@@ -1185,11 +1185,10 @@ const ofertaDe = id => cuenta.ofertas.find(o => o.id === id);
 const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[copiaDe(o).id].uid === uid)
   .reduce((m, o) => (!m || o.p < m.p ? o : m), null);
 function zoomUI(recien) {
-  const c = zoomC, t = TIERS[c.tier], of = c._oferta, mio = !!c._copy && !c._ajena;
+  const c = zoomC, t = TIERS[c.tier], mio = !!c._copy && !c._ajena;
   const venta = mio && c._copy.venta ? ofertaDe(c._copy.venta) : null;
   $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
     (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
-    (of ? `<br><span class="zi-venta">Vende <b>${esc(of.u === cuenta.uid ? 'tú' : nombreDe(of.u))}</b> · ${MONEDA}<b>${fmt(of.p)}</b></span>` : '') +
     (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
     (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '');
   const gb = $('#gradeBtn');
@@ -1220,16 +1219,6 @@ function zoomUI(recien) {
   vb.classList.toggle('on', !!venta);
   vb.disabled = !venta && cuenta.parada;
   if (vb.hidden || venta || vb.disabled || !key || sellPara !== key) { $('#sellBox').hidden = true; sellPara = ''; }
-  // comprar (o retirar) desde el mercado
-  const bb = $('#buyCardBtn');
-  bb.hidden = !of;
-  if (of) {
-    const propia = of.u === cuenta.uid, falta = of.p - cuenta.saldo;
-    bb.innerHTML = propia ? 'Retirar del mercado' : `Comprar <span class="precio">${MONEDA}${fmt(of.p)}</span>`;
-    bb.disabled = !propia && (falta > 0 || cuenta.parada);
-    bb.title = !propia && falta > 0 ? `Te faltan ${fmt(falta)} monedas` : '';
-    bb.classList.toggle('primary', !propia);
-  }
   // otras copias de la misma carta
   const list = copies[c.uid] || [], base = CARDS.find(x => x.uid === c.uid), cp = $('#copies');
   cp.innerHTML = list.length > 1 && mio ? `<span>Tus copias:</span>` + list.map((x, i) =>
@@ -1243,41 +1232,30 @@ function zoomUI(recien) {
 // llegaron datos nuevos con el zoom abierto: la carta pudo venderse, graduarse o cambiar de dueño
 function refrescaZoom() {
   const c = zoomC;
-  if (c._oferta) {
-    const o = ofertaDe(c._oferta.id);
-    if (o) c._oferta = o;
-    else {
-      // ya no está a la venta: si es porque la compré yo, pasa a ser mía
-      const x = (copies[c.uid] || []).find(y => y.key === c._oferta.c);
-      if (!x) { cierraZoom(); toast('Esa carta ya no está a la venta.'); return; }
-      c._copy = x; c._oferta = null;
-    }
-  } else if (c._copy && !c._ajena) {
+  if (c._copy && !c._ajena) {
     const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
     if (x) { c._copy = x; c.graded = !!x.gr; }
     else if (!abriendo.has(c._copy.k)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
   }
   zoomUI();
 }
-let zoomVuelve = '';   // 'col' o 'mk': a dónde vuelve el zoom al cerrarse
+let zoomVuelve = '';   // 'col': a dónde vuelve el zoom al cerrarse
 function cierraZoom() {
   $('#zoom').hidden = true; setTilt(null, null);
   if (zoomVuelve === 'col') { renderCollection(); $('#collection').hidden = false; $('#colGrid').scrollTop = colScroll; }
-  else if (zoomVuelve === 'mk') { renderMercado(); $('#market').hidden = false; $('#mkGrid').scrollTop = mkScroll; }
   else if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
   zoomVuelve = '';
 }
 function closeOverlays() {
   if (grading) return;
-  if (!$('#trade').hidden) { $('#trade').hidden = true; $('#market').hidden = false; return; }
   if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
   zoomVuelve = '';
   if (!$('#ruleta').hidden) { if (!rl.girando) cierraRuleta(); return; }
-  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true; $('#reroll').hidden = true;
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#reroll').hidden = true;
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-for (const id of ['zoom', 'collection', 'market', 'trade', 'reroll']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
+for (const id of ['zoom', 'collection', 'reroll']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
 
 /* ---------------- VENDER ----------------
@@ -1325,33 +1303,13 @@ function marcaVenta(key, id, p) {
     cuenta.ofertas.push({ c: key, o: x.o, k: x.k, i: x.i, at: x.at, gr: !!x.gr, id, u: cuenta.uid, p, t: ahora(), estado: 'activa', fin: 0, comprador: '' });
   rehazColeccion();
   if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
-  if (!$('#market').hidden) renderMercado();
 }
 function quitaVenta(id) {
   cuenta.ofertas = cuenta.ofertas.filter(o => o.id !== id);
   for (const x of cuenta.mias) if (x.venta === id) x.venta = '';
   rehazColeccion();
-  if (!$('#zoom').hidden && zoomC && !grading && !zoomC._oferta) refrescaZoom();
+  if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
 }
-$('#buyCardBtn').onclick = async () => {
-  const c = zoomC, of = c && c._oferta; if (!of) return;
-  const b = $('#buyCardBtn'); b.disabled = true;
-  try {
-    if (of.u === cuenta.uid) { await Red.pide('retirar', { id: of.id }); toast('Retirada del mercado.'); quitaVenta(of.id); cierraZoom(); if (!$('#market').hidden) renderMercado(); return; }
-    await Red.pide('comprarCarta', { id: of.id });
-    Snd.coin(); Snd.reveal(Math.min(c.tier, 2));
-    const [x, y] = centerOf($('#zoomCard'));
-    burst(x, y, { n: 60, colors: [accentOf(c), '#ffcc3d', '#fff'], speed: 11, kinds: ['spark', 'star', 'confetti'], gravity: .15 });
-    toast(`¡Es tuya! Pagaste ${fmt(of.p)} monedas.`);
-    // pasa a ser una copia propia (si los datos nuevos no llegaron antes)
-    if (c._oferta) {
-      c._copy = (copies[c.uid] || []).find(y => y.key === of.c) || { id: c.n, g: c.grade, s: c.wseed, gr: c.graded ? 1 : 0, o: of.o, k: of.k, i: of.i, at: of.at, key: of.c, venta: '' };
-      c._oferta = null;
-    }
-    zoomUI();
-  } catch (e) { b.disabled = false; avisoZoom(esc(e.message)); }
-};
-
 /* Un aviso que aparece y se va. */
 function toast(t, err) {
   const el = document.createElement('div');
@@ -1860,8 +1818,8 @@ addEventListener('message', e => {
 function alDatos(d) {
   const primera = !cuenta.listo;
   Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
-    mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], ventas: d.ventas || [],
-    cambios: d.cambios || [], jugadores: d.jugadores || {}, gente: d.gente || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
+    mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], pendientes: d.pendientes || 0,
+    gente: d.gente || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
   rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
@@ -1876,7 +1834,6 @@ function alDatos(d) {
   pintaAvisos();
   if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
   if (!$('#collection').hidden) renderCollection();
-  if (!$('#market').hidden) renderMercado();
 }
 
 /* ---------------- COMPRA ----------------
@@ -2023,219 +1980,17 @@ $('#showBtn').onclick = async () => {
 function avisoZoom(t) { $('#zoomInfo').insertAdjacentHTML('beforeend', `<br><span class="err">${t}</span>`); }
 
 /* ---------------- MERCADO ----------------
-   Tres pestañas: comprar (lo que otros venden, con filtros), mis ventas
-   (y mis compras) e intercambios. Todo lo que se ve llega ya validado
-   desde Juegos (la economía): una oferta que se ve está a la venta de
-   verdad, y una carta de otro que se ve es suya de verdad. */
-const mk = { tab: 'comprar', col: '', rareza: -1, grad: 'todas', nota: 0, orden: 'barato', q: '', max: 48 };
-let mkScroll = 0;
-// una carta de otro (o una oferta) como carta del abridor
-function instDe(x) {
-  const cp = copiaDe(x), base = CARDS[cp.id];
-  return { ...base, grade: cp.g, wseed: cp.s, graded: !!cp.gr, _rec: true };
-}
-function avatarHTML(u, tam = 22) {
-  const g = cuenta.gente[u] || {}, n = g.n || '?', c = /^#[0-9a-f]{6}$/i.test(g.c || '') ? g.c : '#7c5cff';
-  const f = typeof g.f === 'string' && /^(https:\/\/|data:image\/(jpeg|png|webp);base64,)[^"'<>()\s\\]+$/.test(g.f) ? g.f : '';
-  return `<span class="av" style="--av:${c};width:${tam}px;height:${tam}px">${f ? `<img src="${f}" alt="" referrerpolicy="no-referrer">` : esc(n.trim().charAt(0).toUpperCase() || '?')}</span>`;
-}
-// miniatura: la imagen con el color de su rareza y su nota, si la tiene
-function thumbHTML(x, extra = '') {
-  const cp = copiaDe(x), c = CARDS[cp.id];
-  return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ''))}">
-    <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
-    <small>${esc(c.name.split(' ')[0])}</small></span>`;
-}
-const pendientesMios = () => cuenta.cambios.filter(t => t.estado === 'pendiente' && t.para === cuenta.uid).length;
+   El mercado ya no vive aquí: es la pestaña 🏪 Mercado de Juegos, común con
+   Mascotas (colabtex/src/juegos/mercado.js). El botón le pide al cartero que
+   lleve allá; lo único que queda en el abridor es vender o retirar una carta
+   desde su zoom. El globito del botón cuenta los intercambios que esperan
+   tu respuesta. */
 function pintaAvisos() {
-  const n = pendientesMios();
+  const n = cuenta.pendientes || 0;
   $('#mktBadge').textContent = n || '';
   $('#mktBadge').hidden = !n;
 }
-function openMercado(tab) {
-  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
-  setTilt(null, null);
-  if (tab) mk.tab = tab;
-  zoomVuelve = '';
-  $('#collection').hidden = true;
-  renderMercado();
-  $('#market').hidden = false;
-  $('#mkGrid').scrollTop = 0;
-}
-$('#mktBtn').onclick = () => openMercado();
-function filtradas() {
-  const q = mk.q.trim().toLowerCase();
-  // las propias también: quien vende tiene que ver que su carta está en la tienda
-  let l = cuenta.ofertas.map(o => ({ o, cp: copiaDe(o) }));
-  l = l.filter(({ cp }) => {
-    const c = CARDS[cp.id];
-    if (mk.col && c.col !== mk.col) return false;
-    if (mk.rareza >= 0 && c.tier !== mk.rareza) return false;
-    if (mk.grad === 'si' && !cp.gr) return false;
-    if (mk.grad === 'no' && cp.gr) return false;
-    if (mk.grad === 'si' && mk.nota && cp.g < mk.nota) return false;
-    if (q && !(c.name + ' ' + subtitle(c)).toLowerCase().includes(q)) return false;
-    return true;
-  });
-  const ord = { barato: (a, b) => a.o.p - b.o.p || b.o.t - a.o.t, caro: (a, b) => b.o.p - a.o.p || b.o.t - a.o.t, nuevo: (a, b) => b.o.t - a.o.t };
-  return l.sort(ord[mk.orden]);
-}
-function renderMercado() {
-  const nOf = cuenta.ofertas.length, nMias = cuenta.ofertas.filter(o => o.u === cuenta.uid).length, n = pendientesMios();
-  $('#mkSub').innerHTML = `${nOf} ${nOf === 1 ? 'carta' : 'cartas'} a la venta${nMias ? ` (${nMias} ${nMias === 1 ? 'tuya' : 'tuyas'})` : ''} · tienes ${MONEDA}<b>${fmt(cuenta.saldo)}</b>`;
-  $('#mkTabs').innerHTML = [['comprar', 'Comprar'], ['ventas', 'Mis ventas'], ['cambios', `Intercambios${n ? ` <b>${n}</b>` : ''}`]]
-    .map(([k, t]) => `<button role="tab" aria-selected="${mk.tab === k}" data-tab="${k}">${t}</button>`).join('');
-  $('#mkTabs').querySelectorAll('button').forEach(b => b.onclick = () => { mk.tab = b.dataset.tab; mk.max = 48; renderMercado(); $('#mkGrid').scrollTop = 0; });
-  const grid = $('#mkGrid'), fil = $('#mkFiltros');
-  grid.className = 'mk-grid ' + mk.tab;
-  if (mk.tab === 'comprar') return renderComprar(fil, grid);
-  if (mk.tab === 'ventas') return renderVentas(fil, grid);
-  renderCambios(fil, grid);
-}
-function renderComprar(fil, grid) {
-  const enfocado = document.activeElement && document.activeElement.id === 'mkQ';
-  fil.innerHTML = `
-    <div class="mk-fila">${[['', 'Todas las colecciones'], ...COLS.map(co => [co.key, co.label])].map(([k, l]) =>
-      `<button class="mk-chip mk-col${k === mk.col ? ' on' : ''}" data-colk="${k}">${l}</button>`).join('')}</div>
-    <div class="mk-fila">${[[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])].map(([i, l, sy]) =>
-      `<button class="mk-chip${i === mk.rareza ? ' on' : ''}" data-r="${i}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${sy ? `<i>${sy}</i>` : ''}${l}</button>`).join('')}</div>
-    <div class="mk-fila">
-      <div class="mk-seg" role="group" aria-label="Graduación">${[['todas', 'Todas'], ['si', 'Graduadas'], ['no', 'Sin graduar']].map(([k, t]) =>
-        `<button data-g="${k}" aria-pressed="${mk.grad === k}">${t}</button>`).join('')}</div>
-      ${mk.grad === 'si' ? `<label class="mk-sel">Calidad<select id="mkNota"><option value="0">Cualquier nota</option>${[10, 9, 8, 7, 6, 5].map(g =>
-        `<option value="${g}"${mk.nota === g ? ' selected' : ''}>${g === 10 ? '10 · GEM MINT' : `${g} o más · ${GRADE_WORD[g]}`}</option>`).join('')}</select></label>` : ''}
-      <label class="mk-sel">Ordenar<select id="mkOrden">${[['barato', 'Precio: menor a mayor'], ['caro', 'Precio: mayor a menor'], ['nuevo', 'Más recientes']].map(([k, t]) =>
-        `<option value="${k}"${mk.orden === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
-      <input id="mkQ" class="mk-q" type="search" placeholder="Buscar por nombre…" value="${esc(mk.q)}">
-    </div>`;
-  fil.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { mk.rareza = +b.dataset.r; mk.max = 48; renderMercado(); });
-  fil.querySelectorAll('[data-colk]').forEach(b => b.onclick = () => { mk.col = b.dataset.colk; mk.max = 48; renderMercado(); });
-  fil.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { mk.grad = b.dataset.g; if (mk.grad !== 'si') mk.nota = 0; mk.max = 48; renderMercado(); });
-  const sn = $('#mkNota'); if (sn) sn.onchange = () => { mk.nota = +sn.value; renderMercado(); };
-  $('#mkOrden').onchange = e => { mk.orden = e.target.value; renderMercado(); };
-  const qi = $('#mkQ');
-  qi.oninput = () => { mk.q = qi.value; pintaGridComprar(grid); };
-  qi.onkeydown = e => e.stopPropagation();
-  if (enfocado) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
-  pintaGridComprar(grid);
-}
-function pintaGridComprar(grid) {
-  const l = filtradas();
-  grid.innerHTML = '';
-  if (!l.length) {
-    grid.innerHTML = `<div class="mk-vacio"><b>🃏</b><p>${cuenta.ofertas.length ? 'Nada calza con esos filtros.' : 'Todavía nadie vende cartas. Pon una de las tuyas: ábrela en tu colección y toca «💰 Vender».'}</p></div>`;
-    return;
-  }
-  l.slice(0, mk.max).forEach(({ o }, i) => {
-    const inst = instDe(o), el = makeCard(inst, { back: false, lazy: true });
-    const propia = o.u === cuenta.uid, caro = !propia && o.p > cuenta.saldo;
-    el.insertAdjacentHTML('beforeend', `<div class="mk-tag${caro ? ' caro' : ''}${propia ? ' mia' : ''}"><b>${MONEDA}${fmt(o.p)}</b><span>${propia ? 'Tu oferta' : `${avatarHTML(o.u, 16)}${esc(nombreDe(o.u))}`}</span></div>`);
-    if (inst.graded) el.classList.add('slabbed');
-    el.addEventListener('click', () => { mkScroll = grid.scrollTop; inst._oferta = o; $('#market').hidden = true; zoomVuelve = 'mk'; openZoom(inst); });
-    if (i < 24) el.animate([{ transform: 'translateY(24px) scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, delay: i * 30, easing: 'cubic-bezier(.2,1.2,.4,1)', fill: 'backwards' });
-    grid.appendChild(el);
-  });
-  if (l.length > mk.max) {
-    const b = document.createElement('button'); b.className = 'btn mk-mas'; b.textContent = `Ver ${Math.min(48, l.length - mk.max)} más`;
-    b.onclick = () => { mk.max += 48; pintaGridComprar(grid); };
-    grid.appendChild(b);
-  }
-}
-const cuando = t => { const m = Math.round((ahora() - t) / 60000); return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
-function renderVentas(fil, grid) {
-  fil.innerHTML = `<p class="mk-nota">Pon una carta a la venta desde tu colección: ábrela y toca «💰 Vender». Mientras está a la venta no se puede graduar ni intercambiar.</p>`;
-  const l = cuenta.ventas;
-  if (!l.length) { grid.innerHTML = `<div class="mk-vacio"><b>💰</b><p>Todavía no vendes ni compras nada.</p></div>`; return; }
-  const ESTADO = { activa: ['En venta', 'act'], vendida: ['Vendida', 'ok'], retirada: ['Retirada', ''], impaga: ['No se pagó', 'mal'] };
-  grid.innerHTML = l.map(o => {
-    const compra = o.comprador === cuenta.uid && o.u !== cuenta.uid, [et, cl] = compra ? ['Comprada', 'ok'] : ESTADO[o.estado] || [o.estado, ''];
-    const quien = compra ? `a ${avatarHTML(o.u, 16)}<b>${esc(nombreDe(o.u))}</b>` : o.estado === 'vendida' ? `a ${avatarHTML(o.comprador, 16)}<b>${esc(nombreDe(o.comprador))}</b>` : '';
-    return `<div class="mk-fila-v">${thumbHTML(o)}
-      <div class="mk-v-tx"><span class="mk-est ${cl}">${et}</span><b>${esc(CARDS[copiaDe(o).id].name)}</b><small>${esc(subtitle(CARDS[copiaDe(o).id]))} ${quien ? '· ' + quien : ''}</small><small>${cuando(o.fin || o.t)}</small></div>
-      <div class="mk-v-p">${compra ? '−' : o.estado === 'vendida' ? '+' : ''}${MONEDA}${fmt(o.p)}</div>
-      ${o.estado === 'activa' && o.u === cuenta.uid ? `<button class="btn mk-mini" data-retira="${esc(o.id)}">Retirar</button>` : ''}</div>`;
-  }).join('');
-  grid.querySelectorAll('[data-retira]').forEach(b => b.onclick = async () => {
-    b.disabled = true;
-    try { await Red.pide('retirar', { id: b.dataset.retira }); toast('Retirada del mercado.'); } catch (e) { b.disabled = false; toast(e.message, true); }
-  });
-}
-function lado(xs, quien, vacio) {
-  return `<div class="tc-lado"><small>${quien}</small><div class="tc-cartas">${xs.length ? xs.map(x => thumbHTML(x)).join('') : `<span class="tc-nada">${vacio}</span>`}</div></div>`;
-}
-function renderCambios(fil, grid) {
-  const otros = Object.keys(cuenta.jugadores).length, mias = cuenta.mias.filter(x => !x.venta).length;
-  fil.innerHTML = `<div class="mk-fila"><button class="btn primary" id="tcNuevo"${!otros || !mias || cuenta.parada ? ' disabled' : ''}>⇄ Proponer un intercambio</button>
-    <p class="mk-nota">${!mias ? 'Necesitas al menos una carta que no esté a la venta.' : !otros ? 'Todavía nadie más tiene cartas para cambiar.' : 'Ofrece de 1 a 3 cartas tuyas a cambio de hasta 3 de otra persona. Se hace cuando la otra persona acepta.'}</p></div>`;
-  $('#tcNuevo').onclick = () => abreTrato();
-  const l = cuenta.cambios;
-  if (!l.length) { grid.innerHTML = `<div class="mk-vacio"><b>⇄</b><p>No tienes intercambios todavía.</p></div>`; return; }
-  const ESTADO = { pendiente: ['Pendiente', 'act'], hecho: ['Hecho', 'ok'], nulo: ['No se pudo', 'mal'], cerrado: ['Cerrado', ''] };
-  grid.innerHTML = l.map(t => {
-    const yoDoy = t.de === cuenta.uid, otro = yoDoy ? t.para : t.de, [et, cl] = ESTADO[t.estado] || [t.estado, ''];
-    const deMi = yoDoy ? t.dar : t.pedir, deEl = yoDoy ? t.pedir : t.dar;
-    let acc = '';
-    if (t.estado === 'pendiente') acc = yoDoy
-      ? `<button class="btn mk-mini" data-cierra="${esc(t.id)}">Cancelar</button>`
-      : `<button class="btn primary mk-mini" data-acepta="${esc(t.id)}"${t.posible ? '' : ' disabled title="Alguna carta cambió de dueño o está a la venta"'}>Aceptar</button><button class="btn mk-mini" data-cierra="${esc(t.id)}">Rechazar</button>`;
-    return `<div class="tc-fila ${t.estado}">
-      <header><span class="mk-est ${cl}">${et}</span>${avatarHTML(otro, 20)}<b>${esc(nombreDe(otro))}</b><small>${yoDoy ? 'le propusiste' : 'te propone'} · ${cuando(t.fin || t.at)}</small></header>
-      <div class="tc-cuerpo">${lado(deMi, 'Tú das', 'nada')}<span class="tc-flecha" aria-hidden="true">⇄</span>${lado(deEl, `${esc(nombreDe(otro))} da`, 'nada (un regalo)')}</div>
-      ${t.estado === 'pendiente' && !t.posible ? '<p class="mk-nota err">Ya no se puede: alguna carta cambió de dueño o está a la venta.</p>' : ''}
-      ${acc ? `<div class="tc-acc">${acc}</div>` : ''}</div>`;
-  }).join('');
-  grid.querySelectorAll('[data-acepta]').forEach(b => b.onclick = async () => {
-    b.disabled = true;
-    try { await Red.pide('aceptar', { id: b.dataset.acepta }); Snd.reveal(1); toast('¡Intercambio hecho!'); } catch (e) { b.disabled = false; toast(e.message, true); }
-  });
-  grid.querySelectorAll('[data-cierra]').forEach(b => b.onclick = async () => {
-    b.disabled = true;
-    try { await Red.pide('cerrar', { id: b.dataset.cierra }); toast('Cerrado.'); } catch (e) { b.disabled = false; toast(e.message, true); }
-  });
-}
-
-/* ---------------- PROPONER UN INTERCAMBIO ---------------- */
-const trato = { para: '', dar: [], pedir: [] };
-const ordenCartas = l => [...l].sort((a, b) => { const ca = copiaDe(a), cb = copiaDe(b); return CARDS[cb.id].tier - CARDS[ca.id].tier || (cb.gr ? cb.g : 0) - (ca.gr ? ca.g : 0) || CARDS[ca.id].num - CARDS[cb.id].num; });
-function abreTrato(para) {
-  Object.assign(trato, { para: para || '', dar: [], pedir: [] });
-  $('#market').hidden = true; $('#trade').hidden = false;
-  pintaTrato();
-}
-function pintaTrato() {
-  const box = $('#tradeBody');
-  if (!trato.para) {
-    const js = Object.entries(cuenta.jugadores).sort((a, b) => nombreDe(a[0]).localeCompare(nombreDe(b[0])));
-    box.innerHTML = `<h3>¿Con quién?</h3><div class="tc-gente">${js.map(([u, l]) =>
-      `<button class="tc-persona" data-u="${esc(u)}">${avatarHTML(u, 34)}<b>${esc(nombreDe(u))}</b><small>${l.length} ${l.length === 1 ? 'carta' : 'cartas'}</small></button>`).join('')}</div>`;
-    box.querySelectorAll('[data-u]').forEach(b => b.onclick = () => { trato.para = b.dataset.u; pintaTrato(); });
-    return;
-  }
-  const mias = ordenCartas(cuenta.mias.filter(x => !x.venta)), suyas = ordenCartas(cuenta.jugadores[trato.para] || []);
-  const sel = (l, x) => l.includes(x.c);
-  const rej = (l, elegidas, d) => `<div class="tc-rejilla" data-lado="${d}">${l.map(x => `<button class="tc-elige${sel(elegidas, x) ? ' on' : ''}" data-c="${esc(x.c)}">${thumbHTML(x)}</button>`).join('') || '<p class="mk-nota">Nada para elegir.</p>'}</div>`;
-  box.innerHTML = `<div class="tc-cab"><button class="btn mk-mini" id="tcOtra">‹ Otra persona</button>${avatarHTML(trato.para, 26)}<b>${esc(nombreDe(trato.para))}</b></div>
-    <div class="tc-cols">
-      <section><h3>Tú das <small>${trato.dar.length}/3</small></h3>${rej(mias, trato.dar, 'dar')}</section>
-      <section><h3>Pides <small>${trato.pedir.length}/3</small></h3>${rej(suyas, trato.pedir, 'pedir')}</section>
-    </div>
-    <div class="tc-envio"><button class="btn primary" id="tcEnviar"${trato.dar.length ? '' : ' disabled'}>Enviar propuesta</button>
-      <span class="mk-nota">${trato.dar.length ? (trato.pedir.length ? '' : 'Sin pedir nada, es un regalo.') : 'Elige al menos una carta tuya.'}</span></div>`;
-  $('#tcOtra').onclick = () => { trato.para = ''; trato.dar = []; trato.pedir = []; pintaTrato(); };
-  box.querySelectorAll('.tc-rejilla').forEach(r => r.querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
-    const l = trato[r.dataset.lado], c = b.dataset.c, i = l.indexOf(c);
-    if (i >= 0) l.splice(i, 1); else if (l.length < 3) l.push(c); else { b.animate([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 220 }); return; }
-    Snd.blip(); const top = r.scrollTop; pintaTrato(); const r2 = box.querySelector(`.tc-rejilla[data-lado="${r.dataset.lado}"]`); if (r2) r2.scrollTop = top;
-  }));
-  $('#tcEnviar').onclick = async () => {
-    const b = $('#tcEnviar'); b.disabled = true;
-    try {
-      await Red.pide('proponer', { para: trato.para, dar: trato.dar, pedir: trato.pedir });
-      Snd.coin(); toast(`Propuesta enviada a ${nombreDe(trato.para)}.`);
-      $('#trade').hidden = true; mk.tab = 'cambios'; renderMercado(); $('#market').hidden = false;
-    } catch (e) { b.disabled = false; toast(e.message, true); }
-  };
-}
+$('#mktBtn').onclick = () => Red.manda({ tipo: 'mercado' });
 
 /* ---------------- INICIO ----------------
    Se espera a la cuenta: sin ella no se sabe el saldo ni qué cartas tienes. */

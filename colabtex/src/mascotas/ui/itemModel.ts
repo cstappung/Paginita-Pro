@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import type { Item } from '../game/inventory'
-import type { SlotId } from '../game/types'
-import { buildRig, type PetRig } from '../pets/rig'
+import type { SlotId, SpeciesId, StageId } from '../game/types'
+import { getStage } from '../data/species'
+import { buildRig, type Genes, type PetRig } from '../pets/rig'
 import { dress } from '../pets/wear'
+import { Animator } from '../pets/anim/controller'
 import { buildDecor } from '../scene/decor'
 
 // Modelo 3D de un objeto del inventario "tal cual es", para las miniaturas y el regalo.
@@ -95,4 +97,34 @@ export function mannequinFor(slot: SlotId) {
   let r = mannequins.get(model)
   if (!r) mannequins.set(model, (r = buildRig(model)))
   return r
+}
+
+/**
+ * Una mascota tal cual es, quieta, con lo que lleva puesto (para las fotos del mercado, del perfil
+ * y del salón). `ids`/`tints` son lo puesto por espacio, ya resuelto contra el inventario.
+ */
+export function buildPetModel(especie: SpeciesId, etapa: StageId, genes: Genes, ids: Partial<Record<SlotId, string>> = {}, tints: Partial<Record<SlotId, number>> = {}): ItemModel {
+  const stage = getStage(especie, etapa)
+  const r = buildRig(stage.model, genes)
+  // Recién armado, el rig está en su pose de construcción (la cola recta hacia arriba, la cara con
+  // todas sus expresiones a la vez): el animador lo deja en un reposo de verdad, quieto en un instante.
+  const anim = new Animator(r, 7, stage.scale)
+  const out = anim.advance(0.6, { sleeping: false, sad: false, dirt: 0, growth: 0, roam: false, voice: false }, true)
+  r.face?.update(out.expression ?? 'happy', 1, 0.6)
+  anim.dispose()
+  const puestos = Object.fromEntries(Object.entries(ids).filter(([slot]) => stage.slots.includes(slot as SlotId)))
+  const worn = dress(r, puestos, tints)
+  const quiet = { prop: null, aura: 0, beam: 0, auraColor: null }
+  worn.update(0.8, quiet)
+  const holder = new THREE.Group()
+  holder.add(r.root)
+  const root = frame(holder)
+  return {
+    root,
+    update: (t: number) => worn.update(t, quiet),
+    dispose() {
+      worn.dispose()
+      r.root.traverse((o) => (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.dispose())
+    },
+  }
 }

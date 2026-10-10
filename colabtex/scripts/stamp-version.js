@@ -14,6 +14,8 @@ const PAGES = [
   /* Mascotas: su paquete (build:mascotas) y la hoja que esbuild saca al
      lado. `css` sella también el <link>, que se rompe igual con la caché. */
   { html: "juegos/mascotas/index.html", bundle: "app.js", css: "app.css" },
+  /* El visor (mercado, perfil, salón) carga el mismo paquete, sin la hoja. */
+  { html: "juegos/mascotas/visor.html", bundle: "app.js" },
   /* Los motores de las herramientas .dc no pasan por esbuild, pero el
      problema de la caché es el mismo: la página se sirve fresca (trae la
      opción nueva) y el navegador reutiliza el motor viejo, que no la

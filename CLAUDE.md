@@ -52,6 +52,7 @@ before the first edit. Read only the docs the task needs.
 | Panel de administración | `docs/claude/juegos/admin.md` |
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
+| Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 

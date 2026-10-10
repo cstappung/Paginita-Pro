@@ -77,6 +77,7 @@ import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
+import { crearMercado } from "./juegos/mercado.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
@@ -285,6 +286,7 @@ let paginaPerfil = null;
 let monedasVista = null;
 let prodropVista = null;
 let mascotasVista = null;
+let mercadoVista = null;
 let adminVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
@@ -330,6 +332,7 @@ function perfilDe(uid) {
       if (paginaPerfil) paginaPerfil.refresca();
       if (monedasVista) monedasVista.refresca();
       if (prodropVista) prodropVista.refresca();
+      if (mercadoVista) mercadoVista.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -867,6 +870,8 @@ function leerRuta() {
   if (h === "monedas") return { vista: "monedas", pid: "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
+  const mk = h.match(/^mercado(?:\/(prodrop|mascotas))?$/);
+  if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
@@ -1203,7 +1208,8 @@ function render() {
     return;
   }
   $("pantalla").style.display = "";
-  const clave = state.vista === "perfil" ? "perfil:" + state.perfilUid : state.vista;
+  /* El perfil y el mercado llevan un dato en la ruta (de quién, qué juego). */
+  const clave = state.vista === "perfil" || state.vista === "mercado" ? state.vista + ":" + state.perfilUid : state.vista;
   /* La barra de pestañas va abajo en el móvil solo en las pantallas de
      menú; en una partida o un juego del club se va (tienen su «volver»). */
   document.documentElement.dataset.vista = state.vista.startsWith("solo-") ? "solo" : state.vista;
@@ -1256,12 +1262,14 @@ function desmontaVista() {
   if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
   if (mascotasVista) { mascotasVista.destruir(); mascotasVista = null; }
+  if (mercadoVista) { mercadoVista.destruir(); mercadoVista = null; }
   if (adminVista) { adminVista.destruir(); adminVista = null; }
   if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas"].includes(state.vista));
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas", "mercado"].includes(state.vista));
+  $("tabMercado").classList.toggle("on", state.vista === "mercado");
   $("tabCartas").classList.toggle("on", state.vista === "cartas");
   $("tabMascotas").classList.toggle("on", state.vista === "mascotas");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
@@ -1269,7 +1277,7 @@ function pintaTabs() {
   $("tabMonedas").classList.toggle("on", state.vista === "monedas");
   /* Como invitado se ven todas, con candado: tocarlas lleva a la puerta
      que explica qué hay detrás, que es la mejor razón para la cuenta. */
-  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas", "tabMascotas"]) {
+  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas", "tabMascotas", "tabMercado"]) {
     $(id).classList.toggle("bloq", state.invitado);
     if (state.invitado) $(id).title = "Requiere cuenta"; else $(id).removeAttribute("title");
   }
@@ -1500,9 +1508,16 @@ function armazon() {
   }
   if (state.vista === "cartas") {
     h.innerHTML = "";
-    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""),
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
       quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
     prodropVista.montar(h);
+    return;
+  }
+  if (state.vista === "mercado") {
+    h.innerHTML = "";
+    mercadoVista = crearMercado({ usuario: state.user, datos: datosPerfil, fb, ir, marcoDe: marcoDeUid, juego: state.perfilUid,
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
+    mercadoVista.montar(h);
     return;
   }
   if (state.vista === "mascotas") {
@@ -2826,6 +2841,7 @@ function wire() {
   $("tabMonedas").onclick = () => ir("#monedas");
   $("tabCartas").onclick = () => ir("#cartas");
   $("tabMascotas").onclick = () => ir("#mascotas");
+  $("tabMercado").onclick = () => ir("#mercado");
   $("userMonedas").onclick = () => ir("#monedas");
   window.addEventListener("hashchange", aplicaRuta);
 }

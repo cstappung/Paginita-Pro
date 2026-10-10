@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import * as THREE from 'three'
 import type { Item } from '../game/inventory'
-import { buildItemModel, mannequinFor, visibleBox } from './itemModel'
+import { buildItemModel, mannequinFor, visibleBox, type ItemModel } from './itemModel'
 
 // Miniaturas 3D del inventario: cada objeto (con sus colores) se dibuja una vez en un lienzo
 // aparte y queda como imagen. Se hacen de a pocas por cuadro para no trabar la app.
@@ -65,18 +65,28 @@ function fit(camera: THREE.OrthographicCamera, box: THREE.Box3) {
 
 export const thumbKey = (i: Item) => `${i.kind}:${i.id}:${i.tint}`
 
-function shoot(item: Item) {
+/** Fotografía un modelo (lo deja libre después) y devuelve la imagen, o null sin WebGL. */
+export function snapshot(model: ItemModel): string | null {
   const g = setup()
-  if (!g) return
-  const model = buildItemModel(item, item.kind === 'dance' || item.kind === 'decor' ? undefined : mannequinFor(item.kind))
-  if (!model) return
+  if (!g) {
+    model.dispose()
+    return null
+  }
   model.root.rotation.y = YAW
   g.scene.add(model.root)
   fit(g.camera, visibleBox(model.root))
   g.renderer.render(g.scene, g.camera)
-  cache.set(thumbKey(item), g.renderer.domElement.toDataURL('image/png'))
+  const src = g.renderer.domElement.toDataURL('image/png')
   g.scene.remove(model.root)
   model.dispose()
+  return src
+}
+
+function shoot(item: Item) {
+  const model = buildItemModel(item, item.kind === 'dance' || item.kind === 'decor' ? undefined : mannequinFor(item.kind))
+  if (!model) return
+  const src = snapshot(model)
+  if (src) cache.set(thumbKey(item), src)
 }
 
 function pump() {
@@ -104,11 +114,11 @@ function request(item: Item) {
 }
 
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l))
-const snapshot = () => version
+const instantanea = () => version
 
 /** Imagen del objeto (o null mientras se dibuja, o si no hay WebGL). */
 export function useThumb(item: Item | null) {
-  useSyncExternalStore(subscribe, snapshot)
+  useSyncExternalStore(subscribe, instantanea)
   useEffect(() => {
     if (item) request(item)
   }, [item])
