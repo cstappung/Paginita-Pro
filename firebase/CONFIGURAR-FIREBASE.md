@@ -547,6 +547,25 @@ sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ Mascotas pide publicar otra vez (2026-10-10)
+
+Dos nodos nuevos y un cambio en el mercado:
+
+- `mascotas/a`, `mascotas/r` y `mascotas/c`: las adopciones (la primera
+  gratis, las demás 1000), los regalos (500) y las compras (comida a 20
+  la ración, poción 1000, fondos 10–25, despedirse 0). Se escriben una vez
+  y no se borran: son el gasto, como los sobres.
+- `mascotasEstado/<uid>/<origen~clave>`: el estado de cada mascota (etapa,
+  stats, lo que lleva puesto). Lo escribe su dueño y los demás lo leen por
+  clave; nadie puede leer la colección entera.
+- `mercado/o/$id/c` y `mercado/t/$id/dar|pedir`: además de las cartas
+  aceptan objetos (`ob:<uid>~<clave>`) y mascotas (`ma:<uid>~<clave>`). Las
+  ofertas de cartas de antes siguen valiendo igual.
+
+Sin publicar, Mascotas no puede adoptar ni comprar (el juego lo dice en vez
+de fallar mudo) y las ventas de mascotas u objetos dan `PERMISSION_DENIED`.
+Pegar `firebase/database.rules.json` entero y **Publicar**.
+
 ### Aviso de salas nuevas en Discord (opcional)
 
 Cada sala que se abre desde el vestíbulo puede anunciarse en un canal de

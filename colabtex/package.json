@@ -5,14 +5,15 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node scripts/build-controles.js && esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabtex-app.js && esbuild src/draw-main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabdraw-app.js && esbuild src/reports-main.js --bundle --minify --format=iife --target=es2020 --outfile=../informes-app.js && esbuild src/juegos-main.js --bundle --minify --format=iife --target=es2020 --outfile=../juegos-app.js && npm run build:math && npm run build:pokemon && esbuild node_modules/pdfjs-dist/build/pdf.worker.mjs --bundle --minify --format=esm --target=es2020 --outfile=../colabtex-pdf-worker.js && node scripts/build-i18n.js && node scripts/stamp-version.js",
-    "test:juegos": "node --test tests/gato.test.cjs tests/tulones.test.cjs tests/aleteo.test.cjs tests/dosmil.test.cjs tests/trigon.test.cjs tests/antitrampas.test.cjs tests/antitrampas-bbtan.test.cjs tests/antitrampas-electro.test.cjs tests/antitrampas-minas.test.cjs tests/antitrampas-snake.test.cjs tests/antitrampas-sopa.test.cjs tests/antitrampas-sudoku.test.cjs tests/antitrampas-tetris.test.cjs tests/antitrampas-fanal.test.cjs tests/antitrampas-frontera.test.cjs tests/antitrampas-metrorush.test.cjs tests/antitrampas-sortem.test.cjs tests/antitrampas-atasco.test.cjs tests/castigo.test.cjs tests/sopa.test.cjs tests/salon.test.cjs tests/controles.test.cjs tests/frontera.test.cjs tests/reglas-visuales.test.cjs tests/discord.test.cjs tests/logros.test.cjs tests/presentacion.test.cjs tests/juegos.test.cjs tests/votos.test.cjs tests/flip7.test.cjs tests/cacho.test.cjs tests/uno.test.cjs tests/presidente.test.cjs tests/catan.test.cjs tests/spicy.test.cjs tests/tetris.test.cjs tests/yemas.test.cjs tests/yemas-red.test.cjs tests/yemas-zombis.test.cjs tests/yemas-mapas.test.cjs tests/boxhead.test.cjs tests/clue.test.cjs tests/clue-bots.test.cjs tests/clue-red.test.cjs tests/temas.test.cjs tests/escondite-audio.test.cjs tests/solo.test.cjs tests/club.test.cjs tests/electro.test.cjs tests/sudoku.test.cjs tests/fanal.test.cjs tests/atasco.test.cjs tests/worms-audio.test.cjs tests/mando.test.cjs tests/metrorush.test.cjs tests/metrorush-motor.test.cjs tests/metrorush-historia.test.cjs tests/metrorush-modos.test.cjs tests/metrorush-salto.test.cjs tests/metrorush-fantasma.test.cjs tests/metrorush-city.test.cjs tests/rieles.test.cjs tests/consumo.test.cjs tests/admin.test.cjs tests/monedas.test.cjs",
+    "build": "node scripts/build-controles.js && esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabtex-app.js && esbuild src/draw-main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabdraw-app.js && esbuild src/reports-main.js --bundle --minify --format=iife --target=es2020 --outfile=../informes-app.js && esbuild src/juegos-main.js --bundle --minify --format=iife --target=es2020 --outfile=../juegos-app.js && npm run build:math && npm run build:pokemon && npm run build:mascotas && esbuild node_modules/pdfjs-dist/build/pdf.worker.mjs --bundle --minify --format=esm --target=es2020 --outfile=../colabtex-pdf-worker.js && node scripts/build-i18n.js && node scripts/stamp-version.js",
+    "test:juegos": "node --test tests/gato.test.cjs tests/tulones.test.cjs tests/aleteo.test.cjs tests/dosmil.test.cjs tests/trigon.test.cjs tests/antitrampas.test.cjs tests/antitrampas-bbtan.test.cjs tests/antitrampas-electro.test.cjs tests/antitrampas-minas.test.cjs tests/antitrampas-snake.test.cjs tests/antitrampas-sopa.test.cjs tests/antitrampas-sudoku.test.cjs tests/antitrampas-tetris.test.cjs tests/antitrampas-fanal.test.cjs tests/antitrampas-frontera.test.cjs tests/antitrampas-metrorush.test.cjs tests/antitrampas-sortem.test.cjs tests/antitrampas-atasco.test.cjs tests/castigo.test.cjs tests/sopa.test.cjs tests/salon.test.cjs tests/controles.test.cjs tests/frontera.test.cjs tests/reglas-visuales.test.cjs tests/discord.test.cjs tests/logros.test.cjs tests/presentacion.test.cjs tests/juegos.test.cjs tests/votos.test.cjs tests/flip7.test.cjs tests/cacho.test.cjs tests/uno.test.cjs tests/presidente.test.cjs tests/catan.test.cjs tests/spicy.test.cjs tests/tetris.test.cjs tests/yemas.test.cjs tests/yemas-red.test.cjs tests/yemas-zombis.test.cjs tests/yemas-mapas.test.cjs tests/boxhead.test.cjs tests/clue.test.cjs tests/clue-bots.test.cjs tests/clue-red.test.cjs tests/temas.test.cjs tests/escondite-audio.test.cjs tests/solo.test.cjs tests/club.test.cjs tests/electro.test.cjs tests/sudoku.test.cjs tests/fanal.test.cjs tests/atasco.test.cjs tests/worms-audio.test.cjs tests/mando.test.cjs tests/metrorush.test.cjs tests/metrorush-motor.test.cjs tests/metrorush-historia.test.cjs tests/metrorush-modos.test.cjs tests/metrorush-salto.test.cjs tests/metrorush-fantasma.test.cjs tests/metrorush-city.test.cjs tests/rieles.test.cjs tests/consumo.test.cjs tests/admin.test.cjs tests/monedas.test.cjs tests/mascotas.test.cjs",
     "build:pokemon": "esbuild src/juegos/pokemon/motor-pk.js --bundle --minify --format=iife --target=es2020 --platform=browser --outfile=../juegos-pokemon.js",
     "build:i18n": "node scripts/build-i18n.js",
     "build:controles": "node scripts/build-controles.js -v",
     "build:math": "esbuild src/draw/math-engine.js --bundle --minify --format=iife --target=es2020 --define:PACKAGE_VERSION=\"'3.2.2'\" --outfile=../colabdraw-math.js",
     "start": "node server/static.js",
-    "build:rules-test": "esbuild test-rules.mjs --bundle --platform=node --format=esm --packages=external --outfile=.rules-run.mjs"
+    "build:rules-test": "esbuild test-rules.mjs --bundle --platform=node --format=esm --packages=external --outfile=.rules-run.mjs",
+    "build:mascotas": "esbuild src/mascotas/main.tsx --bundle --minify --format=iife --target=es2020 --jsx=automatic --legal-comments=none --define:import.meta.env.DEV=false --define:import.meta.env.PROD=true --define:import.meta.env.VITE_DEMO=false --define:import.meta.env.BASE_URL='\"./\"' --define:process.env.NODE_ENV='\"production\"' --outfile=../juegos/mascotas/app.js"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,8 @@
     "@codemirror/view": "^6.43.6",
     "@pkmn/randoms": "^0.10.11",
     "@pkmn/sim": "^0.10.11",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
     "codemirror": "^6.0.2",
     "express": "^5.2.1",
     "fflate": "^0.8.3",
@@ -36,11 +39,15 @@
     "lib0": "^0.2.117",
     "mathjax-full": "^3.2.1",
     "pdfjs-dist": "^6.1.200",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.1",
     "ws": "^8.21.1",
     "y-codemirror.next": "^0.3.5",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.0.0",
-    "yjs": "^13.6.31"
+    "yjs": "^13.6.31",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

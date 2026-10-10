@@ -11,6 +11,9 @@ const PAGES = [
   { html: "colabdraw.html", bundle: "colabdraw-app.js" },
   { html: "informes.html", bundle: "informes-app.js" },
   { html: "juegos.html", bundle: "juegos-app.js" },
+  /* Mascotas: su paquete (build:mascotas) y la hoja que esbuild saca al
+     lado. `css` sella también el <link>, que se rompe igual con la caché. */
+  { html: "juegos/mascotas/index.html", bundle: "app.js", css: "app.css" },
   /* Los motores de las herramientas .dc no pasan por esbuild, pero el
      problema de la caché es el mismo: la página se sirve fresca (trae la
      opción nueva) y el navegador reutiliza el motor viejo, que no la
@@ -42,7 +45,12 @@ for (const page of PAGES) {
     failed = true;
     continue;
   }
-  const out = src.replace(patron, `src="${page.bundle}?v=${v}"`);
+  let out = src.replace(patron, `src="${page.bundle}?v=${v}"`);
+  if (page.css) {
+    const css = new RegExp('href="' + page.css.replace(/\./g, "\\.") + '(\\?v=[^"]*)?"');
+    if (!css.test(out)) { console.error(`stamp-version: no se encontró la hoja ${page.css} en ${page.html}`); failed = true; continue; }
+    out = out.replace(css, `href="${page.css}?v=${v}"`);
+  }
   if (out !== src) fs.writeFileSync(file, out);
   console.log(`stamp-version: ${page.bundle}?v=${v}`);
 }

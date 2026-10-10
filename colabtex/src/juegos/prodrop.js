@@ -13,7 +13,7 @@
    de quién es una carta: sin esta comprobación, un gasto sin fondos de
    este mismo navegador pararía la cuenta. */
 import { ambientar } from "./sonido.js";
-import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia } from "./monedas.js";
+import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia, esCarta } from "./monedas.js";
 import { MOTOR, MAX_EXHIBIDAS } from "./prodrop-cartas.js";
 
 const MAX_PRECIO = 100000;
@@ -33,7 +33,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
-    const q = leeCopia(c), so = q && e.sobres[q.o + "~" + q.k];
+    const q = leeCopia(c), so = q && q.tipo === "carta" && e.sobres[q.o + "~" + q.k];
     if (!so || (so.r && q.i !== 0)) return null;
     // la de un re-roll no se rehace con un sobre: va con su carta, en `rr`
     // (no en `id`, que en el mercado es el de la oferta)
@@ -119,7 +119,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           responde(true, r);
         } else if (x.accion === "graduar") {
           const q = leeCopia(x.c);
-          if (!q || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
+          if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
           if (e.graduada[x.c]) throw new Error("Esa carta ya está graduada.");
           if (e.enVenta[x.c]) throw new Error("Retírala del mercado antes de graduarla.");
           pagable(MOTOR.PRECIO.gradua, "Graduar");
@@ -132,7 +132,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
              lee de la economía cuando llega lo escrito. */
           const cs = [...new Set((Array.isArray(x.c) ? x.c : []).map(String))];
           if (cs.length !== MOTOR.REROLL.n) throw new Error(`Elige ${MOTOR.REROLL.n} cartas distintas.`);
-          if (!cs.every(c => leeCopia(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
+          if (!cs.every(c => esCarta(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
           if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
           const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
           if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
@@ -153,12 +153,12 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           if (!so || !so.r) throw new Error("El re-roll no valió: alguna carta cambió de manos a la vez.");
           responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier });
         } else if (x.accion === "exhibir") {
-          const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => leeCopia(c) && mia(c));
+          const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => esCarta(c) && mia(c));
           await fb.exhibirCartas(uid, [...new Set(lista)].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
-          if (!leeCopia(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
+          if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
           if (e.enVenta[x.c]) throw new Error("Esa carta ya está a la venta.");
           if (!(p >= 1 && p <= MAX_PRECIO)) throw new Error(`El precio va de 1 a ${MAX_PRECIO.toLocaleString("es-CL")} monedas.`);
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: no puedes vender hasta ponerte al día.");

@@ -50,6 +50,7 @@
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
+import MM from "../../../juegos/mascotas/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 import { CORTES } from "./cortes.js";
 
@@ -336,9 +337,23 @@ export function monedasDe(uid, datos) {
    - Un **intercambio** vale al aceptarse si los dos tienen todavía sus
      cartas, ninguna está en venta y ninguno está parado. */
 export const SEIS_HORAS = 6 * 3600 * 1000;
+/* Tres tipos de copia, y ninguno se confunde con otro: la carta (como
+   siempre, sin prefijo y con `.i`), el objeto de mascota (`ob:`, de un
+   regalo) y la mascota (`ma:`, de una adopción), estos dos con prefijo y
+   sin `.i`. Una copia escrita antes de Mascotas sigue leyéndose igual. */
 const RE_COPIA = /^([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})\.([0-4])$/;
+const RE_COPIA_M = /^(ob|ma):([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})$/;
 export const claveCopia = (o, k, i) => o + "~" + k + "." + i;
-export const leeCopia = c => { const m = RE_COPIA.exec(String(c || "")); return m ? { o: m[1], k: m[2], i: +m[3] } : null; };
+export const claveObjeto = (o, k) => "ob:" + o + "~" + k;
+export const claveMascota = (o, k) => "ma:" + o + "~" + k;
+export const leeCopia = c => {
+  const s = String(c || ""), m = RE_COPIA.exec(s);
+  if (m) return { tipo: "carta", o: m[1], k: m[2], i: +m[3] };
+  const x = RE_COPIA_M.exec(s);
+  return x ? { tipo: x[1] === "ob" ? "objeto" : "mascota", o: x[2], k: x[3] } : null;
+};
+export const esCarta = c => { const q = leeCopia(c); return !!q && q.tipo === "carta"; };
+export const esMascota = c => { const q = leeCopia(c); return !!q && q.tipo === "mascota"; };
 const CLAVE_SOBRE = /^[-_A-Za-z0-9]{8,24}$/;
 const memoEco = new WeakMap();
 const comoLista = x => (Array.isArray(x) ? x : x && typeof x === "object" ? Object.values(x) : []);
@@ -346,8 +361,10 @@ const comoLista = x => (Array.isArray(x) ? x : x && typeof x === "object" ? Obje
 export function economia(datos) {
   const d = datos || {};
   if (memoEco.has(d)) return memoEco.get(d);
-  const c = d.cartas || {}, m = d.mercado || {}, ev = [];
-  const ORDEN = { s: 0, g: 1, r: 2, o: 3, x: 4, v: 5, t: 6, c: 7 };
+  const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
+  /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
+     abre un regalo y se compra antes de que eso mismo salga a la venta. */
+  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -360,6 +377,17 @@ export function economia(datos) {
   for (const [u, l] of Object.entries(c.r || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "r", at: x.at, u, k, c: comoLista(x.c).map(String) });
+  /* Mascotas: `mascotas/a` adopciones {at, e, p}, `mascotas/r` regalos
+     {at, p} y `mascotas/c` compras {at, k, p, n?, m?}. */
+  for (const [u, l] of Object.entries(ms.a || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "ma", at: x.at, u, k, e: String(x.e || ""), p: num(x.p) });
+  for (const [u, l] of Object.entries(ms.r || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mr", at: x.at, u, k, p: num(x.p) });
+  for (const [u, l] of Object.entries(ms.c || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mc", at: x.at, u, k, q: String(x.k || ""), p: num(x.p), n: x.n, m: typeof x.m === "string" ? x.m : "" });
   for (const [id, o] of Object.entries(m.o || {})) {
     if (!o || !Number.isFinite(o.at)) continue;
     ev.push({ t: "o", at: o.at, id, o });
@@ -375,8 +403,18 @@ export function economia(datos) {
   ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
 
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
+  /* Mascotas: las adopciones y los regalos válidos (por clave de copia),
+     las que tomaron la poción, y quiénes tuvieron cada mascota antes que
+     su dueño de ahora (para heredar su estado). */
+  const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
   const ganado = {};
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {} });
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {},
+    intentos: 0, adopciones: 0, comida: 0, fondos: {} });
+  /* Una mascota cambia de manos: cuenta para el cupo de quien la tiene. */
+  const pasaMascota = (cc, de, a) => {
+    tiene[de] = (tiene[de] || 1) - 1; tiene[a] = (tiene[a] || 0) + 1;
+    (historial[cc] = historial[cc] || []).push(de);
+  };
   /* Un corte (cortes.js) congela lo que la cuenta ganó hasta `hasta` en
      `tope`: lo que gastó antes se mide contra eso y, si no alcanzaba, se
      anula sin parar la cuenta. Lo que gane después ya no tapa nada viejo.
@@ -402,7 +440,7 @@ export function economia(datos) {
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
   const ficha = cc => {
-    const q = leeCopia(cc), so = q && sobres[q.o + "~" + q.k];
+    const q = leeCopia(cc), so = q && q.tipo === "carta" && sobres[q.o + "~" + q.k];
     if (!so) return null;
     if (so.r) return q.i === 0 ? so.r : null;
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
@@ -439,6 +477,37 @@ export function economia(datos) {
       for (const cc of cs) delete dueno[cc];
       sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, r: res, de: cs.slice(), tier };
       dueno[claveCopia(e.u, e.k, 0)] = e.u;
+    } else if (e.t === "ma") {
+      /* Adopción: la primera escrita por cada cuenta es gratis y las demás
+         cuestan PRECIO.adopcion, lo mismo que mira la regla (que solo sabe
+         si ya había alguna). Con el cupo lleno (las que tiene ahora,
+         compradas incluidas) no ocurre: ni cobra ni para la cuenta. */
+      const x = U(e.u), precio = x.intentos === 0 ? 0 : MM.PRECIO.adopcion;
+      x.intentos++;
+      if (!MM.ESPECIES.includes(e.e) || (tiene[e.u] || 0) >= MM.MAX_MASCOTAS) continue;
+      if (e.p !== precio || (precio === 0 ? x.parada : !paga(e.u, precio))) continue;
+      const cc = claveMascota(e.u, e.k);
+      x.adopciones++;
+      mascotas[cc] = { u: e.u, k: e.k, at: e.at, e: e.e };
+      dueno[cc] = e.u; tiene[e.u] = (tiene[e.u] || 0) + 1;
+    } else if (e.t === "mr") {
+      /* Un regalo: lo que trae sale del motor, no de lo escrito. */
+      if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p)) continue;
+      const cc = claveObjeto(e.u, e.k);
+      regalos[cc] = { u: e.u, k: e.k, at: e.at, item: MM.regalo(e.u, e.k, e.at) };
+      dueno[cc] = e.u;
+    } else if (e.t === "mc") {
+      /* Comida, poción (para una mascota suya, que no está a la venta ni la
+         tomó antes), un fondo (una vez) o despedir a una mascota (gratis:
+         sale de la cuenta y libera su cupo). */
+      const x = U(e.u), n = Number.isInteger(e.n) ? e.n : 0, precio = MM.precioCompra(e.q, n);
+      if (precio === null || e.p !== precio) continue;
+      if (e.q === "comida") { if (paga(e.u, precio)) x.comida += n; continue; }
+      const fondo = /^fondo-([a-z]+)$/.exec(e.q);
+      if (fondo) { if (!x.fondos[fondo[1]] && paga(e.u, precio)) x.fondos[fondo[1]] = e.at; continue; }
+      if (!esMascota(e.m) || dueno[e.m] !== e.u || enVenta[e.m]) continue;
+      if (e.q === "pocion") { if (!congelada[e.m] && paga(e.u, precio)) congelada[e.m] = e.at; continue; }
+      if (e.q === "adios" && !x.parada) { delete dueno[e.m]; tiene[e.u] = (tiene[e.u] || 1) - 1; }
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
       const ok = leeCopia(copia) && dueno[copia] === o.u && !enVenta[copia] && !U(o.u).parada && Number.isInteger(p) && p >= 1 && p <= 100000;
@@ -452,7 +521,13 @@ export function economia(datos) {
       if (!o || o.estado !== "activa" || !e.u || e.u === o.u) continue;
       delete enVenta[o.c];
       o.fin = e.at;
-      if (paga(e.u, o.p)) { dueno[o.c] = e.u; U(o.u).cobradas += o.p; o.estado = "vendida"; o.comprador = e.u; }
+      /* Una mascota para quien ya tiene el cupo lleno: la venta no ocurre
+         (no cobra ni para) y la mascota se queda con quien vendía. */
+      if (esMascota(o.c) && (tiene[e.u] || 0) >= MM.MAX_MASCOTAS) { o.estado = "rechazada"; o.comprador = e.u; continue; }
+      if (paga(e.u, o.p)) {
+        dueno[o.c] = e.u; U(o.u).cobradas += o.p; o.estado = "vendida"; o.comprador = e.u;
+        if (esMascota(o.c)) pasaMascota(o.c, o.u, e.u);
+      }
       else { o.estado = "impaga"; o.comprador = e.u; }
     } else if (e.t === "c") {
       /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
@@ -463,12 +538,18 @@ export function economia(datos) {
       const ok = x.de && x.para && x.de !== x.para && dar.length >= 1 && dar.length <= 3 && pedir.length <= 3 &&
         new Set(todas).size === todas.length && !U(x.de).parada && !U(x.para).parada &&
         dar.every(cc => dueno[cc] === x.de && !enVenta[cc]) && pedir.every(cc => dueno[cc] === x.para && !enVenta[cc]);
-      cambios[e.id] = { estado: ok ? "hecho" : "nulo", at: e.at };
-      if (ok) { for (const cc of dar) dueno[cc] = x.para; for (const cc of pedir) dueno[cc] = x.de; }
+      /* Y nadie queda con más mascotas que el cupo. */
+      const nd = dar.filter(esMascota).length, np = pedir.filter(esMascota).length;
+      const cabe = (tiene[x.de] || 0) - nd + np <= MM.MAX_MASCOTAS && (tiene[x.para] || 0) - np + nd <= MM.MAX_MASCOTAS;
+      cambios[e.id] = { estado: ok && cabe ? "hecho" : "nulo", at: e.at };
+      if (ok && cabe) {
+        for (const cc of dar) { dueno[cc] = x.para; if (esMascota(cc)) pasaMascota(cc, x.de, x.para); }
+        for (const cc of pedir) { dueno[cc] = x.de; if (esMascota(cc)) pasaMascota(cc, x.para, x.de); }
+      }
     }
   }
   for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.falta = Math.round(x.falta); void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios };
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial };
   memoEco.set(d, res);
   return res;
 }
@@ -478,11 +559,33 @@ export function copiasDe(uid, datos) {
   const e = economia(datos), out = [];
   for (const [cc, u] of Object.entries(e.dueno)) {
     if (u !== uid) continue;
-    const q = leeCopia(cc), so = e.sobres[q.o + "~" + q.k];
+    const q = leeCopia(cc), so = q.tipo === "carta" && e.sobres[q.o + "~" + q.k];
     if (so) out.push(Object.assign({ c: cc, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[cc], venta: e.enVenta[cc] || "" },
       so.r ? { id: so.r.id, g: so.r.g, w: so.r.w } : {}));
   }
   return out.sort((a, b) => a.at - b.at || (a.k < b.k ? -1 : 1) || a.i - b.i);
+}
+
+/* Las mascotas que una cuenta tiene ahora: de dónde salieron (origen,
+   clave y hora de la adopción, que es lo que da sus genes), su especie, si
+   tomó la poción y si está a la venta. */
+export function mascotasDe(uid, datos) {
+  const e = economia(datos), out = [];
+  for (const [cc, u] of Object.entries(e.dueno)) {
+    const m = u === uid && e.mascotas[cc];
+    if (m) out.push({ c: cc, o: m.u, k: m.k, at: m.at, e: m.e, frozen: !!e.congelada[cc], venta: e.enVenta[cc] || "", antes: (e.historial[cc] || []).slice() });
+  }
+  return out.sort((a, b) => a.at - b.at || (a.c < b.c ? -1 : 1));
+}
+/* Los objetos de regalos que una cuenta tiene ahora (los iniciales no
+   están: no tienen copia). */
+export function objetosDe(uid, datos) {
+  const e = economia(datos), out = [];
+  for (const [cc, u] of Object.entries(e.dueno)) {
+    const r = u === uid && e.regalos[cc];
+    if (r) out.push({ c: cc, o: r.u, k: r.k, at: r.at, kind: r.item.kind, id: r.item.id, tint: r.item.tint, leg: r.item.leg, venta: e.enVenta[cc] || "" });
+  }
+  return out.sort((a, b) => a.at - b.at || (a.c < b.c ? -1 : 1));
 }
 
 /* Cuándo toca el próximo sobre gratis (0: ya). */
@@ -503,7 +606,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid] }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

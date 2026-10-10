@@ -23,6 +23,7 @@ places.
 | **Room game, painted by the page** (turn-based, multiplayer) | `colabtex/src/juegos/<id>.js` + reducer in `motor.js` | Reversi, Cuadritos (simple); UNO, Flip 7 (secret hands) |
 | **Room game in an iframe** (real time, canvas/3D) | `juegos/<id>/` + postman `colabtex/src/juegos/<id>.js` | Boxhead, Yemas, Clue |
 | **Solo Club game** (single player, ranking) | `juegos/club/<id>/`, plain files, no build | Trigon, 2048 (simple); Metro Rush, FANAL (big) |
+| **Tab game in an iframe** (its own tab, no ranking, paid with coins) | `juegos/<id>/` + postman `colabtex/src/juegos/<id>.js` | PRODROP (plain files), Mascotas (TSX built with esbuild) |
 
 ## Solo Club game
 
@@ -180,3 +181,27 @@ npm run test:juegos     # node --test over the games' tests
 - Commit the generated `*-app.js` and `controles-datos.js`.
 - Remind the user, in the PR or the reply, that the Firebase rules must be
   re-published in the console.
+
+## Tab game in an iframe (PRODROP, Mascotas)
+
+- `juegos-main.js`:
+  - `#<id>` in `leerRuta`;
+  - its branch in `armazon` and `html.jg-<id>` (full window);
+  - destroy it in the cleanup next to `prodropVista`;
+  - its tab in `pintaTabs`;
+  - `ICONO_TODOS`.
+- `juegos.html`:
+  - the tab button in `.bar`;
+  - the `html.jg-<id>` rules, with the dark twin;
+  - `[data-vista=<id>]` in the phone bottom-bar selectors.
+- `salon-datos.js` `MOTIVO_CUENTA.<id>` (the guest gate), and
+  `salon.test.cjs`.
+- `scripts/build-controles.js` `PESTANAS`, and `controles.test.cjs`
+  `PROBADOS`. Its postman must name `juegos/<id>/index.html` so the
+  scanner finds the folder.
+- The frame loads `i18n.js`, `mando.js` and `volumen.js` first. It never
+  touches Firebase: every write is a `pide` the postman re-checks against
+  `economia()`.
+- If it is bundled (Mascotas), add its `PAGES` row to `stamp-version.js`
+  and commit the bundle.
+

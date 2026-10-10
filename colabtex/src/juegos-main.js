@@ -76,6 +76,7 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
+import { crearMascotas } from "./juegos/mascotas.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
@@ -104,7 +105,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -283,6 +284,7 @@ let logrosVista = null;
 let paginaPerfil = null;
 let monedasVista = null;
 let prodropVista = null;
+let mascotasVista = null;
 let adminVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
@@ -864,6 +866,7 @@ function leerRuta() {
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
+  if (h === "mascotas") return { vista: "mascotas", pid: "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
@@ -1252,19 +1255,21 @@ function desmontaVista() {
   if (logrosVista) { logrosVista.destruir(); logrosVista = null; }
   if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
+  if (mascotasVista) { mascotasVista.destruir(); mascotasVista = null; }
   if (adminVista) { adminVista.destruir(); adminVista = null; }
   if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas"].includes(state.vista));
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas"].includes(state.vista));
   $("tabCartas").classList.toggle("on", state.vista === "cartas");
+  $("tabMascotas").classList.toggle("on", state.vista === "mascotas");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
   $("tabMonedas").classList.toggle("on", state.vista === "monedas");
   /* Como invitado se ven todas, con candado: tocarlas lleva a la puerta
      que explica qué hay detrás, que es la mejor razón para la cuenta. */
-  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas"]) {
+  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas", "tabMascotas"]) {
     $(id).classList.toggle("bloq", state.invitado);
     if (state.invitado) $(id).title = "Requiere cuenta"; else $(id).removeAttribute("title");
   }
@@ -1428,6 +1433,8 @@ function armazon() {
      del sitio ni la barra de juegos individuales. */
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
+  /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
+  document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
   h.closest("main").classList.toggle("jg-ancho", !motivo && (state.vista === "partida" || state.vista.startsWith("solo-")));
   if (motivo) { h.innerHTML = puertaHtml(motivo); return; }
   const u = state.user;
@@ -1496,6 +1503,12 @@ function armazon() {
     prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""),
       quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
     prodropVista.montar(h);
+    return;
+  }
+  if (state.vista === "mascotas") {
+    h.innerHTML = "";
+    mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir });
+    mascotasVista.montar(h);
     return;
   }
   if (state.vista === "admin") {
@@ -2812,6 +2825,7 @@ function wire() {
   $("tabLogros").onclick = () => ir("#logros");
   $("tabMonedas").onclick = () => ir("#monedas");
   $("tabCartas").onclick = () => ir("#cartas");
+  $("tabMascotas").onclick = () => ir("#mascotas");
   $("userMonedas").onclick = () => ir("#monedas");
   window.addEventListener("hashchange", aplicaRuta);
 }

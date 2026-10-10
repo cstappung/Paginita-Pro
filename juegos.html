@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610100505"></script>
+<script src="i18n.js?v=202610100551"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2329,6 +2329,12 @@ html.jg-prodrop,html.jg-prodrop body{overflow:hidden;height:100%}
 html.jg-prodrop .head,html.jg-prodrop .bar,html.jg-prodrop .rp-fab{display:none!important}
 html.jg-prodrop #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
 .jg-prodrop-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
+/* Mascotas: igual que PRODROP, su iframe ocupa la ventana y trae su barra (← Juegos). */
+html.jg-mascotas,html.jg-mascotas body{overflow:hidden;height:100%}
+html.jg-mascotas .head,html.jg-mascotas .bar,html.jg-mascotas .rp-fab{display:none!important}
+html.jg-mascotas #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#fff8ee}
+.jg-mascotas-frame{display:block;width:100%;height:100%;border:0;background:#fff8ee}
+html[data-tema=oscuro].jg-mascotas #pantalla,html[data-tema=oscuro] .jg-mascotas-frame{background:#17131f}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
 /* ---------- logros ---------- */
 .jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
@@ -4095,16 +4101,16 @@ a.jg-hoja-ya{color:#fff!important}
   /* En las pantallas de menú las pestañas bajan al pie, fijas: el pulgar
      llega sin estirarse y quedan a la vista al hacer scroll. En una
      partida o un juego del club se van, que la pantalla es del juego. */
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffff2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:10.5px;font-weight:600;color:#6b6679;background:transparent;white-space:nowrap}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.on{background:#efe9fb;color:var(--jg-purple)}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab-i,
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab .jg-moneda{width:23px;height:23px}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab:has(.tab-c) .tab-l{display:none}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab-c{display:inline}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.bloq:after{position:absolute;top:7px;left:calc(50% + 7px)}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) main{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .rp-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffff2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:10.5px;font-weight:600;color:#6b6679;background:transparent;white-space:nowrap}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab.on{background:#efe9fb;color:var(--jg-purple)}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab-i,
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab .jg-moneda{width:23px;height:23px}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab:has(.tab-c) .tab-l{display:none}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab-c{display:inline}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab.bloq:after{position:absolute;top:7px;left:calc(50% + 7px)}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) main{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .rp-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
   html:is([data-vista=partida],[data-vista=solo]) .bar{display:none}
 }
 
@@ -4207,9 +4213,9 @@ html[data-tema=oscuro] .jg-puerta{background:var(--os-sup);border-color:var(--os
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar{background:#15121df2;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab{color:var(--os-tx3)}
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.on{background:var(--os-sup3);color:#fff}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar{background:#15121df2;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab{color:var(--os-tx3)}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas]) .bar .tab.on{background:var(--os-sup3);color:#fff}
 }
 
 /* ---- Los rieles del salón (juegos/rieles.js) ----
@@ -4433,10 +4439,11 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
       <button class="tab" id="tabLogros"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2.5l2.6 5.2M16 2.5l-2.6 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="14.5" r="5.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11.6l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z" fill="currentColor"/></svg><span class="tab-l">Logros</span></button>
       <button class="tab" id="tabMonedas"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg><span class="tab-l">Monedas</span></button>
       <button class="tab jg-tab-cartas" id="tabCartas"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.6" y="5.6" width="10.5" height="14.5" rx="2" transform="rotate(-12 8.8 12.8)" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="9.6" y="4" width="10.5" height="14.5" rx="2" fill="currentColor"/><path d="M14.85 8.6l1.2 2.4 2.4.35-1.75 1.7.4 2.4-2.25-1.2-2.25 1.2.4-2.4-1.75-1.7 2.4-.35z" fill="#fff" opacity=".85"/></svg><span class="tab-l">Sobres</span></button>
+      <button class="tab" id="tabMascotas"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c-3.6 0-6.4 5-6.4 9.6 0 4.3 2.8 7.4 6.4 7.4s6.4-3.1 6.4-7.4c0-4.6-2.8-9.6-6.4-9.6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.4 11.6l2.4 1.6 2.1-1.9 2.2 1.9 2.1-1.9 2.4 1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><circle cx="10.2" cy="15.6" r="1" fill="currentColor"/><circle cx="13.8" cy="15.6" r="1" fill="currentColor"/></svg><span class="tab-l">Mascotas</span></button>
     </nav>
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610100505"></script>
+<script src="juegos-app.js?v=202610100551"></script>
 </body>
 </html>

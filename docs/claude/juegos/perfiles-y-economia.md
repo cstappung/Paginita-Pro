@@ -217,7 +217,7 @@ logros, the balance is derived from the same four reads the profile uses
   that covers UTC−3 and UTC−4. So a client can only record *today*, once,
   with the right streak and sum. Deleting the node only loses coins.
 
-Coins are spent in PRODROP (below), and that spending **is** stored:
+Coins are spent in PRODROP, in Mascotas and in the profile shop, and that spending **is** stored:
 `monedasDe` returns `total` (earned, `ganadoDe`), `gastadas`, `cobradas`
 (market sales) and `saldo`. **The header chip and the top both show
 `saldo`**: the top used to order by `total`, and the mismatch with the
@@ -232,3 +232,28 @@ same queue as the logros toast, also used for club plays and podiums).
 The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
+
+**Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
+`economia()` replays three more nodes, between the re-roll and the
+listing at equal `at` (`ORDEN`: `ma` 2.1, `mr` 2.2, `mc` 2.3; the old
+events keep their order):
+
+- `mascotas/a` adoptions: the first one *written* by an account is free
+  (`intentos`, the same thing the rule can see), the rest cost 1000, and
+  none happens with 6 pets owned now.
+- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`.
+- `mascotas/c` purchases:
+  - food, 20 a ration;
+  - potion, 1000, only for an own pet that is not listed and not frozen
+    yet;
+  - a background, once;
+  - `adios`, free.
+
+An unfunded one stops the account like a pack. One that fails for another
+reason (cap, someone else's pet) does not happen and charges nothing.
+`ganadoDe` is unchanged: the only Mascotas income is market sales
+(`cobradas`). The replay also returns `mascotas`, `regalos`, `congelada`
+and `historial` (previous owners). `mascotasDe`/`objetosDe` list what an
+account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
+per-pet state (`mascotasEstado`) is read only by key.
+
