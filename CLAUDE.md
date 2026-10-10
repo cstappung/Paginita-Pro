@@ -75,6 +75,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Clue | `juegos/clue/CLAUDE.md` |
 | Boxhead | `juegos/boxhead/CLAUDE.md` |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
+| Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 
 Solo Club games (read `juegos/club/CLAUDE.md` too):
 
@@ -93,8 +94,9 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Metro Rush | `juegos/club/metrorush/CLAUDE.md` |
 | Mina Club (buscaminas) | `juegos/club/minas/CLAUDE.md` |
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
+| Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
 
-Snake, Tulones and Gato have no doc yet; read their code.
+Snake and Gato have no doc yet; read their code.
 
 **Creating a new game?** Read `docs/claude/juegos/crear-un-juego.md` first:
 the checklist of every file and list a new room or Solo Club game must be

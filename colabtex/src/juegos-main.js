@@ -42,7 +42,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, GT_VARIANTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -64,6 +64,7 @@ import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
 import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
+import { crearTulones } from "./juegos/tulones.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { portadaSolo } from "./juegos/portadas-solo.js";
@@ -97,10 +98,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
@@ -215,6 +216,13 @@ const OPCIONES = {
     /* La meta solo cuenta en versus: bajas para ganar. */
     { clave: "meta", etiqueta: "Bajas para ganar (versus)", por: BX_METAS[1],
       valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+  ],
+  /* Tulones: `tiempo` son los segundos de cada turno y `rondas` 0 es sin fin
+     (gana el último en pie). Ninguno es `modo`. */
+  tulones: [
+    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tulones") },
+    { clave: "tiempo", etiqueta: "Turno", por: 45, valores: TL_TIEMPOS.map(v => ({ v, t: v + " s" })) },
+    { clave: "rondas", etiqueta: "Rondas", valores: TL_RONDAS.map(v => ({ v, t: v ? String(v) : "Sin fin" })) }
   ],
   /* El formato decide qué equipos valen (el validador de Showdown); se
      guarda como `formato` y no como `modo`, que las reglas restringen. */
@@ -1709,6 +1717,10 @@ const NOVEDADES = [
     lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
     sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
     modo: "multi", jugadores: "2 jugadores", cuenta: true },
+  { id: "tulonesred", color: "#63b8ee", alta: "2026-10-10", titulo: "TULONES en línea",
+    lema: "La torre de amigos, ahora cada uno desde su casa: por turnos, ves en directo al que trepa y su cuerpo congelado queda para siempre. Quien no supera la línea roja queda fuera.",
+    sub: "2 a 8 jugadores · por turnos", sala: { k: "tulones", ops: {} }, reglas: ["tulones"],
+    modo: "multi", jugadores: "2 a 8 jugadores", cuenta: true },
   { id: "trigon", color: "#f6d23c", alta: "2026-10-10", titulo: "TRIGON",
     lema: "Arrastra piezas hechas de triángulos al tablero hexagonal. Completa una línea —horizontal o en cualquiera de las dos diagonales— y se borra. Encadena líneas para multiplicar el bono.",
     sub: "Un jugador · puzle de triángulos · 5 temas", ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
@@ -1771,6 +1783,7 @@ function arteNovedad(n) {
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
   // Tulones: la misma escena de la portada del club.
   if (n.id === "trigon") return `<div class="jg-nov-arte-zb">${portadaSolo("trigon")}<b>TRIGON</b></div>`;
+  if (n.id === "tulonesred") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>EN LÍNEA</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
   if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
@@ -2383,7 +2396,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, gato: 1200 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, gato: 1200, tulones: 1800 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -2924,6 +2937,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
+  if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';

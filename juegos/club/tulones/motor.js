@@ -530,10 +530,165 @@
     return code;
   }
 
+  /* ---------------- en línea: la sala ----------------
+     La física no viaja: cada pantalla simula solo al que trepa en ella. Al registro de la sala va lo que decide
+     la partida, y este reductor (lo usa `redTulones` de colabtex) lo vuelve a pasar en cada pantalla:
+
+     - `{t:"sale", uid, n, at, a}`: el del turno n empieza a trepar (`a`, su aspecto). Fija el reloj del turno.
+     - `{t:"congela", uid, n, at, p, b, a}`: su cuerpo al acabar, con las coordenadas en décimas (`codificaPose`).
+       La altura y si supera la línea roja se recalculan aquí, no se cree lo que diga la pantalla.
+     - `{t:"plazo", uid, n, at}`: cualquiera de la sala, pasado el plazo del turno n sin congela (cerró la pestaña,
+       se quedó sin red). Ese turno acaba sin cuerpo: eliminado, como el que no supera la línea.
+     - `{t:"reloj", uid, n, at}`: cualquiera de la sala, cuando el turno n no tiene hora de inicio (el primero, o
+       el que sigue a un abandono, que no trae `at`). La primera vale y desde ella cuenta el plazo.
+     - `{t:"abandona"}` (y la expulsión por votos, que llega igual): fuera; si era su turno, pasa al siguiente.
+
+     `at` es la hora del servidor (las reglas la acotan a unos segundos de `now`), así que el plazo se juzga
+     con jugadas, no con relojes de cada uno. El límite honesto: un cliente reescrito puede mandar una pose
+     inventada; se exige que sea un cuerpo (huesos de su largo) y que no quede más de ALTO_MAX sobre la torre. */
+  const SALA = { TIEMPOS: [30, 45, 60, 90], RONDAS: [0, 3, 5, 10], LISTO_MS: 15000, GRACIA_MS: 8000, ALTO_MAX: 3, SUPERA_MIN: .01, HOLGURA_HUESO: .35 };
+  const tiempoSala = v => (SALA.TIEMPOS.indexOf(+v) >= 0 ? +v : 45);
+  const rondasSala = v => (SALA.RONDAS.indexOf(+v) >= 0 ? +v : 0);
+  function codificaPose(P) { return Array.from(P, v => Math.round(v * 10)).join(','); }
+  function decodificaPose(s) {
+    if (typeof s !== 'string' || s.length > 400) return null;
+    const v = s.split(',');
+    if (v.length !== N * 2) return null;
+    const P = new Float64Array(N * 2);
+    for (let i = 0; i < N * 2; i++) {
+      if (!/^-?\d{1,6}$/.test(v[i])) return null;
+      P[i] = +v[i] / 10;
+      if (i % 2 === 0 ? Math.abs(P[i]) > LIM_X + 20 : P[i] > 5) return null;
+    }
+    return P;
+  }
+  // Un cuerpo de verdad: cada hueso y el tronco cerca de su largo (el solver deja algo de holgura).
+  function poseSana(P) {
+    const d = (a, b) => Math.hypot(P[a * 2] - P[b * 2], P[a * 2 + 1] - P[b * 2 + 1]);
+    for (const h of HUESOS) if (Math.abs(d(h[0], h[1]) - h[2]) > h[2] * SALA.HOLGURA_HUESO) return false;
+    for (const r of RIGIDAS) if (r[3] === 1 && Math.abs(d(r[0], r[1]) - r[2]) > r[2] * SALA.HOLGURA_HUESO) return false;
+    return true;
+  }
+  function codificaBulto(b) { return b ? Math.round(b.x * 10) + ',' + Math.round(b.y * 10) : ''; }
+  function decodificaBulto(s, asp) {
+    const m = typeof s === 'string' ? /^(-?\d{1,4}),(-?\d{1,4})$/.exec(s) : null;
+    return m ? { x: +m[1] / 10, y: +m[2] / 10 } : { x: 0, y: largoBulto(asp) };
+  }
+  function codificaAspecto(a) { const o = limpia(a); return CAMPOS.map(k => o[k]).join('.'); }
+  function decodificaAspecto(s, nombre) {
+    const o = { nombre: nombre || 'Tulón' };
+    const v = typeof s === 'string' && s.length <= 60 ? s.split('.') : [];
+    CAMPOS.forEach((k, i) => { o[k] = /^\d{1,2}$/.test(v[i] || '') ? +v[i] : undefined; });
+    return limpia(o);
+  }
+  function alturaPose(P) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, -P[i * 2 + 1] + RADIO[i]); return m / 100; }
+
+  /* `jugadores`: [{uid, nombre}] en orden de asiento. `op`: {tiempo, rondas, listos}. Devuelve lo que pintan la
+     sala y el marco. Sin hora de inicio (`inicio` 0) el plazo no corre hasta que alguien escribe `reloj`. */
+  function reducirSala(jugadas, jugadores, op) {
+    op = op || {};
+    const tiempo = tiempoSala(op.tiempo), rondas = rondasSala(op.rondas), ms = tiempo * 1000;
+    const js = jugadores || [], ids = js.map(j => j.uid), n0 = js.length;
+    const fuera = {}, eliminados = {}, mejores = {}, aspectos = {};
+    for (const u of ids) mejores[u] = 0;
+    const W = mundo(), torre = [], hist = [];
+    let idx = 0, ronda = 1, n = 0, inicio = 0, saleAt = 0, ganador = null, motivo = '';
+    const activo = i => !fuera[ids[i]] && !eliminados[ids[i]];
+    const enPie = () => ids.filter((u, i) => activo(i));
+    const meta = () => alturaMundo(W);
+    const plazoDe = () => (saleAt ? saleAt + ms + SALA.GRACIA_MS : inicio ? inicio + SALA.LISTO_MS + ms + SALA.GRACIA_MS : Infinity);
+    function cierra() {
+      const q = enPie();
+      if (!q.length) { ganador = ''; motivo = Object.keys(eliminados).length ? 'nadie' : 'abandono'; return true; }
+      if (n0 > 1 && q.length === 1) {
+        ganador = q[0];
+        motivo = ids.some(u => eliminados[u] && !fuera[u]) ? 'ultimo' : 'abandono';
+        return true;
+      }
+      return false;
+    }
+    function porRondas() {
+      const q = enPie();
+      let max = -1, quien = '';
+      for (const u of q) { if (mejores[u] > max) { max = mejores[u]; quien = u; } else if (mejores[u] === max) quien = ''; }
+      ganador = quien; motivo = 'rondas';
+    }
+    // Pasa al siguiente en pie. `at` es la hora con la que acabó el turno: de ella cuenta el siguiente.
+    function siguiente(at) {
+      saleAt = 0; n++;
+      inicio = Number.isFinite(at) && at > 0 ? at : 0;
+      if (cierra()) return;
+      do { idx++; if (idx >= n0) { idx = 0; ronda++; } } while (!activo(idx));
+      if (rondas && ronda > rondas) porRondas();
+    }
+    if (n0) { while (idx < n0 && !activo(idx)) idx++; }
+    const listos = op.listos !== false && n0 > 0;
+    for (const j of listos ? jugadas || [] : []) {
+      if (ganador !== null) break;
+      const u = j && j.uid, i = ids.indexOf(u);
+      if (i < 0) continue;
+      const at = Number.isFinite(j.at) ? j.at : 0;
+      if (j.t === 'abandona') {
+        if (fuera[u]) continue;
+        fuera[u] = true; hist.push({ e: 'sale', uid: u });
+        if (i === idx) siguiente(at); else cierra();
+        continue;
+      }
+      if (fuera[u] || j.n !== n) continue;
+      const turno = ids[idx];
+      if (j.t === 'sale') {
+        if (u !== turno || saleAt) continue;
+        saleAt = at || inicio || 0;
+        if (inicio && saleAt > inicio + SALA.LISTO_MS) saleAt = inicio + SALA.LISTO_MS;
+        if (typeof j.a === 'string') aspectos[u] = j.a;
+        continue;
+      }
+      if (j.t === 'reloj') {
+        if (!inicio && !saleAt && at > 0) inicio = at;
+        continue;
+      }
+      if (j.t === 'plazo') {
+        if (!(at >= plazoDe())) continue;
+        eliminados[turno] = ronda;
+        hist.push({ e: 'plazo', uid: turno, ronda });
+        siguiente(at);
+        continue;
+      }
+      if (j.t !== 'congela' || u !== turno) continue;
+      if (at && at > plazoDe()) continue;
+      const P = decodificaPose(j.p), m = meta();
+      if (!P || !poseSana(P)) continue;
+      const h = alturaPose(P);
+      if (h > m + SALA.ALTO_MAX) continue;
+      const a = typeof j.a === 'string' ? j.a : aspectos[u] || '';
+      const asp = decodificaAspecto(a, (js[i] && js[i].nombre) || '');
+      const foto = { uid: u, p: P, bulto: decodificaBulto(j.b, asp), aspecto: asp, h };
+      W.caps.push(...capsulasDe({ p: P })); W.torre.push(foto); torre.push(foto);
+      mejores[u] = Math.max(mejores[u], h);
+      const ok = h > m + SALA.SUPERA_MIN;
+      if (!ok) eliminados[u] = ronda;
+      hist.push({ e: 'congela', uid: u, h, meta: m, ok, ronda });
+      siguiente(at);
+    }
+    if (ganador === null && listos) cierra();
+    const fin = ganador !== null;
+    const puntos = {};
+    for (const u of ids) puntos[u] = Math.round(mejores[u] * 100);
+    return {
+      fase: !listos ? 'espera' : fin ? 'fin' : 'jugando',
+      turno: !listos || fin ? '' : ids[idx], n, ronda, rondas, tiempo,
+      inicio, saleAt, plazo: !listos || fin ? 0 : plazoDe(), meta: meta(),
+      torre, mejores, puntos, fuera, eliminados, vivos: enPie(), aspectos, hist: hist.slice(-40),
+      ganador, motivo
+    };
+  }
+
   // Versión visible en el título mientras se ajusta la física (quitar al terminar).
-  const VERSION = 'tulones-17';
+  const VERSION = 'tulones-18';
 
   return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, CABRA, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
     crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio,
-    teclaValida, limpiaTeclas, asignaTecla, nombreTecla };
+    teclaValida, limpiaTeclas, asignaTecla, nombreTecla,
+    SALA, tiempoSala, rondasSala, codificaPose, decodificaPose, poseSana, codificaBulto, decodificaBulto, codificaAspecto, decodificaAspecto,
+    alturaPose, reducirSala };
 }));

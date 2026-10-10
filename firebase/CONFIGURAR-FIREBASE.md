@@ -534,6 +534,19 @@ esos modos solo se guarda después de volver a publicar. El
 arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**.
 
+### ⚠ Tulones en línea pide publicar otra vez (2026-10-10)
+
+`'tulones'` tiene que estar en la lista del campo `juego` y en la de
+`logros`. No hay nodo nuevo: los turnos van por `jugadas` (`sale`,
+`congela`, `reloj`, `plazo`), el tiempo y las rondas de la sala entran como
+`tiempo` y `rondas` por `$otro`, y el directo del que trepa va por la malla
+WebRTC de `vivo/<pid>/rtc`, como Boxhead. La regla de `jugadas/$n/at` ahora
+vale también para Tulones: el plazo de cada turno se juzga con esa hora, así
+que tiene que estar a pocos segundos de la del servidor. Sin publicar, la
+sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
 ### Aviso de salas nuevas en Discord (opcional)
 
 Cada sala que se abre desde el vestíbulo puede anunciarse en un canal de

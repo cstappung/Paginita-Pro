@@ -40,6 +40,7 @@ export const CONTROLES = {
   "tetrisclub": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "trigon": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "tulones": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton teclado"},
+  "tulonesclub": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton teclado"},
   "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"}

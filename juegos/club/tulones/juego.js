@@ -9,6 +9,8 @@
   const guarda = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } };
   const I = M.I, C = M.CATALOGO;
   const TINTA = '#2a1e18';
+  // Dentro de una sala de Juegos (colabtex/src/juegos/tulones.js): cada uno trepa en su pantalla y la torre llega por el registro.
+  const ONLINE = /[?&]modo=online\b/.test(location.search);
 
   /* ---------------- sonido ---------------- */
   let actx = null, mudo = lee('tulones.mudo', false);
@@ -531,7 +533,7 @@
     ctx.save(); ctx.strokeStyle = '#e2483d'; ctx.lineWidth = 2.5; ctx.setLineDash([10, 8]);
     ctx.beginPath(); ctx.moveTo(-400, -tope * 100); ctx.lineTo(300, -tope * 100); ctx.stroke(); ctx.restore();
     // Línea fantasma: lo más alto que llegó el que trepa, en cuanto pasa la roja.
-    if (cuerpo && maxTurno > tope) {
+    if ((cuerpo || red.remoto) && maxTurno > tope) {
       const yf = -maxTurno * 100;
       ctx.save(); ctx.globalAlpha = .75; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.setLineDash([4, 6]);
       ctx.beginPath(); ctx.moveTo(-400, yf); ctx.lineTo(250, yf); ctx.stroke();
@@ -542,6 +544,11 @@
 
     dibujaCabra(ctx);
     if (mundoW) for (const f of mundoW.torre) dibujaTulon(ctx, f.p, f.bulto, f.aspecto, { helada: true, cara: 'helado' });
+    if (red.foto) dibujaTulon(ctx, red.foto.p, red.foto.bulto, red.foto.aspecto, { helada: true, cara: 'helado' });
+    if (!cuerpo && red.remoto && estado !== 'fin') {
+      const r = red.remoto, agarra = r.pin.some(Boolean);
+      dibujaTulon(ctx, r.p, r.bulto, r.aspecto, { held: r.held, pin: r.pin, cara: agarra ? 'esfuerzo' : 'normal' });
+    }
     if (cuerpo) {
       const P = cuerpo.p, vy = (P[I.pelvis * 2 + 1] - cuerpo.q[I.pelvis * 2 + 1]) / M.DT;
       const agarrado = cuerpo.pin.some(Boolean) && cuerpo.held.some((h, k) => h && cuerpo.pin[k]);
@@ -563,7 +570,7 @@
 
   function pintaLista() {
     const L = $('listaJug'); L.textContent = '';
-    jugadores.forEach((j, i) => {
+    (ONLINE ? jugadores.slice(0, 1) : jugadores).forEach((j, i) => {
       const d = document.createElement('div'); d.className = 'jug';
       const cv = document.createElement('canvas'); d.appendChild(cv);
       const b = document.createElement('b'); b.textContent = j.nombre; b.translate = false; b.setAttribute('translate', 'no'); d.appendChild(b);
@@ -571,7 +578,7 @@
       const ed = document.createElement('button'); ed.type = 'button'; ed.textContent = '✎'; ed.title = 'Cambiar aspecto'; ed.setAttribute('aria-label', 'Editar a ' + j.nombre);
       ed.addEventListener('click', () => abreEditor(i));
       acc.appendChild(ed);
-      if (jugadores.length > 1) {
+      if (jugadores.length > 1 && !ONLINE) {
         const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.title = 'Quitar'; x.setAttribute('aria-label', 'Quitar a ' + j.nombre);
         x.addEventListener('click', () => { jugadores.splice(i, 1); guardaJug(); pintaLista(); });
         acc.appendChild(x);
@@ -678,7 +685,7 @@
     cam.x = 0; cam.y = -156;
     preparaTurno();
   }
-  const actual = () => jugadores[turnoN % jugadores.length];
+  const actual = () => (ONLINE ? miAspecto() : jugadores[turnoN % jugadores.length]);
   function preparaTurno() {
     estado = 'turno'; pausado = false; inmersivo(false); soltarTodo();
     if (document.pointerLockElement) document.exitPointerLock();
@@ -721,6 +728,7 @@
     return c;
   }
   function arranca() {
+    if (ONLINE && !arrancaRed()) return;
     cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno; ultTic = -1; acum = 0;
     estado = 'jugando'; muestra(null); inmersivo(true);
     escenario.focus({ preventScroll: true });
@@ -728,6 +736,7 @@
   function terminaTurno() {
     if (estado !== 'jugando') return;
     soltarTodo();
+    if (ONLINE) return congelaRed();
     const i = turnoN % jugadores.length, j = jugadores[i];
     const h = cuerpo && M.valido(cuerpo) ? M.altura(cuerpo) : 0;
     if (cuerpo && M.valido(cuerpo)) {
@@ -770,7 +779,7 @@
     muestra('fin'); sonido.fin();
   }
   function pausa(on) {
-    if (estado !== 'jugando') return;
+    if (estado !== 'jugando' || ONLINE) return;
     pausado = on; capas.pausa.hidden = !on; inmersivo(!on);
     if (on) { soltarTodo(); if (document.pointerLockElement) document.exitPointerLock(); $('btnSeguir').focus(); }
     else escenario.focus({ preventScroll: true });
@@ -864,7 +873,7 @@
     $('btnPantalla').setAttribute('aria-label', on ? 'Salir de pantalla completa' : 'Pantalla completa');
     $('btnPantalla').textContent = on ? '🗗' : '⛶';
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando' && !pausado) pausa(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando' && !pausado && !ONLINE) pausa(true); });
 
   const escala = () => H / 520;
   // Ratón: el movimiento lleva lo sostenido.
@@ -1040,7 +1049,7 @@
 
   /* ---------------- novedades ---------------- */
   // Versión que ve el jugador (la del registro de cambios); M.VERSION es la de compilación, para la caché.
-  const VERSION_JUEGO = '0.2';
+  const VERSION_JUEGO = '0.3';
   const dlgNovedades = $('novedades');
   function pestanaNovedades(prox) {
     $('nvTabCambios').setAttribute('aria-selected', String(!prox)); $('nvTabProx').setAttribute('aria-selected', String(prox));
@@ -1055,7 +1064,185 @@
   $('btnNovedades').addEventListener('click', abreNovedades);
   dlgNovedades.addEventListener('close', () => guarda(clave('tulones.novedades'), VERSION_JUEGO));
   // Se abre sola una vez por versión.
-  if (lee(clave('tulones.novedades'), null) !== VERSION_JUEGO) setTimeout(abreNovedades, 300);
+  if (!ONLINE && lee(clave('tulones.novedades'), null) !== VERSION_JUEGO) setTimeout(abreNovedades, 300);
+
+  /* ---------------- en línea ----------------
+     La sala (colabtex/src/juegos/tulones.js) manda `config`, el registro (`jugadas`), la hora del servidor (`hora`)
+     y el directo del que trepa (`vivo`). Aquí se reduce el registro con el mismo M.reducirSala que usa la sala,
+     se reconstruye la torre y se decide qué se ve. Solo se escriben `sale` y `congela` (la sala los firma); el
+     reloj y el plazo los vigila la sala. Mi cuerpo congelado se dibuja (`red.foto`) hasta que vuelve por el
+     registro, ya cuantizado como lo verán todos. */
+  const red = { yo: '', mirando: true, js: [], tiempo: 45, rondas: 0, log: [], est: null, dif: 0, listo: false,
+    remoto: null, objetivo: null, foto: null, salido: -1, n: -1, finTurno: 0, ultEnvio: 0, torreN: -1 };
+  const PADRE = 'tulones-padre', HIJO = 'tulones-hijo';
+  const ESTADO_MS = 66;
+  const aSala = (tipo, d) => { if (window.parent !== window) parent.postMessage(Object.assign({ canal: HIJO, tipo }, d || {}), location.origin); };
+  const horaRed = () => Date.now() + red.dif;
+  function miAspecto() { return M.limpia(Object.assign({}, jugadores[0], { nombre: nombreDe(red.yo) || jugadores[0].nombre })); }
+  const nombreDe = u => { const j = red.js.find(x => x.uid === u); return j ? j.nombre : ''; };
+  const aspectoDe = u => (u === red.yo && !red.mirando ? miAspecto() : M.decodificaAspecto((red.est && red.est.aspectos[u]) || '', nombreDe(u)));
+  const bits = l => l.reduce((a, v, k) => a | (v ? 1 << k : 0), 0);
+  const deBits = (b, n) => Array.from({ length: n }, (_, k) => !!(b & (1 << k)));
+
+  function iniciaRed() {
+    $('btnMas').hidden = true; $('btnJugar').hidden = true; $('btnPausa').hidden = true;
+    document.querySelector('.menu .opciones').hidden = true; document.querySelector('.menu .record').hidden = true;
+    $('btnOtra').hidden = true; $('btnMenu').hidden = true;
+    document.querySelector('.menu .frase').textContent = 'Partida en línea. Elige cómo se ve tu tulón mientras se llena la sala: cada uno trepa en su turno y todos lo ven en directo.';
+    window.addEventListener('message', alMensajeRed);
+    aSala('listo');
+  }
+  function alMensajeRed(e) {
+    if (e.source !== window.parent || e.origin !== location.origin || !e.data || e.data.canal !== PADRE) return;
+    const d = e.data;
+    if (d.tipo === 'hora' && Number.isFinite(d.t)) { red.dif = d.t - Date.now(); return; }
+    if (d.tipo === 'config') {
+      red.yo = String(d.yo || ''); red.mirando = !!d.mirando;
+      red.js = Array.isArray(d.jugadores) ? d.jugadores.map(j => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador').slice(0, 40) })) : [];
+      red.tiempo = M.tiempoSala(d.tiempo); red.rondas = M.rondasSala(d.rondas); red.listo = true;
+      return aplicaRed();
+    }
+    if (d.tipo === 'jugadas' && Array.isArray(d.lista)) { red.log = d.lista; if (red.listo) aplicaRed(); return; }
+    if (d.tipo === 'vivo' && d.v && typeof d.v === 'object') recibeVivo(d.v);
+  }
+
+  function reconstruyeTorre(e) {
+    mundoW = M.mundo();
+    for (const f of e.torre) { mundoW.caps.push(...M.capsulasDe({ p: f.p })); mundoW.torre.push(f); }
+  }
+  function aplicaRed() {
+    const e = red.est = M.reducirSala(red.log, red.js, { tiempo: red.tiempo, rondas: red.rondas });
+    segTurno = e.tiempo; rondas = e.rondas; ronda = e.ronda;
+    if (e.torre.length !== red.torreN) {
+      if (red.torreN >= 0 && e.torre.length > red.torreN) sonido.congela();
+      red.torreN = e.torre.length; reconstruyeTorre(e);
+    }
+    if (red.foto && e.n > red.foto.n) red.foto = null;
+    if (e.n !== red.n) {
+      if (red.n >= 0) avisoDeTurno(e);
+      red.n = e.n; red.remoto = null; red.objetivo = null; maxTurno = 0;
+    }
+    if (e.fase === 'fin') return finRed(e);
+    const toca = e.turno === red.yo && !red.mirando;
+    if (estado === 'jugando' && (!toca || red.salido !== e.n)) { soltarTodo(); cuerpo = null; inmersivo(false); }
+    if (toca && red.salido !== e.n) return turnoRed(e, true);
+    if (toca && estado === 'jugando') return;
+    turnoRed(e, false);
+  }
+  function avisoDeTurno(e) {
+    let h = null;
+    for (let i = e.hist.length - 1; i >= 0 && !h; i--) if (e.hist[i].e === 'congela' || e.hist[i].e === 'plazo') h = e.hist[i];
+    aviso = '';
+    if (h && h.e === 'plazo') aviso = nombreDe(h.uid) + ' se quedó sin tiempo: eliminado';
+    else if (h && !h.ok) aviso = nombreDe(h.uid) + ' no superó ' + fmt(h.meta) + ': eliminado';
+  }
+  function marcadorRed(e, quien) {
+    $('nQuien').textContent = nombreDe(quien) || '—';
+    $('nTorre').textContent = fmt(e.meta);
+  }
+  // Mi turno (`mio`) con el botón y la salida automática, o el de otro: su retrato hasta que sale, y luego su directo.
+  function turnoRed(e, mio) {
+    const quien = e.turno;
+    marcadorRed(e, quien);
+    meta = e.meta;
+    if (!mio && e.saleAt) {
+      estado = 'red'; muestra(null);
+      return;
+    }
+    estado = mio ? 'turno' : 'red';
+    retrato($('retrato'), aspectoDe(quien), 160, 200);
+    $('turnoNombre').textContent = mio ? '¡Te toca!' : 'Le toca a ' + nombreDe(quien);
+    const fuera = !red.mirando && e.eliminados[red.yo] ? ' · quedaste fuera, pero sigues viendo la torre' : '';
+    $('turnoFrase').textContent = (e.rondas ? 'Ronda ' + e.ronda + ' de ' + e.rondas : 'Ronda ' + e.ronda) + ' · supera ' + fmt(e.meta) + fuera;
+    $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
+    $('btnListo').hidden = !mio;
+    $('nTiempo').textContent = e.tiempo + ' s'; $('nTiempo').classList.remove('apura');
+    $('nAltura').textContent = fmt(0);
+    if (capas.turno.hidden) { muestra('turno'); if (mio) { sonido.fanfarria(); setTimeout(() => $('btnListo').focus(), 50); } }
+  }
+  function arrancaRed() {
+    const e = red.est;
+    if (!e || e.fase !== 'jugando' || e.turno !== red.yo || red.mirando || red.salido === e.n) return false;
+    red.salido = e.n; segTurno = e.tiempo; meta = e.meta; maxTurno = 0;
+    red.finTurno = horaRed() + e.tiempo * 1000;
+    $('btnListo').hidden = true;
+    aSala('jugar', { j: { t: 'sale', n: e.n, a: M.codificaAspecto(miAspecto()) } });
+    return true;
+  }
+  function congelaRed() {
+    const e = red.est;
+    if (cuerpo && M.valido(cuerpo) && e) {
+      const p = M.codificaPose(cuerpo.p), P = M.decodificaPose(p);
+      if (P) {
+        red.foto = { n: e.n, p: P, bulto: { x: cuerpo.bulto.x, y: cuerpo.bulto.y }, aspecto: miAspecto() };
+        aSala('jugar', { j: { t: 'congela', n: e.n, p, b: M.codificaBulto(cuerpo.bulto), a: M.codificaAspecto(miAspecto()) } });
+        sonido.congela();
+      }
+    }
+    cuerpo = null; estado = 'red'; inmersivo(false);
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  function mandaEstadoRed() {
+    const t = performance.now();
+    if (!cuerpo || t - red.ultEnvio < ESTADO_MS || !red.est) return;
+    red.ultEnvio = t;
+    aSala('estado', { e: { n: red.est.n, p: M.codificaPose(cuerpo.p), b: M.codificaBulto(cuerpo.bulto), h: bits(cuerpo.held), g: bits(cuerpo.pin), m: Math.round(maxTurno * 100) } });
+  }
+  function recibeVivo(v) {
+    const e = red.est;
+    if (!e || e.fase !== 'jugando' || e.turno === red.yo) return;
+    const d = v[e.turno];
+    if (!d || d.n !== e.n) return;
+    const P = M.decodificaPose(d.p);
+    if (!P) return;
+    const asp = aspectoDe(e.turno);
+    red.objetivo = { p: P, bulto: M.decodificaBulto(d.b, asp), held: deBits(d.h | 0, 4), pin: deBits(d.g | 0, 4), m: (d.m | 0) / 100 };
+    if (!red.remoto) red.remoto = { p: Float64Array.from(P), bulto: red.objetivo.bulto, held: red.objetivo.held, pin: red.objetivo.pin, aspecto: asp };
+  }
+  // El directo llega unas quince veces por segundo: el cuerpo de otro se acerca suave a lo último que llegó.
+  function cuadroRed(dt) {
+    const e = red.est;
+    if (!e) return;
+    if (estado === 'turno' && e.turno === red.yo && red.salido !== e.n) {
+      const sale = (e.inicio || horaRed()) + M.SALA.LISTO_MS - 1500, s = Math.max(0, Math.ceil((sale - horaRed()) / 1000));
+      $('turnoAviso').hidden = false; $('turnoAviso').textContent = (aviso ? aviso + ' · ' : '') + 'Sales solo en ' + s + ' s';
+      if (e.inicio && horaRed() >= sale) arranca();
+    }
+    const r = red.remoto, o = red.objetivo;
+    if (r && o) {
+      const a = 1 - Math.exp(-dt * 18);
+      for (let i = 0; i < r.p.length; i++) r.p[i] += (o.p[i] - r.p[i]) * a;
+      r.bulto = o.bulto; r.held = o.held; r.pin = o.pin; r.aspecto = aspectoDe(e.turno);
+      maxTurno = Math.max(maxTurno, o.m);
+    }
+    if (estado === 'red' && e.fase === 'jugando' && e.turno !== red.yo) {
+      const quedanR = e.saleAt ? Math.max(0, Math.ceil((e.saleAt + e.tiempo * 1000 - horaRed()) / 1000)) : e.tiempo;
+      $('nTiempo').textContent = quedanR + ' s'; $('nTiempo').classList.toggle('apura', !!e.saleAt && quedanR <= 5);
+      $('nAltura').textContent = fmt(r ? M.alturaPose(r.p) : 0);
+    }
+  }
+  function finRed(e) {
+    if (estado === 'fin') return;
+    estado = 'fin'; soltarTodo(); cuerpo = null; red.remoto = null; inmersivo(false);
+    if (document.pointerLockElement) document.exitPointerLock();
+    $('nQuien').textContent = '—'; $('nTiempo').textContent = '—'; $('nTiempo').classList.remove('apura'); $('nTorre').textContent = fmt(e.meta);
+    $('finTorre').textContent = fmt(e.meta); $('finNuevo').hidden = true;
+    const g = e.ganador ? nombreDe(e.ganador) : '';
+    $('finTitulo').textContent = g ? '¡GANA ' + g.toUpperCase() + '!' : e.motivo === 'nadie' ? 'NADIE SUPERÓ LA TORRE' : '¡TORRE TERMINADA!';
+    const L = $('finLista'); L.textContent = '';
+    red.js.map(j => ({ j, h: e.mejores[j.uid] || 0, fuera: !!(e.eliminados[j.uid] || e.fuera[j.uid]), gana: j.uid === e.ganador }))
+      .sort((a, b) => (b.gana - a.gana) || (b.h - a.h)).forEach((o, n) => {
+        const li = document.createElement('li');
+        const pos = document.createElement('span'); pos.className = 'pos'; pos.textContent = (n + 1) + '.';
+        const cv = document.createElement('canvas');
+        const nom = document.createElement('span'); nom.className = 'nom'; nom.textContent = o.j.nombre; nom.setAttribute('translate', 'no');
+        const alt = document.createElement('span'); alt.className = 'alt'; alt.textContent = (o.gana ? '🏆 ' : '') + fmt(o.h) + (o.fuera ? ' ✕' : ''); alt.setAttribute('translate', 'no');
+        if (o.fuera) li.classList.add('fuera');
+        li.append(pos, cv, nom, alt); L.appendChild(li);
+        retrato(cv, aspectoDe(o.j.uid), 44, 55);
+      });
+    muestra('fin'); sonido.fin();
+  }
 
   /* ---------------- bucle ---------------- */
   let acum = 0, antes = performance.now();
@@ -1077,7 +1264,8 @@
       if (!M.valido(cuerpo)) { cuerpo = null; terminaTurno(); }
       else {
         pintaBotones();
-        quedan -= dt;
+        quedan = ONLINE ? (red.finTurno - horaRed()) / 1000 : quedan - dt;
+        if (ONLINE) mandaEstadoRed();
         const s = Math.max(0, Math.ceil(quedan));
         $('nTiempo').textContent = s + ' s';
         $('nTiempo').classList.toggle('apura', quedan <= 5);
@@ -1087,9 +1275,11 @@
         if (quedan <= 0) terminaTurno();
       }
     }
+    if (ONLINE) cuadroRed(dt);
     // Cámara quieta mientras el tulón está en la zona central; solo se corre, suave, si se acerca al borde.
-    if (cuerpo) {
-      const [cx, cy] = centro(cuerpo);
+    const foco = cuerpo || red.remoto;
+    if (foco) {
+      const [cx, cy] = centro(foco);
       let tx = cam.x, ty = cam.y;
       if (cx > tx + ZONA_X) tx = cx - ZONA_X; else if (cx < tx - ZONA_X) tx = cx + ZONA_X;
       if (cy > ty + ZONA_Y) ty = cy - ZONA_Y; else if (cy < ty - ZONA_Y) ty = cy + ZONA_Y;
@@ -1106,7 +1296,8 @@
 
   pintaLista();
   muestra('menu');
-  document.querySelector('.logo').textContent = 'TULONES v' + VERSION_JUEGO;
+  if (ONLINE) iniciaRed();
+  document.querySelector('.logo').textContent = 'TULONES';
   requestAnimationFrame(cuadro);
 
   // Para pruebas desde la consola.

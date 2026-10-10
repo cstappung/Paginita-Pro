@@ -492,6 +492,16 @@ function boxhead() {
     gira(9, en(67, 20, casquillo(0)) + en(67, 140, casquillo(-.6)) + en(67, 260, casquillo(-1.1)));
 }
 
+/* Tulones: calzoncillos que dan la vuelta al anillo y cabezas que se asoman. */
+function tulones() {
+  const calzon = (c, i) => an("hop", 1.6, `<path d="M-5-3H5L4.6 1Q2 2 1 4.4H-1Q-2 2-4.6 1Z" fill="${c}" stroke="#2a1e18" stroke-width=".8"/>`, n1(-i * .3));
+  const cabeza = i => an("pp", 2.4, `<circle r="4" fill="#f6d2b8" stroke="#2a1e18" stroke-width=".8"/><circle cx="-1.4" cy="-.6" r=".6" fill="#2a1e18"/><circle cx="1.4" cy="-.6" r=".6" fill="#2a1e18"/>`, n1(-i * .4));
+  const C = ["#f4f2ec", "#e2483d", "#3a6fd8", "#f2c230"];
+  return aro(60, "#63b8ee", 16, `opacity=".5"`) + aro(52, "#2a1e18", 1.6) + aro(68, "#2a1e18", 1.6) +
+    gira(14, C.map((c, i) => en(60, i * 90, calzon(c, i))).join("")) +
+    [0, 1, 2, 3].map(i => en(60, 45 + i * 90, cabeza(i))).join("");
+}
+
 function zombis() {
   const gota = (ret) => an("dr", 2, `<path d="M0-2.4C1.6 0 2 1 2 2A2 2 0 0 1-2 2C-2 1-1.6 0 0-2.4Z" fill="#4ade80"/>`, ret);
   const mano = `<path d="M-3 7V0L-4.4-4.6L-3.2-5L-2-1V-6.4L-.8-6.6L-.4-1.4V-7L.8-7.1L1.2-1.4V-6.2L2.4-6L2.6-.6L4-3L5-2.4L3 3V7Z" fill="#65a30d" stroke="#1a2e05" stroke-width=".6"/>`;
@@ -586,7 +596,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
   tmetrorush: metrorush, ttrigon: trigon,
   cometa, vortice, sakura, plasma, mariposas
 };
