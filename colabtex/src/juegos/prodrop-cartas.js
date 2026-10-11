@@ -28,7 +28,7 @@ function copia(e, o, k, i) {
   /* Un re-roll es un «sobre» de una sola carta (la 0), sin god pack. */
   const s = so.r ? null : PM.sobre(o, k, so.at), c = so.r ? (i === 0 ? so.r : null) : s.cartas[i], cc = claveCopia(o, k, i);
   if (!c) return null;
-  return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: !!(s && s.dios), rr: !!so.r, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
+  return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: !!(s && s.dios), rr: !!so.r, w: c.w, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
 }
 export const copiaDe = (cc, datos) => { const e = ecoDe(datos), q = leeCopia(cc); return e && q && q.tipo === "carta" ? copia(e, q.o, q.k, q.i) : null; };
 

@@ -112,6 +112,11 @@ other file of the site. Things that hold it together:
   1–100 000. `x` (withdrawn) and `v` (bought) are write-once and exclusive.
   The replay accepts a listing only if the seller owns the copy and it is
   not already listed; a listed card cannot be graded or traded.
+- **Visor mode** (`?ver=1&o=&k=&i=&at=[&gr=1][&rr=id.g.w]`, `montaVisorCarta` at the end of `app.js`):
+  - shows one copy exactly as the opener draws it (aura, holo, wear, slab), alone and on a transparent background;
+  - the market's detail loads it in an iframe;
+  - `html.visor` hides everything else;
+  - it never sends `listo` and makes no sound.
 - **Trades** (`mercado/t/<id>` = `{de, para, dar[1–3], pedir[0–3], at}`, now
   any mix of cards, Mascotas objects and pets):
   `ok` (only `para`) and `x` (either) are write-once and exclusive, and the
