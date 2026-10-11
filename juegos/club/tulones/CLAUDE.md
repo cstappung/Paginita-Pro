@@ -15,6 +15,25 @@ Club side: `juegos/club/CLAUDE.md`.
   Boxhead's. `redTulones` in `colabtex/src/juegos/motor.js` calls
   `globalThis.TulonesMotor.reducirSala`, which the postman sets on import.
 
+## Controls: limbs are always grabbing
+
+The rule is inverted on purpose (the user asked for it). A limb nobody
+holds and that touches anything (floor, pudú, a frozen body) for
+`AGARRE_T` gets `pin` by itself. Holding its key (`held`) releases it and
+the mouse leads it; releasing the key lets it grab wherever it is. A held
+limb never grabs, and nothing pulls the body through a grabbed limb
+(that branch was removed). The body moves through **reach** instead: with
+something grabbed, a led limb aims up to `ALCANCE` past its length and drags
+the body after it. `dePie` counts pinned feet as standing, otherwise the
+tone switched off and the body folded over its own pinned feet.
+Each grab calls `c.alAgarrar(k)` → `sonido.agarra` = `nalgada()` (noise
+crack with two finger taps, low-passed flesh, falling sine thump); watchers
+online hear it more quietly from the `g` bits of the live state.
+`dibujaTeclas` draws each limb's key next to the hand or foot: green when
+pinned, orange when held, dark when free (just the colour for a remote
+climber). The changelog dialog (`VERSION_JUEGO`, `#novedades`) gets a new
+version for player-visible changes.
+
 ## Online: what holds it together
 
 - **Physics never travels.** Each browser simulates only the climber in it.

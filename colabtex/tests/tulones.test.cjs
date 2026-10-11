@@ -15,8 +15,9 @@ test('un cuerpo suelto cae y queda quieto y finito', () => {
   assert.ok(c.bulto.y > 1, 'de pie, el bulto cuelga hacia abajo');
 });
 
+// Agarrado a la fuerza en (x, y): como un miembro libre que tocó algo.
 const fija = (c, k, x, y) => {
-  c.held[k] = true; c.pin[k] = [x, y];
+  c.held[k] = false; c.pin[k] = [x, y];
   const m = M.MIEMBROS[k]; c.vec[k] = [x - c.p[m.raiz * 2], y - c.p[m.raiz * 2 + 1]];
 };
 
@@ -30,18 +31,6 @@ test('colgado de un pie sigue siendo válido y el bulto se invierte', () => {
   assert.ok(c.p[M.I.cabeza * 2 + 1] > c.pin[2][1], 'la cabeza cuelga bajo el pie');
   assert.ok(M.valido(c));
   assert.ok(c.bulto.y < -1, 'cabeza abajo, el bulto cae hacia el ombligo: ' + c.bulto.y);
-});
-
-test('con las manos agarradas, tirar hacia abajo sube el cuerpo', () => {
-  const W = M.mundo(), c = M.crea(-500);
-  deja(c, W, 400);
-  fija(c, 0, c.p[M.I.hombroI * 2] - 10, c.p[M.I.hombroI * 2 + 1] - 40);
-  fija(c, 1, c.p[M.I.hombroD * 2] + 10, c.p[M.I.hombroD * 2 + 1] - 40);
-  deja(c, W, 60);
-  const antes = pelvisY(c);
-  for (let i = 0; i < 60; i++) { assert.strictEqual(M.empujaMiembros(c, 0, 2), 2); M.paso(c, W); }
-  assert.ok(M.valido(c));
-  assert.ok(pelvisY(c) < antes - 50, 'la pelvis sube: ' + antes + ' → ' + pelvisY(c));
 });
 
 test('congelar añade el cuerpo a la torre', () => {
@@ -96,17 +85,52 @@ test('el tono lo deja de pie y no abierto de piernas', () => {
   assert.ok(Math.abs(c.p[M.I.pieI * 2] - c.p[M.I.pieD * 2]) < 60, 'los pies bajo la cadera');
 });
 
-test('un pie que ya tocaba el suelo no se pega hasta despegarse y volver a apoyar un rato', () => {
+test('los pies se agarran solos al suelo y lo sostienen de pie', () => {
+  const W = M.mundo(), c = M.crea(-300);
+  deja(c, W, 1200);
+  assert.ok(c.pin[2] && c.pin[3], 'los dos pies agarrados');
+  assert.ok(!c.pin[0] && !c.pin[1], 'las manos al aire no');
+  assert.ok(c.p[M.I.cabeza * 2 + 1] < -170, 'sigue de pie: ' + c.p[M.I.cabeza * 2 + 1]);
+});
+
+test('apretar suelta el miembro y lo lleva el ratón; al soltar la tecla se agarra donde toca', () => {
   const W = M.mundo(), c = M.crea(-200);
   deja(c, W, 300);
-  M.sostiene(c, 2, true);
-  deja(c, W, 60);
-  assert.strictEqual(c.pin[2], null, 'apretar no lo pega al instante');
-  for (let i = 0; i < 40; i++) { M.empujaMiembros(c, 0, -3); M.paso(c, W); }
-  assert.strictEqual(c.pin[2], null);
-  let n = 0;
-  for (; n < 200 && !c.pin[2]; n++) { M.empujaMiembros(c, 0, 3); M.paso(c, W); }
-  assert.ok(c.pin[2], 'al volver a apoyar se agarra');
+  let agarres = 0; c.alAgarrar = k => { if (k === 3) agarres++; };
+  M.sostiene(c, 3, true);
+  assert.strictEqual(c.pin[3], null, 'apretar lo suelta al instante');
+  for (let i = 0; i < 40; i++) { M.empujaMiembros(c, .8, -2); M.paso(c, W); }
+  assert.strictEqual(c.pin[3], null, 'llevado no se agarra aunque toque');
+  for (let i = 0; i < 40; i++) { M.empujaMiembros(c, .8, 3); M.paso(c, W); }
+  assert.strictEqual(c.pin[3], null, 'mientras dure la tecla, tampoco');
+  const x0 = c.pin[2][0];
+  M.sostiene(c, 3, false);
+  deja(c, W, 120);
+  assert.ok(c.pin[3], 'soltada la tecla, se agarra al suelo');
+  assert.ok(c.pin[3][0] > x0 + 20, 'donde la dejó el ratón: ' + x0 + ' → ' + c.pin[3][0]);
+  assert.strictEqual(agarres, 1, 'avisa una vez (el sonido)');
+});
+
+test('agarrándose y llevando un miembro a la vez se trepa al pudú', () => {
+  const W = M.mundo(), c = M.crea(-120);
+  deja(c, W, 400);
+  const pel0 = pelvisY(c);
+  const lleva = (k, x, y, n) => {
+    M.sostiene(c, k, true);
+    for (let i = 0; i < n; i++) {
+      const m = M.MIEMBROS[k], tx = x - c.p[m.raiz * 2] - c.vec[k][0], ty = y - c.p[m.raiz * 2 + 1] - c.vec[k][1];
+      const d = Math.hypot(tx, ty) || 1, s = Math.min(1, 4 / d);
+      M.empujaMiembros(c, tx * s, ty * s); M.paso(c, W);
+    }
+    M.sostiene(c, k, false); deja(c, W, 120);
+  };
+  lleva(1, -40, -125, 120);
+  lleva(3, -60, -130, 240);
+  lleva(2, -30, -130, 240);
+  lleva(0, 30, -200, 240);
+  assert.ok(M.valido(c));
+  assert.ok(c.pin[2] && c.pin[2][1] < -100, 'un pie quedó sobre el lomo');
+  assert.ok(pelvisY(c) < pel0 - 50, 'la pelvis subió: ' + pel0 + ' → ' + pelvisY(c));
 });
 
 test('agitar los miembros no lo hace volar (rebotes y pogo)', () => {
@@ -138,17 +162,18 @@ test('con un pie agarrado, el brazo sostenido llega recto hacia arriba', () => {
   assert.ok(dy < -50 && Math.abs(dx) < 15, 'mano sobre el hombro: ' + dx + ',' + dy);
 });
 
-test('agarrado de una mano, alcanzar con la otra levanta el cuerpo y las piernas cuelgan', () => {
+test('agarrado de una mano y con las piernas sueltas, alcanzar con la otra levanta el cuerpo', () => {
   const W = M.mundo(), c = M.crea(-110);
   deja(c, W, 300);
   fija(c, 1, -45, -124);
   deja(c, W, 120);
-  M.sostiene(c, 0, true);
+  // Las teclas de las piernas las sueltan del suelo; sin eso los pies agarrados lo sujetan abajo.
+  M.sostiene(c, 0, true); M.sostiene(c, 2, true); M.sostiene(c, 3, true);
   const antes = pelvisY(c);
   for (let i = 0; i < 480; i++) { M.empujaMiembros(c, i < 240 ? -2 : 2, -6); M.paso(c, W); }
   assert.ok(M.valido(c));
+  assert.ok(!c.pin[2] && !c.pin[3], 'las piernas llevadas no se agarran');
   assert.ok(pelvisY(c) < antes - 50, 'la pelvis sube: ' + antes + ' → ' + pelvisY(c));
-  assert.ok(c.p[M.I.pieI * 2 + 1] > pelvisY(c) && c.p[M.I.pieD * 2 + 1] > pelvisY(c), 'los pies cuelgan bajo la pelvis');
 });
 
 const centroX = c => { let x = 0; for (let i = 0; i < M.N; i++) x += c.p[i * 2]; return x / M.N; };
@@ -178,7 +203,7 @@ test('sostener brazo y pierna con un pie apoyado no lo empuja de lado', () => {
   assert.ok(Math.abs(centroX(c) - x0) < 60, 'se movió ' + (centroX(c) - x0));
 });
 
-test('tirado en el suelo, un tirón brusco del brazo lo despega hacia donde va el ratón', () => {
+test('tirado en el suelo con todo agarrado, llevar un brazo hacia arriba lo levanta sin lanzarlo', () => {
   const W = M.mundo(), c = M.crea(-400);
   const px = c.p[M.I.pelvis * 2], py = c.p[M.I.pelvis * 2 + 1];
   for (let i = 0; i < M.N; i++) {
@@ -186,15 +211,15 @@ test('tirado en el suelo, un tirón brusco del brazo lo despega hacia donde va e
     c.p[i * 2] = c.q[i * 2] = px + dy; c.p[i * 2 + 1] = c.q[i * 2 + 1] = py - dx + 70;
   }
   deja(c, W, 600);
+  assert.ok(c.pin.every(Boolean), 'manos y pies agarrados al suelo');
   const centroY = () => { let y = 0; for (let i = 0; i < M.N; i++) y += c.p[i * 2 + 1]; return y / M.N; };
-  const y0 = centroY(), x0 = centroX(c);
-  M.sostiene(c, 1, true);
+  const y0 = centroY();
+  M.sostiene(c, 0, true);
   let alto = y0;
-  for (let i = 0; i < 40; i++) { M.empujaMiembros(c, 6, -10); M.paso(c, W); alto = Math.min(alto, centroY()); }
-  deja(c, W, 60);
-  assert.ok(alto < y0 - 25, 'el cuerpo se despega: ' + y0 + ' → ' + alto);
-  assert.ok(alto > y0 - 90, 'pero no sale volando: ' + y0 + ' → ' + alto);
-  assert.ok(centroX(c) > x0 + 10, 'va hacia la derecha: ' + x0 + ' → ' + centroX(c));
+  for (let i = 0; i < 200; i++) { M.empujaMiembros(c, 0, -5); M.paso(c, W); alto = Math.min(alto, centroY()); }
+  assert.ok(M.valido(c));
+  assert.ok(alto < y0 - 20, 'el cuerpo se levanta: ' + y0 + ' → ' + alto);
+  assert.ok(alto > y0 - 150, 'pero no sale volando: ' + y0 + ' → ' + alto);
 });
 
 /* ---------- en línea: el reductor de la sala ---------- */

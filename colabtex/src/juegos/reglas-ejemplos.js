@@ -215,7 +215,7 @@ export const EJEMPLOS={
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
  tulones:[e('trepar','Trepar por el pudú',
   p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en slip como todos. Tienes el tiempo del turno para superar la línea roja de la torre.',tulones(0)),
-  p('Agarra y empuja','Mantén A para llevar el brazo izquierdo hasta el lomo del pudú: al tocarlo, la mano se agarra. Con la mano agarrada, mover el ratón hacia abajo empuja el cuerpo hacia arriba.',tulones(1)),
+  p('Suelta, lleva y agárrate','Mantén A: la mano izquierda se suelta y sigue al ratón. Llévala al lomo del pudú y suelta A: la mano se agarra ahí. Con la mano agarrada, sube los pies de a uno con W y S y el cuerpo trepa detrás.',tulones(1)),
   p('Congélate y deja torre','Cuando se acaba el tiempo, o al apretar Espacio, tu tulón se congela donde quedó. El siguiente jugador trepa por encima de él, y así la torre crece turno a turno.',tulones(2)))],
  atasco:[e('salida','Sacar el auto rojo en el mínimo',
   p('Mira qué lo encierra','El auto rojo solo se mueve de lado, por la fila de la salida. Aquí lo tapan un auto azul y un camión verde. Para bajar el camión, primero hay que correr el furgón naranja.',atasco(0)),
