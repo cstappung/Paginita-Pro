@@ -78,11 +78,16 @@ el verificador: no pueden discrepar.
    después. Las estrellas salen de contar las movidas contra el mínimo del
    nivel. Una partida que no se puede rehacer, o que no pasa la capa
    anti-bot, rechaza el resultado entero.
-3. **Desbloqueo**: un nivel cuenta solo si estaba abierto según las otras
-   partidas (piso con la mitad de las estrellas del anterior, nivel con el
-   anterior ganado; lo mismo que `nivelAbierto`), repitiendo hasta que no
-   cambia. Lo que no estaba abierto no rechaza: simplemente no suma, y
-   entonces las estrellas declaradas no cuadran si alguien lo sumó.
+3. **Sin desbloqueo (versión 2 de la prueba)**: cada nivel con su partida
+   cuenta solo. La versión 1 pedía que estuviera abierto según las otras
+   partidas, y un nivel sin partida (de antes de las pruebas, o de más de
+   250 movidas) dejaba fuera todos los siguientes: el juego decía 200 ★ y
+   la tabla 150, y parecía desactualizada. No protegía nada: cada estrella
+   que cuenta ya exige una partida rehecha aquí, y saltarse niveles no da
+   más estrellas. El verificador acepta `v` 1 y 2 (una de versión 1 manda
+   justo un subconjunto que la 2 también cuenta); el juego manda la 2, y
+   una página con el verificador viejo en caché la rechaza como «de otra
+   versión», que no castiga.
 4. **Capa anti-bot** (ver abajo).
 5. `puntos` = estrellas de los niveles que cuentan, y `tiempo` = suma de
    sus tiempos (topes 1 ms – 7 días): **igualdad exacta** con lo declarado.
@@ -146,15 +151,15 @@ escrito a mano. Para **no castigar** a nadie:
   abriendo pisos y niveles **en su pantalla**.
 - Su fila de la tabla queda como estaba (las reglas solo dejan escribir
   una que la mejore), y `sospecha()` solo marca lo imposible.
-- A la clasificación nueva van solo las estrellas respaldadas, y cada
-  nivel cuenta en cuanto se vuelve a ganar. Abrir pisos *para la tabla*
-  también exige partidas: un nivel del piso 3 ganado ahora (abierto en su
-  pantalla por estrellas viejas) suma recién cuando los pisos 1 y 2 tengan
-  sus partidas. Mientras la cuenta respaldada no supere la fila vieja, no
-  se escribe nada nuevo (pero cada subida es una partida del club y paga
-  como siempre).
-- El ★ de la cabecera lo dice en su `title` cuando hay diferencia («En la
-  clasificación cuentan N…»).
+- A la clasificación van solo las estrellas respaldadas, y cada nivel
+  cuenta en cuanto se vuelve a ganar (desde la versión 2, aunque falten
+  las partidas de los niveles de abajo). Mientras la cuenta respaldada no
+  supere la fila vieja, no se escribe nada nuevo (pero cada subida es una
+  partida del club y paga como siempre).
+- La cabecera lo dice a la vista cuando hay diferencia («★ 200 / 720 · 150
+  en la tabla») y cada nivel ganado sin partida lleva ⚠ en el edificio
+  (`.sin-prueba`), con el motivo en su `title`: así se sabe cuál volver a
+  ganar.
 
 Lo que se pierde: un honesto con 720 ★ viejos tendría que volver a jugar
 para mejorar su fila. Es el precio de no poder distinguirlo de un tramposo.

@@ -33,7 +33,10 @@ fits a Google URL and no uploaded photo at all. Three consequences:
   top showed initials. Whoever has `foto` unset, or an old Google URL,
   writes the current one to `users/<uid>/perfil/foto`. An https `foto` still
   means «use Google» in the editor (`esFotoGoogle`): uploads are data URLs
-  and «no photo» is `""`, neither is touched.
+  and «no photo» is `""`, neither is touched. Until someone opens Juegos
+  with the new bundle their profile has no photo, so every list also falls
+  back to the Google photo a room-game rank row copied (`fotoEnDatos`, and
+  `foto` in `topMonedas` rows), the same fallback the mini card always had.
 - **Frozen rows show the live apodo** (`nombreVivo(uid, nombre)`): waiting
   rooms, room chat and the Club iframe's ranking (`crearSolo({nombreDe})`,
   re-sent by `refresca()` when a profile arrives) used to print the name

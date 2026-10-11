@@ -233,10 +233,13 @@
 
   function pintaTotal() {
     const t = M.totales(prog), r = respaldadas().estrellas, b = $("totalEstrellas");
-    b.textContent = `★ ${t.estrellas} / ${MAX_ESTRELLAS}`;
-    // Estrellas de antes de las pruebas: se ven, pero la tabla aún no las cuenta.
+    /* Estrellas sin la partida que las ganó (de antes de las pruebas, o de
+       un intento que no se pudo guardar): se ven, pero la tabla no las
+       cuenta. Se dice a la vista, no solo en el `title`: si no, la tabla
+       parecía desactualizada. Los niveles que faltan llevan ⚠ (pintaPisos). */
+    b.textContent = r < t.estrellas ? `★ ${t.estrellas} / ${MAX_ESTRELLAS} · ${r} en la tabla` : `★ ${t.estrellas} / ${MAX_ESTRELLAS}`;
     b.title = r < t.estrellas
-      ? `Estrellas juntadas en todos los niveles. En la clasificación cuentan ${r}: los niveles ganados con una versión anterior del juego cuentan al volver a ganarlos.`
+      ? `Estrellas juntadas en todos los niveles. En la clasificación cuentan ${r}: los niveles marcados con ⚠ no tienen guardada la partida que los ganó. Vuelve a ganarlos y cuentan.`
       : "Estrellas juntadas en todos los niveles";
   }
 
@@ -264,15 +267,18 @@
     lista.replaceChildren();
     const ini = primeroDe(pisoVisto);
     let siguienteMarcado = false;
+    const cuentan = respaldadas().contados;
     p.niveles.forEach((_, k) => {
       const i = ini + k, e = estrellasDe(i), puede = M.nivelAbierto(prog, PISOS, i);
+      const sinPrueba = e > 0 && !cuentan[i];                         // se ve ganado, pero la tabla no lo cuenta
       const b = document.createElement("button");
       b.type = "button"; b.className = "puesto"; b.setAttribute("role", "listitem");
       b.disabled = !puede;
       if (e) b.classList.add(e === 3 ? "perfecto" : "hecho");
+      if (sinPrueba) { b.classList.add("sin-prueba"); b.title = "No cuenta en la clasificación: no quedó guardada la partida que lo ganó. Vuelve a ganarlo."; }
       if (puede && !e && !siguienteMarcado) { b.classList.add("siguiente"); siguienteMarcado = true; } // el próximo por jugar
       b.innerHTML = `<b>${i + 1}</b><span class="est">${"<i>★</i>".repeat(e)}${"★".repeat(3 - e)}</span>`;
-      b.setAttribute("aria-label", `Nivel ${i + 1}: ${puede ? (e ? e + (e === 1 ? " estrella" : " estrellas") : "sin jugar") : "cerrado"}`);
+      b.setAttribute("aria-label", `Nivel ${i + 1}: ${puede ? (e ? e + (e === 1 ? " estrella" : " estrellas") + (sinPrueba ? ", no cuenta en la clasificación" : "") : "sin jugar") : "cerrado"}`);
       b.onclick = () => abreNivel(i);
       lista.appendChild(b);
     });

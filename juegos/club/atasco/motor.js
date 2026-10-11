@@ -356,7 +356,10 @@
      se para con la pestaña oculta: el tiempo del nivel es el instante de
      la última. Unas 10 letras por movida: los 240 niveles con ★★★ ocupan
      ~55 000. */
-  const PRUEBA_VERSION = 1;
+  /* Versión 2: cada nivel con su partida cuenta solo, sin pedir que estuviera
+     «abierto» según las otras (ver resumenPruebas). El verificador acepta las
+     dos: una de versión 1 manda justo el subconjunto que la 2 también cuenta. */
+  const PRUEBA_VERSION = 2, PRUEBA_VERSIONES = [1, 2];
   const PRUEBA_MAX_MOVS = 250;        // más que esto en un nivel no se guarda (es ★, y vuelve a jugarse)
   const PRUEBAS_MAX_LETRAS = 180000;  // todas juntas, con margen bajo los 200 000 de la cuenta y la prueba
   const TIEMPO_MAX = 604800000;       // una semana: el tope del tiempo de la tabla
@@ -492,15 +495,18 @@
     return null;
   }
 
-  /* Lo que las pruebas respaldan: cada una se vuelve a jugar y cuenta solo
-     si su nivel estaba abierto según las otras pruebas (nunca según las
-     estrellas sin prueba, que son justo las que se pueden escribir a
-     mano). Se repite hasta que no cambia: sacar un nivel puede cerrar el
-     siguiente, o un piso. Devuelve las estrellas y el tiempo (la suma de
-     los ms de cada nivel contado, con los topes de la tabla) y, aparte,
-     qué niveles contaron, qué pruebas no valían y por qué (`errores`), y
+  /* Lo que las pruebas respaldan: cada una se vuelve a jugar y, si vale,
+     su nivel cuenta. Devuelve las estrellas y el tiempo (la suma de los ms
+     de cada nivel contado, con los topes de la tabla) y, aparte, qué
+     niveles contaron, qué pruebas no valían y por qué (`errores`), y
      cuáles de esas fallaron por no parecer de una persona (`bots`:
-     [estrellas, movidas, ms, motivo]). */
+     [estrellas, movidas, ms, motivo]).
+     Antes (versión 1) un nivel contaba solo si estaba abierto según las
+     OTRAS pruebas, y un solo nivel sin partida (ganado antes de que
+     existieran, o de más de PRUEBA_MAX_MOVS movidas) dejaba fuera todos
+     los que venían después: el juego decía 200 ★ y la tabla 150. No
+     protegía de nada: cada estrella que cuenta ya exige una partida que
+     se vuelve a jugar, y saltarse niveles no da más estrellas. */
   function resumenPruebas(pruebas, paquetes) {
     const lista = [];
     paquetes.forEach(p => p.niveles.forEach(n => lista.push(n)));
@@ -513,25 +519,7 @@
       try { r = juegaPrueba(lee(lista[i][0]), lista[i][1], t); } catch (e) { r = { error: String(e && e.message || e) }; }
       if (r.error) { errores[k] = r.error; if (r.bot) bots[k] = [r.estrellas, r.movs, r.ms, r.error]; } else validas[k] = [r.estrellas, r.movs, r.ms];
     }
-    // Lo mismo que nivelAbierto/pisoAbierto, pero contando las estrellas de
-    // cada piso una vez por vuelta: con 240 niveles, llamarlas nivel por
-    // nivel costaba ~100 ms y esto corre en el teléfono al ganar.
-    const piso = [], inicio = [];
-    paquetes.forEach((p, j) => { inicio.push(piso.length); p.niveles.forEach(() => piso.push(j)); });
-    let cuenta = validas;
-    for (;;) {
-      const est = paquetes.map(() => 0);
-      for (const [k, v] of Object.entries(cuenta)) est[piso[k]] += v[0];
-      const pisoOk = [];
-      paquetes.forEach((p, j) => { pisoOk[j] = j === 0 || (pisoOk[j - 1] && est[j - 1] >= Math.ceil(paquetes[j - 1].niveles.length * 3 / 2)); });
-      const sig = {};
-      for (const k of Object.keys(cuenta)) {
-        const i = Number(k), j = piso[i];
-        if (pisoOk[j] && (i === inicio[j] || cuenta[i - 1])) sig[k] = cuenta[k];
-      }
-      if (Object.keys(sig).length === Object.keys(cuenta).length) break;
-      cuenta = sig;
-    }
+    const cuenta = validas;
     let e = 0, t = 0;
     for (const v of Object.values(cuenta)) { e += v[0]; t += v[2]; }
     return { estrellas: e, tiempo: Math.min(TIEMPO_MAX, Math.max(1, t)), contados: cuenta, errores, bots };
@@ -542,7 +530,7 @@
     lee, texto, casilla, ocupacion, alcance, puede, aplica, movimientos, resuelto, clave,
     resuelve, limites, estrellas,
     limpiaProgreso, mezclaProgreso, anota, anotaPrueba, totales, pisoAbierto, nivelAbierto,
-    PRUEBA_VERSION, PRUEBA_MAX_MOVS, PRUEBAS_MAX_LETRAS, GAP_MIN, VENTANA, RITMO_MIN, REACCION_MIN, GESTO_MIN,
+    PRUEBA_VERSION, PRUEBA_VERSIONES, PRUEBA_MAX_MOVS, PRUEBAS_MAX_LETRAS, GAP_MIN, VENTANA, RITMO_MIN, REACCION_MIN, GESTO_MIN,
     codificaPrueba, juegaPrueba, resumenPruebas, cuentaMovidas
   };
 });

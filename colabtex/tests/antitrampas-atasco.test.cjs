@@ -95,7 +95,7 @@ test('Atasco: un piso a medias, y lo deshecho (la primera movida no está en 0)'
  // El nivel 23 se juega deshaciendo: la partida que queda empieza a los 9 s.
  const p=partida(23,soluciones[23],()=>700,9000);n[23]=p.texto;
  await ok(dato(e+3,t+p.ms),{v:1,n});
- assert.equal(M.resumenPruebas({23:p.texto},N.pisos).estrellas,0,'solo, el nivel 24 no estaba abierto');
+ assert.equal(M.resumenPruebas({23:p.texto},N.pisos).estrellas,3,'cada nivel con su partida cuenta solo (versión 2)');
 });
 
 test('Atasco: quien tenía estrellas sin prueba no es castigado, solo no cuentan hasta volver a ganarlas',async()=>{
@@ -105,7 +105,7 @@ test('Atasco: quien tenía estrellas sin prueba no es castigado, solo no cuentan
  const r=rng(9);for(const i of [0,80,81,82]){const p=partida(i,soluciones[i],()=>600+Math.floor(r()*500));prog=M.anotaPrueba(M.anota(prog,i,p.movs,p.ms,NIVELES[i][1]).prog,i,p.texto);}
  assert.equal(M.totales(prog).estrellas,80*3+9,'en el edificio se ve todo');
  const res=M.resumenPruebas(prog.p,N.pisos);
- assert.equal(res.estrellas,3,'a la tabla va solo lo respaldado: el nivel 1 (el 81–83 no estaban abiertos según las pruebas)');
+ assert.equal(res.estrellas,12,'a la tabla va todo lo respaldado: el nivel 1 y el 81–83, aunque falten las partidas de los pisos de abajo');
  const n={};for(const k of Object.keys(res.contados))n[k]=prog.p[k];
  await ok(dato(res.estrellas,res.tiempo),{v:1,n});
 });
@@ -143,10 +143,13 @@ test('Atasco: vía 2, progreso editado (estrellas o tiempos que la partida no da
  await no(dato(e*3,t),{v:1,n},/no cuadran/);                    // «3 estrellas» con partidas de 1
  await no(dato(e,t-1000),{v:1,n},/tiempo no cuadra/);           // tiempo recortado
  await no(dato(e,Math.round(t/2)),{v:1,n},/tiempo no cuadra/);
- // Un piso abierto a mano: pruebas del último piso sin las de los anteriores.
+ // Un piso abierto a mano: partidas del último piso sin las de los
+ // anteriores. Cuentan (versión 2): son partidas de verdad, y saltarse
+ // niveles no da más estrellas. Lo que no cuadra es declarar de más.
  const r6=rng(6),m={};let e6=0,t6=0;for(let i=200;i<205;i++){const p=partida(i,soluciones[i],()=>600+Math.floor(r6()*900));m[i]=p.texto;e6+=3;t6+=p.ms;}
- await no(dato(e6,t6),{v:1,n:m},/no cuadran/);
- await no(dato(e+e6,t+t6),{v:1,n:{...n,...m}},/no cuadran/);
+ await ok(dato(e6,t6),{v:2,n:m});
+ await ok(dato(e+e6,t+t6),{v:2,n:{...n,...m}});
+ await no(dato(e+e6+1,t+t6),{v:2,n:{...n,...m}},/no cuadran/);
 });
 
 test('Atasco: vía 3, pruebas tocadas, de otro nivel o que no sacan al auto',async()=>{

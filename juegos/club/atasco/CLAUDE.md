@@ -69,6 +69,11 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
 
 **Atasco's anti-cheat proof** (`docs/antitrampas/atasco.md`) stores, next
 to the progress (`prog.p`), the move list of each level's best attempt, and
-`verifica/atasco.js` replays them with the same engine. **Regenerating
+`verifica/atasco.js` replays them with the same engine. Since proof version
+2 every level with a valid proof counts on its own: version 1 also required
+the level to be «open» according to the other proofs, so one level without a
+proof dropped every later one and the table showed 150 ★ against 200 in the
+game. Levels won without a proof carry ⚠ in the building and the header says
+how many stars the table counts. **Regenerating
 `niveles.js` invalidates every stored proof**: a level whose layout changes
 no longer replays, so its stars stop counting until it is won again.

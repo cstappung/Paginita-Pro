@@ -14,10 +14,11 @@
      movidas de más después de salir;
    - las estrellas salen de contar las movidas contra el mínimo del nivel
      (niveles.js), no de lo que diga nadie;
-   - el nivel tiene que haber estado abierto según las OTRAS pruebas (el
-     piso, con la mitad de las estrellas del anterior; el nivel, con el
-     anterior ganado): editar el progreso para abrir el último piso no
-     sirve, porque lo que abre se cuenta igual que lo que suma;
+   - cada nivel con su partida cuenta solo (versión 2). La versión 1 pedía
+     además que el nivel estuviera abierto según las OTRAS pruebas, y un
+     nivel sin partida dejaba fuera todos los siguientes: el juego decía
+     200 ★ y la tabla 150. No protegía nada, porque toda estrella que
+     cuenta ya exige una partida rehecha aquí;
    - que la haya hecho una mano y no un guion (un bot que usa el
      solucionador saca partidas perfectamente válidas): ningún evento
      sintético (isTrusted falso) salvo las teclas de un mando conectado,
@@ -52,7 +53,7 @@ const nombreNivel = k => (/^\d+$/.test(k) ? 'El nivel ' + (Number(k) + 1) : 'Un 
 export function verifica(dato, prueba) {
   if (!dato || dato.categoria !== CATEGORIA) return 'Atasco no tiene esa tabla.';
   if (!prueba || typeof prueba !== 'object' || Array.isArray(prueba)) return 'La prueba de Atasco no tiene la forma esperada.';
-  if (prueba.v !== M.PRUEBA_VERSION) return 'La prueba es de otra versión de Atasco (recarga la página).';
+  if (!M.PRUEBA_VERSIONES.includes(prueba.v)) return 'La prueba es de otra versión de Atasco (recarga la página).';
   const n = prueba.n;
   if (!n || typeof n !== 'object' || Array.isArray(n) || !Object.keys(n).length) return 'La prueba de Atasco no trae ningún nivel.';
   if (Object.keys(n).length > NIVELES.length) return 'La prueba trae más niveles de los que tiene el juego.';
