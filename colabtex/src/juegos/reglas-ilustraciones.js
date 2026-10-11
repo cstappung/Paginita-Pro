@@ -137,7 +137,7 @@ const tulon=(x,y,piel,pelo,calzon,brazos,piernas,frio)=>{
 };
 const pudu=(x,y)=>`<g transform="translate(${x} ${y})" stroke="#1a1a1a" stroke-width="2">`+[-32,-14,14,32].map(a=>`<path d="M${a} -24 L${a} 0" stroke="#c9743f" stroke-width="7" stroke-linecap="round"/><ellipse cx="${a}" cy="0" rx="4" ry="3" fill="#1a1a1a"/>`).join('')+`<ellipse cx="0" cy="-42" rx="46" ry="24" fill="#b4622e"/><path d="M-36 -30 Q0 -14 36 -30" stroke="#d98a52" stroke-width="6" fill="none"/><path d="M36 -52 L50 -68" stroke="#b4622e" stroke-width="16" stroke-linecap="round"/><ellipse cx="44" cy="-82" rx="5" ry="11" fill="#b4622e" transform="rotate(-35 44 -82)"/><ellipse cx="60" cy="-84" rx="5" ry="11" fill="#b4622e" transform="rotate(30 60 -84)"/><path d="M49 -78 L46 -88 M55 -78 L57 -88" stroke="#efe4c8" stroke-width="3"/><ellipse cx="52" cy="-68" rx="13" ry="11" fill="#b4622e"/><ellipse cx="63" cy="-63" rx="7" ry="5" fill="#d98a52"/><circle cx="68" cy="-62" r="2.6" fill="#1a1a1a" stroke="none"/><circle cx="53" cy="-71" r="2" fill="#1a1a1a" stroke="none"/></g>`;
 export const tulones=etapa=>{
- const nombre=['Al empezar el turno, el tulón aparece al pie del pudú','La mano agarrada al pudú y el ratón hacia abajo suben al tulón','El tulón se congela y el siguiente trepa por encima de él'][etapa];
+ const nombre=['Al empezar el turno, el tulón aparece al pie del pudú','La mano se suelta con A, va al lomo del pudú y se agarra al soltar la tecla','El tulón se congela y el siguiente trepa por encima de él'][etapa];
  let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#8fd3ff"/>`+circle(420,48,20,'#ffe46b')+`<rect x="14" y="200" width="452" height="36" fill="#6fbf4a"/>`;
  cuerpo+=pudu(150,200);
  if(etapa===0){
@@ -145,9 +145,8 @@ export const tulones=etapa=>{
   cuerpo+=txt(332,90,'Tu turno:',20,'#17243b')+txt(332,116,'45 s para',16,'#17243b')+txt(332,138,'trepar',16,'#17243b');
  }else if(etapa===1){
   cuerpo+=tulon(232,150,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-34,-30],[10,-36,26,-18]],[[-6,0,-10,30],[6,0,12,26]]);
-  cuerpo+=circle(198,120,9,'none',C.oro);
-  cuerpo+=line(330,70,330,120,'#17243b',3)+`<path d="M322 112 L330 124 L338 112" stroke="#17243b" stroke-width="3" fill="none"/>`;
-  cuerpo+=txt(350,90,'A: agarra',16,'#17243b')+txt(350,112,'ratón abajo:',16,'#17243b')+txt(350,134,'¡sube!',18,'#17243b');
+  cuerpo+=circle(198,120,9,'none','#2f9e4a');
+  cuerpo+=txt(330,76,'Mantén A:',16,'#17243b')+txt(330,96,'se suelta',16,'#e07b00')+txt(330,124,'Suelta A:',16,'#17243b')+txt(330,146,'¡se agarra!',18,'#2f9e4a');
  }else{
   cuerpo+=tulon(176,136,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-26,-50],[10,-36,24,-48]],[[-6,0,-14,24],[6,0,14,26]],true);
   cuerpo+=tulon(200,78,'#8d5a3b','#1a1a1a','#e8322f',[[-10,-36,-30,-28],[10,-36,26,-52]],[[-6,0,-18,22],[6,0,6,40]]);

@@ -196,7 +196,7 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-21";
+    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-22";
     host.append(aviso, redEl, frame);
     relojPlazo = setInterval(vigila, VIGILA_MS);
   }

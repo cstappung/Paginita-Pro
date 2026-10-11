@@ -7,9 +7,12 @@
    pecho, pelvis, hombros y caderas cruzados, para que no se pliegue
    como un acordeón); las de los miembros son huesos de largo fijo y
    unas «mínimas» impiden que la mano atraviese el hombro. Cada miembro
-   se conduce con un vector (raíz → extremo) que el jugador mueve; si el
-   extremo está agarrado (`pin`), mover el vector arrastra el cuerpo y
-   no el miembro, que es como se trepa en el original.
+   se conduce con un vector (raíz → extremo) que el jugador mueve.
+   Los miembros andan siempre agarrados: el que nadie sostiene y toca algo
+   se queda pegado (`pin`). Apretar su tecla (`held`) lo suelta y lo
+   lleva el ratón; al soltar la tecla se agarra donde esté. Con algo
+   agarrado, el miembro llevado alcanza más allá de su largo y arrastra
+   el cuerpo detrás: así se trepa.
 
    Unidades: 100 = 1 m, y hacia abajo, el suelo en y = 0. Paso fijo de
    1/120 s: el resultado no depende de los fotogramas.
@@ -76,8 +79,8 @@
   // Pose de codo/rodilla y extremo respecto de la raíz, en el marco del torso (r a lo ancho, u hacia la cabeza).
   const RESTO_M = MIEMBROS.map(m => [m.med, m.ext].map(i => [POSE_REPOSO[i][0] - POSE_REPOSO[m.raiz][0], POSE_REPOSO[m.raiz][1] - POSE_REPOSO[i][1]]));
   const TONO_PIERNA = .1, TONO_BRAZO = .008, TONO_TORSO = .04, TONO_AMORT = .7, TONO_MAX = .15;
-  // Agarre: el extremo sostenido tiene que tocar este tiempo seguido, y si ya tocaba al apretar, despegarse antes.
-  const AGARRE_T = .12, ARMA_SEPARA = 12;
+  // Agarre: el extremo libre tiene que tocar este tiempo seguido para quedarse pegado.
+  const AGARRE_T = .12;
   // Pierna que nadie sostiene: no se dobla por debajo de esta fracción de su largo de pie (no se arrodilla al caer).
   // Recién soltada y doblada no se abre de golpe (patearía el suelo): queda firme cuando el tono ya la estiró.
   const PIERNA_FIRME = .92;
@@ -86,8 +89,6 @@
   /* Alcanzar: con otro miembro agarrado, el suelto puede apuntar ALCANCE más allá de su largo. Entonces su punta es
      un ancla que avanza ALC_VEL por paso hacia el objetivo y los huesos arrastran el cuerpo detrás (girando sobre el
      agarre, con las piernas colgando). Si el cuerpo ya no da más, la punta vuelve a donde llega el brazo. */
-  // Empujar con lo agarrado: tope por paso, y qué parte se vuelve velocidad (con mucha, al soltar salía disparado).
-  const EMPUJE_VEL = 2.5, EMPUJE_INERCIA = .1;
   /* Impulso (acción y reacción): mover rápido un miembro sostenido suelto empuja el cuerpo hacia donde va el ratón,
      pero solo si el cuerpo toca algo contra lo que empujar y no está agarrado (colgado manda el alcance). Solo
      cuenta lo brusco: lo movido por paso por encima de IMPULSO_UMBRAL; IMPULSO_K de eso se vuelve velocidad. Topes
@@ -107,7 +108,7 @@
     for (let i = 0; i < N; i++) { p[i * 2] = q[i * 2] = x0 + POSE_T[i][0]; p[i * 2 + 1] = q[i * 2 + 1] = POSE_T[i][1] - 1; }
     const c = { p, q, pin: [null, null, null, null], held: [false, false, false, false], vec: [], contacto: new Array(N).fill(null),
       bulto: { x: 0, y: largoBulto(aspecto), ang: 0, w: 0 }, vp: [0, 0], ap: [0, 0], aspecto: aspecto || null, t: 0,
-      armado: [true, true, true, true], roce: [0, 0, 0, 0], firme: [true, true, true, true], impulso: [0, 0] };
+      roce: [0, 0, 0, 0], firme: [true, true, true, true], impulso: [0, 0] };
     c.vec = MIEMBROS.map(m => [p[m.ext * 2] - p[m.raiz * 2], p[m.ext * 2 + 1] - p[m.raiz * 2 + 1]]);
     return c;
   }
@@ -213,9 +214,9 @@
     // La reacción siempre al cuerpo entero: con un pie apoyado, sostener brazo y pierna también lo empujaba de lado.
     if (rx || ry) { for (let i = 0; i < N; i++) if (!f[i]) { P[i * 2] -= rx / MASA_TOTAL; P[i * 2 + 1] -= ry / MASA_TOTAL; } }
   }
-  // De pie de verdad: algún pie apoyado y nada del tronco ni las rodillas en el suelo (sentado o tirado no cuenta).
+  // De pie de verdad: algún pie apoyado (o agarrado) y nada del tronco ni las rodillas en el suelo (sentado o tirado no cuenta).
   function dePie(c) {
-    if (!(c.contacto[I.pieI] || c.contacto[I.pieD])) return false;
+    if (!(c.contacto[I.pieI] || c.contacto[I.pieD] || c.pin[2] || c.pin[3])) return false;
     for (const i of [I.pelvis, I.pecho, I.cabeza, I.rodillaI, I.rodillaD, I.caderaI, I.caderaD]) if (c.contacto[i]) return false;
     return true;
   }
@@ -251,28 +252,16 @@
       Q[i * 2] = x; Q[i * 2 + 1] = y;
     }
     impulsa(c, f);
-    // Conducir los miembros sostenidos.
+    // Conducir los miembros llevados: sin nada agarrado no pasan de su largo; con algo agarrado, el que alcanza tira.
     MIEMBROS.forEach((m, k) => {
-      if (!c.held[k]) return;
+      if (!c.held[k] || c.pin[k]) return;
       const v = c.vec[k];
-      if (!c.pin[k]) {
-        if (!c.pin.some(Boolean)) { recorta(v, LARGO_M[k] * .97); return; }
-        if (!alcanza[k]) return;
-        const obj = empuja(W, P[m.raiz * 2] + v[0], P[m.raiz * 2 + 1] + v[1], RADIO[m.ext]);
-        const gx = obj[0] - P[m.ext * 2], gy = obj[1] - P[m.ext * 2 + 1], g = Math.hypot(gx, gy);
-        if (g > ALC_HOLGURA) { const a = Math.min(g, ALC_VEL) / g; P[m.ext * 2] += gx * a; P[m.ext * 2 + 1] += gy * a; }
-        Q[m.ext * 2] = P[m.ext * 2]; Q[m.ext * 2 + 1] = P[m.ext * 2 + 1];
-      } else {
-        const pin = c.pin[k];
-        let dx = (pin[0] - v[0]) - P[m.raiz * 2], dy = (pin[1] - v[1]) - P[m.raiz * 2 + 1];
-        dx *= .35; dy *= .35; const d = Math.hypot(dx, dy); if (d > EMPUJE_VEL) { dx *= EMPUJE_VEL / d; dy *= EMPUJE_VEL / d; }
-        // Casi sin velocidad: si el objetivo queda dentro del suelo, empujar cada paso no debe acumular energía.
-        for (let i = 0; i < N; i++) if (!f[i]) { P[i * 2] += dx; P[i * 2 + 1] += dy; Q[i * 2] += dx * (1 - EMPUJE_INERCIA); Q[i * 2 + 1] += dy * (1 - EMPUJE_INERCIA); }
-        // El vector se reacomoda a lo que el cuerpo logró de verdad; deprisa si va muy por delante.
-        const rx = pin[0] - P[m.raiz * 2], ry = pin[1] - P[m.raiz * 2 + 1], atraso = Math.hypot(rx - v[0], ry - v[1]);
-        const sigue = atraso > 25 ? .15 : .02;
-        v[0] += (rx - v[0]) * sigue; v[1] += (ry - v[1]) * sigue;
-      }
+      if (!c.pin.some(Boolean)) { recorta(v, LARGO_M[k] * .97); return; }
+      if (!alcanza[k]) return;
+      const obj = empuja(W, P[m.raiz * 2] + v[0], P[m.raiz * 2 + 1] + v[1], RADIO[m.ext]);
+      const gx = obj[0] - P[m.ext * 2], gy = obj[1] - P[m.ext * 2 + 1], g = Math.hypot(gx, gy);
+      if (g > ALC_HOLGURA) { const a = Math.min(g, ALC_VEL) / g; P[m.ext * 2] += gx * a; P[m.ext * 2 + 1] += gy * a; }
+      Q[m.ext * 2] = P[m.ext * 2]; Q[m.ext * 2 + 1] = P[m.ext * 2 + 1];
     });
     /* Equilibrio: de pie y con los pies apoyados, la parte de arriba se va sobre la pelvis y la de abajo al revés,
        con el impulso total en cero. Acostado no actúa: antes empujaba siempre hacia el mismo lado y se deslizaba solo. */
@@ -326,15 +315,10 @@
     const ax = (pv[0] - pv0[0]) / (DT * DT), ay = (pv[1] - pv0[1]) / (DT * DT);
     c.ap[0] += (ax - c.ap[0]) * .3; c.ap[1] += (ay - c.ap[1]) * .3;
     bulto(c, DT);
-    // Agarre automático: el extremo sostenido que toca algo un rato se queda.
+    // Agarre automático: el extremo que nadie lleva y toca algo un rato se queda.
     MIEMBROS.forEach((m, k) => {
-      if (!c.held[k] || c.pin[k]) return;
-      if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + 2.5)) {
-        // Rearmar pide despegarse de verdad: un temblor de unas unidades no cuenta.
-        if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + ARMA_SEPARA)) c.armado[k] = true;
-        c.roce[k] = 0; return;
-      }
-      if (!c.armado[k]) return;
+      if (c.held[k] || c.pin[k]) return;
+      if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + 2.5)) { c.roce[k] = 0; return; }
       c.roce[k] += DT;
       if (c.roce[k] >= AGARRE_T - 1e-9) {
         c.pin[k] = [P[m.ext * 2], P[m.ext * 2 + 1]];
@@ -394,19 +378,17 @@
     const min = L * (m.brazo ? .3 : .35), max = L * .97 + (otroAgarra ? ALCANCE : 0), d = Math.hypot(v[0], v[1]) || 1e-6;
     if (d > max) { v[0] *= max / d; v[1] *= max / d; } else if (d < min) { v[0] *= min / d; v[1] *= min / d; }
   }
-  // Delta del ratón o del stick: a los sostenidos sueltos; si todos los sostenidos agarran, a esos (trepar).
+  // Delta del ratón o del stick: a los miembros llevados (los agarrados no se mueven).
   function empujaMiembros(c, dx, dy) {
-    const sueltos = [0, 1, 2, 3].filter(k => c.held[k] && !c.pin[k]);
-    const destino = sueltos.length ? sueltos : [0, 1, 2, 3].filter(k => c.held[k]);
-    if (sueltos.length) { c.impulso[0] += dx; c.impulso[1] += dy; }
-    // Un miembro agarrado empuja al revés: tirar hacia abajo sube el cuerpo.
-    for (const k of destino) mueve(c, k, dx, dy);
-    return destino.length;
+    const llevados = [0, 1, 2, 3].filter(k => c.held[k] && !c.pin[k]);
+    if (llevados.length) { c.impulso[0] += dx; c.impulso[1] += dy; }
+    for (const k of llevados) mueve(c, k, dx, dy);
+    return llevados.length;
   }
+  // Apretar suelta el miembro y lo pasa al ratón; soltar la tecla lo deja agarrarse donde caiga.
   function sostiene(c, k, on) {
-    c.held[k] = !!on; c.armado[k] = false; c.roce[k] = 0; c.firme[k] = false;
-    if (!on) c.pin[k] = null;
-    else { const m = MIEMBROS[k]; c.vec[k] = [px(c, m.ext) - px(c, m.raiz), py(c, m.ext) - py(c, m.raiz)]; }
+    c.held[k] = !!on; c.roce[k] = 0; c.firme[k] = false;
+    if (on) { const m = MIEMBROS[k]; c.pin[k] = null; c.vec[k] = [px(c, m.ext) - px(c, m.raiz), py(c, m.ext) - py(c, m.raiz)]; }
   }
 
   /* ---------- congelar: el cuerpo pasa a ser escalón ---------- */
@@ -701,7 +683,7 @@
   }
 
   // Versión visible en el título mientras se ajusta la física (quitar al terminar).
-  const VERSION = 'tulones-18';
+  const VERSION = 'tulones-21';
 
   return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, PUDU, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
     crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio,

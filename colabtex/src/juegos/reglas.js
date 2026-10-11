@@ -966,11 +966,9 @@ const REGLAS = {
       ["Cómo se juega", "Es para jugar por turnos en un mismo equipo, de 1 a 8 personas. En tu turno aparece tu tulón al pie de la torre y tienes el tiempo elegido (de 30 a 90 s) para trepar. Cuando se acaba, o cuando lo decides, tu tulón se <b>congela</b> donde está y pasa a ser parte de la torre: el siguiente puede pisarlo, colgarse de él y seguir subiendo."],
       ["Brazos y piernas", lista([
         "Cada brazo y cada pierna se mueve por separado: <b>A</b> el brazo izquierdo, <b>D</b> el derecho, <b>W</b> la pierna izquierda y <b>S</b> la derecha. Las teclas se cambian en ⌨ Controles.",
-        "Mientras mantienes una tecla, ese miembro sigue al ratón. Los que no sostienes cuelgan con el peso del cuerpo.",
-        "Si la mano o el pie toca el pudú, el suelo o un tulón congelado, <b>se agarra</b>. Al soltar la tecla, se suelta.",
-        "Con algo agarrado, llevar el ratón hacia abajo empuja el cuerpo hacia arriba: así se trepa.",
-        "Agarrado de una mano, estirar la otra más allá de su alcance arrastra el cuerpo hacia allá.",
-        "Tirado en el suelo, un tirón brusco del ratón despega el cuerpo hacia donde lo llevas."
+        "Los miembros andan <b>siempre agarrados</b>: la mano o el pie que toca el pudú, el suelo o un tulón congelado se pega solo. Cada uno lleva su tecla dibujada, en verde mientras está agarrado.",
+        "Mientras mantienes una tecla, ese miembro <b>se suelta</b> y sigue al ratón (su tecla se pone naranja). Al soltar la tecla se agarra donde quede.",
+        "Con algo agarrado, estirar el miembro que llevas más allá de su alcance arrastra el cuerpo hacia allá: así se trepa. Agárrate arriba con una mano y sube los pies de a uno."
       ])],
       ["La torre", "La línea roja marca la altura de la torre al empezar tu turno y tienes que superarla; la altura de un tulón se mide desde el suelo hasta su punto más alto. Si al congelarte no la pasas, quedas eliminado. Con varias personas gana el último en pie; jugando solo, sigues hasta que falles. Si eliges un límite de rondas (3, 5 o 10), la partida termina al cumplirlo. La torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y queda eliminado."],
       ["En línea", lista([

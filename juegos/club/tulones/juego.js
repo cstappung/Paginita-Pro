@@ -56,6 +56,34 @@
       o.connect(lp); o.start(t); o.stop(t + dur + .02);
     }
   }
+  /* La nalgada: un chasquido de ruido brillante con el eco de los dedos (dos golpecitos a los 7 y 15 ms), el
+     palmazo de carne (ruido grave) y un golpe sordo que cae. Cada una sale un poco distinta. */
+  let bufNalgada = null;
+  function nalgada(fuerza) {
+    const a = audio(); if (!a) return;
+    if (!bufNalgada) {
+      const n = Math.floor(a.sampleRate * .3); bufNalgada = a.createBuffer(1, n, a.sampleRate);
+      const d = bufNalgada.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = a.currentTime + .005, v = (fuerza || 1) * (.85 + Math.random() * .3), vel = .85 + Math.random() * .3;
+    const fuente = (filtro, f, q) => {
+      const s = a.createBufferSource(), x = a.createBiquadFilter(), g = a.createGain();
+      s.buffer = bufNalgada; s.playbackRate.value = vel; x.type = filtro; x.frequency.value = f * vel; x.Q.value = q;
+      s.connect(x).connect(g).connect(a.destination); s.start(t, Math.random() * .1); s.stop(t + .2);
+      return g.gain;
+    };
+    const chasquido = fuente('highpass', 1300, .8);
+    chasquido.setValueAtTime(0, t); chasquido.linearRampToValueAtTime(.42 * v, t + .001);
+    chasquido.exponentialRampToValueAtTime(.05 * v, t + .006);
+    chasquido.setValueAtTime(.2 * v, t + .007); chasquido.exponentialRampToValueAtTime(.03 * v, t + .013);
+    chasquido.setValueAtTime(.1 * v, t + .015); chasquido.exponentialRampToValueAtTime(.0001, t + .09);
+    const carne = fuente('lowpass', 750, 1.4);
+    carne.setValueAtTime(0, t); carne.linearRampToValueAtTime(.5 * v, t + .002); carne.exponentialRampToValueAtTime(.0001, t + .12);
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.setValueAtTime(190 * vel, t); o.frequency.exponentialRampToValueAtTime(75, t + .07);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.22 * v, t + .002); g.gain.exponentialRampToValueAtTime(.0001, t + .1);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + .12);
+  }
   const sonido = {
     // Ta-ta-ta-taaa, ta-ta-taaaa: las trompetas del ganador.
     trompetas: () => {
@@ -65,7 +93,7 @@
     },
     // Wa-wa-wa-waaa: el trombón triste del eliminado.
     eliminado: () => { [[311, 0, .32], [294, .36, .32], [277, .72, .32], [262, 1.08, .9, 233]].forEach(([f, t, d, f2]) => metal(f, t, d, .08, f2)); },
-    agarra: () => { tono(520, 0, .09, 'triangle', .14, 760); ruido(0, .05, 2400, .06); },
+    agarra: nalgada,
     congela: () => { [1320, 1760, 2093, 2637].forEach((f, i) => tono(f, i * .06, .35, 'sine', .08)); ruido(0, .3, 6000, .05); },
     fanfarria: () => { [523, 659, 784, 1047].forEach((f, i) => tono(f, i * .1, .22, 'square', .06)); },
     fin: () => { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tono(f, i * .12, .35, 'triangle', .1)); },
@@ -289,15 +317,6 @@
     };
     brazo(I.hombroI, I.codoI, I.manoI, 0);
     brazo(I.hombroD, I.codoD, I.manoD, 1);
-
-    // Anillos de miembros sostenidos.
-    if (opts.held) {
-      M.MIEMBROS.forEach((m, k) => {
-        if (!opts.held[k]) return;
-        ctx.save(); ctx.lineWidth = 3; ctx.strokeStyle = opts.pin && opts.pin[k] ? '#3ccf5a' : '#ff9a1f';
-        ctx.beginPath(); ctx.arc(X(m.ext), Y(m.ext), 13, 0, 7); ctx.stroke(); ctx.restore();
-      });
-    }
 
     dibujaCabeza(ctx, X(I.cabeza), Y(I.cabeza), X(I.cuello), Y(I.cuello), asp, K, opts);
     ctx.restore();
@@ -578,22 +597,44 @@
     if (mundoW) for (const f of mundoW.torre) dibujaTulon(ctx, f.p, f.bulto, f.aspecto, { helada: true, cara: 'helado' });
     if (red.foto) dibujaTulon(ctx, red.foto.p, red.foto.bulto, red.foto.aspecto, { helada: true, cara: 'helado' });
     if (!cuerpo && red.remoto && estado !== 'fin') {
-      const r = red.remoto, agarra = r.pin.some(Boolean);
+      const r = red.remoto, agarra = r.pin.some(Boolean) && r.held.some(Boolean);
       dibujaTulon(ctx, r.p, r.bulto, r.aspecto, { held: r.held, pin: r.pin, cara: agarra ? 'esfuerzo' : 'normal' });
+      dibujaTeclas(ctx, r.p, r.held, r.pin, null);
     }
     if (cuerpo) {
       const P = cuerpo.p, vy = (P[I.pelvis * 2 + 1] - cuerpo.q[I.pelvis * 2 + 1]) / M.DT;
-      const agarrado = cuerpo.pin.some(Boolean) && cuerpo.held.some((h, k) => h && cuerpo.pin[k]);
+      // Esfuerzo: colgado de lo agarrado mientras lleva otro miembro.
+      const agarrado = cuerpo.pin.some(Boolean) && cuerpo.held.some(Boolean);
       const cara = vy > 450 ? 'miedo' : agarrado ? 'esfuerzo' : 'normal';
       // Mira hacia el último miembro sostenido, o al frente.
       let mira = null; const k = cuerpo.held.findIndex(Boolean);
       if (k >= 0) { const e = M.MIEMBROS[k].ext; mira = [P[e * 2], P[e * 2 + 1]]; }
       dibujaTulon(ctx, P, cuerpo.bulto, cuerpo.aspecto, { held: cuerpo.held, pin: cuerpo.pin, cara, mira });
+      dibujaTeclas(ctx, P, cuerpo.held, cuerpo.pin, [0, 1, 2, 3].map(k => nombre(teclas[k])));
       dibujaMiras(ctx, cuerpo);
     }
     if (traza.on) pintaTraza(ctx);
   }
 
+  /* La tecla de cada miembro, en una ficha junto a la mano o el pie: verde si está agarrado, naranja si se lleva
+     (tecla apretada), oscura si cuelga libre. Del que trepa en otra pantalla solo se ven los colores. */
+  function dibujaTeclas(ctx, P, held, pin, letras) {
+    ctx.save(); ctx.lineWidth = 2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    M.MIEMBROS.forEach((m, k) => {
+      // En la mano, más allá de la punta; en el pie, hacia afuera (siguiendo la pierna quedaría bajo el suelo).
+      const ex = P[m.ext * 2], ey = P[m.ext * 2 + 1], dx = ex - P[m.med * 2], dy = ey - P[m.med * 2 + 1], l = Math.hypot(dx, dy) || 1;
+      const afuera = Math.sign(ex - P[I.pelvis * 2]) || (k === 2 ? -1 : 1);
+      const x = m.brazo ? ex + dx / l * 15 : ex + afuera * 17, y = m.brazo ? ey + dy / l * 15 : ey - 6, r = letras ? 10 : 6;
+      ctx.fillStyle = held && held[k] ? '#ff8a00' : pin && pin[k] ? '#2fbf57' : 'rgba(23, 36, 59, .7)';
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke();
+      if (!letras) return;
+      let t = String(letras[k] || ''); if (t.length > 3) t = t.slice(0, 3);
+      ctx.font = '800 ' + (t.length > 1 ? 8 : 12) + 'px system-ui, sans-serif'; ctx.fillStyle = '#ffffff';
+      ctx.fillText(t, x, y + .5);
+    });
+    ctx.restore();
+  }
   // Dónde quiere ir cada miembro sostenido (raíz + vector): el cursor cuando el ratón está capturado.
   function dibujaMiras(ctx, c) {
     ctx.save(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ff9a1f';
@@ -879,10 +920,10 @@
     document.querySelectorAll('.miembro').forEach(b => { b.querySelector('small').textContent = nombre(teclas[b.dataset.k]); });
     const nota = $('nota'), kbd = t => { const e = document.createElement('kbd'); e.textContent = nombre(t); e.setAttribute('translate', 'no'); return e; };
     nota.textContent = '';
-    nota.append('Mantén ', kbd(teclas[0]), ' ', kbd(teclas[1]), ' (brazos) o ', kbd(teclas[2]), ' ', kbd(teclas[3]),
-      ' (piernas) y mueve el ratón. Lo que toca algo se agarra; con todo agarrado, el ratón hacia abajo te sube. ',
+    nota.append('Manos y pies se agarran solos a lo que tocan (verde). Mantén ', kbd(teclas[0]), ' ', kbd(teclas[1]), ' (brazos) o ',
+      kbd(teclas[2]), ' ', kbd(teclas[3]), ' (piernas) para soltar ese miembro y llevarlo con el ratón (naranja); al soltar la tecla se agarra. ',
       kbd(teclas.congela), ' congela antes, ', kbd(teclas.pausa), ' pausa.');
-    escenario.setAttribute('aria-label', 'El escenario. Mantén ' + [0, 1, 2, 3].map(k => nombre(teclas[k])).join(', ') + ' para mover un brazo o una pierna y mueve el ratón para llevarlo.');
+    escenario.setAttribute('aria-label', 'El escenario. Manos y pies se agarran solos. Mantén ' + [0, 1, 2, 3].map(k => nombre(teclas[k])).join(', ') + ' para soltar un brazo o una pierna y llevarlo con el ratón.');
     configuraMando();
   }
   const flechas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
@@ -1122,7 +1163,7 @@
 
   /* ---------------- novedades ---------------- */
   // Versión que ve el jugador (la del registro de cambios); M.VERSION es la de compilación, para la caché.
-  const VERSION_JUEGO = '0.3';
+  const VERSION_JUEGO = '0.4';
   const dlgNovedades = $('novedades');
   function pestanaNovedades(prox) {
     $('nvTabCambios').setAttribute('aria-selected', String(!prox)); $('nvTabProx').setAttribute('aria-selected', String(prox));
@@ -1310,7 +1351,10 @@
     const P = M.decodificaPose(d.p);
     if (!P) return;
     const asp = aspectoDe(e.turno);
-    red.objetivo = { p: P, bulto: M.decodificaBulto(d.b, asp), held: deBits(d.h | 0, 4), pin: deBits(d.g | 0, 4), m: (d.m | 0) / 100 };
+    const antes = red.objetivo && red.objetivo.n === d.n ? red.objetivo.pin : null;
+    red.objetivo = { n: d.n, p: P, bulto: M.decodificaBulto(d.b, asp), held: deBits(d.h | 0, 4), pin: deBits(d.g | 0, 4), m: (d.m | 0) / 100 };
+    // Lo que se agarró desde el último estado suena aquí también, más bajito.
+    if (antes) for (let k = 0; k < 4; k++) if (red.objetivo.pin[k] && !antes[k]) sonido.agarra(.55);
     if (!red.remoto) red.remoto = { p: Float64Array.from(P), bulto: red.objetivo.bulto, held: red.objetivo.held, pin: red.objetivo.pin, aspecto: asp };
   }
   // El directo llega unas quince veces por segundo: el cuerpo de otro se acerca suave a lo último que llegó.
