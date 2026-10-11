@@ -49,6 +49,25 @@ Starter items have no copy key and cannot be listed.
   pet's state, read **by key** from its current owner, once per session.
 - Sort and search are shared. The search also matches a pet's name.
 
+**Cards look alive** (`cartaViva` in `mercado.js`, styles `.jg-mk-cv` in
+`juegos.html`).
+- The grid shows `miniCarta` in a dark showcase lit in the rarity colour.
+  Effects add up by rarity:
+  - every card tilts toward the pointer, with a reflection that follows it;
+  - rare: a band of light sweeps across;
+  - epic: rainbow holo and sparkles;
+  - legendary: also an iridescent copy of the image and rising sparks.
+- A graded card sits in its plastic case, with the grade on the label.
+- Touch only scrolls (no tilt). `prefers-reduced-motion` stops all of it.
+- **The detail shows the real card**: PRODROP in **visor mode**,
+  `juegos/prodrop/index.html?v=pd-N&ver=1&o=&k=&i=&at=[&gr=1][&rr=id.g.w]`.
+  - It is the opener's own `makeCard` with its particle aura, wear and
+    slab, on a transparent background. It neither talks to the postman nor
+    plays sound.
+  - The showcase stays underneath until the iframe loads.
+  - `PD_V` must match the opener's `?v=`.
+  - A reroll needs `w`, so `copia()` in `prodrop-cartas.js` now carries it.
+
 **Thumbnails without three.js in `juegos-app.js`.**
 
 - Cards use `miniCarta`.

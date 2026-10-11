@@ -1282,3 +1282,11 @@ body[data-phase="elige"] .top-line { opacity: 0; }
   .vol-top .vj-ctl input { width: 44px; }
 }
 @media (max-width: 360px) { .col-tot { display: none; } }
+
+/* ---------- modo visor (`?ver=1`): una carta sola para el mercado de Juegos ----------
+   Fondo transparente y nada más que la carta, con aire alrededor para el aura. */
+html.visor, html.visor body { background: transparent; }
+html.visor body > :not(#visor):not(svg) { display: none !important; }
+.visor { position: fixed; inset: 0; display: grid; place-items: center; }
+.visor[hidden] { display: none; }
+.visor .card { width: min(74vw, calc(74vh / 1.4)); animation: zoomIn .5s var(--ease-out); }

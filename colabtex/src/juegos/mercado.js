@@ -5,14 +5,17 @@
    misma economía, porque las reglas no saben si alcanza el dinero ni de
    quién es cada cosa.
 
-   Las cartas se dibujan con `miniCarta`; los objetos y las mascotas, en 3D
+   Las cartas se dibujan con `miniCarta` dentro de una vitrina que se
+   inclina hacia el puntero, con brillo según la rareza y la funda si está
+   graduada (`cartaViva`); el detalle carga la carta de verdad del abridor,
+   con su aura de partículas (PRODROP en modo visor, `?ver=1`). Los objetos y las mascotas, en 3D
    por el visor de Mascotas (visor-mascota.js: fotos para la grilla, la cosa
    girando en el detalle), con su emoji mientras tanto o sin WebGL. Vender se
    hace en cada juego (la carta desde su zoom, la mascota o el objeto desde
    su ficha); aquí se compra, se retira y se intercambia. */
 import { economia, monedasDe, leeCopia } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
-import { miniCarta, MOTOR } from "./prodrop-cartas.js";
+import { miniCarta, MOTOR, RAIZ } from "./prodrop-cartas.js";
 import { avatarMarco } from "./perfil-vista.js";
 import {
   JUEGOS_MERCADO, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
@@ -26,6 +29,37 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&am
 const fmt = n => Math.round(n || 0).toLocaleString("es-CL");
 const claveEstado = c => String(c).replace(/^ma:/, "");
 const LOTE = 48;
+/* El PRODROP del visor: el mismo `?v=` que el abridor (prodrop.js), así se
+   comparte la caché. */
+const PD_V = "pd-18";
+/* Color de texto de cada rareza sobre fondo claro (el de `TIERS` es para
+   fondo oscuro: el gris de las comunes no se leía). */
+const TEXTO_RAREZA = ["#7c8197", "#1b8fd0", "#9a3fe6", "#c98a00"];
+
+/* Una carta viva: la misma `miniCarta`, con capas de brillo según la rareza
+   (holo, destello, iridiscencia; estilos `.jg-mk-cv` en juegos.html) y un
+   reflejo que sigue al puntero. Si está graduada va en su funda, con la
+   nota en la etiqueta. */
+function cartaViva(cp) {
+  const cc = cp.carta, t = cc.tier;
+  const capas = (t >= 3 ? `<span class="jg-mk-cv-iri" aria-hidden="true"><img src="${RAIZ}${esc(cc.img)}" alt="" loading="lazy" draggable="false"></span>` : "")
+    + (t >= 1 ? '<i class="jg-mk-cv-holo" aria-hidden="true"></i>' : "") + (t >= 2 ? '<i class="jg-mk-cv-chispa" aria-hidden="true"></i>' : "")
+    + '<i class="jg-mk-cv-luz" aria-hidden="true"></i>';
+  const funda = cp.gr ? `<span class="jg-mk-funda" style="--gc:${MOTOR.colorNota(cp.g)}"><small>PRODROP</small><em>${esc(MOTOR.GRADE_WORD[cp.g])}</em><b>${cp.g}</b></span>` : "";
+  return `<span class="jg-mk-cv r${t}${cp.gr ? " gr" : ""}"><span class="jg-mk-cv-in">${funda}${miniCarta(cp, capas)}</span></span>`;
+}
+/* La inclinación: el puntero sobre la carta mueve `--rx/--ry` (giro) y
+   `--mx/--my` (dónde cae el reflejo). En táctil no, que es para desplazar. */
+function inclina(el) {
+  el.addEventListener("pointermove", e => {
+    if (e.pointerType === "touch") return;
+    const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--ry", ((x - .5) * 22).toFixed(1) + "deg"); el.style.setProperty("--rx", ((.5 - y) * 18).toFixed(1) + "deg");
+    el.style.setProperty("--mx", (x * 100).toFixed(1) + "%"); el.style.setProperty("--my", (y * 100).toFixed(1) + "%");
+    el.classList.add("mueve");
+  });
+  el.addEventListener("pointerleave", () => { el.classList.remove("mueve"); for (const k of ["--rx", "--ry", "--mx", "--my"]) el.style.removeProperty(k); });
+}
 
 export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) {
   const uid = usuario.uid;
@@ -56,7 +90,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     return null;
   }
   function imagen(r, grande) {
-    if (r.tipo === "carta") return miniCarta(r.cp);
+    if (r.tipo === "carta") return cartaViva(r.cp);
     const p = r.tipo === "baile" ? null : pedidoDe(r), ft = p && fotoDe(p.key);
     const muestra = ft && ft.colores && ft.colores.length ? `<span class="jg-mk-muestra">${ft.colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
     return `<span class="jg-mk-foto${grande ? " grande" : ""}" data-foto="${esc(p ? p.key : "")}">${ft && ft.src ? `<img src="${esc(ft.src)}" alt="" draggable="false">` : `<span class="jg-mk-emoji" aria-hidden="true">${esc(r.emoji)}</span>`}${muestra}${r.leg ? '<b class="jg-mk-leg" title="Legendario">★</b>' : ""}${r.frozen ? '<b class="jg-mk-eterna" title="Tomó la poción eterna">🧪</b>' : ""}</span>`;
@@ -88,8 +122,14 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     host.innerHTML = `
     <section class="jg-mk">
       <header class="jg-mk-cab">
-        <div><h1>🏪 Mercado</h1><small>${ofertas.length} ${ofertas.length === 1 ? "cosa" : "cosas"} a la venta · tienes ${MONEDA} <b>${fmt(m.saldo)}</b></small></div>
-        <div class="jg-mk-ir"><a class="btn2" href="#cartas">🃏 PRODROP</a><a class="btn2" href="#mascotas">🐣 Mascotas</a></div>
+        <div class="jg-mk-cab-tx">
+          <span class="jg-mk-cab-k">Cartas · mascotas · objetos</span>
+          <h1>🏪 Mercado</h1>
+          <p><b>${fmt(ofertas.length)}</b> ${ofertas.length === 1 ? "cosa" : "cosas"} a la venta</p>
+          <div class="jg-mk-cab-acc"><span class="jg-mk-saldo" title="Tu saldo">${MONEDA} <b>${fmt(m.saldo)}</b></span>
+            <a class="jg-mk-cab-ir" href="#cartas">🃏 PRODROP</a><a class="jg-mk-cab-ir" href="#mascotas">🐣 Mascotas</a></div>
+        </div>
+        ${vitrina(ofertas)}
       </header>
       <div class="jg-mk-seg" role="group" aria-label="Juego">${JUEGOS_MERCADO.map(([k, t]) => `<button type="button" data-juego="${k}" aria-pressed="${f.juego === k}">${t}</button>`).join("")}</div>
       ${f.juego === "mascotas" ? `<div class="jg-mk-seg chico" role="group" aria-label="Qué">${TIPOS_MASCOTAS.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${f.tipoM === k}">${t}</button>`).join("")}</div>` : ""}
@@ -101,6 +141,13 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     engancha();
     if (enfocado) { const qi = host.querySelector("#mkQ"); if (qi) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); } }
     pideMiniaturas(tab === "comprar" ? lista.slice(0, max) : tab === "ventas" ? ventas : cambios.flatMap(t => [...t.dar, ...t.pedir]));
+  }
+
+  /* Las tres cartas más caras a la venta, en abanico en el encabezado. */
+  function vitrina(ofertas) {
+    const top = ofertas.filter(r => r.tipo === "carta").sort((a, b) => b.tier - a.tier || b.p - a.p).slice(0, 3);
+    if (!top.length) return "";
+    return `<div class="jg-mk-abanico n${top.length}" aria-hidden="true">${top.map((r, i) => `<span class="jg-mk-ab" style="--k:${i - (top.length - 1) / 2}">${cartaViva(r.cp)}</span>`).join("")}</div>`;
   }
 
   function filtrosHtml() {
@@ -136,11 +183,12 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
 
   function gridHtml(lista, total) {
     if (!lista.length) return `<div class="jg-mk-vacio"><b>🏪</b><p>${total ? "Nada calza con esos filtros." : "Todavía nadie vende nada. Pon a la venta una carta (desde su zoom en PRODROP) o una mascota u objeto (desde su ficha en Mascotas)."}</p></div>`;
-    return `<div class="jg-mk-grid">${lista.slice(0, max).map(r => {
-      const caro = !r.propia && r.p > monedasDe(uid, d).saldo;
-      return `<button type="button" class="jg-mk-it t-${r.tipo}${r.propia ? " mia" : ""}" data-of="${esc(r.id)}">
+    return `<div class="jg-mk-grid">${lista.slice(0, max).map((r, i) => {
+      const caro = !r.propia && r.p > monedasDe(uid, d).saldo, t = r.tipo === "carta" ? MOTOR.TIERS[r.tier] : null;
+      const sub = t ? `<span class="jg-mk-rar">${esc(t.sym)} ${esc(t.label)}</span> · ${esc(r.sub || "")}` : esc(r.sub || "");
+      return `<button type="button" class="jg-mk-it t-${r.tipo}${t ? " r" + r.tier : ""}${r.propia ? " mia" : ""}" data-of="${esc(r.id)}" style="--i:${i % LOTE}${t ? `;--rc:${t.color};--rt:${TEXTO_RAREZA[r.tier]}` : ""}">
         <span class="jg-mk-img">${imagen(r)}</span>
-        <span class="jg-mk-tx"><b${r.tipo === "mascota" ? ' translate="no"' : ""}>${esc(r.nombre)}</b><small>${esc(r.sub || "")}</small></span>
+        <span class="jg-mk-tx"><b${r.tipo === "mascota" ? ' translate="no"' : ""}>${esc(r.nombre)}</b><small>${sub}</small></span>
         <span class="jg-mk-pie"><b class="jg-mk-p${caro ? " caro" : ""}">${MONEDA} ${fmt(r.p)}</b>${r.propia ? '<span class="jg-mk-tuya">Tu oferta</span>' : persona(r.u, 16)}</span>
       </button>`;
     }).join("")}</div>${lista.length > max ? `<button type="button" class="btn2 jg-mk-mas" data-mas>Ver ${Math.min(LOTE, lista.length - max)} más</button>` : ""}`;
@@ -201,6 +249,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     uno("#mkNota", el => el.onchange = () => cambia("nota", +el.value));
     uno("#mkEtapa", el => el.onchange = () => cambia("etapa", el.value));
     uno("#mkOrden", el => el.onchange = () => cambia("orden", el.value));
+    $$(".jg-mk-cv").forEach(inclina);
     uno("#mkQ", el => el.oninput = () => cambia("q", el.value));
     uno("[data-mas]", el => el.onclick = () => { max += LOTE; firma = ""; pinta(); });
     $$("[data-of]").forEach(b => b.onclick = () => abreDetalle(b.dataset.of));
@@ -218,12 +267,14 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     const capa = document.createElement("div");
     capa.className = "jg-mk-capa";
     const propia = r.u === uid, motivo = propia ? "" : puedeComprar(d, uid, r.id);
-    capa.innerHTML = `<div class="jg-mk-det" role="dialog" aria-modal="true" aria-label="${esc(r.nombre)}">
+    const t = r.tipo === "carta" ? MOTOR.TIERS[r.tier] : null, cc = t && r.cp.carta;
+    capa.innerHTML = `<div class="jg-mk-det${t ? " carta r" + r.tier : ""}" role="dialog" aria-modal="true" aria-label="${esc(r.nombre)}"${t ? ` style="--rc:${t.color};--rt:${TEXTO_RAREZA[r.tier]}"` : ""}>
       <button type="button" class="jg-mk-x" aria-label="Cerrar">✕</button>
-      <div class="jg-mk-det-vis${r.tipo === "carta" ? " carta" : ""}">${r.tipo === "carta" ? miniCarta(r.cp) : imagen(r, true)}</div>
+      <div class="jg-mk-det-vis${t ? " carta" : ""}">${t ? `<span class="jg-mk-det-cv">${cartaViva(r.cp)}</span>` : imagen(r, true)}</div>
       <div class="jg-mk-det-tx">
+        ${t ? `<div class="jg-mk-etis"><span class="jg-mk-eti rar">${esc(t.sym)} ${esc(t.label)}</span><span class="jg-mk-eti">${esc(MOTOR.COL[cc.col].label)} · N.º ${String(cc.num).padStart(3, "0")}</span>${r.gr ? `<span class="jg-mk-eti nota" style="--gc:${MOTOR.colorNota(r.g)}">Nota ${r.g} · ${esc(MOTOR.GRADE_WORD[r.g])}</span>` : '<span class="jg-mk-eti">Sin graduar</span>'}${r.cp.dios ? '<span class="jg-mk-eti dios">GOD PACK</span>' : ""}</div>` : ""}
         <h2${r.tipo === "mascota" ? ' translate="no"' : ""}>${esc(r.nombre)}</h2>
-        <p>${esc(r.sub || "")}${r.tipo === "carta" && r.gr ? ` · nota ${r.g} (${esc(MOTOR.GRADE_WORD[r.g])})` : ""}${r.tipo === "carta" && !r.gr ? " · sin graduar" : ""}${r.frozen ? " · 🧪 tomó la poción eterna" : ""}</p>
+        <p>${esc(r.sub || "")}${r.frozen ? " · 🧪 tomó la poción eterna" : ""}</p>
         ${r.tipo === "mascota" ? `<p class="jg-mk-nota">Llega con su etapa, su crecimiento y sus colores. Lo que lleva puesto se queda con quien la vende.</p>` : ""}
         <p class="jg-mk-det-p">${MONEDA} <b>${fmt(r.p)}</b></p>
         <p>${propia ? "Es tu oferta." : `Vende ${persona(r.u, 22)}`}</p>
@@ -239,7 +290,19 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     document.addEventListener("keydown", tecla);
     detalle = { capa, tecla };
     const vis = capa.querySelector(".jg-mk-det-vis");
-    if (r.tipo !== "carta") {
+    if (t) {
+      /* La carta de verdad, con su aura: PRODROP en modo visor. Hasta que
+         carga (o si no carga) queda la vitrina, que ya se inclina. */
+      inclina(vis.querySelector(".jg-mk-cv"));
+      const cp = r.cp, q = new URLSearchParams({ v: PD_V, ver: "1", o: cp.o, k: cp.k, i: String(cp.i), at: String(cp.at) });
+      if (cp.gr) q.set("gr", "1");
+      if (cp.rr) q.set("rr", [cp.id, cp.g, cp.w].join("."));
+      const f = document.createElement("iframe");
+      f.className = "jg-visor jg-mk-pd"; f.title = cc.name; f.setAttribute("tabindex", "-1");
+      f.src = RAIZ + "index.html?" + q;
+      f.onload = () => setTimeout(() => vis.classList.add("pd-listo"), 350);
+      vis.appendChild(f);
+    } else {
       const p = pedidoDe(r);
       if (p) { vis.classList.add("vivo"); const v = document.createElement("div"); v.className = "jg-mk-vivo"; vis.appendChild(v); detalle.visor = montaVisor(v, p); }
     }

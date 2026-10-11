@@ -6,6 +6,9 @@ const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// `?ver=1&…`: el modo visor, una sola carta viva para el mercado de Juegos (al final del archivo)
+const VER = new URLSearchParams(location.search), VISOR = VER.has('ver');
+if (VISOR) document.documentElement.classList.add('visor');
 
 /* ---------------- DATOS ---------------- */
 // El catálogo, las rarezas y el azar viven en motor.js (compartido con Juegos).
@@ -1997,5 +2000,27 @@ $('#mktBtn').onclick = () => Red.manda({ tipo: 'mercado' });
 $('#volverBtn').hidden = !EMBEBIDO;
 $('#volverBtn').onclick = () => Red.manda({ tipo: 'volver' });
 pintaCompra();
-if (EMBEBIDO) Red.manda({ tipo: 'listo' });
+if (VISOR) montaVisorCarta();
+else if (EMBEBIDO) Red.manda({ tipo: 'listo' });
 else $('#cargando').innerHTML = '<p>PRODROP se abre desde <a href="../../juegos.html#cartas">Juegos</a>: ahí están tus monedas y tu colección.</p>';
+
+/* ---------------- VISOR ----------------
+   `index.html?ver=1&o=&k=&i=&at=&gr=1[&rr=id.g.w]`: el detalle del mercado
+   de Juegos muestra la carta tal como se ve aquí (holo, aura de partículas,
+   desgaste, funda de graduada), sola y sobre fondo transparente. No habla
+   con el cartero ni suena. Todo lo de la URL es público, como la economía:
+   la nota de una sin graduar solo se adivina por el desgaste, igual que aquí. */
+function montaVisorCarta() {
+  const n = k => Number(VER.get(k)), rr = (VER.get('rr') || '').split('.').map(Number);
+  let cp = null;
+  try {
+    cp = copiaDe({ o: VER.get('o') || '', k: VER.get('k') || '', i: n('i') || 0, at: n('at'), gr: VER.get('gr') === '1',
+      rr: rr.length === 3 && rr.every(Number.isFinite) ? { id: rr[0], g: rr[1], w: rr[2] } : null });
+  } catch { cp = null; }
+  if (!cp || !CARDS[cp.id]) return;
+  const el = makeCard(fromCopy(CARDS[cp.id], cp), { back: false });
+  light(el);
+  $('#visor').appendChild(el);
+  $('#visor').hidden = false;
+  setTilt(el.querySelector('.tilt'), document.body, 1.1);
+}
