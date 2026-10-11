@@ -26,8 +26,8 @@
   const VIGENCIA = 24 * 3600 * 1000;
 
   /* ---------- Sonido ----------
-     Un AudioContext con tres salidas: la música (el tema «trigon» del
-     cancionero compartido, juegos/audio/temas.js, que toca Chip.Reproductor),
+     Un AudioContext con tres salidas: la música («Prisma Neón», musica.js,
+     que trae sus propios sintetizadores y no pasa por el chip de la casa),
      los efectos y una reverb de sala hecha aquí mismo (un impulso de ruido
      que se apaga), a la que los efectos mandan un poco: es lo que hace que
      cerrar una línea suene a campana y no a pitido. Todo sale por
@@ -38,7 +38,7 @@
      pieza es una nota suave de la pentatónica, una por forma; cerrar líneas
      es un acorde en arpegio que crece con dos líneas y se satura en tres, y
      la racha va recorriendo los acordes del tema. */
-  let ac = null, bus = null, ruidoBuf = null, rep = null, ritmo = null;
+  let ac = null, bus = null, ruidoBuf = null, rep = null;
   let mudo = false, sinMusica = false;
   try { mudo = localStorage.getItem('trigon.mudo') === '1'; sinMusica = localStorage.getItem('trigon.musica') === '0'; } catch (_) { /* nada */ }
   const hz = m => 440 * 2 ** ((m - 69) / 12);
@@ -169,7 +169,7 @@
     },
     // Ganar un poder: un barrido de cristal que sube.
     poder: () => {
-      [0, 2, 4, 7].forEach((j, i) => voz({ t: i * .055, f: hz(PENTA[j] + 12), tipo: 'square', dur: .12, vol: .028, corte: 3800, corte1: 1200, rev: .3 }));
+      [0, 2, 4, 7].forEach((j, i) => voz({ t: i * .055, f: hz(PENTA[j] + 12), tipo: 'sawtooth', det: 9, dur: .14, vol: .024, corte: 3800, corte1: 1200, rev: .3 }));
       soplo({ t: .05, dur: .35, vol: .02, tipo: 'bandpass', f: 1200, f1: 7000, q: 3, rev: .4 });
       brillo(.24, PENTA[9] + 12, .03);
     },
@@ -203,28 +203,16 @@
     }
   };
 
-  /* La música: el tema «trigon» mientras la página se ve. En el menú y al
-     terminar calla la melodía y queda el pulso de la ciudad. */
+  /* La música: «Prisma Neón» (musica.js, sus propios sintetizadores)
+     mientras la página se ve. En el menú y al terminar calla la melodía y
+     quedan los pads, el bajo y la ciudad. */
   function musica() {
-    const c = ac, Chip = window.Chip, Temas = window.Temas;
-    const suena = !sinMusica && c && bus && c.state === 'running' && !document.hidden && Chip && Temas && Temas.temas.trigon;
-    if (!suena) {
-      if (ritmo) { clearInterval(ritmo); ritmo = null; }
-      if (rep) try { rep.detener(); } catch (_) { /* nada */ }
-      return;
-    }
-    if (ritmo) return;
+    const c = ac, TM = window.TrigonMusica;
+    const suena = !sinMusica && c && bus && c.state === 'running' && !document.hidden && TM;
+    if (!suena) { if (rep) try { rep.detener(); } catch (_) { /* nada */ } return; }
     try {
-      if (!rep) rep = new Chip.Reproductor(c, bus.mus, Temas.temas.trigon);
-      rep.reinicia();
-      ritmo = setInterval(() => {
-        try {
-          const jugando = !!E && !terminada && !enMenu();
-          rep.capas.lead = jugando ? 1 : 0;
-          rep.capas.arp = jugando ? 1 : .6;
-          rep.tick(.25);
-        } catch (_) { /* nada */ }
-      }, 80);
+      if (!rep) rep = TM.crear(c, bus.mus, { jugando: () => !!E && !terminada && !enMenu() });
+      rep.arranca();
     } catch (_) { rep = null; }
   }
   function pintaSonido() {

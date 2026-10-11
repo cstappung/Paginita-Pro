@@ -37,9 +37,20 @@ as before. Just-placed cells get `.nueva` (a scale-in with a flash). The
 power-ups are ability slots, not emojis: inline SVG icons (`ICONOS`) in the
 colour of each power (`--poder-*` in `temas.css`, the same in every theme),
 name, charge badge and key. **Audio** is one `AudioContext` (behind
-`volumen.js`) with a music bus playing `Temas.temas.trigon` («Prisma Neón»,
-darksynth in F# harmonic minor; `chip.js` + `temas.js` are loaded by the
-page), an effects bus and a generated-impulse reverb. Effects are in the
+`volumen.js`) with a music bus, an effects bus and a generated-impulse
+reverb. **The music is not the house chip**: `musica.js` (UMD
+`TrigonMusica.crear(ctx, destino, {jugando})`) is its own synth, because
+the chip version was rejected as «arcade, not Cyberpunk». It is Edgerunners
+darksynth: detuned saw pads behind a breathing low-pass, Reese bass with an
+808 in the bridge, ping-pong plucks, a vibrato saw lead, distorted
+power-chord «guitar» in the chorus, sidechain pumping on every kick, a long
+dark reverb and a city/rain bed. Rhythm and harmony are the first version's
+(F# harmonic minor at 120, Neapolitan G bridge). Do not move it back to
+`Chip.Reproductor` or add square-wave voices. It schedules ahead of the
+audio clock, so it renders in an `OfflineAudioContext` (`_prepara(0)`, then
+`programa(t)` in chunks: it does at most 200 steps per call). It is not in
+the header player's `CANCIONES`. `NIVEL` keeps it at the Club's music
+level (RMS ≈ 0.06 at the bus's 0.5). Effects are in the
 song's key: placing a piece is a soft glass note from the F# minor
 pentatonic (one per shape, panned by where it lands); clearing lines is an
 arpeggio on the chord of the current streak that grows with 2 lines and

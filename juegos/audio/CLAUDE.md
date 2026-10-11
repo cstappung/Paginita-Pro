@@ -40,11 +40,11 @@ in `position:fixed`, like the rules manual, and while open it only retouches
 classes and texts on each `alCambiarMusica`, so the volume slider keeps the
 finger mid-drag.
 
-**Trigon brings its own theme** (`trigon`, «Prisma Neón»): darksynth in
-the vein of a cyberpunk anime, F# harmonic minor at 120 with a Neapolitan
-G-major bridge, kept apart from the house's happy synthwaves (Neón 84,
-Línea Neón). The Trigon iframe plays it through its own `Chip.Reproductor`;
-it is also listed in `CANCIONES`.
+**Trigon is the one game whose music is not chip**: `juegos/club/trigon/musica.js`
+is its own synth (Cyberpunk-anime darksynth; details in
+`juegos/club/trigon/CLAUDE.md`), played only inside its iframe and not
+listed in `CANCIONES`. The chip version sounded arcade, which is what the
+user rejected.
 
 **A theme may be a recording instead** (a `CANCIONES` entry with a `url`): Flip 7, Cacho and UNO play
 "Poker Night" by Zane Little (OpenGameArt, CC0) from `juegos/audio/`, looped by

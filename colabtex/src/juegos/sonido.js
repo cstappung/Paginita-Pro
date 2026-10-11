@@ -330,7 +330,6 @@ export const CANCIONES = [
   { id: "bbtan", nombre: "Rebote", grupo: "De los juegos", desc: "BBTAN · arcade saltarín", chip: "bbtan", juegos: ["bbtan"] },
   { id: "sudoku", nombre: "Sudoku Arcade", grupo: "De los juegos", desc: "Sudoku · arcade de cuadrícula en Mi mayor", chip: "sudoku", juegos: ["sudoku"] },
   { id: "atasco", nombre: "Hora punta", grupo: "De los juegos", desc: "Atasco · funk de bocinas en Si bemol", chip: "atasco", juegos: ["atasco"] },
-  { id: "trigon", nombre: "Prisma Neón", grupo: "De los juegos", desc: "Trigon · darksynth de anime cyberpunk en Fa# menor", chip: "trigon", juegos: ["trigon"] },
   { id: "metrorush-barrio", nombre: "Barrio Estación", grupo: "De los juegos", desc: "Metro Rush · la primera estación, Sol mayor con swing", chip: "metrorush-barrio", juegos: ["metrorush"] },
   { id: "metrorush-ocaso", nombre: "Ocaso", grupo: "De los juegos", desc: "Metro Rush · pulso cuadrado de 8 bits", chip: "metrorush-ocaso" },
   { id: "metrorush-neon", nombre: "Línea Neón", grupo: "De los juegos", desc: "Metro Rush · synthwave con prisa", chip: "metrorush-neon" },
