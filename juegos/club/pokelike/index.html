@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610110356"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pokelike — roguelike de Pokémon</title>
+  <meta name="description" content="Elige tu inicial, recorre un mapa distinto cada vez y vence a Brock.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23fff' stroke='%23222' stroke-width='2'/%3E%3Cpath d='M2 16a14 14 0 0 1 28 0z' fill='%23e3350d' stroke='%23222' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%23fff' stroke='%23222' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <link rel="stylesheet" href="estilo.css?v=pokelike-3">
+</head>
+<body>
+  <header class="barra">
+    <h1 class="logo" translate="no">POKELIKE</h1>
+    <span id="zona" class="zona" translate="no"></span>
+    <span class="hueco"></span>
+    <b id="marcaPrueba" class="marca-prueba" title="Partida de prueba" hidden>PRUEBA</b>
+    <button type="button" id="btnPrueba" class="mini" title="Modo prueba" aria-label="Modo prueba" hidden>🐞</button>
+    <button type="button" id="btnInicio" class="mini" title="Volver al título" hidden>☰</button>
+    <span class="vol" data-volumen></span>
+  </header>
+
+  <!-- Título -->
+  <section id="vTitulo" class="vista titulo">
+    <div class="titulo-caja">
+      <p class="logo-grande" translate="no">POKELIKE</p>
+      <p class="lema">Un camino distinto cada vez. Gana las ocho medallas de Kanto y vence a la Liga Pokémon.</p>
+      <div class="botones">
+        <button type="button" id="btnContinuar" class="boton" hidden>▶ Continuar</button>
+        <button type="button" id="btnNueva" class="boton">✦ Nueva partida</button>
+      </div>
+      <p class="chico" id="tituloNota"></p>
+      <div class="prueba">
+        <label class="interruptor-fila"><input type="checkbox" id="chkPrueba"> 🐞 Modo prueba</label>
+        <div id="pruebaOpc" class="prueba-opc" hidden>
+          <label class="interruptor-fila"><input type="checkbox" id="chkInmortal"> Inmortal (perder cuenta como ganar)</label>
+          <label class="interruptor-fila">Empezar en <select id="selDesde"></select></label>
+          <p class="chico">Con el modo prueba aparece 🐞 arriba: ganar el combate, ir al jefe, saltar el gimnasio, subir niveles.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Elegir inicial -->
+  <section id="vInicial" class="vista" hidden>
+    <h2 class="tit-vista">Elige a tu compañero</h2>
+    <div id="iniciales" class="cartas"></div>
+  </section>
+
+  <!-- Mapa + equipo -->
+  <section id="vMapa" class="vista mapa-vista" hidden>
+    <div class="mapa-caja"><svg id="mapa" class="mapa" aria-label="Mapa de la ruta"></svg></div>
+    <aside class="panel-equipo">
+      <div id="medallasPanel"></div>
+      <h2 class="tit-panel">Tu equipo <small id="nEquipo"></small></h2>
+      <p class="chico">El primero vivo sale a pelear. Usa ▲▼ para ordenar.</p>
+      <ol id="equipo" class="equipo"></ol>
+      <div class="leyenda">
+        <span><i class="ico">🌿</i> Salvaje</span><span><i class="ico">◓</i> Captura</span>
+        <span><i class="ico">👤</i> Entrenador</span><span><i class="ico">✚</i> Centro</span><span><i class="ico">🏆</i> Líder</span>
+      </div>
+    </aside>
+  </section>
+
+  <!-- Combate -->
+  <section id="vCombate" class="vista" hidden>
+    <div class="combate">
+      <div id="arena" class="arena">
+        <div class="ficha ficha-e"><b id="nomE" translate="no"></b> <span id="nvE" translate="no"></span>
+          <div class="barra-ps"><i id="psE"></i></div></div>
+        <div class="lugar lugar-e"><img id="spE" alt="" class="sprite"></div>
+        <div class="lugar lugar-j"><img id="spJ" alt="" class="sprite espalda"></div>
+        <div class="ficha ficha-j"><b id="nomJ" translate="no"></b> <span id="nvJ" translate="no"></span>
+          <div class="barra-ps"><i id="psJ"></i></div>
+          <small id="psJt" class="ps-num" translate="no"></small>
+          <div class="barra-xp"><i id="xpJ"></i></div></div>
+        <div id="intro" class="intro" hidden><img id="spRival" alt=""><p id="introTxt"></p></div>
+      </div>
+      <p id="texto" class="texto" aria-live="polite"></p>
+      <div class="controles">
+        <div id="movs" class="movs"></div>
+        <div class="opciones">
+          <button type="button" id="btnAuto" class="interruptor" aria-pressed="true">AUTO</button>
+          <button type="button" id="btnVel" class="interruptor" title="Velocidad">×1</button>
+        </div>
+      </div>
+      <button type="button" id="btnSeguir" class="boton seguir" hidden>Continuar ▶</button>
+    </div>
+  </section>
+
+  <!-- Capas encima del mapa -->
+  <div id="capa" class="capa" hidden>
+    <div class="caja" role="dialog" aria-modal="true" aria-labelledby="capaTit">
+      <h2 id="capaTit"></h2>
+      <p id="capaTxt" class="chico"></p>
+      <div id="capaCuerpo"></div>
+      <div id="capaBotones" class="botones"></div>
+    </div>
+  </div>
+
+  <script src="especies.js?v=pokelike-3"></script>
+  <script src="datos.js?v=pokelike-3"></script>
+  <script src="motor.js?v=pokelike-3"></script>
+  <script src="sonido.js?v=pokelike-3"></script>
+  <script src="juego.js?v=pokelike-3"></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+:root {
+  --fondo: #1d2433; --fondo2: #273047; --tinta: #f3f1e8; --suave: #a9b1c6;
+  --rojo: #e3350d; --amarillo: #ffcb05; --azul: #3b6ec4; --verde: #4cc35a;
+  --borde: #39435e; --carta: #2c3550;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: radial-gradient(ellipse at top, #2d3a5a, var(--fondo) 60%) fixed, var(--fondo);
+  color: var(--tinta); font: 600 15px/1.4 Nunito, system-ui, sans-serif;
+}
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.chico { color: var(--suave); font-size: 13px; margin: 4px 0; }
+.ico { font-style: normal; }
+
+/* Barra superior */
+.barra { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #141a26cc; border-bottom: 1px solid var(--borde); position: sticky; top: 0; z-index: 5; }
+.logo { font: 400 22px 'Lilita One', sans-serif; margin: 0; color: var(--amarillo); letter-spacing: 1px; text-shadow: 2px 2px 0 var(--azul); }
+.zona { color: var(--suave); font-size: 13px; }
+.hueco { flex: 1; }
+.mini { background: var(--fondo2); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 10px; }
+
+.boton {
+  background: var(--rojo); border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 800;
+  box-shadow: 0 4px 0 #8f1f05; transition: transform .08s;
+}
+.boton:active { transform: translateY(3px); box-shadow: 0 1px 0 #8f1f05; }
+.boton.secundario { background: var(--fondo2); box-shadow: 0 4px 0 #11151f; }
+.botones { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+
+.vista { padding: 16px; max-width: 1100px; margin: 0 auto; }
+.tit-vista { text-align: center; font: 400 28px 'Lilita One', sans-serif; }
+
+/* Título */
+.titulo { min-height: calc(100vh - 60px); display: grid; place-items: center; text-align: center; }
+.logo-grande { font: 400 clamp(48px, 12vw, 96px) 'Lilita One', sans-serif; margin: 0; color: var(--amarillo); text-shadow: 4px 4px 0 var(--azul), 8px 8px 0 #0006; letter-spacing: 3px; }
+.lema { color: var(--suave); max-width: 420px; margin: 8px auto; }
+
+/* Cartas de Pokémon (inicial, captura) */
+.cartas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.carta {
+  background: var(--carta); border: 2px solid var(--borde); border-radius: 16px; padding: 12px; width: 190px;
+  text-align: center; transition: transform .12s, border-color .12s;
+}
+.carta:hover, .carta:focus-visible { transform: translateY(-4px); border-color: var(--amarillo); outline: none; }
+.carta img { width: 96px; height: 96px; image-rendering: pixelated; }
+.carta .nombre { font: 400 20px 'Lilita One', sans-serif; }
+.carta ul { list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; color: var(--suave); }
+.tipos { display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.tipo { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 99px; color: #fff; text-shadow: 0 1px 1px #0008; }
+
+/* Mapa */
+.mapa-vista { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.mapa-caja { background: #1a2130; border: 1px solid var(--borde); border-radius: 16px; padding: 8px; }
+.mapa { width: 100%; height: auto; display: block; }
+.mapa .arista { stroke: #4a5675; stroke-width: 3; stroke-dasharray: 2 7; stroke-linecap: round; }
+.mapa .arista.hecha { stroke: var(--amarillo); stroke-dasharray: none; }
+.mapa .nodo circle { fill: #2f3a57; stroke: #56638a; stroke-width: 3; }
+.mapa .nodo text { font-size: 20px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.mapa .nodo.visitado circle { fill: #45506e; stroke: var(--amarillo); }
+.mapa .nodo.visitado { opacity: .75; }
+.mapa .nodo.actual circle { stroke: #fff; stroke-width: 4; }
+.mapa .nodo.libre { cursor: pointer; }
+.mapa .nodo.libre circle { fill: #3c4f7d; stroke: var(--amarillo); animation: late 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.mapa .nodo.libre:hover circle, .mapa .nodo.libre:focus circle { fill: #5470b0; }
+.mapa .nodo.bloqueado { opacity: .45; }
+.mapa .nodo.jefe circle { fill: #5a3b2a; }
+@keyframes late { 50% { transform: scale(1.12); } }
+
+/* Panel de equipo */
+.panel-equipo { background: var(--fondo2); border: 1px solid var(--borde); border-radius: 16px; padding: 12px; position: sticky; top: 64px; }
+.tit-panel { margin: 0; font: 400 20px 'Lilita One', sans-serif; }
+.equipo { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.miembro { display: grid; grid-template-columns: 48px 1fr auto; gap: 8px; align-items: center; background: var(--carta); border-radius: 12px; padding: 6px 8px; border: 2px solid transparent; }
+.miembro.frente { border-color: var(--amarillo); }
+.miembro.caido { opacity: .5; filter: grayscale(1); }
+.miembro img { width: 48px; height: 48px; image-rendering: pixelated; }
+.miembro .linea { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; }
+.miembro .flechas { display: flex; flex-direction: column; gap: 2px; }
+.miembro .flechas button { background: var(--fondo2); border: 1px solid var(--borde); border-radius: 6px; padding: 0 6px; font-size: 11px; line-height: 18px; }
+.miembro .flechas button:disabled { opacity: .3; cursor: default; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--suave); margin-top: 8px; }
+
+.barra-ps, .barra-xp { height: 6px; background: #0d111a; border-radius: 99px; overflow: hidden; margin-top: 3px; }
+.barra-ps i, .barra-xp i { display: block; height: 100%; width: 100%; background: var(--verde); transition: width .5s ease, background-color .3s; }
+.barra-ps i.medio { background: var(--amarillo); }
+.barra-ps i.bajo { background: var(--rojo); }
+.barra-xp { height: 4px; }
+.barra-xp i { background: #4aa3ff; }
+
+/* Combate */
+.combate { max-width: 720px; margin: 0 auto; }
+.arena {
+  position: relative; aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; border: 2px solid var(--borde);
+  background: linear-gradient(#8fd3ff 0 45%, #9ad37a 45% 100%);
+}
+.arena.bosque { background: linear-gradient(#5aa06a 0 45%, #4c8a3f 45% 100%); }
+.arena.gimnasio { background: linear-gradient(#a58a6a 0 45%, #c9b28a 45% 100%); }
+.lugar { position: absolute; width: 34%; display: grid; place-items: center; }
+.lugar::after { content: ''; position: absolute; bottom: 4%; width: 90%; height: 18%; border-radius: 50%; background: #0002; z-index: 0; }
+.lugar-e { right: 8%; top: 12%; }
+.lugar-j { left: 6%; bottom: 2%; }
+.sprite { position: relative; z-index: 1; width: 70%; image-rendering: pixelated; transition: opacity .3s, transform .3s; }
+.lugar-j .sprite { width: 82%; }
+.sprite.embiste { animation: embiste .3s ease; }
+.lugar-e .sprite.embiste { animation-name: embisteE; }
+.sprite.golpe { animation: golpe .4s steps(2) 2; }
+.sprite.cae { transform: translateY(40%); opacity: 0; }
+.sprite.brilla { animation: brilla 1s ease; }
+@keyframes embiste { 50% { transform: translate(18%, -12%); } }
+@keyframes embisteE { 50% { transform: translate(-18%, 12%); } }
+@keyframes golpe { 50% { opacity: .2; } }
+@keyframes brilla { 0%, 100% { filter: none; } 40%, 60% { filter: brightness(3) saturate(0); } }
+.ficha {
+  position: absolute; background: #f8f4e3ee; color: #222; border-radius: 10px; padding: 6px 10px; width: 44%;
+  border: 3px solid #37414f; box-shadow: 3px 3px 0 #0004; font-size: 14px;
+}
+.ficha-e { left: 4%; top: 6%; }
+.ficha-j { right: 4%; bottom: 8%; }
+.ficha .barra-ps, .ficha .barra-xp { background: #44505e; }
+.ps-num { display: block; text-align: right; font-size: 12px; }
+.intro { position: absolute; inset: 0; background: #000a; display: grid; place-items: center; text-align: center; z-index: 3; animation: aparece .3s; }
+.intro img { height: 55%; image-rendering: pixelated; }
+.intro p { font: 400 24px 'Lilita One', sans-serif; margin: 0; }
+@keyframes aparece { from { opacity: 0; } }
+.texto {
+  min-height: 3.2em; background: #f8f4e3; color: #222; border: 3px solid #37414f; border-radius: 10px;
+  padding: 8px 12px; margin: 10px 0; font-size: 16px;
+}
+.controles { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.movs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mov {
+  border: 0; border-radius: 10px; padding: 8px 10px; text-align: left; color: #fff; text-shadow: 0 1px 2px #0009;
+  box-shadow: inset 0 -4px 0 #0003; display: flex; justify-content: space-between; align-items: center; gap: 6px;
+}
+.mov small { opacity: .9; font-size: 11px; }
+.mov:disabled { cursor: default; filter: saturate(.55) brightness(.85); }
+.mov.elegido { outline: 3px solid #fff; filter: none; }
+.opciones { display: flex; flex-direction: column; gap: 8px; }
+.interruptor { background: var(--fondo2); border: 2px solid var(--borde); border-radius: 10px; padding: 6px 12px; font-weight: 800; min-width: 72px; }
+.interruptor[aria-pressed="true"] { background: var(--verde); border-color: #2f8a3b; color: #0b2410; }
+.seguir { display: block; margin: 12px auto 0; }
+
+/* Capa (captura, centro, fin) */
+.capa { position: fixed; inset: 0; background: #0009; display: grid; place-items: center; z-index: 10; padding: 16px; overflow: auto; }
+.caja { background: var(--fondo2); border: 2px solid var(--borde); border-radius: 18px; padding: 18px; max-width: 760px; width: 100%; text-align: center; }
+.caja h2 { margin: 0 0 4px; font: 400 26px 'Lilita One', sans-serif; }
+.caja .carta { cursor: pointer; }
+.medalla {
+  width: 90px; height: 90px; margin: 10px auto; background: linear-gradient(135deg, #d9d9d9, #8c8c8c);
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  box-shadow: inset 0 0 0 6px #6b6b6b; animation: brilla 1.2s ease;
+}
+.mini-equipo { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.mini-equipo figure { margin: 0; font-size: 12px; }
+.mini-equipo img { width: 64px; height: 64px; image-rendering: pixelated; display: block; margin: auto; }
+
+@media (max-width: 760px) {
+  .mapa-vista { grid-template-columns: 1fr; }
+  .panel-equipo { position: static; order: -1; }
+  .equipo { grid-template-columns: 1fr 1fr; }
+  .miembro { grid-template-columns: 36px 1fr auto; padding: 4px 6px; }
+  .miembro img { width: 36px; height: 36px; }
+  .leyenda { display: none; }
+  .ficha { font-size: 12px; width: 48%; }
+  .controles { grid-template-columns: 1fr; }
+  .opciones { flex-direction: row; justify-content: center; }
+  .carta { width: 150px; }
+}
+@media (max-width: 480px) {
+  .barra { gap: 6px; padding: 6px 10px; }
+  .logo { font-size: 18px; }
+  .zona { display: none; }
+  .vol { min-width: 0; flex-shrink: 1; overflow: hidden; }
+  .vol input[type=range] { width: 70px; }
+}
+
+/* Medallas */
+.medallas { display: flex; gap: 5px; justify-content: center; margin: 4px 0 8px; flex-wrap: wrap; }
+.medalla-mini {
+  width: 22px; height: 22px; background: #11151f; opacity: .55;
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+}
+.medalla-mini.tiene { background: var(--c); opacity: 1; box-shadow: inset 0 0 0 3px #0003; }
+.medalla { background: var(--c, #a8a8a8); }
+.medalla.campeon { background: linear-gradient(135deg, #ffe680, #d4a017); }
+
+/* Más fondos de arena */
+.arena.cueva { background: linear-gradient(#4a4038 0 45%, #6b5a48 45% 100%); }
+.arena.torre { background: linear-gradient(#3b3352 0 45%, #5d5274 45% 100%); }
+.arena.mar { background: linear-gradient(#8fd3ff 0 45%, #3f7fc9 45% 100%); }
+.arena.liga { background: linear-gradient(#2b1f4a 0 45%, #6a4b9a 45% 100%); }
+
+/* Modo prueba */
+.prueba { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--borde); }
+.prueba-opc { margin-top: 6px; display: grid; gap: 6px; justify-items: center; }
+.interruptor-fila { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.interruptor-fila select { background: var(--fondo2); color: var(--tinta); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; font: inherit; }
+.marca-prueba { background: #c58b00; color: #1a1200; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: 1px; }
+.botones.columna { flex-direction: column; align-items: stretch; max-width: 320px; margin-left: auto; margin-right: auto; }
