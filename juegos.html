@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610110131"></script>
+<script src="i18n.js?v=202610110213"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -848,6 +848,47 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-rep-it.elegida{background:#7042df33}
   .jg-rep-it.elegida b{color:#d6c7ff}
   .jg-rep-it.auto{margin-top:6px}
+  /* YouTube en el reproductor: pestañas del panel y la caja flotante (youtube.js).
+     La caja no baja de 200 × 200 de video: lo piden las normas de YouTube. */
+  .jg-rep-tabs{display:flex;gap:4px;margin:0 14px 8px;border-bottom:1px solid #ffffff12}
+  .jg-rep-tabs button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-bottom:2px solid transparent;background:transparent;color:#a99bd0;font-size:12px;font-weight:600;padding:8px 4px 9px;cursor:pointer}
+  .jg-rep-tabs button.on{color:#fff;border-bottom-color:#b598ff}
+  .jg-rep-lista[hidden]{display:none}
+  .jg-rep-yt{border-top:0;padding-top:2px}
+  .jg-yt-logo{display:inline-block;width:18px;height:13px;flex:0 0 auto;border-radius:4px;background:#f03;position:relative}
+  .jg-yt-logo::after{content:"";position:absolute;left:7px;top:3.5px;border-left:6px solid #fff;border-top:3px solid transparent;border-bottom:3px solid transparent}
+  .jg-yt-pega{display:flex;gap:6px;margin:6px 6px 8px}
+  .jg-yt-pega input{flex:1;min-width:0;height:34px;border-radius:9px;border:1px solid #ffffff1f;background:#0000004d;color:#fff;padding:0 10px;font-size:12.5px}
+  .jg-yt-pega input::placeholder{color:#8d84aa}
+  .jg-yt-pega button{width:34px;height:34px;border-radius:9px;border:0;background:#f03;color:#fff;cursor:pointer}
+  .jg-yt-err{margin:0 6px 8px;padding:8px 10px;border-radius:10px;background:#ff4d6d22;color:#ffb3c1;font-size:11.5px}
+  .jg-yt-err[hidden]{display:none}
+  .jg-yt-google{display:flex;align-items:center;justify-content:center;gap:9px;width:calc(100% - 12px);margin:4px 6px;height:38px;border-radius:100px;border:0;background:#fff;color:#1f1f1f;font-size:13px;font-weight:600;cursor:pointer}
+  .jg-yt-google:hover{background:#ece9f6}
+  .jg-yt-nota{margin:6px 8px 4px;font-size:11px;color:#9a93b1;line-height:1.45}
+  .jg-yt-yo{display:flex;align-items:center;gap:9px;margin:4px 8px}
+  .jg-yt-yo img{width:26px;height:26px;border-radius:50%}
+  .jg-yt-yo b{flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jg-yt-salir{border:1px solid #ffffff24;background:transparent;color:#c9c1e0;border-radius:100px;font-size:11px;padding:4px 10px;cursor:pointer}
+  .jg-yt-ic{overflow:hidden}.jg-yt-ic img{width:100%;height:100%;object-fit:cover}
+  .jg-rep-it.activa .jg-yt-ic img{display:none}
+  .jg-rep-it.cargando{opacity:.55;cursor:progress}
+  .jg-yt{position:fixed;z-index:85;display:flex;flex-direction:column;background:#15121f;color:#ece6fb;border:1px solid #ffffff1c;border-radius:14px;box-shadow:0 18px 50px #0008;overflow:hidden}
+  .jg-yt.moviendo{opacity:.85}.jg-yt.moviendo .jg-yt-video{pointer-events:none}
+  .jg-yt-barra{display:flex;align-items:center;gap:9px;padding:8px 8px 8px 11px;cursor:grab;touch-action:none;user-select:none}
+  .jg-yt.moviendo .jg-yt-barra{cursor:grabbing}
+  .jg-yt-txt{flex:1;min-width:0}
+  .jg-yt-txt b,.jg-yt-txt small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jg-yt-txt b{font-size:12.5px}.jg-yt-txt small{font-size:10.5px;color:#9a93b1}
+  .jg-yt-x{width:26px;height:26px;border-radius:50%;border:0;background:#ffffff12;color:#fff;cursor:pointer;font-size:11px}
+  .jg-yt-video{height:200px;min-width:200px;background:#000}
+  .jg-yt-video iframe{display:block;width:100%;height:100%;border:0}
+  .jg-yt-ctrl{display:flex;align-items:center;gap:5px;padding:7px 10px}
+  .jg-yt-ctrl button{width:30px;height:30px;border-radius:50%;border:0;background:#ffffff12;color:#fff;cursor:pointer;font-size:12px}
+  .jg-yt-ctrl button.pp{background:#fff;color:#241f36}
+  .jg-yt-ctrl button.on{background:#7042df}
+  .jg-yt-vol{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px}
+  .jg-yt-vol input{width:78px;accent-color:#b598ff}
   @media (max-width:560px){.jg-rep-btn{max-width:150px}}
   @media (prefers-reduced-motion:reduce){.jg-eq i,.jg-rep.sonando .jg-rep-disco{animation:none!important}}
   main{max-width:1232px;padding:28px 32px 72px}.bar{margin-bottom:24px;gap:10px}
@@ -4672,6 +4713,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610110131"></script>
+<script src="juegos-app.js?v=202610110213"></script>
 </body>
 </html>

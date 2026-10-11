@@ -40,6 +40,35 @@ in `position:fixed`, like the rules manual, and while open it only retouches
 classes and texts on each `alCambiarMusica`, so the volume slider keeps the
 finger mid-drag.
 
+**YouTube in the player** (`colabtex/src/juegos/youtube.js`, pure part in
+`youtube-datos.js`, tested by `tests/youtube.test.cjs`). The panel has two
+tabs, Repertorio and YouTube. A pasted link (video, playlist, YouTube Music,
+youtu.be, shorts) plays with no account. «Conectar con Google» is **not** the
+site login: Google Identity Services asks for a separate token, scope
+`youtube.readonly`, with the OAuth client `947244697252-…` in project
+mi-pagina-pro. The token lasts an hour and lives only in `sessionStorage`
+(`jg.yt.token`). `jg.yt.cuenta` remembers the name, so after a reload one
+click re-asks silently. The panel then lists «Me gusta» (`relatedPlaylists.likes`)
+and the account's playlists, and plays up to 200 ids (`MAX_IDS`, the
+`loadPlaylist` limit). Things to keep:
+- The video stays **visible, ≥ 200 × 200**, which is YouTube's policy. It is
+  a floating box you can drag (`jg.yt.pos`) and close, never a hidden audio
+  element.
+- While YouTube plays, `cederMusica(true)` silences the house song, which
+  comes back on close. Picking a house song closes YouTube. YouTube's volume
+  follows `jg.volumen`, and ⏯ ⏮ ⏭ and the header button talk to YouTube.
+- Errors 101/150 (embedding blocked, common on label uploads) skip to the
+  next video.
+- Titles carry `translate="no"`.
+- The scope is sensitive and the app is not verified, so it works for up to
+  100 users. Each one sees «Google no verificó esta app» → Configuración
+  avanzada → Ir a…. With the Audience in *Testing*, only listed test users
+  can connect.
+- The YouTube Data API v3 must be enabled in the Cloud project. Without it,
+  the panel says so.
+- Games with their own music inside a frame (Trigon, Circuit Breakers) are
+  not silenced by YouTube; mute them in the game.
+
 **Trigon is the one game whose music is not chip**: `juegos/club/trigon/musica.js`
 is its own synth (Cyberpunk-anime darksynth; details in
 `juegos/club/trigon/CLAUDE.md`), played only inside its iframe and not
