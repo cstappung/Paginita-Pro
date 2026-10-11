@@ -33,6 +33,11 @@ export function crearTetris(ctx) {
   let raiz = null, p = null, est = null, s = null, muerto = false;
   let raf = 0, t0 = 0, vivoT = 0, aplicada = 0, finPedido = false, fondoT = 0;
   let caidaSonada = false, caidaEnVuelo = false, caidaOtra = 0;
+  /* La largada: el pozo propio espera tres segundos de cuenta atrás antes
+     de caer (3, 2, 1 en rojo y un «¡YA!», con su pitido de carrera). Cada
+     pozo es de su navegador, así que la cuenta también: nada viaja por la
+     red. `largadaHasta` es el instante del «¡YA!»; 0 cuando ya se juega. */
+  let largadaHasta = 0, cuentaVista = 0, cartel = null;
   let vivos = {}, desVivo = null, visto = -1;
   const firmas = {};
   const W = TM.W, HV = TM.H - TM.OCULTAS;
@@ -68,7 +73,7 @@ export function crearTetris(ctx) {
   };
 
   const mando = TM.crearMando(a => {
-    if (!s || !juego() || s.fin) return;
+    if (!s || !juego() || s.fin || largadaHasta) return;
     if (a === "pausa") return;
     const ok = TM.accion(s, a);
     if (ok && (a === "izq" || a === "der")) son("mueve", s.p && s.p.x);
@@ -123,6 +128,7 @@ export function crearTetris(ctx) {
       </div>
       <div id="ttHist" class="jg-tt-hist"></div>`;
     host.appendChild(raiz);
+    cartel = TFX.cartelCuenta(raiz.querySelector(".jg-tt-pozo"));
     window.addEventListener("resize", alGirar);
     const pintaTeclas = () => { raiz.querySelector("#ttTeclasTxt").textContent = TM.textoTeclas(); };
     pintaTeclas(); ponMando();
@@ -132,7 +138,7 @@ export function crearTetris(ctx) {
     });
     raiz.querySelector("#ttTactil").addEventListener("pointerdown", e => {
       const b = e.target.closest("button[data-a]");
-      if (!b || !juego()) return;
+      if (!b || !juego() || largadaHasta) return;
       e.preventDefault();
       const a = b.dataset.a;
       /* ▼ y ◀ ▶ se mantienen, como en el Club: los laterales usan el mismo
@@ -171,6 +177,20 @@ export function crearTetris(ctx) {
     s = TM.crear({ semilla: est.semilla || 1, subeCada: SUBE_CADA });
     fx = TFX.crearEfectos({ TM, celda: CELDA });
     aplicada = 0;
+    if (juego()) { largadaHasta = performance.now() + 3150; cuentaVista = 0; }
+  }
+  /* Mientras dure la cuenta devuelve true (el pozo no avanza); cada número
+     aparece y suena una vez, y en el «¡YA!» suelta el pozo. */
+  function enCuenta(ahora) {
+    if (!largadaHasta) return false;
+    const falta = largadaHasta - ahora;
+    if (falta > 3000) return true;
+    const n = Math.max(0, Math.ceil(falta / 1000));
+    if (n !== cuentaVista) { cuentaVista = n; if (cartel && !document.hidden) cartel.pon(n); son("cuenta", n); }
+    if (n > 0) return true;
+    largadaHasta = 0;
+    mando.suelta();
+    return false;
   }
 
   /* ---------- el bucle ---------- */
@@ -195,6 +215,7 @@ export function crearTetris(ctx) {
   function paso(ahora, dt) {
     if (!s || !est) return;
     if (juego()) {
+      if (enCuenta(ahora)) return;
       if (!s.fin) {
         const deben = est.basura[uid] || 0;
         if (deben > aplicada) { const n = deben - aplicada; TM.recibe(s, n); aplicada = deben; if (s.tiempo > 500) { fx.amenaza(n); son("alarma", n); } }

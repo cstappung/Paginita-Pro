@@ -30,6 +30,8 @@
  *              cinco de Subway City (`metrorush-city-sur`, `-muelles`,
  *              `-bulevar`, `-parque`, `-bajo`), porque audio.js los hace
  *              rotar en vez de repetir uno solo toda la carrera.
+ *   trigon     Fa# menor armónico, 120 — darksynth de anime cyberpunk, con
+ *              bombeo, arpegio resonante y un puente napolitano (Sol sobre Fa#).
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
  *
@@ -1545,6 +1547,36 @@
         "R - - . R - F - R - - . O - F -", "k...h.hks...h.hx", 2)
     },
     orden: "I A A B A B"
+  };
+
+  /* Trigon («Prisma Neón»): darksynth de anime cyberpunk, Fa# menor
+     armónico a 120. La ciudad de noche desde un tren elevado: bajo de sierra
+     a semicorcheas que galopa con el bombeo, arpegio de sierra resonante
+     (casi ácido), melodía ancha y desafinada con mucho eco, y un puente en
+     Sol mayor sobre el Fa# —el segundo grado napolitano— que es lo que la
+     separa de los synthwave alegres de la casa (Neón 84, Línea Neón). El Mi#
+     sobre Do# es la sensible: cada vuelta se cierra en tensión. */
+  T.trigon = {
+    bpm: 120, bombeo: .45,
+    lead: { onda: "saw", vol: .095, vib: .01, desafina: 14, filtro: 2300, eco: { fb: .48, mezcla: .4 } },
+    bajo: { onda: "saw", vol: .13, filtro: 430, q: 5 },
+    arp: { onda: "saw", vol: .05, oct: 4, paso: .05, filtro: 1250, q: 8, sus: .45 },
+    bat: { vol: .36 },
+    secciones: {
+      I: sec("F#m F#m D C#", "", "R . . R . . R . R . . R . . O .", "k...o...k...o..h", 2),
+      A: sec("F#m D Bm C#",
+        "C#6*3 B5 A5*2 G#5*2 A5*2 C#6*2 F#6*4  E6*3 D6 C#6*2 A5*2 F#5*4 .*2 A5*2  " +
+        "B5*2 D6*2 F#6*3 E6 D6*2 C#6*2 B5*4  E#5*4 G#5*2 B5*2 C#6*6 .*2",
+        "R R O R R R O R R R O R R O R O", "k.o.c.okk.o.c.oh", 2),
+      B: sec("D E A C#",
+        "F#6*2 A6*2 F#6*2 E6*2 D6*4 A5*4  G#6*2 B6*2 G#6*2 F#6*2 E6*4 B5*4  " +
+        "A6*3 G#6 E6*2 C#6*2 E6*2 F#6*2 G#6*4  E#6*4 G#6*4 C#7*8",
+        "R R O R R R O R R R O R R O R O", "kho.shokkho.shoc", 2),
+      C: sec("G F#m G C#7",
+        "B5*6 D6*2 G6*4 F#6*4  F#6*8 C#6*4 A5*4  B5*4 D6*4 G6*2 A6*2 B6*4  G#6*4 E#6*4 C#6*8",
+        "R - - - - - - - R - - - O - - -", "K.......s.......", 1)
+    },
+    orden: "I A A B C A B B"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };

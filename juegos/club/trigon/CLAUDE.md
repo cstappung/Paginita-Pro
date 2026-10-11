@@ -27,3 +27,21 @@ the illustrated manual are wired like 2048's, plus the `ttrigon` champion
 frame (a turning ring of triangles; no replays yet); the `soloRanks`, `soloPruebas` and `clubJugadas` regexes
 were widened, so the rules must be re-published.
 `tests/trigon.test.cjs` covers geometry, motor and verifier.
+
+**Look and sound (`juego.js`).** Each filled triangle is a gem: `bisel()`
+draws, right after its polygon, a `<g class="bisel">` with three bevel faces
+(white or black by how each edge faces the light from above) and an inner
+table; CSS shows it with `.celda.llena + .bisel`, so the polygon and its
+classes (`llena`, `fantasma`, `cierra`, `data-i` for the hammer) are the same
+as before. Just-placed cells get `.nueva` (a scale-in with a flash). The
+power-ups are ability slots, not emojis: inline SVG icons (`ICONOS`) in the
+colour of each power (`--poder-*` in `temas.css`, the same in every theme),
+name, charge badge and key. **Audio** is one `AudioContext` (behind
+`volumen.js`) with a music bus playing `Temas.temas.trigon` («Prisma Neón»,
+darksynth in F# harmonic minor; `chip.js` + `temas.js` are loaded by the
+page), an effects bus and a generated-impulse reverb. Effects are in the
+song's key: placing a piece is a soft glass note from the F# minor
+pentatonic (one per shape, panned by where it lands); clearing lines is an
+arpeggio on the chord of the current streak that grows with 2 lines and
+**saturates at 3**. ♪ mutes the music (`trigon.musica`), the speaker the
+effects (`trigon.mudo`). The melody drops out in the menu and after the end.

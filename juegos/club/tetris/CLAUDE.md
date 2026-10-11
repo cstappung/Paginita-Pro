@@ -49,3 +49,14 @@ forever. `avisaCaida` retries until the reducer marks the player `fuera` (a
 `requestAnimationFrame`, so `alOcultar` drives the pit with a 1 s interval
 cut into 100 ms steps: in a simultaneous game the well keeps falling, and
 someone who switched tabs still loses.
+
+**Both start after a 3-second countdown** (red 3, 2, 1 and a green «¡YA!»
+in the middle of the pit, `TFX.cartelCuenta`; race-start beeps and a
+revving engine, `sonido.cuenta`). In the Club it is the `'cuenta'` state of
+`game.js`: the well already shows its piece, but no step runs and no key,
+wall clock or key log (`pulsos`) is recorded until «¡YA!», so the proof is
+exactly what it was without the countdown. Blur or pause during the count
+pauses, and «Seguir» restarts the count. In the room each browser counts
+its own well (`largadaHasta` in `tetris.js`; nothing crosses the network):
+`paso` returns early, so the well neither falls nor takes garbage nor writes
+`tetrisVivo` until then, and the mando/touch handlers ignore input.
