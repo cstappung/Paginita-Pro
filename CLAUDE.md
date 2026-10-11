@@ -46,7 +46,7 @@ before the first edit. Read only the docs the task needs.
 | **Any Juegos work** (rooms, a new game, a game screen) | `colabtex/src/juegos/CLAUDE.md` (always), plus the game's doc below |
 | Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades | `docs/claude/juegos/salon.md` |
 | Perfiles, marcos, fondos, tienda, clasificación/ranking, logros, monedas, recompensa diaria | `docs/claude/juegos/perfiles-y-economia.md` |
-| Música, canciones, reproductor ♪, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
+| Música, canciones, reproductor ♪, YouTube, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |

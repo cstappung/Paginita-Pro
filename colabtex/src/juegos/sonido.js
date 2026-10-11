@@ -402,6 +402,7 @@ let juego = "", sonando = "", timer = null, desbloqueado = false, rep = null;
 let volumen = 0.3, musicaOn = true, eleccion = "auto", modo = "repite";
 let ajuste = { tempo: 1, capas: null };
 let inicio = 0, vueltasVistas = 0;
+let cedida = false;   // YouTube suena (`youtube.js`): la música de la casa calla
 const oyentes = new Set();
 try {
   musicaOn = localStorage.getItem("jg.musica") !== "0";
@@ -421,9 +422,12 @@ export const volumenMusica = () => volumen;
 /** Todo lo que el reproductor de la cabecera necesita para pintarse. */
 export function estadoMusica() {
   const c = POR_ID[sonando] || null;
-  return { on: musicaOn, volumen, eleccion, modo, juego, cancion: c, sonando: !!(c && musicaOn && desbloqueado && !document.hidden),
-    propia: juego === null, delJuego: POR_ID[POR_JUEGO[juego]] || null };
+  return { on: musicaOn, volumen, eleccion, modo, juego, cancion: c, sonando: !!(c && musicaOn && !cedida && desbloqueado && !document.hidden),
+    propia: juego === null, delJuego: POR_ID[POR_JUEGO[juego]] || null, cedida };
 }
+/** YouTube toma o devuelve el sonido: mientras `on`, la canción de la casa
+    no suena, aunque siga elegida, y vuelve sola al cerrarlo. */
+export function cederMusica(on) { if (cedida === !!on) return; cedida = !!on; sincronizaMusica(); }
 /** Se avisa con cada cambio: canción, pausa, volumen, modo o sitio. Devuelve cómo dejar de oír. */
 export function alCambiarMusica(f) { oyentes.add(f); return () => oyentes.delete(f); }
 
@@ -510,7 +514,7 @@ function sincronizaMusica(reinicia) {
     sonando = id; inicio = ctx ? ctx.currentTime : 0; vueltasVistas = 0;
   }
   avisa();
-  if (!sonando || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(false); return; }
+  if (!sonando || !musicaOn || cedida || !desbloqueado || document.hidden) { detenerMusica(false); return; }
   const c = POR_ID[sonando];
   if (c.url) {
     try {
