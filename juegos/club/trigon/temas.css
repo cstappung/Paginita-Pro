@@ -139,3 +139,9 @@ html[data-skin="espacio"][data-modo="claro"] body{background-size:280px 230px,28
 html[data-skin="halloween"] body{background-repeat:no-repeat;background-position:top center,0 0,0 0}
 html[data-skin="forest"] body{background-repeat:repeat-x,no-repeat,no-repeat;background-position:bottom,0 0,0 0;background-size:240px 120px,auto,auto}
 html[data-skin="forest"][data-modo="claro"] body{background-repeat:repeat-x;background-position:bottom;background-size:240px 120px}
+
+/* ---------- Los poderes: un color por poder, el mismo en todos los temas ----------
+   Que el martillo sea siempre ámbar y la bomba siempre roja es lo que deja
+   reconocerlos de reojo; el modo claro solo los oscurece para el contraste. */
+:root{--poder-martillo:#ffb547;--poder-bomba:#ff5470;--poder-girar:#3ee0ff;--poder-cambio:#b48cff;--poder-vida:#ffd84a}
+[data-modo="claro"]{--poder-martillo:#d97a00;--poder-bomba:#e0284c;--poder-girar:#0590b8;--poder-cambio:#7c4ddb;--poder-vida:#b88a00}

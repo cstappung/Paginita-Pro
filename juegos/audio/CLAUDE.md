@@ -40,6 +40,12 @@ in `position:fixed`, like the rules manual, and while open it only retouches
 classes and texts on each `alCambiarMusica`, so the volume slider keeps the
 finger mid-drag.
 
+**Trigon is the one game whose music is not chip**: `juegos/club/trigon/musica.js`
+is its own synth (Cyberpunk-anime darksynth; details in
+`juegos/club/trigon/CLAUDE.md`), played only inside its iframe and not
+listed in `CANCIONES`. The chip version sounded arcade, which is what the
+user rejected.
+
 **A theme may be a recording instead** (a `CANCIONES` entry with a `url`): Flip 7, Cacho and UNO play
 "Poker Night" by Zane Little (OpenGameArt, CC0) from `juegos/audio/`, looped by
 hand at `fin` (124.3 s) through `timeupdate` because the file's tail is

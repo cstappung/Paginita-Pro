@@ -57,11 +57,12 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 @keyframes popSuma{0%{transform:translate(-50%,6px);opacity:1}100%{transform:translate(-50%,-28px);opacity:0}}
 .mini{font:400 15px/1 var(--cartel);padding:9px 12px;border-radius:9px;border:none;background:var(--borde);color:var(--sobre-borde);cursor:pointer;min-height:38px}
 @media (hover:hover){.mini:hover{filter:brightness(1.15)}}
-#sound-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:9px;border:none;background:var(--borde);color:var(--sobre-borde);cursor:pointer}
-#sound-button svg{width:22px;height:22px}
+#sound-button,#music-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:9px;border:none;background:var(--borde);color:var(--sobre-borde);cursor:pointer}
+#sound-button svg,#music-button svg{width:22px;height:22px}
 #sound-button[aria-pressed=false] .ondas{display:none}
-#sound-button[aria-pressed=true] .cruz{display:none}
-@media (pointer:coarse){.mini,#sound-button{min-height:44px;min-width:44px}}
+#sound-button[aria-pressed=true] .cruz,#music-button[aria-pressed=true] .cruz{display:none}
+#music-button[aria-pressed=false]{opacity:.7}
+@media (pointer:coarse){.mini,#sound-button,#music-button{min-height:44px;min-width:44px}}
 
 /* --- El escenario: el hexágono y sus capas --- */
 .escenario{position:relative;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;margin:0 auto;border-radius:16px;overflow:hidden;
@@ -70,8 +71,19 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 .tablero{position:absolute;inset:0;width:100%;height:100%;display:block}
 .tablero polygon{stroke-linejoin:round}
 .celda{fill:var(--celda);transition:fill .12s}
-.celda.llena{fill:var(--color)}
+.celda.llena{fill:var(--color);stroke:color-mix(in srgb,var(--color) 55%,#fff);stroke-width:.025}
 .celda.fantasma{fill:var(--color);opacity:.5}
+/* El bisel (juego.js, bisel): las caras de gema de cada triángulo ocupado. */
+.bisel{pointer-events:none;opacity:0;transition:opacity .12s}
+.bisel .mesa{fill:#fff;fill-opacity:.07}
+.celda.llena+.bisel,.pieza+.bisel{opacity:1}
+.celda.fantasma+.bisel{opacity:.45}
+.celda.cierra+.bisel .mesa{fill-opacity:.3}
+/* Recién puesta: entra un poco grande, con un destello, y se asienta. */
+.celda.nueva,.celda.nueva+.bisel{transform-box:fill-box;transform-origin:center;animation:asienta .38s cubic-bezier(.3,1.6,.5,1)}
+.celda.nueva{animation-name:asienta,destello}
+@keyframes asienta{0%{transform:scale(1.22)}100%{transform:none}}
+@keyframes destello{0%{filter:brightness(1.9)}100%{filter:none}}
 .celda.cierra{filter:brightness(1.35) drop-shadow(0 0 .08px #fff)}
 .celda.cierra:not(.llena):not(.fantasma){fill:var(--celda-cierra)}
 .celda.invalida{fill:#e8322f;opacity:.55}
@@ -108,27 +120,60 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 @keyframes onda{0%{transform:translate(-50%,-50%) scale(.1);opacity:1}100%{transform:translate(-50%,-50%) scale(4);opacity:0;border-width:1px}}
 
 /* --- Los poderes: botones sobre el tablero, sus modos y el aviso --- */
+/* Cada poder es una ranura de habilidad: cristal oscuro con el borde y el
+   icono del color del poder (--pc, temas.css), su nombre abajo, la carga en
+   una placa y la tecla en la esquina. Activo, se enciende entero. */
 /* Celular: una fila fija entre el tablero y la mano, que no tapa ningún triángulo. */
-.poderes{display:flex;justify-content:center;gap:8px;min-height:46px;margin:10px auto 0;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%}
+.poderes{display:flex;justify-content:center;gap:8px;min-height:62px;margin:10px auto 0;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%}
 .poder.vacio{visibility:hidden}
-.poder{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:12px;border:none;
-  background:var(--panel);color:var(--tinta);font:400 21px/1 var(--cartel);box-shadow:0 3px 0 #0005;cursor:pointer;transition:transform .12s;animation:llegaPoder .35s cubic-bezier(.3,1.5,.6,1)}
-@keyframes llegaPoder{0%{transform:scale(.3);opacity:0}100%{transform:none;opacity:1}}
-.poder b{font-size:16px;min-width:1ch;font-variant-numeric:tabular-nums}
-.poder:disabled{opacity:.35;cursor:default;filter:grayscale(.6)}
-.poder[aria-pressed=true]{background:var(--acento);color:var(--sobre-acento);transform:rotate(-12deg) scale(1.08)}
+.poder[data-poder=martillo]{--pc:var(--poder-martillo)}
+.poder[data-poder=bomba]{--pc:var(--poder-bomba)}
+.poder[data-poder=girar]{--pc:var(--poder-girar)}
+.poder[data-poder=cambio]{--pc:var(--poder-cambio)}
+.poder[data-poder=vida]{--pc:var(--poder-vida)}
+.poder{position:relative;display:grid;grid-template-rows:1fr auto;justify-items:center;align-items:center;gap:1px;width:62px;height:62px;padding:7px 4px 5px;
+  border-radius:14px;cursor:pointer;color:var(--pc);border:1.5px solid color-mix(in srgb,var(--pc) 70%,transparent);
+  background:linear-gradient(165deg,color-mix(in srgb,var(--pc) 26%,var(--panel)) 0%,var(--panel) 55%,color-mix(in srgb,var(--panel) 80%,#000) 100%);
+  box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 0 #0004,0 0 14px color-mix(in srgb,var(--pc) 30%,transparent),0 4px 0 #0006;
+  transition:transform .12s,box-shadow .2s,background .2s;animation:llegaPoder .4s cubic-bezier(.3,1.5,.6,1)}
+/* Un brillo de cristal que cruza la ranura de arriba abajo. */
+.poder::before{content:"";position:absolute;inset:1px;border-radius:12px;pointer-events:none;
+  background:linear-gradient(180deg,#ffffff24 0%,#ffffff08 38%,transparent 40%)}
+@keyframes llegaPoder{0%{transform:scale(.3) rotate(-14deg);opacity:0}100%{transform:none;opacity:1}}
+.poder-ico{display:grid;place-items:center;width:28px;height:28px;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--pc) 70%,transparent))}
+.poder-ico svg{width:100%;height:100%;display:block}
+.poder-nombre{font:800 9px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta);opacity:.85;white-space:nowrap}
+.poder-n{position:absolute;top:-7px;right:-7px;min-width:21px;height:21px;padding:0 5px;display:grid;place-items:center;border-radius:999px;
+  font:400 13px/1 var(--cartel);font-variant-numeric:tabular-nums;color:#14101a;background:var(--pc);
+  box-shadow:0 0 0 2px var(--fondo2),0 0 10px color-mix(in srgb,var(--pc) 60%,transparent)}
+.poder-tecla{position:absolute;top:3px;left:4px;padding:1px 3px;border-radius:4px;font:700 8.5px/1 ui-monospace,monospace;
+  color:var(--tinta);opacity:.55;background:#0003;border:1px solid #ffffff1f}
+@media (pointer:coarse){.poder-tecla{display:none}}
+@media (hover:hover){.poder:not(:disabled):hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 0 #0004,0 0 22px color-mix(in srgb,var(--pc) 55%,transparent),0 6px 0 #0006}}
+.poder:not(:disabled):active{transform:translateY(2px);box-shadow:inset 0 1px 0 #ffffff2e,0 0 10px color-mix(in srgb,var(--pc) 30%,transparent),0 1px 0 #0006}
+.poder:disabled{opacity:.38;cursor:default;filter:grayscale(.75);box-shadow:inset 0 1px 0 #ffffff1a,0 3px 0 #0005}
+.poder[aria-pressed=true]{color:#14101a;background:linear-gradient(165deg,color-mix(in srgb,var(--pc) 75%,#fff) 0%,var(--pc) 60%,color-mix(in srgb,var(--pc) 75%,#000) 100%);
+  border-color:color-mix(in srgb,var(--pc) 60%,#fff);animation:activo 1.1s ease-in-out infinite}
+.poder[aria-pressed=true] .poder-nombre{color:#14101a;opacity:1}
+.poder[aria-pressed=true] .poder-ico{filter:none}
+.poder[aria-pressed=true] .poder-n{background:#14101a;color:var(--pc)}
+@keyframes activo{50%{box-shadow:inset 0 1px 0 #fff6,0 0 0 4px color-mix(in srgb,var(--pc) 35%,transparent),0 0 26px var(--pc),0 4px 0 #0006}}
 .poder.urge{animation:urge .8s ease-in-out infinite}
-@keyframes urge{50%{transform:scale(1.15);box-shadow:0 0 0 4px var(--acento),0 0 18px var(--acento)}}
-@media (pointer:coarse){.poder{min-height:44px;min-width:60px;justify-content:center}}
+@keyframes urge{50%{transform:scale(1.1);box-shadow:inset 0 1px 0 #ffffff2e,0 0 0 4px var(--pc),0 0 22px var(--pc),0 4px 0 #0006}}
+@media (pointer:coarse){.poder{width:60px;height:60px}}
+@media (max-width:360px){.poder{width:54px;height:56px}.poder-nombre{font-size:8px}}
 .escenario.modo-martillo,.escenario.modo-bomba{box-shadow:inset 0 0 0 3px var(--acento),0 6px 0 #0004}
-.escenario.modo-martillo .celda.llena{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%A8%3C/text%3E%3C/svg%3E") 6 26,crosshair}
+.escenario.modo-martillo .celda.llena{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%23000' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 4 28 15 24 19 13 8Z'/%3E%3Cpath d='M16.5 12 5 23.5a2.5 2.5 0 0 0 3.5 3.5L20 15.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ffb547' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 4 28 15 24 19 13 8Z' fill='%23ffb547' fill-opacity='.35'/%3E%3Cpath d='M16.5 12 5 23.5a2.5 2.5 0 0 0 3.5 3.5L20 15.5'/%3E%3C/g%3E%3C/svg%3E") 5 27,crosshair}
 .escenario.modo-martillo .celda:not(.llena){opacity:.6}
 @media (hover:hover){.escenario.modo-martillo .celda.llena:hover{filter:brightness(1.45);stroke:var(--tinta);stroke-width:.05}}
 .escenario.modo-bomba .tablero{cursor:crosshair}
 .celda.mira{stroke:#ff5b3b;stroke-width:.07;filter:brightness(1.3)}
 .celda.mira:not(.llena){fill:#ff5b3b55}
 .mano.modo-girar .ranura:not(.vacia){box-shadow:inset 0 0 0 3px var(--acento);cursor:alias;animation:urge 1s ease-in-out infinite}
-.pop-poder{position:absolute;top:6px;right:70px;z-index:5;font:400 28px/1 var(--cartel);color:var(--acento);opacity:0;pointer-events:none;text-shadow:0 2px 0 #0007;white-space:nowrap}
+.pop-poder{position:absolute;top:6px;right:84px;z-index:5;display:flex;align-items:center;gap:4px;font:400 28px/1 var(--cartel);color:var(--acento);opacity:0;pointer-events:none;text-shadow:0 2px 0 #0007;white-space:nowrap}
+.pop-poder .poder-ico{width:34px;height:34px}
+.pop-poder [data-poder=martillo]{color:var(--poder-martillo)}.pop-poder [data-poder=bomba]{color:var(--poder-bomba)}
+.pop-poder [data-poder=girar]{color:var(--poder-girar)}.pop-poder [data-poder=cambio]{color:var(--poder-cambio)}.pop-poder [data-poder=vida]{color:var(--poder-vida)}
 .pop-poder.sube{animation:popPoder 1.3s ease-out}
 @keyframes popPoder{0%{transform:translateY(50px) scale(.4);opacity:0}30%{transform:translateY(0) scale(1.35);opacity:1}75%{opacity:1}100%{transform:translateY(-18px) scale(1);opacity:0}}
 .aviso{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:4;margin:0;padding:7px 14px;border-radius:999px;
@@ -141,7 +186,8 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 .ranura{aspect-ratio:1;max-width:150px;justify-self:center;width:100%;border-radius:14px;background:var(--hueco);display:grid;place-items:center;cursor:grab;
   transition:opacity .15s,transform .15s}
 .ranura svg{width:100%;height:100%;display:block;overflow:visible}
-.ranura .pieza{fill:var(--color)}
+.ranura .pieza{fill:var(--color);stroke:color-mix(in srgb,var(--color) 55%,#fff);stroke-width:.025}
+.ranura svg{filter:drop-shadow(0 3px 3px #0006)}
 .ranura.levantada{opacity:.15}
 .ranura.vacia{cursor:default}
 .ranura.no-cabe{opacity:.35;filter:grayscale(.8)}
@@ -161,7 +207,7 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
   .mesa .escenario{width:100%}
   .mano{grid-template-columns:1fr;width:var(--ancho-mano);margin:0;gap:14px}
   /* Escritorio: los poderes en columna, en la esquina vacía del tablero (encima, en la misma celda de la grilla). */
-  .mesa .poderes{grid-column:1;grid-row:1;justify-self:end;align-self:start;flex-direction:column;width:auto;min-height:0;margin:10px;z-index:4;position:relative}
+  .mesa .poderes{grid-column:1;grid-row:1;justify-self:end;align-self:start;flex-direction:column;width:auto;min-height:0;margin:16px 16px 0 0;gap:12px;z-index:4;position:relative}
   .mesa .escenario{grid-column:1;grid-row:1}
   .mesa .mano{grid-column:2;grid-row:1}
   .ranura{max-width:none}
@@ -169,7 +215,7 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 
 /* La pieza que se arrastra: fija a la ventana, a la escala del tablero. */
 .arrastre{position:fixed;left:0;top:0;z-index:50;pointer-events:none;overflow:visible;filter:drop-shadow(0 6px 6px #0008)}
-.arrastre .pieza{fill:var(--color)}
+.arrastre .pieza{fill:var(--color);stroke:color-mix(in srgb,var(--color) 55%,#fff);stroke-width:.025}
 
 /* Las capas sobre el tablero. */
 .capa{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:6%;text-align:center;
@@ -209,6 +255,13 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 .enlace{background:none;border:none;color:var(--tinta);text-decoration:underline;cursor:pointer;font-weight:700;opacity:.85;padding:4px}
 .como{max-width:520px;text-align:left;font-size:13px;line-height:1.45;background:var(--hueco);border-radius:10px;padding:4px 14px}
 .como p{margin:8px 0}
+.lista-poderes{list-style:none;margin:6px 0;padding:0;display:grid;gap:6px}
+.lista-poderes li{display:flex;align-items:center;gap:10px}
+.lista-poderes li[data-poder=martillo]{--pc:var(--poder-martillo)}.lista-poderes li[data-poder=bomba]{--pc:var(--poder-bomba)}
+.lista-poderes li[data-poder=girar]{--pc:var(--poder-girar)}.lista-poderes li[data-poder=cambio]{--pc:var(--poder-cambio)}.lista-poderes li[data-poder=vida]{--pc:var(--poder-vida)}
+.ico-poder{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:8px;color:var(--pc);
+  border:1.5px solid color-mix(in srgb,var(--pc) 65%,transparent);background:color-mix(in srgb,var(--pc) 16%,var(--panel))}
+.ico-poder svg{width:20px;height:20px}
 kbd{font:700 11px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;border:1px solid color-mix(in srgb,var(--tinta) 30%,transparent);background:color-mix(in srgb,var(--tinta) 8%,transparent)}
 
 /* --- El selector de temas: las tarjetas se pintan con su propio tema (temas.css) --- */
@@ -228,7 +281,7 @@ kbd{font:700 11px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;bor
 @media (prefers-reduced-motion:reduce){
   .ranura.llega svg{animation:none}
   .fx{display:none}
-  .poder,.poder.urge,.pop-poder.sube,.mano.modo-girar .ranura{animation:none}
+  .poder,.poder.urge,.poder[aria-pressed=true],.pop-poder.sube,.mano.modo-girar .ranura,.celda.nueva,.celda.nueva+.bisel{animation:none}
   .estalla,.racha.sube,.pop-suma.sube,.nuevo,.capa{animation:none}
   .racha.sube,.pop-suma.sube{opacity:0}
 }

@@ -549,6 +549,23 @@
         ruido({ t, dur: 0.45, vol: 0.05, tipo: "bandpass", f: 300, f1: 5000, q: 3 });
         [0, 2, 4, 5, 7].forEach((k, i) => campana({ t: t + 0.25 + i * 0.06, f: hz(PENTA[k] + 12), r: 2, i: 1.6, dur: 0.4, vol: 0.045, eco: 0.4 }));
       }),
+      /* La largada: tres pitidos iguales y uno más agudo y largo, como el
+         semáforo de una carrera, con un motor que se revoluciona debajo de
+         cada número y arranca con el «¡YA!». */
+      cuenta: seguro(n => {
+        const t = ahora(), k = Math.max(0, 3 - n);
+        if (n > 0) {
+          tono({ t, f: hz(69), dur: 0.28, vol: 0.09, tipo: "square", corte: 2800 });
+          tono({ t, f: hz(57), dur: 0.28, vol: 0.05, tipo: "square", corte: 1400 });
+          tono({ t, f: 52 + k * 16, f1: 66 + k * 22, dur: 0.85, vol: 0.05 + k * 0.012, tipo: "sawtooth", corte: 380 + k * 160, a: 0.04 });
+          return;
+        }
+        tono({ t, f: hz(81), dur: 0.75, vol: 0.1, tipo: "square", corte: 4400, eco: 0.3 });
+        tono({ t, f: hz(69), dur: 0.75, vol: 0.06, tipo: "square", corte: 2600 });
+        bombo(t, 200, 0.2, 0.42, 4);
+        tono({ t, f: 90, f1: 300, glide: 0.6, dur: 0.75, vol: 0.08, tipo: "sawtooth", corte: 900, corte1: 3200, a: 0.01 });
+        ruido({ t, dur: 0.6, vol: 0.06, tipo: "bandpass", f: 600, f1: 5200, q: 1.4, eco: 0.3 });
+      }),
       inicio: seguro(() => {
         const t = ahora();
         [0, 2, 4, 7].forEach((k, i) => campana({ t: t + i * 0.07, f: hz(PENTA[k] + 12), r: 2, i: 1.8, dur: 0.35, vol: 0.05, pan: (i - 1.5) / 2, eco: 0.35 }));
@@ -593,5 +610,38 @@
     };
   }
 
-  return { crearEfectos, crearSonido, pintaPieza, sprite, altura };
+  /* El cartel de la cuenta atrás: un número rojo enorme en el centro de
+     `host` (3, 2, 1) y un «¡YA!» verde, cada uno entra grande y se encoge.
+     DOM con estilos en línea, para que la sala y el Club lo usen igual sin
+     compartir una hoja de estilos. */
+  function cartelCuenta(host) {
+    const el = document.createElement("div");
+    el.setAttribute("aria-live", "assertive");
+    Object.assign(el.style, { position: "absolute", inset: "0", display: "grid", placeItems: "center", pointerEvents: "none", zIndex: "7" });
+    if (getComputedStyle(host).position === "static") host.style.position = "relative";
+    host.appendChild(el);
+    return {
+      pon(n) {
+        const b = document.createElement("b"), ya = n <= 0, c = ya ? "40,255,110" : "255,36,36";
+        b.textContent = ya ? "¡YA!" : String(n);
+        b.setAttribute("translate", "no");
+        Object.assign(b.style, {
+          font: "900 " + (ya ? "clamp(54px,24vw,96px)" : "clamp(110px,46vw,190px)") + "/1 system-ui,-apple-system,'Segoe UI',sans-serif",
+          color: `rgb(${c})`, letterSpacing: "-.02em",
+          textShadow: `0 0 18px rgba(${c},.9),0 0 50px rgba(${c},.55),0 6px 0 rgba(0,0,0,.6)`,
+          webkitTextStroke: ya ? "2px #eafff0" : "3px #ffe1e1"
+        });
+        el.replaceChildren(b);
+        try {
+          b.animate([{ transform: "scale(2.4)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.22 },
+            { transform: "scale(.92)", opacity: 1, offset: 0.78 }, { transform: "scale(.55)", opacity: 0 }],
+          { duration: ya ? 750 : 1000, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+        } catch (e) { /* sin animación, se ve igual */ }
+      },
+      limpia() { el.replaceChildren(); },
+      quita() { el.remove(); }
+    };
+  }
+
+  return { crearEfectos, crearSonido, cartelCuenta, pintaPieza, sprite, altura };
 });

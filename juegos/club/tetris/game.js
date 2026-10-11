@@ -24,6 +24,12 @@
      sistema, cuánto se jugó de verdad (va en la prueba: un reloj del
      juego frenado a mano se nota contra él). */
   let s = null, g = null, estado = 'menu', ultimo = 0, resto = 0, pared = 0, paredAntes = 0;
+  /* La largada: tres segundos de cuenta atrás (estado 'cuenta') antes de que
+     corra nada. Durante la cuenta el pozo ya tiene su pieza pero no hay
+     pasos, ni teclas, ni reloj de pared, ni registro de pulsaciones: la
+     prueba empieza en el «¡YA!», igual que si la cuenta no existiera. */
+  const LARGADA_MS = 3000;
+  let cuentaIni = 0, cuentaVista = 0, porLargar = false;
   /* Las pulsaciones de la partida (TM.registroTeclas), para la capa
      anti-bot: instante, cuánto se mantuvo y de dónde vino cada una. */
   let pulsos = null;
@@ -38,6 +44,7 @@
      arrastrar de la anterior. */
   const nuevosEfectos = () => FX.crearEfectos({ TM, celda: pozo.width / TM.W });
   let fx = nuevosEfectos();
+  const cartel = FX.cartelCuenta(pozo.parentElement);
 
   const reloj = ms => { const t = Math.max(0, ms) / 1000; return `${Math.floor(t / 60)}:${(t % 60).toFixed(modo === 'sprint' ? 2 : 0).padStart(modo === 'sprint' ? 5 : 2, '0')}`; };
   const cat = () => `club-tetris-${modo}`;
@@ -105,14 +112,32 @@
     g = TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar: a => { if ((a === 'izq' || a === 'der') && s && s.p) efecto('mueve', s.p.x); } });
     s = g.s;
     fx = nuevosEfectos();
-    estado = 'jugando'; fresco = true; ultimo = 0; resto = 0; pared = 0; paredAntes = 0;
-    pulsos = TM.registroTeclas(performance.now());
+    pulsos = null;
     mando.suelta();
     $('capa').hidden = true;
     bloqueaModos(true);
-    efecto('inicio');
+    cuenta();
     inmersivo(true);
     pozo.focus();
+  }
+  function cuenta() {
+    estado = 'cuenta'; porLargar = false;
+    // Un respiro antes del «3»: el audio recién despertado por el clic tarda unos ms en sonar.
+    cuentaIni = performance.now() + 150; cuentaVista = 0;
+  }
+  // Cada número aparece y suena una vez; en el «¡YA!» empieza la partida de verdad.
+  function cuentaPaso(t) {
+    if (t < cuentaIni) return;
+    const n = Math.max(0, 3 - Math.floor(Math.max(0, t - cuentaIni) / (LARGADA_MS / 3)));
+    if (n === cuentaVista) return;
+    cuentaVista = n;
+    cartel.pon(n); efecto('cuenta', n);
+    if (n === 0) largada();
+  }
+  function largada() {
+    estado = 'jugando'; fresco = true; ultimo = 0; resto = 0; pared = 0; paredAntes = 0;
+    pulsos = TM.registroTeclas(performance.now());
+    mando.suelta();
   }
   function termina(gano) {
     estado = 'fin';
@@ -148,7 +173,9 @@
     $('capaP').textContent = p; $('jugar').textContent = b; $('capa').hidden = false;
   }
   function pausa() {
-    if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
+    if (estado === 'cuenta') { estado = 'pausa'; porLargar = true; cartel.limpia(); mando.suelta(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · aún no empieza`, 'Seguir'); }
+    else if (estado === 'pausa' && porLargar) { $('capa').hidden = true; inmersivo(true); cuenta(); pozo.focus(); }
+    else if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
     else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; paredAntes = 0; $('capa').hidden = true; inmersivo(true); pozo.focus(); }
   }
   /* Modo celular (CLAUDE.md): mientras se juega, el pozo ocupa la pantalla
@@ -173,12 +200,17 @@
   }));
   pintaTeclas(); ponMando();
   $('teclas').addEventListener('click', () => {
-    if (estado === 'jugando') pausa();
+    if (estado === 'jugando' || estado === 'cuenta') pausa();
     configurando = true; mando.suelta();
     TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); ponMando(t); }, () => { configurando = false; });
   });
   document.addEventListener('keydown', e => {
     if (configurando) return;
+    if (estado === 'cuenta') {
+      if (mando.accionDe(e.code) === 'pausa' || e.code === 'Escape') { e.preventDefault(); pausa(); }
+      else if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+      return;
+    }
     if (estado !== 'jugando' && estado !== 'pausa' && (e.code === 'Space' || e.code === 'Enter')) {
       if (e.target.closest?.('button') && e.code === 'Enter') return;
       e.preventDefault(); return estado === 'pausa' ? pausa() : empieza();
@@ -189,8 +221,8 @@
     mando.baja(e);
   });
   document.addEventListener('keyup', e => { if (pulsos) pulsos.sube(e.code, e.timeStamp); mando.sube(e); });
-  window.addEventListener('blur', () => { mando.suelta(); if (estado === 'jugando') pausa(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando') pausa(); });
+  window.addEventListener('blur', () => { mando.suelta(); if (estado === 'jugando' || estado === 'cuenta') pausa(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && (estado === 'jugando' || estado === 'cuenta')) pausa(); });
 
   /* Botones táctiles: ◀ ▶ se repiten al mantener, ▼ es bajada blanda. */
   const sueltas = [];
@@ -232,7 +264,7 @@
     if (sonido) iniciaAudio(); else if (audio) { audio.rep.detener(); sonando = false; }
   });
   document.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
-    if (estado === 'jugando' || estado === 'pausa') return;
+    if (estado === 'jugando' || estado === 'pausa' || estado === 'cuenta') return;
     modo = b.dataset.modo; guarda(); ponModo();
   }));
   function ponModo() {
@@ -295,6 +327,7 @@
   function bucle(t) {
     requestAnimationFrame(bucle);
     const dt = ultimo ? Math.min(100, t - ultimo) : 0; ultimo = t;
+    if (estado === 'cuenta') cuentaPaso(t);
     if (estado === 'jugando') {
       const ahora = Date.now();
       if (paredAntes) pared += Math.min(1000, Math.max(0, ahora - paredAntes));

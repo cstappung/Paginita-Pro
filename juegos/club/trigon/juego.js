@@ -25,45 +25,216 @@
   const CAT = 'club-trigon-puntos';
   const VIGENCIA = 24 * 3600 * 1000;
 
-  /* ---------- Sonido ---------- */
-  let ac = null, mudo = false;
-  try { mudo = localStorage.getItem('trigon.mudo') === '1'; } catch (_) { /* nada */ }
-  function audio() {
-    if (mudo) return null;
+  /* ---------- Sonido ----------
+     Un AudioContext con tres salidas: la música («Prisma Neón», musica.js,
+     que trae sus propios sintetizadores y no pasa por el chip de la casa),
+     los efectos y una reverb de sala hecha aquí mismo (un impulso de ruido
+     que se apaga), a la que los efectos mandan un poco: es lo que hace que
+     cerrar una línea suene a campana y no a pitido. Todo sale por
+     ctx.destination, que volumen.js ya envolvió, así que el 🔊 del Club y su
+     deslizador gobiernan las dos cosas; ♪ y el parlante de la barra callan
+     una u otra.
+     Los efectos están en la tonalidad de la música (Fa# menor): poner una
+     pieza es una nota suave de la pentatónica, una por forma; cerrar líneas
+     es un acorde en arpegio que crece con dos líneas y se satura en tres, y
+     la racha va recorriendo los acordes del tema. */
+  let ac = null, bus = null, ruidoBuf = null, rep = null;
+  let mudo = false, sinMusica = false;
+  try { mudo = localStorage.getItem('trigon.mudo') === '1'; sinMusica = localStorage.getItem('trigon.musica') === '0'; } catch (_) { /* nada */ }
+  const hz = m => 440 * 2 ** ((m - 69) / 12);
+  function impulso(c, seg) {
+    const n = Math.floor(c.sampleRate * seg), b = c.createBuffer(2, n, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 3.4; }
+    return b;
+  }
+  // Crea el contexto y sus buses (el navegador solo lo deja tras un gesto) o lo despierta.
+  function contexto() {
+    if (mudo && sinMusica) return null;
     try {
-      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-      if (ac.state === 'suspended') ac.resume();
-    } catch (_) { return null; }
+      if (!ac) {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        const master = ac.createGain(); master.gain.value = .9; master.connect(ac.destination);
+        const comp = ac.createDynamicsCompressor();
+        comp.threshold.value = -16; comp.knee.value = 8; comp.ratio.value = 3; comp.attack.value = .004; comp.release.value = .25;
+        comp.connect(master);
+        const fx = ac.createGain(); fx.connect(comp);
+        const rev = ac.createConvolver(); rev.buffer = impulso(ac, 2.6);
+        const revSal = ac.createGain(); revSal.gain.value = .5; rev.connect(revSal); revSal.connect(comp);
+        const mus = ac.createGain(); mus.gain.value = .5; mus.connect(master);
+        bus = { fx, rev, mus };
+        ruidoBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+        const d = ruidoBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        ac.onstatechange = musica;
+      }
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+    } catch (_) { ac = null; }
     return ac;
   }
-  function tono(f, t0, dur, tipo, vol) {
-    const c = audio(); if (!c) return;
-    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
-    o.type = tipo || 'sine'; o.frequency.setValueAtTime(f, t);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
-  }
-  const sonidos = {
-    toma: () => tono(660, 0, 0.06, 'sine', 0.05),
-    pone: () => { tono(220, 0, 0.09, 'triangle', 0.14); tono(440, 0.01, 0.05, 'sine', 0.04); },
-    vuelve: () => tono(180, 0, 0.1, 'sine', 0.06),
-    borra: n => [0, 4, 7, 12, 16, 19].slice(0, n + 2).forEach((s, i) => tono(523.25 * 2 ** (s / 12), i * 0.06, 0.3, 'triangle', 0.11)),
-    fin: () => [7, 4, 0, -5].forEach((s, i) => tono(392 * 2 ** (s / 12), i * 0.12, 0.35, 'sine', 0.1)),
-    martillo: () => [0, 7, 12, 19].forEach((s, i) => tono(659.25 * 2 ** (s / 12), i * 0.05, 0.25, 'square', 0.05)),
-    golpe: () => { tono(110, 0, 0.12, 'square', 0.16); tono(70, 0.02, 0.18, 'sine', 0.2); tono(1400, 0, 0.04, 'triangle', 0.06); },
-    bomba: () => { tono(80, 0, 0.4, 'sawtooth', 0.14); tono(55, 0.03, 0.5, 'sine', 0.22); [0, 3, 7].forEach((st, i) => tono(220 * 2 ** (st / 12), 0.08 + i * 0.05, 0.25, 'triangle', 0.06)); },
+  const ctxEfectos = () => (mudo ? null : contexto());
+  const sale = (c, g, o) => {
+    let x = g;
+    if (o.pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, o.pan)); g.connect(p); x = p; }
+    x.connect(bus.fx);
+    if (o.rev) { const r = c.createGain(); r.gain.value = o.rev; x.connect(r); r.connect(bus.rev); }
   };
+  const envolvente = (g, t, a, dur, vol) => {
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(.0002, vol), t + a);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  };
+  /* Una voz: oscilador con golpe y caída. `fm` la vuelve campana (un
+     modulador que se apaga antes que la portadora, como un vidrio), `corte`
+     le pone un pasabajos que puede cerrarse, `det` la desafina. */
+  function voz(o) {
+    const c = ctxEfectos(); if (!c || !bus) return;
+    try {
+      const t = c.currentTime + .005 + (o.t || 0), dur = o.dur;
+      const os = c.createOscillator(), g = c.createGain();
+      os.type = o.tipo || 'sine'; os.frequency.setValueAtTime(o.f, t);
+      if (o.f1) os.frequency.exponentialRampToValueAtTime(o.f1, t + (o.glide || dur));
+      if (o.det) os.detune.value = o.det;
+      let n = os, mod = null;
+      if (o.fm) {
+        mod = c.createOscillator(); const mg = c.createGain();
+        mod.frequency.value = o.f * o.fm;
+        mg.gain.setValueAtTime(o.f * (o.ind || 1.5), t); mg.gain.exponentialRampToValueAtTime(o.f * .02 + 1, t + dur * .5);
+        mod.connect(mg); mg.connect(os.frequency); mod.start(t); mod.stop(t + dur + .05);
+      }
+      if (o.corte) {
+        const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.Q.value = o.q || .7;
+        fl.frequency.setValueAtTime(o.corte, t);
+        if (o.corte1) fl.frequency.exponentialRampToValueAtTime(o.corte1, t + dur);
+        n.connect(fl); n = fl;
+      }
+      n.connect(g); envolvente(g, t, o.a || .004, dur, o.vol || .08); sale(c, g, o);
+      os.start(t); os.stop(t + dur + .05);
+      os.onended = () => { try { g.disconnect(); } catch (_) { /* nada */ } };
+    } catch (_) { /* el sonido nunca para el juego */ }
+  }
+  // Un soplo de ruido filtrado: chasquidos, roces, el aire de una explosión.
+  function soplo(o) {
+    const c = ctxEfectos(); if (!c || !bus) return;
+    try {
+      const t = c.currentTime + .005 + (o.t || 0), src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+      src.buffer = ruidoBuf; src.loop = true;
+      fl.type = o.tipo || 'bandpass'; fl.Q.value = o.q || 1;
+      fl.frequency.setValueAtTime(o.f || 1000, t);
+      if (o.f1) fl.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+      src.connect(fl); fl.connect(g); envolvente(g, t, o.a || .002, o.dur, o.vol || .04); sale(c, g, o);
+      src.start(t, Math.random() * .8); src.stop(t + o.dur + .05);
+      src.onended = () => { try { g.disconnect(); } catch (_) { /* nada */ } };
+    } catch (_) { /* nada */ }
+  }
+  // Fa# menor: la pentatónica para las piezas y los acordes del tema para las líneas.
+  const PENTA = [66, 69, 71, 73, 76, 78, 81, 83, 85, 88];
+  const ACORDES = [[54, 66, 69, 73, 76, 80], [50, 62, 66, 69, 73, 76], [47, 59, 62, 66, 69, 73], [45, 57, 61, 64, 68, 71]];
+  const campana = (t, m, vol, dur, pan, rev) => voz({ t, f: hz(m), fm: 2, ind: 1.6, dur, vol, pan, rev });
+  const brillo = (t, m, vol) => voz({ t, f: hz(m), fm: 3.5, ind: .9, dur: .5, vol, pan: Math.random() * 1.4 - .7, rev: .6 });
+  // Un colchón de dos sierras desafinadas que se cierra despacio: el «aaah» de debajo.
+  const colchon = (t, notas, vol, dur) => notas.forEach(m => [-9, 9].forEach(det =>
+    voz({ t, f: hz(m), tipo: 'sawtooth', det, a: .09, dur, vol, corte: 1500, corte1: 450, rev: .5 })));
+  const sonidos = {
+    toma: () => voz({ f: 1480, dur: .045, vol: .025, rev: .05 }),
+    // Poner una pieza: un «toc» de vidrio, suave, con la nota de su forma.
+    pone: (forma, x) => {
+      const m = PENTA[(forma || 0) % 8], pan = (x || 0) * .6;
+      voz({ f: hz(m), fm: 2, ind: .7, dur: .34, vol: .065, pan, rev: .16 });
+      voz({ f: hz(m - 12), tipo: 'triangle', dur: .14, vol: .05, corte: 900, pan });
+      voz({ f: 150, f1: 68, glide: .06, dur: .09, vol: .08 });
+      soplo({ dur: .025, vol: .02, f: 3200, q: 1.4, pan });
+    },
+    vuelve: () => voz({ f: 520, f1: 300, dur: .14, vol: .035, tipo: 'triangle', rev: .1 }),
+    /* Cerrar líneas: con una, cuatro campanas del acorde; con dos, seis más
+       un colchón y destellos; con tres o más (se satura ahí), dos octavas,
+       el bajo, un barrido de aire y una campana final arriba. */
+    borra: (n, racha) => {
+      const k = Math.max(1, Math.min(3, n)), ch = ACORDES[Math.max(0, (racha || 1) - 1) % ACORDES.length];
+      const notas = k === 1 ? ch.slice(1, 5) : k === 2 ? ch.slice(1).concat(ch[1] + 12)
+        : ch.slice(1).concat(ch.slice(1, 4).map(m => m + 12));
+      const paso = [.075, .058, .045][k - 1];
+      notas.forEach((m, i) => campana(i * paso, m, .055 + k * .006, .9 + k * .25, (i / (notas.length - 1) - .5) * 1.2, .35 + k * .08));
+      voz({ f: hz(ch[0] + 12), fm: 1, ind: .4, dur: .5 + k * .2, vol: .05 + k * .015 });
+      if (k >= 2) {
+        colchon(0, ch.slice(1, k === 3 ? 5 : 4), .016 + k * .003, 1.2 + k * .3);
+        for (let i = 0; i < (k === 2 ? 4 : 8); i++) brillo(.18 + i * .07, PENTA[(i * 3 + 2) % PENTA.length] + 12, .022);
+      }
+      if (k === 3) {
+        voz({ f: hz(ch[0]), dur: 1.6, vol: .12, a: .02 });
+        soplo({ dur: 1.2, vol: .028, tipo: 'highpass', f: 1800, f1: 9000, q: .7, rev: .6, a: .2 });
+        campana(notas.length * paso + .12, ch[1] + 24, .045, 1.6, 0, .7);
+      }
+    },
+    fin: () => {
+      [76, 73, 69, 66, 61].forEach((m, i) => campana(i * .16, m, .05, 1.1, (2 - i) * .25, .45));
+      colchon(.3, [54, 61, 66], .016, 2);
+    },
+    // Ganar un poder: un barrido de cristal que sube.
+    poder: () => {
+      [0, 2, 4, 7].forEach((j, i) => voz({ t: i * .055, f: hz(PENTA[j] + 12), tipo: 'sawtooth', det: 9, dur: .14, vol: .024, corte: 3800, corte1: 1200, rev: .3 }));
+      soplo({ t: .05, dur: .35, vol: .02, tipo: 'bandpass', f: 1200, f1: 7000, q: 3, rev: .4 });
+      brillo(.24, PENTA[9] + 12, .03);
+    },
+    // El martillo rompe un triángulo: golpe seco y vidrio que se quiebra.
+    golpe: () => {
+      voz({ f: 190, f1: 55, glide: .08, dur: .14, vol: .14 });
+      soplo({ dur: .12, vol: .09, f: 2400, q: 1.2 });
+      for (let i = 0; i < 4; i++) voz({ t: .015 + i * .028, f: 2200 + Math.random() * 2400, fm: 2.7, ind: 2, dur: .16, vol: .016, pan: Math.random() - .5, rev: .3 });
+    },
+    // La bomba: un estallido grave con aire.
+    bomba: () => {
+      voz({ f: 110, f1: 28, glide: .5, dur: .7, vol: .22 });
+      soplo({ dur: .8, vol: .1, tipo: 'lowpass', f: 2400, f1: 120, q: .7, rev: .3 });
+      soplo({ t: .02, dur: .25, vol: .04, f: 5000, f1: 1500, q: .8 });
+    },
+    // Segunda oportunidad: la bomba y un barrido que sube, como un respiro.
+    vida: () => {
+      sonidos.bomba();
+      soplo({ t: .35, dur: .9, vol: .03, tipo: 'bandpass', f: 400, f1: 6000, q: 2, rev: .6 });
+      [0, 2, 4, 5, 7].forEach((j, i) => campana(.45 + i * .07, PENTA[j] + 12, .04, .9, (i - 2) * .3, .5));
+    },
+    // Girar: un roce de aire que sube.
+    girar: () => {
+      soplo({ dur: .2, vol: .05, tipo: 'bandpass', f: 700, f1: 3600, q: 2.5, rev: .15 });
+      voz({ f: hz(73), f1: hz(85), glide: .12, dur: .16, vol: .035, tipo: 'triangle', rev: .2 });
+    },
+    // Cambiar la mano: tres naipes que se barajan.
+    cambio: () => {
+      for (let i = 0; i < 3; i++) soplo({ t: i * .06, dur: .06, vol: .05, tipo: 'highpass', f: 2600 + i * 600, q: .8 });
+      [0, 4, 7].forEach((j, i) => voz({ t: .2 + i * .05, f: hz(PENTA[j] + 12), fm: 2, ind: .8, dur: .3, vol: .03, rev: .3 }));
+    }
+  };
+
+  /* La música: «Prisma Neón» (musica.js, sus propios sintetizadores)
+     mientras la página se ve. En el menú y al terminar calla la melodía y
+     quedan los pads, el bajo y la ciudad. */
+  function musica() {
+    const c = ac, TM = window.TrigonMusica;
+    const suena = !sinMusica && c && bus && c.state === 'running' && !document.hidden && TM;
+    if (!suena) { if (rep) try { rep.detener(); } catch (_) { /* nada */ } return; }
+    try {
+      if (!rep) rep = TM.crear(c, bus.mus, { jugando: () => !!E && !terminada && !enMenu() });
+      rep.arranca();
+    } catch (_) { rep = null; }
+  }
   function pintaSonido() {
-    const b = $('sound-button');
+    const b = $('sound-button'), m = $('music-button');
     b.setAttribute('aria-pressed', mudo ? 'false' : 'true');
     b.setAttribute('aria-label', mudo ? 'Activar efectos' : 'Desactivar efectos');
+    m.setAttribute('aria-pressed', sinMusica ? 'false' : 'true');
+    m.setAttribute('aria-label', sinMusica ? 'Activar música' : 'Desactivar música');
   }
   $('sound-button').addEventListener('click', () => {
     mudo = !mudo;
     try { localStorage.setItem('trigon.mudo', mudo ? '1' : '0'); } catch (_) { /* nada */ }
-    pintaSonido(); if (!mudo) sonidos.pone();
+    pintaSonido(); if (!mudo) sonidos.pone(0, 0);
   });
+  $('music-button').addEventListener('click', () => {
+    sinMusica = !sinMusica;
+    try { localStorage.setItem('trigon.musica', sinMusica ? '0' : '1'); } catch (_) { /* nada */ }
+    pintaSonido(); contexto(); musica();
+  });
+  // El primer gesto en cualquier parte despierta el audio y arranca la música.
+  for (const t of ['pointerdown', 'keydown']) addEventListener(t, () => { contexto(); musica(); }, true);
+  document.addEventListener('visibilitychange', musica);
   pintaSonido();
 
   /* ---------- Geometría en pantalla ---------- */
@@ -81,7 +252,36 @@
     p.setAttribute('points', puntos(x, y, d, ENCOGE));
     if (clase) p.setAttribute('class', clase);
     padre.appendChild(p);
+    if (clase === 'celda' || clase === 'pieza') padre.appendChild(bisel(x, y, d));
     return p;
+  }
+  /* El bisel que hace de cada triángulo una gema: tres caras inclinadas
+     entre el borde y una mesa interior, iluminadas desde arriba (blanco las
+     que miran a la luz, negro las que le dan la espalda), y la mesa con un
+     brillo leve. Va justo después de su triángulo, así el CSS lo prende y
+     apaga con `.celda.llena + .bisel` sin tocar el polígono de siempre. */
+  const LUZ = [-.36, -.93], MESA = .5;
+  function bisel(x, y, d) {
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'bisel');
+    const v = M.vertices(x, y, d).map(([a, b]) => M.plano(a, b));
+    const cx = (v[0][0] + v[1][0] + v[2][0]) / 3, cy = (v[0][1] + v[1][1] + v[2][1]) / 3;
+    const en = k => v.map(([a, b]) => [cx + (a - cx) * k, cy + (b - cy) * k]);
+    const fuera = en(ENCOGE), dentro = en(MESA), txt = ps => ps.map(([a, b]) => a.toFixed(4) + ',' + b.toFixed(4)).join(' ');
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      const mx = (fuera[i][0] + fuera[j][0]) / 2 - cx, my = (fuera[i][1] + fuera[j][1]) / 2 - cy, n = Math.hypot(mx, my);
+      const luz = (mx * LUZ[0] + my * LUZ[1]) / n;
+      const cara = document.createElementNS(NS, 'polygon');
+      cara.setAttribute('points', txt([fuera[i], fuera[j], dentro[j], dentro[i]]));
+      cara.setAttribute('fill', luz > 0 ? '#fff' : '#000');
+      cara.setAttribute('fill-opacity', (luz > 0 ? .1 + .34 * luz : .1 + .3 * -luz).toFixed(3));
+      g.appendChild(cara);
+    }
+    const mesa = document.createElementNS(NS, 'polygon');
+    mesa.setAttribute('points', txt(dentro)); mesa.setAttribute('class', 'mesa');
+    g.appendChild(mesa);
+    return g;
   }
   // La caja de una pieza en el plano, contando sus vértices.
   function caja(celdas) {
@@ -115,6 +315,14 @@
       celdas[i].style.setProperty('--color', v ? color(v) : '');
       celdas[i].classList.remove('fantasma', 'cierra', 'invalida');
     });
+  }
+  // Las casillas recién puestas se asientan: entran un poco grandes y con un destello.
+  function asienta(casillas) {
+    for (const i of casillas) {
+      const c = celdas[i];
+      c.classList.remove('nueva'); void c.getBBox(); c.classList.add('nueva');
+      setTimeout(() => c.classList.remove('nueva'), 420);
+    }
   }
   function estalla(casillas, valores) {
     const arcoiris = raiz.dataset.skin === 'gris';
@@ -332,26 +540,38 @@
      un modo (el siguiente toque en el tablero o en la mano los usa);
      cambiar mano y segunda oportunidad se usan al tocarlos. Si no cabe
      nada y algún poder puede destrabar la partida, esos botones laten. */
+  /* Los iconos son trazos propios (SVG, currentColor) y no emojis: se ven
+     iguales en todo sistema y toman el color de su poder (--pc, temas.css). */
+  const ICONOS = {
+    martillo: '<path d="M13.2 3.2 20.8 10.8 17.6 14 10 6.4Z" fill="currentColor" fill-opacity=".28"/><path d="M13.2 3.2 20.8 10.8 17.6 14 10 6.4Z"/><path d="m12.6 9.2-8 8a2 2 0 0 0 2.8 2.8l8-8"/>',
+    bomba: '<circle cx="10.5" cy="14" r="6.5" fill="currentColor" fill-opacity=".28"/><circle cx="10.5" cy="14" r="6.5"/><path d="m15.2 9.3 2.3-2.3"/><path d="M19.5 2.5v2.2M21.6 5.6h-2.2M21 3.1l-1.4 1.4"/><path d="M7.4 12.2a3.6 3.6 0 0 1 2.4-2" stroke-opacity=".7"/>',
+    girar: '<path d="M20 12a8 8 0 1 1-2.35-5.66"/><path d="M20.2 3.8v4.6h-4.6"/><path d="m12 8.4 3.6 6.2H8.4Z" fill="currentColor" fill-opacity=".45"/>',
+    cambio: '<path d="M3 7h3.5l10 10H21"/><path d="M3 17h3.5l3-3M14 10l2.5-3H21"/><path d="m18 4 3 3-3 3M18 14l3 3-3 3"/>',
+    vida: '<path d="M12 20.5s-7.5-4.6-7.5-10.4A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.5c0 5.8-7.5 10.4-7.5 10.4Z" fill="currentColor" fill-opacity=".28"/><path d="M12 20.5s-7.5-4.6-7.5-10.4A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.5c0 5.8-7.5 10.4-7.5 10.4Z"/><path d="m12.8 9.6-2.4 3.6h3.2l-2.4 3.6"/>'
+  };
+  const icono = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONOS[k] + '</svg>';
   const PODER_UI = {
-    martillo: { icono: '🔨', nombre: 'Martillo', ayuda: 'toca un triángulo ocupado para romperlo', tecla: 'KeyH', modo: true },
-    bomba: { icono: '💣', nombre: 'Bomba', ayuda: 'toca un punto del tablero: rompe los triángulos a su alrededor', tecla: 'KeyB', modo: true },
-    girar: { icono: '🔄', nombre: 'Girar', ayuda: 'toca una pieza de tu mano (o 1, 2, 3) para girarla 60°', tecla: 'KeyG', modo: true },
-    cambio: { icono: '🔀', nombre: 'Cambiar mano', ayuda: 'descarta tus piezas y recibe tres nuevas', tecla: 'KeyC' },
-    vida: { icono: '💥', nombre: 'Segunda oportunidad', ayuda: 'solo cuando no cabe nada: borra la mitad de abajo del tablero', tecla: 'KeyV' }
+    martillo: { corto: 'Martillo', nombre: 'Martillo', ayuda: 'toca un triángulo ocupado para romperlo', tecla: 'KeyH', modo: true },
+    bomba: { corto: 'Bomba', nombre: 'Bomba', ayuda: 'toca un punto del tablero: rompe los triángulos a su alrededor', tecla: 'KeyB', modo: true },
+    girar: { corto: 'Girar', nombre: 'Girar', ayuda: 'toca una pieza de tu mano (o 1, 2, 3) para girarla 60°', tecla: 'KeyG', modo: true },
+    cambio: { corto: 'Cambio', nombre: 'Cambiar mano', ayuda: 'descarta tus piezas y recibe tres nuevas', tecla: 'KeyC' },
+    vida: { corto: '2ª vida', nombre: 'Segunda oportunidad', ayuda: 'solo cuando no cabe nada: borra la mitad de abajo del tablero', tecla: 'KeyV' }
   };
   let modo = null;
   const botonesPoder = {};
   for (const k of M.ORDEN_PODERES) {
     const u = PODER_UI[k], b = document.createElement('button');
-    b.type = 'button'; b.className = 'poder vacio';
+    b.type = 'button'; b.className = 'poder vacio'; b.dataset.poder = k;
     b.title = u.nombre + ': ' + u.ayuda + ' (' + u.tecla.slice(3) + ')';
     b.setAttribute('aria-label', u.nombre + ': ' + u.ayuda);
     if (u.modo) b.setAttribute('aria-pressed', 'false');
-    b.innerHTML = '<span aria-hidden="true">' + u.icono + '</span><b translate="no">0</b>';
+    b.innerHTML = '<span class="poder-ico">' + icono(k) + '</span><span class="poder-nombre">' + u.corto + '</span>' +
+      '<b class="poder-n" translate="no">0</b><kbd class="poder-tecla" aria-hidden="true">' + u.tecla.slice(3) + '</kbd>';
     b.addEventListener('click', e => activa(k, !e.isTrusted ? 'x' : e.pointerType === 'touch' ? 't' : 'r'));
     $('poderes').appendChild(b);
     botonesPoder[k] = b;
   }
+  for (const el of document.querySelectorAll('.ico-poder[data-poder]')) el.innerHTML = icono(el.dataset.poder);
   function activa(k, origen) {
     if (!E || terminada || enMenu() || !E.poderes[k]) return;
     if (PODER_UI[k].modo) modoPoder(modo === k ? null : k);
@@ -363,7 +583,7 @@
       const n = E ? E.poderes[k] : 0, b = botonesPoder[k];
       // Sin cargas el botón queda invisible pero en su sitio: si se corrieran, un segundo toque caería en otro poder.
       b.classList.toggle('vacio', !n);
-      b.querySelector('b').textContent = String(n);
+      b.querySelector('.poder-n').textContent = String(n);
       b.disabled = !n || terminada || (k === 'vida' && !atascado);
       b.classList.toggle('urge', atascado && n > 0 && !b.disabled);
       if (PODER_UI[k].modo) b.setAttribute('aria-pressed', String(modo === k));
@@ -382,12 +602,12 @@
   }
   function ganaPoderes(lista) {
     if (!lista.length) return;
-    sonidos.martillo();
+    sonidos.poder();
     const p = $('popPoder');
-    p.textContent = '+' + lista.map(k => PODER_UI[k].icono).join('');
+    p.innerHTML = '+' + lista.map(k => '<span class="poder-ico" data-poder="' + k + '">' + icono(k) + '</span>').join('');
     p.classList.remove('sube'); void p.offsetWidth; p.classList.add('sube');
   }
-  const SONIDO_PODER = { martillo: 'golpe', bomba: 'bomba', vida: 'bomba', girar: 'toma', cambio: 'pone' };
+  const SONIDO_PODER = { martillo: 'golpe', bomba: 'bomba', vida: 'vida', girar: 'girar', cambio: 'cambio' };
   function usaPoder(k, a, b, origen) {
     arranca();
     const ahora = reloj().a, dt = Math.max(0, Math.round(ahora - ultimaA));
@@ -547,6 +767,8 @@
     arranca();
     const antes = E.t.slice(), propio = E.mano[s] ? E.mano[s].f + 1 : 0;
     const libres = E.mano[s] && M.destino(E, E.mano[s], dx, dy);
+    // Dónde cae, de -1 (izquierda) a 1: la nota de la pieza suena de ese lado.
+    const lado = libres && libres.length ? libres.reduce((t, i) => t + M.plano(M.CELDAS[i].x, M.CELDAS[i].y)[0], 0) / libres.length / M.LADO : 0;
     const cerradas = libres ? M.lineasQueCierra(E, libres) : [];
     const ahora = reloj().a, dt = Math.max(0, Math.round(ahora - ultimaA));
     const r = M.coloca(E, s, dx, dy, [origen || 'x', dt]);
@@ -556,9 +778,10 @@
     if (r.borradas.length) {
       estalla(r.borradas, r.borradas.map(i => antes[i] || propio));
       celebra(cerradas);
-      sonidos.borra(r.lineas);
+      sonidos.borra(r.lineas, E.racha);
       muestraRacha(r.lineas, E.racha);
-    } else sonidos.pone();
+    } else sonidos.pone(propio - 1, lado);
+    if (libres) asienta(libres.filter(i => E.t[i]));
     popSuma(r.suma);
     ganaPoderes(r.ganados);
     pintaMano(r.reparte); pintaMarcador();
@@ -765,7 +988,7 @@
   addEventListener('pagehide', guardaPartida);
 
   // Para probar desde la consola. Cambiar el estado a mano no sirve para la clasificación: el verificador rehace la partida.
-  window.__trigon = { estado: () => E, motor: M, repinta: () => { pintaTablero(); pintaMano(); pintaMarcador(); } };
+  window.__trigon = { estado: () => E, motor: M, sonidos, repinta: () => { pintaTablero(); pintaMano(); pintaMarcador(); } };
   if (!retoma()) {
     const s = new Uint32Array(1); crypto.getRandomValues(s);
     E = M.nueva(s[0], CUENTA);
