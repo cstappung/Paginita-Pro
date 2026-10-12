@@ -39,7 +39,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
       contar dos veces la misma partida, así que recargar la página con
       la partida terminada no infla el marcador.
    ============================================================ */
-import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA } from "./firebase.js";
+import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
 import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
@@ -622,10 +622,11 @@ function ofreceGuardar(juego, dato) {
     <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(juego))} · ${escapeHtml(marcaInvitado(dato))}</small>
       <b id="jgInvGuardaT">¿Guardamos esta partida?</b>
       <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${juego === "aleteo" ? "" : ", junto con tu avance para seguir después"}.</p></div>
-    <div class="jg-invg-btns"><button class="btn" type="button" data-login>Iniciar sesión y guardar</button><button class="btn2" type="button" data-cierra>Ahora no</button></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-login data-origen="aviso-guardar">Iniciar sesión y guardar</button><button class="btn2" type="button" data-cierra>Ahora no</button></div>
   </div>`;
-  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = quitaOfreceGuardar;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = () => { evento("jg_invitado_aviso_cierra", { juego }); quitaOfreceGuardar(); };
   document.body.appendChild(c);
+  evento("jg_invitado_aviso", { juego, categoria: dato.categoria });
   suena("entra");
 }
 function quitaOfreceGuardar() { const c = $("jgInvGuarda"); if (c) c.remove(); }
@@ -656,6 +657,7 @@ async function subeDeInvitado(u) {
           const previa = await fb.leerSolo(dato.categoria).then(f => f.find(x => x.uid === u.uid) || null, () => null);
           const res = await guardaClub(dato.categoria, u.uid, fila, v.prueba);
           alResultadoClub(juego)(dato, previa, v.prueba);
+          evento("jg_invitado_guardado", { juego, categoria: dato.categoria, record: res && res.committed ? 1 : 0 });
           avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(juego)}` : `Tu partida de ${nombreSolo(juego)} quedó en tu cuenta`,
             res && res.committed ? marcaInvitado(dato) + " · ya está en la clasificación" : marcaInvitado(dato) + " · tu récord guardado era mejor");
         } catch (e) {
@@ -742,13 +744,14 @@ function abreBienvenida() {
   </div>`;
   c.addEventListener("click", ev => {
     const b = ev.target.closest("[data-bv]"), j = ev.target.closest("[data-bv-juego]");
-    if (j) { marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
+    if (j) { evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
     if (!b) return;
     const que = b.getAttribute("data-bv");
+    evento("jg_bienvenida_elige", { opcion: que, paso: b.closest("[data-paso]").getAttribute("data-paso") });
     /* Iniciar sesión o crear cuenta: la ventana de Google. La bienvenida se
        queda hasta que llega la cuenta (watchAuth la cierra); si se cancela,
        sigue aquí para elegir otra cosa. */
-    if (que === "entrar" || que === "crear") { entrarConGoogle(); return; }
+    if (que === "entrar" || que === "crear") { entrarConGoogle("", "bienvenida-" + que); return; }
     if (que === "invitado") {
       marcaBienvenida();
       c.querySelector('[data-paso="1"]').hidden = true;
@@ -761,6 +764,7 @@ function abreBienvenida() {
   });
   document.body.appendChild(c);
   document.documentElement.classList.add("jg-bv-abierta");
+  evento("jg_bienvenida_ver");
   c.querySelector(".jg-bv-caja").focus({ preventScroll: true });
 }
 
@@ -769,14 +773,23 @@ function abreBienvenida() {
    principal queda a un toque. Desde una partida compartida (#p/…) la ruta
    no cambia, así que al entrar se cae directo en la sala. */
 let trasLogin = "";
-async function entrarConGoogle(juego) {
+/* `origen` dice qué botón lo pidió (la bienvenida, el aviso tras una
+   partida de invitado, la franja de un destacado…), para Analytics:
+   `jg_login_pide` al tocarlo y `login`/`sign_up` (los nombres estándar de
+   GA4) si termina en una cuenta, con el mismo origen. */
+async function entrarConGoogle(juego, origen) {
   trasLogin = juego || "";
-  try { await loginGoogle(); }
+  const desde = String(origen || (juego ? "ficha" : "otro")).slice(0, 40);
+  evento("jg_login_pide", { origen: desde });
+  try {
+    const r = await loginGoogle();
+    evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: desde });
+  }
   catch (e) {
     trasLogin = "";
     const cod = (e && e.code) || "";
     /* Cerrar la ventana de Google es cambiar de idea, no un error. */
-    if (/popup-closed-by-user|cancelled-popup-request/.test(cod)) return;
+    if (/popup-closed-by-user|cancelled-popup-request/.test(cod)) { evento("jg_login_cancela", { origen: desde }); return; }
     alert("No se pudo iniciar sesión: " + (cod || (e && e.message) || e) +
       (/popup-blocked/.test(cod) ? "\nEl navegador bloqueó la ventana de Google: permite las ventanas emergentes de este sitio." : ""));
   }
@@ -1786,8 +1799,9 @@ function armazon() {
        pendiente y se le ofrece guardarla; con la cuenta recién estrenada en
        esta pestaña, el juego adopta la partida a medias que dejó. */
     const deInv = DE_INVITADO.has(juego);
+    if (!u) evento("jg_invitado_abre", { juego });
     individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""), nombreDe: nombreVivo,
-      alInvitado: !u && deInv ? d => ofreceGuardar(juego, d) : undefined, deInvitado: !!u && deInv && vinoDeInvitado(),
+      alInvitado: !u && deInv ? (d, mejoro) => { evento("jg_invitado_partida", { juego, categoria: d.categoria, mejoro: mejoro ? 1 : 0 }); if (mejoro) ofreceGuardar(juego, d); } : undefined, deInvitado: !!u && deInv && vinoDeInvitado(),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
       /* El fantasma de Metro Rush: la tabla de la categoría y la prueba de su n.º 1, por clave (solo/club.js). */
       fantasma: u ? { leerTabla: cat => fb.leerSolo(cat), leerPrueba: (cat, uid, p) => fb.leerPruebaSolo(cat, uid, p) } : null,
@@ -1815,7 +1829,7 @@ function armazon() {
       const tira = document.createElement("p");
       tira.className = "jg-inv-tira";
       tira.setAttribute("role", "note");
-      tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login>Iniciar sesión</button>';
+      tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login data-origen="franja-invitado">Iniciar sesión</button>';
       barra.after(tira);
     }
     return;
@@ -3179,7 +3193,7 @@ function wire() {
   $("btnEntrar").onclick = () => entrarConGoogle();
   document.addEventListener("click", ev => {
     const b = ev.target.closest && ev.target.closest("[data-login]");
-    if (b) { ev.preventDefault(); entrarConGoogle(b.getAttribute("data-login") || ""); }
+    if (b) { ev.preventDefault(); entrarConGoogle(b.getAttribute("data-login") || "", b.getAttribute("data-origen") || ""); }
     /* El podio de una ficha lleva a la clasificación de ese juego. */
     const rk = ev.target.closest && ev.target.closest("a[data-rk]");
     if (rk) try { localStorage.setItem("jg.rankJuego", rk.getAttribute("data-rk")); } catch (e) { /* sin almacenamiento */ }

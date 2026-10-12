@@ -2,10 +2,10 @@
 /* Inicialización de Firebase: Auth (Google), Realtime Database,
    Storage y Analytics (opcional). */
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, connectAuthEmulator } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, connectAuthEmulator, getAdditionalUserInfo } from "firebase/auth";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getStorage } from "firebase/storage";
-import { getAnalytics, isSupported as analyticsSupported } from "firebase/analytics";
+import { getAnalytics, logEvent, isSupported as analyticsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
@@ -58,7 +58,19 @@ if (typeof process !== "undefined" && process.env && process.env.FIREBASE_EMU) {
 }
 
 // Analytics solo donde el navegador lo soporta (no rompe en localhost/file)
-analyticsSupported().then(ok => { if (ok) getAnalytics(app); }).catch(() => {});
+const analitica = analyticsSupported().then(ok => ok ? getAnalytics(app) : null).catch(() => null);
+
+/* Un evento de Analytics (el embudo del invitado en Juegos: bienvenida,
+   partidas sin cuenta, inicios de sesión y desde dónde). Nunca lanza ni
+   espera: sin Analytics (Node, bloqueadores, navegadores sin soporte) no
+   pasa nada. Solo nombres y datos del sitio, nunca lo que escribió nadie. */
+export function evento(nombre, datos) {
+  analitica.then(a => { if (a) logEvent(a, nombre, datos || {}); }).catch(() => {});
+}
+/* ¿El inicio de sesión que devolvió `loginGoogle` creó la cuenta? */
+export function esCuentaNueva(resultado) {
+  try { return !!(resultado && getAdditionalUserInfo(resultado)?.isNewUser); } catch (e) { return false; }
+}
 
 export function watchAuth(cb) {
   return onAuthStateChanged(auth, cb);

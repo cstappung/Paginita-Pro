@@ -194,6 +194,19 @@ types their URL still plays them; they never write anything.
   `*-partida` (Trigon accepts `u: "invitado"` in `retoma`), ALETEO and
   FANAL merge their `*.progreso` with `mezclaProgreso` (FANAL's travesía
   checkpoint included), and the cloud copy follows by itself.
+- **The guest funnel is measured** with Firebase Analytics (`evento()` in
+  `src/firebase.js`, which never throws and does nothing without Analytics):
+  `jg_bienvenida_ver`, `jg_bienvenida_elige {opcion, paso}`,
+  `jg_bienvenida_juego {juego}`, `jg_invitado_abre {juego}`,
+  `jg_invitado_partida {juego, categoria, mejoro}`, `jg_invitado_aviso` /
+  `jg_invitado_aviso_cierra`, `jg_login_pide` / `jg_login_cancela {origen}`,
+  the standard `login` / `sign_up {method, origen}` (from
+  `getAdditionalUserInfo().isNewUser`) and `jg_invitado_guardado`. `origen`
+  is the button's `data-origen` (`bienvenida-entrar`, `aviso-guardar`,
+  `franja-invitado`…; `ficha` or `otro` by default). Event names and site
+  ids only, never anything a person wrote. Read them in the Firebase
+  console → Analytics → Events (custom params need registering as custom
+  dimensions to show in reports).
 - What a guest leaves in `localStorage` (`*.cuenta.invitado`,
   `frontera.invitado`, `pk.equipos.invitado`: `esClaveInvitado`) is wiped
   once per tab session (`limpiaInvitado`, flag in `sessionStorage`), so a

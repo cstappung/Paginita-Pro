@@ -12,8 +12,8 @@ import {verificaClub,DE_INVITADO} from './verifica.js';
    la cuenta «invitado», que el salón borra al empezar otra visita.
    En los juegos de `DE_INVITADO` (los destacados del salón) el resultado
    del invitado sí se verifica y queda pendiente en este navegador
-   (`jg.club.pendientes.invitado.<juego>`), y `alInvitado(dato)` le ofrece
-   iniciar sesión para guardarlo: al entrar, juegos-main.js lo sube a la
+   (`jg.club.pendientes.invitado.<juego>`), y `alInvitado(dato, mejoro)`
+   lo cuenta y, si es su mejor marca, le ofrece iniciar sesión para guardarlo: al entrar, juegos-main.js lo sube a la
    cuenta (`subeDeInvitado`). `deInvitado` (con cuenta) le dice al juego
    que esta pestaña venía de invitado, para que adopte la partida a medias
    que dejó (`Club.deInvitado` en conexion.js).
@@ -185,11 +185,11 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           if(muerto)return;
           if(motivo){estado('Esta partida no se pudo comprobar, así que no se podrá guardar: '+motivo,dato.categoria);return;}
           await cargados;
-          // El aviso de la página sale con cada marca nueva del invitado, no con cada partida.
+          // La página cuenta cada partida, pero su aviso sale solo con una marca nueva del invitado.
           const mejoro=mejorClub(dato,pendientes[dato.categoria]);
           if(mejoro){pendientes[dato.categoria]={...dato,prueba:d.prueba,h:Date.now()};persistir();}
           estado('Buena partida. Como invitado todavía no se guardó: inicia sesión y tu mejor marca pasa a la clasificación.',dato.categoria);
-          if(mejoro&&alInvitado){try{alInvitado(dato);}catch(err){/* el aviso no debe romper la partida */}}
+          if(alInvitado){try{alInvitado(dato,mejoro);}catch(err){/* el aviso no debe romper la partida */}}
         });
         return;
       }
