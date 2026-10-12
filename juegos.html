@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610120426"></script>
+<script src="i18n.js?v=202610120749"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1600,6 +1600,7 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-yemas-aviso{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#ffb3001f;border:1px solid #ffb30055;font:13px 'IBM Plex Mono',monospace}.jg-yemas-aviso[hidden]{display:none}
 .jg-yemas-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:#a9dcff}
 .jg-tulones-marco{background:#bfe6ff}
+.jg-hero-marco{background:#0d0820}
 .jg-portada-clue{background:radial-gradient(ellipse at 50% 40%,#5a1422,#1c0a10 70%)}
 .jg-art-cl{position:relative;width:170px;height:104px}
 .jg-art-cl i{position:absolute;bottom:14px;width:34px;height:34px;border-radius:50%;border:3px solid #f3e6c8;box-shadow:0 4px 0 #0005}
@@ -2358,6 +2359,11 @@ html.jg-sortem,html.jg-sortem body{overflow:hidden;height:100%}
 html.jg-sortem .head,html.jg-sortem .bar,html.jg-sortem .rp-fab,html.jg-sortem .jg-solo-barra{display:none!important}
 html.jg-sortem #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#10051f}
 html.jg-sortem .jg-solo-frame{height:100%!important}
+/* PRO HERO ocupa la ventana: su iframe trae su propio menú y su «Volver a Juegos». */
+html.jg-hero,html.jg-hero body{overflow:hidden;height:100%}
+html.jg-hero .head,html.jg-hero .bar,html.jg-hero .rp-fab,html.jg-hero .jg-solo-barra{display:none!important}
+html.jg-hero #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
+.jg-hero-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
 /* Modo celular de los juegos del Club (Tetris, ALETEO, FANAL): mientras se
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
@@ -4793,6 +4799,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610120426"></script>
+<script src="juegos-app.js?v=202610120749"></script>
 </body>
 </html>

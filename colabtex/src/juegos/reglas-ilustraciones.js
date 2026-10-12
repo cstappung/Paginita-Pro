@@ -291,3 +291,25 @@ export const metrorush=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* PRO HERO: la autopista de cinco carriles vista de frente. Etapa 0, una
+   nota verde baja hacia su botón; 1, llega y se acierta (pisar y rasguear);
+   2, el final de la canción con estrellas doradas encima de las azules. */
+export const hero=etapa=>{
+ const nombre=['Una nota verde baja por la autopista hacia su botón','La nota llega al botón: se pisa el traste y se rasguea a la vez','Las estrellas de una canción: doradas encima de las azules'][etapa];
+ const cols=['#22c84a','#e8312f','#f5d21c','#2f7bf0','#f28a1c'];
+ let cuerpo=`<path d="M200 22 L280 22 L400 236 L80 236 Z" fill="#2a1d14" stroke="#8a6a44" stroke-width="2"/>`;
+ for(let i=1;i<5;i++)cuerpo+=line(200+16*i,22,80+64*i,236,'#ffffff22',2);
+ if(etapa<2){
+  cuerpo+=cols.map((c,i)=>`<ellipse cx="${112+64*i}" cy="212" rx="24" ry="11" fill="none" stroke="${c}" stroke-width="5"/>`).join('');
+  const y=etapa===0?110:212,x=etapa===0?152:112,rx=etapa===0?16:24,ry=etapa===0?8:11;
+  cuerpo+=`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${cols[0]}" stroke="#0d3"/><ellipse cx="${x}" cy="${y}" rx="${rx/2}" ry="${ry/2}" fill="#fff" opacity=".8"/>`;
+  if(etapa===1)cuerpo+=circle(112,212,36,'none','#ffe46b')+txt(240,140,'¡+50!',26,'#ffe46b','middle')+txt(330,60,'Racha ×1',16,C.blanco);
+  else cuerpo+=txt(330,60,'Prepárate…',16,C.blanco);
+ }else{
+  cuerpo+=`<rect x="70" y="70" width="340" height="110" rx="14" fill="#142139ee" stroke="#ffc443" stroke-width="2"/>`;
+  const est=(x,c)=>`<path transform="translate(${x} 120)" d="M0-24L7-8H24L10 3 15 20 0 10-15 20-10 3-24-8H-7Z" fill="${c}" stroke="#ffffff55" stroke-width="1.5"/>`;
+  cuerpo+=[0,1,2].map(i=>est(130+55*i,'#ffc443')).join('')+est(295,'#53a8ff')+est(350,'#ffffff22');
+  cuerpo+=txt(240,170,'3 doradas · 1 azul de más',16,C.blanco,'middle');
+ }
+ return svg(nombre,cuerpo);
+};

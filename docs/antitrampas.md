@@ -153,6 +153,7 @@ que se espera de cada uno:
 | 2048 | `club-dosmil-puntos`, `club-dosmil-ficha` | semilla + dirección y Δms de cada jugada | baja |
 | Trigon | `club-trigon-puntos` | semilla + pieza, traslación y Δms de cada jugada | baja |
 | Pokelike | `club-pokelike-puntos`, `club-pokelike-pokedex` | semilla + cuenta + inicial + cada decisión (camino, turno, captura, orden) | media |
+| PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |

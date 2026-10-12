@@ -15,7 +15,7 @@ runs client-side, and persistence for the collaborative tools lives in Firebase.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`, source in `colabtex/src/`) — Overleaf-style collaborative LaTeX editor.
 - **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`, source in `colabtex/src/draw/`) — Inkscape-style collaborative SVG editor.
 - **Informes** (`informes.html` + `informes-app.js`) — the shared bug tracker.
-- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, PRODROP and Mascotas (3D pets, source in `colabtex/src/mascotas/`).
+- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the
@@ -78,6 +78,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Boxhead | `juegos/boxhead/CLAUDE.md` |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
+| PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |
 
 Solo Club games (read `juegos/club/CLAUDE.md` too):
 

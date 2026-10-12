@@ -36,6 +36,13 @@ service firebase.storage {
                     && request.resource.metadata.get('uid', '') == resource.metadata.get('uid', '');
       allow delete: if request.auth != null && esDueno();
     }
+    // Proyecto Hero: canciones del juego (hero/songs_save/...). Se leen con la
+    // sesión iniciada; nadie las escribe desde la web: se suben con gcloud,
+    // que usa tu cuenta de Google Cloud y no pasa por estas reglas.
+    match /hero/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

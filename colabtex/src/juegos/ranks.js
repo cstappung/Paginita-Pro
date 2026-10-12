@@ -32,7 +32,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } };
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }};
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -88,6 +88,9 @@ const SOLO = {
   /* Pokelike: el puntaje de la run y las especies distintas atrapadas en ella. */
   pokelike: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntaje"], ["pokedex", "Pokédex"]] }],
     cat: s => `club-pokelike-${s.n}` },
+  /* PRO HERO: una sola tabla, la general por estrellas doradas (hero.js). */
+  hero: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas doradas"]] }],
+    cat: s => `club-hero-${s.n}` },
   /* Metro Rush: una fila «Modo» con la mejor carrera de cada modo normal
      (carrera es el clásico) y la carrera más larga de cada mundo, en metros
      (Distancia la Línea 3, City distancia City: ahí corren también los modos
@@ -233,7 +236,8 @@ export function crearRanks(ctx) {
   function pintaBarra() {
     const el = host && host.querySelector("#rkJuegos");
     if (!el) return;
-    const orden = ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS);
+    // PRO HERO tiene sala pero clasifica por estrellas, con los de un jugador
+    const orden = (ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS)).filter(k => !EXTRA[k]);
     const boton = (k, j) => `<button class="jg-rk-sel${k === juego ? " on" : ""}" data-juego="${k}" style="--c:${j.color}"
          ${k === juego ? 'aria-current="true"' : ""}><i aria-hidden="true">${esc(icono[k] || "●")}</i>${esc(j.nombre)}</button>`;
     el.innerHTML = boton("general", { nombre: "General", color: "#7c5cff" }) +
@@ -273,7 +277,7 @@ export function crearRanks(ctx) {
       return;
     }
     const adm = solo && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord;
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th>${adm?'<th class="jg-rk-adm" title="Solo administradores">🛡️</th>':''}</tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td>${adm?`<td class="jg-rk-adm"><button type="button" class="btn2 jg-rk-borra" title="Eliminar este récord (administración)" data-borra="${esc(f.uid)}" data-partida="${esc(f.partida||'')}" data-nombre="${esc(f.nombre||'')}">🗑</button></td>`:''}</tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>${categoriaSolo==='club-hero-estrellas'?'Además':'Tiempo'}</th>${adm?'<th class="jg-rk-adm" title="Solo administradores">🛡️</th>':''}</tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):categoriaSolo==='club-hero-estrellas'?Math.floor(f.puntos/10000)+' ★ doradas':f.puntos}</td><td>${categoriaSolo==='club-hero-estrellas'?Math.max(0,f.puntos%10000-Math.floor(f.puntos/10000))+' azules · '+(f.h||0)+' canciones':(f.tiempo/1000).toFixed(2)+' s'}</td>${adm?`<td class="jg-rk-adm"><button type="button" class="btn2 jg-rk-borra" title="Eliminar este récord (administración)" data-borra="${esc(f.uid)}" data-partida="${esc(f.partida||'')}" data-nombre="${esc(f.nombre||'')}">🗑</button></td>`:''}</tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -364,6 +368,9 @@ export function crearRanks(ctx) {
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
     if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-")))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
+    /* PRO HERO: puntos = doradas·10 000 + todas; se dicen las doradas. */
+    if (solo && categoriaSolo === "club-hero-estrellas")
+      return { valor: f => Math.floor((f.puntos || 0) / 10000), txt: v => `${v} ★`, unidad: "", menor: false };
     if (solo && categoriaSolo === "club-atasco-estrellas")
       return { valor: f => f.puntos || 0, txt: v => `${v} ★`, unidad: "", menor: false };
     if (solo && categoriaSolo === "club-fanal-jornadas")
@@ -404,7 +411,8 @@ export function crearRanks(ctx) {
         <span class="jg-rk-tit">¿Tú?</span>
         <div class="jg-rk-pts">&nbsp;</div>
         ${bloque}</div>`;
-    const detalle = solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
+    const detalle = solo && categoriaSolo === "club-hero-estrellas" ? `${plural(f.h || 0, "canción", "canciones")} · ${Math.max(0, (f.puntos || 0) % 10000 - Math.floor((f.puntos || 0) / 10000))} azules`
+      : solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
       : juego === "general" ? `${f.ganadas || 0} G · ${plural(f.juegos || 0, "juego", "juegos")}`
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
@@ -427,6 +435,7 @@ export function crearRanks(ctx) {
       const d = falta(yo, otro);
       if (m.menor) return `${Math.max(0.01, d + 0.01).toFixed(2)} s menos`;
       const n = d + 1;
+      if (solo && categoriaSolo === "club-hero-estrellas") return plural(n, "estrella dorada", "estrellas doradas");
       return solo ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
     };
     let icono = "⚔", tit, txt;

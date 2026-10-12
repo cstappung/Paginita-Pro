@@ -145,12 +145,13 @@ const CLUBS = {
   dosmil: { nombre: "2048", juego: "2048", icono: "🟨", ruta: "dosmil" },
   trigon: { nombre: "Trigon", juego: "Trigon", icono: "🔺", ruta: "trigon" },
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
-  metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" }
+  metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
+  hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|pokelike)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|pokelike|hero)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -183,6 +184,8 @@ export function marcaSolo(cat, f) {
   if (cat === "club-trigon-puntos") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-puntos") return `◓ ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-pokedex") return `📕 ${Number(f.puntos)} especies`;
+  // PRO HERO: las estrellas doradas (puntos = doradas·10 000 + todas, hero.js).
+  if (cat === "club-hero-estrellas") return `🎸 ${Math.floor(f.puntos / 10000)} ★ doradas`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo

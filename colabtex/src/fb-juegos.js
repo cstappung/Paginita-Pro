@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|pokelike)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|pokelike|hero)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;
@@ -659,8 +659,28 @@ export const watchCastigo = (uid, cb) =>
 export function guardarSolo(categoria, uid, dato) {
   return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;
-    return {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
+    const fila = {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
+    // PRO HERO: canciones con alguna estrella dorada y con las cinco (juegos/hero.js)
+    if (categoria === "club-hero-estrellas") { fila.h = dato.h | 0; fila.h5 = dato.h5 | 0; }
+    return fila;
   }, {applyLocally:false});
+}
+
+/* ---------- PRO HERO (juegos/hero.js) ----------
+   `heroMias/<uid>/<canción>` = {g, b, s, at}: tus mejores estrellas doradas
+   y azules y tu mejor puntaje en cada canción. Lo lee solo su dueño, una vez
+   al abrir el juego (son las estrellas de la lista de canciones).
+   `heroCanciones/<canción>/<uid>` = {n, s, e, o, p, d, m, at}: el mejor
+   puntaje de cada uno en esa canción. Se lee por clave, una canción a la vez,
+   y solo cuando alguien se queda 3 s mirándola. */
+export const leerHeroMias = uid => get(ref(db, `heroMias/${uid}`)).then(s => s.val() || {});
+export const leerHeroTop = k => get(ref(db, `heroCanciones/${k}`)).then(s =>
+  Object.entries(s.val() || {}).map(([uid, f]) => ({ ...f, uid })).filter(f => !vetadosSet.has(f.uid)));
+export function guardaHero(k, uid, mia, fila) {
+  const cambios = {};
+  if (mia) cambios[`heroMias/${uid}/${k}`] = { g: mia.g, b: mia.b, s: mia.s, at: serverTimestamp() };
+  if (fila) cambios[`heroCanciones/${k}/${uid}`] = Object.assign({}, fila, { at: serverTimestamp() });
+  return Object.keys(cambios).length ? update(ref(db), cambios) : Promise.resolve();
 }
 
 /* ---------- los rieles del salón (juegos/rieles.js) ----------

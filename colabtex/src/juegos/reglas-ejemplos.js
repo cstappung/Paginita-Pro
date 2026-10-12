@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, trigon, tulones} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -219,6 +219,12 @@ export const EJEMPLOS={
  e('medallas','Medallas y clasificación',
   p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
+ hero:[e('nota','Acertar una nota',
+  p('Mira bajar la nota','Las notas bajan por la autopista hacia cinco botones de colores. Esta es verde: va al primer botón, que con el teclado es la tecla A.',hero(0)),
+  p('Pisa y rasguea','Cuando la nota llega al botón, pisa el traste y rasguea a la vez (↑, ↓ o Intro). En el modo Todo taps basta con pisar el traste justo a tiempo.',hero(1))),
+ e('estrellas','Estrellas doradas y azules',
+  p('Doradas y azules','Las estrellas son doradas solo en Experto, o en la dificultad más alta que tenga ese instrumento. En las demás dificultades son azules, y en la lista de canciones se ven las doradas encima de las azules.',hero(2)),
+  p('Lo que pagan','Cada canción terminada paga 50 monedas (15 al día). Cada estrella dorada nueva paga 100 y cada azul 50, una sola vez; si una azul pasa a dorada, se pagan los 50 que faltaban.',fichas('Tu récord en una canción',['★★★','oro','DORADAS'],['★','azul','AZUL DE MÁS'],['350','verde','MONEDAS'])))],
  tulones:[e('trepar','Trepar por el pudú',
   p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en slip como todos. Tienes el tiempo del turno para superar la línea roja de la torre.',tulones(0)),
   p('Suelta, lleva y agárrate','Mantén A: la mano izquierda se suelta y sigue al ratón. Llévala al lomo del pudú y suelta A: la mano se agarra ahí. Con la mano agarrada, sube los pies de a uno con W y S y el cuerpo trepa detrás.',tulones(1)),
