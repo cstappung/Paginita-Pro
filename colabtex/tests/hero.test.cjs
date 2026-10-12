@@ -247,3 +247,22 @@ test('el mapa de mÃ³dulos del juego tiene todos los archivos con la misma versiÃ
   for (const f of ['src/juegos/hero.js', 'src/juegos/hero-sala.js'])
     assert.match(fs.readFileSync(f, 'utf8'), new RegExp('juegos/hero/index\\.html\\?(modo=online&)?v=' + v), f);
 });
+
+test('pisar trastes durante la cuenta regresiva (antes del segundo 0) no rompe la prueba', async () => {
+  const { leeCancion } = await mod('js/core/leer.js');
+  const { Grabadora, rehace, opcionesMotor } = await mod('js/game/prueba.js');
+  const { createEngine } = await mod('js/core/engine.js');
+  const { applyNoteMode } = await mod('js/core/noteMode.js');
+  const song = leeCancion('notes.chart', new TextEncoder().encode(chartDePrueba(9)).buffer, null);
+  const cab = { id: 'x', p: 'guitar', d: 'expert', m: 'taps', xp: 0, pc: 0 };
+  const track = applyNoteMode(song.parts.guitar.expert, 'taps');
+  const e = createEngine(track, song.tempo, opcionesMotor(cab));
+  const g = new Grabadora(e, cab);
+  g.hasta(-2);
+  g.fret(1, -1.5);   // durante el 3, 2, 1
+  g.fret(0, -1.2);
+  for (const nt of track.notes) { g.fret(nt.frets, nt.time + 0.013); g.fret(0, nt.time + 0.06); }
+  g.hasta(track.notes[track.notes.length - 1].time + 3);
+  const r = rehace(song, g.texto());
+  assert.deepEqual(r.stats, e.stats());
+});
