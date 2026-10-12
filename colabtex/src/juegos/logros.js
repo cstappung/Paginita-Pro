@@ -429,6 +429,22 @@ const SOLO = {
     { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
     { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
   ],
+  /* Pokelike. Los de puntaje salen de club-pokelike-puntos (100 por
+     medalla, 150 por miembro del Alto Mando, 500 por el Campeón: la Liga
+     son 1900, y lo que pase de ahí es la Ruta Infinita); los de Pokédex,
+     de club-pokelike-pokedex (especies distintas atrapadas en una run). */
+  pokelike: [
+    { id: "p100", n: "Medalla Roca", d: "Gana tu primera medalla.", i: "🪨", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 100 },
+    { id: "p400", n: "Medio Kanto", d: "Gana cuatro medallas en una partida.", i: "🎖️", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 400 },
+    { id: "p800", n: "Ocho medallas", d: "Gana las ocho medallas en una partida.", i: "🏅", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 800 },
+    { id: "p1400", n: "El Alto Mando cae", d: "Vence a los cuatro del Alto Mando.", i: "⚔️", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 1400 },
+    { id: "p1900", n: "¡Campeón!", d: "Gana la Liga Pokémon.", i: "🏆", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 1900 },
+    { id: "p2500", n: "Ruta Infinita", d: "Llega a 2 500 puntos (la Liga y unos combates de la Ruta Infinita).", i: "♾️", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 2500 },
+    { id: "p4000", n: "Sin final", d: "Llega a 4 000 puntos en una partida.", i: "🌌", m: "Puntaje", s: d => cat(/-puntos$/)(d) && d.puntos >= 4000 },
+    { id: "d10", n: "Coleccionista", d: "Atrapa 10 especies distintas en una partida.", i: "◓", m: "Pokédex", s: d => cat(/-pokedex$/)(d) && d.puntos >= 10 },
+    { id: "d25", n: "Investigador", d: "Atrapa 25 especies distintas en una partida.", i: "🔎", m: "Pokédex", s: d => cat(/-pokedex$/)(d) && d.puntos >= 25 },
+    { id: "d50", n: "Ayudante del Profesor", d: "Atrapa 50 especies distintas en una partida.", i: "📕", m: "Pokédex", s: d => cat(/-pokedex$/)(d) && d.puntos >= 50 }
+  ],
   /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
@@ -457,7 +473,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

@@ -1039,6 +1039,36 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* Pokelike (juegos/club/pokelike/): lo que dice aquí tiene que coincidir
+     con motor.js (mapa, combate, Liga, Ruta Infinita, puntaje) y juego.js. */
+  pokelike: {
+    lema: "Pokelike: un roguelike de Pokémon de Kanto. Recorre un mapa distinto cada vez, gana las ocho medallas y vence a la Liga. Versión de prueba: el equilibrio puede cambiar.",
+    secciones: [
+      ["Cómo se juega", "Elige a <b>Bulbasaur, Charmander o Squirtle</b> y avanza por un mapa de capas: en cada paso eliges uno de los caminos que bajan. Cada gimnasio tiene su mapa, que termina en el líder; al vencerlo ganas su medalla y pasas al siguiente. Son <b>ocho gimnasios y la Liga Pokémon</b>. Si caen todos tus Pokémon, la partida termina."],
+      ["El mapa", lista([
+        "🌿 <b>Salvaje</b>: un combate contra un Pokémon de la zona.",
+        "◓ <b>Captura</b>: elige uno de tres Pokémon para tu equipo (hasta 6). Con el equipo lleno, eliges a quién reemplaza.",
+        "👤 <b>Entrenador</b>: un combate contra su equipo, que da más experiencia.",
+        "✚ <b>Centro Pokémon</b>: cura a todo el equipo.",
+        "El nodo del líder muestra la medalla que entrega; el ojo encima deja ver su equipo y sus debilidades."
+      ])],
+      ["Combate", "Es de <b>uno contra uno</b>: pelea el primero vivo de tu equipo hasta caer, y entra el siguiente. En <b>AUTO</b> (por defecto) tu Pokémon usa el ataque que más daño hace; apágalo para elegir tú cada movimiento. Los ataques siguen la tabla de tipos moderna. Ganar da experiencia: se sube de nivel, se aprenden ataques y se evoluciona."],
+      ["La Liga", "La Calle Victoria no tiene hierba ni Centros Pokémon: solo entrenadores y capturas. Antes de Lorelei el equipo se cura entero, y entre cada miembro del Alto Mando también. Son cuatro del Alto Mando y el Campeón, con seis Pokémon cada uno."],
+      ["Ruta Infinita", "Al ganar la Liga puedes seguir: pisos sin fin de entrenadores y capturas, con Centros Pokémon cada tanto. Los rivales parten en nivel 75 y suben cada <b>3 victorias</b>. Las capturas sirven para la Pokédex, pero salen más bajas que los rivales."],
+      ["Puntaje", lista([
+        "100 por cada medalla y 150 por cada miembro del Alto Mando.",
+        "500 por vencer al Campeón: ganar la Liga son 1 900.",
+        "En la Ruta Infinita, cada victoria suma 50 más 10 por cada nivel de dificultad."
+      ])],
+      ["Controles", lista([
+        "Toca o haz clic en los caminos del mapa; el mapa se desplaza solo hasta tus opciones.",
+        "Ordena tu equipo arrastrando desde las rayitas (o con ↑↓ del teclado).",
+        "En combate: 1–4 eligen movimiento, A cambia AUTO y V la velocidad (×1, ×2, ×4).",
+        "La partida se guarda sola en este navegador."
+      ])],
+      ["Clasificación", "Dos tablas: <b>Puntaje</b> (a igualdad, la partida más corta) y <b>Pokédex</b> (especies distintas que pasaron por tu equipo en esa partida). Cada partida se rehace con su semilla y sus decisiones antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* 2048 (juegos/club/dosmil/): lo que dice aquí tiene que coincidir con
      motor.js (fusiones, fichas nuevas) y juego.js (controles). */
   dosmil: {
@@ -1180,7 +1210,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", metrorush: "Metro Rush", tulones: "Tulones" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

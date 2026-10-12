@@ -29,6 +29,7 @@ export const CONTROLES = {
   "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "pokelike": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "presidente": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "reversi": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},

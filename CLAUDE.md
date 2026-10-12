@@ -97,6 +97,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Mina Club (buscaminas) | `juegos/club/minas/CLAUDE.md` |
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
 | Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
+| Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.
 
