@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
   <script src="../../audio/volumen.js?v=vol-1"></script>
-  <link rel="stylesheet" href="estilo.css?v=pokelike-3">
+  <link rel="stylesheet" href="estilo.css?v=pokelike-23">
 </head>
 <body>
   <header class="barra">
@@ -21,6 +21,8 @@
     <span class="hueco"></span>
     <b id="marcaPrueba" class="marca-prueba" title="Partida de prueba" hidden>PRUEBA</b>
     <button type="button" id="btnPrueba" class="mini" title="Modo prueba" aria-label="Modo prueba" hidden>🐞</button>
+    <button type="button" id="btnPokedex" class="mini" title="Pokédex" aria-label="Pokédex">📕</button>
+    <button type="button" id="btnNovedades" class="mini" title="Novedades" aria-label="Novedades">📰</button>
     <button type="button" id="btnInicio" class="mini" title="Volver al título" hidden>☰</button>
     <span class="vol" data-volumen></span>
   </header>
@@ -34,13 +36,16 @@
         <button type="button" id="btnContinuar" class="boton" hidden>▶ Continuar</button>
         <button type="button" id="btnNueva" class="boton">✦ Nueva partida</button>
       </div>
+      <div class="botones"><button type="button" id="btnPokedexTitulo" class="boton secundario">📕 Pokédex</button>
+        <button type="button" id="btnFama" class="boton secundario" hidden>🏆 Salón de la Fama</button></div>
       <p class="chico" id="tituloNota"></p>
-      <div class="prueba">
-        <label class="interruptor-fila"><input type="checkbox" id="chkPrueba"> 🐞 Modo prueba</label>
+      <!-- Modo prueba: solo en local (juego.js, EN_LOCAL); en producción queda oculto. -->
+      <div id="zonaPrueba" class="prueba" hidden>
+        <label class="interruptor-fila"><input type="checkbox" id="chkPrueba"> 🐞 Modo prueba (solo en local)</label>
         <div id="pruebaOpc" class="prueba-opc" hidden>
           <label class="interruptor-fila"><input type="checkbox" id="chkInmortal"> Inmortal (perder cuenta como ganar)</label>
           <label class="interruptor-fila">Empezar en <select id="selDesde"></select></label>
-          <p class="chico">Con el modo prueba aparece 🐞 arriba: ganar el combate, ir al jefe, saltar el gimnasio, subir niveles.</p>
+          <p class="chico">Con el modo prueba aparece 🐞 arriba: ganar el combate, ir al jefe, saltar el gimnasio, subir niveles y reiniciar la partida.</p>
         </div>
       </div>
     </div>
@@ -49,7 +54,12 @@
   <!-- Elegir inicial -->
   <section id="vInicial" class="vista" hidden>
     <h2 class="tit-vista">Elige a tu compañero</h2>
+    <div class="oak">
+      <img id="oakSprite" alt="" class="oak-sprite">
+      <div id="oakGlobo" class="dialogo oak-globo" role="button" tabindex="0"><b>Prof. Oak</b><p id="oakTxt" aria-live="polite"></p><small>Toca para otro consejo ▶</small></div>
+    </div>
     <div id="iniciales" class="cartas"></div>
+    <p class="cambiar-yo"><button type="button" id="btnCambiarYo" class="mini"></button></p>
   </section>
 
   <!-- Mapa + equipo -->
@@ -58,28 +68,32 @@
     <aside class="panel-equipo">
       <div id="medallasPanel"></div>
       <h2 class="tit-panel">Tu equipo <small id="nEquipo"></small></h2>
-      <p class="chico">El primero vivo sale a pelear. Usa ▲▼ para ordenar.</p>
+      <p class="chico">El primero vivo sale a pelear. Arrastra desde las rayitas para ordenar.</p>
       <ol id="equipo" class="equipo"></ol>
-      <div class="leyenda">
-        <span><i class="ico">🌿</i> Salvaje</span><span><i class="ico">◓</i> Captura</span>
-        <span><i class="ico">👤</i> Entrenador</span><span><i class="ico">✚</i> Centro</span><span><i class="ico">🏆</i> Líder</span>
-      </div>
+      <div id="leyenda" class="leyenda"></div>
+      <button type="button" id="btnReiniciar" class="boton secundario reiniciar"></button>
     </aside>
   </section>
 
   <!-- Combate -->
-  <section id="vCombate" class="vista" hidden>
+  <section id="vCombate" class="vista combate-vista" hidden>
     <div class="combate">
       <div id="arena" class="arena">
         <div class="ficha ficha-e"><b id="nomE" translate="no"></b> <span id="nvE" translate="no"></span>
-          <div class="barra-ps"><i id="psE"></i></div></div>
+          <div class="barra-ps"><i id="psE"></i></div>
+          <div class="rival-fila"><div id="rivalVivos" class="rival-vivos" hidden></div>
+            <button type="button" id="btnVerRival" class="ver-rival" title="Ver su equipo" aria-label="Ver el equipo del rival" hidden></button></div></div>
         <div class="lugar lugar-e"><img id="spE" alt="" class="sprite"></div>
         <div class="lugar lugar-j"><img id="spJ" alt="" class="sprite espalda"></div>
+        <img id="spYo" alt="" class="yo" hidden>
+        <div id="bolaVuela" class="bola-vuela" hidden></div>
+        <i id="destelloBola" class="destello-bola" hidden></i>
         <div class="ficha ficha-j"><b id="nomJ" translate="no"></b> <span id="nvJ" translate="no"></span>
           <div class="barra-ps"><i id="psJ"></i></div>
           <small id="psJt" class="ps-num" translate="no"></small>
           <div class="barra-xp"><i id="xpJ"></i></div></div>
-        <div id="intro" class="intro" hidden><img id="spRival" alt=""><p id="introTxt"></p></div>
+        <div id="intro" class="intro" hidden><img id="spRival" alt=""><p id="introTxt"></p><p id="introN" class="intro-n"></p>
+          <div id="dialogo" class="dialogo" role="button" tabindex="0" hidden><b id="dlgNombre" translate="no"></b><p id="dlgTxt"></p><small id="dlgSigue"></small></div></div>
       </div>
       <p id="texto" class="texto" aria-live="polite"></p>
       <div class="controles">
@@ -91,6 +105,10 @@
       </div>
       <button type="button" id="btnSeguir" class="boton seguir" hidden>Continuar ▶</button>
     </div>
+    <aside class="equipo-combate" aria-label="Tu equipo en este combate">
+      <h2 class="tit-panel">Tu equipo <small id="ecResumen"></small></h2>
+      <ol id="ecLista" class="ec-lista"></ol>
+    </aside>
   </section>
 
   <!-- Capas encima del mapa -->
@@ -103,10 +121,59 @@
     </div>
   </div>
 
+  <!-- Desfile del Salón de la Fama al ganar la Liga -->
+  <div id="paseo" class="paseo" hidden role="dialog" aria-modal="true" aria-label="Salón de la Fama">
+    <p class="paseo-cab">SALÓN DE LA FAMA</p>
+    <div id="paseoCarta" class="paseo-carta">
+      <img id="paseoSpr" alt="" class="paseo-spr">
+      <div class="paseo-datos"><small id="paseoNum"></small><b id="paseoNom" translate="no"></b><span id="paseoNv"></span><div id="paseoTipos" class="tipos"></div><small id="paseoCuenta" class="paseo-cuenta"></small></div>
+    </div>
+    <div class="paseo-final"><img id="paseoYo" alt="" class="paseo-yo"><p id="paseoTit" class="paseo-tit">¡Bienvenido al Salón de la Fama!</p><div id="paseoTodos" class="paseo-todos"></div></div>
+    <small class="paseo-sigue">Toca para seguir ▶</small>
+  </div>
+
+  <!-- Pokédex: dura entre partidas (pokedex.js) -->
+  <div id="dexCapa" class="capa" hidden>
+    <div class="caja dex-caja" role="dialog" aria-modal="true" aria-labelledby="dexTit">
+      <h2 id="dexTit">Pokédex</h2>
+      <p id="dexResumen" class="dex-resumen"></p>
+      <p id="dexCuenta" class="chico dex-cuenta"></p>
+      <div id="dexFiltro" class="dex-filtro" role="group" aria-label="Filtrar">
+        <button type="button" data-filtro="todos">Todos</button>
+        <button type="button" data-filtro="capturados">Capturados</button>
+        <button type="button" data-filtro="faltan">Me faltan</button>
+      </div>
+      <ol id="dexLista" class="dex-lista"></ol>
+      <p class="chico">Cuenta lo que ves y capturas en partidas normales; las de modo prueba no.</p>
+      <div class="botones"><button type="button" id="dexCerrar" class="boton">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- Novedades: aviso de versión de prueba, cambios y lo que viene -->
+  <div id="novedades" class="capa" hidden>
+    <div class="caja nov-caja" role="dialog" aria-modal="true" aria-labelledby="novTit">
+      <h2 id="novTit">Novedades de Pokelike</h2>
+      <div class="nov-pestanas" role="tablist" aria-label="Secciones">
+        <button type="button" role="tab" id="tabAviso" aria-controls="novAviso">📣 Aviso</button>
+        <button type="button" role="tab" id="tabCambios" aria-controls="novCambios">📝 Cambios</button>
+        <button type="button" role="tab" id="tabProximo" aria-controls="novProximo">🔜 Próximamente</button>
+      </div>
+      <div id="novAviso" class="nov-panel" role="tabpanel" aria-labelledby="tabAviso"></div>
+      <div id="novCambios" class="nov-panel" role="tabpanel" aria-labelledby="tabCambios" hidden></div>
+      <div id="novProximo" class="nov-panel" role="tabpanel" aria-labelledby="tabProximo" hidden></div>
+      <div class="botones"><button type="button" id="novCerrar" class="boton">¡A jugar!</button></div>
+    </div>
+  </div>
+
   <script src="especies.js?v=pokelike-3"></script>
-  <script src="datos.js?v=pokelike-3"></script>
-  <script src="motor.js?v=pokelike-3"></script>
+  <script src="datos.js?v=pokelike-6"></script>
+  <script src="motor.js?v=pokelike-11"></script>
+  <script src="medallas.js?v=pokelike-3"></script>
+  <script src="iconos.js?v=pokelike-3"></script>
+  <script src="pokedex.js?v=pokelike-5"></script>
   <script src="sonido.js?v=pokelike-3"></script>
-  <script src="juego.js?v=pokelike-3"></script>
+  <script src="juego.js?v=pokelike-34"></script>
+  <script src="novedades.js?v=pokelike-29"></script>
+  <script src="nube.js?v=202610122300" defer></script>
 </body>
 </html>

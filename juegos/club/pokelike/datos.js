@@ -182,13 +182,13 @@
       clases: [C('acetrainer', 'Entrenador Guay', [6, 9, 3, 26, 59]), C('acetrainerf', 'Entrenadora Guay', [36, 40, 121, 134, 135, 136]),
         C('veteran', 'Veterano', [112, 68, 130, 76]), C('dragontamer', 'Domadragón', [148, 130, 142, 6])],
       jefes: [
-        { nombre: 'Lorelei', titulo: 'Alto Mando', sprite: 'lorelei', lugar: 'Liga Pokémon', equipo: [[87, 51], [91, 50], [80, 51], [124, 52], [131, 53]] },
-        { nombre: 'Bruno', titulo: 'Alto Mando', sprite: 'bruno', lugar: 'Liga Pokémon', equipo: [[95, 51], [107, 52], [106, 52], [95, 53], [68, 54]] },
-        { nombre: 'Agatha', titulo: 'Alto Mando', sprite: 'agatha', lugar: 'Liga Pokémon', equipo: [[94, 52], [42, 52], [93, 52], [24, 54], [94, 55]] },
-        { nombre: 'Lance', titulo: 'Alto Mando', sprite: 'lance', lugar: 'Liga Pokémon', equipo: [[130, 54], [148, 53], [148, 53], [142, 55], [149, 57]] },
+        { nombre: 'Lorelei', titulo: 'Alto Mando', sprite: 'lorelei', lugar: 'Liga Pokémon', equipo: [[87, 64], [91, 63], [80, 64], [124, 65], [144, 65], [131, 66]] },
+        { nombre: 'Bruno', titulo: 'Alto Mando', sprite: 'bruno', lugar: 'Liga Pokémon', equipo: [[95, 65], [107, 66], [106, 66], [95, 67], [62, 67], [68, 68]] },
+        { nombre: 'Agatha', titulo: 'Alto Mando', sprite: 'agatha', lugar: 'Liga Pokémon', equipo: [[94, 67], [42, 67], [93, 67], [24, 69], [110, 68], [94, 70]] },
+        { nombre: 'Lance', titulo: 'Alto Mando', sprite: 'lance', lugar: 'Liga Pokémon', equipo: [[130, 69], [148, 68], [148, 68], [142, 70], [6, 70], [149, 72]] },
         { nombre: 'Azul', titulo: 'Campeón de la Liga', sprite: 'blue', lugar: 'Liga Pokémon', campeon: true,
           // Cierra con el inicial que le gana al tuyo (lo agrega el motor).
-          equipo: [[18, 56], [65, 55], [112, 56], [103, 56], [59, 57]], contraInicial: { 1: 6, 4: 9, 7: 3 }, nvInicial: 59 },
+          equipo: [[18, 72], [65, 71], [112, 72], [103, 72], [59, 73]], contraInicial: { 1: 6, 4: 9, 7: 3 }, nvInicial: 75 },
       ],
     },
   ];

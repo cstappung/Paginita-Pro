@@ -745,6 +745,18 @@
       }
     },
 
+    "pokedex": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.hasChildren(['d', 'medallas', 'liga'])",
+        "d": { ".validate": "newData.isString() && newData.val().matches(/^[012]{151}$/)" },
+        "medallas": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 8" },
+        "liga": { ".validate": "newData.isNumber() && (newData.val() === 1 || (newData.val() === 0 && !(data.val() === 1)))" },
+        "$otro": { ".validate": false }
+      }
+    },
+
     "presence": {
       "$pid": {
         ".read": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()",

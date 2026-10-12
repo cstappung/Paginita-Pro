@@ -16,6 +16,9 @@ const PAGES = [
   { html: "juegos/mascotas/index.html", bundle: "app.js", css: "app.css" },
   /* El visor (mercado, perfil, salón) carga el mismo paquete, sin la hoja. */
   { html: "juegos/mascotas/visor.html", bundle: "app.js" },
+  /* Pokelike: solo su puente a la cuenta (build:pokelike); el resto del
+     juego son archivos planos con su ?v= a mano. */
+  { html: "juegos/club/pokelike/index.html", bundle: "nube.js" },
   /* Los motores de las herramientas .dc no pasan por esbuild, pero el
      problema de la caché es el mismo: la página se sirve fresca (trae la
      opción nueva) y el navegador reutiliza el motor viejo, que no la

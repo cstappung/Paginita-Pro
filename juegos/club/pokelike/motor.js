@@ -96,12 +96,14 @@
 
   // ── Mapa ────────────────────────────────────────────────────────────
   // Gimnasio: inicio, captura, 6 de contenido, centro, jefe.
-  // Liga: inicio, captura, 4 de contenido, centro y los cinco jefes en fila.
+  // Liga: inicio, captura, 5 de contenido y los cinco jefes en fila. La Calle
+  // Victoria es solo entrenadores y capturas: sin hierba ni centros.
   const TAM_GIMNASIO = [1, 2, 3, 4, 3, 4, 3, 4, 1, 1];
-  const TAM_LIGA = [1, 2, 3, 4, 3, 4, 1, 1, 1, 1, 1, 1];
+  const TAM_LIGA = [1, 2, 3, 4, 3, 4, 3, 1, 1, 1, 1, 1];
   const PESOS = {
     temprano: { salvaje: 40, captura: 30, entrenador: 30, centro: 0 },
     medio:    { salvaje: 30, captura: 18, entrenador: 44, centro: 8 },
+    liga:     { salvaje: 0, captura: 25, entrenador: 75, centro: 0 },
   };
 
   function generarMapa(semilla, tramo = 0) {
@@ -115,12 +117,16 @@
     capas.forEach((capa, c) => capa.forEach(nodo => {
       if (c === 0) nodo.tipo = 'inicio';
       else if (c >= primerJefe) { nodo.tipo = 'jefe'; nodo.jefe = c - primerJefe; }
-      else if (c === primerJefe - 1) nodo.tipo = 'centro';
+      else if (c === primerJefe - 1 && !T.liga) nodo.tipo = 'centro';
       else if (c === 1) nodo.tipo = 'captura';
-      else nodo.tipo = ponderado(st, c <= 3 ? PESOS.temprano : PESOS.medio);
+      else nodo.tipo = ponderado(st, T.liga ? PESOS.liga : c <= 3 ? PESOS.temprano : PESOS.medio);
     }));
-    // Aristas: cada nodo baja al más cercano de la capa siguiente y, a veces,
-    // también al segundo; después nadie queda sin camino de llegada.
+    return { capas, aristas: unir(st, capas) };
+  }
+
+  /* Aristas: cada nodo baja al más cercano de la capa siguiente y, a veces,
+     también al segundo; después nadie queda sin camino de llegada. */
+  function unir(st, capas) {
     const ult = capas.length - 1, aristas = [];
     for (let c = 0; c < ult; c++) {
       const de = capas[c], a = capas[c + 1], llega = new Set();
@@ -136,7 +142,71 @@
     }
     // Un pequeño desorden horizontal para que no se vea como grilla.
     capas.forEach(capa => { if (capa.length > 1) capa.forEach(n => { n.x += (azar(st) - 0.5) * 0.08 / capa.length; }); });
-    return { capas, aristas };
+    return aristas;
+  }
+
+  // ── Ruta Infinita (después de ganar la Liga) ────────────────────────
+  /* Pisos sin fin. Cada piso: inicio, tres capas de contenido, un centro,
+     tres más y un centro al final, que lleva al piso siguiente. Cada nodo de
+     contenido es, mitad y mitad, un entrenador o una captura. Las capturas
+     sirven para la Pokédex (cualquier especie de Kanto, sin evolucionar),
+     pero salen `INF_CAPTURA_BAJO` niveles bajo los rivales: meter una en el
+     equipo lo debilita, y no hay reserva. La dificultad sube cada `INF_CADA` victorias: rivales
+     más altos, equipos más grandes y una IA que se equivoca menos. */
+  const INF_CADA = 3, INF_NIVEL = 75, INF_SUBE = 4, INF_CAPTURA_BAJO = 15;
+  const TAM_INFINITO = [1, 2, 3, 3, 1, 3, 3, 2, 1];
+  /* Los rivales salen de las formas finales con buenas stats (sin Mew ni
+     Mewtwo, que aparecen desde la dificultad 5). */
+  const totalBase = e => ESP[e].b.reduce((a, x) => a + x, 0);
+  const POOL_INFINITO = Object.keys(ESP).map(Number).filter(e => !ESP[e].evo.length && totalBase(e) >= 450 && e !== 150 && e !== 151);
+
+  function generarMapaInfinito(semilla) {
+    const st = { rng: semilla | 0 };
+    const capas = TAM_INFINITO.map((n, c) => Array.from({ length: n }, (_, i) => ({
+      id: `${c}-${i}`, capa: c, x: (i + 0.5) / n,
+      tipo: c === 0 ? 'inicio' : n === 1 ? 'centro' : null,
+    })));
+    capas.flat().forEach(n => { if (!n.tipo) n.tipo = azar(st) < 0.5 ? 'entrenador' : 'captura'; });
+    return { capas, aristas: unir(st, capas) };
+  }
+  const dificultad = run => Math.floor((run.infinito ? run.infinito.victorias : 0) / INF_CADA);
+  const nivelInfinito = run => INF_NIVEL + INF_SUBE * dificultad(run);
+
+  function ofertaInfinita(run) {
+    const nv = Math.max(5, nivelInfinito(run) - INF_CAPTURA_BAJO);
+    return [0, 1, 2].map(() => crearPokemon(run, entre(run, 1, 149), nv + entre(run, -2, 2)));
+  }
+
+  function equipoInfinito(run) {
+    const dif = dificultad(run);
+    const cuantos = Math.min(6, 3 + Math.floor(dif / 2));
+    const nv = nivelInfinito(run);
+    const pool = dif >= 5 ? [...POOL_INFINITO, 150, 151] : POOL_INFINITO;
+    return Array.from({ length: cuantos }, () => crearPokemon(run, pool[entre(run, 0, pool.length - 1)], nv + entre(run, -1, 1)));
+  }
+
+  /* Tras ganar la Liga: el equipo se cura y empieza el primer piso. */
+  function empezarInfinito(run) {
+    if (run.resultado !== 'victoria' || run.infinito) return false;
+    run.infinito = { victorias: 0, puntos: 0, piso: 1 };
+    run.resultado = null;
+    nuevoPisoInfinito(run);
+    return true;
+  }
+  function nuevoPisoInfinito(run) {
+    run.mapa = generarMapaInfinito((run.semilla + 104729 * run.infinito.piso) | 0);
+    run.pos = '0-0'; run.visitados = ['0-0'];
+    run.combate = null; run.oferta = null;
+    curarTodo(run);
+    run.fase = 'mapa';
+  }
+
+  /* Puntaje de la run: la historia vale lo mismo para todos los que la
+     terminan (1900 con la Liga); la Ruta Infinita es lo que separa. */
+  const PUNTOS = { medalla: 100, altoMando: 150, campeon: 500, infinitoBase: 50, infinitoDif: 10 };
+  function puntaje(run) {
+    return run.medallas * PUNTOS.medalla + (run.ligaVencidos || 0) * PUNTOS.altoMando
+      + (run.campeon ? PUNTOS.campeon : 0) + (run.infinito ? run.infinito.puntos : 0);
   }
 
   const nodo = (run, id) => run.mapa.capas.flat().find(n => n.id === id);
@@ -145,6 +215,7 @@
   const tramoDe = run => D.TRAMOS[run.tramo];
 
   function zonaDe(run, n) {
+    if (run.infinito) return { nombre: `Ruta Infinita · Piso ${run.infinito.piso}` };
     const f = profundidad(run, n), zs = tramoDe(run).zonas;
     let i = 0;
     zs.forEach((z, k) => { if (f >= z.desde) i = k; });
@@ -200,11 +271,15 @@
   const vivos = run => run.equipo.filter(p => p.ps > 0);
   const primerVivo = run => run.equipo.findIndex(p => p.ps > 0);
 
+  /* El equipo fijo de un jefe, en orden de salida: [[especie, nivel]]. Sin
+     azar, así la pantalla lo puede mostrar antes del combate. */
+  function equipoJefe(run, k = 0) {
+    const j = tramoDe(run).jefes[k];
+    return j.contraInicial ? [...j.equipo, [j.contraInicial[run.inicial] || 9, j.nvInicial]] : j.equipo;
+  }
   function jefeDe(run, n) {
     const j = tramoDe(run).jefes[n.jefe || 0];
-    const eq = j.equipo.map(([e, nv]) => crearPokemon(run, e, nv));
-    if (j.contraInicial) eq.push(crearPokemon(run, j.contraInicial[run.inicial] || 9, j.nvInicial));
-    return { j, eq };
+    return { j, eq: equipoJefe(run, n.jefe || 0).map(([e, nv]) => crearPokemon(run, e, nv)) };
   }
 
   function entrar(run, id) {
@@ -215,6 +290,10 @@
     if (n.tipo === 'salvaje') {
       const e = Number(ponderado(run, zona.p));
       iniciaCombate(run, 'salvaje', [crearRival(run, e, nivelEn(run, n))], { nombre: zona.nombre });
+    } else if (n.tipo === 'entrenador' && run.infinito) {
+      const cl = D.TRAMOS[D.TRAMOS.length - 1].clases[entre(run, 0, D.TRAMOS[D.TRAMOS.length - 1].clases.length - 1)];
+      iniciaCombate(run, 'entrenador', equipoInfinito(run), { nombre: cl.clase, sprite: cl.sprite });
+      run.combate.torpeza = Math.max(0, 0.2 - 0.04 * dificultad(run));
     } else if (n.tipo === 'entrenador') {
       const cl = T.clases[entre(run, 0, T.clases.length - 1)];
       const f = profundidad(run, n);
@@ -222,8 +301,12 @@
       const eq = Array.from({ length: cuantos }, () => crearRival(run, cl.p[entre(run, 0, cl.p.length - 1)], nivelEn(run, n, run.tramo > 0 ? 1 : 0)));
       iniciaCombate(run, 'entrenador', eq, { nombre: cl.clase, sprite: cl.sprite });
     } else if (n.tipo === 'jefe') {
+      // La Calle Victoria no tiene centros: el equipo descansa antes del Alto Mando.
+      if (T.liga && !n.jefe) curarTodo(run);
       const { j, eq } = jefeDe(run, n);
       iniciaCombate(run, 'jefe', eq, { nombre: j.nombre, sprite: j.sprite, titulo: j.titulo, jefe: n.jefe || 0 });
+    } else if (n.tipo === 'captura' && run.infinito) {
+      run.oferta = ofertaInfinita(run); run.fase = 'captura';
     } else if (n.tipo === 'captura') {
       // Tres de la zona; con suerte, uno es una rareza.
       const nv = nivelEn(run, n, -1);
@@ -256,7 +339,7 @@
     const yo = run.equipo[cb.ij], el = cb.enemigos[cb.ie];
     const msY = movimientos(yo.e, yo.nv);
     const iY = eleccion != null && msY[eleccion] ? eleccion : eligeMov(run, yo, el);
-    const iE = eligeMov(run, el, yo, TORPEZA[cb.tipo]);
+    const iE = eligeMov(run, el, yo, cb.torpeza ?? TORPEZA[cb.tipo]);
     const vY = stats(yo.e, yo.nv).vel, vE = stats(el.e, el.nv).vel;
     const yoPrimero = vY > vE || (vY === vE && azar(run) < 0.5);
     const orden = yoPrimero ? [['j', iY], ['e', iE]] : [['e', iE], ['j', iY]];
@@ -346,11 +429,16 @@
     if (!gano && inmortal) { gano = true; run.debug = true; curarTodo(run); }
     run.combate = null;
     if (!gano) { run.fase = 'fin'; run.resultado = 'derrota'; return; }
+    if (run.infinito) {
+      run.infinito.puntos += PUNTOS.infinitoBase + PUNTOS.infinitoDif * dificultad(run);
+      run.infinito.victorias++;
+    }
     if (cb.tipo !== 'jefe') { run.fase = 'mapa'; return; }
     const j = tramoDe(run).jefes[cb.rival.jefe || 0];
-    if (j.campeon) { run.fase = 'fin'; run.resultado = 'victoria'; }
+    if (j.campeon) { run.fase = 'fin'; run.resultado = 'victoria'; run.campeon = true; }
     else if (j.medalla) { run.medallas++; run.fase = 'medalla'; }
     else {
+      run.ligaVencidos = (run.ligaVencidos || 0) + 1;
       // Entre miembros del Alto Mando no hay centro; hasta que haya objetos, se cura todo.
       curarTodo(run);
       run.fase = 'mapa';
@@ -368,6 +456,7 @@
   }
   /* Lleva al jugador al nodo justo antes del (primer) jefe del mapa. */
   function debugIrAlJefe(run) {
+    if (run.infinito) return;
     run.debug = true;
     const capas = run.mapa.capas, c = capas.findIndex(k => k[0].tipo === 'jefe') - 1;
     run.pos = capas[c][0].id; run.visitados.push(run.pos);
@@ -376,7 +465,8 @@
   /* Gana el gimnasio (o la Liga) sin pelear. */
   function debugSaltarTramo(run) {
     run.debug = true;
-    if (tramoDe(run).liga) { run.combate = null; run.fase = 'fin'; run.resultado = 'victoria'; return; }
+    if (run.infinito) return;
+    if (tramoDe(run).liga) { run.combate = null; run.fase = 'fin'; run.resultado = 'victoria'; run.campeon = true; run.ligaVencidos = 4; return; }
     run.medallas++;
     siguienteTramo(run);
   }
@@ -386,6 +476,27 @@
     for (const p of run.equipo) for (let k = 0; k < n && p.nv < 100; k++) ganaXp(run, p, xpParaSubir(p.nv) - p.xp, ev);
     curarTodo(run);
     return ev;
+  }
+  /* Equipo de prueba competitivo: la evolución final del inicial y cinco
+     de los fuertes de Kanto, todos al mismo nivel. */
+  const EQUIPO_PRUEBA = [149, 65, 94, 143, 135];
+  function debugEquipoFuerte(run, nv = 60) {
+    run.debug = true;
+    run.equipo = [run.inicial + 2, ...EQUIPO_PRUEBA].map(e => crearPokemon(run, e, nv));
+  }
+  /* A las puertas de la Liga con el equipo de prueba, al nivel medio con
+     que se llega jugando (~55-56). */
+  function debugLigaFuerte(semilla, inicial, nv = 55) {
+    const run = debugEmpezarEn(semilla, inicial, D.TRAMOS.length - 1);
+    debugEquipoFuerte(run, nv);
+    return run;
+  }
+  /* Directo a la Ruta Infinita, como si ya se hubiera ganado la Liga. */
+  function debugInfinito(semilla, inicial, nv = INF_NIVEL) {
+    const run = debugLigaFuerte(semilla, inicial, nv);
+    run.ligaVencidos = 4; run.campeon = true; run.resultado = 'victoria';
+    empezarInfinito(run);
+    return run;
   }
   /* Run nueva que empieza en el tramo `t` con un equipo de 6 al nivel de
      ese tramo: el inicial y cinco de las zonas y rarezas del tramo. */
@@ -408,15 +519,14 @@
   // ── Otros nodos ─────────────────────────────────────────────────────
   const MAX_EQUIPO = 6;
   /* Captura la oferta `i` (o ninguna con null). Con el equipo lleno, `suelta`
-     es el índice del Pokémon que se libera para hacerle sitio. */
+     es el índice del Pokémon que se libera: el nuevo ocupa su casilla. */
   function capturar(run, i, suelta = null) {
     if (run.fase !== 'captura') return false;
     if (i != null && run.oferta[i]) {
       if (run.equipo.length >= MAX_EQUIPO) {
         if (suelta == null || !run.equipo[suelta]) return false;
-        run.equipo.splice(suelta, 1);
-      }
-      run.equipo.push(run.oferta[i]);
+        run.equipo[suelta] = run.oferta[i];
+      } else run.equipo.push(run.oferta[i]);
     }
     run.oferta = null; run.fase = 'mapa';
     return true;
@@ -428,6 +538,7 @@
   function salirCentro(run) {
     if (run.fase !== 'centro') return false;
     curarTodo(run); run.fase = 'mapa';
+    if (run.infinito && nodo(run, run.pos).capa === run.mapa.capas.length - 1) { run.infinito.piso++; nuevoPisoInfinito(run); }
     return true;
   }
 
@@ -476,7 +587,8 @@
   return {
     ESP, D, azar, stats, movimientos, efectividad, danoBase, xpParaSubir, crearPokemon,
     generarMapa, nodo, siguientes, zonaDe, nuevaRun, entrar, pasoCombate, terminarCombate,
-    capturar, salirCentro, moverEnEquipo, vivos, simular, MAX_EQUIPO, siguienteTramo, tramoDe,
-    debugGanar, debugIrAlJefe, debugSaltarTramo, debugSubirNiveles, debugEmpezarEn,
+    capturar, salirCentro, moverEnEquipo, equipoJefe, vivos, simular, MAX_EQUIPO, siguienteTramo, tramoDe,
+    debugGanar, debugIrAlJefe, debugSaltarTramo, debugSubirNiveles, debugEmpezarEn, debugLigaFuerte, debugInfinito,
+    empezarInfinito, dificultad, nivelInfinito, puntaje, PUNTOS, INF_CADA,
   };
 });

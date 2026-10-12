@@ -8,7 +8,7 @@ repo → `http://localhost:8123/juegos/club/pokelike/`) y se revisa antes de
 seguir. Nada se integra al Salón, monedas ni ranking hasta la
 Fase 2.
 
-**Estado (v0.2):** Fase 1 hecha salvo **objetos** y **música**; adelantado
+**Estado (v0.1, en desarrollo):** Fase 1 hecha salvo **objetos** y **música**; adelantado
 de la Fase 3/4 lo esencial: **los 8 gimnasios y la Liga** (Alto Mando +
 Campeón), dificultad más alta y un **modo prueba** (inmortal, empezar en
 cualquier gimnasio, saltar). Pendiente de tu prueba en local.
@@ -138,6 +138,8 @@ estable en local. Aquí decidimos si seguimos y cómo.
 Seguir `docs/claude/juegos/crear-un-juego.md` (sección *Solo Club game*):
 
 - Entrada en el Salón (`SOLOS`, portada, icono, ruta `#solo/pokelike`).
+- Cada récord de la clasificación lleva el equipo campeón (el que venció al
+  Campeón, ya guardado en el Salón de la Fama local: `pokelike.fama`).
 - Monedas, 10 logros, clasificación (categoría p. ej. medallas + tiempo).
 - **Antitrampas**: `solo/verifica/pokelike.js` reproduce la run desde la
   semilla y las decisiones con el mismo `motor.js`.
@@ -152,7 +154,8 @@ Seguir `docs/claude/juegos/crear-un-juego.md` (sección *Solo Club game*):
 - Nodos nuevos: «?» (eventos), tutor de movimientos, intercambio,
   legendarios (Articuno/Zapdos/Moltres/Mewtwo en tramos tardíos).
 - Piedras evolutivas, más objetos equipables, Rival (Gary) en tramos fijos.
-- Pokédex persistente entre runs.
+- [x] Pokédex persistente entre runs, en el navegador y en la cuenta
+      (`pokedex/<uid>`).
 
 ## Fase 4 — Liga Pokémon
 
@@ -162,7 +165,9 @@ Seguir `docs/claude/juegos/crear-un-juego.md` (sección *Solo Club game*):
 
 ## Fase 5 — Post-liga y modos
 
-- Modo difícil / endless con más niveles y Pokémon de otras generaciones.
+- [x] Ruta Infinita después de la Liga (solo entrenadores y centros, la
+      dificultad sube cada 3 victorias) y puntaje de la run.
+- Pokémon de otras generaciones en la Ruta Infinita.
 - Variantes: Nuzlocke, run diaria con semilla compartida (todos juegan el
   mismo mapa ese día — encaja con los rankings del club).
 
