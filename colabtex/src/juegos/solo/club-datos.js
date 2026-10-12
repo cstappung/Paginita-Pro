@@ -39,6 +39,9 @@ export function categoriaClub(juego, categoria) {
     // sinmonedas, city y citypuro, los otros) y la carrera más larga de cada mundo
     // (distancia la Línea 3, citydistancia City; ahí van también los modos fantasma,
     // que ya no tienen tabla de puntos: sus filas viejas se ven, pero no entran nuevas).
+    // PRO HERO: una sola tabla, la general por estrellas (juegos/hero.js).
+    : juego === 'hero'
+    ? categoria === 'club-hero-estrellas'
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|city|citypuro)$/.test(categoria)
     : juego === 'tetris'
@@ -92,6 +95,9 @@ export function resultadoClub(juego, dato) {
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
   if (juego === 'frontera' && dato.puntos > 100000) return null;
+  /* PRO HERO: doradas·10 000 + todas (hero.js: codificaHero), con la parte
+     de todas por debajo de 10 000 y nunca menor que las doradas. */
+  if (juego === 'hero' && (dato.puntos % 10000 < Math.floor(dato.puntos / 10000))) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;

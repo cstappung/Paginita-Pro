@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','metrorush','aleteo','dosmil','trigon','pokelike'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','metrorush','aleteo','dosmil','trigon','pokelike','hero'];
  for(const j of juegos){
   const n=j==='metrorush'?11:10;   // Metro Rush suma «Cazafantasmas», el único individual que se escribe en vivo
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,n,j);
@@ -16,7 +16,9 @@ test('diez logros por juego, con ids válidos y únicos',()=>{
  }
  const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8'));
  const re=new RegExp(reglas.rules.logros.$juego['.validate'].match(/matches\(\/(.*)\/\)/)[1]);
- for(const j of Object.keys(JUEGOS))assert.ok(re.test(j),'regla sin '+j);
+ // PRO HERO tiene sala pero ningún logro en vivo: los suyos salen de la marca (club-hero-estrellas) y no se escriben
+ for(const j of Object.keys(JUEGOS))if(j!=='hero')assert.ok(re.test(j),'regla sin '+j);
+ assert.ok(!re.test('hero'),'los logros de PRO HERO no se escriben a mano');
  assert.ok(re.test('metrorush'),'regla sin metrorush (Cazafantasmas se escribe)');
 });
 test('los de la fila salen de ganadas, racha y jugadas',()=>{

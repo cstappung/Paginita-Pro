@@ -65,7 +65,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 export const PESO = {
   escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
-  boxhead: 1.3, tulones: 1.6, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
+  boxhead: 1.3, tulones: 1.6, hero: 1.2, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -109,7 +109,10 @@ export const NIVEL = {
   pokelike: "1223444123",
   /* Metro Rush, en el orden de LOGROS.metrorush: c50k c250k c1m c3m c10m ·
      d1k d5k d10k d21k d42k · fan (Cazafantasmas: pasar al n.º 1 de la distancia). */
-  metrorush: "12334123344"
+  metrorush: "12334123344",
+  /* PRO HERO, en el orden de LOGROS.hero: e1 o1 c5 c10 o50 l10 o100 c40
+     o150 l40. */
+  hero: "1122233344"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -162,7 +165,18 @@ export function monedasRachaFrontera(n) {
   for (let k = 1; k <= Math.min(Math.floor(+n || 0), 500); k++) t += monedasCombateFrontera(k);
   return t;
 }
+/* PRO HERO: la fila guarda doradas·10 000 + Σ máx(doradas, azules) de cada
+   canción (juegos/hero.js), y cada canción paga 100 por estrella dorada y
+   50 por cada azul que no tape ya una dorada: 50·(doradas + máx). Así una
+   estrella se paga una sola vez, y pasar de azul a dorada paga los 50 que
+   faltaban. Con las 333 canciones a cinco doradas son 166 500. El tope
+   (5000 doradas, mil canciones) es el de la regla de `soloRanks`. */
+export function monedasHero(puntos) {
+  const p = Math.max(0, Math.floor(+puntos || 0)), g = Math.min(Math.floor(p / 10000), 5000), m = Math.min(p % 10000, 5000);
+  return 50 * (g + Math.max(g, m));
+}
 function extraRecord(cat, f) {
+  if (cat === "club-hero-estrellas") return monedasHero(f.puntos);
   if (/^club-frontera-(torre|palacio|fabrica)-(50|abierto)$/.test(cat)) return monedasRachaFrontera(f.puntos);
   if (cat === "club-frontera-victorias") return 3 * Math.min(f.puntos || 0, 100000);
   if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
@@ -232,10 +246,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, pokelike: 25, metrorush: 20 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, pokelike: 25, metrorush: 20, hero: 50 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "pokelike", "metrorush"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "pokelike", "metrorush", "hero"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;

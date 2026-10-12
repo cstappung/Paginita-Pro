@@ -464,8 +464,29 @@ const SOLO = {
     { id: "d21k", n: "Media maratón", d: "Recorre 21 000 m en una carrera.", i: "🏅", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 21000 },
     { id: "d42k", n: "Maratón sobre rieles", d: "Recorre 42 000 m en una carrera.", i: "🏆", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 42000 },
     { id: "fan", n: "Cazafantasmas", d: "En un modo Fantasma, llega más lejos que el fantasma del récord.", i: "🔦", m: "Fantasma" }   // en vivo (sin `s`): lo escribe la página
+  ],
+  /* PRO HERO. Todos salen de club-hero-estrellas: puntos = doradas·10 000 +
+     Σ máx(doradas, azules) de cada canción (juegos/hero.js), `h` = canciones
+     con alguna dorada y `h5` = con las cinco. Pensados para que unas 40
+     canciones bien tocadas en Experto den los diez: el último son 40
+     canciones con cinco doradas (200 doradas). */
+  hero: [
+    { id: "e1", n: "Primer acorde", d: "Consigue tu primera estrella, en cualquier dificultad.", i: "⭐", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && heroM(d) >= 1 },
+    { id: "o1", n: "Oro", d: "Consigue tu primera estrella dorada (en Experto, o la dificultad más alta del instrumento).", i: "🌟", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 1 },
+    { id: "c5", n: "Cinco estrellas", d: "Saca las cinco estrellas doradas en una canción.", i: "🎸", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h5 | 0) >= 1 },
+    { id: "c10", n: "Repertorio", d: "Ten estrellas doradas en 10 canciones distintas.", i: "📀", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h | 0) >= 10 },
+    { id: "o50", n: "Disco de oro", d: "Junta 50 estrellas doradas.", i: "💿", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 50 },
+    { id: "l10", n: "Lista de éxitos", d: "Saca las cinco doradas en 10 canciones.", i: "📈", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h5 | 0) >= 10 },
+    { id: "o100", n: "Disco de platino", d: "Junta 100 estrellas doradas.", i: "🏅", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 100 },
+    { id: "c40", n: "Gira mundial", d: "Ten estrellas doradas en 40 canciones distintas.", i: "🌎", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h | 0) >= 40 },
+    { id: "o150", n: "Disco de diamante", d: "Junta 150 estrellas doradas.", i: "💎", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 150 },
+    { id: "l40", n: "Leyenda del rock", d: "Saca las cinco doradas en 40 canciones (200 doradas).", i: "👑", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h5 | 0) >= 40 }
   ]
 };
+/* PRO HERO: las doradas y el total (máx. de doradas y azules por canción)
+   que guarda la fila en `puntos` (hero.js: codificaHero). */
+const heroG = d => Math.floor((+d.puntos || 0) / 10000);
+const heroM = d => (+d.puntos || 0) % 10000;
 
 /* El catálogo entero: juego → sus diez. */
 export const LOGROS = Object.fromEntries([
@@ -473,7 +494,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

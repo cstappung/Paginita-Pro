@@ -409,6 +409,27 @@ const ARTE = {
     ${bola(330, 248, 38, "a-late")}`;
   },
 
+  /* PRO HERO: la autopista de cinco carriles en perspectiva, con notas de
+     los cinco colores bajando hacia sus botones, una nota que estalla al
+     acertarse y tres estrellas (dos doradas y una azul) arriba. */
+  hero: u => {
+    const cols = ["#22c84a", "#e8312f", "#f5d21c", "#2f7bf0", "#f28a1c"];
+    const x = (i, t) => 200 + (i - 2) * (18 + 52 * t);          // carril i a la altura t (0 lejos, 1 cerca)
+    const y = t => 40 + 200 * t;
+    const nota = (i, t, cls = "") => `<g class="${cls}"><ellipse cx="${x(i, t).toFixed(1)}" cy="${y(t).toFixed(1)}" rx="${(8 + 16 * t).toFixed(1)}" ry="${(4 + 7 * t).toFixed(1)}" fill="${cols[i]}" stroke="#000" stroke-opacity=".4"/><ellipse cx="${x(i, t).toFixed(1)}" cy="${y(t).toFixed(1)}" rx="${(4 + 8 * t).toFixed(1)}" ry="${(2 + 3.5 * t).toFixed(1)}" fill="#fff" opacity=".8"/></g>`;
+    const est = (cx, cy, c, cls = "") => `<path class="${cls}" transform="translate(${cx} ${cy})" d="M0-16L5-5H16L7 2 10 14 0 7-10 14-7 2-16-5H-5Z" fill="${c}" stroke="#fff" stroke-opacity=".5"/>`;
+    let carriles = "";
+    for (let i = 0; i <= 5; i++) carriles += `<line x1="${(200 + (i - 2.5) * 18).toFixed(1)}" y1="40" x2="${(200 + (i - 2.5) * 70).toFixed(1)}" y2="240" stroke="#fff" stroke-opacity="${i === 0 || i === 5 ? .5 : .15}" stroke-width="2"/>`;
+    const botones = cols.map((c, i) => `<ellipse cx="${x(i, 1)}" cy="240" rx="24" ry="11" fill="#140c08" stroke="${c}" stroke-width="5"/>`).join("");
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b0f2e"/><stop offset="1" stop-color="#3a1608"/></linearGradient>
+      <linearGradient id="h${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1d14" stop-opacity=".2"/><stop offset="1" stop-color="#4a3220"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <path d="M155 40 H245 L375 260 H25Z" fill="url(#h${u})"/>${carriles}${botones}
+    ${nota(1, .25)}${nota(3, .42)}${nota(4, .6)}${nota(2, .78)}${nota(0, .97, "a-late")}
+    <circle cx="${x(0, 1)}" cy="240" r="34" fill="none" stroke="#ffe46b" stroke-width="3" class="a-late" opacity=".8"/>
+    ${est(300, 52, "#ffc443", "a-late")}${est(336, 52, "#ffc443")}${est(372, 52, "#53a8ff")}`;
+  },
+
   tulones: u => {
     const tipo = (x, y, r, piel, pelo, polera) => `<g transform="translate(${x} ${y}) rotate(${r})">
       <rect x="-9" y="-2" width="18" height="30" rx="7" fill="${piel}" stroke="#2a1d18" stroke-width="2"/>
@@ -452,6 +473,8 @@ const ARTE = {
    cae entonces en su fondo `.sp-e-<id>` de siempre). */
 /* La tarjeta del Club de Tulones (`tulonesclub`, la sala ya se llama `tulones`) usa la misma escena. */
 ARTE.tulonesclub = ARTE.tulones;
+/* PRO HERO: la tarjeta del club (`heroclub`) y la sala (`hero`) comparten escena. */
+ARTE.heroclub = ARTE.hero;
 
 export function portadaSolo(id) {
   const f = ARTE[id];

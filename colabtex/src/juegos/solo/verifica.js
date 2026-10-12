@@ -33,8 +33,9 @@ import * as trigon from './verifica/trigon.js';
 import * as frontera from './verifica/frontera.js';
 import * as metrorush from './verifica/metrorush.js';
 import * as pokelike from './verifica/pokelike.js';
+import * as hero from './verifica/hero.js';
 
-export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, aleteo, dosmil, trigon, frontera, metrorush, pokelike};
+export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, aleteo, dosmil, trigon, frontera, metrorush, pokelike, hero};
 
 /* Lo que ocupa una prueba como texto, como mucho. La regla de
    `soloPruebas` pide lo mismo. */

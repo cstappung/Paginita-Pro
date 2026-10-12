@@ -201,6 +201,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 8,
     alta: "2026-10-10"
+  },
+  hero: {
+    nombre: "PRO HERO",
+    lema: "Guitarra, bajo o batería a la vez sobre la misma canción: cada uno en su instrumento y gana el mejor puntaje",
+    color: "#ffb21e",
+    minimo: 2,
+    cupo: 8,
+    alta: "2026-10-12"
   }
 };
 
@@ -986,6 +994,7 @@ export function reducir(p) {
   if (p.juego === "boxhead") return { ...base, ...redBoxhead(p, js, listos) };
   if (p.juego === "gato") return { ...base, ...redGato(p, js) };
   if (p.juego === "tulones") return { ...base, ...redTulones(p, js, listos) };
+  if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
   return base;
 }
 
@@ -6924,5 +6933,93 @@ function redGato(p, js) {
     fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
     variante, tab, grande, turno, forzado, equis, circulos, movs, ultima,
     linea: ganador ? linea : null, ganador, motivo
+  };
+}
+
+/* ---------- PRO HERO en línea ----------
+   La sala toca una canción tras otra; nunca termina por sí sola (se cierra
+   cuando se van todos, o dormida a las seis horas). Al registro va solo lo
+   que hay que acordar entre todos; las notas, el puntaje en vivo y los
+   aciertos de cada uno van por la malla WebRTC (colabtex/src/juegos/hero-sala.js):
+   - `cancion {id}`: la elige quien dirige (el primer asiento que sigue en la
+     sala). Cambiarla deja a todos sin «listo».
+   - `parte {p, d, m}`: instrumento, dificultad y modo de notas de cada uno.
+   - `listo {on}`: listo para la canción.
+   - `empieza`: quien dirige, con todos los demás listos. Abre la ronda
+     (`ronda` sube) con los que tienen parte elegida: `enJuego`.
+   - `cargado`: ese jugador terminó de descargar la canción. `nocarga`: no
+     pudo, y sale de la ronda.
+   - `go {at}`: quien dirige, cuando todos los de la ronda cargaron. `at` es
+     la hora del servidor (la regla de `jugadas/$n/at` la deja a segundos de
+     `now`) y la canción arranca HR_DEMORA ms después en todas las pantallas.
+   - `fin {r, s, e, …}`: el resultado de cada uno, una vez por ronda. Cuando
+     están todos los de la ronda que siguen en la sala, la ronda queda en
+     `ultima` y se vuelve a elegir canción.
+   No hay ganador de la sala ni fila en `ranks/hero`: lo que clasifica en
+   PRO HERO son las estrellas de cada canción, que se guardan igual que
+   tocando solo. */
+export const HR_DEMORA = 3500;
+export const HR_PARTES = ["guitar", "bass", "rhythm", "keys", "drums", "guitarcoop"];
+export const HR_DIFS = ["expert", "hard", "medium", "easy"];
+export const HR_MODOS = ["taps", "normal", "hopos", "strums"];
+export function redHero(p, js = jugadoresDe(p), listos = true) {
+  const ids = new Set(js.map(j => j.uid));
+  const fuera = {}, partes = {}, prep = {}, hist = [];
+  const ent = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
+  let etapa = "sala", cancion = "", ronda = 0, enJuego = [], cargados = {}, go = 0, fines = {}, ultima = null;
+  const director = () => (js.find(j => !fuera[j.uid]) || {}).uid || "";
+  const presentes = () => js.filter(j => !fuera[j.uid]).map(j => j.uid);
+  const cierraRonda = () => {
+    if (etapa === "cargando" && !enJuego.some(u => !fuera[u])) { etapa = "sala"; return; }
+    if (etapa !== "tocando") return;
+    if (enJuego.some(u => !fuera[u] && !fines[u])) return;
+    ultima = { ronda, cancion, fines, partes: Object.fromEntries(enJuego.map(u => [u, partes[u]])) };
+    hist.push({ e: "ronda", r: ronda });
+    etapa = "sala";
+    for (const k of Object.keys(prep)) delete prep[k];
+  };
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (j.t === "abandona") {
+      if (ids.has(u) && !fuera[u]) { fuera[u] = true; hist.push({ e: "sale", uid: u }); cierraRonda(); }
+      continue;
+    }
+    if (!ids.has(u) || fuera[u]) continue;
+    if (j.t === "parte") {
+      if (etapa !== "sala" || !HR_PARTES.includes(j.p) || !HR_DIFS.includes(j.d)) continue;
+      partes[u] = { p: j.p, d: j.d, m: HR_MODOS.includes(j.m) ? j.m : "normal" };
+    } else if (j.t === "listo") {
+      if (etapa === "sala") prep[u] = !!j.on;
+    } else if (j.t === "cancion") {
+      if (etapa !== "sala" || u !== director() || typeof j.id !== "string" || !j.id || j.id.length > 300 || j.id === cancion) continue;
+      cancion = j.id;
+      for (const k of Object.keys(prep)) delete prep[k];
+    } else if (j.t === "empieza") {
+      if (etapa !== "sala" || u !== director() || !cancion) continue;
+      const ps = presentes();
+      if (!ps.every(x => partes[x] && (x === u || prep[x]))) continue;
+      etapa = "cargando"; ronda++; enJuego = ps; cargados = {}; fines = {}; go = 0;
+      hist.push({ e: "empieza", r: ronda });
+    } else if (j.t === "cargado") {
+      if (etapa === "cargando" && enJuego.includes(u)) cargados[u] = true;
+    } else if (j.t === "nocarga") {
+      if (etapa === "cargando" && enJuego.includes(u)) { enJuego = enJuego.filter(x => x !== u); cierraRonda(); }
+    } else if (j.t === "go") {
+      if (etapa !== "cargando" || u !== director() || !enJuego.every(x => fuera[x] || cargados[x])) continue;
+      etapa = "tocando"; go = (Number.isFinite(j.at) ? j.at : 0) + HR_DEMORA;
+    } else if (j.t === "fin") {
+      if (etapa !== "tocando" || !enJuego.includes(u) || fines[u] || j.r !== ronda) continue;
+      fines[u] = {
+        s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.h, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
+        sp: ent(j.sp, 1e4), st: ent(j.st, 1e4), o: ent(j.o, 1e5), fc: j.fc === 1 ? 1 : 0, q: j.q === 1 ? 1 : 0
+      };
+      cierraRonda();
+    }
+  }
+  const quedan = presentes();
+  const todos = listos && js.length > 0 && !quedan.length;
+  return {
+    fase: todos ? "fin" : "jugando", ganador: todos ? "" : null, motivo: todos ? "abandono" : "",
+    etapa, cancion, director: director(), partes, preparados: prep, ronda, enJuego, cargados, go, fines, ultima, fuera, hist
   };
 }

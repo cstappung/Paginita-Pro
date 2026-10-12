@@ -65,6 +65,8 @@ import { crearTetris } from "./juegos/tetris.js";
 import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
+import { crearHero, ponHero } from "./juegos/hero.js";
+import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { portadaSolo } from "./juegos/portadas-solo.js";
@@ -103,13 +105,13 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", pokelike: "◓", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -224,6 +226,8 @@ const OPCIONES = {
   ],
   /* Tulones: `tiempo` son los segundos de cada turno y `rondas` 0 es sin fin
      (gana el último en pie). Ninguno es `modo`. */
+  /* PRO HERO: solo cuántos caben; la canción se elige dentro de la sala. */
+  hero: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("hero") }],
   tulones: [
     { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tulones") },
     { clave: "tiempo", etiqueta: "Turno", por: 45, valores: TL_TIEMPOS.map(v => ({ v, t: v + " s" })) },
@@ -270,7 +274,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-pokelike", "club-metrorush", "club-tulones"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-pokelike", "club-metrorush", "club-tulones", "club-hero"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -730,6 +734,7 @@ async function anotar(p) {
   if (!p || !p.fin || !u || anotada === state.pid) return;
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
   if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
+  if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -910,17 +915,22 @@ function avisaMonedas(icono, titulo, detalle, monto, tipo) {
    mismo que `registraJugadaClub`). Se encadenan para que dos resultados
    seguidos no lean el mismo contador. */
 let jugadasClubCola = Promise.resolve();
-function marcaJugadaClub(juego) {
+/* Devuelve lo que pagó (0 si hoy ya no paga). `silencio`: el juego lo
+   muestra él mismo (PRO HERO, en su pantalla de resultados). */
+function marcaJugadaClub(juego, { silencio = false } = {}) {
   const u = state.user;
-  if (!u) return;
-  jugadasClubCola = jugadasClubCola.then(async () => {
+  if (!u) return Promise.resolve(0);
+  const hecho = jugadasClubCola.then(async () => {
     try {
       const reg = registraJugadaClub(await fb.leerJugadasClub(u.uid, juego), diaMonedas(), juego);
-      if (!reg) return;
+      if (!reg) return 0;
       await fb.apuntaJugadaClub(u.uid, juego, reg);
-      avisaMonedas("🕹️", "Partida del club", `${reg.hoy} de ${topeClub(juego)} que pagan hoy en este juego`, PAGO_CLUB[juego], "club");
-    } catch (e) { console.warn("[juegos] no se pudo apuntar la partida del club", e); }
+      if (!silencio) avisaMonedas("🕹️", "Partida del club", `${reg.hoy} de ${topeClub(juego)} que pagan hoy en este juego`, PAGO_CLUB[juego], "club");
+      return PAGO_CLUB[juego] || 0;
+    } catch (e) { console.warn("[juegos] no se pudo apuntar la partida del club", e); return 0; }
   });
+  jugadasClubCola = hecho;
+  return hecho;
 }
 
 /* ---------- logros ----------
@@ -970,7 +980,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike|hero)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1472,6 +1482,11 @@ const sospechaClub = s => {
   return fb.reportaSospecha(uid, s);
 };
 
+/* PRO HERO (hero.js): la cuenta y lo que la página ya hace para el club
+   (guardar con prueba, apuntar la partida, celebrar el logro, avisar a los
+   administradores), para el juego solo y para la sala. */
+ponHero({ fb, usuario: () => state.user, nombreVivo, guardaClub, marcaJugadaClub, celebra, sospecha: sospechaClub });
+
 /* ---------- el medidor de descarga (consumo.js) ----------
    Cuánto bajó de la base este navegador y esta cuenta hoy. Lo raro va a
    `sospechas/<uid>` (una vez por día y tipo); en el tope se corta la
@@ -1546,12 +1561,22 @@ function armazon() {
   /* sortEm es solo el juego: el iframe ocupa la ventana, sin la cabecera
      del sitio ni la barra de juegos individuales. */
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
+  /* PRO HERO también ocupa la ventana: es un juego de pantalla completa con su propio menú. */
+  document.documentElement.classList.toggle("jg-hero", state.vista === "solo-hero" && !motivo);
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
   h.closest("main").classList.toggle("jg-ancho", !motivo && (state.vista === "partida" || state.vista.startsWith("solo-")));
   if (motivo) { h.innerHTML = puertaHtml(motivo); return; }
   const u = state.user;
+  if (state.vista === "solo-hero") {
+    /* PRO HERO no es un iframe del club: tiene su propio cartero (hero.js),
+       que verifica cada canción y guarda estrellas, top y monedas. */
+    h.innerHTML = "";
+    individual = crearHero({ volver: () => ir(""), enLinea: () => { ir(""); setTimeout(() => salon.abre && salon.abre("hero"), 50); } });
+    individual.montar(h);
+    return;
+  }
   if (state.vista === "solo-frontera") {
     /* La Frontera Batalla no es un iframe del club: es la pantalla de
        Pokémon en modo local, con sus propias rachas. Como invitado juega
@@ -1608,7 +1633,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1850,6 +1875,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "hero", color: "#ffb21e", alta: "2026-10-12", titulo: "PRO HERO",
+    lema: "Guitarra, bajo, teclado o batería sobre 333 canciones de Clone Hero, con teclado o con tu guitarra. Junta estrellas doradas en Experto para subir en la clasificación, y abre una sala para tocar la misma canción con tus amigos.",
+    sub: "Un jugador o en sala de 2 a 8 · estrellas, top por canción y logros", ruta: "#solo/hero", boton: "Tocar", reglas: ["hero"], modo: "solo", cuenta: true },
   { id: "mascotas", color: "#ff8a3d", alta: "2026-10-10", titulo: "Mascotas",
     lema: "Adopta una gallina o un gato en 3D, dale de comer, báñalo, hazlo dormir y míralo crecer de huevo a adulto. Vístelo con lo que salga de los regalos, enséñale bailes y lúcelo en tu perfil. La primera adopción es gratis.",
     sub: "Crianza en 3D · regalos, ropa, muebles y bailes · mercado", ruta: "#mascotas", boton: "Adoptar", juego: "mascotas",
@@ -1930,6 +1958,7 @@ function arteNovedad(n) {
   // Tulones: la misma escena de la portada del club.
   if (n.id === "trigon") return `<div class="jg-nov-arte-zb">${portadaSolo("trigon")}<b>TRIGON</b></div>`;
   if (n.id === "pokelike") return `<div class="jg-nov-arte-zb">${portadaSolo("pokelike")}<b>POKELIKE</b></div>`;
+  if (n.id === "hero") return `<div class="jg-nov-arte-zb">${portadaSolo("hero")}<b>PRO HERO</b></div>`;
   if (n.id === "tulonesred") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>EN LÍNEA</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
   if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
@@ -2553,7 +2582,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, gato: 1200, tulones: 1800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, gato: 1200, tulones: 1800, hero: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3098,6 +3127,7 @@ function arteJuego(k) {
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
+  if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';

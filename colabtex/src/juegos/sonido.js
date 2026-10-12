@@ -459,7 +459,7 @@ export function siguienteCancion(dir = 1) {
 /* Juegos que traen su propia música dentro del marco. `juegos-main.js` los
    ambienta por su nombre en cada repintado como a todos, y eso pisaba el
    `null` que el marco pidió al montarse: una canción elegida sonaba encima. */
-const PROPIAS = new Set(["worms"]);
+const PROPIAS = new Set(["worms", "hero"]);
 /** `null` = esta pantalla trae su propia música; "" = ninguna en particular. */
 export function ambientar(j) {
   const siguiente = j === null || PROPIAS.has(j) ? null : (j || "");

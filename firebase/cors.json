@@ -5,7 +5,8 @@
       "https://paginita-pro.cl",
       "https://cstappung.github.io",
       "http://localhost:8123",
-      "http://127.0.0.1:8123"
+      "http://127.0.0.1:8123",
+      "http://localhost:8080"
     ],
     "method": ["GET", "HEAD"],
     "maxAgeSeconds": 3600,

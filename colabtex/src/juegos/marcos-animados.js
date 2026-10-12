@@ -261,6 +261,20 @@ function trigon() {
     chispas([[66, 50, 2, 1.7, 0], [66, 230, 1.8, 2.1, -.8]], "#fff3b0"); // dos destellos sueltos
 }
 
+/* PRO HERO: la autopista hecha anillo — las cinco notas de los trastes
+   (verde, rojo, amarillo, azul, naranja) dando la vuelta, una púa dorada
+   que late arriba y dos estrellas, una dorada y una azul, que destellan. */
+function hero() {
+  const cols = ["#22c84a", "#e8312f", "#f5d21c", "#2f7bf0", "#f28a1c"];
+  const nota = c => `<ellipse rx="6.5" ry="4.2" fill="${c}" stroke="#1a1000" stroke-width=".8"/><ellipse rx="3.2" ry="2" fill="#fff" opacity=".85"/>`;
+  const anillo = cada(10, (i, a) => en(60, a, nota(cols[i % 5]), a));
+  const pua = `<path d="M0-8C6-8 8-4 7 0C6 4 2 7 0 9C-2 7-6 4-7 0C-8-4-6-8 0-8Z" fill="#ffc443" stroke="#8a5a00" stroke-width="1"/><path d="M0-5L1.2-1.6H4.8L1.9 .6 3 4 0 1.9-3 4-1.9 .6-4.8-1.6H-1.2Z" fill="#fff3b0"/>`;
+  const estrella = c => `<path d="M0-4L1.1-1.3H4L1.7.5 2.5 3.4 0 1.7-2.5 3.4-1.7.5-4-1.3H-1.1Z" fill="${c}"/>`;
+  return gira(30, anillo) +
+    en(60, 0, an("l", 1.4, pua)) +
+    en(67, 120, an("t", 1.9, estrella("#ffc443"))) + en(67, 240, an("t", 2.3, estrella("#53a8ff"), -.9));
+}
+
 /* Metro Rush: un anillo de vía (balasto, durmientes de madera y dos rieles
    de acero) por el que da vueltas un trencito naranja, visto desde arriba,
    con los focos encendidos, persiguiendo una moneda dorada que gira; un
@@ -597,7 +611,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
-  tmetrorush: metrorush, ttrigon: trigon,
+  tmetrorush: metrorush, ttrigon: trigon, thero: hero,
   cometa, vortice, sakura, plasma, mariposas
 };
 

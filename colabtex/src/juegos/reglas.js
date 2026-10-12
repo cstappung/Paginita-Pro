@@ -1069,6 +1069,42 @@ const REGLAS = {
       ["Clasificación", "Dos tablas: <b>Puntaje</b> (a igualdad, la partida más corta) y <b>Pokédex</b> (especies distintas que pasaron por tu equipo en esa partida). Cada partida se rehace con su semilla y sus decisiones antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* PRO HERO (juegos/hero/): lo que dice aquí tiene que coincidir con su
+     motor (core/engine.js: puntos, multiplicador, Star Power, estrellas),
+     con juegos/hero.js (estrellas doradas y azules, monedas) y con
+     redHero en motor.js (la sala). */
+  hero: {
+    lema: "PRO HERO: toca guitarra, bajo, teclado o batería sobre canciones de Clone Hero. Acierta las notas cuando llegan a la línea, encadena rachas y junta estrellas.",
+    secciones: [
+      ["Cómo se juega", "Las notas bajan por la autopista hacia cinco botones de colores (cuatro o cinco tambores en la batería). Cuando una nota llega a su botón, <b>pisa su traste y rasguea</b> a la vez. Con el modo <b>Todo taps</b> (el que viene puesto) basta con pisar el traste justo a tiempo, sin rasguear. Los acordes se pisan enteros; una nota larga se mantiene apretada hasta el final."],
+      ["Puntos y racha", lista([
+        "Cada nota vale 50 por gema, por el multiplicador.",
+        "El multiplicador sube cada 10 notas seguidas, hasta ×4. Un fallo, o rasguear sin nota, lo devuelve a ×1.",
+        "Las notas largas suman mientras las mantienes.",
+        "En los solos, cada nota acertada da 100 de bono al terminar el solo."
+      ])],
+      ["Star Power", "Las frases de notas con brillo azul cargan la barra de Star Power si las aciertas <b>todas</b>. Con media barra o más, actívalo (Espacio o el botón del mando): duplica el multiplicador hasta que la barra se vacía. Mover el whammy en una nota larga de Star Power también la carga."],
+      ["Estrellas", lista([
+        "Al terminar, el puntaje se compara con lo que vale la canción tocada sin multiplicador: de 0 a 5 estrellas.",
+        "<b>★ Doradas</b>: solo en <b>Experto</b>, o en la dificultad más alta que tenga ese instrumento en esa canción. En cualquier otra dificultad las estrellas son <b>★ azules</b>.",
+        "En la lista de canciones se ven tus mejores estrellas de cada canción: primero las doradas y, detrás, las azules que tengas de más.",
+        "Cada canción terminada se vuelve a tocar en tu navegador con lo que hiciste, nota por nota, antes de guardarse: solo cuenta lo que de verdad se tocó."
+      ])],
+      ["Monedas", lista([
+        "50 por cada canción terminada (las primeras 15 de cada día).",
+        "100 por cada estrella dorada y 50 por cada azul, una sola vez por estrella y por canción.",
+        "Si una estrella azul pasa a dorada, se pagan los 50 que faltaban."
+      ])],
+      ["Clasificación", "Hay una sola: la <b>general</b>, por estrellas doradas sumadas en todas las canciones; en empate, desempatan las azules. Debajo del botón «Jugar» de cada canción está su top de puntajes: aparece si te quedas unos segundos en la canción, para no bajar datos mientras recorres la lista."],
+      ["En línea", "Abre una sala de PRO HERO en el salón (de 2 a 8). Quien dirige elige la canción; cada uno elige su instrumento, su dificultad y el modo de notas, y marca «Listo». La canción se descarga en cada computador y arranca a la vez para todos. Cada uno ve las autopistas de los demás en vivo y, al final, el puntaje de todos. Las estrellas y monedas se ganan igual que tocando solo."],
+      ["Controles", lista([
+        "Teclado: trastes A S D F G, rasgueo ↑ ↓ o Intro, Star Power Espacio, pausa Esc.",
+        "Batería: D F J K L los tambores y Espacio el bombo.",
+        "Guitarras y mandos (Xbox, PlayStation): se configuran en <b>Controles</b>, igual que las teclas.",
+        "Pausa: al volver, la canción retrocede un poco y cuenta 3, 2, 1. En una sala no hay pausa."
+      ])]
+    ]
+  },
   /* 2048 (juegos/club/dosmil/): lo que dice aquí tiene que coincidir con
      motor.js (fusiones, fichas nuevas) y juego.js (controles). */
   dosmil: {
@@ -1210,7 +1246,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

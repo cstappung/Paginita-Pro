@@ -36,7 +36,7 @@ test('@controles en el código del juego manda sobre la lectura',()=>{
 const PROBADOS={
  movil:['orbita','escondite','cartas','cuadritos','worms','reversi','cadena','flip7','cacho','uno','catan','presidente','spicy','tetris','clue','ajedrez','pokemon',
   'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','pokelike','frontera','bots-worms','bots-clue','mascotas'],
- teclado:['boxhead','bots-boxhead','sortem'],
+ teclado:['boxhead','bots-boxhead','sortem','hero','heroclub'],
  tecladoYRaton:['yemas','bots-yemas','tulones','tulonesclub']
 };
 

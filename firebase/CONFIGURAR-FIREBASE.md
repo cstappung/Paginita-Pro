@@ -542,6 +542,35 @@ esos modos solo se guarda después de volver a publicar. El
 arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**.
 
+### ⚠ PRO HERO pide publicar otra vez (2026-10-12)
+
+Base de datos (pegar `firebase/database.rules.json` entero y **Publicar**):
+
+- `heroMias/<uid>/<canción>` = `{g, b, s, at}`: tus mejores estrellas
+  doradas y azules y tu mejor puntaje en cada canción. Solo lo lee y lo
+  escribe su dueño, y solo puede subir.
+- `heroCanciones/<canción>/<uid>` = `{n, s, e, o, p, d, m, at}`: el top de
+  cada canción (lo que se ve bajo «Jugar»). Se lee por clave, una canción a
+  la vez, nunca la colección entera; cada uno escribe su fila, solo si sube
+  y nunca por encima de su `heroMias`.
+- `soloRanks/club-hero-estrellas` (y su `soloPruebas`): la clasificación
+  general por estrellas, con los campos `h` y `h5` (canciones con alguna
+  dorada y con las cinco).
+- `clubJugadas/<uid>/hero`: cada canción terminada paga 50, quince al día.
+- `'hero'` en la lista del campo `juego` de `partidas` (las salas en línea),
+  y la regla de `jugadas/$n/at` vale también para PRO HERO (el arranque
+  sincronizado de la canción usa la hora del servidor).
+
+Sin publicar, el juego se puede tocar pero la canción terminada dice que
+«faltan publicar las reglas», no hay top ni clasificación, y la sala no se
+puede crear.
+
+**Storage**: `firebase/storage.rules` trae el bloque `match /hero/{allPaths=**}`
+(las canciones, `hero/songs_save/…`, se leen con la sesión iniciada y nadie
+las escribe desde la web; se suben con `gcloud storage rsync`) y
+`firebase/cors.json` suma `http://localhost:8080`. Ya están publicados en
+la consola: el repo solo se puso al día con lo que hay allá.
+
 ### ⚠ Tulones en línea pide publicar otra vez (2026-10-10)
 
 `'tulones'` tiene que estar en la lista del campo `juego` y en la de
