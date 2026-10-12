@@ -94,7 +94,11 @@ export function leePrueba(texto) {
   if (o.e) {
     for (const s of o.e.split(';')) {
       const [a, b, c] = s.split(',').map((x) => parseInt(x, 36));
-      if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(c) || a < 0) throw new Error('suceso ilegible');
+      // El primer suceso puede bajar a k = −1: un traste pisado durante la
+      // cuenta regresiva, antes del primer punto de la rejilla (texto() parte
+      // de 0). Después, la rejilla solo avanza.
+      if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(c) || c < 0 ||
+        (ev.length ? a < 0 : k + a < -1)) throw new Error('suceso ilegible');
       k += a;
       u += b;
       ev.push([k, u, c >> 6, c & 63]);
