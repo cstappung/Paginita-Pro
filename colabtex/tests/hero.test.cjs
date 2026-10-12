@@ -271,7 +271,7 @@ test('pisar trastes durante la cuenta regresiva (antes del segundo 0) no rompe l
    mentira: cada jugada que escribe tiene que ir firmada con el uid, porque la
    regla de `jugadas/$n` lo exige (sin él la sala no avanzaba: ni canción ni
    «listo»). */
-test('sala: el cartero firma cada jugada con el uid de quien la escribe', async () => {
+test('sala: el cartero firma cada jugada y ninguna choca con los campos que valida la regla', async () => {
   const dir = path.join(__dirname, '..', 'src', 'juegos');
   const stub = (nombre, codigo) => ({ path: nombre, namespace: 'stub', pluginData: codigo });
   const codigo = (await esbuild.build({
@@ -308,6 +308,44 @@ test('sala: el cartero firma cada jugada con el uid de quien la escribe', async 
     manda({ tipo: 'red', m: { t: 'ready', ready: true } });
     manda({ tipo: 'red', m: { t: 'start' } });
     assert.deepEqual(escritas.map(j => j.t), ['cancion', 'parte', 'listo', 'empieza']);
+    // la ronda en marcha (como si la base devolviera las jugadas de los dos)
+    const pone = j => { p.jugadas[String(Object.keys(p.jugadas).length).padStart(4, '0')] = j; s.actualizar(p, reducir(p)); };
+    pone({ t: 'cancion', uid: 'a', id: 'x' });
+    for (const u of ['a', 'b']) pone({ t: 'parte', uid: u, p: 'guitar', d: 'expert', m: 'taps' });
+    pone({ t: 'listo', uid: 'b', on: true });
+    pone({ t: 'empieza', uid: 'a' });
+    for (const u of ['a', 'b']) pone({ t: 'cargado', uid: u });
+    pone({ t: 'go', uid: 'a', at: Date.now() });
+    manda({ tipo: 'red', m: { t: 'done', stats: { score: 1234, stars: 3, hits: 50, total: 60, misses: 10, bestCombo: 20, spPhrases: 1, spTotal: 2, overhits: 0, fc: false } } });
+    const fin = escritas.find(j => j.t === 'fin');
+    assert.ok(fin, 'el resultado se anota');
+    assert.equal(escritas.find(j => j.t === 'go').uid, 'a');
     for (const j of escritas) assert.equal(j.uid, 'a', j.t + ' sin firmar');
+    /* Ninguna jugada choca con un campo que la regla de `jugadas/$n` valida
+       aparte: `h` y `sal` son textos (los usan otros juegos) y `at` la hora.
+       El resultado llevaba los aciertos en `h` y la base lo rechazaba entero. */
+    const reglas = JSON.parse(fs.readFileSync('../firebase/database.rules.json', 'utf8')).rules.partidas.$pid.jugadas.$n;
+    for (const j of escritas) for (const k of Object.keys(j)) {
+      if (k === 'h' || k === 'sal') assert.equal(typeof j[k], 'string', j.t + '.' + k);
+      if (k === 'at') assert.ok(Number.isFinite(j[k]), j.t + '.at');
+      if (!['t', 'uid', 'at'].includes(k) && k in reglas) assert.fail(j.t + ' usa «' + k + '», que la regla valida aparte');
+    }
+    // y el reductor lee los aciertos de donde los escribe el cartero
+    pone({ ...fin, uid: 'a' });
+    pone({ t: 'fin', uid: 'b', r: 1, s: 99 });
+    assert.equal(reducir(p).ultima.fines.a.h, 50);
   } finally { s?.destruir(); Object.assign(g, antes); }
+});
+
+test('sala: tu autopista va al centro (con 3, en medio; con 4, la del centro a la izquierda)', async () => {
+  const { enElCentro } = await mod('js/game/orden.js');
+  const sala = (n, yo) => Array.from({ length: n }, (_, i) => ({ id: 'j' + i, type: i === yo ? 'local' : 'remote' }));
+  const donde = (n, yo) => enElCentro(sala(n, yo)).findIndex(p => p.type === 'local');
+  assert.equal(donde(1, 0), 0);
+  assert.equal(donde(2, 1), 0);
+  assert.equal(donde(3, 0), 1);
+  assert.equal(donde(3, 2), 1);
+  assert.equal(donde(4, 3), 1);
+  assert.equal(donde(5, 0), 2);
+  assert.deepEqual(enElCentro(sala(4, 3)).map(p => p.id), ['j0', 'j3', 'j1', 'j2'], 'los demás no cambian de orden');
 });

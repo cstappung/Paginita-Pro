@@ -123,6 +123,15 @@ and message names, and the postman plays the server:
   repeated and `RemoteState.apply` ignores ones already applied.
 - The page's chat and «Abandonar» are used; the frame hides its own chat
   and leave button (`sitio.sala`). Spectators see the lobby read-only.
+- **Move fields must not collide with the rule's own keys**: `jugadas/$n`
+  validates `h` and `sal` as strings and `at` as server time. The hits of
+  a `fin` travel as `ac` (as `h` the whole result was refused, so nobody
+  saw the others' stats and the round never closed). The postman test
+  checks every move against the rule's keys.
+- **Fullscreen**: the frame asks for it (`pantallaCompleta` in
+  `puente.js`) on «Estoy listo» / «Empezar canción», the gestures the
+  browser requires. Your highway goes in the middle (`enElCentro` in
+  `js/game/orden.js`: 3 → centre, 4 → centre-left).
 - Room option: only `cupo`.
 
 ## Versioning

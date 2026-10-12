@@ -6952,7 +6952,9 @@ function redGato(p, js) {
    - `go {at}`: quien dirige, cuando todos los de la ronda cargaron. `at` es
      la hora del servidor (la regla de `jugadas/$n/at` la deja a segundos de
      `now`) y la canción arranca HR_DEMORA ms después en todas las pantallas.
-   - `fin {r, s, e, …}`: el resultado de cada uno, una vez por ronda. Cuando
+   - `fin {r, s, e, ac, …}`: el resultado de cada uno, una vez por ronda
+     (los aciertos van en `ac`: la regla de `jugadas/$n` reserva `h` para
+     un texto y rechazaba la jugada entera). Cuando
      están todos los de la ronda que siguen en la sala, la ronda queda en
      `ultima` y se vuelve a elegir canción.
    No hay ganador de la sala ni fila en `ranks/hero`: lo que clasifica en
@@ -7010,7 +7012,7 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
     } else if (j.t === "fin") {
       if (etapa !== "tocando" || !enJuego.includes(u) || fines[u] || j.r !== ronda) continue;
       fines[u] = {
-        s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.h, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
+        s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.ac, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
         sp: ent(j.sp, 1e4), st: ent(j.st, 1e4), o: ent(j.o, 1e5), fc: j.fc === 1 ? 1 : 0, q: j.q === 1 ? 1 : 0
       };
       cierraRonda();

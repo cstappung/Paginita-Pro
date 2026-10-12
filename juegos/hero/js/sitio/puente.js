@@ -65,6 +65,19 @@ if (embebido) {
   if (sitio.sala) document.documentElement.classList.add('en-sala');
 }
 
+// En una sala, la canción se toca a pantalla completa, como tocando solo.
+// El navegador solo la concede con un gesto: se pide al pulsar «Estoy listo»
+// o «Empezar canción» (el iframe tiene allow="fullscreen").
+export function pantallaCompleta() {
+  if (!sitio.sala || document.fullscreenElement || document.webkitFullscreenElement) return;
+  const raiz = document.documentElement;
+  const pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+  try {
+    const r = pide?.call(raiz, { navigationUI: 'hide' });
+    r?.catch?.(() => {});
+  } catch {}
+}
+
 // Las estrellas que se pintan en una canción: las doradas encima de las
 // azules. Con 4 azules y 3 doradas se ven ★★★ doradas y una ★ azul.
 export function estrellasDe(r) {
