@@ -187,6 +187,7 @@ export const useGame = create<GameState>()((set, get) => ({
       ...d.objetos.map((o) => ({ uid: o.c, kind: o.kind, id: o.id, tint: o.tint, ...(o.leg ? { leg: true } : {}), ...(o.venta ? { venta: o.venta } : {}) })),
     ]
     const antes = get()
+    const luz = antes.listo ? antes.lightsOn : d.prefs.luz !== false
     const pets = d.mascotas.map((m) => {
       const local = antes.pets.find((p) => p.id === m.c)
       const ls = Number.isFinite(m.estado?.ls) ? (m.estado!.ls as number) : -1
@@ -198,7 +199,9 @@ export const useGame = create<GameState>()((set, get) => ({
       const limpia = onlyUsable(p, items)
       const cambio = JSON.stringify([limpia.wear, limpia.decor]) !== JSON.stringify([p.wear, p.decor])
       if (!m.venta && (!m.estado || cambio)) guarda(m.c)
-      return limpia
+      // El estado guardado trae los stats de su `ls`: se ponen al día ya, no al primer cuidado ni
+      // al primer tick de `App` (10 s), que dejaban ver a una mascota bien comida que no lo está.
+      return tick(limpia, now, !luz)
     })
     const barra = (d.prefs.barra ?? defaultDanceBar(items)).filter((u) => items.some((i) => i.uid === u && i.kind === 'dance' && !i.venta)).slice(0, DANCE_BAR)
     const fondos = d.fondos ?? []
@@ -216,7 +219,7 @@ export const useGame = create<GameState>()((set, get) => ({
       adopciones: d.adopciones,
       danceBar: barra.length || d.prefs.barra ? barra : defaultDanceBar(items),
       background: antes.listo ? antes.background : fondo,
-      lightsOn: antes.listo ? antes.lightsOn : d.prefs.luz !== false,
+      lightsOn: luz,
     })
   },
 
