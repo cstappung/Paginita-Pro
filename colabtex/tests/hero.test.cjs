@@ -266,3 +266,48 @@ test('pisar trastes durante la cuenta regresiva (antes del segundo 0) no rompe l
   const r = rehace(song, g.texto());
   assert.deepEqual(r.stats, e.stats());
 });
+
+/* El cartero de la sala de verdad (hero-sala.js), con la base y la malla de
+   mentira: cada jugada que escribe tiene que ir firmada con el uid, porque la
+   regla de `jugadas/$n` lo exige (sin él la sala no avanzaba: ni canción ni
+   «listo»). */
+test('sala: el cartero firma cada jugada con el uid de quien la escribe', async () => {
+  const dir = path.join(__dirname, '..', 'src', 'juegos');
+  const stub = (nombre, codigo) => ({ path: nombre, namespace: 'stub', pluginData: codigo });
+  const codigo = (await esbuild.build({
+    entryPoints: [path.join(dir, 'hero-sala.js')], bundle: true, format: 'cjs', platform: 'node', write: false,
+    plugins: [{ name: 'stubs', setup(b) {
+      b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
+      b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(){return {entrar:async()=>true,envia(){},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
+    } }]
+  })).outputFiles[0].text;
+  const m = { exports: {} };
+  new Function('module', 'exports', 'require', codigo)(m, m.exports, require);
+  let oyente = null;
+  const frame = { contentWindow: { postMessage() {} }, style: {}, setAttribute() {}, addEventListener() {}, remove() {} };
+  const g = globalThis, antes = { window: g.window, document: g.document, location: g.location, MutationObserver: g.MutationObserver };
+  g.window = { addEventListener: (t, f) => { if (t === 'message') oyente = f; }, removeEventListener() {} };
+  g.document = { createElement: t => (t === 'iframe' ? frame : { setAttribute() {}, style: {} }), documentElement: { dataset: {} } };
+  g.location = { origin: 'https://sitio' };
+  g.MutationObserver = class { observe() {} disconnect() {} };
+  let s = null;
+  try {
+    const escritas = [];
+    const p = sala(2);
+    p.estado = 'esperando';   // una sala recién abierta: aún no «listos»
+    s = m.exports.crearHeroSala({ uid: 'a', pid: 'p1', mirando: false, terminar() {}, jugar: async j => { escritas.push(j); return true; } });
+    s.montar({ append() {}, innerHTML: '' });
+    const manda = d => oyente({ source: frame.contentWindow, origin: 'https://sitio', data: { canal: 'hero-hijo', ...d } });
+    s.actualizar(p, reducir(p));
+    manda({ tipo: 'listo' });
+    manda({ tipo: 'red', m: { t: 'hello' } });
+    manda({ tipo: 'red', m: { t: 'song', songId: 'Muse - Uprising' } });
+    manda({ tipo: 'red', m: { t: 'part', part: 'guitar', diff: 'expert', mode: 'taps' } });
+    manda({ tipo: 'red', m: { t: 'ready', ready: true } });
+    manda({ tipo: 'red', m: { t: 'start' } });
+    assert.deepEqual(escritas.map(j => j.t), ['cancion', 'parte', 'listo', 'empieza']);
+    for (const j of escritas) assert.equal(j.uid, 'a', j.t + ' sin firmar');
+  } finally { s?.destruir(); Object.assign(g, antes); }
+});
