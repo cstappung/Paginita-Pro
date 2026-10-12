@@ -35,6 +35,7 @@
         'Puntaje: 100 por medalla, 150 por cada miembro del Alto Mando, 500 por el Campeón, y la Ruta Infinita suma más mientras más lejos llegues.',
         'Pokédex que dura entre partidas, en este navegador y, con sesión iniciada, en tu cuenta.',
         'Botón «Empezar de nuevo» con el mismo inicial, y esta ventana de novedades (📰).',
+        'Entra al Club de Juegos: clasificación por puntaje y por Pokédex (especies atrapadas en una partida), monedas y 10 logros. Cada partida se rehace con su semilla y sus decisiones antes de guardarse.',
         'Modo prueba 🐞 para desarrollar, solo en local (en la página publicada no aparece): inmortal, empezar en cualquier gimnasio y atajos.',
       ],
     },
@@ -43,7 +44,7 @@
   const PROXIMAMENTE = [
     'Objetos: Poción, Superpoción, Caramelo raro y objetos equipables.',
     'Música.',
-    'Entrada en el Club: monedas, logros y clasificación con el equipo campeón de cada jugador.',
+    'Clasificación que muestre el equipo campeón de cada jugador.',
     'Nodos nuevos en el mapa: eventos «?», tutor de movimientos, intercambio y legendarios.',
     'Piedras evolutivas y combates contra el Rival en puntos fijos.',
     'Modos: Nuzlocke y partida diaria con el mismo mapa para todos.',

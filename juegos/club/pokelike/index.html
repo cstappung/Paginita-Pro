@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610110356"></script>
+<script src="../../../i18n.js?v=202610120426"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pokelike — roguelike de Pokémon</title>
@@ -11,11 +11,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
-  <link rel="stylesheet" href="estilo.css?v=pokelike-23">
+  <script src="../conexion.js?v=club-11"></script>
+  <link rel="stylesheet" href="estilo.css?v=pokelike-24">
 </head>
 <body>
-  <header class="barra">
+  <!-- .shell: lo pide conexion.js (pone «Volver a Juegos» y el panel de la
+       clasificación). La barra es un div: dentro de Juegos se ocultan los
+       header hijos de .shell. -->
+  <div class="shell">
+  <div class="barra" role="banner">
     <h1 class="logo" translate="no">POKELIKE</h1>
     <span id="zona" class="zona" translate="no"></span>
     <span class="hueco"></span>
@@ -25,7 +31,7 @@
     <button type="button" id="btnNovedades" class="mini" title="Novedades" aria-label="Novedades">📰</button>
     <button type="button" id="btnInicio" class="mini" title="Volver al título" hidden>☰</button>
     <span class="vol" data-volumen></span>
-  </header>
+  </div>
 
   <!-- Título -->
   <section id="vTitulo" class="vista titulo">
@@ -111,6 +117,8 @@
     </aside>
   </section>
 
+  </div><!-- .shell -->
+
   <!-- Capas encima del mapa -->
   <div id="capa" class="capa" hidden>
     <div class="caja" role="dialog" aria-modal="true" aria-labelledby="capaTit">
@@ -167,13 +175,13 @@
 
   <script src="especies.js?v=pokelike-3"></script>
   <script src="datos.js?v=pokelike-6"></script>
-  <script src="motor.js?v=pokelike-11"></script>
+  <script src="motor.js?v=pokelike-12"></script>
   <script src="medallas.js?v=pokelike-3"></script>
   <script src="iconos.js?v=pokelike-3"></script>
   <script src="pokedex.js?v=pokelike-5"></script>
   <script src="sonido.js?v=pokelike-3"></script>
-  <script src="juego.js?v=pokelike-34"></script>
-  <script src="novedades.js?v=pokelike-29"></script>
-  <script src="nube.js?v=202610122300" defer></script>
+  <script src="juego.js?v=pokelike-35"></script>
+  <script src="novedades.js?v=pokelike-30"></script>
+  <script src="nube.js?v=202610120426" defer></script>
 </body>
 </html>

@@ -249,3 +249,51 @@ test('antes de Lorelei el equipo se cura entero (la Calle Victoria no tiene cent
   assert.strictEqual(run.combate.rival.nombre, 'Lorelei');
   assert.ok(run.equipo.every(p => p.ps === M.stats(p.e, p.nv).ps));
 });
+
+/* Juega una run como una persona, con decisiones al azar (caminos, capturas
+   con reemplazo, movimientos manuales, reordenar), solo con las acciones
+   registradas, que son las que usa la pantalla. */
+function juegaAlAzar(semilla, u, inicial, pasos = 4000) {
+  const run = M.nuevaRun(semilla, inicial, u);
+  const r = { rng: semilla ^ 0x1234 };
+  const al = n => Math.floor(M.azar(r) * n);
+  for (let k = 0; k < pasos && run.fase !== 'fin'; k++) {
+    if (run.fase === 'mapa') {
+      if (run.equipo.length > 1 && al(6) === 0) M.moverEnEquipo(run, al(run.equipo.length), al(2) ? 1 : -1);
+      const sig = M.siguientes(run);
+      M.entrar(run, sig[al(sig.length)]);
+    } else if (run.fase === 'combate') {
+      if (!run.combate.fin) M.pasoCombate(run, al(3) === 0 ? al(4) : null);
+      else M.terminarCombate(run);
+    } else if (run.fase === 'captura') {
+      const i = al(4) === 0 ? null : al(run.oferta.length);
+      M.capturar(run, i, run.equipo.length >= M.MAX_EQUIPO && i != null ? al(M.MAX_EQUIPO) : null);
+    } else if (run.fase === 'centro') M.salirCentro(run);
+    else if (run.fase === 'medalla') M.siguienteTramo(run);
+  }
+  return run;
+}
+const huella = run => JSON.stringify({ e: run.equipo, m: run.medallas, t: run.tramo, f: run.fase, p: M.puntaje(run), a: run.atrapados, rng: run.rng });
+
+test('antitrampas: rehacer la partida desde la semilla y las decisiones da lo mismo', () => {
+  for (let s = 1; s <= 40; s++) {
+    const run = juegaAlAzar(s * 977, 'cuenta-' + s, [1, 4, 7][s % 3]);
+    assert.ok(run.log.length > 5);
+    const re = M.rehace(run.nonce, run.u, run.inicial, run.log);
+    assert.ok(!re.error, re.error);
+    assert.strictEqual(huella(re.run), huella(run), `semilla ${s}`);
+    assert.strictEqual(M.atrapados(re.run), run.atrapados.length);
+  }
+});
+
+test('antitrampas: una prueba de otra cuenta o tocada a mano no se rehace igual', () => {
+  const run = juegaAlAzar(4242, 'ana', 4);
+  const otra = M.rehace(run.nonce, 'beto', run.inicial, run.log);
+  assert.ok(otra.error || huella(otra.run) !== huella(run), 'otra cuenta');
+  const log = run.log.slice();
+  const k = log.findIndex(t => t[0] === 'e');
+  log[k] = 'e9-9';
+  assert.ok(M.rehace(run.nonce, run.u, run.inicial, log).error, 'nodo inventado');
+  assert.ok(M.rehace(run.nonce, run.u, run.inicial, [...run.log, 'n']).error || run.fase === 'medalla', 'decisión fuera de lugar');
+  assert.ok(M.rehace(run.nonce, run.u, 25, run.log).error, 'inicial inventado');
+});

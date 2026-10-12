@@ -1,9 +1,12 @@
 # Pokelike — notes for Claude
 
-Roguelike de Pokémon (Gen 1) inspirado en pokelike.xyz. **En construcción**:
-plan y estado en `ROADMAP.md`. Todavía **no** está conectado al Club
-(sin `conexion.js`, ranking, monedas ni antitrampas: eso es la Fase 2), así
-que se abre directo en `/juegos/club/pokelike/`.
+Roguelike de Pokémon (Gen 1) inspirado en pokelike.xyz. Plan y estado en
+`ROADMAP.md`. Es un juego del **Solo Club** (`#solo/pokelike`, iframe de
+`solo/club.js`): manda `Club.result` a dos tablas, `club-pokelike-puntos`
+(`M.puntaje`) y `club-pokelike-pokedex` (`M.atrapados`: especies distintas
+de la run), con una prueba que `solo/verifica/pokelike.js` rehace con este
+mismo motor (ver `docs/antitrampas/pokelike.md`). Logros, monedas, ranking,
+Salón y manual siguen la lista de `docs/claude/juegos/crear-un-juego.md`.
 
 - **Registro de cambios obligatorio** (`NOVEDADES` en `novedades.js`). Todo
   cambio al juego (jugabilidad, balance, interfaz, arreglos) se anota en
@@ -60,6 +63,17 @@ que se abre directo en `/juegos/club/pokelike/`.
   Juegos (`users/<uid>/perfil/nick`, que trae `nube.js`) o «Entrenador/a».
   `lanzaBola` anima la entrada al combate (entrenador + pokébola + destello);
   `empiezaCombate` sube `gen` para que un combate nuevo corte al anterior.
+- **Club y antitrampas**: la pantalla usa las versiones registradas de las
+  acciones del motor (`M.entrar`, `M.pasoCombate`, `M.capturar`…), que dejan
+  un token por decisión en `run.log`; `M.rehace(nonce, u, inicial, log)` la
+  vuelve a jugar. La cuenta (`Club.storageKey`) entra en la semilla y la run
+  se guarda por cuenta (`pokelike.run.cuenta.<uid>`). Los dos relojes del
+  tiempo jugado (`run.relA`/`relW`) solo corren con la pestaña a la vista.
+  `enviaClub` manda al llegar a la pantalla de fin. **Toda acción nueva que
+  cambie la run tiene que pasar por `acciones` y tener su token**, o las
+  runs dejarán de rehacerse. Dentro del iframe nada puede medir el alto de
+  la ventana (`100vh`/`dvh`): conexion.js le dice a la página su alto y el
+  iframe crecería sin fin (ver el final de `estilo.css`).
 - **Archivos planos, sin build** (salvo `nube.js`). Orden de carga (`index.html`):
   `especies.js` → `datos.js` → `motor.js` → `medallas.js` → `iconos.js` → `pokedex.js` → `sonido.js` → `juego.js` → `novedades.js` → `nube.js` (diferido) (ventana de
   novedades con pestañas Aviso / Cambios / Próximamente; independiente del motor).

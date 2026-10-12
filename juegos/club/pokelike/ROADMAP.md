@@ -133,7 +133,11 @@ estable en local. Aquí decidimos si seguimos y cómo.
 
 ---
 
-## Fase 2 — Integración al sitio
+## Fase 2 — Integración al sitio (hecha)
+
+Entró al Solo Club con dos tablas verificadas (puntaje y Pokédex de la
+run), 10 logros, monedas, portada, manual y reglas de Firebase (hay que
+publicarlas a mano). Lo de abajo era el plan.
 
 Seguir `docs/claude/juegos/crear-un-juego.md` (sección *Solo Club game*):
 

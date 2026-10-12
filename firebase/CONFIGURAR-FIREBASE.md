@@ -216,6 +216,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > Hasta volver a publicar las reglas se juega igual, pero las partidas no
 > entran en la clasificación y no pagan monedas.
 
+> **Pokelike (octubre de 2026):** `club-pokelike-puntos` (el puntaje de la
+> run, con tope de 1 000 000) y `club-pokelike-pokedex` (especies distintas
+> atrapadas en la run) son categorías nuevas de `soloRanks` y `soloPruebas`,
+> y `pokelike` un juego nuevo de `clubJugadas`. Además, `pokedex/<uid>` (la
+> Pokédex de cada cuenta, solo del dueño) es un nodo nuevo. Hasta volver a
+> publicar las reglas se juega igual, pero las partidas no entran en la
+> clasificación, no pagan monedas y la Pokédex queda solo en el navegador.
+
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
 > millones) y `club-metrorush-distancia` (los metros de la carrera más larga,

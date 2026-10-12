@@ -54,7 +54,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Mapa */
 /* Con el mapa a la vista la página no se desplaza: barra arriba y el mapa
    ocupa el resto, con su propio scroll. */
-body:has(#vMapa:not([hidden])) { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+body:has(#vMapa:not([hidden])) { overflow: hidden; }
+body:has(#vMapa:not([hidden])) > .shell { height: 100dvh; display: flex; flex-direction: column; }
 .mapa-vista {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr); gap: 16px;
   flex: 1; min-height: 0; width: 100%; padding-bottom: 12px;
@@ -520,3 +521,18 @@ body:has(#vMapa:not([hidden])) { height: 100dvh; overflow: hidden; display: flex
 .ficha-yo small { color: var(--amarillo); font-weight: 800; }
 .ficha-yo b { font: 400 26px 'Lilita One', sans-serif; }
 .fama-yo { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+
+/* Club (conexion.js / conexion.css). Suelta, la página no muestra el panel
+   de clasificación (solo existe dentro de Juegos). Dentro de Juegos va en un
+   iframe que crece con su contenido: nada puede medir el alto de la ventana
+   (100vh/100dvh), o el iframe crecería sin fin. */
+.club-volver { margin: 8px 16px 0 !important; color: var(--suave) !important; }
+html:not(.club-integrado) .club-ranking { display: none; }
+html.club-integrado body { background: radial-gradient(ellipse at top, #2d3a5a, var(--fondo) 60%), var(--fondo); }
+.club-integrado body:has(#vMapa:not([hidden])) { overflow: visible; }
+.club-integrado body:has(#vMapa:not([hidden])) > .shell { height: auto; display: block; }
+.club-integrado .mapa-vista { height: 760px; }
+.club-integrado .titulo { min-height: 600px; }
+.club-integrado .club-ranking { background: var(--fondo2); color: var(--tinta); border-color: var(--borde); margin: 16px; }
+.club-integrado .club-ranking button { background: var(--carta); color: var(--tinta); border-color: var(--borde); }
+@media (max-width: 760px) { .club-integrado .mapa-vista { height: 900px; } }

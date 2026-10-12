@@ -104,6 +104,9 @@ export const NIVEL = {
   /* Trigon, en el orden de LOGROS.trigon: p100 p250 p500 p1k p1.5k p2.5k
      p4k p6k p10k p20k. */
   trigon: "1122233344",
+  /* Pokelike, en el orden de LOGROS.pokelike: p100 p400 p800 p1400 p1900
+     p2500 p4000 · d10 d25 d50. */
+  pokelike: "1223444123",
   /* Metro Rush, en el orden de LOGROS.metrorush: c50k c250k c1m c3m c10m ·
      d1k d5k d10k d21k d42k · fan (Cazafantasmas: pasar al n.º 1 de la distancia). */
   metrorush: "12334123344"
@@ -116,7 +119,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, metrorush: 40 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, aleteo: 30, dosmil: 30, trigon: 30, pokelike: 40, metrorush: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
    paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
@@ -184,6 +187,10 @@ function extraRecord(cat, f) {
   if (cat === "club-dosmil-ficha") { const e = Math.round(Math.log2(f.puntos || 1)); return e > 0 && e <= 18 ? e * e : 0; }
   // Trigon: 1 por cada 100 puntos (sus puntajes son unas diez veces más chicos que los del 2048).
   if (cat === "club-trigon-puntos") return Math.floor(Math.min(f.puntos || 0, 1000000) / 100);
+  /* Pokelike: 1 por cada 50 puntos (la Liga, 1900, son 38; tope en 200) y
+     1 por especie atrapada en la run. */
+  if (cat === "club-pokelike-puntos") return Math.floor(Math.min(f.puntos || 0, 10000) / 50);
+  if (cat === "club-pokelike-pokedex") return Math.min(f.puntos || 0, 151);
   /* Metro Rush: la mejor carrera paga 1 moneda por cada 25 000 puntos
      (1 000 000 son 40, con tope en 200: en el juego se llega a millones) y
      la distancia, 1 por cada 500 m (10 km son 20, tope en 100). */
@@ -225,10 +232,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, metrorush: 20 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, aleteo: 10, dosmil: 15, trigon: 15, pokelike: 25, metrorush: 20 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "metrorush"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco", "aleteo", "dosmil", "trigon", "pokelike", "metrorush"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;

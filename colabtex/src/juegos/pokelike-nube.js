@@ -4,9 +4,10 @@
    resto del sitio (mismo origen, misma persistencia de Firebase Auth), así
    que quien ya entró en Juegos llega con la sesión iniciada.
 
-   Pokelike todavía no vive dentro de Juegos (Fase 2 del ROADMAP), por eso
-   habla con Firebase directo en vez de pasar por un cartero de la página
-   como los juegos del Club. Al integrarlo, esto se muda a un cartero. */
+   Es la única excepción a «el juego del Club no toca Firebase»: la
+   Pokédex de la cuenta no es un récord (no paga ni entra en la
+   clasificación), así que vive aquí en vez de en un cartero de la página.
+   Si algún día da monedas o logros, se muda a un cartero. */
 import { db, watchAuth, loginGoogle, logout } from "../firebase.js";
 import { ref, get, runTransaction } from "firebase/database";
 

@@ -246,15 +246,38 @@
   // ── Run ─────────────────────────────────────────────────────────────
   const semillaTramo = (run, t) => (run.semilla + t * 7919) | 0;
 
-  function nuevaRun(semilla, inicial) {
+  /* FNV-1a y una mezcla de enteros: la cuenta (`u`) entra en la semilla,
+     así una partida de otra cuenta no se puede rehacer como propia. */
+  function hashTexto(t) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return h >>> 0;
+  }
+  function mezcla(a, b) {
+    let h = Math.imul((a ^ 0x9e3779b9) >>> 0, 0x85ebca6b) ^ b;
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return (h ^ (h >>> 16)) | 0;
+  }
+
+  /* `semilla` es la que elige el juego; con cuenta `u`, la semilla real de
+     la run sale de las dos. `log` anota cada decisión (ver `acciones`). */
+  function nuevaRun(semilla, inicial, u = '') {
+    const real = u ? mezcla(semilla >>> 0, hashTexto(String(u))) : semilla | 0;
     const run = {
-      v: 2, semilla: semilla | 0, rng: (semilla ^ 0x5bd1e995) | 0, uid: 0, inicial,
+      v: 2, semilla: real, rng: (real ^ 0x5bd1e995) | 0, uid: 0, inicial,
       tramo: 0, mapa: null, pos: '0-0', visitados: ['0-0'],
       equipo: [], fase: 'mapa', combate: null, oferta: null, medallas: 0, resultado: null, debug: false,
+      nonce: semilla >>> 0, u: String(u || ''), log: [], atrapados: [],
     };
     run.mapa = generarMapa(semillaTramo(run, 0), 0);
     run.equipo.push(crearPokemon(run, inicial, D.NIVEL_INICIAL));
+    anotaAtrapados(run);
     return run;
+  }
+  // Especies distintas que pasaron por el equipo en esta run (la tabla «Pokédex» del Club).
+  function anotaAtrapados(run) {
+    if (!run.atrapados) return;
+    for (const p of run.equipo) if (!run.atrapados.includes(p.e)) run.atrapados.push(p.e);
   }
 
   /* Pasa al mapa del tramo siguiente: equipo curado (se descansó en la
@@ -584,10 +607,79 @@
     return run;
   }
 
+  /* ── Decisiones registradas (antitrampas) ──────────────────────────
+     La pantalla usa estas versiones: cada decisión que cambia la run deja
+     un token en `run.log`, y `rehace` vuelve a jugar la partida desde la
+     semilla aplicando los mismos tokens. Formato:
+       e<id> entrar a un nodo · a turno automático · x<n> turno con el
+       movimiento n · t cerrar el combate · c<i|-> [.<suelta>] captura ·
+       s salir del centro · o<i><+|-> mover en el equipo · n gimnasio
+       siguiente · i empezar la Ruta Infinita */
+  function registra(run, tok) {
+    if (run.log) run.log.push(tok);
+    anotaAtrapados(run);
+  }
+  const acciones = {
+    entrar(run, id) { const ok = entrar(run, id); if (ok) registra(run, 'e' + id); return ok; },
+    pasoCombate(run, eleccion = null) {
+      if (!run.combate || run.combate.fin) return [];
+      const ev = pasoCombate(run, eleccion);
+      registra(run, eleccion == null ? 'a' : 'x' + eleccion);
+      return ev;
+    },
+    terminarCombate(run, o = {}) {
+      if (!run.combate || !run.combate.fin) return;
+      terminarCombate(run, o);
+      registra(run, 't');
+    },
+    capturar(run, i, suelta = null) {
+      const ok = capturar(run, i, suelta);
+      if (ok) registra(run, 'c' + (i == null ? '-' : i) + (suelta == null ? '' : '.' + suelta));
+      return ok;
+    },
+    salirCentro(run) { const ok = salirCentro(run); if (ok) registra(run, 's'); return ok; },
+    moverEnEquipo(run, i, dir) { const ok = moverEnEquipo(run, i, dir); if (ok) registra(run, 'o' + i + (dir > 0 ? '+' : '-')); return ok; },
+    siguienteTramo(run) {
+      if (run.fase !== 'medalla') return false;
+      siguienteTramo(run); registra(run, 'n'); return true;
+    },
+    empezarInfinito(run) { const ok = empezarInfinito(run); if (ok) registra(run, 'i'); return ok; },
+  };
+
+  /* Aplica un token a la run. true si era una decisión válida en ese
+     momento y quedó registrada igual (forma canónica). */
+  function aplica(run, tok) {
+    if (typeof tok !== 'string' || !tok) return false;
+    const antes = run.log.length, c = tok[0], r = tok.slice(1);
+    let m;
+    if (c === 'e') acciones.entrar(run, r);
+    else if (tok === 'a') acciones.pasoCombate(run, null);
+    else if (c === 'x' && /^[0-3]$/.test(r)) acciones.pasoCombate(run, Number(r));
+    else if (tok === 't') acciones.terminarCombate(run);
+    else if (c === 'c' && (m = /^(-|[0-2])(?:\.([0-5]))?$/.exec(r))) acciones.capturar(run, m[1] === '-' ? null : Number(m[1]), m[2] == null ? null : Number(m[2]));
+    else if (tok === 's') acciones.salirCentro(run);
+    else if (c === 'o' && (m = /^([0-5])([+-])$/.exec(r))) acciones.moverEnEquipo(run, Number(m[1]), m[2] === '+' ? 1 : -1);
+    else if (tok === 'n') acciones.siguienteTramo(run);
+    else if (tok === 'i') acciones.empezarInfinito(run);
+    return run.log.length === antes + 1 && run.log[antes] === tok;
+  }
+
+  /* Rehace una partida entera. { run } o { error } en castellano. */
+  function rehace(nonce, u, inicial, tokens) {
+    if (!D.INICIALES.includes(inicial)) return { error: 'El inicial de la prueba no es Bulbasaur, Charmander ni Squirtle.' };
+    if (!Array.isArray(tokens)) return { error: 'Las decisiones de la prueba no se pueden leer.' };
+    const run = nuevaRun(nonce, inicial, u);
+    for (let k = 0; k < tokens.length; k++) {
+      if (!aplica(run, tokens[k])) return { error: `La decisión ${k + 1} («${String(tokens[k]).slice(0, 12)}») no se puede jugar en la partida rehecha.` };
+    }
+    return { run };
+  }
+  const atrapados = run => (run.atrapados || []).length;
+
   return {
     ESP, D, azar, stats, movimientos, efectividad, danoBase, xpParaSubir, crearPokemon,
-    generarMapa, nodo, siguientes, zonaDe, nuevaRun, entrar, pasoCombate, terminarCombate,
-    capturar, salirCentro, moverEnEquipo, equipoJefe, vivos, simular, MAX_EQUIPO, siguienteTramo, tramoDe,
+    generarMapa, nodo, siguientes, zonaDe, nuevaRun, ...acciones,
+    equipoJefe, vivos, simular, MAX_EQUIPO, tramoDe, rehace, aplica, atrapados, hashTexto,
     debugGanar, debugIrAlJefe, debugSaltarTramo, debugSubirNiveles, debugEmpezarEn, debugLigaFuerte, debugInfinito,
     empezarInfinito, dificultad, nivelInfinito, puntaje, PUNTOS, INF_CADA,
   };

@@ -5,7 +5,13 @@
   'use strict';
   const M = window.PokelikeMotor, D = M.D, ESP = M.ESP, S = window.PokelikeSonido, DEX = window.PokelikeDex, MED = window.PokelikeMedallas, IC = window.PokelikeIconos;
   const $ = id => document.getElementById(id);
-  const K_RUN = 'pokelike.run', K_OPC = 'pokelike.opc';
+  /* El Club (juegos/club/conexion.js): la cuenta con que se juega y la
+     tabla. La run se guarda por cuenta, porque su prueba solo vale para la
+     cuenta que la jugó (va mezclada en la semilla). */
+  const Club = window.Club || null;
+  const CUENTA = Club && Club.storageKey ? Club.storageKey('').replace(/^\.cuenta\./, '') : 'local';
+  const CAT_PUNTOS = 'club-pokelike-puntos', CAT_POKEDEX = 'club-pokelike-pokedex';
+  const K_RUN = Club && Club.storageKey ? Club.storageKey('pokelike.run') : 'pokelike.run', K_OPC = 'pokelike.opc';
   const lee = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
   const guarda = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } };
 
@@ -18,7 +24,40 @@
   const EN_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/.test(location.hostname);
   if (!EN_LOCAL) opc.debug = false;
   else if (/[?&]debug=1/.test(location.search)) opc.debug = true;
-  const guardaRun = () => { guarda(K_RUN, run); DEX.registraRun(run); };
+  const guardaRun = () => { cuentaReloj(); guarda(K_RUN, run); DEX.registraRun(run); };
+
+  /* Dos relojes del tiempo jugado (performance.now y Date.now), que solo
+     corren con la pestaña a la vista y viajan en la prueba: si alguien
+     acelera el juego, dejan de coincidir. Se guardan en la run. */
+  let relojDesde = null;
+  function cuentaReloj() {
+    if (!run) { relojDesde = null; return; }
+    const ahora = [performance.now(), Date.now()];
+    if (relojDesde && run.fase !== 'fin') {
+      run.relA = (run.relA || 0) + ahora[0] - relojDesde[0];
+      run.relW = (run.relW || 0) + ahora[1] - relojDesde[1];
+    }
+    relojDesde = document.visibilityState === 'visible' ? ahora : null;
+  }
+  document.addEventListener('visibilitychange', () => { cuentaReloj(); if (run) guarda(K_RUN, run); });
+
+  /* Manda la run a las dos tablas del Club con su prueba (semilla, cuenta,
+     inicial, decisiones y relojes): docs/antitrampas/pokelike.md. Una run
+     de prueba, sin registro o de otra cuenta no se manda. Una vez por cada
+     estado distinto de la run (al ganar la Liga y otra vez al terminar la
+     Ruta Infinita). */
+  function enviaClub() {
+    if (!Club || !run || run.debug || !Array.isArray(run.log) || run.u !== CUENTA) return;
+    if (run.enviadoEn === run.log.length) return;
+    cuentaReloj();
+    const tiempo = Math.max(1, Math.round(run.relA || 0));
+    const prueba = { v: 1, s: run.nonce, u: run.u, i: run.inicial, d: run.log.join(' '), a: tiempo, w: Math.round(run.relW || 0) };
+    const puntos = M.puntaje(run), especies = M.atrapados(run);
+    if (puntos >= 1) Club.result({ categoria: CAT_PUNTOS, puntos, tiempo }, prueba);
+    if (especies >= 1) Club.result({ categoria: CAT_POKEDEX, puntos: especies, tiempo }, prueba);
+    run.enviadoEn = run.log.length;
+    guarda(K_RUN, run);
+  }
 
   /* Quién juega: chico (Rojo) o chica (Hoja), sprites de Rojo Fuego /
      Verde Hoja. El nombre es el apodo de Juegos si hay sesión; si no,
@@ -246,6 +285,7 @@
     gen++;
     run = crear((Date.now() ^ Math.floor(Math.random() * 2 ** 31)) | 0, inicial);
     run.inicio = Date.now();
+    relojDesde = null;
     guardaRun(); cierraCapa(); pintaMapa();
   }
 
@@ -253,8 +293,9 @@
     const semilla = (Date.now() ^ Math.floor(Math.random() * 2 ** 31)) | 0; // solo la semilla; lo demás sale de ella
     run = opc.debug && opc.desde > 0
       ? M.debugEmpezarEn(semilla, inicial, opc.desde)
-      : M.nuevaRun(semilla, inicial);
+      : M.nuevaRun(semilla >>> 0, inicial, CUENTA);
     run.inicio = Date.now();
+    relojDesde = null;
     guardaRun();
     cierraCapa();
     pintaMapa();
@@ -541,6 +582,7 @@
   }
 
   function pintaFin() {
+    enviaClub();
     if (run.infinito) return pintaFinInfinito();
     if (!run.fin) { run.fin = Date.now(); guardaRun(); }
     const seg = Math.round((run.fin - (run.inicio || run.fin)) / 1000);
@@ -1099,6 +1141,8 @@
   $('leyenda').innerHTML = [['salvaje', 'Salvaje'], ['captura', 'Captura'], ['entrenador', 'Entrenador'], ['centro', 'Centro'], ['gimnasio', 'Líder']]
     .map(([t, txt]) => `<span>${IC.svg(t)} ${txt}</span>`).join('');
   $('btnVerRival').innerHTML = `${IC.svg('ojo')} Ver`;
+  if (Club) Club.category(CAT_PUNTOS);
+  cuentaReloj();
   $('bolaVuela').innerHTML = IC.svg('captura', 'bola-svg');
 
   pintaTitulo();

@@ -386,6 +386,29 @@ const ARTE = {
     <g class="a-mueve" style="filter:drop-shadow(0 6px 6px #0008)">${pieza}</g>`;
   },
 
+  /* Pokelike: un trozo del mapa por capas (hierba, entrenador, captura)
+     bajando hacia el líder, con una pokébola grande que late. */
+  pokelike: u => {
+    const bola = (x, y, r, clase = "") => `<g class="${clase}" transform="translate(${x} ${y})">
+      <circle r="${r}" fill="#f5f5f5"/><path d="M${-r} 0 A${r} ${r} 0 0 1 ${r} 0Z" fill="#e3350d"/>
+      <circle r="${r}" fill="none" stroke="#1d1d1d" stroke-width="${r / 7}"/><path d="M${-r} 0H${-r / 3.2} M${r / 3.2} 0H${r}" stroke="#1d1d1d" stroke-width="${r / 6}"/>
+      <circle r="${r / 3.4}" fill="#f5f5f5" stroke="#1d1d1d" stroke-width="${r / 7}"/></g>`;
+    const nodo = (x, y, borde = "#56638a") => `<circle cx="${x}" cy="${y}" r="17" fill="#2f3a57" stroke="${borde}" stroke-width="3"/>`;
+    const hierba = (x, y) => `<path d="M${x - 9} ${y + 8} L${x - 6} ${y - 7} L${x - 3} ${y + 8} Z M${x - 3} ${y + 8} L${x + 1} ${y - 11} L${x + 4} ${y + 8} Z M${x + 3} ${y + 8} L${x + 7} ${y - 5} L${x + 10} ${y + 8} Z" fill="#5fb84c"/>`;
+    const persona = (x, y) => `<g fill="none" stroke="#e8ecf4" stroke-width="2.6" stroke-linecap="round"><path d="M${x - 6} ${y - 3}a6 6 0 0 1 12 0M${x - 9} ${y - 2}h18M${x - 5} ${y - 1}a5 6 0 0 0 10 0M${x - 9} ${y + 11}a9 7 0 0 1 18 0"/></g>`;
+    const lineas = [[200, 34, 120, 92], [200, 34, 280, 92], [120, 92, 90, 150], [120, 92, 200, 150], [280, 92, 200, 150], [280, 92, 310, 150],
+      [90, 150, 150, 208], [200, 150, 150, 208], [200, 150, 250, 208], [310, 150, 250, 208], [150, 208, 200, 262], [250, 208, 200, 262]]
+      .map(([a, b, c, d]) => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#4a5675" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/>`).join("");
+    return `<defs><radialGradient id="g${u}" cx=".5" cy=".2" r=".9"><stop offset="0" stop-color="#2d3a5a"/><stop offset="1" stop-color="#141a26"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>${lineas}
+    ${nodo(200, 34, "#fff")}<path d="M191 39 200 28 209 39 M194 37 V44 H206 V37" fill="none" stroke="#e3350d" stroke-width="2.5"/>
+    ${nodo(120, 92, "#ffcb05")}${bola(120, 92, 10)}${nodo(280, 92, "#ffcb05")}${hierba(280, 92)}
+    ${nodo(90, 150)}${persona(90, 150)}${nodo(200, 150)}${hierba(200, 150)}${nodo(310, 150)}${bola(310, 150, 10)}
+    ${nodo(150, 208)}${persona(150, 208)}${nodo(250, 208)}<path d="M244 202h12v-6h4v6h-4 M250 196v20" stroke="#e3350d" stroke-width="4"/>
+    <circle cx="200" cy="262" r="22" fill="#5a3b2a" stroke="#ffcb05" stroke-width="3"/><polygon points="193,250 207,250 216,259 216,265 207,274 193,274 184,265 184,259" fill="#a9afb7" stroke="#e6e9ee" stroke-width="2"/>
+    ${bola(330, 248, 38, "a-late")}`;
+  },
+
   tulones: u => {
     const tipo = (x, y, r, piel, pelo, polera) => `<g transform="translate(${x} ${y}) rotate(${r})">
       <rect x="-9" y="-2" width="18" height="30" rx="7" fill="${piel}" stroke="#2a1d18" stroke-width="2"/>
