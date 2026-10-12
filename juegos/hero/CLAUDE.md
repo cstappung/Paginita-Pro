@@ -113,6 +113,10 @@ and message names, and the postman plays the server:
   later on every screen), `fin {r, s, e, …}` per player per round. When all
   of the round's present players have `fin`, the round goes to `ultima` and
   the room is back to choosing. A room never ends by itself.
+- **Every move carries `uid`** (`anota` adds it): the `jugadas/$n` rule
+  wants `uid === auth.uid`. Without it every write was refused silently and
+  the room never got a song or a «listo». `tests/hero.test.cjs` drives the
+  real postman to check it.
 - **Live state goes over the WebRTC mesh** (`malla.js` + `crearDirecto`,
   mailbox `vivo/<pid>/rtc`), ~10/s: score, combo, SP and the **last 40 note
   events** (`EV_DIRECTO`) — the channel drops packets, so events are

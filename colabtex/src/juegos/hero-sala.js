@@ -93,7 +93,9 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     }
   }
 
-  const anota = j => jugar(j).catch(err => console.warn("[hero] no se pudo anotar", j.t, err));
+  /* Toda jugada va firmada: la regla de `jugadas/$n` exige `uid === auth.uid`
+     y sin él la base la rechaza (la sala se quedaba sin canción ni «listo»). */
+  const anota = j => jugar({ ...j, uid }).catch(err => console.warn("[hero] no se pudo anotar", j.t, err));
   const ent = (x, max) => Number.isFinite(x) ? Math.max(0, Math.min(max, Math.round(x))) : 0;
 
   function deRed(m) {
