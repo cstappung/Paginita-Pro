@@ -6,7 +6,8 @@ import { PARTS, PART_ORDER, DIFF_LABEL } from '../core/constants.js';
 import { settings, saveSettings } from '../settings.js';
 import { SongSelectScreen } from './songSelect.js';
 import { NOTE_MODES } from '../core/noteMode.js';
-import { sitio } from '../sitio/puente.js';
+import { sitio, pantallaCompleta } from '../sitio/puente.js';
+import { enElCentro } from '../game/orden.js';
 
 const DIFF_UI = ['expert', 'hard', 'medium', 'easy'];
 const chatLog = [];
@@ -62,12 +63,11 @@ async function onLoad(app, m) {
     return;
   }
   const room = net.room;
-  const players = room.players
+  const players = enElCentro(room.players
     .filter((p) => p.inGame)
-    .sort((a, b) => (a.id === net.id ? -1 : b.id === net.id ? 1 : 0))
     .map((p) => p.id === net.id
       ? { type: 'local', id: p.id, name: p.name, part: p.part, diff: p.diff, mode: p.mode, profileId: app.onlineProfile, bot: !!app.onlineBot }
-      : { type: 'remote', id: p.id, name: p.name, part: p.part, diff: p.diff, mode: p.mode });
+      : { type: 'remote', id: p.id, name: p.name, part: p.part, diff: p.diff, mode: p.mode }));
   app.screen?.unmount();
   const session = await app.prepareSession(entry, players, net);
   net.send({ t: session ? 'loaded' : 'noload' });
@@ -280,9 +280,9 @@ export class LobbyScreen extends Screen {
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
       sitio.sala ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
       isHost
-        ? h('button', { class: 'primary big', 'data-nav': true, disabled: !entry || room.phase !== 'lobby' || faltan > 0, onclick: () => net.send({ t: 'start' }) },
+        ? h('button', { class: 'primary big', 'data-nav': true, disabled: !entry || room.phase !== 'lobby' || faltan > 0, onclick: () => { pantallaCompleta(); net.send({ t: 'start' }); } },
           room.phase === 'loading' ? 'Cargando…' : room.phase === 'playing' ? 'Tocando…' : faltan > 0 ? `Esperando que estén listos (${faltan})` : 'Empezar canción')
-        : h('button', { class: `primary big${me?.ready ? ' on' : ''}`, 'data-nav': true, onclick: () => net.send({ t: 'ready', ready: !me?.ready }) },
+        : h('button', { class: `primary big${me?.ready ? ' on' : ''}`, 'data-nav': true, onclick: () => { if (!me?.ready) pantallaCompleta(); net.send({ t: 'ready', ready: !me?.ready }); } },
           me?.ready ? '¡Listo! (cancelar)' : 'Estoy listo')].filter(Boolean));
   }
 

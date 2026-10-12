@@ -124,7 +124,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     else if (m.t === "noload") anota({ t: "nocarga" });
     else if (m.t === "done" && est.etapa === "tocando" && est.enJuego.includes(uid) && !est.fines[uid]) {
       const s = m.stats || {};
-      anota({ t: "fin", r: est.ronda, s: ent(s.score, 1e8), e: ent(s.stars, 6), h: ent(s.hits, 1e5), n: ent(s.total, 1e5),
+      anota({ t: "fin", r: est.ronda, s: ent(s.score, 1e8), e: ent(s.stars, 6), ac: ent(s.hits, 1e5), n: ent(s.total, 1e5),
         x: ent(s.misses, 1e5), c: ent(s.bestCombo, 1e5), sp: ent(s.spPhrases, 1e4), st: ent(s.spTotal, 1e4), o: ent(s.overhits, 1e5),
         fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0 });
     }
@@ -211,7 +211,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-2";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-3";
     host.append(redEl, frame);
   }
 
