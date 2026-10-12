@@ -297,3 +297,14 @@ test('antitrampas: una prueba de otra cuenta o tocada a mano no se rehace igual'
   assert.ok(M.rehace(run.nonce, run.u, run.inicial, [...run.log, 'n']).error || run.fase === 'medalla', 'decisión fuera de lugar');
   assert.ok(M.rehace(run.nonce, run.u, 25, run.log).error, 'inicial inventado');
 });
+
+test('dentro de Juegos nada del juego usa clases que conexion.css oculta', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const dir = path.join(__dirname, '../../juegos/club/pokelike');
+  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(dir, 'estilo.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // conexion.css: .club-integrado .shell>header, .topbar, .intro, footer, .club-volver { display: none }
+  assert.doesNotMatch(html, /class="([^"]* )?(intro|topbar)[" ]/, 'clase oculta en el HTML');
+  assert.doesNotMatch(html, /<(header|footer)\b/, 'header/footer quedan ocultos dentro de .shell');
+  assert.doesNotMatch(css, /\.(intro|topbar)(?![-\w])/, 'clase oculta en el CSS');
+});
