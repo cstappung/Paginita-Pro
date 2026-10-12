@@ -1,6 +1,6 @@
 import {ambientar} from '../sonido.js';
 import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
-import {verificaClub} from './verifica.js';
+import {verificaClub,DE_INVITADO} from './verifica.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase.
@@ -10,6 +10,13 @@ import {verificaClub} from './verifica.js';
    no se guarda ningún récord ni partida a medias, y el panel del juego
    dice por qué en vez de ofrecer «reintentar». El juego guarda lo suyo con
    la cuenta «invitado», que el salón borra al empezar otra visita.
+   En los juegos de `DE_INVITADO` (los destacados del salón) el resultado
+   del invitado sí se verifica y queda pendiente en este navegador
+   (`jg.club.pendientes.invitado.<juego>`), y `alInvitado(dato, mejoro)`
+   lo cuenta y, si es su mejor marca, le ofrece iniciar sesión para guardarlo: al entrar, juegos-main.js lo sube a la
+   cuenta (`subeDeInvitado`). `deInvitado` (con cuenta) le dice al juego
+   que esta pestaña venía de invitado, para que adopte la partida a medias
+   que dejó (`Club.deInvitado` en conexion.js).
 
    Antes de guardar nada, el resultado pasa por el verificador de su juego
    (verifica.js, docs/antitrampas.md) con la prueba que mandó el juego. Si
@@ -25,7 +32,7 @@ import {verificaClub} from './verifica.js';
    de la fila). La fila guarda el nombre que tenía al batir el récord, y sin
    esto el ranking del juego mostraba el de Google donde el resto del sitio
    ya mostraba el apodo. Si el apodo llega después, `refresca()` repinta. */
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe}) {
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe,alInvitado,deInvitado}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   /* El fantasma (Metro Rush, modos «Fantasma»): la tabla ordenada que ya
      trae la escucha de cada categoría (`tablas`), quienes esperan a que
@@ -34,11 +41,14 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
      descarga diario (consumo.js) no da para bajarla en cada carrera. */
   const tablas={},esperanTabla={},pruebasFantasma=new Map();
   const invitado=!usuario,cuenta=invitado?'invitado':usuario.uid;
+  const guardaInvitado=invitado&&DE_INVITADO.has(juego);
   const clave='jg.club.pendientes.'+cuenta+'.'+juego;
   const ocultos=[];
   /* Lo pendiente se vuelve a verificar al cargarlo: hasta que eso termina,
      sincronizar() espera. */
-  const cargados=invitado?Promise.resolve():(async()=>{
+  /* Lo del invitado se verificó al jugarlo y se vuelve a verificar al
+     subirlo a la cuenta: aquí solo hace falta para comparar marcas. */
+  const cargados=invitado?Promise.resolve().then(()=>{if(guardaInvitado)try{pendientes=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}}):(async()=>{
     let valor={};try{valor=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}
     for (const [k,v] of Object.entries(valor)) { const dato=resultadoClub(juego,v);if(!dato||k!==dato.categoria)continue;
       /* Un pendiente de antes de la verificación (sin prueba) se descarta en
@@ -92,7 +102,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   }
   function escuchar(key){
     if(off)off();categoria=key;
-    if(invitado){off=null;estado('Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.',key);return;}
+    if(invitado){off=null;estado(guardaInvitado?'Modo invitado: tu puntaje no se guarda. Inicia sesión (también después de perder) y tu mejor partida pasa a la clasificación.':'Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.',key);return;}
     off=watch(key,(filas,error)=>{
       if(muerto||categoria!==key)return;
       const orden=(filas||[]).sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
@@ -169,7 +179,20 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     }
     if(d.tipo==='resultado'){
       const dato=resultadoClub(juego,d);if(!dato)return;
-      if(invitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
+      if(invitado&&!guardaInvitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
+      if(invitado){
+        verificaClub(juego,dato,d.prueba,{uid:cuenta}).then(async motivo=>{
+          if(muerto)return;
+          if(motivo){estado('Esta partida no se pudo comprobar, así que no se podrá guardar: '+motivo,dato.categoria);return;}
+          await cargados;
+          // La página cuenta cada partida, pero su aviso sale solo con una marca nueva del invitado.
+          const mejoro=mejorClub(dato,pendientes[dato.categoria]);
+          if(mejoro){pendientes[dato.categoria]={...dato,prueba:d.prueba,h:Date.now()};persistir();}
+          estado('Buena partida. Como invitado todavía no se guardó: inicia sesión y tu mejor marca pasa a la clasificación.',dato.categoria);
+          if(alInvitado){try{alInvitado(dato,mejoro);}catch(err){/* el aviso no debe romper la partida */}}
+        });
+        return;
+      }
       const prueba=d.prueba;
       verificaClub(juego,dato,prueba,{uid:cuenta}).then(motivo=>{
         if(muerto)return;
@@ -198,7 +221,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-59&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-60&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

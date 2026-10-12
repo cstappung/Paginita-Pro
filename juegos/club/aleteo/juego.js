@@ -20,6 +20,12 @@
   function lee(k) { try { return JSON.parse(localStorage.getItem(clave(k)) || 'null'); } catch (_) { return null; } }
   function guarda(k, v) { try { localStorage.setItem(clave(k), JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } }
   let prog = M.mezclaProgreso(lee('aleteo.progreso'), null);
+  // Lo que voló como invitado en esta pestaña, si acaba de iniciar sesión
+  // (Club.deInvitado): se junta con lo de la cuenta y sube con la copia.
+  try {
+    const previo = Club && Club.deInvitado ? Club.deInvitado('aleteo.progreso') : null;
+    if (previo) { prog = M.mezclaProgreso(prog, JSON.parse(previo)); guarda('aleteo.progreso', prog); }
+  } catch (_) { /* un progreso ilegible no se adopta */ }
   let ultimaSubida = '';
   function subeNube(forzar) {
     if (!Club || !Club.guardarPartida) return;

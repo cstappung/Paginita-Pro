@@ -134,9 +134,10 @@ say what a guest gets instead. On a phone the banner puts the art on top.
 longer called.
 
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
-no login wall, but **only four games are playable**: Snake, Mina Club,
-Tetris Club and sortEm (`LIBRES_INVITADO` in `salon-datos.js`, the owner's
-choice). Everything else — the other club games, Frontera, the bot
+no login wall, but **only eight games are playable**: the four *destacados*
+BBTAN, ALETEO, FANAL and Trigon (`DESTACADOS_INVITADO`, first in the guest's
+carousel) plus Snake, Mina Club, Tetris Club and sortEm (`LIBRES_INVITADO` in
+`salon-datos.js`, the owner's choice). Everything else — the other club games, Frontera, the bot
 practices and every room — wears the padlock (`bloqueado`), and a typed
 `#solo/<x>` route that is not free (`rutaLibre`) gets the `MOTIVO_CUENTA.solo`
 gate in `armazon`. Nothing is saved — no ranking, logros, coins or cloud
@@ -161,6 +162,51 @@ types their URL still plays them; they never write anything.
   replace the ranking panel with the notice. The Frontera still knows the
   `INVITADO` user (`usuario.invitado`: no ranking, no cloud run, teams in
   `localStorage` only), though a guest no longer reaches it.
+- **The mobile welcome** (`abreBienvenida` in `juegos-main.js`, `.jg-bv`):
+  a first visit from a phone (`pointer:coarse`, smaller side ≤ 600 px)
+  without a session, on the lobby route only, gets a full-screen choice
+  before the salón: «Iniciar sesión», «Crear cuenta» (both are the Google
+  popup; it stays open until the account arrives, so cancelling leaves the
+  choice there) or «Continuar como invitado», which shows the four
+  destacados. Once per device (`jg.bienvenida`, also set on any login, so a
+  logout does not bring it back). A link to a game or a room skips it.
+- **A destacado's score is saved if the guest signs in later.** Only those
+  four (`DE_INVITADO` in `solo/verifica.js`, same list): `crearSolo`
+  verifies the guest's result with uid `invitado` and keeps the best per
+  category in `jg.club.pendientes.invitado.<juego>`; a new best opens
+  «¿Guardamos esta partida?» (`ofreceGuardar`, fixed on `<body>`, above the
+  immersive game), and the game screen carries a guest strip
+  (`.jg-inv-tira`) from the start. On login `subeDeInvitado` re-verifies
+  each pending result, saves it through `guardaClub`, runs
+  `alResultadoClub` (coins, logros) and toasts; on a write failure it is
+  moved to the account's own pending key, which `crearSolo` retries.
+  **Only if this tab was the guest** (`vinoDeInvitado`, the
+  `jg.visitaInvitado` flag of `limpiaInvitado`): leftovers from another
+  visit may be another person's. The proof keeps `u: "invitado"` (the
+  account is in each game's seed, so it cannot be re-signed), and
+  `verificaClub` accepts that `u` for any owner in those games, audits
+  included. Honest limit: another account could copy such a proof from
+  `soloPruebas` and tie that mark, never beat it. No rules change.
+- **The half-played game follows too.** The frame of a destacado opened
+  with an account in a tab that was the guest gets `&deinvitado=1`, and
+  `Club.deInvitado(key)` (conexion.js) hands the game what it stored under
+  `key.cuenta.invitado`, once, deleting it: BBTAN and Trigon adopt their
+  `*-partida` (Trigon accepts `u: "invitado"` in `retoma`), ALETEO and
+  FANAL merge their `*.progreso` with `mezclaProgreso` (FANAL's travesía
+  checkpoint included), and the cloud copy follows by itself.
+- **The guest funnel is measured** with Firebase Analytics (`evento()` in
+  `src/firebase.js`, which never throws and does nothing without Analytics):
+  `jg_bienvenida_ver`, `jg_bienvenida_elige {opcion, paso}`,
+  `jg_bienvenida_juego {juego}`, `jg_invitado_abre {juego}`,
+  `jg_invitado_partida {juego, categoria, mejoro}`, `jg_invitado_aviso` /
+  `jg_invitado_aviso_cierra`, `jg_login_pide` / `jg_login_cancela {origen}`,
+  the standard `login` / `sign_up {method, origen}` (from
+  `getAdditionalUserInfo().isNewUser`) and `jg_invitado_guardado`. `origen`
+  is the button's `data-origen` (`bienvenida-entrar`, `aviso-guardar`,
+  `franja-invitado`…; `ficha` or `otro` by default). Event names and site
+  ids only, never anything a person wrote. Read them in the Firebase
+  console → Analytics → Events (custom params need registering as custom
+  dimensions to show in reports).
 - What a guest leaves in `localStorage` (`*.cuenta.invitado`,
   `frontera.invitado`, `pk.equipos.invitado`: `esClaveInvitado`) is wiped
   once per tab session (`limpiaInvitado`, flag in `sessionStorage`), so a

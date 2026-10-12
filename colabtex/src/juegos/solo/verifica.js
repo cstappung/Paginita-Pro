@@ -58,9 +58,20 @@ export function textoPrueba(prueba) {
    valga (los juegos que lo usan meten la cuenta en la prueba). Nunca lanza: un
    verificador que falla también rechaza (con el error como motivo),
    porque aceptar por las dudas es justo el agujero que se quiere cerrar. */
+/* Los juegos cuyo puntaje de invitado pasa a la cuenta al iniciar sesión
+   (los destacados del salón, `DESTACADOS_INVITADO` en salon-datos.js). Su
+   prueba se jugó con la cuenta «invitado», que va en la semilla, así que
+   no se puede reescribir con el uid de quien entra: esa prueba vale para
+   cualquier dueño, ahora y en cada auditoría. El límite honesto: una prueba
+   de invitado ya guardada en `soloPruebas` la podría copiar otra cuenta,
+   que empataría con esa marca; nunca la mejoraría. */
+export const DE_INVITADO = new Set(['bbtan', 'aleteo', 'fanal', 'trigon']);
+export const UID_INVITADO = 'invitado';
+
 export async function verificaClub(juego, dato, prueba, ctx = {}) {
   const v = VERIFICADORES[juego];
   if (!v) return null;
+  if (DE_INVITADO.has(juego) && prueba && typeof prueba === 'object' && prueba.u === UID_INVITADO) ctx = Object.assign({}, ctx, { uid: UID_INVITADO });
   const texto = textoPrueba(prueba);
   if (texto === null) return 'La prueba de la partida no se puede leer.';
   if (texto.length > PRUEBA_MAX) return 'La prueba de la partida es demasiado grande.';

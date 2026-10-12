@@ -8,7 +8,7 @@ const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replac
 const ctx={crypto:require('node:crypto').webcrypto};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n;globalThis.__J=JUEGOS;',ctx);
 vm.runInContext(sin('src/juegos/controles-datos.js'),ctx);
-vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,rutaLibre,COLOR_SOLO,CONTROLES,enMovil,enPc,pideEnVez,juegoDeNovedad};',ctx);
+vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,rutaLibre,COLOR_SOLO,CONTROLES,enMovil,enPc,pideEnVez,juegoDeNovedad,DESTACADOS_INVITADO};',ctx);
 const S=ctx.__S,J=ctx.__J;
 const main=fs.readFileSync('src/juegos-main.js','utf8');
 const reglas=fs.readFileSync('src/juegos/reglas.js','utf8');
@@ -67,16 +67,18 @@ test('«Nuevo» marca los cuatro últimos de las dos últimas semanas, sin empat
  assert.deepEqual([...S.nuevos([{id:'x',alta:'mal'}],hoy)],[]);
 });
 
-test('el invitado solo juega Snake, Buscaminas, Tetris y sortEm',()=>{
+test('el invitado juega los cuatro destacados más Snake, Buscaminas, Tetris y sortEm',()=>{
  const {multi,solos}=S.entradasSalon(J);
  for(const m of multi){assert.equal(S.bloqueado(m,true),true);assert.equal(S.bloqueado(m,false),false);}
  const libres=solos.filter(s=>!S.bloqueado(s,true)).map(s=>s.id).sort();
- assert.deepEqual([...libres],['minas','snake','sortem','tetrisclub']);
+ assert.deepEqual([...libres],['aleteo','bbtan','fanal','minas','snake','sortem','tetrisclub','trigon']);
+ assert.deepEqual([...S.DESTACADOS_INVITADO],['bbtan','aleteo','fanal','trigon']);
+ for(const d of S.DESTACADOS_INVITADO)assert.ok(solos.some(s=>s.id===d&&s.ruta==='#solo/'+d),'el destacado tiene su ruta: '+d);
  for(const s of solos)assert.equal(S.bloqueado(s,false),false,'con cuenta se juega todo: '+s.id);
  assert.ok(solos.some(s=>s.modo==='bots'&&S.bloqueado(s,true)),'las prácticas contra bots piden cuenta');
  // Las rutas #solo/<x>: el Tetris del club va por «tetris».
- for(const r of ['snake','minas','tetris','sortem'])assert.ok(S.rutaLibre(r),r);
- for(const r of ['bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','pokelike','hero','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
+ for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon'])assert.ok(S.rutaLibre(r),r);
+ for(const r of ['sopa','electro','sudoku','atasco','dosmil','metrorush','pokelike','hero','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
  for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });
 

@@ -56,3 +56,8 @@ pentatonic (one per shape, panned by where it lands); clearing lines is an
 arpeggio on the chord of the current streak that grows with 2 lines and
 **saturates at 3**. ♪ mutes the music (`trigon.musica`), the speaker the
 effects (`trigon.mudo`). The melody drops out in the menu and after the end.
+
+**Guest destacado.** Playable without an account; a guest's score is saved
+if they sign in afterwards, and the game adopts what it left under the
+`invitado` account through `Club.deInvitado` (`docs/claude/juegos/salon.md`).
+Its proof may carry `u: "invitado"` for any owner (`DE_INVITADO`).

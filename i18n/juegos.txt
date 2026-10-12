@@ -453,6 +453,18 @@ Iniciar sesión || Sign in || Accedi
 Acceder || Sign in || Accedi
 Iniciar sesión y jugar || Sign in and play || Accedi e gioca
 Seguir como invitado || Continue as guest || Continua come ospite
+Continuar como invitado || Continue as guest || Continua come ospite
+Crear cuenta || Create account || Crea un account
+Te damos la bienvenida || Welcome || Benvenuto
+Juega ya, sin cuenta || Play now, no account needed || Gioca subito, senza account
+Ver todo el salón || See every game || Vedi tutti i giochi
+Mejor inicio sesión || I'd rather sign in || Preferisco accedere
+MODO INVITADO || GUEST MODE || MODALITÀ OSPITE
+¿Guardamos esta partida? || Shall we save this game? || Salviamo questa partita?
+Iniciar sesión y guardar || Sign in and save || Accedi e salva
+Ahora no || Not now || Non ora
+Partida de invitado || Guest game || Partita da ospite
+Juegas como invitado: || You're playing as a guest: || Stai giocando come ospite:
 Estás como invitado. || You're playing as a guest. || Stai giocando come ospite.
 Modo de juego || Game mode || Modalità di gioco
 Ver todos || See all || Vedi tutti
