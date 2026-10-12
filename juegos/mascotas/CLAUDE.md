@@ -27,6 +27,7 @@
 
 **State is not money.** `mascotasEstado/<uid>/<origen~clave>` (v1, `game/estado.ts`) holds stage, growth, stats, `ls`, sleep, `w` (item uid per slot) and `d` (furniture, rotation in octants).
 - The owner writes it on every action, throttled to one write per pet every 4 s (`GUARDA_MS`) and flushed on `visibilitychange`, never per tick. Stats are derived from `ls` with `tick`.
+- `recibe` must `tick` every pet it builds. Saved stats are as of `ls`, and without the tick a pet left for hours showed its old full bars until the first care action or `App`'s 10 s interval.
 - Others read it **by key** only, never the collection: that is the download cap rule.
 - A pet bought or received has no state in the new account. The postman copies the latest previous owner's state (from `historial`), without `w`/`d`, which belonged to the seller.
 - **Honest limit:** stage and growth are client-claimed, like club marks. A console can grow its own pet; it cannot mint items, coins or potions. The rule only lets the stage move forward.
