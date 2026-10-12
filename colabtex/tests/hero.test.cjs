@@ -349,3 +349,25 @@ test('sala: tu autopista va al centro (con 3, en medio; con 4, la del centro a l
   assert.equal(donde(5, 0), 2);
   assert.deepEqual(enElCentro(sala(4, 3)).map(p => p.id), ['j0', 'j3', 'j1', 'j2'], 'los demás no cambian de orden');
 });
+
+test('sala: un sostenido soltado no vuelve a encender llamas en la pista del otro', async () => {
+  const { RemoteState } = await mod('js/game/remoto.js');
+  const { HIT, MISSED, DROPPED } = await mod('js/core/engine.js');
+  const nota = (time, frets, sp = -1) => ({ time, frets, sp, open: false, double: false, sus: [] });
+  const track = { notes: [nota(1, 1), nota(2, 4), nota(3, 2)], spPhrases: [] };
+  const r = new RemoteState(track, 'guitar');
+  const fx = [];
+  r.onHitFx = (nt, k) => fx.push(k || nt.frets);
+  // el directo repite los últimos sucesos en cada estado (~10 por segundo)
+  const ev = [[0, HIT], [1, HIT], [1, DROPPED], [2, MISSED]];
+  for (let k = 0; k < 20; k++) r.apply({ s: 0, c: 0, m: 1, p: 0, sp: 0, ev }, 2.5 + k * 0.1);
+  assert.deepEqual(fx, [1, 4], 'cada acierto se dibuja una sola vez');
+  assert.deepEqual([...r.noteState], [HIT, DROPPED, MISSED]);
+  assert.equal(r.laneHitTime[2], 2.5, 'el carril del sostenido soltado no se vuelve a «golpear»');
+  // si se perdieron los paquetes del acierto, el soltado llega solo y no dibuja nada
+  const r2 = new RemoteState(track, 'guitar');
+  r2.onHitFx = () => fx.push('x');
+  r2.apply({ ev: [[1, DROPPED], [1, HIT], [0, 9]] }, 1);
+  assert.deepEqual([...r2.noteState], [0, DROPPED, 0]);
+  assert.equal(fx.length, 2);
+});

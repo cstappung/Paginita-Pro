@@ -120,7 +120,11 @@ and message names, and the postman plays the server:
 - **Live state goes over the WebRTC mesh** (`malla.js` + `crearDirecto`,
   mailbox `vivo/<pid>/rtc`), ~10/s: score, combo, SP and the **last 40 note
   events** (`EV_DIRECTO`) — the channel drops packets, so events are
-  repeated and `RemoteState.apply` ignores ones already applied.
+  repeated and `RemoteState.apply` (`js/game/remoto.js`) ignores ones
+  already applied. **A note's state may only move forward** (pending → hit
+  → dropped, or → missed): a released sustain travels as `[i, HIT]` then
+  `[i, DROPPED]`, and re-applying the HIT on every packet drew flames and
+  fret pops ten times a second on a lane with no notes.
 - The page's chat and «Abandonar» are used; the frame hides its own chat
   and leave button (`sitio.sala`). Spectators see the lobby read-only.
 - **Move fields must not collide with the rule's own keys**: `jugadas/$n`
