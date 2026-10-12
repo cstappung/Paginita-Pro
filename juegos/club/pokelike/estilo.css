@@ -136,9 +136,9 @@ body:has(#vMapa:not([hidden])) > .shell { height: 100dvh; display: flex; flex-di
 .ficha-j { right: 4%; bottom: 8%; }
 .ficha .barra-ps, .ficha .barra-xp { background: #44505e; }
 .ps-num { display: block; text-align: right; font-size: 12px; }
-.intro { position: absolute; inset: 0; background: #000a; display: grid; place-items: center; text-align: center; z-index: 3; animation: aparece .3s; }
-.intro img { height: 55%; image-rendering: pixelated; }
-.intro p { font: 400 24px 'Lilita One', sans-serif; margin: 0; }
+.presenta { position: absolute; inset: 0; background: #000a; display: grid; place-items: center; text-align: center; z-index: 3; animation: aparece .3s; }
+.presenta img { height: 55%; image-rendering: pixelated; }
+.presenta p { font: 400 24px 'Lilita One', sans-serif; margin: 0; }
 @keyframes aparece { from { opacity: 0; } }
 .texto {
   min-height: 3.2em; background: #f8f4e3; color: #222; border: 3px solid #37414f; border-radius: 10px;
@@ -401,9 +401,10 @@ body:has(#vMapa:not([hidden])) > .shell { height: 100dvh; display: flex; flex-di
   .casilla.nueva .badge, .casilla.nueva::before, .destello::before, .destello::after { animation: none; }
 }
 
-/* Diálogo de los jefes antes de pelear */
-.intro.con-dialogo { cursor: pointer; grid-template-rows: minmax(0, 1fr) auto auto auto; align-content: stretch; background: radial-gradient(ellipse at 50% 35%, #2d3a5af2, #0b0f18f7 70%); }
-.intro.con-dialogo img { height: 100%; max-height: 190px; min-height: 0; align-self: end; object-fit: contain; }
+/* Diálogo de los jefes antes de pelear. La capa se llama .presenta y no
+   .intro: dentro de Juegos, conexion.css oculta todo .intro. */
+.presenta.con-dialogo { cursor: pointer; grid-template-rows: minmax(0, 1fr) auto auto auto; align-content: stretch; background: radial-gradient(ellipse at 50% 35%, #2d3a5af2, #0b0f18f7 70%); }
+.presenta.con-dialogo img { height: 100%; max-height: 190px; min-height: 0; align-self: end; object-fit: contain; }
 .dialogo {
   align-self: end; width: calc(100% - 24px); margin: 8px 12px 12px; text-align: left; background: #f8f4e3; color: #222;
   border: 3px solid #37414f; border-radius: 10px; padding: 8px 12px; box-shadow: 3px 3px 0 #0006;
@@ -415,8 +416,8 @@ body:has(#vMapa:not([hidden])) > .shell { height: 100dvh; display: flex; flex-di
 @media (max-width: 480px) {
   .estuche { gap: 8px; padding: 12px; border-width: 4px; }
   .dialogo p { font-size: 13px !important; }
-  .intro.con-dialogo #introTxt { display: none; }
-  .intro.con-dialogo .intro-n { font-size: 13px !important; margin: 0 !important; }
+  .presenta.con-dialogo #introTxt { display: none; }
+  .presenta.con-dialogo .intro-n { font-size: 13px !important; margin: 0 !important; }
   .dialogo { margin: 4px 6px 6px; width: calc(100% - 12px); padding: 5px 8px; }
   .dialogo p { min-height: 0; }
 }

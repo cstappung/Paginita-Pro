@@ -36,6 +36,7 @@
         'Pokédex que dura entre partidas, en este navegador y, con sesión iniciada, en tu cuenta.',
         'Botón «Empezar de nuevo» con el mismo inicial, y esta ventana de novedades (📰).',
         'Entra al Club de Juegos: clasificación por puntaje y por Pokédex (especies atrapadas en una partida), monedas y 10 logros. Cada partida se rehace con su semilla y sus decisiones antes de guardarse.',
+        'Arreglado: dentro de Juegos, el combate contra líderes, Alto Mando y Campeón se quedaba en «quiere pelear» sin dejar tocar la pantalla.',
         'Modo prueba 🐞 para desarrollar, solo en local (en la página publicada no aparece): inmortal, empezar en cualquier gimnasio y atajos.',
       ],
     },
