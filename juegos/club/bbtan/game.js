@@ -698,9 +698,15 @@
     return true;
   }
   function cargaPartida() {
+    // La partida que dejó como invitado en esta pestaña, si acaba de iniciar
+    // sesión (Club.deInvitado): pasa a esta cuenta y sube a la nube. Su
+    // prueba sigue siendo de la cuenta «invitado», y el club la acepta así.
+    const previa = Club && Club.deInvitado ? lee(Club.deInvitado('bbtan-partida-v1')) : null;
+    if (previa) { try { localStorage.setItem(PARTIDA, JSON.stringify(previa)); } catch {} }
     let local = null;
     try { local = lee(localStorage.getItem(PARTIDA)); } catch {}
     if (local && !restaura(local)) { try { localStorage.removeItem(PARTIDA); } catch {} local = null; }
+    if (previa && local && fotoRonda) { try { Club.guardarPartida && Club.guardarPartida(JSON.stringify(fotoRonda)); } catch {} }
     const localAt = local ? local.at : 0;
     if (!Club || !Club.pedirPartida) return;
     Club.pedirPartida(dato => {

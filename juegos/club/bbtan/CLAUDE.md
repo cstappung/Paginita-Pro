@@ -165,3 +165,8 @@ copy restores first; then `Club.pedirPartida` asks for the cloud one, which
 wins if it is newer and nothing has been shot yet. A finished or restarted
 game writes `d: null` (a tombstone with its `at`), so a stale copy on another
 device does not come back. It resumes at the start of the saved round.
+
+**Guest destacado.** Playable without an account; a guest's score is saved
+if they sign in afterwards, and the game adopts what it left under the
+`invitado` account through `Club.deInvitado` (`docs/claude/juegos/salon.md`).
+Its proof may carry `u: "invitado"` for any owner (`DE_INVITADO`).

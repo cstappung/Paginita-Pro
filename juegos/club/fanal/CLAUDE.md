@@ -149,3 +149,8 @@ first sends that one. Things that matter:
   which is how the story and the bosses were played through in Chromium.
   The proof is version 4: one mode, always from jornada 1 (`docs/antitrampas/fanal.md`);
   any change to it must bump `club-N` in `solo/club.js`.
+
+**Guest destacado.** Playable without an account; a guest's score is saved
+if they sign in afterwards, and the game adopts what it left under the
+`invitado` account through `Club.deInvitado` (`docs/claude/juegos/salon.md`).
+Its proof may carry `u: "invitado"` for any owner (`DE_INVITADO`).

@@ -7,6 +7,10 @@
   // se lee ni se escribe; el panel lo dice y no ofrece «reintentar».
   const invitado=new URLSearchParams(location.search).get('invitado')==='1';
   const AVISO_INVITADO='Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.';
+  // Recién se inició sesión en esta pestaña después de jugar como invitado
+  // (solo los juegos destacados del salón): el juego puede adoptar lo que
+  // dejó con la cuenta «invitado» (Club.deInvitado).
+  const deinvitado=embebido&&!invitado&&cuenta!=='invitado'&&new URLSearchParams(location.search).get('deinvitado')==='1';
   let categoria='',lista,estado,propio,alPartida=null,quiere=false;
   /* El fantasma (Metro Rush, modos «Fantasma»): la mejor carrera de una tabla
      con su prueba, que pide el juego y lee la página (el juego no toca
@@ -18,6 +22,10 @@
      la rechaza, llega un `rechazo` y se avisa con el evento `club-rechazo`. */
   window.Club=Object.freeze({
     storageKey:key=>key+'.cuenta.'+cuenta,
+    /* `deInvitado(key)`: lo que el juego guardó en `key` jugando como
+       invitado en esta pestaña, como texto (o null), y se borra, para que
+       se adopte una sola vez. Solo después de iniciar sesión desde ahí. */
+    deInvitado(key){if(!deinvitado)return null;const k=key+'.cuenta.invitado';try{const v=localStorage.getItem(k);if(v!==null)localStorage.removeItem(k);return v;}catch(e){return null;}},
     category(key){categoria=key;enviar({tipo:'categoria',categoria:key});if(lista)lista.replaceChildren();if(estado)estado.textContent=invitado?AVISO_INVITADO:key==='zen'?'Zen es libre: conserva tu récord local, sin clasificación competitiva.':'Clasificación por modalidad · cargando…';},
     result(dato,prueba){const {prueba:p0,...resto}=dato||{};enviar({tipo:'resultado',...resto,partida:crypto.randomUUID(),prueba:prueba===undefined?p0:prueba});},
     // La partida a medias, en la cuenta (solo dentro de Juegos).

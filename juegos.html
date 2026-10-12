@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610121834"></script>
+<script src="i18n.js?v=202610121934"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2368,7 +2368,7 @@ html.jg-hero #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
 html.jg-club-inm,html.jg-club-inm body{overflow:hidden;height:100%;overscroll-behavior:none}
-html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
+html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
 html.jg-club-inm #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#000}
 html.jg-club-inm .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
@@ -4127,6 +4127,46 @@ a.jg-hoja-ya{color:#fff!important}
 .jg-puerta-btns .btn,.jg-puerta-btns .btn2{height:46px;display:inline-flex;align-items:center;text-decoration:none!important}
 .jg-puerta .jg-puerta-nota{font-size:12px;color:var(--jg-muted)}
 
+/* ---- La bienvenida del celular (abreBienvenida): elegir antes del salón ---- */
+html.jg-bv-abierta,html.jg-bv-abierta body{overflow:hidden}
+html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important}
+.jg-bv-caja:focus{outline:none}
+.jg-bv{position:fixed;inset:0;z-index:96;overflow-y:auto;overscroll-behavior:contain;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:max(24px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));background:radial-gradient(ellipse at top,#ece4ff,#fbfaff 62%);animation:jgVela .2s ease-out}
+.jg-bv-caja{width:100%;max-width:440px}
+.jg-bv-paso{display:grid;gap:12px;text-align:center}
+.jg-bv-paso[hidden]{display:none}
+.jg-bv h1,.jg-bv h2{margin:4px 0 0;font-size:28px;line-height:1.15;letter-spacing:-.7px;color:var(--jg-ink)}
+.jg-bv h2{font-size:25px}
+.jg-bv-paso>p{margin:0;font-size:14.5px;line-height:1.55;color:#5f5a70}
+.jg-bv-btns{display:grid;gap:10px;margin-top:10px}
+.jg-bv-btns .btn,.jg-bv-btns .btn2{height:52px;border-radius:14px;font-size:15.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.jg-bv-btns .btn{background:var(--jg-purple)}
+.jg-bv-inv{border:0;background:none;padding:12px;font:700 14.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.jg-bv .jg-bv-nota{font-size:12px;color:var(--jg-muted)}
+.jg-bv-juegos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:6px}
+.jg-bv-juego{display:grid;gap:2px;padding:0 0 10px;border-radius:16px;overflow:hidden;background:#fff;border:2px solid color-mix(in srgb,var(--c) 45%,#e4dfeb);text-decoration:none;color:var(--jg-ink);box-shadow:0 6px 18px #2a1d5514}
+.jg-bv-juego:active{transform:scale(.97)}
+.jg-bv-portada{display:block;aspect-ratio:4/3;overflow:hidden;background:#1d1529;margin-bottom:6px}
+.jg-bv-portada svg{display:block;width:100%;height:100%}
+.jg-bv-juego b{font-size:15px}
+.jg-bv-juego small{font-size:12px;color:var(--jg-muted)}
+
+/* ---- El invitado en un destacado: el aviso de arriba y «¿Guardamos esta partida?» ---- */
+.jg-inv-tira{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;border-radius:14px;background:#fff8e6;border:1px solid #f1dca8;color:#5f4610;font-size:12.5px;line-height:1.45}
+.jg-inv-tira>span{flex:1;min-width:0}
+.jg-inv-tira .btn{flex-shrink:0;background:var(--jg-purple)}
+@media (max-width:600px){.jg-inv-tira{font-size:12px;padding:8px 10px;gap:8px}.jg-inv-tira .btn{height:34px;padding:0 12px}}
+.jg-invg{position:fixed;left:0;right:0;bottom:0;z-index:92;display:flex;justify-content:center;padding:0 12px max(12px,env(safe-area-inset-bottom));pointer-events:none}
+.jg-invg-caja{pointer-events:auto;position:relative;width:100%;max-width:520px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:16px 16px 14px;border-radius:20px;background:#fff;border:1px solid #e4dfeb;box-shadow:0 14px 44px #120d1f4d;animation:jgLogroEntra .45s cubic-bezier(.2,1.4,.4,1)}
+.jg-invg-ico{font-size:30px;line-height:1;padding-top:2px}
+.jg-invg-txt small{display:block;font-size:12px;font-weight:700;color:var(--jg-purple)}
+.jg-invg-txt b{display:block;font-size:17px;letter-spacing:-.3px;color:var(--jg-ink);padding-right:26px}
+.jg-invg-txt p{margin:4px 0 0;font-size:13px;line-height:1.5;color:#5f5a70}
+.jg-invg-btns{grid-column:1/-1;display:flex;gap:8px;margin-top:10px}
+.jg-invg-btns .btn{flex:1;height:46px;border-radius:12px;font-size:14px;background:var(--jg-purple)}
+.jg-invg-btns .btn2{height:46px;border-radius:12px}
+.jg-invg-x{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--jg-muted);font-size:15px;cursor:pointer}
+
 /* ---- La caja del invitado en la columna de salas ---- */
 .jg-lado-cuenta{padding-bottom:16px}
 .jg-lado-cuenta header .jg-sal-ico{flex-basis:30px;height:30px;border-radius:10px}
@@ -4264,6 +4304,12 @@ html[data-tema=oscuro] .jg-hoja-ops select{background:var(--os-sup2);border-colo
 html[data-tema=oscuro] .jg-hoja-modos li{background:color-mix(in srgb,var(--c) 16%,var(--os-sup2));border-color:color-mix(in srgb,var(--c) 34%,var(--os-borde));color:var(--os-tx)}
 html[data-tema=oscuro] .jg-hoja-cuenta{background:#221a38;border-color:#3b2d63}
 html[data-tema=oscuro] .jg-puerta{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-bv{background:radial-gradient(ellipse at top,#2a1f4a,#141019 62%)}
+html[data-tema=oscuro] .jg-bv-paso>p,html[data-tema=oscuro] .jg-invg-txt p{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-bv-inv,html[data-tema=oscuro] .jg-invg-txt small{color:#c4b1ff}
+html[data-tema=oscuro] .jg-bv-juego,html[data-tema=oscuro] .jg-invg-caja{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-bv-juego{border-color:color-mix(in srgb,var(--c) 40%,var(--os-borde))}
+html[data-tema=oscuro] .jg-inv-tira{background:#2a2312;border-color:#4d3d17;color:#f1dfae}
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
@@ -4799,6 +4845,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610121834"></script>
+<script src="juegos-app.js?v=202610121934"></script>
 </body>
 </html>

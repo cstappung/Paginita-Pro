@@ -2,8 +2,8 @@
    de que el SDK abra su primera conexión con la base. */
 import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
-import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
-import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
+import { esRachaClub, rachaClub, resultadoClub } from "./juegos/solo/club-datos.js";
+import { VERIFICADORES, juegoDeCategoria, textoPrueba, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
 import { merecesRevision } from "./juegos/admin-datos.js";
@@ -95,7 +95,7 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO } from "./juegos/salon-datos.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -590,6 +590,179 @@ function limpiaInvitado() {
     }
   } catch (e) { /* sin almacenamiento: tampoco hay nada que borrar */ }
 }
+/* ¿Esta pestaña fue invitado en esta visita? Es la marca de `limpiaInvitado`,
+   así que sobrevive a recargar. Lo que un invitado dejó en este navegador
+   solo pasa a una cuenta si la persona entró desde aquí; lo que quedó de
+   otra visita (otra persona, quizá) no. */
+function vinoDeInvitado() {
+  try { return sessionStorage.getItem("jg.visitaInvitado") === "1"; } catch (e) { return false; }
+}
+const nombreSolo = id => (SOLOS.find(x => x.id === id) || {}).nombre || id;
+const marcaInvitado = d => d.categoria === "club-bbtan-rondas" ? `Ronda ${d.puntos}`
+  : d.categoria === "club-fanal-jornadas" ? `${d.puntos} ${d.puntos === 1 ? "jornada" : "jornadas"}`
+  : `${Number(d.puntos).toLocaleString("es-CL")} puntos`;
+
+/* El aviso al invitado que acaba de terminar una partida de un destacado
+   (solo/club.js lo llama solo con una marca nueva suya): todavía no se
+   guardó, y con iniciar sesión pasa a la cuenta (`subeDeInvitado`). Cuelga
+   de <body>, encima del juego también en el modo celular. FANAL manda dos
+   resultados a la vez (travesía y jornadas): el segundo no tapa al primero. */
+function ofreceGuardar(juego, dato) {
+  if (!state.invitado) return;
+  if (dato.categoria === "club-fanal-jornadas" && $("jgInvGuarda")) return;
+  quitaOfreceGuardar();
+  const c = document.createElement("div");
+  c.id = "jgInvGuarda";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInvGuardaT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
+    <span class="jg-invg-ico" aria-hidden="true">🏆</span>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(juego))} · ${escapeHtml(marcaInvitado(dato))}</small>
+      <b id="jgInvGuardaT">¿Guardamos esta partida?</b>
+      <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${juego === "aleteo" ? "" : ", junto con tu avance para seguir después"}.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-login>Iniciar sesión y guardar</button><button class="btn2" type="button" data-cierra>Ahora no</button></div>
+  </div>`;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = quitaOfreceGuardar;
+  document.body.appendChild(c);
+  suena("entra");
+}
+function quitaOfreceGuardar() { const c = $("jgInvGuarda"); if (c) c.remove(); }
+
+/* Lo que el invitado jugó en esta pestaña y quedó pendiente (solo/club.js,
+   `DE_INVITADO`) pasa a la cuenta con la que acaba de entrar: se verifica
+   otra vez (la prueba sigue siendo de la cuenta «invitado», y verifica.js
+   la acepta así), se guarda como cualquier récord y cuenta como partida
+   del club, con sus logros y monedas. Si no se puede escribir, queda
+   pendiente en la cuenta y `crearSolo` la reintenta al abrir el juego. */
+let subiendoInvitado = false;
+async function subeDeInvitado(u) {
+  if (subiendoInvitado || !vinoDeInvitado()) return;
+  subiendoInvitado = true;
+  try {
+    for (const juego of DE_INVITADO) {
+      const k = "jg.club.pendientes." + UID_INVITADO + "." + juego;
+      let lista = {};
+      try { lista = JSON.parse(localStorage.getItem(k) || "{}") || {}; localStorage.removeItem(k); } catch (e) { lista = {}; }
+      for (const v of Object.values(lista)) {
+        const dato = resultadoClub(juego, v);
+        if (!dato || v.prueba === undefined || v.prueba === null) continue;
+        const motivo = await verificaClub(juego, dato, v.prueba, { uid: u.uid });
+        if (motivo) { console.warn("[juegos] la partida de invitado no se pudo comprobar", juego, motivo); continue; }
+        if (!state.user || state.user.uid !== u.uid) return;
+        const fila = Object.assign({}, dato, { nombre: String(u.name || "").slice(0, 80) });
+        try {
+          const previa = await fb.leerSolo(dato.categoria).then(f => f.find(x => x.uid === u.uid) || null, () => null);
+          const res = await guardaClub(dato.categoria, u.uid, fila, v.prueba);
+          alResultadoClub(juego)(dato, previa, v.prueba);
+          avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(juego)}` : `Tu partida de ${nombreSolo(juego)} quedó en tu cuenta`,
+            res && res.committed ? marcaInvitado(dato) + " · ya está en la clasificación" : marcaInvitado(dato) + " · tu récord guardado era mejor");
+        } catch (e) {
+          console.warn("[juegos] no se pudo subir la partida de invitado", e);
+          const kc = "jg.club.pendientes." + u.uid + "." + juego;
+          try {
+            const suyos = JSON.parse(localStorage.getItem(kc) || "{}") || {};
+            const ya = suyos[dato.categoria];
+            if (!ya || dato.puntos > ya.puntos || dato.puntos === ya.puntos && dato.tiempo < ya.tiempo) suyos[dato.categoria] = Object.assign({}, dato, { prueba: v.prueba, h: v.h });
+            localStorage.setItem(kc, JSON.stringify(suyos));
+          } catch (e2) { /* sin almacenamiento */ }
+        }
+      }
+    }
+  } finally { subiendoInvitado = false; }
+}
+function avisaGuardado(titulo, detalle) {
+  toastCola = toastCola.then(() => new Promise(fin => {
+    const t = document.createElement("div");
+    t.className = "jg-logro-toast";
+    t.setAttribute("role", "status");
+    t.innerHTML = `<span class="i">✅</span><span><small>Partida de invitado</small><b>${escapeHtml(titulo)}</b><em>${escapeHtml(detalle)}</em></span>`;
+    document.body.appendChild(t);
+    suena("entra");
+    setTimeout(() => { t.classList.add("sale"); setTimeout(() => { t.remove(); fin(); }, 400); }, 4200);
+  }));
+}
+
+/* ---------- la bienvenida (solo en el celular) ----------
+   Quien llega por primera vez desde un teléfono y sin sesión elige antes
+   de ver el salón: iniciar sesión, crear cuenta (con Google es lo mismo)
+   o seguir como invitado, y entonces se le ofrecen los cuatro destacados,
+   que se juegan sin cuenta. Una sola vez por aparato (`jg.bienvenida`, que
+   también se marca al iniciar sesión), solo en la portada (un enlace a un
+   juego o a una sala va directo a lo suyo) y nunca a quien tiene cuenta. */
+const enCelular = () => {
+  try { return matchMedia("(pointer:coarse)").matches && Math.min(innerWidth, innerHeight) <= 600; } catch (e) { return false; }
+};
+function vioBienvenida() { try { return !!localStorage.getItem("jg.bienvenida"); } catch (e) { return true; } }
+function marcaBienvenida() { try { localStorage.setItem("jg.bienvenida", "1"); } catch (e) { /* sin almacenamiento: se verá otra vez */ } }
+function cierraBienvenida() {
+  const c = $("jgBienvenida");
+  if (!c) return;
+  c.remove();
+  document.documentElement.classList.remove("jg-bv-abierta");
+}
+function abreBienvenida() {
+  if ($("jgBienvenida") || !state.invitado || state.vista !== "vestibulo" || castigoActivo() || vioBienvenida() || !enCelular()) return;
+  const c = document.createElement("div");
+  c.id = "jgBienvenida";
+  c.className = "jg-bv";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-modal", "true");
+  c.setAttribute("aria-labelledby", "jgBvT");
+  const tarjetas = DESTACADOS_INVITADO.map(id => {
+    const e = SOLOS.find(x => x.id === id);
+    return e ? `<a class="jg-bv-juego" href="${e.ruta}" data-bv-juego style="--c:${COLOR_SOLO[id] || "#f6bc64"}">
+      <span class="jg-bv-portada" aria-hidden="true">${portadaSolo(id)}</span>
+      <b>${escapeHtml(e.nombre)}</b><small>${escapeHtml(e.genero)}</small></a>` : "";
+  }).join("");
+  c.innerHTML = `<div class="jg-bv-caja" tabindex="-1">
+    <section class="jg-bv-paso" data-paso="1">
+      <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
+      <h1 id="jgBvT">Te damos la bienvenida</h1>
+      <p>Juegos para jugar solo o con amigos en línea, con clasificación, logros y monedas.</p>
+      <div class="jg-bv-btns">
+        <button class="btn" type="button" data-bv="entrar">Iniciar sesión</button>
+        <button class="btn2" type="button" data-bv="crear">Crear cuenta</button>
+        <button class="jg-bv-inv" type="button" data-bv="invitado">Continuar como invitado</button>
+      </div>
+      <p class="jg-bv-nota">Se entra con tu cuenta de Google: si es la primera vez, tu cuenta queda creada en el mismo paso.</p>
+      <p class="jg-bv-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
+    </section>
+    <section class="jg-bv-paso" data-paso="2" hidden>
+      <span class="jg-eyebrow">MODO INVITADO</span>
+      <h2>Juega ya, sin cuenta</h2>
+      <p>Elige uno. Como invitado tus puntajes y tus partidas <b>no se guardan</b>: inicia sesión cuando quieras, también después de perder, y guardamos tu mejor partida.</p>
+      <div class="jg-bv-juegos">${tarjetas}</div>
+      <div class="jg-bv-btns">
+        <button class="btn2" type="button" data-bv="salon">Ver todo el salón</button>
+        <button class="jg-bv-inv" type="button" data-bv="entrar">Mejor inicio sesión</button>
+      </div>
+    </section>
+  </div>`;
+  c.addEventListener("click", ev => {
+    const b = ev.target.closest("[data-bv]"), j = ev.target.closest("[data-bv-juego]");
+    if (j) { marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
+    if (!b) return;
+    const que = b.getAttribute("data-bv");
+    /* Iniciar sesión o crear cuenta: la ventana de Google. La bienvenida se
+       queda hasta que llega la cuenta (watchAuth la cierra); si se cancela,
+       sigue aquí para elegir otra cosa. */
+    if (que === "entrar" || que === "crear") { entrarConGoogle(); return; }
+    if (que === "invitado") {
+      marcaBienvenida();
+      c.querySelector('[data-paso="1"]').hidden = true;
+      c.querySelector('[data-paso="2"]').hidden = false;
+      const primero = c.querySelector("[data-bv-juego]");
+      if (primero) primero.focus();
+      return;
+    }
+    if (que === "salon") { marcaBienvenida(); cierraBienvenida(); }
+  });
+  document.body.appendChild(c);
+  document.documentElement.classList.add("jg-bv-abierta");
+  c.querySelector(".jg-bv-caja").focus({ preventScroll: true });
+}
 
 /* Iniciar sesión sin perder el hilo. `juego` es la ficha desde la que se
    pidió: al volver con la cuenta se reabre, ya desbloqueada, y el botón
@@ -620,7 +793,7 @@ function puertaHtml(m) {
       <button class="btn" type="button" data-login>Iniciar sesión con Google</button>
       <a class="btn2" href="#">Volver al salón</a>
     </div>
-    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a Snake, Buscaminas, Tetris y sortEm.</p>
+    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm.</p>
     <p class="jg-puerta-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
   </section>`;
 }
@@ -1399,6 +1572,17 @@ function pintaTabs() {
   }
 }
 
+/* Lo que pasa con cada resultado verificado de un juego del club, con
+   cuenta: cuenta como partida (monedas), va a la mejor del día del salón y
+   se celebra el logro que esta marca da y la guardada no daba ya (un logro
+   individual sale de la marca). También para la partida de invitado que
+   sube al iniciar sesión (`subeDeInvitado`). */
+const alResultadoClub = clave => (d, previa, prueba) => {
+  marcaJugadaClub(clave); apuntaRepeticion(d, prueba);
+  const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+  for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id);
+};
+
 /* Guarda un récord de club y, si sube a su dueño al podio de la
    modalidad, lo anuncia en Discord. La tabla se lee *antes* de escribir
    para saber de qué puesto venía; la de después no hace falta leerla,
@@ -1552,6 +1736,7 @@ function pintaTopeConsumo(e) {
 function armazon() {
   const h = $("pantalla");
   if (state.vista !== "partida") ponInmersivo(false);
+  quitaOfreceGuardar();
   /* Como invitado, lo que lee o escribe la base (una partida, la
      clasificación, los sobres…) se cambia por una puerta que lo explica. */
   const motivo = !state.invitado ? null : MOTIVO_CUENTA[state.vista] ||
@@ -1597,7 +1782,12 @@ function armazon() {
     const clave = juego === "tetris" ? "tetrisclub" : juego;
     /* Sin cuenta (`usuario: null`) el club juega en modo invitado: ni
        clasificación, ni partida a medias en la nube, ni logros. */
+    /* Los destacados del invitado (`DE_INVITADO`): sin cuenta, su marca queda
+       pendiente y se le ofrece guardarla; con la cuenta recién estrenada en
+       esta pestaña, el juego adopta la partida a medias que dejó. */
+    const deInv = DE_INVITADO.has(juego);
     individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""), nombreDe: nombreVivo,
+      alInvitado: !u && deInv ? d => ofreceGuardar(juego, d) : undefined, deInvitado: !!u && deInv && vinoDeInvitado(),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
       /* El fantasma de Metro Rush: la tabla de la categoría y la prueba de su n.º 1, por clave (solo/club.js). */
       fantasma: u ? { leerTabla: cat => fb.leerSolo(cat), leerPrueba: (cat, uid, p) => fb.leerPruebaSolo(cat, uid, p) } : null,
@@ -1606,8 +1796,7 @@ function armazon() {
         fb.otorgarLogro(clave, u.uid, id).then(() => celebra(clave, id), e => console.warn("[juegos] no se pudo guardar el logro", id, e)); }) : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
-      alResultado: u ? (d, previa, prueba) => { marcaJugadaClub(clave); apuntaRepeticion(d, prueba); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
-        for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); } : undefined });
+      alResultado: u ? alResultadoClub(clave) : undefined });
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
        juego nuevo del club aparece aquí sin tocar esta línea. */
@@ -1621,6 +1810,14 @@ function armazon() {
       `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button></nav>`;
     barra.querySelector("[data-reglas-solo]").onclick = () => abreReglas(clave);
     h.insertBefore(barra, h.firstChild);
+    /* En los destacados, el invitado lo lee antes de jugar, no solo al perder. */
+    if (state.invitado && deInv) {
+      const tira = document.createElement("p");
+      tira.className = "jg-inv-tira";
+      tira.setAttribute("role", "note");
+      tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login>Iniciar sesión</button>';
+      barra.after(tira);
+    }
     return;
   }
   if (state.vista === "perfil") {
@@ -1793,13 +1990,13 @@ function armazon() {
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
-        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a Snake, Buscaminas, Tetris y sortEm, pero nada se guarda ni cuenta para rankings, logros ni monedas. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
+        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas sin cuenta a BBTAN, ALETEO, FANAL y Trigon (y a Snake, Buscaminas, Tetris y sortEm), pero tus puntajes y partidas no se guardan. Inicia sesión, también después de jugar, y guardamos tu mejor partida de los cuatro primeros. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
         <div id="vesAviso"></div>
       </div>
       <section class="jg-sal-sec jg-sal-solo" aria-labelledby="vesSoloT">
         <header class="jg-sal-tit">
           <span class="jg-sal-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span>
-          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta: Snake, Buscaminas, Tetris y sortEm." : ""}</p></div>
+          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta: BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm." : ""}</p></div>
           <button class="jg-sal-ver" type="button" data-ver-solo>Ver todos</button>
           <button class="jg-desliza" type="button" data-desliza="-1" aria-label="Anteriores">‹</button><button class="jg-desliza" type="button" data-desliza="1" aria-label="Siguientes">›</button>
         </header>
@@ -2274,7 +2471,9 @@ function pintaVestibulo() {
   entradasVes = entradasSalon(JUEGOS, orden);
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
-  entradasVes.solos.sort((x, y) => rango.get(x.id) - rango.get(y.id));
+  /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
+  const destacado = id => inv && DESTACADOS_INVITADO.includes(id) ? DESTACADOS_INVITADO.indexOf(id) - 1000 : 0;
+  entradasVes.solos.sort((x, y) => destacado(x.id) - destacado(y.id) || rango.get(x.id) - rango.get(y.id));
   nuevosVes = nuevos([...entradasVes.solos, ...entradasVes.multi], ahoraV);
   const porJuego = {};
   for (const s of abiertas) porJuego[s.juego] = (porJuego[s.juego] || 0) + 1;
@@ -3053,8 +3252,15 @@ function wire() {
       /* Una ficha abierta (se salió de la cuenta con ella delante) se
          repinta en su versión de invitado. */
       if (salon.abiertaPara()) salon.abre(salon.abiertaPara());
+      abreBienvenida();
       return;
     }
+    /* Con cuenta la bienvenida ya no hace falta, en este aparato tampoco
+       después de salir; y lo que se jugó como invitado en esta pestaña
+       pasa a la cuenta. */
+    marcaBienvenida();
+    cierraBienvenida();
+    quitaOfreceGuardar();
     state.invitado = false;
     state.base = {
       uid: user.uid,
@@ -3107,6 +3313,7 @@ function wire() {
     const reabrir = (state.vista === "vestibulo" && (trasLogin || salon.abiertaPara())) || "";
     trasLogin = "";
     if (reabrir) salon.abre(reabrir);
+    subeDeInvitado(state.user);
   });
 })();
 

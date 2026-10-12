@@ -27,6 +27,14 @@ client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.
 
+**A guest's proof can become an account's** in the four guest
+*destacados* (`DE_INVITADO` in `solo/verifica.js`: BBTAN, ALETEO, FANAL,
+Trigon): `verificaClub` treats `u: "invitado"` as valid for any owner, so a
+score played as a guest can be saved after signing in (details in
+`docs/claude/juegos/salon.md`). Adding a game there means its proof must
+still bind everything else (seed, moves) and its game must adopt the guest's
+half-played state through `Club.deInvitado`.
+
 **Records are also judged by how they were played**
 (`solo/verifica/patrones.js`, `docs/antitrampas.md` §4 bis). A proof that
 replays still rejects when the inputs show a program: runs of keys in the

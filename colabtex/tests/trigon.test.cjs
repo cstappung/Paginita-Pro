@@ -129,6 +129,21 @@ test('rehace la partida del bot',()=>{
  assert.ok(M.rehace(1,'u',[[0,0,0,'r',1.5]]).error);
 });
 
+test('la partida jugada como invitado vale con la cuenta con que se entra después',async()=>{
+ // Los destacados del invitado (DE_INVITADO): la prueba lleva la cuenta
+ // «invitado» en la semilla y no se puede reescribir al iniciar sesión.
+ const {E,ms,p}=prueba(77,'invitado');
+ const dp={categoria:CP,puntos:E.puntos,tiempo:ms};
+ assert.equal(await V.verificaClub('trigon',dp,p,{uid:'invitado'}),null);
+ assert.equal(await V.verificaClub('trigon',dp,p,{uid:'ana'}),null);
+ assert.equal(await V.verificaClub('trigon',{...dp,uid:'ana'},p),null);
+ // La de otra cuenta sigue sin valer, y la de invitado tampoco se infla.
+ assert.notEqual(await V.verificaClub('trigon',dp,prueba(77,'beto').p,{uid:'ana'}),null);
+ assert.notEqual(await V.verificaClub('trigon',{...dp,puntos:E.puntos+1},p,{uid:'ana'}),null);
+ assert.ok(V.DE_INVITADO.has('trigon')&&V.DE_INVITADO.has('bbtan')&&V.DE_INVITADO.has('aleteo')&&V.DE_INVITADO.has('fanal'));
+ assert.ok(!V.DE_INVITADO.has('tetris')&&!V.DE_INVITADO.has('metrorush'));
+});
+
 test('el verificador acepta la partida honesta y rechaza las trampas',async()=>{
  const {E,ms,p}=prueba(99,'ana');
  const dp={categoria:CP,uid:'ana',puntos:E.puntos,tiempo:ms};

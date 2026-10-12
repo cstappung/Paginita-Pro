@@ -752,8 +752,13 @@
     guarda('trigon.partida', { s: E.semilla, u: E.u, j: E.registro, a: Math.round(r.a), w: Math.round(r.w), ua: Math.round(ultimaA), at: Date.now() });
   }
   function retoma() {
+    // La partida que dejó como invitado en esta pestaña, si acaba de iniciar
+    // sesión (Club.deInvitado). Su semilla es de la cuenta «invitado», y el
+    // club acepta esa prueba con cualquier dueño.
+    const previa = Club && Club.deInvitado ? Club.deInvitado('trigon.partida') : null;
+    if (previa) { try { localStorage.setItem(clave('trigon.partida'), previa); } catch (_) { /* nada */ } }
     const g = lee('trigon.partida');
-    if (!g || g.u !== CUENTA || !(Date.now() - (+g.at || 0) < VIGENCIA)) return false;
+    if (!g || (g.u !== CUENTA && g.u !== 'invitado') || !(Date.now() - (+g.at || 0) < VIGENCIA)) return false;
     const r = M.rehace(g.s, g.u, g.j);
     if (r.error || r.E.fin) return false;
     E = r.E; terminada = false;

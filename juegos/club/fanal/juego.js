@@ -58,6 +58,12 @@
   const guardaOpciones = () => guarda("fanal.opciones", opciones);
 
   let prog = M.mezclaProgreso(lee("fanal.progreso", null), null);     // lo leído, los finales vistos, la travesía a medias
+  // Lo que jugó como invitado en esta pestaña, si acaba de iniciar sesión
+  // (Club.deInvitado): se junta con lo de la cuenta, travesía a medias incluida.
+  try {
+    const previo = Club && Club.deInvitado ? Club.deInvitado("fanal.progreso") : null;
+    if (previo) { prog = M.mezclaProgreso(prog, JSON.parse(previo)); guarda("fanal.progreso", prog); }
+  } catch (e) { /* un progreso ilegible no se adopta */ }
   function guardaProgreso(subir) {
     guarda("fanal.progreso", prog);
     if (subir !== false && Club && Club.guardarPartida) Club.guardarPartida(JSON.stringify(prog)); // y a la cuenta

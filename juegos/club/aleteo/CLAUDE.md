@@ -19,3 +19,8 @@ replays (`docs/antitrampas/aleteo.md`); logros, coins, the `taleteo` frame,
 the Discord podium and the manual are wired like Atasco's. The `soloRanks`
 and `clubJugadas` regexes were widened, so the rules must be re-published.
 `tests/aleteo.test.cjs` covers motor, lore and verifier.
+
+**Guest destacado.** Playable without an account; a guest's score is saved
+if they sign in afterwards, and the game adopts what it left under the
+`invitado` account through `Club.deInvitado` (`docs/claude/juegos/salon.md`).
+Its proof may carry `u: "invitado"` for any owner (`DE_INVITADO`).
