@@ -448,11 +448,15 @@ const REGLAS = {
     lema: "Fútbol de discos visto desde arriba: rojo contra azul, de 1 contra 1 hasta 4 contra 4.",
     secciones: [
       ["Controles", lista([
+        "<b>Shift</b> es el sprint: corres más rápido mientras dure la barra bajo tu nombre. Cada vez que paras de correr hay 1,5 segundos de espera y después recarga.",
+        "Las teclas se cambian con <b>⌨ Teclas</b> en el menú del juego, y ahí mismo eliges tu nombre y tu dorsal (hasta dos caracteres: un número, un emoji o letras).",
         "<b>WASD</b> o flechas para moverte; <b>Espacio</b> o <b>X</b> para patear. Mientras mantienes la patada tu disco se marca con un borde blanco, y la pelota sale disparada si la tocas.",
         "Correr contra la pelota también la empuja, pero mucho menos que una patada."
       ])],
       ["Equipos", lista([
-        "Los equipos salen del orden de los asientos: el 1.º, 3.º, 5.º y 7.º son <b>rojos</b>; el 2.º, 4.º, 6.º y 8.º, <b>azules</b>.",
+        "Antes del partido la sala muestra tres columnas: <b>Rojo</b>, <b>Sin equipo</b> y <b>Azul</b>. Cada uno se une al equipo que quiera; quien abrió la sala puede mover a cualquiera, repartir con <b>Auto</b> o <b>Al azar</b>, ponerle nombre a cada equipo (✎) y empezar cuando haya al menos uno por lado.",
+        "Quien queda sin equipo mira el partido en directo.",
+        "El líder (👑) también elige goles, tiempo, cancha y sprint en el vestíbulo, puede pasarle el mando a otro y, desde ✎ Ficha, cortar el partido para volver al vestíbulo. Si abandona, manda el segundo que entró.",
         "El rojo ataca el arco de la <b>derecha</b> y el azul el de la izquierda."
       ])],
       ["El saque", lista([
@@ -461,11 +465,22 @@ const REGLAS = {
       ])],
       ["Ganar", lista([
         "Gana el primer equipo en llegar a la meta: <b>3</b>, <b>5</b> o <b>7</b> goles, elegida al abrir la sala.",
+        "Con <b>tiempo límite</b> (3, 5 o 10 minutos), al acabarse gana el que va arriba. Si van empatados empieza el <b>gol de oro</b>: el próximo gol gana. El reloj solo corre con la pelota en juego.",
+        "Después de un gol todos vuelven a su mitad y saca el equipo que lo recibió: el que anotó no puede tocar la pelota hasta que el rival la mueva.",
         "El gol cuenta para el último del equipo que lo marcó en tocar la pelota; un gol en contra suma al rival, pero no tiene autor.",
         "Si un equipo se queda sin nadie, gana el otro."
       ])],
+      ["Canchas", lista([
+        "<b>Clásica</b>: la de siempre, en pasto.",
+        "<b>Futsal</b>: piso gris, arcos más angostos y una pelota más chica y liviana que sale más rápido al patearla.",
+        "<b>Futsal grande</b>: el mismo futsal en una cancha más grande que la pantalla; la cámara te sigue."
+      ])],
       ["Sin servidor", "Los discos van de navegador a navegador. La pelota la mueve un jugador, el que dirige, y si se va la toma el siguiente. Al registro de la sala solo van los goles, numerados: un gol repetido o fuera de orden no cuenta. Es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/haxball/</code>) se juega contra bots, de 1 contra 1 a 4 contra 4 y en tres niveles."]
+      ["Para practicar", "El juego suelto (<code>juegos/haxball/</code>) se juega contra bots, de 1 contra 1 a 3 contra 3 y en tres niveles."],
+      ["Dos en un teclado", lista([
+        "En la práctica pueden jugar dos personas en el mismo computador: <b>uno contra otro</b> o <b>juntos</b> contra los bots.",
+        "<b>J1</b> se mueve con <b>WASD</b> y patea con <b>Espacio</b>; <b>J2</b> se mueve con las <b>flechas</b> y patea con <b>Enter</b> o <b>P</b>. El sprint es <b>Shift izquierdo</b> para J1 y <b>Shift derecho</b> para J2. La pausa queda en <b>Esc</b>."
+      ])]
     ]
   },
   boxhead: {

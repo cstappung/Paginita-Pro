@@ -127,8 +127,8 @@ export const SOLOS = [
     modos: ["Supervivencia"] },
   { id: "bots-haxball", tipo: "bots", juego: "haxball", nombre: "HaxBall · práctica", genero: "Deporte", icono: "⚽", alta: "2026-10-12",
     url: "juegos/haxball/index.html", reglas: "haxball",
-    lema: "Fútbol de discos contra bots: de 1 contra 1 hasta 4 contra 4.",
-    modos: ["Contra bots"] }
+    lema: "Fútbol de discos contra bots, o con alguien a tu lado en el mismo teclado.",
+    modos: ["Contra bots", "2 en un teclado"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número

@@ -7040,54 +7040,123 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
 /* ---------- HaxBall ----------
    Fútbol de discos en tiempo real, en un iframe (`juegos/haxball/`), con la
    misma malla WebRTC que Yemas y Boxhead. La física de la pelota la lleva
-   quien dirige (el primer asiento presente); cada uno mueve su disco.
+   quien dirige (el primer asiento con equipo presente); cada uno mueve su
+   disco.
 
-   Al registro va solo lo que decide la partida: `{t:"gol", uid, e, n, por}`,
-   escrito por quien dirige. `n` tiene que ser el gol siguiente (el total
-   más uno), así que dos directores momentáneos que vean el mismo gol lo
-   cuentan una vez: el segundo llega con un `n` ya usado. Los equipos son
-   por asiento (par rojo, impar azul), como Yemas al llenarse. Gana el
-   primero en llegar a `meta`; un equipo que se queda sin nadie pierde. */
+   Antes de cada partido hay un vestíbulo de equipos, y todo lo que pasa en
+   él son jugadas, así que todos ven lo mismo en el mismo orden:
+   - `{t:"equipo", uid, a, e}`: pone a `a` en "rojo", "azul" o "" (sin
+     equipo). Cada uno se mueve a sí mismo; el líder mueve a cualquiera.
+   - `{t:"nomeq", uid, e, nombre}`: el líder renombra un equipo.
+   - `{t:"ajuste", uid, k, v}`: el líder cambia `meta`, `tiempo`, `mapa`
+     (cancha) o `sprint`; los campos de la sala son solo los de partida,
+     porque las reglas no dejan reescribirlos.
+   - `{t:"lider", uid, a}`: el líder le pasa el mando a `a`.
+   - `{t:"empieza", uid}`: el líder arranca, con al menos uno por lado.
+   - `{t:"vestibulo", uid}`: el líder corta el partido y vuelven todos al
+     vestíbulo; el marcador vuelve a cero y el siguiente `empieza` es un
+     partido nuevo.
+   El líder empieza siendo quien abrió la sala; si abandona, pasa al primer
+   asiento presente (el segundo en entrar). Quien queda sin equipo mira.
+
+   En el partido va `{t:"gol", uid, e, n, por}`, escrito por quien dirige.
+   `n` tiene que ser el gol siguiente (el total más uno), así que dos
+   directores momentáneos que vean el mismo gol lo cuentan una vez. Gana el
+   primero en llegar a `meta`; un equipo que se queda sin nadie pierde. Con
+   `tiempo` (minutos), quien dirige anota `{t:"tiempo", n}` al acabarse el
+   reloj, con `n` = goles totales que ve: gana el que va arriba (motivo
+   "reloj") y, empatados, empieza el gol de oro (`oro`): el siguiente gol
+   gana (motivo "oro"). */
 export const HB_METAS = [3, 5, 7];
+export const HB_TIEMPOS = [0, 3, 5, 10];
 export const HB_EQUIPOS = ["rojo", "azul"];
-export function metaHaxball(p) {
-  const m = Math.floor(Number(p && p.meta));
-  return HB_METAS.includes(m) ? m : 5;
-}
-export function equiposHaxball(p, js = jugadoresDe(p)) {
-  const eq = {};
-  js.forEach((j, i) => { eq[j.uid] = HB_EQUIPOS[i % 2]; });
-  return eq;
-}
-export function redHaxball(p, js = jugadoresDe(p), listos = true) {
+export const HB_NOMBRES = { rojo: "Rojo", azul: "Azul" };
+export const HB_MAX_NOMBRE = 16;
+export const HB_CANCHAS = { clasica: "Clásica", futsal: "Futsal", grande: "Futsal grande" };
+const hbMeta = v => { const m = Math.floor(Number(v)); return HB_METAS.includes(m) ? m : 5; };
+const hbTiempo = v => { const t = Math.floor(Number(v)); return HB_TIEMPOS.includes(t) ? t : 0; };
+const hbCancha = v => tiene(HB_CANCHAS, v) ? v : "clasica";
+const hbSprint = v => !(v === 0 || v === "0" || v === false);
+/* Lo que eligió quien abrió la sala; el vestíbulo puede cambiarlo después. */
+export const metaHaxball = p => hbMeta(p && p.meta);
+export const tiempoHaxball = p => hbTiempo(p && p.tiempo);
+export const canchaHaxball = p => hbCancha(p && p.mapa);
+export const sprintHaxball = p => hbSprint(p && p.sprint);
+const AJUSTES_HB = { meta: hbMeta, tiempo: hbTiempo, mapa: hbCancha, sprint: hbSprint };
+const nombreEqSano = v => typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, HB_MAX_NOMBRE) : "";
+
+/* Recorre el registro y separa vestíbulo y partido. Devuelve el estado del
+   vestíbulo y las jugadas del partido en curso (desde el último `empieza`
+   válido), que son las únicas que cuentan para el marcador. */
+export function vestibuloHaxball(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
-  const meta = metaHaxball(p), equipos = equiposHaxball(p, js);
-  const goles = { rojo: 0, azul: 0 }, puntos = {}, fuera = {};
-  for (const u of ids) puntos[u] = 0;
-  const hist = [];
-  let ganador = null, motivo = "";
+  const equipos = {}, fuera = {}, nombresEq = { ...HB_NOMBRES };
+  const ajustes = { meta: metaHaxball(p), tiempo: tiempoHaxball(p), mapa: canchaHaxball(p), sprint: sprintHaxball(p) };
+  let empezo = false, partido = [], ronda = 0, lider = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  const repone = () => { if (!lider || fuera[lider]) lider = (js.find(j => !fuera[j.uid]) || {}).uid || ""; };
+  const hay = e => js.some(x => equipos[x.uid] === e && !fuera[x.uid]);
   for (const j of jugadasDe(p)) {
-    if (ganador !== null) break;
     if (j.t === "abandona") {
-      if (ids.has(j.uid) && !fuera[j.uid]) { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); }
+      if (ids.has(j.uid)) { fuera[j.uid] = true; if (!empezo) delete equipos[j.uid]; }
+      repone();
+      if (empezo) partido.push(j);
       continue;
     }
-    if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (!ids.has(j.uid) || fuera[j.uid]) continue;
+    const manda = j.uid === lider;
+    if (j.t === "nomeq" && manda && HB_EQUIPOS.includes(j.e)) { nombresEq[j.e] = nombreEqSano(j.nombre) || HB_NOMBRES[j.e]; continue; }
+    if (j.t === "lider" && manda && ids.has(j.a) && !fuera[j.a]) { lider = j.a; continue; }
+    if (empezo) {
+      if (j.t === "vestibulo" && manda) { empezo = false; partido = []; }
+      else partido.push(j);
+      continue;
+    }
+    if (j.t === "equipo" && ids.has(j.a) && !fuera[j.a] && (j.a === j.uid || manda) && (j.e === "" || HB_EQUIPOS.includes(j.e))) {
+      if (j.e) equipos[j.a] = j.e; else delete equipos[j.a];
+    } else if (j.t === "ajuste" && manda && tiene(AJUSTES_HB, j.k)) {
+      ajustes[j.k] = AJUSTES_HB[j.k](j.v);
+    } else if (j.t === "empieza" && manda && hay("rojo") && hay("azul")) {
+      empezo = true; partido = []; ronda++;
+    }
+  }
+  repone();
+  return { equipos, nombresEq, empezo, ronda, anfitrion: lider, fuera, ajustes, partido };
+}
+export const equiposHaxball = (p, js = jugadoresDe(p)) => vestibuloHaxball(p, js).equipos;
+
+export function redHaxball(p, js = jugadoresDe(p), listos = true) {
+  const ids = new Set(js.map(j => j.uid));
+  const { equipos, nombresEq, empezo, ronda, anfitrion, fuera: idos, ajustes, partido } = vestibuloHaxball(p, js);
+  const { meta, tiempo, sprint } = ajustes, cancha = ajustes.mapa;
+  const goles = { rojo: 0, azul: 0 }, puntos = {}, fuera = { ...idos };
+  for (const u of ids) puntos[u] = 0;
+  const hist = [];
+  let ganador = null, motivo = "", oro = false;
+  for (const j of partido) {
+    if (ganador !== null) break;
+    if (j.t === "abandona") { hist.push({ e: "sale", uid: j.uid }); continue; }
+    if (!equipos[j.uid] || fuera[j.uid]) continue;
+    if (j.t === "tiempo" && tiempo && !oro && j.n === goles.rojo + goles.azul) {
+      if (goles.rojo === goles.azul) { oro = true; hist.push({ e: "oro" }); }
+      else { ganador = goles.rojo > goles.azul ? "eq:rojo" : "eq:azul"; motivo = "reloj"; }
+      continue;
+    }
     if (j.t !== "gol" || !HB_EQUIPOS.includes(j.e)) continue;
     if (j.n !== goles.rojo + goles.azul + 1) continue;
     goles[j.e]++;
     const por = typeof j.por === "string" && ids.has(j.por) && !fuera[j.por] && equipos[j.por] === j.e ? j.por : "";
     if (por) puntos[por]++;
     hist.push({ e: "gol", eq: j.e, uid: por });
-    if (goles[j.e] >= meta) { ganador = "eq:" + j.e; motivo = "meta"; }
+    if (oro) { ganador = "eq:" + j.e; motivo = "oro"; }
+    else if (goles[j.e] >= meta) { ganador = "eq:" + j.e; motivo = "meta"; }
   }
-  if (ganador === null && listos) {
+  if (ganador === null && empezo) {
     const hay = e => js.some(x => equipos[x.uid] === e && !fuera[x.uid]);
     const r = hay("rojo"), a = hay("azul");
     if (!r || !a) { ganador = r ? "eq:rojo" : a ? "eq:azul" : ""; motivo = "abandono"; }
   }
   return {
-    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
-    meta, equipos, goles, puntos, fuera, hist: hist.slice(-40), ganador, motivo
+    fase: !empezo ? "equipos" : ganador !== null ? "fin" : "jugando", turno: "",
+    meta, cancha, tiempo, sprint, oro, ronda, equipos, nombresEq, anfitrion, goles, puntos, fuera, hist: hist.slice(-40), ganador, motivo
   };
 }
