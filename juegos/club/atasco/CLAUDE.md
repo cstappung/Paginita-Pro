@@ -55,7 +55,15 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   `tiempo` = sum of best times), sent **only when the total grows** because
   every result is a paid club play. Progress `{v, n: {i: [stars, moves,
   ms]}}` lives in `localStorage` and in `users/<uid>/club/atasco`
-  (`mezclaProgreso` keeps the best of each field). Ten logros by stars,
+  (`mezclaProgreso` keeps the best of each field). **Catching up with the
+  table** (`ponAlDia`): every `club-tabla` event (sent by `conexion.js` on
+  each table update, *also when the account has no row*) and every cloud
+  merge re-checks backed stars against the row and sends if the table has
+  fewer; `mandadas` stops resending the same total (each send is a paid
+  play) except on «Reintentar sincronización» (`club-reintentar`), which
+  also re-uploads and re-reads the progress. It used to be once per visit,
+  only via `club-record` (row required) and before the cloud merge: a
+  player with no row, or a lost send, stayed out of the table. Ten logros by stars,
   coins (4 per star, `RECORD` 40, `PAGO_CLUB` 15), the `tatasco` champion
   frame, the Discord podium (`🚗 N ★`), the manual with three illustrated
   examples and the lobby card. The `soloRanks` and `clubJugadas` regexes were

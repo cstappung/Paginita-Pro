@@ -2,6 +2,12 @@
 
 Every game under `juegos/club/` (plus Frontera). Each one has its own `CLAUDE.md` in its folder. Club plumbing: `juegos/club/conexion.js`, `colabtex/src/juegos/solo/`. Wiring of logros/coins/ranks: `docs/claude/juegos/perfiles-y-economia.md`.
 
+**Frame events from `conexion.js`**: `club-record` (your row, only when you
+have one; games adopt a better cloud record), `club-tabla` (`{categoria,
+propio|null}` on every table update without error) and `club-reintentar`
+(the «Reintentar sincronización» button; the page also re-syncs its pending
+results and says so when there is nothing pending).
+
 ## Antitrampas (`docs/antitrampas.md`)
 
 **A club record is not believed, it is checked.** `Club.result(dato,

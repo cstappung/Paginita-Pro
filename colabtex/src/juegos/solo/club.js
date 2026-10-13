@@ -69,9 +69,12 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   }
   function enviar(dato){if(!muerto)frame.contentWindow?.postMessage({canal:'club-parent',...dato},location.origin);}
   function estado(texto,key=categoria){enviar({tipo:'estado',categoria:key,texto});}
-  async function sincronizar(){
+  /* `manual`: lo pidió «Reintentar sincronización». Sin nada pendiente el
+     botón no hacía nada visible y parecía roto: ahora lo dice. */
+  async function sincronizar(manual){
     if(guardando||muerto||invitado)return;guardando=true;const revisados={};
     await cargados;
+    if(manual&&!muerto&&!Object.keys(pendientes).length)estado('No queda nada pendiente en este dispositivo: tu récord está al día con tu cuenta.');
     for(const [key,dato] of Object.entries(pendientes)){
       if(muerto)break;revisados[key]=dato.partida;
       estado('Sincronizando tu récord…',key);
@@ -159,7 +162,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     if(d.tipo==='volver'){volver();return;}
     // Modo celular: mientras se juega, el iframe ocupa toda la ventana (como sortEm).
     if(d.tipo==='inmersivo'){document.documentElement.classList.toggle('jg-club-inm',!!d.v);return;}
-    if(d.tipo==='reintentar'){sincronizar();return;}
+    if(d.tipo==='reintentar'){sincronizar(true);return;}
     /* La partida a medias vive en la cuenta: el juego la pide al abrir y la
        manda al empezar cada ronda. Si no hay cuenta o falla, sigue la local. */
     if(d.tipo==='partida-pedir'){
@@ -221,7 +224,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-60&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-61&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

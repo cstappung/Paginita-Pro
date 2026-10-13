@@ -66,6 +66,8 @@
   const respaldadas = () => (resumenDe === prog.p ? resumen : (resumenDe = prog.p, resumen = M.resumenPruebas(prog.p, PISOS)));
   let pisoVisto = Math.min(PISOS.length - 1, Math.max(0, lee("atasco.piso", 0) | 0)); // la pestaña abierta
   let ultimaSubida = "";                                               // lo último mandado a la cuenta
+  let enTabla = null;                                                  // las ★ de tu fila en la tabla (0 sin fila); null hasta saberlo (ponAlDia)
+  let mandadas = 0;                                                    // el último total mandado a la tabla
 
   /* ---------- Estado de la partida ---------- */
   let J = null;           // el nivel en juego: {i, nivel, pos, movs, hist, jugadas, ganado, acum, desde, tocado}
@@ -703,6 +705,7 @@
     const b = r.bots[conBot];
     if (b) { n[conBot] = prog.p[conBot]; puntos += b[0]; tiempo = Math.min(604800000, tiempo + b[2]); } // lo que diría haber ganado
     if (puntos < 1) return;
+    if (conBot < 0) mandadas = puntos;                                 // ya va camino a la tabla: ponAlDia no lo repite
     Club.result({ categoria: CATEGORIA, puntos, tiempo }, { v: M.PRUEBA_VERSION, n });
   }
   function subeNube(forzar) {
@@ -713,8 +716,9 @@
     Club.guardarPartida(texto);
   }
   /* La copia de la cuenta: se junta con la de aquí y, si aquí había algo
-     que la cuenta no tenía, se sube. */
-  if (Club && Club.pedirPartida) Club.pedirPartida(dato => {
+     que la cuenta no tenía, se sube. Después se mira la tabla: lo que trajo
+     la cuenta (otro dispositivo) pudo dejar más estrellas respaldadas. */
+  const alPartida = dato => {
     let nube = null;
     try { nube = dato && typeof dato.d === "string" ? JSON.parse(dato.d) : null; } catch (e) { nube = null; }
     const junta = M.mezclaProgreso(prog, nube, TOTAL, califica);
@@ -724,14 +728,36 @@
     guarda("atasco.progreso", prog);
     if (cambioAqui && !J) pintaPisos(); else pintaTotal();
     if (faltaAlla) subeNube(true);
+    ponAlDia();
+  };
+  if (Club && Club.pedirPartida) Club.pedirPartida(alPartida);
+  /* Ponerse al día con la tabla: si aquí hay más estrellas respaldadas que
+     las de la fila de la cuenta (o la cuenta no tiene fila), se mandan.
+     Antes era una sola vez por visita y solo si ya había fila, y miraba
+     antes de que llegara el progreso de la cuenta: quien no tenía fila, o
+     tenía el avance en otro dispositivo, o perdió un envío (sin conexión,
+     reglas sin publicar, una página con el verificador viejo), se quedaba
+     fuera de la tabla hasta subir el total en un nivel nuevo. Ahora se mira
+     cada vez que la tabla o el progreso cambian; `mandadas` evita repetir
+     el mismo total (cada resultado es una partida del club, y paga), salvo
+     al pulsar «Reintentar sincronización». */
+  function ponAlDia(forzar) {
+    if (!Club || (enTabla === null && !forzar)) return;               // sin saber la tabla, solo si lo pidió la persona
+    const r = respaldadas().estrellas;
+    if (r > (enTabla || 0) && (forzar || r !== mandadas)) mandaResultado();
+  }
+  window.addEventListener("club-tabla", e => {
+    if (!e.detail || e.detail.categoria !== CATEGORIA) return;
+    enTabla = e.detail.propio ? e.detail.propio.puntos || 0 : 0;
+    ponAlDia();
   });
-  /* El récord de la tabla: si aquí hay más estrellas que las que la tabla
-     conoce (se jugó como invitado o sin conexión), se manda una vez. */
-  let sincronizado = false;
-  window.addEventListener("club-record", e => {
-    if (sincronizado || !e.detail || e.detail.categoria !== CATEGORIA) return;
-    sincronizado = true;
-    if (respaldadas().estrellas > (e.detail.puntos || 0)) mandaResultado();
+  /* «Reintentar sincronización» (conexion.js): se vuelve a subir el
+     progreso, se trae el de la cuenta por si cambió en otro dispositivo y
+     se vuelve a mandar el total si la tabla tiene menos. */
+  window.addEventListener("club-reintentar", () => {
+    subeNube(true);
+    ponAlDia(true);
+    if (Club && Club.pedirPartida) Club.pedirPartida(alPartida);
   });
 
   /* ---------- Mando de consola (juegos/audio/mando.js) ----------
