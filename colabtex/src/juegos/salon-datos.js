@@ -124,7 +124,11 @@ export const SOLOS = [
   { id: "bots-boxhead", tipo: "bots", juego: "boxhead", nombre: "Boxhead · práctica", genero: "Acción", icono: "▣", alta: "2026-10-05",
     url: "juegos/boxhead/index.html", reglas: "boxhead",
     lema: "Tú solo contra los zombis y los diablos, en cualquiera de los cinco mapas.",
-    modos: ["Supervivencia"] }
+    modos: ["Supervivencia"] },
+  { id: "bots-haxball", tipo: "bots", juego: "haxball", nombre: "HaxBall · práctica", genero: "Deporte", icono: "⚽", alta: "2026-10-12",
+    url: "juegos/haxball/index.html", reglas: "haxball",
+    lema: "Fútbol de discos contra bots: de 1 contra 1 hasta 4 contra 4.",
+    modos: ["Contra bots"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -135,7 +139,7 @@ export const GENERO = {
   worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", tulones: "Física", hero: "Ritmo"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", tulones: "Física", hero: "Ritmo"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la

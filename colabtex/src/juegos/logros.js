@@ -22,6 +22,10 @@
    una llevan `m`, que es lo que la pestaña pinta como etiqueta.
    ============================================================ */
 import { TAMANOS, ganoEn } from "./motor.js";
+/* Goles de mi equipo y del rival en HaxBall. */
+const hbEq = c => (c.est.equipos || {})[c.me] || "rojo";
+const hbMio = c => (c.est.goles || {})[hbEq(c)] || 0;
+const hbRival = c => (c.est.goles || {})[hbEq(c) === "rojo" ? "azul" : "rojo"] || 0;
 
 const FILA = [
   { id: "primera", n: "Primera victoria", d: "Gana tu primera partida.", i: "🥇", f: f => f.ganadas >= 1 },
@@ -116,6 +120,16 @@ const SALA = {
     { id: "puntos", n: "Multiplicador", d: "Termina una partida cooperativa con 5000 puntos.", i: "✖️", m: "Cooperativo", x: c => c.est.variante === "coop" && ((c.est.puntos || {})[c.me] || 0) >= 5000 },
     { id: "equipo", n: "Pelotón", d: "Llega al nivel 3 con 4 jugadores o más.", i: "👥", m: "Cooperativo", x: c => c.est.variante === "coop" && c.n >= 4 && (c.est.nivel || 1) >= 3 },
     { id: "intacto", n: "Intocable", d: "Gana un versus sin morir ni una vez.", i: "🛡️", m: "Versus", x: c => c.gano && c.est.variante === "versus" && c.est.motivo === "meta" && !((c.est.muertes || {})[c.me]) }
+  ],
+  /* HaxBall: el registro solo lleva los goles (equipo y autor), así que
+     todo sale de `goles`, `puntos` y `equipos` del estado. */
+  haxball: [
+    { id: "primero", n: "A la red", d: "Marca un gol.", i: "⚽", x: c => ((c.est.puntos || {})[c.me] || 0) >= 1 },
+    { id: "triplete", n: "Triplete", d: "Marca tres goles en una partida.", i: "🎩", x: c => ((c.est.puntos || {})[c.me] || 0) >= 3 },
+    { id: "cero", n: "Valla invicta", d: "Gana sin que el rival marque.", i: "🧤", x: c => c.gano && c.est.motivo === "meta" && hbRival(c) === 0 },
+    { id: "goleada", n: "Goleada", d: "Gana por tres goles o más de diferencia.", i: "📣", x: c => c.gano && c.est.motivo === "meta" && hbMio(c) - hbRival(c) >= 3 },
+    { id: "largo", n: "Partido largo", d: "Gana una partida a 7 goles.", i: "⏱️", x: c => c.gano && c.est.motivo === "meta" && c.est.meta === 7 },
+    { id: "tribuna", n: "Cancha llena", d: "Gana con 6 jugadores o más.", i: "🏟️", x: c => c.gano && c.n >= 6 }
   ],
   /* Tulones: todo sale de la torre (`hist` trae cada congela con su altura
      y la línea que tenía que superar) y de la mejor altura de cada uno. */

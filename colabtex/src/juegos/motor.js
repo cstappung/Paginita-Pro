@@ -209,6 +209,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 8,
     alta: "2026-10-12"
+  },
+  haxball: {
+    nombre: "HaxBall",
+    lema: "Fútbol de discos en tiempo real: patea, pasa y mete la pelota en el arco rival",
+    color: "#5689e5",
+    minimo: 2,
+    cupo: 8,
+    alta: "2026-10-12"
   }
 };
 
@@ -995,6 +1003,7 @@ export function reducir(p) {
   if (p.juego === "gato") return { ...base, ...redGato(p, js) };
   if (p.juego === "tulones") return { ...base, ...redTulones(p, js, listos) };
   if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
+  if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
   return base;
 }
 
@@ -1075,6 +1084,8 @@ export function progreso(est, juego) {
   /* En Boxhead cooperativo, cuántos están caídos; en versus, la meta. */
   if (juego === "boxhead" && est.variante === "coop") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
   if (juego === "boxhead" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || BX_METAS[1]));
+  /* En HaxBall, cuánto le falta al equipo que va ganando. */
+  if (juego === "haxball" && est.goles) return c(Math.max(0, ...Object.values(est.goles)) / (est.meta || 5));
   /* En el ajedrez, el material que ya salió del tablero: con las damas
      cambiadas y media docena de piezas fuera es un final. */
   if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
@@ -1259,8 +1270,8 @@ export function equiposYemas(p, js = jugadoresDe(p)) {
 export function ganoEn(p, ganador, uid) {
   if (!ganador || !uid) return false;
   if (ganador === uid) return true;
-  if (!String(ganador).startsWith("eq:") || !p || p.juego !== "yemas") return false;
-  const eq = equiposYemas(p);
+  if (!String(ganador).startsWith("eq:") || !p) return false;
+  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : null;
   return !!eq && eq[uid] === ganador.slice(3);
 }
 
@@ -7023,5 +7034,60 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
   return {
     fase: todos ? "fin" : "jugando", ganador: todos ? "" : null, motivo: todos ? "abandono" : "",
     etapa, cancion, director: director(), partes, preparados: prep, ronda, enJuego, cargados, go, fines, ultima, fuera, hist
+  };
+}
+
+/* ---------- HaxBall ----------
+   Fútbol de discos en tiempo real, en un iframe (`juegos/haxball/`), con la
+   misma malla WebRTC que Yemas y Boxhead. La física de la pelota la lleva
+   quien dirige (el primer asiento presente); cada uno mueve su disco.
+
+   Al registro va solo lo que decide la partida: `{t:"gol", uid, e, n, por}`,
+   escrito por quien dirige. `n` tiene que ser el gol siguiente (el total
+   más uno), así que dos directores momentáneos que vean el mismo gol lo
+   cuentan una vez: el segundo llega con un `n` ya usado. Los equipos son
+   por asiento (par rojo, impar azul), como Yemas al llenarse. Gana el
+   primero en llegar a `meta`; un equipo que se queda sin nadie pierde. */
+export const HB_METAS = [3, 5, 7];
+export const HB_EQUIPOS = ["rojo", "azul"];
+export function metaHaxball(p) {
+  const m = Math.floor(Number(p && p.meta));
+  return HB_METAS.includes(m) ? m : 5;
+}
+export function equiposHaxball(p, js = jugadoresDe(p)) {
+  const eq = {};
+  js.forEach((j, i) => { eq[j.uid] = HB_EQUIPOS[i % 2]; });
+  return eq;
+}
+export function redHaxball(p, js = jugadoresDe(p), listos = true) {
+  const ids = new Set(js.map(j => j.uid));
+  const meta = metaHaxball(p), equipos = equiposHaxball(p, js);
+  const goles = { rojo: 0, azul: 0 }, puntos = {}, fuera = {};
+  for (const u of ids) puntos[u] = 0;
+  const hist = [];
+  let ganador = null, motivo = "";
+  for (const j of jugadasDe(p)) {
+    if (ganador !== null) break;
+    if (j.t === "abandona") {
+      if (ids.has(j.uid) && !fuera[j.uid]) { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); }
+      continue;
+    }
+    if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t !== "gol" || !HB_EQUIPOS.includes(j.e)) continue;
+    if (j.n !== goles.rojo + goles.azul + 1) continue;
+    goles[j.e]++;
+    const por = typeof j.por === "string" && ids.has(j.por) && !fuera[j.por] && equipos[j.por] === j.e ? j.por : "";
+    if (por) puntos[por]++;
+    hist.push({ e: "gol", eq: j.e, uid: por });
+    if (goles[j.e] >= meta) { ganador = "eq:" + j.e; motivo = "meta"; }
+  }
+  if (ganador === null && listos) {
+    const hay = e => js.some(x => equipos[x.uid] === e && !fuera[x.uid]);
+    const r = hay("rojo"), a = hay("azul");
+    if (!r || !a) { ganador = r ? "eq:rojo" : a ? "eq:azul" : ""; motivo = "abandono"; }
+  }
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
+    meta, equipos, goles, puntos, fuera, hist: hist.slice(-40), ganador, motivo
   };
 }

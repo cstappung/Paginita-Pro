@@ -444,6 +444,30 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  haxball: {
+    lema: "Fútbol de discos visto desde arriba: rojo contra azul, de 1 contra 1 hasta 4 contra 4.",
+    secciones: [
+      ["Controles", lista([
+        "<b>WASD</b> o flechas para moverte; <b>Espacio</b> o <b>X</b> para patear. Mientras mantienes la patada tu disco se marca con un borde blanco, y la pelota sale disparada si la tocas.",
+        "Correr contra la pelota también la empuja, pero mucho menos que una patada."
+      ])],
+      ["Equipos", lista([
+        "Los equipos salen del orden de los asientos: el 1.º, 3.º, 5.º y 7.º son <b>rojos</b>; el 2.º, 4.º, 6.º y 8.º, <b>azules</b>.",
+        "El rojo ataca el arco de la <b>derecha</b> y el azul el de la izquierda."
+      ])],
+      ["El saque", lista([
+        "Al empezar y después de cada gol todos vuelven a su mitad. Saca el equipo que recibió el gol (el primero lo saca el rojo).",
+        "Hasta que alguien toque la pelota, nadie puede cruzar a la mitad rival, y solo el equipo que saca puede entrar al círculo central."
+      ])],
+      ["Ganar", lista([
+        "Gana el primer equipo en llegar a la meta: <b>3</b>, <b>5</b> o <b>7</b> goles, elegida al abrir la sala.",
+        "El gol cuenta para el último del equipo que lo marcó en tocar la pelota; un gol en contra suma al rival, pero no tiene autor.",
+        "Si un equipo se queda sin nadie, gana el otro."
+      ])],
+      ["Sin servidor", "Los discos van de navegador a navegador. La pelota la mueve un jugador, el que dirige, y si se va la toma el siguiente. Al registro de la sala solo van los goles, numerados: un gol repetido o fuera de orden no cuenta. Es el mismo límite honesto del resto de los juegos."],
+      ["Para practicar", "El juego suelto (<code>juegos/haxball/</code>) se juega contra bots, de 1 contra 1 a 4 contra 4 y en tres niveles."]
+    ]
+  },
   boxhead: {
     lema: "Acción vista desde arriba: zombis, diablos y un multiplicador que no para de subir. De 1 a 8 jugadores.",
     secciones: [
