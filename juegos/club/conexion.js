@@ -57,7 +57,10 @@
     const panel=document.createElement('section');panel.className='club-ranking';
     panel.innerHTML='<h2>Clasificación de este modo</h2><p class="club-propio"></p><ol></ol><p role="status" aria-live="polite"></p><button type="button">Reintentar sincronización</button>';
     const lateral=embebido?shell.querySelector(':is(.game-layout,.layout)>aside'):null;
-    (lateral||shell).appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
+    (lateral||shell).appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');/* «Reintentar»: la página vuelve a subir lo pendiente y el juego se entera
+       (`club-reintentar`), por si tiene algo que la tabla todavía no conoce
+       (Atasco vuelve a mandar sus estrellas y su progreso). */
+    panel.querySelector('button').onclick=()=>{if(!embebido||invitado)return;estado.textContent='Sincronizando…';enviar({tipo:'reintentar'});window.dispatchEvent(new CustomEvent('club-reintentar',{detail:{categoria}}));};
     if(invitado){panel.classList.add('club-invitado');panel.querySelector('button').hidden=true;}
     if(!embebido){estado.textContent='Abre este juego desde Juegos para sincronizar tu clasificación con tu cuenta.';}else window.Club.category(categoria);
     if(embebido){const sonido=document.getElementById('sound-button');if(sonido)shell.querySelector('.scorebar')?.appendChild(sonido);}
@@ -85,5 +88,10 @@
     estado.textContent=d.error?'No se pudo cargar el ranking en línea. Tu récord local se conserva.':d.filas?.length?'Cada modalidad tiene su propia clasificación.':'Todavía no hay récords. ¡Estrena esta clasificación!';
     propio.textContent=d.propio?'Tu récord en la nube: '+marca(d.propio):'';
     if(d.propio)window.dispatchEvent(new CustomEvent('club-record',{detail:{categoria, ...d.propio}}));
+    /* `club-tabla`: lo que la tabla sabe de esta cuenta, también cuando no
+       tiene fila (`propio` null). `club-record` solo sale con fila, y un
+       juego que tiene que ponerse al día con la tabla (Atasco) nunca se
+       enteraba de que ahí no había nada suyo. Con error no se sabe: no sale. */
+    if(!d.error)window.dispatchEvent(new CustomEvent('club-tabla',{detail:{categoria,propio:d.propio||null}}));
   });
 })();
