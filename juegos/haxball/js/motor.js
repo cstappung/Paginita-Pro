@@ -11,18 +11,45 @@
 
    El saque: el equipo que lo tiene puede entrar al círculo central; el otro
    se queda afuera (CIRCULO + RJ) y cada uno en su mitad hasta que alguien
-   toque la pelota. */
+   toque la pelota.
+
+   Hay tres canchas (`CANCHAS`): la clásica, el futsal y el futsal grande
+   (la misma física en una cancha más grande que la pantalla). El futsal sale sacado del mapa
+   «Futsal x4» de Bazinga! (pelota de radio 6.25 y masa inversa 1.5 frente a
+   10 y 1, rebote 0.4, arcos más angostos, piso gris), llevado a la escala
+   de esta cancha. `usaCancha` reescribe `C` y los postes en el sitio: una
+   página juega una sola cancha a la vez.
+
+   El sprint (`s` en la entrada, solo si además hay dirección) multiplica la
+   aceleración por SPRINT mientras quede energía: la barra llena dura
+   1/SP_GASTO ticks y se recarga en 1/SP_RECARGA. Cada vez que se deja de
+   esprintar hay SP_ESPERA ticks sin recarga (si no, apretar y soltar
+   Shift a ratos daba sprint casi sin fin); si se vació, además hay que
+   soltar la tecla para volver a usarlo. */
 (function (raiz, fabrica) {
   const M = fabrica();
   if (typeof module === 'object' && module.exports) module.exports = M;
   else raiz.HaxballMotor = M;
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  const C = {
+  // AMORT_J 0.93 (el original usa 0.96) frena el disco en la mitad de ticks al
+  // soltar la tecla; ACC sube para que la velocidad tope siga siendo ~2.4.
+  const CLASICA = {
     W: 370, H: 170, G: 64, D: 30, RP: 8, LIM_X: 420, LIM_Y: 210,
-    RJ: 15, RB: 10, ACC: 0.1, ACC_PATEA: 0.07, AMORT_J: 0.96, AMORT_B: 0.99,
+    RJ: 15, RB: 10, ACC: 0.18, ACC_PATEA: 0.126, AMORT_J: 0.93, AMORT_B: 0.99,
     IM_J: 0.5, IM_B: 1, PATADA: 5, ALCANCE: 4, REB: 0.5, REB_PARED: 0.5, CIRCULO: 70,
+    SPRINT: 1.4, SP_GASTO: 1 / 60, SP_RECARGA: 1 / 180, SP_ESPERA: 90,
   };
+  const FUTSAL = Object.assign({}, CLASICA, {
+    G: 50, RB: 6.25, IM_B: 1.5, REB_PARED: 0.4, CIRCULO: 55, ACC: 0.198, ACC_PATEA: 0.15,
+  });
+  // La grande no cabe en la pantalla: el marco la recorre con la cámara.
+  const CANCHAS = {
+    clasica: CLASICA,
+    futsal: FUTSAL,
+    grande: Object.assign({}, FUTSAL, { W: 600, H: 280, G: 70, CIRCULO: 75, LIM_X: 650, LIM_Y: 320 }),
+  };
+  const C = Object.assign({}, CLASICA);
   const EQUIPOS = ['rojo', 'azul'];
   const lado = e => e === 'rojo' ? -1 : 1;          // la mitad donde defiende cada uno
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -31,7 +58,7 @@
 
   // Mundo: pelota, jugadores (uid → {disco, equipo}), postes, saque.
   function crea() {
-    return { b: disco(0, 0, C.RB, C.IM_B), J: new Map(), saque: 'rojo', ult: '', gol: null, toques: 0 };
+    return { cancha, b: disco(0, 0, C.RB, C.IM_B), J: new Map(), saque: 'rojo', ult: '', gol: null, toques: 0 };
   }
   function postes() {
     const p = [];
@@ -39,6 +66,14 @@
     return p;
   }
   const POSTES = postes();
+  let cancha = 'clasica';
+
+  function usaCancha(nombre) {
+    cancha = CANCHAS[nombre] ? nombre : 'clasica';
+    Object.assign(C, CANCHAS[cancha]);
+    POSTES.splice(0, POSTES.length, ...postes());
+    return cancha;
+  }
 
   // Coloca cada equipo en su mitad, en orden de asiento. Quien saca va más
   // cerca del centro.
@@ -124,6 +159,22 @@
     }
   }
 
+  // Gasta o recarga la energía de `j` en este tick. Devuelve si esprinta.
+  function sprint(j, tecla, mueve) {
+    if (!tecla) j.bloq = false;
+    if (tecla && mueve && !j.bloq && j.espera === 0 && j.en > 0) {
+      j.en -= C.SP_GASTO;
+      if (j.en < 1e-9) { j.en = 0; j.espera = C.SP_ESPERA; j.bloq = true; }
+      j.sp = true;
+      return true;
+    }
+    if (j.sp && j.espera === 0) j.espera = C.SP_ESPERA;
+    j.sp = false;
+    if (j.espera > 0) j.espera--;
+    else j.en = Math.min(1, j.en + C.SP_RECARGA);
+    return false;
+  }
+
   // Patada: si el disco está a ALCANCE de la pelota.
   function alcance(j, b, extra) {
     return Math.hypot(b.x - j.x, b.y - j.y) - j.r - b.r < C.ALCANCE + (extra || 0);
@@ -151,7 +202,8 @@
         const l = Math.hypot(ix, iy);
         if (l > 1) { ix /= l; iy /= l; }
       }
-      const a = k ? C.ACC_PATEA : C.ACC;
+      const corre = sprint(j, !!(en && en.s), ix !== 0 || iy !== 0);
+      const a = (k ? C.ACC_PATEA : C.ACC) * (corre ? C.SPRINT : 1);
       d.vx = (d.vx + ix * a) * C.AMORT_J;
       d.vy = (d.vy + iy * a) * C.AMORT_J;
       d.x += d.vx; d.y += d.vy;
@@ -237,8 +289,8 @@
   }
 
   function agrega(m, u, e) {
-    m.J.set(u, { d: disco(lado(e) * C.W / 2, 0, C.RJ, C.IM_J), e, k: false, pateado: false });
+    m.J.set(u, { d: disco(lado(e) * C.W / 2, 0, C.RJ, C.IM_J), e, k: false, pateado: false, en: 1, espera: 0, sp: false, bloq: false });
   }
 
-  return { C, EQUIPOS, lado, crea, agrega, alinea, paso, bot, choque, paredBola, alcance, POSTES };
+  return { C, CANCHAS, usaCancha, EQUIPOS, lado, crea, agrega, alinea, paso, bot, choque, paredBola, alcance, POSTES };
 });

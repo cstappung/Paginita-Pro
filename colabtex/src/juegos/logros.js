@@ -25,6 +25,7 @@ import { TAMANOS, ganoEn } from "./motor.js";
 /* Goles de mi equipo y del rival en HaxBall. */
 const hbEq = c => (c.est.equipos || {})[c.me] || "rojo";
 const hbMio = c => (c.est.goles || {})[hbEq(c)] || 0;
+const hbGanoJugando = c => c.gano && ["meta", "reloj", "oro"].includes(c.est.motivo);
 const hbRival = c => (c.est.goles || {})[hbEq(c) === "rojo" ? "azul" : "rojo"] || 0;
 
 const FILA = [
@@ -126,8 +127,8 @@ const SALA = {
   haxball: [
     { id: "primero", n: "A la red", d: "Marca un gol.", i: "⚽", x: c => ((c.est.puntos || {})[c.me] || 0) >= 1 },
     { id: "triplete", n: "Triplete", d: "Marca tres goles en una partida.", i: "🎩", x: c => ((c.est.puntos || {})[c.me] || 0) >= 3 },
-    { id: "cero", n: "Valla invicta", d: "Gana sin que el rival marque.", i: "🧤", x: c => c.gano && c.est.motivo === "meta" && hbRival(c) === 0 },
-    { id: "goleada", n: "Goleada", d: "Gana por tres goles o más de diferencia.", i: "📣", x: c => c.gano && c.est.motivo === "meta" && hbMio(c) - hbRival(c) >= 3 },
+    { id: "cero", n: "Valla invicta", d: "Gana sin que el rival marque.", i: "🧤", x: c => hbGanoJugando(c) && hbRival(c) === 0 },
+    { id: "goleada", n: "Goleada", d: "Gana por tres goles o más de diferencia.", i: "📣", x: c => hbGanoJugando(c) && hbMio(c) - hbRival(c) >= 3 },
     { id: "largo", n: "Partido largo", d: "Gana una partida a 7 goles.", i: "⏱️", x: c => c.gano && c.est.motivo === "meta" && c.est.meta === 7 },
     { id: "tribuna", n: "Cancha llena", d: "Gana con 6 jugadores o más.", i: "🏟️", x: c => c.gano && c.n >= 6 }
   ],

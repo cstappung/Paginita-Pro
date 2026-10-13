@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610132245"></script>
+<script src="i18n.js?v=202610132307"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1613,6 +1613,29 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-yemas-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:#a9dcff}
 .jg-tulones-marco{background:#bfe6ff}
 .jg-haxball-marco{background:#5a8a4a}
+.jg-hx-vest{margin:0 0 12px;padding:14px;border-radius:16px;background:#22272b;color:#e9edf0}.jg-hx-vest[hidden]{display:none}
+.jg-hx-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.jg-hx-col{background:#181b1e;border-radius:10px;padding:8px;min-height:170px;display:flex;flex-direction:column;gap:6px}
+.jg-hx-col header{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px;border-radius:6px;background:#3a3f44;font-size:14px;min-height:34px}
+.jg-hx-rojo header{color:#ff8f7c}.jg-hx-azul header{color:#a9b8ff}.jg-hx-sin header{color:#e9edf0}
+.jg-hx-col ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.jg-hx-col li{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;font-size:13px}
+.jg-hx-col li.yo{background:#ffffff10}.jg-hx-col li.yo .jg-hx-n{color:#ffd369}.jg-hx-col li em{color:#9aa4ad;font-size:11px}
+.jg-hx-col li.vacio{justify-content:center;color:#5d666e}
+.jg-hx-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-hx-mv,.jg-hx-lapiz{background:#3a3f44;color:#e9edf0;border:0;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:12px}
+.jg-hx-mv:hover,.jg-hx-lapiz:hover{background:#4d545a}
+.jg-hx-col .jg-hx-unir{height:28px;font-size:12px}
+.jg-hx-ren{width:100%;height:28px;padding:0 8px;border-radius:6px;border:1px solid #6b747c;background:#111;color:#fff;font:inherit;text-align:center}
+.jg-hx-ajustes{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:center;margin-top:12px;font-size:12px;color:#c9d1d8}
+.jg-hx-ajustes label{display:flex;align-items:center;gap:6px}
+.jg-hx-ajustes select{height:28px;border-radius:6px;border:1px solid #4d545a;background:#111;color:#fff;font:inherit;padding:0 6px}
+.jg-hx-check input{width:15px;height:15px;accent-color:#ffd369}
+.jg-hx-corona{opacity:.6}.jg-hx-corona:hover{opacity:1}
+.jg-hx-herr{display:flex;gap:6px;justify-content:center;margin-top:10px}
+.jg-hx-info{margin:10px 0 0;text-align:center;font-size:12px;color:#9aa4ad}
+.jg-hx-empieza{display:block;margin:10px auto 0}.jg-hx-empieza:disabled{opacity:.45;cursor:not-allowed}
+@media (max-width:640px){.jg-hx-cols{grid-template-columns:1fr}.jg-hx-col{min-height:0}}
 .jg-hero-marco{background:#0d0820}
 .jg-portada-clue{background:radial-gradient(ellipse at 50% 40%,#5a1422,#1c0a10 70%)}
 .jg-art-cl{position:relative;width:170px;height:104px}
@@ -4858,6 +4881,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610132245"></script>
+<script src="juegos-app.js?v=202610132307"></script>
 </body>
 </html>

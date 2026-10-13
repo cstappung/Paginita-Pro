@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610132245"></script>
+<script src="../../i18n.js?v=202610132307"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -18,8 +18,12 @@ button{font:inherit;cursor:pointer}
 .btn:hover{filter:brightness(1.08)}.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #4a3209}
 .btn2{background:#22332a;color:var(--txt);border:2px solid var(--borde);border-radius:6px;padding:6px 12px;min-width:44px}
 .btn2.sel{border-color:var(--oro);color:var(--oro)}
+.btn2:disabled{opacity:.4;cursor:not-allowed}
 #marcador{position:fixed;left:50%;top:8px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:4px 14px;font-weight:900;font-size:22px;pointer-events:none}
-#gR{color:var(--rojo)}#gA{color:var(--azul)}
+#gR,#nR{color:var(--rojo)}#gA,#nA{color:var(--azul)}
+#reloj{font-size:14px;font-weight:800;color:var(--txt);min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+#reloj.oro{color:var(--oro);min-width:0}
+.neq{font-size:13px;font-weight:800;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #meta{font-size:12px;font-weight:600;color:var(--tenue)}
 #banner{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.6);font-size:44px;font-weight:900;text-shadow:0 4px 0 #000,0 0 18px rgba(0,0,0,.7);opacity:0;transition:opacity .2s,transform .25s;pointer-events:none;white-space:nowrap;text-align:center}
 #banner.ver{opacity:1;transform:translate(-50%,-50%) scale(1)}
@@ -28,7 +32,7 @@ kbd{background:#2b3e32;border:1px solid #567;border-radius:3px;padding:0 4px;fon
 #vol{position:fixed;right:8px;top:8px;z-index:5}
 .capa{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,10,7,.55);z-index:4;padding:16px}
 .capa[hidden]{display:none}
-.caja{max-width:440px;width:100%;padding:18px 20px;text-align:center}
+.caja{max-width:440px;width:100%;max-height:calc(100vh - 32px);overflow-y:auto;padding:18px 20px;text-align:center}
 .logo{margin:0 0 4px;font-size:42px;letter-spacing:.06em;color:var(--oro);text-shadow:0 3px 0 #000}
 .sub{margin:0 0 12px;color:var(--tenue)}
 h3{margin:10px 0 6px;font-size:13px;color:var(--tenue);text-transform:uppercase;letter-spacing:.08em}
@@ -37,14 +41,52 @@ h3{margin:10px 0 6px;font-size:13px;color:var(--tenue);text-transform:uppercase;
 #menuFin,#aMenu{margin-top:14px;margin-left:6px}
 #cuenta{color:var(--tenue);min-height:1em}
 .menu-ayuda{font-size:12px;color:var(--tenue);margin:12px 0 0}
-@media (max-width:640px){#ayuda{display:none}.logo{font-size:32px}#banner{font-size:30px}}
+.casilla{display:inline-flex;gap:6px;align-items:center;margin-top:12px;color:var(--txt);cursor:pointer}
+.casilla input{width:16px;height:16px;accent-color:var(--oro)}
+.fichas{display:grid;gap:6px;justify-items:center}
+.ficha{display:flex;gap:6px;align-items:center}
+.ficha[hidden]{display:none}
+.ficha b{width:22px;color:var(--tenue)}
+.inp{font:inherit;background:#0f1913;color:var(--txt);border:2px solid var(--borde);border-radius:6px;padding:6px 8px;width:170px}
+.inp:focus{outline:none;border-color:var(--oro)}
+.inp.dorsal{width:56px;text-align:center;font-weight:800}
+#aVestibulo[hidden]{display:none}
+#tactil{position:fixed;right:18px;bottom:18px;display:flex;align-items:flex-end;gap:14px;z-index:2}
+#tactil[hidden],#tactil button[hidden]{display:none}
+#tactil button{border-radius:50%;border:2px solid rgba(255,255,255,.45);background:rgba(255,255,255,.14);color:#fff;touch-action:none;-webkit-tap-highlight-color:transparent}
+#tPatea{width:92px;height:92px;font-size:36px}
+#tSprint{width:62px;height:62px;font-size:24px;margin-bottom:46px}
+#tactil button.activo{background:rgba(255,255,255,.38)}
+.extras{display:flex;gap:6px;justify-content:center;margin-top:12px}
+#btnFicha{position:fixed;left:8px;top:8px;z-index:3}
+#btnFicha[hidden]{display:none}
+#teclasCapa,#novedades{z-index:6}
+.tabla-teclas{margin:6px auto 0;border-collapse:collapse}
+.tabla-teclas th{font-size:12px;color:var(--tenue);text-align:left;padding:3px 8px 3px 0;font-weight:600}
+.tabla-teclas td{padding:3px}
+.tabla-teclas .tecla{min-width:120px;font-size:12px}
+.nov-caja{max-width:540px;text-align:left}
+.nov-caja h2{text-align:center}
+.nov-pestanas{display:flex;gap:4px;margin:10px 0 0;border-bottom:2px solid var(--borde)}
+.nov-pestanas button{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;padding:8px 12px;color:var(--tenue);font-weight:800}
+.nov-pestanas button[aria-selected="true"]{color:var(--oro);border-bottom-color:var(--oro)}
+.nov-panel{max-height:min(55vh,420px);overflow-y:auto;padding:12px 4px 0;user-select:text;-webkit-user-select:text}
+.nov-panel ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.nov-entrada+.nov-entrada{margin-top:14px;padding-top:12px;border-top:1px dashed var(--borde)}
+.nov-entrada header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.nov-entrada time,.nov-autor{color:var(--tenue);font-size:12px}
+.nov-autor{margin-left:auto}
+.centro{text-align:center;margin-top:14px}
+@media (max-width:640px){#ayuda{display:none}.neq{display:none}.logo{font-size:32px}#banner{font-size:30px}}
 </style>
 </head>
 <body>
 <canvas id="lienzo"></canvas>
-<div id="marcador" class="panel"><span id="gR">0</span><span>–</span><span id="gA">0</span><span id="meta"></span></div>
+<div id="marcador" class="panel"><span class="neq" id="nR" translate="no">Rojo</span><span id="gR">0</span><span>–</span><span id="gA">0</span><span class="neq" id="nA" translate="no">Azul</span><span id="reloj">0:00</span><span id="meta"></span></div>
 <div id="vol" data-volumen></div>
+<button class="btn2" id="btnFicha" hidden title="Cambiar tu nombre y dorsal">✎ Ficha</button>
 <div id="banner"></div>
+<div id="tactil" hidden><button id="tSprint" aria-label="Sprint">⚡</button><button id="tPatea" aria-label="Patear">⚽</button></div>
 <p id="ayuda" class="panel"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> patear · <kbd>Esc</kbd> pausa</p>
 
 <div id="menu" class="capa">
@@ -52,16 +94,52 @@ h3{margin:10px 0 6px;font-size:13px;color:var(--tenue);text-transform:uppercase;
     <h1 class="logo">HAXBALL</h1>
     <p class="sub">Fútbol de discos: empuja la pelota con el cuerpo y patea con Espacio.</p>
     <div id="opciones">
+      <h3>Modo</h3>
+      <div class="fila"><button class="btn2" data-modo="bots">Contra bots</button><button class="btn2" data-modo="versus">2 jugadores · uno contra otro</button><button class="btn2" data-modo="juntos">2 jugadores · juntos</button></div>
+      <h3>Cancha</h3>
+      <div class="fila"><button class="btn2" data-cancha="clasica">Clásica</button><button class="btn2" data-cancha="futsal">Futsal</button><button class="btn2" data-cancha="grande">Futsal grande</button></div>
       <h3>Jugadores por equipo</h3>
       <div class="fila"><button class="btn2" data-n="1">1 vs 1</button><button class="btn2" data-n="2">2 vs 2</button><button class="btn2" data-n="3">3 vs 3</button></div>
       <h3>Rivales</h3>
       <div class="fila"><button class="btn2" data-nivel="0">Fácil</button><button class="btn2" data-nivel="1">Normal</button><button class="btn2" data-nivel="2">Difícil</button></div>
       <h3>Goles para ganar</h3>
       <div class="fila"><button class="btn2" data-meta="3">3</button><button class="btn2" data-meta="5">5</button><button class="btn2" data-meta="7">7</button></div>
+      <label class="casilla"><input type="checkbox" id="conSprint" checked> Sprint con Shift</label>
+      <h3>Tiempo límite</h3>
+      <div class="fila"><button class="btn2" data-tiempo="0">Sin límite</button><button class="btn2" data-tiempo="3">3 min</button><button class="btn2" data-tiempo="5">5 min</button><button class="btn2" data-tiempo="10">10 min</button></div>
+    </div>
+    <h3>Ficha</h3>
+    <div class="fichas">
+      <div class="ficha" id="ficha_j1"><b id="tag_j1" hidden>J1</b><input class="inp" id="nom_j1" maxlength="14" placeholder="Tu nombre" autocomplete="off" aria-label="Nombre de J1"><input class="inp dorsal" id="dor_j1" placeholder="10" autocomplete="off" aria-label="Dorsal de J1 (hasta 2 caracteres)"></div>
+      <div class="ficha" id="ficha_j2" hidden><b>J2</b><input class="inp" id="nom_j2" maxlength="14" placeholder="Nombre de J2" autocomplete="off" aria-label="Nombre de J2"><input class="inp dorsal" id="dor_j2" placeholder="7" autocomplete="off" aria-label="Dorsal de J2 (hasta 2 caracteres)"></div>
     </div>
     <button class="btn" id="jugar">¡A jugar!</button>
     <p id="cuenta"></p>
-    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> patear.<br>En el celular: arrastra a la izquierda para moverte y toca la derecha para patear.</p>
+    <div class="extras"><button class="btn2" id="aVestibulo" hidden title="Solo el líder de la sala">↩ Volver al vestíbulo</button></div>
+    <div class="extras"><button class="btn2" id="btnTeclas">⌨ Teclas</button><button class="btn2" id="btnNovedades">📰 Novedades</button></div>
+    <p class="menu-ayuda" id="menuAyuda"><span id="menuAyudaTeclas"></span><br>En el celular: arrastra a la izquierda para moverte; a la derecha están patear ⚽ y sprint ⚡.</p>
+  </div>
+</div>
+
+<div id="teclasCapa" class="capa" hidden>
+  <div class="caja panel" role="dialog" aria-modal="true" aria-labelledby="teclasTit">
+    <h2 class="logo" id="teclasTit" style="font-size:30px">TECLAS</h2>
+    <p class="sub">Toca una acción y pulsa la tecla nueva. Jugando solo o en línea sirven las de J1 y J2.</p>
+    <table class="tabla-teclas" id="teclasTabla"></table>
+    <div class="centro"><button class="btn" id="teclasCerrar">Listo</button> <button class="btn2" id="teclasRestaurar">Restaurar</button></div>
+  </div>
+</div>
+
+<div id="novedades" class="capa" hidden>
+  <div class="caja panel nov-caja" role="dialog" aria-modal="true" aria-labelledby="novTit">
+    <h2 class="logo" id="novTit" style="font-size:30px">NOVEDADES</h2>
+    <div class="nov-pestanas" role="tablist" aria-label="Secciones">
+      <button role="tab" id="tabCambios" aria-controls="novCambios" aria-selected="true">Cambios</button>
+      <button role="tab" id="tabProximo" aria-controls="novProximo" aria-selected="false" tabindex="-1">Próximamente</button>
+    </div>
+    <div id="novCambios" class="nov-panel" role="tabpanel" aria-labelledby="tabCambios"></div>
+    <div id="novProximo" class="nov-panel" role="tabpanel" aria-labelledby="tabProximo" hidden></div>
+    <div class="centro"><button class="btn" id="novCerrar">Cerrar</button></div>
   </div>
 </div>
 
@@ -80,7 +158,8 @@ h3{margin:10px 0 6px;font-size:13px;color:var(--tenue);text-transform:uppercase;
   </div>
 </div>
 
-<script src="js/motor.js?v=haxball-1"></script>
-<script src="js/juego.js?v=haxball-1"></script>
+<script src="js/motor.js?v=haxball-8"></script>
+<script src="js/novedades.js?v=haxball-8"></script>
+<script src="js/juego.js?v=haxball-8"></script>
 </body>
 </html>

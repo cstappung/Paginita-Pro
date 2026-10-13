@@ -42,7 +42,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -229,11 +229,18 @@ const OPCIONES = {
      (gana el último en pie). Ninguno es `modo`. */
   /* PRO HERO: solo cuántos caben; la canción se elige dentro de la sala. */
   hero: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("hero") }],
-  /* HaxBall: cuántos caben (los equipos salen por asiento) y a cuántos goles. */
+  /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
+     eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [
-    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("haxball") },
+    { clave: "cupo", etiqueta: "Jugadores", por: 8, valores: cupos("haxball") },
     { clave: "meta", etiqueta: "Goles para ganar", por: HB_METAS[1],
-      valores: HB_METAS.map(n => ({ v: n, t: n + " goles" })) }
+      valores: HB_METAS.map(n => ({ v: n, t: n + " goles" })) },
+    { clave: "mapa", etiqueta: "Cancha", por: "clasica",
+      valores: Object.keys(HB_CANCHAS).map(v => ({ v, t: HB_CANCHAS[v] })) },
+    /* Minutos de juego; al acabarse gana quien va arriba y, empatados, gol de oro. */
+    { clave: "tiempo", etiqueta: "Tiempo límite", por: 0,
+      valores: HB_TIEMPOS.map(v => ({ v, t: v ? v + " min" : "Sin límite" })) },
+    { clave: "sprint", etiqueta: "Sprint (Shift)", por: 1, valores: [{ v: 1, t: "Activado" }, { v: 0, t: "Desactivado" }] }
   ],
   tulones: [
     { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tulones") },
@@ -926,6 +933,7 @@ async function anotar(p) {
   const u = state.user;
   if (!p || !p.fin || !u || anotada === state.pid) return;
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
+  if (p.juego === "haxball" && !equiposHaxball(p)[u.uid]) return;   // quedó sin equipo: miró el partido
   if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
   anotada = state.pid;
@@ -2720,12 +2728,13 @@ function panelEspera(p, est) {
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
       <p>Pásale este enlace a quien quieras: en cuanto entre,
-         ${varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
+         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
       <div class="jg-enlace">
         <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
-      ${!varios ? ""
+      ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
+        : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
         : anfitrion
@@ -2839,7 +2848,7 @@ function pintaFin(p, est) {
     }
   }
   const yo = state.user.uid, g = f.ganador;
-  const juega = !!(p.jugadores || {})[yo];
+  const juega = !!(p.jugadores || {})[yo] && (p.juego !== "haxball" || !!(est.equipos || {})[yo]);
   const clase = !g ? "empate" : ganoEn(p, g, yo) ? "gano" : juega ? "perdi" : "mirando";
   const titulo = f.motivo === "inactiva" ? "Sala cerrada"
     : clase === "gano" ? "¡Has ganado!"
@@ -2916,6 +2925,8 @@ const RAZONES = {
   estrellas: "Capturó más energía en las 36 estrellas.",
   encontrado: "Encontró al personaje escondido.",
   abandono: "La partida acabó por abandono.",
+  reloj: "Se acabó el tiempo: ganó el que llevaba más goles.",
+  oro: "Gol de oro en el alargue.",
   inactiva: "Se cerró sola: pasaron seis horas sin una jugada. No cuenta para la clasificación.",
   meta: "Llegó primero a la meta de bajas.",
   equipo: "Su equipo llegó primero a la meta de bajas.",
@@ -2947,7 +2958,10 @@ const RAZONES = {
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
-  if (String(uid).startsWith("eq:")) return "el equipo " + (uid === "eq:rojo" ? "Rojo" : "Azul");
+  if (String(uid).startsWith("eq:")) {
+    const e = String(uid).slice(3);
+    return "el equipo " + ((est.nombresEq || {})[e] || (e === "rojo" ? "Rojo" : "Azul"));
+  }
   const x = (est.jugadores || []).find(y => y.uid === uid);
   return x ? (x.nombre || "el otro") : "el otro";
 };
