@@ -32,7 +32,11 @@
 - A pet bought or received has no state in the new account. The postman copies the latest previous owner's state (from `historial`), without `w`/`d`, which belonged to the seller.
 - **Honest limit:** stage and growth are client-claimed, like club marks. A console can grow its own pet; it cannot mint items, coins or potions. The rule only lets the stage move forward.
 
-**Preferences** go to `users/<uid>/mascotas`: light, background, dance bar, and `usadas`, the rations eaten (a transaction +1 per handful). Food stock = rations bought (replay) − `usadas`. FPS and mute stay in `localStorage`.
+**Preferences** go to `users/<uid>/mascotas`: `oscuras` (the pets with their light off), background, dance bar, and `usadas`, the rations eaten (a transaction +1 per handful). Food stock = rations bought (replay) − `usadas`. FPS and mute stay in `localStorage`.
+
+**The light is per pet** (`oscuras`, `useLuz(id)`): turning it off for one must not darken the others, and the corral is always lit. The old single `luz: false` is read once as «all dark»; the postman now always writes `luz: true` so it never applies again.
+
+**The top-bar ←** goes back to the corral while a pet is open, and to Juegos only from the corral.
 
 **Balance.** Growth was cut to 1/20 (`GROW_PER_ACTION` 0.05, `GROW_PER_POINT` 0.005). Hatching (egg/box → baby) needs 10/3 growth, a third of the old 10. Stats drop at 2.5× the original rate (`DECAY_PER_HOUR` 17.5/12.5/7.5/10). The «+N 🌱» shows hundredths. `sinPremio` is the old `unpaid`: dancing while already happy still raises stats but gets no per-action growth.
 

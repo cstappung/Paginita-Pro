@@ -16,7 +16,7 @@ import { FPS_MAX, FPS_MIN } from '../game/config'
 import { hoursToWake, hoursToWakeable, mood, neediest } from '../game/rules'
 import type { ActionId, Pet, StatId } from '../game/types'
 import type { CueId } from '../pets/anim/cues'
-import { SIN_COMIDA, useGame } from '../store/gameStore'
+import { SIN_COMIDA, useGame, useLuz } from '../store/gameStore'
 import { avisa, enJuegos } from '../store/red'
 import MM from '../../../../juegos/mascotas/motor.js'
 import { Scene, type Reaction, type Tool } from './Scene'
@@ -118,12 +118,12 @@ function CareButton(props: { pet: Pet; action: ActionId; onClick: () => void; la
   )
 }
 
-/** Botón grande para prender o apagar la luz del cuarto. */
-function LightButton({ hint }: { hint?: string }) {
-  const lightsOn = useGame((s) => s.lightsOn)
+/** Botón grande para prender o apagar la luz del cuarto de esa mascota (no la de las demás). */
+function LightButton({ pet, hint }: { pet: Pet; hint?: string }) {
+  const lightsOn = useLuz(pet.id)
   const setLights = useGame((s) => s.setLights)
   return (
-    <button className={`care tone-${lightsOn ? 'night' : 'sun'}`} onClick={() => (setLights(!lightsOn), play('tap'))}>
+    <button className={`care tone-${lightsOn ? 'night' : 'sun'}`} onClick={() => (setLights(pet.id, !lightsOn), play('tap'))}>
       <span className="care-badge" aria-hidden>
         {lightsOn ? '🌙' : '💡'}
       </span>
@@ -223,7 +223,7 @@ function NightCard({ pet, onAction }: { pet: Pet; onAction: (a: ActionId) => voi
       </p>
       <div className="actions">
         {canSleep && <CareButton pet={pet} action="sleep" onClick={() => onAction('sleep')} />}
-        <LightButton />
+        <LightButton pet={pet} />
       </div>
     </div>
   )
@@ -304,7 +304,7 @@ function PetDetail(props: {
   const { pet, onBack, onAction, onCare, say } = props
   const [tab, setTab] = useState<'care' | 'inventory'>('care')
   const [filter, setFilter] = useState<Filter>('all')
-  const lightsOn = useGame((s) => s.lightsOn)
+  const lightsOn = useLuz(pet.id)
   const rename = useGame((s) => s.rename)
   const stage = getStage(pet.species, pet.stage)
   const stages = getSpecies(pet.species).stages
@@ -444,7 +444,7 @@ function PetDetail(props: {
             <small> Con la luz apagada descansa más rápido.</small>
           </p>
           <div className="actions">
-            <LightButton />
+            <LightButton pet={pet} />
             {(() => {
               // Agotada: todavía no se puede despertar; se avisa cuánto falta en vez de un botón que no responde.
               const wait = hoursToWakeable(pet, false)
@@ -651,10 +651,11 @@ export function App() {
   const owned = useGame((s) => s.fondos)
   const background = useGame((s) => s.background)
   const setBackground = useGame((s) => s.setBackground)
-  const lightsOn = useGame((s) => s.lightsOn)
   const setLights = useGame((s) => s.setLights)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // La luz es la del cuarto de la mascota abierta; en el corral siempre hay luz.
+  const lightsOn = useLuz(selectedId)
   const [reaction, setReaction] = useState<Reaction | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number>(0)
@@ -886,7 +887,13 @@ export function App() {
   return (
     <div className={`app${selected ? ' focus' : ''}`}>
       <header className="topbar">
-        <button className="icon-btn volver" aria-label="Volver a Juegos" title="Volver a Juegos" onClick={() => avisa('volver')}>
+        {/* Mirando una mascota, la flecha vuelve al corral; en el corral, a Juegos. */}
+        <button
+          className="icon-btn volver"
+          aria-label={selected ? 'Volver al corral' : 'Volver a Juegos'}
+          title={selected ? 'Volver al corral' : 'Volver a Juegos'}
+          onClick={() => (selected ? setSelectedId(null) : avisa('volver'))}
+        >
           ←
         </button>
         <h1 className="logo">
@@ -894,14 +901,16 @@ export function App() {
         </h1>
         <Volumen />
         <div className="top-right">
-          <button
-            className="icon-btn"
-            aria-label={lightsOn ? 'Apagar la luz' : 'Prender la luz'}
-            title={lightsOn ? 'Apagar la luz' : 'Prender la luz'}
-            onClick={() => setLights(!lightsOn)}
-          >
-            {lightsOn ? '💡' : '🌙'}
-          </button>
+          {selected && (
+            <button
+              className="icon-btn"
+              aria-label={lightsOn ? `Apagar la luz de ${selected.name}` : `Prender la luz de ${selected.name}`}
+              title={lightsOn ? `Apagar la luz de ${selected.name}` : `Prender la luz de ${selected.name}`}
+              onClick={() => setLights(selected.id, !lightsOn)}
+            >
+              {lightsOn ? '💡' : '🌙'}
+            </button>
+          )}
           <button className="icon-btn" aria-label="Regalos" title="Regalos y pociones" onClick={() => setGifts(true)}>
             🎁
           </button>

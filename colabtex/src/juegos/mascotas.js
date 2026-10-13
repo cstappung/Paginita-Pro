@@ -22,6 +22,9 @@ const MAX_PRECIO = 100000;
 /* La clave del estado de una mascota: su copia sin el prefijo. */
 const claveEstado = c => String(c).replace(/^ma:/, "");
 const RE_ESTADO = /^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/;
+const RE_MASCOTA = /^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/;
+/* RTDB devuelve las listas como arreglo o como objeto de índices. */
+const lista = v => Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : undefined;
 
 /* Lo que se guarda de una mascota, recortado a lo que valida la regla. */
 function limpiaEstado(e) {
@@ -93,7 +96,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
       comida: Math.max(0, comprada - usadas),
       fondos: Object.keys(mio.fondos || {}),
       adopciones: mio.intentos || 0,
-      prefs: { luz: prefs.luz, fondo: prefs.fondo, barra: Array.isArray(prefs.barra) ? prefs.barra : prefs.barra ? Object.values(prefs.barra) : undefined }
+      prefs: { luz: prefs.luz, oscuras: lista(prefs.oscuras), fondo: prefs.fondo, barra: lista(prefs.barra) }
     } });
   }
   const mandaTema = () => manda({ tipo: "tema", tema: temaSitio() });
@@ -178,8 +181,12 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
           responde(true, null);
         } else if (x.accion === "prefs") {
           const p = x.prefs || {};
+          /* La luz es de cada mascota: `oscuras` son las que la tienen apagada. `luz` queda
+             prendida para que el formato viejo (una luz para todas) no vuelva a aplicarse. */
+          const oscuras = (Array.isArray(p.oscuras) ? p.oscuras : []).map(String).filter(c => RE_MASCOTA.test(c)).slice(0, 12);
           await fb.guardaPrefsMascotas(uid, {
-            luz: p.luz !== false,
+            luz: true,
+            oscuras: oscuras.length ? oscuras : null,
             fondo: typeof p.fondo === "string" ? p.fondo.slice(0, 20) : "meadow",
             barra: (Array.isArray(p.barra) ? p.barra : []).map(String).filter(b => b.length <= 80).slice(0, 4)
           });
@@ -236,7 +243,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
       frame.title = "Mascotas — cría tu mascota en 3D";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/mascotas/index.html?v=mc-5";
+      frame.src = "juegos/mascotas/index.html?v=mc-6";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       vigilaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
