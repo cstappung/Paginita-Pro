@@ -72,7 +72,12 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
 
 ## Proof and verification (`js/game/prueba.js`)
 
-The engine (`js/core/engine.js`) is the owner's, untouched. What changed is
+The engine (`js/core/engine.js`) is the owner's, with one fix: **extended
+sustains** (`_matches`, `heldSustainMask`) — the frets of a sustain still held
+don't count when reading the next note, as in Clone Hero. Without it, holding
+a long yellow and tapping green/red on top never hit (the highest fret was
+the yellow) and lifting it dropped the sustain (Dragon Ball Rap, 39 notes).
+Any engine change alters replays: bump `hero-N` and rebuild. What changed is
 **how the session drives it**: a human player plays through a `Grabadora`.
 The engine advances on a fixed grid (`hasta`, every 5 ms of song time) and
 each action is rounded to 0.1 ms and logged with the grid index reached, so
