@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { play } from '../audio/sound'
 import { getBackground } from '../data/accessories'
 import { getStage } from '../data/species'
-import { useGame } from '../store/gameStore'
+import { useGame, useLuz } from '../store/gameStore'
 import type { StageDef } from '../data/species/types'
 import { mood, puesto } from '../game/rules'
 import type { ActionId, Pet, PlacedDecor } from '../game/types'
@@ -551,7 +551,7 @@ export function Scene(props: {
   const decorating = !!props.decorating && !!selected && !tool
   // Girar la mascota seleccionada arrastrando (la cámara y la luz quedan fijas, así el toon se ve igual).
   const bg = getBackground(useGame((s) => s.background))
-  const lightsOn = useGame((s) => s.lightsOn)
+  const lightsOn = useLuz(selected?.id)
   const [yaw, setYaw] = useState(0)
   const drag = useRef<{ x: number; yaw: number; moved: boolean } | null>(null)
   const id = selected?.id
