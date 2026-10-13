@@ -215,6 +215,22 @@ export class GuitarEngine extends EngineBase {
     return held !== 0 && 31 - Math.clz32(held) === 31 - Math.clz32(nt.frets);
   }
 
+  // Sostenido extendido (como Clone Hero): los trastes de un sostenido que
+  // sigue pisado no cuentan al leer la nota nueva. Sin esto, con el amarillo
+  // largo apretado, un verde o un rojo encima no entraba nunca (el traste más
+  // alto era el amarillo) y soltarlo cortaba el sostenido.
+  _matches(nt) {
+    if (GuitarEngine.matches(nt, this.held)) return true;
+    const sus = this.heldSustainMask();
+    return sus !== 0 && GuitarEngine.matches(nt, this.held & ~sus);
+  }
+
+  heldSustainMask() {
+    let m = 0;
+    for (const s of this.sustains) if (!s.open && (this.held & s.mask) === s.mask) m |= s.mask;
+    return m;
+  }
+
   _firstPendingInWindow(t) {
     for (let i = this.next; i < this.notes.length; i++) {
       if (this.noteState[i] !== PENDING) continue;
@@ -276,7 +292,7 @@ export class GuitarEngine extends EngineBase {
     const nt = this.notes[i];
     if (nt.type === NOTE_STRUM) return;
     if (nt.type === NOTE_HOPO && this.combo === 0) return;
-    if (!GuitarEngine.matches(nt, this.held)) return;
+    if (!this._matches(nt)) return;
     this._hit(i, t);
     this.lastFretHit = t;
     this.pendingStrum = -1;
@@ -292,7 +308,7 @@ export class GuitarEngine extends EngineBase {
   _strumHit(t) {
     for (let i = this.next; i < this.notes.length && this.notes[i].time - this.front <= t; i++) {
       if (this.noteState[i] !== PENDING) continue;
-      if (GuitarEngine.matches(this.notes[i], this.held)) {
+      if (this._matches(this.notes[i])) {
         for (let k = this.next; k < i; k++) if (this.noteState[k] === PENDING) this._missCommon(k, t);
         this._hit(i, t);
         return true;
@@ -435,8 +451,13 @@ export class Bot {
         e.pad(nt.pad, at, nt.cymbal);
         continue;
       }
-      const want = nt.open ? 0 : nt.frets;
-      if (nt.type !== NOTE_STRUM && e.held === want) e.fret(want === 0 ? 16 : 0, at);
+      // sigue pisando los sostenidos que suenan si la nota nueva no los usa
+      // (update antes: uno que termina justo en esta nota ya no cuenta)
+      e.update(at);
+      const sus = e.heldSustainMask();
+      const keep = nt.open || (nt.frets & sus) ? 0 : sus;
+      const want = (nt.open ? 0 : nt.frets) | keep;
+      if (nt.type !== NOTE_STRUM && e.held === want) e.fret(keep || (want === 0 ? 16 : 0), at);
       e.fret(want, at);
       if (e.noteState[i] === PENDING) e.strum(at);
     }
