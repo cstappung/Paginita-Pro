@@ -170,6 +170,15 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       partida.leer().then(dato=>enviar({tipo:'partida',dato:dato||null}),()=>enviar({tipo:'partida',error:true}));return;
     }
     if(d.tipo==='fantasma-pedir'){mandaFantasma(String(d.categoria||''));return;}
+    /* La prueba de tu propia fila (Atasco): las partidas que respaldaron tu
+       récord, por si este navegador ya no las tiene (otro dispositivo,
+       almacenamiento borrado). Se lee por clave, como la del fantasma. */
+    if(d.tipo==='prueba-propia-pedir'){
+      const cat=String(d.categoria||''),f=propios[cat],responde=r=>enviar({tipo:'prueba-propia',categoria:cat,...r});
+      if(invitado||!fantasma||!categoriaClub(juego,cat)||!f||typeof f.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(f.partida)){responde({d:''});return;}
+      fantasma.leerPrueba(cat,usuario.uid,f.partida).then(v=>responde({d:v&&typeof v.d==='string'?v.d:''}),()=>responde({error:true}));
+      return;
+    }
     /* Un logro en vivo (Metro Rush: «Cazafantasmas»). Solo los que el juego
        declara así; la página lo escribe una vez en logros/ (la regla no deja
        reescribirlo) y lo celebra. Como invitado no se guarda nada. */
@@ -224,7 +233,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-61&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-62&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

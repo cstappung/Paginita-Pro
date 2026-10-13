@@ -63,7 +63,13 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   play) except on «Reintentar sincronización» (`club-reintentar`), which
   also re-uploads and re-reads the progress. It used to be once per visit,
   only via `club-record` (row required) and before the cloud merge: a
-  player with no row, or a lost send, stayed out of the table. Ten logros by stars,
+  player with no row, or a lost send, stayed out of the table. **Recovering
+  the row's games** (`pideRescate`/`rescata`): when the row has more stars
+  than the local proofs back, the game asks the page for the proof saved with
+  its own row (`Club.pedirPruebaPropia` → `soloPruebas/<cat>/<uid>/<partida>`,
+  read by key), replays each level and merges the valid ones like a cloud
+  copy. A player whose browser lost the proofs saw ⚠ on levels the table had
+  already accepted (180 ★ in game, 30 backed, row of 150). Ten logros by stars,
   coins (4 per star, `RECORD` 40, `PAGO_CLUB` 15), the `tatasco` champion
   frame, the Discord podium (`🚗 N ★`), the manual with three illustrated
   examples and the lobby card. The `soloRanks` and `clubJugadas` regexes were

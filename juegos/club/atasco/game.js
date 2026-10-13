@@ -269,7 +269,7 @@
     lista.replaceChildren();
     const ini = primeroDe(pisoVisto);
     let siguienteMarcado = false;
-    const cuentan = respaldadas().contados;
+    const { contados: cuentan, errores } = respaldadas();
     p.niveles.forEach((_, k) => {
       const i = ini + k, e = estrellasDe(i), puede = M.nivelAbierto(prog, PISOS, i);
       const sinPrueba = e > 0 && !cuentan[i];                         // se ve ganado, pero la tabla no lo cuenta
@@ -277,7 +277,9 @@
       b.type = "button"; b.className = "puesto"; b.setAttribute("role", "listitem");
       b.disabled = !puede;
       if (e) b.classList.add(e === 3 ? "perfecto" : "hecho");
-      if (sinPrueba) { b.classList.add("sin-prueba"); b.title = "No cuenta en la clasificación: no quedó guardada la partida que lo ganó. Vuelve a ganarlo."; }
+      if (sinPrueba) { b.classList.add("sin-prueba"); b.title = errores[i]
+        ? `No cuenta en la clasificación: la partida guardada no se pudo rehacer (${errores[i]}). Vuelve a ganarlo.`
+        : "No cuenta en la clasificación: no quedó guardada la partida que lo ganó. Vuelve a ganarlo."; }
       if (puede && !e && !siguienteMarcado) { b.classList.add("siguiente"); siguienteMarcado = true; } // el próximo por jugar
       b.innerHTML = `<b>${i + 1}</b><span class="est">${"<i>★</i>".repeat(e)}${"★".repeat(3 - e)}</span>`;
       b.setAttribute("aria-label", `Nivel ${i + 1}: ${puede ? (e ? e + (e === 1 ? " estrella" : " estrellas") + (sinPrueba ? ", no cuenta en la clasificación" : "") : "sin jugar") : "cerrado"}`);
@@ -750,11 +752,42 @@
     if (!e.detail || e.detail.categoria !== CATEGORIA) return;
     enTabla = e.detail.propio ? e.detail.propio.puntos || 0 : 0;
     ponAlDia();
+    pideRescate();
   });
+  /* Recuperar las partidas de la fila. Cada récord se guardó con su prueba
+     (soloPruebas), que trae la partida de cada nivel que contó; si este
+     navegador ya no las tiene (se jugó en otro, se borró el almacenamiento,
+     una versión vieja las perdió), esos niveles quedaban con ⚠ y la tabla
+     no podía subir hasta volver a ganarlos uno por uno. Se vuelve a jugar
+     cada una con el motor y las que valen se juntan como si llegaran de la
+     cuenta (mezclaProgreso se queda con la mejor de cada nivel). */
+  let rescatando = false;
+  function pideRescate() {                                             // la fila respalda más que lo de aquí: sus partidas están guardadas con ella
+    if (rescatando || !Club || !Club.pedirPruebaPropia || enTabla === null || enTabla <= respaldadas().estrellas) return;
+    rescatando = true;
+    Club.pedirPruebaPropia(CATEGORIA, rescata);
+  }
+  function rescata(texto) {
+    let pr = null;
+    try { pr = texto ? JSON.parse(texto) : null; } catch (_) { pr = null; }
+    const n = pr && pr.n && typeof pr.n === "object" && !Array.isArray(pr.n) ? pr.n : null;
+    if (!n) return;
+    const traido = { n: {}, p: {} };
+    for (const [k, t] of Object.entries(n)) {
+      const i = Number(k);
+      if (!Number.isInteger(i) || !NIVELES[i] || String(i) !== k) continue;
+      const r = M.juegaPrueba(nivelLeido(i), NIVELES[i].optimo, t);
+      if (r.error) continue;
+      traido.n[i] = [r.estrellas, r.movs, r.ms];
+      traido.p[i] = t;
+    }
+    if (Object.keys(traido.p).length) alPartida({ d: JSON.stringify(traido) });
+  }
   /* «Reintentar sincronización» (conexion.js): se vuelve a subir el
      progreso, se trae el de la cuenta por si cambió en otro dispositivo y
      se vuelve a mandar el total si la tabla tiene menos. */
   window.addEventListener("club-reintentar", () => {
+    rescatando = false; pideRescate();                                 // vuelve a mirar las partidas de la fila
     subeNube(true);
     ponAlDia(true);
     if (Club && Club.pedirPartida) Club.pedirPartida(alPartida);
