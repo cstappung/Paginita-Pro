@@ -584,6 +584,15 @@ sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ HaxBall pide publicar otra vez (2026-10-13)
+
+`'haxball'` tiene que estar en la lista del campo `juego` y en la de
+`logros`. No hay nodo nuevo: los goles van por `jugadas` (`gol`, numerado),
+la meta de la sala entra como `meta` por `$otro` y el directo (discos y
+pelota) va por la malla WebRTC de `vivo/<pid>/rtc`, como Boxhead. Sin
+publicar, la sala de HaxBall no se puede crear. Pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:

@@ -506,6 +506,15 @@ function boxhead() {
     gira(9, en(67, 20, casquillo(0)) + en(67, 140, casquillo(-.6)) + en(67, 260, casquillo(-1.1)));
 }
 
+/* HaxBall: discos rojos y azules en la línea y una pelota que gira. */
+function haxball() {
+  const disco = (c, i) => an("hop", 1.5, `<circle r="5" fill="${c}" stroke="#111" stroke-width="1"/>`, n1(-i * .3));
+  const pelota = `<circle r="3.6" fill="#fff" stroke="#111" stroke-width=".9"/>`;
+  const C = ["#e56e56", "#5689e5", "#e56e56", "#5689e5"];
+  return aro(60, "#5a8a4a", 16) + aro(52, "#e8f0e0", 1.2, `opacity=".8"`) + aro(68, "#e8f0e0", 1.2, `opacity=".8"`) +
+    C.map((c, i) => en(60, 45 + i * 90, disco(c, i))).join("") + gira(6, en(60, 0, pelota));
+}
+
 /* Tulones: calzoncillos que dan la vuelta al anillo y cabezas que se asoman. */
 function tulones() {
   const calzon = (c, i) => an("hop", 1.6, `<path d="M-5-3H5L4.6 1Q2 2 1 4.4H-1Q-2 2-4.6 1Z" fill="${c}" stroke="#2a1e18" stroke-width=".8"/>`, n1(-i * .3));
@@ -610,7 +619,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
   tmetrorush: metrorush, ttrigon: trigon, thero: hero,
   cometa, vortice, sakura, plasma, mariposas
 };

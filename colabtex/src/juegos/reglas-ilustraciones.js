@@ -101,6 +101,18 @@ export const boxhead=etapa=>{
  else {c=cabeza(120,125,C.azul,'→')+cabeza(330,125,C.rojo,'←')+line(134,125,316,125,C.oro,3)+txt(120,170,'A: 9',16,C.azul,'middle')+txt(330,170,'B: 7',16,C.rojo,'middle')+txt(240,215,'Meta: 10 bajas',16,C.oro,'middle');}
  return svg(nombres[etapa],suelo+c);
 };
+/* HaxBall: la cancha de arriba, discos rojos y azules y la pelota. */
+export const haxball=etapa=>{
+ const nombres=['El saque: cada uno en su mitad, solo el que saca entra al círculo','La patada empuja la pelota lejos','Gol: la pelota cruza la línea entre los postes'];
+ let c=rect(18,18,444,214,'#5a8a4a','#e8f0e0',8)+line(240,18,240,232,'#e8f0e0',2)+circle(240,125,40,'none','#e8f0e0');
+ c+=rect(4,95,14,60,'#5a8a4a','#e8f0e0',2)+rect(462,95,14,60,'#5a8a4a','#e8f0e0',2);
+ const d=(x,y,col,k)=>circle(x,y,13,col)+(k?circle(x,y,16,'none','#fff'):'');
+ const p=(x,y)=>circle(x,y,8,'#fff');
+ if(etapa===0)c+=d(150,90,'#e56e56')+d(205,125,'#e56e56')+d(330,90,'#5689e5')+d(330,165,'#5689e5')+p(240,125)+txt(130,215,'Saca el rojo',15,C.blanco,'middle');
+ else if(etapa===1)c+=d(150,140,'#e56e56',1)+p(178,128)+line(190,123,330,80,C.oro,3)+d(360,150,'#5689e5')+txt(240,215,'Espacio o X: patada',15,C.oro,'middle');
+ else c+=d(380,110,'#e56e56')+d(420,170,'#5689e5')+p(470,125)+txt(240,215,'¡Gol del rojo! 1 – 0',16,C.oro,'middle');
+ return svg(nombres[etapa],c);
+};
 /* Atasco: el estacionamiento de 6×6 visto desde arriba, con la salida a la
    derecha de la 3.ª fila. Un ejemplo de cuatro movidas: `etapa` 0 el auto
    rojo encerrado, 1 el camino abierto (tres movidas), 2 el rojo saliendo. */

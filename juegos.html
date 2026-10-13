@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610130041"></script>
+<script src="i18n.js?v=202610130235"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1597,9 +1597,22 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-bx b{position:absolute;left:50%;bottom:4px;width:150px;height:12px;margin-left:-75px;background:repeating-linear-gradient(90deg,#6b5233 0 18px,#5a4429 18px 20px);border:2px solid #2a1d0f}
 .jg-art-bx s{position:absolute;left:104px;bottom:16px;width:14px;height:18px;border-radius:3px;background:#c0392b;border:2px solid #3a1410;box-shadow:inset 0 4px 0 #0003,inset 0 -4px 0 #0003}
 .jg-art-bx em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#f2c14e;text-shadow:2px 2px 0 #6e4d14}
+.jg-art-hx{position:relative;width:170px;height:104px;border-radius:10px;background:repeating-linear-gradient(90deg,#6aa357 0 21px,#5f964d 21px 42px);border:3px solid #e9f2e4;box-sizing:border-box}
+.jg-art-hx::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:0;border-left:2px solid #e9f2e4}
+.jg-art-hx::after{content:"";position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-19px 0 0 -19px;border:2px solid #e9f2e4;border-radius:50%}
+.jg-art-hx i{position:absolute;width:20px;height:20px;border-radius:50%;border:2px solid #111;z-index:1}
+.jg-art-hx i:nth-child(1){left:28px;top:22px;background:#e56e56}
+.jg-art-hx i:nth-child(2){left:44px;top:58px;background:#e56e56}
+.jg-art-hx i:nth-child(3){left:112px;top:28px;background:#5689e5}
+.jg-art-hx i:nth-child(4){left:124px;top:62px;background:#5689e5}
+.jg-art-hx b{position:absolute;left:74px;top:42px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #111;z-index:2}
+.jg-art-hx s,.jg-art-hx u{position:absolute;top:32px;width:8px;height:34px;border:2px solid #e9f2e4;background:#0002}
+.jg-art-hx s{left:-11px;border-right:0}.jg-art-hx u{right:-11px;border-left:0}
+.jg-art-hx em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #2c4f8f}
 .jg-yemas-aviso{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#ffb3001f;border:1px solid #ffb30055;font:13px 'IBM Plex Mono',monospace}.jg-yemas-aviso[hidden]{display:none}
 .jg-yemas-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:#a9dcff}
 .jg-tulones-marco{background:#bfe6ff}
+.jg-haxball-marco{background:#5a8a4a}
 .jg-hero-marco{background:#0d0820}
 .jg-portada-clue{background:radial-gradient(ellipse at 50% 40%,#5a1422,#1c0a10 70%)}
 .jg-art-cl{position:relative;width:170px;height:104px}
@@ -4845,6 +4858,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610130041"></script>
+<script src="juegos-app.js?v=202610130235"></script>
 </body>
 </html>

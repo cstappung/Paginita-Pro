@@ -76,6 +76,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Yemas (shooter, zombis, voz) | `juegos/yemas/CLAUDE.md` |
 | Clue | `juegos/clue/CLAUDE.md` |
 | Boxhead | `juegos/boxhead/CLAUDE.md` |
+| HaxBall | `juegos/haxball/CLAUDE.md` |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 | PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |

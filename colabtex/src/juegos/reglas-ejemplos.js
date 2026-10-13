@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -94,6 +94,10 @@ export const EJEMPLOS={
  e('diez','Cómo continuar después de un diez',
   p('La pila llegó a diez','Se mantiene la especia del anuncio, pero ya no se pide un número mayor que diez.',fichas('Último anuncio',['10','rojo','AJÍ'])),
   p('Reinicia con uno, dos o tres','Puedes anunciar 1, 2 o 3 de ají. Con la pila vacía también abres del 1 al 3, pero eliges la especia.',fichas('Próximos anuncios válidos',['1','rojo','AJÍ'],['2','rojo','AJÍ'],['3','rojo','AJÍ'])))],
+ haxball:[e('saque','El saque y el primer gol',
+  p('Cada uno en su mitad','Al empezar y después de cada gol todos vuelven a su lado. Saca el equipo que recibió el gol; solo él puede entrar al círculo hasta el primer toque.',haxball(0)),
+  p('Patear, no empujar','Mantén Espacio o X junto a la pelota para patearla fuerte. Correr contra ella solo la empuja un poco.',haxball(1)),
+  p('Gol','La pelota tiene que cruzar entera la línea entre los postes. El gol se lo lleva el último de tu equipo que la tocó.',haxball(2)))],
  boxhead:[e('combo','Encadenar bajas para subir el multiplicador',
   p('Cada baja suma uno','Cada zombi o diablo que cae sube el multiplicador en uno y llena la barra de combo. Los puntos de la baja se multiplican por él.',boxhead(0)),
   p('No dejes que la barra se vacíe','La barra baja sola y más rápido cuanto más alto vas. Si llega a cero, el multiplicador vuelve a ×1, pero las armas ya ganadas se quedan.',boxhead(2))),
