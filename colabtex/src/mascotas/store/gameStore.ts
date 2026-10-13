@@ -14,7 +14,7 @@ import { pide } from './red'
 // (mascotas, objetos, comida, fondos) lo dice la economía del sitio y llega con `recibe`; el estado
 // de cada mascota (etapa, stats, lo que lleva puesto) se guarda en `mascotasEstado` a través del
 // cartero, en cada acción y con un respiro (`GUARDA_MS`), nunca en cada tick. Las preferencias que
-// importan entre dispositivos (luz, fondo, barra de bailes) van a `users/<uid>/mascotas`; los cuadros
+// importan entre dispositivos (la luz de cada mascota, fondo, barra de bailes) van a `users/<uid>/mascotas`; los cuadros
 // por segundo y el silencio quedan en este navegador.
 
 /** Respiro entre dos guardados de la misma mascota. */
@@ -32,7 +32,8 @@ export interface Datos {
   comida: number
   fondos: string[]
   adopciones: number
-  prefs: { luz?: boolean; fondo?: string; barra?: string[] }
+  /** `oscuras`: las mascotas con la luz apagada. `luz: false` es el formato viejo (una luz para todas). */
+  prefs: { luz?: boolean; oscuras?: string[]; fondo?: string; barra?: string[] }
 }
 
 interface GameState {
@@ -58,10 +59,13 @@ interface GameState {
   danceBar: string[]
   background: string
   muted: boolean
-  /** Luz del cuarto: apagada, duermen más rápido (y la escena se pone de noche). */
-  lightsOn: boolean
+  /**
+   * Mascotas con la luz de su cuarto apagada: duermen más rápido y su escena se pone de noche.
+   * Es de cada una: apagarle la luz a una no deja a oscuras a las demás.
+   */
+  oscuras: string[]
   recibe: (d: Datos) => void
-  setLights: (on: boolean) => void
+  setLights: (id: string, on: boolean) => void
   setMuted: (m: boolean) => void
   setBackground: (id: string) => void
   /** Compra un fondo. Devuelve null si se pudo, o el motivo. */
@@ -152,7 +156,7 @@ function guardaPrefs() {
   window.clearTimeout(prefsReloj)
   prefsReloj = window.setTimeout(() => {
     const s = useGame.getState()
-    pide('prefs', { prefs: { luz: s.lightsOn, fondo: s.background, barra: s.danceBar } }).catch(() => {})
+    pide('prefs', { prefs: { oscuras: s.oscuras, fondo: s.background, barra: s.danceBar } }).catch(() => {})
   }, 800)
 }
 
@@ -178,7 +182,7 @@ export const useGame = create<GameState>()((set, get) => ({
   danceBar: defaultDanceBar(starterItems()),
   background: 'meadow',
   muted: leeLocal('mascotas.mudo', '0') === '1',
-  lightsOn: true,
+  oscuras: [],
 
   recibe: (d) => {
     const now = Date.now()
@@ -187,7 +191,9 @@ export const useGame = create<GameState>()((set, get) => ({
       ...d.objetos.map((o) => ({ uid: o.c, kind: o.kind, id: o.id, tint: o.tint, ...(o.leg ? { leg: true } : {}), ...(o.venta ? { venta: o.venta } : {}) })),
     ]
     const antes = get()
-    const luz = antes.listo ? antes.lightsOn : d.prefs.luz !== false
+    // Las que ya no están en la cuenta (vendidas, despedidas) salen de la lista.
+    const oscuras = (antes.listo ? antes.oscuras : d.prefs.oscuras ?? (d.prefs.luz === false ? d.mascotas.map((m) => m.c) : []))
+      .filter((id) => d.mascotas.some((m) => m.c === id))
     const pets = d.mascotas.map((m) => {
       const local = antes.pets.find((p) => p.id === m.c)
       const ls = Number.isFinite(m.estado?.ls) ? (m.estado!.ls as number) : -1
@@ -201,7 +207,7 @@ export const useGame = create<GameState>()((set, get) => ({
       if (!m.venta && (!m.estado || cambio)) guarda(m.c)
       // El estado guardado trae los stats de su `ls`: se ponen al día ya, no al primer cuidado ni
       // al primer tick de `App` (10 s), que dejaban ver a una mascota bien comida que no lo está.
-      return tick(limpia, now, !luz)
+      return tick(limpia, now, oscuras.includes(m.c))
     })
     const barra = (d.prefs.barra ?? defaultDanceBar(items)).filter((u) => items.some((i) => i.uid === u && i.kind === 'dance' && !i.venta)).slice(0, DANCE_BAR)
     const fondos = d.fondos ?? []
@@ -219,15 +225,16 @@ export const useGame = create<GameState>()((set, get) => ({
       adopciones: d.adopciones,
       danceBar: barra.length || d.prefs.barra ? barra : defaultDanceBar(items),
       background: antes.listo ? antes.background : fondo,
-      lightsOn: luz,
+      oscuras,
     })
   },
 
   // Antes de cambiar la luz se cierra el tramo de tiempo con la luz que había.
-  setLights: (on) => {
+  setLights: (id, on) => {
+    if (on !== get().oscuras.includes(id)) return
     get().tickAll()
-    for (const p of get().pets) guarda(p.id)
-    set({ lightsOn: on })
+    if (get().pets.some((p) => p.id === id)) guarda(id)
+    set((s) => ({ oscuras: on ? s.oscuras.filter((x) => x !== id) : [...s.oscuras, id] }))
     guardaPrefs()
   },
   setMuted: (muted) => {
@@ -346,7 +353,7 @@ export const useGame = create<GameState>()((set, get) => ({
     if (pet.venta) return 'Está a la venta: retírala del mercado para cuidarla'
     if (action === 'feed' && get().comida < 1) return SIN_COMIDA
     // Primero se pone al día el tiempo, para que la acción actúe sobre los stats reales.
-    const dark = !get().lightsOn
+    const dark = get().oscuras.includes(id)
     const fresh = tick(pet, Date.now(), dark)
     const result = applyAction(fresh, action, dark)
     if (!result.ok) return result.reason ?? 'No se pudo'
@@ -393,7 +400,7 @@ export const useGame = create<GameState>()((set, get) => ({
     guarda(id)
   },
 
-  tickAll: (now = Date.now()) => set((s) => ({ pets: s.pets.map((p) => tick(p, now, !s.lightsOn)) })),
+  tickAll: (now = Date.now()) => set((s) => ({ pets: s.pets.map((p) => tick(p, now, s.oscuras.includes(p.id))) })),
 
   sell: async (c, price) => {
     const s = get()
@@ -440,3 +447,6 @@ export const useGame = create<GameState>()((set, get) => ({
 }))
 
 setMuted(useGame.getState().muted)
+
+/** ¿Tiene la luz prendida esa mascota? Sin mascota (el corral) siempre hay luz. */
+export const useLuz = (id: string | null | undefined) => useGame((s) => !id || !s.oscuras.includes(id))
