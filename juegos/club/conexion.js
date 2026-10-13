@@ -15,7 +15,7 @@
   /* El fantasma (Metro Rush, modos «Fantasma»): la mejor carrera de una tabla
      con su prueba, que pide el juego y lee la página (el juego no toca
      Firebase). Varias esperas por categoría, por si se pide dos veces. */
-  const alFantasma=new Map();
+  const alFantasma=new Map(),alPropia=new Map();
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
   /* `result(dato, prueba)`: la prueba es lo que el verificador de cada juego
      necesita para rehacer la partida (docs/antitrampas.md). Si la página
@@ -37,6 +37,9 @@
        corrió aún esa tabla), 'error' o lo que diga la página. */
     pedirFantasma(cat,cb){if(!embebido){cb(null,'fuera');return;}if(invitado){cb(null,'invitado');return;}
       if(!alFantasma.has(cat))alFantasma.set(cat,[]);alFantasma.get(cat).push(cb);enviar({tipo:'fantasma-pedir',categoria:cat});},
+    /* `pedirPruebaPropia(cat, cb)`: cb(texto) con la prueba guardada junto a
+       tu fila de esa tabla ('' si no hay, null si falló o no hay cuenta). */
+    pedirPruebaPropia(cat,cb){if(!embebido||invitado){cb(null);return;}alPropia.set(cat,cb);enviar({tipo:'prueba-propia-pedir',categoria:cat});},
     /* Pantalla completa en celular mientras se juega (CLAUDE.md, «Modo
        celular»): solo en pantallas táctiles de 600 px o menos, medidas en la
        ventana de arriba, porque el iframe mide lo que la página le dio. */
@@ -77,6 +80,7 @@
     if(d.tipo==='fantasma'){const l=alFantasma.get(d.categoria)||[];alFantasma.delete(d.categoria);for(const f of l)f(d.error?null:d.dato||null,d.error?'error':d.motivo||(d.dato?'':'vacia'));
       // nadie lo pidió: la página lo manda porque cambió el n.º 1 de la tabla (alguien batió el récord)
       if(!l.length&&!d.error)window.dispatchEvent(new CustomEvent('club-fantasma',{detail:{categoria:d.categoria,dato:d.dato||null,motivo:d.motivo||(d.dato?'':'vacia')}}));return;}
+    if(d.tipo==='prueba-propia'){const f=alPropia.get(d.categoria);alPropia.delete(d.categoria);if(f)f(d.error?null:typeof d.d==='string'?d.d:'');return;}
     if(d.tipo==='rechazo'){window.dispatchEvent(new CustomEvent('club-rechazo',{detail:{categoria:d.categoria,partida:d.partida,motivo:d.motivo}}));if(d.categoria===categoria&&estado)estado.textContent='Esta partida no se guardó: '+d.motivo;return;}
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
