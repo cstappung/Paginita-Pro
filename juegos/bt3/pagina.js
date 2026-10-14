@@ -622,6 +622,18 @@
      máquina). Module._Web_Calidad / _Web_EscalaElegida / _Web_FxElegidos: parche, gs_draw.c. */
   (() => {
     let niveles = null, nivel = 0, malos = 0, buenos = 0, calma = 0, paciencia = 15, subioEn = -1e9, visto = 0;
+    /* Solo en la pelea, y no en sus primeros 6 s ni mientras el juego lee el disco: en la selección de personajes y
+       de escenario el juego carga modelos y vistas previas, los cuadros bajan un momento, y el autoajuste lo tomaba
+       por falta de máquina; cambiaba la resolución (el juego rehace sus imágenes de trabajo: un tirón) y después la
+       volvía a subir (otro). Toda lectura del disco cuenta (también la ISO del jugador, no solo el disco privado). */
+    let enPeleaDesde = 0, ultimaLectura = -1e9;
+    const mideDisco = () => {
+      const d = Module.webDisc;
+      if (!d || d.__mide) return;
+      const leer = d.readAt;
+      d.readAt = (o, n) => { ultimaLectura = performance.now(); return leer.call(d, o, n); };
+      d.__mide = true;
+    };
     const arma = () => {
       const s0 = Module._Web_EscalaElegida(), f0 = Module._Web_FxElegidos();
       const l = [[s0, f0], [s0, f0 | 16], [s0, f0 | 24], [Math.max(1, s0 - 1), f0 | 24], [1, f0 | 28], [1, f0 | 29]];
@@ -637,6 +649,11 @@
       const s = Module.webStats;
       if (!s || s.at === visto || !Module._Web_Calidad || !document.body.classList.contains("started") || document.hidden) return;
       visto = s.at;
+      mideDisco();
+      const ahora = performance.now();
+      if (document.body.classList.contains("en-menus")) { enPeleaDesde = 0; malos = buenos = 0; return; }   // (menús: nada)
+      if (!enPeleaDesde) enPeleaDesde = ahora;
+      if (ahora - enPeleaDesde < 6000 || ahora - ultimaLectura < 1500) { malos = buenos = 0; return; }   // (cargando)
       if (!niveles) { try { arma(); } catch (e) { return; } }
       if (calma > 0) { calma--; return; }   // (recién cambiado: que se note antes de medir)
       if (Red.esperando > 0 || Progreso.lectura) { malos = buenos = 0; return; }   // (esperando el disco: no es la máquina)

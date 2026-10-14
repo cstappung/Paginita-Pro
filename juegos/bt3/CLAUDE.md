@@ -279,7 +279,10 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   picture. Under 56 fps for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
   depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 59+ with the program < 75%
   busy → one step up, never above the player's F1 choice (`Web_EscalaElegida`/`Web_FxElegidos`); a step up that
-  fails within 20 s doubles the wait for the next one. Seconds spent waiting for the disc don't count.
+  fails within 20 s doubles the wait for the next one. **Only in fights** (not `body.en-menus`), not in a fight's first
+6 s, and not within 1.5 s of any disc read (`Module.webDisc.readAt` is wrapped: the player's ISO too): in the select
+screens the game loads previews, frames dip, and the tuner took it for a slow machine and changed the scale (the game
+rebuilds its work images: a hitch), then raised it back (another) — lag the owner saw in character/stage select.
 - **The bench used to cut the disc cache to 192 MB** (`webCacheBudget`, from when it ran two games per tab): with one
   game per tab that made the game evict files it still used and re-read them every frame mid-fight (2 fps, 99% busy,
   nothing drawn). Removed; only this page's setting, nothing else on the site.
