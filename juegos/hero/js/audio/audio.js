@@ -462,9 +462,15 @@ export class PreviewPlayer {
     this.fade = null;
   }
 
-  play(url, startSec) {
+  // opciones: loop (los 30 s de Apple se repiten), onError (la URL ya no sirve)
+  play(url, startSec, { loop = false, onError = null } = {}) {
     this.stop();
     this.timer = setTimeout(() => {
+      this.el.loop = loop;
+      this.el.onerror = onError && (() => {
+        this.el.onerror = null;
+        onError();
+      });
       this.el.src = url;
       this.el.volume = 0;
       const begin = () => {
@@ -486,6 +492,7 @@ export class PreviewPlayer {
   stop() {
     clearTimeout(this.timer);
     clearInterval(this.fade);
+    this.el.onerror = null;
     this.el.pause();
     this.el.removeAttribute('src');
     this.el.load();

@@ -130,7 +130,8 @@ export async function loadSongChart(entry, onBytes) {
   return song;
 }
 
-// Vista previa en el menú: con Firebase no hay (las canciones se descargan solo al jugar)
+// Vista previa en el menú con el servidor local. Con Firebase las canciones se descargan solo al
+// jugar: la vista previa la pone Apple (applePreview.js, desde songSelect).
 export function previewInfo(entry) {
   if (library.remote) return null;
   if (entry.preview) return { url: songUrl(entry, entry.preview), start: 0 };

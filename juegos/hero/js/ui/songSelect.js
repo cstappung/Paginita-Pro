@@ -1,12 +1,16 @@
 // Selector de canciones estilo Clone Hero: lista virtual, búsqueda, orden y vista previa.
 import { h, Screen, fmtTime } from './dom.js';
 import { library, artImg, previewInfo } from '../library.js';
+import { appleConocida, previewApple, olvidaApple } from '../applePreview.js';
 import { PARTS, PART_ORDER, DIFFS } from '../core/constants.js';
 import { PartSelectScreen } from './partSelect.js';
 import { sitio, estrellasDe } from '../sitio/puente.js';
 import { claveCancion } from '../sitio/clave.js';
 
 const ROW_H = 58;
+// Una canción que nunca se buscó en Apple se busca solo si te quedas en ella:
+// Apple corta a ~20 búsquedas por minuto.
+const APPLE_ESPERA = 700;
 const SORTS = {
   artist: ['Artista', (s) => s.meta.artist],
   name: ['Título', (s) => s.meta.name],
@@ -55,6 +59,7 @@ export class SongSelectScreen extends Screen {
     if (selectId) this.state.selectId = selectId;
     this.filtered = [];
     this.sel = 0;
+    this.previewTok = 0;
   }
 
   render() {
@@ -97,6 +102,7 @@ export class SongSelectScreen extends Screen {
     lastState = { ...this.state };
     clearTimeout(this.detailTimer);
     clearTimeout(this.previewTimer);
+    this.previewTok++;
     clearTimeout(this.topTimer);
     this.offMias?.();
     this.offTop?.();
@@ -228,11 +234,22 @@ export class SongSelectScreen extends Screen {
       }
     }
     clearTimeout(this.previewTimer);
-    this.previewTimer = setTimeout(() => {
-      const pv = previewInfo(s);
-      if (pv) this.app.preview.play(pv.url, pv.start);
+    const tok = ++this.previewTok;
+    const pv = previewInfo(s);
+    if (pv) {
+      this.previewTimer = setTimeout(() => this.app.preview.play(pv.url, pv.start), 150);
+      return;
+    }
+    // con Firebase: los 30 s de Apple Music, sin bajar nada de la canción
+    const conocida = library.remote ? appleConocida(s) : '';
+    if (conocida === '') return this.app.preview.stop();
+    if (!conocida) this.app.preview.stop();
+    this.previewTimer = setTimeout(async () => {
+      const url = await previewApple(s);
+      if (tok !== this.previewTok) return;
+      if (url) this.app.preview.play(url, 0, { loop: true, onError: () => olvidaApple(s) });
       else this.app.preview.stop();
-    }, 150);
+    }, conocida ? 150 : APPLE_ESPERA);
   }
 
   renderMiRecord() {
