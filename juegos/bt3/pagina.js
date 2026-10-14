@@ -899,7 +899,7 @@
     const CLAVE = "bt3.musica", BUSCA = "chinchonchin", BASE = 0.6;
     const quiere = () => { try { return localStorage.getItem(CLAVE) !== "juego"; } catch (e) { return true; } };
     const norma = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    let pistas = null, fallo = false, enPelea = false, sonando = null;
+    let pistas = null, fallo = "", enPelea = false, sonando = null, hallada = null;   // fallo: por qué no suena (se ve en el ♪)
 
     // las pistas de la canción, ya decodificadas (una vez por página)
     async function bajaCancion(ctx) {
@@ -912,9 +912,13 @@
       if (!await currentUser()) throw new Error("sin sesión de Google");
       const busca = async () => {
         const lib = JSON.parse(new TextDecoder().decode(await downloadPath(`${SITE.storageRoot}/library.json`)));
-        const s = (lib.songs || []).find(x => [x.meta?.name, x.folder, x.id].some(n => norma(n).includes(BUSCA)));
-        if (!s) throw new Error("«" + BUSCA + "» no está en la biblioteca de PRO HERO");
-        const e = { folder: s.folder, v: s.v || "", audio: Object.values(s.audio || {}).filter(Boolean) };
+        /* Lo que PRO HERO muestra de cada canción: su título y su artista (meta.name, meta.artist), más su carpeta. Se
+           comparan sin mayúsculas, tildes, espacios ni signos: «Chin Chon Chín», «chin-chon-chin» y «ChinChonChin» son
+           la misma. Primero por título; si ninguna, por artista o carpeta. */
+        const songs = lib.songs || [], tiene = (x, ks) => ks.some(k => norma(k(x)).includes(BUSCA));
+        const s = songs.find(x => tiene(x, [y => y.meta?.name])) || songs.find(x => tiene(x, [y => y.meta?.artist, y => y.folder, y => y.id]));
+        if (!s) throw new Error("no encontré «" + BUSCA + "» en la biblioteca de PRO HERO (" + songs.length + " canciones)");
+        const e = { folder: s.folder, v: s.v || "", audio: Object.values(s.audio || {}).filter(Boolean), nombre: s.meta?.name || "", artista: s.meta?.artist || "" };
         try { localStorage.setItem(CLAVE + ".cancion", JSON.stringify(e)); } catch (x) {}
         return e;
       };
@@ -928,15 +932,22 @@
         return ctx.decodeAudioData(b.slice(0));   // (decodificar se queda con el buffer: va una copia)
       };
       if (!e) e = await busca();
-      try { return await Promise.all(e.audio.map(pista)); }
-      catch (x) { e = await busca(); return Promise.all(e.audio.map(pista)); }   // (la recordada cambió de lugar o de versión)
+      let r;
+      try { r = await Promise.all(e.audio.map(pista)); }
+      catch (x) { e = await busca(); r = await Promise.all(e.audio.map(pista)); }   // (la recordada cambió de lugar o de versión)
+      hallada = e;
+      return r;
     }
 
     const volumen = () => BASE * Math.max(0, Math.min(100, Module._Web_MusicaPorcentaje ? Module._Web_MusicaPorcentaje() : 100)) / 100;
     async function empieza() {
       const ctx = Module.SDL3 && Module.SDL3.audioContext;
       if (!ctx || !quiere() || fallo || sonando) return;
-      if (!pistas) pistas = bajaCancion(ctx).catch(e => { console.warn("[bt3] música de pelea: suena la del juego —", e.message || e); fallo = true; pistas = null; return null; });
+      if (!pistas) pistas = bajaCancion(ctx).catch(e => {
+        fallo = String(e.message || e);
+        console.warn("[bt3] música de pelea: suena la del juego —", fallo);
+        pistas = null; pintaBoton(); return null;
+      });
       const bufs = await pistas;
       if (!bufs || !bufs.length || !enPelea || sonando || !quiere()) return;
       const gan = ctx.createGain(), t = ctx.currentTime + 0.05, largo = Math.min(...bufs.map(b => b.duration));
@@ -968,14 +979,17 @@
     const boton = document.createElement("button");
     boton.id = "musica"; boton.type = "button";
     function pintaBoton() {
-      const si = quiere();
-      boton.textContent = si ? "♪ Chinchonchin" : "♪ Música del juego";
-      boton.title = si ? "En las peleas suena «chinchonchin» (de PRO HERO). Clic: la música del juego" : "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)";
+      const si = quiere(), cual = hallada && hallada.nombre ? `«${hallada.nombre}»${hallada.artista ? " de " + hallada.artista : ""}` : "«chinchonchin»";
+      // (si no se pudo, el botón lo dice: así se sabe por qué suena la del juego)
+      boton.textContent = !si ? "♪ Música del juego" : fallo ? "♪ Chinchonchin ⚠" : "♪ Chinchonchin";
+      boton.title = !si ? "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)"
+        : fallo ? `No suena ${cual}: ${fallo}. Suena la música del juego. Clic: elegir la música del juego`
+        : `En las peleas suena ${cual}, de PRO HERO. Clic: la música del juego`;
       boton.setAttribute("aria-pressed", String(si));
     }
     boton.onclick = () => {
       try { localStorage.setItem(CLAVE, quiere() ? "juego" : "cancion"); } catch (e) {}
-      if (quiere()) { fallo = false; if (enPelea) empieza(); } else para();
+      if (quiere()) { fallo = ""; if (enPelea) empieza(); } else para();
       pintaBoton();
     };
     pintaBoton();

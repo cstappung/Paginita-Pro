@@ -302,8 +302,9 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   `Module._Web_BgmPropia(1)`: `Adx_CalcOutVol` (src/sys/adx.c) then returns mute **only for the BGM channel and only
   while `gWebEnPelea`**; MAP (stage), voices and SE keep playing, menus keep their music. `Web_BgmAplica` re-applies
   the stored volume (`sWebBgmVol`) when either flag changes. Sound only: both copies of an online fight stay identical.
-- The page (`pagina.js`, 2d) finds the song in PRO HERO's `library.json` (name/folder contains `chinchonchin`,
-  normalized), remembers `{folder, v, audio}` in `bt3.musica.cancion`, and gets its stems with **PRO HERO's own
+- The page (`pagina.js`, 2d) finds the song in PRO HERO's `library.json`: first by title (`meta.name`, what PRO HERO
+  shows), then by artist/folder/id, all normalized (no case, accents, spaces or signs: «Chin Chon Chín» matches). The ♪
+  button says which song it found, or why it failed (⚠ + its tooltip). It remembers `{folder, v, audio}` in `bt3.musica.cancion`, and gets its stems with **PRO HERO's own
   modules** (`../hero/js/cloud.js`, `site.js`, `songCache.js`): same Google session, same Cache Storage key, so a song
   already played in PRO HERO is not downloaded again. Nothing of this loads until the first battle starts.
 - Stems play together, looped at the shortest stem's length, into the SDL context's `destination` (= `pre`, 0a): the
