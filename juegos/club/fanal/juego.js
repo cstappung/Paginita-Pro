@@ -3369,7 +3369,7 @@
     cielo.estrellas = creaEstrellas(Math.min(P.luces, 430), 7);
     luciernagas = [];
     creaMotas();
-    if (Club) Club.category("club-fanal-travesia");
+    if (Club) Club.category("club-fanal-jornadas");
     oculta("capaPortada"); oculta("capaFin");
     if (!p) {                                                          // la introducción, solo al empezar de cero
       cielo.desde = cielo.hacia = 1; cielo.mezcla = 1; document.documentElement.dataset.acto = 1;
@@ -3462,7 +3462,7 @@
     cielo.desde = cielo.hacia = 1; cielo.mezcla = 1; html.dataset.acto = 1;
     cielo.estrellas = creaEstrellas(260, 3); creaMotas(); cielo.lleno = 0; cielo.velObj = 4;
     musica.ponEtapa("titulo", true); musica.estado({ modo: "titulo", jefe: null });
-    if (Club) Club.category("club-fanal-travesia");
+    if (Club) Club.category("club-fanal-jornadas");
     pintaPortada(); muestra("capaPortada");
     pintaHud(true); pintaLlamas();
   }
@@ -4646,13 +4646,16 @@
   F = nuevoFanal();
   aplicaOpciones();
   aplicaSonido();
-  if (Club) Club.category("club-fanal-travesia");
+  if (Club) Club.category("club-fanal-jornadas");
   aPortada();
   requestAnimationFrame(cuadro);
   // El récord de la nube, cuando llega, se muestra como récord.
   window.addEventListener("club-record", e => {
     const d = e.detail || {};
     if (d.categoria === "club-fanal-travesia") prog.mejor.travesia = Math.max(prog.mejor.travesia, d.puntos || 0);
+    // La tabla que se ve es la de jornadas: su fila también es récord (y
+    // evita volver a mandar una jornada que la nube ya tiene).
+    if (d.categoria === "club-fanal-jornadas") prog.mejor.jornada = Math.max(prog.mejor.jornada, d.puntos || 0);
     pintaHud(); pintaPortada();
   });
 
