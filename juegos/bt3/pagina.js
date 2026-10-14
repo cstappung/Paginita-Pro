@@ -45,7 +45,10 @@
       await guarda(h);
       go(fileDisc(f));
     } catch (err) {
-      if (err && err.name !== "AbortError") say("No se pudo abrir el archivo: " + (err.message || err), true);
+      if (err && err.name === "AbortError") return;   // cerró el selector sin elegir
+      // Un marco que no deja usar el selector (sandbox): el <input> de siempre, sin recordar el archivo.
+      if (err && (err.name === "SecurityError" || err.name === "NotAllowedError" || err.name === "TypeError")) { $("iso").click(); return; }
+      say("No se pudo abrir el archivo: " + (err.message || err), true);
     }
   });
   // La ISO de la última vez: un botón que la vuelve a abrir (el navegador pide permiso si hace falta).
@@ -123,6 +126,8 @@
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
+  // La sala de prueba corre dos juegos en la misma pestaña: menos caché del disco por cada uno.
+  if (S.prueba) Module.webCacheBudget = 192 * 1024 * 1024;
 
   let est = null, cuandoEmpiece = null, ronda = 0;
   S.alEstado(e => {
