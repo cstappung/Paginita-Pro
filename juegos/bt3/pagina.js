@@ -55,10 +55,20 @@
       say("No se pudo abrir el archivo: " + (err.message || err), true);
     }
   });
-  // La ISO de la última vez: un botón que la vuelve a abrir (el navegador pide permiso si hace falta).
-  leeAsa().then(h => {
+  /* La ISO de la última vez. Si el navegador todavía deja leerla (Chrome y Edge, después de «Permitir en cada
+     visita»), se usa sola: el jugador la elige una vez y nunca más, ni en las peleas de una sala. Si el permiso
+     venció, queda un botón «Usar …» que lo vuelve a pedir con un clic (pedirlo exige un clic del jugador). */
+  leeAsa().then(async h => {
     if (!h || !$("recordada")) return;
     const b = $("recordada");
+    try {
+      if (await h.queryPermission({ mode: "read" }) === "granted") {
+        const f = await h.getFile();                 // (falla si la movieron o la borraron: cae al botón)
+        say("Usando " + h.name + "…");
+        go(fileDisc(f));
+        return;
+      }
+    } catch (err) {}
     b.textContent = "Usar " + h.name;
     b.hidden = false;
     b.onclick = async () => {
