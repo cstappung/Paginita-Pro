@@ -184,6 +184,12 @@ first sends that one. Things that matter:
   before proof version 4 (shown as «Sin fin (hasta oct. 2026)»; the rules
   still accept it, so they needed no change). `jornadas` is only sent when it
   improves, because every result counts as a club play and pays coins.
+  **The top is the jornadas table** (since oct. 2026): the game's own panel
+  (`Club.category("club-fanal-jornadas")`, «jornada N» in `conexion.js`) and
+  the first option in the Clasificación (`ranks.js`). Ties go to the shorter
+  time, as in every club table. Points still have their own table
+  (Travesía). The champion frame already went to the n.º 1 of *any* FANAL
+  table (`campeones`), so it did not change.
   Ten logros (`deMarca`), coins (the jornadas record pays like BBTAN's
   rounds, `monedasFanal`: jornada n pays 5n + 5 up to 250 from the 49th,
   nothing past the 160th — 220 for the Alba, 1150 for the Sol; and 1
