@@ -265,6 +265,16 @@ const REPERTORIO = {
   cosecha:  (a, t) => [79, 83, 86, 91].forEach((n, k) => campana(a, t + k * 0.055, H(n), 0.05 - k * 0.006, 0.9)),
   ladron:   (a, t) => { [55, 53, 50].forEach((n, k) => P(a, t + k * 0.13, H(n), 0.12, { onda: "tri", vol: 0.13 }));
                         soplo(a, t, 0.45, 0.07, { f: 380, f1: 140, q: 1.1, tipo: "lowpass" }); },
+  /* BT3 (la llave del torneo y el duelo): un soplo de ki que sube y dos notas cuando alguien avanza; el mismo
+     soplo bajando cuando quedas fuera; y la coronación del campeón, un arpegio con brillo encima. Suaves:
+     suenan sobre la sala, no sobre el juego. */
+  kiAvanza: (a, t) => { soplo(a, t, 0.32, 0.07, { f: 500, f1: 3400, q: 1.1, ataque: 0.05 });
+                        P(a, t + 0.18, H(84), 0.07, { onda: "p50", vol: 0.06 }); P(a, t + 0.26, H(91), 0.2, { onda: "p50", vol: 0.06, sus: 0.6 }); },
+  kiCae:    (a, t) => { soplo(a, t, 0.4, 0.05, { f: 2200, f1: 300, q: 1.1 }); seno(a, t + 0.05, 330, 160, 0.45, 0.08, "triangle"); },
+  kiCorona: (a, t) => { soplo(a, t, 0.7, 0.07, { f: 300, f1: 4000, q: 0.9, ataque: 0.2 });
+                        [67, 72, 76, 79, 84].forEach((n, k) => P(a, t + 0.35 + k * 0.08, H(n), 0.09, { onda: "p50", vol: 0.065 }));
+                        [76, 79, 84].forEach(n => P(a, t + 0.8, H(n), 0.9, { onda: "p25", vol: 0.045, sus: 0.7, vib: 0.015 }));
+                        [96, 100, 103, 108].forEach((n, k) => campana(a, t + 0.9 + k * 0.09, H(n), 0.025, 0.6)); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });

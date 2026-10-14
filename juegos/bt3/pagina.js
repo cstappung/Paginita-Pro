@@ -53,7 +53,13 @@
      la copia en memoria). Si algo falla, se carga como siempre. */
   (async () => {
     const url = Module.locateFile ? Module.locateFile("bt3-jspi.wasm", "") : "bt3-jspi.wasm";
-    try {
+    /* Ya bajado antes (esta misma versión): sin barra, directo de la caché del navegador. Así Chrome además
+       reusa el código ya compilado (lo guarda solo para un .wasm cargado de su dirección, no de un blob), y el
+       juego arranca en un momento en vez de recompilar 3,6 MB cada vez. */
+    const yaBajado = "bt3.wasm." + url;
+    let bajadoAntes = false;
+    try { bajadoAntes = localStorage.getItem(yaBajado) === "1"; } catch (e) {}
+    if (!bajadoAntes) try {
       Progreso.tarjeta("Descargando el juego…", 0);
       const r = await fetch(url);
       if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
@@ -71,6 +77,8 @@
       const enMemoria = URL.createObjectURL(new Blob(trozos, { type: "application/wasm" }));
       const original = Module.locateFile;
       Module.locateFile = (f, base) => f.endsWith(".wasm") ? enMemoria : (original ? original(f, base) : base + f);
+      try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith("bt3.wasm.")) localStorage.removeItem(k); }
+            localStorage.setItem(yaBajado, "1"); } catch (e) {}
     } catch (e) {
       Module.keep && Module.keep("descarga con barra: " + (e.message || e) + " (se carga sin barra)");
     }
@@ -179,14 +187,28 @@
     const { size, pieza } = await r.json();
     // Los pedazos de 1 MB, como el disco alojado del fork: los últimos 48 en memoria y, si el juego lee en
     // orden (un escenario, un luchador), los 4 siguientes por adelantado.
+    /* Lo ya bajado se guarda en este computador (Cache Storage, «bt3-disco:<tamaño>»): la segunda vez el menú,
+       los luchadores y los escenarios que ya usaste salen de aquí, sin red. El juego nunca baja la ISO entera,
+       solo los archivos que abre. Se pide el índice al Worker igual cada vez, así que quien sale de la lista
+       deja de entrar aunque tenga pedazos guardados. Si el navegador no deja guardar, se sigue sin caché. */
+    const almacen = await (async () => { try { return await caches.open("bt3-disco:" + size); } catch (e) { return null; } })();
+    try { navigator.storage?.persist?.(); } catch (e) {}   // que el navegador no lo borre al primer apuro de espacio
     const trae = async i => {
+      const url = base + "/pieza/" + String(i).padStart(5, "0") + ".bin";
+      if (almacen) {
+        try { const g = await almacen.match(url); if (g) return new Uint8Array(await g.arrayBuffer()); } catch (e) {}
+      }
       for (let intento = 0; ; intento++) {
-        const res = await fetch(base + "/pieza/" + String(i).padStart(5, "0") + ".bin", { headers: { Authorization: "Bearer " + token } });
+        const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
         if (res.status === 401 && intento < 2) { token = (await pideToken(true)) || token; continue; }   // el token dura una hora
         if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
-        return new Uint8Array(await res.arrayBuffer());
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (almacen) almacen.put(url, new Response(bytes)).catch(() => {});
+        return bytes;
       }
     };
+    // al cambiar la ISO subida (otro tamaño), lo guardado de la anterior no sirve: se borra
+    try { for (const k of await caches.keys()) if (k.startsWith("bt3-disco:") && k !== "bt3-disco:" + size) caches.delete(k); } catch (e) {}
     const guardados = new Map(), cuantas = Math.ceil(size / pieza);
     const pedazo = i => {
       let q = guardados.get(i);
@@ -284,6 +306,44 @@
     if (ms) relojAviso = setTimeout(() => caja.classList.remove("on"), ms);
   }
 
+  // ---------------------------------------------------------------- 2b. un jugador: qué modo
+  /* Fuera de una sala, con el disco ya reconocido y antes de arrancar el programa, se elige el modo: el
+     programa entra directo a él (BT3_WEB_MODO, parche.diff: headless.c). «Menú del juego» es el juego entero
+     desde su menú (historia, torneos, Evolution Z…). El clic sirve además para que el navegador deje sonar el
+     juego desde el primer momento. Si la página trae ?juego=cpu|entrenamiento|menu, entra sin preguntar. */
+  const MODOS = [
+    ["cpu", "🥊", "Contra la CPU", "Eliges personajes y peleas contra la máquina."],
+    ["entrenamiento", "🎯", "Entrenamiento", "El modo entrenamiento del juego: sus lecciones y la práctica libre."],
+    ["menu", "🐉", "Menú del juego", "Todo lo demás: historia, torneos, Evolution Z…"],
+  ];
+  function eligeModo() {
+    const directo = Q.get("juego");
+    const pone = m => {
+      try { localStorage.setItem("bt3.modo", m); } catch (e) {}
+      Module.entornoPendiente = m === "menu" ? [] : [["BT3_WEB_MODO", m]];   // (las películas de entrada ya van apagadas: BT3_NOMOVIE)
+    };
+    if (MODOS.some(x => x[0] === directo)) { pone(directo); return; }
+    let ultimo = "cpu";
+    try { ultimo = localStorage.getItem("bt3.modo") || "cpu"; } catch (e) {}
+    const capa = document.createElement("div");
+    capa.id = "modos";
+    capa.innerHTML = `<div class="card"><p class="ceja">Disco listo</p><h2>¿Qué quieres jugar?</h2>
+      <div class="modos">${MODOS.map(([k, ico, t, d]) => `<button data-m="${k}" class="${k === ultimo ? "ultimo" : ""}">
+        <span aria-hidden="true">${ico}</span><b>${t}</b><small>${d}</small></button>`).join("")}</div>
+      <p class="nota">Duelo y torneo contra tus amigos: se juegan desde una sala de Juegos.</p></div>`;
+    document.body.append(capa);
+    (capa.querySelector(".ultimo") || capa.querySelector("button")).focus();
+    return new Promise(ok => capa.querySelectorAll("button").forEach(b => b.onclick = () => {
+      try { audioUnlock(); } catch (e) {}
+      pone(b.dataset.m);
+      capa.remove();
+      Module.canvas.focus();
+      ok();
+    }));
+  }
+  // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)
+  if (Q.get("modo") !== "online") window.Sala = { entorno: () => ({ BT3_NOMOVIE: "1" }), antesDeEmpezar: eligeModo };
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
@@ -307,7 +367,7 @@
     entorno: () => ({ BT3_NOMOVIE: "1" }),
     async antesDeEmpezar() {
       S.avisa("disco");   // la ISO ya pasó la prueba: la sala lo anota
-      aviso("Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
+      aviso(est && est.torneo ? "Disco listo. Esperando tu pelea del torneo…" : "Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
       aviso("Conectando con " + e.rival.nombre + "…", 0, true);
@@ -331,6 +391,15 @@
       try { FS.mkdir("/net_session"); } catch (err) {}
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },
+  };
+
+  /* El fin de cada pelea (__wrap_BattleResult_Finish en el programa): quién ganó, para la sala. Los dos marcos
+     cuentan lo mismo porque calculan la misma pelea; la sala lo anota cuando coinciden (marcador del duelo, o
+     el ganador de una pelea del torneo). `b` es cuál pelea de esta sesión (el versus sigue pelea tras pelea). */
+  let batallas = 0;
+  Module.onFinBatalla = bits => {
+    Module.keep("pelea terminada: " + (bits & 4 ? "empate" : bits & 1 ? "ganó el jugador 1" : bits & 2 ? "ganó el jugador 2" : "sin ganador") + " (" + bits + ")");
+    S.avisa("resultado", { bits, b: batallas++ });
   };
 
   // Lo que dice el programa de la sesión (gs/net.c): al terminar, la sala vuelve al vestíbulo.

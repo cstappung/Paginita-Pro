@@ -231,6 +231,10 @@ const OPCIONES = {
      (gana el último en pie). Ninguno es `modo`. */
   /* PRO HERO: solo cuántos caben; la canción se elige dentro de la sala. */
   hero: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("hero") }],
+  /* BT3: el formato es el cupo. Dos es un duelo; más es un torneo de eliminación directa (redTorneoBt3), que
+     el organizador empieza cuando están todos. */
+  bt3: [{ clave: "cupo", etiqueta: "Formato", por: 2, valores: [
+    { v: 2, t: "Duelo (1 contra 1)" }, { v: 4, t: "Torneo, hasta 4" }, { v: 8, t: "Torneo, hasta 8" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [
@@ -2104,7 +2108,12 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    (PRODROP es una tienda, BBTAN un juego del club, zombis un modo de
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
-const NOVEDADES = [
+const NOVEDADES_TODAS = [
+  /* BT3 es privado: su diapositiva solo la ven los amigos del disco (bt3Visible, bt3-amigos.js). */
+  { id: "bt3", color: "#ff8a00", alta: "2026-10-14", titulo: "Budokai Tenkaichi 3",
+    lema: "El juego de PS2 completo, en el navegador y a 60 cuadros: contra la CPU, en entrenamiento, o en línea con tus amigos en duelos con revancha y torneos de hasta ocho con su llave.",
+    sub: "Solo PC · Chrome o Edge · un jugador, duelo o torneo", sala: { k: "bt3", ops: { cupo: 2 } }, reglas: ["bt3"],
+    modo: "multi", jugadores: "2–8 jugadores", cuenta: true },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
     lema: "Fútbol de discos en tiempo real: muévete, choca la pelota y patea con espacio. Rojo contra azul, el primero que llega a los goles pactados gana. Solo, contra bots, o en sala con tu gente.",
     sub: "2–8 jugadores · rojo contra azul", sala: { k: "haxball", ops: {} }, reglas: ["haxball"],
@@ -2164,6 +2173,9 @@ const NOVEDADES = [
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
+// Lo que se muestra: sin BT3 para quien no está en la lista de amigos.
+let NOVEDADES = NOVEDADES_TODAS;
+const filtraNovedades = () => { NOVEDADES = NOVEDADES_TODAS.filter(n => n.id !== "bt3" || bt3Visible()); };
 function arteNovedad(n) {
   // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
   if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
@@ -2195,6 +2207,7 @@ function arteNovedad(n) {
   if (n.id === "hero") return `<div class="jg-nov-arte-zb">${portadaSolo("hero")}<b>PRO HERO</b></div>`;
   if (n.id === "tulonesred") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>EN LÍNEA</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
+  if (n.id === "bt3") return `<div class="jg-nov-arte-bt3">${arteJuego("bt3")}</div>`;
   if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
   if (n.id === "haxball") return `<div class="jg-nov-arte-zb">${arteJuego("haxball")}</div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
@@ -2219,6 +2232,7 @@ const plataformaDe = id => id ? { movil: enMovil(id), pc: enPc(id) } : {};
    última a la primera sigue hacia la derecha y, al terminar, la pista
    salta sin transición a la primera de verdad (`enganchaBanner`). */
 function novedadesHtml() {
+  filtraNovedades();
   const inv = state.invitado, N = NOVEDADES.length;
   const diapo = (n, i, copia) => {
     /* Como invitado solo se abren los cuatro juegos libres; lo demás
@@ -2739,7 +2753,7 @@ function panelEspera(p, est) {
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
-        : p.juego === "bt3" ? `<div class="jg-nota">Cada uno elige su ISO abajo; elijan quién es el anfitrión y él empieza la pelea.</div>`
+        : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
         : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
@@ -3385,7 +3399,7 @@ function arteJuego(k) {
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
-  if (k === "bt3") return '<div class="jg-art-bt3"><i></i><i></i><i></i><b></b><em>TENKAICHI 3</em></div>';
+  if (k === "bt3") return '<div class="jg-art-bt3"><s></s><b></b>' + "<i></i>".repeat(7) + '<em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>';
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';

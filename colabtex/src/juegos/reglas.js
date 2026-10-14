@@ -445,28 +445,36 @@ const REGLAS = {
     ]
   },
   bt3: {
-    lema: "El juego de PS2 completo en el navegador, con tu propia ISO: uno contra uno en línea, o solo contra la CPU.",
+    lema: "El juego de PS2 completo en el navegador. Cuatro modos: contra la CPU, entrenamiento, duelo y torneo en línea con tus amigos.",
     secciones: [
-      ["Tu ISO", lista([
-        "Cada jugador necesita su propia imagen del disco, versión <b>USA</b> (SLUS-21678), sin modificar. Se lee solo en tu navegador: no se sube a ningún lado y la página no trae nada del juego.",
-        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). La página recuerda tu ISO: la próxima vez basta con <b>Usar …</b>.",
-        "Si la ISO no es la USA sin modificar, el juego lo dice al arrancar y no sigue."
+      ["Los modos", lista([
+        "<b>Contra la CPU</b> y <b>Entrenamiento</b> son de un jugador: la ficha <b>Tenkaichi 3 · un jugador</b> abre el juego y, con el disco listo, eliges el modo y entra directo (Entrenamiento es el del juego: sus lecciones y la práctica libre). <b>Menú del juego</b> abre todo lo demás: historia, torneos, Evolution Z.",
+        "<b>Duelo</b> (1 contra 1) y <b>Torneo</b> (hasta 4 u 8, eliminación directa) son salas en línea: se eligen en <b>Formato</b> al abrir la sala."
       ])],
-      ["El vestíbulo", lista([
-        "Antes de cada pelea los dos eligen su ISO; la sala muestra <b>ISO lista</b> al lado de cada nombre.",
-        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑) con <b>Hacer anfitrión</b>. El anfitrión es el jugador 1 y pone las reglas: <b>Single Battle</b>, <b>Team Battle</b> o <b>DP Battle</b> de 10, 15 o 20, y el tiempo de cada round.",
-        "Con las dos ISO listas, el anfitrión aprieta <b>Empezar pelea</b>. Al terminar, los dos vuelven al vestíbulo para la revancha."
+      ["El disco", lista([
+        "Si estás en la lista de amigos del disco privado, el juego carga solo: no eliges nada. Lo que ya cargaste queda guardado en tu computador y la próxima vez sale de ahí, sin descargar.",
+        "Si no, necesitas tu propia imagen del disco, versión <b>USA</b> (SLUS-21678), sin modificar. Se lee solo en tu navegador y la página la recuerda: la próxima vez basta con <b>Usar …</b>.",
+        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). El juego va a 60 cuadros por segundo; si tu computador sufre, en <b>Ajustes → Video → Smooth motion</b> se baja a 30, como la consola."
+      ])],
+      ["Duelo", lista([
+        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, y el tiempo de cada round. Con los dos discos listos aprieta <b>¡A pelear!</b>.",
+        "Al terminar la pelea el juego cuenta solo quién ganó: se cierra, vuelven los dos al vestíbulo y se suma al marcador.",
+        "<b>Revancha</b>: la piden los dos y empieza sola, con las mismas reglas, en cuanto cargan los dos discos."
+      ])],
+      ["Torneo", lista([
+        "El que abre la sala organiza: pone las reglas y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave se sortea entre los que están; si no son 4 u 8, alguno pasa directo.",
+        "Las peleas van de a una. El ganador lo cuentan solos los juegos de los dos peleadores y avanza en la llave; si los dos juegos no dicen lo mismo decide el organizador. Un empate se vuelve a pelear.",
+        "Quien se va pierde sus peleas. Gana el torneo quien gana la final."
       ])],
       ["La conexión", lista([
         "La pelea va <b>directo de un navegador al otro</b> (WebRTC): solo viajan los botones de cada uno, y los dos computadores calculan la misma pelea. Firebase solo los presenta al empezar.",
-        "Cada botón actúa unos cuadros después, los justos para que llegue al otro a tiempo: con un ping bajo casi no se nota. El ping se ve en <b>Ajustes → Video</b>.",
+        "Cada botón actúa unos cuadros después, los justos para que llegue al otro a tiempo: con un ping bajo casi no se nota.",
         "Algunas redes (datos del celular, redes de oficina) no dejan una conexión directa: entonces la sala lo avisa. Prueben otra red."
       ])],
       ["Controles", lista([
         "Teclado, o un mando de PS4, PS5 o Xbox por USB o Bluetooth. <b>Ajustes</b> (o F1) abre la ventana del juego en <b>Controls</b>: ahí eliges qué mando usa cada jugador y cambias los botones."
       ])],
-      ["Ganar", "El juego no le dice a la página quién ganó cada pelea, así que estas salas no suman a la clasificación. Sus logros salen de las peleas que juegas: la primera, de anfitrión, revanchas, Team Battle, DP Battle."],
-      ["Un jugador", "La ficha <b>Tenkaichi 3 · un jugador</b> abre el juego completo sin sala: historia, torneos, versus contra la CPU, o 1P contra 2P con dos mandos en el mismo computador."]
+      ["Ganar", "Estas salas no suman a la clasificación del sitio. Sus logros salen de las peleas que juegas: la primera, de anfitrión, revanchas, Team Battle, DP Battle."]
     ]
   },
   haxball: {

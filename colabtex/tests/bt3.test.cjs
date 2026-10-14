@@ -74,3 +74,80 @@ test('está en las reglas de Firebase, en el marco de campeón y en el salón',(
  assert.match(fs.readFileSync(raiz('src/juegos/marcos-animados.js'),'utf8'),/tbt3: bt3/);
  assert.match(fs.readFileSync(raiz('src/juegos/salon-datos.js'),'utf8'),/bt3: "Pelea"/);
 });
+
+// ---------- el torneo ----------
+const torneo=(n,...js)=>({juego:'bt3',anfitrion:'u0',estado:'jugando',cupo:8,semilla:3,
+ jugadores:Object.fromEntries(Array.from({length:n},(_,i)=>['u'+i,{nombre:'J'+i,orden:i}])),
+ jugadas:Object.fromEntries(js.map((j,i)=>[String(i).padStart(4,'0'),j]))});
+// Juega la pelea actual del estado `e` con el ganador que diga `quien(m)`, y devuelve las jugadas.
+const pelea=(m,g)=>[{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'resultado',uid:m.a,m:m.id,g},{t:'resultado',uid:m.b,m:m.id,g}];
+
+test('torneo: lo empieza el organizador con 3 o más; la llave tiene byes y todos son distintos',()=>{
+ assert.equal(B.reducir(torneo(2,{t:'torneo',uid:'u0'})).fase,'vestibulo','con 2 no hay torneo');
+ assert.equal(B.reducir(torneo(5,{t:'torneo',uid:'u1'})).fase,'vestibulo','u1 no organiza');
+ const e=B.reducir(torneo(5,{t:'torneo',uid:'u0'}));
+ assert.equal(e.fase,'torneo');assert.equal(e.llave.length,3,'5 jugadores: llave de 8, tres rondas');
+ const primera=e.llave[0].flatMap(m=>[m.a,m.b]).filter(Boolean);
+ assert.deepEqual([...primera].sort(),['u0','u1','u2','u3','u4']);
+ assert.equal(e.llave[0].filter(m=>m.b==='').length,3,'tres pasan directo');
+ assert.ok(e.actual&&e.actual.a&&e.actual.b,'hay una pelea esperando');
+ assert.deepEqual(JSON.stringify(B.reducir(torneo(5,{t:'torneo',uid:'u0'})).llave),JSON.stringify(e.llave),'la misma semilla, la misma llave');
+});
+
+test('torneo completo de 8: siete peleas y un campeón, con los resultados que cuentan los dos marcos',()=>{
+ const js=[{t:'torneo',uid:'u0'}];let e=B.reducir(torneo(8,...js)),n=0;
+ while(e.fase==='torneo'&&n<20){const m=e.actual;js.push(...pelea(m,m.b));e=B.reducir(torneo(8,...js));n++;}
+ assert.equal(n,7);assert.equal(e.fase,'fin');assert.equal(e.motivo,'torneo');assert.ok(e.ganador);
+ assert.equal(e.ronda,7,'cada pelea cuenta como una ronda para los logros');
+});
+
+test('torneo: si no coinciden decide el organizador; un empate se vuelve a pelear; sin los dos discos no empieza',()=>{
+ let js=[{t:'torneo',uid:'u0'}],e=B.reducir(torneo(4,...js));const m=e.actual;
+ e=B.reducir(torneo(4,...js,{t:'disco',uid:m.a},{t:'empieza',uid:m.a,m:m.id}));assert.equal(e.actual.enCurso,false,'falta un disco');
+ js.push({t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.b,m:m.id},{t:'resultado',uid:m.a,m:m.id,g:m.a},{t:'resultado',uid:m.b,m:m.id,g:m.b});
+ e=B.reducir(torneo(4,...js));assert.equal(e.actual.id,m.id);assert.equal(e.actual.conflicto,true);
+ assert.equal(B.reducir(torneo(4,...js,{t:'decide',uid:'u1',m:m.id,g:m.a})).actual.id,m.id,'u1 no organiza: su decisión no cuenta');
+ e=B.reducir(torneo(4,...js,{t:'decide',uid:'u0',m:m.id,g:m.b}));assert.notEqual(e.actual.id,m.id,'decidió: pasa a la siguiente');
+ assert.equal(e.llave[0].find(x=>x.id===m.id).g,m.b);
+ const emp=[{t:'torneo',uid:'u0'},{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'resultado',uid:m.a,m:m.id,g:'empate'},{t:'resultado',uid:m.b,m:m.id,g:'empate'}];
+ e=B.reducir(torneo(4,...emp));assert.equal(e.actual.id,m.id);assert.equal(e.actual.enCurso,false,'empate: la misma pelea otra vez');
+ assert.equal(e.discos[m.a],false,'sus marcos se recargan: los discos se confirman de nuevo');
+});
+
+test('torneo: quien se va pierde su pelea en curso y las que le tocaban',()=>{
+ let js=[{t:'torneo',uid:'u0'}],e=B.reducir(torneo(4,...js));const m=e.actual;
+ js.push({t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'abandona',uid:m.a});
+ e=B.reducir(torneo(4,...js));assert.equal(e.llave[0].find(x=>x.id===m.id).g,m.b,'gana el que se quedó');
+ assert.notEqual(e.fase,'fin','el torneo sigue');
+ const resto=[...js];while(e.fase==='torneo'){const x=e.actual;resto.push(...pelea(x,x.a));e=B.reducir(torneo(4,...resto));}
+ assert.equal(e.fase,'fin');assert.notEqual(e.ganador,m.a);
+});
+
+test('duelo: al terminar cada pelea vuelven solos al vestíbulo; el marcador cuenta las que los dos marcos dicen igual',()=>{
+ const base=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'}];
+ const r=(n,ga,gb)=>[{t:'resultado',uid:'a',n,b:0,g:ga},{t:'resultado',uid:'b',n,b:0,g:gb}];
+ let e=B.reducir(sala(...base,{t:'resultado',uid:'a',n:1,b:0,g:'a'}));
+ assert.equal(e.fase,'jugando','con un solo marco no se cierra');
+ e=B.reducir(sala(...base,...r(1,'a','a')));
+ assert.equal(e.fase,'vestibulo','los dos lo dijeron: de vuelta al vestíbulo');assert.deepEqual({...e.discos},{},'los discos se piden de nuevo');
+ e=B.reducir(sala(...base,...r(1,'a','a'),...base,...r(2,'b','a'),...base,...r(3,'empate','empate')));
+ assert.deepEqual({...e.marcador},{a:1},'la segunda no cuenta: no coinciden');assert.equal(e.empates,1);
+ assert.equal(e.ronda,3);assert.equal(e.fase,'vestibulo');
+ e=B.reducir(sala(...base,...r(1,'a','a'),{t:'resultado',uid:'a',n:1,b:1,g:'b'}));
+ assert.deepEqual({...e.marcador},{a:1},'un resultado tardío de la pelea ya cerrada no cuenta');
+});
+
+test('duelo: la revancha la confirman los dos y empieza sola cuando cargan los discos',()=>{
+ const pelea=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'},{t:'resultado',uid:'a',n:1,b:0,g:'a'},{t:'resultado',uid:'b',n:1,b:0,g:'a'}];
+ let e=B.reducir(sala({t:'revancha',uid:'a'}));assert.deepEqual({...e.revancha},{},'sin una pelea antes no hay revancha');
+ e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'}));
+ assert.equal(e.fase,'vestibulo');assert.deepEqual({...e.revancha},{b:true},'falta que confirme a');
+ e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'},{t:'revancha',uid:'a'}));
+ assert.equal(e.fase,'vestibulo','los dos dijeron que sí, pero faltan los discos');
+ e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'},{t:'revancha',uid:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'jugando','empieza sola');assert.equal(e.ronda,2);assert.deepEqual({...e.revancha},{});
+ e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'},{t:'revancha',uid:'b',no:true},{t:'revancha',uid:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'vestibulo','b se arrepintió');
+ e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'},{t:'ajuste',uid:'a',k:'tiempo',v:60},{t:'revancha',uid:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'vestibulo','cambiaron las reglas: b tiene que confirmar de nuevo');
+});

@@ -1,3 +1,19 @@
+diff --git a/port/src/gs/gs_draw.c b/port/src/gs/gs_draw.c
+index de3de89..5914b0c 100644
+--- a/port/src/gs/gs_draw.c
++++ b/port/src/gs/gs_draw.c
+@@ -3193,7 +3193,11 @@ void GsGpu_FrameEnd(void) {
+             }
+         }
+         if (gsInterp < 0) {
++#ifdef __EMSCRIPTEN__ /* the browser build (paginita-pro): 60 pictures a second unless the player turned it off in F1 */
++            gsInterp = getenv("BT3_INTERP") != NULL ? atoi(getenv("BT3_INTERP")) : Port_Setting("interp", 1);
++#else
+             gsInterp = getenv("BT3_INTERP") != NULL ? atoi(getenv("BT3_INTERP")) : Port_Setting("interp", 0);
++#endif
+             gsInterp = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
+             sInterpPrev = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
+             sInterpBlend = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
 diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
 index fd6cc57..79829bd 100644
 --- a/port/src/gs/ui.cpp
@@ -27,11 +43,43 @@ index fd6cc57..79829bd 100644
  static void net_open(void) {
      set_open(true);
      sNet = true;
+diff --git a/port/src/headless.c b/port/src/headless.c
+index fb8b892..600a51f 100644
+--- a/port/src/headless.c
++++ b/port/src/headless.c
+@@ -134,6 +134,27 @@ int __wrap_Progress_Main(int arg) {
+                             time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
+                 }
+             }
++#ifdef __EMSCRIPTEN__
++            /* paginita-pro: BT3_WEB_MODO opens one mode straight away, once (the site's mode buttons): "cpu" the
++               versus character select as 1P vs COM, single battle (as the online session does above, mode 39);
++               "entrenamiento" the training mode (mode 44: the lessons, or the character select for free training). Backing out of either leads to the game's own menus, as usual. */
++            {
++                static int sWebModo;
++                const char *m = getenv("BT3_WEB_MODO");
++                if (!sWebModo && m != NULL && !Port_NetSession() && gProgress != NULL && gSaveData != NULL) {
++                    sWebModo = 1;
++                    if (strcmp(m, "cpu") == 0) {
++                        gProgress->mode = 39;
++                        *(int *)((char *)gProgress + 0x620) = 0; /* 1P vs COM */
++                        *(int *)((char *)gProgress + 0x624) = 0; /* single battle */
++                        *(int *)((char *)gProgress + 0x630) = 0;
++                    } else if (strcmp(m, "entrenamiento") == 0) {
++                        gProgress->mode = 44;
++                    }
++                    fprintf(stderr, "bt3: web: mode %s\n", m);
++                }
++            }
++#endif
+             gPortMenuMode = 1; /* the renderer treats all 2D as one centred 4:3 page while the menus run */
+             r = __real_Progress_Main(arg);
+             gPortMenuMode = 0;
 diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
-index dac5c3d..f1c2467 100644
+index dac5c3d..4c4b341 100644
 --- a/port/src/plat_mem.c
 +++ b/port/src/plat_mem.c
-@@ -281,6 +281,96 @@ static void data_fail(const char *what, const char *path) {
+@@ -281,6 +281,108 @@ static void data_fail(const char *what, const char *path) {
      exit(2);
  }
  
@@ -118,6 +166,18 @@ index dac5c3d..f1c2467 100644
 +        setenv(k, v, 1);
 +    }
 +}
++/* El fin de cada pelea, para la página: el juego anota el ganador en BattleResult (BattleResult_Finish, llamado
++   desde battle.c al terminar). El enlace la envuelve (-Wl,--wrap=BattleResult_Finish) y, ya anotado, le cuenta a la
++   página los bits (1 ganó el lado 0 = jugador 1 / anfitrión, 2 ganó el lado 1, 4 empate, 8 se abandonó). En una
++   pelea en línea las dos copias calculan la misma pelea, así que las dos cuentan lo mismo: el torneo de la sala
++   anota solo al ganador cuando coinciden (juegos/bt3/pagina.js, Module.onFinBatalla). */
++extern void __real_BattleResult_Finish(void);
++extern int BattleResult_GetFlags(void);
++EM_JS(void, web_fin_batalla, (int bits), { if (Module.onFinBatalla) Module.onFinBatalla(bits); });
++void __wrap_BattleResult_Finish(void) {
++    __real_BattleResult_Finish();
++    web_fin_batalla(BattleResult_GetFlags());
++}
 +void __wrap_Game_Main(void) {
 +    web_pone_entorno();                /* primero: lo que la página decidió para esta pelea */
 +    gPortStage = "reading the game's programs from the disc image";
@@ -128,7 +188,7 @@ index dac5c3d..f1c2467 100644
  static void Port_LoadGameData(void) {
      char exe[1024], path[1200];
      const char *root = getenv("BT3_DATA") != NULL ? getenv("BT3_DATA") : "gamedata";
-@@ -392,6 +482,7 @@ static void Port_LoadGameData(void) {
+@@ -392,6 +494,7 @@ static void Port_LoadGameData(void) {
          data_fail("the game's programs in your game data are not the unmodified USA release (SLUS-21678)", NULL);
      }
  }
@@ -136,7 +196,7 @@ index dac5c3d..f1c2467 100644
  
  #if defined(__x86_64__)
  /* (between the GS registers at 0x12000000 and the program at 0x20000000: see the note at STACK_BASE) */
-@@ -500,8 +591,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
+@@ -500,8 +603,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
          ExitProcess(4);
      }
  #endif
@@ -288,7 +348,7 @@ index 0000000..5c56d46
 +if __name__ == "__main__":
 +    main()
 diff --git a/port/web/link.py b/port/web/link.py
-index c699272..5547a20 100644
+index c699272..a14ea77 100644
 --- a/port/web/link.py
 +++ b/port/web/link.py
 @@ -18,7 +18,7 @@ GLOBAL_BASE = 0x12100000
@@ -296,7 +356,7 @@ index c699272..5547a20 100644
  COMMON = [f"-sGLOBAL_BASE={GLOBAL_BASE}", "-sSTACK_SIZE=16MB", "-sINITIAL_MEMORY=640MB", "-sALLOW_MEMORY_GROWTH=1",
            "-sMAXIMUM_MEMORY=2048MB", "--use-port=sdl3", "-O3", "-sEXIT_RUNTIME=1", "--profiling-funcs", "-sEMULATE_FUNCTION_POINTER_CASTS=1",
 -          "-Wl,--wrap=Progress_Main"]  # as the native link: the game's mode dispatcher goes through headless.c
-+          "-Wl,--wrap=Progress_Main", "-Wl,--wrap=Game_Main"]  # as the native link: the game's mode dispatcher goes through headless.c
++          "-Wl,--wrap=Progress_Main", "-Wl,--wrap=Game_Main", "-Wl,--wrap=BattleResult_Finish"]  # as the native link: the game's mode dispatcher goes through headless.c
  WEB = ROOT / "port/web"
  WEB_COMMON = ["-sENVIRONMENT=web", "-sMAX_WEBGL_VERSION=2", "-sMIN_WEBGL_VERSION=2", "-lidbfs.js",
                "-sFORCE_FILESYSTEM=1", "-sINVOKE_RUN=0", "-sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,IDBFS",

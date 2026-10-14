@@ -131,8 +131,8 @@ export const SOLOS = [
     modos: ["Contra bots", "2 en un teclado"] },
   { id: "bots-bt3", tipo: "bots", juego: "bt3", nombre: "Tenkaichi 3 · un jugador", genero: "Pelea", icono: "🐉", alta: "2026-10-14",
     url: "juegos/bt3/index.html", reglas: "bt3",
-    lema: "El juego completo con tu propia ISO (USA): historia, torneos y versus contra la CPU, o 1P contra 2P con dos mandos.",
-    modos: ["Contra la CPU", "2 mandos"] }
+    lema: "Contra la CPU o en el modo entrenamiento, directo desde el disco. El menú del juego trae todo lo demás: historia, torneos, Evolution Z.",
+    modos: ["Contra la CPU", "Entrenamiento"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número

@@ -60,12 +60,50 @@ Room game in an iframe, modelled on HaxBall, with one deliberate difference: **t
 - Only STUN: two networks that refuse a direct connection cannot fight; the frame says so after 45 s and the room
   goes back to the lobby. A TURN relay would fix it (not done).
 
-The lobby (`redBt3` in `motor.js`): `anfitrion` (**either player picks who hosts**; the host is the game's player 1
+The duel (`redBt3` in `motor.js`): `anfitrion` (**either player picks who hosts**; the host is the game's player 1
 and sets the rules), `ajuste` (`batalla`, `tiempo` → `reglasBt3`, the word `gs/net.c` reads), `disco` (that frame
-loaded a valid ISO; both needed), `empieza`, `vuelve` (back to the lobby; frames reload, discs re-confirm).
+loaded a valid disc; both needed), `empieza`, `vuelve` (back to the lobby; frames reload, discs re-confirm),
+`resultado` and `revancha`.
 
-**The room does not rank**: the game never tells the page who won, so `anotar` skips `bt3` (like PRO HERO), and
-its ten logros are all room-detected (`SIN_FILA` in `logros.js`: no first-win/streak row logros).
+**Results are automatic.** The patch wraps `BattleResult_Finish` (`--wrap`, `plat_mem.c`) and hands the page the
+winner bits (1 P1, 2 P2, 4 draw, 8 abandoned) → `Module.onFinBatalla` → the frame → `bt3.js` writes
+`{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
+the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
+(`marcador`, `empates`). Bits 8 → `vuelve`. `revancha` (both must ask; any rule or host change clears it) starts
+the next fight by itself once both discs are back. The frame **must** reload between fights: `BT3_NET_SESSION` is
+read once at start-up. That costs nothing now (below).
+
+**Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3; the bracket is shuffled with the
+room's seed, byes up to a power of two, one fight at a time (`actual`). Both fighters' frames report the winner;
+agreement decides, disagreement → organizer `decide`; a draw is refought; leaving forfeits. Each fight is also a
+`ronda` in `hist` so the duel's logros apply.
+
+**The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
+`juegos.html`: only changes seen live are celebrated (not on opening the room), and each animation keeps its start
+time so a repaint mid-way continues it (`--edad` as a negative `animation-delay`; the bracket repaints on every
+disc event). Sounds `kiAvanza`, `kiCae`, `kiCorona` in `sonido.js`, through `busFx` like every room sound.
+
+**The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
+
+## One player: the modes
+
+Outside a room, once the disc is recognised, the page asks **Contra la CPU / Entrenamiento / Menú del juego**
+(`eligeModo` in `pagina.js`; `?juego=cpu|entrenamiento|menu` skips the question). The choice reaches the program
+as `BT3_WEB_MODO` (`Module.entornoPendiente`), and `__wrap_Progress_Main` (patch, `headless.c`) sets
+`gProgress->mode` before the menus run, as the online session does: `cpu` = mode 39 (versus character select,
+`+0x620 = 0` 1P vs COM), `entrenamiento` = mode 44 (the game's training menu: lessons and free training). The click
+is also the gesture that lets the game's audio start.
+
+## Speed
+
+- **60 fps by default**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
+  pictures. The patch defaults the `interp` setting to 1 in the browser build (`gs_draw.c`); a player can turn it
+  off in Ajustes → Video. It is a display-only blend (+16.7 ms of display latency), so lockstep play is unaffected.
+- **Nothing is downloaded twice.** The first load fetches the `.wasm` with a progress bar into a blob; from then on
+  (`localStorage` `bt3.wasm.<url>`) the program loads from its URL, so Chrome serves it from the HTTP cache *and*
+  reuses its compiled code (measured: 3.6 MB/600 ms → 0 bytes/80 ms). The private disc's pieces are kept in Cache
+  Storage (`bt3-disco:<size>`): a second session asks the Worker only for `indice.json` (which still checks the
+  friends list). The game itself never reads the whole ISO: `webDiscEnsure` copies one file at a time as it opens it.
 
 ## Page details
 
@@ -90,8 +128,8 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
   `colabtex/tests/bt3-disco.test.cjs` pins the access rules with a local key pair and a fake bucket.
 - `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
 - **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
-  it says yes, BT3 is filtered out of the catalogue, the solo list, open rooms, games in progress, ranks and
-  logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord nor in
+  it says yes, BT3 is filtered out of the catalogue, the solo list, the novedades banner (`filtraNovedades` in
+  `juegos-main.js`), open rooms, games in progress, ranks and logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord nor in
   `enCurso`. This hides the game; the page files are public like the whole site (they hold nothing of the
   game), and the disc itself is what the Worker protects.
 - The frame gets the token from its parent (`bt3.js` answers `{tipo:"token"}` only to a same-origin iframe

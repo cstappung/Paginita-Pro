@@ -33,7 +33,9 @@ cambia('<title>Tenkaichi 3 Web</title>', f'''<title>Budokai Tenkaichi 3</title>
 <!-- i18n.js primero (traducción del sitio); volumen.js antes que cualquier audio: envuelve AudioContext para que
      el silencio y el volumen del sitio gobiernen el sonido del juego sin que el juego lo sepa. -->
 <script src="../../i18n.js?v={ver}"></script>
-<script src="../audio/volumen.js?v=vol-1"></script>''')
+<script src="../audio/volumen.js?v=vol-1"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">''')
 cambia('<link rel="manifest" href="manifest.webmanifest">\n', '')
 cambia('<link rel="stylesheet" href="net.css">\n<script src="net.js"></script>',
        f'<script src="red.js?v={ver}"></script>')
@@ -57,16 +59,33 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
     border: 1px solid var(--line); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; text-align: center; }
   #sala.on { display: block; }
   .recordada { margin-top: 10px; }
-  /* la tarjeta de inicio, con la cara del vestíbulo de la sala (juegos.html, .jg-bt3-vest) */
-  #start { background: radial-gradient(ellipse at 50% 0%, #5a2a0a 0%, #22140c 42%, #0b0908 100%); }
-  #start .card { background: #15100d; border-color: #3d2a1c; box-shadow: 0 24px 60px #000b, 0 0 0 1px #f28c1e22; padding: 28px; }
-  #start .ceja { margin: 0 0 4px; font: 700 12px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #b7aa9a; }
-  #start h1 { margin: 0 0 10px; font: italic 900 28px/1.1 system-ui, sans-serif; letter-spacing: -.01em; color: #fde047;
-    text-shadow: 0 0 18px #f28c1e99, 2px 2px 0 #7c2d12; }
-  #start .pick { background: linear-gradient(180deg, #ffb347, #f28c1e 55%, #c2410c); color: #1d1004; font-weight: 800;
-    box-shadow: 0 4px 0 #7c2d12; }
-  #start .pick.alt { background: #2a1f18; color: var(--text); border: 1px solid #4a3426; box-shadow: none; }
+  /* la tarjeta de inicio y la elección de modo (pagina.js), con la cara del vestíbulo de la sala (juegos.html,
+     .jg-bt3-vest): el cielo de noche de Dragon Ball, ki naranja, títulos como el logo (Lilita One) */
+  #start, #modos { background: radial-gradient(ellipse 70% 50% at 50% -5%, #ff9a1f55, transparent 70%),
+    repeating-conic-gradient(from 0deg at 50% 0%, #ffffff07 0deg 1.5deg, transparent 1.5deg 7deg),
+    linear-gradient(170deg, #0b1a48, #101c45 45%, #1d0f33 80%, #2a0f0a); }
+  #start .card, #modos .card { background: #0c1a42ee; border: 2px solid #2c4a98; border-radius: 18px; padding: 28px;
+    box-shadow: 0 24px 60px #000b, 0 0 40px #ff8a0022; }
+  .ceja { margin: 0 0 4px; font: 800 11px system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #a9b6dc; }
+  #start h1, #modos h2 { margin: 0 0 12px; font: 400 34px/1.05 'Lilita One', system-ui, sans-serif; letter-spacing: .01em;
+    background: linear-gradient(180deg, #fffbd1, #ffe14a 38%, #ff9d00 70%, #ff5a00); -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-stroke: 1.5px #4a1300; filter: drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 14px #ff8a0066); }
+  #start .pick { background: linear-gradient(180deg, #fff27a, #ffd21f 30%, #ff9d00 65%, #ff6a00); color: #2a0d00; border: 3px solid #3a1000;
+    font: 400 19px 'Lilita One', system-ui, sans-serif; letter-spacing: .03em; box-shadow: 0 5px 0 #3a1000, 0 0 24px #ff8a0066; }
+  #start .pick.alt { background: #16306e; color: var(--text); border: 2px solid #2f4d9c; box-shadow: none; font: 600 15px system-ui, sans-serif; }
   #start .pick:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 3px; }
+  #modos { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 16px; overflow: auto; }
+  #modos .card { max-width: 640px; }
+  #modos .modos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+  #modos button { display: grid; justify-items: start; align-content: start; gap: 4px; padding: 14px; border-radius: 14px; text-align: left;
+    border: 2px solid #2f4d9c; background: linear-gradient(180deg, #16306e, #0c1a42); color: #f4f6ff; cursor: pointer;
+    font: 13px/1.35 system-ui, sans-serif; transition: transform .12s, box-shadow .12s, border-color .12s; }
+  #modos button span { font-size: 30px; line-height: 1; }
+  #modos button b { font: 400 21px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
+  #modos button small { color: #a9b6dc; font-size: 12.5px; }
+  #modos button.ultimo { border-color: #ffd21f99; }
+  #modos button:hover, #modos button:focus-visible { border-color: #ff8a00; box-shadow: 0 0 24px #ff8a0066; transform: translateY(-2px); outline: none; }
+  #modos .nota { margin: 0; font-size: 12.5px; color: #a9b6dc; }
 </style>''')
 cambia('<div id="stage">', '''<div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
   title="Ajustes (F1): video, sonido y controles">Ajustes</button><span id="mando" role="status">Mando: aprieta un botón</span><button

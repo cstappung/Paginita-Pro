@@ -1615,61 +1615,193 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-haxball-marco{background:#5a8a4a}
 /* Budokai Tenkaichi 3: la portada (aura de ki y esferas), el marco y el vestíbulo. Superficies oscuras siempre,
    como el de HaxBall: no necesitan gemelo en el bloque del tema oscuro. */
-.jg-art-bt3{position:relative;width:170px;height:104px;border-radius:12px;background:radial-gradient(circle at 50% 55%,#ffe58a 0 14%,#f59e0b 30%,#7c2d12 62%,#1c0f08 100%);box-shadow:inset 0 0 18px #000a}
-.jg-art-bt3 i{position:absolute;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fde68a 0 18%,#f59e0b 42%,#b45309 100%);border:2px solid #7c2d12}
-.jg-art-bt3 i::after{content:"★";position:absolute;inset:0;display:grid;place-items:center;color:#b91c1c;font-size:11px;line-height:1}
-.jg-art-bt3 i:nth-child(1){left:16px;top:16px}.jg-art-bt3 i:nth-child(2){right:18px;top:12px}.jg-art-bt3 i:nth-child(3){right:30px;bottom:14px}
-.jg-art-bt3 b{position:absolute;left:62px;top:30px;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle,#fff 0 20%,#fde047 45%,#f59e0b00 72%);animation:jg-bt3-ki 1.6s ease-in-out infinite}
-@keyframes jg-bt3-ki{50%{transform:scale(1.18);opacity:.85}}
-@media (prefers-reduced-motion:reduce){.jg-art-bt3 b{animation:none}}
-.jg-art-bt3 em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);white-space:nowrap;font:900 16px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:2px;color:#fff;text-shadow:2px 2px 0 #b45309}
+/* La portada de BT3 (ficha, tarjeta del salón, banner de novedades): el cielo de noche de las peleas con sus
+   líneas de velocidad, un orbe de ki que late al centro, las siete esferas del dragón en arco y el título como el
+   logo. Llena su caja: los tamaños van en % y en cqi (el ancho de la tarjeta). */
+.jg-art-bt3{position:absolute;inset:0;overflow:hidden;isolation:isolate;
+  background:radial-gradient(ellipse 60% 55% at 50% 52%,#ff9a1f88,#ff5a0022 55%,transparent 75%),linear-gradient(170deg,#0b1a48 0%,#13225a 45%,#2a0f3a 78%,#3a1206 100%)}
+.jg-art-bt3 s{position:absolute;inset:-20%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 55%,#ffffff12 0deg 1.6deg,transparent 1.6deg 8deg);
+  -webkit-mask:radial-gradient(circle at 50% 55%,transparent 12%,#000 45%);mask:radial-gradient(circle at 50% 55%,transparent 12%,#000 45%)}
+.jg-art-bt3 b{position:absolute;left:50%;top:50%;width:30%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,#fff 0 16%,#fff6b0 26%,#ffd21f 40%,#ff8a0088 58%,transparent 72%);box-shadow:0 0 40px 10px #ff8a0055}
+.jg-art-bt3 i{position:absolute;width:9%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 35% 30%,#fff7c2 0 12%,#ffb526 38%,#f07800 72%,#a34400 100%);box-shadow:0 0 10px #ff9a1faa,inset -2px -3px 4px #0003}
+.jg-art-bt3 i::after{content:"★";position:absolute;inset:0;display:grid;place-items:center;color:#d61f1f;font-size:clamp(6px,3.4cqi,14px);line-height:1}
+.jg-art-bt3 i:nth-child(3){left:15%;top:46%}.jg-art-bt3 i:nth-child(4){left:23%;top:27%}.jg-art-bt3 i:nth-child(5){left:36%;top:16%}
+.jg-art-bt3 i:nth-child(6){left:50%;top:12%;width:10.5%}.jg-art-bt3 i:nth-child(7){left:64%;top:16%}.jg-art-bt3 i:nth-child(8){left:77%;top:27%}.jg-art-bt3 i:nth-child(9){left:85%;top:46%}
+.jg-art-bt3 em{position:absolute;left:0;right:0;bottom:7%;display:grid;justify-items:center;font-style:normal;line-height:1;text-align:center}
+.jg-art-bt3 em small{font:800 clamp(7px,3.2cqi,12px) system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ffd9a0;text-shadow:0 1px 0 #000}
+.jg-art-bt3 em strong{font:400 clamp(18px,11cqi,46px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;
+  background:linear-gradient(180deg,#fffbd1,#ffe14a 38%,#ff9d00 70%,#ff5a00);-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:1.5px #4a1300;filter:drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 12px #ff8a0088)}
+@media(prefers-reduced-motion:no-preference){.jg-art-bt3 b{animation:jg-bt3-ki 1.8s ease-in-out infinite}.jg-art-bt3 i{animation:jg-bt3-flota 3.2s ease-in-out infinite}
+  .jg-art-bt3 i:nth-child(even){animation-delay:-1.6s}}
+@keyframes jg-bt3-ki{50%{transform:translate(-50%,-50%) scale(1.14);box-shadow:0 0 60px 16px #ff8a0077}}
+@keyframes jg-bt3-flota{50%{transform:translate(-50%,-62%)}}
+.jg-portada-bt3,.jg-nov-arte-bt3{background:#0b1a48}
+.jg-nov-arte-bt3{position:absolute;inset:0;container-type:inline-size}
+/* en el banner la portada es ancha y baja: esferas y orbe más chicos, para que el arco quepa entero */
+.jg-nov-arte-bt3 .jg-art-bt3 i{width:5.6%}.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(6){width:6.6%;top:14%}
+.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(5),.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(7){top:17%}
+.jg-nov-arte-bt3 .jg-art-bt3 b{width:22%}.jg-nov-arte-bt3 .jg-art-bt3 em strong{font-size:clamp(22px,8cqi,56px)}
 .jg-bt3-marco{background:#000}
-/* El vestíbulo de BT3: la pantalla de versus (los dos frente a frente), las reglas como fichas y el botón de
-   pelear. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro. */
-.jg-bt3-vest{--bt3-a:#f28c1e;--bt3-oro:#fde047;--bt3-tx:#f5efe6;--bt3-mu:#b7aa9a;margin:0 0 12px;padding:18px;border-radius:18px;color:var(--bt3-tx);
-  background:radial-gradient(ellipse at 50% 0%,#5a2a0a 0%,#2a1408 38%,#151110 75%);border:1px solid #3d2a1c;display:grid;gap:16px;box-shadow:inset 0 0 40px #0006}
+/* El vestíbulo de BT3, a lo Dragon Ball: el cielo de noche de las peleas (azul profundo con líneas de velocidad
+   y un estallido de ki naranja arriba), títulos como el logo (Lilita One, dorado a naranja con borde oscuro),
+   esferas del dragón de adorno. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro.
+   Las animaciones (la llave, la corona, el duelo) parten de `--edad` (ver `recientes` en bt3.js): un repintado a
+   la mitad sigue donde iba. */
+.jg-bt3-escena{position:relative}
+.jg-bt3-vest{--bt3-a:#ff8a00;--bt3-oro:#ffd21f;--bt3-tx:#f4f6ff;--bt3-mu:#a9b6dc;--bt3-az:#3d7bff;--bt3-panel:#0f1f4dcc;--bt3-borde:#2c4a98;
+  position:relative;margin:0 0 12px;padding:20px;border-radius:20px;color:var(--bt3-tx);display:grid;gap:16px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(ellipse 70% 55% at 50% -8%,#ff9a1f66,#ff6a0022 45%,transparent 70%),
+    repeating-conic-gradient(from 0deg at 50% 0%,#ffffff07 0deg 1.5deg,transparent 1.5deg 7deg),
+    linear-gradient(170deg,#0b1a48 0%,#101c45 45%,#1d0f33 80%,#2a0f0a 100%);
+  border:2px solid #22397a;box-shadow:0 0 0 1px #000 inset,0 10px 30px #0008}
+.jg-bt3-vest::before{content:"";position:absolute;inset:auto -10% -40% -10%;height:60%;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 100%,#ff6a0033,transparent 65%)}
 .jg-bt3-vest[hidden]{display:none}
-.jg-bt3-vest.jugando{padding:10px 14px;gap:0;background:#1a1311}
-.jg-bt3-versus{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:12px}
+.jg-bt3-vest.jugando{padding:10px 14px;gap:0;background:linear-gradient(90deg,#0b1a48,#1d0f33)}
+.jg-bt3-vest button:focus-visible{outline:2px solid #7fb2ff;outline-offset:2px}
+.jg-bt3-logo,.jg-bt3-tit>b,.jg-bt3-vs{font-family:'Lilita One',system-ui,sans-serif;font-weight:400;font-style:normal;
+  background:linear-gradient(180deg,#fffbd1 0%,#ffe14a 38%,#ff9d00 70%,#ff5a00 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:1.5px #4a1300;filter:drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 14px #ff8a0066)}
+.jg-bt3-esferas{display:inline-flex;gap:4px;vertical-align:middle}
+.jg-bt3-esferas i{width:16px;height:16px;border-radius:50%;position:relative;flex:none;
+  background:radial-gradient(circle at 35% 30%,#fff7c2 0 12%,#ffb526 40%,#f07800 75%,#a34400 100%);box-shadow:0 0 8px #ff9a1f88}
+.jg-bt3-esferas i::after{content:"★";position:absolute;inset:0;display:grid;place-items:center;color:#d61f1f;font-size:9px;line-height:1}
+/* el duelo: la pantalla de versus */
+.jg-bt3-versus{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:14px}
 .jg-bt3-versus>.jg-bt3-vs{align-self:center}
 .jg-bt3-hueco{visibility:hidden}
-.jg-bt3-luchador{position:relative;display:grid;justify-items:center;align-content:start;gap:6px;padding:16px 12px 14px;border-radius:14px;background:#00000059;border:1px solid #ffffff14;text-align:center;min-width:0}
-.jg-bt3-luchador.anf{border-color:#f28c1e88;box-shadow:0 0 22px #f28c1e33}
+.jg-bt3-luchador{position:relative;display:grid;justify-items:center;align-content:start;gap:6px;padding:18px 12px 14px;border-radius:16px;text-align:center;min-width:0;
+  background:linear-gradient(180deg,#16306e,#0c1a42);border:2px solid var(--bt3-borde);box-shadow:inset 0 1px 0 #ffffff1a}
+.jg-bt3-luchador.anf{border-color:var(--bt3-a);box-shadow:inset 0 1px 0 #ffffff1a,0 0 26px #ff8a0055}
 .jg-bt3-luchador.yo b{color:var(--bt3-oro)}
-.jg-bt3-luchador.vacio{border-style:dashed;opacity:.75}
+.jg-bt3-luchador.vacio{border-style:dashed;opacity:.7;background:#0c1a4280}
 .jg-bt3-luchador b{font:800 17px/1.2 system-ui,sans-serif;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-bt3-luchador b em{font-weight:500;font-size:12px;color:var(--bt3-mu)}
-.jg-bt3-ava{width:64px;height:64px;border-radius:50%;object-fit:cover;display:grid;place-items:center;font:900 28px system-ui,sans-serif;color:#fff;
-  background:var(--c,#6b4a2b);border:3px solid #ffffff26}
-.jg-bt3-luchador.anf .jg-bt3-ava{border-color:var(--bt3-a)}
-.jg-bt3-rol{font:700 12px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--bt3-mu)}
-.jg-bt3-luchador.anf .jg-bt3-rol{color:#ffc477}
-.jg-bt3-estado{font-size:13px;color:#f5c26b}.jg-bt3-estado.ok{color:#8cddb3}
-.jg-bt3-hacer{margin-top:2px;padding:5px 10px;border-radius:999px;border:1px solid #ffffff2e;background:#ffffff0f;color:var(--bt3-tx);font:600 12px system-ui,sans-serif;cursor:pointer}
-.jg-bt3-hacer:hover{border-color:var(--bt3-a);color:#ffc477}
-.jg-bt3-vs{font:italic 900 34px/1 system-ui,sans-serif;letter-spacing:-.02em;color:var(--bt3-oro);text-shadow:0 0 18px #f28c1e,2px 2px 0 #7c2d12}
-.jg-bt3-reglas{display:grid;gap:10px;padding:12px 14px;border-radius:12px;background:#0000004d}
+.jg-bt3-ava{width:68px;height:68px;border-radius:50%;object-fit:cover;display:grid;place-items:center;font:400 30px 'Lilita One',system-ui,sans-serif;color:#fff;
+  background:var(--c,#3a4f8f);border:3px solid #ffffff33;box-shadow:0 0 0 3px #0b1a48}
+.jg-bt3-luchador.anf .jg-bt3-ava{border-color:var(--bt3-oro)}
+.jg-bt3-rol{font:800 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--bt3-mu)}
+.jg-bt3-luchador.anf .jg-bt3-rol{color:#ffc061}
+.jg-bt3-estado{font-size:13px;color:#ffc061}.jg-bt3-estado.ok{color:#7cf0b6}
+.jg-bt3-hacer{margin-top:2px;padding:5px 12px;border-radius:999px;border:1px solid #ffffff33;background:#ffffff12;color:var(--bt3-tx);font:700 12px system-ui,sans-serif;cursor:pointer}
+.jg-bt3-hacer:hover{border-color:var(--bt3-a);color:#ffc061}
+.jg-bt3-vs{font-size:44px;line-height:1;letter-spacing:.02em;padding:0 4px;transform:skew(-8deg)}
+.jg-bt3-reglas{display:grid;gap:10px;padding:12px 14px;border-radius:14px;background:#06102bb3;border:1px solid #1f3878}
 .jg-bt3-reglas>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
-.jg-bt3-et{min-width:120px;font:700 12px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--bt3-mu)}
+.jg-bt3-et{min-width:130px;font:800 11px system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--bt3-mu)}
 .jg-bt3-fichas{display:flex;flex-wrap:wrap;gap:6px}
-.jg-bt3-ficha{padding:6px 12px;border-radius:8px;border:1px solid #ffffff24;background:#ffffff0d;color:var(--bt3-tx);font:600 13px system-ui,sans-serif;cursor:pointer;font-variant-numeric:tabular-nums}
-.jg-bt3-ficha[aria-pressed=true]{background:var(--bt3-a);border-color:var(--bt3-a);color:#1d1004}
+.jg-bt3-ficha{padding:6px 13px;border-radius:999px;border:1px solid #2f4d9c;background:#132a63;color:var(--bt3-tx);font:700 13px system-ui,sans-serif;cursor:pointer;font-variant-numeric:tabular-nums}
+.jg-bt3-ficha[aria-pressed=true]{background:linear-gradient(180deg,#ffd21f,#ff8a00);border-color:#ffb300;color:#2a0d00;box-shadow:0 0 12px #ff8a0066}
 .jg-bt3-ficha:not([disabled]):not([aria-pressed=true]):hover{border-color:var(--bt3-a)}
-.jg-bt3-ficha[disabled]{cursor:default}.jg-bt3-ficha[disabled]:not([aria-pressed=true]){opacity:.55}
+.jg-bt3-ficha[disabled]{cursor:default}.jg-bt3-ficha[disabled]:not([aria-pressed=true]){opacity:.5}
 .jg-bt3-pie{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
-.jg-bt3-empieza{padding:12px 28px;border:0;border-radius:12px;background:linear-gradient(180deg,#ffb347,#f28c1e 55%,#c2410c);color:#1d1004;
-  font:900 18px system-ui,sans-serif;letter-spacing:.02em;cursor:pointer;box-shadow:0 4px 0 #7c2d12,0 0 24px #f28c1e55}
+.jg-bt3-empieza{padding:12px 30px;border:3px solid #3a1000;border-radius:14px;cursor:pointer;color:#2a0d00;
+  font:400 22px/1 'Lilita One',system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;
+  background:linear-gradient(180deg,#fff27a 0%,#ffd21f 30%,#ff9d00 65%,#ff6a00 100%);box-shadow:0 5px 0 #3a1000,0 0 28px #ff8a0077}
 .jg-bt3-empieza:hover:not([disabled]){filter:brightness(1.08)}
-.jg-bt3-empieza[disabled]{background:#4a3a2d;color:#9a8b7a;box-shadow:none;cursor:default}
+.jg-bt3-empieza:active:not([disabled]){transform:translateY(3px);box-shadow:0 2px 0 #3a1000,0 0 20px #ff8a0066}
+.jg-bt3-empieza[disabled]{background:#26345e;border-color:#18234a;color:#7f8bb3;box-shadow:none;cursor:default}
 .jg-bt3-nota{margin:0;font-size:13px;color:var(--bt3-mu);max-width:70ch}
+.jg-bt3-nota b{color:var(--bt3-tx)}
 .jg-bt3-franja{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:14px}
-.jg-bt3-vivo{font-weight:800;color:#ff6b6b}
-.jg-bt3-vuelve{margin-left:auto;padding:5px 10px;border-radius:8px;border:1px solid #ffffff2e;background:transparent;color:var(--bt3-mu);font:600 12px system-ui,sans-serif;cursor:pointer}
-.jg-bt3-vest button:focus-visible{outline:2px solid #7fb2ff;outline-offset:2px}
-.jg-bt3-privado{padding:18px;border-radius:14px;background:#1a1311;color:#b7aa9a}
-@media(max-width:560px){.jg-bt3-versus{grid-template-columns:1fr}.jg-bt3-vs{justify-self:center;font-size:26px}.jg-bt3-et{min-width:0;width:100%}}
+.jg-bt3-vivo{font-weight:800;color:#ff5d5d}
+.jg-bt3-vuelve{margin-left:auto;padding:5px 10px;border-radius:8px;border:1px solid #ffffff33;background:transparent;color:var(--bt3-mu);font:600 12px system-ui,sans-serif;cursor:pointer}
+.jg-bt3-privado{padding:18px;border-radius:14px;background:#0b1a48;color:#a9b6dc}
+@media(max-width:560px){.jg-bt3-versus{grid-template-columns:1fr}.jg-bt3-vs{justify-self:center;font-size:32px}.jg-bt3-et{min-width:0;width:100%}}
 @media(prefers-reduced-motion:no-preference){.jg-bt3-luchador.anf .jg-bt3-ava{animation:jg-bt3-aura 2.4s ease-in-out infinite}}
-@keyframes jg-bt3-aura{50%{box-shadow:0 0 18px 2px #f28c1e88}}
+@keyframes jg-bt3-aura{50%{box-shadow:0 0 0 3px #0b1a48,0 0 22px 4px #ff9a1faa}}
+/* el marcador y la revancha del duelo */
+.jg-bt3-marcador{margin:-4px 0 0;text-align:center;font-size:15px;color:var(--bt3-mu)}
+.jg-bt3-marcador span{display:inline-block;margin:0 12px;font:400 30px 'Lilita One',system-ui,sans-serif;color:var(--bt3-oro);font-variant-numeric:tabular-nums;text-shadow:0 2px 0 #3a1000,0 0 14px #ff8a0088}
+.jg-bt3-marcador small{display:block;font-size:12px}
+.jg-bt3-revancha{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;padding:10px 14px;border-radius:14px;background:#06102b99;border:1px dashed #3d5db0}
+.jg-bt3-revancha.lista{border:1px solid var(--bt3-oro);box-shadow:0 0 18px #ffd21f44}
+.jg-bt3-rev{padding:8px 18px;border-radius:999px;border:2px solid #ffb300;background:#1b2f66;color:var(--bt3-oro);font:400 16px 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;cursor:pointer}
+.jg-bt3-rev:hover{background:#22397a}.jg-bt3-rev.no{border-color:#56689c;color:var(--bt3-mu);font:700 13px system-ui,sans-serif}
+/* el torneo: título, inscritos, la pelea actual */
+.jg-bt3-tit{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.jg-bt3-tit>b{font-size:30px;line-height:1.05}
+.jg-bt3-tit>span{font-size:13px;color:var(--bt3-mu)}
+.jg-bt3-inscritos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.jg-bt3-inscritos li{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:linear-gradient(180deg,#16306e,#0c1a42);border:1px solid var(--bt3-borde);min-width:0}
+.jg-bt3-inscritos li.yo{border-color:#ffd21f88}.jg-bt3-inscritos li.yo>span{color:var(--bt3-oro)}
+.jg-bt3-inscritos .jg-bt3-ava{grid-row:span 2;width:40px;height:40px;font-size:18px;border-width:2px;box-shadow:none}
+.jg-bt3-inscritos li>span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-bt3-inscritos i{font-style:normal}.jg-bt3-org{font-style:normal;font-size:12px;color:#ffc061}
+.jg-bt3-actual{display:grid;gap:8px;justify-items:center;text-align:center;padding:16px;border-radius:16px;background:#06102bcc;border:2px solid #ff8a0088;box-shadow:0 0 30px #ff8a0033,inset 0 0 30px #3d7bff22}
+.jg-bt3-mini{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:800}
+.jg-bt3-mini .jg-bt3-vs{font-size:30px}
+.jg-bt3-mano{font-size:13px;color:var(--bt3-mu)}.jg-bt3-mano summary{cursor:pointer}.jg-bt3-mano .jg-bt3-fichas{margin-top:8px;justify-content:center}
+/* la llave: pirámide de rondas unidas por líneas (ver pintaTorneo en bt3.js) */
+.jg-bt3-llave{--ln:#3a5aa8;--hueco:38px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);column-gap:var(--hueco);overflow-x:auto;padding:12px 4px 8px}
+.jg-bt3-ronda{display:flex;flex-direction:column;min-width:0}
+.jg-bt3-ronda h4{margin:0 0 4px;text-align:center;font:400 15px 'Lilita One',system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#ffc061;text-shadow:0 2px 0 #1a0600}
+.jg-bt3-ronda ol{list-style:none;margin:0;padding:0;flex:1;display:flex;flex-direction:column}
+.jg-bt3-par{position:relative;flex:1;display:flex;align-items:center;padding:9px 0;min-height:72px}
+.jg-bt3-par>div{width:100%}
+.jg-bt3-ronda:not(.copa) .jg-bt3-par::after{content:"";position:absolute;right:calc(var(--hueco) / -2);width:calc(var(--hueco) / 2);border:0 solid var(--ln);border-right-width:2px}
+.jg-bt3-ronda:not(.copa) .jg-bt3-par:nth-child(odd)::after{top:50%;bottom:0;border-top-width:2px;border-top-right-radius:8px}
+.jg-bt3-ronda:not(.copa) .jg-bt3-par:nth-child(even)::after{top:0;bottom:50%;border-bottom-width:2px;border-bottom-right-radius:8px}
+.jg-bt3-ronda.final .jg-bt3-par::after{bottom:auto!important;height:0;border-right-width:0!important;border-radius:0!important}
+.jg-bt3-ronda:not(:first-child) .jg-bt3-par::before{content:"";position:absolute;left:calc(var(--hueco) / -2);width:calc(var(--hueco) / 2);top:50%;border-top:2px solid var(--ln)}
+.jg-bt3-par.listo::after{border-color:var(--bt3-a)!important;filter:drop-shadow(0 0 4px #ff8a00aa)}
+.jg-bt3-par.lleno::before{border-color:var(--bt3-a);filter:drop-shadow(0 0 4px #ff8a00aa)}
+.jg-bt3-caja{position:relative;display:grid;border-radius:10px;background:linear-gradient(180deg,#14296099,#0b1838);border:2px solid #24407f;font-size:13px;box-shadow:0 3px 0 #050c22}
+.jg-bt3-slot{display:block;padding:7px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.jg-bt3-slot+.jg-bt3-slot{border-top:1px solid #ffffff14}
+.jg-bt3-slot.gana{color:var(--bt3-oro);font-weight:800;background:linear-gradient(90deg,#ff8a0040,transparent)}
+.jg-bt3-slot.pierde{color:#6f7da6;text-decoration:line-through}
+.jg-bt3-slot.vacio,.jg-bt3-slot.bye{color:#6f7da6;font-style:italic;font-weight:500}
+.jg-bt3-caja.vivo{border-color:#ff5d5d;box-shadow:0 3px 0 #050c22,0 0 16px #ff5d5d55}.jg-bt3-caja.sigue{border-color:var(--bt3-a)}
+.jg-bt3-caja em{position:absolute;top:-9px;right:8px;padding:1px 7px;border-radius:6px;font:400 10px 'Lilita One',system-ui,sans-serif;font-style:normal;letter-spacing:.08em;background:var(--bt3-a);color:#2a0d00}
+.jg-bt3-caja.vivo em{background:#ff5d5d;color:#fff}
+.jg-bt3-copa{position:relative;display:grid;justify-items:center;gap:2px;padding:12px 10px;border-radius:14px;border:2px dashed #2f4d9c;text-align:center;color:#6f7da6;overflow:hidden;isolation:isolate}
+.jg-bt3-trofeo{font-size:30px;filter:grayscale(1);opacity:.45}
+.jg-bt3-corona{position:absolute;top:2px;font-size:20px;filter:drop-shadow(0 2px 0 #3a1000)}
+.jg-bt3-copa b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 17px 'Lilita One',system-ui,sans-serif}
+.jg-bt3-rayos{position:absolute;inset:-60%;z-index:-1;opacity:0;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,#ffd21f55 0deg 8deg,transparent 8deg 20deg);-webkit-mask:radial-gradient(circle,#000 20%,transparent 62%);mask:radial-gradient(circle,#000 20%,transparent 62%)}
+.jg-bt3-copa.gana{border:2px solid var(--bt3-oro);background:radial-gradient(circle at 50% 35%,#ff8a0055,#0b1838 75%);box-shadow:0 0 24px #ffd21f55;color:var(--bt3-oro)}
+.jg-bt3-copa.gana .jg-bt3-trofeo{filter:drop-shadow(0 0 10px #ffd21f);opacity:1;margin-top:14px}
+.jg-bt3-copa.gana .jg-bt3-rayos{opacity:.6}
+.jg-bt3-copa.gana b{-webkit-text-stroke:.5px #3a1000;text-shadow:0 2px 0 #3a1000}
+/* los carteles de arriba: quién ganó, quién avanza, el campeón */
+.jg-bt3-avisos{position:absolute;inset:0;z-index:5;pointer-events:none;display:grid;place-items:start center;padding-top:56px;overflow:hidden}
+.jg-bt3-anuncio{display:grid;justify-items:center;gap:2px;padding:12px 28px;border-radius:16px;text-align:center;max-width:90%;
+  background:linear-gradient(180deg,#14296ef2,#0a1640f2);border:3px solid var(--bt3-oro,#ffd21f);box-shadow:0 10px 40px #000a,0 0 40px #ff8a0077;
+  color:#fff;animation:jg-bt3-cartel 3.6s cubic-bezier(.2,.9,.3,1.2) both}
+.jg-bt3-anuncio small{font:800 11px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ffc061}
+.jg-bt3-anuncio b{font:400 30px/1.1 'Lilita One',system-ui,sans-serif;color:#ffd21f;-webkit-text-stroke:1px #3a1000;text-shadow:0 3px 0 #1a0600,0 0 18px #ff8a00}
+.jg-bt3-anuncio>span{font-size:14px;color:#dbe4ff}
+.jg-bt3-anuncio.pierde{border-color:#6f7da6;box-shadow:0 10px 40px #000a}.jg-bt3-anuncio.pierde b{color:#dbe4ff;text-shadow:0 3px 0 #0a1238}
+.jg-bt3-anuncio.campeon{padding:18px 40px;animation-duration:6.5s;border-width:4px;background:radial-gradient(circle at 50% 30%,#ff8a00cc,#7a2a00 55%,#1a0b2e 100%)}
+.jg-bt3-anuncio.campeon b{font-size:42px}
+.jg-bt3-anuncio-corona{font-size:46px;line-height:1;animation:jg-bt3-cae-corona 1.2s .25s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes jg-bt3-cartel{0%{opacity:0;transform:scale(.4) rotate(-4deg);filter:blur(6px)}10%{opacity:1;transform:scale(1.08);filter:none}16%{transform:scale(1)}86%{opacity:1;transform:scale(1)}100%{opacity:0;transform:translateY(-16px) scale(.96)}}
+@keyframes jg-bt3-cae-corona{0%{opacity:0;transform:translateY(-70px) rotate(-30deg)}60%{opacity:1;transform:translateY(6px) rotate(8deg)}100%{transform:none}}
+/* las animaciones de la llave (retraso negativo = la edad: si se repinta, sigue donde iba) */
+.jg-bt3-par.recien::after{animation:jg-bt3-linea 1.2s calc(.35s - var(--edad,0s)) both}
+@keyframes jg-bt3-linea{0%{border-color:var(--ln);filter:none}50%{filter:drop-shadow(0 0 10px #ffd21f)}100%{border-color:var(--bt3-a);filter:drop-shadow(0 0 4px #ff8a00aa)}}
+.jg-bt3-slot.recien.gana{animation:jg-bt3-gana 1.3s calc(0s - var(--edad,0s)) ease-out both}
+@keyframes jg-bt3-gana{0%{background:#ffd21f;color:#2a0d00;transform:scale(1)}25%{transform:scale(1.07);box-shadow:0 0 22px #ffd21f}100%{transform:none}}
+.jg-bt3-slot.recien.pierde{animation:jg-bt3-pierde .9s calc(0s - var(--edad,0s)) both}
+@keyframes jg-bt3-pierde{0%,30%{color:#fff;text-decoration-color:transparent;transform:none}10%,22%{transform:translateX(-4px)}16%,28%{transform:translateX(4px)}100%{color:#6f7da6;text-decoration-color:currentColor}}
+.jg-bt3-slot.llega{animation:jg-bt3-llega .9s calc(.7s - var(--edad,0s)) cubic-bezier(.2,.9,.3,1.3) both}
+@keyframes jg-bt3-llega{0%{opacity:0;transform:translateX(-30px);text-shadow:0 0 0 transparent}60%{opacity:1;text-shadow:0 0 14px #ffd21f;background:#ff8a0055}100%{transform:none}}
+.jg-bt3-copa.corona{animation:jg-bt3-copa-brilla 2.4s calc(.4s - var(--edad,0s)) both}
+@keyframes jg-bt3-copa-brilla{0%{box-shadow:0 0 0 #ffd21f00}30%{box-shadow:0 0 60px 10px #ffd21fcc}100%{box-shadow:0 0 24px #ffd21f55}}
+.jg-bt3-copa.corona .jg-bt3-trofeo{animation:jg-bt3-trofeo 1.2s calc(.3s - var(--edad,0s)) cubic-bezier(.3,1.6,.5,1) both}
+@keyframes jg-bt3-trofeo{0%{opacity:0;transform:translateY(-40px) scale(.3)}100%{opacity:1;transform:none}}
+.jg-bt3-copa.corona .jg-bt3-corona{animation:jg-bt3-cae-corona 1.1s calc(1.2s - var(--edad,0s)) cubic-bezier(.3,1.5,.5,1) both}
+.jg-bt3-copa.corona b{animation:jg-bt3-llega 1s calc(1.5s - var(--edad,0s)) both}
+@media(prefers-reduced-motion:no-preference){.jg-bt3-copa.gana .jg-bt3-rayos{animation:jg-bt3-gira 14s linear infinite}}
+@keyframes jg-bt3-gira{to{transform:rotate(360deg)}}
+.jg-bt3-luchador.brilla{animation:jg-bt3-brilla 3s calc(0s - var(--edad,0s)) ease-out both}
+@keyframes jg-bt3-brilla{0%{box-shadow:0 0 0 #ffd21f00}20%{box-shadow:0 0 50px 8px #ffd21fcc;border-color:#ffd21f;transform:scale(1.03)}100%{transform:none}}
+@media(prefers-reduced-motion:reduce){.jg-bt3-vest *,.jg-bt3-anuncio,.jg-bt3-anuncio *{animation-duration:.01s!important;animation-delay:0s!important}}
 .jg-hx-vest{margin:0 0 12px;padding:14px;border-radius:16px;background:#22272b;color:#e9edf0}.jg-hx-vest[hidden]{display:none}
 .jg-hx-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .jg-hx-col{background:#181b1e;border-radius:10px;padding:8px;min-height:170px;display:flex;flex-direction:column;gap:6px}
@@ -4938,6 +5070,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610140727"></script>
+<script src="juegos-app.js?v=202610140805"></script>
 </body>
 </html>
