@@ -906,7 +906,11 @@
       // (el banco de pruebas no tiene la biblioteca: su página da unas pistas de prueba)
       let prueba = null;
       try { prueba = window.parent !== window && window.parent.BT3_MUSICA_PRUEBA; } catch (e) {}
-      if (prueba) return Promise.all((await prueba()).map(b => ctx.decodeAudioData(b)));
+      if (prueba) {
+        const r = await prueba(), lista = Array.isArray(r) ? r : r.pistas;
+        if (r.nombre) hallada = { nombre: r.nombre, artista: r.artista || "", corto: r.corto || "" };
+        return Promise.all(lista.map(b => ctx.decodeAudioData(b)));
+      }
       const [{ downloadPath, currentUser }, { SITE }, { cacheGet, cachePut }] = await Promise.all([
         import("../hero/js/cloud.js"), import("../hero/js/site.js"), import("../hero/js/songCache.js")]);
       if (!await currentUser()) throw new Error("sin sesión de Google");
@@ -981,7 +985,7 @@
     function pintaBoton() {
       const si = quiere(), cual = hallada && hallada.nombre ? `«${hallada.nombre}»${hallada.artista ? " de " + hallada.artista : ""}` : "«chinchonchin»";
       // (si no se pudo, el botón lo dice: así se sabe por qué suena la del juego)
-      boton.textContent = !si ? "♪ Música del juego" : fallo ? "♪ Chinchonchin ⚠" : "♪ Chinchonchin";
+      boton.textContent = !si ? "♪ Música del juego" : fallo ? "♪ Chinchonchin ⚠" : "♪ " + (hallada && hallada.corto || "Chinchonchin");
       boton.title = !si ? "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)"
         : fallo ? `No suena ${cual}: ${fallo}. Suena la música del juego. Clic: elegir la música del juego`
         : `En las peleas suena ${cual}, de PRO HERO. Clic: la música del juego`;

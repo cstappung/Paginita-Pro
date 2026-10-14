@@ -311,7 +311,7 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   page volume, Ajustes' «Music» (`Web_MusicaPorcentaje`, polled each second) and spectators all include it.
 - Any failure (no session, song not found, SDK blocked) → the game's music, unmuted: `Web_BgmPropia(1)` is only called
   once the song is actually playing. Per player: the ♪ button in the bar (`bt3.musica` = `"juego"` for the original).
-- The bench has no library: its page defines `BT3_MUSICA_PRUEBA` (two synthesized WAV stems) and the frame uses that.
+- The bench has no library: its page defines `BT3_MUSICA_PRUEBA` → `{nombre, corto, pistas}`: a 13 s battle-style loop synthesized on first use (drums+bass+chords stem, melody stem); the ♪ shows «Canción de prueba» and the bench panel has «▶ Oír la canción de prueba».
 
 ## Page details
 
