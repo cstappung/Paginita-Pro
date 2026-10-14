@@ -22,8 +22,9 @@ firmamento, el cenit; 15–20, la Luna, las Siete Hermanas, **el Sol**, the
 last one). Internally the later acts are 6–11 (5 is the endless;
 `ROMANO_ACTO` shows them as V–X). After the Sol the same run turns endless
 (21+, `CICLO_SINFIN`), cycling the nine fighting acts in blocks of two
-(wave + boss), the bosses in **phase 2** on the first lap and **phase 3**
-after (`fase`, `VIDA_FASE`). **There is one mode and no checkpoints**: every
+(wave + boss), the bosses in **phase 2** on the first lap, **phase 3** on
+the second, **phase 4** on the third and **phase 5** from the fourth on
+(`fase`, `faseDeVuelta`, `VIDA_FASE`; jornadas 22–38, 40–56, 58–74, 76+). **There is one mode and no checkpoints**: every
 travesía starts at jornada 1. But it can be resumed: `guardaPunto` stores
 `prog.punto` (with the proof so far, `ver`, the upgrades and `perdidas`, a
 flame lost mid-jornada that is re-applied on resuming) at the start of
@@ -72,14 +73,57 @@ first sends that one. Things that matter:
   solar wind and an eclipse during which it cannot be hit; it dies
   shrinking into a lantern, and `finalSol` tells why. Entering the
   firmamento brings 180 stars back (the moths you put out «went up»).
-- **Phases 2 and 3 are drawn and fought differently** (`faseExtra`,
-  `pintaCuerpo`, `dibujaAura`): bigger (×1.2/×1.35, hit boxes too),
-  crimson tint (`banco.tinte`), a spiked aura, and every new boss escama
-  comes back mirrored 0.42 s later (half of them in phase 2). Phase 3 adds
-  three orbiting thorns that block shots (`V` events, back after 6 s) and,
-  below a third of life, shock rings with one gap at the bottom. A hit may
-  never take more than the bullet's damage (`hiereJefe`): the verifier
-  bounds each `X` by it.
+- **Phases 2 to 5 have their own model and their own ability per boss.**
+  `sprites.js` draws each boss five times (`nodriza(k, fase)`…,
+  `COLORES_<JEFE>_F`, `ESCALA_FASE` ×1.2/×1.35/×1.4/×1.45, hit boxes too): phase
+  2 is «la herida» (ember red, cracks, something extra), phase 3 «la
+  coronada» (near-black body, what burns goes white), phase 4 «la
+  ascendida» (the body is night sky — `asciende` makes the dark palette
+  colours see-through with a cold outline — and its marks are stars joined
+  like a constellation), phase 5 «la del alba» (`amanece`: the dark body
+  pixels are filled with a dithered dawn gradient, violet to gold, with a
+  white outline and `rayos` behind; warm colours replace phase 4's cold
+  ones in `juego.js` too). No tint, no shared aura. Each boss gets one
+  ability in phase 2, a second in phase 3, a third in phase 4 and a fourth
+  in phase 5, keeping the earlier ones (`ESPECIALES`, `ESPECIALES4`,
+  `ESPECIALES5`, `siguienteEspecial`, `jefe.cdEsp`: 10 s / 7.5 s / 6.5 s /
+  6 s; phase 3 alternates, phases 4 and 5 rotate starting with the newest;
+  names and card epithets in `R.FASES`; the ability is announced as
+  «✦ name»). Phase 5: Nodriza Abrazo (white moths that perch on the lantern
+  and slow the oars; rowing hard shakes them off, five put the flame out),
+  Faro Prisma (slow lights; a shot splits one into three fast splinters),
+  Esfinge Acertijo (shows three or four shores in order, then strikes all
+  but one in that order), Casco Escora (everything tilts: the boat slides,
+  shots and scales bend), Crisálida Compás (silk rows with one gap on each
+  bar downbeat, via `alPulso` → `compasPulso`), Hoguera Yesca (sets wrecks
+  on fire: no shelter under them), Luna Rayo de luna (a fixed beam under
+  her), Siete Hermanas Aurora (curtains crossing the water), Sol Amanecer
+  (rises from the horizon; wrecks cast long shadows and the glass heats in
+  the sun, `F.calor` like the Canícula). Phase 4: Nodriza Reclamo (a marching block of
+  larvas), Faro Deslumbre (stand in a shadow strip), Esfinge Tu sombra
+  (your mirrored shadow answers every shot), Casco Bala rasa (balls
+  skipping across the water), Crisálida Mortaja (you are wrapped: shots
+  cut silk), Hoguera Cerco (fire closes in from both shores), Luna
+  Horizonte (the boat wraps around the edges), Siete Hermanas Ronda (they
+  come down and surround you), Sol Ocaso (it sinks; hits push it back).
+  **`VIDA_FASE[4]` equals `VIDA_FASE[3]` on purpose**: boss life is part
+  of the proof, so a third-lap game verifies the same with the old motor.
+  Phases 2 and 3: Nodriza Nidada / Polvo suspendido, Faro
+  Balizas / Giro entero, Esfinge Espejismo / Laberinto, Casco Cadena /
+  Fuego fatuo, Crisálida Capullo de seda / Telar, Hoguera Tizones / Honda,
+  Luna Luna llena / Resaca de luz, Siete Hermanas Alineación / Supernova,
+  Sol Canícula / Colapso. They are described in the comment block «Las
+  fases 2 y 3» in `juego.js`. **They fit the proof as it is**: eggs are
+  larvas (`O`), balizas, the fatuo and thrown lanterns pay like orbiters
+  (`V`, `pagaOrbita`), and anything else a shot breaks (silk, the net,
+  mirages) records no event, hit, points or note. A hit may never take
+  more than the bullet's damage (`hiereJefe`): the verifier bounds each
+  `X` by it. `__fanal.especial(2|3|4|5)` forces the ability. The phase-4
+  ones fit too: Reclamo moths are larvas (`O`), Ocaso is held with plain
+  `X` hits, and a shot fired inside the Mortaja is recorded as a shot that
+  hit nothing. So do phase 5's: Abrazo moths are larvas (`O`), Prisma
+  lights are escamas, the rest cannot be shot; `VIDA_FASE[5]` is phase 3's
+  too.
 
 - **The counter «✦ luces» is the twist made visible.** It starts at 430,
   and each background star *is* one of those lights: killing a moth puts
@@ -115,7 +159,15 @@ first sends that one. Things that matter:
   music through one shared detune source (`curvaBend`). The drone had a
   sine at ~37 Hz: inaudible on a laptop speaker and it ate the headroom the
   bells needed, so nothing goes below ~70 Hz (measured with `nivel()`, an
-  analyser on the output).
+  analyser on the output). **The music gets more energetic with the boss
+  phase** (`est.fase`, set by `iniciaJornada`; `faseMusical`,
+  `energiaDeFase`): more percussion (a kick on every pulse from phase 2,
+  16th hats and a clap from 3, double kick and a fill every fourth bar from
+  4, a galloping kick in 5), an arpeggio layer from phase 3 (16ths in 5),
+  octave/fifth doubling of the melody in 4 and 5, a brighter bass, and the
+  tempo +4 % per phase (`epmDeFase`), capped at `EPM_TECHO` (560 eighths
+  per minute) so the shortest pulse stays ≥ 0.214 s, above the proof's
+  0.2 s «pulsos juntos» window.
 - **Delayed things run on a game-time agenda** (`programa`/`corre`), never
   `setTimeout`: a pause right after the last moth used to start the transit
   under the pause panel, and a timer from a run that had died opened the
