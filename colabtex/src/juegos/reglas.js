@@ -464,7 +464,7 @@ const REGLAS = {
       ])],
       ["Personajes (tier list)", lista([
         "En el duelo y el torneo, quien pone las reglas puede limitar los personajes según la tier list competitiva de BT3: <b>No OP</b> deja fuera a los de tier S hacia arriba (BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo los de tier C hacia abajo. Es una o la otra. Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no.",
-        "En la selección de personajes los vetados se ven oscuros, una lista al costado de la pantalla dice cuáles son, elegir uno suena a error, y el aleatorio (y la CPU) nunca saca uno. En la sala, <b>Ver los vetados</b> muestra la misma lista.",
+        "En la selección de personajes los vetados salen con candado, como los personajes que no están desbloqueados: el cursor se los salta, sus transformaciones vetadas no aparecen, y el aleatorio (y la CPU) nunca saca uno. Una lista al costado de la pantalla dice cuáles son; en la sala, <b>Ver los vetados</b> muestra la misma.",
         "También vale en plena pelea: no se puede transformar ni fusionar en un personaje vetado (como cuando falta energía)."
       ])],
       ["Torneo", lista([

@@ -465,7 +465,7 @@
   /* Los vetados, a la vista: mientras está abierta la selección de personajes (el parche avisa con
      Module.onSeleccion), un panel al costado dice cuáles no se pueden elegir según la regla de la sala, con el
      nombre que tienen en el juego. Se pliega con un clic (se recuerda) y nunca está en la pelea. En la selección
-     misma, los vetados además se ven oscuros (parche: CharSel_WebApagado). */
+     misma, los vetados salen con el candado de los personajes sin desbloquear (parche: ChrGrid_Build). */
   const panel = document.createElement("aside");
   panel.id = "vetos"; panel.hidden = true; panel.setAttribute("aria-label", "Personajes vetados");
   document.body.append(panel);
@@ -486,7 +486,7 @@
     const cuerpo = document.createElement("div");
     cuerpo.className = "cuerpo";
     const nota = document.createElement("p");
-    nota.textContent = "Se ven oscuros: elegirlos suena a error, y tampoco se puede transformar o fusionar en ellos.";
+    nota.textContent = "En la selección salen con candado, como los que no están desbloqueados, y tampoco se puede transformar o fusionar en ellos.";
     cuerpo.append(nota);
     const tiers = [...new Set(listaVetos.map(x => x[0]))];
     for (const t of tiers) {
@@ -507,14 +507,26 @@
      personajes, el programa manda los nombres que trae el disco (Web_Catalogo, parche.diff) y la sala devuelve
      qué ids quedan fuera (`estado.vetados`). El programa los lee de Module.vetados al elegir (web_vetado): un
      vetado suena a error y nunca sale al azar. */
-  Module.onCatalogo = lista => window.parent.postMessage({ canal: "bt3-hijo", tipo: "catalogo", lista }, location.origin);
+  /* Los vetados se calculan aquí (S.vetadosDe, bt3-tiers.js en red.js) con los nombres del disco: los recordados de
+     la vez anterior (`bt3.catalogo`, el mismo que guarda la sala) y, al abrir la selección, los que manda el juego.
+     Esa llamada es sincrónica a propósito: el juego arma su grilla al volver de ella, y los vetados tienen que estar
+     en Module.vetados para que salgan con candado. */
+  let catalogo = null;
+  try { catalogo = JSON.parse(localStorage.getItem("bt3.catalogo") || "null"); } catch (e) {}
   const ponVetados = e => {
+    const r = S.vetadosDe ? S.vetadosDe(catalogo, e && e.veto) : { ids: [], lista: [] };
     const v = [];
-    for (const id of Array.isArray(e.vetados) ? e.vetados : []) if (Number.isInteger(id) && id >= 0 && id <= 160) v[id] = 1;
+    for (const id of r.ids) v[id] = 1;
     Module.vetados = v;
-    reglaVetos = e.veto || "";
-    listaVetos = e.veto && Array.isArray(e.vetadosLista) ? e.vetadosLista.filter(x => Array.isArray(x) && x.length === 2).map(x => [String(x[0]), String(x[1])]) : [];
+    reglaVetos = (e && e.veto) || "";
+    listaVetos = r.lista;
     pintaVetos();
+  };
+  Module.onCatalogo = lista => {
+    catalogo = lista;
+    try { localStorage.setItem("bt3.catalogo", JSON.stringify(lista)); } catch (e) {}
+    ponVetados(est);
+    window.parent.postMessage({ canal: "bt3-hijo", tipo: "catalogo", lista }, location.origin);   // (la sala muestra la misma lista)
   };
   S.alEstado(e => {
     est = e;

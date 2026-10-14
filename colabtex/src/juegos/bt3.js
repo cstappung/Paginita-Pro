@@ -23,7 +23,7 @@ import { BT3_VETOS, BT3_VETOS_TXT, catalogoBt3, vetadosBt3 } from "./bt3-tiers.j
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-8";
+const SRC = "juegos/bt3/index.html?modo=online&v=bt3-9";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
 /* Los nombres de los personajes del disco (los manda el marco al abrir la selección de personajes, ver
@@ -159,15 +159,13 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const rivalUid = est.torneo ? (pelea ? (est.actual.a === uid ? est.actual.b : est.actual.a) : "") : (presentes().find(j => j.uid !== uid) || {}).uid;
     const rival = !rivalUid ? null : esCpuBt3(rivalUid) ? { uid: rivalUid, nombre: nombre(rivalUid), cpu: true, nivel: nivelCpu(rivalUid) }
       : presentes().find(j => j.uid === rivalUid) || { uid: rivalUid };
-    const vr = est.veto ? vetadosBt3(catalogo, est.veto) : null;
     enviar("estado", {
       yo: uid, nombre: nombre(uid), mirando: !enSala(), torneo: !!est.torneo,
       fase: est.torneo ? (pelea ? "jugando" : "espera") : est.fase, ronda: est.torneo ? (est.actual?.n || 0) : (est.ronda || 0),
       rol: j1() === uid || rival?.cpu ? "host" : "join", reglas: est.reglas,   // (contra la CPU, el humano es el jugador 1)
       rival: rival ? { uid: rival.uid, nombre: rival.nombre || "Jugador", cpu: !!rival.cpu, nivel: rival.nivel } : null,
       disco: !!est.discos?.[uid],
-      // los ids que el juego no deja elegir, y con qué nombre del juego quedó cada uno (el panel del marco)
-      veto: est.veto || "", vetados: vr ? vr.ids : [], vetadosLista: vr ? vr.detalle.flatMap(d => d.juego.map(n => [d.tier, n])) : [],
+      veto: est.veto || "",   // la regla de personajes: los vetados los calcula el marco (bt3-marco.js, vetadosDe)
       emite: pelea && emisorDe() === uid   // este marco muestra la pelea en vivo a los que miran (bt3-directo.js)
     });
   }

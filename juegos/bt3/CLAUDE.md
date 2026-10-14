@@ -122,25 +122,23 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 
 **Character rules from a tier list** (duel and tournament, `{t:"ajuste", k:"veto", v:""|"noop"|"malos"}`, one
 setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Sólo malos» bans BROLY..B (C, D and N/C
-stay allowed).
-The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord» image: 161
-portraits = the game's 161 ids (one per form). **Character names are not in the code, they are on the disc**, so:
-the patch hands the select screen's name/form texts (sections 43/44, line n = id n, UTF-16 high byte first) to
-`Module.onCatalogo` once (`Web_Catalogo`, CharSel and TeamSel init) → the frame posts `catalogo` → the room maps
-entries to ids by words (`vetadosBt3`; aliases and exclusions per entry, fewest extra words wins), caches the
-catalog in `bt3.catalogo`, and sends `vetados` in `estado` → `Module.vetados`. The patch asks `web_vetado(id)`:
-CharSel refuses a banned grid cell/form/custom pick with the error sound and its random cell (and the CPU's draw)
-redraws until allowed; TeamSel puts it in `TeamSel_IsCharaFree`, so it is also greyed and skipped at random. Both
-peers read the same disc and rule → same refusals and same draws (no desync); with no catalog yet nothing is
-banned. **Mid-fight too**: `BattleSide_IsCharaUsable` (battle_load.c) refuses a banned id, and it is what
-`BtlAct_CanTransform`/`CanFuse` ask (human and AI), so a banned form cannot be reached by transforming or fusing.
-The player sees the ban: CharSel draws banned chips dark (`CharSel_WebApagado`: a form, or a cell whose forms are
-all out; TeamSel greys through `IsCharaFree`), and while a select screen is open (`Web_Seleccion` → 
-`Module.onSeleccion`) the frame shows a foldable side panel with the banned list by tier (`#vetos`,
-`estado.vetadosLista`, folded state in `bt3.vetosPlegado`). «Ver los vetados» in the
-room lists each entry with the in-game name it matched (or «no se encontró»): **check it against the real disc**
-— one S+ portrait (gold, pointed ears, armour) was not identified and is left out. The bench's «Abrir la
-selección de personajes» posts a hand-written USA-style roster to exercise this without the disc.
+stay allowed). The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord»
+image: 161 portraits = the game's 161 ids, **one per form** (the gold S+ one is Nuova Shenron). Character names are
+not in the code, they are on the disc: when a select screen opens the patch hands its name/form texts (sections
+43/44, line n = id n, UTF-16 high byte first) to `Module.onCatalogo` (`Web_Catalogo`, CharSel and TeamSel init),
+and **the frame computes the banned ids right there, synchronously** (`BT3Sala.vetadosDe` in bt3-marco.js → the
+same `vetadosBt3` the room uses; catalog cached in `bt3.catalogo`) into `Module.vetados`, because the game builds
+its grid as soon as that call returns. In the game (`web_vetado`): `ChrGrid_Build` (view_a_e.c) treats a banned
+id as **not unlocked** — banned forms leave the form lists and a cell left with none becomes the game's own locked
+chip, which the cursor skips and random never draws (grid positions, and so saved item sets, do not move; saved
+custom characters too); CharSel/TeamSel also refuse a banned pick with the error sound and draw any leftover
+banned chip dark; and **mid-fight** `BattleSide_IsCharaUsable` (battle_load.c, asked by `BtlAct_CanTransform`/
+`CanFuse` for human and AI) refuses it, so nobody transforms or fuses into a banned form. Both peers read the same
+disc and rule → same grids and draws (no desync). While a select screen is open (`Web_Seleccion` →
+`Module.onSeleccion`) the frame shows a foldable side panel listing the banned ones by tier (`#vetos`, folded state
+in `bt3.vetosPlegado`); «Ver los vetados» in the room shows the same list with the in-game name each entry matched
+(or «no se encontró») — **check it against the real disc**. The bench's «Abrir la selección de personajes» posts a
+hand-written USA-style roster to exercise this without the disc.
 
 ## One player: the modes
 

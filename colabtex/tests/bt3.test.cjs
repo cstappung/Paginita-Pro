@@ -207,7 +207,7 @@ const ROSTER=[["Goku (Early)"],["Goku (Mid)","Super Saiyan"],["Goku (End)","Supe
  ["Vegito","Super Vegito"],["Gogeta","Super Saiyan"],["Super Saiyan 4 Gogeta"],["Piccolo (Early)","Sync with Nail"],["Piccolo (End)","Fused with Kami"],["Nail"],["Mr. Popo"],
  ["Android 13","Super Android 13"],["Android 16"],["Android #17"],["Android 18"],["Super 17"],["Cell","Semi-Perfect Form","Perfect Form","Super Perfect Form"],["Cell Jr."],
  ["Frieza","2nd Form","3rd Form","Final Form","100% Full Power"],["Cooler","Final Form"],["Majin Buu"],["Super Buu","Gotenks Absorbed","Gohan Absorbed"],["Kid Buu"],["Babidi"],["Dabura"],
- ["Burter"],["Guldo"],["Bardock","Great Ape"],["Bojack","Full Power"],["Chiaotzu"],["Ninja Murasaki"],["Majin Buu (Pure Evil)"],["Fasha"],["Mecha Frieza"],["Krillin"],["Recoome"],["Tapion"],["Tien"],["Yamcha"],["Zarbon","Post-Transformation"],["Great Saiyaman 2"],["Hirudegarn"],["Broly","Super Saiyan","Legendary Super Saiyan"],["Arale"],["Baby","Baby Vegeta","Super Baby 1","Super Baby 2","Great Ape Baby"],["Syn Shenron","Omega Shenron"],["Uub","Majuub"],["Great Ape"]];
+ ["Burter"],["Guldo"],["Bardock","Great Ape"],["Bojack","Full Power"],["Chiaotzu"],["Ninja Murasaki"],["Majin Buu (Pure Evil)"],["Fasha"],["Mecha Frieza"],["Krillin"],["Recoome"],["Tapion"],["Tien"],["Yamcha"],["Zarbon","Post-Transformation"],["Great Saiyaman 2"],["Hirudegarn"],["Broly","Super Saiyan","Legendary Super Saiyan"],["Arale"],["Baby","Baby Vegeta","Super Baby 1","Super Baby 2","Great Ape Baby"],["Syn Shenron","Omega Shenron"],["Nuova Shenron"],["Uub","Majuub"],["Great Ape"]];
 const CATALOGO=ROSTER.flatMap(([n,...f])=>[[n,''],...f.map(x=>[n,x])]).map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
 
 test('reglas de personajes: el anfitrión elige una (No OP o Sólo malos), y queda en el torneo',()=>{
@@ -228,13 +228,14 @@ test('reglas de personajes: cada entrada de la tier list encuentra exactamente a
  for(const d of ma.detalle)assert.equal(d.juego.length,1,d.nombre+' → '+JSON.stringify(d.juego));
  const nombre=i=>[cat[i].nombre,cat[i].forma].filter(Boolean).join(' · ');
  const nNo=no.ids.map(nombre),nMa=ma.ids.map(nombre);
- for(const x of ['Broly · Legendary Super Saiyan','Cell · Super Perfect Form','Android #17','Super 17','Vegito','Vegito · Super Vegito','Super Saiyan 4 Gogeta'])assert.ok(nNo.includes(x),'No OP deja fuera a '+x);
+ for(const x of ['Broly · Legendary Super Saiyan','Cell · Super Perfect Form','Android #17','Super 17','Vegito','Vegito · Super Vegito','Super Saiyan 4 Gogeta','Nuova Shenron'])assert.ok(nNo.includes(x),'No OP deja fuera a '+x);
  for(const x of ['Broly','Broly · Super Saiyan','Cell · Perfect Form','Goku (Early)','Android 13 · Super Android 13','Frieza · Final Form'])assert.ok(!nNo.includes(x),'No OP permite a '+x);
  assert.ok(no.ids.every(i=>ma.ids.includes(i)),'Sólo malos deja fuera todo lo que No OP');
  for(const x of ['Android 13 · Super Android 13','Frieza · 100% Full Power','Super Saiyan 4 Goku','Teen Gohan · Super Saiyan 2','Goku (Mid) · Super Saiyan'])assert.ok(nMa.includes(x),'Sólo malos deja fuera a '+x);
  for(const x of ['Frieza · Final Form','Cell · Perfect Form','Vegeta (End) · Super Vegeta','Teen Gohan','Goku (End) · Super Saiyan 3','Piccolo (Early) · Sync with Nail','Bojack · Full Power','Zarbon · Post-Transformation'])assert.ok(nMa.includes(x),'Sólo malos (de C para abajo) deja fuera también a la B: '+x);
  for(const x of ['Goku (Early)','Kid Buu','Great Ape','Bardock · Great Ape','Piccolo (Early)','Bojack','Zarbon','Great Saiyaman 2','Hirudegarn','Kid Goku','Goten'])assert.ok(!nMa.includes(x),'Sólo malos permite a '+x);
- assert.equal(ma.detalle.length,89,'BROLY..B: 90 retratos menos el dorado de S+ que no se reconoció');
+ assert.equal(ma.detalle.length,90,'BROLY..B: los 90 retratos (el dorado de S+ es Nuova Shenron)');
+ assert.equal(no.detalle.length,14,'No OP: los 14 de BROLY..S');
  assert.equal(T.vetadosBt3([], 'noop').ids.length,0,'sin catálogo todavía no se sabe a quién: nadie');
  assert.equal(T.vetadosBt3(cat,'').ids.length,0);
 });

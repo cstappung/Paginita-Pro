@@ -9,15 +9,17 @@
 
    El juego no trae los nombres en el código: están en el disco. Al abrir la selección de personajes, el juego le
    pasa a su página los 161 nombres con su forma (`Web_Catalogo`, del parche), la página se los manda a la
-   sala y aquí se cruzan con la lista: `vetadosBt3(catalogo, regla)` da los ids que no se pueden elegir. El
-   marco los guarda en `Module.vetados` y el juego (parcheado) no deja elegirlos ni los saca al azar. Los dos
+   marco del juego, que los cruza con la lista en ese mismo instante (`vetadosBt3(catalogo, regla)`, por
+   `BT3Sala.vetadosDe` de bt3-marco.js) y los deja en `Module.vetados` antes de que el juego arme su grilla: el juego
+   (parcheado) los trata como personajes sin desbloquear (candado, el cursor se los salta) y no deja transformarse
+   en ellos. La sala hace la misma cuenta para mostrar la lista. Los dos
    jugadores leen el mismo disco y la misma regla, así que los dos juegos rechazan lo mismo.
 
    Cada entrada es [nombre en la sala, búsqueda, excluye]: la búsqueda son palabras que deben estar TODAS en
    «nombre + forma» del juego (una palabra con «/» acepta cualquiera de sus variantes; varias búsquedas
    separadas por «|» se prueban en orden, la primera que encuentra algo gana), y las que excluye no pueden estar.
-   Si hay varios candidatos queda el que tiene menos palabras de más. Los retratos se identificaron a ojo; la
-   sala muestra con qué nombre del juego quedó cada uno, para revisarlo. */
+   Si hay varios candidatos queda el que tiene menos palabras de más. Los retratos se identificaron a ojo (el dorado
+   de S+ es Nuova Shenron); la sala muestra con qué nombre del juego quedó cada uno. */
 
 // Lo que el juego escribe distinto según el personaje, llevado a una sola palabra.
 const CAMBIOS = [
@@ -57,6 +59,7 @@ export const BT3_TIERS = {
   ],
   "S+": [
     ["Trunks (armadura)", "trunks armor|trunks battle|trunks", "sword kid gt " + FORMAS],
+    ["Nuova Shenron", "nuova|nova shenron", ""],
     ["Majin Buu", "majin buu|fat buu|buu", "super kid evil pure gotenks gohan absorbed"],
     ["Gohan (adulto) Super Saiyan 2", "gohan adult ssj2|gohan ssj2", "teen kid"],
   ],
@@ -150,8 +153,6 @@ export const BT3_TIERS = {
     ["Zarbon (transformado)", "zarbon post|zarbon transform|zarbon monster", ""],
   ],
 };
-/* (Un retrato de S+ no se pudo reconocer: uno dorado con orejas en punta y armadura. Queda fuera de la regla
-   hasta que se sepa quién es.) */
 
 export const BT3_VETOS = { "": "Todos", noop: "No OP", malos: "Sólo malos" };
 export const BT3_VETOS_TXT = {

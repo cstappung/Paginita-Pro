@@ -538,6 +538,62 @@ index 9794ea9..5783e8d 100644
 +
      return (bits[chara / 64] >> (chara % 64)) & 1;
  }
+diff --git a/src/battle/view_a_e.c b/src/battle/view_a_e.c
+index 3e0f86f..2b9066e 100644
+--- a/src/battle/view_a_e.c
++++ b/src/battle/view_a_e.c
+@@ -760,7 +760,14 @@ void StgGrid_MoveUp(s32 *ids, s32 *col, s32 *row, s32 rows) {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c */
++/* paginita-pro: a character the room's tier rule leaves out is treated as one not unlocked yet: its forms leave the
++   form lists and a cell left with none becomes the locked chip, which the cursor skips (and random never draws) */
++#define CHARA_UNLOCKED(id) ((s32)((SAVE_CHARA_WORD(gSaveData, id) >> ((id) % 64)) & 1) && !Web_Vetado(id))
++#else
+ #define CHARA_UNLOCKED(id) ((s32)((SAVE_CHARA_WORD(gSaveData, id) >> ((id) % 64)) & 1))
++#endif
+ 
+ /* Build flags of ChrGrid_Build. */
+ #define CHRGRID_ALL 1        /* no unlock test (never set here) */
+@@ -810,7 +817,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+         if (in[i].formCount != 0) {
+             out[*outCount].formCount = 0;
+             for (j = 0; j < in[i].formCount; j++) {
++#ifdef __EMSCRIPTEN__
++                if (((flags & CHRGRID_ALL) && !Web_Vetado(in[i].form[j])) || CHARA_UNLOCKED(in[i].form[j])) {
++#else
+                 if ((flags & CHRGRID_ALL) || CHARA_UNLOCKED(in[i].form[j])) {
++#endif
+                     out[*outCount].form[out[*outCount].formCount] = in[i].form[j];
+                     out[*outCount].formCount++;
+                 }
+@@ -848,7 +859,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+                 }
+                 break;
+             default:
++#ifdef __EMSCRIPTEN__
++                if (((flags & CHRGRID_ALL) && !Web_Vetado(in[i].id)) || CHARA_UNLOCKED(in[i].id)) {
++#else
+                 if ((flags & CHRGRID_ALL) || CHARA_UNLOCKED(in[i].id)) {
++#endif
+                     out[*outCount] = in[i];
+                 } else {
+                     out[*outCount].id = CHRGRID_ID_LOCKED;
+@@ -874,7 +889,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+         for (i = 0; i < SAVE_REC_COUNT; i++) {
+             custom[i].id = CHRGRID_ID_LOCKED;
+             custom[i].formCount = 0;
+-            if (gSaveData->rec[i].chara >= 0) {
++            if (gSaveData->rec[i].chara >= 0
++#ifdef __EMSCRIPTEN__
++                && !Web_Vetado(gSaveData->rec[i].chara) /* paginita-pro: nor as a saved custom character */
++#endif
++            ) {
+                 for (j = 0; j < *inCount; j++) {
+                     if (gSaveData->rec[i].chara == in[j].id) {
+                         custom[i] = out[j];
 diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
 index d61fdeb..347ba7d 100644
 --- a/src/menu/menu_c_e.c

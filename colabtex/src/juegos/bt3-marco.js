@@ -1,5 +1,6 @@
 import { crearMalla } from "./malla.js";
 import { crearEmisor } from "./bt3-directo.js";
+import { catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
 /* La red de BT3 dentro de su marco (`juegos/bt3/index.html`). Se empaqueta aparte, a `juegos/bt3/red.js`
    (`npm run build:bt3`), porque vive en el iframe y no en la página de la sala.
@@ -102,12 +103,20 @@ function cierra() {
   emisor = null;
 }
 
+/* Las reglas de personajes (bt3-tiers.js), calculadas aquí mismo y sin esperar: el juego pasa sus nombres al abrir
+   la selección y arma su grilla enseguida, así que los vetados tienen que estar listos al volver de esa llamada. */
+function vetadosDe(lista, regla) {
+  if (!regla || !Array.isArray(lista)) return { ids: [], lista: [] };
+  const r = vetadosBt3(catalogoBt3(lista), regla);
+  return { ids: r.ids, lista: r.detalle.flatMap(d => d.juego.map(n => [d.tier, n])) };
+}
+
 window.BT3Sala = {
   activo: new URLSearchParams(location.search).get("modo") === "online",
   estado: () => estado,
   alEstado: cb => { alEstado.add(cb); if (estado) cb(estado); },
   avisa: (tipo, datos) => padre(tipo, datos),       // "listo", "disco", "termino"
-  conecta, envia, cierra, emite,
+  conecta, envia, cierra, emite, vetadosDe,
   recibe: () => cola.shift() || null,
   hay: () => cola.length > 0,
   sano: () => !!malla?.sano(rival),
