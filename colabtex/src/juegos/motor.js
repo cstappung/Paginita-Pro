@@ -7209,6 +7209,7 @@ export function reglasBt3(batalla, tiempo) {
 /* La CPU del torneo: cinco niveles, los del juego (la regla «CPU» del versus: niveles internos 0, 6, 13, 21, 29). */
 export const BT3_NIVELES = ["Muy fácil", "Fácil", "Normal", "Difícil", "Muy difícil"];
 export const esCpuBt3 = u => typeof u === "string" && u.startsWith("cpu:");
+export const BT3_CORTES = 3;   // una pelea cortada por la conexión vuelve sola hasta 3 veces seguidas
 
 export function redBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
@@ -7218,6 +7219,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const marcador = {}, reportes = {};
   let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
   let reanudar = false; // la pelea se cortó por la conexión (o alguien recargó): vuelve a empezar sola, con los dos discos
+  let cortes = 0;       // cortes seguidos de la misma pelea: después de 3 ya no vuelve sola (una red que se cae siempre)
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7245,7 +7247,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
       arranca();
     } else if (j.t === "vuelve" && fase === "jugando") {
       fase = "vestibulo"; discos = {};
-      reanudar = j.por === "corte";   // (no una pelea que alguien dejó a propósito: esa no vuelve sola)
+      cortes = j.por === "corte" ? cortes + 1 : 0;
+      reanudar = j.por === "corte" && cortes <= BT3_CORTES;   // (no una pelea que alguien dejó a propósito: esa no vuelve sola)
       hist.push({ e: "vuelve", uid: j.uid, n: ronda, por: reanudar ? "corte" : "" });
     } else if (j.t === "resultado" && fase === "jugando" && j.n === ronda && Number.isInteger(j.b) && (ids.has(j.g) || j.g === "empate")) {
       // cada pelea de la sesión (b) la cuentan los dos marcos; si coinciden, va al marcador
@@ -7256,6 +7259,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
       if (otros.length === 1 && r[otros[0].uid] !== undefined) {
         r.listo = true;
         if (r[otros[0].uid] === j.g) {
+          cortes = 0;
           if (j.g === "empate") empates++; else marcador[j.g] = (marcador[j.g] || 0) + 1;
           hist.push({ e: "resultado", n: ronda, g: j.g });
         }
@@ -7382,7 +7386,8 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (j.t === "vuelve" && (pelea || esOrg) && m.enCurso) {
       // la pelea se cortó (alguien volvió al menú del juego, o se perdió la conexión): nadie gana todavía; si fue
       // la conexión (o alguien recargó la página), vuelve a empezar sola cuando estén los dos discos
-      m.enCurso = false; m.rep = {}; m.conflicto = false; m.reanudar = j.por === "corte";
+      m.cortes = j.por === "corte" ? (m.cortes || 0) + 1 : 0;
+      m.enCurso = false; m.rep = {}; m.conflicto = false; m.reanudar = j.por === "corte" && m.cortes <= BT3_CORTES;
       discos[m.a] = discos[m.b] = false;
       hist.push({ e: "vuelve", m: m.id, por: m.reanudar ? "corte" : "" });
       continue;

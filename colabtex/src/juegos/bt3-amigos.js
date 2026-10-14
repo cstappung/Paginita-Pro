@@ -11,21 +11,6 @@ let visible = false, pidiendo = null, deQuien = "";
 
 /* La versión del programa del juego (la misma del ?v= de juegos/bt3/: fuente/construir.sh la cambia aquí). */
 export const BT3_VER = "bt3-11";
-
-/* Para un amigo, el programa del juego (3,6 MB) se baja en cuanto se sabe que es amigo, sin apuro y una vez:
-   cuando abra BT3 sale de la caché del navegador y arranca enseguida. En un computador, nunca en el celular
-   (BT3 no se juega ahí). */
-let prebajado = false;
-function prebaja() {
-  if (prebajado || typeof window === "undefined" || !window.matchMedia || window.matchMedia("(pointer: coarse)").matches) return;
-  prebajado = true;
-  const ve = () => {
-    for (const f of ["bt3-jspi.wasm", "bt3-jspi.js", "pagina.js", "red.js", "index.html"]) {
-      fetch("juegos/bt3/" + f + (f === "index.html" ? "?modo=online&v=" : "?v=") + BT3_VER, { priority: "low" }).catch(() => {});
-    }
-  };
-  (window.requestIdleCallback || (f => setTimeout(f, 3000)))(ve, { timeout: 8000 });
-}
 const oyentes = new Set();
 
 export const bt3Visible = () => visible;
@@ -34,7 +19,6 @@ export const alCambiarBt3 = cb => { oyentes.add(cb); };
 function pone(v) {
   if (v === visible) return;
   visible = v;
-  if (v) prebaja();
   for (const cb of oyentes) { try { cb(v); } catch (e) {} }
 }
 

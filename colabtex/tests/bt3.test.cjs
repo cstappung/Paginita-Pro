@@ -319,3 +319,11 @@ test('un corte de conexión (o alguien que recarga en plena pelea) vuelve a empe
  s=B.reducir(torneo(3,...pelea,{t:'vuelve',uid:y,m:m.id},{t:'disco',uid:x},{t:'disco',uid:y}));
  assert.equal(s.actual.enCurso,false,'cortada desde el menú: hay que empezarla');
 });
+
+test('una pelea que se corta una y otra vez deja de volver sola (3 cortes seguidos)',()=>{
+ const js=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'}];
+ for(let i=0;i<3;i++)js.push({t:'vuelve',uid:'b',por:'corte'},{t:'disco',uid:'a'},{t:'disco',uid:'b'});
+ let e=B.reducir(sala(...js));assert.equal(e.fase,'jugando','3 cortes: todavía vuelve sola');
+ e=B.reducir(sala(...js,{t:'vuelve',uid:'b',por:'corte'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'vestibulo','el cuarto ya no: hay que empezarla a mano');assert.equal(e.reanudar,false);
+});

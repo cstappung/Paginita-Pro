@@ -88,7 +88,7 @@ function cors(req, env) {
            "Access-Control-Expose-Headers": "X-Borde" };
 }
 const responde = (cuerpo, estado, cabeceras) => new Response(cuerpo, { status: estado, headers: cabeceras });
-const ARRANQUE_MAX = 1500;                                         // pedazos en la lista de arranque, como mucho
+const ARRANQUE_MAX = 300;                                    // pedazos en la lista de arranque, como mucho (300 MB)
 // El caché de Cloudflare (null donde no existe: en workers.dev existe pero no guarda nada).
 const borde = () => (typeof caches !== "undefined" && caches.default) || null;
 const tarde = (ctx, p) => { if (ctx && ctx.waitUntil) ctx.waitUntil(p.catch(() => {})); else return p.catch(() => {}); };

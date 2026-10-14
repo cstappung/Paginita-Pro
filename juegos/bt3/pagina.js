@@ -314,7 +314,7 @@
     let lista = [];
     try { const r = await fetch(P.base + "/arranque.json", { headers: { Authorization: "Bearer " + P.token } }); if (r.ok) lista = await r.json(); } catch (e) {}
     const local = archivosArranque();
-    const todos = [...new Set([...(Array.isArray(lista) ? lista : []), ...(Array.isArray(local.piezas) ? local.piezas : [])])];
+    const todos = [...new Set([...(Array.isArray(lista) ? lista : []), ...(Array.isArray(local.piezas) ? local.piezas : [])])].slice(0, 300);   // (300 MB como mucho)
     const faltan = todos.filter(i => Number.isInteger(i) && !P.guardadas.has(i));
     if (!faltan.length) return;
     const total = faltan.length;
@@ -327,7 +327,7 @@
   function terminaArranque() {
     if (!Arranque.grabando) return;
     Arranque.grabando = false;
-    const piezas = [...Arranque.piezas].sort((a, b) => a - b).slice(0, 1500), archivos = [...Arranque.archivos].slice(0, 3000);
+    const piezas = [...Arranque.piezas].sort((a, b) => a - b).slice(0, 300), archivos = [...Arranque.archivos].slice(0, 3000);
     try { localStorage.setItem("bt3.arranque." + P.size, JSON.stringify({ piezas, archivos })); } catch (e) {}
     const enviado = "bt3.arranque.enviado." + P.size;
     let ya = false;
@@ -437,18 +437,16 @@
   };
 
   /* ---------- lo esencial (opcional) ---------- */
-  const Esencial = { piezas: null, corriendo: false, pausa: false };
-  async function preparaEsencial(disco) {
-    try {
-      const indice = await leeIndice(disco);
-      Esencial.piezas = piezasDe(idsEsenciales(), indice);
-    } catch (e) { return; }
+  const Esencial = { disco: null, piezas: null, corriendo: false, pausa: false };
+  // (solo ofrece el botón: cuánto es se calcula al apretarlo, porque para saberlo hay que leer las tablas del disco)
+  function preparaEsencial(disco) {
+    Esencial.disco = disco;
     pintaEsencial();
   }
   function pintaEsencial() {
     const ps = Esencial.piezas;
-    if (!ps || !ps.length) return;
-    const faltan = ps.filter(i => !P.guardadas.has(i)).length, tot = ps.length;
+    if (!Esencial.disco || (ps && !ps.length)) return;
+    const faltan = ps ? ps.filter(i => !P.guardadas.has(i)).length : 1, tot = ps ? ps.length : 1;
     let boton = $("esencial");
     if (!boton && SOLO && $("start") && $("serverDisc")) {   // en la tarjeta de inicio, bajo «Jugar»
       boton = document.createElement("button");
@@ -461,16 +459,21 @@
       if (boton) { boton.textContent = "✓ Lo esencial ya está guardado en este computador"; boton.disabled = true; }
       return;
     }
-    const txt = Esencial.corriendo
+    const txt = !ps ? (Esencial.corriendo ? "⬇ Calculando lo esencial…" : "⬇ Bajar lo esencial (menús, escenarios y luchadores)")
+      : Esencial.corriendo
       ? (Esencial.pausa ? "⏸ Lo esencial, en pausa · " : "⬇ Bajando lo esencial · ") + Math.round((tot - faltan) / tot * 100) + "% (" + (tot - faltan) + " de " + tot + " MB)"
       : "⬇ Bajar lo esencial · " + faltan + " MB" + (faltan < tot ? " (" + Math.round((tot - faltan) / tot * 100) + "% ya guardado)" : "");
     if (boton) { boton.textContent = txt; boton.title = "Menús, escenarios y los luchadores en su forma base: para no esperar después. Se puede jugar mientras baja."; }
-    Bajando.pon("esencial", txt, (tot - faltan) / tot, alternaEsencial);
+    if (ps) Bajando.pon("esencial", txt, (tot - faltan) / tot, alternaEsencial);
   }
   async function alternaEsencial() {
     if (Esencial.corriendo) { Esencial.pausa = !Esencial.pausa; pintaEsencial(); return; }
     Esencial.corriendo = true;
     pintaEsencial();
+    if (!Esencial.piezas) {
+      try { Esencial.piezas = piezasDe(idsEsenciales(), await leeIndice(Esencial.disco)); }
+      catch (e) { Esencial.corriendo = false; pintaEsencial(); return; }
+    }
     const pendientes = Esencial.piezas.filter(i => !P.guardadas.has(i));
     let k = 0;
     const uno = async () => {
@@ -551,9 +554,16 @@
       return out;
     } };
     $("pickLabel").hidden = true;
-    prebajaArranque();          // mientras se elige el modo
-    preparaEsencial(disco);     // (calcula cuánto es lo esencial y ofrece el botón)
-    if (SOLO) { listoParaJugar(() => go(disco), P.primeraVez ? "Disco privado listo. La primera vez tarda un poco más: lo que se baja queda guardado." : "Disco privado listo."); return true; }   // espera el «Jugar» (2b)
+    /* Nada se baja antes de jugar: en «un jugador», el arranque empieza con «Jugar» (en paralelo, mientras el
+       programa arranca), y lo esencial solo si el jugador aprieta su botón. En una sala ya se está jugando: el
+       arranque se baja al entrar, mientras se espera la pelea; lo esencial no se ofrece ahí (una bajada grande
+       en plena pelea en línea le quitaría red a la conexión con el rival). */
+    if (SOLO) {
+      preparaEsencial(disco);   // (solo calcula cuánto es y ofrece el botón: no baja nada)
+      listoParaJugar(() => { prebajaArranque(); go(disco); }, P.primeraVez ? "Disco privado listo. La primera vez tarda un poco más: lo que se baja queda guardado." : "Disco privado listo.");
+      return true;   // espera el «Jugar» (2b)
+    }
+    prebajaArranque();
     say("Usando el disco privado…");
     go(disco);
     return true;

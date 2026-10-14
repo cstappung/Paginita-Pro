@@ -127,9 +127,10 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 **Disconnects.** Lockstep: if the rival stops answering mid-fight, the game waits (patch: 25 s instead of 6,
 `QUIET_NS`) and tells the page (`espera` / `sigue` net events) so the frame shows a countdown; if the line comes back
 the fight goes on where it was. If not, the fight is cut with `por: "corte"` and **starts again by itself** when both
-discs are ready (`reanudar` in `redBt3`; `actual.reanudar` in the tournament). A page that loads while its own
+discs are ready (`reanudar` in `redBt3`; `actual.reanudar` in the tournament), up to `BT3_CORTES` (3) cuts in a row
+of the same fight — a line that keeps dropping must not loop forever; after that it is started by hand. A page that loads while its own
 fight is running (a refresh or a new sign-in mid-fight: `llegoEnPlenaPelea` in bt3.js) cuts it at once the same
-way, so nobody waits 25 s. **It cannot resume from the exact moment**: the rollback state is per process (game
+way, so nobody waits 25 s (so does opening the room in a second tab of the same fighter mid-fight). **It cannot resume from the exact moment**: the rollback state is per process (game
 globals and heap, not the call stack, renderer or sound), and a reloaded copy boots from zero, so both copies must
 start the fight again. A cut never gives a win; in the tournament the organizer can still decide it if one never
 comes back.
@@ -198,8 +199,11 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   speed, and on a first visit says it is saved for next time. The Worker sends `no-store` (the page keeps the
   pieces itself: not twice), and puts each piece in Cloudflare's edge cache after the friend check — **this only
   takes effect with a custom domain on the Worker**; on `*.workers.dev` Cloudflare ignores it.
-- **The program is fetched from the lobby** for a friend (`bt3-amigos.js`, on `/soy` = yes, idle, desktop only),
-  so opening BT3 the first time starts from the browser cache. `BT3_VER` there is the version (construir.sh sets it).
+- **Nothing is downloaded before playing** (the owner's rule): never from the lobby; on the solo page the boot
+  list is fetched on «Jugar» and «lo esencial» (even its size: it needs the disc's tables) only when its button is
+  pressed; in a room (already playing) the boot is fetched on entering, and «lo esencial» is not offered there (a
+  big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
+  at 300 pieces (300 MB) on both sides. `BT3_VER` in `bt3-amigos.js` is the program version (construir.sh sets it).
 - **60 fps by default**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
   pictures. The patch defaults the `interp` setting to 1 in the browser build (`gs_draw.c`); a player can turn it
   off in Ajustes → Video. It is a display-only blend (+16.7 ms of display latency), so lockstep play is unaffected.
