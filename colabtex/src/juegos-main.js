@@ -66,7 +66,7 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearHaxball } from "./juegos/haxball.js";
-import { crearBt3, alPedirSalaBt3 } from "./juegos/bt3.js";
+import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
@@ -1188,7 +1188,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike|hero)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike|hero|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1785,6 +1785,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
   /* PRO HERO también ocupa la ventana: es un juego de pantalla completa con su propio menú. */
   document.documentElement.classList.toggle("jg-hero", state.vista === "solo-hero" && !motivo);
+  /* BT3 «un jugador» también: la página del juego, en un marco de Juegos para que tenga la sesión (disco privado). */
+  document.documentElement.classList.toggle("jg-bt3solo", state.vista === "solo-bt3" && !motivo);
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
@@ -1796,6 +1798,12 @@ function armazon() {
        que verifica cada canción y guarda estrellas, top y monedas. */
     h.innerHTML = "";
     individual = crearHero({ volver: () => ir(""), enLinea: () => { ir(""); setTimeout(() => salon.abre && salon.abre("hero"), 50); } });
+    individual.montar(h);
+    return;
+  }
+  if (state.vista === "solo-bt3") {
+    h.innerHTML = "";
+    individual = crearBt3Solo({ volver: () => ir("") });
     individual.montar(h);
     return;
   }

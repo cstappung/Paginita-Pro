@@ -158,7 +158,7 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro =
       let ultimo = -1e9;
       sueltaCuadro = alCuadro(() => {
         const ahora = performance.now();
-        if (ahora - ultimo < 1000 / CUADROS - 4 || !canvas.width || !canvas.height) return;
+        if (!fuente.cuantos() || ahora - ultimo < 1000 / CUADROS - 4 || !canvas.width || !canvas.height) return;   // (nadie mirando: nada)
         ultimo = ahora;
         const ancho = Math.max(2, Math.round(ALTO * canvas.width / canvas.height / 2) * 2);   // (par: lo pide el códec)
         if (chico.width !== ancho) chico.width = ancho;

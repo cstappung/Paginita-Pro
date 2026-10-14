@@ -183,6 +183,14 @@ shows them as a Snake Club–style column next to the start card (`2b` in `pagin
 with a gi-patch emblem drawn by us (亀 機 闘 天; Noto Serif JP subset to those four glyphs) — never game art,
 remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`.
 
+- **The solo page is played inside Juegos** (`#solo/bt3`: `crearBt3Solo` in bt3.js, a full-window frame like PRO
+  HERO, `html.jg-bt3solo`; only for friends, `revisaBt3`). Opened loose (top-level) it had no session, so no token
+  and no private disc: it asked friends for an ISO. Now the lobby entry has `ruta: "#solo/bt3"` (its `url` stays: it
+  is where `build-controles.js` finds the code), and a loose page on a site with a private disc redirects there
+  (`discoPrivado`; `?suelta=1` keeps it loose for tests). «← Juegos» in the bar (mode menu only) posts `volver`.
+- **«Contra la CPU» has a difficulty row** (5 levels, `bt3.cpuNivel`, the tournament's `BT3_NIVELES`): jumping
+  straight to the character select skips the game's rules menu, so the page sends `BT3_WEB_CPU` (the patch writes
+  it into save rule[1] after the save loads).
 - Entrenamiento / Contra la CPU play here. **Nothing starts by itself on the solo page**: the private disc and the
   remembered ISO wait for «Jugar · <modo>» (`listoParaJugar`), which is also the gesture that unlocks audio; picking
   an ISO is itself the click. The mode reaches the program as `BT3_WEB_MODO` (`Module.entornoPendiente`), and
@@ -243,6 +251,10 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
+- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps and how busy the program is:
+  busy near 100% means the game itself is slow; few fps with a free program means something outside it.
+- **Nothing drawn over the game may use `backdrop-filter`** (it re-blurs the game every frame); the banned-list
+  panel (`#vetos`) is solid and only exists in the menus (`body:not(.en-menus) #vetos`).
 
 ## Friends only: the private disc and the hidden game
 

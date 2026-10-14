@@ -288,7 +288,7 @@ export function crearSalon(ctx) {
       pie = `${reglas}<button class="btn jg-hoja-ya" type="button" data-f="login">Iniciar sesión y jugar</button>`;
     } else if (e.modo === "multi") {
       medio = salasHtml(e) + opcionesHtml(e) + `<div class="jg-hoja-podio" data-podio></div>` +
-        (p ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.url)}">Practica solo contra bots →</a></p>` : "");
+        (p ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">Practica solo contra bots →</a></p>` : "");
       pie = `${reglas}${e.id === "pokemon" ? '<button class="btn2" type="button" data-f="equipos" title="Mis equipos">📋 Equipos</button>' : ""}
         <button class="btn jg-hoja-ya" type="button" data-f="sala">Abrir sala e invitar <span aria-hidden="true">→</span></button>`;
     } else {

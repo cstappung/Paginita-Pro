@@ -130,7 +130,7 @@ export const SOLOS = [
     lema: "Fútbol de discos contra bots, o con alguien a tu lado en el mismo teclado.",
     modos: ["Contra bots", "2 en un teclado"] },
   { id: "bots-bt3", tipo: "bots", juego: "bt3", nombre: "Tenkaichi 3 · un jugador", genero: "Pelea", icono: "🐉", alta: "2026-10-14",
-    url: "juegos/bt3/index.html", reglas: "bt3",
+    url: "juegos/bt3/index.html", ruta: "#solo/bt3", reglas: "bt3",   // (se juega dentro de Juegos: la página del juego necesita la sesión para el disco privado)
     lema: "Entrenamiento o contra la CPU, directo desde el disco; y desde ahí mismo, una sala de duelo o de torneo con tus amigos.",
     modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] }
 ];

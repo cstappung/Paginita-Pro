@@ -51,6 +51,44 @@ window.addEventListener("message", async e => {
   e.source.postMessage({ canal: "bt3-padre", tipo: "token", token: token || null }, location.origin);
 });
 
+/* «Un jugador» dentro de Juegos (`#solo/bt3`): la página del juego a pantalla completa, en un marco de ESTA página,
+   para que pueda pedirle el token de quien inició sesión (el oyente de arriba) y jugar desde el disco privado.
+   Suelta (fuera de Juegos) no tiene sesión y pedía la ISO. Solo para los amigos de la lista (bt3-amigos.js). El
+   marco avisa `{tipo:"volver"}` con su «← Juegos». */
+export function crearBt3Solo({ volver }) {
+  let host = null, frame = null, muerto = false;
+  const oye = e => {
+    if (!frame || e.source !== frame.contentWindow || e.origin !== location.origin) return;
+    if (e.data?.canal === HIJO && e.data.tipo === "volver") volver();
+  };
+  return {
+    montar(el) {
+      host = el;
+      host.innerHTML = '<p class="jg-bt3-info">Abriendo Budokai Tenkaichi 3…</p>';
+      revisaBt3().then(ok => {
+        if (muerto) return;
+        if (!ok) { host.innerHTML = '<p class="jg-bt3-info jg-bt3-privado">Este juego es privado. <a class="btn2" href="#">← Juegos</a></p>'; return; }
+        frame = document.createElement("iframe");
+        frame.className = "jg-bt3-solo";
+        frame.title = "Budokai Tenkaichi 3";
+        frame.allow = "fullscreen; gamepad";
+        frame.setAttribute("allowfullscreen", "");
+        frame.src = "juegos/bt3/index.html?v=" + BT3_VER;
+        window.addEventListener("message", oye);
+        host.innerHTML = "";
+        host.append(frame);
+        frame.focus();
+      });
+    },
+    destruir() {
+      muerto = true;
+      window.removeEventListener("message", oye);
+      frame?.remove();
+      if (host) host.innerHTML = "";
+    },
+  };
+}
+
 export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
   let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;

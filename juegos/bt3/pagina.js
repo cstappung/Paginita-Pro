@@ -512,6 +512,9 @@
     let base = "";
     try { base = String((await (await fetch("disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, ""); } catch (e) {}
     if (!base) return false;
+    /* Suelta (sin Juegos alrededor: un enlace viejo, un favorito) no hay sesión, y sin sesión no hay disco privado:
+       se abre dentro de Juegos (#solo/bt3, bt3.js crearBt3Solo), que se la da. ?suelta=1 la deja suelta (pruebas). */
+    if (SOLO && window.parent === window && !Q.get("suelta")) { location.replace("../../juegos.html#solo/bt3"); return true; }
     let token = await pideToken(false);
     if (!token) return false;
     let r;
@@ -578,6 +581,16 @@
   discoPrivado().then(ok => { if (!ok) recordada(); }, () => recordada());
 
   // ---------------------------------------------------------------- 2. la barra
+  /* Los cuadros por segundo del juego y cuánto trabaja (Module.webStats), arriba a la izquierda: con ?hud=1, o con
+     «bt3.hud» = "1" en este navegador (el banco tiene la casilla). Para saber de dónde viene una traba: el juego
+     ocupado cerca del 100% es el juego mismo; pocos cuadros con el juego desocupado es algo de afuera. */
+  try {
+    if (localStorage.getItem("bt3.hud") === "1" && !Q.get("hud")) {
+      const h = $("hud"), antes = Module.onWebStats;
+      h.style.display = "block";
+      Module.onWebStats = s => { antes && antes(s); h.textContent = `${s.fps.toFixed(0)} fps · ${(s.busy * 100).toFixed(0)}% ocupado`; };
+    }
+  } catch (e) {}
   const registro = $("registro");
   const pinta = () => { registro.textContent = (Module.log || []).slice(-200).join("\n"); registro.scrollTop = registro.scrollHeight; };
   let relojLog = 0;
@@ -652,6 +665,13 @@
   try { modo = localStorage.getItem("bt3.modo") || "cpu"; } catch (e) {}
   if (MODOS.some(x => x[0] === Q.get("juego"))) modo = Q.get("juego");
   if (!MODOS.some(x => x[0] === modo)) modo = "cpu";
+  /* La dificultad de «Contra la CPU»: los cinco niveles de la regla «CPU» del juego (0..4 = sus niveles internos 0, 6,
+     13, 21, 29; los mismos del torneo, motor.js BT3_NIVELES). Entrar directo a la selección de personajes se salta
+     el menú de reglas del juego, así que se elige aquí y va como BT3_WEB_CPU (parche: headless.c, la escribe en la
+     regla después de cargar la partida guardada). Se recuerda en «bt3.cpuNivel». */
+  const NIVELES = ["Muy fácil", "Fácil", "Normal", "Difícil", "Muy difícil"];
+  let nivel = 2;
+  try { const n = Number(localStorage.getItem("bt3.cpuNivel")); if (Number.isInteger(n) && n >= 0 && n <= 4) nivel = n; } catch (e) {}
 
   // El disco quedó listo (privado o recordado): el botón «Jugar» lo arranca con el modo elegido.
   function listoParaJugar(f, txt) {
@@ -664,6 +684,11 @@
     if (!st || !lista) return;
     st.classList.toggle("en-sala", deSala(modo));
     lista.querySelectorAll("[data-m]").forEach(b => { const si = b.dataset.m === modo; b.classList.toggle("activo", si); b.setAttribute("aria-pressed", String(si)); });
+    const nv = lista.querySelector(".nivel-cpu");
+    if (nv) {
+      nv.hidden = modo !== "cpu";
+      nv.querySelectorAll("[data-n]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.n) === nivel)));
+    }
     $("abreSala").textContent = enJuegos ? (modo === "duelo" ? "Abrir sala de duelo" : "Abrir sala de torneo") : "Ir a Juegos para jugar en línea";
     if (jugar) { const b = $("serverDisc"); b.hidden = false; b.textContent = "Jugar · " + MODOS.find(x => x[0] === modo)[2]; }
   }
@@ -674,6 +699,15 @@
     lista.innerHTML = `<div class="modos-tit"><h2>Elige el modo</h2><span>01—04</span></div>` + MODOS.map(([k, ico, t, d], i) =>
       `<button type="button" class="modo" data-m="${k}" aria-pressed="false"><span class="ico ico-${k}" aria-hidden="true"><b translate="no">${ico}</b></span>
         <span><strong>${t}${deSala(k) ? " <em>EN LÍNEA</em>" : ""}</strong><small>${d}</small></span><span class="radio" aria-hidden="true"></span></button>`).join("");
+    const nv = document.createElement("div");
+    nv.className = "nivel-cpu"; nv.setAttribute("role", "group"); nv.setAttribute("aria-label", "Dificultad de la CPU");
+    nv.innerHTML = `<span>Dificultad de la CPU</span><div>${NIVELES.map((x, k) => `<button type="button" data-n="${k}" aria-pressed="false">${x}</button>`).join("")}</div>`;
+    nv.querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
+      nivel = Number(b.dataset.n);
+      try { localStorage.setItem("bt3.cpuNivel", String(nivel)); } catch (e) {}
+      pintaModo();
+    });
+    lista.append(nv);
     $("start").classList.add("con-modos");
     $("start").append(lista);
     const sala = document.createElement("button");
@@ -696,7 +730,7 @@
   // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
   async function eligeModo() {
     try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
-    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo]];
+    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo], ...(modo === "cpu" ? [["BT3_WEB_CPU", String(nivel)]] : [])];
     if (desdePrivado) { grabaArchivos(); await precopia(); }   // (el arranque, ya en memoria: ver «el disco privado, rápido»)
   }
   // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)
@@ -715,6 +749,13 @@
     b.id = "volverModos"; b.type = "button"; b.textContent = "← Modos"; b.title = "Volver al menú de modos";
     $("barra").prepend(b);
     b.onclick = () => { if (!document.body.classList.contains("started") || confirm("¿Volver al menú de modos? Lo que no hayas guardado en el juego se pierde.")) aModos(false); };
+    /* Dentro de Juegos (#solo/bt3) el juego ocupa la ventana: «← Juegos», en el menú de modos, vuelve al salón. */
+    if (enJuegos) {
+      const j = document.createElement("button");
+      j.id = "volverJuegos"; j.type = "button"; j.textContent = "← Juegos"; j.title = "Volver a Juegos";
+      $("barra").prepend(j);
+      j.onclick = () => window.parent.postMessage({ canal: "bt3-hijo", tipo: "volver" }, location.origin);
+    }
     try { if (sessionStorage.getItem("bt3.volvio")) { sessionStorage.removeItem("bt3.volvio"); say("Volviste al menú de modos: elige otro o vuelve a jugar."); } } catch (e) {}
   }
 

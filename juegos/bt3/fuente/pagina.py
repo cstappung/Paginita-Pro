@@ -108,6 +108,16 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
   .modo.activo strong { color: #ffd21f; }
   .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
+  /* la dificultad de «Contra la CPU» (pagina.js, 2b): cinco fichas bajo los modos, solo con ese modo elegido */
+  .nivel-cpu { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 2px solid #2f4d9c; background: #0c1a42e6; }
+  .nivel-cpu[hidden] { display: none; }
+  .nivel-cpu > span { font: 800 11px system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #a9b6dc; }
+  .nivel-cpu div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nivel-cpu button { padding: 6px 10px; border-radius: 999px; border: 1px solid #2f4d9c; background: #132a63; color: #f4f6ff;
+    font: 700 12px system-ui, sans-serif; cursor: pointer; }
+  .nivel-cpu button:hover { border-color: #ff8a00; }
+  .nivel-cpu button[aria-pressed="true"] { background: linear-gradient(180deg, #ffd21f, #ff8a00); border-color: #ffd21f; color: #1a0a00; }
+  .nivel-cpu button:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 2px; }
   /* lo que se baja por detrás (pagina.js, «el disco privado, rápido»): una pastilla en la barra con su avance */
   #bajando { --f: 0; background: linear-gradient(90deg, #ff8a0055 calc(var(--f) * 100%), rgba(20,24,32,.88) 0) !important;
     border-color: #ff9d0088 !important; cursor: default; max-width: 42vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -117,13 +127,16 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   #start #esencial[disabled] { opacity: .75; cursor: default; }
   #volverModos, #volverSala, #atras { display: none; }
   body.started #volverModos, body.started #volverSala { display: inline-block; }
+  body.started #volverJuegos { display: none; }   /* (con el juego andando, «← Modos»; desde los modos, a Juegos) */
   body.started.en-menus #atras { display: inline-block; }
   /* los vetados de la sala, al costado mientras se elige personaje (pagina.js, 3): plegable, nunca en la pelea */
   #vetos { position: fixed; z-index: 6; right: calc(var(--sr) + 8px); top: calc(var(--st) + 46px); width: 214px;
     max-height: calc(100vh - var(--st) - var(--sb) - 120px); display: flex; flex-direction: column; border-radius: 12px;
-    background: rgba(8,16,44,.86); border: 1px solid #2f4d9c; color: #e8ecff; font: 12px/1.35 system-ui, sans-serif;
-    box-shadow: 0 8px 24px #0008; backdrop-filter: blur(4px); }
-  #vetos[hidden] { display: none; }
+    background: rgba(8,16,44,.95); border: 1px solid #2f4d9c; color: #e8ecff; font: 12px/1.35 system-ui, sans-serif;
+    box-shadow: 0 8px 24px #0008; }
+  /* sin backdrop-filter: desenfocar lo de atrás (el juego, que cambia cada cuadro) costaba en cada cuadro y trababa el
+     juego; y solo en los menús (body.en-menus, Module.onMenus), aunque el juego no avise que cerró la selección */
+  #vetos[hidden], body:not(.en-menus) #vetos { display: none; }
   #vetos .tit { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border: 0; background: none;
     color: #ffd21f; font: 400 14px 'Lilita One', system-ui, sans-serif; cursor: pointer; text-align: left; }
   #vetos .tit span { flex: 1; min-width: 0; }
