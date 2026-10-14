@@ -141,7 +141,10 @@ prefers `balanced`. The software-GL test box cannot show (1)'s gain; (2) went fr
 the browser has shown it (`preserveDrawingBuffer: false`), and the copy read it after that. The frame that will
 transmit (`Module.conservaCuadro`, set before the program starts) creates its context with `preserveDrawingBuffer:
 true` (pagina.js 0b wraps `getContext` for `Module.canvas`); only that frame pays the per-frame copy. Headless Chrome
-never clears it, so the test box cannot reproduce this one either. Friends find running rooms in «En juego ahora»
+never clears it, so the test box cannot reproduce this one either. (4) **The game comes first**: the copy runs inside
+the game's frame (10 ms at 720p, 44 ms at 1080p on the GPU-less test box), so it measures its own cost and spaces
+itself to stay under 10% of the game's time (`costo * 10`); with a cheap copy that is still 30/s. At a flat 30/s a
+watcher halved the fighter's frame rate (owner: 2 fps in character select). Friends find running rooms in «En juego ahora»
 (BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
@@ -272,10 +275,10 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
-- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps, how busy the program is,
-  how much of the time goes to handing the frame to the GPU (`webStats.prof[0]`; split into the draw loop `prof[1]`
-  and what comes before it, events and texture uploads, `prof[2]`) and draws per frame (`prof[3]`, the patch adds
-  `gsDrawCount` in gs_gl.c). First measurement (owner, a fight): 46 fps, 67% busy, 61% «dibujo». busy near 100% means the game
+- `?hud=1` (the fork's) shows fps; `Module.webStats.prof` has the GPU hand-off time (`[0]`, split into the draw loop
+  `[1]` and what comes before it `[2]`) and draws per frame (`[3]`, the patch adds `gsDrawCount` in gs_gl.c). The
+  page's own green readout (`bt3.hud`) was removed at the owner's request. Owner's first fight: 46 fps, 67% busy, 61%
+  of it handing frames to the GPU. busy near 100% means the game
   itself is slow; a big «dibujo» share means the renderer (where WebGPU could help); few fps with a free program
   means something outside it.
 - **No `confirm()`/`alert()`** in the room or the frame: a sandboxed frame (the bench) blocks them and they return

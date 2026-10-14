@@ -155,14 +155,19 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro =
     if (c2 && chico.captureStream) {
       chico.width = 960; chico.height = ALTO;
       pista = chico.captureStream(0).getVideoTracks()[0];
-      let ultimo = -1e9;
+      /* El juego primero: la copia corre dentro del cuadro del juego, así que se mide cuánto tarda (promedio) y se
+         espacia para no pasar del 10% de su tiempo. Rápida (una tarjeta de video que copia en 1 ms): 30 por segundo;
+         cara (44 ms a 1080p en una máquina sin tarjeta de video): menos cuadros para el que mira, y el que pelea no se
+         traba. Antes iba siempre a 30 y, con alguien mirando, el juego caía a la mitad. */
+      let ultimo = -1e9, costo = 1;
       sueltaCuadro = alCuadro(() => {
         const ahora = performance.now();
-        if (!fuente.cuantos() || ahora - ultimo < 1000 / CUADROS - 4 || !canvas.width || !canvas.height) return;   // (nadie mirando: nada)
+        if (!fuente.cuantos() || ahora - ultimo < Math.max(1000 / CUADROS - 4, costo * 10) || !canvas.width || !canvas.height) return;   // (nadie mirando: nada)
         ultimo = ahora;
         const ancho = Math.max(2, Math.round(ALTO * canvas.width / canvas.height / 2) * 2);   // (par: lo pide el códec)
         if (chico.width !== ancho) chico.width = ancho;
         try { c2.drawImage(canvas, 0, 0, ancho, ALTO); pista.requestFrame?.(); } catch (e) {}
+        costo = costo * 0.8 + (performance.now() - ahora) * 0.2;
       });
     } else {
       pista = canvas.captureStream(CUADROS).getVideoTracks()[0];

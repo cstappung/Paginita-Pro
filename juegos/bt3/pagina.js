@@ -610,23 +610,7 @@
   $("barra").addEventListener("pointerleave", () => { sobreBarra = false; vivaBarra(); });
   $("barra").addEventListener("focusin", () => vivaBarra(6000));
   const alEmpezar = setInterval(() => { if (document.body.classList.contains("started")) { clearInterval(alEmpezar); vivaBarra(4000); } }, 300);
-  /* Los cuadros por segundo del juego y cuánto trabaja (Module.webStats), arriba a la izquierda: con ?hud=1, o con
-     «bt3.hud» = "1" en este navegador (el banco tiene la casilla). Para saber de dónde viene una traba: el juego
-     ocupado cerca del 100% es el juego mismo; pocos cuadros con el juego desocupado es algo de afuera. */
-  try {
-    if (localStorage.getItem("bt3.hud") === "1" && !Q.get("hud")) {
-      const h = $("hud"), antes = Module.onWebStats;
-      h.style.display = "block";
-      /* prof (gs_gl.c, partes del tiempo): [0] mandarle el cuadro a la tarjeta de video, entero; [1] el bucle de las
-         piezas (cada una, sus llamadas a WebGL); [2] lo de antes (eventos, subir imágenes); [3] piezas por ms */
-      const pc = x => ((x || 0) * 100).toFixed(0) + "%";
-      Module.onWebStats = s => {
-        antes && antes(s);
-        const p = s.prof || [], piezas = s.fps ? Math.round((p[3] || 0) * 1000 / s.fps) : 0;
-        h.textContent = `${s.fps.toFixed(0)} fps · ${pc(s.busy)} ocupado · ${pc(p[0])} dibujo (piezas ${pc(p[1])}, antes ${pc(p[2])}) · ${piezas} piezas/cuadro`;
-      };
-    }
-  } catch (e) {}
+  try { localStorage.removeItem("bt3.hud"); } catch (e) {}   // (el contador de las pruebas ya no existe: ?hud=1 del fork sigue)
   const registro = $("registro");
   const pinta = () => { registro.textContent = (Module.log || []).slice(-200).join("\n"); registro.scrollTop = registro.scrollHeight; };
   let relojLog = 0;
