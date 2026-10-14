@@ -27,6 +27,17 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
   show MB progress) and land in Cache Storage (`hero-canciones-v1`, 800 MB
   LRU, invalidated by the song's `v`). Only `library.json` (~260 KB) on
   open; a song (~5 MB) only on «Jugar»; a cover only after dwelling on it.
+- **Menu preview with Firebase = Apple's 30 s** (`js/applePreview.js`), never
+  the song from Storage (that would cost ~5 MB per song browsed). The iTunes
+  Search API has open CORS and no key; `<audio>` plays `previewUrl` straight
+  from Apple. Apple cuts at ~20 searches/min per IP, so: a song never looked
+  up is searched only after `APPLE_ESPERA` (700 ms) on it, each answer (also
+  «not there», retried after a month) lives in localStorage
+  (`hero-apple-v1`), and any failure (Apple's 403 may arrive without CORS)
+  rests a minute. Browsers that can't play AAC (`.m4a`, e.g. open-source
+  Chromium, Playwright's included) never search. The artist must match
+  (`eligeApple`): better no preview than someone else's song. A stored URL
+  that fails to play is forgotten and searched again next time.
 - `?fuente=servidor` makes the frame read `api/library` and `songs/<id>/…`
   next to it instead (the owner's local Node server). That is also how to
   test it without Firebase: drop a fake `api/library` + `songs/<id>/` in the
