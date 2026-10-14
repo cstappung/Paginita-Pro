@@ -134,6 +134,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     aplica();
     el.querySelector('[data-tele="x"]').onclick = () => cierraTele();
     el.querySelector('[data-tele="grande"]').onclick = () => { (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {}); };
+    // en pantalla completa la barra flota y se esconde sola; el mouse la trae (CSS: .jg-bt3-tele.mueve)
+    let quieto = 0;
+    el.addEventListener("pointermove", () => { el.classList.add("mueve"); clearTimeout(quieto); quieto = setTimeout(() => el.classList.remove("mueve"), 2500); });
     const visor = crearVisor({ senal, uid, emisor: pel.emisor,
       alVideo: flujo => {
         video.srcObject = flujo; nota.hidden = true; el.classList.add("en-vivo");

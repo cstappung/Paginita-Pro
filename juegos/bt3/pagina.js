@@ -611,6 +611,47 @@
   $("barra").addEventListener("focusin", () => vivaBarra(6000));
   const alEmpezar = setInterval(() => { if (document.body.classList.contains("started")) { clearInterval(alEmpezar); vivaBarra(4000); } }, 300);
   try { localStorage.removeItem("bt3.hud"); } catch (e) {}   // (el contador de las pruebas ya no existe: ?hud=1 del fork sigue)
+
+  /* ---------------------------------------------------------------- 2a. el autoajuste (como en los juegos de celular)
+     Los cuadros por segundo NO cambian nunca: siempre 60 (el parche fija el movimiento suave, gs_draw.c; en una pelea
+     en línea los dos tienen que ver lo mismo). Lo que baja es lo que cuesta cada cuadro: si el juego no llega a 60
+     durante 3 s seguidos, un escalón menos (sin desenfoque lejano → sin brillo → menos resolución interna → sin neblina
+     → sin contorno); si sobra durante 15 s, uno más, hasta lo que el jugador eligió en Ajustes (F1). Si al subir
+     vuelve a no llegar, la próxima subida espera el doble (no queda subiendo y bajando). No se guarda: los Ajustes del
+     jugador quedan como estaban. No cuenta los segundos en que el juego espera el disco (una carga no es falta de
+     máquina). Module._Web_Calidad / _Web_EscalaElegida / _Web_FxElegidos: parche, gs_draw.c. */
+  (() => {
+    let niveles = null, nivel = 0, malos = 0, buenos = 0, calma = 0, paciencia = 15, subioEn = -1e9, visto = 0;
+    const arma = () => {
+      const s0 = Module._Web_EscalaElegida(), f0 = Module._Web_FxElegidos();
+      const l = [[s0, f0], [s0, f0 | 16], [s0, f0 | 24], [Math.max(1, s0 - 1), f0 | 24], [1, f0 | 28], [1, f0 | 29]];
+      niveles = l.filter((x, i) => !i || x[0] !== l[i - 1][0] || x[1] !== l[i - 1][1]);
+    };
+    const pon = (n, por) => {
+      nivel = n; malos = buenos = 0; calma = 4;
+      const [s, f] = niveles[n];
+      try { Module._Web_Calidad(s, f); } catch (e) { return; }
+      Module.keep && Module.keep(`autoajuste: nivel ${n} (escala ${s}, efectos apagados ${f}) por ${por}`);
+    };
+    setInterval(() => {
+      const s = Module.webStats;
+      if (!s || s.at === visto || !Module._Web_Calidad || !document.body.classList.contains("started") || document.hidden) return;
+      visto = s.at;
+      if (!niveles) { try { arma(); } catch (e) { return; } }
+      if (calma > 0) { calma--; return; }   // (recién cambiado: que se note antes de medir)
+      if (Red.esperando > 0 || Progreso.lectura) { malos = buenos = 0; return; }   // (esperando el disco: no es la máquina)
+      if (s.fps < 56) {
+        buenos = 0;
+        if (++malos >= 3 && nivel < niveles.length - 1) {
+          if (performance.now() - subioEn < 20000) paciencia = Math.min(240, paciencia * 2);   // (subió y no aguantó)
+          pon(nivel + 1, Math.round(s.fps) + " fps");
+        }
+      } else {
+        malos = 0;
+        if (s.fps >= 59 && s.busy < 0.75 && ++buenos >= paciencia && nivel > 0) { subioEn = performance.now(); pon(nivel - 1, "margen"); }
+      }
+    }, 250);
+  })();
   const registro = $("registro");
   const pinta = () => { registro.textContent = (Module.log || []).slice(-200).join("\n"); registro.scrollTop = registro.scrollHeight; };
   let relojLog = 0;
@@ -884,8 +925,10 @@
     panel.append(cuerpo);
   };
   Module.onSeleccion = abierta => { enSeleccion = !!abierta; pintaVetos(); };
-  // La sala de prueba corre dos juegos en la misma pestaña: menos caché del disco por cada uno.
-  if (S.prueba) Module.webCacheBudget = 192 * 1024 * 1024;
+  /* (Aquí el banco de pruebas bajaba la memoria para archivos del disco a 192 MB, de cuando corría dos juegos en una
+     pestaña. Con uno por pestaña sobraba el recorte y faltaba memoria: en plena pelea, al cargar algo nuevo, el juego
+     botaba archivos que todavía usaba y los volvía a leer del disco en cada cuadro: 2 fps, 99% ocupado sin dibujar.
+     Ahora el banco usa los 768 MB del sitio.) */
 
   let est = null, cuandoEmpiece = null, ronda = 0;
   /* Las reglas de personajes de la sala (No OP / Sólo malos, bt3-tiers.js en la sala): al abrir la selección de

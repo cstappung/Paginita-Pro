@@ -133,7 +133,8 @@ tapped *before* the player's own volume (`pagina.js` 0a wraps `AudioContext` aft
 has its own 🔊 and slider (`jg.bt3.tele`). Signalling goes through the
 mesh's mailbox (`vivo/<pid>/rtc`, open to anyone signed in) with its own message types (`ver`, `vof`, `vans`,
 `vcan`, `vfin`, `vlleno`); the frame's mailbox proxy now takes several listeners (mesh + emitter). The viewer's
-screen closes itself when the fight ends, and shows how the video arrives (fps · size · speed, `visor.calidad()`).
+screen closes itself when the fight ends (its ⛶ fills the screen without distortion, the bar floats and hides),
+and shows how the video arrives (fps · size · speed, `visor.calidad()`).
 **It went at ~1 fps and blurry** for two reasons, measured with real WebRTC (`tele/` harness in the bench): (1)
 `captureStream` on the game's canvas reads the WHOLE screen-sized picture back from the GPU every frame («GPU stall
 due to ReadPixels»), which slowed the capture and the game; now the patch calls `Module.onCuadro` after each
@@ -268,9 +269,18 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   pressed; in a room (already playing) the boot is fetched on entering, and «lo esencial» is not offered there (a
   big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
   at 300 pieces (300 MB) on both sides. `BT3_VER` in `bt3-amigos.js` is the program version (construir.sh sets it).
-- **60 fps by default**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
-  pictures. The patch defaults the `interp` setting to 1 in the browser build (`gs_draw.c`); a player can turn it
-  off in Ajustes → Video. It is a display-only blend (+16.7 ms of display latency), so lockstep play is unaffected.
+- **Always 60 fps, locked**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
+  pictures. The patch forces `gsInterp = 1` every frame in the browser build (`gs_draw.c`; F1's combo is disabled and
+  F9 has no effect): in an online fight both players must see the same, never 30 and never more. It is a display-only
+  blend (+16.7 ms of display latency), so lockstep play is unaffected.
+- **Auto-tuner** (`pagina.js` 2a, like a phone game's): the picture rate never changes; what gets cheaper is each
+  picture. Under 56 fps for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
+  depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 59+ with the program < 75%
+  busy → one step up, never above the player's F1 choice (`Web_EscalaElegida`/`Web_FxElegidos`); a step up that
+  fails within 20 s doubles the wait for the next one. Seconds spent waiting for the disc don't count.
+- **The bench used to cut the disc cache to 192 MB** (`webCacheBudget`, from when it ran two games per tab): with one
+  game per tab that made the game evict files it still used and re-read them every frame mid-fight (2 fps, 99% busy,
+  nothing drawn). Removed; only this page's setting, nothing else on the site.
 - **Nothing is downloaded twice.** The first load fetches the `.wasm` with a progress bar into a blob; from then on
   (`localStorage` `bt3.wasm.<url>`) the program loads from its URL, so Chrome serves it from the HTTP cache *and*
   reuses its compiled code (measured: 3.6 MB/600 ms → 0 bytes/80 ms). The private disc's pieces are kept in Cache

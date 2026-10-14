@@ -1,10 +1,42 @@
 diff --git a/port/src/gs/gs_draw.c b/port/src/gs/gs_draw.c
-index de3de89..5914b0c 100644
+index de3de89..1b649de 100644
 --- a/port/src/gs/gs_draw.c
 +++ b/port/src/gs/gs_draw.c
-@@ -3193,7 +3193,11 @@ void GsGpu_FrameEnd(void) {
+@@ -1192,6 +1192,25 @@ void GsGpu_GetSettings(PortVideo *v) {
+     v->texPackCount = TexPack_Count();
+ }
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++/* paginita-pro: the page's auto-tuner (juegos/bt3/pagina.js), like a phone game's: when the frames stop arriving at 60
++   it lowers the internal scale and switches off the costliest effects (distance blur 16, glare 8, depth tint 4,
++   outline 1), and raises them back when there is room, up to what the player chose. Not saved: the player's own
++   settings stay as they were. The picture rate itself never changes (always 60: see the interp lock below). */
++EMSCRIPTEN_KEEPALIVE void Web_Calidad(int scale, int fxOff) {
++    if (scale >= 1 && scale <= 8 && scale != (gsPendingScale ? gsPendingScale : gsScale)) {
++        gsPendingScale = scale; /* applied between two frames */
++    }
++    if (fxOff >= 0) {
++        gsFxOff = (unsigned)fxOff & 31;
++    }
++}
++/* what the player chose (F1), for the auto-tuner's ceiling */
++EMSCRIPTEN_KEEPALIVE int Web_EscalaElegida(void) { return Port_Setting("scale", 2); }
++EMSCRIPTEN_KEEPALIVE int Web_FxElegidos(void) { return Port_Setting("fx_off", 0) & 31; }
++#endif
++
+ /* Applies what differs from the current state, all of it at once, and keeps it for the next run. */
+ void GsGpu_SetSettings(const PortVideo *v) {
+     PortVideo now;
+@@ -3192,8 +3211,17 @@ void GsGpu_FrameEnd(void) {
+                 sInterpNext = 0;
              }
          }
++#ifdef __EMSCRIPTEN__
++        /* paginita-pro: always 60 pictures a second on the site, whatever F1 or F9 say: in an online fight both players
++           must see the same, and the page's auto-tuner lowers the picture's cost instead (Web_Calidad, below) */
++        gsInterp = 1;
++#endif
          if (gsInterp < 0) {
 +#ifdef __EMSCRIPTEN__ /* the browser build (paginita-pro): 60 pictures a second unless the player turned it off in F1 */
 +            gsInterp = getenv("BT3_INTERP") != NULL ? atoi(getenv("BT3_INTERP")) : Port_Setting("interp", 1);
@@ -84,7 +116,7 @@ index 011fc8d..271ec6a 100644
      sWaits++;
      {   /* (the meter, when the two copies wait for each other every blank: time waited, and blanks that waited
 diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
-index fd6cc57..79829bd 100644
+index fd6cc57..f93034f 100644
 --- a/port/src/gs/ui.cpp
 +++ b/port/src/gs/ui.cpp
 @@ -309,6 +309,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Web_NetMenuClosed(void) {
@@ -112,6 +144,26 @@ index fd6cc57..79829bd 100644
  static void net_open(void) {
      set_open(true);
      sNet = true;
+@@ -589,6 +607,9 @@ static void video_tab(PortVideo &v) {
+         static const char *kSmooth[] = { "Off (30, as the console)", "60 pictures a second", "120 pictures a second", "240 pictures a second" };
+         int smooth = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
+         ImGui::SetNextItemWidth(416.0f);
++#ifdef __EMSCRIPTEN__
++        ImGui::BeginDisabled(); /* paginita-pro: fixed at 60 on the site (gs_draw.c), the same for both players */
++#endif
+         if (ImGui::Combo("Smooth motion", &smooth, kSmooth, 4)) {
+             gsInterp = smooth;
+             Port_SettingSave("interp", gsInterp);
+@@ -598,6 +619,9 @@ static void video_tab(PortVideo &v) {
+                               "drawn between each two. The fight itself does not change, and neither does online play.\n"
+                               "The newest picture reaches the screen later: 17 ms at 60, 25 ms at 120, 29 ms at 240.\n"
+                               "Choose what your screen can show. F9 switches it off and on.");
++#ifdef __EMSCRIPTEN__
++        ImGui::EndDisabled();
++#endif
+     }
+     {
+         bool on = meter_on();
 diff --git a/port/src/headless.c b/port/src/headless.c
 index fb8b892..9e6bead 100644
 --- a/port/src/headless.c
