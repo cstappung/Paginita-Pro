@@ -220,9 +220,9 @@ export const JUEGOS = {
   },
   bt3: {
     nombre: "Budokai Tenkaichi 3",
-    lema: "El juego de PS2 en el navegador: duelos uno contra uno o un torneo de eliminación directa con tus amigos",
+    lema: "El juego de PS2 en el navegador: duelos uno contra uno o un torneo de eliminación directa, con tus amigos o contra la CPU",
     color: "#f28c1e",
-    minimo: 2,
+    minimo: 1,   // un torneo se puede jugar solo contra la CPU (el duelo pide dos: minimoDe)
     cupo: 8,
     alta: "2026-10-14"
   }
@@ -245,6 +245,7 @@ export function minimoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
   if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
+  if (p && p.juego === "bt3" && cupoDe(p) <= 2) return 2;   // el duelo de BT3 es de dos; el torneo, desde uno (con CPU)
   return j.minimo || 2;
 }
 
@@ -7177,7 +7178,8 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
    solo lo que pasa en el vestíbulo, nunca la pelea:
    - `{t:"anfitrion", uid, a}`: cualquiera de los dos elige quién es el anfitrión (el jugador 1 del juego,
      el que fija las reglas de la pelea). Empieza siendo quien abrió la sala.
-   - `{t:"ajuste", uid, k, v}`: el anfitrión elige `batalla` (BT3_BATALLAS) o `tiempo` (BT3_TIEMPOS).
+   - `{t:"ajuste", uid, k, v}`: el anfitrión elige `batalla` (BT3_BATALLAS), `tiempo` (BT3_TIEMPOS) o `veto`
+     (personajes prohibidos según la tier list, bt3-tiers.js: "", "noop" o "malos").
    - `{t:"disco", uid}`: el marco de `uid` ya leyó una ISO válida; hace falta la de los dos para empezar.
    - `{t:"empieza", uid}`: el anfitrión arranca, con los dos y sus discos. Abre una pelea (`ronda`).
    - `{t:"vuelve", uid}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
@@ -7189,6 +7191,9 @@ export const BT3_BATALLAS = { single: "Single Battle", team3: "Team 3 vs 3", tea
 export const BT3_TIEMPOS = [60, 90, 180, 240, 0];   // segundos por round; 0 = sin límite (el orden es el del juego)
 const bt3Batalla = v => tiene(BT3_BATALLAS, v) ? v : "single";
 const bt3Tiempo = v => { const n = Math.floor(Number(v)); return BT3_TIEMPOS.includes(n) ? n : 240; };
+/* Las reglas de personajes (bt3-tiers.js): «noop» (fuera de S hacia arriba) o «malos» (solo de B hacia abajo);
+   son una u otra porque es un solo ajuste. "" = cualquiera. */
+const bt3Veto = v => v === "noop" || v === "malos" ? v : "";
 /* La palabra de reglas que espera `gs/net.c` (BT3_NET_RULES): tipo (0 single, 1 team, 2 dp) en los 4 bits
    bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. Desde el bit
    12, cuántos por equipo si no son cinco: el 3 vs 3 es un Team Battle con tope de tres (gs/net.c no mira esos
@@ -7206,7 +7211,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, hist = [];
   if (esTorneoBt3(p)) return redTorneoBt3(p, js);
-  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, empates = 0;
+  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, veto = "", empates = 0;
   const marcador = {}, reportes = {};
   let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
@@ -7217,14 +7222,14 @@ export function redBt3(p, js = jugadoresDe(p)) {
     const vest = fase === "vestibulo";
     const arranca = () => {
       fase = "jugando"; ronda++; revancha = {};
-      hist.push({ e: "ronda", n: ronda, anf: anfitrion, batalla, tiempo });
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, batalla, tiempo, veto });
     };
     const todosListos = () => presentes().length === 2 && presentes().every(x => discos[x.uid]);
     if (j.t === "anfitrion" && vest && ids.has(j.a) && !fuera[j.a]) {
       if (j.a !== anfitrion) revancha = {};   // cambió lo acordado: se vuelve a pedir
       anfitrion = j.a; hist.push({ e: "anfitrion", uid: j.uid, a: j.a });
-    } else if (j.t === "ajuste" && vest && j.uid === anfitrion && (j.k === "batalla" || j.k === "tiempo")) {
-      if (j.k === "batalla") batalla = bt3Batalla(j.v); else tiempo = bt3Tiempo(j.v);
+    } else if (j.t === "ajuste" && vest && j.uid === anfitrion && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
+      if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
       revancha = {};
     } else if (j.t === "disco" && vest) {
       discos[j.uid] = true;
@@ -7260,7 +7265,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const idos = Object.keys(fuera).length;
   const ganador = idos ? (ronda && presentes().length === 1 ? presentes()[0].uid : "") : null;
   return {
-    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, reglas: reglasBt3(batalla, tiempo),
+    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo),
     discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha
   };
 }
@@ -7283,7 +7288,7 @@ export const esTorneoBt3 = p => cupoDe(p) > 2;
 export function redTorneoBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid)), fuera = {}, hist = [];
   let org = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
-  let batalla = "single", tiempo = 240, discos = {}, rondas = null, peleas = 0;
+  let batalla = "single", tiempo = 240, veto = "", discos = {}, rondas = null, peleas = 0;
   const cpus = {};   // "cpu:N" → {n, nivel}: los lugares que el organizador rellenó con la CPU
   const cupo = cupoDe(p);
   // Una pelea entre dos CPU se decide sola, sin jugarla: al azar con la semilla de la sala, a favor del más fuerte.
@@ -7328,8 +7333,8 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     }
     if (j.t === "disco") { discos[j.uid] = true; continue; }
     if (!rondas) {
-      if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo")) {
-        if (j.k === "batalla") batalla = bt3Batalla(j.v); else tiempo = bt3Tiempo(j.v);
+      if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
+        if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
       } else if (j.t === "cpu" && esOrg && esCpuBt3(j.id) && /^cpu:[1-9]$/.test(j.id)) {
         // poner (o cambiar de nivel) o quitar una CPU; no más lugares que el cupo de la sala
         if (j.quita) delete cpus[j.id];
@@ -7370,7 +7375,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (j.t === "empieza" && (pelea || esOrg) && !m.enCurso && listos) {
       m.enCurso = true; m.rep = {}; m.conflicto = false; m.n = ++peleas;
       hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
-      hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo });   // (para los logros, como una pelea del duelo)
+      hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo, veto });   // (para los logros, como una pelea del duelo)
     } else if (j.t === "resultado" && pelea && m.enCurso && (j.g === m.a || j.g === m.b || j.g === "empate") && m.rep[j.uid] === undefined) {
       m.rep[j.uid] = j.g;
       const otro = j.uid === m.a ? m.b : m.a;
@@ -7388,7 +7393,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   const m = rondas ? actual() : null;
   return {
     fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
-    batalla, tiempo, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
+    batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
     llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };

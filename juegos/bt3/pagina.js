@@ -403,9 +403,26 @@
   // La sala de prueba corre dos juegos en la misma pestaña: menos caché del disco por cada uno.
   if (S.prueba) Module.webCacheBudget = 192 * 1024 * 1024;
 
-  let est = null, cuandoEmpiece = null, ronda = 0;
+  let est = null, cuandoEmpiece = null, ronda = 0, vetoVisto = "";
+  /* Las reglas de personajes de la sala (No OP / Sólo malos, bt3-tiers.js en la sala): al abrir la selección de
+     personajes, el programa manda los nombres que trae el disco (Web_Catalogo, parche.diff) y la sala devuelve
+     qué ids quedan fuera (`estado.vetados`). El programa los lee de Module.vetados al elegir (web_vetado): un
+     vetado suena a error y nunca sale al azar. */
+  Module.onCatalogo = lista => window.parent.postMessage({ canal: "bt3-hijo", tipo: "catalogo", lista }, location.origin);
+  const ponVetados = e => {
+    const v = [];
+    for (const id of Array.isArray(e.vetados) ? e.vetados : []) if (Number.isInteger(id) && id >= 0 && id <= 160) v[id] = 1;
+    Module.vetados = v;
+    const firma = (e.veto || "") + ":" + Object.keys(v).length;
+    if (e.veto && Object.keys(v).length && firma !== vetoVisto && !e.mirando && Module.catalogoVisto) {   // (al abrir la selección)
+      vetoVisto = firma;
+      aviso((e.veto === "noop" ? "Regla «No OP»" : "Regla «Sólo malos»") + ": " + Object.keys(v).length +
+        " personajes vetados según la tier list (si eliges uno, suena a error).", 7000);
+    }
+  };
   S.alEstado(e => {
     est = e;
+    ponVetados(e);
     if (e.mirando) {   // un mirón no carga nada: la pelea se ve en la pantalla de cada jugador
       $("start") && $("start").remove();
       aviso("Estás mirando esta sala. La pelea se juega en las pantallas de los dos jugadores.");

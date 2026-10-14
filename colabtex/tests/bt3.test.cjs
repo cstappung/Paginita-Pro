@@ -196,3 +196,43 @@ test('torneo: CPU contra CPU es igual en todas las pantallas; volver al menú co
  assert.equal(e.actual.id,m.id);assert.equal(e.actual.enCurso,false);assert.ok(!e.discos[h],'el disco se vuelve a cargar');
  assert.equal(B.reglasBt3('team3',240)>>12,3,'3 vs 3: tope de tres en los bits altos');assert.equal(B.reglasBt3('team3',240)&15,1,'es un Team Battle');
 });
+
+// Las reglas de personajes (bt3-tiers.js): el nombre y la forma que trae el disco contra la tier list.
+const T=(()=>{const c={};vm.createContext(c);vm.runInContext(sin('src/juegos/bt3-tiers.js')+';globalThis.__T={BT3_TIERS,palabrasBt3,vetadosBt3,catalogoBt3,tiersVetadas};',c);return c.__T;})();
+// Un catálogo con los nombres del juego como los escribe (USA): un personaje por forma.
+const ROSTER=[["Goku (Early)"],["Goku (Mid)","Super Saiyan"],["Goku (End)","Super Saiyan","Super Saiyan 2","Super Saiyan 3"],["Kid Goku"],["Goku (GT)","Super Saiyan","Super Saiyan 3"],["Super Saiyan 4 Goku"],
+ ["Kid Gohan","Super Saiyan"],["Teen Gohan","Super Saiyan","Super Saiyan 2"],["Gohan (Adult)","Super Saiyan","Super Saiyan 2"],["Ultimate Gohan"],["Great Saiyaman"],
+ ["Vegeta (Scouter)"],["Vegeta (Early)","Great Ape"],["Vegeta (Mid)","Super Saiyan"],["Vegeta (End)","Super Saiyan","Super Vegeta","Super Saiyan 2"],["Majin Vegeta"],["Super Saiyan 4 Vegeta"],
+ ["Trunks (Sword)","Super Saiyan"],["Trunks (Battle Armor)","Super Saiyan","Super Trunks"],["Kid Trunks","Super Saiyan"],["Goten","Super Saiyan"],["Gotenks","Super Saiyan","Super Saiyan 3"],
+ ["Vegito","Super Vegito"],["Gogeta","Super Saiyan"],["Super Saiyan 4 Gogeta"],["Piccolo (Early)"],["Piccolo (End)","Fused with Kami"],["Nail"],["Mr. Popo"],
+ ["Android 13","Super Android 13"],["Android 16"],["Android #17"],["Android 18"],["Super 17"],["Cell","Semi-Perfect Form","Perfect Form","Super Perfect Form"],["Cell Jr."],
+ ["Frieza","2nd Form","3rd Form","Final Form","100% Full Power"],["Cooler","Final Form"],["Majin Buu"],["Super Buu","Gotenks Absorbed","Gohan Absorbed"],["Kid Buu"],["Babidi"],["Dabura"],
+ ["Burter"],["Guldo"],["Broly","Super Saiyan","Legendary Super Saiyan"],["Arale"],["Baby","Baby Vegeta","Super Baby 1","Super Baby 2","Great Ape Baby"],["Syn Shenron","Omega Shenron"],["Uub","Majuub"],["Great Ape"]];
+const CATALOGO=ROSTER.flatMap(([n,...f])=>[[n,''],...f.map(x=>[n,x])]).map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
+
+test('reglas de personajes: el anfitrión elige una (No OP o Sólo malos), y queda en el torneo',()=>{
+ let e=B.reducir(sala({t:'ajuste',uid:'a',k:'veto',v:'noop'}));assert.equal(e.veto,'noop');
+ e=B.reducir(sala({t:'ajuste',uid:'a',k:'veto',v:'noop'},{t:'ajuste',uid:'a',k:'veto',v:'malos'}));assert.equal(e.veto,'malos','una o la otra: la última manda');
+ e=B.reducir(sala({t:'ajuste',uid:'b',k:'veto',v:'noop'}));assert.equal(e.veto,'','solo el anfitrión');
+ e=B.reducir(sala({t:'ajuste',uid:'a',k:'veto',v:'trampa'}));assert.equal(e.veto,'','lo que no existe es «todos»');
+ e=B.reducir(torneo(3,{t:'ajuste',uid:'u0',k:'veto',v:'malos'},{t:'torneo',uid:'u0'},{t:'ajuste',uid:'u0',k:'veto',v:''}));
+ assert.equal(e.veto,'malos','con el torneo andando ya no cambia');
+ assert.deepEqual([...T.tiersVetadas('noop')],['BROLY','S++','S+','S']);
+ assert.deepEqual([...T.tiersVetadas('malos')],['BROLY','S++','S+','S','A']);
+});
+
+test('reglas de personajes: cada entrada de la tier list encuentra exactamente a su personaje en el disco',()=>{
+ const cat=T.catalogoBt3(CATALOGO);
+ assert.equal(cat[0].nombre,'Goku (Early)','el catálogo llega como códigos de 16 bits');
+ const no=T.vetadosBt3(cat,'noop'),ma=T.vetadosBt3(cat,'malos');
+ for(const d of ma.detalle)assert.equal(d.juego.length,1,d.nombre+' → '+JSON.stringify(d.juego));
+ const nombre=i=>[cat[i].nombre,cat[i].forma].filter(Boolean).join(' · ');
+ const nNo=no.ids.map(nombre),nMa=ma.ids.map(nombre);
+ for(const x of ['Broly · Legendary Super Saiyan','Cell · Super Perfect Form','Android #17','Super 17','Vegito','Vegito · Super Vegito','Super Saiyan 4 Gogeta'])assert.ok(nNo.includes(x),'No OP deja fuera a '+x);
+ for(const x of ['Broly','Broly · Super Saiyan','Cell · Perfect Form','Goku (Early)','Android 13 · Super Android 13','Frieza · Final Form'])assert.ok(!nNo.includes(x),'No OP permite a '+x);
+ assert.ok(no.ids.every(i=>ma.ids.includes(i)),'Sólo malos deja fuera todo lo que No OP');
+ for(const x of ['Android 13 · Super Android 13','Frieza · 100% Full Power','Super Saiyan 4 Goku','Teen Gohan · Super Saiyan 2','Goku (Mid) · Super Saiyan'])assert.ok(nMa.includes(x),'Sólo malos deja fuera a '+x);
+ for(const x of ['Goku (Early)','Frieza · Final Form','Cell · Perfect Form','Kid Buu','Great Ape','Vegeta (End) · Super Vegeta','Teen Gohan'])assert.ok(!nMa.includes(x),'Sólo malos permite a '+x);
+ assert.equal(T.vetadosBt3([], 'noop').ids.length,0,'sin catálogo todavía no se sabe a quién: nadie');
+ assert.equal(T.vetadosBt3(cat,'').ids.length,0);
+});

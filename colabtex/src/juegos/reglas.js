@@ -458,9 +458,14 @@ const REGLAS = {
         "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). El juego va a 60 cuadros por segundo; si tu computador sufre, en <b>Ajustes → Video → Smooth motion</b> se baja a 30, como la consola."
       ])],
       ["Duelo", lista([
-        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, y el tiempo de cada round. Con los dos discos listos aprieta <b>¡A pelear!</b>.",
+        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>3 vs 3</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, el tiempo de cada round y los personajes permitidos. Con los dos discos listos aprieta <b>¡A pelear!</b>.",
         "Al terminar la pelea el juego cuenta solo quién ganó: se cierra, vuelven los dos al vestíbulo y se suma al marcador.",
         "<b>Revancha</b>: la piden los dos y empieza sola, con las mismas reglas, en cuanto cargan los dos discos."
+      ])],
+      ["Personajes (tier list)", lista([
+        "En el duelo y el torneo, quien pone las reglas puede limitar los personajes según la tier list competitiva de BT3: <b>No OP</b> deja fuera a los de tier S hacia arriba (BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo los de tier B hacia abajo. Es una o la otra.",
+        "En la selección de personajes, elegir uno vetado suena a error, y el aleatorio (y la CPU) nunca saca uno. En la sala, <b>Ver los vetados</b> muestra la lista con el nombre que tienen en el juego.",
+        "Vale para el personaje con que se empieza: transformarse en plena pelea sigue permitido."
       ])],
       ["Torneo", lista([
         "El que abre la sala organiza: pone las reglas y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave se sortea entre los que están; si no son 4 u 8, alguno pasa directo.",

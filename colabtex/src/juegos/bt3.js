@@ -5,6 +5,7 @@ import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
 import { suena } from "./sonido.js";
 import { crearVisor } from "./bt3-directo.js";
+import { BT3_VETOS, BT3_VETOS_TXT, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
 /* Budokai Tenkaichi 3 — el cartero entre la sala y el juego.
 
@@ -22,8 +23,14 @@ import { crearVisor } from "./bt3-directo.js";
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-6";
+const SRC = "juegos/bt3/index.html?modo=online&v=bt3-7";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
+
+/* Los nombres de los personajes del disco (los manda el marco al abrir la selección de personajes, ver
+   bt3-tiers.js): se guardan para que la próxima sala ya sepa qué deja fuera cada regla antes de empezar. */
+const CATALOGO = "bt3.catalogo";
+let catalogo = (() => { try { return catalogoBt3(JSON.parse(localStorage.getItem(CATALOGO) || "null")); } catch (e) { return []; } })();
+const catalogoBueno = c => c.filter(x => x && x.nombre).length >= 100;
 
 /* El disco privado (juegos/bt3/fuente/disco/): el marco del juego le pide a esta página el token de Firebase
    de quien está con la sesión iniciada, y con él le pide los pedazos de la ISO al Worker, que solo responde a
@@ -138,6 +145,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       rol: j1() === uid || rival?.cpu ? "host" : "join", reglas: est.reglas,   // (contra la CPU, el humano es el jugador 1)
       rival: rival ? { uid: rival.uid, nombre: rival.nombre || "Jugador", cpu: !!rival.cpu, nivel: rival.nivel } : null,
       disco: !!est.discos?.[uid],
+      veto: est.veto || "", vetados: est.veto ? vetadosBt3(catalogo, est.veto).ids : [],   // (los ids que el juego no deja elegir)
       emite: pelea && emisorDe() === uid   // este marco muestra la pelea en vivo a los que miran (bt3-directo.js)
     });
   }
@@ -175,6 +183,16 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const d = e.data;
     if (d.tipo === "listo") { listo = true; reenvia(); return; }
     if (d.tipo === "senal") { senalOp(d); return; }
+    if (d.tipo === "catalogo") {
+      const c = catalogoBt3(d.lista);
+      if (!catalogoBueno(c)) return;
+      const nuevo = JSON.stringify(c) !== JSON.stringify(catalogo);
+      catalogo = c;
+      try { localStorage.setItem(CATALOGO, JSON.stringify(d.lista)); } catch (err) {}
+      reenvia();   // (también si no cambió: el marco avisa de la regla al abrir la selección)
+      if (nuevo) pintaVestibulo(true);
+      return;
+    }
     if (partida?.fin || !enSala()) return;   // un mirón no escribe
     if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
     else if (d.tipo === "resultado" && peleando() && Number.isInteger(d.bits)) {
@@ -258,6 +276,29 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       ${est.empates ? `<small>${est.empates} empate${est.empates > 1 ? "s" : ""}</small>` : ""}</p>`;
   }
 
+  /* La regla de personajes (bt3-tiers.js): Todos / No OP / Sólo malos, una u otra, y la lista de los que quedan
+     fuera, con el nombre con que los encontró en el juego (para revisar que la tier list quedó bien leída). */
+  let vetosAbierto = false;
+  function vetoHtml(puede) {
+    const v = est.veto || "", conCat = catalogoBueno(catalogo);
+    const fichas = Object.entries(BT3_VETOS).map(([k, t]) =>
+      `<button class="jg-bt3-ficha" data-k="veto" data-v="${k}" aria-pressed="${k === v}" ${puede ? "" : "disabled"}>${escapeHtml(t)}</button>`).join("");
+    let lista = "";
+    if (v) {
+      const r = vetadosBt3(catalogo, v);
+      lista = `<details class="jg-bt3-vetados"${vetosAbierto ? " open" : ""}><summary>Ver los ${r.detalle.length} vetados</summary>
+        <ul>${r.detalle.map(d => `<li><i>${escapeHtml(d.tier)}</i><span>${escapeHtml(d.nombre)}${!conCat ? ""
+          : d.juego.length ? ` <small translate="no">${escapeHtml(d.juego.join(" / "))}</small>` : ` <small class="no">no se encontró en el juego</small>`}</span></li>`).join("")}</ul>
+        ${conCat ? "" : `<p class="jg-bt3-nota">Los nombres del juego se leen del disco la primera vez que se abre la selección de personajes; el juego no deja elegir a los vetados.</p>`}</details>`;
+    }
+    return `<div class="jg-bt3-veto"><span class="jg-bt3-et">Personajes (tier list)</span><div class="jg-bt3-fichas">${fichas}</div>
+      <p class="jg-bt3-nota">${escapeHtml(BT3_VETOS_TXT[v] || "")}</p>${lista}</div>`;
+  }
+  const atarVetos = () => {
+    const d = vest.querySelector(".jg-bt3-vetados");
+    if (d) d.ontoggle = () => { vetosAbierto = d.open; };
+  };
+
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     if (est.torneo) return pintaTorneo(forzar);
@@ -281,13 +322,13 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       }
     }
     vistoDuelo = peleas;
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha]);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.toggle("jugando", jugando);
     if (jugando) {
       vest.innerHTML = `<div class="jg-bt3-franja"><span class="jg-bt3-vivo">● En pelea</span>
-        <span>Pelea ${est.ronda} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)} · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span>
+        <span>Pelea ${est.ronda} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${est.veto ? " · " + escapeHtml(BT3_VETOS[est.veto]) : ""} · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span>
         ${enSala() ? `<button class="jg-bt3-vuelve" title="Si la pelea se quedó colgada, vuelven los dos al vestíbulo">Volver al vestíbulo</button>`
           : `<button class="jg-bt3-ver" data-ver="1">📺 Ver la pelea en vivo</button>`}</div>`;
       const v = vest.querySelector(".jg-bt3-vuelve");
@@ -323,6 +364,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       <div class="jg-bt3-reglas" role="group" aria-label="Reglas de la pelea">
         <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
         <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(t => [t, TIEMPO_CORTO(t)]), est.tiempo)}</div></div>
+        ${vetoHtml(manda)}
         ${manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el anfitrión.</p>`}
       </div>
       <div class="jg-bt3-pie">
@@ -334,6 +376,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (b.getAttribute("aria-pressed") === "true") return;
       anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
     });
+    atarVetos();
     const emp = vest.querySelector(".jg-bt3-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; empieza(); };
     const rb = vest.querySelector(".jg-bt3-rev");
@@ -387,7 +430,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length, nuevosFuera.has(m.g === m.a ? m.b : m.a));
       vistoLlave = ahora;
     }
-    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.fase, est.llave, a, manda, enSala(), est.cupo, est.cpus]);
+    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.llave, a, manda, enSala(), est.cupo, est.cpus]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.remove("jugando");
@@ -396,6 +439,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const reglas = `<div class="jg-bt3-reglas" role="group" aria-label="Reglas de las peleas">
         <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
         <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(x => [x, TIEMPO_CORTO(x)]), est.tiempo)}</div></div>
+        ${vetoHtml(manda && !est.llave)}
         ${est.llave ? `<p class="jg-bt3-nota">Las mismas reglas en todas las peleas del torneo.</p>` : manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el organizador.</p>`}
       </div>`;
     if (!est.llave) {   // antes de empezar
@@ -477,7 +521,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
         }
         panel = `<div class="jg-bt3-actual">
           <div class="jg-bt3-mini">${quien(a.a)}<span class="jg-bt3-vs">VS</span>${quien(a.b)}</div>
-          <p class="jg-bt3-nota">${NOMBRE_RONDA(+a.id.split(".")[0], total)} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${yoPeleo ? " · <b>¡te toca!</b>" : ""}</p>
+          <p class="jg-bt3-nota">${NOMBRE_RONDA(+a.id.split(".")[0], total)} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${est.veto ? " · " + escapeHtml(BT3_VETOS[est.veto]) : ""}${yoPeleo ? " · <b>¡te toca!</b>" : ""}</p>
           ${cuerpo}</div>`;
       }
       vest.innerHTML = `<header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores · organiza <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span></header>
@@ -490,6 +534,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (b.getAttribute("aria-pressed") === "true") return;
       anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
     });
+    atarVetos();
     // las CPU del torneo: agregar una, rellenar todos los lugares, cambiar el nivel, quitar
     vest.querySelectorAll("[data-cpu]").forEach(b => b.onclick = async () => {
       b.disabled = true;

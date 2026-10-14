@@ -116,6 +116,22 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 
+**Character rules from a tier list** (duel and tournament, `{t:"ajuste", k:"veto", v:""|"noop"|"malos"}`, one
+setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Sólo malos» also A (N/C stays allowed).
+The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord» image: 161
+portraits = the game's 161 ids (one per form). **Character names are not in the code, they are on the disc**, so:
+the patch hands the select screen's name/form texts (sections 43/44, line n = id n, UTF-16 high byte first) to
+`Module.onCatalogo` once (`Web_Catalogo`, CharSel and TeamSel init) → the frame posts `catalogo` → the room maps
+entries to ids by words (`vetadosBt3`; aliases and exclusions per entry, fewest extra words wins), caches the
+catalog in `bt3.catalogo`, and sends `vetados` in `estado` → `Module.vetados`. The patch asks `web_vetado(id)`:
+CharSel refuses a banned grid cell/form/custom pick with the error sound and its random cell (and the CPU's draw)
+redraws until allowed; TeamSel puts it in `TeamSel_IsCharaFree`, so it is also greyed and skipped at random. Both
+peers read the same disc and rule → same refusals and same draws (no desync); with no catalog yet nothing is
+banned. Only the **starting** pick is limited: transforming mid-fight is the game's. «Ver los vetados» in the
+room lists each entry with the in-game name it matched (or «no se encontró»): **check it against the real disc**
+— one S+ portrait (gold, pointed ears, armour) was not identified and is left out. The bench's «Abrir la
+selección de personajes» posts a hand-written USA-style roster to exercise this without the disc.
+
 ## One player: the modes
 
 Four modes, and only four: **Entrenamiento, Contra la CPU, Duelo, Torneo**. The solo page (`?modo` ≠ `online`)
