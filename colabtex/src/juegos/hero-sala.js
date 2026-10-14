@@ -20,6 +20,10 @@ import { atiendeHero, mandaCuenta } from "./hero.js";
    - **Arrancan todos a la vez**: quien dirige escribe `go` cuando todos
      terminaron de descargar la canción, y cada pantalla la empieza
      `HR_DEMORA` ms después de esa hora del servidor (`fb.ahora`).
+   - **Lo que hojea quien dirige** (la canción que tiene marcada en el
+     selector) también va por la malla, como paquete `mira`: los demás ven
+     esa ficha y oyen su vista previa en la sala. Se repite cada `OK_MS` para
+     quien llega tarde, y no toca la base: hojear son decenas de cambios.
    - Cada canción terminada se verifica y se guarda (estrellas, top, monedas)
      igual que tocando solo (`hero.js`, `atiendeHero`). */
 const PADRE = "hero-padre", HIJO = "hero-hijo";
@@ -29,6 +33,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
   let partida = null, est = null, borrado = false, firmaSala = "";
   let malla = null, reloj = null, parado = false, rosterFirma = "", sinMalla = false;
   let cargaRonda = 0, goRonda = 0, goEscrito = 0, resRonda = -1, parteEnviada = "";
+  let ojeo = null, ojeoQ = 0, ojeoVisto = "";   // lo que hojeo yo (si dirijo) y lo último que mandé al marco
   const directo = crearDirecto({ uid, sano: u => !!malla?.sano(u), conectados: () => malla?.conectados() || [] });
 
   const juego = () => !!est?.jugadores?.some(j => j.uid === uid) && !mirando;
@@ -86,6 +91,9 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
       red({ t: "reloj", off: fb.ahora() - Date.now() });
       red({ t: "go", at: est.go, room });
     }
+    // si cambió quien dirige, o empezó la canción, lo que hojeaba ya no vale
+    if (ojeoVisto && (est.etapa !== "sala" || JSON.parse(ojeoVisto)[0] !== est.director)) veOjeo(est.director, null);
+    if (est.director !== uid || est.etapa !== "sala") ojeo = null;
     if (est.ultima && est.ultima.ronda !== resRonda) {
       const primera = resRonda < 0;
       resRonda = est.ultima.ronda;
@@ -104,12 +112,18 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
       hola = true;
       red({ t: "welcome", id: uid });
       red({ t: "reloj", off: fb.ahora() - Date.now() });
-      firmaSala = "";
+      firmaSala = ""; ojeoVisto = "";
       reenvia();
       return;
     }
     if (partida?.fin || !juego() || !est) return;   // quien mira no escribe
     if (m.t === "state") { malla?.envia(directo.sale(m)); return; }
+    if (m.t === "browse") {
+      if (est.director !== uid) return;
+      ojeo = typeof m.songId === "string" && m.songId.length <= 300 ? m.songId : null;
+      mandaOjeo();
+      return;
+    }
     if (m.t === "song" && typeof m.songId === "string" && m.songId.length <= 300) anota({ t: "cancion", id: m.songId });
     else if (m.t === "part") {
       const a = est.partes[uid] || {}, quiere = [m.part, m.diff, m.mode].join("|");
@@ -140,7 +154,23 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
   }
 
   // ---------- el directo ----------
+  // Lo que hojea quien dirige: solo a quienes tengo canal directo (no se reenvía).
+  const mandaOjeo = () => {
+    if (malla && est?.director === uid && est.etapa === "sala") malla.envia({ y: "mira", id: ojeo, q: ++ojeoQ });
+  };
+  function veOjeo(u, id) {
+    const k = JSON.stringify([u, id]);
+    if (k === ojeoVisto) return;
+    ojeoVisto = k;
+    red({ t: "browse", from: u, songId: id });
+  }
+
   function alDatos(u, d) {
+    // `mira` no es un estado: directo.recibe lo tomaría por el directo de `u`
+    if (d?.y === "mira") {
+      if (u === est?.director && est.etapa === "sala" && (d.id === null || (typeof d.id === "string" && d.id.length <= 300))) veOjeo(u, d.id);
+      return;
+    }
     const r = directo.recibe(u, d);
     if (r.reenvia) malla.envia(r.reenvia.d, r.reenvia.a);
     if (!r.cambio) return;
@@ -177,7 +207,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     });
     malla.entrar().then(ok => { if (!ok && !parado) { sinMalla = true; pintaRed(); } },
       err => { console.warn("[hero] malla", err); sinMalla = true; pintaRed(); });
-    reloj = setInterval(() => { anuncia(); pintaRed(); }, OK_MS);
+    reloj = setInterval(() => { anuncia(); mandaOjeo(); pintaRed(); }, OK_MS);
   }
   function paraDirecto() {
     parado = true;
@@ -211,7 +241,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-6";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-7";
     host.append(redEl, frame);
   }
 

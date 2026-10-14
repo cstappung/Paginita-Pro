@@ -152,6 +152,17 @@ and message names, and the postman plays the server:
   `puente.js`) on «Estoy listo» / «Empezar canción», the gestures the
   browser requires. Your highway goes in the middle (`enElCentro` in
   `js/game/orden.js`: 3 → centre, 4 → centre-left).
+- **What the host is browsing** (the song marked in their selector, `onBrowse`
+  in `songSelect.js` → `browse`) goes over the mesh as a `mira` packet,
+  never to the move log (browsing is dozens of changes), and is repeated
+  every `OK_MS` for late joiners. `alDatos` must catch `mira` **before**
+  `directo.recibe`, which would take it for the host's live state. Only the
+  director's is believed; it is cleared when the round starts or the
+  director changes. The lobby shows that card («El anfitrión está
+  mirando…») and plays its preview, else the chosen song's
+  (`tocaVistaPrevia`, shared with the selector). Test in `hero.test.cjs`.
+- The lobby has **«Controles» / «Ajustes»** buttons: `SettingsScreen.back()`
+  → `goMenu()` → in a room, `openOnline()` → back to the lobby.
 - Room option: only `cupo`.
 
 ## Versioning

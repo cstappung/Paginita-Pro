@@ -4,7 +4,8 @@ import { NetClient } from '../net/net.js';
 import { library, artImg } from '../library.js';
 import { PARTS, PART_ORDER, DIFF_LABEL } from '../core/constants.js';
 import { settings, saveSettings } from '../settings.js';
-import { SongSelectScreen } from './songSelect.js';
+import { SongSelectScreen, tocaVistaPrevia, cancelaVistaPrevia } from './songSelect.js';
+import { SettingsScreen } from './settingsScreen.js';
 import { NOTE_MODES } from '../core/noteMode.js';
 import { sitio, pantallaCompleta } from '../sitio/puente.js';
 import { enElCentro } from '../game/orden.js';
@@ -191,12 +192,49 @@ export class LobbyScreen extends Screen {
 
   afterMount() {
     this.off = this.app.net?.on('room', () => this.update());
+    this.offOjeo = this.app.net?.on('browse', () => this.update());
     this.update();
     this.onChat();
   }
 
   beforeUnmount() {
     this.off?.();
+    this.offOjeo?.();
+    cancelaVistaPrevia();
+    this.app.preview.stop();
+  }
+
+  // Suena la vista previa de lo que hojea quien dirige o, si no, de la canción elegida
+  suena(entry) {
+    const id = entry?.id ?? null;
+    if (id === this.sonando) return;
+    this.sonando = id;
+    tocaVistaPrevia(this.app, entry);
+  }
+
+  tarjeta(entry, arte = true) {
+    return h('div', { class: 'ls-card' },
+      (arte && artImg(entry, '', false)) || h('div', { class: 'album empty' }, '♪'),
+      h('div', {}, h('div', { class: 'd-name' }, entry.meta.name), h('div', { class: 'd-artist' }, entry.meta.artist),
+        h('div', { class: 'd-charter' }, entry.meta.charter ? `Chart: ${entry.meta.charter}` : '')));
+  }
+
+  // La canción que tiene marcada quien dirige en su selector (si no eres tú)
+  ojeada(room, isHost) {
+    const o = this.app.net?.ojeo;
+    if (isHost || room.phase !== 'lobby' || !o || o.from !== room.host || o.songId === room.songId) return null;
+    return library.byId.get(o.songId) || null;
+  }
+
+  ojeoEl(oj, entry) {
+    return [h('div', { class: 'ls-ojeo' }, '👀 El anfitrión está mirando…'), this.tarjeta(oj),
+      entry ? h('div', { class: 'ls-elegida' }, 'Elegida: ', h('b', {}, entry.meta.name), ` · ${entry.meta.artist}`) : null].filter(Boolean);
+  }
+
+  ajustesEl() {
+    return h('div', { class: 'lobby-ajustes' },
+      h('button', { 'data-nav': true, onclick: () => this.app.show(new SettingsScreen(this.app, 'controls')) }, '🎮 Controles'),
+      h('button', { 'data-nav': true, onclick: () => this.app.show(new SettingsScreen(this.app)) }, '⚙ Ajustes'));
   }
 
   onLibrary() {
@@ -220,16 +258,18 @@ export class LobbyScreen extends Screen {
     const me = room.players.find((p) => p.id === net.id);
     const isHost = room.host === net.id;
     const entry = room.songId ? library.byId.get(room.songId) : null;
+    const oj = this.ojeada(room, isHost);
+    this.suena(room.phase === 'lobby' ? oj || entry : null);
     this.codeEl.textContent = room.code;
     // quien mira la sala (o la canción no está en tu biblioteca) no elige nada
     if (!me) {
       this.left.replaceChildren(h('h3', {}, `Jugadores (${room.players.length}/${room.cupo || 8})`), ...room.players.map((p) =>
         h('div', { class: 'lp-row' }, h('span', { class: 'lp-name', translate: 'no' }, `${room.host === p.id ? '👑 ' : ''}${p.name}`),
           h('span', { class: 'lp-part' }, `${PARTS[p.part]?.label || '?'} · ${DIFF_LABEL[p.diff] || '?'}`))));
-      this.center.replaceChildren(entry
-        ? h('div', { class: 'ls-card' }, h('div', {}, h('div', { class: 'd-name' }, entry.meta.name), h('div', { class: 'd-artist' }, entry.meta.artist)))
-        : h('div', { class: 'ls-empty' }, 'Todavía no hay canción elegida.'));
-      this.mine.replaceChildren(h('p', { class: 'hint' }, room.phase === 'lobby' ? 'Estás mirando esta sala.' : 'Están tocando. Estás mirando esta sala.'));
+      this.center.replaceChildren(...(oj ? this.ojeoEl(oj, entry) : [entry
+        ? this.tarjeta(entry)
+        : h('div', { class: 'ls-empty' }, 'Todavía no hay canción elegida.')]));
+      this.mine.replaceChildren(h('p', { class: 'hint' }, room.phase === 'lobby' ? 'Estás mirando esta sala.' : 'Están tocando. Estás mirando esta sala.'), this.ajustesEl());
       return;
     }
 
@@ -249,12 +289,9 @@ export class LobbyScreen extends Screen {
         h('span', { class: 'lp-part' }, `${PARTS[p.part]?.label || '?'} · ${DIFF_LABEL[p.diff] || '?'}`),
         h('span', { class: `lp-ready${p.ready || room.host === p.id ? ' ok' : ''}` }, room.host === p.id ? 'Anfitrión' : p.ready ? 'Listo' : 'Esperando'))));
 
-    this.center.replaceChildren(...[
-      entry
-        ? h('div', { class: 'ls-card' },
-          artImg(entry, '', false) || h('div', { class: 'album empty' }, '♪'),
-          h('div', {}, h('div', { class: 'd-name' }, entry.meta.name), h('div', { class: 'd-artist' }, entry.meta.artist),
-            h('div', { class: 'd-charter' }, entry.meta.charter ? `Chart: ${entry.meta.charter}` : '')))
+    this.center.replaceChildren(...(oj ? this.ojeoEl(oj, entry) : []), ...[
+      oj ? null : entry
+        ? this.tarjeta(entry)
         : h('div', { class: 'ls-empty' }, room.songId && library.songs.length ? 'La canción elegida no está en tu biblioteca.' : isHost ? 'Elige una canción para empezar' : 'Esperando a que el anfitrión elija canción…'),
       isHost ? h('button', { 'data-nav': true, onclick: () => this.pickSong() }, entry ? 'Cambiar canción' : 'Elegir canción') : null].filter(Boolean));
 
@@ -278,6 +315,7 @@ export class LobbyScreen extends Screen {
       h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
       h('label', { class: 'set-row' }, h('span', {}, 'Control'), profSel),
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
+      this.ajustesEl(),
       sitio.sala ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
       isHost
         ? h('button', { class: 'primary big', 'data-nav': true, disabled: !entry || room.phase !== 'lobby' || faltan > 0, onclick: () => { pantallaCompleta(); net.send({ t: 'start' }); } },
@@ -287,11 +325,15 @@ export class LobbyScreen extends Screen {
   }
 
   pickSong() {
+    const net = this.app.net;
     this.app.show(new SongSelectScreen(this.app, {
       mode: 'pick',
-      selectId: this.app.net.room?.songId,
+      selectId: net.room?.songId,
+      // los demás ven (y oyen) la canción que tienes marcada mientras eliges
+      onBrowse: (entry) => net.send({ t: 'browse', songId: entry.id }),
       onPick: (entry) => {
-        if (entry) this.app.net.send({ t: 'song', songId: entry.id });
+        net.send({ t: 'browse', songId: null });
+        if (entry) net.send({ t: 'song', songId: entry.id });
         this.app.show(new LobbyScreen(this.app));
       },
     }));

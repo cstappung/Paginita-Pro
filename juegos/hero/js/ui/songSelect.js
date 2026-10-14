@@ -20,6 +20,35 @@ const SORTS = {
   year: ['Año', (s) => s.meta.year],
   length: ['Duración', (s) => s.length],
 };
+// La vista previa de una canción: su audio en el servidor local o, con
+// Firebase, los 30 s de Apple Music, sin bajar nada de la canción. La usan el
+// selector y la sala en línea (lo que hojea quien dirige, la canción elegida).
+let previewTok = 0;
+let previewTimer = null;
+export function cancelaVistaPrevia() {
+  clearTimeout(previewTimer);
+  previewTok++;
+}
+export function tocaVistaPrevia(app, s) {
+  cancelaVistaPrevia();
+  const tok = previewTok;
+  if (!s) return app.preview.stop();
+  const pv = previewInfo(s);
+  if (pv) {
+    previewTimer = setTimeout(() => app.preview.play(pv.url, pv.start), 150);
+    return;
+  }
+  const conocida = library.remote ? appleConocida(s) : '';
+  if (conocida === '') return app.preview.stop();
+  if (!conocida) app.preview.stop();
+  previewTimer = setTimeout(async () => {
+    const url = await previewApple(s);
+    if (tok !== previewTok) return;
+    if (url) app.preview.play(url, 0, { loop: true, onError: () => olvidaApple(s) });
+    else app.preview.stop();
+  }, conocida ? 150 : APPLE_ESPERA);
+}
+
 let lastState = { sort: 'artist', query: '', instrument: 'all', selectId: null };
 
 function norm(s) {
@@ -51,15 +80,15 @@ export function difficultyDots(n) {
 }
 
 export class SongSelectScreen extends Screen {
-  constructor(app, { mode = 'play', onPick = null, selectId = null } = {}) {
+  constructor(app, { mode = 'play', onPick = null, onBrowse = null, selectId = null } = {}) {
     super(app);
     this.mode = mode;
     this.onPick = onPick;
+    this.onBrowse = onBrowse;
     this.state = { ...lastState };
     if (selectId) this.state.selectId = selectId;
     this.filtered = [];
     this.sel = 0;
-    this.previewTok = 0;
   }
 
   render() {
@@ -101,8 +130,7 @@ export class SongSelectScreen extends Screen {
   beforeUnmount() {
     lastState = { ...this.state };
     clearTimeout(this.detailTimer);
-    clearTimeout(this.previewTimer);
-    this.previewTok++;
+    cancelaVistaPrevia();
     clearTimeout(this.topTimer);
     this.offMias?.();
     this.offTop?.();
@@ -233,23 +261,12 @@ export class SongSelectScreen extends Screen {
         }, TOP_ESPERA);
       }
     }
-    clearTimeout(this.previewTimer);
-    const tok = ++this.previewTok;
-    const pv = previewInfo(s);
-    if (pv) {
-      this.previewTimer = setTimeout(() => this.app.preview.play(pv.url, pv.start), 150);
-      return;
+    tocaVistaPrevia(this.app, s);
+    // en una sala, quien dirige deja ver a los demás lo que tiene marcado
+    if (this.onBrowse && s.id !== this.ojeado) {
+      this.ojeado = s.id;
+      this.onBrowse(s);
     }
-    // con Firebase: los 30 s de Apple Music, sin bajar nada de la canción
-    const conocida = library.remote ? appleConocida(s) : '';
-    if (conocida === '') return this.app.preview.stop();
-    if (!conocida) this.app.preview.stop();
-    this.previewTimer = setTimeout(async () => {
-      const url = await previewApple(s);
-      if (tok !== this.previewTok) return;
-      if (url) this.app.preview.play(url, 0, { loop: true, onError: () => olvidaApple(s) });
-      else this.app.preview.stop();
-    }, conocida ? 150 : APPLE_ESPERA);
   }
 
   renderMiRecord() {
