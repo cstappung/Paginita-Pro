@@ -33,7 +33,11 @@
   const olvida = async () => { try { await pide((await tienda("readwrite")).delete("iso")); } catch (e) {} };
   window.Disco = { olvida };
 
-  const conSelector = typeof window.showOpenFilePicker === "function";
+  /* El selector que recuerda el archivo solo donde de verdad se puede usar: en el sitio la página está sola
+     o dentro de Juegos (mismo origen). Dentro de un marco de otro sitio (un artifact, sandbox) el navegador lo
+     rechaza, y abrir el <input> después ya no vale: el clic se gastó y no se abría nada. Ahí, el <input> directo. */
+  const mismoSitio = (() => { try { return window.top === window || !!window.top.location.href; } catch (e) { return false; } })();
+  const conSelector = typeof window.showOpenFilePicker === "function" && mismoSitio;
   // Elegir con el selector del navegador (para poder recordar el archivo); sin él, el <input> de siempre.
   $("pickLabel").addEventListener("click", async e => {
     if (!conSelector) return;
