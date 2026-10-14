@@ -93,6 +93,11 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
   let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;
   let permitido = false, discoMarco = false, peleabaAntes = false;   // es de la lista de amigos (se sabe al montar): antes, nada se pinta
+  /* La celebración se ve entera: el resultado se anota en el K.O. (el juego lo avisa ahí), pero este marco no se recarga
+     hasta que el juego abre su menú de resultados (`menufin`, después de la pose y la frase del ganador), o 25 s. Antes
+     la sala recargaba apenas llegaban los dos avisos y cortaba la pantalla de ganador. Una pelea cortada (sin ganador)
+     se recarga al tiro, como siempre. */
+  let vioGanador = false, esperaMenu = 0;
   let escena = null, avisos = null, tele = null;
 
   /* ---------- mirar la pelea en vivo ----------
@@ -148,11 +153,11 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       antes = q.bytes;
       cal.textContent = `${Math.round(q.fps)} fps · ${q.ancho}×${q.alto}` + (kb ? ` · ${kb >= 1000 ? (kb / 1000).toFixed(1) + " Mb/s" : Math.round(kb) + " kb/s"}` : "");
     }, 1000);
-    tele = { el, visor, id: pel.id, mide };
+    tele = { el, visor, id: pel.id, mide, m: est.torneo ? est.actual?.id : null, cierre: 0 };
   }
   function cierraTele() {
     if (!tele) return;
-    clearInterval(tele.mide);
+    clearInterval(tele.mide); clearTimeout(tele.cierre);
     tele.visor.cierra();
     if (document.fullscreenElement === tele.el) document.exitFullscreen().catch(() => {});
     tele.el.remove();
@@ -264,6 +269,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (nuevo) pintaVestibulo(true);
       return;
     }
+    if (d.tipo === "menufin") { if (esperaMenu) reiniciaMarco(); return; }
     if (partida?.fin || !enSala()) return;   // un mirón no escribe
     if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
     else if (d.tipo === "resultado" && (peleando() || (!est.torneo && est.pendiente && est.fase === "vestibulo")) && Number.isInteger(d.bits)) {
@@ -273,6 +279,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       const cpu = est.torneo && [est.actual.a, est.actual.b].find(esCpuBt3);
       const g = d.bits & 4 ? "empate" : d.bits & 1 ? (cpu ? uid : j1()) : d.bits & 2 ? (cpu || j2()) : null;
       if (!g) { if (d.bits & 8 && !est.torneo) anota({ t: "vuelve", uid }); return; }   // la pelea se abandonó: al vestíbulo
+      vioGanador = true;
       if (est.torneo) { if (d.b === 0 && est.actual.rep?.[uid] === undefined) anota({ t: "resultado", uid, m: est.actual.id, g }); }
       else anota({ t: "resultado", uid, n: est.ronda, b: d.b, g });
     } else if (d.tipo === "termino" && !est.torneo && est.fase === "jugando") {
@@ -730,6 +737,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
 
   // Al volver de una pelea, el marco se recarga: el programa arranca de cero para la siguiente.
   function reiniciaMarco() {
+    clearTimeout(esperaMenu); esperaMenu = 0; vioGanador = false;
     listo = false; discoMarco = false;
     // si la pelea estaba en pantalla completa, se sale: se vuelve a ver la sala (la llave o el vestíbulo)
     try { if (document.fullscreenElement && document.fullscreenElement === frame) document.exitFullscreen().catch(() => {}); } catch (e) {}
@@ -848,11 +856,18 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     llegoEnPlenaPelea();
     avisaCorte();
     cargaMarco();
-    if (tele && peleaEnVivo()?.id !== tele.id) cierraTele();   // la pelea que se miraba terminó
+    if (tele && peleaEnVivo()?.id !== tele.id && !tele.cierre) {
+      // la pelea que se miraba terminó: con ganador, la pantalla queda 18 s más (la celebración); cortada, se cierra ya
+      const conGanador = est.torneo ? est.actual?.id !== tele.m : !est.pendiente;
+      if (conGanador) tele.cierre = setTimeout(cierraTele, 18000); else cierraTele();
+    }
     detectaInicio();
     // Al terminar mi pelea, mi marco se recarga: la siguiente arranca el programa de cero.
     const pelea = peleando();
-    if (peleabaAntes && !pelea && !p.fin) reiniciaMarco();
+    if (peleabaAntes && !pelea && !p.fin) {
+      if (vioGanador && !esperaMenu) { discoMarco = false; esperaMenu = setTimeout(reiniciaMarco, 25000); }   // (la celebración, entera)
+      else if (!esperaMenu) reiniciaMarco();
+    }
     peleabaAntes = pelea;
     faseAntes = est.fase;
     marcaDisco();

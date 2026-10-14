@@ -35,7 +35,7 @@
    - `crearEmisor({senal, uid, canvas, audio, alCuadro})` (en el marco del juego que pelea).
    - `crearVisor({senal, uid, emisor, alVideo, alFalla})` (en la sala, para quien mira): recibe y reenvía. */
 const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
-const ALTO = 540, BITS = 1500000, CUADROS = 30;
+const ALTO = 540, BITS = 1500000, CUADROS = 30, COLCHON_MS = 300;
 const ARRANQUE_KB = 1200, MINIMO_KB = 400;   // con qué ancho parte la conexión del video, y de cuánto no baja
 
 /* La respuesta SDP del espectador, con el ancho de partida del video para quien manda (Chrome lee
@@ -95,6 +95,13 @@ function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
         const flujo = new MediaStream(ps);
         let envio = null;
         for (const tr of ps) { const e = pc.addTrack(tr, flujo); if (tr.kind === "video") envio = e; }
+        /* H.264 primero: Chrome y Edge lo comprimen con la tarjeta de video (VP8, el de siempre, casi siempre con el
+           procesador, que es el del juego). Si este navegador no lo tiene, queda el orden de siempre. */
+        try {
+          const tv = pc.getTransceivers().find(x => x.sender === envio), cods = RTCRtpSender.getCapabilities?.("video")?.codecs || [];
+          const h264 = cods.filter(c => /h264/i.test(c.mimeType));
+          if (tv && h264.length && tv.setCodecPreferences) tv.setCodecPreferences([...h264, ...cods.filter(c => !/h264/i.test(c.mimeType))]);
+        } catch (e) {}
         pc.onicecandidate = e => { if (e.candidate) senal.envia(de, { t: "vcan", s: m.s, d: e.candidate.toJSON() }); };
         pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" || pc.connectionState === "closed") cierraUno(k); };
         const o = await pc.createOffer();
@@ -159,11 +166,21 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro =
          espacia para no pasar del 10% de su tiempo. Rápida (una tarjeta de video que copia en 1 ms): 30 por segundo;
          cara (44 ms a 1080p en una máquina sin tarjeta de video): menos cuadros para el que mira, y el que pelea no se
          traba. Antes iba siempre a 30 y, con alguien mirando, el juego caía a la mitad. */
-      let ultimo = -1e9, costo = 1;
+      /* Y pareja: se copia 1 de cada `paso` cuadros del juego (contando cuadros, no midiendo tiempo), al ritmo más alto
+         de 30, 15, 10 o 5 que deje la copia bajo el 10%; el paso se revisa cada 90 cuadros, para que no salte. Un ritmo
+         parejo se ve fluido; uno que va y viene (lo que pasaba al espaciar por tiempo) se ve a tirones. 24 no: el juego
+         va a 30 y sacar 24 es botar 1 de cada 5, a saltos. */
+      let costo = 1, n = 0, paso = 1, previo = 0, cadaCuadro = 1000 / 60;
       sueltaCuadro = alCuadro(() => {
         const ahora = performance.now();
-        if (!fuente.cuantos() || ahora - ultimo < Math.max(1000 / CUADROS - 4, costo * 10) || !canvas.width || !canvas.height) return;   // (nadie mirando: nada)
-        ultimo = ahora;
+        if (previo) cadaCuadro = cadaCuadro * 0.95 + Math.min(100, ahora - previo) * 0.05;   // (cuánto dura un cuadro del juego)
+        previo = ahora;
+        if (!fuente.cuantos() || !canvas.width || !canvas.height) return;   // (nadie mirando: nada)
+        if (n % 90 === 0) {
+          const ritmo = costo <= 100 / 30 ? 30 : costo <= 100 / 15 ? 15 : costo <= 10 ? 10 : 5;
+          paso = Math.max(1, Math.round(1000 / cadaCuadro / ritmo));
+        }
+        if (n++ % paso) return;
         const ancho = Math.max(2, Math.round(ALTO * canvas.width / canvas.height / 2) * 2);   // (par: lo pide el códec)
         if (chico.width !== ancho) chico.width = ancho;
         try { c2.drawImage(canvas, 0, 0, ancho, ALTO); pista.requestFrame?.(); } catch (e) {}
@@ -275,6 +292,9 @@ export function crearVisor({ senal, uid, emisor, alVideo, alFalla = () => {}, RT
         cierraPc();
         const este = pc = new RTC({ iceServers: ICE });
         este.ontrack = e => {
+          // un colchón: el navegador junta 300 ms antes de mostrar y reparte los cuadros parejo (mirar con un poco de
+          // retraso da igual; a tirones no)
+          try { e.receiver.jitterBufferTarget = COLCHON_MS; } catch (err) {}
           const nuevo = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
           if (flujo !== nuevo) {
             const antes = flujo;

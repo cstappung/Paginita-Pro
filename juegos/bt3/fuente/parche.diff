@@ -290,10 +290,10 @@ index fb8b892..9e6bead 100644
          Port_NetArrived(); /* the logos and the card check are over: the character select is next, with picture and sound */
      }
 diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
-index dac5c3d..d73b0c2 100644
+index dac5c3d..13c16ba 100644
 --- a/port/src/plat_mem.c
 +++ b/port/src/plat_mem.c
-@@ -281,6 +281,119 @@ static void data_fail(const char *what, const char *path) {
+@@ -281,6 +281,125 @@ static void data_fail(const char *what, const char *path) {
      exit(2);
  }
  
@@ -397,6 +397,12 @@ index dac5c3d..d73b0c2 100644
 +   el versus, tras el combate el juego se queda en su pantalla de resultados y su menú de revancha, el aviso no
 +   llegaba, y si alguien volvía a la sala el marco se recargaba sin avisar: el duelo quedaba «sin resultado». Los
 +   bits forzados que Finish agrega después (motivo 0x20 / 0x40) se agregan aquí igual. */
++/* El final se terminó de mostrar (el K.O., la pose y la frase del ganador): btl_seq.c lo llama al entrar al estado del
++   menú de resultados. La sala espera esto para devolver a los jugadores, así la celebración se ve entera. */
++EM_JS(void, web_menu_fin, (void), { if (Module.onMenuFin) Module.onMenuFin(); });
++void Web_MenuFin(void) {
++    web_menu_fin();
++}
 +void Web_FinPelea(void) {
 +    int w = BattleResult_GetFlags(), r = BattleResult_GetReason();
 +    if (r & 0x20) w |= 2;
@@ -413,7 +419,7 @@ index dac5c3d..d73b0c2 100644
  static void Port_LoadGameData(void) {
      char exe[1024], path[1200];
      const char *root = getenv("BT3_DATA") != NULL ? getenv("BT3_DATA") : "gamedata";
-@@ -392,6 +505,7 @@ static void Port_LoadGameData(void) {
+@@ -392,6 +511,7 @@ static void Port_LoadGameData(void) {
          data_fail("the game's programs in your game data are not the unmodified USA release (SLUS-21678)", NULL);
      }
  }
@@ -421,7 +427,7 @@ index dac5c3d..d73b0c2 100644
  
  #if defined(__x86_64__)
  /* (between the GS registers at 0x12000000 and the program at 0x20000000: see the note at STACK_BASE) */
-@@ -500,8 +614,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
+@@ -500,8 +620,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
          ExitProcess(4);
      }
  #endif
@@ -650,7 +656,7 @@ index 9794ea9..5783e8d 100644
      return (bits[chara / 64] >> (chara % 64)) & 1;
  }
 diff --git a/src/battle/btl_seq.c b/src/battle/btl_seq.c
-index c072e01..d5cf8b9 100644
+index c072e01..3e59dca 100644
 --- a/src/battle/btl_seq.c
 +++ b/src/battle/btl_seq.c
 @@ -1344,6 +1344,12 @@ s32 BtlSeqFight_Update(BtlSeqWaitCtx *ctx) {
@@ -666,6 +672,19 @@ index c072e01..d5cf8b9 100644
          if (Battle_GetMode() == 7) {
              return 6;
          }
+@@ -1414,6 +1420,12 @@ s32 BtlSeq_IsModeZero(void) {
+ 
+ /* State 6 enter: mode 0 with a finished battle opens the result menu (step 0); otherwise starts the 1.2 s fade out (step 1). */
+ s32 BtlSeqEnd_Enter(BtlSeqWaitCtx *ctx) {
++#ifdef __EMSCRIPTEN__
++    {
++        extern void Web_MenuFin(void); /* plat_mem.c */
++        Web_MenuFin(); /* paginita-pro: the finish and the winner's scene are over: the room may take the players back now */
++    }
++#endif
+     Battle_GetWork()->flags |= BATTLE_FLAG_DEMO;
+     if (BattleResult_IsAborted()) {
+         Fade_Start(0, 0, 1.0f);
 diff --git a/src/battle/view_a_e.c b/src/battle/view_a_e.c
 index 3e0f86f..2b9066e 100644
 --- a/src/battle/view_a_e.c

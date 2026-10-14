@@ -982,6 +982,10 @@
     S.avisa("resultado", { bits, b: batallas++ });
   };
 
+  // Se terminó de mostrar el final (K.O., pose y frase del ganador; parche: btl_seq.c → Web_MenuFin): la sala recién ahí
+  // recarga este marco, para que la celebración se vea entera (el resultado ya se anotó en el K.O.).
+  Module.onMenuFin = () => S.avisa("menufin");
+
   // Salió de la pelea contra la CPU al menú del juego (parche: headless.c): la sala corta la pelea y lo devuelve.
   Module.onFueraDelModo = () => { aviso("Saliste de la pelea: vuelves a la sala."); S.avisa("termino", { por: "menu" }); };
 

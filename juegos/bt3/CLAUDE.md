@@ -72,7 +72,12 @@ loaded a valid disc; both needed), `empieza`, `vuelve` (back to the lobby; frame
 hands the page the winner bits (1 P1, 2 P2, 4 draw, 8 abandoned; plus the forced bits Finish adds from reason
 0x20/0x40) → `Module.onFinBatalla`. **Not at `BattleResult_Finish`**: that runs at `Battle_Term`, when the battle
 scene is LEFT; in a versus the game stays on its results screen and rematch menu, so no report came, and going back
-to the room reloaded the frame without one (log: `empieza`, then only `vuelve`) → `Module.onFinBatalla` → the frame → `bt3.js` writes
+to the room reloaded the frame without one (log: `empieza`, then only `vuelve`) → `Module.onFinBatalla`. **The
+celebration is shown whole**: the room counts the result at the K.O. but a frame that reported a winner is not
+reloaded until its game enters the results-menu state (`BtlSeqEnd_Enter` → `Web_MenuFin` → `Module.onMenuFin` →
+`menufin`, after the finish and the winner's pose and line), or 25 s (`esperaMenu` in bt3.js); a cut fight reloads at
+once. The spectator's screen stays 18 s after a fight with a winner (`tele.cierre`). Reloading on the result cut the
+winner's screen → the frame → `bt3.js` writes
 `{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
 the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
 (`marcador`, `empates`). Bits 8 → `vuelve`. **A lone report counts**: if one frame said the winner and the fight then
@@ -144,7 +149,12 @@ true` (pagina.js 0b wraps `getContext` for `Module.canvas`); only that frame pay
 never clears it, so the test box cannot reproduce this one either. (4) **The game comes first**: the copy runs inside
 the game's frame (10 ms at 720p, 44 ms at 1080p on the GPU-less test box), so it measures its own cost and spaces
 itself to stay under 10% of the game's time (`costo * 10`); with a cheap copy that is still 30/s. At a flat 30/s a
-watcher halved the fighter's frame rate (owner: 2 fps in character select). Friends find running rooms in «En juego ahora»
+watcher halved the fighter's frame rate (owner: 2 fps in character select). (5) **Even, not just fast**: it copies 1
+of every `paso` game frames (counting frames, not time) at the highest of 30/15/10/5 per second that keeps it under
+10%, re-chosen every 90 frames, and the viewer asks for a 300 ms jitter buffer (`receiver.jitterBufferTarget`): a
+little delay is fine, stutter is not. 24/s was asked and rejected: from a 30/s game it means dropping 1 of 5, unevenly. (6) The sender prefers **H.264**
+(`setCodecPreferences`): Chrome/Edge encode it on the GPU, VP8 mostly on the CPU the game uses; without H.264 the
+usual order stays (the test Chromium has none, so that fallback is what got tested). Friends find running rooms in «En juego ahora»
 (BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
