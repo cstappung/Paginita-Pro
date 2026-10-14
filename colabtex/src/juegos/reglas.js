@@ -445,11 +445,12 @@ const REGLAS = {
     ]
   },
   bt3: {
-    lema: "El juego de PS2 completo en el navegador. Cuatro modos: contra la CPU, entrenamiento, duelo y torneo en línea con tus amigos.",
+    lema: "El juego de PS2 completo en el navegador. Cuatro modos: entrenamiento, contra la CPU, y duelo y torneo en línea con tus amigos.",
     secciones: [
       ["Los modos", lista([
-        "<b>Contra la CPU</b> y <b>Entrenamiento</b> son de un jugador: la ficha <b>Tenkaichi 3 · un jugador</b> abre el juego y, con el disco listo, eliges el modo y entra directo (Entrenamiento es el del juego: sus lecciones y la práctica libre). <b>Menú del juego</b> abre todo lo demás: historia, torneos, Evolution Z.",
-        "<b>Duelo</b> (1 contra 1) y <b>Torneo</b> (hasta 4 u 8, eliminación directa) son salas en línea: se eligen en <b>Formato</b> al abrir la sala."
+        "Son cuatro, y se eligen en la ficha <b>Tenkaichi 3 · un jugador</b>, en la columna <b>Elige el modo</b>: <b>Entrenamiento</b> (las lecciones del juego y la práctica libre), <b>Contra la CPU</b>, <b>Duelo</b> y <b>Torneo</b>.",
+        "Entrenamiento y Contra la CPU se juegan ahí mismo: con el disco listo aprieta <b>Jugar</b> y el juego entra directo a ese modo.",
+        "Duelo (1 contra 1) y Torneo (hasta 8, eliminación directa) son en línea: su botón abre una sala, y tus amigos entran con el enlace. También se abren desde el salón eligiendo el <b>Formato</b>."
       ])],
       ["El disco", lista([
         "Si estás en la lista de amigos del disco privado, el juego carga solo: no eliges nada. Lo que ya cargaste queda guardado en tu computador y la próxima vez sale de ahí, sin descargar.",

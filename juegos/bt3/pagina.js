@@ -17,6 +17,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
+  const SOLO = Q.get("modo") !== "online";   // la página suelta («un jugador»), no el marco de una sala
 
   // ---------------------------------------------------------------- 0. el progreso
   /* Ninguna espera muda: la tarjeta de inicio muestra cuánto falta del programa (3,6 MB), y durante el juego
@@ -132,7 +133,8 @@
     if (!h || !$("recordada")) return;
     const b = $("recordada");
     try {
-      if (await h.queryPermission({ mode: "read" }) === "granted") {
+      // (fuera de una sala no arranca sola: primero se elige el modo y se aprieta, 2b)
+      if (!SOLO && await h.queryPermission({ mode: "read" }) === "granted") {
         const f = await h.getFile();                 // (falla si la movieron o la borraron: cae al botón)
         say("Usando " + h.name + "…");
         go(fileDisc(f));
@@ -247,6 +249,7 @@
       return out;
     } };
     $("pickLabel").hidden = true;
+    if (SOLO) { listoParaJugar(() => go(disco), "Disco privado listo."); return true; }   // espera el «Jugar» (2b)
     say("Usando el disco privado…");
     go(disco);
     return true;
@@ -306,43 +309,74 @@
     if (ms) relojAviso = setTimeout(() => caja.classList.remove("on"), ms);
   }
 
-  // ---------------------------------------------------------------- 2b. un jugador: qué modo
-  /* Fuera de una sala, con el disco ya reconocido y antes de arrancar el programa, se elige el modo: el
-     programa entra directo a él (BT3_WEB_MODO, parche.diff: headless.c). «Menú del juego» es el juego entero
-     desde su menú (historia, torneos, Evolution Z…). El clic sirve además para que el navegador deje sonar el
-     juego desde el primer momento. Si la página trae ?juego=cpu|entrenamiento|menu, entra sin preguntar. */
+  // ---------------------------------------------------------------- 2b. un jugador: el modo
+  /* Como el selector de Snake Club: junto a la tarjeta de inicio, una tarjeta por modo (ícono, nombre, qué es y
+     un círculo marcado en el elegido), y el botón de la tarjeta hace lo que dice el modo elegido:
+     - Entrenamiento y Contra la CPU se juegan aquí: el programa entra directo a ese modo (BT3_WEB_MODO,
+       parche.diff: headless.c). Nada arranca solo: el disco privado y la ISO recordada esperan el «Jugar», que
+       además es el clic que deja sonar el juego. Elegir una ISO también es apretar: arranca con el modo elegido.
+     - Duelo y Torneo se juegan en una sala: el botón le pide a Juegos que abra una (bt3.js, `alPedirSalaBt3`).
+     El modo se recuerda (`bt3.modo`); ?juego=entrenamiento|cpu|duelo|torneo lo elige de entrada. */
   const MODOS = [
-    ["cpu", "🥊", "Contra la CPU", "Eliges personajes y peleas contra la máquina."],
-    ["entrenamiento", "🎯", "Entrenamiento", "El modo entrenamiento del juego: sus lecciones y la práctica libre."],
-    ["menu", "🐉", "Menú del juego", "Todo lo demás: historia, torneos, Evolution Z…"],
+    ["entrenamiento", "🥋", "Entrenamiento", "Las lecciones del juego y la práctica libre."],
+    ["cpu", "🤖", "Contra la CPU", "Eliges personajes y peleas contra la máquina."],
+    ["duelo", "⚔️", "Duelo", "Uno contra uno en línea, con revancha."],
+    ["torneo", "🏆", "Torneo", "Eliminación directa con tus amigos, hasta ocho."],
   ];
-  function eligeModo() {
-    const directo = Q.get("juego");
-    const pone = m => {
-      try { localStorage.setItem("bt3.modo", m); } catch (e) {}
-      Module.entornoPendiente = m === "menu" ? [] : [["BT3_WEB_MODO", m]];   // (las películas de entrada ya van apagadas: BT3_NOMOVIE)
+  const deSala = m => m === "duelo" || m === "torneo";
+  const enJuegos = (() => { try { return window.parent !== window && !!window.parent.location.href; } catch (e) { return false; } })();
+  let modo = "cpu", jugar = null, lista = null;
+  try { modo = localStorage.getItem("bt3.modo") || "cpu"; } catch (e) {}
+  if (MODOS.some(x => x[0] === Q.get("juego"))) modo = Q.get("juego");
+  if (!MODOS.some(x => x[0] === modo)) modo = "cpu";
+
+  // El disco quedó listo (privado o recordado): el botón «Jugar» lo arranca con el modo elegido.
+  function listoParaJugar(f, txt) {
+    jugar = f;
+    say(txt);
+    pintaModo();
+  }
+  function pintaModo() {
+    const st = $("start");
+    if (!st || !lista) return;
+    st.classList.toggle("en-sala", deSala(modo));
+    lista.querySelectorAll("[data-m]").forEach(b => { const si = b.dataset.m === modo; b.classList.toggle("activo", si); b.setAttribute("aria-pressed", String(si)); });
+    $("abreSala").textContent = enJuegos ? (modo === "duelo" ? "Abrir sala de duelo" : "Abrir sala de torneo") : "Ir a Juegos para jugar en línea";
+    if (jugar) { const b = $("serverDisc"); b.hidden = false; b.textContent = "Jugar · " + MODOS.find(x => x[0] === modo)[2]; }
+  }
+  if (SOLO && $("start")) {
+    lista = document.createElement("aside");
+    lista.className = "modos-lista";
+    lista.setAttribute("aria-label", "Modo de juego");
+    lista.innerHTML = `<div class="modos-tit"><h2>Elige el modo</h2><span>01—04</span></div>` + MODOS.map(([k, ico, t, d], i) =>
+      `<button type="button" class="modo" data-m="${k}" aria-pressed="false"><span class="ico" aria-hidden="true">${ico}</span>
+        <span><strong>${t}${deSala(k) ? " <em>EN LÍNEA</em>" : ""}</strong><small>${d}</small></span><span class="radio" aria-hidden="true"></span></button>`).join("");
+    $("start").classList.add("con-modos");
+    $("start").append(lista);
+    const sala = document.createElement("button");
+    sala.id = "abreSala"; sala.type = "button"; sala.className = "pick";
+    $("serverDisc").before(sala);
+    sala.onclick = () => {
+      if (!enJuegos) { window.open("../../juegos.html", "_top"); return; }
+      sala.disabled = true;
+      window.parent.postMessage({ canal: "bt3-hijo", tipo: "sala", cupo: modo === "duelo" ? 2 : 8 }, location.origin);
+      say("Abriendo la sala…");
     };
-    if (MODOS.some(x => x[0] === directo)) { pone(directo); return; }
-    let ultimo = "cpu";
-    try { ultimo = localStorage.getItem("bt3.modo") || "cpu"; } catch (e) {}
-    const capa = document.createElement("div");
-    capa.id = "modos";
-    capa.innerHTML = `<div class="card"><p class="ceja">Disco listo</p><h2>¿Qué quieres jugar?</h2>
-      <div class="modos">${MODOS.map(([k, ico, t, d]) => `<button data-m="${k}" class="${k === ultimo ? "ultimo" : ""}">
-        <span aria-hidden="true">${ico}</span><b>${t}</b><small>${d}</small></button>`).join("")}</div>
-      <p class="nota">Duelo y torneo contra tus amigos: se juegan desde una sala de Juegos.</p></div>`;
-    document.body.append(capa);
-    (capa.querySelector(".ultimo") || capa.querySelector("button")).focus();
-    return new Promise(ok => capa.querySelectorAll("button").forEach(b => b.onclick = () => {
-      try { audioUnlock(); } catch (e) {}
-      pone(b.dataset.m);
-      capa.remove();
-      Module.canvas.focus();
-      ok();
-    }));
+    lista.querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
+      modo = b.dataset.m;
+      try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
+      pintaModo();
+    });
+    $("serverDisc").onclick = () => { if (!jugar) return; try { audioUnlock(); } catch (e) {} const f = jugar; jugar = null; f(); };
+    pintaModo();
+  }
+  // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
+  function eligeModo() {
+    try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
+    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo]];
   }
   // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)
-  if (Q.get("modo") !== "online") window.Sala = { entorno: () => ({ BT3_NOMOVIE: "1" }), antesDeEmpezar: eligeModo };
+  if (SOLO) window.Sala = { entorno: () => ({ BT3_NOMOVIE: "1" }), antesDeEmpezar: eligeModo };
 
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;

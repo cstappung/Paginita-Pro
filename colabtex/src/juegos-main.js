@@ -66,7 +66,7 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearHaxball } from "./juegos/haxball.js";
-import { crearBt3 } from "./juegos/bt3.js";
+import { crearBt3, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
@@ -3288,6 +3288,8 @@ function wire() {
   /* BT3 aparece solo para los amigos de la lista del disco privado: se pregunta al cambiar la sesión, y el
      salón se repinta cuando llega la respuesta (bt3-amigos.js). */
   alCambiarBt3(() => { vesFirma = ""; if (state.vista === "vestibulo") render(); });
+  // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
+  alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
   watchAuth(user => {
     revisaBt3();
     if (!user) {

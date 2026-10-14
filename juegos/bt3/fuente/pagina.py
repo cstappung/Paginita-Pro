@@ -59,33 +59,46 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
     border: 1px solid var(--line); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; text-align: center; }
   #sala.on { display: block; }
   .recordada { margin-top: 10px; }
-  /* la tarjeta de inicio y la elección de modo (pagina.js), con la cara del vestíbulo de la sala (juegos.html,
+  /* la tarjeta de inicio, con la cara del vestíbulo de la sala (juegos.html,
      .jg-bt3-vest): el cielo de noche de Dragon Ball, ki naranja, títulos como el logo (Lilita One) */
-  #start, #modos { background: radial-gradient(ellipse 70% 50% at 50% -5%, #ff9a1f55, transparent 70%),
+  #start { background: radial-gradient(ellipse 70% 50% at 50% -5%, #ff9a1f55, transparent 70%),
     repeating-conic-gradient(from 0deg at 50% 0%, #ffffff07 0deg 1.5deg, transparent 1.5deg 7deg),
     linear-gradient(170deg, #0b1a48, #101c45 45%, #1d0f33 80%, #2a0f0a); }
-  #start .card, #modos .card { background: #0c1a42ee; border: 2px solid #2c4a98; border-radius: 18px; padding: 28px;
+  #start .card { background: #0c1a42ee; border: 2px solid #2c4a98; border-radius: 18px; padding: 28px;
     box-shadow: 0 24px 60px #000b, 0 0 40px #ff8a0022; }
   .ceja { margin: 0 0 4px; font: 800 11px system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #a9b6dc; }
-  #start h1, #modos h2 { margin: 0 0 12px; font: 400 34px/1.05 'Lilita One', system-ui, sans-serif; letter-spacing: .01em;
+  #start h1 { margin: 0 0 12px; font: 400 34px/1.05 'Lilita One', system-ui, sans-serif; letter-spacing: .01em;
     background: linear-gradient(180deg, #fffbd1, #ffe14a 38%, #ff9d00 70%, #ff5a00); -webkit-background-clip: text; background-clip: text;
     color: transparent; -webkit-text-stroke: 1.5px #4a1300; filter: drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 14px #ff8a0066); }
   #start .pick { background: linear-gradient(180deg, #fff27a, #ffd21f 30%, #ff9d00 65%, #ff6a00); color: #2a0d00; border: 3px solid #3a1000;
     font: 400 19px 'Lilita One', system-ui, sans-serif; letter-spacing: .03em; box-shadow: 0 5px 0 #3a1000, 0 0 24px #ff8a0066; }
   #start .pick.alt { background: #16306e; color: var(--text); border: 2px solid #2f4d9c; box-shadow: none; font: 600 15px system-ui, sans-serif; }
   #start .pick:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 3px; }
-  #modos { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 16px; overflow: auto; }
-  #modos .card { max-width: 640px; }
-  #modos .modos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 6px 0 14px; }
-  #modos button { display: grid; justify-items: start; align-content: start; gap: 4px; padding: 14px; border-radius: 14px; text-align: left;
-    border: 2px solid #2f4d9c; background: linear-gradient(180deg, #16306e, #0c1a42); color: #f4f6ff; cursor: pointer;
-    font: 13px/1.35 system-ui, sans-serif; transition: transform .12s, box-shadow .12s, border-color .12s; }
-  #modos button span { font-size: 30px; line-height: 1; }
-  #modos button b { font: 400 21px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
-  #modos button small { color: #a9b6dc; font-size: 12.5px; }
-  #modos button.ultimo { border-color: #ffd21f99; }
-  #modos button:hover, #modos button:focus-visible { border-color: #ff8a00; box-shadow: 0 0 24px #ff8a0066; transform: translateY(-2px); outline: none; }
-  #modos .nota { margin: 0; font-size: 12.5px; color: #a9b6dc; }
+  /* el selector de modo (pagina.js, 2b), como el de Snake Club: una columna de tarjetas junto a la de inicio */
+  #start.con-modos { gap: 22px; flex-wrap: wrap; align-content: center; }
+  .modos-lista { width: 320px; max-width: 100%; display: grid; gap: 8px; }
+  .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
+  .modos-tit h2 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
+  .modos-tit span { font: 400 13px 'Lilita One', system-ui, sans-serif; letter-spacing: .08em; color: #6f7da6; }
+  .modo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 70px; padding: 12px; border-radius: 14px; text-align: left;
+    border: 2px solid #2f4d9c; background: #0c1a42e6; color: #f4f6ff; cursor: pointer; font: 13px/1.35 system-ui, sans-serif;
+    transition: border-color .15s, box-shadow .15s, transform .15s, background .15s; }
+  .modo:hover { border-color: #5a7fd6; transform: translateY(-1px); }
+  .modo:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 2px; }
+  .modo .ico { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 11px; background: #16306e; font-size: 21px; }
+  .modo strong { display: flex; align-items: center; gap: 6px; font: 400 18px 'Lilita One', system-ui, sans-serif; color: #fff; }
+  .modo strong em { font: 800 9px system-ui, sans-serif; font-style: normal; letter-spacing: .08em; padding: 2px 5px; border-radius: 4px;
+    background: #3d7bff33; color: #9cc0ff; }
+  .modo small { display: block; margin-top: 2px; font-size: 12px; color: #a9b6dc; }
+  .modo .radio { margin-left: auto; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #56689c; }
+  .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
+  .modo.activo .ico { background: linear-gradient(180deg, #ffd21f, #ff8a00); }
+  .modo.activo strong { color: #ffd21f; }
+  .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
+  #abreSala { display: none; }
+  #start.en-sala .card .pick:not(#abreSala) { display: none; }
+  #start.en-sala #abreSala { display: block; }
+  @media (max-width: 760px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit { grid-column: 1 / -1; } .modo .radio { display: none; } }
 </style>''')
 cambia('<div id="stage">', '''<div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
   title="Ajustes (F1): video, sonido y controles">Ajustes</button><span id="mando" role="status">Mando: aprieta un botón</span><button

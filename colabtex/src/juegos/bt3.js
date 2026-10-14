@@ -28,10 +28,16 @@ const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
    de quien está con la sesión iniciada, y con él le pide los pedazos de la ISO al Worker, que solo responde a
    los amigos de su lista. Vale para el marco de una sala y para el de «un jugador» del salón; solo se le da a
    un marco de esta misma página que carga juegos/bt3/. Un listener para toda la página, puesto una vez. */
+/* La página del juego suelta («un jugador») también ofrece Duelo y Torneo: esos se juegan en una sala, así que
+   le pide a Juegos que abra una (`{tipo:"sala", cupo}`: 2 es un duelo, más es un torneo). Quien abre la sala
+   la registra `juegos-main.js` con `alPedirSalaBt3`. */
+let pideSala = null;
+export const alPedirSalaBt3 = fn => { pideSala = fn; };
 window.addEventListener("message", async e => {
-  if (e.origin !== location.origin || e.data?.canal !== "bt3-hijo" || e.data.tipo !== "token") return;
+  if (e.origin !== location.origin || e.data?.canal !== "bt3-hijo" || (e.data.tipo !== "token" && e.data.tipo !== "sala")) return;
   const marco = [...document.querySelectorAll("iframe")].find(f => f.contentWindow === e.source);
   if (!marco || !/\/juegos\/bt3\/index\.html/.test(new URL(marco.src, location.href).pathname)) return;
+  if (e.data.tipo === "sala") { if (pideSala) pideSala(e.data.cupo === 2 ? 2 : 8); return; }
   let token = null;
   try { token = await auth.currentUser?.getIdToken(!!e.data.nuevo); } catch (err) {}   // nuevo: el anterior venció
   e.source.postMessage({ canal: "bt3-padre", tipo: "token", token: token || null }, location.origin);

@@ -93,12 +93,18 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 
 ## One player: the modes
 
-Outside a room, once the disc is recognised, the page asks **Contra la CPU / Entrenamiento / Menú del juego**
-(`eligeModo` in `pagina.js`; `?juego=cpu|entrenamiento|menu` skips the question). The choice reaches the program
-as `BT3_WEB_MODO` (`Module.entornoPendiente`), and `__wrap_Progress_Main` (patch, `headless.c`) sets
-`gProgress->mode` before the menus run, as the online session does: `cpu` = mode 39 (versus character select,
-`+0x620 = 0` 1P vs COM), `entrenamiento` = mode 44 (the game's training menu: lessons and free training). The click
-is also the gesture that lets the game's audio start.
+Four modes, and only four: **Entrenamiento, Contra la CPU, Duelo, Torneo**. The solo page (`?modo` ≠ `online`)
+shows them as a Snake Club–style column next to the start card (`2b` in `pagina.js`, styles in `pagina.py`),
+remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`.
+
+- Entrenamiento / Contra la CPU play here. **Nothing starts by itself on the solo page**: the private disc and the
+  remembered ISO wait for «Jugar · <modo>» (`listoParaJugar`), which is also the gesture that unlocks audio; picking
+  an ISO is itself the click. The mode reaches the program as `BT3_WEB_MODO` (`Module.entornoPendiente`), and
+  `__wrap_Progress_Main` (patch, `headless.c`) sets `gProgress->mode` before the menus run, as the online session
+  does: `cpu` = mode 39 (versus character select, `+0x620 = 0` 1P vs COM), `entrenamiento` = mode 44 (the game's
+  training menu: lessons and free training).
+- Duelo / Torneo are rooms: the button posts `{tipo:"sala", cupo}` (2, or 8 for a tournament) to Juegos, which
+  opens it (`alPedirSalaBt3` in `bt3.js`, registered by `juegos-main.js`). Outside Juegos it links there.
 
 ## Speed
 
