@@ -294,6 +294,24 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   Storage (`bt3-disco:<size>`): a second session asks the Worker only for `indice.json` (which still checks the
   friends list). The game itself never reads the whole ISO: `webDiscEnsure` copies one file at a time as it opens it.
 
+## Battle music: «chinchonchin» from PRO HERO
+
+- The patch tells the page when a battle starts and when its scene is left: `Web_PeleaEmpieza(bgm)` in
+  `Battle_ResetWork` (before the game's `Bgm_Play`) and `Web_PeleaTermina` from `__wrap_BattleResult_Finish`
+  (Battle_Term) → `Module.onMusicaPelea(on, bgm)`. While the page's song is sounding it calls
+  `Module._Web_BgmPropia(1)`: `Adx_CalcOutVol` (src/sys/adx.c) then returns mute **only for the BGM channel and only
+  while `gWebEnPelea`**; MAP (stage), voices and SE keep playing, menus keep their music. `Web_BgmAplica` re-applies
+  the stored volume (`sWebBgmVol`) when either flag changes. Sound only: both copies of an online fight stay identical.
+- The page (`pagina.js`, 2d) finds the song in PRO HERO's `library.json` (name/folder contains `chinchonchin`,
+  normalized), remembers `{folder, v, audio}` in `bt3.musica.cancion`, and gets its stems with **PRO HERO's own
+  modules** (`../hero/js/cloud.js`, `site.js`, `songCache.js`): same Google session, same Cache Storage key, so a song
+  already played in PRO HERO is not downloaded again. Nothing of this loads until the first battle starts.
+- Stems play together, looped at the shortest stem's length, into the SDL context's `destination` (= `pre`, 0a): the
+  page volume, Ajustes' «Music» (`Web_MusicaPorcentaje`, polled each second) and spectators all include it.
+- Any failure (no session, song not found, SDK blocked) → the game's music, unmuted: `Web_BgmPropia(1)` is only called
+  once the song is actually playing. Per player: the ♪ button in the bar (`bt3.musica` = `"juego"` for the original).
+- The bench has no library: its page defines `BT3_MUSICA_PRUEBA` (two synthesized WAV stems) and the frame uses that.
+
 ## Page details
 
 - `volumen.js` loads before the program, so the site's mute/volume governs the game's `AudioContext`.

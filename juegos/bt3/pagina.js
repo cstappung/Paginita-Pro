@@ -884,6 +884,104 @@
     if (!si && desdePrivado) terminaArranque();   // la primera pelea: lo leído hasta aquí es el arranque
   };
 
+  // ---------------------------------------------------------------- 2d. la música de pelea
+  /* En vez de la música del juego, durante las peleas suena una canción de PRO HERO: «chinchonchin». El parche avisa
+     cuándo empieza una pelea y cuándo se sale de ella (Module.onMusicaPelea, plat_mem.c); mientras la canción de aquí
+     suena, la música del juego calla (Web_BgmPropia, src/sys/adx.c) y lo demás (golpes, voces, el escenario) sigue.
+     - La canción sale de la biblioteca de PRO HERO en Firebase Storage, con su mismo código (juegos/hero/js: la
+       sesión de Google es la del sitio) y su misma caché: si ya la jugaste en PRO HERO, no se baja de nuevo. Solo
+       se busca al empezar la primera pelea (library.json, ~260 KB, una vez: la canción encontrada se recuerda).
+     - Las pistas (stems) suenan juntas en el contexto de audio del juego, hacia su `destination` (0a): pasan por el
+       volumen de la página, por el «Music» de Ajustes (Web_MusicaPorcentaje) y les llegan a los que miran.
+     - Si no se puede (sin sesión, sin la canción, otro navegador), suena la música del juego, como siempre.
+     - Cada uno elige la suya (♪ en la barra, «bt3.musica» = "juego" para la del juego): la pelea es la misma. */
+  (() => {
+    const CLAVE = "bt3.musica", BUSCA = "chinchonchin", BASE = 0.6;
+    const quiere = () => { try { return localStorage.getItem(CLAVE) !== "juego"; } catch (e) { return true; } };
+    const norma = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    let pistas = null, fallo = false, enPelea = false, sonando = null;
+
+    // las pistas de la canción, ya decodificadas (una vez por página)
+    async function bajaCancion(ctx) {
+      // (el banco de pruebas no tiene la biblioteca: su página da unas pistas de prueba)
+      let prueba = null;
+      try { prueba = window.parent !== window && window.parent.BT3_MUSICA_PRUEBA; } catch (e) {}
+      if (prueba) return Promise.all((await prueba()).map(b => ctx.decodeAudioData(b)));
+      const [{ downloadPath, currentUser }, { SITE }, { cacheGet, cachePut }] = await Promise.all([
+        import("../hero/js/cloud.js"), import("../hero/js/site.js"), import("../hero/js/songCache.js")]);
+      if (!await currentUser()) throw new Error("sin sesión de Google");
+      const busca = async () => {
+        const lib = JSON.parse(new TextDecoder().decode(await downloadPath(`${SITE.storageRoot}/library.json`)));
+        const s = (lib.songs || []).find(x => [x.meta?.name, x.folder, x.id].some(n => norma(n).includes(BUSCA)));
+        if (!s) throw new Error("«" + BUSCA + "» no está en la biblioteca de PRO HERO");
+        const e = { folder: s.folder, v: s.v || "", audio: Object.values(s.audio || {}).filter(Boolean) };
+        try { localStorage.setItem(CLAVE + ".cancion", JSON.stringify(e)); } catch (x) {}
+        return e;
+      };
+      let e = null;
+      try { e = JSON.parse(localStorage.getItem(CLAVE + ".cancion") || "null"); } catch (x) {}
+      // cada pista, de la caché de PRO HERO (la misma clave que fetchSongFile en juegos/hero/js/library.js) o de Storage
+      const pista = async f => {
+        const k = `${e.folder}/${f}?v=${e.v}`;
+        let b = await cacheGet(k);
+        if (!b) { b = await downloadPath(`${SITE.storageRoot}/${e.folder}/${f}`); await cachePut(k, b, SITE.cacheMB * 1024 * 1024); }
+        return ctx.decodeAudioData(b.slice(0));   // (decodificar se queda con el buffer: va una copia)
+      };
+      if (!e) e = await busca();
+      try { return await Promise.all(e.audio.map(pista)); }
+      catch (x) { e = await busca(); return Promise.all(e.audio.map(pista)); }   // (la recordada cambió de lugar o de versión)
+    }
+
+    const volumen = () => BASE * Math.max(0, Math.min(100, Module._Web_MusicaPorcentaje ? Module._Web_MusicaPorcentaje() : 100)) / 100;
+    async function empieza() {
+      const ctx = Module.SDL3 && Module.SDL3.audioContext;
+      if (!ctx || !quiere() || fallo || sonando) return;
+      if (!pistas) pistas = bajaCancion(ctx).catch(e => { console.warn("[bt3] música de pelea: suena la del juego —", e.message || e); fallo = true; pistas = null; return null; });
+      const bufs = await pistas;
+      if (!bufs || !bufs.length || !enPelea || sonando || !quiere()) return;
+      const gan = ctx.createGain(), t = ctx.currentTime + 0.05, largo = Math.min(...bufs.map(b => b.duration));
+      gan.connect(ctx.destination);
+      gan.gain.setValueAtTime(0, t);
+      gan.gain.linearRampToValueAtTime(volumen(), t + 1.5);
+      // todas las pistas a la vez y en vuelta, cortadas al largo de la más corta para que no se desfasen
+      const fuentes = bufs.map(b => { const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.loopStart = 0; s.loopEnd = largo; s.connect(gan); s.start(t); return s; });
+      const mide = setInterval(() => { if (sonando) gan.gain.setTargetAtTime(volumen(), ctx.currentTime, 0.2); }, 1000);
+      sonando = { fuentes, gan, mide };
+      Module._Web_BgmPropia && Module._Web_BgmPropia(1);   // la música del juego calla (solo mientras dura la pelea)
+      pintaBoton();
+    }
+    function para() {
+      if (!sonando) return;
+      const { fuentes, gan, mide } = sonando;
+      sonando = null;
+      clearInterval(mide);
+      try { Module._Web_BgmPropia && Module._Web_BgmPropia(0); } catch (e) {}
+      const t = gan.context.currentTime;
+      gan.gain.cancelScheduledValues(t); gan.gain.setValueAtTime(gan.gain.value, t); gan.gain.linearRampToValueAtTime(0, t + 1.2);
+      setTimeout(() => { for (const s of fuentes) try { s.stop(); } catch (e) {} gan.disconnect(); }, 1400);
+      pintaBoton();
+    }
+    // (se responde fuera de la llamada del juego: no se vuelve a entrar al programa desde su propio aviso)
+    Module.onMusicaPelea = on => { enPelea = !!on; setTimeout(() => (enPelea ? empieza() : para()), 0); };
+
+    // ♪ en la barra: la canción o la música del juego (para cada uno; se puede cambiar en plena pelea)
+    const boton = document.createElement("button");
+    boton.id = "musica"; boton.type = "button";
+    function pintaBoton() {
+      const si = quiere();
+      boton.textContent = si ? "♪ Chinchonchin" : "♪ Música del juego";
+      boton.title = si ? "En las peleas suena «chinchonchin» (de PRO HERO). Clic: la música del juego" : "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)";
+      boton.setAttribute("aria-pressed", String(si));
+    }
+    boton.onclick = () => {
+      try { localStorage.setItem(CLAVE, quiere() ? "juego" : "cancion"); } catch (e) {}
+      if (quiere()) { fallo = false; if (enPelea) empieza(); } else para();
+      pintaBoton();
+    };
+    pintaBoton();
+    $("barra").insertBefore(boton, $("barra").querySelector("[data-volumen]"));
+  })();
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;

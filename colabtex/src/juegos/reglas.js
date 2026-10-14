@@ -513,6 +513,7 @@ const REGLAS = {
         "<b>Teclado o mando</b> (PS4, PS5 o Xbox, por cable o Bluetooth). <b>Ajustes</b> (o F1) → <b>Controls</b>: qué mando usa cada jugador y qué hace cada botón.",
         "El juego va a <b>30 cuadros por segundo</b>, como la consola, igual para todos. Si tu computador no alcanza, baja solo la calidad de la imagen, nunca los cuadros: una pelea en línea es pareja."
       ])],
+      ["Música de pelea", "En las peleas suena <b>«chinchonchin»</b>, de la biblioteca de PRO HERO, en vez de la música del juego (los golpes, las voces y el escenario suenan igual). El <b>♪</b> de la barra de arriba la cambia por la música del juego: cada uno elige la suya, y no cambia nada de la pelea. Se baja una vez, al empezar tu primera pelea (si ya la jugaste en PRO HERO, no se baja de nuevo)."],
       ["Personajes prohibidos", lista([
         "En duelo y torneo, quien pone las reglas puede limitar los personajes con la tier list competitiva: <b>No OP</b> saca a los más fuertes (tiers BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo a los de tier C hacia abajo.",
         "Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no. Tampoco se puede transformar ni fusionar en un vetado en plena pelea.",
