@@ -2109,7 +2109,7 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    (PRODROP es una tienda, BBTAN un juego del club, zombis un modo de
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
-const NOVEDADES_TODAS = [
+const NOVEDADES = [
   /* BT3 es privado: su diapositiva solo la ven los amigos del disco (bt3Visible, bt3-amigos.js). */
   { id: "bt3", color: "#ff8a00", alta: "2026-10-14", titulo: "Budokai Tenkaichi 3",
     lema: "El juego de PS2 completo, en el navegador y a 60 cuadros. De 1 a 8: entrenamiento y contra la CPU, duelos con revancha y torneos de hasta ocho con su llave, con tus amigos o rellenados con CPU.",
@@ -2175,8 +2175,9 @@ const NOVEDADES_TODAS = [
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 // Lo que se muestra: sin BT3 para quien no está en la lista de amigos.
-let NOVEDADES = NOVEDADES_TODAS;
-const filtraNovedades = () => { NOVEDADES = NOVEDADES_TODAS.filter(n => n.id !== "bt3" || bt3Visible()); };
+// (la de BT3 solo la ven los amigos del disco: las que se muestran son estas)
+let VISIBLES = NOVEDADES;
+const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()); };
 function arteNovedad(n) {
   // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
   if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
@@ -2234,7 +2235,7 @@ const plataformaDe = id => id ? { movil: enMovil(id), pc: enPc(id) } : {};
    salta sin transición a la primera de verdad (`enganchaBanner`). */
 function novedadesHtml() {
   filtraNovedades();
-  const inv = state.invitado, N = NOVEDADES.length;
+  const inv = state.invitado, N = VISIBLES.length;
   const diapo = (n, i, copia) => {
     /* Como invitado solo se abren los cuatro juegos libres; lo demás
        (también las prácticas contra bots) pide iniciar sesión. */
@@ -2265,12 +2266,12 @@ function novedadesHtml() {
   return `
       <section class="jg-ban" id="vesBanner" aria-roledescription="carrusel" aria-label="Novedades del salón">
         <div class="jg-ban-vista">
-          <div class="jg-ban-pista" aria-live="off">${NOVEDADES.map((n, i) => diapo(n, i, false)).join("")}${N > 1 ? diapo(NOVEDADES[0], 0, true) : ""}</div>
+          <div class="jg-ban-pista" aria-live="off">${VISIBLES.map((n, i) => diapo(n, i, false)).join("")}${N > 1 ? diapo(VISIBLES[0], 0, true) : ""}</div>
         </div>${N > 1 ? `
         <button class="jg-ban-flecha ant" type="button" data-ban="-1" aria-label="Novedad anterior">‹</button>
         <button class="jg-ban-flecha sig" type="button" data-ban="1" aria-label="Novedad siguiente">›</button>
         <div class="jg-ban-pie">
-          <div class="jg-ban-puntos" role="group" aria-label="Elegir novedad">${NOVEDADES.map((n, i) => `<button type="button" data-ban-ir="${i}" aria-label="${escapeHtml(n.titulo)}"><i></i></button>`).join("")}</div>
+          <div class="jg-ban-puntos" role="group" aria-label="Elegir novedad">${VISIBLES.map((n, i) => `<button type="button" data-ban-ir="${i}" aria-label="${escapeHtml(n.titulo)}"><i></i></button>`).join("")}</div>
           <button class="jg-ban-pausa" type="button" data-ban-pausa aria-label="Pausar las novedades" title="Pausar">❚❚</button>
         </div>` : ""}
       </section>`;
@@ -2294,7 +2295,7 @@ const tiraMascotasHtml = inv => `
       </section>`;
 
 function enganchaNovedades(h) {
-  const de = id => NOVEDADES.find(n => n.id === id);
+  const de = id => VISIBLES.find(n => n.id === id);
   for (const b of h.querySelectorAll("[data-nov-crear]")) {
     const n = de(b.getAttribute("data-nov-crear"));
     b.onclick = () => crear(n.sala.k, Object.assign(porOmision(n.sala.k), n.sala.ops));
@@ -2315,7 +2316,7 @@ const BAN_MS = 7000;
 let banTic = 0;
 function enganchaBanner(h) {
   clearInterval(banTic);
-  const raiz = h.querySelector("#vesBanner"), N = NOVEDADES.length;
+  const raiz = h.querySelector("#vesBanner"), N = VISIBLES.length;
   if (!raiz || N < 2) return;
   const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
   const puntos = [...raiz.querySelectorAll("[data-ban-ir]")], pausa = raiz.querySelector("[data-ban-pausa]");
