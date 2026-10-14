@@ -11,10 +11,11 @@ fallan en voz alta si el fork cambió ese trozo (así una actualización del for
   pedirla en cada pelea;
 - una barra arriba a la derecha: volumen, Ajustes (la ventana F1 en Controls), el mando conectado y el log;
 - `?v=` en el programa y su .wasm, para que el navegador no use uno viejo.
-Uso: pagina.py <shell.html del fork> <index.html de salida> <versión>"""
+Uso: pagina.py <shell.html del fork> <index.html de salida> <versión> [<el .wasm, para el tamaño de la descarga>]"""
 import pathlib, sys
 
 fuente, salida, ver = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+tam_wasm = pathlib.Path(sys.argv[4]).stat().st_size if len(sys.argv) > 4 else 0
 t = fuente.read_text()
 
 
@@ -56,6 +57,16 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
     border: 1px solid var(--line); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; text-align: center; }
   #sala.on { display: block; }
   .recordada { margin-top: 10px; }
+  /* la tarjeta de inicio, con la cara del vestíbulo de la sala (juegos.html, .jg-bt3-vest) */
+  #start { background: radial-gradient(ellipse at 50% 0%, #5a2a0a 0%, #22140c 42%, #0b0908 100%); }
+  #start .card { background: #15100d; border-color: #3d2a1c; box-shadow: 0 24px 60px #000b, 0 0 0 1px #f28c1e22; padding: 28px; }
+  #start .ceja { margin: 0 0 4px; font: 700 12px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #b7aa9a; }
+  #start h1 { margin: 0 0 10px; font: italic 900 28px/1.1 system-ui, sans-serif; letter-spacing: -.01em; color: #fde047;
+    text-shadow: 0 0 18px #f28c1e99, 2px 2px 0 #7c2d12; }
+  #start .pick { background: linear-gradient(180deg, #ffb347, #f28c1e 55%, #c2410c); color: #1d1004; font-weight: 800;
+    box-shadow: 0 4px 0 #7c2d12; }
+  #start .pick.alt { background: #2a1f18; color: var(--text); border: 1px solid #4a3426; box-shadow: none; }
+  #start .pick:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 3px; }
 </style>''')
 cambia('<div id="stage">', '''<div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
   title="Ajustes (F1): video, sonido y controles">Ajustes</button><span id="mando" role="status">Mando: aprieta un botón</span><button
@@ -65,7 +76,7 @@ cambia('<div id="stage">', '''<div id="barra"><span data-volumen></span><button 
 <div id="stage">''')
 
 # ---- la tarjeta de inicio, en español ----
-cambia('<h1>Budokai Tenkaichi 3, in the browser</h1>', '<h1>Budokai Tenkaichi 3</h1>')
+cambia('<h1>Budokai Tenkaichi 3, in the browser</h1>', '<p class="ceja">El juego de PS2, en tu navegador</p>\n    <h1>Budokai Tenkaichi 3</h1>')
 cambia('<p>Choose your own disc image of the USA release (SLUS-21678). It is read in place on this device and never uploaded.</p>',
        '<p>Elige tu propia imagen del disco, versión USA (SLUS-21678). Se lee aquí mismo, en tu navegador: no se sube a ningún lado.</p>')
 cambia('>Choose disc image (.iso)<input', '>Elegir la ISO del juego<input')
@@ -102,8 +113,35 @@ t = t[:inicio] + "  say('');\n\n" + t[fin:]
 cambia("  $('iso').addEventListener('change', (e) => { audioUnlock(); if (e.target.files[0]) go(fileDisc(e.target.files[0])); });",
        "  $('iso').addEventListener('change', (e) => { audioUnlock(); if (e.target.files[0]) { Disco.olvida(); go(fileDisc(e.target.files[0])); } });")
 
+# ---- progreso: nada de esperas mudas (bajar el programa, leer el disco, cargar del disco privado) ----
+cambia("      say('Reading the disc image…');", "      say('Leyendo el disco…');")
+cambia("      say(`Disc recognised (${n.toLocaleString()} archive entries). Starting…`);",
+       "      say(`Disco reconocido (${n.toLocaleString('es')} archivos). Arrancando el juego…`);")
+cambia("say('Loading the program…'))", "say('Cargando el programa…'))")
+cambia("    s.onerror = () => say('Could not load ' + BUILD + '.js', true);",
+       "    s.onerror = () => say('No se pudo cargar el juego (' + BUILD + '.js). Revisa tu conexión y recarga la página.', true);")
+# El programa no se pide solo: pagina.js baja primero el .wasm con una barra de progreso y después lo arranca.
+cambia("    document.body.appendChild(s);\n  }\n</script>", "    window.cargaPrograma = () => document.body.appendChild(s);   // (lo llama pagina.js)\n  }\n</script>")
+# La insignia de lectura del disco: la dibuja pagina.js (en español, con barra) si está.
+cambia("  const netShow = () => { $('net').textContent = `Loading ${(netBytes / 1048576).toFixed(1)} MB`; $('net').classList.add('on'); };",
+       "  const netShow = () => { if (window.Progreso) return Progreso.red(netBytes); $('net').textContent = `Cargando ${(netBytes / 1048576).toFixed(1)} MB`; $('net').classList.add('on'); };")
+cambia('<div id="status"></div>', '<div id="status"></div>\n    <div id="progreso" hidden><div class="pista"><i></i></div><span></span></div>')
+cambia('</style>', '''  /* barras de progreso: en la tarjeta (bajar el juego) y arriba al centro durante el juego (cargar del disco) */
+  #progreso { margin-top: 12px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+  .pista { height: 8px; border-radius: 99px; background: #2a1f18; overflow: hidden; }
+  .pista i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #f28c1e, #fde047); transition: width .2s; }
+  .indef .pista i { width: 35% !important; animation: indef 1.1s ease-in-out infinite; }
+  @keyframes indef { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+  #net { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--st) + 10px); padding: 8px 12px; border-radius: 12px;
+    min-width: 220px; background: rgba(15,11,9,.92); border: 1px solid #3d2a1c; display: none; gap: 6px; font: 600 12px system-ui, sans-serif; }
+  #net.on { display: grid; }
+  #sala.gira::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; border-radius: 50%;
+    border: 2px solid #f28c1e; border-right-color: transparent; animation: gira .8s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .indef .pista i, #sala.gira::before { animation: none; } }
+</style>''')
 # ---- nuestro código, al final: disco recordado, barra, sala ----
-cambia('</script>\n</body>', '</script>\n<script src="pagina.js?v=' + ver + '"></script>\n</body>')
+cambia('</script>\n</body>', '</script>\n<script>var BT3_TAM_WASM = ' + str(tam_wasm) + ';</script>\n<script src="pagina.js?v=' + ver + '"></script>\n</body>')
 
 salida.write_text(t)
 print(f"{salida}: {len(t)} bytes")

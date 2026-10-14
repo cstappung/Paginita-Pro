@@ -20,7 +20,7 @@ import { BT3_BATALLAS, BT3_TIEMPOS } from "./motor.js";
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-2";
+const SRC = "juegos/bt3/index.html?modo=online&v=bt3-3";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
 /* El disco privado (juegos/bt3/fuente/disco/): el marco del juego le pide a esta página el token de Firebase
@@ -116,48 +116,73 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     finally { ocupado = false; }
   }
 
+  /* El vestíbulo, como la pantalla de versus de un juego de pelea: los dos frente a frente (foto, quién es el
+     anfitrión, si su disco ya cargó), las reglas como botones que solo el anfitrión aprieta, y el botón grande
+     para empezar. En plena pelea queda una franja con lo que se está jugando. */
+  const BATALLA_CORTA = { single: "Single", team: "Team", dp10: "DP 10", dp15: "DP 15", dp20: "DP 20" };
+  const TIEMPO_CORTO = t => t ? t + " s" : "∞";
+  function avatar(j) {
+    const foto = typeof j.foto === "string" && /^(data:image\/|https:\/\/)/.test(j.foto) ? j.foto : "";
+    const color = typeof j.color === "string" && /^#[0-9a-f]{3,8}$/i.test(j.color) ? j.color : "#f28c1e";
+    return foto ? `<img class="jg-bt3-ava" src="${escapeHtml(foto)}" alt="">`
+      : `<span class="jg-bt3-ava" style="--c:${color}" aria-hidden="true">${escapeHtml((j.nombre || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
+  }
+  function tarjeta(j) {
+    if (!j) return `<div class="jg-bt3-luchador vacio"><span class="jg-bt3-ava" aria-hidden="true">?</span>
+      <b>Esperando rival</b><span class="jg-bt3-rol">J2</span><span class="jg-bt3-estado">Pásale el enlace de la sala</span>
+      <span class="jg-bt3-hacer jg-bt3-hueco" aria-hidden="true">Hacer anfitrión</span></div>`;
+    const anf = j.uid === est.anfitrion, disco = !!est.discos?.[j.uid], yo = j.uid === uid;
+    return `<div class="jg-bt3-luchador${anf ? " anf" : ""}${yo ? " yo" : ""}">
+      ${avatar(j)}
+      <b translate="no">${escapeHtml(j.nombre || "Jugador")}${yo ? ' <em>(tú)</em>' : ""}</b>
+      <span class="jg-bt3-rol">${anf ? "👑 Anfitrión · J1" : "J2"}</span>
+      <span class="jg-bt3-estado ${disco ? "ok" : ""}">${disco ? "● Disco listo" : "○ Cargando el disco…"}</span>
+      ${!anf && enSala() ? `<button class="jg-bt3-hacer" data-a="${escapeHtml(j.uid)}">Hacer anfitrión</button>`
+        : '<span class="jg-bt3-hacer jg-bt3-hueco" aria-hidden="true">Hacer anfitrión</span>'}
+    </div>`;
+  }
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const jugando = est.fase === "jugando", ver = !partida?.fin;
     vest.hidden = !ver;
     if (!ver) return;
     const js = presentes(), manda = soyAnfitrion();
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.fase, est.ronda, manda, enSala()]);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.fase, est.ronda, manda, enSala()]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
+    vest.classList.toggle("jugando", jugando);
     if (jugando) {
-      vest.innerHTML = `<p class="jg-bt3-info">Pelea ${est.ronda} en curso · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b> ·
-        ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}</p>
-        ${enSala() ? `<button class="btn2 jg-bt3-vuelve" title="Si la pelea se quedó colgada">Volver al vestíbulo</button>` : ""}`;
+      vest.innerHTML = `<div class="jg-bt3-franja"><span class="jg-bt3-vivo">● En pelea</span>
+        <span>Pelea ${est.ronda} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)} · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span>
+        ${enSala() ? `<button class="jg-bt3-vuelve" title="Si la pelea se quedó colgada, vuelven los dos al vestíbulo">Volver al vestíbulo</button>` : ""}</div>`;
       const v = vest.querySelector(".jg-bt3-vuelve");
       if (v) v.onclick = () => { v.disabled = true; anota({ t: "vuelve", uid }); };
       return;
     }
-    const filas = js.map(j => {
-      const anf = j.uid === est.anfitrion, disco = !!est.discos?.[j.uid];
-      return `<li class="${j.uid === uid ? "yo" : ""}">
-        <span class="jg-bt3-n" translate="no">${escapeHtml(j.nombre || "Jugador")}</span>${j.uid === uid ? " <em>(tú)</em>" : ""}
-        ${anf ? '<span class="jg-bt3-anf" title="Anfitrión: jugador 1, pone las reglas">👑 Anfitrión</span>'
-          : enSala() ? `<button class="btn2 jg-bt3-hacer" data-a="${escapeHtml(j.uid)}">Hacer anfitrión</button>` : ""}
-        <span class="jg-bt3-disco ${disco ? "ok" : ""}">${disco ? "ISO lista" : "Eligiendo ISO…"}</span></li>`;
-    }).join("");
+    // el anfitrión a la izquierda, como el jugador 1 en la pantalla del juego
+    const orden = [...js].sort((a, b) => (b.uid === est.anfitrion) - (a.uid === est.anfitrion));
     const listos = js.length === 2 && js.every(j => est.discos?.[j.uid]);
-    const sel = (k, opciones, actual) => `<select data-k="${k}" ${manda ? "" : "disabled"}>${opciones.map(([v, t]) =>
-      `<option value="${v}" ${String(v) === String(actual) ? "selected" : ""}>${escapeHtml(t)}</option>`).join("")}</select>`;
+    const fichas = (k, opciones, actual) => opciones.map(([v, txt]) =>
+      `<button class="jg-bt3-ficha" data-k="${k}" data-v="${v}" aria-pressed="${String(v) === String(actual)}" ${manda ? "" : "disabled"}>${escapeHtml(txt)}</button>`).join("");
+    const falta = js.length < 2 ? "Falta el otro jugador: pásale el enlace de la sala."
+      : !listos ? "Esperando el disco de " + js.filter(j => !est.discos?.[j.uid]).map(j => j.nombre || "Jugador").join(" y ") + "."
+      : manda ? "Todo listo." : "Todo listo: empieza " + nombre(est.anfitrion) + ".";
     vest.innerHTML = `
-      <ul class="jg-bt3-jug">${filas}</ul>
-      <div class="jg-bt3-ajustes">
-        <label>Batalla ${sel("batalla", Object.entries(BT3_BATALLAS), est.batalla)}</label>
-        <label>Tiempo ${sel("tiempo", BT3_TIEMPOS.map(t => [t, TIEMPO_TXT(t)]), est.tiempo)}</label>
+      <div class="jg-bt3-versus">${tarjeta(orden[0])}<span class="jg-bt3-vs" aria-hidden="true">VS</span>${tarjeta(orden[1])}</div>
+      <div class="jg-bt3-reglas" role="group" aria-label="Reglas de la pelea">
+        <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
+        <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(t => [t, TIEMPO_CORTO(t)]), est.tiempo)}</div></div>
+        ${manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el anfitrión.</p>`}
       </div>
-      <p class="jg-bt3-info">El anfitrión es el jugador 1 y pone las reglas. Cada uno necesita su propia ISO de la versión USA
-        (SLUS-21678); se lee solo en su navegador. La pelea va directo entre los dos navegadores.</p>
-      ${manda ? `<button class="btn jg-bt3-empieza" ${listos ? "" : "disabled"}>Empezar pelea</button>
-        ${listos ? "" : `<p class="jg-bt3-info">${js.length < 2 ? "Falta el otro jugador." : "Esperando que los dos elijan su ISO."}</p>`}`
-        : `<p class="jg-bt3-info">Empieza cuando lo diga <span translate="no">${escapeHtml(nombre(est.anfitrion))}</span>.</p>`}`;
+      <div class="jg-bt3-pie">
+        ${manda ? `<button class="jg-bt3-empieza" ${listos ? "" : "disabled"}>¡A pelear!</button>` : ""}
+        <p class="jg-bt3-nota" role="status">${escapeHtml(falta)}</p>
+      </div>`;
     vest.querySelectorAll(".jg-bt3-hacer").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
-    vest.querySelectorAll("select[data-k]").forEach(s => s.onchange = () =>
-      anota({ t: "ajuste", uid, k: s.dataset.k, v: s.dataset.k === "tiempo" ? Number(s.value) : s.value }));
+    vest.querySelectorAll(".jg-bt3-ficha").forEach(b => b.onclick = () => {
+      if (b.getAttribute("aria-pressed") === "true") return;
+      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+    });
     const emp = vest.querySelector(".jg-bt3-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; empieza(); };
   }

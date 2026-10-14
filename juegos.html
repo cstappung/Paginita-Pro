@@ -1624,15 +1624,52 @@ try { var t = localStorage.getItem("jg.tema");
 @media (prefers-reduced-motion:reduce){.jg-art-bt3 b{animation:none}}
 .jg-art-bt3 em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);white-space:nowrap;font:900 16px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:2px;color:#fff;text-shadow:2px 2px 0 #b45309}
 .jg-bt3-marco{background:#000}
-.jg-bt3-vest{margin:0 0 12px;padding:14px;border-radius:16px;background:#1d1a17;color:#efe9e1;display:grid;gap:10px}.jg-bt3-vest[hidden]{display:none}
-.jg-bt3-jug{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.jg-bt3-jug li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#2a2520}
-.jg-bt3-jug li.yo .jg-bt3-n{color:#ffd369}.jg-bt3-jug li em{color:#a89f94;font-size:12px}
-.jg-bt3-anf{padding:2px 8px;border-radius:999px;background:#f28c1e33;color:#ffc477;font-size:12px;font-weight:700}
-.jg-bt3-disco{margin-left:auto;font-size:12px;color:#a89f94}.jg-bt3-disco.ok{color:#8cddb3;font-weight:700}
-.jg-bt3-ajustes{display:flex;flex-wrap:wrap;gap:12px}.jg-bt3-ajustes label{display:flex;align-items:center;gap:6px;font-size:13px}
-.jg-bt3-ajustes select{background:#2a2520;color:#efe9e1;border:1px solid #4a4038;border-radius:8px;padding:4px 6px}
-.jg-bt3-info{margin:0;font-size:13px;color:#c8bfb4;max-width:72ch}.jg-bt3-empieza{justify-self:start}
+/* El vestíbulo de BT3: la pantalla de versus (los dos frente a frente), las reglas como fichas y el botón de
+   pelear. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro. */
+.jg-bt3-vest{--bt3-a:#f28c1e;--bt3-oro:#fde047;--bt3-tx:#f5efe6;--bt3-mu:#b7aa9a;margin:0 0 12px;padding:18px;border-radius:18px;color:var(--bt3-tx);
+  background:radial-gradient(ellipse at 50% 0%,#5a2a0a 0%,#2a1408 38%,#151110 75%);border:1px solid #3d2a1c;display:grid;gap:16px;box-shadow:inset 0 0 40px #0006}
+.jg-bt3-vest[hidden]{display:none}
+.jg-bt3-vest.jugando{padding:10px 14px;gap:0;background:#1a1311}
+.jg-bt3-versus{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:12px}
+.jg-bt3-versus>.jg-bt3-vs{align-self:center}
+.jg-bt3-hueco{visibility:hidden}
+.jg-bt3-luchador{position:relative;display:grid;justify-items:center;align-content:start;gap:6px;padding:16px 12px 14px;border-radius:14px;background:#00000059;border:1px solid #ffffff14;text-align:center;min-width:0}
+.jg-bt3-luchador.anf{border-color:#f28c1e88;box-shadow:0 0 22px #f28c1e33}
+.jg-bt3-luchador.yo b{color:var(--bt3-oro)}
+.jg-bt3-luchador.vacio{border-style:dashed;opacity:.75}
+.jg-bt3-luchador b{font:800 17px/1.2 system-ui,sans-serif;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-bt3-luchador b em{font-weight:500;font-size:12px;color:var(--bt3-mu)}
+.jg-bt3-ava{width:64px;height:64px;border-radius:50%;object-fit:cover;display:grid;place-items:center;font:900 28px system-ui,sans-serif;color:#fff;
+  background:var(--c,#6b4a2b);border:3px solid #ffffff26}
+.jg-bt3-luchador.anf .jg-bt3-ava{border-color:var(--bt3-a)}
+.jg-bt3-rol{font:700 12px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--bt3-mu)}
+.jg-bt3-luchador.anf .jg-bt3-rol{color:#ffc477}
+.jg-bt3-estado{font-size:13px;color:#f5c26b}.jg-bt3-estado.ok{color:#8cddb3}
+.jg-bt3-hacer{margin-top:2px;padding:5px 10px;border-radius:999px;border:1px solid #ffffff2e;background:#ffffff0f;color:var(--bt3-tx);font:600 12px system-ui,sans-serif;cursor:pointer}
+.jg-bt3-hacer:hover{border-color:var(--bt3-a);color:#ffc477}
+.jg-bt3-vs{font:italic 900 34px/1 system-ui,sans-serif;letter-spacing:-.02em;color:var(--bt3-oro);text-shadow:0 0 18px #f28c1e,2px 2px 0 #7c2d12}
+.jg-bt3-reglas{display:grid;gap:10px;padding:12px 14px;border-radius:12px;background:#0000004d}
+.jg-bt3-reglas>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.jg-bt3-et{min-width:120px;font:700 12px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--bt3-mu)}
+.jg-bt3-fichas{display:flex;flex-wrap:wrap;gap:6px}
+.jg-bt3-ficha{padding:6px 12px;border-radius:8px;border:1px solid #ffffff24;background:#ffffff0d;color:var(--bt3-tx);font:600 13px system-ui,sans-serif;cursor:pointer;font-variant-numeric:tabular-nums}
+.jg-bt3-ficha[aria-pressed=true]{background:var(--bt3-a);border-color:var(--bt3-a);color:#1d1004}
+.jg-bt3-ficha:not([disabled]):not([aria-pressed=true]):hover{border-color:var(--bt3-a)}
+.jg-bt3-ficha[disabled]{cursor:default}.jg-bt3-ficha[disabled]:not([aria-pressed=true]){opacity:.55}
+.jg-bt3-pie{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.jg-bt3-empieza{padding:12px 28px;border:0;border-radius:12px;background:linear-gradient(180deg,#ffb347,#f28c1e 55%,#c2410c);color:#1d1004;
+  font:900 18px system-ui,sans-serif;letter-spacing:.02em;cursor:pointer;box-shadow:0 4px 0 #7c2d12,0 0 24px #f28c1e55}
+.jg-bt3-empieza:hover:not([disabled]){filter:brightness(1.08)}
+.jg-bt3-empieza[disabled]{background:#4a3a2d;color:#9a8b7a;box-shadow:none;cursor:default}
+.jg-bt3-nota{margin:0;font-size:13px;color:var(--bt3-mu);max-width:70ch}
+.jg-bt3-franja{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:14px}
+.jg-bt3-vivo{font-weight:800;color:#ff6b6b}
+.jg-bt3-vuelve{margin-left:auto;padding:5px 10px;border-radius:8px;border:1px solid #ffffff2e;background:transparent;color:var(--bt3-mu);font:600 12px system-ui,sans-serif;cursor:pointer}
+.jg-bt3-vest button:focus-visible{outline:2px solid #7fb2ff;outline-offset:2px}
+.jg-bt3-privado{padding:18px;border-radius:14px;background:#1a1311;color:#b7aa9a}
+@media(max-width:560px){.jg-bt3-versus{grid-template-columns:1fr}.jg-bt3-vs{justify-self:center;font-size:26px}.jg-bt3-et{min-width:0;width:100%}}
+@media(prefers-reduced-motion:no-preference){.jg-bt3-luchador.anf .jg-bt3-ava{animation:jg-bt3-aura 2.4s ease-in-out infinite}}
+@keyframes jg-bt3-aura{50%{box-shadow:0 0 18px 2px #f28c1e88}}
 .jg-hx-vest{margin:0 0 12px;padding:14px;border-radius:16px;background:#22272b;color:#e9edf0}.jg-hx-vest[hidden]{display:none}
 .jg-hx-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .jg-hx-col{background:#181b1e;border-radius:10px;padding:8px;min-height:170px;display:flex;flex-direction:column;gap:6px}
@@ -4901,6 +4938,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610140650"></script>
+<script src="juegos-app.js?v=202610140727"></script>
 </body>
 </html>

@@ -18,6 +18,68 @@
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
 
+  // ---------------------------------------------------------------- 0. el progreso
+  /* Ninguna espera muda: la tarjeta de inicio muestra cuánto falta del programa (3,6 MB), y durante el juego
+     una insignia arriba al centro muestra lo que se está cargando del disco privado. */
+  const MB = b => (b / 1048576).toLocaleString("es", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const Progreso = window.Progreso = {
+    tarjeta(txt, frac) {                     // frac null = sin total conocido (barra que va y viene)
+      const el = $("progreso");
+      if (!el) return;
+      el.hidden = false;
+      el.classList.toggle("indef", frac == null);
+      el.querySelector("i").style.width = frac == null ? "" : Math.round(Math.min(1, frac) * 100) + "%";
+      el.querySelector("span").textContent = txt;
+    },
+    sinTarjeta() { const el = $("progreso"); if (el) el.hidden = true; },
+    // la insignia: una lectura grande con su total, o (sin total) lo que lleva bajado
+    insignia(txt, frac) {
+      const n = $("net");
+      if (!n.querySelector(".pista")) n.innerHTML = '<span></span><div class="pista"><i></i></div>';
+      n.querySelector("span").textContent = txt;
+      n.classList.toggle("indef", frac == null);
+      n.querySelector("i").style.width = frac == null ? "" : Math.round(Math.min(1, frac) * 100) + "%";
+      n.classList.add("on");
+    },
+    lectura: null,                           // {hechos, total} de la lectura grande en curso
+    red(bytes) {                             // (lo llama la página del port cuando una lectura tarda)
+      if (Progreso.lectura) return;
+      Progreso.insignia(desdePrivado ? "Cargando del disco privado…" : "Cargando… " + MB(bytes) + " MB", null);
+    },
+  };
+  let desdePrivado = false;
+
+  /* El programa: el .wasm se baja aquí con su barra y se le entrega al programa ya bajado (locateFile apunta a
+     la copia en memoria). Si algo falla, se carga como siempre. */
+  (async () => {
+    const url = Module.locateFile ? Module.locateFile("bt3-jspi.wasm", "") : "bt3-jspi.wasm";
+    try {
+      Progreso.tarjeta("Descargando el juego…", 0);
+      const r = await fetch(url);
+      if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+      const total = window.BT3_TAM_WASM || Number(r.headers.get("content-length")) || 0;
+      const lector = r.body.getReader(), trozos = [];
+      let llevo = 0;
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) break;
+        trozos.push(value);
+        llevo += value.length;
+        Progreso.tarjeta(total ? "Descargando el juego… " + MB(llevo) + " de " + MB(total) + " MB" : "Descargando el juego… " + MB(llevo) + " MB",
+          total ? llevo / total : null);
+      }
+      const enMemoria = URL.createObjectURL(new Blob(trozos, { type: "application/wasm" }));
+      const original = Module.locateFile;
+      Module.locateFile = (f, base) => f.endsWith(".wasm") ? enMemoria : (original ? original(f, base) : base + f);
+    } catch (e) {
+      Module.keep && Module.keep("descarga con barra: " + (e.message || e) + " (se carga sin barra)");
+    }
+    Progreso.tarjeta("Preparando el juego…", null);
+    const listo = Module.onRuntimeInitialized;
+    Module.onRuntimeInitialized = () => { Progreso.sinTarjeta(); listo && listo(); };
+    window.cargaPrograma && window.cargaPrograma();
+  })();
+
   // ---------------------------------------------------------------- 1. la ISO recordada
   const BD = "bt3-iso", TIENDA = "asa";
   const abre = () => new Promise((ok, mal) => {
@@ -136,9 +198,14 @@
       return q;
     };
     let ultimo = -10, racha = 0;
+    desdePrivado = true;
     const disco = { size, readAt: async (o, n) => {
       const out = new Uint8Array(n);
       if (n === 0) return out;
+      // una lectura de 2 MB o más (un escenario, un luchador, una película): la insignia con su barra, si tarda
+      const grande = n >= 2 * 1048576, estado = { hechos: 0, total: n };
+      let reloj = 0;
+      if (grande) reloj = setTimeout(() => { Progreso.lectura = estado; Progreso.insignia("Cargando del disco privado… " + MB(estado.hechos) + " de " + MB(n) + " MB", estado.hechos / n); }, 400);
       const a = Math.floor(o / pieza), z = Math.floor((o + n - 1) / pieza);
       racha = a >= ultimo && a <= ultimo + 2 ? racha + 1 : 0;
       ultimo = z;
@@ -150,8 +217,11 @@
         ids.forEach((i, k) => {
           const desde = Math.max(o, i * pieza), hasta = Math.min(o + n, (i + 1) * pieza);
           out.set(partes[k].subarray(desde - i * pieza, hasta - i * pieza), desde - o);
+          estado.hechos += hasta - desde;
         });
+        if (Progreso.lectura === estado) Progreso.insignia("Cargando del disco privado… " + MB(estado.hechos) + " de " + MB(n) + " MB", estado.hechos / n);
       }
+      if (grande) { clearTimeout(reloj); if (Progreso.lectura === estado) { Progreso.lectura = null; $("net").classList.remove("on"); } }
       return out;
     } };
     $("pickLabel").hidden = true;
@@ -206,10 +276,11 @@
 
   const caja = $("sala");
   let relojAviso = 0;
-  function aviso(txt, ms) {
+  function aviso(txt, ms, gira) {          // gira: algo está en curso (esperar, conectar): el indicador que gira
     clearTimeout(relojAviso);
     caja.textContent = txt;
     caja.classList.toggle("on", !!txt);
+    caja.classList.toggle("gira", !!gira);
     if (ms) relojAviso = setTimeout(() => caja.classList.remove("on"), ms);
   }
 
@@ -236,10 +307,10 @@
     entorno: () => ({ BT3_NOMOVIE: "1" }),
     async antesDeEmpezar() {
       S.avisa("disco");   // la ISO ya pasó la prueba: la sala lo anota
-      aviso("ISO lista. Esperando a que el anfitrión empiece la pelea…");
+      aviso("Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
-      aviso("Conectando con " + e.rival.nombre + "…");
+      aviso("Conectando con " + e.rival.nombre + "…", 0, true);
       const ok = await S.conecta(e.yo, e.rival.uid);
       if (!ok) {
         aviso("No se pudo conectar con " + e.rival.nombre + ": sus redes no dejan una conexión directa. " +
@@ -258,7 +329,7 @@
         BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" }));
       try { FS.mkdir("/net_session"); } catch (err) {}
-      aviso("Preparando la pelea contra " + e.rival.nombre + "…", 4000);
+      aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },
   };
 
