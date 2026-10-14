@@ -16,6 +16,11 @@ const STATE_INTERVAL = 100;
 // Sucesos de notas que viajan en cada estado (los últimos): el canal no reenvía lo perdido
 const EV_DIRECTO = 40;
 
+// Alto rendimiento: se pinta a 3/4 de la resolución de la ventana (sin pantalla de
+// alta densidad) y el navegador lo estira, que es casi gratis. Es lo que más ahorra
+// en un PC sin GPU: la mitad de píxeles o menos.
+const ESCALA_ALTO = 0.75;
+
 export class GameSession {
   constructor(app, { entry, song, players, net = null, onFinish }) {
     this.app = app;
@@ -184,6 +189,37 @@ export class GameSession {
     const stems = new Set(this.players.flatMap((p) => p.stems));
     this.audio.setStemVolumes([...stems]);
     this._setupBackground();
+    this._precalienta();
+  }
+
+  // Sprites y efectos se estrenan aquí, tras la pantalla de carga, y no a mitad de
+  // canción (el primer rayo de Star Power daba un tirón): HighwayRenderer.precalienta
+  _precalienta() {
+    try {
+      this._resize();
+      this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      const opts = this._drawOpts();
+      this._views().forEach(([p, view]) => this.renderer.precalienta(this.ctx, view, p, this.song, { ...opts, keyLabels: p.keyLabels }));
+    } catch (err) {
+      console.warn('[hero] precalentar', err);
+    }
+  }
+
+  _drawOpts() {
+    return {
+      noteSpeed: settings.noteSpeed, lefty: settings.lefty, tilt: settings.highwayTilt,
+      style: settings.highwayStyle, shake: settings.screenShake, alto: settings.altoRendimiento,
+      compartido: this.players.length > 1,
+      rewinding: !!this.rewind,
+      introAge: this.introPerf ? (performance.now() - this.introPerf) / 1000 : 99,
+    };
+  }
+
+  // [jugador, rectángulo] de cada autopista, en píxeles de la ventana
+  _views() {
+    const w = this.canvas.width / this.dpr, hh = this.canvas.height / this.dpr;
+    const n = this.players.length;
+    return this.players.map((p, i) => [p, n === 1 ? { x: 0, y: 0, w, h: hh } : { x: (i * w) / n, y: 0, w: w / n, h: hh }]);
   }
 
   _setupBackground() {
@@ -272,7 +308,8 @@ export class GameSession {
   }
 
   _resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // alto rendimiento: sin pantalla de alta densidad (hasta 4 veces menos píxeles que pintar)
+    const dpr = settings.altoRendimiento ? ESCALA_ALTO : Math.min(2, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(window.innerWidth * dpr);
     this.canvas.height = Math.round(window.innerHeight * dpr);
     this.dpr = dpr;
@@ -408,18 +445,8 @@ export class GameSession {
     ctx.clearRect(0, 0, W, H);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const w = W / this.dpr, hh = H / this.dpr;
-    const n = this.players.length;
-    const colW = w / n;
-    const opts = {
-      noteSpeed: settings.noteSpeed, lefty: settings.lefty, tilt: settings.highwayTilt,
-      style: settings.highwayStyle, shake: settings.screenShake,
-      rewinding: !!this.rewind,
-      introAge: this.introPerf ? (performance.now() - this.introPerf) / 1000 : 99,
-    };
-    this.players.forEach((p, i) => {
-      const view = n === 1 ? { x: 0, y: 0, w, h: hh } : { x: i * colW, y: 0, w: colW, h: hh };
-      this.renderer.draw(ctx, view, p, now, this.song, { ...opts, keyLabels: p.keyLabels });
-    });
+    const opts = this._drawOpts();
+    for (const [p, view] of this._views()) this.renderer.draw(ctx, view, p, now, this.song, { ...opts, keyLabels: p.keyLabels });
 
     // barra de progreso de la canción
     const prog = Math.max(0, Math.min(1, now / this.endAt));

@@ -5,7 +5,7 @@ import { library, artImg } from '../library.js';
 import { PARTS, PART_ORDER, DIFF_LABEL } from '../core/constants.js';
 import { settings, saveSettings } from '../settings.js';
 import { SongSelectScreen, tocaVistaPrevia, cancelaVistaPrevia } from './songSelect.js';
-import { SettingsScreen } from './settingsScreen.js';
+import { SettingsScreen, ALTO_AYUDA } from './settingsScreen.js';
 import { NOTE_MODES } from '../core/noteMode.js';
 import { sitio, pantallaCompleta } from '../sitio/puente.js';
 import { enElCentro } from '../game/orden.js';
@@ -306,6 +306,8 @@ export class LobbyScreen extends Screen {
       ...Object.entries(NOTE_MODES).map(([v, l]) => h('option', { value: v, selected: v === (me?.mode || settings.noteMode) }, l)));
     const profSel = h('select', { 'data-nav': true, onchange: () => { this.app.onlineProfile = profSel.value; } },
       ...settings.profiles.map((p) => h('option', { value: p.id, selected: p.id === this.app.onlineProfile }, p.name)));
+    const alto = h('input', { type: 'checkbox', 'data-nav': true, onchange: () => { settings.altoRendimiento = alto.checked; saveSettings(); } });
+    alto.checked = settings.altoRendimiento;
     const bot = h('input', { type: 'checkbox', onchange: () => { this.app.onlineBot = bot.checked; } });
     bot.checked = !!this.app.onlineBot;
     const faltan = room.players.filter((p) => p.id !== room.host && !p.ready).length;
@@ -314,6 +316,7 @@ export class LobbyScreen extends Screen {
       h('label', { class: 'set-row' }, h('span', {}, 'Dificultad'), diffSel),
       h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
       h('label', { class: 'set-row' }, h('span', {}, 'Control'), profSel),
+      h('label', { class: 'set-row check' }, h('span', {}, 'Alto rendimiento', h('small', {}, ALTO_AYUDA)), alto),
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
       this.ajustesEl(),
       sitio.sala ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,

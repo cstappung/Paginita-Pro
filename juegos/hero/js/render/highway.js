@@ -13,6 +13,7 @@ const S_FAR = 1 / (1 + K);
 const D_MIN = -0.16;
 const MULT_COLORS = { 1: '#ffffff', 2: '#ffb21e', 3: '#3ee36b', 4: '#c75cff' };
 const MAX_PARTICLES = 450;
+const MAX_PARTICLES_ALTO = 140;
 
 function lowerBound(arr, time) {
   let lo = 0, hi = arr.length;
@@ -46,6 +47,8 @@ function introRipple(age, lane, ry) {
 
 export class HighwayRenderer {
   draw(ctx, view, p, now, song, opts) {
+    // modo alto rendimiento: los mismos elementos, con efectos más sencillos
+    this.alto = !!opts.alto;
     const perf = performance.now();
     const dt = Math.min(0.05, Math.max(0, (perf - (p._lastPerf ?? perf)) / 1000));
     p._lastPerf = perf;
@@ -128,6 +131,59 @@ export class HighwayRenderer {
     this._hud(ctx, view, p, now, G, fx, mult);
   }
 
+  /* Todo lo que se dibuja por primera vez a mitad de canción —un sprite que aún
+     no existía, su textura en la GPU, un modo de mezcla o un trazo nuevo— cuesta
+     un tirón ese cuadro: el primer rayo de Star Power era el más visible. Aquí,
+     durante la pantalla de carga, se crean todos los sprites que puede pedir la
+     pista y se pintan dos cuadros de mentira con todos los efectos (rayo, Star
+     Power, llamas de los dos colores, chispas, mensajes); luego se borra. El
+     motor del jugador no se toca: se dibuja una copia con su estado prestado. */
+  precalienta(ctx, view, p, song, opts) {
+    const e = p.engine;
+    const drums = e.kind === 'drums';
+    const sprites = [neckTexture(opts.style || 'wood'), flameTongue('blue'), flameTongue('orange')];
+    const colores = drums ? [...DRUM_COLORS4, ...DRUM_COLORS5] : FRET_COLORS;
+    for (const sp of [false, true]) {
+      if (drums) {
+        sprites.push(kickSprite(sp));
+        for (const c of colores) sprites.push(drumSprite(c, false, sp), drumSprite(c, true, sp));
+      } else {
+        sprites.push(openSprite(0, sp), openSprite(1, sp));
+        for (const c of colores) for (const t of [0, 1, 2]) sprites.push(gemSprite(c, t, sp));
+      }
+    }
+    const brillos = ['rgba(255,255,255,1)', 'rgba(80,200,255,1)', 'rgba(255,170,40,1)', 'rgba(83,231,255,1)',
+      ...colores, ...Object.values(MULT_COLORS).map((c) => rgba(c, 1)), rgba(SP_COLOR, 1)];
+    for (const c of brillos) sprites.push(glowSprite(c));
+    for (const c of [...colores, OPEN_COLOR, KICK_COLOR, SP_COLOR, '#ffffff', '#9fe8ff', '#ffcf5a', ...colores.map((x) => lighten(x, 0.3))]) sprites.push(sparkSprite(c));
+    // cada textura sube a la GPU al pintarla una vez
+    for (const c of sprites) ctx.drawImage(c, view.x, view.y, 2, 2);
+
+    // un cuadro con Star Power activo y otro sin él, con el estado del jugador prestado
+    const notes = e.track.notes;
+    const t0 = (notes.find((n) => n.sp >= 0) || notes[0])?.time ?? 0;
+    const fe = Object.create(e);
+    const lanes = drums ? [...Array(e.track.lanes).keys()] : [0, 1, 2, 3, 4];
+    const falso = {
+      engine: fe, fxQueue: [], label: p.label, color: p.color, keyLabels: p.keyLabels,
+      popups: [{ text: '¡STAR POWER!', t: t0, color: SP_COLOR, big: true }, { text: 'x', t: t0, color: '#ffd34d' }],
+    };
+    for (const [k, sp] of [[0, true], [1, false]]) {
+      const now = t0 + k * 0.05;
+      Object.assign(fe, { spActive: sp, sp: sp ? 1 : 0.6, held: 31, combo: 120, laneHitTime: new Float64Array(8).fill(now), padHitTime: new Float64Array(8).fill(now) });
+      fe.multiplier = () => (sp ? 8 : 4);
+      fe.comboProgress = () => 1;
+      fe.sustainingMask = () => 63;
+      falso.fxQueue.push(
+        { type: 'hit', lanes, sp, star: true, gtype: 0 },
+        { type: 'hit', lanes: [drums ? 'kick' : 'open'], sp, star: !sp, gtype: 1 },
+        { type: 'phrase', lanes }, { type: 'spActivate' }, { type: 'break', had: 60 }, { type: 'streak' });
+      this.draw(ctx, view, falso, now, song, { ...opts, introAge: 99 });
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
   // ---------- Cola de efectos (los eventos del motor llegan aquí) ----------
   _consumeFx(p, fx, G, now, opts) {
     fx.ghosts ??= [];
@@ -193,7 +249,9 @@ export class HighwayRenderer {
   }
 
   _sparks(fx, x, y, color, n, spread) {
-    for (let i = 0; i < n && fx.particles.length < MAX_PARTICLES; i++) {
+    const max = this.alto ? MAX_PARTICLES_ALTO : MAX_PARTICLES;
+    if (this.alto) n = Math.ceil(n / 3);
+    for (let i = 0; i < n && fx.particles.length < max; i++) {
       const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
       const v = 140 + Math.random() * 360;
       fx.particles.push({
@@ -205,26 +263,108 @@ export class HighwayRenderer {
   }
 
   // ---------- Mástil con textura en perspectiva (una línea de pantalla por vez) ----------
-  _neck(ctx, G, now, opts) {
-    const tex = neckTexture(opts.style || 'wood');
-    const texH = tex.height, texW = tex.width;
-    const scale = texH * 0.9;
-    const scroll = (now / G.vis) * scale;
+  // Era el 40 % de cada cuadro: cientos de drawImage. La geometría de cada línea
+  // (profundidad, ancho, transparencia) no cambia entre cuadros y se calcula una
+  // vez; y las líneas seguidas que toman la misma fila de la textura (abajo, donde
+  // el mástil se ve ampliado) van en un solo drawImage. Se ve igual: el ancho de
+  // la línea más ancha del tramo asoma bajo los rieles, que la tapan.
+  _neckLines(G) {
     const yBot = G.view.y + G.view.h;
+    const key = `${G.topY}|${G.strikeY}|${G.hw}|${yBot}`;
+    if (this._neckKey === key) return this._neckL;
     const range = G.strikeY - G.topY;
+    const ys = [], ds = [], ws = [], as = [];
     for (let y = Math.floor(G.topY); y < yBot; y++) {
       const s = 1 - ((G.strikeY - y) * (1 - S_FAR)) / range;
       if (s <= 0) continue;
       const d = (1 / s - 1) / K;
       const a = d > 0.75 ? Math.max(0, (1 - d) / 0.25) : 1;
       if (a <= 0) continue;
-      const w = 2 * G.hw * s;
-      let v = (scroll + d * scale) % texH;
-      if (v < 0) v += texH;
-      ctx.globalAlpha = a * 0.96;
-      ctx.drawImage(tex, 0, v | 0, texW, 1, G.cx - w / 2, y, w, 1.5);
+      ys.push(y);
+      ds.push(d);
+      ws.push(2 * G.hw * s);
+      as.push(a * 0.96);
     }
+    this._neckKey = key;
+    this._neckL = { n: ys.length, y: Int32Array.from(ys), d: Float64Array.from(ds), w: Float64Array.from(ws), a: Float64Array.from(as) };
+    return this._neckL;
+  }
+
+  /* Con varios jugadores, todas las autopistas tienen el mismo mástil en el mismo
+     instante (misma geometría, velocidad y estilo): se pinta una vez en un lienzo
+     aparte y se copia a cada una. La copia cae en píxeles enteros del dispositivo
+     y el desfase subpíxel va dentro del lienzo, así que queda idéntica. Si algo
+     no coincide (un temblor, la guitarra que se bambolea), se pinta directo. */
+  _neck(ctx, G, now, opts) {
+    const tr = ctx.getTransform();
+    if (!opts.compartido || tr.b || tr.c) return this._neckDraw(ctx, G, now, opts, tr.a);
+    const k = tr.a;
+    // bajo la barra de golpeo el mástil sigue abriéndose: el ancho es el de la última línea
+    const L = this._neckLines(G), half = (L.n ? L.w[L.n - 1] : 2 * G.hw) / 2 + 1;
+    const x0 = G.cx - half, y0 = Math.floor(G.topY), yBot = G.view.y + G.view.h;
+    const dx = k * x0 + tr.e, dy = k * y0 + tr.f;
+    const fx = dx - Math.floor(dx), fy = dy - Math.floor(dy);
+    const key = [opts.style, now, G.vis, G.topY, G.strikeY, G.hw, yBot, this.alto, k, fx.toFixed(4), fy.toFixed(4)].join('|');
+    if (this._neckCKey !== key) {
+      // la primera autopista del cuadro lo pinta; las que no coinciden, directo
+      if (this._neckCNow === now) return this._neckDraw(ctx, G, now, opts, k);
+      this._neckCNow = now;
+      const W = Math.ceil(2 * half * k + fx) + 2, H = Math.ceil((yBot - y0) * k + fy) + 2;
+      let c = this._neckC;
+      if (!c || c.width !== W || c.height !== H) {
+        c = this._neckC = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+      }
+      const oc = c.getContext('2d');
+      oc.setTransform(1, 0, 0, 1, 0, 0);
+      oc.clearRect(0, 0, W, H);
+      oc.setTransform(k, 0, 0, k, fx - x0 * k, fy - y0 * k);
+      this._neckDraw(oc, G, now, opts, k);
+      this._neckCKey = key;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(this._neckC, Math.floor(dx), Math.floor(dy));
+    ctx.restore();
+  }
+
+  _neckDraw(ctx, G, now, opts, k) {
+    const tex = neckTexture(opts.style || 'wood');
+    const texH = tex.height, texW = tex.width;
+    const scale = texH * 0.9;
+    const scroll = (now / G.vis) * scale;
+    const L = this._neckLines(G);
+    // alto de cada línea (1.5 tapa las rendijas con escalas de pantalla fraccionarias)
+    const step = this.alto ? 2 : 1;
+    const lh = this.alto ? 2.5 : Number.isInteger(k) ? 1 : 1.5;
+    let runV = -1, runA = -1, runY = 0, runEnd = 0, runW = 0, alpha = -1;
+    const flush = () => {
+      if (runV < 0) return;
+      if (runA !== alpha) ctx.globalAlpha = alpha = runA;
+      ctx.drawImage(tex, 0, runV, texW, 1, G.cx - runW / 2, runY, runW, runEnd - runY + lh);
+    };
+    // sin suavizado la textura se estira mucho más rápido (y casi no se nota: es veta de madera)
+    if (this.alto) ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < L.n; i += step) {
+      let v = (scroll + L.d[i] * scale) % texH;
+      if (v < 0) v += texH;
+      v |= 0;
+      const a = L.a[i], y = L.y[i];
+      if (v === runV && a === runA) {
+        runEnd = y;
+        runW = L.w[i];
+        continue;
+      }
+      flush();
+      runV = v;
+      runA = a;
+      runY = runEnd = y;
+      runW = L.w[i];
+    }
+    flush();
     ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
   }
 
   _trapezoid(ctx, G, d0, d1, widthMul = 1) {
@@ -270,6 +410,13 @@ export class HighwayRenderer {
       const rx = G.laneW * 0.2 * s, ry = rx * 0.42;
       const xs = it.double ? [G.cx - G.laneW * s, G.cx + G.laneW * s] : [G.cx];
       for (const x of xs) {
+        if (this.alto) {
+          ctx.fillStyle = `rgba(200,220,238,${a * 0.85})`;
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
         const g = ctx.createRadialGradient(x - rx * 0.3, y - ry * 0.4, 0, x, y, rx);
         g.addColorStop(0, `rgba(255,255,255,${a})`);
         g.addColorStop(0.5, `rgba(190,215,235,${a * 0.85})`);
@@ -335,7 +482,7 @@ export class HighwayRenderer {
       g.addColorStop(1, rgba(col, 0.5 + amp * 0.4));
       ctx.strokeStyle = g;
       ctx.beginPath();
-      const N = amp > 0 ? 36 : 1;
+      const N = amp > 0 ? (this.alto ? 10 : 36) : 1;
       for (let k = 0; k <= N; k++) {
         const d = G.dBottom + ((1 - G.dBottom) * k) / N;
         const [s, y] = G.proj(d);
@@ -401,10 +548,12 @@ export class HighwayRenderer {
         ctx.moveTo(mid0, y0);
         ctx.lineTo(mid1, y1);
         ctx.stroke();
-        ctx.lineWidth = 10;
-        ctx.globalAlpha = 0.25;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        if (!this.alto) {
+          ctx.lineWidth = 10;
+          ctx.globalAlpha = 0.25;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
         ctx.globalCompositeOperation = 'source-over';
       }
     }
@@ -543,7 +692,7 @@ export class HighwayRenderer {
 
   _ribbon(ctx, G, offX, halfW, d0, d1, color, held, dead, now, alpha) {
     const len = d1 - d0;
-    const N = Math.max(6, Math.min(60, Math.ceil(len * (held ? 90 : 30))));
+    const N = Math.max(6, Math.min(this.alto ? 16 : 60, Math.ceil(len * (held ? 90 : 30))));
     const pts = [];
     for (let k = 0; k <= N; k++) {
       const d = d0 + (len * k) / N;
@@ -572,7 +721,7 @@ export class HighwayRenderer {
       return g;
     };
     // halo
-    if (!dead) {
+    if (!dead && !this.alto) {
       ctx.globalCompositeOperation = 'lighter';
       path(held ? 2.8 : 1.9);
       ctx.fillStyle = grad(color, (held ? 0.32 : 0.14) * alpha);
@@ -648,7 +797,7 @@ export class HighwayRenderer {
     ctx.drawImage(glowSprite('rgba(255,255,255,1)'), x - r, y - r * 0.6, r * 2, r * 1.2);
     // destello ocasional
     const tw = (now * 2.3 + i * 0.37) % 1;
-    if (tw < 0.12) {
+    if (tw < 0.12 && !this.alto) {
       const k = 1 - Math.abs(tw - 0.06) / 0.06;
       const sz = gw * 0.35 * k;
       ctx.globalAlpha = a * k;
@@ -755,7 +904,7 @@ export class HighwayRenderer {
       ctx.globalCompositeOperation = 'lighter';
       for (const paths of b.pts) {
         paths.forEach((pts, pi) => {
-          for (const [w, col] of [[16, `rgba(80,160,255,${0.22 * flick})`], [6, `rgba(170,230,255,${0.7 * flick})`], [2.2, `rgba(255,255,255,${flick})`]]) {
+          for (const [w, col] of (this.alto ? [[6, `rgba(170,230,255,${0.7 * flick})`], [2.2, `rgba(255,255,255,${flick})`]] : [[16, `rgba(80,160,255,${0.22 * flick})`], [6, `rgba(170,230,255,${0.7 * flick})`], [2.2, `rgba(255,255,255,${flick})`]])) {
             ctx.strokeStyle = col;
             ctx.lineWidth = pi ? w * 0.5 : w;
             ctx.lineJoin = 'round';
@@ -786,7 +935,7 @@ export class HighwayRenderer {
       ctx.globalAlpha = Math.max(0, k) * 0.55;
       const gr = base * 1.3;
       ctx.drawImage(glowSprite(hue === 'blue' ? 'rgba(80,200,255,1)' : 'rgba(255,170,40,1)'), x - gr, y - gr * 0.9, gr * 2, gr * 1.6);
-      for (let j = 0; j < 3; j++) {
+      for (let j = this.alto ? 1 : 0; j < (this.alto ? 2 : 3); j++) {
         const w = base * (0.55 + Math.random() * 0.35) * (j === 1 ? 1.15 : 0.85);
         const h = w * (1.7 + Math.random() * 0.8) * (0.6 + 0.4 * k);
         const ox = (j - 1) * w * 0.28 + (Math.random() - 0.5) * w * 0.1;
@@ -964,7 +1113,7 @@ export class HighwayRenderer {
         ctx.arc(x, y, rr, ang(a) + 0.02, ang(Math.min(v, b)) - (v >= b ? 0.02 : 0));
         ctx.strokeStyle = col;
         ctx.shadowColor = col;
-        ctx.shadowBlur = R * 0.25;
+        ctx.shadowBlur = this.alto ? 0 : R * 0.25;
         ctx.stroke();
         ctx.shadowBlur = 0;
       }
@@ -1019,7 +1168,7 @@ export class HighwayRenderer {
     ctx.closePath();
     ctx.fillStyle = e.spActive ? '#bff8ff' : '#ff3d3d';
     ctx.shadowColor = e.spActive ? SP_COLOR : '#ff2a2a';
-    ctx.shadowBlur = R * 0.3;
+    ctx.shadowBlur = this.alto ? 0 : R * 0.3;
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.beginPath();
@@ -1036,7 +1185,7 @@ export class HighwayRenderer {
     const fs = R * 0.5 * (1 + pop * 0.35);
     ctx.font = `800 ${Math.round(fs)}px Rajdhani, "Segoe UI", sans-serif`;
     ctx.shadowColor = hot;
-    ctx.shadowBlur = R * (0.15 + pop * 0.5 + (maxed ? 0.2 : 0));
+    ctx.shadowBlur = this.alto ? 0 : R * (0.15 + pop * 0.5 + (maxed ? 0.2 : 0));
     ctx.fillStyle = mult > 1 || e.spActive ? hot : '#e8e8ee';
     ctx.fillText(`x${mult}`, x, y + R * 0.52);
     ctx.shadowBlur = 0;
@@ -1165,7 +1314,7 @@ export class HighwayRenderer {
       ctx.strokeStyle = 'rgba(220,255,255,0.95)';
       ctx.lineWidth = Math.max(1.5, W * 0.08);
       ctx.shadowColor = '#7ff3ff';
-      ctx.shadowBlur = W * 0.6;
+      ctx.shadowBlur = this.alto ? 0 : W * 0.6;
       ctx.stroke();
       ctx.restore();
     }
@@ -1212,7 +1361,7 @@ export class HighwayRenderer {
     ctx.arc(W / 2, capH / 2, capH * 0.28, 0, Math.PI * 2);
     ctx.fillStyle = active ? '#ffffff' : ready ? `rgba(120,240,255,${0.65 + 0.35 * Math.sin(perf / 120)})` : '#1b2533';
     ctx.shadowColor = '#53e7ff';
-    ctx.shadowBlur = ready || active ? W * 0.8 : 0;
+    ctx.shadowBlur = this.alto ? 0 : ready || active ? W * 0.8 : 0;
     ctx.fill();
     ctx.shadowBlur = 0;
 
@@ -1275,7 +1424,7 @@ export class HighwayRenderer {
     ctx.textAlign = compact ? 'center' : 'left';
     ctx.fillStyle = '#fff';
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = this.alto ? 0 : 6;
     ctx.fillText(Math.floor(e.score).toLocaleString('es'), sx, sy);
     ctx.shadowBlur = 0;
 
@@ -1302,7 +1451,7 @@ export class HighwayRenderer {
       ctx.textAlign = 'center';
       ctx.fillStyle = p.color || '#fff';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = this.alto ? 0 : 6;
       ctx.fillText(p.label, cx, topY - 8);
       ctx.shadowBlur = 0;
     }
@@ -1337,11 +1486,11 @@ export class HighwayRenderer {
       ctx.font = font(800, (pp.big ? 40 : 30) * sc);
       ctx.textAlign = 'center';
       ctx.shadowColor = pp.color || '#fff';
-      ctx.shadowBlur = 18;
+      ctx.shadowBlur = this.alto ? 0 : 18;
       ctx.fillStyle = pp.color || '#fff';
       ctx.fillText(pp.text, cx, popY + k * 40 * scale - age * 10);
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur = this.alto ? 0 : 4;
       ctx.fillStyle = '#fff';
       ctx.globalAlpha = Math.max(0, a) * 0.35;
       ctx.fillText(pp.text, cx, popY + k * 40 * scale - age * 10);
