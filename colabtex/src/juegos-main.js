@@ -66,6 +66,7 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearHaxball } from "./juegos/haxball.js";
+import { crearBt3 } from "./juegos/bt3.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
@@ -106,10 +107,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", yzombis: "🧟" };
@@ -936,6 +937,7 @@ async function anotar(p) {
   if (p.juego === "haxball" && !equiposHaxball(p)[u.uid]) return;   // quedó sin equipo: miró el partido
   if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
+  if (p.juego === "bt3") return;                    // BT3: el juego no dice quién ganó; la sala no clasifica
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -2728,12 +2730,13 @@ function panelEspera(p, est) {
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
       <p>Pásale este enlace a quien quieras: en cuanto entre,
-         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
+         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : p.juego === "bt3" ? "aparece en el vestíbulo de la sala" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
       <div class="jg-enlace">
         <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
+        : p.juego === "bt3" ? `<div class="jg-nota">Cada uno elige su ISO abajo; elijan quién es el anfitrión y él empieza la pelea.</div>`
         : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
@@ -2816,7 +2819,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, gato: 1200, tulones: 1800, hero: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, gato: 1200, tulones: 1800, hero: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3375,6 +3378,7 @@ function arteJuego(k) {
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
+  if (k === "bt3") return '<div class="jg-art-bt3"><i></i><i></i><i></i><b></b><em>TENKAICHI 3</em></div>';
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';

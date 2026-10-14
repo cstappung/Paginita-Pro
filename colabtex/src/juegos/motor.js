@@ -217,6 +217,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 8,
     alta: "2026-10-12"
+  },
+  bt3: {
+    nombre: "Budokai Tenkaichi 3",
+    lema: "El juego de PS2 en el navegador, con tu propia ISO: elijan quién es el anfitrión y peleen uno contra uno",
+    color: "#f28c1e",
+    minimo: 2,
+    cupo: 2,
+    alta: "2026-10-14"
   }
 };
 
@@ -1004,6 +1012,7 @@ export function reducir(p) {
   if (p.juego === "tulones") return { ...base, ...redTulones(p, js, listos) };
   if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
+  if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
   return base;
 }
 
@@ -7158,5 +7167,66 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
   return {
     fase: !empezo ? "equipos" : ganador !== null ? "fin" : "jugando", turno: "",
     meta, cancha, tiempo, sprint, oro, ronda, equipos, nombresEq, anfitrion, goles, puntos, fuera, hist: hist.slice(-40), ganador, motivo
+  };
+}
+
+/* ---------- Budokai Tenkaichi 3 ----------
+   El juego de PS2 compilado a WebAssembly (`juegos/bt3/`, ver su CLAUDE.md), en un iframe. Cada jugador
+   pone su propia ISO, que se lee solo en su navegador. La pelea va de navegador a navegador por la malla
+   (`malla.js`, abierta DENTRO del marco: el buzón de Firebase solo presenta a los dos); al registro va
+   solo lo que pasa en el vestíbulo, nunca la pelea:
+   - `{t:"anfitrion", uid, a}`: cualquiera de los dos elige quién es el anfitrión (el jugador 1 del juego,
+     el que fija las reglas de la pelea). Empieza siendo quien abrió la sala.
+   - `{t:"ajuste", uid, k, v}`: el anfitrión elige `batalla` (BT3_BATALLAS) o `tiempo` (BT3_TIEMPOS).
+   - `{t:"disco", uid}`: el marco de `uid` ya leyó una ISO válida; hace falta la de los dos para empezar.
+   - `{t:"empieza", uid}`: el anfitrión arranca, con los dos y sus discos. Abre una pelea (`ronda`).
+   - `{t:"vuelve", uid}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
+     recargan, así que los discos se vuelven a confirmar.
+   El juego no le dice a la página quién ganó, así que **la sala no clasifica** (`anotar` la salta, como
+   PRO HERO) y sus logros salen de lo que el vestíbulo sí sabe: cuántas peleas, quién fue anfitrión, con
+   qué reglas. La sala termina cuando alguien se va (`abandona`). */
+export const BT3_BATALLAS = { single: "Single Battle", team: "Team Battle", dp10: "DP Battle 10", dp15: "DP Battle 15", dp20: "DP Battle 20" };
+export const BT3_TIEMPOS = [60, 90, 180, 240, 0];   // segundos por round; 0 = sin límite (el orden es el del juego)
+const bt3Batalla = v => tiene(BT3_BATALLAS, v) ? v : "single";
+const bt3Tiempo = v => { const n = Math.floor(Number(v)); return BT3_TIEMPOS.includes(n) ? n : 240; };
+/* La palabra de reglas que espera `gs/net.c` (BT3_NET_RULES): tipo (0 single, 1 team, 2 dp) en los 4 bits
+   bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. */
+export function reglasBt3(batalla, tiempo) {
+  const b = bt3Batalla(batalla), tipo = b === "single" ? 0 : b === "team" ? 1 : 2;
+  const dp = b === "dp15" ? 1 : b === "dp20" ? 2 : 0;
+  return tipo | dp << 4 | BT3_TIEMPOS.indexOf(bt3Tiempo(tiempo)) << 8;
+}
+
+export function redBt3(p, js = jugadoresDe(p)) {
+  const ids = new Set(js.map(j => j.uid));
+  const fuera = {}, hist = [];
+  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240;
+  let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  const presentes = () => js.filter(j => !fuera[j.uid]);
+  for (const j of jugadasDe(p)) {
+    if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); continue; }
+    const vest = fase === "vestibulo";
+    if (j.t === "anfitrion" && vest && ids.has(j.a) && !fuera[j.a]) {
+      anfitrion = j.a; hist.push({ e: "anfitrion", uid: j.uid, a: j.a });
+    } else if (j.t === "ajuste" && vest && j.uid === anfitrion && (j.k === "batalla" || j.k === "tiempo")) {
+      if (j.k === "batalla") batalla = bt3Batalla(j.v); else tiempo = bt3Tiempo(j.v);
+    } else if (j.t === "disco" && vest) {
+      discos[j.uid] = true;
+    } else if (j.t === "empieza" && vest && j.uid === anfitrion && presentes().length === 2 && presentes().every(x => discos[x.uid])) {
+      fase = "jugando"; ronda++;
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, batalla, tiempo });
+    } else if (j.t === "vuelve" && fase === "jugando") {
+      fase = "vestibulo"; discos = {};
+      hist.push({ e: "vuelve", uid: j.uid, n: ronda });
+    }
+  }
+  if (fuera[anfitrion]) anfitrion = (presentes()[0] || {}).uid || "";
+  // Alguien se fue: la sala se cierra. Si ya hubo peleas, el que se quedó la gana por abandono.
+  const idos = Object.keys(fuera).length;
+  const ganador = idos ? (ronda && presentes().length === 1 ? presentes()[0].uid : "") : null;
+  return {
+    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, reglas: reglasBt3(batalla, tiempo),
+    discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : ""
   };
 }

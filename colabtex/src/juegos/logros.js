@@ -132,6 +132,21 @@ const SALA = {
     { id: "largo", n: "Partido largo", d: "Gana una partida a 7 goles.", i: "⏱️", x: c => c.gano && c.est.motivo === "meta" && c.est.meta === 7 },
     { id: "tribuna", n: "Cancha llena", d: "Gana con 6 jugadores o más.", i: "🏟️", x: c => c.gano && c.n >= 6 }
   ],
+  /* Budokai Tenkaichi 3: el juego no le cuenta a la página quién ganó (la sala no clasifica), así que
+     no lleva los cuatro de la fila y sus diez salen de las peleas que abrió el vestíbulo (`hist`,
+     sucesos `ronda` con anfitrión, batalla y tiempo; `ronda` es cuántas van en la sala). */
+  bt3: [
+    { id: "primera", n: "Primer combate", d: "Pelea tu primera batalla en línea.", i: "🐉", x: c => c.ev("ronda") },
+    { id: "anfitrion", n: "Anfitrión", d: "Pelea una batalla siendo el anfitrión.", i: "🏯", x: c => c.ev("ronda", h => h.anf === c.me) },
+    { id: "visita", n: "De visita", d: "Pelea una batalla en la sala de otro anfitrión.", i: "🚪", x: c => c.ev("ronda", h => h.anf && h.anf !== c.me) },
+    { id: "revancha", n: "Revancha", d: "Pelea dos batallas en la misma sala.", i: "🔁", x: c => (c.est.ronda || 0) >= 2 },
+    { id: "maraton", n: "Maratón", d: "Pelea cinco batallas en la misma sala.", i: "🏃", x: c => (c.est.ronda || 0) >= 5 },
+    { id: "incansable", n: "Saiyajin incansable", d: "Pelea diez batallas en la misma sala.", i: "💪", x: c => (c.est.ronda || 0) >= 10 },
+    { id: "equipo", n: "En equipo", d: "Pelea una Team Battle.", i: "👥", x: c => c.ev("ronda", h => h.batalla === "team") },
+    { id: "dp", n: "Estratega", d: "Pelea una DP Battle.", i: "🧮", x: c => c.ev("ronda", h => /^dp/.test(h.batalla || "")) },
+    { id: "infinito", n: "Sin reloj", d: "Pelea una batalla sin límite de tiempo.", i: "♾️", x: c => c.ev("ronda", h => h.tiempo === 0) },
+    { id: "relampago", n: "Relámpago", d: "Pelea una batalla de 60 segundos.", i: "⚡", x: c => c.ev("ronda", h => h.tiempo === 60) }
+  ],
   /* Tulones: todo sale de la torre (`hist` trae cada congela con su altura
      y la línea que tenía que superar) y de la mejor altura de cada uno. */
   tulones: [
@@ -504,8 +519,10 @@ const heroG = d => Math.floor((+d.puntos || 0) / 10000);
 const heroM = d => (+d.puntos || 0) % 10000;
 
 /* El catálogo entero: juego → sus diez. */
+/* Salas que no clasifican (no hay fila de ranks): sus diez logros son todos de partida. */
+const SIN_FILA = new Set(["bt3"]);
 export const LOGROS = Object.fromEntries([
-  ...Object.entries(SALA).map(([j, l]) => [j, [...FILA, ...l]]),
+  ...Object.entries(SALA).map(([j, l]) => [j, SIN_FILA.has(j) ? l : [...FILA, ...l]]),
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */

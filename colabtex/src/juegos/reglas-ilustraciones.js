@@ -101,6 +101,21 @@ export const boxhead=etapa=>{
  else {c=cabeza(120,125,C.azul,'→')+cabeza(330,125,C.rojo,'←')+line(134,125,316,125,C.oro,3)+txt(120,170,'A: 9',16,C.azul,'middle')+txt(330,170,'B: 7',16,C.rojo,'middle')+txt(240,215,'Meta: 10 bajas',16,C.oro,'middle');}
  return svg(nombres[etapa],suelo+c);
 };
+/* BT3: el vestíbulo (dos jugadores, el anfitrión con corona y sus ISO), la presentación por el buzón y la
+   pelea directa entre los dos navegadores. */
+export const bt3=etapa=>{
+ const nombres=['Los dos eligen su ISO y uno es el anfitrión','Firebase solo presenta a los dos navegadores','La pelea va directo entre los dos'];
+ const pc=(x,col,nom,extra)=>rect(x-70,60,140,96,'#1e2a44',col,10)+txt(x,92,nom,17,C.blanco,'middle')+(extra||'');
+ let c='';
+ if(etapa===0)c=pc(130,'#f28c1e','Ana','')+txt(130,62,'👑',22,C.oro,'middle')+txt(130,122,'ISO lista ✓',14,C.verde,'middle')+txt(130,144,'Anfitrión · J1',13,C.oro,'middle')
+  +pc(350,'#5689e5','Beto')+txt(350,122,'ISO lista ✓',14,C.verde,'middle')+txt(350,144,'J2',13,C.blanco,'middle')
+  +txt(240,205,'Single Battle · 240 s · Empezar pelea',15,C.oro,'middle');
+ else if(etapa===1)c=pc(110,'#f28c1e','Ana')+pc(370,'#5689e5','Beto')+rect(195,175,90,44,'#2b2b10','#f5b700',8)+txt(240,203,'buzón',14,C.oro,'middle')
+  +line(150,156,205,180,C.oro,2)+line(330,156,275,180,C.oro,2)+txt(240,120,'«oferta» · «respuesta»',14,C.blanco,'middle')+txt(240,140,'≈20 mensajes y se borran',13,C.blanco,'middle');
+ else c=pc(110,'#f28c1e','Ana')+pc(370,'#5689e5','Beto')+line(180,108,300,108,C.verde,4)+txt(240,96,'botones, 30 por segundo',14,C.verde,'middle')
+  +txt(240,135,'WebRTC directo',15,C.blanco,'middle')+txt(240,205,'Firebase no ve la pelea',16,C.oro,'middle');
+ return svg(nombres[etapa],c);
+};
 /* HaxBall: la cancha de arriba, discos rojos y azules y la pelota. */
 export const haxball=etapa=>{
  const nombres=['El saque: cada uno en su mitad, solo el que saca entra al círculo','La patada empuja la pelota lejos','Gol: la pelota cruza la línea entre los postes'];

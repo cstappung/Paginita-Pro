@@ -1,0 +1,176 @@
+/* Lo que el sitio le agrega a la página del port (`index.html`, armada por fuente/pagina.py). Se carga
+   después del script de la página, así que usa sus nombres globales: Module, ENV, FS, go, fileDisc, say,
+   audioUnlock, start.
+
+   Resumen, en tres partes:
+   1. **La ISO recordada.** Donde el navegador tiene File System Access (Chrome, Edge), la ISO se elige con
+      su selector y su «asa» se guarda en IndexedDB: la próxima vez basta un clic («Usar …»), sin buscarla.
+      El archivo nunca se copia ni se sube: el asa solo deja volver a leerlo, con permiso del jugador.
+   2. **La barra** de arriba a la derecha: el volumen del sitio (`volumen.js`), «Ajustes» (la ventana F1 del
+      juego, abierta en Controls: qué mando usa cada jugador y sus botones), el mando que ve el navegador y
+      el log del programa (con ?log=1, o solo si el juego se detiene).
+   3. **La sala** (`?modo=online`, dentro de Juegos): al elegir la ISO se avisa a la sala, se espera a que el
+      anfitrión empiece, se conecta con el rival por la malla del marco (`red.js`) y recién ahí arranca el
+      programa como sesión en línea. El entorno de la sesión (anfitrión o no, reglas) se pone justo antes
+      de arrancar: el programa lo lee por primera vez en main, no antes.
+   @controles: teclado */
+(() => {
+  const $ = id => document.getElementById(id);
+  const Q = new URLSearchParams(location.search);
+
+  // ---------------------------------------------------------------- 1. la ISO recordada
+  const BD = "bt3-iso", TIENDA = "asa";
+  const abre = () => new Promise((ok, mal) => {
+    const r = indexedDB.open(BD, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(TIENDA);
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => mal(r.error);
+  });
+  const tienda = async modo => (await abre()).transaction(TIENDA, modo).objectStore(TIENDA);
+  const pide = q => new Promise((ok, mal) => { q.onsuccess = () => ok(q.result); q.onerror = () => mal(q.error); });
+  const guarda = async h => { try { await pide((await tienda("readwrite")).put(h, "iso")); } catch (e) {} };
+  const leeAsa = async () => { try { return await pide((await tienda("readonly")).get("iso")); } catch (e) { return null; } };
+  const olvida = async () => { try { await pide((await tienda("readwrite")).delete("iso")); } catch (e) {} };
+  window.Disco = { olvida };
+
+  const conSelector = typeof window.showOpenFilePicker === "function";
+  // Elegir con el selector del navegador (para poder recordar el archivo); sin él, el <input> de siempre.
+  $("pickLabel").addEventListener("click", async e => {
+    if (!conSelector) return;
+    e.preventDefault();
+    audioUnlock();
+    try {
+      const [h] = await showOpenFilePicker({ types: [{ description: "Imagen de disco", accept: { "application/octet-stream": [".iso"] } }] });
+      const f = await h.getFile();
+      await guarda(h);
+      go(fileDisc(f));
+    } catch (err) {
+      if (err && err.name !== "AbortError") say("No se pudo abrir el archivo: " + (err.message || err), true);
+    }
+  });
+  // La ISO de la última vez: un botón que la vuelve a abrir (el navegador pide permiso si hace falta).
+  leeAsa().then(h => {
+    if (!h || !$("recordada")) return;
+    const b = $("recordada");
+    b.textContent = "Usar " + h.name;
+    b.hidden = false;
+    b.onclick = async () => {
+      audioUnlock();
+      try {
+        let p = await h.queryPermission({ mode: "read" });
+        if (p !== "granted") p = await h.requestPermission({ mode: "read" });
+        if (p !== "granted") { say("Sin permiso para leer " + h.name + ". Elígela de nuevo.", true); return; }
+        go(fileDisc(await h.getFile()));
+      } catch (err) {
+        await olvida();   // movida o borrada: no se ofrece más
+        b.hidden = true;
+        say("No se encontró " + h.name + ". Elígela de nuevo.", true);
+      }
+    };
+  });
+
+  // ---------------------------------------------------------------- 2. la barra
+  const registro = $("registro");
+  const pinta = () => { registro.textContent = (Module.log || []).slice(-200).join("\n"); registro.scrollTop = registro.scrollHeight; };
+  let relojLog = 0;
+  const abreLog = () => { registro.classList.add("on"); pinta(); clearInterval(relojLog); relojLog = setInterval(pinta, 1000); };
+  $("verLog").hidden = Q.get("log") !== "1";
+  $("verLog").onclick = () => registro.classList.contains("on") ? (registro.classList.remove("on"), clearInterval(relojLog)) : abreLog();
+  // Si el programa termina o se cae, el log se abre solo: es lo que hay que mandar para arreglarlo.
+  const abortaba = Module.onAbort;
+  Module.onAbort = what => { abortaba && abortaba(what); $("verLog").hidden = false; abreLog(); };
+  Module.onExit = code => { Module.keep("el programa terminó con el código " + code); $("verLog").hidden = false; abreLog(); };
+
+  // Ajustes: la ventana del juego en la pestaña Controls (3). Solo cuando el juego ya arrancó.
+  const ajustes = $("ajustes");
+  const verAjustes = setInterval(() => { if (document.body.classList.contains("started")) { ajustes.hidden = false; clearInterval(verAjustes); } }, 500);
+  ajustes.onclick = () => {
+    if (Module._Web_Settings) Module._Web_Settings(3);   // segundo clic: la cierra
+    Module.canvas.focus();                                 // teclado y mando de vuelta al juego
+  };
+
+  // El mando: el juego lo lee solo (SDL3 y la Gamepad API); aquí solo se muestra cuál ve el navegador.
+  const mando = $("mando");
+  const mandos = () => {
+    let l;
+    try { l = navigator.getGamepads ? navigator.getGamepads() : null; }
+    catch (e) { mando.textContent = "Mandos bloqueados aquí"; mando.className = "mal"; return false; }
+    if (!l) { mando.textContent = "Sin soporte de mandos"; mando.className = "mal"; return false; }
+    const on = [...l].filter(Boolean);
+    mando.textContent = on.length ? "Mando: " + on.map(g => g.id.replace(/\s*\(.*$/, "")).join(", ") : "Mando: aprieta un botón";
+    mando.className = on.length ? "ok" : "";
+    return true;
+  };
+  if (mandos()) setInterval(mandos, 1000);
+  mando.style.cursor = "pointer";
+  mando.onclick = () => { if (!ajustes.hidden) ajustes.onclick(); };
+
+  // El menú «Dragon Net Battle» del juego abría el juego en línea del fork (su servidor): aquí se juega en una sala.
+  Module.onNetMenu = () => {
+    aviso("Para jugar en línea abre una sala de Budokai Tenkaichi 3 en Juegos: elijan anfitrión y peleen.", 6000);
+    try { Module._Web_NetMenuClosed && Module._Web_NetMenuClosed(); } catch (e) {}
+  };
+
+  const caja = $("sala");
+  let relojAviso = 0;
+  function aviso(txt, ms) {
+    clearTimeout(relojAviso);
+    caja.textContent = txt;
+    caja.classList.toggle("on", !!txt);
+    if (ms) relojAviso = setTimeout(() => caja.classList.remove("on"), ms);
+  }
+
+  // ---------------------------------------------------------------- 3. la sala
+  const S = window.BT3Sala;
+  if (!S || !S.activo) return;
+
+  let est = null, cuandoEmpiece = null, ronda = 0;
+  S.alEstado(e => {
+    est = e;
+    if (e.mirando) {   // un mirón no carga nada: la pelea se ve en la pantalla de cada jugador
+      $("start") && $("start").remove();
+      aviso("Estás mirando esta sala. La pelea se juega en las pantallas de los dos jugadores.");
+      return;
+    }
+    if (e.fase === "jugando" && cuandoEmpiece && e.rival) { const f = cuandoEmpiece; cuandoEmpiece = null; f(e); }
+  });
+  S.avisa("listo");
+
+  window.Sala = {
+    // El entorno de la sesión: lo mismo que el fork pone para una pelea en línea (gs/net.c, BT3_NET_*).
+    entorno: () => ({ BT3_NOMOVIE: "1" }),
+    async antesDeEmpezar() {
+      S.avisa("disco");   // la ISO ya pasó la prueba: la sala lo anota
+      aviso("ISO lista. Esperando a que el anfitrión empiece la pelea…");
+      const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
+      ronda = e.ronda;
+      aviso("Conectando con " + e.rival.nombre + "…");
+      const ok = await S.conecta(e.yo, e.rival.uid);
+      if (!ok) {
+        aviso("No se pudo conectar con " + e.rival.nombre + ": sus redes no dejan una conexión directa. " +
+          "Prueben otra red (los datos del celular a veces la bloquean). Vuelvan al vestíbulo e intenten de nuevo.");
+        S.avisa("termino", { por: "sin-conexion" });
+        return new Promise(() => {});   // el programa no arranca; la sala recarga este marco al volver
+      }
+      // Los paquetes del juego, por la malla del marco (gs/net.c: Module.netSend / netRecv, como UDP).
+      Module.netSend = bytes => S.envia(bytes);
+      Module.netRecv = () => S.recibe();
+      Module.netHas = () => S.hay();
+      Object.assign(ENV, {
+        BT3_NET_SESSION: "1", BT3_NET_NAME: e.nombre.slice(0, 16), BT3_NET_DELAY: "auto", BT3_NOMOVIE: "1", BT3_SOUND_TICKS: "1",
+        BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
+      }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" });
+      try { FS.mkdir("/net_session"); } catch (err) {}
+      aviso("Preparando la pelea contra " + e.rival.nombre + "…", 4000);
+    },
+  };
+
+  // Lo que dice el programa de la sesión (gs/net.c): al terminar, la sala vuelve al vestíbulo.
+  Module.onNetEvent = (que, txt) => {
+    Module.keep("red: " + que + " " + txt);
+    if (que === "arrived") aviso("");
+    else if (que === "ended") aviso(txt || "La pelea terminó.");
+    else if (que === "leave") { S.cierra(); S.avisa("termino", { por: txt || "" }); }
+  };
+  addEventListener("pagehide", () => S.cierra());
+})();

@@ -515,6 +515,16 @@ function haxball() {
     C.map((c, i) => en(60, 45 + i * 90, disco(c, i))).join("") + gira(6, en(60, 0, pelota));
 }
 
+/* Budokai Tenkaichi 3: un aura de ki que late y siete esferas naranjas con estrellas que giran. */
+function bt3() {
+  const esfera = (n, i) => an("hop", 1.8, `<circle r="5" fill="#f59e0b" stroke="#7c2d12" stroke-width=".9"/><circle cx="-1.6" cy="-1.8" r="1.4" fill="#fde68a" opacity=".8"/>` +
+    Array.from({ length: n }, (_, k) => `<circle cx="${(Math.cos(k * 2.4) * 1.9).toFixed(2)}" cy="${(Math.sin(k * 2.4) * 1.9 + .6).toFixed(2)}" r=".75" fill="#b91c1c"/>`).join(""), n1(-i * .25));
+  const rafaga = ret => an("dr", 1.4, `<path d="M0-5L1.4 0 0 5-1.4 0Z" fill="#fde047" opacity=".85"/>`, ret);
+  return aro(60, "#f28c1e", 18, `opacity=".35"`) + aro(51, "#fde047", 1.6, `opacity=".9"`) + aro(69, "#fde047", 1.6, `opacity=".9"`) +
+    gira(16, [1, 2, 3, 4, 5, 6, 7].map((n, i) => en(60, i * (360 / 7), esfera(n, i))).join("")) +
+    [0, 1, 2, 3].map(i => en(60, 25 + i * 90, rafaga(-i * .35))).join("");
+}
+
 /* Tulones: calzoncillos que dan la vuelta al anillo y cabezas que se asoman. */
 function tulones() {
   const calzon = (c, i) => an("hop", 1.6, `<path d="M-5-3H5L4.6 1Q2 2 1 4.4H-1Q-2 2-4.6 1Z" fill="${c}" stroke="#2a1e18" stroke-width=".8"/>`, n1(-i * .3));
@@ -619,7 +629,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
   tmetrorush: metrorush, ttrigon: trigon, thero: hero,
   cometa, vortice, sakura, plasma, mariposas
 };

@@ -444,6 +444,31 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  bt3: {
+    lema: "El juego de PS2 completo en el navegador, con tu propia ISO: uno contra uno en línea, o solo contra la CPU.",
+    secciones: [
+      ["Tu ISO", lista([
+        "Cada jugador necesita su propia imagen del disco, versión <b>USA</b> (SLUS-21678), sin modificar. Se lee solo en tu navegador: no se sube a ningún lado y la página no trae nada del juego.",
+        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). La página recuerda tu ISO: la próxima vez basta con <b>Usar …</b>.",
+        "Si la ISO no es la USA sin modificar, el juego lo dice al arrancar y no sigue."
+      ])],
+      ["El vestíbulo", lista([
+        "Antes de cada pelea los dos eligen su ISO; la sala muestra <b>ISO lista</b> al lado de cada nombre.",
+        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑) con <b>Hacer anfitrión</b>. El anfitrión es el jugador 1 y pone las reglas: <b>Single Battle</b>, <b>Team Battle</b> o <b>DP Battle</b> de 10, 15 o 20, y el tiempo de cada round.",
+        "Con las dos ISO listas, el anfitrión aprieta <b>Empezar pelea</b>. Al terminar, los dos vuelven al vestíbulo para la revancha."
+      ])],
+      ["La conexión", lista([
+        "La pelea va <b>directo de un navegador al otro</b> (WebRTC): solo viajan los botones de cada uno, y los dos computadores calculan la misma pelea. Firebase solo los presenta al empezar.",
+        "Cada botón actúa unos cuadros después, los justos para que llegue al otro a tiempo: con un ping bajo casi no se nota. El ping se ve en <b>Ajustes → Video</b>.",
+        "Algunas redes (datos del celular, redes de oficina) no dejan una conexión directa: entonces la sala lo avisa. Prueben otra red."
+      ])],
+      ["Controles", lista([
+        "Teclado, o un mando de PS4, PS5 o Xbox por USB o Bluetooth. <b>Ajustes</b> (o F1) abre la ventana del juego en <b>Controls</b>: ahí eliges qué mando usa cada jugador y cambias los botones."
+      ])],
+      ["Ganar", "El juego no le dice a la página quién ganó cada pelea, así que estas salas no suman a la clasificación. Sus logros salen de las peleas que juegas: la primera, de anfitrión, revanchas, Team Battle, DP Battle."],
+      ["Un jugador", "La ficha <b>Tenkaichi 3 · un jugador</b> abre el juego completo sin sala: historia, torneos, versus contra la CPU, o 1P contra 2P con dos mandos en el mismo computador."]
+    ]
+  },
   haxball: {
     lema: "Fútbol de discos visto desde arriba: rojo contra azul, de 1 contra 1 hasta 4 contra 4.",
     secciones: [
