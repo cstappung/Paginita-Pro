@@ -5,14 +5,15 @@
    necesitando, con el token de Firebase del jugador (`Authorization: Bearer ...`). Este Worker:
    1. verifica ese token como lo haría Firebase: firma RS256 con las claves públicas de Google, emitido para el
       proyecto (`aud`, `iss`), vigente (`exp`, `iat`);
-   2. mira que su uid esté en `AMIGOS` (variable del Worker: uids separados por comas). Nadie más pasa: ni los
+   2. mira que su correo (verificado por Google) o su uid esté en `AMIGOS` (variable del Worker, separados por
+      comas: lo más fácil son los correos con que inician sesión en el sitio). Nadie más pasa: ni los
       demás jugadores del sitio, ni quien copie la dirección;
    3. solo entonces entrega el pedazo. Solo responde a las páginas de `ORIGENES` (CORS).
    Para subir la ISO, `/subir` es una página que la lee en tu navegador y la manda por pedazos con la clave
    `CLAVE_SUBIDA` (un secreto del Worker). Sin esa clave no se puede escribir nada.
 
    Variables del Worker (Settings → Variables and Secrets):
-     AMIGOS        uids de Firebase con acceso, separados por comas (el tuyo incluido)
+     AMIGOS        correos de Google (o uids de Firebase) con acceso, separados por comas (el tuyo incluido)
      CLAVE_SUBIDA  secreto: la clave para subir la ISO (largo, al azar)
      ORIGENES      opcional: orígenes permitidos, separados por comas (por defecto el sitio)
    Enlace (Bindings): un bucket R2 con el nombre de variable DISCO. */
@@ -38,14 +39,14 @@ async function clavesGoogle() {
   return claves;
 }
 
-/* Devuelve el uid si el token es un token de Firebase válido de este proyecto; si no, null. */
+/* Si el token es un token de Firebase válido de este proyecto, {uid, correo, exp}; si no, null. */
 async function uidDe(token) {
   const v = vistos.get(token);
   if (v && v.exp > Date.now() / 1000) return v.uid;
   const uid = await verifica(token);
   if (uid) {
     if (vistos.size > 200) vistos.clear();
-    vistos.set(token, { uid, exp: JSON.parse(texto(b64url(token.split(".")[1]))).exp });
+    vistos.set(token, { uid, exp: uid.exp });
   }
   return uid;
 }
@@ -62,7 +63,8 @@ async function verifica(token) {
     if (!jwk) return null;
     const clave = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
     const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", clave, b64url(f), new TextEncoder().encode(h + "." + c));
-    return ok ? datos.sub : null;
+    // quién es: su uid y, solo si Google lo verificó, su correo (en minúsculas, para comparar con la lista)
+    return ok ? { uid: datos.sub, correo: datos.email_verified === true && typeof datos.email === "string" ? datos.email.toLowerCase() : "", exp: datos.exp } : null;
   } catch (e) {
     return null;
   }
@@ -98,10 +100,11 @@ export default {
     // lista: el sitio lo usa para mostrar BT3 únicamente a los amigos (colabtex/src/juegos/bt3-amigos.js).
     if (req.method !== "GET" || !(url.pathname === "/soy" || url.pathname === "/indice.json" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname))) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const uid = token ? await uidDe(token) : null;
-    if (!uid) return responde("inicia sesión", 401, c);
+    const quien = token ? await uidDe(token) : null;
+    if (!quien) return responde("inicia sesión", 401, c);
     const amigos = (env.AMIGOS || "").split(",").map(s => s.trim()).filter(Boolean);
-    if (!amigos.includes(uid)) return responde("sin acceso", 403, c);
+    const esta = amigos.includes(quien.uid) || (!!quien.correo && amigos.some(a => a.toLowerCase() === quien.correo));
+    if (!esta) return responde("sin acceso", 403, c);
     if (url.pathname === "/soy") return responde("amigo", 200, { ...c, "Cache-Control": "no-store" });
     const obj = await env.DISCO.get(url.pathname.slice(1));
     if (!obj) return responde("no está subido", 404, c);

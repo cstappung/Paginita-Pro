@@ -48,6 +48,16 @@ test('nadie más: sin token, token falso, de otro proyecto, vencido o de alguien
   assert.equal((await pide('/soy')).status,401,'/soy sin sesión');
 });
 
+test('también por correo, solo si Google lo verificó',async()=>{
+ env.AMIGOS='yo, Amiga@Gmail.com';
+ const con=async(o)=>(await pide('/soy',{cab:{Authorization:'Bearer '+await token(datos('uid-cualquiera',o))}})).status;
+ assert.equal(await con({email:'amiga@gmail.com',email_verified:true}),200,'correo de la lista, verificado');
+ assert.equal(await con({email:'AMIGA@gmail.com',email_verified:true}),200,'sin importar mayúsculas');
+ assert.equal(await con({email:'amiga@gmail.com',email_verified:false}),403,'correo sin verificar: no vale');
+ assert.equal(await con({email:'otra@gmail.com',email_verified:true}),403,'otro correo');
+ env.AMIGOS='yo, amigo1';
+});
+
 test('subir pide la clave, y una página de otro sitio no recibe permiso CORS',async()=>{
   assert.equal((await pide('/pieza/00001.bin',{metodo:'PUT',cuerpo:new Uint8Array([9])})).status,403,'sin clave');
   assert.equal((await pide('/pieza/00001.bin',{metodo:'PUT',cab:{'X-Clave':'secreto'},cuerpo:new Uint8Array([9])})).status,200);

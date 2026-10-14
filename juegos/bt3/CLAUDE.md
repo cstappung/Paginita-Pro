@@ -80,7 +80,7 @@ its ten logros are all room-detected (`SIN_FILA` in `logros.js`: no first-win/st
 
 The owner wants BT3 **only for a list of friends** (who own the game), and without anyone choosing an ISO.
 
-- **The list lives in one place**: the Worker's `AMIGOS` variable (Firebase uids, comma-separated) in
+- **The list lives in one place**: the Worker's `AMIGOS` variable (Google emails, verified by Google in the token, or Firebase uids; comma-separated) in
   `fuente/disco/worker.js`, deployed by hand in the owner's Cloudflare dashboard (one file, no build). The
   Worker serves the ISO from an R2 bucket (`DISCO`) in 1 MiB pieces (`pieza/NNNNN.bin` + `indice.json`) only to
   a request carrying a **valid Firebase ID token** (RS256 checked against Google's JWKs, `aud`/`iss` =
