@@ -273,6 +273,17 @@ const REPERTORIO = {
   kiCae:    (a, t) => { soplo(a, t, 0.4, 0.05, { f: 2200, f1: 300, q: 1.1 }); seno(a, t + 0.05, 330, 160, 0.45, 0.08, "triangle"); },
   kiBoom:   (a, t) => { seno(a, t, 140, 38, 0.5, 0.2); soplo(a, t, 0.45, 0.16, { f: 1400, f1: 180, q: 0.7, tipo: "lowpass" });
                         soplo(a, t + 0.02, 0.18, 0.06, { f: 4200, f1: 2000, q: 1.5 }); },
+  /* El comienzo de una pelea, al ritmo de la presentación (bt3.js, `presentaPelea`): los dos entran con un
+     soplo cada uno (0 y 0,15 s), chocan (0,5 s: golpe grave y estallido) y suena el acorde de «¡A pelear!». */
+  kiPelea:  (a, t) => { soplo(a, t, 0.4, 0.06, { f: 300, f1: 2600, q: 1.2, ataque: 0.25 });
+                        soplo(a, t + 0.15, 0.35, 0.06, { f: 2600, f1: 400, q: 1.2, ataque: 0.2 });
+                        seno(a, t + 0.5, 170, 42, 0.45, 0.22); soplo(a, t + 0.5, 0.35, 0.14, { f: 2400, f1: 300, q: 0.7, tipo: "lowpass" });
+                        [[55, 62, 67], [57, 64, 69]].forEach((acorde, k) => acorde.forEach(n =>
+                          P(a, t + 0.72 + k * 0.16, H(n), k ? 0.55 : 0.14, { onda: "p25", vol: 0.05, sus: 0.7 })));
+                        campana(a, t + 0.88, H(91), 0.03, 0.9); },
+  /* El torneo empieza: un gong grave que se abre y un arpegio que sube. */
+  kiTorneo: (a, t) => { campana(a, t, H(43), 0.09, 2.2); campana(a, t, H(55), 0.05, 1.8); seno(a, t, 90, 70, 1.2, 0.12);
+                        [67, 71, 74, 79, 83].forEach((n, k) => P(a, t + 0.3 + k * 0.07, H(n), 0.08, { onda: "p50", vol: 0.05 })); },
   kiCorona: (a, t) => { soplo(a, t, 0.7, 0.07, { f: 300, f1: 4000, q: 0.9, ataque: 0.2 });
                         [67, 72, 76, 79, 84].forEach((n, k) => P(a, t + 0.35 + k * 0.08, H(n), 0.09, { onda: "p50", vol: 0.065 }));
                         [76, 79, 84].forEach(n => P(a, t + 0.8, H(n), 0.9, { onda: "p25", vol: 0.045, sus: 0.7, vib: 0.015 }));

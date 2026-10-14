@@ -1847,6 +1847,34 @@ try { var t = localStorage.getItem("jg.tema");
 @keyframes jg-bt3-ava-golpe{0%,22%{filter:none;transform:none}26%{filter:brightness(3);transform:scale(1.25)}36%{filter:grayscale(1);transform:scale(.8) rotate(-12deg)}100%{filter:none;transform:none}}
 .jg-bt3-luchador.brilla{animation:jg-bt3-brilla 3s calc(0s - var(--edad,0s)) ease-out both}
 @keyframes jg-bt3-brilla{0%{box-shadow:0 0 0 #ffd21f00}20%{box-shadow:0 0 50px 8px #ffd21fcc;border-color:#ffd21f;transform:scale(1.03)}100%{transform:none}}
+/* el comienzo de una pelea (presentaPelea en bt3.js): fijo a la pantalla, encima del marco del juego. Las dos
+   fotos entran por los lados, chocan a los 0,5 s (destello y temblor) y cae «¡A PELEAR!»; dura 2,7 s */
+.jg-bt3-choque{position:fixed;inset:0;z-index:75;pointer-events:none;overflow:hidden;isolation:isolate;
+  background:radial-gradient(ellipse at 50% 45%,#0b1a48cc,#000000e6 75%);animation:jg-bt3-choque-capa 2.7s ease both}
+@keyframes jg-bt3-choque-capa{0%{opacity:0}8%{opacity:1}86%{opacity:1}100%{opacity:0}}
+.jg-bt3-choque .jg-bt3-rayos{position:absolute;inset:-40%;opacity:0;z-index:-1;animation:jg-bt3-gira 9s linear infinite,jg-bt3-aparece .4s .5s both}
+@keyframes jg-bt3-aparece{to{opacity:.2}}
+.jg-bt3-choque>.l,.jg-bt3-choque>.r{position:absolute;top:40%;display:grid;justify-items:center;gap:10px;transform:translateY(-50%)}
+.jg-bt3-choque>.l{right:calc(50% + 30px);animation:jg-bt3-entra-l .5s cubic-bezier(.3,1.4,.6,1) both,jg-bt3-choca .35s .5s both}
+.jg-bt3-choque>.r{left:calc(50% + 30px);animation:jg-bt3-entra-r .5s .15s cubic-bezier(.3,1.4,.6,1) both,jg-bt3-choca .35s .5s both}
+@keyframes jg-bt3-entra-l{0%{transform:translate(-70vw,-50%) skew(-12deg)}100%{transform:translate(0,-50%)}}
+@keyframes jg-bt3-entra-r{0%{transform:translate(70vw,-50%) skew(12deg)}100%{transform:translate(0,-50%)}}
+@keyframes jg-bt3-choca{20%{transform:translate(-6px,-52%)}45%{transform:translate(6px,-48%)}70%{transform:translate(-3px,-50%)}100%{transform:translate(0,-50%)}}
+.jg-bt3-choque .jg-bt3-ava{width:clamp(84px,20vw,136px);height:clamp(84px,20vw,136px);font-size:clamp(36px,9vw,60px);border:4px solid #ffd21f;
+  box-shadow:0 0 0 4px #3a1000,0 0 40px 8px #ff8a00aa}
+.jg-bt3-choque>.r .jg-bt3-ava{border-color:#5aa0ff;box-shadow:0 0 0 4px #0b1a48,0 0 40px 8px #3d7bffaa}
+.jg-bt3-choque>div b{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 clamp(18px,3.4vw,28px) 'Lilita One',system-ui,sans-serif;color:#fff;text-shadow:0 3px 0 #000,0 0 14px #000}
+.jg-bt3-destello{position:absolute;left:50%;top:40%;width:60vmin;height:60vmin;margin:-30vmin 0 0 -30vmin;border-radius:50%;opacity:0;
+  background:radial-gradient(circle,#fff 0 10%,#fff6b0 22%,#ffd21f88 40%,transparent 68%);animation:jg-bt3-fogonazo-g .7s .45s ease-out both}
+@keyframes jg-bt3-fogonazo-g{0%{opacity:0;transform:scale(.2)}20%{opacity:1}100%{opacity:0;transform:scale(1.8)}}
+.jg-bt3-choque strong{position:absolute;left:0;right:0;top:66%;text-align:center;font:400 clamp(44px,10vw,96px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;
+  background:linear-gradient(180deg,#fffbd1,#ffe14a 38%,#ff9d00 70%,#ff5a00);-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:2px #4a1300;filter:drop-shadow(0 5px 0 #1a0600) drop-shadow(0 0 24px #ff8a00);animation:jg-bt3-golpe-txt .45s .68s cubic-bezier(.2,1.6,.5,1) both}
+@keyframes jg-bt3-golpe-txt{0%{opacity:0;transform:scale(3) rotate(-6deg)}100%{opacity:1;transform:skew(-6deg)}}
+.jg-bt3-choque small{position:absolute;left:0;right:0;top:calc(66% + clamp(64px,12vw,118px));text-align:center;font:800 13px system-ui,sans-serif;letter-spacing:.12em;
+  text-transform:uppercase;color:#ffd9a0;text-shadow:0 1px 0 #000;animation:jg-bt3-aparece-txt .4s 1s both}
+@keyframes jg-bt3-aparece-txt{from{opacity:0;transform:translateY(8px)}}
+@media(prefers-reduced-motion:reduce){.jg-bt3-choque,.jg-bt3-choque *{animation-duration:.01s!important;animation-delay:0s!important}}
 @media(prefers-reduced-motion:reduce){.jg-bt3-vest *,.jg-bt3-anuncio,.jg-bt3-anuncio *{animation-duration:.01s!important;animation-delay:0s!important}}
 .jg-hx-vest{margin:0 0 12px;padding:14px;border-radius:16px;background:#22272b;color:#e9edf0}.jg-hx-vest[hidden]{display:none}
 .jg-hx-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -5116,6 +5144,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610140811"></script>
+<script src="juegos-app.js?v=202610140830"></script>
 </body>
 </html>

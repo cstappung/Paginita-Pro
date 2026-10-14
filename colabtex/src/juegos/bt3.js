@@ -461,8 +461,48 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     });
   }
 
+  /* ---------- el comienzo de cada pelea ----------
+     Como la presentación de un juego de pelea: las dos fotos entran por los lados, chocan con un destello y sale
+     «¡A PELEAR!», con su sonido (`kiPelea`). Va encima de todo (fijo a la pantalla), porque en ese momento la
+     sala ya muestra el marco del juego. Solo para lo que empieza mientras se mira: `vistoInicio` es null hasta
+     el primer estado. El comienzo del torneo suena con un gong (`kiTorneo`). */
+  let vistoInicio = null;
+  function presentaPelea(a, b, detalle) {
+    if (document.hidden) return;
+    suena("kiPelea");
+    const lado = (u, c) => { const j = jugador(u); return `<div class="${c}">${avatar(j)}<b translate="no">${escapeHtml(j.nombre || "Jugador")}</b></div>`; };
+    const capa = document.createElement("div");
+    capa.className = "jg-bt3-choque";
+    capa.setAttribute("aria-hidden", "true");
+    capa.innerHTML = `<i class="jg-bt3-rayos"></i>${lado(a, "l")}${lado(b, "r")}<i class="jg-bt3-destello"></i>
+      <strong>¡A PELEAR!</strong><small>${escapeHtml(detalle)}</small>`;
+    document.body.append(capa);
+    setTimeout(() => capa.remove(), 2700);
+  }
+  function detectaInicio() {
+    const llave = !!est.llave, pelea = est.torneo
+      ? (est.actual && est.actual.enCurso ? "t" + est.actual.n : "")
+      : (est.fase === "jugando" ? "d" + est.ronda : "");
+    const antes = vistoInicio;
+    vistoInicio = { llave, pelea };
+    if (!antes || partida?.fin) return;
+    if (llave && !antes.llave && !document.hidden) {
+      suena("kiTorneo");
+      anuncia(`<small>Torneo · ${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores</small><b>¡Comienza el torneo!</b>`, "gana", 3200);
+    }
+    if (pelea && pelea !== antes.pelea) {
+      const reglas = (BT3_BATALLAS[est.batalla] || "") + " · " + TIEMPO_TXT(est.tiempo);
+      if (est.torneo) presentaPelea(est.actual.a, est.actual.b, NOMBRE_RONDA(+est.actual.id.split(".")[0], est.llave.length) + " · " + reglas);
+      else {
+        const otro = presentes().find(j => j.uid !== est.anfitrion)?.uid;
+        if (otro) presentaPelea(est.anfitrion, otro, "Pelea " + est.ronda + " · " + reglas);
+      }
+    }
+  }
+
   function actualizar(p, estado) {
     partida = p; est = estado;
+    detectaInicio();
     // Al terminar mi pelea, mi marco se recarga: la siguiente arranca el programa de cero.
     const pelea = peleando();
     if (peleabaAntes && !pelea && !p.fin) reiniciaMarco();

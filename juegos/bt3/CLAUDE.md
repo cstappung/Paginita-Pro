@@ -84,7 +84,10 @@ time so a repaint mid-way continues it (`--edad` as a negative `animation-delay`
 disc event). Every slot, card and banner shows the player's photo (`avatar(jugador(u))`, the ficha's `foto` or
 the initial on its `color`); the loser's card **explodes** (`explota()`: a flash and 14 fixed shards that inherit
 `--edad`) and stays cracked and grey; the champion gets the crown on their photo. Sounds `kiAvanza`, `kiCae`,
-`kiBoom`, `kiCorona` in `sonido.js`, through `busFx` like every room sound.
+`kiBoom`, `kiCorona` in `sonido.js`, through `busFx` like every room sound. Each fight's start (`detectaInicio`:
+the duel's `ronda` going to `jugando`, a tournament fight's `actual.n` going `enCurso`) shows `presentaPelea`, a
+fixed full-screen intro over the game frame (both photos slide in, clash, «¡A PELEAR!», `kiPelea`, 2.7 s); the
+bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidden tab.
 
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 
