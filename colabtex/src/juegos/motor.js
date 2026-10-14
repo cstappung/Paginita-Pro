@@ -7187,6 +7187,9 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
      peleador recargó la página en plena pelea) la misma pelea vuelve a empezar sola cuando los dos discos están
      listos (`reanudar`): el juego no puede seguir desde donde iba (cada copia arranca de cero; ver
      juegos/bt3/CLAUDE.md), pero nadie tiene que volver a configurar ni apretar nada.
+   - `{t:"decide", uid, n, g}`: el anfitrión le da la victoria de la pelea `n` a `g` sin esperar al juego (se
+     colgó, alguien no vuelve después de un corte, los dos juegos no dijeron lo mismo). Vale para la pelea en
+     curso o la última si todavía no tiene resultado; cuenta en el marcador como cualquier otra y la pelea termina.
    El juego no le dice a la página quién ganó, así que **la sala no clasifica** (`anotar` la salta, como
    PRO HERO) y sus logros salen de lo que el vestíbulo sí sabe: cuántas peleas, quién fue anfitrión, con
    qué reglas. La sala termina cuando alguien se va (`abandona`). */
@@ -7220,6 +7223,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
   let reanudar = false; // la pelea se cortó por la conexión (o alguien recargó): vuelve a empezar sola, con los dos discos
   let cortes = 0;       // cortes seguidos de la misma pelea: después de 3 ya no vuelve sola (una red que se cae siempre)
+  const contadas = new Set();   // las peleas (ronda) que ya tienen resultado en el marcador
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7259,7 +7263,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
       if (otros.length === 1 && r[otros[0].uid] !== undefined) {
         r.listo = true;
         if (r[otros[0].uid] === j.g) {
-          cortes = 0;
+          cortes = 0; contadas.add(ronda);
           if (j.g === "empate") empates++; else marcador[j.g] = (marcador[j.g] || 0) + 1;
           hist.push({ e: "resultado", n: ronda, g: j.g });
         }
@@ -7267,6 +7271,12 @@ export function redBt3(p, js = jugadoresDe(p)) {
         fase = "vestibulo"; discos = {};
         hist.push({ e: "vuelve", uid: "", n: ronda, auto: true });
       }
+    } else if (j.t === "decide" && j.uid === anfitrion && ronda > 0 && j.n === ronda && !contadas.has(ronda) && ids.has(j.g) && !fuera[j.g]) {
+      // el anfitrión da la victoria: cuenta como una pelea ganada y, si se estaba peleando, se vuelve al vestíbulo
+      contadas.add(ronda); cortes = 0; reanudar = false; revancha = {};
+      marcador[j.g] = (marcador[j.g] || 0) + 1;
+      hist.push({ e: "resultado", n: ronda, g: j.g, mano: true });
+      if (fase === "jugando") { fase = "vestibulo"; discos = {}; hist.push({ e: "vuelve", uid: "", n: ronda, auto: true }); }
     }
   }
   if (fuera[anfitrion]) anfitrion = (presentes()[0] || {}).uid || "";
@@ -7276,7 +7286,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
   return {
     fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo),
     discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha,
-    reanudar: ganador === null && fase === "vestibulo" && reanudar
+    reanudar: ganador === null && fase === "vestibulo" && reanudar,
+    pendiente: ganador === null && ronda > 0 && !contadas.has(ronda)   // la última pelea aún sin resultado: el anfitrión puede darla
   };
 }
 
@@ -7289,7 +7300,9 @@ export function redBt3(p, js = jugadoresDe(p)) {
    - `{t:"empieza", uid, m}`: uno de los dos (o el organizador) arranca la pelea `m` con los dos discos listos.
    - `{t:"resultado", uid, m, g}`: lo que dice el marco de cada peleador al terminar (el juego lo cuenta solo,
      __wrap_BattleResult_Finish); también se puede marcar a mano. Si los dos dicen lo mismo, queda; un empate
-     se vuelve a pelear; si no coinciden, `{t:"decide", uid, m, g}` del organizador.
+     se vuelve a pelear; si no coinciden, `{t:"decide", uid, m, g}` del organizador. El organizador también puede
+     dar la victoria de la pelea actual cuando quiera (antes, durante o después de pelearla: alguien no está, el
+     juego se colgó), con la misma jugada.
    - quien se va pierde sus peleas (la que estaba en curso y las que le tocaban); lo mismo quien saca el
      organizador (`{t:"echa", uid, a}`), antes o durante el torneo.
    Gana el torneo quien gana la final. Los logros ven cada pelea como una `ronda` (anfitrión = jugador 1). */
@@ -7329,9 +7342,9 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
     hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo, veto });   // (para los logros, como una pelea del duelo)
   };
-  const decide = (m, g) => {
+  const decide = (m, g, mano = false) => {   // mano: la dio el organizador, no los juegos
     if (g === "empate") { m.enCurso = false; m.rep = {}; m.conflicto = false; hist.push({ e: "empate", m: m.id }); }
-    else { m.g = g; m.enCurso = false; hist.push({ e: "gana", m: m.id, g, a: m.a, b: m.b }); }
+    else { m.g = g; m.enCurso = false; hist.push({ e: "gana", m: m.id, g, a: m.a, b: m.b, ...(mano ? { mano: true } : {}) }); }
     discos[m.a] = discos[m.b] = false;   // sus marcos se recargan para la próxima pelea
     delete discos[""];
     avanza();
@@ -7403,7 +7416,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
       const otro = j.uid === m.a ? m.b : m.a;
       if (m.rep[otro] !== undefined) { if (m.rep[otro] === j.g) decide(m, j.g); else m.conflicto = true; }
     } else if (j.t === "decide" && esOrg && (j.g === m.a || j.g === m.b || j.g === "empate")) {
-      decide(m, j.g);
+      decide(m, j.g, j.g !== "empate");
     }
   }
   reponeOrg();

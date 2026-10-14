@@ -82,8 +82,13 @@
   let desdePrivado = false;
 
   /* El programa: el .wasm se baja aquí con su barra y se le entrega al programa ya bajado (locateFile apunta a
-     la copia en memoria). Si algo falla, se carga como siempre. */
-  (async () => {
+     la copia en memoria). Si algo falla, se carga como siempre.
+     Nada se baja antes de jugar: en «un jugador» se pide recién cuando arranca el juego (`go` en la página del
+     port llama a `pidePrograma`: «Jugar», o elegir la ISO); en una sala, al abrirla, que ya es jugar. Se pide
+     una sola vez (la promesa queda guardada). */
+  let programa = null;
+  const pidePrograma = window.pidePrograma = () => programa || (programa = (async () => {
+    if (!window.cargaPrograma) return;   // (sin JSPI, o en el celular: aquí el juego no corre, no se baja nada)
     const url = Module.locateFile ? Module.locateFile("bt3-jspi.wasm", "") : "bt3-jspi.wasm";
     /* Ya bajado antes (esta misma versión): sin barra, directo de la caché del navegador. Así Chrome además
        reusa el código ya compilado (lo guarda solo para un .wasm cargado de su dirección, no de un blob), y el
@@ -118,7 +123,8 @@
     const listo = Module.onRuntimeInitialized;
     Module.onRuntimeInitialized = () => { Progreso.sinTarjeta(); listo && listo(); };
     window.cargaPrograma && window.cargaPrograma();
-  })();
+  })());
+  if (!SOLO) pidePrograma();
 
   // ---------------------------------------------------------------- 1. la ISO recordada
   const BD = "bt3-iso", TIENDA = "asa";

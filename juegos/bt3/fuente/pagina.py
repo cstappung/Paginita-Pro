@@ -191,9 +191,15 @@ cambia("      say('Reading the disc image…');", "      say('Leyendo el disco�
 cambia("      say(`Disc recognised (${n.toLocaleString()} archive entries). Starting…`);",
        "      say(`Disco reconocido (${n.toLocaleString('es')} archivos). Arrancando el juego…`);")
 cambia("say('Loading the program…'))", "say('Cargando el programa…'))")
+# En «un jugador» el programa (3,6 MB) no se baja al abrir la página: recién al apretar «Jugar» o elegir la ISO,
+# que es cuando se llama a go (pagina.js, `pidePrograma`; en una sala ya se pidió al entrar).
+cambia("  const go = (disc) => Module.ready ? start(disc) : (Module.pendingStart = () => start(disc), say('Cargando el programa…'));",
+       "  const go = (disc) => {\n    if (window.pidePrograma) pidePrograma();\n"
+       "    return Module.ready ? start(disc) : (Module.pendingStart = () => start(disc), say('Cargando el programa…'));\n  };")
 cambia("    s.onerror = () => say('Could not load ' + BUILD + '.js', true);",
        "    s.onerror = () => say('No se pudo cargar el juego (' + BUILD + '.js). Revisa tu conexión y recarga la página.', true);")
-# El programa no se pide solo: pagina.js baja primero el .wasm con una barra de progreso y después lo arranca.
+# El programa no se pide solo: pagina.js baja primero el .wasm con una barra de progreso y después lo arranca
+# (en una sala al abrir la página; en «un jugador», al apretar «Jugar»).
 cambia("    document.body.appendChild(s);\n  }\n</script>", "    window.cargaPrograma = () => document.body.appendChild(s);   // (lo llama pagina.js)\n  }\n</script>")
 # La insignia de lectura del disco: la dibuja pagina.js (en español, con barra) si está.
 cambia("  const netShow = () => { $('net').textContent = `Loading ${(netBytes / 1048576).toFixed(1)} MB`; $('net').classList.add('on'); };",

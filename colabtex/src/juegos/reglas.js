@@ -460,6 +460,7 @@ const REGLAS = {
       ["Duelo", lista([
         "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>3 vs 3</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, el tiempo de cada round y los personajes permitidos. Con los dos discos listos aprieta <b>¡A pelear!</b>.",
         "Al terminar la pelea el juego cuenta solo quién ganó: se cierra, vuelven los dos al vestíbulo y se suma al marcador.",
+        "Si el juego no puede decirlo (se colgó, uno no vuelve después de un corte, los dos juegos no dicen lo mismo), el anfitrión aprieta <b>🏆 Dar la victoria</b> y elige al ganador: cuenta en el marcador como cualquier pelea.",
         "<b>Revancha</b>: la piden los dos y empieza sola, con las mismas reglas, en cuanto cargan los dos discos."
       ])],
       ["Personajes (tier list)", lista([
@@ -470,6 +471,7 @@ const REGLAS = {
       ["Torneo", lista([
         "El que abre la sala organiza: pone las reglas y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave se sortea entre los que están; si no son 4 u 8, alguno pasa directo.",
         "Las peleas van de a una. El ganador lo cuentan solos los juegos de los dos peleadores y avanza en la llave; si los dos juegos no dicen lo mismo decide el organizador. Un empate se vuelve a pelear.",
+        "El organizador puede <b>🏆 Dar la victoria</b> de la pelea actual cuando haga falta (alguien no está, el juego se colgó): el elegido avanza en la llave como si hubiera ganado.",
         "Quien se va pierde sus peleas. Gana el torneo quien gana la final."
       ])],
       ["La conexión", lista([

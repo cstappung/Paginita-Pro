@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610132307"></script>
+<script src="i18n.js?v=202610141847"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1796,6 +1796,14 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-mini{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:800}
 .jg-bt3-mini .jg-bt3-vs{font-size:30px}
 .jg-bt3-mano{font-size:13px;color:var(--bt3-mu)}.jg-bt3-mano summary{cursor:pointer}.jg-bt3-mano .jg-bt3-fichas{margin-top:8px;justify-content:center}
+/* «🏆 Dar la victoria» del anfitrión/organizador (bt3.js, darVictoria): una pastilla dorada que se despliega */
+.jg-bt3-dar{text-align:center}
+.jg-bt3-dar summary{display:inline-block;list-style:none;padding:5px 12px;border-radius:999px;border:1px solid #ffd21f66;background:#ffd21f14;color:var(--bt3-oro);font:700 12px system-ui,sans-serif;cursor:pointer}
+.jg-bt3-dar summary::-webkit-details-marker{display:none}
+.jg-bt3-dar summary:hover,.jg-bt3-dar[open] summary{border-color:var(--bt3-oro);background:#ffd21f26}
+.jg-bt3-dar .jg-bt3-fichas{margin-top:8px;justify-content:center}
+.jg-bt3-franja .jg-bt3-dar{flex:1 1 100%}
+.jg-bt3-pendiente{display:grid;gap:6px;justify-items:center;text-align:center}
 /* la llave: pirámide de rondas unidas por líneas (ver pintaTorneo en bt3.js) */
 .jg-bt3-llave{--ln:#3a5aa8;--hueco:38px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);column-gap:var(--hueco);overflow-x:auto;padding:12px 4px 8px}
 .jg-bt3-ronda{display:flex;flex-direction:column;min-width:0}
@@ -5207,6 +5215,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610141817"></script>
+<script src="juegos-app.js?v=202610141847"></script>
 </body>
 </html>

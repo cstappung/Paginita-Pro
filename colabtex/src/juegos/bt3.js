@@ -252,6 +252,12 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
      anfitrión, si su disco ya cargó), las reglas como botones que solo el anfitrión aprieta, y el botón grande
      para empezar. En plena pelea queda una franja con lo que se está jugando. */
   const ESFERAS = `<span class="jg-bt3-esferas" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  /* «🏆 Dar la victoria», solo para el anfitrión (duelo) o el organizador (torneo): un botón que se despliega en
+     uno por peleador, y cada uno pide confirmación. Sirve cuando el juego no lo puede decir: se colgó, alguien no
+     vuelve después de un corte, o los dos juegos no dijeron lo mismo. El clic lo ata `atarDar`. */
+  const darVictoria = us => `<details class="jg-bt3-dar"><summary>🏆 Dar la victoria</summary>
+    <div class="jg-bt3-fichas">${us.map(u => `<button class="jg-bt3-ficha" data-g="${escapeHtml(u)}">🏆 <span translate="no">${escapeHtml(nombre(u))}</span></button>`).join("")}</div></details>`;
+  const confirmaVictoria = (g, n) => confirm(`¿Darle la victoria de ${n} a ${nombre(g)}? Se anota como ganada y no se puede deshacer.`);
   const BATALLA_CORTA = { single: "Single", team3: "3 vs 3", team: "Team", dp10: "DP 10", dp15: "DP 15", dp20: "DP 20" };
   const TIEMPO_CORTO = t => t ? t + " s" : "∞";
   const jugador = u => esCpuBt3(u) ? { uid: u, nombre: nombre(u), cpu: true, nivel: nivelCpu(u) }
@@ -319,6 +325,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     if (d) d.ontoggle = () => { vetosAbierto = d.open; };
   };
 
+  function atarDar(que, jugada) {
+    vest.querySelectorAll(".jg-bt3-dar [data-g]").forEach(b => b.onclick = () => {
+      if (!confirmaVictoria(b.dataset.g, que)) return;
+      vest.querySelectorAll(".jg-bt3-dar [data-g]").forEach(x => { x.disabled = true; });
+      anota(jugada(b.dataset.g));
+    });
+  }
+
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     if (est.torneo) return pintaTorneo(forzar);
@@ -342,15 +356,18 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       }
     }
     vistoDuelo = peleas;
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar]);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar, est.pendiente]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.toggle("jugando", jugando);
+    // el anfitrión da la victoria de la pelea en curso, o de la última si quedó sin resultado (un corte, «volver»)
+    const dar = manda && js.length === 2 && est.pendiente ? darVictoria(js.map(j => j.uid)) : "";
     if (jugando) {
       vest.innerHTML = `<div class="jg-bt3-franja"><span class="jg-bt3-vivo">● En pelea</span>
         <span>Pelea ${est.ronda} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${est.veto ? " · " + escapeHtml(BT3_VETOS[est.veto]) : ""} · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span>
         ${enSala() ? `<button class="jg-bt3-vuelve" title="Si la pelea se quedó colgada, vuelven los dos al vestíbulo">Volver al vestíbulo</button>`
-          : `<button class="jg-bt3-ver" data-ver="1">📺 Ver la pelea en vivo</button>`}</div>`;
+          : `<button class="jg-bt3-ver" data-ver="1">📺 Ver la pelea en vivo</button>`}${dar}</div>`;
+      atarDar("la pelea " + est.ronda, g => ({ t: "decide", uid, n: est.ronda, g }));
       const v = vest.querySelector(".jg-bt3-vuelve");
       if (v) v.onclick = () => { v.disabled = true; anota({ t: "vuelve", uid }); };
       const ver = vest.querySelector("[data-ver]");
@@ -381,6 +398,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       <header class="jg-bt3-tit"><b>Duelo</b>${ESFERAS}<span>${est.ronda ? "Pelea " + (est.ronda + 1) : "1 contra 1"} · el anfitrión pone las reglas</span></header>
       <div class="jg-bt3-versus">${tarjeta(orden[0])}<span class="jg-bt3-vs" aria-hidden="true">VS</span>${tarjeta(orden[1])}</div>
       ${marcadorHtml(orden)}
+      ${dar ? `<div class="jg-bt3-pendiente"><p class="jg-bt3-nota">La pelea ${est.ronda} quedó sin resultado.</p>${dar}</div>` : ""}
       ${revancha}
       <div class="jg-bt3-reglas" role="group" aria-label="Reglas de la pelea">
         <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
@@ -398,6 +416,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
     });
     atarVetos();
+    atarDar("la pelea " + est.ronda, g => ({ t: "decide", uid, n: est.ronda, g }));
     const emp = vest.querySelector(".jg-bt3-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; empieza(); };
     const rb = vest.querySelector(".jg-bt3-rev");
@@ -522,12 +541,11 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
         const marca = (g, txt) => `<button class="jg-bt3-ficha" data-g="${escapeHtml(g)}">${txt}</button>`;
         let cuerpo;
         if (!a.enCurso) {
-          cuerpo = (a.reanudar ? `<p class="jg-bt3-nota jg-bt3-corte" role="status">⚡ Se cortó la conexión en plena pelea (o alguien recargó la página). Vuelve a empezar sola apenas carguen los dos discos.${manda ? " Si uno no vuelve, puedes decidirla abajo." : ""}</p>` : "")
+          cuerpo = (a.reanudar ? `<p class="jg-bt3-nota jg-bt3-corte" role="status">⚡ Se cortó la conexión en plena pelea (o alguien recargó la página). Vuelve a empezar sola apenas carguen los dos discos.${manda ? " Si uno no vuelve, dale la victoria al otro abajo." : ""}</p>` : "")
             + (listos
             ? (yoPeleo || manda ? `<button class="jg-bt3-empieza" data-h="pelea">¡A pelear!</button>` : `<p class="jg-bt3-nota">Listos los dos: empieza cuando uno de ellos quiera.</p>`)
             : `<p class="jg-bt3-nota">Esperando el disco de ${[a.a, a.b].filter(u => !conDisco(u)).map(quien).join(" y ")}.</p>`)
-            + (manda ? `<details class="jg-bt3-mano"><summary>Organizador: decidir sin pelear (alguien no está)</summary>
-              <div class="jg-bt3-fichas" data-accion="decide">${marca(a.a, "Pasa " + escapeHtml(nombre(a.a)))}${marca(a.b, "Pasa " + escapeHtml(nombre(a.b)))}</div></details>` : "");
+            + (manda ? darVictoria([a.a, a.b]) : "");
         } else if (a.conflicto) {
           cuerpo = `<p class="jg-bt3-nota">Los dos juegos no dijeron el mismo ganador. ${manda ? "Decide tú:" : "Decide " + quien(est.anfitrion) + "."}</p>
             ${manda ? `<div class="jg-bt3-fichas" data-accion="decide">${marca(a.a, "Ganó " + escapeHtml(nombre(a.a)))}${marca(a.b, "Ganó " + escapeHtml(nombre(a.b)))}${marca("empate", "Repetir")}</div>` : ""}`;
@@ -538,8 +556,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
             ${yoPeleo || manda ? `<button class="jg-bt3-vuelve" data-corta="1" title="Si la pelea se quedó colgada: vuelven a la llave y se empieza de nuevo">← Cortar la pelea y volver a la llave</button>` : ""}
             ${yoPeleo && ya === undefined ? `<details class="jg-bt3-mano"><summary>¿No se anotó solo? Márcalo a mano</summary>
               <div class="jg-bt3-fichas" data-accion="resultado">${marca(a.a, "Ganó " + escapeHtml(nombre(a.a)))}${marca(a.b, "Ganó " + escapeHtml(nombre(a.b)))}${marca("empate", "Empate")}</div></details>` : ""}
-            ${manda && !yoPeleo ? `<details class="jg-bt3-mano"><summary>Organizador: decidir esta pelea</summary>
-              <div class="jg-bt3-fichas" data-accion="decide">${marca(a.a, "Ganó " + escapeHtml(nombre(a.a)))}${marca(a.b, "Ganó " + escapeHtml(nombre(a.b)))}</div></details>` : ""}`;
+            ${manda ? darVictoria([a.a, a.b]) : ""}`;
         }
         panel = `<div class="jg-bt3-actual">
           <div class="jg-bt3-mini">${quien(a.a)}<span class="jg-bt3-vs">VS</span>${quien(a.b)}</div>
@@ -576,6 +593,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       b.disabled = true;
       anota({ t: "echa", uid, a: b.dataset.echa });
     });
+    if (a) atarDar("esta pelea", g => ({ t: "decide", uid, m: a.id, g }));
     vest.querySelectorAll("[data-accion] .jg-bt3-ficha").forEach(b => b.onclick = () => {
       b.disabled = true;
       const accion = b.closest("[data-accion]").dataset.accion;

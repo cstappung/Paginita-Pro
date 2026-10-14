@@ -327,3 +327,37 @@ test('una pelea que se corta una y otra vez deja de volver sola (3 cortes seguid
  e=B.reducir(sala(...js,{t:'vuelve',uid:'b',por:'corte'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
  assert.equal(e.fase,'vestibulo','el cuarto ya no: hay que empezarla a mano');assert.equal(e.reanudar,false);
 });
+
+test('duelo: el anfitrión da la victoria (en plena pelea o de la última sin resultado); nadie más puede',()=>{
+ const base=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'}];
+ let e=B.reducir(sala(...base));assert.equal(e.pendiente,true,'la pelea en curso no tiene resultado');
+ e=B.reducir(sala(...base,{t:'decide',uid:'b',n:1,g:'b'}));
+ assert.equal(e.fase,'jugando','b no es el anfitrión: no cuenta');assert.deepEqual({...e.marcador},{});
+ e=B.reducir(sala(...base,{t:'decide',uid:'a',n:1,g:'b'}));
+ assert.equal(e.fase,'vestibulo','termina la pelea');assert.deepEqual({...e.marcador},{b:1},'cuenta en el marcador');
+ assert.equal(e.pendiente,false);assert.deepEqual({...e.discos},{},'los marcos se recargan');
+ e=B.reducir(sala(...base,{t:'decide',uid:'a',n:1,g:'b'},{t:'decide',uid:'a',n:1,g:'a'},{t:'resultado',uid:'a',n:1,b:0,g:'a'},{t:'resultado',uid:'b',n:1,b:0,g:'a'}));
+ assert.deepEqual({...e.marcador},{b:1},'una vez dada, ni otra decisión ni los juegos la cambian');
+ // después de un corte: la da en vez de esperar que vuelva sola
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'},{t:'decide',uid:'a',n:1,g:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'vestibulo','ya decidida: no vuelve a empezar sola');assert.equal(e.reanudar,false);assert.deepEqual({...e.marcador},{a:1});
+ // una pelea que ya contaron los juegos no se puede dar; tampoco una pelea vieja
+ const r=[{t:'resultado',uid:'a',n:1,b:0,g:'a'},{t:'resultado',uid:'b',n:1,b:0,g:'a'}];
+ e=B.reducir(sala(...base,...r,{t:'decide',uid:'a',n:1,g:'b'}));
+ assert.deepEqual({...e.marcador},{a:1});assert.equal(e.pendiente,false);
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'a'},...base,{t:'decide',uid:'a',n:1,g:'b'}));
+ assert.deepEqual({...e.marcador},{},'la pelea 1 ya quedó atrás');assert.equal(e.fase,'jugando');
+});
+
+test('torneo: el organizador da la victoria antes o durante la pelea; queda marcada como dada',()=>{
+ const t=[{t:'torneo',uid:'u0'}];
+ let s=B.reducir(torneo(4,...t));const m=s.actual;
+ s=B.reducir(torneo(4,...t,{t:'decide',uid:'u0',m:m.id,g:m.b}));
+ assert.equal(s.llave[0].find(x=>x.id===m.id).g,m.b,'sin pelearla');
+ assert.ok(s.hist.some(h=>h.e==='gana'&&h.m===m.id&&h.mano),'el historial dice que la dio el organizador');
+ const pelea=[...t,{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id}];
+ s=B.reducir(torneo(4,...pelea,{t:'decide',uid:'u0',m:m.id,g:m.a}));
+ assert.equal(s.llave[0].find(x=>x.id===m.id).g,m.a,'en plena pelea');assert.notEqual(s.actual.id,m.id);
+ assert.equal(s.discos[m.a],false,'sus marcos se recargan');
+ assert.ok(!B.reducir(torneo(4,...pelea,...[{t:'resultado',uid:m.a,m:m.id,g:m.a},{t:'resultado',uid:m.b,m:m.id,g:m.a}])).hist.some(h=>h.mano),'la que cuentan los juegos no lleva la marca');
+});

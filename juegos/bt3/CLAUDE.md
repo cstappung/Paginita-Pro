@@ -15,7 +15,9 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   `bt3-jspi.{js,wasm}` here, generates
   `index.html` with `fuente/pagina.py` from the fork's `port/web/shell.html`, and runs `npm run build:bt3`
   (`colabtex/src/juegos/bt3-marco.js` + `malla.js` → `red.js`). Bump `VER` in `construir.sh` when the program
-  changes: it is the `?v=` of the page's scripts and of the `.wasm` (`locateFile`).
+  changes: it is the `?v=` of the page's scripts and of the `.wasm` (`locateFile`). Bump it too after editing only `pagina.js` or
+  `pagina.py` (their `?v=` is the same `VER`, so the browser kept the old `pagina.js`): then there is no need to
+  compile, just rerun `pagina.py` on the patched fork's `shell.html`, the `BT3_VER` sed and `npm run build`.
 - `pagina.js` (hand-written) is what the site adds to the page. `pagina.py` fails loudly if the fork's page changed
   where it patches: fix the patch there, never by editing `index.html`.
 
@@ -70,12 +72,16 @@ winner bits (1 P1, 2 P2, 4 draw, 8 abandoned) → `Module.onFinBatalla` → the 
 `{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
 the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
 (`marcador`, `empates`). Bits 8 → `vuelve`. `revancha` (both must ask; any rule or host change clears it) starts
-the next fight by itself once both discs are back. The frame **must** reload between fights: `BT3_NET_SESSION` is
+the next fight by itself once both discs are back. **«🏆 Dar la victoria»** (`{t:"decide", uid, n, g}`, only the
+`anfitrion`): the fight in progress, or the last one while it has no counted result (`est.pendiente`: after a cut,
+«Volver al vestíbulo» or two frames that disagreed), goes to `g` in the scoreboard; it ends a running fight and stops
+a cut fight from restarting by itself. Each pick asks for confirmation. The frame **must** reload between fights: `BT3_NET_SESSION` is
 read once at start-up. That costs nothing now (below).
 
 **Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3; the bracket is shuffled with the
 room's seed, byes up to a power of two, one fight at a time (`actual`). Both fighters' frames report the winner;
-agreement decides, disagreement → organizer `decide`; a draw is refought; leaving forfeits. The organizer can
+agreement decides, disagreement → organizer `decide`; the organizer can also **«🏆 Dar la victoria»** of the
+current fight at any time (before or during it, even their own; `hist` marks it `mano`); a draw is refought; leaving forfeits. The organizer can
 **kick** (`{t:"echa", uid, a}`, ⏏ in the list before it starts and «sacar a un jugador» during it): the kicked one
 is `fuera` like someone who left, forfeits, and their photo explodes in a banner. Each fight is also a `ronda` in
 `hist` so the duel's logros apply.
@@ -199,7 +205,10 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   speed, and on a first visit says it is saved for next time. The Worker sends `no-store` (the page keeps the
   pieces itself: not twice), and puts each piece in Cloudflare's edge cache after the friend check — **this only
   takes effect with a custom domain on the Worker**; on `*.workers.dev` Cloudflare ignores it.
-- **Nothing is downloaded before playing** (the owner's rule): never from the lobby; on the solo page the boot
+- **Nothing is downloaded before playing** (the owner's rule): never from the lobby; on the solo page **the
+  program itself** (`bt3-jspi.{js,wasm}`, 3.6 MB) waits too: `go` (patched by `pagina.py`) calls `pidePrograma` in
+  `pagina.js`, so it is fetched on «Jugar» or on picking an ISO (a room frame asks for it on load: entering is
+  playing; without JSPI nothing is fetched at all). The boot
   list is fetched on «Jugar» and «lo esencial» (even its size: it needs the disc's tables) only when its button is
   pressed; in a room (already playing) the boot is fetched on entering, and «lo esencial» is not offered there (a
   big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
