@@ -1340,7 +1340,8 @@ function anunciaEnCurso(p, est) {
     return;
   }
   if (!(p.jugadores || {})[u.uid] || !est.listos) return;
-  if (p.juego === "bt3") return;   // BT3 es privado: no se anuncia en «En juego ahora»
+  /* BT3 también se anuncia en «En juego ahora», para que los amigos entren a mirar un duelo o un torneo: el
+     salón solo se lo muestra a quien ve BT3 (bt3Visible, más abajo). El aviso dice juego y nombres; nada más. */
   if (enCursoToque > 0 && Date.now() - enCursoToque < 5 * 60 * 1000) return;
   enCursoToque = Date.now();
   fb.anunciaEnCurso(state.pid, {
@@ -3384,6 +3385,22 @@ function wire() {
 })();
 
 
+/* Las siete esferas del dragón de la portada de BT3, cada una con sus estrellas (de 1 a 7, dibujadas en SVG
+   como en la serie). Giran en órbita alrededor del orbe de ki (CSS: `.jg-art-bt3 u`); `--k` es su lugar. */
+const ESTRELLA_BT3 = (x, y, r) => `<polygon points="${Array.from({ length: 10 }, (_, i) => {
+  const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * 0.45 : r;
+  return (x + q * Math.cos(a)).toFixed(2) + "," + (y + q * Math.sin(a)).toFixed(2);
+}).join(" ")}"/>`;
+const ESFERAS_BT3 = [
+  [[10, 10, 4.8]],
+  [[6.8, 10, 3.3], [13.2, 10, 3.3]],
+  [[10, 6.6, 3], [6.8, 12.4, 3], [13.2, 12.4, 3]],
+  [[7, 7, 2.8], [13, 7, 2.8], [7, 13, 2.8], [13, 13, 2.8]],
+  [[6.4, 6.4, 2.5], [13.6, 6.4, 2.5], [10, 10, 2.5], [6.4, 13.6, 2.5], [13.6, 13.6, 2.5]],
+  [[7.3, 5.4, 2.3], [12.7, 5.4, 2.3], [7.3, 10, 2.3], [12.7, 10, 2.3], [7.3, 14.6, 2.3], [12.7, 14.6, 2.3]],
+  [[10, 10, 2.2], ...Array.from({ length: 6 }, (_, i) => [10 + 4.7 * Math.cos(i * Math.PI / 3), 10 + 4.7 * Math.sin(i * Math.PI / 3), 2.1])]
+].map((ps, k) => `<i style="--k:${k}"><svg viewBox="0 0 20 20" aria-hidden="true">${ps.map(([x, y, r]) => ESTRELLA_BT3(x, y, r)).join("")}</svg></i>`).join("");
+
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
@@ -3401,7 +3418,7 @@ function arteJuego(k) {
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
-  if (k === "bt3") return '<div class="jg-art-bt3"><s></s><b></b>' + "<i></i>".repeat(7) + '<em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>';
+  if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b></b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';

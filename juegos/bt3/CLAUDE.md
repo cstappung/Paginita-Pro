@@ -75,8 +75,15 @@ read once at start-up. That costs nothing now (below).
 
 **Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3; the bracket is shuffled with the
 room's seed, byes up to a power of two, one fight at a time (`actual`). Both fighters' frames report the winner;
-agreement decides, disagreement → organizer `decide`; a draw is refought; leaving forfeits. Each fight is also a
-`ronda` in `hist` so the duel's logros apply.
+agreement decides, disagreement → organizer `decide`; a draw is refought; leaving forfeits. The organizer can
+**kick** (`{t:"echa", uid, a}`, ⏏ in the list before it starts and «sacar a un jugador» during it): the kicked one
+is `fuera` like someone who left, forfeits, and their photo explodes in a banner. Each fight is also a `ronda` in
+`hist` so the duel's logros apply.
+
+**Spectators** (anyone opening the room who is not playing, and whoever left or was kicked: `enSala()` is false)
+see the lobby, the bracket, the banners and the fight intros live, but **not the fight itself**: the game has no
+spectator netcode, so their frame is never loaded (`cargaMarco`). Friends find running rooms in «En juego ahora»
+(BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
 `juegos.html`: only changes seen live are celebrated (not on opening the room), and each animation keeps its start
@@ -94,7 +101,8 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 ## One player: the modes
 
 Four modes, and only four: **Entrenamiento, Contra la CPU, Duelo, Torneo**. The solo page (`?modo` ≠ `online`)
-shows them as a Snake Club–style column next to the start card (`2b` in `pagina.js`, styles in `pagina.py`),
+shows them as a Snake Club–style column next to the start card (`2b` in `pagina.js`, styles in `pagina.py`), each
+with a gi-patch emblem drawn by us (亀 機 闘 天; Noto Serif JP subset to those four glyphs) — never game art,
 remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`.
 
 - Entrenamiento / Contra la CPU play here. **Nothing starts by itself on the solo page**: the private disc and the
@@ -141,8 +149,8 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
 - `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
 - **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
   it says yes, BT3 is filtered out of the catalogue, the solo list, the novedades banner (`filtraNovedades` in
-  `juegos-main.js`), open rooms, games in progress, ranks and logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord nor in
-  `enCurso`. This hides the game; the page files are public like the whole site (they hold nothing of the
+  `juegos-main.js`), open rooms, games in progress, ranks and logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord; they are in
+  `enCurso` (juego and names only) so friends can watch, and only friends are shown them. This hides the game; the page files are public like the whole site (they hold nothing of the
   game), and the disc itself is what the Worker protects.
 - The frame gets the token from its parent (`bt3.js` answers `{tipo:"token"}` only to a same-origin iframe
   loading `/juegos/bt3/index.html`) and, if `indice.json` answers, starts on the private disc without the ISO

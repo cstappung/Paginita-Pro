@@ -1615,36 +1615,41 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-haxball-marco{background:#5a8a4a}
 /* Budokai Tenkaichi 3: la portada (aura de ki y esferas), el marco y el vestíbulo. Superficies oscuras siempre,
    como el de HaxBall: no necesitan gemelo en el bloque del tema oscuro. */
-/* La portada de BT3 (ficha, tarjeta del salón, banner de novedades): el cielo de noche de las peleas con sus
-   líneas de velocidad, un orbe de ki que late al centro, las siete esferas del dragón en arco y el título como el
-   logo. Llena su caja: los tamaños van en % y en cqi (el ancho de la tarjeta). */
-.jg-art-bt3{position:absolute;inset:0;overflow:hidden;isolation:isolate;
-  background:radial-gradient(ellipse 60% 55% at 50% 52%,#ff9a1f88,#ff5a0022 55%,transparent 75%),linear-gradient(170deg,#0b1a48 0%,#13225a 45%,#2a0f3a 78%,#3a1206 100%)}
-.jg-art-bt3 s{position:absolute;inset:-20%;z-index:-1;background:repeating-conic-gradient(from 0deg at 50% 55%,#ffffff12 0deg 1.6deg,transparent 1.6deg 8deg);
-  -webkit-mask:radial-gradient(circle at 50% 55%,transparent 12%,#000 45%);mask:radial-gradient(circle at 50% 55%,transparent 12%,#000 45%)}
-.jg-art-bt3 b{position:absolute;left:50%;top:50%;width:30%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+/* La portada de BT3 (ficha, tarjeta del salón, banner de novedades): el cielo de noche de las peleas con rayos que
+   giran, un orbe de ki que late al centro, las siete esferas del dragón (cada una con sus estrellas, de 1 a 7)
+   en órbita alrededor, y el título como el logo con un brillo que lo recorre. Mide en `cqmin` (el lado corto de
+   la portada): la misma escena sirve en la tarjeta (4:3) y en el banner (ancho y bajo). */
+.jg-art-bt3{position:absolute;inset:0;overflow:hidden;isolation:isolate;container-type:size;
+  background:radial-gradient(ellipse 60% 55% at 50% 46%,#ff9a1f88,#ff5a0022 55%,transparent 75%),linear-gradient(170deg,#0b1a48 0%,#13225a 45%,#2a0f3a 78%,#3a1206 100%)}
+.jg-art-bt3 s{position:absolute;left:50%;top:44%;width:180cqmax;height:180cqmax;margin:-90cqmax 0 0 -90cqmax;z-index:-1;
+  background:repeating-conic-gradient(from 0deg,#ffffff14 0deg 2deg,transparent 2deg 10deg);
+  -webkit-mask:radial-gradient(circle,transparent 6%,#000 30%,transparent 60%);mask:radial-gradient(circle,transparent 6%,#000 30%,transparent 60%)}
+.jg-art-bt3 b{position:absolute;left:50%;top:44%;width:34cqmin;height:34cqmin;margin:-17cqmin 0 0 -17cqmin;border-radius:50%;
   background:radial-gradient(circle,#fff 0 16%,#fff6b0 26%,#ffd21f 40%,#ff8a0088 58%,transparent 72%);box-shadow:0 0 40px 10px #ff8a0055}
-.jg-art-bt3 i{position:absolute;width:9%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);
-  background:radial-gradient(circle at 35% 30%,#fff7c2 0 12%,#ffb526 38%,#f07800 72%,#a34400 100%);box-shadow:0 0 10px #ff9a1faa,inset -2px -3px 4px #0003}
-.jg-art-bt3 i::after{content:"★";position:absolute;inset:0;display:grid;place-items:center;color:#d61f1f;font-size:clamp(6px,3.4cqi,14px);line-height:1}
-.jg-art-bt3 i:nth-child(3){left:15%;top:46%}.jg-art-bt3 i:nth-child(4){left:23%;top:27%}.jg-art-bt3 i:nth-child(5){left:36%;top:16%}
-.jg-art-bt3 i:nth-child(6){left:50%;top:12%;width:10.5%}.jg-art-bt3 i:nth-child(7){left:64%;top:16%}.jg-art-bt3 i:nth-child(8){left:77%;top:27%}.jg-art-bt3 i:nth-child(9){left:85%;top:46%}
-.jg-art-bt3 em{position:absolute;left:0;right:0;bottom:7%;display:grid;justify-items:center;font-style:normal;line-height:1;text-align:center}
-.jg-art-bt3 em small{font:800 clamp(7px,3.2cqi,12px) system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ffd9a0;text-shadow:0 1px 0 #000}
-.jg-art-bt3 em strong{font:400 clamp(18px,11cqi,46px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;
-  background:linear-gradient(180deg,#fffbd1,#ffe14a 38%,#ff9d00 70%,#ff5a00);-webkit-background-clip:text;background-clip:text;color:transparent;
-  -webkit-text-stroke:1.5px #4a1300;filter:drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 12px #ff8a0088)}
-@media(prefers-reduced-motion:no-preference){.jg-art-bt3 b{animation:jg-bt3-ki 1.8s ease-in-out infinite}.jg-art-bt3 i{animation:jg-bt3-flota 3.2s ease-in-out infinite}
-  .jg-art-bt3 i:nth-child(even){animation-delay:-1.6s}}
-@keyframes jg-bt3-ki{50%{transform:translate(-50%,-50%) scale(1.14);box-shadow:0 0 60px 16px #ff8a0077}}
-@keyframes jg-bt3-flota{50%{transform:translate(-50%,-62%)}}
+.jg-art-bt3 u{position:absolute;left:50%;top:44%;width:0;height:0}
+.jg-art-bt3 i{position:absolute;left:-6.5cqmin;top:-6.5cqmin;width:13cqmin;height:13cqmin;border-radius:50%;
+  transform:rotate(calc(var(--k) * 51.4286deg)) translateY(-31cqmin) rotate(calc(var(--k) * -51.4286deg));
+  background:radial-gradient(circle at 35% 30%,#fff7c2 0 12%,#ffb526 38%,#f07800 72%,#a34400 100%);box-shadow:0 0 12px #ff9a1fbb,inset -2px -3px 5px #0004}
+.jg-art-bt3 i svg{display:block;width:100%;height:100%;fill:#d61f1f;filter:drop-shadow(0 .5px 0 #7a0a0a)}
+.jg-art-bt3 em{position:absolute;left:0;right:0;bottom:6%;z-index:2;display:grid;justify-items:center;font-style:normal;line-height:1;text-align:center}
+.jg-art-bt3 em small{font:800 clamp(7px,4.2cqmin,13px) system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ffd9a0;text-shadow:0 1px 0 #000}
+.jg-art-bt3 em strong{font:400 clamp(18px,15cqmin,58px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;
+  background:linear-gradient(105deg,transparent 42%,#ffffffcc 50%,transparent 58%) 160% 0/250% 100% no-repeat,linear-gradient(180deg,#fffbd1,#ffe14a 38%,#ff9d00 70%,#ff5a00);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1.5px #4a1300;filter:drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 12px #ff8a0088)}
+@media(prefers-reduced-motion:no-preference){
+  .jg-art-bt3 s{animation:jg-bt3-gira 26s linear infinite}
+  .jg-art-bt3 b{animation:jg-bt3-ki 1.8s ease-in-out infinite}
+  .jg-art-bt3 u{animation:jg-bt3-gira 22s linear infinite}
+  .jg-art-bt3 i svg{animation:jg-bt3-gira 22s linear infinite reverse}
+  .jg-art-bt3 i{animation:jg-bt3-esfera 2.6s ease-in-out infinite;animation-delay:calc(var(--k) * -.37s)}
+  .jg-art-bt3 em strong{animation:jg-bt3-brillo 3.6s ease-in-out infinite}}
+@keyframes jg-bt3-ki{50%{transform:scale(1.15);box-shadow:0 0 60px 16px #ff8a0077}}
+@keyframes jg-bt3-esfera{50%{box-shadow:0 0 22px 4px #ffd21fcc,inset -2px -3px 5px #0004}}
+@keyframes jg-bt3-brillo{0%,55%{background-position:160% 0,0 0}100%{background-position:-60% 0,0 0}}
 .jg-portada-bt3,.jg-nov-arte-bt3{background:#0b1a48}
-.jg-nov-arte-bt3{position:absolute;inset:0;container-type:inline-size}
-/* en el banner la portada es ancha y baja: esferas y orbe más chicos, para que el arco quepa entero */
-.jg-nov-arte-bt3 .jg-art-bt3 i{width:5.6%}.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(6){width:6.6%;top:14%}
-.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(5),.jg-nov-arte-bt3 .jg-art-bt3 i:nth-child(7){top:17%}
-.jg-nov-arte-bt3 .jg-art-bt3 b{width:22%}.jg-nov-arte-bt3 .jg-art-bt3 em strong{font-size:clamp(22px,8cqi,56px)}
+.jg-nov-arte-bt3{position:absolute;inset:0}
 .jg-bt3-marco{background:#000}
+.jg-bt3-marco[hidden]{display:none}
 /* El vestíbulo de BT3, a lo Dragon Ball: el cielo de noche de las peleas (azul profundo con líneas de velocidad
    y un estallido de ki naranja arriba), títulos como el logo (Lilita One, dorado a naranja con borde oscuro),
    esferas del dragón de adorno. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro.
@@ -1730,6 +1735,12 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-inscritos li.yo{border-color:#ffd21f88}.jg-bt3-inscritos li.yo>span{color:var(--bt3-oro)}
 .jg-bt3-inscritos .jg-bt3-ava{grid-row:span 2;width:40px;height:40px;font-size:18px;border-width:2px;box-shadow:none}
 .jg-bt3-inscritos li>span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-bt3-inscritos li{position:relative}
+.jg-bt3-echa{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:8px;border:1px solid #ff5d5d66;
+  background:#ff5d5d1a;color:#ff8f8f;font-size:14px;line-height:1;cursor:pointer}
+.jg-bt3-echa:hover{background:#ff5d5d40;color:#fff}
+.jg-bt3-echar .jg-bt3-ficha{border-color:#ff5d5d66;background:#3a1530}
+.jg-bt3-echar .jg-bt3-ficha:hover{border-color:#ff5d5d}
 .jg-bt3-inscritos i{font-style:normal}.jg-bt3-org{font-style:normal;font-size:12px;color:#ffc061}
 .jg-bt3-actual{display:grid;gap:8px;justify-items:center;text-align:center;padding:16px;border-radius:16px;background:#06102bcc;border:2px solid #ff8a0088;box-shadow:0 0 30px #ff8a0033,inset 0 0 30px #3d7bff22}
 .jg-bt3-mini{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:800}
@@ -5144,6 +5155,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610140834"></script>
+<script src="juegos-app.js?v=202610140840"></script>
 </body>
 </html>

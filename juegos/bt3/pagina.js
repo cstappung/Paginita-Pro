@@ -317,11 +317,14 @@
        además es el clic que deja sonar el juego. Elegir una ISO también es apretar: arranca con el modo elegido.
      - Duelo y Torneo se juegan en una sala: el botón le pide a Juegos que abra una (bt3.js, `alPedirSalaBt3`).
      El modo se recuerda (`bt3.modo`); ?juego=entrenamiento|cpu|duelo|torneo lo elige de entrada. */
+  /* Cada modo con su emblema, como el parche del gi en Dragon Ball: un círculo blanco con un kanji (亀 la escuela
+     de la tortuga, donde se entrena; 機 máquina; 闘 pelea; 天 de 天下一武道会, el Tenkaichi Budokai). Dibujados
+     aquí, sin nada del juego: lo del disco no se publica (ver CLAUDE.md). */
   const MODOS = [
-    ["entrenamiento", "🥋", "Entrenamiento", "Las lecciones del juego y la práctica libre."],
-    ["cpu", "🤖", "Contra la CPU", "Eliges personajes y peleas contra la máquina."],
-    ["duelo", "⚔️", "Duelo", "Uno contra uno en línea, con revancha."],
-    ["torneo", "🏆", "Torneo", "Eliminación directa con tus amigos, hasta ocho."],
+    ["entrenamiento", "亀", "Entrenamiento", "Las lecciones del juego y la práctica libre."],
+    ["cpu", "機", "Contra la CPU", "Eliges personajes y peleas contra la máquina."],
+    ["duelo", "闘", "Duelo", "Uno contra uno en línea, con revancha."],
+    ["torneo", "天", "Torneo", "Eliminación directa con tus amigos, hasta ocho."],
   ];
   const deSala = m => m === "duelo" || m === "torneo";
   const enJuegos = (() => { try { return window.parent !== window && !!window.parent.location.href; } catch (e) { return false; } })();
@@ -349,7 +352,7 @@
     lista.className = "modos-lista";
     lista.setAttribute("aria-label", "Modo de juego");
     lista.innerHTML = `<div class="modos-tit"><h2>Elige el modo</h2><span>01—04</span></div>` + MODOS.map(([k, ico, t, d], i) =>
-      `<button type="button" class="modo" data-m="${k}" aria-pressed="false"><span class="ico" aria-hidden="true">${ico}</span>
+      `<button type="button" class="modo" data-m="${k}" aria-pressed="false"><span class="ico ico-${k}" aria-hidden="true"><b translate="no">${ico}</b></span>
         <span><strong>${t}${deSala(k) ? " <em>EN LÍNEA</em>" : ""}</strong><small>${d}</small></span><span class="radio" aria-hidden="true"></span></button>`).join("");
     $("start").classList.add("con-modos");
     $("start").append(lista);

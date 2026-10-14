@@ -7270,7 +7270,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
    - `{t:"resultado", uid, m, g}`: lo que dice el marco de cada peleador al terminar (el juego lo cuenta solo,
      __wrap_BattleResult_Finish); también se puede marcar a mano. Si los dos dicen lo mismo, queda; un empate
      se vuelve a pelear; si no coinciden, `{t:"decide", uid, m, g}` del organizador.
-   - quien se va pierde sus peleas (la que estaba en curso y las que le tocaban).
+   - quien se va pierde sus peleas (la que estaba en curso y las que le tocaban); lo mismo quien saca el
+     organizador (`{t:"echa", uid, a}`), antes o durante el torneo.
    Gana el torneo quien gana la final. Los logros ven cada pelea como una `ronda` (anfitrión = jugador 1). */
 export const esTorneoBt3 = p => cupoDe(p) > 2;
 
@@ -7303,6 +7304,12 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); reponeOrg(); if (rondas) avanza(); continue; }
     const esOrg = j.uid === org;
     if (j.t === "anfitrion" && esOrg && ids.has(j.a) && !fuera[j.a]) { org = j.a; hist.push({ e: "anfitrion", uid: j.uid, a: j.a }); continue; }
+    // El organizador saca a alguien (no a sí mismo): queda fuera como si se hubiera ido; pierde sus peleas.
+    if (j.t === "echa" && esOrg && ids.has(j.a) && j.a !== org && !fuera[j.a]) {
+      fuera[j.a] = true; hist.push({ e: "echado", uid: j.a, por: j.uid });
+      if (rondas) avanza();
+      continue;
+    }
     if (j.t === "disco") { discos[j.uid] = true; continue; }
     if (!rondas) {
       if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo")) {

@@ -16,6 +16,8 @@
 <script src="../audio/volumen.js?v=vol-1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
+<!-- los cuatro kanji de los emblemas de modo, y nada más (text=): unos pocos KB -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&text=%E4%BA%80%E6%A9%9F%E9%97%98%E5%A4%A9&display=swap" rel="stylesheet">
 <style>
   :root { --bg: #0b0c10; --panel: #15171e; --text: #e8e8ea; --muted: #9a9ca6; --accent: #f2a33a; --line: #2a2d38;
     --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
@@ -195,19 +197,30 @@
   .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
   .modos-tit h2 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
   .modos-tit span { font: 400 13px 'Lilita One', system-ui, sans-serif; letter-spacing: .08em; color: #6f7da6; }
-  .modo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 70px; padding: 12px; border-radius: 14px; text-align: left;
+  .modo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 78px; padding: 12px; border-radius: 14px; text-align: left;
     border: 2px solid #2f4d9c; background: #0c1a42e6; color: #f4f6ff; cursor: pointer; font: 13px/1.35 system-ui, sans-serif;
     transition: border-color .15s, box-shadow .15s, transform .15s, background .15s; }
   .modo:hover { border-color: #5a7fd6; transform: translateY(-1px); }
   .modo:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 2px; }
-  .modo .ico { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 11px; background: #16306e; font-size: 21px; }
+  /* el emblema: fondo de ki de su color con líneas de velocidad, y encima el círculo blanco con el kanji */
+  .modo .ico { --c1: #ff9d00; --c2: #b33a00; position: relative; width: 54px; height: 54px; flex: none; display: grid; place-items: center;
+    border-radius: 14px; overflow: hidden; isolation: isolate; box-shadow: inset 0 0 0 2px #ffffff22, 0 3px 0 #050c22;
+    background: repeating-conic-gradient(from 0deg, #ffffff22 0deg 6deg, transparent 6deg 18deg), radial-gradient(circle at 50% 40%, var(--c1), var(--c2) 75%); }
+  .modo .ico b { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: #fffdf5;
+    box-shadow: 0 0 0 2px #1a0a00, 0 2px 6px #0007; font: 900 22px/1 'Noto Serif JP', 'Yu Mincho', 'MS Mincho', serif; color: #111; }
+  .modo .ico-entrenamiento { --c1: #ffb340; --c2: #c2410c; }
+  .modo .ico-cpu { --c1: #4ade80; --c2: #0f5132; }
+  .modo .ico-duelo { --c1: #ff6b6b; --c2: #7f1d1d; }
+  .modo .ico-torneo { --c1: #ffe14a; --c2: #b45309; }
+  .modo.activo .ico { box-shadow: inset 0 0 0 2px #ffd21f, 0 0 16px #ffd21f88, 0 3px 0 #050c22; }
+  @media (prefers-reduced-motion: no-preference) { .modo.activo .ico { animation: aura-modo 1.8s ease-in-out infinite; } }
+  @keyframes aura-modo { 50% { box-shadow: inset 0 0 0 2px #ffd21f, 0 0 26px 4px #ffd21fcc, 0 3px 0 #050c22; } }
   .modo strong { display: flex; align-items: center; gap: 6px; font: 400 18px 'Lilita One', system-ui, sans-serif; color: #fff; }
   .modo strong em { font: 800 9px system-ui, sans-serif; font-style: normal; letter-spacing: .08em; padding: 2px 5px; border-radius: 4px;
     background: #3d7bff33; color: #9cc0ff; }
   .modo small { display: block; margin-top: 2px; font-size: 12px; color: #a9b6dc; }
   .modo .radio { margin-left: auto; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #56689c; }
   .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
-  .modo.activo .ico { background: linear-gradient(180deg, #ffd21f, #ff8a00); }
   .modo.activo strong { color: #ffd21f; }
   .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
   #abreSala { display: none; }

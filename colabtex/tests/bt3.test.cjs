@@ -151,3 +151,16 @@ test('duelo: la revancha la confirman los dos y empieza sola cuando cargan los d
  e=B.reducir(sala(...pelea,{t:'revancha',uid:'b'},{t:'ajuste',uid:'a',k:'tiempo',v:60},{t:'revancha',uid:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
  assert.equal(e.fase,'vestibulo','cambiaron las reglas: b tiene que confirmar de nuevo');
 });
+
+test('torneo: el organizador saca a alguien (antes o durante); nadie más puede',()=>{
+ let e=B.reducir(torneo(4,{t:'echa',uid:'u1',a:'u2'}));
+ assert.ok(!e.fuera.u2,'solo el organizador saca');
+ e=B.reducir(torneo(4,{t:'echa',uid:'u0',a:'u0'}));assert.ok(!e.fuera.u0,'no se saca a sí mismo');
+ e=B.reducir(torneo(4,{t:'echa',uid:'u0',a:'u3'},{t:'torneo',uid:'u0'}));
+ assert.ok(e.fuera.u3);assert.equal(e.llave[0].flatMap(m=>[m.a,m.b]).filter(Boolean).length,3,'antes de empezar: no entra a la llave');
+ e=B.reducir(torneo(4,{t:'torneo',uid:'u0'}));
+ const m=e.actual,saca=m.a===('u0')?m.b:m.a;
+ e=B.reducir(torneo(4,{t:'torneo',uid:'u0'},{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'echa',uid:'u0',a:saca}));
+ assert.ok(e.fuera[saca]);assert.notEqual(e.llave[0].find(x=>x.id===m.id).g,saca,'pierde la pelea en curso');
+ assert.ok(e.hist.some(h=>h.e==='echado'&&h.uid===saca));
+});

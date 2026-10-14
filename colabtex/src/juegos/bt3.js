@@ -55,7 +55,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
      corona) y cada pelea del duelo. Cada animación guarda cuándo empezó (`recientes`): si la llave se vuelve a
      pintar a la mitad, sigue donde iba (`--edad`, un retraso negativo) en vez de partir de cero. */
   const recientes = new Map();
-  let vistoLlave = null, vistoDuelo = -1;
+  let vistoLlave = null, vistoDuelo = -1, vistoFuera = null;
   const edad = (k, dur) => { const t = recientes.get(k); const e = t === undefined ? null : (Date.now() - t) / 1000; return e !== null && e < dur ? e : null; };
   const conEdad = (k, dur, clase) => { const e = edad(k, dur); return e === null ? { c: "", st: "" } : { c: " " + clase, st: ` style="--edad:${e.toFixed(2)}s"` }; };
   function anuncia(html, clase = "", ms = 3600) {
@@ -67,7 +67,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     setTimeout(() => d.remove(), ms);
   }
 
-  const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid);
+  // Juega en esta sala: está entre los jugadores y no se fue ni lo sacaron (si no, mira como cualquier espectador).
+  const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid) && !est?.fuera?.[uid];
   const presentes = () => (est?.jugadores || []).filter(j => !est.fuera?.[j.uid]);
   const nombre = u => (est?.jugadores || []).find(j => j.uid === u)?.nombre || "Jugador";
   const soyAnfitrion = () => enSala() && est.anfitrion === uid;
@@ -297,8 +298,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   /* El cartel de una pelea: el ganador con su aura y, al lado, el que pierde, que revienta en pedazos. */
   const caras = (g, p) => `<div class="jg-bt3-caras"><span class="g">${avatar(jugador(g))}</span><span class="vs" aria-hidden="true">VS</span>
     <span class="p">${avatar(jugador(p))}${explota(1.7)}</span></div>`;
-  function celebra(m, total) {
+  function celebra(m, total, sinCartel = false) {
     recientes.set(m.id, Date.now());
+    if (sinCartel && m.r !== total - 1) return;   // la casilla igual revienta en la llave
     const pierde = m.g === m.a ? m.b : m.a, n = u => `<b translate="no">${escapeHtml(nombre(u))}</b>`;
     setTimeout(() => suena("kiBoom"), 300);   // la carta del que pierde revienta
     if (m.r === total - 1) {   // la final: el campeón
@@ -316,10 +318,21 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   function pintaTorneo(forzar) {
     const js = presentes(), manda = soyAnfitrion(), a = est.actual;
     vest.hidden = false;   // la llave se queda a la vista también al final, debajo del cartel
+    // quien sale del torneo (sacado por el organizador o porque se fue): su foto revienta en el cartel
+    const fueraAhora = Object.keys(est.fuera || {});
+    if (vistoFuera) for (const u of fueraAhora) if (!vistoFuera.includes(u) && !document.hidden) {
+      const echado = (est.hist || []).some(h => h.e === "echado" && h.uid === u);
+      setTimeout(() => suena("kiBoom"), 250);
+      anuncia(`<div class="jg-bt3-caras"><span class="p">${avatar(jugador(u))}${explota(1.7)}</span></div>
+        <small>${echado ? (u === uid ? "El organizador te sacó del torneo" : "Expulsado por el organizador") : "Se fue del torneo"}</small>
+        <b translate="no">${escapeHtml(nombre(u))}</b>`, "pierde", 4200);
+    }
+    const nuevosFuera = new Set(vistoFuera ? fueraAhora.filter(u => !vistoFuera.includes(u)) : []);   // (su pelea la perdieron por irse: ya tienen su cartel)
+    vistoFuera = fueraAhora;
     if (est.llave) {   // peleas decididas desde la última vez: se celebran (no al abrir la sala)
       const ahora = {};
       est.llave.forEach((ronda, r) => ronda.forEach(m => { if (m.g !== undefined) ahora[m.id] = m; }));
-      if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length);
+      if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length, nuevosFuera.has(m.g === m.a ? m.b : m.a));
       vistoLlave = ahora;
     }
     const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.fase, est.llave, a, manda, enSala(), est.cupo]);
@@ -335,6 +348,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       </div>`;
     if (!est.llave) {   // antes de empezar
       const fila = j => `<li class="${j.uid === uid ? "yo" : ""}">${avatar(j)}<span translate="no">${escapeHtml(j.nombre || "Jugador")}</span>
+        ${manda && j.uid !== uid ? `<button class="jg-bt3-echa" data-echa="${escapeHtml(j.uid)}" title="Sacar del torneo" aria-label="Sacar a ${escapeHtml(j.nombre || "Jugador")} del torneo">⏏</button>` : ""}
         ${j.uid === est.anfitrion ? '<em class="jg-bt3-org">👑 Organiza</em>' : ""}
         <i class="jg-bt3-estado ${est.discos?.[j.uid] ? "ok" : ""}">${est.discos?.[j.uid] ? "● Disco listo" : "○ Cargando…"}</i></li>`;
       const puede = js.length >= 3;
@@ -401,11 +415,19 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
           ${cuerpo}</div>`;
       }
       vest.innerHTML = `<header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores · organiza <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span></header>
-        ${panel}<div class="jg-bt3-llave">${llave}</div>`;
+        ${panel}<div class="jg-bt3-llave">${llave}</div>
+        ${manda && js.length > 1 ? `<details class="jg-bt3-mano jg-bt3-echar"><summary>Organizador: sacar a un jugador del torneo</summary>
+          <div class="jg-bt3-fichas">${js.filter(j => j.uid !== uid).map(j => `<button class="jg-bt3-ficha" data-echa="${escapeHtml(j.uid)}">⏏ <span translate="no">${escapeHtml(j.nombre || "Jugador")}</span></button>`).join("")}</div>
+          <p class="jg-bt3-nota">Pierde sus peleas (la que esté en curso y las que le tocaban) y queda mirando.</p></details>` : ""}`;
     }
     vest.querySelectorAll(".jg-bt3-ficha[data-k]").forEach(b => b.onclick = () => {
       if (b.getAttribute("aria-pressed") === "true") return;
       anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+    });
+    vest.querySelectorAll("[data-echa]").forEach(b => b.onclick = () => {
+      if (!confirm("¿Sacar a " + nombre(b.dataset.echa) + " del torneo? Pierde sus peleas y no puede volver a entrar.")) return;
+      b.disabled = true;
+      anota({ t: "echa", uid, a: b.dataset.echa });
     });
     vest.querySelectorAll("[data-accion] .jg-bt3-ficha").forEach(b => b.onclick = () => {
       b.disabled = true;
@@ -427,9 +449,17 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     listo = false; discoMarco = false;
     // si la pelea estaba en pantalla completa, se sale: se vuelve a ver la sala (la llave o el vestíbulo)
     try { if (document.fullscreenElement && document.fullscreenElement === frame) document.exitFullscreen().catch(() => {}); } catch (e) {}
-    if (frame) frame.src = SRC + "&r=" + Date.now();
+    if (frame && enSala()) frame.src = SRC + "&r=" + Date.now();
   }
 
+  /* El marco del juego es solo para quien juega: un espectador (o alguien que se fue o sacaron) ve la sala —el
+     vestíbulo, la llave, los carteles— sin bajar ni arrancar el juego. La pelea en sí se ve solo en las
+     pantallas de los dos peleadores: el juego no tiene modo espectador. */
+  function cargaMarco() {
+    if (!frame || !permitido) return;
+    frame.hidden = !enSala();
+    if (enSala() && !frame.getAttribute("src")) frame.src = SRC;
+  }
   function pantallaCompleta() {
     const pide = frame?.requestFullscreen || frame?.webkitRequestFullscreen;
     if (!pide) return false;
@@ -461,7 +491,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
        juego, aunque haya llegado con el enlace de la sala. */
     revisaBt3().then(ok => {
       if (muerto) return;
-      if (ok) { permitido = true; frame.src = SRC; pintaVestibulo(true); return; }
+      if (ok) { permitido = true; cargaMarco(); pintaVestibulo(true); return; }
       escena.remove(); frame.remove(); vest = frame = escena = avisos = null;
       host.innerHTML = '<p class="jg-bt3-info jg-bt3-privado">Esta sala es privada.</p>';
     });
@@ -508,6 +538,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
 
   function actualizar(p, estado) {
     partida = p; est = estado;
+    cargaMarco();
     detectaInicio();
     // Al terminar mi pelea, mi marco se recarga: la siguiente arranca el programa de cero.
     const pelea = peleando();
