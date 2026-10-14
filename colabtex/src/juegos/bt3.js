@@ -1,4 +1,6 @@
 import * as fb from "../fb-juegos.js";
+import { auth } from "../firebase.js";
+import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS } from "./motor.js";
 
@@ -21,9 +23,23 @@ const PADRE = "bt3-padre", HIJO = "bt3-hijo";
 const SRC = "juegos/bt3/index.html?modo=online&v=bt3-2";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
+/* El disco privado (juegos/bt3/fuente/disco/): el marco del juego le pide a esta página el token de Firebase
+   de quien está con la sesión iniciada, y con él le pide los pedazos de la ISO al Worker, que solo responde a
+   los amigos de su lista. Vale para el marco de una sala y para el de «un jugador» del salón; solo se le da a
+   un marco de esta misma página que carga juegos/bt3/. Un listener para toda la página, puesto una vez. */
+window.addEventListener("message", async e => {
+  if (e.origin !== location.origin || e.data?.canal !== "bt3-hijo" || e.data.tipo !== "token") return;
+  const marco = [...document.querySelectorAll("iframe")].find(f => f.contentWindow === e.source);
+  if (!marco || !/\/juegos\/bt3\/index\.html/.test(new URL(marco.src, location.href).pathname)) return;
+  let token = null;
+  try { token = await auth.currentUser?.getIdToken(!!e.data.nuevo); } catch (err) {}   // nuevo: el anterior venció
+  e.source.postMessage({ canal: "bt3-padre", tipo: "token", token: token || null }, location.origin);
+});
+
 export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
   let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;
+  let permitido = false;   // es de la lista de amigos (se sabe al montar): antes, nada se pinta
 
   const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid);
   const presentes = () => (est?.jugadores || []).filter(j => !est.fuera?.[j.uid]);
@@ -101,7 +117,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   }
 
   function pintaVestibulo(forzar) {
-    if (!vest || !est) return;
+    if (!vest || !est || !permitido) return;
     const jugando = est.fase === "jugando", ver = !partida?.fin;
     vest.hidden = !ver;
     if (!ver) return;
@@ -172,8 +188,15 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     frame.allow = "fullscreen; gamepad";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = SRC;
     host.append(vest, frame);
+    /* Solo los amigos de la lista del disco privado (bt3-amigos.js): a cualquier otro, ni el vestíbulo ni el
+       juego, aunque haya llegado con el enlace de la sala. */
+    revisaBt3().then(ok => {
+      if (muerto) return;
+      if (ok) { permitido = true; frame.src = SRC; pintaVestibulo(true); return; }
+      vest.remove(); frame.remove(); vest = frame = null;
+      host.innerHTML = '<p class="jg-bt3-info jg-bt3-privado">Esta sala es privada.</p>';
+    });
   }
 
   function actualizar(p, estado) {

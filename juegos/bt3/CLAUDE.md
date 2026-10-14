@@ -75,3 +75,25 @@ its ten logros are all room-detected (`SIN_FILA` in `logros.js`: no first-win/st
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
+
+## Friends only: the private disc and the hidden game
+
+The owner wants BT3 **only for a list of friends** (who own the game), and without anyone choosing an ISO.
+
+- **The list lives in one place**: the Worker's `AMIGOS` variable (Firebase uids, comma-separated) in
+  `fuente/disco/worker.js`, deployed by hand in the owner's Cloudflare dashboard (one file, no build). The
+  Worker serves the ISO from an R2 bucket (`DISCO`) in 1 MiB pieces (`pieza/NNNNN.bin` + `indice.json`) only to
+  a request carrying a **valid Firebase ID token** (RS256 checked against Google's JWKs, `aud`/`iss` =
+  `mi-pagina-pro`, not expired) whose uid is on the list. `/soy` answers 200 to a friend, 403 otherwise.
+  `/subir` is a page served by the Worker itself that uploads the ISO from the owner's browser with
+  `CLAVE_SUBIDA`. Verified tokens are cached in memory: the free plan gives little CPU per request.
+  `colabtex/tests/bt3-disco.test.cjs` pins the access rules with a local key pair and a fake bucket.
+- `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
+- **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
+  it says yes, BT3 is filtered out of the catalogue, the solo list, open rooms, games in progress, ranks and
+  logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord nor in
+  `enCurso`. This hides the game; the page files are public like the whole site (they hold nothing of the
+  game), and the disc itself is what the Worker protects.
+- The frame gets the token from its parent (`bt3.js` answers `{tipo:"token"}` only to a same-origin iframe
+  loading `/juegos/bt3/index.html`) and, if `indice.json` answers, starts on the private disc without the ISO
+  picker (`discoPrivado` in `pagina.js`); otherwise it falls back to the remembered ISO, then to choosing one.

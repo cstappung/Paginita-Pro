@@ -58,7 +58,7 @@
   /* La ISO de la última vez. Si el navegador todavía deja leerla (Chrome y Edge, después de «Permitir en cada
      visita»), se usa sola: el jugador la elige una vez y nunca más, ni en las peleas de una sala. Si el permiso
      venció, queda un botón «Usar …» que lo vuelve a pedir con un clic (pedirlo exige un clic del jugador). */
-  leeAsa().then(async h => {
+  const recordada = () => leeAsa().then(async h => {
     if (!h || !$("recordada")) return;
     const b = $("recordada");
     try {
@@ -85,6 +85,82 @@
       }
     };
   });
+
+  /* ------------------------------------------------ 1b. el disco privado (solo los amigos de la lista)
+     Si el sitio tiene uno (`disco-privado.json` trae la dirección del Worker, juegos/bt3/fuente/disco/) y esta
+     página está dentro de Juegos, se le pide a Juegos el token de Firebase de quien inició sesión y con él el
+     índice al Worker. Si responde, el juego arranca leyendo de ahí y no se pide ninguna ISO; si no (no es de la
+     lista, sin sesión, sin disco privado), sigue todo como siempre: la ISO recordada o elegir una. */
+  const pideToken = nuevo => new Promise(ok => {
+    if (window.parent === window) return ok(null);    // la página suelta, fuera de Juegos: sin sesión
+    const fin = v => { clearTimeout(reloj); removeEventListener("message", oye); ok(v); };
+    const oye = e => { if (e.source === window.parent && e.origin === location.origin && e.data?.canal === "bt3-padre" && e.data.tipo === "token") fin(e.data.token || null); };
+    const reloj = setTimeout(() => fin(null), 4000);
+    addEventListener("message", oye);
+    window.parent.postMessage({ canal: "bt3-hijo", tipo: "token", nuevo: !!nuevo }, location.origin);
+  });
+  async function discoPrivado() {
+    let base = "";
+    try { base = String((await (await fetch("disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, ""); } catch (e) {}
+    if (!base) return false;
+    let token = await pideToken(false);
+    if (!token) return false;
+    let r;
+    try { r = await fetch(base + "/indice.json", { headers: { Authorization: "Bearer " + token } }); } catch (e) { return false; }
+    if (r.status === 403) {   // con sesión, pero fuera de la lista: su código, para pasárselo al dueño del disco
+      let uid = "";
+      try { uid = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).sub; } catch (e) {}
+      say("Disco privado: no estás en la lista (tu código: " + uid + "). Mientras, elige tu ISO.");
+      return false;
+    }
+    if (!r.ok) return false;
+    const { size, pieza } = await r.json();
+    // Los pedazos de 1 MB, como el disco alojado del fork: los últimos 48 en memoria y, si el juego lee en
+    // orden (un escenario, un luchador), los 4 siguientes por adelantado.
+    const trae = async i => {
+      for (let intento = 0; ; intento++) {
+        const res = await fetch(base + "/pieza/" + String(i).padStart(5, "0") + ".bin", { headers: { Authorization: "Bearer " + token } });
+        if (res.status === 401 && intento < 2) { token = (await pideToken(true)) || token; continue; }   // el token dura una hora
+        if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
+        return new Uint8Array(await res.arrayBuffer());
+      }
+    };
+    const guardados = new Map(), cuantas = Math.ceil(size / pieza);
+    const pedazo = i => {
+      let q = guardados.get(i);
+      if (q) { guardados.delete(i); guardados.set(i, q); return q; }
+      q = netRead(() => trae(i));                    // (reintentos y el aviso «Cargando» de la página)
+      q.catch(() => guardados.delete(i));
+      guardados.set(i, q);
+      while (guardados.size > 48) guardados.delete(guardados.keys().next().value);
+      return q;
+    };
+    let ultimo = -10, racha = 0;
+    const disco = { size, readAt: async (o, n) => {
+      const out = new Uint8Array(n);
+      if (n === 0) return out;
+      const a = Math.floor(o / pieza), z = Math.floor((o + n - 1) / pieza);
+      racha = a >= ultimo && a <= ultimo + 2 ? racha + 1 : 0;
+      ultimo = z;
+      if (racha >= 2) for (let i = z + 1; i <= Math.min(cuantas - 1, z + 4); i++) if (!guardados.has(i)) pedazo(i).catch(() => {});
+      for (let s = a; s <= z; s += 6) {
+        const ids = [];
+        for (let i = s; i <= Math.min(z, s + 5); i++) ids.push(i);
+        const partes = await Promise.all(ids.map(pedazo));
+        ids.forEach((i, k) => {
+          const desde = Math.max(o, i * pieza), hasta = Math.min(o + n, (i + 1) * pieza);
+          out.set(partes[k].subarray(desde - i * pieza, hasta - i * pieza), desde - o);
+        });
+      }
+      return out;
+    } };
+    $("pickLabel").hidden = true;
+    say("Usando el disco privado…");
+    go(disco);
+    return true;
+  }
+  // Primero el disco privado; si no hay, la ISO recordada; si tampoco, el jugador elige.
+  discoPrivado().then(ok => { if (!ok) recordada(); }, () => recordada());
 
   // ---------------------------------------------------------------- 2. la barra
   const registro = $("registro");

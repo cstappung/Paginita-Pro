@@ -67,6 +67,7 @@ import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3 } from "./juegos/bt3.js";
+import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
@@ -1335,6 +1336,7 @@ function anunciaEnCurso(p, est) {
     return;
   }
   if (!(p.jugadores || {})[u.uid] || !est.listos) return;
+  if (p.juego === "bt3") return;   // BT3 es privado: no se anuncia en «En juego ahora»
   if (enCursoToque > 0 && Date.now() - enCursoToque < 5 * 60 * 1000) return;
   enCursoToque = Date.now();
   fb.anunciaEnCurso(state.pid, {
@@ -1383,7 +1385,7 @@ async function crear(juego, extra) {
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
-    anunciaSala(salaParaDiscord(pid, juego, extra, u));
+    if (juego !== "bt3") anunciaSala(salaParaDiscord(pid, juego, extra, u));   // BT3 es privado: ni en Discord
     ir("#p/" + pid);
   } catch (e) { avisa(e, juego); }
 }
@@ -1860,7 +1862,7 @@ function armazon() {
   if (state.vista === "logros") {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
+      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible())
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero" })[k] || k) });
     logrosVista.montar(h);
     return;
@@ -1908,7 +1910,7 @@ function armazon() {
   if (state.vista === "ranks") {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
-      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
+      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()),
       datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "", foto: fotoEnDatos(u, datosP) }, colorForUid),
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
@@ -2452,7 +2454,7 @@ const entradaVes = id => entradasVes.solos.find(e => e.id === id) || entradasVes
 function salasAbiertas() {
   if (!state.user) return [];
   const mias = new Set(state.mias.map(x => x.id)), ahora = fb.ahora();
-  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora));
+  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()));
 }
 
 /* El podio de un juego, en su ficha: es la razón para abrir una sala de
@@ -2503,8 +2505,9 @@ function pintaVestibulo() {
   /* El catálogo: los multijugador por popularidad (la de la última visita
      mientras llega la de hoy), los del club también, y las prácticas
      contra bots al final, que son la versión pequeña de un multijugador. */
-  const orden = ordenPopular(Object.keys(JUEGOS));
+  const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible());   // BT3: solo los amigos
   entradasVes = entradasSalon(JUEGOS, orden);
+  if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3");
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
@@ -2589,7 +2592,7 @@ function pintaVestibulo() {
      anuncio viejo es de una partida que alguien dejó a medias sin
      cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
   const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
-  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco);
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()));
   $("vesNCurso").textContent = vivas.length;
   $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
     const j = JUEGOS[x.juego] || {};
@@ -3268,7 +3271,11 @@ function wire() {
       return rep.sendFeedback(r, { uid: u.uid, userName: u.name });
     }
   });
+  /* BT3 aparece solo para los amigos de la lista del disco privado: se pregunta al cambiar la sesión, y el
+     salón se repinta cuando llega la respuesta (bt3-amigos.js). */
+  alCambiarBt3(() => { vesFirma = ""; if (state.vista === "vestibulo") render(); });
   watchAuth(user => {
+    revisaBt3();
     if (!user) {
       /* Sin sesión (o al salir) no hay muro: el salón en modo invitado,
          en la misma ruta en que se estaba. */
