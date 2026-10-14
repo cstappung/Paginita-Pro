@@ -11,8 +11,8 @@
       el log del programa (con ?log=1, o solo si el juego se detiene).
    3. **La sala** (`?modo=online`, dentro de Juegos): al elegir la ISO se avisa a la sala, se espera a que el
       anfitrión empiece, se conecta con el rival por la malla del marco (`red.js`) y recién ahí arranca el
-      programa como sesión en línea. El entorno de la sesión (anfitrión o no, reglas) se pone justo antes
-      de arrancar: el programa lo lee por primera vez en main, no antes.
+      programa como sesión en línea. El entorno de la sesión (anfitrión o no, reglas) lo pone el programa con
+      setenv al empezar el juego (Module.entornoPendiente): ENV ya no sirve una vez cargado el runtime.
    @controles: teclado */
 (() => {
   const $ = id => document.getElementById(id);
@@ -165,10 +165,12 @@
       Module.netSend = bytes => S.envia(bytes);
       Module.netRecv = () => S.recibe();
       Module.netHas = () => S.hay();
-      Object.assign(ENV, {
+      /* Las variables de la sesión. No sirve tocar ENV a esta altura (el runtime ya lo copió al cargar): las
+         pone el programa mismo con setenv al empezar el juego (__wrap_Game_Main, parche.diff). */
+      Module.entornoPendiente = Object.entries(Object.assign({
         BT3_NET_SESSION: "1", BT3_NET_NAME: e.nombre.slice(0, 16), BT3_NET_DELAY: "auto", BT3_NOMOVIE: "1", BT3_SOUND_TICKS: "1",
         BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
-      }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" });
+      }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" }));
       try { FS.mkdir("/net_session"); } catch (err) {}
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 4000);
     },

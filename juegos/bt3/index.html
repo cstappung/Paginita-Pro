@@ -173,7 +173,7 @@
   #sala.on { display: block; }
   .recordada { margin-top: 10px; }
 </style>
-<script src="red.js?v=bt3-1"></script>
+<script src="red.js?v=bt3-2"></script>
 </head>
 <body>
 <div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
@@ -237,7 +237,7 @@
     printErr: (t) => { Module.keep(t); console.warn(t); },
     keep: (t) => { Module.log.push(t); if (Module.log.length > 4000) { Module.log.splice(0, 1000); Module.logBase += 1000; } },
     noInitialRun: true,
-    locateFile: (f, base) => base + f + '?v=bt3-1',   // el .wasm con la misma versión que su .js
+    locateFile: (f, base) => base + f + '?v=bt3-2',   // el .wasm con la misma versión que su .js
     // phones: a smaller cache of the disc's files (they are kept in memory)
     webCacheBudget: (phone ? 256 : 768) * 1024 * 1024,
     // the port's switches; set before the program starts up (its start-up code reads the environment, which is
@@ -567,11 +567,11 @@
   }
   else {
     const s = document.createElement('script');
-    s.src = BUILD + '.js?v=bt3-1';
+    s.src = BUILD + '.js?v=bt3-2';
     s.onerror = () => say('Could not load ' + BUILD + '.js', true);
     document.body.appendChild(s);
   }
 </script>
-<script src="pagina.js?v=bt3-1"></script>
+<script src="pagina.js?v=bt3-2"></script>
 </body>
 </html>

@@ -28,14 +28,15 @@ index fd6cc57..79829bd 100644
      set_open(true);
      sNet = true;
 diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
-index dac5c3d..91c3423 100644
+index dac5c3d..f1c2467 100644
 --- a/port/src/plat_mem.c
 +++ b/port/src/plat_mem.c
-@@ -281,6 +281,75 @@ static void data_fail(const char *what, const char *path) {
+@@ -281,6 +281,96 @@ static void data_fail(const char *what, const char *path) {
      exit(2);
  }
  
 +#ifdef BT3_WEB_SKELETON
++#include <emscripten.h>
 +/* Build web sin datos del juego (port/web/gen_data_skeleton.py): las tablas vienen en blanco dentro del .wasm y
 +   su lista (gWebDatos: dirección, fuente, offset, largo) va compilada en el programa en vez de en un .dat. Aquí se
 +   rellenan desde el disco del jugador, igual que la release de escritorio; el hash comprueba que es el USA. */
@@ -98,7 +99,27 @@ index dac5c3d..91c3423 100644
 +   dentro de main: no en los constructores, que corren antes. El enlace envuelve Game_Main (-Wl,--wrap=Game_Main,
 +   port/web/link.py), la primera función del juego que llama main, para rellenar las tablas justo antes. */
 +extern void __real_Game_Main(void);
++/* El entorno de una pelea en línea (BT3_NET_SESSION, HOST o JOIN, RULES...). La página lo decide recién cuando
++   el anfitrión empieza, y para entonces el programa ya cargó: Emscripten copia ENV al entorno de C al arrancar
++   el runtime, así que cambiar ENV después no sirve (el juego abría el menú principal en vez del versus). Aquí,
++   al empezar el juego y antes de que nada lea el entorno, la página entrega las variables y se ponen con
++   setenv. `Module.entornoPendiente` es una lista de pares [nombre, valor] (juegos/bt3/pagina.js). */
++EM_JS(int, web_entorno_n, (void), { return (Module.entornoPendiente || []).length; });
++EM_JS(void, web_entorno_i, (int i, char *k, int kn, char *v, int vn), {
++    const e = Module.entornoPendiente[i];
++    stringToUTF8(String(e[0]), k, kn);
++    stringToUTF8(String(e[1]), v, vn);
++});
++static void web_pone_entorno(void) {
++    char k[64], v[256];
++    int i, n = web_entorno_n();
++    for (i = 0; i < n; i++) {
++        web_entorno_i(i, k, (int)sizeof(k), v, (int)sizeof(v));
++        setenv(k, v, 1);
++    }
++}
 +void __wrap_Game_Main(void) {
++    web_pone_entorno();                /* primero: lo que la página decidió para esta pelea */
 +    gPortStage = "reading the game's programs from the disc image";
 +    Port_LoadGameData();               /* las tablas del juego, desde la ISO del jugador */
 +    __real_Game_Main();                /* y el juego, como siempre */
@@ -107,7 +128,7 @@ index dac5c3d..91c3423 100644
  static void Port_LoadGameData(void) {
      char exe[1024], path[1200];
      const char *root = getenv("BT3_DATA") != NULL ? getenv("BT3_DATA") : "gamedata";
-@@ -392,6 +461,7 @@ static void Port_LoadGameData(void) {
+@@ -392,6 +482,7 @@ static void Port_LoadGameData(void) {
          data_fail("the game's programs in your game data are not the unmodified USA release (SLUS-21678)", NULL);
      }
  }
@@ -115,7 +136,7 @@ index dac5c3d..91c3423 100644
  
  #if defined(__x86_64__)
  /* (between the GS registers at 0x12000000 and the program at 0x20000000: see the note at STACK_BASE) */
-@@ -500,8 +570,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
+@@ -500,8 +591,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
          ExitProcess(4);
      }
  #endif

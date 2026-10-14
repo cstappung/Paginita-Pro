@@ -52,9 +52,11 @@ Room game in an iframe, modelled on HaxBall, with one deliberate difference: **t
 - The game's netcode is the fork's `gs/net.c`: inputs of the last 16 frames per packet, version check,
   `BT3_NET_DELAY=auto`. **In the browser it is lockstep with input delay, not rollback**: rollback (`state.c`) needs
   the 64-bit desktop's page tracking and reports `Port_RollCan() == 0` here.
-- The session environment (`BT3_NET_HOST`/`RULES` or `JOIN`) is set in `ENV` right before `callMain`: nothing reads
-  the environment before `main` (the constructors don't), so the frame does not reload into the session like the
-  fork does, and the ISO is chosen once per fight.
+- The session environment (`BT3_NET_SESSION`, `HOST`/`RULES` or `JOIN`) is **not** written to `ENV`: Emscripten
+  copies `ENV` into C's environment when the runtime starts, so a later `ENV` change is never seen (the game
+  opened the main menu instead of the versus screen). The page leaves the pairs in `Module.entornoPendiente` and
+  `__wrap_Game_Main` applies them with `setenv` before anything reads them. So the frame does not reload into the
+  session like the fork does, and the ISO is chosen once per fight.
 - Only STUN: two networks that refuse a direct connection cannot fight; the frame says so after 45 s and the room
   goes back to the lobby. A TURN relay would fix it (not done).
 

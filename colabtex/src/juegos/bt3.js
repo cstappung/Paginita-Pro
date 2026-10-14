@@ -18,7 +18,7 @@ import { BT3_BATALLAS, BT3_TIEMPOS } from "./motor.js";
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-1";
+const SRC = "juegos/bt3/index.html?modo=online&v=bt3-2";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
 export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
