@@ -5,8 +5,8 @@
      historia, cada una una oleada de polillas seguida de su jefe (ocho
      hasta el Alba, seis en la otra orilla y seis en lo alto, que termina
      en el Sol), y una función que fabrica las del sin fin a partir de la
-     21: los mismos jefes en su fase 2 (la primera vuelta) y 3 (todas las
-     que siguen), con una oleada entre cada dos. La travesía es una sola y
+     21: los mismos jefes en su fase 2 (la primera vuelta), 3, 4 y 5 (la
+     cuarta y todas las que siguen), con una oleada entre cada dos. La travesía es una sola y
      no se acaba: después del Sol sigue sola hacia el sin fin.
    - Los AUGURIOS: cada jornada que pasas, la noche aprende algo (un poco
      más de fuego, escamas más rápidas, polillas que aguantan un golpe
@@ -216,8 +216,8 @@
 
   /* El sin fin recorre los nueve actos de pelea en bloques de dos: una
      oleada y el jefe del acto, que vuelve en otra fase. La primera vuelta
-     entera es la fase 2; de ahí en adelante, la 3 (y cada vuelta más
-     fuerte por la dificultad). */
+     entera es la fase 2, la segunda la 3, la tercera la 4 y de ahí en
+     adelante, la 5 (y cada vuelta más fuerte por la dificultad). */
   const CICLO_SINFIN = [1, 2, 3, 6, 7, 8, 9, 10, 11];
   const JEFE_DE_ACTO = { 1: "nodriza", 2: "faro", 3: "esfinge", 6: "casco", 7: "crisalida", 8: "hoguera", 9: "luna", 10: "constelacion", 11: "sol" };
   /* La oleada que el sin fin copia y endurece en cada acto. La del acto I
@@ -226,7 +226,7 @@
   const OLEADA_I_SINFIN = { acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.4, fuego: 0.95, balas: 3, apunta: 0.22, picada: 0.07, deriva: 1.5, mensajeras: 1 };
   const oleadaBase = acto => (acto === 1 ? OLEADA_I_SINFIN : JORNADAS[OLEADA_DE_ACTO[acto] - 1]);
   /* La fase de los jefes de una vuelta del sin fin (en la historia, 1). */
-  const faseDeVuelta = vuelta => (vuelta >= 1 ? 3 : 2);
+  const faseDeVuelta = vuelta => Math.min(5, 2 + Math.max(0, vuelta));
 
   /* Una jornada cualquiera, con sus augurios: las de la historia de la
      tabla y las del sin fin fabricadas. */
@@ -281,8 +281,12 @@
 
   /* La vida de un jefe en una jornada: crece con el nivel de la jornada
      (el arma también crece, con las mejoras) hasta el cuádruple, en el sin
-     fin con la fuerza, y en las fases 2 y 3 un poco más. */
-  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3 };
+     fin con la fuerza, y en las fases 2 y 3 un poco más. Las fases 4 y 5
+     tienen la vida de la 3 A PROPÓSITO: la vida de un jefe entra en la prueba (el
+     verificador no deja que muera con menos daño), y así una partida de la
+     tercera vuelta vale lo mismo con este motor que con el anterior. Lo
+     que las hace más duras son sus habilidades nuevas. */
+  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.3, 5: 1.3 };
   function vidaJefe(j) {
     const base = VIDA_JEFE[j.jefe] || 0;
     const porJornada = Math.min(4, 1 + 0.05 * Math.max(0, (j.nivel || j.n || 4) - 4));

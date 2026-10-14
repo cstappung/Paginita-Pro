@@ -30,7 +30,7 @@ test('la travesía: veinte jornadas, una oleada y un jefe por acto, el Alba en l
  assert.ok(M.jornada(15).marea>0&&M.jornada(17).fugaces>0&&M.jornada(19).marea>0&&M.jornada(19).fugaces>0);
 });
 
-test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2 y 3',()=>{
+test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2, 3, 4 y 5',()=>{
  const ol=M.JORNADAS.filter(j=>j.tipo==='oleada');
  for(let i=1;i<ol.length;i++)assert.ok(ol[i].fuego>=ol[i-1].fuego-0.2,'fuego jornada '+ol[i].n);
  // La primera oleada sigue siendo la más amable.
@@ -43,7 +43,9 @@ test('la curva: la historia sube de jornada en jornada; después del Sol los jef
  assert.deepEqual([21,22].map(n=>M.jornada(n).tipo),['oleada','jefe']);
  assert.deepEqual([22,24,26,28,30,32,34,36,38].map(n=>M.jornada(n).jefe),['nodriza','faro','esfinge','casco','crisalida','hoguera','luna','constelacion','sol']);
  assert.ok([21,23,25].every(n=>M.jornada(n).acto===5));
- assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+3*ciclo).fase,3);
+ assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+2*ciclo).fase,4);assert.equal(M.jornada(22+3*ciclo).fase,5);assert.equal(M.jornada(22+9*ciclo).fase,5);
+ // La fase 4 no cambia la vida respecto de la 3 (la vida entra en la prueba): solo sube por la jornada.
+ assert.equal(M.VIDA_FASE[4],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[5],M.VIDA_FASE[3]);
  assert.ok(M.vidaJefe(M.jornada(22+ciclo))>M.vidaJefe(M.jornada(22)),'el jefe vuelve más fuerte');
  assert.ok(M.vidaJefe(M.jornada(22))>M.vidaJefe(M.jornada(2)),'la fase 2 es más dura que la primera vez');
  assert.ok(M.vidaJefe(M.jornada(20))>M.vidaJefe(M.jornada(4)),'los jefes crecen con la jornada');
@@ -278,4 +280,23 @@ test('las categorías de FANAL pasan por el club, por Discord y por las reglas',
  const html=fs.readFileSync(path.join(D,'index.html'),'utf8');
  for(const f of ['relato','motor','sprites','musica','juego'])assert.match(html,new RegExp(f+'\\.js\\?v=fanal-\\d+'));
  assert.match(html,/i18n\.js\?v=/);assert.match(html,/conexion\.js\?v=club-\d+/);
+});
+
+test('la música por fase: cada fase del sin fin suena con más energía, sin romper el reloj de la prueba',()=>{
+ const en=f=>MU.capas({modo:'juego',tension:0.3,peligro:0,fase:f});
+ // La percusión crece de fase en fase y el arpegio entra en la 3.
+ for(let f=2;f<=5;f++)assert.ok(en(f).percusion>en(f-1).percusion||en(f).percusion===1,'percusión '+f);
+ assert.equal(en(1).arpegio,0);assert.equal(en(2).arpegio,0);assert.ok(en(3).arpegio>0&&en(5).arpegio>en(3).arpegio);
+ // La fase 1 es la música de siempre, y fuera del juego la fase no cuenta.
+ assert.deepEqual(MU.capas({modo:'juego',tension:0.3,peligro:0}),en(1));
+ assert.deepEqual(MU.capas({modo:'transito',fase:5}),MU.capas({modo:'transito'}));
+ assert.equal(MU.faseMusical({modo:'titulo',fase:5}),1);assert.equal(MU.faseMusical({modo:'juego',fase:9}),5);
+ // El compás se acelera con la fase, pero el pulso más corto (dos corcheas) nunca baja de 0,2 s:
+ // la prueba cuenta los pulsos demasiado juntos.
+ for(const e of Object.values(MU.ETAPAS))for(const lat of [1,1.3,1.6]){
+  const base=e.epm*lat;
+  assert.equal(MU.epmDeFase(base,1),base);
+  for(let f=2;f<=5;f++){const v=MU.epmDeFase(base,f);assert.ok(v>=MU.epmDeFase(base,f-1)&&v>=base);assert.ok(120/v>0.2||v===base,'pulso de '+(120/v).toFixed(3)+' s');}
+ }
+ assert.ok(MU.epmDeFase(300,5)>300*1.15);
 });

@@ -243,10 +243,13 @@
      - modo: titulo | juego | transito | revelacion | final | silencio | apagado
      - tension: 0 con la formación entera, 1 cuando queda la última polilla
      - peligro: 0 tranquilo, 1 con escamas encima o la formación abajo
-     - jefe: nombre del jefe o null */
+     - jefe: nombre del jefe o null
+     - fase: 1 en la historia; 2 a 5 en el sin fin (la de los jefes de esa
+       vuelta). Cada fase suena con más energía que la anterior: ver
+       `energiaDeFase` y lo que hace con ella `programaTick`. */
   function capas(est) {
     const modo = est.modo || "juego", t = clamp(est.tension || 0), p = clamp(est.peligro || 0), jefe = !!est.jefe;
-    const c = { dron: 0, latido: 0, campanas: 0, percusion: 0, melodia: 0, tensionPad: 0, leitmotiv: 0, viento: 0 };
+    const c = { dron: 0, latido: 0, campanas: 0, percusion: 0, melodia: 0, tensionPad: 0, leitmotiv: 0, viento: 0, arpegio: 0 };
     if (modo === "silencio") return c;                                     // los silencios también se componen
     if (modo === "titulo") return Object.assign(c, { dron: 0.6, campanas: 0.35, viento: 0.5 });
     if (modo === "transito") return Object.assign(c, { dron: 0.7, campanas: 0.25, viento: 0.6 });
@@ -260,11 +263,31 @@
     c.campanas = 0.45 + 0.4 * t;
     c.percusion = 0.35 + 0.65 * t;
     c.tensionPad = Math.max(0, p - 0.25) / 0.75;                           // solo cuando el peligro es real
+    // Las fases del sin fin: la percusión ya no espera a la tensión, y desde
+    // la 3 entra una voz nueva, el arpegio.
+    const fase = faseMusical(est), en = energiaDeFase(fase);
+    c.percusion = Math.min(1, c.percusion + 0.45 * en);
+    c.campanas = Math.min(1, c.campanas + 0.15 * en);
+    if (fase >= 3) c.arpegio = Math.min(1, 0.5 + 0.2 * (fase - 3) + 0.2 * t);
     if (jefe) { c.leitmotiv = 1; c.melodia = 0; }                          // el jefe trae su propia melodía
     else c.melodia = t < 0.25 ? 0 : (t - 0.25) / 0.75;                     // la melodía entra a mitad de oleada
     return c;
   }
   const clamp = v => Math.max(0, Math.min(1, v));
+  /* La fase que suena: la del estado, y solo mientras se juega (el
+     tránsito, la portada y los finales suenan siempre igual). */
+  const faseMusical = est => ((est.modo || "juego") === "juego" ? Math.max(1, Math.min(5, Math.round(est.fase || 1))) : 1);
+  /* De 0 (fase 1) a 1 (fase 5): cuánta energía de más. */
+  const energiaDeFase = fase => (Math.max(1, Math.min(5, fase || 1)) - 1) / 4;
+  /* Cuánto más rápido va el compás en cada fase: un 4 % por fase, hasta un
+     16 % en la 5. Con un techo: dos corcheas seguidas (el pulso más corto)
+     nunca duran menos de 0,21 s, porque la prueba cuenta los pulsos que
+     vienen a menos de 0,2 s y deja pasar muy pocos (prueba.js: pulsosJuntos). */
+  const EPM_TECHO = 560;
+  function epmDeFase(epm, fase) {
+    const subido = epm * (1 + 0.04 * (Math.max(1, Math.min(5, fase || 1)) - 1));
+    return Math.max(epm, Math.min(subido, EPM_TECHO));
+  }
 
   /* Un generador con semilla para las figuras de campana de cada etapa. */
   function azar(semilla) {
@@ -310,7 +333,7 @@
     // --- Estado musical ---
     let etapa = Object.assign({}, ETAPAS.titulo), etapaPendiente = null;
     let mapa = mapaCompas(etapa.metrica), figura = figuraCampanas(etapa.escala);
-    let est = { modo: "titulo", tension: 0, peligro: 0, jefe: null, vida: 1, latido: 1 };
+    let est = { modo: "titulo", tension: 0, peligro: 0, jefe: null, vida: 1, latido: 1, fase: 1 };
     let ganancia = capas(est);    // ganancias objetivo de cada capa
     let g = Object.assign({}, ganancia); // ganancias suavizadas (lo que suena)
 
@@ -559,6 +582,7 @@
       const t = aAudio(tj), dt = 60 / epmEfectivo();
       const R = etapa.raiz, E = etapa.escala, n = ESCALAS[E].cents.length;
       const enSilencio = callado > 0;
+      const fase = faseMusical(est), en = energiaDeFase(fase);           // la energía de la fase (0 en la historia)
 
       // LATIDO: el bajo de cuatro notas que baja, uno por pulso.
       if (esPulso && g.latido > 0.01 && !enSilencio) {
@@ -567,18 +591,32 @@
         const f = frecuencia(R / 2, E, grado);
         const sucioL = Math.max(0, est.tension - 0.45) / 0.55;          // la tensión ensucia el latido
         pulso(t, f, dt * 1.6, 0.42 * g.latido * (nivel === 2 ? 1 : 0.85), {
-          ancho: 0.22, pwm: 0.6 + est.tension * 2, corte: 360 + 1100 * est.tension, q: 4 + 6 * est.tension, barrido: 0.5, sostiene: 0.3
+          ancho: 0.22, pwm: 0.6 + est.tension * 2, corte: 360 + 1100 * est.tension + 600 * en, q: 4 + 6 * est.tension, barrido: 0.5, sostiene: 0.3
         });
         if (sucioL > 0) pulso(t, f * Math.pow(2, (est.tension > 0.8 ? 600 : 100) / 1200), dt * 1.2, 0.16 * sucioL * g.latido, { ancho: 0.12, corte: 900, q: 3, barrido: 0.6 });
+      }
+
+      // Fases 2 a 5: el bajo no descansa. En las corcheas que no son pulso
+      // repite su nota una octava arriba, corta: un motor de corcheas.
+      if (!esPulso && fase >= 2 && g.latido > 0.01 && !enSilencio) {
+        const f = frecuencia(R, E, [3, 2, 1, 0][(pasoLatido + 3) % 4]);
+        pulso(t, f, dt * 0.55, (0.09 + 0.11 * en) * g.latido, { ancho: 0.3, corte: 650 + 1100 * en, q: 3, barrido: 0.4, sostiene: 0.2 });
       }
 
       // PERCUSIÓN: parche grave en el uno, golpes en los pulsos, roce en las corcheas.
       if (g.percusion > 0.01 && !enSilencio) {
         if (nivel === 2) golpeGrave(t, 150, 48, 0.32, 0.5 * g.percusion);
-        else if (nivel >= 1 && est.tension > 0.2) golpeGrave(t, 120, 60, 0.18, 0.22 * g.percusion);
+        else if (nivel >= 1 && (est.tension > 0.2 || fase >= 2)) golpeGrave(t, 120, 60, 0.18, (0.22 + 0.16 * en) * g.percusion);
         const roce = etapa.metrica === "5/4" ? 2600 : 6500;               // en la niebla, un roce más opaco
         soplo(t, 0.03 + (nivel > 0 ? 0.02 : 0), (nivel > 0 ? 0.07 : 0.04) * g.percusion, roce, 0.8, "highpass");
-        if (est.tension > 0.6) soplo(t + dt / 2, 0.025, 0.035 * g.percusion, roce * 1.2, 0.8, "highpass"); // semicorcheas cuando aprieta
+        if (est.tension > 0.6 || fase >= 3) soplo(t + dt / 2, 0.025, 0.035 * g.percusion, roce * 1.2, 0.8, "highpass"); // semicorcheas cuando aprieta (desde la fase 3, siempre)
+        // Fase 3: un contratiempo seco, como una palmada, en los pulsos débiles.
+        if (fase >= 3 && nivel === 1) soplo(t, 0.07, (0.07 + 0.06 * en) * g.percusion, 1900, 1.1, "bandpass");
+        // Fase 4: el parche grave se adelanta al uno (doble golpe) y redobla al cerrar cada cuarto compás.
+        if (fase >= 4 && k === mapa.largo - 1) golpeGrave(t, 130, 55, 0.14, 0.3 * g.percusion);
+        if (fase >= 4 && compas % 4 === 3 && k >= mapa.largo - 4) golpeGrave(t + dt / 2, 200 - (k - (mapa.largo - 4)) * 24, 70, 0.11, 0.26 * g.percusion);
+        // Fase 5: el galope: un parche chico en cada corchea que no es pulso.
+        if (fase >= 5 && !esPulso) golpeGrave(t, 96, 62, 0.09, 0.17 * g.percusion);
         // El gong cierra el ciclo cada cuatro compases, como en un gongan.
         if (k === 0 && compas % 4 === 0) campana(t, R / 2, 4.5, 0.22 * Math.max(g.percusion, g.dron), { ratio: 1.4, indice: 1.2, ombak: 2, envio: 0.6 });
       }
@@ -595,6 +633,15 @@
       // En el alba, unas campanitas de vidrio en 4 contra 9 (o lo que toque).
       if (est.modo === "juego" && etapa.escala === "lidiaAum" && absoluto % 2 === 1 && g.campanas > 0.01) {
         campana(t, frecuencia(R * 4, E, (absoluto * 3) % n), 0.6, 0.06 * g.campanas, { ratio: 3, indice: 0.8, pan: Math.sin(absoluto) * 0.7 });
+      }
+
+      // ARPEGIO (fases 3 a 5): una voz corta y brillante que sube y baja por la
+      // escala, una nota por corchea (en la 5, también la semicorchea). Es lo
+      // que más empuja: lo demás marca el paso, esto corre.
+      if (g.arpegio > 0.01 && !enSilencio) {
+        const fig = [0, 2, 4, 2, 1, 3, 5, 3], gr = fig[absoluto % fig.length] + (compas % 4 === 3 ? 1 : 0), lado = absoluto % 2 ? 0.5 : -0.5;
+        pulso(t, frecuencia(R * 4, E, gr), dt * 0.5, 0.055 * g.arpegio, { ancho: 0.18, corte: 2200 + 1800 * en, q: 2, ataque: 0.004, sostiene: 0.25, pan: lado, envio: 0.25 });
+        if (fase >= 5) pulso(t + dt / 2, frecuencia(R * 4, E, gr + 2), dt * 0.4, 0.04 * g.arpegio, { ancho: 0.18, corte: 4200, q: 2, ataque: 0.004, sostiene: 0.2, pan: -lado });
       }
 
       // MELODÍA o LEITMOTIV: una frase por cada dos compases.
@@ -687,6 +734,11 @@
         if (!fil) campana(t, f, dur * 2.5, 0.2 * vol, { ratio: 1, indice: 0.9, ombak: 0.6 });
         else pulso(t, f, dur, 0.16 * vol, { ancho: 0.33, pwm: 3, corte: fil, q: 1.5, vibrato: 10, ataque: 0.02, sostiene: 0.7, envio: 0.4, eco: etapa.metrica !== "7/8", desliza: 0.97 });
       }
+      // Fases 4 y 5: la frase se dobla una octava arriba (y en la 5, con su
+      // quinta encima): el mismo tema, pero cantado más alto.
+      const fase = faseMusical(est);
+      if (fase >= 4) pulso(t, f * 2, dur * 0.6, 0.05 * vol, { ancho: 0.25, corte: 3600, q: 1.2, ataque: 0.01, sostiene: 0.5, envio: 0.3 });
+      if (fase >= 5) pulso(t, f * 3, dur * 0.4, 0.032 * vol, { ancho: 0.2, corte: 4400, q: 1.2, ataque: 0.01, sostiene: 0.4 });
     }
 
     /* Las corcheas por minuto que mandan ahora: las de la etapa por el
@@ -694,7 +746,8 @@
        lentas en el tránsito y en la revelación. */
     function epmEfectivo() {
       const lento = est.modo === "transito" ? 0.62 : est.modo === "revelacion" || est.modo === "final" || est.modo === "apagado" ? 0.45 : est.modo === "titulo" ? 1 : 1;
-      return etapa.epm * (est.modo === "juego" ? est.latido || 1 : 1) * lento;
+      const base = etapa.epm * (est.modo === "juego" ? est.latido || 1 : 1) * lento;
+      return epmDeFase(base, faseMusical(est));                          // en el sin fin, un poco más rápido en cada fase
     }
 
     /* Suaviza las ganancias hacia sus objetivos y las aplica a las capas
@@ -947,6 +1000,6 @@
     ESCALAS, METRICAS, ETAPAS, ROTACION_SINFIN, MOTIVOS,
     mapaCompas, frecuencia, gradoQuinta, etapaSinFin, largoMotivo,
     transpone, invierte, retrograda, aumenta, fragmenta, tartamudea, faseDeVida, leitmotiv,
-    capas, figuraCampanas, crearMotor
+    capas, faseMusical, energiaDeFase, epmDeFase, EPM_TECHO, figuraCampanas, crearMotor
   };
 });
