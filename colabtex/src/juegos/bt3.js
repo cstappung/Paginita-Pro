@@ -452,6 +452,10 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
 
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
+    /* Mientras el juego todavía muestra la celebración (esperaMenu), la sala de este peleador no cambia nada: el
+       vestíbulo con el marcador, el cartel del ganador o la llave nueva empujaban el juego hacia abajo y se llevaban
+       la vista en plena pantalla de ganador. Se pinta todo junto al recargar el marco (reiniciaMarco). */
+    if (esperaMenu) return;
     if (est.torneo) return pintaTorneo(forzar);
     const jugando = est.fase === "jugando", ver = !partida?.fin;
     vest.hidden = !ver;
@@ -745,6 +749,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     // si la pelea estaba en pantalla completa, se sale: se vuelve a ver la sala (la llave o el vestíbulo)
     try { if (document.fullscreenElement && document.fullscreenElement === frame) document.exitFullscreen().catch(() => {}); } catch (e) {}
     if (frame && enSala()) frame.src = SRC + "&r=" + Date.now();
+    pintaVestibulo(true);   // (lo que quedó guardado mientras se veía la celebración: el marcador, el cartel, la llave)
   }
 
   /* El marco del juego es solo para quien juega: un espectador (o alguien que se fue o sacaron) ve la sala —el

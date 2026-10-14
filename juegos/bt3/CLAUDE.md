@@ -76,7 +76,9 @@ to the room reloaded the frame without one (log: `empieza`, then only `vuelve`) 
 celebration is shown whole**: the room counts the result at the K.O. but a frame that reported a winner is not
 reloaded until its game enters the results-menu state (`BtlSeqEnd_Enter` → `Web_MenuFin` → `Module.onMenuFin` →
 `menufin`, after the finish and the winner's pose and line), or 25 s (`esperaMenu` in bt3.js); a cut fight reloads at
-once. The spectator's screen stays 18 s after a fight with a winner (`tele.cierre`). Reloading on the result cut the
+once. Meanwhile **that fighter's room does not repaint** (`pintaVestibulo` returns while `esperaMenu`): the lobby with
+the score, the winner's banner or the new bracket pushed the game down and took the eye off the winner's screen;
+`reiniciaMarco` paints it all at once. The spectator's screen stays 18 s after a fight with a winner (`tele.cierre`). Reloading on the result cut the
 winner's screen → the frame → `bt3.js` writes
 `{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
 the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
@@ -270,7 +272,7 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
   at 300 pieces (300 MB) on both sides. `BT3_VER` in `bt3-amigos.js` is the program version (construir.sh sets it).
 - **Always 60 fps, locked**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
-  pictures. The patch forces `gsInterp = 1` every frame in the browser build (`gs_draw.c`; F1's combo is disabled and
+  pictures, so it must be ON (off is 30). The patch forces it on, `gsInterp = 1`, in every `GsGpu_FrameEnd` in the browser build (`gs_draw.c`; F1's combo is disabled and
   F9 has no effect): in an online fight both players must see the same, never 30 and never more. It is a display-only
   blend (+16.7 ms of display latency), so lockstep play is unaffected.
 - **Auto-tuner** (`pagina.js` 2a, like a phone game's): the picture rate never changes; what gets cheaper is each
