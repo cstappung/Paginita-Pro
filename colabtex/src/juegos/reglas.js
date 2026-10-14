@@ -455,7 +455,7 @@ const REGLAS = {
       ["El disco", lista([
         "Si estás en la lista de amigos del disco privado, el juego carga solo: no eliges nada. Lo que ya cargaste queda guardado en tu computador y la próxima vez sale de ahí, sin descargar.",
         "Si no, necesitas tu propia imagen del disco, versión <b>USA</b> (SLUS-21678), sin modificar. Se lee solo en tu navegador y la página la recuerda: la próxima vez basta con <b>Usar …</b>.",
-        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). El juego va a 60 cuadros por segundo; si tu computador sufre, en <b>Ajustes → Video → Smooth motion</b> se baja a 30, como la consola."
+        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). El juego va a 30 cuadros por segundo, como la consola, igual para los dos jugadores; si tu computador no alcanza, baja solo la calidad de la imagen (efectos y resolución), nunca los cuadros."
       ])],
       ["Duelo", lista([
         "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>3 vs 3</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, el tiempo de cada round y los personajes permitidos. Con los dos discos listos aprieta <b>¡A pelear!</b>.",

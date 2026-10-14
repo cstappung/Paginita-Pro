@@ -1,5 +1,5 @@
 diff --git a/port/src/gs/gs_draw.c b/port/src/gs/gs_draw.c
-index de3de89..23c00c1 100644
+index de3de89..a343b3f 100644
 --- a/port/src/gs/gs_draw.c
 +++ b/port/src/gs/gs_draw.c
 @@ -1192,6 +1192,25 @@ void GsGpu_GetSettings(PortVideo *v) {
@@ -8,10 +8,10 @@ index de3de89..23c00c1 100644
  
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
-+/* paginita-pro: the page's auto-tuner (juegos/bt3/pagina.js), like a phone game's: when the frames stop arriving at 60
++/* paginita-pro: the page's auto-tuner (juegos/bt3/pagina.js), like a phone game's: when the frames stop arriving at 30
 +   it lowers the internal scale and switches off the costliest effects (distance blur 16, glare 8, depth tint 4,
 +   outline 1), and raises them back when there is room, up to what the player chose. Not saved: the player's own
-+   settings stay as they were. The picture rate itself never changes (always 60: see the interp lock below). */
++   settings stay as they were. The picture rate itself never changes (always 30: see the interp lock below). */
 +EMSCRIPTEN_KEEPALIVE void Web_Calidad(int scale, int fxOff) {
 +    if (scale >= 1 && scale <= 8 && scale != (gsPendingScale ? gsPendingScale : gsScale)) {
 +        gsPendingScale = scale; /* applied between two frames */
@@ -40,16 +40,17 @@ index de3de89..23c00c1 100644
              gsInterp = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
              sInterpPrev = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
              sInterpBlend = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
-@@ -3205,6 +3228,13 @@ void GsGpu_FrameEnd(void) {
+@@ -3205,6 +3228,14 @@ void GsGpu_FrameEnd(void) {
              sInterpPrims = malloc(INTERP_MAX_PRIMS * sizeof(InterpPrim));
              sInterpPrimUsed = malloc(INTERP_MAX_PRIMS);
          }
 +#ifdef __EMSCRIPTEN__
-+        /* paginita-pro: always 60 pictures a second on the site (smooth motion ON), whatever F1 or F9 say: in an online
-+           fight both players must see the same, and the page's auto-tuner lowers the picture's cost instead (Web_Calidad).
-+           AFTER the block above: it allocates the in-between buffers the first time, and with the lock before it they
-+           were never allocated (writes through NULL into low memory: 6 fps and worse). */
-+        gsInterp = 1;
++        /* paginita-pro: always 30 pictures a second on the site, as the console and as the game's own logic (smooth
++           motion OFF: its in-between pictures nearly doubled the drawing), whatever F1 or F9 say: in an online fight both
++           players must see the same, and the page's auto-tuner lowers the picture's cost instead (Web_Calidad). AFTER
++           the block above: it allocates the in-between buffers the first time (with the lock before it they were never
++           allocated: writes through NULL into low memory, 6 fps and worse). */
++        gsInterp = 0;
 +#endif
          {
              /* A scene the game shows at 60 a second (one vertical blank per picture: menus, the character select) has
@@ -124,7 +125,7 @@ index 011fc8d..271ec6a 100644
      sWaits++;
      {   /* (the meter, when the two copies wait for each other every blank: time waited, and blanks that waited
 diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
-index fd6cc57..f93034f 100644
+index fd6cc57..bca1af4 100644
 --- a/port/src/gs/ui.cpp
 +++ b/port/src/gs/ui.cpp
 @@ -309,6 +309,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Web_NetMenuClosed(void) {
@@ -157,7 +158,7 @@ index fd6cc57..f93034f 100644
          int smooth = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
          ImGui::SetNextItemWidth(416.0f);
 +#ifdef __EMSCRIPTEN__
-+        ImGui::BeginDisabled(); /* paginita-pro: fixed at 60 on the site (gs_draw.c), the same for both players */
++        ImGui::BeginDisabled(); /* paginita-pro: fixed at 30 on the site (gs_draw.c), the same for both players */
 +#endif
          if (ImGui::Combo("Smooth motion", &smooth, kSmooth, 4)) {
              gsInterp = smooth;

@@ -10,7 +10,7 @@ import { auth } from "../firebase.js";
 let visible = false, pidiendo = null, deQuien = "";
 
 /* La versión del programa del juego (la misma del ?v= de juegos/bt3/: fuente/construir.sh la cambia aquí). */
-export const BT3_VER = "bt3-22";
+export const BT3_VER = "bt3-23";
 const oyentes = new Set();
 
 export const bt3Visible = () => visible;

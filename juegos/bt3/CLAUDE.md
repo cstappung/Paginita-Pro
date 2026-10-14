@@ -271,13 +271,14 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   pressed; in a room (already playing) the boot is fetched on entering, and «lo esencial» is not offered there (a
   big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
   at 300 pieces (300 MB) on both sides. `BT3_VER` in `bt3-amigos.js` is the program version (construir.sh sets it).
-- **Always 60 fps, locked**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
-  pictures, so it must be ON (off is 30). The patch forces it on, `gsInterp = 1`, in every `GsGpu_FrameEnd` in the browser build (`gs_draw.c`; F1's combo is disabled and
-  F9 has no effect): in an online fight both players must see the same, never 30 and never more. It is a display-only
-  blend (+16.7 ms of display latency), so lockstep play is unaffected.
+- **Always 30 fps, locked** (the owner's call, after trying 60): the game simulates at 30 like the PS2, and the port's
+  "Smooth motion" in-between pictures nearly doubled the drawing. The patch forces it off, `gsInterp = 0`, in every
+  `GsGpu_FrameEnd`, AFTER the block that allocates the in-between buffers (with the lock before it they were never
+  allocated: writes through NULL, 6 fps) in the browser build (`gs_draw.c`; F1's combo is disabled and
+  F9 has no effect): in an online fight both players must see the same.
 - **Auto-tuner** (`pagina.js` 2a, like a phone game's): the picture rate never changes; what gets cheaper is each
-  picture. Under 56 fps for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
-  depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 59+ with the program < 75%
+  picture. Under 28 fps for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
+  depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 29.5+ with the program < 75%
   busy → one step up, never above the player's F1 choice (`Web_EscalaElegida`/`Web_FxElegidos`); a step up that
   fails within 20 s doubles the wait for the next one. **Only in fights** (not `body.en-menus`), not in a fight's first
 6 s, and not within 1.5 s of any disc read (`Module.webDisc.readAt` is wrapped: the player's ISO too): in the select

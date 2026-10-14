@@ -613,9 +613,9 @@
   try { localStorage.removeItem("bt3.hud"); } catch (e) {}   // (el contador de las pruebas ya no existe: ?hud=1 del fork sigue)
 
   /* ---------------------------------------------------------------- 2a. el autoajuste (como en los juegos de celular)
-     Los cuadros por segundo NO cambian nunca: siempre 60 (el parche fija el movimiento suave, gs_draw.c; en una pelea
-     en línea los dos tienen que ver lo mismo). Lo que baja es lo que cuesta cada cuadro: si el juego no llega a 60
-     durante 3 s seguidos, un escalón menos (sin desenfoque lejano → sin brillo → menos resolución interna → sin neblina
+     Los cuadros por segundo NO cambian nunca: siempre 30, como la consola y la lógica del juego (el parche apaga y fija
+     el movimiento suave, gs_draw.c; en una pelea en línea los dos tienen que ver lo mismo). Lo que baja es lo que
+     cuesta cada cuadro: si el juego no llega a 30 (28) durante 3 s seguidos, un escalón menos (sin desenfoque lejano → sin brillo → menos resolución interna → sin neblina
      → sin contorno); si sobra durante 15 s, uno más, hasta lo que el jugador eligió en Ajustes (F1). Si al subir
      vuelve a no llegar, la próxima subida espera el doble (no queda subiendo y bajando). No se guarda: los Ajustes del
      jugador quedan como estaban. No cuenta los segundos en que el juego espera el disco (una carga no es falta de
@@ -657,7 +657,7 @@
       if (!niveles) { try { arma(); } catch (e) { return; } }
       if (calma > 0) { calma--; return; }   // (recién cambiado: que se note antes de medir)
       if (Red.esperando > 0 || Progreso.lectura) { malos = buenos = 0; return; }   // (esperando el disco: no es la máquina)
-      if (s.fps < 56) {
+      if (s.fps < 28) {
         buenos = 0;
         if (++malos >= 3 && nivel < niveles.length - 1) {
           if (performance.now() - subioEn < 20000) paciencia = Math.min(240, paciencia * 2);   // (subió y no aguantó)
@@ -665,7 +665,7 @@
         }
       } else {
         malos = 0;
-        if (s.fps >= 59 && s.busy < 0.75 && ++buenos >= paciencia && nivel > 0) { subioEn = performance.now(); pon(nivel - 1, "margen"); }
+        if (s.fps >= 29.5 && s.busy < 0.75 && ++buenos >= paciencia && nivel > 0) { subioEn = performance.now(); pon(nivel - 1, "margen"); }
       }
     }, 250);
   })();
