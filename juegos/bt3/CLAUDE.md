@@ -67,8 +67,12 @@ and sets the rules), `ajuste` (`batalla`, `tiempo` → `reglasBt3`, the word `gs
 loaded a valid disc; both needed), `empieza`, `vuelve` (back to the lobby; frames reload, discs re-confirm),
 `resultado` and `revancha`.
 
-**Results are automatic.** The patch wraps `BattleResult_Finish` (`--wrap`, `plat_mem.c`) and hands the page the
-winner bits (1 P1, 2 P2, 4 draw, 8 abandoned) → `Module.onFinBatalla` → the frame → `bt3.js` writes
+**Results are automatic.** When the fight ends (`BtlSeqFight` state update in `btl_seq.c`, the frame
+`BtlSeq_CheckBattleEnd` says it is over: K.O., time up, abandon) the patch calls `Web_FinPelea` (`plat_mem.c`), which
+hands the page the winner bits (1 P1, 2 P2, 4 draw, 8 abandoned; plus the forced bits Finish adds from reason
+0x20/0x40) → `Module.onFinBatalla`. **Not at `BattleResult_Finish`**: that runs at `Battle_Term`, when the battle
+scene is LEFT; in a versus the game stays on its results screen and rematch menu, so no report came, and going back
+to the room reloaded the frame without one (log: `empieza`, then only `vuelve`) → `Module.onFinBatalla` → the frame → `bt3.js` writes
 `{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
 the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
 (`marcador`, `empates`). Bits 8 → `vuelve`. **A lone report counts**: if one frame said the winner and the fight then
@@ -268,8 +272,10 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
-- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps, how busy the program is and
-  how much of the time goes to handing the frame to the GPU (`webStats.prof[0]`): busy near 100% means the game
+- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps, how busy the program is,
+  how much of the time goes to handing the frame to the GPU (`webStats.prof[0]`; split into the draw loop `prof[1]`
+  and what comes before it, events and texture uploads, `prof[2]`) and draws per frame (`prof[3]`, the patch adds
+  `gsDrawCount` in gs_gl.c). First measurement (owner, a fight): 46 fps, 67% busy, 61% «dibujo». busy near 100% means the game
   itself is slow; a big «dibujo» share means the renderer (where WebGPU could help); few fps with a free program
   means something outside it.
 - **No `confirm()`/`alert()`** in the room or the frame: a sandboxed frame (the bench) blocks them and they return

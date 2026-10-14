@@ -617,8 +617,14 @@
     if (localStorage.getItem("bt3.hud") === "1" && !Q.get("hud")) {
       const h = $("hud"), antes = Module.onWebStats;
       h.style.display = "block";
-      // prof[0]: la parte del tiempo que se va en mandarle el cuadro a la tarjeta de video (gs_gl.c)
-      Module.onWebStats = s => { antes && antes(s); h.textContent = `${s.fps.toFixed(0)} fps · ${(s.busy * 100).toFixed(0)}% ocupado · ${((s.prof && s.prof[0]) * 100 || 0).toFixed(0)}% dibujo`; };
+      /* prof (gs_gl.c, partes del tiempo): [0] mandarle el cuadro a la tarjeta de video, entero; [1] el bucle de las
+         piezas (cada una, sus llamadas a WebGL); [2] lo de antes (eventos, subir imágenes); [3] piezas por ms */
+      const pc = x => ((x || 0) * 100).toFixed(0) + "%";
+      Module.onWebStats = s => {
+        antes && antes(s);
+        const p = s.prof || [], piezas = s.fps ? Math.round((p[3] || 0) * 1000 / s.fps) : 0;
+        h.textContent = `${s.fps.toFixed(0)} fps · ${pc(s.busy)} ocupado · ${pc(p[0])} dibujo (piezas ${pc(p[1])}, antes ${pc(p[2])}) · ${piezas} piezas/cuadro`;
+      };
     }
   } catch (e) {}
   const registro = $("registro");

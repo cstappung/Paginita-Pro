@@ -14,6 +14,18 @@ index de3de89..5914b0c 100644
              gsInterp = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
              sInterpPrev = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
              sInterpBlend = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
+diff --git a/port/src/gs/gs_gl.c b/port/src/gs/gs_gl.c
+index 95fe9bc..d81fd3e 100644
+--- a/port/src/gs/gs_gl.c
++++ b/port/src/gs/gs_gl.c
+@@ -1242,6 +1242,7 @@ static void frame_end_body(void) {
+     if (UBO_RANGES) { ranges_done(); }
+ #ifdef __EMSCRIPTEN__
+     Web_ProfAdd(1, emscripten_get_now() - tLoop); /* the draws themselves (Module.webStats.prof[1]) */
++    Web_ProfAdd(3, (double)gsDrawCount); /* paginita-pro: how many draws (prof[3] × 1000 / fps = draws per frame) */
+ #endif
+     /* the shown buffer: the one sceGsSwapDBuff set up for this frame, else the first target */
+     best = gGsMainFbp >= 0 ? GsDraw_TargetGet((uint32_t)gGsMainFbp, 0) : -1;
 diff --git a/port/src/gs/net.c b/port/src/gs/net.c
 index 011fc8d..271ec6a 100644
 --- a/port/src/gs/net.c
@@ -278,10 +290,10 @@ index fb8b892..9e6bead 100644
          Port_NetArrived(); /* the logos and the card check are over: the character select is next, with picture and sound */
      }
 diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
-index dac5c3d..4c4b341 100644
+index dac5c3d..d73b0c2 100644
 --- a/port/src/plat_mem.c
 +++ b/port/src/plat_mem.c
-@@ -281,6 +281,108 @@ static void data_fail(const char *what, const char *path) {
+@@ -281,6 +281,119 @@ static void data_fail(const char *what, const char *path) {
      exit(2);
  }
  
@@ -375,10 +387,21 @@ index dac5c3d..4c4b341 100644
 +   anota solo al ganador cuando coinciden (juegos/bt3/pagina.js, Module.onFinBatalla). */
 +extern void __real_BattleResult_Finish(void);
 +extern int BattleResult_GetFlags(void);
++extern int BattleResult_GetReason(void);
 +EM_JS(void, web_fin_batalla, (int bits), { if (Module.onFinBatalla) Module.onFinBatalla(bits); });
 +void __wrap_BattleResult_Finish(void) {
-+    __real_BattleResult_Finish();
-+    web_fin_batalla(BattleResult_GetFlags());
++    __real_BattleResult_Finish();   /* (el aviso ya no va aquí: ver Web_FinPelea) */
++}
++/* La pelea se decidió (K.O., tiempo, abandono): btl_seq.c lo llama una vez, en el cuadro en que la pelea termina.
++   Antes el aviso iba en BattleResult_Finish, que corre recién al SALIR de la escena de la pelea (Battle_Term): en
++   el versus, tras el combate el juego se queda en su pantalla de resultados y su menú de revancha, el aviso no
++   llegaba, y si alguien volvía a la sala el marco se recargaba sin avisar: el duelo quedaba «sin resultado». Los
++   bits forzados que Finish agrega después (motivo 0x20 / 0x40) se agregan aquí igual. */
++void Web_FinPelea(void) {
++    int w = BattleResult_GetFlags(), r = BattleResult_GetReason();
++    if (r & 0x20) w |= 2;
++    if (r & 0x40) w |= 1;
++    web_fin_batalla(w);
 +}
 +void __wrap_Game_Main(void) {
 +    web_pone_entorno();                /* primero: lo que la página decidió para esta pelea */
@@ -390,7 +413,7 @@ index dac5c3d..4c4b341 100644
  static void Port_LoadGameData(void) {
      char exe[1024], path[1200];
      const char *root = getenv("BT3_DATA") != NULL ? getenv("BT3_DATA") : "gamedata";
-@@ -392,6 +494,7 @@ static void Port_LoadGameData(void) {
+@@ -392,6 +505,7 @@ static void Port_LoadGameData(void) {
          data_fail("the game's programs in your game data are not the unmodified USA release (SLUS-21678)", NULL);
      }
  }
@@ -398,7 +421,7 @@ index dac5c3d..4c4b341 100644
  
  #if defined(__x86_64__)
  /* (between the GS registers at 0x12000000 and the program at 0x20000000: see the note at STACK_BASE) */
-@@ -500,8 +603,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
+@@ -500,8 +614,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
          ExitProcess(4);
      }
  #endif
@@ -626,6 +649,23 @@ index 9794ea9..5783e8d 100644
 +
      return (bits[chara / 64] >> (chara % 64)) & 1;
  }
+diff --git a/src/battle/btl_seq.c b/src/battle/btl_seq.c
+index c072e01..d5cf8b9 100644
+--- a/src/battle/btl_seq.c
++++ b/src/battle/btl_seq.c
+@@ -1344,6 +1344,12 @@ s32 BtlSeqFight_Update(BtlSeqWaitCtx *ctx) {
+         }
+     }
+     if (BtlSeq_CheckBattleEnd()) {
++#ifdef __EMSCRIPTEN__
++        {
++            extern void Web_FinPelea(void); /* plat_mem.c */
++            Web_FinPelea(); /* paginita-pro: the page learns the winner now, when the fight ends, not when the scene is left */
++        }
++#endif
+         if (Battle_GetMode() == 7) {
+             return 6;
+         }
 diff --git a/src/battle/view_a_e.c b/src/battle/view_a_e.c
 index 3e0f86f..2b9066e 100644
 --- a/src/battle/view_a_e.c
