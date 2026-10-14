@@ -6,8 +6,8 @@
 // WebRTC, sin pasar por la base de datos. Los mensajes son los mismos que
 // hablaba el servidor de antes, así que online.js y session.js casi no
 // cambian:
-//   el juego manda  song, part, ready, start, loaded, noload, state, done, leave
-//   la página manda welcome, room, load, go, pstate, results, error, reloj
+//   el juego manda  song, part, ready, start, loaded, noload, state, done, leave, browse
+//   la página manda welcome, room, load, go, pstate, results, error, reloj, browse
 import { sitio } from '../sitio/puente.js';
 
 export class NetClient {
@@ -15,6 +15,7 @@ export class NetClient {
     this.handlers = new Map();
     this.id = null;
     this.room = null;
+    this.ojeo = null; // {from, songId}: la canción que tiene marcada quien dirige en su selector
     this.offset = 0; // hora del servidor - Date.now()
     this.rtt = 0;
     this._conectado = false;
@@ -43,6 +44,7 @@ export class NetClient {
     if (m.t === 'reloj' && Number.isFinite(m.off)) this.offset = m.off;
     if (m.room) this.room = m.room;
     if (m.t === 'left') this.room = null;
+    if (m.t === 'browse') this.ojeo = m.songId ? { from: m.from, songId: m.songId } : null;
     for (const fn of this.handlers.get(m.t) || []) fn(m);
     for (const fn of this.handlers.get('*') || []) fn(m);
   }

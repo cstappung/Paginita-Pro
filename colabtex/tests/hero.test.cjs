@@ -337,6 +337,76 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
   } finally { s?.destruir(); Object.assign(g, antes); }
 });
 
+/* Lo que hojea quien dirige va por la malla (paquete `mira`), nunca al
+   registro de la sala, y solo se cree si viene de quien dirige. */
+test('sala: los demás ven la canción que hojea el anfitrión, sin escribir en la base', async () => {
+  const dir = path.join(__dirname, '..', 'src', 'juegos');
+  const stub = (nombre, codigo) => ({ path: nombre, namespace: 'stub', pluginData: codigo });
+  const codigo = (await esbuild.build({
+    entryPoints: [path.join(dir, 'hero-sala.js')], bundle: true, format: 'cjs', platform: 'node', write: false,
+    plugins: [{ name: 'stubs', setup(b) {
+      b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
+      b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(o){globalThis.__malla=o;return {entrar:async()=>true,envia(d){globalThis.__salen.push(d);},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
+    } }]
+  })).outputFiles[0].text;
+  const m = { exports: {} };
+  new Function('module', 'exports', 'require', codigo)(m, m.exports, require);
+  const g = globalThis, antes = { window: g.window, document: g.document, location: g.location, MutationObserver: g.MutationObserver };
+  const salas = [];
+  const arma = (uid) => {
+    let oyente = null;
+    const alMarco = [];
+    const frame = { contentWindow: { postMessage: d => alMarco.push(d) }, style: {}, setAttribute() {}, addEventListener() {}, remove() {} };
+    g.window = { addEventListener: (t, f) => { if (t === 'message') oyente = f; }, removeEventListener() {} };
+    g.document = { createElement: t => (t === 'iframe' ? frame : { setAttribute() {}, style: {} }), documentElement: { dataset: {} } };
+    g.__salen = [];
+    const escritas = [];
+    const s = m.exports.crearHeroSala({ uid, pid: 'p1', mirando: false, terminar() {}, jugar: async j => { escritas.push(j); return true; } });
+    salas.push(s);
+    s.montar({ append() {}, innerHTML: '' });
+    const p = sala(2);
+    p.estado = 'esperando';
+    s.actualizar(p, reducir(p));
+    const manda = d => oyente({ source: frame.contentWindow, origin: 'https://sitio', data: { canal: 'hero-hijo', ...d } });
+    manda({ tipo: 'listo' });
+    manda({ tipo: 'red', m: { t: 'hello' } });
+    return { s, p, manda, escritas, salen: g.__salen, malla: g.__malla, alMarco, ojeos: () => alMarco.filter(d => d.m?.t === 'browse').map(d => d.m) };
+  };
+  g.location = { origin: 'https://sitio' };
+  g.MutationObserver = class { observe() {} disconnect() {} };
+  try {
+    // quien dirige (a) hojea: sale por la malla, no a la base
+    const a = arma('a');
+    a.manda({ tipo: 'red', m: { t: 'browse', songId: 'Muse - Uprising' } });
+    assert.deepEqual(a.escritas, [], 'hojear no escribe jugadas');
+    const paquete = a.salen.find(d => d.y === 'mira');
+    assert.equal(paquete?.id, 'Muse - Uprising');
+    // b lo recibe de a (que dirige) y lo pasa a su marco
+    const b = arma('b');
+    b.malla.alDatos('a', paquete);
+    assert.deepEqual(b.ojeos().at(-1), { t: 'browse', from: 'a', songId: 'Muse - Uprising' });
+    // repetido (llega cada segundo) no se vuelve a pasar; de quien no dirige, se ignora
+    const n = b.ojeos().length;
+    b.malla.alDatos('a', { ...paquete, q: 99 });
+    b.malla.alDatos('b2', { y: 'mira', id: 'Otra', q: 1 });
+    assert.equal(b.ojeos().length, n);
+    // y no se confunde con el directo de a
+    assert.equal(b.alMarco.filter(d => d.m?.t === 'pstate').length, 0);
+    // quien no dirige no puede hojear para los demás
+    b.manda({ tipo: 'red', m: { t: 'browse', songId: 'Trampa' } });
+    assert.equal(b.salen.filter(d => d.y === 'mira').length, 0);
+    // al empezar la canción, lo hojeado se borra
+    b.p.jugadas[String(Object.keys(b.p.jugadas).length).padStart(4, '0')] = { t: 'cancion', uid: 'a', id: 'x' };
+    for (const u of ['a', 'b']) b.p.jugadas[String(Object.keys(b.p.jugadas).length).padStart(4, '0')] = { t: 'parte', uid: u, p: 'guitar', d: 'expert', m: 'taps' };
+    b.p.jugadas[String(Object.keys(b.p.jugadas).length).padStart(4, '0')] = { t: 'listo', uid: 'b', on: true };
+    b.p.jugadas[String(Object.keys(b.p.jugadas).length).padStart(4, '0')] = { t: 'empieza', uid: 'a' };
+    b.s.actualizar(b.p, reducir(b.p));
+    assert.deepEqual(b.ojeos().at(-1), { t: 'browse', from: 'a', songId: null });
+  } finally { for (const s of salas) s.destruir(); Object.assign(g, antes); delete g.__malla; delete g.__salen; }
+});
+
 test('sala: tu autopista va al centro (con 3, en medio; con 4, la del centro a la izquierda)', async () => {
   const { enElCentro } = await mod('js/game/orden.js');
   const sala = (n, yo) => Array.from({ length: n }, (_, i) => ({ id: 'j' + i, type: i === yo ? 'local' : 'remote' }));
