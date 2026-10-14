@@ -44,37 +44,118 @@ index fd6cc57..79829bd 100644
      set_open(true);
      sNet = true;
 diff --git a/port/src/headless.c b/port/src/headless.c
-index fb8b892..600a51f 100644
+index fb8b892..f5e6c7d 100644
 --- a/port/src/headless.c
 +++ b/port/src/headless.c
-@@ -134,6 +134,27 @@ int __wrap_Progress_Main(int arg) {
+@@ -95,6 +95,30 @@ static void port_stage_replace_init(void) {
+ 
+ extern void Port_NetRules(int *type, int *dp, int *time); /* gs/net.c */
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++static int sWebModo;   /* 0 none, 1 cpu, 2 entrenamiento, -1 unknown (BT3_WEB_MODO) */
++static int sWebFijo;   /* a tournament fight: the rules are fixed, the versus menu is out of bounds too */
++static int sWebFuera;  /* the page was told the player left the mode */
++static int sWebTiempo = -1, sWebCpu = -1, sWebPuestas; /* save rules 0 and 1 to write once the save is loaded */
++/* the CPU's fighter or team is drawn at random (BT3_WEB_AZAR) */
++int Web_ComAzar(void) {
++    return sWebModo == 1 && getenv("BT3_WEB_AZAR") != NULL && atoi(getenv("BT3_WEB_AZAR")) != 0;
++}
++/* most members per team (BT3_WEB_EQUIPO, 1..5; 5 without it); online too: both pages set it from the room */
++int Web_EquipoMax(void) {
++    static int max = -1;
++    if (max < 0) {
++        max = getenv("BT3_WEB_EQUIPO") != NULL ? atoi(getenv("BT3_WEB_EQUIPO")) : 5;
++        max = max < 1 || max > 5 ? 5 : max;
++    }
++    return max;
++}
++EM_JS(void, web_fuera_del_modo, (int mode), {
++    if (Module.onFueraDelModo) Module.onFueraDelModo(mode);
++});
++#endif
++
+ int __wrap_Progress_Main(int arg) {
+     const char *path;
+     PortStages_Init();
+@@ -134,6 +158,47 @@ int __wrap_Progress_Main(int arg) {
                              time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
                  }
              }
 +#ifdef __EMSCRIPTEN__
 +            /* paginita-pro: BT3_WEB_MODO opens one mode straight away, once (the site's mode buttons): "cpu" the
-+               versus character select as 1P vs COM, single battle (as the online session does above, mode 39);
-+               "entrenamiento" the training mode (mode 44: the lessons, or the character select for free training). Backing out of either leads to the game's own menus, as usual. */
++               versus character select as 1P vs COM (as the online session does above, mode 39, or the team select,
++               mode 40, for a team or DP battle); "entrenamiento" the training mode (mode 44: the lessons, or the
++               character select for free training). With it, from the site's tournaments:
++                 BT3_WEB_REGLAS  the room's rules word (as BT3_NET_RULES: type | dp << 4 | time << 8)
++                 BT3_WEB_CPU     CPU strength 0..4 (save rule[1]: levels 0, 6, 13, 21, 29)
++                 BT3_WEB_AZAR    the CPU's fighter (or team) is drawn at random (Web_ComAzar, menu_c_e.c / menu_e_b.c)
++                 BT3_WEB_EQUIPO  most members per team (3 for the 3 vs 3 team battle; Web_EquipoMax, menu_e_b.c)
++               Leaving the mode for the game's other menus is reported to the page (Port_Trace, below). */
 +            {
-+                static int sWebModo;
 +                const char *m = getenv("BT3_WEB_MODO");
 +                if (!sWebModo && m != NULL && !Port_NetSession() && gProgress != NULL && gSaveData != NULL) {
-+                    sWebModo = 1;
-+                    if (strcmp(m, "cpu") == 0) {
-+                        gProgress->mode = 39;
++                    sWebModo = strcmp(m, "cpu") == 0 ? 1 : strcmp(m, "entrenamiento") == 0 ? 2 : -1;
++                    sWebFijo = getenv("BT3_WEB_REGLAS") != NULL;
++                    if (sWebModo == 1) {
++                        int type = 0, dp = 0, time = -1;
++                        if (sWebFijo) {
++                            unsigned r = (unsigned)strtoul(getenv("BT3_WEB_REGLAS"), NULL, 0);
++                            type = (int)(r & 15) > 2 ? 0 : (int)(r & 15);
++                            dp = (int)(r >> 4 & 15) > 2 ? 0 : (int)(r >> 4 & 15);
++                            time = (int)(r >> 8 & 15) > 4 ? 3 : (int)(r >> 8 & 15);
++                        }
++                        gProgress->mode = type != 0 ? 40 : 39;
 +                        *(int *)((char *)gProgress + 0x620) = 0; /* 1P vs COM */
-+                        *(int *)((char *)gProgress + 0x624) = 0; /* single battle */
-+                        *(int *)((char *)gProgress + 0x630) = 0;
-+                    } else if (strcmp(m, "entrenamiento") == 0) {
++                        *(int *)((char *)gProgress + 0x624) = type;
++                        *(int *)((char *)gProgress + 0x630) = dp;
++                        /* the time limit and the CPU strength are save rules, and the card check (still ahead) loads
++                           the player's save over them: they are written once it is over (Port_Trace) */
++                        sWebTiempo = time;
++                        if (getenv("BT3_WEB_CPU") != NULL) {
++                            int lv = atoi(getenv("BT3_WEB_CPU"));
++                            sWebCpu = lv < 0 ? 0 : lv > 4 ? 4 : lv;
++                        }
++                    } else if (sWebModo == 2) {
 +                        gProgress->mode = 44;
 +                    }
-+                    fprintf(stderr, "bt3: web: mode %s\n", m);
++                    fprintf(stderr, "bt3: web: mode %s%s\n", m, sWebFijo ? " (tournament fight)" : "");
 +                }
 +            }
 +#endif
              gPortMenuMode = 1; /* the renderer treats all 2D as one centred 4:3 page while the menus run */
              r = __real_Progress_Main(arg);
              gPortMenuMode = 0;
+@@ -312,6 +377,29 @@ void Port_Trace(unsigned vblanks) {
+             Port_StateLog(vblanks, NULL, 0);
+         }
+     }
++#ifdef __EMSCRIPTEN__
++    /* paginita-pro: the page chose this mode; backing out of it into the game's other menus (the main menu, or
++       the versus menu during a tournament fight) goes back to the page instead, once. Checked once the first-run
++       part (logos, card check) is over. */
++    if (sWebModo > 0 && !sWebPuestas && gProgress != NULL && gSaveData != NULL && !(gProgress->flags & 0x40)) {
++        sWebPuestas = 1;
++        if (sWebTiempo >= 0) {
++            *(int *)((char *)gSaveData + 0xC34) = sWebTiempo; /* rule[0]: time limit */
++        }
++        if (sWebCpu >= 0) {
++            *(int *)((char *)gSaveData + 0xC38) = sWebCpu; /* rule[1]: CPU strength */
++        }
++    }
++    if (sWebModo > 0 && !sWebFuera && gProgress != NULL && !(gProgress->flags & 0x40)) {
++        int md = gProgress->mode;
++        int ok = sWebModo == 2 ? (md == 44 || md == 45) : sWebFijo ? (md >= 39 && md <= 41) : (md >= 38 && md <= 41);
++        if (!ok) {
++            sWebFuera = 1;
++            fprintf(stderr, "bt3: web: left the mode (menu mode %d)\n", md);
++            web_fuera_del_modo(md);
++        }
++    }
++#endif
+     if (Port_NetWarp() && sNetEntered && gProgress != NULL && !(gProgress->flags & 0x40)) {
+         Port_NetArrived(); /* the logos and the card check are over: the character select is next, with picture and sound */
+     }
 diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
 index dac5c3d..4c4b341 100644
 --- a/port/src/plat_mem.c
@@ -382,3 +463,175 @@ index 0000000..d2bf244
 +void __cxa_guard_abort(uint64_t *guarda) {
 +    (void)guarda;                              /* la inicialización falló: se deja sin marcar para reintentar */
 +}
+diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
+index d61fdeb..aa35d8e 100644
+--- a/src/menu/menu_c_e.c
++++ b/src/menu/menu_c_e.c
+@@ -1214,6 +1214,29 @@ void CharSel_Update(void) {
+ }
+ 
+ /* The side a pad is choosing for, its number and its movies. */
++#ifdef __EMSCRIPTEN__
++extern int Web_ComAzar(void); /* headless.c */
++/* paginita-pro: side `n` gets a character drawn at random (one of its forms too), with no items, and is done. */
++static void CharSel_WebAzar(s32 n) {
++    s32 k, id, chara = 0;
++    for (;;) {
++        k = Rand_Range(gCharSel->masterCount[n]);
++        id = gCharSel->cells[n][k].id;
++        if (id < MCHR_RANDOM) {
++            chara = id;
++            break;
++        }
++    }
++    if (gCharSel->cells[n][k].formCount != 0) {
++        chara = gCharSel->cells[n][k].form[Rand_Range(gCharSel->cells[n][k].formCount)];
++    }
++    gCharSel->side[n]->picked = chara;
++    gCharSel->side[n]->chara = chara;
++    memset(&gCharSel->side[n]->items, 0, 0x10);
++    gCharSel->side[n]->state = CHARSEL_ST_DONE;
++    CharSel_RequestFace(n);
++}
++#endif
+ #define CS_N (i + gCharSel->turn)
+ #define CS_SIDE (gCharSel->side[CS_N])
+ #define CS_REEL (&gCharSel->flash[1 + CS_N])
+@@ -1731,6 +1754,13 @@ void CharSel_Input(s32 *running) {
+                     CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_off_start");
+                 }
+                 CS_SIDE->state = CHARSEL_ST_DONE;
++#ifdef __EMSCRIPTEN__
++                if (gCharSel->players == 0 && gCharSel->turn == 0 && Web_ComAzar()) {
++                    /* paginita-pro (a tournament fight against the CPU): the CPU's fighter is drawn at random, as the
++                       random cell does, instead of the pad choosing it */
++                    CharSel_WebAzar(1);
++                } else
++#endif
+                 if (gCharSel->players != 1 && gCharSel->turn == 0) {
+                     /* one pad: now choose for the other side */
+                     gCharSel->turn = 1;
+diff --git a/src/menu/menu_e_b.c b/src/menu/menu_e_b.c
+index 04ba62e..6b0af0d 100644
+--- a/src/menu/menu_e_b.c
++++ b/src/menu/menu_e_b.c
+@@ -97,6 +97,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
+     return gTeamSel->side[side]->cost + ChrTbl_GetCost(chara) <= w->dpMax;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_ComAzar(void);    /* headless.c */
++extern int Web_EquipoMax(void);  /* headless.c: 3 for the site's 3 vs 3 team battle, else 5 */
++/* paginita-pro: most members a team may have (TS_MEMBER_MAX, or fewer for the site's 3 vs 3; DP battles keep 5). */
++static s32 TeamSel_Max(void) {
++    return gTeamSel->battleType == 2 ? TS_MEMBER_MAX : Web_EquipoMax();
++}
++/* paginita-pro: side `n` (the CPU's) gets a team drawn at random, as the random cell draws: `count` members (the
++   pad's team size), none the same person twice, within the DP limit in a DP battle; then it is done. */
++static void TeamSel_WebAzar(s32 n, s32 count) {
++    TeamSelSide *sd = gTeamSel->side[n];
++    s32 tries, idx, chara;
++    sd->memberCount = 0;
++    sd->cost = 0;
++    while (sd->memberCount < count) {
++        sd->cur = sd->memberCount;
++        for (tries = 0; tries < 400; tries++) {
++            for (;;) {
++                idx = Rand_Range(gTeamSel->masterCount[n]);
++                if (gTeamSel->cells[n][idx].id < TS_RANDOM) {
++                    chara = gTeamSel->cells[n][idx].id;
++                    break;
++                }
++            }
++            if (gTeamSel->cells[n][idx].formCount != 0) {
++                chara = gTeamSel->cells[n][idx].form[Rand_Range(gTeamSel->cells[n][idx].formCount)];
++            }
++            if (TeamSel_IsCharaFree(n, chara) && TeamSel_FitsDp(n, chara)) {
++                break;
++            }
++        }
++        if (tries == 400) {
++            break; /* (nothing else fits the DP left: the team stays smaller) */
++        }
++        memset(&sd->member[sd->memberCount], 0, sizeof(TsMember));
++        sd->member[sd->memberCount].chara = chara;
++        sd->memberCount++;
++        TeamSel_SumCost(n, 0);
++    }
++    if (sd->memberCount == 0) { /* (cannot happen: any one character fits) */
++        sd->member[0].chara = gTeamSel->side[n ^ 1]->member[0].chara;
++        sd->memberCount = 1;
++    }
++    sd->cur = TS_CUR_MENU;
++    sd->chara = sd->member[0].chara;
++    TeamSel_SetTeamTex(n);
++    TeamSel_RequestFace(n);
++    sd->state = TEAMSEL_ST_DONE;
++}
++#endif
++
+ /* Takes member `idx` out of a side's team: the members behind it move up and the last slot is emptied. */
+ void TeamSel_RemoveMember(s32 side, s32 idx) {
+     s32 i;
+@@ -1722,6 +1773,11 @@ f32 TeamSel_Input(s32 *result) {
+                         /* it was a new member: the cursor goes to the next free slot */
+                         CUR_SIDE->memberCount = CUR_SIDE->cur + 1;
+                         CUR_SIDE->cur = CUR_SIDE->memberCount;
++#ifdef __EMSCRIPTEN__
++                        if (CUR_SIDE->memberCount >= TeamSel_Max()) {
++                            CUR_SIDE->cur = TS_CUR_MENU; /* paginita-pro: the team is full (3 vs 3): on to the plate */
++                        }
++#endif
+                     }
+                     TeamSel_SetTeamTex(CUR_N);
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+@@ -1755,6 +1811,11 @@ f32 TeamSel_Input(s32 *result) {
+                     } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
+                         CUR_SIDE->cur = CUR_SIDE->memberCount;
+                     }
++#ifdef __EMSCRIPTEN__
++                    if (CUR_SIDE->cur != TS_CUR_MENU && CUR_SIDE->cur >= TeamSel_Max()) {
++                        CUR_SIDE->cur = TeamSel_Max() - 1; /* paginita-pro: no free slot past a full team */
++                    }
++#endif
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+                     if (CUR_SIDE->cur == TS_CUR_MENU) {
+                         CUR_SIDE->chara = CUR_SIDE->member[0].chara;
+@@ -1771,6 +1832,11 @@ f32 TeamSel_Input(s32 *result) {
+                     } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
+                         CUR_SIDE->cur = TS_CUR_MENU;
+                     }
++#ifdef __EMSCRIPTEN__
++                    if (CUR_SIDE->cur != TS_CUR_MENU && CUR_SIDE->cur >= TeamSel_Max()) {
++                        CUR_SIDE->cur = TS_CUR_MENU; /* paginita-pro: no free slot past a full team */
++                    }
++#endif
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+                     if (CUR_SIDE->cur == TS_CUR_MENU) {
+                         CUR_SIDE->chara = CUR_SIDE->member[0].chara;
+@@ -1793,11 +1859,24 @@ f32 TeamSel_Input(s32 *result) {
+                         gTeamSel->backup[CUR_N] = CUR_MEMBER;
+                         CUR_SIDE->state = TEAMSEL_ST_GRID;
+                         Snd_PlaySe(1, 1);
+-                    } else if (CUR_SIDE->memberCount != 0) {
++                    }
++#ifdef __EMSCRIPTEN__
++                    else if (TeamSel_Max() < TS_MEMBER_MAX && CUR_SIDE->memberCount != TeamSel_Max()) {
++                        Snd_PlaySe(1, 7); /* paginita-pro: a 3 vs 3 team has exactly three */
++                    }
++#endif
++                    else if (CUR_SIDE->memberCount != 0) {
+                         /* the team is complete */
+                         Flash_GotoLabel(&gTeamSel->flash[CUR_N + 1], "fl_out", 1);
+                         TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_ok");
+                         CUR_SIDE->state = TEAMSEL_ST_DONE;
++#ifdef __EMSCRIPTEN__
++                        if (gTeamSel->players == 0 && gTeamSel->base == 0 && Web_ComAzar()) {
++                            /* paginita-pro (a tournament fight against the CPU): the CPU's team is drawn at random,
++                               as big as the pad's, instead of the pad choosing it */
++                            TeamSel_WebAzar(1, CUR_SIDE->memberCount);
++                        } else
++#endif
+                         if (gTeamSel->players != TEAMSEL_PLAYERS_TWO && gTeamSel->base == 0) {
+                             /* one pad: it goes on to the second team */
+                             gTeamSel->base = 1;

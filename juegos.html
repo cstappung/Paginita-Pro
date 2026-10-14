@@ -1624,16 +1624,20 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-bt3 s{position:absolute;left:50%;top:44%;width:180cqmax;height:180cqmax;margin:-90cqmax 0 0 -90cqmax;z-index:-1;
   background:repeating-conic-gradient(from 0deg,#ffffff14 0deg 2deg,transparent 2deg 10deg);
   -webkit-mask:radial-gradient(circle,transparent 6%,#000 30%,transparent 60%);mask:radial-gradient(circle,transparent 6%,#000 30%,transparent 60%)}
-.jg-art-bt3 b{position:absolute;left:50%;top:44%;width:34cqmin;height:34cqmin;margin:-17cqmin 0 0 -17cqmin;border-radius:50%;
-  background:radial-gradient(circle,#fff 0 16%,#fff6b0 26%,#ffd21f 40%,#ff8a0088 58%,transparent 72%);box-shadow:0 0 40px 10px #ff8a0055}
-.jg-art-bt3 u{position:absolute;left:50%;top:44%;width:0;height:0}
-.jg-art-bt3 i{position:absolute;left:-6.5cqmin;top:-6.5cqmin;width:13cqmin;height:13cqmin;border-radius:50%;
-  transform:rotate(calc(var(--k) * 51.4286deg)) translateY(-31cqmin) rotate(calc(var(--k) * -51.4286deg));
+/* al centro, la esfera Z: una esfera de ki naranja con la Z del logo encima */
+.jg-art-bt3 b{position:absolute;left:50%;top:40%;width:24cqmin;height:24cqmin;margin:-12cqmin 0 0 -12cqmin;border-radius:50%;display:grid;place-items:center;
+  font:400 17cqmin/1 'Lilita One',system-ui,sans-serif;color:#e8200a;-webkit-text-stroke:.5cqmin #3a0800;text-shadow:0 .8cqmin 0 #3a0800;
+  background:radial-gradient(circle at 34% 28%,#fff8d0 0 9%,#ffc23d 26%,#ff8a00 55%,#b43c00 88%);box-shadow:0 0 0 .6cqmin #ffd21f66,0 0 30px 10px #ff8a0088,inset -1.4cqmin -1.8cqmin 2.4cqmin #7a2400aa}
+.jg-art-bt3 u{position:absolute;left:50%;top:40%;width:0;height:0}
+.jg-art-bt3 i{position:absolute;left:-6cqmin;top:-6cqmin;width:12cqmin;height:12cqmin;border-radius:50%;
+  transform:rotate(calc(var(--k) * 51.4286deg)) translateY(-27cqmin) rotate(calc(var(--k) * -51.4286deg));
   background:radial-gradient(circle at 35% 30%,#fff7c2 0 12%,#ffb526 38%,#f07800 72%,#a34400 100%);box-shadow:0 0 12px #ff9a1fbb,inset -2px -3px 5px #0004}
 .jg-art-bt3 i svg{display:block;width:100%;height:100%;fill:#d61f1f;filter:drop-shadow(0 .5px 0 #7a0a0a)}
-.jg-art-bt3 em{position:absolute;left:0;right:0;bottom:6%;z-index:2;display:grid;justify-items:center;font-style:normal;line-height:1;text-align:center}
-.jg-art-bt3 em small{font:800 clamp(7px,4.2cqmin,13px) system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ffd9a0;text-shadow:0 1px 0 #000}
-.jg-art-bt3 em strong{font:400 clamp(18px,15cqmin,58px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;
+.jg-art-bt3 em{position:absolute;left:0;right:0;bottom:5%;z-index:2;display:grid;justify-items:center;font-style:normal;line-height:1;text-align:center;isolation:isolate}
+/* una sombra detrás del título: se lee aunque pase una esfera o el brillo del orbe */
+.jg-art-bt3 em::before{content:"";position:absolute;left:8%;right:8%;top:-18%;bottom:-25%;z-index:-1;background:radial-gradient(ellipse at 50% 60%,#05081cdd 0,#05081c88 45%,transparent 72%)}
+.jg-art-bt3 em small{font:800 clamp(8px,4.4cqmin,13px) system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#fff1d6;text-shadow:0 1px 0 #000,0 0 6px #000}
+.jg-art-bt3 em strong{font:400 clamp(18px,min(15cqmin,11cqw),58px)/1 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap;
   background:linear-gradient(105deg,transparent 42%,#ffffffcc 50%,transparent 58%) 160% 0/250% 100% no-repeat,linear-gradient(180deg,#fffbd1,#ffe14a 38%,#ff9d00 70%,#ff5a00);
   -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1.5px #4a1300;filter:drop-shadow(0 3px 0 #1a0600) drop-shadow(0 0 12px #ff8a0088)}
 @media(prefers-reduced-motion:no-preference){
@@ -1643,11 +1647,18 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-art-bt3 i svg{animation:jg-bt3-gira 22s linear infinite reverse}
   .jg-art-bt3 i{animation:jg-bt3-esfera 2.6s ease-in-out infinite;animation-delay:calc(var(--k) * -.37s)}
   .jg-art-bt3 em strong{animation:jg-bt3-brillo 3.6s ease-in-out infinite}}
-@keyframes jg-bt3-ki{50%{transform:scale(1.15);box-shadow:0 0 60px 16px #ff8a0077}}
+@keyframes jg-bt3-ki{50%{transform:scale(1.08);box-shadow:0 0 0 .6cqmin #ffd21f99,0 0 50px 18px #ff8a00aa,inset -1.4cqmin -1.8cqmin 2.4cqmin #7a2400aa}}
 @keyframes jg-bt3-esfera{50%{box-shadow:0 0 22px 4px #ffd21fcc,inset -2px -3px 5px #0004}}
 @keyframes jg-bt3-brillo{0%,55%{background-position:160% 0,0 0}100%{background-position:-60% 0,0 0}}
 .jg-portada-bt3,.jg-nov-arte-bt3{background:#0b1a48}
 .jg-nov-arte-bt3{position:absolute;inset:0}
+/* En el banner, las portadas se dibujan en 380×165 y se amplían (.jg-ban .jg-ban-arte>*, --k): de la de BT3 solo
+   se veía el centro en una pantalla mediana y el título quedaba cortado. Esta llena la columna tal cual (mide en
+   cq*: se adapta sola), con la escena un poco a la derecha, lejos del borde que se desvanece. */
+.jg-ban .jg-ban-arte>.jg-nov-arte-bt3{left:0;top:0;width:100%;height:100%;transform:none}
+.jg-ban .jg-ban-arte .jg-art-bt3 b,.jg-ban .jg-ban-arte .jg-art-bt3 u{left:56%}
+.jg-ban .jg-ban-arte .jg-art-bt3 em{left:12%}
+@media(max-width:720px){.jg-ban .jg-ban-arte .jg-art-bt3 b,.jg-ban .jg-ban-arte .jg-art-bt3 u{left:50%}.jg-ban .jg-ban-arte .jg-art-bt3 em{left:0}}
 .jg-bt3-marco{background:#000}
 .jg-bt3-marco[hidden]{display:none}
 /* El vestíbulo de BT3, a lo Dragon Ball: el cielo de noche de las peleas (azul profundo con líneas de velocidad
@@ -1736,6 +1747,31 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-inscritos .jg-bt3-ava{grid-row:span 2;width:40px;height:40px;font-size:18px;border-width:2px;box-shadow:none}
 .jg-bt3-inscritos li>span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-bt3-inscritos li{position:relative}
+/* la CPU del torneo: un lente de scouter con su nivel (1 a 5) */
+.jg-bt3-ava.cpu{position:relative;background:radial-gradient(circle at 40% 35%,#9dffb0 0 10%,#22c55e 35%,#065f2c 80%);border-color:#86efac;overflow:hidden}
+.jg-bt3-ava.cpu i{position:absolute;inset:18% 12% 30% 12%;border-radius:40% 40% 20% 20%;background:linear-gradient(180deg,#ffffff66,#ffffff00)}
+.jg-bt3-ava.cpu small{position:absolute;right:-2px;bottom:-2px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;display:grid;place-items:center;
+  font:400 11px/1 'Lilita One',system-ui,sans-serif;color:#ffd21f;background:#052e16;border:1.5px solid #86efac}
+.jg-bt3-slot .jg-bt3-ava.cpu small{min-width:12px;height:12px;font-size:8px;border-width:1px}
+.jg-bt3-inscritos li.cpu{border-color:#22c55e66}
+.jg-bt3-inscritos li:has(.jg-bt3-echa){padding-right:44px}
+.jg-bt3-nivel{font-style:normal;font-size:12px;color:#86efac}
+.jg-bt3-nivel select{max-width:100%;padding:4px 6px;border-radius:8px;border:1px solid #22c55e88;background:#052e16;color:#dcfce7;font:600 12px system-ui,sans-serif}
+.jg-bt3-libres{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:12px;border:1px dashed #22c55e88;background:#052e1655;font-size:13px}
+.jg-bt3-libres small{color:var(--bt3-mu)}
+.jg-bt3-libres .jg-bt3-ficha{border-color:#22c55e88;background:#0b3d22}
+/* mirar la pelea en vivo (bt3-directo.js) */
+.jg-bt3-ver{padding:8px 16px;border-radius:999px;border:2px solid #ff5d5d;background:#3a0f1a;color:#fff;font:400 15px 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;cursor:pointer;box-shadow:0 0 14px #ff5d5d55}
+.jg-bt3-ver:hover{background:#5a1525}
+.jg-bt3-tele{margin:0 0 12px;border-radius:18px;overflow:hidden;border:2px solid #ff5d5d;background:#000;box-shadow:0 0 30px #ff5d5d33}
+.jg-bt3-tele header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:linear-gradient(90deg,#3a0f1a,#0b1a48);color:#fff;font:400 16px 'Lilita One',system-ui,sans-serif}
+.jg-bt3-tele header i{font-style:normal;color:#ffd21f}
+.jg-bt3-tele header button{width:32px;height:32px;border-radius:8px;border:1px solid #ffffff33;background:#ffffff14;color:#fff;cursor:pointer}
+.jg-bt3-tele header button:first-of-type{margin-left:auto}
+.jg-bt3-tele-video{position:relative;aspect-ratio:16/9;max-height:58vh;margin:0 auto;display:grid;place-items:center}
+.jg-bt3-tele video{width:100%;height:100%;object-fit:contain;background:#000}
+.jg-bt3-tele-video p{position:absolute;margin:0;padding:10px 14px;border-radius:10px;background:#000c;color:#fff}
+.jg-bt3-tele:fullscreen{display:flex;flex-direction:column;border:0;border-radius:0}.jg-bt3-tele:fullscreen .jg-bt3-tele-video{flex:1;aspect-ratio:auto}
 .jg-bt3-echa{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:8px;border:1px solid #ff5d5d66;
   background:#ff5d5d1a;color:#ff8f8f;font-size:14px;line-height:1;cursor:pointer}
 .jg-bt3-echa:hover{background:#ff5d5d40;color:#fff}
@@ -1794,9 +1830,10 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-anuncio{display:grid;justify-items:center;gap:2px;padding:12px 28px;border-radius:16px;text-align:center;max-width:90%;
   background:linear-gradient(180deg,#14296ef2,#0a1640f2);border:3px solid var(--bt3-oro,#ffd21f);box-shadow:0 10px 40px #000a,0 0 40px #ff8a0077;
   color:#fff;animation:jg-bt3-cartel 3.6s cubic-bezier(.2,.9,.3,1.2) both}
-.jg-bt3-anuncio small{font:800 11px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ffc061}
+.jg-bt3-anuncio small,.jg-bt3-anuncio b,.jg-bt3-anuncio>span{position:relative;z-index:7}   /* el texto encima de la explosión */
+.jg-bt3-anuncio small{font:800 12px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ffe3b0;text-shadow:0 1px 0 #000,0 0 8px #000}
 .jg-bt3-anuncio b{font:400 30px/1.1 'Lilita One',system-ui,sans-serif;color:#ffd21f;-webkit-text-stroke:1px #3a1000;text-shadow:0 3px 0 #1a0600,0 0 18px #ff8a00}
-.jg-bt3-anuncio>span{font-size:14px;color:#dbe4ff}
+.jg-bt3-anuncio>span{font-size:14px;color:#fff;text-shadow:0 1px 0 #000}
 .jg-bt3-anuncio.pierde{border-color:#6f7da6;box-shadow:0 10px 40px #000a}.jg-bt3-anuncio.pierde b{color:#dbe4ff;text-shadow:0 3px 0 #0a1238}
 .jg-bt3-anuncio.campeon{padding:18px 40px;animation-duration:6.5s;border-width:4px;background:radial-gradient(circle at 50% 30%,#ff8a00cc,#7a2a00 55%,#1a0b2e 100%)}
 .jg-bt3-anuncio.campeon b{font-size:42px}
@@ -5155,6 +5192,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610140840"></script>
+<script src="juegos-app.js?v=202610140859"></script>
 </body>
 </html>

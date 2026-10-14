@@ -223,6 +223,8 @@
   .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
   .modo.activo strong { color: #ffd21f; }
   .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
+  #volverModos { display: none; }
+  body.started #volverModos { display: inline-block; }
   #abreSala { display: none; }
   #start.en-sala .card .pick:not(#abreSala) { display: none; }
   #start.en-sala #abreSala { display: block; }
@@ -241,7 +243,7 @@
   @keyframes gira { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .indef .pista i, #sala.gira::before { animation: none; } }
 </style>
-<script src="red.js?v=bt3-5"></script>
+<script src="red.js?v=bt3-6"></script>
 </head>
 <body>
 <div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
@@ -307,7 +309,7 @@
     printErr: (t) => { Module.keep(t); console.warn(t); },
     keep: (t) => { Module.log.push(t); if (Module.log.length > 4000) { Module.log.splice(0, 1000); Module.logBase += 1000; } },
     noInitialRun: true,
-    locateFile: (f, base) => base + f + '?v=bt3-5',   // el .wasm con la misma versión que su .js
+    locateFile: (f, base) => base + f + '?v=bt3-6',   // el .wasm con la misma versión que su .js
     // phones: a smaller cache of the disc's files (they are kept in memory)
     webCacheBudget: (phone ? 256 : 768) * 1024 * 1024,
     // the port's switches; set before the program starts up (its start-up code reads the environment, which is
@@ -637,12 +639,12 @@
   }
   else {
     const s = document.createElement('script');
-    s.src = BUILD + '.js?v=bt3-5';
+    s.src = BUILD + '.js?v=bt3-6';
     s.onerror = () => say('No se pudo cargar el juego (' + BUILD + '.js). Revisa tu conexión y recarga la página.', true);
     window.cargaPrograma = () => document.body.appendChild(s);   // (lo llama pagina.js)
   }
 </script>
-<script>var BT3_TAM_WASM = 3595266;</script>
-<script src="pagina.js?v=bt3-5"></script>
+<script>var BT3_TAM_WASM = 3597933;</script>
+<script src="pagina.js?v=bt3-6"></script>
 </body>
 </html>

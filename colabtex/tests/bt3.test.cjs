@@ -7,7 +7,7 @@ const raiz=f=>path.join(__dirname,'..',f);
 const sin=f=>fs.readFileSync(raiz(f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__B={reducir,reglasBt3,JUEGOS,LOGROS,NIVEL,PESO,detecta,BT3_TIEMPOS};',ctx);
+ ';globalThis.__B={reducir,reglasBt3,esCpuBt3,JUEGOS,LOGROS,NIVEL,PESO,detecta,BT3_TIEMPOS};',ctx);
 const B=ctx.__B;
 
 // Una sala de dos (a la abrió) con estas jugadas en orden.
@@ -163,4 +163,36 @@ test('torneo: el organizador saca a alguien (antes o durante); nadie más puede'
  e=B.reducir(torneo(4,{t:'torneo',uid:'u0'},{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'echa',uid:'u0',a:saca}));
  assert.ok(e.fuera[saca]);assert.notEqual(e.llave[0].find(x=>x.id===m.id).g,saca,'pierde la pelea en curso');
  assert.ok(e.hist.some(h=>h.e==='echado'&&h.uid===saca));
+});
+
+test('torneo con CPU: rellenar, niveles, CPU contra CPU se decide sola, contra la CPU decide un solo marco',()=>{
+ // dos humanos + dos CPU (una fácil, una difícil)
+ const base=[{t:'cpu',uid:'u0',id:'cpu:1',nivel:0},{t:'cpu',uid:'u0',id:'cpu:2',nivel:4}];
+ let e=B.reducir(torneo(2,...base,{t:'cpu',uid:'u1',id:'cpu:3',nivel:2}));
+ assert.deepEqual(Object.keys(e.cpus).sort(),['cpu:1','cpu:2'],'solo el organizador pone CPU');
+ e=B.reducir(torneo(2,...base,{t:'cpu',uid:'u0',id:'cpu:1',nivel:3}));assert.equal(e.cpus['cpu:1'].nivel,3,'cambia el nivel');
+ e=B.reducir(torneo(2,...base,{t:'cpu',uid:'u0',id:'cpu:2',quita:true}));assert.deepEqual(Object.keys(e.cpus),['cpu:1']);
+ e=B.reducir(torneo(2,...base,{t:'torneo',uid:'u0'}));
+ assert.equal(e.fase,'torneo','2 humanos + 2 CPU = 4');
+ const todos=e.llave[0].flatMap(m=>[m.a,m.b]);assert.equal(todos.filter(B.esCpuBt3).length,2);
+ // jugar hasta el final: contra la CPU basta el resultado del humano
+ const js=[...base,{t:'torneo',uid:'u0'}];
+ for(let i=0;i<5&&e.fase==='torneo';i++){
+  const m=e.actual;assert.ok(!(B.esCpuBt3(m.a)&&B.esCpuBt3(m.b)),'CPU contra CPU no espera a nadie');
+  const h=[m.a,m.b].filter(u=>!B.esCpuBt3(u));
+  js.push(...h.map(u=>({t:'disco',uid:u})),{t:'empieza',uid:h[0],m:m.id},{t:'resultado',uid:h[0],m:m.id,g:h[0]});
+  if(h.length===2)js.push({t:'resultado',uid:h[1],m:m.id,g:h[0]});
+  e=B.reducir(torneo(2,...js));
+ }
+ assert.equal(e.fase,'fin');assert.ok(!B.esCpuBt3(e.ganador),'ganó un humano (cada humano ganó sus peleas)');
+});
+
+test('torneo: CPU contra CPU es igual en todas las pantallas; volver al menú corta la pelea sin decidirla',()=>{
+ const base=[{t:'cpu',uid:'u0',id:'cpu:1',nivel:1},{t:'cpu',uid:'u0',id:'cpu:2',nivel:1},{t:'cpu',uid:'u0',id:'cpu:3',nivel:3},{t:'torneo',uid:'u0'}];
+ const a=B.reducir(torneo(1,...base)),b=B.reducir(torneo(1,...base));
+ assert.deepEqual(a.llave,b.llave);
+ let e=a;const m=e.actual;const h=[m.a,m.b].find(u=>!B.esCpuBt3(u));
+ e=B.reducir(torneo(1,...base,{t:'disco',uid:h},{t:'empieza',uid:h,m:m.id},{t:'vuelve',uid:h,m:m.id}));
+ assert.equal(e.actual.id,m.id);assert.equal(e.actual.enCurso,false);assert.ok(!e.discos[h],'el disco se vuelve a cargar');
+ assert.equal(B.reglasBt3('team3',240)>>12,3,'3 vs 3: tope de tres en los bits altos');assert.equal(B.reglasBt3('team3',240)&15,1,'es un Team Battle');
 });

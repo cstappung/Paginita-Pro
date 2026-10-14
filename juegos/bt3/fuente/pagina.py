@@ -108,6 +108,8 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
   .modo.activo strong { color: #ffd21f; }
   .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
+  #volverModos { display: none; }
+  body.started #volverModos { display: inline-block; }
   #abreSala { display: none; }
   #start.en-sala .card .pick:not(#abreSala) { display: none; }
   #start.en-sala #abreSala { display: block; }

@@ -1,4 +1,5 @@
 import { crearMalla } from "./malla.js";
+import { crearEmisor } from "./bt3-directo.js";
 
 /* La red de BT3 dentro de su marco (`juegos/bt3/index.html`). Se empaqueta aparte, a `juegos/bt3/red.js`
    (`npm run build:bt3`), porque vive en el iframe y no en la página de la sala.
@@ -19,7 +20,9 @@ const KEEP = new Uint8Array([0x42, 0x54, 0x33, 0x4e, 9, 0, 0, 0]);   // «sigo a
 const padre = (tipo, datos = {}) => window.parent.postMessage({ canal: HIJO, tipo, ...datos }, location.origin);
 
 // ---------- el buzón de la sala, por postMessage (la misma forma que `fb.senalMalla`) ----------
-let alMsj = null, alPres = null, pedidos = 0;
+// (lo escuchan la malla de la pelea y el emisor de la pelea en vivo: cada uno se queda con sus mensajes)
+const alMsj = new Set();
+let alPres = null, pedidos = 0;
 const esperando = new Map();   // id → resolver de `entra`
 const senal = {
   entra(s) {
@@ -29,7 +32,11 @@ const senal = {
   sale() { padre("senal", { op: "sale" }); },
   alPresentes(cb) { alPres = cb; padre("senal", { op: "presentes", on: true }); return () => { alPres = null; padre("senal", { op: "presentes", on: false }); }; },
   envia(para, m) { padre("senal", { op: "envia", para, m }); },
-  alMensajes(cb) { alMsj = cb; padre("senal", { op: "mensajes", on: true }); return () => { alMsj = null; padre("senal", { op: "mensajes", on: false }); }; },
+  alMensajes(cb) {
+    alMsj.add(cb);
+    if (alMsj.size === 1) padre("senal", { op: "mensajes", on: true });
+    return () => { alMsj.delete(cb); if (!alMsj.size) padre("senal", { op: "mensajes", on: false }); };
+  },
 };
 
 // ---------- lo que dice la sala ----------
@@ -39,7 +46,7 @@ window.addEventListener("message", e => {
   if (e.source !== window.parent || e.origin !== location.origin || e.data?.canal !== PADRE) return;
   const d = e.data;
   if (d.tipo === "estado") { estado = d; for (const cb of alEstado) cb(d); }
-  else if (d.tipo === "senal-mensaje") alMsj?.(d.de, d.m);
+  else if (d.tipo === "senal-mensaje") for (const cb of alMsj) cb(d.de, d.m);
   else if (d.tipo === "senal-presentes") alPres?.(d.v);
   else if (d.tipo === "senal-entro") { esperando.get(d.id)?.(d.ok); esperando.delete(d.id); }
 });
@@ -78,10 +85,20 @@ function envia(bytes) {
   return bytes.length;
 }
 
+/* La pelea en vivo (bt3-directo.js): este marco es el que pelea y la sala lo eligió para mostrarla (`estado.emite`):
+   contesta a los que piden verla con la imagen del lienzo del juego. */
+let emisor = null;
+function emite(canvas) {
+  if (emisor || !canvas || !estado?.yo) return;
+  emisor = crearEmisor({ senal, uid: estado.yo, canvas });
+}
+
 function cierra() {
   clearInterval(keep);
   malla?.salir();
   malla = null;
+  emisor?.cierra();
+  emisor = null;
 }
 
 window.BT3Sala = {
@@ -89,7 +106,7 @@ window.BT3Sala = {
   estado: () => estado,
   alEstado: cb => { alEstado.add(cb); if (estado) cb(estado); },
   avisa: (tipo, datos) => padre(tipo, datos),       // "listo", "disco", "termino"
-  conecta, envia, cierra,
+  conecta, envia, cierra, emite,
   recibe: () => cola.shift() || null,
   hay: () => cola.length > 0,
   sano: () => !!malla?.sano(rival),

@@ -7185,17 +7185,22 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
    El juego no le dice a la página quién ganó, así que **la sala no clasifica** (`anotar` la salta, como
    PRO HERO) y sus logros salen de lo que el vestíbulo sí sabe: cuántas peleas, quién fue anfitrión, con
    qué reglas. La sala termina cuando alguien se va (`abandona`). */
-export const BT3_BATALLAS = { single: "Single Battle", team: "Team Battle", dp10: "DP Battle 10", dp15: "DP Battle 15", dp20: "DP Battle 20" };
+export const BT3_BATALLAS = { single: "Single Battle", team3: "Team 3 vs 3", team: "Team Battle", dp10: "DP Battle 10", dp15: "DP Battle 15", dp20: "DP Battle 20" };
 export const BT3_TIEMPOS = [60, 90, 180, 240, 0];   // segundos por round; 0 = sin límite (el orden es el del juego)
 const bt3Batalla = v => tiene(BT3_BATALLAS, v) ? v : "single";
 const bt3Tiempo = v => { const n = Math.floor(Number(v)); return BT3_TIEMPOS.includes(n) ? n : 240; };
 /* La palabra de reglas que espera `gs/net.c` (BT3_NET_RULES): tipo (0 single, 1 team, 2 dp) en los 4 bits
-   bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. */
+   bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. Desde el bit
+   12, cuántos por equipo si no son cinco: el 3 vs 3 es un Team Battle con tope de tres (gs/net.c no mira esos
+   bits; la página del juego los pasa aparte, BT3_WEB_EQUIPO, a los dos lados). */
 export function reglasBt3(batalla, tiempo) {
-  const b = bt3Batalla(batalla), tipo = b === "single" ? 0 : b === "team" ? 1 : 2;
+  const b = bt3Batalla(batalla), tipo = b === "single" ? 0 : b === "team" || b === "team3" ? 1 : 2;
   const dp = b === "dp15" ? 1 : b === "dp20" ? 2 : 0;
-  return tipo | dp << 4 | BT3_TIEMPOS.indexOf(bt3Tiempo(tiempo)) << 8;
+  return tipo | dp << 4 | BT3_TIEMPOS.indexOf(bt3Tiempo(tiempo)) << 8 | (b === "team3" ? 3 : 0) << 12;
 }
+/* La CPU del torneo: cinco niveles, los del juego (la regla «CPU» del versus: niveles internos 0, 6, 13, 21, 29). */
+export const BT3_NIVELES = ["Muy fácil", "Fácil", "Normal", "Difícil", "Muy difícil"];
+export const esCpuBt3 = u => typeof u === "string" && u.startsWith("cpu:");
 
 export function redBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
@@ -7279,6 +7284,15 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid)), fuera = {}, hist = [];
   let org = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   let batalla = "single", tiempo = 240, discos = {}, rondas = null, peleas = 0;
+  const cpus = {};   // "cpu:N" → {n, nivel}: los lugares que el organizador rellenó con la CPU
+  const cupo = cupoDe(p);
+  // Una pelea entre dos CPU se decide sola, sin jugarla: al azar con la semilla de la sala, a favor del más fuerte.
+  const entreCpus = m => {
+    const la = cpus[m.a].nivel, lb = cpus[m.b].nivel;
+    let h = (p.semilla >>> 0) || 1;
+    for (const c of m.id) h = Math.imul(h ^ c.charCodeAt(0), 0x9E3779B1) >>> 0;
+    return rng(h)() < (1 + la) / (2 + la + lb) ? m.a : m.b;
+  };
   const presentes = () => js.filter(j => !fuera[j.uid]);
   const reponeOrg = () => { if (!org || fuera[org]) org = (presentes()[0] || {}).uid || ""; };
   // Los ganadores suben, los byes y los que se fueron se resuelven solos. Una pasada en orden de ronda alcanza.
@@ -7286,6 +7300,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     rondas.forEach((ronda, r) => ronda.forEach((m, k) => {
       if (r > 0) { m.a = rondas[r - 1][2 * k].g; m.b = rondas[r - 1][2 * k + 1].g; }
       if (m.g !== undefined || m.a === undefined || m.b === undefined) return;
+      if (m.a && m.b && cpus[m.a] && cpus[m.b]) { m.g = entreCpus(m); m.enCurso = false; hist.push({ e: "gana", m: m.id, g: m.g, a: m.a, b: m.b, cpu: true }); return; }
       if (m.b === "" || (m.a !== "" && fuera[m.b] && !fuera[m.a])) m.g = m.a;
       else if (m.a === "" || (fuera[m.a] && !fuera[m.b])) m.g = m.b;
       else if (fuera[m.a] && fuera[m.b]) m.g = "";
@@ -7297,6 +7312,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (g === "empate") { m.enCurso = false; m.rep = {}; m.conflicto = false; hist.push({ e: "empate", m: m.id }); }
     else { m.g = g; m.enCurso = false; hist.push({ e: "gana", m: m.id, g, a: m.a, b: m.b }); }
     discos[m.a] = discos[m.b] = false;   // sus marcos se recargan para la próxima pelea
+    delete discos[""];
     avanza();
   };
   for (const j of jugadasDe(p)) {
@@ -7314,8 +7330,15 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (!rondas) {
       if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo")) {
         if (j.k === "batalla") batalla = bt3Batalla(j.v); else tiempo = bt3Tiempo(j.v);
-      } else if (j.t === "torneo" && esOrg && presentes().length >= 3) {
-        const azar = rng((p.semilla >>> 0) || 1), lista = presentes().map(x => x.uid);
+      } else if (j.t === "cpu" && esOrg && esCpuBt3(j.id) && /^cpu:[1-9]$/.test(j.id)) {
+        // poner (o cambiar de nivel) o quitar una CPU; no más lugares que el cupo de la sala
+        if (j.quita) delete cpus[j.id];
+        else if (cpus[j.id] || presentes().length + Object.keys(cpus).length < cupo) {
+          const nivel = Math.max(0, Math.min(4, Math.floor(Number(j.nivel)) || 0));
+          cpus[j.id] = { n: Number(j.id.slice(4)), nivel };
+        }
+      } else if (j.t === "torneo" && esOrg && presentes().length + Object.keys(cpus).length >= 3) {
+        const azar = rng((p.semilla >>> 0) || 1), lista = [...presentes().map(x => x.uid), ...Object.keys(cpus).sort()];
         for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(azar() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
         let tam = 2;
         while (tam < lista.length) tam *= 2;
@@ -7331,8 +7354,20 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     }
     const m = actual();
     if (!m || j.m !== m.id) continue;
-    const pelea = j.uid === m.a || j.uid === m.b;
-    if (j.t === "empieza" && (pelea || esOrg) && !m.enCurso && discos[m.a] && discos[m.b]) {
+    const pelea = j.uid === m.a || j.uid === m.b, contraCpu = !!(cpus[m.a] || cpus[m.b]);
+    const listos = (cpus[m.a] || discos[m.a]) && (cpus[m.b] || discos[m.b]);   // (la CPU no carga disco)
+    if (j.t === "vuelve" && (pelea || esOrg) && m.enCurso) {
+      // la pelea se cortó (alguien volvió al menú del juego): se vuelve a empezar, nadie gana todavía
+      m.enCurso = false; m.rep = {}; m.conflicto = false;
+      discos[m.a] = discos[m.b] = false;
+      hist.push({ e: "vuelve", m: m.id });
+      continue;
+    }
+    if (j.t === "resultado" && pelea && m.enCurso && contraCpu && (j.g === m.a || j.g === m.b || j.g === "empate")) {
+      decide(m, j.g);   // contra la CPU juega uno solo: su juego dice quién ganó
+      continue;
+    }
+    if (j.t === "empieza" && (pelea || esOrg) && !m.enCurso && listos) {
       m.enCurso = true; m.rep = {}; m.conflicto = false; m.n = ++peleas;
       hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
       hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo });   // (para los logros, como una pelea del duelo)
@@ -7354,7 +7389,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   return {
     fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
     batalla, tiempo, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
-    llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto } : null,
+    llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };
 }

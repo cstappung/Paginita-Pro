@@ -80,9 +80,27 @@ agreement decides, disagreement → organizer `decide`; a draw is refought; leav
 is `fuera` like someone who left, forfeits, and their photo explodes in a banner. Each fight is also a `ronda` in
 `hist` so the duel's logros apply.
 
+**CPUs and empty places.** Before starting, the organizer fills free places with CPUs (`{t:"cpu", id:"cpu:N",
+nivel}`, levels 0–4 = the game's CPU strength rule; `quita` removes one) or leaves them empty (their rival gets a
+bye). A CPU is a bracket slot, not a player (`est.cpus`, `esCpuBt3`). CPU vs CPU is decided at once, seeded by the
+room's seed and the match id, weighted by level (the same on every screen). Human vs CPU is played alone in the
+human's frame: `BT3_WEB_MODO=cpu` + `BT3_WEB_REGLAS` + `BT3_WEB_CPU` + `BT3_WEB_AZAR=1` (the patch draws the CPU's
+fighter, or team within the DP limit, at random in the select screens: `CharSel_WebAzar`, `TeamSel_WebAzar`), and
+that one frame's result decides. `{t:"vuelve", m}` cuts the fight in progress without deciding it (a fighter left
+the select screens, or «Cortar la pelea»); it is replayed.
+
+**Team 3 vs 3** is a Team Battle with a cap of three: `reglasBt3` puts 3 in bits 12–15 (gs/net.c ignores them),
+and both pages pass `BT3_WEB_EQUIPO=3` to their program; the patch's `TeamSel_Max` stops the team at three and
+asks for exactly three.
+
 **Spectators** (anyone opening the room who is not playing, and whoever left or was kicked: `enSala()` is false)
-see the lobby, the bracket, the banners and the fight intros live, but **not the fight itself**: the game has no
-spectator netcode, so their frame is never loaded (`cargaMarco`). Friends find running rooms in «En juego ahora»
+see the lobby, the bracket, the banners and the fight intros live; their frame is never loaded (`cargaMarco`).
+**They can watch the fight too** (`bt3-directo.js`): the game has no spectator netcode, so the fighter that is
+player 1 (or the human against a CPU) sends its canvas as a WebRTC video (`captureStream`, ~540p, 30 fps, ≤ 1.5
+Mb/s, at most 6 viewers, no audio) to whoever presses «📺 Ver la pelea en vivo». Signalling goes through the
+mesh's mailbox (`vivo/<pid>/rtc`, open to anyone signed in) with its own message types (`ver`, `vof`, `vans`,
+`vcan`, `vfin`, `vlleno`); the frame's mailbox proxy now takes several listeners (mesh + emitter). The viewer's
+screen closes itself when the fight ends. Friends find running rooms in «En juego ahora»
 (BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
@@ -113,6 +131,12 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   training menu: lessons and free training).
 - Duelo / Torneo are rooms: the button posts `{tipo:"sala", cupo}` (2, or 8 for a tournament) to Juegos, which
   opens it (`alPedirSalaBt3` in `bt3.js`, registered by `juegos-main.js`). Outside Juegos it links there.
+- **No back door to the rest of the game.** Backing out of the chosen mode into the game's other menus (main
+  menu; in a tournament fight also the versus menu) is caught by the patch (`Port_Trace` in `headless.c`, after
+  the first-run part) and reported once to `Module.onFueraDelModo`: the solo page reloads to the mode selector,
+  a room frame tells the room (`termino` → the fight is cut). «← Modos» in the bar does the same on purpose.
+- The save rules the patch writes (time limit rule[0], CPU strength rule[1]) are written only after the card
+  check, because loading the player's save would overwrite them.
 
 ## Speed
 

@@ -381,6 +381,22 @@
   // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)
   if (SOLO) window.Sala = { entorno: () => ({ BT3_NOMOVIE: "1" }), antesDeEmpezar: eligeModo };
 
+  /* Volver al menú de modos: el botón «← Modos» de la barra (con el juego andando), y también si el jugador sale
+     del modo desde el propio juego (atrás hasta el menú principal: el parche lo avisa, Module.onFueraDelModo).
+     Así no se llega al resto del juego por la puerta de atrás: siempre se vuelve a elegir aquí. */
+  const aModos = aviso => {
+    try { if (aviso) sessionStorage.setItem("bt3.volvio", "1"); } catch (e) {}
+    location.reload();
+  };
+  if (SOLO) {
+    Module.onFueraDelModo = () => aModos(true);
+    const b = document.createElement("button");
+    b.id = "volverModos"; b.type = "button"; b.textContent = "← Modos"; b.title = "Volver al menú de modos";
+    $("barra").prepend(b);
+    b.onclick = () => { if (!document.body.classList.contains("started") || confirm("¿Volver al menú de modos? Lo que no hayas guardado en el juego se pierde.")) aModos(false); };
+    try { if (sessionStorage.getItem("bt3.volvio")) { sessionStorage.removeItem("bt3.volvio"); say("Volviste al menú de modos: elige otro o vuelve a jugar."); } } catch (e) {}
+  }
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
@@ -407,6 +423,17 @@
       aviso(est && est.torneo ? "Disco listo. Esperando tu pelea del torneo…" : "Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
+      const equipo = (e.reglas >> 12 & 15) || 0;   // 3 = el Team 3 vs 3 (motor.js, reglasBt3)
+      if (e.rival.cpu) {
+        /* Una pelea del torneo contra la CPU: se juega aquí solo, sin red. El juego entra al versus 1P vs COM con
+           las reglas de la sala, la CPU con su nivel y su luchador (o equipo) al azar (BT3_WEB_*, parche.diff). */
+        Module.entornoPendiente = Object.entries(Object.assign({
+          BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
+        }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
+        if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo
+        aviso("Tu pelea contra " + e.rival.nombre + " (" + ["muy fácil", "fácil", "normal", "difícil", "muy difícil"][e.rival.nivel ?? 2] + "): elige tu luchador.", 6000);
+        return;
+      }
       aviso("Conectando con " + e.rival.nombre + "…", 0, true);
       const ok = await S.conecta(e.yo, e.rival.uid);
       if (!ok) {
@@ -424,8 +451,10 @@
       Module.entornoPendiente = Object.entries(Object.assign({
         BT3_NET_SESSION: "1", BT3_NET_NAME: e.nombre.slice(0, 16), BT3_NET_DELAY: "auto", BT3_NOMOVIE: "1", BT3_SOUND_TICKS: "1",
         BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
-      }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" }));
+      }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
+      equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));   // (el tope de equipo no viaja en la sesión: lo ponen los dos)
       try { FS.mkdir("/net_session"); } catch (err) {}
+      if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo (bt3-directo.js)
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },
   };
@@ -438,6 +467,9 @@
     Module.keep("pelea terminada: " + (bits & 4 ? "empate" : bits & 1 ? "ganó el jugador 1" : bits & 2 ? "ganó el jugador 2" : "sin ganador") + " (" + bits + ")");
     S.avisa("resultado", { bits, b: batallas++ });
   };
+
+  // Salió de la pelea contra la CPU al menú del juego (parche: headless.c): la sala corta la pelea y lo devuelve.
+  Module.onFueraDelModo = () => { aviso("Saliste de la pelea: vuelves a la sala."); S.avisa("termino", { por: "menu" }); };
 
   // Lo que dice el programa de la sesión (gs/net.c): al terminar, la sala vuelve al vestíbulo.
   Module.onNetEvent = (que, txt) => {

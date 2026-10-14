@@ -2979,6 +2979,7 @@ const RAZONES = {
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
+  if (String(uid).startsWith("cpu:")) return "la CPU " + String(uid).slice(4);   // (un lugar del torneo de BT3)
   if (String(uid).startsWith("eq:")) {
     const e = String(uid).slice(3);
     return "el equipo " + ((est.nombresEq || {})[e] || (e === "rojo" ? "Rojo" : "Azul"));
@@ -3418,7 +3419,7 @@ function arteJuego(k) {
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
-  if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b></b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
+  if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
