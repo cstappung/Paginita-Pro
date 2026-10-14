@@ -10,14 +10,16 @@
 
    Para no cargar al que juega: el video sale a unos 540 de alto, 30 cuadros y 1,5 Mb/s como mucho (el
    navegador lo codifica, casi siempre con la tarjeta de video), solo cuando alguien lo pide y a lo más a
-   seis a la vez. Sin audio: el sonido del juego se queda con quien juega.
+   seis a la vez. Con sonido: el del juego, tomado antes del volumen de quien juega (si él lo baja o lo silencia,
+   los que miran lo siguen oyendo; cada uno tiene su propio volumen en la pantalla).
 
-   - `crearEmisor({senal, uid, canvas})` (en el marco del juego que pelea): contesta los pedidos.
+   - `crearEmisor({senal, uid, canvas, audio})` (en el marco del juego que pelea): contesta los pedidos. `audio()`
+     da la pista de sonido del juego (o null si todavía no suena nada).
    - `crearVisor({senal, uid, emisor, alVideo, alFalla})` (en la sala, para quien mira): pide y muestra. */
 const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
 const ALTO = 540, BITS = 1500000, MAX_VISORES = 6;
 
-export function crearEmisor({ senal, uid, canvas, RTC = globalThis.RTCPeerConnection, max = MAX_VISORES }) {
+export function crearEmisor({ senal, uid, canvas, audio = () => null, RTC = globalThis.RTCPeerConnection, max = MAX_VISORES }) {
   const visores = new Map();   // "<de>|<s>" → {pc, cola, remota}
   let pista = null;
   // una sola captura del lienzo para todos los que miran
@@ -43,7 +45,9 @@ export function crearEmisor({ senal, uid, canvas, RTC = globalThis.RTCPeerConnec
         cierraUno(k);
         const pc = new RTC({ iceServers: ICE }), x = { pc, cola: [], remota: false };
         visores.set(k, x);
-        const tr = captura(), envio = pc.addTrack(tr, new MediaStream([tr]));
+        const tr = captura(), au = audio(), flujo = new MediaStream(au ? [tr, au] : [tr]);
+        const envio = pc.addTrack(tr, flujo);
+        if (au) pc.addTrack(au, flujo);
         pc.onicecandidate = e => { if (e.candidate) senal.envia(de, { t: "vcan", s: m.s, d: e.candidate.toJSON() }); };
         pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" || pc.connectionState === "closed") cierraUno(k); };
         const o = await pc.createOffer();

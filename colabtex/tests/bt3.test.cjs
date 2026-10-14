@@ -204,10 +204,10 @@ const ROSTER=[["Goku (Early)"],["Goku (Mid)","Super Saiyan"],["Goku (End)","Supe
  ["Kid Gohan","Super Saiyan"],["Teen Gohan","Super Saiyan","Super Saiyan 2"],["Gohan (Adult)","Super Saiyan","Super Saiyan 2"],["Ultimate Gohan"],["Great Saiyaman"],
  ["Vegeta (Scouter)"],["Vegeta (Early)","Great Ape"],["Vegeta (Mid)","Super Saiyan"],["Vegeta (End)","Super Saiyan","Super Vegeta","Super Saiyan 2"],["Majin Vegeta"],["Super Saiyan 4 Vegeta"],
  ["Trunks (Sword)","Super Saiyan"],["Trunks (Battle Armor)","Super Saiyan","Super Trunks"],["Kid Trunks","Super Saiyan"],["Goten","Super Saiyan"],["Gotenks","Super Saiyan","Super Saiyan 3"],
- ["Vegito","Super Vegito"],["Gogeta","Super Saiyan"],["Super Saiyan 4 Gogeta"],["Piccolo (Early)"],["Piccolo (End)","Fused with Kami"],["Nail"],["Mr. Popo"],
+ ["Vegito","Super Vegito"],["Gogeta","Super Saiyan"],["Super Saiyan 4 Gogeta"],["Piccolo (Early)","Sync with Nail"],["Piccolo (End)","Fused with Kami"],["Nail"],["Mr. Popo"],
  ["Android 13","Super Android 13"],["Android 16"],["Android #17"],["Android 18"],["Super 17"],["Cell","Semi-Perfect Form","Perfect Form","Super Perfect Form"],["Cell Jr."],
  ["Frieza","2nd Form","3rd Form","Final Form","100% Full Power"],["Cooler","Final Form"],["Majin Buu"],["Super Buu","Gotenks Absorbed","Gohan Absorbed"],["Kid Buu"],["Babidi"],["Dabura"],
- ["Burter"],["Guldo"],["Broly","Super Saiyan","Legendary Super Saiyan"],["Arale"],["Baby","Baby Vegeta","Super Baby 1","Super Baby 2","Great Ape Baby"],["Syn Shenron","Omega Shenron"],["Uub","Majuub"],["Great Ape"]];
+ ["Burter"],["Guldo"],["Bardock","Great Ape"],["Bojack","Full Power"],["Chiaotzu"],["Ninja Murasaki"],["Majin Buu (Pure Evil)"],["Fasha"],["Mecha Frieza"],["Krillin"],["Recoome"],["Tapion"],["Tien"],["Yamcha"],["Zarbon","Post-Transformation"],["Great Saiyaman 2"],["Hirudegarn"],["Broly","Super Saiyan","Legendary Super Saiyan"],["Arale"],["Baby","Baby Vegeta","Super Baby 1","Super Baby 2","Great Ape Baby"],["Syn Shenron","Omega Shenron"],["Uub","Majuub"],["Great Ape"]];
 const CATALOGO=ROSTER.flatMap(([n,...f])=>[[n,''],...f.map(x=>[n,x])]).map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
 
 test('reglas de personajes: el anfitrión elige una (No OP o Sólo malos), y queda en el torneo',()=>{
@@ -218,7 +218,7 @@ test('reglas de personajes: el anfitrión elige una (No OP o Sólo malos), y que
  e=B.reducir(torneo(3,{t:'ajuste',uid:'u0',k:'veto',v:'malos'},{t:'torneo',uid:'u0'},{t:'ajuste',uid:'u0',k:'veto',v:''}));
  assert.equal(e.veto,'malos','con el torneo andando ya no cambia');
  assert.deepEqual([...T.tiersVetadas('noop')],['BROLY','S++','S+','S']);
- assert.deepEqual([...T.tiersVetadas('malos')],['BROLY','S++','S+','S','A']);
+ assert.deepEqual([...T.tiersVetadas('malos')],['BROLY','S++','S+','S','A','B'],'Sólo malos: de C hacia abajo');
 });
 
 test('reglas de personajes: cada entrada de la tier list encuentra exactamente a su personaje en el disco',()=>{
@@ -232,7 +232,33 @@ test('reglas de personajes: cada entrada de la tier list encuentra exactamente a
  for(const x of ['Broly','Broly · Super Saiyan','Cell · Perfect Form','Goku (Early)','Android 13 · Super Android 13','Frieza · Final Form'])assert.ok(!nNo.includes(x),'No OP permite a '+x);
  assert.ok(no.ids.every(i=>ma.ids.includes(i)),'Sólo malos deja fuera todo lo que No OP');
  for(const x of ['Android 13 · Super Android 13','Frieza · 100% Full Power','Super Saiyan 4 Goku','Teen Gohan · Super Saiyan 2','Goku (Mid) · Super Saiyan'])assert.ok(nMa.includes(x),'Sólo malos deja fuera a '+x);
- for(const x of ['Goku (Early)','Frieza · Final Form','Cell · Perfect Form','Kid Buu','Great Ape','Vegeta (End) · Super Vegeta','Teen Gohan'])assert.ok(!nMa.includes(x),'Sólo malos permite a '+x);
+ for(const x of ['Frieza · Final Form','Cell · Perfect Form','Vegeta (End) · Super Vegeta','Teen Gohan','Goku (End) · Super Saiyan 3','Piccolo (Early) · Sync with Nail','Bojack · Full Power','Zarbon · Post-Transformation'])assert.ok(nMa.includes(x),'Sólo malos (de C para abajo) deja fuera también a la B: '+x);
+ for(const x of ['Goku (Early)','Kid Buu','Great Ape','Bardock · Great Ape','Piccolo (Early)','Bojack','Zarbon','Great Saiyaman 2','Hirudegarn','Kid Goku','Goten'])assert.ok(!nMa.includes(x),'Sólo malos permite a '+x);
+ assert.equal(ma.detalle.length,89,'BROLY..B: 90 retratos menos el dorado de S+ que no se reconoció');
  assert.equal(T.vetadosBt3([], 'noop').ids.length,0,'sin catálogo todavía no se sabe a quién: nadie');
  assert.equal(T.vetadosBt3(cat,'').ids.length,0);
+});
+
+test('la pelea en vivo manda también el sonido del juego (si hay), en el mismo flujo que el video',async()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor};',c);
+ class MS{constructor(t){this.t=t;}}
+ c.MediaStream=MS;
+ const pcs=[];
+ class RTC{constructor(){this.tracks=[];this.signalingState='stable';pcs.push(this);}
+  addTrack(t,s){this.tracks.push([t.kind,s]);return{getParameters:()=>({encodings:[{}]}),setParameters:async()=>{}};}
+  createOffer(){return Promise.resolve({type:'offer',sdp:'x'});} setLocalDescription(){this.signalingState='have-local-offer';return Promise.resolve();} close(){}}
+ const canvas={height:540,captureStream:()=>({getVideoTracks:()=>[{kind:'video',readyState:'live'}]})};
+ const hacia=[];let oye=null;
+ const senal={envia:(p,m)=>hacia.push(m),alMensajes:f=>{oye=f;return()=>{};}};
+ const con=c.__D.crearEmisor({senal,uid:'a',canvas,audio:()=>({kind:'audio'}),RTC});
+ await oye('b',{t:'ver',s:'1'});
+ assert.deepEqual(pcs[0].tracks.map(x=>x[0]),['video','audio']);
+ assert.equal(pcs[0].tracks[0][1],pcs[0].tracks[1][1],'video y sonido van juntos: el visor los recibe en un solo flujo');
+ assert.equal(hacia[0].t,'vof');
+ con.cierra();
+ const sin_=c.__D.crearEmisor({senal,uid:'a',canvas,RTC});
+ await oye('c',{t:'ver',s:'2'});
+ assert.deepEqual(pcs[1].tracks.map(x=>x[0]),['video'],'sin sonido todavía, igual se ve');
+ sin_.cierra();
 });

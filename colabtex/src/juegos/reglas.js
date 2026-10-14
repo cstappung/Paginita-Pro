@@ -463,9 +463,9 @@ const REGLAS = {
         "<b>Revancha</b>: la piden los dos y empieza sola, con las mismas reglas, en cuanto cargan los dos discos."
       ])],
       ["Personajes (tier list)", lista([
-        "En el duelo y el torneo, quien pone las reglas puede limitar los personajes según la tier list competitiva de BT3: <b>No OP</b> deja fuera a los de tier S hacia arriba (BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo los de tier B hacia abajo. Es una o la otra.",
-        "En la selección de personajes, elegir uno vetado suena a error, y el aleatorio (y la CPU) nunca saca uno. En la sala, <b>Ver los vetados</b> muestra la lista con el nombre que tienen en el juego.",
-        "Vale para el personaje con que se empieza: transformarse en plena pelea sigue permitido."
+        "En el duelo y el torneo, quien pone las reglas puede limitar los personajes según la tier list competitiva de BT3: <b>No OP</b> deja fuera a los de tier S hacia arriba (BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo los de tier C hacia abajo. Es una o la otra. Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no.",
+        "En la selección de personajes los vetados se ven oscuros, una lista al costado de la pantalla dice cuáles son, elegir uno suena a error, y el aleatorio (y la CPU) nunca saca uno. En la sala, <b>Ver los vetados</b> muestra la misma lista.",
+        "También vale en plena pelea: no se puede transformar ni fusionar en un personaje vetado (como cuando falta energía)."
       ])],
       ["Torneo", lista([
         "El que abre la sala organiza: pone las reglas y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave se sortea entre los que están; si no son 4 u 8, alguno pasa directo.",

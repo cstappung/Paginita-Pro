@@ -90,7 +90,8 @@ function envia(bytes) {
 let emisor = null;
 function emite(canvas) {
   if (emisor || !canvas || !estado?.yo) return;
-  emisor = crearEmisor({ senal, uid: estado.yo, canvas });
+  // el sonido del juego, del contexto de audio que la página del juego marca (juegos/bt3/pagina.js, Module.audioJuego)
+  emisor = crearEmisor({ senal, uid: estado.yo, canvas, audio: () => window.Module?.audioJuego?.() || null });
 }
 
 function cierra() {

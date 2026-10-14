@@ -44,10 +44,10 @@ index fd6cc57..79829bd 100644
      set_open(true);
      sNet = true;
 diff --git a/port/src/headless.c b/port/src/headless.c
-index fb8b892..9c37864 100644
+index fb8b892..56001fb 100644
 --- a/port/src/headless.c
 +++ b/port/src/headless.c
-@@ -95,6 +95,62 @@ static void port_stage_replace_init(void) {
+@@ -95,6 +95,73 @@ static void port_stage_replace_init(void) {
  
  extern void Port_NetRules(int *type, int *dp, int *time); /* gs/net.c */
  
@@ -102,6 +102,17 @@ index fb8b892..9c37864 100644
 +    for (var id = 0; id <= 160; id++) lista.push([linea(nombres, id), linea(formas, id)]);
 +    try { Module.onCatalogo(lista); } catch (e) { console.warn("[bt3] catalogo", e); }
 +});
++/* The menus start (1) or a battle does (0). */
++EM_JS(void, web_en_menus, (int si), {
++    if (Module.onMenus) Module.onMenus(!!si);
++});
++/* A character (or team) select screen opens (1) or closes (0): the page shows the room's banned characters meanwhile. */
++EM_JS(void, web_seleccion, (int abierta), {
++    if (Module.onSeleccion) Module.onSeleccion(!!abierta);
++});
++void Web_Seleccion(int abierta) {
++    web_seleccion(abierta);
++}
 +void Web_Catalogo(void *nombres, void *formas) {
 +    if (nombres != NULL && formas != NULL) web_catalogo(nombres, formas);
 +}
@@ -110,7 +121,7 @@ index fb8b892..9c37864 100644
  int __wrap_Progress_Main(int arg) {
      const char *path;
      PortStages_Init();
-@@ -134,6 +190,47 @@ int __wrap_Progress_Main(int arg) {
+@@ -134,9 +201,56 @@ int __wrap_Progress_Main(int arg) {
                              time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
                  }
              }
@@ -156,9 +167,18 @@ index fb8b892..9c37864 100644
 +            }
 +#endif
              gPortMenuMode = 1; /* the renderer treats all 2D as one centred 4:3 page while the menus run */
++#ifdef __EMSCRIPTEN__
++            web_en_menus(1); /* paginita-pro: the page shows its «Atrás» button only in the menus */
++#endif
              r = __real_Progress_Main(arg);
              gPortMenuMode = 0;
-@@ -312,6 +409,29 @@ void Port_Trace(unsigned vblanks) {
++#ifdef __EMSCRIPTEN__
++            web_en_menus(0);
++#endif
+             sFromMenu = 1; /* a battle set up by the real menus follows: the traces apply to it too */
+             return r;
+         }
+@@ -312,6 +426,29 @@ void Port_Trace(unsigned vblanks) {
              Port_StateLog(vblanks, NULL, 0);
          }
      }
@@ -495,31 +515,115 @@ index 0000000..d2bf244
 +void __cxa_guard_abort(uint64_t *guarda) {
 +    (void)guarda;                              /* la inicialización falló: se deja sin marcar para reintentar */
 +}
+diff --git a/src/battle/battle_load.c b/src/battle/battle_load.c
+index 9794ea9..5783e8d 100644
+--- a/src/battle/battle_load.c
++++ b/src/battle/battle_load.c
+@@ -1989,9 +1989,18 @@ void BattleSide_SetMemberItems(s32 side, s32 idx, BattleItemSet *items) {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c: the room's tier rule leaves it out */
++#endif
+ /* 1 when character id is in the side's usable-character bits. */
+ s32 BattleSide_IsCharaUsable(s32 side, s32 chara) {
+     u64 *bits = Side(side)->charaBits.bits;
+ 
++#ifdef __EMSCRIPTEN__
++    if (Web_Vetado(chara)) {
++        return 0; /* paginita-pro: no transforming or fusing into a form the room's tier rule leaves out */
++    }
++#endif
++
+     return (bits[chara / 64] >> (chara % 64)) & 1;
+ }
 diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
-index d61fdeb..636e774 100644
+index d61fdeb..347ba7d 100644
 --- a/src/menu/menu_c_e.c
 +++ b/src/menu/menu_c_e.c
-@@ -42,6 +42,9 @@ CharSel *gCharSel = NULL;
+@@ -42,6 +42,10 @@ CharSel *gCharSel = NULL;
  
  extern void TextBox_Init(MTextBox *box, void *text, u32 preset);
  extern void TextBox_SetUnk80(MTextBox *box, s32 value);
 +#ifdef __EMSCRIPTEN__
 +extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
++extern void Web_Seleccion(int abierta);                /* headless.c */
 +#endif
  extern void TextBox_AttachLine(MFlash *flash, MFlashRef *ref, s32 x, s32 y, s32 line, MTextBox *box);
  extern void Flash_ClipSetOffset(MFlash *flash, MFlashRef *ref, s32 x, s32 y);
  extern void IconWin_SetIcon(s32 icon);
-@@ -524,6 +527,9 @@ void CharSel_Init(s32 section) {
+@@ -524,6 +528,10 @@ void CharSel_Init(s32 section) {
  
      gCharSel->nameText = MPACK_AT(gCharSel->res, 43);
      gCharSel->formText = MPACK_AT(gCharSel->res, 44);
 +#ifdef __EMSCRIPTEN__
 +    Web_Catalogo(gCharSel->nameText, gCharSel->formText); /* paginita-pro: the names, for the room's tier rule */
++    Web_Seleccion(1);
 +#endif
      gCharSel->chipPack = (u32 *)MPACK_AT(gCharSel->res, 45);
      for (i = 0; i < MCHR_CELL_MAX; i++) {
          CS_RES(gCharSel->chipPack, i + 1);
-@@ -1214,6 +1220,39 @@ void CharSel_Update(void) {
+@@ -754,6 +762,9 @@ void CharSel_Init(s32 section) {
+ void CharSel_Term(void) {
+     s32 i;
+ 
++#ifdef __EMSCRIPTEN__
++    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++#endif
+ #ifdef PORT
+     gUiNameIdx = -1; /* drop the port's name overlays */
+     gUiSongIdx = -1;
+@@ -805,6 +816,33 @@ void CharSel_Term(void) {
+ 
+ /* Draws the screen: the stage picture cross fade, then the labels, texture rectangles and visibility of every
+    clip of the five movies are set from the state, the movies are drawn, then the windows and the side panels. */
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c */
++/* paginita-pro: whether a chip of side `n` is drawn dark: a form the room's rule leaves out, or a grid cell whose
++   forms are all out (a cell with some allowed form stays lit; its banned forms go dark when it is opened). */
++static s32 CharSel_WebApagado(s32 n, s32 id) {
++    s32 k, f;
++
++    if (id < 0 || id > 0xA0 || !Web_Vetado(id)) {
++        return 0;
++    }
++    if (gCharSel->side[n]->flags & CHARSEL_SIDE_FORMS) {
++        return 1;
++    }
++    for (k = 0; k < gCharSel->masterCount[n]; k++) {
++        if (gCharSel->cells[n][k].id == id) {
++            for (f = 0; f < gCharSel->cells[n][k].formCount; f++) {
++                if (!Web_Vetado(gCharSel->cells[n][k].form[f])) {
++                    return 0;
++                }
++            }
++            break;
++        }
++    }
++    return 1;
++}
++#endif
++
+ void CharSel_Draw(void) {
+     MFlashRef ref;
+     MFlashUv uv;
+@@ -1172,6 +1210,14 @@ void CharSel_Draw(void) {
+             sprintf(name, "mc_chara_chip_%03d", j);
+             Flash_FindLabel(f, NULL, name, &ref);
+             Flash_ClipSetFlags(f, &ref, 0x80, (u8)gCharSel->side[i]->mask);
++#ifdef __EMSCRIPTEN__
++            /* paginita-pro: a chip the room's tier rule leaves out is drawn dark (chips 0..6 show the reel, 7..13
++               the reel it is replacing); the colour reaches the clip's children */
++            Flash_ClipSetColor(f, &ref,
++                               CharSel_WebApagado(i, j < 7 ? gCharSel->side[i]->chip[j] : gCharSel->side[i]->prevChip[j - 7])
++                                   ? 0.3f
++                                   : 1.0f);
++#endif
+         }
+     }
+ 
+@@ -1214,6 +1260,39 @@ void CharSel_Update(void) {
  }
  
  /* The side a pad is choosing for, its number and its movies. */
@@ -559,7 +663,7 @@ index d61fdeb..636e774 100644
  #define CS_N (i + gCharSel->turn)
  #define CS_SIDE (gCharSel->side[CS_N])
  #define CS_REEL (&gCharSel->flash[1 + CS_N])
-@@ -1489,7 +1528,13 @@ void CharSel_Input(s32 *running) {
+@@ -1489,7 +1568,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
@@ -574,7 +678,7 @@ index d61fdeb..636e774 100644
                      Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_ok");
                      gCharSel->customRows[CS_N] = 4;
-@@ -1540,7 +1585,13 @@ void CharSel_Input(s32 *running) {
+@@ -1540,7 +1625,13 @@ void CharSel_Input(s32 *running) {
                  CS_SIDE->chara = CS_SIDE->chip[CS_SIDE->form];
                  CharSel_RequestFace(CS_N);
                  Snd_PlaySe(2, 0);
@@ -589,7 +693,7 @@ index d61fdeb..636e774 100644
                  Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                  CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_FORM_CHIP, "fl_ok");
                  if (CS_SIDE->flags & CHARSEL_SIDE_CUSTOM) {
-@@ -1707,6 +1758,9 @@ void CharSel_Input(s32 *running) {
+@@ -1707,6 +1798,9 @@ void CharSel_Input(s32 *running) {
                  } else {
                      if (CS_CELL.id == MCHR_RANDOM) {
                          /* the random cell: draw a cell that is a character, then one of its forms */
@@ -599,7 +703,7 @@ index d61fdeb..636e774 100644
                          for (;;) {
                              n = Rand_Range(gCharSel->masterCount[CS_N]);
                              id = gCharSel->cells[CS_N][n].id;
-@@ -1718,6 +1772,7 @@ void CharSel_Input(s32 *running) {
+@@ -1718,6 +1812,7 @@ void CharSel_Input(s32 *running) {
                          if (gCharSel->cells[CS_N][n].formCount != 0) {
                              chara = gCharSel->cells[CS_N][n].form[Rand_Range(gCharSel->cells[CS_N][n].formCount)];
                          }
@@ -607,7 +711,7 @@ index d61fdeb..636e774 100644
                          CS_SIDE->picked = chara;
                      } else {
                          CS_SIDE->picked = CS_SIDE->chip[CS_SIDE->col];
-@@ -1731,6 +1786,13 @@ void CharSel_Input(s32 *running) {
+@@ -1731,6 +1826,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_off_start");
                  }
                  CS_SIDE->state = CHARSEL_ST_DONE;
@@ -621,7 +725,7 @@ index d61fdeb..636e774 100644
                  if (gCharSel->players != 1 && gCharSel->turn == 0) {
                      /* one pad: now choose for the other side */
                      gCharSel->turn = 1;
-@@ -1797,7 +1859,13 @@ void CharSel_Input(s32 *running) {
+@@ -1797,7 +1899,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
@@ -637,16 +741,17 @@ index d61fdeb..636e774 100644
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CUSTOM_CHIP, "fl_ok");
                      gCharSel->customRows[CS_N] = 2;
 diff --git a/src/menu/menu_e_b.c b/src/menu/menu_e_b.c
-index 04ba62e..aaf87f7 100644
+index 04ba62e..c25836d 100644
 --- a/src/menu/menu_e_b.c
 +++ b/src/menu/menu_e_b.c
-@@ -69,11 +69,21 @@ void TeamSel_SumCost(s32 side, s32 skipCur) {
+@@ -69,11 +69,22 @@ void TeamSel_SumCost(s32 side, s32 skipCur) {
      }
  }
  
 +#ifdef __EMSCRIPTEN__
 +extern int Web_Vetado(int chara);                      /* headless.c: the room's tier rule leaves it out */
 +extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
++extern void Web_Seleccion(int abierta);                /* headless.c */
 +#endif
 +
  /* Returns 0 if another member of the side's team is the same person as `chara` (a form of the same character). */
@@ -662,7 +767,7 @@ index 04ba62e..aaf87f7 100644
      for (i = 0; i < gTeamSel->side[side]->memberCount; i++) {
          if (i != gTeamSel->side[side]->cur) {
              if (ChrTbl_IsRelated(chara, gTeamSel->side[side]->member[i].chara)) {
-@@ -97,6 +107,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
+@@ -97,6 +108,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
      return gTeamSel->side[side]->cost + ChrTbl_GetCost(chara) <= w->dpMax;
  }
  
@@ -720,17 +825,28 @@ index 04ba62e..aaf87f7 100644
  /* Takes member `idx` out of a side's team: the members behind it move up and the last slot is emptied. */
  void TeamSel_RemoveMember(s32 side, s32 idx) {
      s32 i;
-@@ -605,6 +666,9 @@ void TeamSel_Init(s32 section) {
+@@ -605,6 +667,10 @@ void TeamSel_Init(s32 section) {
      gTeamSel->unk3EA0 = MPACK_AT(gCommonRes->data[2], 2);
      gTeamSel->nameText = MPACK_AT(gTeamSel->res, 43);
      gTeamSel->formText = MPACK_AT(gTeamSel->res, 44);
 +#ifdef __EMSCRIPTEN__
 +    Web_Catalogo(gTeamSel->nameText, gTeamSel->formText); /* paginita-pro: the names, for the room's tier rule */
++    Web_Seleccion(1);
 +#endif
      gTeamSel->chipPack = (u32 *)MPACK_AT(gTeamSel->res, 45);
      for (i = 0; i < TS_CELL_MAX; i++) {
          res = (MTexRes *)MPACK_AT(gTeamSel->chipPack, i + 1);
-@@ -1722,6 +1786,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -746,6 +812,9 @@ void TeamSel_Init(s32 section) {
+ void TeamSel_Term(void) {
+     s32 i;
+ 
++#ifdef __EMSCRIPTEN__
++    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++#endif
+     IconWin_Term();
+     ItemHelp_Term();
+     ItemPanel_Term(1);
+@@ -1722,6 +1791,11 @@ f32 TeamSel_Input(s32 *result) {
                          /* it was a new member: the cursor goes to the next free slot */
                          CUR_SIDE->memberCount = CUR_SIDE->cur + 1;
                          CUR_SIDE->cur = CUR_SIDE->memberCount;
@@ -742,7 +858,7 @@ index 04ba62e..aaf87f7 100644
                      }
                      TeamSel_SetTeamTex(CUR_N);
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
-@@ -1755,6 +1824,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1755,6 +1829,11 @@ f32 TeamSel_Input(s32 *result) {
                      } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
                          CUR_SIDE->cur = CUR_SIDE->memberCount;
                      }
@@ -754,7 +870,7 @@ index 04ba62e..aaf87f7 100644
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
                      if (CUR_SIDE->cur == TS_CUR_MENU) {
                          CUR_SIDE->chara = CUR_SIDE->member[0].chara;
-@@ -1771,6 +1845,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1771,6 +1850,11 @@ f32 TeamSel_Input(s32 *result) {
                      } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
                          CUR_SIDE->cur = TS_CUR_MENU;
                      }
@@ -766,7 +882,7 @@ index 04ba62e..aaf87f7 100644
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
                      if (CUR_SIDE->cur == TS_CUR_MENU) {
                          CUR_SIDE->chara = CUR_SIDE->member[0].chara;
-@@ -1793,11 +1872,24 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1793,11 +1877,24 @@ f32 TeamSel_Input(s32 *result) {
                          gTeamSel->backup[CUR_N] = CUR_MEMBER;
                          CUR_SIDE->state = TEAMSEL_ST_GRID;
                          Snd_PlaySe(1, 1);

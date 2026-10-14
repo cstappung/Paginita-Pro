@@ -97,7 +97,11 @@ asks for exactly three.
 see the lobby, the bracket, the banners and the fight intros live; their frame is never loaded (`cargaMarco`).
 **They can watch the fight too** (`bt3-directo.js`): the game has no spectator netcode, so the fighter that is
 player 1 (or the human against a CPU) sends its canvas as a WebRTC video (`captureStream`, ~540p, 30 fps, ≤ 1.5
-Mb/s, at most 6 viewers, no audio) to whoever presses «📺 Ver la pelea en vivo». Signalling goes through the
+Mb/s, at most 6 viewers) **with the game's sound** to whoever presses «📺 Ver la pelea en vivo». The sound is
+tapped *before* the player's own volume (`pagina.js` 0a wraps `AudioContext` after `volumen.js`: the game's
+`destination` becomes a `pre` gain → the player's volume, plus a `MediaStreamDestination` when someone watches;
+`Module.audioJuego()` reads it from `Module.SDL3.audioContext` only), so a muted player is still heard; the viewer
+has its own 🔊 and slider (`jg.bt3.tele`). Signalling goes through the
 mesh's mailbox (`vivo/<pid>/rtc`, open to anyone signed in) with its own message types (`ver`, `vof`, `vans`,
 `vcan`, `vfin`, `vlleno`); the frame's mailbox proxy now takes several listeners (mesh + emitter). The viewer's
 screen closes itself when the fight ends. Friends find running rooms in «En juego ahora»
@@ -117,7 +121,8 @@ bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidd
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 
 **Character rules from a tier list** (duel and tournament, `{t:"ajuste", k:"veto", v:""|"noop"|"malos"}`, one
-setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Sólo malos» also A (N/C stays allowed).
+setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Sólo malos» bans BROLY..B (C, D and N/C
+stay allowed).
 The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord» image: 161
 portraits = the game's 161 ids (one per form). **Character names are not in the code, they are on the disc**, so:
 the patch hands the select screen's name/form texts (sections 43/44, line n = id n, UTF-16 high byte first) to
@@ -127,7 +132,12 @@ catalog in `bt3.catalogo`, and sends `vetados` in `estado` → `Module.vetados`.
 CharSel refuses a banned grid cell/form/custom pick with the error sound and its random cell (and the CPU's draw)
 redraws until allowed; TeamSel puts it in `TeamSel_IsCharaFree`, so it is also greyed and skipped at random. Both
 peers read the same disc and rule → same refusals and same draws (no desync); with no catalog yet nothing is
-banned. Only the **starting** pick is limited: transforming mid-fight is the game's. «Ver los vetados» in the
+banned. **Mid-fight too**: `BattleSide_IsCharaUsable` (battle_load.c) refuses a banned id, and it is what
+`BtlAct_CanTransform`/`CanFuse` ask (human and AI), so a banned form cannot be reached by transforming or fusing.
+The player sees the ban: CharSel draws banned chips dark (`CharSel_WebApagado`: a form, or a cell whose forms are
+all out; TeamSel greys through `IsCharaFree`), and while a select screen is open (`Web_Seleccion` → 
+`Module.onSeleccion`) the frame shows a foldable side panel with the banned list by tier (`#vetos`,
+`estado.vetadosLista`, folded state in `bt3.vetosPlegado`). «Ver los vetados» in the
 room lists each entry with the in-game name it matched (or «no se encontró»): **check it against the real disc**
 — one S+ portrait (gold, pointed ears, armour) was not identified and is left out. The bench's «Abrir la
 selección de personajes» posts a hand-written USA-style roster to exercise this without the disc.
@@ -145,6 +155,9 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   `__wrap_Progress_Main` (patch, `headless.c`) sets `gProgress->mode` before the menus run, as the online session
   does: `cpu` = mode 39 (versus character select, `+0x620 = 0` 1P vs COM), `entrenamiento` = mode 44 (the game's
   training menu: lessons and free training).
+- **Back buttons.** «◀ Atrás» in the bar presses player 1's Triangle (the game's back in every menu) through
+  `Web_TouchSet`, only while the menus run (`web_en_menus` around `__real_Progress_Main` → `Module.onMenus`; in a
+  fight Triangle is an attack). «← Modos» (solo) and «← Sala» (room frame: cuts the fight, `termino`) leave.
 - Duelo / Torneo are rooms: the button posts `{tipo:"sala", cupo}` (2, or 8 for a tournament) to Juegos, which
   opens it (`alPedirSalaBt3` in `bt3.js`, registered by `juegos-main.js`). Outside Juegos it links there.
 - **No back door to the rest of the game.** Backing out of the chosen mode into the game's other menus (main

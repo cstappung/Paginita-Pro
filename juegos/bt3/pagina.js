@@ -19,6 +19,37 @@
   const Q = new URLSearchParams(location.search);
   const SOLO = Q.get("modo") !== "online";   // la página suelta («un jugador»), no el marco de una sala
 
+  // ---------------------------------------------------------------- 0a. el sonido para los que miran
+  /* Los que miran una pelea en la sala la ven y la oyen (bt3-directo.js): el emisor manda también el sonido del
+     juego. Se toma ANTES del volumen de quien juega (volumen.js le pone al contexto un `destination` con su
+     volumen): todo lo que el juego conecta «al parlante» pasa primero por `pre`, y de ahí al volumen de este
+     jugador y, cuando alguien mira, a una salida de flujo. Así, si el que juega se silencia, los demás lo siguen
+     oyendo; cada uno tiene su propio volumen en su pantalla. */
+  (() => {
+    const Base = window.AudioContext || window.webkitAudioContext;
+    if (!Base) return;
+    class ConToma extends Base {
+      constructor(...args) {
+        super(...args);
+        try {
+          const vol = this.destination, pre = this.createGain();
+          pre.connect(vol);
+          for (const p of ["maxChannelCount", "numberOfInputs"]) if (!(p in pre)) Object.defineProperty(pre, p, { get: () => vol[p] });
+          Object.defineProperty(this, "destination", { configurable: true, get: () => pre });
+          this.__toma = { pre, salida: null };
+        } catch (e) { /* el juego suena igual; solo no se puede mandar */ }
+      }
+    }
+    try { window.AudioContext = ConToma; if (window.webkitAudioContext) window.webkitAudioContext = ConToma; } catch (e) {}
+    // (el contexto del juego es el de SDL; otro contexto de la página, si lo hubiera, no cuenta)
+    Module.audioJuego = () => {
+      const ctx = Module.SDL3 && Module.SDL3.audioContext, t = ctx && ctx.__toma;
+      if (!t || ctx.state === "closed") return null;
+      if (!t.salida) { t.salida = ctx.createMediaStreamDestination(); t.pre.connect(t.salida); }
+      return t.salida.stream.getAudioTracks()[0] || null;
+    };
+  })();
+
   // ---------------------------------------------------------------- 0. el progreso
   /* Ninguna espera muda: la tarjeta de inicio muestra cuánto falta del programa (3,6 MB), y durante el juego
      una insignia arriba al centro muestra lo que se está cargando del disco privado. */
@@ -397,13 +428,81 @@
     try { if (sessionStorage.getItem("bt3.volvio")) { sessionStorage.removeItem("bt3.volvio"); say("Volviste al menú de modos: elige otro o vuelve a jugar."); } } catch (e) {}
   }
 
+  // ---------------------------------------------------------------- 2c. «◀ Atrás» en los menús
+  /* Con el mouse no había cómo volver atrás en los menús del juego: este botón aprieta el Triángulo del jugador 1
+     (el «atrás» de todos los menús de BT3: PADG_TRIANGLE 0x400 en el juego, PAD_TRIANGLE 0x1000 en el mando) por la
+     misma entrada que los controles táctiles (Web_TouchSet). Solo se ve en los menús (el parche avisa con
+     Module.onMenus): en la pelea el Triángulo es un golpe. */
+  const atras = document.createElement("button");
+  atras.id = "atras"; atras.type = "button"; atras.textContent = "◀ Atrás";
+  atras.title = "Volver atrás en el menú del juego (lo mismo que el Triángulo; en el teclado, la I)";
+  $("barra").insertBefore(atras, $("barra").querySelector("[data-volumen]"));
+  atras.onclick = () => {
+    atras.blur();   // (el foco vuelve al juego: las teclas siguen andando)
+    if (!Module._Web_TouchSet) return;
+    const T = window.BT3Touch || {}, bits = T.bits || 0, lx = T.lx ?? 128, ly = T.ly ?? 128;
+    Module._Web_TouchSet(bits | 0x1000, lx, ly);
+    setTimeout(() => Module._Web_TouchSet(bits, lx, ly), 120);
+  };
+  Module.onMenus = si => document.body.classList.toggle("en-menus", !!si);
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
+
+  /* «← Sala»: salir de la pelea y volver al vestíbulo de la sala cuando se quiera (la pelea se corta y no cuenta).
+     Lo mismo que salir del modo desde el propio juego (Module.onFueraDelModo, más abajo). */
+  const aSala = document.createElement("button");
+  aSala.id = "volverSala"; aSala.type = "button"; aSala.textContent = "← Sala"; aSala.title = "Volver a la sala (esta pelea se corta)";
+  $("barra").prepend(aSala);
+  aSala.onclick = () => {
+    if (!confirm("¿Volver a la sala? Esta pelea se corta y no cuenta.")) return;
+    aviso("Volviendo a la sala…");
+    S.cierra();
+    S.avisa("termino", { por: "menu" });
+  };
+
+  /* Los vetados, a la vista: mientras está abierta la selección de personajes (el parche avisa con
+     Module.onSeleccion), un panel al costado dice cuáles no se pueden elegir según la regla de la sala, con el
+     nombre que tienen en el juego. Se pliega con un clic (se recuerda) y nunca está en la pelea. En la selección
+     misma, los vetados además se ven oscuros (parche: CharSel_WebApagado). */
+  const panel = document.createElement("aside");
+  panel.id = "vetos"; panel.hidden = true; panel.setAttribute("aria-label", "Personajes vetados");
+  document.body.append(panel);
+  let plegado = false, enSeleccion = false, listaVetos = [], reglaVetos = "";
+  try { plegado = localStorage.getItem("bt3.vetosPlegado") === "1"; } catch (e) {}
+  const pintaVetos = () => {
+    panel.hidden = !(enSeleccion && listaVetos.length);
+    if (panel.hidden) return;
+    panel.classList.toggle("plegado", plegado);
+    panel.replaceChildren();
+    const tit = document.createElement("button");
+    tit.type = "button"; tit.className = "tit"; tit.setAttribute("aria-expanded", String(!plegado));
+    tit.innerHTML = `<span>🚫 Vetados · ${reglaVetos === "noop" ? "No OP" : "Sólo malos"}</span><b></b><i>${plegado ? "▸" : "▾"}</i>`;
+    tit.querySelector("b").textContent = listaVetos.length;
+    tit.onclick = () => { plegado = !plegado; try { localStorage.setItem("bt3.vetosPlegado", plegado ? "1" : "0"); } catch (e) {} pintaVetos(); };
+    panel.append(tit);
+    if (plegado) return;
+    const cuerpo = document.createElement("div");
+    cuerpo.className = "cuerpo";
+    const nota = document.createElement("p");
+    nota.textContent = "Se ven oscuros: elegirlos suena a error, y tampoco se puede transformar o fusionar en ellos.";
+    cuerpo.append(nota);
+    const tiers = [...new Set(listaVetos.map(x => x[0]))];
+    for (const t of tiers) {
+      const g = document.createElement("section");
+      const h = document.createElement("h3"); h.textContent = t; g.append(h);
+      const ul = document.createElement("ul"); ul.translate = false;
+      for (const [, n] of listaVetos.filter(x => x[0] === t)) { const li = document.createElement("li"); li.textContent = n; ul.append(li); }
+      g.append(ul); cuerpo.append(g);
+    }
+    panel.append(cuerpo);
+  };
+  Module.onSeleccion = abierta => { enSeleccion = !!abierta; pintaVetos(); };
   // La sala de prueba corre dos juegos en la misma pestaña: menos caché del disco por cada uno.
   if (S.prueba) Module.webCacheBudget = 192 * 1024 * 1024;
 
-  let est = null, cuandoEmpiece = null, ronda = 0, vetoVisto = "";
+  let est = null, cuandoEmpiece = null, ronda = 0;
   /* Las reglas de personajes de la sala (No OP / Sólo malos, bt3-tiers.js en la sala): al abrir la selección de
      personajes, el programa manda los nombres que trae el disco (Web_Catalogo, parche.diff) y la sala devuelve
      qué ids quedan fuera (`estado.vetados`). El programa los lee de Module.vetados al elegir (web_vetado): un
@@ -413,12 +512,9 @@
     const v = [];
     for (const id of Array.isArray(e.vetados) ? e.vetados : []) if (Number.isInteger(id) && id >= 0 && id <= 160) v[id] = 1;
     Module.vetados = v;
-    const firma = (e.veto || "") + ":" + Object.keys(v).length;
-    if (e.veto && Object.keys(v).length && firma !== vetoVisto && !e.mirando && Module.catalogoVisto) {   // (al abrir la selección)
-      vetoVisto = firma;
-      aviso((e.veto === "noop" ? "Regla «No OP»" : "Regla «Sólo malos»") + ": " + Object.keys(v).length +
-        " personajes vetados según la tier list (si eliges uno, suena a error).", 7000);
-    }
+    reglaVetos = e.veto || "";
+    listaVetos = e.veto && Array.isArray(e.vetadosLista) ? e.vetadosLista.filter(x => Array.isArray(x) && x.length === 2).map(x => [String(x[0]), String(x[1])]) : [];
+    pintaVetos();
   };
   S.alEstado(e => {
     est = e;

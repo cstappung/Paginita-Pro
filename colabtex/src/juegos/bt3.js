@@ -23,7 +23,7 @@ import { BT3_VETOS, BT3_VETOS_TXT, catalogoBt3, vetadosBt3 } from "./bt3-tiers.j
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-7";
+const SRC = "juegos/bt3/index.html?modo=online&v=bt3-8";
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
 /* Los nombres de los personajes del disco (los manda el marco al abrir la selección de personajes, ver
@@ -68,14 +68,34 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const el = document.createElement("div");
     el.className = "jg-bt3-tele";
     el.innerHTML = `<header><span class="jg-bt3-vivo">● EN VIVO</span><b translate="no">${escapeHtml(nombre(pel.a))}</b><i>VS</i><b translate="no">${escapeHtml(nombre(pel.b))}</b>
+      <span class="jg-bt3-tele-son"><button type="button" data-tele="son"></button><input type="range" min="0" max="100" step="1" data-tele="vol" aria-label="Volumen de la pelea"></span>
       <button type="button" data-tele="grande" title="Pantalla completa" aria-label="Pantalla completa">⛶</button><button type="button" data-tele="x" title="Dejar de mirar" aria-label="Dejar de mirar">✕</button></header>
-      <div class="jg-bt3-tele-video"><video autoplay playsinline muted></video><p class="jg-bt3-nota">Conectando con la pantalla de <b translate="no">${escapeHtml(nombre(pel.emisor))}</b>…</p></div>`;
+      <div class="jg-bt3-tele-video"><video autoplay playsinline></video><p class="jg-bt3-nota">Conectando con la pantalla de <b translate="no">${escapeHtml(nombre(pel.emisor))}</b>…</p></div>`;
     escena.prepend(el);
     const video = el.querySelector("video"), nota = el.querySelector("p");
+    /* El sonido de la pelea (el del juego del que pelea): con su propio silencio y volumen, guardados aparte de los
+       del juego («jg.bt3.tele»), porque mirar no es jugar. */
+    const son = el.querySelector('[data-tele="son"]'), vol = el.querySelector('[data-tele="vol"]');
+    let cfg = { v: 70, m: false };
+    try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem("jg.bt3.tele") || "{}")); } catch (e) {}
+    const aplica = () => {
+      video.muted = cfg.m; video.volume = Math.max(0, Math.min(1, cfg.v / 100));
+      vol.value = String(cfg.v);
+      son.textContent = cfg.m || !cfg.v ? "🔇" : "🔊";
+      son.title = son.ariaLabel = cfg.m ? "Activar el sonido de la pelea" : "Silenciar la pelea";
+      try { localStorage.setItem("jg.bt3.tele", JSON.stringify(cfg)); } catch (e) {}
+    };
+    son.onclick = () => { cfg.m = !cfg.m; if (!cfg.m && !cfg.v) cfg.v = 50; aplica(); video.play?.().catch(() => {}); };
+    vol.oninput = () => { cfg.v = Number(vol.value); cfg.m = false; aplica(); };
+    aplica();
     el.querySelector('[data-tele="x"]').onclick = () => cierraTele();
     el.querySelector('[data-tele="grande"]').onclick = () => { (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {}); };
     const visor = crearVisor({ senal, uid, emisor: pel.emisor,
-      alVideo: flujo => { video.srcObject = flujo; video.play?.().catch(() => {}); nota.hidden = true; el.classList.add("en-vivo"); },
+      alVideo: flujo => {
+        video.srcObject = flujo; nota.hidden = true; el.classList.add("en-vivo");
+        // (el clic en «Ver la pelea» deja sonar; si el navegador igual no deja, empieza en silencio y el 🔇 lo activa)
+        video.play?.().catch(() => { cfg.m = true; aplica(); video.play?.().catch(() => {}); });
+      },
       alFalla: por => { nota.hidden = false; nota.textContent = por === "lleno" ? "Ya hay muchos mirando esta pelea: prueba en un rato."
         : "No se pudo conectar con la pantalla del que pelea (su red no deja una conexión directa)."; } });
     tele = { el, visor, id: pel.id };
@@ -139,13 +159,15 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const rivalUid = est.torneo ? (pelea ? (est.actual.a === uid ? est.actual.b : est.actual.a) : "") : (presentes().find(j => j.uid !== uid) || {}).uid;
     const rival = !rivalUid ? null : esCpuBt3(rivalUid) ? { uid: rivalUid, nombre: nombre(rivalUid), cpu: true, nivel: nivelCpu(rivalUid) }
       : presentes().find(j => j.uid === rivalUid) || { uid: rivalUid };
+    const vr = est.veto ? vetadosBt3(catalogo, est.veto) : null;
     enviar("estado", {
       yo: uid, nombre: nombre(uid), mirando: !enSala(), torneo: !!est.torneo,
       fase: est.torneo ? (pelea ? "jugando" : "espera") : est.fase, ronda: est.torneo ? (est.actual?.n || 0) : (est.ronda || 0),
       rol: j1() === uid || rival?.cpu ? "host" : "join", reglas: est.reglas,   // (contra la CPU, el humano es el jugador 1)
       rival: rival ? { uid: rival.uid, nombre: rival.nombre || "Jugador", cpu: !!rival.cpu, nivel: rival.nivel } : null,
       disco: !!est.discos?.[uid],
-      veto: est.veto || "", vetados: est.veto ? vetadosBt3(catalogo, est.veto).ids : [],   // (los ids que el juego no deja elegir)
+      // los ids que el juego no deja elegir, y con qué nombre del juego quedó cada uno (el panel del marco)
+      veto: est.veto || "", vetados: vr ? vr.ids : [], vetadosLista: vr ? vr.detalle.flatMap(d => d.juego.map(n => [d.tier, n])) : [],
       emite: pelea && emisorDe() === uid   // este marco muestra la pelea en vivo a los que miran (bt3-directo.js)
     });
   }

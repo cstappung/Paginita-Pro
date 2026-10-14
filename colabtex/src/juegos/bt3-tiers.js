@@ -4,8 +4,8 @@
    por personaje y forma, que es justo como el juego numera a sus personajes (ids 0..160, cada forma con el
    suyo). Dos reglas, una u otra (o ninguna):
    - `noop` («No OP»): fuera los de tier S hacia arriba (BROLY, S++, S+ y S).
-   - `malos` («Sólo malos»): solo de B hacia abajo, o sea fuera también los de A. Los N/C (los gigantes: los
-     simios, Hirudegarn…) quedan permitidos: la lista no los pone sobre B.
+   - `malos` («Sólo malos»): solo de C hacia abajo, o sea fuera también los de A y B. Los N/C (los gigantes:
+     los simios, Hirudegarn…) quedan permitidos: la lista no los pone sobre C.
 
    El juego no trae los nombres en el código: están en el disco. Al abrir la selección de personajes, el juego le
    pasa a su página los 161 nombres con su forma (`Web_Catalogo`, del parche), la página se los manda a la
@@ -43,8 +43,9 @@ export function palabrasBt3(texto) {
   return new Set(t.split(/[^a-z0-9]+/).filter(w => w && !VACIAS.has(w)));
 }
 
-/* Las 46 de A hacia arriba, por tier (lo de B para abajo no hace falta: siempre se puede elegir). El orden es el
-   de la imagen, fila por fila. */
+/* Las 90 de B hacia arriba, por tier (lo de C para abajo no hace falta: siempre se puede elegir). El orden es el
+   de la imagen, fila por fila. Cada forma es un retrato aparte (Goku (fin), su SSJ, su SSJ2 y su SSJ3 son cuatro),
+   y la regla vale también para transformarse o fusionarse en plena pelea. */
 const FORMAS = "ssj ssj2 ssj3 ssj4 lssj ape fullpower";
 export const BT3_TIERS = {
   BROLY: [
@@ -62,7 +63,7 @@ export const BT3_TIERS = {
   S: [
     ["Arale", "arale", ""],
     ["Baby (Gran Simio dorado)", "baby ape|golden ape", ""],
-    ["Trunks (armadura) Super Saiyan", "trunks armor ssj|trunks battle ssj|trunks ssj", "sword kid gt ssj2 ssj3"],
+    ["Super Trunks", "super trunks|trunks armor super|trunks battle super", "sword kid gt"],
     ["Vegito", "vegito", "super ssj"],
     ["Super 17", "super 17", ""],
     ["Gogeta Super Saiyan 4", "gogeta ssj4", ""],
@@ -77,7 +78,7 @@ export const BT3_TIERS = {
     ["Cell Semi-Perfecto", "cell semiperfect|cell second", ""],
     ["Cooler (forma final)", "cooler final|cooler fifth", "meta"],
     ["Dabura", "dabura", ""],
-    ["Nail", "nail", "piccolo"],
+    ["Piccolo (inicio) sincronizado con Nail", "piccolo nail|piccolo sync", "kami fused"],
     ["Freezer (tercera forma)", "frieza third", ""],
     ["Freezer (100 %)", "frieza fullpower", ""],
     ["Goku (fin) Super Saiyan", "goku end ssj", "ssj2 ssj3"],
@@ -89,9 +90,9 @@ export const BT3_TIERS = {
     ["Gotenks", "gotenks", FORMAS],
     ["Trunks (niño) Super Saiyan", "trunks kid ssj", ""],
     ["Trunks (niño)", "trunks kid", FORMAS],
-    ["Uub", "majuub|uub", ""],
+    ["Majuub", "majuub|uub ssj|uub", ""],
     ["Mr. Popo", "popo", ""],
-    ["Piccolo (fusionado con Kami)", "piccolo kami|piccolo fused|piccolo end", "nail"],
+    ["Piccolo (fin) fusionado con Kami", "piccolo kami|piccolo fused", "nail sync"],
     ["Super Baby 2", "baby 2|baby ssj", ""],
     ["Super Buu", "super buu", "gotenks gohan absorbed"],
     ["Super Buu (absorbe a Gotenks)", "buu gotenks", ""],
@@ -100,7 +101,53 @@ export const BT3_TIERS = {
     ["Gohan (joven) Super Saiyan", "gohan teen ssj", "ssj2"],
     ["Vegeta (fin) Super Saiyan 2", "vegeta end ssj2|vegeta ssj2", "majin"],
     ["Vegeta Super Saiyan 4", "vegeta ssj4", ""],
-    ["Vegeta (medio) Super Saiyan", "vegeta mid ssj|vegeta early ssj", "ssj2"],
+    ["Vegeta Super Saiyan (otro)", "vegeta mid ssj|vegeta gt ssj|vegeta early ssj", "ssj2 ssj4"],
+  ],
+  B: [
+    ["Gohan (adulto) Super Saiyan", "gohan adult ssj", "ssj2"],
+    ["Androide 16", "16", ""],
+    ["Baby Vegeta", "baby vegeta", "super ssj 1 2 ape"],
+    ["Bardock", "bardock", FORMAS],
+    ["Bojack (máximo poder)", "bojack fullpower|bojack full", ""],
+    ["Broly Super Saiyan", "broly ssj", "lssj"],
+    ["Cell (imperfecto)", "cell imperfect|cell first|cell", "semiperfect perfect superperfect jr second"],
+    ["Cell Jr.", "cell jr|jr", ""],
+    ["Cell (perfecto)", "cell perfect", "semiperfect superperfect imperfect"],
+    ["Chaoz", "chiaotzu|chaozu", ""],
+    ["Ninja Murasaki", "murasaki", ""],
+    ["Buu malvado", "evil buu|pure evil|evil", "kid super"],
+    ["Fasha", "fasha|celipa", ""],
+    ["Freezer (primera forma)", "frieza first|frieza", "second third final fullpower mecha"],
+    ["Freezer (segunda forma)", "frieza second", ""],
+    ["Freezer (forma final)", "frieza final", "fullpower"],
+    ["Gohan (adulto)", "gohan adult", FORMAS + " ultimate"],
+    ["Goku (fin) Super Saiyan 2", "goku end ssj2", ""],
+    ["Goku (fin) Super Saiyan 3", "goku end ssj3", ""],
+    ["Goku (GT) Super Saiyan 3", "goku gt ssj3", ""],
+    ["Goku (GT)", "goku gt", FORMAS],
+    ["Goku (GT) Super Saiyan", "goku gt ssj", "ssj3 ssj4"],
+    ["Gotenks Super Saiyan 3", "gotenks ssj3", ""],
+    ["Gran Saiyaman", "great saiyaman|saiyaman", "2 videl"],
+    ["Krilin", "krillin|kuririn", ""],
+    ["Mecha Freezer", "mecha frieza", ""],
+    ["Nail", "nail", "piccolo sync"],
+    ["Syn Shenron", "syn shenron|syn", "omega"],
+    ["Piccolo (fin)", "piccolo end", "kami fused nail sync"],
+    ["Recoome", "recoome", ""],
+    ["Super Baby 1", "super baby 1|baby 1", "2"],
+    ["Super Buu (absorbe a Gohan)", "buu gohan", ""],
+    ["Trunks (armadura) Super Saiyan", "trunks armor ssj|trunks battle ssj", "kid sword super ssj2"],
+    ["Trunks (espada) Super Saiyan", "trunks sword ssj", ""],
+    ["Tapion", "tapion", ""],
+    ["Gohan (joven)", "gohan teen", FORMAS],
+    ["Ten Shin Han", "tien|tenshinhan", ""],
+    ["Uub", "uub", "majuub"],
+    ["Vegeta (fin) Súper Vegeta", "vegeta end super|vegeta super", "ssj4 baby gt"],
+    ["Vegeta Majin", "majin vegeta", ""],
+    ["Vegeta (scouter)", "vegeta scouter", "ape"],
+    ["Vegeta (inicio)", "vegeta early|vegeta mid", FORMAS],
+    ["Yamcha", "yamcha", ""],
+    ["Zarbon (transformado)", "zarbon post|zarbon transform|zarbon monster", ""],
   ],
 };
 /* (Un retrato de S+ no se pudo reconocer: uno dorado con orejas en punta y armadura. Queda fuera de la regla
@@ -110,9 +157,9 @@ export const BT3_VETOS = { "": "Todos", noop: "No OP", malos: "Sólo malos" };
 export const BT3_VETOS_TXT = {
   "": "Se puede elegir cualquier personaje.",
   noop: "Fuera los de tier S hacia arriba (BROLY, S++, S+ y S).",
-  malos: "Solo los de tier B hacia abajo (fuera también los de A).",
+  malos: "Solo los de tier C hacia abajo (fuera también los de A y B).",
 };
-export const tiersVetadas = regla => regla === "noop" ? ["BROLY", "S++", "S+", "S"] : regla === "malos" ? ["BROLY", "S++", "S+", "S", "A"] : [];
+export const tiersVetadas = regla => regla === "noop" ? ["BROLY", "S++", "S+", "S"] : regla === "malos" ? ["BROLY", "S++", "S+", "S", "A", "B"] : [];
 export const entradasVetadas = regla => tiersVetadas(regla).flatMap(t => BT3_TIERS[t].map(e => ({ tier: t, nombre: e[0], busca: e[1], excluye: e[2] })));
 
 const PALABRAS = new WeakMap();   // (las palabras de cada personaje del catálogo, calculadas una vez)
