@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610141953"></script>
+<script src="i18n.js?v=202610142007"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1751,6 +1751,18 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-tit>b{font-size:30px;line-height:1.05}
 .jg-bt3-tit>span{font-size:13px;color:var(--bt3-mu)}
 .jg-bt3-inscritos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+/* La llave antes de empezar (bt3.js, atarPrevia): las peleas de la primera ronda; el organizador arrastra o toca. */
+.jg-bt3-previa{display:grid;gap:10px}
+.jg-bt3-previa header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.jg-bt3-previa header b{font:400 18px 'Lilita One',system-ui,sans-serif;color:var(--bt3-oro)}
+.jg-bt3-previa header span{flex:1;min-width:200px;font-size:13px;color:var(--bt3-mu)}
+.jg-bt3-previa ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.jg-bt3-lugar[draggable=true],.jg-bt3-lugar.bye[tabindex]{cursor:grab}
+.jg-bt3-lugar+.jg-bt3-lugar{border-top:1px solid #24407f}
+.jg-bt3-lugar.bye{color:var(--bt3-mu);font-style:italic;font-weight:500;min-height:38px}
+.jg-bt3-lugar.arrastra{opacity:.4}
+.jg-bt3-lugar.sobre,.jg-bt3-lugar.elegido{background:#ff8a0033;box-shadow:inset 0 0 0 2px var(--bt3-a);border-radius:8px}
+.jg-bt3-lugar:focus-visible{outline:2px solid #7fb2ff;outline-offset:-2px;border-radius:8px}
 .jg-bt3-inscritos li{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:linear-gradient(180deg,#16306e,#0c1a42);border:1px solid var(--bt3-borde);min-width:0}
 .jg-bt3-inscritos li.yo{border-color:#ffd21f88}.jg-bt3-inscritos li.yo>span{color:var(--bt3-oro)}
 .jg-bt3-inscritos .jg-bt3-ava{grid-row:span 2;width:40px;height:40px;font-size:18px;border-width:2px;box-shadow:none}
@@ -5223,6 +5235,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610141953"></script>
+<script src="juegos-app.js?v=202610142007"></script>
 </body>
 </html>

@@ -78,8 +78,12 @@ the next fight by itself once both discs are back. **«🏆 Dar la victoria»** 
 a cut fight from restarting by itself. Each pick asks for confirmation. The frame **must** reload between fights: `BT3_NET_SESSION` is
 read once at start-up. That costs nothing now (below).
 
-**Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3; the bracket is shuffled with the
-room's seed, byes up to a power of two, one fight at a time (`actual`). Both fighters' frames report the winner;
+**Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3, **with the bracket they arranged**:
+before starting everyone sees the first round (`est.previa`, slots in pairs, `""` = bye; drawn with the room's seed,
+k-th against (tam/2+k)-th so byes spread) and the organizer drags one fighter onto another, or taps one then the
+other, or «🔀 Mezclar» (`{t:"orden", uid, lista}`: all the slots; ignored unless it has the bracket's size and no
+pair is empty; whoever joins later takes a free slot; if the size changes, e.g. 5→4, it is redrawn). `{t:"torneo"}`
+fixes it. Byes up to a power of two, one fight at a time (`actual`). Both fighters' frames report the winner;
 agreement decides, disagreement → organizer `decide`; the organizer can also **«🏆 Dar la victoria»** of the
 current fight at any time (before or during it, even their own; `hist` marks it `mano`); a draw is refought; leaving forfeits. The organizer can
 **kick** (`{t:"echa", uid, a}`, ⏏ in the list before it starts and «sacar a un jugador» during it): the kicked one
@@ -188,9 +192,13 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   and no private disc: it asked friends for an ISO. Now the lobby entry has `ruta: "#solo/bt3"` (its `url` stays: it
   is where `build-controles.js` finds the code), and a loose page on a site with a private disc redirects there
   (`discoPrivado`; `?suelta=1` keeps it loose for tests). «← Juegos» in the bar (mode menu only) posts `volver`.
-- **«Contra la CPU» has a difficulty row** (5 levels, `bt3.cpuNivel`, the tournament's `BT3_NIVELES`): jumping
-  straight to the character select skips the game's rules menu, so the page sends `BT3_WEB_CPU` (the patch writes
-  it into save rule[1] after the save loads).
+- **«Contra la CPU» has its own rules** (modalidad, tiempo por round, dificultad; `bt3.cpuBatalla`/`cpuTiempo`/
+  `cpuNivel`): jumping straight to the character select skips the game's rules menu, so the page sends them as the
+  tournament's CPU fight does: `BT3_WEB_REGLAS` (`reglasCpu` in pagina.js mirrors `reglasBt3`), `BT3_WEB_CPU`
+  (the patch writes save rule[1] after the save loads) and `BT3_WEB_EQUIPO=3` for 3 vs 3.
+- **The top bar hides itself while playing** (it covered player 2's health bar): `body.started:not(.barra-viva)
+  #barra`, back on mouse move for 2.5 s, while hovered or focused, and 4 s at start. The controller pill is short
+  (`🎮 <name>`, full ids in its title).
 - Entrenamiento / Contra la CPU play here. **Nothing starts by itself on the solo page**: the private disc and the
   remembered ISO wait for «Jugar · <modo>» (`listoParaJugar`), which is also the gesture that unlocks audio; picking
   an ISO is itself the click. The mode reaches the program as `BT3_WEB_MODO` (`Module.entornoPendiente`), and

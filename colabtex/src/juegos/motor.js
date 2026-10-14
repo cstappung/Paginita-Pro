@@ -7293,9 +7293,12 @@ export function redBt3(p, js = jugadoresDe(p)) {
 
 /* ---------- el torneo de BT3 ----------
    Una sala de BT3 para 3 a 8 (`cupo` > 2) es un torneo de eliminación directa. El que abrió la sala organiza
-   (puede pasárselo a otro): pone las reglas y lo empieza. Al empezar (`{t:"torneo"}`) la llave sale de los que
-   están, mezclados con la semilla de la sala (todos ven la misma); con un número que no es potencia de dos,
-   algunos pasan directo (bye). Las peleas van de a una, en orden de ronda:
+   (puede pasárselo a otro): pone las reglas, arma la llave y lo empieza. Antes de empezar, la llave de la primera
+   ronda se ve (`est.previa`: los lugares de a dos, "" = pasa directo): sale de los que están, mezclados con la
+   semilla de la sala (todos ven la misma), y el organizador la cambia arrastrando o con «Mezclar» (`{t:"orden",
+   uid, lista}`: los lugares enteros; vale si es del tamaño de la llave y ninguna pelea queda sin nadie, y quien
+   entra después ocupa un lugar libre). Con un número que no es potencia de dos, algunos pasan directo (bye).
+   `{t:"torneo"}` la fija y empieza. Las peleas van de a una, en orden de ronda:
    - `{t:"disco", uid}`: el marco de `uid` ya tiene su disco (se vuelve a pedir después de cada pelea suya).
    - `{t:"empieza", uid, m}`: uno de los dos (o el organizador) arranca la pelea `m` con los dos discos listos.
    - `{t:"resultado", uid, m, g}`: lo que dice el marco de cada peleador al terminar (el juego lo cuenta solo,
@@ -7314,6 +7317,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   let batalla = "single", tiempo = 240, veto = "", discos = {}, rondas = null, peleas = 0;
   const cpus = {};   // "cpu:N" → {n, nivel}: los lugares que el organizador rellenó con la CPU
   const cupo = cupoDe(p);
+  let orden = null;   // la llave que armó el organizador (lugares de a dos), o null: la del sorteo
   // Una pelea entre dos CPU se decide sola, sin jugarla: al azar con la semilla de la sala, a favor del más fuerte.
   const entreCpus = m => {
     const la = cpus[m.a].nivel, lb = cpus[m.b].nivel;
@@ -7323,6 +7327,27 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   };
   const presentes = () => js.filter(j => !fuera[j.uid]);
   const reponeOrg = () => { if (!org || fuera[org]) org = (presentes()[0] || {}).uid || ""; };
+  /* La llave de la primera ronda antes de empezar: lugares de a dos (pelea k = lugares 2k y 2k+1), "" = nadie. El
+     sorteo pone al k-ésimo contra el (tam/2 + k)-ésimo, así los que pasan directo quedan repartidos. */
+  const participantes = () => [...presentes().map(x => x.uid), ...Object.keys(cpus).sort()];
+  const tamDe = n => { let t = 2; while (t < n) t *= 2; return t; };
+  const sorteo = () => {
+    const azar = rng((p.semilla >>> 0) || 1), lista = participantes();
+    for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(azar() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
+    const tam = tamDe(lista.length), s = [];
+    for (let k = 0; k < tam / 2; k++) s.push(lista[k], lista[tam / 2 + k] || "");
+    return s;
+  };
+  const previa = () => {
+    const base = sorteo();
+    if (!orden || orden.length !== base.length) return base;
+    const quedan = new Set(participantes()), s = orden.map(u => quedan.delete(u) ? u : "");
+    // quien entró después de armarla: a un lugar libre (en el orden del sorteo)
+    for (const u of base) if (u && quedan.has(u)) { const i = s.indexOf(""); if (i < 0) break; s[i] = u; quedan.delete(u); }
+    if (quedan.size) return base;
+    for (let k = 0; k < s.length; k += 2) if (!s[k] && !s[k + 1]) return base;   // (una pelea sin nadie: no sirve)
+    return s;
+  };
   // Los ganadores suben, los byes y los que se fueron se resuelven solos. Una pasada en orden de ronda alcanza.
   const avanza = () => {
     rondas.forEach((ronda, r) => ronda.forEach((m, k) => {
@@ -7377,17 +7402,16 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
           const nivel = Math.max(0, Math.min(4, Math.floor(Number(j.nivel)) || 0));
           cpus[j.id] = { n: Number(j.id.slice(4)), nivel };
         }
+      } else if (j.t === "orden" && esOrg && Array.isArray(j.lista) && j.lista.length <= 16) {
+        orden = j.lista.map(u => typeof u === "string" ? u : "");
       } else if (j.t === "torneo" && esOrg && presentes().length + Object.keys(cpus).length >= 3) {
-        const azar = rng((p.semilla >>> 0) || 1), lista = [...presentes().map(x => x.uid), ...Object.keys(cpus).sort()];
-        for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(azar() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
-        let tam = 2;
-        while (tam < lista.length) tam *= 2;
+        const s = previa(), tam = s.length;
         rondas = [];
         for (let r = 0, n = tam / 2; n >= 1; r++, n /= 2) {
           rondas.push(Array.from({ length: n }, (_, k) => ({ id: r + "." + k, r, k,
-            a: r ? undefined : lista[k], b: r ? undefined : (lista[tam / 2 + k] || ""), rep: {}, enCurso: false, conflicto: false })));
+            a: r ? undefined : s[2 * k], b: r ? undefined : s[2 * k + 1], rep: {}, enCurso: false, conflicto: false })));
         }
-        hist.push({ e: "torneo", n: lista.length });
+        hist.push({ e: "torneo", n: s.filter(Boolean).length });
         avanza();
       }
       continue;
@@ -7429,7 +7453,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   return {
     fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
     batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
-    llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
+    llave: rondas, previa: rondas ? null : previa(), actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };
 }

@@ -384,6 +384,47 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     };
   };
 
+  /* La llave antes de empezar (solo el organizador): soltar un peleador sobre otro lugar los cambia; con el teclado o
+     el dedo, se toca uno y después el otro. Una pelea no puede quedar sin nadie (los dos «pasa directo»). */
+  let elegido = -1;
+  function atarPrevia() {
+    const caja = vest.querySelector(".jg-bt3-previa");
+    if (!caja || !soyAnfitrion() || est.llave) return;
+    const cambia = (i, k) => {
+      const s = (est.previa || []).slice();
+      if (i === k || i < 0 || k < 0 || i >= s.length || k >= s.length) return;
+      [s[i], s[k]] = [s[k], s[i]];
+      for (let x = 0; x < s.length; x += 2) if (!s[x] && !s[x + 1]) { anuncia("<small>La llave</small><b>Una pelea no puede quedar vacía</b>", "empate", 2200); return; }
+      anota({ t: "orden", uid, lista: s });
+    };
+    caja.querySelectorAll("[data-lugar]").forEach(el => {
+      const i = Number(el.dataset.lugar);
+      el.ondragstart = e => { e.dataTransfer.setData("text/plain", String(i)); e.dataTransfer.effectAllowed = "move"; el.classList.add("arrastra"); };
+      el.ondragend = () => el.classList.remove("arrastra");
+      el.ondragover = e => { e.preventDefault(); el.classList.add("sobre"); };
+      el.ondragleave = () => el.classList.remove("sobre");
+      el.ondrop = e => { e.preventDefault(); el.classList.remove("sobre"); cambia(Number(e.dataTransfer.getData("text/plain")), i); };
+      const toca = () => {
+        if (elegido < 0) { if (!el.classList.contains("bye")) { elegido = i; el.classList.add("elegido"); } return; }
+        const de = elegido; elegido = -1;
+        caja.querySelectorAll(".elegido").forEach(x => x.classList.remove("elegido"));
+        cambia(de, i);
+      };
+      el.onclick = toca;
+      el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toca(); } };
+    });
+    const mezcla = caja.querySelector("[data-mezcla]");
+    if (mezcla) mezcla.onclick = () => {
+      // un sorteo nuevo, como el de la sala: el k-ésimo contra el (tam/2 + k)-ésimo, así nadie queda sin rival dos veces
+      const lista = (est.previa || []).filter(Boolean), tam = (est.previa || []).length;
+      for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
+      const s = [];
+      for (let k = 0; k < tam / 2; k++) s.push(lista[k] || "", lista[tam / 2 + k] || "");
+      elegido = -1;
+      anota({ t: "orden", uid, lista: s });
+    };
+  }
+
   function atarDar(que, jugada) {
     vest.querySelectorAll(".jg-bt3-dar [data-g]").forEach(b => b.onclick = () => {
       if (!confirmaVictoria(b.dataset.g, que)) return;
@@ -529,7 +570,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length, nuevosFuera.has(m.g === m.a ? m.b : m.a));
       vistoLlave = ahora;
     }
-    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.llave, a, manda, enSala(), est.cupo, est.cpus]);
+    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.llave, est.previa, a, manda, enSala(), est.cupo, est.cpus]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.remove("jugando");
@@ -556,16 +597,29 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
           `<option value="${k}" ${k === nivelCpu(c) ? "selected" : ""}>Nivel ${k + 1} · ${t}</option>`).join("")}</select>` : `Nivel ${nivelCpu(c) + 1} · ${BT3_NIVELES[nivelCpu(c)]}`}</i></li>`;
       const total = js.length + cpus.length, puede = total >= 3;
       const tam = (() => { let t = 2; while (t < total) t *= 2; return t; })();
+      /* La llave de la primera ronda, antes de empezar: el organizador la arma arrastrando a uno sobre otro (o
+         tocando uno y después el otro: en una pantalla táctil no hay arrastre) y la sortea con «Mezclar». Los demás
+         la ven igual, sin moverla. */
+      const previa = est.previa || [];
+      const lugar = (u, i) => u
+        ? `<span class="jg-bt3-slot jg-bt3-lugar" data-lugar="${i}"${manda ? ' draggable="true" tabindex="0" role="button"' : ""} title="${manda ? "Arrástralo (o tócalo y después toca otro lugar) para cambiarlo de pelea" : ""}">${avatar(jugador(u))}<span class="jg-bt3-nom" translate="no">${escapeHtml(nombre(u))}</span></span>`
+        : `<span class="jg-bt3-slot jg-bt3-lugar bye" data-lugar="${i}"${manda ? ' tabindex="0" role="button"' : ""}>pasa directo</span>`;
+      const llavePrevia = puede && previa.length ? `<section class="jg-bt3-previa">
+          <header><b>Primera ronda</b><span>${manda ? "Arrastra a un peleador sobre otro para cambiar quién pelea con quién." : "La arma " + escapeHtml(nombre(est.anfitrion)) + "."}</span>
+            ${manda ? `<button class="jg-bt3-ficha" data-mezcla="1" type="button" title="Sortear la llave de nuevo">🔀 Mezclar</button>` : ""}</header>
+          <ol>${Array.from({ length: previa.length / 2 }, (_, k) => `<li class="jg-bt3-caja">${lugar(previa[2 * k], 2 * k)}${lugar(previa[2 * k + 1], 2 * k + 1)}</li>`).join("")}</ol>
+        </section>` : "";
       vest.innerHTML = `
         <header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${js.length} inscrito${js.length === 1 ? "" : "s"}${cpus.length ? " + " + cpus.length + " CPU" : ""} · eliminación directa</span></header>
         <ul class="jg-bt3-inscritos">${js.map(fila).join("")}${cpus.map(filaCpu).join("")}</ul>
         ${manda && libres ? `<div class="jg-bt3-libres"><span>${libres} lugar${libres === 1 ? "" : "es"} libre${libres === 1 ? "" : "s"}:</span>
           <button class="jg-bt3-ficha" data-cpu="1">＋ Agregar una CPU</button><button class="jg-bt3-ficha" data-cpu="todas">Rellenar con CPU</button>
           <small>o déjalos vacíos: su rival pasa directo.</small></div>` : ""}
+        ${llavePrevia}
         ${reglas}
         <div class="jg-bt3-pie">
           ${manda ? `<button class="jg-bt3-empieza" data-h="torneo" ${puede ? "" : "disabled"}>¡Empezar torneo!</button>` : ""}
-          <p class="jg-bt3-nota" role="status">${puede ? (manda ? `Al empezar se sortea la llave de ${tam}${tam > total ? ` (${tam - total} pasa${tam - total === 1 ? "" : "n"} directo)` : ""}.` : "Empieza cuando lo diga " + escapeHtml(nombre(est.anfitrion)) + ".")
+          <p class="jg-bt3-nota" role="status">${puede ? (manda ? `Se empieza con esta llave de ${tam}${tam > total ? ` (${tam - total} pasa${tam - total === 1 ? "" : "n"} directo)` : ""}.` : "Empieza cuando lo diga " + escapeHtml(nombre(est.anfitrion)) + ".")
             : manda ? "Hacen falta al menos 3 (contando las CPU): pásales el enlace de la sala o agrega CPU." : "Hacen falta al menos 3: pásales el enlace de la sala."}</p>
         </div>`;
     } else {
@@ -641,6 +695,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       let n = b.dataset.cpu === "todas" ? libres : Math.min(1, libres);
       for (let k = 1; k <= 9 && n > 0; k++) if (!usados.has("cpu:" + k)) { await anota({ t: "cpu", uid, id: "cpu:" + k, nivel: 2 }); n--; }
     });
+    atarPrevia();
     const ver = vest.querySelector("[data-ver]");
     if (ver) ver.onclick = () => abreTele();
     const corta = vest.querySelector("[data-corta]");

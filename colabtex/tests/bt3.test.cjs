@@ -417,3 +417,30 @@ test('los nombres del disco se leen como el juego (UTF-16, byte bajo primero) y 
  assert.deepEqual(T.vetadosBt3(T.catalogoBt3(alReves),'noop').ids,T.vetadosBt3(T.catalogoBt3(CATALOGO),'noop').ids);
  assert.ok(T.vetadosBt3(T.catalogoBt3(alReves),'noop').ids.length>10);
 });
+
+test('torneo: el organizador arma la llave antes de empezar (arrastrando o mezclando) y empieza con esa',()=>{
+ const J=x=>JSON.stringify(x);
+ let e=B.reducir(torneo(5));
+ assert.equal(e.previa.length,8,'5 peleadores: llave de 8');
+ assert.equal(e.previa.filter(Boolean).length,5);
+ for(let k=0;k<8;k+=2)assert.ok(e.previa[k]||e.previa[k+1],'ninguna pelea sin nadie');
+ const sorteo=J(e.previa);
+ const vacia=['u4','u0','u1','u2','u3','','',''];   // la última pelea sin nadie: no vale
+ assert.equal(J(B.reducir(torneo(5,{t:'orden',uid:'u0',lista:vacia})).previa),sorteo,'una pelea sin nadie: queda la del sorteo');
+ const valida=['u4','u0','u1','','u2','','u3',''];
+ assert.equal(J(B.reducir(torneo(5,{t:'orden',uid:'u1',lista:valida})).previa),sorteo,'solo el organizador');
+ assert.equal(J(B.reducir(torneo(5,{t:'orden',uid:'u0',lista:valida})).previa),J(valida));
+ e=B.reducir(torneo(5,{t:'orden',uid:'u0',lista:valida},{t:'torneo',uid:'u0'}));
+ assert.equal(J(e.llave[0].map(m=>[m.a,m.b])),J([['u4','u0'],['u1',''],['u2',''],['u3','']]),'empieza con esa llave');
+ assert.equal(e.previa,null);
+ assert.equal(e.actual.id,'0.0','la primera pelea es la que armó');
+ // alguien se va antes de empezar y la llave sigue siendo de 8: su lugar queda libre y lo demás se mantiene
+ const seis=['u4','u0','u1','u5','u2','','u3',''];
+ const sin=B.reducir(torneo(6,{t:'orden',uid:'u0',lista:seis},{t:'abandona',uid:'u5'}));
+ assert.equal(J(sin.previa),J(['u4','u0','u1','','u2','','u3','']));
+ // si la llave cambia de tamaño (de 5 a 4: de 8 lugares a 4), se vuelve a sortear
+ assert.equal(B.reducir(torneo(5,{t:'orden',uid:'u0',lista:valida},{t:'abandona',uid:'u2'})).previa.length,4);
+ // una CPU que se agrega después ocupa un lugar libre
+ const cpu=B.reducir(torneo(5,{t:'orden',uid:'u0',lista:valida},{t:'cpu',uid:'u0',id:'cpu:1',nivel:2}));
+ assert.ok(cpu.previa.includes('cpu:1')&&cpu.previa.length===8);
+});

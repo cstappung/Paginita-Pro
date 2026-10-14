@@ -48,7 +48,11 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   #barra button, #mando { background: rgba(20,24,32,.88); color: #e8e8ea; border: 1px solid #3a4356; border-radius: 6px;
     padding: 5px 9px; font: inherit; cursor: pointer; }
   #barra button:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 2px; }
-  #mando { max-width: 38vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mando { max-width: min(220px, 30vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* con el juego andando la barra no tapa el juego (ahí está la vida del jugador 2): se oculta sola y vuelve al mover
+     el mouse, como en un reproductor de video (pagina.js, 2: body.barra-viva) */
+  #barra { transition: opacity .25s, transform .25s; }
+  body.started:not(.barra-viva) #barra { opacity: 0; transform: translateY(-10px); pointer-events: none; }
   #mando.ok { border-color: #4fd1a5; color: #4fd1a5; }
   #mando.mal { border-color: #ff6b7a; color: #ff6b7a; }
   #registro { position: fixed; left: 8px; right: 8px; bottom: 8px; max-height: 45%; z-index: 8; display: none; margin: 0;

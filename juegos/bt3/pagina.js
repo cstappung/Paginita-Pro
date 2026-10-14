@@ -581,6 +581,20 @@
   discoPrivado().then(ok => { if (!ok) recordada(); }, () => recordada());
 
   // ---------------------------------------------------------------- 2. la barra
+  /* Con el juego andando, la barra de arriba (volumen, Ajustes, el mando, «← Modos» / «← Sala», «◀ Atrás») tapaba
+     el juego: ahí va la vida del jugador 2. Se oculta sola (CSS: body.started sin .barra-viva) y vuelve al mover el
+     mouse, 2,5 s, o mientras el mouse está encima o tiene el foco; al empezar se ve unos segundos para que se sepa. */
+  let relojBarra = 0, sobreBarra = false;
+  const vivaBarra = (ms = 2500) => {
+    document.body.classList.add("barra-viva");
+    clearTimeout(relojBarra);
+    relojBarra = setTimeout(() => { if (!sobreBarra && !$("barra").contains(document.activeElement)) document.body.classList.remove("barra-viva"); }, ms);
+  };
+  addEventListener("pointermove", e => { if (e.pointerType === "mouse") vivaBarra(); }, { passive: true });
+  $("barra").addEventListener("pointerenter", () => { sobreBarra = true; vivaBarra(); });
+  $("barra").addEventListener("pointerleave", () => { sobreBarra = false; vivaBarra(); });
+  $("barra").addEventListener("focusin", () => vivaBarra(6000));
+  const alEmpezar = setInterval(() => { if (document.body.classList.contains("started")) { clearInterval(alEmpezar); vivaBarra(4000); } }, 300);
   /* Los cuadros por segundo del juego y cuánto trabaja (Module.webStats), arriba a la izquierda: con ?hud=1, o con
      «bt3.hud» = "1" en este navegador (el banco tiene la casilla). Para saber de dónde viene una traba: el juego
      ocupado cerca del 100% es el juego mismo; pocos cuadros con el juego desocupado es algo de afuera. */
@@ -618,7 +632,8 @@
     catch (e) { mando.textContent = "Mandos bloqueados aquí"; mando.className = "mal"; return false; }
     if (!l) { mando.textContent = "Sin soporte de mandos"; mando.className = "mal"; return false; }
     const on = [...l].filter(Boolean);
-    mando.textContent = on.length ? "Mando: " + on.map(g => g.id.replace(/\s*\(.*$/, "")).join(", ") : "Mando: aprieta un botón";
+    mando.textContent = on.length ? "🎮 " + on.map(g => g.id.replace(/\s*\(.*$/, "")).join(", ") : "🎮 aprieta un botón";
+    mando.title = on.length ? on.map(g => g.id).join("\n") : "Ningún mando todavía: aprieta un botón del mando";
     mando.className = on.length ? "ok" : "";
     return true;
   };
@@ -672,6 +687,20 @@
   const NIVELES = ["Muy fácil", "Fácil", "Normal", "Difícil", "Muy difícil"];
   let nivel = 2;
   try { const n = Number(localStorage.getItem("bt3.cpuNivel")); if (Number.isInteger(n) && n >= 0 && n <= 4) nivel = n; } catch (e) {}
+  /* La modalidad y el tiempo por round, igual que en una sala (motor.js BT3_BATALLAS / BT3_TIEMPOS): van como la
+     palabra de reglas del torneo contra la CPU (BT3_WEB_REGLAS: tipo | DP << 4 | índice del tiempo << 8 | 3 << 12 en
+     el 3 vs 3, como reglasBt3) y, en el 3 vs 3, BT3_WEB_EQUIPO=3. Se recuerdan en «bt3.cpuBatalla» / «bt3.cpuTiempo». */
+  const BATALLAS = [["single", "Single"], ["team3", "3 vs 3"], ["team", "Team"], ["dp10", "DP 10"], ["dp15", "DP 15"], ["dp20", "DP 20"]];
+  const TIEMPOS = [60, 90, 180, 240, 0];   // segundos por round; 0 = sin límite (el orden es el del juego)
+  let batalla = "single", tiempo = 240;
+  try {
+    const b = localStorage.getItem("bt3.cpuBatalla"); if (BATALLAS.some(x => x[0] === b)) batalla = b;
+    const s = Number(localStorage.getItem("bt3.cpuTiempo")); if (localStorage.getItem("bt3.cpuTiempo") !== null && TIEMPOS.includes(s)) tiempo = s;
+  } catch (e) {}
+  const reglasCpu = () => {
+    const tipo = batalla === "single" ? 0 : batalla === "team" || batalla === "team3" ? 1 : 2, dp = batalla === "dp15" ? 1 : batalla === "dp20" ? 2 : 0;
+    return tipo | dp << 4 | TIEMPOS.indexOf(tiempo) << 8 | (batalla === "team3" ? 3 : 0) << 12;
+  };
 
   // El disco quedó listo (privado o recordado): el botón «Jugar» lo arranca con el modo elegido.
   function listoParaJugar(f, txt) {
@@ -688,6 +717,8 @@
     if (nv) {
       nv.hidden = modo !== "cpu";
       nv.querySelectorAll("[data-n]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.n) === nivel)));
+      nv.querySelectorAll("[data-b]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.b === batalla)));
+      nv.querySelectorAll("[data-t]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.t) === tiempo)));
     }
     $("abreSala").textContent = enJuegos ? (modo === "duelo" ? "Abrir sala de duelo" : "Abrir sala de torneo") : "Ir a Juegos para jugar en línea";
     if (jugar) { const b = $("serverDisc"); b.hidden = false; b.textContent = "Jugar · " + MODOS.find(x => x[0] === modo)[2]; }
@@ -700,13 +731,14 @@
       `<button type="button" class="modo" data-m="${k}" aria-pressed="false"><span class="ico ico-${k}" aria-hidden="true"><b translate="no">${ico}</b></span>
         <span><strong>${t}${deSala(k) ? " <em>EN LÍNEA</em>" : ""}</strong><small>${d}</small></span><span class="radio" aria-hidden="true"></span></button>`).join("");
     const nv = document.createElement("div");
-    nv.className = "nivel-cpu"; nv.setAttribute("role", "group"); nv.setAttribute("aria-label", "Dificultad de la CPU");
-    nv.innerHTML = `<span>Dificultad de la CPU</span><div>${NIVELES.map((x, k) => `<button type="button" data-n="${k}" aria-pressed="false">${x}</button>`).join("")}</div>`;
-    nv.querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
-      nivel = Number(b.dataset.n);
-      try { localStorage.setItem("bt3.cpuNivel", String(nivel)); } catch (e) {}
-      pintaModo();
-    });
+    nv.className = "nivel-cpu"; nv.setAttribute("role", "group"); nv.setAttribute("aria-label", "La pelea contra la CPU");
+    nv.innerHTML = `<span>Modalidad</span><div>${BATALLAS.map(([k, x]) => `<button type="button" data-b="${k}" aria-pressed="false">${x}</button>`).join("")}</div>
+      <span>Tiempo por round</span><div>${TIEMPOS.map(s => `<button type="button" data-t="${s}" aria-pressed="false">${s ? s + " s" : "∞"}</button>`).join("")}</div>
+      <span>Dificultad de la CPU</span><div>${NIVELES.map((x, k) => `<button type="button" data-n="${k}" aria-pressed="false">${x}</button>`).join("")}</div>`;
+    const guardaCpu = () => { try { localStorage.setItem("bt3.cpuNivel", String(nivel)); localStorage.setItem("bt3.cpuBatalla", batalla); localStorage.setItem("bt3.cpuTiempo", String(tiempo)); } catch (e) {} pintaModo(); };
+    nv.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { nivel = Number(b.dataset.n); guardaCpu(); });
+    nv.querySelectorAll("[data-b]").forEach(b => b.onclick = () => { batalla = b.dataset.b; guardaCpu(); });
+    nv.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { tiempo = Number(b.dataset.t); guardaCpu(); });
     lista.append(nv);
     $("start").classList.add("con-modos");
     $("start").append(lista);
@@ -730,7 +762,8 @@
   // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
   async function eligeModo() {
     try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
-    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo], ...(modo === "cpu" ? [["BT3_WEB_CPU", String(nivel)]] : [])];
+    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo], ...(modo === "cpu"
+      ? [["BT3_WEB_CPU", String(nivel)], ["BT3_WEB_REGLAS", String(reglasCpu())], ...(batalla === "team3" ? [["BT3_WEB_EQUIPO", "3"]] : [])] : [])];
     if (desdePrivado) { grabaArchivos(); await precopia(); }   // (el arranque, ya en memoria: ver «el disco privado, rápido»)
   }
   // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)

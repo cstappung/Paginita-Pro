@@ -469,7 +469,7 @@ const REGLAS = {
         "También vale en plena pelea: no se puede transformar ni fusionar en un personaje vetado (como cuando falta energía)."
       ])],
       ["Torneo", lista([
-        "El que abre la sala organiza: pone las reglas y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave se sortea entre los que están; si no son 4 u 8, alguno pasa directo.",
+        "El que abre la sala organiza: pone las reglas, arma la llave y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave de la primera ronda se ve antes de empezar: sale sorteada, y el organizador la cambia <b>arrastrando</b> a un peleador sobre otro (o tocando uno y después el otro) o la vuelve a sortear con <b>🔀 Mezclar</b>. Si no son 4 u 8, alguno pasa directo.",
         "Las peleas van de a una. El ganador lo cuentan solos los juegos de los dos peleadores y avanza en la llave; si los dos juegos no dicen lo mismo decide el organizador. Un empate se vuelve a pelear.",
         "El organizador puede <b>🏆 Dar la victoria</b> de la pelea actual cuando haga falta (alguien no está, el juego se colgó): el elegido avanza en la llave como si hubiera ganado.",
         "Quien se va pierde sus peleas. Gana el torneo quien gana la final."
