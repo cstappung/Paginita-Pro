@@ -94,7 +94,8 @@ a cut fight from restarting by itself. Each pick asks for confirmation. The fram
 read once at start-up. That costs nothing now (below).
 
 **Tournament** (`cupo` > 2, `redTorneoBt3`): the organizer starts it with ≥ 3, **with the bracket they arranged**:
-before starting everyone sees the first round (`est.previa`, slots in pairs, `""` = bye; drawn with the room's seed,
+before starting everyone sees the whole bracket as the same pyramid as during the tournament (rounds «Por definir»,
+who passes directly already in round 2, the cup), and its first round is `est.previa` ( slots in pairs, `""` = bye; drawn with the room's seed,
 k-th against (tam/2+k)-th so byes spread) and the organizer drags one fighter onto another, or taps one then the
 other, or «🔀 Mezclar» (`{t:"orden", uid, lista}`: all the slots; ignored unless it has the bracket's size and no
 pair is empty; whoever joins later takes a free slot; if the size changes, e.g. 5→4, it is redrawn). `{t:"torneo"}`

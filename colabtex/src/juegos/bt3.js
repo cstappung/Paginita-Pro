@@ -618,17 +618,34 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
           `<option value="${k}" ${k === nivelCpu(c) ? "selected" : ""}>Nivel ${k + 1} · ${t}</option>`).join("")}</select>` : `Nivel ${nivelCpu(c) + 1} · ${BT3_NIVELES[nivelCpu(c)]}`}</i></li>`;
       const total = js.length + cpus.length, puede = total >= 3;
       const tam = (() => { let t = 2; while (t < total) t *= 2; return t; })();
-      /* La llave de la primera ronda, antes de empezar: el organizador la arma arrastrando a uno sobre otro (o
-         tocando uno y después el otro: en una pantalla táctil no hay arrastre) y la sortea con «Mezclar». Los demás
-         la ven igual, sin moverla. */
+      /* La llave antes de empezar, ya como la pirámide del torneo (las rondas, la copa): el organizador arma la primera
+         ronda arrastrando a uno sobre otro (o tocando uno y después el otro: en una pantalla táctil no hay arrastre) y la
+         sortea con «Mezclar». Las rondas siguientes dicen «Por definir», salvo quien ya pasa directo. Los demás la ven
+         igual, sin moverla. */
       const previa = est.previa || [];
       const lugar = (u, i) => u
         ? `<span class="jg-bt3-slot jg-bt3-lugar" data-lugar="${i}"${manda ? ' draggable="true" tabindex="0" role="button"' : ""} title="${manda ? "Arrástralo (o tócalo y después toca otro lugar) para cambiarlo de pelea" : ""}">${avatar(jugador(u))}<span class="jg-bt3-nom" translate="no">${escapeHtml(nombre(u))}</span></span>`
         : `<span class="jg-bt3-slot jg-bt3-lugar bye" data-lugar="${i}"${manda ? ' tabindex="0" role="button"' : ""}>pasa directo</span>`;
-      const llavePrevia = puede && previa.length ? `<section class="jg-bt3-previa">
-          <header><b>Primera ronda</b><span>${manda ? "Arrastra a un peleador sobre otro para cambiar quién pelea con quién." : "La arma " + escapeHtml(nombre(est.anfitrion)) + "."}</span>
+      const porDefinir = u => `<span class="jg-bt3-slot${u ? "" : " vacio"}">${u ? avatar(jugador(u)) : '<span class="jg-bt3-ava vacia" aria-hidden="true">?</span>'}<span class="jg-bt3-nom" translate="no">${escapeHtml(u ? nombre(u) : "Por definir")}</span></span>`;
+      let pisos = "";
+      if (puede && previa.length) {
+        const rondas = Math.round(Math.log2(previa.length));
+        // en la segunda ronda ya se sabe quién llega de una pelea con un solo peleador (pasa directo)
+        const directo = k => { const x = previa[2 * k], y = previa[2 * k + 1]; return x && !y ? x : y && !x ? y : undefined; };
+        for (let r = 0; r < rondas; r++) {
+          const n = previa.length >> (r + 1);
+          const peleas = Array.from({ length: n }, (_, k) => `<li class="jg-bt3-par"><div class="jg-bt3-caja">${r === 0
+            ? lugar(previa[2 * k], 2 * k) + lugar(previa[2 * k + 1], 2 * k + 1)
+            : r === 1 ? porDefinir(directo(2 * k)) + porDefinir(directo(2 * k + 1)) : porDefinir() + porDefinir()}</div></li>`).join("");
+          pisos += `<section class="jg-bt3-ronda${r === rondas - 1 ? " final" : ""}"><h4>${NOMBRE_RONDA(r, rondas)}</h4><ol>${peleas}</ol></section>`;
+        }
+        pisos += `<section class="jg-bt3-ronda copa"><h4>Campeón</h4><ol><li class="jg-bt3-par"><div class="jg-bt3-copa"><i class="jg-bt3-rayos" aria-hidden="true"></i>
+          <span class="jg-bt3-trofeo" aria-hidden="true">🏆</span><b>Por definir</b></div></li></ol></section>`;
+      }
+      const llavePrevia = pisos ? `<section class="jg-bt3-previa">
+          <header><b>La llave</b><span>${manda ? "Arrastra a un peleador sobre otro de la primera ronda para cambiar quién pelea con quién." : "La arma " + escapeHtml(nombre(est.anfitrion)) + "."}</span>
             ${manda ? `<button class="jg-bt3-ficha" data-mezcla="1" type="button" title="Sortear la llave de nuevo">🔀 Mezclar</button>` : ""}</header>
-          <ol>${Array.from({ length: previa.length / 2 }, (_, k) => `<li class="jg-bt3-caja">${lugar(previa[2 * k], 2 * k)}${lugar(previa[2 * k + 1], 2 * k + 1)}</li>`).join("")}</ol>
+          <div class="jg-bt3-llave">${pisos}</div>
         </section>` : "";
       vest.innerHTML = `
         <header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${js.length} inscrito${js.length === 1 ? "" : "s"}${cpus.length ? " + " + cpus.length + " CPU" : ""} · eliminación directa</span></header>

@@ -25,6 +25,9 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 
 /* Cada sección es `[título, html]`. El html es nuestro, no del usuario. */
 const lista = xs => "<ul>" + xs.map(x => "<li>" + x + "</li>").join("") + "</ul>";
+/* Pasos numerados (lo que se hace en orden) y una tabla de dos columnas (opción → qué hace). */
+const pasos = xs => '<ol class="jg-reglas-pasos">' + xs.map(x => "<li>" + x + "</li>").join("") + "</ol>";
+const tabla = filas => '<dl class="jg-reglas-tabla">' + filas.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>";
 
 const UNO_COMUN = [
   ["El objetivo", "Quedarte sin cartas antes que nadie. Se juega una sola mano: quien suelta su última carta gana la partida."],
@@ -444,45 +447,84 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:
+     cupo 2 = duelo). Lo común va detrás: qué hace falta, los personajes prohibidos, mirar y qué hacer si algo falla. */
   bt3: {
-    lema: "El juego de PS2 completo en el navegador. Cuatro modos: entrenamiento, contra la CPU, y duelo y torneo en línea con tus amigos.",
+    lema: "El Budokai Tenkaichi 3 de PS2, entero en tu navegador. Pelea contra la CPU, o contra tus amigos en duelo o en torneo.",
+    modos: {
+      duelo: {
+        nombre: "Duelo",
+        secciones: [
+          ["Cómo se juega", pasos([
+            "Abre una sala con <b>Formato: Duelo</b> y pásale el enlace a tu amigo. Cuando entra, aparecen los dos frente a frente.",
+            "Cada uno espera su <b>● Disco listo</b> (el juego se carga solo la primera vez; después sale de tu computador).",
+            "El <b>anfitrión</b> (👑, el jugador 1) elige las reglas y aprieta <b>¡A pelear!</b>. Cualquiera de los dos puede cambiarlo con <b>Hacer anfitrión</b>, en la tarjeta del J2.",
+            "Eligen personaje y escenario en el juego, y a pelear. Al K.O. el juego anota solo quién ganó: se ve entera la celebración y, cuando sale el menú de resultados, vuelven los dos a la sala con el marcador al día."
+          ])],
+          ["Las reglas de la pelea", tabla([
+            ["Batalla", "<b>Single</b> (uno contra uno), <b>Team 3 vs 3</b>, <b>Team</b> (hasta 5 por lado) o <b>DP</b> de 10, 15 o 20 puntos (cada personaje cuesta puntos)."],
+            ["Tiempo por round", "60, 90, 180 o 240 segundos, o <b>sin límite</b>."],
+            ["Personajes", "<b>Todos</b>, <b>No OP</b> o <b>Sólo malos</b> (abajo, «Personajes prohibidos»)."]
+          ])],
+          ["Revancha y marcador", lista([
+            "Después de cada pelea, <b>🔁 Pedir revancha</b>: cuando el otro acepta, empieza sola con las mismas reglas apenas carguen los dos discos.",
+            "El marcador cuenta las peleas ganadas de cada uno en esta sala (y los empates aparte). Por ejemplo: <i>Ana 2 – 1 Beto</i>."
+          ])]
+        ]
+      },
+      torneo: {
+        nombre: "Torneo",
+        secciones: [
+          ["Armar el torneo", pasos([
+            "Abre una sala con <b>Formato: Torneo</b> (hasta 4 o hasta 8) y pasa el enlace. Quien la abre <b>organiza</b> (👑): pone las reglas y arma la llave.",
+            "¿Faltan amigos? <b>＋ Agregar una CPU</b> o <b>Rellenar con CPU</b>, cada una con su nivel (del 1, muy fácil, al 5, muy difícil). Un lugar que queda vacío le da el pase directo a su rival.",
+            "La llave se ve entera desde el principio, como pirámide. El organizador <b>arrastra</b> a un peleador sobre otro de la primera ronda para cambiarlos (en pantalla táctil: toca uno y después el otro), o sortea de nuevo con <b>🔀 Mezclar</b>.",
+            "Con al menos 3 (contando las CPU), <b>¡Empezar torneo!</b>. Desde ahí ya no entra nadie más."
+          ])],
+          ["Durante el torneo", lista([
+            "Las peleas van de a una; la que sigue sale marcada <b>SIGUIENTE</b> en la llave. Cuando los dos tienen su disco listo, cualquiera de los dos (o el organizador) aprieta <b>¡A pelear!</b>.",
+            "Contra una CPU se pelea en el computador del humano. Una pelea entre dos CPU se decide sola, sin jugarse: al azar, con ventaja para la de más nivel.",
+            "Al K.O. el juego de los dos anota solo al ganador, que sube en la llave. Si los dos juegos no dicen lo mismo, decide el organizador. Un <b>empate se vuelve a pelear</b>.",
+            "Los demás miran mientras tanto: <b>📺 Ver la pelea en vivo</b>.",
+            "Gana el torneo quien gana la final: se lleva la copa 🏆 y la corona 👑."
+          ])],
+          ["El organizador", lista([
+            "Puede <b>🏆 Dar la victoria</b> de la pelea actual (alguien no volvió, el juego se colgó): se aprieta dos veces, para no hacerlo sin querer.",
+            "Puede <b>sacar a un jugador</b> del torneo: pierde sus peleas y queda mirando. Quien se va de la sala también pierde las suyas."
+          ])]
+        ]
+      },
+      solo: {
+        nombre: "Un jugador",
+        secciones: [
+          ["Los modos", lista([
+            "En la ficha <b>Tenkaichi 3 · un jugador</b>, columna <b>Elige el modo</b>: <b>Entrenamiento</b>, <b>Contra la CPU</b>, <b>Duelo</b> o <b>Torneo</b>. Los dos últimos abren una sala en línea (las otras pestañas de este manual).",
+            "<b>Entrenamiento</b>: las lecciones del juego y la práctica libre, para aprender los combos.",
+            "<b>Contra la CPU</b>: eliges la dificultad (del 1, muy fácil, al 5, muy difícil), la batalla y el tiempo por round, y aprietas <b>Jugar</b>: el juego entra directo a la pelea.",
+            "<b>← Modos</b>, en la barra de arriba, vuelve al menú (se aprieta dos veces, para no perder la pelea sin querer)."
+          ])]
+        ]
+      }
+    },
     secciones: [
-      ["Los modos", lista([
-        "Son cuatro, y se eligen en la ficha <b>Tenkaichi 3 · un jugador</b>, en la columna <b>Elige el modo</b>: <b>Entrenamiento</b> (las lecciones del juego y la práctica libre), <b>Contra la CPU</b>, <b>Duelo</b> y <b>Torneo</b>.",
-        "Entrenamiento y Contra la CPU se juegan ahí mismo: con el disco listo aprieta <b>Jugar</b> y el juego entra directo a ese modo.",
-        "Duelo (1 contra 1) y Torneo (hasta 8, eliminación directa) son en línea: su botón abre una sala, y tus amigos entran con el enlace. También se abren desde el salón eligiendo el <b>Formato</b>."
+      ["Lo que necesitas", lista([
+        "Un computador con <b>Chrome</b> o <b>Edge</b>. En el celular no se puede jugar.",
+        "<b>El disco</b>: si estás en la lista de amigos, se carga solo. Si no, tu propia imagen del disco, versión <b>USA</b> (SLUS-21678): se lee solo en tu navegador y la página la recuerda.",
+        "<b>Teclado o mando</b> (PS4, PS5 o Xbox, por cable o Bluetooth). <b>Ajustes</b> (o F1) → <b>Controls</b>: qué mando usa cada jugador y qué hace cada botón.",
+        "El juego va a <b>30 cuadros por segundo</b>, como la consola, igual para todos. Si tu computador no alcanza, baja solo la calidad de la imagen, nunca los cuadros: una pelea en línea es pareja."
       ])],
-      ["El disco", lista([
-        "Si estás en la lista de amigos del disco privado, el juego carga solo: no eliges nada. Lo que ya cargaste queda guardado en tu computador y la próxima vez sale de ahí, sin descargar.",
-        "Si no, necesitas tu propia imagen del disco, versión <b>USA</b> (SLUS-21678), sin modificar. Se lee solo en tu navegador y la página la recuerda: la próxima vez basta con <b>Usar …</b>.",
-        "Se juega en un computador con <b>Chrome</b> o <b>Edge</b> (no en el celular). El juego va a 30 cuadros por segundo, como la consola, igual para los dos jugadores; si tu computador no alcanza, baja solo la calidad de la imagen (efectos y resolución), nunca los cuadros."
+      ["Personajes prohibidos", lista([
+        "En duelo y torneo, quien pone las reglas puede limitar los personajes con la tier list competitiva: <b>No OP</b> saca a los más fuertes (tiers BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo a los de tier C hacia abajo.",
+        "Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no. Tampoco se puede transformar ni fusionar en un vetado en plena pelea.",
+        "En la selección, los vetados salen <b>con candado</b>: el cursor se los salta y el aleatorio nunca los saca. En la sala, <b>Ver los vetados</b> los lista."
       ])],
-      ["Duelo", lista([
-        "Cualquiera de los dos elige quién es el <b>anfitrión</b> (👑). El anfitrión es el jugador 1 y pone las reglas: <b>Single</b>, <b>3 vs 3</b>, <b>Team</b> o <b>DP</b> de 10, 15 o 20, el tiempo de cada round y los personajes permitidos. Con los dos discos listos aprieta <b>¡A pelear!</b>.",
-        "Al terminar la pelea el juego cuenta solo quién ganó: se cierra, vuelven los dos al vestíbulo y se suma al marcador.",
-        "Si el juego no puede decirlo (se colgó, uno no vuelve después de un corte, los dos juegos no dicen lo mismo), el anfitrión aprieta <b>🏆 Dar la victoria</b> y elige al ganador: cuenta en el marcador como cualquier pelea.",
-        "<b>Revancha</b>: la piden los dos y empieza sola, con las mismas reglas, en cuanto cargan los dos discos."
+      ["Si algo falla", tabla([
+        ["La pelea se colgó", "En el duelo, <b>Volver al vestíbulo</b>; en el torneo, <b>← Cortar la pelea y volver a la llave</b>. Se puede volver a empezar."],
+        ["Se cortó la conexión", "La pelea vuelve a empezar sola apenas carguen los dos discos."],
+        ["No se anotó el ganador", "El anfitrión u organizador aprieta <b>🏆 Dar la victoria</b> y elige quién ganó."],
+        ["«Su red no deja una conexión directa»", "Algunas redes (datos del celular, oficinas) bloquean la conexión entre computadores. Prueben otra red."]
       ])],
-      ["Personajes (tier list)", lista([
-        "En el duelo y el torneo, quien pone las reglas puede limitar los personajes según la tier list competitiva de BT3: <b>No OP</b> deja fuera a los de tier S hacia arriba (BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo los de tier C hacia abajo. Es una o la otra. Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no.",
-        "En la selección de personajes los vetados salen con candado, como los personajes que no están desbloqueados: el cursor se los salta, sus transformaciones vetadas no aparecen, y el aleatorio (y la CPU) nunca saca uno. Una lista al costado de la pantalla dice cuáles son; en la sala, <b>Ver los vetados</b> muestra la misma.",
-        "También vale en plena pelea: no se puede transformar ni fusionar en un personaje vetado (como cuando falta energía)."
-      ])],
-      ["Torneo", lista([
-        "El que abre la sala organiza: pone las reglas, arma la llave y aprieta <b>¡Empezar torneo!</b> con al menos tres. La llave de la primera ronda se ve antes de empezar: sale sorteada, y el organizador la cambia <b>arrastrando</b> a un peleador sobre otro (o tocando uno y después el otro) o la vuelve a sortear con <b>🔀 Mezclar</b>. Si no son 4 u 8, alguno pasa directo.",
-        "Las peleas van de a una. El ganador lo cuentan solos los juegos de los dos peleadores y avanza en la llave; si los dos juegos no dicen lo mismo decide el organizador. Un empate se vuelve a pelear.",
-        "El organizador puede <b>🏆 Dar la victoria</b> de la pelea actual cuando haga falta (alguien no está, el juego se colgó): el elegido avanza en la llave como si hubiera ganado.",
-        "Quien se va pierde sus peleas. Gana el torneo quien gana la final."
-      ])],
-      ["La conexión", lista([
-        "La pelea va <b>directo de un navegador al otro</b> (WebRTC): solo viajan los botones de cada uno, y los dos computadores calculan la misma pelea. Firebase solo los presenta al empezar.",
-        "Cada botón actúa unos cuadros después, los justos para que llegue al otro a tiempo: con un ping bajo casi no se nota.",
-        "Algunas redes (datos del celular, redes de oficina) no dejan una conexión directa: entonces la sala lo avisa. Prueben otra red."
-      ])],
-      ["Controles", lista([
-        "Teclado, o un mando de PS4, PS5 o Xbox por USB o Bluetooth. <b>Ajustes</b> (o F1) abre la ventana del juego en <b>Controls</b>: ahí eliges qué mando usa cada jugador y cambias los botones."
-      ])],
-      ["Ganar", "Estas salas no suman a la clasificación del sitio. Sus logros salen de las peleas que juegas: la primera, de anfitrión, revanchas, Team Battle, DP Battle."]
+      ["Ganar", "Estas salas no suman a la clasificación del sitio. Sí dan logros: la primera pelea, de anfitrión, de visita, revanchas, Team Battle, DP Battle, sin reloj, de 60 segundos…"]
     ]
   },
   haxball: {

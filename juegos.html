@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610142142"></script>
+<script src="i18n.js?v=202610142223"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1756,7 +1756,7 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-previa header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .jg-bt3-previa header b{font:400 18px 'Lilita One',system-ui,sans-serif;color:var(--bt3-oro)}
 .jg-bt3-previa header span{flex:1;min-width:200px;font-size:13px;color:var(--bt3-mu)}
-.jg-bt3-previa ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+
 .jg-bt3-lugar[draggable=true],.jg-bt3-lugar.bye[tabindex]{cursor:grab}
 .jg-bt3-lugar+.jg-bt3-lugar{border-top:1px solid #24407f}
 .jg-bt3-lugar.bye{color:var(--bt3-mu);font-style:italic;font-weight:500;min-height:38px}
@@ -2154,6 +2154,15 @@ html.jg-tt-inm .jg-tt-tactil button{flex:1 1 0;min-width:0;min-height:48px;font-
 .jg-reglas-cuerpo h3{margin:0 0 6px;font-size:14px;color:#342646}
 .jg-reglas-cuerpo p{margin:0 0 6px}.jg-reglas-cuerpo ul{margin:0;padding-left:20px}.jg-reglas-cuerpo li{margin:3px 0}
 .jg-reglas-cuerpo b{color:#1f1829}
+/* pasos numerados (lo que se hace en orden) y tablas «opción → qué hace» (reglas.js: pasos, tabla) */
+.jg-reglas-pasos{list-style:none;margin:0;padding:0;counter-reset:paso}
+.jg-reglas-pasos li{position:relative;margin:0;padding:4px 0 8px 36px;counter-increment:paso}
+.jg-reglas-pasos li::before{content:counter(paso);position:absolute;left:0;top:3px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:700 12px system-ui,sans-serif;background:#342646;color:#fff}
+.jg-reglas-tabla{display:grid;grid-template-columns:minmax(110px,auto) 1fr;margin:0;border:1px solid #eee9f5;border-radius:10px;overflow:hidden}
+.jg-reglas-tabla dt,.jg-reglas-tabla dd{margin:0;padding:8px 12px;border-top:1px solid #eee9f5}
+.jg-reglas-tabla dt:first-of-type,.jg-reglas-tabla dt:first-of-type+dd{border-top:0}
+.jg-reglas-tabla dt{font-weight:700;color:#342646;background:#f8f5fc}
+@media(max-width:600px){.jg-reglas-tabla{grid-template-columns:1fr}.jg-reglas-tabla dd{border-top:0;padding-top:0}.jg-reglas-tabla dt:first-of-type+dd{padding-top:0}}
 .jg-reglas-pie{display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid #eee9f5}
 @media(max-width:600px){.jg-reglas-capa{padding:0;place-items:end stretch}.jg-reglas{max-height:92vh;max-height:92dvh;border-radius:18px 18px 0 0}.jg-reglas-cab,.jg-reglas-tabs,.jg-reglas-cuerpo,.jg-reglas-pie{padding-left:16px;padding-right:16px}}
 /* El ⚑ de los informes flota encima de todo (z-index 900) y en el móvil
@@ -2692,6 +2701,9 @@ html[data-tema=oscuro] .jg-cc-h.h-ronda,html[data-tema=oscuro] .jg-cc-h.h-anula{
 html[data-tema=oscuro] .jg-reglas{background:var(--os-sup);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-reglas-cab,html[data-tema=oscuro] .jg-reglas-tabs,html[data-tema=oscuro] .jg-reglas-pie{border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-reglas-cab small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-reglas-pasos li::before{background:#c5b3ff;color:#1a1424}
+html[data-tema=oscuro] .jg-reglas-tabla,html[data-tema=oscuro] .jg-reglas-tabla dt,html[data-tema=oscuro] .jg-reglas-tabla dd{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-reglas-tabla dt{background:#ffffff0d;color:var(--os-tx)}
 html[data-tema=oscuro] .jg-reglas-cab p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-reglas-x{background:var(--os-sup3);color:var(--os-tx)}html[data-tema=oscuro] .jg-reglas-x:hover{background:#3a3150}
 html[data-tema=oscuro] .jg-reglas-tabs{background:var(--os-sup2)}
@@ -5245,6 +5257,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610142142"></script>
+<script src="juegos-app.js?v=202610142223"></script>
 </body>
 </html>

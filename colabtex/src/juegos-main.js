@@ -266,7 +266,8 @@ const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
   : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
   : juego === "yemas" ? (o.variante || "todos")
   : juego === "boxhead" ? (o.variante || "coop")
-  : juego === "gato" ? (o.variante === "super" ? "super" : "clasico") : o.modo;
+  : juego === "gato" ? (o.variante === "super" ? "super" : "clasico")
+  : juego === "bt3" ? (Number(o.cupo) > 2 ? "torneo" : "duelo") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
