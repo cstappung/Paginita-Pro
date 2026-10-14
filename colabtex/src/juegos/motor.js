@@ -7226,6 +7226,12 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const contadas = new Set();   // las peleas (ronda) que ya tienen resultado en el marcador
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
+  // una pelea con ganador: al marcador, y ya no vuelve a empezar sola
+  const cuenta = g => {
+    cortes = 0; reanudar = false; contadas.add(ronda);
+    if (g === "empate") empates++; else marcador[g] = (marcador[g] || 0) + 1;
+    hist.push({ e: "resultado", n: ronda, g });
+  };
   for (const j of jugadasDe(p)) {
     if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
     if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); continue; }
@@ -7251,9 +7257,22 @@ export function redBt3(p, js = jugadoresDe(p)) {
       arranca();
     } else if (j.t === "vuelve" && fase === "jugando") {
       fase = "vestibulo"; discos = {};
+      /* La pelea terminó en el juego de uno (avisó el ganador) y la sesión se cerró antes de que avisara el otro (el
+         otro salió de la pantalla de resultados, se cortó): lo que dijo ese juego vale; no hay pelea que repetir. */
+      const solo = Object.entries(reportes).filter(([k, r]) => k.startsWith(ronda + ".") && !r.listo).map(([, r]) => r);
+      const unico = solo.length && Object.keys(solo[0]).length === 1 ? Object.values(solo[0])[0] : null;
+      if (unico !== null && !contadas.has(ronda)) {
+        solo[0].listo = true;
+        cuenta(unico);
+        hist.push({ e: "vuelve", uid: j.uid, n: ronda, auto: true });
+        continue;
+      }
       cortes = j.por === "corte" ? cortes + 1 : 0;
       reanudar = j.por === "corte" && cortes <= BT3_CORTES;   // (no una pelea que alguien dejó a propósito: esa no vuelve sola)
       hist.push({ e: "vuelve", uid: j.uid, n: ronda, por: reanudar ? "corte" : "" });
+    } else if (j.t === "resultado" && fase === "vestibulo" && ronda > 0 && j.n === ronda && !contadas.has(ronda) && (ids.has(j.g) || j.g === "empate")) {
+      // un aviso que llega con la sala ya en el vestíbulo (la pelea ya terminó): vale, si esa pelea sigue sin resultado
+      cuenta(j.g);
     } else if (j.t === "resultado" && fase === "jugando" && j.n === ronda && Number.isInteger(j.b) && (ids.has(j.g) || j.g === "empate")) {
       // cada pelea de la sesión (b) la cuentan los dos marcos; si coinciden, va al marcador
       const k = ronda + "." + j.b, r = reportes[k] = reportes[k] || {};
@@ -7262,20 +7281,15 @@ export function redBt3(p, js = jugadoresDe(p)) {
       const otros = presentes().filter(x => x.uid !== j.uid);
       if (otros.length === 1 && r[otros[0].uid] !== undefined) {
         r.listo = true;
-        if (r[otros[0].uid] === j.g) {
-          cortes = 0; contadas.add(ronda);
-          if (j.g === "empate") empates++; else marcador[j.g] = (marcador[j.g] || 0) + 1;
-          hist.push({ e: "resultado", n: ronda, g: j.g });
-        }
+        if (r[otros[0].uid] === j.g) cuenta(j.g);
         // la pelea terminó (los dos juegos lo dijeron): vuelven solos al vestíbulo, los marcos se cierran
         fase = "vestibulo"; discos = {};
         hist.push({ e: "vuelve", uid: "", n: ronda, auto: true });
       }
     } else if (j.t === "decide" && j.uid === anfitrion && ronda > 0 && j.n === ronda && !contadas.has(ronda) && ids.has(j.g) && !fuera[j.g]) {
       // el anfitrión da la victoria: cuenta como una pelea ganada y, si se estaba peleando, se vuelve al vestíbulo
-      contadas.add(ronda); cortes = 0; reanudar = false; revancha = {};
-      marcador[j.g] = (marcador[j.g] || 0) + 1;
-      hist.push({ e: "resultado", n: ronda, g: j.g, mano: true });
+      cuenta(j.g); revancha = {};
+      hist[hist.length - 1].mano = true;
       if (fase === "jugando") { fase = "vestibulo"; discos = {}; hist.push({ e: "vuelve", uid: "", n: ronda, auto: true }); }
     }
   }
@@ -7423,6 +7437,8 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     if (j.t === "vuelve" && (pelea || esOrg) && m.enCurso) {
       // la pelea se cortó (alguien volvió al menú del juego, o se perdió la conexión): nadie gana todavía; si fue
       // la conexión (o alguien recargó la página), vuelve a empezar sola cuando estén los dos discos
+      const dichos = Object.values(m.rep || {});
+      if (dichos.length === 1) { decide(m, dichos[0]); continue; }   // (un juego ya dijo quién ganó: vale, como en el duelo)
       m.cortes = j.por === "corte" ? (m.cortes || 0) + 1 : 0;
       m.enCurso = false; m.rep = {}; m.conflicto = false; m.reanudar = j.por === "corte" && m.cortes <= BT3_CORTES;
       discos[m.a] = discos[m.b] = false;

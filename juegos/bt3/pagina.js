@@ -50,6 +50,21 @@
     };
   })();
 
+  // ---------------------------------------------------------------- 0b. la imagen para los que miran
+  /* El que transmite la pelea (bt3-directo.js) copia cada cuadro del lienzo del juego. WebGL, por omisión, puede
+     borrar el lienzo apenas el navegador lo muestra (preserveDrawingBuffer: false), y la copia salía NEGRA con la
+     pestaña al frente (en segundo plano no se muestra nada y no se borra: ahí sí se veía). Así que el marco que va a
+     transmitir (la sala lo dice antes de arrancar el programa: Module.conservaCuadro) crea su contexto conservando el
+     último cuadro. Solo ese: conservarlo cuesta una copia por cuadro, y los demás no la necesitan. */
+  (() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (tipo, opciones) {
+      if (this === Module.canvas && Module.conservaCuadro && /^(webgl2?|experimental-webgl)$/.test(tipo))
+        opciones = Object.assign({}, opciones, { preserveDrawingBuffer: true });
+      return original.call(this, tipo, opciones);
+    };
+  })();
+
   // ---------------------------------------------------------------- 0. el progreso
   /* Ninguna espera muda: la tarjeta de inicio muestra cuánto falta del programa (3,6 MB), y durante el juego
      una insignia arriba al centro muestra lo que se está cargando del disco privado. */
@@ -602,7 +617,8 @@
     if (localStorage.getItem("bt3.hud") === "1" && !Q.get("hud")) {
       const h = $("hud"), antes = Module.onWebStats;
       h.style.display = "block";
-      Module.onWebStats = s => { antes && antes(s); h.textContent = `${s.fps.toFixed(0)} fps · ${(s.busy * 100).toFixed(0)}% ocupado`; };
+      // prof[0]: la parte del tiempo que se va en mandarle el cuadro a la tarjeta de video (gs_gl.c)
+      Module.onWebStats = s => { antes && antes(s); h.textContent = `${s.fps.toFixed(0)} fps · ${(s.busy * 100).toFixed(0)}% ocupado · ${((s.prof && s.prof[0]) * 100 || 0).toFixed(0)}% dibujo`; };
     }
   } catch (e) {}
   const registro = $("registro");
@@ -781,7 +797,14 @@
     const b = document.createElement("button");
     b.id = "volverModos"; b.type = "button"; b.textContent = "← Modos"; b.title = "Volver al menú de modos";
     $("barra").prepend(b);
-    b.onclick = () => { if (!document.body.classList.contains("started") || confirm("¿Volver al menú de modos? Lo que no hayas guardado en el juego se pierde.")) aModos(false); };
+    /* Con el juego andando, dos clics: el primero pregunta en el botón mismo (confirm() lo bloquea un marco con sandbox,
+       como el del banco de pruebas, y el botón parecía muerto); a los 4 s vuelve a ser «← Modos». */
+    let seguro = 0;
+    b.onclick = () => {
+      if (!document.body.classList.contains("started") || seguro) { aModos(false); return; }
+      b.textContent = "¿Salir? Lo no guardado se pierde"; b.classList.add("seguro");
+      seguro = setTimeout(() => { seguro = 0; b.textContent = "← Modos"; b.classList.remove("seguro"); }, 4000);
+    };
     /* Dentro de Juegos (#solo/bt3) el juego ocupa la ventana: «← Juegos», en el menú de modos, vuelve al salón. */
     if (enJuegos) {
       const j = document.createElement("button");
@@ -822,8 +845,13 @@
   const aSala = document.createElement("button");
   aSala.id = "volverSala"; aSala.type = "button"; aSala.textContent = "← Sala"; aSala.title = "Volver a la sala (esta pelea se corta)";
   $("barra").prepend(aSala);
+  let seguroSala = 0;   // (dos clics, como «← Modos»: confirm() no sirve en un marco con sandbox)
   aSala.onclick = () => {
-    if (!confirm("¿Volver a la sala? Esta pelea se corta y no cuenta.")) return;
+    if (!seguroSala) {
+      aSala.textContent = "¿Salir? La pelea se corta"; aSala.classList.add("seguro");
+      seguroSala = setTimeout(() => { seguroSala = 0; aSala.textContent = "← Sala"; aSala.classList.remove("seguro"); }, 4000);
+      return;
+    }
     aviso("Volviendo a la sala…");
     S.cierra();
     S.avisa("termino", { por: "menu" });
@@ -924,7 +952,7 @@
         Module.entornoPendiente = Object.entries(Object.assign({
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
-        if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo
+        if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo
         await listoArranque;
         aviso("Tu pelea contra " + e.rival.nombre + " (" + ["muy fácil", "fácil", "normal", "difícil", "muy difícil"][e.rival.nivel ?? 2] + "): elige tu luchador.", 6000);
         return;
@@ -949,7 +977,7 @@
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
       equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));   // (el tope de equipo no viaja en la sesión: lo ponen los dos)
       try { FS.mkdir("/net_session"); } catch (err) {}
-      if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo (bt3-directo.js)
+      if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo (bt3-directo.js; 0b)
       await listoArranque;
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },

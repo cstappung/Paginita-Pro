@@ -71,7 +71,11 @@ loaded a valid disc; both needed), `empieza`, `vuelve` (back to the lobby; frame
 winner bits (1 P1, 2 P2, 4 draw, 8 abandoned) → `Module.onFinBatalla` → the frame → `bt3.js` writes
 `{t:"resultado", uid, n, b, g}`. When **both** frames said something about the same fight the duel goes back to
 the lobby by itself (frames reload, fullscreen exits); only when they agree does it count for the scoreboard
-(`marcador`, `empates`). Bits 8 → `vuelve`. `revancha` (both must ask; any rule or host change clears it) starts
+(`marcador`, `empates`). Bits 8 → `vuelve`. **A lone report counts**: if one frame said the winner and the fight then
+ends without the other's report (its session closed first: someone left the results screen, a cut), that report is
+the result (the game computed it), and it does not restart as a cut; a report arriving with the room already back in
+the lobby counts too while that fight has no result (duel `vuelve`/late `resultado`; tournament `vuelve` with one
+`rep`). Without this, finished duels showed «La pelea N quedó sin resultado». `revancha` (both must ask; any rule or host change clears it) starts
 the next fight by itself once both discs are back. **«🏆 Dar la victoria»** (`{t:"decide", uid, n, g}`, only the
 `anfitrion`): the fight in progress, or the last one while it has no counted result (`est.pendiente`: after a cut,
 «Volver al vestíbulo» or two frames that disagreed), goes to `g` in the scoreboard; it ends a running fight and stops
@@ -128,7 +132,12 @@ present (`Web_FrameDone`, while the canvas still holds the frame) and the emitte
 canvas (`drawImage`, on the GPU), at most 30/s, only while someone watches, and sends that (`captureStream(0)` +
 `requestFrame`); (2) the bandwidth estimate starts at ~300 kb/s and Chrome shrank the picture to 320×180: the
 emitter rewrites the viewer's answer (`conArranque`: `x-google-start-bitrate=1200;x-google-min-bitrate=400`) and
-prefers `balanced`. The software-GL test box cannot show (1)'s gain; (2) went from 320×180 to a steady 960×540. Friends find running rooms in «En juego ahora»
+prefers `balanced`. The software-GL test box cannot show (1)'s gain; (2) went from 320×180 to a steady 960×540. (3)
+**The copy came out black with the fighter's tab in front** (fine in the background): WebGL may clear the canvas once
+the browser has shown it (`preserveDrawingBuffer: false`), and the copy read it after that. The frame that will
+transmit (`Module.conservaCuadro`, set before the program starts) creates its context with `preserveDrawingBuffer:
+true` (pagina.js 0b wraps `getContext` for `Module.canvas`); only that frame pays the per-frame copy. Headless Chrome
+never clears it, so the test box cannot reproduce this one either. Friends find running rooms in «En juego ahora»
 (BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
@@ -259,8 +268,14 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
-- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps and how busy the program is:
-  busy near 100% means the game itself is slow; few fps with a free program means something outside it.
+- `?hud=1`, or `localStorage["bt3.hud"] = "1"` (the bench has a checkbox), shows fps, how busy the program is and
+  how much of the time goes to handing the frame to the GPU (`webStats.prof[0]`): busy near 100% means the game
+  itself is slow; a big «dibujo» share means the renderer (where WebGPU could help); few fps with a free program
+  means something outside it.
+- **No `confirm()`/`alert()`** in the room or the frame: a sandboxed frame (the bench) blocks them and they return
+  «no» silently, so the buttons looked dead. Confirm in the button itself (`dosClics` in bt3.js; «← Modos»/«← Sala»).
+- **Renderer:** WebGL2 (the GL back end, GLSL ES 3.00) is the only one that runs: WebGL 1 lacks what it needs, and
+  the other back end (`gs_gpu.c`) uses SDL3's GPU API, whose pinned version has Vulkan/D3D12/Metal but no WebGPU.
 - **Nothing drawn over the game may use `backdrop-filter`** (it re-blurs the game every frame); the banned-list
   panel (`#vetos`) is solid and only exists in the menus (`body:not(.en-menus) #vetos`).
 

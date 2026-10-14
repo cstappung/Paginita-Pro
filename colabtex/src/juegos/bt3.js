@@ -266,7 +266,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     }
     if (partida?.fin || !enSala()) return;   // un mirón no escribe
     if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
-    else if (d.tipo === "resultado" && peleando() && Number.isInteger(d.bits)) {
+    else if (d.tipo === "resultado" && (peleando() || (!est.torneo && est.pendiente && est.fase === "vestibulo")) && Number.isInteger(d.bits)) {
+      // (también tarde: la sala ya volvió al vestíbulo porque la sesión del otro se cerró, y esta pelea sigue sin resultado)
       // El juego contó quién ganó (bits de BattleResult: 1 jugador 1, 2 jugador 2, 4 empate; 8 = se abandonó).
       // contra la CPU el juego es local: el lado 1 es este jugador y el 2 la CPU
       const cpu = est.torneo && [est.actual.a, est.actual.b].find(esCpuBt3);
@@ -308,7 +309,15 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
      vuelve después de un corte, o los dos juegos no dijeron lo mismo. El clic lo ata `atarDar`. */
   const darVictoria = us => `<details class="jg-bt3-dar"><summary>🏆 Dar la victoria</summary>
     <div class="jg-bt3-fichas">${us.map(u => `<button class="jg-bt3-ficha" data-g="${escapeHtml(u)}">🏆 <span translate="no">${escapeHtml(nombre(u))}</span></button>`).join("")}</div></details>`;
-  const confirmaVictoria = (g, n) => confirm(`¿Darle la victoria de ${n} a ${nombre(g)}? Se anota como ganada y no se puede deshacer.`);
+  /* Confirmar sin ventanas: el primer clic cambia el botón a «✓ Confirmar…» (y deshace el de los demás del grupo),
+     el segundo hace la acción. confirm() no sirve: en un marco con sandbox (el banco de pruebas) el navegador lo
+     bloquea, devuelve «no» sin mostrar nada, y el botón parecía muerto. */
+  const dosClics = (b, grupo, txt, accion) => {
+    if (b.dataset.seguro === "1") { grupo.forEach(x => { x.disabled = true; }); accion(); return; }
+    for (const x of grupo) if (x.dataset.seguro === "1") { x.dataset.seguro = ""; x.classList.remove("seguro"); x.innerHTML = x.dataset.txt; }
+    b.dataset.txt = b.innerHTML; b.dataset.seguro = "1"; b.classList.add("seguro");
+    b.innerHTML = txt;
+  };
   const BATALLA_CORTA = { single: "Single", team3: "3 vs 3", team: "Team", dp10: "DP 10", dp15: "DP 15", dp20: "DP 20" };
   const TIEMPO_CORTO = t => t ? t + " s" : "∞";
   const jugador = u => esCpuBt3(u) ? { uid: u, nombre: nombre(u), cpu: true, nivel: nivelCpu(u) }
@@ -426,11 +435,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   }
 
   function atarDar(que, jugada) {
-    vest.querySelectorAll(".jg-bt3-dar [data-g]").forEach(b => b.onclick = () => {
-      if (!confirmaVictoria(b.dataset.g, que)) return;
-      vest.querySelectorAll(".jg-bt3-dar [data-g]").forEach(x => { x.disabled = true; });
-      anota(jugada(b.dataset.g));
-    });
+    const grupo = [...vest.querySelectorAll(".jg-bt3-dar [data-g]")];
+    grupo.forEach(b => b.onclick = () => dosClics(b, grupo,
+      `✓ Confirmar: gana <span translate="no">${escapeHtml(nombre(b.dataset.g))}</span>`, () => anota(jugada(b.dataset.g))));
   }
 
   function pintaVestibulo(forzar) {
@@ -702,11 +709,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     if (corta) corta.onclick = () => { corta.disabled = true; anota({ t: "vuelve", uid, m: est.actual.id }); };
     vest.querySelectorAll("[data-nivel]").forEach(sel => sel.onchange = () => anota({ t: "cpu", uid, id: sel.dataset.nivel, nivel: Number(sel.value) }));
     vest.querySelectorAll("[data-quita]").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "cpu", uid, id: b.dataset.quita, quita: true }); });
-    vest.querySelectorAll("[data-echa]").forEach(b => b.onclick = () => {
-      if (!confirm("¿Sacar a " + nombre(b.dataset.echa) + " del torneo? Pierde sus peleas y no puede volver a entrar.")) return;
-      b.disabled = true;
-      anota({ t: "echa", uid, a: b.dataset.echa });
-    });
+    const echables = [...vest.querySelectorAll("[data-echa]")];
+    echables.forEach(b => b.onclick = () => dosClics(b, echables,
+      `✓ Sí, sacar a <span translate="no">${escapeHtml(nombre(b.dataset.echa))}</span>`, () => anota({ t: "echa", uid, a: b.dataset.echa })));
     if (a) atarDar("esta pelea", g => ({ t: "decide", uid, m: a.id, g }));
     vest.querySelectorAll("[data-accion] .jg-bt3-ficha").forEach(b => b.onclick = () => {
       b.disabled = true;

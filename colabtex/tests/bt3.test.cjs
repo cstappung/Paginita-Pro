@@ -444,3 +444,23 @@ test('torneo: el organizador arma la llave antes de empezar (arrastrando o mezcl
  const cpu=B.reducir(torneo(5,{t:'orden',uid:'u0',lista:valida},{t:'cpu',uid:'u0',id:'cpu:1',nivel:2}));
  assert.ok(cpu.previa.includes('cpu:1')&&cpu.previa.length===8);
 });
+
+test('una pelea que terminó con un solo aviso del ganador cuenta (la sesión del otro se cerró antes de que avisara)',()=>{
+ const base=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'}];
+ let e=B.reducir(sala(...base,{t:'resultado',uid:'a',n:1,b:0,g:'b'},{t:'vuelve',uid:'b',por:'corte'}));
+ assert.deepEqual({...e.marcador},{b:1},'lo que dijo un juego vale');
+ assert.equal(e.reanudar,false,'y no vuelve a empezar sola');assert.equal(e.pendiente,false);
+ // el aviso del otro, tarde (la sala ya en el vestíbulo): no cuenta dos veces
+ e=B.reducir(sala(...base,{t:'resultado',uid:'a',n:1,b:0,g:'b'},{t:'vuelve',uid:'b',por:'corte'},{t:'resultado',uid:'b',n:1,b:0,g:'b'}));
+ assert.deepEqual({...e.marcador},{b:1});
+ // un corte sin ningún aviso: sigue siendo un corte (vuelve a empezar sola)
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'}));
+ assert.equal(e.reanudar,true);assert.equal(e.pendiente,true);
+ // y un aviso que llega después de ese corte: la pelea ya terminó en ese juego, cuenta
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'},{t:'resultado',uid:'a',n:1,b:0,g:'a'}));
+ assert.deepEqual({...e.marcador},{a:1});assert.equal(e.reanudar,false);
+ // el torneo igual: un aviso y después el corte
+ const t=[{t:'torneo',uid:'u0'}];let s=B.reducir(torneo(4,...t));const m=s.actual;
+ s=B.reducir(torneo(4,...t,{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'resultado',uid:m.a,m:m.id,g:m.b},{t:'vuelve',uid:m.b,m:m.id,por:'corte'}));
+ assert.equal(s.llave[0].find(x=>x.id===m.id).g,m.b);
+});

@@ -54,6 +54,7 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   #barra { transition: opacity .25s, transform .25s; }
   body.started:not(.barra-viva) #barra { opacity: 0; transform: translateY(-10px); pointer-events: none; }
   #mando.ok { border-color: #4fd1a5; color: #4fd1a5; }
+  #barra button.seguro { border-color: #ffd21f; color: #ffd21f; }
   #mando.mal { border-color: #ff6b7a; color: #ff6b7a; }
   #registro { position: fixed; left: 8px; right: 8px; bottom: 8px; max-height: 45%; z-index: 8; display: none; margin: 0;
     padding: 8px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: rgba(10,12,16,.94);
