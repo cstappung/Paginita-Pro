@@ -9,6 +9,14 @@
       comas: lo más fácil son los correos con que inician sesión en el sitio). Nadie más pasa: ni los
       demás jugadores del sitio, ni quien copie la dirección;
    3. solo entonces entrega el pedazo. Solo responde a las páginas de `ORIGENES` (CORS).
+   Rapidez: R2 no tiene servidores en Sudamérica, así que cada pedazo se guarda además en el caché de Cloudflare
+   más cercano (`caches.default`, después de revisar que es amigo: ese caché no es público, solo este Worker lo
+   lee). **Solo funciona con un dominio propio** para el Worker (Settings → Domains & Routes → Custom domain);
+   en `*.workers.dev` Cloudflare lo ignora y todo sigue saliendo de R2, igual que antes. Al navegador se le dice
+   `no-store`: la página guarda los pedazos ella misma (Cache Storage), y así no quedan guardados dos veces.
+   `/arranque.json`: qué pedazos lee el juego para llegar al menú y a la primera pelea. Lo escribe la página
+   del primer amigo que juega (y lo completan los siguientes); con él, la página del próximo baja esos pedazos
+   de una vez, antes de que el juego los pida.
    Para subir la ISO, `/subir` es una página que la lee en tu navegador y la manda por pedazos con la clave
    `CLAVE_SUBIDA` (un secreto del Worker). Sin esa clave no se puede escribir nada.
 
@@ -75,13 +83,48 @@ function cors(req, env) {
   const origen = req.headers.get("Origin") || "";
   const permitidos = (env.ORIGENES || ORIGENES).split(",").map(s => s.trim());
   if (!permitidos.includes(origen)) return {};
-  return { "Access-Control-Allow-Origin": origen, "Access-Control-Allow-Headers": "Authorization, X-Clave",
-           "Access-Control-Allow-Methods": "GET, PUT, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin" };
+  return { "Access-Control-Allow-Origin": origen, "Access-Control-Allow-Headers": "Authorization, X-Clave, Content-Type",
+           "Access-Control-Allow-Methods": "GET, PUT, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin",
+           "Access-Control-Expose-Headers": "X-Borde" };
 }
 const responde = (cuerpo, estado, cabeceras) => new Response(cuerpo, { status: estado, headers: cabeceras });
+const ARRANQUE_MAX = 1500;                                         // pedazos en la lista de arranque, como mucho
+// El caché de Cloudflare (null donde no existe: en workers.dev existe pero no guarda nada).
+const borde = () => (typeof caches !== "undefined" && caches.default) || null;
+const tarde = (ctx, p) => { if (ctx && ctx.waitUntil) ctx.waitUntil(p.catch(() => {})); else return p.catch(() => {}); };
+
+/* Un pedazo: del caché de Cloudflare si está; si no, de R2 (y se deja en el caché para el próximo). La llave del
+   caché es la dirección sin el token: el mismo pedazo para todos los amigos. */
+async function pedazo(url, env, ctx) {
+  const cache = borde(), llave = url.origin + url.pathname;
+  if (cache) {
+    try { const g = await cache.match(llave); if (g) return { bytes: await g.arrayBuffer(), borde: "HIT" }; } catch (e) {}
+  }
+  const obj = await env.DISCO.get(url.pathname.slice(1));
+  if (!obj) return null;
+  const bytes = await new Response(obj.body).arrayBuffer();
+  if (cache) await tarde(ctx, cache.put(llave, new Response(bytes, { headers: { "Cache-Control": "public, max-age=2592000" } })));
+  return { bytes, borde: cache ? "MISS" : "NO" };
+}
+
+/* La lista de arranque que manda una página: [pedazo, ...], enteros dentro del disco. Se junta con la que ya
+   había (sin repetir, ordenada) y se guarda con un tope. */
+async function sumaArranque(req, env) {
+  let nuevos;
+  try { nuevos = JSON.parse(await req.text()); } catch (e) { return null; }
+  if (!Array.isArray(nuevos) || nuevos.length > ARRANQUE_MAX) return null;
+  let max = Infinity;
+  try { const i = await env.DISCO.get("indice.json"); if (i) { const d = JSON.parse(await new Response(i.body).text()); max = Math.ceil(d.size / d.pieza); } } catch (e) {}
+  if (!nuevos.every(n => Number.isInteger(n) && n >= 0 && n < max)) return null;
+  let viejos = [];
+  try { const o = await env.DISCO.get("arranque.json"); if (o) viejos = JSON.parse(await new Response(o.body).text()); } catch (e) {}
+  const todos = [...new Set([...(Array.isArray(viejos) ? viejos : []), ...nuevos])].filter(n => Number.isInteger(n)).sort((a, b) => a - b).slice(0, ARRANQUE_MAX);
+  await env.DISCO.put("arranque.json", new TextEncoder().encode(JSON.stringify(todos)));
+  return todos.length;
+}
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url), c = cors(req, env);
     if (req.method === "OPTIONS") return responde(null, 204, c);
 
@@ -98,7 +141,8 @@ export default {
 
     // Leer: el índice o un pedazo, solo para los amigos. `/soy` contesta solo si quien pregunta está en la
     // lista: el sitio lo usa para mostrar BT3 únicamente a los amigos (colabtex/src/juegos/bt3-amigos.js).
-    if (req.method !== "GET" || !(url.pathname === "/soy" || url.pathname === "/indice.json" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname))) return responde("no existe", 404, c);
+    const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
+    if (!lee && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const quien = token ? await uidDe(token) : null;
     if (!quien) return responde("inicia sesión", 401, c);
@@ -106,10 +150,19 @@ export default {
     const esta = amigos.includes(quien.uid) || (!!quien.correo && amigos.some(a => a.toLowerCase() === quien.correo));
     if (!esta) return responde("sin acceso", 403, c);
     if (url.pathname === "/soy") return responde("amigo", 200, { ...c, "Cache-Control": "no-store" });
+    if (req.method === "PUT") {   // la lista de arranque, de un amigo
+      const n = await sumaArranque(req, env);
+      return n === null ? responde("lista inválida", 400, c) : responde(String(n), 200, c);
+    }
+    if (url.pathname.startsWith("/pieza/")) {
+      const p = await pedazo(url, env, ctx);
+      if (!p) return responde("no está subido", 404, c);
+      return responde(p.bytes, 200, { ...c, "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Borde": p.borde });
+    }
     const obj = await env.DISCO.get(url.pathname.slice(1));
-    if (!obj) return responde("no está subido", 404, c);
-    return responde(obj.body, 200, { ...c, "Content-Type": url.pathname.endsWith(".json") ? "application/json" : "application/octet-stream",
-                                     "Cache-Control": "private, max-age=31536000, immutable" });   // un pedazo nunca cambia
+    if (!obj) return responde(url.pathname === "/arranque.json" ? "[]" : "no está subido", url.pathname === "/arranque.json" ? 200 : 404,
+      { ...c, "Content-Type": "application/json", "Cache-Control": "no-store" });
+    return responde(obj.body, 200, { ...c, "Content-Type": "application/json", "Cache-Control": "no-store" });
   }
 };
 

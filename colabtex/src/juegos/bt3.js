@@ -1,6 +1,6 @@
 import * as fb from "../fb-juegos.js";
 import { auth } from "../firebase.js";
-import { revisaBt3 } from "./bt3-amigos.js";
+import { revisaBt3, BT3_VER } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
 import { suena } from "./sonido.js";
@@ -23,7 +23,7 @@ import { BT3_VETOS, BT3_VETOS_TXT, catalogoBt3, vetadosBt3 } from "./bt3-tiers.j
    - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
      espera (BT3_NET_SESSION). */
 const PADRE = "bt3-padre", HIJO = "bt3-hijo";
-const SRC = "juegos/bt3/index.html?modo=online&v=bt3-9";
+const SRC = "juegos/bt3/index.html?modo=online&v=" + BT3_VER;
 const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
 
 /* Los nombres de los personajes del disco (los manda el marco al abrir la selección de personajes, ver
@@ -224,9 +224,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       if (est.torneo) { if (d.b === 0 && est.actual.rep?.[uid] === undefined) anota({ t: "resultado", uid, m: est.actual.id, g }); }
       else anota({ t: "resultado", uid, n: est.ronda, b: d.b, g });
     } else if (d.tipo === "termino" && !est.torneo && est.fase === "jugando") {
-      anota({ t: "vuelve", uid });
+      anota({ t: "vuelve", uid, por: d.por === "corte" ? "corte" : "" });   // (un corte de conexión vuelve a empezar solo)
     } else if (d.tipo === "termino" && est.torneo && peleando()) {
-      anota({ t: "vuelve", uid, m: est.actual.id });   // salió de la pelea (al menú del juego): se corta, sin decidir
+      anota({ t: "vuelve", uid, m: est.actual.id, por: d.por === "corte" ? "corte" : "" });   // se corta, sin decidir
     }
   }
   // El disco listo de este marco, anotado cuando hace falta (el torneo lo pide de nuevo después de cada pelea).
@@ -342,7 +342,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       }
     }
     vistoDuelo = peleas;
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha]);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.toggle("jugando", jugando);
@@ -362,13 +362,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     const listos = js.length === 2 && js.every(j => est.discos?.[j.uid]);
     const fichas = (k, opciones, actual) => opciones.map(([v, txt]) =>
       `<button class="jg-bt3-ficha" data-k="${k}" data-v="${v}" aria-pressed="${String(v) === String(actual)}" ${manda ? "" : "disabled"}>${escapeHtml(txt)}</button>`).join("");
-    const falta = js.length < 2 ? "Falta el otro jugador: pásale el enlace de la sala."
+    const falta = est.reanudar ? "Se cortó la conexión en plena pelea: vuelve a empezar sola apenas carguen los dos discos."
+      : js.length < 2 ? "Falta el otro jugador: pásale el enlace de la sala."
       : !listos ? "Esperando el disco de " + js.filter(j => !est.discos?.[j.uid]).map(j => j.nombre || "Jugador").join(" y ") + "."
       : manda ? "Todo listo." : "Todo listo: empieza " + nombre(est.anfitrion) + ".";
     // la revancha: después de una pelea, los dos la piden y empieza sola en cuanto cargan los dos discos
     const rev = est.revancha || {}, otro = js.find(j => j.uid !== uid);
     let revancha = "";
-    if (est.ronda > 0 && js.length === 2 && enSala()) {
+    if (est.ronda > 0 && js.length === 2 && enSala() && !est.reanudar) {   // (tras un corte la pelea vuelve sola: sin revancha)
       const yoSi = !!rev[uid], elSi = !!(otro && rev[otro.uid]);
       revancha = `<div class="jg-bt3-revancha${yoSi && elSi ? " lista" : ""}">
         ${yoSi ? `<button class="jg-bt3-rev no" data-no="1">Cancelar revancha</button>` : `<button class="jg-bt3-rev">🔁 ${elSi ? "¡Acepto la revancha!" : "Pedir revancha"}</button>`}
@@ -521,7 +522,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
         const marca = (g, txt) => `<button class="jg-bt3-ficha" data-g="${escapeHtml(g)}">${txt}</button>`;
         let cuerpo;
         if (!a.enCurso) {
-          cuerpo = (listos
+          cuerpo = (a.reanudar ? `<p class="jg-bt3-nota jg-bt3-corte" role="status">⚡ Se cortó la conexión en plena pelea (o alguien recargó la página). Vuelve a empezar sola apenas carguen los dos discos.${manda ? " Si uno no vuelve, puedes decidirla abajo." : ""}</p>` : "")
+            + (listos
             ? (yoPeleo || manda ? `<button class="jg-bt3-empieza" data-h="pelea">¡A pelear!</button>` : `<p class="jg-bt3-nota">Listos los dos: empieza cuando uno de ellos quiera.</p>`)
             : `<p class="jg-bt3-nota">Esperando el disco de ${[a.a, a.b].filter(u => !conDisco(u)).map(quien).join(" y ")}.</p>`)
             + (manda ? `<details class="jg-bt3-mano"><summary>Organizador: decidir sin pelear (alguien no está)</summary>
@@ -681,8 +683,33 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     }
   }
 
+  /* Esta pestaña llegó (o volvió: recargó la página, volvió a iniciar sesión) con SU pelea andando: su juego ya no
+     está en esa pelea, y el del rival espera en vano. Se corta en el acto, como un corte de conexión, y la misma
+     pelea vuelve a empezar sola cuando los dos tengan el disco (motor.js, `reanudar`). */
+  let primeraVez = true;
+  function llegoEnPlenaPelea() {
+    if (!primeraVez || !est) return;   // (la primera llamada ya trae la sala entera: es la foto de Firebase)
+    primeraVez = false;
+    if (!enSala() || partida?.fin || !peleando()) return;
+    if (est.torneo) { if (!esCpuBt3(est.actual.a) || !esCpuBt3(est.actual.b)) anota({ t: "vuelve", uid, m: est.actual.id, por: "corte" }); }
+    else anota({ t: "vuelve", uid, por: "corte" });
+  }
+
+  // un corte nuevo mientras se mira: el cartel lo explica (no al abrir la sala)
+  let cortesVistos = null;
+  function avisaCorte() {
+    const n = (est.hist || []).filter(h => h.e === "vuelve" && h.por === "corte").length;
+    if (cortesVistos !== null && n > cortesVistos && !document.hidden) {
+      suena("kiCae");
+      anuncia(`<small>Se cortó la conexión</small><b>⚡ La pelea vuelve a empezar</b><span>sola, apenas carguen los dos discos</span>`, "empate", 5000);
+    }
+    cortesVistos = n;
+  }
+
   function actualizar(p, estado) {
     partida = p; est = estado;
+    llegoEnPlenaPelea();
+    avisaCorte();
     cargaMarco();
     if (tele && peleaEnVivo()?.id !== tele.id) cierraTele();   // la pelea que se miraba terminó
     detectaInicio();

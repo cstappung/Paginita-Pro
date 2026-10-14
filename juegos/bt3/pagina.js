@@ -202,6 +202,303 @@
     addEventListener("message", oye);
     window.parent.postMessage({ canal: "bt3-hijo", tipo: "token", nuevo: !!nuevo }, location.origin);
   });
+  /* ---------- el disco privado, rápido ----------
+     El disco está en el R2 del dueño cortado en pedazos de 1 MB (fuente/disco/worker.js). Para que no se espere:
+     - **Una cola** con hasta 10 pedidos a la vez: lo que el juego espera ahora («alta») pasa antes que lo que se
+       baja por adelantado («baja»), y un pedazo pedido por adelantado que el juego ya necesita sube a «alta».
+       Una lectura grande pide todos sus pedazos de una vez (no de a 6 esperando al más lento).
+     - **Lo bajado se guarda** en este computador (Cache Storage, «bt3-disco:<tamaño>») y la próxima vez sale de
+       ahí. El Worker le dice al navegador `no-store`, para que no quede guardado dos veces.
+     - **El arranque, por adelantado**: la primera vez se anota qué pedazos (y qué archivos) lee el juego hasta
+       la primera pelea; esa lista se comparte en el Worker (`/arranque.json`) y, al abrir la página, se bajan esos
+       pedazos mientras el jugador todavía elige el modo. En este computador, además, esos archivos se copian a la
+       memoria del juego en paralelo justo antes de arrancarlo (`precopia`).
+     - **Lo esencial** (opcional, un botón): menús, escenarios y luchadores (forma base) para no esperar después.
+     - **Las voces de los elegidos**: al salir de la selección (parche: Module.onElegidos) se bajan las frases de
+       los luchadores elegidos, para que la primera vez que hablan en la pelea el juego no se detenga a buscarlas.
+     - **Siempre se ve** cuando el juego espera algo de la red: la insignia de arriba dice cuánto lleva y a qué
+       velocidad, y la primera vez avisa que lo bajado queda guardado. */
+  const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false };
+  const Cola = { activos: 0, max: 10, alta: [], baja: [] };
+  function despacha() {
+    for (;;) {
+      let t = null;
+      if (Cola.alta.length && Cola.activos < Cola.max) t = Cola.alta.shift();
+      else if (!Cola.alta.length && Cola.baja.length && Cola.activos < 6) t = Cola.baja.shift();
+      if (!t) return;
+      Cola.activos++;
+      t.corre();
+    }
+  }
+  // la red: cuánto se bajó en esta sesión y a qué velocidad (los últimos 3 s)
+  const Red = { bytes: 0, ventana: [], esperando: 0, reloj: 0, tic: 0 };
+  const anotaRed = n => { const t = performance.now(); Red.bytes += n; Red.ventana.push([t, n]); while (Red.ventana.length && t - Red.ventana[0][0] > 3000) Red.ventana.shift(); };
+  const velocidad = () => {
+    const t = performance.now(), v = Red.ventana.filter(x => t - x[0] <= 3000);
+    return v.length ? v.reduce((a, x) => a + x[1], 0) / Math.max(0.5, (t - v[0][0]) / 1000) : 0;
+  };
+  function muestraRed() {
+    const vel = velocidad(), v = vel > 0 ? " · " + MB(vel) + " MB/s" : "";
+    const nota = P.primeraVez ? " · la primera vez tarda más: lo que se baja queda guardado" : "";
+    if (Progreso.lectura) {
+      const e = Progreso.lectura;
+      Progreso.insignia("Cargando del disco privado… " + MB(e.hechos) + " de " + MB(e.total) + " MB" + v + nota, e.hechos / e.total);
+    } else Progreso.insignia("↓ Disco privado · " + MB(Red.bytes) + " MB bajados" + v + nota, null);
+  }
+  // el juego espera algo de la red: a los 0,4 s se muestra, y se va un momento después de que llega
+  function esperaRed(mas) {
+    Red.esperando += mas;
+    if (Red.esperando > 0 && !Red.reloj && !Red.tic) Red.reloj = setTimeout(() => { Red.reloj = 0; muestraRed(); Red.tic = setInterval(muestraRed, 300); }, 400);
+    if (Red.esperando === 0) {
+      clearTimeout(Red.reloj); Red.reloj = 0;
+      setTimeout(() => { if (Red.esperando === 0 && !Progreso.lectura) { clearInterval(Red.tic); Red.tic = 0; $("net").classList.remove("on"); } }, 350);
+    }
+  }
+  const urlPieza = i => P.base + "/pieza/" + String(i).padStart(5, "0") + ".bin";
+  // un pedazo desde la red (con reintentos: el token dura una hora, y una red de celular a veces corta)
+  async function deRed(i, alta) {
+    for (let intento = 0; ; intento++) {
+      try {
+        const res = await fetch(urlPieza(i), { headers: { Authorization: "Bearer " + P.token }, priority: alta ? "high" : "low" });
+        if (res.status === 401 && intento < 2) { P.token = (await pideToken(true)) || P.token; continue; }
+        if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        anotaRed(bytes.length);
+        if (P.almacen) { P.guardadas.add(i); P.almacen.put(urlPieza(i), new Response(bytes)).catch(() => P.guardadas.delete(i)); }
+        return bytes;
+      } catch (e) {
+        if (intento >= (alta ? 6 : 3)) throw e;
+        Module.keep && Module.keep("disco privado: pedazo " + i + " falló (" + (e.message || e) + "), de nuevo");
+        await new Promise(ok => setTimeout(ok, 300 * 2 ** intento));
+      }
+    }
+  }
+  // los pedazos en memoria (los últimos 64) y los que están en camino
+  const enMemoria = new Map(), enCamino = new Map();
+  function pedazo(i, alta) {
+    let q = enMemoria.get(i);
+    if (q) { enMemoria.delete(i); enMemoria.set(i, q); return q; }
+    const c = enCamino.get(i);
+    if (c) {
+      if (alta && c.tarea && Cola.baja.includes(c.tarea)) { Cola.baja.splice(Cola.baja.indexOf(c.tarea), 1); Cola.alta.push(c.tarea); despacha(); }
+      if (alta && !c.alta) { c.alta = true; esperaRed(1); const fin = () => esperaRed(-1); c.q.then(fin, fin); }
+      return c.q;
+    }
+    const camino = { alta, tarea: null, q: null };
+    camino.q = (async () => {
+      if (P.almacen && P.guardadas.has(i)) {
+        try { const g = await P.almacen.match(urlPieza(i)); if (g) return new Uint8Array(await g.arrayBuffer()); } catch (e) {}
+      }
+      return await new Promise((ok, mal) => {
+        camino.tarea = { corre: () => { camino.tarea = null; deRed(i, camino.alta).then(ok, mal).finally(() => { Cola.activos--; despacha(); }); } };
+        (alta ? Cola.alta : Cola.baja).push(camino.tarea);
+        despacha();
+      });
+    })();
+    if (alta) { esperaRed(1); const fin = () => esperaRed(-1); camino.q.then(fin, fin); }
+    enCamino.set(i, camino);
+    camino.q.then(() => {
+      enCamino.delete(i);
+      enMemoria.set(i, camino.q);
+      while (enMemoria.size > 64) enMemoria.delete(enMemoria.keys().next().value);
+    }, () => enCamino.delete(i));
+    return camino.q;
+  }
+  // bajar por adelantado (sin esperar ni mostrar nada): los que no estén guardados todavía
+  const adelanta = ids => ids.filter(i => i >= 0 && i < P.cuantas && !P.guardadas.has(i) && !enMemoria.has(i)).map(i => pedazo(i, false).catch(() => {}));
+
+  /* ---------- el arranque ---------- */
+  const Arranque = { grabando: true, piezas: new Set(), archivos: new Set(), clave: "" };
+  const archivosArranque = () => { try { return JSON.parse(localStorage.getItem("bt3.arranque." + P.size) || "{}"); } catch (e) { return {}; } };
+  async function prebajaArranque() {
+    let lista = [];
+    try { const r = await fetch(P.base + "/arranque.json", { headers: { Authorization: "Bearer " + P.token } }); if (r.ok) lista = await r.json(); } catch (e) {}
+    const local = archivosArranque();
+    const todos = [...new Set([...(Array.isArray(lista) ? lista : []), ...(Array.isArray(local.piezas) ? local.piezas : [])])];
+    const faltan = todos.filter(i => Number.isInteger(i) && !P.guardadas.has(i));
+    if (!faltan.length) return;
+    const total = faltan.length;
+    let hechos = 0;
+    Bajando.pon("arranque", "⬇ Adelantando el arranque…", 0);
+    await Promise.all(adelanta(faltan).map(q => q.then(() => { hechos++; Bajando.pon("arranque", "⬇ Adelantando el arranque · " + hechos + " de " + total + " MB", hechos / total); })));
+    Bajando.quita("arranque");
+  }
+  // la primera pelea empezó: lo leído hasta aquí es el arranque (se guarda aquí y se suma a la lista del Worker)
+  function terminaArranque() {
+    if (!Arranque.grabando) return;
+    Arranque.grabando = false;
+    const piezas = [...Arranque.piezas].sort((a, b) => a - b).slice(0, 1500), archivos = [...Arranque.archivos].slice(0, 3000);
+    try { localStorage.setItem("bt3.arranque." + P.size, JSON.stringify({ piezas, archivos })); } catch (e) {}
+    const enviado = "bt3.arranque.enviado." + P.size;
+    let ya = false;
+    try { ya = localStorage.getItem(enviado) === "1"; } catch (e) {}
+    if (ya || !piezas.length) return;
+    fetch(P.base + "/arranque.json", { method: "PUT", headers: { Authorization: "Bearer " + P.token, "Content-Type": "application/json" }, body: JSON.stringify(piezas) })
+      .then(r => { if (r.ok) try { localStorage.setItem(enviado, "1"); } catch (e) {} }).catch(() => {});
+  }
+  // antes de arrancar el programa: los archivos del arranque, copiados a la memoria del juego de a 8 a la vez
+  async function precopia() {
+    const lista = (archivosArranque().archivos || []).filter(x => typeof x === "string" && Module.webIndex && Module.webIndex[x.replace(/^\/?gamedata\//, "")]);
+    if (!lista.length || !Module.webDiscEnsure) return;
+    let hechos = 0, siguiente = 0;
+    const uno = async () => { while (siguiente < lista.length) { const p = lista[siguiente++]; try { await Module.webDiscEnsure(p); } catch (e) {} hechos++; if (hechos % 8 === 0) Progreso.insignia("Preparando el juego… " + hechos + " de " + lista.length + " archivos", hechos / lista.length); } };
+    await Promise.all(Array.from({ length: 8 }, uno));
+    if (!Progreso.lectura && !Red.tic) $("net").classList.remove("on");
+  }
+  // anota lo que el juego abre (y qué pedazos lee) hasta la primera pelea
+  function grabaArchivos() {
+    const original = Module.webDiscEnsure;
+    if (!original || original.grabando) return;
+    Module.webDiscEnsure = async function (path) { if (Arranque.grabando) Arranque.archivos.add(path); return original(path); };
+    Module.webDiscEnsure.grabando = true;
+  }
+
+  /* ---------- lo esencial y las voces: qué archivos ----------
+     Cada archivo del juego tiene un número (docs del port, files_and_assets.md): `pzs3us1` lleva del 1 al 0xD47 y
+     `pzs3us2` del 0xD48 en adelante. Lo esencial: los comunes (2..5), los parámetros de cada luchador
+     (8 + chara·2 + lado), los bancos de sonido (0x14A, 0x14B, del escenario 0x14E..), los escenarios (0x171..),
+     las pantallas de carga (0x3C1..), y de cada luchador su modelo (0x590 + chara·10), sus animaciones (+8, +9)
+     y su banco de voz (0xBDA / 0xC7B + chara). Las frases de voz: chara·100 + frase + 0x8D4E (o + 0xCC32). */
+  const rutaDe = id => id <= 0 ? "pzs3us0/" + String(id).padStart(5, "0") + ".bin"
+    : id <= 0xD47 ? "pzs3us1/" + String(id - 1).padStart(5, "0") + ".bin" : "pzs3us2/" + String(id - 0xD48).padStart(5, "0") + ".bin";
+  function idsEsenciales() {
+    const ids = [2, 3, 4, 5, 0x14A, 0x14B, 0x3C1, 0x3C2, 0x3C3];
+    for (let i = 8; i < 8 + 161 * 2; i++) ids.push(i);
+    for (let i = 0x14E; i <= 0x197; i++) ids.push(i);
+    for (let c = 0; c <= 160; c++) ids.push(0x590 + c * 10, 0x598 + c * 10, 0x599 + c * 10, 0xBDA + c, 0xC7B + c);
+    return ids;
+  }
+  const idsLuchador = c => {
+    const ids = [8 + c * 2, 9 + c * 2, 0xBDA + c, 0xC7B + c];
+    for (let k = 0; k < 10; k++) ids.push(0x590 + c * 10 + k);
+    for (let l = 0; l < 100; l++) ids.push(c * 100 + l + 0x8D4E, c * 100 + l + 0xCC32);
+    return ids;
+  };
+  // los pedazos de esos archivos, con el índice de los archivos del disco (el del juego, o uno leído aquí)
+  function piezasDe(ids, indice) {
+    const out = new Set();
+    for (const id of ids) {
+      const e = indice[rutaDe(id)];
+      if (!e || !e[1]) continue;
+      for (let i = Math.floor(e[0] / P.pieza); i <= Math.floor((e[0] + e[1] - 1) / P.pieza); i++) out.add(i);
+    }
+    return [...out];
+  }
+  // el índice de los archivos del disco, como lo arma el juego (web_pre.js): directorio ISO 9660 y las tablas AFS
+  async function leeIndice(disco) {
+    const u32 = (b, o) => b[o] | b[o + 1] << 8 | b[o + 2] << 16 | b[o + 3] * 16777216;
+    const pvd = await disco.readAt(16 * 2048, 2048), afs = {};
+    const camina = async (lba, tam, pre) => {
+      const dir = await disco.readAt(lba * 2048, tam);
+      for (let o = 0; o < dir.length;) {
+        const largo = dir[o];
+        if (largo === 0) { o = (Math.floor(o / 2048) + 1) * 2048; continue; }
+        const ext = u32(dir, o + 2), sz = u32(dir, o + 10), flags = dir[o + 25], nl = dir[o + 32], crudo = dir.subarray(o + 33, o + 33 + nl);
+        o += largo;
+        if (nl === 1 && (crudo[0] === 0 || crudo[0] === 1)) continue;
+        const nombre = String.fromCharCode(...crudo).replace(/;1$/, "");
+        if (flags & 2) { if (pre === "" && nombre === "DATA") await camina(ext, sz, "DATA/"); }
+        else if (/^DATA\/PZS3US[012]\.AFS$/.test(pre + nombre)) afs[nombre[6]] = ext * 2048;
+      }
+    };
+    await camina(u32(pvd, 158), u32(pvd, 166), "");
+    const indice = {};
+    for (const n of ["0", "1", "2"]) {
+      if (afs[n] === undefined) continue;
+      const cab = await disco.readAt(afs[n], 8), cuantos = u32(cab, 4), tabla = await disco.readAt(afs[n] + 8, cuantos * 8);
+      for (let i = 0; i < cuantos; i++) indice["pzs3us" + n + "/" + String(i).padStart(5, "0") + ".bin"] = [afs[n] + u32(tabla, i * 8), u32(tabla, i * 8 + 4)];
+    }
+    return indice;
+  }
+
+  /* ---------- la barrita de lo que se baja por detrás (en la barra de arriba) ---------- */
+  const Bajando = {
+    el: null, cosas: new Map(),
+    pon(k, txt, frac, alClic) {
+      if (!this.el) {
+        this.el = document.createElement("button");
+        this.el.type = "button"; this.el.id = "bajando";
+        $("barra").insertBefore(this.el, $("barra").querySelector("[data-volumen]"));
+        this.el.onclick = () => { const c = [...this.cosas.values()].pop(); c && c.alClic && c.alClic(); };
+      }
+      this.cosas.set(k, { txt, frac, alClic });
+      this.pinta();
+    },
+    quita(k) { this.cosas.delete(k); this.pinta(); },
+    pinta() {
+      if (!this.el) return;
+      const c = [...this.cosas.values()].pop();
+      this.el.hidden = !c;
+      if (!c) return;
+      this.el.textContent = c.txt;
+      this.el.style.setProperty("--f", c.frac == null ? "0" : String(Math.min(1, c.frac)));
+      this.el.classList.toggle("clic", !!c.alClic);
+    },
+  };
+
+  /* ---------- lo esencial (opcional) ---------- */
+  const Esencial = { piezas: null, corriendo: false, pausa: false };
+  async function preparaEsencial(disco) {
+    try {
+      const indice = await leeIndice(disco);
+      Esencial.piezas = piezasDe(idsEsenciales(), indice);
+    } catch (e) { return; }
+    pintaEsencial();
+  }
+  function pintaEsencial() {
+    const ps = Esencial.piezas;
+    if (!ps || !ps.length) return;
+    const faltan = ps.filter(i => !P.guardadas.has(i)).length, tot = ps.length;
+    let boton = $("esencial");
+    if (!boton && SOLO && $("start") && $("serverDisc")) {   // en la tarjeta de inicio, bajo «Jugar»
+      boton = document.createElement("button");
+      boton.id = "esencial"; boton.type = "button"; boton.className = "pick alt";
+      $("serverDisc").after(boton);
+      boton.onclick = () => alternaEsencial();
+    }
+    if (!faltan) {
+      Bajando.quita("esencial");
+      if (boton) { boton.textContent = "✓ Lo esencial ya está guardado en este computador"; boton.disabled = true; }
+      return;
+    }
+    const txt = Esencial.corriendo
+      ? (Esencial.pausa ? "⏸ Lo esencial, en pausa · " : "⬇ Bajando lo esencial · ") + Math.round((tot - faltan) / tot * 100) + "% (" + (tot - faltan) + " de " + tot + " MB)"
+      : "⬇ Bajar lo esencial · " + faltan + " MB" + (faltan < tot ? " (" + Math.round((tot - faltan) / tot * 100) + "% ya guardado)" : "");
+    if (boton) { boton.textContent = txt; boton.title = "Menús, escenarios y los luchadores en su forma base: para no esperar después. Se puede jugar mientras baja."; }
+    Bajando.pon("esencial", txt, (tot - faltan) / tot, alternaEsencial);
+  }
+  async function alternaEsencial() {
+    if (Esencial.corriendo) { Esencial.pausa = !Esencial.pausa; pintaEsencial(); return; }
+    Esencial.corriendo = true;
+    pintaEsencial();
+    const pendientes = Esencial.piezas.filter(i => !P.guardadas.has(i));
+    let k = 0;
+    const uno = async () => {
+      while (k < pendientes.length) {
+        while (Esencial.pausa) await new Promise(ok => setTimeout(ok, 500));
+        const i = pendientes[k++];
+        if (!P.guardadas.has(i)) await pedazo(i, false).catch(() => {});
+        pintaEsencial();
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, uno));   // (la cola deja pasar antes lo que el juego espera)
+    Esencial.corriendo = false;
+    pintaEsencial();
+  }
+
+  /* ---------- las voces y los modelos de los elegidos ---------- */
+  Module.onElegidos = charas => {
+    if (!Module.webIndex || !P.size) return;
+    const ids = [...new Set(charas.filter(c => Number.isInteger(c) && c >= 0 && c <= 160))].flatMap(idsLuchador);
+    const rutas = ids.map(rutaDe).filter(r => Module.webIndex[r]);
+    adelanta(piezasDe(ids, Module.webIndex));
+    // y las frases, ya copiadas a la memoria del juego (de a 3, sin apuro)
+    const frases = rutas.filter(r => r.startsWith("pzs3us2/"));
+    let k = 0;
+    const uno = async () => { while (k < frases.length) { const r = frases[k++]; try { await Module.webDiscEnsure("/gamedata/" + r); } catch (e) {} } };
+    for (let n = 0; n < 3; n++) uno();
+  };
+
   async function discoPrivado() {
     let base = "";
     try { base = String((await (await fetch("disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, ""); } catch (e) {}
@@ -218,69 +515,45 @@
     }
     if (!r.ok) return false;
     const { size, pieza } = await r.json();
-    // Los pedazos de 1 MB, como el disco alojado del fork: los últimos 48 en memoria y, si el juego lee en
-    // orden (un escenario, un luchador), los 4 siguientes por adelantado.
-    /* Lo ya bajado se guarda en este computador (Cache Storage, «bt3-disco:<tamaño>»): la segunda vez el menú,
-       los luchadores y los escenarios que ya usaste salen de aquí, sin red. El juego nunca baja la ISO entera,
-       solo los archivos que abre. Se pide el índice al Worker igual cada vez, así que quien sale de la lista
-       deja de entrar aunque tenga pedazos guardados. Si el navegador no deja guardar, se sigue sin caché. */
-    const almacen = await (async () => { try { return await caches.open("bt3-disco:" + size); } catch (e) { return null; } })();
+    Object.assign(P, { base, token, size, pieza, cuantas: Math.ceil(size / pieza) });
+    P.almacen = await (async () => { try { return await caches.open("bt3-disco:" + size); } catch (e) { return null; } })();
     try { navigator.storage?.persist?.(); } catch (e) {}   // que el navegador no lo borre al primer apuro de espacio
-    const trae = async i => {
-      const url = base + "/pieza/" + String(i).padStart(5, "0") + ".bin";
-      if (almacen) {
-        try { const g = await almacen.match(url); if (g) return new Uint8Array(await g.arrayBuffer()); } catch (e) {}
-      }
-      for (let intento = 0; ; intento++) {
-        const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-        if (res.status === 401 && intento < 2) { token = (await pideToken(true)) || token; continue; }   // el token dura una hora
-        if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
-        const bytes = new Uint8Array(await res.arrayBuffer());
-        if (almacen) almacen.put(url, new Response(bytes)).catch(() => {});
-        return bytes;
-      }
-    };
     // al cambiar la ISO subida (otro tamaño), lo guardado de la anterior no sirve: se borra
     try { for (const k of await caches.keys()) if (k.startsWith("bt3-disco:") && k !== "bt3-disco:" + size) caches.delete(k); } catch (e) {}
-    const guardados = new Map(), cuantas = Math.ceil(size / pieza);
-    const pedazo = i => {
-      let q = guardados.get(i);
-      if (q) { guardados.delete(i); guardados.set(i, q); return q; }
-      q = netRead(() => trae(i));                    // (reintentos y el aviso «Cargando» de la página)
-      q.catch(() => guardados.delete(i));
-      guardados.set(i, q);
-      while (guardados.size > 48) guardados.delete(guardados.keys().next().value);
-      return q;
-    };
+    // qué pedazos ya están guardados aquí (para no pedirlos, y para saber si es la primera vez)
+    if (P.almacen) try {
+      for (const q of await P.almacen.keys()) { const m = /\/pieza\/(\d{5})\.bin$/.exec(q.url); if (m) P.guardadas.add(Number(m[1])); }
+    } catch (e) {}
+    // la primera vez: este computador nunca llegó a una pelea (no tiene anotado el arranque) y casi no tiene nada
+    P.primeraVez = !(archivosArranque().archivos || []).length && P.guardadas.size < 40;
+    if (P.primeraVez) say("La primera vez tarda un poco más: lo que se baja del disco privado queda guardado en este computador, y la próxima vez sale de aquí.");
     let ultimo = -10, racha = 0;
     desdePrivado = true;
     const disco = { size, readAt: async (o, n) => {
       const out = new Uint8Array(n);
       if (n === 0) return out;
-      // una lectura de 2 MB o más (un escenario, un luchador, una película): la insignia con su barra, si tarda
+      // una lectura de 2 MB o más (un escenario, un luchador): la insignia con su barra y la velocidad, si tarda
       const grande = n >= 2 * 1048576, estado = { hechos: 0, total: n };
-      let reloj = 0;
-      if (grande) reloj = setTimeout(() => { Progreso.lectura = estado; Progreso.insignia("Cargando del disco privado… " + MB(estado.hechos) + " de " + MB(n) + " MB", estado.hechos / n); }, 400);
       const a = Math.floor(o / pieza), z = Math.floor((o + n - 1) / pieza);
+      if (Arranque.grabando) for (let i = a; i <= z; i++) Arranque.piezas.add(i);
       racha = a >= ultimo && a <= ultimo + 2 ? racha + 1 : 0;
       ultimo = z;
-      if (racha >= 2) for (let i = z + 1; i <= Math.min(cuantas - 1, z + 4); i++) if (!guardados.has(i)) pedazo(i).catch(() => {});
-      for (let s = a; s <= z; s += 6) {
-        const ids = [];
-        for (let i = s; i <= Math.min(z, s + 5); i++) ids.push(i);
-        const partes = await Promise.all(ids.map(pedazo));
-        ids.forEach((i, k) => {
-          const desde = Math.max(o, i * pieza), hasta = Math.min(o + n, (i + 1) * pieza);
-          out.set(partes[k].subarray(desde - i * pieza, hasta - i * pieza), desde - o);
-          estado.hechos += hasta - desde;
-        });
-        if (Progreso.lectura === estado) Progreso.insignia("Cargando del disco privado… " + MB(estado.hechos) + " de " + MB(n) + " MB", estado.hechos / n);
-      }
-      if (grande) { clearTimeout(reloj); if (Progreso.lectura === estado) { Progreso.lectura = null; $("net").classList.remove("on"); } }
+      if (racha >= 2) adelanta([z + 1, z + 2, z + 3, z + 4]);   // lee en orden: los 4 siguientes por adelantado
+      if (grande) Progreso.lectura = estado;
+      const ids = [];
+      for (let i = a; i <= z; i++) ids.push(i);
+      await Promise.all(ids.map(i => pedazo(i, true).then(b => {
+        const desde = Math.max(o, i * pieza), hasta = Math.min(o + n, (i + 1) * pieza);
+        out.set(b.subarray(desde - i * pieza, hasta - i * pieza), desde - o);
+        estado.hechos += hasta - desde;
+      })));
+      if (grande && Progreso.lectura === estado) { Progreso.lectura = null; if (!Red.tic) $("net").classList.remove("on"); }
       return out;
     } };
     $("pickLabel").hidden = true;
-    if (SOLO) { listoParaJugar(() => go(disco), "Disco privado listo."); return true; }   // espera el «Jugar» (2b)
+    prebajaArranque();          // mientras se elige el modo
+    preparaEsencial(disco);     // (calcula cuánto es lo esencial y ofrece el botón)
+    if (SOLO) { listoParaJugar(() => go(disco), P.primeraVez ? "Disco privado listo. La primera vez tarda un poco más: lo que se baja queda guardado." : "Disco privado listo."); return true; }   // espera el «Jugar» (2b)
     say("Usando el disco privado…");
     go(disco);
     return true;
@@ -405,9 +678,10 @@
     pintaModo();
   }
   // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
-  function eligeModo() {
+  async function eligeModo() {
     try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
     Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo]];
+    if (desdePrivado) { grabaArchivos(); await precopia(); }   // (el arranque, ya en memoria: ver «el disco privado, rápido»)
   }
   // (los mismos ganchos que usa la sala: el entorno de partida, leído al cargar el programa, y antes de arrancarlo)
   if (SOLO) window.Sala = { entorno: () => ({ BT3_NOMOVIE: "1" }), antesDeEmpezar: eligeModo };
@@ -444,7 +718,10 @@
     Module._Web_TouchSet(bits | 0x1000, lx, ly);
     setTimeout(() => Module._Web_TouchSet(bits, lx, ly), 120);
   };
-  Module.onMenus = si => document.body.classList.toggle("en-menus", !!si);
+  Module.onMenus = si => {
+    document.body.classList.toggle("en-menus", !!si);
+    if (!si && desdePrivado) terminaArranque();   // la primera pelea: lo leído hasta aquí es el arranque
+  };
 
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
@@ -545,6 +822,8 @@
     entorno: () => ({ BT3_NOMOVIE: "1" }),
     async antesDeEmpezar() {
       S.avisa("disco");   // la ISO ya pasó la prueba: la sala lo anota
+      // mientras se espera la pelea, el arranque ya va a la memoria del juego (disco privado)
+      const listoArranque = desdePrivado ? (grabaArchivos(), precopia()) : Promise.resolve();
       aviso(est && est.torneo ? "Disco listo. Esperando tu pelea del torneo…" : "Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
@@ -556,6 +835,7 @@
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
         if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo
+        await listoArranque;
         aviso("Tu pelea contra " + e.rival.nombre + " (" + ["muy fácil", "fácil", "normal", "difícil", "muy difícil"][e.rival.nivel ?? 2] + "): elige tu luchador.", 6000);
         return;
       }
@@ -580,6 +860,7 @@
       equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));   // (el tope de equipo no viaja en la sesión: lo ponen los dos)
       try { FS.mkdir("/net_session"); } catch (err) {}
       if (e.emite) S.emite(Module.canvas);   // los demás de la sala pueden mirarla en vivo (bt3-directo.js)
+      await listoArranque;
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },
   };
@@ -596,12 +877,36 @@
   // Salió de la pelea contra la CPU al menú del juego (parche: headless.c): la sala corta la pelea y lo devuelve.
   Module.onFueraDelModo = () => { aviso("Saliste de la pelea: vuelves a la sala."); S.avisa("termino", { por: "menu" }); };
 
-  // Lo que dice el programa de la sesión (gs/net.c): al terminar, la sala vuelve al vestíbulo.
+  /* Lo que dice el programa de la sesión (gs/net.c). Si el rival deja de contestar en plena pelea, el juego se
+     detiene a esperarlo hasta 25 s (parche: una red de casa a veces se corta unos segundos) y aquí se ve la cuenta;
+     si vuelve, sigue la pelea donde iba. Si no, la pelea se corta («corte») y la sala la vuelve a empezar sola
+     cuando estén los dos (motor.js, `reanudar`): una copia del juego que se recargó no puede volver a una pelea a
+     la mitad (cada una arranca de cero). */
+  let cuenta = 0, cortada = false;
   Module.onNetEvent = (que, txt) => {
     Module.keep("red: " + que + " " + txt);
     if (que === "arrived") aviso("");
-    else if (que === "ended") aviso(txt || "La pelea terminó.");
-    else if (que === "leave") { S.cierra(); S.avisa("termino", { por: txt || "" }); }
+    else if (que === "espera") {
+      const hasta = Date.now() + (Number(txt) || 25) * 1000, quien = (est && est.rival && est.rival.nombre) || "tu rival";
+      clearInterval(cuenta);
+      const pinta = () => {
+        const s = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
+        aviso("⚡ Se cortó la conexión con " + quien + ". La pelea está en pausa: esperándolo " + s + " s… (si no vuelve, la pelea empieza de nuevo cuando estén los dos)", 0, true);
+      };
+      pinta();
+      cuenta = setInterval(pinta, 500);
+    } else if (que === "sigue") {
+      clearInterval(cuenta);
+      aviso("¡Volvió la conexión! La pelea sigue.", 2500);
+    } else if (que === "ended") {
+      clearInterval(cuenta);
+      cortada = !/different version/i.test(txt || "");
+      aviso(txt ? "La pelea se cortó: " + (/lost|did not answer|left/i.test(txt) ? "se perdió la conexión con tu rival" : txt) + ". Vuelve a empezar sola cuando estén los dos." : "La pelea terminó.");
+    } else if (que === "leave") {
+      clearInterval(cuenta);
+      S.cierra();
+      S.avisa("termino", { por: cortada ? "corte" : (txt || "") });
+    }
   };
   addEventListener("pagehide", () => S.cierra());
 })();

@@ -14,7 +14,7 @@
 set -euo pipefail
 
 COMMIT=81507cde58685a6f5aab917c298d9a9f82fe09b0      # stufno102/Tenkaichi3Decomp, «Browser build» (2026-10-12)
-VER=bt3-9                                            # súbelo al cambiar el programa: va en los ?v= de la página
+VER=bt3-11                                           # súbelo al cambiar el programa: va en los ?v= de la página
 AQUI="$(cd "$(dirname "$0")" && pwd)"                # juegos/bt3/fuente
 DESTINO="$(cd "$AQUI/.." && pwd)"                    # juegos/bt3
 RAIZ="$(cd "$DESTINO/../.." && pwd)"                 # la raíz del sitio
@@ -38,6 +38,9 @@ python3 port/web/link.py web
 # 3. Copiar el programa a juegos/bt3/ y armar la página.
 cp port/build/web/bt3-jspi.js port/build/web/bt3-jspi.wasm "$DESTINO/"
 python3 "$AQUI/pagina.py" port/web/shell.html "$DESTINO/index.html" "$VER" "$DESTINO/bt3-jspi.wasm"
+
+# La misma versión para la sala (el marco y la descarga anticipada del salón, colabtex/src/juegos/bt3-amigos.js).
+sed -i "s/^export const BT3_VER = \".*\";/export const BT3_VER = \"$VER\";/" "$RAIZ/colabtex/src/juegos/bt3-amigos.js"
 
 # 4. La red del marco (bt3-marco.js + malla.js → juegos/bt3/red.js).
 cd "$RAIZ/colabtex" && npm run build:bt3

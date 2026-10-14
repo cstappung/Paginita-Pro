@@ -97,7 +97,13 @@ asks for exactly three.
 see the lobby, the bracket, the banners and the fight intros live; their frame is never loaded (`cargaMarco`).
 **They can watch the fight too** (`bt3-directo.js`): the game has no spectator netcode, so the fighter that is
 player 1 (or the human against a CPU) sends its canvas as a WebRTC video (`captureStream`, ~540p, 30 fps, ≤ 1.5
-Mb/s, at most 6 viewers) **with the game's sound** to whoever presses «📺 Ver la pelea en vivo». The sound is
+Mb/s) **with the game's sound** to whoever presses «📺 Ver la pelea en vivo». **Viewers relay to each other**: the
+fighter encodes for ONE viewer only (`DIRECTOS`), every viewer that already sees it re-sends it to up to two
+(`RELEVO`), up to 14 (`MAX_VISORES`). The emitter keeps the tree (`ver` → itself, `vir` → «take it from that
+viewer», `vespera` → nobody can yet; `vya` = this viewer can relay), never offers a viewer its own branch, and
+when someone leaves (`vfin`) or drops silently (their children report it: `cae`; a relay that never answers is
+given up after 6 s; «disconnected» for 4 s counts as dropped) their children re-ask and hang from someone else with
+their whole branch (relays swap tracks with `replaceTrack`, no renegotiation). Each hop re-encodes (~0.1–0.2 s). The sound is
 tapped *before* the player's own volume (`pagina.js` 0a wraps `AudioContext` after `volumen.js`: the game's
 `destination` becomes a `pre` gain → the player's volume, plus a `MediaStreamDestination` when someone watches;
 `Module.audioJuego()` reads it from `Module.SDL3.audioContext` only), so a muted player is still heard; the viewer
@@ -117,6 +123,16 @@ the initial on its `color`); the loser's card **explodes** (`explota()`: a flash
 the duel's `ronda` going to `jugando`, a tournament fight's `actual.n` going `enCurso`) shows `presentaPelea`, a
 fixed full-screen intro over the game frame (both photos slide in, clash, «¡A PELEAR!», `kiPelea`, 2.7 s); the
 bracket appearing plays `kiTorneo`. Nothing plays on opening a room or in a hidden tab.
+
+**Disconnects.** Lockstep: if the rival stops answering mid-fight, the game waits (patch: 25 s instead of 6,
+`QUIET_NS`) and tells the page (`espera` / `sigue` net events) so the frame shows a countdown; if the line comes back
+the fight goes on where it was. If not, the fight is cut with `por: "corte"` and **starts again by itself** when both
+discs are ready (`reanudar` in `redBt3`; `actual.reanudar` in the tournament). A page that loads while its own
+fight is running (a refresh or a new sign-in mid-fight: `llegoEnPlenaPelea` in bt3.js) cuts it at once the same
+way, so nobody waits 25 s. **It cannot resume from the exact moment**: the rollback state is per process (game
+globals and heap, not the call stack, renderer or sound), and a reloaded copy boots from zero, so both copies must
+start the fight again. A cut never gives a win; in the tournament the organizer can still decide it if one never
+comes back.
 
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 
@@ -167,6 +183,23 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
 
 ## Speed
 
+- **The private disc loads in parallel and ahead** (`pagina.js`, «el disco privado, rápido»): a queue with up to
+  10 piece requests in flight, where what the game waits for («alta») goes before prefetching («baja», ≤ 6) and a
+  prefetched piece the game now needs is promoted; a big read asks for all its pieces at once. **The boot is
+  prefetched**: the first session records which pieces (and files) it read until the first fight
+  (`terminaArranque`, on `Module.onMenus(false)`), keeps that locally (`bt3.arranque.<size>`) and adds the pieces
+  to the Worker's shared `/arranque.json`; on opening the page the next one downloads them while the player is
+  still choosing a mode, and before starting the program the recorded files are copied into the game's memory 8
+  at a time (`precopia`). **The chosen fighters** (`Web_Elegidos`, CharSel/TeamSel term) get their models, voice
+  banks and voice lines prefetched, the lines copied into memory, so the first time one speaks mid-fight the game
+  does not stop. **«Lo esencial»** (a button, opt-in): commons, stages, every fighter's base model/anims/voice bank
+  (computed from the AFS tables with the file-id formulas of the port's docs), downloaded in the background.
+  **The wait is always visible**: when the game waits on the network for > 0.4 s the badge shows MB downloaded and
+  speed, and on a first visit says it is saved for next time. The Worker sends `no-store` (the page keeps the
+  pieces itself: not twice), and puts each piece in Cloudflare's edge cache after the friend check — **this only
+  takes effect with a custom domain on the Worker**; on `*.workers.dev` Cloudflare ignores it.
+- **The program is fetched from the lobby** for a friend (`bt3-amigos.js`, on `/soy` = yes, idle, desktop only),
+  so opening BT3 the first time starts from the browser cache. `BT3_VER` there is the version (construir.sh sets it).
 - **60 fps by default**: the game simulates at 30 like the PS2; the port's "Smooth motion" draws in-between
   pictures. The patch defaults the `interp` setting to 1 in the browser build (`gs_draw.c`); a player can turn it
   off in Ajustes → Video. It is a display-only blend (+16.7 ms of display latency), so lockstep play is unaffected.

@@ -108,6 +108,13 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   .modo.activo { border-color: #ff8a00; background: linear-gradient(180deg, #1b2f66, #0f1f4d); box-shadow: 0 0 20px #ff8a0044; }
   .modo.activo strong { color: #ffd21f; }
   .modo.activo .radio { background: #ffd21f; border-color: #ffd21f; box-shadow: inset 0 0 0 3px #0f1f4d; }
+  /* lo que se baja por detrás (pagina.js, «el disco privado, rápido»): una pastilla en la barra con su avance */
+  #bajando { --f: 0; background: linear-gradient(90deg, #ff8a0055 calc(var(--f) * 100%), rgba(20,24,32,.88) 0) !important;
+    border-color: #ff9d0088 !important; cursor: default; max-width: 42vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bajando.clic { cursor: pointer; }
+  #bajando[hidden] { display: none; }
+  #start #esencial { margin-top: 8px; font-size: 13px; }
+  #start #esencial[disabled] { opacity: .75; cursor: default; }
   #volverModos, #volverSala, #atras { display: none; }
   body.started #volverModos, body.started #volverSala { display: inline-block; }
   body.started.en-menus #atras { display: inline-block; }

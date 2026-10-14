@@ -66,3 +66,35 @@ test('subir pide la clave, y una página de otro sitio no recibe permiso CORS',a
   const r=await W.fetch(new Request('https://disco.ejemplo/pieza/00000.bin',{headers:{Origin:'https://otro-sitio.com',Authorization:'Bearer '+t}}),env);
   assert.equal(r.headers.get('access-control-allow-origin'),null,'otro sitio: el navegador no le deja leer la respuesta');
 });
+
+test('rapidez: el pedazo va con no-store (la página lo guarda ella) y queda en el caché de Cloudflare para el próximo amigo',async()=>{
+  const guardado=new Map();
+  globalThis.caches={default:{match:async k=>guardado.has(k)?new Response(guardado.get(k)):undefined,put:async(k,r)=>{guardado.set(k,new Uint8Array(await r.arrayBuffer()));}}};
+  try{
+    const t=await token(datos('amigo1'));
+    const r1=await pide('/pieza/00000.bin',{cab:{Authorization:'Bearer '+t}});
+    assert.equal(r1.status,200);assert.equal(r1.headers.get('cache-control'),'no-store','el navegador no lo guarda dos veces');
+    assert.equal(r1.headers.get('x-borde'),'MISS');assert.deepEqual([...new Uint8Array(await r1.arrayBuffer())],[1,2,3]);
+    assert.ok(guardado.has('https://disco.ejemplo/pieza/00000.bin'),'la llave no lleva el token: sirve para todos los amigos');
+    const r2=await pide('/pieza/00000.bin',{cab:{Authorization:'Bearer '+t}});
+    assert.equal(r2.headers.get('x-borde'),'HIT');assert.deepEqual([...new Uint8Array(await r2.arrayBuffer())],[1,2,3]);
+    assert.equal((await pide('/pieza/00000.bin',{cab:{Authorization:'Bearer '+await token(datos('extraño'))}})).status,403,'el caché no salta la lista');
+    assert.equal((await pide('/pieza/00000.bin')).status,401,'ni la sesión');
+  }finally{delete globalThis.caches;}
+});
+
+test('la lista de arranque: la leen y la completan los amigos, con pedazos que existen',async()=>{
+  const t=await token(datos('amigo1')),A={Authorization:'Bearer '+t};
+  let r=await pide('/arranque.json',{cab:A});assert.equal(r.status,200);assert.deepEqual(await r.json(),[],'sin lista todavía: vacía');
+  env.DISCO.put('indice.json',new TextEncoder().encode(JSON.stringify({size:10*1048576,pieza:1048576})));
+  r=await pide('/arranque.json',{metodo:'PUT',cab:A,cuerpo:JSON.stringify([3,1,2])});assert.equal(r.status,200);
+  r=await pide('/arranque.json',{metodo:'PUT',cab:A,cuerpo:JSON.stringify([2,5])});assert.equal(await r.text(),'4');
+  assert.deepEqual(await (await pide('/arranque.json',{cab:A})).json(),[1,2,3,5],'se juntan, sin repetir y en orden');
+  assert.equal((await pide('/arranque.json',{metodo:'PUT',cab:A,cuerpo:JSON.stringify([10])})).status,400,'un pedazo fuera del disco');
+  assert.equal((await pide('/arranque.json',{metodo:'PUT',cab:A,cuerpo:'["x"]'})).status,400);
+  assert.equal((await pide('/arranque.json',{metodo:'PUT',cab:A,cuerpo:'no es json'})).status,400);
+  assert.equal((await pide('/arranque.json',{metodo:'PUT',cuerpo:'[1]'})).status,401,'sin sesión no se escribe');
+  assert.equal((await pide('/arranque.json',{metodo:'PUT',cab:{Authorization:'Bearer '+await token(datos('extraño'))},cuerpo:'[1]'})).status,403,'ni alguien fuera de la lista');
+  assert.equal((await pide('/indice.json',{metodo:'PUT',cab:A,cuerpo:'{}'})).status,403,'el índice sigue pidiendo la clave de subida');
+  env.DISCO.put('indice.json',new TextEncoder().encode('{"size":3,"pieza":1048576}'));
+});

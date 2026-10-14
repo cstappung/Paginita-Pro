@@ -263,3 +263,59 @@ test('la pelea en vivo manda también el sonido del juego (si hay), en el mismo 
  assert.deepEqual(pcs[1].tracks.map(x=>x[0]),['video'],'sin sonido todavía, igual se ve');
  sin_.cierra();
 });
+
+test('la pelea en vivo en árbol: el que pelea manda a uno; los demás la reciben de espectadores que ya la ven (2 cada uno)',async()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor};',c);
+ c.MediaStream=class{constructor(t){this.t=t;}};
+ class RTC{constructor(){this.signalingState='stable';}addTrack(){return{getParameters:()=>({encodings:[{}]}),setParameters:async()=>{}};}
+  createOffer(){return Promise.resolve({type:'offer',sdp:'x'});} setLocalDescription(){return Promise.resolve();} close(){} getSenders(){return[];}}
+ const canvas={height:540,captureStream:()=>({getVideoTracks:()=>[{kind:'video',readyState:'live'}]})};
+ const a=[];let oye=null;
+ const senal={envia:(p,m)=>a.push([p,m]),alMensajes:f=>{oye=f;return()=>{};}};
+ const E=c.__D.crearEmisor({senal,uid:'E',canvas,RTC});
+ const ultimo=p=>[...a].reverse().find(x=>x[0]===p)[1];
+ await oye('A',{t:'ver',s:'a'});assert.equal(ultimo('A').t,'vof','el primero la recibe del que pelea');
+ await oye('B',{t:'ver',s:'b'});assert.equal(ultimo('B').t,'vespera','nadie la ve todavía: que espere');
+ await oye('A',{t:'vya',s:'a'});
+ await oye('B',{t:'ver',s:'b'});assert.deepEqual([ultimo('B').t,ultimo('B').a,ultimo('B').as],['vir','A','a'],'de A');
+ await oye('C',{t:'ver',s:'c'});assert.equal(ultimo('C').a,'A','de A también (dos cada uno)');
+ await oye('D',{t:'ver',s:'d'});assert.equal(ultimo('D').t,'vespera','A está lleno y B y C no ven todavía');
+ await oye('B',{t:'vya',s:'b'});
+ await oye('D',{t:'ver',s:'d'});assert.equal(ultimo('D').a,'B');
+ assert.equal(E.cuantos(),1,'el que pelea manda a uno solo');
+ // se va A: B y C piden de nuevo; B pasa a recibir del que pelea, y C de B (no de su propia rama)
+ await oye('A',{t:'vfin',s:'a'});
+ assert.equal(ultimo('B').t,'vreve');assert.equal(ultimo('C').t,'vreve');
+ await oye('B',{t:'ver',s:'b'});assert.equal(ultimo('B').t,'vof','B queda directo');
+ await oye('C',{t:'ver',s:'c'});assert.equal(ultimo('C').a,'B');
+ await oye('B',{t:'ver',s:'b',cae:'x|y'});   // (un «cae» de alguien que no está no rompe nada)
+ const arbol=E.arbol();
+ assert.ok(arbol.every(n=>n.hijos.length<=2));assert.equal(arbol.filter(n=>n.padre==='').length,1);
+ assert.ok(!arbol.some(n=>n.k.startsWith('A|')),'A ya no está');
+ // D cuelga de B, y si B pidiera colgarse de D sería un ciclo: nunca se le ofrece alguien de su propia rama
+ await oye('D',{t:'vya',s:'d'});
+ const n=arbol.length;assert.equal(n,3);
+ E.cierra();
+});
+
+test('un corte de conexión (o alguien que recarga en plena pelea) vuelve a empezar solo; salir al menú no',()=>{
+ const base=[{t:'disco',uid:'a'},{t:'disco',uid:'b'},{t:'empieza',uid:'a'}];
+ let e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'}));
+ assert.equal(e.fase,'vestibulo');assert.equal(e.reanudar,true,'se cortó: queda para empezar sola');
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'},{t:'disco',uid:'a'}));assert.equal(e.fase,'vestibulo','falta el otro disco');
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'b',por:'corte'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'jugando','con los dos discos empieza sola');assert.equal(e.ronda,2);assert.equal(e.reanudar,false);
+ e=B.reducir(sala(...base,{t:'vuelve',uid:'a'},{t:'disco',uid:'a'},{t:'disco',uid:'b'}));
+ assert.equal(e.fase,'vestibulo','salir al menú del juego no vuelve a empezar solo');assert.equal(e.reanudar,false);
+ // el torneo: la pelea cortada vuelve a empezar sola, sin decidirse
+ const t=[{t:'torneo',uid:'u0'}];
+ let s=B.reducir(torneo(3,...t));const m=s.actual;const [x,y]=[m.a,m.b];
+ const pelea=[...t,{t:'disco',uid:x},{t:'disco',uid:y},{t:'empieza',uid:x,m:m.id}];
+ s=B.reducir(torneo(3,...pelea,{t:'vuelve',uid:y,m:m.id,por:'corte'}));
+ assert.equal(s.actual.enCurso,false);assert.equal(s.actual.reanudar,true);assert.equal(s.actual.g,undefined,'nadie gana por un corte');
+ s=B.reducir(torneo(3,...pelea,{t:'vuelve',uid:y,m:m.id,por:'corte'},{t:'disco',uid:x},{t:'disco',uid:y}));
+ assert.equal(s.actual.enCurso,true,'con los dos discos vuelve a empezar sola');assert.equal(s.actual.n,2);
+ s=B.reducir(torneo(3,...pelea,{t:'vuelve',uid:y,m:m.id},{t:'disco',uid:x},{t:'disco',uid:y}));
+ assert.equal(s.actual.enCurso,false,'cortada desde el menú: hay que empezarla');
+});

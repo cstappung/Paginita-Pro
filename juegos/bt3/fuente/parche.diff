@@ -14,6 +14,63 @@ index de3de89..5914b0c 100644
              gsInterp = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
              sInterpPrev = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
              sInterpBlend = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
+diff --git a/port/src/gs/net.c b/port/src/gs/net.c
+index 011fc8d..271ec6a 100644
+--- a/port/src/gs/net.c
++++ b/port/src/gs/net.c
+@@ -679,7 +679,32 @@ static void sample_local(unsigned tick) {
+     sHave[sMe] = at + 1;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++/* paginita-pro: a friend's line can drop for a few seconds (wifi, a router): the fight waits for them longer before
++   it is given up, and the page shows a countdown meanwhile (Module.onNetEvent "espera" / "sigue"). */
++#define QUIET_NS 25000000000ull
++#else
+ #define QUIET_NS 6000000000ull /* this long without the input the game is waiting for: the other player is gone */
++#endif
++static int sWaitShown; /* paginita-pro: the page was told the game is waiting for the other player */
++static void wait_notice(uint64_t t0, uint64_t now) {
++#ifdef __EMSCRIPTEN__
++    if (!sWaitShown && now - t0 > 1500000000ull) {
++        sWaitShown = 1;
++        web_net_event("espera", "25");
++    }
++#else
++    (void)t0; (void)now;
++#endif
++}
++static void wait_over(void) {
++#ifdef __EMSCRIPTEN__
++    if (sWaitShown) {
++        sWaitShown = 0;
++        web_net_event("sigue", "");
++    }
++#endif
++}
+ 
+ static void ended(const char *why, unsigned tick) {
+     fprintf(stderr, "bt3: net: %s (blank %u)\n", why, tick);
+@@ -742,7 +767,9 @@ static void roll_tick(unsigned tick) {
+             if (now - t0 > QUIET_NS && now - sLastHeardNs > QUIET_NS) {
+                 gone_quiet(tick);
+             }
++            wait_notice(t0, now);
+         }
++        wait_over();
+         {   /* (see sTheirAhead) */
+             int diff = (int)sMyAhead - (int)sTheirAhead; /* (both taken at the same point of a blank: when sending) */
+             if (getenv("BT3_NET_SKEW") != NULL && tick == 1500) { /* testing: this copy falls behind by that many ms, once */
+@@ -822,7 +849,9 @@ void Port_NetBeginTick(unsigned tick) {
+         if (now - t0 > QUIET_NS && now - sLastHeardNs > QUIET_NS) {
+             gone_quiet(tick);
+         }
++        wait_notice(t0, now);
+     }
++    wait_over();
+     sWaitNs += SDL_GetTicksNS() - t0;
+     sWaits++;
+     {   /* (the meter, when the two copies wait for each other every blank: time waited, and blanks that waited
 diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
 index fd6cc57..79829bd 100644
 --- a/port/src/gs/ui.cpp
@@ -44,10 +101,10 @@ index fd6cc57..79829bd 100644
      set_open(true);
      sNet = true;
 diff --git a/port/src/headless.c b/port/src/headless.c
-index fb8b892..56001fb 100644
+index fb8b892..9dd32fd 100644
 --- a/port/src/headless.c
 +++ b/port/src/headless.c
-@@ -95,6 +95,73 @@ static void port_stage_replace_init(void) {
+@@ -95,6 +95,84 @@ static void port_stage_replace_init(void) {
  
  extern void Port_NetRules(int *type, int *dp, int *time); /* gs/net.c */
  
@@ -102,6 +159,17 @@ index fb8b892..56001fb 100644
 +    for (var id = 0; id <= 160; id++) lista.push([linea(nombres, id), linea(formas, id)]);
 +    try { Module.onCatalogo(lista); } catch (e) { console.warn("[bt3] catalogo", e); }
 +});
++/* The fighters just chosen (a select screen closes): the page fetches their voice lines ahead, so the first time
++   one speaks in the fight the game does not stop to read it from the network. */
++EM_JS(void, web_elegidos, (const int *ids, int n), {
++    if (!Module.onElegidos) return;
++    var a = [];
++    for (var i = 0; i < n; i++) a.push(HEAP32[(ids >> 2) + i]);
++    try { Module.onElegidos(a); } catch (e) {}
++});
++void Web_Elegidos(const int *ids, int n) {
++    if (n > 0) web_elegidos(ids, n);
++}
 +/* The menus start (1) or a battle does (0). */
 +EM_JS(void, web_en_menus, (int si), {
 +    if (Module.onMenus) Module.onMenus(!!si);
@@ -121,7 +189,7 @@ index fb8b892..56001fb 100644
  int __wrap_Progress_Main(int arg) {
      const char *path;
      PortStages_Init();
-@@ -134,9 +201,56 @@ int __wrap_Progress_Main(int arg) {
+@@ -134,9 +212,56 @@ int __wrap_Progress_Main(int arg) {
                              time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
                  }
              }
@@ -178,7 +246,7 @@ index fb8b892..56001fb 100644
              sFromMenu = 1; /* a battle set up by the real menus follows: the traces apply to it too */
              return r;
          }
-@@ -312,6 +426,29 @@ void Port_Trace(unsigned vblanks) {
+@@ -312,6 +437,29 @@ void Port_Trace(unsigned vblanks) {
              Port_StateLog(vblanks, NULL, 0);
          }
      }
@@ -595,21 +663,22 @@ index 3e0f86f..2b9066e 100644
                      if (gSaveData->rec[i].chara == in[j].id) {
                          custom[i] = out[j];
 diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
-index d61fdeb..347ba7d 100644
+index d61fdeb..4933f1a 100644
 --- a/src/menu/menu_c_e.c
 +++ b/src/menu/menu_c_e.c
-@@ -42,6 +42,10 @@ CharSel *gCharSel = NULL;
+@@ -42,6 +42,11 @@ CharSel *gCharSel = NULL;
  
  extern void TextBox_Init(MTextBox *box, void *text, u32 preset);
  extern void TextBox_SetUnk80(MTextBox *box, s32 value);
 +#ifdef __EMSCRIPTEN__
 +extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
 +extern void Web_Seleccion(int abierta);                /* headless.c */
++extern void Web_Elegidos(const int *ids, int n);       /* headless.c */
 +#endif
  extern void TextBox_AttachLine(MFlash *flash, MFlashRef *ref, s32 x, s32 y, s32 line, MTextBox *box);
  extern void Flash_ClipSetOffset(MFlash *flash, MFlashRef *ref, s32 x, s32 y);
  extern void IconWin_SetIcon(s32 icon);
-@@ -524,6 +528,10 @@ void CharSel_Init(s32 section) {
+@@ -524,6 +529,10 @@ void CharSel_Init(s32 section) {
  
      gCharSel->nameText = MPACK_AT(gCharSel->res, 43);
      gCharSel->formText = MPACK_AT(gCharSel->res, 44);
@@ -620,17 +689,21 @@ index d61fdeb..347ba7d 100644
      gCharSel->chipPack = (u32 *)MPACK_AT(gCharSel->res, 45);
      for (i = 0; i < MCHR_CELL_MAX; i++) {
          CS_RES(gCharSel->chipPack, i + 1);
-@@ -754,6 +762,9 @@ void CharSel_Init(s32 section) {
+@@ -754,6 +763,13 @@ void CharSel_Init(s32 section) {
  void CharSel_Term(void) {
      s32 i;
  
 +#ifdef __EMSCRIPTEN__
 +    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++    {
++        int elegidos[2] = { gCharSel->side[0]->picked, gCharSel->side[1]->picked };
++        Web_Elegidos(elegidos, 2); /* paginita-pro: their voice lines are fetched ahead */
++    }
 +#endif
  #ifdef PORT
      gUiNameIdx = -1; /* drop the port's name overlays */
      gUiSongIdx = -1;
-@@ -805,6 +816,33 @@ void CharSel_Term(void) {
+@@ -805,6 +821,33 @@ void CharSel_Term(void) {
  
  /* Draws the screen: the stage picture cross fade, then the labels, texture rectangles and visibility of every
     clip of the five movies are set from the state, the movies are drawn, then the windows and the side panels. */
@@ -664,7 +737,7 @@ index d61fdeb..347ba7d 100644
  void CharSel_Draw(void) {
      MFlashRef ref;
      MFlashUv uv;
-@@ -1172,6 +1210,14 @@ void CharSel_Draw(void) {
+@@ -1172,6 +1215,14 @@ void CharSel_Draw(void) {
              sprintf(name, "mc_chara_chip_%03d", j);
              Flash_FindLabel(f, NULL, name, &ref);
              Flash_ClipSetFlags(f, &ref, 0x80, (u8)gCharSel->side[i]->mask);
@@ -679,7 +752,7 @@ index d61fdeb..347ba7d 100644
          }
      }
  
-@@ -1214,6 +1260,39 @@ void CharSel_Update(void) {
+@@ -1214,6 +1265,39 @@ void CharSel_Update(void) {
  }
  
  /* The side a pad is choosing for, its number and its movies. */
@@ -719,7 +792,7 @@ index d61fdeb..347ba7d 100644
  #define CS_N (i + gCharSel->turn)
  #define CS_SIDE (gCharSel->side[CS_N])
  #define CS_REEL (&gCharSel->flash[1 + CS_N])
-@@ -1489,7 +1568,13 @@ void CharSel_Input(s32 *running) {
+@@ -1489,7 +1573,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
@@ -734,7 +807,7 @@ index d61fdeb..347ba7d 100644
                      Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_ok");
                      gCharSel->customRows[CS_N] = 4;
-@@ -1540,7 +1625,13 @@ void CharSel_Input(s32 *running) {
+@@ -1540,7 +1630,13 @@ void CharSel_Input(s32 *running) {
                  CS_SIDE->chara = CS_SIDE->chip[CS_SIDE->form];
                  CharSel_RequestFace(CS_N);
                  Snd_PlaySe(2, 0);
@@ -749,7 +822,7 @@ index d61fdeb..347ba7d 100644
                  Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                  CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_FORM_CHIP, "fl_ok");
                  if (CS_SIDE->flags & CHARSEL_SIDE_CUSTOM) {
-@@ -1707,6 +1798,9 @@ void CharSel_Input(s32 *running) {
+@@ -1707,6 +1803,9 @@ void CharSel_Input(s32 *running) {
                  } else {
                      if (CS_CELL.id == MCHR_RANDOM) {
                          /* the random cell: draw a cell that is a character, then one of its forms */
@@ -759,7 +832,7 @@ index d61fdeb..347ba7d 100644
                          for (;;) {
                              n = Rand_Range(gCharSel->masterCount[CS_N]);
                              id = gCharSel->cells[CS_N][n].id;
-@@ -1718,6 +1812,7 @@ void CharSel_Input(s32 *running) {
+@@ -1718,6 +1817,7 @@ void CharSel_Input(s32 *running) {
                          if (gCharSel->cells[CS_N][n].formCount != 0) {
                              chara = gCharSel->cells[CS_N][n].form[Rand_Range(gCharSel->cells[CS_N][n].formCount)];
                          }
@@ -767,7 +840,7 @@ index d61fdeb..347ba7d 100644
                          CS_SIDE->picked = chara;
                      } else {
                          CS_SIDE->picked = CS_SIDE->chip[CS_SIDE->col];
-@@ -1731,6 +1826,13 @@ void CharSel_Input(s32 *running) {
+@@ -1731,6 +1831,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_off_start");
                  }
                  CS_SIDE->state = CHARSEL_ST_DONE;
@@ -781,7 +854,7 @@ index d61fdeb..347ba7d 100644
                  if (gCharSel->players != 1 && gCharSel->turn == 0) {
                      /* one pad: now choose for the other side */
                      gCharSel->turn = 1;
-@@ -1797,7 +1899,13 @@ void CharSel_Input(s32 *running) {
+@@ -1797,7 +1904,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
@@ -797,10 +870,10 @@ index d61fdeb..347ba7d 100644
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CUSTOM_CHIP, "fl_ok");
                      gCharSel->customRows[CS_N] = 2;
 diff --git a/src/menu/menu_e_b.c b/src/menu/menu_e_b.c
-index 04ba62e..c25836d 100644
+index 04ba62e..c5c1b85 100644
 --- a/src/menu/menu_e_b.c
 +++ b/src/menu/menu_e_b.c
-@@ -69,11 +69,22 @@ void TeamSel_SumCost(s32 side, s32 skipCur) {
+@@ -69,11 +69,23 @@ void TeamSel_SumCost(s32 side, s32 skipCur) {
      }
  }
  
@@ -808,6 +881,7 @@ index 04ba62e..c25836d 100644
 +extern int Web_Vetado(int chara);                      /* headless.c: the room's tier rule leaves it out */
 +extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
 +extern void Web_Seleccion(int abierta);                /* headless.c */
++extern void Web_Elegidos(const int *ids, int n);       /* headless.c */
 +#endif
 +
  /* Returns 0 if another member of the side's team is the same person as `chara` (a form of the same character). */
@@ -823,7 +897,7 @@ index 04ba62e..c25836d 100644
      for (i = 0; i < gTeamSel->side[side]->memberCount; i++) {
          if (i != gTeamSel->side[side]->cur) {
              if (ChrTbl_IsRelated(chara, gTeamSel->side[side]->member[i].chara)) {
-@@ -97,6 +108,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
+@@ -97,6 +109,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
      return gTeamSel->side[side]->cost + ChrTbl_GetCost(chara) <= w->dpMax;
  }
  
@@ -881,7 +955,7 @@ index 04ba62e..c25836d 100644
  /* Takes member `idx` out of a side's team: the members behind it move up and the last slot is emptied. */
  void TeamSel_RemoveMember(s32 side, s32 idx) {
      s32 i;
-@@ -605,6 +667,10 @@ void TeamSel_Init(s32 section) {
+@@ -605,6 +668,10 @@ void TeamSel_Init(s32 section) {
      gTeamSel->unk3EA0 = MPACK_AT(gCommonRes->data[2], 2);
      gTeamSel->nameText = MPACK_AT(gTeamSel->res, 43);
      gTeamSel->formText = MPACK_AT(gTeamSel->res, 44);
@@ -892,17 +966,26 @@ index 04ba62e..c25836d 100644
      gTeamSel->chipPack = (u32 *)MPACK_AT(gTeamSel->res, 45);
      for (i = 0; i < TS_CELL_MAX; i++) {
          res = (MTexRes *)MPACK_AT(gTeamSel->chipPack, i + 1);
-@@ -746,6 +812,9 @@ void TeamSel_Init(s32 section) {
+@@ -746,6 +813,18 @@ void TeamSel_Init(s32 section) {
  void TeamSel_Term(void) {
      s32 i;
  
 +#ifdef __EMSCRIPTEN__
 +    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++    {
++        int elegidos[2 * TS_MEMBER_MAX], n = 0, k, m;
++        for (k = 0; k < 2; k++) {
++            for (m = 0; m < gTeamSel->side[k]->memberCount && m < TS_MEMBER_MAX; m++) {
++                elegidos[n++] = gTeamSel->side[k]->member[m].chara;
++            }
++        }
++        Web_Elegidos(elegidos, n); /* paginita-pro: their voice lines are fetched ahead */
++    }
 +#endif
      IconWin_Term();
      ItemHelp_Term();
      ItemPanel_Term(1);
-@@ -1722,6 +1791,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1722,6 +1801,11 @@ f32 TeamSel_Input(s32 *result) {
                          /* it was a new member: the cursor goes to the next free slot */
                          CUR_SIDE->memberCount = CUR_SIDE->cur + 1;
                          CUR_SIDE->cur = CUR_SIDE->memberCount;
@@ -914,7 +997,7 @@ index 04ba62e..c25836d 100644
                      }
                      TeamSel_SetTeamTex(CUR_N);
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
-@@ -1755,6 +1829,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1755,6 +1839,11 @@ f32 TeamSel_Input(s32 *result) {
                      } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
                          CUR_SIDE->cur = CUR_SIDE->memberCount;
                      }
@@ -926,7 +1009,7 @@ index 04ba62e..c25836d 100644
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
                      if (CUR_SIDE->cur == TS_CUR_MENU) {
                          CUR_SIDE->chara = CUR_SIDE->member[0].chara;
-@@ -1771,6 +1850,11 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1771,6 +1860,11 @@ f32 TeamSel_Input(s32 *result) {
                      } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
                          CUR_SIDE->cur = TS_CUR_MENU;
                      }
@@ -938,7 +1021,7 @@ index 04ba62e..c25836d 100644
                      TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
                      if (CUR_SIDE->cur == TS_CUR_MENU) {
                          CUR_SIDE->chara = CUR_SIDE->member[0].chara;
-@@ -1793,11 +1877,24 @@ f32 TeamSel_Input(s32 *result) {
+@@ -1793,11 +1887,24 @@ f32 TeamSel_Input(s32 *result) {
                          gTeamSel->backup[CUR_N] = CUR_MEMBER;
                          CUR_SIDE->state = TEAMSEL_ST_GRID;
                          Snd_PlaySe(1, 1);

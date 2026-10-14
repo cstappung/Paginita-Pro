@@ -7182,8 +7182,11 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
      (personajes prohibidos según la tier list, bt3-tiers.js: "", "noop" o "malos").
    - `{t:"disco", uid}`: el marco de `uid` ya leyó una ISO válida; hace falta la de los dos para empezar.
    - `{t:"empieza", uid}`: el anfitrión arranca, con los dos y sus discos. Abre una pelea (`ronda`).
-   - `{t:"vuelve", uid}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
-     recargan, así que los discos se vuelven a confirmar.
+   - `{t:"vuelve", uid, por}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
+     recargan, así que los discos se vuelven a confirmar. Con `por: "corte"` (se perdió la conexión, o un
+     peleador recargó la página en plena pelea) la misma pelea vuelve a empezar sola cuando los dos discos están
+     listos (`reanudar`): el juego no puede seguir desde donde iba (cada copia arranca de cero; ver
+     juegos/bt3/CLAUDE.md), pero nadie tiene que volver a configurar ni apretar nada.
    El juego no le dice a la página quién ganó, así que **la sala no clasifica** (`anotar` la salta, como
    PRO HERO) y sus logros salen de lo que el vestíbulo sí sabe: cuántas peleas, quién fue anfitrión, con
    qué reglas. La sala termina cuando alguien se va (`abandona`). */
@@ -7214,6 +7217,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, veto = "", empates = 0;
   const marcador = {}, reportes = {};
   let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
+  let reanudar = false; // la pelea se cortó por la conexión (o alguien recargó): vuelve a empezar sola, con los dos discos
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7221,7 +7225,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
     if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); continue; }
     const vest = fase === "vestibulo";
     const arranca = () => {
-      fase = "jugando"; ronda++; revancha = {};
+      fase = "jugando"; ronda++; revancha = {}; reanudar = false;
       hist.push({ e: "ronda", n: ronda, anf: anfitrion, batalla, tiempo, veto });
     };
     const todosListos = () => presentes().length === 2 && presentes().every(x => discos[x.uid]);
@@ -7233,7 +7237,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
       revancha = {};
     } else if (j.t === "disco" && vest) {
       discos[j.uid] = true;
-      if (presentes().every(x => revancha[x.uid]) && todosListos()) arranca();
+      if ((reanudar || presentes().every(x => revancha[x.uid])) && todosListos()) arranca();
     } else if (j.t === "revancha" && vest && ronda > 0) {
       if (j.no) delete revancha[j.uid]; else revancha[j.uid] = true;
       if (presentes().every(x => revancha[x.uid]) && todosListos()) arranca();
@@ -7241,7 +7245,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
       arranca();
     } else if (j.t === "vuelve" && fase === "jugando") {
       fase = "vestibulo"; discos = {};
-      hist.push({ e: "vuelve", uid: j.uid, n: ronda });
+      reanudar = j.por === "corte";   // (no una pelea que alguien dejó a propósito: esa no vuelve sola)
+      hist.push({ e: "vuelve", uid: j.uid, n: ronda, por: reanudar ? "corte" : "" });
     } else if (j.t === "resultado" && fase === "jugando" && j.n === ronda && Number.isInteger(j.b) && (ids.has(j.g) || j.g === "empate")) {
       // cada pelea de la sesión (b) la cuentan los dos marcos; si coinciden, va al marcador
       const k = ronda + "." + j.b, r = reportes[k] = reportes[k] || {};
@@ -7266,7 +7271,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const ganador = idos ? (ronda && presentes().length === 1 ? presentes()[0].uid : "") : null;
   return {
     fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo),
-    discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha
+    discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha,
+    reanudar: ganador === null && fase === "vestibulo" && reanudar
   };
 }
 
@@ -7313,6 +7319,12 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     }));
   };
   const actual = () => rondas && rondas.flat().find(m => m.g === undefined && m.a !== undefined && m.b !== undefined) || null;
+  const listosDe = m => (cpus[m.a] || discos[m.a]) && (cpus[m.b] || discos[m.b]);   // (la CPU no carga disco)
+  const arrancaPelea = m => {
+    m.enCurso = true; m.rep = {}; m.conflicto = false; m.n = ++peleas; m.reanudar = false;
+    hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
+    hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo, veto });   // (para los logros, como una pelea del duelo)
+  };
   const decide = (m, g) => {
     if (g === "empate") { m.enCurso = false; m.rep = {}; m.conflicto = false; hist.push({ e: "empate", m: m.id }); }
     else { m.g = g; m.enCurso = false; hist.push({ e: "gana", m: m.id, g, a: m.a, b: m.b }); }
@@ -7331,7 +7343,13 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
       if (rondas) avanza();
       continue;
     }
-    if (j.t === "disco") { discos[j.uid] = true; continue; }
+    if (j.t === "disco") {
+      discos[j.uid] = true;
+      // una pelea cortada por la conexión vuelve a empezar sola en cuanto están los dos discos
+      const m = rondas && actual();
+      if (m && m.reanudar && !m.enCurso && listosDe(m)) arrancaPelea(m);
+      continue;
+    }
     if (!rondas) {
       if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
         if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
@@ -7360,12 +7378,13 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     const m = actual();
     if (!m || j.m !== m.id) continue;
     const pelea = j.uid === m.a || j.uid === m.b, contraCpu = !!(cpus[m.a] || cpus[m.b]);
-    const listos = (cpus[m.a] || discos[m.a]) && (cpus[m.b] || discos[m.b]);   // (la CPU no carga disco)
+    const listos = listosDe(m);
     if (j.t === "vuelve" && (pelea || esOrg) && m.enCurso) {
-      // la pelea se cortó (alguien volvió al menú del juego): se vuelve a empezar, nadie gana todavía
-      m.enCurso = false; m.rep = {}; m.conflicto = false;
+      // la pelea se cortó (alguien volvió al menú del juego, o se perdió la conexión): nadie gana todavía; si fue
+      // la conexión (o alguien recargó la página), vuelve a empezar sola cuando estén los dos discos
+      m.enCurso = false; m.rep = {}; m.conflicto = false; m.reanudar = j.por === "corte";
       discos[m.a] = discos[m.b] = false;
-      hist.push({ e: "vuelve", m: m.id });
+      hist.push({ e: "vuelve", m: m.id, por: m.reanudar ? "corte" : "" });
       continue;
     }
     if (j.t === "resultado" && pelea && m.enCurso && contraCpu && (j.g === m.a || j.g === m.b || j.g === "empate")) {
@@ -7373,9 +7392,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
       continue;
     }
     if (j.t === "empieza" && (pelea || esOrg) && !m.enCurso && listos) {
-      m.enCurso = true; m.rep = {}; m.conflicto = false; m.n = ++peleas;
-      hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
-      hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo, veto });   // (para los logros, como una pelea del duelo)
+      arrancaPelea(m);
     } else if (j.t === "resultado" && pelea && m.enCurso && (j.g === m.a || j.g === m.b || j.g === "empate") && m.rep[j.uid] === undefined) {
       m.rep[j.uid] = j.g;
       const otro = j.uid === m.a ? m.b : m.a;
@@ -7394,7 +7411,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   return {
     fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
     batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
-    llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto } : null, cpus,
+    llave: rondas, actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };
 }
