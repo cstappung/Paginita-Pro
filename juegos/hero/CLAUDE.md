@@ -165,6 +165,32 @@ and message names, and the postman plays the server:
   → `goMenu()` → in a room, `openOnline()` → back to the lobby.
 - Room option: only `cupo`.
 
+## Performance (`render/highway.js`, `game/session.js`)
+
+Measured without GPU (headless Chromium, flushing the canvas each frame):
+the neck was ~40 % of every frame, and the first Star Power bolt stalled.
+
+- **The neck** is one `drawImage` per screen line. Its per-line geometry is
+  cached (`_neckLines`), consecutive lines sampling the same texture row are
+  one draw, and lines are 1 px tall at integer scales (1.5 only at
+  fractional ones, where 1 px leaves seams). With several highways
+  (`opts.compartido`) it is painted once into a side canvas and copied to
+  each, landing on whole device pixels with the subpixel offset baked in;
+  the canvas must be as wide as the **last** line (below the strike bar the
+  neck keeps widening — sized by `2·hw` it was clipped). Shake/wobble → drawn
+  directly.
+- **`precalienta`** runs at the end of `session.load`: it creates every
+  sprite the track can ask for, uploads each, and draws two fake frames
+  with every effect (bolt, SP on/off, flames, sparks, popups) using a copy
+  of the engine (`Object.create`), then clears. A new effect in the renderer
+  should get an event there too, or it will hitch the first time it shows.
+- **Alto rendimiento** (`settings.altoRendimiento`, in Ajustes › Juego and in
+  the room): canvas at `ESCALA_ALTO` (0.75) CSS px with no HiDPI, every
+  other neck line without smoothing, no `shadowBlur`, ⅓ of the sparks, one
+  flame tongue, no ribbon halo / wide rail glow, simpler bolt and inlays;
+  the menu background at 0.75 too. Normal mode must look the same: compare
+  screenshots before/after when touching the renderer.
+
 ## Versioning
 
 `index.html` has an **import map giving every module `?v=hero-N`**, plus the

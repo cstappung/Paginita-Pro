@@ -6,6 +6,8 @@ import { audioContext, SongAudio, sampleBank } from '../audio/audio.js';
 import { NOTE_MODES } from '../core/noteMode.js';
 import { FRET_COLORS, DRUM_COLORS5 } from '../core/constants.js';
 
+export const ALTO_AYUDA = 'Para PCs lentos o si el juego va a tirones: menos resolución y efectos más sencillos';
+
 export class SettingsScreen extends Screen {
   constructor(app, tab = 'game') {
     super(app);
@@ -70,6 +72,7 @@ export class SettingsScreen extends Screen {
     const name = h('input', { type: 'text', value: settings.playerName, placeholder: 'Tu nombre', maxlength: 20, 'data-nav': true, oninput: () => { settings.playerName = name.value; saveSettings(); } });
     this.body.replaceChildren(
       h('label', { class: 'set-row' }, h('span', {}, 'Nombre de jugador'), name),
+      this.check('Modo alto rendimiento', () => settings.altoRendimiento, (v) => (settings.altoRendimiento = v), ALTO_AYUDA),
       this.select('Modo de notas', NOTE_MODES, () => settings.noteMode, (v) => (settings.noteMode = v),
         'Todo taps: solo pulsa los trastes, sin rasgueo'),
       this.select('Estilo de la pista', { wood: 'Mástil de madera', dark: 'Clásico oscuro' }, () => settings.highwayStyle, (v) => (settings.highwayStyle = v)),

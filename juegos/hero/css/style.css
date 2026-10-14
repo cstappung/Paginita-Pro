@@ -279,6 +279,7 @@ input[type=range] { accent-color: var(--accent); }
 .ls-empty { color: var(--muted); padding: 24px 0; text-align: center; }
 .lobby-mine { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
 .lobby-mine .set-row { grid-template-columns: 110px 1fr; }
+.lobby-mine .set-row.check { grid-template-columns: 1fr auto; }
 .lobby-ajustes { display: flex; gap: 8px; }
 .lobby-ajustes button { flex: 1; }
 .ls-ojeo { color: var(--accent-2); font-weight: 700; animation: ls-ojeo 1.6s ease-in-out infinite; }

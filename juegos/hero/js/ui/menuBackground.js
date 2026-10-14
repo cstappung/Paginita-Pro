@@ -2,6 +2,7 @@
 // Focos que barren el humo, luces desenfocadas (bokeh) de los colores de los trastes que flotan,
 // un suelo de neón que se pierde en el horizonte y un pulso suave como de bombo.
 import { FRET_COLORS } from '../core/constants.js';
+import { settings } from '../settings.js';
 
 const TAU = Math.PI * 2;
 
@@ -87,7 +88,8 @@ export class MenuBackground {
   }
 
   draw() {
-    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    // alto rendimiento: el fondo de los menús también se pinta a menos resolución
+    const dpr = settings.altoRendimiento ? 0.75 : Math.min(1.5, window.devicePixelRatio || 1);
     const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
     if (this.canvas.width !== W || this.canvas.height !== H) {
       this.canvas.width = W;
