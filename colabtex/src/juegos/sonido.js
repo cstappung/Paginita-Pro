@@ -271,6 +271,8 @@ const REPERTORIO = {
   kiAvanza: (a, t) => { soplo(a, t, 0.32, 0.07, { f: 500, f1: 3400, q: 1.1, ataque: 0.05 });
                         P(a, t + 0.18, H(84), 0.07, { onda: "p50", vol: 0.06 }); P(a, t + 0.26, H(91), 0.2, { onda: "p50", vol: 0.06, sus: 0.6 }); },
   kiCae:    (a, t) => { soplo(a, t, 0.4, 0.05, { f: 2200, f1: 300, q: 1.1 }); seno(a, t + 0.05, 330, 160, 0.45, 0.08, "triangle"); },
+  kiBoom:   (a, t) => { seno(a, t, 140, 38, 0.5, 0.2); soplo(a, t, 0.45, 0.16, { f: 1400, f1: 180, q: 0.7, tipo: "lowpass" });
+                        soplo(a, t + 0.02, 0.18, 0.06, { f: 4200, f1: 2000, q: 1.5 }); },
   kiCorona: (a, t) => { soplo(a, t, 0.7, 0.07, { f: 300, f1: 4000, q: 0.9, ataque: 0.2 });
                         [67, 72, 76, 79, 84].forEach((n, k) => P(a, t + 0.35 + k * 0.08, H(n), 0.09, { onda: "p50", vol: 0.065 }));
                         [76, 79, 84].forEach(n => P(a, t + 0.8, H(n), 0.9, { onda: "p25", vol: 0.045, sus: 0.7, vib: 0.015 }));

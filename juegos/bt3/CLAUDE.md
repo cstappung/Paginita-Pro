@@ -81,7 +81,10 @@ agreement decides, disagreement → organizer `decide`; a draw is refought; leav
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
 `juegos.html`: only changes seen live are celebrated (not on opening the room), and each animation keeps its start
 time so a repaint mid-way continues it (`--edad` as a negative `animation-delay`; the bracket repaints on every
-disc event). Sounds `kiAvanza`, `kiCae`, `kiCorona` in `sonido.js`, through `busFx` like every room sound.
+disc event). Every slot, card and banner shows the player's photo (`avatar(jugador(u))`, the ficha's `foto` or
+the initial on its `color`); the loser's card **explodes** (`explota()`: a flash and 14 fixed shards that inherit
+`--edad`) and stays cracked and grey; the champion gets the crown on their photo. Sounds `kiAvanza`, `kiCae`,
+`kiBoom`, `kiCorona` in `sonido.js`, through `busFx` like every room sound.
 
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 

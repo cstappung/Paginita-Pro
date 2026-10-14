@@ -163,6 +163,15 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   const ESFERAS = `<span class="jg-bt3-esferas" aria-hidden="true"><i></i><i></i><i></i></span>`;
   const BATALLA_CORTA = { single: "Single", team: "Team", dp10: "DP 10", dp15: "DP 15", dp20: "DP 20" };
   const TIEMPO_CORTO = t => t ? t + " s" : "∞";
+  const jugador = u => (est?.jugadores || []).find(j => j.uid === u) || { uid: u, nombre: nombre(u) };
+  /* La explosión del que pierde: un fogonazo y esquirlas de la carta que salen volando (posiciones fijas, para
+     que un repintado no las cambie). La `--edad` la hereda de la casilla o la carta que explota; `k` escala la
+     distancia a la que vuelan. */
+  const ESQUIRLAS = Array.from({ length: 14 }, (_, i) => {
+    const a = i / 14 * Math.PI * 2 + (i % 3) * 0.35, d = 30 + (i * 37 % 34);
+    return `<b style="--x:${Math.round(Math.cos(a) * d)}px;--y:${Math.round(Math.sin(a) * d * 0.75)}px;--r:${(i * 97 % 360) - 180}deg;--s:${(0.7 + (i * 13 % 10) / 16).toFixed(2)}"></b>`;
+  }).join("");
+  const explota = (k = 1) => `<i class="jg-bt3-boom" aria-hidden="true" style="--k:${k}"><s></s>${ESQUIRLAS}</i>`;
   function avatar(j) {
     const foto = typeof j.foto === "string" && /^(data:image\/|https:\/\/)/.test(j.foto) ? j.foto : "";
     const color = typeof j.color === "string" && /^#[0-9a-f]{3,8}$/i.test(j.color) ? j.color : "#f28c1e";
@@ -174,8 +183,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       <b>Esperando rival</b><span class="jg-bt3-rol">J2</span><span class="jg-bt3-estado">Pásale el enlace de la sala</span>
       <span class="jg-bt3-hacer jg-bt3-hueco" aria-hidden="true">Hacer anfitrión</span></div>`;
     const anf = j.uid === est.anfitrion, disco = !!est.discos?.[j.uid], yo = j.uid === uid;
-    const brillo = conEdad("duelo:" + j.uid, 3, "brilla");
-    return `<div class="jg-bt3-luchador${anf ? " anf" : ""}${yo ? " yo" : ""}${brillo.c}"${brillo.st}>
+    const brillo = conEdad("duelo:" + j.uid, 3, "brilla"), cae = conEdad("duelo-pierde:" + j.uid, 3, "revienta");
+    return `<div class="jg-bt3-luchador${anf ? " anf" : ""}${yo ? " yo" : ""}${brillo.c}${cae.c}"${brillo.st || cae.st}>${cae.c ? explota(1.6) : ""}
       ${avatar(j)}
       <b translate="no">${escapeHtml(j.nombre || "Jugador")}${yo ? ' <em>(tú)</em>' : ""}</b>
       <span class="jg-bt3-rol">${anf ? "👑 Anfitrión · J1" : "J2"}</span>
@@ -207,9 +216,12 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       recientes.set("duelo", Date.now());
       if (g === "empate") { suena("kiCae"); anuncia(`<small>Pelea ${est.ronda}</small><b>¡Empate!</b>`, "empate"); }
       else if (g) {
+        const p = (est.jugadores || []).find(j => j.uid !== g && !est.fuera?.[j.uid])?.uid;
         suena(g === uid || !enSala() ? "kiAvanza" : "kiCae");
-        anuncia(`<small>Pelea ${est.ronda}</small><b translate="no">¡Gana ${escapeHtml(nombre(g))}!</b>`, g === uid ? "gana" : enSala() ? "pierde" : "gana");
+        setTimeout(() => suena("kiBoom"), 300);
+        anuncia((p ? caras(g, p) : "") + `<small>Pelea ${est.ronda}</small><b translate="no">¡Gana ${escapeHtml(nombre(g))}!</b>`, g === uid ? "gana" : enSala() ? "pierde" : "gana", 4200);
         recientes.set("duelo:" + g, Date.now());
+        if (p) recientes.set("duelo-pierde:" + p, Date.now());
       }
     }
     vistoDuelo = peleas;
@@ -276,18 +288,23 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   const NOMBRE_RONDA = (r, total) => ["Final", "Semifinal", "Cuartos", "Octavos"][total - 1 - r] || "Ronda " + (r + 1);
   const nomb = u => u === "" ? "—" : u === undefined ? "Por definir" : nombre(u);
   // Una pelea del torneo recién decidida: su animación, su sonido y el cartel de arriba.
+  /* El cartel de una pelea: el ganador con su aura y, al lado, el que pierde, que revienta en pedazos. */
+  const caras = (g, p) => `<div class="jg-bt3-caras"><span class="g">${avatar(jugador(g))}</span><span class="vs" aria-hidden="true">VS</span>
+    <span class="p">${avatar(jugador(p))}${explota(1.7)}</span></div>`;
   function celebra(m, total) {
     recientes.set(m.id, Date.now());
     const pierde = m.g === m.a ? m.b : m.a, n = u => `<b translate="no">${escapeHtml(nombre(u))}</b>`;
+    setTimeout(() => suena("kiBoom"), 300);   // la carta del que pierde revienta
     if (m.r === total - 1) {   // la final: el campeón
       recientes.set("copa", Date.now());
       suena("kiCorona");
-      anuncia(`<span class="jg-bt3-anuncio-corona" aria-hidden="true">👑</span><small>Campeón del torneo</small>${n(m.g)}`, "campeon", 6500);
+      anuncia(`<div class="jg-bt3-coronado"><i class="jg-bt3-rayos" aria-hidden="true"></i><span class="jg-bt3-anuncio-corona" aria-hidden="true">👑</span>${avatar(jugador(m.g))}</div>
+        <small>Campeón del torneo</small>${n(m.g)}`, "campeon", 6500);
     } else {
       suena(pierde === uid ? "kiCae" : "kiAvanza");
-      anuncia(pierde === uid ? `<small>Quedaste fuera</small><b>Ganó ${n(m.g)}</b>`
-        : `<small>${m.g === uid ? "¡Ganaste!" : "Pasa a la siguiente ronda"}</small>${n(m.g)} <span>avanza a ${NOMBRE_RONDA(m.r + 1, total).toLowerCase()}</span>`,
-        pierde === uid ? "pierde" : "gana");
+      anuncia(caras(m.g, pierde) + (pierde === uid ? `<small>Quedaste fuera</small><b>Ganó ${n(m.g)}</b>`
+        : `<small>${m.g === uid ? "¡Ganaste!" : "Pasa a la siguiente ronda"}</small>${n(m.g)} <span>avanza a ${NOMBRE_RONDA(m.r + 1, total).toLowerCase()}</span>`),
+        pierde === uid ? "pierde" : "gana", 4200);
     }
   }
   function pintaTorneo(forzar) {
@@ -336,7 +353,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
         const llega = k => m.r > 0 ? conEdad(est.llave[m.r - 1][2 * m.k + k].id, 3, "llega") : { c: "", st: "" };
         const fila = (u, k) => {
           const l = llega(k), res = m.g !== undefined && u ? (m.g === u ? "gana" : "pierde") : u === undefined ? "vacio" : "";
-          return `<span class="jg-bt3-slot ${res}${decidida.c}${l.c}"${decidida.st || l.st} translate="no">${escapeHtml(nomb(u))}</span>`;
+          const cara = u ? avatar(jugador(u)) : '<span class="jg-bt3-ava vacia" aria-hidden="true">?</span>';
+          return `<span class="jg-bt3-slot ${res}${decidida.c}${l.c}"${decidida.st || l.st}>${cara}<span class="jg-bt3-nom" translate="no">${escapeHtml(nomb(u))}</span>${res === "pierde" && decidida.c ? explota() : ""}</span>`;
         };
         return `<li class="jg-bt3-par${m.g ? " listo" : ""}${m.r > 0 && m.a && m.b ? " lleno" : ""}${decidida.c}"${decidida.st}><div class="jg-bt3-caja ${cls}">${fila(m.a, 0)}${m.b === "" ? '<span class="jg-bt3-slot bye">pasa directo</span>' : fila(m.b, 1)}
           ${cls === "vivo" ? "<em>EN PELEA</em>" : cls === "sigue" ? "<em>SIGUIENTE</em>" : ""}</div></li>`;
@@ -344,7 +362,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       const campeon = est.llave[total - 1][0].g, corona = conEdad("copa", 7, "corona");
       const llave = est.llave.map((ronda, r) => `<section class="jg-bt3-ronda${r === total - 1 ? " final" : ""}"><h4>${NOMBRE_RONDA(r, total)}</h4><ol>${ronda.map(caja).join("")}</ol></section>`).join("")
         + `<section class="jg-bt3-ronda copa"><h4>Campeón</h4><ol><li class="jg-bt3-par${campeon ? " listo" : ""}"><div class="jg-bt3-copa${campeon ? " gana" : ""}${corona.c}"${corona.st}>
-            <i class="jg-bt3-rayos" aria-hidden="true"></i><span class="jg-bt3-trofeo" aria-hidden="true">🏆</span>${campeon ? '<span class="jg-bt3-corona" aria-hidden="true">👑</span>' : ""}
+            <i class="jg-bt3-rayos" aria-hidden="true"></i>${campeon
+              ? `<span class="jg-bt3-campeon"><span class="jg-bt3-corona" aria-hidden="true">👑</span>${avatar(jugador(campeon))}<span class="jg-bt3-trofeo" aria-hidden="true">🏆</span></span>`
+              : '<span class="jg-bt3-trofeo" aria-hidden="true">🏆</span>'}
             <b translate="no">${campeon ? escapeHtml(nombre(campeon)) : "Por definir"}</b></div></li></ol></section>`;
       let panel = "";
       if (a) {
