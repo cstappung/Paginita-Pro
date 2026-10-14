@@ -102,8 +102,8 @@ asks for exactly three.
 **Spectators** (anyone opening the room who is not playing, and whoever left or was kicked: `enSala()` is false)
 see the lobby, the bracket, the banners and the fight intros live; their frame is never loaded (`cargaMarco`).
 **They can watch the fight too** (`bt3-directo.js`): the game has no spectator netcode, so the fighter that is
-player 1 (or the human against a CPU) sends its canvas as a WebRTC video (`captureStream`, ~540p, 30 fps, ≤ 1.5
-Mb/s) **with the game's sound** to whoever presses «📺 Ver la pelea en vivo». **Viewers relay to each other**: the
+player 1 (or the human against a CPU) sends its canvas as a WebRTC video (540p, 30 fps, ≤ 1.5 Mb/s) **with the
+game's sound** to whoever presses «📺 Ver la pelea en vivo». **Viewers relay to each other**: the
 fighter encodes for ONE viewer only (`DIRECTOS`), every viewer that already sees it re-sends it to up to two
 (`RELEVO`), up to 14 (`MAX_VISORES`). The emitter keeps the tree (`ver` → itself, `vir` → «take it from that
 viewer», `vespera` → nobody can yet; `vya` = this viewer can relay), never offers a viewer its own branch, and
@@ -116,7 +116,15 @@ tapped *before* the player's own volume (`pagina.js` 0a wraps `AudioContext` aft
 has its own 🔊 and slider (`jg.bt3.tele`). Signalling goes through the
 mesh's mailbox (`vivo/<pid>/rtc`, open to anyone signed in) with its own message types (`ver`, `vof`, `vans`,
 `vcan`, `vfin`, `vlleno`); the frame's mailbox proxy now takes several listeners (mesh + emitter). The viewer's
-screen closes itself when the fight ends. Friends find running rooms in «En juego ahora»
+screen closes itself when the fight ends, and shows how the video arrives (fps · size · speed, `visor.calidad()`).
+**It went at ~1 fps and blurry** for two reasons, measured with real WebRTC (`tele/` harness in the bench): (1)
+`captureStream` on the game's canvas reads the WHOLE screen-sized picture back from the GPU every frame («GPU stall
+due to ReadPixels»), which slowed the capture and the game; now the patch calls `Module.onCuadro` after each
+present (`Web_FrameDone`, while the canvas still holds the frame) and the emitter copies it scaled down to a 540-high
+canvas (`drawImage`, on the GPU), at most 30/s, only while someone watches, and sends that (`captureStream(0)` +
+`requestFrame`); (2) the bandwidth estimate starts at ~300 kb/s and Chrome shrank the picture to 320×180: the
+emitter rewrites the viewer's answer (`conArranque`: `x-google-start-bitrate=1200;x-google-min-bitrate=400`) and
+prefers `balanced`. The software-GL test box cannot show (1)'s gain; (2) went from 320×180 to a steady 960×540. Friends find running rooms in «En juego ahora»
 (BT3 does announce there now; the lobby shows it only to `bt3Visible`).
 
 **The lobby's animations** live in `bt3.js` (`recientes`, `celebra`, `anuncia`) and the `.jg-bt3-*` block of
@@ -148,7 +156,8 @@ setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Só
 stay allowed). The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord»
 image: 161 portraits = the game's 161 ids, **one per form** (the gold S+ one is Nuova Shenron). Character names are
 not in the code, they are on the disc: when a select screen opens the patch hands its name/form texts (sections
-43/44, line n = id n, UTF-16 high byte first) to `Module.onCatalogo` (`Web_Catalogo`, CharSel and TeamSel init),
+43/44, line n = id n, **UTF-16 little-endian**: the game reads them as native `u16`, `btl_seq.c` compares them
+with `'0'`) to `Module.onCatalogo` (`Web_Catalogo`, CharSel and TeamSel init),
 and **the frame computes the banned ids right there, synchronously** (`BT3Sala.vetadosDe` in bt3-marco.js → the
 same `vetadosBt3` the room uses; catalog cached in `bt3.catalogo`) into `Module.vetados`, because the game builds
 its grid as soon as that call returns. In the game (`web_vetado`): `ChrGrid_Build` (view_a_e.c) treats a banned
@@ -160,7 +169,11 @@ banned chip dark; and **mid-fight** `BattleSide_IsCharaUsable` (battle_load.c, a
 disc and rule → same grids and draws (no desync). While a select screen is open (`Web_Seleccion` →
 `Module.onSeleccion`) the frame shows a foldable side panel listing the banned ones by tier (`#vetos`, folded state
 in `bt3.vetosPlegado`); «Ver los vetados» in the room shows the same list with the in-game name each entry matched
-(or «no se encontró») — **check it against the real disc**. The bench's «Abrir la selección de personajes» posts a
+(or «no se encontró»), «N de M encontrados en tu disco» and **«📋 Copiar los nombres del disco»** (id + name per
+line) — **check it against the real disc**. Trap: until bt3-12 the patch read the names high byte first, so «G»
+(0x47) arrived as 0x4700, nothing matched and **no rule banned anything**; the bench and the tests fed correct codes
+and never saw it. `catalogoBt3` now flips a list whose characters mostly have a zero low byte (the stale
+`bt3.catalogo` in friends' browsers), and a test runs the compiled `web_catalogo` over a disc-shaped buffer. The bench's «Abrir la selección de personajes» posts a
 hand-written USA-style roster to exercise this without the disc.
 
 ## One player: the modes

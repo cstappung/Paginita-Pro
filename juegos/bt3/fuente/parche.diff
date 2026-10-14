@@ -101,10 +101,10 @@ index fd6cc57..79829bd 100644
      set_open(true);
      sNet = true;
 diff --git a/port/src/headless.c b/port/src/headless.c
-index fb8b892..9dd32fd 100644
+index fb8b892..9e6bead 100644
 --- a/port/src/headless.c
 +++ b/port/src/headless.c
-@@ -95,6 +95,84 @@ static void port_stage_replace_init(void) {
+@@ -95,6 +95,85 @@ static void port_stage_replace_init(void) {
  
  extern void Port_NetRules(int *type, int *dp, int *time); /* gs/net.c */
  
@@ -141,7 +141,8 @@ index fb8b892..9dd32fd 100644
 +    return chara >= 0 && chara <= 0xA0 && web_vetado(chara);
 +}
 +/* The select screens' name and form texts (sections 43 and 44: line n is character n's name / form; word n+1 of
-+   the file is the offset of line n; 16-bit characters, high byte first) go to the page once, as character codes. */
++   the file is the offset of line n; UTF-16 little-endian, low byte first, as the game reads them: btl_seq.c compares
++   a u16 with '0') go to the page once, as character codes. */
 +EM_JS(void, web_catalogo, (const void *nombres, const void *formas), {
 +    if (!Module.onCatalogo || Module.catalogoVisto) return;
 +    Module.catalogoVisto = true;
@@ -149,7 +150,7 @@ index fb8b892..9dd32fd 100644
 +        var q = b + 4 * (n + 1), off = (HEAPU8[q] | HEAPU8[q + 1] << 8 | HEAPU8[q + 2] << 16 | HEAPU8[q + 3] << 24) & ~3;
 +        var p = b + off, s = [];
 +        for (var i = 0; i < 64; i++) {
-+            var c = HEAPU8[p + 2 * i] << 8 | HEAPU8[p + 2 * i + 1];
++            var c = HEAPU8[p + 2 * i] | HEAPU8[p + 2 * i + 1] << 8;
 +            if (!c) break;
 +            s.push(c);
 +        }
@@ -189,7 +190,7 @@ index fb8b892..9dd32fd 100644
  int __wrap_Progress_Main(int arg) {
      const char *path;
      PortStages_Init();
-@@ -134,9 +212,56 @@ int __wrap_Progress_Main(int arg) {
+@@ -134,9 +213,56 @@ int __wrap_Progress_Main(int arg) {
                              time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
                  }
              }
@@ -246,7 +247,7 @@ index fb8b892..9dd32fd 100644
              sFromMenu = 1; /* a battle set up by the real menus follows: the traces apply to it too */
              return r;
          }
-@@ -312,6 +437,29 @@ void Port_Trace(unsigned vblanks) {
+@@ -312,6 +438,29 @@ void Port_Trace(unsigned vblanks) {
              Port_StateLog(vblanks, NULL, 0);
          }
      }
@@ -583,6 +584,25 @@ index 0000000..d2bf244
 +void __cxa_guard_abort(uint64_t *guarda) {
 +    (void)guarda;                              /* la inicialización falló: se deja sin marcar para reintentar */
 +}
+diff --git a/port/web/target/yield_web.c b/port/web/target/yield_web.c
+index 9df3aa8..89643e2 100644
+--- a/port/web/target/yield_web.c
++++ b/port/web/target/yield_web.c
+@@ -44,7 +44,14 @@ void Web_SleepMs(double ms) {
+     }
+ }
+ 
++/* paginita-pro: a picture was just drawn, and the canvas still holds it (the browser has not shown it yet). The page
++   copies it from here, small, for whoever watches the fight live (Module.onCuadro, only set while someone watches). */
++EM_JS(void, web_cuadro, (void), {
++    if (Module.onCuadro) Module.onCuadro();
++});
++
+ void Web_FrameDone(void) {
++    web_cuadro();
+     sPresents++;
+     if (emscripten_get_now() - sLastYield > 20.0) {
+         Web_SleepMs(0);
 diff --git a/src/battle/battle_load.c b/src/battle/battle_load.c
 index 9794ea9..5783e8d 100644
 --- a/src/battle/battle_load.c

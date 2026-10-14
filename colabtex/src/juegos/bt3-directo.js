@@ -17,13 +17,55 @@
    `vir`, `vespera`, `vreve`, `vya`, `vof` (oferta), `vans` (respuesta), `vcan` (candidatos), `vfin` y `vlleno`.
    La malla de la pelea los ignora (no traen su sesión), y aquí se ignoran los de ella.
 
-   El video sale a unos 540 de alto, 30 cuadros y 1,5 Mb/s como mucho; el sonido es el del juego, tomado antes del
+   El video sale a 540 de alto, 30 cuadros y 1,5 Mb/s como mucho; el sonido es el del juego, tomado antes del
    volumen de quien juega (juegos/bt3/pagina.js), y cada espectador tiene su propio volumen.
 
-   - `crearEmisor({senal, uid, canvas, audio})` (en el marco del juego que pelea).
+   **Lo que lo hacía ir a 1 cuadro por segundo, y feo** (medido con WebRTC de verdad, tele/ en el banco):
+   - Capturar el lienzo del juego (`captureStream`) lee de la tarjeta de video el cuadro ENTERO, del tamaño de la
+     pantalla (1920×1080 o más), en cada cuadro: frena la tarjeta («GPU stall due to ReadPixels») y al juego mismo, y
+     la captura quedaba en pocos cuadros. Ahora, si el juego avisa cada cuadro que dibuja (`alCuadro`: el parche
+     llama a Module.onCuadro), ese cuadro se copia achicado a un lienzo propio de 540 de alto (`drawImage`, dentro
+     de la tarjeta) hasta 30 veces por segundo, y se manda ese (`captureStream(0)` + `requestFrame`). Solo mientras
+     alguien mira. Sin el aviso (un programa viejo), se captura el lienzo del juego como antes.
+   - La conexión parte con ~300 kb/s y sube de a poco; con pocos cuadros casi no subía, y Chrome bajaba la
+     resolución hasta 320×180 para cumplir. Ahora la respuesta del espectador se toca antes de usarla
+     (`conArranque`: x-google-start-bitrate/min-bitrate) para partir en 1,2 Mb/s sin bajar de 400 kb/s, y se
+     prefiere el equilibrio (`balanced`) entre cuadros y resolución.
+
+   - `crearEmisor({senal, uid, canvas, audio, alCuadro})` (en el marco del juego que pelea).
    - `crearVisor({senal, uid, emisor, alVideo, alFalla})` (en la sala, para quien mira): recibe y reenvía. */
 const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
-const ALTO = 540, BITS = 1500000;
+const ALTO = 540, BITS = 1500000, CUADROS = 30;
+const ARRANQUE_KB = 1200, MINIMO_KB = 400;   // con qué ancho parte la conexión del video, y de cuánto no baja
+
+/* La respuesta SDP del espectador, con el ancho de partida del video para quien manda (Chrome lee
+   x-google-start-bitrate / x-google-min-bitrate del códec acordado): sin esto parte en ~300 kb/s y la imagen
+   empieza borrosa y chica. Solo toca los códecs de video (no el rtx ni el red). */
+export function conArranque(sdp) {
+  if (typeof sdp !== "string") return sdp;
+  const extra = `x-google-start-bitrate=${ARRANQUE_KB};x-google-min-bitrate=${MINIMO_KB}`;
+  const fin = sdp.includes("\r\n") ? "\r\n" : "\n";
+  const lineas = sdp.split(fin);
+  let video = false;
+  const pts = new Set();
+  for (const l of lineas) {
+    if (l.startsWith("m=")) video = l.startsWith("m=video");
+    const m = video && /^a=rtpmap:(\d+) (VP8|VP9|H264|AV1)\//i.exec(l);
+    if (m) pts.add(m[1]);
+  }
+  const out = [], conFmtp = new Set();
+  for (const l of lineas) {
+    const f = /^a=fmtp:(\d+) (.*)$/.exec(l);
+    if (f && pts.has(f[1])) { conFmtp.add(f[1]); out.push(/x-google-start-bitrate/.test(l) ? l : l + ";" + extra); }
+    else out.push(l);
+  }
+  // los que no traían fmtp (VP8): uno nuevo, justo después de su rtpmap
+  for (let i = out.length - 1; i >= 0; i--) {
+    const m = /^a=rtpmap:(\d+) /.exec(out[i]);
+    if (m && pts.has(m[1]) && !conFmtp.has(m[1])) out.splice(i + 1, 0, `a=fmtp:${m[1]} ${extra}`);
+  }
+  return out.join(fin);
+}
 export const DIRECTOS = 1;       // a cuántos les manda el que pelea
 export const RELEVO = 2;         // a cuántos les reenvía cada espectador
 export const MAX_VISORES = 14;   // cuántos pueden mirar una pelea
@@ -61,15 +103,15 @@ function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
           const p = envio.getParameters();
           if (!p.encodings || !p.encodings.length) p.encodings = [{}];
           const alto = ps.find(t => t.kind === "video")?.getSettings?.().height || ALTO;
-          Object.assign(p.encodings[0], { maxBitrate: BITS, maxFramerate: 30, scaleResolutionDownBy: Math.max(1, alto / ALTO) });
-          p.degradationPreference = "maintain-framerate";
+          Object.assign(p.encodings[0], { maxBitrate: BITS, maxFramerate: CUADROS, scaleResolutionDownBy: Math.max(1, alto / ALTO) });
+          p.degradationPreference = "balanced";
           await envio.setParameters(p);
         } catch (e) {}
         senal.envia(de, { t: "vof", s: m.s, d: { type: o.type, sdp: o.sdp } });
       } else if (m.t === "vans") {
         const x = visores.get(k);
         if (!x || x.pc.signalingState !== "have-local-offer") return;
-        await x.pc.setRemoteDescription(m.d);
+        await x.pc.setRemoteDescription({ type: m.d.type, sdp: conArranque(m.d.sdp) });
         x.remota = true;
         for (const c of x.cola.splice(0)) await x.pc.addIceCandidate(c).catch(() => {});
       } else if (m.t === "vcan") {
@@ -99,14 +141,33 @@ function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
   };
 }
 
-export function crearEmisor({ senal, uid, canvas, audio = () => null, RTC = globalThis.RTCPeerConnection, max = DIRECTOS, total = MAX_VISORES, relevo = RELEVO }) {
-  let pista = null;
-  // una sola captura del lienzo para todo
+export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro = null, RTC = globalThis.RTCPeerConnection, max = DIRECTOS, total = MAX_VISORES, relevo = RELEVO }) {
+  let pista = null, sueltaCuadro = null;
+  /* Una sola captura para todo. Con el aviso de cada cuadro (alCuadro), una copia chica del lienzo del juego (540 de
+     alto, el ancho según su forma), hecha justo después de que el juego dibuja: ahí el lienzo todavía tiene el
+     cuadro (después de mostrarlo el navegador lo puede borrar). Sin el aviso, el lienzo del juego entero. */
   const video = () => {
-    if (!pista || pista.readyState === "ended") {
-      pista = canvas.captureStream(30).getVideoTracks()[0];
-      try { pista.contentHint = "motion"; } catch (e) {}
+    if (pista && pista.readyState !== "ended") return pista;
+    sueltaCuadro?.();
+    sueltaCuadro = null;
+    const chico = alCuadro && typeof document !== "undefined" ? document.createElement("canvas") : null;
+    const c2 = chico?.getContext?.("2d", { alpha: false });
+    if (c2 && chico.captureStream) {
+      chico.width = 960; chico.height = ALTO;
+      pista = chico.captureStream(0).getVideoTracks()[0];
+      let ultimo = -1e9;
+      sueltaCuadro = alCuadro(() => {
+        const ahora = performance.now();
+        if (ahora - ultimo < 1000 / CUADROS - 4 || !canvas.width || !canvas.height) return;
+        ultimo = ahora;
+        const ancho = Math.max(2, Math.round(ALTO * canvas.width / canvas.height / 2) * 2);   // (par: lo pide el códec)
+        if (chico.width !== ancho) chico.width = ancho;
+        try { c2.drawImage(canvas, 0, 0, ancho, ALTO); pista.requestFrame?.(); } catch (e) {}
+      });
+    } else {
+      pista = canvas.captureStream(CUADROS).getVideoTracks()[0];
     }
+    try { pista.contentHint = "motion"; } catch (e) {}
     return pista;
   };
   const fuente = crearFuente({ senal, uid, max, RTC, pistas: () => [video(), audio()].filter(Boolean) });
@@ -165,6 +226,7 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, RTC = glob
     cierra() {
       off?.();
       fuente.cierra();
+      sueltaCuadro?.();
       try { pista?.stop(); } catch (e) {}
     },
   };
@@ -252,6 +314,13 @@ export function crearVisor({ senal, uid, emisor, alVideo, alFalla = () => {}, RT
   senal.envia(emisor, { t: "ver", s });
   return {
     reenvia: () => fuente.cuantos(),
+    // cómo está llegando el video (para mostrarlo): cuadros por segundo, tamaño y bytes recibidos hasta ahora
+    async calidad() {
+      if (!pc) return null;
+      let r = null;
+      try { (await pc.getStats()).forEach(x => { if (x.type === "inbound-rtp" && x.kind === "video") r = x; }); } catch (e) {}
+      return r && { fps: r.framesPerSecond || 0, ancho: r.frameWidth || 0, alto: r.frameHeight || 0, bytes: r.bytesReceived || 0 };
+    },
     cierra() {
       if (!vivo) return;
       vivo = false;

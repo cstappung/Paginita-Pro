@@ -69,6 +69,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
     el.className = "jg-bt3-tele";
     el.innerHTML = `<header><span class="jg-bt3-vivo">● EN VIVO</span><b translate="no">${escapeHtml(nombre(pel.a))}</b><i>VS</i><b translate="no">${escapeHtml(nombre(pel.b))}</b>
       <span class="jg-bt3-tele-son"><button type="button" data-tele="son"></button><input type="range" min="0" max="100" step="1" data-tele="vol" aria-label="Volumen de la pelea"></span>
+      <small class="jg-bt3-tele-cal" title="Cómo te está llegando el video: cuadros por segundo, resolución y velocidad"></small>
       <button type="button" data-tele="grande" title="Pantalla completa" aria-label="Pantalla completa">⛶</button><button type="button" data-tele="x" title="Dejar de mirar" aria-label="Dejar de mirar">✕</button></header>
       <div class="jg-bt3-tele-video"><video autoplay playsinline></video><p class="jg-bt3-nota">Conectando con la pantalla de <b translate="no">${escapeHtml(nombre(pel.emisor))}</b>…</p></div>`;
     escena.prepend(el);
@@ -98,10 +99,22 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       },
       alFalla: por => { nota.hidden = false; nota.textContent = por === "lleno" ? "Ya hay muchos mirando esta pelea: prueba en un rato."
         : "No se pudo conectar con la pantalla del que pelea (su red no deja una conexión directa)."; } });
-    tele = { el, visor, id: pel.id };
+    /* Cómo llega (cuadros por segundo, resolución, velocidad), cada segundo: si alguien lo ve mal, se sabe si es la
+       red (pocos kb/s) o la pantalla del que pelea (pocos cuadros con buena velocidad). */
+    const cal = el.querySelector(".jg-bt3-tele-cal");
+    let antes = null;
+    const mide = setInterval(async () => {
+      const q = await visor.calidad?.();
+      if (!q || !q.ancho) return;
+      const kb = antes ? Math.max(0, (q.bytes - antes) * 8 / 1000) : 0;
+      antes = q.bytes;
+      cal.textContent = `${Math.round(q.fps)} fps · ${q.ancho}×${q.alto}` + (kb ? ` · ${kb >= 1000 ? (kb / 1000).toFixed(1) + " Mb/s" : Math.round(kb) + " kb/s"}` : "");
+    }, 1000);
+    tele = { el, visor, id: pel.id, mide };
   }
   function cierraTele() {
     if (!tele) return;
+    clearInterval(tele.mide);
     tele.visor.cierra();
     if (document.fullscreenElement === tele.el) document.exitFullscreen().catch(() => {});
     tele.el.remove();
@@ -315,7 +328,9 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       lista = `<details class="jg-bt3-vetados"${vetosAbierto ? " open" : ""}><summary>Ver los ${r.detalle.length} vetados</summary>
         <ul>${r.detalle.map(d => `<li><i>${escapeHtml(d.tier)}</i><span>${escapeHtml(d.nombre)}${!conCat ? ""
           : d.juego.length ? ` <small translate="no">${escapeHtml(d.juego.join(" / "))}</small>` : ` <small class="no">no se encontró en el juego</small>`}</span></li>`).join("")}</ul>
-        ${conCat ? "" : `<p class="jg-bt3-nota">Los nombres del juego se leen del disco la primera vez que se abre la selección de personajes; el juego no deja elegir a los vetados.</p>`}</details>`;
+        ${conCat ? `<p class="jg-bt3-nota">${r.detalle.filter(d => d.juego.length).length} de ${r.detalle.length} encontrados en tu disco.
+          <button type="button" class="jg-bt3-ficha" data-copia="1" title="Para revisar la tier list: la lista de personajes que trae el disco">📋 Copiar los nombres del disco</button></p>`
+          : `<p class="jg-bt3-nota">Los nombres del juego se leen del disco la primera vez que se abre la selección de personajes; el juego no deja elegir a los vetados.</p>`}</details>`;
     }
     return `<div class="jg-bt3-veto"><span class="jg-bt3-et">Personajes (tier list)</span><div class="jg-bt3-fichas">${fichas}</div>
       <p class="jg-bt3-nota">${escapeHtml(BT3_VETOS_TXT[v] || "")}</p>${lista}</div>`;
@@ -323,6 +338,12 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
   const atarVetos = () => {
     const d = vest.querySelector(".jg-bt3-vetados");
     if (d) d.ontoggle = () => { vetosAbierto = d.open; };
+    // los nombres que trajo el disco, uno por línea con su id (para revisar a mano que la tier list los encuentre)
+    const cp = vest.querySelector("[data-copia]");
+    if (cp) cp.onclick = async () => {
+      const txt = catalogo.map((c, i) => c && c.nombre ? i + "\t" + c.nombre + (c.forma ? " · " + c.forma : "") : "").filter(Boolean).join("\n");
+      try { await navigator.clipboard.writeText(txt); cp.textContent = "✓ Copiados"; } catch (e) { cp.textContent = "No se pudo copiar"; }
+    };
   };
 
   function atarDar(que, jugada) {

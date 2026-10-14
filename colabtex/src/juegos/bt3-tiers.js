@@ -185,10 +185,20 @@ export function buscaBt3(cat, busca, excluye = "") {
 }
 
 /* El catálogo que manda el juego, [[códigos del nombre], [códigos de la forma]] por id, a texto. Los caracteres
-   son de 16 bits (el juego los guarda con el byte alto primero; el parche ya los da como números). */
+   son de 16 bits, UTF-16 con el byte BAJO primero (como los lee el juego; el parche ya los da como números).
+   Hasta bt3-12 el parche los leía al revés: «G» (0x0047) llegaba como 0x4700, un ideograma, ningún nombre coincidía
+   con la tier list y no se vetaba nada. Esas listas quedaron guardadas en los navegadores (`bt3.catalogo`), así que
+   una lista donde la mayoría de los caracteres tienen el byte bajo en cero se da vuelta aquí. */
 export function catalogoBt3(lista) {
   if (!Array.isArray(lista)) return [];
-  const txt = a => Array.isArray(a) ? String.fromCharCode(...a.filter(c => Number.isInteger(c) && c >= 32 && c < 0xFFFE).slice(0, 64)).replace(/\s+/g, " ").trim() : "";
+  let altos = 0, bajos = 0;
+  for (const e of lista) if (Array.isArray(e)) for (const a of e) if (Array.isArray(a)) for (const c of a) {
+    if (!Number.isInteger(c)) continue;
+    if (c > 0xFF && (c & 0xFF) === 0) altos++; else if (c <= 0xFF) bajos++;
+  }
+  const alReves = altos > bajos;
+  const da = c => alReves ? ((c & 0xFF) << 8 | c >> 8) : c;
+  const txt = a => Array.isArray(a) ? String.fromCharCode(...a.filter(Number.isInteger).map(da).filter(c => c >= 32 && c < 0xFFFE).slice(0, 64)).replace(/\s+/g, " ").trim() : "";
   return lista.slice(0, 161).map(e => Array.isArray(e) ? { nombre: txt(e[0]), forma: txt(e[1]) } : null);
 }
 

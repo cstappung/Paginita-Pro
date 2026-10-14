@@ -361,3 +361,59 @@ test('torneo: el organizador da la victoria antes o durante la pelea; queda marc
  assert.equal(s.discos[m.a],false,'sus marcos se recargan');
  assert.ok(!B.reducir(torneo(4,...pelea,...[{t:'resultado',uid:m.a,m:m.id,g:m.a},{t:'resultado',uid:m.b,m:m.id,g:m.a}])).hist.some(h=>h.mano),'la que cuentan los juegos no lleva la marca');
 });
+
+test('la pelea en vivo parte con buen ancho (la respuesta lleva x-google-start-bitrate) y se copia achicada con el aviso de cada cuadro',async()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor,conArranque};',c);
+ const sdp=['v=0','m=audio 9 UDP/TLS/RTP/SAVPF 111','a=rtpmap:111 opus/48000/2','a=fmtp:111 minptime=10;useinbandfec=1',
+  'm=video 9 UDP/TLS/RTP/SAVPF 96 97 98','a=rtpmap:96 VP8/90000','a=rtpmap:97 rtx/90000','a=fmtp:97 apt=96','a=rtpmap:98 H264/90000','a=fmtp:98 profile-level-id=42e01f',''].join('\r\n');
+ const r=c.__D.conArranque(sdp);
+ assert.match(r,/a=rtpmap:96 VP8\/90000\r\na=fmtp:96 x-google-start-bitrate=1200;x-google-min-bitrate=400\r\n/,'VP8 sin fmtp: uno nuevo');
+ assert.match(r,/a=fmtp:98 profile-level-id=42e01f;x-google-start-bitrate=1200/,'H264: se suma al suyo');
+ assert.doesNotMatch(r,/fmtp:97 [^\r]*x-google|fmtp:111 [^\r]*x-google/,'ni el rtx ni el sonido');
+ assert.equal(c.__D.conArranque(r),r,'dos veces da lo mismo');
+ // con el aviso: una copia de 540 de alto con la forma del juego, como mucho 30 por segundo, y nada sin espectadores
+ const pedidos=[];let dibujos=0,cuadro=null,suelto=0;
+ const chico={width:0,height:0,getContext:()=>({drawImage:(f,x,y,w,h)=>{dibujos++;pedidos.push([w,h]);}}),captureStream:()=>({getVideoTracks:()=>[{kind:'video',readyState:'live',requestFrame(){}}]})};
+ c.document={createElement:()=>chico};let t=0;c.performance={now:()=>t};
+ c.MediaStream=class{constructor(x){this.x=x;}};
+ class RTC{constructor(){this.signalingState='stable';}addTrack(){return{getParameters:()=>({encodings:[{}]}),setParameters:async()=>{}};}
+  createOffer(){return Promise.resolve({type:'offer',sdp:'x'});} setLocalDescription(){return Promise.resolve();} close(){} getSenders(){return[];}}
+ const canvas={width:1920,height:1080,captureStream:()=>{throw new Error('no debe capturar el lienzo grande');}};
+ let oye=null;const senal={envia:()=>{},alMensajes:f=>{oye=f;return()=>{};}};
+ const E=c.__D.crearEmisor({senal,uid:'E',canvas,RTC,alCuadro:f=>{cuadro=f;return()=>{suelto++;cuadro=null;};}});
+ assert.equal(cuadro,null,'sin nadie mirando no se copia nada');
+ await oye('A',{t:'ver',s:'a'});
+ for(let i=0;i<60;i++){t=i*1000/60;cuadro();}   // un segundo a 60 cuadros
+ assert.ok(dibujos>=28&&dibujos<=31,'unos 30 por segundo: '+dibujos);
+ assert.deepEqual(pedidos[0],[960,540]);
+ E.cierra();assert.equal(suelto,1,'al cerrar deja de copiar');
+});
+
+test('los nombres del disco se leen como el juego (UTF-16, byte bajo primero) y una lista vieja al revés se corrige',()=>{
+ // la función del programa compilado (EM_JS del parche), sobre una memoria armada como el texto del disco
+ const js=fs.readFileSync(raiz('../juegos/bt3/bt3-jspi.js'),'utf8');
+ const fuente=/function web_catalogo\(nombres,formas\)\{[\s\S]*?\n?\}(?=\s*web_catalogo\.sig)/.exec(js);
+ assert.ok(fuente,'el programa trae web_catalogo');
+ const archivo=lineas=>{   // palabra n+1 = desplazamiento de la línea n; texto UTF-16LE terminado en 0
+  const cab=4*(lineas.length+1),partes=[];let off=cab;const offs=[];
+  for(const l of lineas){offs.push(off);const b=Buffer.alloc((l.length+1)*2);for(let i=0;i<l.length;i++)b.writeUInt16LE(l.charCodeAt(i),2*i);partes.push(b);off+=b.length;off=(off+3)&~3;partes.push(Buffer.alloc(((off-(offs.at(-1)+b.length))))) ;}
+  const h=Buffer.alloc(cab);h.writeUInt32LE(lineas.length,0);offs.forEach((o,i)=>h.writeUInt32LE(o,4*(i+1)));
+  return Buffer.concat([h,...partes]);
+ };
+ const nombres=Array.from({length:161},(_,i)=>i===2?'Goku (End)':i===0?'Goku (Early)':'X'+i),formas=Array.from({length:161},(_,i)=>i===2?'Super Saiyan 3':'');
+ const a=archivo(nombres),b=archivo(formas),mem=new Uint8Array(64+a.length+b.length);mem.set(a,16);mem.set(b,32+a.length);
+ let lista=null;const ctx={HEAPU8:mem,Module:{onCatalogo:l=>{lista=l;}},console};vm.createContext(ctx);
+ vm.runInContext(fuente[0]+';web_catalogo(16,'+(32+a.length)+');',ctx);
+ assert.equal(lista[2][0][0],'G'.charCodeAt(0),'el programa da «G» como 0x47, no 0x4700');
+ const cat=T.catalogoBt3(lista);
+ assert.deepEqual([cat[2].nombre,cat[2].forma,cat[0].nombre],['Goku (End)','Super Saiyan 3','Goku (Early)']);
+ // una lista guardada por bt3-12 o antes (cada carácter con los bytes dados vuelta) se lee igual
+ const vuelta=JSON.parse(JSON.stringify(lista),(k,v)=>typeof v==='number'?((v&0xFF)<<8|v>>8):v);
+ const cat2=T.catalogoBt3(vuelta);
+ assert.deepEqual([cat2[2].nombre,cat2[2].forma],['Goku (End)','Super Saiyan 3']);
+ // y con la tier list: la lista al revés veta lo mismo que la buena
+ const alReves=CATALOGO.map(e=>e.map(a=>a.map(v=>(v&0xFF)<<8|v>>8)));
+ assert.deepEqual(T.vetadosBt3(T.catalogoBt3(alReves),'noop').ids,T.vetadosBt3(T.catalogoBt3(CATALOGO),'noop').ids);
+ assert.ok(T.vetadosBt3(T.catalogoBt3(alReves),'noop').ids.length>10);
+});
