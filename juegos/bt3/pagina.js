@@ -717,17 +717,83 @@
   if (!avisaHijo()) { let n = 0; const t = setInterval(() => { if (avisaHijo() || ++n > 40) clearInterval(t); }, 250); }
   mando.style.cursor = "pointer";
 
-  /* En el celular (Chrome de Android: los controles táctiles del fork, body.coarse): con el juego andando, el
-     primer toque pone el juego a pantalla completa, sin la barra del navegador que le quita alto. Pedirla necesita un
-     toque (el navegador no la da sola), y si se sale (el gesto de atrás) el próximo toque la pide de nuevo. Dentro
-     de Juegos el marco tiene `allowfullscreen`. */
+  /* ---- En el celular (Chrome de Android: los controles táctiles del fork, body.coarse) ----
+     Sin mouse, la barra (que vuelve al mover el mouse) quedaba escondida para siempre: sin ← Modos, ni volumen, ni
+     Ajustes. Y la pantalla completa se volvía a pedir en cada toque, así que no había cómo salir. Aquí:
+     - ☰ (arriba al centro, tenue): muestra la barra unos segundos;
+     - ⛶ en la barra: entra o sale de la pantalla completa. Sola se pide UNA vez, al primer toque con el juego andando;
+       si el jugador sale (⛶ o el gesto de atrás), no se vuelve a pedir;
+     - 🎮 en la barra: el tamaño y la transparencia de los controles táctiles (`--esc` y `--opa` en #pad, ver
+       pagina.py; se recuerdan en este celular);
+     - si el sonido del juego no está andando (el navegador lo deja mudo hasta un toque que valga), un botón grande
+       «🔊 Activar el sonido»: un toque de verdad sobre un botón, que el navegador siempre acepta. */
   if (document.body.classList.contains("coarse")) {
-    const pideCompleta = () => {
-      if (!document.body.classList.contains("started") || document.fullscreenElement) return;
-      const raiz = document.documentElement, pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
-      try { pide && Promise.resolve(pide.call(raiz, { navigationUI: "hide" })).catch(() => {}); } catch (e) {}
+    const andando = () => document.body.classList.contains("started");
+    const completa = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const ponCompleta = si => {
+      try {
+        if (si) { const r = document.documentElement, f = r.requestFullscreen || r.webkitRequestFullscreen; f && Promise.resolve(f.call(r, { navigationUI: "hide" })).catch(() => {}); }
+        else { const f = document.exitFullscreen || document.webkitExitFullscreen; f && Promise.resolve(f.call(document)).catch(() => {}); }
+      } catch (e) {}
     };
-    addEventListener("pointerup", pideCompleta, true);
+    let yaPidio = false;
+    addEventListener("pointerup", () => { if (yaPidio || !andando() || completa()) return; yaPidio = true; ponCompleta(true); }, true);
+
+    const boton = (id, txt, titulo) => { const b = document.createElement("button"); b.id = id; b.type = "button"; b.textContent = txt; b.title = titulo; b.setAttribute("aria-label", titulo); return b; };
+    // ☰: la barra a la vista
+    const menu = boton("menuTactil", "☰", "Mostrar el menú");
+    menu.onclick = () => vivaBarra(6000);
+    document.body.append(menu);
+    // ⛶ en la barra
+    const pc = boton("completa", "⛶", "Pantalla completa");
+    const pintaPc = () => { const si = completa(); pc.textContent = si ? "⛶ Salir" : "⛶"; pc.title = si ? "Salir de la pantalla completa" : "Pantalla completa"; };
+    pc.onclick = () => { yaPidio = true; ponCompleta(!completa()); vivaBarra(3000); };
+    document.addEventListener("fullscreenchange", pintaPc);
+    document.addEventListener("webkitfullscreenchange", pintaPc);
+    pintaPc();
+    $("barra").insertBefore(pc, $("barra").querySelector("[data-volumen]"));
+
+    // 🎮: el tamaño y la transparencia de los controles
+    const pad = $("pad");
+    const lee = (k, d) => { try { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? v : d; } catch (e) { return d; } };
+    let esc = lee("bt3.pad.tamano", 100), opa = lee("bt3.pad.opacidad", 100);
+    const aplica = () => {
+      pad.style.setProperty("--esc", String(esc / 100));
+      pad.style.setProperty("--opa", String(opa / 100));
+      try { localStorage.setItem("bt3.pad.tamano", String(esc)); localStorage.setItem("bt3.pad.opacidad", String(opa)); } catch (e) {}
+      try { if (typeof relayout === "function") relayout(); } catch (e) {}   // (las zonas de toque se miden de nuevo)
+    };
+    aplica();
+    const panel = document.createElement("div");
+    panel.id = "ajustePad"; panel.hidden = true;
+    panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", "Ajustar los controles táctiles");
+    panel.innerHTML = '<b>Controles en pantalla</b>' +
+      '<label>Tamaño <input type="range" min="70" max="120" step="5" data-k="esc"><output></output></label>' +
+      '<label>Opacidad <input type="range" min="25" max="100" step="5" data-k="opa"><output></output></label>' +
+      '<p>En horizontal crecen hasta 110 % (más, la cruceta tocaría el stick). «Hide» los esconde del todo.</p>' +
+      '<div><button type="button" data-x="normal">Como venían</button><button type="button" data-x="listo">Listo</button></div>';
+    const pintaPanel = () => panel.querySelectorAll("input").forEach(i => { i.value = i.dataset.k === "esc" ? esc : opa; i.nextElementSibling.textContent = i.value + "%"; });
+    panel.addEventListener("input", e => { const i = e.target; if (!i.dataset.k) return; if (i.dataset.k === "esc") esc = +i.value; else opa = +i.value; aplica(); pintaPanel(); });
+    panel.addEventListener("click", e => {
+      const x = e.target.dataset && e.target.dataset.x;
+      if (x === "normal") { esc = 100; opa = 100; aplica(); pintaPanel(); }
+      if (x === "listo") panel.hidden = true;
+    });
+    document.body.append(panel);
+    const ctl = boton("ajustarPad", "🎮", "Ajustar los controles táctiles (tamaño y opacidad)");
+    ctl.onclick = () => { pintaPanel(); panel.hidden = !panel.hidden; if (!panel.hidden && !document.body.classList.contains("touch") && typeof setTouch === "function") setTouch(true); };
+    $("barra").insertBefore(ctl, $("barra").querySelector("[data-volumen]"));
+
+    // 🔊: el sonido, si el navegador lo dejó mudo
+    const son = boton("activaSonido", "🔊 Activar el sonido", "El navegador dejó el juego sin sonido: tócalo para activarlo");
+    son.hidden = true;
+    son.onclick = () => { try { if (typeof audioUnlock === "function") audioUnlock(); } catch (e) {} setTimeout(revisaSonido, 400); };
+    document.body.append(son);
+    function revisaSonido() {
+      const ctx = Module.SDL3 && Module.SDL3.audioContext;
+      son.hidden = !andando() || !ctx || ctx.state === "running";
+    }
+    setInterval(revisaSonido, 1000);
   }
   mando.onclick = () => { if (!ajustes.hidden) ajustes.onclick(); };
 
@@ -911,7 +977,8 @@
   };
 
   // ---------------------------------------------------------------- 2d. la música de pelea
-  /* En vez de la música del juego, durante las peleas suena una canción de PRO HERO: «chinchonchin». El parche avisa
+  /* Por defecto suena la música del juego (pedido del dueño). Con el ♪ («bt3.musica» = "cancion"), durante las peleas
+     suena en su lugar una canción de PRO HERO: «chinchonchin». El parche avisa
      cuándo empieza una pelea y cuándo se sale de ella (Module.onMusicaPelea, plat_mem.c); mientras la canción de aquí
      suena, la música del juego calla (Web_BgmPropia, src/sys/adx.c) y lo demás (golpes, voces, el escenario) sigue.
      - La canción sale de la biblioteca de PRO HERO en Firebase Storage, con su mismo código (juegos/hero/js: la
@@ -923,7 +990,7 @@
      - Cada uno elige la suya (♪ en la barra, «bt3.musica» = "juego" para la del juego): la pelea es la misma. */
   (() => {
     const CLAVE = "bt3.musica", BUSCA = "chinchonchin", BASE = 0.6;
-    const quiere = () => { try { return localStorage.getItem(CLAVE) !== "juego"; } catch (e) { return true; } };
+    const quiere = () => { try { return localStorage.getItem(CLAVE) === "cancion"; } catch (e) { return false; } };   // (por defecto, la del juego: a pedido del dueño)
     const norma = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
     let pistas = null, fallo = "", enPelea = false, sonando = null, hallada = null;   // fallo: por qué no suena (se ve en el ♪)
 

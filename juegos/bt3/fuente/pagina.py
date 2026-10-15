@@ -208,15 +208,43 @@ cambia('</style>', '''  body.started .i18n-flota { display: none; }
   @media (orientation: portrait) { body.coarse.started #barra { max-width: calc(100vw - 16px); } }
   body.coarse #barra .vj-ctl input, body.coarse #barra .vj-ctl output { display: none; }
   body.coarse #mando:not(.ok) { display: none; }
+  /* el tamaño y la opacidad de los controles (🎮, pagina.js): todo el pad está medido en --u, así que escalar --u
+     agranda los botones y su distancia a los bordes juntos */
+  /* (con tope: más grande, la cruceta se monta sobre el stick en horizontal desde 115 %, y el stick sobre □ en
+     vertical desde 130 %; medido en el banco, prueba53) */
+  @media (orientation: landscape) { #pad { --u: calc(var(--vh, 1vh) * min(var(--esc, 1), 1.1)); } }
+  @media (orientation: portrait) { #pad { --u: calc(var(--vw, 1vw) * .62 * min(var(--esc, 1), 1.2)); } }
+  #pad { opacity: var(--opa, 1); }
+  /* ☰ (la barra a la vista), ⛶ y 🎮 solo en el celular */
+  #menuTactil, #activaSonido { display: none; }
+  body.coarse.started #menuTactil { display: block; position: fixed; z-index: 6; top: calc(var(--st) + 4px); left: 50%; translate: -50% 0;
+    padding: 2px 14px; border-radius: 0 0 10px 10px; border: 1px solid #ffffff33; border-top: 0; background: #14182099; color: #fff;
+    font: 700 16px/1.4 system-ui, sans-serif; opacity: .7; transition: opacity .25s; }
+  body.barra-viva #menuTactil { opacity: 0; pointer-events: none; }
+  body.coarse.started #activaSonido:not([hidden]) { display: block; position: fixed; z-index: 8; left: 50%; top: 38%; translate: -50% -50%;
+    padding: 12px 20px; border-radius: 12px; border: 2px solid #ffd21f; background: #0c1a42f2; color: #ffd21f;
+    font: 700 17px system-ui, sans-serif; box-shadow: 0 8px 30px #000a; }
+  #ajustePad { position: fixed; z-index: 9; left: 50%; top: 50%; translate: -50% -50%; width: min(340px, calc(100vw - 32px));
+    display: grid; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 2px solid #2c4a98; background: #0c1a42f5; color: #e8eaf6;
+    font: 14px/1.4 system-ui, sans-serif; box-shadow: 0 12px 40px #000c; }
+  #ajustePad[hidden] { display: none; }
+  #ajustePad b { color: #ffd21f; font: 400 18px 'Lilita One', system-ui, sans-serif; }
+  #ajustePad label { display: grid; grid-template-columns: 90px 1fr 46px; align-items: center; gap: 8px; }
+  #ajustePad input { width: 100%; accent-color: #ffb21e; }
+  #ajustePad output { text-align: right; font-variant-numeric: tabular-nums; }
+  #ajustePad p { margin: 0; color: #a9b6dc; font-size: 12.5px; }
+  #ajustePad div { display: flex; gap: 8px; justify-content: flex-end; }
+  #ajustePad button { padding: 7px 12px; border-radius: 8px; border: 1px solid #2f4d9c; background: #16306e; color: #fff; font: 600 14px system-ui, sans-serif; }
+  #ajustePad button[data-x="listo"] { background: #ffb21e; border-color: #ffb21e; color: #2a0d00; }
 </style>''')
 
 # ---- deslizar con el dedo: en todo el inicio, no solo en la tarjeta ----
 # El fork bloquea el arrastre con el dedo (touchmove) en toda la página salvo en `.card`, para que el juego no se
 # mueva ni haga zoom. Pero los modos (pagina.js, 2b) van fuera de la tarjeta: se bajaba arrastrando sobre ella y,
 # con el dedo ya sobre los modos, no se podía volver a subir. Se deja arrastrar en todo el inicio (`#start`, que se
-# quita al empezar) y en las dos listas con scroll propio (los vetados, el log).
+# quita al empezar), en las dos listas con scroll propio (los vetados, el log) y en el panel 🎮 (sus deslizadores).
 cambia("    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card')) e.preventDefault(); }, { passive: false });",
-       "    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card, #start, #vetos, #registro')) e.preventDefault(); }, { passive: false });")
+       "    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card, #start, #vetos, #registro, #ajustePad')) e.preventDefault(); }, { passive: false });")
 
 # ---- Chrome o Edge (JSPI): en el computador y en Android; iPhone y Safari no ----
 # Solo se construye la versión JSPI. La tienen Chrome y Edge, también Chrome de Android (con los controles táctiles
