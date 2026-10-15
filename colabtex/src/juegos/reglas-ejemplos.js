@@ -302,7 +302,7 @@ export const VARIANTES={
  bt3:{
   duelo:[e('duelo','Un duelo, de la sala a la revancha',
    p('Los dos listos','Cada uno espera su «● Disco listo». Ana es la anfitriona: elige la batalla, el tiempo y los personajes, y aprieta ¡A pelear!.',bt3('vest')),
-   p('A pelear','Eligen personaje y escenario en el juego. Cada uno juega en su computador, con su teclado o su mando; la vida, el ki y el reloj son los del juego.',bt3('pelea')),
+   p('A pelear','Eligen personaje y escenario en el juego. Cada uno juega en su computador o celular, con teclado, mando o los botones táctiles; la vida, el ki y el reloj son los del juego.',bt3('pelea')),
    p('El K.O. se anota solo','Al terminar, el juego le dice a la sala quién ganó. Nadie tiene que marcar nada: la celebración se ve entera y después vuelven los dos a la sala.',bt3('ko')),
    p('Marcador y revancha','La sala suma la pelea al marcador. Si los dos aprietan la revancha, la siguiente empieza sola con las mismas reglas.',bt3('marcador'))),
   e('dar','Cuando el juego no pudo decir quién ganó',

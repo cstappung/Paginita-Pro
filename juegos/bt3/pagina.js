@@ -13,7 +13,7 @@
       anfitrión empiece, se conecta con el rival por la malla del marco (`red.js`) y recién ahí arranca el
       programa como sesión en línea. El entorno de la sesión (anfitrión o no, reglas) lo pone el programa con
       setenv al empezar el juego (Module.entornoPendiente): ENV ya no sirve una vez cargado el runtime.
-   @controles: teclado */
+   @controles: tactil teclado */
 (() => {
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
@@ -103,7 +103,7 @@
      una sola vez (la promesa queda guardada). */
   let programa = null;
   const pidePrograma = window.pidePrograma = () => programa || (programa = (async () => {
-    if (!window.cargaPrograma) return;   // (sin JSPI, o en el celular: aquí el juego no corre, no se baja nada)
+    if (!window.cargaPrograma) return;   // (sin JSPI, como en el iPhone: aquí el juego no corre, no se baja nada)
     const url = Module.locateFile ? Module.locateFile("bt3-jspi.wasm", "") : "bt3-jspi.wasm";
     /* Ya bajado antes (esta misma versión): sin barra, directo de la caché del navegador. Así Chrome además
        reusa el código ya compilado (lo guarda solo para un .wasm cargado de su dirección, no de un blob), y el
@@ -705,7 +705,30 @@
     return true;
   };
   if (mandos()) setInterval(mandos, 1000);
+  /* Juegos (la página de arriba) carga juegos/audio/mando.js: sin juego que lo configure, el mando maneja ahí un
+     cursor (el círculo blanco) y su A hace clic donde esté, encima de la pelea. Aquí mando.js no se carga (el
+     juego lee el mando solo, ver CLAUDE.md), así que avisamos nosotros lo que su copia avisaría: «este marco es
+     un hijo con mando». Mientras el marco se ve, arriba se apartan (sin cursor ni clics); al esconderlo vuelven. */
+  const avisaHijo = () => {
+    try { if (parent !== window && parent.Mando && parent.Mando._hijo) { parent.Mando._hijo(window); return true; } }
+    catch (e) {}
+    return false;
+  };
+  if (!avisaHijo()) { let n = 0; const t = setInterval(() => { if (avisaHijo() || ++n > 40) clearInterval(t); }, 250); }
   mando.style.cursor = "pointer";
+
+  /* En el celular (Chrome de Android: los controles táctiles del fork, body.coarse): con el juego andando, el
+     primer toque pone el juego a pantalla completa, sin la barra del navegador que le quita alto. Pedirla necesita un
+     toque (el navegador no la da sola), y si se sale (el gesto de atrás) el próximo toque la pide de nuevo. Dentro
+     de Juegos el marco tiene `allowfullscreen`. */
+  if (document.body.classList.contains("coarse")) {
+    const pideCompleta = () => {
+      if (!document.body.classList.contains("started") || document.fullscreenElement) return;
+      const raiz = document.documentElement, pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+      try { pide && Promise.resolve(pide.call(raiz, { navigationUI: "hide" })).catch(() => {}); } catch (e) {}
+    };
+    addEventListener("pointerup", pideCompleta, true);
+  }
   mando.onclick = () => { if (!ajustes.hidden) ajustes.onclick(); };
 
   // El menú «Dragon Net Battle» del juego abría el juego en línea del fork (su servidor): aquí se juega en una sala.
@@ -985,10 +1008,12 @@
     // ♪ en la barra: la canción o la música del juego (para cada uno; se puede cambiar en plena pelea)
     const boton = document.createElement("button");
     boton.id = "musica"; boton.type = "button";
+    const chico = document.body.classList.contains("coarse");
     function pintaBoton() {
       const si = quiere(), cual = hallada && hallada.nombre ? `«${hallada.nombre}»${hallada.artista ? " de " + hallada.artista : ""}` : "«chinchonchin»";
       // (si no se pudo, el botón lo dice: así se sabe por qué suena la del juego)
-      boton.textContent = !si ? "♪ Música del juego" : fallo ? "♪ Chinchonchin ⚠" : "♪ " + (hallada && hallada.corto || "Chinchonchin");
+      boton.textContent = !si ? (chico ? "♪ Juego" : "♪ Música del juego") : fallo ? "♪ ⚠" + (chico ? "" : " Chinchonchin")
+        : chico ? "♪" : "♪ " + (hallada && hallada.corto || "Chinchonchin");   // (en el celular, corto: la barra va entre los botones)
       boton.title = !si ? "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)"
         : fallo ? `No suena ${cual}: ${fallo}. Suena la música del juego. Clic: elegir la música del juego`
         : `En las peleas suena ${cual}, de PRO HERO. Clic: la música del juego`;
@@ -1007,18 +1032,34 @@
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
 
-  /* «← Sala»: salir de la pelea y volver al vestíbulo de la sala cuando se quiera (la pelea se corta y no cuenta).
-     Lo mismo que salir del modo desde el propio juego (Module.onFueraDelModo, más abajo). */
+  /* El botón de salida del marco, en dos tiempos según lo que esté pasando:
+     - en plena pelea, «← Sala»: corta la pelea (no cuenta) y vuelve al vestíbulo de la sala o a la llave. Lo mismo
+       que salir del modo desde el propio juego (Module.onFueraDelModo, más abajo).
+     - esperando (el disco ya cargó y el juego espera a que empiece la pelea), «← Salir del duelo / del torneo»: sale
+       de la sala, como «← Vestíbulo» de la cabecera (que a pantalla completa no se ve). Antes aquí también mandaba
+       «termino», que fuera de una pelea la sala ignora: el segundo clic no hacía nada.
+     `enPeleaSala` lo pone `antesDeEmpezar` cuando empieza la pelea (el marco se recarga después de cada una). */
+  let est = null, cuandoEmpiece = null, ronda = 0;
+  let enPeleaSala = false;
   const aSala = document.createElement("button");
-  aSala.id = "volverSala"; aSala.type = "button"; aSala.textContent = "← Sala"; aSala.title = "Volver a la sala (esta pelea se corta)";
+  aSala.id = "volverSala"; aSala.type = "button";
+  const textoSala = () => enPeleaSala ? "← Sala" : est && est.torneo ? "← Salir del torneo" : "← Salir del duelo";
+  const pintaSala = () => {
+    if (seguroSala) return;   // (a mitad de confirmar: no se le cambia el texto)
+    aSala.textContent = textoSala();
+    aSala.title = enPeleaSala ? "Volver a la sala (esta pelea se corta)" : "Salir de la sala y volver a Juegos";
+  };
   $("barra").prepend(aSala);
   let seguroSala = 0;   // (dos clics, como «← Modos»: confirm() no sirve en un marco con sandbox)
+  pintaSala();
   aSala.onclick = () => {
     if (!seguroSala) {
-      aSala.textContent = "¿Salir? La pelea se corta"; aSala.classList.add("seguro");
-      seguroSala = setTimeout(() => { seguroSala = 0; aSala.textContent = "← Sala"; aSala.classList.remove("seguro"); }, 4000);
+      aSala.textContent = enPeleaSala ? "¿Salir? La pelea se corta" : "¿Salir de la sala?"; aSala.classList.add("seguro");
+      seguroSala = setTimeout(() => { seguroSala = 0; aSala.classList.remove("seguro"); pintaSala(); }, 4000);
       return;
     }
+    clearTimeout(seguroSala); seguroSala = 0; aSala.classList.remove("seguro"); pintaSala();
+    if (!enPeleaSala) { aviso("Saliendo de la sala…"); S.cierra(); S.avisa("salir"); return; }
     aviso("Volviendo a la sala…");
     S.cierra();
     S.avisa("termino", { por: "menu" });
@@ -1070,7 +1111,6 @@
      botaba archivos que todavía usaba y los volvía a leer del disco en cada cuadro: 2 fps, 99% ocupado sin dibujar.
      Ahora el banco usa los 768 MB del sitio.) */
 
-  let est = null, cuandoEmpiece = null, ronda = 0;
   /* Las reglas de personajes de la sala (No OP / Sólo malos, bt3-tiers.js en la sala): al abrir la selección de
      personajes, el programa manda los nombres que trae el disco (Web_Catalogo, parche.diff) y la sala devuelve
      qué ids quedan fuera (`estado.vetados`). El programa los lee de Module.vetados al elegir (web_vetado): un
@@ -1098,6 +1138,7 @@
   };
   S.alEstado(e => {
     est = e;
+    pintaSala();
     ponVetados(e);
     if (e.mirando) {   // un mirón no carga nada: la pelea se ve en la pantalla de cada jugador
       $("start") && $("start").remove();
@@ -1118,6 +1159,7 @@
       aviso(est && est.torneo ? "Disco listo. Esperando tu pelea del torneo…" : "Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
+      enPeleaSala = true; pintaSala();   // (desde aquí «← Sala» corta la pelea)
       const equipo = (e.reglas >> 12 & 15) || 0;   // 3 = el Team 3 vs 3 (motor.js, reglasBt3)
       if (e.rival.cpu) {
         /* Una pelea del torneo contra la CPU: se juega aquí solo, sin red. El juego entra al versus 1P vs COM con

@@ -89,7 +89,7 @@ export function crearBt3Solo({ volver }) {
   };
 }
 
-export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
+export function crearBt3({ uid, pid, jugar, terminar, mirando, salir }) {
   let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
   let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;
   let permitido = false, discoMarco = false, peleabaAntes = false;   // es de la lista de amigos (se sabe al montar): antes, nada se pinta
@@ -273,6 +273,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       return;
     }
     if (d.tipo === "menufin") { if (esperaMenu) reiniciaMarco(); return; }
+    /* «← Salir de la sala» del marco (sin pelea en curso: esperando en el vestíbulo o en la llave): lo mismo que
+       «← Vestíbulo» de la cabecera, que a pantalla completa no se ve. Antes el marco mandaba «termino», que fuera
+       de una pelea no hace nada, y el botón parecía muerto. */
+    if (d.tipo === "salir") {
+      try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {}
+      salir?.();
+      return;
+    }
     if (partida?.fin || !enSala()) return;   // un mirón no escribe
     if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
     else if (d.tipo === "resultado" && (peleando() || (!est.torneo && est.pendiente && est.fase === "vestibulo")) && Number.isInteger(d.bits)) {

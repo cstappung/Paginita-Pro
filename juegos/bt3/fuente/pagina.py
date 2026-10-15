@@ -82,7 +82,10 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   #start .pick.alt { background: #16306e; color: var(--text); border: 2px solid #2f4d9c; box-shadow: none; font: 600 15px system-ui, sans-serif; }
   #start .pick:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 3px; }
   /* el selector de modo (pagina.js, 2b), como el de Snake Club: una columna de tarjetas junto a la de inicio */
-  #start.con-modos { gap: 22px; flex-wrap: wrap; align-content: center; }
+  /* `safe center`: centrado mientras cabe; si no cabe (un celular vertical, una ventana baja) empieza arriba y se
+     desliza. Con `center` a secas lo que sobraba arriba quedaba cortado, fuera del alcance del scroll. */
+  #start { align-items: safe center; justify-content: safe center; }
+  #start.con-modos { gap: 22px; flex-wrap: wrap; align-content: safe center; }
   .modos-lista { width: 320px; max-width: 100%; display: grid; gap: 8px; }
   .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
   .modos-tit h2 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
@@ -158,6 +161,8 @@ cambia('</style>', '''  #barra { position: fixed; z-index: 7; top: calc(var(--st
   #start.en-sala .card .pick:not(#abreSala) { display: none; }
   #start.en-sala #abreSala { display: block; }
   @media (max-width: 760px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit { grid-column: 1 / -1; } .modo .radio { display: none; } }
+  /* un celular vertical (Android): una columna; las dos de 460 px se salían de la pantalla */
+  @media (max-width: 500px) { .modos-lista { width: 100%; grid-template-columns: 1fr; } }
 </style>''')
 cambia('<div id="stage">', '''<div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
   title="Ajustes (F1): video, sonido y controles">Ajustes</button><span id="mando" role="status">Mando: aprieta un botón</span><button
@@ -176,15 +181,44 @@ cambia('<button class="pick" id="serverDisc" hidden>Play</button>',
 cambia('<kbd>F1</kbd> settings and controls &nbsp; <kbd>F11</kbd> full screen &nbsp; Saves stay in this browser.',
        '<kbd>F1</kbd> o «Ajustes»: video, sonido y controles &nbsp; <kbd>F11</kbd> pantalla completa &nbsp; Las partidas guardadas quedan en este navegador.')
 cambia('<div class="keys mobile-only">Plays in landscape or portrait, with touch controls (a controller works too).\n      For full screen on iPhone: Share &rarr; Add to Home Screen. Saves stay on this device.</div>',
-       '<div class="keys mobile-only">Se juega en horizontal o vertical, con controles táctiles (un mando también sirve).\n      Las partidas guardadas quedan en este dispositivo.</div>')
+       '<div class="keys mobile-only">Se juega con controles táctiles (un mando también sirve), mejor con el celular en horizontal:\n      al tocar el juego se pone a pantalla completa. Las partidas guardadas quedan en este celular.</div>')
 
-# ---- solo computador con Chrome o Edge (JSPI): en el celular no se juega ----
+# ---- los controles táctiles: solo en una pantalla sin mouse ----
+# El fork los muestra si hay «algo táctil» (pointer: coarse o maxTouchPoints > 1), y un notebook con pantalla táctil
+# (o un Windows con drivers táctiles) cumple eso aunque se juegue con mouse y teclado: los controles tapaban la pelea.
+# «Táctil» exige que NO haya ningún puntero fino (mouse o touchpad): un celular sí, un PC con pantalla táctil no.
+cambia("  const coarse = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;",
+       "  const coarse = !matchMedia('(any-pointer: fine)').matches &&   // (con mouse o touchpad no: ver pagina.py)\n"
+       "                 (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1);")
+# Y lo guardado no manda en el computador: el fork guardaba 'bt3.touch' = '1' al arrancar aunque nadie lo eligiera,
+# así que ese '1' viejo los volvía a encender. Con mouse solo ?touch=1 los muestra.
+cambia("      let touch = coarse;\n      try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}",
+       "      let touch = coarse;\n      if (coarse) try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}")
+
+# ---- en el celular: la barra chica y al centro, sin tapar los botones táctiles ----
+# Los botones del fork van en dos columnas a los lados (horizontal) o abajo (vertical). La barra del sitio, a la
+# derecha como en el PC, tapaba R2 y START en horizontal y se salía de la pantalla en vertical. En el celular va
+# centrada entre las columnas (con el juego andando; antes queda donde en el PC), sin el deslizador del volumen (queda el botón 🔇) ni el indicador del mando si no hay
+# uno. `translate` (no `transform`) para no pisar la animación con que la barra se esconde. El selector de idioma
+# flotante de i18n.js (abajo a la izquierda) se iba encima del stick: con el juego andando no se muestra (en ningún
+# aparato: en el PC tapaba la imagen).
+cambia('</style>', '''  body.started .i18n-flota { display: none; }
+  body.coarse.started #barra { left: 50%; right: auto; translate: -50% 0; flex-wrap: wrap; justify-content: center;
+    max-width: calc(100vw - var(--vh, 1vh) * 84); }
+  @media (orientation: portrait) { body.coarse.started #barra { max-width: calc(100vw - 16px); } }
+  body.coarse #barra .vj-ctl input, body.coarse #barra .vj-ctl output { display: none; }
+  body.coarse #mando:not(.ok) { display: none; }
+</style>''')
+
+# ---- Chrome o Edge (JSPI): en el computador y en Android; iPhone y Safari no ----
+# Solo se construye la versión JSPI. La tienen Chrome y Edge, también Chrome de Android (con los controles táctiles
+# del fork). En el iPhone todo navegador es Safari por dentro, sin JSPI: ahí no arranca y se dice.
 cambia("  const BUILD = Q.get('build') || ('Suspending' in WebAssembly ? 'bt3-jspi' : 'bt3-async');",
        "  const BUILD = 'bt3-jspi';   // (solo la versión JSPI: sin ella el juego no arranca, ver abajo)")
 cambia("  if (typeof WebAssembly !== 'object') say('This browser cannot run WebAssembly.', true);",
-       "  if (typeof WebAssembly !== 'object' || !('Suspending' in WebAssembly) || phone) {\n"
+       "  if (typeof WebAssembly !== 'object' || !('Suspending' in WebAssembly)) {\n"
        "    $('pickLabel').hidden = true;\n"
-       "    say('Este juego necesita Chrome o Edge en un computador (no funciona en el celular ni en Safari).', true);\n"
+       "    say('Este juego necesita Chrome o Edge: en el computador, o Chrome en un celular Android. En iPhone y Safari no funciona.', true);\n"
        "  }")
 
 # ---- el programa: con versión, también el .wasm ----

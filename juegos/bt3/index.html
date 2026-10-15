@@ -12,7 +12,7 @@
 <title>Budokai Tenkaichi 3</title>
 <!-- i18n.js primero (traducción del sitio); volumen.js antes que cualquier audio: envuelve AudioContext para que
      el silencio y el volumen del sitio gobiernen el sonido del juego sin que el juego lo sepa. -->
-<script src="../../i18n.js?v=202610150323"></script>
+<script src="../../i18n.js?v=202610150458"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
@@ -197,7 +197,10 @@
   #start .pick.alt { background: #16306e; color: var(--text); border: 2px solid #2f4d9c; box-shadow: none; font: 600 15px system-ui, sans-serif; }
   #start .pick:focus-visible { outline: 2px solid #7fb2ff; outline-offset: 3px; }
   /* el selector de modo (pagina.js, 2b), como el de Snake Club: una columna de tarjetas junto a la de inicio */
-  #start.con-modos { gap: 22px; flex-wrap: wrap; align-content: center; }
+  /* `safe center`: centrado mientras cabe; si no cabe (un celular vertical, una ventana baja) empieza arriba y se
+     desliza. Con `center` a secas lo que sobraba arriba quedaba cortado, fuera del alcance del scroll. */
+  #start { align-items: safe center; justify-content: safe center; }
+  #start.con-modos { gap: 22px; flex-wrap: wrap; align-content: safe center; }
   .modos-lista { width: 320px; max-width: 100%; display: grid; gap: 8px; }
   .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
   .modos-tit h2 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: #ffd21f; text-shadow: 0 2px 0 #1a0600; }
@@ -273,6 +276,14 @@
   #start.en-sala .card .pick:not(#abreSala) { display: none; }
   #start.en-sala #abreSala { display: block; }
   @media (max-width: 760px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit { grid-column: 1 / -1; } .modo .radio { display: none; } }
+  /* un celular vertical (Android): una columna; las dos de 460 px se salían de la pantalla */
+  @media (max-width: 500px) { .modos-lista { width: 100%; grid-template-columns: 1fr; } }
+  body.started .i18n-flota { display: none; }
+  body.coarse.started #barra { left: 50%; right: auto; translate: -50% 0; flex-wrap: wrap; justify-content: center;
+    max-width: calc(100vw - var(--vh, 1vh) * 84); }
+  @media (orientation: portrait) { body.coarse.started #barra { max-width: calc(100vw - 16px); } }
+  body.coarse #barra .vj-ctl input, body.coarse #barra .vj-ctl output { display: none; }
+  body.coarse #mando:not(.ok) { display: none; }
   /* barras de progreso: en la tarjeta (bajar el juego) y arriba al centro durante el juego (cargar del disco) */
   #progreso { margin-top: 12px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
   .pista { height: 8px; border-radius: 99px; background: #2a1f18; overflow: hidden; }
@@ -287,7 +298,7 @@
   @keyframes gira { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .indef .pista i, #sala.gira::before { animation: none; } }
 </style>
-<script src="red.js?v=bt3-30"></script>
+<script src="red.js?v=bt3-31"></script>
 </head>
 <body>
 <div id="barra"><span data-volumen></span><button id="ajustes" type="button" hidden
@@ -327,8 +338,8 @@
     <div id="status"></div>
     <div id="progreso" hidden><div class="pista"><i></i></div><span></span></div>
     <div class="keys desktop-only"><kbd>F1</kbd> o «Ajustes»: video, sonido y controles &nbsp; <kbd>F11</kbd> pantalla completa &nbsp; Las partidas guardadas quedan en este navegador.</div>
-    <div class="keys mobile-only">Se juega en horizontal o vertical, con controles táctiles (un mando también sirve).
-      Las partidas guardadas quedan en este dispositivo.</div>
+    <div class="keys mobile-only">Se juega con controles táctiles (un mando también sirve), mejor con el celular en horizontal:
+      al tocar el juego se pone a pantalla completa. Las partidas guardadas quedan en este celular.</div>
   </div>
 </div>
 <script>
@@ -337,7 +348,8 @@
   const status = $('status');
   const say = (t, err) => { status.textContent = t; status.className = err ? 'err' : ''; };
   const showError = (t) => { const e = $('err'); e.textContent = t; e.style.display = 'block'; };
-  const coarse = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+  const coarse = !matchMedia('(any-pointer: fine)').matches &&   // (con mouse o touchpad no: ver pagina.py)
+                 (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1);
   const phone = coarse && Math.min(screen.width, screen.height) < 600;
   if (coarse) document.body.classList.add('coarse');
   // iPhone: a type filter can grey out a disc image in Files (iOS does not always know .iso); allow any file there
@@ -353,7 +365,7 @@
     printErr: (t) => { Module.keep(t); console.warn(t); },
     keep: (t) => { Module.log.push(t); if (Module.log.length > 4000) { Module.log.splice(0, 1000); Module.logBase += 1000; } },
     noInitialRun: true,
-    locateFile: (f, base) => base + f + '?v=bt3-30',   // el .wasm con la misma versión que su .js
+    locateFile: (f, base) => base + f + '?v=bt3-31',   // el .wasm con la misma versión que su .js
     // phones: a smaller cache of the disc's files (they are kept in memory)
     webCacheBudget: (phone ? 256 : 768) * 1024 * 1024,
     // the port's switches; set before the program starts up (its start-up code reads the environment, which is
@@ -652,7 +664,7 @@
       $('start').remove();
       document.body.classList.add('started');
       let touch = coarse;
-      try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}
+      if (coarse) try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}
       if (Q.get('touch')) touch = Q.get('touch') === '1';
       setTouch(touch);
       if (navigator.wakeLock) {
@@ -680,18 +692,18 @@
   say('');
 
   // the program itself
-  if (typeof WebAssembly !== 'object' || !('Suspending' in WebAssembly) || phone) {
+  if (typeof WebAssembly !== 'object' || !('Suspending' in WebAssembly)) {
     $('pickLabel').hidden = true;
-    say('Este juego necesita Chrome o Edge en un computador (no funciona en el celular ni en Safari).', true);
+    say('Este juego necesita Chrome o Edge: en el computador, o Chrome en un celular Android. En iPhone y Safari no funciona.', true);
   }
   else {
     const s = document.createElement('script');
-    s.src = BUILD + '.js?v=bt3-30';
+    s.src = BUILD + '.js?v=bt3-31';
     s.onerror = () => say('No se pudo cargar el juego (' + BUILD + '.js). Revisa tu conexión y recarga la página.', true);
     window.cargaPrograma = () => document.body.appendChild(s);   // (lo llama pagina.js)
   }
 </script>
 <script>var BT3_TAM_WASM = 3600358;</script>
-<script src="pagina.js?v=bt3-30"></script>
+<script src="pagina.js?v=bt3-31"></script>
 </body>
 </html>

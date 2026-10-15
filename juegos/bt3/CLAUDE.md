@@ -9,8 +9,22 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   the browser fork [stufno102/Tenkaichi3Decomp](https://github.com/stufno102/Tenkaichi3Decomp), pinned in
   `fuente/construir.sh` (`COMMIT`). Our changes to that fork are **one patch**, `fuente/parche.diff`; never edit the
   generated files here by hand.
-- **PC only, Chrome or Edge.** The game is not playable on a phone, so only the JSPI build is made; the fork's
-  Asyncify build (Safari/iPhone) is not, and the page says so on a phone or a browser without JSPI.
+- **Chrome or Edge: on a PC, or Chrome on Android.** Only the JSPI build is made; the fork's Asyncify build
+  (Safari/iPhone, where every browser is Safari underneath) is not, and the page says so on a browser without JSPI.
+  On Android (`body.coarse`) the fork's touch pad shows, and `pagina.py`/`pagina.js` adapt the site's parts:
+  - the bar goes centred between the pad's columns while playing (`translate`, not `transform`, which the bar's
+    hide animation owns), without the volume slider or an idle controller badge, and the ♪ label is short;
+  - the floating language picker of `i18n.js` is hidden once the game runs (it sat on the stick);
+  - the first tap with the game running asks for fullscreen (the frame has `allowfullscreen`);
+  - the mode list is one column under 500 px, and `#start` centres with `safe center` (plain `center` cut off the
+    top of a card taller than the screen, out of reach of the scroll).
+  `@controles: tactil teclado` in `pagina.js` makes the lobby tag it for phones too. Bench test: `prueba50`
+  (Pixel 7, both orientations). Speed on a real phone was never measured.
+- **The fork's on-screen touch pad must not show on a PC.** The fork shows it on `pointer: coarse` or
+  `maxTouchPoints > 1`, which a Windows PC with touch drivers or a touchscreen laptop reports even when played with
+  a mouse: the pad covered the fight. `pagina.py` makes "touch" require that there is **no** fine pointer
+  (`any-pointer: fine`), and ignores the stored `bt3.touch` there, because the fork stored `'1'` on its own at
+  start. With a mouse only `?touch=1` shows it.
 - `fuente/construir.sh <workdir>` clones the fork, applies the patch, builds with Emscripten 6.x, copies
   `bt3-jspi.{js,wasm}` here, generates
   `index.html` with `fuente/pagina.py` from the fork's `port/web/shell.html`, and runs `npm run build:bt3`
@@ -255,7 +269,11 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   training menu: lessons and free training).
 - **Back buttons.** «◀ Atrás» in the bar presses player 1's Triangle (the game's back in every menu) through
   `Web_TouchSet`, only while the menus run (`web_en_menus` around `__real_Progress_Main` → `Module.onMenus`; in a
-  fight Triangle is an attack). «← Modos» (solo) and «← Sala» (room frame: cuts the fight, `termino`) leave.
+  fight Triangle is an attack). «← Modos» (solo) leaves. The room frame's button has two jobs: in a fight it is
+  «← Sala» (cuts the fight, `termino`); while waiting for one (disc loaded, vestíbulo or bracket) it is «← Salir del
+  duelo/torneo» and posts `salir`, which `bt3.js` turns into the room's own exit (`ctx.salir` =
+  `salirDeLaPartida`, the header's «← Vestíbulo»). It used to send `termino` there too, which the room ignores
+  outside a fight: the second click did nothing. `enPeleaSala` is set in `antesDeEmpezar`. Bench test: `prueba49`.
 - Duelo / Torneo are rooms: the button posts `{tipo:"sala", cupo}` (2, or 8 for a tournament) to Juegos, which
   opens it (`alPedirSalaBt3` in `bt3.js`, registered by `juegos-main.js`). Outside Juegos it links there.
 - **No back door to the rest of the game.** Backing out of the chosen mode into the game's other menus (main
@@ -336,7 +354,9 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
 
 - `volumen.js` loads before the program, so the site's mute/volume governs the game's `AudioContext`.
   `mando.js` is **not** loaded: the game reads controllers itself (SDL3), and synthesised keys would double every
-  button.
+  button. But Juegos (the top page) loads it, and with no config there it drives its cursor (the white circle) over
+  the game and clicks with A. So `pagina.js` registers the frame by hand with `parent.Mando._hijo(window)` (what the
+  frame's own copy would do): while the frame is visible the top page steps aside. Bench test: `prueba47`.
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.
