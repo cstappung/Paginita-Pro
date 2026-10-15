@@ -272,14 +272,15 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   pressed; in a room (already playing) the boot is fetched on entering, and «lo esencial» is not offered there (a
   big download during an online fight would take bandwidth from the link with the rival). The boot list is capped
   at 300 pieces (300 MB) on both sides. `BT3_VER` in `bt3-amigos.js` is the program version (construir.sh sets it).
-- **Always 30 fps, locked** (the owner's call, after trying 60): the game simulates at 30 like the PS2, and the port's
-  "Smooth motion" in-between pictures nearly doubled the drawing. The patch forces it off, `gsInterp = 0`, in every
-  `GsGpu_FrameEnd`, AFTER the block that allocates the in-between buffers (with the lock before it they were never
-  allocated: writes through NULL, 6 fps) in the browser build (`gs_draw.c`; F1's combo is disabled and
-  F9 has no effect): in an online fight both players must see the same.
+- **30 fps by default, smooth motion optional** (the owner's call): the game simulates at 30 like the PS2; the port's
+  "Smooth motion" (F1 → Video, or F9) only draws in-between pictures (60/120/240) and nearly doubles the drawing, so
+  it starts off. The fight is computed at 30 either way, so online it does not matter if the rival has it on. In the
+  browser its setting is `"suave"` (default 0; gs_draw.c, ui.cpp, gs_gl.c), a new key so everyone starts at 30
+  whatever the old `"interp"` held. Trap from the time it was locked: forcing `gsInterp = 0` BEFORE the block that
+  allocates the in-between buffers left them unallocated (writes through NULL, 6 fps); never set it before that block.
 - **Auto-tuner** (`pagina.js` 2a, like a phone game's): the picture rate never changes; what gets cheaper is each
-  picture. Under 28 fps for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
-  depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 29.5+ with the program < 75%
+  picture. Its goal is 30, or 60 with smooth motion on (`Web_Suave`; 120/240 still aim at 60). Under 93% of it for 3 s → one step down (no distance blur → no glare → internal scale −1 → scale 1 and no
+  depth tint → no outline: `Web_Calidad(scale, fxOff)` in the patch, not saved); 15 s at 98%+ of it with the program < 75%
   busy → one step up, never above the player's F1 choice (`Web_EscalaElegida`/`Web_FxElegidos`); a step up that
   fails within 20 s doubles the wait for the next one. **Only in fights** (not `body.en-menus`), not in a fight's first
 6 s, and not within 1.5 s of any disc read (`Module.webDisc.readAt` is wrapped: the player's ISO too): in the select

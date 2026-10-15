@@ -14,7 +14,7 @@
 set -euo pipefail
 
 COMMIT=81507cde58685a6f5aab917c298d9a9f82fe09b0      # stufno102/Tenkaichi3Decomp, «Browser build» (2026-10-12)
-VER=bt3-26                                           # súbelo al cambiar el programa: va en los ?v= de la página
+VER=bt3-27                                           # súbelo al cambiar el programa: va en los ?v= de la página
 AQUI="$(cd "$(dirname "$0")" && pwd)"                # juegos/bt3/fuente
 DESTINO="$(cd "$AQUI/.." && pwd)"                    # juegos/bt3
 RAIZ="$(cd "$DESTINO/../.." && pwd)"                 # la raíz del sitio
