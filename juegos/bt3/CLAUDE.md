@@ -106,7 +106,8 @@ current fight at any time (before or during it, even their own; `hist` marks it 
 is `fuera` like someone who left, forfeits, and their photo explodes in a banner. Each fight is also a `ronda` in
 `hist` so the duel's logros apply.
 
-**CPUs and empty places.** Before starting, the organizer fills free places with CPUs (`{t:"cpu", id:"cpu:N",
+**CPUs and empty places.** A tournament starts with nobody but the organizer: no CPUs, no bots (the bench too; its
+test players come only from the organizer's «＋ Entra un jugador de prueba»). Before starting, the organizer fills free places with CPUs (`{t:"cpu", id:"cpu:N",
 nivel}`, levels 0–4 = the game's CPU strength rule; `quita` removes one) or leaves them empty (their rival gets a
 bye). A CPU is a bracket slot, not a player (`est.cpus`, `esCpuBt3`). CPU vs CPU is decided at once, seeded by the
 room's seed and the match id, weighted by level (the same on every screen). Human vs CPU is played alone in the

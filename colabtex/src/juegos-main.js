@@ -2121,7 +2121,7 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
 const NOVEDADES = [
   /* BT3 es privado: su diapositiva solo la ven los amigos del disco (bt3Visible, bt3-amigos.js). */
   { id: "bt3", color: "#ff8a00", alta: "2026-10-14", titulo: "Budokai Tenkaichi 3",
-    lema: "El juego de PS2 completo, en el navegador y a 60 cuadros. De 1 a 8: entrenamiento y contra la CPU, duelos con revancha y torneos de hasta ocho con su llave, con tus amigos o rellenados con CPU.",
+    lema: "El juego de PS2 completo, en el navegador y a 30 cuadros como la consola. De 1 a 8: entrenamiento y contra la CPU, duelos con revancha y torneos de hasta ocho con su llave, con tus amigos y, si el organizador quiere, con CPU.",
     sub: "Solo PC · Chrome o Edge · 1 a 8 jugadores", sala: { k: "bt3", ops: { cupo: 2 } }, reglas: ["bt3"],
     modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
