@@ -7,8 +7,8 @@ marcas de antes de la versión 4 y no recibe ninguna nueva.
 
 **Versión 4** (octubre de 2026): un solo modo. La historia son veinte
 jornadas (una oleada y un jefe por acto) hasta el Sol, y después sigue sin
-fin con los jefes en fase 2 y 3 (en la fase 3, sus espinas son eventos
-`V`; el Sol suelta larvas, `O`). Ya no hay puntos de control: toda prueba
+fin con los jefes en fase 2 a 5 (el verificador admite `V` en cualquier
+jefe en fase 3 o más; el Sol suelta larvas, `O`). Ya no hay puntos de control: toda prueba
 empieza en la jornada 1 (`m:"t"`, `k:0`, o se rechaza). Retomar una
 travesía guardada (la página se cerró, o «Salir» en la pausa) sigue la
 **misma** prueba: el punto guarda la prueba hasta la jornada que empezaba,
@@ -18,6 +18,44 @@ brasas y notas. Una llama perdida en la jornada a medias viaja como
 devuelve llamas. El tiempo declarado es el de toda la travesía. Las
 pruebas de la 3 se rechazan como de otra versión (no castiga), y el iframe
 subió a `club-47`.
+
+**Las habilidades de las fases 2 y 3** (rediseño de octubre de 2026, sin
+cambio de versión: `prueba.js` y el verificador son los mismos). Cada jefe
+tiene una habilidad propia por fase, y todas caben en los eventos que ya
+había: los huevos de la Nidada (Nodriza) son larvas, `O`; las balizas del
+Faro, el fuego fatuo del Casco (solo fase 3) y los fanales que la Hoguera
+arroja pagan como lo que orbita, `V`. Lo demás que un tiro rompe (la seda
+de la Crisálida, su red, los espejismos de la Esfinge) **no anota evento,
+ni acierto, ni puntos, ni nota**, igual que un tiro perdido, y mientras
+dura no hay `X`: el daño declarado al jefe nunca supera el de sus balas.
+Las «espinas» que nombra el comentario de `V` en `prueba.js` ya no
+existen; la regla que las admitía (cualquier jefe en fase 3) es la que usa
+el fuego fatuo.
+
+**La fase 4** (octubre de 2026, también sin cambio de versión). Desde la
+tercera vuelta del sin fin (jornada 58) `M.jornada` devuelve `fase: 4`. El
+verificador solo mira la fase para admitir `V` (`fase >= 3`), así que nada
+cambia para él, y **la vida del jefe es la de la fase 3**
+(`VIDA_FASE[4] === VIDA_FASE[3]`, con un test que lo cuida): si subiera,
+una partida jugada con el `motor.js` anterior (en caché) moriría el jefe
+con «menos daño del que aguanta» y se rechazaría. Subirla exige cambiar la
+versión de la prueba y `club-N`. Sus habilidades usan lo que ya había: las
+polillas del Reclamo son larvas de la Nodriza (`O`), el Ocaso del Sol se
+sostiene con golpes normales (`X`), y un tiro disparado dentro de la
+Mortaja de la Crisálida queda anotado como un disparo que no dio en nada.
+
+**La fase 5** (octubre de 2026, sin cambio de versión). Desde la cuarta
+vuelta (jornada 76) `fase: 5`, con la vida de la fase 3 por lo mismo
+(`VIDA_FASE[5] === VIDA_FASE[3]`, también en el test). Las polillas del
+Abrazo (Nodriza) son larvas (`O`) aunque no quemen; las luces del Prisma
+(Faro) y sus astillas son escamas, que un tiro anula sin anotar nada; lo
+demás (Acertijo, Escora, Compás, Yesca, Rayo de luna, Aurora, Amanecer)
+no se rompe a tiros. **La música acelera con la fase** (`epmDeFase` en
+`musica.js`: +4 % por fase, con techo `EPM_TECHO = 560` corcheas por
+minuto), y los tiros afinados se juzgan contra sus pulsos. El techo deja el
+pulso más corto (dos corcheas) en ≥ 0,214 s, por encima de los 0,2 s con
+que el verificador cuenta pulsos «juntos» (`pulsosJuntos`): una partida
+afinada en la fase 5 no parece un programa.
 
 **Versión 2 de la prueba** (octubre de 2026): la travesía se alargó a una
 segunda parte y después sin fin, cada jornada da una brasa que se gasta en
