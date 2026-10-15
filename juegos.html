@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610150154"></script>
+<script src="i18n.js?v=202610150204"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -117,6 +117,7 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-fin-exp{color:#b4232a;font-weight:600}
   /* El chat va debajo del tablero, no al lado: al lado le robaba ancho
      justo a los tableros que más lo necesitan. */
+  .jg-chat[hidden]{display:none!important}   /* (sala privada de BT3: ni el chat) */
   .jg-chat{margin-top:18px;background:#fff;border:1px solid #e4dfeb;border-radius:16px;overflow:hidden}
   .jg-chat>header{display:flex;align-items:baseline;gap:10px;padding:12px 16px;border-bottom:1px solid #efebf5}
   .jg-chat>header h2{font-size:13.5px;margin:0}.jg-chat>header small{font-size:11px;color:#8a97a3}
@@ -5257,6 +5258,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610150154"></script>
+<script src="juegos-app.js?v=202610150204"></script>
 </body>
 </html>

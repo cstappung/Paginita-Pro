@@ -1,4 +1,5 @@
 import { auth } from "../firebase.js";
+import { ponOculto } from "./ocultos.js";
 
 /* ¿Ve BT3 quien inició sesión? Solo los amigos de la lista del disco privado.
 
@@ -19,6 +20,7 @@ export const alCambiarBt3 = cb => { oyentes.add(cb); };
 function pone(v) {
   if (v === visible) return;
   visible = v;
+  ponOculto("bt3", !v);   // (las vistas que nombran juegos: tienda del perfil, monedas)
   for (const cb of oyentes) { try { cb(v); } catch (e) {} }
 }
 

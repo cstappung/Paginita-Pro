@@ -464,3 +464,25 @@ test('una pelea que terminó con un solo aviso del ganador cuenta (la sesión de
  s=B.reducir(torneo(4,...t,{t:'disco',uid:m.a},{t:'disco',uid:m.b},{t:'empieza',uid:m.a,m:m.id},{t:'resultado',uid:m.a,m:m.id,g:m.b},{t:'vuelve',uid:m.b,m:m.id,por:'corte'}));
  assert.equal(s.llave[0].find(x=>x.id===m.id).g,m.b);
 });
+
+/* BT3 es privado: a quien no está en la lista de amigos del Worker no se le muestra ni nombra. Estas son las puertas;
+   si una vista nueva lista juegos, tiene que pasar por bt3Visible() o juegoOculto(). */
+test('BT3 oculto por omisión, y cada vista que nombra juegos lo respeta',()=>{
+ const o={};vm.runInNewContext(sin('src/juegos/ocultos.js')+';__o={juegoOculto,ponOculto}',o);
+ assert.equal(o.__o.juegoOculto('bt3'),true,'hasta que el Worker diga que sí, oculto');
+ o.__o.ponOculto('bt3',false);assert.equal(o.__o.juegoOculto('bt3'),false);
+ o.__o.ponOculto('bt3',true);assert.equal(o.__o.juegoOculto('bt3'),true);
+ assert.equal(o.__o.juegoOculto('uno'),false);
+ const lee=f=>fs.readFileSync(raiz(f),'utf8'),main=lee('src/juegos-main.js');
+ assert.match(lee('src/juegos/bt3-amigos.js'),/ponOculto\("bt3", !v\)/,'la respuesta del Worker mueve juegoOculto');
+ // la sala abierta por enlace: «Sala privada», sin chat, sin quiénes, sin «Unirse»; y entrar() se niega
+ assert.match(main,/const privada = p\.juego === "bt3" && !bt3Visible\(\);[\s\S]{0,80}\$\("jgChat"\)\.hidden = privada;/);
+ assert.match(main,/async function entrar\(pid\) \{[\s\S]{0,400}sala\.juego === "bt3" && !bt3Visible\(\)\) return;/);
+ assert.match(main,/function pintaQuienes\(p, est\) \{[\s\S]{0,150}p\.juego === "bt3" && !bt3Visible\(\)/);
+ // las listas del salón (catálogo, solos, novedades, salas abiertas, en juego), clasificación y logros
+ for (const r of [/k !== "bt3" \|\| bt3Visible\(\)/, /n\.id !== "bt3" \|\| bt3Visible\(\)/, /s\.juego !== "bt3" \|\| bt3Visible\(\)/, /x\.juego !== "bt3" \|\| bt3Visible\(\)/, /ocultos: \(\) => bt3Visible\(\) \? \[\] : \["bt3"\]/])
+  assert.match(main,r);
+ assert.match(lee('src/juegos/logros-vista.js'),/!fuera\.has\(j\)/,'los logros no vuelven a meter un juego oculto');
+ assert.match(lee('src/juegos/monedas-vista.js'),/filter\(j => !juegoOculto\(j\)\)/,'la tabla de monedas no nombra a BT3');
+ assert.match(lee('src/juegos/perfil.js'),/!juegoOculto\(it\.req\.top\)/,'la tienda no muestra su premio de campeón');
+});

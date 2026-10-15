@@ -22,7 +22,7 @@ const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombr
 const info = j => JUEGOS[j] || EXTRA[j] || { nombre: j, color: "#888" };
 const MAX_NOMBRES = 8;
 
-export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
+export function crearLogros({ uid, watchLogros, perfil, orden, ocultos = () => [], icono = {} }) {
   let host = null, off = null, datos = null, fallo = null, firma = "";
   let juego = "";
   try { juego = localStorage.getItem("jg.logrosJuego") || ""; } catch (e) { /* sin almacenamiento */ }
@@ -40,7 +40,9 @@ export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
     for (const filas of Object.values(datos.solo || {})) for (const [u, f] of Object.entries(filas || {})) if (f && f.nombre && !nombres[u]) nombres[u] = f.nombre;
     const { tiene, gente } = reparto(datos.ranks, datos.solo, datos.logros);
     const juegos = (orden ? orden() : Object.keys(LOGROS)).filter(j => LOGROS[j]);
-    for (const j of Object.keys(LOGROS)) if (!juegos.includes(j)) juegos.push(j);
+    /* (los que `orden` no trae van al final; los ocultos no: BT3 para quien no está en su lista de amigos) */
+    const fuera = new Set(ocultos());
+    for (const j of Object.keys(LOGROS)) if (!juegos.includes(j) && !fuera.has(j)) juegos.push(j);
     /* Cuántos tiene cada uno, por juego y en total. */
     const cuenta = {}, total = {};
     for (const j of juegos) {
@@ -119,7 +121,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
     if (!host) return;
     if (!datos) { host.innerHTML = `<p class="jg-nota">Cargando logros…</p>`; return; }
     const R = calcula();
-    if (!LOGROS[juego]) juego = R.juegos.find(j => R.gente[j].has(uid)) || R.juegos[0];
+    if (!LOGROS[juego] || !R.juegos.includes(juego)) juego = R.juegos.find(j => R.gente[j].has(uid)) || R.juegos[0];   // (un oculto tampoco por enlace)
     const aviso = fallo ? `<p class="jg-nota jg-aviso">No se pudieron leer los logros guardados (${esc(fallo.code || fallo.message || fallo)}). Si dice PERMISSION_DENIED, hay que volver a publicar las reglas en la consola de Firebase: <code>firebase/database.rules.json</code>. Los que salen de la clasificación se ven igual.</p>` : "";
     const f = JSON.stringify([juego, fallo && String(fallo.code || fallo), datos, R.juegos]) + R.juegos.map(j => [...R.gente[j]].map(nombreDe).join()).join("|");
     if (f === firma) return;

@@ -1420,6 +1420,9 @@ function salaParaDiscord(pid, juego, extra, u) {
 async function entrar(pid) {
   const u = state.user;
   if (!u) return;
+  // BT3: solo entran los amigos de la lista (la sala privada no ofrece «Unirse», y esto cierra cualquier otro camino)
+  const sala = state.partida && state.pid === pid ? state.partida : state.salas.find(s => s.id === pid);
+  if (sala && sala.juego === "bt3" && !bt3Visible()) return;
   try {
     await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
@@ -1876,7 +1879,8 @@ function armazon() {
   if (state.vista === "logros") {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible())
+      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
+      ocultos: () => bt3Visible() ? [] : ["bt3"]
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero" })[k] || k) });
     logrosVista.montar(h);
     return;
@@ -2655,6 +2659,7 @@ function avisoReglas(err) {
 }
 
 /* ---------- pintado: la partida ---------- */
+let bt3Revisando = false, bt3Revisada = false;   // (la pregunta de acceso a BT3 de una sala privada: una vez)
 function pintaPartida() {
   const p = state.partida, est = state.estado;
   if (!p) {
@@ -2664,6 +2669,25 @@ function pintaPartida() {
       : state.cargando ? "" : `<div class="vacio">La sala se cerró o el enlace no es correcto.</div>`;
     desmontaJuego();
     $("jgFin").innerHTML = "";
+    return;
+  }
+
+  /* BT3 es privado (bt3-amigos.js): a quien no está en la lista de amigos no se le muestra nada de la sala —ni
+     el juego, ni quiénes están, ni el chat, ni «Unirse»—, aunque tenga el enlace. Mientras el Worker no contesta
+     (`/soy`, una vez por sesión) dice que se está comprobando, y al llegar la respuesta la sala se repinta. */
+  const privada = p.juego === "bt3" && !bt3Visible();
+  $("jgChat").hidden = privada;
+  if (privada) {
+    ambientar(""); desmontaJuego();
+    $("jgTitulo").textContent = "Sala privada"; $("jgTitulo").style.color = "";
+    $("jgQuienes").innerHTML = ""; $("jgAbandonar").style.display = "none";
+    for (const id of ["jgMirando", "jgHost", "jgRevancha", "jgFin"]) $(id).innerHTML = "";
+    $("jgInvita").innerHTML = `<div class="jg-invita"><b>${bt3Revisando ? "Comprobando el acceso…" : "Esta sala es privada."}</b></div>`;
+    if (!bt3Revisando && !bt3Revisada) {
+      bt3Revisando = true;
+      revisaBt3().then(() => { bt3Revisando = false; bt3Revisada = true; if (state.vista === "partida") pintaPartida(); });
+      $("jgInvita").innerHTML = '<div class="jg-invita"><b>Comprobando el acceso…</b></div>';
+    }
     return;
   }
 
@@ -3040,6 +3064,7 @@ function fueraDe(est) {
 function pintaQuienes(p, est) {
   const caja = $("jgQuienes");
   if (!caja) return;
+  if (p.juego === "bt3" && !bt3Visible()) { caja.innerHTML = ""; return; }   // (sala privada: ni quiénes están)
   const yo = state.user.uid;
   const juego = !!(p.jugadores || {})[yo];
   const fuera = fueraDe(est);
@@ -3299,7 +3324,7 @@ function wire() {
   });
   /* BT3 aparece solo para los amigos de la lista del disco privado: se pregunta al cambiar la sesión, y el
      salón se repinta cuando llega la respuesta (bt3-amigos.js). */
-  alCambiarBt3(() => { vesFirma = ""; if (state.vista === "vestibulo") render(); });
+  alCambiarBt3(() => { vesFirma = ""; bt3Revisada = false; if (state.vista === "vestibulo") render(); else if (state.vista === "partida") pintaPartida(); });
   // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
   alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
   watchAuth(user => {

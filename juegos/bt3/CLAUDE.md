@@ -351,7 +351,16 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
 - `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
 - **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
   it says yes, BT3 is filtered out of the catalogue, the solo list, the novedades banner (`filtraNovedades` in
-  `juegos-main.js`), open rooms, games in progress, ranks and logros, and a BT3 room shows "Esta sala es privada". BT3 rooms are never announced on Discord; they are in
+  `juegos-main.js`), open rooms, games in progress, ranks and logros (`ocultos` in `logros-vista.js`: it used to
+  re-add every game missing from `orden`, BT3 included), and never named elsewhere (`juegoOculto` in
+  `juegos/ocultos.js`: the coins table, the shop's champion prize). A BT3 room opened by link shows only «Sala
+  privada» — no players, no chat, no «Unirse» — and `entrar()` refuses it. `tests/bt3.test.cjs` pins these gates:
+  a new view that lists games must go through `bt3Visible()` or `juegoOculto()`.
+- **Adding a friend is only the Worker's `AMIGOS`** (Cloudflare → Variables → save): nothing in Firebase. They must
+  sign in with that Google account and reload the page (`/soy` is asked once per session). The page's admins
+  (`admins/<uid>`) are not friends by being admins.
+- Honest limit: the lobby query still downloads waiting BT3 rooms to every signed-in browser (hidden in the UI), and
+  the rules let any signed-in user create one from the console. Only the disc is truly locked (the Worker). BT3 rooms are never announced on Discord; they are in
   `enCurso` (juego and names only) so friends can watch, and only friends are shown them. This hides the game; the page files are public like the whole site (they hold nothing of the
   game), and the disc itself is what the Worker protects.
 - The frame gets the token from its parent (`bt3.js` answers `{tipo:"token"}` only to a same-origin iframe
