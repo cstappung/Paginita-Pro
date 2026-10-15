@@ -18,6 +18,10 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   - without a mouse the bar never came back (it revives on mouse moves), so ☰ (top centre) shows it; the bar gets
     ⛶ (enter/leave fullscreen) and 🎮 (pad size 70–120 % and opacity: `--esc`/`--opa` on #pad, `bt3.pad.*`;
     the size is capped at 110 % in landscape and 120 % in portrait, past that buttons overlap — `choques.cjs`);
+  - the fork caches where each touch button is (`Touch.rects`) and re-measured only on rotation, but the buttons
+    also move when the height changes without rotating (fullscreen, Chrome's bar hiding): taps landed on the old
+    places and «didn't react the first time» until the phone was turned and back. `Touch.down` now measures on every
+    new finger (~18 rects). Bench test: `prueba54` (fails with the old page, passes now);
   - fullscreen is asked by itself only ONCE (first tap with the game running): asking on every tap made it
     impossible to leave;
   - «🔊 Activar el sonido» shows while the game's AudioContext is not running (a tap on a real button always

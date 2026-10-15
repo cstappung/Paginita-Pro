@@ -246,6 +246,14 @@ cambia('</style>', '''  body.started .i18n-flota { display: none; }
 cambia("    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card')) e.preventDefault(); }, { passive: false });",
        "    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card, #start, #vetos, #registro, #ajustePad')) e.preventDefault(); }, { passive: false });")
 
+# ---- los botones táctiles se miden de nuevo con cada dedo ----
+# El fork guarda dónde está cada botón (Touch.rects) y solo lo vuelve a medir al girar el celular. Pero los botones se
+# mueven también cuando cambia el alto de la pantalla sin girar: al entrar a pantalla completa (el primer toque, ver
+# pagina.js) o cuando la barra de Chrome se esconde. Los toques caían donde estaban antes y «no reaccionaban a la
+# primera»; girar y volver lo arreglaba. Medir ~18 rectángulos en cada dedo nuevo no cuesta nada.
+cambia("      if (!this.rects) this.layout();\n      if (e.target.closest('[data-hide]'))",
+       "      this.layout();   // (siempre: la pantalla pudo cambiar de alto sin girar; ver pagina.py)\n      if (e.target.closest('[data-hide]'))")
+
 # ---- Chrome o Edge (JSPI): en el computador y en Android; iPhone y Safari no ----
 # Solo se construye la versión JSPI. La tienen Chrome y Edge, también Chrome de Android (con los controles táctiles
 # del fork). En el iPhone todo navegador es Safari por dentro, sin JSPI: ahí no arranca y se dice.
