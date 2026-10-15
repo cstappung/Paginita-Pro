@@ -265,6 +265,45 @@ test('reglas de personajes: qué deja elegir cada una',()=>{
  assert.equal(r.ids.length+r.permitidos.length,cat.filter(Boolean).length,'cada personaje del disco, o se puede o queda fuera');
 });
 
+/* El disco del dueño trae los nombres en español: estos son los que la lista no encontraba (copiados de su sala), con
+   la entrada que les toca. «Vegeta 2ª forma · Monstruo» es Majin Vegeta (lo dijo el dueño). */
+test('la tier list encuentra a los personajes con los nombres en español del disco',()=>{
+ const ES=[["Goku (inicio)","","Goku (Early) - Base"],["Goku (med)","","Goku (Mid) - Base"],["Goku (med)","Super Saiyan","Goku (Mid) - Super Saiyan"],["Goku (fin)","","Goku (End) - Base"],
+  ["Goku (fin)","Super Saiyan","Goku (End) - Super Saiyan"],["Goku (fin)","Super Saiyan 2","Goku (End) - Super Saiyan 2"],["Goku (fin)","Super Saiyan 3","Goku (End) - Super Saiyan 3"],
+  ["Goku niño","","Goku (Kid)"],["Goku niño","Gran Mono","Great Ape Kid Goku"],["Gohan niño","","Gohan (Kid)"],["Joven Gohan","","Gohan (Teen) - Base"],
+  ["Joven Gohan","Super Saiyan","Gohan (Teen) - Super Saiyan"],["Joven Gohan","Super Saiyan 2","Gohan (Teen) - Super Saiyan 2"],["Gohan","","Gohan (Adult) - Base"],
+  ["Gohan","Super Saiyan","Gohan (Adult) - Super Saiyan"],["Gohan","Super Saiyan 2","Gohan (Adult) - Super Saiyan 2"],["Gohan definitivo","","Ultimate Gohan"],
+  ["Piccolo (inicio)","","Piccolo (Early)"],["Piccolo (fin)","","Piccolo (End)"],["Krilin","","Krillin"],["Chaos","","Chiaotzu"],["Vegeta (Explorador)","","Vegeta (Scouter)"],
+  ["Gran mono Vegeta","","Great Ape Vegeta"],["Vegeta","","Vegeta (End) - Base"],["Vegeta","Super Saiyan","Vegeta (End) - Super Saiyan"],["Vegeta","Súper Vegeta","Super Vegeta"],
+  ["Vegeta 2ª forma","","Vegeta (Second Form) - Base"],["Vegeta 2ª forma","Super Saiyan","Vegeta (Second Form) - Super Saiyan"],
+  ["Vegeta 2ª forma","Super Saiyan 2","Vegeta (Second Form) - Super Saiyan 2"],["Vegeta 2ª forma","Monstruo","Majin Vegeta"],["Trunks (Espada)","","Trunks (Sword) - Base"],
+  ["Trunks (Espada)","Super Saiyan","Trunks (Sword) - Super Saiyan"],["Trunks","","Trunks (Fighting) - Base"],["Trunks","Super Saiyan","Trunks (Fighting) - Super Saiyan"],
+  ["Trunks","Súper Trunks","Super Trunks"],["Trunks niño","","Trunks (Kid) - Base"],["Trunks niño","Super Saiyan","Trunks (Kid) - Super Saiyan"],
+  ["Súper Gogeta","","Super Gogeta (Z) - Super Saiyan"],["Kaiyoshin","","Supreme Kai"],["Yajirobai","","Yajirobe"],["Ub","","Uub"],["Ub","Majuub","Majuub"],
+  ["Maestro Roshi","","Master Roshi - Base"],["Maestro Roshi","Poder máximo","Master Roshi - Max Power"],["Abuelo Gohan","","Grandpa Gohan"],["Namu","","Nam"],
+  ["Rey Vegeta","","King Vegeta"],["Gran mono Rey Vegeta","","Great Ape King Vegeta"],["Gran mono Bardock","","Great Ape Bardock"],["Gran mono Fasha","","Great Ape Fasha"],
+  ["Gran mono Raditz","","Great Ape Raditz"],["Gran mono Nappa","","Great Ape Nappa"],["Zarbon","","Zarbon - Base"],["Zarbon","Transformado","Zarbon - Transformed"],
+  ["Célula","1ª forma","Cell - First Form"],["Célula","2ª forma","Cell - Second Form"],["Célula","Forma perfecta","Cell - Perfect Form"],["Célula","Perfecto","Cell - Super Perfect Form"],
+  ["Rey demonio Dabra","","Dabura"],["Monstruo Bu","","Majin Buu (Good)"],["Bu maldad pura","","Evil Buu"],["Súper Bu","","Super Buu - Base"],
+  ["Súper Bu","Gotenks absorbido","Super Buu - Gotenks Absorbed"],["Súper Bu","Gohan absorbido","Super Buu - Gohan Absorbed"],["Pequeño Bu","","Kid Buu"],
+  ["Gran mono Turles","","Great Ape Turles"],["Slug","","Lord Slug - Base"],["Slug","Gigante","Lord Slug - Giant Form"],["Broly","","Broly - Base"],
+  ["Broly","Super Saiyan","Broly - Super Saiyan"],["Broly","Super Saiyan legendario","Broly - Legendary Super Saiyan"],["Gran mono Baby","","Great Ape Baby"],
+  ["Neo Shenron","","Nuova Shenron"],["Shin Shenron","","Syn Shenron"],["Shin Shenron","Súper Yi-Shin-Long","Omega Shenron"],["Máquina Pilaf","","Pilaf Machine - Base"],
+  ["Máquina Pilaf","Fusión","Pilaf Machine - Combined Form"],["Pandereta","","Tambourine"],["Rey Demonio Piccolo","","King Piccolo"],
+  ["Gohan del futuro","","Gohan (Future) - Base"],["Gohan del futuro","Super Saiyan","Gohan (Future) - Super Saiyan"]];
+ // el catálogo como lo manda el juego: códigos de 16 bits del nombre y de la forma
+ const lista=ES.map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
+ const r=T.vetadosBt3(T.catalogoBt3(lista),'noop');
+ for(const [n,f,entrada] of ES){
+  const quien=n+(f?' · '+f:''), d=r.detalle.find(x=>x.juego.includes(quien));
+  assert.ok(d,quien+': no lo encuentra ninguna entrada');
+  assert.equal(d.nombre,entrada,quien);
+ }
+ const usados=r.detalle.flatMap(d=>d.juego);
+ assert.equal(new Set(usados).size,usados.length,'ninguno en dos entradas: '+usados.filter((x,i)=>usados.indexOf(x)!==i));
+ assert.equal(r.sinTier.length,0,'ninguno sin tier: '+r.sinTier.map(x=>x.nombre));
+});
+
 test('la pelea en vivo manda también el sonido del juego (si hay), en el mismo flujo que el video',async()=>{
  const c={};vm.createContext(c);
  vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor};',c);

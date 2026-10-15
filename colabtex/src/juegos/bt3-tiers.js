@@ -21,6 +21,22 @@
    Si hay varios candidatos queda el que tiene menos palabras de más. Los retratos se identificaron a ojo (el dorado
    de S+ es Nuova Shenron); la sala muestra con qué nombre del juego quedó cada uno. */
 
+/* El disco puede traer los nombres en español (el del dueño: «Goku (inicio)», «Joven Gohan», «Célula · Forma perfecta»,
+   «Gran mono Vegeta», «Pequeño Bu»…): primero sus palabras pasan a las de la lista (en inglés). Van antes que CAMBIOS
+   porque «super saiyan legendario» tiene que ganarle a «super saiyan». «ª» no se descompone con NFD: se trata aparte. */
+const CAMBIOS_ES = [
+  [/super saiyan legendario|ssj legendario/g, " lssj "],
+  [/gran mono/g, " ape "],
+  [/(\d)\s*ª/g, "$1a"],
+  [/\b1a forma\b/g, " first "], [/\b2a forma\b/g, " second "], [/\b3a forma\b/g, " third "],
+  [/forma perfecta/g, " perfect "], [/\bperfecto\b/g, " superperfect "],   // (Célula: la «forma perfecta» y la última, «Perfecto»)
+  [/maldad pura/g, " pure evil "], [/poder maximo/g, " max power "],
+  [/\binicio\b/g, " early "], [/\bmedio\b|\bmed\b/g, " mid "], [/\bfin\b/g, " end "],
+  [/\bnino\b|\bpequeno\b/g, " kid "], [/\bjoven\b/g, " teen "], [/\bdefinitivo\b/g, " ultimate "], [/\bfuturo\b/g, " future "],
+  [/\bexplorador\b/g, " scouter "], [/\bespada\b/g, " sword "], [/\babuelo\b/g, " grandpa "], [/\brey\b/g, " king "],
+  [/\bcelula\b/g, " cell "], [/\btransformado\b/g, " transform "], [/\babsorbido\b/g, " absorbed "], [/\bgigante\b/g, " giant "],
+  [/\bbu\b/g, " buu "],
+];
 // Lo que el juego escribe distinto según el personaje, llevado a una sola palabra.
 const CAMBIOS = [
   [/legendary super saiyan|legendary ssj|lssj/g, " lssj "],
@@ -36,11 +52,12 @@ const CAMBIOS = [
   [/\blate\b/g, " end "], [/\bmiddle\b/g, " mid "], [/\bstart\b/g, " early "], [/\byoung\b/g, " teen "], [/\bchild\b/g, " kid "],
   [/freeza|freezer/g, "frieza"], [/vegetto/g, "vegito"], [/\bboo\b/g, "buu"], [/armou?red/g, "armor"],
 ];
-const VACIAS = new Set(["form", "of", "the", "base", "normal", "mode", "no", "android", "c"]);
+const VACIAS = new Set(["form", "of", "the", "base", "normal", "mode", "no", "android", "c", "del", "de", "la", "el", "los", "las", "forma", "androide"]);
 
 export function palabrasBt3(texto) {
   let t = " " + String(texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() + " ";
   t = t.replace(/[#.]/g, " ");
+  for (const [re, por] of CAMBIOS_ES) t = t.replace(re, por);
   for (const [re, por] of CAMBIOS) t = t.replace(re, por);
   return new Set(t.split(/[^a-z0-9]+/).filter(w => w && !VACIAS.has(w)));
 }
@@ -62,15 +79,15 @@ export const BT3_TIERS = {
     ["Android 17", "17", "super hell " + FORMAS],
   ],
   "S+": [
-    ["Trunks (Fighting) - Base", "trunks armor|trunks battle|trunks fighting", "sword kid gt super " + FORMAS],
-    ["Nuova Shenron", "nuova|nova shenron", ""],
+    ["Trunks (Fighting) - Base", "trunks armor|trunks battle|trunks fighting|trunks", "sword kid gt super future " + FORMAS],
+    ["Nuova Shenron", "nuova|nova shenron|neo shenron", ""],
     ["Kid Buu", "kid buu|buu kid|pure buu", ""],
-    ["Gohan (Adult) - Super Saiyan 2", "gohan adult ssj2", "teen kid future"],
+    ["Gohan (Adult) - Super Saiyan 2", "gohan adult ssj2|gohan ssj2", "teen kid future"],
   ],
   S: [
     ["Arale", "arale", ""],
     ["Great Ape Baby", "baby ape|golden ape", ""],
-    ["Trunks (Fighting) - Super Saiyan", "trunks armor ssj|trunks battle ssj|trunks fighting ssj", "kid sword super ssj2"],
+    ["Trunks (Fighting) - Super Saiyan", "trunks armor ssj|trunks battle ssj|trunks fighting ssj|trunks ssj", "kid sword super ssj2 future"],
     ["Vegito (normal)", "vegito", "super ssj"],   // (el JSON decía «Vegito - Super Saiyan»: el de la imagen es el normal, de pelo negro)
     ["Super Android 17", "super 17|17 super", ""],
     ["Gogeta (GT) - Super Saiyan 4", "gogeta ssj4", ""],
@@ -84,12 +101,12 @@ export const BT3_TIERS = {
     ["Burter", "burter", ""],
     ["Cell - Second Form", "cell semiperfect|cell second", ""],
     ["Cooler - Final Form", "cooler final|cooler fifth", "meta metal"],
-    ["Dabura", "dabura", ""],
+    ["Dabura", "dabura|dabra", ""],
     ["King Piccolo", "king piccolo|piccolo king|piccolo daimao", ""],
     ["Frieza - Third Form", "frieza third", ""],
     ["Frieza - Full Power", "frieza fullpower", ""],
-    ["Gohan (Adult) - Super Saiyan", "gohan adult ssj", "ssj2"],
-    ["Super Gogeta (Z) - Super Saiyan", "gogeta ssj", "ssj4"],
+    ["Gohan (Adult) - Super Saiyan", "gohan adult ssj|gohan ssj", "ssj2 teen kid future"],
+    ["Super Gogeta (Z) - Super Saiyan", "gogeta ssj|super gogeta", "ssj4"],
     ["Goku (Early) - Base", "goku early", FORMAS],
     ["Goku (GT) - Super Saiyan 4", "goku ssj4", ""],
     ["Goku (Mid) - Super Saiyan", "goku mid ssj", ""],
@@ -98,13 +115,13 @@ export const BT3_TIERS = {
     ["Trunks (Kid) - Super Saiyan", "trunks kid ssj", ""],
     ["Trunks (Kid) - Base", "trunks kid", FORMAS],
     ["Majuub", "majuub|uub ssj", ""],
-    ["Nam", "nam", ""],
+    ["Nam", "nam|namu", ""],
     ["Piccolo (End)", "piccolo end", "kami fused nail sync king"],
     ["Super Baby 2", "super baby 2|baby 2", ""],
     ["Super Buu - Base", "super buu", "gotenks gohan absorbed"],
     ["Super Buu - Gotenks Absorbed", "buu gotenks", ""],
-    ["Super Vegeta", "super vegeta|vegeta super", "ssj4 baby gt"],
-    ["Syn Shenron", "syn shenron|syn", "omega"],
+    ["Super Vegeta", "super vegeta|vegeta super", "ssj4 baby gt monstruo"],
+    ["Syn Shenron", "syn shenron|shin shenron|syn", "omega yi long"],
     ["Gohan (Teen) - Super Saiyan", "gohan teen ssj", "ssj2"],
     ["Vegeta (Second Form) - Super Saiyan 2", "vegeta ssj2", "majin"],
     ["Vegeta (GT) - Super Saiyan 4", "vegeta ssj4", ""],
@@ -120,7 +137,7 @@ export const BT3_TIERS = {
     ["Cell - First Form", "cell imperfect|cell first|cell", "semiperfect perfect superperfect jr second"],
     ["Cell Jr.", "cell jr|jr", ""],
     ["Cell - Super Perfect Form", "cell superperfect", ""],   // (la última transformación de Cell: el dueño)
-    ["Chiaotzu", "chiaotzu|chaozu", ""],
+    ["Chiaotzu", "chiaotzu|chaozu|chaos", ""],
     ["Cyborg Tao", "cyborg tao|tao cyborg|murasaki", ""],
     ["Evil Buu", "evil buu|pure evil|evil", "kid super"],
     ["Fasha", "fasha|celipa", "ape"],
@@ -135,10 +152,10 @@ export const BT3_TIERS = {
     ["Goten - Super Saiyan", "goten ssj", ""],
     ["Gotenks - Super Saiyan 3", "gotenks ssj3", ""],
     ["Great Saiyaman", "great saiyaman|saiyaman", "2 videl"],
-    ["Krillin", "krillin|kuririn", ""],
+    ["Krillin", "krillin|kuririn|krilin", ""],
     ["Mecha Frieza", "mecha frieza", ""],
     ["Nail", "nail", "piccolo sync"],
-    ["Omega Shenron", "omega", ""],
+    ["Omega Shenron", "omega|yi long|super yi", ""],   // (en español: «Shin Shenron · Súper Yi-Shin-Long»)
     ["Piccolo (Early)", "piccolo early", "kami fused nail sync king"],
     ["Recoome", "recoome", ""],
     ["Super Baby 1", "super baby 1|baby 1", "2"],
@@ -148,16 +165,16 @@ export const BT3_TIERS = {
     ["Tapion", "tapion", ""],
     ["Ultimate Gohan", "ultimate gohan|gohan ultimate", ""],
     ["Tien", "tien|tenshinhan", ""],
-    ["Uub", "uub", "majuub ssj"],
-    ["Vegeta (End) - Super Saiyan", "vegeta end ssj", "ssj2 ssj3 super"],
-    ["Majin Vegeta", "majin vegeta", ""],
+    ["Uub", "uub|ub", "majuub ssj"],
+    ["Vegeta (End) - Super Saiyan", "vegeta end ssj|vegeta ssj", "ssj2 ssj3 ssj4 super second scouter majin baby"],   // (en español: «Vegeta · Super Saiyan»)
+    ["Majin Vegeta", "majin vegeta|vegeta monstruo", ""],   // (en español: «Vegeta 2ª forma · Monstruo», dice el dueño)
     ["Vegeta (Scouter)", "vegeta scouter", "ape"],
-    ["Vegeta (Second Form) - Base", "vegeta second|vegeta mid|vegeta early", FORMAS + " super"],
+    ["Vegeta (Second Form) - Base", "vegeta second|vegeta mid|vegeta early", FORMAS + " super monstruo majin"],
     ["Yamcha", "yamcha", ""],
     ["Zarbon - Transformed", "zarbon post|zarbon transform|zarbon monster", ""],
   ],
   C: [
-    ["Gohan (Adult) - Base", "gohan adult", FORMAS + " ultimate"],
+    ["Gohan (Adult) - Base", "gohan adult|gohan", FORMAS + " ultimate kid teen future grandpa absorbed saiyaman"],   // (en español, solo «Gohan»)
     ["Android 13 - Base", "13", "super fusion"],
     ["Cui", "cui", ""],
     ["Bojack - Base", "bojack", "fullpower full"],
@@ -175,7 +192,7 @@ export const BT3_TIERS = {
     ["Kibito Kai", "kibito kai|kibitoshin|kibito", ""],
     ["Gohan (Kid)", "gohan kid", FORMAS],
     ["King Vegeta", "king vegeta|vegeta king", "ape"],
-    ["Majin Buu (Good)", "majin buu|fat buu|buu", "super kid evil pure gotenks gohan absorbed"],
+    ["Majin Buu (Good)", "majin buu|fat buu|monstruo buu|buu", "super kid evil pure gotenks gohan absorbed"],
     ["Metal Cooler", "metal cooler|meta cooler|cooler metal|cooler meta", ""],
     ["Nappa", "nappa", "ape"],
     ["Pikkon", "pikkon|paikuhan", ""],
@@ -185,11 +202,11 @@ export const BT3_TIERS = {
     ["Super Garlic Jr.", "super garlic|garlic super", ""],
     ["Super Janemba", "super janemba|janemba super|janemba evil", "giant fat"],
     ["Trunks (Sword) - Base", "trunks sword", FORMAS],
-    ["Tambourine", "tambourine|tamborine", ""],
+    ["Tambourine", "tambourine|tamborine|pandereta", ""],
     ["Gohan (Teen) - Base", "gohan teen", FORMAS],
     ["Turles", "turles|tullece", "ape"],
-    ["Vegeta (End) - Base", "vegeta end", FORMAS + " super"],
-    ["Yajirobe", "yajirobe", ""],
+    ["Vegeta (End) - Base", "vegeta end|vegeta", FORMAS + " super second scouter majin king baby monstruo"],   // (en español, solo «Vegeta»)
+    ["Yajirobe", "yajirobe|yajirobai", ""],
     ["Zarbon - Base", "zarbon", "post transform monster"],
   ],
   D: [
@@ -213,8 +230,8 @@ export const BT3_TIERS = {
     ["Pan", "pan", ""],
     ["Lord Slug - Base", "slug", "giant"],
     ["Spopovich", "spopovich", ""],
-    ["Pilaf Machine - Base", "pilaf", "combined giant"],   // (el JSON tenía dos «Spopovich»: uno es la máquina de Pilaf)
-    ["Supreme Kai", "supreme kai|kaioshin", "kibito"],
+    ["Pilaf Machine - Base", "pilaf", "combined giant fusion"],   // (el JSON tenía dos «Spopovich»: uno es la máquina de Pilaf)
+    ["Supreme Kai", "supreme kai|kaioshin|kaiyoshin", "kibito"],
     ["Videl - Base", "videl", "saiyaman"],
     ["Zangya", "zangya", ""],
   ],
@@ -231,7 +248,7 @@ export const BT3_TIERS = {
     ["Hirudegarn", "hirudegarn|hildegarn", ""],
     ["Janemba - Giant Form", "janemba", "super evil"],
     ["Lord Slug - Giant Form", "slug giant", ""],
-    ["Pilaf Machine - Combined Form", "pilaf combined|pilaf", ""],
+    ["Pilaf Machine - Combined Form", "pilaf combined|pilaf fusion|pilaf", ""],   // (en español: «Máquina Pilaf · Fusión»)
   ],
 };
 
