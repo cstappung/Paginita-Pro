@@ -341,7 +341,9 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
 
 - `volumen.js` loads before the program, so the site's mute/volume governs the game's `AudioContext`.
   `mando.js` is **not** loaded: the game reads controllers itself (SDL3), and synthesised keys would double every
-  button.
+  button. But Juegos (the top page) loads it, and with no config there it drives its cursor (the white circle) over
+  the game and clicks with A. So `pagina.js` registers the frame by hand with `parent.Mando._hijo(window)` (what the
+  frame's own copy would do): while the frame is visible the top page steps aside. Bench test: `prueba47`.
 - "Ajustes" calls `Module._Web_Settings(3)` (patch, `ui.cpp`): the F1 window on Controls (which controller each
   player uses, remapping). The in-game "Dragon Net Battle" menu points players to the rooms instead.
 - `?log=1` shows the program's log; it also opens by itself if the program exits or aborts.

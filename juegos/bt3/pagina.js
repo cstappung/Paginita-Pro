@@ -705,6 +705,16 @@
     return true;
   };
   if (mandos()) setInterval(mandos, 1000);
+  /* Juegos (la página de arriba) carga juegos/audio/mando.js: sin juego que lo configure, el mando maneja ahí un
+     cursor (el círculo blanco) y su A hace clic donde esté, encima de la pelea. Aquí mando.js no se carga (el
+     juego lee el mando solo, ver CLAUDE.md), así que avisamos nosotros lo que su copia avisaría: «este marco es
+     un hijo con mando». Mientras el marco se ve, arriba se apartan (sin cursor ni clics); al esconderlo vuelven. */
+  const avisaHijo = () => {
+    try { if (parent !== window && parent.Mando && parent.Mando._hijo) { parent.Mando._hijo(window); return true; } }
+    catch (e) {}
+    return false;
+  };
+  if (!avisaHijo()) { let n = 0; const t = setInterval(() => { if (avisaHijo() || ++n > 40) clearInterval(t); }, 250); }
   mando.style.cursor = "pointer";
   mando.onclick = () => { if (!ajustes.hidden) ajustes.onclick(); };
 
