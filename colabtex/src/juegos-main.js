@@ -2812,6 +2812,10 @@ function montaJuego(p) {
      lo convierte en cuatro. */
   modulo = fab({
     uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora,
+    /* Salir de la sala, lo mismo que «← Vestíbulo» de la cabecera: para
+       un juego cuyo marco tapa la página (BT3 a pantalla completa) y que
+       ofrece su propio botón de salida. */
+    salir: salirDeLaPartida,
     /* Quien mira monta el mismo módulo, que con esto sabe que no debe
        pintar una mano «suya» ni ofrecer botones que no van a escribir. */
     mirando: !soyJugador(),

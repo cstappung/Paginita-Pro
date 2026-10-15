@@ -1017,18 +1017,34 @@
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
 
-  /* «← Sala»: salir de la pelea y volver al vestíbulo de la sala cuando se quiera (la pelea se corta y no cuenta).
-     Lo mismo que salir del modo desde el propio juego (Module.onFueraDelModo, más abajo). */
+  /* El botón de salida del marco, en dos tiempos según lo que esté pasando:
+     - en plena pelea, «← Sala»: corta la pelea (no cuenta) y vuelve al vestíbulo de la sala o a la llave. Lo mismo
+       que salir del modo desde el propio juego (Module.onFueraDelModo, más abajo).
+     - esperando (el disco ya cargó y el juego espera a que empiece la pelea), «← Salir del duelo / del torneo»: sale
+       de la sala, como «← Vestíbulo» de la cabecera (que a pantalla completa no se ve). Antes aquí también mandaba
+       «termino», que fuera de una pelea la sala ignora: el segundo clic no hacía nada.
+     `enPeleaSala` lo pone `antesDeEmpezar` cuando empieza la pelea (el marco se recarga después de cada una). */
+  let est = null, cuandoEmpiece = null, ronda = 0;
+  let enPeleaSala = false;
   const aSala = document.createElement("button");
-  aSala.id = "volverSala"; aSala.type = "button"; aSala.textContent = "← Sala"; aSala.title = "Volver a la sala (esta pelea se corta)";
+  aSala.id = "volverSala"; aSala.type = "button";
+  const textoSala = () => enPeleaSala ? "← Sala" : est && est.torneo ? "← Salir del torneo" : "← Salir del duelo";
+  const pintaSala = () => {
+    if (seguroSala) return;   // (a mitad de confirmar: no se le cambia el texto)
+    aSala.textContent = textoSala();
+    aSala.title = enPeleaSala ? "Volver a la sala (esta pelea se corta)" : "Salir de la sala y volver a Juegos";
+  };
   $("barra").prepend(aSala);
   let seguroSala = 0;   // (dos clics, como «← Modos»: confirm() no sirve en un marco con sandbox)
+  pintaSala();
   aSala.onclick = () => {
     if (!seguroSala) {
-      aSala.textContent = "¿Salir? La pelea se corta"; aSala.classList.add("seguro");
-      seguroSala = setTimeout(() => { seguroSala = 0; aSala.textContent = "← Sala"; aSala.classList.remove("seguro"); }, 4000);
+      aSala.textContent = enPeleaSala ? "¿Salir? La pelea se corta" : "¿Salir de la sala?"; aSala.classList.add("seguro");
+      seguroSala = setTimeout(() => { seguroSala = 0; aSala.classList.remove("seguro"); pintaSala(); }, 4000);
       return;
     }
+    clearTimeout(seguroSala); seguroSala = 0; aSala.classList.remove("seguro"); pintaSala();
+    if (!enPeleaSala) { aviso("Saliendo de la sala…"); S.cierra(); S.avisa("salir"); return; }
     aviso("Volviendo a la sala…");
     S.cierra();
     S.avisa("termino", { por: "menu" });
@@ -1080,7 +1096,6 @@
      botaba archivos que todavía usaba y los volvía a leer del disco en cada cuadro: 2 fps, 99% ocupado sin dibujar.
      Ahora el banco usa los 768 MB del sitio.) */
 
-  let est = null, cuandoEmpiece = null, ronda = 0;
   /* Las reglas de personajes de la sala (No OP / Sólo malos, bt3-tiers.js en la sala): al abrir la selección de
      personajes, el programa manda los nombres que trae el disco (Web_Catalogo, parche.diff) y la sala devuelve
      qué ids quedan fuera (`estado.vetados`). El programa los lee de Module.vetados al elegir (web_vetado): un
@@ -1108,6 +1123,7 @@
   };
   S.alEstado(e => {
     est = e;
+    pintaSala();
     ponVetados(e);
     if (e.mirando) {   // un mirón no carga nada: la pelea se ve en la pantalla de cada jugador
       $("start") && $("start").remove();
@@ -1128,6 +1144,7 @@
       aviso(est && est.torneo ? "Disco listo. Esperando tu pelea del torneo…" : "Disco listo. Esperando a que el anfitrión empiece la pelea…", 0, true);
       const e = est && est.fase === "jugando" && est.rival ? est : await new Promise(ok => { cuandoEmpiece = ok; });
       ronda = e.ronda;
+      enPeleaSala = true; pintaSala();   // (desde aquí «← Sala» corta la pelea)
       const equipo = (e.reglas >> 12 & 15) || 0;   // 3 = el Team 3 vs 3 (motor.js, reglasBt3)
       if (e.rival.cpu) {
         /* Una pelea del torneo contra la CPU: se juega aquí solo, sin red. El juego entra al versus 1P vs COM con

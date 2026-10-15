@@ -260,7 +260,11 @@ remembered in `bt3.modo`, preselected by `?juego=entrenamiento|cpu|duelo|torneo`
   training menu: lessons and free training).
 - **Back buttons.** «◀ Atrás» in the bar presses player 1's Triangle (the game's back in every menu) through
   `Web_TouchSet`, only while the menus run (`web_en_menus` around `__real_Progress_Main` → `Module.onMenus`; in a
-  fight Triangle is an attack). «← Modos» (solo) and «← Sala» (room frame: cuts the fight, `termino`) leave.
+  fight Triangle is an attack). «← Modos» (solo) leaves. The room frame's button has two jobs: in a fight it is
+  «← Sala» (cuts the fight, `termino`); while waiting for one (disc loaded, vestíbulo or bracket) it is «← Salir del
+  duelo/torneo» and posts `salir`, which `bt3.js` turns into the room's own exit (`ctx.salir` =
+  `salirDeLaPartida`, the header's «← Vestíbulo»). It used to send `termino` there too, which the room ignores
+  outside a fight: the second click did nothing. `enPeleaSala` is set in `antesDeEmpezar`. Bench test: `prueba49`.
 - Duelo / Torneo are rooms: the button posts `{tipo:"sala", cupo}` (2, or 8 for a tournament) to Juegos, which
   opens it (`alPedirSalaBt3` in `bt3.js`, registered by `juegos-main.js`). Outside Juegos it links there.
 - **No back door to the rest of the game.** Backing out of the chosen mode into the game's other menus (main
