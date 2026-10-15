@@ -464,7 +464,7 @@ const REGLAS = {
           ["Las reglas de la pelea", tabla([
             ["Batalla", "<b>Single</b> (uno contra uno), <b>Team 3 vs 3</b>, <b>Team</b> (hasta 5 por lado) o <b>DP</b> de 10, 15 o 20 puntos (cada personaje cuesta puntos)."],
             ["Tiempo por round", "60, 90, 180 o 240 segundos, o <b>sin límite</b>."],
-            ["Personajes", "<b>Todos</b>, <b>No OP</b> o <b>Sólo malos</b> (abajo, «Personajes prohibidos»)."]
+            ["Personajes", "<b>Todos</b>, <b>No OP</b>, <b>Sólo malos</b> o <b>Sólo gigantes</b> (abajo, «Personajes prohibidos»)."]
           ])],
           ["Revancha y marcador", lista([
             "Después de cada pelea, <b>🔁 Pedir revancha</b>: cuando el otro acepta, empieza sola con las mismas reglas apenas carguen los dos discos.",
@@ -515,9 +515,9 @@ const REGLAS = {
       ])],
       ["Música de pelea", "En las peleas suena <b>«chinchonchin»</b>, de la biblioteca de PRO HERO, en vez de la música del juego (los golpes, las voces y el escenario suenan igual). El <b>♪</b> de la barra de arriba la cambia por la música del juego: cada uno elige la suya, y no cambia nada de la pelea. Se baja una vez, al empezar tu primera pelea (si ya la jugaste en PRO HERO, no se baja de nuevo)."],
       ["Personajes prohibidos", lista([
-        "En duelo y torneo, quien pone las reglas puede limitar los personajes con la tier list competitiva: <b>No OP</b> saca a los más fuertes (tiers BROLY, S++, S+ y S); <b>Sólo malos</b> deja solo a los de tier C hacia abajo.",
+        "En duelo y torneo, quien pone las reglas puede limitar los personajes con la tier list competitiva. Cada regla dice qué tiers <b>se pueden</b>: <b>No OP</b> solo A, B, C y D (fuera BROLY, S++, S+, S y los gigantes); <b>Sólo malos</b> solo C y D; <b>Sólo gigantes</b> solo N/C (los Grandes Simios, Hirudegarn, Janemba gigante…). Un personaje que la lista no nombra queda fuera.",
         "Cada transformación cuenta aparte: Goku (fin) puede estar permitido y su Super Saiyan 3 no. Tampoco se puede transformar ni fusionar en un vetado en plena pelea.",
-        "En la selección, los vetados salen <b>con candado</b>: el cursor se los salta y el aleatorio nunca los saca. En la sala, <b>Ver los vetados</b> los lista."
+        "En la selección, los vetados salen <b>con candado</b>: el cursor se los salta y el aleatorio nunca los saca. En la sala, con una regla puesta, <b>📋 Ver la tier list</b> muestra los tiers con sus colores y quién queda con candado."
       ])],
       ["Si algo falla", tabla([
         ["La pelea se colgó", "En el duelo, <b>Volver al vestíbulo</b>; en el torneo, <b>← Cortar la pelea y volver a la llave</b>. Se puede volver a empezar."],

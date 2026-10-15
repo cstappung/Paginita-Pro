@@ -10,7 +10,7 @@ const UNO_COLOR=e('coincidir','Qué carta puedes jugar',
  p('Mira el descarte','Sobre un 7 rojo sirven otro rojo, un 7 de otro color o un comodín. El 9 azul no coincide.',cart(['Mesa',[['7','rojo','ROJO']]],['Tu mano',[['3','rojo','SÍ'],['7','azul','SÍ'],['★','violeta','SÍ'],['9','azul','NO']]])),
  p('El número permite cambiar el color','Si juegas el 7 azul, la siguiente carta debe coincidir con azul, con 7 o ser un comodín.',cart(['Nuevo descarte',[['7','azul','AZUL']]],['Próxima mano',[['2','azul','SÍ'],['7','oro','SÍ'],['3','rojo','NO']]])));
 const VETOS_BT3=e('vetos','Personajes prohibidos (tier list)',
- p('Quien pone las reglas elige','Todos, No OP (fuera los más fuertes: BROLY, S++, S+ y S) o Sólo malos (solo de tier C hacia abajo). Cada transformación cuenta aparte.',bt3('vetos')),
+ p('Quien pone las reglas elige','Todos, No OP (solo A, B, C y D), Sólo malos (solo C y D) o Sólo gigantes (solo N/C). Cada transformación cuenta aparte.',bt3('vetos')),
  p('En la selección, con candado','Los vetados no se pueden elegir: el cursor se los salta y el aleatorio nunca los saca. Tampoco se puede transformar en uno en plena pelea.',bt3('vetos')));
 export const EJEMPLOS={
  orbita:[e('gravedad','Lanzar, capturar y dejar un satélite',

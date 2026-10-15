@@ -7199,7 +7199,7 @@ const bt3Batalla = v => tiene(BT3_BATALLAS, v) ? v : "single";
 const bt3Tiempo = v => { const n = Math.floor(Number(v)); return BT3_TIEMPOS.includes(n) ? n : 240; };
 /* Las reglas de personajes (bt3-tiers.js): «noop» (fuera de S hacia arriba) o «malos» (solo de B hacia abajo);
    son una u otra porque es un solo ajuste. "" = cualquiera. */
-const bt3Veto = v => v === "noop" || v === "malos" ? v : "";
+const bt3Veto = v => v === "noop" || v === "malos" || v === "gigantes" ? v : "";
 /* La palabra de reglas que espera `gs/net.c` (BT3_NET_RULES): tipo (0 single, 1 team, 2 dp) en los 4 bits
    bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. Desde el bit
    12, cuántos por equipo si no son cinco: el 3 vs 3 es un Team Battle con tope de tres (gs/net.c no mira esos

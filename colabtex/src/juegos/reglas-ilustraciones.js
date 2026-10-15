@@ -155,8 +155,8 @@ export const bt3=escena=>{
   else if(escena==='avanza')c+=line(310,86,330,86,C.verde,3)+txt(240,226,'Ana ganó a la CPU 1 y espera en la final',13,C.verde,'middle');
   else c+=txt(240,226,'Ana gana la final y el torneo',14,C.oro,'middle');
  }else if(escena==='vetos'){
-  c=b3ficha(30,18,80,'Todos',0)+b3ficha(118,18,80,'No OP',1)+b3ficha(206,18,100,'Sólo malos',0);
-  const nombres=['Goku','SSJ3','Broly','Gohan','Vegeta','Gogeta','Cell','Krillin'],veto=new Set([1,2,5]);
+  c=b3ficha(14,18,70,'Todos',0)+b3ficha(90,18,74,'No OP',1)+b3ficha(170,18,104,'Sólo malos',0)+b3ficha(280,18,124,'Sólo gigantes',0);
+  const nombres=['Goku','Broly LSSJ','Gohan','Vegito','Krillin','Cell SP','Gogeta 4','Gran Simio'],veto=new Set([1,3,5,6,7]);   // (con No OP: fuera BROLY, S++, S+, S y N/C)
   nombres.forEach((n,k)=>{const x=30+(k%4)*108,y=60+Math.floor(k/4)*72;c+=rect(x,y,96,60,veto.has(k)?'#1a1f2e':B3.caja,veto.has(k)?'#55606b':B3.borde,8)+txt(x+48,y+28,veto.has(k)?'🔒':'🙂',18,C.blanco,'middle')+txt(x+48,y+50,n,12,veto.has(k)?C.gris:C.blanco,'middle');});
   c+=txt(240,226,'El cursor se salta los vetados; el aleatorio nunca los saca',12,C.gris,'middle');
  }else if(escena==='modos'){

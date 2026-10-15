@@ -111,9 +111,9 @@ function cierra() {
 /* Las reglas de personajes (bt3-tiers.js), calculadas aquí mismo y sin esperar: el juego pasa sus nombres al abrir
    la selección y arma su grilla enseguida, así que los vetados tienen que estar listos al volver de esa llamada. */
 function vetadosDe(lista, regla) {
-  if (!regla || !Array.isArray(lista)) return { ids: [], lista: [] };
+  if (!regla || !Array.isArray(lista)) return { ids: [], lista: [], permitidos: [] };
   const r = vetadosBt3(catalogoBt3(lista), regla);
-  return { ids: r.ids, lista: r.detalle.flatMap(d => d.juego.map(n => [d.tier, n])) };
+  return { ids: r.ids, lista: r.vetados, permitidos: r.permitidos };   // ([tier, nombre en el juego])
 }
 
 window.BT3Sala = {

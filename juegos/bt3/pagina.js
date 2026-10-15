@@ -1025,13 +1025,15 @@
   };
 
   /* Los vetados, a la vista: mientras está abierta la selección de personajes (el parche avisa con
-     Module.onSeleccion), un panel al costado dice cuáles no se pueden elegir según la regla de la sala, con el
-     nombre que tienen en el juego. Se pliega con un clic (se recuerda) y nunca está en la pelea. En la selección
+     Module.onSeleccion), un panel al costado dice qué se puede elegir según la regla de la sala, con el nombre que
+     tienen en el juego: la lista más corta de las dos (con «No OP» los vetados; con «Sólo malos» o «Sólo gigantes»,
+     los permitidos). Se pliega con un clic (se recuerda) y nunca está en la pelea. En la selección
      misma, los vetados salen con el candado de los personajes sin desbloquear (parche: ChrGrid_Build). */
   const panel = document.createElement("aside");
   panel.id = "vetos"; panel.hidden = true; panel.setAttribute("aria-label", "Personajes vetados");
   document.body.append(panel);
-  let plegado = false, enSeleccion = false, listaVetos = [], reglaVetos = "";
+  let plegado = false, enSeleccion = false, listaVetos = [], listaSi = [], reglaVetos = "";
+  const NOMBRE_REGLA = { noop: "No OP", malos: "Sólo malos", gigantes: "Sólo gigantes" };
   try { plegado = localStorage.getItem("bt3.vetosPlegado") === "1"; } catch (e) {}
   const pintaVetos = () => {
     panel.hidden = !(enSeleccion && listaVetos.length);
@@ -1040,22 +1042,24 @@
     panel.replaceChildren();
     const tit = document.createElement("button");
     tit.type = "button"; tit.className = "tit"; tit.setAttribute("aria-expanded", String(!plegado));
-    tit.innerHTML = `<span>🚫 Vetados · ${reglaVetos === "noop" ? "No OP" : "Sólo malos"}</span><b></b><i>${plegado ? "▸" : "▾"}</i>`;
-    tit.querySelector("b").textContent = listaVetos.length;
+    const muestraSi = listaSi.length && listaSi.length < listaVetos.length, lista = muestraSi ? listaSi : listaVetos;
+    tit.innerHTML = `<span>${muestraSi ? "✅ Permitidos" : "🚫 Vetados"} · ${NOMBRE_REGLA[reglaVetos] || ""}</span><b></b><i>${plegado ? "▸" : "▾"}</i>`;
+    tit.querySelector("b").textContent = lista.length;
     tit.onclick = () => { plegado = !plegado; try { localStorage.setItem("bt3.vetosPlegado", plegado ? "1" : "0"); } catch (e) {} pintaVetos(); };
     panel.append(tit);
     if (plegado) return;
     const cuerpo = document.createElement("div");
     cuerpo.className = "cuerpo";
     const nota = document.createElement("p");
-    nota.textContent = "En la selección salen con candado, como los que no están desbloqueados, y tampoco se puede transformar o fusionar en ellos.";
+    nota.textContent = muestraSi ? "Solo estos se pueden elegir: los demás salen con candado, y tampoco se puede transformar o fusionar en ellos."
+      : "En la selección salen con candado, como los que no están desbloqueados, y tampoco se puede transformar o fusionar en ellos.";
     cuerpo.append(nota);
-    const tiers = [...new Set(listaVetos.map(x => x[0]))];
+    const tiers = [...new Set(lista.map(x => x[0]))];
     for (const t of tiers) {
       const g = document.createElement("section");
-      const h = document.createElement("h3"); h.textContent = t; g.append(h);
+      const h = document.createElement("h3"); h.textContent = t === "?" ? "Sin tier en la lista" : t; g.append(h);
       const ul = document.createElement("ul"); ul.translate = false;
-      for (const [, n] of listaVetos.filter(x => x[0] === t)) { const li = document.createElement("li"); li.textContent = n; ul.append(li); }
+      for (const [, n] of lista.filter(x => x[0] === t)) { const li = document.createElement("li"); li.textContent = n; ul.append(li); }
       g.append(ul); cuerpo.append(g);
     }
     panel.append(cuerpo);
@@ -1078,12 +1082,12 @@
   let catalogo = null;
   try { catalogo = JSON.parse(localStorage.getItem("bt3.catalogo") || "null"); } catch (e) {}
   const ponVetados = e => {
-    const r = S.vetadosDe ? S.vetadosDe(catalogo, e && e.veto) : { ids: [], lista: [] };
+    const r = S.vetadosDe ? S.vetadosDe(catalogo, e && e.veto) : { ids: [], lista: [], permitidos: [] };
     const v = [];
     for (const id of r.ids) v[id] = 1;
     Module.vetados = v;
     reglaVetos = (e && e.veto) || "";
-    listaVetos = r.lista;
+    listaVetos = r.lista; listaSi = r.permitidos || [];
     pintaVetos();
   };
   Module.onCatalogo = lista => {

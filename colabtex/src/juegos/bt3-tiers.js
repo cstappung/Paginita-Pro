@@ -45,122 +45,215 @@ export function palabrasBt3(texto) {
   return new Set(t.split(/[^a-z0-9]+/).filter(w => w && !VACIAS.has(w)));
 }
 
-/* Las 90 de B hacia arriba, por tier (lo de C para abajo no hace falta: siempre se puede elegir). El orden es el
-   de la imagen, fila por fila. Cada forma es un retrato aparte (Goku (fin), su SSJ, su SSJ2 y su SSJ3 son cuatro),
-   y la regla vale también para transformarse o fusionarse en plena pelea. */
+/* La tier list entera: los 161 retratos, por tier y en el orden de la imagen (fila por fila), con los nombres de la lista
+   del dueño (un JSON). Donde ese JSON repetía un nombre, el dueño o la imagen decidieron: el Cell de S++ es el
+   Perfecto y el de B su última transformación (el Súper Perfecto), el de A que el JSON llamaba «Bojack - Full Power» es el Súper Androide 13 (piel
+   azul, pelo rojo; el Bojack de máximo poder, verde, está en B), uno de los «Salza» de C es Nappa y una de las «Pan» de
+   D es Chi-Chi niña y uno de los «Spopovich» de D es la Pilaf Machine (la normal; la combinada es N/C). Cada forma es un retrato aparte (Goku (fin), su SSJ, su SSJ2 y su SSJ3 son cuatro), y la regla
+   vale también para transformarse o fusionarse en plena pelea. */
 const FORMAS = "ssj ssj2 ssj3 ssj4 lssj ape fullpower";
+export const BT3_ORDEN = ["BROLY", "S++", "S+", "S", "A", "B", "C", "D", "N/C"];
 export const BT3_TIERS = {
   BROLY: [
-    ["Broly (Super Saiyan Legendario)", "broly lssj", ""],
+    ["Broly - Legendary Super Saiyan", "broly lssj", ""],
   ],
   "S++": [
-    ["Cell (Súper Perfecto)", "cell superperfect", ""],
-    ["Androide 17", "17", "super hell " + FORMAS],
+    ["Cell - Perfect Form", "cell perfect", "semiperfect superperfect imperfect"],
+    ["Android 17", "17", "super hell " + FORMAS],
   ],
   "S+": [
-    ["Trunks (armadura)", "trunks armor|trunks battle|trunks", "sword kid gt " + FORMAS],
+    ["Trunks (Fighting) - Base", "trunks armor|trunks battle|trunks fighting", "sword kid gt super " + FORMAS],
     ["Nuova Shenron", "nuova|nova shenron", ""],
-    ["Majin Buu", "majin buu|fat buu|buu", "super kid evil pure gotenks gohan absorbed"],
-    ["Gohan (adulto) Super Saiyan 2", "gohan adult ssj2|gohan ssj2", "teen kid"],
+    ["Kid Buu", "kid buu|buu kid|pure buu", ""],
+    ["Gohan (Adult) - Super Saiyan 2", "gohan adult ssj2", "teen kid future"],
   ],
   S: [
     ["Arale", "arale", ""],
-    ["Baby (Gran Simio dorado)", "baby ape|golden ape", ""],
-    ["Super Trunks", "super trunks|trunks armor super|trunks battle super", "sword kid gt"],
-    ["Vegito", "vegito", "super ssj"],
-    ["Super 17", "super 17", ""],
-    ["Gogeta Super Saiyan 4", "gogeta ssj4", ""],
-    ["Super Vegito", "super vegito|vegito ssj", ""],
+    ["Great Ape Baby", "baby ape|golden ape", ""],
+    ["Trunks (Fighting) - Super Saiyan", "trunks armor ssj|trunks battle ssj|trunks fighting ssj", "kid sword super ssj2"],
+    ["Vegito (normal)", "vegito", "super ssj"],   // (el JSON decía «Vegito - Super Saiyan»: el de la imagen es el normal, de pelo negro)
+    ["Super Android 17", "super 17|17 super", ""],
+    ["Gogeta (GT) - Super Saiyan 4", "gogeta ssj4", ""],
+    ["Super Vegito (Super Saiyan)", "super vegito|vegito ssj", ""],
   ],
   A: [
-    ["Gohan (joven) Super Saiyan 2", "gohan teen ssj2", ""],
-    ["Súper Androide 13", "super 13|13 fusion", ""],
-    ["Androide 18", "18", ""],
+    ["Gohan (Teen) - Super Saiyan 2", "gohan teen ssj2", ""],
+    ["Super Android 13", "13 super|super 13|13 fusion", ""],
+    ["Android 18", "18", ""],
     ["Babidi", "babidi", ""],
     ["Burter", "burter", ""],
-    ["Cell Semi-Perfecto", "cell semiperfect|cell second", ""],
-    ["Cooler (forma final)", "cooler final|cooler fifth", "meta"],
+    ["Cell - Second Form", "cell semiperfect|cell second", ""],
+    ["Cooler - Final Form", "cooler final|cooler fifth", "meta metal"],
     ["Dabura", "dabura", ""],
-    ["Piccolo (inicio) sincronizado con Nail", "piccolo nail|piccolo sync", "kami fused"],
-    ["Freezer (tercera forma)", "frieza third", ""],
-    ["Freezer (100 %)", "frieza fullpower", ""],
-    ["Goku (fin) Super Saiyan", "goku end ssj", "ssj2 ssj3"],
-    ["Gogeta Super Saiyan", "gogeta ssj", "ssj4"],
-    ["Goku (fin)", "goku end", FORMAS],
-    ["Goku Super Saiyan 4", "goku ssj4", ""],
-    ["Goku (medio) Super Saiyan", "goku mid ssj", ""],
-    ["Gotenks Super Saiyan", "gotenks ssj", "ssj3"],
-    ["Gotenks", "gotenks", FORMAS],
-    ["Trunks (niño) Super Saiyan", "trunks kid ssj", ""],
-    ["Trunks (niño)", "trunks kid", FORMAS],
-    ["Majuub", "majuub|uub ssj|uub", ""],
-    ["Mr. Popo", "popo", ""],
-    ["Piccolo (fin) fusionado con Kami", "piccolo kami|piccolo fused", "nail sync"],
-    ["Super Baby 2", "baby 2|baby ssj", ""],
-    ["Super Buu", "super buu", "gotenks gohan absorbed"],
-    ["Super Buu (absorbe a Gotenks)", "buu gotenks", ""],
-    ["Vegeta (fin) Super Saiyan", "vegeta end ssj", "ssj2 ssj3 super"],
-    ["Omega Shenron", "omega", ""],
-    ["Gohan (joven) Super Saiyan", "gohan teen ssj", "ssj2"],
-    ["Vegeta (fin) Super Saiyan 2", "vegeta end ssj2|vegeta ssj2", "majin"],
-    ["Vegeta Super Saiyan 4", "vegeta ssj4", ""],
-    ["Vegeta Super Saiyan (otro)", "vegeta mid ssj|vegeta gt ssj|vegeta early ssj", "ssj2 ssj4"],
+    ["King Piccolo", "king piccolo|piccolo king|piccolo daimao", ""],
+    ["Frieza - Third Form", "frieza third", ""],
+    ["Frieza - Full Power", "frieza fullpower", ""],
+    ["Gohan (Adult) - Super Saiyan", "gohan adult ssj", "ssj2"],
+    ["Super Gogeta (Z) - Super Saiyan", "gogeta ssj", "ssj4"],
+    ["Goku (Early) - Base", "goku early", FORMAS],
+    ["Goku (GT) - Super Saiyan 4", "goku ssj4", ""],
+    ["Goku (Mid) - Super Saiyan", "goku mid ssj", ""],
+    ["Gotenks - Super Saiyan", "gotenks ssj", "ssj3"],
+    ["Gotenks - Base", "gotenks", FORMAS + " buu absorbed"],
+    ["Trunks (Kid) - Super Saiyan", "trunks kid ssj", ""],
+    ["Trunks (Kid) - Base", "trunks kid", FORMAS],
+    ["Majuub", "majuub|uub ssj", ""],
+    ["Nam", "nam", ""],
+    ["Piccolo (End)", "piccolo end", "kami fused nail sync king"],
+    ["Super Baby 2", "super baby 2|baby 2", ""],
+    ["Super Buu - Base", "super buu", "gotenks gohan absorbed"],
+    ["Super Buu - Gotenks Absorbed", "buu gotenks", ""],
+    ["Super Vegeta", "super vegeta|vegeta super", "ssj4 baby gt"],
+    ["Syn Shenron", "syn shenron|syn", "omega"],
+    ["Gohan (Teen) - Super Saiyan", "gohan teen ssj", "ssj2"],
+    ["Vegeta (Second Form) - Super Saiyan 2", "vegeta ssj2", "majin"],
+    ["Vegeta (GT) - Super Saiyan 4", "vegeta ssj4", ""],
+    ["Vegeta (Second Form) - Super Saiyan", "vegeta second ssj|vegeta mid ssj|vegeta early ssj", "ssj2 ssj4"],
   ],
   B: [
-    ["Gohan (adulto) Super Saiyan", "gohan adult ssj", "ssj2"],
-    ["Androide 16", "16", ""],
-    ["Baby Vegeta", "baby vegeta", "super ssj 1 2 ape"],
+    ["Gohan (Future) - Super Saiyan", "gohan future ssj", ""],
+    ["Android 16", "16", ""],
+    ["Baby Vegeta - Base", "baby vegeta", "super ssj 1 2 ape"],
     ["Bardock", "bardock", FORMAS],
-    ["Bojack (máximo poder)", "bojack fullpower|bojack full", ""],
-    ["Broly Super Saiyan", "broly ssj", "lssj"],
-    ["Cell (imperfecto)", "cell imperfect|cell first|cell", "semiperfect perfect superperfect jr second"],
+    ["Bojack - Full Power", "bojack fullpower|bojack full", ""],
+    ["Broly - Super Saiyan", "broly ssj", "lssj"],
+    ["Cell - First Form", "cell imperfect|cell first|cell", "semiperfect perfect superperfect jr second"],
     ["Cell Jr.", "cell jr|jr", ""],
-    ["Cell (perfecto)", "cell perfect", "semiperfect superperfect imperfect"],
-    ["Chaoz", "chiaotzu|chaozu", ""],
-    ["Ninja Murasaki", "murasaki", ""],
-    ["Buu malvado", "evil buu|pure evil|evil", "kid super"],
-    ["Fasha", "fasha|celipa", ""],
-    ["Freezer (primera forma)", "frieza first|frieza", "second third final fullpower mecha"],
-    ["Freezer (segunda forma)", "frieza second", ""],
-    ["Freezer (forma final)", "frieza final", "fullpower"],
-    ["Gohan (adulto)", "gohan adult", FORMAS + " ultimate"],
-    ["Goku (fin) Super Saiyan 2", "goku end ssj2", ""],
-    ["Goku (fin) Super Saiyan 3", "goku end ssj3", ""],
-    ["Goku (GT) Super Saiyan 3", "goku gt ssj3", ""],
-    ["Goku (GT)", "goku gt", FORMAS],
-    ["Goku (GT) Super Saiyan", "goku gt ssj", "ssj3 ssj4"],
-    ["Gotenks Super Saiyan 3", "gotenks ssj3", ""],
-    ["Gran Saiyaman", "great saiyaman|saiyaman", "2 videl"],
-    ["Krilin", "krillin|kuririn", ""],
-    ["Mecha Freezer", "mecha frieza", ""],
+    ["Cell - Super Perfect Form", "cell superperfect", ""],   // (la última transformación de Cell: el dueño)
+    ["Chiaotzu", "chiaotzu|chaozu", ""],
+    ["Cyborg Tao", "cyborg tao|tao cyborg|murasaki", ""],
+    ["Evil Buu", "evil buu|pure evil|evil", "kid super"],
+    ["Fasha", "fasha|celipa", "ape"],
+    ["Frieza - First Form", "frieza first|frieza", "second third final fullpower mecha soldier ape"],
+    ["Frieza - Second Form", "frieza second", ""],
+    ["Frieza - Final Form", "frieza final", "fullpower"],
+    ["Gohan (Future) - Base", "gohan future", FORMAS],
+    ["Goku (End) - Super Saiyan 2", "goku end ssj2", ""],
+    ["Goku (End) - Super Saiyan 3", "goku end ssj3", ""],
+    ["Goku (GT) - Super Saiyan 3", "goku gt ssj3", ""],
+    ["Goku (GT) - Base", "goku gt", FORMAS],
+    ["Goten - Super Saiyan", "goten ssj", ""],
+    ["Gotenks - Super Saiyan 3", "gotenks ssj3", ""],
+    ["Great Saiyaman", "great saiyaman|saiyaman", "2 videl"],
+    ["Krillin", "krillin|kuririn", ""],
+    ["Mecha Frieza", "mecha frieza", ""],
     ["Nail", "nail", "piccolo sync"],
-    ["Syn Shenron", "syn shenron|syn", "omega"],
-    ["Piccolo (fin)", "piccolo end", "kami fused nail sync"],
+    ["Omega Shenron", "omega", ""],
+    ["Piccolo (Early)", "piccolo early", "kami fused nail sync king"],
     ["Recoome", "recoome", ""],
     ["Super Baby 1", "super baby 1|baby 1", "2"],
-    ["Super Buu (absorbe a Gohan)", "buu gohan", ""],
-    ["Trunks (armadura) Super Saiyan", "trunks armor ssj|trunks battle ssj", "kid sword super ssj2"],
-    ["Trunks (espada) Super Saiyan", "trunks sword ssj", ""],
+    ["Super Buu - Gohan Absorbed", "buu gohan", ""],
+    ["Super Trunks", "super trunks|trunks armor super|trunks battle super", "sword kid gt"],
+    ["Trunks (Sword) - Super Saiyan", "trunks sword ssj", ""],
     ["Tapion", "tapion", ""],
-    ["Gohan (joven)", "gohan teen", FORMAS],
-    ["Ten Shin Han", "tien|tenshinhan", ""],
-    ["Uub", "uub", "majuub"],
-    ["Vegeta (fin) Súper Vegeta", "vegeta end super|vegeta super", "ssj4 baby gt"],
-    ["Vegeta Majin", "majin vegeta", ""],
-    ["Vegeta (scouter)", "vegeta scouter", "ape"],
-    ["Vegeta (inicio)", "vegeta early|vegeta mid", FORMAS],
+    ["Ultimate Gohan", "ultimate gohan|gohan ultimate", ""],
+    ["Tien", "tien|tenshinhan", ""],
+    ["Uub", "uub", "majuub ssj"],
+    ["Vegeta (End) - Super Saiyan", "vegeta end ssj", "ssj2 ssj3 super"],
+    ["Majin Vegeta", "majin vegeta", ""],
+    ["Vegeta (Scouter)", "vegeta scouter", "ape"],
+    ["Vegeta (Second Form) - Base", "vegeta second|vegeta mid|vegeta early", FORMAS + " super"],
     ["Yamcha", "yamcha", ""],
-    ["Zarbon (transformado)", "zarbon post|zarbon transform|zarbon monster", ""],
+    ["Zarbon - Transformed", "zarbon post|zarbon transform|zarbon monster", ""],
+  ],
+  C: [
+    ["Gohan (Adult) - Base", "gohan adult", FORMAS + " ultimate"],
+    ["Android 13 - Base", "13", "super fusion"],
+    ["Cui", "cui", ""],
+    ["Bojack - Base", "bojack", "fullpower full"],
+    ["Captain Ginyu", "ginyu", ""],
+    ["Appule", "appule", ""],
+    ["Devilman", "devilman|devil man", ""],
+    ["Dodoria", "dodoria", ""],
+    ["Dr. Gero (Android 20)", "gero|20", ""],
+    ["Goku (End) - Super Saiyan", "goku end ssj", "ssj2 ssj3"],
+    ["Goku (End) - Base", "goku end", FORMAS],
+    ["Goku (GT) - Super Saiyan", "goku gt ssj", "ssj3 ssj4"],
+    ["Goku (Mid) - Base", "goku mid", FORMAS],
+    ["Goten - Base", "goten", FORMAS],
+    ["Jeice", "jeice", ""],
+    ["Kibito Kai", "kibito kai|kibitoshin|kibito", ""],
+    ["Gohan (Kid)", "gohan kid", FORMAS],
+    ["King Vegeta", "king vegeta|vegeta king", "ape"],
+    ["Majin Buu (Good)", "majin buu|fat buu|buu", "super kid evil pure gotenks gohan absorbed"],
+    ["Metal Cooler", "metal cooler|meta cooler|cooler metal|cooler meta", ""],
+    ["Nappa", "nappa", "ape"],
+    ["Pikkon", "pikkon|paikuhan", ""],
+    ["Raditz", "raditz", "ape"],
+    ["Saibaman", "saibaman|saibamen", ""],
+    ["Salza", "salza", ""],
+    ["Super Garlic Jr.", "super garlic|garlic super", ""],
+    ["Super Janemba", "super janemba|janemba super|janemba evil", "giant fat"],
+    ["Trunks (Sword) - Base", "trunks sword", FORMAS],
+    ["Tambourine", "tambourine|tamborine", ""],
+    ["Gohan (Teen) - Base", "gohan teen", FORMAS],
+    ["Turles", "turles|tullece", "ape"],
+    ["Vegeta (End) - Base", "vegeta end", FORMAS + " super"],
+    ["Yajirobe", "yajirobe", ""],
+    ["Zarbon - Base", "zarbon", "post transform monster"],
+  ],
+  D: [
+    ["Android 19", "19", ""],
+    ["Android 8", "8|hatchan", ""],
+    ["Broly - Base", "broly", FORMAS],
+    ["Chi-Chi (Kid)", "chi chi|chichi", ""],   // (el JSON tenía dos «Pan»: una es la Chi-Chi niña, la del casco rosado)
+    ["Cooler - Base", "cooler", "final fifth metal meta"],
+    ["Frieza Soldier", "soldier", ""],
+    ["Garlic Jr. - Base", "garlic", "super"],
+    ["General Blue", "blue", ""],
+    ["General Tao", "tao|taopaipai", "cyborg"],
+    ["Grandpa Gohan", "grandpa gohan|gohan grandpa", ""],
+    ["Great Saiyaman 2", "great saiyaman 2|saiyaman 2|videl saiyaman", ""],
+    ["Guldo", "guldo|gurd", ""],
+    ["Mr. Satan", "satan|hercule", ""],
+    ["Goku (Kid)", "kid goku|goku kid", "ape"],
+    ["King Cold", "king cold|cold", ""],
+    ["Master Roshi - Base", "roshi|master roshi|kame", "max power muscle"],
+    ["Master Roshi - Max Power", "roshi max|roshi power|roshi muscle", ""],
+    ["Pan", "pan", ""],
+    ["Lord Slug - Base", "slug", "giant"],
+    ["Spopovich", "spopovich", ""],
+    ["Pilaf Machine - Base", "pilaf", "combined giant"],   // (el JSON tenía dos «Spopovich»: uno es la máquina de Pilaf)
+    ["Supreme Kai", "supreme kai|kaioshin", "kibito"],
+    ["Videl - Base", "videl", "saiyaman"],
+    ["Zangya", "zangya", ""],
+  ],
+  "N/C": [
+    ["Dr. Wheelo", "wheelo|willow", ""],
+    ["Great Ape Bardock", "bardock ape", ""],
+    ["Great Ape Fasha", "fasha ape", ""],
+    ["Great Ape Kid Goku", "goku ape|kid goku ape", ""],
+    ["Great Ape Nappa", "nappa ape", ""],
+    ["Great Ape King Vegeta", "king vegeta ape", ""],
+    ["Great Ape Raditz", "raditz ape", ""],
+    ["Great Ape Turles", "turles ape", ""],
+    ["Great Ape Vegeta", "vegeta ape", "king baby"],
+    ["Hirudegarn", "hirudegarn|hildegarn", ""],
+    ["Janemba - Giant Form", "janemba", "super evil"],
+    ["Lord Slug - Giant Form", "slug giant", ""],
+    ["Pilaf Machine - Combined Form", "pilaf combined|pilaf", ""],
   ],
 };
 
-export const BT3_VETOS = { "": "Todos", noop: "No OP", malos: "Sólo malos" };
+/* Las reglas. Cada una dice qué tiers SE PERMITEN (así las pidió el dueño):
+   - `noop` («No OP»): solo A, B, C y D (fuera BROLY, S++, S+, S y también los gigantes N/C).
+   - `malos` («Sólo malos»): solo C y D.
+   - `gigantes` («Sólo gigantes»): solo N/C (los Grandes Simios, Hirudegarn, Janemba gigante…), y además el Gran
+     Simio de Baby, que en la lista es S pero es un gigante (`PERMITE_TAMBIEN`).
+   Un personaje del juego que la lista no nombra queda fuera en las tres: la regla dice qué se permite, y lo que no se
+   reconoce no entra. */
+export const BT3_VETOS = { "": "Todos", noop: "No OP", malos: "Sólo malos", gigantes: "Sólo gigantes" };
 export const BT3_VETOS_TXT = {
   "": "Se puede elegir cualquier personaje.",
-  noop: "Fuera los de tier S hacia arriba (BROLY, S++, S+ y S).",
-  malos: "Solo los de tier C hacia abajo (fuera también los de A y B).",
+  noop: "Solo los de tier A, B, C y D (fuera BROLY, S++, S+, S y los gigantes N/C).",
+  malos: "Solo los de tier C y D.",
+  gigantes: "Solo los gigantes: tier N/C (los Grandes Simios, Hirudegarn, Janemba gigante, Slug gigante…) y el Gran Simio de Baby.",
 };
-export const tiersVetadas = regla => regla === "noop" ? ["BROLY", "S++", "S+", "S"] : regla === "malos" ? ["BROLY", "S++", "S+", "S", "A", "B"] : [];
+const PERMITE = { noop: ["A", "B", "C", "D"], malos: ["C", "D"], gigantes: ["N/C"] };
+// personajes sueltos que una regla permite aunque su tier no (por el nombre de su entrada)
+const PERMITE_TAMBIEN = { gigantes: new Set(["Great Ape Baby"]) };
+export const tiersPermitidas = regla => PERMITE[regla] || BT3_ORDEN;
+export const tiersVetadas = regla => regla && PERMITE[regla] ? BT3_ORDEN.filter(t => !PERMITE[regla].includes(t)) : [];
 export const entradasVetadas = regla => tiersVetadas(regla).flatMap(t => BT3_TIERS[t].map(e => ({ tier: t, nombre: e[0], busca: e[1], excluye: e[2] })));
 
 const PALABRAS = new WeakMap();   // (las palabras de cada personaje del catálogo, calculadas una vez)
@@ -202,13 +295,40 @@ export function catalogoBt3(lista) {
   return lista.slice(0, 161).map(e => Array.isArray(e) ? { nombre: txt(e[0]), forma: txt(e[1]) } : null);
 }
 
-/* Los ids que la regla deja fuera, con lo que encontró cada entrada (para mostrarlo en la sala). */
-export function vetadosBt3(cat, regla) {
-  const ids = new Set(), detalle = [];
-  for (const e of entradasVetadas(regla)) {
-    const hay = cat && cat.length ? buscaBt3(cat, e.busca, e.excluye) : [];
-    hay.forEach(i => ids.add(i));
-    detalle.push({ tier: e.tier, nombre: e.nombre, juego: hay.map(i => [cat[i].nombre, cat[i].forma].filter(Boolean).join(" · ")) });
+/* El tier de cada personaje del juego (id → tier) y lo que encontró cada entrada de la lista. Si dos entradas encuentran
+   al mismo, gana la de tier más alto. Los Grandes Simios que la lista no nombra uno por uno (todo «Great Ape» del juego
+   menos el de Baby, que es S) son N/C. */
+export function tiersDe(cat) {
+  const tier = new Map(), entradas = [];
+  for (const t of BT3_ORDEN) for (const [nombre, busca, excluye] of BT3_TIERS[t]) {
+    const hay = cat && cat.length ? buscaBt3(cat, busca, excluye) : [];
+    for (const i of hay) if (!tier.has(i)) tier.set(i, t);
+    entradas.push({ tier: t, nombre, ids: hay });
   }
-  return { ids: [...ids].sort((a, b) => a - b), detalle };
+  (cat || []).forEach((c, i) => {
+    if (!c || tier.has(i)) return;
+    const p = palabrasBt3(c.nombre + " " + c.forma);
+    if (p.has("ape") && !p.has("baby")) tier.set(i, "N/C");
+  });
+  return { tier, entradas };
+}
+
+/* Lo que una regla deja fuera, para el juego (`ids`) y para mostrarlo (la sala y el panel del juego):
+   - `detalle`: cada entrada de la lista con su tier, lo que encontró en el disco y si queda vetada;
+   - `vetados` / `permitidos`: [tier, nombre en el juego] de cada personaje del disco;
+   - `sinTier`: los del disco que la lista no nombra (quedan fuera con cualquier regla). */
+export function vetadosBt3(cat, regla) {
+  const hayCat = !!(cat && cat.length), nombreDe = i => [cat[i].nombre, cat[i].forma].filter(Boolean).join(" · ");
+  const { tier, entradas } = tiersDe(hayCat ? cat : []);
+  const permite = new Set(tiersPermitidas(regla)), activa = !!PERMITE[regla], tambien = PERMITE_TAMBIEN[regla] || new Set();
+  const sueltos = new Set(entradas.filter(e => tambien.has(e.nombre)).flatMap(e => e.ids));
+  const ids = [], vetados = [], permitidos = [], sinTier = [];
+  if (hayCat) cat.forEach((c, i) => {
+    if (!c) return;
+    const t = tier.get(i), fuera = activa && !(t && permite.has(t)) && !sueltos.has(i);
+    if (fuera) { ids.push(i); vetados.push([t || "?", nombreDe(i)]); } else permitidos.push([t || "?", nombreDe(i)]);
+    if (!t) sinTier.push({ nombre: nombreDe(i), vetado: fuera });
+  });
+  const detalle = entradas.map(e => ({ tier: e.tier, nombre: e.nombre, juego: e.ids.map(nombreDe), vetado: activa && !permite.has(e.tier) && !tambien.has(e.nombre) }));
+  return { ids, detalle, vetados, permitidos, sinTier };
 }

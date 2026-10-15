@@ -186,10 +186,18 @@ comes back.
 
 **The room does not rank** (`anotar` skips `bt3`) and its ten logros are room-detected (`SIN_FILA` in `logros.js`).
 
-**Character rules from a tier list** (duel and tournament, `{t:"ajuste", k:"veto", v:""|"noop"|"malos"}`, one
-setting so the two are mutually exclusive): «No OP» bans tiers BROLY..S, «Sólo malos» bans BROLY..B (C, D and N/C
-stay allowed). The list is `colabtex/src/juegos/bt3-tiers.js`, read by eye from the r/tenkaichi4 «comp discord»
-image: 161 portraits = the game's 161 ids, **one per form** (the gold S+ one is Nuova Shenron). Character names are
+**Character rules from a tier list** (duel and tournament, `{t:"ajuste", k:"veto", v:""|"noop"|"malos"|"gigantes"}`,
+one setting so they are mutually exclusive). **Each rule says which tiers ARE allowed** (the owner's words):
+«No OP» = A, B, C, D; «Sólo malos» = C, D; «Sólo gigantes» = N/C plus Great Ape Baby (an S, but a giant:
+`PERMITE_TAMBIEN`). Anything else is banned, and so is any character
+of the disc the list does not name (`sinTier`). The list is `colabtex/src/juegos/bt3-tiers.js`: all 161 portraits of
+the r/tenkaichi4 «comp discord» image, in its row order, with the owner's names (a JSON); where that JSON repeated a
+name the owner or the image decided (S++ Cell = Perfect, B Cell = his last form, Super Perfect; A «Bojack FP» =
+Super Android 13, C has one Salza and one Nappa, one D
+«Pan» = Chi-Chi (Kid), one D «Spopovich» = Pilaf Machine (base; the combined one is N/C); S «Vegito - Super Saiyan» is the black-haired base Vegito, next to Super Vegito). `tiersDe` gives
+each disc id the tier of the first (highest) entry that finds it; unnamed «Great Ape» forms (not Baby's) are N/C.
+In the room, with a rule on, **«📋 Ver la tier list»** shows the tiers in the image's colours, each entry allowed or
+locked and the disc name it matched; the in-game side panel lists the shorter of allowed/banned. Character names are
 not in the code, they are on the disc: when a select screen opens the patch hands its name/form texts (sections
 43/44, line n = id n, **UTF-16 little-endian**: the game reads them as native `u16`, `btl_seq.c` compares them
 with `'0'`) to `Module.onCatalogo` (`Web_Catalogo`, CharSel and TeamSel init),
@@ -202,8 +210,8 @@ custom characters too); CharSel/TeamSel also refuse a banned pick with the error
 banned chip dark; and **mid-fight** `BattleSide_IsCharaUsable` (battle_load.c, asked by `BtlAct_CanTransform`/
 `CanFuse` for human and AI) refuses it, so nobody transforms or fuses into a banned form. Both peers read the same
 disc and rule → same grids and draws (no desync). While a select screen is open (`Web_Seleccion` →
-`Module.onSeleccion`) the frame shows a foldable side panel listing the banned ones by tier (`#vetos`, folded state
-in `bt3.vetosPlegado`); «Ver los vetados» in the room shows the same list with the in-game name each entry matched
+`Module.onSeleccion`) the frame shows a foldable side panel listing the banned (or allowed) ones by tier (`#vetos`, folded state
+in `bt3.vetosPlegado`); «Ver la tier list» in the room shows every entry with the in-game name each entry matched
 (or «no se encontró»), «N de M encontrados en tu disco» and **«📋 Copiar los nombres del disco»** (id + name per
 line) — **check it against the real disc**. Trap: until bt3-12 the patch read the names high byte first, so «G»
 (0x47) arrived as 0x4700, nothing matched and **no rule banned anything**; the bench and the tests fed correct codes

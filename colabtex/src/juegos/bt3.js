@@ -5,7 +5,7 @@ import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
 import { suena } from "./sonido.js";
 import { crearVisor } from "./bt3-directo.js";
-import { BT3_VETOS, BT3_VETOS_TXT, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
+import { BT3_VETOS, BT3_VETOS_TXT, BT3_ORDEN, tiersPermitidas, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
 /* Budokai Tenkaichi 3 — el cartero entre la sala y el juego.
 
@@ -372,19 +372,25 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
       ${est.empates ? `<small>${est.empates} empate${est.empates > 1 ? "s" : ""}</small>` : ""}</p>`;
   }
 
-  /* La regla de personajes (bt3-tiers.js): Todos / No OP / Sólo malos, una u otra, y la lista de los que quedan
-     fuera, con el nombre con que los encontró en el juego (para revisar que la tier list quedó bien leída). */
+  /* La regla de personajes (bt3-tiers.js): Todos / No OP / Sólo malos / Sólo gigantes, una u otra. Con una regla
+     puesta, «📋 Ver la tier list»: los tiers como en la imagen (sus colores), cada personaje con candado o no según
+     la regla, y con el nombre con que lo encontró en el disco (para revisar que la lista quedó bien leída). */
   let vetosAbierto = false;
+  const COLOR_TIER = { BROLY: "#c48fd1", "S++": "#f07a7a", "S+": "#f9a06f", S: "#fbc373", A: "#fdfd7d", B: "#bdf77d", C: "#7ef77f", D: "#7dfdfd", "N/C": "#7dbdfd" };
   function vetoHtml(puede) {
     const v = est.veto || "", conCat = catalogoBueno(catalogo);
     const fichas = Object.entries(BT3_VETOS).map(([k, t]) =>
       `<button class="jg-bt3-ficha" data-k="veto" data-v="${k}" aria-pressed="${k === v}" ${puede ? "" : "disabled"}>${escapeHtml(t)}</button>`).join("");
     let lista = "";
     if (v) {
-      const r = vetadosBt3(catalogo, v);
-      lista = `<details class="jg-bt3-vetados"${vetosAbierto ? " open" : ""}><summary>Ver los ${r.detalle.length} vetados</summary>
-        <ul>${r.detalle.map(d => `<li><i>${escapeHtml(d.tier)}</i><span>${escapeHtml(d.nombre)}${!conCat ? ""
-          : d.juego.length ? ` <small translate="no">${escapeHtml(d.juego.join(" / "))}</small>` : ` <small class="no">no se encontró en el juego</small>`}</span></li>`).join("")}</ul>
+      const r = vetadosBt3(catalogo, v), si = new Set(tiersPermitidas(v));
+      const chip = d => `<li class="${d.vetado ? "no" : "si"}">${d.vetado ? '<span class="cand" aria-label="vetado">🔒</span>' : ""}<span translate="no">${escapeHtml(d.nombre)}</span>${!conCat ? ""
+        : d.juego.length ? `<small translate="no">${escapeHtml(d.juego.join(" / "))}</small>` : `<small class="no">no se encontró en el juego</small>`}</li>`;
+      const filas = BT3_ORDEN.map(t => `<div class="jg-bt3-tl-fila${si.has(t) ? " si" : " no"}"><b style="--tc:${COLOR_TIER[t]}">${escapeHtml(t)}<small>${si.has(t) ? "se puede" : "fuera"}</small></b>
+        <ul>${r.detalle.filter(d => d.tier === t).map(chip).join("")}</ul></div>`).join("");
+      const sin = conCat && r.sinTier.length ? `<p class="jg-bt3-nota">Del disco, sin tier en la lista (quedan fuera): <span translate="no">${r.sinTier.map(x => escapeHtml(x.nombre)).join(" · ")}</span></p>` : "";
+      lista = `<details class="jg-bt3-vetados jg-bt3-tl"${vetosAbierto ? " open" : ""}><summary>📋 Ver la tier list${conCat ? ` · ${r.permitidos.length} se pueden, ${r.ids.length} con candado` : ""}</summary>
+        <div class="jg-bt3-tl-filas">${filas}</div>${sin}
         ${conCat ? `<p class="jg-bt3-nota">${r.detalle.filter(d => d.juego.length).length} de ${r.detalle.length} encontrados en tu disco.
           <button type="button" class="jg-bt3-ficha" data-copia="1" title="Para revisar la tier list: la lista de personajes que trae el disco">📋 Copiar los nombres del disco</button></p>`
           : `<p class="jg-bt3-nota">Los nombres del juego se leen del disco la primera vez que se abre la selección de personajes; el juego no deja elegir a los vetados.</p>`}</details>`;
