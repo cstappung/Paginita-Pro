@@ -9,8 +9,17 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   the browser fork [stufno102/Tenkaichi3Decomp](https://github.com/stufno102/Tenkaichi3Decomp), pinned in
   `fuente/construir.sh` (`COMMIT`). Our changes to that fork are **one patch**, `fuente/parche.diff`; never edit the
   generated files here by hand.
-- **PC only, Chrome or Edge.** The game is not playable on a phone, so only the JSPI build is made; the fork's
-  Asyncify build (Safari/iPhone) is not, and the page says so on a phone or a browser without JSPI.
+- **Chrome or Edge: on a PC, or Chrome on Android.** Only the JSPI build is made; the fork's Asyncify build
+  (Safari/iPhone, where every browser is Safari underneath) is not, and the page says so on a browser without JSPI.
+  On Android (`body.coarse`) the fork's touch pad shows, and `pagina.py`/`pagina.js` adapt the site's parts:
+  - the bar goes centred between the pad's columns while playing (`translate`, not `transform`, which the bar's
+    hide animation owns), without the volume slider or an idle controller badge, and the ♪ label is short;
+  - the floating language picker of `i18n.js` is hidden once the game runs (it sat on the stick);
+  - the first tap with the game running asks for fullscreen (the frame has `allowfullscreen`);
+  - the mode list is one column under 500 px, and `#start` centres with `safe center` (plain `center` cut off the
+    top of a card taller than the screen, out of reach of the scroll).
+  `@controles: tactil teclado` in `pagina.js` makes the lobby tag it for phones too. Bench test: `prueba50`
+  (Pixel 7, both orientations). Speed on a real phone was never measured.
 - **The fork's on-screen touch pad must not show on a PC.** The fork shows it on `pointer: coarse` or
   `maxTouchPoints > 1`, which a Windows PC with touch drivers or a touchscreen laptop reports even when played with
   a mouse: the pad covered the fight. `pagina.py` makes "touch" require that there is **no** fine pointer

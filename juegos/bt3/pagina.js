@@ -13,7 +13,7 @@
       anfitrión empiece, se conecta con el rival por la malla del marco (`red.js`) y recién ahí arranca el
       programa como sesión en línea. El entorno de la sesión (anfitrión o no, reglas) lo pone el programa con
       setenv al empezar el juego (Module.entornoPendiente): ENV ya no sirve una vez cargado el runtime.
-   @controles: teclado */
+   @controles: tactil teclado */
 (() => {
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
@@ -103,7 +103,7 @@
      una sola vez (la promesa queda guardada). */
   let programa = null;
   const pidePrograma = window.pidePrograma = () => programa || (programa = (async () => {
-    if (!window.cargaPrograma) return;   // (sin JSPI, o en el celular: aquí el juego no corre, no se baja nada)
+    if (!window.cargaPrograma) return;   // (sin JSPI, como en el iPhone: aquí el juego no corre, no se baja nada)
     const url = Module.locateFile ? Module.locateFile("bt3-jspi.wasm", "") : "bt3-jspi.wasm";
     /* Ya bajado antes (esta misma versión): sin barra, directo de la caché del navegador. Así Chrome además
        reusa el código ya compilado (lo guarda solo para un .wasm cargado de su dirección, no de un blob), y el
@@ -716,6 +716,19 @@
   };
   if (!avisaHijo()) { let n = 0; const t = setInterval(() => { if (avisaHijo() || ++n > 40) clearInterval(t); }, 250); }
   mando.style.cursor = "pointer";
+
+  /* En el celular (Chrome de Android: los controles táctiles del fork, body.coarse): con el juego andando, el
+     primer toque pone el juego a pantalla completa, sin la barra del navegador que le quita alto. Pedirla necesita un
+     toque (el navegador no la da sola), y si se sale (el gesto de atrás) el próximo toque la pide de nuevo. Dentro
+     de Juegos el marco tiene `allowfullscreen`. */
+  if (document.body.classList.contains("coarse")) {
+    const pideCompleta = () => {
+      if (!document.body.classList.contains("started") || document.fullscreenElement) return;
+      const raiz = document.documentElement, pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+      try { pide && Promise.resolve(pide.call(raiz, { navigationUI: "hide" })).catch(() => {}); } catch (e) {}
+    };
+    addEventListener("pointerup", pideCompleta, true);
+  }
   mando.onclick = () => { if (!ajustes.hidden) ajustes.onclick(); };
 
   // El menú «Dragon Net Battle» del juego abría el juego en línea del fork (su servidor): aquí se juega en una sala.
@@ -995,10 +1008,12 @@
     // ♪ en la barra: la canción o la música del juego (para cada uno; se puede cambiar en plena pelea)
     const boton = document.createElement("button");
     boton.id = "musica"; boton.type = "button";
+    const chico = document.body.classList.contains("coarse");
     function pintaBoton() {
       const si = quiere(), cual = hallada && hallada.nombre ? `«${hallada.nombre}»${hallada.artista ? " de " + hallada.artista : ""}` : "«chinchonchin»";
       // (si no se pudo, el botón lo dice: así se sabe por qué suena la del juego)
-      boton.textContent = !si ? "♪ Música del juego" : fallo ? "♪ Chinchonchin ⚠" : "♪ " + (hallada && hallada.corto || "Chinchonchin");
+      boton.textContent = !si ? (chico ? "♪ Juego" : "♪ Música del juego") : fallo ? "♪ ⚠" + (chico ? "" : " Chinchonchin")
+        : chico ? "♪" : "♪ " + (hallada && hallada.corto || "Chinchonchin");   // (en el celular, corto: la barra va entre los botones)
       boton.title = !si ? "En las peleas suena la música del juego. Clic: «chinchonchin» (de PRO HERO)"
         : fallo ? `No suena ${cual}: ${fallo}. Suena la música del juego. Clic: elegir la música del juego`
         : `En las peleas suena ${cual}, de PRO HERO. Clic: la música del juego`;

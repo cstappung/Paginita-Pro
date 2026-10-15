@@ -457,7 +457,7 @@ const REGLAS = {
         secciones: [
           ["Cómo se juega", pasos([
             "Abre una sala con <b>Formato: Duelo</b> y pásale el enlace a tu amigo. Cuando entra, aparecen los dos frente a frente.",
-            "Cada uno espera su <b>● Disco listo</b> (el juego se carga solo la primera vez; después sale de tu computador).",
+            "Cada uno espera su <b>● Disco listo</b> (el juego se carga solo la primera vez; después sale de tu computador o celular).",
             "El <b>anfitrión</b> (👑, el jugador 1) elige las reglas y aprieta <b>¡A pelear!</b>. Cualquiera de los dos puede cambiarlo con <b>Hacer anfitrión</b>, en la tarjeta del J2.",
             "Eligen personaje y escenario en el juego, y a pelear. Al K.O. el juego anota solo quién ganó: se ve entera la celebración y, cuando sale el menú de resultados, vuelven los dos a la sala con el marcador al día."
           ])],
@@ -508,9 +508,10 @@ const REGLAS = {
     },
     secciones: [
       ["Lo que necesitas", lista([
-        "Un computador con <b>Chrome</b> o <b>Edge</b>. En el celular no se puede jugar.",
+        "Un computador con <b>Chrome</b> o <b>Edge</b>, o un celular <b>Android</b> con <b>Chrome</b>. En el <b>iPhone</b> (y en Safari) no funciona: le falta lo que el juego necesita para correr en el navegador.",
+        "<b>En el celular</b>: aparecen los botones del mando en la pantalla (el botón <b>Hide</b> los esconde). Mejor en horizontal; al tocar el juego se pone a pantalla completa. La primera vez se bajan unos 270 MB: mejor con wifi. En un celular sencillo puede andar lento.",
         "<b>El disco</b>: si estás en la lista de amigos, se carga solo. Si no, tu propia imagen del disco, versión <b>USA</b> (SLUS-21678): se lee solo en tu navegador y la página la recuerda.",
-        "<b>Teclado o mando</b> (PS4, PS5 o Xbox, por cable o Bluetooth). <b>Ajustes</b> (o F1) → <b>Controls</b>: qué mando usa cada jugador y qué hace cada botón.",
+        "<b>Teclado, mando o los botones táctiles</b> (mando PS4, PS5 o Xbox, por cable o Bluetooth, también en el celular). <b>Ajustes</b> (o F1) → <b>Controls</b>: qué mando usa cada jugador y qué hace cada botón.",
         "El juego va a <b>30 cuadros por segundo</b>, como la consola. En <b>Ajustes</b> (F1) → Video → <b>Smooth motion</b> puedes pedir 60 (o más): dibuja imágenes intermedias, pero la pelea se calcula a 30 igual, así que en línea da lo mismo que tu rival tenga otra opción. Si tu computador no alcanza, baja solo la calidad de la imagen, nunca los cuadros."
       ])],
       ["Música de pelea", "En las peleas suena <b>«chinchonchin»</b>, de la biblioteca de PRO HERO, en vez de la música del juego (los golpes, las voces y el escenario suenan igual). El <b>♪</b> de la barra de arriba la cambia por la música del juego: cada uno elige la suya, y no cambia nada de la pelea. Se baja una vez, al empezar tu primera pelea (si ya la jugaste en PRO HERO, no se baja de nuevo)."],
