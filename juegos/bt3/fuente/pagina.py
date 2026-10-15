@@ -210,6 +210,14 @@ cambia('</style>', '''  body.started .i18n-flota { display: none; }
   body.coarse #mando:not(.ok) { display: none; }
 </style>''')
 
+# ---- deslizar con el dedo: en todo el inicio, no solo en la tarjeta ----
+# El fork bloquea el arrastre con el dedo (touchmove) en toda la página salvo en `.card`, para que el juego no se
+# mueva ni haga zoom. Pero los modos (pagina.js, 2b) van fuera de la tarjeta: se bajaba arrastrando sobre ella y,
+# con el dedo ya sobre los modos, no se podía volver a subir. Se deja arrastrar en todo el inicio (`#start`, que se
+# quita al empezar) y en las dos listas con scroll propio (los vetados, el log).
+cambia("    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card')) e.preventDefault(); }, { passive: false });",
+       "    document.addEventListener(ev, (e) => { if (!e.target.closest || !e.target.closest('.card, #start, #vetos, #registro')) e.preventDefault(); }, { passive: false });")
+
 # ---- Chrome o Edge (JSPI): en el computador y en Android; iPhone y Safari no ----
 # Solo se construye la versión JSPI. La tienen Chrome y Edge, también Chrome de Android (con los controles táctiles
 # del fork). En el iPhone todo navegador es Safari por dentro, sin JSPI: ahí no arranca y se dice.

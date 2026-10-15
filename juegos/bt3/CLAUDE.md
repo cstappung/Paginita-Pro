@@ -16,6 +16,9 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
     hide animation owns), without the volume slider or an idle controller badge, and the ♪ label is short;
   - the floating language picker of `i18n.js` is hidden once the game runs (it sat on the stick);
   - the first tap with the game running asks for fullscreen (the frame has `allowfullscreen`);
+  - the fork blocks `touchmove` everywhere but `.card` (no page scroll or zoom while playing); the modes sit outside
+    the card, so a finger could scroll down over the card and never back up over the modes. The exception now
+    covers `#start` (removed when the game starts), `#vetos` and `#registro`. Bench test: `prueba51`;
   - the mode list is one column under 500 px, and `#start` centres with `safe center` (plain `center` cut off the
     top of a card taller than the screen, out of reach of the scroll).
   `@controles: tactil teclado` in `pagina.js` makes the lobby tag it for phones too. Bench test: `prueba50`
