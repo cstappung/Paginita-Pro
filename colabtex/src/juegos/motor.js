@@ -217,6 +217,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 8,
     alta: "2026-10-12"
+  },
+  bt3: {
+    nombre: "Budokai Tenkaichi 3",
+    lema: "El juego de PS2 en el navegador: duelos uno contra uno o un torneo de eliminación directa, con tus amigos o contra la CPU",
+    color: "#f28c1e",
+    minimo: 1,   // un torneo se puede jugar solo contra la CPU (el duelo pide dos: minimoDe)
+    cupo: 8,
+    alta: "2026-10-14"
   }
 };
 
@@ -237,6 +245,7 @@ export function minimoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
   if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
+  if (p && p.juego === "bt3" && cupoDe(p) <= 2) return 2;   // el duelo de BT3 es de dos; el torneo, desde uno (con CPU)
   return j.minimo || 2;
 }
 
@@ -1004,6 +1013,7 @@ export function reducir(p) {
   if (p.juego === "tulones") return { ...base, ...redTulones(p, js, listos) };
   if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
+  if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
   return base;
 }
 
@@ -7158,5 +7168,308 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
   return {
     fase: !empezo ? "equipos" : ganador !== null ? "fin" : "jugando", turno: "",
     meta, cancha, tiempo, sprint, oro, ronda, equipos, nombresEq, anfitrion, goles, puntos, fuera, hist: hist.slice(-40), ganador, motivo
+  };
+}
+
+/* ---------- Budokai Tenkaichi 3 ----------
+   El juego de PS2 compilado a WebAssembly (`juegos/bt3/`, ver su CLAUDE.md), en un iframe. Cada jugador
+   pone su propia ISO, que se lee solo en su navegador. La pelea va de navegador a navegador por la malla
+   (`malla.js`, abierta DENTRO del marco: el buzón de Firebase solo presenta a los dos); al registro va
+   solo lo que pasa en el vestíbulo, nunca la pelea:
+   - `{t:"anfitrion", uid, a}`: cualquiera de los dos elige quién es el anfitrión (el jugador 1 del juego,
+     el que fija las reglas de la pelea). Empieza siendo quien abrió la sala.
+   - `{t:"ajuste", uid, k, v}`: el anfitrión elige `batalla` (BT3_BATALLAS), `tiempo` (BT3_TIEMPOS) o `veto`
+     (personajes prohibidos según la tier list, bt3-tiers.js: "", "noop" o "malos").
+   - `{t:"disco", uid}`: el marco de `uid` ya leyó una ISO válida; hace falta la de los dos para empezar.
+   - `{t:"empieza", uid}`: el anfitrión arranca, con los dos y sus discos. Abre una pelea (`ronda`).
+   - `{t:"vuelve", uid, por}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
+     recargan, así que los discos se vuelven a confirmar. Con `por: "corte"` (se perdió la conexión, o un
+     peleador recargó la página en plena pelea) la misma pelea vuelve a empezar sola cuando los dos discos están
+     listos (`reanudar`): el juego no puede seguir desde donde iba (cada copia arranca de cero; ver
+     juegos/bt3/CLAUDE.md), pero nadie tiene que volver a configurar ni apretar nada.
+   - `{t:"decide", uid, n, g}`: el anfitrión le da la victoria de la pelea `n` a `g` sin esperar al juego (se
+     colgó, alguien no vuelve después de un corte, los dos juegos no dijeron lo mismo). Vale para la pelea en
+     curso o la última si todavía no tiene resultado; cuenta en el marcador como cualquier otra y la pelea termina.
+   El juego no le dice a la página quién ganó, así que **la sala no clasifica** (`anotar` la salta, como
+   PRO HERO) y sus logros salen de lo que el vestíbulo sí sabe: cuántas peleas, quién fue anfitrión, con
+   qué reglas. La sala termina cuando alguien se va (`abandona`). */
+export const BT3_BATALLAS = { single: "Single Battle", team3: "Team 3 vs 3", team: "Team Battle", dp10: "DP Battle 10", dp15: "DP Battle 15", dp20: "DP Battle 20" };
+export const BT3_TIEMPOS = [60, 90, 180, 240, 0];   // segundos por round; 0 = sin límite (el orden es el del juego)
+const bt3Batalla = v => tiene(BT3_BATALLAS, v) ? v : "single";
+const bt3Tiempo = v => { const n = Math.floor(Number(v)); return BT3_TIEMPOS.includes(n) ? n : 240; };
+/* Las reglas de personajes (bt3-tiers.js): «noop» (fuera de S hacia arriba) o «malos» (solo de B hacia abajo);
+   son una u otra porque es un solo ajuste. "" = cualquiera. */
+const bt3Veto = v => v === "noop" || v === "malos" || v === "gigantes" ? v : "";
+/* La palabra de reglas que espera `gs/net.c` (BT3_NET_RULES): tipo (0 single, 1 team, 2 dp) en los 4 bits
+   bajos, cuál DP (0 = 10, 1 = 15, 2 = 20) en los siguientes y el índice del tiempo desde el bit 8. Desde el bit
+   12, cuántos por equipo si no son cinco: el 3 vs 3 es un Team Battle con tope de tres (gs/net.c no mira esos
+   bits; la página del juego los pasa aparte, BT3_WEB_EQUIPO, a los dos lados). */
+export function reglasBt3(batalla, tiempo) {
+  const b = bt3Batalla(batalla), tipo = b === "single" ? 0 : b === "team" || b === "team3" ? 1 : 2;
+  const dp = b === "dp15" ? 1 : b === "dp20" ? 2 : 0;
+  return tipo | dp << 4 | BT3_TIEMPOS.indexOf(bt3Tiempo(tiempo)) << 8 | (b === "team3" ? 3 : 0) << 12;
+}
+/* La CPU del torneo: cinco niveles, los del juego (la regla «CPU» del versus: niveles internos 0, 6, 13, 21, 29). */
+export const BT3_NIVELES = ["Muy fácil", "Fácil", "Normal", "Difícil", "Muy difícil"];
+export const esCpuBt3 = u => typeof u === "string" && u.startsWith("cpu:");
+export const BT3_CORTES = 3;   // una pelea cortada por la conexión vuelve sola hasta 3 veces seguidas
+
+export function redBt3(p, js = jugadoresDe(p)) {
+  const ids = new Set(js.map(j => j.uid));
+  const fuera = {}, hist = [];
+  if (esTorneoBt3(p)) return redTorneoBt3(p, js);
+  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, veto = "", empates = 0;
+  const marcador = {}, reportes = {};
+  let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
+  let reanudar = false; // la pelea se cortó por la conexión (o alguien recargó): vuelve a empezar sola, con los dos discos
+  let cortes = 0;       // cortes seguidos de la misma pelea: después de 3 ya no vuelve sola (una red que se cae siempre)
+  const contadas = new Set();   // las peleas (ronda) que ya tienen resultado en el marcador
+  let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  const presentes = () => js.filter(j => !fuera[j.uid]);
+  // una pelea con ganador: al marcador, y ya no vuelve a empezar sola
+  const cuenta = g => {
+    cortes = 0; reanudar = false; contadas.add(ronda);
+    if (g === "empate") empates++; else marcador[g] = (marcador[g] || 0) + 1;
+    hist.push({ e: "resultado", n: ronda, g });
+  };
+  for (const j of jugadasDe(p)) {
+    if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); continue; }
+    const vest = fase === "vestibulo";
+    const arranca = () => {
+      fase = "jugando"; ronda++; revancha = {}; reanudar = false;
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, batalla, tiempo, veto });
+    };
+    const todosListos = () => presentes().length === 2 && presentes().every(x => discos[x.uid]);
+    if (j.t === "anfitrion" && vest && ids.has(j.a) && !fuera[j.a]) {
+      if (j.a !== anfitrion) revancha = {};   // cambió lo acordado: se vuelve a pedir
+      anfitrion = j.a; hist.push({ e: "anfitrion", uid: j.uid, a: j.a });
+    } else if (j.t === "ajuste" && vest && j.uid === anfitrion && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
+      if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
+      revancha = {};
+    } else if (j.t === "disco" && vest) {
+      discos[j.uid] = true;
+      if ((reanudar || presentes().every(x => revancha[x.uid])) && todosListos()) arranca();
+    } else if (j.t === "revancha" && vest && ronda > 0) {
+      if (j.no) delete revancha[j.uid]; else revancha[j.uid] = true;
+      if (presentes().every(x => revancha[x.uid]) && todosListos()) arranca();
+    } else if (j.t === "empieza" && vest && j.uid === anfitrion && todosListos()) {
+      arranca();
+    } else if (j.t === "vuelve" && fase === "jugando") {
+      fase = "vestibulo"; discos = {};
+      /* La pelea terminó en el juego de uno (avisó el ganador) y la sesión se cerró antes de que avisara el otro (el
+         otro salió de la pantalla de resultados, se cortó): lo que dijo ese juego vale; no hay pelea que repetir. */
+      const solo = Object.entries(reportes).filter(([k, r]) => k.startsWith(ronda + ".") && !r.listo).map(([, r]) => r);
+      const unico = solo.length && Object.keys(solo[0]).length === 1 ? Object.values(solo[0])[0] : null;
+      if (unico !== null && !contadas.has(ronda)) {
+        solo[0].listo = true;
+        cuenta(unico);
+        hist.push({ e: "vuelve", uid: j.uid, n: ronda, auto: true });
+        continue;
+      }
+      cortes = j.por === "corte" ? cortes + 1 : 0;
+      reanudar = j.por === "corte" && cortes <= BT3_CORTES;   // (no una pelea que alguien dejó a propósito: esa no vuelve sola)
+      hist.push({ e: "vuelve", uid: j.uid, n: ronda, por: reanudar ? "corte" : "" });
+    } else if (j.t === "resultado" && fase === "vestibulo" && ronda > 0 && j.n === ronda && !contadas.has(ronda) && (ids.has(j.g) || j.g === "empate")) {
+      // un aviso que llega con la sala ya en el vestíbulo (la pelea ya terminó): vale, si esa pelea sigue sin resultado
+      cuenta(j.g);
+    } else if (j.t === "resultado" && fase === "jugando" && j.n === ronda && Number.isInteger(j.b) && (ids.has(j.g) || j.g === "empate")) {
+      // cada pelea de la sesión (b) la cuentan los dos marcos; si coinciden, va al marcador
+      const k = ronda + "." + j.b, r = reportes[k] = reportes[k] || {};
+      if (r[j.uid] !== undefined || r.listo) continue;
+      r[j.uid] = j.g;
+      const otros = presentes().filter(x => x.uid !== j.uid);
+      if (otros.length === 1 && r[otros[0].uid] !== undefined) {
+        r.listo = true;
+        if (r[otros[0].uid] === j.g) cuenta(j.g);
+        // la pelea terminó (los dos juegos lo dijeron): vuelven solos al vestíbulo, los marcos se cierran
+        fase = "vestibulo"; discos = {};
+        hist.push({ e: "vuelve", uid: "", n: ronda, auto: true });
+      }
+    } else if (j.t === "decide" && j.uid === anfitrion && ronda > 0 && j.n === ronda && !contadas.has(ronda) && ids.has(j.g) && !fuera[j.g]) {
+      // el anfitrión da la victoria: cuenta como una pelea ganada y, si se estaba peleando, se vuelve al vestíbulo
+      cuenta(j.g); revancha = {};
+      hist[hist.length - 1].mano = true;
+      if (fase === "jugando") { fase = "vestibulo"; discos = {}; hist.push({ e: "vuelve", uid: "", n: ronda, auto: true }); }
+    }
+  }
+  if (fuera[anfitrion]) anfitrion = (presentes()[0] || {}).uid || "";
+  // Alguien se fue: la sala se cierra. Si ya hubo peleas, el que se quedó la gana por abandono.
+  const idos = Object.keys(fuera).length;
+  const ganador = idos ? (ronda && presentes().length === 1 ? presentes()[0].uid : "") : null;
+  return {
+    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo),
+    discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha,
+    reanudar: ganador === null && fase === "vestibulo" && reanudar,
+    pendiente: ganador === null && ronda > 0 && !contadas.has(ronda)   // la última pelea aún sin resultado: el anfitrión puede darla
+  };
+}
+
+/* ---------- el torneo de BT3 ----------
+   Una sala de BT3 para 3 a 8 (`cupo` > 2) es un torneo de eliminación directa. El que abrió la sala organiza
+   (puede pasárselo a otro): pone las reglas, arma la llave y lo empieza. Antes de empezar, la llave de la primera
+   ronda se ve (`est.previa`: los lugares de a dos, "" = pasa directo): sale de los que están, mezclados con la
+   semilla de la sala (todos ven la misma), y el organizador la cambia arrastrando o con «Mezclar» (`{t:"orden",
+   uid, lista}`: los lugares enteros; vale si es del tamaño de la llave y ninguna pelea queda sin nadie, y quien
+   entra después ocupa un lugar libre). Con un número que no es potencia de dos, algunos pasan directo (bye).
+   `{t:"torneo"}` la fija y empieza. Las peleas van de a una, en orden de ronda:
+   - `{t:"disco", uid}`: el marco de `uid` ya tiene su disco (se vuelve a pedir después de cada pelea suya).
+   - `{t:"empieza", uid, m}`: uno de los dos (o el organizador) arranca la pelea `m` con los dos discos listos.
+   - `{t:"resultado", uid, m, g}`: lo que dice el marco de cada peleador al terminar (el juego lo cuenta solo,
+     __wrap_BattleResult_Finish); también se puede marcar a mano. Si los dos dicen lo mismo, queda; un empate
+     se vuelve a pelear; si no coinciden, `{t:"decide", uid, m, g}` del organizador. El organizador también puede
+     dar la victoria de la pelea actual cuando quiera (antes, durante o después de pelearla: alguien no está, el
+     juego se colgó), con la misma jugada.
+   - quien se va pierde sus peleas (la que estaba en curso y las que le tocaban); lo mismo quien saca el
+     organizador (`{t:"echa", uid, a}`), antes o durante el torneo.
+   Gana el torneo quien gana la final. Los logros ven cada pelea como una `ronda` (anfitrión = jugador 1). */
+export const esTorneoBt3 = p => cupoDe(p) > 2;
+
+export function redTorneoBt3(p, js = jugadoresDe(p)) {
+  const ids = new Set(js.map(j => j.uid)), fuera = {}, hist = [];
+  let org = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  let batalla = "single", tiempo = 240, veto = "", discos = {}, rondas = null, peleas = 0;
+  const cpus = {};   // "cpu:N" → {n, nivel}: los lugares que el organizador rellenó con la CPU
+  const cupo = cupoDe(p);
+  let orden = null;   // la llave que armó el organizador (lugares de a dos), o null: la del sorteo
+  // Una pelea entre dos CPU se decide sola, sin jugarla: al azar con la semilla de la sala, a favor del más fuerte.
+  const entreCpus = m => {
+    const la = cpus[m.a].nivel, lb = cpus[m.b].nivel;
+    let h = (p.semilla >>> 0) || 1;
+    for (const c of m.id) h = Math.imul(h ^ c.charCodeAt(0), 0x9E3779B1) >>> 0;
+    return rng(h)() < (1 + la) / (2 + la + lb) ? m.a : m.b;
+  };
+  const presentes = () => js.filter(j => !fuera[j.uid]);
+  const reponeOrg = () => { if (!org || fuera[org]) org = (presentes()[0] || {}).uid || ""; };
+  /* La llave de la primera ronda antes de empezar: lugares de a dos (pelea k = lugares 2k y 2k+1), "" = nadie. El
+     sorteo pone al k-ésimo contra el (tam/2 + k)-ésimo, así los que pasan directo quedan repartidos. */
+  const participantes = () => [...presentes().map(x => x.uid), ...Object.keys(cpus).sort()];
+  const tamDe = n => { let t = 2; while (t < n) t *= 2; return t; };
+  const sorteo = () => {
+    const azar = rng((p.semilla >>> 0) || 1), lista = participantes();
+    for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(azar() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
+    const tam = tamDe(lista.length), s = [];
+    for (let k = 0; k < tam / 2; k++) s.push(lista[k], lista[tam / 2 + k] || "");
+    return s;
+  };
+  const previa = () => {
+    const base = sorteo();
+    if (!orden || orden.length !== base.length) return base;
+    const quedan = new Set(participantes()), s = orden.map(u => quedan.delete(u) ? u : "");
+    // quien entró después de armarla: a un lugar libre (en el orden del sorteo)
+    for (const u of base) if (u && quedan.has(u)) { const i = s.indexOf(""); if (i < 0) break; s[i] = u; quedan.delete(u); }
+    if (quedan.size) return base;
+    for (let k = 0; k < s.length; k += 2) if (!s[k] && !s[k + 1]) return base;   // (una pelea sin nadie: no sirve)
+    return s;
+  };
+  // Los ganadores suben, los byes y los que se fueron se resuelven solos. Una pasada en orden de ronda alcanza.
+  const avanza = () => {
+    rondas.forEach((ronda, r) => ronda.forEach((m, k) => {
+      if (r > 0) { m.a = rondas[r - 1][2 * k].g; m.b = rondas[r - 1][2 * k + 1].g; }
+      if (m.g !== undefined || m.a === undefined || m.b === undefined) return;
+      if (m.a && m.b && cpus[m.a] && cpus[m.b]) { m.g = entreCpus(m); m.enCurso = false; hist.push({ e: "gana", m: m.id, g: m.g, a: m.a, b: m.b, cpu: true }); return; }
+      if (m.b === "" || (m.a !== "" && fuera[m.b] && !fuera[m.a])) m.g = m.a;
+      else if (m.a === "" || (fuera[m.a] && !fuera[m.b])) m.g = m.b;
+      else if (fuera[m.a] && fuera[m.b]) m.g = "";
+      if (m.g !== undefined) { m.enCurso = false; if (m.a && m.b) hist.push({ e: "pasa", m: m.id, g: m.g }); }
+    }));
+  };
+  const actual = () => rondas && rondas.flat().find(m => m.g === undefined && m.a !== undefined && m.b !== undefined) || null;
+  const listosDe = m => (cpus[m.a] || discos[m.a]) && (cpus[m.b] || discos[m.b]);   // (la CPU no carga disco)
+  const arrancaPelea = m => {
+    m.enCurso = true; m.rep = {}; m.conflicto = false; m.n = ++peleas; m.reanudar = false;
+    hist.push({ e: "pelea", m: m.id, n: m.n, a: m.a, b: m.b });
+    hist.push({ e: "ronda", n: m.n, anf: m.a, batalla, tiempo, veto });   // (para los logros, como una pelea del duelo)
+  };
+  const decide = (m, g, mano = false) => {   // mano: la dio el organizador, no los juegos
+    if (g === "empate") { m.enCurso = false; m.rep = {}; m.conflicto = false; hist.push({ e: "empate", m: m.id }); }
+    else { m.g = g; m.enCurso = false; hist.push({ e: "gana", m: m.id, g, a: m.a, b: m.b, ...(mano ? { mano: true } : {}) }); }
+    discos[m.a] = discos[m.b] = false;   // sus marcos se recargan para la próxima pelea
+    delete discos[""];
+    avanza();
+  };
+  for (const j of jugadasDe(p)) {
+    if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t === "abandona") { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); reponeOrg(); if (rondas) avanza(); continue; }
+    const esOrg = j.uid === org;
+    if (j.t === "anfitrion" && esOrg && ids.has(j.a) && !fuera[j.a]) { org = j.a; hist.push({ e: "anfitrion", uid: j.uid, a: j.a }); continue; }
+    // El organizador saca a alguien (no a sí mismo): queda fuera como si se hubiera ido; pierde sus peleas.
+    if (j.t === "echa" && esOrg && ids.has(j.a) && j.a !== org && !fuera[j.a]) {
+      fuera[j.a] = true; hist.push({ e: "echado", uid: j.a, por: j.uid });
+      if (rondas) avanza();
+      continue;
+    }
+    if (j.t === "disco") {
+      discos[j.uid] = true;
+      // una pelea cortada por la conexión vuelve a empezar sola en cuanto están los dos discos
+      const m = rondas && actual();
+      if (m && m.reanudar && !m.enCurso && listosDe(m)) arrancaPelea(m);
+      continue;
+    }
+    if (!rondas) {
+      if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
+        if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
+      } else if (j.t === "cpu" && esOrg && esCpuBt3(j.id) && /^cpu:[1-9]$/.test(j.id)) {
+        // poner (o cambiar de nivel) o quitar una CPU; no más lugares que el cupo de la sala
+        if (j.quita) delete cpus[j.id];
+        else if (cpus[j.id] || presentes().length + Object.keys(cpus).length < cupo) {
+          const nivel = Math.max(0, Math.min(4, Math.floor(Number(j.nivel)) || 0));
+          cpus[j.id] = { n: Number(j.id.slice(4)), nivel };
+        }
+      } else if (j.t === "orden" && esOrg && Array.isArray(j.lista) && j.lista.length <= 16) {
+        orden = j.lista.map(u => typeof u === "string" ? u : "");
+      } else if (j.t === "torneo" && esOrg && presentes().length + Object.keys(cpus).length >= 3) {
+        const s = previa(), tam = s.length;
+        rondas = [];
+        for (let r = 0, n = tam / 2; n >= 1; r++, n /= 2) {
+          rondas.push(Array.from({ length: n }, (_, k) => ({ id: r + "." + k, r, k,
+            a: r ? undefined : s[2 * k], b: r ? undefined : s[2 * k + 1], rep: {}, enCurso: false, conflicto: false })));
+        }
+        hist.push({ e: "torneo", n: s.filter(Boolean).length });
+        avanza();
+      }
+      continue;
+    }
+    const m = actual();
+    if (!m || j.m !== m.id) continue;
+    const pelea = j.uid === m.a || j.uid === m.b, contraCpu = !!(cpus[m.a] || cpus[m.b]);
+    const listos = listosDe(m);
+    if (j.t === "vuelve" && (pelea || esOrg) && m.enCurso) {
+      // la pelea se cortó (alguien volvió al menú del juego, o se perdió la conexión): nadie gana todavía; si fue
+      // la conexión (o alguien recargó la página), vuelve a empezar sola cuando estén los dos discos
+      const dichos = Object.values(m.rep || {});
+      if (dichos.length === 1) { decide(m, dichos[0]); continue; }   // (un juego ya dijo quién ganó: vale, como en el duelo)
+      m.cortes = j.por === "corte" ? (m.cortes || 0) + 1 : 0;
+      m.enCurso = false; m.rep = {}; m.conflicto = false; m.reanudar = j.por === "corte" && m.cortes <= BT3_CORTES;
+      discos[m.a] = discos[m.b] = false;
+      hist.push({ e: "vuelve", m: m.id, por: m.reanudar ? "corte" : "" });
+      continue;
+    }
+    if (j.t === "resultado" && pelea && m.enCurso && contraCpu && (j.g === m.a || j.g === m.b || j.g === "empate")) {
+      decide(m, j.g);   // contra la CPU juega uno solo: su juego dice quién ganó
+      continue;
+    }
+    if (j.t === "empieza" && (pelea || esOrg) && !m.enCurso && listos) {
+      arrancaPelea(m);
+    } else if (j.t === "resultado" && pelea && m.enCurso && (j.g === m.a || j.g === m.b || j.g === "empate") && m.rep[j.uid] === undefined) {
+      m.rep[j.uid] = j.g;
+      const otro = j.uid === m.a ? m.b : m.a;
+      if (m.rep[otro] !== undefined) { if (m.rep[otro] === j.g) decide(m, j.g); else m.conflicto = true; }
+    } else if (j.t === "decide" && esOrg && (j.g === m.a || j.g === m.b || j.g === "empate")) {
+      decide(m, j.g, j.g !== "empate");
+    }
+  }
+  reponeOrg();
+  const final = rondas ? rondas[rondas.length - 1][0] : null;
+  const campeon = final && final.g !== undefined ? final.g : null;
+  const quedan = presentes().length;
+  // Antes de empezar, la sala sigue aunque alguien se vaya; con el torneo andando, termina en la final (o si queda uno).
+  const ganador = campeon !== null ? campeon : rondas && quedan <= 1 ? ((presentes()[0] || {}).uid || "") : null;
+  const m = rondas ? actual() : null;
+  return {
+    fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
+    batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
+    llave: rondas, previa: rondas ? null : previa(), actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
+    ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };
 }

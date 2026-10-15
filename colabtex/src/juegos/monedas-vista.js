@@ -1,6 +1,7 @@
 /* Monedas — lo que se pinta: la caja del top en el vestíbulo y la
    pestaña #monedas (tu saldo, de dónde sale, el top entero y la tabla de
    tarifas). El cálculo es de monedas.js; aquí solo se dibuja. */
+import { juegoOculto } from "./ocultos.js";
 import { JUEGOS } from "./motor.js";
 import { avatarMarco, quien, marcoDeUid } from "./perfil-vista.js";
 import {
@@ -78,7 +79,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
     if (!ultimo) { host.innerHTML = `<section class="jg-mo"><p class="jg-nada">Contando monedas…</p></section>`; return; }
     const lista = topMonedas(ultimo), yo = monedasDe(uid, ultimo), puesto = lista.findIndex(f => f.uid === uid) + 1;
     const hoy = diaChile(), d = (ultimo.diario || {})[uid];
-    const juegos = Object.keys(PESO).sort((a, b) => PESO[b] - PESO[a] || a.localeCompare(b));
+    const juegos = Object.keys(PESO).filter(j => !juegoOculto(j)).sort((a, b) => PESO[b] - PESO[a] || a.localeCompare(b));
     host.innerHTML = `<section class="jg-mo">
       <header class="jg-mo-hero">
         <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.saldo)} ${MONEDA}</strong>

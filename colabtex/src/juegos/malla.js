@@ -33,7 +33,7 @@ const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:1
 const LLENO = 1 << 18;          // lo que se deja en cola sin enviar antes de saltarse estados
 const VIGILA_MS = 1000;
 
-export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}, alCambiar = () => {},
+export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}, alBinario = null, alCambiar = () => {},
   RTC = globalThis.RTCPeerConnection, ahora = () => Date.now() }) {
   let sesion = "", offP = null, offM = null, reloj = null, intento = 0;
   const pares = new Map();          // uid → {pc, dc, s, k, cola, remota, desde, abrio, malDesde}
@@ -63,8 +63,13 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     const mio = () => pares.get(u) === x;
     dc.onopen = () => { if (mio()) { x.abrio = true; x.malDesde = 0; alCambiar(); } };
     dc.onclose = () => { if (mio()) alCambiar(); };
+    dc.binaryType = "arraybuffer";
     dc.onmessage = ev => {
-      if (!mio() || typeof ev.data !== "string") return;
+      if (!mio()) return;
+      if (typeof ev.data !== "string") {                 // un paquete binario (BT3: el formato de su red, sin JSON)
+        if (alBinario && ev.data instanceof ArrayBuffer) alBinario(u, new Uint8Array(ev.data));
+        return;
+      }
       let d;
       try { d = JSON.parse(ev.data); } catch { return; }
       alDatos(u, d);
@@ -199,8 +204,18 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     }
   }
 
+  /* Lo mismo con bytes tal cual (un Uint8Array), para un juego cuyo paquete ya es binario y llega muchas veces
+     por segundo (BT3, `juegos/bt3/`): ni JSON ni copias de más. Quien no pasó `alBinario` los ignora. */
+  function enviaBin(bytes, a = null) {
+    for (const [u, x] of pares) {
+      if (a && !a.includes(u)) continue;
+      if (!sanoX(x) || x.dc.bufferedAmount > LLENO) continue;
+      try { x.dc.send(bytes); } catch {}
+    }
+  }
+
   return {
-    entrar, salir, envia, revisa,
+    entrar, salir, envia, enviaBin, revisa,
     activa: () => !!sesion,
     sano: u => sanoX(pares.get(u)),
     presentes: () => [...presentes.keys()],

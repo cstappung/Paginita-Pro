@@ -593,6 +593,16 @@ pelota) va por la malla WebRTC de `vivo/<pid>/rtc`, como Boxhead. Sin
 publicar, la sala de HaxBall no se puede crear. Pegar
 `firebase/database.rules.json` entero y **Publicar**.
 
+### ⚠ Budokai Tenkaichi 3 pide publicar otra vez (2026-10-14)
+
+`'bt3'` tiene que estar en la lista del campo `juego` y en la de `logros`.
+No hay nodo nuevo: el vestíbulo va por `jugadas` (`anfitrion`, `ajuste`,
+`disco`, `empieza`, `vuelve`) y la pelea va de navegador a navegador por la
+malla WebRTC; `vivo/<pid>/rtc` solo presenta a los dos al empezar cada pelea.
+Sin publicar, la sala de BT3 no se puede crear (el juego de un jugador,
+`juegos/bt3/`, funciona igual). Pegar `firebase/database.rules.json` entero y
+**Publicar**.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:

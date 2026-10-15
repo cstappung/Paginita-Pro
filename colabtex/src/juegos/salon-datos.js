@@ -128,7 +128,11 @@ export const SOLOS = [
   { id: "bots-haxball", tipo: "bots", juego: "haxball", nombre: "HaxBall · práctica", genero: "Deporte", icono: "⚽", alta: "2026-10-12",
     url: "juegos/haxball/index.html", reglas: "haxball",
     lema: "Fútbol de discos contra bots, o con alguien a tu lado en el mismo teclado.",
-    modos: ["Contra bots", "2 en un teclado"] }
+    modos: ["Contra bots", "2 en un teclado"] },
+  { id: "bots-bt3", tipo: "bots", juego: "bt3", nombre: "Tenkaichi 3 · un jugador", genero: "Pelea", icono: "🐉", alta: "2026-10-14",
+    url: "juegos/bt3/index.html", ruta: "#solo/bt3", reglas: "bt3",   // (se juega dentro de Juegos: la página del juego necesita la sesión para el disco privado)
+    lema: "Entrenamiento o contra la CPU, directo desde el disco; y desde ahí mismo, una sala de duelo o de torneo con tus amigos.",
+    modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -139,7 +143,7 @@ export const GENERO = {
   worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", tulones: "Física", hero: "Ritmo"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", tulones: "Física", hero: "Ritmo"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la

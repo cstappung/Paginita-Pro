@@ -66,6 +66,8 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearHaxball } from "./juegos/haxball.js";
+import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
+import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
@@ -106,10 +108,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", yzombis: "🧟" };
@@ -229,6 +231,10 @@ const OPCIONES = {
      (gana el último en pie). Ninguno es `modo`. */
   /* PRO HERO: solo cuántos caben; la canción se elige dentro de la sala. */
   hero: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("hero") }],
+  /* BT3: el formato es el cupo. Dos es un duelo; más es un torneo de eliminación directa (redTorneoBt3), que
+     el organizador empieza cuando están todos. */
+  bt3: [{ clave: "cupo", etiqueta: "Formato", por: 2, valores: [
+    { v: 2, t: "Duelo (1 contra 1)" }, { v: 4, t: "Torneo, hasta 4" }, { v: 8, t: "Torneo, hasta 8" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [
@@ -260,7 +266,8 @@ const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
   : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
   : juego === "yemas" ? (o.variante || "todos")
   : juego === "boxhead" ? (o.variante || "coop")
-  : juego === "gato" ? (o.variante === "super" ? "super" : "clasico") : o.modo;
+  : juego === "gato" ? (o.variante === "super" ? "super" : "clasico")
+  : juego === "bt3" ? (Number(o.cupo) > 2 ? "torneo" : "duelo") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -936,6 +943,7 @@ async function anotar(p) {
   if (p.juego === "haxball" && !equiposHaxball(p)[u.uid]) return;   // quedó sin equipo: miró el partido
   if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
+  if (p.juego === "bt3") return;                    // BT3: el juego no dice quién ganó; la sala no clasifica
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -1181,7 +1189,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike|hero)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones|pokelike|hero|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1333,6 +1341,8 @@ function anunciaEnCurso(p, est) {
     return;
   }
   if (!(p.jugadores || {})[u.uid] || !est.listos) return;
+  /* BT3 también se anuncia en «En juego ahora», para que los amigos entren a mirar un duelo o un torneo: el
+     salón solo se lo muestra a quien ve BT3 (bt3Visible, más abajo). El aviso dice juego y nombres; nada más. */
   if (enCursoToque > 0 && Date.now() - enCursoToque < 5 * 60 * 1000) return;
   enCursoToque = Date.now();
   fb.anunciaEnCurso(state.pid, {
@@ -1381,7 +1391,7 @@ async function crear(juego, extra) {
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
-    anunciaSala(salaParaDiscord(pid, juego, extra, u));
+    if (juego !== "bt3") anunciaSala(salaParaDiscord(pid, juego, extra, u));   // BT3 es privado: ni en Discord
     ir("#p/" + pid);
   } catch (e) { avisa(e, juego); }
 }
@@ -1410,6 +1420,9 @@ function salaParaDiscord(pid, juego, extra, u) {
 async function entrar(pid) {
   const u = state.user;
   if (!u) return;
+  // BT3: solo entran los amigos de la lista (la sala privada no ofrece «Unirse», y esto cierra cualquier otro camino)
+  const sala = state.partida && state.pid === pid ? state.partida : state.salas.find(s => s.id === pid);
+  if (sala && sala.juego === "bt3" && !bt3Visible()) return;
   try {
     await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
@@ -1776,6 +1789,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
   /* PRO HERO también ocupa la ventana: es un juego de pantalla completa con su propio menú. */
   document.documentElement.classList.toggle("jg-hero", state.vista === "solo-hero" && !motivo);
+  /* BT3 «un jugador» también: la página del juego, en un marco de Juegos para que tenga la sesión (disco privado). */
+  document.documentElement.classList.toggle("jg-bt3solo", state.vista === "solo-bt3" && !motivo);
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
@@ -1787,6 +1802,12 @@ function armazon() {
        que verifica cada canción y guarda estrellas, top y monedas. */
     h.innerHTML = "";
     individual = crearHero({ volver: () => ir(""), enLinea: () => { ir(""); setTimeout(() => salon.abre && salon.abre("hero"), 50); } });
+    individual.montar(h);
+    return;
+  }
+  if (state.vista === "solo-bt3") {
+    h.innerHTML = "";
+    individual = crearBt3Solo({ volver: () => ir("") });
     individual.montar(h);
     return;
   }
@@ -1858,7 +1879,8 @@ function armazon() {
   if (state.vista === "logros") {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
+      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
+      ocultos: () => bt3Visible() ? [] : ["bt3"]
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero" })[k] || k) });
     logrosVista.montar(h);
     return;
@@ -1906,7 +1928,7 @@ function armazon() {
   if (state.vista === "ranks") {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
-      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
+      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()),
       datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "", foto: fotoEnDatos(u, datosP) }, colorForUid),
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
@@ -2101,6 +2123,11 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  /* BT3 es privado: su diapositiva solo la ven los amigos del disco (bt3Visible, bt3-amigos.js). */
+  { id: "bt3", color: "#ff8a00", alta: "2026-10-14", titulo: "Budokai Tenkaichi 3",
+    lema: "El juego de PS2 completo, en el navegador y a 30 cuadros como la consola. De 1 a 8: entrenamiento y contra la CPU, duelos con revancha y torneos de hasta ocho con su llave, con tus amigos y, si el organizador quiere, con CPU.",
+    sub: "Solo PC · Chrome o Edge · 1 a 8 jugadores", sala: { k: "bt3", ops: { cupo: 2 } }, reglas: ["bt3"],
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
     lema: "Fútbol de discos en tiempo real: muévete, choca la pelota y patea con espacio. Rojo contra azul, el primero que llega a los goles pactados gana. Solo, contra bots, o en sala con tu gente.",
     sub: "2–8 jugadores · rojo contra azul", sala: { k: "haxball", ops: {} }, reglas: ["haxball"],
@@ -2160,6 +2187,10 @@ const NOVEDADES = [
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
+// Lo que se muestra: sin BT3 para quien no está en la lista de amigos.
+// (la de BT3 solo la ven los amigos del disco: las que se muestran son estas)
+let VISIBLES = NOVEDADES;
+const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()); };
 function arteNovedad(n) {
   // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
   if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
@@ -2191,6 +2222,7 @@ function arteNovedad(n) {
   if (n.id === "hero") return `<div class="jg-nov-arte-zb">${portadaSolo("hero")}<b>PRO HERO</b></div>`;
   if (n.id === "tulonesred") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>EN LÍNEA</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
+  if (n.id === "bt3") return `<div class="jg-nov-arte-bt3">${arteJuego("bt3")}</div>`;
   if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
   if (n.id === "haxball") return `<div class="jg-nov-arte-zb">${arteJuego("haxball")}</div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
@@ -2215,7 +2247,8 @@ const plataformaDe = id => id ? { movil: enMovil(id), pc: enPc(id) } : {};
    última a la primera sigue hacia la derecha y, al terminar, la pista
    salta sin transición a la primera de verdad (`enganchaBanner`). */
 function novedadesHtml() {
-  const inv = state.invitado, N = NOVEDADES.length;
+  filtraNovedades();
+  const inv = state.invitado, N = VISIBLES.length;
   const diapo = (n, i, copia) => {
     /* Como invitado solo se abren los cuatro juegos libres; lo demás
        (también las prácticas contra bots) pide iniciar sesión. */
@@ -2246,12 +2279,12 @@ function novedadesHtml() {
   return `
       <section class="jg-ban" id="vesBanner" aria-roledescription="carrusel" aria-label="Novedades del salón">
         <div class="jg-ban-vista">
-          <div class="jg-ban-pista" aria-live="off">${NOVEDADES.map((n, i) => diapo(n, i, false)).join("")}${N > 1 ? diapo(NOVEDADES[0], 0, true) : ""}</div>
+          <div class="jg-ban-pista" aria-live="off">${VISIBLES.map((n, i) => diapo(n, i, false)).join("")}${N > 1 ? diapo(VISIBLES[0], 0, true) : ""}</div>
         </div>${N > 1 ? `
         <button class="jg-ban-flecha ant" type="button" data-ban="-1" aria-label="Novedad anterior">‹</button>
         <button class="jg-ban-flecha sig" type="button" data-ban="1" aria-label="Novedad siguiente">›</button>
         <div class="jg-ban-pie">
-          <div class="jg-ban-puntos" role="group" aria-label="Elegir novedad">${NOVEDADES.map((n, i) => `<button type="button" data-ban-ir="${i}" aria-label="${escapeHtml(n.titulo)}"><i></i></button>`).join("")}</div>
+          <div class="jg-ban-puntos" role="group" aria-label="Elegir novedad">${VISIBLES.map((n, i) => `<button type="button" data-ban-ir="${i}" aria-label="${escapeHtml(n.titulo)}"><i></i></button>`).join("")}</div>
           <button class="jg-ban-pausa" type="button" data-ban-pausa aria-label="Pausar las novedades" title="Pausar">❚❚</button>
         </div>` : ""}
       </section>`;
@@ -2275,7 +2308,7 @@ const tiraMascotasHtml = inv => `
       </section>`;
 
 function enganchaNovedades(h) {
-  const de = id => NOVEDADES.find(n => n.id === id);
+  const de = id => VISIBLES.find(n => n.id === id);
   for (const b of h.querySelectorAll("[data-nov-crear]")) {
     const n = de(b.getAttribute("data-nov-crear"));
     b.onclick = () => crear(n.sala.k, Object.assign(porOmision(n.sala.k), n.sala.ops));
@@ -2296,7 +2329,7 @@ const BAN_MS = 7000;
 let banTic = 0;
 function enganchaBanner(h) {
   clearInterval(banTic);
-  const raiz = h.querySelector("#vesBanner"), N = NOVEDADES.length;
+  const raiz = h.querySelector("#vesBanner"), N = VISIBLES.length;
   if (!raiz || N < 2) return;
   const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
   const puntos = [...raiz.querySelectorAll("[data-ban-ir]")], pausa = raiz.querySelector("[data-ban-pausa]");
@@ -2450,7 +2483,7 @@ const entradaVes = id => entradasVes.solos.find(e => e.id === id) || entradasVes
 function salasAbiertas() {
   if (!state.user) return [];
   const mias = new Set(state.mias.map(x => x.id)), ahora = fb.ahora();
-  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora));
+  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()));
 }
 
 /* El podio de un juego, en su ficha: es la razón para abrir una sala de
@@ -2501,8 +2534,9 @@ function pintaVestibulo() {
   /* El catálogo: los multijugador por popularidad (la de la última visita
      mientras llega la de hoy), los del club también, y las prácticas
      contra bots al final, que son la versión pequeña de un multijugador. */
-  const orden = ordenPopular(Object.keys(JUEGOS));
+  const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible());   // BT3: solo los amigos
   entradasVes = entradasSalon(JUEGOS, orden);
+  if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3");
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
@@ -2587,7 +2621,7 @@ function pintaVestibulo() {
      anuncio viejo es de una partida que alguien dejó a medias sin
      cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
   const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
-  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco);
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()));
   $("vesNCurso").textContent = vivas.length;
   $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
     const j = JUEGOS[x.juego] || {};
@@ -2625,6 +2659,7 @@ function avisoReglas(err) {
 }
 
 /* ---------- pintado: la partida ---------- */
+let bt3Revisando = false, bt3Revisada = false;   // (la pregunta de acceso a BT3 de una sala privada: una vez)
 function pintaPartida() {
   const p = state.partida, est = state.estado;
   if (!p) {
@@ -2634,6 +2669,25 @@ function pintaPartida() {
       : state.cargando ? "" : `<div class="vacio">La sala se cerró o el enlace no es correcto.</div>`;
     desmontaJuego();
     $("jgFin").innerHTML = "";
+    return;
+  }
+
+  /* BT3 es privado (bt3-amigos.js): a quien no está en la lista de amigos no se le muestra nada de la sala —ni
+     el juego, ni quiénes están, ni el chat, ni «Unirse»—, aunque tenga el enlace. Mientras el Worker no contesta
+     (`/soy`, una vez por sesión) dice que se está comprobando, y al llegar la respuesta la sala se repinta. */
+  const privada = p.juego === "bt3" && !bt3Visible();
+  $("jgChat").hidden = privada;
+  if (privada) {
+    ambientar(""); desmontaJuego();
+    $("jgTitulo").textContent = "Sala privada"; $("jgTitulo").style.color = "";
+    $("jgQuienes").innerHTML = ""; $("jgAbandonar").style.display = "none";
+    for (const id of ["jgMirando", "jgHost", "jgRevancha", "jgFin"]) $(id).innerHTML = "";
+    $("jgInvita").innerHTML = `<div class="jg-invita"><b>${bt3Revisando ? "Comprobando el acceso…" : "Esta sala es privada."}</b></div>`;
+    if (!bt3Revisando && !bt3Revisada) {
+      bt3Revisando = true;
+      revisaBt3().then(() => { bt3Revisando = false; bt3Revisada = true; if (state.vista === "partida") pintaPartida(); });
+      $("jgInvita").innerHTML = '<div class="jg-invita"><b>Comprobando el acceso…</b></div>';
+    }
     return;
   }
 
@@ -2728,12 +2782,13 @@ function panelEspera(p, est) {
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
       <p>Pásale este enlace a quien quieras: en cuanto entre,
-         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
+         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : p.juego === "bt3" ? "aparece en el vestíbulo de la sala" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
       <div class="jg-enlace">
         <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
+        : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
         : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
@@ -2816,7 +2871,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, gato: 1200, tulones: 1800, hero: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, gato: 1200, tulones: 1800, hero: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -2958,6 +3013,7 @@ const RAZONES = {
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
+  if (String(uid).startsWith("cpu:")) return "la CPU " + String(uid).slice(4);   // (un lugar del torneo de BT3)
   if (String(uid).startsWith("eq:")) {
     const e = String(uid).slice(3);
     return "el equipo " + ((est.nombresEq || {})[e] || (e === "rojo" ? "Rojo" : "Azul"));
@@ -3008,6 +3064,7 @@ function fueraDe(est) {
 function pintaQuienes(p, est) {
   const caja = $("jgQuienes");
   if (!caja) return;
+  if (p.juego === "bt3" && !bt3Visible()) { caja.innerHTML = ""; return; }   // (sala privada: ni quiénes están)
   const yo = state.user.uid;
   const juego = !!(p.jugadores || {})[yo];
   const fuera = fueraDe(est);
@@ -3265,7 +3322,13 @@ function wire() {
       return rep.sendFeedback(r, { uid: u.uid, userName: u.name });
     }
   });
+  /* BT3 aparece solo para los amigos de la lista del disco privado: se pregunta al cambiar la sesión, y el
+     salón se repinta cuando llega la respuesta (bt3-amigos.js). */
+  alCambiarBt3(() => { vesFirma = ""; bt3Revisada = false; if (state.vista === "vestibulo") render(); else if (state.vista === "partida") pintaPartida(); });
+  // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
+  alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
   watchAuth(user => {
+    revisaBt3();
     if (!user) {
       /* Sin sesión (o al salir) no hay muro: el salón en modo invitado,
          en la misma ruta en que se estaba. */
@@ -3358,6 +3421,22 @@ function wire() {
 })();
 
 
+/* Las siete esferas del dragón de la portada de BT3, cada una con sus estrellas (de 1 a 7, dibujadas en SVG
+   como en la serie). Giran en órbita alrededor del orbe de ki (CSS: `.jg-art-bt3 u`); `--k` es su lugar. */
+const ESTRELLA_BT3 = (x, y, r) => `<polygon points="${Array.from({ length: 10 }, (_, i) => {
+  const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * 0.45 : r;
+  return (x + q * Math.cos(a)).toFixed(2) + "," + (y + q * Math.sin(a)).toFixed(2);
+}).join(" ")}"/>`;
+const ESFERAS_BT3 = [
+  [[10, 10, 4.8]],
+  [[6.8, 10, 3.3], [13.2, 10, 3.3]],
+  [[10, 6.6, 3], [6.8, 12.4, 3], [13.2, 12.4, 3]],
+  [[7, 7, 2.8], [13, 7, 2.8], [7, 13, 2.8], [13, 13, 2.8]],
+  [[6.4, 6.4, 2.5], [13.6, 6.4, 2.5], [10, 10, 2.5], [6.4, 13.6, 2.5], [13.6, 13.6, 2.5]],
+  [[7.3, 5.4, 2.3], [12.7, 5.4, 2.3], [7.3, 10, 2.3], [12.7, 10, 2.3], [7.3, 14.6, 2.3], [12.7, 14.6, 2.3]],
+  [[10, 10, 2.2], ...Array.from({ length: 6 }, (_, i) => [10 + 4.7 * Math.cos(i * Math.PI / 3), 10 + 4.7 * Math.sin(i * Math.PI / 3), 2.1])]
+].map((ps, k) => `<i style="--k:${k}"><svg viewBox="0 0 20 20" aria-hidden="true">${ps.map(([x, y, r]) => ESTRELLA_BT3(x, y, r)).join("")}</svg></i>`).join("");
+
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
@@ -3375,6 +3454,7 @@ function arteJuego(k) {
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
+  if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';

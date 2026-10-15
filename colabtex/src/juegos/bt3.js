@@ -1,0 +1,926 @@
+import * as fb from "../fb-juegos.js";
+import { auth } from "../firebase.js";
+import { revisaBt3, BT3_VER } from "./bt3-amigos.js";
+import { escapeHtml } from "../util.js";
+import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
+import { suena } from "./sonido.js";
+import { crearVisor } from "./bt3-directo.js";
+import { BT3_VETOS, BT3_VETOS_TXT, BT3_ORDEN, tiersPermitidas, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
+
+/* Budokai Tenkaichi 3 — el cartero entre la sala y el juego.
+
+   El juego entero vive en `juegos/bt3/` (el port de PS2 en WebAssembly, con la ISO de cada jugador) y entra
+   aquí en un iframe. Este módulo no toca la pelea:
+
+   - **La pelea va de marco a marco**: el marco abre su propia malla WebRTC (`bt3-marco.js` → `juegos/bt3/
+     red.js`) y le pasa al juego cada paquete sin salir del iframe, para que ningún paquete espere a que la
+     página de la sala esté libre. Lo único que pasa por aquí es la **presentación**: el buzón de Firebase
+     (`fb.senalMalla`, `vivo/<pid>/rtc`) vive en esta página, que tiene la sesión, y el marco lo usa por
+     postMessage (`senal`). Son unos veinte mensajes por pelea, que se borran al leerse; durante la pelea,
+     Firebase no ve nada.
+   - **Al registro va solo el vestíbulo** (`redBt3` en `motor.js`): quién es el anfitrión (lo eligen los
+     jugadores), las reglas que pone el anfitrión, que cada uno ya cargó su ISO, empezar y volver.
+   - El marco se recarga al volver al vestíbulo: cada pelea arranca el programa de cero, como el juego
+     espera (BT3_NET_SESSION). */
+const PADRE = "bt3-padre", HIJO = "bt3-hijo";
+const SRC = "juegos/bt3/index.html?modo=online&v=" + BT3_VER;
+const TIEMPO_TXT = t => t ? t + " segundos" : "Sin límite";
+
+/* Los nombres de los personajes del disco (los manda el marco al abrir la selección de personajes, ver
+   bt3-tiers.js): se guardan para que la próxima sala ya sepa qué deja fuera cada regla antes de empezar. */
+const CATALOGO = "bt3.catalogo";
+let catalogo = (() => { try { return catalogoBt3(JSON.parse(localStorage.getItem(CATALOGO) || "null")); } catch (e) { return []; } })();
+const catalogoBueno = c => c.filter(x => x && x.nombre).length >= 100;
+
+/* El disco privado (juegos/bt3/fuente/disco/): el marco del juego le pide a esta página el token de Firebase
+   de quien está con la sesión iniciada, y con él le pide los pedazos de la ISO al Worker, que solo responde a
+   los amigos de su lista. Vale para el marco de una sala y para el de «un jugador» del salón; solo se le da a
+   un marco de esta misma página que carga juegos/bt3/. Un listener para toda la página, puesto una vez. */
+/* La página del juego suelta («un jugador») también ofrece Duelo y Torneo: esos se juegan en una sala, así que
+   le pide a Juegos que abra una (`{tipo:"sala", cupo}`: 2 es un duelo, más es un torneo). Quien abre la sala
+   la registra `juegos-main.js` con `alPedirSalaBt3`. */
+let pideSala = null;
+export const alPedirSalaBt3 = fn => { pideSala = fn; };
+window.addEventListener("message", async e => {
+  if (e.origin !== location.origin || e.data?.canal !== "bt3-hijo" || (e.data.tipo !== "token" && e.data.tipo !== "sala")) return;
+  const marco = [...document.querySelectorAll("iframe")].find(f => f.contentWindow === e.source);
+  if (!marco || !/\/juegos\/bt3\/index\.html/.test(new URL(marco.src, location.href).pathname)) return;
+  if (e.data.tipo === "sala") { if (pideSala) pideSala(e.data.cupo === 2 ? 2 : 8); return; }
+  let token = null;
+  try { token = await auth.currentUser?.getIdToken(!!e.data.nuevo); } catch (err) {}   // nuevo: el anterior venció
+  e.source.postMessage({ canal: "bt3-padre", tipo: "token", token: token || null }, location.origin);
+});
+
+/* «Un jugador» dentro de Juegos (`#solo/bt3`): la página del juego a pantalla completa, en un marco de ESTA página,
+   para que pueda pedirle el token de quien inició sesión (el oyente de arriba) y jugar desde el disco privado.
+   Suelta (fuera de Juegos) no tiene sesión y pedía la ISO. Solo para los amigos de la lista (bt3-amigos.js). El
+   marco avisa `{tipo:"volver"}` con su «← Juegos». */
+export function crearBt3Solo({ volver }) {
+  let host = null, frame = null, muerto = false;
+  const oye = e => {
+    if (!frame || e.source !== frame.contentWindow || e.origin !== location.origin) return;
+    if (e.data?.canal === HIJO && e.data.tipo === "volver") volver();
+  };
+  return {
+    montar(el) {
+      host = el;
+      host.innerHTML = '<p class="jg-bt3-info">Abriendo Budokai Tenkaichi 3…</p>';
+      revisaBt3().then(ok => {
+        if (muerto) return;
+        if (!ok) { host.innerHTML = '<p class="jg-bt3-info jg-bt3-privado">Este juego es privado. <a class="btn2" href="#">← Juegos</a></p>'; return; }
+        frame = document.createElement("iframe");
+        frame.className = "jg-bt3-solo";
+        frame.title = "Budokai Tenkaichi 3";
+        frame.allow = "fullscreen; gamepad";
+        frame.setAttribute("allowfullscreen", "");
+        frame.src = "juegos/bt3/index.html?v=" + BT3_VER;
+        window.addEventListener("message", oye);
+        host.innerHTML = "";
+        host.append(frame);
+        frame.focus();
+      });
+    },
+    destruir() {
+      muerto = true;
+      window.removeEventListener("message", oye);
+      frame?.remove();
+      if (host) host.innerHTML = "";
+    },
+  };
+}
+
+export function crearBt3({ uid, pid, jugar, terminar, mirando }) {
+  let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
+  let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;
+  let permitido = false, discoMarco = false, peleabaAntes = false;   // es de la lista de amigos (se sabe al montar): antes, nada se pinta
+  /* La celebración se ve entera: el resultado se anota en el K.O. (el juego lo avisa ahí), pero este marco no se recarga
+     hasta que el juego abre su menú de resultados (`menufin`, después de la pose y la frase del ganador), o 25 s. Antes
+     la sala recargaba apenas llegaban los dos avisos y cortaba la pantalla de ganador. Una pelea cortada (sin ganador)
+     se recarga al tiro, como siempre. */
+  let vioGanador = false, esperaMenu = 0;
+  let escena = null, avisos = null, tele = null;
+
+  /* ---------- mirar la pelea en vivo ----------
+     Una pantalla en la sala (fuera del vestíbulo, que se repinta) con el video que manda el que pelea. Se
+     cierra sola cuando la pelea termina, o con su ✕. */
+  function abreTele() {
+    const pel = peleaEnVivo();
+    if (!pel || !escena || pel.emisor === uid) return;
+    cierraTele();
+    if (!senal) senal = fb.senalMalla(pid, uid);
+    const el = document.createElement("div");
+    el.className = "jg-bt3-tele";
+    el.innerHTML = `<header><span class="jg-bt3-vivo">● EN VIVO</span><b translate="no">${escapeHtml(nombre(pel.a))}</b><i>VS</i><b translate="no">${escapeHtml(nombre(pel.b))}</b>
+      <span class="jg-bt3-tele-son"><button type="button" data-tele="son"></button><input type="range" min="0" max="100" step="1" data-tele="vol" aria-label="Volumen de la pelea"></span>
+      <small class="jg-bt3-tele-cal" title="Cómo te está llegando el video: cuadros por segundo, resolución y velocidad"></small>
+      <button type="button" data-tele="grande" title="Pantalla completa" aria-label="Pantalla completa">⛶</button><button type="button" data-tele="x" title="Dejar de mirar" aria-label="Dejar de mirar">✕</button></header>
+      <div class="jg-bt3-tele-video"><video autoplay playsinline></video><p class="jg-bt3-nota">Conectando con la pantalla de <b translate="no">${escapeHtml(nombre(pel.emisor))}</b>…</p></div>`;
+    escena.prepend(el);
+    const video = el.querySelector("video"), nota = el.querySelector("p");
+    /* El sonido de la pelea (el del juego del que pelea): con su propio silencio y volumen, guardados aparte de los
+       del juego («jg.bt3.tele»), porque mirar no es jugar. */
+    const son = el.querySelector('[data-tele="son"]'), vol = el.querySelector('[data-tele="vol"]');
+    let cfg = { v: 70, m: false };
+    try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem("jg.bt3.tele") || "{}")); } catch (e) {}
+    const aplica = () => {
+      video.muted = cfg.m; video.volume = Math.max(0, Math.min(1, cfg.v / 100));
+      vol.value = String(cfg.v);
+      son.textContent = cfg.m || !cfg.v ? "🔇" : "🔊";
+      son.title = son.ariaLabel = cfg.m ? "Activar el sonido de la pelea" : "Silenciar la pelea";
+      try { localStorage.setItem("jg.bt3.tele", JSON.stringify(cfg)); } catch (e) {}
+    };
+    son.onclick = () => { cfg.m = !cfg.m; if (!cfg.m && !cfg.v) cfg.v = 50; aplica(); video.play?.().catch(() => {}); };
+    vol.oninput = () => { cfg.v = Number(vol.value); cfg.m = false; aplica(); };
+    aplica();
+    el.querySelector('[data-tele="x"]').onclick = () => cierraTele();
+    el.querySelector('[data-tele="grande"]').onclick = () => { (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {}); };
+    // en pantalla completa la barra flota y se esconde sola; el mouse la trae (CSS: .jg-bt3-tele.mueve)
+    let quieto = 0;
+    el.addEventListener("pointermove", () => { el.classList.add("mueve"); clearTimeout(quieto); quieto = setTimeout(() => el.classList.remove("mueve"), 2500); });
+    const visor = crearVisor({ senal, uid, emisor: pel.emisor,
+      alVideo: flujo => {
+        video.srcObject = flujo; nota.hidden = true; el.classList.add("en-vivo");
+        // (el clic en «Ver la pelea» deja sonar; si el navegador igual no deja, empieza en silencio y el 🔇 lo activa)
+        video.play?.().catch(() => { cfg.m = true; aplica(); video.play?.().catch(() => {}); });
+      },
+      alFalla: por => { nota.hidden = false; nota.textContent = por === "lleno" ? "Ya hay muchos mirando esta pelea: prueba en un rato."
+        : "No se pudo conectar con la pantalla del que pelea (su red no deja una conexión directa)."; } });
+    /* Cómo llega (cuadros por segundo, resolución, velocidad), cada segundo: si alguien lo ve mal, se sabe si es la
+       red (pocos kb/s) o la pantalla del que pelea (pocos cuadros con buena velocidad). */
+    const cal = el.querySelector(".jg-bt3-tele-cal");
+    let antes = null;
+    const mide = setInterval(async () => {
+      const q = await visor.calidad?.();
+      if (!q || !q.ancho) return;
+      const kb = antes ? Math.max(0, (q.bytes - antes) * 8 / 1000) : 0;
+      antes = q.bytes;
+      cal.textContent = `${Math.round(q.fps)} fps · ${q.ancho}×${q.alto}` + (kb ? ` · ${kb >= 1000 ? (kb / 1000).toFixed(1) + " Mb/s" : Math.round(kb) + " kb/s"}` : "");
+    }, 1000);
+    tele = { el, visor, id: pel.id, mide, m: est.torneo ? est.actual?.id : null, cierre: 0 };
+  }
+  function cierraTele() {
+    if (!tele) return;
+    clearInterval(tele.mide); clearTimeout(tele.cierre);
+    tele.visor.cierra();
+    if (document.fullscreenElement === tele.el) document.exitFullscreen().catch(() => {});
+    tele.el.remove();
+    tele = null;
+  }
+
+  /* ---------- lo que se celebra ----------
+     Solo lo que cambia mientras se mira (no al abrir la sala): una pelea del torneo que se decide (el ganador
+     brilla, el perdedor cae, el ganador entra a su casilla de la ronda siguiente), el campeón (la copa y la
+     corona) y cada pelea del duelo. Cada animación guarda cuándo empezó (`recientes`): si la llave se vuelve a
+     pintar a la mitad, sigue donde iba (`--edad`, un retraso negativo) en vez de partir de cero. */
+  const recientes = new Map();
+  let vistoLlave = null, vistoDuelo = -1, vistoFuera = null;
+  const edad = (k, dur) => { const t = recientes.get(k); const e = t === undefined ? null : (Date.now() - t) / 1000; return e !== null && e < dur ? e : null; };
+  const conEdad = (k, dur, clase) => { const e = edad(k, dur); return e === null ? { c: "", st: "" } : { c: " " + clase, st: ` style="--edad:${e.toFixed(2)}s"` }; };
+  function anuncia(html, clase = "", ms = 3600) {
+    if (!avisos) return;
+    const d = document.createElement("div");
+    d.className = "jg-bt3-anuncio " + clase;
+    d.innerHTML = html;
+    avisos.replaceChildren(d);
+    setTimeout(() => d.remove(), ms);
+  }
+
+  // Juega en esta sala: está entre los jugadores y no se fue ni lo sacaron (si no, mira como cualquier espectador).
+  const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid) && !est?.fuera?.[uid];
+  const presentes = () => (est?.jugadores || []).filter(j => !est.fuera?.[j.uid]);
+  // (las CPU del torneo son lugares de la llave, no jugadores: «cpu:N» con su nivel en est.cpus)
+  const nombre = u => esCpuBt3(u) ? "CPU " + u.slice(4) : (est?.jugadores || []).find(j => j.uid === u)?.nombre || "Jugador";
+  const nivelCpu = u => est?.cpus?.[u]?.nivel ?? 2;
+  const soyAnfitrion = () => enSala() && est.anfitrion === uid;
+  const peleando = () => !!est && enSala() && (est.torneo
+    ? !!(est.actual && est.actual.enCurso && (est.actual.a === uid || est.actual.b === uid))
+    : est.fase === "jugando");
+  // en esta pelea, quién es el jugador 1 (el anfitrión de la sesión) y quién el 2
+  const j1 = () => est.torneo ? est.actual?.a : est.anfitrion;
+  const j2 = () => est.torneo ? est.actual?.b : (presentes().find(j => j.uid !== est.anfitrion) || {}).uid;
+  /* La pelea que se está jugando ahora (para mirarla en vivo) y quién la muestra: el jugador 1, o el humano
+     contra la CPU (bt3-directo.js). null si no hay pelea en curso. */
+  const emisorDe = () => est.torneo ? (esCpuBt3(est.actual?.a) ? est.actual?.b : est.actual?.a) : est.anfitrion;
+  const peleaEnVivo = () => !est ? null
+    : est.torneo ? (est.actual?.enCurso ? { id: "t" + est.actual.n, a: est.actual.a, b: est.actual.b, emisor: emisorDe() } : null)
+    : (est.fase === "jugando" ? { id: "d" + est.ronda, a: est.anfitrion, b: j2(), emisor: est.anfitrion } : null);
+
+  function enviar(tipo, datos = {}) {
+    if (muerto || !frame?.contentWindow) return;
+    frame.contentWindow.postMessage({ canal: PADRE, tipo, ...datos }, location.origin);
+  }
+
+  // Lo que el marco necesita saber de la sala. En «jugando» lleva todo lo de la pelea (rol, reglas, rival).
+  function reenvia() {
+    if (!listo || !est) return;
+    // El marco solo arranca una pelea cuando ve «jugando» con un rival: en el torneo, solo los dos que pelean ahora.
+    const pelea = peleando();
+    const rivalUid = est.torneo ? (pelea ? (est.actual.a === uid ? est.actual.b : est.actual.a) : "") : (presentes().find(j => j.uid !== uid) || {}).uid;
+    const rival = !rivalUid ? null : esCpuBt3(rivalUid) ? { uid: rivalUid, nombre: nombre(rivalUid), cpu: true, nivel: nivelCpu(rivalUid) }
+      : presentes().find(j => j.uid === rivalUid) || { uid: rivalUid };
+    enviar("estado", {
+      yo: uid, nombre: nombre(uid), mirando: !enSala(), torneo: !!est.torneo,
+      fase: est.torneo ? (pelea ? "jugando" : "espera") : est.fase, ronda: est.torneo ? (est.actual?.n || 0) : (est.ronda || 0),
+      rol: j1() === uid || rival?.cpu ? "host" : "join", reglas: est.reglas,   // (contra la CPU, el humano es el jugador 1)
+      rival: rival ? { uid: rival.uid, nombre: rival.nombre || "Jugador", cpu: !!rival.cpu, nivel: rival.nivel } : null,
+      disco: !!est.discos?.[uid],
+      veto: est.veto || "",   // la regla de personajes: los vetados los calcula el marco (bt3-marco.js, vetadosDe)
+      emite: pelea && emisorDe() === uid   // este marco muestra la pelea en vivo a los que miran (bt3-directo.js)
+    });
+  }
+
+  /* ---------- el buzón, prestado al marco ----------
+     Las mismas operaciones que `malla.js` le pide a su `senal` (entra, sale, alPresentes, envia,
+     alMensajes), una por mensaje. Solo un jugador de la sala puede usarlo (las reglas de `vivo/<pid>/rtc`
+     ya lo exigen; esto evita pedirlo en vano). */
+  function senalOp(d) {
+    if (!enSala()) return;
+    if (!senal) senal = fb.senalMalla(pid, uid);
+    if (d.op === "mensajes") {
+      offM?.();
+      offM = d.on ? senal.alMensajes((de, m) => enviar("senal-mensaje", { de, m })) : null;
+    } else if (d.op === "presentes") {
+      offP?.();
+      offP = d.on ? senal.alPresentes(v => enviar("senal-presentes", { v })) : null;
+    } else if (d.op === "entra") {
+      senal.entra(String(d.s || "").slice(0, 16)).then(() => enviar("senal-entro", { id: d.id, ok: true }),
+        () => enviar("senal-entro", { id: d.id, ok: false }));
+    } else if (d.op === "sale") {
+      offP?.(); offM?.(); offP = offM = null;
+      senal.sale();
+    } else if (d.op === "envia" && typeof d.para === "string" && d.m && typeof d.m === "object") {
+      senal.envia(d.para, d.m);
+    }
+  }
+
+  async function anota(j) {
+    try { await jugar(j); } catch (err) { console.warn("[bt3] no se pudo anotar", j.t, err); }
+  }
+
+  function mensaje(e) {
+    if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
+    const d = e.data;
+    if (d.tipo === "listo") { listo = true; reenvia(); return; }
+    if (d.tipo === "senal") { senalOp(d); return; }
+    if (d.tipo === "catalogo") {
+      const c = catalogoBt3(d.lista);
+      if (!catalogoBueno(c)) return;
+      const nuevo = JSON.stringify(c) !== JSON.stringify(catalogo);
+      catalogo = c;
+      try { localStorage.setItem(CATALOGO, JSON.stringify(d.lista)); } catch (err) {}
+      reenvia();   // (también si no cambió: el marco avisa de la regla al abrir la selección)
+      if (nuevo) pintaVestibulo(true);
+      return;
+    }
+    if (d.tipo === "menufin") { if (esperaMenu) reiniciaMarco(); return; }
+    if (partida?.fin || !enSala()) return;   // un mirón no escribe
+    if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
+    else if (d.tipo === "resultado" && (peleando() || (!est.torneo && est.pendiente && est.fase === "vestibulo")) && Number.isInteger(d.bits)) {
+      // (también tarde: la sala ya volvió al vestíbulo porque la sesión del otro se cerró, y esta pelea sigue sin resultado)
+      // El juego contó quién ganó (bits de BattleResult: 1 jugador 1, 2 jugador 2, 4 empate; 8 = se abandonó).
+      // contra la CPU el juego es local: el lado 1 es este jugador y el 2 la CPU
+      const cpu = est.torneo && [est.actual.a, est.actual.b].find(esCpuBt3);
+      const g = d.bits & 4 ? "empate" : d.bits & 1 ? (cpu ? uid : j1()) : d.bits & 2 ? (cpu || j2()) : null;
+      if (!g) { if (d.bits & 8 && !est.torneo) anota({ t: "vuelve", uid }); return; }   // la pelea se abandonó: al vestíbulo
+      vioGanador = true;
+      if (est.torneo) { if (d.b === 0 && est.actual.rep?.[uid] === undefined) anota({ t: "resultado", uid, m: est.actual.id, g }); }
+      else anota({ t: "resultado", uid, n: est.ronda, b: d.b, g });
+    } else if (d.tipo === "termino" && !est.torneo && est.fase === "jugando") {
+      anota({ t: "vuelve", uid, por: d.por === "corte" ? "corte" : "" });   // (un corte de conexión vuelve a empezar solo)
+    } else if (d.tipo === "termino" && est.torneo && peleando()) {
+      anota({ t: "vuelve", uid, m: est.actual.id, por: d.por === "corte" ? "corte" : "" });   // se corta, sin decidir
+    }
+  }
+  // El disco listo de este marco, anotado cuando hace falta (el torneo lo pide de nuevo después de cada pelea).
+  function marcaDisco() {
+    if (!discoMarco || discoPedido || !est || !enSala() || partida?.fin || est.discos?.[uid]) return;
+    if (!est.torneo && est.fase !== "vestibulo") return;
+    discoPedido = true;
+    anota({ t: "disco", uid }).finally(() => { discoPedido = false; });
+  }
+
+  // ---------- el vestíbulo ----------
+  async function empieza() {
+    if (ocupado) return;
+    ocupado = true;
+    try {
+      await jugar({ t: "empieza", uid });
+      if (partida.estado === "esperando") await fb.setEstado(pid, "jugando");
+    } catch (err) { console.warn("[bt3] no se pudo empezar", err); }
+    finally { ocupado = false; }
+  }
+
+  /* El vestíbulo, como la pantalla de versus de un juego de pelea: los dos frente a frente (foto, quién es el
+     anfitrión, si su disco ya cargó), las reglas como botones que solo el anfitrión aprieta, y el botón grande
+     para empezar. En plena pelea queda una franja con lo que se está jugando. */
+  const ESFERAS = `<span class="jg-bt3-esferas" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  /* «🏆 Dar la victoria», solo para el anfitrión (duelo) o el organizador (torneo): un botón que se despliega en
+     uno por peleador, y cada uno pide confirmación. Sirve cuando el juego no lo puede decir: se colgó, alguien no
+     vuelve después de un corte, o los dos juegos no dijeron lo mismo. El clic lo ata `atarDar`. */
+  const darVictoria = us => `<details class="jg-bt3-dar"><summary>🏆 Dar la victoria</summary>
+    <div class="jg-bt3-fichas">${us.map(u => `<button class="jg-bt3-ficha" data-g="${escapeHtml(u)}">🏆 <span translate="no">${escapeHtml(nombre(u))}</span></button>`).join("")}</div></details>`;
+  /* Confirmar sin ventanas: el primer clic cambia el botón a «✓ Confirmar…» (y deshace el de los demás del grupo),
+     el segundo hace la acción. confirm() no sirve: en un marco con sandbox (el banco de pruebas) el navegador lo
+     bloquea, devuelve «no» sin mostrar nada, y el botón parecía muerto. */
+  const dosClics = (b, grupo, txt, accion) => {
+    if (b.dataset.seguro === "1") { grupo.forEach(x => { x.disabled = true; }); accion(); return; }
+    for (const x of grupo) if (x.dataset.seguro === "1") { x.dataset.seguro = ""; x.classList.remove("seguro"); x.innerHTML = x.dataset.txt; }
+    b.dataset.txt = b.innerHTML; b.dataset.seguro = "1"; b.classList.add("seguro");
+    b.innerHTML = txt;
+  };
+  const BATALLA_CORTA = { single: "Single", team3: "3 vs 3", team: "Team", dp10: "DP 10", dp15: "DP 15", dp20: "DP 20" };
+  const TIEMPO_CORTO = t => t ? t + " s" : "∞";
+  const jugador = u => esCpuBt3(u) ? { uid: u, nombre: nombre(u), cpu: true, nivel: nivelCpu(u) }
+    : (est?.jugadores || []).find(j => j.uid === u) || { uid: u, nombre: nombre(u) };
+  /* La explosión del que pierde: un fogonazo y esquirlas de la carta que salen volando (posiciones fijas, para
+     que un repintado no las cambie). La `--edad` la hereda de la casilla o la carta que explota; `k` escala la
+     distancia a la que vuelan. */
+  const ESQUIRLAS = Array.from({ length: 14 }, (_, i) => {
+    const a = i / 14 * Math.PI * 2 + (i % 3) * 0.35, d = 30 + (i * 37 % 34);
+    return `<b style="--x:${Math.round(Math.cos(a) * d)}px;--y:${Math.round(Math.sin(a) * d * 0.75)}px;--r:${(i * 97 % 360) - 180}deg;--s:${(0.7 + (i * 13 % 10) / 16).toFixed(2)}"></b>`;
+  }).join("");
+  const explota = (k = 1) => `<i class="jg-bt3-boom" aria-hidden="true" style="--k:${k}"><s></s>${ESQUIRLAS}</i>`;
+  function avatar(j) {
+    // la CPU: un visor de scouter (el lente verde) con su nivel
+    if (j.cpu) return `<span class="jg-bt3-ava cpu" aria-hidden="true" title="${escapeHtml(BT3_NIVELES[j.nivel] || "")}"><i></i><small>${(j.nivel ?? 2) + 1}</small></span>`;
+    const foto = typeof j.foto === "string" && /^(data:image\/|https:\/\/)/.test(j.foto) ? j.foto : "";
+    const color = typeof j.color === "string" && /^#[0-9a-f]{3,8}$/i.test(j.color) ? j.color : "#f28c1e";
+    return foto ? `<img class="jg-bt3-ava" src="${escapeHtml(foto)}" alt="">`
+      : `<span class="jg-bt3-ava" style="--c:${color}" aria-hidden="true">${escapeHtml((j.nombre || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
+  }
+  function tarjeta(j) {
+    if (!j) return `<div class="jg-bt3-luchador vacio"><span class="jg-bt3-ava" aria-hidden="true">?</span>
+      <b>Esperando rival</b><span class="jg-bt3-rol">J2</span><span class="jg-bt3-estado">Pásale el enlace de la sala</span>
+      <span class="jg-bt3-hacer jg-bt3-hueco" aria-hidden="true">Hacer anfitrión</span></div>`;
+    const anf = j.uid === est.anfitrion, disco = !!est.discos?.[j.uid], yo = j.uid === uid;
+    const brillo = conEdad("duelo:" + j.uid, 3, "brilla"), cae = conEdad("duelo-pierde:" + j.uid, 3, "revienta");
+    return `<div class="jg-bt3-luchador${anf ? " anf" : ""}${yo ? " yo" : ""}${brillo.c}${cae.c}"${brillo.st || cae.st}>${cae.c ? explota(1.6) : ""}
+      ${avatar(j)}
+      <b translate="no">${escapeHtml(j.nombre || "Jugador")}${yo ? ' <em>(tú)</em>' : ""}</b>
+      <span class="jg-bt3-rol">${anf ? "👑 Anfitrión · J1" : "J2"}</span>
+      <span class="jg-bt3-estado ${disco ? "ok" : ""}">${disco ? "● Disco listo" : "○ Cargando el disco…"}</span>
+      ${!anf && enSala() ? `<button class="jg-bt3-hacer" data-a="${escapeHtml(j.uid)}">Hacer anfitrión</button>`
+        : '<span class="jg-bt3-hacer jg-bt3-hueco" aria-hidden="true">Hacer anfitrión</span>'}
+    </div>`;
+  }
+  // El marcador del duelo: las peleas en que los dos juegos dijeron el mismo ganador.
+  function marcadorHtml(orden) {
+    const m = est.marcador || {}, total = Object.values(m).reduce((a, b) => a + b, 0) + (est.empates || 0);
+    if (!total || orden.length < 2) return "";
+    const n = u => `<b translate="no">${escapeHtml(nombre(u))}</b>`;
+    return `<p class="jg-bt3-marcador" aria-label="Marcador">${n(orden[0].uid)} <span>${m[orden[0].uid] || 0} – ${m[orden[1].uid] || 0}</span> ${n(orden[1].uid)}
+      ${est.empates ? `<small>${est.empates} empate${est.empates > 1 ? "s" : ""}</small>` : ""}</p>`;
+  }
+
+  /* La regla de personajes (bt3-tiers.js): Todos / No OP / Sólo malos / Sólo gigantes, una u otra. Con una regla
+     puesta, «📋 Ver la tier list»: los tiers como en la imagen (sus colores), cada personaje con candado o no según
+     la regla, y con el nombre con que lo encontró en el disco (para revisar que la lista quedó bien leída). */
+  let vetosAbierto = false;
+  const COLOR_TIER = { BROLY: "#c48fd1", "S++": "#f07a7a", "S+": "#f9a06f", S: "#fbc373", A: "#fdfd7d", B: "#bdf77d", C: "#7ef77f", D: "#7dfdfd", "N/C": "#7dbdfd" };
+  function vetoHtml(puede) {
+    const v = est.veto || "", conCat = catalogoBueno(catalogo);
+    const fichas = Object.entries(BT3_VETOS).map(([k, t]) =>
+      `<button class="jg-bt3-ficha" data-k="veto" data-v="${k}" aria-pressed="${k === v}" ${puede ? "" : "disabled"}>${escapeHtml(t)}</button>`).join("");
+    let lista = "";
+    if (v) {
+      const r = vetadosBt3(catalogo, v), si = new Set(tiersPermitidas(v));
+      const chip = d => `<li class="${d.vetado ? "no" : "si"}">${d.vetado ? '<span class="cand" aria-label="vetado">🔒</span>' : ""}<span translate="no">${escapeHtml(d.nombre)}</span>${!conCat ? ""
+        : d.juego.length ? `<small translate="no">${escapeHtml(d.juego.join(" / "))}</small>` : `<small class="no">no se encontró en el juego</small>`}</li>`;
+      const filas = BT3_ORDEN.map(t => `<div class="jg-bt3-tl-fila${si.has(t) ? " si" : " no"}"><b style="--tc:${COLOR_TIER[t]}">${escapeHtml(t)}<small>${si.has(t) ? "se puede" : "fuera"}</small></b>
+        <ul>${r.detalle.filter(d => d.tier === t).map(chip).join("")}</ul></div>`).join("");
+      const sin = conCat && r.sinTier.length ? `<p class="jg-bt3-nota">Del disco, sin tier en la lista (quedan fuera): <span translate="no">${r.sinTier.map(x => escapeHtml(x.nombre)).join(" · ")}</span></p>` : "";
+      lista = `<details class="jg-bt3-vetados jg-bt3-tl"${vetosAbierto ? " open" : ""}><summary>📋 Ver la tier list${conCat ? ` · ${r.permitidos.length} se pueden, ${r.ids.length} con candado` : ""}</summary>
+        <div class="jg-bt3-tl-filas">${filas}</div>${sin}
+        ${conCat ? `<p class="jg-bt3-nota">${r.detalle.filter(d => d.juego.length).length} de ${r.detalle.length} encontrados en tu disco.
+          <button type="button" class="jg-bt3-ficha" data-copia="1" title="Para revisar la tier list: la lista de personajes que trae el disco">📋 Copiar los nombres del disco</button></p>`
+          : `<p class="jg-bt3-nota">Los nombres del juego se leen del disco la primera vez que se abre la selección de personajes; el juego no deja elegir a los vetados.</p>`}</details>`;
+    }
+    return `<div class="jg-bt3-veto"><span class="jg-bt3-et">Personajes (tier list)</span><div class="jg-bt3-fichas">${fichas}</div>
+      <p class="jg-bt3-nota">${escapeHtml(BT3_VETOS_TXT[v] || "")}</p>${lista}</div>`;
+  }
+  const atarVetos = () => {
+    const d = vest.querySelector(".jg-bt3-vetados");
+    if (d) d.ontoggle = () => { vetosAbierto = d.open; };
+    // los nombres que trajo el disco, uno por línea con su id (para revisar a mano que la tier list los encuentre)
+    const cp = vest.querySelector("[data-copia]");
+    if (cp) cp.onclick = async () => {
+      const txt = catalogo.map((c, i) => c && c.nombre ? i + "\t" + c.nombre + (c.forma ? " · " + c.forma : "") : "").filter(Boolean).join("\n");
+      try { await navigator.clipboard.writeText(txt); cp.textContent = "✓ Copiados"; } catch (e) { cp.textContent = "No se pudo copiar"; }
+    };
+  };
+
+  /* La llave antes de empezar (solo el organizador): soltar un peleador sobre otro lugar los cambia; con el teclado o
+     el dedo, se toca uno y después el otro. Una pelea no puede quedar sin nadie (los dos «pasa directo»). */
+  let elegido = -1;
+  function atarPrevia() {
+    const caja = vest.querySelector(".jg-bt3-previa");
+    if (!caja || !soyAnfitrion() || est.llave) return;
+    const cambia = (i, k) => {
+      const s = (est.previa || []).slice();
+      if (i === k || i < 0 || k < 0 || i >= s.length || k >= s.length) return;
+      [s[i], s[k]] = [s[k], s[i]];
+      for (let x = 0; x < s.length; x += 2) if (!s[x] && !s[x + 1]) { anuncia("<small>La llave</small><b>Una pelea no puede quedar vacía</b>", "empate", 2200); return; }
+      anota({ t: "orden", uid, lista: s });
+    };
+    caja.querySelectorAll("[data-lugar]").forEach(el => {
+      const i = Number(el.dataset.lugar);
+      el.ondragstart = e => { e.dataTransfer.setData("text/plain", String(i)); e.dataTransfer.effectAllowed = "move"; el.classList.add("arrastra"); };
+      el.ondragend = () => el.classList.remove("arrastra");
+      el.ondragover = e => { e.preventDefault(); el.classList.add("sobre"); };
+      el.ondragleave = () => el.classList.remove("sobre");
+      el.ondrop = e => { e.preventDefault(); el.classList.remove("sobre"); cambia(Number(e.dataTransfer.getData("text/plain")), i); };
+      const toca = () => {
+        if (elegido < 0) { if (!el.classList.contains("bye")) { elegido = i; el.classList.add("elegido"); } return; }
+        const de = elegido; elegido = -1;
+        caja.querySelectorAll(".elegido").forEach(x => x.classList.remove("elegido"));
+        cambia(de, i);
+      };
+      el.onclick = toca;
+      el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toca(); } };
+    });
+    const mezcla = caja.querySelector("[data-mezcla]");
+    if (mezcla) mezcla.onclick = () => {
+      // un sorteo nuevo, como el de la sala: el k-ésimo contra el (tam/2 + k)-ésimo, así nadie queda sin rival dos veces
+      const lista = (est.previa || []).filter(Boolean), tam = (est.previa || []).length;
+      for (let i = lista.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [lista[i], lista[k]] = [lista[k], lista[i]]; }
+      const s = [];
+      for (let k = 0; k < tam / 2; k++) s.push(lista[k] || "", lista[tam / 2 + k] || "");
+      elegido = -1;
+      anota({ t: "orden", uid, lista: s });
+    };
+  }
+
+  function atarDar(que, jugada) {
+    const grupo = [...vest.querySelectorAll(".jg-bt3-dar [data-g]")];
+    grupo.forEach(b => b.onclick = () => dosClics(b, grupo,
+      `✓ Confirmar: gana <span translate="no">${escapeHtml(nombre(b.dataset.g))}</span>`, () => anota(jugada(b.dataset.g))));
+  }
+
+  function pintaVestibulo(forzar) {
+    if (!vest || !est || !permitido) return;
+    /* Mientras el juego todavía muestra la celebración (esperaMenu), la sala de este peleador no cambia nada: el
+       vestíbulo con el marcador, el cartel del ganador o la llave nueva empujaban el juego hacia abajo y se llevaban
+       la vista en plena pantalla de ganador. Se pinta todo junto al recargar el marco (reiniciaMarco). */
+    if (esperaMenu) return;
+    if (est.torneo) return pintaTorneo(forzar);
+    const jugando = est.fase === "jugando", ver = !partida?.fin;
+    vest.hidden = !ver;
+    if (!ver) return;
+    const js = presentes(), manda = soyAnfitrion();
+    // una pelea nueva en el marcador: quién ganó, con su sonido
+    const peleas = Object.values(est.marcador || {}).reduce((x, y) => x + y, 0) + (est.empates || 0);
+    if (vistoDuelo >= 0 && peleas > vistoDuelo) {
+      const g = [...(est.hist || [])].reverse().find(h => h.e === "resultado")?.g;
+      recientes.set("duelo", Date.now());
+      if (g === "empate") { suena("kiCae"); anuncia(`<small>Pelea ${est.ronda}</small><b>¡Empate!</b>`, "empate"); }
+      else if (g) {
+        const p = (est.jugadores || []).find(j => j.uid !== g && !est.fuera?.[j.uid])?.uid;
+        suena(g === uid || !enSala() ? "kiAvanza" : "kiCae");
+        setTimeout(() => suena("kiBoom"), 300);
+        anuncia((p ? caras(g, p) : "") + `<small>Pelea ${est.ronda}</small><b translate="no">¡Gana ${escapeHtml(nombre(g))}!</b>`, g === uid ? "gana" : enSala() ? "pierde" : "gana", 4200);
+        recientes.set("duelo:" + g, Date.now());
+        if (p) recientes.set("duelo-pierde:" + p, Date.now());
+      }
+    }
+    vistoDuelo = peleas;
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar, est.pendiente]);
+    if (!forzar && firma === vestFirma) return;
+    vestFirma = firma;
+    vest.classList.toggle("jugando", jugando);
+    // el anfitrión da la victoria de la pelea en curso, o de la última si quedó sin resultado (un corte, «volver»)
+    const dar = manda && js.length === 2 && est.pendiente ? darVictoria(js.map(j => j.uid)) : "";
+    if (jugando) {
+      vest.innerHTML = `<div class="jg-bt3-franja"><span class="jg-bt3-vivo">● En pelea</span>
+        <span>Pelea ${est.ronda} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${est.veto ? " · " + escapeHtml(BT3_VETOS[est.veto]) : ""} · anfitrión <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span>
+        ${enSala() ? `<button class="jg-bt3-vuelve" title="Si la pelea se quedó colgada, vuelven los dos al vestíbulo">Volver al vestíbulo</button>`
+          : `<button class="jg-bt3-ver" data-ver="1">📺 Ver la pelea en vivo</button>`}${dar}</div>`;
+      atarDar("la pelea " + est.ronda, g => ({ t: "decide", uid, n: est.ronda, g }));
+      const v = vest.querySelector(".jg-bt3-vuelve");
+      if (v) v.onclick = () => { v.disabled = true; anota({ t: "vuelve", uid }); };
+      const ver = vest.querySelector("[data-ver]");
+      if (ver) ver.onclick = () => abreTele();
+      return;
+    }
+    // el anfitrión a la izquierda, como el jugador 1 en la pantalla del juego
+    const orden = [...js].sort((a, b) => (b.uid === est.anfitrion) - (a.uid === est.anfitrion));
+    const listos = js.length === 2 && js.every(j => est.discos?.[j.uid]);
+    const fichas = (k, opciones, actual) => opciones.map(([v, txt]) =>
+      `<button class="jg-bt3-ficha" data-k="${k}" data-v="${v}" aria-pressed="${String(v) === String(actual)}" ${manda ? "" : "disabled"}>${escapeHtml(txt)}</button>`).join("");
+    const falta = est.reanudar ? "Se cortó la conexión en plena pelea: vuelve a empezar sola apenas carguen los dos discos."
+      : js.length < 2 ? "Falta el otro jugador: pásale el enlace de la sala."
+      : !listos ? "Esperando el disco de " + js.filter(j => !est.discos?.[j.uid]).map(j => j.nombre || "Jugador").join(" y ") + "."
+      : manda ? "Todo listo." : "Todo listo: empieza " + nombre(est.anfitrion) + ".";
+    // la revancha: después de una pelea, los dos la piden y empieza sola en cuanto cargan los dos discos
+    const rev = est.revancha || {}, otro = js.find(j => j.uid !== uid);
+    let revancha = "";
+    if (est.ronda > 0 && js.length === 2 && enSala() && !est.reanudar) {   // (tras un corte la pelea vuelve sola: sin revancha)
+      const yoSi = !!rev[uid], elSi = !!(otro && rev[otro.uid]);
+      revancha = `<div class="jg-bt3-revancha${yoSi && elSi ? " lista" : ""}">
+        ${yoSi ? `<button class="jg-bt3-rev no" data-no="1">Cancelar revancha</button>` : `<button class="jg-bt3-rev">🔁 ${elSi ? "¡Acepto la revancha!" : "Pedir revancha"}</button>`}
+        <span class="jg-bt3-nota" role="status">${yoSi && elSi ? "¡Revancha! Empieza sola apenas carguen los dos discos."
+          : yoSi ? "Esperando que " + `<b translate="no">${escapeHtml(otro.nombre || "tu rival")}</b>` + " acepte…"
+          : elSi ? `<b translate="no">${escapeHtml(otro.nombre || "Tu rival")}</b> quiere la revancha.` : "Las mismas reglas, sin volver a configurar: tienen que confirmar los dos."}</span></div>`;
+    }
+    vest.innerHTML = `
+      <header class="jg-bt3-tit"><b>Duelo</b>${ESFERAS}<span>${est.ronda ? "Pelea " + (est.ronda + 1) : "1 contra 1"} · el anfitrión pone las reglas</span></header>
+      <div class="jg-bt3-versus">${tarjeta(orden[0])}<span class="jg-bt3-vs" aria-hidden="true">VS</span>${tarjeta(orden[1])}</div>
+      ${marcadorHtml(orden)}
+      ${dar ? `<div class="jg-bt3-pendiente"><p class="jg-bt3-nota">La pelea ${est.ronda} quedó sin resultado.</p>${dar}</div>` : ""}
+      ${revancha}
+      <div class="jg-bt3-reglas" role="group" aria-label="Reglas de la pelea">
+        <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
+        <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(t => [t, TIEMPO_CORTO(t)]), est.tiempo)}</div></div>
+        ${vetoHtml(manda)}
+        ${manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el anfitrión.</p>`}
+      </div>
+      <div class="jg-bt3-pie">
+        ${manda ? `<button class="jg-bt3-empieza" ${listos ? "" : "disabled"}>¡A pelear!</button>` : ""}
+        <p class="jg-bt3-nota" role="status">${escapeHtml(falta)}</p>
+      </div>`;
+    vest.querySelectorAll(".jg-bt3-hacer").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
+    vest.querySelectorAll(".jg-bt3-ficha").forEach(b => b.onclick = () => {
+      if (b.getAttribute("aria-pressed") === "true") return;
+      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+    });
+    atarVetos();
+    atarDar("la pelea " + est.ronda, g => ({ t: "decide", uid, n: est.ronda, g }));
+    const emp = vest.querySelector(".jg-bt3-empieza");
+    if (emp) emp.onclick = () => { emp.disabled = true; empieza(); };
+    const rb = vest.querySelector(".jg-bt3-rev");
+    if (rb) rb.onclick = () => { rb.disabled = true; anota(rb.dataset.no ? { t: "revancha", uid, no: true } : { t: "revancha", uid }); };
+  }
+
+  /* ---------- el torneo ----------
+     Antes de empezar: quiénes están (con su disco), las reglas y «Empezar torneo» del organizador. Después: la
+     llave por rondas, la pelea actual destacada y lo que toca hacer en ella (arrancarla, o confirmar a mano si el
+     juego no lo contó solo, o que el organizador decida si los dos no coinciden). */
+  const NOMBRE_RONDA = (r, total) => ["Final", "Semifinal", "Cuartos", "Octavos"][total - 1 - r] || "Ronda " + (r + 1);
+  const nomb = u => u === "" ? "—" : u === undefined ? "Por definir" : nombre(u);
+  // Una pelea del torneo recién decidida: su animación, su sonido y el cartel de arriba.
+  /* El cartel de una pelea: el ganador con su aura y, al lado, el que pierde, que revienta en pedazos. */
+  const caras = (g, p) => `<div class="jg-bt3-caras"><span class="g">${avatar(jugador(g))}</span><span class="vs" aria-hidden="true">VS</span>
+    <span class="p">${avatar(jugador(p))}${explota(1.7)}</span></div>`;
+  function celebra(m, total, sinCartel = false) {
+    recientes.set(m.id, Date.now());
+    if (sinCartel && m.r !== total - 1) return;   // la casilla igual revienta en la llave
+    const pierde = m.g === m.a ? m.b : m.a, n = u => `<b translate="no">${escapeHtml(nombre(u))}</b>`;
+    setTimeout(() => suena("kiBoom"), 300);   // la carta del que pierde revienta
+    if (m.r === total - 1) {   // la final: el campeón
+      recientes.set("copa", Date.now());
+      suena("kiCorona");
+      anuncia(`<div class="jg-bt3-coronado"><i class="jg-bt3-rayos" aria-hidden="true"></i><span class="jg-bt3-anuncio-corona" aria-hidden="true">👑</span>${avatar(jugador(m.g))}</div>
+        <small>Campeón del torneo</small>${n(m.g)}`, "campeon", 6500);
+    } else {
+      suena(pierde === uid ? "kiCae" : "kiAvanza");
+      anuncia(caras(m.g, pierde) + (pierde === uid ? `<small>Quedaste fuera</small><b>Ganó ${n(m.g)}</b>`
+        : `<small>${m.g === uid ? "¡Ganaste!" : "Pasa a la siguiente ronda"}</small>${n(m.g)} <span>avanza a ${NOMBRE_RONDA(m.r + 1, total).toLowerCase()}</span>`),
+        pierde === uid ? "pierde" : "gana", 4200);
+    }
+  }
+  function pintaTorneo(forzar) {
+    const js = presentes(), manda = soyAnfitrion(), a = est.actual;
+    vest.hidden = false;   // la llave se queda a la vista también al final, debajo del cartel
+    // quien sale del torneo (sacado por el organizador o porque se fue): su foto revienta en el cartel
+    const fueraAhora = Object.keys(est.fuera || {});
+    if (vistoFuera) for (const u of fueraAhora) if (!vistoFuera.includes(u) && !document.hidden) {
+      const echado = (est.hist || []).some(h => h.e === "echado" && h.uid === u);
+      setTimeout(() => suena("kiBoom"), 250);
+      anuncia(`<div class="jg-bt3-caras"><span class="p">${avatar(jugador(u))}${explota(1.7)}</span></div>
+        <small>${echado ? (u === uid ? "El organizador te sacó del torneo" : "Expulsado por el organizador") : "Se fue del torneo"}</small>
+        <b translate="no">${escapeHtml(nombre(u))}</b>`, "pierde", 4200);
+    }
+    const nuevosFuera = new Set(vistoFuera ? fueraAhora.filter(u => !vistoFuera.includes(u)) : []);   // (su pelea la perdieron por irse: ya tienen su cartel)
+    vistoFuera = fueraAhora;
+    if (est.llave) {   // peleas decididas desde la última vez: se celebran (no al abrir la sala)
+      const ahora = {};
+      est.llave.forEach((ronda, r) => ronda.forEach(m => { if (m.g !== undefined) ahora[m.id] = m; }));
+      if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length, nuevosFuera.has(m.g === m.a ? m.b : m.a));
+      vistoLlave = ahora;
+    }
+    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.llave, est.previa, a, manda, enSala(), est.cupo, est.cpus]);
+    if (!forzar && firma === vestFirma) return;
+    vestFirma = firma;
+    vest.classList.remove("jugando");
+    const fichas = (k, opciones, actual) => opciones.map(([v, txt]) =>
+      `<button class="jg-bt3-ficha" data-k="${k}" data-v="${v}" aria-pressed="${String(v) === String(actual)}" ${manda && !est.llave ? "" : "disabled"}>${escapeHtml(txt)}</button>`).join("");
+    const reglas = `<div class="jg-bt3-reglas" role="group" aria-label="Reglas de las peleas">
+        <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
+        <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(x => [x, TIEMPO_CORTO(x)]), est.tiempo)}</div></div>
+        ${vetoHtml(manda && !est.llave)}
+        ${est.llave ? `<p class="jg-bt3-nota">Las mismas reglas en todas las peleas del torneo.</p>` : manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el organizador.</p>`}
+      </div>`;
+    if (!est.llave) {   // antes de empezar
+      const fila = j => `<li class="${j.uid === uid ? "yo" : ""}">${avatar(j)}<span translate="no">${escapeHtml(j.nombre || "Jugador")}</span>
+        ${manda && j.uid !== uid ? `<button class="jg-bt3-echa" data-echa="${escapeHtml(j.uid)}" title="Sacar del torneo" aria-label="Sacar a ${escapeHtml(j.nombre || "Jugador")} del torneo">⏏</button>` : ""}
+        ${j.uid === est.anfitrion ? '<em class="jg-bt3-org">👑 Organiza</em>' : ""}
+        <i class="jg-bt3-estado ${est.discos?.[j.uid] ? "ok" : ""}">${est.discos?.[j.uid] ? "● Disco listo" : "○ Cargando…"}</i></li>`;
+      /* Los lugares vacíos: el organizador los rellena con la CPU (cada una con su nivel) o los deja vacíos, y
+         entonces su rival pasa directo (gana por no presentación). */
+      const cpus = Object.keys(est.cpus || {}).sort();
+      const cupo = Math.max(js.length, est.cupo || partida?.cupo || 8), libres = Math.max(0, cupo - js.length - cpus.length);
+      const filaCpu = c => `<li class="cpu">${avatar(jugador(c))}<span translate="no">${escapeHtml(nombre(c))}</span>
+        ${manda ? `<button class="jg-bt3-echa" data-quita="${c}" title="Quitar esta CPU" aria-label="Quitar ${escapeHtml(nombre(c))}">✕</button>` : ""}
+        <i class="jg-bt3-nivel">${manda ? `<select data-nivel="${c}" aria-label="Nivel de ${escapeHtml(nombre(c))}">${BT3_NIVELES.map((t, k) =>
+          `<option value="${k}" ${k === nivelCpu(c) ? "selected" : ""}>Nivel ${k + 1} · ${t}</option>`).join("")}</select>` : `Nivel ${nivelCpu(c) + 1} · ${BT3_NIVELES[nivelCpu(c)]}`}</i></li>`;
+      const total = js.length + cpus.length, puede = total >= 3;
+      const tam = (() => { let t = 2; while (t < total) t *= 2; return t; })();
+      /* La llave antes de empezar, ya como la pirámide del torneo (las rondas, la copa): el organizador arma la primera
+         ronda arrastrando a uno sobre otro (o tocando uno y después el otro: en una pantalla táctil no hay arrastre) y la
+         sortea con «Mezclar». Las rondas siguientes dicen «Por definir», salvo quien ya pasa directo. Los demás la ven
+         igual, sin moverla. */
+      const previa = est.previa || [];
+      const lugar = (u, i) => u
+        ? `<span class="jg-bt3-slot jg-bt3-lugar" data-lugar="${i}"${manda ? ' draggable="true" tabindex="0" role="button"' : ""} title="${manda ? "Arrástralo (o tócalo y después toca otro lugar) para cambiarlo de pelea" : ""}">${avatar(jugador(u))}<span class="jg-bt3-nom" translate="no">${escapeHtml(nombre(u))}</span></span>`
+        : `<span class="jg-bt3-slot jg-bt3-lugar bye" data-lugar="${i}"${manda ? ' tabindex="0" role="button"' : ""}>pasa directo</span>`;
+      const porDefinir = u => `<span class="jg-bt3-slot${u ? "" : " vacio"}">${u ? avatar(jugador(u)) : '<span class="jg-bt3-ava vacia" aria-hidden="true">?</span>'}<span class="jg-bt3-nom" translate="no">${escapeHtml(u ? nombre(u) : "Por definir")}</span></span>`;
+      let pisos = "";
+      if (puede && previa.length) {
+        const rondas = Math.round(Math.log2(previa.length));
+        // en la segunda ronda ya se sabe quién llega de una pelea con un solo peleador (pasa directo)
+        const directo = k => { const x = previa[2 * k], y = previa[2 * k + 1]; return x && !y ? x : y && !x ? y : undefined; };
+        for (let r = 0; r < rondas; r++) {
+          const n = previa.length >> (r + 1);
+          const peleas = Array.from({ length: n }, (_, k) => `<li class="jg-bt3-par"><div class="jg-bt3-caja">${r === 0
+            ? lugar(previa[2 * k], 2 * k) + lugar(previa[2 * k + 1], 2 * k + 1)
+            : r === 1 ? porDefinir(directo(2 * k)) + porDefinir(directo(2 * k + 1)) : porDefinir() + porDefinir()}</div></li>`).join("");
+          pisos += `<section class="jg-bt3-ronda${r === rondas - 1 ? " final" : ""}"><h4>${NOMBRE_RONDA(r, rondas)}</h4><ol>${peleas}</ol></section>`;
+        }
+        pisos += `<section class="jg-bt3-ronda copa"><h4>Campeón</h4><ol><li class="jg-bt3-par"><div class="jg-bt3-copa"><i class="jg-bt3-rayos" aria-hidden="true"></i>
+          <span class="jg-bt3-trofeo" aria-hidden="true">🏆</span><b>Por definir</b></div></li></ol></section>`;
+      }
+      const llavePrevia = pisos ? `<section class="jg-bt3-previa">
+          <header><b>La llave</b><span>${manda ? "Arrastra a un peleador sobre otro de la primera ronda para cambiar quién pelea con quién." : "La arma " + escapeHtml(nombre(est.anfitrion)) + "."}</span>
+            ${manda ? `<button class="jg-bt3-ficha" data-mezcla="1" type="button" title="Sortear la llave de nuevo">🔀 Mezclar</button>` : ""}</header>
+          <div class="jg-bt3-llave">${pisos}</div>
+        </section>` : "";
+      vest.innerHTML = `
+        <header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${js.length} inscrito${js.length === 1 ? "" : "s"}${cpus.length ? " + " + cpus.length + " CPU" : ""} · eliminación directa</span></header>
+        <ul class="jg-bt3-inscritos">${js.map(fila).join("")}${cpus.map(filaCpu).join("")}</ul>
+        ${manda && libres ? `<div class="jg-bt3-libres"><span>${libres} lugar${libres === 1 ? "" : "es"} libre${libres === 1 ? "" : "s"}:</span>
+          <button class="jg-bt3-ficha" data-cpu="1">＋ Agregar una CPU</button><button class="jg-bt3-ficha" data-cpu="todas">Rellenar con CPU</button>
+          <small>o déjalos vacíos: su rival pasa directo.</small></div>` : ""}
+        ${llavePrevia}
+        ${reglas}
+        <div class="jg-bt3-pie">
+          ${manda ? `<button class="jg-bt3-empieza" data-h="torneo" ${puede ? "" : "disabled"}>¡Empezar torneo!</button>` : ""}
+          <p class="jg-bt3-nota" role="status">${puede ? (manda ? `Se empieza con esta llave de ${tam}${tam > total ? ` (${tam - total} pasa${tam - total === 1 ? "" : "n"} directo)` : ""}.` : "Empieza cuando lo diga " + escapeHtml(nombre(est.anfitrion)) + ".")
+            : manda ? "Hacen falta al menos 3 (contando las CPU): pásales el enlace de la sala o agrega CPU." : "Hacen falta al menos 3: pásales el enlace de la sala."}</p>
+        </div>`;
+    } else {
+      const total = est.llave.length;
+      /* La llave como pirámide: una columna por ronda, cada pelea centrada entre las dos que la alimentan (cada
+         <li> ocupa el doble de alto que los de la ronda anterior) y unidas por líneas (CSS, ::before/::after).
+         Al final, la copa con el campeón. */
+      const caja = m => {
+        const cls = m.g !== undefined ? "listo" : a && a.id === m.id ? (a.enCurso ? "vivo" : "sigue") : "";
+        const decidida = conEdad(m.id, 3, "recien");
+        // la casilla de esta pelea a la que llegó alguien recién: el ganador de la pelea de la ronda anterior entra
+        const llega = k => m.r > 0 ? conEdad(est.llave[m.r - 1][2 * m.k + k].id, 3, "llega") : { c: "", st: "" };
+        const fila = (u, k) => {
+          const l = llega(k), res = m.g !== undefined && u ? (m.g === u ? "gana" : "pierde") : u === undefined ? "vacio" : "";
+          const cara = u ? avatar(jugador(u)) : '<span class="jg-bt3-ava vacia" aria-hidden="true">?</span>';
+          return `<span class="jg-bt3-slot ${res}${decidida.c}${l.c}"${decidida.st || l.st}>${cara}<span class="jg-bt3-nom" translate="no">${escapeHtml(nomb(u))}</span>${res === "pierde" && decidida.c ? explota() : ""}</span>`;
+        };
+        return `<li class="jg-bt3-par${m.g ? " listo" : ""}${m.r > 0 && m.a && m.b ? " lleno" : ""}${decidida.c}"${decidida.st}><div class="jg-bt3-caja ${cls}">${fila(m.a, 0)}${m.b === "" ? '<span class="jg-bt3-slot bye">pasa directo</span>' : fila(m.b, 1)}
+          ${cls === "vivo" ? "<em>EN PELEA</em>" : cls === "sigue" ? "<em>SIGUIENTE</em>" : ""}</div></li>`;
+      };
+      const campeon = est.llave[total - 1][0].g, corona = conEdad("copa", 7, "corona");
+      const llave = est.llave.map((ronda, r) => `<section class="jg-bt3-ronda${r === total - 1 ? " final" : ""}"><h4>${NOMBRE_RONDA(r, total)}</h4><ol>${ronda.map(caja).join("")}</ol></section>`).join("")
+        + `<section class="jg-bt3-ronda copa"><h4>Campeón</h4><ol><li class="jg-bt3-par${campeon ? " listo" : ""}"><div class="jg-bt3-copa${campeon ? " gana" : ""}${corona.c}"${corona.st}>
+            <i class="jg-bt3-rayos" aria-hidden="true"></i>${campeon
+              ? `<span class="jg-bt3-campeon"><span class="jg-bt3-corona" aria-hidden="true">👑</span>${avatar(jugador(campeon))}<span class="jg-bt3-trofeo" aria-hidden="true">🏆</span></span>`
+              : '<span class="jg-bt3-trofeo" aria-hidden="true">🏆</span>'}
+            <b translate="no">${campeon ? escapeHtml(nombre(campeon)) : "Por definir"}</b></div></li></ol></section>`;
+      let panel = "";
+      if (a) {
+        const yoPeleo = a.a === uid || a.b === uid, conDisco = u => esCpuBt3(u) || est.discos?.[u], listos = conDisco(a.a) && conDisco(a.b);
+        const quien = u => `<b translate="no">${escapeHtml(nombre(u))}</b>`;
+        const marca = (g, txt) => `<button class="jg-bt3-ficha" data-g="${escapeHtml(g)}">${txt}</button>`;
+        let cuerpo;
+        if (!a.enCurso) {
+          cuerpo = (a.reanudar ? `<p class="jg-bt3-nota jg-bt3-corte" role="status">⚡ Se cortó la conexión en plena pelea (o alguien recargó la página). Vuelve a empezar sola apenas carguen los dos discos.${manda ? " Si uno no vuelve, dale la victoria al otro abajo." : ""}</p>` : "")
+            + (listos
+            ? (yoPeleo || manda ? `<button class="jg-bt3-empieza" data-h="pelea">¡A pelear!</button>` : `<p class="jg-bt3-nota">Listos los dos: empieza cuando uno de ellos quiera.</p>`)
+            : `<p class="jg-bt3-nota">Esperando el disco de ${[a.a, a.b].filter(u => !conDisco(u)).map(quien).join(" y ")}.</p>`)
+            + (manda ? darVictoria([a.a, a.b]) : "");
+        } else if (a.conflicto) {
+          cuerpo = `<p class="jg-bt3-nota">Los dos juegos no dijeron el mismo ganador. ${manda ? "Decide tú:" : "Decide " + quien(est.anfitrion) + "."}</p>
+            ${manda ? `<div class="jg-bt3-fichas" data-accion="decide">${marca(a.a, "Ganó " + escapeHtml(nombre(a.a)))}${marca(a.b, "Ganó " + escapeHtml(nombre(a.b)))}${marca("empate", "Repetir")}</div>` : ""}`;
+        } else {
+          const ya = a.rep?.[uid];
+          cuerpo = `<p class="jg-bt3-nota"><span class="jg-bt3-vivo">● En pelea</span> El resultado se anota solo al terminar.</p>
+            ${!yoPeleo ? `<button class="jg-bt3-ver" data-ver="1">📺 Ver la pelea en vivo</button>` : ""}
+            ${yoPeleo || manda ? `<button class="jg-bt3-vuelve" data-corta="1" title="Si la pelea se quedó colgada: vuelven a la llave y se empieza de nuevo">← Cortar la pelea y volver a la llave</button>` : ""}
+            ${yoPeleo && ya === undefined ? `<details class="jg-bt3-mano"><summary>¿No se anotó solo? Márcalo a mano</summary>
+              <div class="jg-bt3-fichas" data-accion="resultado">${marca(a.a, "Ganó " + escapeHtml(nombre(a.a)))}${marca(a.b, "Ganó " + escapeHtml(nombre(a.b)))}${marca("empate", "Empate")}</div></details>` : ""}
+            ${manda ? darVictoria([a.a, a.b]) : ""}`;
+        }
+        panel = `<div class="jg-bt3-actual">
+          <div class="jg-bt3-mini">${quien(a.a)}<span class="jg-bt3-vs">VS</span>${quien(a.b)}</div>
+          <p class="jg-bt3-nota">${NOMBRE_RONDA(+a.id.split(".")[0], total)} · ${escapeHtml(BT3_BATALLAS[est.batalla] || "")} · ${TIEMPO_TXT(est.tiempo)}${est.veto ? " · " + escapeHtml(BT3_VETOS[est.veto]) : ""}${yoPeleo ? " · <b>¡te toca!</b>" : ""}</p>
+          ${cuerpo}</div>`;
+      }
+      vest.innerHTML = `<header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores · organiza <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span></header>
+        ${panel}<div class="jg-bt3-llave">${llave}</div>
+        ${manda && js.length > 1 ? `<details class="jg-bt3-mano jg-bt3-echar"><summary>Organizador: sacar a un jugador del torneo</summary>
+          <div class="jg-bt3-fichas">${js.filter(j => j.uid !== uid).map(j => `<button class="jg-bt3-ficha" data-echa="${escapeHtml(j.uid)}">⏏ <span translate="no">${escapeHtml(j.nombre || "Jugador")}</span></button>`).join("")}</div>
+          <p class="jg-bt3-nota">Pierde sus peleas (la que esté en curso y las que le tocaban) y queda mirando.</p></details>` : ""}`;
+    }
+    vest.querySelectorAll(".jg-bt3-ficha[data-k]").forEach(b => b.onclick = () => {
+      if (b.getAttribute("aria-pressed") === "true") return;
+      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+    });
+    atarVetos();
+    // las CPU del torneo: agregar una, rellenar todos los lugares, cambiar el nivel, quitar
+    vest.querySelectorAll("[data-cpu]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      const usados = new Set(Object.keys(est.cpus || {}));
+      const libres = Math.max(0, (est.cupo || partida?.cupo || 8) - presentes().length - usados.size);
+      let n = b.dataset.cpu === "todas" ? libres : Math.min(1, libres);
+      for (let k = 1; k <= 9 && n > 0; k++) if (!usados.has("cpu:" + k)) { await anota({ t: "cpu", uid, id: "cpu:" + k, nivel: 2 }); n--; }
+    });
+    atarPrevia();
+    const ver = vest.querySelector("[data-ver]");
+    if (ver) ver.onclick = () => abreTele();
+    const corta = vest.querySelector("[data-corta]");
+    if (corta) corta.onclick = () => { corta.disabled = true; anota({ t: "vuelve", uid, m: est.actual.id }); };
+    vest.querySelectorAll("[data-nivel]").forEach(sel => sel.onchange = () => anota({ t: "cpu", uid, id: sel.dataset.nivel, nivel: Number(sel.value) }));
+    vest.querySelectorAll("[data-quita]").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "cpu", uid, id: b.dataset.quita, quita: true }); });
+    const echables = [...vest.querySelectorAll("[data-echa]")];
+    echables.forEach(b => b.onclick = () => dosClics(b, echables,
+      `✓ Sí, sacar a <span translate="no">${escapeHtml(nombre(b.dataset.echa))}</span>`, () => anota({ t: "echa", uid, a: b.dataset.echa })));
+    if (a) atarDar("esta pelea", g => ({ t: "decide", uid, m: a.id, g }));
+    vest.querySelectorAll("[data-accion] .jg-bt3-ficha").forEach(b => b.onclick = () => {
+      b.disabled = true;
+      const accion = b.closest("[data-accion]").dataset.accion;
+      anota({ t: accion, uid, m: est.actual.id, g: b.dataset.g });
+    });
+    const emp = vest.querySelector(".jg-bt3-empieza");
+    if (emp) emp.onclick = async () => {
+      emp.disabled = true;
+      if (emp.dataset.h === "torneo") {
+        await anota({ t: "torneo", uid });
+        if (partida.estado === "esperando") fb.setEstado(pid, "jugando").catch(() => {});   // cierra la puerta: ya no entra nadie
+      } else anota({ t: "empieza", uid, m: est.actual.id });
+    };
+  }
+
+  // Al volver de una pelea, el marco se recarga: el programa arranca de cero para la siguiente.
+  function reiniciaMarco() {
+    clearTimeout(esperaMenu); esperaMenu = 0; vioGanador = false;
+    listo = false; discoMarco = false;
+    // si la pelea estaba en pantalla completa, se sale: se vuelve a ver la sala (la llave o el vestíbulo)
+    try { if (document.fullscreenElement && document.fullscreenElement === frame) document.exitFullscreen().catch(() => {}); } catch (e) {}
+    if (frame && enSala()) frame.src = SRC + "&r=" + Date.now();
+    pintaVestibulo(true);   // (lo que quedó guardado mientras se veía la celebración: el marcador, el cartel, la llave)
+  }
+
+  /* El marco del juego es solo para quien juega: un espectador (o alguien que se fue o sacaron) ve la sala —el
+     vestíbulo, la llave, los carteles— sin bajar ni arrancar el juego. La pelea en sí se ve solo en las
+     pantallas de los dos peleadores: el juego no tiene modo espectador. */
+  function cargaMarco() {
+    if (!frame || !permitido) return;
+    frame.hidden = !enSala();
+    if (enSala() && !frame.getAttribute("src")) frame.src = SRC;
+  }
+  function pantallaCompleta() {
+    const pide = frame?.requestFullscreen || frame?.webkitRequestFullscreen;
+    if (!pide) return false;
+    try { pide.call(frame, { navigationUI: "hide" })?.then?.(() => frame.contentWindow?.focus(), () => {}); }
+    catch { return false; }
+    frame.contentWindow?.focus();
+    return true;
+  }
+
+  function montar(el) {
+    host = el; host.innerHTML = "";
+    escena = document.createElement("div");
+    escena.className = "jg-bt3-escena";
+    vest = document.createElement("div");
+    vest.className = "jg-bt3-vest";
+    vest.hidden = true;
+    avisos = document.createElement("div");
+    avisos.className = "jg-bt3-avisos";
+    avisos.setAttribute("aria-live", "polite");
+    escena.append(vest, avisos);
+    frame = document.createElement("iframe");
+    frame.title = "Budokai Tenkaichi 3 — partida en línea";
+    frame.className = "jg-yemas-marco jg-bt3-marco";
+    frame.allow = "fullscreen; gamepad";
+    frame.setAttribute("allowfullscreen", "");
+    window.addEventListener("message", mensaje);
+    host.append(escena, frame);
+    /* Solo los amigos de la lista del disco privado (bt3-amigos.js): a cualquier otro, ni el vestíbulo ni el
+       juego, aunque haya llegado con el enlace de la sala. */
+    revisaBt3().then(ok => {
+      if (muerto) return;
+      if (ok) { permitido = true; cargaMarco(); pintaVestibulo(true); return; }
+      escena.remove(); frame.remove(); vest = frame = escena = avisos = null;
+      host.innerHTML = '<p class="jg-bt3-info jg-bt3-privado">Esta sala es privada.</p>';
+    });
+  }
+
+  /* ---------- el comienzo de cada pelea ----------
+     Como la presentación de un juego de pelea: las dos fotos entran por los lados, chocan con un destello y sale
+     «¡A PELEAR!», con su sonido (`kiPelea`). Va encima de todo (fijo a la pantalla), porque en ese momento la
+     sala ya muestra el marco del juego. Solo para lo que empieza mientras se mira: `vistoInicio` es null hasta
+     el primer estado. El comienzo del torneo suena con un gong (`kiTorneo`). */
+  let vistoInicio = null;
+  function presentaPelea(a, b, detalle) {
+    if (document.hidden) return;
+    suena("kiPelea");
+    const lado = (u, c) => { const j = jugador(u); return `<div class="${c}">${avatar(j)}<b translate="no">${escapeHtml(j.nombre || "Jugador")}</b></div>`; };
+    const capa = document.createElement("div");
+    capa.className = "jg-bt3-choque";
+    capa.setAttribute("aria-hidden", "true");
+    capa.innerHTML = `<i class="jg-bt3-rayos"></i>${lado(a, "l")}${lado(b, "r")}<i class="jg-bt3-destello"></i>
+      <strong>¡A PELEAR!</strong><small>${escapeHtml(detalle)}</small>`;
+    document.body.append(capa);
+    setTimeout(() => capa.remove(), 2700);
+  }
+  function detectaInicio() {
+    const llave = !!est.llave, pelea = est.torneo
+      ? (est.actual && est.actual.enCurso ? "t" + est.actual.n : "")
+      : (est.fase === "jugando" ? "d" + est.ronda : "");
+    const antes = vistoInicio;
+    vistoInicio = { llave, pelea };
+    if (!antes || partida?.fin) return;
+    if (llave && !antes.llave && !document.hidden) {
+      suena("kiTorneo");
+      anuncia(`<small>Torneo · ${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores</small><b>¡Comienza el torneo!</b>`, "gana", 3200);
+    }
+    if (pelea && pelea !== antes.pelea) {
+      const reglas = (BT3_BATALLAS[est.batalla] || "") + " · " + TIEMPO_TXT(est.tiempo);
+      if (est.torneo) presentaPelea(est.actual.a, est.actual.b, NOMBRE_RONDA(+est.actual.id.split(".")[0], est.llave.length) + " · " + reglas);
+      else {
+        const otro = presentes().find(j => j.uid !== est.anfitrion)?.uid;
+        if (otro) presentaPelea(est.anfitrion, otro, "Pelea " + est.ronda + " · " + reglas);
+      }
+    }
+  }
+
+  /* Esta pestaña llegó (o volvió: recargó la página, volvió a iniciar sesión) con SU pelea andando: su juego ya no
+     está en esa pelea, y el del rival espera en vano. Se corta en el acto, como un corte de conexión, y la misma
+     pelea vuelve a empezar sola cuando los dos tengan el disco (motor.js, `reanudar`). */
+  let primeraVez = true;
+  function llegoEnPlenaPelea() {
+    if (!primeraVez || !est) return;   // (la primera llamada ya trae la sala entera: es la foto de Firebase)
+    primeraVez = false;
+    if (!enSala() || partida?.fin || !peleando()) return;
+    if (est.torneo) { if (!esCpuBt3(est.actual.a) || !esCpuBt3(est.actual.b)) anota({ t: "vuelve", uid, m: est.actual.id, por: "corte" }); }
+    else anota({ t: "vuelve", uid, por: "corte" });
+  }
+
+  // un corte nuevo mientras se mira: el cartel lo explica (no al abrir la sala)
+  let cortesVistos = null;
+  function avisaCorte() {
+    const n = (est.hist || []).filter(h => h.e === "vuelve" && h.por === "corte").length;
+    if (cortesVistos !== null && n > cortesVistos && !document.hidden) {
+      suena("kiCae");
+      anuncia(`<small>Se cortó la conexión</small><b>⚡ La pelea vuelve a empezar</b><span>sola, apenas carguen los dos discos</span>`, "empate", 5000);
+    }
+    cortesVistos = n;
+  }
+
+  function actualizar(p, estado) {
+    partida = p; est = estado;
+    llegoEnPlenaPelea();
+    avisaCorte();
+    cargaMarco();
+    if (tele && peleaEnVivo()?.id !== tele.id && !tele.cierre) {
+      // la pelea que se miraba terminó: con ganador, la pantalla queda 18 s más (la celebración); cortada, se cierra ya
+      const conGanador = est.torneo ? est.actual?.id !== tele.m : !est.pendiente;
+      if (conGanador) tele.cierre = setTimeout(cierraTele, 18000); else cierraTele();
+    }
+    detectaInicio();
+    // Al terminar mi pelea, mi marco se recarga: la siguiente arranca el programa de cero.
+    const pelea = peleando();
+    if (peleabaAntes && !pelea && !p.fin) {
+      if (vioGanador && !esperaMenu) { discoMarco = false; esperaMenu = setTimeout(reiniciaMarco, 25000); }   // (la celebración, entera)
+      else if (!esperaMenu) reiniciaMarco();
+    }
+    peleabaAntes = pelea;
+    faseAntes = est.fase;
+    marcaDisco();
+    pintaVestibulo();
+    reenvia();
+    if (est.fase === "fin" && !p.fin && enSala()) terminar(est.ganador, est.motivo);
+    if (p.fin && !borrado && enSala()) {
+      borrado = true;
+      offP?.(); offM?.();
+      fb.borraYemasVivo(pid);   // (borra `vivo/<pid>/rtc`, el buzón de esta sala)
+    }
+  }
+
+  function destruir() {
+    muerto = true;
+    cierraTele();
+    offP?.(); offM?.();
+    senal?.sale();
+    window.removeEventListener("message", mensaje);
+    frame?.remove();
+    if (host) host.innerHTML = "";
+  }
+
+  return { montar, actualizar, destruir, pantallaCompleta };
+}

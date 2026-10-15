@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -9,6 +9,9 @@ const TETRIS=e('filas','Completar y limpiar una fila',
 const UNO_COLOR=e('coincidir','Qué carta puedes jugar',
  p('Mira el descarte','Sobre un 7 rojo sirven otro rojo, un 7 de otro color o un comodín. El 9 azul no coincide.',cart(['Mesa',[['7','rojo','ROJO']]],['Tu mano',[['3','rojo','SÍ'],['7','azul','SÍ'],['★','violeta','SÍ'],['9','azul','NO']]])),
  p('El número permite cambiar el color','Si juegas el 7 azul, la siguiente carta debe coincidir con azul, con 7 o ser un comodín.',cart(['Nuevo descarte',[['7','azul','AZUL']]],['Próxima mano',[['2','azul','SÍ'],['7','oro','SÍ'],['3','rojo','NO']]])));
+const VETOS_BT3=e('vetos','Personajes prohibidos (tier list)',
+ p('Quien pone las reglas elige','Todos, No OP (solo A, B, C y D), Sólo malos (solo C y D) o Sólo gigantes (solo N/C). Cada transformación cuenta aparte.',bt3('vetos')),
+ p('En la selección, con candado','Los vetados no se pueden elegir: el cursor se los salta y el aleatorio nunca los saca. Tampoco se puede transformar en uno en plena pelea.',bt3('vetos')));
 export const EJEMPLOS={
  orbita:[e('gravedad','Lanzar, capturar y dejar un satélite',
   p('Apunta desde tu base','Arrastra para elegir dirección y fuerza, o usa ángulo y potencia. Solo el primer tramo se anticipa: el resto lo curva la gravedad.',orbita(0)),
@@ -94,6 +97,7 @@ export const EJEMPLOS={
  e('diez','Cómo continuar después de un diez',
   p('La pila llegó a diez','Se mantiene la especia del anuncio, pero ya no se pide un número mayor que diez.',fichas('Último anuncio',['10','rojo','AJÍ'])),
   p('Reinicia con uno, dos o tres','Puedes anunciar 1, 2 o 3 de ají. Con la pila vacía también abres del 1 al 3, pero eliges la especia.',fichas('Próximos anuncios válidos',['1','rojo','AJÍ'],['2','rojo','AJÍ'],['3','rojo','AJÍ'])))],
+ bt3:[],   // (BT3 tiene un ejemplo propio por pestaña: VARIANTES.bt3)
  haxball:[e('saque','El saque y el primer gol',
   p('Cada uno en su mitad','Al empezar y después de cada gol todos vuelven a su lado. Saca el equipo que recibió el gol; solo él puede entrar al círculo hasta el primer toque.',haxball(0)),
   p('Patear, no empujar','Mantén Espacio o X junto a la pelota para patearla fuerte. Correr contra ella solo la empuja un poco.',haxball(1)),
@@ -294,6 +298,27 @@ const VENGANZA=[e('cero','El cero y el siete gafe',
  p('El trece es una excepción','En Vengeance puedes tener dos 13 sin pasarte. Esa excepción no convierte cualquier número repetido en válido.',fichas('Pareja permitida',['13','oro'],['13','oro'])),
  p('Los otros números siguen repitiéndose','Dos ochos todavía te hacen pasarte si no tienes protección. Super mantiene la excepción del 13, pero añade una familia 14 diferente.',fichas('Repetición peligrosa',['8','azul'],['8','rojo'])))];
 export const VARIANTES={
+ /* BT3: cada pestaña con lo suyo; los personajes con candado, en el duelo y el torneo (contra la CPU no hay vetos). */
+ bt3:{
+  duelo:[e('duelo','Un duelo, de la sala a la revancha',
+   p('Los dos listos','Cada uno espera su «● Disco listo». Ana es la anfitriona: elige la batalla, el tiempo y los personajes, y aprieta ¡A pelear!.',bt3('vest')),
+   p('A pelear','Eligen personaje y escenario en el juego. Cada uno juega en su computador, con su teclado o su mando; la vida, el ki y el reloj son los del juego.',bt3('pelea')),
+   p('El K.O. se anota solo','Al terminar, el juego le dice a la sala quién ganó. Nadie tiene que marcar nada: la celebración se ve entera y después vuelven los dos a la sala.',bt3('ko')),
+   p('Marcador y revancha','La sala suma la pelea al marcador. Si los dos aprietan la revancha, la siguiente empieza sola con las mismas reglas.',bt3('marcador'))),
+  e('dar','Cuando el juego no pudo decir quién ganó',
+   p('Una pelea sin resultado','Si el juego se colgó o alguien no volvió, la pelea queda sin resultado. Solo el anfitrión ve el botón 🏆 Dar la victoria.',bt3('dar')),
+   p('Dos clics, a propósito','El primer clic elige al ganador y el segundo lo confirma. La pelea cuenta en el marcador como cualquier otra.',bt3('marcador'))),
+  VETOS_BT3],
+  torneo:[e('llave','Armar la llave y jugar el torneo',
+   p('Los inscritos','Quien abre la sala organiza. Si faltan amigos, completa con CPU de nivel 1 a 5; un lugar vacío le da el pase directo a su rival.',bt3('inscritos')),
+   p('La llave, como pirámide','Desde antes de empezar se ve la llave entera. El organizador arrastra a un peleador sobre otro para cambiarlos, o los sortea con 🔀 Mezclar.',bt3('arrastra')),
+   p('Una pelea a la vez','La que toca sale marcada SIGUIENTE. El ganador lo anota el juego solo y sube a la ronda siguiente; los demás miran en vivo.',bt3('avanza')),
+   p('La copa','Quien gana la final se lleva la copa y la corona. Un empate en cualquier ronda se vuelve a pelear.',bt3('copa'))),
+  VETOS_BT3],
+  solo:[e('cpu','Pelear contra la CPU',
+   p('Elige el modo','En la ficha de un jugador eliges el modo. Contra la CPU pide además la dificultad, del 1 (muy fácil) al 5 (muy difícil).',bt3('modos')),
+   p('Batalla y tiempo','Eliges la batalla y el tiempo por round, y Jugar entra directo a la pelea. Para cambiar de modo, ← Modos en la barra de arriba.',bt3('cpu')))]
+ },
  gato:{
   clasico:[e('tapar','Tapar la raya del rival',
    p('El rival amenaza','La O tiene dos en la diagonal. Si no escribes en la esquina que falta, en su próximo turno hace tres en raya.',tablero('Gato: O amenaza la diagonal',3,3,['O','X','','','O','','','','X'],{0:'rojo',4:'rojo'})),

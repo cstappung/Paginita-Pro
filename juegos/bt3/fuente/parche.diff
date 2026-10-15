@@ -1,0 +1,1274 @@
+diff --git a/port/src/gs/gs_draw.c b/port/src/gs/gs_draw.c
+index de3de89..fc6ef71 100644
+--- a/port/src/gs/gs_draw.c
++++ b/port/src/gs/gs_draw.c
+@@ -1192,6 +1192,29 @@ void GsGpu_GetSettings(PortVideo *v) {
+     v->texPackCount = TexPack_Count();
+ }
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++/* paginita-pro: the page's auto-tuner (juegos/bt3/pagina.js), like a phone game's: when the frames stop arriving at 30
++   it lowers the internal scale and switches off the costliest effects (distance blur 16, glare 8, depth tint 4,
++   outline 1), and raises them back when there is room, up to what the player chose. Not saved: the player's own
++   settings stay as they were. The picture rate itself is the player's (30 by default, more with smooth motion: Web_Suave). */
++EMSCRIPTEN_KEEPALIVE void Web_Calidad(int scale, int fxOff) {
++    if (scale >= 1 && scale <= 8 && scale != (gsPendingScale ? gsPendingScale : gsScale)) {
++        gsPendingScale = scale; /* applied between two frames */
++    }
++    if (fxOff >= 0) {
++        gsFxOff = (unsigned)fxOff & 31;
++    }
++}
++/* what the player chose (F1), for the auto-tuner's ceiling */
++EMSCRIPTEN_KEEPALIVE int Web_EscalaElegida(void) { return Port_Setting("scale", 2); }
++EMSCRIPTEN_KEEPALIVE int Web_FxElegidos(void) { return Port_Setting("fx_off", 0) & 31; }
++/* smooth motion now (0 off = 30 a second, 1 = 60, 2 = 120, 3 = 240): what the auto-tuner aims for. The fight is
++   computed 30 times a second either way, so an online rival with another setting plays the same fight. */
++extern int gsInterp; /* (defined below, with the in-between pictures) */
++EMSCRIPTEN_KEEPALIVE int Web_Suave(void) { return gsInterp < 0 ? 0 : gsInterp; }
++#endif
++
+ /* Applies what differs from the current state, all of it at once, and keeps it for the next run. */
+ void GsGpu_SetSettings(const PortVideo *v) {
+     PortVideo now;
+@@ -3193,7 +3216,12 @@ void GsGpu_FrameEnd(void) {
+             }
+         }
+         if (gsInterp < 0) {
++#ifdef __EMSCRIPTEN__ /* the browser build (paginita-pro): 30 a second, as the console, unless the player turns smooth motion
++                         on in F1 (or F9). Its own setting, "suave", so every player starts at 30 whatever "interp" held. */
++            gsInterp = getenv("BT3_INTERP") != NULL ? atoi(getenv("BT3_INTERP")) : Port_Setting("suave", 0);
++#else
+             gsInterp = getenv("BT3_INTERP") != NULL ? atoi(getenv("BT3_INTERP")) : Port_Setting("interp", 0);
++#endif
+             gsInterp = gsInterp < 0 ? 0 : gsInterp > 3 ? 3 : gsInterp;
+             sInterpPrev = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
+             sInterpBlend = malloc(MAX_VU_UNIFORMS * sizeof(Vu0Uniform));
+diff --git a/port/src/gs/gs_gl.c b/port/src/gs/gs_gl.c
+index 95fe9bc..ea50885 100644
+--- a/port/src/gs/gs_gl.c
++++ b/port/src/gs/gs_gl.c
+@@ -1056,7 +1056,11 @@ static void frame_end_body(void) {
+             extern void Port_SettingsWrite(void);
+             static int was = 1; /* (the same setting as F1, Video, Smooth motion: off, or back to what it was) */
+             if (gsInterp > 0) { was = gsInterp; gsInterp = 0; } else { gsInterp = was; }
++#ifdef __EMSCRIPTEN__
++            Port_SettingSave("suave", gsInterp); /* paginita-pro: its own key, default 30 (gs_draw.c) */
++#else
+             Port_SettingSave("interp", gsInterp);
++#endif
+             Port_SettingsWrite();
+             fprintf(stderr, "bt3: smooth motion %s\n", gsInterp == 0 ? "off" : gsInterp == 1 ? "60" : gsInterp == 2 ? "120" : "240");
+         }
+@@ -1242,6 +1246,7 @@ static void frame_end_body(void) {
+     if (UBO_RANGES) { ranges_done(); }
+ #ifdef __EMSCRIPTEN__
+     Web_ProfAdd(1, emscripten_get_now() - tLoop); /* the draws themselves (Module.webStats.prof[1]) */
++    Web_ProfAdd(3, (double)gsDrawCount); /* paginita-pro: how many draws (prof[3] × 1000 / fps = draws per frame) */
+ #endif
+     /* the shown buffer: the one sceGsSwapDBuff set up for this frame, else the first target */
+     best = gGsMainFbp >= 0 ? GsDraw_TargetGet((uint32_t)gGsMainFbp, 0) : -1;
+diff --git a/port/src/gs/net.c b/port/src/gs/net.c
+index 011fc8d..271ec6a 100644
+--- a/port/src/gs/net.c
++++ b/port/src/gs/net.c
+@@ -679,7 +679,32 @@ static void sample_local(unsigned tick) {
+     sHave[sMe] = at + 1;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++/* paginita-pro: a friend's line can drop for a few seconds (wifi, a router): the fight waits for them longer before
++   it is given up, and the page shows a countdown meanwhile (Module.onNetEvent "espera" / "sigue"). */
++#define QUIET_NS 25000000000ull
++#else
+ #define QUIET_NS 6000000000ull /* this long without the input the game is waiting for: the other player is gone */
++#endif
++static int sWaitShown; /* paginita-pro: the page was told the game is waiting for the other player */
++static void wait_notice(uint64_t t0, uint64_t now) {
++#ifdef __EMSCRIPTEN__
++    if (!sWaitShown && now - t0 > 1500000000ull) {
++        sWaitShown = 1;
++        web_net_event("espera", "25");
++    }
++#else
++    (void)t0; (void)now;
++#endif
++}
++static void wait_over(void) {
++#ifdef __EMSCRIPTEN__
++    if (sWaitShown) {
++        sWaitShown = 0;
++        web_net_event("sigue", "");
++    }
++#endif
++}
+ 
+ static void ended(const char *why, unsigned tick) {
+     fprintf(stderr, "bt3: net: %s (blank %u)\n", why, tick);
+@@ -742,7 +767,9 @@ static void roll_tick(unsigned tick) {
+             if (now - t0 > QUIET_NS && now - sLastHeardNs > QUIET_NS) {
+                 gone_quiet(tick);
+             }
++            wait_notice(t0, now);
+         }
++        wait_over();
+         {   /* (see sTheirAhead) */
+             int diff = (int)sMyAhead - (int)sTheirAhead; /* (both taken at the same point of a blank: when sending) */
+             if (getenv("BT3_NET_SKEW") != NULL && tick == 1500) { /* testing: this copy falls behind by that many ms, once */
+@@ -822,7 +849,9 @@ void Port_NetBeginTick(unsigned tick) {
+         if (now - t0 > QUIET_NS && now - sLastHeardNs > QUIET_NS) {
+             gone_quiet(tick);
+         }
++        wait_notice(t0, now);
+     }
++    wait_over();
+     sWaitNs += SDL_GetTicksNS() - t0;
+     sWaits++;
+     {   /* (the meter, when the two copies wait for each other every blank: time waited, and blanks that waited
+diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
+index fd6cc57..d8cf52e 100644
+--- a/port/src/gs/ui.cpp
++++ b/port/src/gs/ui.cpp
+@@ -309,6 +309,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Web_NetMenuClosed(void) {
+ }
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++/* El botón "Settings" de la página (sobre todo para celulares y para quien no sabe de F1): abre la ventana de
++   ajustes en la pestaña pedida (3 = Controls, donde se elige qué mando usa cada jugador y se cambian botones),
++   o la cierra si ya estaba abierta. Devuelve 1 si quedó abierta. */
++extern "C" EMSCRIPTEN_KEEPALIVE int Web_Settings(int pestana) {
++    if (!sReady) {
++        return 0;                      /* la ventana todavía no existe (el juego no arrancó) */
++    }
++    if (sOpen) {
++        set_open(false);               /* segundo toque: cerrar */
++        return 0;
++    }
++    sForceTab = pestana;               /* esa pestaña queda elegida al dibujarse */
++    set_open(true);
++    return 1;
++}
++#endif
++
+ static void net_open(void) {
+     set_open(true);
+     sNet = true;
+@@ -591,7 +609,11 @@ static void video_tab(PortVideo &v) {
+         ImGui::SetNextItemWidth(416.0f);
+         if (ImGui::Combo("Smooth motion", &smooth, kSmooth, 4)) {
+             gsInterp = smooth;
++#ifdef __EMSCRIPTEN__
++            Port_SettingSave("suave", gsInterp); /* paginita-pro: its own key, default 30 (gs_draw.c) */
++#else
+             Port_SettingSave("interp", gsInterp);
++#endif
+             Port_SettingsWrite();
+         }
+         ImGui::SetItemTooltip("Experimental. The game computes a fight 30 times a second. With this, more pictures are\n"
+diff --git a/port/src/headless.c b/port/src/headless.c
+index fb8b892..9e6bead 100644
+--- a/port/src/headless.c
++++ b/port/src/headless.c
+@@ -95,6 +95,85 @@ static void port_stage_replace_init(void) {
+ 
+ extern void Port_NetRules(int *type, int *dp, int *time); /* gs/net.c */
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++static int sWebModo;   /* 0 none, 1 cpu, 2 entrenamiento, -1 unknown (BT3_WEB_MODO) */
++static int sWebFijo;   /* a tournament fight: the rules are fixed, the versus menu is out of bounds too */
++static int sWebFuera;  /* the page was told the player left the mode */
++static int sWebTiempo = -1, sWebCpu = -1, sWebPuestas; /* save rules 0 and 1 to write once the save is loaded */
++/* the CPU's fighter or team is drawn at random (BT3_WEB_AZAR) */
++int Web_ComAzar(void) {
++    return sWebModo == 1 && getenv("BT3_WEB_AZAR") != NULL && atoi(getenv("BT3_WEB_AZAR")) != 0;
++}
++/* most members per team (BT3_WEB_EQUIPO, 1..5; 5 without it); online too: both pages set it from the room */
++int Web_EquipoMax(void) {
++    static int max = -1;
++    if (max < 0) {
++        max = getenv("BT3_WEB_EQUIPO") != NULL ? atoi(getenv("BT3_WEB_EQUIPO")) : 5;
++        max = max < 1 || max > 5 ? 5 : max;
++    }
++    return max;
++}
++EM_JS(void, web_fuera_del_modo, (int mode), {
++    if (Module.onFueraDelModo) Module.onFueraDelModo(mode);
++});
++/* The room's character rules (No OP / only weak ones, from a tier list): the page decides which character ids are
++   out, from the names the game itself shows, and keeps them in Module.vetados. Both players' pages read the same
++   disc and the same rule, so both games refuse the same picks and draw the same random ones (no desync). */
++EM_JS(int, web_vetado, (int chara), {
++    var v = Module.vetados;
++    return v && v[chara] ? 1 : 0;
++});
++int Web_Vetado(int chara) {
++    return chara >= 0 && chara <= 0xA0 && web_vetado(chara);
++}
++/* The select screens' name and form texts (sections 43 and 44: line n is character n's name / form; word n+1 of
++   the file is the offset of line n; UTF-16 little-endian, low byte first, as the game reads them: btl_seq.c compares
++   a u16 with '0') go to the page once, as character codes. */
++EM_JS(void, web_catalogo, (const void *nombres, const void *formas), {
++    if (!Module.onCatalogo || Module.catalogoVisto) return;
++    Module.catalogoVisto = true;
++    function linea(b, n) {
++        var q = b + 4 * (n + 1), off = (HEAPU8[q] | HEAPU8[q + 1] << 8 | HEAPU8[q + 2] << 16 | HEAPU8[q + 3] << 24) & ~3;
++        var p = b + off, s = [];
++        for (var i = 0; i < 64; i++) {
++            var c = HEAPU8[p + 2 * i] | HEAPU8[p + 2 * i + 1] << 8;
++            if (!c) break;
++            s.push(c);
++        }
++        return s;
++    }
++    var lista = [];
++    for (var id = 0; id <= 160; id++) lista.push([linea(nombres, id), linea(formas, id)]);
++    try { Module.onCatalogo(lista); } catch (e) { console.warn("[bt3] catalogo", e); }
++});
++/* The fighters just chosen (a select screen closes): the page fetches their voice lines ahead, so the first time
++   one speaks in the fight the game does not stop to read it from the network. */
++EM_JS(void, web_elegidos, (const int *ids, int n), {
++    if (!Module.onElegidos) return;
++    var a = [];
++    for (var i = 0; i < n; i++) a.push(HEAP32[(ids >> 2) + i]);
++    try { Module.onElegidos(a); } catch (e) {}
++});
++void Web_Elegidos(const int *ids, int n) {
++    if (n > 0) web_elegidos(ids, n);
++}
++/* The menus start (1) or a battle does (0). */
++EM_JS(void, web_en_menus, (int si), {
++    if (Module.onMenus) Module.onMenus(!!si);
++});
++/* A character (or team) select screen opens (1) or closes (0): the page shows the room's banned characters meanwhile. */
++EM_JS(void, web_seleccion, (int abierta), {
++    if (Module.onSeleccion) Module.onSeleccion(!!abierta);
++});
++void Web_Seleccion(int abierta) {
++    web_seleccion(abierta);
++}
++void Web_Catalogo(void *nombres, void *formas) {
++    if (nombres != NULL && formas != NULL) web_catalogo(nombres, formas);
++}
++#endif
++
+ int __wrap_Progress_Main(int arg) {
+     const char *path;
+     PortStages_Init();
+@@ -134,9 +213,56 @@ int __wrap_Progress_Main(int arg) {
+                             time == 0 ? "60" : time == 1 ? "90" : time == 2 ? "180" : time == 3 ? "240" : "none");
+                 }
+             }
++#ifdef __EMSCRIPTEN__
++            /* paginita-pro: BT3_WEB_MODO opens one mode straight away, once (the site's mode buttons): "cpu" the
++               versus character select as 1P vs COM (as the online session does above, mode 39, or the team select,
++               mode 40, for a team or DP battle); "entrenamiento" the training mode (mode 44: the lessons, or the
++               character select for free training). With it, from the site's tournaments:
++                 BT3_WEB_REGLAS  the room's rules word (as BT3_NET_RULES: type | dp << 4 | time << 8)
++                 BT3_WEB_CPU     CPU strength 0..4 (save rule[1]: levels 0, 6, 13, 21, 29)
++                 BT3_WEB_AZAR    the CPU's fighter (or team) is drawn at random (Web_ComAzar, menu_c_e.c / menu_e_b.c)
++                 BT3_WEB_EQUIPO  most members per team (3 for the 3 vs 3 team battle; Web_EquipoMax, menu_e_b.c)
++               Leaving the mode for the game's other menus is reported to the page (Port_Trace, below). */
++            {
++                const char *m = getenv("BT3_WEB_MODO");
++                if (!sWebModo && m != NULL && !Port_NetSession() && gProgress != NULL && gSaveData != NULL) {
++                    sWebModo = strcmp(m, "cpu") == 0 ? 1 : strcmp(m, "entrenamiento") == 0 ? 2 : -1;
++                    sWebFijo = getenv("BT3_WEB_REGLAS") != NULL;
++                    if (sWebModo == 1) {
++                        int type = 0, dp = 0, time = -1;
++                        if (sWebFijo) {
++                            unsigned r = (unsigned)strtoul(getenv("BT3_WEB_REGLAS"), NULL, 0);
++                            type = (int)(r & 15) > 2 ? 0 : (int)(r & 15);
++                            dp = (int)(r >> 4 & 15) > 2 ? 0 : (int)(r >> 4 & 15);
++                            time = (int)(r >> 8 & 15) > 4 ? 3 : (int)(r >> 8 & 15);
++                        }
++                        gProgress->mode = type != 0 ? 40 : 39;
++                        *(int *)((char *)gProgress + 0x620) = 0; /* 1P vs COM */
++                        *(int *)((char *)gProgress + 0x624) = type;
++                        *(int *)((char *)gProgress + 0x630) = dp;
++                        /* the time limit and the CPU strength are save rules, and the card check (still ahead) loads
++                           the player's save over them: they are written once it is over (Port_Trace) */
++                        sWebTiempo = time;
++                        if (getenv("BT3_WEB_CPU") != NULL) {
++                            int lv = atoi(getenv("BT3_WEB_CPU"));
++                            sWebCpu = lv < 0 ? 0 : lv > 4 ? 4 : lv;
++                        }
++                    } else if (sWebModo == 2) {
++                        gProgress->mode = 44;
++                    }
++                    fprintf(stderr, "bt3: web: mode %s%s\n", m, sWebFijo ? " (tournament fight)" : "");
++                }
++            }
++#endif
+             gPortMenuMode = 1; /* the renderer treats all 2D as one centred 4:3 page while the menus run */
++#ifdef __EMSCRIPTEN__
++            web_en_menus(1); /* paginita-pro: the page shows its «Atrás» button only in the menus */
++#endif
+             r = __real_Progress_Main(arg);
+             gPortMenuMode = 0;
++#ifdef __EMSCRIPTEN__
++            web_en_menus(0);
++#endif
+             sFromMenu = 1; /* a battle set up by the real menus follows: the traces apply to it too */
+             return r;
+         }
+@@ -312,6 +438,29 @@ void Port_Trace(unsigned vblanks) {
+             Port_StateLog(vblanks, NULL, 0);
+         }
+     }
++#ifdef __EMSCRIPTEN__
++    /* paginita-pro: the page chose this mode; backing out of it into the game's other menus (the main menu, or
++       the versus menu during a tournament fight) goes back to the page instead, once. Checked once the first-run
++       part (logos, card check) is over. */
++    if (sWebModo > 0 && !sWebPuestas && gProgress != NULL && gSaveData != NULL && !(gProgress->flags & 0x40)) {
++        sWebPuestas = 1;
++        if (sWebTiempo >= 0) {
++            *(int *)((char *)gSaveData + 0xC34) = sWebTiempo; /* rule[0]: time limit */
++        }
++        if (sWebCpu >= 0) {
++            *(int *)((char *)gSaveData + 0xC38) = sWebCpu; /* rule[1]: CPU strength */
++        }
++    }
++    if (sWebModo > 0 && !sWebFuera && gProgress != NULL && !(gProgress->flags & 0x40)) {
++        int md = gProgress->mode;
++        int ok = sWebModo == 2 ? (md == 44 || md == 45) : sWebFijo ? (md >= 39 && md <= 41) : (md >= 38 && md <= 41);
++        if (!ok) {
++            sWebFuera = 1;
++            fprintf(stderr, "bt3: web: left the mode (menu mode %d)\n", md);
++            web_fuera_del_modo(md);
++        }
++    }
++#endif
+     if (Port_NetWarp() && sNetEntered && gProgress != NULL && !(gProgress->flags & 0x40)) {
+         Port_NetArrived(); /* the logos and the card check are over: the character select is next, with picture and sound */
+     }
+diff --git a/port/src/plat_mem.c b/port/src/plat_mem.c
+index dac5c3d..827cadd 100644
+--- a/port/src/plat_mem.c
++++ b/port/src/plat_mem.c
+@@ -281,6 +281,149 @@ static void data_fail(const char *what, const char *path) {
+     exit(2);
+ }
+ 
++#ifdef BT3_WEB_SKELETON
++#include <emscripten.h>
++/* Build web sin datos del juego (port/web/gen_data_skeleton.py): las tablas vienen en blanco dentro del .wasm y
++   su lista (gWebDatos: dirección, fuente, offset, largo) va compilada en el programa en vez de en un .dat. Aquí se
++   rellenan desde el disco del jugador, igual que la release de escritorio; el hash comprueba que es el USA. */
++typedef struct { uint8_t *dir; uint32_t fuente, off, largo; } WebDato;
++extern const WebDato gWebDatos[];      /* la lista generada */
++extern const uint32_t gWebNumDatos;    /* cuántas entradas tiene */
++extern const uint64_t gWebSumaDatos;   /* el hash esperado de todos esos bytes */
++
++static void Port_LoadGameData(void) {
++    char path[1200];
++    uint8_t *elf, *src[2] = {NULL, NULL};
++    size_t elfSize = 0, srcSize[2] = {0, 0};
++    uint64_t hash = 0xCBF29CE484222325ull;   /* FNV-1a, el mismo que la release de escritorio */
++    uint32_t i, k;
++
++    snprintf(path, sizeof(path), "gamedata/disc/SLUS_216.78");   /* el programa principal, sacado de la ISO */
++    elf = read_file(path, &elfSize);
++    if (elf == NULL || elfSize < 0x34 || memcmp(elf, "\177ELF", 4) != 0) {
++        data_fail("the game's program was not found", path);
++    }
++    {   /* sus secciones cargadas, como una sola imagen desde 0x100000 (igual que la versión de escritorio) */
++        uint32_t shoff, sh[6];
++        uint16_t shentsize, shnum;
++        memcpy(&shoff, elf + 0x20, 4);
++        memcpy(&shentsize, elf + 0x2E, 2);
++        memcpy(&shnum, elf + 0x30, 2);
++        srcSize[0] = ROM_END - ROM_BASE;
++        src[0] = calloc(1, srcSize[0]);
++        for (i = 0; i < shnum && (size_t)shoff + (size_t)(i + 1) * shentsize <= elfSize; i++) {
++            memcpy(sh, elf + shoff + (size_t)i * shentsize, sizeof(sh)); /* nombre, tipo, flags, dir, offset, tamaño */
++            if ((sh[2] & 2) && sh[1] != 8 && sh[5] != 0 && sh[3] >= ROM_BASE && sh[3] + sh[5] <= ROM_END &&
++                (size_t)sh[4] + sh[5] <= elfSize) {
++                memcpy(src[0] + (sh[3] - ROM_BASE), elf + sh[4], sh[5]);
++            }
++        }
++        free(elf);
++    }
++    snprintf(path, sizeof(path), "gamedata/disc/BIN/DBZP.BIN");  /* el programa de menús */
++    src[1] = read_file(path, &srcSize[1]);
++    if (src[1] == NULL) {
++        data_fail("the game's menu program was not found", path);
++    }
++    for (i = 0; i < gWebNumDatos; i++) {     /* cada trozo: copiarlo del disco a su lugar en la tabla */
++        const WebDato *d = &gWebDatos[i];
++        if (d->fuente > 1 || (size_t)d->off + d->largo > srcSize[d->fuente]) {
++            data_fail("damaged list of the game's data", NULL);
++        }
++        memcpy(d->dir, src[d->fuente] + d->off, d->largo);
++        for (k = 0; k < d->largo; k++) {
++            hash = (hash ^ src[d->fuente][d->off + k]) * 0x100000001B3ull;
++        }
++    }
++    free(src[0]);
++    free(src[1]);
++    if (hash != gWebSumaDatos) {
++        data_fail("the game's programs in your disc image are not the unmodified USA release (SLUS-21678)", NULL);
++    }
++}
++/* En la web, leer el disco detiene el programa hasta que la página trae los bytes (JSPI), y eso solo se puede
++   dentro de main: no en los constructores, que corren antes. El enlace envuelve Game_Main (-Wl,--wrap=Game_Main,
++   port/web/link.py), la primera función del juego que llama main, para rellenar las tablas justo antes. */
++extern void __real_Game_Main(void);
++/* El entorno de una pelea en línea (BT3_NET_SESSION, HOST o JOIN, RULES...). La página lo decide recién cuando
++   el anfitrión empieza, y para entonces el programa ya cargó: Emscripten copia ENV al entorno de C al arrancar
++   el runtime, así que cambiar ENV después no sirve (el juego abría el menú principal en vez del versus). Aquí,
++   al empezar el juego y antes de que nada lea el entorno, la página entrega las variables y se ponen con
++   setenv. `Module.entornoPendiente` es una lista de pares [nombre, valor] (juegos/bt3/pagina.js). */
++EM_JS(int, web_entorno_n, (void), { return (Module.entornoPendiente || []).length; });
++EM_JS(void, web_entorno_i, (int i, char *k, int kn, char *v, int vn), {
++    const e = Module.entornoPendiente[i];
++    stringToUTF8(String(e[0]), k, kn);
++    stringToUTF8(String(e[1]), v, vn);
++});
++static void web_pone_entorno(void) {
++    char k[64], v[256];
++    int i, n = web_entorno_n();
++    for (i = 0; i < n; i++) {
++        web_entorno_i(i, k, (int)sizeof(k), v, (int)sizeof(v));
++        setenv(k, v, 1);
++    }
++}
++/* El fin de cada pelea, para la página: el juego anota el ganador en BattleResult (BattleResult_Finish, llamado
++   desde battle.c al terminar). El enlace la envuelve (-Wl,--wrap=BattleResult_Finish) y, ya anotado, le cuenta a la
++   página los bits (1 ganó el lado 0 = jugador 1 / anfitrión, 2 ganó el lado 1, 4 empate, 8 se abandonó). En una
++   pelea en línea las dos copias calculan la misma pelea, así que las dos cuentan lo mismo: el torneo de la sala
++   anota solo al ganador cuando coinciden (juegos/bt3/pagina.js, Module.onFinBatalla). */
++extern void __real_BattleResult_Finish(void);
++extern int BattleResult_GetFlags(void);
++extern int BattleResult_GetReason(void);
++EM_JS(void, web_fin_batalla, (int bits), { if (Module.onFinBatalla) Module.onFinBatalla(bits); });
++void Web_PeleaTermina(void);
++void __wrap_BattleResult_Finish(void) {
++    __real_BattleResult_Finish();   /* (el aviso ya no va aquí: ver Web_FinPelea) */
++    Web_PeleaTermina();             /* (corre al salir de la escena de la pelea, Battle_Term: se acabó su música) */
++}
++/* La música de pelea propia (juegos/bt3/pagina.js, Module.onMusicaPelea): la página sabe cuándo empieza una pelea
++   (con el número de la canción que el juego eligió) y cuándo se sale de ella; mientras su canción suena, avisa con
++   Web_BgmPropia(1) y la música del juego calla (src/sys/adx.c). Web_MusicaPorcentaje: el volumen «Music» de Ajustes,
++   para que la canción de la página lo siga. */
++extern int gWebBgmPropia, gWebEnPelea, gPortMusicPercent;
++extern void Web_BgmAplica(void);
++EM_JS(void, web_musica_pelea, (int on, int bgm), { if (Module.onMusicaPelea) Module.onMusicaPelea(on, bgm); });
++void Web_PeleaEmpieza(int bgm) {
++    gWebEnPelea = 1;
++    web_musica_pelea(1, bgm);
++}
++void Web_PeleaTermina(void) {
++    if (!gWebEnPelea) return;
++    gWebEnPelea = 0;
++    Web_BgmAplica();
++    web_musica_pelea(0, 0);
++}
++EMSCRIPTEN_KEEPALIVE void Web_BgmPropia(int on) {
++    gWebBgmPropia = on != 0;
++    Web_BgmAplica();
++}
++EMSCRIPTEN_KEEPALIVE int Web_MusicaPorcentaje(void) { return gPortMusicPercent; }
++/* La pelea se decidió (K.O., tiempo, abandono): btl_seq.c lo llama una vez, en el cuadro en que la pelea termina.
++   Antes el aviso iba en BattleResult_Finish, que corre recién al SALIR de la escena de la pelea (Battle_Term): en
++   el versus, tras el combate el juego se queda en su pantalla de resultados y su menú de revancha, el aviso no
++   llegaba, y si alguien volvía a la sala el marco se recargaba sin avisar: el duelo quedaba «sin resultado». Los
++   bits forzados que Finish agrega después (motivo 0x20 / 0x40) se agregan aquí igual. */
++/* El final se terminó de mostrar (el K.O., la pose y la frase del ganador): btl_seq.c lo llama al entrar al estado del
++   menú de resultados. La sala espera esto para devolver a los jugadores, así la celebración se ve entera. */
++EM_JS(void, web_menu_fin, (void), { if (Module.onMenuFin) Module.onMenuFin(); });
++void Web_MenuFin(void) {
++    web_menu_fin();
++}
++void Web_FinPelea(void) {
++    int w = BattleResult_GetFlags(), r = BattleResult_GetReason();
++    if (r & 0x20) w |= 2;
++    if (r & 0x40) w |= 1;
++    web_fin_batalla(w);
++}
++void __wrap_Game_Main(void) {
++    web_pone_entorno();                /* primero: lo que la página decidió para esta pelea */
++    gPortStage = "reading the game's programs from the disc image";
++    Port_LoadGameData();               /* las tablas del juego, desde la ISO del jugador */
++    __real_Game_Main();                /* y el juego, como siempre */
++}
++#else
+ static void Port_LoadGameData(void) {
+     char exe[1024], path[1200];
+     const char *root = getenv("BT3_DATA") != NULL ? getenv("BT3_DATA") : "gamedata";
+@@ -392,6 +535,7 @@ static void Port_LoadGameData(void) {
+         data_fail("the game's programs in your game data are not the unmodified USA release (SLUS-21678)", NULL);
+     }
+ }
++#endif /* BT3_WEB_SKELETON */
+ 
+ #if defined(__x86_64__)
+ /* (between the GS registers at 0x12000000 and the program at 0x20000000: see the note at STACK_BASE) */
+@@ -500,8 +644,10 @@ __attribute__((constructor)) static void Port_MapMemory(void) {
+         ExitProcess(4);
+     }
+ #endif
++#ifndef BT3_WEB_SKELETON /* (web: más tarde, en __wrap_Game_Main; aquí todavía no se puede leer el disco) */
+     gPortStage = "reading the game's programs from gamedata";
+     Port_LoadGameData();
++#endif
+     gPortStage = "reserving the game's memory";
+ #if defined(__x86_64__) && !defined(_WIN32)
+     mallopt(M_MMAP_MAX, 0);
+diff --git a/port/web/build.py b/port/web/build.py
+index 97ff781..a6658d9 100644
+--- a/port/web/build.py
++++ b/port/web/build.py
+@@ -26,7 +26,7 @@ GAME = LAX + ["-std=gnu89", "-fno-strict-aliasing", "-ffp-contract=off", "-fcomm
+         "-include", "port_libm.h", "-Iinclude", "-Iport/include", "-include", "port_compat.h"]
+ NEWLIB = LAX + ["-std=gnu89", "-fno-strict-aliasing", "-ffp-contract=off", "-fno-builtin", "-w", "-Iport/include", "-include", "newlib_shim.h"]
+ FOPEN = ["-Dfopen=Web_Fopen"]  # the port's file opens go through port/web/target/disc_*.c
+-PORTC = LAX + FOPEN + ["-std=gnu99", "-fno-strict-aliasing", "-ffp-contract=off", "-fno-builtin", "-w", "-Iinclude", "-Iport/include", "-Iport/src",
++PORTC = LAX + FOPEN + ["-DBT3_WEB_SKELETON", "-std=gnu99", "-fno-strict-aliasing", "-ffp-contract=off", "-fno-builtin", "-w", "-Iinclude", "-Iport/include", "-Iport/src",
+          "-Iport/web/include"]
+ SOFT = ["-DSF_FAST_CALLS", "-include", "math.h", "-include", "stdlib.h", "-include", "port_libm.h"]
+ HOSTC = LAX + FOPEN + ["-std=gnu99", "-fno-strict-aliasing", "-Wall", "-Wno-unused", "-Wno-misleading-indentation", "-w", f"-I{B / 'gen/gs'}",
+diff --git a/port/web/gen_data_skeleton.py b/port/web/gen_data_skeleton.py
+new file mode 100644
+index 0000000..5c56d46
+--- /dev/null
++++ b/port/web/gen_data_skeleton.py
+@@ -0,0 +1,121 @@
++#!/usr/bin/env python3
++"""Tablas de datos del juego para la build web SIN el disco: lo que hace gen_data_web.py, pero desde las tablas
++"en blanco" del port de escritorio (port/data/*.s) en vez de los archivos que splat saca del disco.
++
++Resumen: cada tabla trae solo su FORMA (etiquetas, tamaños, punteros). Sus valores son del juego y salen del disco
++del jugador al arrancar, como en la release de escritorio. Así el .wasm no contiene nada del juego y se puede
++publicar. Directivas: .space N (N bytes que vienen del disco), .zero N (ceros), .long X (puntero de 4 bytes).
++Se reescriben a ensamblador wasm (.skip / .int32, más .type/.size, que wasm exige) y por cada .space se anota
++(símbolo, desplazamiento, fuente, offset, largo) en port/build/gen/data_web/lista_datos.c; plat_mem.c lo recorre.
++Los punteros a funciones necesitan .functype (su firma, de port/build/obj_web/sigs.json, que hace build.py).
++
++Uso: port/web/gen_data_skeleton.py   -> port/build/obj_web/data_*.o y data_objects.txt (tras port/web/build.py)"""
++import json, pathlib, subprocess, sys
++
++ROOT = pathlib.Path(__file__).resolve().parents[2]
++DST = ROOT / "port/build/gen/data_web"                   # los .s generados
++OBJ = ROOT / "port/build/obj_web"                        # los objetos, junto a los del resto del programa
++WASM = {"i1": "i32", "i8": "i32", "i16": "i32", "i32": "i32", "ptr": "i32", "i64": "i64", "float": "f32", "double": "f64"}
++ABSOLUTE = {"D_3BE71C": 0x3BE71C}                       # dato en una dirección fija de la PS2 (como irweb.py)
++ROM_BASE = 0x100000                                      # la fuente 0 (SLUS_216.78) se lee como imagen desde aquí
++
++
++def functype(nombre, sig):
++    """La declaración de firma que wasm necesita para guardar un puntero a función en datos."""
++    params = [WASM.get(t, "i32") for t in sig["params"]] + (["i32"] if sig["var"] else [])  # variádicas: +1 puntero
++    res = [] if sig["ret"] == "void" else [WASM.get(sig["ret"], "i32")]
++    return f"\t.functype\t{nombre} ({', '.join(params)}) -> ({', '.join(res)})"
++
++
++def main():
++    sigs = json.load(open(OBJ / "sigs.json"))           # firmas de todas las funciones definidas en el programa
++    indice, suma = {}, None
++    for l in (ROOT / "port/data/index.txt").read_text().splitlines():
++        p = l.split()
++        if not p or p[0].startswith("#"):
++            continue
++        if p[0] == "checksum":                           # el hash de los bytes del disco: comprueba que es el USA
++            suma = int(p[1], 16)
++        else:
++            indice[p[0]] = (int(p[1]), int(p[2], 16))   # tabla -> (fuente, offset de su primer byte)
++    DST.mkdir(parents=True, exist_ok=True)
++    # Qué nombres son DATOS: las etiquetas de las propias tablas y las variables globales definidas en el C.
++    # Un nombre al que apunta una tabla y que no es ninguna de las dos cosas ni una función definida es una
++    # función de biblioteca que la build todavía no tiene (link.py le hace un stub void(void)): wasm debe saberlo.
++    datos = {l.strip()[:-1] for f in (ROOT / "port/data").glob("*.s") for l in f.read_text().splitlines()
++             if l.strip().endswith(":")}
++    for ll in OBJ.glob("*.raw.ll"):
++        for l in ll.read_text(errors="replace").splitlines():
++            if l.startswith("@") and " = " in l and "external" not in l.split(" = ")[1][:40]:
++                datos.add(l[1:].split(" ")[0].strip('"'))
++    entradas, objetos = [], []
++    for f in sorted((ROOT / "port/data").glob("*.s")):
++        fuente, off = indice.get(f.stem, (2, 0))         # las .bss no están: solo tienen ceros
++        # (el offset de index.txt ya es la posición dentro de la imagen que empieza en 0x100000, no una dirección:
++        #  make_dat.py lo usa tal cual. Restarle ROM_BASE leía cada trozo del lugar equivocado.)
++        texto = f.read_text()
++        seccion = ".bss" if "\n.section .bss" in texto else ".data"
++        cuerpo, simbolos, funcs = [], [], set()
++        for linea in texto.splitlines():
++            t = linea.split("#")[0].strip()              # sin comentarios
++            if not t:
++                continue
++            if t.startswith(".section"):                 # una sección por tabla: el enlazador las ubica libremente
++                cuerpo.append(f'\t.section\t{seccion}.{f.stem.replace(".", "_")},"",@')
++            elif t.startswith((".p2align", ".globl")):
++                cuerpo.append("\t" + t)
++            elif t.endswith(":"):                        # empieza un símbolo; su tamaño se suma después
++                simbolos.append([t[:-1], 0])
++                cuerpo += [f"\t.type\t{t[:-1]},@object", f"\t.size\t{t[:-1]}, @@{t[:-1]}@@", t]
++            elif t.startswith((".space", ".zero")):
++                n = int(t.split()[1], 0)
++                if not simbolos:                         # relleno antes del primer símbolo: le damos uno propio
++                    pad = "WebPad_" + f.stem.replace(".", "_")
++                    simbolos.append([pad, 0])
++                    cuerpo += [f"\t.globl\t{pad}", f"\t.type\t{pad},@object", f"\t.size\t{pad}, @@{pad}@@", f"{pad}:"]
++                if t.startswith(".space") and seccion == ".data":
++                    entradas.append((simbolos[-1][0], simbolos[-1][1], fuente, off, n))  # viene del disco
++                cuerpo.append(f"\t.skip\t{n}")           # reserva n bytes en cero
++                simbolos[-1][1] += n
++                off += n
++            elif t.startswith(".long"):
++                v = t.split(None, 1)[1]
++                if v in ABSOLUTE:                        # se guarda su valor, no un símbolo
++                    v = hex(ABSOLUTE[v])
++                base = v.split("+")[0].split("-")[0]
++                if base not in sigs and base not in datos and not base.lstrip("-").isdigit() and not base.startswith("0x"):
++                    sigs[base] = {"ret": "void", "params": [], "var": False}  # función que aún falta (stub)
++                if base in sigs:                         # puntero a función: índice en la tabla de funciones
++                    funcs.add(base)
++                cuerpo.append(f"\t.int32\t{v}")
++                simbolos[-1][1] += 4
++                off += 4
++            else:
++                sys.exit(f"{f.name}: directiva desconocida: {t}")
++        for nombre, tam in simbolos:                     # ahora que se saben, los tamaños
++            cuerpo = [l.replace(f"@@{nombre}@@", str(tam)) for l in cuerpo]
++        s = DST / (f.stem + ".s")
++        s.write_text("\n".join([functype(n, sigs[n]) for n in sorted(funcs)] + cuerpo) + "\n")
++        o = OBJ / f"data_{f.stem.replace('.', '_')}.o"
++        r = subprocess.run(["emcc", "-c", str(s), "-o", str(o)], capture_output=True, text=True)
++        if r.returncode:
++            sys.exit(f"FALLÓ {s.name}: {r.stderr.strip()[:600]}")
++        objetos.append(str(o))
++    # La lista para el runtime: la dirección real la pone el enlazador (&símbolo + desplazamiento).
++    c = ["/* generado por port/web/gen_data_skeleton.py: qué bytes de las tablas salen del disco */",
++         "#include <stdint.h>", "typedef struct { uint8_t *dir; uint32_t fuente, off, largo; } WebDato;"]
++    c += [f"extern uint8_t {s}[];" for s in sorted({e[0] for e in entradas})]
++    c.append("const WebDato gWebDatos[] = {")
++    c += [f"    {{{s} + {d}, {fu}, 0x{o:X}, {n}}}," for s, d, fu, o, n in entradas]
++    c += ["};", f"const uint32_t gWebNumDatos = {len(entradas)};", f"const uint64_t gWebSumaDatos = 0x{suma:X}ull;"]
++    lc = DST / "lista_datos.c"
++    lc.write_text("\n".join(c) + "\n")
++    o = OBJ / "data_lista.o"
++    subprocess.run(["emcc", "-c", "-O2", str(lc), "-o", str(o)], check=True)
++    objetos.append(str(o))
++    (OBJ / "data_objects.txt").write_text("\n".join(objetos) + "\n")
++    print(f"{len(objetos)} objetos de datos; {len(entradas)} trozos ({sum(e[4] for e in entradas)} bytes) salen del disco")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/port/web/link.py b/port/web/link.py
+index c699272..a14ea77 100644
+--- a/port/web/link.py
++++ b/port/web/link.py
+@@ -18,7 +18,7 @@ GLOBAL_BASE = 0x12100000
+ 
+ COMMON = [f"-sGLOBAL_BASE={GLOBAL_BASE}", "-sSTACK_SIZE=16MB", "-sINITIAL_MEMORY=640MB", "-sALLOW_MEMORY_GROWTH=1",
+           "-sMAXIMUM_MEMORY=2048MB", "--use-port=sdl3", "-O3", "-sEXIT_RUNTIME=1", "--profiling-funcs", "-sEMULATE_FUNCTION_POINTER_CASTS=1",
+-          "-Wl,--wrap=Progress_Main"]  # as the native link: the game's mode dispatcher goes through headless.c
++          "-Wl,--wrap=Progress_Main", "-Wl,--wrap=Game_Main", "-Wl,--wrap=BattleResult_Finish"]  # as the native link: the game's mode dispatcher goes through headless.c
+ WEB = ROOT / "port/web"
+ WEB_COMMON = ["-sENVIRONMENT=web", "-sMAX_WEBGL_VERSION=2", "-sMIN_WEBGL_VERSION=2", "-lidbfs.js",
+               "-sFORCE_FILESYSTEM=1", "-sINVOKE_RUN=0", "-sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,IDBFS",
+diff --git a/port/web/src/web_cxa.c b/port/web/src/web_cxa.c
+new file mode 100644
+index 0000000..d2bf244
+--- /dev/null
++++ b/port/web/src/web_cxa.c
+@@ -0,0 +1,16 @@
++/* Las dos funciones del runtime de C++ que usan las variables "static" locales de ui.cpp para inicializarse una
++   sola vez. El enlace es con emcc (C), no em++, así que no vienen solas. El programa web tiene un solo hilo:
++   basta con mirar y marcar el primer byte de la "guarda" que el compilador reserva para cada variable. */
++#include <stdint.h>
++
++int __cxa_guard_acquire(uint64_t *guarda) {
++    return *(volatile uint8_t *)guarda == 0;   /* 1 = aún no inicializada: el que llama la inicializa ahora */
++}
++
++void __cxa_guard_release(uint64_t *guarda) {
++    *(volatile uint8_t *)guarda = 1;           /* ya está inicializada: las próximas veces no se repite */
++}
++
++void __cxa_guard_abort(uint64_t *guarda) {
++    (void)guarda;                              /* la inicialización falló: se deja sin marcar para reintentar */
++}
+diff --git a/port/web/target/yield_web.c b/port/web/target/yield_web.c
+index 9df3aa8..89643e2 100644
+--- a/port/web/target/yield_web.c
++++ b/port/web/target/yield_web.c
+@@ -44,7 +44,14 @@ void Web_SleepMs(double ms) {
+     }
+ }
+ 
++/* paginita-pro: a picture was just drawn, and the canvas still holds it (the browser has not shown it yet). The page
++   copies it from here, small, for whoever watches the fight live (Module.onCuadro, only set while someone watches). */
++EM_JS(void, web_cuadro, (void), {
++    if (Module.onCuadro) Module.onCuadro();
++});
++
+ void Web_FrameDone(void) {
++    web_cuadro();
+     sPresents++;
+     if (emscripten_get_now() - sLastYield > 20.0) {
+         Web_SleepMs(0);
+diff --git a/src/battle/battle_load.c b/src/battle/battle_load.c
+index 9794ea9..5783e8d 100644
+--- a/src/battle/battle_load.c
++++ b/src/battle/battle_load.c
+@@ -1989,9 +1989,18 @@ void BattleSide_SetMemberItems(s32 side, s32 idx, BattleItemSet *items) {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c: the room's tier rule leaves it out */
++#endif
+ /* 1 when character id is in the side's usable-character bits. */
+ s32 BattleSide_IsCharaUsable(s32 side, s32 chara) {
+     u64 *bits = Side(side)->charaBits.bits;
+ 
++#ifdef __EMSCRIPTEN__
++    if (Web_Vetado(chara)) {
++        return 0; /* paginita-pro: no transforming or fusing into a form the room's tier rule leaves out */
++    }
++#endif
++
+     return (bits[chara / 64] >> (chara % 64)) & 1;
+ }
+diff --git a/src/battle/battle_work.c b/src/battle/battle_work.c
+index 3602cb9..90de2d1 100644
+--- a/src/battle/battle_work.c
++++ b/src/battle/battle_work.c
+@@ -55,6 +55,12 @@ void Battle_ResetWork(void) {
+     BattleReplay_ClearDataFlag();
+     BattleResult_Clear();
+     BtlEvent_Reset();
++#ifdef __EMSCRIPTEN__
++    {
++        extern void Web_PeleaEmpieza(int bgm); /* plat_mem.c: paginita-pro, la música de pelea propia */
++        Web_PeleaEmpieza(Battle_GetBgm());
++    }
++#endif
+ #ifdef PORT
+     Bgm_Play(PORT_BGM_FILE(Battle_GetBgm())); /* (a song added from outside the disc has a file id of its own) */
+ #else
+diff --git a/src/battle/btl_seq.c b/src/battle/btl_seq.c
+index c072e01..3e59dca 100644
+--- a/src/battle/btl_seq.c
++++ b/src/battle/btl_seq.c
+@@ -1344,6 +1344,12 @@ s32 BtlSeqFight_Update(BtlSeqWaitCtx *ctx) {
+         }
+     }
+     if (BtlSeq_CheckBattleEnd()) {
++#ifdef __EMSCRIPTEN__
++        {
++            extern void Web_FinPelea(void); /* plat_mem.c */
++            Web_FinPelea(); /* paginita-pro: the page learns the winner now, when the fight ends, not when the scene is left */
++        }
++#endif
+         if (Battle_GetMode() == 7) {
+             return 6;
+         }
+@@ -1414,6 +1420,12 @@ s32 BtlSeq_IsModeZero(void) {
+ 
+ /* State 6 enter: mode 0 with a finished battle opens the result menu (step 0); otherwise starts the 1.2 s fade out (step 1). */
+ s32 BtlSeqEnd_Enter(BtlSeqWaitCtx *ctx) {
++#ifdef __EMSCRIPTEN__
++    {
++        extern void Web_MenuFin(void); /* plat_mem.c */
++        Web_MenuFin(); /* paginita-pro: the finish and the winner's scene are over: the room may take the players back now */
++    }
++#endif
+     Battle_GetWork()->flags |= BATTLE_FLAG_DEMO;
+     if (BattleResult_IsAborted()) {
+         Fade_Start(0, 0, 1.0f);
+diff --git a/src/battle/view_a_e.c b/src/battle/view_a_e.c
+index 3e0f86f..2b9066e 100644
+--- a/src/battle/view_a_e.c
++++ b/src/battle/view_a_e.c
+@@ -760,7 +760,14 @@ void StgGrid_MoveUp(s32 *ids, s32 *col, s32 *row, s32 rows) {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c */
++/* paginita-pro: a character the room's tier rule leaves out is treated as one not unlocked yet: its forms leave the
++   form lists and a cell left with none becomes the locked chip, which the cursor skips (and random never draws) */
++#define CHARA_UNLOCKED(id) ((s32)((SAVE_CHARA_WORD(gSaveData, id) >> ((id) % 64)) & 1) && !Web_Vetado(id))
++#else
+ #define CHARA_UNLOCKED(id) ((s32)((SAVE_CHARA_WORD(gSaveData, id) >> ((id) % 64)) & 1))
++#endif
+ 
+ /* Build flags of ChrGrid_Build. */
+ #define CHRGRID_ALL 1        /* no unlock test (never set here) */
+@@ -810,7 +817,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+         if (in[i].formCount != 0) {
+             out[*outCount].formCount = 0;
+             for (j = 0; j < in[i].formCount; j++) {
++#ifdef __EMSCRIPTEN__
++                if (((flags & CHRGRID_ALL) && !Web_Vetado(in[i].form[j])) || CHARA_UNLOCKED(in[i].form[j])) {
++#else
+                 if ((flags & CHRGRID_ALL) || CHARA_UNLOCKED(in[i].form[j])) {
++#endif
+                     out[*outCount].form[out[*outCount].formCount] = in[i].form[j];
+                     out[*outCount].formCount++;
+                 }
+@@ -848,7 +859,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+                 }
+                 break;
+             default:
++#ifdef __EMSCRIPTEN__
++                if (((flags & CHRGRID_ALL) && !Web_Vetado(in[i].id)) || CHARA_UNLOCKED(in[i].id)) {
++#else
+                 if ((flags & CHRGRID_ALL) || CHARA_UNLOCKED(in[i].id)) {
++#endif
+                     out[*outCount] = in[i];
+                 } else {
+                     out[*outCount].id = CHRGRID_ID_LOCKED;
+@@ -874,7 +889,11 @@ void ChrGrid_Build(s32 *outCount, ChrGridCell *out, s32 *inCount, ChrGridCell *i
+         for (i = 0; i < SAVE_REC_COUNT; i++) {
+             custom[i].id = CHRGRID_ID_LOCKED;
+             custom[i].formCount = 0;
+-            if (gSaveData->rec[i].chara >= 0) {
++            if (gSaveData->rec[i].chara >= 0
++#ifdef __EMSCRIPTEN__
++                && !Web_Vetado(gSaveData->rec[i].chara) /* paginita-pro: nor as a saved custom character */
++#endif
++            ) {
+                 for (j = 0; j < *inCount; j++) {
+                     if (gSaveData->rec[i].chara == in[j].id) {
+                         custom[i] = out[j];
+diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
+index d61fdeb..4933f1a 100644
+--- a/src/menu/menu_c_e.c
++++ b/src/menu/menu_c_e.c
+@@ -42,6 +42,11 @@ CharSel *gCharSel = NULL;
+ 
+ extern void TextBox_Init(MTextBox *box, void *text, u32 preset);
+ extern void TextBox_SetUnk80(MTextBox *box, s32 value);
++#ifdef __EMSCRIPTEN__
++extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
++extern void Web_Seleccion(int abierta);                /* headless.c */
++extern void Web_Elegidos(const int *ids, int n);       /* headless.c */
++#endif
+ extern void TextBox_AttachLine(MFlash *flash, MFlashRef *ref, s32 x, s32 y, s32 line, MTextBox *box);
+ extern void Flash_ClipSetOffset(MFlash *flash, MFlashRef *ref, s32 x, s32 y);
+ extern void IconWin_SetIcon(s32 icon);
+@@ -524,6 +529,10 @@ void CharSel_Init(s32 section) {
+ 
+     gCharSel->nameText = MPACK_AT(gCharSel->res, 43);
+     gCharSel->formText = MPACK_AT(gCharSel->res, 44);
++#ifdef __EMSCRIPTEN__
++    Web_Catalogo(gCharSel->nameText, gCharSel->formText); /* paginita-pro: the names, for the room's tier rule */
++    Web_Seleccion(1);
++#endif
+     gCharSel->chipPack = (u32 *)MPACK_AT(gCharSel->res, 45);
+     for (i = 0; i < MCHR_CELL_MAX; i++) {
+         CS_RES(gCharSel->chipPack, i + 1);
+@@ -754,6 +763,13 @@ void CharSel_Init(s32 section) {
+ void CharSel_Term(void) {
+     s32 i;
+ 
++#ifdef __EMSCRIPTEN__
++    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++    {
++        int elegidos[2] = { gCharSel->side[0]->picked, gCharSel->side[1]->picked };
++        Web_Elegidos(elegidos, 2); /* paginita-pro: their voice lines are fetched ahead */
++    }
++#endif
+ #ifdef PORT
+     gUiNameIdx = -1; /* drop the port's name overlays */
+     gUiSongIdx = -1;
+@@ -805,6 +821,33 @@ void CharSel_Term(void) {
+ 
+ /* Draws the screen: the stage picture cross fade, then the labels, texture rectangles and visibility of every
+    clip of the five movies are set from the state, the movies are drawn, then the windows and the side panels. */
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara); /* headless.c */
++/* paginita-pro: whether a chip of side `n` is drawn dark: a form the room's rule leaves out, or a grid cell whose
++   forms are all out (a cell with some allowed form stays lit; its banned forms go dark when it is opened). */
++static s32 CharSel_WebApagado(s32 n, s32 id) {
++    s32 k, f;
++
++    if (id < 0 || id > 0xA0 || !Web_Vetado(id)) {
++        return 0;
++    }
++    if (gCharSel->side[n]->flags & CHARSEL_SIDE_FORMS) {
++        return 1;
++    }
++    for (k = 0; k < gCharSel->masterCount[n]; k++) {
++        if (gCharSel->cells[n][k].id == id) {
++            for (f = 0; f < gCharSel->cells[n][k].formCount; f++) {
++                if (!Web_Vetado(gCharSel->cells[n][k].form[f])) {
++                    return 0;
++                }
++            }
++            break;
++        }
++    }
++    return 1;
++}
++#endif
++
+ void CharSel_Draw(void) {
+     MFlashRef ref;
+     MFlashUv uv;
+@@ -1172,6 +1215,14 @@ void CharSel_Draw(void) {
+             sprintf(name, "mc_chara_chip_%03d", j);
+             Flash_FindLabel(f, NULL, name, &ref);
+             Flash_ClipSetFlags(f, &ref, 0x80, (u8)gCharSel->side[i]->mask);
++#ifdef __EMSCRIPTEN__
++            /* paginita-pro: a chip the room's tier rule leaves out is drawn dark (chips 0..6 show the reel, 7..13
++               the reel it is replacing); the colour reaches the clip's children */
++            Flash_ClipSetColor(f, &ref,
++                               CharSel_WebApagado(i, j < 7 ? gCharSel->side[i]->chip[j] : gCharSel->side[i]->prevChip[j - 7])
++                                   ? 0.3f
++                                   : 1.0f);
++#endif
+         }
+     }
+ 
+@@ -1214,6 +1265,39 @@ void CharSel_Update(void) {
+ }
+ 
+ /* The side a pad is choosing for, its number and its movies. */
++#ifdef __EMSCRIPTEN__
++extern int Web_ComAzar(void); /* headless.c */
++extern int Web_Vetado(int chara); /* headless.c: the room's tier rule leaves this character out */
++/* paginita-pro: the random cell's draw (a cell that is a character, then one of its forms), skipping what the room's
++   rule leaves out. With no rule it draws exactly as the original loop. */
++static s32 CharSel_WebSorteo(s32 n, s32 *cell) {
++    s32 k, id, chara, tries;
++    for (tries = 0;; tries++) {
++        k = Rand_Range(gCharSel->masterCount[n]);
++        id = gCharSel->cells[n][k].id;
++        if (id >= MCHR_RANDOM) {
++            continue;
++        }
++        chara = id;
++        if (gCharSel->cells[n][k].formCount != 0) {
++            chara = gCharSel->cells[n][k].form[Rand_Range(gCharSel->cells[n][k].formCount)];
++        }
++        if (!Web_Vetado(chara) || tries > 4000) {
++            *cell = k;
++            return chara;
++        }
++    }
++}
++/* paginita-pro: side `n` gets a character drawn at random (one of its forms too), with no items, and is done. */
++static void CharSel_WebAzar(s32 n) {
++    s32 k, chara = CharSel_WebSorteo(n, &k);
++    gCharSel->side[n]->picked = chara;
++    gCharSel->side[n]->chara = chara;
++    memset(&gCharSel->side[n]->items, 0, 0x10);
++    gCharSel->side[n]->state = CHARSEL_ST_DONE;
++    CharSel_RequestFace(n);
++}
++#endif
+ #define CS_N (i + gCharSel->turn)
+ #define CS_SIDE (gCharSel->side[CS_N])
+ #define CS_REEL (&gCharSel->flash[1 + CS_N])
+@@ -1489,7 +1573,13 @@ void CharSel_Input(s32 *running) {
+                     CharSel_RequestFace(CS_N);
+                     CS_SIDE->state = CHARSEL_ST_FORM;
+                     Snd_PlaySe(2, 0x29);
+-                } else {
++                }
++#ifdef __EMSCRIPTEN__
++                else if (Web_Vetado(CS_SIDE->chara)) {
++                    Snd_PlaySe(1, 7); /* paginita-pro: the room's tier rule leaves this one out */
++                }
++#endif
++                else {
+                     Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
+                     CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_ok");
+                     gCharSel->customRows[CS_N] = 4;
+@@ -1540,7 +1630,13 @@ void CharSel_Input(s32 *running) {
+                 CS_SIDE->chara = CS_SIDE->chip[CS_SIDE->form];
+                 CharSel_RequestFace(CS_N);
+                 Snd_PlaySe(2, 0);
+-            } else if (gPad[i].gamePressed & 0x200) {
++            }
++#ifdef __EMSCRIPTEN__
++            else if ((gPad[i].gamePressed & 0x200) && Web_Vetado(CS_SIDE->chara)) {
++                Snd_PlaySe(1, 7); /* paginita-pro: the room's tier rule leaves this form out */
++            }
++#endif
++            else if (gPad[i].gamePressed & 0x200) {
+                 Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
+                 CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_FORM_CHIP, "fl_ok");
+                 if (CS_SIDE->flags & CHARSEL_SIDE_CUSTOM) {
+@@ -1707,6 +1803,9 @@ void CharSel_Input(s32 *running) {
+                 } else {
+                     if (CS_CELL.id == MCHR_RANDOM) {
+                         /* the random cell: draw a cell that is a character, then one of its forms */
++#ifdef __EMSCRIPTEN__
++                        chara = CharSel_WebSorteo(CS_N, &n); /* paginita-pro: never one the room's rule leaves out */
++#else
+                         for (;;) {
+                             n = Rand_Range(gCharSel->masterCount[CS_N]);
+                             id = gCharSel->cells[CS_N][n].id;
+@@ -1718,6 +1817,7 @@ void CharSel_Input(s32 *running) {
+                         if (gCharSel->cells[CS_N][n].formCount != 0) {
+                             chara = gCharSel->cells[CS_N][n].form[Rand_Range(gCharSel->cells[CS_N][n].formCount)];
+                         }
++#endif
+                         CS_SIDE->picked = chara;
+                     } else {
+                         CS_SIDE->picked = CS_SIDE->chip[CS_SIDE->col];
+@@ -1731,6 +1831,13 @@ void CharSel_Input(s32 *running) {
+                     CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_off_start");
+                 }
+                 CS_SIDE->state = CHARSEL_ST_DONE;
++#ifdef __EMSCRIPTEN__
++                if (gCharSel->players == 0 && gCharSel->turn == 0 && Web_ComAzar()) {
++                    /* paginita-pro (a tournament fight against the CPU): the CPU's fighter is drawn at random, as the
++                       random cell does, instead of the pad choosing it */
++                    CharSel_WebAzar(1);
++                } else
++#endif
+                 if (gCharSel->players != 1 && gCharSel->turn == 0) {
+                     /* one pad: now choose for the other side */
+                     gCharSel->turn = 1;
+@@ -1797,7 +1904,13 @@ void CharSel_Input(s32 *running) {
+                     CharSel_RequestFace(CS_N);
+                     CS_SIDE->state = CHARSEL_ST_FORM;
+                     Snd_PlaySe(2, 0x29);
+-                } else {
++                }
++#ifdef __EMSCRIPTEN__
++                else if (Web_Vetado(CS_SIDE->chara)) {
++                    Snd_PlaySe(1, 7); /* paginita-pro: the room's tier rule leaves this one out */
++                }
++#endif
++                else {
+                     Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
+                     CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CUSTOM_CHIP, "fl_ok");
+                     gCharSel->customRows[CS_N] = 2;
+diff --git a/src/menu/menu_e_b.c b/src/menu/menu_e_b.c
+index 04ba62e..c5c1b85 100644
+--- a/src/menu/menu_e_b.c
++++ b/src/menu/menu_e_b.c
+@@ -69,11 +69,23 @@ void TeamSel_SumCost(s32 side, s32 skipCur) {
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_Vetado(int chara);                      /* headless.c: the room's tier rule leaves it out */
++extern void Web_Catalogo(void *nombres, void *formas); /* headless.c */
++extern void Web_Seleccion(int abierta);                /* headless.c */
++extern void Web_Elegidos(const int *ids, int n);       /* headless.c */
++#endif
++
+ /* Returns 0 if another member of the side's team is the same person as `chara` (a form of the same character). */
+ s32 TeamSel_IsCharaFree(s32 side, s32 chara) {
+     s32 ok = 1;
+     s32 i;
+ 
++#ifdef __EMSCRIPTEN__
++    if (Web_Vetado(chara)) {
++        return 0; /* paginita-pro: out by the room's tier rule (greyed, refused, never drawn at random) */
++    }
++#endif
+     for (i = 0; i < gTeamSel->side[side]->memberCount; i++) {
+         if (i != gTeamSel->side[side]->cur) {
+             if (ChrTbl_IsRelated(chara, gTeamSel->side[side]->member[i].chara)) {
+@@ -97,6 +109,57 @@ s32 TeamSel_FitsDp(s32 side, s32 chara) {
+     return gTeamSel->side[side]->cost + ChrTbl_GetCost(chara) <= w->dpMax;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++extern int Web_ComAzar(void);    /* headless.c */
++extern int Web_EquipoMax(void);  /* headless.c: 3 for the site's 3 vs 3 team battle, else 5 */
++/* paginita-pro: most members a team may have (TS_MEMBER_MAX, or fewer for the site's 3 vs 3; DP battles keep 5). */
++static s32 TeamSel_Max(void) {
++    return gTeamSel->battleType == 2 ? TS_MEMBER_MAX : Web_EquipoMax();
++}
++/* paginita-pro: side `n` (the CPU's) gets a team drawn at random, as the random cell draws: `count` members (the
++   pad's team size), none the same person twice, within the DP limit in a DP battle; then it is done. */
++static void TeamSel_WebAzar(s32 n, s32 count) {
++    TeamSelSide *sd = gTeamSel->side[n];
++    s32 tries, idx, chara;
++    sd->memberCount = 0;
++    sd->cost = 0;
++    while (sd->memberCount < count) {
++        sd->cur = sd->memberCount;
++        for (tries = 0; tries < 400; tries++) {
++            for (;;) {
++                idx = Rand_Range(gTeamSel->masterCount[n]);
++                if (gTeamSel->cells[n][idx].id < TS_RANDOM) {
++                    chara = gTeamSel->cells[n][idx].id;
++                    break;
++                }
++            }
++            if (gTeamSel->cells[n][idx].formCount != 0) {
++                chara = gTeamSel->cells[n][idx].form[Rand_Range(gTeamSel->cells[n][idx].formCount)];
++            }
++            if (TeamSel_IsCharaFree(n, chara) && TeamSel_FitsDp(n, chara)) {
++                break;
++            }
++        }
++        if (tries == 400) {
++            break; /* (nothing else fits the DP left: the team stays smaller) */
++        }
++        memset(&sd->member[sd->memberCount], 0, sizeof(TsMember));
++        sd->member[sd->memberCount].chara = chara;
++        sd->memberCount++;
++        TeamSel_SumCost(n, 0);
++    }
++    if (sd->memberCount == 0) { /* (cannot happen: any one character fits) */
++        sd->member[0].chara = gTeamSel->side[n ^ 1]->member[0].chara;
++        sd->memberCount = 1;
++    }
++    sd->cur = TS_CUR_MENU;
++    sd->chara = sd->member[0].chara;
++    TeamSel_SetTeamTex(n);
++    TeamSel_RequestFace(n);
++    sd->state = TEAMSEL_ST_DONE;
++}
++#endif
++
+ /* Takes member `idx` out of a side's team: the members behind it move up and the last slot is emptied. */
+ void TeamSel_RemoveMember(s32 side, s32 idx) {
+     s32 i;
+@@ -605,6 +668,10 @@ void TeamSel_Init(s32 section) {
+     gTeamSel->unk3EA0 = MPACK_AT(gCommonRes->data[2], 2);
+     gTeamSel->nameText = MPACK_AT(gTeamSel->res, 43);
+     gTeamSel->formText = MPACK_AT(gTeamSel->res, 44);
++#ifdef __EMSCRIPTEN__
++    Web_Catalogo(gTeamSel->nameText, gTeamSel->formText); /* paginita-pro: the names, for the room's tier rule */
++    Web_Seleccion(1);
++#endif
+     gTeamSel->chipPack = (u32 *)MPACK_AT(gTeamSel->res, 45);
+     for (i = 0; i < TS_CELL_MAX; i++) {
+         res = (MTexRes *)MPACK_AT(gTeamSel->chipPack, i + 1);
+@@ -746,6 +813,18 @@ void TeamSel_Init(s32 section) {
+ void TeamSel_Term(void) {
+     s32 i;
+ 
++#ifdef __EMSCRIPTEN__
++    Web_Seleccion(0); /* paginita-pro: the page hides its list of banned characters */
++    {
++        int elegidos[2 * TS_MEMBER_MAX], n = 0, k, m;
++        for (k = 0; k < 2; k++) {
++            for (m = 0; m < gTeamSel->side[k]->memberCount && m < TS_MEMBER_MAX; m++) {
++                elegidos[n++] = gTeamSel->side[k]->member[m].chara;
++            }
++        }
++        Web_Elegidos(elegidos, n); /* paginita-pro: their voice lines are fetched ahead */
++    }
++#endif
+     IconWin_Term();
+     ItemHelp_Term();
+     ItemPanel_Term(1);
+@@ -1722,6 +1801,11 @@ f32 TeamSel_Input(s32 *result) {
+                         /* it was a new member: the cursor goes to the next free slot */
+                         CUR_SIDE->memberCount = CUR_SIDE->cur + 1;
+                         CUR_SIDE->cur = CUR_SIDE->memberCount;
++#ifdef __EMSCRIPTEN__
++                        if (CUR_SIDE->memberCount >= TeamSel_Max()) {
++                            CUR_SIDE->cur = TS_CUR_MENU; /* paginita-pro: the team is full (3 vs 3): on to the plate */
++                        }
++#endif
+                     }
+                     TeamSel_SetTeamTex(CUR_N);
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+@@ -1755,6 +1839,11 @@ f32 TeamSel_Input(s32 *result) {
+                     } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
+                         CUR_SIDE->cur = CUR_SIDE->memberCount;
+                     }
++#ifdef __EMSCRIPTEN__
++                    if (CUR_SIDE->cur != TS_CUR_MENU && CUR_SIDE->cur >= TeamSel_Max()) {
++                        CUR_SIDE->cur = TeamSel_Max() - 1; /* paginita-pro: no free slot past a full team */
++                    }
++#endif
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+                     if (CUR_SIDE->cur == TS_CUR_MENU) {
+                         CUR_SIDE->chara = CUR_SIDE->member[0].chara;
+@@ -1771,6 +1860,11 @@ f32 TeamSel_Input(s32 *result) {
+                     } else if (CUR_SIDE->cur > CUR_SIDE->memberCount) {
+                         CUR_SIDE->cur = TS_CUR_MENU;
+                     }
++#ifdef __EMSCRIPTEN__
++                    if (CUR_SIDE->cur != TS_CUR_MENU && CUR_SIDE->cur >= TeamSel_Max()) {
++                        CUR_SIDE->cur = TS_CUR_MENU; /* paginita-pro: no free slot past a full team */
++                    }
++#endif
+                     TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_on_start");
+                     if (CUR_SIDE->cur == TS_CUR_MENU) {
+                         CUR_SIDE->chara = CUR_SIDE->member[0].chara;
+@@ -1793,11 +1887,24 @@ f32 TeamSel_Input(s32 *result) {
+                         gTeamSel->backup[CUR_N] = CUR_MEMBER;
+                         CUR_SIDE->state = TEAMSEL_ST_GRID;
+                         Snd_PlaySe(1, 1);
+-                    } else if (CUR_SIDE->memberCount != 0) {
++                    }
++#ifdef __EMSCRIPTEN__
++                    else if (TeamSel_Max() < TS_MEMBER_MAX && CUR_SIDE->memberCount != TeamSel_Max()) {
++                        Snd_PlaySe(1, 7); /* paginita-pro: a 3 vs 3 team has exactly three */
++                    }
++#endif
++                    else if (CUR_SIDE->memberCount != 0) {
+                         /* the team is complete */
+                         Flash_GotoLabel(&gTeamSel->flash[CUR_N + 1], "fl_out", 1);
+                         TeamSel_ClipGoto(CUR_N + 1, CUR_N, TEAMSEL_CLIP_TEAM, "fl_ok");
+                         CUR_SIDE->state = TEAMSEL_ST_DONE;
++#ifdef __EMSCRIPTEN__
++                        if (gTeamSel->players == 0 && gTeamSel->base == 0 && Web_ComAzar()) {
++                            /* paginita-pro (a tournament fight against the CPU): the CPU's team is drawn at random,
++                               as big as the pad's, instead of the pad choosing it */
++                            TeamSel_WebAzar(1, CUR_SIDE->memberCount);
++                        } else
++#endif
+                         if (gTeamSel->players != TEAMSEL_PLAYERS_TWO && gTeamSel->base == 0) {
+                             /* one pad: it goes on to the second team */
+                             gTeamSel->base = 1;
+diff --git a/src/sys/adx.c b/src/sys/adx.c
+index 4f5825f..d91c952 100644
+--- a/src/sys/adx.c
++++ b/src/sys/adx.c
+@@ -18,6 +18,16 @@ extern s32 BtlScript_IsSlotBusy(s32 voice, s32 kind); /* D_00334788[voice][kind]
+ 
+ #define ADX_CLAMP(x, lo, hi) ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : (x))
+ 
++#ifdef __EMSCRIPTEN__
++/* paginita-pro: la música de pelea propia (juegos/bt3/pagina.js). Mientras dura una pelea (gWebEnPelea, de
++   Battle_ResetWork a Battle_Term) y la página tiene su canción sonando (gWebBgmPropia), el reproductor de la música
++   (BGM) queda mudo; el sonido del escenario (MAP), las voces y los golpes siguen. El volumen pedido se guarda
++   (sWebBgmVol) para devolverlo cuando la página para. Solo el sonido: la pelea es la misma. */
++int gWebBgmPropia = 0, gWebEnPelea = 0;
++static s32 sWebBgmVol = 0x40;
++void Web_BgmAplica(void);
++#endif
++
+ extern AdxPlayer gAdxPlayerTbl[];
+ extern s32 gAdxChannelGainTbl[];
+ extern AdxSaveView *gSaveData;
+@@ -27,6 +37,14 @@ s32 Adx_CalcOutVol(s32 ch, s32 vol) {
+     s32 kind;
+     s32 v;
+ 
++#ifdef __EMSCRIPTEN__
++    if (ch == ADX_CH_BGM) {
++        sWebBgmVol = vol;
++        if (gWebBgmPropia && gWebEnPelea) {
++            return ADX_OUTVOL_MUTE;
++        }
++    }
++#endif
+     switch (ch) {
+     case ADX_CH_BGM:
+     case ADX_CH_MAP:
+@@ -229,6 +247,13 @@ void Adx_SetMono(s32 mono) {
+     ADXT_SetOutputMono(mono != 0);
+ }
+ 
++#ifdef __EMSCRIPTEN__
++/* Vuelve a poner el volumen de la música con lo que dicen gWebBgmPropia y gWebEnPelea (plat_mem.c los cambia). */
++void Web_BgmAplica(void) {
++    ADXT_SetOutVol(gAdxPlayerTbl[ADX_CH_BGM].adxt, Adx_CalcOutVol(ADX_CH_BGM, sWebBgmVol));
++}
++#endif
++
+ /* Plays music file `id` on the BGM player. */
+ void Bgm_PlayEx(s32 id, s32 vol, s32 pan) {
+     Adx_Play(ADX_CH_BGM, id, vol, pan);

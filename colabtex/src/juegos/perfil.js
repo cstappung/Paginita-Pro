@@ -33,6 +33,7 @@ export const COLORES = [
 import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
 import { avatarMarco, tarjetaHtml, capaFondo } from "./perfil-vista.js";
 import { PRECIO_TIENDA } from "./tienda.js";
+import { juegoOculto } from "./ocultos.js";   // (BT3 es privado: ni su premio de campeón a quien no lo ve)
 import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
 
@@ -269,7 +270,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const grupos = (lista, actual, attr, dentro) => [
       ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top))],
       [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda)],
-      ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
+      ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top && !juegoOculto(it.req.top)).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
     ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
     $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));
     $("#pfFondos").innerHTML = grupos(FONDOS, fondo, "fondo", o => `<span class="jg-ped-muestra" style="background:${esc(o.css(color))}">${capaFondo(o)}</span>`);

@@ -101,6 +101,76 @@ export const boxhead=etapa=>{
  else {c=cabeza(120,125,C.azul,'→')+cabeza(330,125,C.rojo,'←')+line(134,125,316,125,C.oro,3)+txt(120,170,'A: 9',16,C.azul,'middle')+txt(330,170,'B: 7',16,C.rojo,'middle')+txt(240,215,'Meta: 10 bajas',16,C.oro,'middle');}
  return svg(nombres[etapa],suelo+c);
 };
+/* BT3: las pantallas de verdad, dibujadas en chico. `escena` dice cuál: la sala del duelo, la pelea (barras de vida y
+   reloj), el K.O., el marcador con la revancha, dar la victoria; los inscritos del torneo, la llave (arrastrar, el
+   ganador que sube, la copa), los personajes con candado y el menú de un jugador. Fondo azul noche y naranja de la sala. */
+const B3={naranja:'#ff8a00',noche:'#101a33',caja:'#1c2a4f',borde:'#3a5aa8',vida:'#f5c400',ki:'#4fc3ff'};
+const b3cara=(x,y,col,letra,r=15)=>circle(x,y,r,col,'#0b1226')+txt(x,y+5,letra,r>12?14:11,'#0b1226','middle');
+const b3boton=(x,y,w,t,fill=B3.naranja,col='#2a1300')=>rect(x,y,w,30,fill,'#ffd18a',15)+txt(x+w/2,y+20,t,14,col,'middle');
+const b3ficha=(x,y,w,t,on)=>rect(x,y,w,24,on?B3.naranja:'#24345f',on?'#ffd18a':B3.borde,12)+txt(x+w/2,y+16,t,12,on?'#2a1300':C.blanco,'middle');
+const b3slot=(x,y,w,nom,col,extra='')=>rect(x,y,w,28,B3.caja,B3.borde,6)+(col?b3cara(x+16,y+14,col,nom[0],10):circle(x+16,y+14,10,'#24345f',B3.borde))+txt(x+32,y+19,nom,12,col?C.blanco:C.gris)+extra;
+const b3barra=(x,y,w,p,der)=>rect(x,y,w,12,'#2b0d12','#000',3)+`<rect x="${der?x+w-w*p:x}" y="${y+1}" width="${w*p}" height="10" rx="2" fill="${B3.vida}"/>`;
+export const bt3=escena=>{
+ const N={vest:'La sala del duelo: los dos con el disco listo, el anfitrión elige las reglas',pelea:'La pelea: barras de vida, ki y el reloj del round',
+  ko:'K.O.: el juego anota solo al ganador',marcador:'De vuelta en la sala: el marcador y la revancha',dar:'Dar la victoria: dos clics para confirmar',
+  inscritos:'Los inscritos del torneo y las CPU para completar',arrastra:'La llave: arrastra a un peleador sobre otro para cambiarlos',
+  avanza:'El ganador sube a la ronda siguiente',copa:'El campeón se lleva la copa',vetos:'Los vetados salen con candado en la selección',
+  modos:'Un jugador: el menú de modos y la dificultad',cpu:'Contra la CPU: la batalla, el tiempo y Jugar'};
+ let c='';
+ if(escena==='vest'){
+  const carta=(x,col,nom,rol)=>rect(x,28,150,118,B3.caja,col,12)+b3cara(x+75,62,col,nom[0],20)+txt(x+75,102,nom,16,C.blanco,'middle')+txt(x+75,120,rol,12,C.oro,'middle')+txt(x+75,138,'● Disco listo',12,C.verde,'middle');
+  c=carta(40,B3.naranja,'Ana','👑 Anfitrión · J1')+carta(290,'#5689e5','Beto','J2')+txt(240,96,'VS',26,B3.naranja,'middle')
+   +b3ficha(40,160,70,'Single',1)+b3ficha(116,160,60,'240 s',1)+b3ficha(182,160,70,'No OP',1)+b3boton(300,200,140,'¡A pelear!')+txt(40,222,'Las reglas las elige Ana',12,C.gris);
+ }else if(escena==='pelea'){
+  c=b3barra(20,20,180,.72,0)+b3barra(280,20,180,.35,1)+txt(20,52,'Goku',13,C.blanco)+txt(460,52,'Vegeta',13,C.blanco,'end')
+   +rect(214,12,52,30,'#000','#f5c400',6)+txt(240,34,'187',17,C.oro,'middle')
+   +`<rect x="20" y="58" width="120" height="6" rx="3" fill="${B3.ki}"/><rect x="380" y="58" width="60" height="6" rx="3" fill="${B3.ki}"/>`
+   +circle(140,150,26,B3.naranja,'#ffd18a')+circle(340,140,26,'#5689e5','#bcd4ff')+line(168,148,312,141,B3.ki,6)+circle(312,141,10,'#e8f7ff')
+   +txt(240,226,'Cada uno con su teclado o su mando',13,C.gris,'middle');
+ }else if(escena==='ko'){
+  c=b3barra(20,20,180,.4,0)+b3barra(280,20,180,0,1)+`<text x="240" y="130" fill="${B3.naranja}" stroke="#2a1300" stroke-width="3" font-size="64" font-weight="900" font-family="system-ui,sans-serif" text-anchor="middle">K.O.</text>`
+   +rect(130,160,220,40,'#2a1d05',C.oro,10)+txt(240,186,'Gana Ana · se anota sola',15,C.oro,'middle')+txt(240,226,'La sala espera la celebración y el menú del juego',12,C.gris,'middle');
+ }else if(escena==='marcador'){
+  c=b3cara(120,60,B3.naranja,'A',22)+b3cara(360,60,'#5689e5','B',22)+txt(240,72,'2 – 1',34,C.oro,'middle')+txt(120,104,'Ana',14,C.blanco,'middle')+txt(360,104,'Beto',14,C.blanco,'middle')
+   +b3boton(150,128,180,'🔁 ¡Acepto la revancha!')+txt(240,190,'Beto quiere la revancha.',13,C.blanco,'middle')+txt(240,214,'Empieza sola, con las mismas reglas',13,C.gris,'middle');
+ }else if(escena==='dar'){
+  c=txt(240,40,'La pelea 3 quedó sin resultado',15,C.blanco,'middle')+rect(50,62,380,52,B3.caja,B3.borde,10)+txt(64,93,'🏆 Dar la victoria:',14,C.oro)
+   +b3ficha(210,76,90,'Ana',0)+b3ficha(310,76,90,'Beto',0)+rect(50,132,380,52,B3.caja,C.oro,10)+b3boton(150,143,180,'✓ Confirmar: gana Ana','#f6d47e')
+   +txt(240,214,'Primer clic elige, el segundo confirma',13,C.gris,'middle');
+ }else if(escena==='inscritos'){
+  const fila=(y,col,nom,der)=>rect(30,y,420,32,B3.caja,B3.borde,8)+(col?b3cara(50,y+16,col,nom[0],11):circle(50,y+16,11,'#3bd17a','#0b1226'))+txt(70,y+21,nom,13,C.blanco)+txt(436,y+21,der,12,C.gris,'end');
+  c=fila(18,B3.naranja,'Ana','👑 Organiza · ● Disco listo')+fila(56,'#5689e5','Beto','● Disco listo')+fila(94,'','CPU 1','Nivel 3 · Normal')
+   +b3ficha(30,140,150,'＋ Agregar una CPU',0)+b3ficha(188,140,140,'Rellenar con CPU',0)+b3boton(150,184,180,'¡Empezar torneo!')+txt(240,236,'Mínimo 3, contando las CPU',12,C.gris,'middle');
+ }else if(escena==='arrastra'||escena==='avanza'||escena==='copa'){
+  const L=(r,k)=>({x:[22,180,330][r],y:r===0?[30,70,130,170][k]:r===1?[50,150][k]:100});
+  const ronda0=escena==='arrastra'?[['Ana',B3.naranja],['CPU 1',''],['Beto','#5689e5'],['Carla','#8b5cf6']]:[['Ana',B3.naranja],['CPU 1',''],['Beto','#5689e5'],['Carla','#8b5cf6']];
+  c=txt(80,20,'Semifinal',12,C.oro,'middle')+txt(240,20,'Final',12,C.oro,'middle')+txt(400,20,'Campeón',12,C.oro,'middle');
+  ronda0.forEach(([n,col],k)=>{const p=L(0,k),pierde=escena!=='arrastra'&&(n==='CPU 1'||(escena==='copa'&&n==='Carla'));c+=b3slot(p.x,p.y,120,n,col)+(pierde?line(p.x+28,p.y+14,p.x+110,p.y+14,C.rojo,2):'');});
+  c+=line(142,58,160,58,B3.borde,2)+line(160,58,160,79,B3.borde,2)+line(142,158,160,158,B3.borde,2)+line(160,158,160,124,B3.borde,2)+line(160,100,180,100,B3.borde,2);
+  const f1=escena==='arrastra'?['Por definir','']:['Ana',B3.naranja], f2=escena==='copa'?['Beto','#5689e5']:['Por definir',''];
+  c+=b3slot(180,72,130,f1[0],f1[1])+b3slot(180,104,130,f2[0],f2[1]);
+  c+=rect(340,66,120,72,'#2a1d05',escena==='copa'?C.oro:B3.borde,10)+txt(400,98,'🏆',24,C.oro,'middle')+txt(400,126,escena==='copa'?'Ana':'Por definir',13,escena==='copa'?C.oro:C.gris,'middle')+(escena==='copa'?txt(400,82,'👑',16,C.oro,'middle'):'');
+  if(escena==='arrastra')c+=`<path d="M100 84 C150 100 150 120 100 140" stroke="${B3.naranja}" stroke-width="3" fill="none" stroke-dasharray="6 4" marker-end="url(#b3f)"/><defs><marker id="b3f" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="${B3.naranja}"/></marker></defs>`
+   +b3ficha(22,212,110,'🔀 Mezclar',0)+txt(146,229,'o toca uno y después el otro',12,C.gris);
+  else if(escena==='avanza')c+=line(310,86,330,86,C.verde,3)+txt(240,226,'Ana ganó a la CPU 1 y espera en la final',13,C.verde,'middle');
+  else c+=txt(240,226,'Ana gana la final y el torneo',14,C.oro,'middle');
+ }else if(escena==='vetos'){
+  c=b3ficha(14,18,70,'Todos',0)+b3ficha(90,18,74,'No OP',1)+b3ficha(170,18,104,'Sólo malos',0)+b3ficha(280,18,124,'Sólo gigantes',0);
+  const nombres=['Goku','Broly LSSJ','Gohan','Vegito','Krillin','Cell SP','Gogeta 4','Gran Simio'],veto=new Set([1,3,5,6,7]);   // (con No OP: fuera BROLY, S++, S+, S y N/C)
+  nombres.forEach((n,k)=>{const x=30+(k%4)*108,y=60+Math.floor(k/4)*72;c+=rect(x,y,96,60,veto.has(k)?'#1a1f2e':B3.caja,veto.has(k)?'#55606b':B3.borde,8)+txt(x+48,y+28,veto.has(k)?'🔒':'🙂',18,C.blanco,'middle')+txt(x+48,y+50,n,12,veto.has(k)?C.gris:C.blanco,'middle');});
+  c+=txt(240,226,'El cursor se salta los vetados; el aleatorio nunca los saca',12,C.gris,'middle');
+ }else if(escena==='modos'){
+  const m=(y,t,on)=>rect(30,y,190,34,on?B3.naranja:B3.caja,on?'#ffd18a':B3.borde,8)+txt(46,y+22,t,14,on?'#2a1300':C.blanco);
+  c=txt(30,22,'Elige el modo',13,C.oro)+m(32,'Entrenamiento',0)+m(72,'Contra la CPU',1)+m(112,'Duelo · en línea',0)+m(152,'Torneo · en línea',0)
+   +txt(250,48,'Dificultad',13,C.oro)+[1,2,3,4,5].map(k=>b3ficha(250+(k-1)*42,58,36,String(k),k===3)).join('')+txt(250,104,'3 · Normal',13,C.blanco)
+   +txt(250,140,'Duelo y Torneo abren una sala',12,C.gris)+txt(250,158,'y tus amigos entran con el enlace',12,C.gris);
+ }else{
+  c=txt(30,30,'Batalla',13,C.oro)+b3ficha(30,40,70,'Single',1)+b3ficha(106,40,80,'3 vs 3',0)+b3ficha(192,40,64,'Team',0)+b3ficha(262,40,64,'DP 15',0)
+   +txt(30,96,'Tiempo por round',13,C.oro)+b3ficha(30,106,50,'60',0)+b3ficha(86,106,50,'90',0)+b3ficha(142,106,50,'180',1)+b3ficha(198,106,50,'240',0)+b3ficha(254,106,40,'∞',0)
+   +b3boton(30,160,140,'Jugar')+txt(186,180,'entra directo a la pelea',13,C.gris)+txt(30,226,'← Modos (arriba) vuelve al menú',12,C.gris);
+ }
+ return svg(N[escena]||'Budokai Tenkaichi 3',`<rect width="480" height="250" rx="14" fill="${B3.noche}"/>`+c);
+};
 /* HaxBall: la cancha de arriba, discos rojos y azules y la pelota. */
 export const haxball=etapa=>{
  const nombres=['El saque: cada uno en su mitad, solo el que saca entra al círculo','La patada empuja la pelota lejos','Gol: la pelota cruza la línea entre los postes'];

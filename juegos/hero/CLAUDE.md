@@ -44,6 +44,10 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
   folder, serve with `npm start`, and never commit them.
 - `sfx/` are sound effects taken from Clone Hero. The owner was warned the
   repo is public; deleting the folder falls back to synthesized sounds.
+- **BT3 reuses these modules** (`juegos/bt3/pagina.js`, «la música de pelea»): it imports `js/cloud.js`,
+  `js/site.js` and `js/songCache.js` to fetch `chinchonchin` as its battle music, with the same cache keys as
+  `fetchSongFile`. Renaming their exports, `SITE.storageRoot` or the cache key format breaks BT3's music (it then
+  falls back to the game's own music, silently).
 
 ## Stars, records and the ranking (`hero.js`, `hero-datos.js`)
 
