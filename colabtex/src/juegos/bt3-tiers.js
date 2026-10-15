@@ -35,6 +35,7 @@ const CAMBIOS_ES = [
   [/\bnino\b|\bpequeno\b/g, " kid "], [/\bjoven\b/g, " teen "], [/\bdefinitivo\b/g, " ultimate "], [/\bfuturo\b/g, " future "],
   [/\bexplorador\b/g, " scouter "], [/\bespada\b/g, " sword "], [/\babuelo\b/g, " grandpa "], [/\brey\b/g, " king "],
   [/\bcelula\b/g, " cell "], [/\btransformado\b/g, " transform "], [/\babsorbido\b/g, " absorbed "], [/\bgigante\b/g, " giant "],
+  [/\bsoldado\b/g, " soldier "],   // («Soldado de Freezer»)
   [/\bbu\b/g, " buu "],
 ];
 // Lo que el juego escribe distinto según el personaje, llevado a una sola palabra.
@@ -239,7 +240,7 @@ export const BT3_TIERS = {
     ["Dr. Wheelo", "wheelo|willow", ""],
     ["Great Ape Bardock", "bardock ape", ""],
     ["Great Ape Fasha", "fasha ape", ""],
-    ["Great Ape Kid Goku", "goku ape|kid goku ape", ""],
+    ["Great Ape Kid Goku", "goku ape|kid goku ape|ape", ""],   // (en el disco del dueño es «Gran Mono» a secas: el simio sin otro nombre)
     ["Great Ape Nappa", "nappa ape", ""],
     ["Great Ape King Vegeta", "king vegeta ape", ""],
     ["Great Ape Raditz", "raditz ape", ""],

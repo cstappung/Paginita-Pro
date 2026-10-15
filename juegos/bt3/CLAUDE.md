@@ -200,9 +200,11 @@ each disc id the tier of the first (highest) entry that finds it; unnamed «Grea
 Vegeta», «Pequeño Bu», «Shin Shenron · Súper Yi-Shin-Long»…): `CAMBIOS_ES` turns their words into the list's English
 ones before matching (inicio→early, fin→end, niño→kid, gran mono→ape, 2ª forma→second, célula→cell, «perfecto»
 alone→superperfect…), and entries carry the Spanish-only names (Krilin, Chaos, Ub, Namu, Dabra, Yajirobai,
-Kaiyoshin, Pandereta, Neo Shenron, Máquina Pilaf · Fusión). «Vegeta 2ª forma · Monstruo» is Majin Vegeta (owner);
-plain «Gohan», «Vegeta» and «Trunks» are the adult / Vegeta (End) / battle-armour ones. A test pins every name of
-that disc that failed before.
+Kaiyoshin, Pandereta, Neo Shenron, Máquina Pilaf · Fusión; «soldado» → soldier). «Vegeta 2ª forma · Monstruo» is
+Majin Vegeta and a bare «Gran Mono» is Kid Goku's Great Ape (owner); plain «Gohan», «Vegeta» and «Trunks» are the
+adult / Vegeta (End) / battle-armour ones. **A test holds the owner's whole disc** (its 161 names, id by id, from
+«📋 Copiar los nombres del disco») and checks each lands on its entry, one to one: change an entry and that test says
+which disc name moved. The bench's «Abrir la selección de personajes» posts the same 161 names.
 In the room, with a rule on, **«📋 Ver la tier list»** shows the tiers in the image's colours, each entry allowed or
 locked and the disc name it matched; the in-game side panel lists the shorter of allowed/banned. Character names are
 not in the code, they are on the disc: when a select screen opens the patch hands its name/form texts (sections

@@ -265,42 +265,76 @@ test('reglas de personajes: qué deja elegir cada una',()=>{
  assert.equal(r.ids.length+r.permitidos.length,cat.filter(Boolean).length,'cada personaje del disco, o se puede o queda fuera');
 });
 
-/* El disco del dueño trae los nombres en español: estos son los que la lista no encontraba (copiados de su sala), con
-   la entrada que les toca. «Vegeta 2ª forma · Monstruo» es Majin Vegeta (lo dijo el dueño). */
-test('la tier list encuentra a los personajes con los nombres en español del disco',()=>{
- const ES=[["Goku (inicio)","","Goku (Early) - Base"],["Goku (med)","","Goku (Mid) - Base"],["Goku (med)","Super Saiyan","Goku (Mid) - Super Saiyan"],["Goku (fin)","","Goku (End) - Base"],
-  ["Goku (fin)","Super Saiyan","Goku (End) - Super Saiyan"],["Goku (fin)","Super Saiyan 2","Goku (End) - Super Saiyan 2"],["Goku (fin)","Super Saiyan 3","Goku (End) - Super Saiyan 3"],
-  ["Goku niño","","Goku (Kid)"],["Goku niño","Gran Mono","Great Ape Kid Goku"],["Gohan niño","","Gohan (Kid)"],["Joven Gohan","","Gohan (Teen) - Base"],
+/* El disco del dueño, entero: sus 161 personajes como los nombra (en español, id por id, copiados de «📋 Copiar los
+   nombres del disco»), y la entrada de la tier list que le toca a cada uno. «Vegeta 2ª forma · Monstruo» es Majin
+   Vegeta y «Gran Mono» a secas es el Gran Simio de Goku niño (lo dijo el dueño). */
+test('la tier list encuentra a los 161 personajes del disco del dueño, uno por entrada',()=>{
+ const DISCO=[
+  ["Goku (inicio)","","Goku (Early) - Base"],["Goku (med)","","Goku (Mid) - Base"],["Goku (med)","Super Saiyan","Goku (Mid) - Super Saiyan"],
+  ["Goku (fin)","","Goku (End) - Base"],["Goku (fin)","Super Saiyan","Goku (End) - Super Saiyan"],["Goku (fin)","Super Saiyan 2","Goku (End) - Super Saiyan 2"],
+  ["Goku (fin)","Super Saiyan 3","Goku (End) - Super Saiyan 3"],["Goku (GT)","","Goku (GT) - Base"],["Goku (GT)","Super Saiyan","Goku (GT) - Super Saiyan"],
+  ["Goku (GT)","Super Saiyan 3","Goku (GT) - Super Saiyan 3"],["Goku (GT)","Super Saiyan 4","Goku (GT) - Super Saiyan 4"],["Goku niño","","Goku (Kid)"],
+  ["Gran Mono","","Great Ape Kid Goku"],["Gohan niño","","Gohan (Kid)"],["Joven Gohan","","Gohan (Teen) - Base"],
   ["Joven Gohan","Super Saiyan","Gohan (Teen) - Super Saiyan"],["Joven Gohan","Super Saiyan 2","Gohan (Teen) - Super Saiyan 2"],["Gohan","","Gohan (Adult) - Base"],
-  ["Gohan","Super Saiyan","Gohan (Adult) - Super Saiyan"],["Gohan","Super Saiyan 2","Gohan (Adult) - Super Saiyan 2"],["Gohan definitivo","","Ultimate Gohan"],
-  ["Piccolo (inicio)","","Piccolo (Early)"],["Piccolo (fin)","","Piccolo (End)"],["Krilin","","Krillin"],["Chaos","","Chiaotzu"],["Vegeta (Explorador)","","Vegeta (Scouter)"],
-  ["Gran mono Vegeta","","Great Ape Vegeta"],["Vegeta","","Vegeta (End) - Base"],["Vegeta","Super Saiyan","Vegeta (End) - Super Saiyan"],["Vegeta","Súper Vegeta","Super Vegeta"],
-  ["Vegeta 2ª forma","","Vegeta (Second Form) - Base"],["Vegeta 2ª forma","Super Saiyan","Vegeta (Second Form) - Super Saiyan"],
-  ["Vegeta 2ª forma","Super Saiyan 2","Vegeta (Second Form) - Super Saiyan 2"],["Vegeta 2ª forma","Monstruo","Majin Vegeta"],["Trunks (Espada)","","Trunks (Sword) - Base"],
-  ["Trunks (Espada)","Super Saiyan","Trunks (Sword) - Super Saiyan"],["Trunks","","Trunks (Fighting) - Base"],["Trunks","Super Saiyan","Trunks (Fighting) - Super Saiyan"],
-  ["Trunks","Súper Trunks","Super Trunks"],["Trunks niño","","Trunks (Kid) - Base"],["Trunks niño","Super Saiyan","Trunks (Kid) - Super Saiyan"],
-  ["Súper Gogeta","","Super Gogeta (Z) - Super Saiyan"],["Kaiyoshin","","Supreme Kai"],["Yajirobai","","Yajirobe"],["Ub","","Uub"],["Ub","Majuub","Majuub"],
-  ["Maestro Roshi","","Master Roshi - Base"],["Maestro Roshi","Poder máximo","Master Roshi - Max Power"],["Abuelo Gohan","","Grandpa Gohan"],["Namu","","Nam"],
-  ["Rey Vegeta","","King Vegeta"],["Gran mono Rey Vegeta","","Great Ape King Vegeta"],["Gran mono Bardock","","Great Ape Bardock"],["Gran mono Fasha","","Great Ape Fasha"],
-  ["Gran mono Raditz","","Great Ape Raditz"],["Gran mono Nappa","","Great Ape Nappa"],["Zarbon","","Zarbon - Base"],["Zarbon","Transformado","Zarbon - Transformed"],
-  ["Célula","1ª forma","Cell - First Form"],["Célula","2ª forma","Cell - Second Form"],["Célula","Forma perfecta","Cell - Perfect Form"],["Célula","Perfecto","Cell - Super Perfect Form"],
-  ["Rey demonio Dabra","","Dabura"],["Monstruo Bu","","Majin Buu (Good)"],["Bu maldad pura","","Evil Buu"],["Súper Bu","","Super Buu - Base"],
-  ["Súper Bu","Gotenks absorbido","Super Buu - Gotenks Absorbed"],["Súper Bu","Gohan absorbido","Super Buu - Gohan Absorbed"],["Pequeño Bu","","Kid Buu"],
-  ["Gran mono Turles","","Great Ape Turles"],["Slug","","Lord Slug - Base"],["Slug","Gigante","Lord Slug - Giant Form"],["Broly","","Broly - Base"],
-  ["Broly","Super Saiyan","Broly - Super Saiyan"],["Broly","Super Saiyan legendario","Broly - Legendary Super Saiyan"],["Gran mono Baby","","Great Ape Baby"],
-  ["Neo Shenron","","Nuova Shenron"],["Shin Shenron","","Syn Shenron"],["Shin Shenron","Súper Yi-Shin-Long","Omega Shenron"],["Máquina Pilaf","","Pilaf Machine - Base"],
+  ["Gohan","Super Saiyan","Gohan (Adult) - Super Saiyan"],["Gohan","Super Saiyan 2","Gohan (Adult) - Super Saiyan 2"],["Gran Saiyaman","","Great Saiyaman"],
+  ["Gohan definitivo","","Ultimate Gohan"],["Piccolo (inicio)","","Piccolo (Early)"],["Piccolo (fin)","","Piccolo (End)"],
+  ["Nail","","Nail"],["Krilin","","Krillin"],["Yamcha","","Yamcha"],
+  ["Tenshinhan","","Tien"],["Chaos","","Chiaotzu"],["Vegeta (Explorador)","","Vegeta (Scouter)"],
+  ["Gran mono Vegeta","","Great Ape Vegeta"],["Vegeta","","Vegeta (End) - Base"],["Vegeta","Super Saiyan","Vegeta (End) - Super Saiyan"],
+  ["Súper Vegeta","","Super Vegeta"],["Vegeta 2ª forma","","Vegeta (Second Form) - Base"],["Vegeta 2ª forma","Super Saiyan","Vegeta (Second Form) - Super Saiyan"],
+  ["Vegeta 2ª forma","Super Saiyan 2","Vegeta (Second Form) - Super Saiyan 2"],["Vegeta 2ª forma","Monstruo","Majin Vegeta"],["Vegeta 2ª forma","Super Saiyan 4","Vegeta (GT) - Super Saiyan 4"],
+  ["Trunks (Espada)","","Trunks (Sword) - Base"],["Trunks (Espada)","Super Saiyan","Trunks (Sword) - Super Saiyan"],["Trunks","","Trunks (Fighting) - Base"],
+  ["Trunks","Super Saiyan","Trunks (Fighting) - Super Saiyan"],["Súper Trunks","","Super Trunks"],["Trunks niño","","Trunks (Kid) - Base"],
+  ["Trunks niño","Super Saiyan","Trunks (Kid) - Super Saiyan"],["Goten","","Goten - Base"],["Goten","Super Saiyan","Goten - Super Saiyan"],
+  ["Gotenks","","Gotenks - Base"],["Gotenks","Super Saiyan","Gotenks - Super Saiyan"],["Gotenks","Super Saiyan 3","Gotenks - Super Saiyan 3"],
+  ["Vegetto","","Vegito (normal)"],["Súper Vegetto","","Super Vegito (Super Saiyan)"],["Súper Gogeta","","Super Gogeta (Z) - Super Saiyan"],
+  ["Gogeta","Super Saiyan 4","Gogeta (GT) - Super Saiyan 4"],["Mr. Satan","","Mr. Satan"],["Videl","","Videl - Base"],
+  ["Gran Saiyaman 2","","Great Saiyaman 2"],["Kaiyoshin","","Supreme Kai"],["Kibitoshin","","Kibito Kai"],
+  ["Yajirobai","","Yajirobe"],["Pikkon","","Pikkon"],["Tapion","","Tapion"],
+  ["Pan","","Pan"],["Ub","","Uub"],["Majuub","","Majuub"],
+  ["Maestro Roshi","","Master Roshi - Base"],["Maestro Roshi","Poder máximo","Master Roshi - Max Power"],["Abuelo Gohan","","Grandpa Gohan"],
+  ["Namu","","Nam"],["Hatchan","","Android 8"],["Rey Vegeta","","King Vegeta"],
+  ["Gran mono Rey Vegeta","","Great Ape King Vegeta"],["Bardock","","Bardock"],["Gran mono Bardock","","Great Ape Bardock"],
+  ["Fasha","","Fasha"],["Gran mono Fasha","","Great Ape Fasha"],["Raditz","","Raditz"],
+  ["Gran mono Raditz","","Great Ape Raditz"],["Saibaman","","Saibaman"],["Nappa","","Nappa"],
+  ["Gran mono Nappa","","Great Ape Nappa"],["Zarbon","","Zarbon - Base"],["Zarbon","Transformado","Zarbon - Transformed"],
+  ["Dodoria","","Dodoria"],["Cui","","Cui"],["Capitán Ginyu","","Captain Ginyu"],
+  ["Recoome","","Recoome"],["Burter","","Burter"],["Jeice","","Jeice"],
+  ["Guldo","","Guldo"],["Freezer","1ª forma","Frieza - First Form"],["Freezer","2ª forma","Frieza - Second Form"],
+  ["Freezer","3ª forma","Frieza - Third Form"],["Freezer","Forma final","Frieza - Final Form"],["Freezer","100% de poder","Frieza - Full Power"],
+  ["Mecha Freezer","","Mecha Frieza"],["King Cold","","King Cold"],["Appule","","Appule"],
+  ["Soldado de Freezer","","Frieza Soldier"],["Androide n°16","","Android 16"],["Androide n°17","","Android 17"],
+  ["Androide n°18","","Android 18"],["Androide n°19","","Android 19"],["Dr. Gero","","Dr. Gero (Android 20)"],
+  ["Célula","1ª forma","Cell - First Form"],["Célula","2ª forma","Cell - Second Form"],["Célula","Forma perfecta","Cell - Perfect Form"],
+  ["Célula","Perfecto","Cell - Super Perfect Form"],["Célula Jr.","","Cell Jr."],["Babidi","","Babidi"],
+  ["Rey demonio Dabra","","Dabura"],["Monstruo Bu","","Majin Buu (Good)"],["Bu maldad pura","","Evil Buu"],
+  ["Súper Bu","","Super Buu - Base"],["Súper Bu","Gotenks absorbido","Super Buu - Gotenks Absorbed"],["Súper Bu","Gohan absorbido","Super Buu - Gohan Absorbed"],
+  ["Pequeño Bu","","Kid Buu"],["Garlic Jr.","","Garlic Jr. - Base"],["Súper Garlic Jr.","","Super Garlic Jr."],
+  ["Dr. Willow","","Dr. Wheelo"],["Turles","","Turles"],["Gran mono Turles","","Great Ape Turles"],
+  ["Slug","","Lord Slug - Base"],["Slug","Gigante","Lord Slug - Giant Form"],["Salza","","Salza"],
+  ["Cooler","","Cooler - Base"],["Cooler","Forma final","Cooler - Final Form"],["Metal Cooler","","Metal Cooler"],
+  ["Androide n°13","","Android 13 - Base"],["Androide n°13","Fusión","Super Android 13"],["Broly","","Broly - Base"],
+  ["Broly","Super Saiyan","Broly - Super Saiyan"],["Broly","Super Saiyan legendario","Broly - Legendary Super Saiyan"],["Zangya","","Zangya"],
+  ["Bojack","","Bojack - Base"],["Bojack","100% de poder","Bojack - Full Power"],["Janemba","","Janemba - Giant Form"],
+  ["Súper Janemba","","Super Janemba"],["Hildegarn","","Hirudegarn"],["Baby Vegeta","","Baby Vegeta - Base"],
+  ["Súper Baby 1","","Super Baby 1"],["Súper Baby 2","","Super Baby 2"],["Gran mono Baby","","Great Ape Baby"],
+  ["Súper N°17","","Super Android 17"],["Neo Shenron","","Nuova Shenron"],["Shin Shenron","","Syn Shenron"],
+  ["Súper Yi-Shin-Long","","Omega Shenron"],["Tao Pai Pai","","General Tao"],["Tao Cyborg","","Cyborg Tao"],
+  ["General Blue","","General Blue"],["Devilman","","Devilman"],["Máquina Pilaf","","Pilaf Machine - Base"],
   ["Máquina Pilaf","Fusión","Pilaf Machine - Combined Form"],["Pandereta","","Tambourine"],["Rey Demonio Piccolo","","King Piccolo"],
-  ["Gohan del futuro","","Gohan (Future) - Base"],["Gohan del futuro","Super Saiyan","Gohan (Future) - Super Saiyan"]];
+  ["Arale","","Arale"],["Chi-chi","","Chi-Chi (Kid)"],["Spopovich","","Spopovich"],
+  ["Gohan del futuro","","Gohan (Future) - Base"],["Gohan del futuro","Super Saiyan","Gohan (Future) - Super Saiyan"],
+ ];
+ assert.equal(DISCO.length,161);
  // el catálogo como lo manda el juego: códigos de 16 bits del nombre y de la forma
- const lista=ES.map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
+ const lista=DISCO.map(([n,f])=>[[...n].map(c=>c.charCodeAt(0)),[...f].map(c=>c.charCodeAt(0))]);
  const r=T.vetadosBt3(T.catalogoBt3(lista),'noop');
- for(const [n,f,entrada] of ES){
-  const quien=n+(f?' · '+f:''), d=r.detalle.find(x=>x.juego.includes(quien));
-  assert.ok(d,quien+': no lo encuentra ninguna entrada');
-  assert.equal(d.nombre,entrada,quien);
+ for(const [n,f,entrada] of DISCO){
+  const quien=n+(f?' · '+f:''), d=r.detalle.filter(x=>x.juego.includes(quien));
+  assert.equal(d.length,1,quien+': '+d.length+' entradas');
+  assert.equal(d[0].nombre,entrada,quien);
  }
- const usados=r.detalle.flatMap(d=>d.juego);
- assert.equal(new Set(usados).size,usados.length,'ninguno en dos entradas: '+usados.filter((x,i)=>usados.indexOf(x)!==i));
+ assert.equal(r.detalle.filter(d=>d.juego.length!==1).length,0,'cada entrada, exactamente un personaje: '+r.detalle.filter(d=>d.juego.length!==1).map(d=>d.nombre));
  assert.equal(r.sinTier.length,0,'ninguno sin tier: '+r.sinTier.map(x=>x.nombre));
 });
 
