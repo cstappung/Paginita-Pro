@@ -11,6 +11,11 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   generated files here by hand.
 - **PC only, Chrome or Edge.** The game is not playable on a phone, so only the JSPI build is made; the fork's
   Asyncify build (Safari/iPhone) is not, and the page says so on a phone or a browser without JSPI.
+- **The fork's on-screen touch pad must not show on a PC.** The fork shows it on `pointer: coarse` or
+  `maxTouchPoints > 1`, which a Windows PC with touch drivers or a touchscreen laptop reports even when played with
+  a mouse: the pad covered the fight. `pagina.py` makes "touch" require that there is **no** fine pointer
+  (`any-pointer: fine`), and ignores the stored `bt3.touch` there, because the fork stored `'1'` on its own at
+  start. With a mouse only `?touch=1` shows it.
 - `fuente/construir.sh <workdir>` clones the fork, applies the patch, builds with Emscripten 6.x, copies
   `bt3-jspi.{js,wasm}` here, generates
   `index.html` with `fuente/pagina.py` from the fork's `port/web/shell.html`, and runs `npm run build:bt3`

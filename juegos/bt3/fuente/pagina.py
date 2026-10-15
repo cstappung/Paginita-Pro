@@ -178,6 +178,18 @@ cambia('<kbd>F1</kbd> settings and controls &nbsp; <kbd>F11</kbd> full screen &n
 cambia('<div class="keys mobile-only">Plays in landscape or portrait, with touch controls (a controller works too).\n      For full screen on iPhone: Share &rarr; Add to Home Screen. Saves stay on this device.</div>',
        '<div class="keys mobile-only">Se juega en horizontal o vertical, con controles táctiles (un mando también sirve).\n      Las partidas guardadas quedan en este dispositivo.</div>')
 
+# ---- los controles táctiles: solo en una pantalla sin mouse ----
+# El fork los muestra si hay «algo táctil» (pointer: coarse o maxTouchPoints > 1), y un notebook con pantalla táctil
+# (o un Windows con drivers táctiles) cumple eso aunque se juegue con mouse y teclado: los controles tapaban la pelea.
+# Aquí se juega en el computador: «táctil» exige que NO haya ningún puntero fino (mouse o touchpad).
+cambia("  const coarse = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;",
+       "  const coarse = !matchMedia('(any-pointer: fine)').matches &&   // (con mouse o touchpad no: ver pagina.py)\n"
+       "                 (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1);")
+# Y lo guardado no manda en el computador: el fork guardaba 'bt3.touch' = '1' al arrancar aunque nadie lo eligiera,
+# así que ese '1' viejo los volvía a encender. Con mouse solo ?touch=1 los muestra.
+cambia("      let touch = coarse;\n      try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}",
+       "      let touch = coarse;\n      if (coarse) try { const t = localStorage.getItem('bt3.touch'); if (t !== null) touch = t === '1'; } catch (e) {}")
+
 # ---- solo computador con Chrome o Edge (JSPI): en el celular no se juega ----
 cambia("  const BUILD = Q.get('build') || ('Suspending' in WebAssembly ? 'bt3-jspi' : 'bt3-async');",
        "  const BUILD = 'bt3-jspi';   // (solo la versión JSPI: sin ella el juego no arranca, ver abajo)")
