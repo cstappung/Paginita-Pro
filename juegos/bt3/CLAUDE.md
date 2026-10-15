@@ -15,7 +15,20 @@ The PS2 game compiled to WebAssembly, played from **each player's own ISO**. Rea
   - the bar goes centred between the pad's columns while playing (`translate`, not `transform`, which the bar's
     hide animation owns), without the volume slider or an idle controller badge, and the ♪ label is short;
   - the floating language picker of `i18n.js` is hidden once the game runs (it sat on the stick);
-  - the first tap with the game running asks for fullscreen (the frame has `allowfullscreen`);
+  - without a mouse the bar never came back (it revives on mouse moves), so ☰ (top centre) shows it; the bar gets
+    ⛶ (enter/leave fullscreen) and 🎮 (pad size 70–120 % and opacity: `--esc`/`--opa` on #pad, `bt3.pad.*`;
+    the size is capped at 110 % in landscape and 120 % in portrait, past that buttons overlap — `choques.cjs`);
+  - the fork caches where each touch button is (`Touch.rects`) and re-measured only on rotation, but the buttons
+    also move when the height changes without rotating (fullscreen, Chrome's bar hiding): taps landed on the old
+    places and «didn't react the first time» until the phone was turned and back. `Touch.down` now measures on every
+    new finger (~18 rects). Bench test: `prueba54` (fails with the old page, passes now);
+  - fullscreen is asked by itself only ONCE (first tap with the game running): asking on every tap made it
+    impossible to leave;
+  - «🔊 Activar el sonido» shows while the game's AudioContext is not running (a tap on a real button always
+    unlocks it). Bench test: `prueba53`;
+  - the fork blocks `touchmove` everywhere but `.card` (no page scroll or zoom while playing); the modes sit outside
+    the card, so a finger could scroll down over the card and never back up over the modes. The exception now
+    covers `#start` (removed when the game starts), `#vetos` and `#registro`. Bench test: `prueba51`;
   - the mode list is one column under 500 px, and `#start` centres with `safe center` (plain `center` cut off the
     top of a card taller than the screen, out of reach of the scroll).
   `@controles: tactil teclado` in `pagina.js` makes the lobby tag it for phones too. Bench test: `prueba50`
@@ -333,6 +346,8 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
 
 ## Battle music: «chinchonchin» from PRO HERO
 
+- **Off by default** (owner's request): the game's own music plays unless the player picks the song with ♪
+  (`bt3.musica` = `"cancion"`). Before, the default was the song.
 - The patch tells the page when a battle starts and when its scene is left: `Web_PeleaEmpieza(bgm)` in
   `Battle_ResetWork` (before the game's `Bgm_Play`) and `Web_PeleaTermina` from `__wrap_BattleResult_Finish`
   (Battle_Term) → `Module.onMusicaPelea(on, bgm)`. While the page's song is sounding it calls
