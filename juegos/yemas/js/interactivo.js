@@ -708,7 +708,8 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
     escena.remove(grupo);
     grupo.traverse(o => {
       if (o.geometry) o.geometry.dispose();
-      if (o.material) { o.material.map?.dispose(); o.material.dispose?.(); }
+      // Los materiales de las armas (mano.js) son compartidos: se quedan.
+      if (o.material && !o.material.userData?.compartido) { o.material.map?.dispose(); o.material.dispose?.(); }
     });
     for (const b of [...propios]) sacaChoque(b);
     SILUETA.dispose();
