@@ -53,6 +53,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
     linear-gradient(#000, #000) center / 100% 2px no-repeat,
     radial-gradient(circle at center, transparent 0 min(38vh, 38vw), #000 calc(min(38vh, 38vw) + 1px));
 }
+#vineta { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.32)); }
 #danio { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle, transparent 45%, rgba(220, 20, 20, 0.85)); }
 #feed { position: absolute; top: 14px; right: 16px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .baja { background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 8px; font-size: 14px; }

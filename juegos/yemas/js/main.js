@@ -2,10 +2,12 @@
 // Suelto es práctica contra bots; con ?modo=online dentro de la sala de Juegos,
 // la sala le pasa los demás jugadores y anota las muertes en el registro.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   crearMundo, moverCuerpo, empujaCuerpo, metido, rayoMundo, rayoHuevo, crearHuevo, crearBandera, crearBase, crearPedestal,
-  SPAWNS, BASES, PUNTOS_ARMA, SKINS, ALTO, OJOS,
+  SPAWNS, BASES, PUNTOS_ARMA, SKINS, ALTO, OJOS, crearGuante,
 } from 'yemas/mundo';
+import { construyeArma, armaConManos, crearVista, brilloPap } from 'yemas/mano';
 import {
   ARMAS, SARTEN, ESPATULA, ZOMBI, ESPATULA_CFG, RECARGAS, NOMBRE_ARMA, GRANADAS, TIPOS_GRANADA, caida, armaEnPunto,
   BEBIDAS, conPap, RECARGAS_ZOMBIS, MAQUINA, ICONO_BEBIDA, BONOS,
@@ -49,6 +51,9 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.autoClear = false;
+// Tonos de cine: las luces fuertes no se queman y los colores quedan más ricos.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 
 const escena = new THREE.Scene();
 escena.background = new THREE.Color('#a9dcff');
@@ -64,8 +69,74 @@ sol.position.set(20, 40, 12);
 sol.castShadow = true;
 sol.shadow.mapSize.set(2048, 2048);
 Object.assign(sol.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
-sol.shadow.bias = -0.0005;
-escena.add(sol);
+sol.shadow.bias = -0.0004;
+sol.shadow.normalBias = 0.02;
+escena.add(sol, sol.target);
+// El sol sigue al jugador (con la sombra cerca, más nítida) desde la misma
+// dirección de siempre.
+const SOL = new THREE.Vector3(20, 40, 12).normalize().multiplyScalar(70);
+Object.assign(sol.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 160 });
+function sigueSol() {
+  const x = Math.round(camara.position.x / 2) * 2, z = Math.round(camara.position.z / 2) * 2;
+  sol.target.position.set(x, 0, z);
+  sol.position.set(x + SOL.x, SOL.y, z + SOL.z);
+}
+
+// El cielo: un domo con degradé del horizonte (el color de la niebla, para
+// que todo se funda) al cénit, el sol con su halo y nubes que pasan. De noche
+// (los mapas de zombis) sin nubes y con estrellas.
+const domo = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: {
+    horizonte: { value: escena.fog.color }, cenit: { value: new THREE.Color('#3f8fe6') },
+    solDir: { value: SOL.clone().normalize() }, solColor: { value: new THREE.Color('#fff1d0') },
+    nubes: { value: 1 }, estrellas: { value: 0 }, t: { value: 0 },
+  },
+  vertexShader: `varying vec3 vDir;
+    void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w * 0.9999; }`,
+  fragmentShader: `uniform vec3 horizonte, cenit, solDir, solColor; uniform float nubes, estrellas, t; varying vec3 vDir;
+    float az(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float ruido(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(az(i), az(i + vec2(1, 0)), f.x), mix(az(i + vec2(0, 1)), az(i + vec2(1, 1)), f.x), f.y); }
+    float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * ruido(p); p *= 2.03; a *= 0.5; } return s; }
+    void main() {
+      vec3 d = normalize(vDir); float h = d.y;
+      vec3 c = mix(horizonte, cenit, pow(clamp(h, 0.0, 1.0), 0.55));
+      float s = max(dot(d, solDir), 0.0);
+      c += solColor * (pow(s, 900.0) * 3.0 + pow(s, 14.0) * 0.22);
+      if (estrellas > 0.0 && h > 0.05) {
+        vec2 q = d.xz / (h + 0.4) * 140.0;
+        float e = step(0.9965, az(floor(q))) * smoothstep(0.05, 0.4, h);
+        c += vec3(e) * estrellas * (0.5 + 0.5 * sin(t * 2.0 + az(floor(q) + 3.0) * 30.0));
+      }
+      if (nubes > 0.0 && h > 0.0) {
+        vec2 uv = d.xz / (h + 0.12) * 1.2 + vec2(t * 0.006, t * 0.002);
+        float n = fbm(uv);
+        float m = smoothstep(0.5, 0.78, n) * nubes * smoothstep(0.0, 0.18, h);
+        vec3 nube = mix(vec3(1.0), horizonte * 0.8 + 0.1, smoothstep(0.62, 0.95, n)) + solColor * pow(s, 6.0) * 0.25;
+        c = mix(c, nube, m);
+      }
+      gl_FragColor = vec4(c, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+}));
+domo.frustumCulled = false;
+domo.renderOrder = -1;
+escena.add(domo);
+// Las cosas de cáscara (huevos, zombis, nidos) reflejan ese mismo cielo.
+const pmrem = new THREE.PMREMGenerator(renderer);
+let envCielo = null;
+function reflejaCielo() {
+  const sc = new THREE.Scene();
+  const d = new THREE.Mesh(domo.geometry, domo.material);
+  d.frustumCulled = false;
+  sc.add(d);
+  envCielo?.dispose();
+  envCielo = pmrem.fromScene(sc, 0.02, 0.1, 400);
+  escena.environment = envCielo.texture;
+}
+reflejaCielo();
 
 // En zombis el mundo se vuelve a armar con el mapa elegido (alConfig); los
 // colisores son siempre la misma lista, que granadas y zombis ya tienen.
@@ -74,139 +145,17 @@ let mundo = crearMundo(escena, null, colisores);
 let inter = null;   // lo que se compra y se toca en zombis (interactivo.js)
 let bonos = null;   // las bonificaciones que sueltan los zombis (bonos.js)
 
-// El arma en primera persona va en su propia escena para que no atraviese paredes
+// El arma en primera persona va en su propia escena para que no atraviese
+// paredes, con un estudio de fotos de mentira para que el metal brille. Los
+// modelos y su animación (retroceso, recargas, fogonazo) están en mano.js.
 const escenaArma = new THREE.Scene();
 const camaraArma = new THREE.PerspectiveCamera(60, 1, 0.01, 10);
-escenaArma.add(new THREE.HemisphereLight('#ffffff', '#886644', 2.2));
-const luzArma = new THREE.DirectionalLight('#ffffff', 1.5);
+escenaArma.add(new THREE.HemisphereLight('#ffffff', '#886644', 1.5));
+const luzArma = new THREE.DirectionalLight('#fff4e0', 1.9);
 luzArma.position.set(1, 2, 1);
 escenaArma.add(luzArma);
-
-// Un modelo por arma: sirve para la mano y para el arma tirada en el piso.
-const MEDIDAS = { 0: [0.55, 0.09, 0.025], 1: [0.5, 0.13, 0.045], 2: [0.85, 0.08, 0.025], 6: [0.9, 0.16, 0.075], 7: [0.32, 0.07, 0.022],
-  10: [0.45, 0.12, 0.04], 11: [0.95, 0.13, 0.035], 12: [0.75, 0.08, 0.022] };
-function construyeArma(id) {
-  const a = ARMAS[id];
-  const g = new THREE.Group();
-  const oscuro = new THREE.MeshLambertMaterial({ color: '#2d2d35' });
-  if (id === ESPATULA) {
-    // La espátula dorada: mango redondo y una paleta plana con ranuras.
-    const oro = new THREE.MeshPhongMaterial({ color: '#f2c230', emissive: '#6b4a00', specular: '#fff6cc', shininess: 90 });
-    const mango = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.26, 10), oro);
-    mango.rotation.x = Math.PI / 2;
-    mango.position.z = 0.06;
-    const paleta = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.15), oro);
-    paleta.position.z = -0.14;
-    g.add(mango, paleta);
-    for (const x of [-0.03, 0, 0.03]) {
-      const ranura = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.014, 0.09), oscuro);
-      ranura.position.set(x, 0, -0.14);
-      g.add(ranura);
-    }
-    return g;
-  }
-  if (id === MAQUINA) {
-    // La Máquina de muerte: una ametralladora pesada de seis cañones que giran.
-    const fierro = new THREE.MeshPhongMaterial({ color: a.color, specular: '#aaaaaa', shininess: 60 });
-    const caja = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.34), fierro);
-    caja.position.z = 0.02;
-    const giro = new THREE.Group();
-    giro.position.set(0, 0.01, -0.18);
-    for (let i = 0; i < 6; i++) {
-      const th = i / 6 * Math.PI * 2;
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.6, 8), oscuro);
-      c.rotation.x = Math.PI / 2;
-      c.position.set(Math.cos(th) * 0.045, Math.sin(th) * 0.045, -0.3);
-      giro.add(c);
-    }
-    for (const z of [-0.05, -0.4, -0.58]) {
-      const aro = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.03, 16), fierro);
-      aro.rotation.x = Math.PI / 2;
-      aro.position.z = z;
-      giro.add(aro);
-    }
-    const asa = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), oscuro);
-    asa.position.set(0, 0.12, -0.02);
-    const cinta = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.12), new THREE.MeshLambertMaterial({ color: '#6a5a2a' }));
-    cinta.position.set(-0.13, -0.04, 0.02);
-    const mango = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.07), oscuro);
-    mango.position.set(0, -0.14, 0.1);
-    mango.rotation.x = 0.3;
-    g.add(caja, giro, asa, cinta, mango);
-    g.userData.giro = giro;
-    return g;
-  }
-  if (a.melee) {
-    // La sartén: el fondo negro, el borde y el mango de madera.
-    const fierro = new THREE.MeshPhongMaterial({ color: a.color, specular: '#888888', shininess: 40 });
-    const fondo = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.035, 24), fierro);
-    fondo.position.z = -0.27;
-    const borde = new THREE.Mesh(new THREE.TorusGeometry(0.145, 0.012, 6, 24), fierro);
-    borde.rotation.x = Math.PI / 2;
-    borde.position.set(0, 0.018, -0.27);
-    const mango = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.2), new THREE.MeshLambertMaterial({ color: '#5a3a24' }));
-    mango.position.z = -0.03;
-    g.add(fondo, borde, mango);
-    return g;
-  }
-  const [largo, ancho, r] = MEDIDAS[id];
-  const cuerpo = new THREE.MeshLambertMaterial({ color: a.color });
-  const caja = new THREE.Mesh(new THREE.BoxGeometry(ancho, 0.12, largo * 0.55), cuerpo);
-  caja.position.z = -largo * 0.2;
-  g.add(caja);
-  const canon = new THREE.Mesh(new THREE.CylinderGeometry(r, r, largo, 12), a.cohete ? cuerpo : oscuro);
-  canon.rotation.x = Math.PI / 2;
-  canon.position.set(0, a.cohete ? 0.06 : 0.03, -largo * 0.5);
-  g.add(canon);
-  const mango = new THREE.Mesh(new THREE.BoxGeometry(ancho * 0.8, 0.16, 0.08), oscuro);
-  mango.position.set(0, -0.11, 0.02);
-  mango.rotation.x = 0.3;
-  g.add(mango);
-  if (a.zoom) {
-    const mira = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.22, 10), oscuro);
-    mira.rotation.x = Math.PI / 2;
-    mira.position.set(0, 0.11, -0.2);
-    g.add(mira);
-  }
-  return g;
-}
-const modelos = {};
-for (const id of Object.keys(ARMAS)) {
-  modelos[id] = construyeArma(+id);
-  modelos[id].visible = false;
-  escenaArma.add(modelos[id]);
-}
-// La bazuca es grande: en la mano va más chica y más abajo, o tapa media pantalla.
-modelos[6].scale.setScalar(0.7);
-modelos[MAQUINA].scale.setScalar(0.85);
-
-// Con Pack-a-Punch el arma se ve metalizada: un cromo con un brillo violeta
-// que va cambiando de tono, para que se note desde lejos que es especial.
-const matsPap = [];
-function metaliza(g) {
-  g.traverse(o => {
-    if (!o.isMesh) return;
-    const base = o.material.color ? o.material.color.clone() : new THREE.Color('#888888');
-    const c = base.lerp(new THREE.Color('#b8bcd8'), 0.55);
-    o.material = new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 160, emissive: '#3a1a80', emissiveIntensity: 0.5 });
-    matsPap.push(o.material);
-  });
-  return g;
-}
-const modelosPap = {};
-for (const id of Object.keys(ARMAS)) {
-  if (ARMAS[id].melee || +id === MAQUINA || +id === ESPATULA) continue;
-  modelosPap[id] = metaliza(construyeArma(+id));
-  modelosPap[id].visible = false;
-  modelosPap[id].scale.copy(modelos[id].scale);
-  escenaArma.add(modelosPap[id]);
-}
-const _tono = new THREE.Color();
-function brilloPap() {
-  const t = performance.now() / 1000;
-  _tono.setHSL((0.72 + 0.12 * Math.sin(t * 1.3)) % 1, 0.9, 0.35 + 0.1 * Math.sin(t * 3.1));
-  for (const mt of matsPap) mt.emissive.copy(_tono);
-}
+escenaArma.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+const vista = crearVista(escenaArma);
 
 // La bebida: una botella que sube a la boca, se empina y se baja. Mientras
 // se toma no hay arma en la mano (ni disparos).
@@ -222,7 +171,11 @@ const vidrio = new THREE.MeshPhongMaterial({ color: '#ffffff', specular: '#fffff
   const tapa = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.015, 10), new THREE.MeshPhongMaterial({ color: '#d8d8d8', shininess: 80 }));
   tapa.position.y = 0.195;
   const etiqueta = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.07, 14), new THREE.MeshLambertMaterial({ color: '#f4efe0' }));
-  botella.add(cuerpo, hombro, cuello, tapa, etiqueta);
+  // El guante que la sostiene.
+  const guante = crearGuante(1);
+  guante.scale.setScalar(1.7);
+  guante.position.set(-0.012, -0.02, 0.0);
+  botella.add(cuerpo, hombro, cuello, tapa, etiqueta, guante);
 }
 botella.visible = false;
 escenaArma.add(botella);
@@ -620,6 +573,9 @@ function cambiarArma(i) {
   yo.zoom = 0;
   yo.cadencia = Math.max(yo.cadencia, 0.35);
   yo.retroceso = 1;
+  sonido.cortaRecarga();
+  sonido.sacar();
+  vista.saca();
 }
 
 function recargar() {
@@ -627,7 +583,7 @@ function recargar() {
   if (!yo.vivo || a.melee || !m || yo.recargando > 0 || m.c === a.cargador) return;
   if (m.r <= 0) { aviso(esZombis() ? 'Sin recargas: compra munición o usa la sartén' : 'Sin recargas: busca otra arma o usa la sartén'); sonido.vacio(); return; }
   yo.recargando = yo.recargaTotal = a.recarga * (yo.perks.has('speed') ? 0.5 : 1);
-  sonido.recarga();
+  sonido.recarga(a.id, yo.recargaTotal);
 }
 
 const _u = new THREE.Vector3(), _v = new THREE.Vector3();
@@ -698,6 +654,8 @@ function disparar() {
   yo.yaw += (Math.random() - 0.5) * a.retroceso * 0.5;
   yo.retroceso = Math.min(1, yo.retroceso + 0.6);
   sonido.disparo(a.id);
+  vista.dispara(a.id);
+  destellaTiro(boca, 1);
   publicar();
 }
 
@@ -765,6 +723,8 @@ function lanzarCohete(a, desvio = 0) {
   yo.retroceso = 1;
   yo.pitch = Math.min(1.5, yo.pitch + a.retroceso);
   sonido.disparo(a.id);
+  vista.dispara(a.id);
+  destellaTiro(o, a.rayo ? 2 : 1.4);
   publicar();
 }
 
@@ -1020,7 +980,7 @@ const tipoEn = (s, g) => armaEnPunto(red.semilla || 1, s, g, red.variante === 't
 function quitaDelSuelo(st) {
   if (!st.obj) return;
   escena.remove(st.obj);
-  st.obj.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  st.obj.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (!o.material.userData.compartido) o.material.dispose(); } });
   st.obj = null;
 }
 function armasTomadas(armas) {
@@ -1127,21 +1087,31 @@ function alJugador(id, e) {
   if (!j.vivo && e.v) j.mesh.position.copy(j.obj);
   j.vivo = !!e.v;
   j.mesh.visible = j.vivo;
+  // El arma que lleva, con sus guantes, en la mano del huevo.
+  const ia = e.a | 0;
+  if (j.armaId !== ia) {
+    if (j.arma) { j.mesh.userData.mano.remove(j.arma); j.arma.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); }
+    j.armaId = ia;
+    j.arma = ARMAS[ia] ? armaConManos(ia) : null;
+    if (j.arma) { j.arma.scale.multiplyScalar(1.25); j.mesh.userData.mano.add(j.arma); }
+  }
   if (e.s && e.s.i !== j.sI) {
     j.sI = e.s.i;
-    const boca = j.mesh.userData.punta.getWorldPosition(new THREE.Vector3());
+    j.patada = 1;
+    const boca = (j.arma?.userData.boca || j.mesh.userData.punta).getWorldPosition(new THREE.Vector3());
     const fins = Array.isArray(e.s.e) ? e.s.e : Object.values(e.s.e || {});
     for (const f of fins.slice(0, 12)) {
       const fin = new THREE.Vector3(+f[0] || 0, +f[1] || 0, +f[2] || 0);
       trazo(boca, fin, '#ffb347');
       chispa(fin, '#ffffff');
     }
-    sonido.disparo(e.a | 0, boca.distanceTo(yo.pos));
+    sonido.disparo(e.a | 0, boca);
+    if (!ARMAS[ia]?.melee) destellaTiro(boca, 1);
   }
   // Está cargando su autodestrucción: brilla y pita (lo pinta el bucle).
-  if (e.ad && !j.ad) sonido.pitido(0, j.mesh.position.distanceTo(yo.pos));
+  if (e.ad && !j.ad) sonido.pitido(0, j.mesh.position);
   j.ad = !!e.ad && j.vivo;
-  if (e.ds && !j.ds && j.vivo) sonido.desliza(j.mesh.position.distanceTo(yo.pos));
+  if (e.ds && !j.ds && j.vivo) sonido.desliza(j.mesh.position);
   j.ds = !!e.ds && j.vivo;
   // En el suelo esperando que lo levanten.
   const ab = j.vivo && e.ab > 0;
@@ -1318,7 +1288,8 @@ function autodestruir() {
 let temblor = 0;
 function explosion(p, radio = GRANADA.radio, verde = false) {
   const d = p.distanceTo(yo.pos);
-  sonido.explosion(d);
+  sonido.explosion(p);
+  destellaTiro(p, verde ? 6 : 10, verde ? '#7dff5a' : '#ffa040', 0.25);
   temblor = Math.max(temblor, Math.max(0, 1 - d / 14) * (verde ? 0.4 : 1));
   const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12),
     new THREE.MeshBasicMaterial({ color: verde ? '#62ff4a' : '#ffb347', transparent: true, opacity: 0.9 }));
@@ -1357,7 +1328,7 @@ function texturaHumo() {
 }
 const VIDA_HUMO = 14;
 function nube(p) {
-  sonido.humo(p.distanceTo(yo.pos));
+  sonido.humo(p);
   const g = new THREE.Group();
   for (let i = 0; i < 26; i++) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texturaHumo(), color: '#cfd4d6', transparent: true, opacity: 0, depthWrite: false }));
@@ -1446,13 +1417,14 @@ function chispa(p, color) {
   efectos.push({ obj: m, vida: 0.2, max: 0.2, crece: 3 });
 }
 
-const geoCascara = new THREE.BoxGeometry(0.14, 0.03, 0.11);
+// Los pedazos de cáscara son curvos, como de verdad.
+const geoCascara = new THREE.SphereGeometry(0.13, 6, 4, 0, 1.3, 0.3, 1.0);
 const geoYema = new THREE.SphereGeometry(0.09, 8, 6);
 const manchas = [];
 function explotar(p, color, frito = true) {
   for (let i = 0; i < 22; i++) {
     const yema = i >= 14;
-    const mat = new THREE.MeshLambertMaterial({ color: yema ? '#ffb300' : color, transparent: true });
+    const mat = new THREE.MeshLambertMaterial({ color: yema ? '#ffb300' : color, transparent: true, side: THREE.DoubleSide });
     const m = new THREE.Mesh(yema ? geoYema : geoCascara, mat);
     m.position.set(p.x, p.y + 0.4 + Math.random() * 1.1, p.z);
     m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
@@ -1470,8 +1442,37 @@ function explotar(p, color, frito = true) {
     manchas.push({ obj: f, t: 14 });
     if (manchas.length > 30) quitaFrito(manchas.shift().obj);
   }
-  sonido.crack(p.distanceTo(yo.pos));
-  sonido.fritura(p.distanceTo(yo.pos));
+  sonido.crack(p);
+  sonido.fritura(p);
+}
+
+// Las plumas de una gallina infernal: caen meciéndose, despacio.
+const geoPluma = new THREE.PlaneGeometry(0.07, 0.2).translate(0, 0.1, 0);
+function plumas(p) {
+  for (let i = 0; i < 18; i++) {
+    const m = new THREE.Mesh(geoPluma, new THREE.MeshLambertMaterial({ color: i % 3 ? '#3a2622' : '#c0391b', transparent: true, side: THREE.DoubleSide }));
+    m.position.set(p.x, p.y + 0.3 + Math.random() * 0.4, p.z);
+    m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+    escena.add(m);
+    efectos.push({
+      obj: m, vida: 2.6, max: 2.6, piso: p.y, leve: Math.random() * 6,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 4, 2 + Math.random() * 3, (Math.random() - 0.5) * 4),
+      giro: (Math.random() - 0.5) * 6,
+    });
+  }
+}
+
+// El fogonazo alumbra alrededor un instante (una sola luz para todos los
+// tiros: la última gana).
+const luzTiro = new THREE.PointLight('#ffc070', 0, 10, 2);
+escena.add(luzTiro);
+let luzTiroT = 0, luzTiroMax = 0.06;
+function destellaTiro(p, fuerza = 1, color = '#ffc070', dura = 0.06) {
+  luzTiro.position.copy(p);
+  luzTiro.color.set(color);
+  luzTiro.userData.fuerza = 6 * fuerza;
+  luzTiro.distance = 10 * Math.sqrt(fuerza);
+  luzTiroT = luzTiroMax = dura;
 }
 
 // Lo que queda en el piso: un huevo frito. La clara es una mancha blanca de
@@ -1523,7 +1524,7 @@ function quitaFrito(g) {
 function quitar(obj) {
   escena.remove(obj);
   obj.material.dispose();
-  if (obj.geometry !== geoTrazo && obj.geometry !== geoChispa && obj.geometry !== geoCascara && obj.geometry !== geoYema) obj.geometry.dispose();
+  if (obj.geometry !== geoTrazo && obj.geometry !== geoChispa && obj.geometry !== geoCascara && obj.geometry !== geoYema && obj.geometry !== geoPluma) obj.geometry.dispose();
 }
 
 function actualizarEfectos(dt) {
@@ -1531,7 +1532,17 @@ function actualizarEfectos(dt) {
     const f = efectos[i];
     f.vida -= dt;
     const k = Math.max(0, f.vida / f.max);
-    if (f.vel) {
+    if (f.vel && f.leve !== undefined) {
+      // Una pluma: el aire la frena y la mece.
+      f.vel.multiplyScalar(Math.exp(-3 * dt));
+      f.vel.y -= 3 * dt;
+      f.obj.position.addScaledVector(f.vel, dt);
+      f.obj.position.x += Math.sin(f.vida * 5 + f.leve) * dt * 0.6;
+      f.obj.rotation.z = Math.sin(f.vida * 4 + f.leve) * 0.8;
+      f.obj.rotation.y += f.giro * dt;
+      if (f.obj.position.y < f.piso + 0.03) { f.obj.position.y = f.piso + 0.03; f.vel.set(0, 0, 0); }
+      f.obj.material.opacity = Math.min(1, k * 3);
+    } else if (f.vel) {
       f.vel.y -= 18 * dt;
       f.obj.position.addScaledVector(f.vel, dt);
       f.obj.rotation.x += f.giro * dt;
@@ -1543,6 +1554,8 @@ function actualizarEfectos(dt) {
     }
     if (f.vida <= 0) { quitar(f.obj); efectos.splice(i, 1); }
   }
+  luzTiroT = Math.max(0, luzTiroT - dt);
+  luzTiro.intensity = luzTiroT > 0 ? (luzTiro.userData.fuerza || 6) * luzTiroT / luzTiroMax : 0;
   for (let i = manchas.length - 1; i >= 0; i--) {
     const m = manchas[i];
     m.t -= dt;
@@ -1650,14 +1663,15 @@ function montaZombis() {
   zombis = crearZombis(escena, colisores, {
     alCaer: alCaeZombi,
     pideRonda: r => red.accion('ronda', { r }),
-    grunido: p => sonido.grunido(p.distanceTo(camara.position)),
-    rompe: p => sonido.rompe(p.distanceTo(camara.position)),
+    grunido: (p, tipo) => sonido.grunido(p, tipo),
+    ataca: (p, tipo) => sonido.ataque(p, tipo),
+    rompe: p => sonido.rompe(p),
     aparece: alAparecerZombi,
-    // El último perro de la ronda suelta una Munición máxima.
+    // La última gallina infernal de la ronda suelta una Munición máxima.
     finPerros: p => { if (soyDirector()) bonos?.suelta(p, 'municion'); },
-    chilla: p => sonido.chillido(p.distanceTo(camara.position)),
-    ruge: p => { sonido.ruge(p.distanceTo(camara.position)); temblor = Math.max(temblor, Math.max(0, 1 - p.distanceTo(yo.pos) / 25) * 0.6); },
-    casco: p => sonido.casco(p.distanceTo(camara.position)),
+    chilla: p => sonido.chillido(p),
+    ruge: p => { sonido.ruge(p); temblor = Math.max(temblor, Math.max(0, 1 - p.distanceTo(yo.pos) / 25) * 0.6); },
+    casco: p => sonido.casco(p),
   });
   // Cada mapa trae su cielo, su niebla y su luz.
   const M = MAPAS[red.mapa] || MAPAS.nacht, am = M.ambiente || {};
@@ -1668,6 +1682,16 @@ function montaZombis() {
   sol.intensity = am.sol ?? 0.9;
   sol.color.set(am.solColor || '#c9bbff');
   nieblaBase = { near: escena.fog.near, far: escena.fog.far, color: escena.fog.color.clone() };
+  // De noche: el cénit oscuro, la luna (el mismo «sol», tenue) y estrellas.
+  const u = domo.material.uniforms;
+  u.cenit.value.set(am.fondo || '#2b2740').multiplyScalar(0.3);
+  u.solColor.value.set(am.solColor || '#c9bbff').multiplyScalar(0.5);
+  u.nubes.value = 0;
+  u.estrellas.value = 1;
+  cenitBase = u.cenit.value.clone();
+  reflejaCielo();
+  // Los tonos de cine aplastan lo oscuro: de noche se abre un poco el diafragma.
+  renderer.toneMappingExposure = 1.45;
   inter = crearInteractivo(escena, M, colisores, mundo, {
     pos: () => yo.pos,
     puedo: () => puedoJugar() && yo.vivo && !yo.abatido,
@@ -1757,9 +1781,9 @@ function textoCaido() {
   return `${quien}. Vuelves cuando empiece la ronda ${(marcador.ronda || 1) + 1}, si alguien aguanta.`;
 }
 
-// En las rondas de perros el mapa se cierra en una niebla anaranjada, como el
+// En las rondas de gallinas infernales el mapa se cierra en una niebla anaranjada, como el
 // aviso de Black Ops de que viene algo distinto; la siguiente la despeja.
-let nieblaBase = null;
+let nieblaBase = null, cenitBase = null;
 const NIEBLA_PERROS = new THREE.Color('#5a2a14');
 function nieblaRonda(r) {
   if (!nieblaBase) return;
@@ -1768,19 +1792,22 @@ function nieblaRonda(r) {
   escena.fog.far = perros ? Math.min(nieblaBase.far, 42) : nieblaBase.far;
   escena.fog.color.copy(perros ? NIEBLA_PERROS : nieblaBase.color);
   escena.background.copy(escena.fog.color);
+  const u = domo.material.uniforms;
+  u.cenit.value.copy(cenitBase).lerp(NIEBLA_PERROS, perros ? 0.6 : 0);
+  u.estrellas.value = perros ? 0 : 1;
 }
 
-// Un zombi que aparece: el perro cae en un rayo y el Mutante sale rugiendo.
+// Un zombi que aparece: la gallina infernal cae en un rayo y el Mutante sale rugiendo.
 function alAparecerZombi(tipo, pos) {
   if (tipo === 'p') {
-    sonido.trueno(pos.distanceTo(camara.position));
+    sonido.trueno(pos);
     const rayo = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.2, 30, 6),
       new THREE.MeshBasicMaterial({ color: '#dfe8ff', transparent: true, opacity: 0.95 }));
     rayo.position.set(pos.x, pos.y + 15, pos.z);
     escena.add(rayo);
     efectos.push({ obj: rayo, vida: 0.3, max: 0.3 });
   } else if (tipo === 'j') {
-    sonido.ruge(pos.distanceTo(camara.position));
+    sonido.ruge(pos);
     temblor = Math.max(temblor, Math.max(0, 1 - pos.distanceTo(yo.pos) / 30));
     aviso('¡Llegó el Mutante!');
   }
@@ -1814,16 +1841,18 @@ function sumaPuntos(n) {
 }
 
 function alCaeZombi({ pos, killer, cab, a, explota, tipo }) {
-  explotar(pos, tipo === 'p' ? '#4a1f17' : tipo === 't' ? '#a7c43a' : '#8fa36b', false);
+  explotar(pos, tipo === 'p' ? '#3b2622' : tipo === 't' ? '#a7c43a' : '#8fa36b', false);
+  sonido.muereZombi(pos, tipo);
+  if (tipo === 'p') plumas(pos);
   // El Mutante siempre suelta algo; los demás, con la suerte de siempre.
   if (soyDirector() && (tipo === 'j' || killer)) bonos?.suelta(pos, tipo === 'j' || undefined);
   if (tipo === 'j') { explosion(pos, 3); aviso('¡Cayó el Mutante!'); }
   const d = pos.distanceTo(yo.pos);
   // El que ardía (la lava de Pueblo, el napalm) revienta en llamas y quema lo
-  // que tenga cerca; el tóxico suelta su gas (PhD no lo para) y el perro, un
-  // fogonazo más chico.
+  // que tenga cerca; el tóxico suelta su gas (PhD no lo para) y la gallina
+  // infernal, un fogonazo más chico.
   if (explota === 1 || explota === true) {
-    sonido.quema(d);
+    sonido.quema(pos);
     explosion(pos, ZB.explota);
     if (yo.vivo && !yo.perks.has('phd') && d < ZB.explota)
       alGolpe({ de: '', n: 'Un zombi en llamas', dmg: ZB.danioExplota, cab: false, a: ZOMBI });
@@ -1831,10 +1860,10 @@ function alCaeZombi({ pos, killer, cab, a, explota, tipo }) {
     explosion(pos, ZB.gas, true);
     if (yo.vivo && d < ZB.gas) alGolpe({ de: '', n: 'El gas de un tóxico', dmg: ZB.danioGas, cab: false, a: ZOMBI });
   } else if (explota === 3) {
-    sonido.quema(d);
+    sonido.quema(pos);
     explosion(pos, ZB.perro);
     if (yo.vivo && !yo.perks.has('phd') && d < ZB.perro)
-      alGolpe({ de: '', n: 'Un perro infernal', dmg: ZB.danioPerro, cab: false, a: ZOMBI });
+      alGolpe({ de: '', n: 'Una gallina infernal', dmg: ZB.danioPerro, cab: false, a: ZOMBI });
   }
   if (killer !== red.yo) return;
   yo.zk++;
@@ -1963,7 +1992,7 @@ function mallaEspatula() {
 function quitaMalla(m) {
   if (!m) return;
   escena.remove(m);
-  m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (!o.material.userData.compartido) o.material.dispose(); } });
 }
 function tirarEspatula() {
   if (!puedoJugar() || !yo.vivo || !yo.espatula || yo.ep) return;
@@ -2006,7 +2035,7 @@ function pasoEspatula(dt) {
       e.cd = ESPATULA_CFG.cada;
       red.golpear(e.u, { dmg: 1, cab: false, a: ESPATULA });
       marcaGolpe(false);
-      sonido.espatulazo(meta.distanceTo(yo.pos));
+      sonido.espatulazo(meta);
       chispa(meta, '#ffd54a');
       e.pos.addScaledVector(dir, -1.2);   // rebota y vuelve
     }
@@ -2216,7 +2245,9 @@ function actualizar(dt) {
     // Saltar corta el deslizamiento, pero el impulso sigue en el aire.
     // Saltando desde un deslizamiento se llega más alto.
     if (teclas.has('Space') && yo.enSuelo && !yo.abatido) { yo.vel.y = SALTO * (yo.deslizando > 0 ? 1.3 : 1); yo.enSuelo = false; yo.deslizando = 0; }
+    const vyAntes = yo.vel.y, enAire = !yo.enSuelo;
     moverCuerpo(yo, dt, colisores);
+    if (enAire && yo.enSuelo && vyAntes < -5) { sonido.aterriza(Math.min(1.5, -vyAntes / 12)); vista.aterriza(-vyAntes / 10); }
     if (zombis) chocaZombis();
 
     yo.cadencia = Math.max(0, yo.cadencia - dt);
@@ -2263,26 +2294,27 @@ function actualizar(dt) {
   const fov = 75 + 8 * yo.sprintK - yo.zoom * (a.zoom ? 55 : 0);
   if (Math.abs(camara.fov - fov) > 0.01) { camara.fov = fov; camara.updateProjectionMatrix(); }
 
-  // Arma en mano
+  // Arma en mano: el modelo, el retroceso y las recargas los anima mano.js.
   const enMano = yo.vivo && !red.mirando && !terminado;
   const bebe = yo.bebiendo > 0;
-  const m = (a.pap && modelosPap[a.id]) || modelos[a.id];
-  for (const x of [...Object.values(modelos), ...Object.values(modelosPap)]) x.visible = enMano && !bebe && x === m && yo.zoom < 0.8;
   pasoBotella(enMano && bebe);
   if (a.pap) brilloPap();
-  if (a.id === MAQUINA) m.userData.giro.rotation.z += dt * (gatillo ? 40 : 6);
   const vel = Math.hypot(yo.vel.x, yo.vel.z);
+  const bobAntes = yo.bob;
   if (yo.enSuelo) yo.bob += dt * vel * 1.6;
+  // Un paso cada media vuelta del balanceo.
+  if (enMano && yo.enSuelo && vel > 1.5 && yo.deslizando <= 0 && Math.floor(yo.bob / Math.PI) !== Math.floor(bobAntes / Math.PI)) sonido.paso(yo.corriendo);
   yo.retroceso = Math.max(0, yo.retroceso - dt * 8);
   yo.tajo = Math.max(0, yo.tajo - dt / SARTEN_DURA);
-  const bajar = yo.recargando > 0 ? Math.sin(Math.PI * (1 - yo.recargando / yo.recargaTotal)) : 0;
-  m.position.copy(BASE_ARMA);
-  m.position.x += Math.sin(yo.bob) * 0.012 * Math.min(1, vel / VEL) - yo.zoom * 0.24;
-  m.position.y += Math.abs(Math.cos(yo.bob)) * 0.012 * Math.min(1, vel / VEL) - bajar * 0.15 - yo.sprintK * 0.05;
-  m.position.z += yo.retroceso * 0.07;
   // Corriendo, el arma se baja y se cruza; deslizándose vuelve a apuntar.
   const cruza = yo.corriendo ? yo.sprintK : 0;
-  m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7 - cruza * 0.35, cruza * 0.45, 0);
+  const mu = yo.mun[a.id];
+  const m = vista.paso(dt, {
+    ver: enMano && !bebe && yo.zoom < 0.8, id: a.id, pap: !!a.pap,
+    mov: yo.enSuelo ? Math.min(1, vel / VEL) : 0, sprint: yo.sprintK, cruza, zoom: yo.zoom,
+    recarga: yo.recargando > 0 ? 1 - yo.recargando / yo.recargaTotal : -1,
+    yaw: yo.yaw, pitch: yo.pitch, bob: yo.bob, gatillo: gatillo && enMano, balas: a.infinita ? 1 : (mu?.c ?? 0),
+  });
   if (a.melee) poseSarten(m, cruza);
 
   actualizaBanderas();
@@ -2329,6 +2361,19 @@ function actualizar(dt) {
     c.rotation.x += ((j.ab ? 1.35 : j.ds ? 0.7 : 0) - c.rotation.x) * kp;
     if (j.ab) c.rotation.z = 0;
     c.position.y = j.ab ? 0.25 : Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
+    // Las patas al paso de lo que avanza, el pestañeo y el culatazo del arma.
+    const ud = j.mesh.userData;
+    j.paso = (j.paso || 0) + Math.min(v, 12) * dt * 3;
+    const amp = j.ab ? 0 : Math.min(1, v / 4) * 0.75;
+    ud.pies?.forEach((pa, i) => { pa.rotation.x = Math.sin(j.paso + i * Math.PI) * amp; });
+    ud.parpadeo -= dt;
+    if (ud.parpadeo < -0.12) ud.parpadeo = 2 + Math.random() * 4;
+    ud.ojos?.forEach(o => { o.scale.y = ud.parpadeo < 0 ? 0.12 : 1; });
+    if (j.arma) {
+      j.patada = Math.max(0, (j.patada || 0) - dt * 7);
+      j.arma.position.z = 0.12 * j.patada;
+      j.arma.rotation.x = 0.3 * j.patada;
+    }
     if (j.epMalla && j.epObj) { j.epMalla.position.lerp(j.epObj, kp); j.epMalla.rotation.y += dt * 14; j.epMalla.rotation.x = 0.6; }
   }
 
@@ -2347,6 +2392,10 @@ function bucle(ahora) {
     camara.lookAt(0, 2, 0);
   }
   actualizarEfectos(dt);
+  sonido.oido(camara.position, camara.rotation.y);
+  domo.position.copy(camara.position);
+  domo.material.uniforms.t.value = ahora / 1000;
+  sigueSol();
   renderer.clear();
   renderer.render(escena, camara);
   if (jugando) {
@@ -2358,7 +2407,7 @@ requestAnimationFrame(bucle);
 
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
-  yo, otros, disparar, beber, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
+  yo, otros, escena, escenaArma, camara, vista, domo, disparar, beber, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
   get inter() { return inter; }, get mundo() { return mundo; }, get pad() { return { padPausa, padActivo }; },
   get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },
