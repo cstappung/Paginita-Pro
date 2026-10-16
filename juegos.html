@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610160034"></script>
+<script src="i18n.js?v=202610161727"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1759,6 +1759,10 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-bt3-revancha.lista{border:1px solid var(--bt3-oro);box-shadow:0 0 18px #ffd21f44}
 .jg-bt3-rev{padding:8px 18px;border-radius:999px;border:2px solid #ffb300;background:#1b2f66;color:var(--bt3-oro);font:400 16px 'Lilita One',system-ui,sans-serif;letter-spacing:.02em;cursor:pointer}
 .jg-bt3-rev:hover{background:#22397a}.jg-bt3-rev.no{border-color:#56689c;color:var(--bt3-mu);font:700 13px system-ui,sans-serif}
+/* En el celular la revancha queda fija abajo y grande: se pide con el pulgar sin buscarla bajo el vestíbulo (sticky no
+   servía: solo se pega mientras su caja se ve). Debajo de los carteles (60) y el manual (80). */
+@media (max-width:700px){.jg-bt3-revancha{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:40;background:#06102bf2;box-shadow:0 -6px 24px #000a}
+  .jg-bt3-rev{flex:1 1 100%;padding:14px 20px;font-size:20px}.jg-bt3-rev.no{font-size:15px}}
 /* el torneo: título, inscritos, la pelea actual */
 .jg-bt3-tit{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .jg-bt3-tit>b{font-size:30px;line-height:1.05}
@@ -5270,6 +5274,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610160034"></script>
+<script src="juegos-app.js?v=202610161727"></script>
 </body>
 </html>

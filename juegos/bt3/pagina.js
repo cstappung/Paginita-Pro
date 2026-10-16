@@ -239,16 +239,31 @@
        los luchadores elegidos, para que la primera vez que hablan en la pelea el juego no se detenga a buscarlas.
      - **Siempre se ve** cuando el juego espera algo de la red: la insignia de arriba dice cuánto lleva y a qué
        velocidad, y la primera vez avisa que lo bajado queda guardado. */
-  const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false };
-  const Cola = { activos: 0, max: 10, alta: [], baja: [] };
+  const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false, sinLote: false };
+  /* Los pedazos que esperan van juntos en UNA llamada (`/lote` del Worker): el plan gratis de Cloudflare cuenta llamadas
+     (100.000 al día), no megas. Hasta 8 en lo que se baja por adelantado y 4 en lo que el juego espera ya (para no
+     poner una lectura urgente detrás de muchas otras); la respuesta trae los pedazos uno tras otro y cada uno se
+     entrega apenas llega. Arrancar el juego la primera vez: ~272 llamadas de a uno, ~35 así. Si el Worker es viejo
+     (404 a /lote), `P.sinLote` y se vuelve a pedir de a uno, como antes. */
+  const Cola = { activos: 0, max: 10, alta: [], baja: [], LOTE_ALTA: 4, LOTE_BAJA: 8, llamadas: 0 };
+  window.BT3Cola = Cola;   // (el banco cuenta las llamadas)
+  /* Despachar un instante después (setTimeout 0), no en el acto: los pedidos de un mismo momento (una lectura grande,
+     lo que se adelanta) entran de a uno, cada uno después de mirar el caché; despachados al entrar, salía cada uno
+     solo en su propia llamada y nunca se juntaban. */
+  let programado = 0;
+  const pronto = () => { if (!programado) programado = setTimeout(() => { programado = 0; despacha(); }, 0); };
   function despacha() {
     for (;;) {
-      let t = null;
-      if (Cola.alta.length && Cola.activos < Cola.max) t = Cola.alta.shift();
-      else if (!Cola.alta.length && Cola.baja.length && Cola.activos < 6) t = Cola.baja.shift();
-      if (!t) return;
+      let cola = null;
+      if (Cola.alta.length && Cola.activos < Cola.max) cola = Cola.alta;
+      else if (!Cola.alta.length && Cola.baja.length && Cola.activos < 6) cola = Cola.baja;
+      if (!cola) return;
+      const lote = [cola.shift()], tope = P.sinLote ? 1 : cola === Cola.alta ? Cola.LOTE_ALTA : Cola.LOTE_BAJA;
+      while (lote.length < tope && cola.length) lote.push(cola.shift());
+      if (cola === Cola.alta) while (lote.length < tope && Cola.baja.length) lote.push(Cola.baja.shift());   // (lo adelantado aprovecha el viaje)
       Cola.activos++;
-      t.corre();
+      for (const t of lote) t.sale();
+      corre(lote).finally(() => { Cola.activos--; despacha(); });
     }
   }
   // la red: cuánto se bajó en esta sesión y a qué velocidad (los últimos 3 s)
@@ -276,16 +291,60 @@
     }
   }
   const urlPieza = i => P.base + "/pieza/" + String(i).padStart(5, "0") + ".bin";
+  // un pedazo que llegó: se cuenta y se guarda en este navegador
+  function llego(i, bytes) {
+    anotaRed(bytes.length);
+    if (P.almacen) { P.guardadas.add(i); P.almacen.put(urlPieza(i), new Response(bytes)).catch(() => P.guardadas.delete(i)); }
+  }
+  const largo = i => Math.min(P.pieza, P.size - i * P.pieza);   // (el último pedazo del disco es más corto)
+  // un lote: uno solo de a uno (o con un Worker viejo); varios por /lote, y lo que no llegó, de a uno
+  async function corre(lote) {
+    const deAUno = ts => Promise.all(ts.map(t => deRed(t.i, t.alta).then(t.ok, t.mal)));
+    if (lote.length === 1 || P.sinLote) return deAUno(lote);
+    const pend = lote.slice();
+    try { await deLote(pend); }
+    catch (e) { Module.keep && Module.keep("disco privado: un lote falló (" + (e.message || e) + "), lo que falta de a uno"); }
+    if (pend.length) await deAUno(pend);
+  }
+  async function deLote(pend) {
+    const alta = pend.some(t => t.alta);
+    for (let intento = 0; intento < 2; intento++) {
+      Cola.llamadas++;
+      const res = await fetch(P.base + "/lote?p=" + pend.map(t => t.i).join(","), { headers: { Authorization: "Bearer " + P.token }, priority: alta ? "high" : "low" });
+      if (res.status === 401 && intento === 0) { P.token = (await pideToken(true)) || P.token; continue; }
+      if (res.status === 404 || res.status === 400) { P.sinLote = true; return; }   // (un Worker sin /lote: de a uno)
+      if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+      // los pedazos vienen uno tras otro: cada uno se corta y se entrega apenas está entero
+      const lector = res.body.getReader(), partes = [];
+      let hay = 0;
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (value && value.length) { partes.push(value); hay += value.length; }
+        while (pend.length && hay >= largo(pend[0].i)) {
+          const L = largo(pend[0].i), b = new Uint8Array(L);
+          for (let k = 0; k < L;) {
+            const x = partes[0], n = Math.min(x.length, L - k);
+            b.set(x.subarray(0, n), k); k += n;
+            if (n === x.length) partes.shift(); else partes[0] = x.subarray(n);
+          }
+          hay -= L;
+          const t = pend.shift();
+          llego(t.i, b); t.ok(b);
+        }
+        if (done) return;
+      }
+    }
+  }
   // un pedazo desde la red (con reintentos: el token dura una hora, y una red de celular a veces corta)
   async function deRed(i, alta) {
     for (let intento = 0; ; intento++) {
       try {
+        Cola.llamadas++;
         const res = await fetch(urlPieza(i), { headers: { Authorization: "Bearer " + P.token }, priority: alta ? "high" : "low" });
         if (res.status === 401 && intento < 2) { P.token = (await pideToken(true)) || P.token; continue; }
         if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
         const bytes = new Uint8Array(await res.arrayBuffer());
-        anotaRed(bytes.length);
-        if (P.almacen) { P.guardadas.add(i); P.almacen.put(urlPieza(i), new Response(bytes)).catch(() => P.guardadas.delete(i)); }
+        llego(i, bytes);
         return bytes;
       } catch (e) {
         if (intento >= (alta ? 6 : 3)) throw e;
@@ -311,9 +370,9 @@
         try { const g = await P.almacen.match(urlPieza(i)); if (g) return new Uint8Array(await g.arrayBuffer()); } catch (e) {}
       }
       return await new Promise((ok, mal) => {
-        camino.tarea = { corre: () => { camino.tarea = null; deRed(i, camino.alta).then(ok, mal).finally(() => { Cola.activos--; despacha(); }); } };
+        camino.tarea = { i, get alta() { return camino.alta; }, ok, mal, sale: () => { camino.tarea = null; } };
         (alta ? Cola.alta : Cola.baja).push(camino.tarea);
-        despacha();
+        pronto();
       });
     })();
     if (alta) { esperaRed(1); const fin = () => esperaRed(-1); camino.q.then(fin, fin); }
@@ -495,17 +554,15 @@
       try { Esencial.piezas = piezasDe(idsEsenciales(), await leeIndice(Esencial.disco)); }
       catch (e) { Esencial.corriendo = false; pintaEsencial(); return; }
     }
+    /* De a tandas de 64: la cola las junta en lotes de 8 (una llamada al Worker cada 8 MB). Antes eran 4 «trabajadores»
+       que pedían un pedazo y esperaban: nunca había más de 4 en la cola y cada uno salía en su propia llamada. La
+       pausa se mira entre tandas, y la cola igual deja pasar antes lo que el juego espera. */
     const pendientes = Esencial.piezas.filter(i => !P.guardadas.has(i));
-    let k = 0;
-    const uno = async () => {
-      while (k < pendientes.length) {
-        while (Esencial.pausa) await new Promise(ok => setTimeout(ok, 500));
-        const i = pendientes[k++];
-        if (!P.guardadas.has(i)) await pedazo(i, false).catch(() => {});
-        pintaEsencial();
-      }
-    };
-    await Promise.all(Array.from({ length: 4 }, uno));   // (la cola deja pasar antes lo que el juego espera)
+    for (let k = 0; k < pendientes.length; k += 64) {
+      while (Esencial.pausa) await new Promise(ok => setTimeout(ok, 500));
+      await Promise.all(pendientes.slice(k, k + 64).filter(i => !P.guardadas.has(i))
+        .map(i => pedazo(i, false).catch(() => {}).then(() => pintaEsencial())));
+    }
     Esencial.corriendo = false;
     pintaEsencial();
   }
@@ -918,7 +975,7 @@
   // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
   async function eligeModo() {
     try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
-    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo], ...(modo === "cpu"
+    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_SEED", semillaLocal()], ["BT3_WEB_MODO", modo], ...(modo === "cpu"
       ? [["BT3_WEB_CPU", String(nivel)], ["BT3_WEB_REGLAS", String(reglasCpu())], ...(batalla === "team3" ? [["BT3_WEB_EQUIPO", "3"]] : [])] : [])];
     if (desdePrivado) { grabaArchivos(); await precopia(); }   // (el arranque, ya en memoria: ver «el disco privado, rápido»)
   }
@@ -1095,6 +1152,90 @@
     $("barra").insertBefore(boton, $("barra").querySelector("[data-volumen]"));
   })();
 
+  // ---------------------------------------------------------------- 2e. el azar: semilla nueva y 🎲
+  /* La semilla. El port siembra el azar del juego una sola vez, al arrancar, con un número FIJO (0x12345678,
+     plat_sys.c: así una corrida se puede repetir), y cada vuelta a los modos arranca el programa de cero: el
+     «aleatorio» de la selección (y el luchador al azar de la CPU) repetía siempre los mismos personajes. El parche
+     lee BT3_SEED si está (Vu0_Init corre dentro de Game_Main, después de que la página pone el entorno):
+     - jugando solo o contra la CPU del torneo: una semilla al azar cada vez (`semillaLocal`);
+     - en una pelea en línea las dos copias del juego tienen que sacar LO MISMO (cada una calcula la pelea entera):
+       la semilla sale de lo que las dos ven igual: la sala (de la dirección de Juegos, #p/<sala>, que tiene hasta
+       una pestaña vieja), los dos jugadores, el número de pelea y las reglas (`semillaSala`). Cambia en cada pelea
+       y en cada sala, y no depende de qué versión de Juegos tenga abierta cada uno. */
+  const semillaLocal = () => {
+    const a = new Uint32Array(1);
+    try { crypto.getRandomValues(a); } catch (e) { a[0] = (Math.random() * 4294967296) >>> 0; }
+    return String((a[0] & 0x7fffffff) || 1);   // (31 bits: el parche la lee con strtol, y un long de wasm32 es de 32 bits con signo)
+  };
+  const semillaSala = e => {
+    let sala = "";
+    try { sala = (String(window.parent.location.hash).match(/#p\/([^/?&]+)/) || [])[1] || ""; } catch (x) {}
+    const quienes = [e.yo, e.rival && e.rival.uid].filter(Boolean).sort().join(",");
+    const txt = [sala, quienes, e.torneo ? "t" : "d", e.ronda || 0, e.reglas || 0].join("|");
+    let h = 0x811c9dc5;   // FNV-1a de 32 bits: el mismo número en los dos navegadores
+    for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return String((h & 0x7fffffff) || 1);
+  };
+  window.BT3Semilla = { local: semillaLocal, sala: semillaSala };
+
+  /* 🎲 Aleatorio. En la grilla de personajes, R3 (el parche: CharSel_WebRuleta) lleva el cursor a un personaje al
+     azar —respetando la regla de la sala— sin elegirlo: se ve quién salió, se confirma con ✕ o se vuelve a tirar.
+     Va por el mando, así que en una pelea en línea las dos copias tiran igual. Además del R3 del mando y del de la
+     pantalla táctil, una tecla de la página lo aprieta (R por defecto; se cambia con ⌨ en la barra, «bt3.tecla.azar»)
+     y el botón 🎲 de la barra, que solo se ve con la selección abierta (Module.onSeleccion). */
+  const Seleccion = { abierta: false, oyentes: [] };
+  Module.onSeleccion = a => { Seleccion.abierta = !!a; for (const f of Seleccion.oyentes) { try { f(Seleccion.abierta); } catch (e) {} } };
+  window.BT3Seleccion = Seleccion;
+  const CLAVE_TECLA = "bt3.tecla.azar";
+  let tecla = "KeyR";
+  try { tecla = localStorage.getItem(CLAVE_TECLA) || tecla; } catch (e) {}
+  const nombreTecla = c => String(c).replace(/^Key/, "").replace(/^Digit/, "").replace(/^Numpad/, "Num ").replace(/^Arrow/, "Flecha ");
+  const tira = () => {
+    if (!Module._Web_TouchSet || !Seleccion.abierta) return false;
+    const T = window.BT3Touch || {}, bits = T.bits || 0, lx = T.lx ?? 128, ly = T.ly ?? 128;
+    Module._Web_TouchSet(bits | 0x4, lx, ly);   // PAD_R3 (include/sys/pad.h)
+    setTimeout(() => Module._Web_TouchSet(bits, lx, ly), 120);
+    return true;
+  };
+  const dado = document.createElement("button");
+  dado.id = "dado"; dado.type = "button"; dado.hidden = true;
+  const cambia = document.createElement("button");
+  cambia.id = "dadoTecla"; cambia.type = "button"; cambia.hidden = true; cambia.textContent = "⌨";
+  cambia.title = "Cambiar la tecla del aleatorio"; cambia.setAttribute("aria-label", cambia.title);
+  let esperando = false;
+  const pintaDado = () => {
+    dado.hidden = cambia.hidden = !Seleccion.abierta;
+    dado.textContent = esperando ? "Aprieta una tecla… (Esc cancela)" : "🎲 " + nombreTecla(tecla);
+    dado.title = "Aleatorio: el cursor a un personaje al azar (tecla " + nombreTecla(tecla) + ", o R3 en el mando). Vuelve a tirar o confirma con ✕.";
+  };
+  dado.onclick = () => { dado.blur(); if (esperando) return; tira(); };
+  cambia.onclick = () => { cambia.blur(); esperando = true; pintaDado(); };
+  addEventListener("keydown", e => {
+    if (esperando) {
+      e.preventDefault(); e.stopPropagation();
+      if (e.code !== "Escape" && e.code) { tecla = e.code; try { localStorage.setItem(CLAVE_TECLA, tecla); } catch (x) {} }
+      esperando = false; pintaDado();
+      return;
+    }
+    if (e.code === tecla && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "")) tira();
+  }, true);
+  Seleccion.oyentes.push(() => { if (!Seleccion.abierta) esperando = false; pintaDado(); });
+  /* Los atajos, a la vista: la primera vez que se abre la selección en esta página, las tres primeras veces en este
+     computador (en el celular no hay teclado: ahí está el ☰). */
+  let atajosVistos = false;
+  Seleccion.oyentes.push(abierta => {
+    if (!abierta || atajosVistos || document.body.classList.contains("coarse")) return;
+    atajosVistos = true;
+    let n = 0;
+    try { n = Number(localStorage.getItem("bt3.atajos")) || 0; } catch (e) {}
+    if (n >= 3) return;
+    try { localStorage.setItem("bt3.atajos", String(n + 1)); } catch (e) {}
+    aviso("Atajos: " + nombreTecla(tecla) + " = 🎲 aleatorio · F1 = Ajustes y controles · I = atrás en los menús", 6000);
+  });
+  pintaDado();
+  $("barra").insertBefore(cambia, $("barra").firstChild);
+  $("barra").insertBefore(dado, cambia);
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
@@ -1172,7 +1313,7 @@
     }
     panel.append(cuerpo);
   };
-  Module.onSeleccion = abierta => { enSeleccion = !!abierta; pintaVetos(); };
+  Seleccion.oyentes.push(abierta => { enSeleccion = !!abierta; pintaVetos(); });   // (Module.onSeleccion: 2e)
   /* (Aquí el banco de pruebas bajaba la memoria para archivos del disco a 192 MB, de cuando corría dos juegos en una
      pestaña. Con uno por pestaña sobraba el recorte y faltaba memoria: en plena pelea, al cargar algo nuevo, el juego
      botaba archivos que todavía usaba y los volvía a leer del disco en cada cuadro: 2 fps, 99% ocupado sin dibujar.
@@ -1232,6 +1373,7 @@
         /* Una pelea del torneo contra la CPU: se juega aquí solo, sin red. El juego entra al versus 1P vs COM con
            las reglas de la sala, la CPU con su nivel y su luchador (o equipo) al azar (BT3_WEB_*, parche.diff). */
         Module.entornoPendiente = Object.entries(Object.assign({
+          BT3_SEED: semillaLocal(),   // (contra la CPU se juega aquí solo: azar de verdad, 2e)
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
         if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo
@@ -1254,6 +1396,7 @@
       /* Las variables de la sesión. No sirve tocar ENV a esta altura (el runtime ya lo copió al cargar): las
          pone el programa mismo con setenv al empezar el juego (__wrap_Game_Main, parche.diff). */
       Module.entornoPendiente = Object.entries(Object.assign({
+        BT3_SEED: semillaSala(e),   // (la misma en las dos copias: 2e)
         BT3_NET_SESSION: "1", BT3_NET_NAME: e.nombre.slice(0, 16), BT3_NET_DELAY: "auto", BT3_NOMOVIE: "1", BT3_SOUND_TICKS: "1",
         BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
@@ -1287,15 +1430,30 @@
      cuando estén los dos (motor.js, `reanudar`): una copia del juego que se recargó no puede volver a una pelea a
      la mitad (cada una arranca de cero). */
   let cuenta = 0, cortada = false;
+  /* Un pitido corto por cada segundo de la cuenta (más agudo los últimos cinco): una pausa por corte se nota aunque
+     no se esté mirando la pantalla. Va por el contexto de audio del juego, así que lo gobierna el volumen de la página. */
+  function pitido(hz) {
+    try {
+      const ctx = Module.SDL3 && Module.SDL3.audioContext;
+      if (!ctx || ctx.state !== "running") return;
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+      o.type = "sine"; o.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.14);
+    } catch (e) {}
+  }
+  window.BT3Pitido = pitido;   // (el banco lo prueba)
   Module.onNetEvent = (que, txt) => {
     Module.keep("red: " + que + " " + txt);
     if (que === "arrived") aviso("");
     else if (que === "espera") {
       const hasta = Date.now() + (Number(txt) || 25) * 1000, quien = (est && est.rival && est.rival.nombre) || "tu rival";
       clearInterval(cuenta);
+      let ultimo = -1;
       const pinta = () => {
         const s = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
         aviso("⚡ Se cortó la conexión con " + quien + ". La pelea está en pausa: esperándolo " + s + " s… (si no vuelve, la pelea empieza de nuevo cuando estén los dos)", 0, true);
+        if (s !== ultimo) { ultimo = s; pitido(s <= 5 ? 1320 : 880); }   // (también se oye: quizás no se mira la pantalla)
       };
       pinta();
       cuenta = setInterval(pinta, 500);

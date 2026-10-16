@@ -344,6 +344,33 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   Storage (`bt3-disco:<size>`): a second session asks the Worker only for `indice.json` (which still checks the
   friends list). The game itself never reads the whole ISO: `webDiscEnsure` copies one file at a time as it opens it.
 
+## Random: a fresh seed, and 🎲
+
+- The port seeds the game's RNG once, at boot, with a **fixed** number (`func_002BB390` → 0x12345678 in
+  `port/src/plat_sys.c`, so a run is repeatable), and every return to the modes restarts the program: the «?» cell and
+  the CPU's random fighter repeated the same characters every time. `BT3_SEED` overrides it and is read inside
+  `Game_Main` (`Vu0_Init` → `Rand_Init`), after the page's `entornoPendiente` is applied, so no C change was needed:
+  `pagina.js` 2e passes a random seed when playing alone or against a tournament CPU, and in an online fight a seed
+  both copies compute the same (FNV-1a of the room id from `parent.location.hash`, both uids sorted, fight number,
+  rules): lockstep needs both copies to draw the same. Seeds are 31-bit: the patch reads them with `strtol`, and a
+  wasm32 `long` is 32-bit signed, so larger ones clamped to the same value.
+- **R3 in the character grid** (`CharSel_WebRuleta`, menu_c_e.c) moves that side's cursor to a random allowed
+  character without choosing it; R3 was unused there. It goes through the pad, so online both copies roll alike.
+  The page presses R3 (`PAD_R3` 0x4 via `Web_TouchSet`) for its own key (default R, `bt3.tecla.azar`, changed with
+  ⌨) and for the 🎲 button, both shown only while the selection is open (`Module.onSeleccion`, now fanned out via
+  `Seleccion.oyentes` because the room's banned-list panel listens too).
+
+## Small touches (bench test `prueba56`)
+
+- «🏆 Dar la victoria» also writes «X dio la victoria de la pelea N a Y» in the room chat, through the new `ctx.chat`
+  that `juegos-main.js` hands every room module (`fb.mandaChat` as the person present).
+- On a phone (≤700 px) the rematch bar is `position: fixed` at the bottom; `sticky` failed because it only sticks
+  while its own box is on screen.
+- The reconnection countdown (`onNetEvent("espera")`) beeps once a second, higher in the last five, through the
+  game's AudioContext (`pitido`), so the page volume governs it.
+- The first time the character selection opens in a page, on a PC, the shortcuts show for 6 s (🎲 key, F1, I);
+  only the first three times on that computer (`bt3.atajos`).
+
 ## Battle music: «chinchonchin» from PRO HERO
 
 - **Off by default** (owner's request): the game's own music plays unless the player picks the song with ♪
@@ -400,6 +427,14 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
   `/subir` is a page served by the Worker itself that uploads the ISO from the owner's browser with
   `CLAVE_SUBIDA`. Verified tokens are cached in memory: the free plan gives little CPU per request.
   `colabtex/tests/bt3-disco.test.cjs` pins the access rules with a local key pair and a fake bucket.
+- **Requests are batched** (`/lote?p=a,b,…`, up to 8 pieces in one response, streamed one after another with a
+  pull-based `ReadableStream` so the Worker holds one piece at a time). The free Workers plan counts requests
+  (100k/day), not bytes: one piece per request made a first start ~272 requests. The page's queue (`Cola`) sends up
+  to 8 pieces per call for prefetching and 4 for what the game is waiting on, and hands each piece over as soon as
+  its bytes are in (`deLote`). Two traps found in the bench: dispatching on push sent every piece alone (now
+  `pronto()`, a setTimeout 0), and «lo esencial» ran 4 workers awaiting one piece each (now batches of 64). Bench:
+  `prueba57` («lo esencial» 41 → 8 requests, pieces byte-identical, last short piece, 401 and >8 refused). An old
+  Worker answers 404 to `/lote`: `P.sinLote` and back to one by one. **The owner must redeploy `worker.js`** for it.
 - `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
 - **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
   it says yes, BT3 is filtered out of the catalogue, the solo list, the novedades banner (`filtraNovedades` in

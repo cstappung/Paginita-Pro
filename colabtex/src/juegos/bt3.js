@@ -89,7 +89,7 @@ export function crearBt3Solo({ volver }) {
   };
 }
 
-export function crearBt3({ uid, pid, jugar, terminar, mirando, salir }) {
+export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   let host, frame, vest, partida = null, est = null, listo = false, muerto = false, ocupado = false, vestFirma = "";
   let senal = null, offP = null, offM = null, faseAntes = "", borrado = false, discoPedido = false;
   let permitido = false, discoMarco = false, peleabaAntes = false;   // es de la lista de amigos (se sabe al montar): antes, nada se pinta
@@ -460,8 +460,13 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir }) {
 
   function atarDar(que, jugada) {
     const grupo = [...vest.querySelectorAll(".jg-bt3-dar [data-g]")];
+    /* Dar la victoria a mano queda escrito en el chat de la sala: así nadie se pregunta después quién la dio ni a
+       quién (el marcador solo dice que ganó). */
     grupo.forEach(b => b.onclick = () => dosClics(b, grupo,
-      `✓ Confirmar: gana <span translate="no">${escapeHtml(nombre(b.dataset.g))}</span>`, () => anota(jugada(b.dataset.g))));
+      `✓ Confirmar: gana <span translate="no">${escapeHtml(nombre(b.dataset.g))}</span>`, () => {
+        anota(jugada(b.dataset.g));
+        chat?.(`🏆 ${nombre(uid)} dio la victoria de ${que} a ${b.dataset.g === "empate" ? "nadie (empate)" : nombre(b.dataset.g)}.`);
+      }));
   }
 
   function pintaVestibulo(forzar) {

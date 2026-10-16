@@ -838,7 +838,7 @@ index 3e0f86f..2b9066e 100644
                      if (gSaveData->rec[i].chara == in[j].id) {
                          custom[i] = out[j];
 diff --git a/src/menu/menu_c_e.c b/src/menu/menu_c_e.c
-index d61fdeb..4933f1a 100644
+index d61fdeb..0a86f7b 100644
 --- a/src/menu/menu_c_e.c
 +++ b/src/menu/menu_c_e.c
 @@ -42,6 +42,11 @@ CharSel *gCharSel = NULL;
@@ -927,7 +927,7 @@ index d61fdeb..4933f1a 100644
          }
      }
  
-@@ -1214,6 +1265,39 @@ void CharSel_Update(void) {
+@@ -1214,6 +1265,63 @@ void CharSel_Update(void) {
  }
  
  /* The side a pad is choosing for, its number and its movies. */
@@ -963,11 +963,50 @@ index d61fdeb..4933f1a 100644
 +    gCharSel->side[n]->state = CHARSEL_ST_DONE;
 +    CharSel_RequestFace(n);
 +}
++/* paginita-pro: R3 in the grid moves side `n`'s cursor to a character drawn at random (the room's tier rule
++   respected, the "?" and custom cells skipped), without choosing it: the player sees who came out and confirms
++   with Cross, or presses R3 again for another. It goes through the pad, so in a match both copies do the same draw
++   from the same generator (the page gives both the same BT3_SEED). The page also presses R3 for a key of its own
++   (juegos/bt3/pagina.js, «🎲»). */
++static void CharSel_WebRuleta(s32 n, s32 pad) {
++    s32 k, row, col;
++    (void)pad;
++    (void)CharSel_WebSorteo(n, &k);
++    col = k % 7;
++    row = k / 7;
++    CharSel_ClipGoto(n + 1, n, CHARSEL_CLIP_CHIP, "fl_off_start");
++    if (row != gCharSel->side[n]->row) {
++        Flash_GotoLabel(&gCharSel->flash[1 + n], "fl_reel_down", 1);
++        gCharSel->side[n]->mask = 1;
++    }
++    gCharSel->side[n]->col = col;
++    gCharSel->side[n]->row = row;
++    CharSel_ClipGoto(n + 1, n, CHARSEL_CLIP_CHIP, "fl_on_start");
++    CharSel_SetRowChips(n);
++    gCharSel->side[n]->chara = gCharSel->side[n]->chip[col];
++    CharSel_RequestFace(n);
++    Snd_PlaySe(2, 2);
++}
 +#endif
  #define CS_N (i + gCharSel->turn)
  #define CS_SIDE (gCharSel->side[CS_N])
  #define CS_REEL (&gCharSel->flash[1 + CS_N])
-@@ -1489,7 +1573,13 @@ void CharSel_Input(s32 *running) {
+@@ -1447,7 +1555,13 @@ void CharSel_Input(s32 *running) {
+                 CS_SIDE->chara = CS_SIDE->chip[CS_SIDE->col];
+                 CharSel_RequestFace(CS_N);
+                 Snd_PlaySe(2, 1);
+-            } else if (gPad[i].gamePressed & 0x200) {
++            }
++#ifdef __EMSCRIPTEN__
++            else if (gPad[i].gamePressed & 0x80000) { /* PADG_R3: paginita-pro, the cursor to a random character */
++                CharSel_WebRuleta(CS_N, i);
++            }
++#endif
++            else if (gPad[i].gamePressed & 0x200) {
+                 if (CS_CELL.id == MCHR_RANDOM) {
+                     Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
+                     CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_ok");
+@@ -1489,7 +1603,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
@@ -982,7 +1021,7 @@ index d61fdeb..4933f1a 100644
                      Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_ok");
                      gCharSel->customRows[CS_N] = 4;
-@@ -1540,7 +1630,13 @@ void CharSel_Input(s32 *running) {
+@@ -1540,7 +1660,13 @@ void CharSel_Input(s32 *running) {
                  CS_SIDE->chara = CS_SIDE->chip[CS_SIDE->form];
                  CharSel_RequestFace(CS_N);
                  Snd_PlaySe(2, 0);
@@ -997,7 +1036,7 @@ index d61fdeb..4933f1a 100644
                  Flash_GotoLabel(CS_PLATE, "fl_custom_in", 1);
                  CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_FORM_CHIP, "fl_ok");
                  if (CS_SIDE->flags & CHARSEL_SIDE_CUSTOM) {
-@@ -1707,6 +1803,9 @@ void CharSel_Input(s32 *running) {
+@@ -1707,6 +1833,9 @@ void CharSel_Input(s32 *running) {
                  } else {
                      if (CS_CELL.id == MCHR_RANDOM) {
                          /* the random cell: draw a cell that is a character, then one of its forms */
@@ -1007,7 +1046,7 @@ index d61fdeb..4933f1a 100644
                          for (;;) {
                              n = Rand_Range(gCharSel->masterCount[CS_N]);
                              id = gCharSel->cells[CS_N][n].id;
-@@ -1718,6 +1817,7 @@ void CharSel_Input(s32 *running) {
+@@ -1718,6 +1847,7 @@ void CharSel_Input(s32 *running) {
                          if (gCharSel->cells[CS_N][n].formCount != 0) {
                              chara = gCharSel->cells[CS_N][n].form[Rand_Range(gCharSel->cells[CS_N][n].formCount)];
                          }
@@ -1015,7 +1054,7 @@ index d61fdeb..4933f1a 100644
                          CS_SIDE->picked = chara;
                      } else {
                          CS_SIDE->picked = CS_SIDE->chip[CS_SIDE->col];
-@@ -1731,6 +1831,13 @@ void CharSel_Input(s32 *running) {
+@@ -1731,6 +1861,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_ClipGoto(CS_N + 1, CS_N, CHARSEL_CLIP_CHIP, "fl_off_start");
                  }
                  CS_SIDE->state = CHARSEL_ST_DONE;
@@ -1029,7 +1068,7 @@ index d61fdeb..4933f1a 100644
                  if (gCharSel->players != 1 && gCharSel->turn == 0) {
                      /* one pad: now choose for the other side */
                      gCharSel->turn = 1;
-@@ -1797,7 +1904,13 @@ void CharSel_Input(s32 *running) {
+@@ -1797,7 +1934,13 @@ void CharSel_Input(s32 *running) {
                      CharSel_RequestFace(CS_N);
                      CS_SIDE->state = CHARSEL_ST_FORM;
                      Snd_PlaySe(2, 0x29);
