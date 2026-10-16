@@ -1163,6 +1163,18 @@
     if (e.code === tecla && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "")) tira();
   }, true);
   Seleccion.oyentes.push(() => { if (!Seleccion.abierta) esperando = false; pintaDado(); });
+  /* Los atajos, a la vista: la primera vez que se abre la selección en esta página, las tres primeras veces en este
+     computador (en el celular no hay teclado: ahí está el ☰). */
+  let atajosVistos = false;
+  Seleccion.oyentes.push(abierta => {
+    if (!abierta || atajosVistos || document.body.classList.contains("coarse")) return;
+    atajosVistos = true;
+    let n = 0;
+    try { n = Number(localStorage.getItem("bt3.atajos")) || 0; } catch (e) {}
+    if (n >= 3) return;
+    try { localStorage.setItem("bt3.atajos", String(n + 1)); } catch (e) {}
+    aviso("Atajos: " + nombreTecla(tecla) + " = 🎲 aleatorio · F1 = Ajustes y controles · I = atrás en los menús", 6000);
+  });
   pintaDado();
   $("barra").insertBefore(cambia, $("barra").firstChild);
   $("barra").insertBefore(dado, cambia);
@@ -1361,15 +1373,30 @@
      cuando estén los dos (motor.js, `reanudar`): una copia del juego que se recargó no puede volver a una pelea a
      la mitad (cada una arranca de cero). */
   let cuenta = 0, cortada = false;
+  /* Un pitido corto por cada segundo de la cuenta (más agudo los últimos cinco): una pausa por corte se nota aunque
+     no se esté mirando la pantalla. Va por el contexto de audio del juego, así que lo gobierna el volumen de la página. */
+  function pitido(hz) {
+    try {
+      const ctx = Module.SDL3 && Module.SDL3.audioContext;
+      if (!ctx || ctx.state !== "running") return;
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+      o.type = "sine"; o.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.14);
+    } catch (e) {}
+  }
+  window.BT3Pitido = pitido;   // (el banco lo prueba)
   Module.onNetEvent = (que, txt) => {
     Module.keep("red: " + que + " " + txt);
     if (que === "arrived") aviso("");
     else if (que === "espera") {
       const hasta = Date.now() + (Number(txt) || 25) * 1000, quien = (est && est.rival && est.rival.nombre) || "tu rival";
       clearInterval(cuenta);
+      let ultimo = -1;
       const pinta = () => {
         const s = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
         aviso("⚡ Se cortó la conexión con " + quien + ". La pelea está en pausa: esperándolo " + s + " s… (si no vuelve, la pelea empieza de nuevo cuando estén los dos)", 0, true);
+        if (s !== ultimo) { ultimo = s; pitido(s <= 5 ? 1320 : 880); }   // (también se oye: quizás no se mira la pantalla)
       };
       pinta();
       cuenta = setInterval(pinta, 500);

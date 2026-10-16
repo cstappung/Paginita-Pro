@@ -360,6 +360,17 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   ⌨) and for the 🎲 button, both shown only while the selection is open (`Module.onSeleccion`, now fanned out via
   `Seleccion.oyentes` because the room's banned-list panel listens too).
 
+## Small touches (bench test `prueba56`)
+
+- «🏆 Dar la victoria» also writes «X dio la victoria de la pelea N a Y» in the room chat, through the new `ctx.chat`
+  that `juegos-main.js` hands every room module (`fb.mandaChat` as the person present).
+- On a phone (≤700 px) the rematch bar is `position: fixed` at the bottom; `sticky` failed because it only sticks
+  while its own box is on screen.
+- The reconnection countdown (`onNetEvent("espera")`) beeps once a second, higher in the last five, through the
+  game's AudioContext (`pitido`), so the page volume governs it.
+- The first time the character selection opens in a page, on a PC, the shortcuts show for 6 s (🎲 key, F1, I);
+  only the first three times on that computer (`bt3.atajos`).
+
 ## Battle music: «chinchonchin» from PRO HERO
 
 - **Off by default** (owner's request): the game's own music plays unless the player picks the song with ♪

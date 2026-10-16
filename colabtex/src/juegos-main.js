@@ -2816,6 +2816,9 @@ function montaJuego(p) {
        un juego cuyo marco tapa la página (BT3 a pantalla completa) y que
        ofrece su propio botón de salida. */
     salir: salirDeLaPartida,
+    /* Escribir en el chat de la sala a nombre de quien está: para que una
+       decisión a mano quede a la vista de todos (BT3: «Dar la victoria»). */
+    chat: texto => fb.mandaChat(state.pid, { uid: state.user.uid, nombre: state.user.name }, texto).catch(() => false),
     /* Quien mira monta el mismo módulo, que con esto sabe que no debe
        pintar una mano «suya» ni ofrecer botones que no van a escribir. */
     mirando: !soyJugador(),
