@@ -7,14 +7,17 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 
 const r = esbuild.buildSync({
-  stdin: { contents: `export * from './juegos/mercado-datos.js'; export { leeCopia } from './juegos/monedas.js'; export { mejoresDropsMascotas } from './juegos/mascotas-datos.js';`, resolveDir: path.join(__dirname, '..', 'src'), loader: 'js' },
+  stdin: { contents: `export * from './juegos/mercado-datos.js'; export { leeCopia } from './juegos/monedas.js'; export { mejoresDropsMascotas } from './juegos/mascotas-datos.js'; export { fijaSerie1 } from './juegos/prodrop-cartas.js';`, resolveDir: path.join(__dirname, '..', 'src'), loader: 'js' },
   bundle: true, write: false, format: 'cjs', platform: 'node', target: 'node20', logLevel: 'silent'
 });
 const M = { exports: {} };
 new Function('module', 'exports', 'require', r.outputFiles[0].text)(M, M.exports, require);
-const { mejoresDropsMascotas, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente, puedeComprar, puedeProponer, pendientesDe, FILTROS_INICIALES } = M.exports;
+const { fijaSerie1, mejoresDropsMascotas, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente, puedeComprar, puedeProponer, pendientesDe, FILTROS_INICIALES } = M.exports;
 
 const T = 1791700000000, V = 'vende0001', C = 'compra001';
+// las dos cuentas ven la Serie 01 (los profes), y quien mira es la compradora
+const AMBOS = { [V]: { at: 1 }, [C]: { at: 1 } };
+fijaSerie1(AMBOS, C);
 function base() {
   const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: { s: {} }, mercado: { o: {}, t: {} }, clubJugadas: {}, podios: {}, tienda: {}, mascotas: { a: {}, r: {}, c: {} }, completo: true,
     ajustes: { [V]: { a: { n: 9000, m: 'x', por: 'admin', at: T - 1 } }, [C]: { a: { n: 9000, m: 'x', por: 'admin', at: T - 1 } } } };
@@ -109,4 +112,27 @@ test('los últimos drops legendarios de Mascotas (la tira del salón): solo lege
   assert.deepEqual(l.map(x => x.at), legs.map(x => x[1]).sort((a, b) => b - a));
   assert.equal(mejoresDropsMascotas(d, 2).length, 2);
   assert.deepEqual(mejoresDropsMascotas({ completo: false }, 5), []);
+});
+
+test('la Serie 01: sus cartas solo están en el mercado de quien la ve, y solo se cambian entre dos que la ven', () => {
+  const d = base();
+  d.mascotas.a[C] = { '-Nmia00001': { at: T + 30, e: 'cat', p: 0 } };
+  const carta = `${V}~p-Npack0001.1`, dar = [`ma:${C}~-Nmia00001`];
+  d.mercado.t['-Ntrato0001'] = { de: C, para: V, dar, pedir: [carta], at: T + 40 };
+  try {
+    // la compradora no está en la lista; la vendedora sí
+    fijaSerie1({ [V]: { at: 1 } }, C);
+    assert.ok(ofertasMercado(d, C, {}).every(x => x.tipo !== 'carta'), 'la oferta de la carta no sale');
+    assert.match(puedeComprar(d, C, '-Nof0000001'), /ya no está a la venta/);
+    assert.equal(puedeComprar(d, C, '-Nof0000002'), '', 'lo demás se compra igual');
+    assert.ok(!gente(d, C)[V].some(c => c.includes('~p-Npack0001.')), 'no se le ofrece pedirla');
+    assert.equal(misCambios(d, C, {}).length, 0, 'el intercambio que la nombra no existe para ella');
+    assert.match(puedeProponer(d, C, V, dar, [carta]), /no se puede cambiar/);
+    // quien sí la ve tampoco se la puede pedir ni dar a quien no la ve
+    fijaSerie1({ [V]: { at: 1 } }, V);
+    assert.ok(ofertasMercado(d, V, {}).some(x => x.tipo === 'carta'), 'la vendedora ve su oferta');
+    assert.match(puedeProponer(d, V, C, [carta], []), /no se puede cambiar/);
+    assert.ok(!gente(d, V)[C] || gente(d, V)[C].every(c => !c.includes('~p-')));
+  } finally { fijaSerie1(AMBOS, C); }
+  assert.equal(misCambios(d, C, {}).length, 1, 'con la lista de vuelta, el intercambio está ahí');
 });

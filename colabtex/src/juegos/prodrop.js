@@ -11,10 +11,15 @@
    comprobar contra esa misma economía —el iframe podría estar mirando
    algo viejo—, porque las reglas no pueden saber si alcanza el dinero ni
    de quién es una carta: sin esta comprobación, un gasto sin fondos de
-   este mismo navegador pararía la cuenta. */
+   este mismo navegador pararía la cuenta.
+
+   La Serie 01 (Profes) solo le llega a quien está en la lista del admin
+   (`veSerie1`, prodrop-cartas.js): para el resto el abridor no recibe sus
+   cartas, ni sus sobres, ni la opción de comprarlos. No se le quita nada:
+   la economía sigue contándolas como suyas. */
 import { ambientar } from "./sonido.js";
 import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia, esCarta } from "./monedas.js";
-import { MOTOR, MAX_EXHIBIDAS } from "./prodrop-cartas.js";
+import { MOTOR, MAX_EXHIBIDAS, veSerie1, colVisible, copiaVisible } from "./prodrop-cartas.js";
 import { pendientesDe } from "./mercado-datos.js";
 
 const MAX_PRECIO = 100000;
@@ -26,16 +31,18 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
   function manda(x) { if (!muerto && frame && frame.contentWindow) frame.contentWindow.postMessage({ canal: "prodrop-parent", ...x }, location.origin); }
   const eco = () => economia(d);
   const cuenta = () => monedasDe(uid, d);
-  function exhibidas() {
+  // todas las que tiene puestas, también las de una serie que no ve
+  function exhibidasTodas() {
     const l = (perfil(uid) || {}).cartas;
     return (Array.isArray(l) ? l : l && typeof l === "object" ? Object.values(l) : [])
       .filter(k => typeof k === "string").map(k => (k.includes("~") ? k : uid + "~" + k)).slice(0, MAX_EXHIBIDAS);
   }
+  const exhibidas = () => exhibidasTodas().filter(c => copiaVisible(c));
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
     const q = leeCopia(c), so = q && q.tipo === "carta" && e.sobres[q.o + "~" + q.k];
-    if (!so || (so.r && q.i !== 0)) return null;
+    if (!so || (so.r && q.i !== 0) || !copiaVisible(c)) return null;
     // la de un re-roll no se rehace con un sobre: va con su carta, en `rr`
     // (no en `id`, que en el mercado es el de la oferta)
     return Object.assign({ c, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[c] }, so.r ? { rr: { id: so.r.id, g: so.r.g, w: so.r.w } } : {});
@@ -54,11 +61,12 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       const x = copia(e, o.c);
       if (x) ofertas.push(Object.assign(x, { id: o.id, u: persona(o.u), p: o.p, t: o.at, estado: o.estado, fin: 0, comprador: "" }));
     }
-    const mio = e.usuarios[uid];
-    manda({ tipo: "datos", uid, saldo: m.saldo, parada: m.parada, falta: m.falta,
-      mias: copiasDe(uid, d).map(x => Object.assign({ c: x.c, o: x.o, k: x.k, i: x.i, at: x.at, gr: x.gr, venta: x.venta },
+    const mio = e.usuarios[uid], sobres = {};
+    for (const [k, at] of Object.entries((mio && mio.sobres) || {})) if (colVisible(MOTOR.coleccionDe(k))) sobres[k] = at;
+    manda({ tipo: "datos", uid, saldo: m.saldo, parada: m.parada, falta: m.falta, serie1: veSerie1(),
+      mias: copiasDe(uid, d).filter(x => copiaVisible(x.c)).map(x => Object.assign({ c: x.c, o: x.o, k: x.k, i: x.i, at: x.at, gr: x.gr, venta: x.venta },
         x.id != null ? { rr: { id: x.id, g: x.g, w: x.w } } : {})),
-      sobres: (mio && mio.sobres) || {}, gratis: proximoGratis(uid, d, fb.ahora()),
+      sobres, gratis: proximoGratis(uid, d, fb.ahora()),
       ofertas, pendientes: pendientesDe(d, uid), gente,
       exh: exhibidas(), desfase: fb.ahora() - Date.now() });
   }
@@ -69,11 +77,16 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
     if (m.parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no puedes gastar.");
     if (falta(p)) throw new Error(`${que} cuesta ${p}: te faltan ${falta(p)} monedas.`);
   }
-  const mia = c => economia(d).dueno[c] === uid;
+  // una carta suya que ve (las de una serie oculta no se tocan desde aquí)
+  const mia = c => economia(d).dueno[c] === uid && copiaVisible(c);
   /* El prefijo de la colección que pide el abridor. Uno viejo (de antes de
      las colecciones, en caché) no la manda: su sobre va sin prefijo y sale
      del catálogo que ese abridor conoce. */
   const prefijo = col => (MOTOR.COL[col] ? MOTOR.COL[col].prefijo : "");
+  /* Un sobre sin prefijo es de los profes (`coleccionDe`): un abridor viejo
+     en caché tampoco compra la Serie 01 si no la ve. */
+  const sobreVisible = col => colVisible(MOTOR.coleccionDe(prefijo(col)));
+  const SIN_SOBRE = "Ese sobre no está disponible.";
 
   /* Una petición a la vez: dos compras seguidas con el saldo justo para
      una no deben pasar las dos el control. */
@@ -85,11 +98,13 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
         const e = eco();
         if (x.accion === "comprar") {
           const p = MOTOR.precioSobre(fb.ahora());
+          if (!sobreVisible(x.col)) throw new Error(SIN_SOBRE);
           pagable(p, "Un sobre");
           const r = await fb.comprarSobre(uid, p, prefijo(x.col));
           if (!(economia(d).sobres[uid + "~" + r.k])) throw new Error("Otra pestaña gastó tus monedas a la vez: este sobre no vale hasta que ganes las que faltan.");
           responde(true, r);
         } else if (x.accion === "gratis") {
+          if (!sobreVisible(x.col)) throw new Error(SIN_SOBRE);
           if (proximoGratis(uid, d, fb.ahora())) throw new Error("Tu sobre gratis todavía no está listo.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se abren sobres.");
           const r = await fb.sobreGratis(uid, prefijo(x.col));
@@ -131,7 +146,10 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
           responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier });
         } else if (x.accion === "exhibir") {
           const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => esCarta(c) && mia(c));
-          await fb.exhibirCartas(uid, [...new Set(lista)].slice(0, MAX_EXHIBIDAS));
+          /* Las que tenía puestas de una serie que ya no ve se quedan, si
+             caben: el abridor no las conoce y no debe borrarlas. */
+          const ocultas = exhibidasTodas().filter(c => !copiaVisible(c) && economia(d).dueno[c] === uid);
+          await fb.exhibirCartas(uid, [...new Set([...lista, ...ocultas])].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
@@ -182,7 +200,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-18";
+      frame.src = "juegos/prodrop/index.html?v=pd-19";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

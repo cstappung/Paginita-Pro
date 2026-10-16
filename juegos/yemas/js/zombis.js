@@ -22,7 +22,7 @@
 // vez que se abre una. Si ven a su presa la persiguen derecho; si no, van al
 // nodo visible que deja menos camino hasta el nodo desde donde se la ve.
 import * as THREE from 'three';
-import { moverCuerpo, rayoMundo, crearZombi, ALTO } from 'yemas/mundo';
+import { moverCuerpo, rayoMundo, crearZombi, soltarZombi, ALTO } from 'yemas/mundo';
 
 export const ZB = {
   mordida: 40, alcance: 1.3, cadencia: 1.1, preparar: 0.35, sube: 0.9, pausa: 9, arranque: 3,
@@ -49,8 +49,8 @@ export const mordidaRonda = r => Math.min(75, 30 + 2.5 * (Math.max(1, r) - 1));
 // Las clases de zombi, para que las rondas no sean solo «lo mismo con más
 // vida»: cada pocas rondas llega algo nuevo hasta pasada la 30, como en Black
 // Ops. El índice en TIPOS viaja por la red: lo nuevo va siempre al final.
-//   n común · c corredor (5) · g grandote (8) · p perro infernal (rondas de
-//   perros: 6, 11, 16…) · t tóxico (10: se arrastra y revienta en gas) ·
+//   n común · c corredor (5) · g grandote (8) · p gallina infernal (rondas de
+//   gallinas: 6, 11, 16…) · t tóxico (10: se arrastra y revienta en gas) ·
 //   f napalm (15: arde siempre, quema al que se arrima y explota) · x chillón
 //   (18: su grito ciega) · j el Mutante (jefe de las rondas 20, 25, 30…) ·
 //   k con casco (22: a la cabeza no le duele hasta romperlo).
@@ -123,7 +123,7 @@ export const TOPE_VIVOS = { t: 4, f: 2, x: 2, k: 8 };
 // Lo que se avisa al empezar las rondas que traen algo nuevo.
 export const NOVEDAD_RONDA = {
   5: '¡Cuidado: ahora algunos corren!',
-  6: '¡Ronda de perros infernales! Salen de un rayo, cerca tuyo. El último suelta munición',
+  6: '¡Ronda de gallinas infernales! Salen de un rayo, cerca tuyo. La última suelta munición',
   8: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
   10: '¡Tóxicos! Se arrastran y revientan en gas verde: no los mates encima',
   13: '¡Ronda 13: los corredores ya te alcanzan caminando!',
@@ -137,7 +137,7 @@ export const NOVEDAD_RONDA = {
 };
 export function novedadRonda(r) {
   if (NOVEDAD_RONDA[r]) return NOVEDAD_RONDA[r];
-  if (esPerros(r)) return '¡Ronda de perros infernales!';
+  if (esPerros(r)) return '¡Ronda de gallinas infernales!';
   if (esJefe(r)) return '¡Vuelve el Mutante!';
   return '';
 }
@@ -192,11 +192,12 @@ const geoLlama = new THREE.ConeGeometry(0.22, 0.7, 7);
 const matLlama = new THREE.MeshBasicMaterial({ color: '#ff8a1c', transparent: true, opacity: 0.85, depthWrite: false });
 const matLlama2 = new THREE.MeshBasicMaterial({ color: '#ffd23a', transparent: true, opacity: 0.8, depthWrite: false });
 
-// cb: alCaer({id, pos, killer, cab, a, explota, tipo}), pideRonda(r), grunido(pos),
-//     rompe(pos) (una tabla arrancada), aparece(tipo, pos), finPerros(pos),
-//     chilla(pos), ruge(pos), casco(pos)
+// cb: alCaer({id, pos, killer, cab, a, explota, tipo}), pideRonda(r), grunido(pos, tipo),
+//     ataca(pos, tipo) (el amago del mordisco), rompe(pos) (una tabla
+//     arrancada), aparece(tipo, pos), finPerros(pos), chilla(pos), ruge(pos),
+//     casco(pos)
 // `explota` al morir: 0 nada, 1 fuego (lava o napalm), 2 gas (tóxico), 3 el
-// fogonazo de un perro. Los marcos viejos lo leían como verdadero o falso.
+// fogonazo de plumas de una gallina infernal (`p`, antes un perro). Los marcos viejos lo leían como verdadero o falso.
 export function crearZombis(escena, colisores, cb) {
   const zs = new Map();         // id → zombi
   const vistos = new Set();     // muertes ya anunciadas
@@ -314,7 +315,7 @@ export function crearZombis(escena, colisores, cb) {
     const z = zs.get(id);
     if (!z) return null;
     escena.remove(z.mesh);
-    z.mesh.userData.casco.material.dispose();
+    soltarZombi(z.mesh);
     zs.delete(id);
     return z;
   }
@@ -802,6 +803,13 @@ export function crearZombis(escena, colisores, cb) {
       dr = Math.atan2(Math.sin(dr), Math.cos(dr));
       z.mesh.rotation.y += dr * kp;
       const c = z.mesh.userData.cuerpo;
+      // Cuánto anda de verdad (sirve igual al director que a los demás): marca
+      // el paso de las patas, que así no patinan.
+      const mp = z.mesh.position;
+      if (z.px !== undefined && dt > 0) z.rapidez += (Math.min(9, Math.hypot(mp.x - z.px, mp.z - z.pz) / dt) - z.rapidez) * kp;
+      else z.rapidez = 0;
+      z.px = mp.x; z.pz = mp.z;
+      z.zancada = (z.zancada || 0) + z.rapidez * dt;
       const fase = t * 9 + z.id;
       c.rotation.z = Math.sin(fase) * 0.16;
       // Arrancando tablas: tirones hacia adelante.
@@ -811,23 +819,45 @@ export function crearZombis(escena, colisores, cb) {
         : trepa ? 0.5 + Math.sin(t * 10 + z.id) * 0.12 : (z.carga > 0 ? 0.5 : 0.18) + (z.prep >= 0 ? 0.45 : 0);
       if (trepa) c.rotation.z = Math.sin(t * 10 + z.id) * 0.1;
       const ud = z.mesh.userData;
-      // Los perros galopan y el tóxico se arrastra: ni se bambolean ni se
-      // inclinan como uno que camina.
+      // Las gallinas corren a saltitos y el tóxico se arrastra: ni se
+      // bambolean ni se inclinan como uno que camina.
       if (ud.patas) {
-        c.rotation.z = 0; c.rotation.x = z.prep >= 0 ? 0.25 : 0;
-        c.position.y = Math.abs(Math.sin(t * 13 + z.id)) * 0.08;
-        ud.patas.forEach((pa, i) => { pa.rotation.x = Math.sin(t * 13 + z.id + (i % 2 ? Math.PI : 0) + (i > 1 ? 0.6 : 0)) * 0.7; });
+        const zz = z.zancada * 5.5 + z.id;
+        c.rotation.z = 0; c.rotation.x = z.prep >= 0 ? 0.35 : 0.08;
+        c.position.y = Math.abs(Math.sin(zz)) * 0.07;
+        ud.patas.forEach((pa, i) => { pa.rotation.x = Math.sin(zz + (i % 2 ? Math.PI : 0)) * 0.85; });
+        // Aletea como loca y picotea; al amagar el picotazo estira el cuello.
+        ud.alas?.forEach((a, i) => { a.rotation.z = (i ? -1 : 1) * (0.25 + (0.5 + 0.5 * Math.sin(t * 24 + z.id)) * 0.7); });
+        if (ud.cabeza) {
+          ud.cabeza.rotation.x = z.prep >= 0 ? 0.55 + Math.sin(t * 30) * 0.2 : Math.sin(zz * 2) * 0.18;
+          ud.cabeza.position.z = -0.3 - (z.prep >= 0 ? 0.08 : 0);
+        }
+      }
+      // Los demás arrastran las patas de pollo, al paso de lo que avanzan.
+      if (ud.piernas) {
+        const amp = Math.min(1, z.rapidez / 1.6) * 0.65;
+        ud.piernas.forEach((pi, i) => { pi.rotation.x = Math.sin(z.zancada * 3.4 + z.id + i * Math.PI) * amp; });
       }
       if (ud.repta) { c.rotation.z = Math.sin(t * 5 + z.id) * 0.06; c.rotation.x = 0; c.position.z = Math.sin(t * 5 + z.id) * 0.06; }
       if (ud.yelmo) ud.yelmo.visible = z.casco > 0;
-      if (ud.boca) ud.boca.scale.y = z.grita > 0 ? 1.6 + Math.sin(t * 40) * 0.3 : 0.5;
+      // La boca: abierta de par en par al gritar o al ir a morder, y si no,
+      // masculla.
+      if (ud.boca) ud.boca.scale.y = z.grita > 0 ? 1.6 + Math.sin(t * 40) * 0.3
+        : z.prep >= 0 ? 1.3 : 0.45 + 0.3 * Math.max(0, Math.sin(t * 5 + z.id * 1.7));
+      if (z.prep >= 0 && !z.amagaba && ojo && z.mesh.position.distanceTo(ojo) < 25) cb.ataca?.(z.mesh.position, z.tipo);
+      z.amagaba = z.prep >= 0;
       if (z.grita > 0 && !z.gritaba && ojo) cb.chilla?.(z.mesh.position);
       z.gritaba = z.grita > 0;
       if (ud.ojos && z.tipo === 'j') ud.ojos.forEach(o => o.material.emissiveIntensity = z.carga > 0 ? 2.5 : 1);
       const brazos = z.mesh.userData.brazos || [];
       brazos.forEach((b, i) => {
-        const obj = trepa ? Math.PI / 2 + 0.9 + Math.sin(t * 10 + z.id + i * Math.PI) * 0.35 : Math.PI / 2;
+        // Estirados hacia adelante y meciéndose; arriba al trepar, y al ir
+        // a morder se levantan para el zarpazo.
+        const obj = trepa ? Math.PI / 2 + 0.9 + Math.sin(t * 10 + z.id + i * Math.PI) * 0.35
+          : z.fase === 'rompe' ? Math.PI / 2 + Math.max(0, Math.sin(t * 7 + z.id + i * 1.3)) * 0.6
+          : z.prep >= 0 ? Math.PI / 2 + 0.7 : Math.PI / 2 - 0.1 + Math.sin(t * 2.6 + z.id + i * Math.PI) * 0.16;
         b.rotation.x += (obj - b.rotation.x) * kp;
+        b.rotation.z = (i ? -1 : 1) * (0.06 + Math.sin(t * 1.9 + z.id + i) * 0.05);
       });
       z.golpeT = Math.max(0, z.golpeT - dt);
       const e = z.mesh.userData.casco.material.emissive;
@@ -839,7 +869,7 @@ export function crearZombis(escena, colisores, cb) {
       z.grunido -= dt;
       if (z.grunido <= 0) {
         z.grunido = 4 + Math.random() * 7;
-        if (ojo && z.mesh.position.distanceTo(ojo) < 30) cb.grunido(z.mesh.position);
+        if (ojo && z.mesh.position.distanceTo(ojo) < 30) cb.grunido(z.mesh.position, z.tipo);
       }
     }
     // Los huevos fritos verdes: se extienden al caer, la yema late y se

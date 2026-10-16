@@ -15,6 +15,10 @@ the PRODROP iframe. The nodes are the same, `mercado/o` (listings) and
 - the replay accepts only a listing whose seller owns the copy;
 - an unfunded purchase is `impaga`.
 
+Serie 01 (Profes) cards exist only for accounts on the admin's list
+(`juegos/prodrop/CLAUDE.md`): `fichaCopia` hides them from everyone else,
+and they trade only between two accounts that both see the series.
+
 **Copy types** (`leeCopia`):
 
 - a card is `<uid>~<pack>.<i>`, exactly as before;

@@ -957,3 +957,15 @@ export const levantaSuspension = uid => remove(ref(db, `suspensiones/${uid}`));
 /* El veto de siempre (`vetados/<uid>`): para siempre, hasta que se quite. */
 export const veta = (uid, m) => set(ref(db, `vetados/${uid}`), { at: serverTimestamp(), m: String(m || "").slice(0, 300) });
 export const quitaVeto = uid => remove(ref(db, `vetados/${uid}`));
+
+/* ---------- PRODROP: quién ve la Serie 01 (Profes) ----------
+   `prodropSerie1/<uid>` = {at, por}: la lista la escribe un administrador
+   desde su panel. Es solo de vista: quitar a alguien no le toca ni una
+   carta (la economía no lee este nodo), solo deja de verlas. La leen
+   todos los que iniciaron sesión porque un intercambio necesita saber si
+   la otra persona también ve la serie. Antes de publicar las reglas la
+   lectura falla y nadie la ve (`cb({})`). */
+export const watchSerie1 = cb =>
+  onValue(ref(db, "prodropSerie1"), s => cb(s.val() || {}), () => cb({}));
+export const habilitaSerie1 = (uid, por) => set(ref(db, `prodropSerie1/${uid}`), { at: serverTimestamp(), por });
+export const quitaSerie1 = uid => remove(ref(db, `prodropSerie1/${uid}`));

@@ -109,7 +109,7 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   and between-round timers, each zombie as `[id, x, y, z, ry, hp%, rising,
   burning, phase, window, kind, marks]` (marks: 1 helmet on, 2 charging, 4
   screaming), and the last 20 deaths as `[id, killer, head, weapon, explodes,
-  kind]`, where `explodes` is 0, 1 fire, 2 toxic gas or 3 a dog's burst.
+  kind]`, where `explodes` is 0, 1 fire, 2 toxic gas or 3 a hell chicken's burst.
   Fields only ever go on the end, so an older frame still reads the state
   (an unknown kind draws as a common one). The other frames only draw them
   (`desdeRed`). Firebase drops empty arrays, so `zb.z` can come back
@@ -182,9 +182,11 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   blinds for 1.3 s). The helmeted one (`k`, 22: headshots do 15 % and
   count as body shots until the helmet, 60 % of its life, breaks). From
   round 28 the specials weigh half again and commons nearly vanish.
-  **Two kinds of round break the routine**: dog rounds (`esPerros`: 6,
-  11, 16…) spawn only hellhounds (`p`), out of a lightning strike a few
-  metres from a player under orange fog, and the last one drops a Max
+  **Two kinds of round break the routine**: hell chicken rounds
+  (Black Ops' dog rounds, egg-themed; the code keeps the old names:
+  `esPerros`: 6, 11, 16…, kind `p`) spawn only hell chickens, out of a
+  lightning strike a few metres from a player under orange fog, burst
+  into feathers (`plumas` in `main.js`), and the last one drops a Max
   Ammo; boss rounds (`esJefe`: 20, 25, 30…) open with the Mutante (`j`,
   two from round 30 with two or more players), whose life is `jefeHp`,
   that no single hit can take more than 8 % of (so no Insta-Kill
@@ -197,10 +199,15 @@ cost is a stray bite, not a broken game. Seven things hold it together:
 - **A zombie's shape is what gets shot.** `FORMA` (scale `e`, relative
   height `a`) and `MEDIDA_Z` in `mundo.js` must agree (the test compares
   them): `rayoHuevo(o, d, p, escala, alto)` flattens the ellipsoid of a
-  dog or a crawling toxic, the head line is `alto`-scaled in both
+  chicken or a crawling toxic, the head line is `alto`-scaled in both
   `primerBlanco` and the hit, and `chocaZombis` scales radius and height
   too. The models (`crearZombi` in `mundo.js`) carry what `animar` moves:
-  `patas` (a dog's gallop), `repta`, `yelmo`, `boca`, `ojos`.
+  `patas`, `alas` and `cabeza` (a chicken's hop, flap and peck), `piernas`
+  (every walker), `brazos` (shoulder pivots), `repta`, `yelmo`, `boca`
+  (every kind has one, with teeth), `ojos`. Each model merges its static
+  parts by material (`funde`) to keep draw calls down, so its geometries
+  are its own: remove one with `soltarZombi`, which spares the shared
+  `geoHuevo` and the shared materials.
   `tests/yemas-zombis.test.cjs` pins the curve, the cap, the round each
   kind arrives in and the special rounds.
 
@@ -451,3 +458,39 @@ the tab is hidden. `tests/yemas.test.cjs` covers the reducer, the four
 variants and `ganoEn`. Practice is free-for-all or zombies. The team modes
 and online zombies were tested with several frames driven by a fake room
 that runs the real `reducir`.
+
+**Looks and sound (the «less blocky» pass).** Things that hold it together:
+
+- **First-person weapons are `mano.js`** (`yemas/mano` in the import
+  map). `construyeArma(id)` builds each weapon's model (egg-themed: the
+  mixer SMG, the pump shotgun loaded with eggs, the poached sniper, the
+  eggs benedict bazooka…); `armaConManos(id)` adds the two gloves
+  (`crearGuante` in `mundo.js`, also used by the eggs and the bottle).
+  The convention is muzzle to `-z`, grip at the origin, `userData.boca`
+  the muzzle, `der`/`izq` the glove poses and `recarga` the reload kind
+  (`cargador`, `cerrojo`, `escopeta`, `cohete`, `rayo`, `cinta`, `peine`).
+  `crearVista(escenaArma)` animates it: spring recoil, sway, bob, draw,
+  landing, keyframed reloads driven by `recarga` 0–1, muzzle flash and
+  ejected casings. The reload keyframes line up with the clicks of
+  `sonido.recarga(arma, dur)` in `audio.js`; change both together.
+  Materials in `mano.js` are shared and flagged `userData.compartido`:
+  anything that disposes a weapon model (`quitaDelSuelo`, `quitaMalla`,
+  `interactivo.js`'s `desmonta`) must skip those.
+- **Other eggs carry their weapon** (`j.arma`, rebuilt when `e.a`
+  changes, in `userData.mano`), kick on each shot, blink and walk.
+- **Graphics**: ACES tone mapping (exposure 1.15, 1.45 on the night
+  zombies maps), a sky dome shader (its horizon *is* the fog colour
+  object, so they always match; sun and clouds by day, stars at night,
+  tinted orange on chicken rounds), the sky reflected as
+  `escena.environment` through PMREM (`reflejaCielo`, re-run when the sky
+  changes), a `RoomEnvironment` for the weapon scene, and a sun whose
+  shadow box follows the camera (`sigueSol`). three r160 has no
+  `environmentIntensity`, and the environment only lights
+  Standard/Physical materials. `three/addons/` is in the import map for
+  these.
+- **Audio is positional**: every world sound takes a position (or a
+  plain distance), and `sonido.oido(pos, yaw)` sets the listener each
+  frame. Zombies have Call of Duty–style voices per kind (`grunido`,
+  `ataque` when they wind up a bite, `muereZombi`), the hell chickens
+  their own. Footsteps follow the bob; landings are louder the harder
+  the fall.

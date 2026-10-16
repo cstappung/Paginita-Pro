@@ -1290,3 +1290,5 @@ html.visor body > :not(#visor):not(svg) { display: none !important; }
 .visor { position: fixed; inset: 0; display: grid; place-items: center; }
 .visor[hidden] { display: none; }
 .visor .card { width: min(74vw, calc(74vh / 1.4)); animation: zoomIn .5s var(--ease-out); }
+/* La Serie 01 (profes) solo para quien la ve: app.js pone body.serie1. */
+body:not(.serie1) .solo-serie1 { display: none; }

@@ -16,6 +16,36 @@ export const RAIZ = "juegos/prodrop/";
 export const MAX_EXHIBIDAS = 4;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+/* ---------- la Serie 01 (Profes): solo para quien habilita el admin ----------
+   `prodropSerie1/<uid>` (lo escribe el panel de administración). Para quien
+   no está en la lista esa colección no existe en ninguna pantalla: ni su
+   sobre, ni sus cartas en la colección, el perfil propio o el ajeno, el
+   mercado, los intercambios, las tablas o los drops. **Es solo de vista**:
+   la economía no lee la lista, así que quien sale de ella no pierde nada
+   (sus cartas, su saldo y sus gastos siguen igual) y al volver a entrar
+   las ve otra vez. La colección de una copia sale de la clave de su sobre
+   (`coleccionDe`: «c…» componentes, lo demás profes), sin rehacerlo.
+   Hasta que llega la lista (o sin reglas publicadas) no se ve. */
+export const SERIE1 = "profes";
+let serie1 = {}, yo = "";
+/* La lista y quién mira. Devuelve si cambió lo que ve alguien. */
+export function fijaSerie1(lista, uid) {
+  const l = lista && typeof lista === "object" ? lista : {}, u = uid || "";
+  const antes = JSON.stringify([Object.keys(serie1).sort(), yo]);
+  serie1 = l; yo = u;
+  return antes !== JSON.stringify([Object.keys(serie1).sort(), yo]);
+}
+/* ¿Ve la serie esta cuenta? Sin uid, la de quien mira. */
+export const veSerie1 = (u = yo) => !!(u && serie1[u]);
+export const colVisible = (col, u) => col !== SERIE1 || veSerie1(u);
+/* Una copia («o~k.i», «ob:…», «ma:…») que esa cuenta puede ver. */
+export function copiaVisible(cc, u) {
+  const q = leeCopia(cc);
+  return !q || q.tipo !== "carta" || colVisible(PM.coleccionDe(q.k), u);
+}
+/* Cuántas cartas tiene la colección que ve quien mira. */
+export const totalVisible = () => PM.COLECCIONES.reduce((s, c) => s + (colVisible(c.key) ? PM.POR_COL[c.key].length : 0), 0);
+
 /* La economía, solo con la lectura completa: con la mitad de los nodos
    lo ganado sale de una suma a medias. */
 export const ecoDe = datos => (datos && datos.completo ? economia(datos) : null);
@@ -24,7 +54,7 @@ export const ecoDe = datos => (datos && datos.completo ? economia(datos) : null)
    carta}. `uid` es el origen: los drops hablan de quien abrió el sobre. */
 function copia(e, o, k, i) {
   const so = e.sobres[o + "~" + k];
-  if (!so) return null;
+  if (!so || !colVisible(PM.coleccionDe(k))) return null;
   /* Un re-roll es un «sobre» de una sola carta (la 0), sin god pack. */
   const s = so.r ? null : PM.sobre(o, k, so.at), c = so.r ? (i === 0 ? so.r : null) : s.cartas[i], cc = claveCopia(o, k, i);
   if (!c) return null;
@@ -55,6 +85,7 @@ export function mejoresDrops(datos, n = 8) {
   const e = ecoDe(datos), out = [];
   if (!e) return out;
   for (const so of Object.values(e.sobres)) {
+    if (!colVisible(PM.coleccionDe(so.k))) continue;
     if (so.r) { if (PM.CARDS[so.r.id].tier >= 2) out.push(copia(e, so.u, so.k, 0)); continue; }
     const s = PM.sobre(so.u, so.k, so.at);
     s.cartas.forEach((c, i) => { if (PM.CARDS[c.id].tier >= 2) out.push(copia(e, so.u, so.k, i)); });
@@ -69,19 +100,22 @@ const memoCopias = new WeakMap();
 function copiasVivas(datos) {
   const e = ecoDe(datos);
   if (!e) return null;
-  if (memoCopias.has(e)) return memoCopias.get(e);
+  // lo que se ve depende de la Serie 01: la memoria también
+  const m = memoCopias.get(e), v = veSerie1();
+  if (m && m.v === v) return m.out;
   const out = [];
   for (const [cc, u] of Object.entries(e.dueno)) {
     const q = leeCopia(cc), c = q && q.tipo === "carta" && copia(e, q.o, q.k, q.i);
     if (c && u) out.push(c);
   }
-  memoCopias.set(e, out);
+  memoCopias.set(e, { v, out });
   return out;
 }
 
-/* Top de colección: cuántas cartas distintas de las TOTAL tiene cada
-   cuenta ahora (graduadas o no; repetidas cuentan una vez). En empate,
-   más legendarias, luego más copias. */
+/* Top de colección: cuántas cartas distintas de las que ve quien mira
+   (todas, o sin la Serie 01) tiene cada cuenta ahora (graduadas o no;
+   repetidas cuentan una vez). En empate, más legendarias, luego más
+   copias. */
 export function rankingColeccion(datos, n = 10) {
   const l = copiasVivas(datos);
   if (!l) return null;
@@ -92,7 +126,7 @@ export function rankingColeccion(datos, n = 10) {
     if (c.carta.tier === 3) a.leyendas.add(c.id);
   }
   return Object.values(por)
-    .map(a => ({ uid: a.uid, tiene: a.ids.size, total: PM.TOTAL, copias: a.copias, leyendas: a.leyendas.size }))
+    .map(a => ({ uid: a.uid, tiene: a.ids.size, total: totalVisible(), copias: a.copias, leyendas: a.leyendas.size }))
     .sort((a, b) => b.tiene - a.tiene || b.leyendas - a.leyendas || b.copias - a.copias || (a.uid < b.uid ? -1 : 1))
     .slice(0, n);
 }
@@ -115,7 +149,7 @@ export function cifras(datos) {
   const e = ecoDe(datos);
   let sobres = 0, dioses = 0, leyendas = 0;
   for (const so of Object.values((e && e.sobres) || {})) {
-    if (so.r) continue;   // un re-roll no es un sobre abierto
+    if (so.r || !colVisible(PM.coleccionDe(so.k))) continue;   // un re-roll no es un sobre abierto
     const s = PM.sobre(so.u, so.k, so.at);
     sobres++; if (s.dios) dioses++;
     leyendas += s.cartas.filter(c => PM.CARDS[c.id].tier === 3).length;
