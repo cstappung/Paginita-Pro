@@ -6,7 +6,7 @@
 `juegos/admin-datos.js`, pure and shared with
 `scripts/auditar-club.cjs`; `tests/admin.test.cjs`). The 🛡️ in the header
 appears after one `esAdminJuegos` read per session. The panel is the face,
-not the key: every write is re-checked by the rules. Four tabs:
+not the key: every write is re-checked by the rules. Five tabs:
 
 - **Récords**: `guardaConPodio` writes `revisiones/<cat>/<uid>` = `{p, pts,
   t, l, n, at}` whenever a club record climbs to places 1–3
@@ -40,6 +40,11 @@ not the key: every write is re-checked by the rules. Four tabs:
   stored in `localStorage` (lifting it must work). The rules add the same
   condition as `vetados` (until `hasta`) to every write `vetados` blocks.
   The permanent veto (`vetados`) is managed from the same tab.
+- **Serie 01**: who sees PRODROP's Profes collection, `prodropSerie1/<uid>`
+  = `{at, por}` (admins write, anyone signed in reads). View-only: removing
+  someone keeps every card of theirs (`juegos/prodrop/CLAUDE.md`). The tab
+  shows how many Serie 01 copies each account owns, and the admin must add
+  themselves to see it too.
 
 `test-rules.mjs` covers the new nodes. To run it here the database emulator
 had to be started with `java -jar` and the rules PUT with curl to the

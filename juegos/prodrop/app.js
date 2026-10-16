@@ -77,10 +77,21 @@ const CARDS = M.CARDS.map(m => {
   const v = VARIANTS.find(x => x.key === m.vkey), h = hash(m.person + v.key);
   return Object.assign({}, m, { v, hp: (v.hp || 0) + (h % 3) * 10, retreat: 1 + (h % 3) });
 });
-const TOTAL = CARDS.length;
 // cada colección numera sus cartas: N.º 12/170 en los profes, N.º 12/275 en componentes
 const totalDe = c => M.POR_COL[c.col].length;
-const COLS = M.COLECCIONES;
+/* Las colecciones que ve esta cuenta. La Serie 01 (profes) solo le llega
+   a quien está en la lista del admin (`serie1` en los datos): para el
+   resto no hay sobre, ni pestaña, ni cartas (Juegos ni las manda). Sus
+   cartas siguen siendo suyas: solo no se ven. */
+let COLS = M.COLECCIONES, TOTAL = CARDS.length;
+function fijaColecciones(serie1) {
+  COLS = M.COLECCIONES.filter(co => serie1 || co.key !== 'profes');
+  TOTAL = COLS.reduce((n, co) => n + M.POR_COL[co.key].length, 0);
+  const una = COLS.length < 2;
+  ['#cambiaBtn', '#cambiaBtn2', '#rrCols', '#colTabs'].forEach(q => { const el = $(q); if (el) el.style.display = una ? 'none' : ''; });
+  document.body.classList.toggle('serie1', !!serie1);
+}
+const colVisible = k => COLS.some(co => co.key === k);
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
@@ -770,6 +781,8 @@ const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${SKIN[coleccion]
    Lo primero al entrar: qué sobre abrir. Cada colección muestra tres de
    sus mejores cartas, cuántas tienes de ella y qué trae. */
 function eligeSobre() {
+  // con una sola colección no hay nada que elegir
+  if (COLS.length < 2) { coleccion = COLS[0].key; tienda(); return; }
   setPhase('elige');
   comprados = []; pull = []; abriendo = new Set();
   rehazColeccion();
@@ -1488,7 +1501,7 @@ function renderCopies() {
 let colCol = '';
 function renderCollection() {
   if (colView) return renderCopies();
-  if (!M.COL[colCol]) colCol = coleccion;
+  if (!colVisible(colCol)) colCol = coleccion;
   $('#colGrid').classList.remove('copies-view');
   const todas = M.POR_COL[colCol].map(m => CARDS[m.n]), deCol = todas.filter(c => col[c.uid]).length;
   const gn = Object.values(copies).flat().filter(cp => cp.gr && CARDS[cp.id].col === colCol).length;
@@ -1819,7 +1832,10 @@ addEventListener('message', e => {
   if (d.tipo === 'datos') alDatos(d);
 });
 function alDatos(d) {
-  const primera = !cuenta.listo;
+  const primera = !cuenta.listo, antes = COLS.length;
+  fijaColecciones(!!d.serie1);
+  if (!colVisible(coleccion)) coleccion = COLS[0].key;
+  if (!colVisible(rr.col)) { rr.col = coleccion; rr.sel = []; }
   Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
     mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], pendientes: d.pendientes || 0,
     gente: d.gente || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
@@ -1828,11 +1844,13 @@ function alDatos(d) {
     $('#cargando').hidden = true;
     let ks = []; try { ks = (localStorage.getItem(PENDIENTE()) || '').split(',').filter(Boolean); } catch {}
     // sobres comprados y sin abrir (se cerró la pestaña): se sigue con esos, sin cobrar otra vez
-    const vivos = ks.filter(k => cuenta.sobres[k]).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
+    const vivos = ks.filter(k => cuenta.sobres[k] && colVisible(M.coleccionDe(k))).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
     if (vivos.length) newPacks(vivos);
     else eligeSobre();
     return;
   }
+  // cambió qué colecciones ve: se vuelve a elegir sobre si estaba eligiendo
+  if (COLS.length !== antes && (phase === 'elige' || phase === 'tienda')) { eligeSobre(); return; }
   pintaCompra();
   pintaAvisos();
   if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();

@@ -2,7 +2,7 @@
    El panel de administración (`#admin`), solo para quien está en
    `admins/<uid>` (eso se escribe a mano en la consola de Firebase).
 
-   Cuatro pestañas:
+   Cinco pestañas:
    - **Récords**: cada récord del club que sube al podio (1.º a 3.º) de su
      tabla deja una revisión (`revisiones/<cat>/<uid>`). Aquí se abre, se
      baja su prueba, se pasa por el verificador y —en Tetris, Snake, sortEm
@@ -20,6 +20,9 @@
    - **Suspensiones**: dejar a alguien fuera de Juegos el tiempo que se
      elija, con la pantalla de «WASTED» (castigo.js). También el veto de
      siempre, para las tablas.
+   - **Serie 01**: quién ve la colección de los profes de PRODROP
+     (`prodropSerie1`). Es solo de vista: quitar a alguien no le toca
+     ninguna carta, solo deja de verlas hasta que se le vuelva a poner.
 
    El panel es la cara, no la llave: las reglas de Firebase vuelven a
    comprobar que quien escribe está en `admins`.
@@ -32,7 +35,8 @@ import { verificaClub, juegoDeCategoria, sospechaFila, VERIFICADORES } from "./s
 import { crearRepro } from "./repeticion.js";
 import { repDe } from "./rieles-datos.js";
 import { nombreCategoria } from "./perfil-tarjeta.js";
-import { monedasDe, formatoMonedas } from "./monedas.js";
+import { monedasDe, formatoMonedas, copiasDe } from "./monedas.js";
+import { MOTOR, SERIE1 } from "./prodrop-cartas.js";
 
 // Escapa texto para meterlo en HTML sin que nadie cuele etiquetas
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -56,13 +60,15 @@ export function crearAdmin(ctx) {
   let detalle = null;                    // {categoria, uid, partida, nombre, puntos, tiempo, lugar, origen}
   let player = null;                     // el reproductor abierto (se destruye al cerrar)
   const pruebas = new Map();             // "cat|uid|partida" → {prueba, at, bytes, motivo} ya bajadas en esta visita
-  let offDatos = null, offAdm = null, aviso = "";
+  let offDatos = null, offAdm = null, offSerie1 = null, aviso = "";
+  let serie1 = {};                       // prodropSerie1: {uid: {at, por}}
 
   /* ---------- la cáscara ---------- */
   function montar(h) {
     host = h;
     offDatos = ctx.datos(d => { datos = d; pinta(); });
     offAdm = fb.watchAdmin((d, err) => { adm = d; errAdm = err; pinta(); });
+    offSerie1 = fb.watchSerie1(l => { serie1 = l; pinta(); });
     host.addEventListener("click", alClic);
     host.addEventListener("submit", alEnviar);
     host.addEventListener("input", alEscribir);
@@ -72,6 +78,7 @@ export function crearAdmin(ctx) {
     muerto = true;
     if (offDatos) offDatos();
     if (offAdm) offAdm();
+    if (offSerie1) offSerie1();
     cierraPlayer();
     if (host) { host.removeEventListener("click", alClic); host.removeEventListener("submit", alEnviar); host.removeEventListener("input", alEscribir); host.innerHTML = ""; }
   }
@@ -96,11 +103,11 @@ export function crearAdmin(ctx) {
       ${sinReglas ? `<p class="jg-adm-aviso">Faltan publicar las reglas nuevas en la consola de Firebase (revisiones, suspensiones, auditados, ajustesMonedas). Hasta entonces el panel no puede leer ni escribir.</p>` : ""}
       ${aviso ? `<p class="jg-adm-aviso" role="status">${esc(aviso)}</p>` : ""}
       <nav class="jg-adm-tabs" role="tablist">
-        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`]]
+        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"]]
           .map(([k, t]) => `<button type="button" role="tab" class="btn2${pestaña === k ? " on" : ""}" data-tab="${k}" aria-selected="${pestaña === k}">${t}</button>`).join("")}
       </nav>
       ${detalle ? detalleHtml() : ""}
-      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : suspensionesHtml()}</div>
+      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : suspensionesHtml()}</div>
     </section>`;
     if (pl) { const sitio = host.querySelector(".jg-adm-player-sitio"); if (sitio) sitio.replaceWith(pl); else cierraPlayer(); }
     for (const [id, v] of Object.entries(escrito)) { const i = host.querySelector("#" + id); if (i && id !== "admBusca") i.value = v; }
@@ -323,6 +330,8 @@ export function crearAdmin(ctx) {
     const s = new Set();
     for (const k of ["ranks", "solo", "logros"]) for (const t of Object.values((datos && datos[k]) || {})) for (const u of Object.keys(t || {})) s.add(u);
     for (const k of ["diario", "clubJugadas", "ajustes"]) for (const u of Object.keys((datos && datos[k]) || {})) s.add(u);
+    for (const u of Object.keys((datos && datos.cartas && datos.cartas.s) || {})) s.add(u);
+    for (const u of Object.keys(serie1)) s.add(u);
     return [...s];
   }
   function buscadorHtml(ph) {
@@ -406,6 +415,26 @@ export function crearAdmin(ctx) {
     catch (e) { alert("No se pudo suspender: " + (permiso(e) ? "las reglas no lo permiten (¿están publicadas?)" : (e && e.message || e))); return false; }
   }
 
+  /* ---------- la Serie 01 de PRODROP ----------
+     Quién ve las cartas de los profes. Para el resto no existen en ninguna
+     pantalla, pero siguen siendo suyas: la economía no lee esta lista. */
+  const deSerie1 = u => (datos && datos.completo ? copiasDe(u, datos).filter(x => MOTOR.coleccionDe(x.k) === SERIE1).length : null);
+  const cuantas = n => n == null ? "" : ` · tiene ${n} ${n === 1 ? "carta" : "cartas"} de la serie`;
+  function serie1Html() {
+    const l = Object.entries(serie1).sort((a, b) => nombre(a[0]).localeCompare(nombre(b[0])));
+    const ficha = cuenta ? `<div class="jg-adm-caja">
+        <p><b translate="no">${esc(nombre(cuenta))}</b> ${serie1[cuenta] ? "ve la Serie 01" : "<b>no</b> ve la Serie 01"}${cuantas(deSerie1(cuenta))}.</p>
+        <p class="jg-adm-btns">${serie1[cuenta] ? `<button type="button" class="btn2 jg-adm-rojo" data-quitas1="${esc(cuenta)}">Quitarle la Serie 01</button>`
+          : `<button type="button" class="btn" data-pons1="${esc(cuenta)}">Mostrarle la Serie 01</button>`}</p>
+      </div>` : "";
+    return `<p class="jg-adm-nota">La Serie 01 (los profes) solo la ve quien está en esta lista: para el resto no aparece en PRODROP, los perfiles, el mercado, las tablas ni los drops. Quitar a alguien no le quita ninguna carta: siguen en su colección y las vuelve a ver si se le pone otra vez. Tú también tienes que estar en la lista para verla.</p>` +
+      buscadorHtml("Busca una cuenta para mostrarle o quitarle la serie") + ficha +
+      `<h3>La ven (${l.length})</h3>` + (l.length ? `<ul class="jg-adm-lista">${l.map(([u, v]) => `<li><div><b translate="no">${esc(nombre(u))}</b>
+          <small>desde ${fecha(v && v.at)}${v && v.por ? " · por " + esc(nombre(v.por)) : ""}${cuantas(deSerie1(u))}</small></div>
+          <span class="jg-adm-btns"><button type="button" class="btn2" data-quitas1="${esc(u)}">Quitar</button></span></li>`).join("")}</ul>`
+        : `<p class="jg-nada">Nadie la ve todavía.</p>`);
+  }
+
   /* ---------- los eventos ---------- */
   const partes = s => String(s || "").split("|");
   async function alClic(e) {
@@ -448,6 +477,19 @@ export function crearAdmin(ctx) {
     if (ds.dur) { const i = host.querySelector("#admDur"); if (i) i.value = ds.dur; return; }
     if (ds.levanta) { if (confirm(`¿Levantar la suspensión de ${nombre(ds.levanta)}?`)) fb.levantaSuspension(ds.levanta).catch(err => alert(err && err.message || err)); return; }
     if (ds.veta) { const m = prompt(`Motivo del veto a ${nombre(ds.veta)}:`, ""); if (m !== null) fb.veta(ds.veta, m).catch(err => alert(err && err.message || err)); return; }
+    if (ds.pons1) {
+      const u = ds.pons1;
+      try { await fb.habilitaSerie1(u, yo); aviso = `${nombre(u)} ya ve la Serie 01.`; }
+      catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
+      pinta(); return;
+    }
+    if (ds.quitas1) {
+      const u = ds.quitas1;
+      if (!confirm(`¿Dejar de mostrarle la Serie 01 a ${nombre(u)}? No pierde ninguna carta: solo deja de verlas.`)) return;
+      try { await fb.quitaSerie1(u); aviso = `${nombre(u)} ya no ve la Serie 01 (sus cartas siguen siendo suyas).`; }
+      catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
+      pinta(); return;
+    }
     if (ds.quitaveto) { if (confirm(`¿Quitar el veto a ${nombre(ds.quitaveto)}?`)) fb.quitaVeto(ds.quitaveto).catch(err => alert(err && err.message || err)); return; }
   }
   function alEnviar(e) {

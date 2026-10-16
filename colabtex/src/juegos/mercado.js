@@ -15,7 +15,7 @@
    su ficha); aquí se compra, se retira y se intercambia. */
 import { economia, monedasDe, leeCopia } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
-import { miniCarta, MOTOR, RAIZ } from "./prodrop-cartas.js";
+import { miniCarta, MOTOR, RAIZ, colVisible, copiaVisible, veSerie1 } from "./prodrop-cartas.js";
 import { avatarMarco } from "./perfil-vista.js";
 import {
   JUEGOS_MERCADO, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
@@ -31,7 +31,7 @@ const claveEstado = c => String(c).replace(/^ma:/, "");
 const LOTE = 48;
 /* El PRODROP del visor: el mismo `?v=` que el abridor (prodrop.js), así se
    comparte la caché. */
-const PD_V = "pd-18";
+const PD_V = "pd-19";
 /* Color de texto de cada rareza sobre fondo claro (el de `TIERS` es para
    fondo oscuro: el gris de las comunes no se leía). */
 const TEXTO_RAREZA = ["#7c8197", "#1b8fd0", "#9a3fe6", "#c98a00"];
@@ -113,8 +113,9 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     leeEstados([...ofertas, ...ventas].filter(r => r.tipo === "mascota" && !(claveEstado(r.c) in estados)).map(r => r.c));
     leeEstados(cambios.flatMap(t => [...t.dar, ...t.pedir]).filter(r => r.tipo === "mascota" && !(claveEstado(r.c) in estados)).map(r => r.c));
     const m = monedasDe(uid, d), pend = cambios.filter(t => t.estado === "pendiente" && t.para === uid).length;
+    if (f.col && !colVisible(f.col)) f.col = "";   // una colección que ya no ve
     const lista = tab === "comprar" ? filtra(ofertas, f) : [];
-    const sig = JSON.stringify([tab, f, max, m.saldo, lista.map(r => [r.id, r.p, r.nombre, r.etapa]), tab === "ventas" ? ventas.map(r => [r.id, r.estado]) : 0,
+    const sig = JSON.stringify([tab, f, max, m.saldo, veSerie1(), lista.map(r => [r.id, r.p, r.nombre, r.etapa]), tab === "ventas" ? ventas.map(r => [r.id, r.estado]) : 0,
       tab === "cambios" ? cambios.map(t => [t.id, t.estado, t.posible]) : 0, Object.keys(estados).length]);
     if (sig === firma) return;
     firma = sig;
@@ -157,7 +158,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     let propios = "";
     if (f.juego === "prodrop") {
       propios = `
-      <div class="jg-mk-fila">${[["", "Todas las colecciones"], ...MOTOR.COLECCIONES.map(c => [c.key, c.label])].map(([k, l]) =>
+      <div class="jg-mk-fila">${[["", "Todas las colecciones"], ...MOTOR.COLECCIONES.filter(c => colVisible(c.key)).map(c => [c.key, c.label])].map(([k, l]) =>
         `<button type="button" class="jg-mk-chip${f.col === k ? " on" : ""}" data-col="${k}">${esc(l)}</button>`).join("")}</div>
       <div class="jg-mk-fila">${[[-1, "Todas", "", "#a49fb3"], ...MOTOR.TIERS.map((t, i) => [i, t.label, t.sym, t.color])].map(([i, l, sy, c]) =>
         `<button type="button" class="jg-mk-chip${f.rareza === i ? " on" : ""}" data-rareza="${i}" style="--c:${c}">${sy ? `<i>${esc(sy)}</i>` : ""}${esc(l)}</button>`).join("")}</div>
@@ -344,7 +345,8 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
       box.querySelectorAll("[data-u]").forEach(b => b.onclick = () => { trato.para = b.dataset.u; pintaTrato(); });
       return;
     }
-    const mias = intercambiables(d, uid, estados), suyas = (g[trato.para] || []).map(c => fichaCopia(c, d, estados)).filter(Boolean);
+    // una carta de la Serie 01 solo se ofrece a quien también la ve
+    const mias = intercambiables(d, uid, estados).filter(x => copiaVisible(x.c, trato.para)), suyas = (g[trato.para] || []).map(c => fichaCopia(c, d, estados)).filter(Boolean);
     leeEstados([...mias, ...suyas].filter(r => r.tipo === "mascota" && !(claveEstado(r.c) in estados)).map(r => r.c));
     const rej = (l, eleg, lado) => `<div class="jg-mk-rej" data-lado="${lado}">${l.map(x =>
       `<button type="button" class="jg-mk-elige${eleg.includes(x.c) ? " on" : ""}" data-c="${esc(x.c)}" title="${esc(x.nombre)}"><span class="jg-mk-img chica">${imagen(x)}</span><small${x.tipo === "mascota" ? ' translate="no"' : ""}>${esc(x.nombre)}</small></button>`).join("") || '<p class="jg-mk-nota">Nada para elegir.</p>'}</div>`;

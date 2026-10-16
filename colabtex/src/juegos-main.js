@@ -86,7 +86,7 @@ import { crearMascotasPerfil } from "./juegos/perfil-mascota.js";
 import { mejoresDropsMascotas, pedidoObjeto } from "./juegos/mascotas-datos.js";
 import { fotoDe, pideFotos } from "./juegos/visor-mascota.js";
 import { crearMercado } from "./juegos/mercado.js";
-import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
+import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion, fijaSerie1, veSerie1 } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil, esFotoGoogle } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
 import { estadisticas, nombreCategoria, marcoVisible, valorMarca } from "./juegos/perfil-tarjeta.js";
@@ -301,7 +301,7 @@ function ordenPopular(claves) {
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
 }
 
-let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null, offSuspension = null;
+let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null, offSuspension = null, offSerie1 = null;
 let offChat = null, chatMsgs = [], chatFirma = "";
 let jugadasVistas = -1;   // cuántas jugadas tenía el registro la última vez
 let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj local)
@@ -449,6 +449,20 @@ function datosPerfil(cb) {
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
   return () => oyentesP.delete(cb);
+}
+/* La Serie 01 de PRODROP cambió para alguien (prodrop-cartas.js): lo que
+   se ve de las cartas sale de los mismos datos, así que se vuelven a
+   mandar en un objeto nuevo (las memorias se invalidan y todo el que
+   escucha repinta), y el vestíbulo rehace sus novedades. */
+function alCambiarSerie1(lista, uid) {
+  if (!fijaSerie1(lista, uid)) return;
+  if (datosP) {
+    datosP = conDerivados(Object.assign({}, datosP));
+    for (const f of [...oyentesP]) f(datosP);
+  }
+  if (prodropVista) prodropVista.refresca();
+  vesFirma = "";
+  if (state.vista === "vestibulo") render();
 }
 /* Lo que el perfil necesita y no está en ningún nodo: el n.º 1 de monedas
    y el de la colección de PRODROP (piden la economía entera) y lo que la
@@ -2173,7 +2187,7 @@ const NOVEDADES = [
     sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
     modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "componentes", color: "#2fbf71", alta: "2026-10-04", titulo: "PRODROP · colección Componentes",
-    lema: "La segunda colección de cartas: 25 componentes electrónicos en 11 temas, del realista y el esquemático al pixel art, el dieciochero y el arcano. Las legendarias salen quemadas… o con nieve de Navidad.",
+    lema: "Una colección de cartas: 25 componentes electrónicos en 11 temas, del realista y el esquemático al pixel art, el dieciochero y el arcano. Las legendarias salen quemadas… o con nieve de Navidad.",
     sub: "275 cartas nuevas · elige el sobre de Componentes al abrir", ruta: "#cartas", boton: "Abrir un sobre", cuenta: true },
   { id: "sudoku", color: "#ff2fb4", alta: "2026-10-04", titulo: "Sudoku Arcade",
     lema: "El sudoku del día con su racha, el clásico en cuatro dificultades y el arcade: tres vidas, combos de hasta ×4 y premio por cerrar filas, columnas y cajas.",
@@ -2182,7 +2196,7 @@ const NOVEDADES = [
     lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
     sub: "Un jugador · veinticinco jornadas, siete jefes, taller de mejoras y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
-    lema: "Sobres de cinco cartas, de los profes o de componentes, y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
+    lema: () => (veSerie1() ? "Sobres de cinco cartas, de los profes o de componentes" : "Sobres de cinco cartas") + ", y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
@@ -2228,6 +2242,11 @@ function arteNovedad(n) {
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
   if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
   if (n.id === "prodrop") {
+    // la Serie 01 (los profes) solo para quien la ve; si no, tres componentes
+    if (!veSerie1()) {
+      const cs = ["dieciochero/esp32", "quemado/timer-555", "halloween/led"];
+      return `<div class="jg-nov-arte-pd">${cs.map(c => `<img src="juegos/prodrop/cards/componentes/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
+    }
     const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];
     return `<div class="jg-nov-arte-pd">${cs.map((c, i) => `<img src="juegos/prodrop/cards/${i === 1 ? "legendarias" : "epicas"}/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
   }
@@ -2267,7 +2286,7 @@ function novedadesHtml() {
             <div class="jg-ban-cuerpo">
               <div class="jg-ban-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span>${insignia}<span class="jg-ban-fecha">${escapeHtml(fechaAlta(n.alta))}</span></div>
               <h2>${escapeHtml(n.titulo)}</h2>
-              <p>${escapeHtml(n.lema)}</p>
+              <p>${escapeHtml(typeof n.lema === "function" ? n.lema() : n.lema)}</p>
               <small>${escapeHtml(typeof n.sub === "function" ? n.sub() : n.sub)}${cuenta ? " · requiere cuenta" : ""}</small>
               <div class="jg-nov-pie">
                 ${accion}
@@ -3342,8 +3361,9 @@ function wire() {
       state.invitado = true;
       state.salas = []; state.mias = []; state.enCurso = []; state.tablas = {};
       soltarPartida();
-      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension]) { if (f) { try { f(); } catch (e) {} } }
-      offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = null;
+      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension, offSerie1]) { if (f) { try { f(); } catch (e) {} } }
+      offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = offSerie1 = null;
+      fijaSerie1({}, "");
       state.admin = false;
       revisaCastigo({ uid: null, cuenta: 0, suspension: null });
       if (offConsumo) { try { offConsumo(); } catch (e) {} offConsumo = null; }
@@ -3388,6 +3408,10 @@ function wire() {
     if (offSuspension) { try { offSuspension(); } catch (e) {} }
     revisaCastigo({ suspension: null });
     offSuspension = fb.watchSuspension(user.uid, v => revisaCastigo({ suspension: v }));
+    /* Quién ve la Serie 01 de PRODROP (la lista del panel de admin). */
+    if (offSerie1) { try { offSerie1(); } catch (e) {} }
+    fijaSerie1({}, user.uid);
+    offSerie1 = fb.watchSerie1(l => { if (state.user && state.user.uid === user.uid) alCambiarSerie1(l, user.uid); });
     /* ¿Es administrador? Una lectura por sesión. */
     state.admin = null;
     fb.esAdminJuegos(user.uid).then(a => {

@@ -8,8 +8,11 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM,__MM:require('../../juegos/mascotas/motor.js')};vm.createContext(ctx);
 vm.runInContext('const PM=__PM,MM=__MM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras}',ctx);
+ ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras,fijaSerie1,veSerie1,copiaVisible,totalVisible}',ctx);
 const M=ctx.__M;
+// quien mira ve la Serie 01 (los profes), salvo en la prueba que dice lo contrario
+const VE_TODO={mira:{at:1,por:'adm'}};
+M.fijaSerie1(VE_TODO,'mira');
 
 test('el catálogo: profes (17 personas por 10 variantes) y componentes (25 por 11 temáticas), con su imagen',()=>{
  assert.equal(PM.TOTAL,170+275);
@@ -346,4 +349,46 @@ test('colecciones: un re-roll da una carta de la colección de su clave, y no me
  assert.ok(!M.economia(d('-Nrr0000000001')).sobres[u+'~-Nrr0000000001'],'ni con una clave de antes');
  // y los sobres con prefijo se cobran igual que los de siempre
  assert.equal(M.monedasDe(u,d('c-Nrr000000001')).gastadas,Object.keys(s).length*80);
+});
+
+test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde nada al salir de ella',()=>{
+ const u='usrAAAA';
+ let kp='',kc='';
+ for(let i=0;!kp||!kc;i++){
+  const p='p-Nks'+String(i).padStart(8,'0'),c='c-Nks'+String(i).padStart(8,'0'),at=1790000000000+i;
+  if(!kp&&PM.CARDS[PM.sobre(u,p,at).cartas[4].id].tier>=2)kp=p;
+  if(!kc&&PM.CARDS[PM.sobre(u,c,at).cartas[4].id].tier>=2)kc=c;
+ }
+ const atDe=k=>1790000000000+ +k.slice(5);
+ const d=conGanado({[u]:1000},0,{cartas:{s:{[u]:{[kp]:{at:atDe(kp),p:80},[kc]:{at:atDe(kc),p:80}}}},mercado:{o:{},t:{}}});
+ const perfil={cartas:[u+'~'+kp+'.4',u+'~'+kc+'.4']};
+ assert.ok(M.veSerie1());
+ assert.equal(M.exhibidasDe(u,perfil,d).length,2);
+ assert.equal(M.rankingColeccion(d)[0].total,PM.TOTAL);
+ const saldo=M.monedasDe(u,d).saldo,copias=M.copiasDe(u,d).length;
+ // sin estar en la lista
+ assert.equal(M.fijaSerie1({},'mira'),true,'cambió lo que se ve');
+ assert.equal(M.veSerie1(),false);
+ assert.equal(M.fijaSerie1({},'mira'),false,'la misma lista no repinta');
+ assert.equal(M.copiaVisible(u+'~'+kp+'.0'),false);assert.equal(M.copiaVisible(u+'~'+kc+'.0'),true);
+ assert.equal(M.copiaVisible(u+'~-Nviejo00000.0'),false,'un sobre sin prefijo es de los profes');
+ assert.equal(M.copiaVisible('ma:'+u+'~-Nadop00001'),true,'una mascota no es una carta');
+ const ex=M.exhibidasDe(u,perfil,d);
+ assert.equal(ex.length,1);assert.equal(ex[0].carta.col,'comp');
+ assert.ok(M.mejoresDrops(d).every(c=>c.carta.col==='comp'));
+ assert.ok(M.mejoresDrops(d).length>=1);
+ const col=M.rankingColeccion(d);
+ assert.equal(col[0].total,PM.POR_COL.comp.length);assert.equal(col[0].copias,5,'solo cuentan las de componentes');
+ assert.equal(M.totalVisible(),PM.POR_COL.comp.length);
+ assert.equal(M.cifras(d).sobres,1,'el sobre de los profes no se cuenta');
+ // la economía no lee la lista: las cartas, el saldo y el gasto siguen iguales
+ assert.equal(M.monedasDe(u,d).saldo,saldo);assert.equal(M.copiasDe(u,d).length,copias);assert.equal(copias,10);
+ // otra cuenta en la lista: quien mira sigue sin verla, pero sabe que esa sí
+ M.fijaSerie1({otra:{at:1}},'mira');
+ assert.equal(M.veSerie1(),false);assert.equal(M.veSerie1('otra'),true);
+ assert.equal(M.copiaVisible(u+'~'+kp+'.0','otra'),true);
+ // al volver a la lista vuelve todo
+ M.fijaSerie1(VE_TODO,'mira');
+ assert.equal(M.exhibidasDe(u,perfil,d).length,2);
+ assert.equal(M.rankingColeccion(d)[0].copias,10);
 });
