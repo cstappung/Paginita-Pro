@@ -39,6 +39,29 @@ other file of the site. Things that hold it together:
   card comes from that collection. Each collection numbers its own cards
   (`num`, N.º 12/275), the collection view has a tab per collection with a
   section per variant or theme, and the market filters by collection.
+- **The Serie 01 (Profes) is only for the admin's list** (`prodropSerie1/<uid>`
+  = `{at, por}`, written from the panel's «Serie 01» tab, readable by anyone
+  signed in because trades need the other side's answer). For everyone
+  else the collection does not exist on any screen. **It is view-only**:
+  `economia()` never reads the list, so leaving it loses no card, coin or
+  spend, and coming back shows everything again. One filter does it:
+  `prodrop-cartas.js` holds the list and the viewer (`fijaSerie1`, set by
+  `juegos-main.js` from `fb.watchSerie1`; until it arrives nothing of the
+  series shows) and `copia()` returns null for a hidden collection, so
+  exhibited cards, drops, both card tables (`total` is `totalVisible()`),
+  `cifras` and the market's `fichaCopia` all follow. A copy's collection is
+  read from its pack key (`coleccionDe`: no prefix is profes), never
+  rebuilt. A Serie 01 card only trades between two accounts that both see
+  it (`gente`, `puedeProponer`, the composer), and a trade naming one does
+  not exist for a viewer who cannot see it. The postman sends `serie1`, and
+  filters `mias`, `sobres`, `ofertas` and `exh`; it refuses buying a hidden
+  pack (also an old opener's prefix-less one) and keeps hidden exhibited
+  cards when the frame saves its list. The frame (`fijaColecciones`) drops
+  the chooser, «Cambiar sobre», the collection and re-roll tabs and the
+  Profes paragraph of the odds (`.solo-serie1`) when only one collection is
+  left. A change of list re-sends `datosP` as a new object
+  (`alCambiarSerie1`), which repaints every view. The images are still
+  public files of the repo: this hides, it does not lock.
 - **Reveal animations are per collection and rarity** (`revela.js`,
   `REVELA.de(card)` gives `{antes, despues}`; its particles carry their own
   `draw` and the `fxStep` loop paints them). Profes: chalk on a
@@ -208,4 +231,4 @@ other file of the site. Things that hold it together:
   of valid packs only, in the order they came out (newest first), with who
   pulled them and when.
 
-The `cartas` and `mercado` nodes and `perfil/cartas` need the rules re-published.
+The `cartas`, `mercado` and `prodropSerie1` nodes and `perfil/cartas` need the rules re-published.

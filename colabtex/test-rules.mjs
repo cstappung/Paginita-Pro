@@ -614,8 +614,23 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await allowed("el admin elimina el récord entero de una vez", () => update(ref(db), {
     [`soloRanks/club-bbtan-rondas/${ub.uid}`]: null, [`soloPruebas/club-bbtan-rondas/${ub.uid}/partidaB9`]: null,
     [`revisiones/club-bbtan-rondas/${ub.uid}`]: null, [`auditados/club-bbtan-rondas/${ub.uid}`]: null }));
+  // la Serie 01 de PRODROP: la lista la lleva el admin, la leen todos
+  const s1 = (u, x) => set(ref(db, `prodropSerie1/${u}`), Object.assign({ at: serverTimestamp(), por: ua.uid }, x));
+  await denied("la Serie 01 no se firma a nombre de otro", () => s1(ub.uid, { por: ub.uid }));
+  await denied("ni lleva otra hora", () => s1(ub.uid, { at: 5 }));
+  await denied("ni campos de más", () => s1(ub.uid, { extra: 1 }));
+  await allowed("el admin le muestra la Serie 01 a B", () => s1(ub.uid, {}));
+  await allowed("y a sí mismo", () => s1(ua.uid, {}));
+  await loginAs(B);
+  await allowed("B lee la lista (los intercambios la necesitan)", () => get(ref(db, "prodropSerie1")));
+  await denied("B no se quita ni se pone nada", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
+  await denied("ni pone a otro", () => set(ref(db, `prodropSerie1/${ua.uid}x`), { at: serverTimestamp(), por: ub.uid }));
+  await loginAs(A);
+  await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
+  await remove(ref(db, `prodropSerie1/${ua.uid}`));
   await comoDueno(`admins/${ua.uid}`, null);
   await denied("sin ser admin ya no suma monedas", () => ajuste({}));
+  await denied("ni se pone en la Serie 01", () => s1(ua.uid, {}));
 }
 
 await signOut(auth);

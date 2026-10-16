@@ -6,9 +6,14 @@
    (intercambios), con las mismas garantías de siempre (`x` y `v` una sola
    vez y excluyentes; el replay solo acepta ofertas de quien es dueño; una
    compra sin fondos queda `impaga`). Lo único nuevo es qué es cada copia:
-   `leeCopia` dice si es una carta, un objeto (`ob:`) o una mascota (`ma:`). */
+   `leeCopia` dice si es una carta, un objeto (`ob:`) o una mascota (`ma:`).
+
+   Las cartas de la Serie 01 (Profes) solo existen para quien la ve
+   (`veSerie1`, prodrop-cartas.js): `fichaCopia` no las resuelve para los
+   demás, así que no salen en las ofertas, las ventas ni los intercambios,
+   y solo se cambian entre dos cuentas que la ven. */
 import { economia, monedasDe, copiasDe, mascotasDe, objetosDe, leeCopia } from "./monedas.js";
-import { copiaDe, MOTOR } from "./prodrop-cartas.js";
+import { copiaDe, MOTOR, copiaVisible } from "./prodrop-cartas.js";
 import { fichaObjeto, fichaMascota } from "./mascotas-datos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 
@@ -112,12 +117,14 @@ export function intercambiables(datos, uid, estados) {
   return cs.map(c => fichaCopia(c, datos, estados)).filter(Boolean);
 }
 
-/* Con quién se puede cambiar: todo el que tenga algo y no esté parado. */
+/* Con quién se puede cambiar: todo el que tenga algo y no esté parado.
+   Una carta de la Serie 01 solo cuenta si la ven los dos. */
 export function gente(datos, uid) {
   if (!datos || !datos.completo) return {};
   const e = economia(datos), out = {};
   for (const [c, u] of Object.entries(e.dueno)) {
     if (u === uid || e.enVenta[c] || (e.usuarios[u] && e.usuarios[u].parada)) continue;
+    if (!copiaVisible(c) || !copiaVisible(c, u)) continue;
     (out[u] = out[u] || []).push(c);
   }
   return out;
@@ -132,6 +139,8 @@ export function misCambios(datos, uid, estados) {
   for (const [id, t] of Object.entries((datos.mercado && datos.mercado.t) || {})) {
     if (!t || (t.de !== uid && t.para !== uid)) continue;
     const hecho = e.cambios[id], dar = lista(t.dar), pedir = lista(t.pedir);
+    // uno con una carta de una serie que no ve no existe para quien mira
+    if (![...dar, ...pedir].every(c => copiaVisible(c))) continue;
     const estado = Number.isFinite(t.x) ? "cerrado" : hecho ? hecho.estado : "pendiente";
     const posible = dar.every(c => e.dueno[c] === t.de && !e.enVenta[c]) && pedir.every(c => e.dueno[c] === t.para && !e.enVenta[c]) && !parada(t.de) && !parada(t.para);
     out.push({ id, de: t.de, para: t.para, at: t.at, fin: t.ok || t.x || 0, estado, posible,
@@ -146,7 +155,7 @@ export const pendientesDe = (datos, uid) => misCambios(datos, uid).filter(t => t
    motivo para no hacerlo, o "" si se puede. */
 export function puedeComprar(datos, uid, id) {
   const e = economia(datos), o = e.ofertas[id];
-  if (!o || o.estado !== "activa") return "Alguien se te adelantó: eso ya no está a la venta.";
+  if (!o || o.estado !== "activa" || !copiaVisible(o.c)) return "Alguien se te adelantó: eso ya no está a la venta.";
   if (o.u === uid) return "Es tu propia oferta.";
   if (e.usuarios[o.u] && e.usuarios[o.u].parada) return "Esa cuenta no puede vender ahora.";
   const m = monedasDe(uid, datos);
@@ -161,6 +170,7 @@ export function puedeProponer(datos, uid, para, dar, pedir) {
   if (!dar.length || dar.length > 3 || pedir.length > 3) return "Ofrece de 1 a 3 cosas y pide hasta 3.";
   if (!dar.every(c => leeCopia(c) && e.dueno[c] === uid && !e.enVenta[c])) return "Algo de lo tuyo ya no es tuyo o está a la venta.";
   if (!pedir.every(c => leeCopia(c) && e.dueno[c] === para && !e.enVenta[c])) return "Algo de lo que pides ya no es suyo o está a la venta.";
+  if (![...dar, ...pedir].every(c => copiaVisible(c) && copiaVisible(c, para))) return "Esa carta no se puede cambiar con esa persona.";
   if (monedasDe(uid, datos).parada || (e.usuarios[para] && e.usuarios[para].parada)) return "Ahora no se puede proponer ese intercambio.";
   const n = l => l.filter(c => leeCopia(c).tipo === "mascota").length;
   if (mascotasDe(uid, datos).length - n(dar) + n(pedir) > MM.MAX_MASCOTAS) return `Quedarías con más de ${MM.MAX_MASCOTAS} mascotas.`;
