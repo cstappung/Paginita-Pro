@@ -239,16 +239,31 @@
        los luchadores elegidos, para que la primera vez que hablan en la pelea el juego no se detenga a buscarlas.
      - **Siempre se ve** cuando el juego espera algo de la red: la insignia de arriba dice cuánto lleva y a qué
        velocidad, y la primera vez avisa que lo bajado queda guardado. */
-  const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false };
-  const Cola = { activos: 0, max: 10, alta: [], baja: [] };
+  const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false, sinLote: false };
+  /* Los pedazos que esperan van juntos en UNA llamada (`/lote` del Worker): el plan gratis de Cloudflare cuenta llamadas
+     (100.000 al día), no megas. Hasta 8 en lo que se baja por adelantado y 4 en lo que el juego espera ya (para no
+     poner una lectura urgente detrás de muchas otras); la respuesta trae los pedazos uno tras otro y cada uno se
+     entrega apenas llega. Arrancar el juego la primera vez: ~272 llamadas de a uno, ~35 así. Si el Worker es viejo
+     (404 a /lote), `P.sinLote` y se vuelve a pedir de a uno, como antes. */
+  const Cola = { activos: 0, max: 10, alta: [], baja: [], LOTE_ALTA: 4, LOTE_BAJA: 8, llamadas: 0 };
+  window.BT3Cola = Cola;   // (el banco cuenta las llamadas)
+  /* Despachar un instante después (setTimeout 0), no en el acto: los pedidos de un mismo momento (una lectura grande,
+     lo que se adelanta) entran de a uno, cada uno después de mirar el caché; despachados al entrar, salía cada uno
+     solo en su propia llamada y nunca se juntaban. */
+  let programado = 0;
+  const pronto = () => { if (!programado) programado = setTimeout(() => { programado = 0; despacha(); }, 0); };
   function despacha() {
     for (;;) {
-      let t = null;
-      if (Cola.alta.length && Cola.activos < Cola.max) t = Cola.alta.shift();
-      else if (!Cola.alta.length && Cola.baja.length && Cola.activos < 6) t = Cola.baja.shift();
-      if (!t) return;
+      let cola = null;
+      if (Cola.alta.length && Cola.activos < Cola.max) cola = Cola.alta;
+      else if (!Cola.alta.length && Cola.baja.length && Cola.activos < 6) cola = Cola.baja;
+      if (!cola) return;
+      const lote = [cola.shift()], tope = P.sinLote ? 1 : cola === Cola.alta ? Cola.LOTE_ALTA : Cola.LOTE_BAJA;
+      while (lote.length < tope && cola.length) lote.push(cola.shift());
+      if (cola === Cola.alta) while (lote.length < tope && Cola.baja.length) lote.push(Cola.baja.shift());   // (lo adelantado aprovecha el viaje)
       Cola.activos++;
-      t.corre();
+      for (const t of lote) t.sale();
+      corre(lote).finally(() => { Cola.activos--; despacha(); });
     }
   }
   // la red: cuánto se bajó en esta sesión y a qué velocidad (los últimos 3 s)
@@ -276,16 +291,60 @@
     }
   }
   const urlPieza = i => P.base + "/pieza/" + String(i).padStart(5, "0") + ".bin";
+  // un pedazo que llegó: se cuenta y se guarda en este navegador
+  function llego(i, bytes) {
+    anotaRed(bytes.length);
+    if (P.almacen) { P.guardadas.add(i); P.almacen.put(urlPieza(i), new Response(bytes)).catch(() => P.guardadas.delete(i)); }
+  }
+  const largo = i => Math.min(P.pieza, P.size - i * P.pieza);   // (el último pedazo del disco es más corto)
+  // un lote: uno solo de a uno (o con un Worker viejo); varios por /lote, y lo que no llegó, de a uno
+  async function corre(lote) {
+    const deAUno = ts => Promise.all(ts.map(t => deRed(t.i, t.alta).then(t.ok, t.mal)));
+    if (lote.length === 1 || P.sinLote) return deAUno(lote);
+    const pend = lote.slice();
+    try { await deLote(pend); }
+    catch (e) { Module.keep && Module.keep("disco privado: un lote falló (" + (e.message || e) + "), lo que falta de a uno"); }
+    if (pend.length) await deAUno(pend);
+  }
+  async function deLote(pend) {
+    const alta = pend.some(t => t.alta);
+    for (let intento = 0; intento < 2; intento++) {
+      Cola.llamadas++;
+      const res = await fetch(P.base + "/lote?p=" + pend.map(t => t.i).join(","), { headers: { Authorization: "Bearer " + P.token }, priority: alta ? "high" : "low" });
+      if (res.status === 401 && intento === 0) { P.token = (await pideToken(true)) || P.token; continue; }
+      if (res.status === 404 || res.status === 400) { P.sinLote = true; return; }   // (un Worker sin /lote: de a uno)
+      if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+      // los pedazos vienen uno tras otro: cada uno se corta y se entrega apenas está entero
+      const lector = res.body.getReader(), partes = [];
+      let hay = 0;
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (value && value.length) { partes.push(value); hay += value.length; }
+        while (pend.length && hay >= largo(pend[0].i)) {
+          const L = largo(pend[0].i), b = new Uint8Array(L);
+          for (let k = 0; k < L;) {
+            const x = partes[0], n = Math.min(x.length, L - k);
+            b.set(x.subarray(0, n), k); k += n;
+            if (n === x.length) partes.shift(); else partes[0] = x.subarray(n);
+          }
+          hay -= L;
+          const t = pend.shift();
+          llego(t.i, b); t.ok(b);
+        }
+        if (done) return;
+      }
+    }
+  }
   // un pedazo desde la red (con reintentos: el token dura una hora, y una red de celular a veces corta)
   async function deRed(i, alta) {
     for (let intento = 0; ; intento++) {
       try {
+        Cola.llamadas++;
         const res = await fetch(urlPieza(i), { headers: { Authorization: "Bearer " + P.token }, priority: alta ? "high" : "low" });
         if (res.status === 401 && intento < 2) { P.token = (await pideToken(true)) || P.token; continue; }
         if (!res.ok) throw new Error("disco privado: HTTP " + res.status);
         const bytes = new Uint8Array(await res.arrayBuffer());
-        anotaRed(bytes.length);
-        if (P.almacen) { P.guardadas.add(i); P.almacen.put(urlPieza(i), new Response(bytes)).catch(() => P.guardadas.delete(i)); }
+        llego(i, bytes);
         return bytes;
       } catch (e) {
         if (intento >= (alta ? 6 : 3)) throw e;
@@ -311,9 +370,9 @@
         try { const g = await P.almacen.match(urlPieza(i)); if (g) return new Uint8Array(await g.arrayBuffer()); } catch (e) {}
       }
       return await new Promise((ok, mal) => {
-        camino.tarea = { corre: () => { camino.tarea = null; deRed(i, camino.alta).then(ok, mal).finally(() => { Cola.activos--; despacha(); }); } };
+        camino.tarea = { i, get alta() { return camino.alta; }, ok, mal, sale: () => { camino.tarea = null; } };
         (alta ? Cola.alta : Cola.baja).push(camino.tarea);
-        despacha();
+        pronto();
       });
     })();
     if (alta) { esperaRed(1); const fin = () => esperaRed(-1); camino.q.then(fin, fin); }
@@ -495,17 +554,15 @@
       try { Esencial.piezas = piezasDe(idsEsenciales(), await leeIndice(Esencial.disco)); }
       catch (e) { Esencial.corriendo = false; pintaEsencial(); return; }
     }
+    /* De a tandas de 64: la cola las junta en lotes de 8 (una llamada al Worker cada 8 MB). Antes eran 4 «trabajadores»
+       que pedían un pedazo y esperaban: nunca había más de 4 en la cola y cada uno salía en su propia llamada. La
+       pausa se mira entre tandas, y la cola igual deja pasar antes lo que el juego espera. */
     const pendientes = Esencial.piezas.filter(i => !P.guardadas.has(i));
-    let k = 0;
-    const uno = async () => {
-      while (k < pendientes.length) {
-        while (Esencial.pausa) await new Promise(ok => setTimeout(ok, 500));
-        const i = pendientes[k++];
-        if (!P.guardadas.has(i)) await pedazo(i, false).catch(() => {});
-        pintaEsencial();
-      }
-    };
-    await Promise.all(Array.from({ length: 4 }, uno));   // (la cola deja pasar antes lo que el juego espera)
+    for (let k = 0; k < pendientes.length; k += 64) {
+      while (Esencial.pausa) await new Promise(ok => setTimeout(ok, 500));
+      await Promise.all(pendientes.slice(k, k + 64).filter(i => !P.guardadas.has(i))
+        .map(i => pedazo(i, false).catch(() => {}).then(() => pintaEsencial())));
+    }
     Esencial.corriendo = false;
     pintaEsencial();
   }

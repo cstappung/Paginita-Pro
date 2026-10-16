@@ -427,6 +427,14 @@ The owner wants BT3 **only for a list of friends** (who own the game), and witho
   `/subir` is a page served by the Worker itself that uploads the ISO from the owner's browser with
   `CLAVE_SUBIDA`. Verified tokens are cached in memory: the free plan gives little CPU per request.
   `colabtex/tests/bt3-disco.test.cjs` pins the access rules with a local key pair and a fake bucket.
+- **Requests are batched** (`/lote?p=a,b,…`, up to 8 pieces in one response, streamed one after another with a
+  pull-based `ReadableStream` so the Worker holds one piece at a time). The free Workers plan counts requests
+  (100k/day), not bytes: one piece per request made a first start ~272 requests. The page's queue (`Cola`) sends up
+  to 8 pieces per call for prefetching and 4 for what the game is waiting on, and hands each piece over as soon as
+  its bytes are in (`deLote`). Two traps found in the bench: dispatching on push sent every piece alone (now
+  `pronto()`, a setTimeout 0), and «lo esencial» ran 4 workers awaiting one piece each (now batches of 64). Bench:
+  `prueba57` («lo esencial» 41 → 8 requests, pieces byte-identical, last short piece, 401 and >8 refused). An old
+  Worker answers 404 to `/lote`: `P.sinLote` and back to one by one. **The owner must redeploy `worker.js`** for it.
 - `disco-privado.json` holds the Worker's address (empty = no private disc). The address is not a secret.
 - **Hidden unless a friend** (`colabtex/src/juegos/bt3-amigos.js`): on every sign-in the lobby asks `/soy`; until
   it says yes, BT3 is filtered out of the catalogue, the solo list, the novedades banner (`filtraNovedades` in

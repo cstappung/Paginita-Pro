@@ -17,6 +17,12 @@
    `/arranque.json`: qué pedazos lee el juego para llegar al menú y a la primera pelea. Lo escribe la página
    del primer amigo que juega (y lo completan los siguientes); con él, la página del próximo baja esos pedazos
    de una vez, antes de que el juego los pida.
+   `/lote?p=12,13,14`: varios pedazos (hasta LOTE) en UNA respuesta, uno detrás del otro y en ese orden. El plan
+   gratis de Workers cuenta llamadas (100.000 al día), no megas: de a uno, arrancar el juego eran ~272 llamadas; de a
+   ocho, ~35. Se mandan a medida que se leen (un ReadableStream que pide el siguiente cuando el anterior salió), así
+   que la página recibe el primero igual de rápido que antes y nunca hay más de uno en la memoria del Worker. Cada
+   pedazo mide PIEZA salvo el último del disco: la página sabe cortarlos. Un Worker viejo contesta 404 a /lote y la
+   página vuelve a pedir de a uno.
    Para subir la ISO, `/subir` es una página que la lee en tu navegador y la manda por pedazos con la clave
    `CLAVE_SUBIDA` (un secreto del Worker). Sin esa clave no se puede escribir nada.
 
@@ -29,6 +35,7 @@ const PROYECTO = "mi-pagina-pro";                                  // el proyect
 const ORIGENES = "https://paginita-pro.cl,https://www.paginita-pro.cl,http://localhost:8123";
 const CLAVES_GOOGLE = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const PIEZA = 1024 * 1024;                                         // tamaño de cada pedazo de la ISO
+const LOTE = 8;                                                     // pedazos por llamada en /lote, como mucho
 
 let claves = null, clavesHasta = 0;                                // las claves públicas de Google, en memoria
 const vistos = new Map();                                          // token ya verificado → {uid, exp}: el plan gratis da
@@ -141,7 +148,7 @@ export default {
 
     // Leer: el índice o un pedazo, solo para los amigos. `/soy` contesta solo si quien pregunta está en la
     // lista: el sitio lo usa para mostrar BT3 únicamente a los amigos (colabtex/src/juegos/bt3-amigos.js).
-    const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
+    const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || url.pathname === "/lote" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
     if (!lee && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const quien = token ? await uidDe(token) : null;
@@ -153,6 +160,22 @@ export default {
     if (req.method === "PUT") {   // la lista de arranque, de un amigo
       const n = await sumaArranque(req, env);
       return n === null ? responde("lista inválida", 400, c) : responde(String(n), 200, c);
+    }
+    if (url.pathname === "/lote") {
+      // los números: enteros, sin repetir, hasta LOTE (que el índice no esté subido no importa: falla el pedazo)
+      const ps = (url.searchParams.get("p") || "").split(",").filter(Boolean).map(Number);
+      if (!ps.length || ps.length > LOTE || !ps.every(n => Number.isInteger(n) && n >= 0 && n < 100000) || new Set(ps).size !== ps.length)
+        return responde("lote inválido", 400, c);
+      let k = 0;
+      const flujo = new ReadableStream({
+        async pull(ctl) {
+          if (k >= ps.length) { ctl.close(); return; }
+          const n = ps[k++], p = await pedazo(new URL("/pieza/" + String(n).padStart(5, "0") + ".bin", url.origin), env, ctx);
+          if (!p) { ctl.error(new Error("falta el pedazo " + n)); return; }
+          ctl.enqueue(new Uint8Array(p.bytes));
+        }
+      }, { highWaterMark: 0 });   // (uno a la vez: el siguiente se lee cuando el anterior ya salió)
+      return responde(flujo, 200, { ...c, "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Lote": ps.join(",") });
     }
     if (url.pathname.startsWith("/pieza/")) {
       const p = await pedazo(url, env, ctx);
