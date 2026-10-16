@@ -344,6 +344,22 @@ rebuilds its work images: a hitch), then raised it back (another) — lag the ow
   Storage (`bt3-disco:<size>`): a second session asks the Worker only for `indice.json` (which still checks the
   friends list). The game itself never reads the whole ISO: `webDiscEnsure` copies one file at a time as it opens it.
 
+## Random: a fresh seed, and 🎲
+
+- The port seeds the game's RNG once, at boot, with a **fixed** number (`func_002BB390` → 0x12345678 in
+  `port/src/plat_sys.c`, so a run is repeatable), and every return to the modes restarts the program: the «?» cell and
+  the CPU's random fighter repeated the same characters every time. `BT3_SEED` overrides it and is read inside
+  `Game_Main` (`Vu0_Init` → `Rand_Init`), after the page's `entornoPendiente` is applied, so no C change was needed:
+  `pagina.js` 2e passes a random seed when playing alone or against a tournament CPU, and in an online fight a seed
+  both copies compute the same (FNV-1a of the room id from `parent.location.hash`, both uids sorted, fight number,
+  rules): lockstep needs both copies to draw the same. Seeds are 31-bit: the patch reads them with `strtol`, and a
+  wasm32 `long` is 32-bit signed, so larger ones clamped to the same value.
+- **R3 in the character grid** (`CharSel_WebRuleta`, menu_c_e.c) moves that side's cursor to a random allowed
+  character without choosing it; R3 was unused there. It goes through the pad, so online both copies roll alike.
+  The page presses R3 (`PAD_R3` 0x4 via `Web_TouchSet`) for its own key (default R, `bt3.tecla.azar`, changed with
+  ⌨) and for the 🎲 button, both shown only while the selection is open (`Module.onSeleccion`, now fanned out via
+  `Seleccion.oyentes` because the room's banned-list panel listens too).
+
 ## Battle music: «chinchonchin» from PRO HERO
 
 - **Off by default** (owner's request): the game's own music plays unless the player picks the song with ♪

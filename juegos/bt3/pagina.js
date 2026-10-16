@@ -918,7 +918,7 @@
   // Al arrancar el programa: el modo elegido (los de sala nunca llegan aquí: su botón abre la sala).
   async function eligeModo() {
     try { localStorage.setItem("bt3.modo", modo); } catch (e) {}
-    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_WEB_MODO", modo], ...(modo === "cpu"
+    Module.entornoPendiente = deSala(modo) ? [] : [["BT3_SEED", semillaLocal()], ["BT3_WEB_MODO", modo], ...(modo === "cpu"
       ? [["BT3_WEB_CPU", String(nivel)], ["BT3_WEB_REGLAS", String(reglasCpu())], ...(batalla === "team3" ? [["BT3_WEB_EQUIPO", "3"]] : [])] : [])];
     if (desdePrivado) { grabaArchivos(); await precopia(); }   // (el arranque, ya en memoria: ver «el disco privado, rápido»)
   }
@@ -1095,6 +1095,78 @@
     $("barra").insertBefore(boton, $("barra").querySelector("[data-volumen]"));
   })();
 
+  // ---------------------------------------------------------------- 2e. el azar: semilla nueva y 🎲
+  /* La semilla. El port siembra el azar del juego una sola vez, al arrancar, con un número FIJO (0x12345678,
+     plat_sys.c: así una corrida se puede repetir), y cada vuelta a los modos arranca el programa de cero: el
+     «aleatorio» de la selección (y el luchador al azar de la CPU) repetía siempre los mismos personajes. El parche
+     lee BT3_SEED si está (Vu0_Init corre dentro de Game_Main, después de que la página pone el entorno):
+     - jugando solo o contra la CPU del torneo: una semilla al azar cada vez (`semillaLocal`);
+     - en una pelea en línea las dos copias del juego tienen que sacar LO MISMO (cada una calcula la pelea entera):
+       la semilla sale de lo que las dos ven igual: la sala (de la dirección de Juegos, #p/<sala>, que tiene hasta
+       una pestaña vieja), los dos jugadores, el número de pelea y las reglas (`semillaSala`). Cambia en cada pelea
+       y en cada sala, y no depende de qué versión de Juegos tenga abierta cada uno. */
+  const semillaLocal = () => {
+    const a = new Uint32Array(1);
+    try { crypto.getRandomValues(a); } catch (e) { a[0] = (Math.random() * 4294967296) >>> 0; }
+    return String((a[0] & 0x7fffffff) || 1);   // (31 bits: el parche la lee con strtol, y un long de wasm32 es de 32 bits con signo)
+  };
+  const semillaSala = e => {
+    let sala = "";
+    try { sala = (String(window.parent.location.hash).match(/#p\/([^/?&]+)/) || [])[1] || ""; } catch (x) {}
+    const quienes = [e.yo, e.rival && e.rival.uid].filter(Boolean).sort().join(",");
+    const txt = [sala, quienes, e.torneo ? "t" : "d", e.ronda || 0, e.reglas || 0].join("|");
+    let h = 0x811c9dc5;   // FNV-1a de 32 bits: el mismo número en los dos navegadores
+    for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return String((h & 0x7fffffff) || 1);
+  };
+  window.BT3Semilla = { local: semillaLocal, sala: semillaSala };
+
+  /* 🎲 Aleatorio. En la grilla de personajes, R3 (el parche: CharSel_WebRuleta) lleva el cursor a un personaje al
+     azar —respetando la regla de la sala— sin elegirlo: se ve quién salió, se confirma con ✕ o se vuelve a tirar.
+     Va por el mando, así que en una pelea en línea las dos copias tiran igual. Además del R3 del mando y del de la
+     pantalla táctil, una tecla de la página lo aprieta (R por defecto; se cambia con ⌨ en la barra, «bt3.tecla.azar»)
+     y el botón 🎲 de la barra, que solo se ve con la selección abierta (Module.onSeleccion). */
+  const Seleccion = { abierta: false, oyentes: [] };
+  Module.onSeleccion = a => { Seleccion.abierta = !!a; for (const f of Seleccion.oyentes) { try { f(Seleccion.abierta); } catch (e) {} } };
+  window.BT3Seleccion = Seleccion;
+  const CLAVE_TECLA = "bt3.tecla.azar";
+  let tecla = "KeyR";
+  try { tecla = localStorage.getItem(CLAVE_TECLA) || tecla; } catch (e) {}
+  const nombreTecla = c => String(c).replace(/^Key/, "").replace(/^Digit/, "").replace(/^Numpad/, "Num ").replace(/^Arrow/, "Flecha ");
+  const tira = () => {
+    if (!Module._Web_TouchSet || !Seleccion.abierta) return false;
+    const T = window.BT3Touch || {}, bits = T.bits || 0, lx = T.lx ?? 128, ly = T.ly ?? 128;
+    Module._Web_TouchSet(bits | 0x4, lx, ly);   // PAD_R3 (include/sys/pad.h)
+    setTimeout(() => Module._Web_TouchSet(bits, lx, ly), 120);
+    return true;
+  };
+  const dado = document.createElement("button");
+  dado.id = "dado"; dado.type = "button"; dado.hidden = true;
+  const cambia = document.createElement("button");
+  cambia.id = "dadoTecla"; cambia.type = "button"; cambia.hidden = true; cambia.textContent = "⌨";
+  cambia.title = "Cambiar la tecla del aleatorio"; cambia.setAttribute("aria-label", cambia.title);
+  let esperando = false;
+  const pintaDado = () => {
+    dado.hidden = cambia.hidden = !Seleccion.abierta;
+    dado.textContent = esperando ? "Aprieta una tecla… (Esc cancela)" : "🎲 " + nombreTecla(tecla);
+    dado.title = "Aleatorio: el cursor a un personaje al azar (tecla " + nombreTecla(tecla) + ", o R3 en el mando). Vuelve a tirar o confirma con ✕.";
+  };
+  dado.onclick = () => { dado.blur(); if (esperando) return; tira(); };
+  cambia.onclick = () => { cambia.blur(); esperando = true; pintaDado(); };
+  addEventListener("keydown", e => {
+    if (esperando) {
+      e.preventDefault(); e.stopPropagation();
+      if (e.code !== "Escape" && e.code) { tecla = e.code; try { localStorage.setItem(CLAVE_TECLA, tecla); } catch (x) {} }
+      esperando = false; pintaDado();
+      return;
+    }
+    if (e.code === tecla && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "")) tira();
+  }, true);
+  Seleccion.oyentes.push(() => { if (!Seleccion.abierta) esperando = false; pintaDado(); });
+  pintaDado();
+  $("barra").insertBefore(cambia, $("barra").firstChild);
+  $("barra").insertBefore(dado, cambia);
+
   // ---------------------------------------------------------------- 3. la sala
   const S = window.BT3Sala;
   if (!S || !S.activo) return;
@@ -1172,7 +1244,7 @@
     }
     panel.append(cuerpo);
   };
-  Module.onSeleccion = abierta => { enSeleccion = !!abierta; pintaVetos(); };
+  Seleccion.oyentes.push(abierta => { enSeleccion = !!abierta; pintaVetos(); });   // (Module.onSeleccion: 2e)
   /* (Aquí el banco de pruebas bajaba la memoria para archivos del disco a 192 MB, de cuando corría dos juegos en una
      pestaña. Con uno por pestaña sobraba el recorte y faltaba memoria: en plena pelea, al cargar algo nuevo, el juego
      botaba archivos que todavía usaba y los volvía a leer del disco en cada cuadro: 2 fps, 99% ocupado sin dibujar.
@@ -1232,6 +1304,7 @@
         /* Una pelea del torneo contra la CPU: se juega aquí solo, sin red. El juego entra al versus 1P vs COM con
            las reglas de la sala, la CPU con su nivel y su luchador (o equipo) al azar (BT3_WEB_*, parche.diff). */
         Module.entornoPendiente = Object.entries(Object.assign({
+          BT3_SEED: semillaLocal(),   // (contra la CPU se juega aquí solo: azar de verdad, 2e)
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
         if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo
@@ -1254,6 +1327,7 @@
       /* Las variables de la sesión. No sirve tocar ENV a esta altura (el runtime ya lo copió al cargar): las
          pone el programa mismo con setenv al empezar el juego (__wrap_Game_Main, parche.diff). */
       Module.entornoPendiente = Object.entries(Object.assign({
+        BT3_SEED: semillaSala(e),   // (la misma en las dos copias: 2e)
         BT3_NET_SESSION: "1", BT3_NET_NAME: e.nombre.slice(0, 16), BT3_NET_DELAY: "auto", BT3_NOMOVIE: "1", BT3_SOUND_TICKS: "1",
         BT3_SAVES: "/net_session", BT3_UNLOCK_ALL: "0",   // la sesión desbloquea todo sola, igual en los dos lados
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
