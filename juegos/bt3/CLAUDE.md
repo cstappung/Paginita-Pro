@@ -86,8 +86,13 @@ Room game in an iframe, modelled on HaxBall, with one deliberate difference: **t
   opened the main menu instead of the versus screen). The page leaves the pairs in `Module.entornoPendiente` and
   `__wrap_Game_Main` applies them with `setenv` before anything reads them. So the frame does not reload into the
   session like the fork does, and the ISO is chosen once per fight.
-- Only STUN: two networks that refuse a direct connection cannot fight; the frame says so after 45 s and the room
-  goes back to the lobby. A TURN relay would fix it (not done).
+- STUN by default. **A TURN relay is the host's last resort, never automatic** (owner's rule): «Conexión: 🛰 Relevo de
+  Cloudflare» in the room (`{t:"ajuste", k:"relevo", v:true}`, host in a duel, organizer in a tournament also
+  mid-bracket). Only then does each frame ask the Worker's `/turn` (friends only; `TURN_ID` + secret `TURN_CLAVE`
+  of Cloudflare Realtime → TURN; short-lived credentials from `generate-ice-servers`, port-53 URLs dropped,
+  reused for half their life) and add them to the mesh's `ice`. Without those variables `/turn` answers 404 and it
+  connects direct as before. Free tier: 1,000 GB/month; a fight is only inputs, but never relay the spectator video.
+  Without it, two networks that refuse a direct connection cannot fight; the frame says so after 45 s.
 - **Why it failed goes to the room chat** («⚡ BT3 · A → B: …»): the room reloads the frame on going back to the
   lobby, so the frame's own notice was never read («stuck on Conectando…, then back»). `bt3-marco.js` `explica`
   says how far the link got (rival never present / ICE failed / never answered, with `malla.detalle`), and
