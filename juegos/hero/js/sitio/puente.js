@@ -4,6 +4,7 @@
 // Fuera de un iframe (abierto a mano) el juego funciona igual, sin récords
 // en la nube.
 import { claveCancion } from './clave.js';
+import { celular } from './celular.js';
 
 const PADRE = 'hero-padre', HIJO = 'hero-hijo';
 const params = new URLSearchParams(location.search);
@@ -74,7 +75,8 @@ export function pantallaCompleta() {
   const pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
   try {
     const r = pide?.call(raiz, { navigationUI: 'hide' });
-    r?.catch?.(() => {});
+    // en el celular, además, horizontal (donde el navegador deja bloquearla)
+    r?.then?.(() => celular && screen.orientation?.lock?.('landscape')?.catch?.(() => {}), () => {});
   } catch {}
 }
 

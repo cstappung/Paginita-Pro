@@ -30,13 +30,13 @@ test('@controles en el código del juego manda sobre la lectura',()=>{
 });
 
 /* Lo que se comprobó jugando en un teléfono emulado (táctil, 390 × 844) el
-   5-10-2026: la lectura del código tiene que dar lo mismo. Un juego nuevo no
+   5-10-2026 (PRO HERO, con sus cinco botones, el 17-10-2026): la lectura del código tiene que dar lo mismo. Un juego nuevo no
    necesita estar aquí; si se prueba y la lectura falla, se corrige con
    `@controles:` en su código y se añade a esta lista. */
 const PROBADOS={
  movil:['orbita','escondite','cartas','cuadritos','worms','reversi','cadena','flip7','cacho','uno','catan','presidente','spicy','tetris','clue','ajedrez','pokemon',
-  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','protiles','pokelike','frontera','bots-worms','bots-clue','mascotas'],
- teclado:['boxhead','bots-boxhead','sortem','hero','heroclub'],
+  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','protiles','pokelike','frontera','bots-worms','bots-clue','mascotas','hero','heroclub'],
+ teclado:['boxhead','bots-boxhead','sortem'],
  tecladoYRaton:['yemas','bots-yemas','tulones','tulonesclub']
 };
 

@@ -208,6 +208,37 @@ file or the versions disagree.
 Keyboard, guitars and gamepads are read by the game itself (`js/input/`,
 Gamepad API). `mando.js` is loaded only so the page's cursor steps aside;
 `Mando.configura` claims Select (Star Power on many guitars). `@controles:
-teclado` in `main.js`: menus have clicks, but there is no touch play.
+tactil teclado` in `main.js` (touch = the phone mode below).
 Volume: the pause menu has four sliders, plus the site's 🔊 in the corner
 (`[data-volumen]`, `volumen.js`).
+
+## Modo celular (`js/sitio/celular.js`, `js/ui/tactil.js`)
+
+- **Detected by the screen, not the iframe**: `pointer:coarse` and the short
+  side of `screen` ≤ 600 px; `?celular=1`/`=0` forces it (Playwright's
+  `devices['Pixel 7 landscape']` triggers it by itself). Adds `html.celular`.
+- **Landscape only**: in portrait `.gira` covers everything, and turning the
+  phone mid-song pauses it (not in a room). Club mode asks fullscreen +
+  `screen.orientation.lock` on every `pointerup` (not `pointerdown`: the
+  resize moved the click onto another button); a room only does it in
+  `pantallaCompleta`, so the page's chat stays visible in the lobby.
+- **Starts in alto rendimiento and «todo taps»** (set in memory at startup;
+  no strum with five buttons). `_makePlayer` forces `taps` for local players,
+  so the proof header agrees. Drums are hidden (they need a kick).
+- **Five buttons = five equal columns** of the screen. The renderer
+  (`opts.celular`) raises the strike bar to 70 % and widens the highway
+  (`anchoCelular`) so each lane is exactly one fifth wide at the buttons'
+  centre (90 %): changing one side means changing the other. Gems are
+  flattened (`tilt` × 0.62), the HUD moves to the top-left (`_hudCelular`),
+  ★ (Star Power) and ❚❚ (pause) are DOM buttons on the right, and only your
+  own highway is drawn (in a room the others' `fxQueue` is emptied).
+- **Touch never calls the engine**: `Tactil` emits `{device: 'touch', code:
+  't0'…'t4' | 'tsp' | 'tpausa'}` and the human player gets the `TACTIL`
+  profile, so everything goes through the `Grabadora` like a gamepad.
+  Multi-touch chords and sliding a finger across colours work (a count of
+  fingers per lane).
+- **Nothing is saved from a phone** (the owner's call: unfair to PC players):
+  `mandaResultado` returns early, so no `resultado` → no stars, no ranking,
+  no coins. The results screen and the room lobby say so.
+- Outside Juegos, i18n.js's floating language selector sat on the green
+  button: hidden while playing (`html.celular.tocando`).

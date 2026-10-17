@@ -7,6 +7,10 @@ import { settings, saveSettings } from '../settings.js';
 import { SongSelectScreen, tocaVistaPrevia, cancelaVistaPrevia } from './songSelect.js';
 import { SettingsScreen, ALTO_AYUDA } from './settingsScreen.js';
 import { NOTE_MODES } from '../core/noteMode.js';
+import { celular } from '../sitio/celular.js';
+
+// En el celular: sin batería (necesita bombo) y siempre todo taps (cinco botones, sin rasgueo)
+const partesDe = (entry) => PART_ORDER.filter((p) => entry.parts[p] && !(celular && PARTS[p].kind === 'drums'));
 import { sitio, pantallaCompleta } from '../sitio/puente.js';
 import { enElCentro } from '../game/orden.js';
 
@@ -276,11 +280,12 @@ export class LobbyScreen extends Screen {
 
     // Si la canción no tiene mi instrumento/dificultad, elige otro automáticamente
     if (entry && me) {
-      const parts = PART_ORDER.filter((p) => entry.parts[p]);
+      const parts = partesDe(entry);
       let part = parts.includes(me.part) ? me.part : parts[0];
       const diffs = DIFF_UI.filter((d) => entry.parts[part]?.[d]);
       let diff = diffs.includes(me.diff) ? me.diff : diffs[0];
-      if (part !== me.part || diff !== me.diff || !me.mode) net.send({ t: 'part', part, diff, mode: me.mode || settings.noteMode });
+      const mode = celular ? 'taps' : me.mode || settings.noteMode;
+      if (part !== me.part || diff !== me.diff || mode !== me.mode) net.send({ t: 'part', part, diff, mode });
     }
 
     this.left.replaceChildren(h('h3', {}, `Jugadores (${room.players.length}/${room.cupo || 8})`), ...room.players.map((p) =>
@@ -295,7 +300,7 @@ export class LobbyScreen extends Screen {
         : h('div', { class: 'ls-empty' }, room.songId && library.songs.length ? 'La canción elegida no está en tu biblioteca.' : isHost ? 'Elige una canción para empezar' : 'Esperando a que el anfitrión elija canción…'),
       isHost ? h('button', { 'data-nav': true, onclick: () => this.pickSong() }, entry ? 'Cambiar canción' : 'Elegir canción') : null].filter(Boolean));
 
-    const parts = entry ? PART_ORDER.filter((p) => entry.parts[p]) : PART_ORDER;
+    const parts = entry ? partesDe(entry) : PART_ORDER;
     const diffs = entry ? DIFF_UI.filter((d) => entry.parts[me?.part]?.[d]) : DIFF_UI;
     const sendPart = (o) => net.send({ t: 'part', part: me.part, diff: me.diff, mode: me.mode || settings.noteMode, ...o });
     const partSel = h('select', { 'data-nav': true, onchange: () => sendPart({ part: partSel.value }) },
@@ -314,12 +319,13 @@ export class LobbyScreen extends Screen {
     this.mine.replaceChildren(...[
       h('label', { class: 'set-row' }, h('span', {}, 'Instrumento'), partSel),
       h('label', { class: 'set-row' }, h('span', {}, 'Dificultad'), diffSel),
-      h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
-      h('label', { class: 'set-row' }, h('span', {}, 'Control'), profSel),
+      celular ? null : h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
+      celular ? null : h('label', { class: 'set-row' }, h('span', {}, 'Control'), profSel),
       h('label', { class: 'set-row check' }, h('span', {}, 'Alto rendimiento', h('small', {}, ALTO_AYUDA)), alto),
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
       this.ajustesEl(),
-      sitio.sala ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
+      sitio.sala && celular ? h('p', { class: 'd-aviso' }, 'En el celular las partidas no se guardan: los récords y las estrellas son para teclado, mando o guitarra.') : null,
+      sitio.sala && !celular ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
       isHost
         ? h('button', { class: 'primary big', 'data-nav': true, disabled: !entry || room.phase !== 'lobby' || faltan > 0, onclick: () => { pantallaCompleta(); net.send({ t: 'start' }); } },
           room.phase === 'loading' ? 'Cargando…' : room.phase === 'playing' ? 'Tocando…' : faltan > 0 ? `Esperando que estén listos (${faltan})` : 'Empezar canción')
