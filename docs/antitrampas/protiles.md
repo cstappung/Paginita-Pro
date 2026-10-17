@@ -10,7 +10,12 @@ Nueve tablas, una por canción y una para la mezcla:
 
 ## La prueba
 
-`{v: 1, m, s, u, g, n, a, w, x?}`:
+`{v: 2, m, s, u, g, n, a, w, x?}` (se aceptan `v: 1` y `v: 2`):
+
+- `v`: la versión del motor. **2** (la que se juega): canciones reescritas
+  y la ficha se escapa al salir más de la mitad de su largo por abajo. **1**:
+  las canciones del estreno (`SONGS_V1` en `motor.js`) y el escape a 0,15
+  filas; queda solo para rehacer las pruebas ya guardadas o pendientes.
 
 - `m`: el modo (el id de la canción o `mezcla`); tiene que ser el de la tabla.
 - `s`: la semilla (32 bits). `u`: la cuenta. Las dos juntas deciden los
@@ -30,7 +35,8 @@ Nueve tablas, una por canción y una para la mezcla:
 
 1. Que cada nota se tocara en el carril de su ficha (lo que ata la prueba a
    la semilla y la cuenta) y cuando su ficha estaba en pantalla
-   (`M.tocable`: desde que asoma hasta 0,15 filas bajo el borde) y que
+   (`M.tocable`: desde que asoma hasta que salió la mitad de su largo bajo
+   el borde; 0,15 filas en la versión 1) y que
    ninguna ficha se escapara antes de la última nota, rehaciendo la partida
    paso a paso con el mismo motor (`juegos/club/protiles/motor.js`).
 2. Que la partida rehecha llegue viva al tick `n` (termina ahí porque se

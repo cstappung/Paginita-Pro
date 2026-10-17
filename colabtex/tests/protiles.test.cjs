@@ -11,8 +11,8 @@ const M=require(path.join(D,'motor.js'));
 /* Un bot que toca cada ficha cuando le faltan entre `lo` y `hi` filas para
    el borde (al azar), suelta las largas a veces antes de tiempo, y deja
    escaparse la ficha número `notas`. */
-function juega(modo,semilla,u,{notas=300,lo=.4,hi=2.6,igual=false}={}){
- const E=M.nueva(modo,semilla,u),acciones=[];let a=semilla*7+3;
+function juega(modo,semilla,u,{notas=300,lo=.4,hi=2.6,igual=false,v=M.PRUEBA_V}={}){
+ const E=M.nueva(modo,semilla,u,v),acciones=[];let a=semilla*7+3;
  const azar=()=>{a=(a*1103515245+12345)>>>0;return a/4294967296;};
  let falta=null,suelta=null;
  const golpe=()=>{const t=E.tiles[E.next];const dc=t.hold?Math.round(t.len*100*(.5+azar()*.5)):null;
@@ -29,7 +29,7 @@ function juega(modo,semilla,u,{notas=300,lo=.4,hi=2.6,igual=false}={}){
  }
  const ms=E.t*M.TICK_MS;
  return {E,dato:{categoria:'club-protiles-'+modo,puntos:E.score,tiempo:Math.max(1,ms)},
-  p:{v:1,m:modo,s:semilla,u,g:M.codifica(acciones),n:E.t,a:ms+500,w:ms+700}};
+  p:{v,m:modo,s:semilla,u,g:M.codifica(acciones),n:E.t,a:ms+500,w:ms+700}};
 }
 
 test('el motor es repetible y cada canción tiene sus fichas',()=>{
@@ -57,9 +57,34 @@ test('la partida se rehace igual y el verificador la acepta',async()=>{
  assert.ok(new Set(E.tiles.slice(0,E.next).map(t=>t.S.id)).size>=2);
 });
 
+test('versión 2: la ficha se escapa al salir más de la mitad; la 1 se sigue verificando',async()=>{
+ assert.equal(M.PRUEBA_V,2);
+ for(const len of [1,2,3,6]){
+  const E=M.nueva('cristal',1,'ana');const t={s:10,len};
+  E.pos=10+len/2;assert.ok(M.tocable(E,t),'justo en la mitad todavía se toca');
+  E.pos=10+len/2+.01;assert.ok(!M.tocable(E,t));
+  const E1=M.nueva('cristal',1,'ana',1);E1.pos=10.16;assert.ok(!M.tocable(E1,t),'la versión 1 corta a las 0,15 filas');
+ }
+ // Las canciones nuevas no son las de antes, y cada compás del estribillo dura 8 corcheas.
+ for(const S of M.SONGS){
+  assert.notEqual(S.hook,M.SONGS_V1.find(x=>x.id===S.id).hook,S.id);
+  for(const b of S.hookBars)assert.equal(b.reduce((a,n)=>a+n.len,0),8,S.id);
+  for(const c of S.cells)assert.equal(c.reduce((a,b)=>a+b,0),8,S.id);
+ }
+ // Una partida jugada con la versión 1 (canciones y regla de entonces) sigue valiendo.
+ for(const m of ['calle','mezcla']){
+  const {dato,p}=juega(m,99,'ana',{v:1,notas:m==='mezcla'?900:200});
+  assert.equal(p.v,1);
+  assert.equal(await V.verificaClub('protiles',dato,p,{uid:'ana'}),null);
+  assert.notEqual(await V.verificaClub('protiles',dato,{...p,v:2},{uid:'ana'}),null,'la misma prueba no rehace en la versión 2');
+ }
+ const {dato,p}=juega('calle',99,'ana');
+ assert.match(await V.verificaClub('protiles',dato,{...p,v:3},{uid:'ana'}),/versión/);
+});
+
 test('rechaza cada trampa',async()=>{
  const {dato,p}=juega('verano',777,'ana');
- const mal=async(d,q,re)=>{const m=await V.verificaClub('protiles',d,q,{uid:'ana'});assert.notEqual(m,null);if(re)assert.match(m,re);};
+ const mal=async(d,q,re)=>{const m=await V.verificaClub("protiles",d,q,{uid:"ana"});assert.notEqual(m,null);if(re)assert.match(m,re);};
  await mal({...dato,puntos:dato.puntos+1},p,/suma/);
  await mal({...dato,categoria:'club-protiles-calle'},p);
  await mal({...dato,categoria:'club-protiles-nada'},p);
@@ -72,8 +97,9 @@ test('rechaza cada trampa',async()=>{
  await mal(dato,{...p,a:1000,w:1000},/reloj/);
  await mal(dato,{...p,g:'zz!'});
  // Una nota tocada antes de que su ficha asome.
- const ac=M.decodifica(p.g);ac[5]={...ac[5],t:ac[4].t};
- await mal(dato,{...p,g:M.codifica(ac)});
+ // (las 20 primeras en el tick 0: la vigésima está muy por encima de la pantalla).
+ const ac=M.decodifica(p.g).map((x,i)=>i<20?{...x,t:0}:x);
+ await mal(dato,{...p,g:M.codifica(ac)},/no estaba en pantalla/);
  // Declarar que la partida siguió viva más allá de cuando se escapó la ficha.
  await mal({...dato,tiempo:(p.n+50)*M.TICK_MS},{...p,n:p.n+50},/termina/);
  await mal(dato,undefined);
