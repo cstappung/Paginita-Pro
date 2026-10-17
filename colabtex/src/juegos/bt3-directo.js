@@ -34,7 +34,7 @@
 
    - `crearEmisor({senal, uid, canvas, audio, alCuadro})` (en el marco del juego que pelea).
    - `crearVisor({senal, uid, emisor, alVideo, alFalla})` (en la sala, para quien mira): recibe y reenvía. */
-const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+export const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
 const ALTO = 540, BITS = 1500000, CUADROS = 30, COLCHON_MS = 300;
 const ARRANQUE_KB = 1200, MINIMO_KB = 400;   // con qué ancho parte la conexión del video, y de cuánto no baja
 
@@ -73,7 +73,7 @@ export const MAX_VISORES = 14;   // cuántos pueden mirar una pelea
 /* Una fuente: le entrega sus pistas (video y sonido) a quien se las pida, como mucho a `max` a la vez. La usan el
    emisor (con el lienzo del juego) y cada espectador que reenvía (con lo que recibe; `sesion`: solo atiende a
    quien le pide a esa sesión suya). No escucha el buzón: le pasan los mensajes (`alMensaje`). */
-function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
+function crearFuente({ senal, uid, pistas, max, sesion = null, RTC, servidores = () => ICE }) {
   const visores = new Map();   // "<de>|<s>" → {pc, cola, remota}
   function cierraUno(k) {
     const x = visores.get(k);
@@ -90,7 +90,7 @@ function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
         const ps = pistas().filter(t => t && t.readyState !== "ended");
         if ((!visores.has(k) && visores.size >= max) || !ps.some(t => t.kind === "video")) { senal.envia(de, { t: "vlleno", s: m.s }); return; }
         cierraUno(k);
-        const pc = new RTC({ iceServers: ICE }), x = { pc, cola: [], remota: false };
+        const pc = new RTC({ iceServers: servidores() }), x = { pc, cola: [], remota: false };
         visores.set(k, x);
         const flujo = new MediaStream(ps);
         let envio = null;
@@ -148,7 +148,11 @@ function crearFuente({ senal, uid, pistas, max, sesion = null, RTC }) {
   };
 }
 
-export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro = null, RTC = globalThis.RTCPeerConnection, max = DIRECTOS, total = MAX_VISORES, relevo = RELEVO }) {
+/* ice: los servidores de cada conexión, o una función que los da (se lee al abrir cada una): con el relevo de
+   Cloudflare activado en la sala (TURN, el último recurso) van también sus credenciales, que pueden llegar tarde. */
+const iceDe = ice => typeof ice === "function" ? ice : () => ice;
+export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro = null, RTC = globalThis.RTCPeerConnection, max = DIRECTOS, total = MAX_VISORES, relevo = RELEVO, ice = ICE }) {
+  const servidores = iceDe(ice);
   let pista = null, sueltaCuadro = null;
   /* Una sola captura para todo. Con el aviso de cada cuadro (alCuadro), una copia chica del lienzo del juego (540 de
      alto, el ancho según su forma), hecha justo después de que el juego dibuja: ahí el lienzo todavía tiene el
@@ -192,7 +196,7 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro =
     try { pista.contentHint = "motion"; } catch (e) {}
     return pista;
   };
-  const fuente = crearFuente({ senal, uid, max, RTC, pistas: () => [video(), audio()].filter(Boolean) });
+  const fuente = crearFuente({ senal, uid, max, RTC, servidores, pistas: () => [video(), audio()].filter(Boolean) });
   /* El árbol de los que miran: "<de>|<s>" → {de, s, padre ("" = el emisor), hijos, listo, orden}. */
   const arbol = new Map();
   let llegada = 0;
@@ -254,12 +258,13 @@ export function crearEmisor({ senal, uid, canvas, audio = () => null, alCuadro =
   };
 }
 
-export function crearVisor({ senal, uid, emisor, alVideo, alFalla = () => {}, RTC = globalThis.RTCPeerConnection, espera = 30000, relevo = RELEVO }) {
+export function crearVisor({ senal, uid, emisor, alVideo, alFalla = () => {}, RTC = globalThis.RTCPeerConnection, espera = 30000, relevo = RELEVO, ice = ICE }) {
+  const servidores = iceDe(ice);
   const s = Math.random().toString(36).slice(2, 10);   // este pedido (si pide de nuevo, es otro)
   let pc = null, remota = false, vivo = true, padre = emisor, padreS = null, flujo = null, visto = false, reloj = 0, reintento = 0, plazo = 0, corte = 0;
   let cola = [];
   // lo que recibe, lo reenvía a los que el emisor le cuelgue (solo a quien le pide a esta sesión)
-  const fuente = crearFuente({ senal, uid, sesion: s, max: relevo, RTC, pistas: () => flujo ? flujo.getTracks() : [] });
+  const fuente = crearFuente({ senal, uid, sesion: s, max: relevo, RTC, servidores, pistas: () => flujo ? flujo.getTracks() : [] });
   const armaReloj = () => { clearTimeout(reloj); reloj = setTimeout(() => { if (vivo && !visto) alFalla("sin-respuesta"); }, espera); };
   function cierraPc() { try { pc?.close(); } catch (e) {} pc = null; remota = false; cola = []; }
   // pedirle al emisor de quién recibirla (cae: la fuente que se cayó, para que la saque del árbol)
@@ -290,7 +295,7 @@ export function crearVisor({ senal, uid, emisor, alVideo, alFalla = () => {}, RT
       } else if (m.t === "vof" && de === padre) {
         clearTimeout(plazo);
         cierraPc();
-        const este = pc = new RTC({ iceServers: ICE });
+        const este = pc = new RTC({ iceServers: servidores() });
         este.ontrack = e => {
           // un colchón: el navegador junta 300 ms antes de mostrar y reparte los cuadros parejo (mirar con un poco de
           // retraso da igual; a tirones no)

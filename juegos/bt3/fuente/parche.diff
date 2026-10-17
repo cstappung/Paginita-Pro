@@ -127,10 +127,28 @@ index 011fc8d..271ec6a 100644
      sWaits++;
      {   /* (the meter, when the two copies wait for each other every blank: time waited, and blanks that waited
 diff --git a/port/src/gs/ui.cpp b/port/src/gs/ui.cpp
-index fd6cc57..d8cf52e 100644
+index fd6cc57..dd532ed 100644
 --- a/port/src/gs/ui.cpp
 +++ b/port/src/gs/ui.cpp
-@@ -309,6 +309,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Web_NetMenuClosed(void) {
+@@ -278,7 +278,17 @@ int Ui_Init(SDL_Window *window, SDL_GPUDevice *device, void *gl_context) {
+     return 1;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++/* paginita-pro: the page hides its touch controls and bar while this window is open (they covered it on a phone) */
++EM_JS(void, web_ajustes, (int open), { if (Module.onAjustes) Module.onAjustes(!!open); });
++#endif
+ static void set_open(bool open) {
++#ifdef __EMSCRIPTEN__
++    if (open != sOpen) {
++        web_ajustes(open);
++    }
++#endif
+     sOpen = open;
+     sNet = false;
+     sCapKind = 0;
+@@ -309,6 +319,42 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Web_NetMenuClosed(void) {
  }
  #endif
  
@@ -152,10 +170,40 @@ index fd6cc57..d8cf52e 100644
 +}
 +#endif
 +
++/* paginita-pro: windows that fit the screen. On a phone the display is ~400 x 850 points (portrait) or ~850 x 400
++   (landscape): a 640 x 560 window went off it, with its close box out of reach. */
++static float fit_w(float want) { float m = ImGui::GetIO().DisplaySize.x - 16.0f; return want < m ? want : (m > 200.0f ? m : 200.0f); }
++static float fit_h(float want) { float m = ImGui::GetIO().DisplaySize.y - 16.0f; return want < m ? want : (m > 150.0f ? m : 150.0f); }
++static void fit_window(void) {   /* (before Begin) never larger than the screen */
++    ImGuiIO &io = ImGui::GetIO();
++    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(io.DisplaySize.x - 8.0f, io.DisplaySize.y - 8.0f));
++}
++static void keep_on_screen(void) {   /* (after Begin) the whole window on the screen, its title bar first */
++    ImGuiIO &io = ImGui::GetIO();
++    ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize(), q = p;
++    if (q.x + z.x > io.DisplaySize.x - 4.0f) q.x = io.DisplaySize.x - 4.0f - z.x;
++    if (q.y + z.y > io.DisplaySize.y - 4.0f) q.y = io.DisplaySize.y - 4.0f - z.y;
++    if (q.x < 4.0f) q.x = 4.0f;
++    if (q.y < 4.0f) q.y = 4.0f;
++    if (q.x != p.x || q.y != p.y) ImGui::SetWindowPos(q);
++}
++
  static void net_open(void) {
      set_open(true);
      sNet = true;
-@@ -591,7 +609,11 @@ static void video_tab(PortVideo &v) {
+@@ -322,8 +368,10 @@ static void build_net(void) {
+     bool open = true;
+ 
+     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+-    ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
++    ImGui::SetNextWindowSize(ImVec2(fit_w(560.0f), 0.0f), ImGuiCond_Appearing);
++    fit_window();
+     if (ImGui::Begin("Dragon Net Battle", &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
++        keep_on_screen();
+         ImGui::TextWrapped("Fight a player on another computer. One of you hosts, the other joins with the host's address.");
+         ImGui::Spacing();
+         ImGui::SetNextItemWidth(260.0f);
+@@ -591,7 +639,11 @@ static void video_tab(PortVideo &v) {
          ImGui::SetNextItemWidth(416.0f);
          if (ImGui::Combo("Smooth motion", &smooth, kSmooth, 4)) {
              gsInterp = smooth;
@@ -167,6 +215,18 @@ index fd6cc57..d8cf52e 100644
              Port_SettingsWrite();
          }
          ImGui::SetItemTooltip("Experimental. The game computes a fight 30 times a second. With this, more pictures are\n"
+@@ -760,8 +812,10 @@ static void build(void) {
+     GsGpu_GetSettings(&v);
+     was = v;
+     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+-    ImGui::SetNextWindowSize(ImVec2(640.0f, 560.0f), ImGuiCond_Appearing);
++    ImGui::SetNextWindowSize(ImVec2(fit_w(640.0f), fit_h(560.0f)), ImGuiCond_Appearing);
++    fit_window();
+     if (ImGui::Begin("Settings", &open, ImGuiWindowFlags_NoCollapse)) {
++        keep_on_screen();
+         if (ImGui::BeginTabBar("tabs")) {
+             if (tab("Video", 0)) { video_tab(v); ImGui::EndTabItem(); }
+             if (tab("Effects", 1)) { effects_tab(v); ImGui::EndTabItem(); }
 diff --git a/port/src/headless.c b/port/src/headless.c
 index fb8b892..9e6bead 100644
 --- a/port/src/headless.c

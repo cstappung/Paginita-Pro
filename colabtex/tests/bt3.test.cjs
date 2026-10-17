@@ -598,3 +598,26 @@ test('el relevo de Cloudflare: lo activa a mano el anfitrión (nunca solo), y el
  t=B.reducir(torneo(3,{t:'torneo',uid:'u0'},{t:'ajuste',uid:'u0',k:'relevo',v:true}));
  assert.ok(t.llave,'con el torneo andando');assert.equal(t.relevo,true,'también se puede activar');
 });
+
+test('la pelea en vivo con el relevo: sin él, los mismos STUN de siempre; con él, también el TURN (que puede llegar tarde)',async()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor,ICE};',c);
+ c.MediaStream=class{constructor(t){this.t=t;}};
+ const cfgs=[];
+ class RTC{constructor(cfg){cfgs.push(JSON.parse(JSON.stringify(cfg)));this.signalingState='stable';}addTrack(){return{getParameters:()=>({encodings:[{}]}),setParameters:async()=>{}};}
+  createOffer(){return Promise.resolve({type:'offer',sdp:'x'});} setLocalDescription(){return Promise.resolve();} close(){} getSenders(){return[];}}
+ const canvas={height:540,captureStream:()=>({getVideoTracks:()=>[{kind:'video',readyState:'live'}]})};
+ let oye=null;const senal={envia:()=>{},alMensajes:f=>{oye=f;return()=>{};}};
+ const STUN=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}];
+ const normal=c.__D.crearEmisor({senal,uid:'E',canvas,RTC});
+ await oye('A',{t:'ver',s:'a'});
+ assert.deepEqual(cfgs[0].iceServers,STUN,'modo normal: igual que antes');
+ normal.cierra();
+ const TURN={urls:['turn:turn.cloudflare.com:3478?transport=udp'],username:'u',credential:'c'};
+ let llegaron=[];
+ const conRelevo=c.__D.crearEmisor({senal,uid:'E',canvas,RTC,ice:()=>[...c.__D.ICE,...llegaron]});
+ llegaron=[TURN];   // (las credenciales llegaron después de crear el emisor, antes de que alguien pida mirar)
+ await oye('B',{t:'ver',s:'b'});
+ assert.deepEqual(cfgs[1].iceServers,[...STUN,TURN],'con el relevo: el TURN también');
+ conRelevo.cierra();
+});

@@ -110,11 +110,11 @@ function envia(bytes) {
 /* La pelea en vivo (bt3-directo.js): este marco es el que pelea y la sala lo eligió para mostrarla (`estado.emite`):
    contesta a los que piden verla con la imagen del lienzo del juego. */
 let emisor = null;
-function emite(canvas) {
+function emite(canvas, relevo = []) {   // relevo: los servidores TURN, si el anfitrión lo activó (como en `conecta`)
   if (emisor || !canvas || !estado?.yo) return;
   // el sonido del juego, del contexto de audio que la página del juego marca (juegos/bt3/pagina.js, Module.audioJuego);
   // la imagen, copiada achicada cada vez que el juego termina un cuadro (parche: Web_FrameDone → Module.onCuadro)
-  emisor = crearEmisor({ senal, uid: estado.yo, canvas, audio: () => window.Module?.audioJuego?.() || null,
+  emisor = crearEmisor({ senal, uid: estado.yo, canvas, ice: [...ICE_BASE, ...relevo], audio: () => window.Module?.audioJuego?.() || null,
     alCuadro: fn => {
       window.Module.onCuadro = fn;
       return () => { if (window.Module.onCuadro === fn) window.Module.onCuadro = null; };
