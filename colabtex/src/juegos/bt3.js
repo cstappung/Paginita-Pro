@@ -1,10 +1,10 @@
 import * as fb from "../fb-juegos.js";
 import { auth } from "../firebase.js";
-import { revisaBt3, BT3_VER } from "./bt3-amigos.js";
+import { revisaBt3, relevoBt3, BT3_VER } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
 import { suena } from "./sonido.js";
-import { crearVisor } from "./bt3-directo.js";
+import { crearVisor, ICE as ICE_VIVO } from "./bt3-directo.js";
 import { BT3_VETOS, BT3_VETOS_TXT, BT3_ORDEN, tiersPermitidas, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
 /* Budokai Tenkaichi 3 — el cartero entre la sala y el juego.
@@ -103,6 +103,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   /* ---------- mirar la pelea en vivo ----------
      Una pantalla en la sala (fuera del vestíbulo, que se repinta) con el video que manda el que pelea. Se
      cierra sola cuando la pelea termina, o con su ✕. */
+  /* Con el relevo activado, el que mira también puede recibir la pelea por Cloudflare (si su red y la del que pelea no
+     dejan una conexión directa): sus credenciales se piden al abrir la pantalla y se renuevan cada hora. */
+  const relevo = { ice: [], a: 0 };
+  function pideRelevo() {
+    if (Date.now() - relevo.a < 3600e3) return;
+    relevo.a = Date.now();
+    relevoBt3().then(v => { relevo.ice = v; if (!v.length) relevo.a = 0; });
+  }
   function abreTele() {
     const pel = peleaEnVivo();
     if (!pel || !escena || pel.emisor === uid) return;
@@ -137,7 +145,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     // en pantalla completa la barra flota y se esconde sola; el mouse la trae (CSS: .jg-bt3-tele.mueve)
     let quieto = 0;
     el.addEventListener("pointermove", () => { el.classList.add("mueve"); clearTimeout(quieto); quieto = setTimeout(() => el.classList.remove("mueve"), 2500); });
-    const visor = crearVisor({ senal, uid, emisor: pel.emisor,
+    if (est.relevo) pideRelevo();
+    const visor = crearVisor({ senal, uid, emisor: pel.emisor, ice: () => [...ICE_VIVO, ...(est?.relevo ? relevo.ice : [])],
       alVideo: flujo => {
         video.srcObject = flujo; nota.hidden = true; el.classList.add("en-vivo");
         // (el clic en «Ver la pelea» deja sonar; si el navegador igual no deja, empieza en silencio y el 🔇 lo activa)

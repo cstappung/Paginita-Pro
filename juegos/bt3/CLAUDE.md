@@ -91,7 +91,11 @@ Room game in an iframe, modelled on HaxBall, with one deliberate difference: **t
   mid-bracket). Only then does each frame ask the Worker's `/turn` (friends only; `TURN_ID` + secret `TURN_CLAVE`
   of Cloudflare Realtime → TURN; short-lived credentials from `generate-ice-servers`, port-53 URLs dropped,
   reused for half their life) and add them to the mesh's `ice`. Without those variables `/turn` answers 404 and it
-  connects direct as before. Free tier: 1,000 GB/month; a fight is only inputs, but never relay the spectator video.
+  connects direct as before. Free tier: 1,000 GB/month; a fight is only inputs. **Spectators too, only with the relay on**
+  (owner: «solo para el modo relevo; lo normal no se toca»): the fighter's emitter gets the same servers
+  (`S.emite(canvas, relevo)`), the room asks `/turn` itself when someone opens «Ver la pelea» (`relevoBt3` in
+  bt3-amigos.js, renewed hourly) and `crearEmisor`/`crearVisor` take `ice` as a function read at each connection
+  (credentials may arrive late). Relay off = the same two STUN as always. Video costs ~700 MB/h per relayed hop.
   Without it, two networks that refuse a direct connection cannot fight; the frame says so after 45 s.
 - **Why it failed goes to the room chat** («⚡ BT3 · A → B: …»): the room reloads the frame on going back to the
   lobby, so the frame's own notice was never read («stuck on Conectando…, then back»). `bt3-marco.js` `explica`

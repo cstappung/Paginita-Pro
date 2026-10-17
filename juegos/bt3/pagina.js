@@ -1510,7 +1510,7 @@
           BT3_SEED: semillaLocal(),   // (contra la CPU se juega aquí solo: azar de verdad, 2e)
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
-        if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo
+        if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas, e.relevo ? await pideRelevo() : []); }   // los demás de la sala pueden mirarla en vivo
         await listoArranque;
         aviso("Tu pelea contra " + e.rival.nombre + " (" + ["muy fácil", "fácil", "normal", "difícil", "muy difícil"][e.rival.nivel ?? 2] + "): elige tu luchador.", 6000);
         return;
@@ -1541,7 +1541,7 @@
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
       equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));   // (el tope de equipo no viaja en la sesión: lo ponen los dos)
       try { FS.mkdir("/net_session"); } catch (err) {}
-      if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo (bt3-directo.js; 0b)
+      if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas, relevo); }   // los demás de la sala pueden mirarla en vivo (bt3-directo.js; 0b; con el relevo, si está activado)
       await listoArranque;
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },
