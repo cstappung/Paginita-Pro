@@ -240,6 +240,26 @@
      - **Siempre se ve** cuando el juego espera algo de la red: la insignia de arriba dice cuánto lleva y a qué
        velocidad, y la primera vez avisa que lo bajado queda guardado. */
   const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false, sinLote: false };
+  /* El relevo (TURN) para una pelea en línea: si las redes de los dos no dejan una conexión directa, los paquetes
+     pasan por Cloudflare. El Worker del disco privado da credenciales que vencen solas, solo a los amigos
+     (fuente/disco/worker.js, /turn). Si no hay Worker, llave o respuesta en 4 s: [] y se conecta como siempre. */
+  async function pideRelevo() {
+    try {
+      let base = P.base, token = P.token;
+      if (!base) base = String((await (await fetch("disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, "");
+      if (!base) return [];
+      if (!token) token = await pideToken(false);
+      if (!token) return [];
+      const ctl = new AbortController(), reloj = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch(base + "/turn", { headers: { Authorization: "Bearer " + token }, signal: ctl.signal });
+      clearTimeout(reloj);
+      if (!r.ok) return [];
+      const d = await r.json();
+      return Array.isArray(d.iceServers) ? d.iceServers.filter(x => x && x.urls) : [];
+    } catch (e) {
+      return [];
+    }
+  }
   /* Los pedazos que esperan van juntos en UNA llamada (`/lote` del Worker): el plan gratis de Cloudflare cuenta llamadas
      (100.000 al día), no megas. Hasta 8 en lo que se baja por adelantado y 4 en lo que el juego espera ya (para no
      poner una lectura urgente detrás de muchas otras); la respuesta trae los pedazos uno tras otro y cada uno se
@@ -1382,7 +1402,10 @@
         return;
       }
       aviso("Conectando con " + e.rival.nombre + "…", 0, true);
-      const ok = await S.conecta(e.yo, e.rival.uid);
+      // el relevo (TURN) solo si el anfitrión lo activó en la sala: nunca solo (último recurso)
+      const relevo = e.relevo ? await pideRelevo() : [];
+      Module.keep("red: relevo " + (!e.relevo ? "apagado (solo conexión directa)" : relevo.length ? "activado" : "activado, pero el Worker no dio credenciales"));
+      const ok = await S.conecta(e.yo, e.rival.uid, relevo, !!e.relevo);
       if (!ok) {
         const motivo = (S.motivo && S.motivo()) || "sus redes no dejan una conexión directa";
         aviso("No se pudo conectar con " + e.rival.nombre + ": " + motivo + ". Vuelvan al vestíbulo e intenten de nuevo.");
@@ -1390,6 +1413,7 @@
         S.avisa("termino", { por: "sin-conexion", motivo });   // la sala lo escribe en el chat (este aviso se pierde al recargar)
         return new Promise(() => {});   // el programa no arranca; la sala recarga este marco al volver
       }
+      S.via?.().then(v => { if (v) Module.keep("red: conectados por " + (v === "relevo" ? "el relevo de Cloudflare" : "conexión directa")); });
       // Los paquetes del juego, por la malla del marco (gs/net.c: Module.netSend / netRecv, como UDP).
       Module.netSend = bytes => S.envia(bytes);
       Module.netRecv = () => S.recibe();

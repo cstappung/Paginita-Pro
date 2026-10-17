@@ -584,3 +584,17 @@ test('BT3 oculto por omisión, y cada vista que nombra juegos lo respeta',()=>{
  assert.match(lee('src/juegos/monedas-vista.js'),/filter\(j => !juegoOculto\(j\)\)/,'la tabla de monedas no nombra a BT3');
  assert.match(lee('src/juegos/perfil.js'),/!juegoOculto\(it\.req\.top\)/,'la tienda no muestra su premio de campeón');
 });
+
+test('el relevo de Cloudflare: lo activa a mano el anfitrión (nunca solo), y el organizador también en pleno torneo',()=>{
+ assert.equal(B.reducir(sala()).relevo,false,'apagado por defecto');
+ let e=B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,true,'el anfitrión lo activa');
+ e=B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:true},{t:'ajuste',uid:'a',k:'relevo',v:false}));assert.equal(e.relevo,false,'y lo apaga');
+ assert.equal(B.reducir(sala({t:'ajuste',uid:'b',k:'relevo',v:true})).relevo,false,'el otro no');
+ assert.equal(B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:'1'})).relevo,false,'solo true lo activa');
+ e=B.reducir(sala({t:'revancha',uid:'b'},{t:'ajuste',uid:'a',k:'relevo',v:true}));
+ assert.equal(e.relevo,true);
+ let t=B.reducir(torneo(3,{t:'ajuste',uid:'u0',k:'relevo',v:true}));assert.equal(t.relevo,true,'el organizador, antes de empezar');
+ assert.equal(B.reducir(torneo(3,{t:'ajuste',uid:'u1',k:'relevo',v:true})).relevo,false,'un peleador no');
+ t=B.reducir(torneo(3,{t:'torneo',uid:'u0'},{t:'ajuste',uid:'u0',k:'relevo',v:true}));
+ assert.ok(t.llave,'con el torneo andando');assert.equal(t.relevo,true,'también se puede activar');
+});

@@ -11,7 +11,7 @@ import { ponOculto } from "./ocultos.js";
 let visible = false, pidiendo = null, deQuien = "";
 
 /* La versión del programa del juego (la misma del ?v= de juegos/bt3/: fuente/construir.sh la cambia aquí). */
-export const BT3_VER = "bt3-34";
+export const BT3_VER = "bt3-35";
 const oyentes = new Set();
 
 export const bt3Visible = () => visible;
