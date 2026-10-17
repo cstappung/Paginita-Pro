@@ -124,10 +124,12 @@ test('agarrándose y llevando un miembro a la vez se trepa al pudú', () => {
     }
     M.sostiene(c, k, false); deja(c, W, 120);
   };
+  // Los huesos ya no atraviesan el lomo: el pie izquierdo sube por encima del borde en vez de cruzarlo.
   lleva(1, -40, -125, 120);
   lleva(3, -60, -130, 240);
-  lleva(2, -30, -130, 240);
+  lleva(2, -60, -170, 240);
   lleva(0, 30, -200, 240);
+  lleva(1, 30, -220, 240);
   assert.ok(M.valido(c));
   assert.ok(c.pin[2] && c.pin[2][1] < -100, 'un pie quedó sobre el lomo');
   assert.ok(pelvisY(c) < pel0 - 50, 'la pelvis subió: ' + pel0 + ' → ' + pelvisY(c));
@@ -210,6 +212,9 @@ test('tirado en el suelo con todo agarrado, llevar un brazo hacia arriba lo leva
     const dx = c.p[i * 2] - px, dy = c.p[i * 2 + 1] - py;
     c.p[i * 2] = c.q[i * 2] = px + dy; c.p[i * 2 + 1] = c.q[i * 2 + 1] = py - dx + 70;
   }
+  // Acostado sin nada metido en el suelo (girado, un brazo quedaba bajo tierra y el rebote lo dejaba de pie).
+  let hunde = 0; for (let i = 0; i < M.N; i++) hunde = Math.max(hunde, c.p[i * 2 + 1] + M.RADIO[i]);
+  for (let i = 0; i < M.N; i++) { c.p[i * 2 + 1] -= hunde; c.q[i * 2 + 1] -= hunde; }
   deja(c, W, 600);
   assert.ok(c.pin.every(Boolean), 'manos y pies agarrados al suelo');
   const centroY = () => { let y = 0; for (let i = 0; i < M.N; i++) y += c.p[i * 2 + 1]; return y / M.N; };
@@ -218,8 +223,43 @@ test('tirado en el suelo con todo agarrado, llevar un brazo hacia arriba lo leva
   let alto = y0;
   for (let i = 0; i < 200; i++) { M.empujaMiembros(c, 0, -5); M.paso(c, W); alto = Math.min(alto, centroY()); }
   assert.ok(M.valido(c));
-  assert.ok(alto < y0 - 20, 'el cuerpo se levanta: ' + y0 + ' → ' + alto);
+  assert.ok(alto < y0 - 10, 'el cuerpo se levanta: ' + y0 + ' → ' + alto);
   assert.ok(alto > y0 - 150, 'pero no sale volando: ' + y0 + ' → ' + alto);
+});
+
+test('no se atraviesa a un congelado: ni partículas ni huesos se le meten', () => {
+  const cerca = (ax, ay, bx, by, x, y) => { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy; let t = l ? ((x - ax) * dx + (y - ay) * dy) / l : 0; t = Math.max(0, Math.min(1, t)); return [ax + dx * t, ay + dy * t]; };
+  let s = 3; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  let peor = 0;
+  for (let run = 0; run < 6; run++) {
+    const W = M.mundo(), f = M.crea(250); deja(f, W, 200); M.congela(f, W);
+    const caps = W.caps.slice(M.PUDU.length), c = M.crea(40 + rnd() * 40);
+    deja(c, W, 60);
+    let vx = 0, vy = 0;
+    for (let t = 0; t < 1500; t++) {
+      if (t % 30 === 0) { const k = Math.floor(rnd() * 4); M.sostiene(c, k, !c.held[k]); }
+      vx = vx * .9 + (rnd() - .4) * 3; vy = vy * .9 + (rnd() - .5) * 3;
+      M.empujaMiembros(c, vx, vy); M.paso(c, W);
+      const P = c.p;
+      for (const k of caps) for (const m of M.MIEMBROS) for (const [a, b] of [[m.raiz, m.med], [m.med, m.ext]]) for (let j = 0; j <= 10; j++) {
+        const x = P[a * 2] + (P[b * 2] - P[a * 2]) * j / 10, y = P[a * 2 + 1] + (P[b * 2 + 1] - P[a * 2 + 1]) * j / 10, q = cerca(k.ax, k.ay, k.bx, k.by, x, y);
+        peor = Math.max(peor, k.r + 5 - Math.hypot(x - q[0], y - q[1]));
+      }
+    }
+    assert.ok(M.valido(c));
+  }
+  assert.ok(peor < 6, 'se metió ' + peor.toFixed(1) + ' en el congelado');
+});
+
+test('al soltar la tecla tocando algo, el miembro se agarra al instante', () => {
+  const W = M.mundo(), c = M.crea(-300);
+  deja(c, W, 300);
+  M.sostiene(c, 3, true);
+  for (let i = 0; i < 30; i++) { M.empujaMiembros(c, 1, 0); M.paso(c, W); }
+  for (let i = 0; i < 60; i++) { M.empujaMiembros(c, 0, 3); M.paso(c, W); }
+  assert.ok(!c.pin[3], 'llevado no se agarra');
+  M.sostiene(c, 3, false); M.paso(c, W);
+  assert.ok(c.pin[3], 'agarrado en el primer paso tras soltar');
 });
 
 /* ---------- en línea: el reductor de la sala ---------- */

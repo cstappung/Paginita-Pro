@@ -26,6 +26,10 @@ limb never grabs, and nothing pulls the body through a grabbed limb
 something grabbed, a led limb aims up to `ALCANCE` past its length and drags
 the body after it. `dePie` counts pinned feet as standing, otherwise the
 tone switched off and the body folded over its own pinned feet.
+Releasing a key grabs **at once** if the limb touches something (margin
+`SUELTA_MARGEN`), and for `SUELTA_T` its first touch does too; waiting
+`AGARRE_T` there made the hand slide off. `AGARRE_T` still applies to limbs
+that just land on something.
 Each grab calls `c.alAgarrar(k)` → `sonido.agarra` = `nalgada()` (noise
 crack with two finger taps, low-passed flesh, falling sine thump); watchers
 online hear it more quietly from the `g` bits of the live state.
@@ -95,6 +99,17 @@ version for player-visible changes.
 
 `tests/tulones.test.cjs` covers the physics and, under «sala», the reducer
 through the real `reducir` (turn order, bad poses, deadlines, rounds, votes).
+
+## Collisions: nobody passes through a frozen body
+
+`choques` runs on **every** solver iteration against the capsules near the
+body (`cercanos`, margin `CERCA`), and the side of each capsule is decided by
+the position at the start of the step (`S` in `separa`): pushing out to the
+nearest side let a point past a limb's axis exit on the far side. Bones
+(`TUBOS`) collide as whole segments (`entreSegmentos`), not by their midpoint;
+a frozen arm slipped between two samples. The reach anchor collides too.
+Do not go back to "last 3 iterations only" or midpoint samples: the
+random-input test «no se atraviesa a un congelado» measures it.
 
 Known quirk (also offline): the tower height is the top of the capsules, and
 a body standing on the ground is ~2.04 m, so a low tower can be «beaten» by
