@@ -44,5 +44,24 @@ Traps:
 - Mute: the game's own `#sound-button` (in the scorebar) plus the Club's
   volume slider (`volumen.js`), also visible in the immersive strip.
 - Guests cannot play it (not a `DESTACADOS_INVITADO`).
+- **Phone width**: in `html.club-inm` / `html.pt-pc` the `.layout` column
+  must `align-items:stretch`; with the normal layout's `start` the box shrank
+  to its content (268 px) and sat against the left edge of every phone.
+- **Fullscreen** (⛶ in the scorebar and the pause card): `requestFullscreen`
+  on the document (Metro Rush's approach); `html.pt-pc` reuses the immersive
+  layout. Hidden where the API is missing (iPhone). No keyboard shortcut:
+  F is a lane key.
+- **⚙ Ajustes** (`#ajustes`, from the menu or the pause): the four lane keys
+  (`teclas`, stored as `KeyboardEvent.code` in `save.teclas`; a key already
+  used elsewhere is swapped; Escape/Tab/Meta… are refused) and five palettes
+  (`TEMAS` in `juego.js`: clasico, medianoche, menta, atardecer, neon). A
+  palette sets the box's `--pt-*` variables inline and the canvas colours
+  `C`; `--pt-ficha`/`--pt-sobre` are the tile colour and what goes on it, also
+  used by solid buttons, so dark palettes (light tiles) keep their contrast.
+  Neither touches the proof: keys only map to lanes, colours are paint.
+- Light optimisations, same picture: the lane-glow gradient is built once per
+  size and palette (intensity via `globalAlpha`), the nearest piano sample is
+  memoised per note, and a finished long tile drops its audio voices (every
+  tile stays in `E.tiles`, so they were never freed).
 
 `tests/protiles.test.cjs` covers the engine, the replay and the verifier.

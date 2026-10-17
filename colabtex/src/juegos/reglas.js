@@ -1179,7 +1179,9 @@ const REGLAS = {
       ["Canciones", "Ocho canciones originales, de la balada (<b>Cristal</b>, fácil) al EDM (<b>Despegue</b>, experto). Cada una empieza por su estribillo y después se sigue componiendo sola, igual para todos: estrofa, pre, estribillo y puente, y cada tanto el estribillo sube un tono. La <b>mezcla infinita</b> las encadena las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
       ["Controles", lista([
         "Táctil o ratón: toca las fichas.",
-        "Teclado: D, F, J y K son los cuatro carriles. Esc o P pausa; tras la pausa hay una cuenta de 3.",
+        "Teclado: D, F, J y K son los cuatro carriles (se cambian en ⚙ Ajustes). Esc o P pausa; tras la pausa hay una cuenta de 3.",
+        "⚙ Ajustes (en el menú y en la pausa): elige otra tecla para cada carril y una de cinco paletas de colores (Clásico, Medianoche, Menta, Atardecer y Neón). Se recuerdan en este navegador.",
+        "⛶ (junto al sonido, o en la pausa): pantalla completa, donde el navegador la permite.",
         "En el menú, 1 a 8 eligen canción.",
         "Mando: ← y ↓ de la cruceta, A y B son los cuatro carriles; Start pausa."
       ])],
