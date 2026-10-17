@@ -81,6 +81,9 @@
   const TONO_PIERNA = .1, TONO_BRAZO = .008, TONO_TORSO = .04, TONO_AMORT = .7, TONO_MAX = .15;
   // Agarre: el extremo libre tiene que tocar este tiempo seguido para quedarse pegado.
   const AGARRE_T = .12;
+  /* Recién soltada la tecla, el miembro se agarra al instante si toca algo (con SUELTA_MARGEN de holgura), y
+     durante SUELTA_T lo primero que toque también: esperar AGARRE_T ahí hacía resbalar la mano que uno soltó. */
+  const SUELTA_T = .3, SUELTA_MARGEN = 6;
   // Pierna que nadie sostiene: no se dobla por debajo de esta fracción de su largo de pie (no se arrodilla al caer).
   // Recién soltada y doblada no se abre de golpe (patearía el suelo): queda firme cuando el tono ya la estiró.
   const PIERNA_FIRME = .92;
@@ -99,8 +102,10 @@
   const ALCANCE = 120, ALC_VEL = 2, ALC_HOLGURA = 4;
   // Red de seguridad: ninguna partícula pasa de esta velocidad (unidades por paso; 10 ≈ 12 m/s).
   const VEL_MAX = 10;
-  // Puntos de colisión a mitad de hueso, además de las partículas.
-  const MUESTRAS = [[I.cabeza, I.cuello, 8], [I.pecho, I.pelvis, 15], [I.pecho, I.cuello, 12], ...HUESOS.map(h => [h[0], h[1], (RADIO[h[0]] + RADIO[h[1]]) / 2])];
+    // Huesos que chocan enteros con el mundo (además de las partículas), con su grosor.
+  const TUBOS = [[I.cabeza, I.cuello, 8], [I.pecho, I.pelvis, 15], [I.pecho, I.cuello, 12], ...HUESOS.map(h => [h[0], h[1], (RADIO[h[0]] + RADIO[h[1]]) / 2])];
+  // Margen alrededor del cuerpo para elegir las cápsulas con que puede chocar en un paso.
+  const CERCA = 60, CERCA_TONO = 130;
 
   /* ---------- el cuerpo ---------- */
   function crea(x0, aspecto) {
@@ -108,7 +113,7 @@
     for (let i = 0; i < N; i++) { p[i * 2] = q[i * 2] = x0 + POSE_T[i][0]; p[i * 2 + 1] = q[i * 2 + 1] = POSE_T[i][1] - 1; }
     const c = { p, q, pin: [null, null, null, null], held: [false, false, false, false], vec: [], contacto: new Array(N).fill(null),
       bulto: { x: 0, y: largoBulto(aspecto), ang: 0, w: 0 }, vp: [0, 0], ap: [0, 0], aspecto: aspecto || null, t: 0,
-      roce: [0, 0, 0, 0], firme: [true, true, true, true], impulso: [0, 0] };
+      roce: [0, 0, 0, 0], suelta: [0, 0, 0, 0], firme: [true, true, true, true], impulso: [0, 0] };
     c.vec = MIEMBROS.map(m => [p[m.ext * 2] - p[m.raiz * 2], p[m.ext * 2 + 1] - p[m.raiz * 2 + 1]]);
     return c;
   }
@@ -238,7 +243,9 @@
 
   /* ---------- un paso ---------- */
   function paso(c, W) {
-    const P = c.p, Q = c.q, f = fijado(c);
+    const P = c.p, Q = c.q, f = fijado(c), S = Float64Array.from(P), Lc = cercanos(W, S, CERCA);
+    // El tono apunta a la pose de reposo, a menos de un miembro del cuerpo: le bastan las cápsulas de alrededor.
+    const Wt = { caps: cercanos(W, S, CERCA_TONO) };
     const alcanza = MIEMBROS.map((m, k) => c.held[k] && !c.pin[k] && c.pin.some(Boolean) && Math.hypot(c.vec[k][0], c.vec[k][1]) > LARGO_M[k] * .97 + 1);
     MIEMBROS.forEach((m, k) => { if (alcanza[k]) f[m.ext] = true; });
     const pv0 = [P[I.pelvis * 2] - Q[I.pelvis * 2], P[I.pelvis * 2 + 1] - Q[I.pelvis * 2 + 1]];
@@ -261,6 +268,8 @@
       const obj = empuja(W, P[m.raiz * 2] + v[0], P[m.raiz * 2 + 1] + v[1], RADIO[m.ext]);
       const gx = obj[0] - P[m.ext * 2], gy = obj[1] - P[m.ext * 2 + 1], g = Math.hypot(gx, gy);
       if (g > ALC_HOLGURA) { const a = Math.min(g, ALC_VEL) / g; P[m.ext * 2] += gx * a; P[m.ext * 2 + 1] += gy * a; }
+      // El ancla tampoco atraviesa: el objetivo está fuera, pero el camino hasta él puede cruzar a otro.
+      chocaPunto(c, m.ext, Lc, S);
       Q[m.ext * 2] = P[m.ext * 2]; Q[m.ext * 2 + 1] = P[m.ext * 2 + 1];
     });
     /* Equilibrio: de pie y con los pies apoyados, la parte de arriba se va sobre la pelvis y la de abajo al revés,
@@ -278,7 +287,7 @@
     }
     // Restricciones y choques.
     for (let it = 0; it < ITER; it++) {
-      tono(c, f, W);
+      tono(c, f, Wt);
       guia(c, f, W);
       for (const r of RIGIDAS) distancia(c, r[0], r[1], r[2], r[3], f[r[0]], f[r[1]]);
       for (const h of HUESOS) distancia(c, h[0], h[1], h[2], 1, f[h[0]], f[h[1]]);
@@ -294,13 +303,13 @@
         if (d < mn[2]) distancia(c, a, b, mn[2], 1, f[a], f[b]);
       }
       MIEMBROS.forEach((m, k) => { if (c.pin[k]) { P[m.ext * 2] = c.pin[k][0]; P[m.ext * 2 + 1] = c.pin[k][1]; } });
-      if (it >= ITER - 3) choques(c, W, f);
+      choques(c, W, f, Lc, S);
     }
     // El ancla que alcanza no puede dejar el brazo más largo de lo que es: si el cuerpo no la siguió, vuelve.
     MIEMBROS.forEach((m, k) => {
       if (!alcanza[k]) return;
       const dx = P[m.ext * 2] - P[m.raiz * 2], dy = P[m.ext * 2 + 1] - P[m.raiz * 2 + 1], d = Math.hypot(dx, dy) || 1e-6, L = LARGO_M[k];
-      if (d > L + 1) { P[m.ext * 2] = Q[m.ext * 2] = P[m.raiz * 2] + dx / d * L; P[m.ext * 2 + 1] = Q[m.ext * 2 + 1] = P[m.raiz * 2 + 1] + dy / d * L; }
+      if (d > L + 1) { P[m.ext * 2] = P[m.raiz * 2] + dx / d * L; P[m.ext * 2 + 1] = P[m.raiz * 2 + 1] + dy / d * L; chocaPunto(c, m.ext, Lc, S); Q[m.ext * 2] = P[m.ext * 2]; Q[m.ext * 2 + 1] = P[m.ext * 2 + 1]; }
     });
     // Rozamiento en lo que toca.
     for (let i = 0; i < N; i++) {
@@ -318,9 +327,12 @@
     // Agarre automático: el extremo que nadie lleva y toca algo un rato se queda.
     MIEMBROS.forEach((m, k) => {
       if (c.held[k] || c.pin[k]) return;
-      if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + 2.5)) { c.roce[k] = 0; return; }
+      const recien = c.suelta[k] > 0;
+      if (recien) c.suelta[k] -= DT;
+      if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + (recien ? SUELTA_MARGEN : 2.5))) { c.roce[k] = 0; return; }
       c.roce[k] += DT;
-      if (c.roce[k] >= AGARRE_T - 1e-9) {
+      if (recien || c.roce[k] >= AGARRE_T - 1e-9) {
+        c.suelta[k] = 0;
         c.pin[k] = [P[m.ext * 2], P[m.ext * 2 + 1]];
         c.vec[k] = [c.pin[k][0] - P[m.raiz * 2], c.pin[k][1] - P[m.raiz * 2 + 1]];
         if (c.alAgarrar) c.alAgarrar(k);
@@ -329,22 +341,86 @@
     c.t += DT;
   }
 
-  function choques(c, W, f) {
+  /* Choques contra el mundo. Cada partícula y cada hueso se separan de cada cápsula cercana, y el lado lo decide
+     la posición al empezar el paso (S): una punta que ya pasó la mitad de un miembro congelado volvía a salir por
+     el otro lado y atravesaba al compañero. Los huesos chocan enteros (punto más cercano entre segmentos), no solo
+     por su mitad: un brazo ajeno se colaba entre dos muestras. */
+  function cercanos(W, S, h) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < N; i++) { const x = S[i * 2], y = S[i * 2 + 1]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    return W.caps.filter(s => s.x1 > x0 - h && s.x0 < x1 + h && s.y1 > y0 - h && s.y0 < y1 + h);
+  }
+  // Separa el punto (x,y) de radio r de la cápsula s; (ox,oy) es dónde estaba antes. Devuelve [x, y, nx, ny] o null.
+  function separa(s, x, y, r, ox, oy) {
+    if (x < s.x0 - r || x > s.x1 + r || y < s.y0 - r || y > s.y1 + r) return null;
+    const [cx, cy] = cercano(s.ax, s.ay, s.bx, s.by, x, y);
+    let dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy);
+    const R = s.r + r;
+    if (d >= R) return null;
+    const [qx, qy] = cercano(s.ax, s.ay, s.bx, s.by, ox, oy);
+    let ux = ox - qx, uy = oy - qy; const n0 = Math.hypot(ux, uy);
+    let nx, ny;
+    if (d > 1e-6) { nx = dx / d; ny = dy / d; } else if (n0 > 1e-6) { nx = ux / n0; ny = uy / n0; } else { nx = 0; ny = -1; }
+    // Si cruzó el eje de la cápsula respecto de dónde estaba, vuelve por donde entró.
+    if (n0 > 1e-6 && dx * ux + dy * uy < 0) { nx = ux / n0; ny = uy / n0; }
+    const pen = R - (dx * nx + dy * ny);
+    if (pen <= 0) return null;
+    return [x + nx * pen, y + ny * pen, nx, ny];
+  }
+  function chocaPunto(c, i, L, S) {
+    const P = c.p; let x = P[i * 2], y = P[i * 2 + 1], n = null; const r = RADIO[i];
+    if (y + r > 0) { y = -r; n = [0, -1]; }
+    for (let pasada = 0; pasada < 2; pasada++) for (const s of L) {
+      const o = separa(s, x, y, r, S[i * 2], S[i * 2 + 1]);
+      if (o) { x = o[0]; y = o[1]; n = [o[2], o[3]]; }
+    }
+    if (y + r > 0) { y = -r; n = [0, -1]; }
+    if (x < -LIM_X) x = -LIM_X; if (x > LIM_X) x = LIM_X;
+    P[i * 2] = x; P[i * 2 + 1] = y;
+    return n;
+  }
+  // Puntos más cercanos entre los segmentos p1q1 y p2q2: [s, t] (Ericson, Real-Time Collision Detection 5.1.9).
+  function entreSegmentos(p1x, p1y, q1x, q1y, p2x, p2y, q2x, q2y) {
+    const d1x = q1x - p1x, d1y = q1y - p1y, d2x = q2x - p2x, d2y = q2y - p2y, rx = p1x - p2x, ry = p1y - p2y;
+    const a = d1x * d1x + d1y * d1y, e = d2x * d2x + d2y * d2y, f = d2x * rx + d2y * ry;
+    const cl = v => v < 0 ? 0 : v > 1 ? 1 : v;
+    let s, t;
+    if (a <= 1e-9 && e <= 1e-9) return [0, 0];
+    if (a <= 1e-9) { s = 0; t = cl(f / e); }
+    else {
+      const c = d1x * rx + d1y * ry;
+      if (e <= 1e-9) { t = 0; s = cl(-c / a); }
+      else {
+        const b = d1x * d2x + d1y * d2y, den = a * e - b * b;
+        s = den > 1e-9 ? cl((b * f - c * e) / den) : 0;
+        t = (b * s + f) / e;
+        if (t < 0) { t = 0; s = cl(-c / a); } else if (t > 1) { t = 1; s = cl((b - c) / a); }
+      }
+    }
+    return [s, t];
+  }
+  function chocaHueso(c, a, b, r, L, S, f) {
+    if (f[a] && f[b]) return;
     const P = c.p;
-    for (let i = 0; i < N; i++) {
-      c.contacto[i] = null; if (f[i]) continue;
-      const r = empuja(W, P[i * 2], P[i * 2 + 1], RADIO[i]);
-      P[i * 2] = r[0]; P[i * 2 + 1] = r[1]; if (r[2] !== null) c.contacto[i] = [r[2], r[3]];
+    for (const k of L) {
+      const ax = P[a * 2], ay = P[a * 2 + 1], bx = P[b * 2], by = P[b * 2 + 1];
+      if (Math.max(ax, bx) < k.x0 - r || Math.min(ax, bx) > k.x1 + r || Math.max(ay, by) < k.y0 - r || Math.min(ay, by) > k.y1 + r) continue;
+      const [s] = entreSegmentos(ax, ay, bx, by, k.ax, k.ay, k.bx, k.by);
+      // Los extremos ya chocan como partículas: el hueso solo pone lo de en medio.
+      if (s <= .02 || s >= .98) continue;
+      const x = ax + (bx - ax) * s, y = ay + (by - ay) * s;
+      const ox = S[a * 2] + (S[b * 2] - S[a * 2]) * s, oy = S[a * 2 + 1] + (S[b * 2 + 1] - S[a * 2 + 1]) * s;
+      const o = separa(k, x, y, r, ox, oy);
+      if (!o) continue;
+      const dx = o[0] - x, dy = o[1] - y;
+      const wa = f[a] ? 0 : 1 - s, wb = f[b] ? 0 : s, w2 = wa * wa + wb * wb;
+      if (w2 < .04) continue;
+      P[a * 2] += dx * wa / w2; P[a * 2 + 1] += dy * wa / w2; P[b * 2] += dx * wb / w2; P[b * 2 + 1] += dy * wb / w2;
     }
-    for (const s of MUESTRAS) {
-      const a = s[0], b = s[1];
-      const mx = (P[a * 2] + P[b * 2]) / 2, my = (P[a * 2 + 1] + P[b * 2 + 1]) / 2;
-      const r = empuja(W, mx, my, s[2]);
-      if (r[2] === null) continue;
-      const dx = r[0] - mx, dy = r[1] - my;
-      if (!f[a]) { P[a * 2] += dx; P[a * 2 + 1] += dy; }
-      if (!f[b]) { P[b * 2] += dx; P[b * 2 + 1] += dy; }
-    }
+  }
+  function choques(c, W, f, L, S) {
+    for (let i = 0; i < N; i++) { c.contacto[i] = null; if (!f[i]) c.contacto[i] = chocaPunto(c, i, L, S); }
+    for (const h of TUBOS) chocaHueso(c, h[0], h[1], h[2], L, S, f);
   }
 
   /* El bulto: péndulo colgado de la entrepierna, en el marco de la pelvis. BULTO_L es su largo físico (fija el
@@ -387,7 +463,9 @@
   }
   // Apretar suelta el miembro y lo pasa al ratón; soltar la tecla lo deja agarrarse donde caiga.
   function sostiene(c, k, on) {
+    const antes = c.held[k];
     c.held[k] = !!on; c.roce[k] = 0; c.firme[k] = false;
+    if (c.suelta) c.suelta[k] = antes && !on ? SUELTA_T : 0;
     if (on) { const m = MIEMBROS[k]; c.pin[k] = null; c.vec[k] = [px(c, m.ext) - px(c, m.raiz), py(c, m.ext) - py(c, m.raiz)]; }
   }
 
@@ -683,7 +761,7 @@
   }
 
   // Versión visible en el título mientras se ajusta la física (quitar al terminar).
-  const VERSION = 'tulones-21';
+  const VERSION = 'tulones-22';
 
   return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, PUDU, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
     crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio,
