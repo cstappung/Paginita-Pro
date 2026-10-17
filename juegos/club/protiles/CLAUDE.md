@@ -34,6 +34,17 @@ switches the side ranking panel to its table (`Club.category`); the
 only when the game ends (a tile escapes or a tap misses) with score ≥ 1;
 quitting from the pause menu sends nothing, as in the original.
 
+**Proof versions** (`PRUEBA_V` = 2, `PRUEBA_VERSIONES` = [1, 2]): a tile
+escapes when more than half of its length is below the edge (`escapeDe`);
+v1 used 0.15 rows and the launch songs, kept as `SONGS_V1` only so stored
+and pending proofs still replay. **Any change to what decides a tile (song
+data, `cells`, `RHY`, the composer, escape, speed) needs a new version**,
+with the old data kept for the verifier; `STYLES` and drums are sound only
+and can change freely. v2 songs keep the eight ids/names/genres (the tables
+and logros hang on them) but are rewritten on each genre's rhythm: `cells`
+are the verse bar rhythms (3-3-2 dembow/tropical, straight eighths for
+synthwave/EDM…), the hook's strong beats are chord tones of `prog.c`.
+
 Traps:
 - **The piano credit is mandatory (CC BY 3.0)** and must not be a
   `<footer>`: `conexion.css` hides footers inside Juegos. It is `.pie`.

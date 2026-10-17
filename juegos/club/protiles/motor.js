@@ -17,7 +17,10 @@
      partida.
    - Geometría en filas: la pantalla mide `FILAS` (4) de alto, la fila 0 es
      el borde de abajo. Una ficha de inicio `s` tiene su borde de abajo en
-     la fila `FILAS - (s - pos)` contando desde arriba. */
+     la fila `FILAS - (s - pos)` contando desde arriba.
+   - Una ficha se escapa (y la partida termina) cuando salió más de la
+     mitad de su largo por abajo; en las pruebas de la versión 1, apenas
+     pasaba 0,15 filas del borde. */
 (function (root) {
   'use strict';
   /* =========================================================
@@ -28,7 +31,9 @@
      hook: estribillo fijo (8 compases, "grado:filas") — la identidad de cada canción
      prog: acordes por compás en grados (0 = I/i); [a,b] = dos acordes en el compás
      ========================================================= */
-  const SONGS = [
+  /* Versión 1: las canciones con que se estrenó el juego. Ya no se juegan;
+     quedan para que el verificador rehaga las pruebas guardadas con ellas. */
+  const SONGS_V1 = [
     { id:'cristal', name:'Cristal', genre:'Balada pop', bpm:76, diff:1, mode:'major', mel:67, style:'ballad', range:[-2,9], rhy:{ straight:2, sync:0, slow:3 },
       prog:{ v:[0,4,5,3], p:[5,3,0,4], c:[0,4,5,3,0,4,5,3], b:[5,3,0,4,5,3,4,4] },
       hook:`4:2 4:2 5:1 4:3 | 2:2 1:2 2:4 | 4:2 4:2 5:1 7:3 | 7:2 5:2 4:4 | 4:2 4:2 5:1 4:3 | 2:2 1:2 4:4 | 5:2 4:2 2:1 4:3 | 2:2 1:2 0:4` },
@@ -54,51 +59,98 @@
       prog:{ v:[0,5,2,6], p:[5,6,0,6], c:[5,6,0,0,5,6,2,6], b:[3,3,5,5,6,6,6,6] },
       hook:`4:1 4:1 7:1 4:1 5:2 4:1 2:1 | 3:1 3:1 6:1 3:1 4:2 3:1 1:1 | 2:1 2:1 4:1 2:1 7:2 4:2 | 4:2 2:2 0:4 | 4:1 4:1 7:1 4:1 5:2 4:1 2:1 | 3:1 3:1 6:1 3:1 4:2 3:1 1:1 | 2:1 2:1 4:1 2:1 6:2 4:2 | 3:2 1:2 0:4` },
   ];
+  /* Versión 2 (la que se juega): las mismas ocho ideas, reescritas sobre el
+     ritmo que define a cada género hoy. `cells` son los ritmos de compás de
+     la estrofa (en corcheas, suman 8): el tresillo 3-3-2 del dembow y del
+     tropical, las corcheas seguidas del synthwave y del EDM, el empuje de
+     octavas del disco, la síncopa del K-pop, el arrastre del lo-fi.
+     Progresiones de ahora: I–V–vi–IV y vi–IV–I–V (balada), ii–V–I con
+     séptimas (lo-fi), i–VI–III–VII (reggaetón), IV–I–V–vi (tropical),
+     VI–VII–i (synthwave, K-pop, EDM). */
+  const SONGS = [
+    { id:'cristal', name:'Cristal', genre:'Balada pop', bpm:72, diff:1, mode:'major', mel:67, style:'ballad', range:[-2,9],
+      cells:[[2,2,4],[2,1,1,4],[3,1,2,2],[2,2,2,2],[4,2,2],[1,1,2,4],[3,1,4]],
+      prog:{ v:[0,4,5,3], p:[3,4,1,4], c:[5,3,0,4,5,3,0,4], b:[3,0,4,5,3,0,4,4] },
+      hook:`5:2 7:2 7:1 9:3 | 7:1 8:1 7:2 5:4 | 4:2 4:1 5:1 7:2 9:2 | 8:2 6:2 4:4 | 5:2 7:2 7:1 9:3 | 7:1 8:1 7:2 10:4 | 9:2 9:1 8:1 7:2 4:2 | 8:1 7:1 6:2 4:4` },
+    { id:'medianoche', name:'Medianoche', genre:'Lo-fi R&B', bpm:82, diff:1, mode:'major', mel:65, sev:true, style:'lofi', range:[1,10],
+      cells:[[3,1,2,2],[1,2,1,4],[2,1,1,4],[3,3,2],[1,1,2,4],[2,2,4],[1,2,1,2,2]],
+      prog:{ v:[1,4,0,5], p:[3,2,1,4], c:[3,2,5,0,3,2,1,4], b:[5,1,4,0,3,2,1,4] },
+      hook:`7:3 5:1 7:2 9:2 | 8:1 6:1 4:2 6:4 | 4:3 5:1 7:2 9:2 | 9:2 7:1 8:1 7:4 | 7:3 5:1 7:2 9:2 | 8:1 6:1 4:2 8:4 | 10:2 8:1 7:1 5:2 3:2 | 8:1 6:1 4:6` },
+    { id:'calle', name:'Calle', genre:'Reggaetón', bpm:92, diff:2, mode:'minor', mel:69, style:'reggaeton', range:[-2,7],
+      cells:[[3,3,2],[1,2,1,2,2],[2,1,2,1,2],[1,1,1,2,1,2],[3,1,1,1,2],[3,3,1,1]],
+      prog:{ v:[0,5,2,6], p:[3,4,5,6], c:[0,5,2,6,0,5,2,6], b:[5,6,0,0,3,3,4,4] },
+      hook:`4:3 4:3 2:2 | 2:1 2:1 2:1 0:2 2:1 0:2 | 4:3 4:3 6:2 | 6:1 5:1 3:2 1:1 3:3 | 7:3 7:3 4:2 | 5:1 5:1 5:1 7:2 5:1 4:2 | 4:1 4:1 4:1 2:2 4:1 6:2 | 3:3 1:3 -1:2` },
+    { id:'verano', name:'Verano', genre:'Tropical house', bpm:102, diff:2, mode:'major', mel:72, style:'tropical', range:[-2,8],
+      cells:[[3,3,2],[1,2,1,2,2],[2,1,1,2,2],[3,1,2,2],[1,1,1,1,2,2],[3,3,1,1]],
+      prog:{ v:[5,3,0,4], p:[1,3,4,4], c:[3,0,4,5,3,0,4,5], b:[5,4,3,0,5,4,3,4] },
+      hook:`5:3 5:3 3:2 | 4:1 2:1 4:1 2:2 0:1 2:2 | 4:3 4:3 6:2 | 7:1 5:1 7:2 5:4 | 5:3 5:3 7:2 | 9:1 7:1 9:1 7:2 4:1 7:2 | 8:3 6:3 4:2 | 2:1 4:1 5:6` },
+    { id:'neon', name:'Neón', genre:'Synthwave', bpm:110, diff:3, mode:'minor', mel:65, style:'synth', range:[-3,8],
+      cells:[[1,1,1,1,2,2],[2,1,1,2,2],[2,2,1,1,2],[1,1,2,1,1,2],[2,2,2,2],[3,1,2,2]],
+      prog:{ v:[0,5,2,6], p:[3,4,5,6], c:[5,6,0,4,5,6,0,0], b:[3,5,0,6,3,5,6,6] },
+      hook:`7:1 7:1 9:1 7:1 5:2 7:2 | 8:1 8:1 10:1 8:1 6:2 8:2 | 9:1 7:1 4:2 9:1 7:1 4:2 | 8:2 6:2 4:4 | 7:1 7:1 9:1 7:1 5:2 7:2 | 8:1 8:1 10:1 8:1 10:2 6:2 | 7:1 9:1 11:2 9:1 7:1 4:2 | 7:2 4:1 2:1 0:4` },
+    { id:'latido', name:'Latido', genre:'Disco pop', bpm:118, diff:3, mode:'minor', mel:71, style:'disco', range:[-2,9],
+      cells:[[1,1,2,1,1,2],[2,1,1,2,2],[1,2,1,2,2],[2,2,1,1,2],[1,1,2,2,2],[3,1,3,1]],
+      prog:{ v:[0,3,6,2], p:[5,6,3,4], c:[0,3,6,2,0,3,6,2], b:[5,6,0,0,5,6,4,4] },
+      hook:`4:1 4:1 7:2 4:1 4:1 2:2 | 5:1 5:1 7:2 5:1 3:1 0:2 | 6:1 6:1 8:2 6:1 6:1 3:2 | 4:2 2:1 4:1 6:4 | 7:1 7:1 9:2 7:1 7:1 4:2 | 7:1 7:1 10:2 7:1 5:1 3:2 | 8:1 6:1 8:1 10:1 8:2 6:2 | 6:2 4:2 2:4` },
+    { id:'estrellas', name:'Estrellas', genre:'K-pop', bpm:122, diff:4, mode:'minor', mel:66, style:'kpop', range:[0,10],
+      cells:[[1,2,1,2,2],[1,1,2,1,1,2],[3,3,2],[2,1,1,1,1,2],[1,2,1,1,1,2],[2,2,1,1,2]],
+      prog:{ v:[0,5,3,6], p:[3,4,5,6], c:[5,6,0,0,5,6,2,4], b:[3,4,0,5,3,4,6,6] },
+      hook:`7:1 7:2 9:1 7:2 5:2 | 8:1 8:2 10:1 8:2 6:2 | 9:1 9:2 11:1 9:2 7:1 4:1 | 7:3 9:1 7:4 | 7:1 7:2 9:1 7:2 5:2 | 8:1 8:2 10:1 8:2 10:2 | 11:1 11:1 9:2 11:1 9:1 6:2 | 8:2 6:2 4:4` },
+    { id:'despegue', name:'Despegue', genre:'EDM', bpm:126, diff:4, mode:'minor', mel:64, style:'edm', range:[-2,8],
+      cells:[[1,1,1,1,2,2],[1,1,2,1,1,2],[2,1,1,1,1,2],[1,2,1,1,2,1],[1,1,1,1,1,1,2],[2,2,1,1,2]],
+      prog:{ v:[0,5,2,6], p:[3,3,5,6], c:[5,6,0,0,5,6,2,6], b:[3,3,5,5,6,6,6,6] },
+      hook:`7:1 7:1 9:1 7:1 5:1 7:1 9:2 | 8:1 8:1 10:1 8:1 6:1 8:1 10:2 | 7:1 4:1 7:1 9:1 11:2 9:2 | 7:2 4:2 2:1 4:1 7:2 | 7:1 7:1 9:1 7:1 5:1 7:1 9:2 | 8:1 8:1 10:1 8:1 6:1 8:1 6:2 | 9:1 9:1 11:1 9:1 6:1 9:1 11:2 | 10:2 8:2 6:4` },
+  ];
 
   /* Acompañamiento por estilo: patrones de 16 semicorcheas por compás.
      b bajo (R raíz, O octava, 5 quinta) · c acordes (x sostenido, p corto) · a arpegio
-     k bombo · s caja (s) / aro (r) · h charles (h cerrado, o abierto)
-     low = estrofa · mid = pre-estribillo · high = estribillo · brk = intro/puente */
+     k bombo · s caja (s) / aro (r) / aplauso (c) · h charles (h cerrado, o abierto)
+     low = estrofa · mid = pre-estribillo · high = estribillo · brk = intro/puente
+     Solo suenan: no deciden ninguna ficha, así que cambiarlos no toca las pruebas.
+     Cada uno sigue el ritmo de su género: dembow (bombo en negras, caja en
+     3-3-2), house (bombo en negras, charles abierto a contratiempo), boom bap
+     del lo-fi, bajo en octavas del disco, Jersey club en el estribillo del
+     K-pop, bajo a contratiempo del big room. */
   const STYLES = {
     ballad: { noRoll:true,
-      low:  { b:'R...............', a:'a.a.a.a.a.a.a.a.' },
-      mid:  { b:'R.......5.......', a:'a.a.a.a.a.a.a.a.', k:'k.......k.......' },
-      high: { b:'R.......5.......', a:'a.a.a.a.a.a.a.a.', c:'x...............', k:'k.......k.......', s:'....s.......s...', h:'..h...h...h...h.' },
+      low:  { b:'R.......5.......', a:'a.a.a.a.a.a.a.a.' },
+      mid:  { b:'R.......5.......', a:'a.a.a.a.a.a.a.a.', k:'k.........k.....', s:'........r.......' },
+      high: { b:'R.......5...R...', c:'x.......x.......', a:'a...a...a...a...', k:'k.........k.....', s:'....c.......c...', h:'..h...h...h...h.' },
       brk:  { b:'R...............', c:'x.......x.......' } },
     lofi: { noRoll:true,
-      low:  { b:'R.....R.........', c:'x.........x.....', k:'k.........k.....', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
-      mid:  { b:'R.....R...5.....', c:'x.....x...x.....', k:'k.........k.....', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
-      high: { b:'R.....R...5.....', c:'x.....x...x.....', a:'..........a.a.a.', k:'k......k..k.....', s:'....s.......s...', h:'h.hhh.h.h.hhh.h.' },
+      low:  { b:'R.....R.........', c:'x.........x.....', k:'k......k..k.....', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
+      mid:  { b:'R.....R...5.....', c:'x.....x...x.....', k:'k......k..k.....', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
+      high: { b:'R.....R...5.....', c:'x.....x...x.....', a:'..........a.a.a.', k:'k......k.kk.....', s:'....s.......s...', h:'h.hhh.h.h.hhh.h.' },
       brk:  { b:'R...............', c:'x...............', h:'h...h...h...h...' } },
     reggaeton: {
-      low:  { b:'R.......R.......', c:'x...............', k:'k.......k.......', s:'...r..r....r..r.' },
-      mid:  { b:'R..R....R..R....', c:'x.......x.......', k:'k...k...k...k...', s:'...r..r....r..r.' },
-      high: { b:'R..R..R.R..R..R.', c:'...p..p....p..p.', k:'k...k...k...k...', s:'...s..s....s..s.', h:'h.h.h.h.h.h.h.h.' },
+      low:  { b:'R..R....R..R....', c:'x...............', k:'k...k...k...k...', s:'...r..r....r..r.' },
+      mid:  { b:'R..R....R..R....', c:'x.......x.......', k:'k...k...k...k...', s:'...s..s....s..s.', h:'h.h.h.h.h.h.h.h.' },
+      high: { b:'R..R..R.R..R..R.', c:'...p..p....p..p.', k:'k...k...k...k...', s:'...s..s....s..s.', h:'h.hhh.h.h.hhh.h.' },
       brk:  { b:'R...............', c:'x...............', s:'...r..r....r..r.' } },
     tropical: {
-      low:  { b:'R.......R.......', c:'x...............', h:'..h...h...h...h.' },
-      mid:  { b:'R...R...R...R...', c:'..p...p...p...p.', k:'k...k...k...k...', h:'..h...h...h...h.' },
-      high: { b:'R..R..R.R..R..R.', c:'p..p..p.p..p..p.', k:'k...k...k...k...', s:'....s.......s...', h:'..h...h...h...h.' },
+      low:  { b:'R.......R.......', c:'..p...p...p...p.', h:'..h...h...h...h.' },
+      mid:  { b:'R...R...R...R...', c:'..p...p...p...p.', k:'k...k...k...k...', s:'...r..r...r..r..', h:'..h...h...h...h.' },
+      high: { b:'R..R..R.R..R..R.', c:'p..p..p...p..p..', k:'k...k...k...k...', s:'....c.......c...', h:'..o...o...o...o.' },
       brk:  { b:'R...............', c:'x.......x.......' } },
     synth: {
-      low:  { b:'R.......R.......', c:'x...............', k:'k.......k.......', h:'..h...h...h...h.' },
-      mid:  { b:'R.R.R.R.R.R.R.R.', c:'x.......x.......', k:'k...k...k...k...', h:'..h...h...h...h.' },
-      high: { b:'R.O.R.O.R.O.R.O.', a:'a.a.a.a.a.a.a.a.', k:'k...k...k...k...', s:'....s.......s...', h:'..h...h...h...h.' },
+      low:  { b:'R.R.R.R.R.R.R.R.', c:'x...............', k:'k.......k.......', h:'..h...h...h...h.' },
+      mid:  { b:'R.R.R.R.R.R.R.R.', c:'x.......x.......', k:'k...k...k...k...', s:'....s.......s...', h:'..h...h...h...h.' },
+      high: { b:'R.O.R.O.R.O.R.O.', a:'a.a.a.a.a.a.a.a.', k:'k...k...k...k...', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
       brk:  { b:'R...............', c:'x...............' } },
     disco: {
-      low:  { b:'R.O.R.O.R.O.R.O.', c:'x...............', k:'k...k...k...k...', h:'..h...h...h...h.' },
-      mid:  { b:'R.O.R.O.R.O.R.O.', c:'p...p...p...p...', k:'k...k...k...k...', s:'....s.......s...', h:'..h...h...h...h.' },
-      high: { b:'R.O.R.O.R.O.R.O.', c:'..p...p...p...p.', k:'k...k...k...k...', s:'....s.......s...', h:'..o...o...o...o.' },
+      low:  { b:'R.O.R.O.R.O.R.O.', c:'..p...p...p...p.', k:'k...k...k...k...', h:'..h...h...h...h.' },
+      mid:  { b:'R.O.R.O.R.O.R.O.', c:'..p...p...p...p.', k:'k...k...k...k...', s:'....c.......c...', h:'..h...h...h...h.' },
+      high: { b:'R.O.R.O.R.O.R.O.', c:'..p...p...p...p.', k:'k...k...k...k...', s:'....c.......c...', h:'h.o.h.o.h.o.h.o.' },
       brk:  { b:'R...............', c:'x...............' } },
     kpop: {
       low:  { b:'R..R......R.....', c:'x...............', k:'k......k........', s:'....s.......s...', h:'h.h.h.h.h.h.h.h.' },
-      mid:  { b:'R..R..R...R.R...', c:'p..p..p...p.....', k:'k..k..k...k.....', s:'....s.......s...', h:'hhhhhhhhhhhhhhhh' },
-      high: { b:'R..R..R.O..R..R.', c:'p..p..p.p..p..p.', k:'k..k..k.k...k...', s:'....s.......s...', h:'hhhhhhhhhhhhhhhh' },
+      mid:  { b:'R..R..R...R.R...', c:'p..p..p...p.....', k:'k..k..k...k.....', s:'....c.......c...', h:'hhhhhhhhhhhhhhhh' },
+      high: { b:'R..R..R.O..R..R.', c:'p..p..p.p..p..p.', k:'k..k..k...k.k.k.', s:'....c.......c...', h:'h.h.h.h.h.h.h.h.' },
       brk:  { b:'R...............', c:'x.......x.......' } },
     edm: {
       low:  { b:'R.......R.......', c:'p...p...p...p...', k:'k.......k.......', h:'..h...h...h...h.' },
-      mid:  { b:'R.R.R.R.R.R.R.R.', c:'p.p.p.p.p.p.p.p.', k:'k...k...k...k...', s:'s.......s.......', h:'..h...h...h...h.' },
-      high: { b:'..R...R...R...R.', c:'p..p..p.p..p..p.', k:'k...k...k...k...', s:'....s.......s...', h:'..o...o...o...o.' },
+      mid:  { b:'R.R.R.R.R.R.R.R.', c:'p.p.p.p.p.p.p.p.', k:'k...k...k...k...', s:'c...c...c...c...', h:'..h...h...h...h.' },
+      high: { b:'..R...R...R...R.', c:'p..p..p.p..p..p.', k:'k...k...k...k...', s:'....c.......c...', h:'..o...o...o...o.' },
       brk:  { b:'R...............', c:'x...............' } },
   };
   const RHY = {
@@ -119,7 +171,7 @@
   const hashStr = s => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
   const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 
-  SONGS.forEach(S => {
+  SONGS_V1.concat(SONGS).forEach(S => {
     S.tps = S.bpm * 2 / 60;
     S.tonic = S.mel % 12;
     S.hookBars = S.hook.split('|').map(b => b.trim().split(/\s+/).map(t => { const [i, l] = t.split(':'); return { idx: +i, len: +l }; }));
@@ -138,6 +190,7 @@
   const rep = (a, n) => Array.from({ length: n }, (_, i) => a[i % a.length]);
   function chordAt(chords, pos){ const st = pos * 2; for (const c of chords) if (st >= c.from && st < c.to) return c.deg; return chords[0].deg; }
   function pickRhythm(rng, S){
+    if (S.cells) return pick(rng, S.cells);
     const w = S.rhy, tot = w.straight + w.sync + w.slow; let r = rng() * tot;
     return pick(rng, (r -= w.straight) < 0 ? RHY.straight : (r -= w.sync) < 0 ? RHY.sync : RHY.slow);
   }
@@ -225,7 +278,7 @@
     const cp = g.comp;
     if (!cp.queue.length){
       if (g.kind === 'mara'){
-        if (cp.cycle > 0){ cp.si = (cp.si + 1) % SONGS.length; cp.S = SONGS[cp.si]; cp.n = 0; }
+        if (cp.cycle > 0){ cp.si = (cp.si + 1) % g.canciones.length; cp.S = g.canciones[cp.si]; cp.n = 0; }
         cp.queue = ['c', 'v', 'p', 'c'];
       } else cp.queue = cp.cycle === 0 ? ['intro', 'v', 'p', 'c', 'v', 'p', 'c', 'b', 'c'] : ['v', 'p', 'c', 'b', cp.cycle % 2 ? 'cmod' : 'c'];
       cp.cycle++;
@@ -282,7 +335,13 @@
   const TICK_MS = 4, DT = TICK_MS / 1000;
   const FILAS = 4;              // filas visibles
   const ARRIBA = 4.35;          // se puede tocar desde que asoma (con el margen del dedo)
-  const ESCAPE = 0.15;          // pasada esta fracción de fila bajo el borde, se escapó
+  const ESCAPE = 0.15;          // versión 1: pasada esta fracción de fila bajo el borde, se escapó
+  /* Versión 2: una ficha se escapa cuando salió más de la mitad por abajo
+     (la mitad de su largo, que en una larga son varias filas). Antes se
+     perdía apenas tocaba el fondo (0,15 filas). */
+  const PRUEBA_V = 2, PRUEBA_VERSIONES = [1, 2];
+  const CANCIONES = { 1: SONGS_V1, 2: SONGS };
+  const escapeDe = (E, t) => E.v === 1 ? ESCAPE : t.len / 2;
   const HOLD_MIN = 0.4;         // distancia mínima (filas) para completar una larga
   const MODOS = SONGS.map(S => S.id).concat(['mezcla']);
 
@@ -329,11 +388,14 @@
 
   /* Una partida nueva. `modo`: el id de una canción o 'mezcla' (las 8
      encadenadas). */
-  function nueva(modo, semilla, u) {
-    const i = SONGS.findIndex(S => S.id === modo);
+  function nueva(modo, semilla, u, v) {
+    v = v == null ? PRUEBA_V : v;
+    if (!PRUEBA_VERSIONES.includes(v)) throw new Error('versión desconocida: ' + v);
+    const canciones = CANCIONES[v];
+    const i = canciones.findIndex(S => S.id === modo);
     if (i < 0 && modo !== 'mezcla') throw new Error('modo desconocido: ' + modo);
-    const S = SONGS[Math.max(0, i)];
-    const E = { modo, kind: i < 0 ? 'mara' : 'song', idx: Math.max(0, i), semilla: semilla >>> 0, u: String(u || ''),
+    const S = canciones[Math.max(0, i)];
+    const E = { modo, v, canciones, kind: i < 0 ? 'mara' : 'song', idx: Math.max(0, i), semilla: semilla >>> 0, u: String(u || ''),
       tiles: [], evq: [], barRows: [], genRow: 1, prevLane: -1,
       comp: { S, si: 0, cycle: 0, n: 0, queue: [], prev: Math.round((S.range[0] + S.range[1]) / 2) },
       next: 0, pos: 0, speed: S.tps, maxF: 1, started: false, over: false, t: 0,
@@ -345,7 +407,7 @@
   const actual = E => (E.tiles[E.next] || E.tiles[E.tiles.length - 1]).S;
   // Dónde está el borde de abajo de una ficha, en filas desde arriba.
   const bordeAbajo = (E, t, pos) => FILAS - (t.s - (pos == null ? E.pos : pos));
-  const tocable = (E, t) => !!t && E.pos >= t.s - ARRIBA && E.pos <= t.s + ESCAPE;
+  const tocable = (E, t) => !!t && E.pos >= t.s - ARRIBA && E.pos <= t.s + escapeDe(E, t);
 
   function terminaLarga(E) {
     const h = E.hold;
@@ -373,7 +435,7 @@
       if (E.hold.prog >= 1) r = { larga: terminaLarga(E) };
     }
     const t = E.tiles[E.next];
-    if (t && E.pos > t.s + ESCAPE) { E.over = true; E.por = 'escape'; E.hold = null; return Object.assign(r || {}, { fallo: 'escape' }); }
+    if (t && E.pos > t.s + escapeDe(E, t)) { E.over = true; E.por = 'escape'; E.hold = null; return Object.assign(r || {}, { fallo: 'escape' }); }
     return r;
   }
 
@@ -433,11 +495,13 @@
      de eso). Devuelve {puntos, desfases} o {error}. `desfases` es, en cada
      nota, cuánto le faltaba a la ficha para el borde (filas): la huella de
      la mano. */
-  function rehace(modo, semilla, u, acciones, n) {
+  function rehace(modo, semilla, u, acciones, n, v) {
+    v = v == null ? PRUEBA_V : v;
+    if (!PRUEBA_VERSIONES.includes(v)) return { error: 'La prueba es de otra versión de PRO TILES.' };
     if (!MODOS.includes(modo)) return { error: 'PRO TILES no tiene ese modo.' };
     if (!acciones || !acciones.length || acciones[0].r || acciones[0].t !== 0) return { error: 'La partida no arranca tocando la primera ficha.' };
     if (!Number.isSafeInteger(n) || n < 0 || n > 3e6) return { error: 'El tick final no es válido.' };
-    const E = nueva(modo, semilla, u), desfases = [];
+    const E = nueva(modo, semilla, u, v), desfases = [];
     for (const a of acciones) {
       while (E.t < a.t) {
         paso(E);
@@ -462,7 +526,8 @@
   const STAR_AT = [100, 250, 450, 700, 1000, 1400, 2000];
   function level(score) { let n = 0; for (const t of STAR_AT) if (score >= t) n++; return n; }
 
-  const api = { SONGS, STYLES, DIFF, SCALE, HOLD, TICK_MS, DT, FILAS, ARRIBA, ESCAPE, HOLD_MIN, MODOS, STAR_AT,
+  const api = { SONGS, SONGS_V1, STYLES, DIFF, SCALE, HOLD, TICK_MS, DT, FILAS, ARRIBA, ESCAPE, HOLD_MIN, MODOS, STAR_AT,
+    PRUEBA_V, PRUEBA_VERSIONES, escapeDe,
     mulberry32, hashStr, mezcla, hashTexto, expNeg, speedFactor, clamp, nueva, asegura, actual, bordeAbajo, tocable,
     paso, golpe, suelta, falla, codifica, decodifica, rehace, level };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
