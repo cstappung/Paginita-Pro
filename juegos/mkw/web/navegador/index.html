@@ -7,7 +7,7 @@
 <!-- Página del juego para el banco (fase 3): Mario Kart Wii + Retro Rewind con aurora real (WebGPU) en un canvas.
      La sirve SOLO web/navegador/servidor.mjs en 127.0.0.1 (el juego y el disco son privados).
      Parámetros: ?auto=1 arranca sin apretar el botón (para Playwright); ?cuadros=N termina la prueba en N cuadros. -->
-<link rel="stylesheet" href="/banco/estilo.css">
+<link rel="stylesheet" href="banco/estilo.css">
 <style>
   /* El canvas: 640x528 es el tamaño nativo del juego (la imagen PAL de la Wii); se agranda con CSS sin deformarse */
   #pantalla{position:relative;max-width:880px}
@@ -108,6 +108,6 @@
   <pre id="log"></pre>
 </div>
 
-<script type="module" src="/mkw.mjs"></script>
+<script type="module" src="mkw.mjs"></script>
 </body>
 </html>

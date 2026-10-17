@@ -133,10 +133,23 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   normal + `Queue::WriteBuffer` de lo usado (~1,5 MB), y sin el giro de la pausa de presentar. CPU del juego
   13,3 → 7,9 ms por cuadro; cuadros pasados de 16,7 ms 336 → 9 de 1140. `herramientas/medir-cpu.sh`,
   `tiempos-cuadro.mjs`, `guion.mjs --traza`. Navegador 21/0, partidas 6/0, celular 16/0
-- ⬜ **Medir con la CPU frenada** (como un celular): Chrome con `Emulation.setCPUThrottlingRate` 4× y la misma partida,
-  para ver qué se rompe primero en un teléfono
-- ⬜ **Primer toque de los grupos de sonido de los personajes al azar** (~2 s de carga con 50 ms de latencia en la
-  primera carrera): predecir los grupos a partir de los karts que avisa el juego
+- ✅ **Medir como en la página real** (bitácora §54): `herramientas/sitio-local.mjs` (el sitio servido como GitHub
+  Pages sin COOP/COEP + el juego en el marco de Juegos + lo privado desde otro origen con CORS y 50 ms) y
+  `herramientas/medir-sitio.mjs` (perfiles `pc`, `cpu4`, `celular`; CPU por cuadro p95/p99, ritmo en pantalla, GPU,
+  hilo ocupado, heap, MB, 1.ª y 2.ª visita). PC: 60 fps, 7,97 ms por cuadro, 0 tirones; CPU frenada ×4: 17,7 fps;
+  celular emulado: 4 fps (el freno de Chrome no escala parejo: medir en un teléfono real)
+- ✅ **Tirón en carrera** (§54): la toma del canvas a compás (cede siempre, deja correr la actualización atrasada,
+  toma en "anterior + 4"): tomas parejas 83 → 98,6 %, CPU 9,4 → ~8 ms. `?esperaToma=0`, `?atrasada=0`, `?compas=0`
+- ✅ **Primer toque de las voces de los personajes al azar** (§54): los 42 grupos de voces de CPU del BRSAR (nombres
+  de la sección SYMB) y los 174 archivos de voces de CPU de RR, con prioridad baja; cada bloque se entrega apenas
+  está. Espera en la largada ~1000 → ~60 ms. `?voces=0`
+- ✅ **Carga del programa** (§54): `mkw.wasm.br` (124,3 → 16,1 MB, ningún archivo > 100 MB), con huella (`?v=`) y
+  guardable para siempre; 2.ª visita sin bajarlo ni compilarlo (primer cuadro 7,9 → 2,3 s a 50 Mbit/s).
+  `compilar-web.py --final`. Descartado: `wasm-opt -O3` (sin ganancia)
+- ⬜ **El Worker de verdad**: entregar el programa como en `servidor.mjs` (§54: `immutable` con `?v=`,
+  `mkw.wasm.br` con `Content-Encoding: br`, `X-Mkw-Build` en el manifiesto). Lo publica el dueño
+- ⬜ **CPU del juego en equipos débiles**: medir en un teléfono real (Android con Chrome) y, si no llega a 60, buscar
+  dónde recortar el trabajo del juego traducido (el perfil frenado es el de siempre: juego, sonido, aurora)
 - ⬜ **Subir las semillas** (`build/web/navegador/pipelines.bin` y `bloques.json`) a R2 junto al `.wasm` al publicar
   (fase 6), y rehacerlas (`guion.mjs … --semilla`, 3 veces) cada vez que cambie aurora o el disco
 - ✅ **Partidas guardadas** (`web/navegador/guardado.mjs`): partida de RR (`rksys.dat`), NAND (ajustes de RR y de la
@@ -200,6 +213,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-17 06:30** — **Medido como en la página real y arreglados el tirón en carrera y la carga** (§54). Sitio local como GitHub Pages (sin aislamiento) con el juego en el marco de Juegos y lo privado desde otro origen; `medir-sitio.mjs` en 3 perfiles. Toma del canvas a compás (tomas parejas 83 → 98,6 %), voces de los CPU bajadas antes (largada ~1 s → ~60 ms de disco), `.wasm` brotli 16,1 MB con huella y caché (2.ª visita: primer cuadro 2,3 s, 0 tirones). PC 60 fps, 7,97 ms por cuadro (p99 12,0). Descartados: margen de toma, `wasm-opt -O3`. Navegador 21/0, partidas 6/0, celular 16/0.
 - **2026-10-17 04:10** — **La presentación de la carrera ya cabe en el cuadro** (§53). La traza del ritmo con contadores de espera (`guion.mjs --traza`, `herramientas/tiempos-cuadro.mjs`) mostró CPU real de 14–17 ms; el perfil con columnas apuntó al pegamento de WebGPU: aurora mapeaba 37 MB por cuadro y Emscripten los llenaba de ceros y los copiaba enteros. Ahora un bloque plano y `Queue::WriteBuffer` solo de lo usado (~1,5 MB), y la pausa de presentar ya no gira. CPU del juego 13,3 → 7,9 ms; cuadros > 16,7 ms 336 → 9 de 1140; hilo principal 29 % → 21 %. Navegador 21/0 ×2, partidas 6/0, celular 16/0.
 - **2026-10-17 02:40** — **Bajar antes los archivos** (§52): avisos del juego, lectura adelantada, sin el bloqueo de la caché HTTP de Chrome, archivos diminutos y semilla de bloques con prioridad baja que se aparta de las cargas, grupos de sonido enteros. Con 50 ms de latencia simulada la espera al disco pasa de 30,1 s a 5,0 s; en red local de 3,4 s a 1,5 s. La prueba del navegador mide desde el cuadro 420 (el título carga entre el 300 y el 360). Banco `disco` 27/0, `brsar` 9/0, Node 13/0, navegador 21/0 ×3.
 - **2026-10-17 01:30** — **Tirón de la largada resuelto** (§50–51). Búsqueda de archivos en el índice del disco nativa con tabla hash (337–389 ms → 9–13 ms por ráfaga; 25.413 respuestas iguales a las del juego). Pipelines de WebGPU en segundo plano (saltando el dibujo hasta que llegan) y precalentados al arrancar con la lista guardada en IndexedDB más una semilla de 414 junto al `.wasm`. Largada: 2 s a 2–4 fps → un segundo a 34 fps (carga, 209 ms de red), después 60; menús sin congelones. Node 13/0, navegador 21/0, banco `pipelines` 14/0.

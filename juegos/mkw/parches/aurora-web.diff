@@ -1,29 +1,52 @@
 diff --git a/aurora-main/lib/aurora.cpp b/aurora-main/lib/aurora.cpp
-index aede66a..c318eb5 100644
+index aede66a..ebaff70 100644
 --- a/aurora-main/lib/aurora.cpp
 +++ b/aurora-main/lib/aurora.cpp
-@@ -17,6 +17,9 @@
+@@ -17,6 +17,21 @@
  
  #include <SDL3/SDL_filesystem.h>
  #include <SDL3/SDL_thread.h>
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
++// MKW RETRO (browser): the present pause yields until the page's next rendering update has taken the canvas, or until
++// `ms` pass, whichever comes first (Module.mkwEsperaToma; bitácora §54). -1 = the page offers none.
++EM_ASYNC_JS(int, mkw_aurora_espera_toma, (double ms), {
++    if (!Module.mkwEsperaToma) return -1;
++    await Module.mkwEsperaToma(ms);
++    return 0;
++});
++// MKW RETRO (browser): before acquiring the canvas texture, let a rendering update that is overdue (a refresh passed
++// while the guest kept the main thread busy) run first. Otherwise that stale update takes the new frame one refresh
++// early and the next one waits a refresh longer: 3/5 refreshes instead of 4 at 240 Hz (bitácora §54).
++EM_JS(int, mkw_aurora_toma_atrasada, (), { return Module.mkwTomaAtrasada ? (Module.mkwTomaAtrasada() ? 1 : 0) : 0; });
++EM_ASYNC_JS(void, mkw_aurora_espera_atrasada, (), { await Module.mkwEsperaAtrasada(); });
 +#endif
  #include <magic_enum.hpp>
  
  #include "system_info.hpp"
-@@ -96,6 +99,19 @@ void wait_until_precise(PresentClock::time_point deadline) noexcept {
+@@ -93,9 +108,30 @@ void wait_until_precise(PresentClock::time_point deadline) noexcept {
+   // practice; 400 us absorbs the observed overshoot, about 1.6 ms of one core at 240 Hz.
+   constexpr auto kSpinWindow = std::chrono::microseconds(400);
+   auto now = PresentClock::now();
++#ifndef __EMSCRIPTEN__
    if (now >= deadline) {
      return;
    }
++#endif
 +#ifdef __EMSCRIPTEN__
 +  // MKW RETRO: in the browser a blocking sleep would freeze the tab; emscripten_sleep suspends the
 +  // guest (JSPI) and lets the page run until the deadline. No spin afterwards: Present() is a no-op in the
 +  // browser and the page takes the canvas only while we are suspended, so spinning to the exact deadline
 +  // only burned up to ~2 ms of CPU per frame (7 % of the main thread in a race; MKW RETRO bitácora §53).
++  //
++  // Always yield, even with less than 2 ms left (it used to skip the pause then): the browser takes the canvas only
++  // while we are suspended, so a frame that reached its present after retrace+4.5 ms was taken at the END of the
++  // next frame, a refresh or two late, and showed for 5 refreshes then 3 (judder at 240 Hz, worst in races where
++  // encoding takes longer). The page wakes us right after its rendering update (the canvas is taken) or at the
++  // deadline; with no page, the old sleep.
 +  {
 +    const auto ms = std::chrono::duration<double, std::milli>(deadline - now).count();
-+    if (ms >= 2.0) {
++    if (mkw_aurora_espera_toma(std::max(ms, 1.0)) < 0 && ms >= 2.0) {
 +      emscripten_sleep(static_cast<unsigned>(ms - 1.0));
 +    }
 +    return;
@@ -32,7 +55,7 @@ index aede66a..c318eb5 100644
  
    const auto timerDeadline = deadline - now > kSpinWindow ? deadline - kSpinWindow : deadline;
  #if defined(_WIN32)
-@@ -259,6 +275,10 @@ FrameWorkerState g_frameWorker;
+@@ -259,6 +295,10 @@ FrameWorkerState g_frameWorker;
  bool frame_worker_requested() noexcept {
  #ifdef AURORA_ENABLE_GX
    static const bool enabled = [] {
@@ -43,7 +66,19 @@ index aede66a..c318eb5 100644
  #if defined(__APPLE__)
      // ImGui's SDL backend may raise an SDL window from ImGui::NewFrame(). On
      // macOS that reaches AppKit, whose window operations are main-thread-only;
-@@ -1009,7 +1029,13 @@ bool present_presentation_job(const PresentationJob& job) {
+@@ -943,6 +983,11 @@ bool present_presentation_job(const PresentationJob& job) {
+           webgpu::g_graphicsConfig.surfaceConfiguration.height);
+     }
+     if (!surfaceSizeChanged && window::is_presentable()) {
++#ifdef __EMSCRIPTEN__
++      if (mkw_aurora_toma_atrasada()) {
++        mkw_aurora_espera_atrasada();
++      }
++#endif
+       const auto acquireStarted = PresentClock::now();
+       auto acquired = acquire_surface_texture();
+       acquireDuration =
+@@ -1009,7 +1054,13 @@ bool present_presentation_job(const PresentationJob& job) {
            wgpu::Status presentStatus;
            {
              std::lock_guard submitLock(g_queueSubmitMutex);
@@ -57,7 +92,7 @@ index aede66a..c318eb5 100644
            }
            presentDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
                PresentClock::now() - presentStarted);
-@@ -1679,7 +1705,8 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
+@@ -1679,7 +1730,8 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
  
  // Phase 3: hand the encoded group to whoever owns presentation.
  void publish_presentations(std::vector<PresentationJob>&& presentationJobs, bool interpolationActive) {
@@ -87,7 +122,7 @@ index bb8fba4..85de618 100644
  #else
    const auto props = SDL_GetWindowProperties(window);
 diff --git a/aurora-main/lib/gfx/common.cpp b/aurora-main/lib/gfx/common.cpp
-index e093901..ef0cc74 100644
+index e093901..538ba88 100644
 --- a/aurora-main/lib/gfx/common.cpp
 +++ b/aurora-main/lib/gfx/common.cpp
 @@ -132,6 +132,16 @@ constexpr size_t FrameSlotCount = 3;
@@ -216,9 +251,9 @@ index e093901..ef0cc74 100644
 +#ifdef __EMSCRIPTEN__
 +  // MKW RETRO: every 10 s, how many bytes a frame uploads (the page's log; bitácora §53)
 +  if (static uint32_t s_cuenta = 0; g_webStagingPlano && advanceFrame && ++s_cuenta % 600 == 0) {
-+    Log.info("staging: frame uploads vertices {} KB, uniforms {} KB, indices {} KB, storage {} KB",
++    Log.info("staging: frame uploads vertices {} KB, uniforms {} KB, indices {} KB, storage {} KB; {} draws ({} merged), {} render passes",
 +             g_stats.lastVertSize / 1024, g_stats.lastUniformSize / 1024, g_stats.lastIndexSize / 1024,
-+             g_stats.lastStorageSize / 1024);
++             g_stats.lastStorageSize / 1024, g_drawCallCount, g_mergedDrawCallCount, g_renderPasses.size());
 +  }
 +#endif
    if constexpr (UseTextureBuffer) {

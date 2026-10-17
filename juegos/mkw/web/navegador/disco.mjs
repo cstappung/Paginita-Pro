@@ -39,11 +39,12 @@ export const PREFIJO = 'mkw-disco:';
 export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 1024 * 1024, buscar = (u, o) => fetch(u, o),
                              cajas = globalThis.caches, adelantarActivo = true, maxFondo = 12,
                              avisoMax = 4 * 1024 * 1024, avisoGrande = 1024 * 1024, rachaMax = 8, maxBaja = 4,
-                             grupoMax = 8 * 1024 * 1024, pausaBaja = 40, quietud = 300 } = {}) {
+                             grupoMax = 8 * 1024 * 1024, pausaBaja = 15, quietud = 300 } = {}) {
   const estado = { pedidosRed: 0, bytesRed: 0, bloquesCache: 0, bloquesMemoria: 0, lecturas: 0, sinCache: false,
                    // adelantados: bloques traídos en segundo plano; aprovechados: bloques que el juego leyó y ya
                    // estaban (o venían en camino) gracias a eso; esperaRed: lecturas del juego que tuvieron que pedir
-                   adelantados: 0, aprovechados: 0, esperaRed: 0, avisos: 0 };
+                   adelantados: 0, aprovechados: 0, esperaRed: 0, avisos: 0,
+                   colaBaja: () => colaBaja.length };        // trabajos de prioridad baja que esperan turno
   const memoria = new Map();            // clave → Uint8Array (el orden del Map = del más viejo al más nuevo)
   let enMemoria = 0, caja = null;
   const enCurso = new Map();            // clave → promesa (dos lecturas del mismo bloque a la vez piden una sola vez)
@@ -115,25 +116,30 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   // tramos seguidos (un pedido por tramo). Cada bloque queda en enCurso mientras tanto, para que otra lectura del
   // mismo bloque espere este pedido en vez de hacer otro. Devuelve la promesa de un Map bloque → datos.
   function encargar(url, tam, bloques, alTerminar, aLaMemoria = true) {
+    // Cada bloque tiene su propia promesa y se entrega APENAS está (§54): antes todas esperaban el trabajo entero, y
+    // un bloque que ya estaba en Cache Storage esperaba a que otro bloque del mismo trabajo llegara de la red (~60 ms
+    // con la red del sitio: las voces de la largada).
+    const avisos = new Map();
+    const propias = bloques.map(b => [b, clave(url, b), new Promise((listo, error) => avisos.set(b, { listo, error }))]);
     const trabajo = (async () => {
       const res = new Map();
-      await Promise.all(bloques.map(async b => { const d = await deCaja(clave(url, b)); if (d) res.set(b, d); }));
+      await Promise.all(bloques.map(async b => { const d = await deCaja(clave(url, b)); if (d) { res.set(b, d); avisos.get(b).listo(d); } }));
       const faltan = bloques.filter(b => !res.has(b));
       for (let a = 0; a < faltan.length;) {
         let z = a;
         while (z + 1 < faltan.length && faltan[z + 1] === faltan[z] + 1) z++;
         const lista = await bajar(url, tam, faltan[a], faltan[z], aLaMemoria);
-        for (let x = a; x <= z; x++) res.set(faltan[x], lista[x - a]);
+        for (let x = a; x <= z; x++) { res.set(faltan[x], lista[x - a]); avisos.get(faltan[x]).listo(lista[x - a]); }
         a = z + 1;
       }
       return res;
     })();
-    const propias = bloques.map(b => [clave(url, b), trabajo.then(r => r.get(b))]);
-    // si la red falla, estas promesas quedan rechazadas aunque nadie más las espere: marcarlas como "atendidas"
-    // para que el navegador no avise "error sin atender" (quien sí las espera recibe el error igual)
-    for (const [, p] of propias) p.catch(() => {});
-    for (const [c, p] of propias) enCurso.set(c, p);
-    const limpiar = () => { for (const [c, p] of propias) if (enCurso.get(c) === p) enCurso.delete(c); if (alTerminar) alTerminar(); };
+    // si la red falla, las promesas de los bloques que faltaban quedan rechazadas aunque nadie más las espere:
+    // marcarlas como "atendidas" para que el navegador no avise "error sin atender" (quien sí las espera recibe el error)
+    trabajo.catch(e => { for (const { error } of avisos.values()) error(e); });
+    for (const [, , p] of propias) p.catch(() => {});
+    for (const [, c, p] of propias) enCurso.set(c, p);
+    const limpiar = () => { for (const [, c, p] of propias) if (enCurso.get(c) === p) enCurso.delete(c); if (alTerminar) alTerminar(); };
     trabajo.then(limpiar, limpiar);
     return trabajo;
   }
@@ -267,5 +273,12 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     caja = null;
   }
 
-  return { estado, abrir, leer, adelantar, adelantarBloques, agrupar, entero, ocupado, borrar, bloque };
+  // Diagnóstico (mkw.mjs ?trazaDisco=1): dónde está el bloque que tiene el byte `inicio` de este archivo, AHORA
+  async function donde(url, inicio) {
+    const k = clave(url, Math.floor(inicio / bloque));
+    return { memoria: memoria.has(k), enCurso: enCurso.has(k), deFondo: deFondo.has(k),
+             enCola: colaBaja.some(t => t.url === url && t.lista.includes(Math.floor(inicio / bloque))),
+             caja: caja ? !!(await caja.match(k)) : null };
+  }
+  return { estado, abrir, leer, adelantar, adelantarBloques, agrupar, entero, ocupado, borrar, bloque, donde };
 }

@@ -120,6 +120,10 @@ def main():
     # --carpeta build/web-xxx: compilar en un taller propio (objetos + salida), p. ej. cuando otra sesión de trabajo
     # usa build/web al mismo tiempo. Servirlo con MKW_BUILD=build/web-xxx/navegador (Node: MKW_BUILD_NODE=…/node).
     ap.add_argument("--carpeta", default=None)
+    # --final: el programa que se publica (bitácora §54): sin los nombres de las funciones (--profiling-funcs, 2,7 MB
+    # que solo sirven para los perfiles) y comprimido al final (herramientas/comprimir-build.mjs: mkw.wasm.br/.gz,
+    # lo que el Worker entrega).
+    ap.add_argument("--final", action="store_true")
     args = ap.parse_args()
     args.simd = not args.sin_simd
 
@@ -302,7 +306,7 @@ def main():
     enlace = [str(EMXX), f"@{rutas(sal / 'objetos.rsp')}", "-o", rutas(sal / "mkw.js"),
               # --profiling-funcs: conserva los nombres de las funciones dentro del .wasm, para que el perfil
               # (prueba-navegador.mjs --perfil) diga "aurora::gfx::render" y no "wasm-function[81234]"
-              "-O2", "--profiling-funcs", "-fwasm-exceptions", "-sSUPPORT_LONGJMP=wasm",
+              "-O2"] + ([] if args.final else ["--profiling-funcs"]) + ["-fwasm-exceptions", "-sSUPPORT_LONGJMP=wasm",
               "-sJSPI=1", "-sJSPI_EXPORTS=['mkw_host_context_trampoline']",
               f"-sEXPORTED_FUNCTIONS={exports!r}".replace("'", '"'),
               "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=['$stackSave','$stackRestore']",
@@ -311,6 +315,8 @@ def main():
               "-sERROR_ON_UNDEFINED_SYMBOLS=1"] + propio + (["-msimd128"] if args.simd else [])
     print("enlazando…")
     r = subprocess.run(enlace, env=env)
+    if r.returncode == 0 and args.final and navegador:
+        r = subprocess.run(["node", str(RAIZ / "herramientas" / "comprimir-build.mjs"), str(sal)])
     sys.exit(r.returncode)
 
 

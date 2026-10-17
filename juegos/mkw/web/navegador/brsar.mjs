@@ -43,3 +43,33 @@ export function gruposBrsar(bytes, tamArchivo = Infinity) {
     return rangos.sort((a, b) => a[0] - b[0]);
   } catch { return []; }                                         // tabla cortada o desplazamientos fuera del archivo
 }
+
+// Los grupos CON SU NOMBRE (bitácora §54): [nombre, inicio, fin] de cada grupo. Los nombres están en la sección SYMB
+// (en 0x10 del encabezado, antes de INFO): "SYMB", tamaño, y en su byte 8 un u32 que lleva (relativo a ese byte 8) a
+// la tabla de textos: u32 cantidad y un u32 por texto (también relativo al byte 8 de SYMB), cada texto terminado en 0.
+// El u32 "nombre" de cada grupo es el número de su texto. Sirve para elegir grupos por nombre: p. ej. las voces de
+// los corredores manejados por la consola ("GRP_VO_MR_NPC" = Mario CPU), que se eligen al azar en cada carrera.
+export function gruposConNombreBrsar(bytes, tamArchivo = Infinity) {
+  try {
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (v.getUint32(0) !== 0x52534152) return [];
+    const symb = v.getUint32(0x10) + 8, info = v.getUint32(0x18);
+    if (v.getUint32(symb - 8) !== 0x53594D42 || v.getUint32(info) !== 0x494E464F) return [];   // "SYMB", "INFO"
+    const textos = symb + v.getUint32(symb), cuantosTextos = v.getUint32(textos);
+    const texto = i => {
+      if (i >= cuantosTextos) return '';
+      const ini = symb + v.getUint32(textos + 4 + 4 * i);
+      let fin = ini; while (fin < bytes.length && bytes[fin]) fin++;
+      return String.fromCharCode(...bytes.subarray(ini, Math.min(fin, ini + 64)));
+    };
+    const base = info + 8, tabla = base + v.getUint32(base + 4 * 8 + 4), n = v.getUint32(tabla);
+    if (n > 100000) return [];
+    const salida = [];
+    for (let i = 0; i < n; i++) {
+      const g = base + v.getUint32(tabla + 4 + 8 * i + 4);
+      const ini = v.getUint32(g + 16), fin = v.getUint32(g + 24) + v.getUint32(g + 28);   // datos + ondas
+      if (fin > ini && fin <= tamArchivo) salida.push([texto(v.getUint32(g)), ini, fin]);
+    }
+    return salida;
+  } catch { return []; }
+}

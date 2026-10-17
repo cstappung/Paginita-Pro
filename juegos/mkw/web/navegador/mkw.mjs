@@ -11,15 +11,20 @@
 //      descarga SOLO ese pedazo (petición HTTP con Range). Con JSPI el juego queda en pausa mientras llega.
 //   5. Llama a main(): el runtime arranca, aurora crea el WebGPU sobre el <canvas id="canvas"> y dibuja.
 //   6. Cada segundo muestra cuadros por segundo y trabajo por cuadro, y anota las verificaciones del banco.
-import { prueba } from '/banco/comun.js';
-import { crearControles, ACCIONES, BOTON, nombreTecla } from '/web/navegador/controles.mjs';
-import { crearSonido } from '/web/navegador/sonido.mjs';
-import { crearGuardado } from '/web/navegador/guardado.mjs';
-import { crearDisco } from '/web/navegador/disco.mjs';
-import { crearPipelines } from '/web/navegador/pipelines.mjs';
-import { largoEncabezadoBrsar, gruposBrsar } from '/web/navegador/brsar.mjs';
+import { prueba } from './banco/comun.js';
+import { crearControles, ACCIONES, BOTON, nombreTecla } from './controles.mjs';
+import { crearSonido } from './sonido.mjs';
+import { crearGuardado } from './guardado.mjs';
+import { crearDisco } from './disco.mjs';
+import { crearPipelines } from './pipelines.mjs';
+import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 
 const parametros = new URLSearchParams(location.search);
+// De dónde salen las piezas privadas (el juego compilado, el manifiesto y los archivos del disco). Vacío = este mismo
+// servidor (servidor.mjs). En el sitio vendrán del Worker de amigos, otro origen (como el disco de BT3):
+// ?privado=http://127.0.0.1:8151 lo imita con herramientas/sitio-local.mjs (bitácora §54). La página en sí usa
+// direcciones relativas, para vivir en /juegos/mkw/ del sitio igual que aquí en /.
+const ORIGEN = (parametros.get('privado') || '').replace(/\/+$/, '');
 const TRAZA_DISCO = parametros.has('trazaDisco');   // anotar cada lectura del disco que hace el juego (bitácora §52)
 const CUADROS_PRUEBA = Number(parametros.get('cuadros') || 0);   // 0 = jugar sin fin
 const { ok, nota, fin } = prueba('juego', 'Juego en el navegador (fase 3)');
@@ -92,6 +97,29 @@ const revisionGpu = (async () => {
   window.mkwEstado.gpu = { pedida: GPU, dada: nombreGpu, ignora };
   return { adaptador, nombreGpu, ignora };
 })();
+// Tiempo de GPU (?gpu=1, diagnóstico; bitácora §54): cuánto tarda la tarjeta en terminar lo que aurora le manda en cada
+// cuadro. Envuelve GPUQueue.submit: al último envío de cada cuadro le pregunta "avisame cuando termines"
+// (onSubmittedWorkDone) y mide la demora. Si la tarjeta estaba libre, eso es su tiempo de trabajo; si se acerca a un
+// refresco del monitor, el compositor a veces no alcanza a mostrar la imagen a tiempo (ritmo 3-5-3-5).
+const gpuMedida = { muestras: [] };
+if (parametros.get('gpu') === '1' && globalThis.GPUQueue) {
+  const original = GPUQueue.prototype.submit;
+  let pendiente = null;
+  GPUQueue.prototype.submit = function (buffers) {
+    const r = original.call(this, buffers);
+    const t0 = performance.now(), cola = this;
+    if (pendiente !== null) return r;                 // ya hay uno midiéndose en este cuadro
+    pendiente = t0;
+    queueMicrotask(() => {                            // el último envío seguido (mismo trozo de trabajo) cuenta junto
+      cola.onSubmittedWorkDone().then(() => {
+        if (gpuMedida.muestras.length < 200000) gpuMedida.muestras.push([pendiente, performance.now() - pendiente]);
+        pendiente = null;
+      });
+    });
+    return r;
+  };
+  window.mkwGpu = () => gpuMedida.muestras;
+}
 // Traza del ritmo (?traza=1, diagnóstico): guarda con hora cada refresco, cada espera del juego y cada cuadro
 // entregado, y al final la vuelca a la consola en líneas "[traza] [...]" para analizarla fuera (ver
 // herramientas/analizar-traza.mjs). Códigos: 'r' = refresco (valor = hora del rAF), 'v' = lo que vio el medidor
@@ -136,6 +164,13 @@ const FASE_VI = parametros.has('faseVi') ? Number(parametros.get('faseVi')) : nu
 //    Chrome alarga a 4 ms los setTimeout encadenados (uno pedido desde otro más de 5 veces seguidas).
 // ?ceder=0: el juego gira como antes, con la fase que se mide sola (§43), para comparar.
 const CEDER = parametros.get('ceder') !== '0';
+// ?esperaToma=0: la pausa de presentar de aurora vuelve a ser un sueño fijo hasta retrace+6,5 ms, y nada si faltan
+// menos de 2 ms (antes de §54), para comparar.
+const ESPERA_TOMA = parametros.get('esperaToma') !== '0';
+// ?atrasada=0: aurora toma la textura del canvas sin esperar la actualización de la pantalla atrasada (antes de §54).
+const ESPERA_ATRASADA = parametros.get('atrasada') !== '0';
+// ?compas=0: sin el compás de 4 refrescos (solo se espera la actualización atrasada).
+const COMPAS = parametros.get('compas') !== '0';
 const FASE_CEDER = 0.75;
 const enTareaNueva = (() => {
   const canal = new MessageChannel(), cola = [];
@@ -143,11 +178,11 @@ const enTareaNueva = (() => {
   return f => { cola.push(f); canal.port2.postMessage(0); };
 })();
 const relojMonitor = {
-  t: 0, p: 0, n: 0, deltas: [], esperas: [],
+  t: 0, p: 0, n: 0, deltas: [], esperas: [], tomas: [],
   entregado: 0, retrace: 0, desfases: [], fase: null, tomaAnterior: 0, huecosToma: {}, fotos: [],
   valido() { return this.deltas.length >= 30 && performance.now() - this.t < 100; },  // pestaña oculta → no
   tic(hora) {
-    if (this.entregado) {
+    if (this.entregado && !this.esperandoAtrasada) {
       // Primer refresco después de que el juego entregó un cuadro: el navegador toma el canvas AHORA. Se guarda
       // cuánto pasó desde la "tele" (retrace) del cuadro hasta la toma (los últimos 240 cuadros, 4 s), y cuántos
       // refrescos pasaron desde la toma anterior.
@@ -183,6 +218,7 @@ const relojMonitor = {
     anota('r', hora);
     // despertar a quien espera el refresco "justo antes" de su vencimiento (ver esperaHasta)
     this.esperas = this.esperas.filter(e => (hora >= e.desde ? (e.listo(1), false) : true));
+    for (const f of this.tomas.splice(0)) f(hora);          // la pausa de presentar de aurora: el canvas ya se tomó
     requestAnimationFrame(h => this.tic(h));
   },
   // El runtime avisa que va a entregar un cuadro a aurora; retraceMs = la "tele" (retrace) de ese cuadro.
@@ -202,6 +238,58 @@ const relojMonitor = {
     const distancia = this.fase === null ? p : Math.min(Math.abs(nueva - this.fase), p - Math.abs(nueva - this.fase));
     if (distancia > 0.3) this.fase = nueva;
     return this.fase;
+  },
+  // La pausa de presentar de aurora (§54): se cumple apenas el navegador hizo su actualización de la pantalla (ahí
+  // tomó el canvas con el cuadro recién entregado), desde una tarea nueva para que esa actualización termine antes de
+  // que el juego siga; o a los `ms` si no llega ninguna antes (a 60 Hz el refresco siguiente queda lejos).
+  // La toma del canvas, a compás (§54). aurora pregunta tomaAtrasada() justo antes de tomar la textura del canvas.
+  // Dos casos en que tomarla de inmediato sale mal:
+  //  - una actualización de la pantalla ATRASADA: pasó un refresco y el navegador no pudo correr su actualización
+  //    (el juego tenía el hilo). Si aurora toma la textura ahora, esa actualización vieja se lleva el cuadro nuevo un
+  //    refresco antes, y el siguiente dura uno más: 3 y 5 refrescos en vez de 4 a 240 Hz (el tirón en carrera).
+  //  - el compás: a 240 Hz cada cuadro debe verse 4 refrescos. objetivo = refresco de la toma anterior + 4; la textura
+  //    se toma recién después de la actualización del refresco objetivo − 1, así la del objetivo se la lleva. Si el
+  //    juego entrega antes (un cuadro rápido), espera; si entrega tarde, se toma apenas se pueda y el compás se rearma.
+  //    (Probado y descartado: dejar un margen de 2,5 ms entre la entrega y el refresco de la toma: 69–74 % a compás
+  //    contra 95 % sin margen, §54.)
+  // tomaAtrasada() calcula desde qué hora de rAF ya se puede tomar y dice si hay que esperar a ese rAF.
+  ultimaToma: 0, desdeToma: 0, esperandoAtrasada: false,
+  tomaAtrasada() {
+    if (!this.valido() || !(this.p > 0)) return false;
+    const p = this.p, n = Math.round(16.6833 / p), ahora = performance.now();
+    this.desdeToma = ahora - 1.5 * p;            // sin compás: solo un refresco que pasó hace más de medio refresco
+    if (COMPAS && n >= 2 && Math.abs(16.6833 - n * p) < 0.1 * p && this.ultimaToma) {
+      const objetivo = this.ultimaToma + n * p;
+      if (ahora < objetivo + 0.5 * p) this.desdeToma = objetivo - 1.5 * p;
+    }
+    return this.t < this.desdeToma;
+  },
+  // Espera el rAF con hora ≥ desdeToma (se cumple en una tarea nueva, como esperaHasta), o un tope de tiempo.
+  esperaAtrasada() {
+    const desde = this.desdeToma;
+    anota('a', desde - this.t);
+    this.esperandoAtrasada = true;
+    return new Promise(listo => {
+      let hecho = false;
+      const fin = v => {
+        if (hecho) return; hecho = true;
+        this.esperas = this.esperas.filter(e => e !== espera); this.esperandoAtrasada = false;
+        anota('b', v); listo();
+      };
+      const espera = { desde, listo: () => enTareaNueva(() => fin(1)) };
+      this.esperas.push(espera);
+      setTimeout(() => fin(0), Math.max(2, desde - performance.now() + 1.5 * this.p));
+    });
+  },
+  esperaToma(ms) {
+    anota('t', ms);
+    return new Promise(listo => {
+      let hecho = false;
+      const fin = v => { if (hecho) return; hecho = true; this.tomas = this.tomas.filter(f => f !== aviso); anota('u', v); listo(); };
+      const aviso = hora => { this.ultimaToma = hora; enTareaNueva(() => fin(1)); };   // hora del refresco de la toma
+      this.tomas.push(aviso);
+      setTimeout(() => fin(0), ms);
+    });
   },
   // Promesa que se cumple con 1 cuando llega el último refresco antes del vencimiento (hora > vencimiento − p;
   // el runtime gira el resto, menos de un refresco), con 0 a los `servicioMs` (para que el juego atienda su sonido
@@ -282,7 +370,7 @@ window.mkwGuardado = guardado;              // para las pruebas
 const guardadosAlAbrir = guardado.cargar().catch(e => { guardado.estado.error = String(e); return new Map(); });
 // Pipelines para precalentar (pipelines.mjs): la lista de este navegador y la semilla del servidor.
 // ?precalentar=no: sin listas (para medir el peor caso, la primera visita sin semilla).
-const pipelines = crearPipelines();
+const pipelines = crearPipelines({ urlSemilla: ORIGEN + '/build/pipelines.bin' });
 const listasAlAbrir = parametros.get('precalentar') === 'no' ? Promise.resolve({}) : pipelines.cargar();
 function pintarPartidas() {
   const e = guardado.estado;
@@ -380,7 +468,7 @@ setInterval(() => {
 }, 200);
 
 // La dirección web de un archivo del juego: es la misma ruta, con cada pedazo "escapado" (espacios → %20…)
-const direccion = ruta => ruta.split('/').map(encodeURIComponent).join('/');
+const direccion = ruta => ORIGEN + ruta.split('/').map(encodeURIComponent).join('/');
 
 async function arrancar() {
   $('arrancar').disabled = true;
@@ -396,7 +484,7 @@ async function arrancar() {
   if (ignora) nota('el navegador ignora la elección de tarjeta (da la misma para alto rendimiento y bajo consumo)');
 
   // 2) Manifiesto
-  const respuestaManifiesto = await fetch('/manifiesto.json');
+  const respuestaManifiesto = await fetch(ORIGEN + '/manifiesto.json');
   const manifiesto = await respuestaManifiesto.json();
   // Caché del disco (disco.mjs): lo bajado queda en este navegador; la versión de los archivos la da el servidor
   // ?adelantar=0: sin bajar antes (ni avisos del juego ni lectura seguida), para comparar (bitácora §52)
@@ -443,13 +531,18 @@ async function arrancar() {
 
   // 4) El juego
   const t1 = performance.now();
-  const crear = (await import('/build/mkw.js')).default;
+  // El programa con su huella (?v=, de la cabecera X-Mkw-Build del manifiesto): el servidor lo da guardable para
+  // siempre y Chrome reusa su caché HTTP y su caché de código en la próxima visita (bitácora §54). ?huella=0:
+  // sin huella (siempre se baja y se compila de nuevo, como antes).
+  const huellaBuild = parametros.get('huella') === '0' ? null : respuestaManifiesto.headers.get('X-Mkw-Build');
+  const conHuella = f => ORIGEN + '/build/' + f + (huellaBuild ? '?v=' + huellaBuild : '');
+  const crear = (await import(conHuella('mkw.js'))).default;
   let lecturas = 0, bytes = 0;
   const M = await crear({
     canvas: $('canvas'),
     mkwGpuPreferencia: GPU,
     mkwVibrar: (puerto, cmd) => controles.vibrar(puerto, cmd),   // el juego pide vibrar (pad_web.cpp)
-    locateFile: f => '/build/' + f,
+    locateFile: f => conHuella(f),
     print: escribe,
     printErr: t => escribe('[err] ' + t),
     // El runtime llama a esto para cada lectura del disco (ver dvd.cpp y dvd_contract.h en el parche)
@@ -458,13 +551,15 @@ async function arrancar() {
       const tam = tamaños.get(ruta);
       if (tam === undefined) return -2;                        // no es perezoso: que lo lea de la memoria
       if (inicio >= tam) return -3;
-      if (TRAZA_DISCO) escribe(`[lee] ${ruta} ${inicio} ${largo}`);   // ?trazaDisco=1: cada lectura del juego (diagnóstico)
+      if (TRAZA_DISCO) escribe(`[lee] cuadro ${window.mkwCuadros ? window.mkwCuadros() : 0} ${ruta} ${inicio} ${largo}`);   // ?trazaDisco=1: cada lectura del juego (diagnóstico)
       anotarLectura(ruta, tam, inicio, largo);
       let datos;
       const t0 = performance.now();
+      const donde = TRAZA_DISCO ? disco.donde(direccion(ruta), inicio) : null;   // diagnóstico: dónde estaba el bloque
       try { datos = await disco.leer(direccion(ruta), tam, inicio, largo); }   // bloques de 256 KB, con caché
       catch (e) { escribe('[mkw] ' + e.message); return -1; }
       msEsperaDisco += performance.now() - t0;   // el juego estuvo parado esperando estos bytes
+      if (TRAZA_DISCO && performance.now() - t0 > 5) { const ms = performance.now() - t0; donde.then(d => escribe(`[espera] ${ms.toFixed(0)} ms ${ruta} ${inicio} ${largo} ${JSON.stringify(d)}`)); }
       lecturas++; bytes += datos.length;
       window.mkwEstado.lecturas = lecturas; window.mkwEstado.bytes = bytes;
       return datos;
@@ -486,6 +581,9 @@ async function arrancar() {
     ...(ENGANCHE ? {
       mkwVsync: relojMonitor,
       mkwEsperaHasta: (vencimiento, servicioMs) => relojMonitor.esperaHasta(vencimiento, servicioMs),
+      ...(ESPERA_TOMA ? { mkwEsperaToma: ms => relojMonitor.esperaToma(ms) } : {}),
+      ...(ESPERA_ATRASADA ? { mkwTomaAtrasada: () => relojMonitor.tomaAtrasada(),
+                              mkwEsperaAtrasada: () => relojMonitor.esperaAtrasada() } : {}),
       mkwSonidoAjuste: AJUSTE_SONIDO,
       mkwCeder: CEDER,
       ...(TRAZA ? { mkwTraza: anota } : {}),
@@ -498,7 +596,24 @@ async function arrancar() {
     } : {}),
   });
   moduloTraza = M;
+  // Para medir desde afuera (herramientas/medir-sitio.mjs): el contador de cuadros al instante (el del medidor se
+  // actualiza una vez por segundo) y la memoria del wasm (el "heap": todo lo que el juego tiene reservado), en MB
+  window.mkwCuadros = () => M._mkw_web_cuadros();
+  window.mkwHeapMB = () => M.HEAPU8.length / 1048576;
   ok('el juego (wasm) cargó', !!M, `${(performance.now() - t1).toFixed(0)} ms`);
+  // Carga del programa (§54): cuándo terminó de llegar el .wasm (la red o la caché) y cuándo quedó listo para correr.
+  // Con instantiateStreaming el navegador compila MIENTRAS baja; "compilar" = lo que tardó DESPUÉS de que llegó el
+  // último byte. bytes = lo que viajó (0 = salió de la caché HTTP; Timing-Allow-Origin deja verlo desde otro origen).
+  {
+    const w = performance.getEntriesByType('resource').find(e => /\/mkw\.wasm(\?|$)/.test(e.name));
+    const listo = performance.now();
+    window.mkwEstado.programa = w ? {
+      inicio: t1, llegó: w.responseEnd, listo, bajarMs: w.responseEnd - w.startTime, compilarMs: listo - w.responseEnd,
+      bytes: w.transferSize, comprimido: w.encodedBodySize, descomprimido: w.decodedBodySize,
+    } : { inicio: t1, listo };
+    if (w) nota(`programa: llegó en ${(w.responseEnd - w.startTime).toFixed(0)} ms (${(w.transferSize / 1048576).toFixed(1)} MB por la red` +
+                `${w.transferSize === 0 ? ', de la caché' : ''}), listo ${(listo - w.responseEnd).toFixed(0)} ms después`);
+  }
   window.mkw = M;
 
   // 6a) Ritmo contra el monitor: requestAnimationFrame se llama una vez por cada refresco de la pantalla (60 Hz
@@ -568,14 +683,14 @@ async function arrancar() {
     }
     Object.assign(sonidoMedido, { cola, ritmo, tirados });
     $('sonidoDato').textContent = !es.contextos ? 'sonido: —' : es.activo ? `sonido ${db.toFixed(0)} dB` : 'sonido bloqueado';
-    if (!primerCuadro && ahora.c > 0) { primerCuadro = true; ok('primer cuadro dibujado', true, `a los ${((ahora.t - t1) / 1000).toFixed(1)} s`); }
+    if (!primerCuadro && ahora.c > 0) { window.mkwEstado.primerCuadroMs = ahora.t; primerCuadro = true; ok('primer cuadro dibujado', true, `a los ${((ahora.t - t1) / 1000).toFixed(1)} s`); }
     // Solo cuentan los segundos que EMPIEZAN pasado el cuadro 420: el título carga sus archivos entre los cuadros
     // ~300 y ~360 (Code.pul de Retro Rewind, Title.szs, 2.416 búsquedas en el índice), y en la primera visita ese
     // segundo espera a la red. Con el corte en 300, según dónde caía el límite del segundo, entraba o no (§52).
     if (desde >= 420) medidas.push({ fps, trabajo });
     // una línea por segundo en la consola: así la prueba deja la "película" del ritmo del juego
     console.log(`[medidor] ${((ahora.t - t1) / 1000).toFixed(0)} s: cuadro ${ahora.c}, ${fps.toFixed(1)} fps, ` +
-                `trabajo ${trabajo.toFixed(2)} ms, disco ${lecturas} lecturas (red ${de.pedidosRed} pedidos ${(de.bytesRed / 1048576).toFixed(1)} MB, caché ${de.bloquesCache} bloques, esperó ${esperaDiscoSeg.toFixed(0)} ms; adelantados ${de.adelantados}, aprovechados ${de.aprovechados}), ` +
+                `trabajo ${trabajo.toFixed(2)} ms, disco ${lecturas} lecturas (red ${de.pedidosRed} pedidos ${(de.bytesRed / 1048576).toFixed(1)} MB, caché ${de.bloquesCache} bloques, esperó ${esperaDiscoSeg.toFixed(0)} ms; adelantados ${de.adelantados}, aprovechados ${de.aprovechados}, cola baja ${de.colaBaja ? de.colaBaja() : 0}), ` +
                 `fase ${window.mkwEstado.fase.e.toFixed(2)} ms (ajuste ${window.mkwEstado.fase.ajuste.toFixed(3)}, objetivo ${relojMonitor.objetivo(relojMonitor.p).toFixed(2)}), ` +
                 `sonido ${!es.contextos ? 'sin abrir' : es.activo ? `${db.toFixed(1)} dB` : 'bloqueado'} (bloques ${es.bloques}, en silencio ${es.bloquesSilencio}, huecos ${es.huecos}, ` +
                 `cola ${cola.toFixed(1)} ms, ritmo ${((ritmo - 1) * 100).toFixed(3)} %, tirados ${tirados}, ` +
@@ -601,6 +716,8 @@ async function arrancar() {
     const rangos = gruposBrsar(await disco.leer(url, tam, 0, largo), tam);
     disco.agrupar(url, rangos);
     nota(`${ruta.split('/').pop()}: ${rangos.length} grupos de sonido (cada uno se baja entero al tocarlo)`);
+    vocesCpuBrsar.push(...gruposConNombreBrsar(await disco.leer(url, tam, 0, largo), tam)
+      .filter(([nombre]) => /^GRP_VO_[A-Z0-9]+_(CAN_)?NPC$/.test(nombre)).map(([, ini, fin]) => [ruta, ini, fin]));
   })().catch(e => escribe('[mkw] tabla de grupos: ' + e.message));
   // Con el título en pantalla (cuadro 300), traer en segundo plano y con prioridad baja todos los archivos diminutos
   // (≤ 8 KB: 613 archivos, 1,5 MB): el juego los lee de a uno, un pedido por cuadro (los fantasmas del Contrarreloj,
@@ -643,22 +760,56 @@ window.mkwLecturas = () => [...lecturasVistas.values()];
 // orden en que el juego los fue necesitando; los que estén en Cache Storage (visitas siguientes) no van a la red.
 async function precalentarBloques(tamaños) {
   let semilla;
-  try { const r = await fetch('/build/bloques.json', { cache: 'no-store' }); if (!r.ok) return; semilla = await r.json(); }
+  try { const r = await fetch(ORIGEN + '/build/bloques.json', { cache: 'no-store' }); if (!r.ok) return; semilla = await r.json(); }
   catch { return; }
   const minimo = semilla.corridas >= 2 ? 2 : 1;          // con varias corridas, solo lo que se repite (no los CPU al azar)
   // solo lo que el juego necesitó por primera vez después del título (lo de antes ya lo bajó él al arrancar), y como
   // mucho 32 MB, en el orden en que los fue necesitando
-  const lista = (semilla.bloques || []).filter(([ruta, , cuadro, veces]) => veces >= minimo && cuadro >= 300 && tamaños.has(ruta))
-    .sort((a, b) => a[2] - b[2]);
+  const todos = (semilla.bloques || []).filter(([ruta, , cuadro]) => cuadro >= 300 && tamaños.has(ruta));
+  const lista = todos.filter(([, , , veces]) => veces >= minimo);
   let n = 0, bytes = 0;
-  for (const [ruta, b] of lista) {
-    const tam = tamaños.get(ruta);
-    const largo = Math.min(disco.bloque, tam - b * disco.bloque);   // el último bloque de un archivo es más corto
-    if (largo <= 0 || bytes + largo > 32 * 1048576) continue;
-    disco.adelantarBloques(direccion(ruta), tam, b, b);
-    n++; bytes += largo;
+  // Las voces de los corredores CPU (bloquesVocesCpu) van intercaladas donde el juego las necesita: en el cuadro en
+  // que las semillas vieron por primera vez una voz de CPU (la cuenta regresiva); si no hay dato, al final.
+  const VOZ = /\/Character\/Sound\/[^/]*_NPC\.|revo_kart\.brsar$/;
+  const cuadroVoces = Math.min(...todos.filter(([ruta, , , veces]) => veces < minimo && VOZ.test(ruta)).map(([, , c]) => c), Infinity);
+  const voces = parametros.get('voces') !== '0' ? bloquesVocesCpu(tamaños) : [];
+  const orden = [...lista.map(([ruta, b, cuadro]) => [ruta, b, cuadro, false]), ...voces.map(([ruta, b]) => [ruta, b, cuadroVoces, true])]
+    .sort((x, y) => x[2] - y[2]);
+  let nVoces = 0, bytesVoces = 0;
+  const pedidos = new Set();
+  // bloques seguidos del mismo archivo van en UN pedido (menos viajes a la red; la fila baja espera entre pedidos)
+  let tramo = null;
+  const cerrar = () => { if (tramo) disco.adelantarBloques(direccion(tramo.ruta), tamaños.get(tramo.ruta), tramo.b0, tramo.b1); tramo = null; };
+  for (const [ruta, b, , esVoz] of orden) {
+    if (pedidos.has(ruta + '|' + b)) continue;
+    const tam = tamaños.get(ruta), largo = Math.min(disco.bloque, tam - b * disco.bloque);   // el último es más corto
+    if (largo <= 0 || (!esVoz && bytes + largo > 32 * 1048576)) continue;
+    pedidos.add(ruta + '|' + b);
+    if (tramo && tramo.ruta === ruta && tramo.b1 === b - 1 && tramo.b1 - tramo.b0 < 7) tramo.b1 = b;
+    else { cerrar(); tramo = { ruta, b0: b, b1: b }; }
+    if (esVoz) { nVoces++; bytesVoces += largo; } else { n++; bytes += largo; }
   }
+  cerrar();
   nota(`semilla de bloques: ${n} bloques (${(bytes / 1048576).toFixed(1)} MB) pedidos con prioridad baja`);
+  if (voces.length) nota(`voces de los corredores CPU: ${nVoces} bloques (${(bytesVoces / 1048576).toFixed(1)} MB), ` +
+                         `intercaladas en el cuadro ${cuadroVoces === Infinity ? '(al final)' : cuadroVoces}`);
+}
+
+// Las voces de los corredores de la consola (CPU), §54. En cada carrera la consola elige corredores al azar, y en la
+// cuenta regresiva el juego lee la voz de cada uno: el comienzo de su grupo en revo_kart.brsar (GRP_VO_MR_NPC…) y,
+// para los personajes de Retro Rewind, su archivo en Character/Sound (…_NPC.brwsd/.brbnk). Son ~15 lecturas de a una,
+// ~60 ms cada una con la red del sitio: ~1 s de juego congelado al largar. La semilla de bloques no las tiene (cambian
+// en cada carrera; solo guarda lo que se repite), así que se piden todas con la semilla, con prioridad baja: los 42
+// grupos de voces de CPU enteros (56 bloques, 14 MB) y los archivos de voces de CPU de Retro Rewind enteros (174
+// archivos, 26,7 MB); solo en la 1.ª visita, después salen de la caché. ?voces=0: sin esto.
+const vocesCpuBrsar = [];                    // [ruta del brsar, inicio, fin del grupo], de la tabla de grupos (más abajo)
+function bloquesVocesCpu(tamaños) {
+  const salida = [];
+  for (const [ruta, ini, fin] of vocesCpuBrsar)          // el grupo entero (el juego lo lee en pedazos de 300–400 KB)
+    for (let b = Math.floor(ini / disco.bloque); b <= Math.floor((fin - 1) / disco.bloque); b++) salida.push([ruta, b]);
+  for (const [ruta, tam] of tamaños) if (/\/Character\/Sound\/[^/]*_NPC\./.test(ruta))   // el archivo entero (1 o 2 bloques)
+    for (let b = 0; b <= Math.floor((tam - 1) / disco.bloque); b++) salida.push([ruta, b]);
+  return salida;
 }
 
 // Arma el sistema de archivos del juego en la memoria (MEMFS) antes de su main().

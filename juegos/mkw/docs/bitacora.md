@@ -151,6 +151,18 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **`WriteBuffer` (`Queue::WriteBuffer`)** | La otra forma de llenar un búfer de la GPU: "copia estos N bytes a este búfer". Copia solo lo que se le pasa, en el orden de la cola de la GPU (después de lo ya enviado, antes de lo que se envíe luego). |
 | **Pegamento (glue) de Emscripten** | El JavaScript que Emscripten genera junto al `.wasm` (`mkw.js`) para todo lo que el wasm no puede hacer solo: hablar con WebGPU, leer el reloj, pedir archivos. Cada vez que el wasm lo llama hay un pequeño costo de "cruzar la frontera". |
 | **Traza del ritmo** | Una lista, con hora, de los momentos de cada cuadro: el juego entrega el cuadro (1), aurora vuelve (2), el juego se pone a esperar ('e') y se despierta ('w'). Con `?traza=1` la página la guarda; `guion.mjs --traza` la vuelca y `herramientas/tiempos-cuadro.mjs` la convierte en "cuánto trabajó cada parte en cada cuadro". Como un osciloscopio con varias puntas sobre el mismo ciclo. |
+| **Origen** | La "dirección de la casa" de una página: protocolo + nombre + puerto (`https://paginita-pro.cl`). Dos páginas del mismo origen se tratan como de confianza entre sí; de orígenes distintos, el navegador las separa y pide permisos (CORS). El sitio está en GitHub Pages y lo privado en el Worker: dos orígenes. |
+| **iframe (marco)** | Una página metida dentro de otra, como una ventana. La sección Juegos abre cada juego en un iframe a pantalla completa (`crearBt3Solo`); el juego corre en su propia página, con su propio hilo de JavaScript compartido con la página de afuera. |
+| **crossOriginIsolated / SharedArrayBuffer** | `SharedArrayBuffer` es memoria que varios hilos ven a la vez (lo que necesitan los hilos de WebAssembly). El navegador solo la da si la página está "aislada" (`crossOriginIsolated` = true), y para eso el servidor debe mandar COOP/COEP. GitHub Pages no las manda: la página del sitio NO está aislada. El juego no la necesita (un solo hilo + JSPI). |
+| **Caché HTTP** | Donde el navegador guarda lo que bajó, según lo que diga la cabecera `Cache-Control` del servidor: `no-store` = no guardar; `max-age=600` = sirve 10 minutos; `immutable` = no cambia nunca (para eso la dirección lleva una huella, `?v=…`, que cambia con cada versión). Como un banco de capacitores de reserva: si ya está cargado, no se pide de nuevo a la fuente. |
+| **Caché de código** | Chrome, además del archivo, guarda el **código de máquina ya compilado** del `.wasm` (si la respuesta era guardable). En la próxima visita no compila de nuevo. |
+| **instantiateStreaming** | La forma de cargar un `.wasm` que compila MIENTRAS se baja (no espera el archivo entero). Necesita la respuesta del servidor tal cual (no un "blob" armado por la página) y el tipo `application/wasm`. Emscripten la usa sola. |
+| **Content-Encoding (br / gzip)** | La cabecera con que el servidor dice "esto viaja comprimido": el navegador lo descomprime solo, por el camino. Brotli (`br`) comprime más que gzip. El `.wasm` se guarda ya comprimido (`mkw.wasm.br`, 16 MB en vez de 124). |
+| **Percentil (p95, p99)** | Ordenando todas las medidas de menor a mayor, el p95 es la que deja el 95 % por debajo. El promedio esconde los picos; el p99 dice "1 de cada 100 cuadros tarda esto o más". Como la tensión de rizado pico, no la media. |
+| **Frenar la CPU (throttling)** | Chrome puede hacer que el procesador ande N veces más lento (`Emulation.setCPUThrottlingRate`) para ver cómo se portaría en un PC o teléfono más débil. Perfiles: `cpu4` (4 veces) y `celular` (6 veces + pantalla de Pixel 7). |
+| **Actualización de la pantalla** | Una vez por refresco del monitor, el navegador corre los `requestAnimationFrame`, dibuja la página y le entrega la imagen al **compositor**. En ese momento "toma" el canvas del juego. Solo puede hacerlo cuando el hilo está libre: si el juego tiene el hilo, la actualización se **atrasa**. |
+| **Compás de la toma** | La regla de §54 para que cada cuadro del juego se vea el mismo tiempo: a 240 Hz, la textura del canvas se toma recién después de la actualización del refresco "toma anterior + 3", así la del + 4 se la lleva. Como un tren de pulsos sincronizado con un reloj, en vez de disparado por cada evento. |
+| **Cola de prioridad baja** | La fila de bajadas "por si acaso" (la semilla de bloques, las voces de los CPU): avanza solo cuando el juego no está esperando nada, un pedido cada 15 ms como mucho, para no quitarle red a lo urgente. |
 | **Bucle de eventos (event loop)** | El ciclo del navegador: atiende un aviso (un clic, un temporizador, la respuesta de la red, la GPU), luego otro… Si un programa no le devuelve el control, el ciclo se para y la página se congela. |
 | **Ceder el control (yield)** | Que el programa diga "sigo después" y deje correr al bucle de eventos. Con JSPI el juego se pausa en medio de una función y continúa donde estaba cuando llega lo que esperaba. |
 | **MEMFS** | El sistema de archivos de mentira de Emscripten, guardado en la memoria (RAM) de la página: carpetas y archivos que el juego abre como si fueran del disco. Se borra al cerrar la página. |
@@ -2246,3 +2258,157 @@ solo cuadro), no CPU.
 
 Herramientas nuevas: `guion.mjs --traza`, `herramientas/tiempos-cuadro.mjs`, `herramientas/medir-cpu.sh`, funciones
 sin nombre del perfil con su línea y columna. Parámetro nuevo: `?staging=mapeo`.
+
+### 54. Medir como en la página real, el tirón en carrera y la carga · 04:10–06:30
+
+**El pedido.** Llevar el rendimiento al máximo **en las mismas condiciones que tendrá en paginita-pro.cl**, no en el
+servidor cómodo de pruebas: medir primero con un script repetible, después optimizar de a un cambio, medido antes y
+después, y dejar un parámetro que vuelva al camino viejo. Además, el dueño jugó y notó **tirones en carrera**, sobre
+todo al tomar booster pads.
+
+**1. El sitio en esta PC (`herramientas/sitio-local.mjs`).** Dos servidores, los dos solo en 127.0.0.1:
+
+- **"GitHub Pages"** (puerto 8150): los archivos del repo del sitio (`terceros/Paginita-Pro`, rama
+  `claude/loving-planck-9k2yam`) servidos como los da Pages: solo archivos, gzip, `Cache-Control: max-age=600`, ETag y
+  **sin COOP/COEP**. La página no queda aislada (`crossOriginIsolated` = false, sin `SharedArrayBuffer`): el juego
+  corre igual porque usa un solo hilo + JSPI, como BT3. Nuestra página va en `/juegos/mkw/`.
+- **"El Worker"** (puerto 8151): lo privado (programa, manifiesto, disco y Retro Rewind) desde **otro origen**, con
+  CORS solo para el origen del sitio y 50 ms de latencia en cada pedido (la red hasta R2). La página lo pide con
+  `?privado=http://127.0.0.1:8151`.
+- **Dentro de Juegos**: `http://127.0.0.1:8150/juegos.html?mkw=1` abre la página de Juegos de verdad (Firebase,
+  mando.js, volumen.js e i18n.js corriendo) en la ruta de BT3 solo (`#solo/bt3`) y pone el marco del juego en
+  `#pantalla` como `crearBt3Solo`: `<iframe class="jg-bt3-solo" allow="fullscreen; gamepad">` con `html.jg-bt3solo`.
+  Eso lo agrega solo este servidor de pruebas.
+
+**2. Medir (`herramientas/medir-sitio.mjs`).** Abre Chrome de verdad (el instalado, con la tarjeta NVIDIA, sin
+sonido), entra a Juegos, maneja los menús con teclas contando **cuadros del juego** (no milisegundos: así llega igual
+aunque la CPU esté frenada) y, ya en la carrera, mantiene acelerar 20 s (`--items`: usa un ítem cada 2 s; un hongo da
+el mismo empujón que un booster pad). Reporta:
+- tiempo hasta el primer cuadro y hasta la carrera; fps de la carrera;
+- **CPU por cuadro** (juego + aurora, de la traza del ritmo): promedio, p95, p99, máximo y cuántos pasan de 16,7 ms;
+- **ritmo en pantalla**: lo que de verdad llega al monitor (Chrome anota cada imagen, `Display::FrameDisplayed`):
+  cuántas duran 4 refrescos (a 240 Hz) y "a compás" (ver abajo);
+- GPU por cuadro (con `?gpu=1`), hilo principal ocupado (%), memoria del wasm, MB bajados por origen y desde la
+  caché HTTP, carga del programa (bajada, compilación);
+- desglose de cada tirón (juego / aurora / espera del runtime / disco).
+
+Perfiles: `pc`, `cpu4` (CPU 4 veces más lenta) y `celular` (Pixel 7 emulado + CPU 6 veces más lenta). Opciones:
+`--visitas 2` (la 2.ª con caché), `--red 50` (50 Mbit/s), `--perfilar`, `--trazaChrome`, `--extra "&param=…"`.
+Todo queda en `build/web/datos/medir-sitio/`.
+
+Trampa de la medida: la pantalla también muestra **imágenes de más** que no son cuadros del juego (cuando cambia un
+texto de la página, p. ej. el medidor de fps cada segundo, el compositor dibuja una imagen extra: 2+2 refrescos en vez
+de 4). La imagen del juego no cambia ni se corre; el ojo no lo ve. La cifra "a compás" junta esos huecos.
+
+**3. El tirón en carrera: la toma del canvas.** La traza mostró que el juego entrega sus cuadros parejos (98 %
+cada 4 refrescos), pero el navegador los **tomaba** disparejos: 80 % con 4 refrescos, el resto 3 y 5. Tres causas,
+tres arreglos (en `aurora.cpp` y `mkw.mjs`):
+
+| Causa | Arreglo | Volver al camino viejo |
+|---|---|---|
+| La pausa de presentar de aurora no cedía si faltaban menos de 2 ms: el navegador tomaba el canvas tarde | siempre cede, y vuelve apenas el navegador hizo su actualización de la pantalla (`mkwEsperaToma`) | `?esperaToma=0` |
+| Una actualización de la pantalla **atrasada** (pasó un refresco mientras el juego tenía el hilo) se llevaba el cuadro nuevo un refresco antes | antes de tomar la textura del canvas, aurora deja correr esa actualización (`mkwTomaAtrasada`/`mkwEsperaAtrasada`) | `?atrasada=0` |
+| El momento de entrega varía ±1,5 ms alrededor de un refresco: a veces cae antes, a veces después | **compás**: el cuadro se toma en el refresco "toma anterior + 4"; si el juego entrega antes, espera; si entrega tarde, se toma apenas se pueda y el compás se rearma | `?compas=0` |
+
+Resultado en las **tomas** (traza del ritmo, 1900 cuadros): de 83 % a **98,6 %** cada 4 refrescos. En **pantalla**
+la mejora es menor y la medida varía entre corridas: con el compás, 95,0 % y 95,1 % a compás (dos corridas); con el
+camino viejo, 97,6 % y 90,8 %. El compás quedó porque es estable. La CPU por cuadro bajó de 9,4 a 7,5–8,5 ms (aurora
+ya no duerme pasado el momento de la toma). Lo que queda disparejo en pantalla (~5 %) ocurre después de la toma, en
+el compositor de Chrome.
+
+Probado y descartado: dejar 2,5 ms de margen entre la entrega y el refresco de la toma (69–74 % a compás contra
+95 %). Se sacó del código.
+
+**4. El tirón de la largada: las voces de los corredores CPU.** Con `?trazaDisco=1` la página ahora anota cada
+lectura que espera y **dónde estaba** su bloque (memoria, en camino, en la cola de prioridad baja, en Cache Storage).
+Al empezar la cuenta regresiva el juego lee la voz de cada corredor de la consola, de a una: el comienzo de su grupo
+en `revo_kart.brsar` (`GRP_VO_MR_NPC`…) y, para los personajes de Retro Rewind, su archivo en `Character/Sound`.
+Son ~15 lecturas × ~60 ms de red = **~1 s de juego congelado**. La semilla de bloques no las tiene porque cambian en
+cada carrera (los CPU son al azar).
+
+- `brsar.mjs` ahora lee también los **nombres** de los grupos (la sección SYMB del formato público BRSAR, Tockdom), y
+  la página pide con prioridad baja, intercalados en la semilla donde el juego los necesita, los 42 grupos de voces
+  de CPU enteros (14 MB) y los 174 archivos de voces de CPU de Retro Rewind (26,7 MB). Solo en la 1.ª visita; después
+  salen de la caché. `?voces=0` lo apaga.
+- Arreglo en `disco.mjs`: cada bloque de un pedido ahora se entrega **apenas está**. Antes un bloque que ya estaba en
+  Cache Storage esperaba a que otro bloque del mismo pedido llegara de la red (60 ms).
+- La cola de prioridad baja espera 15 ms entre pedidos (eran 40) y junta bloques seguidos en un pedido: termina a
+  los 23 s de juego en vez de 57 (la carrera empieza a los ~69 s).
+
+Resultado: la espera de disco en la largada bajó de ~1000 ms a **~60 ms** (una sola lectura: la voz del personaje
+del jugador). En la 2.ª visita no hay tirones.
+
+**5. La carga del programa.**
+- **Comprimido**: `mkw.wasm` (124,3 MB) se guarda también como `mkw.wasm.br` (brotli 11, **16,1 MB**) y
+  `mkw.wasm.gz` (gzip 9, 28,6 MB) con `node herramientas/comprimir-build.mjs` (2,5 min). El Worker entrega el
+  comprimido con `Content-Encoding: br`, y el navegador lo descomprime mientras compila. Así **ningún archivo
+  guardado pasa de 100 MB**.
+- **Con huella y guardable**: el manifiesto trae la cabecera `X-Mkw-Build` (huella de `mkw.js` + `mkw.wasm`). La
+  página pide `mkw.js?v=huella` y `mkw.wasm?v=huella`, y el Worker los da con
+  `Cache-Control: public, max-age=31536000, immutable`, como BT3. La 2.ª visita no los baja (caché HTTP) ni los
+  compila (caché de código de Chrome). Las piezas del disco siguen con `no-store` (van a Cache Storage).
+  `?huella=0` vuelve a pedirlos sin huella.
+- **Compilar**: Emscripten usa `instantiateStreaming` sobre la respuesta del servidor (nunca un blob). El programa
+  queda listo **0,1 s** después de llegar el último byte (en el perfil cpu4, 0,45 s).
+- **Final**: `python herramientas/compilar-web.py --modo navegador --final` enlaza sin `--profiling-funcs` (los nombres
+  de las funciones: 2,7 MB que solo sirven para perfilar) y comprime al terminar.
+
+Primera y segunda visita (`--visitas 2 --red 50`, 50 Mbit/s, latencia 50 ms):
+
+| | 1.ª visita | 2.ª visita |
+|---|---|---|
+| Programa por la red | 16,1 MB en 3,2 s (antes: 124,3 MB, ~20 s a 50 Mbit/s) | 0 (caché HTTP) |
+| Primer cuadro | 7,9 s | **2,3 s** |
+| Hasta la carrera (con los menús a teclazos) | 80,9 s | 66,6 s |
+| Bajado del Worker | 210 MB | 4,6 MB |
+| Tirones en la carrera | 3 (largada) | **0** |
+
+**6. Base en los 3 perfiles** (`node herramientas/medir-sitio.mjs --perfil P --etiqueta base54 --items`, 1.ª
+visita, dentro de Juegos, latencia 50 ms):
+
+| | **PC** (×1) | **cpu4** (CPU ×4) | **celular** (Pixel 7, CPU ×6) | PC al empezar §54 |
+|---|---|---|---|---|
+| fps en la carrera | **60,0** | 17,7 | 4,0 | 60 |
+| CPU por cuadro: promedio / p95 / p99 | **7,97 / 10,7 / 12,0 ms** | 56,3 / 82,9 / 104,7 ms | 248 / 328 / 364 ms | 8,94 / 10,2 / 11,2 ms |
+| Cuadros > 16,7 ms | 1 de 1983 | todos | todos | 0 |
+| Tirones en pantalla (imagen > 1,5 cuadros) | **0** | — | — | 4–7 (largada) |
+| Hilo principal ocupado | 44 % | 99 % | 100 % | 41 % |
+| GPU por cuadro (envío → terminado) | 5,1 ms | (lo frena la CPU) | (lo frena la CPU) | 3,0 ms |
+| Memoria del wasm | 512 MB | 512 MB | 512 MB | 512 MB |
+| Primer cuadro | 2,9 s | 5,4 s | 7,7 s | ~3 s |
+| Programa listo después del último byte | 0,10 s | 0,45 s | 0,70 s | — |
+| Bajado del Worker | 206 MB (programa 16) | 224 MB | 225 MB | 284 MB (programa 124) |
+
+Cómo leerla:
+- **En el PC el juego va sobrado**: 8 ms de 16,7, y la carrera ya no tiene tirones grandes.
+- **Con la CPU frenada no escala parejo.** Frenada 4 veces, el juego gasta 7 veces más por cuadro; frenada 6
+  veces, 30 veces más. El perfil de la carrera frenada es el mismo de siempre (juego traducido, sonido, aurora), sin
+  nada raro. El freno de Chrome suspende el hilo a pedazos, y un programa que recorre mucha memoria (124 MB de
+  código, 512 MB de memoria) pierde sus cachés en cada pausa. Es una cota pesimista, no la medida de un teléfono: el
+  número real de un celular hay que medirlo en uno. Lo que sí dice: en equipos débiles el límite es la CPU del juego
+  traducido, no la carga ni la GPU. Esa es la palanca que sigue.
+
+Probado y descartado: pasar el programa por `wasm-opt -O3` (el optimizador de WebAssembly, además del `-O2` que ya
+usa Emscripten al enlazar). Tarda 1 minuto y achica solo 2,4 % (130,4 → 127,2 MB); la CPU por cuadro en la carrera
+quedó igual (8,17 contra 8,22 ms, dentro del ruido). No se usa.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Navegador (`prueba-navegador.mjs 900`) | **21/0** (cuadros parejos en pantalla 95,6 %) |
+| Partidas (`prueba-partidas.mjs`) | **6/0** |
+| Celular (`prueba-tactil.mjs`, Pixel 7 emulado) | **16/0** |
+| Dentro de Juegos, como la página | `crossOriginIsolated` false, sin `SharedArrayBuffer`, juego a 60 fps |
+| Imagen | foto de la carrera igual que antes (HUD, karts, mapa, posición) |
+| Parche | `aurora-web.diff` regenerado, `git apply --check -R` limpio |
+
+Herramientas nuevas: `herramientas/sitio-local.mjs`, `herramientas/medir-sitio.mjs`, `herramientas/comprimir-build.mjs`,
+`herramientas/analizar-chrome.mjs` (qué tan ocupado está cada hilo en una traza de Chrome), `herramientas/subir-kit.sh`
+(copia solo lo propio a `juegos/mkw/` del sitio) y `compilar-web.py --final`. Parámetros nuevos de la página:
+`?privado=ORIGEN`, `?esperaToma=0`, `?atrasada=0`, `?compas=0`, `?huella=0`, `?voces=0`, `?gpu=1`. Del servidor:
+`MKW_CORS=ORIGEN`, cabeceras `X-Mkw-Build` y `Timing-Allow-Origin`, `mkw.wasm.br` con `Content-Encoding: br`.
+
+**Para el Worker de verdad** (lo publica el dueño): entregar `mkw.js`/`mkw.wasm` con `?v=` como guardables para
+siempre (`immutable`) y el `.wasm` desde el objeto `mkw.wasm.br` de R2 con `Content-Encoding: br`; el manifiesto con
+`X-Mkw-Build` (la huella que sube el script junto con los archivos) y `Access-Control-Expose-Headers` que la incluya.

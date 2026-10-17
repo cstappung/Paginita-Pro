@@ -27,6 +27,13 @@ import crypto from 'node:crypto';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PUERTO = Number(process.argv[2]) || 8140;
 const LATENCIA = Number(process.env.MKW_LATENCIA) || 0;   // ms extra por pedido a /mkw/ (simular la red del sitio)
+// MKW_CORS=http://127.0.0.1:8150: este servidor hace de "Worker de amigos" para una página de OTRO origen (el sitio
+// local de herramientas/sitio-local.mjs), como será en paginita-pro.cl: la página en GitHub Pages y lo privado (juego
+// y disco) en el Worker. Solo ese origen puede leer las respuestas (CORS: el permiso que da un servidor para que una
+// página de otro sitio lea lo que responde); sin la variable, nadie de afuera. La latencia cuenta entonces para todo
+// lo privado (/build/, /manifiesto.json, /mkw/, /wc/), no solo para el disco.
+const CORS = process.env.MKW_CORS || '';
+const PRIVADO = /^\/(build|mkw|wc)\/|^\/manifiesto\.json$/;
 
 // prefijo de la dirección → carpeta real en el PC
 const CARPETAS = [
@@ -71,13 +78,49 @@ for (const [prefijo, carpeta] of CARPETAS.slice(0, 4)) { huella.update(prefijo);
 const manifiestoJson = JSON.stringify(manifiesto);
 const VERSION = huella.digest('hex').slice(0, 16);
 console.log('versión de los archivos: ' + VERSION);
+
+// El PROGRAMA (mkw.js + mkw.wasm, ~130 MB) va como en BT3: con la dirección "versionada" (?v=huella) y guardable para
+// siempre en la caché HTTP del navegador (Cache-Control: immutable). Así la 2.ª visita no lo baja de nuevo, y Chrome
+// además guarda el código de máquina ya compilado del .wasm (su "caché de código", que solo funciona si la respuesta
+// es guardable): no lo vuelve a compilar. La huella cambia con cada compilación (tamaño y fecha de los dos archivos),
+// y viaja en la cabecera X-Mkw-Build del manifiesto. Sin ?v= (o con una huella vieja) va sin caché, como antes.
+// En el sitio, el Worker hace lo mismo con los objetos de R2 (bitácora §54).
+const carpetaBuild = CARPETAS.find(([p]) => p === '/build/')[1];
+const huellaBuild = () => {
+  const h = crypto.createHash('sha1');
+  for (const f of ['mkw.js', 'mkw.wasm']) { try { const st = fs.statSync(path.join(carpetaBuild, f)); h.update(`${f}|${st.size}|${st.mtimeMs};`); } catch {} }
+  return h.digest('hex').slice(0, 16);
+};
+// Comprimido: el .wasm se guarda y se entrega YA comprimido (mkw.wasm.br, hecho por herramientas/comprimir-build.mjs):
+// pesa ~4 veces menos (ningún archivo de más de 100 MB, y se baja más rápido); el navegador lo descomprime solo
+// mientras lo compila (Content-Encoding: br). Si no existe (o es más viejo que el .wasm), va sin comprimir.
+const comprimido = (archivo, aceptadas) => {
+  for (const [ext, nombre] of [['.br', 'br'], ['.gz', 'gzip']]) {
+    if (!aceptadas.split(',').some(x => x.split(';')[0].trim() === nombre)) continue;   // "gzip, deflate, br, zstd"
+    try { if (fs.statSync(archivo + ext).mtimeMs >= fs.statSync(archivo).mtimeMs) return [archivo + ext, nombre]; } catch {}
+  }
+  return null;
+};
 console.log(Object.entries(manifiesto).map(([p, l]) => `${p}: ${l.length} archivos`).join('\n'));
 
 http.createServer((pedido, respuesta) => {
   const url = decodeURIComponent(pedido.url.split('?')[0]);
+  if (CORS) {
+    respuesta.setHeader('Access-Control-Allow-Origin', CORS);
+    respuesta.setHeader('Vary', 'Origin');
+    respuesta.setHeader('Timing-Allow-Origin', CORS);   // que la página pueda ver los tiempos y tamaños (medir-sitio)
+    respuesta.setHeader('Access-Control-Expose-Headers', 'X-Mkw-Version, X-Mkw-Build, Content-Range, Content-Length');
+    if (pedido.method === 'OPTIONS') {           // la "pregunta previa" del navegador antes de un pedido con Range
+      respuesta.writeHead(204, { 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Range', 'Access-Control-Max-Age': '600' });
+      return respuesta.end();
+    }
+  }
   if (url === '/manifiesto.json') {
-    respuesta.writeHead(200, { 'Content-Type': TIPOS['.json'], 'Cache-Control': 'no-store', 'X-Mkw-Version': VERSION });
-    return respuesta.end(manifiestoJson);
+    return setTimeout(() => {
+      respuesta.writeHead(200, { 'Content-Type': TIPOS['.json'], 'Cache-Control': 'no-store', 'X-Mkw-Version': VERSION,
+                                 'X-Mkw-Build': huellaBuild() });
+      respuesta.end(manifiestoJson);
+    }, CORS ? LATENCIA : 0);
   }
   const par = CARPETAS.find(([prefijo]) => url.startsWith(prefijo));
   let archivo = path.normalize(path.join(par[1], url.slice(par[0].length)));
@@ -85,7 +128,7 @@ http.createServer((pedido, respuesta) => {
   if (url.endsWith('/')) archivo = path.join(archivo, 'index.html');
   // MKW_LATENCIA=50: cada pedido de los archivos del juego (/mkw/) tarda 50 ms más en empezar, como la red hasta R2
   // en el sitio (aquí, en la misma PC, tarda ~1 ms). Sirve para medir lo que espera el juego de verdad (bitácora §52).
-  const demora = url.startsWith('/mkw/') ? LATENCIA : 0;
+  const demora = (CORS ? PRIVADO.test(url) : url.startsWith('/mkw/')) ? LATENCIA : 0;
   setTimeout(() => fs.stat(archivo, (error, info) => {
     if (error || !info.isFile()) { respuesta.writeHead(404); return respuesta.end('no existe: ' + url); }
     const cabeceras = {
@@ -95,6 +138,16 @@ http.createServer((pedido, respuesta) => {
       // guarda la página en su propia caché (disco.mjs), así no quedan guardados dos veces (igual que el Worker de BT3)
       'Cache-Control': 'no-store',
     };
+    // el programa con su huella vigente: guardable para siempre (ver huellaBuild)
+    const programa = /^\/build\/mkw\.(js|wasm)$/.test(url);
+    const v = new URLSearchParams(pedido.url.split('?')[1] || '').get('v');
+    if (programa && v && v === huellaBuild()) cabeceras['Cache-Control'] = 'public, max-age=31536000, immutable';
+    const yaComprimido = programa && !pedido.headers.range ? comprimido(archivo, pedido.headers['accept-encoding'] || '') : null;
+    if (yaComprimido) {
+      const [otro, codificacion] = yaComprimido, largo = fs.statSync(otro).size;
+      respuesta.writeHead(200, { ...cabeceras, 'Content-Encoding': codificacion, 'Content-Length': largo, 'Vary': 'Accept-Encoding' + (CORS ? ', Origin' : '') });
+      return pedido.method === 'HEAD' ? respuesta.end() : fs.createReadStream(otro).pipe(respuesta);
+    }
     const rango = /^bytes=(\d+)-(\d*)$/.exec(pedido.headers.range || '');
     if (rango) {                                    // solo un pedazo: 206 "contenido parcial"
       const inicio = Number(rango[1]);

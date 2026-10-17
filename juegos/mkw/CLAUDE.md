@@ -63,4 +63,12 @@ la primera vez). Partidas: `node web/navegador/prueba-partidas.mjs` (6 puntos). 
 cabecera; `P:ms` = perfil, `R` = recargar, `K~ms` = mantener; `--semilla` = guarda la semilla de pipelines
 (`pipelines.bin`) y suma la de bloques (`bloques.json`, correrlo 3 veces) en `build/web/navegador/`: van con el `.wasm`,
 nunca a git). CPU por cuadro en la carrera: `bash herramientas/medir-cpu.sh <etiqueta> ["&param=valor"]` (traza del
-ritmo + `herramientas/tiempos-cuadro.mjs`). **Las pruebas en Chrome van sin sonido** (`--mute-audio`): el dueño lo pidió.
+ritmo + `herramientas/tiempos-cuadro.mjs`). **Como en la página real** (§54): `node herramientas/sitio-local.mjs` →
+http://127.0.0.1:8150/juegos.html?mkw=1 (el sitio de `terceros/Paginita-Pro` servido como GitHub Pages, sin COOP/COEP, y
+el juego en el marco de Juegos; lo privado desde un "Worker" en 8151 con CORS y 50 ms de latencia; la página lo pide con
+`?privado=ORIGEN`). Medir ahí: `node herramientas/medir-sitio.mjs --perfil pc|cpu4|celular --etiqueta X [--items]
+[--visitas 2] [--red 50] [--extra "&param=…"]` (CPU por cuadro, ritmo en pantalla, GPU, hilo ocupado, heap, MB bajados →
+`build/web/datos/medir-sitio/`). Programa para publicar: `python herramientas/compilar-web.py --modo navegador --final`
+(sin nombres de funciones + `mkw.wasm.br`, 16 MB; o `node herramientas/comprimir-build.mjs`). Caminos viejos para
+comparar: `?esperaToma=0`, `?atrasada=0`, `?compas=0`, `?huella=0`, `?voces=0`, `?staging=mapeo`.
+**Las pruebas en Chrome van sin sonido** (`--mute-audio`): el dueño lo pidió.
