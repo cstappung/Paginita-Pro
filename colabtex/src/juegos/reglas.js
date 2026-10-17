@@ -1164,6 +1164,28 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
+     con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
+  protiles: {
+    lema: "PRO TILES: toca las fichas negras al ritmo de ocho canciones pop originales que nunca terminan. Un error y se acaba.",
+    secciones: [
+      ["Cómo se juega", "La pantalla tiene <b>cuatro carriles</b> y las fichas negras bajan por ellos. Tócalas en orden, de abajo hacia arriba: cada ficha es una nota de la melodía y suena con piano de cola. La primera, en coral, empieza la canción."],
+      ["Lo que termina la partida", lista([
+        "Que una ficha negra se escape por abajo sin tocarla.",
+        "Tocar un carril donde no hay ficha (con el dedo, tocar una ficha ya tocada o una de más arriba no cuenta como error)."
+      ])],
+      ["Fichas largas", "Las fichas largas (con un punto coral) se <b>mantienen</b>: con el teclado, hasta que pasan enteras; con el dedo, hasta la altura donde las tocaste. Si la completas (al menos un 80 %), suma un bono: +1 por una de 3 corcheas, +2 por una de 4, +4 por una de 6."],
+      ["Puntos y estrellas", "Cada nota suma 1, más el bono de las largas. Con 100, 250 y 450 puntos ganas tres estrellas; con 700, 1 000 y 1 400, tres coronas; con 2 000, el <b>mundo</b>. La pantalla acelera sin parar, así que cada punto cuesta más que el anterior."],
+      ["Canciones", "Ocho canciones originales, de la balada (<b>Cristal</b>, fácil) al EDM (<b>Despegue</b>, experto). Cada una empieza por su estribillo y después se sigue componiendo sola, igual para todos: estrofa, pre, estribillo y puente, y cada tanto el estribillo sube un tono. La <b>mezcla infinita</b> las encadena las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
+      ["Controles", lista([
+        "Táctil o ratón: toca las fichas.",
+        "Teclado: D, F, J y K son los cuatro carriles. Esc o P pausa; tras la pausa hay una cuenta de 3.",
+        "En el menú, 1 a 8 eligen canción.",
+        "Mando: ← y ↓ de la cruceta, A y B son los cuatro carriles; Start pausa."
+      ])],
+      ["Clasificación", "Hay <b>un top por canción</b> y otro para la <b>mezcla</b> de las ocho: nueve tablas, por puntos (a igualdad, la partida más corta). Cada partida se rehace nota por nota con su semilla antes de guardarse, así que solo cuenta lo que de verdad se tocó."]
+    ]
+  },
   /* Pokelike (juegos/club/pokelike/): lo que dice aquí tiene que coincidir
      con motor.js (mapa, combate, Liga, Ruta Infinita, puntaje) y juego.js. */
   pokelike: {
@@ -1371,7 +1393,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

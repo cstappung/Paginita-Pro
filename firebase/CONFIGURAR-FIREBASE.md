@@ -216,6 +216,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > Hasta volver a publicar las reglas se juega igual, pero las partidas no
 > entran en la clasificación y no pagan monedas.
 
+> **PRO TILES (octubre de 2026):** nueve categorías nuevas de `soloRanks`
+> y `soloPruebas`, `club-protiles-(cristal|medianoche|calle|verano|neon|
+> latido|estrellas|despegue|mezcla)` (una por canción y la mezcla, puntos con
+> tope de 1 000 000), y `protiles` un juego nuevo de `clubJugadas`. Hasta
+> volver a publicar las reglas se juega igual, pero las partidas no entran en
+> la clasificación y no pagan monedas.
+
 > **Pokelike (octubre de 2026):** `club-pokelike-puntos` (el puntaje de la
 > run, con tope de 1 000 000) y `club-pokelike-pokedex` (especies distintas
 > atrapadas en la run) son categorías nuevas de `soloRanks` y `soloPruebas`,

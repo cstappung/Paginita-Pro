@@ -261,6 +261,22 @@ function trigon() {
     chispas([[66, 50, 2, 1.7, 0], [66, 230, 1.8, 2.1, -.8]], "#fff3b0"); // dos destellos sueltos
 }
 
+/* PRO TILES: un teclado de piano hecho anillo (teclas blancas con sus
+   negras encima) que gira despacio, una ficha negra con su borde coral que
+   late arriba y dos notas que destellan. */
+function protiles() {
+  // 36 blancas tocándose en el radio 61; la negra va entre una y la siguiente,
+  // salvo después de la 3.ª y la 7.ª de cada octava (mi–fa y si–do).
+  const blanca = `<rect x="-5.3" y="-8" width="10.6" height="16" rx="1.2" fill="#faf7f1" stroke="#141414" stroke-width=".7"/>`;
+  const negra = `<rect x="2.6" y="-8" width="5.4" height="9" rx="1" fill="#141414"/>`;
+  const teclas = cada(36, (i, a) => en(61, a, blanca + (i % 7 === 2 || i % 7 === 6 ? "" : negra), a));
+  const ficha = `<rect x="-6" y="-9" width="12" height="18" rx="2.5" fill="#141414" stroke="#ff5a36" stroke-width="1.6"/><circle cy="4" r="2" fill="#ff5a36"/>`;
+  const nota = c => `<path d="M1.5-5V2.2A2.4 2 0 1 1 .2 .5V-6.2L5-7.4V-5.3Z" fill="${c}"/>`;
+  return gira(34, teclas) +
+    en(61, 0, an("l", 1.3, ficha)) +
+    en(67, 125, an("t", 1.8, nota("#ff5a36"))) + en(67, 235, an("t", 2.2, nota("#e7a21b"), -.9));
+}
+
 /* PRO HERO: la autopista hecha anillo — las cinco notas de los trastes
    (verde, rojo, amarillo, azul, naranja) dando la vuelta, una púa dorada
    que late arriba y dos estrellas, una dorada y una azul, que destellan. */
@@ -630,7 +646,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
-  tmetrorush: metrorush, ttrigon: trigon, thero: hero,
+  tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero,
   cometa, vortice, sakura, plasma, mariposas
 };
 

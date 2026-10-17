@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, tulones, hero} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -207,6 +207,12 @@ export const EJEMPLOS={
  e('tablas','Puntos y clasificación',
   p('Dos tablas','La tabla Puntos guarda la suma de todas las juntadas de la partida. La tabla Ficha guarda la ficha más alta a la que llegaste, y a igualdad gana quien llegó antes.',fichas('Una partida',['2048','oro','FICHA'],['20 312','verde','PUNTOS'],['4:12','azul','TIEMPO'])),
   p('Se puede seguir','Llegar al 2048 no termina la partida: puedes seguir hacia el 4096 y más allá. Cada partida se rehace jugada por jugada con su semilla antes de guardarse.',fichas('Más allá',['2048','oro','LOGRADO'],['4096','rojo','SIGUIENTE'],['8192','violeta','LEYENDA'])))],
+ protiles:[e('fichas','Tocar las fichas en orden',
+  p('Empieza','La primera ficha está en coral: tócala y la canción arranca. Desde ahí bajan las negras, una por nota de la melodía.',protiles(0)),
+  p('Toca la de más abajo','Siempre se toca la ficha negra más baja. Si la dejas escapar por el borde, o tocas un carril vacío, la partida termina.',protiles(1))),
+ e('largas','Las fichas largas',
+  p('Mantén','Una ficha larga, con su punto coral, se mantiene apretada mientras baja. La barra coral muestra cuánto falta.',protiles(2)),
+  p('El bono','Si la completas suma su bono: +1, +2 o +4 según lo larga que sea. Soltarla antes no termina la partida, pero no da el bono.',protiles(3)))],
  trigon:[e('linea','Cerrar y borrar una línea',
   p('Busca el hueco','A esta línea horizontal le falta un solo triángulo. Mientras arrastras una pieza, su sombra muestra dónde caería y la línea que cerraría se ilumina.',trigon(0)),
   p('Suelta la pieza','La pieza encaja en el hueco y la línea queda llena de borde a borde. Si la pieza llena varias líneas a la vez, se borran todas juntas.',trigon(1)),
