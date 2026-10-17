@@ -210,10 +210,10 @@ cambia('</style>', '''  body.started .i18n-flota { display: none; }
   body.coarse #mando:not(.ok) { display: none; }
   /* el tamaño y la opacidad de los controles (🎮, pagina.js): todo el pad está medido en --u, así que escalar --u
      agranda los botones y su distancia a los bordes juntos */
-  /* (con tope: más grande, la cruceta se monta sobre el stick en horizontal desde 115 %, y el stick sobre □ en
-     vertical desde 130 %; medido en el banco, prueba53) */
-  @media (orientation: landscape) { #pad { --u: calc(var(--vh, 1vh) * min(var(--esc, 1), 1.1)); } }
-  @media (orientation: portrait) { #pad { --u: calc(var(--vw, 1vw) * .62 * min(var(--esc, 1), 1.2)); } }
+  /* (con tope en 100 %: la disposición por defecto ya es la grande, y más allá la cruceta toca el stick en
+     horizontal y ✕ toca START en vertical — banco, choques.cjs. Para agrandar uno solo: ✏️ en el panel 🎮) */
+  @media (orientation: landscape) { #pad { --u: calc(var(--vh, 1vh) * min(var(--esc, 1), 1)); } }
+  @media (orientation: portrait) { #pad { --u: calc(var(--vw, 1vw) * .62 * min(var(--esc, 1), 1)); } }
   #pad { opacity: var(--opa, 1); }
   /* ☰ (la barra a la vista), ⛶ y 🎮 solo en el celular */
   #menuTactil, #activaSonido { display: none; }
