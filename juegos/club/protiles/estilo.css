@@ -1,0 +1,207 @@
+/* PRO TILES — la caja del juego (.pt) es el original con sus variables
+   renombradas (--pt-*): conexion.css redefine --ink, --paper y --line en
+   html.club-integrado y en su modo oscuro, y con los nombres de siempre el
+   juego se habría teñido. Todo lo que era position:fixed ahora es absoluto
+   dentro de la caja, porque la página vive dentro de un iframe que mide su
+   propio alto. */
+
+/* ---------- Página ---------- */
+body{margin:0;background:#EEE8DD;color:#141414;font-family:'Inter',system-ui,sans-serif}
+.shell{max-width:1120px;margin:0 auto;padding:18px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+main{min-width:0}
+.cab{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 10px;color:var(--ink,#141414)}
+.logo{display:flex;align-items:center;gap:10px;margin:0;font:800 26px 'Sora',system-ui,sans-serif;letter-spacing:-.5px}
+.logo .mark,.brand .mark{display:flex;gap:2px;height:22px;align-items:flex-end}
+.logo .mark i{width:5px;border-radius:1.5px;background:currentColor}
+.logo .mark i:nth-child(1){height:14px}.logo .mark i:nth-child(2){height:22px}.logo .mark i:nth-child(3){height:10px;background:#FF5A36}.logo .mark i:nth-child(4){height:18px}
+.lema{margin:0;color:var(--muted,#8C857A);font-size:14px}
+.scorebar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 14px;margin:0 0 12px;border-radius:14px;background:#fff;border:1px solid var(--line,#E4DCCF)}
+.dato small{display:block;font:700 10px 'Inter',system-ui,sans-serif;letter-spacing:1.4px;color:var(--muted,#8C857A)}
+.dato strong{display:block;font:800 18px 'Sora',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#sound-button{margin-left:auto;width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line,#E4DCCF);background:transparent;color:inherit;cursor:pointer}
+#sound-button svg{width:18px;height:18px}
+#sound-button .cruz{display:none}
+#sound-button[aria-pressed=false] .ondas{display:none}
+#sound-button[aria-pressed=false] .cruz{display:inline}
+.nota{color:var(--muted,#8C857A);font-size:13px;line-height:1.6;margin:12px 2px 0}
+.nota kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:6px;font:600 12px 'Inter',system-ui,sans-serif;background:#fff;border:1px solid #E4DCCF;border-bottom-width:2px;color:#34312C}
+.pt-tabla{border:1px solid var(--line,#E4DCCF);background:#fff;border-radius:18px;padding:18px;color:var(--ink,#141414)}
+.pt-tabla h2{margin:0 0 10px;font-size:16px}
+.pt-tabla select{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--line,#E4DCCF);background:transparent;color:inherit;font:600 14px 'Inter',system-ui,sans-serif}
+.pt-tabla p{margin:10px 0 0;font-size:12px;line-height:1.6;color:var(--muted,#8C857A)}
+.club-integrado[data-tema=oscuro] .pt-tabla{background:#222638;border-color:var(--border)}
+.club-integrado[data-tema=oscuro] .pt-tabla select option{background:#222638}
+.rnota{margin-top:12px;font-size:12px;color:var(--pt-red)}
+.rnota:empty{display:none}
+@media(max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){.shell{padding:10px}.pt{height:min(720px,calc(100svh - 40px));min-height:520px;border-radius:16px}}
+
+/* ---------- Juego (el original) ---------- */
+.pt{
+  --pt-bg:#EEE8DD; --pt-paper:#FAF7F1; --pt-card:#FFFFFF; --pt-ink:#141414; --pt-ink2:#34312C; --pt-mut:#8C857A; --pt-line:#E4DCCF;
+  --pt-coral:#FF5A36; --pt-coral2:#FF8A6B; --pt-red:#D7263D;
+  --pt-fd:'Sora',system-ui,sans-serif; --pt-fu:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --pt-shadow:0 1px 2px rgba(20,20,20,.04),0 8px 24px rgba(20,20,20,.06);
+}
+.pt,:where(.pt) *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  .pt{position:relative;width:100%;height:740px;overflow:hidden;border-radius:22px;background:var(--pt-bg);color:var(--pt-ink);font-family:var(--pt-fu);user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-font-smoothing:antialiased;box-shadow:0 1px 2px rgba(20,20,20,.05),0 12px 40px rgba(20,20,20,.10)}
+:where(.pt button){font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.hidden{display:none!important}
+:where(.pt) svg{display:block}
+kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:6px;font:600 12px var(--pt-fu);
+  background:var(--pt-card);border:1px solid var(--pt-line);border-bottom-width:2px;color:var(--pt-ink2)}
+.pt :focus-visible{outline:2px solid var(--pt-coral);outline-offset:2px}
+
+/* ================= Menú ================= */
+.menu{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden}
+.wrap{max-width:620px;margin:0 auto;padding:18px 18px 40px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font:700 17px var(--pt-fd);letter-spacing:-.2px}
+.mark{display:flex;gap:2px;height:22px;align-items:flex-end}
+.mark i{width:5px;border-radius:1.5px;background:var(--pt-ink)}
+.mark i:nth-child(1){height:14px}.mark i:nth-child(2){height:22px}.mark i:nth-child(3){height:10px;background:var(--pt-coral)}.mark i:nth-child(4){height:18px}
+.tools{display:flex;gap:8px;align-items:center}
+.seg{display:flex;padding:3px;border-radius:999px;background:var(--pt-card);box-shadow:var(--pt-shadow)}
+.seg button{padding:7px 12px;border-radius:999px;font:600 13px var(--pt-fu);color:var(--pt-mut);transition:background .2s,color .2s}
+.seg button.on{background:var(--pt-ink);color:#fff}
+.icon{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--pt-card);box-shadow:var(--pt-shadow);transition:transform .15s}
+.icon:active{transform:scale(.92)}
+.icon svg{width:18px;height:18px}
+.st{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.hero{margin:44px 0 30px}
+.hero h2{font:800 clamp(40px,9vw,64px)/.95 var(--pt-fd);letter-spacing:-2.5px}
+.hero h2 em{font-style:normal;color:var(--pt-coral)}
+.hero p{margin-top:16px;color:var(--pt-ink2);font-size:16px;line-height:1.55;max-width:460px}
+
+.mara{position:relative;width:100%;display:flex;align-items:center;gap:16px;padding:20px;border-radius:22px;text-align:left;
+  background:var(--pt-ink);color:#fff;overflow:hidden;transition:transform .2s;box-shadow:0 12px 32px rgba(20,20,20,.18)}
+.mara:hover{transform:translateY(-2px)}
+.mara:active{transform:scale(.985)}
+.mara .bars{position:absolute;right:84px;top:0;bottom:0;display:flex;gap:5px;align-items:flex-end;opacity:.14}
+.mara .bars i{width:10px;background:#fff;border-radius:3px 3px 0 0;animation:eq 1.4s ease-in-out infinite}
+.mara .bars i:nth-child(2){animation-delay:.15s}.mara .bars i:nth-child(3){animation-delay:.3s}.mara .bars i:nth-child(4){animation-delay:.45s}.mara .bars i:nth-child(5){animation-delay:.6s}.mara .bars i:nth-child(6){animation-delay:.75s}
+@keyframes eq{0%,100%{height:25%}50%{height:80%}}
+.mara .txt{position:relative;flex:1}
+.mara small{display:block;font:700 11px var(--pt-fu);letter-spacing:2px;text-transform:uppercase;color:var(--pt-coral2)}
+.mara b{display:block;font:700 24px var(--pt-fd);margin-top:4px;letter-spacing:-.5px}
+.mara span.d{display:block;color:rgba(255,255,255,.65);font-size:14px;margin-top:4px}
+.mara .go{position:relative;flex:none;width:52px;height:52px;border-radius:50%;background:var(--pt-coral);display:grid;place-items:center}
+.mara .go svg{width:18px;height:18px;fill:#fff;margin-left:3px}
+
+.sec{display:flex;justify-content:space-between;align-items:baseline;margin:34px 2px 12px}
+.sec h3{font:700 20px var(--pt-fd);letter-spacing:-.4px}
+.sec span{color:var(--pt-mut);font-size:13px}
+.songs{list-style:none;display:flex;flex-direction:column;gap:8px}
+.song{width:100%;display:flex;align-items:center;gap:14px;padding:12px 14px 12px 12px;border-radius:18px;background:var(--pt-card);
+  box-shadow:var(--pt-shadow);text-align:left;transition:transform .18s,box-shadow .18s;animation:rise .45s ease backwards}
+.song:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(20,20,20,.04),0 14px 30px rgba(20,20,20,.09)}
+.song:active{transform:scale(.985)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.cover{flex:none;width:48px;height:48px;border-radius:12px;position:relative;overflow:hidden;background:var(--pt-ink)}
+.cover i{position:absolute;bottom:0;width:6px;border-radius:2px 2px 0 0;background:#fff;opacity:.9}
+.song .meta{flex:1;min-width:0}
+.song .meta b{display:block;font:600 16px var(--pt-fd);letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.song .meta small{display:flex;align-items:center;gap:6px;color:var(--pt-mut);font-size:13px;margin-top:2px;white-space:nowrap}
+.dots{display:inline-flex;gap:3px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--pt-line)}
+.dots i.on{background:var(--pt-ink2)}
+.rec{flex:none;text-align:right}
+.rec small{display:block;color:var(--pt-mut);font:600 12px var(--pt-fd);margin-top:3px;font-variant-numeric:tabular-nums}
+.stars{display:flex;gap:2px;justify-content:flex-end;align-items:center}
+.stars svg{width:14px;height:14px;fill:var(--pt-line)}
+.stars svg.on{fill:var(--pt-coral)}
+.stars svg.cw.on{fill:#E7A21B}
+.stars svg.world{width:20px;height:20px}
+.song .play{flex:none;width:40px;height:40px;border-radius:50%;background:var(--pt-ink);display:grid;place-items:center;transition:background .2s}
+.song:hover .play{background:var(--pt-coral)}
+.song .play svg{width:13px;height:13px;fill:#fff;margin-left:2px}
+.pie{margin-top:34px;color:var(--pt-mut);font-size:12.5px;line-height:1.8;text-align:center}
+.pie a{color:var(--pt-mut)}
+.pie button{color:var(--pt-mut);text-decoration:underline;text-underline-offset:3px;font-size:12.5px}
+.load{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--pt-card);box-shadow:var(--pt-shadow);font:600 12px var(--pt-fu);color:var(--pt-ink2);margin-bottom:10px}
+.load i{width:8px;height:8px;border-radius:50%;background:var(--pt-coral);animation:pulse 1s ease-in-out infinite}
+.load.ok i{background:#2BB673;animation:none}
+@keyframes pulse{50%{opacity:.3}}
+
+/* ================= Juego ================= */
+#game{position:absolute;inset:0}
+#stage{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;background:var(--pt-paper);
+  box-shadow:0 0 0 1px rgba(20,20,20,.04),0 20px 80px rgba(20,20,20,.12)}
+#hud{flex:none;height:64px;padding:0 12px;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:8px;
+  background:var(--pt-paper);border-bottom:1px solid var(--pt-line);position:relative;z-index:2}
+#bPause{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--pt-line);background:var(--pt-card)}
+#bPause svg{width:14px;height:14px;fill:var(--pt-ink)}
+.hs{text-align:center;line-height:1;min-width:0}
+#score{font:800 30px var(--pt-fd);letter-spacing:-1px;font-variant-numeric:tabular-nums;display:inline-block}
+#score.pop{animation:spop .16s ease}
+@keyframes spop{50%{transform:scale(1.12)}}
+#sub{display:block;margin-top:4px;font:600 10px var(--pt-fu);letter-spacing:1.6px;text-transform:uppercase;color:var(--pt-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hstars{min-width:44px;justify-content:flex-end}
+#hstars svg{width:18px;height:18px}
+#hstars svg.world{width:24px;height:24px}
+#hstars svg.pop{animation:starpop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes starpop{0%{transform:scale(.2) rotate(-60deg)}}
+.lapbar{flex:none;height:3px;background:var(--pt-line);position:relative;z-index:2}
+.lapbar i{display:block;height:100%;width:0;background:var(--pt-coral);transition:width .2s}
+#field{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none}
+#cv{display:block;touch-action:none}
+#intro{position:absolute;left:50%;top:9%;transform:translateX(-50%);width:min(88%,320px);padding:18px 18px 16px;border-radius:20px;text-align:center;
+  background:rgba(255,255,255,.96);box-shadow:0 12px 40px rgba(20,20,20,.14);pointer-events:none;transition:opacity .35s,transform .35s}
+#intro.gone{opacity:0;transform:translate(-50%,-12px)}
+#intro small{font:700 10px var(--pt-fu);letter-spacing:2px;text-transform:uppercase;color:var(--pt-coral)}
+#intro b{display:block;font:700 24px/1.15 var(--pt-fd);letter-spacing:-.5px;margin-top:6px}
+#intro span{display:block;color:var(--pt-mut);font-size:13px;margin-top:3px}
+#intro p{margin-top:12px;font-size:14px;color:var(--pt-ink2)}
+#count{position:absolute;inset:0;display:grid;place-items:center;font:800 110px var(--pt-fd);color:var(--pt-ink);pointer-events:none}
+#count:empty{display:none}
+#count.pop{animation:cnt .9s ease}
+@keyframes cnt{0%{transform:scale(1.5);opacity:0}25%{transform:none;opacity:1}100%{opacity:.1}}
+
+/* ================= Overlays ================= */
+.overlay{position:absolute;inset:0;z-index:10;display:grid;place-items:center;padding:16px;overflow-y:auto;
+  background:rgba(238,232,221,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:fade .2s ease}
+@keyframes fade{from{opacity:0}}
+.card{width:min(100%,360px);padding:26px 22px 22px;border-radius:26px;background:var(--pt-card);text-align:center;
+  box-shadow:0 2px 6px rgba(20,20,20,.05),0 30px 80px rgba(20,20,20,.16);animation:cardin .4s cubic-bezier(.2,1.25,.4,1)}
+@keyframes cardin{from{transform:translateY(16px) scale(.97);opacity:0}}
+.kick{font:700 11px var(--pt-fu);letter-spacing:2px;text-transform:uppercase;color:var(--pt-coral)}
+.card h3{font:700 26px/1.1 var(--pt-fd);letter-spacing:-.6px;margin-top:6px}
+.card .why{color:var(--pt-mut);font-size:14px;margin-top:6px}
+.big{font:800 76px/1 var(--pt-fd);letter-spacing:-3px;margin-top:18px;font-variant-numeric:tabular-nums}
+.rst{justify-content:center;margin-top:10px;gap:6px}
+.rst svg{width:28px;height:28px}
+.rst svg.on{animation:starpop .5s cubic-bezier(.2,1.6,.4,1) backwards}
+.rst svg.world{width:44px;height:44px}
+.best{color:var(--pt-mut);font-size:13px;margin-top:10px}
+.best b{color:var(--pt-coral)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);margin:20px 0;border-top:1px solid var(--pt-line);border-bottom:1px solid var(--pt-line)}
+.stats div{padding:12px 4px}
+.stats div+div{border-left:1px solid var(--pt-line)}
+.stats b{display:block;font:700 19px var(--pt-fd);font-variant-numeric:tabular-nums}
+.stats small{color:var(--pt-mut);font-size:12px}
+.btns{display:flex;gap:10px}
+.btn{flex:1;padding:15px 12px;border-radius:14px;font:600 15px var(--pt-fu);background:var(--pt-paper);border:1px solid var(--pt-line);transition:transform .12s,background .2s}
+.btn:hover{background:#F2EDE4}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--pt-ink);color:#fff;border-color:var(--pt-ink)}
+.btn.pri:hover{background:#000}
+.vstack{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.tip{color:var(--pt-mut);font-size:12px;margin-top:14px}
+@media (prefers-reduced-motion:reduce){:where(.pt) *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+/* ---------- Modo celular (juegos/club/CLAUDE.md): mientras se toca, la caja
+   llena la pantalla; queda arriba una franja con el marcador, el sonido y
+   el volumen. ---------- */
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#EEE8DD}
+html.club-inm .shell{max-width:none;height:100dvh;box-sizing:border-box;margin:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:flex;flex-direction:column}
+html.club-inm .layout{display:flex;flex-direction:column;flex:1;min-height:0;gap:0}
+html.club-inm main{display:flex;flex-direction:column;flex:1;min-height:0}
+html.club-inm .cab,html.club-inm .nota,html.club-inm .layout>aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .scorebar,html.club-inm.club-integrado .scorebar,html.club-inm.club-integrado[data-tema] .scorebar{margin:0;padding:4px 10px;gap:12px;flex-wrap:nowrap;border-radius:0;border:0;background:#141414;color:#fff}
+html.club-inm .dato small{font-size:8px;color:#bdb4a6}
+html.club-inm .dato strong{font-size:14px}
+html.club-inm #sound-button{width:32px;height:32px;border-color:#fff6;color:#fff}
+html.club-inm .scorebar .vj-ctl input,html.club-inm .scorebar .vj-ctl output{display:none}
+html.club-inm .pt{flex:1;height:auto;min-height:0;border-radius:0;box-shadow:none}

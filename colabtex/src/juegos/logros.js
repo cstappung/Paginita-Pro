@@ -459,6 +459,21 @@ const SOLO = {
     { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
     { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
   ],
+  /* PRO TILES. Los siete primeros salen de cualquier canción suelta (las
+     estrellas, coronas y el mundo del juego: 100 250 450 700 1000 1400
+     2000); los tres últimos, de la mezcla de las ocho. */
+  protiles: [
+    { id: "e1", n: "Primera estrella", d: "Haz 100 puntos en una canción.", i: "⭐", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 100 },
+    { id: "e2", n: "Dos estrellas", d: "Haz 250 puntos en una canción.", i: "🌟", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 250 },
+    { id: "e3", n: "¡Magistral!", d: "Haz 450 puntos en una canción (tres estrellas).", i: "🎹", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 450 },
+    { id: "c1", n: "Primera corona", d: "Haz 700 puntos en una canción.", i: "👑", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 700 },
+    { id: "c2", n: "¡Leyenda!", d: "Haz 1 000 puntos en una canción.", i: "🎼", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 1000 },
+    { id: "c3", n: "Tres coronas", d: "Haz 1 400 puntos en una canción.", i: "🏆", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 1400 },
+    { id: "w", n: "¡Nivel mundial!", d: "Haz 2 000 puntos en una canción.", i: "🌍", m: "Canción", s: d => cat(/^club-protiles-(?!mezcla$)/)(d) && d.puntos >= 2000 },
+    { id: "m300", n: "Sesión de DJ", d: "Haz 300 puntos en la mezcla de las ocho canciones.", i: "🎧", m: "Mezcla", s: d => cat(/^club-protiles-mezcla$/)(d) && d.puntos >= 300 },
+    { id: "m1k", n: "Ocho temas", d: "Haz 1 000 puntos en la mezcla.", i: "💿", m: "Mezcla", s: d => cat(/^club-protiles-mezcla$/)(d) && d.puntos >= 1000 },
+    { id: "m2500", n: "Sin fin", d: "Haz 2 500 puntos en la mezcla.", i: "♾️", m: "Mezcla", s: d => cat(/^club-protiles-mezcla$/)(d) && d.puntos >= 2500 }
+  ],
   /* Pokelike. Los de puntaje salen de club-pokelike-puntos (100 por
      medalla, 150 por miembro del Alto Mando, 500 por el Campeón: la Liga
      son 1900, y lo que pase de ahí es la Ruta Infinita); los de Pokédex,
@@ -526,7 +541,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

@@ -223,9 +223,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   function montar(el){
     host=el;ambientar(null);host.innerHTML='';
     for(const id of ['btnMusica','volMusica','btnSonido']){const el=document.getElementById(id);if(el){ocultos.push([el,el.style.display]);el.style.display='none';}}
-    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='aleteo'?'ALETEO':juego==='dosmil'?'2048':juego==='trigon'?'Trigon':juego==='pokelike'?'Pokelike':juego==='metrorush'?'Metro Rush':juego==='tulones'?'Tulones':'Snake Club';
+    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='aleteo'?'ALETEO':juego==='dosmil'?'2048':juego==='trigon'?'Trigon':juego==='protiles'?'PRO TILES':juego==='pokelike'?'Pokelike':juego==='metrorush'?'Metro Rush':juego==='tulones'?'Tulones':'Snake Club';
     frame.className='jg-solo-frame';
-    frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='dosmil'||juego==='trigon'||juego==='pokelike'||juego==='tulones'||juego==='metrorush'?'900px':'760px';
+    frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='dosmil'||juego==='trigon'||juego==='protiles'||juego==='pokelike'||juego==='tulones'||juego==='metrorush'?'900px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
     if(juego==='sortem')frame.addEventListener('load',()=>frame.focus());
@@ -233,7 +233,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-63&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-64&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

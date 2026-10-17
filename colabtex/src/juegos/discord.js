@@ -127,6 +127,7 @@ const MODALIDADES = {
   travesia: "travesía", sinfin: "travesía sin fin", jornadas: "jornada más lejana",  // FANAL
   estrellas: "estrellas",  // Atasco
   carrera: "mejor carrera", distancia: "distancia",  // Metro Rush (el clásico)
+  cristal: "Cristal", medianoche: "Medianoche", calle: "Calle", verano: "Verano", neon: "Neón", latido: "Latido", despegue: "Despegue", mezcla: "mezcla de las 8",  // PRO TILES (estrellas ya es Atasco: se lee igual)
   puro: "sin ayudas", sinmonedas: "sin monedas", fantasma: "fantasma", city: "City", citypuro: "City sin ayudas", cityfantasma: "City fantasma"  // Metro Rush (los otros modos)
 };
 const CLUBS = {
@@ -144,6 +145,7 @@ const CLUBS = {
   aleteo: { nombre: "ALETEO", juego: "ALETEO", icono: "🐦", ruta: "aleteo" },
   dosmil: { nombre: "2048", juego: "2048", icono: "🟨", ruta: "dosmil" },
   trigon: { nombre: "Trigon", juego: "Trigon", icono: "🔺", ruta: "trigon" },
+  protiles: { nombre: "PRO TILES", juego: "PRO TILES", icono: "🎹", ruta: "protiles" },
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
   hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" }
@@ -151,7 +153,7 @@ const CLUBS = {
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|pokelike|hero)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -181,6 +183,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-aleteo-vuelo") return `🐦 ${f.puntos} ${f.puntos === 1 ? "tubo" : "tubos"}`;
   if (cat === "club-dosmil-puntos") return `🟨 ${f.puntos} puntos`;
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
+  if (/^club-protiles-/.test(cat)) return `🎹 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-trigon-puntos") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-puntos") return `◓ ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   if (cat === "club-pokelike-pokedex") return `📕 ${Number(f.puntos)} especies`;

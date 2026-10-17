@@ -38,6 +38,7 @@ export const CONTROLES = {
   "pokelike": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "presidente": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "protiles": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "reversi": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "snake": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "sopa": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},

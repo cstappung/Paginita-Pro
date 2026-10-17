@@ -95,6 +95,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | ALETEO | `juegos/club/aleteo/CLAUDE.md` |
 | 2048 (dosmil) | `juegos/club/dosmil/CLAUDE.md` |
 | Trigon | `juegos/club/trigon/CLAUDE.md` |
+| PRO TILES (piano tiles, canciones, mezcla) | `juegos/club/protiles/CLAUDE.md` |
 | Atasco | `juegos/club/atasco/CLAUDE.md` |
 | Metro Rush | `juegos/club/metrorush/CLAUDE.md` |
 | Mina Club (buscaminas) | `juegos/club/minas/CLAUDE.md` |
