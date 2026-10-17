@@ -9,9 +9,33 @@
 'use strict';
 const M = window.ProTilesMotor, Club = window.Club;
 const { SONGS, DIFF, STAR_AT, level, TICK_MS } = M;
-const KEYS = ['D', 'F', 'J', 'K'];
-const KEYMAP = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
-const C = { paper: '#FAF7F1', ink: '#141414', line: '#E8E1D5', bar: '#EFE8DC', ghost: '#E6DFD3', coral: '#FF5A36', coral2: '#FF8A6B', red: '#D7263D' };
+/* Las teclas de los carriles son configurables (⚙ Ajustes): se guardan como
+   `KeyboardEvent.code`, así que no dependen del idioma del teclado. */
+const TECLAS_BASE = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
+const PROHIBIDAS = new Set(['Escape', 'Tab', 'MetaLeft', 'MetaRight', 'OSLeft', 'OSRight', 'ContextMenu', 'CapsLock', 'F5', 'F11', 'F12']);
+let teclas = TECLAS_BASE.slice();
+const carrilDe = code => teclas.indexOf(code);
+const NOMBRE_TECLA = { Space: 'Espacio', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Semicolon: ';', Quote: "'", Comma: ',', Period: '.',
+  Slash: '/', Backslash: '\\', BracketLeft: '[', BracketRight: ']', Minus: '-', Equal: '=', Backquote: '`', IntlBackslash: '<', Enter: 'Intro',
+  ShiftLeft: 'Mayús', ShiftRight: 'Mayús der.', ControlLeft: 'Ctrl', ControlRight: 'Ctrl der.', AltLeft: 'Alt', AltRight: 'Alt der.', Backspace: '⌫' };
+const etiqueta = code => /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5)
+  : /^Numpad\d$/.test(code) ? 'Num ' + code.slice(6) : NOMBRE_TECLA[code] || String(code || '?').replace(/^Numpad/, 'Num ');
+const KEYS = { get length() { return 4; } };
+for (let i = 0; i < 4; i++) Object.defineProperty(KEYS, i, { get: () => etiqueta(teclas[i]) });
+
+/* Paletas (⚙ Ajustes). Cada una da las variables de la caja (--pt-*) y los
+   colores del lienzo. `ficha` es el color de las fichas y de las superficies
+   macizas (botones, la tarjeta de la mezcla); `sobre`, lo que va encima. */
+const TEMAS = {
+  clasico:    { nombre: 'Clásico',    bg: '#EEE8DD', paper: '#FAF7F1', card: '#FFFFFF', ink: '#141414', ink2: '#34312C', mut: '#8C857A', line: '#E4DCCF', bar: '#EFE8DC', lane: '#E8E1D5', ghost: '#E6DFD3', coral: '#FF5A36', coral2: '#FF8A6B', red: '#D7263D', ficha: '#141414', sobre: '#FFFFFF', velo: 'rgba(238,232,221,.72)', tecla: '#BDB4A6', acTxt: '#FFFFFF' },
+  medianoche: { nombre: 'Medianoche', bg: '#0F1220', paper: '#161A2B', card: '#1E2337', ink: '#EEF0F7', ink2: '#C9CDE0', mut: '#8A90AB', line: '#2A3050', bar: '#1D2236', lane: '#262C46', ghost: '#232A45', coral: '#8C6CFF', coral2: '#B9A4FF', red: '#FF4D6D', ficha: '#E9ECFF', sobre: '#161A2B', velo: 'rgba(15,18,32,.75)', tecla: '#4C5478', acTxt: '#FFFFFF' },
+  menta:      { nombre: 'Menta',      bg: '#E1F1E8', paper: '#F4FBF7', card: '#FFFFFF', ink: '#10261C', ink2: '#2D4A3D', mut: '#6F8A7D', line: '#CFE3D8', bar: '#E4F2EA', lane: '#D6E9DE', ghost: '#D3E7DB', coral: '#0FAF7F', coral2: '#5FDDB5', red: '#E03131', ficha: '#10261C', sobre: '#FFFFFF', velo: 'rgba(225,241,232,.74)', tecla: '#9CB8AA', acTxt: '#FFFFFF' },
+  atardecer:  { nombre: 'Atardecer',  bg: '#FCE6E1', paper: '#FFF5F2', card: '#FFFFFF', ink: '#3A1A2A', ink2: '#5C3346', mut: '#A07A88', line: '#F3D3CC', bar: '#FBE9E4', lane: '#F5DAD3', ghost: '#F3D9D2', coral: '#E64980', coral2: '#F783AC', red: '#C92A2A', ficha: '#3A1A2A', sobre: '#FFFFFF', velo: 'rgba(252,230,225,.74)', tecla: '#C9A2AE', acTxt: '#FFFFFF' },
+  neon:       { nombre: 'Neón',       bg: '#07070C', paper: '#0D0D16', card: '#16161F', ink: '#F5F5FF', ink2: '#C8C8E0', mut: '#7A7A99', line: '#25253C', bar: '#141422', lane: '#1E1E33', ghost: '#1C1C2E', coral: '#00E5FF', coral2: '#7DF9FF', red: '#FF2E63', ficha: '#FF2E88', sobre: '#FFFFFF', velo: 'rgba(7,7,12,.75)', tecla: '#4A4A6E', acTxt: '#07070C' },
+};
+const C = {};
+// rgba de un #RRGGBB: el brillo, las ondas y los destellos siguen al acento de la paleta.
+const rgba = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
 const CAT = modo => 'club-protiles-' + modo;
 const NOMBRE = modo => modo === 'mezcla' ? 'Mezcla infinita' : (SONGS.find(S => S.id === modo) || {}).name || modo;
 
@@ -42,9 +66,12 @@ function starsHTML(lv, popFrom) {
 /* ---------- Guardado (por cuenta: Club.storageKey) ---------- */
 const CUENTA = Club && Club.storageKey ? Club.storageKey('').replace(/^\.cuenta\./, '') : 'local';
 const SKEY = Club && Club.storageKey ? Club.storageKey('protiles') : 'protiles.cuenta.local';
-let save = { best: {}, mara: 0, mode: null, muted: false, tabla: '' };
+let save = { best: {}, mara: 0, mode: null, muted: false, tabla: '', teclas: null, tema: 'clasico' };
 try { const s = JSON.parse(localStorage.getItem(SKEY)); if (s && typeof s === 'object') save = Object.assign(save, s); } catch (e) { /* sin almacenamiento */ }
 if (!save.best || typeof save.best !== 'object') save.best = {};
+if (Array.isArray(save.teclas) && save.teclas.length === 4 && new Set(save.teclas).size === 4 &&
+  save.teclas.every(k => typeof k === 'string' && /^[A-Za-z0-9]{1,24}$/.test(k) && !PROHIBIDAS.has(k))) teclas = save.teclas.slice();
+if (!TEMAS[save.tema]) save.tema = 'clasico';
 const persist = () => { try { localStorage.setItem(SKEY, JSON.stringify(save)); } catch (e) { /* sin almacenamiento */ } };
 const mejorDe = modo => modo === 'mezcla' ? save.mara || 0 : save.best[modo] || 0;
 function anotaMejor(modo, p) {
@@ -62,7 +89,7 @@ const SAMPLE_URL = 'https://tonejs.github.io/audio/salamander/';
 const SAMPLE_NAMES = ['C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6','Ds6','Fs6','A6','C7'];
 const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const sampleMidi = n => { const m = n.match(/^([A-G])(s?)(\d)$/); return (+m[3] + 1) * 12 + PC[m[1]] + (m[2] ? 1 : 0); };
-const buffers = new Map(), voices = new Set();
+const buffers = new Map(), voices = new Set(), cercana = new Map();
 let AC = null, bus = null, master = null, drums = null, noiseBuf = null, loadedN = 0, failedN = 0, cargando = false;
 
 function ensureAudio() {
@@ -94,7 +121,7 @@ function loadSamples() {
     fetch(SAMPLE_URL + n + '.mp3')
       .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
       .then(b => new Promise((res, rej) => AC.decodeAudioData(b, res, rej)))
-      .then(buf => { buffers.set(sampleMidi(n), buf); loadedN++; updLoad(); })
+      .then(buf => { buffers.set(sampleMidi(n), buf); cercana.clear(); loadedN++; updLoad(); })
       .catch(() => { failedN++; updLoad(); });
   });
 }
@@ -116,9 +143,15 @@ function setMuted(m) {
 function playNote(midi, when, vel, dur) {
   if (!AC) return null;
   const t = Math.max(when || 0, AC.currentTime);
-  let best = null, bd = 99;
-  for (const m of buffers.keys()) { const d = Math.abs(m - midi); if (d < bd) { bd = d; best = m; } }
-  if (best === null || bd > 4) return synthNote(midi, t, vel, dur);
+  // La muestra más cercana se recuerda por nota (cada nota la buscaba entre todas).
+  let best = cercana.get(midi);
+  if (best === undefined) {
+    let bd = 99; best = null;
+    for (const m of buffers.keys()) { const d = Math.abs(m - midi); if (d < bd) { bd = d; best = m; } }
+    if (bd > 4) best = null;
+    cercana.set(midi, best);
+  }
+  if (best === null) return synthNote(midi, t, vel, dur);
   const src = AC.createBufferSource();
   src.buffer = buffers.get(best);
   src.playbackRate.value = Math.pow(2, (midi - best) / 12);
@@ -180,6 +213,13 @@ const sfxClick = () => { if (AC) playNote(96, 0, .05, .25); };
    ========================================================= */
 const app = $('app'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1, rowH = 0, laneW = 0;
+// El degradado del brillo de un carril, hecho una vez por tamaño y paleta.
+let brillo = null, brilloDe = '';
+function brilloCarril() {
+  const k = H + C.coral;
+  if (k !== brilloDe) { brilloDe = k; brillo = ctx.createLinearGradient(0, H, 0, H * .45); brillo.addColorStop(0, rgba(C.coral, .12)); brillo.addColorStop(1, rgba(C.coral, 0)); }
+  return brillo;
+}
 function layout() {
   const vw = app.clientWidth, vh = app.clientHeight;
   if (!vw || !vh) return;
@@ -228,7 +268,7 @@ function startGame(modo) {
   $('iKick').textContent = E.kind === 'song' ? `${S.genre} · ${S.bpm} BPM` : 'Mezcla infinita';
   $('iTitle').textContent = E.kind === 'song' ? S.name : 'Todas, sin fin';
   $('iComp').textContent = E.kind === 'song' ? 'Canción original · no termina nunca' : 'Empieza con ' + S.name;
-  $('iHow').innerHTML = mode === 'kb' ? `Pulsa <kbd>${first}</kbd> para empezar` : 'Toca la ficha naranja para empezar';
+  $('iHow').innerHTML = mode === 'kb' ? `Pulsa <kbd>${first}</kbd> para empezar` : 'Toca la ficha de color para empezar';
   $('intro').classList.remove('gone');
   $('count').textContent = '';
   $('hstars').innerHTML = starsHTML(0);
@@ -292,6 +332,7 @@ function cierraLarga(fin) {
     FX.texts.push({ x: (h.lane + .5) * laneW, y: clamp(tileBot(h) - h.len * rowH + 26, 40, H - 40), text: '+' + fin.bonus, t: 0 });
     (h.voices || []).forEach(v => releaseVoice(v, AC ? AC.currentTime + .25 : 0, .35));
   } else (h.voices || []).forEach(v => releaseVoice(v, AC ? AC.currentTime : 0, .15));
+  h.voices = null;   // la ficha queda en la partida: sin esto retenía sus nodos de audio
   revisaNivel();
   updHUD();
 }
@@ -311,7 +352,7 @@ function fail(kind, lane, y, h) {
   const g = G, E = g.E;
   h = h || E.hold;
   if (kind === 'wrong') { if (E.over) return; M.falla(E); }
-  if (h) { h.tile.state = 1; h.tile.t = 1; (h.tile.voices || []).forEach(v => releaseVoice(v, AC ? AC.currentTime : 0, .1)); }
+  if (h) { h.tile.state = 1; h.tile.t = 1; (h.tile.voices || []).forEach(v => releaseVoice(v, AC ? AC.currentTime : 0, .1)); h.tile.voices = null; }
   g.failT = 0; g.failFrom = g.vp;
   if (kind === 'miss') {
     const t = E.tiles[E.next]; t.state = 3; t.t = 0;
@@ -357,8 +398,9 @@ function schedule(g) {
     else { const v = e.vel / Math.sqrt(e.notes.length); e.notes.forEach(m => playNote(m, t, v, e.len / E.speed)); }
   }
 }
+function envejece(arr, dt) { for (let i = arr.length - 1; i >= 0; i--) { arr[i].t += dt; if (arr[i].t > .7) arr.splice(i, 1); } }
 function update(dt) {
-  for (const arr of [FX.ripples, FX.texts]) for (let i = arr.length - 1; i >= 0; i--) { arr[i].t += dt; if (arr[i].t > .7) arr.splice(i, 1); }
+  envejece(FX.ripples, dt); envejece(FX.texts, dt);
   for (let i = 0; i < 4; i++) laneFlash[i] = Math.max(0, laneFlash[i] - dt * 4);
   const g = G; if (!g) return;
   const E = g.E;
@@ -396,17 +438,15 @@ function render(dt) {
     if (y > H) break;
     if (y >= 0) ctx.fillRect(0, Math.round(y), W, 1);
   }
-  for (let i = 1; i < 4; i++) { ctx.fillStyle = C.line; ctx.fillRect(Math.round(i * laneW), 0, 1, H); }
+  for (let i = 1; i < 4; i++) { ctx.fillStyle = C.lane; ctx.fillRect(Math.round(i * laneW), 0, 1, H); }
   for (let i = 0; i < 4; i++) {
     const a = Math.max(laneFlash[i] * .8, keyDown[i] ? .6 : 0);
     if (a <= 0) continue;
-    const gr = ctx.createLinearGradient(0, H, 0, H * .45);
-    gr.addColorStop(0, `rgba(255,90,54,${.12 * a})`); gr.addColorStop(1, 'rgba(255,90,54,0)');
-    ctx.fillStyle = gr; ctx.fillRect(i * laneW, 0, laneW, H);
+    ctx.globalAlpha = a; ctx.fillStyle = brilloCarril(); ctx.fillRect(i * laneW, 0, laneW, H); ctx.globalAlpha = 1;
   }
   if (mode === 'kb') {
     ctx.font = '600 13px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let i = 0; i < 4; i++) { ctx.fillStyle = keyDown[i] ? C.coral : '#BDB4A6'; ctx.fillText(KEYS[i], (i + .5) * laneW, H - 16); }
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = keyDown[i] ? C.coral : C.tecla; ctx.fillText(KEYS[i], (i + .5) * laneW, H - 16); }
   }
   const adt = g.paused ? 0 : dt;
   for (let i = Math.max(0, E.next - 16); i < E.tiles.length; i++) {
@@ -423,7 +463,7 @@ function render(dt) {
   }
   for (const r of FX.ripples) {
     const k = r.t / .45; if (k > 1) continue;
-    ctx.strokeStyle = `rgba(255,90,54,${(1 - k) * .9})`; ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(C.coral, (1 - k) * .9); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(r.x, r.y, 8 + easeOut(k) * laneW * .5, 0, 6.283); ctx.stroke();
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 18px Sora, system-ui, sans-serif';
@@ -440,35 +480,35 @@ function drawTile(t, bot, i) {
   const R = Math.min(7, h / 3);
   if (t.state === 0 || t.state === 2) {
     const start = i === 0 && !g.E.started;
-    rr(x, y, w, h, R); ctx.fillStyle = start ? C.coral : C.ink; ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.fillRect(x + R, y + 1.5, w - R * 2, 1.2);
+    rr(x, y, w, h, R); ctx.fillStyle = start ? C.coral : C.ficha; ctx.fill();
+    ctx.fillStyle = rgba(C.sobre, .09); ctx.fillRect(x + R, y + 1.5, w - R * 2, 1.2);
     if (t.hold) {
-      ctx.fillStyle = 'rgba(255,90,54,.55)'; ctx.fillRect(cx - .75, y + 16, 1.5, Math.max(0, h - 40));
-      ctx.beginPath(); ctx.arc(cx, y + h - 18, 4.5, 0, 6.283); ctx.fillStyle = start ? '#fff' : C.coral; ctx.fill();
+      ctx.fillStyle = rgba(C.coral, .55); ctx.fillRect(cx - .75, y + 16, 1.5, Math.max(0, h - 40));
+      ctx.beginPath(); ctx.arc(cx, y + h - 18, 4.5, 0, 6.283); ctx.fillStyle = start ? C.sobre : C.coral; ctx.fill();
       if (t.state === 2) {
         const fh = clamp(y + h - t.target, 20, h - 4);
         const gr = ctx.createLinearGradient(0, y + h - fh, 0, y + h);
         gr.addColorStop(0, C.coral2); gr.addColorStop(1, C.coral);
         rr(x + 3, y + h - fh - 2, w - 6, fh, Math.min(5, R)); ctx.fillStyle = gr; ctx.fill();
-        ctx.save(); ctx.shadowColor = 'rgba(255,90,54,.8)'; ctx.shadowBlur = 16;
+        ctx.save(); ctx.shadowColor = rgba(C.coral, .8); ctx.shadowBlur = 16;
         ctx.beginPath(); ctx.arc(cx, y + h - fh + 8, 6, 0, 6.283); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
       }
     }
     if (start) {
       const p = (performance.now() / 1000) % 1.3 / 1.3;
-      ctx.strokeStyle = `rgba(255,90,54,${1 - p})`; ctx.lineWidth = 2;
+      ctx.strokeStyle = rgba(C.coral, 1 - p); ctx.lineWidth = 2;
       rr(x - p * 10, y - p * 10, w + p * 20, h + p * 20, R + p * 6); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = C.acTxt; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = '700 15px Sora, system-ui, sans-serif'; ctx.fillText('Iniciar', cx, y + h / 2 - (mode === 'kb' ? 7 : 0));
-      if (mode === 'kb') { ctx.font = '600 11px Inter, system-ui, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText('tecla ' + KEYS[t.lane], cx, y + h / 2 + 11); }
+      if (mode === 'kb') { ctx.font = '600 11px Inter, system-ui, sans-serif'; ctx.fillStyle = rgba(C.acTxt, .8); ctx.fillText('tecla ' + KEYS[t.lane], cx, y + h / 2 + 11); }
     } else if (mode === 'kb' && t.state === 0 && h > 26) {
-      ctx.fillStyle = 'rgba(255,255,255,.32)'; ctx.font = '600 11px Inter, system-ui, sans-serif';
+      ctx.fillStyle = rgba(C.sobre, .32); ctx.font = '600 11px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(KEYS[t.lane], cx, y + h / 2);
     }
   } else if (t.state === 1) {
     const k = Math.min(1, t.t / .16), s = Math.sin(k * Math.PI) * 3;
     rr(x + s, y + s, w - s * 2, h - s * 2, R); ctx.fillStyle = C.ghost; ctx.fill();
-    if (k < 1) { ctx.globalAlpha = 1 - k; ctx.fillStyle = C.ink; ctx.fill(); ctx.globalAlpha = 1; }
+    if (k < 1) { ctx.globalAlpha = 1 - k; ctx.fillStyle = C.ficha; ctx.fill(); ctx.globalAlpha = 1; }
   } else if (t.state === 3) {
     rr(x, y, w, h, R); ctx.fillStyle = C.red; ctx.globalAlpha = .55 + .45 * Math.cos(t.t * 18); ctx.fill(); ctx.globalAlpha = 1;
   }
@@ -534,10 +574,13 @@ const restart = () => startGame(G.modo);
 function toMenu() { G = null; keyDown.fill(0); silenceAll(.4); buildMenu(); show('menu'); }
 function show(name) {
   screen = name;
-  $('menu').classList.toggle('hidden', name !== 'menu');
-  $('game').classList.toggle('hidden', name === 'menu');
+  // Los ajustes se abren encima del menú o de la pausa (con el juego detrás).
+  const fondo = name === 'ajustes' ? (ajustesDesde === 'menu' ? 'menu' : 'game') : name;
+  $('menu').classList.toggle('hidden', fondo !== 'menu');
+  $('game').classList.toggle('hidden', fondo === 'menu');
   $('pause').classList.toggle('hidden', name !== 'pause');
   $('result').classList.toggle('hidden', name !== 'result');
+  $('ajustes').classList.toggle('hidden', name !== 'ajustes');
   document.querySelectorAll('.kb-only').forEach(e => e.classList.toggle('hidden', mode !== 'kb'));
   inmersivo(name === 'game');
 }
@@ -573,7 +616,7 @@ function buildMenu() {
 function setMode(m, silent) {
   mode = m; save.mode = m; if (!silent) persist();
   document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
-  $('modeHint').innerHTML = m === 'kb' ? 'Teclas <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>' : 'Toca las fichas negras';
+  $('modeHint').innerHTML = m === 'kb' ? 'Teclas ' + kbds() : 'Toca las fichas';
 }
 
 /* La tabla que se mira: la de la canción que se juega, o la que se eligió
@@ -616,9 +659,10 @@ for (const t of ['selectstart', 'dragstart']) app.addEventListener(t, e => e.pre
 app.addEventListener('touchstart', e => { if (screen === 'game' && !e.target.closest('button')) e.preventDefault(); }, { passive: false });
 
 window.addEventListener('keydown', e => {
-  const lane = KEYMAP[e.code];
+  if (screen === 'ajustes') { teclaAjustes(e); return; }
+  const lane = carrilDe(e.code);
   if (screen === 'game') {
-    if (lane !== undefined) {
+    if (lane >= 0) {
       e.preventDefault();
       if (e.repeat) return;
       unlockAudio();
@@ -639,8 +683,8 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => {
-  const lane = KEYMAP[e.code];
-  if (lane !== undefined) { keyDown[lane] = 0; release('k' + e.code); }
+  const lane = carrilDe(e.code);
+  if (lane >= 0) { keyDown[lane] = 0; release('k' + e.code); }
 });
 
 $('bPause').addEventListener('click', () => { unlockAudio(); pauseGame(); });
@@ -659,9 +703,10 @@ window.addEventListener('blur', () => pauseGame());
 new ResizeObserver(() => { if (screen !== 'menu') layout(); }).observe(app);
 
 /* ---------- Mando: cruceta ← ↓ y botones A B son los cuatro carriles ---------- */
-if (window.Mando) {
+function configuraMando() {
+  if (!window.Mando) return;
   window.Mando.configura({
-    botones: { izq: 'KeyD', abajo: 'KeyF', a: 'KeyJ', b: 'KeyK', start: 'KeyP' },
+    botones: { izq: teclas[0], abajo: teclas[1], a: teclas[2], b: teclas[3], start: 'KeyP' },
     objetivo: () => document.body,
     menu: () => screen !== 'game',
     inicio: () => screen === 'pause' ? $('pResume') : screen === 'result' ? $('rAgain') : $('bMara'),
@@ -669,6 +714,93 @@ if (window.Mando) {
     zonas: [{ sel: '#nota' }]
   });
 }
+configuraMando();
+
+/* ---------- Pantalla completa (⛶ en el marcador y en la pausa) ----------
+   Se pide sobre el documento entero (el iframe del Club tiene
+   allow="fullscreen"); html.pt-pc deja solo la franja del marcador —con el
+   sonido, el volumen y el ⛶ para salir— y la caja ocupando el resto. En el
+   iPhone no hay pantalla completa de elementos: el botón no se muestra y
+   queda el modo celular de conexion.js. El estado sigue a fullscreenchange,
+   también si se sale con Escape. */
+const enPantallaCompleta = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const hayPantallaCompleta = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+function alternaPantallaCompleta() {
+  if (!hayPantallaCompleta) return;
+  try {
+    if (enPantallaCompleta()) { const f = document.exitFullscreen || document.webkitExitFullscreen; const r = f && f.call(document); if (r && r.catch) r.catch(() => {}); }
+    else { const el = document.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen; const r = f && f.call(el); if (r && r.catch) r.catch(() => {}); }
+  } catch (e) { /* el navegador no dejó: se sigue en ventana */ }
+}
+function pintaPantallaCompleta() {
+  const si = enPantallaCompleta();
+  document.documentElement.classList.toggle('pt-pc', si);
+  const b = $('bFull'), t = si ? 'Salir de pantalla completa' : 'Pantalla completa';
+  b.hidden = $('pFull').hidden = !hayPantallaCompleta;
+  b.setAttribute('aria-pressed', String(si)); b.title = t; b.setAttribute('aria-label', t);
+  $('pFull').textContent = t;
+}
+$('bFull').onclick = () => { unlockAudio(); alternaPantallaCompleta(); };
+$('pFull').onclick = () => { unlockAudio(); alternaPantallaCompleta(); };
+document.addEventListener('fullscreenchange', pintaPantallaCompleta);
+document.addEventListener('webkitfullscreenchange', pintaPantallaCompleta);
+
+/* ---------- ⚙ Ajustes: teclas de los carriles y paleta ---------- */
+let ajustesDesde = 'menu', esperando = -1;
+const kbds = () => [0, 1, 2, 3].map(i => `<kbd translate="no">${KEYS[i]}</kbd>`).join(' ');
+function aplicaTema(id) {
+  const T = TEMAS[id] || TEMAS.clasico;
+  save.tema = TEMAS[id] ? id : 'clasico';
+  Object.assign(C, T);
+  for (const k of ['bg', 'paper', 'card', 'ink', 'ink2', 'mut', 'line', 'coral', 'coral2', 'red', 'ficha', 'sobre', 'velo', 'acTxt'])
+    app.style.setProperty('--pt-' + k, T[k]);
+  app.dataset.tema = save.tema;
+  pintaAjustes();
+}
+function pintaTeclas() {
+  if ($('modeHint')) setMode(mode, true);
+  const n = $('notaTeclas'); if (n) n.innerHTML = kbds();
+  configuraMando();
+}
+function pintaAjustes() {
+  const caja = $('ajTeclas');
+  caja.innerHTML = [0, 1, 2, 3].map(i => `<button type="button" class="tecla${esperando === i ? ' espera' : ''}" data-i="${i}" aria-label="Carril ${i + 1}: ${KEYS[i]}"><small>Carril ${i + 1}</small><b translate="no">${esperando === i ? '…' : KEYS[i]}</b></button>`).join('');
+  caja.querySelectorAll('.tecla').forEach(b => b.onclick = () => { esperando = esperando === +b.dataset.i ? -1 : +b.dataset.i; pintaAjustes(); });
+  $('ajAviso').textContent = esperando >= 0 ? `Pulsa la tecla nueva para el carril ${esperando + 1} (Esc cancela).` : 'Toca un carril y pulsa la tecla que quieras.';
+  const temas = $('ajTemas');
+  temas.innerHTML = Object.entries(TEMAS).map(([id, T]) => `<button type="button" class="tema${id === save.tema ? ' on' : ''}" data-t="${id}" aria-pressed="${id === save.tema}">
+    <span class="muestra" style="background:${T.paper};border-color:${T.line}">${[0, 1, 2, 3].map(k => `<i style="background:${k === 1 ? T.coral : k === 3 ? T.ficha : 'transparent'};${k ? 'border-left:1px solid ' + T.lane : ''}"></i>`).join('')}</span>
+    <b>${T.nombre}</b></button>`).join('');
+  temas.querySelectorAll('.tema').forEach(b => b.onclick = () => { aplicaTema(b.dataset.t); persist(); });
+}
+function abreAjustes() {
+  if (screen === 'game') pauseGame();
+  if (screen !== 'menu' && screen !== 'pause') return;
+  ajustesDesde = screen; esperando = -1;
+  pintaAjustes(); show('ajustes');
+  $('ajListo').focus({ preventScroll: true });
+}
+function cierraAjustes() {
+  esperando = -1;
+  if (ajustesDesde === 'pause') { show('pause'); $('pResume').focus({ preventScroll: true }); } else show('menu');
+}
+function teclaAjustes(e) {
+  if (esperando < 0) { if (e.code === 'Escape') { e.preventDefault(); cierraAjustes(); } return; }
+  e.preventDefault();
+  if (e.repeat) return;
+  if (e.code === 'Escape') { esperando = -1; pintaAjustes(); return; }
+  if (PROHIBIDAS.has(e.code) || !/^[A-Za-z0-9]{1,24}$/.test(e.code)) { $('ajAviso').textContent = 'Esa tecla no se puede usar. Prueba otra.'; return; }
+  const otra = teclas.indexOf(e.code);
+  if (otra >= 0 && otra !== esperando) teclas[otra] = teclas[esperando];   // ya estaba en otro carril: se intercambian
+  teclas[esperando] = e.code;
+  esperando = -1;
+  save.teclas = teclas.slice(); persist();
+  pintaTeclas(); pintaAjustes();
+}
+$('bAjustes').onclick = () => { unlockAudio(); abreAjustes(); };
+$('pAjustes').onclick = abreAjustes;
+$('ajListo').onclick = cierraAjustes;
+$('ajReset').onclick = () => { teclas = TECLAS_BASE.slice(); save.teclas = null; esperando = -1; persist(); pintaTeclas(); pintaAjustes(); };
 
 /* ---------- La tabla del Club ---------- */
 // Un récord de la nube mejor que el local (otro dispositivo) se adopta.
@@ -693,13 +825,16 @@ window.__protiles = {
 const tactil = matchMedia('(pointer:coarse)').matches;
 $('nota').innerHTML = (tactil
   ? 'Toca las fichas negras de abajo hacia arriba; mantén las largas. '
-  : 'Teclas <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd> (o clic) para tocar; mantén las largas; <kbd>Esc</kbd> pausa; <kbd>1</kbd>–<kbd>8</kbd> eligen canción en el menú. ') +
+  : 'Teclas <span id="notaTeclas"></span> (o clic) para tocar, cámbialas en ⚙ Ajustes; mantén las largas; <kbd>Esc</kbd> pausa; <kbd>1</kbd>–<kbd>8</kbd> eligen canción en el menú. ') +
   'Un error termina la partida. ' +
   (document.documentElement.classList.contains('club-integrado')
     ? 'Cada canción tiene su propio top, y la mezcla el suyo.'
     : 'Tus récords viven en este navegador; juega desde Juegos para entrar en la clasificación.');
 
+aplicaTema(save.tema);
 buildMenu();
+pintaTeclas();
+pintaPantallaCompleta();
 setMuted(save.muted);
 loadSamples();
 updLoad();

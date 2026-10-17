@@ -115,3 +115,13 @@ test('las versiones, el juego y las reglas',()=>{
  assert.equal((reglas.match(/club-protiles-\(cristal\|medianoche\|calle\|verano\|neon\|latido\|estrellas\|despegue\|mezcla\)/g)||[]).length,3,'soloRanks, su tope y soloPruebas');
  assert.match(reglas,/\|trigon\|protiles\|/,'clubJugadas');
 });
+
+test('ajustes, paletas, pantalla completa y ancho en el celular',()=>{
+ const html=fs.readFileSync(path.join(D,'index.html'),'utf8'),js=fs.readFileSync(path.join(D,'juego.js'),'utf8'),css=fs.readFileSync(path.join(D,'estilo.css'),'utf8');
+ for(const id of ['bAjustes','pAjustes','ajustes','ajTeclas','ajTemas','ajReset','ajListo','bFull','pFull'])assert.match(html,new RegExp(`id="${id}"`),id);
+ const temas=/const TEMAS = \{([\s\S]*?)\n\};/.exec(js)[1];
+ assert.deepEqual([...temas.matchAll(/^\s+(\w+):\s+\{ nombre/mg)].map(m=>m[1]),['clasico','medianoche','menta','atardecer','neon'],'cinco paletas');
+ for(const k of ['bg','paper','card','ink','ficha','sobre','coral','lane','acTxt'])assert.equal((temas.match(new RegExp(`\\b${k}: '`,'g'))||[]).length,5,k+' en cada paleta');
+ assert.match(js,/requestFullscreen/);assert.match(js,/carrilDe\(e\.code\)/);
+ assert.match(css,/:is\(html\.club-inm,html\.pt-pc\) \.layout\{[^}]*align-items:stretch/,'la caja se estira a lo ancho del celular');
+});
