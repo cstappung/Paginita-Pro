@@ -12,7 +12,7 @@
 <title>Budokai Tenkaichi 3</title>
 <!-- i18n.js primero (traducción del sitio); volumen.js antes que cualquier audio: envuelve AudioContext para que
      el silencio y el volumen del sitio gobiernen el sonido del juego sin que el juego lo sepa. -->
-<script src="../../i18n.js?v=202610170548"></script>
+<script src="../../i18n.js?v=bt3-36"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
@@ -296,7 +296,9 @@
   body.coarse.started #menuTactil { display: block; position: fixed; z-index: 6; top: calc(var(--st) + 4px); left: 50%; translate: -50% 0;
     padding: 2px 14px; border-radius: 0 0 10px 10px; border: 1px solid #ffffff33; border-top: 0; background: #14182099; color: #fff;
     font: 700 16px/1.4 system-ui, sans-serif; opacity: .7; transition: opacity .25s; }
-  body.barra-viva #menuTactil { opacity: 0; pointer-events: none; }
+  /* (con la barra a la vista el ☰ se va: iba encima de sus botones. Tiene que ganarle a la regla de arriba, que es más
+     específica: con solo `body.barra-viva` el ☰ no se ocultaba nunca) */
+  body.coarse.started.barra-viva #menuTactil { opacity: 0; pointer-events: none; }
   body.coarse.started #activaSonido:not([hidden]) { display: block; position: fixed; z-index: 8; left: 50%; top: 38%; translate: -50% -50%;
     padding: 12px 20px; border-radius: 12px; border: 2px solid #ffd21f; background: #0c1a42f2; color: #ffd21f;
     font: 700 17px system-ui, sans-serif; box-shadow: 0 8px 30px #000a; }
