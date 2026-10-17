@@ -106,7 +106,7 @@ if (perfil) {
   // 3b) Esperar el final de la prueba (máximo: el tiempo de los cuadros pedidos + 2 minutos)
   const maximo = (cuadros / 60 + 120) * 1000;
   // Desbloquear el sonido como una persona: cuando el medidor de la página dice "sonido bloqueado", un clic de
-  // verdad (Playwright hace clics "confiables", como un mouse) en el título de la página, lejos del juego.
+  // verdad (Playwright hace clics "confiables", como un mouse) en una esquina de la página (el juego no usa el mouse).
   // OJO: antes del clic no se le pregunta nada a la página (evaluate/waitForFunction): Playwright los corre como
   // si fueran un gesto de la persona, y eso solo ya desbloquearía el sonido. Por eso se lee la consola.
   const bloqueado = await new Promise(listo => {
@@ -114,8 +114,9 @@ if (perfil) {
     pagina.on('console', mirar);
     setTimeout(() => { pagina.off('console', mirar); listo(null); }, 60000);
   });
-  console.log(`· sonido antes del clic: ${bloqueado === null ? 'el juego no lo abrió en 60 s' : bloqueado ? 'bloqueado' : 'sonando'}; clic en el título de la página`);
-  await pagina.locator('h1').click();
+  console.log(`· sonido antes del clic: ${bloqueado === null ? 'el juego no lo abrió en 60 s' : bloqueado ? 'bloqueado' : 'sonando'}; clic en una esquina de la página`);
+  // (la página nueva esconde la tarjeta de inicio al arrancar: el clic va a una esquina del juego, que no usa el mouse)
+  await pagina.locator('#canvas').click({ position: { x: 4, y: 4 }, force: true });
   const pantalla = medirPantalla();
   try {
     await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: maximo, polling: 1000 });

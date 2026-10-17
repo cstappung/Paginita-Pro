@@ -164,8 +164,9 @@ export function crearGuardado({ base = 'mkw-partidas', almacen = 'archivos', esp
     const crudo = new Blob(partes);
     return new Response(crudo.stream().pipeThrough(new CompressionStream('gzip'))).blob();
   }
-  // Reemplaza TODO lo guardado por el contenido del paquete (después hay que recargar la página)
-  async function importar(blob) {
+  // Abre un paquete y revisa TODO, sin tocar lo guardado: devuelve [[ruta, {datos, mtime}], …] o lanza un error que
+  // se puede mostrar. Sirve para mostrarle a la persona qué licencias trae ANTES de reemplazar nada.
+  async function abrirPaquete(blob) {
     let bytes;
     try { bytes = new Uint8Array(await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()); }
     catch { throw new Error('no es un paquete de partidas de MKW'); }   // no está comprimido con gzip
@@ -182,6 +183,11 @@ export function crearGuardado({ base = 'mkw-partidas', almacen = 'archivos', esp
       p += tam;
     }
     if (p !== bytes.length) throw new Error('paquete con bytes de más');
+    return archivos;
+  }
+  // Reemplaza TODO lo guardado por el contenido del paquete (después hay que recargar la página)
+  async function importar(blob) {
+    const archivos = await abrirPaquete(blob);                     // si está roto, lanza aquí y no se borra nada
     detener();                                                     // recién ahora: el paquete está bien
     const tx = await transaccion('readwrite');
     const os = tx.objectStore(almacen);
@@ -189,9 +195,27 @@ export function crearGuardado({ base = 'mkw-partidas', almacen = 'archivos', esp
     for (const [ruta, valor] of archivos) os.put(valor, ruta);
     await terminada(tx);
     await cargar();
-    return indice.length;
+    return archivos.length;
+  }
+
+  // ---- Un archivo suelto: la partida de una Wii o de Dolphin (rksys.dat), la base de Mii (RFL_DB.dat) ----
+  // leerArchivo da los bytes guardados (o null); ponerArchivo reemplaza SOLO ese archivo y deja el resto (ajustes de
+  // Retro Rewind, fantasmas) como estaba. Igual que importar, deja quieto el guardado automático hasta recargar.
+  async function leerArchivo(ruta) {
+    if (FS) await guardarPendientes();
+    const v = await promesa((await transaccion('readonly')).objectStore(almacen).get(ruta));
+    return v ? v.datos : null;
+  }
+  async function ponerArchivo(ruta, datos) {
+    if (!interesa(ruta)) throw new Error('ruta fuera de las carpetas de partidas: ' + ruta);
+    detener();
+    const tx = await transaccion('readwrite');
+    tx.objectStore(almacen).put({ datos: new Uint8Array(datos), mtime: Date.now() }, ruta);
+    await terminada(tx);
+    await cargar();
   }
 
   return { estado, cargar, restaurar, vigilar, guardarPendientes, borrarTodo, pedirPersistencia, interesa, exportar, importar,
+           abrirPaquete, leerArchivo, ponerArchivo, detener,
            get pendientes() { return pendientes.size + borrados.size; } };
 }

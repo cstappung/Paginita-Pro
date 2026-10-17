@@ -293,7 +293,7 @@ def main():
     if navegador:
         # El navegador: aurora de verdad (WebGPU en el <canvas>), archivos en la memoria (MEMFS) que la página
         # llena antes de arrancar; los archivos grandes del disco se piden por HTTP al leerlos (web/navegador).
-        exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_pad",
+        exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_pad", "_mkw_web_mem",
                     "_mkw_web_sonido_cola_ms", "_mkw_web_sonido_ritmo", "_mkw_web_sonido_tirados",
                     # la lista de pipelines usados, para precalentarlos en la próxima visita (web/navegador/pipelines.mjs)
                     "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos"]

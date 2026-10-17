@@ -16,10 +16,13 @@
 //         "K~30000:500" = mantener K apretada 30 s (p. ej. acelerar en una carrera);
 //         "P:4000" = perfil de 4 s (en qué funciones se va el tiempo), acelerando mientras mide;
 //         "Q:4000" = lo mismo sin apretar nada (para perfilar un menú sin elegir nada);
+//         "X:1000" = evaluar la expresión de --evaluar en ese momento (y al final no);
 //         "F*4:500" = frenar la CPU 4× desde ahora, como un celular ("F*1" = normal; ver medir-cpu.sh)
 //       --esperar N: cuadros que espera antes del primer paso (por defecto 360 = 6 s, ya en el título)
 //       --extra "&x=y": parámetros más para la página (p. ej. "&rutas=traducido" o "&thp=comparar")
 //       --traza: al final, vuelca la traza del ritmo a consola.log (con --extra "&traza=1")
+//       --mii: antes de los pasos deja una base de Mii de prueba (2 Mii inventados) y recarga
+//       --evaluar "expr": al final escribe el resultado de evaluar expr en la página (diagnóstico)
 //       --listar: al final, lista los archivos que escribió el juego (para saber qué hay que guardar)
 //       --llamadores "f1,f2": con un paso P o Q, dice desde qué funciones se llama a f1, f2 (p. ej. el reloj)
 //       --semilla: al final, guarda la lista de pipelines que usó el juego como semilla para precalentar
@@ -36,7 +39,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const args = process.argv.slice(2);
 const opcion = (n, porDefecto) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : porDefecto; };
-const pasos = (args.find(a => !a.startsWith('--') && !['--esperar', '--extra', '--llamadores'].includes(args[args.indexOf(a) - 1])) || '').split(/\s+/).filter(Boolean);
+const pasos = (args.find(a => !a.startsWith('--') && !['--esperar', '--extra', '--llamadores', '--evaluar'].includes(args[args.indexOf(a) - 1])) || '').split(/\s+/).filter(Boolean);
 const esperarCuadros = Number(opcion('--esperar', 360));
 const PUERTO = 8142;
 const NOMBRE = { K: 'KeyK', J: 'KeyJ', P: 'KeyP', T: 'KeyT', G: 'KeyG', F: 'KeyF', H: 'KeyH',
@@ -59,6 +62,21 @@ pagina.on('request', r => { const u = new URL(r.url()); if (u.pathname.startsWit
 pagina.on('pageerror', e => { log.write('[pageerror] ' + e.message + '\n'); console.log('[pageerror] ' + e.message); });
 await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1${opcion('--extra', '')}`);   // --extra "&rutas=traducido" etc.
 await pagina.waitForFunction(n => (window.mkwEstado?.cuadros || 0) >= n, esperarCuadros, { timeout: 120000, polling: 250 });
+// --mii: antes de los pasos, deja una base de Mii de prueba (RFL_DB.dat con 2 Mii inventados, armada por mii.mjs) en
+// las partidas del navegador y recarga: así se ve si el juego los lista al crear la licencia ("Elegir Mii")
+if (args.includes('--mii')) {
+  const r = await pagina.evaluate(async () => {
+    const M = await import('/mii.mjs');
+    const a = M.miiNuevo({ nombre: 'Prueba' }); a.pelo.tipo = 20; a.pelo.color = 6; a.colorFavorito = 4; a.lentes.tipo = 1;
+    const b = M.miiNuevo({ nombre: 'Banco', esChica: 1, ahora: Date.now() + 8000 }); b.cara.piel = 3; b.colorFavorito = 7;
+    const base = M.armarBase([a, b]);
+    await window.mkwGuardado.ponerArchivo(M.RUTA_RFLDB, base);
+    return M.leerBase(base).mii.map(x => x.mii.nombre).join(', ');
+  });
+  console.log('base de Mii de prueba: ' + r);
+  await pagina.reload();
+  await pagina.waitForFunction(n => (window.mkwEstado?.cuadros || 0) >= n, esperarCuadros, { timeout: 120000, polling: 250 });
+}
 
 const foto = async nombre => pagina.locator('#canvas').screenshot({ path: path.join(carpeta, nombre + '.png') });
 await foto('00-inicio');
@@ -70,6 +88,13 @@ for (const paso of pasos) {
   const [letra, veces] = teclaVeces.split('*');
   const sostener = Number(sostenerTexto || 120);
   const ms = Number(msTexto || 1200);
+  if (letra === 'X') {
+    // X:ms = evaluar ahora la expresión de --evaluar (p. ej. escribir algo en la memoria del juego) y esperar
+    console.log('X: ' + JSON.stringify(await pagina.evaluate(opcion('--evaluar', '')).catch(e => String(e))));
+    await pagina.waitForTimeout(ms);
+    n++;
+    continue;
+  }
   if (letra === 'F') {
     // F*4:500 = desde ahora la CPU de la página va 4 veces más lenta (como un celular; F*1 = normal). Usa el freno de
     // las DevTools de Chrome (Emulation.setCPUThrottlingRate): frena el hilo de la página, el del juego incluido.
@@ -141,7 +166,9 @@ for (const paso of pasos) {
   await foto(`${String(n).padStart(2, '0')}-${letra === '-' ? 'espera' : letra}`);
   // con el cuadro y el segundo del medidor, para saber a qué pantalla corresponde cada línea de consola.log
   const cuadro = await pagina.evaluate(() => window.mkwEstado?.cuadros || 0);
-  console.log(`paso ${n}: ${paso} → foto (cuadro ${cuadro}, segundo ${((Date.now() - inicio) / 1000).toFixed(0)})`);
+  // y en qué pantalla quedó el juego (menus.mjs: sección, página, pista/modo/cc elegidos), leído de su memoria
+  const menu = await pagina.evaluate(() => window.mkwMenus ? window.mkwMenus.texto(window.mkwMenus.estado()) : '');
+  console.log(`paso ${n}: ${paso} → foto (cuadro ${cuadro}, segundo ${((Date.now() - inicio) / 1000).toFixed(0)})${menu ? ' · ' + menu : ''}`);
 }
 if (args.includes('--traza')) {
   // La traza del ritmo (con --extra "&traza=1"): a consola.log en líneas "[traza] [...]" (herramientas/analizar-traza.mjs
@@ -150,6 +177,8 @@ if (args.includes('--traza')) {
   for (let i = 0; i < t.length; i += 3000) log.write('[traza] ' + JSON.stringify(t.slice(i, i + 3000)) + '\n');
   console.log(`traza del ritmo: ${t.length} eventos`);
 }
+// --evaluar "expresión": al final, evalúa una expresión en la página y escribe el resultado (diagnóstico)
+if (opcion('--evaluar', '') && !pasos.some(p => p.startsWith('X'))) console.log('evaluar: ' + JSON.stringify(await pagina.evaluate(opcion('--evaluar', '')).catch(e => String(e))));
 if (args.includes('--listar')) {
   // Qué archivos escribió el juego (fecha posterior al arranque de main), en todo su sistema de archivos
   const escritos = await pagina.evaluate(() => {

@@ -2,111 +2,400 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MKW en el navegador</title>
-<!-- Página del juego para el banco (fase 3): Mario Kart Wii + Retro Rewind con aurora real (WebGPU) en un canvas.
-     La sirve SOLO web/navegador/servidor.mjs en 127.0.0.1 (el juego y el disco son privados).
-     Parámetros: ?auto=1 arranca sin apretar el botón (para Playwright); ?cuadros=N termina la prueba en N cuadros. -->
-<link rel="stylesheet" href="banco/estilo.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Mario Kart Wii</title>
+<!-- La página del juego (bitácora §55), con la cara de Paginita Pro / Juegos y la forma de la de BT3: el juego ocupa toda
+     la ventana; adelante, la tarjeta de inicio con "Tu partida" y la columna de modos; arriba a la derecha una barra que
+     se esconde sola mientras se juega; a la derecha, un cajón con los paneles (Partida, Controles, Sonido, Avanzado).
+     El programa de la página es mkw.mjs (el juego) + interfaz.mjs (todo lo de la pantalla de inicio, paneles y diálogos).
+     Aquí la sirve web/navegador/servidor.mjs en 127.0.0.1; en el sitio, el juego en sí viene del Worker de amigos.
+     Parámetros: ?auto=1 arranca sin apretar el botón (pruebas); ?cuadros=N termina la prueba en N cuadros. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Lilita+One&display=swap" rel="stylesheet">
 <style>
-  /* El canvas: 640x528 es el tamaño nativo del juego (la imagen PAL de la Wii); se agranda con CSS sin deformarse */
-  #pantalla{position:relative;max-width:880px}
-  #pantalla:fullscreen{max-width:none;background:#000;display:flex;align-items:center;justify-content:center}
-  #pantalla:fullscreen #canvas{max-width:none;height:100%;width:auto}
-  /* Con el mando táctil (celular): el recuadro del juego ocupa la pantalla y la imagen queda centrada; los botones
-     van a los costados (acostado) o debajo (parado), sobre el negro, sin tapar el juego */
-  body.tactil #pantalla{max-width:none;width:100vw;margin-left:calc(50% - 50vw);height:100svh;background:#000;display:flex;align-items:center;justify-content:center}
-  body.tactil #canvas{width:auto;height:auto;max-width:100%;max-height:100%}
-  #tablaTeclas button{font:600 12px ui-monospace,Consolas,monospace;padding:3px 8px;margin:1px}
-  #canvas{display:block;width:100%;max-width:880px;aspect-ratio:640/528;background:#000;border-radius:8px;outline:none}
-  .fila{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
-  .dato{font:600 14px ui-monospace,Consolas,monospace}
-  /* Avisos discretos: una franja de color suave con borde a la izquierda (no gritan, pero se ven) */
-  .aviso{margin:8px 0 10px;padding:7px 12px;border-left:3px solid var(--nota);border-radius:6px;font-size:13px;
-         color:var(--texto);background:color-mix(in srgb,var(--nota) 10%,transparent)}
-  details.aviso summary{cursor:pointer;color:var(--nota)}
-  details.aviso[open] summary{margin-bottom:4px}
-  #log{max-height:220px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;color:var(--suave);margin:0}
+  /* Los colores del sitio (juegos.html: --jg-ink, --jg-purple…) más los de la tarjeta de carreras (rojo y amarillo) */
+  :root { --tinta: #232137; --morado: #7042df; --lila: #ab8bff; --suave: #a7a3bd; --texto: #f1effa; --panel: #17142a;
+    --panel2: #201c38; --linea: #3a3361; --amarillo: #ffd21f; --rojo: #e8322e; --verde: #3fd59a; --peligro: #ff6b7a;
+    --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
+    --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--texto); overflow: hidden;
+    font: 15px/1.5 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  button { font: inherit; }
+  :focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+
+  /* ---- el juego: toda la ventana; la imagen centrada sin deformarse (el canvas mide lo que pide SDL) ---- */
+  #pantalla { inset: 0; background: #000; }
+  #canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; }
+
+  /* ---- la pantalla de inicio: el cielo de un circuito de noche, la bandera a cuadros y líneas de velocidad ---- */
+  #inicio { position: fixed; inset: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 22px; overflow: auto;
+    align-items: safe center; justify-content: safe center; align-content: safe center;
+    padding: calc(56px + var(--st)) calc(16px + var(--sr)) calc(20px + var(--sb)) calc(16px + var(--sl));
+    background:
+      repeating-linear-gradient(100deg, #ffffff06 0 2px, transparent 2px 46px),
+      radial-gradient(ellipse 80% 55% at 50% 110%, #e8322e44, transparent 70%),
+      radial-gradient(ellipse 60% 45% at 50% -10%, #7042df66, transparent 70%),
+      linear-gradient(170deg, #120f2a, #1b1440 45%, #2a1036 80%, #300f18); }
+  #inicio::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 14px; opacity: .55; pointer-events: none;
+    background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14px 14px; }
+  body.started #inicio { display: none; }
+  .tarjeta { width: 460px; max-width: 100%; box-sizing: border-box; padding: 26px; border-radius: 18px;
+    background: #161233ee; border: 2px solid #4b3d93; box-shadow: 0 24px 60px #000b, 0 0 40px #7042df33; }
+  .ceja { margin: 0 0 4px; font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--lila); }
+  h1 { margin: 0 0 4px; font: 400 40px/1.02 'Lilita One', system-ui, sans-serif; letter-spacing: .01em;
+    background: linear-gradient(180deg, #fff7c2, #ffe14a 35%, #ff9d00 65%, #e8322e); -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-stroke: 1.5px #3b0a06; filter: drop-shadow(0 3px 0 #1a0402) drop-shadow(0 0 14px #ff6a0055); }
+  .sub { display: inline-block; margin: 0 0 14px; padding: 2px 10px; border-radius: 999px; background: #e8322e; color: #fff;
+    font: 400 15px 'Lilita One', system-ui, sans-serif; letter-spacing: .04em; box-shadow: 0 2px 0 #5a0d0b; }
+  .tarjeta p { margin: 0 0 14px; color: var(--suave); font-size: 14px; }
+  .jugar { display: block; width: 100%; padding: 13px 16px; border-radius: 12px; cursor: pointer; border: 3px solid #3b0a06;
+    background: linear-gradient(180deg, #fff27a, #ffd21f 30%, #ff9d00 65%, #ff5a00); color: #2a0800;
+    font: 400 21px 'Lilita One', system-ui, sans-serif; letter-spacing: .03em; box-shadow: 0 5px 0 #3b0a06, 0 0 24px #ff6a0055; }
+  .jugar:hover { filter: brightness(1.07); }
+  .jugar:disabled { filter: grayscale(.5) brightness(.8); cursor: default; }
+  .boton { padding: 7px 12px; border-radius: 10px; border: 1px solid var(--linea); background: var(--panel2); color: var(--texto);
+    cursor: pointer; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .boton:hover { border-color: var(--lila); }
+  .boton.principal { background: var(--morado); border-color: var(--morado); color: #fff; }
+  .boton.peligro { color: var(--peligro); border-color: #6a2a3a; }
+  .boton:disabled { opacity: .5; cursor: default; }
+  #estadoInicio { margin-top: 12px; min-height: 1.4em; font-size: 13px; color: var(--suave); }
+  .teclas { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
+  kbd { font: 12px ui-monospace, Consolas, monospace; background: #241f40; border: 1px solid var(--linea); border-radius: 4px; padding: 1px 5px; }
+
+  /* "Tu partida": las licencias como fichas, con su estado (guardada aquí / en tu cuenta) */
+  .partida { margin: 0 0 16px; padding: 12px; border-radius: 14px; background: #0f0c24; border: 1px solid var(--linea); }
+  .partida-tit { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .partida-tit b { font: 400 17px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .chip { margin-left: auto; padding: 2px 9px; border-radius: 999px; font: 600 11px 'IBM Plex Sans', sans-serif; background: #2a2450; color: var(--suave); }
+  .chip.bien { background: #133a2d; color: var(--verde); }
+  .licencias { display: grid; gap: 6px; margin: 0 0 10px; }
+  .licencia { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--linea); }
+  .licencia .num { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--morado);
+    color: #fff; font: 400 15px 'Lilita One', system-ui, sans-serif; }
+  .licencia strong { display: block; font-weight: 600; }
+  .licencia small { display: block; color: var(--suave); font-size: 12px; }
+  .licencia .ca { margin-left: auto; font: 12px ui-monospace, Consolas, monospace; color: var(--lila); white-space: nowrap; }
+  .vacia { margin: 0 0 10px; font-size: 13px; color: var(--suave); }
+  .fila-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ayuda-donde { margin-top: 8px; font-size: 12.5px; color: var(--suave); }
+  .ayuda-donde summary { cursor: pointer; color: var(--lila); }
+  .ayuda-donde code { font-size: 11.5px; word-break: break-all; color: var(--texto); }
+  .ayuda-donde li { margin: 4px 0; }
+
+  /* ---- la columna de modos (como la de BT3 y Snake Club): una tarjeta por modo, con su emblema ---- */
+  .modos-lista { width: 340px; max-width: 100%; display: grid; gap: 8px; align-content: start; }
+  .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
+  .modos-tit h2 { margin: 0; font: 400 21px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-shadow: 0 2px 0 #1a0402; }
+  .modos-tit span { font: 400 13px 'Lilita One', system-ui, sans-serif; letter-spacing: .08em; color: #8a83b8; }
+  .modo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 11px 12px; border-radius: 14px; text-align: left;
+    border: 2px solid #3d3378; background: #161233e6; color: var(--texto); cursor: pointer; font: 13px/1.35 'IBM Plex Sans', sans-serif;
+    transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .modo:hover { border-color: #7a68d6; transform: translateY(-1px); }
+  .modo .ico { --c1: #ff9d00; --c2: #b33a00; width: 50px; height: 50px; flex: none; display: grid; place-items: center; border-radius: 14px;
+    box-shadow: inset 0 0 0 2px #ffffff22, 0 3px 0 #0a0820;
+    background: repeating-linear-gradient(115deg, #ffffff1c 0 4px, transparent 4px 11px), radial-gradient(circle at 50% 35%, var(--c1), var(--c2) 78%); }
+  .modo .ico svg { width: 30px; height: 30px; filter: drop-shadow(0 2px 0 #0006); }
+  .ico-libre { --c1: #ffb340 !important; --c2: #c2410c !important; }
+  .ico-gp { --c1: #ffe14a !important; --c2: #b45309 !important; }
+  .ico-vs { --c1: #ff6b6b !important; --c2: #8f1d1d !important; }
+  .ico-tt { --c1: #5ad1ff !important; --c2: #0b5a8a !important; }
+  .ico-bat { --c1: #4ade80 !important; --c2: #0f5132 !important; }
+  .ico-red { --c1: #b69bff !important; --c2: #4a24a8 !important; }
+  .ico-mii { --c1: #ff9ad5 !important; --c2: #a1306f !important; }
+  .modo strong { display: flex; align-items: center; gap: 6px; font: 400 18px 'Lilita One', system-ui, sans-serif; color: #fff; }
+  .modo strong em { font: 700 9px 'IBM Plex Sans', sans-serif; font-style: normal; letter-spacing: .08em; padding: 2px 5px; border-radius: 4px;
+    background: #7042df44; color: #c9b8ff; text-transform: uppercase; }
+  .modo small { display: block; margin-top: 2px; font-size: 12px; color: var(--suave); }
+  .modo .radio { margin-left: auto; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #5d5598; }
+  .modo.activo { border-color: var(--amarillo); background: linear-gradient(180deg, #2a2160, #1a1442); box-shadow: 0 0 20px #ffd21f33; }
+  .modo.activo strong { color: var(--amarillo); }
+  .modo.activo .radio { background: var(--amarillo); border-color: var(--amarillo); box-shadow: inset 0 0 0 3px #1a1442; }
+  /* lo que se elige dentro de un modo (copa, pista, cilindrada): fichas bajo la columna */
+  .opciones-modo { display: grid; gap: 8px; padding: 10px 12px; border-radius: 14px; border: 2px solid #3d3378; background: #161233e6; }
+  .opciones-modo > span { font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); }
+  .fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fichas button { padding: 6px 10px; border-radius: 999px; border: 1px solid #3d3378; background: #221c4a; color: var(--texto);
+    font: 600 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
+  .fichas button:hover { border-color: var(--amarillo); }
+  .fichas button[aria-pressed="true"] { background: linear-gradient(180deg, #ffd21f, #ff8a00); border-color: var(--amarillo); color: #1a0a00; }
+  .pistas { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 210px; overflow: auto; }
+  .pistas button { text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto);
+    font: 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
+  .pistas button[aria-pressed="true"] { border-color: var(--amarillo); color: var(--amarillo); }
+  @media (max-width: 860px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit, .opciones-modo { grid-column: 1 / -1; } .modo .radio { display: none; } }
+  @media (max-width: 520px) { .modos-lista { width: 100%; grid-template-columns: 1fr; } }
+
+  /* ---- la barra de arriba: volumen, Partida, Controles, ⛶, el mando; con el juego andando se esconde sola ---- */
+  #barra { position: fixed; z-index: 7; top: calc(var(--st) + 22px); right: calc(var(--sr) + 10px); display: flex; gap: 6px; align-items: center;
+    flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 20px); font: 600 12px 'IBM Plex Sans', sans-serif; transition: opacity .25s, transform .25s; }
+  body.started #barra { top: calc(var(--st) + 8px); }
+  #barra > button, #barra > a, #mando { background: rgba(23,20,42,.9); color: var(--texto); border: 1px solid #463d7a; border-radius: 8px;
+    padding: 5px 10px; font: inherit; cursor: pointer; text-decoration: none; }
+  #barra > button:hover { border-color: var(--lila); }
+  #barra > button[aria-expanded="true"] { background: var(--morado); border-color: var(--morado); }
+  #mando { cursor: default; max-width: min(240px, 34vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mando.ok { border-color: var(--verde); color: var(--verde); }
+  #barra button.seguro { border-color: var(--amarillo); color: var(--amarillo); }
+  body.started:not(.barra-viva):not(.cajon-abierto) #barra { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+  #volverJuegos { display: none; }
+  html.en-juegos #volverJuegos { display: inline-block; }
+  .vol-mini { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; background: rgba(23,20,42,.9); border: 1px solid #463d7a; }
+  .vol-mini input { width: 80px; accent-color: var(--amarillo); }
+  .vol-mini button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; }
+  body.tactil .vol-mini input { display: none; }
+  /* en el celular, la barra va arriba al centro: a la derecha está el ▶ (pausa) del mando táctil */
+  body.tactil #barra { left: 50%; right: auto; translate: -50% 0; justify-content: center; max-width: calc(100vw - 30cqmin); }
+  body.tactil.started #barra { max-width: 60vw; }
+
+  /* ---- el cajón: un panel a la derecha con pestañas ---- */
+  #cajon { position: fixed; z-index: 8; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); box-sizing: border-box; display: flex; flex-direction: column;
+    background: #120f26f7; border-left: 1px solid var(--linea); box-shadow: -18px 0 40px #0009; transform: translateX(105%);
+    transition: transform .22s ease; padding-top: var(--st); padding-bottom: var(--sb); }
+  body.cajon-abierto #cajon { transform: none; }
+  .pestanas { display: flex; gap: 4px; padding: 10px 10px 0; border-bottom: 1px solid var(--linea); }
+  .pestanas button { padding: 8px 10px; border: 0; border-radius: 10px 10px 0 0; background: none; color: var(--suave); cursor: pointer; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .pestanas button[aria-selected="true"] { background: var(--panel2); color: var(--amarillo); }
+  .pestanas .cerrar { margin-left: auto; font-size: 18px; line-height: 1; padding: 6px 10px; }
+  .hoja { flex: 1; overflow: auto; padding: 14px 16px 24px; }
+  .hoja h2 { margin: 0 0 10px; font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .hoja h3 { margin: 16px 0 6px; font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--lila); }
+  .hoja p, .hoja li { font-size: 13px; color: var(--suave); }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; font-size: 13px; }
+  .fila input[type=range] { accent-color: var(--amarillo); }
+  .dato { font: 600 12.5px ui-monospace, Consolas, monospace; color: var(--texto); }
+  .aviso { margin: 8px 0 10px; padding: 7px 12px; border-left: 3px solid var(--amarillo); border-radius: 6px; font-size: 13px;
+    color: var(--texto); background: #ffd21f14; }
+  details.aviso summary { cursor: pointer; color: var(--amarillo); }
+  #tablaTeclas { border-collapse: collapse; font-size: 13px; }
+  #tablaTeclas td { padding: 2px 6px; color: var(--suave); }
+  #tablaTeclas button { font: 600 12px ui-monospace, Consolas, monospace; padding: 3px 8px; margin: 1px; border-radius: 6px;
+    border: 1px solid var(--linea); background: var(--panel2); color: var(--texto); cursor: pointer; }
+  .respaldos { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .respaldos li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--panel2); }
+  .respaldos li span { flex: 1; min-width: 0; }
+  .respaldos li small { display: block; color: var(--suave); }
+  #log { max-height: 260px; overflow: auto; font: 11.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--suave); margin: 0;
+    background: #0b0918; padding: 8px; border-radius: 8px; }
+  #resultados { margin: 0; padding-left: 18px; font-size: 12.5px; }
+  #resumen { font-weight: 600; }
+
+  /* ---- arrastrar un archivo a la página ---- */
+  #soltar { position: fixed; inset: 12px; z-index: 20; display: grid; place-items: center; border: 3px dashed var(--amarillo); border-radius: 22px;
+    background: #120f26e6; color: var(--amarillo); font: 400 26px 'Lilita One', system-ui, sans-serif; text-align: center; pointer-events: none; }
+
+  /* ---- los diálogos de la página (en un marco con sandbox confirm()/alert() no andan) ---- */
+  dialog { max-width: min(480px, calc(100vw - 32px)); border: 2px solid #4b3d93; border-radius: 16px; padding: 20px; background: var(--panel);
+    color: var(--texto); box-shadow: 0 24px 60px #000c; }
+  dialog::backdrop { background: #05031099; }
+  dialog h2 { margin: 0 0 8px; font: 400 21px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  dialog .cuerpo { font-size: 14px; color: var(--suave); }
+  dialog .cuerpo b { color: var(--texto); }
+  dialog .acciones { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+  /* ---- sobre el juego: el aviso del piloto y la lista para elegir copa/pista ---- */
+  #avisoJuego { position: fixed; z-index: 6; left: 50%; top: calc(var(--st) + 10px); translate: -50% 0; max-width: calc(100vw - 32px);
+    padding: 7px 14px; border-radius: 999px; background: #161233ee; border: 1px solid #4b3d93; color: var(--texto);
+    font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
+  #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
+  #elegirPista { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb)); background: #0d0a1fee; }
+  .elegir-cab { max-width: 1100px; margin: 0 auto 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .elegir-cab h2 { margin: 0 8px 0 0; font: 400 28px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .elegir-cab input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; }
+  .copas { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .copa { display: grid; gap: 3px; padding: 8px; border-radius: 12px; background: #161233; border: 2px solid #3d3378; }
+  .copa-cab { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; border: 0; border-radius: 8px; background: none; color: var(--amarillo); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .copa-cab b { font: 400 16px 'Lilita One', system-ui, sans-serif; }
+  .copa-cab:disabled { cursor: default; }
+  .copa-cab:not(:disabled):hover { background: #2a2160; }
+  .copa .pista { text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto); cursor: pointer; font: 12.5px 'IBM Plex Sans', sans-serif; }
+  .copa .pista:not(:disabled):hover { border-color: var(--amarillo); color: var(--amarillo); }
+  .copa .pista:disabled { cursor: default; opacity: .85; }
+
+  /* ---- el editor de Mii: pantalla propia, sin arrancar el juego ---- */
+  #editorMii { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
+    background: linear-gradient(170deg, #1a1234, #24123a 60%, #2c1030); }
+  .mii-marco { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: 220px 1fr; gap: 16px; }
+  .mii-cabeza { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .mii-cabeza h2 { margin: 0; font: 400 28px 'Lilita One', system-ui, sans-serif; color: #ff9ad5; text-shadow: 0 2px 0 #3a0a24; }
+  .mii-cabeza .boton:first-child { margin-right: 4px; }
+  .mii-lista { display: grid; gap: 6px; align-content: start; }
+  .mii-lista button.mii { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 12px; border: 2px solid #3d3378; background: #161233;
+    color: var(--texto); cursor: pointer; text-align: left; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .mii-lista button.mii[aria-pressed="true"] { border-color: #ff9ad5; }
+  .mii-lista button.mii svg { width: 40px; height: 40px; flex: none; }
+  .mii-editor { display: grid; grid-template-columns: 200px 1fr; gap: 16px; padding: 16px; border-radius: 16px; background: #161233ee; border: 2px solid #4b3d93; }
+  .mii-vista { display: grid; justify-items: center; gap: 6px; align-content: start; }
+  .mii-vista svg { width: 180px; height: 180px; background: #0f0c24; border-radius: 18px; }
+  .mii-vista small { color: var(--suave); font-size: 11.5px; text-align: center; }
+  .mii-pestanas { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .mii-pestanas button { padding: 5px 10px; border-radius: 999px; border: 1px solid #3d3378; background: #221c4a; color: var(--texto); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .mii-pestanas button[aria-selected="true"] { background: #ff9ad5; border-color: #ff9ad5; color: #2a0a1c; }
+  .mii-campos { display: grid; gap: 8px; }
+  .mii-campos label { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 8px; font-size: 13px; color: var(--suave); }
+  .mii-campos input[type=range] { width: 100%; accent-color: #ff9ad5; }
+  .mii-campos input[type=text] { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; }
+  .mii-campos output { text-align: right; font: 600 12px ui-monospace, Consolas, monospace; color: var(--texto); }
+  .mii-campos .colores { display: flex; gap: 4px; flex-wrap: wrap; }
+  .mii-campos .colores button { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #0006; cursor: pointer; }
+  .mii-campos .colores button[aria-pressed="true"] { outline: 2px solid #fff; outline-offset: 1px; }
+  .mii-pie { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .mii-pie p { flex-basis: 100%; margin: 4px 0 0; font-size: 12.5px; color: var(--suave); }
+  @media (max-width: 760px) { .mii-marco, .mii-editor { grid-template-columns: 1fr; } .mii-lista { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } }
 </style>
 </head>
 <body>
-<h1>Mario Kart Wii <span>+ Retro Rewind</span> en el navegador</h1>
-<p>Fase 3: aurora de verdad (WebGPU) dibujando en un canvas. Teclado, mandos y celular (ver «Controles»).</p>
+<!-- el juego (position:fixed va en el atributo: controles.mjs le pone position:relative si no tiene una propia) -->
+<div id="pantalla" style="position:fixed"><canvas id="canvas" tabindex="0"></canvas></div>
 
-<div class="caja" id="opciones">
-  <h2 style="font-size:16px;margin:0 0 8px">Opciones</h2>
-  <div class="fila">
-    <label for="volumen">Volumen:</label>
-    <input type="range" id="volumen" min="0" max="100" step="1" style="width:180px">
-    <span class="dato" id="volumenDato">—</span>
-    <label><input type="checkbox" id="silencio"> Silencio</label>
-  </div>
-  <div class="fila">
-    <span>Partidas guardadas:</span>
-    <span id="partidas" style="font-size:13px;color:var(--suave)">—</span>
-    <button id="bajarPartidas" style="font-size:13px;padding:4px 10px">Descargar</button>
-    <button id="subirPartidas" style="font-size:13px;padding:4px 10px">Cargar…</button>
-    <input type="file" id="archivoPartidas" accept=".mkwp" hidden>
-    <button id="borrarPartidas" style="font-size:13px;padding:4px 10px">Borrar partidas guardadas</button>
-  </div>
-  <div class="fila">
-    <span>Datos del juego en este navegador:</span>
-    <span id="datosDisco" style="font-size:13px;color:var(--suave)">—</span>
-    <button id="borrarDisco" style="font-size:13px;padding:4px 10px">Borrar</button>
-  </div>
-  <p id="gpuEnUso" style="margin:0;font-size:13px;color:var(--suave)">🎮 tarjeta de video: —</p>
-  <details class="aviso" id="gpuAyuda" hidden>
-    <summary>¿Tienes una tarjeta de video dedicada y el juego va lento?</summary>
-    La tarjeta que usa el navegador la decide Windows, no la página. Para cambiarla: Configuración → Sistema →
-    Pantalla → Gráficos → tu navegador (p. ej. Google Chrome) → <i>Alto rendimiento</i>, y reinicia el navegador.
-  </details>
+<div id="barra">
+  <button id="volverJuegos" type="button" title="Volver a Juegos">← Juegos</button>
+  <span data-volumen hidden></span>
+  <span class="vol-mini" id="volMini"><button type="button" id="volMiniMudo" title="Silencio">🔊</button><input type="range" id="volMiniBarra" min="0" max="100" aria-label="Volumen"></span>
+  <button type="button" data-abre="partida" aria-expanded="false">Partida</button>
+  <button type="button" data-abre="controles" aria-expanded="false">Controles</button>
+  <button type="button" data-abre="avanzado" aria-expanded="false" title="Ajustes y diagnóstico">⚙</button>
+  <button type="button" id="completa" title="Pantalla completa">⛶</button>
+  <span id="mando" role="status">Mando: aprieta un botón</span>
 </div>
 
-<div class="caja">
-  <div class="fila">
-    <button id="arrancar" class="principal">Arrancar el juego</button>
-    <span class="dato" id="fps">— fps</span>
-    <span class="dato" id="trabajo">trabajo — ms</span>
-    <span class="dato" id="lecturas">disco: —</span>
-    <span class="dato" id="sonidoDato">sonido: —</span>
+<div id="inicio">
+  <div class="tarjeta">
+    <p class="ceja">El juego de Wii, en tu navegador</p>
+    <h1>Mario Kart Wii</h1>
+    <span class="sub">+ Retro Rewind</span>
+    <p>Más de 200 pistas clásicas, todo desbloqueado. Se juega con el teclado, un mando o el celular.</p>
+
+    <section class="partida" aria-labelledby="tituloPartida">
+      <div class="partida-tit"><b id="tituloPartida">Tu partida</b><span class="chip" id="chipPartida">—</span></div>
+      <div class="licencias" id="licenciasInicio"></div>
+      <p class="vacia" id="partidaVacia" hidden>Todavía no hay licencias. Al jugar, el juego crea una y se guarda sola en
+        este navegador. ¿Ya juegas en una Wii o en Dolphin? <b>Carga tu partida</b> y sigue donde quedaste.</p>
+      <div class="fila-botones">
+        <button type="button" class="boton principal" data-cargar>Cargar mi partida…</button>
+        <button type="button" class="boton" data-abre="partida">Descargar · respaldos</button>
+      </div>
+    </section>
+
+    <button id="arrancar" class="jugar" type="button">Jugar</button>
+    <div id="estadoInicio" role="status"></div>
+    <div class="teclas"><kbd>K</kbd> acelerar · <kbd>J</kbd> frenar · <kbd>←</kbd><kbd>→</kbd> girar · <kbd>L</kbd> derrapar ·
+      <kbd>Espacio</kbd> objeto · <kbd>P</kbd> pausa — todo se cambia en «Controles». La partida se guarda sola en este navegador.</div>
   </div>
-  <p class="aviso" id="sonidoAviso" hidden>
-    🔇 El navegador tiene el sonido bloqueado hasta que toques la página o aprietes una tecla.</p>
-  <div id="pantalla"><canvas id="canvas" tabindex="0"></canvas></div>
+
+  <div class="modos-lista" id="modos">
+    <div class="modos-tit"><h2>Modos</h2><span>ELIGE CÓMO JUGAR</span></div>
+    <!-- interfaz.mjs las arma (MODOS): cada una con su emblema, su texto y si ya anda -->
+  </div>
 </div>
 
-<div class="caja" id="controles">
-  <h2 style="font-size:16px;margin:0 0 8px">Controles</h2>
-  <div class="fila">
-    <label><input type="checkbox" id="usarTactil"> Mando táctil (celular)</label>
-    <label><input type="checkbox" id="usarInclinacion"> Dirigir inclinando el teléfono</label>
-    <button id="completa">Pantalla completa</button>
-    <span class="dato" id="puerto1">puerto 1: —</span>
+<aside id="cajon" aria-label="Opciones">
+  <div class="pestanas" role="tablist">
+    <button type="button" role="tab" data-hoja="partida" aria-selected="true">Partida</button>
+    <button type="button" role="tab" data-hoja="controles" aria-selected="false">Controles</button>
+    <button type="button" role="tab" data-hoja="avanzado" aria-selected="false">Avanzado</button>
+    <button type="button" class="cerrar" id="cerrarCajon" title="Cerrar (Esc)">×</button>
   </div>
-  <div class="fila" id="ajustesTactil" hidden>
-    <label for="tamTactil">Tamaño del mando táctil:</label>
-    <input type="range" id="tamTactil" min="80" max="130" step="5" style="width:140px">
-    <span class="dato" id="tamTactilDato">—</span>
-    <label for="opaTactil">Opacidad:</label>
-    <input type="range" id="opaTactil" min="30" max="100" step="5" style="width:140px">
-    <span class="dato" id="opaTactilDato">—</span>
-  </div>
-  <p style="margin:0 0 8px;font-size:13px">Mandos conectados: <span id="listaMandos">ninguno (aprieta un botón del mando para que el navegador lo vea)</span></p>
-  <details>
-    <summary>Teclado (puerto 1) — clic en una tecla para cambiarla</summary>
+
+  <section class="hoja" id="hojaPartida" role="tabpanel">
+    <h2>Tu partida</h2>
+    <div class="licencias" id="licenciasPanel"></div>
+    <p id="partidas" style="font-size:12.5px;color:var(--suave);margin:0 0 10px">—</p>
+    <div class="fila-botones">
+      <button type="button" class="boton principal" id="subirPartidas" data-cargar>Cargar mi partida…</button>
+      <button type="button" class="boton" id="bajarRksys">Descargar rksys.dat</button>
+      <button type="button" class="boton" id="bajarPartidas">Descargar copia completa</button>
+    </div>
+    <input type="file" id="archivoPartidas" accept=".dat,.mkwp,.mii,application/octet-stream" hidden>
+    <p style="margin-top:8px">Carga el <b>rksys.dat</b> de tu Wii o de Dolphin, o una <b>copia completa</b> (.mkwp) bajada de aquí.
+      También puedes arrastrarlo a la página. Antes de reemplazar algo se guarda una copia de respaldo.</p>
+    <details class="ayuda-donde">
+      <summary>¿Dónde está mi partida?</summary>
+      <ul>
+        <li><b>Wii con Retro Rewind</b> (tarjeta SD): <code>riivolution/save/RetroWFC/RMCP/rksys.dat</code></li>
+        <li><b>Dolphin con Retro Rewind</b> (o WheelWizard): en la carpeta de Dolphin,
+          <code>Load/Riivolution/riivolution/save/RetroWFC/RMCP/rksys.dat</code></li>
+        <li><b>Dolphin sin mods</b>: <code>Wii/title/00010000/524d4350/data/rksys.dat</code> (Europa; 524d4345 = EE. UU., 524d434a = Japón)</li>
+        <li>La carpeta de Dolphin: en Windows, <code>Documentos\Dolphin Emulator</code> o <code>%AppData%\Dolphin Emulator</code>; en Dolphin,
+          menú Archivo → Abrir carpeta de usuario.</li>
+        <li>Para volver a llevarla a la Wii o a Dolphin: «Descargar rksys.dat» y ponlo en la misma carpeta (guarda antes una copia del que había).</li>
+      </ul>
+    </details>
+    <h3>En tu cuenta</h3>
+    <p id="nubeEstado">Inicia sesión en Paginita Pro para tener tu partida en la nube y seguir en otro equipo.</p>
+    <h3>Copias de respaldo</h3>
+    <ul class="respaldos" id="listaRespaldos"></ul>
+    <h3>Borrar</h3>
+    <button type="button" class="boton peligro" id="borrarPartidas">Borrar las partidas de este navegador</button>
+  </section>
+
+  <section class="hoja" id="hojaControles" role="tabpanel" hidden>
+    <h2>Controles</h2>
+    <div class="fila">
+      <label><input type="checkbox" id="usarTactil"> Mando táctil (celular)</label>
+      <label><input type="checkbox" id="usarInclinacion"> Dirigir inclinando el teléfono</label>
+    </div>
+    <div id="ajustesTactil" hidden>
+      <div class="fila">
+        <label for="tamTactil">Tamaño del mando táctil</label>
+        <input type="range" id="tamTactil" min="80" max="130" step="5" style="width:130px">
+        <span class="dato" id="tamTactilDato">—</span>
+      </div>
+      <div class="fila">
+        <label for="opaTactil">Opacidad</label>
+        <input type="range" id="opaTactil" min="30" max="100" step="5" style="width:130px">
+        <span class="dato" id="opaTactilDato">—</span>
+      </div>
+    </div>
+    <p class="dato" id="puerto1">puerto 1: —</p>
+    <h3>Mandos</h3>
+    <p>Mandos conectados: <span id="listaMandos">ninguno (aprieta un botón del mando para que el navegador lo vea)</span></p>
+    <h3>Teclado (jugador 1)</h3>
+    <p>Clic en una tecla para cambiarla.</p>
     <table id="tablaTeclas"></table>
-    <button id="restaurarTeclas" style="margin-top:8px">Restaurar teclas por defecto</button>
-  </details>
-</div>
+    <button type="button" class="boton" id="restaurarTeclas" style="margin-top:8px">Restaurar teclas por defecto</button>
+  </section>
 
-<div class="caja">
-  <div id="resumen"></div>
-  <ul id="resultados"></ul>
-</div>
+  <section class="hoja" id="hojaAvanzado" role="tabpanel" hidden>
+    <h2>Avanzado</h2>
+    <h3>Sonido</h3>
+    <div class="fila">
+      <label for="volumen">Volumen</label>
+      <input type="range" id="volumen" min="0" max="100" step="1" style="width:160px">
+      <span class="dato" id="volumenDato">—</span>
+      <label><input type="checkbox" id="silencio"> Silencio</label>
+    </div>
+    <p class="aviso" id="sonidoAviso" hidden>🔇 El navegador tiene el sonido bloqueado hasta que toques la página o aprietes una tecla.</p>
+    <h3>Video</h3>
+    <p id="gpuEnUso" style="margin:0">🎮 tarjeta de video: —</p>
+    <details class="aviso" id="gpuAyuda" hidden>
+      <summary>¿Tienes una tarjeta de video dedicada y el juego va lento?</summary>
+      La tarjeta que usa el navegador la decide Windows, no la página. Para cambiarla: Configuración → Sistema →
+      Pantalla → Gráficos → tu navegador (p. ej. Google Chrome) → <i>Alto rendimiento</i>, y reinicia el navegador.
+    </details>
+    <h3>Datos del juego</h3>
+    <div class="fila"><span id="datosDisco" style="color:var(--suave)">—</span>
+      <button type="button" class="boton" id="borrarDisco">Borrar</button></div>
+    <h3>Diagnóstico</h3>
+    <div class="fila">
+      <span class="dato" id="fps">— fps</span>
+      <span class="dato" id="trabajo">trabajo — ms</span>
+      <span class="dato" id="sonidoDato">sonido: —</span>
+    </div>
+    <p class="dato" id="lecturas" style="font-weight:400">disco: —</p>
+    <div id="resumen"></div>
+    <ul id="resultados"></ul>
+    <h3>Registro</h3>
+    <pre id="log"></pre>
+  </section>
+</aside>
 
-<div class="caja">
-  <pre id="log"></pre>
-</div>
+<div id="editorMii" hidden></div>
+<div id="soltar" hidden>Suelta tu partida aquí<br><small style="font:14px 'IBM Plex Sans',sans-serif">rksys.dat, copia .mkwp, RFL_DB.dat o un Mii (.mii)</small></div>
+<dialog id="dialogo"><h2></h2><div class="cuerpo"></div><div class="acciones"></div></dialog>
 
 <script type="module" src="mkw.mjs"></script>
 </body>

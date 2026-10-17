@@ -175,7 +175,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 ## Fase 5 — En el sitio (repo Paginita-Pro)
 
-- ⬜ `juegos/mkw/`: página propia (patrón `pagina.py`/`pagina.js` de BT3), barra, volumen, mando táctil
+- 🟡 `juegos/mkw/`: página propia con la cara del sitio (§55: inicio, modos, barra, cajón, «Tu partida», Mi Mii, piloto); ⬜ integrarla en `juegos.html` (marco `jg-mkw-solo`, `volumen.js`, `i18n.js`)
 - ⬜ `.wasm` + archivos del disco en R2, servidos por el Worker solo a `AMIGOS` (lotes, Cache Storage)
 - ⬜ Oculto salvo amigos (`juegoOculto()`); nada se baja desde el vestíbulo
 - 🟡 **Partidas en la nube** (`web/navegador/nube.mjs`): el paquete `.mkwp` en Firebase Storage `mkw/<uid>/partidas.mkwp`
@@ -191,8 +191,17 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   **no hace falta el Worker**), salas con gente ordenadas, sondeo cada 15 s solo con la pestaña a la vista, código de
   amigo con su control MD5 (Tockdom; verificado 280/0 con el servidor real) y buscar amigo. Banco `pruebas/salas/` 19/0.
   ⬜ Panel en la página del sitio; ⬜ código de amigo propio desde `rksys.dat`; ⬜ qué significa cada `rk`
-- ⬜ Jugar en línea: puente WebSocket/WebRTC ↔ UDP/TCP con relé propio (lo más difícil; se decide al llegar)
+- 🟡 Jugar en línea por la página: diseño "WFC virtual" en `docs/en-linea.md` (sockets de la Wii → JS, UDP por WebRTC, WFC chiquito en la pestaña del anfitrión, Firebase solo presenta). ⬜ F0 sockets ⬜ F1 WFC virtual ⬜ F2 transporte ⬜ F3 sala (cola de pistas tipo playlist, hasta 12, 45 s entre pistas con «Confirmar»; entrar con la carrera andando: «siguiente carrera» o «sala», mirando mientras tanto) ⬜ F4
 - ⬜ Espectadores (`bt3-directo.js` adaptado a canvas WebGPU)
+
+## Modos de la página (§55)
+
+- ✅ Gran Premio (copa elegida) y Carrera (pista elegida) con el piloto, nombres de las pistas leídos del juego
+- ✅ Mi Mii (base de Mii de la Wii, caras de partida); ⬜ fotos reales de las caras (sacadas del juego, a R2)
+- ⬜ Copa a tu gusto (4 pistas elegidas o al azar con semilla nueva, reordenar y volver a sortear)
+- ⬜ Contrarreloj; ⬜ CPU: dificultad o sin CPU en todos los modos (probado: sin CPU funciona); ⬜ cilindrada y personaje
+- ⬜ Récords de tiempo por pista y cilindrada en Firebase (el tiempo final se lee de la memoria: Raceinfo 0x809BD730)
+- ⬜ Imágenes sacadas del juego para elegir: foto de cada pista, ícono de cada copa (a R2 con el `.wasm`, nunca a git)
 
 ---
 
@@ -213,6 +222,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-17 13:30** — **La página con la cara del sitio, tu partida, Mi Mii y el piloto** (§55). `index.html` nuevo (juego a toda ventana, tarjeta de inicio, modos, barra que se esconde, cajón, diálogos propios) con `interfaz.mjs`; cargar el rksys.dat de una Wii/Dolphin o un .mkwp con revisión de CRC, descargar, copias de respaldo automáticas (`licencias.mjs`, `respaldos.mjs`); «Mi Mii» arma la base de Mii de la Wii (`mii.mjs`, CRC-16/XMODEM) con caras de partida, y el juego los lista al crear la licencia; el piloto (`menus.mjs`) lee la memoria del juego (`mkw_web_mem`) y lleva solo a una pista de Carrera o a una copa de Gran Premio, con los nombres de las ~360 pistas leídos del juego. En línea diseñado (`docs/en-linea.md`). Banco 19/0, 11/0; piloto 9/0; navegador 20/0; partidas 6/0; celular 16/0.
 - **2026-10-17 06:30** — **Medido como en la página real y arreglados el tirón en carrera y la carga** (§54). Sitio local como GitHub Pages (sin aislamiento) con el juego en el marco de Juegos y lo privado desde otro origen; `medir-sitio.mjs` en 3 perfiles. Toma del canvas a compás (tomas parejas 83 → 98,6 %), voces de los CPU bajadas antes (largada ~1 s → ~60 ms de disco), `.wasm` brotli 16,1 MB con huella y caché (2.ª visita: primer cuadro 2,3 s, 0 tirones). PC 60 fps, 7,97 ms por cuadro (p99 12,0). Descartados: margen de toma, `wasm-opt -O3`. Navegador 21/0, partidas 6/0, celular 16/0.
 - **2026-10-17 04:10** — **La presentación de la carrera ya cabe en el cuadro** (§53). La traza del ritmo con contadores de espera (`guion.mjs --traza`, `herramientas/tiempos-cuadro.mjs`) mostró CPU real de 14–17 ms; el perfil con columnas apuntó al pegamento de WebGPU: aurora mapeaba 37 MB por cuadro y Emscripten los llenaba de ceros y los copiaba enteros. Ahora un bloque plano y `Queue::WriteBuffer` solo de lo usado (~1,5 MB), y la pausa de presentar ya no gira. CPU del juego 13,3 → 7,9 ms; cuadros > 16,7 ms 336 → 9 de 1140; hilo principal 29 % → 21 %. Navegador 21/0 ×2, partidas 6/0, celular 16/0.
 - **2026-10-17 02:40** — **Bajar antes los archivos** (§52): avisos del juego, lectura adelantada, sin el bloqueo de la caché HTTP de Chrome, archivos diminutos y semilla de bloques con prioridad baja que se aparta de las cargas, grupos de sonido enteros. Con 50 ms de latencia simulada la espera al disco pasa de 30,1 s a 5,0 s; en red local de 3,4 s a 1,5 s. La prueba del navegador mide desde el cuadro 420 (el título carga entre el 300 y el 360). Banco `disco` 27/0, `brsar` 9/0, Node 13/0, navegador 21/0 ×3.

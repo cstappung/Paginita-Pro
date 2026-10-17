@@ -71,7 +71,10 @@ for (const orientacion of ['parado', 'acostado']) {
   ok(`${orientacion}: el recuadro del juego ocupa justo la pantalla (${Math.round(m0.capa.w)}×${Math.round(m0.capa.h)} en ` +
      `${Math.round(m0.capa.x)},${Math.round(m0.capa.y)}; pantalla ${m0.pantalla.w}×${m0.pantalla.h})`,
      Math.abs(m0.capa.x) <= 1 && Math.abs(m0.capa.y) <= 1 && Math.abs(m0.capa.w - m0.pantalla.w) <= 1 && Math.abs(m0.capa.h - m0.pantalla.h) <= 1);
-  ok(`${orientacion}: el control de tamaño está a la vista`, await pagina.locator('#ajustesTactil').isVisible());
+  // los ajustes del mando táctil están en el cajón, pestaña «Controles» (interfaz.mjs): se abre como lo haría la persona
+  await pagina.evaluate(() => window.mkwInterfaz.abrirCajon('controles'));
+  ok(`${orientacion}: el control de tamaño está a la vista (Controles)`, await pagina.locator('#ajustesTactil').isVisible());
+  await pagina.evaluate(() => window.mkwInterfaz.cerrarCajon());
 
   // Cada tamaño del deslizador: nada se pisa y todo cabe
   const problemas = [];
@@ -92,6 +95,8 @@ for (const orientacion of ['parado', 'acostado']) {
      problemas.join(' | ') || `11 tamaños`);
 
   // Toques de verdad (CDP: Input.dispatchTouchEvent = el navegador cree que hay dedos en la pantalla)
+  // (con el juego andando: la tarjeta de inicio se va y deja el mando táctil a la vista, como al apretar Jugar)
+  await pagina.evaluate(() => document.body.classList.add('started'));
   await pagina.evaluate(() => window.mkwControles.ajustarTactil({ esc: 1 }));
   const m = await medir(pagina);
   await aLaVista();

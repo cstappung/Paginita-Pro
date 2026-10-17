@@ -18,6 +18,8 @@ import { crearGuardado } from './guardado.mjs';
 import { crearDisco } from './disco.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
+import { crearInterfaz } from './interfaz.mjs';
+import { crearLector, crearPiloto, leerNombres } from './menus.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // De dónde salen las piezas privadas (el juego compilado, el manifiesto y los archivos del disco). Vacío = este mismo
@@ -332,7 +334,7 @@ window.mkwEstado = Object.assign(window.mkwEstado || {}, { fase: { e: 0, n: 0, a
 // ---- Sonido (web/navegador/sonido.mjs) ----
 // Se instala ANTES de cargar el juego: así el AudioContext que crea SDL3 pasa por nuestro volumen y medidor.
 // ?bloquearSonido=1: arranca bloqueado aunque el navegador lo deje sonar (para probar el desbloqueo; ver sonido.mjs)
-const sonido = crearSonido({ alCambiar: () => pintarSonido(), simularBloqueo: parametros.get('bloquearSonido') === '1' });
+const sonido = crearSonido({ alCambiar: () => { pintarSonido(); ui?.sonidoCambio(); }, simularBloqueo: parametros.get('bloquearSonido') === '1' });
 if (parametros.get('sonidoPagina') !== '0') sonido.instalar();   // ?sonidoPagina=0: sin esto (para comparar)
 window.mkwSonido = sonido;                  // para las pruebas
 const barraVolumen = document.getElementById('volumen'), casillaSilencio = document.getElementById('silencio');
@@ -358,16 +360,17 @@ async function pintarDatosDisco() {
 }
 pintarDatosDisco();
 document.getElementById('borrarDisco').addEventListener('click', async () => {
-  if (!confirm('¿Borrar los archivos del juego guardados en este navegador? Las partidas no se tocan; la próxima vez se bajan de nuevo.')) return;
+  if (!await ui.preguntar({ titulo: 'Borrar los datos del juego', si: 'Borrar', peligro: true,
+    texto: 'Se borran los archivos del juego guardados en este navegador (para liberar espacio). Las partidas no se tocan; la próxima vez se bajan de nuevo.' })) return;
   for (const n of await caches.keys()) if (n.startsWith('mkw-disco:')) await caches.delete(n);
   pintarDatosDisco();
 });
 
 // ---- Partidas guardadas (web/navegador/guardado.mjs) ----
 // Se leen de IndexedDB al abrir la página; se restauran antes del main() del juego y se guardan solas al escribirse.
-const guardado = crearGuardado({ alCambiar: () => pintarPartidas() });
+const guardado = crearGuardado({ alCambiar: () => { pintarPartidas(); ui?.partidaCambio(); } });
 window.mkwGuardado = guardado;              // para las pruebas
-const guardadosAlAbrir = guardado.cargar().catch(e => { guardado.estado.error = String(e); return new Map(); });
+let guardadosAlAbrir = guardado.cargar().catch(e => { guardado.estado.error = String(e); return new Map(); });
 // Pipelines para precalentar (pipelines.mjs): la lista de este navegador y la semilla del servidor.
 // ?precalentar=no: sin listas (para medir el peor caso, la primera visita sin semilla).
 const pipelines = crearPipelines({ urlSemilla: ORIGEN + '/build/pipelines.bin' });
@@ -378,28 +381,7 @@ function pintarPartidas() {
   document.getElementById('partidas').textContent = e.error ? `error: ${e.error}`
     : e.archivos ? `${e.archivos} archivos en este navegador${hora}` : 'ninguna todavía (se guardan solas al jugar)';
 }
-document.getElementById('borrarPartidas').addEventListener('click', async () => {
-  if (!confirm('¿Borrar las licencias, ajustes y fantasmas guardados en este navegador? No se puede deshacer.')) return;
-  await guardado.borrarTodo();
-  location.reload();                        // el juego en memoria todavía tiene la partida: se recarga limpio
-});
-
-// Descargar todas las partidas en un archivo (.mkwp) y cargarlas en otro navegador. En el sitio, ese mismo
-// archivo es el que se sube a Firebase Storage para tener la partida en la nube.
-document.getElementById('bajarPartidas').addEventListener('click', async () => {
-  const blob = await guardado.exportar();
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'partidas-mkw.mkwp' });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-});
-const archivoPartidas = document.getElementById('archivoPartidas');
-document.getElementById('subirPartidas').addEventListener('click', () => archivoPartidas.click());
-archivoPartidas.addEventListener('change', async () => {
-  const f = archivoPartidas.files[0];
-  if (!f || !confirm('¿Reemplazar las partidas de este navegador por las del archivo? Se recarga la página.')) return;
-  try { await guardado.importar(f); location.reload(); }
-  catch (e) { alert('No se pudo cargar: ' + e.message); }
-});
+// Cargar, descargar, borrar y las copias de respaldo: interfaz.mjs (panel «Partida»)
 
 // ---- Controles (web/navegador/controles.mjs) ----
 // Funcionan desde que se abre la página; hasta que el juego arranca, lo que juntan no va a ningún lado.
@@ -434,7 +416,9 @@ pintarAjustesTactil();
 document.getElementById('usarInclinacion').addEventListener('change', e => controles.inclinar(e.target.checked));
 document.getElementById('completa').addEventListener('click', async () => {
   // pantalla completa y, en el celular, acostado (horizontal); si el navegador no deja girar, no pasa nada
-  await document.getElementById('pantalla').requestFullscreen().catch(() => {});
+  // (toda la página, no solo el juego: así la barra y el cajón siguen a mano)
+  if (document.fullscreenElement) { await document.exitFullscreen().catch(() => {}); return; }
+  await document.documentElement.requestFullscreen().catch(() => {});
   if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
 });
 document.getElementById('restaurarTeclas').addEventListener('click', () => { controles.restaurarTeclas(); pintarTeclas(); });
@@ -467,13 +451,19 @@ setInterval(() => {
     : 'ninguno (aprieta un botón del mando para que el navegador lo vea)';
 }, 200);
 
+// ---- La cara de la página (interfaz.mjs): inicio, modos, barra, cajón, «Tu partida», diálogos ----
+// alCambiarGuardado: el editor de Mii guardó algo sin recargar la página → se vuelve a leer lo guardado para el arranque
+var ui = crearInterfaz({ guardado, sonido, controles,
+  alCambiarGuardado: () => { guardadosAlAbrir = guardado.cargar().catch(() => new Map()); } });
+window.mkwInterfaz = ui;
+
 // La dirección web de un archivo del juego: es la misma ruta, con cada pedazo "escapado" (espacios → %20…)
 const direccion = ruta => ORIGEN + ruta.split('/').map(encodeURIComponent).join('/');
 
 async function arrancar() {
   $('arrancar').disabled = true;
-  // En el celular (mando táctil), llevar el recuadro del juego a la pantalla: arriba quedan opciones y textos
-  if (document.body.classList.contains('tactil')) $('pantalla').scrollIntoView({ block: 'start' });
+  ui.empezo();                                // la pantalla de inicio se va; el juego ocupa la ventana
+  $('canvas').focus();
 
   // 1) Lo que el navegador necesita
   const hayJspi = 'Suspending' in WebAssembly;
@@ -615,6 +605,26 @@ async function arrancar() {
                 `${w.transferSize === 0 ? ', de la caché' : ''}), listo ${(listo - w.responseEnd).toFixed(0)} ms después`);
   }
   window.mkw = M;
+  // En qué pantalla está el juego (menus.mjs: lee la memoria de la Wii; para elegir pista o copa desde la página)
+  window.mkwMenus = crearLector(M);
+  // El piloto (menus.mjs): con «Gran Premio» o «Carrera» elegidos, lleva el juego solo hasta la carrera. La copa o la
+  // pista se eligen en una lista de la página (interfaz.mjs) cuando el juego ya cargó sus nombres (en el menú principal).
+  // ?modo=vs&copa=13&fila=2 en la dirección: sin preguntar (para las pruebas).
+  const piloto = crearPiloto({ lector: window.mkwMenus, controles, alAviso: (t, mal) => ui.aviso(t, mal),
+    esperarEleccion: () => ui.elegirPista({ modo: objetivoPiloto.modo, copas: leerNombres(window.mkwMenus, M) }) });
+  window.mkwPiloto = piloto;
+  const objetivoPiloto = { modo: parametros.get('modo') || window.mkwModo.modo };
+  if (objetivoPiloto.modo === 'gp' || objetivoPiloto.modo === 'vs') {
+    if (parametros.has('copa')) { objetivoPiloto.copa = Number(parametros.get('copa')); objetivoPiloto.fila = Number(parametros.get('fila') || 0); }
+    // CPU: ?cpu=facil|normal|dificil|ninguna (si no, la que se eligió en la página); ?autoconducir=1 solo para el banco
+    objetivoPiloto.cpu = parametros.get('cpu') || window.mkwModo.cpu;
+    if (parametros.get('autoconducir') === '1') objetivoPiloto.autoconducir = true;
+    ui.aviso('Yendo a la carrera… (toca una tecla para manejar tú)');
+    piloto.ir(objetivoPiloto).then(llego => {
+      window.mkwEstado.piloto = { llego, ...objetivoPiloto };
+      nota(`piloto: ${llego ? 'llegó a la carrera' : 'se detuvo'} (${JSON.stringify(objetivoPiloto)})`);
+    });
+  }
 
   // 6a) Ritmo contra el monitor: requestAnimationFrame se llama una vez por cada refresco de la pantalla (60 Hz
   // en un monitor común). En cada refresco se mira cuántos cuadros nuevos entregó el juego: lo ideal es 1.

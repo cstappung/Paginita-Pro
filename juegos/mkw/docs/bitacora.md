@@ -290,6 +290,18 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Bloqueo de la caché HTTP (cache lock)** | Chrome no deja que dos pedidos al MISMO archivo pasen a la vez por su caché HTTP: los pone en fila, aunque pidan pedazos distintos. Con `cache: 'no-store'` el pedido no pasa por esa caché y van en paralelo. |
 | **Semilla de bloques** | La lista de pedazos del disco que el juego leyó después del título en varias partidas de prueba (los que se repiten en ≥ 2 corridas: no los de los personajes al azar). La primera visita los baja de antemano con prioridad baja. Va con el `.wasm` (R2), nunca a git. |
 | **Rama (branch) / PR** | Rama = una línea de trabajo paralela. PR (pull request) = la solicitud de juntar una rama con la principal, para revisarla antes. |
+| **rksys.dat / licencia** | La partida de Mario Kart Wii: un solo archivo de 2,8 MB con hasta 4 licencias (los perfiles del principio, cada una con su Mii, récords, VR). Formato público (mkwiiki/Tockdom): empieza con "RKSD", cada licencia con "RKPD", y al final una suma de control. |
+| **CRC (suma de control)** | Un número calculado de todos los bytes de un archivo, guardado al final. Si cambia un solo bit, el número ya no cuadra y se sabe que el archivo está dañado. Como el bit de paridad de una línea serie, pero de 16 o 32 bits. rksys.dat usa CRC-32 (el de zip); la base de Mii, CRC-16/XMODEM. |
+| **Copia de respaldo automática** | Antes de reemplazar la partida (cargar un archivo, borrar, restaurar, guardar Mii), la página guarda una "foto" de todo lo guardado en otra base del navegador, y se queda con las últimas 8. Como el disyuntor que deja volver atrás: un error se deshace con un clic. |
+| **Mii / RFL_DB.dat** | Cada Mii son 74 bytes con todos sus rasgos apretados en campos de pocos bits. La Wii guarda hasta 100 en su memoria interna, en `RFL_DB.dat`, que es donde Mario Kart Wii los busca al elegir el Mii de la licencia. |
+| **Campo de bits** | Varios datos chicos metidos en un mismo número: por ejemplo, en 16 bits van "es chica" (1 bit), mes (4), día (5), color favorito (4)… Como un registro de un microcontrolador, donde cada grupo de bits es un ajuste distinto. |
+| **Memoria del juego (de la Wii) dentro del wasm** | El juego traducido sigue usando direcciones de la Wii (0x80000000…). El runtime guarda esa memoria en dos bloques dentro de la memoria del wasm; `mkw_web_mem` le dice a la página dónde quedó cada bloque, y la página lee de ahí (en big-endian) sin copiar nada. Como poner una punta de osciloscopio en un bus: se mira lo que pasa sin cambiar el circuito. |
+| **Big-endian** | El orden de los bytes de un número: la Wii pone primero el byte más grande (0x12345678 queda 12 34 56 78); las PC, al revés. Por eso la página lee con `getUint32(p, false)`. |
+| **Sección / página (del menú del juego)** | Cómo organiza Mario Kart Wii sus pantallas: la sección es el "modo de pantalla" (menú principal, un jugador, carrera…), y dentro de ella se apilan páginas (elegir personaje, kart, copa…). Leerlas es saber en qué pantalla está el juego. |
+| **Racedata / CupsConfig** | Racedata: el objeto del juego con la configuración de la carrera (modo, cilindrada, pista). CupsConfig: el de Pulsar (el motor de Retro Rewind) con la copa y la pista elegidas entre sus ~360 pistas. Lo encontramos buscando en la memoria la estructura que cambiaba al elegir copas distintas. |
+| **Piloto (lazo cerrado)** | El programa de la página que maneja los menús solo: mira en qué página está el juego, aprieta el botón que corresponde y comprueba el resultado (el modo, la pista); si no es lo pedido, vuelve atrás y corrige. Como un regulador con realimentación, en vez de un temporizador a ciegas. |
+| **BMG** | El formato de las tablas de textos del juego (cada mensaje con su número). En la de Retro Rewind, el mensaje 0x20000 + n es el nombre de la pista n: de ahí salen los nombres de la lista para elegir pista. |
+| **Caras de partida (presets)** | Mii ya armados para empezar, como los "invitados" del juego: se elige uno y solo se le pone nombre y color. Los de la página los armamos nosotros (no son los datos de Nintendo). |
 
 ---
 
@@ -2412,3 +2424,153 @@ Herramientas nuevas: `herramientas/sitio-local.mjs`, `herramientas/medir-sitio.m
 **Para el Worker de verdad** (lo publica el dueño): entregar `mkw.js`/`mkw.wasm` con `?v=` como guardables para
 siempre (`immutable`) y el `.wasm` desde el objeto `mkw.wasm.br` de R2 con `Content-Encoding: br`; el manifiesto con
 `X-Mkw-Build` (la huella que sube el script junto con los archivos) y `Access-Control-Expose-Headers` que la incluya.
+
+### 55. La página con la cara del sitio, tu partida, Mi Mii y el piloto que te lleva a la carrera · 2026-10-17
+
+**Qué pidió el dueño:** (1) que la página se vea como Paginita Pro; (2) que una persona común pueda cargar su licencia
+y guardarla; (3) un "envoltorio" como el de Budokai: modos claros, elegir una pista o una copa completa, en línea por
+nuestra página; (4) un modo solo para el Mii propio; y en el camino: entrar a una sala con la carrera andando (elegir
+"siguiente carrera" o "sala", mirando mientras tanto), vistas previas de las pistas, el Canal Mii, y récords de tiempo
+por pista y cilindrada en Firebase.
+
+#### 55.1 La página nueva (`index.html` + `interfaz.mjs`)
+
+Antes era una página de banco (cajas una debajo de otra). Ahora tiene la forma de la de BT3 con los colores del sitio
+(IBM Plex Sans, Lilita One para títulos, el morado de Juegos) y un cielo de circuito de noche con bandera a cuadros
+dibujado con CSS (nada del juego):
+
+- **El juego ocupa toda la ventana.** El canvas mide la ventana y la imagen va centrada sin deformarse
+  (`object-fit: contain`).
+- **Tarjeta de inicio**: título, "Tu partida" (las licencias guardadas) y el botón grande **Jugar**.
+- **Columna de modos**: Jugar libre, Gran Premio, Carrera, Contrarreloj, Batalla, En línea, Mi Mii. Cada uno con un
+  emblema dibujado por nosotros (SVG). Los que todavía no llevan directo dicen PRONTO.
+- **Barra de arriba**: volumen, Partida, Controles, ⚙, ⛶ y el mando conectado. Con el juego andando se esconde sola y
+  vuelve al mover el mouse (como un reproductor de video). Dentro del sitio aparece «← Juegos».
+- **Cajón a la derecha** con pestañas: Partida, Controles (táctil, mandos, teclas), Avanzado (sonido, tarjeta de video,
+  datos del juego, diagnóstico y registro).
+- **Diálogos propios** en vez de `confirm()`/`alert()`, que dentro del marco del sitio (con sandbox) no funcionan.
+
+Se conservaron todos los `id` que usan `mkw.mjs` y las pruebas. Cambios en las pruebas: `prueba-navegador` hace el clic
+de desbloquear el sonido en una esquina del juego (el título ya no está a la vista); `prueba-tactil` abre la pestaña
+Controles para ver los ajustes del mando táctil.
+
+#### 55.2 Tu partida: cargarla, guardarla, deshacer
+
+**Cómo lo vive una persona:** en la tarjeta de inicio ve sus licencias ("Ana · VR 5.230 · 812 carreras", con su código
+de amigo). Si ya juega en una Wii o en Dolphin: **Cargar mi partida…** (o arrastrar el archivo a la página). La página
+mira qué es por dentro (no por el nombre), lo revisa, muestra qué licencias trae y pregunta antes de reemplazar. Para
+llevarla de vuelta: **Descargar rksys.dat** (va en la misma carpeta de la Wii o de Dolphin) o **copia completa** (.mkwp,
+para otro navegador). «¿Dónde está mi partida?» explica las carpetas (SD de la Wii con RR, Dolphin con RR o WheelWizard,
+Dolphin sin mods con los códigos de región).
+
+- `licencias.mjs`: lee rksys.dat (formato público de mkwiiki/Tockdom): "RKSD", licencias "RKPD" cada 0x8CC0 bytes,
+  nombre UTF-16, VR, BR, carreras, ID de perfil → código de amigo, y **CRC-32 al final**. Un archivo con el CRC malo
+  NO se carga: el juego diría que está dañado y ofrecería borrarlo.
+- `guardado.mjs`: `abrirPaquete` (revisa un .mkwp sin tocar nada, para mostrar qué trae), `leerArchivo` y
+  `ponerArchivo` (reemplaza SOLO el rksys.dat: los ajustes de RR y los fantasmas quedan).
+- `respaldos.mjs`: antes de cargar, borrar, restaurar o guardar Mii, una copia de todo (el mismo .mkwp, ~3 KB) en otra
+  base del navegador, con fecha, motivo y qué licencias tenía. Quedan las últimas 8, con «Restaurar».
+
+#### 55.3 Mi Mii
+
+Mario Kart Wii no tiene editor de Mii: los toma de la memoria interna de la Wii (`RFL_DB.dat`), donde los pone el Canal
+Mii, un programa aparte de la consola que no está en el disco. La página arma esa base ella misma:
+
+- `mii.mjs`: un Mii son 74 bytes de campos de bits (wiibrew, "Mii data"). El formato se escribe UNA vez (`GRUPOS`) y
+  sirve para leer y para escribir. Se conservan también los bits sin uso conocido. La base (`RFL_DB.dat`, 0x1F1E0
+  bytes): "RNOD", 100 casillas de 74 bytes y **CRC-16/XMODEM** al final (confirmado: 3dbrew dice que la Wii usa ese).
+- `editor-mii.mjs`: lista de Mii, **caras de partida** (12 armadas por nosotros + 🎲 al azar, como los Mii invitados
+  del juego: se elige una y se le pone nombre y color), pestañas de rasgos con deslizadores y una vista previa
+  aproximada dibujada por nosotros. También carga y descarga un `.mii` o la base entera. El Mii de una licencia se marca
+  con ⭐ (se reconoce por su id, que se conserva al editarlo).
+
+**Comprobado en el juego:** `guion.mjs --mii` deja una base con 2 Mii inventados y recarga. Al crear la licencia,
+«Choose a Mii!» muestra los dos (uno con lentes, otra con pelo largo), y se puede crear la licencia con «Prueba».
+
+#### 55.4 Elegir pista o copa: el piloto
+
+La página no puede llamar al juego, pero puede hacer lo mismo que una persona: apretar botones. Para no apretar a
+ciegas (con esperas fijas que fallan si una pantalla tarda), **mira la memoria del juego**:
+
+1. `puente.cpp`: `mkw_web_mem(dirección)` da dónde quedó, dentro del wasm, la memoria de la Wii (dos bloques fijos:
+   MEM1 en 0x80000000 y MEM2 en 0x90000000). Trampa: hay que pedirlo cuando el juego ya arrancó (antes vale 0).
+2. `menus.mjs`: lee la **sección y la página** del menú (SectionMgr, puntero en 0x809C1E38) y lo elegido (Racedata,
+   puntero en 0x809BD728). Las direcciones salen del código abierto de Pulsar (`symbols.txt`).
+   Recorrido medido con `guion.mjs` (ahora anota la pantalla de cada paso):
+
+   | Sección | Páginas |
+   |---|---|
+   | 0x3f | título |
+   | 0x45 | crear licencia |
+   | 0x41 | menú principal (0x5a) |
+   | 0x48 | un jugador |
+   | 0x19 / 0x1a | carrera (GP / VS) |
+
+   Dentro de "un jugador" (0x48), en orden: 0x69 modos → 0x6a o 0x72 cilindrada → 0x6b personaje → 0x6c kart →
+   0x10e (una de RR) → 0x6d derrape → 0x6e copas → 0x6f pistas → 0x101 variante de RR → 0x4b «OK».
+3. **CupsConfig de Pulsar.** Escribir la copa en Racedata no sirvió: Retro Rewind guarda la copa en su propio objeto.
+   Se encontró buscando en la memoria la estructura que cambiaba al elegir dos copas distintas. Quedó en **0x8043319C**:
+
+   | Desplazamiento | Qué guarda |
+   |---|---|
+   | +0x00 | copa (0x40 + n) |
+   | +0x10 | pista ganadora |
+   | +0x14 | pista elegida |
+   | +0x24 | cantidad de copas (90) |
+
+   Las pistas de RR se numeran 0x100 + 4·copa + fila. Si se escriben antes de abrir la pantalla de copas, el cursor
+   aparece en la copa y la fila pedidas. No hay puntero que lleve a ese objeto (está dentro del código de RR), así que
+   antes de escribir se revisa que tenga la forma esperada.
+4. **El piloto** (`crearPiloto`): una máquina de estados. Según la página, aprieta A, o abajo para elegir el modo, o
+   deja escrita la copa. Comprueba en **lazo cerrado**: el modo en la pantalla de cilindrada y la pista en la
+   confirmación; si no es lo pedido, B y corrige. Aprieta por una fuente nueva del puerto 1 de `controles.mjs`
+   (`pilotar`), que se manda enseguida (con la pestaña en segundo plano requestAnimationFrame no corre: esa fue la
+   trampa). Se detiene si la persona toca una tecla o el mando.
+5. **Los nombres**: la tabla de textos de RR (BMG en memoria) tiene en el mensaje 0x20000 + n el nombre de la pista n.
+   La lista para elegir (con buscador) los muestra tal como los trae el juego en esa PC. Quedan anotados en el navegador
+   para la próxima vez. No se suben a ningún lado.
+
+**Resultado:** «Carrera, copa 14, pista 3» llega sola a «GBA Bowser Castle 4» en ~25 s desde que se abre la página.
+«Gran Premio, copa 4» empieza en «SNES Vanilla Lake 1, 1st Race». En el panel del navegador: Carrera → Jugar → la lista
+→ buscar «rainbow» → «N64 Rainbow Road» → la carrera. Falta elegir cilindrada (hoy la que viene marcada: 150cc en VS,
+200cc en GP) y personaje.
+
+#### 55.5 En línea (diseño) y lo que viene
+
+El diseño completo está en `docs/en-linea.md`: "WFC virtual" dentro de la sala. Los sockets de la Wii van a JavaScript,
+el UDP del juego por WebRTC, un servidor WFC chiquito en la pestaña del anfitrión, y Firebase solo para presentar a los
+jugadores, como BT3. Lo de entrar con la carrera andando ya lo hace el juego (vista en vivo): «Entrar en la siguiente
+carrera» arranca y espera mirando; «Ir a la sala» muestra el video del anfitrión. Son semanas de trabajo, en fases F0–F4
+con prueba en el banco cada una.
+
+Pendiente de esta tanda:
+
+- Vistas previas de cada pista: fotos sacadas del juego, una por pista, que van a R2 con el `.wasm` (son imágenes del
+  juego: nunca a git).
+- Récords de tiempo por pista y cilindrada en Firebase: leer el tiempo final de la memoria del juego.
+- Integrar el Canal Mii: haría falta el del propio dueño (un respaldo de su Wii) y traducirlo aparte.
+
+**Pruebas (con la compilación `--final`):**
+
+| Prueba | Resultado |
+|---|---|
+| Banco sin el juego (`banco/correr.mjs`): licencias, mii, guardado, controles, nube | **19/0, 11/0, 15/0, 28/0, 23/0** |
+| Piloto con el juego (`prueba-piloto.mjs`) | **9/0** (Carrera copa 14 pista 3 y Gran Premio copa 4) |
+| Navegador (`prueba-navegador.mjs 900`) | **20/0** (60 fps, trabajo máx. 6,5 ms) |
+| Partidas (`prueba-partidas.mjs`) | **6/0** |
+| Celular (`prueba-tactil.mjs`) | **16/0**, después de dos arreglos: la tarjeta de inicio tapaba el mando táctil (la prueba ahora simula «juego andando») y la barra tapaba el ▶ (en el celular la barra va arriba al centro) |
+| Mii en el juego (`guion.mjs --mii`) | los 2 Mii de la página aparecen en «Choose a Mii!» |
+| Carrera sola, sin CPU, manejando la CPU (`&cpu=ninguna&autoconducir=1`) | terminó sola; la página leyó el tiempo final de la memoria (2:22.846, 1.º) y la página de resultados es la 0x2f |
+
+**Comandos:**
+
+```bash
+python herramientas/compilar-web.py --modo navegador --final
+node banco/correr.mjs licencias mii guardado controles nube
+node web/navegador/prueba-piloto.mjs
+node web/navegador/guion.mjs "K:2500 K:2000 K:2500" --mii
+node web/navegador/guion.mjs "-:30000" --extra "&modo=vs&copa=13&fila=2"
+```
+
+`banco/correr.mjs` es nuevo: corre páginas del banco en Chrome sin ventana y junta sus ✓/✗. `guion.mjs` tiene tres
+cosas nuevas: anota la pantalla de cada paso, `X:ms` evalúa `--evaluar` en ese momento, y `--mii`.

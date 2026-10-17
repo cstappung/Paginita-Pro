@@ -72,3 +72,4 @@ el juego en el marco de Juegos; lo privado desde un "Worker" en 8151 con CORS y 
 (sin nombres de funciones + `mkw.wasm.br`, 16 MB; o `node herramientas/comprimir-build.mjs`). Caminos viejos para
 comparar: `?esperaToma=0`, `?atrasada=0`, `?compas=0`, `?huella=0`, `?voces=0`, `?staging=mapeo`.
 **Las pruebas en Chrome van sin sonido** (`--mute-audio`): el dueño lo pidió.
+Banco sin el juego, sin ventana: `node banco/correr.mjs licencias mii …` (✓/✗ de cada página). Piloto con el juego: `node web/navegador/prueba-piloto.mjs` (9 puntos). La página: `interfaz.mjs` (inicio, modos, cajón, «Tu partida»), `menus.mjs` (memoria del juego y piloto: `?modo=vs&copa=13&fila=2&cpu=ninguna`), `mii.mjs`/`editor-mii.mjs`, `licencias.mjs`, `respaldos.mjs`. En línea: diseño en `docs/en-linea.md`.

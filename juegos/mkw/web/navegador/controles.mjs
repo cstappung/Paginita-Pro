@@ -70,6 +70,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   Object.assign(teclas, leer(CLAVE_TECLAS) || {});   // lo que el jugador cambió
   const tactil = { activo: false, sx: 0, sy: 0, botones: 0 };
   const inclinacion = { activa: false, centro: null, x: 0 };
+  const piloto = { botones: 0 };                  // la página aprieta botones sola (menus.mjs: ir a una copa/pista)
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
@@ -181,6 +182,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     for (const m of mandos) if (m.puerto !== undefined) suma(m.puerto, m, m.nombre);
     if (tactil.activo) suma(0, { ...tactil, gl: tactil.botones & BOTON.L ? 255 : 0, gr: tactil.botones & BOTON.R ? 255 : 0 }, 'táctil');
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
+    if (piloto.botones) suma(0, piloto, 'piloto');
     puertos.forEach((d, p) => {
       const firma = [d.conectado, d.botones, d.sx, d.sy, d.cx, d.cy, d.gl, d.gr].join();
       if (firma === ultimo[p]) return;            // sin cambios: no hace falta volver a mandarlo
@@ -197,7 +199,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
 
   return {
     estado, teclas, vibrar, paso,
-    reenviar() { ultimo.length = 0; },                           // volver a mandar todo (p. ej. al arrancar el juego)
+    reenviar() { ultimo.length = 0; },
+    // el piloto automático (menus.mjs) aprieta estos botones en el puerto 1, sumados a lo que haga la persona
+    // (y lo manda enseguida: con la pestaña en segundo plano requestAnimationFrame no corre)
+    pilotar(botones) { piloto.botones = botones | 0; paso(); },                           // volver a mandar todo (p. ej. al arrancar el juego)
     reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
     esperando: () => esperandoTecla,
     restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },
