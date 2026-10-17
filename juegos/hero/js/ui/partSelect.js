@@ -5,6 +5,7 @@ import { PARTS, PART_ORDER, DIFF_LABEL } from '../core/constants.js';
 import { settings, profileById } from '../settings.js';
 import { navAction, deviceMatches } from '../input/input.js';
 import { NOTE_MODES } from '../core/noteMode.js';
+import { celular } from '../sitio/celular.js';
 
 const MODE_SHORT = { taps: 'Todo taps', normal: 'Normal', hopos: 'Todo HOPOs', strums: 'Todo rasgueo' };
 import { SongSelectScreen } from './songSelect.js';
@@ -15,7 +16,8 @@ export class PartSelectScreen extends Screen {
   constructor(app, entry) {
     super(app);
     this.entry = entry;
-    this.parts = PART_ORDER.filter((p) => entry.parts[p]);
+    // en el celular solo lo que se toca con cinco botones (la batería necesita bombo)
+    this.parts = PART_ORDER.filter((p) => entry.parts[p] && !(celular && PARTS[p].kind === 'drums'));
     this.slots = [];
     this.addSlot(app.defaultProfileId());
   }
@@ -30,7 +32,7 @@ export class PartSelectScreen extends Screen {
       partIdx,
       diffIdx: 0,
       bot: false,
-      mode: last.mode || settings.noteMode,
+      mode: celular ? 'taps' : last.mode || settings.noteMode,
       wantDiff: last.diff || 'expert',
     };
     this.slots.push(slot);
@@ -94,12 +96,12 @@ export class PartSelectScreen extends Screen {
         h('div', { class: 'slot-head' },
           h('span', { class: 'slot-p' }, `P${si + 1}`),
           h('span', { class: 'slot-name' }, slot.name),
-          h('span', { class: 'slot-dev' }, prof?.name || '')),
+          h('span', { class: 'slot-dev' }, celular ? 'Pantalla táctil' : prof?.name || '')),
         h('div', { class: 'slot-sum' }, slot.step !== 'part' ? `${PARTS[part].label}${slot.step === 'ready' ? ' · ' + DIFF_LABEL[this.diffsFor(slot)[slot.diffIdx]] : ''}${slot.bot ? ' · BOT' : ''}` : (slot.bot ? 'Modo bot activado' : `Elige instrumento · ${MODE_SHORT[slot.mode]}`)),
         h('div', { class: 'slot-items' }, ...items),
         si > 0 ? h('button', { class: 'slot-leave', onclick: () => this.removeSlot(slot) }, 'Salir') : null);
     });
-    if (this.slots.length < 4) {
+    if (this.slots.length < 4 && !celular) {
       cols.push(h('div', { class: 'slot join' }, h('div', { class: 'join-text' }, '+', h('small', {}, 'Pulsa verde para unirte'))));
     }
     this.slotsEl.replaceChildren(...cols);
@@ -123,6 +125,7 @@ export class PartSelectScreen extends Screen {
       else if (a === 'down') slot.partIdx = (slot.partIdx + 1) % n;
       else if (a === 'confirm') {
         if (slot.partIdx === this.parts.length) {
+          if (celular) return; // sin rasgueo: siempre todo taps
           const modes = Object.keys(NOTE_MODES);
           slot.mode = modes[(modes.indexOf(slot.mode) + 1) % modes.length];
         } else if (slot.partIdx === this.parts.length + 1) slot.bot = !slot.bot;

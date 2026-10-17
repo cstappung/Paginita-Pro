@@ -5,6 +5,7 @@ import { PARTS, DIFF_LABEL } from '../core/constants.js';
 import { SongSelectScreen } from './songSelect.js';
 import { LobbyScreen } from './online.js';
 import { sitio } from '../sitio/puente.js';
+import { celular } from '../sitio/celular.js';
 import { dificultadMaxima } from '../sitio/clave.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('es');
@@ -104,7 +105,9 @@ export class ResultsScreen extends Screen {
         h('button', { 'data-nav': true, onclick: () => this.back() }, 'Elegir otra canción'),
       ];
     // Lo que dice la página de Juegos de esta canción: guardada, estrellas, monedas
-    this.nube = sitio.embebido && sitio.cuenta ? h('div', { class: 'res-nube' }, 'Verificando tu partida…') : null;
+    this.nube = celular
+      ? h('div', { class: 'res-nube' }, h('b', {}, 'En el celular las partidas no se guardan'), h('span', {}, 'Los récords y las estrellas se ganan con teclado, mando o guitarra.'))
+      : sitio.embebido && sitio.cuenta ? h('div', { class: 'res-nube' }, 'Verificando tu partida…') : null;
     return h('div', { class: 'screen results' },
       this.nube,
       h('div', { class: 'res-title' },

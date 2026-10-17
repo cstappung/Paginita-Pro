@@ -10,6 +10,8 @@ import { songUrl, fetchSongFile, fileUrl, library } from '../library.js';
 import { h } from '../ui/dom.js';
 import { Grabadora, opcionesMotor } from './prueba.js';
 import { RemoteState } from './remoto.js';
+import { celular } from '../sitio/celular.js';
+import { Tactil, TACTIL } from '../ui/tactil.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -51,11 +53,15 @@ export class GameSession {
         p.inputs.push({ profile: kb, map: buildActionMap(kb, p.track.kind) });
       }
     }
+    // en el celular, el primer humano toca con los cinco botones de la pantalla (ui/tactil.js)
+    this.tactilDe = celular ? humans[0] || null : null;
+    this.tactilDe?.inputs.push({ profile: TACTIL, map: buildActionMap(TACTIL, this.tactilDe.track.kind) });
   }
 
   _makePlayer(pd, idx, count) {
     const raw = this.song.parts[pd.part]?.[pd.diff];
-    const mode = pd.mode || (pd.type === 'remote' ? 'normal' : settings.noteMode);
+    // en el celular no hay rasgueo: todo taps (el modo va en la cabecera de la prueba)
+    const mode = celular && pd.type !== 'remote' ? 'taps' : pd.mode || (pd.type === 'remote' ? 'normal' : settings.noteMode);
     const track = applyNoteMode(raw, mode);
     if (!track) throw new Error(`La canción no tiene ${pd.part}/${pd.diff}`);
     const p = {
@@ -87,7 +93,7 @@ export class GameSession {
     if (pd.profileId) {
       p.profile = profileById(pd.profileId);
       p.inputs = [{ profile: p.profile, map: buildActionMap(p.profile, track.kind) }];
-      if (settings.showKeyLabels && p.profile.device === 'keyboard' && !pd.bot) p.keyLabels = this._keyLabels(p.profile, track);
+      if (settings.showKeyLabels && p.profile.device === 'keyboard' && !pd.bot && !celular) p.keyLabels = this._keyLabels(p.profile, track);
     }
     p.engine.listener = (type, a, b) => this._onEngineEvent(p, type, a, b);
     return p;
@@ -207,8 +213,9 @@ export class GameSession {
 
   _drawOpts() {
     return {
-      noteSpeed: settings.noteSpeed, lefty: settings.lefty, tilt: settings.highwayTilt,
-      style: settings.highwayStyle, shake: settings.screenShake, alto: settings.altoRendimiento,
+      // en el celular la autopista es ancha y baja: las gemas, más aplastadas
+      noteSpeed: settings.noteSpeed, lefty: settings.lefty, tilt: celular ? settings.highwayTilt * 0.62 : settings.highwayTilt,
+      style: settings.highwayStyle, shake: settings.screenShake, alto: settings.altoRendimiento, celular,
       compartido: this.players.length > 1,
       rewinding: !!this.rewind,
       introAge: this.introPerf ? (performance.now() - this.introPerf) / 1000 : 99,
@@ -218,6 +225,11 @@ export class GameSession {
   // [jugador, rectángulo] de cada autopista, en píxeles de la ventana
   _views() {
     const w = this.canvas.width / this.dpr, hh = this.canvas.height / this.dpr;
+    // en el celular solo tu autopista, a todo lo ancho (las de los demás quedarían diminutas)
+    if (celular) {
+      const yo = this.tactilDe || this.local[0] || this.players[0];
+      return [[yo, { x: 0, y: 0, w, h: hh }]];
+    }
     const n = this.players.length;
     return this.players.map((p, i) => [p, n === 1 ? { x: 0, y: 0, w, h: hh } : { x: (i * w) / n, y: 0, w: w / n, h: hh }]);
   }
@@ -266,6 +278,7 @@ export class GameSession {
     this.introPerf = performance.now();
     this.audio.playSample('ripple', 0.8);
     this._showIntro();
+    if (this.tactilDe) this.tactil = new Tactil(this);
     this.unsubInput = this.app.input.on((ev) => this.handleInput(ev));
     this.app.input.capture = true;
     this.resize = () => this._resize();
@@ -292,6 +305,13 @@ export class GameSession {
       m.charter ? h('div', { class: 'si-charter' }, `Chart: ${m.charter}`) : null);
     this.app.overlay.append(this.introEl);
     setTimeout(() => this.introEl?.classList.add('hide'), 5500);
+    if (this.tactilDe) {
+      this.helpEl = h('div', { class: 'play-help' }, 'Toca el botón de cada color justo cuando su nota llegue al círculo (no hace falta rasguear). Barra morada: no toques nada',
+        h('small', {}, 'Star Power: ★ · Pausa: ❚❚ · En el celular las partidas no se guardan'));
+      this.app.overlay.append(this.helpEl);
+      setTimeout(() => this.helpEl?.classList.add('hide'), 7000);
+      return;
+    }
     // Ayuda rápida de controles para el jugador de teclado
     const kp = this.local.find((p) => p.keyLabels);
     if (kp) {
@@ -446,7 +466,10 @@ export class GameSession {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const w = W / this.dpr, hh = H / this.dpr;
     const opts = this._drawOpts();
-    for (const [p, view] of this._views()) this.renderer.draw(ctx, view, p, now, this.song, { ...opts, keyLabels: p.keyLabels });
+    const vistas = this._views();
+    for (const [p, view] of vistas) this.renderer.draw(ctx, view, p, now, this.song, { ...opts, keyLabels: p.keyLabels });
+    // los que no se pintan no consumen sus efectos: que no se acumulen toda la canción
+    if (vistas.length < this.players.length) for (const p of this.players) if (!vistas.some(([q]) => q === p)) p.fxQueue.length = 0;
 
     // barra de progreso de la canción
     const prog = Math.max(0, Math.min(1, now / this.endAt));
@@ -540,6 +563,7 @@ export class GameSession {
     this.pauseMenu = null;
     this.paused = false;
     if (!this.net) this._rewindAndResume();
+    this.tactil?.suelta();
     for (const p of this.local) {
       // al volver de la pausa, se sueltan los trastes para evitar estados pegados
       p.frets = 0;
@@ -642,6 +666,8 @@ export class GameSession {
     this.audio.stop();
     this.introEl?.remove();
     this.helpEl?.remove();
+    this.tactil?.destroy();
+    this.tactil = null;
     this._clearBackground();
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);

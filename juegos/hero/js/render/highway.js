@@ -45,6 +45,15 @@ function introRipple(age, lane, ry) {
   return [Math.max(0.05, e), (1 - k) * ry * 2.5];
 }
 
+// Celular (sitio/celular.js): la barra de golpeo sube y la autopista se ensancha
+// hasta que, a la altura de los botones táctiles (ui/tactil.js: el 20 % de abajo,
+// centro en CEL_BOTONES), cada carril mide justo un quinto de la pantalla.
+const CEL_STRIKE = 0.7, CEL_BOTONES = 0.9;
+function anchoCelular(w, h, strikeY, topY) {
+  const s = 1 + ((h * CEL_BOTONES - strikeY) * (1 - S_FAR)) / (strikeY - topY);
+  return w / 2 / s;
+}
+
 export class HighwayRenderer {
   draw(ctx, view, p, now, song, opts) {
     // modo alto rendimiento: los mismos elementos, con efectos más sencillos
@@ -59,11 +68,12 @@ export class HighwayRenderer {
     const e = p.engine;
     const drums = e.kind === 'drums';
     const lanes = drums ? e.track.lanes : 5;
-    const strikeY = view.y + view.h * 0.8;
-    const topY = view.y + view.h * 0.08;
-    const hw = Math.min(view.w * 0.4, view.h * 0.3);
+    const cel = !!opts.celular;
+    const strikeY = view.y + view.h * (cel ? CEL_STRIKE : 0.8);
+    const topY = view.y + view.h * (cel ? 0.05 : 0.08);
+    const hw = cel ? anchoCelular(view.w, view.h, strikeY - view.y, topY - view.y) : Math.min(view.w * 0.4, view.h * 0.3);
     const G = {
-      view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2,
+      view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2, celular: cel,
       laneW: (2 * hw) / lanes,
       vis: 1.45 / Math.max(0.3, opts.noteSpeed),
       lefty: opts.lefty,
@@ -1400,6 +1410,7 @@ export class HighwayRenderer {
   _hud(ctx, view, p, now, G, fx, mult) {
     const e = p.engine;
     const { cx, hw, strikeY, topY } = G;
+    if (G.celular) return this._hudCelular(ctx, view, p, now, G, fx, mult);
     const right = cx + hw * 1.12;
     const compact = view.x + view.w - right < 120;
     const scale = Math.max(0.6, Math.min(1.3, view.h / 900));
@@ -1456,6 +1467,41 @@ export class HighwayRenderer {
       ctx.shadowBlur = 0;
     }
 
+    this._soloYPopups(ctx, view, p, now, G, scale, font);
+  }
+
+  // Celular: la autopista ocupa casi todo el ancho y abajo están los botones, así
+  // que el marcador va en la esquina de arriba a la izquierda, donde la autopista
+  // es angosta. A la derecha quedan los botones ★ y pausa (ui/tactil.js).
+  _hudCelular(ctx, view, p, now, G, fx, mult) {
+    const e = p.engine;
+    const scale = Math.max(0.7, Math.min(1.1, view.h / 480));
+    const multColor = e.spActive ? SP_COLOR : MULT_COLORS[Math.min(4, mult)] || '#fff';
+    const font = (wgt, px) => `${wgt} ${Math.round(px * scale)}px Rajdhani, "Segoe UI", sans-serif`;
+    const x = view.x + 16, y = view.y + 40 * scale;
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.font = font(700, 34);
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = this.alto ? 0 : 6;
+    ctx.fillText(Math.floor(e.score).toLocaleString('es'), x, y);
+    ctx.shadowBlur = 0;
+    if (e.combo > 0) {
+      ctx.font = font(600, 18);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(`Racha ${e.combo}`, x, y + 22 * scale);
+    }
+    const R = 30 * scale;
+    this._multGauge(ctx, e, now, fx, mult, multColor, x + R + 6, y + 40 * scale + R, R);
+    this._spCell(ctx, e, now, fx, x, y + 52 * scale + 2 * R + 14 * scale, 120 * scale, 14 * scale, true);
+    this._soloYPopups(ctx, view, p, now, G, scale, font);
+  }
+
+  // El cartel del solo y los mensajes emergentes, iguales en los dos marcadores
+  _soloYPopups(ctx, view, p, now, G, scale, font) {
+    const e = p.engine;
+    const { cx, strikeY, topY } = G;
     const solo = e.currentSolo?.(now);
     if (solo && solo.total) {
       const pct = Math.round((solo.hits / solo.total) * 100);
