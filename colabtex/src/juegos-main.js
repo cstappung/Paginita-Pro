@@ -98,7 +98,7 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 
 const $ = id => document.getElementById(id);
@@ -2136,118 +2136,66 @@ const fechaAlta = a => {
 const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
 
 /* Lo que se destaca a mano: no siempre lo nuevo es un juego de sala
-   (PRODROP es una tienda, BBTAN un juego del club, zombis un modo de
-   Yemas), así que la lista se escribe aquí en vez de salir de las fechas
-   `alta` de JUEGOS. El primero lleva «★ Lo último». */
+   (PRODROP es una tienda, Mascotas una crianza), así que la lista se
+   escribe aquí en vez de salir de las fechas `alta` de JUEGOS. El orden
+   es el que eligió la dueña del sitio, no el de las fechas: el sello
+   «★ Lo último» lo lleva la de `alta` más reciente (`selloNovedad`).
+   Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
+   del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
-  /* BT3 es privado: su diapositiva solo la ven los amigos del disco (bt3Visible, bt3-amigos.js). */
-  { id: "bt3", color: "#ff8a00", alta: "2026-10-14", titulo: "Budokai Tenkaichi 3",
-    lema: "El juego de PS2 completo, en el navegador y a 30 cuadros como la consola. De 1 a 8: entrenamiento y contra la CPU, duelos con revancha y torneos de hasta ocho con su llave, con tus amigos y, si el organizador quiere, con CPU.",
-    sub: "Solo PC · Chrome o Edge · 1 a 8 jugadores", sala: { k: "bt3", ops: { cupo: 2 } }, reglas: ["bt3"],
-    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
-  { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
-    lema: "Fútbol de discos en tiempo real: muévete, choca la pelota y patea con espacio. Rojo contra azul, el primero que llega a los goles pactados gana. Solo, contra bots, o en sala con tu gente.",
-    sub: "2–8 jugadores · rojo contra azul", sala: { k: "haxball", ops: {} }, reglas: ["haxball"],
-    modo: "multi", jugadores: "2–8 jugadores", cuenta: true },
   { id: "hero", color: "#ffb21e", alta: "2026-10-12", titulo: "PRO HERO",
     lema: "Guitarra, bajo, teclado o batería sobre 333 canciones de Clone Hero, con teclado o con tu guitarra. Junta estrellas doradas en Experto para subir en la clasificación, y abre una sala para tocar la misma canción con tus amigos.",
-    sub: "Un jugador o en sala de 2 a 8 · estrellas, top por canción y logros", ruta: "#solo/hero", boton: "Tocar", reglas: ["hero"], modo: "solo", cuenta: true },
+    sub: "Un jugador o en sala de 2 a 8 · estrellas, top por canción y logros", ruta: "#solo/hero", boton: "Jugar", reglas: ["hero"], modo: "solo", cuenta: true },
   { id: "mascotas", color: "#ff8a3d", alta: "2026-10-10", titulo: "Mascotas",
     lema: "Adopta una gallina o un gato en 3D, dale de comer, báñalo, hazlo dormir y míralo crecer de huevo a adulto. Vístelo con lo que salga de los regalos, enséñale bailes y lúcelo en tu perfil. La primera adopción es gratis.",
-    sub: "Crianza en 3D · regalos, ropa, muebles y bailes · mercado", ruta: "#mascotas", boton: "Adoptar", juego: "mascotas",
+    sub: "Crianza en 3D · regalos, ropa, muebles y bailes · mercado", ruta: "#mascotas", boton: "Jugar", juego: "mascotas",
     modo: "solo", cuenta: true },
-  { id: "gato", color: "#2f6b4f", alta: "2026-10-06", titulo: "Gato y Super Gato",
-    lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
-    sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
-    modo: "multi", jugadores: "2 jugadores", cuenta: true },
-  { id: "tulonesred", color: "#63b8ee", alta: "2026-10-10", titulo: "TULONES en línea",
-    lema: "La torre de amigos, ahora cada uno desde su casa: por turnos, ves en directo al que trepa y su cuerpo congelado queda para siempre. Quien no supera la línea roja queda fuera.",
-    sub: "2 a 8 jugadores · por turnos", sala: { k: "tulones", ops: {} }, reglas: ["tulones"],
-    modo: "multi", jugadores: "2 a 8 jugadores", cuenta: true },
-  { id: "pokelike", color: "#e3350d", alta: "2026-10-12", titulo: "POKELIKE",
-    lema: "Un roguelike de Pokémon de Kanto: elige tu inicial, recorre un mapa distinto cada vez, gana las ocho medallas y vence a la Liga. Después, la Ruta Infinita.",
-    sub: "Un jugador · roguelike de Pokémon · versión de prueba", ruta: "#solo/pokelike", boton: "Jugar", reglas: ["pokelike"], modo: "solo" },
   { id: "protiles", color: "#ff5a36", alta: "2026-10-17", titulo: "PRO TILES",
     lema: "Ocho canciones pop originales que nunca terminan: se componen solas mientras tocas, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
-    sub: "Un jugador · piano · 8 canciones + mezcla", ruta: "#solo/protiles", boton: "Tocar", reglas: ["protiles"], modo: "solo" },
+    sub: "Un jugador · piano · 8 canciones + mezcla", ruta: "#solo/protiles", boton: "Jugar", reglas: ["protiles"], modo: "solo" },
+  { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
+    lema: "Fútbol de discos en tiempo real: muévete, choca la pelota y patea con espacio. Rojo contra azul, el primero que llega a los goles pactados gana. Solo, contra bots, o en sala con tu gente.",
+    sub: "2–8 jugadores · rojo contra azul", ficha: "haxball", juego: "haxball", boton: "Jugar", reglas: ["haxball"],
+    modo: "multi", jugadores: "2–8 jugadores", cuenta: true },
+  { id: "tulones", color: "#63b8ee", alta: "2026-10-10", titulo: "TULONES",
+    lema: "Trepa sobre un pudú y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana: de 1 a 8 en el mismo teclado, o en línea por turnos, cada uno desde su casa.",
+    sub: "1 a 8 jugadores · en el mismo teclado o en línea · física de muñecos", ruta: "#solo/tulones", boton: "Jugar", reglas: ["tulones"],
+    modo: "multi", jugadores: "1–8 jugadores" },
   { id: "trigon", color: "#f6d23c", alta: "2026-10-10", titulo: "TRIGON",
     lema: "Arrastra piezas hechas de triángulos al tablero hexagonal. Completa una línea —horizontal o en cualquiera de las dos diagonales— y se borra. Encadena líneas para multiplicar el bono.",
     sub: "Un jugador · puzle de triángulos · 5 temas", ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
-  { id: "tulones", color: "#63b8ee", alta: "2026-10-09", titulo: "TULONES",
-    lema: "Trepa sobre un pudú y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana. De 1 a 8 en el mismo teclado.",
-    sub: "1 a 8 jugadores en el mismo equipo · física de muñecos", ruta: "#solo/tulones", boton: "Trepar", reglas: ["tulones"], modo: "solo" },
-  { id: "dosmil", color: "#edc22e", alta: "2026-10-07", titulo: "2048",
-    lema: "Desliza las fichas hacia un lado: las iguales que chocan se juntan en una del doble. Cada jugada trae una ficha nueva. Llega al 2048… y sigue.",
-    sub: "Un jugador · junta fichas hasta el 2048", ruta: "#solo/dosmil", boton: "Jugar", reglas: ["dosmil"], modo: "solo" },
-  { id: "aleteo", color: "#3fb6f5", alta: "2026-10-06", titulo: "ALETEO",
-    lema: "Un pajarito vuelve al nido por entre los tubos. Toca para aletear. Cuanto más lejos llega, más tarde se hace… y lo que hay al final del cielo no es un nido.",
-    sub: "Un jugador · seis cielos y una sola tabla", ruta: "#solo/aleteo", boton: "Volar", reglas: ["aleteo"], modo: "solo" },
-  { id: "metrorush", color: "#ff6a3d", alta: "2026-10-05", titulo: "METRO RUSH",
-    lema: "Corre por las vías esquivando trenes: salta las barreras bajas, rueda bajo las altas y sube por las rampas a correr sobre los techos. Junta monedas, cumple retos y no dejes que el inspector te atrape.",
-    sub: "Un jugador · esquiva trenes, junta monedas y llega a la Estación Fantasma", ruta: "#solo/metrorush", boton: "Correr", reglas: ["metrorush"], modo: "solo" },
-  { id: "atasco", color: "#e8322f", alta: "2026-10-05", titulo: "Atasco",
-    lema: "Estás encerrado en el auto rojo. Desliza autos, camiones y buses por su carril hasta abrirte camino a la salida. Con el mínimo de movidas, tres estrellas.",
-    sub: "Un jugador · 240 niveles en seis pisos", ruta: "#solo/atasco", boton: "Arrancar", reglas: ["atasco"], modo: "solo" },
-  { id: "boxhead", color: "#c8892f", alta: "2026-10-05", titulo: "Boxhead",
-    lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
-    sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
-    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
-  { id: "componentes", color: "#2fbf71", alta: "2026-10-04", titulo: "PRODROP · colección Componentes",
-    lema: "Una colección de cartas: 25 componentes electrónicos en 11 temas, del realista y el esquemático al pixel art, el dieciochero y el arcano. Las legendarias salen quemadas… o con nieve de Navidad.",
-    sub: "275 cartas nuevas · elige el sobre de Componentes al abrir", ruta: "#cartas", boton: "Abrir un sobre", cuenta: true },
-  { id: "sudoku", color: "#ff2fb4", alta: "2026-10-04", titulo: "Sudoku Arcade",
-    lema: "El sudoku del día con su racha, el clásico en cuatro dificultades y el arcade: tres vidas, combos de hasta ×4 y premio por cerrar filas, columnas y cajas.",
-    sub: "Un jugador · diario, clásico y arcade", ruta: "#solo/sudoku", boton: "Jugar", reglas: ["sudoku"], modo: "solo" },
-  { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
-    lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
-    sub: "Un jugador · veinticinco jornadas, siete jefes, taller de mejoras y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
     lema: () => (veSerie1() ? "Sobres de cinco cartas, de los profes o de componentes" : "Sobres de cinco cartas") + ", y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+  { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
+    lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
+    sub: "Un jugador · veinticinco jornadas, siete jefes, taller de mejoras y una travesía sin fin", ruta: "#solo/fanal", boton: "Jugar", reglas: ["fanal"], modo: "solo" }
 ];
-// Lo que se muestra: sin BT3 para quien no está en la lista de amigos.
-// (la de BT3 solo la ven los amigos del disco: las que se muestran son estas)
+/* Lo que se muestra: una novedad de BT3 (si vuelve) solo la ven los
+   amigos del disco (bt3Visible, bt3-amigos.js). */
 let VISIBLES = NOVEDADES;
 const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()); };
+/* El sello de cada diapositiva: «★ Lo último» para la más reciente,
+   «Nuevo» para lo de las dos últimas semanas y «Destacado» para el resto
+   (PRODROP no es nuevo, pero está porque se quiere que se vea). */
+function selloNovedad(n, lista) {
+  const ultima = lista.reduce((a, b) => (b.alta > a.alta ? b : a), lista[0]);
+  if (n === ultima) return "★ Lo último";
+  return diasDesde(n.alta, fb.ahora()) <= 14 ? "Nuevo" : "Destacado";
+}
 function arteNovedad(n) {
   // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
   if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
-  // 2048: el tablero de 4×4 con sus fichas y la del 2048 que late.
-  if (n.id === "dosmil") {
-    const f = [2, 0, 4, 8, 0, 16, 2, 0, 32, 64, 0, 4, 128, 256, 512, 2048];
-    return `<div class="jg-nov-arte-dm"><div>${f.map(v => `<i class="v${v}">${v || ""}</i>`).join("")}</div><b>2048</b></div>`;
-  }
-  // ALETEO: el cielo que se oscurece de izquierda a derecha, tubos y el pájaro.
-  if (n.id === "aleteo") return `<div class="jg-nov-arte-al"><i></i><i></i><i></i><i></i><s></s><em></em><b>ALETEO</b></div>`;
-  // Sudoku Arcade: el tablero de neón con unas cifras, la casilla que late, las vidas y el combo.
-  if (n.id === "sudoku") {
-    const cifras = [[0, 0, 5, 1], [2, 0, 3], [4, 1, 7, 1], [7, 1, 1], [1, 3, 8], [3, 2, 6, 1], [6, 3, 2], [8, 4, 9, 1], [5, 5, 4], [2, 6, 1, 1], [7, 6, 5], [0, 8, 6], [4, 7, 3, 1], [6, 8, 7], [8, 7, 8]];
-    return `<div class="jg-nov-arte-sd"><div>${cifras.map(([x, y, v, p]) => `<i${p ? ' class="p"' : ""} style="--x:${x};--y:${y}">${v}</i>`).join("")}<em></em></div><u>♥♥♥</u><s>×4</s><b>SUDOKU <span>ARCADE</span></b></div>`;
-  }
-  if (n.id === "componentes") {
-    const cs = ["arcano/esp32", "navidad/timer-555", "quemado/mosfet-potencia"];
-    return `<div class="jg-nov-arte-pd cmp">${cs.map(c => `<img src="juegos/prodrop/cards/componentes/${c}.webp" alt="" loading="lazy">`).join("")}<i>NUEVA COLECCIÓN</i><b>COMPO<span>NENTES</span></b></div>`;
-  }
-  // Atasco: un estacionamiento visto desde arriba, el auto rojo y la barrera de salida.
-  if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
-  // Metro Rush: tres vías que se juntan en el horizonte, un tren de frente con los focos encendidos y unas monedas.
-  if (n.id === "metrorush") return `<div class="jg-nov-arte-mr"><i></i><i></i><i></i><em></em><b>METRO RUSH</b></div>`;
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
-  // Tulones: la misma escena de la portada del club.
+  // Los del club: la misma escena de su portada.
   if (n.id === "protiles") return `<div class="jg-nov-arte-zb">${portadaSolo("protiles")}<b>PRO TILES</b></div>`;
   if (n.id === "trigon") return `<div class="jg-nov-arte-zb">${portadaSolo("trigon")}<b>TRIGON</b></div>`;
-  if (n.id === "pokelike") return `<div class="jg-nov-arte-zb">${portadaSolo("pokelike")}<b>POKELIKE</b></div>`;
   if (n.id === "hero") return `<div class="jg-nov-arte-zb">${portadaSolo("hero")}<b>PRO HERO</b></div>`;
-  if (n.id === "tulonesred") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>EN LÍNEA</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
   if (n.id === "bt3") return `<div class="jg-nov-arte-bt3">${arteJuego("bt3")}</div>`;
-  if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
-  if (n.id === "haxball") return `<div class="jg-nov-arte-zb">${arteJuego("haxball")}</div>`;
-  if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
-  if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
   if (n.id === "prodrop") {
     // la Serie 01 (los profes) solo para quien la ve; si no, tres componentes
     if (!veSerie1()) {
@@ -2257,8 +2205,20 @@ function arteNovedad(n) {
     const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];
     return `<div class="jg-nov-arte-pd">${cs.map((c, i) => `<img src="juegos/prodrop/cards/${i === 1 ? "legendarias" : "epicas"}/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
   }
-  return `<div class="jg-nov-arte-bb"><i></i><i></i><i></i><i></i><i></i><i></i><em></em><b>BBTAN</b></div>`;
+  // Un juego de sala: su portada del catálogo.
+  return `<div class="jg-nov-arte-zb">${arteJuego(n.juego || n.id)}</div>`;
 }
+
+/* El texto del botón grande sobre el color del juego: oscuro sobre los
+   colores claros (el amarillo de PRO HERO o de Trigon), blanco sobre el
+   resto. Luminancia relativa, la de las pautas de contraste. */
+function tintaSobre(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "#fff";
+  const l = [0, 2, 4].map(k => { const c = parseInt(m[1].slice(k, k + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] > 0.36 ? "#1a1206" : "#fff";
+}
+const PLAY = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg>';
 
 /* Dónde se juega un juego del salón, con la forma que espera
    `plataformas`; vacío si la novedad no lleva a un juego (PRODROP). */
@@ -2283,15 +2243,18 @@ function novedadesHtml() {
       /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
          para el juego al que lleva la novedad. */
       plataformas(plataformaDe(juegoDeNovedad(n)));
+    /* El botón grande: lo primero que se ve después del título. Sin
+       cuenta, el mismo botón pide iniciar sesión (con su candado). */
+    const ico = c => `<span class="jg-ban-jugar-ico" aria-hidden="true">${c}</span>`;
     const accion = cuenta
-      ? `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`
-      : n.sala ? `<button class="btn" data-nov-crear="${n.id}">Abrir sala <span aria-hidden="true">→</span></button>`
-      : `<a class="btn" href="${n.ruta}">${escapeHtml(n.boton)} <span aria-hidden="true">→</span></a>`;
+      ? `<button class="jg-ban-jugar" type="button" data-login>${ico(CANDADO)}<span>Iniciar sesión y jugar</span></button>`
+      : n.ficha ? `<button class="jg-ban-jugar" type="button" data-nov-ficha="${n.ficha}">${ico(PLAY)}<span>${escapeHtml(n.boton)}</span></button>`
+      : `<a class="jg-ban-jugar" href="${n.ruta}">${ico(PLAY)}<span>${escapeHtml(n.boton)}</span></a>`;
     return `
-          <article class="jg-ban-c${cuenta ? " bloq" : ""}" style="--c:${n.color}" ${copia ? 'aria-hidden="true" inert' : `role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${N}: ${escapeHtml(n.titulo)}"`}>
+          <article class="jg-ban-c${cuenta ? " bloq" : ""}" style="--c:${n.color};--tinta:${tintaSobre(n.color)}" ${copia ? 'aria-hidden="true" inert' : `role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${N}: ${escapeHtml(n.titulo)}"`}>
             <div class="jg-portada jg-nov-arte jg-ban-arte" aria-hidden="true">${arteNovedad(n)}</div>
             <div class="jg-ban-cuerpo">
-              <div class="jg-ban-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span>${insignia}<span class="jg-ban-fecha">${escapeHtml(fechaAlta(n.alta))}</span></div>
+              <div class="jg-ban-meta"><span class="jg-nov-sello">${selloNovedad(n, VISIBLES)}</span>${insignia}<span class="jg-ban-fecha">${escapeHtml(fechaAlta(n.alta))}</span></div>
               <h2>${escapeHtml(n.titulo)}</h2>
               <p>${escapeHtml(typeof n.lema === "function" ? n.lema() : n.lema)}</p>
               <small>${escapeHtml(typeof n.sub === "function" ? n.sub() : n.sub)}${cuenta ? " · requiere cuenta" : ""}</small>
@@ -2335,10 +2298,10 @@ const tiraMascotasHtml = inv => `
 
 function enganchaNovedades(h) {
   const de = id => VISIBLES.find(n => n.id === id);
-  for (const b of h.querySelectorAll("[data-nov-crear]")) {
-    const n = de(b.getAttribute("data-nov-crear"));
-    b.onclick = () => crear(n.sala.k, Object.assign(porOmision(n.sala.k), n.sala.ops));
-  }
+  /* «Jugar» en un juego de sala abre su ficha: ahí están las salas que
+     esperan, las opciones y la práctica. Abrir una sala de un toque desde
+     un banner que pasa solo sería anunciarla en Discord por un roce. */
+  for (const b of h.querySelectorAll("[data-nov-ficha]")) b.onclick = () => salon.abre(b.dataset.novFicha, b);
   for (const b of h.querySelectorAll("[data-nov-reglas]")) {
     const n = de(b.getAttribute("data-nov-reglas")), [k, modo] = n.reglas;
     b.onclick = () => abreReglas(k, modo ? { modo, nombre: JUEGOS[k] ? JUEGOS[k].nombre : n.titulo } : undefined);

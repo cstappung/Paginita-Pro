@@ -140,12 +140,20 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
-because what is new is not always a room game (today Metro Rush, FANAL and
-PRODROP, each with its own cover in `arteNovedad`); each entry may
-carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
-say what a guest gets instead. On a phone the banner puts the art on top.
-`novedades()` in `motor.js` is the older date-driven version and is no
-longer called.
+because what is new is not always a room game (Mascotas, PRODROP). Today it
+holds **eight slides in the owner's order** — PRO HERO, Mascotas, PRO TILES,
+HaxBall, TULONES (one slide for the local and the online game), Trigon,
+PRODROP, FANAL — pinned by `salon.test.cjs`. The order is not by date: the
+«★ Lo último» seal goes to the newest `alta` (`selloNovedad`), «Nuevo» to
+the last 14 days, «Destacado» to the rest. Each slide has its own art
+(`arteNovedad`) and a **big «Jugar» button** (`.jg-ban-jugar`, the game's
+colour, text in `--tinta` from `tintaSobre` so yellow gets dark text): it
+goes to `ruta`, or opens the game's ficha (`ficha`) for a room game — the
+banner never opens a room by itself. For a guest the same button reads
+«Iniciar sesión y jugar» when the slide needs an account. Entries may carry
+`modo` (the same badge as the thumbnails). On a phone the banner puts the
+art on top and the button spans the width. `novedades()` in `motor.js` is
+the older date-driven version and is no longer called.
 
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
 no login wall, but **only eight games are playable**: the four *destacados*

@@ -117,3 +117,13 @@ test('una novedad lleva las etiquetas del juego al que lleva',()=>{
  const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
  for(const m of nov.matchAll(/ruta: "(#solo\/\w+)"|sala: \{ k: "(\w+)"/g)){const n=m[1]?{ruta:m[1]}:{sala:{k:m[2]}};assert.ok(S.CONTROLES[S.juegoDeNovedad(n)],JSON.stringify(n));}
 });
+
+/* Las novedades del banner son las que eligió la dueña del sitio, en su
+   orden, y cada una tiene adónde llevar con su botón grande. */
+test('las novedades: las ocho elegidas, en su orden, con su botón',()=>{
+ const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
+ const ids=[...nov.matchAll(/^  \{ id: "(\w+)"/mg)].map(m=>m[1]);
+ assert.deepEqual(ids,['hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
+ for(const m of nov.split(/^  \{ id: /m).slice(1)) assert.match(m,/ruta: "#|ficha: "\w+"/,'sin adónde ir: '+m.slice(0,20));
+ assert.ok(!nov.includes('sala: {'),'el banner no abre salas de un toque');
+});
