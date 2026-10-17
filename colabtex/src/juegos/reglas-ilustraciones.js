@@ -304,6 +304,28 @@ export const trigon=etapa=>{
  if(etapa===3)cuerpo+=txt(300,70,'Horizontal',18,C.azul)+txt(300,104,'Diagonal ↘',18,C.verde)+txt(300,138,'Diagonal ↗',18,C.rojo)+txt(300,190,'Cualquiera sirve.',15,C.gris);
  return svg(nombre,cuerpo);
 };
+/* PRO TILES: los cuatro carriles en papel crema y las fichas negras.
+   `etapa`: 0 la ficha de inicio en coral; 1 la negra más baja y un carril
+   vacío marcado en rojo; 2 una larga a medio mantener; 3 la larga completa
+   con su bono. */
+export const protiles=etapa=>{
+ const nombre=['La ficha de inicio, en coral, sobre los cuatro carriles','Se toca la ficha negra más baja; tocar un carril vacío termina la partida','Una ficha larga mantenida: la barra coral sube','La ficha larga completa suma su bono'][etapa];
+ const W=46,x0=36,y0=14,h=222;
+ let cuerpo=`<rect x="${x0}" y="${y0}" width="${W*4}" height="${h}" rx="8" fill="#faf7f1"/>`;
+ for(let i=1;i<4;i++)cuerpo+=`<rect x="${x0+i*W}" y="${y0}" width="1.5" height="${h}" fill="#e2d9cb"/>`;
+ const ficha=(c,y,alto,fill='#141414')=>`<rect x="${x0+c*W+3}" y="${y}" width="${W-6}" height="${alto}" rx="6" fill="${fill}"/>`;
+ if(etapa===0)cuerpo+=ficha(2,170,54,'#ff5a36')+txt(x0+2*W+W/2,201,'Iniciar',12,'#ffffff','middle')+ficha(0,110,54)+ficha(3,50,54)+
+  txt(270,90,'La primera, en coral,',17,C.blanco)+txt(270,116,'empieza la canción.',17,C.blanco)+txt(270,170,'Después, las negras.',15,C.gris);
+ if(etapa===1)cuerpo+=ficha(1,168,54)+ficha(3,108,54)+ficha(0,48,54)+`<rect x="${x0+2*W+3}" y="168" width="${W-6}" height="54" rx="6" fill="none" stroke="#d7263d" stroke-width="3" stroke-dasharray="6 4"/>`+
+  txt(270,80,'✓ La más baja primero.',16,C.verde)+txt(270,120,'✗ Un carril vacío',16,C.rojo)+txt(270,142,'termina la partida.',16,C.rojo)+txt(270,190,'Y no dejes que se escape.',14,C.gris);
+ if(etapa===2||etapa===3){
+  const y=etapa===2?74:120,alto=150,lleno=etapa===2?70:alto-6;
+  cuerpo+=ficha(1,y,alto)+`<rect x="${x0+W+6}" y="${y+alto-lleno-3}" width="${W-12}" height="${lleno}" rx="5" fill="#ff7a55"/>`+`<circle cx="${x0+W+W/2}" cy="${y+alto-lleno+5}" r="5" fill="#ffffff"/>`;
+  if(etapa===2)cuerpo+=txt(270,90,'Mantén apretado',17,C.blanco)+txt(270,116,'mientras baja.',17,C.blanco)+txt(270,170,'La barra coral sube.',15,C.gris);
+  else cuerpo+=txt(270,90,'¡Completa!',22,C.oro)+txt(270,124,'+1 por la nota',15,C.gris)+txt(270,152,'+2 de bono (4 corcheas)',15,C.verde);
+ }
+ return svg(nombre,cuerpo);
+};
 /* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
    bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
    las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,

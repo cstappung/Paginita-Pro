@@ -358,6 +358,21 @@ const ARTE = {
 
   /* Tulones: el pudú al fondo y la torre de amigos congelados en
      calzoncillos, con el de arriba trepando. */
+  /* PRO TILES: los cuatro carriles en papel crema, las fichas negras
+     bajando (una larga con su punto coral), la de inicio en coral que late
+     y un dedo de luz donde se tocó. */
+  protiles: u => {
+    const W = 64, x0 = 72, fichas = [[0, 196, 70], [2, 120, 70], [1, 36, 70], [3, -60, 140]];
+    let carriles = "";
+    for (let i = 1; i < 4; i++) carriles += `<rect x="${x0 + i * W}" y="0" width="1.5" height="300" fill="#e2d9cb"/>`;
+    const negras = fichas.map(([c, y, h]) => `<rect x="${x0 + c * W + 3}" y="${y}" width="${W - 6}" height="${h}" rx="7" fill="#141414"/>`).join("");
+    const larga = `<rect x="${x0 + 3 * W + W / 2 - 1}" y="-44" width="2" height="100" fill="#ff5a36" opacity=".6"/><circle cx="${x0 + 3 * W + W / 2}" cy="62" r="5" fill="#ff5a36"/>`;
+    return `<rect width="400" height="300" fill="#eee8dd"/>
+    <rect x="${x0}" y="0" width="${W * 4}" height="300" fill="#faf7f1"/>${carriles}${negras}${larga}
+    <g class="a-late"><rect x="${x0 + 2 * W + 3}" y="210" width="${W - 6}" height="70" rx="7" fill="#ff5a36"/></g>
+    <circle cx="${x0 + 2 * W + W / 2}" cy="245" r="22" fill="none" stroke="#ff8a6b" stroke-width="3" opacity=".8"/>`;
+  },
+
   /* Trigon: el hexágono de triángulos con algunas piezas puestas y una
      pieza de la mano flotando encima, en los colores del tema Clásico. */
   trigon: u => {

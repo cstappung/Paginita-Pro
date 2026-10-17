@@ -32,6 +32,9 @@ export function categoriaClub(juego, categoria) {
     // Trigon: una sola tabla, el puntaje de la partida.
     : juego === 'trigon'
     ? categoria === 'club-trigon-puntos'
+    // PRO TILES: un top por canción y otro para la mezcla de las ocho.
+    : juego === 'protiles'
+    ? /^club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)$/.test(categoria)
     // Pokelike: el puntaje de la run y las especies distintas atrapadas en ella.
     : juego === 'pokelike'
     ? /^club-pokelike-(puntos|pokedex)$/.test(categoria)
@@ -83,6 +86,8 @@ export function resultadoClub(juego, dato) {
   if (dato.categoria === 'club-dosmil-ficha' && (dato.puntos > 262144 || (dato.puntos & (dato.puntos - 1)) !== 0)) return null;
   /* Trigon: el puntaje, hasta 1 000 000 (la racha multiplica el bono). */
   if (dato.categoria === 'club-trigon-puntos' && dato.puntos > 1000000) return null;
+  /* PRO TILES: notas más bonos de las largas, con el tope de su verificador. */
+  if (juego === 'protiles' && dato.puntos > 1000000) return null;
   /* Pokelike: el puntaje (la Ruta Infinita no tiene techo; el de la regla
      es 1 000 000) y las especies de Kanto, 151 como mucho. */
   if (dato.categoria === 'club-pokelike-puntos' && dato.puntos > 1000000) return null;
