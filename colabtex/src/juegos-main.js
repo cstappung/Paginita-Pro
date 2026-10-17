@@ -98,7 +98,8 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
+import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -2052,6 +2053,7 @@ function armazon() {
           <button type="button" data-modo-ves="solo"><span class="jg-modos-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span><span class="mo-l">1 jugador</span><span class="mo-c">Solo</span> <b id="vesNSolo"></b></button>
           <button type="button" data-modo-ves="multi"><span class="jg-modos-ico m-multi" aria-hidden="true">${ICONO_MULTI}</span><span class="mo-l">Multijugador</span><span class="mo-c">Multi</span> <b id="vesNMulti"></b></button>
         </div>
+        ${buscadorHtml()}
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
@@ -2116,6 +2118,7 @@ function armazon() {
   for (const b of h.querySelectorAll("[data-desliza]")) {
     b.onclick = () => { const c = $("vesSolos"); c.scrollBy({ left: Number(b.dataset.desliza) * c.clientWidth * 0.9, behavior: "smooth" }); };
   }
+  enganchaBuscador(h);
   enganchaNovedades(h);
   enganchaBanner(h);
   vigilaDropsMascotas(h);
@@ -2494,6 +2497,142 @@ function ponModo(m) {
   }
 }
 
+/* ---------- el buscador del salón ----------
+   Va en la barra de modo, que se queda pegada arriba: así está a mano
+   también al fondo del catálogo. No busca el nombre al pie de la letra:
+   `buscador.js` puntúa cada juego por su nombre, sus apodos, su género,
+   dónde se juega y su lema, y desempata por lo que más se juega. Elegir
+   un resultado abre su ficha, igual que tocar su tarjeta (nunca juega ni
+   abre una sala de un toque). En el celular es una lupa que se despliega
+   sobre la barra; en el PC, un campo con atajo «/». */
+const LUPA = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m10.6 10.6 3.4 3.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+/* Lo que no es un juego del catálogo pero se busca como uno: llevan a su
+   pantalla. */
+const SITIOS_BUSCA = [
+  { id: "mascotas", modo: "sitio", nombre: "Mascotas", genero: "Crianza 3D", icono: "🐣", color: "#ff8a3d", ruta: "#mascotas", sitio: "mascotas",
+    lema: "Adopta una gallina o un gato en 3D, dale de comer y míralo crecer. Ropa, muebles y bailes de los regalos." },
+  { id: "prodrop", modo: "sitio", nombre: "PRODROP", genero: "Cartas coleccionables", icono: "🃏", color: "#9b4dff", ruta: "#cartas", sitio: "prodrop sobres",
+    lema: "Abre sobres de cartas, gradúalas, exhíbelas en tu perfil y véndelas en el mercado." }
+];
+let indiceVes = [], busRes = [], busActivo = -1;
+const buscadorHtml = () => `
+        <div class="jg-bus" role="search">
+          <button class="jg-bus-abre" type="button" aria-label="Buscar un juego" title="Buscar un juego">${LUPA}</button>
+          <label class="jg-bus-campo">${LUPA}<input id="vesBusca" type="search" placeholder="Busca: piano, cartas, zombis…" autocomplete="off" spellcheck="false" enterkeyhint="search"
+            role="combobox" aria-label="Buscar un juego" aria-autocomplete="list" aria-expanded="false" aria-controls="vesBuscaLista"><kbd aria-hidden="true">/</kbd></label>
+          <button class="jg-bus-x" type="button" aria-label="Cerrar la búsqueda">✕</button>
+          <ul class="jg-bus-lista" id="vesBuscaLista" role="listbox" aria-label="Juegos encontrados" hidden></ul>
+        </div>`;
+/* Cuánto se juega cada entrada, en la escala de `state.popular`: la
+   práctica contra bots cuenta la mitad que su juego. */
+const popularDe = e => e.modo === "multi" ? state.popular[e.id] || 0
+  : e.popular ? state.popular[e.popular] || 0 : e.juego ? (state.popular[e.juego] || 0) / 2 : 0;
+const MODO_BUS = { solo: "1 jugador", bots: "Contra bots", sitio: "" };
+function pintaBusqueda() {
+  const campo = $("vesBusca"), lista = $("vesBuscaLista");
+  if (!campo || !lista) return;
+  const q = campo.value.trim();
+  busRes = q ? buscaJuegos(indiceVes, q, { popular: popularDe, nuevo: e => nuevosVes.has(e.id), max: 10 }) : [];
+  busActivo = busRes.length ? 0 : -1;
+  if (!q) { lista.hidden = true; lista.innerHTML = ""; }
+  else {
+    lista.hidden = false;
+    lista.innerHTML = busRes.length ? busRes.map((r, k) => {
+      const e = r.e, bloq = bloqueado(e, state.invitado);
+      const modo = e.modo === "multi" ? `${ICONO_MULTI}${escapeHtml(e.cupo)}` : MODO_BUS[e.modo] ? `${ICONO_SOLO}${MODO_BUS[e.modo]}` : "";
+      const ico = e.modo === "multi" ? ICONO[e.id] : e.modo === "bots" ? ICONO[e.juego] : e.icono;
+      return `<li class="jg-bus-r${bloq ? " bloq" : ""}" id="vesBus${k}" role="option" aria-selected="${k === busActivo}" data-bus="${k}" style="--c:${escapeHtml(e.color || "#8860ed")}">
+            <span class="jg-bus-ico" aria-hidden="true">${escapeHtml(ico || "●")}</span>
+            <span class="jg-bus-txt"><b>${escapeHtml(e.nombre)}</b><small>${modo ? `<span class="jg-bus-modo m-${e.modo}">${modo}</span>` : ""}${escapeHtml(e.genero || "")}${r.motivo ? ` · «${escapeHtml(r.motivo)}»` : ""}</small></span>
+            ${bloq ? `<span class="jg-bus-candado" title="Requiere cuenta">${CANDADO}</span>` : ""}
+          </li>`;
+    }).join("")
+      : `<li class="jg-bus-nada" role="presentation">Nada se parece a «<span translate="no">${escapeHtml(q)}</span>». Prueba con un género (cartas, puzle, ritmo), «celular» o «con amigos».</li>`;
+  }
+  marcaBusqueda();
+}
+function marcaBusqueda() {
+  const campo = $("vesBusca"), lista = $("vesBuscaLista");
+  if (!campo || !lista) return;
+  const abierta = !lista.hidden;
+  campo.setAttribute("aria-expanded", String(abierta));
+  for (const li of lista.querySelectorAll("[data-bus]")) li.setAttribute("aria-selected", String(Number(li.dataset.bus) === busActivo));
+  if (abierta && busActivo >= 0) {
+    campo.setAttribute("aria-activedescendant", "vesBus" + busActivo);
+    const li = $("vesBus" + busActivo);
+    if (li) li.scrollIntoView({ block: "nearest" });
+  } else campo.removeAttribute("aria-activedescendant");
+}
+const cierraListaBus = () => { const l = $("vesBuscaLista"); if (l) { l.hidden = true; marcaBusqueda(); } };
+function eligeBusqueda(k) {
+  const r = busRes[k];
+  if (!r) return;
+  evento("jg_busca_elige", { juego: r.e.id, puesto: k + 1 });
+  cierraListaBus();
+  if (r.e.modo === "sitio") { ir(r.e.ruta); return; }
+  salon.abre(r.e.id, $("vesBusca"));
+}
+function enganchaBuscador(h) {
+  const caja = h.querySelector(".jg-bus"), campo = $("vesBusca"), lista = $("vesBuscaLista"), barra = h.querySelector(".jg-modos");
+  if (!caja || !campo) return;
+  /* En el celular la lupa despliega el campo sobre la barra (el selector
+     de modo se esconde mientras tanto); ✕ o soltarlo vacío lo pliega. */
+  const pliega = () => { campo.value = ""; pintaBusqueda(); barra.classList.remove("buscando"); };
+  /* La barra sube hasta quedar pegada arriba, para que la lista tenga
+     sitio debajo y no quede tras la barra de pestañas del celular. */
+  const subeBarra = () => {
+    const y = barra.getBoundingClientRect().top;
+    if (y > 1 && matchMedia("(max-width: 720px)").matches) window.scrollTo({ top: window.scrollY + y });
+  };
+  caja.querySelector(".jg-bus-abre").onclick = () => { barra.classList.add("buscando"); subeBarra(); campo.focus({ preventScroll: true }); };
+  caja.querySelector(".jg-bus-x").onclick = () => { pliega(); caja.querySelector(".jg-bus-abre").focus(); };
+  campo.addEventListener("input", pintaBusqueda);
+  campo.addEventListener("focus", () => { subeBarra(); if (campo.value.trim()) pintaBusqueda(); });
+  campo.addEventListener("keydown", ev => {
+    const n = busRes.length;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      if (lista.hidden) { pintaBusqueda(); return; }
+      if (n) { busActivo = (busActivo + (ev.key === "ArrowDown" ? 1 : -1) + n) % n; marcaBusqueda(); }
+    } else if (ev.key === "Enter") {
+      ev.preventDefault();
+      if (!lista.hidden && busActivo >= 0) eligeBusqueda(busActivo);
+    } else if (ev.key === "Escape") {
+      /* Primero cierra la lista; con la lista cerrada, borra y sale. */
+      ev.preventDefault(); ev.stopPropagation();
+      if (!lista.hidden) cierraListaBus(); else { pliega(); campo.blur(); }
+    }
+  });
+  /* El toque sobre un resultado no le quita el foco al campo antes de
+     tiempo (si no, `focusout` cerraba la lista y el clic caía en nada). */
+  lista.addEventListener("pointerdown", ev => ev.preventDefault());
+  lista.addEventListener("click", ev => {
+    const li = ev.target.closest("[data-bus]");
+    if (li) eligeBusqueda(Number(li.dataset.bus));
+  });
+  lista.addEventListener("pointermove", ev => {
+    const li = ev.target.closest("[data-bus]");
+    if (li && Number(li.dataset.bus) !== busActivo) { busActivo = Number(li.dataset.bus); marcaBusqueda(); }
+  });
+  caja.addEventListener("focusout", ev => {
+    if (caja.contains(ev.relatedTarget)) return;
+    cierraListaBus();
+    if (!campo.value.trim()) barra.classList.remove("buscando");
+  });
+}
+/* «/» lleva al buscador desde cualquier parte del salón, como en tantos
+   sitios; no mientras se escribe en otro campo. */
+document.addEventListener("keydown", ev => {
+  if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey || state.vista !== "vestibulo") return;
+  const t = ev.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const campo = $("vesBusca");
+  if (!campo) return;
+  ev.preventDefault();
+  campo.closest(".jg-modos").classList.add("buscando");
+  campo.focus();
+});
+
 /* ---------- el catálogo del salón ----------
    Las entradas (`salon-datos.js`) se rehacen en cada pintado: el orden
    por popularidad y las salas que esperan cambian solos. La miniatura y
@@ -2566,6 +2705,7 @@ function pintaVestibulo() {
   const destacado = id => inv && DESTACADOS_INVITADO.includes(id) ? DESTACADOS_INVITADO.indexOf(id) - 1000 : 0;
   entradasVes.solos.sort((x, y) => destacado(x.id) - destacado(y.id) || rango.get(x.id) - rango.get(y.id));
   nuevosVes = nuevos([...entradasVes.solos, ...entradasVes.multi], ahoraV);
+  indiceVes = indiceBusqueda([...entradasVes.solos, ...entradasVes.multi, ...SITIOS_BUSCA]);
   const porJuego = {};
   for (const s of abiertas) porJuego[s.juego] = (porJuego[s.juego] || 0) + 1;
   /* «Más jugado» solo con datos de popularidad de verdad: sin ellos el

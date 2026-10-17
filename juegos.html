@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610171807"></script>
+<script src="i18n.js?v=202610172047"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -4302,6 +4302,53 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
   .jg-modos-entrar{padding:0 12px;font-size:12.5px}
 }
 
+/* ---- El buscador, en la barra de modo (pegada arriba) ----
+   En el PC es un campo a la derecha del selector; en el celular, una lupa
+   que al tocarla ocupa la barra entera (`.buscando`) hasta que se cierra.
+   La lista cuelga de la barra, que por ser sticky la contiene. */
+.jg-bus{position:relative;flex:0 1 300px;min-width:0;display:flex;align-items:center;gap:6px}
+.jg-bus-abre,.jg-bus-x{display:none;place-items:center;flex-shrink:0;width:44px;height:44px;border-radius:50%;border:1px solid #e1dcea;background:#fff;color:var(--jg-ink);font-size:15px;cursor:pointer}
+.jg-bus-abre svg{width:18px;height:18px}
+.jg-bus-campo{flex:1;display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border-radius:100px;background:#fff;border:1px solid #e1dcea;color:#8a8399;cursor:text;min-width:0;transition:border-color .15s,box-shadow .15s}
+.jg-bus-campo:focus-within{border-color:var(--jg-purple);box-shadow:0 0 0 3px #8860ed2e;color:var(--jg-purple)}
+.jg-bus-campo svg{width:16px;height:16px;flex-shrink:0}
+.jg-bus-campo input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;padding:0;font:500 14px 'IBM Plex Sans',sans-serif;color:var(--jg-ink)}
+.jg-bus-campo input::placeholder{color:#9b95a8}
+.jg-bus-campo kbd{font:600 11px 'IBM Plex Mono',monospace;padding:1px 6px;border:1px solid #ddd8e6;border-radius:5px;color:#8a8399;background:#faf9fc}
+.jg-bus-campo:focus-within kbd{display:none}
+.jg-bus-lista{position:absolute;top:calc(100% + 8px);right:0;z-index:30;width:min(420px,calc(100vw - 32px));max-height:min(62vh,470px);overflow:auto;overscroll-behavior:contain;margin:0;padding:6px;list-style:none;background:#fff;border:1px solid #e4dfeb;border-radius:18px;box-shadow:0 18px 50px #2a1e4430}
+.jg-bus-r{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;cursor:pointer}
+.jg-bus-r[aria-selected=true]{background:#f1edf8}
+.jg-bus-ico{flex:0 0 38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:18px;color:var(--c);background:color-mix(in srgb,var(--c) 16%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 32%,transparent)}
+.jg-bus-txt{flex:1;min-width:0}
+.jg-bus-txt b{display:block;font:600 14px/1.3 'IBM Plex Sans',sans-serif;color:var(--jg-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-bus-txt small{display:block;margin-top:2px;font-size:12px;color:var(--jg-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-bus-modo{display:inline-flex;align-items:center;gap:3px;margin-right:6px;padding:1px 7px 1px 5px;border-radius:100px;font-weight:600;font-size:11px;vertical-align:1px}
+.jg-bus-modo svg{width:12px;height:12px}
+.jg-bus-modo.m-solo{background:var(--m-solo-bg);color:var(--m-solo-tx)}
+.jg-bus-modo.m-bots{background:#ffe7a8;color:var(--m-solo-tx)}
+.jg-bus-modo.m-multi{background:var(--m-multi-bg);color:var(--m-multi-tx)}
+.jg-bus-r.bloq b{color:#8a8399}
+.jg-bus-candado{flex-shrink:0;display:grid;color:#8a8399}.jg-bus-candado svg{width:14px;height:14px}
+.jg-bus-nada{padding:12px;font-size:13px;color:var(--jg-muted);line-height:1.45}
+@media(pointer:coarse){.jg-bus-campo kbd{display:none}}
+@media(max-width:900px){.jg-bus{flex:0 1 240px}}
+@media(max-width:600px){
+  .jg-bus{position:static;flex:0 0 auto}
+  .jg-bus-abre{display:grid}
+  .jg-bus-campo{display:none}
+  .jg-modos.buscando .jg-modos-sel,.jg-modos.buscando .jg-modos-entrar,.jg-modos.buscando .jg-bus-abre{display:none}
+  .jg-modos.buscando .jg-bus{flex:1}
+  .jg-modos.buscando .jg-bus-campo{display:flex}
+  .jg-modos.buscando .jg-bus-x{display:grid}
+  /* 16 px: con menos, el iPhone hace zoom al enfocar el campo. */
+  .jg-bus-campo input{font-size:16px}
+  /* El ✕ propio cierra la búsqueda; el del navegador sobraba al lado. */
+  .jg-bus-campo input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+  /* Con el teclado abierto queda menos de media pantalla. */
+  .jg-bus-lista{left:16px;right:16px;width:auto;top:calc(100% + 2px);max-height:min(48vh,440px)}
+}
+
 /* ---- El aviso del invitado: claro, pero discreto ---- */
 .jg-invitado-aviso{display:flex;align-items:center;gap:10px;margin:0 0 16px;padding:10px 12px;border-radius:14px;background:#fff8e6;border:1px solid #f1dca8;color:#5f4610;font-size:12.5px;line-height:1.45}
 .jg-invitado-ico{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--m-solo-bg);color:var(--m-solo-tx)}
@@ -4709,6 +4756,17 @@ html[data-tema=oscuro] .jg-modos-sel button[aria-pressed=true]{background:var(--
 html[data-tema=oscuro] .jg-modos-sel b{color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-modos-ico.m-solo{color:#ffcf5c}
 html[data-tema=oscuro] .jg-modos-ico.m-multi{color:#b69bff}
+html[data-tema=oscuro] .jg-bus-campo,html[data-tema=oscuro] .jg-bus-abre,html[data-tema=oscuro] .jg-bus-x{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-bus-campo:focus-within{border-color:#a78bfa;color:#c4b1ff;box-shadow:0 0 0 3px #a78bfa30}
+html[data-tema=oscuro] .jg-bus-campo input{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-bus-campo input::placeholder{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-bus-campo kbd{background:var(--os-sup3);border-color:var(--os-borde2);color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-bus-lista{background:var(--os-sup);border-color:var(--os-borde);box-shadow:0 18px 50px #000a}
+html[data-tema=oscuro] .jg-bus-r[aria-selected=true]{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-bus-ico{background:color-mix(in srgb,var(--c) 20%,var(--os-sup2))}
+html[data-tema=oscuro] .jg-bus-txt b{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-bus-txt small,html[data-tema=oscuro] .jg-bus-nada{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-bus-r.bloq b,html[data-tema=oscuro] .jg-bus-candado{color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-invitado-aviso{background:#2a2312;border-color:#4d3d17;color:#f1dfae}
 html[data-tema=oscuro] .jg-invitado-aviso button,html[data-tema=oscuro] .jg-sal-ver,html[data-tema=oscuro] .jg-enlace-btn,html[data-tema=oscuro] .jg-hoja-alt,html[data-tema=oscuro] .jg-hoja-nota a{color:#c4b1ff}
 html[data-tema=oscuro] .jg-sal-intro .jg-eyebrow{color:#c4b1ff}
@@ -5274,6 +5332,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610171807"></script>
+<script src="juegos-app.js?v=202610172047"></script>
 </body>
 </html>

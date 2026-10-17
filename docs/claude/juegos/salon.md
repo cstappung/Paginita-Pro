@@ -20,6 +20,20 @@ item by the whole grid, not by its area, so when the column ended at
 the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* and
 the rooms column (open rooms, top coins, your games) are never hidden.
 
+- **The search** (`buscadorHtml`/`enganchaBuscador` in `juegos-main.js`,
+  ranking in `juegos/buscador.js`, pure, `tests/buscador.test.cjs`) lives in
+  the sticky mode bar: a field with a «/» shortcut on PC, a 🔍 that unfolds
+  over the bar on a phone (`.jg-modos.buscando`, and the bar scrolls up to
+  stick so the list has room above the tab bar). It is **not a literal
+  match**: each query word scores its best hit across weighted fields
+  (`PESOS`: name, `APODOS`, genre, tags derived from the entry —
+  solo/multi/duelo/celular/diario—, modes, lema), exact > prefix > one typo
+  (Damerau, same first letter, words ≥ 5 letters) > substring. Popularity
+  and «nuevo» only break ties (≤ 2.5 points); a bots practice goes after
+  its game. Picking a result opens the **ficha** (never plays or opens a
+  room); Mascotas and PRODROP (`SITIOS_BUSCA`) navigate. A new game is
+  found by its name with no change; give it a row in `APODOS` (the test
+  requires one for every non-bots entry).
 - **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
   `.jg-ban` in juegos.html) shows one slide at a time and advances by
   itself every `BAN_MS` (7 s), the next one entering from the right. After
