@@ -29,12 +29,12 @@
    pasa por la base: se lo sirve un tercero que tenga canal con los dos
    (ver `yemas-red.js`). */
 
-const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+export const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
 const LLENO = 1 << 18;          // lo que se deja en cola sin enviar antes de saltarse estados
 const VIGILA_MS = 1000;
 
 export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}, alBinario = null, alCambiar = () => {},
-  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now() }) {
+  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE }) {   // ice: más servidores (BT3: el relevo TURN)
   let sesion = "", offP = null, offM = null, reloj = null, intento = 0;
   const pares = new Map();          // uid → {pc, dc, s, k, cola, remota, desde, abrio, malDesde}
   const presentes = new Map();      // uid → sesión
@@ -56,7 +56,7 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
 
   function nuevoPar(u, s, k) {
     cierra(u);
-    const pc = new RTC({ iceServers: ICE });
+    const pc = new RTC({ iceServers: ice });
     const dc = pc.createDataChannel("directo", { negotiated: true, id: 0, ordered: false, maxRetransmits: 0 });
     const x = { pc, dc, s, k, cola: [], remota: false, abrio: false, malDesde: ahora() };
     pares.set(u, x);
@@ -220,6 +220,17 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     sano: u => sanoX(pares.get(u)),
     // en qué quedó la conexión con `u` (para explicar por qué no conectó): null si nunca hubo par
     detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || "", ice: x.pc.iceConnectionState || "", dc: x.dc.readyState, abrio: x.abrio } : null; },
+    // por dónde va la conexión con `u`: "directa" o "relevo" (TURN), o "" si no se sabe todavía
+    via: async u => {
+      const x = pares.get(u);
+      if (!x || !sanoX(x)) return "";
+      try {
+        const st = await x.pc.getStats(); let par = null;
+        st.forEach(r => { if (r.type === "candidate-pair" && r.state === "succeeded" && (r.nominated || !par)) par = r; });
+        const loc = par && st.get(par.localCandidateId), rem = par && st.get(par.remoteCandidateId);
+        return !par ? "" : (loc?.candidateType === "relay" || rem?.candidateType === "relay") ? "relevo" : "directa";
+      } catch { return ""; }
+    },
     presentes: () => [...presentes.keys()],
     conectados: () => [...pares].filter(([, x]) => sanoX(x)).map(([u]) => u),
   };

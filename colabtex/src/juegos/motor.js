@@ -7180,6 +7180,9 @@ export function redHaxball(p, js = jugadoresDe(p), listos = true) {
      el que fija las reglas de la pelea). Empieza siendo quien abrió la sala.
    - `{t:"ajuste", uid, k, v}`: el anfitrión elige `batalla` (BT3_BATALLAS), `tiempo` (BT3_TIEMPOS) o `veto`
      (personajes prohibidos según la tier list, bt3-tiers.js: "", "noop" o "malos").
+   - `{t:"ajuste", uid, k:"relevo", v}`: el anfitrión activa (true) o apaga el relevo de Cloudflare (TURN) para
+     las peleas siguientes: el último recurso cuando sus redes no dejan una conexión directa. No es automático
+     (el dueño lo pidió así): sin él, los marcos ni piden las credenciales al Worker.
    - `{t:"disco", uid}`: el marco de `uid` ya leyó una ISO válida; hace falta la de los dos para empezar.
    - `{t:"empieza", uid}`: el anfitrión arranca, con los dos y sus discos. Abre una pelea (`ronda`).
    - `{t:"vuelve", uid, por}`: la pelea terminó (o se cortó) y los dos vuelven al vestíbulo; los marcos se
@@ -7218,7 +7221,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, hist = [];
   if (esTorneoBt3(p)) return redTorneoBt3(p, js);
-  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, veto = "", empates = 0;
+  let discos = {}, fase = "vestibulo", ronda = 0, batalla = "single", tiempo = 240, veto = "", empates = 0, relevo = false;
   const marcador = {}, reportes = {};
   let revancha = {};   // quién pidió la revancha (después de una pelea); con los dos y sus discos, empieza sola
   let reanudar = false; // la pelea se cortó por la conexión (o alguien recargó): vuelve a empezar sola, con los dos discos
@@ -7247,6 +7250,8 @@ export function redBt3(p, js = jugadoresDe(p)) {
     } else if (j.t === "ajuste" && vest && j.uid === anfitrion && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
       if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
       revancha = {};
+    } else if (j.t === "ajuste" && vest && j.uid === anfitrion && j.k === "relevo") {
+      relevo = j.v === true;   // (solo cómo se conectan: no cambia la pelea, así que la revancha pedida sigue)
     } else if (j.t === "disco" && vest) {
       discos[j.uid] = true;
       if ((reanudar || presentes().every(x => revancha[x.uid])) && todosListos()) arranca();
@@ -7298,7 +7303,7 @@ export function redBt3(p, js = jugadoresDe(p)) {
   const idos = Object.keys(fuera).length;
   const ganador = idos ? (ronda && presentes().length === 1 ? presentes()[0].uid : "") : null;
   return {
-    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo),
+    fase: ganador !== null ? "fin" : fase, turno: "", anfitrion, batalla, tiempo, veto, relevo, reglas: reglasBt3(batalla, tiempo),
     discos, ronda, fuera, hist: hist.slice(-40), ganador, motivo: ganador !== null ? "abandono" : "", marcador, empates, revancha,
     reanudar: ganador === null && fase === "vestibulo" && reanudar,
     pendiente: ganador === null && ronda > 0 && !contadas.has(ronda)   // la última pelea aún sin resultado: el anfitrión puede darla
@@ -7328,7 +7333,7 @@ export const esTorneoBt3 = p => cupoDe(p) > 2;
 export function redTorneoBt3(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid)), fuera = {}, hist = [];
   let org = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
-  let batalla = "single", tiempo = 240, veto = "", discos = {}, rondas = null, peleas = 0;
+  let batalla = "single", tiempo = 240, veto = "", relevo = false, discos = {}, rondas = null, peleas = 0;
   const cpus = {};   // "cpu:N" → {n, nivel}: los lugares que el organizador rellenó con la CPU
   const cupo = cupoDe(p);
   let orden = null;   // la llave que armó el organizador (lugares de a dos), o null: la del sorteo
@@ -7406,6 +7411,8 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
       if (m && m.reanudar && !m.enCurso && listosDe(m)) arrancaPelea(m);
       continue;
     }
+    // el relevo (último recurso, como en el duelo): el organizador lo cambia también con el torneo andando
+    if (j.t === "ajuste" && esOrg && j.k === "relevo") { relevo = j.v === true; continue; }
     if (!rondas) {
       if (j.t === "ajuste" && esOrg && (j.k === "batalla" || j.k === "tiempo" || j.k === "veto")) {
         if (j.k === "batalla") batalla = bt3Batalla(j.v); else if (j.k === "veto") veto = bt3Veto(j.v); else tiempo = bt3Tiempo(j.v);
@@ -7468,7 +7475,7 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
   const m = rondas ? actual() : null;
   return {
     fase: ganador !== null ? "fin" : rondas ? "torneo" : "vestibulo", torneo: true, turno: "", anfitrion: org,
-    batalla, tiempo, veto, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
+    batalla, tiempo, veto, relevo, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
     llave: rondas, previa: rondas ? null : previa(), actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
   };

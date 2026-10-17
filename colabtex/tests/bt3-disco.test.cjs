@@ -98,3 +98,29 @@ test('la lista de arranque: la leen y la completan los amigos, con pedazos que e
   assert.equal((await pide('/indice.json',{metodo:'PUT',cab:A,cuerpo:'{}'})).status,403,'el índice sigue pidiendo la clave de subida');
   env.DISCO.put('indice.json',new TextEncoder().encode('{"size":3,"pieza":1048576}'));
 });
+
+test('el relevo TURN: solo para amigos, con la llave guardada en el Worker y sin el puerto 53',async()=>{
+  const A={Authorization:'Bearer '+await token(datos('amigo1'))};
+  assert.equal((await pide('/turn',{cab:A})).status,404,'sin llave configurada: no hay relevo (se conecta directo)');
+  const fetchGoogle=globalThis.fetch;let pedidos=0,llamada=null;
+  globalThis.fetch=async(u,o)=>{
+    if(!String(u).startsWith('https://rtc.live.cloudflare.com/'))return fetchGoogle(u,o);
+    pedidos++;llamada={u:String(u),o};
+    return new Response(JSON.stringify({iceServers:[{urls:['stun:stun.cloudflare.com:3478','stun:stun.cloudflare.com:53']},
+      {urls:['turn:turn.cloudflare.com:3478?transport=udp','turn:turn.cloudflare.com:53?transport=udp','turns:turn.cloudflare.com:443?transport=tcp'],username:'u',credential:'c'}]}),{status:201});
+  };
+  try{
+    Object.assign(env,{TURN_ID:'llave1',TURN_CLAVE:'clave-secreta'});
+    assert.equal((await pide('/turn')).status,401,'sin sesión: nada');
+    assert.equal((await pide('/turn',{cab:{Authorization:'Bearer '+await token(datos('extraño'))}})).status,403,'fuera de la lista: nada');
+    assert.equal(pedidos,0,'y Cloudflare ni se consulta');
+    const r=await pide('/turn',{cab:A});assert.equal(r.status,200);
+    const {iceServers}=await r.json();
+    assert.match(llamada.u,/\/v1\/turn\/keys\/llave1\/credentials\/generate-ice-servers$/);
+    assert.equal(llamada.o.headers.Authorization,'Bearer clave-secreta');
+    assert.ok(!JSON.stringify(iceServers).includes(':53'),'sin el puerto 53');
+    assert.equal(iceServers[1].username,'u');assert.equal(iceServers[1].urls.length,2);
+    assert.ok(!JSON.stringify(iceServers).includes('clave-secreta'),'la llave no sale del Worker');
+    await pide('/turn',{cab:A});assert.equal(pedidos,1,'las credenciales se reusan mientras no vencen');
+  }finally{globalThis.fetch=fetchGoogle;delete env.TURN_ID;delete env.TURN_CLAVE;}
+});
