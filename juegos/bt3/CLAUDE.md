@@ -88,6 +88,11 @@ Room game in an iframe, modelled on HaxBall, with one deliberate difference: **t
   session like the fork does, and the ISO is chosen once per fight.
 - Only STUN: two networks that refuse a direct connection cannot fight; the frame says so after 45 s and the room
   goes back to the lobby. A TURN relay would fix it (not done).
+- **Why it failed goes to the room chat** («⚡ BT3 · A → B: …»): the room reloads the frame on going back to the
+  lobby, so the frame's own notice was never read («stuck on Conectando…, then back»). `bt3-marco.js` `explica`
+  says how far the link got (rival never present / ICE failed / never answered, with `malla.detalle`), and
+  `pagina.js` translates gs/net.c's `ended` text; both travel as `motivo` in `termino`, and `bt3.js` writes it
+  once per fight and reason. Bench test: `prueba58`.
 
 The duel (`redBt3` in `motor.js`): `anfitrion` (**either player picks who hosts**; the host is the game's player 1
 and sets the rules), `ajuste` (`batalla`, `tiempo` → `reglasBt3`, the word `gs/net.c` reads), `disco` (that frame

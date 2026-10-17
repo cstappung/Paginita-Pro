@@ -53,15 +53,29 @@ window.addEventListener("message", e => {
 });
 
 // ---------- la conexión con el rival ----------
-let malla = null, rival = "", keep = 0;
+let malla = null, rival = "", keep = 0, motivo = "";
 const cola = [];   // paquetes que llegaron y el juego todavía no leyó
 
-/* Abre la malla y espera a tener canal sano con `uidRival`. Resuelve true si conectó. */
+/* Por qué no se pudo conectar, en palabras de la gente (la sala lo escribe en el chat: el marco se recarga al
+   volver al vestíbulo y su aviso se pierde). Mira hasta dónde llegó la conexión con el rival. */
+function explica(sinBuzon) {
+  if (sinBuzon) return "la sala no dejó usar su buzón de conexión (¿la sesión se cerró? recarga la página)";
+  if (!malla?.presentes().includes(rival)) return "el juego del rival nunca llegó a conectarse (no cargó su disco, cerró la pestaña o su página es vieja: que recargue)";
+  const d = malla.detalle(rival);
+  if (!d) return "no se llegó a armar la conexión con el rival";
+  const estado = `conexión «${d.pc || "?"}», ICE «${d.ice || "?"}», canal «${d.dc}»`;
+  if (d.ice === "failed" || d.pc === "failed") return "sus redes no dejan una conexión directa: prueben otra red (los datos del celular o algunos routers la bloquean) — " + estado;
+  if (d.ice === "new" || d.ice === "checking") return "la conexión directa nunca respondió (un firewall o la red la bloquea) — " + estado;
+  return "la conexión se armó a medias y no se abrió el canal — " + estado;
+}
+
+/* Abre la malla y espera a tener canal sano con `uidRival`. Resuelve true si conectó (si no, `motivo` dice por qué). */
 function conecta(yo, uidRival) {
   rival = uidRival;
+  motivo = "";
   return new Promise(ok => {
     let hecho = false;
-    const fin = r => { if (!hecho) { hecho = true; clearTimeout(reloj); ok(r); } };
+    const fin = (r, sinBuzon) => { if (!hecho) { hecho = true; clearTimeout(reloj); if (!r) { try { motivo = explica(sinBuzon); } catch { motivo = "no se pudo conectar"; } } ok(r); } };
     malla = crearMalla({
       uid: yo, senal,
       quiere: u => u === rival,                     // solo el rival: nada de terceros en un uno contra uno
@@ -74,7 +88,7 @@ function conecta(yo, uidRival) {
       alCambiar: () => { if (malla?.sano(rival)) fin(true); },
     });
     const reloj = setTimeout(() => fin(false), ESPERA_CONEXION);
-    malla.entrar().then(r => { if (!r) fin(false); }, () => fin(false));
+    malla.entrar().then(r => { if (!r) fin(false, true); }, () => fin(false, true));
   }).then(ok => {
     if (ok) keep = setInterval(() => envia(KEEP), 500);
     return ok;
@@ -122,6 +136,7 @@ window.BT3Sala = {
   alEstado: cb => { alEstado.add(cb); if (estado) cb(estado); },
   avisa: (tipo, datos) => padre(tipo, datos),       // "listo", "disco", "termino"
   conecta, envia, cierra, emite, vetadosDe,
+  motivo: () => motivo,                              // por qué falló el último `conecta`
   recibe: () => cola.shift() || null,
   hay: () => cola.length > 0,
   sano: () => !!malla?.sano(rival),
