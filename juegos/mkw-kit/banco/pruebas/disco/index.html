@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caché del disco</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Caché del disco: <span>bloques y Cache Storage</span></h1>
+<p>Prueba el módulo de caché de los archivos del disco (<code>web/navegador/disco.mjs</code>) <b>sin el juego</b>: un
+  "servidor falso" responde los pedidos HTTP Range con bytes de forma conocida (el byte número <i>i</i> vale
+  <i>i</i>·7 mod 256) y cuenta cuántos pedidos le llegan. Se comprueba que lo leído es exacto, que lo ya bajado no se
+  vuelve a pedir (ni en la misma página ni al "volver a abrirla") y que otra versión de los archivos tira la caché
+  vieja. La segunda parte usa un servidor <b>lento</b> (30 ms por pedido, como la red del sitio) para probar bajar
+  antes: los avisos del juego ("voy a leer este archivo") y la lectura seguida. Usa cachés de prueba aparte.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearDisco, PREFIJO } from '/web/navegador/disco.mjs';
+
+const { ok, nota, fin } = prueba('disco', 'Caché del disco (sin el juego)');
+const BLOQUE = 256 * 1024;
+const ARCHIVO = '/falso/Course/prueba.szs', TAM = 3 * BLOQUE + 1000;   // 3 bloques y un pedacito
+const esperado = (ini, largo) => Uint8Array.from({ length: largo }, (_, k) => ((ini + k) * 7) & 255);
+const iguales = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+// ---- servidor falso ----
+const pedidos = [];
+let falla = false;
+async function servidor(url, opciones = {}) {
+  const rango = opciones.headers && opciones.headers.Range;
+  pedidos.push(rango || 'entero');
+  if (falla) return new Response('no', { status: 503 });
+  if (!rango) return new Response(esperado(0, 5000));
+  const [, a, b] = /bytes=(\d+)-(\d+)/.exec(rango);
+  const ini = Number(a), fin = Math.min(Number(b), TAM - 1);
+  return new Response(esperado(ini, fin - ini + 1), { status: 206 });
+}
+const limpiar = async () => { for (const n of await caches.keys()) if (n.startsWith(PREFIJO)) await caches.delete(n); };
+await limpiar();
+
+try {
+  // 1) leer bien
+  const d1 = crearDisco({ version: 'prueba-1', buscar: servidor, adelantarActivo: false });
+  await d1.abrir();
+  let r = await d1.leer(ARCHIVO, TAM, 100, 50);
+  ok('una lectura chica devuelve justo esos bytes', iguales(r, esperado(100, 50)));
+  ok('…y pide el bloque entero de 256 KB (1 pedido)', pedidos.length === 1 && pedidos[0] === `bytes=0-${BLOQUE - 1}`, pedidos[0]);
+  pedidos.length = 0;
+  r = await d1.leer(ARCHIVO, TAM, 200, 5000);
+  ok('otra lectura dentro del mismo bloque no va a la red', pedidos.length === 0 && iguales(r, esperado(200, 5000)));
+  r = await d1.leer(ARCHIVO, TAM, BLOQUE - 10, 2 * BLOQUE + 20);   // cruza 3 bloques: el 0 (guardado), 1, 2 y 3
+  ok('una lectura que cruza bloques es exacta', iguales(r, esperado(BLOQUE - 10, 2 * BLOQUE + 20)));
+  ok('los bloques que faltan seguidos se piden en UN solo pedido', pedidos.length === 1 && pedidos[0] === `bytes=${BLOQUE}-${TAM - 1}`, pedidos.join(', '));
+  r = await d1.leer(ARCHIVO, TAM, TAM - 100, 5000);
+  ok('leer pasado el final devuelve solo hasta el final', iguales(r, esperado(TAM - 100, 100)));
+  pedidos.length = 0;
+  const [x, y] = await Promise.all([d1.leer('/falso/otro.szs', TAM, 0, 10), d1.leer('/falso/otro.szs', TAM, 20, 10)]);
+  ok('dos lecturas del mismo bloque a la vez → un solo pedido', pedidos.length === 1 && iguales(x, esperado(0, 10)) && iguales(y, esperado(20, 10)), `${pedidos.length} pedido(s)`);
+
+  // 2) archivos chicos enteros
+  pedidos.length = 0;
+  const e1 = await d1.entero('/falso/chico.bin');
+  const e2 = await d1.entero('/falso/chico.bin');
+  ok('un archivo chico entero se baja una vez y después sale de la caché', pedidos.length === 1 && iguales(e1, e2) && e1.length === 5000);
+  await new Promise(r => setTimeout(r, 300));            // que terminen de guardarse los bloques
+
+  // 3) "volver a abrir la página": todo sale de Cache Storage
+  pedidos.length = 0;
+  const d2 = crearDisco({ version: 'prueba-1', buscar: servidor, adelantarActivo: false });
+  await d2.abrir();
+  r = await d2.leer(ARCHIVO, TAM, 0, TAM);
+  const ch = await d2.entero('/falso/chico.bin');
+  ok('al volver a abrir, el archivo entero sale de la caché: 0 pedidos a la red', pedidos.length === 0 && iguales(r, esperado(0, TAM)) && ch.length === 5000,
+     `${d2.estado.bloquesCache} bloques de la caché, ${pedidos.length} pedidos`);
+
+  // 4) otra versión de los archivos: la caché vieja se borra
+  const d3 = crearDisco({ version: 'prueba-2', buscar: servidor, adelantarActivo: false });
+  await d3.abrir();
+  const nombres = (await caches.keys()).filter(n => n.startsWith(PREFIJO));
+  ok('con otra versión de los archivos, la caché vieja se borra sola', nombres.length === 1 && nombres[0] === PREFIJO + 'prueba-2', nombres.join(', '));
+  pedidos.length = 0;
+  await d3.leer(ARCHIVO, TAM, 0, 10);
+  ok('…y lo de la versión nueva se vuelve a pedir', pedidos.length === 1);
+
+  // 5) errores de la red
+  falla = true;
+  let error = '';
+  try { await d3.leer('/falso/nuevo.szs', TAM, 0, 10); } catch (e) { error = e.message; }
+  ok('si la red falla, la lectura avisa con un error (el juego recibe -1)', /HTTP 503/.test(error), error);
+  falla = false;
+  r = await d3.leer('/falso/nuevo.szs', TAM, 0, 10);
+  ok('después del error se puede volver a leer', iguales(r, esperado(0, 10)));
+
+  // 6) memoria con tope
+  const d4 = crearDisco({ version: 'prueba-2', buscar: servidor, memoriaMax: 2 * BLOQUE, adelantarActivo: false });
+  await d4.abrir();
+  for (let b = 0; b < 4; b++) await d4.leer('/falso/tope.szs', TAM, b * BLOQUE, 1);
+  pedidos.length = 0;
+  await d4.leer('/falso/tope.szs', TAM, 0, 1);
+  ok('la memoria tiene tope: lo más viejo sale de la memoria pero sigue en Cache Storage', pedidos.length === 0 && d4.estado.bloquesCache >= 1);
+
+  // 7) Bajar antes (bitácora §52), con un servidor lento: 30 ms por pedido, como la red del sitio
+  const tamDe = new Map(), lentos = [];
+  let activosRed = 0, maxActivosRed = 0;
+  async function lento(url, opciones = {}) {
+    const [, a, b] = /bytes=(\d+)-(\d+)/.exec(opciones.headers.Range);
+    lentos.push(url.split('/').pop() + ' ' + opciones.headers.Range);
+    activosRed++; maxActivosRed = Math.max(maxActivosRed, activosRed);
+    await new Promise(r => setTimeout(r, 30));
+    activosRed--;
+    const ini = Number(a), fin = Math.min(Number(b), tamDe.get(url) - 1);
+    return new Response(esperado(ini, fin - ini + 1), { status: 206 });
+  }
+  const archivo = (nombre, tam) => { const u = '/lento/' + nombre; tamDe.set(u, tam); return u; };
+  const d5 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });   // sin Cache Storage: solo la red
+  // a) el juego encuentra 10 archivos de 2 bloques (como los karts y las voces de la largada) y después los lee de a uno
+  const voces = Array.from({ length: 10 }, (_, i) => archivo(`voz${i}.brwsd`, 2 * BLOQUE - 500));
+  let t = performance.now();
+  for (const u of voces) await d5.leer(u, tamDe.get(u), 0, tamDe.get(u));
+  const sinAviso = performance.now() - t;
+  const d6 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  const voces2 = Array.from({ length: 10 }, (_, i) => archivo(`otra${i}.brwsd`, 2 * BLOQUE - 500));
+  lentos.length = 0; maxActivosRed = 0;
+  t = performance.now();
+  for (const u of voces2) d6.adelantar(u, tamDe.get(u));                 // los avisos llegan todos juntos
+  const leidos = [];
+  for (const u of voces2) leidos.push(await d6.leer(u, tamDe.get(u), 0, tamDe.get(u)));
+  const conAviso = performance.now() - t;
+  ok('con avisos, 10 archivos que el juego lee de a uno llegan en paralelo: mucho menos tiempo',
+     conAviso < sinAviso / 2.5, `sin avisos ${sinAviso.toFixed(0)} ms, con avisos ${conAviso.toFixed(0)} ms`);
+  ok('…sin pedir nada dos veces (10 pedidos, uno por archivo) y con los datos exactos',
+     lentos.length === 10 && leidos.every((d, i) => iguales(d, esperado(0, tamDe.get(voces2[i])))), `${lentos.length} pedidos`);
+  ok('…y como mucho 12 pedidos a la vez (no ahoga la conexión)', maxActivosRed <= 12 && maxActivosRed >= 2, `máximo ${maxActivosRed} a la vez`);
+  // 20 avisos juntos: los primeros 12 salen ya, el resto espera turno (y si el juego llega antes, lo pide él)
+  const muchas = Array.from({ length: 20 }, (_, i) => archivo(`mucha${i}.brbnk`, 5000));
+  const d10 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  maxActivosRed = 0; lentos.length = 0;
+  for (const u of muchas) d10.adelantar(u, 5000);
+  for (const u of muchas) await d10.leer(u, 5000, 0, 5000);
+  ok('con 20 avisos juntos nunca hay más de 12 pedidos a la vez, y nada se pide dos veces', maxActivosRed <= 12 && lentos.length === 20,
+     `máximo ${maxActivosRed}, ${lentos.length} pedidos`);
+  ok('el contador dice que el juego aprovechó lo adelantado', d6.estado.aprovechados === 20 && d6.estado.avisos === 10,
+     `${d6.estado.aprovechados} bloques aprovechados, ${d6.estado.adelantados} adelantados`);
+  // prioridad baja: 30 archivos diminutos en la fila baja, y después un aviso del juego
+  const diminutos = Array.from({ length: 30 }, (_, i) => archivo(`fantasma${i}.rkg`, 2000));
+  const d11 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  maxActivosRed = 0; lentos.length = 0;
+  for (const u of diminutos) d11.adelantar(u, 2000, { baja: true });
+  const maxBajaVisto = maxActivosRed;
+  const urgente = archivo('urgente.szs', 3000);
+  d11.adelantar(urgente, 3000);
+  await new Promise(r => setTimeout(r, 5));
+  const posUrgente = lentos.findIndex(l => l.startsWith('urgente.szs'));
+  ok('la fila de prioridad baja va de a 4 y un aviso del juego no espera detrás de ella',
+     maxBajaVisto <= 4 && posUrgente >= 0 && posUrgente <= 4, `baja: ${maxBajaVisto} a la vez; el aviso salió en el lugar ${posUrgente + 1}`);
+  for (const u of diminutos) await d11.leer(u, 2000, 0, 2000);
+  ok('…y los 30 diminutos llegan igual, cada uno una sola vez', lentos.length === 31, `${lentos.length} pedidos`);
+  // b) un archivo grande (40 MB, como revo_kart.brsar): del aviso solo se baja el primer MB
+  const grande = archivo('grande.brsar', 40 * 1024 * 1024);
+  lentos.length = 0;
+  d6.adelantar(grande, tamDe.get(grande));
+  await new Promise(r => setTimeout(r, 120));
+  ok('de un archivo grande, el aviso baja solo el primer MB (no 40 MB que quizás no lea)',
+     lentos.length === 1 && lentos[0].endsWith(`bytes=0-${4 * BLOQUE - 1}`), lentos.join(', '));
+  // c) lectura seguida: un video leído en orden, de a 64 KB
+  const video = archivo('video.thp', 24 * BLOQUE);
+  const d7 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  let bien = true;
+  t = performance.now();
+  for (let o = 0; o < tamDe.get(video); o += 65536) {
+    const d = await d7.leer(video, tamDe.get(video), o, 65536);
+    bien = bien && iguales(d, esperado(o, 65536));
+    await new Promise(r => setTimeout(r, 4));                             // el juego decodifica entre lectura y lectura
+  }
+  ok('un video leído en orden: el disco se adelanta y casi ninguna lectura espera a la red',
+     bien && d7.estado.esperaRed <= 3, `${d7.estado.esperaRed} de ${d7.estado.lecturas} lecturas esperaron; ${(performance.now() - t).toFixed(0)} ms`);
+  // d) lecturas salteadas (como el archivo de sonido): no se adelanta nada de más
+  const salteado = archivo('salteado.brsar', 64 * BLOQUE);
+  lentos.length = 0;
+  for (const b of [40, 3, 22, 9, 51]) await d7.leer(salteado, tamDe.get(salteado), b * BLOQUE + 100, 1000);
+  await new Promise(r => setTimeout(r, 80));
+  ok('lecturas salteadas no disparan el adelanto (no se baja lo que no se va a leer)', lentos.length === 5, `${lentos.length} pedidos`);
+  // e) apagado (?adelantar=0): los avisos no hacen nada
+  const d8 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null, adelantarActivo: false });
+  lentos.length = 0;
+  d8.adelantar(archivo('nada.szs', BLOQUE), BLOQUE);
+  await new Promise(r => setTimeout(r, 60));
+  ok('con el adelanto apagado, un aviso no pide nada', lentos.length === 0);
+  // f) si la red falla durante un adelanto, el juego igual puede leer después
+  const d9 = crearDisco({ version: 'prueba-3', cajas: null, buscar: async () => new Response('no', { status: 503 }) });
+  d9.adelantar('/lento/roto.szs', BLOQUE);
+  await new Promise(r => setTimeout(r, 30));
+  let err = '';
+  try { await d9.leer('/lento/roto.szs', BLOQUE, 0, 10); } catch (e) { err = e.message; }
+  ok('un adelanto que falla no deja nada colgado: la lectura del juego vuelve a pedir y avisa su error', /503/.test(err), err);
+
+  await d4.borrar();
+  ok('borrar deja sin cachés del disco', (await caches.keys()).filter(n => n.startsWith(PREFIJO)).length === 0);
+} catch (e) {
+  ok('la prueba corrió sin errores', false, String(e && e.stack || e));
+}
+await limpiar();
+fin();
+</script>
+</body>
+</html>

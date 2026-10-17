@@ -1,0 +1,19 @@
+/* Estilo común del banco: oscuro por defecto, claro si el sistema lo pide. */
+:root{--fondo:#121417;--caja:#1b1e23;--borde:#2c3038;--texto:#e8e6e3;--suave:#9aa0a8;--bien:#3fb950;--mal:#f85149;--acento:#e4002b;--nota:#79c0ff}
+@media (prefers-color-scheme: light){:root{--fondo:#f6f7f9;--caja:#fff;--borde:#d9dde3;--texto:#1d2025;--suave:#5c636e;--bien:#1a7f37;--mal:#cf222e;--nota:#0969da}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--texto);font:15px/1.5 system-ui,sans-serif;padding:24px 16px;max-width:900px;margin-inline:auto}
+h1{font-size:22px;margin:0 0 4px}h1 span{color:var(--acento)}
+p{color:var(--suave);margin:0 0 16px}
+code{background:var(--caja);border:1px solid var(--borde);border-radius:4px;padding:0 4px;font-size:13px}
+.caja{background:var(--caja);border:1px solid var(--borde);border-radius:12px;padding:16px;margin:0 0 16px}
+#resumen{font-weight:700;font-size:18px;margin:0 0 8px}#resumen.bien{color:var(--bien)}#resumen.mal{color:var(--mal)}
+#resultados{list-style:none;margin:0;padding:0;font:13px/1.7 ui-monospace,Consolas,monospace}
+#resultados li{padding:2px 0;border-bottom:1px solid var(--borde);overflow-wrap:anywhere}
+#resultados .bien{color:var(--bien)}#resultados .mal{color:var(--mal)}#resultados .nota{color:var(--nota)}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--borde);vertical-align:top}
+th{color:var(--suave);font-weight:600;font-size:13px}
+a{color:var(--nota)}
+button{font:600 14px system-ui,sans-serif;border-radius:8px;padding:8px 14px;border:1px solid var(--borde);background:var(--caja);color:var(--texto);cursor:pointer}
+button.principal{background:var(--acento);border-color:var(--acento);color:#fff}
+.estado-bien{color:var(--bien);font-weight:700}.estado-mal{color:var(--mal);font-weight:700}.estado-nada{color:var(--suave)}

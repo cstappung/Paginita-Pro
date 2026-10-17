@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MKW en el navegador</title>
+<!-- Página del juego para el banco (fase 3): Mario Kart Wii + Retro Rewind con aurora real (WebGPU) en un canvas.
+     La sirve SOLO web/navegador/servidor.mjs en 127.0.0.1 (el juego y el disco son privados).
+     Parámetros: ?auto=1 arranca sin apretar el botón (para Playwright); ?cuadros=N termina la prueba en N cuadros. -->
+<link rel="stylesheet" href="/banco/estilo.css">
+<style>
+  /* El canvas: 640x528 es el tamaño nativo del juego (la imagen PAL de la Wii); se agranda con CSS sin deformarse */
+  #pantalla{position:relative;max-width:880px}
+  #pantalla:fullscreen{max-width:none;background:#000;display:flex;align-items:center;justify-content:center}
+  #pantalla:fullscreen #canvas{max-width:none;height:100%;width:auto}
+  /* Con el mando táctil (celular): el recuadro del juego ocupa la pantalla y la imagen queda centrada; los botones
+     van a los costados (acostado) o debajo (parado), sobre el negro, sin tapar el juego */
+  body.tactil #pantalla{max-width:none;width:100vw;margin-left:calc(50% - 50vw);height:100svh;background:#000;display:flex;align-items:center;justify-content:center}
+  body.tactil #canvas{width:auto;height:auto;max-width:100%;max-height:100%}
+  #tablaTeclas button{font:600 12px ui-monospace,Consolas,monospace;padding:3px 8px;margin:1px}
+  #canvas{display:block;width:100%;max-width:880px;aspect-ratio:640/528;background:#000;border-radius:8px;outline:none}
+  .fila{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+  .dato{font:600 14px ui-monospace,Consolas,monospace}
+  /* Avisos discretos: una franja de color suave con borde a la izquierda (no gritan, pero se ven) */
+  .aviso{margin:8px 0 10px;padding:7px 12px;border-left:3px solid var(--nota);border-radius:6px;font-size:13px;
+         color:var(--texto);background:color-mix(in srgb,var(--nota) 10%,transparent)}
+  details.aviso summary{cursor:pointer;color:var(--nota)}
+  details.aviso[open] summary{margin-bottom:4px}
+  #log{max-height:220px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;color:var(--suave);margin:0}
+</style>
+</head>
+<body>
+<h1>Mario Kart Wii <span>+ Retro Rewind</span> en el navegador</h1>
+<p>Fase 3: aurora de verdad (WebGPU) dibujando en un canvas. Teclado, mandos y celular (ver «Controles»).</p>
+
+<div class="caja" id="opciones">
+  <h2 style="font-size:16px;margin:0 0 8px">Opciones</h2>
+  <div class="fila">
+    <label for="volumen">Volumen:</label>
+    <input type="range" id="volumen" min="0" max="100" step="1" style="width:180px">
+    <span class="dato" id="volumenDato">—</span>
+    <label><input type="checkbox" id="silencio"> Silencio</label>
+  </div>
+  <div class="fila">
+    <span>Partidas guardadas:</span>
+    <span id="partidas" style="font-size:13px;color:var(--suave)">—</span>
+    <button id="bajarPartidas" style="font-size:13px;padding:4px 10px">Descargar</button>
+    <button id="subirPartidas" style="font-size:13px;padding:4px 10px">Cargar…</button>
+    <input type="file" id="archivoPartidas" accept=".mkwp" hidden>
+    <button id="borrarPartidas" style="font-size:13px;padding:4px 10px">Borrar partidas guardadas</button>
+  </div>
+  <div class="fila">
+    <span>Datos del juego en este navegador:</span>
+    <span id="datosDisco" style="font-size:13px;color:var(--suave)">—</span>
+    <button id="borrarDisco" style="font-size:13px;padding:4px 10px">Borrar</button>
+  </div>
+  <p id="gpuEnUso" style="margin:0;font-size:13px;color:var(--suave)">🎮 tarjeta de video: —</p>
+  <details class="aviso" id="gpuAyuda" hidden>
+    <summary>¿Tienes una tarjeta de video dedicada y el juego va lento?</summary>
+    La tarjeta que usa el navegador la decide Windows, no la página. Para cambiarla: Configuración → Sistema →
+    Pantalla → Gráficos → tu navegador (p. ej. Google Chrome) → <i>Alto rendimiento</i>, y reinicia el navegador.
+  </details>
+</div>
+
+<div class="caja">
+  <div class="fila">
+    <button id="arrancar" class="principal">Arrancar el juego</button>
+    <span class="dato" id="fps">— fps</span>
+    <span class="dato" id="trabajo">trabajo — ms</span>
+    <span class="dato" id="lecturas">disco: —</span>
+    <span class="dato" id="sonidoDato">sonido: —</span>
+  </div>
+  <p class="aviso" id="sonidoAviso" hidden>
+    🔇 El navegador tiene el sonido bloqueado hasta que toques la página o aprietes una tecla.</p>
+  <div id="pantalla"><canvas id="canvas" tabindex="0"></canvas></div>
+</div>
+
+<div class="caja" id="controles">
+  <h2 style="font-size:16px;margin:0 0 8px">Controles</h2>
+  <div class="fila">
+    <label><input type="checkbox" id="usarTactil"> Mando táctil (celular)</label>
+    <label><input type="checkbox" id="usarInclinacion"> Dirigir inclinando el teléfono</label>
+    <button id="completa">Pantalla completa</button>
+    <span class="dato" id="puerto1">puerto 1: —</span>
+  </div>
+  <div class="fila" id="ajustesTactil" hidden>
+    <label for="tamTactil">Tamaño del mando táctil:</label>
+    <input type="range" id="tamTactil" min="80" max="130" step="5" style="width:140px">
+    <span class="dato" id="tamTactilDato">—</span>
+    <label for="opaTactil">Opacidad:</label>
+    <input type="range" id="opaTactil" min="30" max="100" step="5" style="width:140px">
+    <span class="dato" id="opaTactilDato">—</span>
+  </div>
+  <p style="margin:0 0 8px;font-size:13px">Mandos conectados: <span id="listaMandos">ninguno (aprieta un botón del mando para que el navegador lo vea)</span></p>
+  <details>
+    <summary>Teclado (puerto 1) — clic en una tecla para cambiarla</summary>
+    <table id="tablaTeclas"></table>
+    <button id="restaurarTeclas" style="margin-top:8px">Restaurar teclas por defecto</button>
+  </details>
+</div>
+
+<div class="caja">
+  <div id="resumen"></div>
+  <ul id="resultados"></ul>
+</div>
+
+<div class="caja">
+  <pre id="log"></pre>
+</div>
+
+<script type="module" src="/mkw.mjs"></script>
+</body>
+</html>

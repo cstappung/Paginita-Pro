@@ -1,0 +1,36 @@
+# ---- NADA DEL JUEGO ENTRA AL REPO (ni la imagen, ni lo extraído, ni lo traducido) ----
+# la imagen del disco (y cualquier otro formato de imagen)
+Mario Kart Wii*/
+*.rvz
+*.iso
+*.wbfs
+*.wia
+*.gcz
+*.ciso
+# archivos sacados del disco (main.dol, StaticR.rel, .szs...) y del mod
+extraido/
+*.dol
+*.rel
+*.szs
+RetroRewind6/
+riivolution/
+# el C++ que genera el traductor ES el código de Nintendo traducido: nunca se sube
+generado/
+generated/
+# compilaciones (.wasm/.js del juego incluidos: se sirven solo desde R2 privado)
+build/
+salida/
+*.wasm
+# repos de terceros clonados para trabajar (se fija su commit en herramientas/versiones.md)
+terceros/
+# herramientas instaladas (emsdk, etc.)
+herramientas/emsdk/
+herramientas/cache/
+# varios
+node_modules/
+*.log
+.vs/
+# excepción: los .wasm de las pruebas del banco son programas nuestros chicos (nada del juego)
+!banco/**/*.wasm
+# capturas y resultados de las pruebas
+banco/**/*.png

@@ -1,0 +1,923 @@
+diff --git a/aurora-main/lib/aurora.cpp b/aurora-main/lib/aurora.cpp
+index aede66a..c318eb5 100644
+--- a/aurora-main/lib/aurora.cpp
++++ b/aurora-main/lib/aurora.cpp
+@@ -17,6 +17,9 @@
+ 
+ #include <SDL3/SDL_filesystem.h>
+ #include <SDL3/SDL_thread.h>
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ #include <magic_enum.hpp>
+ 
+ #include "system_info.hpp"
+@@ -96,6 +99,19 @@ void wait_until_precise(PresentClock::time_point deadline) noexcept {
+   if (now >= deadline) {
+     return;
+   }
++#ifdef __EMSCRIPTEN__
++  // MKW RETRO: in the browser a blocking sleep would freeze the tab; emscripten_sleep suspends the
++  // guest (JSPI) and lets the page run until the deadline. No spin afterwards: Present() is a no-op in the
++  // browser and the page takes the canvas only while we are suspended, so spinning to the exact deadline
++  // only burned up to ~2 ms of CPU per frame (7 % of the main thread in a race; MKW RETRO bitácora §53).
++  {
++    const auto ms = std::chrono::duration<double, std::milli>(deadline - now).count();
++    if (ms >= 2.0) {
++      emscripten_sleep(static_cast<unsigned>(ms - 1.0));
++    }
++    return;
++  }
++#endif
+ 
+   const auto timerDeadline = deadline - now > kSpinWindow ? deadline - kSpinWindow : deadline;
+ #if defined(_WIN32)
+@@ -259,6 +275,10 @@ FrameWorkerState g_frameWorker;
+ bool frame_worker_requested() noexcept {
+ #ifdef AURORA_ENABLE_GX
+   static const bool enabled = [] {
++#if defined(__EMSCRIPTEN__)
++    // MKW RETRO: the browser build has no threads; encode/submit/present run on the calling thread.
++    return false;
++#endif
+ #if defined(__APPLE__)
+     // ImGui's SDL backend may raise an SDL window from ImGui::NewFrame(). On
+     // macOS that reaches AppKit, whose window operations are main-thread-only;
+@@ -1009,7 +1029,13 @@ bool present_presentation_job(const PresentationJob& job) {
+           wgpu::Status presentStatus;
+           {
+             std::lock_guard submitLock(g_queueSubmitMutex);
++#ifdef __EMSCRIPTEN__
++            // MKW RETRO: a browser canvas has no Present(); the page shows the current texture by
++            // itself when the guest yields to the event loop (the VI wait or the next frame).
++            presentStatus = wgpu::Status::Success;
++#else
+             presentStatus = g_surface.Present();
++#endif
+           }
+           presentDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
+               PresentClock::now() - presentStarted);
+@@ -1679,7 +1705,8 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame,
+ 
+ // Phase 3: hand the encoded group to whoever owns presentation.
+ void publish_presentations(std::vector<PresentationJob>&& presentationJobs, bool interpolationActive) {
+-#if defined(__APPLE__)
++#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
++  // MKW RETRO: same synchronous path in the browser (no presenter thread).
+   (void)interpolationActive;
+   // Presenting reaches SDL/AppKit, whose window operations must stay on the
+   // main thread. Interpolation normally starts the presenter worker, so keep
+diff --git a/aurora-main/lib/dawn/BackendBinding.cpp b/aurora-main/lib/dawn/BackendBinding.cpp
+index bb8fba4..85de618 100644
+--- a/aurora-main/lib/dawn/BackendBinding.cpp
++++ b/aurora-main/lib/dawn/BackendBinding.cpp
+@@ -10,7 +10,13 @@ namespace aurora::webgpu::utils {
+ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptorCocoa(SDL_Window* window);
+ 
+ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptor(SDL_Window* window) {
+-#if defined(SDL_PLATFORM_MACOS) || defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS)
++#if defined(__EMSCRIPTEN__)
++  // MKW RETRO: in the browser the surface is the page's <canvas id="canvas"> (the one SDL also uses).
++  (void)window;
++  auto desc = std::make_shared<wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector>();
++  desc->selector = "#canvas";
++  return std::move(desc);
++#elif defined(SDL_PLATFORM_MACOS) || defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS)
+   return SetupWindowAndGetSurfaceDescriptorCocoa(window);
+ #else
+   const auto props = SDL_GetWindowProperties(window);
+diff --git a/aurora-main/lib/gfx/common.cpp b/aurora-main/lib/gfx/common.cpp
+index e093901..ef0cc74 100644
+--- a/aurora-main/lib/gfx/common.cpp
++++ b/aurora-main/lib/gfx/common.cpp
+@@ -132,6 +132,16 @@ constexpr size_t FrameSlotCount = 3;
+ static std::array<wgpu::Buffer, FrameSlotCount> g_stagingBuffers;
+ static size_t currentStagingBuffer = 0;
+ static StagingMapState s_mappingState;
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (browser): the staging buffers are not mapped. In the browser, GetMappedRange on a 37 MB range makes
++// Emscripten malloc 37 MB of wasm memory, fill it with zeros, and on Unmap copy all 37 MB into the GPU buffer, every
++// frame, however little the frame used (~7 % of the CPU in a race). Instead the frame writes into one plain block of
++// wasm memory and end_batch uploads only the bytes used with Queue::WriteBuffer (one copy of what was written).
++// MKW_STAGING=mapeo restores the mapped path (to compare).
++static bool g_webStagingPlano = true;
++static std::unique_ptr<u8[]> g_webStaging;
++static bool g_webStagingAbierto = false;  // a frame has the block "mapped" (begin_frame .. end_batch)
++#endif
+ static wgpu::Limits g_cachedLimits;
+ // Advanced once per logical frame in the seal prologue, under the renderer GPU mutex and with the
+ // producer blocked, so every later reader sees a value that no longer moves.
+@@ -894,6 +904,15 @@ void initialize() {
+                "Shared Index Buffer");
+   createBuffer(g_storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
+                "Shared Storage Buffer");
++#ifdef __EMSCRIPTEN__
++  if (const char* modo = std::getenv("MKW_STAGING"); modo && std::string_view{modo} == "mapeo") {
++    g_webStagingPlano = false;
++  }
++  if (g_webStagingPlano) {
++    if (!g_webStaging) g_webStaging = std::make_unique<u8[]>(StagingBufferSize);
++    Log.info("staging: plain wasm block + Queue::WriteBuffer of the used bytes (MKW_STAGING=mapeo for the mapped path)");
++  } else
++#endif
+   for (int i = 0; i < g_stagingBuffers.size(); ++i) {
+     const auto label = fmt::format("Staging Buffer {}", i);
+     createBuffer(g_stagingBuffers[i], wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc, StagingBufferSize,
+@@ -1029,6 +1048,9 @@ void shutdown() {
+ }
+ 
+ void map_staging_buffer() {
++#ifdef __EMSCRIPTEN__
++  if (g_webStagingPlano) return;  // nothing to map: the plain block is always writable
++#endif
+   const auto generation = s_mappingState.request();
+   if (generation == 0) {
+     return;
+@@ -1051,6 +1073,9 @@ void map_staging_buffer() {
+ 
+ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
+   ZoneScoped;
++#ifdef __EMSCRIPTEN__
++  if (!g_webStagingPlano)
++#endif
+   {
+     ZoneScopedN("Wait for buffer map");
+     map_staging_buffer();
+@@ -1083,6 +1108,13 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
+     if (size <= 0) {
+       return;
+     }
++#ifdef __EMSCRIPTEN__
++    if (g_webStagingPlano) {
++      buf = ByteBuffer{g_webStaging.get() + bufferOffset, static_cast<size_t>(size)};
++      bufferOffset += size;
++      return;
++    }
++#endif
+     buf = ByteBuffer{static_cast<u8*>(stagingBuf.GetMappedRange(bufferOffset, size)), static_cast<size_t>(size)};
+     bufferOffset += size;
+   };
+@@ -1093,6 +1125,9 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
+   if constexpr (UseTextureBuffer) {
+     mapBuffer(g_textureUpload, TextureUploadSize);
+   }
++#ifdef __EMSCRIPTEN__
++  g_webStagingAbierto = g_webStagingPlano;
++#endif
+ 
+   g_drawCallCount = 0;
+   g_mergedDrawCallCount = 0;
+@@ -1139,6 +1174,12 @@ void abort_frame() noexcept {
+     g_textureUploads.clear();
+     g_textureUpload.release();
+   }
++#ifdef __EMSCRIPTEN__
++  if (g_webStagingPlano) {
++    if (g_webStagingAbierto) gx::drop_pending_frame_interpolation_uniforms();
++    g_webStagingAbierto = false;
++  } else
++#endif
+   if (s_mappingState.state() == BufferMapState::Mapped) {
+     // Pending interpolation tasks hold raw pointers into the mapped staging
+     // range; they must be dropped before the buffer is unmapped and rotated.
+@@ -1176,12 +1217,28 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+   const auto writeBuffer = [&](ByteBuffer& buf, wgpu::Buffer& out, uint64_t size, std::string_view label) {
+     const auto writeSize = buf.size(); // Only need to copy this many bytes
+     if (writeSize > 0) {
++#ifdef __EMSCRIPTEN__
++      if (g_webStagingPlano) {
++        // WriteBuffer lands in queue order before the command buffer this frame submits next (where the copy
++        // above would have run), and after everything already submitted, which still sees the old bytes.
++        // The aligned size reads up to 3 bytes past writeSize: still inside this region of the block.
++        g_queue.WriteBuffer(out, 0, g_webStaging.get() + bufferOffset, AURORA_ALIGN(writeSize, 4));
++        buf.release();
++        bufferOffset += size;
++        return writeSize;
++      }
++#endif
+       cmd.CopyBufferToBuffer(g_stagingBuffers[currentStagingBuffer], bufferOffset, out, 0, AURORA_ALIGN(writeSize, 4));
+       buf.release();
+     }
+     bufferOffset += size;
+     return writeSize;
+   };
++#ifdef __EMSCRIPTEN__
++  if (g_webStagingPlano)
++    g_webStagingAbierto = false;
++  else
++#endif
+   g_stagingBuffers[currentStagingBuffer].Unmap();
+   s_mappingState.reset();
+   g_stats.drawCallCount = g_drawCallCount;
+@@ -1190,6 +1247,14 @@ static void end_batch_impl(const wgpu::CommandEncoder& cmd, bool advanceFrame) {
+   g_stats.lastUniformSize = writeBuffer(g_uniforms, g_uniformBuffer, UniformBufferSize, "Uniform");
+   g_stats.lastIndexSize = writeBuffer(g_indices, g_indexBuffer, IndexBufferSize, "Index");
+   g_stats.lastStorageSize = writeBuffer(g_storage, g_storageBuffer, StorageBufferSize, "Storage");
++#ifdef __EMSCRIPTEN__
++  // MKW RETRO: every 10 s, how many bytes a frame uploads (the page's log; bitácora §53)
++  if (static uint32_t s_cuenta = 0; g_webStagingPlano && advanceFrame && ++s_cuenta % 600 == 0) {
++    Log.info("staging: frame uploads vertices {} KB, uniforms {} KB, indices {} KB, storage {} KB",
++             g_stats.lastVertSize / 1024, g_stats.lastUniformSize / 1024, g_stats.lastIndexSize / 1024,
++             g_stats.lastStorageSize / 1024);
++  }
++#endif
+   if constexpr (UseTextureBuffer) {
+     g_stats.lastTextureUploadSize = g_textureUpload.size();
+     {
+@@ -1550,8 +1615,17 @@ static void render_pass_impl(const wgpu::RenderPassEncoder& pass, const std::vec
+       // "in front" geometry silently vanishes. A full [0,1] viewport is unaffected either way,
+       // which is why this only broke specific elements, not the whole scene. Matches upstream
+       // aurora's apply_viewport (lib/gfx/encoding.cpp) exactly.
++#ifdef __EMSCRIPTEN__
++      // Web port: the browser's WebGPU rejects a depth range outside [0, 1] (a validation error that kills the
++      // whole frame and aborts). Games ask for slightly-out ranges on purpose (Mario Kart Wii's race HUD:
++      // znear -0.06 -> 0.95..1.06 after the reversed-Z remap); desktop Dawn let it through. Clamp AFTER the
++      // remap, so the direction the comment above insists on is kept; only the overshoot is cut.
++      const float minDepth = std::clamp(gx::UseReversedZ ? 1.0f - vp.zfar : vp.znear, 0.0f, 1.0f);
++      const float maxDepth = std::clamp(gx::UseReversedZ ? 1.0f - vp.znear : vp.zfar, minDepth, 1.0f);
++#else
+       const float minDepth = gx::UseReversedZ ? 1.0f - vp.zfar : vp.znear;
+       const float maxDepth = gx::UseReversedZ ? 1.0f - vp.znear : vp.zfar;
++#endif
+       pass.SetViewport(vp.left, vp.top, vp.width, vp.height, minDepth, maxDepth);
+     } break;
+     case CommandType::SetScissor: {
+@@ -1605,6 +1679,22 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass, Pipelin
+   }
+   wgpu::RenderPipeline pipeline;
+   bool pipelineReady;
++#ifdef __EMSCRIPTEN__
++  // Web: si su pipeline todavía se está compilando en el navegador, este dibujo se salta (un cuadro sin ese
++  // objeto en vez de congelar la imagen); en una pasada que hornea una textura para siempre se arma en el momento.
++  if (!try_pipeline(ref, pipeline)) {
++    if (!requireReady && web_saltar_si_no_esta()) {
++      web_contar_salto();
++      return false;
++    }
++    if (!wait_pipeline(ref, pipeline)) {
++      return false;
++    }
++  }
++  pass.SetPipeline(pipeline);
++  currentPipeline = ref;
++  return true;
++#endif
+   if (!skip_unready_pipelines()) {
+     pipelineReady = wait_pipeline(ref, pipeline);
+   } else if (requireReady) {
+diff --git a/aurora-main/lib/gfx/dds_io.cpp b/aurora-main/lib/gfx/dds_io.cpp
+index 84eecc2..becc629 100644
+--- a/aurora-main/lib/gfx/dds_io.cpp
++++ b/aurora-main/lib/gfx/dds_io.cpp
+@@ -203,7 +203,7 @@ std::optional<ConvertedTexture> parse_dds_bytes(ArrayRef<uint8_t> bytes) noexcep
+     return std::nullopt;
+   }
+ 
+-  ByteBuffer data{expectedSize};
++  ByteBuffer data{static_cast<size_t>(expectedSize)};  // MKW RETRO: size_t is 32-bit in wasm
+   std::memcpy(data.data(), bytes.data() + parsedLayout->dataOffset, expectedSize);
+   return ConvertedTexture{
+       .format = parsedLayout->format,
+diff --git a/aurora-main/lib/gfx/pipeline_cache.cpp b/aurora-main/lib/gfx/pipeline_cache.cpp
+index d995e00..a546fe4 100644
+--- a/aurora-main/lib/gfx/pipeline_cache.cpp
++++ b/aurora-main/lib/gfx/pipeline_cache.cpp
+@@ -23,6 +23,13 @@
+ #include <fmt/format.h>
+ #include <tracy/Tracy.hpp>
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#endif
++
+ namespace aurora::gfx {
+ static Module Log("aurora::gfx::pipeline_cache");
+ 
+@@ -69,12 +76,51 @@ constexpr size_t MaxPipelineWorkers = 22;
+ // Cached clear and GX pipelines are prewarmed using the full worker pool.
+ constexpr size_t MaxBackgroundPipelineWorkers = MaxPipelineWorkers;
+ // For synchronous pipeline fallback (OpenGL)
+-#ifdef NDEBUG
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (web): la cola es el precalentado; cada uno cuesta ~0,2 ms (armar el shader y pedirlo en segundo
++// plano), así que 8 por cuadro son ~1,6 ms y 400 pipelines quedan pedidos en menos de 1 s.
++constexpr size_t BuildPipelinesPerFrame = 8;
++#elif defined(NDEBUG)
+ constexpr size_t BuildPipelinesPerFrame = 5;
+ #else
+ constexpr size_t BuildPipelinesPerFrame = 1;
+ #endif
+ static std::vector<std::thread> g_pipelineThreads;
++
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (web): el navegador compila cada pipeline nuevo en su proceso de GPU (WGSL → HLSL → código de la
++// tarjeta, ~25 ms cada uno en Windows). Pedido con CreateRenderPipeline (sincrónico), ese trabajo frena todo lo
++// que viene detrás, y una tanda de 50–80 pipelines nuevos (al entrar a una pista) congelaba la imagen 1–2 s. En la
++// web se piden con CreateRenderPipelineAsync: el navegador los compila en sus hilos de fondo y el cuadro sigue;
++// el dibujo que necesita uno que todavía no está se salta (como hace aurora en escritorio con "Skip draws while
++// shaders compile"), salvo en las pasadas que hornean una textura para siempre (requireReady), donde se arma en
++// el momento. MKW_PIPELINES=sincronico vuelve a lo de antes (para comparar).
++static bool g_webAsincrono = true;            // false con MKW_PIPELINES=sincronico
++static bool g_webPedirAsync = false;          // true mientras find_pipeline/compile llaman al "create"
++static bool g_webSeLanzo = false;             // build_pipeline lo pidió asíncrono (no devolvió nada)
++static PipelineRef g_webHashActual = 0;
++struct WebEnCamino {
++  NewPipelineCallback create;                 // para armarlo en el momento si hace falta antes de que llegue
++  uint32_t firstFrameUsed;
++  double desde;                               // cuándo se pidió (ms), para medir cuánto tarda el navegador
++};
++static absl::flat_hash_map<PipelineRef, WebEnCamino> g_webEnCamino;
++// Lista de configuraciones de pipeline usadas (las de las listas cargadas al arrancar más las nuevas de esta
++// sesión). La página la guarda en IndexedDB y en la próxima visita se piden todas en segundo plano al arrancar,
++// antes de que el juego las necesite (precalentar). Formato del archivo: "MKWPIPE1", u32 cantidad, y por cada una
++// u32 tipo, u32 versión, u32 primer cuadro, u32 tamaño y los bytes de la configuración (todo little-endian).
++struct WebRegistro {
++  uint32_t tipo, version, primerCuadro;
++  ByteBuffer config;
++};
++static absl::flat_hash_map<PipelineRef, WebRegistro> g_webLista;
++static ByteBuffer g_webExportado;
++constexpr size_t WebListaMax = 8192;
++constexpr char WebMagia[8] = {'M', 'K', 'W', 'P', 'I', 'P', 'E', '1'};
++// medidor (una línea por segundo en la consola)
++static uint32_t g_webPedidos = 0, g_webListos = 0, g_webSaltados = 0, g_webForzados = 0, g_webSincronicos = 0;
++static double g_webMsLlamada = 0.0, g_webMsEspera = 0.0, g_webMsForzados = 0.0, g_webDesde = 0.0;
++#endif
+ static bool g_pipelineThreadEnd = false;
+ static size_t g_activeBackgroundPipelineWorkers = 0;
+ static std::condition_variable g_pipelineCv;
+@@ -360,6 +406,15 @@ static PipelineCacheWrite make_pipeline_cache_write(ShaderType type, PipelineRef
+ }
+ 
+ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
++#ifdef __EMSCRIPTEN__
++  if (g_webLista.size() < WebListaMax && !g_webLista.contains(write.hash)) {
++    g_webLista.try_emplace(write.hash, WebRegistro{.tipo = static_cast<uint32_t>(underlying(write.type)),
++                                                   .version = write.configVersion,
++                                                   .primerCuadro = write.firstFrameUsed,
++                                                   .config = std::move(write.config)});
++  }
++  return;
++#endif
+   if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr) {
+     return;
+   }
+@@ -433,6 +488,90 @@ static bool remove_pending_pipeline(Queue& queue, PipelineRef hash) {
+   return true;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++static void web_guardar_listo(PipelineRef hash, wgpu::RenderPipeline pipeline, uint32_t firstFrameUsed) {
++  std::scoped_lock guard{g_pipelineMutex};
++  const auto [_, inserted] = g_pipelines.try_emplace(hash, CachedPipeline{
++                                                               .pipeline = std::move(pipeline),
++                                                               .firstFrameUsed = firstFrameUsed,
++                                                           });
++  if (inserted) {
++    ++createdPipelines;
++  }
++}
++
++// Llega del navegador (en ProcessEvents, al final de cada cuadro) cuando terminó de compilar uno.
++static void web_pipeline_llego(PipelineRef hash, wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline,
++                               wgpu::StringView message) {
++  const auto it = g_webEnCamino.find(hash);
++  if (it == g_webEnCamino.end()) {
++    return;  // ya se armó en el momento (web_terminar_ya); este sobra
++  }
++  WebEnCamino enCamino = std::move(it->second);
++  g_webEnCamino.erase(it);
++  if (status != wgpu::CreatePipelineAsyncStatus::Success || !pipeline) {
++    Log.error("CreateRenderPipelineAsync falló ({}); se arma sincrónico", std::string_view(message));
++    pipeline = enCamino.create();
++  }
++  g_webMsEspera += emscripten_get_now() - enCamino.desde;
++  ++g_webListos;
++  web_guardar_listo(hash, std::move(pipeline), enCamino.firstFrameUsed);
++}
++
++// Un dibujo que no se puede saltar necesita ya un pipeline que todavía está en camino: armarlo ahora (sincrónico).
++static bool web_terminar_ya(PipelineRef hash) {
++  const auto it = g_webEnCamino.find(hash);
++  if (it == g_webEnCamino.end()) {
++    return false;
++  }
++  WebEnCamino enCamino = std::move(it->second);
++  g_webEnCamino.erase(it);  // la respuesta asíncrona que llegue después se descarta
++  const double t0 = emscripten_get_now();
++  auto pipeline = enCamino.create();  // g_webPedirAsync está apagado: build_pipeline lo crea sincrónico
++  g_webMsForzados += emscripten_get_now() - t0;
++  ++g_webForzados;
++  web_guardar_listo(hash, std::move(pipeline), enCamino.firstFrameUsed);
++  return true;
++}
++
++// Llama al "create" de un pipeline nuevo. Si build_pipeline lo pidió asíncrono, queda en camino y devuelve false;
++// si no (pipelines de borrado, modo sincrónico), devuelve true con el pipeline listo.
++static bool web_crear(PipelineRef hash, const NewPipelineCallback& create, uint32_t firstFrameUsed,
++                      wgpu::RenderPipeline& pipeline) {
++  const double t0 = emscripten_get_now();
++  g_webPedirAsync = g_webAsincrono;
++  g_webSeLanzo = false;
++  g_webHashActual = hash;
++  pipeline = create();
++  g_webPedirAsync = false;
++  g_webMsLlamada += emscripten_get_now() - t0;
++  if (g_webSeLanzo) {
++    ++g_webPedidos;
++    g_webEnCamino.try_emplace(hash, WebEnCamino{.create = create, .firstFrameUsed = firstFrameUsed, .desde = t0});
++    return false;
++  }
++  ++g_webSincronicos;
++  return true;
++}
++
++bool web_pipeline_async(const wgpu::RenderPipelineDescriptor& descriptor) {
++  if (!g_webPedirAsync) {
++    return false;
++  }
++  const PipelineRef hash = g_webHashActual;
++  webgpu::g_device.CreateRenderPipelineAsync(
++      &descriptor, wgpu::CallbackMode::AllowProcessEvents,
++      [hash](wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline, wgpu::StringView message) {
++        web_pipeline_llego(hash, status, std::move(pipeline), message);
++      });
++  g_webSeLanzo = true;
++  return true;
++}
++
++void web_contar_salto() noexcept { ++g_webSaltados; }
++bool web_saltar_si_no_esta() noexcept { return g_webAsincrono; }
++#endif
++
+ template <typename PipelineConfig>
+ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& config, NewPipelineCallback&& cb,
+                                       bool persist, std::optional<uint32_t> firstFrameUsedOverride) {
+@@ -456,6 +595,10 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+         pipelineIt->second.firstFrameUsed = firstFrameUsed;
+         cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
+       }
++#ifdef __EMSCRIPTEN__
++    } else if (g_webEnCamino.contains(hash)) {
++      // ya pedido al navegador; llega solo
++#endif
+     } else if (g_pendingPipelines.contains(hash)) {
+       auto* pending = touch_pending_pipeline(hash, g_pipelineFrameActive);
+       if (pending != nullptr && firstFrameUsed < pending->firstFrameUsed) {
+@@ -500,6 +643,25 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+     }
+   }
+ 
++#ifdef __EMSCRIPTEN__
++  if (syncCreate) {
++    wgpu::RenderPipeline listo;
++    if (!web_crear(hash, cb, firstFrameUsed, listo)) {
++      syncCreate = false;  // en camino: se guarda cuando llegue (web_pipeline_llego)
++      std::scoped_lock guard{g_pipelineMutex};
++      removedPending = remove_pending_pipeline(g_priorityPipelines, hash);
++      removedPending = remove_pending_pipeline(g_backgroundPipelines, hash) || removedPending;
++      if (removedPending) {
++        g_pendingPipelines.erase(hash);
++      }
++      if (persist) {
++        cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
++      }
++    } else {
++      cb = [listo] { return listo; };
++    }
++  }
++#endif
+   if (syncCreate) {
+     const auto pipeline = cb();
+     {
+@@ -711,6 +873,14 @@ static void seed_pipeline_cache() {
+ }
+ 
+ static bool prepare_pipeline_cache_db() {
++#ifdef __EMSCRIPTEN__
++  // MKW RETRO: the on-disk pipeline cache needs a writer thread and a real file system; in the browser
++  // it stays off (Chrome keeps its own cache of compiled shaders).
++  if (!g_pipelineCacheBroken) {
++    pipeline_cache_abort();
++  }
++  return false;
++#endif
+   if (g_pipelineCacheBroken) {
+     return false;
+   }
+@@ -968,7 +1138,23 @@ static void note_pipeline_queue_drained() {
+ }
+ 
+ static void compile_pending_pipeline(PendingPipeline pending) {
++#ifdef __EMSCRIPTEN__
++  wgpu::RenderPipeline result;
++  if (!web_crear(pending.hash, pending.create, pending.firstFrameUsed, result)) {
++    {
++      std::lock_guard lock{g_pipelineMutex};
++      g_pendingPipelines.erase(pending.hash);
++    }
++    --queuedPipelines;
++    if (queuedPipelines.load() == 0 && g_prewarmActive.exchange(false)) {
++      std::printf("[pipelines] precalentado: los %u de la lista ya están pedidos (%.1f s desde el arranque)\n",
++                  g_prewarmCount, std::chrono::duration<double>(std::chrono::steady_clock::now() - g_prewarmStart).count());
++    }
++    return;
++  }
++#else
+   auto result = pending.create();
++#endif
+   {
+     std::lock_guard lock{g_pipelineMutex};
+     const auto [_, inserted] = g_pipelines.try_emplace(pending.hash, CachedPipeline{
+@@ -1107,7 +1293,103 @@ static void load_pipeline_cache_entries(ShaderType type, uint32_t configVersion,
+   sqlite3_clear_bindings(g_pipelineCacheLoadStmt);
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// Lee una lista (archivo que la página dejó antes de main) y pone en la cola cada configuración válida.
++// Devuelve cuántas se aceptaron; descarta las de otra versión o tamaño (otra compilación de aurora).
++template <typename PipelineConfig, typename CreateFn>
++static bool web_precalentar_una(const uint8_t* datos, uint32_t tam, uint32_t primerCuadro, CreateFn&& create,
++                                uint32_t version, ShaderType type) {
++  if (tam != sizeof(PipelineConfig)) {
++    return false;
++  }
++  PipelineConfig config;
++  std::memcpy(&config, datos, sizeof(config));
++  if (config.version != version) {
++    return false;
++  }
++  if constexpr (std::is_same_v<PipelineConfig, gx::PipelineConfig>) {
++    if (!gx::valid_pipeline_config(config)) {
++      return false;
++    }
++  }
++  const PipelineRef hash = xxh3_hash(config, static_cast<HashType>(type));
++  find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro);
++  if (g_webLista.size() < WebListaMax) {
++    ByteBuffer copia(tam);
++    std::memcpy(copia.data(), datos, tam);
++    g_webLista.try_emplace(hash, WebRegistro{.tipo = static_cast<uint32_t>(underlying(type)), .version = version,
++                                             .primerCuadro = primerCuadro, .config = std::move(copia)});
++  }
++  return true;
++}
++
++static void web_leer_lista(const char* ruta, uint32_t& aceptadas, uint32_t& descartadas) {
++  std::FILE* f = std::fopen(ruta, "rb");
++  if (f == nullptr) {
++    return;
++  }
++  std::vector<uint8_t> d;
++  uint8_t buf[65536];
++  size_t n;
++  while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
++    d.insert(d.end(), buf, buf + n);
++  }
++  std::fclose(f);
++  const auto u32 = [&](size_t o) {
++    uint32_t v;
++    std::memcpy(&v, d.data() + o, 4);
++    return v;
++  };
++  if (d.size() < 12 || std::memcmp(d.data(), WebMagia, 8) != 0) {
++    std::printf("[pipelines] %s no es una lista de pipelines; se ignora\n", ruta);
++    return;
++  }
++  const uint32_t cantidad = u32(8);
++  size_t o = 12;
++  for (uint32_t i = 0; i < cantidad; ++i) {
++    if (o + 16 > d.size()) {
++      break;
++    }
++    const uint32_t tipo = u32(o), version = u32(o + 4), primerCuadro = u32(o + 8), tam = u32(o + 12);
++    o += 16;
++    if (o + tam > d.size()) {
++      break;
++    }
++    bool ok = false;
++    if (tipo == underlying(ShaderType::GX)) {
++      ok = web_precalentar_una<gx::PipelineConfig>(d.data() + o, tam, primerCuadro, gx::create_pipeline,
++                                                   gx::GXPipelineConfigVersion, ShaderType::GX);
++    } else if (tipo == underlying(ShaderType::Clear)) {
++      ok = web_precalentar_una<clear::PipelineConfig>(d.data() + o, tam, primerCuadro, clear::create_pipeline,
++                                                      clear::ClearPipelineConfigVersion, ShaderType::Clear);
++    }
++    (ok ? aceptadas : descartadas)++;
++    o += tam;
++  }
++}
++
++static void web_cargar_listas() {
++  uint32_t aceptadas = 0, descartadas = 0;
++  web_leer_lista("/datos/pipelines/semilla.bin", aceptadas, descartadas);
++  web_leer_lista("/datos/pipelines/propia.bin", aceptadas, descartadas);
++  const auto enCola = queuedPipelines.load();
++  if (enCola > 0) {
++    g_prewarmCount = enCola;
++    g_prewarmStart = std::chrono::steady_clock::now();
++    g_prewarmActive.store(true, std::memory_order_release);
++  }
++  if (aceptadas + descartadas > 0) {
++    std::printf("[pipelines] precalentando %u (en la cola, se piden en segundo plano de a %zu por cuadro); "
++                "%u descartados (de otra versión)\n",
++                static_cast<unsigned>(queuedPipelines.load()), BuildPipelinesPerFrame, descartadas);
++  }
++}
++#endif
++
+ static void load_pipeline_cache() {
++#ifdef __EMSCRIPTEN__
++  web_cargar_listas();
++#endif
+   if (!prepare_pipeline_cache_db()) {
+     return;
+   }
+@@ -1163,6 +1445,11 @@ PipelineRef find_pipeline(ShaderType type, const gx::PipelineConfig& config, New
+ }
+ 
+ void initialize_pipeline_cache() {
++#ifdef __EMSCRIPTEN__
++  const char* modo = std::getenv("MKW_PIPELINES");
++  g_webAsincrono = !(modo != nullptr && std::strcmp(modo, "sincronico") == 0);
++  std::printf("[pipelines] modo %s\n", g_webAsincrono ? "asíncrono (en segundo plano)" : "sincrónico");
++#endif
+   g_pipelineCacheBroken = false;
+   g_pipelineCacheWriterStop = false;
+   g_pipelineFrameActive = false;
+@@ -1227,6 +1514,21 @@ void begin_pipeline_frame() {
+ 
+ void end_pipeline_frame() {
+   g_pipelineFrameActive = false;
++#ifdef __EMSCRIPTEN__
++  const double ahora = emscripten_get_now();
++  if (ahora - g_webDesde >= 1000.0) {
++    if (g_webPedidos + g_webListos + g_webSincronicos + g_webForzados + g_webSaltados > 0) {
++      std::printf("[pipelines] %u pedidos en segundo plano (llamada %.1f ms), %u llegaron (tardaron %.0f ms en "
++                  "promedio), %u en camino, %u sincrónicos, %u armados en el momento (%.1f ms), %u dibujos saltados\n",
++                  g_webPedidos, g_webMsLlamada, g_webListos, g_webListos ? g_webMsEspera / g_webListos : 0.0,
++                  static_cast<unsigned>(g_webEnCamino.size()), g_webSincronicos, g_webForzados, g_webMsForzados,
++                  g_webSaltados);
++    }
++    g_webPedidos = g_webListos = g_webSaltados = g_webForzados = g_webSincronicos = 0;
++    g_webMsLlamada = g_webMsEspera = g_webMsForzados = 0.0;
++    g_webDesde = ahora;
++  }
++#endif
+   if (!g_hasPipelineThread) {
+     build_synchronous_pipelines_for_frame();
+   }
+@@ -1258,6 +1560,11 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+ 
+ static bool wait_pipeline_impl(PipelineRef ref, wgpu::RenderPipeline& pipeline, bool fatalIfMissing,
+                                bool persistentPass) {
++#ifdef __EMSCRIPTEN__
++  if (!try_pipeline(ref, pipeline)) {
++    web_terminar_ya(ref);
++  }
++#endif
+   std::unique_lock lock{g_pipelineMutex};
+   if (!g_pipelines.contains(ref) && g_pendingPipelines.contains(ref)) {
+     ZoneScopedN("wait_pipeline");
+@@ -1297,6 +1604,51 @@ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pi
+ 
+ } // namespace aurora::gfx
+ 
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (web): la página (web/navegador/pipelines.mjs) pregunta cada tanto cuántas hay y, si cambió, pide el
++// archivo armado (mkw_web_pipelines_armar devuelve el tamaño; mkw_web_pipelines_datos, dónde está en la memoria).
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_cuantos() {
++  return static_cast<uint32_t>(aurora::gfx::g_webLista.size());
++}
++
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_armar() {
++  using namespace aurora::gfx;
++  std::vector<const WebRegistro*> orden;
++  orden.reserve(g_webLista.size());
++  for (const auto& [_, r] : g_webLista) {
++    orden.push_back(&r);
++  }
++  // los que se usan antes van primero (así el precalentado pide primero los del título y los menús)
++  std::sort(orden.begin(), orden.end(), [](const WebRegistro* a, const WebRegistro* b) {
++    return a->primerCuadro < b->primerCuadro;
++  });
++  size_t total = 12;
++  for (const auto* r : orden) {
++    total += 16 + r->config.size();
++  }
++  g_webExportado = aurora::ByteBuffer(total);
++  uint8_t* p = g_webExportado.data();
++  const auto pon = [&](uint32_t v) {
++    std::memcpy(p, &v, 4);
++    p += 4;
++  };
++  std::memcpy(p, WebMagia, 8);
++  p += 8;
++  pon(static_cast<uint32_t>(orden.size()));
++  for (const auto* r : orden) {
++    pon(r->tipo);
++    pon(r->version);
++    pon(r->primerCuadro);
++    pon(static_cast<uint32_t>(r->config.size()));
++    std::memcpy(p, r->config.data(), r->config.size());
++    p += r->config.size();
++  }
++  return static_cast<uint32_t>(total);
++}
++
++extern "C" EMSCRIPTEN_KEEPALIVE const uint8_t* mkw_web_pipelines_datos() { return aurora::gfx::g_webExportado.data(); }
++#endif
++
+ void aurora_set_skip_unready_pipelines(const bool enabled) { aurora::gfx::set_skip_unready_pipelines(enabled); }
+ 
+ bool aurora_get_skip_unready_pipelines() { return aurora::gfx::skip_unready_pipelines(); }
+diff --git a/aurora-main/lib/gfx/pipeline_cache.hpp b/aurora-main/lib/gfx/pipeline_cache.hpp
+index 737e531..16df982 100644
+--- a/aurora-main/lib/gfx/pipeline_cache.hpp
++++ b/aurora-main/lib/gfx/pipeline_cache.hpp
+@@ -33,4 +33,12 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline);
+ // path. Separate from wait_pipeline so skip-unready mode never becomes blocking for other passes.
+ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pipeline);
+ 
++#ifdef __EMSCRIPTEN__
++// MKW RETRO (web): build_pipeline pide el pipeline con CreateRenderPipelineAsync si corresponde (devuelve true y
++// entonces no hay que crearlo); bind_pipeline salta el dibujo si el suyo no llegó y cuenta los saltos.
++bool web_pipeline_async(const wgpu::RenderPipelineDescriptor& descriptor);
++bool web_saltar_si_no_esta() noexcept;
++void web_contar_salto() noexcept;
++#endif
++
+ } // namespace aurora::gfx
+diff --git a/aurora-main/lib/gfx/staging_map.hpp b/aurora-main/lib/gfx/staging_map.hpp
+index 2c79e7f..4566ecc 100644
+--- a/aurora-main/lib/gfx/staging_map.hpp
++++ b/aurora-main/lib/gfx/staging_map.hpp
+@@ -4,6 +4,9 @@
+ #include <condition_variable>
+ #include <cstdint>
+ #include <mutex>
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ 
+ namespace aurora::gfx {
+ 
+@@ -50,6 +53,15 @@ public:
+   }
+ 
+   void wait_for_progress() {
++#ifdef __EMSCRIPTEN__
++    // MKW RETRO: in the browser the map completes only when the page's event loop runs, and a
++    // condition-variable wait would spin forever on the only thread. Yield instead (JSPI suspends
++    // the guest; the caller's loop then calls ProcessEvents and re-checks the state).
++    if (state() == BufferMapState::Mapping) {
++      emscripten_sleep(0);
++    }
++    return;
++#endif
+     std::unique_lock lock(mutex_);
+     // ProcessEvents is still serviced between waits for implementations that
+     // need it. A spontaneous completion wakes immediately, without polling.
+diff --git a/aurora-main/lib/gx/frame_interpolation.cpp b/aurora-main/lib/gx/frame_interpolation.cpp
+index cd2d339..8148475 100644
+--- a/aurora-main/lib/gx/frame_interpolation.cpp
++++ b/aurora-main/lib/gx/frame_interpolation.cpp
+@@ -93,7 +93,13 @@ private:
+     const unsigned hardware = std::thread::hardware_concurrency();
+     // The caller helps too. Cap the helpers: tasks are short memcpy+math, so dispatch
+     // overhead and memory bandwidth dominate past a few threads.
++#ifdef __EMSCRIPTEN__
++    // MKW RETRO: no threads in the browser build; the caller does all the work.
++    const unsigned helpers = 0;
++    (void)hardware;
++#else
+     const unsigned helpers = hardware > 2 ? std::min(hardware - 1, 6u) : 0;
++#endif
+     m_workers.reserve(helpers);
+     for (unsigned i = 0; i < helpers; ++i) {
+       m_workers.emplace_back([this] { worker_loop(); });
+diff --git a/aurora-main/lib/gx/gx.cpp b/aurora-main/lib/gx/gx.cpp
+index 15952a6..9bfc2b3 100644
+--- a/aurora-main/lib/gx/gx.cpp
++++ b/aurora-main/lib/gx/gx.cpp
+@@ -6,6 +6,7 @@
+ #include "../webgpu/gpu.hpp"
+ #include "../internal.hpp"
+ #include "../gfx/common.hpp"
++#include "../gfx/pipeline_cache.hpp"
+ #include "../gfx/tex_palette_conv.hpp"
+ #include "../gfx/texture.hpp"
+ #include "../gfx/texture_convert.hpp"
+@@ -1642,6 +1643,11 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
+           },
+       .fragment = &fragmentState,
+   };
++#ifdef __EMSCRIPTEN__
++  if (gfx::web_pipeline_async(descriptor)) {
++    return {};  // pedido en segundo plano (pipeline_cache.cpp lo guarda cuando llega)
++  }
++#endif
+   return g_device.CreateRenderPipeline(&descriptor);
+ }
+ 
+diff --git a/aurora-main/lib/webgpu/gpu.cpp b/aurora-main/lib/webgpu/gpu.cpp
+index 37515f2..e681fc4 100644
+--- a/aurora-main/lib/webgpu/gpu.cpp
++++ b/aurora-main/lib/webgpu/gpu.cpp
+@@ -25,7 +25,7 @@
+ #if defined(WEBGPU_DAWN) && !defined(__MINGW32__)
+ #include "../dawn/BackendBinding.hpp"
+ #include <dawn/native/DawnNative.h>
+-#elif defined(WEBGPU_DAWN)
++#elif defined(WEBGPU_DAWN) || defined(__EMSCRIPTEN__)
+ #include "../dawn/BackendBinding.hpp"
+ #endif
+ 
+@@ -33,6 +33,17 @@
+ #include <windows.h>
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++// MKW RETRO: the page lets the player choose which graphics card to ask the browser for
++// (Module.mkwGpuPreferencia: "alto" = high performance, "bajo" = low power, anything else = no
++// preference). A web page cannot pick a GPU by name; this is only a hint the browser may ignore.
++EM_JS(int, mkw_web_gpu_preferencia, (), {
++  const p = Module.mkwGpuPreferencia;
++  return p === 'alto' ? 2 : p === 'bajo' ? 1 : 0;
++});
++#endif
++
+ namespace aurora::gx {
+ void clear_display_copy_cache() noexcept;
+ } // namespace aurora::gx
+@@ -558,8 +569,16 @@ bool initialize(AuroraBackend auroraBackend) {
+     }
+   }
+   {
++#ifdef __EMSCRIPTEN__
++    const int preference = mkw_web_gpu_preferencia();
++    const auto powerPreference = preference == 2   ? wgpu::PowerPreference::HighPerformance
++                                 : preference == 1 ? wgpu::PowerPreference::LowPower
++                                                   : wgpu::PowerPreference::Undefined;
++#else
++    const auto powerPreference = wgpu::PowerPreference::HighPerformance;
++#endif
+     const wgpu::RequestAdapterOptions options{
+-        .powerPreference = wgpu::PowerPreference::HighPerformance,
++        .powerPreference = powerPreference,
+         .backendType = backend,
+         .compatibleSurface = g_surface,
+     };
+@@ -644,12 +663,14 @@ bool initialize(AuroraBackend auroraBackend) {
+     std::vector<wgpu::FeatureName> requiredFeatures;
+     // Optional native sharing for MetalFX. Devices without either feature keep
+     // the normal renderer; the upscaler checks the enabled pair at runtime.
++#ifndef __EMSCRIPTEN__  // MKW RETRO: Dawn-native-only features, absent from the browser's WebGPU
+     if (backend == wgpu::BackendType::Metal &&
+         g_adapter.HasFeature(wgpu::FeatureName::SharedTextureMemoryIOSurface) &&
+         g_adapter.HasFeature(wgpu::FeatureName::SharedFenceMTLSharedEvent)) {
+       requiredFeatures.push_back(wgpu::FeatureName::SharedTextureMemoryIOSurface);
+       requiredFeatures.push_back(wgpu::FeatureName::SharedFenceMTLSharedEvent);
+     }
++#endif
+     bool implicitDeviceSynchronizationSupported = false;
+     wgpu::SupportedFeatures supportedFeatures;
+     g_adapter.GetFeatures(&supportedFeatures);
+@@ -661,11 +682,17 @@ bool initialize(AuroraBackend auroraBackend) {
+       }
+       // The presenter calls device and queue methods while the frame worker encodes, which Dawn only
+       // supports with this feature; without it the two race inside the device's dynamic uploader.
++#ifndef __EMSCRIPTEN__
+       if (feature == wgpu::FeatureName::ImplicitDeviceSynchronization) {
+         implicitDeviceSynchronizationSupported = true;
+         requiredFeatures.push_back(feature);
+       }
++#endif
+     }
++#ifdef __EMSCRIPTEN__
++    // MKW RETRO: single-threaded in the browser, so there is nothing to synchronize.
++    implicitDeviceSynchronizationSupported = true;
++#endif
+     if (!implicitDeviceSynchronizationSupported) {
+       Log.warn(
+           "Adapter does not support ImplicitDeviceSynchronization; multi-threaded presentation is "
+@@ -764,6 +791,7 @@ bool initialize(AuroraBackend auroraBackend) {
+     if (!g_device) {
+       return false;
+     }
++#ifndef __EMSCRIPTEN__  // MKW RETRO: Dawn's logging hook does not exist in the browser
+     g_device.SetLoggingCallback([](wgpu::LoggingType type, wgpu::StringView message) {
+       AuroraLogLevel level = LOG_FATAL;
+       switch (type) {
+@@ -784,6 +812,7 @@ bool initialize(AuroraBackend auroraBackend) {
+       }
+       Log.report(level, "WebGPU message: {}", message);
+     });
++#endif
+   }
+   g_queue = g_device.GetQueue();
+ 

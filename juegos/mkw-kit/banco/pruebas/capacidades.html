@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capacidades del navegador</title>
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<h1>¿Este navegador puede correr <span>Mario Kart Wii</span>?</h1>
+<p>Revisa lo que el juego necesita (obligatorio) y lo que mejora la experiencia (opcional). No baja nada del juego.
+  Es la misma revisión que hará la página del sitio antes de ofrecer «Jugar».</p>
+<div class="caja"><div id="resumen">revisando…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>Cómo leerlo:</b> las líneas «obligatorio» en rojo significan que el juego no va a correr aquí
+  (por ejemplo, iPhone no tiene JSPI). Las «opcional» solo apagan una función (vibración, inclinar el teléfono…).</div>
+<script type="module">
+import { prueba } from '../comun.js';
+const { ok, nota, fin } = prueba('capacidades', 'Capacidades del navegador');
+
+// ---------- obligatorio ----------
+// JSPI: deja que el programa wasm "espere" (archivos, GPU, cambio de hilo del juego) sin congelar la pestaña.
+ok('obligatorio: JSPI (WebAssembly.Suspending)', 'Suspending' in WebAssembly, 'Suspending' in WebAssembly ? 'sí' : 'no: Safari/iPhone o Chrome viejo');
+
+// WebGPU: el dibujo del juego (aurora habla WebGPU).
+let adaptador = null, dispositivo = null;
+if (!navigator.gpu) ok('obligatorio: WebGPU (navigator.gpu)', false, 'el navegador no tiene WebGPU');
+else {
+  adaptador = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
+  ok('obligatorio: WebGPU con un adaptador', !!adaptador, adaptador ? (adaptador.info?.vendor || '') + ' ' + (adaptador.info?.architecture || '') : 'sin adaptador (GPU no soportada o bloqueada)');
+  if (adaptador) {
+    dispositivo = await adaptador.requestDevice().catch(e => { nota('requestDevice falló: ' + e.message); return null; });
+    ok('obligatorio: dispositivo WebGPU', !!dispositivo);
+    nota('features: ' + [...adaptador.features].sort().join(', '));
+    nota(`límites: maxTextureDimension2D=${adaptador.limits.maxTextureDimension2D}, maxBufferSize=${(adaptador.limits.maxBufferSize / 1048576) | 0} MB, maxStorageBufferBindingSize=${(adaptador.limits.maxStorageBufferBindingSize / 1048576) | 0} MB`);
+    // aurora genera shaders WGSL en el momento: comprobar que el compilador de WGSL anda
+    if (dispositivo) {
+      const m = dispositivo.createShaderModule({ code: '@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i), 0.0, 0.0, 1.0); }' });
+      const info = await m.getCompilationInfo();
+      ok('obligatorio: compila shaders WGSL', !info.messages.some(x => x.type === 'error'), info.messages.map(x => x.message).join('; ') || 'sin errores');
+    }
+    ok('opcional: texturas comprimidas BC', adaptador.features.has('texture-compression-bc'), 'aurora la usa si está (menos memoria de GPU)');
+  }
+}
+
+// Memoria: la RAM de la Wii (~155 MB) + el programa (decenas a >100 MB) + archivos en caché → pedir 2 GB de techo.
+let mem = false;
+try { new WebAssembly.Memory({ initial: 1, maximum: 32768 }); mem = true; } catch (e) {}
+ok('obligatorio: memoria wasm de hasta 2 GB', mem);
+
+// Excepciones nativas de wasm: el runtime usa una excepción C++ para los accesos inválidos a memoria.
+ok('obligatorio: excepciones de WebAssembly', typeof WebAssembly.Tag === 'function', typeof WebAssembly.Tag === 'function' ? 'sí' : 'no');
+
+// ---------- rendimiento ----------
+// 60 fps: ¿la pantalla refresca a 60 o más? (se mide con requestAnimationFrame durante 1 s)
+// (con la pestaña oculta el navegador no dibuja cuadros: a los 2 s se rinde y lo dice, en vez de quedarse esperando)
+const hz = await new Promise(r => { let n = 0; const t0 = performance.now(); const paso = t => { n++; if (t - t0 < 1000) requestAnimationFrame(paso); else r(n * 1000 / (t - t0)); }; requestAnimationFrame(paso); setTimeout(() => r(null), 2000); });
+if (hz === null || document.hidden) nota('rendimiento: no se pudo medir el refresco (la pestaña no está a la vista)');
+else ok('rendimiento: la pantalla refresca a 60 Hz o más', hz >= 57, hz.toFixed(1) + ' Hz');
+nota(`núcleos: ${navigator.hardwareConcurrency || '?'} · memoria del equipo: ${navigator.deviceMemory ? navigator.deviceMemory + ' GB (aprox.)' : '?'}`);
+
+// ---------- controles ----------
+ok('controles: teclado', true, 'siempre');
+ok('controles: mandos (Gamepad API)', 'getGamepads' in navigator, 'conecta un mando y aprieta un botón: aparece abajo');
+const tactil = matchMedia('(any-pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+nota('pantalla táctil sin mouse (celular): ' + (tactil ? 'sí → se muestra el mando táctil' : 'no → sin mando táctil'));
+ok('opcional: inclinar el teléfono (DeviceOrientation)', 'DeviceOrientationEvent' in window, tactil ? 'para dirigir como el Wii Wheel' : 'en PC no aplica');
+ok('opcional: vibración del mando', 'vibrationActuator' in (Gamepad?.prototype || {}) || 'vibrate' in navigator, '');
+ok('opcional: pantalla completa', !!document.documentElement.requestFullscreen);
+
+// ---------- extras ----------
+ok('opcional: SharedArrayBuffer (página aislada)', !!window.crossOriginIsolated, window.crossOriginIsolated ? 'sí (servir.cjs manda COOP/COEP)' : 'no: sin COOP/COEP');
+ok('opcional: almacenamiento privado del origen (OPFS)', !!navigator.storage?.getDirectory, 'para partidas y caché grande');
+fin();
+
+// los mandos que se conecten después
+addEventListener('gamepadconnected', e => nota(`mando conectado: «${e.gamepad.id}» (${e.gamepad.buttons.length} botones, ${e.gamepad.axes.length} ejes, mapeo ${e.gamepad.mapping || 'no estándar'})`));
+</script>
+</body>
+</html>

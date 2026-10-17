@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco MKW</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<h1>Banco de pruebas · <span>Mario Kart Wii</span> + Retro Rewind</h1>
+<p>Cada prueba es una página suelta que muestra qué pasó. Aquí se ve el último resultado de cada una (guardado en
+  este navegador). Nada del juego vive aquí: los datos de prueba solo tienen la forma del juego.</p>
+<div class="caja">
+  <table>
+    <thead><tr><th>Prueba</th><th>Qué verifica</th><th>Fase</th><th>Último resultado</th></tr></thead>
+    <tbody id="tabla"></tbody>
+  </table>
+</div>
+<div class="caja"><button id="borrar">Borrar resultados guardados</button></div>
+<script>
+  // id → [página, qué verifica, fase del PLAN.md]
+  const PRUEBAS = {
+    capacidades: ['pruebas/capacidades.html', 'Si el navegador tiene lo que necesita el juego: JSPI, WebGPU, memoria, 60 Hz, mandos', '1'],
+    fibers:      ['pruebas/fibers/index.html', 'Los «hilos» del juego (fibers) cambiando de pila con JSPI, sin Asyncify', '1'],
+    excepciones: ['pruebas/excepciones/index.html', 'Excepciones C++ (-fwasm-exceptions) atrapadas por el hilo correcto entre fibers', '1'],
+    webgpu:      ['pruebas/webgpu/index.html', 'WebGPU desde C++ (emdawnwebgpu): esperas de aurora con JSPI, 60 fps, lectura de vuelta por cuadro', '1'],
+    fma:         ['pruebas/fma/index.html', 'Multiplicar y sumar exacto (fmadd/ps_madd) bit a bit contra musl, y más rápido', '1'],
+    paridad:     ['pruebas/paridad/index.html', 'La matemática real del runtime en wasm da los mismos bits que el build x86 (22 operaciones, NaN incluidos)', '1'],
+    sonido:      ['pruebas/sonido/index.html', 'Sonido: SDL3 pasa por el volumen y el medidor de la página, arranca bloqueado y se desbloquea con el primer toque, volumen, silencio, cortes (13 puntos; necesita un clic)', '3'],
+    guardado:    ['pruebas/guardado/index.html', 'Partidas guardadas con el MEMFS real de Emscripten: lo que el juego escribe llega solo a IndexedDB, vuelve al reabrir, paquete para descargar/cargar (y subir a Firebase) (15 puntos)', '3'],
+    controles:   ['pruebas/controles/index.html', 'Teclado, mandos (Gamepad API falsa), mando táctil e inclinación → mando de GameCube por puerto, sin el juego (28 puntos)', '3'],
+    salas:       ['pruebas/salas/index.html', 'Salas de Retro WFC en vivo con un servidor falso: MD5 (RFC 1321), código de amigo con su control (Tockdom), salas ordenadas, buscar amigo, sondeo solo con la pestaña a la vista (19 puntos)', '6'],
+    nube:        ['pruebas/nube/index.html', 'Partidas en la nube: dos navegadores y un Firebase Storage falso con las reglas del sitio: subir, bajar, sin cambios, sin conexión, conflictos con respaldo, permisos y tope (23 puntos)', '5'],
+    disco:       ['pruebas/disco/index.html', 'Caché del disco: bloques de 256 KB en Cache Storage, un pedido por tramo, nada se baja dos veces, versión nueva borra la vieja; bajar antes con un servidor lento: avisos del juego en paralelo, lectura seguida, tope de 12 pedidos, fila de prioridad baja (27 puntos)', '3'],
+    brsar:       ['pruebas/brsar/index.html', 'Grupos de sonido con un BRSAR falso: leer la tabla de grupos (formato de Tockdom), archivos rotos, y bajar el grupo entero apenas se lee dentro de él (9 puntos)', '3'],
+    pipelines:   ['pruebas/pipelines/index.html', 'Precalentar pipelines con un aurora falso: leer la semilla y la lista de este navegador, dejarlas para aurora, guardar solo si la lista creció o al esconder la pestaña, datos malos y IndexedDB bloqueado (14 puntos)', '3'],
+    thp:         ['pruebas/thp/index.html', 'Video THP con el decodificador nativo: cuadros falsos (JPEG estándar sin relleno 0xFF00) iguales a la IDCT exacta ±1, texturas en baldosas de 8×4, datos cortados/basura/no soportados, un cuadro de 672×736 en < 6 ms (8 puntos; Node: node banco/pruebas/thp/prueba-node.mjs)', '3'],
+    tactil:      ['node web/navegador/prueba-tactil.mjs', 'Mando táctil en un Pixel 7 emulado, parado y acostado: el recuadro ocupa la pantalla, de 80 % a 130 % ningún botón pisa a otro, toques reales por CDP con uno y dos dedos (16 puntos)', '3'],
+    // Las que usan el juego de verdad corren en Node (el .wasm del juego nunca se sirve desde el banco)
+    arranque:    ['node web/node/prueba-arranque.mjs', 'El juego + Retro Rewind arranca en Node sin pantalla: disco, OS, escenas, 60 fps, volcado de memoria (13 puntos)', '2'],
+    partidas:    ['node web/navegador/prueba-partidas.mjs', 'Con el juego de verdad: crear una licencia, recargar la página y que siga ahí (6 puntos)', '3'],
+    juego:       ['node web/navegador/prueba-navegador.mjs', 'El juego en Chrome con aurora real: WebGPU en el canvas, disco por HTTP Range, imagen, 60 fps, enganche al monitor, la tecla A llega y el juego responde, sonido desbloqueado, sin cortes y con la cola centrada (20 puntos). Para jugar: node web/navegador/servidor.mjs y abrir http://127.0.0.1:8140/', '3'],
+  };
+  const pinta = () => {
+    document.getElementById('tabla').innerHTML = Object.entries(PRUEBAS).map(([id, [url, que, fase]]) => {
+      let r = null; try { r = JSON.parse(localStorage.getItem('banco.' + id)); } catch (e) {}
+      const estado = !r ? '<span class="estado-nada">sin correr</span>'
+        : `<span class="${r.mal ? 'estado-mal' : 'estado-bien'}">${r.bien} bien, ${r.mal} mal</span><br><small>${new Date(r.cuando).toLocaleString()}</small>`;
+      const enlace = url.startsWith('node ') ? `${id}<br><small><code>${url}</code></small>` : `<a href="${url}">${id}</a>`;
+      const est = url.startsWith('node ') && !r ? '<span class="estado-nada">en Node (ver la terminal)</span>' : estado;
+      return `<tr><td>${enlace}</td><td>${que}</td><td>${fase}</td><td>${est}</td></tr>`;
+    }).join('');
+  };
+  document.getElementById('borrar').onclick = () => { Object.keys(PRUEBAS).forEach(id => localStorage.removeItem('banco.' + id)); pinta(); };
+  addEventListener('storage', pinta); addEventListener('focus', pinta);
+  pinta();
+</script>
+</body>
+</html>

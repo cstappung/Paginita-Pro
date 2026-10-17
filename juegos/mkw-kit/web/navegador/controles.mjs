@@ -1,0 +1,319 @@
+// Controles del juego en la página: teclado, mandos (Gamepad API) y celular (mando táctil + inclinar para dirigir).
+//
+// Resumen: el juego solo entiende mandos de GameCube (4 puertos). Este módulo junta todo lo que el jugador usa y,
+// una vez por refresco de pantalla, arma el estado de un mando de GameCube por puerto y se lo entrega al juego con
+// `enviar(puerto, conectado, botones, sx, sy, cx, cy, gl, gr)` (en la página real es Module._mkw_web_pad, ver
+// web/navegador/pad_web.cpp). No sabe nada del juego: por eso se prueba solo en el banco (banco/pruebas/controles).
+//
+//   - Teclado → puerto 1. Mapeo por defecto pensado para Mario Kart, cambiable y guardado en el navegador.
+//   - Mandos → el primero comparte el puerto 1 con el teclado; los siguientes van a los puertos 2, 3 y 4.
+//     Mapeo "standard" del navegador (Xbox/PlayStation/Switch Pro/genéricos), zona muerta, gatillos analógicos.
+//   - Táctil (celular) → puerto 1: stick a la izquierda y botones a la derecha, cada dedo por separado.
+//   - Inclinar el teléfono (como el Wii Wheel) → mueve el stick a izquierda/derecha del puerto 1 (opcional).
+//   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular.
+
+// ---- Botones de GameCube (los mismos bits que dolphin/pad.h) ----
+export const BOTON = {
+  izquierda: 0x0001, derecha: 0x0002, abajo: 0x0004, arriba: 0x0008,   // cruz (en MKW: truco = cruz arriba)
+  Z: 0x0010, R: 0x0020, L: 0x0040, A: 0x0100, B: 0x0200, X: 0x0400, Y: 0x0800, START: 0x1000,
+};
+
+// ---- Teclado: acción → teclas (KeyboardEvent.code: la tecla física, no la letra; así sirve en cualquier idioma) ----
+export const ACCIONES = [
+  // [id,            nombre que ve el jugador,             teclas por defecto]
+  ['stickArriba',    'Stick arriba',                       ['KeyW', 'ArrowUp']],
+  ['stickAbajo',     'Stick abajo',                        ['KeyS', 'ArrowDown']],
+  ['stickIzquierda', 'Stick izquierda (girar)',            ['KeyA', 'ArrowLeft']],
+  ['stickDerecha',   'Stick derecha (girar)',              ['KeyD', 'ArrowRight']],
+  ['A',              'A — acelerar / aceptar',             ['KeyK', 'Enter']],
+  ['B',              'B — frenar, marcha atrás / volver',  ['KeyJ', 'Backspace']],
+  ['R',              'R — derrapar / saltar',              ['KeyL', 'ShiftLeft']],
+  ['L',              'L — usar objeto',                    ['Space', 'KeyI']],
+  ['arriba',         'Cruz arriba — truco',                ['KeyT']],
+  ['abajo',          'Cruz abajo',                         ['KeyG']],
+  ['izquierda',      'Cruz izquierda',                     ['KeyF']],
+  ['derecha',        'Cruz derecha',                       ['KeyH']],
+  ['X',              'X — mirar atrás',                    ['KeyU']],
+  ['Y',              'Y',                                  ['KeyO']],
+  ['Z',              'Z',                                  ['KeyN']],
+  ['START',          'Start — pausa',                      ['KeyP', 'Escape']],
+];
+const CLAVE_TECLAS = 'mkw.teclas';
+const CLAVE_TACTIL = 'mkw.tactil';
+const leer = clave => { try { return JSON.parse(localStorage.getItem(clave)); } catch { return null; } };
+const guardar = (clave, valor) => { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {} };
+
+// ---- Mandos: botones del mapeo "standard" (https://w3c.github.io/gamepad/#remapping) → GameCube ----
+// 0 abajo (Xbox A / PS ✕) · 1 derecha (B / ○) · 2 izquierda (X / □) · 3 arriba (Y / △) · 4 LB · 5 RB · 6 LT · 7 RT
+// 8 Back · 9 Start · 10/11 clic de sticks · 12-15 cruz (arriba, abajo, izquierda, derecha)
+const MANDO_BOTONES = [
+  [0, BOTON.A], [1, BOTON.B], [2, BOTON.X], [3, BOTON.Y],
+  [4, BOTON.L], [5, BOTON.Z],                       // LB = objeto (L digital), RB = Z
+  [9, BOTON.START], [8, BOTON.START],
+  [12, BOTON.arriba], [13, BOTON.abajo], [14, BOTON.izquierda], [15, BOTON.derecha],
+];
+const ZONA_MUERTA = 0.15;   // un stick suelto nunca marca 0 exacto: por debajo del 15 % se toma como centro
+
+// stick del navegador (−1..1, +y = ABAJO) → stick de GameCube (−128..127, +y = ARRIBA), con zona muerta redonda
+function aStickGC(x, y) {
+  const r = Math.hypot(x, y);
+  if (r < ZONA_MUERTA) return [0, 0];
+  const k = Math.min(1, (r - ZONA_MUERTA) / (1 - ZONA_MUERTA)) / r;   // reescala para que siga llegando a 1
+  return [Math.round(x * k * 127), Math.round(-y * k * 127)];
+}
+const recorta = v => Math.max(-128, Math.min(127, Math.round(v)));
+
+export function crearControles({ enviar, objetivoTeclado = window, contenedorTactil = null, alCambiar = null } = {}) {
+  // --- estado de cada fuente ---
+  const teclasApretadas = new Set();              // KeyboardEvent.code de las teclas apretadas ahora
+  let teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def]));
+  Object.assign(teclas, leer(CLAVE_TECLAS) || {});   // lo que el jugador cambió
+  const tactil = { activo: false, sx: 0, sy: 0, botones: 0 };
+  const inclinacion = { activa: false, centro: null, x: 0 };
+  let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
+  const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
+  const ultimo = [];                              // lo último enviado por puerto (para no repetir)
+  const estado = { puertos: [], mandos: [] };     // para mostrar en pantalla y para las pruebas
+
+  // --- teclado ---
+  const teclasEnUso = () => new Set(Object.values(teclas).flat());
+  const alBajar = e => {
+    if (esperandoTecla) {                         // reasignando: esta tecla pasa a ser de esa acción
+      e.preventDefault();
+      if (e.code !== 'Escape') {
+        for (const id of Object.keys(teclas)) teclas[id] = teclas[id].filter(c => c !== e.code);   // sin repetidas
+        teclas[esperandoTecla] = [e.code];
+        guardar(CLAVE_TECLAS, teclas);
+      }
+      esperandoTecla = null;
+      alCambiar && alCambiar();
+      return;
+    }
+    if (teclasEnUso().has(e.code)) {
+      e.preventDefault();                         // que flechas y espacio no muevan la página
+      teclasApretadas.add(e.code);
+    }
+  };
+  const alSubir = e => teclasApretadas.delete(e.code);
+  const alPerderFoco = () => teclasApretadas.clear();   // si la ventana pierde el foco, se sueltan todas
+  objetivoTeclado.addEventListener('keydown', alBajar);
+  objetivoTeclado.addEventListener('keyup', alSubir);
+  window.addEventListener('blur', alPerderFoco);
+  const accion = id => teclas[id].some(c => teclasApretadas.has(c));
+
+  function leerTeclado() {
+    let botones = 0;
+    for (const [id] of ACCIONES) if (BOTON[id] && accion(id)) botones |= BOTON[id];
+    const sx = (accion('stickDerecha') ? 127 : 0) - (accion('stickIzquierda') ? 128 : 0);
+    const sy = (accion('stickArriba') ? 127 : 0) - (accion('stickAbajo') ? 128 : 0);
+    // el teclado no tiene gatillos analógicos: L o R apretados = gatillo a fondo (como el clic de la GameCube)
+    return { botones, sx, sy, gl: botones & BOTON.L ? 255 : 0, gr: botones & BOTON.R ? 255 : 0, activo: teclasApretadas.size > 0 };
+  }
+
+  // --- mandos (Gamepad API) ---
+  function leerMandos() {
+    const lista = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(Boolean);
+    for (const idx of [...puertosMando.keys()]) if (!lista.some(g => g.index === idx)) puertosMando.delete(idx);
+    for (const g of lista) {                      // un mando nuevo va al primer puerto libre
+      if (puertosMando.has(g.index)) continue;
+      const usados = new Set(puertosMando.values());
+      const libre = [0, 1, 2, 3].find(p => !usados.has(p));
+      if (libre !== undefined) puertosMando.set(g.index, libre);
+    }
+    return lista.map(g => {
+      let botones = 0;
+      for (const [i, bit] of MANDO_BOTONES) if (g.buttons[i] && g.buttons[i].pressed) botones |= bit;
+      const [sx, sy] = aStickGC(g.axes[0] || 0, g.axes[1] || 0);
+      const [cx, cy] = aStickGC(g.axes[2] || 0, g.axes[3] || 0);
+      const gl = Math.round(255 * ((g.buttons[6] && g.buttons[6].value) || 0));   // LT analógico → L
+      const gr = Math.round(255 * ((g.buttons[7] && g.buttons[7].value) || 0));   // RT analógico → R (derrapar)
+      if (gl > 128) botones |= BOTON.L;            // pasada la mitad, también cuenta el clic digital
+      if (gr > 128) botones |= BOTON.R;
+      const glFinal = g.buttons[4] && g.buttons[4].pressed ? 255 : gl;   // LB (digital) = L a fondo
+      return { puerto: puertosMando.get(g.index), nombre: g.id, botones, sx, sy, cx, cy, gl: glFinal, gr, mando: g };
+    });
+  }
+
+  // --- vibración: el juego la pide por puerto ---
+  const vibrando = new Set();
+  function vibrar(puerto, cmd) {
+    const on = cmd === 1;
+    if (on === vibrando.has(puerto)) return;
+    on ? vibrando.add(puerto) : vibrando.delete(puerto);
+    for (const m of leerMandos()) {
+      if (m.puerto !== puerto || !m.mando.vibrationActuator) continue;
+      if (on) m.mando.vibrationActuator.playEffect('dual-rumble', { duration: 5000, strongMagnitude: 0.8, weakMagnitude: 0.8 }).catch(() => {});
+      else m.mando.vibrationActuator.reset().catch(() => {});
+    }
+    if (puerto === 0 && tactil.activo && navigator.vibrate) navigator.vibrate(on ? 5000 : 0);
+  }
+
+  // --- inclinación (Wii Wheel): girar el teléfono acostado como un volante ---
+  const alInclinar = e => {
+    if (!inclinacion.activa || e.beta == null) return;
+    // con el teléfono horizontal, "beta" es el giro de volante; se mide respecto de la posición al activar
+    const angulo = screen.orientation && screen.orientation.angle === 270 ? -e.beta : e.beta;
+    if (inclinacion.centro === null) inclinacion.centro = angulo;
+    const grados = angulo - inclinacion.centro;
+    inclinacion.x = Math.abs(grados) < 3 ? 0 : recorta((grados / 35) * 127);   // 35° = giro a fondo
+  };
+  window.addEventListener('deviceorientation', alInclinar);
+
+  // --- mando táctil ---
+  let tactilUI = null;
+  const ajustesTactil = { esc: 1, opa: 1, ...(leer(CLAVE_TACTIL) || {}) };
+  if (contenedorTactil) { tactilUI = crearTactil(contenedorTactil, tactil); tactilUI.ajustar(ajustesTactil); }
+
+  // --- cada refresco: juntar todo y entregarlo ---
+  function paso() {
+    const kb = leerTeclado();
+    const mandos = leerMandos();
+    const puertos = [0, 1, 2, 3].map(p => ({ conectado: false, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0, fuentes: [] }));
+    const suma = (p, f, nombre) => {             // sumar una fuente a un puerto (botones con OR, sticks sumados)
+      const d = puertos[p];
+      d.conectado = true; d.fuentes.push(nombre);
+      d.botones |= f.botones || 0;
+      d.sx = recorta(d.sx + (f.sx || 0)); d.sy = recorta(d.sy + (f.sy || 0));
+      d.cx = recorta(d.cx + (f.cx || 0)); d.cy = recorta(d.cy + (f.cy || 0));
+      d.gl = Math.max(d.gl, f.gl || 0); d.gr = Math.max(d.gr, f.gr || 0);
+    };
+    suma(0, kb, 'teclado');                       // el puerto 1 siempre está conectado (teclado)
+    for (const m of mandos) if (m.puerto !== undefined) suma(m.puerto, m, m.nombre);
+    if (tactil.activo) suma(0, { ...tactil, gl: tactil.botones & BOTON.L ? 255 : 0, gr: tactil.botones & BOTON.R ? 255 : 0 }, 'táctil');
+    if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
+    puertos.forEach((d, p) => {
+      const firma = [d.conectado, d.botones, d.sx, d.sy, d.cx, d.cy, d.gl, d.gr].join();
+      if (firma === ultimo[p]) return;            // sin cambios: no hace falta volver a mandarlo
+      ultimo[p] = firma;
+      enviar(p, d.conectado ? 1 : 0, d.botones, d.sx, d.sy, d.cx, d.cy, d.gl, d.gr);
+    });
+    estado.puertos = puertos;
+    estado.mandos = mandos.map(({ mando, ...resto }) => resto);
+    if (tactilUI) tactilUI.pinta();
+  }
+  let vivo = true;
+  const bucle = () => { if (!vivo) return; paso(); requestAnimationFrame(bucle); };
+  requestAnimationFrame(bucle);
+
+  return {
+    estado, teclas, vibrar, paso,
+    reenviar() { ultimo.length = 0; },                           // volver a mandar todo (p. ej. al arrancar el juego)
+    reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
+    esperando: () => esperandoTecla,
+    restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },
+    teclasDe: id => teclas[id],
+    tactil(activar) { tactil.activo = activar; if (tactilUI) tactilUI.mostrar(activar); },
+    // Tamaño (0,8–1,3) y opacidad (0,3–1) del mando táctil, guardados en el navegador ("mkw.tactil")
+    ajustesTactil: () => ({ ...ajustesTactil }),
+    ajustarTactil(cambios) {
+      Object.assign(ajustesTactil, cambios);
+      ajustesTactil.esc = Math.min(1.3, Math.max(0.8, Number(ajustesTactil.esc) || 1));
+      ajustesTactil.opa = Math.min(1, Math.max(0.3, Number(ajustesTactil.opa) || 1));
+      guardar(CLAVE_TACTIL, ajustesTactil);
+      if (tactilUI) tactilUI.ajustar(ajustesTactil);
+    },
+    async inclinar(activar) {
+      // Android: funciona directo. (iPhone pide permiso, pero el juego no corre en iPhone.)
+      inclinacion.activa = activar; inclinacion.centro = null; inclinacion.x = 0;
+    },
+    detener() { vivo = false; objetivoTeclado.removeEventListener('keydown', alBajar); objetivoTeclado.removeEventListener('keyup', alSubir); },
+  };
+}
+
+// ---- Mando táctil: stick (izquierda) + botones (derecha), multitáctil con Pointer Events ----
+// Cada dedo se sigue por su pointerId: un dedo en el stick y otro en A funcionan a la vez. Los botones se "re-miden"
+// en cada movimiento (un dedo que se desliza de A a R suelta A y aprieta R), como el mando táctil de BT3.
+// Todo se mide en "cqmin" = 1 % del lado MÁS CORTO del recuadro: así los botones tienen el mismo tamaño con el
+// teléfono acostado o parado (con % del ancho, acostado el stick salía más alto que media pantalla).
+// Medidas comprobadas con prueba-tactil.mjs (Pixel 7 parado y acostado, tamaños 80–130 %): ninguno pisa a otro, todos
+// caben y miden ≥ 44 px. A la derecha ocupan 42 cqmin de ancho: acostado es justo la franja negra al lado de la imagen.
+const BOTONES_TACTILES = [
+  // [texto, bit, posición (desde la esquina inferior derecha, o superior derecha si dice top), tamaño, ¿fijo?]
+  ['A', BOTON.A, { right: 4, bottom: 18 }, 20],          // acelerar: el más grande, bajo el pulgar
+  ['B', BOTON.B, { right: 26, bottom: 4 }, 16],          // frenar / marcha atrás
+  ['R', BOTON.R, { right: 4, bottom: 42 }, 16],          // saltar / derrapar
+  ['L', BOTON.L, { right: 26, bottom: 26 }, 16],         // usar objeto
+  ['↑', BOTON.arriba, { right: 26, bottom: 46 }, 14],    // truco (cruz arriba)
+  ['▶', BOTON.START, { right: 4, top: 4 }, 11, true],    // pausa: arriba a la derecha y de tamaño fijo (no cambia con el deslizador)
+];
+function crearTactil(contenedor, tactil) {
+  const capa = document.createElement('div');
+  capa.className = 'mkw-tactil';
+  // --esc (tamaño, 1 = normal) y la opacidad se ajustan desde la página (ajustar()); todo se mide en % del recuadro
+  capa.style.cssText = 'position:absolute;inset:0;touch-action:none;user-select:none;display:none;z-index:5;--esc:1;' +
+                       'container-type:size';      // para que cqmin mida este recuadro
+  const base = document.createElement('div');   // el aro del stick
+  base.style.cssText = 'position:absolute;left:4cqmin;bottom:8cqmin;width:calc(30cqmin * var(--esc));aspect-ratio:1;border-radius:50%;' +
+                       'background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35)';
+  const perilla = document.createElement('div');
+  perilla.style.cssText = 'position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;background:rgba(255,255,255,.45)';
+  base.append(perilla);
+  capa.append(base);
+  const botones = BOTONES_TACTILES.map(([texto, bit, pos, tam, fijo]) => {
+    const b = document.createElement('div');
+    b.textContent = texto;
+    b.dataset.bit = bit;
+    // la posición se corre con el tamaño (los botones crecen hacia el centro, sin salirse por el borde)
+    const esc = fijo ? '1' : 'var(--esc)';        // el de pausa no cambia de tamaño
+    const vertical = pos.top !== undefined ? `top:calc(${pos.top}cqmin * ${esc})` : `bottom:calc(${pos.bottom}cqmin * ${esc})`;
+    b.style.cssText = `position:absolute;right:calc(${pos.right}cqmin * ${esc});${vertical};` +
+      `height:calc(${tam}cqmin * ${esc});aspect-ratio:1;` +
+      'border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 18px system-ui;color:#fff;' +
+      'background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.4)';
+    capa.append(b);
+    return b;
+  });
+  contenedor.style.position = contenedor.style.position || 'relative';
+  contenedor.append(capa);
+
+  const dedos = new Map();                         // pointerId → { stick: bool, x, y }
+  const dentro = (el, x, y) => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+  const recalcula = () => {
+    let bits = 0, sx = 0, sy = 0;
+    for (const d of dedos.values()) {
+      if (d.stick) {                               // distancia al centro del aro, normalizada a su radio
+        const r = base.getBoundingClientRect();
+        const nx = (d.x - (r.left + r.width / 2)) / (r.width / 2);
+        const ny = (d.y - (r.top + r.height / 2)) / (r.height / 2);
+        [sx, sy] = aStickGC(Math.max(-1, Math.min(1, nx)), Math.max(-1, Math.min(1, ny)));
+      } else {
+        for (const b of botones) if (dentro(b, d.x, d.y)) bits |= Number(b.dataset.bit);
+      }
+    }
+    tactil.botones = bits; tactil.sx = sx; tactil.sy = sy;
+  };
+  capa.addEventListener('pointerdown', e => {
+    try { capa.setPointerCapture(e.pointerId); } catch {}   // (los toques simulados de las pruebas no se pueden "capturar")
+    // un dedo es del stick si cae en el aro o en la zona de la izquierda (hasta el borde derecho del aro + un poco)
+    const aro = base.getBoundingClientRect();
+    // (salvo que caiga justo sobre un botón: con el tamaño grande, B queda cerca de esa zona)
+    const enBoton = botones.some(b => dentro(b, e.clientX, e.clientY));
+    dedos.set(e.pointerId, { stick: !enBoton && (dentro(base, e.clientX, e.clientY) || e.clientX < aro.right + aro.width * 0.25),
+                             x: e.clientX, y: e.clientY });
+    recalcula();
+  });
+  capa.addEventListener('pointermove', e => { const d = dedos.get(e.pointerId); if (d) { d.x = e.clientX; d.y = e.clientY; recalcula(); } });
+  const suelta = e => { dedos.delete(e.pointerId); recalcula(); };
+  capa.addEventListener('pointerup', suelta);
+  capa.addEventListener('pointercancel', suelta);
+
+  return {
+    mostrar(si) { capa.style.display = si ? 'block' : 'none'; if (!si) { dedos.clear(); recalcula(); } },
+    ajustar({ esc, opa }) { capa.style.setProperty('--esc', String(esc)); capa.style.opacity = String(opa); },
+    pinta() {                                      // la perilla sigue al dedo; los botones apretados se iluminan
+      perilla.style.transform = `translate(${(tactil.sx / 127) * 60}%, ${(-tactil.sy / 127) * 60}%)`;
+      for (const b of botones) b.style.background = tactil.botones & Number(b.dataset.bit) ? 'rgba(228,0,43,.6)' : 'rgba(255,255,255,.18)';
+    },
+    capa, base, botones,
+  };
+}
+
+// Nombre legible de una tecla (KeyboardEvent.code → texto corto)
+export function nombreTecla(code) {
+  const especiales = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Espacio', Enter: 'Enter',
+                       Backspace: 'Retroceso', ShiftLeft: 'Shift izq.', ShiftRight: 'Shift der.', Escape: 'Esc', Tab: 'Tab' };
+  if (especiales[code]) return especiales[code];
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return code;
+}

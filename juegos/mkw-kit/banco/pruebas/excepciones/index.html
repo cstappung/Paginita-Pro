@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Excepciones entre fibers</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Excepciones C++ cruzando <span>los hilos del juego</span></h1>
+<p>El runtime de WiiCompiled lanza una excepción cuando el juego toca memoria inválida, y la atrapa el hilo que la
+  lanzó. Con los hilos hechos sobre JSPI, cada hilo es otra pila de wasm: aquí se comprueba que cada excepción la
+  atrapa el <code>try</code> correcto aunque otros hilos estén suspendidos dentro de su propio <code>try</code>.</p>
+<div class="caja"><div id="resumen">corriendo…</div><ul id="resultados"></ul></div>
+<div class="caja">Compilado con <code>-fwasm-exceptions</code> (excepciones nativas de WebAssembly, las que usará el
+  juego). Código: <code>banco/pruebas/excepciones/excepciones.cpp</code>.</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { correExcepciones } from './prueba.mjs';
+const { ok, nota, fin } = prueba('excepciones', 'Excepciones entre fibers');
+if (!('Suspending' in WebAssembly)) { ok('el navegador tiene JSPI', false); fin(); }
+else {
+  const crea = (await import('./excepciones.js')).default;
+  const { r } = await correExcepciones(crea, ok);
+  nota('registro: ' + r.join(' '));
+  fin();
+}
+</script>
+</body>
+</html>

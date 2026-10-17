@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGPU desde C++</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>#lienzo{width:100%;max-width:640px;aspect-ratio:640/528;display:block;border-radius:8px;background:#000;margin:0 0 12px}</style>
+</head>
+<body>
+<h1>WebGPU desde C++ con <span>las esperas de aurora</span></h1>
+<p>aurora (el renderizador de WiiCompiled) espera a la GPU de forma bloqueante en tres lugares: al pedir el
+  adaptador, al pedir el dispositivo y, en cada cuadro, al leer píxeles de vuelta a la RAM (la copia de EFB). Aquí
+  las mismas llamadas (<code>Instance::WaitAny</code>) suspenden el programa con JSPI, y un bucle «infinito» como el
+  del juego dibuja 180 cuadros cediendo el control al final de cada uno.</p>
+<canvas id="lienzo" width="640" height="528"></canvas>
+<div class="caja"><div id="resumen">corriendo…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>Qué significa:</b> si llega a los 180 cuadros a ~60 fps con la lectura de vuelta en cada uno,
+  el modelo de aurora (esperar a la GPU en medio del cuadro) sirve en el navegador sin reescribirlo. La lectura de
+  vuelta tiene que caber holgada en un cuadro (16,7 ms). Código: <code>banco/pruebas/webgpu/webgpu.cpp</code>.</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('webgpu', 'WebGPU desde C++');
+if (!('Suspending' in WebAssembly) || !navigator.gpu) { ok('JSPI y WebGPU disponibles', false); fin(); }
+else {
+  const oculta = document.hidden;
+  const crea = (await import('./webgpu.js')).default;
+  const M = await crea({ print: t => nota('[wasm] ' + t), printErr: t => nota('[wasm err] ' + t) });
+  try { await M.callMain([]); } catch (e) { nota('excepción: ' + e.message); }
+  const paso = M._paso(), err = M.UTF8ToString(M._error());
+  ok('adaptador pedido con WaitAny (suspendido por JSPI)', paso >= 1, err);
+  ok('dispositivo pedido con WaitAny', paso >= 2);
+  ok('superficie sobre el <canvas> a 640×528', paso >= 3);
+  ok('pipeline con shader WGSL compilado en el momento', paso >= 4);
+  ok('180 cuadros desde un bucle que cede al final de cada uno', paso >= 5 && M._cuadros() === 180, M._cuadros() + ' cuadros');
+  const fps = M._cuadros() / (M._ms_total() / 1000);
+  if (oculta) nota(`la pestaña estaba oculta: sin cuadros de pantalla, se esperó 16 ms por cuadro (${fps.toFixed(1)} «fps»)`);
+  else ok('a ~60 fps', fps >= 55, fps.toFixed(1) + ' fps');
+  ok('lectura de vuelta de la GPU en cada cuadro (MapAsync + WaitAny)', M._lecturas() === 180, M._lecturas() + ' lecturas');
+  ok('el color leído es el dibujado (rojo 228,0,43)', M._lecturas_bien() === 180, M._lecturas_bien() + ' de ' + M._lecturas());
+  ok('la lectura de vuelta cabe en un cuadro (< 8 ms)', M._ms_lectura() < 8, M._ms_lectura().toFixed(2) + ' ms de media');
+  ok('sin errores de GPU', !err, err || 'ninguno');
+  fin();
+}
+</script>
+</body>
+</html>

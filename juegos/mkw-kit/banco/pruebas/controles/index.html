@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controles del juego</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>#pantalla{position:relative;width:100%;max-width:640px;aspect-ratio:640/528;background:#223;border-radius:8px}</style>
+</head>
+<body>
+<h1>Controles: <span>teclado, mandos y celular</span></h1>
+<p>Prueba el módulo de controles de la página (<code>web/navegador/controles.mjs</code>) <b>sin el juego</b>: en vez del
+  juego hay un "juego falso" que anota el mando de GameCube que recibe cada puerto. Se simulan teclas, mandos falsos
+  (Gamepad API de mentira), toques en el mando táctil y la inclinación del teléfono.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>El mando táctil</b> (el de la prueba, sobre un rectángulo del tamaño del juego):
+  <div id="pantalla"></div></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearControles, BOTON } from '/web/navegador/controles.mjs';
+
+const { ok, nota, fin } = prueba('controles', 'Controles (sin el juego)');
+try { localStorage.removeItem('mkw.teclas'); } catch {}      // empezar con el mapeo por defecto
+
+// ---- "juego falso": guarda lo último que recibió cada puerto ----
+const recibido = [];
+const enviar = (puerto, conectado, botones, sx, sy, cx, cy, gl, gr) => { recibido[puerto] = { conectado, botones, sx, sy, cx, cy, gl, gr }; };
+
+// ---- mandos falsos: se reemplaza navigator.getGamepads por una lista que la prueba controla ----
+const mandosFalsos = [];
+const efectos = [];                                          // vibraciones pedidas a los mandos falsos
+navigator.getGamepads = () => mandosFalsos;
+const mandoFalso = (index, id) => ({
+  index, id, mapping: 'standard', connected: true,
+  axes: [0, 0, 0, 0],
+  buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+  vibrationActuator: { playEffect: (tipo, o) => { efectos.push(['vibra', index, tipo]); return Promise.resolve(); },
+                       reset: () => { efectos.push(['para', index]); return Promise.resolve(); } },
+});
+
+const c = crearControles({ enviar, contenedorTactil: document.getElementById('pantalla') });
+const tecla = (tipo, code) => { const e = new KeyboardEvent(tipo, { code, bubbles: true, cancelable: true }); window.dispatchEvent(e); return e; };
+const p0 = () => (c.paso(), recibido[0]);
+
+// ---- 1) teclado ----
+ok('el puerto 1 está conectado aunque no se toque nada', p0().conectado === 1);
+c.paso();
+ok('los puertos 2 a 4 empiezan desconectados', [1, 2, 3].every(p => !recibido[p] || recibido[p].conectado === 0));
+tecla('keydown', 'KeyK');
+ok('tecla K → botón A', (p0().botones & BOTON.A) !== 0, `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'KeyK');
+ok('al soltar K se suelta A', (p0().botones & BOTON.A) === 0);
+tecla('keydown', 'KeyA');
+ok('tecla A (izquierda) → stick a fondo a la izquierda', p0().sx === -128 && recibido[0].sy === 0, `sx ${recibido[0].sx}`);
+tecla('keyup', 'KeyA'); tecla('keydown', 'KeyW'); tecla('keydown', 'KeyD');
+ok('W + D → stick arriba y a la derecha', p0().sx === 127 && recibido[0].sy === 127);
+tecla('keyup', 'KeyW'); tecla('keyup', 'KeyD');
+tecla('keydown', 'KeyL');
+ok('tecla L → R (derrapar) con el gatillo analógico a fondo', (p0().botones & BOTON.R) !== 0 && recibido[0].gr === 255);
+tecla('keyup', 'KeyL');
+const flecha = tecla('keydown', 'ArrowUp'); tecla('keyup', 'ArrowUp');
+ok('las flechas no mueven la página (preventDefault)', flecha.defaultPrevented);
+const otra = tecla('keydown', 'F5'); tecla('keyup', 'F5');
+ok('una tecla sin uso (F5) sigue funcionando para el navegador', !otra.defaultPrevented);
+
+// ---- 2) cambiar una tecla ----
+c.reasignar('A');
+tecla('keydown', 'KeyM'); tecla('keyup', 'KeyM');
+tecla('keydown', 'KeyM');
+ok('reasignar A a la tecla M', (p0().botones & BOTON.A) !== 0 && c.teclasDe('A').join() === 'KeyM');
+tecla('keyup', 'KeyM');
+let guardado = null; try { guardado = JSON.parse(localStorage.getItem('mkw.teclas')); } catch {}
+ok('el cambio queda guardado en el navegador', guardado && guardado.A && guardado.A[0] === 'KeyM');
+c.restaurarTeclas();
+tecla('keydown', 'KeyK');
+ok('restaurar el mapeo por defecto (K vuelve a ser A)', (p0().botones & BOTON.A) !== 0);
+tecla('keyup', 'KeyK');
+
+// ---- 3) mandos ----
+const m1 = mandoFalso(0, 'Mando falso Xbox (STANDARD GAMEPAD)');
+mandosFalsos.push(m1);
+m1.buttons[0] = { pressed: true, value: 1 };             // botón de abajo (Xbox A)
+m1.axes = [1, -1, 0, 0];                                // stick a la derecha y arriba (en el navegador, −1 = arriba)
+m1.buttons[7] = { pressed: true, value: 0.8 };          // RT al 80 %
+let r = p0();
+ok('mando 1 → puerto 1: botón A', (r.botones & BOTON.A) !== 0);
+ok('mando 1: stick arriba-derecha (con +y arriba como en la GameCube)', r.sx > 80 && r.sy > 80, `sx ${r.sx}, sy ${r.sy}`);
+ok('mando 1: gatillo RT analógico → R (204 de 255) y su clic digital', r.gr === 204 && (r.botones & BOTON.R) !== 0, `gr ${r.gr}`);
+m1.axes = [0.1, 0.08, 0, 0];
+ok('zona muerta: un stick casi suelto marca centro', p0().sx === 0 && recibido[0].sy === 0);
+m1.axes = [0, 0, -1, 0];
+ok('stick derecho del mando → stick C', p0().cx === -127, `cx ${recibido[0].cx}`);
+const m2 = mandoFalso(1, 'Mando falso PlayStation');
+mandosFalsos.push(m2);
+m2.buttons[1] = { pressed: true, value: 1 };            // botón derecho (PS ○) → B
+c.paso();
+ok('un segundo mando va al puerto 2', recibido[1] && recibido[1].conectado === 1 && (recibido[1].botones & BOTON.B) !== 0);
+mandosFalsos.splice(1, 1);
+c.paso();
+ok('al desconectarlo, el puerto 2 queda desconectado', recibido[1].conectado === 0);
+c.vibrar(0, 1);
+c.vibrar(0, 0);
+ok('vibración: el juego la pide y llega al mando del puerto 1 (vibra y para)',
+   efectos.some(e => e[0] === 'vibra' && e[1] === 0) && efectos.some(e => e[0] === 'para' && e[1] === 0), JSON.stringify(efectos));
+mandosFalsos.length = 0;
+c.paso();
+
+// ---- 4) mando táctil ----
+c.tactil(true);
+const centro = el => { const b = el.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+const toque = (tipo, el, id, dx = 0, dy = 0) => {
+  const [x, y] = el instanceof Element ? centro(el) : el;
+  document.querySelector('.mkw-tactil').dispatchEvent(new PointerEvent(tipo, { pointerId: id, clientX: x + dx, clientY: y + dy, bubbles: true, pointerType: 'touch' }));
+};
+const ui = document.querySelector('.mkw-tactil');
+const botonTactil = texto => [...ui.children].find(e => e.textContent === texto);
+toque('pointerdown', botonTactil('A'), 11);
+ok('táctil: tocar A → botón A', (p0().botones & BOTON.A) !== 0);
+const aro = ui.children[0];
+const ancho = aro.getBoundingClientRect().width;
+toque('pointerdown', aro, 12, ancho * 0.45, 0);
+r = p0();
+ok('táctil: un segundo dedo en el stick (a la derecha) mientras A sigue apretado', r.sx > 90 && (r.botones & BOTON.A) !== 0, `sx ${r.sx}`);
+toque('pointermove', botonTactil('R'), 11);
+r = p0();
+ok('táctil: deslizar el dedo de A a R suelta A y aprieta R', (r.botones & BOTON.A) === 0 && (r.botones & BOTON.R) !== 0);
+toque('pointerup', botonTactil('R'), 11); toque('pointerup', aro, 12);
+r = p0();
+ok('táctil: al levantar los dedos se suelta todo', r.botones === 0 && r.sx === 0);
+c.tactil(false);
+
+// ---- 5) inclinar para dirigir ----
+await c.inclinar(true);
+const inclina = beta => window.dispatchEvent(Object.assign(new Event('deviceorientation'), { beta, gamma: 0, alpha: 0 }));
+inclina(10);                                              // posición al activar = centro
+ok('inclinación: la posición al activar es el centro', p0().sx === 0);
+inclina(27.5);                                            // 17,5° de giro = medio volante
+ok('inclinación: girar 17,5° → stick a la mitad', Math.abs(p0().sx - 64) <= 1, `sx ${recibido[0].sx}`);
+inclina(10 + 50);
+ok('inclinación: girar de más no pasa del tope', p0().sx === 127);
+await c.inclinar(false);
+ok('inclinación apagada: el stick vuelve al centro', p0().sx === 0);
+
+c.restaurarTeclas();
+nota('teclas por defecto: stick WASD/flechas · A = K/Enter · B = J/Retroceso · R = L/Shift · L = Espacio/I · truco = T · Start = P/Esc');
+fin();
+</script>
+</body>
+</html>
