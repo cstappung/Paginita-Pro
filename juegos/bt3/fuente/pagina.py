@@ -238,6 +238,85 @@ cambia('</style>', '''  body.started .i18n-flota { display: none; }
   #ajustePad button[data-x="listo"] { background: #ffb21e; border-color: #ffb21e; color: #2a0d00; }
 </style>''')
 
+# ---- los controles táctiles: más grandes por defecto, y la ventana de Ajustes sin nada encima ----
+# El dueño pidió botones más grandes de fábrica. Misma idea que el fork (dos columnas a los lados de la imagen en
+# horizontal, todo bajo la imagen en vertical), con cada botón más grande: en horizontal la cara pasa de 11 a 15 (de
+# --u), la cruceta de 9 a 12 y el stick de 32 a 36; en vertical la cara de 20 a 25, la cruceta de 15 a 18 y el stick
+# de 52 a 60. Los botones de la cara y la cruceta pueden entrar un poco en la imagen en los celulares más angostos
+# (sus columnas miden ~36 --u). Sin choques entre ellos: banco, choques.cjs. Cada botón se puede además mover y
+# agrandar a mano (✏️ en el panel 🎮, pagina.js).
+# Mientras la ventana de Ajustes del juego está abierta (Module.onAjustes, parche: ui.cpp) se ocultan los controles y
+# la barra: tapaban la ventana y se comían sus toques; «✕ Cerrar ajustes» abajo al centro la cierra.
+cambia('</style>', """  @media (orientation: landscape) {
+    #pad .sh { width: calc(var(--u) * 17); height: calc(var(--u) * 11); }
+    #pad .l2, #pad .r2 { top: calc(var(--st) + var(--u) * 2); }
+    #pad .l1, #pad .r1 { top: calc(var(--st) + var(--u) * 14); }
+    #pad .sm { width: calc(var(--u) * 12); height: calc(var(--u) * 8); font-size: calc(var(--u) * 3.2); }
+    #pad .select { left: calc(var(--fl) + var(--u) * 21); top: calc(var(--st) + var(--u) * 3.5); }
+    #pad .l3 { left: calc(var(--fl) + var(--u) * 21); top: calc(var(--st) + var(--u) * 15.5); }
+    #pad .start { right: calc(var(--fr) + var(--u) * 21); top: calc(var(--st) + var(--u) * 3.5); }
+    #pad .r3 { right: calc(var(--fr) + var(--u) * 21); top: calc(var(--st) + var(--u) * 15.5); }
+    #pad .dp { width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
+    #pad .dp.up { left: calc(var(--fl) + var(--u) * 14); top: calc(var(--st) + var(--u) * 26); }
+    #pad .dp.left { left: calc(var(--fl) + var(--u) * 2); top: calc(var(--st) + var(--u) * 38); }
+    #pad .dp.right { left: calc(var(--fl) + var(--u) * 26); top: calc(var(--st) + var(--u) * 38); }
+    #pad .dp.down { left: calc(var(--fl) + var(--u) * 14); top: calc(var(--st) + var(--u) * 50); }
+    #pad .stick { width: calc(var(--u) * 35); height: calc(var(--u) * 35); left: calc(var(--el) + var(--u) * 2); bottom: calc(var(--sb) + var(--u) * 1); }
+    #pad .face { width: calc(var(--u) * 15); height: calc(var(--u) * 15); }
+    #pad .face.tri { right: calc(var(--er) + var(--u) * 16.5); bottom: calc(var(--sb) + var(--u) * 34); }
+    #pad .face.cro { right: calc(var(--er) + var(--u) * 16.5); bottom: calc(var(--sb) + var(--u) * 2); }
+    #pad .face.cir { right: calc(var(--er) + var(--u) * 1); bottom: calc(var(--sb) + var(--u) * 18); }
+    #pad .face.squ { right: calc(var(--er) + var(--u) * 32); bottom: calc(var(--sb) + var(--u) * 18); }
+    #pad .hide { right: calc(var(--fr) + var(--u) * 2); top: calc(var(--st) + var(--u) * 27); }
+  }
+  @media (orientation: portrait) {
+    #pad .stick { left: calc(var(--u) * 4); bottom: calc(var(--sb) + var(--u) * 20); width: calc(var(--u) * 60); height: calc(var(--u) * 60); }
+    #pad .face { width: calc(var(--u) * 25); height: calc(var(--u) * 25); }
+    #pad .face.tri { right: calc(var(--u) * 27.5); bottom: calc(var(--sb) + var(--u) * 61.5); }
+    #pad .face.cro { right: calc(var(--u) * 27.5); bottom: calc(var(--sb) + var(--u) * 9.5); }
+    #pad .face.cir { right: calc(var(--u) * 1.5); bottom: calc(var(--sb) + var(--u) * 35.5); }
+    #pad .face.squ { right: calc(var(--u) * 53.5); bottom: calc(var(--sb) + var(--u) * 35.5); }
+    #pad .dp { width: calc(var(--u) * 18); height: calc(var(--u) * 18); }
+    #pad .dp.up { left: calc(var(--u) * 25); bottom: calc(var(--sb) + var(--u) * 127); }
+    #pad .dp.down { left: calc(var(--u) * 25); bottom: calc(var(--sb) + var(--u) * 91); }
+    #pad .dp.left { left: calc(var(--u) * 7); bottom: calc(var(--sb) + var(--u) * 109); }
+    #pad .dp.right { left: calc(var(--u) * 43); bottom: calc(var(--sb) + var(--u) * 109); }
+    #pad .sh { width: calc(var(--u) * 26); height: calc(var(--u) * 15); }
+    #pad .l2 { left: calc(var(--u) * 4); } #pad .l1 { left: calc(var(--u) * 33); }
+    #pad .r1 { right: calc(var(--u) * 33); } #pad .r2 { right: calc(var(--u) * 4); }
+    #pad .sm { width: calc(var(--u) * 22); height: calc(var(--u) * 11); font-size: calc(var(--u) * 4.2); }
+    #pad .select { left: calc(50% - var(--u) * 24); bottom: calc(var(--sb) + var(--u) * 4); }
+    #pad .start { left: calc(50% + var(--u) * 2); bottom: calc(var(--sb) + var(--u) * 4); }
+    #pad .l3 { left: calc(50% - var(--u) * 24); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 24); }
+    #pad .r3 { left: calc(50% + var(--u) * 2); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 24); }
+    #pad .hide { left: calc(50% - var(--u) * 11); top: calc(var(--st) + min(var(--vw, 1vw) * 75, var(--vh, 1vh) * 52) + var(--u) * 39);
+      width: calc(var(--u) * 22); }
+  }
+  /* la ventana de Ajustes del juego abierta: nada encima (ni se come sus toques) */
+  body.ajustes-abiertos #pad, body.ajustes-abiertos #show, body.ajustes-abiertos #vetos, body.ajustes-abiertos #hud,
+  body.ajustes-abiertos #activaSonido, body.coarse.ajustes-abiertos #barra, body.coarse.ajustes-abiertos #menuTactil { display: none !important; }
+  #cierraAjustes { display: none; }
+  body.coarse.ajustes-abiertos #cierraAjustes { display: block; position: fixed; z-index: 9; left: 50%; bottom: calc(var(--sb) + 10px);
+    translate: -50% 0; padding: 10px 18px; border-radius: 12px; border: 2px solid #ffd21f; background: #0c1a42f2; color: #ffd21f;
+    font: 700 16px system-ui, sans-serif; box-shadow: 0 8px 30px #000a; }
+  /* ✏️ mover y agrandar cada control (pagina.js) */
+  #editaPad, #editaBarra { display: none; }
+  body.editando-pad #editaPad { display: block; position: fixed; inset: 0; z-index: 5; touch-action: none; }
+  body.editando-pad #pad { opacity: 1; }
+  body.editando-pad #pad .b, body.editando-pad #pad .stick { outline: 2px dashed #ffffffa0; outline-offset: 1px; }
+  body.editando-pad #pad .sel { outline: 3px solid #ffb21e; background: rgba(255,178,30,.4); }
+  body.editando-pad #barra, body.editando-pad #menuTactil { display: none !important; }
+  body.editando-pad #editaBarra { display: flex; position: fixed; z-index: 9; left: 50%; top: calc(var(--st) + 6px); translate: -50% 0;
+    flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; max-width: calc(100vw - 16px); padding: 8px 10px;
+    border-radius: 12px; border: 2px solid #2c4a98; background: #0c1a42f0; color: #e8eaf6; font: 13px/1.3 system-ui, sans-serif;
+    box-shadow: 0 8px 30px #000a; }
+  #editaBarra span { flex-basis: 100%; text-align: center; }
+  #editaBarra button { min-width: 40px; padding: 7px 10px; border-radius: 8px; border: 1px solid #2f4d9c; background: #16306e; color: #fff;
+    font: 700 15px system-ui, sans-serif; }
+  #editaBarra button:disabled { opacity: .4; }
+  #editaBarra button[data-e="listo"] { background: #ffb21e; border-color: #ffb21e; color: #2a0d00; }
+</style>""")
+
 # ---- deslizar con el dedo: en todo el inicio, no solo en la tarjeta ----
 # El fork bloquea el arrastre con el dedo (touchmove) en toda la página salvo en `.card`, para que el juego no se
 # mueva ni haga zoom. Pero los modos (pagina.js, 2b) van fuera de la tarjeta: se bajaba arrastrando sobre ella y,
