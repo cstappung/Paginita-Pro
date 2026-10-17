@@ -218,6 +218,8 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     entrar, salir, envia, enviaBin, revisa,
     activa: () => !!sesion,
     sano: u => sanoX(pares.get(u)),
+    // en qué quedó la conexión con `u` (para explicar por qué no conectó): null si nunca hubo par
+    detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || "", ice: x.pc.iceConnectionState || "", dc: x.dc.readyState, abrio: x.abrio } : null; },
     presentes: () => [...presentes.keys()],
     conectados: () => [...pares].filter(([, x]) => sanoX(x)).map(([u]) => u),
   };
