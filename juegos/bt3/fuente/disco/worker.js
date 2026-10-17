@@ -30,6 +30,8 @@
      AMIGOS        correos de Google (o uids de Firebase) con acceso, separados por comas (el tuyo incluido)
      CLAVE_SUBIDA  secreto: la clave para subir la ISO (largo, al azar)
      ORIGENES      opcional: orígenes permitidos, separados por comas (por defecto el sitio)
+     TURN_ID       opcional: el «Turn Token ID» de Cloudflare Realtime → TURN (el relevo de las peleas en línea)
+     TURN_CLAVE    opcional, secreto: su «API Token». Sin estos dos, /turn contesta 404 y se conecta solo directo
    Enlace (Bindings): un bucket R2 con el nombre de variable DISCO. */
 const PROYECTO = "mi-pagina-pro";                                  // el proyecto de Firebase del sitio
 const ORIGENES = "https://paginita-pro.cl,https://www.paginita-pro.cl,http://localhost:8123";
@@ -130,6 +132,33 @@ async function sumaArranque(req, env) {
   return todos.length;
 }
 
+/* El relevo (TURN de Cloudflare Realtime) para las peleas en línea: cuando las redes de los dos no dejan una conexión
+   directa, los paquetes de la pelea pasan por Cloudflare. TURN_ID y TURN_CLAVE (secreto) son la llave del TURN, que
+   nunca sale del Worker: con ella se piden a Cloudflare credenciales que vencen solas (TURN_TTL) y esas son las que
+   recibe la página. Se guardan en memoria hasta la mitad de su vida (todos los amigos usan las mismas). Sin llave,
+   o si Cloudflare falla, devuelve [] y la página conecta como siempre (solo directo). */
+const TURN_TTL = 6 * 3600;                                        // segundos de vida de cada credencial
+let turn = null, turnHasta = 0;
+async function relevo(env) {
+  if (!env.TURN_ID || !env.TURN_CLAVE) return [];
+  if (turn && Date.now() < turnHasta) return turn;
+  try {
+    const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_ID}/credentials/generate-ice-servers`, {
+      method: "POST", headers: { Authorization: "Bearer " + env.TURN_CLAVE, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttl: TURN_TTL }) });
+    if (!r.ok) return [];
+    const d = await r.json();
+    // (sin las direcciones del puerto 53: los navegadores las bloquean o se quedan esperándolas, como dice Cloudflare)
+    const ice = (Array.isArray(d.iceServers) ? d.iceServers : [d.iceServers]).filter(x => x && x.urls).map(x => ({
+      ...x, urls: (Array.isArray(x.urls) ? x.urls : [x.urls]).filter(u => typeof u === "string" && !/:53(\?|$)/.test(u)) }))
+      .filter(x => x.urls.length);
+    turn = ice; turnHasta = Date.now() + TURN_TTL * 500;          // (la mitad de la vida, en ms)
+    return ice;
+  } catch (e) {
+    return [];
+  }
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url), c = cors(req, env);
@@ -148,7 +177,7 @@ export default {
 
     // Leer: el índice o un pedazo, solo para los amigos. `/soy` contesta solo si quien pregunta está en la
     // lista: el sitio lo usa para mostrar BT3 únicamente a los amigos (colabtex/src/juegos/bt3-amigos.js).
-    const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || url.pathname === "/lote" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
+    const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || url.pathname === "/lote" || url.pathname === "/turn" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
     if (!lee && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const quien = token ? await uidDe(token) : null;
@@ -157,6 +186,10 @@ export default {
     const esta = amigos.includes(quien.uid) || (!!quien.correo && amigos.some(a => a.toLowerCase() === quien.correo));
     if (!esta) return responde("sin acceso", 403, c);
     if (url.pathname === "/soy") return responde("amigo", 200, { ...c, "Cache-Control": "no-store" });
+    if (url.pathname === "/turn") {   // el relevo para las peleas en línea, solo para amigos
+      const ice = await relevo(env);
+      return responde(JSON.stringify({ iceServers: ice }), ice.length ? 200 : 404, { ...c, "Content-Type": "application/json", "Cache-Control": "no-store" });
+    }
     if (req.method === "PUT") {   // la lista de arranque, de un amigo
       const n = await sumaArranque(req, env);
       return n === null ? responde("lista inválida", 400, c) : responde(String(n), 200, c);

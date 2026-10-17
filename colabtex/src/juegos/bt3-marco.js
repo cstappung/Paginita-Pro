@@ -1,4 +1,4 @@
-import { crearMalla } from "./malla.js";
+import { crearMalla, ICE as ICE_BASE } from "./malla.js";
 import { crearEmisor } from "./bt3-directo.js";
 import { catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
@@ -53,7 +53,7 @@ window.addEventListener("message", e => {
 });
 
 // ---------- la conexión con el rival ----------
-let malla = null, rival = "", keep = 0, motivo = "";
+let malla = null, rival = "", keep = 0, motivo = "", conRelevo = false, relevoPedido = false;
 const cola = [];   // paquetes que llegaron y el juego todavía no leyó
 
 /* Por qué no se pudo conectar, en palabras de la gente (la sala lo escribe en el chat: el marco se recarga al
@@ -64,20 +64,27 @@ function explica(sinBuzon) {
   const d = malla.detalle(rival);
   if (!d) return "no se llegó a armar la conexión con el rival";
   const estado = `conexión «${d.pc || "?"}», ICE «${d.ice || "?"}», canal «${d.dc}»`;
-  if (d.ice === "failed" || d.pc === "failed") return "sus redes no dejan una conexión directa: prueben otra red (los datos del celular o algunos routers la bloquean) — " + estado;
-  if (d.ice === "new" || d.ice === "checking") return "la conexión directa nunca respondió (un firewall o la red la bloquea) — " + estado;
+  const sin = conRelevo ? " (ni siquiera por el relevo de Cloudflare: un firewall bloquea todo)"
+    : relevoPedido ? " y el relevo está activado pero el Worker no dio credenciales (falta TURN_ID / TURN_CLAVE, o hay que volver a publicarlo)"
+    : ". Último recurso: el anfitrión puede activar «🛰 Relevo de Cloudflare» en la sala y volver a intentar";
+  if (d.ice === "failed" || d.pc === "failed") return "sus redes no dejan una conexión directa" + sin + " — " + estado;
+  if (d.ice === "new" || d.ice === "checking") return "la conexión nunca respondió" + sin + " — " + estado;
   return "la conexión se armó a medias y no se abrió el canal — " + estado;
 }
 
 /* Abre la malla y espera a tener canal sano con `uidRival`. Resuelve true si conectó (si no, `motivo` dice por qué). */
-function conecta(yo, uidRival) {
+/* relevo: los servidores TURN del Worker (juegos/bt3/pagina.js, pideRelevo); pedido: el anfitrión lo activó en la sala
+   (aunque el Worker no haya dado nada). */
+function conecta(yo, uidRival, relevo = [], pedido = false) {
   rival = uidRival;
   motivo = "";
+  conRelevo = relevo.length > 0;
+  relevoPedido = pedido;
   return new Promise(ok => {
     let hecho = false;
     const fin = (r, sinBuzon) => { if (!hecho) { hecho = true; clearTimeout(reloj); if (!r) { try { motivo = explica(sinBuzon); } catch { motivo = "no se pudo conectar"; } } ok(r); } };
     malla = crearMalla({
-      uid: yo, senal,
+      uid: yo, senal, ice: [...ICE_BASE, ...relevo],
       quiere: u => u === rival,                     // solo el rival: nada de terceros en un uno contra uno
       alBinario: (u, bytes) => {
         if (u !== rival) return;
@@ -103,11 +110,11 @@ function envia(bytes) {
 /* La pelea en vivo (bt3-directo.js): este marco es el que pelea y la sala lo eligió para mostrarla (`estado.emite`):
    contesta a los que piden verla con la imagen del lienzo del juego. */
 let emisor = null;
-function emite(canvas) {
+function emite(canvas, relevo = []) {   // relevo: los servidores TURN, si el anfitrión lo activó (como en `conecta`)
   if (emisor || !canvas || !estado?.yo) return;
   // el sonido del juego, del contexto de audio que la página del juego marca (juegos/bt3/pagina.js, Module.audioJuego);
   // la imagen, copiada achicada cada vez que el juego termina un cuadro (parche: Web_FrameDone → Module.onCuadro)
-  emisor = crearEmisor({ senal, uid: estado.yo, canvas, audio: () => window.Module?.audioJuego?.() || null,
+  emisor = crearEmisor({ senal, uid: estado.yo, canvas, ice: [...ICE_BASE, ...relevo], audio: () => window.Module?.audioJuego?.() || null,
     alCuadro: fn => {
       window.Module.onCuadro = fn;
       return () => { if (window.Module.onCuadro === fn) window.Module.onCuadro = null; };
@@ -137,6 +144,7 @@ window.BT3Sala = {
   avisa: (tipo, datos) => padre(tipo, datos),       // "listo", "disco", "termino"
   conecta, envia, cierra, emite, vetadosDe,
   motivo: () => motivo,                              // por qué falló el último `conecta`
+  via: () => (malla?.via ? malla.via(rival) : Promise.resolve("")),   // "directa" o "relevo", para el registro
   recibe: () => cola.shift() || null,
   hay: () => cola.length > 0,
   sano: () => !!malla?.sano(rival),

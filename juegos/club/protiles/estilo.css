@@ -19,6 +19,12 @@ main{min-width:0}
 .scorebar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 14px;margin:0 0 12px;border-radius:14px;background:#fff;border:1px solid var(--line,#E4DCCF)}
 .dato small{display:block;font:700 10px 'Inter',system-ui,sans-serif;letter-spacing:1.4px;color:var(--muted,#8C857A)}
 .dato strong{display:block;font:800 18px 'Sora',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#bFull{margin-left:auto;width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line,#E4DCCF);background:transparent;color:inherit;cursor:pointer}
+#bFull svg{width:17px;height:17px}
+#bFull[hidden]{display:none}
+#bFull .sale,#bFull[aria-pressed=true] .entra{display:none}
+#bFull[aria-pressed=true] .sale{display:inline}
+#bFull:not([hidden])+#sound-button{margin-left:0}
 #sound-button{margin-left:auto;width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line,#E4DCCF);background:transparent;color:inherit;cursor:pointer}
 #sound-button svg{width:18px;height:18px}
 #sound-button .cruz{display:none}
@@ -41,6 +47,7 @@ main{min-width:0}
 .pt{
   --pt-bg:#EEE8DD; --pt-paper:#FAF7F1; --pt-card:#FFFFFF; --pt-ink:#141414; --pt-ink2:#34312C; --pt-mut:#8C857A; --pt-line:#E4DCCF;
   --pt-coral:#FF5A36; --pt-coral2:#FF8A6B; --pt-red:#D7263D;
+  --pt-ficha:#141414; --pt-sobre:#FFFFFF; --pt-velo:rgba(238,232,221,.72); --pt-acTxt:#FFFFFF;
   --pt-fd:'Sora',system-ui,sans-serif; --pt-fu:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
   --pt-shadow:0 1px 2px rgba(20,20,20,.04),0 8px 24px rgba(20,20,20,.06);
 }
@@ -64,7 +71,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .tools{display:flex;gap:8px;align-items:center}
 .seg{display:flex;padding:3px;border-radius:999px;background:var(--pt-card);box-shadow:var(--pt-shadow)}
 .seg button{padding:7px 12px;border-radius:999px;font:600 13px var(--pt-fu);color:var(--pt-mut);transition:background .2s,color .2s}
-.seg button.on{background:var(--pt-ink);color:#fff}
+.seg button.on{background:var(--pt-ficha);color:var(--pt-sobre)}
 .icon{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--pt-card);box-shadow:var(--pt-shadow);transition:transform .15s}
 .icon:active{transform:scale(.92)}
 .icon svg{width:18px;height:18px}
@@ -76,19 +83,19 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .hero p{margin-top:16px;color:var(--pt-ink2);font-size:16px;line-height:1.55;max-width:460px}
 
 .mara{position:relative;width:100%;display:flex;align-items:center;gap:16px;padding:20px;border-radius:22px;text-align:left;
-  background:var(--pt-ink);color:#fff;overflow:hidden;transition:transform .2s;box-shadow:0 12px 32px rgba(20,20,20,.18)}
+  background:var(--pt-ficha);color:var(--pt-sobre);overflow:hidden;transition:transform .2s;box-shadow:0 12px 32px rgba(20,20,20,.18)}
 .mara:hover{transform:translateY(-2px)}
 .mara:active{transform:scale(.985)}
 .mara .bars{position:absolute;right:84px;top:0;bottom:0;display:flex;gap:5px;align-items:flex-end;opacity:.14}
-.mara .bars i{width:10px;background:#fff;border-radius:3px 3px 0 0;animation:eq 1.4s ease-in-out infinite}
+.mara .bars i{width:10px;background:var(--pt-sobre);border-radius:3px 3px 0 0;animation:eq 1.4s ease-in-out infinite}
 .mara .bars i:nth-child(2){animation-delay:.15s}.mara .bars i:nth-child(3){animation-delay:.3s}.mara .bars i:nth-child(4){animation-delay:.45s}.mara .bars i:nth-child(5){animation-delay:.6s}.mara .bars i:nth-child(6){animation-delay:.75s}
 @keyframes eq{0%,100%{height:25%}50%{height:80%}}
 .mara .txt{position:relative;flex:1}
 .mara small{display:block;font:700 11px var(--pt-fu);letter-spacing:2px;text-transform:uppercase;color:var(--pt-coral2)}
 .mara b{display:block;font:700 24px var(--pt-fd);margin-top:4px;letter-spacing:-.5px}
-.mara span.d{display:block;color:rgba(255,255,255,.65);font-size:14px;margin-top:4px}
+.mara span.d{display:block;color:var(--pt-sobre);opacity:.65;font-size:14px;margin-top:4px}
 .mara .go{position:relative;flex:none;width:52px;height:52px;border-radius:50%;background:var(--pt-coral);display:grid;place-items:center}
-.mara .go svg{width:18px;height:18px;fill:#fff;margin-left:3px}
+.mara .go svg{width:18px;height:18px;fill:var(--pt-acTxt);margin-left:3px}
 
 .sec{display:flex;justify-content:space-between;align-items:baseline;margin:34px 2px 12px}
 .sec h3{font:700 20px var(--pt-fd);letter-spacing:-.4px}
@@ -99,7 +106,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .song:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(20,20,20,.04),0 14px 30px rgba(20,20,20,.09)}
 .song:active{transform:scale(.985)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}
-.cover{flex:none;width:48px;height:48px;border-radius:12px;position:relative;overflow:hidden;background:var(--pt-ink)}
+.cover{flex:none;width:48px;height:48px;border-radius:12px;position:relative;overflow:hidden;background:var(--pt-ficha)}
 .cover i{position:absolute;bottom:0;width:6px;border-radius:2px 2px 0 0;background:#fff;opacity:.9}
 .song .meta{flex:1;min-width:0}
 .song .meta b{display:block;font:600 16px var(--pt-fd);letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -114,9 +121,9 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .stars svg.on{fill:var(--pt-coral)}
 .stars svg.cw.on{fill:#E7A21B}
 .stars svg.world{width:20px;height:20px}
-.song .play{flex:none;width:40px;height:40px;border-radius:50%;background:var(--pt-ink);display:grid;place-items:center;transition:background .2s}
+.song .play{flex:none;width:40px;height:40px;border-radius:50%;background:var(--pt-ficha);display:grid;place-items:center;transition:background .2s}
 .song:hover .play{background:var(--pt-coral)}
-.song .play svg{width:13px;height:13px;fill:#fff;margin-left:2px}
+.song .play svg{width:13px;height:13px;fill:var(--pt-sobre);margin-left:2px}
 .pie{margin-top:34px;color:var(--pt-mut);font-size:12.5px;line-height:1.8;text-align:center}
 .pie a{color:var(--pt-mut)}
 .pie button{color:var(--pt-mut);text-decoration:underline;text-underline-offset:3px;font-size:12.5px}
@@ -148,7 +155,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 #field{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none}
 #cv{display:block;touch-action:none}
 #intro{position:absolute;left:50%;top:9%;transform:translateX(-50%);width:min(88%,320px);padding:18px 18px 16px;border-radius:20px;text-align:center;
-  background:rgba(255,255,255,.96);box-shadow:0 12px 40px rgba(20,20,20,.14);pointer-events:none;transition:opacity .35s,transform .35s}
+  background:rgba(255,255,255,.96);background:color-mix(in srgb,var(--pt-card) 96%,transparent);box-shadow:0 12px 40px rgba(20,20,20,.14);pointer-events:none;transition:opacity .35s,transform .35s}
 #intro.gone{opacity:0;transform:translate(-50%,-12px)}
 #intro small{font:700 10px var(--pt-fu);letter-spacing:2px;text-transform:uppercase;color:var(--pt-coral)}
 #intro b{display:block;font:700 24px/1.15 var(--pt-fd);letter-spacing:-.5px;margin-top:6px}
@@ -161,7 +168,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 
 /* ================= Overlays ================= */
 .overlay{position:absolute;inset:0;z-index:10;display:grid;place-items:center;padding:16px;overflow-y:auto;
-  background:rgba(238,232,221,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:fade .2s ease}
+  background:var(--pt-velo);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:fade .2s ease}
 @keyframes fade{from{opacity:0}}
 .card{width:min(100%,360px);padding:26px 22px 22px;border-radius:26px;background:var(--pt-card);text-align:center;
   box-shadow:0 2px 6px rgba(20,20,20,.05),0 30px 80px rgba(20,20,20,.16);animation:cardin .4s cubic-bezier(.2,1.25,.4,1)}
@@ -183,25 +190,46 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .stats small{color:var(--pt-mut);font-size:12px}
 .btns{display:flex;gap:10px}
 .btn{flex:1;padding:15px 12px;border-radius:14px;font:600 15px var(--pt-fu);background:var(--pt-paper);border:1px solid var(--pt-line);transition:transform .12s,background .2s}
-.btn:hover{background:#F2EDE4}
+.btn:hover{filter:brightness(.97)}
 .btn:active{transform:scale(.97)}
-.btn.pri{background:var(--pt-ink);color:#fff;border-color:var(--pt-ink)}
-.btn.pri:hover{background:#000}
+.btn.pri{background:var(--pt-ficha);color:var(--pt-sobre);border-color:var(--pt-ficha)}
+.btn.pri:hover{filter:brightness(.88)}
 .vstack{display:flex;flex-direction:column;gap:10px;margin-top:20px}
 .tip{color:var(--pt-mut);font-size:12px;margin-top:14px}
 @media (prefers-reduced-motion:reduce){:where(.pt) *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
 
-/* ---------- Modo celular (juegos/club/CLAUDE.md): mientras se toca, la caja
-   llena la pantalla; queda arriba una franja con el marcador, el sonido y
-   el volumen. ---------- */
-html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#EEE8DD}
-html.club-inm .shell{max-width:none;height:100dvh;box-sizing:border-box;margin:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:flex;flex-direction:column}
-html.club-inm .layout{display:flex;flex-direction:column;flex:1;min-height:0;gap:0}
-html.club-inm main{display:flex;flex-direction:column;flex:1;min-height:0}
-html.club-inm .cab,html.club-inm .nota,html.club-inm .layout>aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
-html.club-inm .scorebar,html.club-inm.club-integrado .scorebar,html.club-inm.club-integrado[data-tema] .scorebar{margin:0;padding:4px 10px;gap:12px;flex-wrap:nowrap;border-radius:0;border:0;background:#141414;color:#fff}
-html.club-inm .dato small{font-size:8px;color:#bdb4a6}
-html.club-inm .dato strong{font-size:14px}
-html.club-inm #sound-button{width:32px;height:32px;border-color:#fff6;color:#fff}
+/* ---------- Modo celular (juegos/club/CLAUDE.md) y pantalla completa (⛶,
+   html.pt-pc): la caja llena la pantalla; arriba queda una franja con el
+   marcador, el sonido, el volumen y el ⛶. La columna se estira a lo ancho
+   (align-items:stretch): con el `start` del diseño normal, la caja medía lo
+   que su contenido y quedaba angosta y pegada a la izquierda del celular. ---------- */
+:is(html.club-inm,html.pt-pc),:is(html.club-inm,html.pt-pc) body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#EEE8DD}
+:is(html.club-inm,html.pt-pc) .shell{max-width:none;width:100%;height:100dvh;box-sizing:border-box;margin:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:flex;flex-direction:column}
+:is(html.club-inm,html.pt-pc) .layout{display:flex;flex-direction:column;align-items:stretch;flex:1;min-height:0;width:100%;gap:0}
+:is(html.club-inm,html.pt-pc) main{display:flex;flex-direction:column;flex:1;min-height:0;width:100%}
+:is(html.club-inm,html.pt-pc) :is(.cab,.nota,.layout>aside,.club-volver,.club-ranking,.club-vol-flota,.i18n-flota){display:none!important}
+:is(html.club-inm,html.pt-pc) .scorebar,:is(html.club-inm,html.pt-pc).club-integrado .scorebar,:is(html.club-inm,html.pt-pc).club-integrado[data-tema] .scorebar{margin:0;padding:4px 10px;gap:12px;flex-wrap:nowrap;border-radius:0;border:0;background:#141414;color:#fff}
+:is(html.club-inm,html.pt-pc) .dato small{font-size:8px;color:#bdb4a6}
+:is(html.club-inm,html.pt-pc) .dato strong{font-size:14px}
+:is(html.club-inm,html.pt-pc) :is(#sound-button,#bFull){width:32px;height:32px;border-color:#fff6;color:#fff}
 html.club-inm .scorebar .vj-ctl input,html.club-inm .scorebar .vj-ctl output{display:none}
-html.club-inm .pt{flex:1;height:auto;min-height:0;border-radius:0;box-shadow:none}
+:is(html.club-inm,html.pt-pc) .pt{flex:1;width:100%;max-width:none;height:auto;min-height:0;border-radius:0;box-shadow:none}
+
+/* ---------- ⚙ Ajustes: teclas de los carriles y paletas ---------- */
+.ajustes{width:min(100%,400px)}
+.aj-sec{margin:18px 0 8px;font:700 11px var(--pt-fu);letter-spacing:1.6px;text-transform:uppercase;color:var(--pt-mut);text-align:left}
+.aj-teclas{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tecla{padding:10px 4px 9px;border-radius:12px;background:var(--pt-paper);border:1px solid var(--pt-line);border-bottom-width:3px;color:var(--pt-ink)}
+.tecla small{display:block;font:600 10px var(--pt-fu);color:var(--pt-mut)}
+.tecla b{display:block;margin-top:3px;font:700 18px var(--pt-fd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tecla.espera{border-color:var(--pt-coral);color:var(--pt-coral);animation:pulse 1s ease-in-out infinite}
+.aj-reset{display:block;width:100%;margin-top:10px;padding:10px;font-size:13px}
+.aj-temas{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.tema{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:12px;border:2px solid transparent;color:var(--pt-ink)}
+.tema.on{border-color:var(--pt-coral)}
+.tema b{font:600 11px var(--pt-fu)}
+.muestra{display:flex;width:100%;height:44px;border-radius:8px;overflow:hidden;border:1px solid}
+.muestra i{flex:1}
+.muestra i:nth-child(2){margin-top:14px;border-radius:3px 3px 0 0}
+.muestra i:nth-child(4){margin-bottom:12px;border-radius:0 0 3px 3px}
+@media(max-width:420px){.aj-temas{grid-template-columns:repeat(3,1fr)}}

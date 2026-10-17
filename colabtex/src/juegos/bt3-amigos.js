@@ -11,7 +11,7 @@ import { ponOculto } from "./ocultos.js";
 let visible = false, pidiendo = null, deQuien = "";
 
 /* La versión del programa del juego (la misma del ?v= de juegos/bt3/: fuente/construir.sh la cambia aquí). */
-export const BT3_VER = "bt3-34";
+export const BT3_VER = "bt3-36";
 const oyentes = new Set();
 
 export const bt3Visible = () => visible;
@@ -22,6 +22,26 @@ function pone(v) {
   visible = v;
   ponOculto("bt3", !v);   // (las vistas que nombran juegos: tienda del perfil, monedas)
   for (const cb of oyentes) { try { cb(v); } catch (e) {} }
+}
+
+/* El relevo de Cloudflare (TURN) para mirar una pelea en vivo, cuando el anfitrión lo activó en la sala: las mismas
+   credenciales que piden los marcos de los que pelean (Worker del disco, /turn, solo amigos). [] si no hay. */
+export async function relevoBt3() {
+  const u = auth.currentUser;
+  if (!u) return [];
+  try {
+    const cfg = await (await fetch("juegos/bt3/disco-privado.json", { cache: "no-store" })).json();
+    const base = String(cfg.url || "").replace(/\/+$/, "");
+    if (!base) return [];
+    const ctl = new AbortController(), reloj = setTimeout(() => ctl.abort(), 4000);
+    const r = await fetch(base + "/turn", { headers: { Authorization: "Bearer " + await u.getIdToken() }, signal: ctl.signal });
+    clearTimeout(reloj);
+    if (!r.ok) return [];
+    const d = await r.json();
+    return Array.isArray(d.iceServers) ? d.iceServers.filter(x => x && x.urls) : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 /* Pregunta de nuevo si cambió la sesión; si no, devuelve lo que ya sabe (o la pregunta en curso). */

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610170546"></script>
+<script src="../../../i18n.js?v=202610170636"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>PRO TILES — canciones que nunca terminan</title>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-17"></script>
-  <link rel="stylesheet" href="estilo.css?v=protiles-1">
+  <link rel="stylesheet" href="estilo.css?v=protiles-2">
 </head>
 <body>
   <div class="shell">
@@ -30,6 +30,9 @@
           <div class="dato"><small>MODO</small><strong id="nModo" translate="no">—</strong></div>
           <div class="dato"><small>MEJOR</small><strong id="nMejor" translate="no">0</strong></div>
           <div class="dato"><small>PUNTOS</small><strong id="nPuntos" translate="no">0</strong></div>
+          <button type="button" id="bFull" aria-pressed="false" aria-label="Pantalla completa" title="Pantalla completa" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="entra" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="sale" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+          </button>
           <button type="button" id="sound-button" aria-pressed="true" aria-label="Silenciar" title="Sonido">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
@@ -46,6 +49,7 @@
                 <div class="brand" translate="no"><span class="mark"><i></i><i></i><i></i><i></i></span>Pro Tiles</div>
                 <div class="tools">
                   <div class="seg" id="seg"><button type="button" data-m="touch">Táctil</button><button type="button" data-m="kb">Teclado</button></div>
+                  <button type="button" class="icon" id="bAjustes" aria-label="Ajustes: teclas y colores" title="Ajustes: teclas y colores"><svg viewBox="0 0 24 24" class="st"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
                 </div>
               </div>
 
@@ -96,9 +100,25 @@
                 <button type="button" class="btn pri" id="pResume">Continuar</button>
                 <button type="button" class="btn" id="pRestart">Reiniciar</button>
                 <button type="button" class="btn" id="pSound"></button>
+                <button type="button" class="btn" id="pFull" hidden>Pantalla completa</button>
+                <button type="button" class="btn" id="pAjustes">Ajustes: teclas y colores</button>
                 <button type="button" class="btn" id="pMenu">Menú</button>
               </div>
               <div class="tip kb-only">Esc continuar · R reiniciar · M menú</div>
+            </div>
+          </section>
+
+          <section id="ajustes" class="overlay hidden" role="dialog" aria-labelledby="ajTitulo">
+            <div class="card ajustes">
+              <div class="kick">Ajustes</div>
+              <h3 id="ajTitulo">Teclas y colores</h3>
+              <div class="aj-sec">Teclas de los carriles</div>
+              <div class="aj-teclas" id="ajTeclas"></div>
+              <div class="tip" id="ajAviso" role="status"></div>
+              <button type="button" class="btn aj-reset" id="ajReset">Volver a D F J K</button>
+              <div class="aj-sec">Paleta de colores</div>
+              <div class="aj-temas" id="ajTemas"></div>
+              <div class="vstack"><button type="button" class="btn pri" id="ajListo">Listo</button></div>
             </div>
           </section>
 
@@ -137,6 +157,6 @@
     </div>
   </div>
   <script src="motor.js?v=protiles-1"></script>
-  <script src="juego.js?v=protiles-1"></script>
+  <script src="juego.js?v=protiles-2"></script>
 </body>
 </html>

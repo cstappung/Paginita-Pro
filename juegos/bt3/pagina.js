@@ -240,6 +240,26 @@
      - **Siempre se ve** cuando el juego espera algo de la red: la insignia de arriba dice cuánto lleva y a qué
        velocidad, y la primera vez avisa que lo bajado queda guardado. */
   const P = { base: "", token: "", size: 0, pieza: 0, cuantas: 0, almacen: null, guardadas: new Set(), primeraVez: false, sinLote: false };
+  /* El relevo (TURN) para una pelea en línea: si las redes de los dos no dejan una conexión directa, los paquetes
+     pasan por Cloudflare. El Worker del disco privado da credenciales que vencen solas, solo a los amigos
+     (fuente/disco/worker.js, /turn). Si no hay Worker, llave o respuesta en 4 s: [] y se conecta como siempre. */
+  async function pideRelevo() {
+    try {
+      let base = P.base, token = P.token;
+      if (!base) base = String((await (await fetch("disco-privado.json", { cache: "no-store" })).json()).url || "").replace(/\/+$/, "");
+      if (!base) return [];
+      if (!token) token = await pideToken(false);
+      if (!token) return [];
+      const ctl = new AbortController(), reloj = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch(base + "/turn", { headers: { Authorization: "Bearer " + token }, signal: ctl.signal });
+      clearTimeout(reloj);
+      if (!r.ok) return [];
+      const d = await r.json();
+      return Array.isArray(d.iceServers) ? d.iceServers.filter(x => x && x.urls) : [];
+    } catch (e) {
+      return [];
+    }
+  }
   /* Los pedazos que esperan van juntos en UNA llamada (`/lote` del Worker): el plan gratis de Cloudflare cuenta llamadas
      (100.000 al día), no megas. Hasta 8 en lo que se baja por adelantado y 4 en lo que el juego espera ya (para no
      poner una lectura urgente detrás de muchas otras); la respuesta trae los pedazos uno tras otro y cada uno se
@@ -747,6 +767,17 @@
     if (Module._Web_Settings) Module._Web_Settings(3);   // segundo clic: la cierra
     Module.canvas.focus();                                 // teclado y mando de vuelta al juego
   };
+  /* Mientras la ventana de Ajustes está abierta (la abre este botón, F1 o el menú del juego; parche: ui.cpp avisa con
+     Module.onAjustes) se ocultan los controles táctiles y, en el celular, la barra: la tapaban y se comían sus toques
+     (pagina.py, body.ajustes-abiertos). En el celular, «✕ Cerrar ajustes» abajo al centro la cierra. */
+  const cierraAjustes = document.createElement("button");
+  cierraAjustes.id = "cierraAjustes"; cierraAjustes.type = "button"; cierraAjustes.textContent = "✕ Cerrar ajustes";
+  cierraAjustes.onclick = () => { if (Module._Web_Settings && document.body.classList.contains("ajustes-abiertos")) Module._Web_Settings(3); };
+  document.body.append(cierraAjustes);
+  Module.onAjustes = abierta => {
+    document.body.classList.toggle("ajustes-abiertos", !!abierta);
+    if (!abierta) { try { if (window.BT3Touch) BT3Touch.rects = null; } catch (e) {} }   // (los botones vuelven: medirlos de nuevo)
+  };
 
   // El mando: el juego lo lee solo (SDL3 y la Gamepad API); aquí solo se muestra cuál ve el navegador.
   const mando = $("mando");
@@ -813,21 +844,123 @@
     // 🎮: el tamaño y la transparencia de los controles
     const pad = $("pad");
     const lee = (k, d) => { try { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? v : d; } catch (e) { return d; } };
-    let esc = lee("bt3.pad.tamano", 100), opa = lee("bt3.pad.opacidad", 100);
+    let esc = Math.min(100, lee("bt3.pad.tamano", 100)), opa = lee("bt3.pad.opacidad", 100);   // (100 % ya es el grande)
     const aplica = () => {
       pad.style.setProperty("--esc", String(esc / 100));
       pad.style.setProperty("--opa", String(opa / 100));
       try { localStorage.setItem("bt3.pad.tamano", String(esc)); localStorage.setItem("bt3.pad.opacidad", String(opa)); } catch (e) {}
       try { if (typeof relayout === "function") relayout(); } catch (e) {}   // (las zonas de toque se miden de nuevo)
+      aplicaPiezas();
     };
+    /* ✏️ Mover y agrandar cada control, por separado en horizontal y en vertical (`bt3.pad.pos.h` / `.v`):
+       {grupo: {x, y, k}}, x/y el corrimiento en fracción del ancho/alto de la pantalla y k el tamaño (1 = el de
+       la disposición). La cruceta es un grupo (se mueve y crece entera, alrededor de su centro); los demás van uno
+       por uno, así se puede cambiar el orden (poner □ donde estaba ○…). Se aplica con `translate` y `scale` sobre
+       cada botón, que no tocan la disposición de pagina.py, y el fork mide las zonas de toque con
+       getBoundingClientRect, que ya los incluye (BT3Touch.rects se mide de nuevo). Mientras se edita, una capa
+       encima del mando recibe los toques: ninguno llega al juego. */
+    const clavePos = () => "bt3.pad.pos." + (innerWidth > innerHeight ? "h" : "v");
+    const grupoDe = el => el.classList.contains("dp") ? "dp" : el.hasAttribute("data-stick") ? "stick" : el.hasAttribute("data-hide") ? "hide" : el.dataset.btn;
+    const piezas = () => [...pad.querySelectorAll(".b, .stick")];
+    let pos = {};
+    const leePos = () => { try { const v = JSON.parse(localStorage.getItem(clavePos()) || "{}"); pos = v && typeof v === "object" ? v : {}; } catch (e) { pos = {}; } };
+    const guardaPos = () => { try { localStorage.setItem(clavePos(), JSON.stringify(pos)); } catch (e) {} };
+    function aplicaPiezas() {
+      const ps = piezas();
+      for (const el of ps) { el.style.translate = ""; el.style.scale = ""; }
+      if (!Object.keys(pos).length) { if (window.BT3Touch) BT3Touch.rects = null; return; }
+      // los centros sin ajuste: para que un grupo crezca alrededor de SU centro y no cada botón del suyo
+      const base = new Map(ps.map(el => { const r = el.getBoundingClientRect(); return [el, [r.left + r.width / 2, r.top + r.height / 2]]; }));
+      const centro = {};
+      for (const el of ps) { const g = grupoDe(el), c = base.get(el), t = centro[g] || (centro[g] = [0, 0, 0]); t[0] += c[0]; t[1] += c[1]; t[2]++; }
+      for (const el of ps) {
+        const g = grupoDe(el), a = pos[g];
+        if (!a) continue;
+        const k = a.k || 1, [cx, cy] = base.get(el), t = centro[g], gx = t[0] / t[2], gy = t[1] / t[2];
+        el.style.translate = `${(a.x || 0) * innerWidth + (k - 1) * (cx - gx)}px ${(a.y || 0) * innerHeight + (k - 1) * (cy - gy)}px`;
+        if (k !== 1) el.style.scale = String(k);
+      }
+      if (window.BT3Touch) BT3Touch.rects = null;
+    }
+    leePos();
+    addEventListener("resize", () => { leePos(); aplicaPiezas(); });   // (girar: la otra disposición y sus ajustes)
+
+    const capa = document.createElement("div");
+    capa.id = "editaPad";
+    const barraE = document.createElement("div");
+    barraE.id = "editaBarra"; barraE.setAttribute("role", "toolbar"); barraE.setAttribute("aria-label", "Editar los controles");
+    barraE.innerHTML = '<span>Toca un botón y arrástralo para moverlo. − / + cambia su tamaño.</span>' +
+      '<button type="button" data-e="menos" aria-label="Más chico">−</button><button type="button" data-e="mas" aria-label="Más grande">+</button>' +
+      '<button type="button" data-e="este">↺ Este</button><button type="button" data-e="todos">↺ Todos</button><button type="button" data-e="listo">✓ Listo</button>';
+    document.body.append(capa, barraE);
+    let elegido = "", arrastre = null;
+    const marca = () => {
+      for (const el of piezas()) el.classList.toggle("sel", !!elegido && grupoDe(el) === elegido);
+      barraE.querySelector("span").textContent = elegido ? "«" + ({ dp: "Cruceta", stick: "Stick", hide: "Hide" }[elegido] || elegido.toUpperCase().replace("TRI", "△").replace("CIR", "○").replace("CRO", "✕").replace("SQU", "□")) + "» · " +
+        Math.round(((pos[elegido] && pos[elegido].k) || 1) * 100) + " % — arrástralo o usa − / +" : "Toca un botón y arrástralo para moverlo. − / + cambia su tamaño.";
+      barraE.querySelectorAll('[data-e="menos"],[data-e="mas"],[data-e="este"]').forEach(b => { b.disabled = !elegido; });
+    };
+    function editaPiezas(si) {
+      document.body.classList.toggle("editando-pad", si);
+      if (si && !document.body.classList.contains("touch") && typeof setTouch === "function") setTouch(true);
+      elegido = ""; arrastre = null; marca();
+      if (!si) guardaPos();
+    }
+    const piezaEn = (x, y) => {
+      let mejor = null, d = Infinity;
+      for (const el of piezas()) {
+        const r = el.getBoundingClientRect();
+        if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 6 && y <= r.bottom + 6) {
+          const dd = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+          if (dd < d) { d = dd; mejor = el; }
+        }
+      }
+      return mejor;
+    };
+    capa.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      const el = piezaEn(e.clientX, e.clientY);
+      elegido = el ? grupoDe(el) : "";
+      marca();
+      if (!el) return;
+      try { capa.setPointerCapture(e.pointerId); } catch (_) {}
+      const a = pos[elegido] || {};
+      arrastre = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: a.x || 0, ay: a.y || 0 };
+    });
+    capa.addEventListener("pointermove", e => {
+      if (!arrastre || e.pointerId !== arrastre.id) return;
+      e.preventDefault();
+      const a = pos[elegido] || (pos[elegido] = {});
+      a.x = Math.round((arrastre.ax + (e.clientX - arrastre.x0) / innerWidth) * 1000) / 1000;
+      a.y = Math.round((arrastre.ay + (e.clientY - arrastre.y0) / innerHeight) * 1000) / 1000;
+      aplicaPiezas();
+    });
+    for (const ev of ["pointerup", "pointercancel"]) capa.addEventListener(ev, () => { if (arrastre) { arrastre = null; guardaPos(); } });
+    barraE.addEventListener("click", e => {
+      const q = e.target.closest("[data-e]");
+      if (!q) return;
+      const que = q.dataset.e;
+      if (que === "listo") return editaPiezas(false);
+      if (que === "todos") { pos = {}; guardaPos(); aplicaPiezas(); elegido = ""; return marca(); }
+      if (!elegido) return;
+      if (que === "este") delete pos[elegido];
+      else {
+        const a = pos[elegido] || (pos[elegido] = {});
+        a.k = Math.max(0.6, Math.min(2, Math.round(((a.k || 1) + (que === "mas" ? 0.1 : -0.1)) * 10) / 10));
+      }
+      guardaPos(); aplicaPiezas(); marca();
+    });
+    window.BT3Piezas = { edita: editaPiezas, aplica: aplicaPiezas, pos: () => pos };   // (el banco lo prueba)
     aplica();
+
     const panel = document.createElement("div");
     panel.id = "ajustePad"; panel.hidden = true;
     panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", "Ajustar los controles táctiles");
     panel.innerHTML = '<b>Controles en pantalla</b>' +
-      '<label>Tamaño <input type="range" min="70" max="120" step="5" data-k="esc"><output></output></label>' +
+      '<label>Tamaño <input type="range" min="60" max="100" step="5" data-k="esc"><output></output></label>' +
       '<label>Opacidad <input type="range" min="25" max="100" step="5" data-k="opa"><output></output></label>' +
-      '<p>En horizontal crecen hasta 110 % (más, la cruceta tocaría el stick). «Hide» los esconde del todo.</p>' +
+      '<p>El tamaño agranda todos juntos. Para mover un botón (cambiar el orden) o agrandar solo uno: ✏️. «Hide» los esconde del todo.</p>' +
+      '<button type="button" data-x="editar">✏️ Mover y agrandar botones</button>' +
       '<div><button type="button" data-x="normal">Como venían</button><button type="button" data-x="listo">Listo</button></div>';
     const pintaPanel = () => panel.querySelectorAll("input").forEach(i => { i.value = i.dataset.k === "esc" ? esc : opa; i.nextElementSibling.textContent = i.value + "%"; });
     panel.addEventListener("input", e => { const i = e.target; if (!i.dataset.k) return; if (i.dataset.k === "esc") esc = +i.value; else opa = +i.value; aplica(); pintaPanel(); });
@@ -835,6 +968,7 @@
       const x = e.target.dataset && e.target.dataset.x;
       if (x === "normal") { esc = 100; opa = 100; aplica(); pintaPanel(); }
       if (x === "listo") panel.hidden = true;
+      if (x === "editar") { panel.hidden = true; editaPiezas(true); }
     });
     document.body.append(panel);
     const ctl = boton("ajustarPad", "🎮", "Ajustar los controles táctiles (tamaño y opacidad)");
@@ -1376,13 +1510,16 @@
           BT3_SEED: semillaLocal(),   // (contra la CPU se juega aquí solo: azar de verdad, 2e)
           BT3_WEB_MODO: "cpu", BT3_WEB_REGLAS: String(e.reglas), BT3_WEB_CPU: String(e.rival.nivel ?? 2), BT3_WEB_AZAR: "1", BT3_NOMOVIE: "1"
         }, equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));
-        if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo
+        if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas, e.relevo ? await pideRelevo() : []); }   // los demás de la sala pueden mirarla en vivo
         await listoArranque;
         aviso("Tu pelea contra " + e.rival.nombre + " (" + ["muy fácil", "fácil", "normal", "difícil", "muy difícil"][e.rival.nivel ?? 2] + "): elige tu luchador.", 6000);
         return;
       }
       aviso("Conectando con " + e.rival.nombre + "…", 0, true);
-      const ok = await S.conecta(e.yo, e.rival.uid);
+      // el relevo (TURN) solo si el anfitrión lo activó en la sala: nunca solo (último recurso)
+      const relevo = e.relevo ? await pideRelevo() : [];
+      Module.keep("red: relevo " + (!e.relevo ? "apagado (solo conexión directa)" : relevo.length ? "activado" : "activado, pero el Worker no dio credenciales"));
+      const ok = await S.conecta(e.yo, e.rival.uid, relevo, !!e.relevo);
       if (!ok) {
         const motivo = (S.motivo && S.motivo()) || "sus redes no dejan una conexión directa";
         aviso("No se pudo conectar con " + e.rival.nombre + ": " + motivo + ". Vuelvan al vestíbulo e intenten de nuevo.");
@@ -1390,6 +1527,7 @@
         S.avisa("termino", { por: "sin-conexion", motivo });   // la sala lo escribe en el chat (este aviso se pierde al recargar)
         return new Promise(() => {});   // el programa no arranca; la sala recarga este marco al volver
       }
+      S.via?.().then(v => { if (v) Module.keep("red: conectados por " + (v === "relevo" ? "el relevo de Cloudflare" : "conexión directa")); });
       // Los paquetes del juego, por la malla del marco (gs/net.c: Module.netSend / netRecv, como UDP).
       Module.netSend = bytes => S.envia(bytes);
       Module.netRecv = () => S.recibe();
@@ -1403,7 +1541,7 @@
       }, e.rol === "host" ? { BT3_NET_HOST: "1", BT3_NET_RULES: String(e.reglas) } : { BT3_NET_JOIN: "127.0.0.1:1" },
       equipo ? { BT3_WEB_EQUIPO: String(equipo) } : {}));   // (el tope de equipo no viaja en la sesión: lo ponen los dos)
       try { FS.mkdir("/net_session"); } catch (err) {}
-      if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas); }   // los demás de la sala pueden mirarla en vivo (bt3-directo.js; 0b)
+      if (e.emite) { Module.conservaCuadro = true; S.emite(Module.canvas, relevo); }   // los demás de la sala pueden mirarla en vivo (bt3-directo.js; 0b; con el relevo, si está activado)
       await listoArranque;
       aviso("Preparando la pelea contra " + e.rival.nombre + "…", 6000, true);
     },

@@ -584,3 +584,40 @@ test('BT3 oculto por omisión, y cada vista que nombra juegos lo respeta',()=>{
  assert.match(lee('src/juegos/monedas-vista.js'),/filter\(j => !juegoOculto\(j\)\)/,'la tabla de monedas no nombra a BT3');
  assert.match(lee('src/juegos/perfil.js'),/!juegoOculto\(it\.req\.top\)/,'la tienda no muestra su premio de campeón');
 });
+
+test('el relevo de Cloudflare: lo activa a mano el anfitrión (nunca solo), y el organizador también en pleno torneo',()=>{
+ assert.equal(B.reducir(sala()).relevo,false,'apagado por defecto');
+ let e=B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,true,'el anfitrión lo activa');
+ e=B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:true},{t:'ajuste',uid:'a',k:'relevo',v:false}));assert.equal(e.relevo,false,'y lo apaga');
+ assert.equal(B.reducir(sala({t:'ajuste',uid:'b',k:'relevo',v:true})).relevo,false,'el otro no');
+ assert.equal(B.reducir(sala({t:'ajuste',uid:'a',k:'relevo',v:'1'})).relevo,false,'solo true lo activa');
+ e=B.reducir(sala({t:'revancha',uid:'b'},{t:'ajuste',uid:'a',k:'relevo',v:true}));
+ assert.equal(e.relevo,true);
+ let t=B.reducir(torneo(3,{t:'ajuste',uid:'u0',k:'relevo',v:true}));assert.equal(t.relevo,true,'el organizador, antes de empezar');
+ assert.equal(B.reducir(torneo(3,{t:'ajuste',uid:'u1',k:'relevo',v:true})).relevo,false,'un peleador no');
+ t=B.reducir(torneo(3,{t:'torneo',uid:'u0'},{t:'ajuste',uid:'u0',k:'relevo',v:true}));
+ assert.ok(t.llave,'con el torneo andando');assert.equal(t.relevo,true,'también se puede activar');
+});
+
+test('la pelea en vivo con el relevo: sin él, los mismos STUN de siempre; con él, también el TURN (que puede llegar tarde)',async()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/bt3-directo.js')+';globalThis.__D={crearEmisor,ICE};',c);
+ c.MediaStream=class{constructor(t){this.t=t;}};
+ const cfgs=[];
+ class RTC{constructor(cfg){cfgs.push(JSON.parse(JSON.stringify(cfg)));this.signalingState='stable';}addTrack(){return{getParameters:()=>({encodings:[{}]}),setParameters:async()=>{}};}
+  createOffer(){return Promise.resolve({type:'offer',sdp:'x'});} setLocalDescription(){return Promise.resolve();} close(){} getSenders(){return[];}}
+ const canvas={height:540,captureStream:()=>({getVideoTracks:()=>[{kind:'video',readyState:'live'}]})};
+ let oye=null;const senal={envia:()=>{},alMensajes:f=>{oye=f;return()=>{};}};
+ const STUN=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}];
+ const normal=c.__D.crearEmisor({senal,uid:'E',canvas,RTC});
+ await oye('A',{t:'ver',s:'a'});
+ assert.deepEqual(cfgs[0].iceServers,STUN,'modo normal: igual que antes');
+ normal.cierra();
+ const TURN={urls:['turn:turn.cloudflare.com:3478?transport=udp'],username:'u',credential:'c'};
+ let llegaron=[];
+ const conRelevo=c.__D.crearEmisor({senal,uid:'E',canvas,RTC,ice:()=>[...c.__D.ICE,...llegaron]});
+ llegaron=[TURN];   // (las credenciales llegaron después de crear el emisor, antes de que alguien pida mirar)
+ await oye('B',{t:'ver',s:'b'});
+ assert.deepEqual(cfgs[1].iceServers,[...STUN,TURN],'con el relevo: el TURN también');
+ conRelevo.cierra();
+});

@@ -1,10 +1,10 @@
 import * as fb from "../fb-juegos.js";
 import { auth } from "../firebase.js";
-import { revisaBt3, BT3_VER } from "./bt3-amigos.js";
+import { revisaBt3, relevoBt3, BT3_VER } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
 import { BT3_BATALLAS, BT3_TIEMPOS, BT3_NIVELES, esCpuBt3 } from "./motor.js";
 import { suena } from "./sonido.js";
-import { crearVisor } from "./bt3-directo.js";
+import { crearVisor, ICE as ICE_VIVO } from "./bt3-directo.js";
 import { BT3_VETOS, BT3_VETOS_TXT, BT3_ORDEN, tiersPermitidas, catalogoBt3, vetadosBt3 } from "./bt3-tiers.js";
 
 /* Budokai Tenkaichi 3 — el cartero entre la sala y el juego.
@@ -103,6 +103,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   /* ---------- mirar la pelea en vivo ----------
      Una pantalla en la sala (fuera del vestíbulo, que se repinta) con el video que manda el que pelea. Se
      cierra sola cuando la pelea termina, o con su ✕. */
+  /* Con el relevo activado, el que mira también puede recibir la pelea por Cloudflare (si su red y la del que pelea no
+     dejan una conexión directa): sus credenciales se piden al abrir la pantalla y se renuevan cada hora. */
+  const relevo = { ice: [], a: 0 };
+  function pideRelevo() {
+    if (Date.now() - relevo.a < 3600e3) return;
+    relevo.a = Date.now();
+    relevoBt3().then(v => { relevo.ice = v; if (!v.length) relevo.a = 0; });
+  }
   function abreTele() {
     const pel = peleaEnVivo();
     if (!pel || !escena || pel.emisor === uid) return;
@@ -137,7 +145,8 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     // en pantalla completa la barra flota y se esconde sola; el mouse la trae (CSS: .jg-bt3-tele.mueve)
     let quieto = 0;
     el.addEventListener("pointermove", () => { el.classList.add("mueve"); clearTimeout(quieto); quieto = setTimeout(() => el.classList.remove("mueve"), 2500); });
-    const visor = crearVisor({ senal, uid, emisor: pel.emisor,
+    if (est.relevo) pideRelevo();
+    const visor = crearVisor({ senal, uid, emisor: pel.emisor, ice: () => [...ICE_VIVO, ...(est?.relevo ? relevo.ice : [])],
       alVideo: flujo => {
         video.srcObject = flujo; nota.hidden = true; el.classList.add("en-vivo");
         // (el clic en «Ver la pelea» deja sonar; si el navegador igual no deja, empieza en silencio y el 🔇 lo activa)
@@ -224,6 +233,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       rol: j1() === uid || rival?.cpu ? "host" : "join", reglas: est.reglas,   // (contra la CPU, el humano es el jugador 1)
       rival: rival ? { uid: rival.uid, nombre: rival.nombre || "Jugador", cpu: !!rival.cpu, nivel: rival.nivel } : null,
       disco: !!est.discos?.[uid],
+      relevo: !!est.relevo,   // el anfitrión activó el relevo de Cloudflare (TURN): el marco pide credenciales al Worker
       veto: est.veto || "",   // la regla de personajes: los vetados los calcula el marco (bt3-marco.js, vetadosDe)
       emite: pelea && emisorDe() === uid   // este marco muestra la pelea en vivo a los que miran (bt3-directo.js)
     });
@@ -395,6 +405,16 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
      la regla, y con el nombre con que lo encontró en el disco (para revisar que la lista quedó bien leída). */
   let vetosAbierto = false;
   const COLOR_TIER = { BROLY: "#c48fd1", "S++": "#f07a7a", "S+": "#f9a06f", S: "#fbc373", A: "#fdfd7d", B: "#bdf77d", C: "#7ef77f", D: "#7dfdfd", "N/C": "#7dbdfd" };
+  /* El relevo de Cloudflare (TURN): el último recurso cuando las redes de los dos no dejan una conexión directa
+     (el chat lo dice: «⚡ BT3 · … no hay relevo»). Lo activa a mano el anfitrión u organizador, nunca solo: con él,
+     los marcos piden credenciales al Worker y la conexión puede pasar por Cloudflare. */
+  function relevoHtml(puede) {
+    const on = !!est.relevo;
+    const ficha = (v, txt) => `<button class="jg-bt3-ficha" data-k="relevo" data-v="${v}" aria-pressed="${(v === "1") === on}" ${puede ? "" : "disabled"}>${txt}</button>`;
+    return `<div class="jg-bt3-veto"><span class="jg-bt3-et">Conexión</span><div class="jg-bt3-fichas">${ficha("", "Directa")}${ficha("1", "🛰 Relevo de Cloudflare")}</div>
+      <p class="jg-bt3-nota">${on ? "Activado para las próximas peleas: si no pueden conectarse directo, la pelea pasa por Cloudflare (un poco más de ping)."
+        : "Último recurso: actívalo solo si no logran conectarse (el chat dice por qué)."}</p></div>`;
+  }
   function vetoHtml(puede) {
     const v = est.veto || "", conCat = catalogoBueno(catalogo);
     const fichas = Object.entries(BT3_VETOS).map(([k, t]) =>
@@ -506,7 +526,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       }
     }
     vistoDuelo = peleas;
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar, est.pendiente]);
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, est.relevo, catalogoBueno(catalogo), est.fase, est.ronda, manda, enSala(), est.marcador, est.empates, est.revancha, est.reanudar, est.pendiente]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.toggle("jugando", jugando);
@@ -554,6 +574,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
         <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(t => [t, TIEMPO_CORTO(t)]), est.tiempo)}</div></div>
         ${vetoHtml(manda)}
+        ${relevoHtml(manda)}
         ${manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el anfitrión.</p>`}
       </div>
       <div class="jg-bt3-pie">
@@ -563,7 +584,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     vest.querySelectorAll(".jg-bt3-hacer").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
     vest.querySelectorAll(".jg-bt3-ficha").forEach(b => b.onclick = () => {
       if (b.getAttribute("aria-pressed") === "true") return;
-      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.k === "relevo" ? b.dataset.v === "1" : b.dataset.v });
     });
     atarVetos();
     atarDar("la pelea " + est.ronda, g => ({ t: "decide", uid, n: est.ronda, g }));
@@ -620,7 +641,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       if (vistoLlave) for (const [id, m] of Object.entries(ahora)) if (!(id in vistoLlave) && m.g && m.a && m.b) celebra(m, est.llave.length, nuevosFuera.has(m.g === m.a ? m.b : m.a));
       vistoLlave = ahora;
     }
-    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, catalogoBueno(catalogo), est.fase, est.llave, est.previa, a, manda, enSala(), est.cupo, est.cpus]);
+    const firma = JSON.stringify(["t", js.map(j => [j.uid, j.nombre, j.foto]), est.anfitrion, est.discos, est.batalla, est.tiempo, est.veto, est.relevo, catalogoBueno(catalogo), est.fase, est.llave, est.previa, a, manda, enSala(), est.cupo, est.cpus]);
     if (!forzar && firma === vestFirma) return;
     vestFirma = firma;
     vest.classList.remove("jugando");
@@ -630,6 +651,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <div><span class="jg-bt3-et">Batalla</span><div class="jg-bt3-fichas">${fichas("batalla", Object.entries(BATALLA_CORTA), est.batalla)}</div></div>
         <div><span class="jg-bt3-et">Tiempo por round</span><div class="jg-bt3-fichas">${fichas("tiempo", BT3_TIEMPOS.map(x => [x, TIEMPO_CORTO(x)]), est.tiempo)}</div></div>
         ${vetoHtml(manda && !est.llave)}
+        ${relevoHtml(manda)}
         ${est.llave ? `<p class="jg-bt3-nota">Las mismas reglas en todas las peleas del torneo.</p>` : manda ? "" : `<p class="jg-bt3-nota">Las reglas las pone el organizador.</p>`}
       </div>`;
     if (!est.llave) {   // antes de empezar
@@ -745,13 +767,14 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       }
       vest.innerHTML = `<header class="jg-bt3-tit"><b>Torneo</b>${ESFERAS}<span>${est.llave[0].flatMap(m => [m.a, m.b]).filter(Boolean).length} peleadores · organiza <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b></span></header>
         ${panel}<div class="jg-bt3-llave">${llave}</div>
+        ${manda || est.relevo ? relevoHtml(manda) : ""}
         ${manda && js.length > 1 ? `<details class="jg-bt3-mano jg-bt3-echar"><summary>Organizador: sacar a un jugador del torneo</summary>
           <div class="jg-bt3-fichas">${js.filter(j => j.uid !== uid).map(j => `<button class="jg-bt3-ficha" data-echa="${escapeHtml(j.uid)}">⏏ <span translate="no">${escapeHtml(j.nombre || "Jugador")}</span></button>`).join("")}</div>
           <p class="jg-bt3-nota">Pierde sus peleas (la que esté en curso y las que le tocaban) y queda mirando.</p></details>` : ""}`;
     }
     vest.querySelectorAll(".jg-bt3-ficha[data-k]").forEach(b => b.onclick = () => {
       if (b.getAttribute("aria-pressed") === "true") return;
-      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.v });
+      anota({ t: "ajuste", uid, k: b.dataset.k, v: b.dataset.k === "tiempo" ? Number(b.dataset.v) : b.dataset.k === "relevo" ? b.dataset.v === "1" : b.dataset.v });
     });
     atarVetos();
     // las CPU del torneo: agregar una, rellenar todos los lugares, cambiar el nivel, quitar
