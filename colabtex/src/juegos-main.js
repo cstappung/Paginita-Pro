@@ -100,6 +100,7 @@ import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./j
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
 import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
+import { escenaNovedad } from "./juegos/novedades-arte.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -2129,10 +2130,6 @@ function armazon() {
    Lo primero del vestíbulo es lo que llegó último, para que quien vuelve
    al salón lo vea sin recorrer el catálogo; justo debajo, la tira de los
    últimos drops de PRODROP. */
-const fechaAlta = a => {
-  const d = new Date(a + "T12:00:00");
-  return isNaN(d) ? "" : d.toLocaleDateString("es", { day: "numeric", month: "long" });
-};
 const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
 
 /* Lo que se destaca a mano: no siempre lo nuevo es un juego de sala
@@ -2144,34 +2141,41 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
   { id: "hero", color: "#ffb21e", alta: "2026-10-12", titulo: "PRO HERO",
+    gancho: "Toca. Brilla. Domina el escenario.", datos: [["333", "canciones"], ["4", "instrumentos"], ["2–8", "en sala"]],
     lema: "Guitarra, bajo, teclado o batería sobre 333 canciones de Clone Hero, con teclado o con tu guitarra. Junta estrellas doradas en Experto para subir en la clasificación, y abre una sala para tocar la misma canción con tus amigos.",
-    sub: "Un jugador o en sala de 2 a 8 · estrellas, top por canción y logros", ruta: "#solo/hero", boton: "Jugar", reglas: ["hero"], modo: "solo", cuenta: true },
+    ruta: "#solo/hero", boton: "Jugar", reglas: ["hero"], modo: "solo", cuenta: true },
   { id: "mascotas", color: "#ff8a3d", alta: "2026-10-10", titulo: "Mascotas",
+    gancho: "Tu mascota te está esperando", datos: [["Gratis", "la primera"], ["3D", "gallina o gato"], ["🎁", "regalos legendarios"]],
     lema: "Adopta una gallina o un gato en 3D, dale de comer, báñalo, hazlo dormir y míralo crecer de huevo a adulto. Vístelo con lo que salga de los regalos, enséñale bailes y lúcelo en tu perfil. La primera adopción es gratis.",
-    sub: "Crianza en 3D · regalos, ropa, muebles y bailes · mercado", ruta: "#mascotas", boton: "Jugar", juego: "mascotas",
+    ruta: "#mascotas", boton: "Jugar", juego: "mascotas",
     modo: "solo", cuenta: true },
   { id: "protiles", color: "#ff5a36", alta: "2026-10-17", titulo: "PRO TILES",
+    gancho: "Que no se te escape ni una", datos: [["8", "canciones"], ["∞", "nunca terminan"], ["1", "error y se acaba"]],
     lema: "Ocho canciones pop originales que nunca terminan: se componen solas mientras tocas, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
-    sub: "Un jugador · piano · 8 canciones + mezcla", ruta: "#solo/protiles", boton: "Jugar", reglas: ["protiles"], modo: "solo" },
+    ruta: "#solo/protiles", boton: "Jugar", reglas: ["protiles"], modo: "solo" },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
+    gancho: "Fútbol a toda velocidad", datos: [["2–8", "jugadores"], ["En vivo", "tiempo real"], ["Bots", "para practicar"]],
     lema: "Fútbol de discos en tiempo real: muévete, choca la pelota y patea con espacio. Rojo contra azul, el primero que llega a los goles pactados gana. Solo, contra bots, o en sala con tu gente.",
-    sub: "2–8 jugadores · rojo contra azul", ficha: "haxball", juego: "haxball", boton: "Jugar", reglas: ["haxball"],
+    ficha: "haxball", juego: "haxball", boton: "Jugar", reglas: ["haxball"],
     modo: "multi", jugadores: "2–8 jugadores", cuenta: true },
   { id: "tulones", color: "#63b8ee", alta: "2026-10-10", titulo: "TULONES",
+    gancho: "La torre más alta gana", datos: [["1–8", "jugadores"], ["En línea", "o mismo teclado"], ["4", "extremidades sueltas"]],
     lema: "Trepa sobre un pudú y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana: de 1 a 8 en el mismo teclado, o en línea por turnos, cada uno desde su casa.",
-    sub: "1 a 8 jugadores · en el mismo teclado o en línea · física de muñecos", ruta: "#solo/tulones", boton: "Jugar", reglas: ["tulones"],
+    ruta: "#solo/tulones", boton: "Jugar", reglas: ["tulones"],
     modo: "multi", jugadores: "1–8 jugadores" },
   { id: "trigon", color: "#f6d23c", alta: "2026-10-10", titulo: "TRIGON",
+    gancho: "Encaja. Completa. Explota.", datos: [["3", "direcciones"], ["5", "temas"], ["×3", "combos"]],
     lema: "Arrastra piezas hechas de triángulos al tablero hexagonal. Completa una línea —horizontal o en cualquiera de las dos diagonales— y se borra. Encadena líneas para multiplicar el bono.",
-    sub: "Un jugador · puzle de triángulos · 5 temas", ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
-  { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
+    ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
+  { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP",
+    gancho: "¿Te saldrá la legendaria?",
     lema: () => (veSerie1() ? "Sobres de cinco cartas, de los profes o de componentes" : "Sobres de cinco cartas") + ", y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
-    sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
-      return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
+    datos: () => [[String(MOTOR.precioSobre(fb.ahora())), "monedas el sobre"], ["Gratis", "uno cada 6 h"], ["5", "cartas por sobre"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
+    gancho: "Lleva la última luz", datos: [["25", "jornadas"], ["7", "jefes"], ["∞", "travesía sin fin"]],
     lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
-    sub: "Un jugador · veinticinco jornadas, siete jefes, taller de mejoras y una travesía sin fin", ruta: "#solo/fanal", boton: "Jugar", reglas: ["fanal"], modo: "solo" }
+    ruta: "#solo/fanal", boton: "Jugar", reglas: ["fanal"], modo: "solo" }
 ];
 /* Lo que se muestra: una novedad de BT3 (si vuelve) solo la ven los
    amigos del disco (bt3Visible, bt3-amigos.js). */
@@ -2185,29 +2189,11 @@ function selloNovedad(n, lista) {
   if (n === ultima) return "★ Lo último";
   return diasDesde(n.alta, fb.ahora()) <= 14 ? "Nuevo" : "Destacado";
 }
-function arteNovedad(n) {
-  // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
-  if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
-  // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
-  if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
-  // Los del club: la misma escena de su portada.
-  if (n.id === "protiles") return `<div class="jg-nov-arte-zb">${portadaSolo("protiles")}<b>PRO TILES</b></div>`;
-  if (n.id === "trigon") return `<div class="jg-nov-arte-zb">${portadaSolo("trigon")}<b>TRIGON</b></div>`;
-  if (n.id === "hero") return `<div class="jg-nov-arte-zb">${portadaSolo("hero")}<b>PRO HERO</b></div>`;
-  if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
-  if (n.id === "bt3") return `<div class="jg-nov-arte-bt3">${arteJuego("bt3")}</div>`;
-  if (n.id === "prodrop") {
-    // la Serie 01 (los profes) solo para quien la ve; si no, tres componentes
-    if (!veSerie1()) {
-      const cs = ["dieciochero/esp32", "quemado/timer-555", "halloween/led"];
-      return `<div class="jg-nov-arte-pd">${cs.map(c => `<img src="juegos/prodrop/cards/componentes/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
-    }
-    const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];
-    return `<div class="jg-nov-arte-pd">${cs.map((c, i) => `<img src="juegos/prodrop/cards/${i === 1 ? "legendarias" : "epicas"}/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
-  }
-  // Un juego de sala: su portada del catálogo.
-  return `<div class="jg-nov-arte-zb">${arteJuego(n.juego || n.id)}</div>`;
-}
+/* La escena de cada diapositiva: una ilustración animada a todo el ancho
+   (`novedades-arte.js`). Una novedad sin escena propia se queda con un
+   fondo del color de su juego. */
+const escenaDe = n => escenaNovedad(n.id, { serie1: n.id === "prodrop" && veSerie1() }) ||
+  `<div class="ep-gen" style="background:radial-gradient(circle at 75% 40%,${n.color},#0b0716 70%)"></div>`;
 
 /* El texto del botón grande sobre el color del juego: oscuro sobre los
    colores claros (el amarillo de PRO HERO o de Trigon), blanco sobre el
@@ -2246,18 +2232,22 @@ function novedadesHtml() {
     /* El botón grande: lo primero que se ve después del título. Sin
        cuenta, el mismo botón pide iniciar sesión (con su candado). */
     const ico = c => `<span class="jg-ban-jugar-ico" aria-hidden="true">${c}</span>`;
+    /* «FANAL · la otra orilla»: el nombre en grande y el resto debajo. */
+    const [titulo, apellido] = n.titulo.split(" · ");
+    const datos = (typeof n.datos === "function" ? n.datos() : n.datos) || [];
     const accion = cuenta
       ? `<button class="jg-ban-jugar" type="button" data-login>${ico(CANDADO)}<span>Iniciar sesión y jugar</span></button>`
       : n.ficha ? `<button class="jg-ban-jugar" type="button" data-nov-ficha="${n.ficha}">${ico(PLAY)}<span>${escapeHtml(n.boton)}</span></button>`
       : `<a class="jg-ban-jugar" href="${n.ruta}">${ico(PLAY)}<span>${escapeHtml(n.boton)}</span></a>`;
     return `
-          <article class="jg-ban-c${cuenta ? " bloq" : ""}" style="--c:${n.color};--tinta:${tintaSobre(n.color)}" ${copia ? 'aria-hidden="true" inert' : `role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${N}: ${escapeHtml(n.titulo)}"`}>
-            <div class="jg-portada jg-nov-arte jg-ban-arte" aria-hidden="true">${arteNovedad(n)}</div>
+          <article class="jg-ban-c${cuenta ? " bloq" : ""}" data-ep="${n.id}" style="--c:${n.color};--tinta:${tintaSobre(n.color)}" ${copia ? 'aria-hidden="true" inert' : `role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${N}: ${escapeHtml(n.titulo)}"`}>
+            <div class="jg-ban-escena" aria-hidden="true">${escenaDe(n)}</div>
             <div class="jg-ban-cuerpo">
-              <div class="jg-ban-meta"><span class="jg-nov-sello">${selloNovedad(n, VISIBLES)}</span>${insignia}<span class="jg-ban-fecha">${escapeHtml(fechaAlta(n.alta))}</span></div>
-              <h2>${escapeHtml(n.titulo)}</h2>
-              <p>${escapeHtml(typeof n.lema === "function" ? n.lema() : n.lema)}</p>
-              <small>${escapeHtml(typeof n.sub === "function" ? n.sub() : n.sub)}${cuenta ? " · requiere cuenta" : ""}</small>
+              <div class="jg-ban-meta"><span class="jg-nov-sello">${selloNovedad(n, VISIBLES)}</span>${insignia}</div>
+              ${n.gancho ? `<p class="jg-ban-gancho">${escapeHtml(n.gancho)}</p>` : ""}
+              <h2 class="jg-ban-logo">${escapeHtml(titulo)}${apellido ? ` <span>${escapeHtml(apellido)}</span>` : ""}</h2>
+              <p class="jg-ban-lema">${escapeHtml(typeof n.lema === "function" ? n.lema() : n.lema)}</p>
+              ${datos.length ? `<ul class="jg-ban-datos">${datos.map(([v, t]) => `<li><b>${escapeHtml(v)}</b><span>${escapeHtml(t)}</span></li>`).join("")}</ul>` : ""}
               <div class="jg-nov-pie">
                 ${accion}
                 ${n.reglas ? `<button class="btn2" data-nov-reglas="${n.id}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(n.titulo)}">📖</button>` : ""}
@@ -2322,6 +2312,9 @@ function enganchaBanner(h) {
   if (!raiz || N < 2) return;
   const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
   const puntos = [...raiz.querySelectorAll("[data-ban-ir]")], pausa = raiz.querySelector("[data-ban-pausa]");
+  /* Todas las diapositivas, la copia del final incluida: solo la que se ve
+     lleva `.on`, que es la que anima su escena y hace entrar su texto. */
+  const diapos = [...raiz.querySelectorAll(".jg-ban-c")];
   const quieto = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
   let i = 0, t = 0, encima = false, foco = false, pausado = quieto, arrastre = null;
   const pon = (k, anima, dx = 0) => {
@@ -2330,6 +2323,7 @@ function enganchaBanner(h) {
   };
   const pinta = () => {
     const j = i % N;
+    diapos.forEach((d, k) => d.classList.toggle("on", k === i));
     puntos.forEach((b, k) => { b.classList.toggle("on", k === j); b.setAttribute("aria-current", String(k === j)); });
     const lleno = raiz.querySelector(".jg-ban-puntos .on i");
     for (const b of puntos) b.firstChild.style.transform = "";
@@ -2341,6 +2335,7 @@ function enganchaBanner(h) {
   };
   const ve = k => {
     t = 0;
+    for (const d of diapos) d.classList.remove("ya");
     /* Parada en la copia (a medio pasar): se cuenta desde la primera. */
     if (i >= N) { k -= N; i = 0; pon(0, false); void pista.offsetWidth; }
     /* De la primera hacia atrás: se salta a la copia y se anima desde ahí. */
@@ -2353,7 +2348,8 @@ function enganchaBanner(h) {
   /* Al llegar a la copia de la primera, se vuelve a la de verdad sin que
      se note: son idénticas. */
   pista.addEventListener("transitionend", e => {
-    if (e.target === pista && i >= N) { i = 0; pon(0, false); pinta(); }
+    /* La primera ya se vio entrar (era la copia): no repite la entrada. */
+    if (e.target === pista && i >= N) { i = 0; pon(0, false); diapos[0].classList.add("ya"); pinta(); }
   });
   raiz.querySelectorAll("[data-ban]").forEach(b => b.onclick = () => ve(i + Number(b.dataset.ban)));
   puntos.forEach(b => b.onclick = () => ve(Number(b.dataset.banIr)));

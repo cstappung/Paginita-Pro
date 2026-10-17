@@ -42,9 +42,19 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   that only counts while nobody is looking closely: mouse over, focus
   inside, hidden tab, the ⏸ button, an open ficha and reduced motion all
   hold it; the active dot fills with the time left. Swipe on touch; a drag
-  is never a click. Each slide's art (`arteNovedad`) is drawn at the old
-  card's size (380×165) and scaled whole with `transform` — `zoom` pushed
-  px-placed pieces out of the box.
+  is never a click. **Each slide is a full-width animated scene**
+  (`juegos/novedades-arte.js`, one SVG of 1200×420 per game with
+  `xMaxYMid slice`) with the text over a dark veil on the left. The
+  scene's subject must stay between x ≈ 600 and 1180: on PC the veil
+  covers the left, on a phone the scene is the top strip and the slice
+  shows only the right half. PRODROP's scene is HTML (its cards are
+  photos). Only the visible slide (`.on`) animates; its text enters in a
+  cascade (not again when the loop snaps back: `.ya`). An animated piece
+  (`ep-*`) must never carry an SVG `transform` itself (wrap it in a `<g>`):
+  the CSS animation replaces it — `salon.test.cjs` checks it. Each game's
+  name is a logo in its own font (Bungee, Lilita One, Cinzel; Google Fonts
+  link in juegos.html), with a hook line (`gancho`) and three big facts
+  (`datos`) under the lema.
 - **Últimos drops legendarios · Mascotas** (`pintaDropsMascotas`, from
   `mejoresDropsMascotas` in `mascotas-datos.js`): the legendary items of
   valid gifts, newest first, with who and when (names `translate="no"`).
@@ -145,8 +155,8 @@ holds **eight slides in the owner's order** — PRO HERO, Mascotas, PRO TILES,
 HaxBall, TULONES (one slide for the local and the online game), Trigon,
 PRODROP, FANAL — pinned by `salon.test.cjs`. The order is not by date: the
 «★ Lo último» seal goes to the newest `alta` (`selloNovedad`), «Nuevo» to
-the last 14 days, «Destacado» to the rest. Each slide has its own art
-(`arteNovedad`) and a **big «Jugar» button** (`.jg-ban-jugar`, the game's
+the last 14 days, «Destacado» to the rest. Each slide has its scene
+and a **big «Jugar» button** (`.jg-ban-jugar`, the game's
 colour, text in `--tinta` from `tintaSobre` so yellow gets dark text): it
 goes to `ruta`, or opens the game's ficha (`ficha`) for a room game — the
 banner never opens a room by itself. For a guest the same button reads
