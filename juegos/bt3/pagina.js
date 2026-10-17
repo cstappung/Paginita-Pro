@@ -1384,9 +1384,10 @@
       aviso("Conectando con " + e.rival.nombre + "…", 0, true);
       const ok = await S.conecta(e.yo, e.rival.uid);
       if (!ok) {
-        aviso("No se pudo conectar con " + e.rival.nombre + ": sus redes no dejan una conexión directa. " +
-          "Prueben otra red (los datos del celular a veces la bloquean). Vuelvan al vestíbulo e intenten de nuevo.");
-        S.avisa("termino", { por: "sin-conexion" });
+        const motivo = (S.motivo && S.motivo()) || "sus redes no dejan una conexión directa";
+        aviso("No se pudo conectar con " + e.rival.nombre + ": " + motivo + ". Vuelvan al vestíbulo e intenten de nuevo.");
+        Module.keep("red: sin conexión: " + motivo);
+        S.avisa("termino", { por: "sin-conexion", motivo });   // la sala lo escribe en el chat (este aviso se pierde al recargar)
         return new Promise(() => {});   // el programa no arranca; la sala recarga este marco al volver
       }
       // Los paquetes del juego, por la malla del marco (gs/net.c: Module.netSend / netRecv, como UDP).
@@ -1429,7 +1430,7 @@
      si vuelve, sigue la pelea donde iba. Si no, la pelea se corta («corte») y la sala la vuelve a empezar sola
      cuando estén los dos (motor.js, `reanudar`): una copia del juego que se recargó no puede volver a una pelea a
      la mitad (cada una arranca de cero). */
-  let cuenta = 0, cortada = false;
+  let cuenta = 0, cortada = false, motivoRed = "";   // motivoRed: por qué terminó la sesión, para el chat de la sala
   /* Un pitido corto por cada segundo de la cuenta (más agudo los últimos cinco): una pausa por corte se nota aunque
      no se esté mirando la pantalla. Va por el contexto de audio del juego, así que lo gobierna el volumen de la página. */
   function pitido(hz) {
@@ -1463,11 +1464,14 @@
     } else if (que === "ended") {
       clearInterval(cuenta);
       cortada = !/different version/i.test(txt || "");
+      motivoRed = !txt ? "" : /different version/i.test(txt) ? "el juego del rival es otra versión (que los dos recarguen la página con Ctrl+F5)"
+        : /did not answer/i.test(txt) ? "el juego del rival no respondió al empezar (se conectaron, pero su juego no llegó a la pelea: que recargue)"
+        : /lost|left/i.test(txt) ? "se perdió la conexión con el rival en plena pelea" : txt;
       aviso(txt ? "La pelea se cortó: " + (/lost|did not answer|left/i.test(txt) ? "se perdió la conexión con tu rival" : txt) + ". Vuelve a empezar sola cuando estén los dos." : "La pelea terminó.");
     } else if (que === "leave") {
       clearInterval(cuenta);
       S.cierra();
-      S.avisa("termino", { por: cortada ? "corte" : (txt || "") });
+      S.avisa("termino", { por: cortada ? "corte" : (txt || ""), motivo: motivoRed });
     }
   };
   addEventListener("pagehide", () => S.cierra());

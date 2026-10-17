@@ -97,7 +97,7 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
      hasta que el juego abre su menú de resultados (`menufin`, después de la pose y la frase del ganador), o 25 s. Antes
      la sala recargaba apenas llegaban los dos avisos y cortaba la pantalla de ganador. Una pelea cortada (sin ganador)
      se recarga al tiro, como siempre. */
-  let vioGanador = false, esperaMenu = 0;
+  let vioGanador = false, esperaMenu = 0, avisoRed = "";   // avisoRed: el último «por qué no conectó» escrito en el chat
   let escena = null, avisos = null, tele = null;
 
   /* ---------- mirar la pelea en vivo ----------
@@ -282,6 +282,16 @@ export function crearBt3({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       return;
     }
     if (partida?.fin || !enSala()) return;   // un mirón no escribe
+    if (d.tipo === "termino" && typeof d.motivo === "string" && d.motivo) {
+      /* Por qué no se pudo conectar (o se cortó): el marco se recarga al volver al vestíbulo y su aviso se pierde,
+         así que queda escrito en el chat de la sala, a la vista de los dos. Una vez por pelea y motivo. */
+      const n = est.torneo ? est.actual?.id : est.ronda, clave = n + "|" + d.motivo;
+      if (clave !== avisoRed) {
+        avisoRed = clave;
+        const otro = (est.torneo ? [est.actual?.a, est.actual?.b] : [j1(), j2()]).find(u => u && u !== uid);
+        chat?.(`⚡ BT3 · ${nombre(uid)} → ${otro ? nombre(otro) : "su rival"}: ${d.motivo}`.slice(0, 300));
+      }
+    }
     if (d.tipo === "disco") { discoMarco = true; marcaDisco(); }
     else if (d.tipo === "resultado" && (peleando() || (!est.torneo && est.pendiente && est.fase === "vestibulo")) && Number.isInteger(d.bits)) {
       // (también tarde: la sala ya volvió al vestíbulo porque la sesión del otro se cerró, y esta pelea sigue sin resultado)
