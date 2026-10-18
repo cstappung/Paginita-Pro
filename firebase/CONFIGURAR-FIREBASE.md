@@ -631,6 +631,33 @@ Sin publicar, la sala de BT3 no se puede crear (el juego de un jugador,
 `juegos/bt3/`, funciona igual). Pegar `firebase/database.rules.json` entero y
 **Publicar**.
 
+### ⚠ Memazo pide publicar otra vez (2026-10-18)
+
+`'memazo'` tiene que estar en la lista del campo `juego` y en la de
+`logros`. No hay nodo nuevo: los memes, las notas y los cierres de cada
+etapa van por `jugadas` (`arranca`, `meme`, `nota`, `cierra`), y las rondas
+y el tiempo de la sala entran como `rondas` y `tiempo` por `$otro`. La regla
+de `jugadas/$n/at` ahora vale también para Memazo: el plazo para escribir y
+para calificar se juzga con esa hora. Sin publicar, la sala de Memazo no se
+puede crear. Pegar `firebase/database.rules.json` entero y **Publicar**, o
+usar el botón **Copiar las reglas** del cartel de la página de juegos.
+
+**Plantillas reales y GIFs (también 2026-10-18).** La sala de Memazo elige
+de dónde salen las plantillas. Las **reales** vienen de la API pública de
+Imgflip y no piden nada. Los **GIFs** vienen de GIPHY, que pide una clave:
+
+1. Crear una cuenta en [developers.giphy.com](https://developers.giphy.com/dashboard/)
+   → *Create an App* → **API** (no SDK) y copiar su *API Key*.
+2. En Realtime Database → Datos, crear el nodo `giphy` con un hijo `clave`
+   y pegar ahí la clave (texto, sin comillas).
+
+Las reglas nuevas traen `giphy` legible por quien tenga sesión y no
+escribible desde la web, como `discord`. La clave queda a la vista de
+quien juegue (cada navegador la usa para buscar), igual que la de
+Firebase; GIPHY la limita por cantidad de llamadas, y si se abusa se
+cambia por otra en ese nodo sin tocar el código. Sin clave, una sala de
+GIFs ofrece los dibujos de la casa.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:

@@ -640,13 +640,24 @@ function mariposas() {
     gira(13, en(67, 250, mariposa("#ec4899", "#831843"), 250 + 90));
 }
 
+function memazo() {
+  // Memes que orbitan (un cuadro con su texto arriba y abajo) y caras de risa que saltan.
+  const meme = c => rect(15, 13, 1.2, "#fff", `stroke="#1c0b38" stroke-width=".8"`) + rect(11, 2.6, .6, c) +
+    `<rect x="-5.5" y="3.4" width="11" height="2" rx=".6" fill="#111"/><rect x="-5.5" y="-5.6" width="11" height="2" rx=".6" fill="#111"/>`;
+  const cara = i => an("hop", 1.3, `<circle r="5.2" fill="#ffd23f" stroke="#7a4a00" stroke-width=".7"/><path d="M-3-1.6l1.6-1M3-1.6l-1.6-1" stroke="#7a4a00" stroke-width=".9" stroke-linecap="round"/><path d="M-3 .6Q0 5 3 .6Z" fill="#7a4a00"/><path d="M-4.4-.6q-.8 1.6 0 2.6" stroke="#38bdf8" stroke-width="1" fill="none"/>`, n1(-i * .3));
+  const C = ["#ff3d8b", "#38bdf8", "#4ade80"];
+  return aro(60, "#4a1d8f", 18) + aro(51, "#ffd23f", 1.4, `stroke-dasharray="3 3"`) + aro(69, "#ffd23f", 1.4, `stroke-dasharray="3 3"`) +
+    gira(16, cada(6, (i, a) => en(60, a, an("l", 1.6, meme(C[i % 3]), n1(-i * .25)), a))) +
+    [0, 1, 2].map(i => en(60, 30 + i * 120, cara(i))).join("");
+}
+
 const DIBUJOS = {
   tsnake: snake, tminas: minas, ttetris: tetris, tsortem: sortem, tbbtan: bbtan, tsopa: sopa,
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
-  tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero,
+  tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero, tmemazo: memazo,
   cometa, vortice, sakura, plasma, mariposas
 };
 

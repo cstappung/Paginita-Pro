@@ -192,6 +192,8 @@ await denied("B NO reescribe el mensaje de un error", () => set(ref(db, "errors/
 await denied("B NO infla el contador", () => set(ref(db, "errors/epruebas1/veces"), 1000));
 await allowed("B sí suma una vez", () => rep.publishError(errRec, userB2.uid));
 await allowed("B lee el webhook de Discord (para anunciar sus salas)", () => get(ref(db, "discord")));
+await allowed("B lee la clave de GIPHY (los GIFs de Memazo)", () => get(ref(db, "giphy")));
+await denied("B no puede cambiar la clave de GIPHY", () => set(ref(db, "giphy/clave"), "abcdefghijkl"));
 await denied("B NO puede reescribir el texto de A", () =>
   set(ref(db, `feedback/${fbId}/titulo`), "secuestrado"));
 await denied("B NO puede borrar lo de A", () => rep.deleteFeedback(fbId));

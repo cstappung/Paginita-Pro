@@ -67,7 +67,7 @@ export const MARCOS = [
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
     ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["thaxball", "haxball", "Arco de oro"], ["tbt3", "bt3", "Ki desbordante"], ["ttulones", "tulones", "Torre de tulones"], ["tatasco", "atasco", "Luz verde"], ["taleteo", "aleteo", "Ala negra"], ["tdosmil", "dosmil", "Ficha dorada"],
-    ["tmetrorush", "metrorush", "Maquinista"], ["ttrigon", "trigon", "Triángulos"], ["tprotiles", "protiles", "Teclas de piano"], ["thero", "hero", "Púa dorada"]
+    ["tmetrorush", "metrorush", "Maquinista"], ["ttrigon", "trigon", "Triángulos"], ["tprotiles", "protiles", "Teclas de piano"], ["thero", "hero", "Púa dorada"], ["tmemazo", "memazo", "Marco de meme"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 

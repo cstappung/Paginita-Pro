@@ -56,6 +56,9 @@ const mias = (obj, me) => Object.keys(obj || {}).filter(k => obj[k] === me);
 const ajColorDe = c => (c.est.blancas === c.me ? "w" : c.est.negras === c.me ? "b" : "");
 const ladoMax = Math.max(...Object.values(TAMANOS).map(t => t.lado));
 
+/* Memazo: mis memes de toda la partida, y quién sacó la mejor nota de una ronda ("" si empatan). */
+const mzMios = c => (c.est.historial || []).flatMap(h => h.memes).filter(m => m.uid === c.me);
+const mzMejor = h => { const o = h.memes.slice().sort((a, b) => b.total - a.total); return o[0] && o[0].total > 0 && (!o[1] || o[1].total < o[0].total) ? o[0].uid : ""; };
 /* Pokémon: el resumen que el motor saca del registro de Showdown. */
 const pkDe = c => { const i = (c.est.lados || []).indexOf(c.me); return (i >= 0 && c.est.resumen && c.est.resumen[i]) || {}; };
 const SALA = {
@@ -99,6 +102,15 @@ const SALA = {
     { id: "pequeno", n: "Primer gatito", d: "Gana un gato pequeño en el Super Gato.", i: "🐱", m: "Super Gato", x: c => c.est.variante === "super" && (c.est.grande || []).includes(c.est.equis === c.me ? "x" : "o") },
     { id: "cinco", n: "Dueño de la pizarra", d: "Ten cinco gatos pequeños a la vez.", i: "🧽", m: "Super Gato", x: c => { const f = c.est.equis === c.me ? "x" : "o"; return c.est.variante === "super" && (c.est.grande || []).filter(v => v === f).length >= 5; } },
     { id: "tablas", n: "Gato encerrado", d: "Termina una partida en empate.", i: "🤝", x: c => c.est.fase === "fin" && c.est.motivo === "empate" }
+  ],
+  /* Memazo: todo sale del historial de rondas, con las notas de cada meme. */
+  memazo: [
+    { id: "unanime", n: "Unánime", d: "Un meme tuyo recibe 🔥 de todos los demás (con 2 o más calificando).", i: "🔥", x: c => mzMios(c).some(m => { const v = Object.values(m.notas); return v.length >= 2 && v.every(x => x === 5); }) },
+    { id: "ronda", n: "Meme de la ronda", d: "Saca la mejor nota de una ronda, sin empate.", i: "🖼️", x: c => (c.est.historial || []).some(h => mzMejor(h) === c.me) },
+    { id: "barrida", n: "Barrida", d: "Gana todas las rondas de una partida de 3 rondas o más.", i: "🧹", x: c => c.gano && (c.est.historial || []).length >= 3 && c.est.historial.every(h => mzMejor(h) === c.me) },
+    { id: "viral", n: "Viral", d: "Gana una partida con 6 jugadores o más.", i: "📈", x: c => c.gano && c.n >= 6 },
+    { id: "tomatazo", n: "Tomatazo", d: "Un meme tuyo recibe 🍅 de todos los demás (con 2 o más calificando).", i: "🍅", x: c => mzMios(c).some(m => { const v = Object.values(m.notas); return v.length >= 2 && v.every(x => x === 1); }) },
+    { id: "justo", n: "Por una risa", d: "Gana por un solo punto.", i: "🤏", x: c => c.gano && margen(c.est.puntos || {}, c) === 1 }
   ],
   reversi: [
     { id: "cincuenta", n: "Marea negra", d: "Gana con 50 fichas o más.", i: "🌊", x: c => c.gano && ((c.est.cuenta || {})[c.me] || 0) >= 50 },

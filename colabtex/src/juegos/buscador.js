@@ -68,6 +68,7 @@ export const APODOS = {
   worms: "worms artilleria gusanos explosiones bazuca",
   reversi: "othello fichas",
   gato: "tres en raya tic tac toe tateti super gato",
+  memazo: "make it meme memes plantillas humor risa chistes fiesta party votar",
   cadena: "chain reaction reaccion atomos explosiones",
   flip7: "flip seven cartas numeros suerte",
   cacho: "dados dudo calzo perudo cachito",

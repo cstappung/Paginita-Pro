@@ -155,7 +155,7 @@
         "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
         "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'tulones' || newData.val() === 'hero'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'tulones' || newData.val() === 'hero' || newData.val() === 'memazo'" },
         "modo": { ".validate": "newData.val() === 'normal' || newData.val() === 'venganza' || newData.val() === 'super' || newData.val() === 'clasico' || newData.val() === 'nomercy' || newData.val() === 'nomercyx' || newData.val() === 'allwild' || newData.val() === 'liar'" },
         "malla": { ".validate": "newData.val() === 'chica' || newData.val() === 'clasica' || newData.val() === 'grande'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
@@ -197,7 +197,7 @@
             ".validate": "newData.hasChildren(['t', 'uid']) && newData.child('t').isString() && newData.child('t').val().length <= 16 && $n.length >= 4",
             "h": { ".validate": "newData.isString() && newData.val().length <= 80" },
             "sal": { ".validate": "newData.isString() && newData.val().length <= 40" },
-            "at": { ".validate": "(root.child('partidas').child($pid).child('juego').val() !== 'ajedrez' && root.child('partidas').child($pid).child('juego').val() !== 'tulones' && root.child('partidas').child($pid).child('juego').val() !== 'hero') || (newData.isNumber() && newData.val() <= now + 3000 && newData.val() >= now - 8000)" },
+            "at": { ".validate": "(root.child('partidas').child($pid).child('juego').val() !== 'ajedrez' && root.child('partidas').child($pid).child('juego').val() !== 'tulones' && root.child('partidas').child($pid).child('juego').val() !== 'hero' && root.child('partidas').child($pid).child('juego').val() !== 'memazo') || (newData.isNumber() && newData.val() <= now + 3000 && newData.val() >= now - 8000)" },
             "$otro": { ".validate": true }
           }
         },
@@ -306,6 +306,11 @@
     },
 
     "discord": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
+    "giphy": {
       ".read": "auth != null",
       ".write": false
     },
@@ -794,7 +799,7 @@
     "logros": {
       ".read": "auth != null",
       "$juego": {
-        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|metrorush|tulones)$/)",
+        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|metrorush|tulones|memazo)$/)",
         "$uid": {
           "$id": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",

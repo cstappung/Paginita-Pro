@@ -66,7 +66,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 export const PESO = {
   escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
-  boxhead: 1.3, haxball: 1.2, bt3: 1.5, tulones: 1.6, hero: 1.2, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
+  boxhead: 1.3, haxball: 1.2, bt3: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -83,7 +83,7 @@ export const NIVEL = {
   cadena: F + "132232", worms: F + "132323", flip7: F + "221232",
   cacho: F + "212132", uno: F + "121223", catan: F + "122213",
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",
-  yemas: F + "133243", clue: F + "321233", boxhead: F + "232223", haxball: F + "123223", tulones: F + "232323",
+  yemas: F + "133243", clue: F + "321233", boxhead: F + "232223", haxball: F + "123223", tulones: F + "232323", memazo: F + "313222",
   /* BT3 no lleva los de la fila (no clasifica): primera anfitrion visita revancha maraton incansable
      equipo dp infinito relampago. */
   bt3: "1112342212",
