@@ -310,6 +310,11 @@
       ".write": false
     },
 
+    "giphy": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
     "diario": {
       ".read": "auth != null",
       "$uid": {

@@ -326,6 +326,29 @@ export function memeHtml(id, textos = [], { vacias = false, clase = "" } = {}) {
     <svg viewBox="0 0 ${pl.w} ${pl.h}" preserveAspectRatio="none" aria-hidden="true">${pl.arte}</svg>${cajas}</div>`;
 }
 
+/* La URL de una plantilla de afuera; `mini` pide la versión liviana (los GIF pesan). */
+export function urlExterna(mm, mini) {
+  if (mm.p === "if") return "https://i.imgflip.com/" + mm.u;
+  if (mm.p === "gif") return `https://media.giphy.com/media/${mm.u}/${mini ? "200w" : "giphy"}.gif`;
+  return "";
+}
+
+/* Un meme cualquiera de la partida: dibujo de la casa o imagen de afuera
+   (Imgflip o GIPHY, con las cajas que puso su autor). `editable` añade el
+   asa para agrandar cada caja (el editor). */
+export function memeDe(mm, textos = mm.x || [], { vacias = false, clase = "", mini = false, editable = false } = {}) {
+  if (PLANTILLAS[mm.p]) return memeHtml(mm.p, textos, { vacias, clase });
+  const url = urlExterna(mm, mini);
+  if (!url || !Array.isArray(mm.c)) return "";
+  const cajas = mm.c.map((b, i) => {
+    const t = textos[i] || "";
+    return `<div class="jg-mz-caja jg-mz-c-imp${!t && vacias ? " vacia" : ""}" data-k="${i}" data-n="Texto ${i + 1}"
+      style="left:${b[0]}%;top:${b[1]}%;width:${b[2]}%;height:${b[3]}%;--t:8"><span translate="no">${esc(t)}</span>${editable ? `<b class="jg-mz-asa" data-asa="${i}"></b>` : ""}</div>`;
+  }).join("");
+  return `<div class="jg-mz-meme jg-mz-ext ${clase}" data-p="${mm.p}" style="aspect-ratio:${mm.w}/${mm.h}">
+    <img src="${esc(url)}" alt="${esc(mm.n || "")}" loading="lazy" referrerpolicy="no-referrer" draggable="false">${cajas}</div>`;
+}
+
 /* Achica cada texto hasta que quepa en su caja. El tamaño va en `cqw`
    (relativo al ancho del meme), así que lo que cabe en la miniatura cabe
    igual en grande: el ajuste se hace una vez y vale a cualquier tamaño.

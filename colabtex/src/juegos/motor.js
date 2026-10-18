@@ -7504,7 +7504,9 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
      del primer asiento en cuanto la sala está lista.
    - `meme {r, p, x:[textos], at}` es el meme de la ronda `r` con la
      plantilla `p`, que tiene que ser una de las que le tocaron. Vale el
-     último que llegue mientras se escribe: se puede corregir.
+     último que llegue mientras se escribe: se puede corregir. Con
+     plantillas de afuera `p` es "if" (Imgflip) o "gif" (GIPHY) y la
+     jugada trae además `u, w, h, n, c` (ver `externoMemazo`).
    - `nota {r, m, v, at}` califica el meme `m` de la ronda `r`. Vale la
      primera de cada uno, y nunca la del autor.
    - `cierra {r, e, m, at}` cierra la etapa `e` («escribir» o «votar»)
@@ -7535,6 +7537,33 @@ export const MZ_PLANTILLAS = {
   mono: 1, incendio: 2, panico: 3, trato: 2, siempre: 2, perros: 4, bici: 2, salida: 3,
   quien: 2, elegante: 2, cartel: 1, noticia: 2
 };
+/* De dónde salen las plantillas. Los dibujos de la casa valen siempre
+   (son también el plan B si la API de afuera no responde); en las otras
+   la jugada trae la imagen (`u`, su tamaño `w`×`h`) y dónde va cada
+   texto (`c`, rectángulos en %), porque esas plantillas no traen cajas.
+   La imagen se valida contra el formato de cada servicio: nadie puede
+   meter una URL cualquiera en la pantalla de los demás. */
+export const MZ_FUENTES = { reales: "Plantillas reales (Imgflip)", gif: "GIFs (GIPHY)", dibujos: "Dibujos de la casa" };
+export const fuenteMemazo = p => Object.prototype.hasOwnProperty.call(MZ_FUENTES, p && p.fuente) ? p.fuente : "dibujos";
+export const MZ_CAJAS_MAX = 5;
+const mzNum = (v, a, b) => Math.max(a, Math.min(b, Math.round((Number(v) || 0) * 10) / 10));
+/* La plantilla de afuera de una jugada `meme`, o null si no vale en esta sala. */
+export function externoMemazo(j, fuente) {
+  const p = j && j.p;
+  if (!((p === "if" && fuente === "reales") || (p === "gif" && fuente === "gif"))) return null;
+  const u = String(j.u || "");
+  if (p === "if" ? !/^[A-Za-z0-9]{3,12}\.(jpg|png|gif)$/.test(u) : !/^[A-Za-z0-9]{6,40}$/.test(u)) return null;
+  const w = Math.round(Number(j.w)), h = Math.round(Number(j.h));
+  if (!(w >= 40 && w <= 5000 && h >= 40 && h <= 5000) || w / h > 5 || h / w > 5) return null;
+  if (!Array.isArray(j.c) || !j.c.length || j.c.length > MZ_CAJAS_MAX) return null;
+  const c = [];
+  for (const b of j.c) {
+    if (!Array.isArray(b) || b.length !== 4) return null;
+    const x = mzNum(b[0], 0, 95), y = mzNum(b[1], 0, 95);
+    c.push([x, y, mzNum(b[2], 5, 100 - x), mzNum(b[3], 5, 100 - y)]);
+  }
+  return { u, w, h, c, n: typeof j.n === "string" ? j.n.slice(0, 60) : "" };
+}
 export const tiempoMemazo = p => MZ_TIEMPOS.includes(Number(p && p.tiempo)) ? Number(p.tiempo) : 90;
 export const rondasMemazo = p => MZ_RONDAS.includes(Number(p && p.rondas)) ? Number(p.rondas) : 3;
 const mzSemilla = (semilla, r, k) => ((semilla >>> 0) ^ Math.imul(r * 31 + k + 1, 0x9E3779B1)) >>> 0;
@@ -7550,8 +7579,8 @@ export function ofertasMemazo(semilla, r, i) {
 
 /* Los textos tal como cuentan: tantos como cajas, recortados y sin
    saltos de línea de más. `null` si no hay nada escrito. */
-export function textosMemazo(p, x) {
-  const n = MZ_PLANTILLAS[p];
+export function textosMemazo(p, x, cuantas) {
+  const n = cuantas || MZ_PLANTILLAS[p];
   if (!n || !Array.isArray(x)) return null;
   const t = Array.from({ length: n }, (_, k) => typeof x[k] === "string"
     ? x[k].replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim().slice(0, MZ_LARGO) : "");
@@ -7561,7 +7590,7 @@ export function textosMemazo(p, x) {
 export function redMemazo(p, js = jugadoresDe(p), listos = true) {
   const asiento = {};
   js.forEach((j, i) => { asiento[j.uid] = i; });
-  const rondas = rondasMemazo(p), tiempo = tiempoMemazo(p), sem = Number(p.semilla) || 0;
+  const rondas = rondasMemazo(p), tiempo = tiempoMemazo(p), fuente = fuenteMemazo(p), sem = Number(p.semilla) || 0;
   const fuera = {}, puntos = {}, fuegos = {}, tomates = {};
   for (const j of js) { puntos[j.uid] = 0; fuegos[j.uid] = 0; tomates[j.uid] = 0; }
   const historial = [];
@@ -7594,7 +7623,7 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
     completa = false;
     if (etapa === "escribir") {
       const lista = js.filter(j => envios[j.uid] && !fuera[j.uid])
-        .map(j => ({ uid: j.uid, p: envios[j.uid].p, x: envios[j.uid].x, notas: {}, total: 0 }));
+        .map(j => ({ uid: j.uid, ...envios[j.uid], notas: {}, total: 0 }));
       memes = mezcla(lista, rng(mzSemilla(sem, r, 1)));
       if (!memes.length) return finRonda(at);
       etapa = "votar"; m = 0; desde = at; plazo = at + MZ_VOTO_MS;
@@ -7639,10 +7668,11 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
       continue;
     }
     if (etapa === "escribir" && j.t === "meme" && Number(j.r) === r) {
-      if (!ofertasMemazo(sem, r, asiento[j.uid]).includes(j.p)) continue;
-      const x = textosMemazo(j.p, j.x);
+      const ext = MZ_PLANTILLAS[j.p] ? null : externoMemazo(j, fuente);
+      if (!ext && !ofertasMemazo(sem, r, asiento[j.uid]).includes(j.p)) continue;
+      const x = textosMemazo(j.p, j.x, ext && ext.c.length);
       if (!x) continue;
-      envios[j.uid] = { p: j.p, x };
+      envios[j.uid] = ext ? { p: j.p, x, ...ext } : { p: j.p, x };
       mira(at);
     } else if (etapa === "votar" && j.t === "nota" && Number(j.r) === r && Number(j.m) === m) {
       const v = Math.floor(Number(j.v));
@@ -7656,7 +7686,7 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
   const fin = ganador !== null;
   return {
     fase: !listos ? "espera" : fin ? "fin" : "jugando", turno: "",
-    etapa: fin ? "fin" : etapa, r, m, desde, plazo, completa, rondas, tiempo,
+    etapa: fin ? "fin" : etapa, r, m, desde, plazo, completa, rondas, tiempo, fuente,
     debe: fin ? [] : falta(), listosYa: etapa === "escribir" ? Object.keys(envios) : [],
     memes: etapa === "votar" || fin ? memes : [], total: memes.length,
     historial, puntos, fuegos, tomates, fuera, cierre, ganador, motivo

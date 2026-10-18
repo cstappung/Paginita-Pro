@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const code=fs.readFileSync('src/juegos/motor.js','utf8').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto};vm.createContext(context);
-vm.runInContext(code+';Object.assign(this,{MZ_PLANTILLAS,MZ_VOTO_MS,MZ_REVELA_MS,MZ_RESUMEN_MS,MZ_LARGO});',context);
-const {reducir,meToca,progreso,ofertasMemazo,textosMemazo,MZ_PLANTILLAS,MZ_VOTO_MS,MZ_REVELA_MS,MZ_RESUMEN_MS,MZ_LARGO}=context;
+vm.runInContext(code+';Object.assign(this,{MZ_PLANTILLAS,fuenteMemazo,MZ_VOTO_MS,MZ_REVELA_MS,MZ_RESUMEN_MS,MZ_LARGO});',context);
+const {reducir,meToca,progreso,ofertasMemazo,textosMemazo,externoMemazo,fuenteMemazo,MZ_PLANTILLAS,MZ_VOTO_MS,MZ_REVELA_MS,MZ_RESUMEN_MS,MZ_LARGO}=context;
 const nombres=['a','b','c','d','e','f','g','h','i','j'];
 
 const sala=(n,extra={})=>{
@@ -169,4 +169,36 @@ test('Sin arranca no se escribe, y quien no está en la sala no juega',()=>{
  assert.equal(est.etapa,'arranque');
  const q=sala(3,{estado:'esperando'});
  assert.equal(pon(q,{t:'arranca',uid:'a',at:tic()}).fase,'espera');
+});
+
+test('Plantillas de afuera: solo valen en su sala y con una imagen de su servicio',()=>{
+ const j={p:'if',u:'30b1gx.jpg',w:1200,h:1200,n:'Drake Hotline Bling',c:[[3,3,94,22],[3,75,94,22]]};
+ assert.ok(externoMemazo(j,'reales'));
+ assert.equal(externoMemazo(j,'gif'),null);
+ assert.equal(externoMemazo(j,'dibujos'),null);
+ assert.equal(externoMemazo({...j,u:'../x.jpg'},'reales'),null);
+ assert.equal(externoMemazo({...j,u:'javascript:alert(1)'},'reales'),null);
+ assert.equal(externoMemazo({...j,u:'30b1gx.jpg" onerror="x'},'reales'),null);
+ assert.equal(externoMemazo({...j,c:[]},'reales'),null);
+ assert.equal(externoMemazo({...j,c:Array(6).fill([0,0,10,10])},'reales'),null);
+ assert.equal(externoMemazo({...j,w:10},'reales'),null);
+ assert.equal(externoMemazo({...j,w:5000,h:100},'reales'),null);
+ const g=externoMemazo({p:'gif',u:'3o7aCSPqXE5C6T8tBC',w:480,h:270,c:[[90,90,50,50]]},'gif');
+ assert.deepEqual(JSON.parse(JSON.stringify(g.c)),[[90,90,10,10]]);
+ assert.equal(externoMemazo({p:'gif',u:'a/b',w:480,h:270,c:[[0,0,50,50]]},'gif'),null);
+ assert.equal(fuenteMemazo({fuente:'gif'}),'gif');assert.equal(fuenteMemazo({fuente:'otra'}),'dibujos');
+});
+
+test('Sala de plantillas reales: el meme lleva su imagen y sus cajas; los dibujos siguen valiendo',()=>{
+ const p=sala(2,{fuente:'reales'});let est=pon(p,{t:'arranca',uid:'a',at:tic()});
+ est=pon(p,{t:'meme',uid:'a',r:1,p:'if',u:'1ur9b0.jpg',w:1200,h:800,n:'Distracted',c:[[3,60,30,20],[35,40,30,20],[68,55,30,20]],x:['yo','el meme','la tarea','sobra'],at:tic()});
+ assert.ok(!est.debe.includes('a'));
+ est=pon(p,memeDe(p,est,'b'));
+ assert.equal(est.etapa,'votar');
+ const mm=est.memes.find(m=>m.uid==='a');
+ assert.equal(mm.u,'1ur9b0.jpg');assert.equal(mm.c.length,3);assert.deepEqual([...mm.x],['yo','el meme','la tarea']);
+ assert.equal(est.fuente,'reales');
+ const q=sala(2);let e2=pon(q,{t:'arranca',uid:'a',at:tic()});
+ e2=pon(q,{t:'meme',uid:'a',r:1,p:'if',u:'1ur9b0.jpg',w:1200,h:800,c:[[0,0,50,50]],x:['yo'],at:tic()});
+ assert.ok(e2.debe.includes('a'));
 });

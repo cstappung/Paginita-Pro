@@ -424,8 +424,13 @@ const REGLAS = {
   memazo: {
     lema: "Memes con amigos: de 2 a 10 jugadores, gana quien saque más risas.",
     secciones: [
+      ["Las plantillas", lista([
+        "Quien abre la sala elige de dónde salen: <b>plantillas reales</b> (los memes más usados de Imgflip), <b>GIFs</b> (de GIPHY) o los <b>dibujos de la casa</b>.",
+        "Con plantillas reales o GIFs puedes <b>buscar</b> la que quieras, o pedir <b>otras tres</b>. Como esas imágenes no traen sitio para el texto, cada texto se <b>arrastra</b> sobre la imagen y se agranda desde su esquina; puedes poner de uno a cinco.",
+        "Si el servicio de afuera no responde, te tocan dibujos de la casa y la partida sigue igual."
+      ])],
       ["Escribir", lista([
-        "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada plantilla tiene de uno a cuatro.",
+        "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada dibujo de la casa tiene de uno a cuatro.",
         "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste.",
         "La etapa termina cuando todos mandaron el suyo o se acaba el tiempo. Quien no mandó nada se queda sin meme en esa ronda."
       ])],

@@ -42,7 +42,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -259,9 +259,11 @@ const OPCIONES = {
     /* Cada ronda nueva suma un segundo por cada otro jugador en pie. */
     { clave: "acumula", etiqueta: "Tiempo", valores: [{ v: 0, t: "Fijo" }, { v: 1, t: "Se acumula cada ronda" }] }
   ],
-  /* Memazo: cuántas rondas y cuánto se tiene para escribir cada meme. */
+  /* Memazo: de dónde salen las plantillas (`fuente`, no `modo`), cuántas
+     rondas y cuánto se tiene para escribir cada meme. */
   memazo: [
     { clave: "cupo", etiqueta: "Jugadores", por: 6, valores: cupos("memazo") },
+    { clave: "fuente", etiqueta: "Plantillas", por: "reales", valores: Object.keys(MZ_FUENTES).map(v => ({ v, t: MZ_FUENTES[v] })) },
     { clave: "rondas", etiqueta: "Rondas", por: 3, valores: MZ_RONDAS.map(v => ({ v, t: v + " rondas" })) },
     { clave: "tiempo", etiqueta: "Para escribir", por: 90, valores: MZ_TIEMPOS.map(v => ({ v, t: v + " s" })) }
   ],

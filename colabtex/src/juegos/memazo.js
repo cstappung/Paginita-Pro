@@ -25,7 +25,8 @@
  *   el mismo límite honesto que el resto de los juegos.
  */
 import { MZ_NOTAS, MZ_LARGO, MZ_REVELA_MS, MZ_RESUMEN_MS, ofertasMemazo } from "./motor.js";
-import { PLANTILLAS, cajasDe, memeHtml, ajustaTextos, ponTexto } from "./memazo-plantillas.js";
+import { PLANTILLAS, cajasDe, memeDe, ajustaTextos, ponTexto } from "./memazo-plantillas.js";
+import { plantillasImgflip, gifsGiphy, eligeTres, cajasPorDefecto } from "./memazo-fuentes.js";
 import { suena } from "./sonido.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -39,8 +40,15 @@ export function crearMemazo(ctx) {
   let tic = null, tAuto = null, hecho = "", hechoEn = 0, enviando = false, votando = false;
   let vistaVista = "", antes = null, ocupadoAntes = false;
   const firmas = {};
-  /* Lo que llevo escrito en la ronda: la plantilla elegida y los textos de cada una. */
-  let borrador = { r: 0, p: "", x: {} };
+  /* Lo que llevo escrito en la ronda: la plantilla elegida (su clave: el id
+     de un dibujo, o `if:…`/`gif:…`), los textos de cada una y, para las de
+     afuera, la imagen con las cajas donde las dejé. */
+  let borrador = { r: 0, p: "", x: {}, ext: {}, vuelta: 0, q: "" };
+  /* Las plantillas de afuera de esta sala: `{estado: cargando|listo|error, lista}`,
+     y la búsqueda en curso. `vistas` guarda cada plantilla ofrecida por su clave. */
+  let fuente = { estado: "", lista: [] }, busqueda = { q: "", estado: "", lista: [] }, tBusca = null;
+  const vistas = {};
+  let arrastre = null;
   let enviado = "";   // lo último que mandé, para avisar de cambios sin enviar
   let sonadaR = 0;    // la ronda cuyas plantillas ya sonaron al repartirse
 
@@ -61,6 +69,7 @@ export function crearMemazo(ctx) {
       </div>`;
     host.addEventListener("click", alClic);
     host.addEventListener("input", alEscribir);
+    host.addEventListener("pointerdown", alAgarrar);
     tic = setInterval(alTic, 250);
     /* Anton llega de Google Fonts después del primer ajuste: con la letra
        de reserva los textos se habrían medido más estrechos. */
@@ -69,8 +78,9 @@ export function crearMemazo(ctx) {
 
   function destruir() {
     muerto = true;
-    clearInterval(tic); clearTimeout(tAuto);
-    if (host) { host.removeEventListener("click", alClic); host.removeEventListener("input", alEscribir); host.innerHTML = ""; }
+    clearInterval(tic); clearTimeout(tAuto); clearTimeout(tBusca);
+    sueltaArrastre();
+    if (host) { host.removeEventListener("click", alClic); host.removeEventListener("input", alEscribir); host.removeEventListener("pointerdown", alAgarrar); host.innerHTML = ""; }
     host = null;
   }
 
@@ -129,41 +139,182 @@ export function crearMemazo(ctx) {
     }).join(""));
   }
 
-  function ofertas() { return ofertasMemazo(p.semilla, est.r, est.jugadores.findIndex(j => j.uid === uid)); }
+  const miAsiento = () => est.jugadores.findIndex(j => j.uid === uid);
+  const esExterna = k => /^(if|gif):/.test(k || "");
+  /* La plantilla de una clave: `{p}` para un dibujo, la imagen con sus cajas para las de afuera. */
+  const planDe = k => esExterna(k) ? borrador.ext[k] : { p: k };
+  const nCajas = k => esExterna(k) ? (borrador.ext[k] ? borrador.ext[k].c.length : 0) : cajasDe(k).length;
+  const textosDe = k => {
+    const n = nCajas(k), t = borrador.x[k] || (borrador.x[k] = []);
+    while (t.length < n) t.push("");
+    t.length = n;
+    return t;
+  };
+  const claveDe = pl => PLANTILLAS[pl.p] ? pl.p : pl.p + ":" + pl.u;
+
+  /* Las tres de dibujo que me tocan (también el plan B si la API falla). */
+  const ofertasDibujo = () => ofertasMemazo(p.semilla, est.r, miAsiento()).map(id => ({ p: id, n: PLANTILLAS[id].nombre }));
+
+  function cargaFuente() {
+    if (est.fuente === "dibujos" || fuente.estado) return;
+    fuente = { estado: "cargando", lista: [] };
+    const pide = est.fuente === "gif" ? gifsGiphy() : plantillasImgflip();
+    pide.then(l => { fuente = { estado: "listo", lista: l }; }, e => { console.warn("[memazo] plantillas de afuera", e); fuente = { estado: "error", lista: [] }; })
+      .then(() => { if (!muerto) pinta(); });
+  }
+
+  /* Lo que se ofrece ahora: el resultado de la búsqueda, tres de la
+     fuente de la sala, o tres dibujos si esa fuente no respondió. */
+  function ofertas() {
+    if (borrador.q.trim() && busqueda.q === borrador.q.trim() && busqueda.estado === "listo") return busqueda.lista.slice(0, 9);
+    if (est.fuente === "dibujos" || fuente.estado === "error") return ofertasDibujo();
+    if (fuente.estado !== "listo") return [];
+    return eligeTres(fuente.lista, Number(p.semilla) || 0, est.r, miAsiento(), borrador.vuelta);
+  }
+
+  function elige(pl) {
+    const k = claveDe(pl);
+    if (esExterna(k) && !borrador.ext[k]) borrador.ext[k] = { p: pl.p, u: pl.u, w: pl.w, h: pl.h, n: pl.n, c: cajasPorDefecto(pl.cajas) };
+    borrador.p = k;
+  }
 
   function preparaBorrador() {
-    const ofs = ofertas();
-    if (borrador.r !== est.r) { borrador = { r: est.r, p: ofs[0], x: {} }; enviado = ""; }
-    if (!ofs.includes(borrador.p)) borrador.p = ofs[0];
+    if (borrador.r !== est.r) { borrador = { r: est.r, p: "", x: {}, ext: {}, vuelta: 0, q: "" }; enviado = ""; }
+    cargaFuente();
+    if (!borrador.p || (!esExterna(borrador.p) && !PLANTILLAS[borrador.p])) {
+      const o = ofertas();
+      if (o.length) elige(o[0]);
+    }
   }
 
   function editor() {
-    const ofs = ofertas();
-    const id = borrador.p, textos = borrador.x[id] || (borrador.x[id] = cajasDe(id).map(() => ""));
+    const k = borrador.p;
+    const afuera = est.fuente !== "dibujos" && fuente.estado !== "error";
+    const lienzo = k ? memeDe(planDe(k), textosDe(k), { vacias: true, clase: "jg-mz-vacias" + (esExterna(k) ? " jg-mz-movible" : ""), editable: esExterna(k) })
+      : `<div class="jg-mz-aviso grande">⏳ Trayendo plantillas…</div>`;
+    const credito = est.fuente === "gif" && fuente.estado !== "error" ? "Powered by GIPHY"
+      : est.fuente === "reales" && fuente.estado !== "error" ? "Plantillas de Imgflip" : "";
+    const falla = est.fuente !== "dibujos" && fuente.estado === "error"
+      ? `<div class="jg-mz-falla">${est.fuente === "gif" ? "No se pudo hablar con GIPHY (¿falta la clave en la base?)" : "No se pudo traer la lista de Imgflip"}: te tocan plantillas de la casa.</div>` : "";
     return `<div class="jg-mz-editor">
-      <div class="jg-mz-lienzo">${memeHtml(id, textos, { vacias: true, clase: "jg-mz-vacias" })}</div>
+      <div class="jg-mz-lienzo">${lienzo}</div>
       <div class="jg-mz-panel">
-        <div class="jg-mz-tit">Elige plantilla</div>
-        <div class="jg-mz-ofertas">${ofs.map(o => `<button class="jg-mz-oferta${o === id ? " sel" : ""}" data-oferta="${o}" title="${esc(PLANTILLAS[o].nombre)}">
-          ${memeHtml(o, borrador.x[o] || [])}<span>${esc(PLANTILLAS[o].nombre)}</span></button>`).join("")}</div>
-        <div class="jg-mz-tit">Escribe</div>
-        <div class="jg-mz-campos">${textos.map((t, k) => `<label><span>Texto ${k + 1}</span>
-          <textarea data-k="${k}" maxlength="${MZ_LARGO}" rows="2" placeholder="${k ? "…y aquí" : "Escribe algo gracioso"}" translate="no">${esc(t)}</textarea></label>`).join("")}</div>
+        <div class="jg-mz-tit">Elige plantilla <button class="jg-mz-mini" data-otras="1" title="Otras tres">🔀 Otras</button></div>
+        ${falla}
+        ${afuera ? `<input class="jg-mz-busca" id="mzBusca" type="search" maxlength="50" value="${esc(borrador.q)}" placeholder="${est.fuente === "gif" ? "Busca un GIF…" : "Busca una plantilla (en inglés: drake, cat…)"}" autocomplete="off">` : ""}
+        <div class="jg-mz-ofertas" id="mzOfertas"></div>
+        ${credito ? `<div class="jg-mz-credito">${credito}</div>` : ""}
+        <div class="jg-mz-tit">Escribe${esExterna(k) ? ` <span class="jg-mz-cajas"><button class="jg-mz-mini" data-cajas="-1" title="Un texto menos">−</button><button class="jg-mz-mini" data-cajas="1" title="Un texto más">＋</button></span>` : ""}</div>
+        <div class="jg-mz-campos">${k ? textosDe(k).map((t, i) => `<label><span>Texto ${i + 1}</span>
+          <textarea data-k="${i}" maxlength="${MZ_LARGO}" rows="2" placeholder="${i ? "…y aquí" : "Escribe algo gracioso"}" translate="no">${esc(t)}</textarea></label>`).join("") : ""}</div>
+        ${esExterna(k) ? `<div class="jg-mz-ayuda">Arrastra cada texto sobre la imagen para ponerlo donde quieras; la esquina de abajo lo agranda.</div>` : ""}
         <div class="jg-mz-envio"><button class="btn" id="mzEnviar">¡Listo!</button><span class="jg-mz-estado" id="mzEstado"></span></div>
       </div>
     </div>`;
+  }
+
+  /* Las miniaturas de la oferta van aparte del editor: la búsqueda las
+     cambia sin tocar lo escrito. */
+  function pintaOfertas() {
+    const el = host && host.querySelector("#mzOfertas");
+    if (!el) return;
+    const o = ofertas();
+    const buscando = borrador.q.trim() && (busqueda.q !== borrador.q.trim() || busqueda.estado === "cargando");
+    const firma = [borrador.p, buscando, busqueda.estado, fuente.estado, o.map(claveDe).join(",")].join("|");
+    if (el.dataset.firma === firma) return;
+    el.dataset.firma = firma;
+    for (const pl of o) vistas[claveDe(pl)] = pl;
+    el.innerHTML = buscando ? `<div class="jg-mz-nada">Buscando…</div>`
+      : borrador.q.trim() && busqueda.estado === "error" ? `<div class="jg-mz-nada">La búsqueda falló.</div>`
+      : !o.length ? `<div class="jg-mz-nada">${fuente.estado === "cargando" ? "Cargando…" : "Nada por aquí."}</div>`
+      : o.map(pl => {
+        const k = claveDe(pl);
+        const vista = esExterna(k) ? (borrador.ext[k] || { ...pl, c: cajasPorDefecto(pl.cajas) }) : pl;
+        return `<button class="jg-mz-oferta${k === borrador.p ? " sel" : ""}" data-oferta="${esc(k)}" title="${esc(pl.n || "")}">
+          ${memeDe(vista, borrador.x[k] || [], { mini: true })}<span translate="no">${esc(pl.n || "")}</span></button>`;
+      }).join("");
+    ajustaTextos(el);
+  }
+
+  /* Lo que mandaría ahora: la plantilla y sus textos (y la imagen con sus cajas). */
+  function jugadaMeme() {
+    const k = borrador.p;
+    if (!k) return null;
+    const x = textosDe(k).map(t => (t || "").trim());
+    if (!esExterna(k)) return { p: k, x };
+    const e = borrador.ext[k];
+    return { p: e.p, u: e.u, w: e.w, h: e.h, n: e.n, c: e.c.map(b => b.map(v => Math.round(v * 10) / 10)), x };
   }
 
   function estadoEnvio() {
     const el = host && host.querySelector("#mzEstado"), btn = host && host.querySelector("#mzEnviar");
     if (!el || !btn) return;
     const ya = (est.listosYa || []).includes(uid);
-    const ahoraVa = JSON.stringify([borrador.p, borrador.x[borrador.p] || []]);
-    const hay = (borrador.x[borrador.p] || []).some(t => t.trim());
+    const j = jugadaMeme();
+    const hay = !!j && j.x.some(t => t);
     btn.disabled = enviando || !hay;
     btn.textContent = ya ? "Actualizar" : "¡Listo!";
     el.textContent = !ya ? (hay ? "" : "Escribe al menos un texto.")
-      : ahoraVa === enviado ? "✓ Enviado. Puedes corregirlo hasta que se acabe el tiempo." : "Tienes cambios sin enviar.";
+      : JSON.stringify(j) === enviado ? "✓ Enviado. Puedes corregirlo hasta que se acabe el tiempo." : "Tienes cambios sin enviar.";
+  }
+
+  /* ---------- mover y agrandar los textos (plantillas de afuera) ---------- */
+  function alAgarrar(ev) {
+    const caja = ev.target.closest(".jg-mz-lienzo .jg-mz-movible .jg-mz-caja");
+    if (!caja || vistaVista !== "escribir" || !esExterna(borrador.p)) return;
+    const meme = caja.closest(".jg-mz-meme"), r = meme.getBoundingClientRect();
+    const k = Number(caja.getAttribute("data-k")), b = borrador.ext[borrador.p].c[k];
+    if (!b) return;
+    ev.preventDefault();
+    arrastre = { k, caja, meme, r, b0: b.slice(), x0: ev.clientX, y0: ev.clientY, tam: !!ev.target.closest(".jg-mz-asa") };
+    caja.classList.add("agarrada");
+    window.addEventListener("pointermove", alMover);
+    window.addEventListener("pointerup", sueltaArrastre);
+    window.addEventListener("pointercancel", sueltaArrastre);
+  }
+  function alMover(ev) {
+    const a = arrastre;
+    if (!a) return;
+    const dx = (ev.clientX - a.x0) / a.r.width * 100, dy = (ev.clientY - a.y0) / a.r.height * 100;
+    const c = borrador.ext[borrador.p] && borrador.ext[borrador.p].c;
+    if (!c || !c[a.k]) return;
+    let [x, y, w, h] = a.b0;
+    if (a.tam) { w = Math.max(8, Math.min(100 - x, w + dx)); h = Math.max(6, Math.min(100 - y, h + dy)); }
+    else { x = Math.max(0, Math.min(100 - w, x + dx)); y = Math.max(0, Math.min(100 - h, y + dy)); }
+    c[a.k] = [x, y, w, h];
+    Object.assign(a.caja.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
+    if (a.tam) ajustaTextos(a.meme);
+  }
+  function sueltaArrastre() {
+    window.removeEventListener("pointermove", alMover);
+    window.removeEventListener("pointerup", sueltaArrastre);
+    window.removeEventListener("pointercancel", sueltaArrastre);
+    if (!arrastre) return;
+    arrastre.caja.classList.remove("agarrada");
+    ajustaTextos(arrastre.meme);
+    arrastre = null;
+    const k = borrador.p, mini = host && host.querySelector(`.jg-mz-oferta[data-oferta="${CSS.escape(k)}"]`);
+    if (mini && esExterna(k)) { mini.querySelector(".jg-mz-meme").outerHTML = memeDe(borrador.ext[k], textosDe(k), { mini: true }); ajustaTextos(mini); }
+    estadoEnvio();
+  }
+
+  /* Buscar: en Imgflip se filtra la lista que ya está; en GIPHY se pregunta. */
+  function busca() {
+    const q = borrador.q.trim();
+    clearTimeout(tBusca);
+    if (!q) { busqueda = { q: "", estado: "", lista: [] }; pintaOfertas(); return; }
+    if (est.fuente === "reales") {
+      const n = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      busqueda = { q, estado: "listo", lista: fuente.lista.filter(m => n(m.n).includes(n(q))) };
+      pintaOfertas();
+      return;
+    }
+    busqueda = { q, estado: "cargando", lista: [] };
+    pintaOfertas();
+    tBusca = setTimeout(() => {
+      gifsGiphy(q).then(l => ({ q, estado: "listo", lista: l }), () => ({ q, estado: "error", lista: [] }))
+        .then(b => { if (!muerto && borrador.q.trim() === q) { busqueda = b; pintaOfertas(); } });
+    }, 450);
   }
 
   function notas(mm) {
@@ -178,7 +329,7 @@ export function crearMemazo(ctx) {
     return {
       firma: "revela|" + est.r + "|" + est.m + "|" + mm.uid,
       html: `<div class="jg-mz-revela${media >= 4 ? " top" : ""}">
-        <div class="jg-mz-grande">${memeHtml(mm.p, mm.x)}</div>
+        <div class="jg-mz-grande">${memeDe(mm)}</div>
         <div class="jg-mz-autor">
           <div class="jg-mz-de">Era de</div>
           <div class="jg-mz-quien" style="--c:${esc(j.color || "#888")}"><span class="jg-con-marco">${ctx.avatar ? ctx.avatar(j, 44) : ""}</span><b translate="no">${esc(nombreDe(mm.uid))}</b></div>
@@ -203,7 +354,7 @@ export function crearMemazo(ctx) {
       firma: ["votar", est.r, est.m, autor, mia || 0, ya, voy, soy()].join("|"),
       html: `<div class="jg-mz-voto">
         <div class="jg-mz-cuenta">Meme ${est.m + 1} de ${est.total} · Ronda ${est.r} de ${est.rondas}</div>
-        <div class="jg-mz-grande">${memeHtml(mm.p, mm.x)}</div>
+        <div class="jg-mz-grande">${memeDe(mm)}</div>
         ${abajo}
         <div class="jg-mz-faltan">${ya} de ${voy} ya calificaron</div>
       </div>`
@@ -212,7 +363,7 @@ export function crearMemazo(ctx) {
 
   function tarjeta(mm, grande) {
     const j = jugadorDe(mm.uid) || { color: "#888" };
-    return `<figure class="jg-mz-tarjeta${grande ? " grande" : ""}">${memeHtml(mm.p, mm.x)}
+    return `<figure class="jg-mz-tarjeta${grande ? " grande" : ""}">${memeDe(mm, mm.x, { mini: !grande })}
       <figcaption style="--c:${esc(j.color || "#888")}"><span translate="no">${esc(nombreDe(mm.uid))}</span><b>${mm.total}</b><s>${notas(mm)}</s></figcaption></figure>`;
   }
   const ordenados = h => h.memes.slice().sort((a, b) => b.total - a.total);
@@ -265,7 +416,7 @@ export function crearMemazo(ctx) {
     else if (v === "arranque") pieza = { firma: "arranque", html: `<div class="jg-mz-aviso grande">🎲 Barajando plantillas…</div>` };
     else if (v === "escribir" && soy()) {
       preparaBorrador();
-      pieza = { firma: "escribir|" + est.r + "|" + borrador.p, html: editor(), sonido: () => { if (sonadaR !== est.r) { sonadaR = est.r; suena("reparte"); } } };
+      pieza = { firma: ["escribir", est.r, borrador.p, nCajas(borrador.p), fuente.estado].join("|"), html: editor(), sonido: () => { if (sonadaR !== est.r) { sonadaR = est.r; suena("reparte"); } } };
     } else if (v === "escribir") pieza =
       { firma: "mira|" + est.r, html: `<div class="jg-mz-aviso grande">✍️ Están escribiendo sus memes…<br><small>Los verás uno por uno cuando acaben.</small></div>` };
     else if (v === "votar") pieza = votacion();
@@ -274,11 +425,11 @@ export function crearMemazo(ctx) {
     else pieza = galeria();
     const cambio = set("mzEscena", pieza.firma, pieza.html, el => ajustaTextos(el));
     if (cambio && pieza.sonido && antes !== null) pieza.sonido();
-    if (v === "escribir" && soy()) estadoEnvio();
+    if (v === "escribir" && soy()) { pintaOfertas(); estadoEnvio(); }
 
     let pie;
     if (v === "espera") pie = "Pásale el enlace de la sala a tus amigos: de 2 a 10, y cuantos más, mejor.";
-    else if (v === "escribir") pie = "Elige una de tus tres plantillas y ponle texto. Cuando todos manden el suyo, o se acabe el tiempo, se vota.";
+    else if (v === "escribir") pie = "Elige una plantilla y ponle texto. Cuando todos manden el suyo, o se acabe el tiempo, se vota.";
     else if (v === "votar" || v === "revela") pie = "🍅 1 · 😐 2 · 🙂 3 · 😂 4 · 🔥 5 puntos para el autor. No se sabe de quién es hasta que todos califican.";
     else if (v === "resumen") pie = "Los puntos de cada meme ya están en el marcador de arriba.";
     else if (v === "fin") pie = "Gana quien sumó más puntos con sus memes; a igualdad, quien sacó más 🔥.";
@@ -340,13 +491,15 @@ export function crearMemazo(ctx) {
 
   /* ---------- lo que hace la gente ---------- */
   function alEscribir(ev) {
+    if (!est || borrador.r !== est.r) return;
+    if (ev.target.id === "mzBusca") { borrador.q = ev.target.value.slice(0, 50); busca(); return; }
     const ta = ev.target.closest && ev.target.closest(".jg-mz-campos textarea");
-    if (!ta || !est || borrador.r !== est.r) return;
+    if (!ta || !borrador.p) return;
     const k = Number(ta.getAttribute("data-k"));
-    const lista = borrador.x[borrador.p] || (borrador.x[borrador.p] = []);
+    const lista = textosDe(borrador.p);
     lista[k] = ta.value.replace(/\n/g, " ").slice(0, MZ_LARGO);
     ponTexto(host.querySelector(".jg-mz-lienzo .jg-mz-meme"), k, lista[k]);
-    const mini = host.querySelector(`.jg-mz-oferta[data-oferta="${borrador.p}"] .jg-mz-meme`);
+    const mini = host.querySelector(`.jg-mz-oferta[data-oferta="${CSS.escape(borrador.p)}"] .jg-mz-meme`);
     if (mini) ponTexto(mini, k, lista[k]);
     estadoEnvio();
   }
@@ -355,18 +508,34 @@ export function crearMemazo(ctx) {
     if (!est || est.fase !== "jugando") return;
     const of = ev.target.closest(".jg-mz-oferta");
     if (of && vistaVista === "escribir") {
-      borrador.p = of.getAttribute("data-oferta");
-      suena("clic");
+      const pl = vistas[of.getAttribute("data-oferta")];
+      if (pl) { elige(pl); suena("clic"); pinta(); }
+      return;
+    }
+    if (ev.target.closest("[data-otras]") && vistaVista === "escribir") {
+      borrador.vuelta++; borrador.q = "";
+      const b = host.querySelector("#mzBusca");
+      if (b) b.value = "";
+      busqueda = { q: "", estado: "", lista: [] };
+      suena("reparte");
+      pintaOfertas();
+      return;
+    }
+    const cj = ev.target.closest("[data-cajas]");
+    if (cj && vistaVista === "escribir" && esExterna(borrador.p)) {
+      const c = borrador.ext[borrador.p].c, d = Number(cj.getAttribute("data-cajas"));
+      if (d > 0 && c.length < 5) c.push([20, 40, 60, 18]);
+      if (d < 0 && c.length > 1) c.pop();
       pinta();
       return;
     }
     if (ev.target.closest("#mzEnviar") && vistaVista === "escribir" && !enviando) {
-      const x = (borrador.x[borrador.p] || []).map(t => (t || "").trim());
-      if (!x.some(t => t)) return;
+      const j = jugadaMeme();
+      if (!j || !j.x.some(t => t)) return;
       enviando = true; estadoEnvio();
       try {
-        if (await jugar({ t: "meme", uid, r: est.r, p: borrador.p, x, at: ahora() })) {
-          enviado = JSON.stringify([borrador.p, borrador.x[borrador.p] || []]);
+        if (await jugar({ t: "meme", uid, r: est.r, ...j, at: ahora() })) {
+          enviado = JSON.stringify(j);
           suena("entra");
         }
       } finally { if (!muerto) { enviando = false; estadoEnvio(); } }
