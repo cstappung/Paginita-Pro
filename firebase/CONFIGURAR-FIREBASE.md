@@ -250,6 +250,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > hasta entonces el récord de distancia de City se queda en el dispositivo y
 > el logro no se guarda.
 
+> **PRO DEFENDER (18 de octubre de 2026):** cinco categorías nuevas de
+> `soloRanks` y `soloPruebas`, `club-prodefender-(prado|dunas|glaciar|
+> caldera|vacio)` (la ronda récord de cada reino, con tope de 100). No usa
+> `clubJugadas` (no paga por partida: paga cada ronda nueva del récord) ni
+> `users/<uid>/club` (la partida a medias vive en el navegador). Hasta volver
+> a publicar las reglas se juega igual, pero las rondas no entran en la
+> clasificación y no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 
@@ -591,6 +599,30 @@ sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ Ruleta, blackjack, póker y plinko piden publicar otra vez (2026-10-18)
+
+El nodo `casino/<uid>/<clave>` admite cuatro juegos más: `j: 'r'` (ruleta,
+con las fichas en `b/<casilla>`, 10–500 en total), `'b'` (blackjack,
+10–500, cada decisión en `a/<i>` = `{t, at}` con `t` en p/q/d/s), `'v'`
+(póker, 10–100, el cambio en `x` = `{m, at}` con `m` de 0 a 31) y `'l'`
+(plinko, filas `n` 8/12/16, riesgo `d` 0–2 con tope 500/200/50). Todo de
+una vez y con `at === now`. Sin publicar, esos cuatro fallan con
+PERMISSION_DENIED (el avión y el pingüino siguen andando). Pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
+### ⚠ El Casino pide publicar otra vez (2026-10-18)
+
+Nodo nuevo `casino/<uid>/<clave>` = `{j, p, d?, at}`: una ronda del avión
+(`j: 'a'`) o del pingüino (`j: 'p'`, dificultad `d` 0–3). La regla exige
+`at === now`, que la apuesta sea un entero entre 10 y el tope del juego
+(avión 500; pingüino 1000/500/200/50 según la dificultad) y que no se
+reescriba. Las marcas `t/<i>` (avión), `s/<i>` (pingüino) y `c` (retirarse)
+son de una vez y valen `now`: de esa hora sale el azar
+(`colabtex/src/juegos/casino-motor.js`). Lo lee cualquiera con sesión, como
+los sobres de PRODROP: el saldo de todos sale de ahí. Sin publicar, apostar
+falla con PERMISSION_DENIED. Pegar `firebase/database.rules.json` entero y
+**Publicar**.
+
 ### ⚠ HaxBall pide publicar otra vez (2026-10-13)
 
 `'haxball'` tiene que estar en la lista del campo `juego` y en la de
@@ -623,6 +655,33 @@ malla WebRTC; `vivo/<pid>/rtc` solo presenta a los dos al empezar cada pelea.
 Sin publicar, la sala de BT3 no se puede crear (el juego de un jugador,
 `juegos/bt3/`, funciona igual). Pegar `firebase/database.rules.json` entero y
 **Publicar**.
+
+### ⚠ Memazo pide publicar otra vez (2026-10-18)
+
+`'memazo'` tiene que estar en la lista del campo `juego` y en la de
+`logros`. No hay nodo nuevo: los memes, las notas y los cierres de cada
+etapa van por `jugadas` (`arranca`, `meme`, `nota`, `cierra`), y las rondas
+y el tiempo de la sala entran como `rondas` y `tiempo` por `$otro`. La regla
+de `jugadas/$n/at` ahora vale también para Memazo: el plazo para escribir y
+para calificar se juzga con esa hora. Sin publicar, la sala de Memazo no se
+puede crear. Pegar `firebase/database.rules.json` entero y **Publicar**, o
+usar el botón **Copiar las reglas** del cartel de la página de juegos.
+
+**Plantillas reales y GIFs (también 2026-10-18).** La sala de Memazo elige
+de dónde salen las plantillas. Las **reales** vienen de la API pública de
+Imgflip y no piden nada. Los **GIFs** vienen de GIPHY, que pide una clave:
+
+1. Crear una cuenta en [developers.giphy.com](https://developers.giphy.com/dashboard/)
+   → *Create an App* → **API** (no SDK) y copiar su *API Key*.
+2. En Realtime Database → Datos, crear el nodo `giphy` con un hijo `clave`
+   y pegar ahí la clave (texto, sin comillas).
+
+Las reglas nuevas traen `giphy` legible por quien tenga sesión y no
+escribible desde la web, como `discord`. La clave queda a la vista de
+quien juegue (cada navegador la usa para buscar), igual que la de
+Firebase; GIPHY la limita por cantidad de llamadas, y si se abusa se
+cambia por otra en ese nodo sin tocar el código. Sin clave, una sala de
+GIFs ofrece los dibujos de la casa.
 
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 

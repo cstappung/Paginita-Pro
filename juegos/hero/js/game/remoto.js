@@ -2,6 +2,15 @@
 // que llega por el directo (session.js → la malla WebRTC → onRemoteState).
 import { HIT, MISSED, DROPPED } from '../core/engine.js';
 
+/* Sus aciertos llegan tarde: lo que tarda la malla, más hasta 100 ms de espera
+   al próximo estado (session.js, STATE_INTERVAL), más lo que su canción vaya
+   corrida de la tuya. Pintada con tu reloj, su autopista dejaba pasar cada nota
+   por la barra y la encendía después: se veía tocando a destiempo. Así que se
+   pinta con retraso (`retraso`, session.draw): cada acierto nuevo mide cuánto
+   después de su nota llegó, el objetivo sigue el borde de arriba de esas
+   medidas (sube rápido, baja lento) y lo pintado se acerca a él sin saltos. */
+const RETRASO_INI = 0.12, RETRASO_MAX = 0.8, RETRASO_VEL = 0.15;
+
 // Estado de un jugador remoto reconstruido a partir de los mensajes de red
 export class RemoteState {
   constructor(track, kind) {
@@ -26,12 +35,32 @@ export class RemoteState {
     this.phraseHits = new Uint16Array(np);
     this.phraseTotal = new Uint16Array(np);
     for (const nt of track.notes) if (nt.sp >= 0 && !nt.double) this.phraseTotal[nt.sp]++;
+    this.lag = RETRASO_INI;
+    this.lagVis = RETRASO_INI;
+    this._lagPerf = null;
+  }
+
+  // Segundos de atraso con que se pinta su autopista (cambia a lo más un 15 %)
+  retraso(perf) {
+    const dt = this._lagPerf === null ? 0 : Math.min(0.1, Math.max(0, (perf - this._lagPerf) / 1000));
+    this._lagPerf = perf;
+    const paso = RETRASO_VEL * dt;
+    this.lagVis += Math.max(-paso, Math.min(paso, this.lag - this.lagVis));
+    return this.lagVis;
+  }
+
+  _mide(nt, now) {
+    const s = now - nt.time;
+    // uno muy viejo es un estado que llegó a destiempo (al entrar o tras un corte): no dice nada
+    if (!(s >= 0 && s <= RETRASO_MAX)) return;
+    this.lag += (s - this.lag) * (s > this.lag ? 0.3 : 0.03);
   }
   multiplier() { return this.mult; }
   comboProgress() { return this.prog; }
   currentSolo() { return this.solo; }
   sustainingMask() { return this.sus; }
 
+  // `now`: tu tiempo de canción; lo que se marca va en el reloj retrasado de su autopista
   apply(m, now) {
     this.score = m.s;
     this.combo = m.c;
@@ -55,13 +84,15 @@ export class RemoteState {
       const nt = this.notes[i];
       if (st === MISSED && nt.sp >= 0) this.phraseFailed[nt.sp] = 1;
       if (st !== HIT) continue;
+      this._mide(nt, now);
       this.onHitFx?.(nt);
       if (nt.sp >= 0 && !this.phraseFailed[nt.sp] && ++this.phraseHits[nt.sp] === this.phraseTotal[nt.sp]) this.onHitFx?.(nt, 'phrase');
+      const t = now - this.lagVis;
       if (this.kind === 'drums') {
-        this.laneHitTime[nt.pad + 1] = now;
-        this.padHitTime[nt.pad + 1] = now;
-      } else if (nt.open) this.laneHitTime[5] = now;
-      else for (let f = 0; f < 5; f++) if (nt.frets & (1 << f)) this.laneHitTime[f] = now;
+        this.laneHitTime[nt.pad + 1] = t;
+        this.padHitTime[nt.pad + 1] = t;
+      } else if (nt.open) this.laneHitTime[5] = t;
+      else for (let f = 0; f < 5; f++) if (nt.frets & (1 << f)) this.laneHitTime[f] = t;
     }
   }
 }

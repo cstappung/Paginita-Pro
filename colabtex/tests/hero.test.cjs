@@ -316,9 +316,10 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     pone({ t: 'empieza', uid: 'a' });
     for (const u of ['a', 'b']) pone({ t: 'cargado', uid: u });
     pone({ t: 'go', uid: 'a', at: Date.now() });
-    manda({ tipo: 'red', m: { t: 'done', stats: { score: 1234, stars: 3, hits: 50, total: 60, misses: 10, bestCombo: 20, spPhrases: 1, spTotal: 2, overhits: 0, fc: false } } });
+    manda({ tipo: 'red', m: { t: 'done', stats: { score: 1234, stars: 3, hits: 50, total: 60, misses: 10, bestCombo: 20, spPhrases: 1, spTotal: 2, overhits: 0, fc: false }, curva: [100, 200, 1234] } });
     const fin = escritas.find(j => j.t === 'fin');
     assert.ok(fin, 'el resultado se anota');
+    assert.equal(fin.cv, '2s.5k.ya', 'la curva viaja en un texto corto');
     assert.equal(escritas.find(j => j.t === 'go').uid, 'a');
     for (const j of escritas) assert.equal(j.uid, 'a', j.t + ' sin firmar');
     /* Ninguna jugada choca con un campo que la regla de `jugadas/$n` valida
@@ -334,6 +335,8 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     pone({ ...fin, uid: 'a' });
     pone({ t: 'fin', uid: 'b', r: 1, s: 99 });
     assert.equal(reducir(p).ultima.fines.a.h, 50);
+    assert.deepEqual([...reducir(p).ultima.fines.a.cv], [100, 200, 1234], 'y la curva, para la gráfica');
+    assert.equal(reducir(p).ultima.fines.b.cv, undefined);
   } finally { s?.destruir(); Object.assign(g, antes); }
 });
 
@@ -433,11 +436,128 @@ test('sala: un sostenido soltado no vuelve a encender llamas en la pista del otr
   for (let k = 0; k < 20; k++) r.apply({ s: 0, c: 0, m: 1, p: 0, sp: 0, ev }, 2.5 + k * 0.1);
   assert.deepEqual(fx, [1, 4], 'cada acierto se dibuja una sola vez');
   assert.deepEqual([...r.noteState], [HIT, DROPPED, MISSED]);
-  assert.equal(r.laneHitTime[2], 2.5, 'el carril del sostenido soltado no se vuelve a «golpear»');
+  assert.equal(r.laneHitTime[2], 2.5 - r.lagVis, 'el carril del sostenido soltado no se vuelve a «golpear»');
   // si se perdieron los paquetes del acierto, el soltado llega solo y no dibuja nada
   const r2 = new RemoteState(track, 'guitar');
   r2.onHitFx = () => fx.push('x');
   r2.apply({ ev: [[1, DROPPED], [1, HIT], [0, 9]] }, 1);
   assert.deepEqual([...r2.noteState], [0, DROPPED, 0]);
   assert.equal(fx.length, 2);
+});
+
+test('sala: con 4 o más, tú en grande al medio y los demás a los lados (2·1·2, 3·1·2…)', async () => {
+  const { vistas } = await mod('js/game/orden.js');
+  const W = 1920, H = 1080;
+  const sala = n => Array.from({ length: n }, (_, i) => ({ id: 'j' + i }));
+  // hasta 3, columnas iguales como antes
+  for (const n of [1, 2, 3]) {
+    const v = vistas(sala(n), sala(n)[0], W, H);
+    assert.deepEqual(v.map(([, r]) => r.w), Array(n).fill(W / n));
+    assert.ok(v.every(([, r]) => r.h === H && r.y === 0));
+  }
+  for (const [n, izq, der] of [[4, 2, 1], [5, 2, 2], [6, 3, 2], [7, 3, 3], [8, 4, 3]]) {
+    for (const dpr of [1, 1.5, 0.75]) {
+      const js = sala(n), yo = js[n - 1];
+      const v = vistas(js, yo, W, H, dpr);
+      assert.equal(v.length, n);
+      assert.deepEqual(new Set(v.map(([p]) => p)).size, n, 'cada uno una vez');
+      const [c, r] = v[0];
+      assert.equal(c, yo, 'tú vas al centro');
+      assert.equal(r.h, H);
+      const lados = v.slice(1).map(([, q]) => q);
+      assert.equal(lados.filter(q => q.x === 0).length, izq, n + ': a la izquierda');
+      assert.equal(lados.filter(q => q.x > r.x).length, der, n + ': a la derecha');
+      assert.ok(lados.every(q => q.w === lados[0].w && q.h === lados[0].h), 'las de los lados, todas iguales');
+      assert.ok(r.w > lados[0].w, 'la del centro es la grande');
+      // no se pisan ni se salen de la pantalla
+      for (const q of [r, ...lados]) assert.ok(q.x >= 0 && q.y >= -1e-9 && q.x + q.w <= W + 1e-9 && q.y + q.h <= H + 1e-9);
+      for (const a of lados) for (const b of lados) if (a !== b) assert.ok(a.x !== b.x || a.y + a.h <= b.y + 1e-9 || b.y + b.h <= a.y + 1e-9);
+      // en píxeles enteros del dispositivo, para compartir el mástil
+      const entero = x => Math.abs(x * dpr - Math.round(x * dpr)) < 1e-6;
+      assert.ok(lados.every(q => entero(q.x) && entero(q.y) && entero(q.w) && entero(q.h)));
+    }
+  }
+});
+
+test('sala: la hora de quien dirige se mide por la malla (como NTP) y vale la de menor ida y vuelta', async () => {
+  const dir = path.join(__dirname, '..', 'src', 'juegos');
+  const codigo = (await esbuild.build({
+    entryPoints: [path.join(dir, 'hero-sala.js')], bundle: true, format: 'cjs', platform: 'node', write: false,
+    plugins: [{ name: 'stubs', setup(b) {
+      b.onResolve({ filter: /fb-juegos\.js$|\/malla\.js$|\/hero\.js$/ }, a => ({ path: a.path, namespace: 'stub' }));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ahora=()=>0,senalMalla=0,borraYemasVivo=0,crearMalla=0,atiendeHero=0,mandaCuenta=0;', loader: 'js' }));
+    } }]
+  })).outputFiles[0].text;
+  const m = { exports: {} };
+  new Function('module', 'exports', 'require', codigo)(m, m.exports, require);
+  // mi reloj va 5000 ms atrás del de quien dirige; la ida tarda `ida`, la vuelta `vuelta`
+  let yo = 1000;
+  const r = m.exports.crearReloj({ ahora: () => yo });
+  assert.equal(r.desfase('a'), null);
+  const ronda = (ida, vuelta) => {
+    const t = r.tic();
+    yo += ida;
+    const tac = r.tac(t, yo + 5000);
+    yo += vuelta;
+    r.recibe('a', tac);
+  };
+  ronda(200, 20);              // una lenta y despareja: 90 ms de error
+  assert.equal(r.desfase('a'), 5000 + 90);
+  ronda(10, 12);               // una rápida: casi exacta
+  ronda(300, 300);
+  assert.equal(r.desfase('a'), 5000 - 1);
+  assert.equal(r.desfase('b'), null, 'la de otro director no vale');
+  r.recibe('a', { a: 'x', b: 1 });
+  r.recibe('a', { a: yo + 10, b: 1 });   // del futuro
+  assert.equal(r.desfase('a'), 5000 - 1);
+  // si cambia quien dirige, se empieza de cero
+  ronda(0, 0);
+  r.recibe('b', { a: yo, b: yo + 7 });
+  assert.equal(r.desfase('b'), 7);
+  assert.equal(r.desfase('a'), null);
+});
+
+test('sala: la autopista del otro se pinta con el retraso con que llegan sus aciertos', async () => {
+  const { RemoteState } = await mod('js/game/remoto.js');
+  const { HIT } = await mod('js/core/engine.js');
+  const notas = Array.from({ length: 200 }, (_, i) => ({ time: 1 + i * 0.1, frets: 1, sp: -1, open: false, double: false, sus: [] }));
+  const r = new RemoteState({ notes: notas, spPhrases: [] }, 'guitar');
+  // llegan 250 ms tarde, de a un estado cada 100 ms con los últimos sucesos
+  let perf = 0;
+  for (let k = 0; k < 200; k++) {
+    const now = 1 + k * 0.1 + 0.25;
+    r.apply({ ev: [[Math.max(0, k - 1), HIT], [k, HIT]] }, now);
+    perf += 100;
+    r.retraso(perf);
+  }
+  assert.ok(Math.abs(r.lag - 0.25) < 0.02, 'mide el retraso: ' + r.lag);
+  assert.ok(Math.abs(r.lagVis - 0.25) < 0.02, 'y lo pintado llega a él: ' + r.lagVis);
+  // el carril se enciende cuando, en su reloj, la nota está en la barra
+  assert.ok(Math.abs(r.laneHitTime[0] - notas[199].time) < 0.02);
+  // lo pintado no salta: a lo más 15 ms por cada 100 ms
+  const antes = r.lagVis;
+  r.lag = 0.8;
+  r.retraso(perf + 100);
+  assert.ok(r.lagVis - antes <= 0.0151);
+  // un estado viejo (llegó tras un corte) no mueve la medida
+  const r2 = new RemoteState({ notes: notas, spPhrases: [] }, 'guitar');
+  r2.apply({ ev: [[0, HIT]] }, 30);
+  assert.equal(r2.lag, 0.12);
+});
+
+test('sala: la carrera (puntaje a lo largo de la canción) se lee bien o se ignora, y la franja dice quién iba primero', async () => {
+  const motor = carga(path.join(__dirname, '..', 'src', 'juegos', 'motor.js'));
+  const { codificaCurvaHero, leeCurvaHero, HR_CURVA } = motor;
+  const c = Array.from({ length: HR_CURVA }, (_, i) => i * 54321);
+  assert.deepEqual(leeCurvaHero(codificaCurvaHero(c)), c);
+  assert.equal(codificaCurvaHero(Array(200).fill(1)).split('.').length, HR_CURVA, 'no más de HR_CURVA puntos');
+  assert.equal(leeCurvaHero(codificaCurvaHero([1e12])).at(0), 1e8, 'el tope');
+  for (const malo of [undefined, '', 5, 'a..b', 'ZZ', 'a.-1', '1'.repeat(1000), Array(70).fill('1').join('.'), 'zzzzzzz'])
+    assert.equal(leeCurvaHero(malo), null, String(malo).slice(0, 20));
+  const { lideres, CURVA_N } = await mod('js/game/carrera.js');
+  assert.equal(CURVA_N, HR_CURVA, 'la página y el marco cuentan los mismos puntos');
+  const a = { curva: [0, 10, 30, 30, 50, 60] }, b = { curva: [0, 20, 20, 30, 70] };
+  const t = lideres([a, b], 6).map(x => [x.s === a ? 'a' : 'b', x.i, x.j]);
+  // 0: nadie (todo en 0); 1: b; 2: a; 3: empate, sigue a; 4: b; 5: solo queda a (b abandonó)
+  assert.deepEqual(t, [['b', 1, 2], ['a', 2, 4], ['b', 4, 5], ['a', 5, 6]]);
 });

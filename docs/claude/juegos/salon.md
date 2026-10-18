@@ -20,6 +20,20 @@ item by the whole grid, not by its area, so when the column ended at
 the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* and
 the rooms column (open rooms, top coins, your games) are never hidden.
 
+- **The search** (`buscadorHtml`/`enganchaBuscador` in `juegos-main.js`,
+  ranking in `juegos/buscador.js`, pure, `tests/buscador.test.cjs`) lives in
+  the sticky mode bar: a field with a «/» shortcut on PC, a 🔍 that unfolds
+  over the bar on a phone (`.jg-modos.buscando`, and the bar scrolls up to
+  stick so the list has room above the tab bar). It is **not a literal
+  match**: each query word scores its best hit across weighted fields
+  (`PESOS`: name, `APODOS`, genre, tags derived from the entry —
+  solo/multi/duelo/celular/diario—, modes, lema), exact > prefix > one typo
+  (Damerau, same first letter, words ≥ 5 letters) > substring. Popularity
+  and «nuevo» only break ties (≤ 2.5 points); a bots practice goes after
+  its game. Picking a result opens the **ficha** (never plays or opens a
+  room); Mascotas and PRODROP (`SITIOS_BUSCA`) navigate. A new game is
+  found by its name with no change; give it a row in `APODOS` (the test
+  requires one for every non-bots entry).
 - **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
   `.jg-ban` in juegos.html) shows one slide at a time and advances by
   itself every `BAN_MS` (7 s), the next one entering from the right. After
@@ -28,9 +42,22 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   that only counts while nobody is looking closely: mouse over, focus
   inside, hidden tab, the ⏸ button, an open ficha and reduced motion all
   hold it; the active dot fills with the time left. Swipe on touch; a drag
-  is never a click. Each slide's art (`arteNovedad`) is drawn at the old
-  card's size (380×165) and scaled whole with `transform` — `zoom` pushed
-  px-placed pieces out of the box.
+  is never a click. **Each slide is a full-width animated scene**
+  (`juegos/novedades-arte.js`, one SVG of 1200×420 per game with
+  `xMaxYMid slice`) with the text over a dark veil on the left. The
+  scene's subject must stay between x ≈ 600 and 1180: on PC the veil
+  covers the left, on a phone the scene is the top strip and the slice
+  shows only the right half. PRODROP's scene is HTML (its cards are
+  photos). Only the visible slide (`.on`) animates; its text enters in a
+  cascade (not again when the loop snaps back: `.ya`). An animated piece
+  (`ep-*`) must never carry an SVG `transform` itself (wrap it in a `<g>`):
+  the CSS animation replaces it — `salon.test.cjs` checks it. Each game's
+  PRO DEFENDER's attackers walk the path with `ep-marcha`, whose keyframes
+  are the vertices of `PD_CAMINO` (percentages = cumulative length): change
+  one, change both. Each game's
+  name is a logo in its own font (Bungee, Lilita One, Cinzel; Google Fonts
+  link in juegos.html), with a hook line (`gancho`) and three big facts
+  (`datos`) under the lema.
 - **Últimos drops legendarios · Mascotas** (`pintaDropsMascotas`, from
   `mejoresDropsMascotas` in `mascotas-datos.js`): the legendary items of
   valid gifts, newest first, with who and when (names `translate="no"`).
@@ -126,12 +153,20 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
-because what is new is not always a room game (today Metro Rush, FANAL and
-PRODROP, each with its own cover in `arteNovedad`); each entry may
-carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
-say what a guest gets instead. On a phone the banner puts the art on top.
-`novedades()` in `motor.js` is the older date-driven version and is no
-longer called.
+because what is new is not always a room game (Mascotas, PRODROP). Today it
+holds **ten slides in the owner's order** — Momazo :v, PRO DEFENDER, PRO HERO, Mascotas, PRO TILES,
+HaxBall, TULONES (one slide for the local and the online game), Trigon,
+PRODROP, FANAL — pinned by `salon.test.cjs`. The order is not by date: the
+«★ Lo último» seal goes to the newest `alta` (`selloNovedad`), «Nuevo» to
+the last 14 days, «Destacado» to the rest. Each slide has its scene
+and a **big «Jugar» button** (`.jg-ban-jugar`, the game's
+colour, text in `--tinta` from `tintaSobre` so yellow gets dark text): it
+goes to `ruta`, or opens the game's ficha (`ficha`) for a room game — the
+banner never opens a room by itself. For a guest the same button reads
+«Iniciar sesión y jugar» when the slide needs an account. Entries may carry
+`modo` (the same badge as the thumbnails). On a phone the banner puts the
+art on top and the button spans the width. `novedades()` in `motor.js` is
+the older date-driven version and is no longer called.
 
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
 no login wall, but **only eight games are playable**: the four *destacados*

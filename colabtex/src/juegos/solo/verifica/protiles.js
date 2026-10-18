@@ -4,7 +4,7 @@
    Nueve tablas: una por canción (`club-protiles-<id>`) y la mezcla de las
    ocho (`club-protiles-mezcla`). puntos = el puntaje de la partida (una
    por nota, más el bono de las largas completadas), tiempo = lo que duró
-   en tiempo de juego (pasos de 4 ms). El juego manda `{v: 1, m, s, u, g,
+   en tiempo de juego (pasos de 4 ms). El juego manda `{v: 3, m, s, u, g,
    n, a, w, x?}`: el modo, la semilla, la cuenta, cada nota tocada con su
    tick (y, en las largas, a qué altura se tocó), cada larga soltada, el
    tick final y lo jugado en los dos relojes. Aquí se vuelve a tocar con el
@@ -25,7 +25,7 @@
 import M from '../../../../../juegos/club/protiles/motor.js';
 import { minDesviacion, dosRelojes } from './patrones.js';
 
-export const PRUEBA = 1;
+export const PRUEBA = 3;
 
 const MAX_PUNTOS = 1000000;
 /* Una persona no toca 50 notas seguidas a menos de 0,02 filas de la misma
@@ -39,7 +39,10 @@ export function verifica(dato, prueba, ctx) {
   const modo = dato && modoDe(dato.categoria);
   if (!modo) return 'PRO TILES no tiene esa tabla.';
   if (!prueba || typeof prueba !== 'object' || Array.isArray(prueba)) return 'La prueba de PRO TILES no tiene la forma esperada.';
-  if (prueba.v !== 1) return 'La prueba es de otra versión de PRO TILES (recarga la página).';
+  /* Versión 3: las canciones de Pixabay adaptadas a piano. Las pruebas de
+     las versiones 1 y 2 (guardadas, o pendientes en un navegador) se rehacen
+     con las canciones y la regla de entonces. */
+  if (!M.PRUEBA_VERSIONES.includes(prueba.v)) return 'La prueba es de otra versión de PRO TILES (recarga la página).';
   if (prueba.m !== modo) return 'La prueba es de otra canción que la tabla.';
   const uid = (ctx && ctx.uid) || dato.uid;
   if (typeof prueba.u !== 'string') return 'La prueba no dice de qué cuenta es.';
@@ -55,7 +58,7 @@ export function verifica(dato, prueba, ctx) {
   if (Number.isFinite(prueba.a) && n * M.TICK_MS > prueba.a + 1000) return 'La partida duró más en el juego que en el reloj.';
   const acciones = M.decodifica(prueba.g);
   if (!acciones) return 'Las notas de la prueba no se pueden leer.';
-  const res = M.rehace(modo, prueba.s, prueba.u, acciones, n);
+  const res = M.rehace(modo, prueba.s, prueba.u, acciones, n, prueba.v);
   if (res.error) return res.error;
   if (res.puntos !== puntos) return `La partida rehecha suma ${res.puntos} puntos, no ${puntos}.`;
   if (minDesviacion(res.desfases, MANO_V) < MANO_SD)

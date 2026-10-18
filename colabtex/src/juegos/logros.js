@@ -56,6 +56,9 @@ const mias = (obj, me) => Object.keys(obj || {}).filter(k => obj[k] === me);
 const ajColorDe = c => (c.est.blancas === c.me ? "w" : c.est.negras === c.me ? "b" : "");
 const ladoMax = Math.max(...Object.values(TAMANOS).map(t => t.lado));
 
+/* Memazo: mis memes de toda la partida, y quién sacó la mejor nota de una ronda ("" si empatan). */
+const mzMios = c => (c.est.historial || []).flatMap(h => h.memes).filter(m => m.uid === c.me);
+const mzMejor = h => { const o = h.memes.slice().sort((a, b) => b.total - a.total); return o[0] && o[0].total > 0 && (!o[1] || o[1].total < o[0].total) ? o[0].uid : ""; };
 /* Pokémon: el resumen que el motor saca del registro de Showdown. */
 const pkDe = c => { const i = (c.est.lados || []).indexOf(c.me); return (i >= 0 && c.est.resumen && c.est.resumen[i]) || {}; };
 const SALA = {
@@ -99,6 +102,15 @@ const SALA = {
     { id: "pequeno", n: "Primer gatito", d: "Gana un gato pequeño en el Super Gato.", i: "🐱", m: "Super Gato", x: c => c.est.variante === "super" && (c.est.grande || []).includes(c.est.equis === c.me ? "x" : "o") },
     { id: "cinco", n: "Dueño de la pizarra", d: "Ten cinco gatos pequeños a la vez.", i: "🧽", m: "Super Gato", x: c => { const f = c.est.equis === c.me ? "x" : "o"; return c.est.variante === "super" && (c.est.grande || []).filter(v => v === f).length >= 5; } },
     { id: "tablas", n: "Gato encerrado", d: "Termina una partida en empate.", i: "🤝", x: c => c.est.fase === "fin" && c.est.motivo === "empate" }
+  ],
+  /* Memazo: todo sale del historial de rondas, con las notas de cada meme. */
+  memazo: [
+    { id: "unanime", n: "Unánime", d: "Un meme tuyo recibe 🔥 de todos los demás (con 2 o más calificando).", i: "🔥", x: c => mzMios(c).some(m => { const v = Object.values(m.notas); return v.length >= 2 && v.every(x => x === 5); }) },
+    { id: "ronda", n: "Meme de la ronda", d: "Saca la mejor nota de una ronda, sin empate.", i: "🖼️", x: c => (c.est.historial || []).some(h => mzMejor(h) === c.me) },
+    { id: "barrida", n: "Barrida", d: "Gana todas las rondas de una partida de 3 rondas o más.", i: "🧹", x: c => c.gano && (c.est.historial || []).length >= 3 && c.est.historial.every(h => mzMejor(h) === c.me) },
+    { id: "viral", n: "Viral", d: "Gana una partida con 6 jugadores o más.", i: "📈", x: c => c.gano && c.n >= 6 },
+    { id: "tomatazo", n: "Tomatazo", d: "Un meme tuyo recibe 🍅 de todos los demás (con 2 o más calificando).", i: "🍅", x: c => mzMios(c).some(m => { const v = Object.values(m.notas); return v.length >= 2 && v.every(x => x === 1); }) },
+    { id: "justo", n: "Por una risa", d: "Gana por un solo punto.", i: "🤏", x: c => c.gano && margen(c.est.puntos || {}, c) === 1 }
   ],
   reversi: [
     { id: "cincuenta", n: "Marea negra", d: "Gana con 50 fichas o más.", i: "🌊", x: c => c.gano && ((c.est.cuenta || {})[c.me] || 0) >= 50 },
@@ -541,6 +553,21 @@ const SOLO = {
     { id: "c40", n: "Gira mundial", d: "Ten estrellas doradas en 40 canciones distintas.", i: "🌎", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h | 0) >= 40 },
     { id: "o150", n: "Disco de diamante", d: "Junta 150 estrellas doradas.", i: "💎", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 150 },
     { id: "l40", n: "Leyenda del rock", d: "Saca las cinco doradas en 40 canciones (200 doradas).", i: "👑", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h5 | 0) >= 40 }
+  ],
+  /* PRO DEFENDER. Salen de la ronda récord de cada reino
+     (club-prodefender-<reino>): la 25 es el primer jefe, la 50 abre el reino
+     siguiente y la 100 es el trofeo. */
+  prodefender: [
+    { id: "r10", n: "Primera muralla", d: "Supera la ronda 10 en cualquier reino.", i: "🛡️", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 10 },
+    { id: "r25", n: "Matajefes", d: "Supera la ronda 25, la del primer jefe, en cualquier reino.", i: "☠️", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 25 },
+    { id: "r50", n: "Medio camino", d: "Supera la ronda 50 en cualquier reino.", i: "🔓", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 50 },
+    { id: "prado", n: "Trofeo del Prado", d: "Supera las 100 rondas del Prado Esmeralda.", i: "🌿", m: "Reinos", s: d => cat(/-prado$/)(d) && d.puntos >= 100 },
+    { id: "dunas", n: "Trofeo de las Dunas", d: "Supera las 100 rondas de las Dunas de Ámbar.", i: "🏜️", m: "Reinos", s: d => cat(/-dunas$/)(d) && d.puntos >= 100 },
+    { id: "glaciar", n: "Trofeo del Glaciar", d: "Supera las 100 rondas del Glaciar Cristal.", i: "❄️", m: "Reinos", s: d => cat(/-glaciar$/)(d) && d.puntos >= 100 },
+    { id: "caldera", n: "Trofeo de la Caldera", d: "Supera las 100 rondas de la Caldera Volcánica.", i: "🌋", m: "Reinos", s: d => cat(/-caldera$/)(d) && d.puntos >= 100 },
+    { id: "vacio50", n: "Al borde del Vacío", d: "Supera la ronda 50 del Nexo del Vacío.", i: "🌀", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 50 },
+    { id: "vacio75", n: "Mirar al abismo", d: "Supera la ronda 75 del Nexo del Vacío.", i: "👁️", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 75 },
+    { id: "vacio", n: "PRO DEFENDER", d: "Supera las 100 rondas del Nexo del Vacío.", i: "🏆", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 100 }
   ]
 };
 /* PRO HERO: las doradas y el total (máx. de doradas y azules por canción)
@@ -556,7 +583,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

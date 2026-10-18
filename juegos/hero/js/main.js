@@ -1,7 +1,7 @@
 // Punto de entrada: gestiona pantallas, carga de canciones y sesiones de juego.
-// @controles: teclado
-// (Se toca con teclado, guitarra o mando: build-controles.js no debe leer los
-// clics de los menús como «se juega en el celular».)
+// @controles: tactil teclado
+// (Teclado, guitarra o mando en el PC; en el celular, los cinco botones de
+// ui/tactil.js, en horizontal y sin guardar récords: sitio/celular.js.)
 import { InputManager, navAction } from './input/input.js';
 import { PreviewPlayer, audioContext } from './audio/audio.js';
 import { library, loadSongChart, artImg, songBytes } from './library.js';
@@ -18,6 +18,7 @@ import { songSource } from './site.js';
 import { RankingScreen } from './ui/ranking.js';
 import { sitio } from './sitio/puente.js';
 import { claveCancion } from './sitio/clave.js';
+import { celular, iniciaCelular } from './sitio/celular.js';
 
 class MainMenu extends Screen {
   render() {
@@ -284,6 +285,8 @@ class App {
   // La canción terminada va a la página: ella la vuelve a tocar con la prueba
   // (verifica el puntaje), guarda tus estrellas y paga las monedas.
   mandaResultado(entry, results, net) {
+    // en el celular no se guarda nada: los récords son para guitarra, mando o teclado
+    if (celular) return;
     const r = results.find((x) => x.prueba && x.stats && !x.bot);
     const b = this.lastSong?.bytes;
     if (!sitio.embebido || !r || !b) return;
@@ -359,4 +362,5 @@ class App {
 // página mientras se toca, y Select (el Star Power de muchas guitarras) es del juego.
 if (window.Mando) window.Mando.configura({ botones: { select: () => {} } });
 
+iniciaCelular();
 window.app = new App();

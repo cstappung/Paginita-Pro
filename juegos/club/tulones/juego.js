@@ -1163,7 +1163,7 @@
 
   /* ---------------- novedades ---------------- */
   // Versión que ve el jugador (la del registro de cambios); M.VERSION es la de compilación, para la caché.
-  const VERSION_JUEGO = '0.4';
+  const VERSION_JUEGO = '0.5';
   const dlgNovedades = $('novedades');
   function pestanaNovedades(prox) {
     $('nvTabCambios').setAttribute('aria-selected', String(!prox)); $('nvTabProx').setAttribute('aria-selected', String(prox));

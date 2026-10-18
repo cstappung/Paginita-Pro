@@ -226,6 +226,14 @@ export const JUEGOS = {
     cupo: 8,
     alta: "2026-10-14"
   },
+  memazo: {
+    nombre: "Momazo :v",   // el id sigue siendo `memazo`: lo usan las reglas, las salas y las tablas
+    lema: "Ponle texto a una plantilla, califica los memes de los demás sin saber de quién son y gana quien saque más risas",
+    color: "#f5b301",
+    minimo: 2,
+    cupo: 10,
+    alta: "2026-10-18"
+  },
   mkw: {
     nombre: "Mario Kart Wii",
     lema: "Mario Kart Wii con Retro Rewind en el navegador: carreras en línea de hasta 12, con tus amigos y CPU de relleno",
@@ -1022,6 +1030,7 @@ export function reducir(p) {
   if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
   if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
+  if (p.juego === "memazo") return { ...base, ...redMemazo(p, js, listos) };
   if (p.juego === "mkw") return { ...base, ...redMkw(p, js) };
   return base;
 }
@@ -1112,6 +1121,8 @@ export function progreso(est, juego) {
   if (juego === "gato" && est.tab) return c(est.movs / (est.variante === "super" ? 81 : 9));
   /* En Tulones, cuántos quedaron fuera de la torre. */
   if (juego === "tulones" && est.vivos) return c(1 - est.vivos.length / Math.max(1, (est.jugadores || []).length));
+  /* En Memazo, las rondas y los memes ya calificados de la actual. */
+  if (juego === "memazo" && est.rondas) return c(((est.historial || []).length + (est.etapa === "votar" && est.total ? est.m / est.total : 0)) / est.rondas);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -6984,7 +6995,10 @@ function redGato(p, js) {
      `now`) y la canción arranca HR_DEMORA ms después en todas las pantallas.
    - `fin {r, s, e, ac, …}`: el resultado de cada uno, una vez por ronda
      (los aciertos van en `ac`: la regla de `jugadas/$n` reserva `h` para
-     un texto y rechazaba la jugada entera). Cuando
+     un texto y rechazaba la jugada entera). `cv` es su puntaje a lo largo
+     de la canción (HR_CURVA puntos en base 36 separados por «.»,
+     `codificaCurvaHero`): con él la pantalla final dibuja quién iba ganando.
+     Uno que no se lee se ignora; el resultado vale igual. Cuando
      están todos los de la ronda que siguen en la sala, la ronda queda en
      `ultima` y se vuelve a elegir canción.
    No hay ganador de la sala ni fila en `ranks/hero`: lo que clasifica en
@@ -6994,6 +7008,19 @@ export const HR_DEMORA = 3500;
 export const HR_PARTES = ["guitar", "bass", "rhythm", "keys", "drums", "guitarcoop"];
 export const HR_DIFS = ["expert", "hard", "medium", "easy"];
 export const HR_MODOS = ["taps", "normal", "hopos", "strums"];
+export const HR_CURVA = 60;
+const HR_CURVA_MAX = 1e8;
+export function codificaCurvaHero(c) {
+  if (!Array.isArray(c)) return "";
+  return c.slice(0, HR_CURVA).map(x => Math.max(0, Math.min(HR_CURVA_MAX, Math.floor(+x) || 0)).toString(36)).join(".");
+}
+export function leeCurvaHero(t) {
+  if (typeof t !== "string" || !t || t.length > HR_CURVA * 7) return null;
+  const v = t.split(".");
+  if (v.length > HR_CURVA || !v.every(x => /^[0-9a-z]{1,6}$/.test(x))) return null;
+  const n = v.map(x => parseInt(x, 36));
+  return n.every(x => x <= HR_CURVA_MAX) ? n : null;
+}
 export function redHero(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, partes = {}, prep = {}, hist = [];
@@ -7045,6 +7072,8 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
         s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.ac, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
         sp: ent(j.sp, 1e4), st: ent(j.st, 1e4), o: ent(j.o, 1e5), fc: j.fc === 1 ? 1 : 0, q: j.q === 1 ? 1 : 0
       };
+      const cv = leeCurvaHero(j.cv);
+      if (cv) fines[u].cv = cv;
       cierraRonda();
     }
   }
@@ -7487,6 +7516,216 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     batalla, tiempo, veto, relevo, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
     llave: rondas, previa: rondas ? null : previa(), actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
+  };
+}
+
+/* ---------- Memazo ----------
+   Cada ronda a cada uno le tocan `MZ_OFERTAS` plantillas, elige una y le
+   escribe los textos con reloj; después los memes de la ronda salen de
+   uno en uno, sin autor, y los demás les ponen nota de 1 (🍅) a 5 (🔥).
+   Lo que suma cada meme va a su autor, y tras la última ronda gana
+   quien más sumó (a igualdad, quien sacó más 🔥).
+
+   Las jugadas:
+   - `arranca {at}` abre la primera ronda; la escribe sola la pantalla
+     del primer asiento en cuanto la sala está lista.
+   - `meme {r, p, x:[textos], at}` es el meme de la ronda `r` con la
+     plantilla `p`, que tiene que ser una de las que le tocaron. Vale el
+     último que llegue mientras se escribe: se puede corregir. Con
+     plantillas de afuera `p` es "if" (Imgflip) o "gif" (GIPHY) y la
+     jugada trae además `u, an, al, n, c` (ver `externoMemazo`). El alto
+     no puede ir en `h`: las reglas reservan `h` (y `sal`) de toda jugada
+     para el hash de otros juegos y exigen que sea texto, así que un número
+     ahí hacía rechazar la jugada entera.
+   - `nota {r, m, v, at}` califica el meme `m` de la ronda `r`. Vale la
+     primera de cada uno, y nunca la del autor.
+   - `cierra {r, e, m, at}` cierra la etapa `e` («escribir» o «votar»)
+     cuando se acabó su tiempo o cuando ya no falta nadie (porque alguien
+     se fue). La escriben solas las pantallas, en relevo por asiento.
+
+   Una etapa se cierra con la jugada que la completa (el último meme, la
+   última nota) o con `cierra`, y la hora de esa jugada abre la
+   siguiente: el plazo es esa hora más lo que dura. Por eso todas llevan
+   `at`, que las reglas obligan a que sea la hora del servidor (±unos
+   segundos); `abandona` no la lleva, y si completa una etapa la deja
+   `completa` hasta que llegue un `cierra`. Las plantillas que tocan
+   salen de la semilla, la ronda y el asiento: nadie elige las suyas. */
+export const MZ_TIEMPOS = [60, 90, 120];
+export const MZ_RONDAS = [3, 5, 7];
+export const MZ_VOTO_MS = 20000;     // para calificar un meme
+export const MZ_REVELA_MS = 4500;    // la nota del anterior, antes de enseñar el siguiente
+export const MZ_RESUMEN_MS = 9000;   // el podio de la ronda, antes de escribir la siguiente
+export const MZ_LARGO = 90;          // caracteres por texto
+export const MZ_OFERTAS = 3;
+export const MZ_NOTAS = { 1: "🍅", 2: "😐", 3: "🙂", 4: "😂", 5: "🔥" };
+/* Cada plantilla con cuántos textos lleva. El dibujo y dónde va cada
+   texto están en `memazo-plantillas.js`, con las mismas claves (lo
+   comprueba `tests/memazo.test.cjs`). */
+export const MZ_PLANTILLAS = {
+  sino: 2, botones: 3, cerebro: 4, todobien: 2, distraido: 3, gritogato: 2, mariposa: 3,
+  plan: 3, cachetada: 2, uno25: 2, senalan: 2, sorpresa: 1, dolor: 2, exito: 2, piensa: 2,
+  mono: 1, incendio: 2, panico: 3, trato: 2, siempre: 2, perros: 4, bici: 2, salida: 3,
+  quien: 2, elegante: 2, cartel: 1, noticia: 2
+};
+/* De dónde salen las plantillas. Los dibujos de la casa valen siempre
+   (son también el plan B si la API de afuera no responde); en las otras
+   la jugada trae la imagen (`u`, su tamaño `w`×`h`) y dónde va cada
+   texto (`c`, rectángulos en %), porque esas plantillas no traen cajas.
+   La imagen se valida contra el formato de cada servicio: nadie puede
+   meter una URL cualquiera en la pantalla de los demás. */
+export const MZ_FUENTES = { reales: "Plantillas reales (Imgflip)", gif: "GIFs (GIPHY)", dibujos: "Dibujos de la casa" };
+export const fuenteMemazo = p => Object.prototype.hasOwnProperty.call(MZ_FUENTES, p && p.fuente) ? p.fuente : "dibujos";
+export const MZ_CAJAS_MAX = 5;
+const mzNum = (v, a, b) => Math.max(a, Math.min(b, Math.round((Number(v) || 0) * 10) / 10));
+/* La plantilla de afuera de una jugada `meme`, o null si no vale en esta sala. */
+export function externoMemazo(j, fuente) {
+  const p = j && j.p;
+  if (!((p === "if" && fuente === "reales") || (p === "gif" && fuente === "gif"))) return null;
+  const u = String(j.u || "");
+  if (p === "if" ? !/^[A-Za-z0-9]{3,12}\.(jpg|png|gif)$/.test(u) : !/^[A-Za-z0-9]{6,40}$/.test(u)) return null;
+  const w = Math.round(Number(j.an)), h = Math.round(Number(j.al));
+  if (!(w >= 40 && w <= 5000 && h >= 40 && h <= 5000) || w / h > 5 || h / w > 5) return null;
+  if (!Array.isArray(j.c) || !j.c.length || j.c.length > MZ_CAJAS_MAX) return null;
+  const c = [];
+  for (const b of j.c) {
+    if (!Array.isArray(b) || b.length !== 4) return null;
+    const x = mzNum(b[0], 0, 95), y = mzNum(b[1], 0, 95);
+    c.push([x, y, mzNum(b[2], 5, 100 - x), mzNum(b[3], 5, 100 - y)]);
+  }
+  return { u, w, h, c, n: typeof j.n === "string" ? j.n.slice(0, 60) : "" };
+}
+/* La jugada `meme` de una plantilla de afuera (`{p, u, w, h, n, c}`, como
+   las guarda el editor) con sus textos. La arma el motor y no la pantalla
+   para que el test compruebe sus campos contra las reglas. */
+export function jugadaExternaMemazo(pl, x) {
+  return { p: pl.p, u: pl.u, an: pl.w, al: pl.h, n: pl.n || "", c: pl.c.map(b => b.map(v => Math.round(v * 10) / 10)), x };
+}
+export const tiempoMemazo = p => MZ_TIEMPOS.includes(Number(p && p.tiempo)) ? Number(p.tiempo) : 90;
+export const rondasMemazo = p => MZ_RONDAS.includes(Number(p && p.rondas)) ? Number(p.rondas) : 3;
+const mzSemilla = (semilla, r, k) => ((semilla >>> 0) ^ Math.imul(r * 31 + k + 1, 0x9E3779B1)) >>> 0;
+
+/* Las plantillas que le tocan al asiento `i` en la ronda `r`: tres
+   seguidas de una baraja de la ronda, así que en una sala de hasta
+   nueve nadie comparte oferta con nadie. */
+export function ofertasMemazo(semilla, r, i) {
+  const ids = Object.keys(MZ_PLANTILLAS);
+  const b = mezcla(ids, rng(mzSemilla(Number(semilla) || 0, r, 0)));
+  return Array.from({ length: MZ_OFERTAS }, (_, k) => b[(i * MZ_OFERTAS + k) % b.length]);
+}
+
+/* Los textos tal como cuentan: tantos como cajas, recortados y sin
+   saltos de línea de más. `null` si no hay nada escrito. */
+export function textosMemazo(p, x, cuantas) {
+  const n = cuantas || MZ_PLANTILLAS[p];
+  if (!n || !Array.isArray(x)) return null;
+  const t = Array.from({ length: n }, (_, k) => typeof x[k] === "string"
+    ? x[k].replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim().slice(0, MZ_LARGO) : "");
+  return t.some(s => s) ? t : null;
+}
+
+export function redMemazo(p, js = jugadoresDe(p), listos = true) {
+  const asiento = {};
+  js.forEach((j, i) => { asiento[j.uid] = i; });
+  const rondas = rondasMemazo(p), tiempo = tiempoMemazo(p), fuente = fuenteMemazo(p), sem = Number(p.semilla) || 0;
+  const fuera = {}, puntos = {}, fuegos = {}, tomates = {};
+  for (const j of js) { puntos[j.uid] = 0; fuegos[j.uid] = 0; tomates[j.uid] = 0; }
+  const historial = [];
+  let etapa = "arranque", r = 0, m = 0, desde = 0, plazo = 0, completa = false;
+  let envios = {}, memes = [], ganador = null, motivo = "", cierre = 0;
+  const activos = () => js.filter(j => !fuera[j.uid]).map(j => j.uid);
+  const votantes = () => memes[m] ? activos().filter(u => u !== memes[m].uid) : [];
+  const falta = () => etapa === "escribir" ? activos().filter(u => !envios[u])
+    : etapa === "votar" ? votantes().filter(u => !(u in memes[m].notas)) : [];
+  const hora = j => Number.isFinite(Number(j.at)) && Number(j.at) > 0 ? Number(j.at) : 0;
+
+  function acaba(at) {
+    cierre = at;
+    const vivos = activos();
+    const orden = vivos.slice().sort((a, b) => puntos[b] - puntos[a] || fuegos[b] - fuegos[a]);
+    const a = orden[0], b = orden[1];
+    if (!a || !puntos[a] || (b && puntos[a] === puntos[b] && fuegos[a] === fuegos[b])) { ganador = ""; motivo = "empate"; }
+    else { ganador = a; motivo = "risas"; }
+  }
+  function escribe(at, nr) {
+    r = nr; etapa = "escribir"; envios = {}; memes = []; m = 0; desde = at;
+    plazo = at + (r > 1 ? MZ_RESUMEN_MS : 0) + tiempo * 1000;
+  }
+  function finRonda(at) {
+    historial.push({ r, memes });
+    if (r >= rondas) acaba(at);
+    else escribe(at, r + 1);
+  }
+  function avanza(at) {
+    completa = false;
+    if (etapa === "escribir") {
+      const lista = js.filter(j => envios[j.uid] && !fuera[j.uid])
+        .map(j => ({ uid: j.uid, ...envios[j.uid], notas: {}, total: 0 }));
+      memes = mezcla(lista, rng(mzSemilla(sem, r, 1)));
+      if (!memes.length) return finRonda(at);
+      etapa = "votar"; m = 0; desde = at; plazo = at + MZ_VOTO_MS;
+      return;
+    }
+    const mm = memes[m];
+    mm.total = Object.values(mm.notas).reduce((s, v) => s + v, 0);
+    puntos[mm.uid] = (puntos[mm.uid] || 0) + mm.total;
+    fuegos[mm.uid] = (fuegos[mm.uid] || 0) + Object.values(mm.notas).filter(v => v === 5).length;
+    tomates[mm.uid] = (tomates[mm.uid] || 0) + Object.values(mm.notas).filter(v => v === 1).length;
+    m++;
+    if (m < memes.length) { desde = at; plazo = at + MZ_REVELA_MS + MZ_VOTO_MS; }
+    else finRonda(at);
+  }
+  /* Tras cada jugada: si ya no falta nadie, la etapa se cierra con su
+     hora, o queda `completa` si la jugada no trae hora. */
+  function mira(at) {
+    if (ganador !== null || (etapa !== "escribir" && etapa !== "votar")) return;
+    if (falta().length) return;
+    if (at) avanza(at); else completa = true;
+  }
+
+  for (const j of jugadasDe(p)) {
+    if (ganador !== null) break;
+    if (!(j.uid in asiento)) continue;
+    if (j.t === "abandona") {
+      if (fuera[j.uid]) continue;
+      fuera[j.uid] = true;
+      if (listos && etapa !== "arranque" && activos().length < 2) { ganador = activos()[0] || ""; motivo = "abandono"; break; }
+      mira(0);
+      continue;
+    }
+    if (fuera[j.uid] || !listos) continue;
+    const at = hora(j);
+    if (!at) continue;
+    if (etapa === "arranque") {
+      if (j.t === "arranca") escribe(at, 1);
+      continue;
+    }
+    if (j.t === "cierra") {
+      if (j.e === etapa && Number(j.r) === r && (etapa !== "votar" || Number(j.m) === m) && (completa || at >= plazo)) avanza(at);
+      continue;
+    }
+    if (etapa === "escribir" && j.t === "meme" && Number(j.r) === r) {
+      const ext = MZ_PLANTILLAS[j.p] ? null : externoMemazo(j, fuente);
+      if (!ext && !ofertasMemazo(sem, r, asiento[j.uid]).includes(j.p)) continue;
+      const x = textosMemazo(j.p, j.x, ext && ext.c.length);
+      if (!x) continue;
+      envios[j.uid] = ext ? { p: j.p, x, ...ext } : { p: j.p, x };
+      mira(at);
+    } else if (etapa === "votar" && j.t === "nota" && Number(j.r) === r && Number(j.m) === m) {
+      const v = Math.floor(Number(j.v));
+      const mm = memes[m];
+      if (!(v >= 1 && v <= 5) || j.uid === mm.uid || j.uid in mm.notas) continue;
+      mm.notas[j.uid] = v;
+      mira(at);
+    }
+  }
+  if (listos && ganador === null && etapa === "arranque" && activos().length < 2 && js.length >= 2) { ganador = activos()[0] || ""; motivo = "abandono"; }
+  const fin = ganador !== null;
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando", turno: "",
+    etapa: fin ? "fin" : etapa, r, m, desde, plazo, completa, rondas, tiempo, fuente,
+    debe: fin ? [] : falta(), listosYa: etapa === "escribir" ? Object.keys(envios) : [],
+    memes: etapa === "votar" || fin ? memes : [], total: memes.length,
+    historial, puntos, fuegos, tomates, fuera, cierre, ganador, motivo
   };
 }
 

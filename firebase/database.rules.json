@@ -155,7 +155,7 @@
         "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
         "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'mkw' || newData.val() === 'tulones' || newData.val() === 'hero'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'mkw' || newData.val() === 'tulones' || newData.val() === 'hero' || newData.val() === 'memazo'" },
         "modo": { ".validate": "newData.val() === 'normal' || newData.val() === 'venganza' || newData.val() === 'super' || newData.val() === 'clasico' || newData.val() === 'nomercy' || newData.val() === 'nomercyx' || newData.val() === 'allwild' || newData.val() === 'liar'" },
         "malla": { ".validate": "newData.val() === 'chica' || newData.val() === 'clasica' || newData.val() === 'grande'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
@@ -197,7 +197,7 @@
             ".validate": "newData.hasChildren(['t', 'uid']) && newData.child('t').isString() && newData.child('t').val().length <= 16 && $n.length >= 4",
             "h": { ".validate": "newData.isString() && newData.val().length <= 80" },
             "sal": { ".validate": "newData.isString() && newData.val().length <= 40" },
-            "at": { ".validate": "(root.child('partidas').child($pid).child('juego').val() !== 'ajedrez' && root.child('partidas').child($pid).child('juego').val() !== 'tulones' && root.child('partidas').child($pid).child('juego').val() !== 'hero') || (newData.isNumber() && newData.val() <= now + 3000 && newData.val() >= now - 8000)" },
+            "at": { ".validate": "(root.child('partidas').child($pid).child('juego').val() !== 'ajedrez' && root.child('partidas').child($pid).child('juego').val() !== 'tulones' && root.child('partidas').child($pid).child('juego').val() !== 'hero' && root.child('partidas').child($pid).child('juego').val() !== 'memazo') || (newData.isNumber() && newData.val() <= now + 3000 && newData.val() >= now - 8000)" },
             "$otro": { ".validate": true }
           }
         },
@@ -334,6 +334,11 @@
     },
 
     "discord": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
+    "giphy": {
       ".read": "auth != null",
       ".write": false
     },
@@ -584,6 +589,57 @@
       }
     },
 
+    "casino": {
+      ".read": "auth != null",
+      "$uid": {
+        "$k": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['j', 'p', 'at']) && newData.child('p').isNumber() && newData.child('p').val() % 1 === 0 && newData.child('p').val() >= 10 && ((newData.child('j').val() === 'a' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'p' && ((newData.child('d').val() === 0 && newData.child('p').val() <= 1000) || (newData.child('d').val() === 1 && newData.child('p').val() <= 500) || (newData.child('d').val() === 2 && newData.child('p').val() <= 200) || (newData.child('d').val() === 3 && newData.child('p').val() <= 50))) || (newData.child('j').val() === 'r' && !newData.hasChild('d') && newData.hasChild('b') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'b' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'v' && !newData.hasChild('d') && newData.child('p').val() <= 100) || (newData.child('j').val() === 'l' && newData.hasChild('n') && ((newData.child('d').val() === 0 && newData.child('p').val() <= 500) || (newData.child('d').val() === 1 && newData.child('p').val() <= 200) || (newData.child('d').val() === 2 && newData.child('p').val() <= 50))))",
+          "j": { ".validate": "newData.val() === 'a' || newData.val() === 'p' || newData.val() === 'r' || newData.val() === 'b' || newData.val() === 'v' || newData.val() === 'l'" },
+          "p": { ".validate": "newData.isNumber()" },
+          "d": { ".validate": "newData.isNumber()" },
+          "n": { ".validate": "newData.parent().child('j').val() === 'l' && (newData.val() === 8 || newData.val() === 12 || newData.val() === 16)" },
+          "at": { ".validate": "newData.val() === now" },
+          "b": {
+            ".validate": "newData.parent().child('j').val() === 'r'",
+            "$x": { ".validate": "$x.matches(/^(n([0-9]|[12][0-9]|3[0-6])|rojo|negro|par|impar|baja|alta|d[1-3]|c[1-3])$/) && newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 500" }
+          },
+          "t": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'a'",
+              ".validate": "$i.matches(/^[0-9]{1,3}$/) && newData.val() === now"
+            }
+          },
+          "s": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'p'",
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.val() === now"
+            }
+          },
+          "a": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'b'",
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.hasChildren(['t', 'at'])",
+              "t": { ".validate": "newData.isString() && newData.val().matches(/^[pqds]$/)" },
+              "at": { ".validate": "newData.val() === now" },
+              "$otro": { ".validate": false }
+            }
+          },
+          "x": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'v'",
+            ".validate": "newData.hasChildren(['m', 'at'])",
+            "m": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 31" },
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
+          },
+          "c": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).exists()",
+            ".validate": "newData.val() === now"
+          },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "tienda": {
       ".read": "auth != null",
       "$uid": {
@@ -633,12 +689,12 @@
         ],
         "$uid": {
           ".write": "auth != null && ((auth.uid === $uid && !root.child('vetados').child(auth.uid).exists() && (!root.child('suspensiones').child(auth.uid).exists() || root.child('suspensiones').child(auth.uid).child('hasta').val() <= now)) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
-          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-aleteo-vuelo|club-dosmil-(puntos|ficha)|club-trigon-puntos|club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)|club-pokelike-(puntos|pokedex)|club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)|club-hero-estrellas|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val())) && ($categoria.beginsWith('yemas-zombis-') || root.child('soloPruebas').child($categoria).child($uid).child(newData.child('partida').val()).exists()) && (!$categoria.matches(/^club-(sopa|sudoku|electro)-racha$/) || newData.child('puntos').val() <= root.child('rachasClub').child($uid).child($categoria).child('n').val())",
+          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-aleteo-vuelo|club-dosmil-(puntos|ficha)|club-trigon-puntos|club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)|club-pokelike-(puntos|pokedex)|club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)|club-hero-estrellas|club-prodefender-(prado|dunas|glaciar|caldera|vacio)|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val())) && ($categoria.beginsWith('yemas-zombis-') || root.child('soloPruebas').child($categoria).child($uid).child(newData.child('partida').val()).exists()) && (!$categoria.matches(/^club-(sopa|sudoku|electro)-racha$/) || newData.child('puntos').val() <= root.child('rachasClub').child($uid).child($categoria).child('n').val())",
           "nombre": {
             ".validate": "newData.isString() && newData.val().length <= 80"
           },
           "puntos": {
-            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= ($categoria === 'club-hero-estrellas' ? 50009999 : $categoria.beginsWith('club-snake-') || $categoria.beginsWith('club-tetris-') || $categoria === 'club-metrorush-carrera' || $categoria === 'club-metrorush-puro' || $categoria === 'club-metrorush-sinmonedas' || $categoria === 'club-metrorush-city' || $categoria === 'club-metrorush-citypuro' || $categoria === 'club-metrorush-fantasma' || $categoria === 'club-metrorush-cityfantasma' ? 1000000000 : $categoria === 'club-dosmil-puntos' ? 4000000 : $categoria === 'club-dosmil-ficha' || $categoria.matches(/^club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)$/) || $categoria === 'club-trigon-puntos' || $categoria === 'club-pokelike-puntos' || $categoria === 'club-metrorush-distancia' || $categoria === 'club-metrorush-citydistancia' || $categoria === 'club-fanal-travesia' || $categoria === 'club-fanal-sinfin' || $categoria === 'club-sudoku-arcade' || $categoria === 'club-electro-puntos' ? 1000000 : 100000) && (!$categoria.beginsWith('club-minas-') || newData.val() === 1) && (!$categoria.matches(/^club-sudoku-(facil|medio|dificil|experto)$/) || newData.val() === 1) && newData.val() % 1 === 0"
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= ($categoria === 'club-hero-estrellas' ? 50009999 : $categoria.beginsWith('club-snake-') || $categoria.beginsWith('club-tetris-') || $categoria === 'club-metrorush-carrera' || $categoria === 'club-metrorush-puro' || $categoria === 'club-metrorush-sinmonedas' || $categoria === 'club-metrorush-city' || $categoria === 'club-metrorush-citypuro' || $categoria === 'club-metrorush-fantasma' || $categoria === 'club-metrorush-cityfantasma' ? 1000000000 : $categoria === 'club-dosmil-puntos' ? 4000000 : $categoria === 'club-dosmil-ficha' || $categoria.matches(/^club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)$/) || $categoria === 'club-trigon-puntos' || $categoria === 'club-pokelike-puntos' || $categoria === 'club-metrorush-distancia' || $categoria === 'club-metrorush-citydistancia' || $categoria === 'club-fanal-travesia' || $categoria === 'club-fanal-sinfin' || $categoria === 'club-sudoku-arcade' || $categoria === 'club-electro-puntos' ? 1000000 : 100000) && (!$categoria.beginsWith('club-minas-') || newData.val() === 1) && (!$categoria.beginsWith('club-prodefender-') || newData.val() <= 100) && (!$categoria.matches(/^club-sudoku-(facil|medio|dificil|experto)$/) || newData.val() === 1) && newData.val() % 1 === 0"
           },
           "tiempo": {
             ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 604800000 && newData.val() % 1 === 0"
@@ -665,7 +721,7 @@
           "$partida": {
             ".read": "auth != null",
             ".write": "auth != null && ((auth.uid === $uid && !data.exists() && newData.exists()) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
-            ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-aleteo-vuelo|club-dosmil-(puntos|ficha)|club-trigon-puntos|club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)|club-pokelike-(puntos|pokedex)|club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)|club-hero-estrellas)$/) && $partida.matches(/^[-a-zA-Z0-9]{1,80}$/) && newData.hasChildren(['v', 'd', 'at'])",
+            ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-aleteo-vuelo|club-dosmil-(puntos|ficha)|club-trigon-puntos|club-protiles-(cristal|medianoche|calle|verano|neon|latido|estrellas|despegue|mezcla)|club-pokelike-(puntos|pokedex)|club-metrorush-(carrera|distancia|citydistancia|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)|club-hero-estrellas|club-prodefender-(prado|dunas|glaciar|caldera|vacio))$/) && $partida.matches(/^[-a-zA-Z0-9]{1,80}$/) && newData.hasChildren(['v', 'd', 'at'])",
             "v": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000" },
             "d": { ".validate": "newData.isString() && newData.val().length <= 200000" },
             "at": { ".validate": "newData.val() === now" },
@@ -792,7 +848,7 @@
     "logros": {
       ".read": "auth != null",
       "$juego": {
-        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|mkw|metrorush|tulones)$/)",
+        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|mkw|metrorush|tulones|memazo)$/)",
         "$uid": {
           "$id": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",

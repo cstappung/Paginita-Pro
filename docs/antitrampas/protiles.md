@@ -10,7 +10,14 @@ Nueve tablas, una por canción y una para la mezcla:
 
 ## La prueba
 
-`{v: 1, m, s, u, g, n, a, w, x?}`:
+`{v: 3, m, s, u, g, n, a, w, x?}` (se aceptan `v: 1`, `v: 2` y `v: 3`):
+
+- `v`: la versión del motor. **3** (la que se juega): las canciones de
+  Pixabay transcritas a piano (`SONGS`), con el escape de la 2. **2**: las
+  canciones compuestas sobre el ritmo de cada género (`SONGS_V2`) y la
+  ficha que se escapa al salir más de la mitad de su largo por abajo. **1**:
+  las canciones del estreno (`SONGS_V1`) y el escape a 0,15 filas. La 1 y
+  la 2 quedan solo para rehacer las pruebas ya guardadas o pendientes.
 
 - `m`: el modo (el id de la canción o `mezcla`); tiene que ser el de la tabla.
 - `s`: la semilla (32 bits). `u`: la cuenta. Las dos juntas deciden los
@@ -30,7 +37,8 @@ Nueve tablas, una por canción y una para la mezcla:
 
 1. Que cada nota se tocara en el carril de su ficha (lo que ata la prueba a
    la semilla y la cuenta) y cuando su ficha estaba en pantalla
-   (`M.tocable`: desde que asoma hasta 0,15 filas bajo el borde) y que
+   (`M.tocable`: desde que asoma hasta que salió la mitad de su largo bajo
+   el borde; 0,15 filas en la versión 1) y que
    ninguna ficha se escapara antes de la última nota, rehaciendo la partida
    paso a paso con el mismo motor (`juegos/club/protiles/motor.js`).
 2. Que la partida rehecha llegue viva al tick `n` (termina ahí porque se
@@ -52,8 +60,8 @@ un tiempo mínimo creíble para un puntaje.
 El motor avanza en pasos fijos de 4 ms, así que la frecuencia de la
 pantalla no cambia lo que pasa. La curva de velocidad usa `expNeg` (Taylor
 con + − × ÷) y no `Math.exp`, que no da el mismo último bit en todos los
-motores. Los carriles salen de mulberry32; las notas del compositor, de
-mulberry32 sembrado con el id de la canción.
+motores. Los carriles salen de mulberry32; en las versiones 1 y 2, las notas del compositor salen de
+mulberry32 sembrado con el id de la canción (en la 3 están escritas).
 
 ## El límite honesto
 

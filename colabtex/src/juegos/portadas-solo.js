@@ -481,6 +481,27 @@ const ARTE = {
     <path d="M316 24 V4" stroke="#1a1020" stroke-width="3"/><path class="a-flamea" d="M317 4 L338 10 L317 17Z" fill="#fb923c"/>
     ${ventanas}<rect x="308" y="206" width="16" height="30" rx="8" fill="#ffb15c"/>
     <path d="M236 236 V150 L248 138 L260 150 V236Z M366 236 V160 L376 150 L386 160 V236Z" fill="#241430"/>`;
+  },
+
+  /* PRO DEFENDER: el Prado Esmeralda con su camino en zigzag, tres torres
+     disparando a la fila de atacantes y el jefe escarabajo al fondo. */
+  prodefender: u => {
+    const camino = "M-10 92 H150 V182 H70 V262 H270 V122 H410";
+    const torre = (x, y, c, a, clase = "") => `<g transform="translate(${x} ${y})"><circle r="21" fill="#2a3156" stroke="#161a30" stroke-width="3"/><circle r="15" fill="${c}"/>
+      <g class="${clase}" transform="rotate(${a})"><rect x="-4" y="-25" width="8" height="18" rx="3" fill="#1c2238"/></g><circle r="6" fill="#fff" opacity=".5"/></g>`;
+    const bicho = (x, y, r, c) => `<g transform="translate(${x} ${y})"><circle r="${r}" fill="${c}" stroke="#0006" stroke-width="2"/><circle cx="${-r / 3}" cy="${-r / 4}" r="${r / 4}" fill="#fff"/><circle cx="${r / 3}" cy="${-r / 4}" r="${r / 4}" fill="#fff"/><circle cx="${-r / 3}" cy="${-r / 4}" r="${r / 9}" fill="#111"/><circle cx="${r / 3}" cy="${-r / 4}" r="${r / 9}" fill="#111"/></g>`;
+    let flores = "";
+    for (let k = 0; k < 26; k++) flores += `<circle cx="${(k * 97) % 400}" cy="${(k * 61) % 300}" r="${2 + (k % 3)}" fill="${["#f7f3a1", "#ffb3c7", "#c8f7a6"][k % 3]}" opacity=".8"/>`;
+    return `<defs><radialGradient id="g${u}" cx=".7" cy=".25" r=".9"><stop offset="0" stop-color="#4fa046"/><stop offset="1" stop-color="#25632a"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>${flores}
+    <path d="${camino}" fill="none" stroke="#8f7140" stroke-width="40" stroke-linejoin="round"/>
+    <path d="${camino}" fill="none" stroke="#c9a86a" stroke-width="32" stroke-linejoin="round"/>
+    <circle cx="210" cy="200" r="24" fill="#3f8fd0" stroke="#2d6a9a" stroke-width="4"/><ellipse cx="204" cy="194" rx="9" ry="4" fill="#fff" opacity=".35"/>
+    ${bicho(40, 92, 10, "#8fd16a")}${bicho(75, 92, 10, "#8fd16a")}${bicho(112, 92, 12, "#e2c14d")}${bicho(150, 128, 11, "#d0574f")}${bicho(150, 165, 10, "#8fd16a")}
+    ${bicho(338, 122, 26, "#5b3a8c")}<path d="M322 98 l-8 -14 M354 98 l8 -14" stroke="#2e1d48" stroke-width="5" stroke-linecap="round"/>
+    ${torre(205, 58, "#5fbf4a", 205, "a-mueve")}${torre(105, 140, "#7fd6ff", 60)}${torre(318, 186, "#ffb84d", 330)}
+    <path d="M196 76 L156 122" stroke="#fff27a" stroke-width="4" stroke-linecap="round" class="a-late"/>
+    <circle cx="154" cy="125" r="7" fill="#fff27a" opacity=".85" class="a-late"/>`;
   }
 };
 

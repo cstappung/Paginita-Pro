@@ -79,7 +79,7 @@ test('el invitado juega los cuatro destacados más Snake, Buscaminas, Tetris y s
  // Las rutas #solo/<x>: el Tetris del club va por «tetris».
  for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon'])assert.ok(S.rutaLibre(r),r);
  for(const r of ['sopa','electro','sudoku','atasco','dosmil','protiles','metrorush','pokelike','hero','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
- for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
+ for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil','casino'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });
 
 test('al empezar otra visita se borra solo lo del invitado',()=>{
@@ -116,4 +116,35 @@ test('una novedad lleva las etiquetas del juego al que lleva',()=>{
  /* Y las de verdad: cada novedad que abre una sala o un juego del club lo encuentra. */
  const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
  for(const m of nov.matchAll(/ruta: "(#solo\/\w+)"|sala: \{ k: "(\w+)"/g)){const n=m[1]?{ruta:m[1]}:{sala:{k:m[2]}};assert.ok(S.CONTROLES[S.juegoDeNovedad(n)],JSON.stringify(n));}
+});
+
+/* Las novedades del banner son las que eligió la dueña del sitio, en su
+   orden, y cada una tiene adónde llevar con su botón grande. */
+test('las novedades: las diez elegidas, en su orden, con su botón',()=>{
+ const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
+ const ids=[...nov.matchAll(/^  \{ id: "(\w+)"/mg)].map(m=>m[1]);
+ assert.deepEqual(ids,['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
+ for(const m of nov.split(/^  \{ id: /m).slice(1)) assert.match(m,/ruta: "#|ficha: "\w+"/,'sin adónde ir: '+m.slice(0,20));
+ assert.ok(!nov.includes('sala: {'),'el banner no abre salas de un toque');
+});
+
+/* Cada novedad tiene su escena animada, sin huecos ni números rotos, y
+   ningún elemento que se anima lleva su propio `transform` (la animación
+   CSS lo pisaría y la pieza saltaría al origen). */
+test('las escenas de las novedades',()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(sin('src/juegos/novedades-arte.js')+'\n;globalThis.__E={escenaNovedad,tieneEscena};',c);
+ for(const id of ['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']){
+  assert.ok(c.__E.tieneEscena(id),id+' sin escena');
+  for(const serie1 of [false,true]){
+   const h=c.__E.escenaNovedad(id,{serie1});
+   assert.ok(h.length>500,id);
+   assert.ok(!/undefined|NaN/.test(h),id+': undefined o NaN');
+   assert.ok(!/<[^>]*class="ep-[^"]*"[^>]*\stransform="/.test(h)&&!/<[^>]*\stransform="[^"]*"[^>]*class="ep-/.test(h),id+': una pieza animada con transform propio');
+  }
+ }
+ assert.equal(c.__E.escenaNovedad('no-existe'),'');
+ /* los id de los degradados no se repiten entre dos pintados */
+ const a=c.__E.escenaNovedad('hero'),b=c.__E.escenaNovedad('hero');
+ assert.notEqual(a.match(/id="(\w+)"/)[1],b.match(/id="(\w+)"/)[1]);
 });

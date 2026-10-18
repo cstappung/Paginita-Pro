@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;
@@ -338,19 +338,47 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 11;
+const NODOS_MONEDAS = 12;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
+  const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
+  /* El casino cambia varias veces por segundo mientras alguien vuela (cada
+     aviso del avión es una escritura) y cada cambio rehace la economía de
+     todos: se junta lo que llega en un segundo y se avisa una vez. */
+  let espera = 0;
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
-    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; llegados.add(k);
-    d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
-  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
+    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
+    if (k === "casino" && llegados.has(k)) { if (!espera) espera = setTimeout(() => { espera = 0; avisa(); }, 1000); return; }
+    llegados.add(k); avisa();
+  }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas")];
-  return () => offs.forEach(f => f());
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino")];
+  return () => { clearTimeout(espera); offs.forEach(f => f()); };
 }
+
+/* ---------- el casino ----------
+   `casino/<uid>/<clave>` = {j, p, d?, at}: una ronda (juegos/casino-motor.js).
+   `at` y cada marca (`t/<i>` los avisos del avión, `s/<i>` los saltos del
+   pingüino, `c` el retirarse, `a/<i>` = {t, at} cada decisión del
+   blackjack y `x` = {m, at} el cambio del póker) son la hora del servidor,
+   que la regla exige igual a `now` y que no se reescribe: de ahí sale el
+   azar. Cada función devuelve esa hora, leída después de escribir. `extra`
+   son los demás campos de la ronda o de la marca (`d`, `n`, `b`, `t`, `m`). */
+export async function apuestaCasino(uid, j, p, extra) {
+  const r = ref(db, `casino/${uid}/${push(ref(db, `casino/${uid}`)).key}`);
+  await set(r, Object.assign({ j, p }, extra || {}, { at: serverTimestamp() }));
+  const x = (await get(r)).val();
+  return { k: r.key, at: x.at };
+}
+export async function marcaCasino(uid, k, ruta, extra) {
+  const r = ref(db, `casino/${uid}/${k}/${ruta}`);
+  await set(r, extra ? Object.assign({}, extra, { at: serverTimestamp() }) : serverTimestamp());
+  const x = (await get(r)).val();
+  return extra ? x.at : x;
+}
+export const leeRondaCasino = (uid, k) => get(ref(db, `casino/${uid}/${k}`)).then(s => s.val());
 
 /* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo lo repasa `economia()`. */

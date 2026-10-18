@@ -15,7 +15,7 @@ runs client-side, and persistence for the collaborative tools lives in Firebase.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`, source in `colabtex/src/`) — Overleaf-style collaborative LaTeX editor.
 - **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`, source in `colabtex/src/draw/`) — Inkscape-style collaborative SVG editor.
 - **Informes** (`informes.html` + `informes-app.js`) — the shared bug tracker.
-- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
+- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, the Casino, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the
@@ -53,6 +53,7 @@ before the first edit. Read only the docs the task needs.
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
+| Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 
@@ -81,6 +82,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Mario Kart Wii (MKW, Retro Rewind, WiiCompiled port, online rooms, VR) | `juegos/mkw/CLAUDE.md` (the port) and `juegos/mkw/docs/en-linea.md` + the header of `colabtex/src/juegos/mkw.js` (the room) |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
+| Memazo (memes, plantillas, estilo Make It Meme) | `docs/claude/juegos/memazo.md` |
 | PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |
 
 Solo Club games (read `juegos/club/CLAUDE.md` too):
@@ -103,6 +105,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
 | Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
+| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda) | `juegos/club/prodefender/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.
 

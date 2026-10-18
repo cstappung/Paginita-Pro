@@ -200,6 +200,9 @@ function drum(kind, t, vel) {
     const o = AC.createOscillator(), g = AC.createGain(); o.type = 'triangle'; o.frequency.value = 185;
     g.gain.setValueAtTime(.12 * vel, t); g.gain.exponentialRampToValueAtTime(.001, t + .09);
     o.connect(g); g.connect(drums); o.start(t); o.stop(t + .1);
+  } else if (kind === 'c') {
+    // Aplauso: tres ráfagas cortas y una cola, como las palmas del pop de ahora.
+    [0, .011, .023].forEach((d, i) => noise(t + d, 'bandpass', 1500, .9, (i < 2 ? .14 : .22) * vel, i < 2 ? .02 : .15));
   } else if (kind === 'r') noise(t, 'bandpass', 3200, 4, .16 * vel, .05);
   else if (kind === 'h') noise(t, 'highpass', 8000, .7, .045 * vel, .04);
   else if (kind === 'o') noise(t, 'highpass', 7000, .7, .04 * vel, .22);
@@ -267,7 +270,7 @@ function startGame(modo) {
   const S = E.tiles[0].S, first = KEYS[E.tiles[0].lane];
   $('iKick').textContent = E.kind === 'song' ? `${S.genre} · ${S.bpm} BPM` : 'Mezcla infinita';
   $('iTitle').textContent = E.kind === 'song' ? S.name : 'Todas, sin fin';
-  $('iComp').textContent = E.kind === 'song' ? 'Canción original · no termina nunca' : 'Empieza con ' + S.name;
+  $('iComp').textContent = E.kind === 'song' ? 'Adaptada a piano · no termina nunca' : 'Empieza con ' + S.name;
   $('iHow').innerHTML = mode === 'kb' ? `Pulsa <kbd>${first}</kbd> para empezar` : 'Toca la ficha de color para empezar';
   $('intro').classList.remove('gone');
   $('count').textContent = '';
@@ -376,7 +379,7 @@ function enviaResultado(g) {
   const E = g.E;
   g.nuevo = E.score > 0 && anotaMejor(E.modo, E.score);
   if (!Club || E.score < 1 || tocado) return;
-  const prueba = { v: 1, m: E.modo, s: E.semilla, u: E.u, g: M.codifica(g.acciones), n: E.t,
+  const prueba = { v: M.PRUEBA_V, m: E.modo, s: E.semilla, u: E.u, g: M.codifica(g.acciones), n: E.t,
     a: Math.round(performance.now() - g.t0 - g.pP), w: Date.now() - g.w0 - g.pW };
   if (!g.fiable) prueba.x = 1;
   Club.result({ categoria: CAT(E.modo), puntos: E.score, tiempo: Math.max(1, E.t * TICK_MS) }, prueba);

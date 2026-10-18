@@ -192,6 +192,8 @@ await denied("B NO reescribe el mensaje de un error", () => set(ref(db, "errors/
 await denied("B NO infla el contador", () => set(ref(db, "errors/epruebas1/veces"), 1000));
 await allowed("B sí suma una vez", () => rep.publishError(errRec, userB2.uid));
 await allowed("B lee el webhook de Discord (para anunciar sus salas)", () => get(ref(db, "discord")));
+await allowed("B lee la clave de GIPHY (los GIFs de Memazo)", () => get(ref(db, "giphy")));
+await denied("B no puede cambiar la clave de GIPHY", () => set(ref(db, "giphy/clave"), "abcdefghijkl"));
 await denied("B NO puede reescribir el texto de A", () =>
   set(ref(db, `feedback/${fbId}/titulo`), "secuestrado"));
 await denied("B NO puede borrar lo de A", () => rep.deleteFeedback(fbId));
@@ -219,6 +221,66 @@ console.log("— Monedas: días seguidos (diario) —");
   await loginAs(B);
   ok("B lee el diario de A (para el top)", (await get(ref(db, `diario/${ua.uid}/bono`))).val() === 250);
   await denied("B no escribe el diario de A", () => set(ref(db, `diario/${ua.uid}`), { dia: hoy, racha: 1, mejor: 1, dias: 1, bono: 250, at: serverTimestamp() }));
+  await loginAs(A);
+}
+
+console.log("— Casino —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const ronda = (uid, k, x) => set(ref(db, `casino/${uid}/${k}`), Object.assign({ at: serverTimestamp() }, x));
+  await denied("no se apuesta menos de 10", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 5 }));
+  await denied("ni más del tope del avión", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 501 }));
+  await denied("ni del tope del pingüino extremo", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 51, d: 3 }));
+  await denied("ni una dificultad que no existe", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 10, d: 4 }));
+  await denied("ni un juego que no existe", () => ronda(ua.uid, "rondaX0001", { j: "x", p: 10 }));
+  await denied("ni monedas con decimales", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10.5 }));
+  await denied("ni se elige la hora", () => set(ref(db, `casino/${ua.uid}/rondaA0001`), { j: "a", p: 10, at: 1700000000000 }));
+  await denied("ni se cuela el resultado", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10, choque: 50 }));
+  await allowed("A apuesta en el avión", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 500 }));
+  await allowed("A apuesta en el pingüino fácil", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 1000, d: 0 }));
+  await denied("una ronda no se reescribe", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10 }));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `casino/${ua.uid}/rondaA0001`)));
+  await allowed("A avisa que sigue volando", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/0`), serverTimestamp()));
+  await denied("un aviso no se reescribe", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/0`), serverTimestamp()));
+  await denied("ni lleva otra hora", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/1`), 1700000000000));
+  await denied("el avión no salta", () => set(ref(db, `casino/${ua.uid}/rondaA0001/s/0`), serverTimestamp()));
+  await denied("ni hay avisos de una ronda que no existe", () => set(ref(db, `casino/${ua.uid}/noexiste01/t/0`), serverTimestamp()));
+  await allowed("A salta con el pingüino", () => set(ref(db, `casino/${ua.uid}/rondaP0001/s/0`), serverTimestamp()));
+  await denied("el pingüino no avisa", () => set(ref(db, `casino/${ua.uid}/rondaP0001/t/0`), serverTimestamp()));
+  await allowed("A se retira", () => set(ref(db, `casino/${ua.uid}/rondaA0001/c`), serverTimestamp()));
+  await denied("y no se retira dos veces", () => set(ref(db, `casino/${ua.uid}/rondaA0001/c`), serverTimestamp()));
+  await denied("ni se retira de una ronda que no existe", () => set(ref(db, `casino/${ua.uid}/noexiste01/c`), serverTimestamp()));
+  // ruleta, blackjack, póker y plinko
+  await allowed("A apuesta en la ruleta", () => ronda(ua.uid, "rondaR0001", { j: "r", p: 30, b: { rojo: 20, n17: 10 } }));
+  await denied("una ruleta sin apuestas no vale", () => ronda(ua.uid, "rondaR0002", { j: "r", p: 30 }));
+  await denied("ni una casilla que no existe", () => ronda(ua.uid, "rondaR0002", { j: "r", p: 30, b: { n37: 30 } }));
+  await denied("ni una ficha con decimales", () => ronda(ua.uid, "rondaR0002", { j: "r", p: 30, b: { rojo: 29.5, negro: 0.5 } }));
+  await denied("ni la ruleta sobre 500", () => ronda(ua.uid, "rondaR0002", { j: "r", p: 501, b: { rojo: 501 } }));
+  await denied("las fichas son solo de la ruleta", () => ronda(ua.uid, "rondaB0002", { j: "b", p: 30, b: { rojo: 30 } }));
+  await allowed("A apuesta en el blackjack", () => ronda(ua.uid, "rondaB0001", { j: "b", p: 500 }));
+  await denied("ni el blackjack sobre 500", () => ronda(ua.uid, "rondaB0002", { j: "b", p: 510 }));
+  await allowed("A pide carta", () => set(ref(db, `casino/${ua.uid}/rondaB0001/a/0`), { t: "p", at: serverTimestamp() }));
+  await denied("una acción no se reescribe", () => set(ref(db, `casino/${ua.uid}/rondaB0001/a/0`), { t: "q", at: serverTimestamp() }));
+  await denied("ni es una que no existe", () => set(ref(db, `casino/${ua.uid}/rondaB0001/a/1`), { t: "x", at: serverTimestamp() }));
+  await denied("ni lleva otra hora", () => set(ref(db, `casino/${ua.uid}/rondaB0001/a/1`), { t: "q", at: 1700000000000 }));
+  await denied("ni carga nada más", () => set(ref(db, `casino/${ua.uid}/rondaB0001/a/1`), { t: "q", at: serverTimestamp(), carta: 0 }));
+  await denied("el póker no pide carta", () => set(ref(db, `casino/${ua.uid}/rondaR0001/a/0`), { t: "p", at: serverTimestamp() }));
+  await allowed("A apuesta en el póker", () => ronda(ua.uid, "rondaV0001", { j: "v", p: 100 }));
+  await denied("ni el póker sobre 100", () => ronda(ua.uid, "rondaV0002", { j: "v", p: 101 }));
+  await denied("cambiar: la máscara va de 0 a 31", () => set(ref(db, `casino/${ua.uid}/rondaV0001/x`), { m: 32, at: serverTimestamp() }));
+  await allowed("A cambia cartas", () => set(ref(db, `casino/${ua.uid}/rondaV0001/x`), { m: 5, at: serverTimestamp() }));
+  await denied("y no cambia dos veces", () => set(ref(db, `casino/${ua.uid}/rondaV0001/x`), { m: 0, at: serverTimestamp() }));
+  await denied("ni cambia en el blackjack", () => set(ref(db, `casino/${ua.uid}/rondaB0001/x`), { m: 0, at: serverTimestamp() }));
+  await allowed("A tira una bola de plinko", () => ronda(ua.uid, "rondaL0001", { j: "l", p: 50, d: 2, n: 16 }));
+  await denied("plinko alto no pasa de 50", () => ronda(ua.uid, "rondaL0002", { j: "l", p: 51, d: 2, n: 16 }));
+  await denied("ni hay filas de 10", () => ronda(ua.uid, "rondaL0002", { j: "l", p: 10, d: 0, n: 10 }));
+  await denied("ni plinko sin filas", () => ronda(ua.uid, "rondaL0002", { j: "l", p: 10, d: 0 }));
+  await denied("ni filas en otro juego", () => ronda(ua.uid, "rondaA0002", { j: "a", p: 10, n: 8 }));
+  await loginAs(B);
+  ok("B lee la ronda de A (el saldo de todos sale de ahí)", (await get(ref(db, `casino/${ua.uid}/rondaA0001/p`))).val() === 500);
+  await denied("B no apuesta a nombre de A", () => ronda(ua.uid, "rondaA0002", { j: "a", p: 10 }));
+  await denied("ni se retira por A", () => set(ref(db, `casino/${ua.uid}/rondaP0001/c`), serverTimestamp()));
   await loginAs(A);
 }
 

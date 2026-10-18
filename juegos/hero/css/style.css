@@ -222,6 +222,39 @@ input[type=range] { accent-color: var(--accent); }
 .solo { background: rgba(255, 211, 77, .12); color: #ffd34d; border-radius: 8px; padding: 2px 10px; font-weight: 600; }
 .solo.perfect { background: #ffd34d; color: #1a1000; }
 .rc-wait { color: var(--muted); font-style: italic; margin: 20px 0; }
+/* La carrera de la sala (results.js, carreraEl): una línea por jugador, con el color de su autopista */
+.res-carrera-slot { width: min(900px, 100%); }
+.res-carrera-slot:empty { display: none; }
+.res-carrera {
+  background: linear-gradient(180deg, rgba(30, 24, 56, .92), rgba(12, 10, 22, .92));
+  border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55); animation: res-in .5s .3s ease-out both;
+}
+.cr-leyenda { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .95rem; margin-bottom: 4px; }
+.cr-leyenda i, .cr-fila i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.cr-leyenda small { color: var(--muted); }
+.cr-caja { position: relative; }
+.cr-caja svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cr-grid { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
+.cr-grid.base { stroke: rgba(255, 255, 255, .22); }
+.cr-eje { fill: var(--muted); font: 600 12px var(--font); font-variant-numeric: tabular-nums; }
+.cr-nombre { fill: var(--text); font: 700 13px var(--font); }
+.cr-linea { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: cr-traza 1.6s calc(.5s + var(--k) * .12s) ease-out forwards; }
+@keyframes cr-traza { to { stroke-dashoffset: 0; } }
+.cr-fin { stroke: #14121f; stroke-width: 2; animation: res-in .3s 1.9s ease-out both; }
+.cr-cruz { stroke: rgba(255, 255, 255, .45); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.cr-toque { cursor: crosshair; touch-action: pan-y; }
+.cr-tip {
+  position: absolute; top: 4px; min-width: 150px; pointer-events: none; z-index: 2;
+  background: rgba(10, 8, 20, .95); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 2px; font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+.cr-tip[hidden] { display: none; }
+.cr-tip b { color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.cr-fila { display: flex; align-items: center; gap: 0; }
+.cr-fila span { flex: 1; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.cr-fila em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cr-nota { color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .res-buttons { display: flex; gap: 12px; animation: res-in .4s .5s ease-out both; }
 @keyframes res-in { from { opacity: 0; transform: translateY(14px); } }
 @media (max-width: 640px) {
@@ -230,7 +263,8 @@ input[type=range] { accent-color: var(--accent); }
   .rc-stars { font-size: 2rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .res-card, .res-title, .badge, .rc-stars .star.on, .tl-hit, .tl-miss, .res-buttons { animation: none; }
+  .res-card, .res-title, .badge, .rc-stars .star.on, .tl-hit, .tl-miss, .res-buttons, .res-carrera, .cr-fin { animation: none; }
+  .cr-linea { animation: none; stroke-dashoffset: 0; }
   .ring-fg { animation: none; stroke-dashoffset: var(--off); }
 }
 
@@ -397,3 +431,63 @@ html.en-juegos .logo-a { font-size: clamp(1.6rem, 4.5vw, 3rem); }
 html.en-juegos .menu-btn { padding: 8px 18px; }
 html.en-juegos .menu-btn span { font-size: 1.3rem; }
 html.en-juegos .song-detail .album { width: min(100%, 170px); }
+
+/* ---------- Modo celular (js/sitio/celular.js, js/ui/tactil.js) ---------- */
+html.celular, html.celular body { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+/* En vertical no se juega: lo tapa todo */
+.gira { display: none; }
+@media (orientation: portrait) {
+  html.celular .gira { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; background: radial-gradient(ellipse at center, #1b1430, #050508); }
+}
+.gira b { font-size: 1.8rem; text-transform: uppercase; letter-spacing: .04em; }
+.gira span { color: var(--muted); font-size: 1.1rem; }
+.gira-cel { width: 46px; height: 80px; border: 4px solid var(--accent); border-radius: 10px; margin-bottom: 14px; animation: gira 2.2s ease-in-out infinite; }
+@keyframes gira { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+
+/* Los cinco botones: columnas iguales a todo lo ancho; se ven en el 20 % de abajo,
+   pero el toque cuenta desde más arriba (ZONA en tactil.js) */
+.tactil { position: fixed; inset: 0; pointer-events: none !important; }
+.tactil > * { pointer-events: auto; }
+.tc-zona { position: absolute; inset: 0; touch-action: none; -webkit-touch-callout: none; }
+.tc-fila { position: absolute; left: 0; right: 0; bottom: 0; height: 20%; min-height: 52px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 6px max(6px, env(safe-area-inset-bottom)); pointer-events: none; }
+.tc-btn { --c: #fff; border-radius: 14px; border: 3px solid var(--c); background: color-mix(in srgb, var(--c) 22%, rgba(0, 0, 0, .35)); box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .35); transition: background .05s, transform .05s; }
+.tc-btn.on { background: var(--c); transform: translateY(2px) scale(.97); box-shadow: 0 0 22px var(--c); }
+.tactil button { position: absolute; display: grid; place-items: center; padding: 0; border-radius: 50%; touch-action: none; }
+.tc-pausa { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); width: 44px; height: 44px; font-size: 1rem; background: rgba(16, 14, 28, .7); }
+.tc-sp { top: 24%; right: max(14px, env(safe-area-inset-right)); width: 64px; height: 64px; font-size: 1.9rem; color: #53e7ff; background: rgba(16, 14, 28, .7); border: 2px solid #53e7ff; box-shadow: 0 0 14px rgba(83, 231, 255, .35); }
+/* Mientras se toca, el volumen sube a la esquina (abajo está el botón naranjo) */
+html.celular.tocando .vol-sitio { bottom: auto; top: max(8px, env(safe-area-inset-top)); right: calc(max(8px, env(safe-area-inset-right)) + 54px); }
+/* el selector de idioma (solo fuera de Juegos) tapaba el botón verde */
+html.celular.tocando .i18n-flota { display: none; }
+html.celular .play-help { bottom: auto; top: 30%; font-size: 1rem; }
+html.celular .play-help small { font-size: .85rem; }
+html.celular .song-intro { top: 46%; left: 14px; padding: 8px 14px; }
+
+/* Menús en horizontal: poco alto, todo más compacto y con el detalle de la
+   canción a la derecha (sin él no hay botón «Jugar»: el doble toque no es fiable) */
+html.celular .screen { padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); gap: 8px; overflow-y: auto; }
+html.celular .screen > .hint:last-child { display: none; }
+html.celular .ss-head h1 { font-size: 1.3rem; }
+html.celular .ss-body { grid-template-columns: minmax(0, 1.25fr) minmax(220px, 1fr); gap: 10px; }
+html.celular .song-detail { display: flex; padding: 10px; gap: 6px; }
+html.celular .song-detail .album { width: min(100%, 90px); }
+html.celular .d-name { font-size: 1.3rem; }
+html.celular .d-artist { font-size: 1.05rem; }
+html.celular .d-info { display: none; }
+html.celular .song-detail > button.primary { order: -1; font-size: 1.2rem; padding: .6em 1em; }
+html.celular .slots { align-content: start; }
+html.celular .slot { min-height: 0; padding: 10px 14px; gap: 6px; }
+html.celular .slot-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+html.celular .slot-item { font-size: 1.05rem; padding: .45em .8em; }
+html.celular .main-menu { gap: 10px; }
+html.celular .logo-b { font-size: clamp(2.4rem, 13vh, 5rem); }
+html.celular .logo-a { font-size: clamp(1.2rem, 6vh, 2.2rem); }
+html.celular .menu-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(720px, 100%); }
+html.celular .menu-btn { padding: 6px 14px; }
+html.celular .menu-btn span { font-size: 1.15rem; }
+html.celular .menu-btn small { font-size: .8rem; }
+html.celular .pm-box { max-height: calc(100dvh - 16px); overflow-y: auto; padding: 12px 20px; gap: 6px; }
+html.celular .pm-box button { font-size: 1.1rem; padding: .45em 1em; }
+html.celular .loading-screen .lp-art { width: 110px; height: 110px; }
+html.celular .lp-name { font-size: 1.5rem; }
+html.celular .results .res-title { margin-top: 0; }

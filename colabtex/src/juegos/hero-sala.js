@@ -2,6 +2,7 @@ import * as fb from "../fb-juegos.js";
 import { crearMalla } from "./malla.js";
 import { crearDirecto, OK_MS } from "./yemas-red.js";
 import { atiendeHero, mandaCuenta } from "./hero.js";
+import { codificaCurvaHero } from "./motor.js";
 
 /* PRO HERO en línea — el cartero de la sala, hermano del de Boxhead.
 
@@ -19,7 +20,12 @@ import { atiendeHero, mandaCuenta } from "./hero.js";
      veces por segundo. Nada de eso pasa por la base de datos.
    - **Arrancan todos a la vez**: quien dirige escribe `go` cuando todos
      terminaron de descargar la canción, y cada pantalla la empieza
-     `HR_DEMORA` ms después de esa hora del servidor (`fb.ahora`).
+     `HR_DEMORA` ms después de esa hora del servidor. La hora no es la de
+     `fb.ahora` de cada uno: `.info/serverTimeOffset` no descuenta lo que
+     tardó en llegar, así que cada navegador la tenía corrida a su manera
+     (cientos de ms) y la canción partía a destiempo. Cada uno la pide por la
+     malla a quien dirige (`tic`/`tac`, como NTP, `crearReloj`) y todos usan
+     la de quien dirige; sin canal con él, la de Firebase.
    - **Lo que hojea quien dirige** (la canción que tiene marcada en el
      selector) también va por la malla, como paquete `mira`: los demás ven
      esa ficha y oyen su vista previa en la sala. Se repite cada `OK_MS` para
@@ -28,6 +34,35 @@ import { atiendeHero, mandaCuenta } from "./hero.js";
      igual que tocando solo (`hero.js`, `atiendeHero`). */
 const PADRE = "hero-padre", HIJO = "hero-hijo";
 
+/* La hora de quien dirige, vista desde aquí. Cada `tic` sale con mi
+   `Date.now()` (`a`); quien dirige contesta `tac` con su hora (`b`, su
+   `fb.ahora()`), y al volver supongo que la contestó a medio camino:
+   desfase = b + ida_y_vuelta/2 − ahora. De las últimas `RELOJ_MUESTRAS` vale
+   la de ida y vuelta más corta, que es la que menos pudo esperar en una cola.
+   Si cambia quien dirige, se empieza de cero. Puro (el reloj se inyecta),
+   para tests/hero.test.cjs. */
+const RELOJ_MUESTRAS = 12;
+export function crearReloj({ ahora = () => Date.now() } = {}) {
+  let de = "", muestras = [];
+  return {
+    tic: () => ({ y: "tic", a: ahora() }),
+    tac: (d, hora) => ({ y: "tac", a: d.a, b: hora }),
+    // un `tac` que llegó de `u`, que dirige
+    recibe(u, d) {
+      const c = ahora(), rtt = c - d.a;
+      if (!Number.isFinite(d.a) || !Number.isFinite(d.b) || !(rtt >= 0 && rtt < 5000)) return;
+      if (u !== de) { de = u; muestras = []; }
+      muestras.push({ rtt, off: d.b + rtt / 2 - c });
+      if (muestras.length > RELOJ_MUESTRAS) muestras.shift();
+    },
+    // hora de `director` − mi Date.now(), o null si no tengo muestras suyas
+    desfase(director) {
+      if (director !== de || !muestras.length) return null;
+      return muestras.reduce((m, x) => (x.rtt < m.rtt ? x : m)).off;
+    },
+  };
+}
+
 export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
   let host, frame, temaObs, redEl, muerto = false, listo = false, hola = false;
   let partida = null, est = null, borrado = false, firmaSala = "";
@@ -35,6 +70,13 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
   let cargaRonda = 0, goRonda = 0, goEscrito = 0, resRonda = -1, parteEnviada = "";
   let ojeo = null, ojeoQ = 0, ojeoVisto = "";   // lo que hojeo yo (si dirijo) y lo último que mandé al marco
   const directo = crearDirecto({ uid, sano: u => !!malla?.sano(u), conectados: () => malla?.conectados() || [] });
+  const horaSala = crearReloj();
+  // la hora con que arranca la canción: la de quien dirige (si la tengo) o la de Firebase
+  const ahoraSala = () => {
+    const o = est && est.director !== uid ? horaSala.desfase(est.director) : null;
+    return o === null ? fb.ahora() : Date.now() + o;
+  };
+  const relojAlMarco = () => red({ t: "reloj", off: ahoraSala() - Date.now() });
 
   const juego = () => !!est?.jugadores?.some(j => j.uid === uid) && !mirando;
   const esJugador = u => !!est?.jugadores?.some(j => j.uid === u);
@@ -49,7 +91,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
 
   const statsDe = f => f && {
     score: f.s, stars: f.e, hits: f.h, total: f.n, misses: f.x, accuracy: f.n ? f.h / f.n : 0, bestCombo: f.c,
-    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q
+    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q, curva: f.cv || null
   };
 
   // La sala con la forma que esperaba el juego de su servidor
@@ -88,7 +130,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     }
     if (est.etapa === "tocando" && yoEnRonda && goRonda !== est.ronda && est.go) {
       goRonda = est.ronda;
-      red({ t: "reloj", off: fb.ahora() - Date.now() });
+      relojAlMarco();
       red({ t: "go", at: est.go, room });
     }
     // si cambió quien dirige, o empezó la canción, lo que hojeaba ya no vale
@@ -111,7 +153,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (m.t === "hello") {
       hola = true;
       red({ t: "welcome", id: uid });
-      red({ t: "reloj", off: fb.ahora() - Date.now() });
+      relojAlMarco();
       firmaSala = ""; ojeoVisto = "";
       reenvia();
       return;
@@ -137,10 +179,10 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     else if (m.t === "loaded") anota({ t: "cargado" });
     else if (m.t === "noload") anota({ t: "nocarga" });
     else if (m.t === "done" && est.etapa === "tocando" && est.enJuego.includes(uid) && !est.fines[uid]) {
-      const s = m.stats || {};
+      const s = m.stats || {}, curva = codificaCurvaHero(m.curva);
       anota({ t: "fin", r: est.ronda, s: ent(s.score, 1e8), e: ent(s.stars, 6), ac: ent(s.hits, 1e5), n: ent(s.total, 1e5),
         x: ent(s.misses, 1e5), c: ent(s.bestCombo, 1e5), sp: ent(s.spPhrases, 1e4), st: ent(s.spTotal, 1e4), o: ent(s.overhits, 1e5),
-        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0 });
+        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0, ...(curva ? { cv: curva } : {}) });
     }
   }
 
@@ -165,10 +207,23 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     red({ t: "browse", from: u, songId: id });
   }
 
+  // Pido la hora a quien dirige, solo por canal directo (reenviada no vale: tardó de más)
+  const pideHora = () => {
+    if (malla && juego() && est.director && est.director !== uid && malla.sano(est.director)) malla.envia(horaSala.tic(), [est.director]);
+  };
+
   function alDatos(u, d) {
-    // `mira` no es un estado: directo.recibe lo tomaría por el directo de `u`
+    // `mira`, `tic` y `tac` no son estados: directo.recibe los tomaría por el directo de `u`
     if (d?.y === "mira") {
       if (u === est?.director && est.etapa === "sala" && (d.id === null || (typeof d.id === "string" && d.id.length <= 300))) veOjeo(u, d.id);
+      return;
+    }
+    if (d?.y === "tic") {
+      if (est?.director === uid && Number.isFinite(d.a)) malla.envia(horaSala.tac(d, fb.ahora()), [u]);
+      return;
+    }
+    if (d?.y === "tac") {
+      if (u === est?.director) horaSala.recibe(u, d);
       return;
     }
     const r = directo.recibe(u, d);
@@ -207,7 +262,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     });
     malla.entrar().then(ok => { if (!ok && !parado) { sinMalla = true; pintaRed(); } },
       err => { console.warn("[hero] malla", err); sinMalla = true; pintaRed(); });
-    reloj = setInterval(() => { anuncia(); mandaOjeo(); pintaRed(); }, OK_MS);
+    reloj = setInterval(() => { anuncia(); mandaOjeo(); pideHora(); pintaRed(); }, OK_MS);
   }
   function paraDirecto() {
     parado = true;
@@ -241,7 +296,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-8";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-11";
     host.append(redEl, frame);
   }
 

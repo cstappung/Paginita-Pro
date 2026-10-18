@@ -1,6 +1,6 @@
 # PRO TILES — notes for Claude
 
-Solo Club game of Juegos (a Piano Tiles with 8 original endless pop songs),
+Solo Club game of Juegos (a Piano Tiles with 8 endless songs, one per genre),
 brought in by the owner as a single `index.html` and split here. Shared
 club rules (anti-cheat proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking/champion-frame wiring in
@@ -10,7 +10,7 @@ club rules (anti-cheat proof, castigo, modo celular) are in
 Plain files, no build (`?v=protiles-N`):
 
 - `motor.js` (UMD `ProTilesMotor`, pure): the songs, accompaniment styles,
-  the endless composer (verbatim from the original) and the game itself:
+  the old endless composer (v1/v2 only) and the game itself:
   fixed 4 ms steps (`paso`), `golpe` (hit the next tile), `suelta` (release
   a long tile), `falla` (tap outside), the proof codec and `rehace`.
   Geometry is in rows (the screen is 4 rows tall). **Lanes come from
@@ -33,6 +33,28 @@ switches the side ranking panel to its table (`Club.category`); the
 `#selTabla` select in the aside picks any of the nine. The result is sent
 only when the game ends (a tile escapes or a tap misses) with score ≥ 1;
 quitting from the pause menu sends nothing, as in the original.
+
+**Proof versions** (`PRUEBA_V` = 3, `PRUEBA_VERSIONES` = [1, 2, 3]): a tile
+escapes when more than half of its length is below the edge (`escapeDe`);
+v1 used 0.15 rows. `SONGS_V1` and `SONGS_V2` (the composed songs) are kept
+only so stored and pending proofs still replay. **Any change to what decides
+a tile (song data, `hold`, the composer, escape, speed) needs a new
+version**, with the old data kept for the verifier; `STYLES` and drums are
+sound only and can change freely.
+
+**v3 songs are transcriptions** of eight royalty-free Pixabay tracks the
+owner chose (chill pop, lo-fi, reggaetón, tropical house, synthwave, disco,
+K-pop, EDM), kept under the old ids/names (tables, logros and `discord.js`
+hang on them). Nothing is composed any more: each song is fixed `secs`
+(`mel` as `Note:len` in eighths, bars of 8, half rows allowed; `ch` one
+chord per bar or `A,B`), played as `form` once, then `loop` forever (`x+`
+goes up a tone every other loop); the mix plays each song's `mix`. Lo-fi
+runs at 60 (half time). K-pop and EDM are written at half time (`medio`):
+lengths double and each written bar becomes two, so their tiles are a row
+tall at 160/150 BPM; there a tile is long from 4 rows (`hold`). The
+transcription came from basic-pitch notes + beat-synced chroma (melody,
+rhythm and progression per section), simplified for piano: sixteenth runs
+merged, rests absorbed into the previous tile.
 
 Traps:
 - **The piano credit is mandatory (CC BY 3.0)** and must not be a

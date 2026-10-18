@@ -421,6 +421,32 @@ const REGLAS = {
       }
     }
   },
+  memazo: {
+    lema: "Memes con amigos: de 2 a 10 jugadores, gana quien saque más risas.",
+    secciones: [
+      ["Las plantillas", lista([
+        "Quien abre la sala elige de dónde salen: <b>plantillas reales</b> (los memes más usados de Imgflip), <b>GIFs</b> (de GIPHY) o los <b>dibujos de la casa</b>.",
+        "Con plantillas reales o GIFs puedes <b>buscar</b> la que quieras, o pedir <b>otras tres</b>. Como esas imágenes no traen sitio para el texto, cada texto se <b>arrastra</b> sobre la imagen y se agranda desde su esquina; puedes poner de uno a cinco.",
+        "Si el servicio de afuera no responde, te tocan dibujos de la casa y la partida sigue igual."
+      ])],
+      ["Escribir", lista([
+        "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada dibujo de la casa tiene de uno a cuatro.",
+        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste.",
+        "La etapa termina cuando todos mandaron el suyo o se acaba el tiempo. Quien no mandó nada se queda sin meme en esa ronda."
+      ])],
+      ["Calificar", lista([
+        "Los memes salen <b>de uno en uno</b> y sin nombre. Cada uno le pone una nota: <b>🍅 1</b>, <b>😐 2</b>, <b>🙂 3</b>, <b>😂 4</b> o <b>🔥 5</b>.",
+        "El autor no califica el suyo (y nadie sabe quién es). Hay 20 segundos por meme; la primera nota de cada uno es la que vale.",
+        "Cuando todos calificaron, o se acabó el tiempo, se revela de quién era y cuánto sumó: todas sus notas van a su autor."
+      ])],
+      ["Ganar", lista([
+        "Después de cada ronda se enseña el podio de la ronda. La partida dura 3, 5 o 7 rondas, según la sala.",
+        "Gana quien más puntos sumó con sus memes. A igualdad, gana quien recibió más 🔥; si también empatan, es empate.",
+        "Al final queda la galería con todos los memes de la partida."
+      ])],
+      ["Lo que no se ve", "La pantalla no dice quién falta por calificar, porque el que no califica es el autor. El registro de la partida sí lleva quién escribió cada meme: quien abra las herramientas del navegador lo puede ver. Es un juego entre amigos."]
+    ]
+  },
   spicy: {
     lema: "Faroles picantes: de 2 a 6 jugadores, gana quien consiga dos trofeos.",
     secciones: [
@@ -1193,16 +1219,16 @@ const REGLAS = {
   /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
      con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
   protiles: {
-    lema: "PRO TILES: toca las fichas negras al ritmo de ocho canciones pop originales que nunca terminan. Un error y se acaba.",
+    lema: "PRO TILES: toca las fichas negras al ritmo de ocho canciones adaptadas a piano que nunca terminan. Un error y se acaba.",
     secciones: [
       ["Cómo se juega", "La pantalla tiene <b>cuatro carriles</b> y las fichas negras bajan por ellos. Tócalas en orden, de abajo hacia arriba: cada ficha es una nota de la melodía y suena con piano de cola. La primera, en coral, empieza la canción."],
       ["Lo que termina la partida", lista([
-        "Que una ficha negra se escape por abajo sin tocarla.",
+        "Que una ficha negra se escape por abajo sin tocarla: se pierde cuando más de la mitad de la ficha ya salió por abajo, así que todavía puedes tocarla mientras se ve su mitad de arriba.",
         "Tocar un carril donde no hay ficha (con el dedo, tocar una ficha ya tocada o una de más arriba no cuenta como error)."
       ])],
-      ["Fichas largas", "Las fichas largas (con un punto coral) se <b>mantienen</b>: con el teclado, hasta que pasan enteras; con el dedo, hasta la altura donde las tocaste. Si la completas (al menos un 80 %), suma un bono: +1 por una de 3 corcheas, +2 por una de 4, +4 por una de 6."],
+      ["Fichas largas", "Las fichas largas (con un punto coral) se <b>mantienen</b>: con el teclado, hasta que pasan enteras; con el dedo, hasta la altura donde las tocaste. Si la completas (al menos un 80 %), suma un bono: +1 por una de 3 filas, +2 por una de 4, +4 por una de 6."],
       ["Puntos y estrellas", "Cada nota suma 1, más el bono de las largas. Con 100, 250 y 450 puntos ganas tres estrellas; con 700, 1 000 y 1 400, tres coronas; con 2 000, el <b>mundo</b>. La pantalla acelera sin parar, así que cada punto cuesta más que el anterior."],
-      ["Canciones", "Ocho canciones originales, de la balada (<b>Cristal</b>, fácil) al EDM (<b>Despegue</b>, experto). Cada una empieza por su estribillo y después se sigue componiendo sola, igual para todos: estrofa, pre, estribillo y puente, y cada tanto el estribillo sube un tono. La <b>mezcla infinita</b> las encadena las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
+      ["Canciones", "Ocho canciones de verdad, una por género (música libre de Pixabay), transcritas y adaptadas a piano: chill pop (<b>Cristal</b>), lo-fi (<b>Medianoche</b>, la más tranquila), reggaetón (<b>Calle</b>), tropical house (<b>Verano</b>), synthwave (<b>Neón</b>), disco (<b>Latido</b>), K-pop (<b>Estrellas</b>) y EDM (<b>Despegue</b>, la más rápida). Cada ficha es una nota de su melodía, con su ritmo: el dembow del reggaetón, los acordes picados del chill pop, las octavas del disco. Se tocan enteras (intro, estrofa, estribillo) y después vuelven a empezar sin fin, igual para todos; cada dos vueltas el estribillo sube un tono. La <b>mezcla infinita</b> encadena el estribillo y la estrofa de las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
       ["Controles", lista([
         "Táctil o ratón: toca las fichas.",
         "Teclado: D, F, J y K son los cuatro carriles (se cambian en ⚙ Ajustes). Esc o P pausa; tras la pausa hay una cuenta de 3.",
@@ -1277,6 +1303,29 @@ const REGLAS = {
         "Batería: D F J K L los tambores y Espacio el bombo.",
         "Guitarras y mandos (Xbox, PlayStation): se configuran en <b>Controles</b>, igual que las teclas.",
         "Pausa: al volver, la canción retrocede un poco y cuenta 3, 2, 1. En una sala no hay pausa."
+      ])]
+    ]
+  },
+  /* PRO DEFENDER (juegos/club/prodefender/): lo que dice aquí tiene que
+     coincidir con js/engine.js y js/data/ (reinos, rondas, torres) y con
+     monedasProdefender en monedas.js. */
+  prodefender: {
+    lema: "PRO DEFENDER: un tower defense de cinco reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
+    secciones: [
+      ["Cómo se juega", "Los atacantes recorren el camino de un extremo al otro, y cada uno que llega te quita vidas. Elige un defensor de la tienda, colócalo junto al camino (no encima, ni pegado a otro) y pulsa <b>▶ Ronda</b>. Al perder todas las vidas la partida se acaba."],
+      ["Oro y mejoras", "Cada atacante eliminado da oro, y cada ronda superada da un bono. Con ese oro compras defensores y los mejoras: cada uno tiene <b>dos caminos de cuatro mejoras</b>, pero solo uno puede pasar del nivel 2. Vender devuelve el 75 % de lo invertido."],
+      ["Reinos", lista([
+        "Cinco reinos: Prado Esmeralda, Dunas de Ámbar, Glaciar Cristal, Caldera Volcánica y Nexo del Vacío, cada uno con su mapa, sus atacantes y su jefe.",
+        "Superar la <b>ronda 50</b> de un reino abre el siguiente, y cada reino trae dos defensas nuevas.",
+        "Hay jefes en las rondas 25, 50, 75 y 100, y rondas especiales cada diez.",
+        "Si pierdes, puedes reintentar la ronda desde su comienzo hasta tres veces por partida."
+      ])],
+      ["Atacantes", "Algunos exigen preparar algo antes: los <b>camuflados</b> solo los ven las torres con detección, los <b>voladores</b> esquivan morteros y minas, y el <b>blindaje</b> resta daño a cada golpe. La vista previa de arriba dice qué viene en la ronda siguiente; el Almanaque, el resto."],
+      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
+      ["Controles", lista([
+        "Clic en un defensor de la tienda y luego en el mapa para colocarlo (con Shift, varios seguidos). Clic sobre una torre para ver sus mejoras.",
+        "Teclado: Espacio empieza la ronda, F cambia la velocidad, P pausa, M silencia. 1-9, 0, - y = eligen defensor; Z y X mejoran cada camino; Supr vende y Tab cambia el objetivo.",
+        "La partida se guarda sola entre rondas: puedes salir y seguir después."
       ])]
     ]
   },
@@ -1421,7 +1470,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

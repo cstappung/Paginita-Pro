@@ -417,6 +417,57 @@ export const hero=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* Memazo: elegir plantilla, escribir, calificar y la revelación. */
+export const memazo=etapa=>{
+ const nombre=['Tres plantillas para elegir; la elegida queda marcada','La plantilla elegida con sus dos textos escritos','Un meme sin nombre y las cinco notas para calificarlo','Se revela el autor del meme y lo que sumó'][etapa];
+ const meme=(x,y,w,h,arriba,abajo)=>rect(x,y,w,h,'#f6c75a','#1c0b38',4)+rect(x+w*.55,y,w*.45,h,'#ffffff','#1c0b38',4)+
+  (arriba?txt(x+w*.775,y+h*.3,arriba,Math.min(15,w*.06),'#141414','middle'):'')+(abajo?txt(x+w*.775,y+h*.75,abajo,Math.min(15,w*.06),'#141414','middle'):'')+
+  circle(x+w*.27,y+h*.3,h*.13,'#ffdf8a','#1c0b38')+circle(x+w*.27,y+h*.75,h*.13,'#ffdf8a','#1c0b38')+
+  line(x+w*.2,y+h*.27,x+w*.34,y+h*.33,'#1c0b38',3)+line(x+w*.2,y+h*.78,x+w*.34,y+h*.72,'#1c0b38',3);
+ let c=`<rect x="0" y="0" width="480" height="250" rx="14" fill="#2b1060"/>`;
+ if(etapa===0){
+  [0,1,2].map(i=>{c+=meme(40+i*140,50,120,110,'','')+(i===1?`<rect x="${34+i*140}" y="44" width="132" height="122" rx="8" fill="none" stroke="#ffd23f" stroke-width="4"/>`:'');});
+  c+=txt(240,200,'Te tocan tres: elige una',18,'#ffd23f','middle')+txt(240,228,'60, 90 o 120 segundos para escribir',13,C.violeta,'middle');
+ }else if(etapa===1){
+  c+=meme(30,30,220,190,'Jugar solo','Con amigos');
+  c+=rect(280,40,170,46,'#12062a','#ffffff55',8)+txt(292,68,'Jugar solo',15,'#fff')+rect(280,100,170,46,'#12062a','#ffffff55',8)+txt(292,128,'Con amigos',15,'#fff');
+  c+=rect(300,170,130,40,'#ff3d8b','#ff3d8b',10)+txt(365,196,'¡Listo!',17,'#fff','middle');
+ }else if(etapa===2){
+  c+=meme(140,18,200,150,'Lunes','Viernes')+txt(240,186,'¿De quién será?',14,C.violeta,'middle');
+  ['🍅','😐','🙂','😂','🔥'].forEach((e,i)=>{c+=rect(70+i*70,196,60,46,i===4?'#ffd23f33':'#ffffff18',i===4?'#ffd23f':'#ffffff44',12)+txt(100+i*70,228,e,24,'#fff','middle');});
+ }else{
+  c+=meme(24,30,230,190,'Lunes','Viernes');
+  c+=txt(360,62,'ERA DE',13,C.violeta,'middle')+circle(360,96,20,'#88caff','#fff')+txt(360,104,'A',20,'#17243b','middle')+txt(360,142,'Ana',18,'#fff','middle');
+  c+=txt(360,176,'🔥 🔥 😂 🙂',20,'#fff','middle')+txt(360,222,'+17',34,'#ffd23f','middle');
+ }
+ return svg(nombre,c);
+};
+/* PRO DEFENDER: un trozo de camino. `etapa`: 0 una torre recién puesta con
+   su alcance y atacantes entrando; 1 los dos caminos de mejora (uno llega a
+   4, el otro se queda en 2); 2 el récord que sube de la 60 a la 70 y lo que
+   paga. */
+export const defensa=etapa=>{
+ const nombre=['Una torre junto al camino, con su círculo de alcance, y atacantes entrando','Los dos caminos de mejora de una torre: uno llega al nivel 4 y el otro se queda en el 2','El récord sube de la ronda 60 a la 70: diez rondas nuevas, 200 monedas en el Prado'][etapa];
+ let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#3e8f3a"/>`;
+ if(etapa===0){
+  cuerpo+=`<path d="M14 90 H250 V200 H466" fill="none" stroke="#8f7140" stroke-width="44" stroke-linejoin="round"/><path d="M14 90 H250 V200 H466" fill="none" stroke="#c9a86a" stroke-width="36" stroke-linejoin="round"/>`;
+  cuerpo+=circle(180,150,78,'#ffffff22','#ffffff99')+circle(180,150,20,'#2a3156','#161a30')+circle(180,150,14,'#5fbf4a');
+  cuerpo+=[40,82,124].map((x,i)=>circle(x,90,11,i===2?'#e2c14d':'#8fd16a','#0006')).join('')+line(180,150,124,92,C.oro,4);
+  cuerpo+=txt(300,60,'Alcance',18,C.blanco)+txt(300,84,'de la torre',16,C.blanco);
+ }
+ if(etapa===1){
+  cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#1c2238"/>`;
+  const fila=(y,nombre,n,max,col)=>txt(40,y,nombre,17,C.blanco)+[0,1,2,3].map(i=>rect(220+i*52,y-22,40,30,i<n?col:'#242b46',i<max?'#ffffff66':'#ff9c9c',6)).join('')+(max<4?txt(440,y,'🔒',18,C.rojo,'end'):'');
+  cuerpo+=fila(90,'Camino 1',4,4,C.verde)+fila(170,'Camino 2',2,2,C.azul)+txt(240,226,'Solo un camino pasa del nivel 2',15,C.gris,'middle');
+ }
+ if(etapa===2){
+  cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#1c2238"/>`;
+  cuerpo+=rect(40,70,400,34,'#242b46','#465773',8)+rect(40,70,240,34,C.verde,'none',8)+rect(280,70,40,34,C.oro,'none',0);
+  cuerpo+=txt(40,58,'Récord del Prado',16,C.blanco)+txt(280,130,'60',16,C.verde,'middle')+txt(320,130,'70',16,C.oro,'middle');
+  cuerpo+=txt(240,180,'10 rondas nuevas × 20 = +200 🪙',20,C.oro,'middle')+txt(240,212,'Las primeras 60 ya se pagaron',15,C.gris,'middle');
+ }
+ return svg(nombre,cuerpo);
+};
 
 /* Mario Kart Wii: dibujos propios (una pista ovalada con puntos de colores; nada del arte del juego).
    0 el vestíbulo · 1 la carrera en línea · 2 quien llega tarde mira y entra en la siguiente · 3 el VR que sigue a la cuenta. */

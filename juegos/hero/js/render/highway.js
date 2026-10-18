@@ -45,6 +45,15 @@ function introRipple(age, lane, ry) {
   return [Math.max(0.05, e), (1 - k) * ry * 2.5];
 }
 
+// Celular (sitio/celular.js): la barra de golpeo sube y la autopista se ensancha
+// hasta que, a la altura de los botones táctiles (ui/tactil.js: el 20 % de abajo,
+// centro en CEL_BOTONES), cada carril mide justo un quinto de la pantalla.
+const CEL_STRIKE = 0.7, CEL_BOTONES = 0.9;
+function anchoCelular(w, h, strikeY, topY) {
+  const s = 1 + ((h * CEL_BOTONES - strikeY) * (1 - S_FAR)) / (strikeY - topY);
+  return w / 2 / s;
+}
+
 export class HighwayRenderer {
   draw(ctx, view, p, now, song, opts) {
     // modo alto rendimiento: los mismos elementos, con efectos más sencillos
@@ -59,11 +68,12 @@ export class HighwayRenderer {
     const e = p.engine;
     const drums = e.kind === 'drums';
     const lanes = drums ? e.track.lanes : 5;
-    const strikeY = view.y + view.h * 0.8;
-    const topY = view.y + view.h * 0.08;
-    const hw = Math.min(view.w * 0.4, view.h * 0.3);
+    const cel = !!opts.celular;
+    const strikeY = view.y + view.h * (cel ? CEL_STRIKE : 0.8);
+    const topY = view.y + view.h * (cel ? 0.05 : 0.08);
+    const hw = cel ? anchoCelular(view.w, view.h, strikeY - view.y, topY - view.y) : Math.min(view.w * 0.4, view.h * 0.3);
     const G = {
-      view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2,
+      view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2, celular: cel,
       laneW: (2 * hw) / lanes,
       vis: 1.45 / Math.max(0.3, opts.noteSpeed),
       lefty: opts.lefty,
@@ -112,7 +122,9 @@ export class HighwayRenderer {
       }
     }
 
-    this._neck(ctx, G, now, opts);
+    // el mástil (veta de madera) va con el reloj de la canción aunque la autopista de
+    // otro jugador se pinte con retraso (session.js): así se comparte y no se nota
+    this._neck(ctx, G, opts.neckNow ?? now, opts);
     if (e.spActive) this._spTint(ctx, G, now);
     this._inlays(ctx, G, song, now);
     this._fretWires(ctx, G, song, now);
@@ -271,7 +283,10 @@ export class HighwayRenderer {
   _neckLines(G) {
     const yBot = G.view.y + G.view.h;
     const key = `${G.topY}|${G.strikeY}|${G.hw}|${yBot}`;
-    if (this._neckKey === key) return this._neckL;
+    // con 4 o más hay autopistas de dos tamaños y en varias filas: una geometría por cada una
+    const cache = (this._neckLs ??= new Map());
+    const hecho = cache.get(key);
+    if (hecho) return hecho;
     const range = G.strikeY - G.topY;
     const ys = [], ds = [], ws = [], as = [];
     for (let y = Math.floor(G.topY); y < yBot; y++) {
@@ -285,9 +300,10 @@ export class HighwayRenderer {
       ws.push(2 * G.hw * s);
       as.push(a * 0.96);
     }
-    this._neckKey = key;
-    this._neckL = { n: ys.length, y: Int32Array.from(ys), d: Float64Array.from(ds), w: Float64Array.from(ws), a: Float64Array.from(as) };
-    return this._neckL;
+    const L = { n: ys.length, y: Int32Array.from(ys), d: Float64Array.from(ds), w: Float64Array.from(ws), a: Float64Array.from(as) };
+    if (cache.size >= 16) cache.clear();
+    cache.set(key, L);
+    return L;
   }
 
   /* Con varios jugadores, todas las autopistas tienen el mismo mástil en el mismo
@@ -304,15 +320,19 @@ export class HighwayRenderer {
     const x0 = G.cx - half, y0 = Math.floor(G.topY), yBot = G.view.y + G.view.h;
     const dx = k * x0 + tr.e, dy = k * y0 + tr.f;
     const fx = dx - Math.floor(dx), fy = dy - Math.floor(dy);
-    const key = [opts.style, now, G.vis, G.topY, G.strikeY, G.hw, yBot, this.alto, k, fx.toFixed(4), fy.toFixed(4)].join('|');
-    if (this._neckCKey !== key) {
-      // la primera autopista del cuadro lo pinta; las que no coinciden, directo
-      if (this._neckCNow === now) return this._neckDraw(ctx, G, now, opts, k);
-      this._neckCNow = now;
+    // Un lienzo por geometría (la grande del centro y las chicas de los lados, con
+    // 4 o más): cada uno se pinta una vez por cuadro y se copia a las que coinciden.
+    const geo = [opts.style, G.vis, G.topY - y0, G.strikeY - y0, G.hw, yBot - y0, this.alto, k, fx.toFixed(4), fy.toFixed(4)].join('|');
+    const lienzos = (this._neckCs ??= new Map());
+    let n = lienzos.get(geo);
+    if (!n || n.now !== now) {
       const W = Math.ceil(2 * half * k + fx) + 2, H = Math.ceil((yBot - y0) * k + fy) + 2;
-      let c = this._neckC;
-      if (!c || c.width !== W || c.height !== H) {
-        c = this._neckC = document.createElement('canvas');
+      if (!n) {
+        if (lienzos.size >= 8) lienzos.clear();
+        lienzos.set(geo, (n = { c: document.createElement('canvas'), now: null }));
+      }
+      const c = n.c;
+      if (c.width !== W || c.height !== H) {
         c.width = W;
         c.height = H;
       }
@@ -321,11 +341,11 @@ export class HighwayRenderer {
       oc.clearRect(0, 0, W, H);
       oc.setTransform(k, 0, 0, k, fx - x0 * k, fy - y0 * k);
       this._neckDraw(oc, G, now, opts, k);
-      this._neckCKey = key;
+      n.now = now;
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(this._neckC, Math.floor(dx), Math.floor(dy));
+    ctx.drawImage(n.c, Math.floor(dx), Math.floor(dy));
     ctx.restore();
   }
 
@@ -1400,6 +1420,7 @@ export class HighwayRenderer {
   _hud(ctx, view, p, now, G, fx, mult) {
     const e = p.engine;
     const { cx, hw, strikeY, topY } = G;
+    if (G.celular) return this._hudCelular(ctx, view, p, now, G, fx, mult);
     const right = cx + hw * 1.12;
     const compact = view.x + view.w - right < 120;
     const scale = Math.max(0.6, Math.min(1.3, view.h / 900));
@@ -1456,6 +1477,41 @@ export class HighwayRenderer {
       ctx.shadowBlur = 0;
     }
 
+    this._soloYPopups(ctx, view, p, now, G, scale, font);
+  }
+
+  // Celular: la autopista ocupa casi todo el ancho y abajo están los botones, así
+  // que el marcador va en la esquina de arriba a la izquierda, donde la autopista
+  // es angosta. A la derecha quedan los botones ★ y pausa (ui/tactil.js).
+  _hudCelular(ctx, view, p, now, G, fx, mult) {
+    const e = p.engine;
+    const scale = Math.max(0.7, Math.min(1.1, view.h / 480));
+    const multColor = e.spActive ? SP_COLOR : MULT_COLORS[Math.min(4, mult)] || '#fff';
+    const font = (wgt, px) => `${wgt} ${Math.round(px * scale)}px Rajdhani, "Segoe UI", sans-serif`;
+    const x = view.x + 16, y = view.y + 40 * scale;
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.font = font(700, 34);
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = this.alto ? 0 : 6;
+    ctx.fillText(Math.floor(e.score).toLocaleString('es'), x, y);
+    ctx.shadowBlur = 0;
+    if (e.combo > 0) {
+      ctx.font = font(600, 18);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(`Racha ${e.combo}`, x, y + 22 * scale);
+    }
+    const R = 30 * scale;
+    this._multGauge(ctx, e, now, fx, mult, multColor, x + R + 6, y + 40 * scale + R, R);
+    this._spCell(ctx, e, now, fx, x, y + 52 * scale + 2 * R + 14 * scale, 120 * scale, 14 * scale, true);
+    this._soloYPopups(ctx, view, p, now, G, scale, font);
+  }
+
+  // El cartel del solo y los mensajes emergentes, iguales en los dos marcadores
+  _soloYPopups(ctx, view, p, now, G, scale, font) {
+    const e = p.engine;
+    const { cx, strikeY, topY } = G;
     const solo = e.currentSolo?.(now);
     if (solo && solo.total) {
       const pct = Math.round((solo.hits / solo.total) * 100);

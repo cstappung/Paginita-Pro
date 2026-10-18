@@ -145,6 +145,17 @@ and message names, and the postman plays the server:
   → dropped, or → missed): a released sustain travels as `[i, HIT]` then
   `[i, DROPPED]`, and re-applying the HIT on every packet drew flames and
   fret pops ten times a second on a lane with no notes.
+- **The race chart** («La carrera», results screen after a room song): each
+  player's frame samples their own score at `CURVA_N` (60) equal steps of
+  `song.endTime` (`session._anotaCurva`, only with `net`), sends it with
+  `done`, and the postman writes it in the `fin` move as `cv`, base-36
+  numbers joined by `.` (`codificaCurvaHero`; a string, not an array, so
+  RTDB can't turn it into an object). `redHero` reads it with
+  `leeCurvaHero` and drops anything malformed (the result still counts).
+  `results.js` (`carreraEl`) draws one line per player in their highway
+  colour, a strip of who was first in each stretch (`lideres` in
+  `js/game/carrera.js`), names at the line ends only with ≤ 4 players, and
+  a crosshair tooltip. `CURVA_N` and `HR_CURVA` must agree (test).
 - The page's chat and «Abandonar» are used; the frame hides its own chat
   and leave button (`sitio.sala`). Spectators see the lobby read-only.
 - **Move fields must not collide with the rule's own keys**: `jugadas/$n`
@@ -155,7 +166,29 @@ and message names, and the postman plays the server:
 - **Fullscreen**: the frame asks for it (`pantallaCompleta` in
   `puente.js`) on «Estoy listo» / «Empezar canción», the gestures the
   browser requires. Your highway goes in the middle (`enElCentro` in
-  `js/game/orden.js`: 3 → centre, 4 → centre-left).
+  `js/game/orden.js`: 3 → centre). With 4+ it is **big in the middle and
+  the rest in two narrow side columns** (`vistas` in `orden.js`, used by
+  `session._views`): 4 → 2·1·1, 5 → 2·1·2, 6 → 3·1·2, 7 → 3·1·3, 8 → 4·1·3.
+  Side tiles are all the same size, on whole device pixels (so they share
+  the painted neck), and each view is clipped. The neck caches
+  (`_neckLines`, the shared neck canvas) are per geometry: with a single
+  cache, two sizes per frame repainted everything.
+- **Everyone starts on the director's clock.** `.info/serverTimeOffset`
+  doesn't subtract the handshake's latency, so each browser's `fb.ahora`
+  was off by its own hundreds of ms and the song started at different
+  moments. Each player asks the director over the mesh every second
+  (`tic`/`tac`, NTP-style, `crearReloj` in `hero-sala.js`; minimum-RTT of the
+  last 12) and sends the frame `reloj` with the director's time; with no
+  direct channel to the director, Firebase's. `alDatos` catches `tic`/`tac`
+  before `directo.recibe`, like `mira`.
+- **Other players' highways are drawn late on purpose** (`RemoteState.retraso`
+  in `remoto.js`). Their hits arrive 100–300 ms after the note (mesh + the
+  100 ms `STATE_INTERVAL`): drawn on your clock, each note crossed the bar and
+  lit up afterwards, which read as playing off-beat. Each new hit measures
+  how late it arrived; the target follows the upper envelope (up fast, down
+  slow, ignoring samples > 0.8 s) and the drawn delay moves toward it at ≤
+  15 %. `laneHitTime` is stamped on that delayed clock. The neck uses your
+  clock (`opts.neckNow`) so it stays shared; wood grain has no beat.
 - **What the host is browsing** (the song marked in their selector, `onBrowse`
   in `songSelect.js` → `browse`) goes over the mesh as a `mira` packet,
   never to the move log (browsing is dozens of changes), and is repeated
@@ -208,6 +241,37 @@ file or the versions disagree.
 Keyboard, guitars and gamepads are read by the game itself (`js/input/`,
 Gamepad API). `mando.js` is loaded only so the page's cursor steps aside;
 `Mando.configura` claims Select (Star Power on many guitars). `@controles:
-teclado` in `main.js`: menus have clicks, but there is no touch play.
+tactil teclado` in `main.js` (touch = the phone mode below).
 Volume: the pause menu has four sliders, plus the site's 🔊 in the corner
 (`[data-volumen]`, `volumen.js`).
+
+## Modo celular (`js/sitio/celular.js`, `js/ui/tactil.js`)
+
+- **Detected by the screen, not the iframe**: `pointer:coarse` and the short
+  side of `screen` ≤ 600 px; `?celular=1`/`=0` forces it (Playwright's
+  `devices['Pixel 7 landscape']` triggers it by itself). Adds `html.celular`.
+- **Landscape only**: in portrait `.gira` covers everything, and turning the
+  phone mid-song pauses it (not in a room). Club mode asks fullscreen +
+  `screen.orientation.lock` on every `pointerup` (not `pointerdown`: the
+  resize moved the click onto another button); a room only does it in
+  `pantallaCompleta`, so the page's chat stays visible in the lobby.
+- **Starts in alto rendimiento and «todo taps»** (set in memory at startup;
+  no strum with five buttons). `_makePlayer` forces `taps` for local players,
+  so the proof header agrees. Drums are hidden (they need a kick).
+- **Five buttons = five equal columns** of the screen. The renderer
+  (`opts.celular`) raises the strike bar to 70 % and widens the highway
+  (`anchoCelular`) so each lane is exactly one fifth wide at the buttons'
+  centre (90 %): changing one side means changing the other. Gems are
+  flattened (`tilt` × 0.62), the HUD moves to the top-left (`_hudCelular`),
+  ★ (Star Power) and ❚❚ (pause) are DOM buttons on the right, and only your
+  own highway is drawn (in a room the others' `fxQueue` is emptied).
+- **Touch never calls the engine**: `Tactil` emits `{device: 'touch', code:
+  't0'…'t4' | 'tsp' | 'tpausa'}` and the human player gets the `TACTIL`
+  profile, so everything goes through the `Grabadora` like a gamepad.
+  Multi-touch chords and sliding a finger across colours work (a count of
+  fingers per lane).
+- **Nothing is saved from a phone** (the owner's call: unfair to PC players):
+  `mandaResultado` returns early, so no `resultado` → no stars, no ranking,
+  no coins. The results screen and the room lobby say so.
+- Outside Juegos, i18n.js's floating language selector sat on the green
+  button: hidden while playing (`html.celular.tocando`).

@@ -5,7 +5,9 @@ import { PARTS, DIFF_LABEL } from '../core/constants.js';
 import { SongSelectScreen } from './songSelect.js';
 import { LobbyScreen } from './online.js';
 import { sitio } from '../sitio/puente.js';
+import { celular } from '../sitio/celular.js';
 import { dificultadMaxima } from '../sitio/clave.js';
+import { CURVA_N, lideres } from '../game/carrera.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('es');
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
@@ -80,6 +82,104 @@ function sectionsEl(sections) {
     })));
 }
 
+/* La carrera (en una sala): el puntaje de cada uno a lo largo de la canción, una
+   línea por jugador con el mismo color de su autopista, y debajo una franja con
+   quién iba primero en cada tramo. Cada curva son CURVA_N puntos a pasos iguales
+   de la canción (session.js) y llega con el resultado de cada uno. Al pasar el
+   puntero, la línea vertical y el cuadro con los puntajes de ese momento. */
+const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// Un tope «redondo» para el eje (que se divida en 4 rayas limpias), por potencia de 10
+function topeEje(max) {
+  const p = 10 ** Math.floor(Math.log10(Math.max(1, max)));
+  return [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].map((k) => k * p).find((v) => v >= max);
+}
+
+export function carreraEl(series, dur) {
+  const n = Math.max(...series.map((x) => x.curva.length)), N = CURVA_N;
+  const W = 860, H = 230, L = 58, R = 120, T = 12, B = 26, FR = 12;
+  const pw = W - L - R, ph = H - T - B;
+  const tope = topeEje(Math.max(1, ...series.flatMap((x) => x.curva)));
+  const X = (i) => L + (pw * (i + 1)) / N; // el punto i es el fin del tramo i
+  const Y = (v) => T + ph * (1 - v / tope);
+  let g = '';
+  // rejilla horizontal y eje de puntaje (recesivos)
+  for (let k = 0; k <= 4; k++) {
+    const v = (tope * k) / 4, y = Y(v);
+    g += `<line x1="${L}" x2="${L + pw}" y1="${y}" y2="${y}" class="cr-grid${k ? '' : ' base'}"/>`;
+    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" class="cr-eje">${v >= 1e6 ? `${+(v / 1e6).toFixed(2)} M` : v >= 1000 ? `${+(v / 1000).toFixed(1)} k` : v}</text>`;
+  }
+  // eje de tiempo: cada 30 s, 1 min o 2 min según lo que dure
+  const paso = dur > 360 ? 120 : dur > 150 ? 60 : 30;
+  for (let t = 0; t <= dur + 0.01; t += paso) {
+    const x = L + (pw * t) / dur;
+    g += `<text x="${x}" y="${T + ph + FR + 14}" text-anchor="middle" class="cr-eje">${fmtT(t)}</text>`;
+  }
+  // franja de quién iba primero
+  const yF = T + ph + 2;
+  for (const tr of lideres(series, n)) {
+    const x0 = tr.i ? X(tr.i - 1) : L, x1 = X(tr.j - 1);
+    g += `<rect x="${(x0 + 1).toFixed(1)}" y="${yF}" width="${Math.max(1, x1 - x0 - 2).toFixed(1)}" height="${FR - 6}" rx="2" fill="${tr.s.color}"/>`;
+  }
+  // líneas (desde 0 al empezar) y nombres al final, sin pisarse
+  const finales = [];
+  series.forEach((x, k) => {
+    const pts = [`${L},${Y(0)}`, ...x.curva.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`)];
+    g += `<polyline points="${pts.join(' ')}" class="cr-linea" stroke="${x.color}" style="--k:${k}"/>`;
+    const i = x.curva.length - 1;
+    if (i >= 0) {
+      g += `<circle cx="${X(i)}" cy="${Y(x.curva[i])}" r="4" fill="${x.color}" class="cr-fin"/>`;
+      finales.push({ x, y: Y(x.curva[i]), cx: X(i) });
+    }
+  });
+  finales.sort((a, b) => a.y - b.y);
+  for (let k = 1; k < finales.length; k++) finales[k].y = Math.max(finales[k].y, finales[k - 1].y + 15);
+  const sobra = finales.length ? finales[finales.length - 1].y - (T + ph) : 0;
+  if (sobra > 0) for (const f of finales) f.y -= sobra;
+  // con más de 4, solo la leyenda: los nombres apilados ya no apuntan a su línea
+  if (finales.length <= 4) for (const f of finales) {
+    g += `<text x="${L + pw + 12}" y="${(f.y + 4).toFixed(1)}" class="cr-nombre" translate="no">${esc(f.x.name.length > 13 ? f.x.name.slice(0, 12) + '…' : f.x.name)}</text>`;
+  }
+  g += `<line class="cr-cruz" x1="0" x2="0" y1="${T}" y2="${T + ph}" visibility="hidden"/>`;
+  g += `<rect class="cr-toque" x="${L}" y="${T}" width="${pw}" height="${ph + FR}" fill="transparent"/>`;
+
+  const caja = h('div', { class: 'cr-caja' });
+  caja.innerHTML = `<svg viewBox="0 0 ${W} ${H + FR}" role="img" aria-label="Puntaje de cada jugador a lo largo de la canción">${g}</svg>`;
+  const tip = h('div', { class: 'cr-tip', hidden: true });
+  caja.append(tip);
+  const svg = caja.querySelector('svg'), cruz = svg.querySelector('.cr-cruz'), toque = svg.querySelector('.cr-toque');
+  const mueve = (e) => {
+    const r = svg.getBoundingClientRect();
+    const vx = ((e.clientX - r.left) / r.width) * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round(((vx - L) / pw) * N - 1)));
+    const x = X(i);
+    cruz.setAttribute('x1', x);
+    cruz.setAttribute('x2', x);
+    cruz.setAttribute('visibility', 'visible');
+    const filas = series.filter((s) => i < s.curva.length).sort((a, b) => b.curva[i] - a.curva[i]);
+    tip.replaceChildren(h('b', {}, fmtT(((i + 1) / N) * dur)),
+      ...filas.map((s) => h('div', { class: 'cr-fila' }, h('i', { style: { background: s.color } }), h('span', { translate: 'no' }, s.name), h('em', {}, fmt(s.curva[i])))));
+    tip.hidden = false;
+    const izq = (x / W) * r.width;
+    tip.style.left = `${izq > r.width / 2 ? izq - tip.offsetWidth - 12 : izq + 12}px`;
+  };
+  const sale = () => {
+    cruz.setAttribute('visibility', 'hidden');
+    tip.hidden = true;
+  };
+  toque.addEventListener('pointermove', mueve);
+  toque.addEventListener('pointerdown', mueve);
+  toque.addEventListener('pointerleave', sale);
+
+  const leyenda = h('div', { class: 'cr-leyenda' }, series.map((s) =>
+    h('span', {}, h('i', { style: { background: s.color } }), h('span', { translate: 'no' }, s.name), s.quit ? h('small', {}, ' (abandonó)') : null)));
+  return h('div', { class: 'res-carrera' },
+    h('div', { class: 'rc-sub' }, 'La carrera · quién iba ganando'),
+    leyenda, caja,
+    h('div', { class: 'cr-nota' }, 'La franja de abajo es quién iba primero en cada parte de la canción.'));
+}
+
 export class ResultsScreen extends Screen {
   constructor(app, { entry, results, net }) {
     super(app);
@@ -104,7 +204,9 @@ export class ResultsScreen extends Screen {
         h('button', { 'data-nav': true, onclick: () => this.back() }, 'Elegir otra canción'),
       ];
     // Lo que dice la página de Juegos de esta canción: guardada, estrellas, monedas
-    this.nube = sitio.embebido && sitio.cuenta ? h('div', { class: 'res-nube' }, 'Verificando tu partida…') : null;
+    this.nube = celular
+      ? h('div', { class: 'res-nube' }, h('b', {}, 'En el celular las partidas no se guardan'), h('span', {}, 'Los récords y las estrellas se ganan con teclado, mando o guitarra.'))
+      : sitio.embebido && sitio.cuenta ? h('div', { class: 'res-nube' }, 'Verificando tu partida…') : null;
     return h('div', { class: 'screen results' },
       this.nube,
       h('div', { class: 'res-title' },
@@ -112,6 +214,7 @@ export class ResultsScreen extends Screen {
         h('div', { class: 'res-name' }, this.entry.meta.name),
         h('div', { class: 'res-artist' }, this.entry.meta.artist)),
       this.cards,
+      (this.carrera = h('div', { class: 'res-carrera-slot' })),
       this.net ? h('div', { class: 'hint wait-hint' }, 'Esperando a los demás jugadores…') : null,
       h('div', { class: 'res-buttons' }, ...buttons));
   }
@@ -177,6 +280,20 @@ export class ResultsScreen extends Screen {
     this.cards.classList.toggle('multi', multi);
     this.cards.replaceChildren(...sorted.map((r, i) => this.card(r, i, multi)));
     this.countUp();
+    this.pintaCarrera();
+  }
+
+  // Con dos o más curvas (en una sala), la gráfica de quién iba ganando
+  pintaCarrera() {
+    if (!this.net || !this.carrera) return;
+    const series = this.results
+      .map((r) => ({ name: r.name || 'Jugador', color: r.color || '#ffffff', curva: r.curva || r.stats?.curva, quit: !!r.stats?.quit }))
+      .filter((x) => Array.isArray(x.curva) && x.curva.length);
+    const firma = JSON.stringify(series);
+    if (firma === this.firmaCarrera) return;
+    this.firmaCarrera = firma;
+    const dur = this.app.lastSong?.endTime;
+    this.carrera.replaceChildren(...(series.length >= 2 && dur > 0 ? [carreraEl(series, dur)] : []));
   }
 
   card(r, i, multi) {
