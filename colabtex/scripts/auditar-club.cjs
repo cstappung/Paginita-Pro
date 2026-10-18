@@ -32,6 +32,10 @@ const fs = require('fs'), path = require('path'), esbuild = require('esbuild');
    el panel de administración de Juegos (#admin), así los dos nunca
    discrepan. */
 function cargaVerificadores() {
+  /* PRO DEFENDER rehace la partida con el motor del juego, que no es un
+     módulo: sus archivos se cargan en globalThis.PD (verifica/prodefender.js). */
+  const pd = path.join(__dirname, '../../juegos/club/prodefender/js/');
+  for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(pd + f);
   const code = esbuild.buildSync({
     stdin: {
       contents: "export * from './juegos/solo/verifica.js'; export { senalesFila, hallazgo } from './juegos/admin-datos.js';",
