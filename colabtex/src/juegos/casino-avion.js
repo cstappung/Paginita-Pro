@@ -435,8 +435,10 @@ export function montarAvion(h, api) {
       retomada = true;
       const e = api.economia(), rs = api.rondas();
       if (!e) { retomada = false; return; }
-      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "a" && x.estado === "vuela" && x.valida)
-        .sort((a, b) => b.at - a.at)[0];
+      // la economía resuelve sin reloj (todo vuelo viejo ya cayó): aquí se
+      // vuelve a resolver con la hora de ahora
+      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "a" && x.valida && rs[x.k] &&
+        resuelveAvion(uid, x.k, rs[x.k], api.ahora()).estado === "vuela").sort((a, b) => b.at - a.at)[0];
       if (!r || api.ahora() > horaAvion(r.at, AVION.TOPE) - 1500 || !rs[r.k]) return;
       const x = rs[r.k];
       empieza({ k: r.k, r: { j: "a", p: x.p, at: x.at, t: Object.assign({}, x.t || {}) } });

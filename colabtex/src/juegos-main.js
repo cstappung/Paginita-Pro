@@ -1220,7 +1220,7 @@ function leerRuta() {
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
-  const cs = h.match(/^casino(?:\/(avion|pinguino))?$/);
+  const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };

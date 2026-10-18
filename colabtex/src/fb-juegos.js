@@ -361,19 +361,22 @@ export function watchLogros(cb) {
 /* ---------- el casino ----------
    `casino/<uid>/<clave>` = {j, p, d?, at}: una ronda (juegos/casino-motor.js).
    `at` y cada marca (`t/<i>` los avisos del avión, `s/<i>` los saltos del
-   pingüino, `c` el retirarse) son la hora del servidor, que la regla exige
-   igual a `now` y que no se reescribe: de ahí sale el azar. Cada función
-   devuelve esa hora, leída después de escribir. */
-export async function apuestaCasino(uid, j, p, d) {
+   pingüino, `c` el retirarse, `a/<i>` = {t, at} cada decisión del
+   blackjack y `x` = {m, at} el cambio del póker) son la hora del servidor,
+   que la regla exige igual a `now` y que no se reescribe: de ahí sale el
+   azar. Cada función devuelve esa hora, leída después de escribir. `extra`
+   son los demás campos de la ronda o de la marca (`d`, `n`, `b`, `t`, `m`). */
+export async function apuestaCasino(uid, j, p, extra) {
   const r = ref(db, `casino/${uid}/${push(ref(db, `casino/${uid}`)).key}`);
-  await set(r, j === "p" ? { j, p, d, at: serverTimestamp() } : { j, p, at: serverTimestamp() });
+  await set(r, Object.assign({ j, p }, extra || {}, { at: serverTimestamp() }));
   const x = (await get(r)).val();
   return { k: r.key, at: x.at };
 }
-export async function marcaCasino(uid, k, ruta) {
+export async function marcaCasino(uid, k, ruta, extra) {
   const r = ref(db, `casino/${uid}/${k}/${ruta}`);
-  await set(r, serverTimestamp());
-  return (await get(r)).val();
+  await set(r, extra ? Object.assign({}, extra, { at: serverTimestamp() }) : serverTimestamp());
+  const x = (await get(r)).val();
+  return extra ? x.at : x;
 }
 export const leeRondaCasino = (uid, k) => get(ref(db, `casino/${uid}/${k}`)).then(s => s.val());
 

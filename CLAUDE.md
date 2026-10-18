@@ -53,7 +53,7 @@ before the first edit. Read only the docs the task needs.
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
-| Casino, apuestas, el avión, el pingüino(ito) | `docs/claude/juegos/casino.md` |
+| Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 
