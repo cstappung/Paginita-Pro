@@ -32,6 +32,10 @@ el reino, la semilla, las jugadas y el último paso. Cada jugada es
 - La **cuenta va en la semilla** de cada tramo: una prueba copiada de otra
   cuenta no se rehace igual (y además `u` tiene que ser el uid de quien guarda).
 
+Para mirar cómo jugó alguien (balance, sospechas), `colabtex/scripts/prodefender-analiza.cjs`
+rehace una prueba exportada de `soloPruebas` y la cuenta ronda a ronda (vidas, oro, qué se
+escapó, qué construyó). Solo con el motor de la versión de la prueba (`ve`; `--motor`).
+
 ## La verificación (`colabtex/src/juegos/solo/verifica/prodefender.js`)
 
 Se vuelve a jugar la partida con el mismo motor y la ronda y el tiempo tienen que

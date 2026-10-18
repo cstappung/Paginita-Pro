@@ -30,11 +30,23 @@ Versioning. The Huerto was cut 40 % (owner: people filled the map with farms)
 — do not raise it back without asking.
 
 Round composition (`buildRounds`): from round 20 each group prefers the enemy
-type that comes out in tens (`ideal`, 30 then 24), like Bloons' zeppelins. The
-old fit let late rounds send hundreds of 9-HP Sombras clamped to `maxN`, which
-also threw away most of the round's budget. A group that still overflows `maxN`
-(special rounds of only weak types) comes out **reinforced** (`hpX`, up to x6,
-applied in `startRound`/`update`) instead of losing the budget.
+type that comes out in tens (`ideal`: 30, then 24, then shrinking from round 55
+to 5 at round 100), like Bloons' zeppelins. The old fit let late rounds send
+hundreds of 9-HP Sombras clamped to `maxN`, which also threw away most of the
+round's budget. A group that still overflows `maxN` comes out **reinforced**
+(`hpX`, up to x6, applied in `startRound`/`update`) instead of losing the budget.
+
+**Late rounds climb the ladder of big enemies** (owner's request: not many of
+the same small ones). `hpMult` is unchanged up to round 50 and then grows
+0.024/round instead of 0.068 (x46 at round 100, was x356), so the budget buys
+*bigger* enemies instead of inflating small ones; big types get a weight bonus
+from round 45 (`grande`). The ladder (`enemies.js`, every kingdom's `pool`):
+tanks Portador → Titán → **Fortaleza → Ciudadela → Leviatán** and flying balloons
+**Zepelín → Dirigible → Acorazado Celeste → Arca**, each splitting into two or
+three of the step below (`children`); shapes `supertank` and `blimp` in
+`render.js`, scaled by `d.rank`. From round 55 the specials Estampida and Noche
+de Sombras also admit big types, which come with the group's `mod` (`fast`
+x1.35 speed / `camo`), inherited by their children (`Game.modifica`).
 
 ## Heroes (`towers.js`, after the 22 towers)
 
@@ -45,11 +57,38 @@ attack is `s.atk` (`tHero` reuses `tProjectile`/`tRail`/`tSniper` and adds
 `ampAura` in `updateEnemies`, `slowAura`, or the Caldera's tower buff through
 the totem code with radius `s.aura`) and an automatic ability from tier 0
 (`selva`, `tormenta`, `invierno`, `erupcion`, `grieta` in `useAbility`; `s.abCd`
-overrides `PD.ABILITIES[].cd`). Heroes may take **both** paths to 4
-(`canUpgrade`). They are appended at the end of `TOWER_ORDER` because proofs
+overrides `PD.ABILITIES[].cd`). Heroes may take **both** paths to 4 and
+**one** of them to a 5th tier of 60000 (`canUpgrade` reads `ups.length`; the
+UI draws `P.ups.length` pips, the 5th pink). Their tiers 1–4 cost 50 % more
+than the owner's originals (with both paths at 4 they were the best value on
+the map). They are appended at the end of `TOWER_ORDER` because proofs
 store towers by index there — never insert a tower before them. In `main.js` the
 hero sits above the shop on its own row (key H) and `shopTowers` keeps the
 number hotkeys for the towers only.
+
+## Knockback and crowd control
+
+Every push back along the path goes through `Game.retrocede(e, px)`: Ancla,
+bumerán/balista/géiser pushes (`push`) and Ra'kesh's Tormenta. It spends a
+per-enemy lifetime budget `KB_MAX` (260 px, big 180, boss 140) kept in
+`e.pulled`, and **children inherit `pulled`** from their parent. Before, the
+Tormenta had no cap and each child started from zero, so buffed knockback
+towers kept rounds from ever ending. Nyx's Grieta rewinds each enemy **once**
+(`e.rifted`, also inherited). A freeze leaves 1 s of `freezeImm` after it ends
+(`FREEZE_IMM`; re-freezes only slow), the same idea as `stunImm`. Do not add a
+new push that writes `e.dist` directly.
+
+## Balance tools (`colabtex/scripts/`)
+
+- `prodefender-bot.cjs`: a bot that plays well (shooting range per tower and
+  tier on the real engine, spends by damage per gold, expert build order) and
+  prints the round reached, lives lost per decade and how far enemies get.
+  `--motor DIR` runs another engine copy (e.g. `git archive` of an older
+  commit) to compare; `--ayuda N` gives unlimited lives up to round N (its
+  opening is weaker than a person's). Several minutes per 100-round game.
+- `prodefender-analiza.cjs`: replays a proof from `soloPruebas` (console
+  export) and prints it round by round: lives, gold, leaks by type, max
+  advance, what was built. A proof only replays with the engine of its `ve`.
 
 ## Determinism — do not break it
 

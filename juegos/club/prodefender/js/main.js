@@ -300,6 +300,7 @@
     for (const id in PD.ENEMIES) { const d = PD.ENEMIES[id]; if (d.children) for (const [c] of d.children) parentOf[c] = d.name; }
     const sections = [
       ['Atacantes comunes', ['brote', 'veloz', 'robusto', 'alado', 'escudero', 'sombra', 'blindado', 'divisor', 'gelatinita', 'portador', 'titan']],
+      ['Los grandes · rondas altas', ['fortaleza', 'ciudadela', 'leviatan', 'zepelin', 'dirigible', 'celeste', 'arca']],
       ['Reino 1 · Prado Esmeralda', ['musgo', 'chaman', 'enjambre']],
       ['Reino 2 · Dunas de Ámbar', ['excavador', 'escorpion', 'espejismo']],
       ['Reino 3 · Glaciar Cristal', ['golem', 'cristal', 'yeti']],
@@ -371,7 +372,7 @@
       const it = el(`<div class="shop-item hero" data-id="${hid}"><span class="nw">♛ HÉROE</span><span class="hk">H</span><canvas width="108" height="108"></canvas><div class="nm">${d.name.split(',')[0]}</div><div class="ct">${fmt(d.cost)}</div></div>`);
       towerIcon(it.querySelector('canvas'), hid, [0, 0]);
       it.addEventListener('click', () => { if (!game.hasHero()) setPlacing(ui.placing === hid ? null : hid); });
-      it.addEventListener('mousemove', ev => showTip(`<b>${d.name}</b><span class="tc">${fmt(d.cost)} oro</span> · Héroe (uno por partida)<br>${d.desc}<br><span class="tc">Puede subir sus dos caminos hasta el nivel 4.</span>`, ev.clientX, ev.clientY));
+      it.addEventListener('mousemove', ev => showTip(`<b>${d.name}</b><span class="tc">${fmt(d.cost)} oro</span> · Héroe (uno por partida)<br>${d.desc}<br><span class="tc">Puede subir sus dos caminos hasta el nivel 4 y uno de ellos al nivel 5.</span>`, ev.clientX, ev.clientY));
       it.addEventListener('mouseleave', hideTip);
       shop.appendChild(it);
     }
@@ -511,10 +512,10 @@
   }
   function pathHtml(t, p) {
     const P = t.def.paths[p], tier = t.tiers[p], next = P.ups[tier];
-    const pips = [0, 1, 2, 3].map(i => `<span class="pip ${i < tier ? 'f' : ''}"></span>`).join('');
+    const pips = P.ups.map((u, i) => `<span class="pip ${i < tier ? 'f' : ''}${i > 3 ? ' p5' : ''}"></span>`).join('');
     let body;
     if (!next) body = `<div class="up-max">★ Camino al máximo</div>`;
-    else if (!game.canUpgrade(t, p)) body = `<div class="up-lock">🔒 Bloqueado: el otro camino ya pasó del nivel 2.</div>`;
+    else if (!game.canUpgrade(t, p)) body = `<div class="up-lock">🔒 Bloqueado: ${t.def.hero ? 'el otro camino ya llegó al nivel 5 (solo uno puede).' : 'el otro camino ya pasó del nivel 2.'}</div>`;
     else body = `<div class="up-next"><div class="un">${next.name}</div><div class="ud">${next.desc}</div>
       <button class="btn up-btn" data-p="${p}"><span>Mejorar <small>(${p ? 'X' : 'Z'})</small></span><span class="cst"></span></button></div>`;
     const owned = P.ups.slice(0, tier).map(u => u.name).join(' · ');
@@ -531,7 +532,7 @@
       <div class="inf-head"><canvas width="116" height="116"></canvas><div><h3>${d.name}</h3><div class="sub">Nivel ${t.tiers[0]}-${t.tiers[1]} · Invertido ${fmt(t.spent)}</div></div><button class="inf-close" title="Cerrar (Esc)">✕</button></div>
       <div class="inf-stats">${statsRows(t).map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
       ${d.targeting ? `<div class="targets">${MODES.map(m => `<button data-m="${m[0]}" class="${t.mode === m[0] ? 'on' : ''}">${m[1]}</button>`).join('')}</div>` : ''}
-      ${d.hero ? `<div class="sub" style="font-size:12px;color:var(--gold)">♛ Héroe del reino: uno por partida. Puede subir sus <b>dos</b> caminos hasta el nivel 4.</div>` : ''}
+      ${d.hero ? `<div class="sub" style="font-size:12px;color:var(--gold)">♛ Héroe del reino: uno por partida. Puede subir sus <b>dos</b> caminos hasta el nivel 4 y <b>uno</b> de ellos al nivel 5.</div>` : ''}
       ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${abCd(t)} s).</div>` : ''}
       ${t.buffed ? `<div class="sub" style="font-size:12px;color:#e07bff">♫ Potenciada por un Tótem del Eco</div>` : ''}
       <div class="paths">${pathHtml(t, 0)}${pathHtml(t, 1)}</div>
@@ -564,8 +565,9 @@
     if (t) {
       guardaQuieto();
       const up = t.def.paths[p].ups[t.tiers[p] - 1];
-      sfx(t.tiers[p] === 4 ? 'upgradeMax' : 'upgrade', t.x);
-      if (t.tiers[p] === 4) toast(`<b>${up.name}</b>¡Mejora definitiva desbloqueada!`, 'good', { tower: t.type });
+      const fin = t.tiers[p] === t.def.paths[p].ups.length;
+      sfx(t.tiers[p] >= 4 ? 'upgradeMax' : 'upgrade', t.x);
+      if (fin || t.tiers[p] === 4) toast(`<b>${up.name}</b>${!fin && game.canUpgrade(t, p) ? '¡Nivel 4! Este camino aún puede llegar al nivel 5 (solo uno de los dos).' : '¡Mejora definitiva desbloqueada!'}`, 'good', { tower: t.type });
       renderInfo();
     }
   }

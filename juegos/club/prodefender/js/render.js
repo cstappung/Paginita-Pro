@@ -337,6 +337,48 @@
     for (let i = 0; i < 4; i++) { const x = -r + i * r * 0.55; c.beginPath(); c.moveTo(x, -r * 0.5); c.lineTo(x + r * 0.15, -r * 0.3); c.lineTo(x, -r * 0.1); c.stroke(); }
     noGlow(c);
   };
+  // Supertanques: el Titán con más torretas y franjas de alerta según el escalón (d.rank 1–3)
+  ART.supertank = (c, d, r, p) => {
+    const k = d.rank || 1, band = ['#ffcc33', '#ff7a2a', '#ff3a5a'][k - 1];
+    for (const s of [-1, 1]) {   // orugas extra a los lados
+      rrect(c, -r * 1.35, s * r * 1.25 - r * 0.16, r * 2.5, r * 0.32, r * 0.12, '#14171c', '#06080a', 1);
+    }
+    ART.titan(c, d, r * 0.92, p);
+    glow(c, band, 8); c.fillStyle = band;
+    for (let i = 0; i < k + 1; i++) c.fillRect(-r * 1.15 + i * r * 0.22, -r * 0.08, r * 0.1, r * 0.16);
+    noGlow(c);
+    const pos = k === 1 ? [[-r * 0.65, 0]] : k === 2 ? [[-r * 0.7, -r * 0.5], [-r * 0.7, r * 0.5]] : [[-r * 0.75, -r * 0.55], [-r * 0.75, r * 0.55], [r * 0.85, 0]];
+    for (const [x, y] of pos) {
+      c.fillStyle = '#2a2f37'; c.fillRect(x, y - r * 0.07, r * 0.55, r * 0.14);
+      orb(c, x, y, r * 0.26, r * 0.26, sh(d.color, 0.25));
+      glow(c, band, 6); circle(c, x, y, r * 0.07, band); noGlow(c);
+    }
+  };
+  // Globos (zepelines): casco alargado con costillas, aletas atrás, góndola y motores;
+  // más planchas de blindaje y más motores cuanto más alto el escalón (d.rank 0–3)
+  ART.blimp = (c, d, r, p) => {
+    const k = d.rank || 0, L = r * 1.45, Hh = r * 0.78, spin = p * TAU * 3;
+    for (const s of [-1, 1]) shape(c, [[-L * 0.7, s * Hh * 0.35], [-L * 1.12, s * Hh * 1.05], [-L * 1.02, s * Hh * 0.2]], sh(d.color, -0.35), '#1a1030', 1.2);
+    shape(c, [[-L * 0.75, 0], [-L * 1.15, -Hh * 0.18], [-L * 1.15, Hh * 0.18]], sh(d.color, -0.45), '#1a1030', 1);
+    ell(c, 0, 0, L, Hh, 0, lg(c, 0, -Hh, 0, Hh, [sh(d.color, 0.5), d.color, sh(d.color, -0.55)]), '#1a1030', 2);
+    c.strokeStyle = sh(d.color, -0.4); c.lineWidth = 1;
+    for (let i = 1; i < 6; i++) { const x = -L + i * L / 3; const h = Hh * Math.sqrt(Math.max(0, 1 - (x / L) * (x / L))); c.beginPath(); c.moveTo(x, -h); c.lineTo(x, h); c.stroke(); }
+    c.beginPath(); c.moveTo(-L * 0.95, 0); c.lineTo(L * 0.95, 0); c.stroke();
+    for (let i = 0; i < k; i++) {   // planchas de blindaje
+      const x = -L * 0.45 + i * L * 0.36;
+      rrect(c, x - r * 0.14, -Hh * 0.62, r * 0.28, Hh * 1.24, r * 0.08, lg(c, x, -Hh, x, Hh, ['#c9cfd8', '#7a828e', '#3a404a']), '#15181d', 1);
+    }
+    rrect(c, -L * 0.3, -r * 0.16, L * 0.6, r * 0.32, r * 0.1, '#2b2140', '#0d0818', 1);   // góndola
+    glow(c, '#ffe08a', 6); for (let i = 0; i < 3; i++) circle(c, -L * 0.18 + i * L * 0.18, 0, r * 0.05, '#ffe9a8'); noGlow(c);
+    const mot = k >= 2 ? [[-L * 0.15, -Hh * 0.95], [-L * 0.15, Hh * 0.95], [L * 0.35, -Hh * 0.8], [L * 0.35, Hh * 0.8]] : [[-L * 0.1, -Hh * 0.95], [-L * 0.1, Hh * 0.95]];
+    for (const [x, y] of mot) {
+      circle(c, x, y, r * 0.14, '#3a3448', '#0d0818', 1);
+      c.strokeStyle = 'rgba(230,230,255,0.7)'; c.lineWidth = r * 0.05;
+      c.beginPath(); c.moveTo(x - Math.cos(spin) * r * 0.2, y - Math.sin(spin) * r * 0.08); c.lineTo(x + Math.cos(spin) * r * 0.2, y + Math.sin(spin) * r * 0.08); c.stroke();
+    }
+    ell(c, L * 0.78, 0, r * 0.2, r * 0.26, 0, lg(c, L * 0.65, -r * 0.3, L * 0.9, r * 0.3, ['#ffffff', '#c9a7ff', '#5a3aa8']), '#1a1030', 1);
+    spec(c, -L * 0.2, -Hh * 0.45, r * 0.45, 0.35);
+  };
   function maskArt(c, d, r, p, staffCol, horns) {
     const sw = Math.sin(p * TAU) * 0.15;
     for (let i = 0; i < 7; i++) { const a = Math.PI + (i - 3) * 0.32; c.save(); c.rotate(a); leaf(c, r * 1.25, r * 0.22, ['#ff5050', '#ffd84d', '#4fe08a', '#5ad1ff'][i % 4]); c.restore(); }
@@ -580,7 +622,7 @@
   };
 
   const EXT = { sprout: 1.55, spark: 1.95, ember: 1.95, shell: 1.6, moth: 2.0, bee: 1.8, knight: 1.45, ghost: 2.0, mirage: 2.0, wisp: 2.0, hex: 1.55, magnet: 1.55,
-    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
+    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, supertank: 1.95, blimp: 1.8, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
     wormSeg: 1.3, golem: 1.65, crystal: 1.75, yeti: 1.55, lizard: 2.45, rock: 1.3, bird: 2.0, phoenix: 2.5, eye: 1.6, star: 1.45, voidboss: 2.1 };
   const SPIN = { crystal: 1.4, star: 1.6 };
   const FR = 8;
@@ -617,10 +659,11 @@
   const TRES = 3;
   const TSPR = {};
   function gems(c, s, tiers) {
-    for (let p = 0; p < 2; p++) for (let i = 0; i < 4; i++) {
+    for (let p = 0; p < 2; p++) for (let i = 0; i < Math.max(4, tiers[p]); i++) {   // el 5.º, solo en héroes
       const a = p ? (Math.PI * 0.5 - 0.42 - i * 0.3) : (Math.PI * 0.5 + 0.42 + i * 0.3);
       const x = Math.cos(a) * (s + 1.5), y = Math.sin(a) * (s + 1.5);
-      if (i < tiers[p]) { glow(c, p ? '#5ad1ff' : '#ffcf4d', 4); poly(c, x, y, 2.3, 4, 0, p ? '#8ae8ff' : '#ffe58a', p ? '#1a5a88' : '#8a5a00', 0.7); noGlow(c); }
+      if (i > 3) { glow(c, '#ff5ad1', 7); poly(c, x, y, 3, 4, 0, '#ff9ae8', '#8a1a6a', 0.8); noGlow(c); }
+      else if (i < tiers[p]) { glow(c, p ? '#5ad1ff' : '#ffcf4d', 4); poly(c, x, y, 2.3, 4, 0, p ? '#8ae8ff' : '#ffe58a', p ? '#1a5a88' : '#8a5a00', 0.7); noGlow(c); }
       else circle(c, x, y, 1.5, 'rgba(0,0,0,0.5)');
     }
   }

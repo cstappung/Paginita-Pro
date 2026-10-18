@@ -18,7 +18,8 @@
       obstacles: [{ x: 540, y: 330, r: 48, kind: 'lake' }, { x: 300, y: 420, r: 26, kind: 'rock' }, { x: 760, y: 300, r: 22, kind: 'rock' }, { x: 950, y: 560, r: 40, kind: 'lake' }],
       boss: 'reyEscarabajo',
       pool: [['brote', 1, 1], ['veloz', 3, 1], ['robusto', 5, 1], ['musgo', 7, 1.2], ['alado', 8, 1], ['escudero', 9, 1], ['enjambre', 10, 1.2],
-        ['sombra', 12, 1], ['chaman', 14, 1.2], ['blindado', 15, 1], ['divisor', 18, 1], ['portador', 30, 0.8], ['titan', 56, 0.7]]
+        ['sombra', 12, 1], ['chaman', 14, 1.2], ['blindado', 15, 1], ['divisor', 18, 1], ['portador', 30, 0.8], ['zepelin', 38, 0.8], ['titan', 56, 0.7],
+        ['fortaleza', 66, 0.8], ['dirigible', 70, 0.8], ['ciudadela', 82, 0.8], ['celeste', 85, 0.8], ['leviatan', 94, 0.9], ['arca', 96, 0.9]]
     },
     {
       name: 'Dunas de Ámbar', short: 'Dunas',
@@ -30,7 +31,8 @@
       boss: 'gusano',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 4, 1], ['excavador', 6, 1.3], ['alado', 7, 1], ['escudero', 9, 1], ['escorpion', 11, 1.3],
         ['sombra', 12, 1], ['blindado', 14, 1], ['espejismo', 17, 1.3], ['divisor', 18, 1], ['musgo', 21, 0.8], ['enjambre', 22, 0.8], ['chaman', 25, 0.8],
-        ['portador', 27, 0.8], ['titan', 54, 0.7]]
+        ['portador', 27, 0.8], ['zepelin', 36, 0.8], ['titan', 54, 0.7],
+        ['fortaleza', 64, 0.8], ['dirigible', 68, 0.8], ['ciudadela', 80, 0.8], ['celeste', 83, 0.8], ['leviatan', 93, 0.9], ['arca', 95, 0.9]]
     },
     {
       name: 'Glaciar Cristal', short: 'Glaciar',
@@ -42,7 +44,8 @@
       boss: 'coloso',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 4, 1], ['cristal', 5, 1.3], ['alado', 7, 1], ['escudero', 8, 1], ['golem', 10, 1.3],
         ['sombra', 11, 1], ['blindado', 12, 1], ['yeti', 15, 1.3], ['divisor', 17, 1], ['excavador', 20, 0.8], ['escorpion', 23, 0.8], ['portador', 25, 0.8],
-        ['musgo', 26, 0.7], ['espejismo', 28, 0.8], ['chaman', 33, 0.7], ['titan', 52, 0.7]]
+        ['musgo', 26, 0.7], ['espejismo', 28, 0.8], ['chaman', 33, 0.7], ['zepelin', 35, 0.8], ['titan', 52, 0.7],
+        ['fortaleza', 62, 0.8], ['dirigible', 66, 0.8], ['ciudadela', 78, 0.8], ['celeste', 82, 0.8], ['leviatan', 92, 0.9], ['arca', 94, 0.9]]
     },
     {
       name: 'Caldera Volcánica', short: 'Caldera',
@@ -57,7 +60,8 @@
       boss: 'fenix',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['salamandra', 4, 1.3], ['robusto', 5, 1], ['alado', 6, 1], ['ave', 7, 1.3], ['escudero', 8, 1],
         ['magma', 9, 1.3], ['sombra', 10, 1], ['blindado', 12, 1], ['heraldo', 14, 1.3], ['divisor', 16, 1], ['golem', 20, 0.8], ['cristal', 22, 0.8],
-        ['portador', 24, 0.8], ['excavador', 25, 0.7], ['yeti', 27, 0.7], ['escorpion', 30, 0.7], ['chaman', 33, 0.7], ['enjambre', 35, 0.7], ['titan', 50, 0.7]]
+        ['portador', 24, 0.8], ['excavador', 25, 0.7], ['yeti', 27, 0.7], ['escorpion', 30, 0.7], ['chaman', 33, 0.7], ['enjambre', 35, 0.7], ['zepelin', 33, 0.8], ['titan', 50, 0.7],
+        ['fortaleza', 60, 0.8], ['dirigible', 64, 0.8], ['ciudadela', 76, 0.8], ['celeste', 80, 0.8], ['leviatan', 91, 0.9], ['arca', 93, 0.9]]
     },
     {
       name: 'Nexo del Vacío', short: 'Vacío',
@@ -73,7 +77,8 @@
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['espectro', 5, 1.3], ['alado', 6, 1], ['escudero', 8, 1], ['fractal', 10, 1.3],
         ['sombra', 11, 1], ['magnetita', 13, 1.3], ['blindado', 14, 1], ['saboteador', 18, 1.3], ['divisor', 20, 1], ['salamandra', 22, 0.8],
         ['cristal', 24, 0.8], ['excavador', 26, 0.7], ['portador', 27, 0.8], ['heraldo', 28, 0.8], ['golem', 30, 0.7], ['espejismo', 32, 0.7],
-        ['magma', 34, 0.7], ['yeti', 36, 0.7], ['chaman', 38, 0.7], ['ave', 40, 0.7], ['titan', 54, 0.7], ['colosoVacio', 70, 0.7]]
+        ['magma', 34, 0.7], ['yeti', 36, 0.7], ['chaman', 38, 0.7], ['ave', 40, 0.7], ['zepelin', 32, 0.8], ['titan', 54, 0.7], ['fortaleza', 58, 0.8], ['dirigible', 62, 0.8],
+        ['colosoVacio', 70, 0.7], ['ciudadela', 75, 0.8], ['celeste', 78, 0.8], ['leviatan', 90, 0.9], ['arca', 92, 0.9]]
     }
   ];
 
@@ -95,9 +100,11 @@
   // Las torres al máximo (nivel 4) disparan el daño desde la ronda ~45: los enemigos responden.
   PD.lateMult = function (r) { return 1 + 0.045 * Math.max(0, r - 43); };
   PD.hpMult = function (L, r) {
-    // enemigos más duros desde el principio (x1.8 en la 20, x7 en la 50, x18 en la 70, x70 en la 100):
-    // menos enemigos de relleno y cada uno aguanta más.
-    const k = 0.03 * (Math.min(r, 20) - 1) + 0.046 * Math.max(0, r - 20) + 0.022 * Math.max(0, r - 55);
+    // enemigos más duros desde el principio (x1.8 en la 20, x8 en la 50, x18 en la 70, x46 en la 100).
+    // Desde la 50 la vida de cada enemigo sube más despacio que antes (x356 en la 100) y el
+    // presupuesto de la ronda se gasta en enemigos MÁS GRANDES (tanques y globos que se abren
+    // en otros), no en los mismos chicos con cincuenta veces más vida.
+    const k = 0.03 * (Math.min(r, 20) - 1) + 0.046 * Math.max(0, Math.min(r, 50) - 20) + 0.024 * Math.max(0, r - 50);
     return Math.exp(k) * Math.sqrt(PD.lateMult(r));
   };
   // Vida extra sobre la curva de arriba, aplicada al aparecer (engine.js: spawn), así que
@@ -128,9 +135,9 @@
 
   const SPECIALS = [
     { name: 'Horda', desc: 'Una marea de un único tipo de enemigo.', mono: true },
-    { name: 'Estampida', desc: 'Solo enemigos rápidos, muy juntos.', filter: d => d.speed >= 70, tight: 0.5 },
+    { name: 'Estampida', desc: 'Solo enemigos rápidos, muy juntos.', filter: d => d.speed >= 70, tight: 0.5, mod: 'fast', modDesc: 'Los grandes llegan ACELERADOS.' },
     { name: 'Asalto Aéreo', desc: 'El cielo se llena de voladores.', filter: d => d.flying },
-    { name: 'Noche de Sombras', desc: 'Casi todos llegan camuflados.', filter: d => d.camo },
+    { name: 'Noche de Sombras', desc: 'Casi todos llegan camuflados.', filter: d => d.camo, mod: 'camo', modDesc: 'Los grandes llegan CAMUFLADOS.' },
     { name: 'Muralla de Acero', desc: 'Enemigos blindados y resistentes.', filter: d => (d.armor || 0) >= 2 || d.hp >= 30 }
   ];
 
@@ -167,7 +174,11 @@
         special = SPECIALS[(Math.floor(r / 10) + li) % SPECIALS.length];
         const ok = unlocked.filter(p => !special.filter || special.filter(E[p[0]]));
         if (ok.length === 0) special = SPECIALS[0];
-        round.special = { name: special.name, desc: special.desc };
+        // Desde la 55 las especiales también admiten a los grandes (si no, eran mil chicos
+        // reforzados): en Estampida y Noche de Sombras llegan acelerados o camuflados.
+        const late = r >= 55 && !special.mono;
+        round.special = { name: special.name, desc: special.desc + (late && special.modDesc ? ' ' + special.modDesc : '') };
+        if (late && special.mod) special = { ...special, filter: (f => d => f(d) || d.big)(special.filter), late: true };
       }
 
       // más grupos = rondas mixtas que exigen combinar defensas
@@ -175,7 +186,9 @@
       if (special && special.mono) nGroups = 1;
       if (newcomers.length && !special && r > 3) nGroups = Math.max(2, nGroups);
       const maxN = r < 20 ? 60 : r < 50 ? 110 : 160;
-      const ideal = r < 40 ? 30 : 24;   // cuántos de un tipo por grupo, idealmente (desde la ronda 20)
+      // cuántos de un tipo por grupo, idealmente (desde la ronda 20). Baja desde la 55 hasta 5
+      // en la 100: los grupos tardíos son de pocos grandes, no de cientos de chicos.
+      const ideal = r < 40 ? 30 : r < 55 ? 24 : Math.max(5, 24 - (r - 55) * 0.42);
       const used = {};
       const gs = [];
 
@@ -205,8 +218,9 @@
               if (n > maxN) fit *= Math.pow(maxN / n, 2);
             }
             const fresh = r - p[1] < 8 ? 1.6 : 1;
+            const grande = d.big && r >= 45 ? 1 + (r - 45) / 12 : 1;   // los grandes, cada vez más frecuentes
             const repeat = used[p[0]] && !(special && special.mono) ? 0.25 : 1;   // variedad dentro de la ronda
-            cands.push({ id: p[0], w: p[2] * fit * fresh * repeat });
+            cands.push({ id: p[0], w: p[2] * fit * fresh * repeat * grande });
           }
           if (!cands.length) cands.push({ id: unlocked[0][0], w: 1 });
           choice = pickWeighted(rng, cands).id;
@@ -230,7 +244,9 @@
       gs.sort((a, b) => a.unit - b.unit);
       let start = 0.5;
       for (const g of gs) {
-        round.groups.push({ type: g.type, n: g.n, interval: g.interval, start, path: g.path, hpX: Math.round(g.hpX * 100) / 100 });
+        const grp = { type: g.type, n: g.n, interval: g.interval, start, path: g.path, hpX: Math.round(g.hpX * 100) / 100 };
+        if (special && special.late && special.mod && E[g.type].big) grp.mod = special.mod;
+        round.groups.push(grp);
         start += g.duration * (0.45 + rng() * 0.35) + 0.8;
       }
       if (bossRound) {

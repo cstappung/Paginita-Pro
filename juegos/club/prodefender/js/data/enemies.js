@@ -63,6 +63,47 @@
       desc: 'Fortaleza ambulante con blindaje 8. Lleva 2 Portadores en su interior.'
     },
 
+    // --------- LA ESCALERA DE LOS GRANDES (rondas altas, todos los reinos) ---------
+    // Como los dirigibles de Bloons: en vez de cientos de enemigos chicos inflados,
+    // las rondas altas mandan pocos enemigos enormes que al caer sueltan a los del
+    // escalón de abajo. Tanques por tierra (Portador → Titán → Fortaleza → Ciudadela
+    // → Leviatán) y globos por el aire (Zepelín → Dirigible → Acorazado Celeste → Arca).
+    fortaleza: {
+      name: 'Fortaleza Rodante', hp: 4500, armor: 10, speed: 21, bounty: 260, leak: 60, r: 36,
+      color: '#56606c', shape: 'supertank', rank: 1, children: [['titan', 2]], big: true,
+      desc: 'SUPERTANQUE. Blindaje 10. Al caer libera 2 Titanes de Hierro.'
+    },
+    ciudadela: {
+      name: 'Ciudadela de Guerra', hp: 14000, armor: 12, speed: 18, bounty: 520, leak: 120, r: 41,
+      color: '#3f4a5a', shape: 'supertank', rank: 2, children: [['fortaleza', 2]], big: true,
+      desc: 'SUPER SUPERTANQUE. Blindaje 12. Al caer libera 2 Fortalezas Rodantes.'
+    },
+    leviatan: {
+      name: 'Leviatán de Acero', hp: 42000, armor: 14, speed: 15, bounty: 1100, leak: 250, r: 47,
+      color: '#2a3140', shape: 'supertank', rank: 3, children: [['ciudadela', 2]], big: true,
+      desc: 'SUPER SUPER SUPERTANQUE. Blindaje 14. Al caer libera 2 Ciudadelas de Guerra.'
+    },
+    zepelin: {
+      name: 'Zepelín de Polillas', hp: 700, armor: 2, speed: 40, bounty: 40, leak: 8, r: 22, flying: true,
+      color: '#b993dc', shape: 'blimp', rank: 0, children: [['alado', 4], ['enjambre', 6]], big: true,
+      desc: 'GLOBO VOLADOR. Al reventar suelta 4 Polillas y 6 Abejorros.'
+    },
+    dirigible: {
+      name: 'Gran Dirigible', hp: 2600, armor: 4, speed: 32, bounty: 150, leak: 20, r: 28, flying: true,
+      color: '#9a72cc', shape: 'blimp', rank: 1, children: [['zepelin', 3]], big: true,
+      desc: 'SUPERGLOBO. Blindaje 4. Al reventar suelta 3 Zepelines.'
+    },
+    celeste: {
+      name: 'Acorazado Celeste', hp: 9000, armor: 6, speed: 26, bounty: 380, leak: 50, r: 34, flying: true,
+      color: '#7354b0', shape: 'blimp', rank: 2, children: [['dirigible', 2]], big: true,
+      desc: 'SUPER SUPERGLOBO. Blindaje 6. Al reventar suelta 2 Grandes Dirigibles.'
+    },
+    arca: {
+      name: 'Arca de la Tormenta', hp: 30000, armor: 8, speed: 21, bounty: 900, leak: 120, r: 40, flying: true,
+      color: '#4a3584', shape: 'blimp', rank: 3, children: [['celeste', 2]], big: true,
+      desc: 'SUPER SUPER SUPERGLOBO. Blindaje 8. Al reventar suelta 2 Acorazados Celestes.'
+    },
+
     // ------------------- NIVEL 1 · PRADO ESMERALDA -------------------
     musgo: {
       name: 'Musgo Vivo', hp: 28, speed: 48, bounty: 5, leak: 2, r: 12, regen: 0.05,

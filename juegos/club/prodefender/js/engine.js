@@ -10,6 +10,14 @@
   PD.PATH_HALF = PATH_HALF; PD.TOWER_GAP = TOWER_GAP;
   // Fuerza con la que un enemigo rompe muros de raíces y golpea a los gólems (por segundo)
   const chew = e => (e.d.boss ? 60 : Math.max(1, e.d._leak)) * 3;
+  // Retroceso total que aguanta un enemigo en toda su vida (px de camino). Lo gastan TODOS
+  // los empujes (Ancla, bumerán, balista, géiser, Tormenta de Arena) y los hijos lo heredan
+  // del padre: antes la Tormenta no tenía tope y cada hijo empezaba de cero, y con torres
+  // potenciadas los enemigos casi no salían nunca.
+  const KB_MAX = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
+  // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
+  // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
+  const FREEZE_IMM = 1;
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -174,8 +182,9 @@
     }
     canUpgrade(t, p) {
       const nt = t.tiers.slice(); nt[p]++;
-      if (nt[p] > 4) return false;
-      if (nt[0] > 2 && nt[1] > 2 && !t.def.hero) return false;   // los héroes suben los dos caminos
+      if (nt[p] > t.def.paths[p].ups.length) return false;
+      if (t.def.hero) return !(nt[0] > 4 && nt[1] > 4);   // los héroes suben los dos a 4, pero solo UNO al 5
+      if (nt[0] > 2 && nt[1] > 2) return false;
       return true;
     }
     discountFor(t) {
@@ -281,7 +290,7 @@
       for (const g of R.groups) {
         for (let i = 0; i < g.n; i++) {
           let path = g.path === -1 ? (i % this.paths.length) : Math.min(g.path, this.paths.length - 1);
-          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1 });
+          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1, mod: g.mod });
         }
       }
       q.sort((a, b) => a.t - b.t);
@@ -327,7 +336,7 @@
       const e = {
         id: this.uid++, d, type, path, dist: Math.max(0, dist), hp, maxHp: hp, shield, maxShield: shield, shieldT: 0,
         x: 0, y: 0, a: 0, vx: 0, vy: 0, hpM, tier: tier || 0,
-        slowF: 0, slowT: 0, frozenT: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0,
+        slowF: 0, slowT: 0, frozenT: 0, freezeImm: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0, rifted: false,
         burnDps: 0, burnT: 0, burnSrc: null, poisDps: 0, poisT: 0, poisSrc: null,
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
@@ -346,6 +355,13 @@
       this.enemies.push(e);
       if (d.boss) this.emit({ type: 'boss', enemy: e });
       return e;
+    }
+
+    // grandes de las rondas especiales tardías (levels.js): camuflados o acelerados; sus hijos también
+    modifica(e, mod) {
+      e.mod = mod;
+      if (mod === 'camo') e.camo = true;
+      else if (mod === 'fast') e.fast = 1.35;
     }
 
     // camuflado visible si la torre lo detecta, un Faro lo ilumina o una Marca del Vacío lo delata
@@ -384,8 +400,9 @@
       else if (f === e.slowF) e.slowT = Math.max(e.slowT, dur);
     }
     applyFreeze(e, dur) {
-      if (e.d.freezeImmune || e.d.boss) { this.applySlow(e, 0.6, dur); return; }
+      if (e.d.freezeImmune || e.d.boss || e.freezeImm > 0) { this.applySlow(e, 0.6, dur); return; }
       e.frozenT = Math.max(e.frozenT, dur);
+      e.freezeImm = e.frozenT + FREEZE_IMM;
     }
     // congelar/sabotear una torre; después queda inmune 2 s para evitar bloqueos en cadena
     disableTower(t, dur) {
@@ -494,6 +511,8 @@
         for (const [c, n] of d.children) for (let i = 0; i < n; i++) {
           const ch = this.spawn(c, e.path, e.dist - k * 9 + 4, e.hpM);
           ch.slowF = e.slowF * 0.5; ch.slowT = e.slowT;
+          ch.pulled = e.pulled; ch.rifted = e.rifted;   // el retroceso ya gastado se hereda
+          if (e.mod) this.modifica(ch, e.mod);
           k++;
         }
       }
@@ -566,6 +585,7 @@
         if (e.invulnT > 0) e.invulnT -= dt;
         if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
         if (e.frozenT > 0) e.frozenT -= dt;
+        if (e.freezeImm > 0) e.freezeImm -= dt;
         if (e.stunT > 0) e.stunT -= dt;
         if (e.stunImm > 0) e.stunImm -= dt;
         if (e.healCd > 0) e.healCd -= dt;
@@ -649,9 +669,10 @@
         if (d.enrage && !e.enraged && e.hp < e.maxHp * d.enrage.below) e.enraged = true;
         // movimiento
         let sp = 0;
-        if (hurry) { sp = d.speed * sm; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
+        const vel = d.speed * sm * (e.fast || 1);
+        if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
         else if (e.frozenT <= 0 && e.stunT <= 0) {
-          sp = d.speed * sm * (1 - e.slowF) * e.haste;
+          sp = vel * (1 - e.slowF) * e.haste;
           if (e.auraSlow && !d.slowImmune) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
           if (e.burrowed) sp *= d.burrow.speed;
           if (e.enraged) sp *= d.enrage.mult;
@@ -984,10 +1005,8 @@
       if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
       const o = { armorMult: s.armorMult };
       this.inRange(t, s.range, e => {
-        // tope de retroceso acumulado: la gravedad frena, pero nunca bloquea una ronda para siempre
-        const want = e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull;
-        const back = Math.min(want, Math.max(0, (e.d.boss ? 180 : 300) - e.pulled), e.dist);
-        if (back > 0) { e.dist -= back; e.pulled += back; }
+        // tope de retroceso acumulado (retrocede): la gravedad frena, pero nunca bloquea una ronda para siempre
+        this.retrocede(e, e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull);
         this.damage(e, s.dmg, s.dtype, t, o);
         if (s.stun && !e.dead) this.applyStun(e, s.stun);
       });
@@ -1113,10 +1132,12 @@
       return out;
     }
     // empuje hacia atrás con tope acumulado (igual que la gravedad: frena, nunca bloquea para siempre)
-    push(e, amt) {
-      const want = e.d.boss ? amt * 0.25 : amt;
-      const back = Math.min(want, Math.max(0, (e.d.boss ? 180 : 300) - e.pulled), e.dist);
+    push(e, amt) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt); }
+    // todo retroceso pasa por aquí: gasta del tope del enemigo (KB_MAX) y devuelve cuánto retrocedió
+    retrocede(e, want) {
+      const back = Math.min(want, Math.max(0, KB_MAX(e) - e.pulled), e.dist);
       if (back > 0) { e.dist -= back; e.pulled += back; }
+      return back > 0 ? back : 0;
     }
 
     // ---- Cazador de Bumeranes: golpea a la ida y a la vuelta ----
@@ -1657,7 +1678,7 @@
         case 'selva':
           // raíces: los terrestres quedan clavados (los jefes solo con Bosque Eterno, y frenados)
           for (const e of this.enemies) {
-            if (e.dead || e.d.flying || (e.d.boss && !s.selvaBoss)) continue;
+            if (e.dead || (e.d.flying && !s.selvaAir) || (e.d.boss && !s.selvaBoss)) continue;
             e.holdT = Math.max(e.holdT, s.selvaDur);
             this.applyPoison(e, s.selvaDps, s.selvaDur, t);
             this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 4, r1: e.d.r + 14, color: '#7ae05a', w: 3 });
@@ -1668,8 +1689,8 @@
           if (hurry) break;
           for (const e of this.enemies) {
             if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > s.stormR) continue;
-            const back = Math.min(e.dist, s.stormPush * (e.d.boss ? 0.25 : 1));
-            if (back > 0) { this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: e.d.r * 1.6 }); e.dist -= back; if (e.engaged) this.release(e); }
+            const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1));
+            if (back > 0) { this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: e.d.r * 1.6 }); if (e.engaged) this.release(e); }
             this.applyStun(e, s.stormStun);
           }
           this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.8, r0: 20, r1: Math.min(700, s.stormR), color: '#ffd38a', w: 12 });
@@ -1695,15 +1716,19 @@
         case 'grieta':
           if (hurry) break;
           for (const e of this.enemies) {
-            if (e.dead) continue;
+            // una sola vez por enemigo (y sus hijos tampoco): antes cada Grieta los volvía a
+            // devolver y con la recarga corta una ronda podía no terminar nunca
+            if (e.dead || e.rifted) continue;
             const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack);
             if (back <= 1) continue;
+            e.rifted = true;
             this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#c07bff', r: e.d.r * 1.5 });
             e.dist -= back;
             posAt(this.paths[e.path], e.dist, tmp); e.x = tmp.x; e.y = tmp.y; e.a = tmp.a;
             if (e.engaged) this.release(e);
             if (s.riftStun) this.applyStun(e, s.riftStun);
             if (s.riftHex) { e.hexT = Math.max(e.hexT, 6); e.hexAmp = Math.max(e.hexAmp, s.riftHex * (e.d.boss ? 0.5 : 1)); e.hexSrc = e.hexSrc || t; }
+            if (s.riftDmg) this.damage(e, s.riftDmg, 'arcane', t, { bossMult: 2 });
             this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#8a5bff', r: e.d.r * 1.5 });
           }
           this.fx.push({ k: 'flashscreen', t: 0, T: 0.7, color: 'rgba(170,110,255,' });
@@ -1729,7 +1754,8 @@
         this.rt += dt;
         while (this.qi < this.queue.length && this.queue[this.qi].t <= this.rt) {
           const q = this.queue[this.qi++];
-          this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
+          const e = this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
+          if (q.mod) this.modifica(e, q.mod);
         }
       }
       this.grid.clear();
