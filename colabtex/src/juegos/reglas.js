@@ -447,6 +447,32 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, CPU de relleno, llegar tarde, el VR);
+     las carreras en sí son las del juego (Retro Rewind), así que el manual no las repite. */
+  mkw: {
+    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: carreras en línea de hasta 12 con tus amigos, y la CPU completa la parrilla.",
+    secciones: [
+      ["Cómo se juega", pasos([
+        "Abre una sala de <b>Mario Kart Wii</b> y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑): su pestaña hace de servidor de la sala.",
+        "El anfitrión elige la <b>CPU de relleno</b> (sin CPU, fácil, normal o difícil) y aprieta <b>¡A correr!</b>.",
+        "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). <b>Con CPU de relleno y hasta 4 pilotos</b> corren una <b>copa sincronizada</b> de 4 pistas: todos ven la misma carrera y la CPU completa los 12 lugares.",
+        "<b>Sin CPU o con más de 4 pilotos</b>, el juego <b>entra solo</b> en línea: la sala del juego, la votación de pista y las carreras de siempre.",
+        "Cuando quieran parar, el anfitrión aprieta <b>Volver al vestíbulo</b>."
+      ])],
+      ["Llegar tarde y salir", lista([
+        "Quien entra con una carrera andando <b>mira</b> y entra en la <b>siguiente</b> (en la copa con CPU, en la tanda siguiente).",
+        "Si el anfitrión se va, el puesto pasa al siguiente y todos vuelven al vestíbulo (sin su pestaña no hay servidor).",
+        "Hay que manejar: el juego saca de la carrera a quien se queda quieto mucho rato."
+      ])],
+      ["Controles", tabla([
+        ["Teclado", "Las teclas del juego (se cambian en <b>Opciones</b> dentro de la página del juego)."],
+        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
+        ["Celular", "Botones en pantalla, y se dobla <b>inclinando el teléfono</b>."]
+      ])],
+      ["Tu VR", "Retro Rewind calcula tu <b>VR</b> (y tu BR) después de cada carrera <b>en línea</b> (la sala sin CPU de relleno); la copa con CPU no lo mueve. La página lo guarda en tu cuenta: en otro aparato el juego empieza con el mismo. La sala muestra el VR de cada piloto."],
+      ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
+    ]
+  },
   /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:
      cupo 2 = duelo). Lo común va detrás: qué hace falta, los personajes prohibidos, mirar y qué hacer si algo falla. */
   bt3: {

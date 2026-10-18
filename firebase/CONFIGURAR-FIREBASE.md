@@ -600,6 +600,20 @@ pelota) va por la malla WebRTC de `vivo/<pid>/rtc`, como Boxhead. Sin
 publicar, la sala de HaxBall no se puede crear. Pegar
 `firebase/database.rules.json` entero y **Publicar**.
 
+### ⚠ Mario Kart Wii pide publicar otra vez (2026-10-17)
+
+`'mkw'` tiene que estar en la lista del campo `juego` y en la de `logros`, y el
+tope de `cupo` sube de 10 a **12** (una sala en línea de Mario Kart Wii admite
+12; cada juego sigue limitando el suyo en `motor.js`). Un nodo nuevo, `mkw`:
+`mkw/vr/{uid}` (el VR y el BR de Retro Rewind de cada uno) y
+`mkw/records/{pista}-{cat}/{uid}` (su mejor tiempo por pista y categoría);
+todos leen, cada uno escribe solo lo suyo, y un récord solo se reemplaza por
+uno mejor (`juegos/mkw/docs/firebase-mkw.md` §4–6). El vestíbulo va por
+`jugadas` (`ajuste`, `anfitrion`, `empieza`, `vuelve`) y las carreras van de
+navegador a navegador por la malla WebRTC; `vivo/<pid>/rtc` solo presenta.
+Sin publicar, la sala de Mario Kart Wii no se puede crear. Pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
 ### ⚠ Budokai Tenkaichi 3 pide publicar otra vez (2026-10-14)
 
 `'bt3'` tiene que estar en la lista del campo `juego` y en la de `logros`.

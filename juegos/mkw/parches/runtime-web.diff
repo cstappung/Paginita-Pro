@@ -492,10 +492,31 @@ index a5066f8..48dd0a6 100644
      // (its own !(scaled > 0) rule maps NaN to 0, matching what MAXPS-with-zero
      // does on the x86 path per the comment there), packed the same way the
 diff --git a/runtime/include/memory_access.h b/runtime/include/memory_access.h
-index 7ac535d..a82f604 100644
+index 7ac535d..1d1ff22 100644
 --- a/runtime/include/memory_access.h
 +++ b/runtime/include/memory_access.h
-@@ -539,6 +539,9 @@ MKW_MEMORY_FORCE_INLINE void WriteResolvedFloat64(uint8_t* r, uint32_t o, uint32
+@@ -368,9 +368,20 @@ MKW_MEMORY_FORCE_INLINE bool TryReadGuestScalar(uint32_t address, T& outValue) {
+     return true;
+ }
+ 
++#ifdef MKW_VIGIA
++}  // namespace MemoryInline
++// MKW web, depuración (MKW_CFLAGS_EXTRA=-DMKW_VIGIA, taller aparte): "punto de vigilancia" de escritura: si se escribe
++// en [g_mkwVigiaDesde, +g_mkwVigiaTam) se avisa a mkw_vigia_toque (web/juego/depurar_lockstep.cpp).
++extern "C" uint32_t g_mkwVigiaDesde, g_mkwVigiaTam;
++extern "C" void mkw_vigia_toque(uint32_t address, uint32_t size);
++namespace MemoryInline {
++#endif
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE bool TryWriteGuestScalar(uint32_t address, T value) {
+     static_assert(sizeof(T) >= 1 && sizeof(T) <= kMaxFastScalarSize);
++#ifdef MKW_VIGIA
++    if (address - g_mkwVigiaDesde < g_mkwVigiaTam) [[unlikely]] mkw_vigia_toque(address, sizeof(T));
++#endif
+     // A mixed executable/data 1 MiB page zeroes the coarse writable bias even though most of
+     // its 4 KiB sub-pages are plain data; MKW's THP buffers share such a page with .text, which
+     // used to force ~15% of total CPU through the cold path. The sparse sub-page tier below
+@@ -539,6 +550,9 @@ MKW_MEMORY_FORCE_INLINE void WriteResolvedFloat64(uint8_t* r, uint32_t o, uint32
  
  template <typename T>
  MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
@@ -505,7 +526,7 @@ index 7ac535d..a82f604 100644
      T value{};
      std::memcpy(&value, MKW_FLAT_GUEST_BASE + address, sizeof(T));
      return MaybeByteSwap(value);
-@@ -546,6 +549,9 @@ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
+@@ -546,6 +560,9 @@ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
  
  template <typename T>
  MKW_MEMORY_FORCE_INLINE void FlatStore(uint32_t address, T value) {
@@ -515,7 +536,7 @@ index 7ac535d..a82f604 100644
      const T swapped = MaybeByteSwap(value);
      std::memcpy(MKW_FLAT_GUEST_BASE + address, &swapped, sizeof(T));
  }
-@@ -616,25 +622,32 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
+@@ -616,25 +633,32 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
  // of flat stores), skipping the MMIO mask/compare that's pure overhead there. Still safe if that proof were ever wrong: the flat view maps
  // 0xCC000000..0xCDFFFFFF PAGE_NOACCESS, so a stray MMIO store faults into the same handler and diagnostic as the checked path, just reported
  // instead of dispatched inline. Never use these for an address the translator hasn't proven.
@@ -704,6 +725,201 @@ index 7ceda4c..0c5b649 100644
 +extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_sonido_ritmo() { return AudioBackend::Instance().WebRateRatio(); }
 +extern "C" EMSCRIPTEN_KEEPALIVE unsigned mkw_web_sonido_tirados() { return AudioBackend::Instance().WebDroppedBlocks(); }
 +#endif
+diff --git a/runtime/src/hle/net/network_core.cpp b/runtime/src/hle/net/network_core.cpp
+index 7c68222..62121a0 100644
+--- a/runtime/src/hle/net/network_core.cpp
++++ b/runtime/src/hle/net/network_core.cpp
+@@ -368,11 +368,20 @@ bool WaitForReadable(NativeSocket socket, int timeoutMs) {
+     return ret > 0 && (pfd.revents & (POLLRDNORM | POLLIN | POLLERR | POLLHUP)) != 0;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// Web: the sockets live in the page's virtual network (web/navegador/red_web.cpp + red.mjs). close() and
++// fcntl() stay the file-system ones, so the two calls that touch a socket descriptor go to the bridge directly.
++extern "C" int mkw_red_cerrar(int fd);
++extern "C" void mkw_red_bloqueante(int fd, bool blocking);
++#endif
++
+ void CloseNativeSocket(NativeSocket socket) {
+     if (socket == kInvalidSocket) {
+         return;
+     }
+-#ifdef _WIN32
++#ifdef __EMSCRIPTEN__
++    mkw_red_cerrar(socket);
++#elif defined(_WIN32)
+     closesocket(socket);
+ #else
+     close(socket);
+@@ -380,7 +389,9 @@ void CloseNativeSocket(NativeSocket socket) {
+ }
+ 
+ void SetNonBlocking(NativeSocket socket, bool enabled) {
+-#ifdef _WIN32
++#ifdef __EMSCRIPTEN__
++    mkw_red_bloqueante(socket, !enabled);
++#elif defined(_WIN32)
+     u_long mode = enabled ? 1 : 0;
+     ioctlsocket(socket, FIONBIO, &mode);
+ #else
+diff --git a/runtime/src/hle/net/network_deferred.cpp b/runtime/src/hle/net/network_deferred.cpp
+index 8ed5e0e..4210d69 100644
+--- a/runtime/src/hle/net/network_deferred.cpp
++++ b/runtime/src/hle/net/network_deferred.cpp
+@@ -269,6 +269,12 @@ static DeferredDnsCompletion ResolveDeferredDns(DeferredDnsWork work) {
+ }
+ 
+ static bool LaunchDeferredDns(DeferredDnsWork work) {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    // Web without threads: the page's resolver (red_web.cpp getaddrinfo -> red.mjs) answers from a table at once,
++    // so resolve inline and queue the completion; the scheduler pump delivers it exactly like a worker's.
++    QueueDeferredDnsCompletion(ResolveDeferredDns(std::move(work)));
++    return true;
++#endif
+     std::unique_ptr<std::thread> worker;
+     try {
+         worker = std::make_unique<std::thread>([work = std::move(work)]() mutable {
+diff --git a/runtime/src/hle/net/network_ssl.cpp b/runtime/src/hle/net/network_ssl.cpp
+index 9e4fd76..6918747 100644
+--- a/runtime/src/hle/net/network_ssl.cpp
++++ b/runtime/src/hle/net/network_ssl.cpp
+@@ -2,7 +2,12 @@
+ #include "runtime_config.h"
+ #include "runtime_log.h"
+ 
+-#ifndef _WIN32
++// Web (__EMSCRIPTEN__): no TLS library. Every session is plaintext: the only servers are the room's virtual WFC
++// (web/navegador), which speaks plain HTTP on 80 and 443, like Retro WFC's plaintext hosts below.
++#ifdef __EMSCRIPTEN__
++#include <sys/time.h>
++#endif
++#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+ #include <mbedtls/ctr_drbg.h>
+ #include <mbedtls/entropy.h>
+ #include <mbedtls/error.h>
+@@ -75,7 +80,7 @@ struct SslSession {
+     CredHandle cred{};
+     CtxtHandle context{};
+     SecPkgContext_StreamSizes sizes{};
+-#else
++#elif !defined(__EMSCRIPTEN__)
+     bool haveSsl = false;
+     mbedtls_ssl_context sslContext{};
+     mbedtls_ssl_config sslConfig{};
+@@ -562,6 +567,57 @@ static int32_t SslRead(SslSession& ssl, uint8_t* out, uint32_t size) {
+     ssl.decrypted.erase(ssl.decrypted.begin(), ssl.decrypted.begin() + copied);
+     return copied == 0 ? SSL_ERR_ZERO : static_cast<int32_t>(copied);
+ }
++#elif defined(__EMSCRIPTEN__)
++// Web: plaintext only (see the include block at the top). The "handshake" just checks there is a socket; reads
++// and writes go straight to it, exactly like the plaintextWfc path below.
++static void ClearSslSession(SslSession& ssl) {
++    ssl = {};
++}
++
++static int32_t SslHandshakeImpl(SslSession& ssl) {
++    if (ssl.native == kInvalidSocket) {
++        return SSL_ERR_SYSCALL;
++    }
++    ssl.handshaked = true;
++    return SSL_OK;
++}
++
++static int32_t SslWrite(SslSession& ssl, const uint8_t* data, uint32_t size) {
++    if (!data || size == 0) {
++        return SSL_ERR_ZERO;
++    }
++    const int32_t handshakeRet = SslHandshake(ssl);
++    if (handshakeRet != SSL_OK) {
++        return handshakeRet;
++    }
++    uint32_t total = 0;
++    while (total < size) {
++        const ssize_t sent = send(ssl.native, data + total, size - total, 0);
++        if (sent <= 0) {
++            return SSL_ERR_SYSCALL;
++        }
++        total += static_cast<uint32_t>(sent);
++    }
++    return static_cast<int32_t>(total);
++}
++
++static int32_t SslRead(SslSession& ssl, uint8_t* out, uint32_t size) {
++    if (!out || size == 0) {
++        return SSL_ERR_ZERO;
++    }
++    const int32_t handshakeRet = SslHandshake(ssl);
++    if (handshakeRet != SSL_OK) {
++        return handshakeRet;
++    }
++    const ssize_t ret = recv(ssl.native, out, size, 0);
++    if (ret == 0) {
++        return SSL_ERR_ZERO;
++    }
++    if (ret < 0) {
++        return SSL_ERR_RAGAIN;
++    }
++    return static_cast<int32_t>(ret);
++}
+ #else
+ // Windows gets TLS for free from the OS (Schannel, above) - mbed TLS is this project's own
+ // vendored equivalent for everywhere else (runtime/third_party/mbedtls, see runtime/CMakeLists.txt
+diff --git a/runtime/src/hle/os/os_time.cpp b/runtime/src/hle/os/os_time.cpp
+index a89e4a4..75ea581 100644
+--- a/runtime/src/hle/os/os_time.cpp
++++ b/runtime/src/hle/os/os_time.cpp
+@@ -26,6 +26,42 @@ void ReadTimeBaseRegisters(uint32_t& outHi, uint32_t& outLo)
+ }
+ } // namespace
+ 
++// MKW web — la hora de la carrera sincronizada (lockstep, bitácora §61). Con g_mkwRelojFijo encendido (la sala con
++// CPU, ppc_helpers.cpp), OSGetTime no da la hora de la PC sino una que sale de los cuadros DEL JUEGO (Raceinfo
++// 0x809BD730: +0x1E cuenta la presentación, +0x20 la carrera): todas las lecturas de un mismo cuadro dan lo mismo y
++// cada cuadro avanza 1/60 s. Así lo que el juego (o Retro Rewind: tiene un temporizador de 3 s en la carrera) mide en
++// tiempo real sale igual en todas las consolas. (Antes salía de los refrescos del monitor, g_mkwCuadros: si el juego
++// se atrasaba un momento, esa cuenta saltaba distinto en cada consola y la carrera se separaba.) Si alguien la lee
++// muchísimas veces en un cuadro (esperando que pase el tiempo), después de 256 lecturas empieza a avanzar un poco
++// por lectura para que esa espera termine. Cada carrera empieza de cero (g_mkwRelojGeneracion cambia en InitRng).
++// Las alarmas y el resto del runtime siguen con el reloj real.
++extern "C" int g_mkwRelojFijo;
++extern "C" unsigned g_mkwRelojGeneracion;
++namespace {
++bool HoraDeCarrera(uint32_t& hi, uint32_t& lo)
++{
++    if (!g_mkwRelojFijo) return false;
++    static unsigned generacion = ~0u, lecturas = 0;
++    static uint64_t base = 0, pasos = ~0ull;       // base: lo que sumaron los Raceinfo anteriores (presentación → carrera)
++    static uint32_t ultimo = 0;
++    if (generacion != g_mkwRelojGeneracion) { generacion = g_mkwRelojGeneracion; base = 0; ultimo = 0; pasos = ~0ull; lecturas = 0; }
++    const uint32_t ri = ::Memory::Read32(0x809BD730u);
++    if (::Memory::Contains(ri, 0x24)) {
++        const uint32_t f = static_cast<uint32_t>(::Memory::Read16(ri + 0x1E)) + ::Memory::Read32(ri + 0x20);
++        if (f < ultimo) base += static_cast<uint64_t>(ultimo) + 1;   // empezó otro Raceinfo: la hora no vuelve atrás
++        ultimo = f;
++    }
++    const uint64_t ahora = base + ultimo;
++    if (ahora != pasos) { pasos = ahora; lecturas = 0; }
++    ++lecturas;
++    const uint64_t t = (1ull << 44) + ahora * 1012500u                                   // 60,75 MHz / 60
++                     + (lecturas > 256 ? static_cast<uint64_t>(lecturas - 256) * 600u : 0u);
++    hi = static_cast<uint32_t>(t >> 32);
++    lo = static_cast<uint32_t>(t);
++    return true;
++}
++} // namespace
++
+ namespace OsHleInternal {
+ uint64_t ReadSystemTime()
+ {
+@@ -50,7 +86,7 @@ extern "C" void OS__GetTime_HLE(CpuContext* ctx)
+ 
+     uint32_t hi = 0;
+     uint32_t lo = 0;
+-    ReadTimeBaseRegisters(hi, lo);
++    if (!HoraDeCarrera(hi, lo)) ReadTimeBaseRegisters(hi, lo);
+     ctx->gpr[3] = hi;
+     ctx->gpr[4] = lo;
+ }
 diff --git a/runtime/src/hle/storage/dvd.cpp b/runtime/src/hle/storage/dvd.cpp
 index 1acf239..e89bdd6 100644
 --- a/runtime/src/hle/storage/dvd.cpp
@@ -796,10 +1012,10 @@ index f09d88e..e59c1af 100644
          if (publishEc) {
              LogNandError("NANDMove", "failed to publish cross-mount copy: %s",
 diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
-index 7ee76b5..29694e2 100644
+index 7ee76b5..f2b604e 100644
 --- a/runtime/src/hle/vi.cpp
 +++ b/runtime/src/hle/vi.cpp
-@@ -15,12 +15,65 @@
+@@ -15,12 +15,77 @@
  #include <array>
  #include <atomic>
  #include <chrono>
@@ -860,12 +1076,24 @@ index 7ee76b5..29694e2 100644
 +EM_JS(int, mkw_web_cede, (), {
 +    return Module.mkwCeder && Module.mkwEsperaHasta ? 1 : 0;
 +});
++// MKW RETRO (browser, grid NOT locked to the monitor: the online rooms ?red, §58, and a tab whose refresh clock went
++// stale): suspends (JSPI) until `deadline` arrives (1, the page wakes us at or just after it) or `serviceMs` pass (0);
++// the caller spins whatever is left (usually nothing).
++// Without it the unlocked waits spun on the page's only thread: in the synchronized race the page got a turn only
++// when the lockstep waited for the other console, and when the race ended it never got one again (bitácora §63).
++EM_ASYNC_JS(int, mkw_web_espera_reloj, (double deadline, double serviceMs), {
++    if (!Module.mkwEsperaReloj) return 3;
++    return await Module.mkwEsperaReloj(deadline, serviceMs);
++});
++EM_JS(int, mkw_web_cede_reloj, (), {
++    return Module.mkwEsperaReloj ? 1 : 0;
++});
 +#endif
 +
  #if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
  #define WIN32_LEAN_AND_MEAN
-@@ -167,6 +220,21 @@ void SleepPreciselyUntil(Clock::time_point deadline, bool finishWithSpin = false
+@@ -167,6 +232,21 @@ void SleepPreciselyUntil(Clock::time_point deadline, bool finishWithSpin = false
      }
      const auto timerDeadline =
          finishWithSpin && deadline - now > spinWindow ? deadline - spinWindow : deadline;
@@ -887,7 +1115,7 @@ index 7ee76b5..29694e2 100644
  #if defined(_WIN32)
  #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
  #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-@@ -238,6 +306,56 @@ void WriteGuestStateLocked() {
+@@ -238,6 +318,56 @@ void WriteGuestStateLocked() {
      }
  }
  
@@ -944,7 +1172,7 @@ index 7ee76b5..29694e2 100644
  void EnsureInitializedLocked() {
      if (g_vi.initialized) {
          return;
-@@ -465,6 +583,27 @@ void VI_HLE_WaitForNextRetracePoll() {
+@@ -465,6 +595,40 @@ void VI_HLE_WaitForNextRetracePoll() {
      if (now >= retraceDeadline) {
          return;
      }
@@ -968,11 +1196,24 @@ index 7ee76b5..29694e2 100644
 +        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
 +        return;
 +    }
++    // Grid not locked (online rooms, §63): yield to the page by time, as in PaceToRetraceBoundary.
++    static const bool canYieldClock = mkw_web_cede_reloj() != 0;
++    if (canYieldClock) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(retraceDeadline - now).count();
++        if (mkw_web_espera_reloj(deadlineMs, 1.0) != 0) {  // the retrace is due
++            while (Clock::now() < retraceDeadline) {
++            }
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        return;
++    }
 +#endif
      // Audio DMA and alarm queues still need regular service even when the VI
      // deadline is farther away. The high-resolution wait removes the 1 ms
      // scheduler overshoot when retrace is the next event.
-@@ -489,6 +628,31 @@ uint64_t s_lastPresentAnchorNanos = 0;
+@@ -489,6 +653,54 @@ uint64_t s_lastPresentAnchorNanos = 0;
  // DMA and timers keep running, then delivers that retrace so guest logic starts exactly on the grid.
  void PaceToRetraceBoundary(Clock::time_point deadline) {
      constexpr auto kServiceSlice = 1ms;
@@ -1000,11 +1241,34 @@ index 7ee76b5..29694e2 100644
 +        VI_HLE_ProcessRetracesDeferred(1);
 +        return;
 +    }
++    // MKW RETRO (browser, grid NOT locked: the online rooms ?red go by the wall clock, bitácora §58/§63): the
++    // slice loop below never sleeps (1 ms slices are under emscripten_sleep's 2 ms floor), so it spun the whole
++    // wait without ever giving the page a turn. Yield to the page by time instead. Waking a little late is fine: the
++    // retrace is stamped on the grid (lastRetrace = target), and with no lock there is no refresh to line up with.
++    static const bool canYieldClock = mkw_web_cede_reloj() != 0;
++    if (canYieldClock) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
++        for (;;) {
++            const int woke = mkw_web_espera_reloj(deadlineMs, 1.0);
++            OS_HLE_ProcessAlarmsDeferred(8);
++            Audio_HLE_PollDeferred();
++            if (woke != 0) {
++                break;
++            }
++        }
++        while (Clock::now() < deadline) {
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        VI_HLE_ProcessRetracesDeferred(1);
++        return;
++    }
 +#endif
      for (;;) {
          const auto now = Clock::now();
          if (now >= deadline) {
-@@ -524,6 +688,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -524,6 +736,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
      } sequenceGuard;
      Clock::time_point paceDeadline{};
      bool paceThisFrame = false;
@@ -1014,7 +1278,7 @@ index 7ee76b5..29694e2 100644
      if (paceToRetrace) {
          uint64_t baseNanos = 0;
          uint64_t intervalNanos = 0;
-@@ -531,6 +698,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -531,6 +746,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          {
              std::lock_guard<std::mutex> lock(g_viMutex);
              EnsureInitializedLocked();
@@ -1026,7 +1290,7 @@ index 7ee76b5..29694e2 100644
              paceDeadline = g_vi.lastRetrace + g_vi.retraceInterval;
              retraceCount = g_vi.retraceCount;
              baseNanos = static_cast<uint64_t>(
-@@ -577,7 +749,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -577,7 +797,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          aurora_set_present_schedule(0, 0);
      }
  
@@ -1255,6 +1519,70 @@ index 1597d20..6580730 100644
  
  #endif
          const auto backendDisplayName = [](AuroraBackend value) -> const char* {
+diff --git a/runtime/src/ppc_helpers.cpp b/runtime/src/ppc_helpers.cpp
+index 488f943..ea88be9 100644
+--- a/runtime/src/ppc_helpers.cpp
++++ b/runtime/src/ppc_helpers.cpp
+@@ -403,6 +403,59 @@ extern "C" uint32_t PPC_Mftb()
+     return static_cast<uint32_t>(GetTimeBase());
+ }
+ 
++// MKW web — el reloj del azar de la carrera sincronizada (lockstep, bitácora §61). Las pocas funciones del juego
++// que sacan su azar del reloj del procesador (Random::__ct/Reset, los objetos, el temporizador: la lista está en
++// compilar-web.py, RELOJ_CARRERA) leen este en vez de mftb. Con g_mkwRelojFijo encendido es un contador: cada
++// lectura avanza kMkwRelojPaso desde un número que la página fija al preparar la carrera (semillas_nativo.cpp), así
++// todas las consolas de la sala sacan el mismo azar. Apagado (siempre, salvo en la sala con CPU) es el reloj normal.
++extern "C" {
++int g_mkwRelojFijo = 0;
++uint64_t g_mkwRelojValor = 0;
++unsigned g_mkwRelojGeneracion = 0;   // cambia en cada carrera (semillas_nativo.cpp): la hora de os_time.cpp empieza de cero
++}
++extern "C" uint32_t PPC_MftbCarrera()
++{
++    if (!g_mkwRelojFijo) return PPC_Mftb();
++    g_mkwRelojValor += 2000;                              // ~33 µs del reloj de la Wii por lectura
++    return static_cast<uint32_t>(g_mkwRelojValor);
++}
++
++// Lo que de verdad usan esas funciones (compilar-web.py): un reloj POR LUGAR. Con un solo contador para todas, una
++// lectura de más en cualquier parte (un efecto que arma su azar en una consola y no en otra) corría todos los números
++// siguientes: el sorteo del objeto de una caja salía distinto y la carrera se separaba (bitácora §62). Ahora el valor
++// sale solo de (cuadro de la carrera, función que lee, desde dónde la llamaron = lr, cuántas veces leyó ese mismo
++// lugar en este cuadro): base + cuadro·1012500 (un cuadro de 1/60 s del reloj de la Wii) + un corrimiento por lugar
++// + 7 por lectura. Sigue subiendo con el tiempo para cada lugar (los que miden cuánto pasó lo ven avanzar).
++namespace {
++struct LecturaReloj { uint64_t clave; uint64_t cuadro; uint32_t cuenta; };
++LecturaReloj g_lecturas[512];
++unsigned g_lecturasGen = ~0u;
++}
++extern "C" uint32_t PPC_MftbCarreraEn(uint32_t sitio, uint32_t lr)
++{
++    if (!g_mkwRelojFijo) return PPC_Mftb();
++    if (g_lecturasGen != g_mkwRelojGeneracion) {           // carrera nueva: tabla en cero
++        g_lecturasGen = g_mkwRelojGeneracion;
++        for (auto& l : g_lecturas) l = LecturaReloj{0, 0, 0};
++    }
++    uint64_t cuadro = 0;                                   // Raceinfo (0x809BD730): +0x1E (16 bits) + +0x20
++    const uint32_t ri = ::Memory::Read32(0x809BD730u);
++    if (ri && ::Memory::Contains(ri, 0x24)) cuadro = 1 + ::Memory::Read16(ri + 0x1E) + ::Memory::Read32(ri + 0x20);
++    const uint64_t clave = (static_cast<uint64_t>(sitio + 1) << 32) | lr;
++    uint32_t h = static_cast<uint32_t>(clave * 0x9E3779B97F4A7C15ull >> 32);
++    uint32_t i = h & 511u;
++    for (uint32_t n = 0; n < 512; n++, i = (i + 1) & 511u) {
++        LecturaReloj& l = g_lecturas[i];
++        if (l.clave == clave || l.clave == 0) {
++            if (l.clave == 0) l = LecturaReloj{clave, cuadro, 0};
++            if (l.cuadro != cuadro) { l.cuadro = cuadro; l.cuenta = 0; }
++            const uint32_t k = l.cuenta++;
++            return static_cast<uint32_t>(g_mkwRelojValor + cuadro * 1012500ull + (h & 255u) * 1000u + k * 7ull);
++        }
++    }
++    return static_cast<uint32_t>(g_mkwRelojValor + cuadro * 1012500ull + (h & 255u) * 1000u);   // tabla llena
++}
++
+ extern "C" uint32_t PPC_Mftbu()
+ {
+     return static_cast<uint32_t>(GetTimeBase() >> 32);
 diff --git a/runtime/include/isa/ppc_isa_wasm_neon.h b/runtime/include/isa/ppc_isa_wasm_neon.h
 new file mode 100644
 index 0000000..834be87

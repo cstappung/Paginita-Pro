@@ -73,3 +73,88 @@ Mostrar en la página: `nube.estado.accion` ("iguales", "bajada: …", "subida: 
 | `jugado` | hora del archivo más nuevo de la partida (cuándo se jugó): decide los conflictos |
 | `actualizado` | cuándo se subió |
 | `version` | formato del paquete (`1`) |
+
+## 4. Récords de tiempo por pista y cilindrada (Realtime Database) — bitácora §57
+
+Cada vez que termina una carrera, la página lee del juego el tiempo final, la pista y la categoría (modo + cc:
+`tt150`, `tt200`, `vs150`, `vs200`, `vs500`, `vs100`, `vsespejo`) y guarda el mejor en el navegador. Si la persona
+inició sesión, también en **Firebase Realtime Database** (la base que el sitio ya usa para las salas y los logros; el
+sitio no usa Firestore, así que no hace falta activar nada nuevo): uno por persona y por pista+categoría.
+
+```
+mkw/records/{pista}-{cat}/{uid}
+  uid, nombre (≤ 20), ms (número), pista ("10e"), cat ("tt150"), personaje, kart, version (1), at (hora del servidor)
+```
+
+La tabla de una pista = `orderByChild('ms').limitToFirst(10)` (pide `.indexOn: ["ms"]`, ya en la regla).
+
+## 5. VR y BR de cada jugador (Realtime Database) — bitácora §59
+
+Retro Rewind calcula su VR en cada consola y lo guarda en `RRRating.pul` (que ya viaja con la partida en la nube,
+sección 1). Además la página lo guarda en Firebase, uno por persona, para que:
+
+- en otro aparato, el juego reciba el VR de la cuenta **al entrar en línea** (lo pregunta con
+  `/api/mkw_rr_ratings?pid=…` y nuestro WFC contesta con el de Firebase), aunque su archivo local sea viejo;
+- la sala y las tablas del sitio puedan mostrar el VR de cada jugador.
+
+```
+mkw/vr/{uid}
+  uid, nombre (≤ 20), vr (1..1 000 000), br (1..1 000 000), version (1), at (hora del servidor)
+```
+
+Tabla de VR: `orderByChild('vr').limitToLast(10)` (de menor a mayor: se da vuelta). Costo: 1 lectura al entrar + 1
+escritura por carrera en línea en que cambie el VR.
+
+## 6. Las reglas de las secciones 4 y 5 (`firebase/database.rules.json`, las publica el dueño)
+
+Van dentro de `"rules"`, como un nodo `"mkw"` (ya están escritas en la copia del sitio, rama de trabajo):
+
+```json
+"mkw": {
+  "records": {
+    ".read": true,
+    "$tabla": {
+      ".indexOn": ["ms"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && (!newData.exists() || !data.exists() || newData.child('ms').val() < data.child('ms').val())",
+        ".validate": "newData.hasChildren(['uid', 'nombre', 'ms', 'pista', 'cat', 'version', 'at']) && newData.child('uid').val() === $uid && newData.child('ms').isNumber() && newData.child('ms').val() >= 5000 && newData.child('ms').val() <= 3600000 && newData.child('nombre').isString() && newData.child('nombre').val().length <= 20 && newData.child('pista').isString() && newData.child('pista').val().matches(/^[0-9a-f]{3}$/) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(tt|vs)(150|200|500|100|espejo)$/) && $tabla === newData.child('pista').val() + '-' + newData.child('cat').val() && newData.child('at').val() === now",
+        "personaje": { ".validate": "newData.isNumber()" },
+        "kart": { ".validate": "newData.isNumber()" },
+        "uid": { ".validate": true }, "nombre": { ".validate": true }, "ms": { ".validate": true }, "pista": { ".validate": true },
+        "cat": { ".validate": true }, "version": { ".validate": "newData.isNumber()" }, "at": { ".validate": true },
+        "$otro": { ".validate": false }
+      }
+    }
+  },
+  "vr": {
+    ".read": true,
+    ".indexOn": ["vr"],
+    "$uid": {
+      ".write": "auth != null && auth.uid === $uid",
+      ".validate": "newData.hasChildren(['uid', 'nombre', 'vr', 'br', 'version', 'at']) && newData.child('uid').val() === $uid && newData.child('vr').isNumber() && newData.child('vr').val() >= 1 && newData.child('vr').val() <= 1000000 && newData.child('br').isNumber() && newData.child('br').val() >= 1 && newData.child('br').val() <= 1000000 && newData.child('nombre').isString() && newData.child('nombre').val().length <= 20 && newData.child('at').val() === now",
+      "uid": { ".validate": true }, "nombre": { ".validate": true }, "vr": { ".validate": true }, "br": { ".validate": true },
+      "version": { ".validate": "newData.isNumber()" }, "at": { ".validate": true },
+      "$otro": { ".validate": false }
+    }
+  }
+}
+```
+
+Qué cubre y qué no: nadie puede escribir el tiempo o el VR de otro, ni empeorar su récord, ni meter campos raros o
+valores absurdos. **No** puede saber si el valor es honesto (la página corre en el navegador de cada uno). Si hace
+falta, más adelante: validar en el Worker. El banco imita estas reglas (`banco/pruebas/records`, `banco/pruebas/vr`).
+
+### En la página del sitio
+
+La sala del sitio (`colabtex/src/juegos/mkw.js`) arma los dos almacenes con las funciones de `firebase/database` que
+ya trae el sitio y se los pasa al marco del juego (misma página, mismo origen) **antes** de que entre en línea:
+
+```js
+import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
+const rtdb = { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp };
+marco.contentWindow.mkwConectarRecords({ almacen: <como almacenRtdb de records.mjs>, uid, nombre });
+await marco.contentWindow.mkwConectarVr({ almacen: <como almacenRtdbVr de vr.mjs>, uid, nombre });
+```
+
+Costo (plan gratis de Realtime Database: 10 GB al mes de descarga): una lectura de un nodo chico al entrar, una
+escritura por carrera terminada que mejora, y 10 filas cada vez que alguien abre una tabla. Despreciable.

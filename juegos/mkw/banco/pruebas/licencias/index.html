@@ -15,9 +15,10 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { leerRksys, resumenLicencia, queArchivo, crc32, TAM_RKSYS, RUTA_RKSYS } from '/web/navegador/licencias.mjs';
+import { leerRksys, resumenLicencia, queArchivo, crc32, TAM_RKSYS, RUTA_RKSYS, leerRating } from '/web/navegador/licencias.mjs';
 import { crearGuardado } from '/web/navegador/guardado.mjs';
 import { crearRespaldos } from '/web/navegador/respaldos.mjs';
+import { md5, codigoDesdePid, codigoValido, limpiarCodigo } from '/web/navegador/codigo-amigo.mjs';
 
 const { ok, nota, fin } = prueba('licencias', 'Licencias, cargar partida y respaldos (sin el juego)');
 const borrarBase = n => new Promise(r => { const p = indexedDB.deleteDatabase(n); p.onsuccess = p.onerror = p.onblocked = () => r(); });
@@ -47,6 +48,26 @@ ok('una partida bien formada es válida', r.valido && r.crcBien, r.problema);
 ok('trae 2 licencias, en las casillas 1 y 3', r.licencias.length === 2 && r.licencias[0].casilla === 1 && r.licencias[1].casilla === 3);
 ok('lee el nombre (UTF-16), el VR y las carreras', r.licencias[0].nombre === 'Ana' && r.licencias[0].vr === 5230 && r.licencias[0].carreras === 812);
 ok('arma el código de amigo desde el ID de perfil', /^\d{4}-\d{4}-\d{4}$/.test(r.licencias[0].codigoAmigo), r.licencias[0].codigoAmigo);
+// El código de amigo (codigo-amigo.mjs; antes en el visor de salas de Retro WFC, que se quitó: bitácora §64)
+{
+  const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  const txt = s => new TextEncoder().encode(s);
+  // MD5: los vectores del RFC 1321 (y uno largo, que ocupa dos bloques)
+  const vectores = [['', 'd41d8cd98f00b204e9800998ecf8427e'], ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+                    ['message digest', 'f96b697d7cb7938d525a2f31aaf161d0'], ['a'.repeat(100), '36a92cc94a9e0fa21f625f8bfb007adf']];
+  const malos = vectores.filter(([e, h]) => hex(md5(txt(e))) !== h);
+  ok('MD5 da lo mismo que el estándar (RFC 1321) en 4 casos, incluido uno de dos bloques', malos.length === 0, malos.map(m => m[0].slice(0, 10)).join(', '));
+  // código de amigo desde el número de jugador (valores calculados aparte con Python/hashlib)
+  const ref = [[123456789, '2535-2652-7253'], [600000001, '2368-2320-1281'], [4000000000, '4807-4136-9856'], [1, '0214-7483-6481']];
+  const mal = ref.filter(([pid, c]) => codigoDesdePid(pid) !== c);
+  ok('código de amigo = pid con 7 bits de control del MD5 (fórmula de Tockdom): 4 de 4 iguales a la referencia', mal.length === 0,
+     mal.map(([p]) => `${p} → ${codigoDesdePid(p)}`).join(', '));
+  ok('un código bien escrito es válido, con guiones, espacios o pegado',
+     codigoValido('2535-2652-7253') && codigoValido('2535 2652 7253') && codigoValido('253526527253'));
+  ok('un código con una cifra cambiada se detecta como mal escrito (como el dígito verificador del RUT)',
+     !codigoValido('2535-2652-7254') && !codigoValido('2535-2652-7263') && !codigoValido('3535-2652-7253'));
+  ok('11 cifras, letras o vacío → inválido', !codigoValido('2535-2652-725') && !codigoValido('abcd-efgh-ijkl') && !codigoValido('') && limpiarCodigo('x') === '');
+}
 ok('sin ID de perfil, sin código de amigo', r.licencias[1].codigoAmigo === '');
 ok('el resumen de una licencia se lee bien', /^VR 5.?230 · 812 carreras$/.test(resumenLicencia(r.licencias[0])) && resumenLicencia(r.licencias[1]) === '1 carrera',
    resumenLicencia(r.licencias[0]));
@@ -99,6 +120,14 @@ ok('restaurar una copia devuelve la partida de antes', restaurada.valido && rest
 nota(`paquete de prueba: ${paquete.size} bytes (la partida de 2,8 MB comprimida)`);
 
 await borrarBase(BASE); await borrarBase(RBASE);
+// RRRating.pul de Retro Rewind (falso, con la forma del de verdad): RRRT, versión 1, 100 casillas, perfil + VR/100 + BR/100
+const rr = new Uint8Array(1640), vr = new DataView(rr.buffer);
+rr.set([0x52, 0x52, 0x52, 0x54]); vr.setUint16(4, 1); vr.setUint16(6, 100);
+vr.setUint32(8, 163024427); vr.setFloat32(12, 77.77); vr.setFloat32(16, 65.43); vr.setUint32(20, 1);
+vr.setUint32(24, 5); vr.setFloat32(28, 50); vr.setFloat32(32, 50); vr.setUint32(36, 1);
+const tablaRR = leerRating(rr);
+ok('RRRating.pul: el VR de Retro Rewind por perfil (77,77 → 7.777)', tablaRR.get(163024427)?.vr === 7777 && tablaRR.get(163024427)?.br === 6543 && tablaRR.get(5)?.vr === 5000 && tablaRR.size === 2, JSON.stringify([...tablaRR]));
+ok('un archivo que no es RRRating.pul no da nada', leerRating(new Uint8Array(40)).size === 0 && leerRating(null).size === 0);
 fin();
 </script>
 </body>

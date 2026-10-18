@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala del sitio (falsa)</title>
+<style>
+  :root { --fondo: #0f1c3a; --tinta: #eef2ff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fondo: #0f1c3a; --tinta: #eef2ff; } }
+  :root[data-theme="dark"] { --fondo: #0f1c3a; --tinta: #eef2ff; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font: 14px system-ui, sans-serif; }
+  header { padding: 8px 16px; }
+  iframe { display: block; width: 100%; height: calc(100vh - 40px); border: 0; background: #000; }
+</style>
+</head>
+<body>
+<header id="cab">Sala falsa del sitio…</header>
+<script type="module">
+// La página de la sala del sitio, en falso, para probar el marco del juego como lo abrirá el sitio (bitácora §59):
+// arma la dirección con la misma forma que srcMkw (colabtex/src/juegos/mkw.js), le presta el buzón por postMessage
+// con el MISMO código que senalOp de mkw.js (aquí el buzón es el falso del banco, BroadcastChannel, en vez de
+// fb.senalMalla) y le pasa un almacén de VR falso apenas carga (como conectarNube). Nada de Firebase.
+//   ?sala=…&uid=…&nodo=N[&anfitrion=1]&vr=VR&br=BR&relleno=normal
+//   ?sala=…&uid=…&sincro=uidA,uidB&ronda=N&relleno=normal  → la carrera sincronizada con CPU (§61), como srcMkw con est.sincro
+import { senalCanal } from '/web/navegador/malla.mjs';
+
+const q = new URLSearchParams(location.search);
+const pid = q.get('sala') || 'banco', uid = q.get('uid') || 'u' + Math.random().toString(36).slice(2, 8);
+const PADRE = 'mkw-padre', HIJO = 'mkw-hijo';
+const frame = document.createElement('iframe');
+frame.allow = 'fullscreen; gamepad; accelerometer; gyroscope';
+document.body.append(frame);
+// lo que la nube "tiene" de esta persona (como mkw/vr/<uid>) y lo que el juego le manda guardar
+const nube = new Map();
+if (q.get('vr')) nube.set(uid, { uid, nombre: 'Piloto', vr: +q.get('vr'), br: +(q.get('br') || 5000), version: 1 });
+window.salaFalsa = { nube, guardados: [], mensajes: { entra: 0, envia: 0, recibe: 0 } };
+const almacenVr = {
+  async mio(u) { return nube.get(u) || null; },
+  async guardar(u, dato) { nube.set(u, dato); window.salaFalsa.guardados.push(dato); },
+  async top(n) { return [...nube.values()].sort((a, b) => b.vr - a.vr).slice(0, n); },
+};
+const almacenRecords = { async mio() { return null; }, async guardar() {}, async top() { return []; } };
+
+function enviar(tipo, datos = {}) { frame.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin); }
+// ---- igual que senalOp de colabtex/src/juegos/mkw.js (con el buzón falso) ----
+let senal = null, offP = null, offM = null;
+function senalOp(d) {
+  if (!senal) senal = senalCanal({ sala: pid, uid });
+  if (d.op === 'mensajes') {
+    offM?.();
+    offM = d.on ? senal.alMensajes((de, m) => { window.salaFalsa.mensajes.recibe++; enviar('senal-mensaje', { de, m }); }) : null;
+  } else if (d.op === 'presentes') {
+    offP?.();
+    offP = d.on ? senal.alPresentes(v => enviar('senal-presentes', { v })) : null;
+  } else if (d.op === 'entra') {
+    window.salaFalsa.mensajes.entra++;
+    senal.entra(String(d.s || '').slice(0, 16)).then(() => enviar('senal-entro', { id: d.id, ok: true }),
+      () => enviar('senal-entro', { id: d.id, ok: false }));
+  } else if (d.op === 'sale') {
+    offP?.(); offM?.(); offP = offM = null;
+    senal.sale();
+  } else if (d.op === 'envia' && typeof d.para === 'string' && d.m && typeof d.m === 'object') {
+    // (las reglas de vivo/<pid>/rtc piden un campo t de texto en cada mensaje: se comprueba aquí)
+    if (typeof d.m.t !== 'string') { console.warn('[sala falsa] mensaje sin t: Firebase lo rechazaría', d.m); return; }
+    window.salaFalsa.mensajes.envia++;
+    senal.envia(d.para, d.m);
+  }
+}
+addEventListener('message', e => {
+  if (e.source !== frame.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
+  if (e.data.tipo === 'senal') senalOp(e.data);
+});
+// ---- igual que conectarNube ----
+let vueltas = 0;
+const conecta = setInterval(() => {
+  const w = frame.contentWindow;
+  if (++vueltas > 240) { clearInterval(conecta); return; }
+  if (typeof w?.mkwConectarVr !== 'function' || typeof w?.mkwConectarRecords !== 'function') return;
+  clearInterval(conecta);
+  w.mkwConectarRecords({ almacen: almacenRecords, uid, nombre: 'Piloto' });
+  w.mkwConectarVr({ almacen: almacenVr, uid, nombre: 'Piloto' }).then(r => { window.salaFalsa.vrCargado = r; });
+}, 250);
+// ---- la semilla y las pistas de la tanda: igual que mkwCarrera (colabtex/src/juegos/motor.js) ----
+function mkwCarrera(pid, ronda) {
+  let h = 2166136261;
+  for (const c of `${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let x = (h >>> 0) || 1;
+  const azar = n => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % n; };
+  const semilla = (h >>> 0) || 1, pistas = [], vistas = new Set();
+  while (pistas.length < 4) {
+    const copa = azar(79), fila = azar(4), k = copa * 4 + fila;
+    if (vistas.has(k)) continue;
+    vistas.add(k); pistas.push({ copa, fila });
+  }
+  return { semilla, pistas };
+}
+// ---- la dirección, con la forma de srcMkw ----
+const ronda = Number(q.get('ronda') || 1), cpu = q.get('relleno') || 'normal';
+const p = new URLSearchParams({ auto: '1', red: 'malla', senal: 'padre', sala: pid, uid, nodo: q.get('nodo') || '2' });
+if (q.get('sincro')) {
+  const { semilla, pistas } = mkwCarrera(pid, ronda);
+  p.set('modo', 'copa'); p.set('sincro', q.get('sincro')); p.set('semilla', String(semilla));
+  p.set('pistas', pistas.map(t => `${t.copa}.${t.fila}`).join(',')); p.set('cpu', cpu);
+} else {
+  p.set('modo', 'enlinea'); p.set('relleno', cpu);
+  if (q.get('anfitrion') === '1') p.set('anfitrion', '1');
+}
+p.set('r', String(ronda));
+// ?extra=… (solo el banco): parámetros de más para el juego, p. ej. extra=autoconducir%3D1 para que en la prueba de la
+// copa (prueba-sincro.mjs --sala --copa) los karts de los humanos también los maneje la CPU y las carreras terminen solas
+for (const [k, v] of new URLSearchParams(q.get('extra') || '')) p.set(k, v);
+frame.src = '/index.html?' + p.toString();
+document.getElementById('cab').textContent = `Sala falsa ${pid} · ${uid} · ${p.get('sincro') ? 'carrera sincronizada con CPU' : 'nodo ' + p.get('nodo')}${p.get('anfitrion') ? ' · anfitrión' : ''}`;
+</script>
+</body>
+</html>

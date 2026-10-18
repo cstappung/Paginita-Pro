@@ -22,3 +22,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_ms_espera() { return g_mkwHostIdl
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* mkw_web_mem(unsigned direccion) {
   return Memory::Contains(direccion, 4) ? Memory::GetPointer(direccion, 4) : nullptr;
 }
+
+// El reloj del azar de la carrera sincronizada (ppc_helpers.cpp, bitácora §61; 0 = apagado). Dos consolas en la misma
+// carrera tienen que llevar el mismo número en el mismo cuadro: sirve para ver que siguen iguales.
+extern "C" int g_mkwRelojFijo;
+extern "C" uint64_t g_mkwRelojValor;
+extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_reloj() { return g_mkwRelojFijo ? double(g_mkwRelojValor) : 0.0; }

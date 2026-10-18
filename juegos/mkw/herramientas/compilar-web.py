@@ -45,7 +45,6 @@ EXCLUIDOS = {
     "discord_presence.cpp": "Discord del PC (vacío en web/headless/escritorio_vacio.cpp)",
     "settings_overlay.cpp": "menú F10 con imgui (vacío en escritorio_vacio.cpp)",
     "controller_mapping_wizard.cpp": "asistente de mandos con imgui",
-    "hle/net/network_ssl.cpp": "TLS con mbedTLS; el juego en línea llega en la fase 6",
     "product/base_product.cpp": "el producto es Retro Rewind, no el juego base",
 }
 SEMANTICA = {"ppc_helpers.cpp", "fpu_helpers.cpp", "ppc_quantized.cpp"}
@@ -120,6 +119,9 @@ def main():
     # --carpeta build/web-xxx: compilar en un taller propio (objetos + salida), p. ej. cuando otra sesión de trabajo
     # usa build/web al mismo tiempo. Servirlo con MKW_BUILD=build/web-xxx/navegador (Node: MKW_BUILD_NODE=…/node).
     ap.add_argument("--carpeta", default=None)
+    # --salida build/web-xxx/navegador: solo el ENLACE va a otra carpeta (los objetos siguen compartidos). Sirve para
+    # probar un cambio mientras otra prueba usa el mkw.wasm de siempre. Servirlo con MKW_BUILD=<esa carpeta>.
+    ap.add_argument("--salida", default=None)
     # --final: el programa que se publica (bitácora §54): sin los nombres de las funciones (--profiling-funcs, 2,7 MB
     # que solo sirven para los perfiles) y comprimido al final (herramientas/comprimir-build.mjs: mkw.wasm.br/.gz,
     # lo que el Worker entrega).
@@ -128,7 +130,7 @@ def main():
     args.simd = not args.sin_simd
 
     carpeta = args.carpeta or ("build/web-sin-simd" if args.sin_simd else "build/web")
-    sal = RAIZ / carpeta / args.modo         # aquí queda mkw.js + mkw.wasm de este modo
+    sal = RAIZ / (args.salida or f"{carpeta}/{args.modo}")   # aquí queda mkw.js + mkw.wasm de este modo
     obra = RAIZ / carpeta / "node"           # "taller" compartido: build.ninja, objetos, archivos generados
     obj = obra / "obj"
     gen = obra / "gen"
@@ -229,10 +231,56 @@ def main():
     #   func_801B3BAC = THPVideoDecode (el video de elegir copa/pista) -> web/thp/thp_nativo.cpp
     #   func_8015DF4C = DVD::ConvertPathToEntrynum (nombre de archivo → número en el índice del disco)
     #                   -> web/dvd/rutas_nativo.cpp (recuerda las respuestas: la búsqueda recorría ~7 500 entradas)
-    REEMPLAZOS = {"func_801B3BAC": "func_801B3BAC_traducida", "func_8015DF4C": "func_8015DF4C_traducida"}
+    #   func_8052F924 = RacedataScenario::InitRng (las semillas del azar de la carrera)
+    #                   -> web/juego/semillas_nativo.cpp (la de la página en «Copa a tu gusto», §56)
+    REEMPLAZOS = {"func_801B3BAC": "func_801B3BAC_traducida", "func_8015DF4C": "func_8015DF4C_traducida",
+                  "func_8052F924": "func_8052F924_traducida",
+                  # MEMAllocFromExpHeapEx / MEMAllocFromFrmHeapEx / ClipInfoMgr::Update / AI::Character::UpdateLookAtCamera
+                  # -> web/juego/lockstep_nativo.cpp
+                  # (memoria en cero y todo "a la vista" en la carrera sincronizada, §61)
+                  "func_80198D88": "func_80198D88_traducida", "func_801994E4": "func_801994E4_traducida",
+                  "func_80787774": "func_80787774_traducida", "func_807379BC": "func_807379BC_traducida",
+                  "func_807EC7F8": "func_807EC7F8_traducida", "func_807F7E80": "func_807F7E80_traducida",
+                  "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida"}
+    if os.environ.get("MKW_DEPURAR") == "1":              # depuración de la red (web/juego/depurar_red.cpp, §58)
+        REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800CCC68", "800D1D90", "800D0FEC", "806561A8", "80656FF8", "80653DDC", "800D2000", "800DAD9C", "800FBA4C", "800E8814", "80623054", "80666288", "8063519C", "8067552C", "80635A3C", "80635AC8", "80635B2C")}); REEMPLAZOS["rr_overlay_80635A3C"] = "rr_overlay_80635A3C_traducida"
+    # El azar de la carrera sincronizada (sala con CPU, bitácora §61): en estas funciones del juego, la lectura del
+    # reloj del procesador (PPC_Mftb) pasa a PPC_MftbCarrera (ppc_helpers.cpp), que en la sala es un contador igual en
+    # todas las consolas. Son las que siembran azar con el reloj: Random::__ct y Random::Reset (la IA de los CPU y casi
+    # todo lo demás), Item::SlotData::Init/DecideItem/SetupOnlineVSProbabilities (los objetos de las cajas) y
+    # RaceTimerMgrBase/RaceTimerMgr::Reset. Las otras lecturas (tiempos de carga, sonido, alarmas) siguen con el reloj real.
+    # 80550730 = GetTick (lo llaman las funciones de objetos, también 0x807BBE98, que no lee el reloj por su cuenta)
+    RELOJ_CARRERA = ["80555464", "805554D0", "807BAF48", "807BB42C", "807BBD60", "80532D44", "80535864", "80550730"]
+    # "Vista propia" en la carrera sincronizada (§61): estas funciones de SONIDO y del HUD preguntan quién tiene la
+    # pantalla (Racedata::GetPlayerIdOfLocalPlayer, 0x80531F70) para saber de qué kart es "lo propio" (el motor que
+    # suena como tuyo, el aviso del caparazón azul, el globo del objeto…). La tabla de pantallas es la misma en todas
+    # las consolas (la mira la lógica), así que solo aquí la pregunta se cambia por mkw_vista_propia_v0: mi puesto.
+    VISTA_PROPIA = ["806F77D4", "806F7828", "806F7AA8", "806F8188", "806FD0AC", "80711514", "8071497C", "80716608",
+                    "80718F84", "80719044",                                   # Audio::*
+                    "807EBF20", "807F132C", "807F1D44", "807F1DB4", "807F22BC", "807F7C6C"]   # CtrlRace*, RaceBalloons
+    if os.environ.get("MKW_DEPURAR_LS") == "1":           # depuración temporal de la carrera sincronizada (§61)
+        REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("80555578", "805555CC", "80555628", "805556A8", "807351DC", "80732678", "8023C920", "8051BC78")})
+        # y las que llevan Random::next copiado adentro (la constante del multiplicador): quién mueve azar1/azar2
+        genfun = WC / "generated/functions"
+        vigiladas = sorted(f.stem[5:] for f in genfun.glob("func_*.cpp") if "= -1293680640;" in f.read_text(encoding="utf-8", errors="ignore")
+                           and f.stem not in REEMPLAZOS and f.stem[5:] != "80555578")
+        REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in vigiladas})
+        envolturas = gen / "depurar_azar_gen.cpp"
+        envolturas.write_text('#include "ppc_runtime.h"' + chr(10) + 'extern "C" void mkw_vigila_azar(const char*, CpuContext*, void (*)(CpuContext*));' + chr(10)
+                              + "".join(f'extern "C" void func_{d}_traducida(CpuContext*); extern "C" void func_{d}(CpuContext* c) {{ mkw_vigila_azar("{d}", c, func_{d}_traducida); }}' + chr(10) for d in vigiladas),
+                              encoding="utf-8")
+        print(f"depuración: {len(vigiladas)} funciones con el azar copiado adentro, vigiladas")
     banderas["thp"] = base + ["-O3"]
     unidades += [("thp", RAIZ / "web/thp" / f) for f in ("thp_decodificador.cpp", "thp_nativo.cpp")]
-    unidades += [("thp", RAIZ / "web/dvd/rutas_nativo.cpp")]
+    unidades += [("thp", RAIZ / "web/dvd/rutas_nativo.cpp"), ("thp", RAIZ / "web/juego/semillas_nativo.cpp"),
+                ("thp", RAIZ / "web/juego/lockstep_nativo.cpp")]
+    # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
+    # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
+    unidades += [("thp", RAIZ / "web/red/red_web.cpp")]
+    if os.environ.get("MKW_DEPURAR") == "1":
+        unidades += [("thp", RAIZ / "web/juego/depurar_red.cpp")]
+    if os.environ.get("MKW_DEPURAR_LS") == "1":
+        unidades += [("thp", RAIZ / "web/juego/depurar_lockstep.cpp"), ("thp", gen / "depurar_azar_gen.cpp")]
     copias = {}                                           # shard original → texto con las definiciones renombradas
     for nombre, nuevo_nombre in REEMPLAZOS.items():
         definicion = f'#line 1 "{nombre}.cpp"'.encode()   # el traductor pega aquí el cuerpo de la función
@@ -246,6 +294,61 @@ def main():
             sys.exit(f"{nombre}: no encuentro su definición en {original.name}")
         copias[original] = texto.replace(cabecera, f'extern "C" void {nuevo_nombre}(CpuContext* MKW_RESTRICT ctx)')
         unidades[donde[0]] = ("juego_reemplazo", original)
+    for sitio, d in enumerate(RELOJ_CARRERA):
+        marca = f'#line 1 "func_{d}.cpp"'
+        donde = [i for i, (g, f) in enumerate(unidades) if g in ("juego", "juego_reemplazo") and marca.encode() in f.read_bytes()]
+        if not donde:
+            sys.exit(f"func_{d}: no encuentro el shard que la define (RELOJ_CARRERA)")
+        for i in donde:                                   # (alguna vive en dos shards: la base y la de Retro Rewind)
+            original = unidades[i][1]
+            texto = copias.get(original) or original.read_text(encoding="utf-8")
+            ini = texto.index(marca)
+            fin = texto.find('#line 1 "', ini + len(marca))
+            fin = len(texto) if fin < 0 else fin
+            cuerpo = texto[ini:fin]
+            if "PPC_Mftb()" not in cuerpo:
+                sys.exit(f"func_{d}: ya no lee el reloj (¿se volvió a traducir distinto?)")
+            # cada función con su número (sitio) y el lr del momento: el reloj por lugar (ppc_helpers.cpp, §62)
+            # (la versión "_statefree" de la función, que algunos llaman directo, no tiene ctx: ahí el lugar es solo la función)
+            partes = re.split(r'(?=extern "C" [^\n]*_statefree\()', cuerpo)
+            cuerpo = "".join(t.replace("PPC_Mftb()", f"PPC_MftbCarreraEn({sitio}u, 0u)" if "_statefree(" in t.split(chr(10), 1)[0]
+                                       else f"PPC_MftbCarreraEn({sitio}u, ctx->lr)") for t in partes)
+            texto = texto[:ini] + cuerpo + texto[fin:]
+            if not texto.startswith('extern "C" unsigned int PPC_MftbCarreraEn(unsigned int, unsigned int);'):
+                texto = 'extern "C" unsigned int PPC_MftbCarreraEn(unsigned int, unsigned int);' + chr(10) + texto
+            copias[original] = texto
+            unidades[i] = ("juego_reemplazo", original)
+    VISTA_FN = ('#ifndef MKW_VISTA_PROPIA' + chr(10) + '#define MKW_VISTA_PROPIA' + chr(10) +
+                'extern "C" int g_mkwRelojFijo; extern "C" int g_mkwMiPuesto; extern "C" int g_mkwVistaPropia;' + chr(10) +
+                'static inline uint64_t mkw_vista_propia_v0(uint32_t r3, uint32_t r4) {' + chr(10) +
+                '    if (g_mkwRelojFijo && (g_mkwVistaPropia & 1) && g_mkwMiPuesto >= 0 && g_mkwMiPuesto < 12) return static_cast<uint32_t>(g_mkwMiPuesto);' + chr(10) +
+                '    return static_cast<uint32_t>(static_cast<int32_t>(static_cast<int8_t>(MemoryInline::FlatRead8(r3 + r4 + 2948u))));' + chr(10) +
+                '}' + chr(10) + '#endif' + chr(10))
+    for d in VISTA_PROPIA:
+        marcas = [f'#line 1 "func_{d}.cpp"', f'#line 1 "rr_overlay_{d}.cpp"']
+        donde = [i for i, (g, f) in enumerate(unidades) if g in ("juego", "juego_reemplazo") and any(m.encode() in f.read_bytes() for m in marcas)]
+        if not donde:
+            sys.exit(f"func_{d}: no encuentro el shard que la define (VISTA_PROPIA)")
+        cambiadas = 0                                     # (alguna vive en dos shards y en uno la llamada quedó en línea)
+        for i in donde:
+            original = unidades[i][1]
+            texto = copias.get(original) or original.read_text(encoding="utf-8")
+            for marca in marcas:
+                if marca not in texto:
+                    continue
+                ini = texto.index(marca)
+                fin = texto.find('#line 1 "', ini + len(marca))
+                fin = len(texto) if fin < 0 else fin
+                cuerpo = texto[ini:fin]
+                if "func_80531F70_statefree_v0(r" not in cuerpo:
+                    continue
+                cambiadas += 1
+                cuerpo = cuerpo.replace("func_80531F70_statefree_v0(r", "mkw_vista_propia_v0(r")
+                texto = texto[:ini] + VISTA_FN + cuerpo + texto[fin:]
+                copias[original] = texto
+                unidades[i] = ("juego_reemplazo", original)
+        if not cambiadas:
+            sys.exit(f"func_{d}: ya no pregunta por la pantalla (¿se volvió a traducir distinto?)")
     dirs_copias = sorted({o.parent for o in copias})
     banderas["juego_reemplazo"] = banderas["juego"] + [f"-I{rutas(d)}" for d in dirs_copias]   # su *_traits.h
     for i, (g, f) in enumerate(unidades):
@@ -293,7 +396,7 @@ def main():
     if navegador:
         # El navegador: aurora de verdad (WebGPU en el <canvas>), archivos en la memoria (MEMFS) que la página
         # llena antes de arrancar; los archivos grandes del disco se piden por HTTP al leerlos (web/navegador).
-        exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_pad", "_mkw_web_mem",
+        exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_reloj", "_mkw_web_pad", "_mkw_web_mem",
                     "_mkw_web_sonido_cola_ms", "_mkw_web_sonido_ritmo", "_mkw_web_sonido_tirados",
                     # la lista de pipelines usados, para precalentarlos en la próxima visita (web/navegador/pipelines.mjs)
                     "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos"]

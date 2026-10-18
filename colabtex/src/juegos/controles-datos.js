@@ -34,6 +34,7 @@ export const CONTROLES = {
   "mascotas": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton"},
   "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "mkw": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokelike": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},

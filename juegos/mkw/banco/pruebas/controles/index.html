@@ -17,10 +17,10 @@
   <div id="pantalla"></div></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearControles, BOTON } from '/web/navegador/controles.mjs';
+import { crearControles, BOTON, tipoMando } from '/web/navegador/controles.mjs';
 
 const { ok, nota, fin } = prueba('controles', 'Controles (sin el juego)');
-try { localStorage.removeItem('mkw.teclas'); } catch {}      // empezar con el mapeo por defecto
+try { localStorage.removeItem('mkw.teclas'); localStorage.removeItem('mkw.mandos'); } catch {}      // empezar con el mapeo por defecto
 
 // ---- "juego falso": guarda lo último que recibió cada puerto ----
 const recibido = [];
@@ -102,6 +102,61 @@ c.vibrar(0, 1);
 c.vibrar(0, 0);
 ok('vibración: el juego la pide y llega al mando del puerto 1 (vibra y para)',
    efectos.some(e => e[0] === 'vibra' && e[1] === 0) && efectos.some(e => e[0] === 'para' && e[1] === 0), JSON.stringify(efectos));
+mandosFalsos.length = 0;
+c.paso();
+
+// ---- 3b) mandos de Nintendo, ajustes y asignar botones (bitácora §57) ----
+ok('reconoce el tipo de mando por su nombre', [
+  tipoMando('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)'), tipoMando('DualSense Wireless Controller (Vendor: 054c Product: 0ce6)'),
+  tipoMando('Xbox 360 Controller (XInput STANDARD GAMEPAD)'), tipoMando('USB GamePad (Vendor: 0079 Product: 1846)'), tipoMando('Mando raro')].join() === 'nintendo,playstation,xbox,gamecube,generico');
+const pro = mandoFalso(0, 'Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)');
+mandosFalsos.push(pro);
+pro.buttons[1] = { pressed: true, value: 1 };           // el botón de la DERECHA = la «A» de un Switch Pro
+r = p0();
+ok('Switch Pro (automático): la «A» de la etiqueta (derecha) es A', (r.botones & BOTON.A) !== 0 && (r.botones & BOTON.B) === 0, `botones 0x${r.botones.toString(16)}`);
+pro.buttons[1] = { pressed: false, value: 0 }; pro.buttons[0] = { pressed: true, value: 1 };
+ok('… y la «B» (abajo) es B', (p0().botones & BOTON.B) !== 0);
+c.ajustarMandos({ disposicion: 'posicion' });
+ok('con «por posición» el de abajo vuelve a ser A (como Xbox)', (p0().botones & BOTON.A) !== 0);
+c.ajustarMandos({ disposicion: 'auto' });
+pro.buttons[0] = { pressed: false, value: 0 };
+pro.axes = [0.12, 0, 0, 0];
+ok('zona muerta 15 %: el stick al 12 % marca centro', p0().sx === 0);
+c.ajustarMandos({ zona: 5 });
+ok('zona muerta 5 %: el mismo 12 % ya mueve', p0().sx > 0, `sx ${recibido[0].sx}`);
+ok('los ajustes quedan guardados en el navegador', JSON.parse(localStorage.getItem('mkw.mandos')).zona === 5);
+c.ajustarMandos({ zona: 15 }); pro.axes = [0, 0, 0, 0];
+efectos.length = 0;
+c.ajustarMandos({ vibrar: false });
+c.vibrar(0, 1); c.vibrar(0, 0);
+ok('vibración apagada: no vibra (pero sí para)', !efectos.some(e => e[0] === 'vibra') && efectos.some(e => e[0] === 'para'));
+c.ajustarMandos({ vibrar: true });
+mandosFalsos.length = 0;
+// un adaptador de GameCube sin mapeo estándar: se le asignan los botones con el asistente
+const gc = mandoFalso(0, 'USB GamePad (Vendor: 0079 Product: 1846)');
+gc.mapping = '';
+mandosFalsos.push(gc);
+c.paso();
+ok('un mando sin mapeo estándar se marca para asignarle botones', c.estado.mandos[0]?.sinMapa === true);
+const espera = ms => new Promise(res => setTimeout(res, ms));
+for (const [boton, i] of [['A', 1], ['B', 2], ['R', 7]]) {
+  const prometido = c.asignarBoton(gc.id, boton);
+  gc.buttons[i] = { pressed: true, value: 1 }; c.paso();
+  const n = await Promise.race([prometido, espera(200).then(() => 'tarde')]);
+  gc.buttons[i] = { pressed: false, value: 0 }; c.paso();
+  if (n !== i) ok(`asignar ${boton}`, false, `devolvió ${n}`);
+}
+gc.buttons[1] = { pressed: true, value: 1 };
+r = p0();
+ok('asignado: el botón 1 del adaptador es A', (r.botones & BOTON.A) !== 0 && c.estado.mandos[0].propio && !c.estado.mandos[0].sinMapa);
+gc.buttons[1] = { pressed: false, value: 0 }; gc.buttons[7] = { pressed: true, value: 0.6 };
+r = p0();
+ok('asignado: R con su valor analógico (153 de 255)', (r.botones & BOTON.R) !== 0 && r.gr === 255, `gr ${r.gr}`);
+gc.buttons[7] = { pressed: false, value: 0 };
+const cancelada = c.asignarBoton(gc.id, 'X'); c.cancelarAsignacion();
+ok('cancelar el asistente no asigna nada', (await cancelada) === null && c.prefsMandos().propios[gc.id].X === undefined);
+c.borrarAsignacion(gc.id);
+ok('borrar la asignación vuelve al mapeo de siempre', !c.prefsMandos().propios[gc.id]);
 mandosFalsos.length = 0;
 c.paso();
 

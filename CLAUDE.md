@@ -78,6 +78,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Boxhead | `juegos/boxhead/CLAUDE.md` |
 | HaxBall | `juegos/haxball/CLAUDE.md` |
 | Budokai Tenkaichi 3 (BT3, PS2 port, ISO, online rooms) | `juegos/bt3/CLAUDE.md` |
+| Mario Kart Wii (MKW, Retro Rewind, WiiCompiled port, online rooms, VR) | `juegos/mkw/CLAUDE.md` (the port) and `juegos/mkw/docs/en-linea.md` + the header of `colabtex/src/juegos/mkw.js` (the room) |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 | PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |

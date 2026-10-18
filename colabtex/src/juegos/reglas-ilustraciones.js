@@ -417,3 +417,28 @@ export const hero=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+
+/* Mario Kart Wii: dibujos propios (una pista ovalada con puntos de colores; nada del arte del juego).
+   0 el vestíbulo · 1 la carrera en línea · 2 quien llega tarde mira y entra en la siguiente · 3 el VR que sigue a la cuenta. */
+export const mkw=etapa=>{
+ const nombre=['El vestíbulo de la sala: los pilotos, el anfitrión y la CPU de relleno','Una carrera en línea: los pilotos de la sala y la CPU que completa la parrilla','Quien llega con la carrera andando mira y entra en la siguiente','El VR de cada uno queda en su cuenta y sube o baja con cada carrera'][etapa];
+ const cols=['#e8312f','#2f7bf0','#22c84a','#f5d21c','#c26bf0','#f28a1c'];
+ let cuerpo='';
+ if(etapa===0){
+  ['Ana 👑','Beto','Carla'].forEach((n,i)=>{cuerpo+=rect(40,30+i*52,250,42,'#273650','#465773')+circle(64,51+i*52,10,cols[i])+txt(84,57+i*52,n,17);});
+  cuerpo+=rect(310,30,140,42,'#3a2a14','#8a6a44')+txt(380,57,'CPU normal',15,C.oro,'middle');
+  cuerpo+=rect(310,92,140,52,'#1f5a35','#2f8a55')+txt(380,124,'¡A correr!',18,'#e6f9ee','middle');
+  cuerpo+=txt(240,226,'El anfitrión elige la CPU y abre las carreras',14,C.gris,'middle');
+ } else if(etapa===1||etapa===2){
+  cuerpo+=`<ellipse cx="240" cy="120" rx="190" ry="88" fill="none" stroke="#465773" stroke-width="34"/><ellipse cx="240" cy="120" rx="190" ry="88" fill="none" stroke="#f2f5ff" stroke-width="2" stroke-dasharray="10 12"/>`;
+  cuerpo+=line(240,22,240,56,'#f2f5ff',3)+txt(252,44,'meta',13,C.gris);
+  const pos=[[120,48],[175,36],[300,36],[370,58],[420,120],[60,120]];
+  pos.forEach(([x,y],i)=>{ if(etapa===2&&i===5) return; cuerpo+=circle(x,y,11,cols[i],'#ffffff88'); });
+  if(etapa===1){ cuerpo+=txt(240,126,'3 personas + 3 CPU',16,C.blanco,'middle'); cuerpo+=txt(240,234,'Cada uno corre en su computador; la carrera va entre ellos',13,C.gris,'middle'); }
+  else { cuerpo+=rect(150,98,180,46,'#273650','#465773')+circle(172,121,10,cols[5])+txt(188,127,'Dani mira…',16)+txt(240,234,'Termina la carrera y Dani entra en la siguiente',13,C.gris,'middle'); }
+ } else {
+  [['Ana','5.230','+48',C.verde],['Beto','4.990','−21',C.rojo],['Carla','6.100','+12',C.verde]].forEach(([n,v,d,c],i)=>{cuerpo+=rect(60,30+i*56,360,46,'#273650','#465773')+txt(84,60+i*56,n,17)+txt(300,60+i*56,'VR '+v,17,C.blanco,'end')+txt(390,60+i*56,d,17,c,'end');});
+  cuerpo+=txt(240,226,'Se guarda en tu cuenta: en otro aparato sigue igual',14,C.gris,'middle');
+ }
+ return svg(nombre,cuerpo);
+};

@@ -19,9 +19,88 @@ import { crearDisco } from './disco.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 import { crearInterfaz } from './interfaz.mjs';
+import { montarMandos } from './opciones-mandos.mjs';
+import { crearRecords, vigilarCarreras, textoTiempo, nombreCategoria as NOMBRE_CATEGORIA } from './records.mjs';
 import { crearLector, crearPiloto, leerNombres } from './menus.mjs';
+import { crearPila, crearConmutador, crearEnlaceCanal, crearRouterMalla } from './red.mjs';
+import { crearMalla, senalPadre, senalCanal } from './malla.mjs';
+import { crearWfc } from './wfc.mjs';
+import { crearVr, presentarVr, extraerVrbr } from './vr.mjs';
+import { crearLockstep, huellaCarrera, armarPlantel, MARCA as MARCA_LOCKSTEP } from './lockstep.mjs';
 
 const parametros = new URLSearchParams(location.search);
+// ---- En línea (bitácora §58). ?red=1: la red de juguete de la sala, con el WFC virtual en esta misma pestaña
+// (10.77.0.1) y el juego en 10.77.0.2. Todos los nombres de servidores (nintendowifi.net, gs.nintendowifi.net,
+// rwfc.net…) apuntan al WFC virtual. Lo que pasa queda en window.mkwRed.registro (y en la consola con ?red=ver).
+// VR y BR (vr.mjs, §59): existe siempre (la tarjeta de inicio lo muestra). Con sesión en el sitio, la página llama
+// window.mkwConectarVr({ almacen: almacenRtdbVr({ rtdb, db }), uid, nombre }) ANTES de entrar en línea: lee el VR de
+// la cuenta y se lo presenta al WFC de la sala, que se lo da al juego cuando pregunta
+const vr = crearVr();
+window.mkwVr = vr;
+// ---- La carrera sincronizada de la sala con CPU (lockstep.mjs, bitácora §61) ----
+// ?sincro=uidA,uidB,…&uid=YO&modo=copa&pistas=…&semilla=N&cpu=normal&red=malla: cada navegador de la sala corre la
+// misma carrera offline (12 karts: estos humanos, en ese orden, y CPU) y la malla reparte los botones de cada cuadro.
+// ?pjs=personaje.vehículo,… (opcional, en el orden de sincro): lo que eligió cada humano. Sin `semilla` no hay número
+// común del que partir: no se arma.
+const sincro = parametros.get('sincro') && parametros.get('semilla') ? (() => {
+  const yo = parametros.get('uid') || '';
+  const pjs = (parametros.get('pjs') || '').split(',');
+  const humanos = parametros.get('sincro').split(',').filter(Boolean).slice(0, 4).map((uid, mando) => {
+    const [pj, veh] = (pjs[mando] || '').split('.').map(x => x === '' || x === undefined ? NaN : Number(x));
+    return { uid, mando, personaje: pj, vehiculo: veh };
+  });
+  const miPuesto = humanos.findIndex(h => h.uid === yo);
+  if (miPuesto < 0) return null;
+  window.mkwPlantel = armarPlantel({ humanos, semilla: Number(parametros.get('semilla')) >>> 0 });
+  // ?autoconducir=1 (solo para el banco): los karts de los humanos también los maneja la CPU (sin mando), así cada
+  // carrera termina sola y se puede probar la copa entera; los botones igual viajan por la malla
+  if (parametros.get('autoconducir') === '1') window.mkwPlantel.forEach(x => { x[3] = -1; });
+  window.mkwMiPuesto = miPuesto;                    // la cámara y el HUD siguen a mi kart (semillas_nativo.cpp)
+  window.mkwRelojFijo = true;                       // el azar de la carrera, igual en todas (ppc_helpers.cpp)
+  return { yo, humanos, miPuesto, local: [0, 0, 0, 0, 0, 0, 0], lockstep: null };
+})() : null;
+window.mkwSincro = sincro;
+const red = parametros.has('red') ? (() => {
+  const registro = [];
+  const anotar = t => { t = new Date().toISOString().slice(11, 23) + ' ' + t; registro.push(t); if (registro.length > 2000) registro.shift(); if (parametros.get('red') === 'ver') console.log(t); };
+  // ?red=1: todo en esta pestaña (un conmutador en memoria). ?red=canal&nodo=N[&anfitrion=1]: varias pestañas en la
+  // misma sala del banco, unidas por BroadcastChannel (como lo harán los canales WebRTC); el anfitrión tiene el WFC
+  // y su juego es la 10.77.0.2; los demás, 10.77.0.N
+  // ?red=malla&nodo=N[&anfitrion=1][&sala=…]: lo de verdad (F2): una malla WebRTC entre navegadores. La señalización la
+  // presta la página de la sala del sitio (postMessage, como BT3) si el juego está en su marco (o con &senal=padre); si
+  // no, un buzón falso por BroadcastChannel (banco: dos pestañas del mismo Chrome)
+  const modo = parametros.get('red'), multi = modo === 'canal' || modo === 'malla';
+  const anfitrion = !multi || parametros.get('anfitrion') === '1';
+  const conmutador = multi ? null : crearConmutador();
+  let router = null, malla = null;
+  if (modo === 'malla') {
+    const uid = parametros.get('uid') || 'u' + Math.random().toString(36).slice(2, 10);
+    const enMarco = parametros.get('senal') === 'padre' || (window.parent !== window && parametros.get('senal') !== 'canal');
+    const senal = enMarco ? senalPadre({ canal: 'mkw' }) : senalCanal({ sala: parametros.get('sala') || 'banco', uid });
+    router = crearRouterMalla({ registro: anotar });
+    // los mensajes de la carrera sincronizada (lockstep.mjs) empiezan con su marca; los demás son de la red del juego
+    const alBinario = (de, b, canal) => b[0] === MARCA_LOCKSTEP ? sincro?.lockstep?.alBinario(de, b) : router.alBinario(de, b, canal);
+    malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar });
+    router.usar(malla);
+    malla.entrar().then(ok => anotar(`[malla] ${ok ? 'entré a la sala como ' + uid : 'no pude entrar a la sala'}`));
+  }
+  const enlace = () => router ? router.enlace() : multi ? crearEnlaceCanal('mkw-red-' + (parametros.get('sala') || 'banco')) : conmutador.enlace();
+  const wfc = anfitrion ? crearWfc({ pila: crearPila({ ip: '10.77.0.1', enlace: enlace(), registro: (...a) => anotar('[wfc-red] ' + a.join(' ')) }), registro: anotar }) : null;
+  const miIp = `10.77.0.${multi ? Math.max(2, Number(parametros.get('nodo')) || 2) : 2}`;
+  // la pila del juego; el espía lee lo que el juego le informa al WFC por GPCM (29900): su VR y BR después de cada
+  // carrera → vr.informar (localStorage + Firebase). El presentador le cuenta al WFC el VR de la cuenta
+  const latin1 = new TextDecoder('latin1');
+  const espia = (par, datos) => {
+    if (par?.puerto !== 29900) return;
+    const vb = extraerVrbr(latin1.decode(datos)); if (!vb) return;
+    vr.informar(vb).then(r => { if (r.cambio) anotar(`[vr] el juego informa VR ${vb.vr} / BR ${vb.br}${r.antes ? ` (antes ${r.antes.vr})` : ''} → ${r.nube}`); });
+  };
+  const pila = crearPila({ ip: miIp, enlace: enlace(), dns: () => '10.77.0.1', registro: (...a) => anotar('[juego-red] ' + a.join(' ')), espia });
+  const presentador = presentarVr({ pila });
+  const r = { pila, wfc, registro, conmutador, ip: miIp, malla, router, presentador };
+  window.mkwRed = r;
+  return r;
+})() : null;
 // De dónde salen las piezas privadas (el juego compilado, el manifiesto y los archivos del disco). Vacío = este mismo
 // servidor (servidor.mjs). En el sitio vendrán del Worker de amigos, otro origen (como el disco de BT3):
 // ?privado=http://127.0.0.1:8151 lo imita con herramientas/sitio-local.mjs (bitácora §54). La página en sí usa
@@ -67,7 +146,15 @@ const precargar = (prefijo, ruta) =>
 //   t = hora del último refresco,  p = período (ms entre refrescos, la mediana de los últimos 60: 16,67 en 60 Hz)
 // El runtime (vi.cpp) lee t y p para correr su reloj, y usa esperaHasta() para despertar justo con un refresco.
 // Con ?enganche=0 en la dirección no se le ofrece nada de esto al juego (para comparar con y sin enganche).
-const ENGANCHE = parametros.get('enganche') !== '0';
+// En línea (?red) va SIEMPRE sin enganche (bitácora §58): todas las consolas de la carrera tienen que avanzar al mismo
+// ritmo medido con el reloj de pared, no con el refresco de cada monitor (con el enganche, los refrescos que una
+// pestaña pierde son cuadros perdidos: dos pestañas se separaron 0,44 cuadros por segundo y Retro Rewind echaba al
+// invitado a los ~34 s). Con el reloj propio del runtime la diferencia queda en ±2 cuadros sin acumularse.
+const ENGANCHE = parametros.get('enganche') !== '0' && !parametros.has('red');
+// La pausa de presentar de aurora y la toma a compás (§54) no tocan el reloj VI (solo esperan a que el navegador tome
+// el canvas, con tope en el vencimiento del cuadro): van también en línea. Sin ellas, con ?red el juego casi no
+// soltaba el hilo y la página pasaba 120-700 ms sin actualizar la pantalla ni atender la red (bitácora §63).
+const PRESENTA = parametros.get('enganche') !== '0';
 // Ajuste fino del ritmo del sonido (parche en audio_backend.cpp): ?ajusteSonido=0 lo apaga para comparar
 const AJUSTE_SONIDO = parametros.get('ajusteSonido') !== '0';
 
@@ -313,6 +400,28 @@ const relojMonitor = {
 };
 requestAnimationFrame(h => relojMonitor.tic(h));
 
+// La espera del juego cuando su reloj NO va enganchado al monitor (bitácora §63): en línea (?red, §58) siempre, en
+// un monitor cuyo refresco no divide los 60 Hz del juego (144, 165, 175 Hz) y cuando el reloj del monitor deja de
+// valer (una pestaña que pasó >100 ms sin refrescar). Se cumple con 1 al llegar el vencimiento o con 0 a los
+// `servicioMs` (para que el juego atienda su sonido y alarmas y vuelva a esperar). Siempre desde una tarea nueva
+// (enTareaNueva): así el setTimeout no sufre el mínimo de 4 ms de los temporizadores anidados.
+// El último tramo se pide REDONDEADO HACIA ARRIBA y sin margen: despierta en el vencimiento o un poco después (0,1-1
+// ms), nunca antes, y el runtime casi no gira. Llegar un poco tarde no corre el reloj del juego (cada "tele" se
+// sella en su lugar de la grilla, vi.cpp: lastRetrace = target) y sin enganche no hay refresco con el que calzar.
+// Con un margen de 1,5 ms girando, el reloj se leía miles de veces por cuadro: ~8 % del tiempo de la pestaña (§63).
+// Con la pestaña oculta Chrome demora los setTimeout hasta 1 s: ahí solo se cede una vuelta (MessageChannel) y se
+// sigue, para que la sala no se atrase.
+// Antes de §63, sin esto, la espera giraba sin soltar nunca el hilo: en la carrera sincronizada la página solo
+// respiraba cuando el lockstep esperaba a la otra consola (huecos de 120-700 ms) y, terminada la carrera, nunca más.
+function esperaReloj(vencimiento, servicioMs) {
+  return new Promise(listo => {
+    const falta = vencimiento - performance.now();
+    if (document.hidden) enTareaNueva(() => listo(falta <= 0 ? 1 : 0));
+    else if (falta <= servicioMs) enTareaNueva(() => setTimeout(() => listo(1), Math.max(0, Math.ceil(falta))));
+    else enTareaNueva(() => setTimeout(() => listo(0), servicioMs));
+  });
+}
+
 // Foto del canvas en chico (ancho×alto, RGBA), tomada en el momento en que el navegador toma el cuadro nuevo (ver
 // relojMonitor.tic). Si en 1 s no hay cuadro nuevo (juego parado), se saca igual.
 const fotoCanvas = (ancho, alto) => new Promise(listo => {
@@ -437,7 +546,7 @@ function pintarTeclas() {
   }
 }
 pintarTeclas();
-// Lo que recibe el puerto 1 y qué mandos hay, 5 veces por segundo (para ver que todo responde)
+// Lo que recibe el puerto 1, 5 veces por segundo (para ver que todo responde; los mandos: opciones-mandos.mjs)
 const NOMBRES_BOTON = Object.entries(BOTON);
 setInterval(() => {
   const p = controles.estado.puertos[0];
@@ -445,17 +554,25 @@ setInterval(() => {
     const apretados = NOMBRES_BOTON.filter(([, bit]) => p.botones & bit).map(([n]) => n).join(' ');
     document.getElementById('puerto1').textContent = `puerto 1: ${apretados || '—'} · stick ${p.sx},${p.sy}` + (p.gr ? ` · R ${p.gr}` : '');
   }
-  const mandos = controles.estado.mandos;
-  document.getElementById('listaMandos').textContent = mandos.length
-    ? mandos.map(m => `${m.nombre} → puerto ${m.puerto + 1}`).join(' · ')
-    : 'ninguno (aprieta un botón del mando para que el navegador lo vea)';
 }, 200);
 
 // ---- La cara de la página (interfaz.mjs): inicio, modos, barra, cajón, «Tu partida», diálogos ----
 // alCambiarGuardado: el editor de Mii guardó algo sin recargar la página → se vuelve a leer lo guardado para el arranque
-var ui = crearInterfaz({ guardado, sonido, controles,
+var ui = crearInterfaz({ guardado, sonido, controles, imagenes: ORIGEN + '/build/imagenes',
   alCambiarGuardado: () => { guardadosAlAbrir = guardado.cargar().catch(() => new Map()); } });
 window.mkwInterfaz = ui;
+// Panel «Mandos» (opciones-mandos.mjs): tipo de mando, disposición de botones, zona muerta, vibración, probar y asignar
+montarMandos(document.getElementById('mandosPanel'), controles);
+// Récords (records.mjs): existen desde el principio (la lista de pistas muestra tus mejores tiempos antes de jugar)
+const records = crearRecords();
+window.mkwRecords = records;
+window.mkwConectarRecords = o => records.conectar(o);
+window.mkwConectarVr = async o => {
+  vr.conectar(o);
+  const r = await vr.cargar();
+  if (r && vr.conNube) red?.presentador.presentar(r);     // sin sesión manda el archivo del juego (RRRating.pul)
+  return r;
+};
 
 // La dirección web de un archivo del juego: es la misma ruta, con cada pedazo "escapado" (espacios → %20…)
 const direccion = ruta => ORIGEN + ruta.split('/').map(encodeURIComponent).join('/');
@@ -561,19 +678,33 @@ async function arrancar() {
       const t = tamaños.get(ruta);
       if (t !== undefined) disco.adelantar(direccion(ruta), t);   // solo los perezosos: los demás ya están en memoria
     },
+    // La semilla de la carrera que se prepara, si la página eligió una («Copa a tu gusto»: web/juego/semillas_nativo.cpp)
+    mkwSemillas: () => window.mkwSemillaCarrera || null,
+    // El reloj fijo de la carrera sincronizada (sala con CPU, lockstep.mjs; ?reloj=fijo para probarlo): desde que se
+    // prepara la carrera, el reloj del procesador es un contador igual en todas las consolas (semillas_nativo.cpp)
+    get mkwRelojFijo() { return parametros.get('reloj') === 'fijo' || !!window.mkwRelojFijo; },
+    mkwLsArreglos: parametros.get('arreglos') !== '0',
+    mkwVistaPropia: (parametros.get('vista') === '0' ? 0 : 1) | (parametros.get('camara') === '0' ? 0 : 2),   // ?vista=0 / ?camara=0: sin sonido-HUD / cámara propios (para comparar)   // ?arreglos=0: sin «todo a la vista» (lockstep_nativo.cpp), para comparar
+    // …y el plantel (personaje y vehículo de los 12 puestos) que la sala reparte igual a todas (lockstep.mjs)
+    mkwPlantel: () => window.mkwPlantel || null,
+    mkwMiPuesto: () => window.mkwMiPuesto ?? null,
+    // La red del juego (web/red/red_web.cpp → red.mjs): solo con ?red=1; sin ella el juego ve "sin conexión"
+    mkwRed: red?.pila,
     preRun: [m => {
       armarArchivos(m, contenidos, tamaños);
       carpetasVacias.forEach(c => m.FS.mkdirTree(c));
       guardado.restaurar(m.FS, guardados);   // encima de lo que trae el servidor (la partida vacía de RR)
       pipelines.escribir(m.FS, listas);      // aurora las lee al iniciar y las pide en segundo plano
     }],
+    // Ceder sin enganche (vi.cpp, §63): la espera por reloj cuando el cuadro no va enganchado al monitor
+    ...(CEDER ? { mkwEsperaReloj: esperaReloj } : {}),
+    ...(PRESENTA && ESPERA_TOMA ? { mkwEsperaToma: ms => relojMonitor.esperaToma(ms) } : {}),
+    ...(PRESENTA && ESPERA_ATRASADA ? { mkwTomaAtrasada: () => relojMonitor.tomaAtrasada(),
+                                        mkwEsperaAtrasada: () => relojMonitor.esperaAtrasada() } : {}),
     // Enganche al monitor (vi.cpp en el parche): sin estas tres, el juego sigue con su temporizador como en Node
     ...(ENGANCHE ? {
       mkwVsync: relojMonitor,
       mkwEsperaHasta: (vencimiento, servicioMs) => relojMonitor.esperaHasta(vencimiento, servicioMs),
-      ...(ESPERA_TOMA ? { mkwEsperaToma: ms => relojMonitor.esperaToma(ms) } : {}),
-      ...(ESPERA_ATRASADA ? { mkwTomaAtrasada: () => relojMonitor.tomaAtrasada(),
-                              mkwEsperaAtrasada: () => relojMonitor.esperaAtrasada() } : {}),
       mkwSonidoAjuste: AJUSTE_SONIDO,
       mkwCeder: CEDER,
       ...(TRAZA ? { mkwTraza: anota } : {}),
@@ -607,22 +738,75 @@ async function arrancar() {
   window.mkw = M;
   // En qué pantalla está el juego (menus.mjs: lee la memoria de la Wii; para elegir pista o copa desde la página)
   window.mkwMenus = crearLector(M);
-  // El piloto (menus.mjs): con «Gran Premio» o «Carrera» elegidos, lleva el juego solo hasta la carrera. La copa o la
-  // pista se eligen en una lista de la página (interfaz.mjs) cuando el juego ya cargó sus nombres (en el menú principal).
-  // ?modo=vs&copa=13&fila=2 en la dirección: sin preguntar (para las pruebas).
+  // Récords (records.mjs): al terminar cada carrera, el tiempo final (leído del juego) queda como récord personal de
+  // esa pista y categoría (modo + cc). Con sesión en el sitio, también va a la tabla de Firebase: la página del sitio
+  // llama window.mkwConectarRecords({ almacen: almacenRtdb({ rtdb, db }), uid, nombre }).
+  vigilarCarreras({ lector: window.mkwMenus, alTerminar: async c => {
+    const r = await records.registrar(c);
+    window.mkwEstado.ultimoTiempo = { ...c, ...r };
+    const cat = NOMBRE_CATEGORIA(c.cat);
+    ui.aviso(`${textoTiempo(c.ms)} en ${cat}` + (r.mejoraLocal ? (r.anterior ? ` — ¡récord personal! (antes ${textoTiempo(r.anterior)})` : ' — tu primer tiempo aquí') : ` · tu mejor: ${textoTiempo(r.anterior)}`) +
+      (r.nube === 'subido' ? ' · subido a la tabla' : ''));
+    nota(`récord: pista 0x${c.pista.toString(16)} ${c.cat} ${textoTiempo(c.ms)} (${r.nube})`);
+  } });
+
+  // El piloto (menus.mjs): con «Gran Premio», «Carrera», «Contrarreloj» o «Copa a tu gusto» elegidos, lleva el juego
+  // solo hasta la carrera. La copa o la(s) pista(s) se eligen en una lista de la página (interfaz.mjs) cuando el juego
+  // ya cargó sus nombres (en el menú principal). En la dirección, sin preguntar (para las pruebas):
+  //   ?modo=vs&copa=13&fila=2 · ?modo=copa&pistas=13.2,0.1,5.3,40.0&semilla=12345 (copa.fila de cada una)
+  const conPrimera = r => r && r.pistas ? { ...r, copa: r.pistas[0].copa, fila: r.pistas[0].fila } : r;
   const piloto = crearPiloto({ lector: window.mkwMenus, controles, alAviso: (t, mal) => ui.aviso(t, mal),
-    esperarEleccion: () => ui.elegirPista({ modo: objetivoPiloto.modo, copas: leerNombres(window.mkwMenus, M) }) });
+    esperarEleccion: () => ui.elegirPista({ modo: objetivoPiloto.modo, copas: leerNombres(window.mkwMenus, M) }).then(conPrimera) });
   window.mkwPiloto = piloto;
   const objetivoPiloto = { modo: parametros.get('modo') || window.mkwModo.modo };
-  if (objetivoPiloto.modo === 'gp' || objetivoPiloto.modo === 'vs') {
+  // ?modo=enlinea (la sala del sitio la pone): el piloto entra solo hasta «VS mundial». Quien no es anfitrión espera a
+  // tener ruta al WFC de la sala (10.77.0.1) por la malla antes de conectarse
+  if (objetivoPiloto.modo === 'enlinea' && red) {
+    const redLista = () => !!red.wfc || !red.router || !!red.router.rutas()['10.77.0.1'];
+    piloto.enLinea({ redLista }).then(llego => {
+      window.mkwEstado.piloto = { llego, modo: 'enlinea', paginas: piloto.paginas };
+      nota(`piloto en línea: ${llego ? 'buscando rivales' : 'se detuvo'}`);
+      if (!llego) return;
+      // Vigilante: una búsqueda normal se junta en ~40 s. Una vez de nueve, en las pruebas, los dos quedaron buscando
+      // sin juntarse; si pasan 100 s buscando, se cancela (B) y se vuelve a buscar. Solo mientras nadie toque nada.
+      let desde = performance.now(), reintentos = 0;
+      const vigila = setInterval(async () => {
+        const e = window.mkwMenus.estado(), ps = e.paginas || [];
+        if (!(e.seccion === 0x55 && ps[ps.length - 1] === 0x8f)) { desde = performance.now(); if (e.seccion === 0x58 || e.seccion === 0x68) clearInterval(vigila); return; }
+        if (performance.now() - desde < 100000 || piloto.activo || reintentos >= 5) return;
+        reintentos++; desde = performance.now();
+        nota(`piloto en línea: 100 s buscando sin juntarse, vuelvo a buscar (${reintentos})`);
+        controles.pilotar(0x200); await new Promise(r => setTimeout(r, 150)); controles.pilotar(0);
+        await new Promise(r => setTimeout(r, 2500));
+        piloto.enLinea({ redLista });
+      }, 2000);
+    });
+  }
+  if (['gp', 'vs', 'tt', 'copa'].includes(objetivoPiloto.modo)) {
     if (parametros.has('copa')) { objetivoPiloto.copa = Number(parametros.get('copa')); objetivoPiloto.fila = Number(parametros.get('fila') || 0); }
+    if (parametros.has('pistas')) {
+      Object.assign(objetivoPiloto, conPrimera({ pistas: parametros.get('pistas').split(',').map(t => { const [c, f] = t.split('.').map(Number); return { copa: c, fila: f || 0 }; }),
+        semilla: Number(parametros.get('semilla') || 0) >>> 0 }));
+    }
     // CPU: ?cpu=facil|normal|dificil|ninguna (si no, la que se eligió en la página); ?autoconducir=1 solo para el banco
-    objetivoPiloto.cpu = parametros.get('cpu') || window.mkwModo.cpu;
+    if (objetivoPiloto.modo !== 'tt') objetivoPiloto.cpu = parametros.get('cpu') || window.mkwModo.cpu;
     if (parametros.get('autoconducir') === '1') objetivoPiloto.autoconducir = true;
-    ui.aviso('Yendo a la carrera… (toca una tecla para manejar tú)');
-    piloto.ir(objetivoPiloto).then(llego => {
-      window.mkwEstado.piloto = { llego, ...objetivoPiloto };
-      nota(`piloto: ${llego ? 'llegó a la carrera' : 'se detuvo'} (${JSON.stringify(objetivoPiloto)})`);
+    if (parametros.has('objetos')) objetivoPiloto.objetos = Number(parametros.get('objetos'));
+    // Contrarreloj: contra el mejor fantasma (si no, solo): ?fantasma=0 o lo elegido en la página
+    if (objetivoPiloto.modo === 'tt') objetivoPiloto.fantasma = parametros.has('fantasma') ? parametros.get('fantasma') !== '0' : window.mkwModo.fantasma !== false;
+    ui.aviso('Yendo a la carrera… (Esc para manejar tú)');
+    piloto.ir(objetivoPiloto).then(async llego => {
+      window.mkwEstado.piloto = { llego, ...objetivoPiloto, paginas: piloto.paginas };
+      nota(`piloto: ${llego ? 'llegó a la carrera' : 'se detuvo'} (${JSON.stringify(objetivoPiloto)}) páginas ${piloto.paginas.map(p => p.toString(16)).join(',')}`);
+      if (llego && objetivoPiloto.modo === 'copa') {
+        // las carreras 2, 3 y 4 de la copa a tu gusto: el piloto pone cada pista cuando aparece la pantalla de copas
+        window.mkwEstado.copa = { carrera: 1 };
+        ui.aviso('Copa a tu gusto: carrera 1 de 4');
+        const termino = await piloto.seguirCopa(objetivoPiloto, n => { window.mkwEstado.copa = { carrera: n + 1 }; ui.aviso(`Copa a tu gusto: carrera ${n + 1} de 4…`); });
+        window.mkwEstado.copa.termino = termino;
+        window.mkwSemillaCarrera = null;          // las carreras que vengan después: el azar de siempre
+        nota(`copa a tu gusto: ${termino ? 'jugó las 4' : 'se dejó'}`);
+      }
     });
   }
 
@@ -712,7 +896,18 @@ async function arrancar() {
   }, 1000);
 
   // Desde ahora los controles van al juego (mando de GameCube por puerto, ver pad_web.cpp)
-  enviarAlJuego = (...estado) => M._mkw_web_pad(...estado);
+  enviarAlJuego = (...estado) => {
+    if (sincro && estado[0] === 0) sincro.local = estado.slice(2, 9);   // lo mío, para la carrera sincronizada
+    M._mkw_web_pad(...estado);
+  };
+  // la carrera sincronizada: el juego le pide a M.mkwLockstep los botones de cada cuadro (pad_web.cpp)
+  if (sincro && red?.malla) {
+    sincro.lockstep = crearLockstep({ yo: sincro.yo, humanos: sincro.humanos, local: () => sincro.local,
+      enviar: (u, b, canal) => red.malla.enviar(u, b, canal), huella: () => huellaCarrera(window.mkwMenus),
+      registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
+    M.mkwLockstep = sincro.lockstep;
+    M.mkwLockstepFin = () => controles.reenviar();   // terminó la carrera: la página vuelve a mandar sus mandos
+  }
   controles.reenviar();
 
   // 5) main()
@@ -845,7 +1040,7 @@ function armarArchivos(m, contenidos, tamaños) {
   FS.writeFile('/datos/WiiCompiled/Config.toml', [
     '# Generado por web/navegador/mkw.mjs',
     '[audio]', 'mix_worker = false', '',     // sin hilos en la web: el sonido se mezcla en el mismo hilo
-    '[network]', 'enabled = false', '',
+    '[network]', `enabled = ${red ? 'true' : 'false'}`, '',     // en línea solo con la red de la sala (?red=1, §58)
     '[discord]', 'enabled = false', '',
     '[paths]', 'dvd_root = "/mkw/disco"', 'retro_rewind_root = "/mkw/sd/RetroRewind6"', '',
   ].join('\n'));

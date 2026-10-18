@@ -56,8 +56,8 @@ Para retraducir desde cero: `powershell -ExecutionPolicy Bypass -File herramient
 Para compilar el juego a wasm: `python herramientas/compilar-web.py`; correrlo en Node: `node web/node/correr.mjs 300`;
 probarlo: `node web/node/prueba-arranque.mjs` (13 puntos ✓/✗).
 En el navegador (fase 3): librerías de aurora `bash herramientas/bajar-deps-aurora.sh` (una vez), compilar
-`python herramientas/compilar-web.py --modo navegador`, jugar `node web/navegador/servidor.mjs` → http://127.0.0.1:8140/
-(solo esta PC; `MKW_LATENCIA=50` simula la red hasta R2), probar `node web/navegador/prueba-navegador.mjs 900` (Playwright, 21 puntos; `cd banco && npm install`
+`python herramientas/compilar-web.py --modo navegador`, jugar `node web/navegador/servidor.mjs` → http://127.0.0.1:8140/ (o doble clic en `jugar.bat`)
+(solo esta PC; `MKW_LATENCIA=50` simula la red hasta R2), probar `node web/navegador/prueba-navegador.mjs 900` (Playwright, 21 puntos, o 20 con un monitor que no es múltiplo de 60 Hz: ahí no se exige «parejos en pantalla»; `cd banco && npm install`
 la primera vez). Partidas: `node web/navegador/prueba-partidas.mjs` (6 puntos). Celular: `node web/navegador/prueba-tactil.mjs`
 (Pixel 7 emulado, 16 puntos). Manejar el juego con teclas y fotos: `node web/navegador/guion.mjs "K:2500 K:2000 …"` (ver su
 cabecera; `P:ms` = perfil, `R` = recargar, `K~ms` = mantener; `--semilla` = guarda la semilla de pipelines
@@ -68,8 +68,9 @@ http://127.0.0.1:8150/juegos.html?mkw=1 (el sitio de `terceros/Paginita-Pro` ser
 el juego en el marco de Juegos; lo privado desde un "Worker" en 8151 con CORS y 50 ms de latencia; la página lo pide con
 `?privado=ORIGEN`). Medir ahí: `node herramientas/medir-sitio.mjs --perfil pc|cpu4|celular --etiqueta X [--items]
 [--visitas 2] [--red 50] [--extra "&param=…"]` (CPU por cuadro, ritmo en pantalla, GPU, hilo ocupado, heap, MB bajados →
-`build/web/datos/medir-sitio/`). Programa para publicar: `python herramientas/compilar-web.py --modo navegador --final`
+`build/web/datos/medir-sitio/`). Lo que ve un jugador en línea (una pestaña, 60 s de carrera: cuadros, refrescos justos/repetidos/saltados, latido): `node herramientas/medir-enlinea.mjs ["&param=…" …]` (§63). Programa para publicar: `python herramientas/compilar-web.py --modo navegador --final`
 (sin nombres de funciones + `mkw.wasm.br`, 16 MB; o `node herramientas/comprimir-build.mjs`). Caminos viejos para
 comparar: `?esperaToma=0`, `?atrasada=0`, `?compas=0`, `?huella=0`, `?voces=0`, `?staging=mapeo`.
 **Las pruebas en Chrome van sin sonido** (`--mute-audio`): el dueño lo pidió.
+Sala con CPU (lockstep, §61): banco `node banco/correr.mjs lockstep` (25 puntos) y con el juego `node web/navegador/prueba-sincro.mjs` (dos pestañas, 9 puntos; `--extra=&arreglos=0` compara sin «todo a la vista»; `--sala` = dentro de la sala falsa del sitio; `--copa` = la copa entera, hasta 25 min, `--minutos=N`; `--pistas=50.2,… --semilla=N` = una carrera fija). En la página: `?vista=0` (sonido/HUD sin vista propia), `?camara=0`. Depurar la carrera: `MKW_DEPURAR_LS=1` y el punto de vigilancia `MKW_CFLAGS_EXTRA=-DMKW_VIGIA … --carpeta build/web-vigia` (servirlo con `MKW_BUILD=build/web-vigia/navegador`), §62.
 Banco sin el juego, sin ventana: `node banco/correr.mjs licencias mii …` (✓/✗ de cada página). Piloto con el juego: `node web/navegador/prueba-piloto.mjs` (9 puntos). La página: `interfaz.mjs` (inicio, modos, cajón, «Tu partida»), `menus.mjs` (memoria del juego y piloto: `?modo=vs&copa=13&fila=2&cpu=ninguna`), `mii.mjs`/`editor-mii.mjs`, `licencias.mjs`, `respaldos.mjs`. En línea: diseño en `docs/en-linea.md`.

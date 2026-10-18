@@ -13,9 +13,11 @@
 // Uso (en mkw.mjs):  const ui = crearInterfaz({ guardado, sonido, controles, alCambiarGuardado });
 //                    ui.preguntar({...}), ui.avisar(...), ui.partidaCambio(), ui.sonidoCambio(), ui.empezo()
 
-import { leerRksys, resumenLicencia, queArchivo, RUTA_RKSYS } from './licencias.mjs';
+import { leerRksys, resumenLicencia, queArchivo, RUTA_RKSYS, leerRating, RUTA_RATING } from './licencias.mjs';
 import { crearRespaldos } from './respaldos.mjs';
 import { abrirEditorMii } from './editor-mii.mjs';
+import { crearImagenes } from './imagenes.mjs';
+import { textoTiempo, nombreCategoria } from './records.mjs';
 
 const $ = id => document.getElementById(id);
 const el = (etiqueta, props = {}, ...hijos) => { const e = Object.assign(document.createElement(etiqueta), props); e.append(...hijos); return e; };
@@ -28,6 +30,7 @@ const leerPref = (k, d) => { try { const v = localStorage.getItem('mkw.' + k); r
 const ICONOS = {
   libre: '<circle cx="16" cy="16" r="11" fill="none" stroke="#fff" stroke-width="3.2"/><circle cx="16" cy="16" r="3.2" fill="#fff"/><path d="M5.5 14h7.5M19 14h7.5M16 19.5V27" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>',
   gp: '<path d="M9 5h14v6a7 7 0 0 1-14 0z" fill="#fff"/><path d="M9 7H5a4 4 0 0 0 4 6M23 7h4a4 4 0 0 1-4 6" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M14 18h4v5h-4zM10 24h12v3H10z" fill="#fff"/>',
+  copa: '<rect x="4" y="4" width="11" height="11" rx="2.5" fill="#fff"/><rect x="17" y="4" width="11" height="11" rx="2.5" fill="#ffffffaa"/><rect x="4" y="17" width="11" height="11" rx="2.5" fill="#ffffffaa"/><rect x="17" y="17" width="11" height="11" rx="2.5" fill="#fff"/>',
   vs: '<path d="M8 4v25" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M9 5h16v12H9z" fill="#fff"/><path d="M9 5h4v4H9zm8 0h4v4h-4zm-4 4h4v4h-4zm8 0h4v4h-4zm-12 4h4v4H9zm8 0h4v4h-4z" fill="#222"/>',
   tt: '<circle cx="16" cy="18" r="10" fill="none" stroke="#fff" stroke-width="3"/><path d="M16 18v-6M16 18l4 3" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><path d="M13 4h6" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
   bat: '<ellipse cx="16" cy="12" rx="8" ry="9" fill="#fff"/><path d="M16 21l-2 3h4z" fill="#fff"/><path d="M16 24c0 3-3 3-3 6" fill="none" stroke="#fff" stroke-width="1.8"/><ellipse cx="13" cy="9" rx="2" ry="3" fill="#ffffff88"/>',
@@ -40,13 +43,14 @@ export const MODOS = [
   { id: 'libre', nombre: 'Jugar libre', texto: 'Los menús del juego, como en la Wii: todos los modos y las 200+ pistas.', listo: true },
   { id: 'gp', nombre: 'Gran Premio', texto: 'Una copa completa: 4 carreras contra la CPU. Te llevamos directo.', listo: true },
   { id: 'vs', nombre: 'Carrera', texto: 'La pista que elijas, contra la CPU. Te llevamos directo.', listo: true },
-  { id: 'tt', nombre: 'Contrarreloj', texto: 'Tú contra el reloj y tus fantasmas.', listo: false },
+  { id: 'copa', nombre: 'Copa a tu gusto', texto: '4 pistas que eliges tú o al azar, en el orden que quieras.', listo: true },
+  { id: 'tt', nombre: 'Contrarreloj', texto: 'Tú contra el reloj y el mejor fantasma. Te llevamos directo.', listo: true },
   { id: 'bat', nombre: 'Batalla', texto: 'Globos o monedas en las arenas.', listo: false },
   { id: 'red', nombre: 'En línea', texto: 'Salas de Paginita Pro: juega con tus amigos.', listo: false },
   { id: 'mii', nombre: 'Mi Mii', texto: 'Crea o cambia tu Mii sin abrir el juego.', listo: true, accion: true },
 ];
 
-export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado = () => {} }) {
+export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado = () => {}, imagenes = '/build/imagenes' }) {
   const respaldos = crearRespaldos();
   const enJuegos = window.parent !== window;
   if (enJuegos) document.documentElement.classList.add('en-juegos');
@@ -67,6 +71,9 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       const b = el('button', { type: 'button', className: 'boton ' + (peligro ? 'peligro' : 'principal'), textContent: si, onclick: () => terminar(true) });
       acciones.append(b);
       dialogo.onclose = () => listo(false);           // Esc
+      // Esc cierra el diálogo aunque la tecla esté tomada por los controles del juego (Esc = Start), que le quitan al
+      // navegador su cierre automático: se cierra a mano
+      dialogo.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); terminar(false); } };
       dialogo.showModal();
       b.focus();
     });
@@ -156,6 +163,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     let info = null;
     try { const b = await guardado.leerArchivo(RUTA_RKSYS); if (b) info = leerRksys(b); } catch {}
     licencias = info && info.crcBien ? info.licencias : [];
+    // el VR que usa Retro Rewind está en RRRating.pul (por ID de perfil): ese manda sobre el de rksys.dat
+    try { const rr = leerRating(await guardado.leerArchivo(RUTA_RATING)); for (const l of licencias) { const x = rr.get(l.pid); if (x) Object.assign(l, x); } } catch {}
     for (const id of ['licenciasInicio', 'licenciasPanel']) $(id).replaceChildren(...licencias.map(fichaLicencia));
     $('partidaVacia').hidden = licencias.length > 0;
     const e = guardado.estado, chip = $('chipPartida');
@@ -287,11 +296,43 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
         return;
       }
       elegirModo(m.id);
+      // en pantallas angostas los modos quedan bajo la tarjeta: volver a mostrar los ajustes y «Jugar»
+      if (matchMedia('(max-width: 860px)').matches) (opciones.hidden ? $('arrancar') : opciones).scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     modos.append(b);
   }
+  // Ajustes del modo (en la tarjeta, sobre «Jugar»): la CPU en las carreras (dificultad o sin CPU) y el fantasma en Contrarreloj.
+  // Van a window.mkwModo (cpu, fantasma), que mkw.mjs le pasa al piloto; quedan anotados para la próxima vez.
+  elegido.cpu = leerPref('cpu', 'normal');
+  elegido.fantasma = leerPref('fantasma', true);
+  const opciones = el('div', { className: 'opciones-modo', id: 'opcionesModo' });
+  $('arrancar').before(opciones);                                       // justo sobre «Jugar», donde se decide
+  const fichas = (titulo, valores, actual, alElegir) => {
+    const caja = el('div', { className: 'fichas', role: 'group' });
+    caja.setAttribute('aria-label', titulo);
+    for (const [valor, texto] of valores) {
+      const b = el('button', { type: 'button', textContent: texto });
+      b.setAttribute('aria-pressed', String(valor === actual));
+      b.dataset.valor = String(valor);
+      b.onclick = () => { caja.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); alElegir(valor); };
+      caja.append(b);
+    }
+    return [el('span', { textContent: titulo }), caja];
+  };
+  function pintarOpciones(id) {
+    opciones.replaceChildren();
+    opciones.hidden = !['gp', 'vs', 'copa', 'tt'].includes(id);
+    if (id === 'tt') {
+      opciones.append(...fichas('Fantasma', [[true, 'Contra el mejor fantasma'], [false, 'Solo']], elegido.fantasma, v => { elegido.fantasma = v; guardarPref('fantasma', v); }));
+    } else {
+      opciones.append(...fichas('Rivales (CPU)', [['facil', 'Fácil'], ['normal', 'Normal'], ['dificil', 'Difícil'], ['ninguna', 'Sin CPU']], elegido.cpu,
+        v => { elegido.cpu = v; guardarPref('cpu', v); }));
+    }
+    opciones.append(el('small', { className: 'opciones-nota', textContent: id === 'gp' ? 'La copa la eliges al cargar el juego.' : id === 'copa' ? 'Las 4 pistas las armas al cargar el juego.' : 'La pista la eliges al cargar el juego.' }));
+  }
   function elegirModo(id) {
     elegido.modo = id; guardarPref('modo', id);
+    pintarOpciones(id);
     modos.querySelectorAll('.modo').forEach(b => b.classList.toggle('activo', b.id === 'modo-' + id));
     const m = MODOS.find(x => x.id === id);
     $('arrancar').textContent = id === 'libre' ? 'Jugar' : `Jugar · ${m.nombre}`;
@@ -317,31 +358,202 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     avisoJuego.textContent = texto; avisoJuego.hidden = !texto; avisoJuego.classList.toggle('mal', mal);
     if (texto && !texto.includes('…')) setTimeout(() => { if (avisoJuego.textContent === texto) avisoJuego.hidden = true; }, 6000);   // los de «…» quedan mientras dure
   }
-  // La lista de copas (Gran Premio) o de pistas (Carrera), con los nombres que trae el juego (menus.mjs: leerNombres).
-  // Los nombres quedan anotados en este navegador (localStorage) para la próxima vez. Devuelve {copa, fila} o null.
-  function elegirPista({ modo, copas }) {
-    if (copas && copas.length) guardarPref('pistas', copas); else copas = leerPref('pistas', null);
-    if (!copas || !copas.length) copas = Array.from({ length: 8 }, () => ['', '', '', '']);
+  // ---------------- Elegir copa, pista o armar una copa ----------------
+  // Las imágenes sacadas del juego (herramientas/sacar-imagenes.mjs, fotos-pistas.mjs, planos-pistas.mjs) van en unos
+  // pocos paquetes en la parte privada (build/imagenes, en R2 detrás del Worker; imagenes.mjs los abre): ícono de cada
+  // copa, foto, plano y videíto de cada pista. Si alguna falta, queda un recuadro vacío y la lista sigue andando.
+  const fotos = crearImagenes(imagenes);
+  const imagen = (promesa, clase, alt = '') => {
+    const i = el('img', { className: clase, alt, decoding: 'async' });
+    promesa.then(u => { if (u) i.src = u; else i.classList.add('sin-imagen'); });
+    i.onerror = () => i.classList.add('sin-imagen');
+    return i;
+  };
+  // Videíto en la vista previa: solo si no se pidió "menos movimiento" ni "ahorro de datos"
+  const conVideo = () => !matchMedia('(prefers-reduced-motion: reduce)').matches && !navigator.connection?.saveData;
+  // Los nombres de las pistas: los que lee el juego (menus.mjs) > los anotados en este navegador > los del índice de
+  // los paquetes (los que anotó fotos-pistas.mjs) > «Pista n».
+  async function nombresPistas(copas) {
+    if (copas && copas.length) { guardarPref('pistas', copas); return copas; }
+    copas = leerPref('pistas', null);
+    if (copas && copas.length) return copas;
+    copas = await fotos.nombres();
+    if (copas && copas.length) return copas;
+    return Array.from({ length: 8 }, () => ['', '', '', '']);
+  }
+  // Sorteos con semilla: la misma semilla da siempre las mismas pistas (mulberry32, un generador chico y conocido).
+  // Cada «volver a sortear» saca una semilla nueva del azar del navegador (crypto) y esa semilla también va al juego
+  // (la usa para los objetos y la CPU: menus.mjs la escribe antes de cada carrera).
+  const semillaNueva = () => crypto.getRandomValues(new Uint32Array(1))[0];
+  function azar(semilla) {
+    let t = semilla >>> 0;
+    return () => { t = (t + 0x6D2B79F5) >>> 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x ^= x + Math.imul(x ^ (x >>> 7), 61 | x); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // La tabla de récords de una pista: fichas por categoría y los 10 mejores (records.mjs: de Firebase con sesión en el
+  // sitio; sin sesión, solo el tuyo de este navegador)
+  const CATEGORIAS = ['tt150', 'tt200', 'vs150', 'vs200', 'vs500', 'vs100', 'vsespejo'];
+  function mostrarTabla(c, f, cat = 'tt150') {
+    const pista = 0x100 + 4 * c + f, caja = el('div', { className: 'tabla-records' });
+    const lista = el('ol', { className: 'tabla-filas' });
+    const pintar = async elegida => {
+      chips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cat === elegida)));
+      lista.replaceChildren(el('li', { className: 'tabla-vacia', textContent: 'Cargando…' }));
+      let filas = [];
+      try { filas = await window.mkwRecords?.tabla(pista, elegida) || []; } catch (e) { lista.replaceChildren(el('li', { className: 'tabla-vacia', textContent: 'No se pudo leer la tabla (¿sin conexión?).' })); return; }
+      lista.replaceChildren(...(filas.length ? filas.map((r, i) => el('li', { className: r.tuyo ? 'tuyo' : '' },
+        el('span', { className: 'puesto', textContent: i + 1 }), el('span', { className: 'quien', textContent: r.nombre || 'Piloto' }), el('b', { textContent: textoTiempo(r.ms) })))
+        : [el('li', { className: 'tabla-vacia', textContent: 'Todavía no hay tiempos en esta categoría. ¡Sé el primero!' })]));
+    };
+    const chips = el('div', { className: 'fichas' }, ...CATEGORIAS.map(k => {
+      const b = el('button', { type: 'button', textContent: nombreCategoria(k) });
+      b.dataset.cat = k; b.onclick = () => pintar(k);
+      return b;
+    }));
+    caja.append(chips, lista, el('p', { className: 'tabla-nota', textContent: window.mkwRecords?.conNube ? '' : 'Inicia sesión en Paginita Pro para subir tus tiempos a la tabla de todos. Sin sesión se guardan solo en este navegador.' }));
+    pintar(CATEGORIAS.includes(cat) ? cat : 'tt150');
+    preguntar({ titulo: `Récords · ${nombreRecords(c, f)}`, nodo: caja, no: null, si: 'Cerrar' });
+  }
+  let nombreRecords = (c, f) => `Copa ${c + 1}, pista ${f + 1}`;
+
+  // elegirPista({ modo: 'gp' | 'vs' | 'copa', copas }) →
+  //   gp: { copa, fila: 0 } · vs: { copa, fila } · copa (copa a tu gusto): { pistas: [{copa, fila} ×4], semilla } · o null
+  // Con mouse: pasar por encima muestra la foto y el plano a la derecha. Con el dedo: el primer toque muestra, el
+  // segundo elige (no hay "pasar por encima" en una pantalla táctil).
+  async function elegirPista({ modo, copas }) {
+    copas = await nombresPistas(copas);
+    const nombre = (c, f) => copas[c]?.[f] || `Pista ${f + 1}`;
+    nombreRecords = nombre;
     return new Promise(listo => {
-      const caja = el('div', { id: 'elegirPista' });
-      const titulo = modo === 'gp' ? 'Elige la copa' : 'Elige la pista';
+      const caja = el('div', { id: 'elegirPista', className: 'modo-' + modo });
+      const titulo = { gp: 'Elige la copa', vs: 'Elige la pista', copa: 'Arma tu copa' }[modo];
       const buscar = el('input', { type: 'search', placeholder: 'Buscar pista (p. ej. «N64» o «Rainbow»)' });
       buscar.setAttribute('aria-label', 'Buscar pista');
       const lista = el('div', { className: 'copas' });
-      const terminar = v => { caja.remove(); listo(v); };
+      const teclaEsc = e => { if (e.key === 'Escape' && !dialogo.open) { e.stopPropagation(); terminar(null); } };   // (Esc en un diálogo cierra solo el diálogo)
+      const terminar = v => { caja.remove(); document.removeEventListener('keydown', teclaEsc, true); listo(v); };
+      document.addEventListener('keydown', teclaEsc, true);
+
+      // La vista previa: foto (la presentación de la pista, desde el aire) + plano (desde arriba, del course.kmp)
+      const vista = el('aside', { className: 'vista' });
+      vista.setAttribute('aria-live', 'polite');
+      let enVista = '';
+      function mostrarPista(c, f) {
+        if (enVista === `${c}/${f}`) return;
+        const aca = enVista = `${c}/${f}`;
+        const h = el('h3', { textContent: nombre(c, f) });
+        h.setAttribute('translate', 'no');
+        const foto = imagen(fotos.foto(c, f), 'vista-foto', 'Foto de la pista');
+        vista.replaceChildren(
+          el('div', { className: 'vista-cab' }, imagen(fotos.copa(c), 'vista-icono'), el('span', { textContent: `Copa ${c + 1} · pista ${f + 1}` })),
+          h, foto, imagen(fotos.plano(c, f), 'vista-plano', 'Plano de la pista'));
+        // tus mejores tiempos en esta pista (records.mjs, de este navegador)
+        const mejores = window.mkwRecords?.mejoresDe(0x100 + 4 * c + f) || [];
+        if (mejores.length) vista.append(el('ul', { className: 'vista-records' }, ...mejores.map(m =>
+          el('li', {}, el('span', { textContent: nombreCategoria(m.cat) }), el('b', { textContent: textoTiempo(m.ms) })))));
+        vista.append(el('button', { type: 'button', className: 'boton vista-tabla', textContent: '🏆 Récords de esta pista', onclick: () => mostrarTabla(c, f, mejores[0]?.cat) }));
+        // si se queda mirando esta pista ~½ s, la foto pasa a ser el videíto (se baja la copa entera, una vez)
+        if (conVideo()) setTimeout(async () => {
+          if (enVista !== aca) return;
+          const u = await fotos.clip(c, f);
+          if (u && enVista === aca) { foto.src = u; foto.classList.remove('sin-imagen'); foto.classList.add('en-video'); }
+        }, 450);
+      }
+      function mostrarCopa(c) {
+        if (enVista === `${c}`) return;
+        enVista = `${c}`;
+        vista.replaceChildren(
+          el('div', { className: 'vista-cab' }, imagen(fotos.copa(c), 'vista-icono grande'), el('h3', { textContent: `Copa ${c + 1}` })),
+          el('div', { className: 'vista-cuatro' }, ...[0, 1, 2, 3].map(f => el('figure', {}, imagen(fotos.plano(c, f), 'vista-plano'),
+            el('figcaption', { textContent: nombre(c, f) })))));
+      }
+      vista.append(el('p', { className: 'vista-vacia', textContent: 'Pasa el mouse por una pista para ver su foto y su plano.' }));
+
+      // Un botón que muestra con el mouse/foco y elige con clic; con el dedo, el primer toque solo muestra
+      function boton(props, mostrar, elegir) {
+        const b = el('button', { type: 'button', ...props });
+        let toque = false;
+        b.addEventListener('pointerdown', e => { toque = e.pointerType === 'touch'; });
+        b.addEventListener('pointerenter', e => { if (e.pointerType !== 'touch') mostrar(); });
+        b.addEventListener('focus', mostrar);
+        b.onclick = () => {
+          if (toque && !b.classList.contains('visto')) {
+            caja.querySelectorAll('.visto').forEach(x => x.classList.remove('visto'));
+            b.classList.add('visto'); mostrar(); return;
+          }
+          elegir();
+        };
+        return b;
+      }
+
+      // ---- Copa a tu gusto: 4 casillas, elegidas o al azar, reordenar, volver a sortear, confirmar ----
+      const tuCopa = { pistas: [null, null, null, null], semilla: semillaNueva(), casilla: 0 };
+      window.mkwTuCopa = tuCopa;                                  // para las pruebas
+      const panelCopa = el('section', { className: 'tu-copa' });
+      const todas = () => copas.flatMap((p, c) => p.map((_, f) => ({ copa: c, fila: f })));
+      const igual = (x, y) => x && y && x.copa === y.copa && x.fila === y.fila;
+      function sortear(casillas) {                  // sortea esas casillas con una semilla nueva, sin repetir pistas
+        tuCopa.semilla = semillaNueva();
+        const r = azar(tuCopa.semilla);
+        for (const i of casillas) {
+          const libres = todas().filter(p => !tuCopa.pistas.some((q, j) => j !== i && igual(p, q)));
+          tuCopa.pistas[i] = libres[Math.floor(r() * libres.length)];
+        }
+        pintarCopa();
+      }
+      function pintarCopa() {
+        const listos = tuCopa.pistas.every(Boolean);
+        panelCopa.replaceChildren(
+          el('div', { className: 'tu-copa-cab' },
+            el('b', { textContent: 'Tu copa' }),
+            el('span', { className: 'semilla', title: 'La semilla del sorteo; también decide los objetos y la CPU en las carreras',
+              textContent: 'Semilla ' + tuCopa.semilla.toString(16).toUpperCase().padStart(8, '0') }),
+            el('button', { type: 'button', className: 'boton', id: 'copaAzar', textContent: '🎲 Todo al azar', onclick: () => sortear([0, 1, 2, 3]) })),
+          el('ol', { className: 'casillas' }, ...tuCopa.pistas.map((p, i) => {
+            const li = el('li', { className: 'casilla' + (i === tuCopa.casilla ? ' activa' : '') });
+            li.onclick = e => { if (e.target.closest('button')) return; tuCopa.casilla = i; pintarCopa(); if (p) mostrarPista(p.copa, p.fila); };
+            const mover = (d, txt, etiqueta) => el('button', { type: 'button', className: 'mini', textContent: txt, title: etiqueta, disabled: i + d < 0 || i + d > 3,
+              onclick: () => { const j = i + d; [tuCopa.pistas[i], tuCopa.pistas[j]] = [tuCopa.pistas[j], tuCopa.pistas[i]]; tuCopa.casilla = j; pintarCopa(); } });
+            const nom = el('span', { className: 'casilla-nombre', textContent: p ? nombre(p.copa, p.fila) : (i === tuCopa.casilla ? 'Elige abajo…' : 'Vacía') });
+            nom.setAttribute('translate', 'no');
+            li.append(
+              el('span', { className: 'num', textContent: i + 1 }),
+              p ? imagen(fotos.foto(p.copa, p.fila), 'casilla-foto') : el('span', { className: 'casilla-foto vacia' }),
+              el('span', { className: 'casilla-copa' }, ...(p ? [imagen(fotos.copa(p.copa), 'casilla-icono', `Copa ${p.copa + 1}`), el('span', { textContent: `Copa ${p.copa + 1}` })] : []), nom),
+              el('span', { className: 'casilla-botones' },
+                mover(-1, '↑', 'Subir'), mover(1, '↓', 'Bajar'),
+                el('button', { type: 'button', className: 'mini', textContent: '🎲', title: 'Sortear esta', onclick: () => { tuCopa.casilla = i; sortear([i]); } }),
+                el('button', { type: 'button', className: 'mini', textContent: '✕', title: 'Vaciar', disabled: !p, onclick: () => { tuCopa.pistas[i] = null; tuCopa.casilla = i; pintarCopa(); } })));
+            return li;
+          })),
+          el('div', { className: 'tu-copa-pie' },
+            el('button', { type: 'button', className: 'boton primario', id: 'copaConfirmar', disabled: !listos,
+              textContent: listos ? 'Confirmar y jugar ▸' : `Faltan ${tuCopa.pistas.filter(x => !x).length}`,
+              onclick: () => terminar({ pistas: tuCopa.pistas.map(p => ({ ...p })), semilla: tuCopa.semilla }) })));
+      }
+      function ponerEnCopa(c, f) {                  // la pista va a la casilla elegida; después, a la siguiente vacía
+        tuCopa.pistas[tuCopa.casilla] = { copa: c, fila: f };
+        const vacia = tuCopa.pistas.findIndex(x => !x);
+        if (vacia >= 0) tuCopa.casilla = vacia;
+        pintarCopa();
+      }
+
       const pintar = () => {
         const q = buscar.value.trim().toLowerCase();
         lista.replaceChildren(...copas.map((pistas, c) => {
           if (q && !pistas.some(n => n.toLowerCase().includes(q))) return null;
           const tarjeta = el('div', { className: 'copa' });
-          const cab = el('button', { type: 'button', className: 'copa-cab', disabled: modo !== 'gp' },
-            el('b', { textContent: `Copa ${c + 1}` }), ...(modo === 'gp' ? [el('span', { textContent: 'Jugar esta copa ▸' })] : []));
-          cab.onclick = () => terminar({ copa: c, fila: 0 });
-          tarjeta.append(cab);
+          const cabeza = [imagen(fotos.copa(c), 'copa-icono'), el('b', { textContent: `Copa ${c + 1}` })];
+          if (modo === 'gp') {
+            const cab = boton({ className: 'copa-cab', title: 'Jugar esta copa' }, () => mostrarCopa(c), () => terminar({ copa: c, fila: 0 }));
+            cab.append(...cabeza, el('span', { textContent: 'Jugar ▸' }));
+            tarjeta.append(cab);
+          } else tarjeta.append(el('div', { className: 'copa-cab' }, ...cabeza));
           pistas.forEach((n, f) => {
-            const b = el('button', { type: 'button', className: 'pista', textContent: n || `Pista ${f + 1}`, disabled: modo === 'gp' });
+            const b = boton({ className: 'pista' + (q && !n.toLowerCase().includes(q) ? ' apagada' : '') }, () => mostrarPista(c, f),
+              modo === 'gp' ? () => terminar({ copa: c, fila: 0 }) : modo === 'copa' ? () => ponerEnCopa(c, f) : () => terminar({ copa: c, fila: f }));
+            b.textContent = n || `Pista ${f + 1}`;
             b.setAttribute('translate', 'no');
-            b.onclick = () => terminar({ copa: c, fila: f });
             tarjeta.append(b);
           });
           return tarjeta;
@@ -349,7 +561,9 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       };
       buscar.oninput = pintar;
       caja.append(el('div', { className: 'elegir-cab' }, el('h2', { textContent: titulo }), buscar,
-        el('button', { type: 'button', className: 'boton', textContent: 'Prefiero los menús del juego', onclick: () => terminar(null) })), lista);
+        el('button', { type: 'button', className: 'boton', textContent: 'Prefiero los menús del juego', onclick: () => terminar(null) })));
+      if (modo === 'copa') { caja.append(panelCopa); pintarCopa(); }
+      caja.append(el('div', { className: 'elegir-cuerpo' }, lista, vista));
       document.body.append(caja);
       pintar();
       buscar.focus();

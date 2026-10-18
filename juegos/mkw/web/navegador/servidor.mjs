@@ -49,6 +49,8 @@ const CARPETAS = [
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.wasm': 'application/wasm',
+  // las imágenes sacadas del juego para elegir pista y copa (build/…/imagenes: fotos, planos, íconos)
+  '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml',
 };
 
 // Recorre una carpeta y devuelve [[ruta relativa con "/", tamaño], ...]. Las carpetas vacías van con tamaño -1

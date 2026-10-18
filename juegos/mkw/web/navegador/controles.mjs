@@ -7,7 +7,9 @@
 //
 //   - Teclado → puerto 1. Mapeo por defecto pensado para Mario Kart, cambiable y guardado en el navegador.
 //   - Mandos → el primero comparte el puerto 1 con el teclado; los siguientes van a los puertos 2, 3 y 4.
-//     Mapeo "standard" del navegador (Xbox/PlayStation/Switch Pro/genéricos), zona muerta, gatillos analógicos.
+//     Mapeo "standard" del navegador (Xbox/PlayStation/Switch Pro/genéricos), zona muerta ajustable, gatillos
+//     analógicos; disposición «por letra» para los de Nintendo (A a la derecha) y asignación propia por mando (para
+//     adaptadores de GameCube y mandos sin mapeo estándar), todo guardado en el navegador ("mkw.mandos").
 //   - Táctil (celular) → puerto 1: stick a la izquierda y botones a la derecha, cada dedo por separado.
 //   - Inclinar el teléfono (como el Wii Wheel) → mueve el stick a izquierda/derecha del puerto 1 (opcional).
 //   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular.
@@ -52,13 +54,33 @@ const MANDO_BOTONES = [
   [9, BOTON.START], [8, BOTON.START],
   [12, BOTON.arriba], [13, BOTON.abajo], [14, BOTON.izquierda], [15, BOTON.derecha],
 ];
-const ZONA_MUERTA = 0.15;   // un stick suelto nunca marca 0 exacto: por debajo del 15 % se toma como centro
+// Los mandos de Nintendo (Switch Pro, Joy-Con) tienen las letras cambiadas de lugar: la A está a la DERECHA (donde
+// Xbox tiene B) y la B abajo. El navegador numera por POSICIÓN (0 = el de abajo), así que con un Switch Pro la "A"
+// de la etiqueta llegaría como B. Con la disposición «por letra» se cruzan: 1 (derecha, «A») → A, 0 (abajo, «B»)
+// → B, 3 (arriba, «X») → X, 2 (izquierda, «Y») → Y. «Automático» la usa solo si el mando es de Nintendo.
+const MANDO_LETRA = [[1, BOTON.A], [0, BOTON.B], [3, BOTON.X], [2, BOTON.Y], ...MANDO_BOTONES.slice(4)];
+// Qué mando es, por su nombre (el navegador pone el fabricante: 057e Nintendo, 054c Sony, 045e Microsoft)
+export function tipoMando(id = '') {
+  const s = id.toLowerCase();
+  if (/0079.{0,12}1846|mayflash|gamecube|057e.{0,12}0337/.test(s)) return 'gamecube';
+  if (/057e|nintendo|pro controller|joy-con/.test(s)) return 'nintendo';
+  if (/054c|playstation|dualsense|dualshock|wireless controller/.test(s)) return 'playstation';
+  if (/045e|xbox|xinput/.test(s)) return 'xbox';
+  return 'generico';
+}
+export const NOMBRE_TIPO = { nintendo: 'Nintendo (Switch Pro / Joy-Con)', playstation: 'PlayStation', xbox: 'Xbox', gamecube: 'GameCube (adaptador)', generico: 'Mando genérico' };
+// Los botones de GameCube que se pueden asignar a mano (para mandos raros o gustos propios), en orden del asistente
+export const ASIGNABLES = [['A', 'A — acelerar'], ['B', 'B — frenar'], ['R', 'R — derrapar'], ['L', 'L — objeto'], ['X', 'X — mirar atrás'],
+  ['Y', 'Y'], ['Z', 'Z'], ['START', 'Start — pausa'], ['arriba', 'Cruz arriba — truco'], ['abajo', 'Cruz abajo'], ['izquierda', 'Cruz izquierda'], ['derecha', 'Cruz derecha']];
+const CLAVE_MANDOS = 'mkw.mandos';
+const PREFS_MANDOS = { disposicion: 'auto', zona: 15, vibrar: true, propios: {} };   // zona muerta en %
 
 // stick del navegador (−1..1, +y = ABAJO) → stick de GameCube (−128..127, +y = ARRIBA), con zona muerta redonda
-function aStickGC(x, y) {
+// (un stick suelto nunca marca 0 exacto: por debajo de la zona muerta se toma como centro; por defecto 15 %)
+function aStickGC(x, y, zona = 0.15) {
   const r = Math.hypot(x, y);
-  if (r < ZONA_MUERTA) return [0, 0];
-  const k = Math.min(1, (r - ZONA_MUERTA) / (1 - ZONA_MUERTA)) / r;   // reescala para que siga llegando a 1
+  if (r < zona) return [0, 0];
+  const k = Math.min(1, (r - zona) / (1 - zona)) / r;                 // reescala para que siga llegando a 1
   return [Math.round(x * k * 127), Math.round(-y * k * 127)];
 }
 const recorta = v => Math.max(-128, Math.min(127, Math.round(v)));
@@ -75,6 +97,8 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
   const estado = { puertos: [], mandos: [] };     // para mostrar en pantalla y para las pruebas
+  const prefsMandos = { ...PREFS_MANDOS, ...(leer(CLAVE_MANDOS) || {}) };   // disposición, zona muerta, vibrar, asignaciones
+  let asignando = null;                           // { id, boton, antes:Set, listo } mientras el asistente espera un botón
 
   // --- teclado ---
   const teclasEnUso = () => new Set(Object.values(teclas).flat());
@@ -121,17 +145,40 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       const libre = [0, 1, 2, 3].find(p => !usados.has(p));
       if (libre !== undefined) puertosMando.set(g.index, libre);
     }
+    const zona = Math.min(0.4, Math.max(0.03, prefsMandos.zona / 100));
     return lista.map(g => {
-      let botones = 0;
-      for (const [i, bit] of MANDO_BOTONES) if (g.buttons[i] && g.buttons[i].pressed) botones |= bit;
-      const [sx, sy] = aStickGC(g.axes[0] || 0, g.axes[1] || 0);
-      const [cx, cy] = aStickGC(g.axes[2] || 0, g.axes[3] || 0);
-      const gl = Math.round(255 * ((g.buttons[6] && g.buttons[6].value) || 0));   // LT analógico → L
-      const gr = Math.round(255 * ((g.buttons[7] && g.buttons[7].value) || 0));   // RT analógico → R (derrapar)
-      if (gl > 128) botones |= BOTON.L;            // pasada la mitad, también cuenta el clic digital
-      if (gr > 128) botones |= BOTON.R;
-      const glFinal = g.buttons[4] && g.buttons[4].pressed ? 255 : gl;   // LB (digital) = L a fondo
-      return { puerto: puertosMando.get(g.index), nombre: g.id, botones, sx, sy, cx, cy, gl: glFinal, gr, mando: g };
+      const tipo = tipoMando(g.id), propio = prefsMandos.propios[g.id];
+      const letra = prefsMandos.disposicion === 'letra' || (prefsMandos.disposicion === 'auto' && tipo === 'nintendo');
+      const apretado = i => !!(g.buttons[i] && g.buttons[i].pressed);
+      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, tipo, letra, propio: !!propio, sinMapa: g.mapping !== 'standard' && !propio, mando: g };
+      // el asistente de asignar: el primer botón que se aprieta (y no estaba apretado al empezar) queda para ese botón
+      if (asignando && asignando.id === g.id) {
+        const i = g.buttons.findIndex((b, k) => b && b.pressed && !asignando.antes.has(k));
+        if (i >= 0) {
+          const listo = asignando.listo;
+          prefsMandos.propios[g.id] = { ...(prefsMandos.propios[g.id] || {}), [asignando.boton]: i };
+          guardar(CLAVE_MANDOS, prefsMandos); asignando = null; listo(i);
+        }
+        return { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };   // mientras asigna, el mando no maneja
+      }
+      let botones = 0, gl = 0, gr = 0;
+      if (propio) {
+        // asignación propia: cada botón de GameCube sale del botón del mando que se eligió (L y R con su valor analógico)
+        for (const [nombre] of ASIGNABLES) if (propio[nombre] !== undefined && apretado(propio[nombre])) botones |= BOTON[nombre];
+        const valor = i => i === undefined ? 0 : Math.round(255 * ((g.buttons[i] && g.buttons[i].value) || 0));
+        gl = Math.max(valor(propio.L), botones & BOTON.L ? 255 : 0);
+        gr = Math.max(valor(propio.R), botones & BOTON.R ? 255 : 0);
+      } else {
+        for (const [i, bit] of (letra ? MANDO_LETRA : MANDO_BOTONES)) if (apretado(i)) botones |= bit;
+        gl = Math.round(255 * ((g.buttons[6] && g.buttons[6].value) || 0));   // LT/ZL analógico → L
+        gr = Math.round(255 * ((g.buttons[7] && g.buttons[7].value) || 0));   // RT/ZR analógico → R (derrapar)
+        if (gl > 128) botones |= BOTON.L;          // pasada la mitad, también cuenta el clic digital
+        if (gr > 128) botones |= BOTON.R;
+        if (apretado(4)) gl = 255;                 // LB / L (digital) = L a fondo
+      }
+      const [sx, sy] = aStickGC(g.axes[0] || 0, g.axes[1] || 0, zona);
+      const [cx, cy] = aStickGC(g.axes[2] || 0, g.axes[3] || 0, zona);
+      return { ...comun, botones, sx, sy, cx, cy, gl, gr };
     });
   }
 
@@ -142,11 +189,11 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     if (on === vibrando.has(puerto)) return;
     on ? vibrando.add(puerto) : vibrando.delete(puerto);
     for (const m of leerMandos()) {
-      if (m.puerto !== puerto || !m.mando.vibrationActuator) continue;
+      if (m.puerto !== puerto || !m.mando.vibrationActuator || (on && !prefsMandos.vibrar)) continue;
       if (on) m.mando.vibrationActuator.playEffect('dual-rumble', { duration: 5000, strongMagnitude: 0.8, weakMagnitude: 0.8 }).catch(() => {});
       else m.mando.vibrationActuator.reset().catch(() => {});
     }
-    if (puerto === 0 && tactil.activo && navigator.vibrate) navigator.vibrate(on ? 5000 : 0);
+    if (puerto === 0 && tactil.activo && navigator.vibrate && (prefsMandos.vibrar || !on)) navigator.vibrate(on ? 5000 : 0);
   }
 
   // --- inclinación (Wii Wheel): girar el teléfono acostado como un volante ---
@@ -207,6 +254,25 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     esperando: () => esperandoTecla,
     restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },
     teclasDe: id => teclas[id],
+    // --- mandos: disposición de botones ('auto' | 'posicion' | 'letra'), zona muerta (%), vibrar, asignaciones propias ---
+    prefsMandos: () => JSON.parse(JSON.stringify(prefsMandos)),
+    ajustarMandos(cambios) {
+      Object.assign(prefsMandos, cambios);
+      prefsMandos.zona = Math.min(40, Math.max(3, Number(prefsMandos.zona) || 15));
+      if (!['auto', 'posicion', 'letra'].includes(prefsMandos.disposicion)) prefsMandos.disposicion = 'auto';
+      prefsMandos.vibrar = prefsMandos.vibrar !== false;
+      guardar(CLAVE_MANDOS, prefsMandos);
+    },
+    // asistente: espera que se apriete un botón del mando `id` y lo deja para el botón de GameCube `boton`.
+    // → Promise con el número del botón del mando (o null si se cancela)
+    asignarBoton(id, boton) {
+      if (asignando) asignando.listo(null);
+      const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.id === id);
+      const antes = new Set(g ? g.buttons.map((b, k) => b && b.pressed ? k : -1).filter(k => k >= 0) : []);
+      return new Promise(listo => { asignando = { id, boton, antes, listo }; });
+    },
+    cancelarAsignacion() { if (asignando) { asignando.listo(null); asignando = null; } },
+    borrarAsignacion(id) { delete prefsMandos.propios[id]; guardar(CLAVE_MANDOS, prefsMandos); },
     tactil(activar) { tactil.activo = activar; if (tactilUI) tactilUI.mostrar(activar); },
     // Tamaño (0,8–1,3) y opacidad (0,3–1) del mando táctil, guardados en el navegador ("mkw.tactil")
     ajustesTactil: () => ({ ...ajustesTactil }),

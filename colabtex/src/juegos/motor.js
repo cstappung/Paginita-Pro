@@ -225,6 +225,14 @@ export const JUEGOS = {
     minimo: 1,   // un torneo se puede jugar solo contra la CPU (el duelo pide dos: minimoDe)
     cupo: 8,
     alta: "2026-10-14"
+  },
+  mkw: {
+    nombre: "Mario Kart Wii",
+    lema: "Mario Kart Wii con Retro Rewind en el navegador: carreras en línea de hasta 12, con tus amigos y CPU de relleno",
+    color: "#e4202e",
+    minimo: 1,   // se puede abrir la sala solo (con CPU de relleno) y esperar a los demás
+    cupo: 12,    // lo que admite una sala en línea del juego
+    alta: "2026-10-17"
   }
 };
 
@@ -1014,6 +1022,7 @@ export function reducir(p) {
   if (p.juego === "hero") return { ...base, ...redHero(p, js, listos) };
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
   if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
+  if (p.juego === "mkw") return { ...base, ...redMkw(p, js) };
   return base;
 }
 
@@ -7478,5 +7487,86 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
     batalla, tiempo, veto, relevo, reglas: reglasBt3(batalla, tiempo), discos, ronda: peleas, fuera, hist: hist.slice(-60),
     llave: rondas, previa: rondas ? null : previa(), actual: m ? { id: m.id, a: m.a, b: m.b, enCurso: m.enCurso, n: m.n || 0, rep: m.rep, conflicto: m.conflicto, reanudar: !!m.reanudar } : null, cpus,
     ganador, motivo: ganador === null ? "" : campeon !== null ? "torneo" : "abandono"
+  };
+}
+
+/* ---------- Mario Kart Wii (+ Retro Rewind) ----------
+   El juego compilado a WebAssembly (`juegos/mkw/`, ver su CLAUDE.md), en un iframe. La carrera va de navegador a
+   navegador por una malla WebRTC abierta DENTRO del marco (el buzón de Firebase, `vivo/<pid>/rtc`, solo presenta);
+   el servidor en línea del juego (un "WFC" escrito por nosotros) corre en el marco del anfitrión, y cada juego entra
+   solo a «VS mundial», donde se encuentran (la sala, la votación de pista y las carreras son las del juego). Al
+   registro va solo el vestíbulo:
+   - `{t:"ajuste", uid, k:"cpu", v}`: el anfitrión elige la CPU de relleno (MKW_CPU: "ninguna", "facil", "normal",
+     "dificil") para las carreras siguientes.
+   - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
+     vive en su pestaña).
+   - `{t:"empieza", uid}`: el anfitrión abre las carreras: todos los marcos cargan el juego y entran en línea.
+   - `{t:"vuelve", uid}`: el anfitrión las cierra y todos vuelven al vestíbulo.
+   - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y, si estaban corriendo,
+     vuelven todos al vestíbulo (sin su pestaña no hay servidor).
+   Quien entra con las carreras andando carga el juego y entra solo: el juego lo deja mirando y lo suma en la
+   carrera siguiente. Cada jugador tiene su NODO (su dirección en la red del juego, 10.77.0.<nodo>): 2 + su orden de
+   llegada a la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
+   La sala termina cuando ya no queda nadie. */
+export const MKW_CPU = { ninguna: "Sin CPU", facil: "CPU fácil", normal: "CPU normal", dificil: "CPU difícil" };
+const mkwCpu = v => tiene(MKW_CPU, v) ? v : "normal";
+/* La carrera con CPU de relleno es la "carrera sincronizada" del juego (cada navegador corre la misma carrera offline
+   con los botones de todos): cada humano maneja un puerto de mando de GameCube, y hay 4. Con más pilotos se corre en
+   línea, sin CPU. */
+export const MKW_SINCRO_MAX = 4;
+export const MKW_COPAS = 79;            // copas de carrera de Retro Rewind (las de arenas no cuentan)
+/* La semilla y las 4 pistas de una tanda: salen de la sala y del número de tanda, así cada navegador calcula lo mismo
+   sin que nadie lo escriba. */
+export function mkwCarrera(pid, ronda) {
+  let h = 2166136261;
+  for (const c of `${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let x = (h >>> 0) || 1;
+  const azar = n => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % n; };
+  const semilla = (h >>> 0) || 1, pistas = [], vistas = new Set();
+  while (pistas.length < 4) {
+    const copa = azar(MKW_COPAS), fila = azar(4), k = copa * 4 + fila;
+    if (vistas.has(k)) continue;
+    vistas.add(k); pistas.push({ copa, fila });
+  }
+  return { semilla, pistas };
+}
+
+export function redMkw(p, js = jugadoresDe(p)) {
+  const ids = new Set(js.map(j => j.uid));
+  const fuera = {}, hist = [];
+  let fase = "vestibulo", ronda = 0, cpu = mkwCpu(p && p.cpu), sincro = null;
+  let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  const presentes = () => js.filter(j => !fuera[j.uid]);
+  for (const j of jugadasDe(p)) {
+    if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t === "abandona") {
+      fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid });
+      if (j.uid === anfitrion) {
+        anfitrion = (presentes()[0] || {}).uid || "";
+        // en línea su pestaña era el servidor: vuelven todos. En la carrera sincronizada no hay servidor: siguen
+        if (fase === "jugando" && !sincro) { fase = "vestibulo"; hist.push({ e: "vuelve", por: "anfitrion" }); }
+      }
+      continue;
+    }
+    const esAnf = j.uid === anfitrion;
+    if (j.t === "ajuste" && esAnf && j.k === "cpu") { cpu = mkwCpu(j.v); continue; }
+    if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
+    if (j.t === "empieza" && esAnf && fase === "vestibulo") {
+      fase = "jugando"; ronda++;
+      // con CPU y hasta 4 pilotos: carrera sincronizada, con los que están ahora, en este orden (puerto 1, 2, 3, 4)
+      const ps = presentes();
+      sincro = cpu !== "ninguna" && ps.length <= MKW_SINCRO_MAX ? ps.map(x => x.uid) : null;
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, jugadores: ps.length, sincro: !!sincro });
+      continue;
+    }
+    if (j.t === "vuelve" && esAnf && fase === "jugando") { fase = "vestibulo"; hist.push({ e: "vuelve", n: ronda }); continue; }
+  }
+  const nodos = {};
+  js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
+  const quedan = presentes().length;
+  return {
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, ronda, nodos, fuera, hist: hist.slice(-40),
+    sincro: fase === "jugando" ? sincro : null,
+    ganador: "", motivo: quedan ? "" : "abandono"
   };
 }

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610170612"></script>
+<script src="i18n.js?v=202610182232"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1662,6 +1662,47 @@ try { var t = localStorage.getItem("jg.tema");
 @media(max-width:720px){.jg-ban .jg-ban-arte .jg-art-bt3 b,.jg-ban .jg-ban-arte .jg-art-bt3 u{left:50%}.jg-ban .jg-ban-arte .jg-art-bt3 em{left:0}}
 .jg-bt3-marco{background:#000}
 .jg-bt3-marco[hidden]{display:none}
+/* Mario Kart Wii: la portada (una bandera a cuadros que flamea y el nombre en letras nuestras: nada del arte del
+   juego), el marco y el vestíbulo. Superficies oscuras siempre, como BT3: sin gemelo en el bloque del tema oscuro. */
+.jg-art-mkw{position:absolute;inset:0;overflow:hidden;isolation:isolate;container-type:size;
+  background:radial-gradient(ellipse 70% 60% at 50% 120%,#ff3b3b66,transparent 70%),linear-gradient(165deg,#0f1c3a 0%,#1b2f63 55%,#3a0d1a 100%)}
+.jg-art-mkw s{position:absolute;left:-10%;right:-10%;top:18%;height:26cqmin;z-index:-1;transform:skewY(-8deg);opacity:.85;
+  background:repeating-conic-gradient(#f4f6ff 0 25%,#151a24 0 50%) 0 0/8cqmin 8cqmin;
+  -webkit-mask:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);mask:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
+  animation:jgMkwFlamea 3.2s ease-in-out infinite alternate}
+@keyframes jgMkwFlamea{from{transform:skewY(-8deg) translateY(0)}to{transform:skewY(-5deg) translateY(2cqmin)}}
+.jg-art-mkw em{position:absolute;left:0;right:0;bottom:12%;display:flex;flex-direction:column;align-items:center;font-style:normal;text-align:center}
+.jg-art-mkw em small{font:700 6.5cqmin/1 system-ui,sans-serif;letter-spacing:.3em;text-transform:uppercase;color:#ffd34d}
+.jg-art-mkw em strong{font:900 14cqmin/1.05 system-ui,sans-serif;color:#fff;text-shadow:0 .6cqmin 0 #c81d25,0 1.2cqmin 2cqmin #0008;font-style:italic}
+.jg-portada-mkw,.jg-nov-arte-mkw{background:#0f1c3a}
+.jg-mkw-marco{background:#000}
+.jg-mkw-marco[hidden]{display:none}
+.jg-mkw-escena{display:flex;flex-direction:column;gap:10px}
+.jg-mkw-vest{background:linear-gradient(160deg,#0f1c3a,#1b2f63);color:#eef2ff;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.jg-mkw-vest[hidden]{display:none}
+.jg-mkw-vest.jugando{flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 14px}
+.jg-mkw-vest.jugando .jg-mkw-pilotos{flex:1 1 auto}
+.jg-mkw-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.jg-mkw-cab b{font-size:1.15rem}
+.jg-mkw-cab span{color:#b9c4e6;font-size:.92rem}
+.jg-mkw-pilotos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.jg-mkw-piloto{background:#ffffff10;border:1px solid #ffffff22;border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.jg-mkw-piloto.anf{border-color:#ffd34d;box-shadow:inset 0 0 0 1px #ffd34d55}
+.jg-mkw-piloto b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mkw-piloto small{color:#b9c4e6}
+.jg-mkw-dar{margin-top:4px;align-self:flex-start;font-size:.8rem;border:1px solid #ffffff44;background:transparent;color:#eef2ff;border-radius:8px;padding:2px 8px;cursor:pointer}
+.jg-mkw-cpu{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.jg-mkw-cpu span{color:#b9c4e6;margin-right:4px}
+.jg-mkw-ficha{border:1px solid #ffffff44;background:#ffffff0d;color:#eef2ff;border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit}
+.jg-mkw-ficha[aria-pressed=true]{background:#ffd34d;color:#1b1400;border-color:#ffd34d;font-weight:700}
+.jg-mkw-ficha:disabled{cursor:default;opacity:.75}
+.jg-mkw-pie{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.jg-mkw-empieza,.jg-mkw-vuelve{border:0;border-radius:12px;padding:10px 20px;font:800 1.05rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw-empieza{background:#e4202e;color:#fff}
+.jg-mkw-empieza:disabled{opacity:.5;cursor:default}
+.jg-mkw-vuelve{background:#ffffff1f;color:#eef2ff}
+.jg-mkw-nota{margin:0;color:#d8def5;font-size:.95rem}
+@media (prefers-reduced-motion:reduce){.jg-art-mkw s{animation:none}}
 /* El vestíbulo de BT3, a lo Dragon Ball: el cielo de noche de las peleas (azul profundo con líneas de velocidad
    y un estallido de ki naranja arriba), títulos como el logo (Lilita One, dorado a naranja con borde oscuro),
    esferas del dragón de adorno. Siempre oscuro, como el juego: no lleva gemelo en el bloque del tema oscuro.
@@ -5274,6 +5315,6 @@ html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610170612"></script>
+<script src="juegos-app.js?v=202610182232"></script>
 </body>
 </html>

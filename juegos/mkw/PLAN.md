@@ -10,6 +10,81 @@ después lo social.
 
 ---
 
+## Lo que falta, en orden (plan del 2026-10-18)
+
+**Dónde estamos:** el juego corre en Chrome a 60 fps (~8,5 ms de procesador por cuadro de 16,7), con controles,
+sonido, partidas, caché, página propia con sus modos, en línea por nuestra página (WFC en la pestaña del anfitrión +
+malla WebRTC) y carrera sincronizada con CPU de relleno en la sala del sitio. Todo probado **en este PC**. Falta
+publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
+
+**Decisiones del dueño (2026-10-18):**
+- Commits en la rama del sitio y en el repo local: **sí**; push y PR: **sí** (merge: cuando él lo diga).
+- El Worker de Mario Kart usa **el mismo Worker y la misma lista de amigos que BT3**; el Worker y la subida a R2
+  **los hace el dueño** (aquí se prepara todo lo que necesita: qué servir, el programa final, la lista de archivos).
+- **El VR solo se mueve en línea** (VS por el WFC de la sala). La carrera sincronizada con CPU no lo toca.
+- **Se quita el visor de salas de Retro WFC** (`salas.mjs`): el multijugador va solo por nuestra página.
+- **Dos PCs = dos juegos abiertos en el mismo PC** (así se probó BT3): basta con las pruebas de dos pestañas y una
+  prueba a mano con dos ventanas.
+
+### Etapa A — Cerrar lo de hoy y poner el trabajo a salvo
+- ✅ A1. Terminar las pruebas: `prueba-copa.mjs` (copa offline de 4 carreras), modo Node recompilado +
+  `prueba-arranque.mjs` (13 puntos), y ver por qué el navegador da 20 puntos si `CLAUDE.md` dice 21
+- ✅ A2. Sitio: `npm run build` en `colabtex` (cambiaron `mkw.js` y `motor.js`) + `npm run test:juegos` + `mkw.test.cjs`
+- ✅ A3. Papeles al día: este plan (marcar lo hecho), `docs/en-linea.md` (fases con su estado real), `CLAUDE.md`
+- ⬜ A4. `subir-kit.sh` y commit en `claude/loving-planck-9k2yam` **solo con lo nuestro** (kit, sala de Mario Kart en
+  `colabtex/src/juegos/`, pruebas, reglas de Firebase, `juegos-app.js` + `juegos.html`); afuera el trabajo ajeno, los
+  cambios de solo fin de línea y los sellos de `i18n.js`
+- ⬜ A5. Primer commit del repo local `MKW RETRO` (revisando `git status` contra `.gitignore`)
+- ⬜ A6. Push de la rama y PR a `main` (sin merge)
+
+### Etapa B — Publicación privada (jugar en el sitio de verdad)
+- ⬜ B1. Inventario exacto de lo que el Worker tiene que servir (lo que hoy sirve `servidor.mjs`): programa
+  (`mkw.js`, `mkw.wasm.br` con `Content-Encoding: br` y huella `?v=`), manifiesto del disco, pedazos (HTTP Range) del
+  disco y de `RetroRewind6/`, semillas (`pipelines.bin`, `bloques.json`), imágenes; CORS solo el sitio
+- ⬜ B2. Programa final (`compilar-web.py --modo navegador --final`) y semillas nuevas (`guion.mjs … --semilla`, 3 corridas)
+- ⬜ B3. Lista de archivos para R2 (disco 2,6 GB + RR 2,1 GB + programa 16 MB ≈ 4,7 GB) con huellas, y su
+  comprobación; `docs/publicar.md` con los pasos del dueño (Worker, R2, `juegos/mkw/privado.json`, reglas de Firebase)
+- ⬜ B4. Banco: el Worker imitado en local con disco y RR **falsos** (403 a no-amigos, Range exacto, brotli, CORS)
+- ⬜ B5. Ensayo general en este PC (`sitio-local.mjs`): 1.ª y 2.ª visita, sala con dos pestañas, partidas, VR
+- ⬜ B6. Partidas en la nube (`nube.mjs`) con la sesión real del sitio
+- ⬜ B7. (Dueño) publicar Worker, subir a R2, poner la dirección, publicar reglas → prueba en el sitio real como amigo
+  y como no-amigo
+
+### Etapa C — En línea: terminarlo y endurecerlo
+- ⬜ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada (la página ya acepta `?pjs=`)
+- ⬜ C2. Pruebas largas de "misma carrera": muchas copas sincronizadas con semillas y pistas al azar
+- ⬜ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego
+- ⬜ C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas)
+- ⬜ C5. PC lento en la sala (`prueba-sincro --lento`)
+- ⬜ C6. VS en línea sin CPU: cola de pistas y «Confirmar» sobre la votación (F3); TURN, más jugadores, fallos en el chat (F4)
+- ⬜ C7. Espectadores (video del anfitrión, como `bt3-directo.js`)
+- ⬜ C8. Dónde guarda Pulsar `RRSettings.pul` (trofeos) y `RRRating.pul` (VR) en línea
+
+### Etapa D — Página y modos
+- ⬜ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador
+- ⬜ D2. Imágenes sacadas del juego (fotos de pistas, íconos, caras de Mii) a R2 con el programa
+- ✅ D3. Quitar el visor de salas de Retro WFC (§64); el código de amigo propio ya sale del `rksys.dat` (`licencias.mjs`)
+- ⬜ D4. La ayuda de "tarjeta de video equivocada" en la página del sitio
+
+### Etapa E — Rendimiento
+- ⬜ E1. Sonido con AudioWorklet (latencia ~100–150 → ~30 ms) y sin cortes en el arranque
+- ⬜ E2. Primera visita: los ~9 tirones por pipelines nuevos en 20 s
+- ⬜ E3. Monitores de 60/120/240 Hz: recortar el giro final de 0,75 ms (medir con el monitor en 240 Hz)
+- ⬜ E4. Celulares (cuando el dueño diga): teléfono real con `adb reverse`; misma carrera entre PC y teléfono (NaN en ARM)
+
+### Etapa F — De fondo
+- ⬜ F1. Un script que corra todas las pruebas y diga "N bien, M mal"
+- ⬜ F2. Banco que falta: disco y RR falsos, Worker local, juego falso chico
+- ⬜ F3. Script para actualizar Retro Rewind (delta, retraducir `Code.pul`, recompilar, semillas, R2)
+- ⬜ F4. Siempre: bitácora + glosario, `parches/` y `versiones.md` al día
+
+**Terminado =** un amigo entra al sitio → Juegos → Mario Kart Wii → carga desde R2 por el Worker → juega a 60 fps;
+sus partidas, récords y VR quedan en Firebase. Una sala de 2–12 corre (con CPU de relleno y ≤ 4 humanos, la carrera
+sincronizada; si no, el VS en línea) sin separarse ni congelarse. Un no-amigo no ve el juego ni puede bajarlo. Nada
+del juego en git ni público. Celular: actualización aparte.
+
+---
+
 ## Fase 0 — Preparación ✅
 
 - ✅ Analizar WiiCompiled, WheelWizard y Retro Rewind (`docs/analisis.md`)
@@ -43,16 +118,18 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 - ✅ `banco/pruebas/capacidades.html`: ¿el navegador puede correr el juego? (JSPI, WebGPU, WGSL, memoria, excepciones, 60 Hz, mandos, táctil, inclinación) — 14/0 en el PC
 - ✅ Páginas de las pruebas de concepto de la fase 1: ✅ fibers · ✅ excepciones · ✅ WebGPU · ✅ FMA · ✅ paridad x86↔wasm
 - ⬜ **Disco falso** con la forma del de MKW (árbol `files/` con nombres y tamaños de verdad, relleno adentro) y
-  **Retro Rewind falso** (`RetroRewind6/` con la misma forma), para probar la carga por pedido y el overlay
-- ⬜ **Worker local** (el `worker.js` de BT3 adaptado) con tokens propios, latencia simulada y modo "sin lote"
-- ⬜ **Juego falso**: un `.wasm` chico que imita los ganchos del de verdad (pide archivos, dibuja un cuadro de
-  prueba con WebGPU a 60 fps, avisa "empezó la carrera", "terminó, ganó X") para armar la página sin el juego
-- ⬜ **Firebase y WebRTC falsos** (BroadcastChannel entre pestañas) para salas y espectadores
-- ⬜ **Salas de Retro WFC falsas** (`roomstatus` de mentira con jugadores y Miis inventados)
+  **Retro Rewind falso** (`RetroRewind6/` con la misma forma), para probar el Worker sin datos reales (etapas B4/F2)
+- ⬜ **Worker local** (el Worker de amigos imitado en 127.0.0.1) con disco y RR falsos: 403 a no-amigos, Range, brotli, CORS (etapa B4)
+- ⬜ **Juego falso**: un `.wasm` chico que imita los ganchos del de verdad (etapa F2; hoy las páginas se prueban con el juego
+  de verdad en este PC)
+- ✅ **Firebase y WebRTC falsos**: buzón por BroadcastChannel (`senal=canal`), Firebase falso que aplica las reglas
+  (`nube` 23/0, `vr` 20/0, `records`), red falsa (`red` 20/0), sala falsa del sitio (`sala-mkw`); espectadores: etapa C7
+- ✅ ~~Salas de Retro WFC falsas~~: ya no hacen falta, el visor de Retro WFC se quitó (§64)
 - 🟡 **Controles simulados** (`banco/pruebas/controles/`, 28/0): mando falso (Gamepad API de mentira), teclas,
   toques de varios dedos (pointer events), inclinación falsa (`deviceorientation`), vibración. Falta: toques
   por CDP en un Pixel 7 vertical/horizontal y que ningún botón táctil choque con otro a ningún tamaño
-- ⬜ Pruebas de Playwright (`pruebaNN.cjs`) + `banco/pruebas.ps1` que las corre todas: `N bien, M mal`
+- 🟡 Pruebas de Playwright: `node banco/correr.mjs` corre todas las páginas del banco (21/21) y `web/navegador/prueba-*.mjs`
+  las del juego; falta un solo script que corra todo (etapa F1)
 
 ## Fase 2 — El juego en wasm, sin pantalla (como `link.py node` de BT3) ✅
 
@@ -92,9 +169,8 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   - ✅ Pruebas: `banco/pruebas/sonido/` **13/0** (sin el juego; necesita un clic) y en la prueba del navegador
     (bloqueo simulado con `?bloquearSonido=1` porque Chrome manejado por Playwright nunca bloquea): desbloqueo con
     el clic, música del título a −14 dB, sin cortes desde el cuadro 300, cola centrada
-  - ⬜ Cortes en el arranque (2 huecos + bloques tirados mientras el juego se traba leyendo el disco): se irán
-    con la caché de lo bajado del disco. Latencia ~100–150 ms (bloque de 43 ms + cola de 60): bajarla con un
-    AudioWorklet en vez del ScriptProcessorNode
+  - ⬜ Cortes en el arranque (2 huecos + bloques tirados mientras el juego se traba leyendo el disco) y latencia
+    ~100–150 ms (bloque de 43 ms + cola de 60): AudioWorklet en vez del ScriptProcessorNode (etapa E1)
 - ✅ **Controles** (todos llegan al juego como un mando de GameCube por puerto): `web/navegador/pad_web.cpp`
   reemplaza el `pad.cpp` de aurora (que leía SDL) y la página lo llena con `_mkw_web_pad(puerto, …)` en cada
   refresco; `web/navegador/controles.mjs` junta las fuentes:
@@ -146,12 +222,13 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 - ✅ **Carga del programa** (§54): `mkw.wasm.br` (124,3 → 16,1 MB, ningún archivo > 100 MB), con huella (`?v=`) y
   guardable para siempre; 2.ª visita sin bajarlo ni compilarlo (primer cuadro 7,9 → 2,3 s a 50 Mbit/s).
   `compilar-web.py --final`. Descartado: `wasm-opt -O3` (sin ganancia)
-- ⬜ **El Worker de verdad**: entregar el programa como en `servidor.mjs` (§54: `immutable` con `?v=`,
-  `mkw.wasm.br` con `Content-Encoding: br`, `X-Mkw-Build` en el manifiesto). Lo publica el dueño
-- ⬜ **CPU del juego en equipos débiles**: medir en un teléfono real (Android con Chrome) y, si no llega a 60, buscar
-  dónde recortar el trabajo del juego traducido (el perfil frenado es el de siempre: juego, sonido, aurora)
-- ⬜ **Subir las semillas** (`build/web/navegador/pipelines.bin` y `bloques.json`) a R2 junto al `.wasm` al publicar
-  (fase 6), y rehacerlas (`guion.mjs … --semilla`, 3 veces) cada vez que cambie aurora o el disco
+- ⬜ **El Worker de verdad** (el mismo de BT3, con su lista de amigos): entregar el programa como `servidor.mjs` (§54:
+  `immutable` con `?v=`, `mkw.wasm.br` con `Content-Encoding: br`, `X-Mkw-Build` en el manifiesto). Lo prepara y
+  publica el dueño; aquí se deja todo lo que necesita (etapa B)
+- ⬜ **CPU del juego en equipos débiles**: medir en un teléfono real (Android con Chrome) cuando el dueño lo pida
+  (etapa E4; la emulación con freno de Chrome exagera)
+- ⬜ **Subir las semillas** (`pipelines.bin`, `bloques.json`) a R2 junto al `.wasm` y rehacerlas cuando cambie aurora o
+  el disco (etapas B2/B3)
 - ✅ **Partidas guardadas** (`web/navegador/guardado.mjs`): partida de RR (`rksys.dat`), NAND (ajustes de RR y de la
   consola) y lo nuevo en la SD (fantasmas) se guardan solos en IndexedDB (enganche a cerrar/renombrar/borrar del
   sistema de archivos, medio segundo después del último cambio) y vuelven antes del `main()` al reabrir. Descargar /
@@ -169,39 +246,52 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 ## Fase 4 — Retro Rewind completo en el navegador
 
-- ⬜ Overlay de `RetroRewind6/` (pistas, personajes, música) sobre los archivos del disco, servido por pedido igual que el disco
-- 🟡 Ajustes de Pulsar: `RRGameSettings.pul` ya se guarda (NAND `shared2/Pulsar/RetroRewind6/`); falta ver dónde caen `RRSettings.pul` (trofeos) y `RRRating.pul` (VR) al jugar contrarreloj / en línea
-- ⬜ Actualizar a una versión nueva de RR = bajar el delta, retraducir `Code.pul`, recompilar, subir a R2 (script)
+- ✅ Overlay de `RetroRewind6/` (pistas, personajes, música) por pedido igual que el disco: en local lo sirve
+  `servidor.mjs`; en R2, etapa B
+- 🟡 Ajustes de Pulsar: `RRGameSettings.pul` ya se guarda (NAND `shared2/Pulsar/RetroRewind6/`); `RRRating.pul` (VR) se
+  lee (`licencias.mjs`); falta ver dónde caen `RRSettings.pul` (trofeos) y el VR al jugar en línea (etapa C8)
+- ⬜ Actualizar a una versión nueva de RR = bajar el delta, retraducir `Code.pul`, recompilar, subir a R2 (script, etapa F3)
 
 ## Fase 5 — En el sitio (repo Paginita-Pro)
 
-- 🟡 `juegos/mkw/`: página propia con la cara del sitio (§55: inicio, modos, barra, cajón, «Tu partida», Mi Mii, piloto); ⬜ integrarla en `juegos.html` (marco `jg-mkw-solo`, `volumen.js`, `i18n.js`)
-- ⬜ `.wasm` + archivos del disco en R2, servidos por el Worker solo a `AMIGOS` (lotes, Cache Storage)
-- ⬜ Oculto salvo amigos (`juegoOculto()`); nada se baja desde el vestíbulo
+- ✅ `juegos/mkw/`: página propia con la cara del sitio (§55: inicio, modos, barra, cajón, «Tu partida», Mi Mii, piloto)
+  y ✅ **integrada en `juegos.html` como juego de sala** (§60: marco, vestíbulo con CPU de relleno y hasta 12, manual,
+  portada, reglas de Firebase, `mkw.js` + `motor.js`)
+- ⬜ `.wasm` + archivos del disco y de RR en R2, servidos por el Worker solo a `AMIGOS` (etapa B; el dueño publica)
+- ✅ Oculto salvo amigos (`ocultos.js` + `bt3-amigos.js`, como BT3); nada se baja desde el vestíbulo (§60)
 - 🟡 **Partidas en la nube** (`web/navegador/nube.mjs`): el paquete `.mkwp` en Firebase Storage `mkw/<uid>/partidas.mkwp`
   con huella SHA-256 y hora de juego en los metadatos; al entrar sube, baja o no hace nada según las huellas; conflictos
   → gana la jugada más recientemente y la otra queda de respaldo; subida automática con espera y tope de frecuencia.
   Banco `pruebas/nube/` (Firebase falso con las reglas) **23/0**. Regla y código para la página en `docs/firebase-mkw.md`.
-  ⬜ Conectarlo en `juegos/mkw/` con el inicio de sesión real; ⬜ el dueño publica la regla de Storage
-- ⬜ Banco de pruebas y pruebas de Playwright (como el de BT3)
+  ⬜ Conectarlo con el inicio de sesión real del sitio (etapa B6); ⬜ el dueño publica la regla de Storage
+- ✅ Pruebas de la sala: `colabtex/tests/mkw.test.cjs` (10/10) y la sala falsa `banco/pruebas/sala-mkw` (`prueba-enlinea
+  --sala`, `prueba-sincro --sala`)
 
 ## Fase 6 — En línea y social
 
-- 🟡 **Salas de Retro WFC en vivo** (`web/navegador/salas.mjs`): lee `rwfc.net/api/roomstatus` directo (responde CORS `*`:
-  **no hace falta el Worker**), salas con gente ordenadas, sondeo cada 15 s solo con la pestaña a la vista, código de
-  amigo con su control MD5 (Tockdom; verificado 280/0 con el servidor real) y buscar amigo. Banco `pruebas/salas/` 19/0.
-  ⬜ Panel en la página del sitio; ⬜ código de amigo propio desde `rksys.dat`; ⬜ qué significa cada `rk`
-- 🟡 Jugar en línea por la página: diseño "WFC virtual" en `docs/en-linea.md` (sockets de la Wii → JS, UDP por WebRTC, WFC chiquito en la pestaña del anfitrión, Firebase solo presenta). ⬜ F0 sockets ⬜ F1 WFC virtual ⬜ F2 transporte ⬜ F3 sala (cola de pistas tipo playlist, hasta 12, 45 s entre pistas con «Confirmar»; entrar con la carrera andando: «siguiente carrera» o «sala», mirando mientras tanto) ⬜ F4
-- ⬜ Espectadores (`bt3-directo.js` adaptado a canvas WebGPU)
+- ✅ ~~Salas de Retro WFC en vivo~~ → **se quitó** (decisión del dueño, §64): el multijugador va solo por nuestra página.
+  El código de amigo pasó a `codigo-amigo.mjs` y «Tu partida» lo sigue mostrando (sale del pid del `rksys.dat`)
+- 🟡 Jugar en línea por la página: diseño "WFC virtual" en `docs/en-linea.md` (sockets de la Wii → JS, UDP por WebRTC, WFC chiquito en la pestaña del anfitrión, Firebase solo presenta). ✅ F0 sockets ✅ F1 WFC virtual (2 pestañas, 3 carreras seguidas, §58) ✅ F2 transporte (malla WebRTC + router, buzón intercambiable; probado con el juego y en `banco/pruebas/red`, §59) 🟡 F3 sala (✅ sala del sitio con vestíbulo, hasta 12, entrar con la carrera andando → el juego lo suma en la siguiente, §60; ✅ carrera sincronizada con CPU de relleno, §61–63; ⬜ cola de pistas tipo playlist y 45 s con «Confirmar» sobre la votación del juego: etapa C6) ⬜ F4 robustez (TURN, más jugadores, motivos de fallo en el chat: etapa C6)
+- ⬜ Espectadores (`bt3-directo.js` adaptado a canvas WebGPU; etapa C7)
+- ✅ **CPU de relleno en línea** (§61–63): con CPU de relleno y ≤ 4 humanos la sala corre la **carrera sincronizada**
+  (todas las consolas corren la misma carrera offline con los botones de todos: lockstep); con más humanos, VS en línea
+  sin CPU. Copa entera 4/4 con semilla y dentro de la sala falsa
+- ✅ **VR/BR de cada jugador en Firebase** (pedido del dueño): `vr.mjs` → Realtime Database `mkw/vr/<uid>` (§60); el WFC
+  se lo devuelve al juego al entrar (`/api/mkw_rr_ratings`), el espía de la pila lee lo que informa el juego tras cada
+  carrera (§59). **Solo se mueve en línea** (decisión del dueño): la carrera sincronizada no lo toca. Falta: el dueño
+  publica las reglas (`docs/firebase-mkw.md` §6)
+- ✅ El multijugador va **solo por nuestra página** (§64: se quitó el visor de Retro WFC)
 
 ## Modos de la página (§55)
 
 - ✅ Gran Premio (copa elegida) y Carrera (pista elegida) con el piloto, nombres de las pistas leídos del juego
-- ✅ Mi Mii (base de Mii de la Wii, caras de partida); ⬜ fotos reales de las caras (sacadas del juego, a R2)
-- ⬜ Copa a tu gusto (4 pistas elegidas o al azar con semilla nueva, reordenar y volver a sortear)
-- ⬜ Contrarreloj; ⬜ CPU: dificultad o sin CPU en todos los modos (probado: sin CPU funciona); ⬜ cilindrada y personaje
-- ⬜ Récords de tiempo por pista y cilindrada en Firebase (el tiempo final se lee de la memoria: Raceinfo 0x809BD730)
-- ⬜ Imágenes sacadas del juego para elegir: foto de cada pista, ícono de cada copa (a R2 con el `.wasm`, nunca a git)
+- ✅ Mi Mii (base de Mii de la Wii, caras de partida); ⬜ fotos reales de las caras (sacadas del juego, a R2; etapa D2)
+- ✅ Copa a tu gusto: 4 pistas elegidas, con su **semilla** (misma semilla = misma copa; §56)
+- ✅ Contrarreloj (con o sin el mejor fantasma); ✅ CPU: dificultad o sin CPU; ⬜ cilindrada y personaje (etapa D1)
+- ✅ Récords de tiempo por pista y cilindrada (§57; en Realtime Database desde §60)
+- 🟡 Imágenes sacadas del juego para elegir (foto, plano y videíto de cada pista, ícono de cada copa): hechas en local
+  (`sacar-imagenes.mjs`, `empaquetar-imagenes.mjs`; `prueba-elegir` 23/23 con paquetes falsos); a R2 con el `.wasm`,
+  nunca a git (etapa D2)
 
 ---
 
@@ -221,6 +311,14 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-18 23:20** — **Plan del dueño guardado y etapa A** (§64). El dueño contestó: commits, push y PR sí (merge cuando él diga); mismo Worker y lista de amigos que BT3, el Worker y R2 los publica él; el VR solo se mueve en línea; fuera el visor de salas de Retro WFC; "dos PCs" = dos ventanas. Se quitó `salas.mjs` (el código de amigo pasó a `codigo-amigo.mjs`, con 5 puntos nuevos en el banco de licencias: 26/26). Las reglas de la sala del sitio dicen ahora que la copa con CPU no mueve el VR. Arreglo: la carrera 4 de la copa a tu gusto salía a veces sin su semilla (la página la borraba antes de que el juego preparara la carrera; lo destapó §63): `prueba-copa` **11/11**. Todo verde: banco 21/21, Node 13/13, navegador 20/20, partidas 6/6, piloto 9/9, elegir 23/23, sincro 9/9 (y `--sala`), copas sincronizadas 4/4 y 4/4, en línea 9/9, sitio 885/893 (las 8 de siempre, ajenas) y `mkw.test` 10/10.
+- **2026-10-18 18:00** — **En línea, la página ya no se congela** (§63). Sin enganche al monitor (`?red`: la carrera sincronizada y el VS por el WFC de la sala) el runtime esperaba cada cuadro girando sin soltar el hilo: la página respiraba solo cuando el lockstep esperaba a la otra consola (huecos de 120-700 ms) y, al terminar la carrera, nunca más (la copa no pasaba a la carrera 2). Ahora `vi.cpp` cede por reloj (`mkwEsperaReloj`) y la pausa de presentar de aurora va también en línea: copa sincronizada **4/4** (con semilla) y **4/4** dentro de la sala falsa del sitio, carrera 2 en las dos con las huellas iguales; una pestaña en línea igual de pareja que sin red (34,8 % de refrescos con cuadro nuevo, 0 % saltados, 60 cuadros/s). Y una optimización que salió de ahí: en monitores que no se pueden enganchar (144/165/175 Hz) y en línea, la espera despierta al juego en el vencimiento sin girar 1,5 ms: leer el reloj bajó de ~8 % a ~0,5 % del tiempo de la pestaña (~1,7 ms por cuadro menos de procesador quemado; hilo ocupado 41–47 % en vez de 46–52 %), con la pantalla igual de pareja (0 % saltados). Nueva herramienta `herramientas/medir-enlinea.mjs`. Pruebas más firmes: tope de 10 s por lectura en `prueba-sincro`, `autoconducir` en la sala falsa, `prueba-enlinea` con el build de siempre, banco 21/21 (el del sonido aprieta su botón).
+- **2026-10-18 14:50** — **La carrera sincronizada ya no se separa** (§62). Dos desincronizaciones escondidas que salían 3 de cada 4 veces con la semilla de una sala real: (1) la «compensación de lag» de Retro Rewind (`rr_kamek_81806568`) se saltaba el dibujo de cuadros según la carga de cada PC, y el dibujo copia la posición de los karts a sus modelos (que lee la IA): en la sala con CPU ahora se dibuja siempre; (2) el reloj fijo del sorteo era un contador para todo el juego: ahora es **por lugar** (`PPC_MftbCarreraEn(sitio, lr)`). Misma carrera 2 veces: **4/4 idénticas** (antes 1/4). La sala del sitio elige la carrera sincronizada (CPU de relleno y ≤ 4 humanos), fin de carrera cuando llegan todos los humanos, vista propia de sonido y HUD, carrera 2 de la copa aunque el Raceinfo quede en la misma dirección, `jugar.bat`. Herramientas: punto de vigilancia (`-DMKW_VIGIA`, `--carpeta build/web-vigia`).
+- **2026-10-18 01:50** — **Sala con CPU de relleno: la carrera sincronizada funciona** (§61). Lockstep: todas las consolas corren la misma carrera VS offline (12 karts, humanos + CPU) con los botones de todos (`lockstep.mjs`, `pad_web.cpp`, `semillas_nativo.cpp`, `lockstep_nativo.cpp`, `PPC_MftbCarrera`). La desincronización era la tabla de pantallas de Racedata: ahora igual en todas, y solo cámara y HUD van al kart propio. Corte en dos pasos cuando alguien se va (error real hallado por el banco nuevo `banco/pruebas/lockstep` 25/25); 45 s de espera a quien no llegó. `prueba-sincro.mjs` **9/9** (15/15 huellas iguales). Piloto: toques contados en cuadros, corrige el modo, y **solo Esc** lo detiene (el aviso del sonido hacía que cualquier tecla lo parara: bug que vio el dueño). PC 60 fps, 9 ms (+1 ms por explicar). Celular: para una versión futura.
+- **2026-10-17 20:55** — **La sala del sitio** (§60): Mario Kart Wii como juego de sala en la copia del sitio (motor `redMkw`, cartero `mkw.js`, vestíbulo con VR y CPU de relleno, privado como BT3, manual, portada, reglas de Firebase con tope 12 y nodo `mkw`, `tests/mkw.test.cjs`); VR y récords pasados a Realtime Database (el sitio no usa Firestore); el piloto entra solo en línea (`?modo=enlinea`) con vigilante de búsqueda; `prueba-enlinea.mjs` 8/9 corridas bien y `--sala` 11/11.
+- **2026-10-17 20:15** — **Malla WebRTC, banco de la red y VR en Firebase** (§59). `malla.mjs` + `crearRouterMalla` (F2) probados con el juego entre dos pestañas; `banco/pruebas/red` 20/20 (destapó y arregló una pérdida de bytes en la pila); el VR: Retro Rewind lo pregunta con `/api/mkw_rr_ratings` (formato `{"found":1,"vr":…}`, averiguado en su código) y lo informa por GPCM; `vr.mjs` lo guarda en Firestore `mkw_vr/{uid}` y se lo devuelve al juego al entrar (probado: el juego guardó 7.777); `banco/pruebas/vr` 20/20; «Tu partida» muestra el VR de RR.
+- **2026-10-17 19:20** — **En línea funcionando entre dos pestañas** (§58). Sockets del juego hacia la página (`web/red/red_web.cpp`, esperas con JSPI), pila de red propia (`red.mjs`), y un WFC escrito por nosotros dentro de la pestaña anfitriona (`wfc.mjs`, `wfc-salas.mjs`: NAS, GPCM, QR2, lista de salas cifrada con enctypeX, NATNEG, SAKE, API de RR). Dos pestañas se encuentran, pasan por la sala y corren viéndose (~36 paquetes/s, 0 perdidos); sin "enganche" en modo red para que no se desfasen. La "desconexión a los 34 s" era el **anti-AFK** del juego (encontrado con ganchos de depuración `MKW_DEPURAR=1` y un osciloscopio de memoria). Perfil fijo por consola (sin error 60000 al volver a entrar). 3 carreras seguidas con resultados, salida por AFK y reingreso. Pendiente: CPU de relleno en línea, VR en Firebase, salas como BT3 (Firebase + WebRTC), sala de la página conectada al juego.
 
 - **2026-10-17 13:30** — **La página con la cara del sitio, tu partida, Mi Mii y el piloto** (§55). `index.html` nuevo (juego a toda ventana, tarjeta de inicio, modos, barra que se esconde, cajón, diálogos propios) con `interfaz.mjs`; cargar el rksys.dat de una Wii/Dolphin o un .mkwp con revisión de CRC, descargar, copias de respaldo automáticas (`licencias.mjs`, `respaldos.mjs`); «Mi Mii» arma la base de Mii de la Wii (`mii.mjs`, CRC-16/XMODEM) con caras de partida, y el juego los lista al crear la licencia; el piloto (`menus.mjs`) lee la memoria del juego (`mkw_web_mem`) y lleva solo a una pista de Carrera o a una copa de Gran Premio, con los nombres de las ~360 pistas leídos del juego. En línea diseñado (`docs/en-linea.md`). Banco 19/0, 11/0; piloto 9/0; navegador 20/0; partidas 6/0; celular 16/0.
 - **2026-10-17 06:30** — **Medido como en la página real y arreglados el tirón en carrera y la carga** (§54). Sitio local como GitHub Pages (sin aislamiento) con el juego en el marco de Juegos y lo privado desde otro origen; `medir-sitio.mjs` en 3 perfiles. Toma del canvas a compás (tomas parejas 83 → 98,6 %), voces de los CPU bajadas antes (largada ~1 s → ~60 ms de disco), `.wasm` brotli 16,1 MB con huella y caché (2.ª visita: primer cuadro 2,3 s, 0 tirones). PC 60 fps, 7,97 ms por cuadro (p99 12,0). Descartados: margen de toma, `wasm-opt -O3`. Navegador 21/0, partidas 6/0, celular 16/0.

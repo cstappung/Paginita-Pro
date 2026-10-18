@@ -58,4 +58,21 @@ por su propio transporte, sin tocar el juego). Quien llega durante una carrera v
 | F3 | La sala en el sitio: crear/entrar, `fase`, «siguiente carrera / sala», video del anfitrión | Playwright con salas falsas y alguien que entra a mitad de carrera |
 | F4 | Robustez: TURN, 12 jugadores, motivos de fallo en el chat | — |
 
-Estado: diseño hecho; se empieza por F0. Es el trabajo más grande que queda (semanas, no horas).
+Estado (2026-10-18):
+
+| Fase | Estado |
+|---|---|
+| F0 sockets | ✅ `web/red/red_web.cpp` + `red.mjs` (bitácora §58) |
+| F1 WFC virtual | ✅ `wfc.mjs` + `wfc-salas.mjs`: dos pestañas se encuentran y corren 3 carreras seguidas (§58) |
+| F2 transporte | ✅ malla WebRTC + router, buzón intercambiable (`malla.mjs`, banco `red` 20/20, §59) |
+| F3 sala en el sitio | 🟡 ✅ sala con vestíbulo, hasta 12, entrar con la carrera andando (§60); ✅ CPU de relleno con la carrera sincronizada (abajo, §61–63); ⬜ cola de pistas y «Confirmar» sobre la votación; ⬜ video del anfitrión para los que miran |
+| F4 robustez | ⬜ TURN del Worker, más jugadores, motivos de fallo en el chat |
+
+**La CPU de relleno: carrera sincronizada (lockstep).** Arriba se descartó el lockstep para el VS en línea de 12. Pero
+el juego en línea no anima CPU de otra consola (§58.5), y la CPU de relleno es obligatoria (pedido del dueño). Por eso,
+**con CPU de relleno y hasta 4 humanos** (los 4 puertos del mando de GameCube) la sala no usa el WFC: cada consola corre
+la misma «copa a tu gusto» offline (12 karts, con la misma semilla y las mismas pistas) y la malla reparte los botones
+de cada cuadro (`lockstep.mjs`, `pad_web.cpp`, `lockstep_nativo.cpp`). Con más de 4 humanos se corre en línea, sin CPU.
+**El VR solo se mueve en línea** (decisión del dueño, 2026-10-18): la carrera sincronizada no lo toca.
+
+Lo que falta está en `PLAN.md` (etapa C).

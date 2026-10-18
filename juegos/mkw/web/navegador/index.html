@@ -59,7 +59,7 @@
   .boton { padding: 7px 12px; border-radius: 10px; border: 1px solid var(--linea); background: var(--panel2); color: var(--texto);
     cursor: pointer; font: 600 13px 'IBM Plex Sans', sans-serif; }
   .boton:hover { border-color: var(--lila); }
-  .boton.principal { background: var(--morado); border-color: var(--morado); color: #fff; }
+  .boton.principal, .boton.primario { background: var(--morado); border-color: var(--morado); color: #fff; }
   .boton.peligro { color: var(--peligro); border-color: #6a2a3a; }
   .boton:disabled { opacity: .5; cursor: default; }
   #estadoInicio { margin-top: 12px; min-height: 1.4em; font-size: 13px; color: var(--suave); }
@@ -115,9 +115,11 @@
   .modo.activo strong { color: var(--amarillo); }
   .modo.activo .radio { background: var(--amarillo); border-color: var(--amarillo); box-shadow: inset 0 0 0 3px #1a1442; }
   /* lo que se elige dentro de un modo (copa, pista, cilindrada): fichas bajo la columna */
-  .opciones-modo { display: grid; gap: 8px; padding: 10px 12px; border-radius: 14px; border: 2px solid #3d3378; background: #161233e6; }
+  .opciones-modo { display: grid; gap: 8px; padding: 10px 12px; margin-bottom: 14px; border-radius: 14px; border: 2px solid #3d3378; background: #161233e6; }
   .opciones-modo > span { font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); }
   .fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opciones-nota { color: var(--suave); font-size: 12px; }
+  .opciones-modo[hidden] { display: none; }
   .fichas button { padding: 6px 10px; border-radius: 999px; border: 1px solid #3d3378; background: #221c4a; color: var(--texto);
     font: 600 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
   .fichas button:hover { border-color: var(--amarillo); }
@@ -126,13 +128,21 @@
   .pistas button { text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto);
     font: 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
   .pistas button[aria-pressed="true"] { border-color: var(--amarillo); color: var(--amarillo); }
-  @media (max-width: 860px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit, .opciones-modo { grid-column: 1 / -1; } .modo .radio { display: none; } }
+  @media (max-width: 860px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit { grid-column: 1 / -1; } .modo .radio { display: none; } }
   @media (max-width: 520px) { .modos-lista { width: 100%; grid-template-columns: 1fr; } }
 
   /* ---- la barra de arriba: volumen, Partida, Controles, ⛶, el mando; con el juego andando se esconde sola ---- */
   #barra { position: fixed; z-index: 7; top: calc(var(--st) + 22px); right: calc(var(--sr) + 10px); display: flex; gap: 6px; align-items: center;
     flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 20px); font: 600 12px 'IBM Plex Sans', sans-serif; transition: opacity .25s, transform .25s; }
   body.started #barra { top: calc(var(--st) + 8px); }
+  /* en el celular, antes de jugar, la barra es una franja de cabecera (fondo propio): no queda encima del texto */
+  @media (max-width: 860px) {
+    html body:not(.started) #barra { left: 0; right: 0; top: 0; translate: none; max-width: none; justify-content: center; padding: calc(var(--st) + 16px) 10px 8px;
+      background: linear-gradient(#0d0a1f 75%, #0d0a1f00); }
+    body:not(.started) #inicio { padding-top: calc(var(--st) + 104px); }
+  }
+  /* las teclas no sirven en una pantalla táctil */
+  @media (pointer: coarse) { .teclas { display: none; } }
   #barra > button, #barra > a, #mando { background: rgba(23,20,42,.9); color: var(--texto); border: 1px solid #463d7a; border-radius: 8px;
     padding: 5px 10px; font: inherit; cursor: pointer; text-decoration: none; }
   #barra > button:hover { border-color: var(--lila); }
@@ -202,19 +212,90 @@
     font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
   #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
   #elegirPista { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb)); background: #0d0a1fee; }
-  .elegir-cab { max-width: 1100px; margin: 0 auto 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .elegir-cab, .tu-copa, .elegir-cuerpo { max-width: 1240px; margin-left: auto; margin-right: auto; }
+  .elegir-cab { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .elegir-cab h2 { margin: 0 8px 0 0; font: 400 28px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
   .elegir-cab input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; }
-  .copas { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-  .copa { display: grid; gap: 3px; padding: 8px; border-radius: 12px; background: #161233; border: 2px solid #3d3378; }
-  .copa-cab { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; border: 0; border-radius: 8px; background: none; color: var(--amarillo); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
-  .copa-cab b { font: 400 16px 'Lilita One', system-ui, sans-serif; }
-  .copa-cab:disabled { cursor: default; }
-  .copa-cab:not(:disabled):hover { background: #2a2160; }
+  .elegir-cuerpo { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+  .copas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .copa { display: grid; gap: 3px; padding: 8px; border-radius: 12px; background: #161233; border: 2px solid #3d3378; align-content: start; }
+  .copa-cab { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border: 0; border-radius: 8px; background: none; color: var(--amarillo); font: 600 12px 'IBM Plex Sans', sans-serif; text-align: left; }
+  button.copa-cab { cursor: pointer; }
+  .copa-cab b { font: 400 16px 'Lilita One', system-ui, sans-serif; flex: 1; }
+  button.copa-cab:hover, button.copa-cab:focus-visible, button.copa-cab.visto { background: #2a2160; outline: none; }
+  .copa-icono { width: 34px; height: 34px; object-fit: contain; flex: none; }
   .copa .pista { text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto); cursor: pointer; font: 12.5px 'IBM Plex Sans', sans-serif; }
-  .copa .pista:not(:disabled):hover { border-color: var(--amarillo); color: var(--amarillo); }
-  .copa .pista:disabled { cursor: default; opacity: .85; }
+  .copa .pista:hover, .copa .pista:focus-visible, .copa .pista.visto { border-color: var(--amarillo); color: var(--amarillo); outline: none; }
+  .modo-gp .copa .pista { opacity: .85; }
+  .copa .pista.apagada { opacity: .4; }
+  .sin-imagen { visibility: hidden; }
+  /* la vista previa: queda quieta a la derecha mientras la lista corre */
+  .vista { position: sticky; top: 0; display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #161233; border: 2px solid #3d3378; min-height: 200px; }
+  .vista-cab { display: flex; gap: 8px; align-items: center; color: var(--suave); font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .vista h3 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--texto); }
+  .vista-icono { width: 30px; height: 30px; object-fit: contain; }
+  .vista-icono.grande { width: 56px; height: 56px; }
+  .vista-foto { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #0f0c24; }
+  .vista-plano { width: 100%; aspect-ratio: 4/3; border-radius: 10px; background: #221d47; }
+  .vista-cuatro { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .vista-cuatro figure { margin: 0; }
+  .vista-cuatro figcaption { font-size: 11.5px; color: var(--suave); text-align: center; margin-top: 2px; }
+  .vista-records { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; }
+  .vista-records li { display: flex; justify-content: space-between; padding: 3px 8px; border-radius: 8px; background: #221d47; color: var(--suave); }
+  .vista-records b { color: var(--amarillo); font-variant-numeric: tabular-nums; }
+  .vista-tabla { justify-self: start; }
+  .tabla-records { display: grid; gap: 10px; min-width: min(460px, 80vw); }
+  .tabla-filas { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .tabla-filas li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; background: #1d1840; }
+  .tabla-filas li.tuyo { outline: 2px solid var(--amarillo); }
+  .tabla-filas .puesto { font: 400 18px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-align: center; }
+  .tabla-filas b { font-variant-numeric: tabular-nums; }
+  .tabla-filas .tabla-vacia { display: block; color: var(--suave); text-align: center; background: none; }
+  .tabla-nota { margin: 0; color: var(--suave); font-size: 12px; }
+  .vista-vacia { margin: auto; color: var(--suave); font-size: 13px; text-align: center; }
+  @media (max-width: 760px) {
+    .elegir-cuerpo { grid-template-columns: 1fr; }
+    /* en el celular la vista va abajo, fija, y aparece al primer toque */
+    .vista { position: fixed; left: 8px; right: 8px; bottom: calc(8px + var(--sb)); top: auto; z-index: 2; grid-template-columns: 1fr 1fr; min-height: 0; box-shadow: 0 -6px 24px #000a; }
+    .vista:has(.vista-vacia) { display: none; }
+    .vista-cab, .vista h3 { grid-column: 1 / -1; }
+    .vista-cuatro { grid-column: 1 / -1; grid-template-columns: repeat(4, 1fr); }
+    #elegirPista { padding-bottom: 46vw; }
+  }
+  /* copa a tu gusto */
+  .tu-copa { margin-bottom: 12px; padding: 10px; border-radius: 14px; background: #1b1440; border: 2px solid var(--amarillo); }
+  .tu-copa-cab { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .tu-copa-cab b { font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .semilla { font: 600 12px ui-monospace, monospace; color: var(--suave); padding: 3px 8px; border-radius: 999px; background: #0f0c24; }
+  .tu-copa-cab .boton { margin-left: auto; }
+  .casillas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; }
+  .casilla { display: grid; grid-template-columns: auto 64px minmax(0, 1fr); grid-template-rows: auto auto; gap: 2px 8px; align-items: center; padding: 6px; border-radius: 10px; background: #161233; border: 2px solid #3d3378; cursor: pointer; }
+  .casilla.activa { border-color: var(--amarillo); }
+  .casilla .num { grid-row: 1 / 3; font: 400 22px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); width: 22px; text-align: center; }
+  .casilla-foto { grid-row: 1 / 3; width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: #0f0c24; display: block; }
+  .casilla-copa { display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .casilla-copa > span:not(.casilla-nombre) { font: 600 10.5px 'IBM Plex Sans', sans-serif; color: var(--suave); white-space: nowrap; }
+  .casilla-icono { width: 22px; height: 22px; object-fit: contain; flex: none; }
+  .casilla-nombre { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .casilla-botones { display: flex; gap: 3px; }
+  .mini { min-width: 28px; height: 24px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--linea); background: #221d47; color: var(--texto); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .mini:disabled { opacity: .35; cursor: default; }
+  .tu-copa-pie { display: flex; justify-content: flex-end; margin-top: 8px; }
 
+  /* ---- panel de mandos (opciones-mandos.mjs) ---- */
+  #cajon select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; max-width: 100%; }
+  .mandos-lista { display: grid; gap: 8px; margin-top: 6px; }
+  .mandos-lista.vacia::before { content: attr(data-vacia); color: var(--suave); font-size: 13px; }
+  .mando-tarjeta { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
+  .mando-cab { display: grid; }
+  .mando-cab small { color: var(--suave); }
+  .probador { display: flex; gap: 12px; align-items: center; }
+  .stick-aro { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #4b3d93; display: grid; place-items: center; flex: none; }
+  .stick-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--amarillo); }
+  .luces { display: flex; flex-wrap: wrap; gap: 4px; }
+  .luz { min-width: 26px; padding: 3px 6px; border-radius: 7px; background: #221d47; color: var(--suave); text-align: center; font: 600 11.5px 'IBM Plex Sans', sans-serif; }
+  .luz.encendida { background: var(--amarillo); color: #1a0a00; }
+  .asistente p { margin: 0 0 6px; }
   /* ---- el editor de Mii: pantalla propia, sin arrancar el juego ---- */
   #editorMii { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
     background: linear-gradient(170deg, #1a1234, #24123a 60%, #2c1030); }
@@ -352,7 +433,7 @@
     </div>
     <p class="dato" id="puerto1">puerto 1: —</p>
     <h3>Mandos</h3>
-    <p>Mandos conectados: <span id="listaMandos">ninguno (aprieta un botón del mando para que el navegador lo vea)</span></p>
+    <div id="mandosPanel"></div>
     <h3>Teclado (jugador 1)</h3>
     <p>Clic en una tecla para cambiarla.</p>
     <table id="tablaTeclas"></table>

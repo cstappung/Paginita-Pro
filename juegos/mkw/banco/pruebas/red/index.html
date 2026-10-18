@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red en línea</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Red en línea: <span>pila, WFC y malla WebRTC</span></h1>
+<p>Prueba lo que lleva el modo en línea (bitácora §58) <b>sin el juego</b> y con datos falsos con la forma de los del
+  juego: la pila de red de la página (<code>red.mjs</code>: UDP y TCP), el WFC escrito por nosotros
+  (<code>wfc.mjs</code>: un cliente falso entra por NAS y GPCM con la misma cuenta MD5 que hace la consola, y vuelve a
+  entrar con el mismo perfil), el cifrado de la lista de salas (<code>wfc-salas.mjs</code>: enctypeX ida y vuelta, el
+  filtro tipo SQL) y la <b>malla WebRTC de verdad</b> (<code>malla.mjs</code> + <code>crearRouterMalla</code>) entre
+  dos "navegadores" en esta misma página, con su buzón falso.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPila, crearConmutador, crearRouterMalla } from '/web/navegador/red.mjs';
+import { crearWfc } from '/web/navegador/wfc.mjs';
+import { consolaFalsa, hasta, lector } from './consola-falsa.mjs';
+import { enctypexCifrar, enctypexDescifrar, evaluarFiltro } from '/web/navegador/wfc-salas.mjs';
+import { crearMalla, senalCanal } from '/web/navegador/malla.mjs';
+
+const { ok, fin } = prueba('red', 'Red en línea (sin el juego)');
+const tx = new TextEncoder(), rx = new TextDecoder('latin1');
+
+try {
+  // ---- 1) la pila en una pestaña: UDP y TCP de eco ----
+  const sw = crearConmutador();
+  const srv = crearPila({ ip: '10.77.0.1', enlace: sw.enlace() }), cli = crearPila({ ip: '10.77.0.2', enlace: sw.enlace() });
+  srv.udp(7, (d, ip, p, responder) => responder(d));
+  srv.servidorTcp(7, con => con.alRecibir(b => con.enviar(b)));
+  let ecoUdp = null;
+  const u = cli.udp(0, d => { ecoUdp = rx.decode(d); });
+  u.enviar(tx.encode('hola udp'), '10.77.0.1', 7);
+  await hasta(() => ecoUdp);
+  ok('UDP: el eco vuelve igual', ecoUdp === 'hola udp', ecoUdp);
+  const c1 = await cli.conectarTcp('10.77.0.1', 7), l1 = lector(c1);
+  const grande = 'x'.repeat(50000) + 'FIN';
+  c1.enviar(tx.encode(grande));
+  ok('TCP: 50 KB de eco, completos y en orden', (await l1.esperar(t => t.length >= grande.length, 3000)) === grande);
+  let rechazo = '';
+  await cli.conectarTcp('10.77.0.1', 9).catch(e => { rechazo = e.message; });
+  ok('TCP a un puerto sin nadie: rechazada (como un RST)', rechazo === 'rechazada', rechazo);
+
+  // ---- 2) el WFC con un cliente falso (la forma de lo que manda la consola) ----
+  const swW = crearConmutador();
+  const pilaW = crearPila({ ip: '10.77.0.1', enlace: swW.enlace() }), consola = crearPila({ ip: '10.77.0.2', enlace: swW.enlace() });
+  const wfc = crearWfc({ pila: pilaW });
+  const falsa = consolaFalsa(consola);
+  const entrar = d => falsa.entrar(d);
+  const datosConsola = { action: 'login', gamecd: 'RMCP', userid: '1234567890123', gsbrcd: 'RMCJabcdefg', ingamesn: 'Ana' };
+  const n1 = await falsa.nas(datosConsola);
+  ok('NAS login: returncd 001, token y reto', n1.returncd === '001' && n1.token?.startsWith('NDS') && n1.challenge?.length === 8, JSON.stringify(n1).slice(0, 80));
+  const g1 = await entrar(datosConsola);
+  ok('GPCM: entra (\\lc\\2) con la prueba MD5 correcta del servidor', g1.r.orden === 'lc' && g1.r.datos.lc === '2' && g1.r.datos.proof === g1.prueba);
+  const perfil1 = g1.r.datos.profileid;
+  g1.con.cerrar();
+  const g2 = await entrar(datosConsola);
+  ok('volver a entrar da EL MISMO perfil (si no, la consola corta con el error 60000)', g2.r.datos.profileid === perfil1 && g2.r.datos.uniquenick === g1.r.datos.uniquenick, `${perfil1} / ${g2.r.datos.profileid}`);
+  const g3 = await entrar({ ...datosConsola, userid: '9999999999999' });
+  ok('otra consola, otro perfil', g3.r.datos.profileid !== perfil1);
+  // QR2: latido → reto → respuesta → registrada
+  let qr2r = [];
+  const q = consola.udp(0, d => qr2r.push(d));
+  const latido = (...kv) => { const t = kv.join('\0') + '\0'; const b = new Uint8Array(5 + t.length); b[0] = 3; b.set([0, 0, 0, 7], 1); b.set(tx.encode(t), 5); return b; };
+  q.enviar(latido('localip0', '10.77.0.2', 'localport', '5000', 'gamename', 'mariokartwii', 'numplayers', '1', 'dwc_pid', perfil1), '10.77.0.1', 27900);
+  await hasta(() => qr2r.length);
+  ok('QR2: el primer latido recibe un reto (FE FD 01)', qr2r[0]?.[0] === 0xfe && qr2r[0]?.[2] === 0x01);
+  q.enviar(Uint8Array.of(1, 0, 0, 0, 7, ...tx.encode('respuesta'), 0), '10.77.0.1', 27900);
+  await hasta(() => qr2r.length > 1);
+  ok('QR2: con la respuesta queda registrada (FE FD 0A)', qr2r[1]?.[2] === 0x0a && [...wfc.qr2.values()].some(s => s.registrada));
+
+  // ---- 3) la lista de salas: enctypeX y el filtro ----
+  const retoCli = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]), datos = tx.encode('lista de salas de prueba '.repeat(20));
+  const cifrado = enctypexCifrar('9r3Rmy', retoCli, datos);
+  ok('enctypeX: cifrar y descifrar devuelve lo mismo', rx.decode(enctypexDescifrar('9r3Rmy', retoCli, cifrado)) === rx.decode(datos));
+  ok('enctypeX: el texto cifrado no se parece al original', rx.decode(cifrado.subarray(20, 60)) !== rx.decode(datos.subarray(0, 40)));
+  const sala = { dwc_mver: '90', numplayers: '3', maxplayers: '11', rk: 'vs_10', ev: '9000', dwc_pid: '5' };
+  ok('filtro: lo que cumple pasa', evaluarFiltro("dwc_mver = 90 and numplayers < 11 and rk = 'vs_10'", sala));
+  ok('filtro: lo que no cumple no pasa', !evaluarFiltro("dwc_mver = 90 and rk = 'vs_11'", sala));
+  ok('filtro: VR (ev) ignorado como en Retro WFC', evaluarFiltro("rk = 'vs_10' and ev >= 1 and ev <= 3050", sala, { ignorar: new Set(['ev', 'eb']) }));
+
+  // ---- 4) la malla WebRTC de verdad entre dos "navegadores" (A: WFC + su juego; B: otro juego) ----
+  const salaId = 'red-' + Math.random().toString(36).slice(2, 6);
+  const nav = uid => { const router = crearRouterMalla(); const malla = crearMalla({ uid, senal: senalCanal({ sala: salaId, uid }), alBinario: router.alBinario, alCambiar: router.alCambiar }); router.usar(malla); return { uid, router, malla }; };
+  const A = nav('ua'), B = nav('ub');
+  const servA = crearPila({ ip: '10.77.0.1', enlace: A.router.enlace() }), juegoA = crearPila({ ip: '10.77.0.2', enlace: A.router.enlace() });
+  const juegoB = crearPila({ ip: '10.77.0.3', enlace: B.router.enlace() });
+  servA.udp(7, (d, ip, p, responder) => responder(d));
+  servA.servidorTcp(7, con => con.alRecibir(b => con.enviar(b)));
+  await A.malla.entrar(); await B.malla.entrar();
+  const conecto = await hasta(() => A.malla.conectados().includes('ub') && B.router.rutas()['10.77.0.1'] === 'ua' && A.router.rutas()['10.77.0.3'] === 'ub', 15000);
+  ok('malla: los dos se conectan por WebRTC y cada uno aprende las IPs del otro', conecto, JSON.stringify({ A: A.router.rutas(), B: B.router.rutas(), d: A.malla.detalle('ub') }));
+  let ecoM = null;
+  const ub = juegoB.udp(0, d => { ecoM = rx.decode(d); });
+  ub.enviar(tx.encode('carrera'), '10.77.0.1', 7);
+  await hasta(() => ecoM, 3000);
+  ok('malla UDP (canal sin orden): de B al WFC de A y vuelta', ecoM === 'carrera', ecoM);
+  // 200 paquetes UDP seguidos: en la misma PC llegan casi todos (por internet alguno se puede perder: es UDP)
+  let llegan = 0;
+  const ub2 = juegoB.udp(0, () => { llegan++; });
+  for (let i = 0; i < 200; i++) ub2.enviar(new Uint8Array(205), '10.77.0.1', 7);
+  await hasta(() => llegan >= 195, 4000);
+  ok('malla UDP: 200 paquetes de 205 bytes (como los de la carrera), vuelven ≥ 195', llegan >= 195, `${llegan}/200`);
+  const cM = await juegoB.conectarTcp('10.77.0.1', 7), lM = lector(cM);
+  const mucho = Array.from({ length: 2000 }, (_, i) => `linea ${i};`).join('');
+  cM.enviar(tx.encode(mucho));
+  ok('malla TCP (canal confiable): ' + mucho.length + ' bytes de eco, completos y en orden', (await lM.esperar(t => t.length >= mucho.length, 5000)) === mucho);
+  // dentro de A, juego → WFC sin pasar por la malla
+  let local = null;
+  const ua2 = juegoA.udp(0, d => { local = rx.decode(d); });
+  ua2.enviar(tx.encode('local'), '10.77.0.1', 7);
+  await hasta(() => local, 2000);
+  ok('dentro de una pestaña (juego → WFC) se entrega directo', local === 'local');
+  B.malla.salir();
+  ok('cuando B se va, A olvida su ruta', await hasta(() => !A.router.rutas()['10.77.0.3'], 8000), JSON.stringify(A.router.rutas()));
+  A.malla.salir();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e.stack || e.message);
+}
+fin();
+</script>
+</body>
+</html>

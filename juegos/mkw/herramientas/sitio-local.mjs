@@ -42,6 +42,7 @@ if (!fs.existsSync(path.join(SITIO, 'juegos.html'))) {
 // dirección → carpeta (la primera que calce): el juego en /juegos/mkw/, el resto es el sitio
 const CARPETAS = [
   ['/juegos/mkw/banco/', path.join(raiz, 'banco')],
+  ['/juegos/mkw/web/navegador/', path.join(raiz, 'web/navegador')],   // donde queda la página en el sitio (la sala la abre ahí)
   ['/juegos/mkw/', path.join(raiz, 'web/navegador')],
   ['/', SITIO],
 ];
@@ -81,6 +82,11 @@ const MARCO = `<script>
 const comprimidos = new Map();          // archivo|fecha → gzip (no se recomprime en cada pedido)
 http.createServer((pedido, respuesta) => {
   const url = decodeURIComponent(pedido.url.split('?')[0]);
+  // de dónde saca la sala del sitio el programa del juego (colabtex/src/juegos/mkw.js): aquí, el "Worker" local
+  if (url === '/juegos/mkw/privado.json') {
+    respuesta.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return respuesta.end(JSON.stringify({ url: WORKER }));
+  }
   const par = CARPETAS.find(([p]) => url.startsWith(p));
   let archivo = path.normalize(path.join(par[1], url.slice(par[0].length)));
   if (!archivo.startsWith(par[1])) { respuesta.writeHead(403); return respuesta.end(); }

@@ -19,6 +19,9 @@
 //   pc       la PC tal cual
 //   cpu4     la CPU de la pestaña 4 veces más lenta (el freno de las DevTools de Chrome) desde que abre
 //   celular  un Pixel 7 emulado (pantalla 412×915 a 2,625×, toque, navegador de Android) con la CPU 6× más lenta
+//            (un celular de gama media o viejo: el caso pesimista)
+//   celular-alto  el mismo Pixel 7 con la CPU 2,5× más lenta: un celular de gama alta actual (Snapdragon 8 Gen 2/3,
+//            Apple A17) tiene núcleos a menos de la mitad de un PC de escritorio, no a un sexto
 //            (un Android de gama media es varias veces más lento que esta PC)
 //
 // Uso:  node herramientas/medir-sitio.mjs --perfil pc [--etiqueta base] [--segundos 20] [--extra "&staging=mapeo"]
@@ -47,7 +50,7 @@ const EXTRA = opcion('--extra', '');
 const LATENCIA = opcion('--latencia', '50');
 const VISITAS = Number(opcion('--visitas', 1));
 const PUERTO = 8160;
-const FRENO = { pc: 1, cpu4: 4, celular: 6 }[PERFIL];
+const FRENO = { pc: 1, cpu4: 4, celular: 6, 'celular-alto': 2.5 }[PERFIL];
 if (!FRENO) { console.error('perfil desconocido: ' + PERFIL); process.exit(1); }
 
 // La secuencia: [tecla, cuadros que espera después] (los mismos pasos que guion.mjs / medir-cpu.sh, en cuadros:
@@ -69,7 +72,7 @@ const PAGES = `http://127.0.0.1:${PUERTO}`, WORKER = `http://127.0.0.1:${PUERTO 
 const carpetaPerfil = path.join(os.tmpdir(), 'mkw-medir-' + process.pid);
 const contexto = await chromium.launchPersistentContext(carpetaPerfil, {
   channel: 'chrome', headless: !args.includes('--ventana'), args: ['--mute-audio'],
-  ...(PERFIL === 'celular' ? devices['Pixel 7'] : { viewport: { width: 1280, height: 800 } }),
+  ...(PERFIL.startsWith('celular') ? devices['Pixel 7'] : { viewport: { width: 1280, height: 800 } }),
 });
 const resultados = [];
 for (let visita = 1; visita <= VISITAS; visita++) resultados.push(await medirUnaVez(visita));

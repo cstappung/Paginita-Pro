@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sala en línea: <span>jugadores, cola de pistas y los 45 s entre carreras</span></h1>
+<p>Prueba <code>web/navegador/sala.mjs</code> (bitácora §58) <b>sin el juego y sin red</b>: varias personas
+  <b>inventadas</b> en la misma página, conectadas por un bus en memoria (lo que en el sitio harán Firebase y WebRTC),
+  con un <b>reloj falso</b> para probar los 45 s sin esperarlos. Comprueba: entrar hasta 12 (la 13.ª no), la cola tipo
+  playlist (agregar, mover, quitar solo lo tuyo), «Empezar» solo el anfitrión, confirmar todos = empezar antes, que el
+  tiempo se acabe, entrar con la carrera andando (mirar y elegir) y que si el anfitrión se va otro tome su lugar.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSala, crearBus, MAX_JUGADORES, SEGUNDOS_ELEGIR } from '/web/navegador/sala.mjs';
+
+const { ok, fin } = prueba('sala', 'Sala en línea (sin el juego, reloj falso)');
+// ---- reloj falso: el tiempo avanza solo cuando la prueba lo dice ----
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const reloj = { ahora: () => t, cada: (fn) => { tareas.set(nId, fn); return nId++; }, parar: id => tareas.delete(id) };
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); };
+const listo = () => new Promise(r => setTimeout(r, 0));          // que pasen los mensajes del bus
+const bus = crearBus();
+const persona = (id, anfitrion = false) => crearSala({ canal: bus.canal(), yo: { id, nombre: id.toUpperCase() }, anfitrion, reloj });
+
+// 1) anfitrión y dos más
+const ana = persona('ana', true); await listo();
+const beto = persona('beto'); t += 10; await listo();
+const caro = persona('caro'); t += 10; await listo(); await listo();
+ok('tres personas: todos ven a los 3', [ana, beto, caro].every(s => s.estado?.jugadores.length === 3), [ana, beto, caro].map(s => s.estado?.jugadores.length).join());
+ok('ana es la anfitriona para todos', [ana, beto, caro].every(s => s.estado.anfitrion === 'ana') && ana.estado.soyAnfitrion && !beto.estado.soyAnfitrion);
+
+// 2) hasta 12
+const extra = [];
+for (let i = 0; i < 9; i++) { extra.push(persona('p' + i)); t += 10; await listo(); }
+await listo();
+ok(`entran hasta ${MAX_JUGADORES}`, ana.estado.jugadores.length === 12);
+const trece = persona('trece'); await listo(); await listo();
+ok('la 13.ª no entra y ve por qué', ana.estado.jugadores.length === 12 && /llena/.test(trece.estado?.rechazo || ''), trece.estado?.rechazo);
+trece.salir();
+for (const s of extra) s.salir();
+await listo(); await listo();
+ok('al salir, la sala vuelve a 3', ana.estado.jugadores.length === 3 && beto.estado.jugadores.length === 3);
+
+// 3) la cola (playlist)
+beto.agregar({ copa: 3, fila: 1 }); await listo();
+caro.agregar({ copa: 10, fila: 2 }); await listo();
+ana.agregar({ copa: 0, fila: 0 }); await listo(); await listo();
+ok('la cola tiene las 3 pistas, en el orden en que se agregaron', ana.estado.cola.map(x => `${x.copa}.${x.fila}`).join() === '3.1,10.2,0.0' && caro.estado.cola.length === 3);
+const deBeto = ana.estado.cola[0].id, deCaro = ana.estado.cola[1].id;
+caro.quitar(deBeto); await listo(); await listo();
+ok('no puedes quitar la pista de otro', ana.estado.cola.length === 3);
+caro.mover(deCaro, -1); await listo(); await listo();
+ok('quien la puso puede subirla', ana.estado.cola[0].id === deCaro);
+caro.empezar(); await listo(); await listo();
+ok('solo la anfitriona puede empezar', ana.estado.fase === 'sala');
+
+// 4) empezar: 45 s para elegir
+ana.empezar(); await listo(); await listo();
+ok(`empezar abre ${SEGUNDOS_ELEGIR} s para elegir personaje y kart`, beto.estado.fase === 'eligiendo' && ana.estado.restante === SEGUNDOS_ELEGIR, `${ana.estado.restante} s`);
+await avanzar(10000);
+ok('la cuenta regresiva baja', ana.estado.restante === 35, `${ana.estado.restante} s`);
+ana.confirmar(); beto.confirmar(); await listo(); await listo();
+ok('con 2 de 3 confirmados sigue esperando', ana.estado.fase === 'eligiendo' && ana.estado.jugadores.filter(j => j.listo).length === 2);
+caro.confirmar(); await listo(); await listo();
+ok('todos confirman → la carrera empieza antes de tiempo', ana.estado.fase === 'carrera' && beto.estado.fase === 'carrera');
+ok('se corre la primera de la cola y sale de la cola', ana.estado.actual?.id === deCaro && ana.estado.cola.length === 2);
+
+// 5) entrar con la carrera andando
+const dani = persona('dani'); t += 10; await listo(); await listo();
+ok('quien entra con la carrera andando la mira (espectador)', dani.estado?.espectador === true && !ana.estado.espectador);
+dani.entrarEnLaSiguiente(); await listo(); await listo();
+ok('y puede elegir «entrar en la siguiente carrera»', ana.estado.jugadores.find(j => j.id === 'dani')?.espera === true);
+
+// 6) termina la carrera: otra vez a elegir; ahora dani corre
+ana.terminoCarrera(); await listo(); await listo();
+ok('al terminar: 45 s para elegir la siguiente', ana.estado.fase === 'eligiendo' && !dani.estado.espectador && ana.estado.historia.length === 1);
+ok('dani ya no espera: corre la próxima', ana.estado.jugadores.find(j => j.id === 'dani').espera === false);
+await avanzar(46000);
+ok('si se acaba el tiempo, empieza igual', ana.estado.fase === 'carrera' && dani.estado.fase === 'carrera');
+
+// 7) la anfitriona se va: toma su lugar quien entró primero (beto)
+ana.salir(); await listo(); await listo();
+ok('si la anfitriona se va, beto (el que entró primero) toma su lugar', beto.estado.soyAnfitrion && caro.estado.anfitrion === 'beto' && caro.estado.jugadores.length === 3, caro.estado.anfitrion);
+beto.terminoCarrera(); await listo(); await listo();
+ok('el nuevo anfitrión sigue la sala: termina la carrera y abre la elección (queda 1 en la cola)', caro.estado.fase === 'eligiendo' && caro.estado.cola.length === 1);
+await avanzar(46000);
+beto.terminoCarrera(); await listo(); await listo();
+ok('cola vacía al terminar → de vuelta a la sala', caro.estado.fase === 'sala');
+fin();
+</script>
+</body>
+</html>

@@ -19,11 +19,29 @@
 // Una partida de la Wii original (Wii/title/00010000/524d4350/data/rksys.dat) y una de Retro Rewind
 // (riivolution/save/RetroWFC/RMCP/rksys.dat) tienen el mismo formato: cualquiera sirve.
 
-import { codigoDesdePid } from './salas.mjs';
+import { codigoDesdePid } from './codigo-amigo.mjs';
 
 export const TAM_RKSYS = 0x2BC000;
 export const RUTA_RKSYS = '/mkw/sd/riivolution/save/RetroWFC/RMCP/rksys.dat';   // donde la busca Retro Rewind
 const INICIO_LICENCIA = 0x08, TAM_LICENCIA = 0x8CC0, POS_CRC = 0x27FFC;
+
+// El VR de Retro Rewind NO es el de rksys.dat (ese queda en el del juego base): RR lo guarda en su propio archivo,
+// RRRating.pul, en la memoria interna (lo vimos al leerlo después de una partida en línea, bitácora §59):
+//   0x0 "RRRT"  0x4 versión u16 (1)  0x6 casillas u16 (100)
+//   0x8 + n·16  por perfil en línea: ID de perfil u32, VR/100 (float32), BR/100 (float32), u32 (1 = en uso)
+//   p. ej. 0x429B8A3D = 77,77 → VR 7.777
+export const RUTA_RATING = '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6/RRRating.pul';
+// → Map(ID de perfil → { vr, br }) (vacío si no es un RRRating.pul)
+export function leerRating(bytes) {
+  const r = new Map();
+  if (!bytes || bytes.length < 8 || texto4(bytes, 0) !== 'RRRT') return r;
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), n = v.getUint16(6);
+  for (let i = 0, p = 8; i < n && p + 16 <= bytes.length; i++, p += 16) {
+    const pid = v.getUint32(p), vr = v.getFloat32(p + 4), br = v.getFloat32(p + 8);
+    if (pid && Number.isFinite(vr) && Number.isFinite(br) && vr > 0) r.set(pid, { vr: Math.round(vr * 100), br: Math.round(br * 100) });
+  }
+  return r;
+}
 
 // CRC-32 (polinomio 0xEDB88320 reflejado, el de zip): una tabla de 256 valores y un byte a la vez
 let tabla = null;
@@ -68,7 +86,7 @@ export function leerRksys(bytes) {
       vr: v.getUint16(b + 0xB0), br: v.getUint16(b + 0xB2),
       carreras: v.getInt32(b + 0xB4), batallas: v.getInt32(b + 0xB8),
       victoriasVs: v.getInt32(b + 0x88), victoriasEnLinea: v.getInt32(b + 0x98),
-      codigoAmigo: pid ? codigoDesdePid(pid) : '',
+      pid, codigoAmigo: pid ? codigoDesdePid(pid) : '',
     });
   }
   if (!r.crcBien) { r.problema = 'el archivo está dañado (su suma de control no cuadra): el juego lo rechazaría y ofrecería borrarlo'; return r; }

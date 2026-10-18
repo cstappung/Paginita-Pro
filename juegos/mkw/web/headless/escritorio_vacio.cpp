@@ -4,12 +4,10 @@
 //   - settings_overlay: el menú de opciones que se abre con F10, dibujado con la librería imgui. En la web los
 //     ajustes van en la página (HTML), no dentro del juego.
 //   - DiscordPresence: mostrar "jugando Mario Kart" en Discord; habla con el programa de Discord del PC.
-//   - TLS (conexiones cifradas, network_ssl.cpp, con mbedTLS): solo lo usa el juego en línea, que llega en la fase 6
-//     con su propio puente. Mientras tanto cualquier intento de abrir una conexión cifrada falla con un error que
-//     el juego entiende ("no se pudo"), igual que sin internet.
+//   (Las conexiones "cifradas" del juego en línea ya no van aquí: network_ssl.cpp se compila para la web en modo
+//    solo texto plano, ver parches/runtime-web.diff y bitácora §58.)
 #include "discord_presence.h"
 #include "settings_overlay.h"
-#include "hle/net/network_internal.h"
 
 namespace settings_overlay {
 void InitializeRuntimeSettings() noexcept {}
@@ -28,15 +26,3 @@ void SetActivity(Activity) {}
 void Reset() {}
 void Shutdown() {}
 }  // namespace DiscordPresence
-
-namespace NetworkHle {
-void ClearSslSessionsForSocket(uint32_t) {}
-NasSslWriteAction PreparePlainNasTcpWrite(WiiSocket&, const uint8_t*, uint32_t, std::vector<uint8_t>&)
-{
-    return NasSslWriteAction::PassThrough;
-}
-int32_t HandleSslIoctlv(uint32_t, const std::vector<IoVector>&, const std::vector<IoVector>&)
-{
-    return -1;  // error genérico de SSL de la Wii: el juego lo trata como "sin conexión"
-}
-}  // namespace NetworkHle

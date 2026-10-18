@@ -147,6 +147,21 @@ const SALA = {
     { id: "infinito", n: "Sin reloj", d: "Pelea una batalla sin límite de tiempo.", i: "♾️", x: c => c.ev("ronda", h => h.tiempo === 0) },
     { id: "relampago", n: "Relámpago", d: "Pelea una batalla de 60 segundos.", i: "⚡", x: c => c.ev("ronda", h => h.tiempo === 60) }
   ],
+  /* Mario Kart Wii: como BT3, el juego no le cuenta a la página quién ganó (la sala no clasifica). Sus diez salen
+     de las tandas de carreras que abrió el vestíbulo (`hist`, sucesos `ronda` con anfitrión, CPU de relleno y
+     cuántos había; `ronda` es cuántas tandas van en la sala). */
+  mkw: [
+    { id: "largada", n: "Luz verde", d: "Abre tu primera tanda de carreras en línea.", i: "🏁", x: c => c.ev("ronda") },
+    { id: "anfitrion", n: "Dueño de la pista", d: "Corre siendo el anfitrión de la sala.", i: "🏟️", x: c => c.ev("ronda", h => h.anf === c.me) },
+    { id: "visita", n: "Piloto invitado", d: "Corre en la sala de otro anfitrión.", i: "🚪", x: c => c.ev("ronda", h => h.anf && h.anf !== c.me) },
+    { id: "puros", n: "Sin ayuda", d: "Corre una tanda sin CPU de relleno.", i: "🙅", x: c => c.ev("ronda", h => h.cpu === "ninguna") },
+    { id: "rivales", n: "CPU feroz", d: "Corre una tanda con la CPU difícil.", i: "🤖", x: c => c.ev("ronda", h => h.cpu === "dificil") },
+    { id: "grupo", n: "En pandilla", d: "Corre con 4 personas o más en la sala.", i: "👥", x: c => c.ev("ronda", h => h.jugadores >= 4) },
+    { id: "parrilla", n: "Parrilla llena", d: "Corre con 8 personas o más en la sala.", i: "🏎️", x: c => c.ev("ronda", h => h.jugadores >= 8) },
+    { id: "otra", n: "Otra vuelta", d: "Abre dos tandas en la misma sala.", i: "🔁", x: c => (c.est.ronda || 0) >= 2 },
+    { id: "gira", n: "Gira mundial", d: "Abre cinco tandas en la misma sala.", i: "🌍", x: c => (c.est.ronda || 0) >= 5 },
+    { id: "leyenda", n: "Leyenda del circuito", d: "Abre diez tandas en la misma sala.", i: "🏆", x: c => (c.est.ronda || 0) >= 10 }
+  ],
   /* Tulones: todo sale de la torre (`hist` trae cada congela con su altura
      y la línea que tenía que superar) y de la mejor altura de cada uno. */
   tulones: [
@@ -535,7 +550,7 @@ const heroM = d => (+d.puntos || 0) % 10000;
 
 /* El catálogo entero: juego → sus diez. */
 /* Salas que no clasifican (no hay fila de ranks): sus diez logros son todos de partida. */
-const SIN_FILA = new Set(["bt3"]);
+const SIN_FILA = new Set(["bt3", "mkw"]);
 export const LOGROS = Object.fromEntries([
   ...Object.entries(SALA).map(([j, l]) => [j, SIN_FILA.has(j) ? l : [...FILA, ...l]]),
   ...Object.entries(SOLO)

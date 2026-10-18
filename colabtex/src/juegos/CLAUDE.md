@@ -18,7 +18,7 @@ room picks inside that range along with anything else the game offers;
 that offers nothing passes nothing. The lobby's player-count options are
 derived from `JUEGOS` (`cupos(k)` in `juegos-main.js`), so raising a `cupo` is
 one number in `motor.js` plus the rule's ceiling
-(`partidas/$pid/cupo` `.validate`, now `<= 10`). Each ceiling is where *that*
+(`partidas/$pid/cupo` `.validate`, now `<= 12` for Mario Kart Wii). Each ceiling is where *that*
 game stops working, not a round number:
 
 - **cuadritos, 10.** Nothing on the board depends on the count; with ten a

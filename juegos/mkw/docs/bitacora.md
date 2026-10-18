@@ -305,6 +305,116 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 
 ---
 
+### La red en línea (§58)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Red, paquete** | Las consolas se hablan mandándose **paquetes**: trozos de bytes con una dirección de destino. Como cartas: cada una lleva el destinatario escrito y viaja sola. |
+| **Dirección IP** | El "número de casa" de cada aparato en la red (p. ej. `10.77.0.2`). En nuestra red de juguete: `10.77.0.1` es el servidor WFC, `10.77.0.2` la pestaña anfitriona, `10.77.0.3`… las demás. |
+| **Puerto** | Dentro de un aparato, el número de "ventanilla" a la que va el paquete (el servidor de entrada escucha en 29900, el de salas en 28910…). IP + puerto = dirección completa, como edificio + departamento. |
+| **Socket** | El "enchufe" de red que abre un programa: un extremo por el que manda y recibe. El juego abre los suyos con las funciones POSIX `socket`, `connect`, `sendto`, `recv`…; las reemplazamos por las nuestras (`web/red/red_web.cpp`), que hablan con la página. |
+| **UDP** | Forma de mandar paquetes sueltos, sin acuse de recibo: rápida, pero alguno se puede perder o llegar desordenado. La carrera va por UDP (60 veces por segundo importa más llegar a tiempo que llegar todo). Como una radio: se transmite y ya. |
+| **TCP** | Forma de mandar un **chorro** de bytes con acuse de recibo y en orden: si algo se pierde, se repite. La entrada al servidor (GPCM) va por TCP. Como una llamada telefónica: se conecta primero y se confirma lo dicho. |
+| **DNS** | El "directorio telefónico": convierte un nombre (`gpcm.gs.play.rwfc.net`) en una IP. El nuestro contesta siempre `10.77.0.1`, así el juego cree hablar con los servidores de Retro WFC y habla con el nuestro. |
+| **HTTP / SOAP** | HTTP: el idioma de las páginas web (pedido "POST /ac" → respuesta). SOAP: mensajes en XML dentro de HTTP; lo usa el "almacén" SAKE. |
+| **WFC (Wi-Fi Connection)** | El servicio en línea de Nintendo para la Wii (cerrado en 2014). Retro Rewind usa **Retro WFC**, uno hecho por la comunidad. Nosotros escribimos uno propio que corre **dentro de la pestaña anfitriona** (`web/navegador/wfc.mjs`): nadie sale a internet. |
+| **NAS** | El primer servidor al que entra la consola: crea la cuenta y da un **token** (un pase de entrada) y un reto. |
+| **GPCM** | El servidor de "presencia" de GameSpy (TCP 29900): login con el token, perfil, lista de amigos, estado. Mientras la consola está en línea, esta conexión queda abierta (es su "línea telefónica" con el servidor). |
+| **QR2** | "Query & Reporting" de GameSpy (UDP 27900): cada consola manda un **latido** cada ~10 s con sus datos (cuántos jugadores tiene, si abrió una sala, su VR…). Así el servidor sabe quién está en línea. |
+| **Lista de salas (server browser)** | TCP 28910: la consola pide "¿quién está jugando con estas condiciones?" con un filtro tipo SQL; el servidor contesta con las consolas que cumplen, **cifrado** con enctypeX. También pasa mensajes de una consola a otra ("quiero entrar a tu sala"). |
+| **enctypeX** | El cifrado de GameSpy para esa lista: un cifrado de flujo (cada byte se mezcla con un byte "al azar" que sale de una clave y de dos retos), parecido a RC4. Como un codificador con una secuencia pseudoaleatoria que solo el que conoce la semilla puede repetir. |
+| **NAT / NATNEG** | En internet, los routers (NAT) esconden las consolas detrás de una sola IP. NATNEG (UDP 27901) es el servidor que ayuda a dos consolas a "encontrarse" a través de sus routers. En nuestra red no hay routers: solo junta a las dos y le dice a cada una la dirección de la otra. |
+| **SAKE** | El "almacén" de GameSpy (SOAP): Mario Kart guarda ahí su FriendInfo (el Mii que ven los amigos). |
+| **Anfitrión de la sala (host)** | La consola que abrió la sala; las demás se unen a ella. Distinto del "anfitrión del WFC" (la pestaña donde corre nuestro servidor). |
+| **aid** | El número de cada consola dentro de una sala (0, 1, 2…). |
+| **Latencia** | El tiempo que tarda un paquete en llegar. En la misma PC, casi cero; por internet, decenas de ms. |
+| **Pila de red (stack)** | El programa que maneja los sockets de un aparato: a qué socket va cada paquete que llega, qué conexiones TCP hay. La nuestra es `crearPila` en `web/navegador/red.mjs` (una por pestaña y otra para el WFC). |
+| **Conmutador / enlace** | Lo que lleva paquetes de una pila a otra: en una pestaña, un conmutador en memoria; entre pestañas, un **BroadcastChannel** (un canal del navegador entre pestañas del mismo sitio). Más adelante, WebRTC entre computadores. Como un switch de red. |
+| **BroadcastChannel / WebRTC** | BroadcastChannel: mensajes entre pestañas del mismo navegador. WebRTC: conexión directa entre dos navegadores en distintos computadores (como BT3); Firebase solo sirve para presentarlos (la "señalización"). |
+| **Pila de llamadas (call stack) / LR** | Cuando una función llama a otra, guarda "a dónde volver" (el registro **LR**, link register). Recorriendo esas direcciones guardadas se sabe quién llamó a quién: la **cadena de llamadas**. Como seguir un cable desde la carga hasta el interruptor que la prendió. |
+| **Gancho (hook) de depuración** | Reemplazar una función del juego por una nuestra que anota algo y después llama a la original. No cambia el comportamiento; es una punta de prueba. |
+| **AFK** | "Away from keyboard": jugador que no maneja. El juego en línea saca a quien no se mueve por un rato (para no trabar la carrera de los demás). |
+| **Perfil (profile id)** | El número de cada jugador en el servidor. La consola lo guarda en su partida la primera vez y, al volver a entrar, espera el mismo. |
+
+### La malla WebRTC y el VR (§59)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Malla (mesh)** | Cada navegador de la sala conectado **directo** con cada uno de los otros (no a un servidor central). Con 4 jugadores son 6 conexiones. Como una red eléctrica mallada: cada nodo tiene línea con los demás. `web/navegador/malla.mjs`. |
+| **Canal de datos (WebRTC datachannel)** | Un "cable" dentro de una conexión WebRTC. Abrimos dos por par: **udp** (sin orden y sin repetir: si un paquete se pierde, se pierde, como lo espera la carrera) y **tcp** (en orden y confiable, para la entrada al servidor). |
+| **Señalización / buzón** | Antes de conectarse directo, dos navegadores tienen que intercambiar unos "datos de contacto" (oferta, respuesta, candidatos). Eso viaja por un buzón: Firebase en el sitio (como BT3), o un BroadcastChannel falso en el banco. Después el buzón ya no se usa. |
+| **ICE / candidato** | Las formas posibles de llegar a un navegador (su IP local, la IP pública que ve un servidor STUN…). WebRTC prueba las parejas hasta que una funciona. Como probar varias rutas de cable hasta que hay continuidad. |
+| **Router (enrutador) de la malla** | Lo que decide por dónde mandar cada paquete según su IP de destino: si la IP es de esta pestaña, directo; si es de otro navegador, por la malla. Cada navegador anuncia a los demás qué IPs tiene. `crearRouterMalla` en `red.mjs`. |
+| **JSON** | Una forma de escribir datos como texto: `{"found":1,"vr":7777}`. Claves entre comillas y sus valores. Casi toda la web lo usa. |
+| **Coma flotante (float32)** | Una forma de guardar números con decimales en 4 bytes (signo, exponente y mantisa, como la notación científica: 7,777 × 10¹). Retro Rewind guarda el VR así, dividido por 100: 77,77 = VR 7.777. |
+| **Firestore / reglas** | La base de datos de documentos de Firebase (la que ya usa el sitio para los récords). Las **reglas** son el "interruptor de seguridad" del lado de Google: deciden quién puede leer o escribir cada documento (aquí: todos leen, cada uno escribe solo el suyo). |
+| **Espía (de la pila)** | Una función que ve cada trozo TCP que el juego manda, sin cambiarlo; con ella la página lee el VR que el juego le informa al servidor. Como una pinza amperimétrica: mide sin cortar el cable. |
+| **Marco de pila (stack frame)** | El pedacito de memoria que cada función usa mientras corre para sus variables locales. Al terminar queda escrito hasta que otra función lo pisa: leyéndolo justo después se sabe hasta dónde llegó. |
+
+### La sala del sitio (§60)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Realtime Database** | La base de datos de Firebase que ya usa el sitio para las salas, los logros y el chat: un árbol de datos (como carpetas) que se actualiza en vivo en todos los navegadores. El VR y los récords van ahí (`mkw/vr`, `mkw/records`), no en Firestore, que el sitio no usa. |
+| **Registro de jugadas (log) y reductor** | En el sitio, una sala no guarda "el estado": guarda la lista de cosas que pasaron (`jugadas`: «empieza», «vuelve», «ajuste»…), una tras otra y sin borrar. El **reductor** (`redMkw`) relee esa lista desde el principio y calcula el estado (quién es el anfitrión, si están corriendo). Como un contador de energía: no guarda "cuánto queda", suma lo registrado. |
+| **Cartero (`mkw.js` del sitio)** | El módulo de la página del sitio que hace de intermediario entre la sala y el juego en su iframe: le pasa los mensajes del buzón, le da el VR de la cuenta y dibuja el vestíbulo. No toca la carrera. |
+| **Vestíbulo** | La pantalla de la sala antes de correr: quiénes están, su VR, el anfitrión, la CPU de relleno y el botón «¡A correr!». |
+| **Nodo** | El número de cada jugador en la red del juego: su dirección es 10.77.0.<nodo>. Se da por orden de llegada (2, 3, 4…) y no cambia aunque otros se vayan. |
+| **Vigilante (watchdog)** | Un reloj que revisa si algo se quedó pegado y, si pasa demasiado tiempo, lo destraba. Como el relé de un temporizador de seguridad. |
+
+### La carrera sincronizada con CPU (§61)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Lockstep (paso a paso sincronizado)** | Todas las consolas de la sala corren la **misma** carrera offline (12 karts: los humanos y la CPU), y ninguna avanza un cuadro hasta tener los botones de todos para ese cuadro. Como varios relojes esclavos que solo dan un paso cuando llega el pulso común. |
+| **Determinismo** | Que el juego, con las mismas entradas, dé exactamente el mismo resultado, bit por bit, en todas las consolas. Es lo que hace posible el lockstep: solo viajan los botones, no la posición de cada kart. |
+| **Desincronización (desync)** | Cuando dos consolas, con los mismos botones, calculan algo distinto: desde ahí cada una ve otra carrera. Como dos osciladores "iguales" que se separan por una diferencia mínima. |
+| **Huella** | Un número que resume el estado de la carrera (el avance de los 12 karts mezclado). Cada 120 cuadros las consolas comparan su huella: si coinciden, siguen viendo la misma carrera. Como comparar la suma de verificación de dos archivos. |
+| **Retraso de entrada (3 cuadros)** | Lo que tocas ahora vale para 3 cuadros después (50 ms): es el tiempo que tienen tus botones para llegar a los demás antes de hacer falta. |
+| **Plantel** | Quién corre en cada uno de los 12 puestos: personaje, vehículo, si es humano o CPU, y el mando de cada humano. Lo arma la sala con una semilla, así es igual en todas las consolas. |
+| **Kart títere** | El kart de un humano de la sala: para el juego es un "CPU" (así no arma pantalla dividida), pero lee el mando de su dueño en vez de la inteligencia artificial. |
+| **PPC_MftbCarrera** | El reemplazo del reloj del procesador (`mftb`) en las 7 funciones que siembran el azar de la carrera: en la carrera sincronizada cuenta de a pasos fijos en vez de leer la hora, así el azar sale igual en todas. |
+| **Tabla de pantallas (hud mapping)** | En Racedata, qué jugador tiene la pantalla (la cámara y el HUD). Parte de la lógica del juego también la mira: si es distinta en cada consola, la carrera se separa. Ahora es la misma en todas (puesto 0) y solo la cámara y el HUD se apuntan al kart de cada uno. |
+| **HUD** | Lo que se dibuja encima de la carrera: puesto, vuelta, tiempo, ventana del objeto, mapa. |
+| **Corte en dos pasos (two-phase commit)** | Cuando alguien se va, antes de seguir sin él se pregunta a todos hasta qué cuadro tienen sus botones y se corta después del último que tenga cualquiera. Así nadie usó botones "de verdad" en un cuadro que otro ya marcó "sin nadie". Como un interruptor de transferencia que espera a que todas las fases confirmen. |
+| **Decisor** | El primer humano de la sala que sigue conectado (y que no es al que se espera): él decide los cortes, para que todos corten en el mismo cuadro. |
+
+### Las dos desincronizaciones escondidas (§62)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Pulsar** | El "motor" de mods sobre el que está hecho Retro Rewind: código propio que se mete en el juego en lugares elegidos. Cambia, por ejemplo, el bucle principal. |
+| **Kamek / overlay** | Las dos maneras en que Pulsar cambia el juego: un **kamek** es un pedacito de código nuevo al que el juego salta desde un punto (`rr_kamek_81806568`); un **overlay** reemplaza una función entera del juego por la suya (`rr_overlay_8000951C` = el bucle principal). Como soldar un puente en una placa o cambiar un integrado entero por otro. |
+| **Compensación de lag (salto de dibujo)** | Lo que hace Pulsar si el juego va atrasado respecto al reloj real: se salta el dibujo de un cuadro y corre la lógica una vez más para alcanzarlo. Como un motor que, si se atrasa, se saltea un paso del ciclo para recuperar el sincronismo. Depende de lo cargada que esté cada PC: por eso separaba las carreras. |
+| **Refresco de pantalla (vblank/retrace)** | El pulso de 60 Hz de la pantalla: cada vez que termina de dibujarse una imagen. El juego cuenta estos pulsos para saber si va a tiempo. |
+| **ModelDirector** | La pieza del juego que copia la posición de cada kart (lo que calcula la física) a su **modelo** 3D (lo que se dibuja). En MKW lo llama el dibujo, no la lógica. |
+| **ItemPlayer** | La ficha de objetos de cada jugador (584 bytes): qué objeto tiene, si la ruleta está girando, cuántos le quedan. |
+| **Reloj por lugar** | El reemplazo del reloj fijo de §61: en vez de un contador para todo el juego, cada lugar que pide la hora recibe un número que sale solo del cuadro de la carrera y de quién la pide. Como darle a cada aparato su propio generador de base de tiempo en vez de colgarlos todos del mismo. |
+| **lr (link register)** | El registro del procesador PowerPC que guarda a dónde volver cuando termina una función: sirve como "firma" de desde dónde la llamaron. |
+| **Punto de vigilancia (watchpoint)** | Una trampa que avisa cada vez que alguien escribe en una dirección de memoria elegida, con la pila de llamadas (quién fue). Como una punta de osciloscopio con disparo en un nodo: te dice el instante y la causa. |
+| **Huella sin punteros** | Una huella de un objeto que ignora los campos que son direcciones de memoria (cambian de una corrida a otra aunque el estado sea el mismo) y compara solo los valores. |
+
+### La página que se congelaba al terminar la carrera en línea (§63)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Reloj de pared** | El reloj "de verdad" (el de la pared, el del PC), en contraposición al refresco del monitor. En línea (`?red`) el juego cuenta sus cuadros con el reloj de pared, no enganchado al monitor (§58): así todas las consolas de la sala avanzan al mismo ritmo aunque sus monitores refresquen distinto. |
+| **Espera enganchada / sin enganche** | Las dos maneras en que el runtime espera el próximo cuadro en el navegador. **Enganchada**: le pide a la página que lo despierte en el refresco del monitor justo antes de la hora (la página usa `requestAnimationFrame`). **Sin enganche**: espera por el reloj de pared. Antes de §63, sin enganche el runtime **giraba** (espera activa) sin soltar nunca el hilo de la página. |
+| **Temporizador anidado (mínimo de 4 ms)** | Un `setTimeout` pedido desde adentro de otro temporizador. Después de 5 niveles, Chrome lo demora al menos 4 ms aunque se pida 0 o 1 ms (una regla de los navegadores para que una página no gaste la CPU con temporizadores en cadena). Por eso las esperas del juego piden el temporizador desde una **tarea nueva** (un mensaje de `MessageChannel`), que empieza el conteo de niveles de cero. Es como un relé con tiempo mínimo de conmutación: por debajo de eso, pedir menos no sirve. |
+| **Pestaña oculta** | Una pestaña que no se ve (otra encima, ventana minimizada). Chrome deja de llamar a `requestAnimationFrame` y retrasa los `setTimeout` hasta 1 s. Si el juego dependiera de ellos, en una pestaña oculta andaría a 1 cuadro por segundo y se atrasaría de la sala; por eso ahí la espera solo cede una vuelta y sigue. |
+| **Latido (sonda de respuesta)** | Para saber si la página está "viva", la prueba pone un `setInterval` de 100 ms y mide el hueco más largo entre dos llamadas. Si la página atiende bien, los huecos son ~100 ms; si el hilo está tomado, crecen (700 ms) o la prueba ni siquiera puede leer la página (`page.evaluate` no vuelve). Es como medir el período de un oscilador para saber si alguien lo está cargando. |
+| **Pausa de presentar** | El momento, después de terminar de dibujar un cuadro, en que aurora espera a que el navegador "tome" el canvas (lo lleve a la pantalla) antes de seguir con el próximo cuadro (§54). Ahí la página recibe su turno. |
+
+### Guardar el trabajo y publicarlo (§64)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Push / fetch** | `push` = mandar los commits de una rama de este PC a GitHub (el repo "remoto"); `fetch` = traer de GitHub lo nuevo que hicieron otros, sin mezclarlo todavía. Como sincronizar dos copias de un mismo plano: una en el escritorio y otra en el archivo central. |
+| **Merge (juntar)** | Mezclar una rama con otra (aquí, la del PR con `main`, lo que publica GitHub Pages). Solo lo hace el dueño o se hace cuando él lo dice: mientras no, el PR es una propuesta que se puede revisar sin que cambie el sitio. |
+| **Vector de prueba** | Una entrada con su resultado conocido de antemano, publicada por quien definió el algoritmo (por ejemplo, el RFC 1321 dice que el MD5 de "abc" es `900150983cd24fb0d6963f7d28e17f72`). Si nuestro programa da lo mismo, está bien hecho. Como calibrar un instrumento contra un patrón. |
+| **Carrera entre procesos (race condition)** | Un error que aparece o no según cuál de dos cosas que corren a la par llega primero (aquí: la página borrando la semilla y el juego leyéndola). Es como dos señales que llegan a un flip-flop sin sincronizar: el resultado depende de cuál gana por nanosegundos. Se arregla imponiendo el orden (esperar a que una termine antes de la otra), no "esperando un poquito". |
+| **Etapa (del plan)** | Un grupo de tareas que se cierra entero antes de pasar al siguiente (A: poner el trabajo a salvo, B: publicar en privado, C: en línea…). Están en `PLAN.md`, "Lo que falta, en orden". |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -2574,3 +2684,663 @@ node web/navegador/guion.mjs "-:30000" --extra "&modo=vs&copa=13&fila=2"
 
 `banco/correr.mjs` es nuevo: corre páginas del banco en Chrome sin ventana y junta sus ✓/✗. `guion.mjs` tiene tres
 cosas nuevas: anota la pantalla de cada paso, `X:ms` evalúa `--evaluar` en ese momento, y `--mii`.
+
+### 56. «Copa a tu gusto» con su semilla · 2026-10-17
+
+**Qué:** en «Copa a tu gusto» la persona elige 4 pistas y una **semilla** (un número que se ve y cambia con 🎲). Con la
+misma semilla, la misma copa se juega igual (los mismos objetos de las cajas, lo mismo de los CPU).
+
+**El problema:** la página escribía la semilla en Racedata, pero al preparar cada carrera el juego la pisaba con el
+reloj de la consola (`RacedataScenario::InitRng`, 0x8052F924, instrucción `mftb`). Como poner un valor en un registro
+que un temporizador sobrescribe en el siguiente pulso.
+
+**Arreglo:** `web/juego/semillas_nativo.cpp` reemplaza esa función (mismo mecanismo que el THP nativo: `REEMPLAZOS` en
+`compilar-web.py`; la traducida pasa a llamarse `func_8052F924_traducida`). Primero corre la del juego; después, si la
+página pidió una semilla para esta carrera (`Module.mkwSemillas()` → `[s1, s2]`), escribe esas dos en la copia de la
+carrera (+0xB74, +0xB78). En los demás modos queda exactamente lo del juego.
+
+También: `copasRR` cuenta solo las copas de **carrera** (CupsConfig dice 90 copas en total, de ellas 44 arenas de
+batalla = 11 copas; quedan 79), y `pistas.json` de las fotos quedó en 79 copas (antes las 80–89 daban vuelta a la copa 0).
+
+### 57. Récords por pista y cilindrada (local + Firebase) · 2026-10-17
+
+`web/navegador/records.mjs`: mientras hay una carrera, mira la memoria cada ½ s; cuando el jugador 1 cruza la meta lee
+su tiempo final (Raceinfo → jugador → Timer), la pista (CupsConfig de Pulsar), la cilindrada y el modo (Racedata) y
+arma la categoría (p. ej. `tt150`, `vs200`). El mejor de cada pista y categoría queda en el navegador y, con sesión del
+sitio, en Firestore (`mkw_records/{pista}-{cat}/tiempos/{uid}`, solo si mejora; las reglas lo exigen:
+`docs/firebase-mkw.md`). La tabla = los 10 mejores. Probado con un Firestore falso que imita las reglas
+(`banco/pruebas/records`).
+
+### 58. En línea: un WFC dentro de la pestaña y dos consolas corriendo juntas · 2026-10-17
+
+**Qué pidió el dueño:** "haz pruebas y asegúrate que el modo en línea funcione, es clave". Y en el camino: el
+multijugador va **solo por nuestra página** (salas como BT3), cada jugador guarda su **VR** en Firebase, y las salas en
+línea tienen que poder **rellenarse con CPU**.
+
+**La idea en una línea:** el juego cree que se conecta a los servidores de Retro WFC; en realidad cada "socket" que abre
+llega a la página, y la página lo lleva a un **WFC escrito por nosotros** que corre dentro de la pestaña anfitriona.
+Entre pestañas los paquetes viajan por BroadcastChannel (después, entre computadores, por WebRTC). Ningún paquete sale a
+internet. Como un banco de pruebas de comunicaciones con un switch y un servidor simulados en la misma mesa.
+
+#### 58.1 Los sockets del juego, hacia la página
+
+El juego (DWC, la biblioteca de red de Nintendo, y el runtime de WiiCompiled) usa las funciones POSIX de red: `socket`,
+`connect`, `sendto`, `recvfrom`, `poll`, `getaddrinfo`… En `web/red/red_web.cpp` definimos **todas esas funciones con
+el mismo nombre**: al enlazar, las de un archivo objeto propio ganan a las de la librería del sistema (como soldar un
+puente que deja fuera de circuito a la pieza de fábrica). Cada una llama a `Module.mkwRed` (la pila de la página).
+
+- Las que **esperan** (un `recv` bloqueante, un `poll` con tiempo) duermen sin trabar el navegador gracias a **JSPI**
+  (`mkw_red_esperar`, con tope de 15 s): el juego "se queda esperando" mientras el navegador sigue andando.
+- `close` y `fcntl` no se pueden reemplazar así (los usa todo); el runtime llama a `mkw_red_cerrar` y
+  `mkw_red_bloqueante` (parche en `network_core.cpp`).
+- SSL: el juego pide conexiones cifradas (HTTPS); dentro de la red de juguete van sin cifrar (parche en
+  `network_ssl.cpp`). Nada sale a internet, así que no hay nada que proteger en el camino.
+- Nuestros sockets empiezan en el número 0x7000 para no chocar con los de archivos.
+
+#### 58.2 La pila de red de la página (`red.mjs`)
+
+`crearPila({ ip, enlace, dns })`: sockets UDP y TCP con sus colas, conexiones TCP con apretón de manos
+(syn → ack, d = datos, fin, rst), puertos efímeros, y el DNS que contesta siempre `10.77.0.1`. `crearConmutador` (en
+memoria, para una pestaña) y `crearEnlaceCanal` (BroadcastChannel entre pestañas) llevan los paquetes. Se puede mirar
+el tráfico por cada vecino (`cuentas()`: enviados, recibidos, tirados) y, para depurar, anotar cada paquete
+(`globalThis.mkwTrazaUdp = []`).
+
+Trampa encontrada: las conexiones que el WFC aceptaba no se liberaban al cerrarse: a las 64 se llenaba la tabla y fallaba
+("reading 'recibido'"). Ahora se liberan con fin/rst y el tope es 256; 300 conexiones seguidas dejan 1 socket abierto.
+
+#### 58.3 El WFC (`wfc.mjs`, `wfc-salas.mjs`)
+
+Escrito desde la descripción pública de cada protocolo (sin copiar código de wfc-server, que es AGPL):
+
+| Servicio | Puerto | Qué hace el nuestro |
+|---|---|---|
+| available | UDP 27900 | "sí, el juego tiene servicio" |
+| NAS | HTTP 80 `/ac` | crea la cuenta, login (token + reto), ubicación del servicio |
+| GPCM | TCP 29900 | login comprobando la respuesta MD5 (la misma cuenta que hace el juego, verificada), perfil, amigos vacíos, estado, `ka` |
+| QR2 | UDP 27900 | latidos, reto → registrada, keepalive, mensajes de cliente |
+| Lista de salas | TCP 28910 | filtro tipo SQL, respuesta cifrada con enctypeX (clave `9r3Rmy`); pasa mensajes entre consolas por QR2 |
+| NATNEG | UDP 27901 | junta a las dos consolas por su cookie y les manda CONNECT con la dirección de la otra |
+| SAKE | SOAP | FriendInfo por perfil |
+| API de RR | HTTP | `mkw_stats`, `multiplier`, `mkw_rr_ratings` |
+
+Como Retro WFC, la búsqueda **no separa por VR** (`ev`, `eb` se ignoran en el filtro): con poca gente, que todos se
+encuentren.
+
+#### 58.4 Dos pestañas a la par: sin "enganche" al monitor
+
+Con dos juegos en dos pestañas, uno iba a 59,43 cuadros/s y el otro a 59,87: el que se atrasa acumula diferencia y Retro
+Rewind avisa "Detected frame lag". La causa: el modo "enganche" (esperar el refresco del monitor) pierde un cuadro cada
+vez que una pestaña se pasa del refresco. Con `?red` el enganche queda apagado: las dos van a ~59,8 con ±2 cuadros, sin
+acumular.
+
+#### 58.5 Primera carrera en línea… y una desconexión a los 34 s
+
+Resultado: las dos pestañas se encuentran (lista de salas + NATNEG), pasan por la sala (sección 0x58) y corren
+(0x68) viéndose en la pista, ~36 paquetes UDP por segundo en cada sentido y 0 perdidos. Pero a los ~34 s de largar,
+**las dos** mostraban "You were disconnected from the other players", al mismo tiempo.
+
+Cómo se buscó (cada paso descartó una sospecha):
+
+1. **¿Se cortó el tráfico?** Traza de cada paquete (`mkwTrazaUdp`): llegan paquetes hasta el último milisegundo. No es
+   la red. El contador de cuadros que va en el paquete de carrera (RACEHEADER_1) marcaba 1801 al cortar: **30,0 s de
+   carrera exactos**. Un temporizador del juego.
+2. **¿Un error de DWC?** Ganchos de depuración (`web/juego/depurar_red.cpp`, solo con `MKW_DEPURAR=1` al compilar) en
+   `DWCi_SetError` y `DWC_CloseAllConnectionsHard`, que anotan la **cadena de llamadas** recorriendo la pila de la Wii.
+   Para eso se armó la tabla dirección → nombre a partir de `guest_symbol_table.cpp` (20 193 funciones con nombre).
+   Ningún error de DWC antes del corte.
+3. **¿El temporizador de "no recibí nada"?** `DWCi_TransportProcess` corta a un jugador si pasan **7 s** sin datos de
+   él. El reloj de cada jugador se actualizaba bien (se leyó en vivo). No era.
+4. **Un "osciloscopio" de memoria:** desde la página, cada 4 ms, leer las banderas de `RKNet::Controller` y anotar solo
+   los cambios. Las dos pestañas levantaban la bandera de apagado **en el mismo cuadro** (±4 ms): lo dispara la lógica de
+   la carrera (que va sincronizada cuadro a cuadro), no la red.
+5. **Quién pide salir:** ganchos en `SectionMgr::SetNextSection` → la orden de ir a la escena 0x79 ("desconectado")
+   venía de `Pages::DisconnectMgr::OnUpdate`. Leyendo su código traducido: corta si un byte del modo de juego
+   (RaceInfo+0x10 → +276) vale 1. El osciloscopio lo confirmó: ese byte pasa a 1 justo en el corte.
+6. **Quién escribe ese byte:** `GMDataOnlineVS`, con la versión de Retro Rewind. Es el **anti-AFK**: para cada jugador
+   local, si su kart va más lento que un umbral, cuenta cuadros; pasado el límite marca "inactivo" y la consola se
+   desconecta de la sala.
+
+**Conclusión: no era un error nuestro.** El robot de la prueba solo apretaba A y el kart quedaba contra una pared. El
+juego hace exactamente lo que haría en una Wii: saca al que no maneja.
+
+**Para las pruebas:** el piloto automático en línea pone al jugador local como CPU **en la sala, antes de cargar la
+carrera** (en la carrera ya es tarde: el juego arma los pilotos al cargar). Funciona para el **anfitrión de la sala**
+(puesto 0): su kart corre solo, la otra pestaña lo ve, y la carrera llega a 2:07 con los dos relojes iguales (±0,25 s)
+y cada uno viendo al otro en el minimapa. En el puesto 1 (el que se une) el kart queda quieto: el juego en línea no
+anima CPU de otra consola. Por eso los "CPU de relleno" en línea necesitan un cambio en el juego (pendiente, ver 58.8).
+
+Trampa: algunas funciones chicas (como `RKNet::Controller::ScheduleShutdown`) el traductor las **copia dentro** de
+quien las llama, y otras las llama por una versión "sin estado" (`_statefree`) que no pasa por el gancho. Y
+`SectionMgr::ExitSection` pide el apagado y **se queda esperando adentro** hasta que termina: un gancho que mira "al
+volver" no lo ve. Por eso el osciloscopio de memoria fue la herramienta decisiva.
+
+#### 58.6 Volver a entrar: el perfil tiene que ser siempre el mismo
+
+Con el escenario "el que se une queda quieto → lo saca el anti-AFK → vuelve a buscar", la consola recibía
+"Communication error… Error Code: 60000" al reconectarse. El WFC le daba un **perfil nuevo** en cada entrada
+(600000510, 511, 512…), pero la consola guarda en su partida el perfil de la primera vez y, si no coincide, corta.
+
+Arreglo: el perfil (y el apodo) salen de una cuenta fija (MD5) sobre el identificador de la consola (`userid` +
+`gsbrcd`, lo que manda al NAS). La misma consola recibe siempre el mismo perfil, en cualquier sesión y con cualquier
+pestaña de servidor, sin guardar nada. Si la misma consola entra de nuevo, se cierra su conexión vieja.
+
+#### 58.7 Resultados
+
+| Prueba (dos pestañas, `wfc-dos.mjs`, ~20 min) | Resultado |
+|---|---|
+| Entrar a Retro WFC (NAS, GPCM, QR2, SAKE) | "Welcome to Retro Wi-Fi Connection!", menú Wi-Fi |
+| Encontrarse (lista de salas cifrada + NATNEG) | sí, en ~1 s |
+| Sala → votación → carrera | sí; ~36 paquetes UDP/s por sentido, 0 perdidos |
+| Carrera entera con el anfitrión en piloto automático | 2:50, resultados (sección 0x58) |
+| El que se une quieto | lo saca el anti-AFK a los ~30 s (lo correcto) |
+| Volver a entrar (perfil fijo) | sin error 60000; se junta de nuevo con el anfitrión |
+| Carreras seguidas | **3 carreras** (22:07, 22:12, 22:17) con sala y votación entre medio |
+| Ritmo | ~60 cuadros/s en las dos pestañas |
+
+#### 58.8 Lo que sigue
+
+- **CPU de relleno en línea** (pedido del dueño): el anfitrión simula los CPU y los manda por la red como jugadores. El
+  juego ya admite 2 jugadores por consola en línea (el "invitado"); para llegar a 12 con pocos humanos hay que extender
+  el paquete de carrera (`RKNet::PacketMgr`).
+- **VR en Firebase**: Retro Rewind guarda el VR en `RRRating.pul` (ya viaja con la partida en la nube); falta publicarlo
+  por jugador para la sala y la búsqueda.
+- **Salas como BT3**: Firebase para presentar a los navegadores + WebRTC entre ellos, en lugar de BroadcastChannel.
+- La sala de la página (`sala.mjs`: cola de pistas, 45 s, mirar mientras tanto) conectada al juego; 12 jugadores; pruebas
+  del banco para la red.
+
+**Comandos:**
+
+```bash
+python herramientas/compilar-web.py --modo navegador --salida build/web-red/navegador
+MKW_DEPURAR=1 python herramientas/compilar-web.py --modo navegador --salida build/web-dep/navegador
+MKW_BUILD=build/web-red/navegador node web/navegador/servidor.mjs
+```
+
+En el navegador: `?red=1` (una pestaña, red en memoria) o `?red=canal&nodo=2&anfitrion=1` y `?red=canal&nodo=3` (dos
+pestañas que se ven por BroadcastChannel; la anfitriona corre el WFC).
+
+## 2026-10-17 · §59 La malla WebRTC, su banco y el VR en Firebase
+
+### 59.1 La malla WebRTC (F2): lo de verdad entre navegadores
+
+En §58 dos pestañas se hablaban por BroadcastChannel (solo sirve dentro del mismo navegador). Para jugar entre
+computadores hace falta **WebRTC**, como BT3. Piezas nuevas:
+
+- `web/navegador/malla.mjs` — `crearMalla({ uid, senal, alBinario, alCambiar })`: una conexión WebRTC con cada otro
+  navegador de la sala, con **dos canales de datos**: `udp` (sin orden, sin reintentos: lo que espera la carrera) y
+  `tcp` (en orden, confiable: GPCM, HTTP). Ofrece el de uid menor (así nunca ofrecen los dos a la vez). Si el canal
+  udp se atasca (más de 1 MB esperando), tira paquetes en vez de acumular retraso.
+- El **buzón** (`senal`) es intercambiable: `senalPadre()` habla con la página del sitio por `postMessage` (el mismo
+  protocolo de BT3: la página del sitio tiene Firebase y pasa los mensajes); `senalCanal()` es un buzón falso por
+  BroadcastChannel para el banco.
+- `crearRouterMalla()` en `red.mjs`: cada navegador anuncia sus IPs (`{t:'ips'}`) por el canal tcp a cada par nuevo;
+  así sabe a quién mandar cada paquete. Cuando un par se va, se olvidan sus IPs.
+- `mkw.mjs`: modo `?red=malla&nodo=N[&anfitrion=1][&sala=…]`.
+
+**Resultado con el juego (dos pestañas de Chrome, cada una con su malla):** rutas aprendidas en 1,2 s, se encuentran,
+sala, carrera; ~36 paquetes/s por sentido, 0 perdidos. Igual que con BroadcastChannel.
+
+### 59.2 El banco de la red (`banco/pruebas/red`, 20 puntos)
+
+Sin el juego: la pila (eco UDP, 50 KB de eco TCP, conexión rechazada), el WFC con una **consola falsa**
+(`banco/pruebas/red/consola-falsa.mjs`: NAS con el base64 de la Wii, GPCM con la cuenta MD5 de GameSpy, el mismo perfil
+al volver a entrar, otro perfil para otra consola, QR2 con su reto), enctypeX ida y vuelta y el filtro de salas, y la
+**malla WebRTC de verdad** entre dos "navegadores" en la misma página (UDP y TCP a través de la malla, 200 paquetes de
+205 bytes sin pérdidas, entrega directa dentro de una pestaña, rutas olvidadas al salir).
+
+**Trampa encontrada por el banco:** si el servidor habla primero (GPCM saluda apenas uno se conecta), los bytes que
+llegaban antes de que el código JS se pusiera a escuchar se perdían. Con el juego no se notaba (el juego lee por su
+socket, que sí los guarda), pero era un error de la pila: ahora `alRecibir` entrega primero lo que ya había llegado.
+
+### 59.3 El VR y el BR en Firebase
+
+**Qué hace Retro Rewind con el VR** (leído en su código traducido, `rr_kamek_8182BAF0` y vecinos, y en sus textos):
+
+1. Lo **calcula** cada consola al terminar una carrera en línea y lo guarda en `RRRating.pul` (memoria interna).
+2. Lo **informa** al servidor por GPCM: `\wl:report\\wl:mkw_vrbr\vr=5000|br=5000\final\`.
+3. Al entrar en línea **pregunta** el guardado: `GET http://nas.play.rwfc.net/api/mkw_rr_ratings?pid=<perfil>`.
+
+Para contestar bien hubo que averiguar el formato exacto (paso a paso, porque la primera respuesta no funcionaba):
+
+| Prueba | Qué se vio | Conclusión |
+|---|---|---|
+| Respuesta `{"found":true,"vr":777700,…}` | el juego siguió con 5000 | algo no le gustó |
+| "Punta" en memoria: un byte que su función de respuesta pone en 0 al empezar | pasó a 0 a los 20 ms del pedido | la función **sí corre** |
+| Buscar el texto de la respuesta en la memoria de la Wii | estaba copiado entero en la memoria de la función | la respuesta **llegó** |
+| Leer las variables locales de esa función (su marco de pila) | JSON leído bien; "found" = 0 | falla en "found" |
+| Leer su lector de "found" (`rr_kamek_81824900` → `818243B0`) | usa el **lector de números** | quiere `"found": 1`, no `true` |
+| Mirar `RRRating.pul` | `RRRT`, perfil, `0x42480000` = 50,0 | el VR va **dividido por 100**, en coma flotante |
+
+Así que la respuesta correcta es `{"found":1,"vr":7777,"br":6543}` (el juego divide por 100 y guarda 77,77). **Con el
+juego de verdad:** la página le presentó VR 7.777 / BR 6.543 al WFC; el juego preguntó al entrar y su `RRRating.pul`
+quedó con `0x429B8A3D` (77,77) y `0x4282DC29` (65,43). Funciona.
+
+**El circuito completo** (`web/navegador/vr.mjs`):
+
+```
+ Firestore mkw_vr/{uid} --(al entrar: vr.cargar)--> página --(UDP al puerto 27999 del WFC, hasta que diga "ok")--> WFC
+ juego --(GET /api/mkw_rr_ratings?pid=…)--> WFC --{"found":1,"vr":…}--> juego (lo guarda en RRRating.pul)
+ juego --(GPCM \wl:mkw_vrbr\vr=…|br=…, después de cada carrera)--> WFC
+   └─ el ESPÍA de la pila de la página lo ve pasar --> vr.informar --> localStorage + Firestore (solo si cambió)
+```
+
+- Cada página escribe **solo su** documento (reglas en `docs/firebase-mkw.md` §5). El WFC, que corre en la pestaña del
+  anfitrión, no escribe en Firebase: solo recuerda el VR de cada IP y perfil para contestar.
+- Sin sesión: el VR queda en el navegador y en `RRRating.pul` (que ya viaja con la partida en la nube); al iniciar
+  sesión, si la nube no tenía nada, sube el local.
+- «Tu partida» ahora muestra el VR de Retro Rewind (de `RRRating.pul`, por ID de perfil), no el del juego base que
+  queda en `rksys.dat` (`leerRating` en `licencias.mjs`).
+- La sala del sitio llama `window.mkwConectarVr({ almacen: almacenFirestoreVr({ fs, db }), uid, nombre })` **antes** de
+  entrar en línea.
+
+**Pruebas:** `banco/pruebas/vr` (20 puntos: formato del juego, un aparato sube y otro baja, sin sesión, reglas, tabla,
+y con el WFC: presentar → preguntar → informar → la nube cambia); `banco/pruebas/licencias` (+2: leer `RRRating.pul`).
+
+```bash
+node banco/correr.mjs red vr licencias
+```
+
+## 2026-10-17 · §60 La sala del sitio: Mario Kart como juego de sala, igual que BT3
+
+**Qué se hizo** (en la copia del sitio, `terceros/Paginita-Pro`, rama `claude/loving-planck-9k2yam`; nada publicado):
+
+- `colabtex/src/juegos/motor.js`: `JUEGOS.mkw` (1 a **12** jugadores) y el reductor `redMkw`. Al registro va solo el
+  vestíbulo: `ajuste` (la CPU de relleno), `anfitrion` (pasar el puesto), `empieza`, `vuelve`, `abandona`. Si el
+  anfitrión se va, el puesto pasa al siguiente y, si corrían, vuelven todos al vestíbulo (su pestaña era el servidor).
+  Cada jugador tiene su nodo fijo (2 + orden de llegada).
+- `colabtex/src/juegos/mkw.js` (nuevo, el cartero): el vestíbulo (pilotos con su VR, CPU de relleno, «¡A correr!»,
+  «Volver al vestíbulo», «Pasar anfitrión»), el marco del juego solo mientras corren y solo para los jugadores, el
+  buzón `vivo/<pid>/rtc` prestado por postMessage (el mismo código que BT3), y los almacenes de VR y récords sobre la
+  Realtime Database del sitio, que le pasa al marco apenas carga.
+- `juegos-main.js`, `logros.js` (10 logros propios: la sala no clasifica, como BT3), `monedas.js`, `salon-datos.js`
+  (género «Carreras»), `ocultos.js` y `bt3-amigos.js` (**privado**: solo los amigos de la lista del Worker, igual que
+  BT3), el manual 📖 con ejemplos y dibujos propios, la portada (bandera a cuadros y el nombre en letras nuestras) y el
+  estilo del vestíbulo en `juegos.html`.
+- `firebase/database.rules.json`: `'mkw'` en la lista de juegos y de logros, el tope de `cupo` de 10 a **12**, y el nodo
+  `mkw` (`vr`, `records`). Nota para el dueño en `firebase/CONFIGURAR-FIREBASE.md` (**hay que publicarlas a mano**).
+- `colabtex/tests/mkw.test.cjs` (8 pruebas) en `npm run test:juegos`.
+
+**Por qué Realtime Database y no Firestore:** al revisar el sitio se vio que no usa Firestore (no tiene ni reglas de
+Firestore); el VR y los récords (§57, §59) pasaron a `mkw/vr/{uid}` y `mkw/records/{pista}-{cat}/{uid}` para no obligar
+a activar otro producto (`almacenRtdbVr` en `vr.mjs`, `almacenRtdb` en `records.mjs`, `docs/firebase-mkw.md` §4–6).
+
+**El juego entra solo** (`menus.mjs`, `enLinea`): con `?modo=enlinea` el piloto va del título a «VS mundial»; quien no
+es anfitrión espera a tener ruta al WFC de la sala por la malla antes de conectarse. Y un **vigilante**: si un juego
+lleva 100 s buscando sin juntarse, cancela y vuelve a buscar (en 9 corridas pasó una vez que los dos quedaron
+buscando para siempre).
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| `colabtex` `npm run test:juegos` | 883 bien, 8 mal — las 8 ya fallaban antes (Worker de BT3 y una del salón) |
+| `node web/navegador/prueba-enlinea.mjs` (dos pestañas, malla WebRTC, sin tocar teclas) | 9 de 9 en 8 de 9 corridas (también con B entrando antes que A); se juntan a los ~40 s de buscar |
+| `node web/navegador/prueba-enlinea.mjs --sala` (el juego dentro de una sala del sitio falsa, `banco/pruebas/sala-mkw/padre.html`) | **11 de 11**: buzón por postMessage, y cada juego recibió el VR de su cuenta (6.789 y 7.100) |
+
+**Falta:** la CPU de relleno en línea (la sala ya la elige, el juego todavía no la pone), que el dueño publique las
+reglas, y el Worker que sirve el programa (`juegos/mkw/privado.json` con su dirección).
+
+```bash
+node web/navegador/prueba-enlinea.mjs [--sala]
+cd terceros/Paginita-Pro/colabtex && npm run build && npm run test:juegos
+```
+
+## 2026-10-18 · §61 La carrera sincronizada: la sala con CPU de relleno
+
+**Qué se quería:** que una sala en línea pueda llenarse con CPU (lo pidió el dueño: «tiene que tener la habilidad de
+rellenar con CPU»). El modo en línea del juego (§58) no tiene CPU; el modo **VS offline** sí. La idea: cada navegador
+corre la misma carrera VS offline con 12 karts (los humanos + CPU), y en cada cuadro todas las consolas usan los mismos
+botones de cada humano. Eso es un **lockstep** (ver el glosario): solo viajan los botones (8 bytes por cuadro y humano).
+
+**Las piezas:**
+- `web/navegador/lockstep.mjs`: junta los botones de todos para cada cuadro y responde cuando están; cada paquete
+  repite los últimos 16 cuadros (si se pierde uno, el siguiente lo trae) y lo que falta se pide de nuevo. Cada 120
+  cuadros compara la **huella**. Si alguien se va, el **decisor** corta su kart en **dos pasos** (primero pregunta a
+  todos hasta dónde tienen, después corta después del último). Al que todavía no llegó a la carrera se le espera
+  hasta 45 s (cada uno carga a su ritmo); al que estaba y se calla, 4 s.
+- `web/navegador/pad_web.cpp`: en la carrera, cada vez que el juego lee los mandos en un cuadro nuevo, le pide los
+  botones a `lockstep.mjs` y **espera** (JSPI suspende el juego) hasta tenerlos. Apunta la cámara al kart propio.
+- `web/juego/semillas_nativo.cpp` (en `RacedataScenario::InitRng`): escribe las semillas, enciende el reloj fijo y el
+  **plantel** (personaje, vehículo y el mando de cada humano en su puesto).
+- `web/juego/lockstep_nativo.cpp`: memoria nueva en cero, "todo a la vista", los CPU no miran la cámara (los dos
+  últimos se pueden apagar con `?arreglos=0` para comparar), y el **HUD** de cada consola muestra su kart
+  (`CtrlRaceBase::GetPlayerId` y `CtrlRaceTime::GetPlayerId` devuelven mi puesto).
+- Runtime (`ppc_helpers.cpp`, `os_time.cpp`): `PPC_MftbCarrera` y la hora del juego por cuadros en la carrera.
+
+**La desincronización que costó encontrar:** con todo eso, una carrera offline salía idéntica dos veces seguidas en
+la misma consola (incluso con la CPU frenada 2×), pero dos pestañas se separaban hacia el cuadro 1.200. El
+experimento decisivo: dos corridas con la misma tabla de pantallas pero la cámara mirando a otro kart → idénticas
+2.519 cuadros (solo cambió el azar "visual" de las animaciones de los pilotos). Conclusión: lo que separaba la carrera
+era la **tabla de pantallas** de Racedata (cada consola le daba la pantalla a su kart), no la cámara: la miran también
+la lógica de fin de carrera, Lakitu, los efectos y el sonido. Arreglo: la tabla queda igual en todas (puesto 0) y cada
+consola solo mueve su cámara (`RaceCameraMgr` → cámara +0x9C) y su HUD a su kart.
+
+**El banco nuevo** (`banco/pruebas/lockstep`, sin el juego): consolas falsas con un "juego" que mezcla los botones
+de cada cuadro en un número, y una red falsa con 5–40 ms de latencia y 1 de cada 7 paquetes perdidos. Encontró un error
+real: cuando alguien se iba, una consola podía haber usado sus últimos botones mientras el decisor (que no los había
+recibido) cortaba antes → las dos cortaban en el "mismo" cuadro pero una había usado botones de verdad. De ahí el corte
+en dos pasos (5 de 5 salidas bien, cada una en un cuadro distinto).
+
+**El piloto de los menús** (`menus.mjs`), tres arreglos que destaparon las pruebas:
+1. Los toques de la lista de modos a veces se perdían o contaban doble (se fue a Batalla, página 0x75): ahora cada
+   toque se sostiene **6 cuadros del juego** apretado y 6 suelto, no solo 110 ms.
+2. Lazo cerrado del modo: si en Batalla o en personajes el modo que quedó no es el pedido, vuelve atrás y corrige.
+3. **Bug real que vio el dueño** («los demás modos abren el juego desde el inicio»): el aviso del sonido bloqueado dice
+   «aprieta una tecla», y cualquier tecla detenía al piloto, que se quedaba en el título. Ahora solo **Esc** (o Start
+   en un mando) toma el control, y el aviso lo dice.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| `node banco/correr.mjs lockstep` (red mala, alguien se va ×5, llega tarde, el decisor nunca llega, carrera nueva, desync a propósito, plantel) | **25/25** (3 corridas seguidas) |
+| `node web/navegador/prueba-sincro.mjs` (dos pestañas con el juego, 10 CPU, cada una con su teclado) | **9/9**: 15 de 15 huellas iguales, cámara y HUD de cada una en su kart, espera promedio 0,2–0,4 ms por cuadro |
+| Piloto con una tecla apretada durante la carga (guion propio) | llega a la lista de pistas a los 9 s (antes: se quedaba en el título) |
+
+**Medición en el PC** (`medir-sitio.mjs --perfil pc`, 2 visitas): 60 fps; CPU 9,0–9,4 ms por cuadro (ayer 8,0–8,2: hay
+~1 ms más que falta explicar, sigue dentro del presupuesto de 16,7 ms). La primera visita tiene más tirones (9 en 20 s)
+porque la tarjeta de video compila en segundo plano los ~600 "pipelines" de la semilla; la segunda, 1. Los tirones que
+vio el dueño jugando coincidieron además con una compilación del juego y una prueba de dos Chrome corriendo a la vez en
+el mismo PC.
+
+**Perfil `celular-alto`** (Pixel 7 con la CPU 2,5× más lenta): 67 ms por cuadro, 8 veces el PC y no 2,5: el freno de
+Chrome no es parejo, así que la emulación subestima a los celulares (lo notó el dueño). Los celulares quedan para una
+versión futura (pedido del dueño); el día que toque, medir en uno real con `adb reverse tcp:8140 tcp:8140`.
+
+**Falta:** el sonido sigue al kart del puesto 0 en todas las consolas; una vez (de 6 corridas) el juego de A se cayó
+al empezar la carrera en `Effects::Player::UpdateNonItemEffects` (no se repitió); conectar la sala del sitio (elegir la
+carrera sincronizada cuando hay CPU de relleno y hasta 4 humanos: el mando de GameCube tiene 4 puertos); el ~1 ms de
+CPU de más.
+
+```bash
+node banco/correr.mjs lockstep
+node web/navegador/prueba-sincro.mjs [--lento] [--extra=&arreglos=0]
+node herramientas/medir-sitio.mjs --perfil celular-alto --etiqueta X
+```
+
+## 2026-10-18 · §62 La carrera sincronizada en la sala del sitio, y las dos desincronizaciones escondidas
+
+**Qué se quería:** que la sala del sitio use la carrera sincronizada (§61) cuando hay CPU de relleno, que la copa
+completa (4 carreras) llegue al final igual en todas las consolas, y que el modo en línea "funcione sí o sí" (lo
+pidió el dueño). Con eso andando aparecieron dos desincronizaciones que solo se veían a veces: costó encontrarlas
+porque la carrera se separaba recién a los 2 min 20 s y no en todas las corridas.
+
+### 62.1 La sala del sitio elige la carrera sincronizada
+
+- `colabtex/src/juegos/motor.js` (Paginita-Pro): si la sala tiene CPU de relleno y hasta 4 humanos
+  (`MKW_SINCRO_MAX`: el mando de GameCube tiene 4 puertos), al apretar «¡A correr!» se congela la lista de quiénes
+  corren (`est.sincro`) y `mkwCarrera(pid, ronda)` saca de la semilla de la sala la semilla de la carrera y 4 pistas
+  distintas (copa < 79). Si el anfitrión se va en medio, la ronda sigue (ya no se vuelve al vestíbulo).
+- `colabtex/src/juegos/mkw.js`: el iframe del juego se abre con `modo=copa&sincro=…&semilla=…&pistas=…&cpu=…` solo
+  para los que están en `est.sincro`. Pruebas: `colabtex/tests/mkw.test.cjs` (10/10).
+- El banco de la sala (`banco/pruebas/sala-mkw/padre.html`) arma la misma dirección para probarlo sin el sitio.
+
+### 62.2 El fin de la carrera, la vista propia y el piloto
+
+- **Fin de carrera** (`GMDataVS::CanRaceEnd`, 0x80536054, envuelta en `lockstep_nativo.cpp`): el juego terminaba la
+  carrera cuando llegaba el kart del puesto 0 (el de la pantalla). Ahora termina cuando llegaron **todos los humanos
+  que siguen en la sala** (RaceinfoPlayer +0x38 bit 0x2), igual en todas las consolas.
+- **El contador de cuadros** se lee de +0x1E (16 bits) + +0x20: al terminar la carrera el byte alto de +0x1C se llena
+  de marcas y el número salía basura. El lockstep se detiene en la etapa ≥ 4 (resultados): esos menús son locales.
+- **La carrera 2 de la copa** (`pad_web.cpp`, `CuadroDeCarrera`): la carrera siguiente se arma con un «Scene
+  Restart» y su Raceinfo puede quedar en la **misma dirección** que el de la anterior. El código solo reconocía una
+  carrera nueva si cambiaba la dirección, así que en la carrera 2 el lockstep no se enganchaba (cada consola corría
+  sola). Ahora también es carrera nueva cuando el mismo Raceinfo vuelve a la etapa < 4 después de haber terminado.
+- **Vista propia** (`VISTA_PROPIA` en `compilar-web.py`): en 16 funciones de **sonido** y **HUD** la pregunta "¿de
+  quién es la pantalla?" (`Racedata::GetPlayerIdOfLocalPlayer`) se reemplaza por `mkw_vista_propia_v0` = mi puesto.
+  La tabla de pantallas sigue igual en todas (la lógica la mira, §61); solo lo que se oye y se ve sigue a mi kart.
+  `?vista=0` apaga sonido+HUD propios, `?camara=0` la cámara propia (para comparar).
+- **Piloto** (`menus.mjs`): en la carrera sincronizada aprieta A 6 s después del fin hasta que aparece la lista de
+  copas, para que la copa siga sola; `records.mjs` guarda el tiempo de MI kart.
+- `jugar.bat`: doble clic → servidor del juego + Chrome en http://127.0.0.1:8140/.
+
+### 62.3 Primera desincronización: la "compensación de lag" de Retro Rewind
+
+**El síntoma:** con la semilla de una sala real (2121618600, pistas 50.2/50.0/65.3/45.0) dos corridas offline de
+la misma carrera, en la misma PC, se separaban 3 de cada 4 veces, siempre en los mismos cuadros (8.484 o 8.768).
+
+**Cómo se encontró** (cada paso con su herramienta, todas en la carpeta temporal de la sesión):
+1. Huella por cuadro de cada kart, del azar 1 (el de la lógica) y del azar 2 → el azar 1 se separaba en el cuadro
+   8.484 por una decisión de la IA de un CPU (`AI::PlayerKart::UpdateAction1`): en una corrida usa una acción en el
+   8.484 y en la otra otra acción en el 8.490.
+2. Huella de la IA de cada CPU por cuadro (sin contar punteros: las direcciones cambian de una corrida a otra) →
+   idéntica hasta el 8.484: lo que cambia es algo de afuera que la IA consulta.
+3. Comparar el kart 6 entero → una matriz de posición (la del **modelo** del kart, `K+3c +0xC8`) tenía en una corrida
+   la posición de este cuadro y en la otra la del cuadro anterior (82 unidades atrás).
+4. **Punto de vigilancia** (ver glosario): un build aparte (`--carpeta build/web-vigia`, `-DMKW_VIGIA`) que avisa
+   cada escritura en una dirección, con la pila de llamadas. La matriz la escribe `ModelDirector::Update`, y a
+   esa la llama **el dibujo** (`GameScene::draw` → `ScnMgr::DrawMain`), no la lógica.
+5. Registro de en qué cuadros se dibuja → en algunos cuadros el juego **no dibujaba**: corría la lógica dos veces
+   seguidas. Quien lo decide es Retro Rewind (Pulsar): reemplaza el bucle principal (`RKSystem::Run`, el
+   `rr_overlay_8000951C`) y en 0x800095C4 llama a `rr_kamek_81806568`, que mira cuántos refrescos de pantalla
+   **reales** pasaron (AsyncDisplay +108) y, si el juego va atrasado, se salta el dibujo para alcanzar al reloj.
+
+**Por qué separa la carrera:** cada PC se salta cuadros distintos según lo cargada que esté; en los cuadros sin
+dibujo la copia de la posición en el modelo queda atrasada, la IA de los CPU la lee, y decide otra cosa.
+
+**El arreglo** (`lockstep_nativo.cpp`, `rr_kamek_81806568`): en la carrera sincronizada se hace lo del juego
+original: si el bucle quiere dibujar, se empieza el cuadro de pantalla (`AsyncDisplay::beginFrame`) y se dibuja
+siempre. Una PC que no da abasto va más lenta y la sala la espera (es lo que hace el lockstep de todas formas).
+Fuera de la sala con CPU no cambia nada. De paso, `AsyncDisplay::beginFrame` guarda en +100 una fracción medida con
+el reloj real; en la carrera sincronizada queda fija en su tope (también la usaba la animación de los pilotos).
+
+### 62.4 Segunda desincronización: el reloj del sorteo compartido
+
+**El síntoma:** con el dibujo arreglado, las dos corridas seguían separándose, ahora siempre en el 8.484. La huella
+de los **objetos** de cada jugador (`ItemPlayer`, 584 bytes cada uno) mostró dónde: en el cuadro 8.419 el CPU 6
+toca una caja y le sale el objeto 5 en una corrida y el 4 en la otra (`ItemPlayer +0x74`).
+
+**Por qué:** el sorteo de los objetos saca su azar del reloj del procesador, que en la carrera sincronizada es el
+reloj fijo de §61 (`PPC_MftbCarrera`). Pero era **un solo contador para todo el juego**: cada lectura, venga de
+donde venga, lo avanza un paso. Con que alguna parte lo lea una vez de más en una PC (cualquier cosa que arme un
+`Random` nuevo, por ejemplo), todos los números siguientes se corren y la caja da otro objeto.
+
+**El arreglo:** un **reloj por lugar** (`PPC_MftbCarreraEn(sitio, lr)` en `ppc_helpers.cpp`). Cada una de las 8
+funciones de `RELOJ_CARRERA` tiene su número (sitio) y se le pasa el `lr` del momento (desde dónde la llamaron). El
+valor sale solo de: el cuadro de la carrera, el sitio, el lr y cuántas veces leyó ese mismo lugar en ese cuadro.
+Sigue subiendo con el tiempo para cada lugar (las que miden cuánto pasó lo ven avanzar), y una lectura de más en
+un lugar ya no mueve a los otros. `GetTick` tiene además una versión "sin estado" (`func_80550730_statefree`) que no
+tiene `ctx`: ahí el lugar es solo la función.
+
+### 62.5 Lo que se descartó por el camino
+
+- **El lugar en la memoria:** en cada corrida todas las piezas de la carrera quedan corridas de a 32 bytes (por lo
+  que pasó antes en los menús). Se pensó que alguna parte del juego dependía de las direcciones, pero una pareja con
+  Raceinfo en la **misma** dirección también se separó. No era eso.
+- **El azar 2** (Raceinfo +8) lo usa solo la animación de los pilotos (dos funciones con `Random::next` copiado
+  adentro: 0x807C6A44 y 0x807CB530): no toca la carrera.
+- La comparación de toda la memoria entre corridas no sirvió: aun antes de separarse hay ~100.000 palabras distintas
+  (punteros, gráficos, sonido).
+
+### 62.6 Pruebas
+
+| Prueba | Antes | Ahora |
+|---|---|---|
+| Misma carrera offline 2 veces (semilla de la sala, 12 CPU, ~9.190 cuadros), 4 parejas | 3 de 4 separadas (cuadro 8.484/8.768) | **4 de 4 idénticas** (karts, azar 1, azar 2 y objetos) |
+| `prueba-sincro.mjs --copa --pistas=50.2,50.0,65.3,45.0 --semilla=2121618600` (dos pestañas) | se separaba; después de §62, se congelaba al terminar la carrera 1 (§63) | **4 de 4**: las dos pasan solas a la carrera 2 (cuadro 1.035) con las huellas iguales en toda la copa (95 de 95) |
+| `prueba-sincro.mjs --sala --copa` (dentro de la sala falsa del sitio) | la carrera no terminaba (los humanos no se movían: §63) | **4 de 4**: carrera 2 en las dos (cuadro 956), huellas iguales (82 de 82) |
+
+**Trampas:** el `EM_ASM` de C++ se come las barras invertidas (`/(\d+)/` llega a JavaScript como `/(d+)/`): usar
+`[0-9]`. Y `Error.stackTraceLimit` es 10 por omisión: para ver la pila completa hay que subirlo.
+
+```bash
+node web/navegador/prueba-sincro.mjs --copa --pistas=50.2,50.0,65.3,45.0 --semilla=2121618600
+node web/navegador/prueba-sincro.mjs --sala --copa [--minutos=25]
+MKW_DEPURAR_LS=1 MKW_CFLAGS_EXTRA=-DMKW_VIGIA python herramientas/compilar-web.py --modo navegador --carpeta build/web-vigia
+```
+
+## 2026-10-18 · §63 La página que se congelaba al terminar la carrera en línea
+
+**El síntoma:** en la prueba de la copa sincronizada (`prueba-sincro.mjs --copa`) la carrera 1 terminaba igual en las
+dos pestañas (87 de 87 huellas), pero ninguna pasaba a la carrera 2: se quedaban en la pantalla de puntos. Y la
+prueba, que tiene un tope de 25 minutos, tardó **casi dos horas**: el reloj de la página saltó de 222 s a 6.885 s
+entre dos líneas del medidor.
+
+**Cómo se encontró:**
+1. En el registro, después del fin de la carrera, había ~14.500 líneas de `[pipelines]` (una por segundo: ~1 h 50 min)
+   y **ninguna** del medidor, que es un `setInterval` de la página. Es decir: el juego seguía corriendo (60 cuadros
+   por segundo, imprimiendo), pero el **bucle de eventos** de la página no corría nunca. Por eso tampoco llegaban dos
+   pipelines pedidas en segundo plano ("2 en camino" durante 6.667 s: su respuesta necesita el bucle de eventos) y la
+   prueba no podía leer la página (`page.evaluate` no volvía, así que nunca llegaba a mirar su tope de tiempo).
+2. Una prueba propia que lee cada pestaña con tope de 4 s y un **latido** (glosario) lo confirmó: durante la carrera
+   los huecos eran de 120 a 700 ms (la página respiraba a ratos) y, apenas terminó la carrera (cuadro 10.504),
+   las dos pestañas dejaron de responder del todo.
+3. La causa está en cómo espera el runtime entre cuadros (`vi.cpp`). En línea (`?red`) la página **no ofrece el
+   enganche al monitor** (§58: el juego debe ir con el reloj de pared). Sin enganche, la espera iba en rebanadas de
+   1 ms (`SleepPreciselyUntil(ahora + 1 ms)`) y el runtime solo cede con `emscripten_sleep` si faltan **2 ms o más**:
+   nunca cedía, giraba toda la espera. Y la pausa de presentar de aurora (la otra ocasión de ceder) también estaba
+   apagada en línea. Durante la carrera sincronizada la página solo respiraba cuando el lockstep esperaba los
+   botones de la otra consola. Terminada la carrera, el lockstep ya no espera a nadie: **nada cedía nunca más**.
+
+**Qué significa para el jugador:** no era solo la prueba. En cualquier sala en línea (la carrera sincronizada y el VS
+por el WFC de la sala) la página casi no actualizaba la pantalla ni atendía la red ni el teclado durante la carrera,
+y al terminar la carrera sincronizada quedaba congelada.
+
+**El arreglo** (dos partes):
+- **Esperar sin enganche cediendo** (`vi.cpp`, `PaceToRetraceBoundary` y `VI_HLE_WaitForNextRetracePoll`): si el
+  reloj no va enganchado al monitor, el runtime le pide a la página `Module.mkwEsperaReloj(vencimiento, 1 ms)`
+  (`mkw.mjs`, `esperaReloj`): la página lo despierta cuando falta ≤ 1,5 ms (el runtime gira ese resto) o a 1 ms para
+  que atienda sonido y alarmas. El `setTimeout` se pide desde una tarea nueva (sin el mínimo de 4 ms de los
+  temporizadores anidados). En una pestaña oculta solo cede una vuelta (Chrome demora ahí los `setTimeout` hasta 1 s y
+  la sala no puede esperar). Sirve también para una pestaña normal cuyo reloj del monitor dejó de valer.
+- **La pausa de presentar también en línea** (`mkw.mjs`, `PRESENTA`): `mkwEsperaToma` y la toma a compás no tocan el
+  reloj del juego (solo esperan a que el navegador tome el canvas, con tope en el vencimiento del cuadro), así que
+  ahora van también con `?red`. Sin ella, cuando un cuadro tardaba más que su turno no había ninguna espera y la
+  página seguía sin turno.
+
+**Resultados** (dos pestañas: una prueba de la sesión que lee cada pestaña con tope y latido; una pestaña: `node herramientas/medir-enlinea.mjs "" "&esperaToma=0&atrasada=0"` y `SIN_RED=1 node herramientas/medir-enlinea.mjs`):
+
+| Medida | Antes | Solo la espera nueva | Las dos partes |
+|---|---|---|---|
+| Fin de la carrera 1 de la copa (dos pestañas) | **las dos se congelan** | pasan solas a la carrera 2 | pasan solas a la carrera 2 |
+| Hueco máximo del latido de 100 ms en carrera (dos pestañas) | 120–700 ms | 120–400 ms | **113–137 ms** |
+| Una pestaña en línea (lo que tiene cada jugador): refrescos con cuadro nuevo / repetidos / saltados (monitor de ~175 Hz: lo ideal es 34,3 % / 65,7 % / 0 %) | — | 40,6 % / 59,1 % / **0,4 %** (el navegador pierde turnos de pantalla) | **34,8 % / 65,2 % / 0 %** (igual que sin red: 34,3 / 65,7 / 0) |
+| Cuadros por segundo del juego, una pestaña en línea | — | 60,0 | **59,9** |
+
+Con **dos pestañas en el mismo PC** la carrera sincronizada va ahora a ~51 cuadros por segundo (antes ~60): ahora el
+navegador sí lleva cada cuadro a la pantalla, y dos juegos en el mismo PC se reparten la CPU. Con un jugador por PC
+(lo real) va a 60 y parejo, como se ve en la tabla.
+
+**Además, en las pruebas:**
+- `prueba-sincro.mjs`: cada lectura de la página tiene tope de 10 s y avisa "la página no responde"; así una página
+  colgada ya no deja la prueba corriendo horas.
+- `prueba-sincro.mjs --sala --copa`: la sala falsa (`banco/pruebas/sala-mkw/padre.html`) acepta `?extra=` y le pasa
+  al juego `autoconducir=1`; antes, dentro de la sala, los karts de los humanos no se movían y la carrera no
+  terminaba nunca (a los 25 min iba por el cuadro 75.000).
+- `prueba-enlinea.mjs` usaba un build aparte y viejo (`build/web-red`, del 17 de octubre): ahora usa el de siempre,
+  que ya trae la red del juego.
+- `banco/correr.mjs` aprieta el botón «empezar» de las páginas que necesitan el primer toque (la del sonido no
+  terminaba nunca: 21 de 21 páginas bien).
+
+**Optimización que salió de esto: la espera sin margen.** Con la espera nueva, el perfil de 10 s de carrera
+(`guion.mjs … P:10000 --llamadores "_emscripten_get_now,_clock_time_get,now"`) mostró que ~8 % de todo el tiempo de la
+pestaña se iba en **leer el reloj** (`_emscripten_get_now`, `now`, `_clock_time_get`, `bigintToI53Checked`,
+`wasm-to-js`), casi todo desde el bucle ocioso del juego (`SelectThread`): el último 1,5 ms de cada espera giraba
+preguntando la hora miles de veces. Pasa en todo monitor que **no se puede enganchar**: los 60 Hz del juego
+(16,68 ms) tienen que ser un número entero de refrescos, y en uno de 175 Hz (el de este PC hoy), 144 o 165 Hz no lo
+son, así que el juego espera "sin enganche" también fuera de línea. Ahí no hay refresco con el que calzar y llegar un
+poco tarde no corre el reloj del juego (cada "tele" se sella en su lugar de la grilla: `lastRetrace = target`), así
+que la página ahora despierta al juego **en** el vencimiento (el último tramo del `setTimeout` redondeado hacia arriba,
+sin margen) y el runtime casi no gira.
+
+| Perfil de 10 s de carrera (monitor de 175 Hz) | Margen de 1,5 ms | Sin margen |
+|---|---|---|
+| Leer el reloj | ~8,4 % | **~0,5 %** |
+| Ocioso (la pestaña libre) | 54–56 % | **65 %** |
+| Hilo principal ocupado (`medir-sitio --perfil pc`) | 46–52 % | **41–47 %** |
+| CPU por cuadro del juego + aurora (no cuenta las esperas) | 8,4–9,1 ms | 8,5–9,3 ms (igual, dentro del ruido) |
+
+Es decir, ~1,7 ms por cuadro que el procesador ya no quema girando (menos consumo y más lugar para la página), sin
+cambiar el trabajo del juego. La pantalla sigue igual de pareja (`medir-enlinea.mjs`, una pestaña, 60 s de carrera):
+sin red 34,4 % de refrescos con cuadro nuevo / 65,6 % repetidos / **0 % saltados** (lo ideal a 175 Hz: 34,3 / 65,7 / 0);
+en línea 35,3 / 64,7 / **0**, 60 cuadros por segundo en las dos.
+
+**Trampa:** "el juego va a 60 cuadros por segundo" (el medidor) no quiere decir que la pantalla los muestre: el
+medidor cuenta los cuadros que el juego le entrega a aurora. Que lleguen a la pantalla depende de que la página tenga
+turno. Lo que lo mide es `mkwEstado.vsync` (refrescos con cuadro nuevo justo, repetidos y saltados).
+
+```bash
+python herramientas/compilar-web.py --modo navegador
+node web/navegador/prueba-sincro.mjs --copa --pistas=50.2,50.0,65.3,45.0 --semilla=2121618600
+node web/navegador/prueba-sincro.mjs --sala --copa
+```
+
+## 2026-10-18 · §64 El plan del dueño, el visor de Retro WFC fuera y el trabajo a salvo en git
+
+**Qué pasó:** se revisó todo lo hecho y se escribió el plan de lo que falta (`PLAN.md`, "Lo que falta, en orden",
+etapas A a F). El dueño contestó las preguntas abiertas:
+
+| Pregunta | Respuesta del dueño | Qué cambia |
+|---|---|---|
+| ¿Commits en la rama del sitio y en el repo local? ¿Push y PR? | Sí a las dos; el merge, cuando él lo diga | Etapa A: commits, push y PR a `main` sin juntar |
+| ¿Qué Worker y qué lista de amigos para Mario Kart? | Los mismos de BT3; el Worker y la subida a R2 **los hace él** | Aquí se prepara todo lo que necesita (etapa B) y no se publica nada |
+| ¿El VR se mueve en la carrera sincronizada con CPU? | **No: solo en línea** (VS por el WFC de la sala) | La carrera sincronizada no escribe VR en Firebase |
+| ¿Se quita el visor de salas de Retro WFC? | Sí | Se borró `salas.mjs` y su página del banco (abajo) |
+| ¿Cómo se prueban "dos PCs"? | Como BT3: dos juegos abiertos en el mismo PC | Bastan las pruebas de dos pestañas y una prueba a mano con dos ventanas |
+
+**El visor de salas, fuera.** `web/navegador/salas.mjs` leía en vivo la lista pública de salas del servidor de la
+comunidad (Retro WFC, en `rwfc.net`) y la mostraba en la página: quién estaba jugando, en qué sala, con qué VR. Como el
+multijugador va **solo por nuestra página** (salas del sitio, el WFC virtual en la pestaña del anfitrión y la malla
+WebRTC), el visor sobraba, y además hacía que la página dependiera de un servidor ajeno. Se borraron `salas.mjs`, su
+página del banco (`banco/pruebas/salas/`) y su entrada en `banco/index.html`. **No** confundir con `wfc-salas.mjs`, la
+lista de salas de nuestro propio WFC virtual, que sigue.
+
+Lo único útil que tenía el visor era el **código de amigo** (12 cifras calculadas del número de jugador con un MD5,
+§46): se pasó a un archivo propio, `web/navegador/codigo-amigo.mjs`, que ahora usa `licencias.mjs` («Tu partida»
+muestra el código de cada licencia). Como su página del banco desapareció, sus pruebas se pasaron a la de licencias,
+que subió de 21 a **26 puntos**:
+
+| Punto nuevo (`banco/pruebas/licencias/`) | Qué comprueba |
+|---|---|
+| MD5 con los vectores del RFC 1321 | Que nuestro MD5 da lo mismo que el patrón publicado ("", "abc", "message digest" y 100 letras "a", que ocupa dos bloques) |
+| 4 códigos de referencia | 4 números de jugador con su código ya conocido (verificados contra los 280 jugadores de Retro WFC el 17-10) |
+| Un código bien escrito, en 3 formatos | Con guiones, con espacios y todo junto: los tres válidos |
+| Un código con una cifra mal | Cambiar una cifra (en el número o en el control) lo hace inválido: el control "atrapa" el error |
+| 11 cifras, letras o vacío | Inválidos, sin romper nada |
+
+**Resultados de la etapa A (este PC, monitor de ~175 Hz):**
+
+| Prueba | Resultado |
+|---|---|
+| Banco sin el juego (`node banco/correr.mjs`) | 21/21 páginas |
+| Licencias (con el código de amigo) | **26/26** |
+| Juego en Node (`prueba-arranque.mjs`, recompilado) | 13/13 |
+| Navegador (`prueba-navegador.mjs 900`) | 20/20 (21 con un monitor que es múltiplo de 60 Hz; el punto "parejos en pantalla" solo se puede medir si se engancha) |
+| Partidas / piloto / elegir | 6/6 · 9/9 · 23/23 |
+| Sala con CPU, dos pestañas (`prueba-sincro.mjs`, normal y `--sala`) | 9/9 y 9/9 |
+| Copa sincronizada (con semilla y dentro de la sala falsa) | 4/4 y 4/4 carreras |
+| VS en línea por el WFC de la sala (`prueba-enlinea.mjs`) | 9/9 |
+| Copa fuera de línea, 4 carreras (`prueba-copa.mjs`) | 10/11 la primera vez (la carrera 4 sin su semilla, abajo); **11/11** con el arreglo |
+| Sitio: `npm run test:juegos` | 885/893; las 8 que fallan ya fallaban antes y no son de Mario Kart (7 del Worker del disco de BT3 y 1 del salón) |
+| Sitio: `node tests/mkw.test.cjs` | 10/10 |
+
+**Un error que destapó §63: la carrera 4 de la copa salía sin su semilla.** En «Copa a tu gusto» cada carrera
+tiene su semilla (el número del que sale todo su azar, §56). La página la deja en `window.mkwSemillaCarrera` y el
+juego la toma al **preparar** la carrera (`RacedataScenario::InitRng`, con el gancho de `semillas_nativo.cpp`). Al
+terminar la copa, `mkw.mjs` borra esa semilla para que las carreras que vengan después tengan el azar de siempre. El
+problema: lo borraba apenas el piloto (`menus.mjs`, `seguirCopa`) **llegaba** a la carrera 4, es decir, apenas el
+juego empezaba a cargarla, y el juego la prepara un poco después. Antes de §63 la página casi nunca tenía turno en
+ese momento (el juego no soltaba el hilo), así que el borrado llegaba tarde y "funcionaba" por suerte; ahora que la
+página tiene turno a tiempo, el borrado ganaba y la carrera 4 salía con el azar del reloj (`4f96838f` en vez de
+`6ae94d29`). Es una **carrera entre dos procesos** (como dos señales que llegan a un flip-flop sin sincronizar: el
+resultado depende de cuál llega primero). **Arreglo:** `seguirCopa` no vuelve hasta que la carrera 4 está en pantalla
+(su página de juego, 0x0D/0x0E; para entonces el juego ya preparó el azar), con tope de 60 s, y recién ahí se borra.
+Resultado: `prueba-copa.mjs` **11/11**, la semilla de la carrera 4 es la pedida.
+
+**Commits.** El trabajo quedó guardado en dos lugares:
+1. **El sitio** (`terceros/Paginita-Pro`, rama `claude/loving-planck-9k2yam`): antes, `bash herramientas/subir-kit.sh`
+   copia a `juegos/mkw/` todo lo propio de este proyecto (lo que git no ignora: `web/`, `banco/`, `parches/`,
+   `herramientas/`, `docs/`, `PLAN.md`, `CLAUDE.md`) y frena si ve algo con forma de juego o de más de 50 MB; después se
+   agregan **solo los archivos de Mario Kart** (la rama tiene otros cambios del dueño que no son nuestros: no se tocan)
+   y se revisa `git diff --cached --stat` (nada del juego, nada grande).
+2. **El repo local** (`MKW RETRO`): el primer commit, revisando antes `git status` contra `.gitignore` para que no
+   entre nada del juego (`terceros/`, `extraido/`, `build/`).
+
+**Trampa:** en el sitio, `npm run build` vuelve a sellar `?v=…` en las 35 páginas que cargan `i18n.js`; esos cambios
+de solo sello no van en el commit de Mario Kart (son ruido y chocan con cualquier otro trabajo del sitio).
+
+```bash
+node banco/correr.mjs licencias
+cd terceros/Paginita-Pro/colabtex && npm run build && npm run test:juegos && node tests/mkw.test.cjs
+bash herramientas/subir-kit.sh
+```

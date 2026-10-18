@@ -43,7 +43,7 @@ const pasos = (args.find(a => !a.startsWith('--') && !['--esperar', '--extra', '
 const esperarCuadros = Number(opcion('--esperar', 360));
 const PUERTO = 8142;
 const NOMBRE = { K: 'KeyK', J: 'KeyJ', P: 'KeyP', T: 'KeyT', G: 'KeyG', F: 'KeyF', H: 'KeyH',
-                 W: 'KeyW', A: 'KeyA', S: 'KeyS', D: 'KeyD', L: 'KeyL', E: 'Space', U: 'KeyU', O: 'KeyO', N: 'KeyN' };
+                 W: 'KeyW', A: 'KeyA', S: 'KeyS', D: 'KeyD', L: 'KeyL', E: 'Space', U: 'KeyU', O: 'KeyO', N: 'KeyN', M: 'Escape' };   // M = Start (P es «perfil»)
 
 const carpeta = path.join(raiz, 'build/web/datos/guion');
 rmSync(carpeta, { recursive: true, force: true });

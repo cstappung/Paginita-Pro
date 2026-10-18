@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carrera sincronizada</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Carrera sincronizada: <span>los mismos botones en todas las consolas</span></h1>
+<p>Prueba <code>lockstep.mjs</code> (bitácora §61) <b>sin el juego</b>. Cada "consola" es un juego falso: en cada cuadro
+  pide los botones de todos (<code>pad(cuadro)</code>), los mezcla en su estado (como el juego mueve los karts) y sigue.
+  Si todas reciben exactamente los mismos botones en cada cuadro, todas terminan con el mismo estado. La red es falsa:
+  cada paquete tarda entre 5 y 40 ms y uno de cada siete del canal "udp" se pierde (el canal "tcp" llega siempre y en orden). Además: un jugador que se va a
+  mitad de carrera, uno que nunca llega (y justo es el que decidía), una carrera nueva, una desincronización a
+  propósito y el plantel de 12 karts.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearLockstep, armarPlantel, PESO, RETRASO } from '/web/navegador/lockstep.mjs';
+
+const { ok, nota, fin } = prueba('lockstep', 'Carrera sincronizada (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const START = 0x1000;
+
+// Una sala falsa: consolas con su lockstep y una red con latencia y pérdidas. `fuera` = esa consola no manda ni recibe.
+function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200 } = {}) {
+  const humanos = uids.map((uid, mando) => ({ uid, mando }));
+  const consolas = {};
+  for (const uid of uids) {
+    const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, enviados: new Map(), vistos: [], registro: [], tcp: {} };
+    let toque = 0;
+    c.ls = crearLockstep({
+      yo: uid, humanos, esperaCorte, esperaInicio,
+      registro: t => c.registro.push(t),
+      // lo que "toca" esta consola: cambia con el tiempo y a veces trae START (que no debe llegar al juego)
+      local: () => {
+        toque++;
+        const v = [(toque * 37 + uid.charCodeAt(0)) & 0x1F7F | (toque % 50 === 0 ? START : 0), (toque % 255) - 128, uid.charCodeAt(0) - 100, 0, 0, toque % 7, 0];
+        c.enviados.set(c.cuadro + RETRASO, v);        // vale para el cuadro actual + RETRASO
+        return v;
+      },
+      huella: () => c.estado,
+      enviar: (a, bytes, canal) => {
+        if (c.fuera || consolas[a].fuera) return;
+        if (canal === 'udp' && Math.random() < perdida) return;
+        const copia = bytes.slice();
+        // "udp" puede llegar desordenado; "tcp" llega en orden (como el canal confiable de WebRTC)
+        let t = performance.now() + 5 + Math.random() * 35;
+        if (canal === 'tcp') { t = Math.max(t, (c.tcp[a] || 0) + 0.1); c.tcp[a] = t; }
+        setTimeout(() => { if (!consolas[a].fuera) consolas[a].ls.alBinario(uid, copia); }, t - performance.now());
+      },
+    });
+  }
+  return consolas;
+}
+
+// El juego falso: pide los botones de cada cuadro y los mezcla en su estado. `salirEn` = deja de jugar en ese cuadro.
+async function correr(c, { desde = 0, hasta, salirEn = -1, lento = 0 }) {
+  for (let k = desde; k < hasta; k++) {
+    if (k === salirEn) { c.fuera = true; return; }
+    c.cuadro = k;
+    const d = await c.ls.pad(k);
+    for (let i = 0; i < 32; i++) c.estado = Math.imul(c.estado ^ d[i], 16777619) >>> 0;
+    c.vistos[k] = Array.from(d);
+    await espera(lento);
+  }
+}
+const iguales = cs => cs.every(c => c.estado === cs[0].estado);
+const conTiempo = (p, ms) => Promise.race([p, espera(ms).then(() => 'tarde')]);
+
+try {
+  // ---- 1) tres consolas, red mala, una más lenta ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla']);
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: 600 }), correr(s.beto, { hasta: 600 }), correr(s.carla, { hasta: 600, lento: 3 })]), 60000);
+    const cs = Object.values(s), e = cs.map(c => c.ls.estado());
+    ok('tres consolas con la red mala terminan los 600 cuadros', r !== 'tarde' && cs.every(c => c.cuadro === 599), cs.map(c => c.cuadro).join(', '));
+    ok('las tres terminan con el MISMO estado (recibieron los mismos botones en cada cuadro)', iguales(cs), cs.map(c => c.estado.toString(16)).join(' '));
+    ok('las huellas se compararon y coinciden', e.every(x => x.huellasIguales >= 8 && !x.desincronizado), e.map(x => x.huellasIguales).join(', '));
+    // lo que tocó Beto para el cuadro 100 es lo que Ana y Carla ven en el puerto 1 en el cuadro 100
+    const b100 = s.beto.enviados.get(100), a100 = s.ana.vistos[100].slice(8, 16), c100 = s.carla.vistos[100].slice(8, 16);
+    ok('los botones de Beto llegan a su puerto (1) en las otras consolas, en su cuadro', !!b100 && a100[0] === 1 && a100[2] === b100[1] && a100[3] === b100[2] && c100.join() === a100.join(),
+      `Beto tocó ${b100?.slice(0, 3)} → Ana ve ${a100.slice(1, 4)}`);
+    ok('antes del cuadro RETRASO todos los botones son neutros', s.ana.vistos.slice(0, RETRASO).every(d => d.every((v, i) => i % 8 === 0 || v === 0)));
+    ok('START (pausa) nunca llega al juego', cs.every(c => c.vistos.every(d => [1, 9, 17, 25].every(i => !(d[i] & START)))));
+    ok('se perdieron paquetes y se recuperaron (hubo esperas, pero cortas)', e.every(x => x.esperas > 0 && Object.keys(x.cortes).length === 0),
+      e.map(x => `${x.esperas} esperas, máx ${x.maxEspera.toFixed(0)} ms`).join(' · '));
+  }
+
+  // ---- 2) Beto se va (5 veces, en cuadros distintos: qué paquetes se pierden cambia cada vez) ----
+  {
+    const filas = [];
+    for (let vez = 0; vez < 5; vez++) {
+      const sale = 150 + 37 * vez;
+      const s = crearSala(['ana', 'beto', 'carla']);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: 400 }), correr(s.beto, { hasta: 400, salirEn: sale }), correr(s.carla, { hasta: 400 })]), 60000);
+      const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+      filas.push({ sale, r, fin: s.ana.cuadro === 399 && s.carla.cuadro === 399, corteA: ea.cortes[1], corteC: ec.cortes[1],
+        igual: s.ana.estado === s.carla.estado && !ea.desincronizado && !ec.desincronizado,
+        anuncio: s.ana.registro.some(t => t.includes('sigue sin nadie')) && s.carla.registro.some(t => t.includes('sigue sin nadie')),
+        // el puerto de Beto: conectado 1 antes del corte y 2 desde el corte (así el juego deja de esperarlo en la meta)
+        marca: s.ana.vistos[ea.cortes[1] - 1]?.[8] === 1 && s.ana.vistos[ea.cortes[1]]?.[8] === 2 && s.carla.vistos[399]?.[8] === 2 });
+    }
+    ok('Beto se va: Ana y Carla siguen hasta el final (5 de 5)', filas.every(f => f.r !== 'tarde' && f.fin));
+    ok('las dos cortan a Beto en el MISMO cuadro, después de que se fue', filas.every(f => f.corteA !== undefined && f.corteA === f.corteC && f.corteA >= f.sale),
+      filas.map(f => `sale ${f.sale} → ${f.corteA}/${f.corteC}`).join(', '));
+    ok('y siguen con el mismo estado (nadie usó botones de Beto donde otro ya puso "sin nadie")', filas.every(f => f.igual), filas.map(f => f.igual ? '=' : '≠').join(''));
+    ok('decidió Ana (la primera que sigue) y se lo anunció a Carla', filas.every(f => f.anuncio));
+    ok('desde el corte, el puerto de Beto llega marcado como "se fue" (2) en las dos consolas', filas.every(f => f.marca));
+  }
+
+  // ---- 3) Ana (la primera, la que decidiría) nunca llega ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla']);
+    s.ana.fuera = true;
+    const r = await conTiempo(Promise.all([correr(s.beto, { hasta: 300 }), correr(s.carla, { hasta: 300 })]), 30000);
+    const eb = s.beto.ls.estado(), ec = s.carla.ls.estado();
+    ok('Ana nunca llega: Beto y Carla no se quedan esperando para siempre', r !== 'tarde' && s.beto.cuadro === 299 && s.carla.cuadro === 299, `${s.beto.cuadro}, ${s.carla.cuadro}`);
+    ok('pero al que no llega se le espera más que al que se va (y esa espera se cuenta aparte: no es costo de sincronizar)', s.beto.ls.estado().msLlegada >= 1100 && s.beto.ls.estado().maxEspera < 1100,
+      `llegada ${s.beto.ls.estado().msLlegada.toFixed(0)} ms, peor espera de sincronizar ${s.beto.ls.estado().maxEspera.toFixed(0)} ms`);
+    ok('decide el siguiente (Beto) y las dos cortan a Ana desde el principio', eb.cortes[0] === RETRASO && ec.cortes[0] === RETRASO, `Beto ${eb.cortes[0]}, Carla ${ec.cortes[0]}`);
+    ok('y siguen con el mismo estado', s.beto.estado === s.carla.estado && !eb.desincronizado);
+  }
+
+  // ---- 3b) Carla llega 800 ms tarde (cargó más lento): se la espera y juega ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla']);
+    const pa = correr(s.ana, { hasta: 300 }), pb = correr(s.beto, { hasta: 300 });
+    await espera(800);
+    const r = await conTiempo(Promise.all([pa, pb, correr(s.carla, { hasta: 300 })]), 30000);
+    const e = Object.values(s).map(c => c.ls.estado());
+    ok('Carla llega tarde a la carrera: nadie la corta y juegan las tres', r !== 'tarde' && e.every(x => Object.keys(x.cortes).length === 0) && iguales(Object.values(s)),
+      e.map(x => JSON.stringify(x.cortes)).join(' '));
+  }
+
+  // ---- 4) carrera nueva: el contador vuelve a 0 (después de 400 cuadros); quien empieza antes guarda lo de la siguiente ----
+  {
+    const s = crearSala(['ana', 'beto']);
+    await conTiempo(Promise.all([correr(s.ana, { hasta: 400 }), correr(s.beto, { hasta: 400 })]), 30000);
+    // Ana empieza la carrera 2 en seguida; Beto un rato después (los botones de Ana para la carrera 2 llegan antes)
+    const pa = correr(s.ana, { hasta: 250 });
+    await espera(150);
+    const r = await conTiempo(Promise.all([pa, correr(s.beto, { hasta: 250 })]), 30000);
+    const ea = s.ana.ls.estado(), eb = s.beto.ls.estado();
+    ok('segunda carrera: las dos cuentan la carrera 2 y la terminan', r !== 'tarde' && ea.carrera === 2 && eb.carrera === 2 && s.beto.cuadro === 249, `Ana ${ea.carrera}, Beto ${eb.carrera}`);
+    ok('la segunda carrera también sale igual en las dos', s.ana.estado === s.beto.estado && !ea.desincronizado && !eb.desincronizado);
+  }
+
+  // ---- 5) una desincronización a propósito se detecta ----
+  {
+    const s = crearSala(['ana', 'beto'], { perdida: 0 });
+    const pa = correr(s.ana, { hasta: 300 }), pb = correr(s.beto, { hasta: 300 });
+    await espera(200); s.beto.estado ^= 1;                // Beto "se equivoca" (como si su juego calculara distinto)
+    await conTiempo(Promise.all([pa, pb]), 30000);
+    const ea = s.ana.ls.estado();
+    ok('si una consola calcula distinto, la huella lo detecta', !!ea.desincronizado, JSON.stringify(ea.desincronizado));
+  }
+
+  // ---- 6) el plantel de 12 karts ----
+  {
+    const humanos = [{ uid: 'ana', mando: 0, personaje: 9, vehiculo: 5 }, { uid: 'beto', mando: 1, personaje: 1, vehiculo: 7 }, { uid: 'carla', mando: 2 }];
+    const p = armarPlantel({ humanos, semilla: 777 }), p2 = armarPlantel({ humanos, semilla: 777 }), p3 = armarPlantel({ humanos, semilla: 778 });
+    ok('12 karts: los humanos primero, cada uno con su mando; el resto CPU (mando -1)', p.length === 12 && p.slice(0, 3).map(x => x[3]).join() === '0,1,2' && p.slice(3).every(x => x[3] === -1));
+    ok('el elegido de Ana se respeta (personaje 9, vehículo 5)', p[0][0] === 5 && p[0][1] === 9);
+    ok('un vehículo que no es del peso del personaje se cambia por el estándar de su peso', p[1][1] === 1 && p[1][0] === PESO[1], `Beto: ${p[1]}`);
+    ok('todos los vehículos son del peso de su personaje', p.every(([veh, pj]) => veh % 3 === PESO[pj] && veh < 36));
+    ok('no se repiten personajes', new Set(p.map(x => x[1])).size === 12);
+    ok('los CPU salen de la semilla: la misma semilla da el mismo plantel en todas las consolas', JSON.stringify(p) === JSON.stringify(p2) && JSON.stringify(p) !== JSON.stringify(p3));
+  }
+} catch (e) {
+  ok('la prueba corrió sin errores', false, e.stack || e.message);
+}
+fin();
+</script>
+</body>
+</html>
