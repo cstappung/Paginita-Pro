@@ -145,6 +145,17 @@ and message names, and the postman plays the server:
   → dropped, or → missed): a released sustain travels as `[i, HIT]` then
   `[i, DROPPED]`, and re-applying the HIT on every packet drew flames and
   fret pops ten times a second on a lane with no notes.
+- **The race chart** («La carrera», results screen after a room song): each
+  player's frame samples their own score at `CURVA_N` (60) equal steps of
+  `song.endTime` (`session._anotaCurva`, only with `net`), sends it with
+  `done`, and the postman writes it in the `fin` move as `cv`, base-36
+  numbers joined by `.` (`codificaCurvaHero`; a string, not an array, so
+  RTDB can't turn it into an object). `redHero` reads it with
+  `leeCurvaHero` and drops anything malformed (the result still counts).
+  `results.js` (`carreraEl`) draws one line per player in their highway
+  colour, a strip of who was first in each stretch (`lideres` in
+  `js/game/carrera.js`), names at the line ends only with ≤ 4 players, and
+  a crosshair tooltip. `CURVA_N` and `HR_CURVA` must agree (test).
 - The page's chat and «Abandonar» are used; the frame hides its own chat
   and leave button (`sitio.sala`). Spectators see the lobby read-only.
 - **Move fields must not collide with the rule's own keys**: `jugadas/$n`
