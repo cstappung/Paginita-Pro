@@ -57,29 +57,50 @@ test('la partida se rehace igual y el verificador la acepta',async()=>{
  assert.ok(new Set(E.tiles.slice(0,E.next).map(t=>t.S.id)).size>=2);
 });
 
-test('versión 2: la ficha se escapa al salir más de la mitad; la 1 se sigue verificando',async()=>{
- assert.equal(M.PRUEBA_V,2);
+test('versión 2 y 3: la ficha se escapa al salir más de la mitad; la 1 se sigue verificando',async()=>{
+ assert.equal(M.PRUEBA_V,3);
  for(const len of [1,2,3,6]){
   const E=M.nueva('cristal',1,'ana');const t={s:10,len};
   E.pos=10+len/2;assert.ok(M.tocable(E,t),'justo en la mitad todavía se toca');
   E.pos=10+len/2+.01;assert.ok(!M.tocable(E,t));
   const E1=M.nueva('cristal',1,'ana',1);E1.pos=10.16;assert.ok(!M.tocable(E1,t),'la versión 1 corta a las 0,15 filas');
  }
- // Las canciones nuevas no son las de antes, y cada compás del estribillo dura 8 corcheas.
- for(const S of M.SONGS){
+ // Las de la versión 2 siguen con sus estribillos de 8 corcheas.
+ for(const S of M.SONGS_V2){
   assert.notEqual(S.hook,M.SONGS_V1.find(x=>x.id===S.id).hook,S.id);
   for(const b of S.hookBars)assert.equal(b.reduce((a,n)=>a+n.len,0),8,S.id);
   for(const c of S.cells)assert.equal(c.reduce((a,b)=>a+b,0),8,S.id);
  }
- // Una partida jugada con la versión 1 (canciones y regla de entonces) sigue valiendo.
- for(const m of ['calle','mezcla']){
-  const {dato,p}=juega(m,99,'ana',{v:1,notas:m==='mezcla'?900:200});
-  assert.equal(p.v,1);
+ // Una partida jugada con las versiones 1 y 2 (canciones y regla de entonces) sigue valiendo.
+ for(const v of [1,2])for(const m of ['calle','mezcla']){
+  const {dato,p}=juega(m,99,'ana',{v,notas:m==='mezcla'?900:200});
+  assert.equal(p.v,v);
   assert.equal(await V.verificaClub('protiles',dato,p,{uid:'ana'}),null);
-  assert.notEqual(await V.verificaClub('protiles',dato,{...p,v:2},{uid:'ana'}),null,'la misma prueba no rehace en la versión 2');
+  assert.notEqual(await V.verificaClub('protiles',dato,{...p,v:3},{uid:'ana'}),null,'la misma prueba no rehace en la versión 3');
  }
  const {dato,p}=juega('calle',99,'ana');
- assert.match(await V.verificaClub('protiles',dato,{...p,v:3},{uid:'ana'}),/versión/);
+ assert.match(await V.verificaClub('protiles',dato,{...p,v:4},{uid:'ana'}),/versión/);
+});
+
+test('versión 3: las ocho canciones transcritas',()=>{
+ assert.deepEqual(M.SONGS.map(S=>S.id),M.SONGS_V2.map(S=>S.id),'mismos ids: de ellos cuelgan las tablas y los logros');
+ for(const S of M.SONGS){
+  assert.ok(S.form.length&&S.loop.length&&S.mix.length,S.id);
+  for(const k of [...S.form,...S.loop,...S.mix])assert.ok(S.secs[k.replace(/\+$/,'')],S.id+' '+k);
+  for(const [k,sec] of Object.entries(S.secs))for(const b of sec.bars){
+   // Cada compás suma 8 filas y ninguna ficha mide menos de una fila.
+   assert.equal(b.notes.reduce((a,n)=>a+n.len,0),8,S.id+' '+k);
+   for(const n of b.notes){assert.ok(n.len>=1,S.id+' '+k);assert.ok(n.midi>=48&&n.midi<=96,S.id+' '+k);}
+   for(const c of b.chords)assert.ok(c.tonos&&c.pc>=0&&c.pc<12);
+  }
+ }
+ // La canción no se compone: después de la primera pasada se repite el loop tal cual.
+ const E=M.nueva('latido',1,'ana');while(E.tiles.length<1200){E.next=E.tiles.length;M.asegura(E);}
+ const S=E.tiles[0].S,primera=[...S.form].reduce((a,k)=>a+S.secs[k].bars.length*8,0),vuelta=S.loop.reduce((a,k)=>a+S.secs[k.replace('+','')].bars.length*8,0);
+ const notas=a=>E.tiles.filter(t=>t.s>=a+1&&t.s<a+1+vuelta).map(t=>[t.s-a,t.len]);
+ assert.deepEqual(notas(primera),notas(primera+vuelta),'cada vuelta tiene las mismas fichas');
+ const alto=a=>E.tiles.filter(t=>t.s>=a+1&&t.s<a+1+vuelta).map(t=>t.midis[0]);
+ assert.notDeepEqual(alto(primera),alto(primera+vuelta),'y cada dos vueltas el estribillo sube un tono');
 });
 
 test('rechaza cada trampa',async()=>{

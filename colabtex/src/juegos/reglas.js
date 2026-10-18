@@ -1193,16 +1193,16 @@ const REGLAS = {
   /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
      con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
   protiles: {
-    lema: "PRO TILES: toca las fichas negras al ritmo de ocho canciones pop originales que nunca terminan. Un error y se acaba.",
+    lema: "PRO TILES: toca las fichas negras al ritmo de ocho canciones adaptadas a piano que nunca terminan. Un error y se acaba.",
     secciones: [
       ["Cómo se juega", "La pantalla tiene <b>cuatro carriles</b> y las fichas negras bajan por ellos. Tócalas en orden, de abajo hacia arriba: cada ficha es una nota de la melodía y suena con piano de cola. La primera, en coral, empieza la canción."],
       ["Lo que termina la partida", lista([
         "Que una ficha negra se escape por abajo sin tocarla: se pierde cuando más de la mitad de la ficha ya salió por abajo, así que todavía puedes tocarla mientras se ve su mitad de arriba.",
         "Tocar un carril donde no hay ficha (con el dedo, tocar una ficha ya tocada o una de más arriba no cuenta como error)."
       ])],
-      ["Fichas largas", "Las fichas largas (con un punto coral) se <b>mantienen</b>: con el teclado, hasta que pasan enteras; con el dedo, hasta la altura donde las tocaste. Si la completas (al menos un 80 %), suma un bono: +1 por una de 3 corcheas, +2 por una de 4, +4 por una de 6."],
+      ["Fichas largas", "Las fichas largas (con un punto coral) se <b>mantienen</b>: con el teclado, hasta que pasan enteras; con el dedo, hasta la altura donde las tocaste. Si la completas (al menos un 80 %), suma un bono: +1 por una de 3 filas, +2 por una de 4, +4 por una de 6."],
       ["Puntos y estrellas", "Cada nota suma 1, más el bono de las largas. Con 100, 250 y 450 puntos ganas tres estrellas; con 700, 1 000 y 1 400, tres coronas; con 2 000, el <b>mundo</b>. La pantalla acelera sin parar, así que cada punto cuesta más que el anterior."],
-      ["Canciones", "Ocho canciones originales, de la balada (<b>Cristal</b>, fácil) al EDM (<b>Despegue</b>, experto), cada una sobre el ritmo de su género: el dembow del reggaetón, el tresillo del tropical house, el boom bap del lo-fi, las octavas del disco. Cada una empieza por su estribillo y después se sigue componiendo sola, igual para todos: estrofa, pre, estribillo y puente, y cada tanto el estribillo sube un tono. La <b>mezcla infinita</b> las encadena las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
+      ["Canciones", "Ocho canciones de verdad, una por género (música libre de Pixabay), transcritas y adaptadas a piano: chill pop (<b>Cristal</b>), lo-fi (<b>Medianoche</b>, la más tranquila), reggaetón (<b>Calle</b>), tropical house (<b>Verano</b>), synthwave (<b>Neón</b>), disco (<b>Latido</b>), K-pop (<b>Estrellas</b>) y EDM (<b>Despegue</b>, la más rápida). Cada ficha es una nota de su melodía, con su ritmo: el dembow del reggaetón, los acordes picados del chill pop, las octavas del disco. Se tocan enteras (intro, estrofa, estribillo) y después vuelven a empezar sin fin, igual para todos; cada dos vueltas el estribillo sube un tono. La <b>mezcla infinita</b> encadena el estribillo y la estrofa de las ocho, como una sesión de DJ, y el tempo se adapta a cada una."],
       ["Controles", lista([
         "Táctil o ratón: toca las fichas.",
         "Teclado: D, F, J y K son los cuatro carriles (se cambian en ⚙ Ajustes). Esc o P pausa; tras la pausa hay una cuenta de 3.",
