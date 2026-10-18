@@ -168,3 +168,11 @@ test('huertos rebajados y enemigos con más vida a partir de las primeras rondas
  g.round=30;g.startRound();for(let i=0;i<120&&!g.enemies.length;i++)g.update(P.STEP);
  const e=g.enemies[0];assert.ok(e);assert.ok(Math.abs(e.maxHp-e.d.hp*PD.hpMult(g.L,31)*2)<1e-6,'vida x2 en la ronda 31');
 });
+
+test('rondas altas: grupos de enemigos duros en decenas, no cientos de débiles',()=>{
+ for(let li=0;li<5;li++){
+  const R=PD.buildRounds(li);let llenos=0,grupos=0;
+  for(let r=60;r<=100;r++){const x=R[r-1];if(x.special||x.boss)continue;for(const g of x.groups){grupos++;if(g.n>=160)llenos++;}}
+  assert.ok(llenos/grupos<0.1,PD.LEVELS[li].short+': '+llenos+' de '+grupos+' grupos son de 160 o más');
+ }
+});

@@ -29,6 +29,13 @@ spawns half as many enemies), `PD.BOSS_SCALE`/`PD.BOSS_GROW`, each kingdom's
 Versioning. The Huerto was cut 40 % (owner: people filled the map with farms)
 — do not raise it back without asking.
 
+Round composition (`buildRounds`): from round 20 each group prefers the enemy
+type that comes out in tens (`ideal`, 30 then 24), like Bloons' zeppelins. The
+old fit let late rounds send hundreds of 9-HP Sombras clamped to `maxN`, which
+also threw away most of the round's budget. A group that still overflows `maxN`
+(special rounds of only weak types) comes out **reinforced** (`hpX`, up to x6,
+applied in `startRound`/`update`) instead of losing the budget.
+
 ## Heroes (`towers.js`, after the 22 towers)
 
 One per kingdom (`PD.heroOf(li)`), only in its own kingdom (`towersFor`) and

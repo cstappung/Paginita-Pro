@@ -175,6 +175,7 @@
       if (special && special.mono) nGroups = 1;
       if (newcomers.length && !special && r > 3) nGroups = Math.max(2, nGroups);
       const maxN = r < 20 ? 60 : r < 50 ? 110 : 160;
+      const ideal = r < 40 ? 30 : 24;   // cuántos de un tipo por grupo, idealmente (desde la ronda 20)
       const used = {};
       const gs = [];
 
@@ -191,10 +192,18 @@
             if (special && special.filter && !special.filter(d)) continue;
             const unit = PD.enemyThreat(p[0]) * hpM;
             const n = share / unit;
+            // Preferir el tipo que sale en unas decenas (como los zepelines de Bloons): con el
+            // presupuesto de las rondas altas, un enemigo débil saldría por miles, se recortaba a
+            // maxN y la ronda perdía casi todo su presupuesto (cientos de Sombras y ningún pesado).
+            // (desde la ronda 20: el comienzo queda como lo diseñó el dueño)
             let fit = 1;
             if (n < 1) fit = 0.02 * n;
-            else if (n < 4) fit = n / 4;
-            else if (n > maxN) fit = Math.pow(maxN / n, 2);
+            else if (r < 20) { if (n < 4) fit = n / 4; else if (n > maxN) fit = Math.pow(maxN / n, 2); }
+            else {
+              fit = Math.exp(-1.3 * Math.abs(Math.log(n / ideal)));
+              if (n < 4) fit *= n / 4;
+              if (n > maxN) fit *= Math.pow(maxN / n, 2);
+            }
             const fresh = r - p[1] < 8 ? 1.6 : 1;
             const repeat = used[p[0]] && !(special && special.mono) ? 0.25 : 1;   // variedad dentro de la ronda
             cands.push({ id: p[0], w: p[2] * fit * fresh * repeat });
@@ -205,20 +214,23 @@
         used[choice] = true;
         const unit = PD.enemyThreat(choice) * hpM;
         let n = Math.round(share / unit);
-        const swarm = choice === 'enjambre';
-        n = Math.max(1, Math.min(swarm ? maxN * 1.6 : maxN, n));
+        const swarm = choice === 'enjambre', cap = swarm ? maxN * 1.6 : maxN;
+        // Si el grupo no cabe (rondas especiales de solo débiles), salen REFORZADOS en vez de
+        // perder el presupuesto: más vida cada uno, hasta x6.
+        const hpX = n > cap ? Math.min(6, n / cap) : 1;
+        n = Math.max(1, Math.min(cap, n));
         const d = E[choice];
         let duration = Math.min(20, 2.5 + n * 0.22) * (d.speed > 90 ? 0.7 : 1) * (special && special.tight ? special.tight : 1);
         if (r <= 4) duration = Math.max(duration, n * 0.55);
         const interval = Math.max(0.07, duration / n);
         const path = multiPath ? (rng() < 0.4 ? -1 : (g % 2)) : 0;
-        gs.push({ type: choice, n, interval, path, duration, unit });
+        gs.push({ type: choice, n, interval, path, duration, unit: unit * hpX, hpX });
       }
       // Orden de salida: de los más débiles a los más duros, con el jefe como final de la ronda.
       gs.sort((a, b) => a.unit - b.unit);
       let start = 0.5;
       for (const g of gs) {
-        round.groups.push({ type: g.type, n: g.n, interval: g.interval, start, path: g.path });
+        round.groups.push({ type: g.type, n: g.n, interval: g.interval, start, path: g.path, hpX: Math.round(g.hpX * 100) / 100 });
         start += g.duration * (0.45 + rng() * 0.35) + 0.8;
       }
       if (bossRound) {

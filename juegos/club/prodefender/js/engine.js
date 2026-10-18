@@ -281,7 +281,7 @@
       for (const g of R.groups) {
         for (let i = 0; i < g.n; i++) {
           let path = g.path === -1 ? (i % this.paths.length) : Math.min(g.path, this.paths.length - 1);
-          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier });
+          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1 });
         }
       }
       q.sort((a, b) => a.t - b.t);
@@ -1729,7 +1729,7 @@
         this.rt += dt;
         while (this.qi < this.queue.length && this.queue[this.qi].t <= this.rt) {
           const q = this.queue[this.qi++];
-          this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1), q.tier);
+          this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
         }
       }
       this.grid.clear();
