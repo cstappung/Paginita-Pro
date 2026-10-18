@@ -2188,7 +2188,7 @@ const NOVEDADES = [
     modo: "solo", cuenta: true },
   { id: "protiles", color: "#ff5a36", alta: "2026-10-17", titulo: "PRO TILES",
     gancho: "Que no se te escape ni una", datos: [["8", "canciones"], ["∞", "nunca terminan"], ["1", "error y se acaba"]],
-    lema: "Ocho canciones pop originales que nunca terminan: se componen solas mientras tocas, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
+    lema: "Ocho canciones, una por género, adaptadas a piano y sin final, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
     ruta: "#solo/protiles", boton: "Jugar", reglas: ["protiles"], modo: "solo" },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
     gancho: "Fútbol a toda velocidad", datos: [["2–8", "jugadores"], ["En vivo", "tiempo real"], ["Bots", "para practicar"]],

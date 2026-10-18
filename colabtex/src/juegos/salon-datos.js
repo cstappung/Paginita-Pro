@@ -95,7 +95,7 @@ export const SOLOS = [
     modos: ["Un récord por reino", "Hasta 10 000 🪙 por reino"] },
   { id: "protiles", tipo: "club", nombre: "PRO TILES", genero: "Ritmo", icono: "🎹", alta: "2026-10-17",
     ruta: "#solo/protiles", reglas: "protiles", popular: "club-protiles", ranking: true,
-    lema: "Toca las fichas negras al ritmo de 8 canciones pop originales que nunca terminan, con piano de cola real. Un error y se acaba.",
+    lema: "Toca las fichas negras al ritmo de 8 canciones adaptadas a piano que nunca terminan, con piano de cola real. Un error y se acaba.",
     modos: ["Un top por canción", "Mezcla de las 8"] },
   { id: "trigon", tipo: "club", nombre: "Trigon", genero: "Puzle", icono: "🔺", alta: "2026-10-10",
     ruta: "#solo/trigon", reglas: "trigon", popular: "club-trigon", ranking: true,
