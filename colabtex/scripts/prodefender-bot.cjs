@@ -310,12 +310,19 @@ class Bot {
     const vienen = this.vienen(r);
     const camos = dmg.filter(t => t.s.camo).length + (T.some(t => t.type === 'faro') ? 2 : 0);
     const detecta = modo === 'detecta' && camos < dmg.length / 2;   // plan «detección»: la mitad de las torres
-    if (vienen.camo && (camos < (r < 25 ? 2 : 3) || detecta)) {
+    const quiereCamo = (r < 25 ? 2 : 3) + Math.round(vienen.fc * 8);   // más detección cuanto más camuflado viene
+    if (vienen.camo && (camos < quiereCamo || detecta)) {
       // la detección llega con el nivel 2 del segundo camino de estas torres
       const e = dmg.filter(t => DETECTA[t.type] && !t.s.camo && t.tiers[1] < 2 && g.canUpgrade(t, 1)).sort((a, b) => b.tiers[1] - a.tiers[1] || g.upgradeCost(a, 1) - g.upgradeCost(b, 1))[0];
       if (e) return { k: 'up', t: e, p: 1, cost: g.upgradeCost(e, 1) };
       const barata = ['espinas', 'vigia', 'voltaico'].find(x => this.permitidas.includes(x) && !vet[x]);
-      if (barata && camos < (r < 25 ? 2 : 3)) return nuevo(barata);
+      if (barata && camos < quiereCamo) return nuevo(barata);
+    }
+    // muchos voladores y casi nada que les pegue: antiaéreo (lo que haría una persona)
+    if (vienen.ff > 0.3) {
+      const aire = dmg.filter(t => !t.s.noFlying).reduce((a, t) => a + this.poder(t), 0), todo = dmg.reduce((a, t) => a + this.poder(t), 0) || 1;
+      const aa = ['prisma', 'voltaico', 'vigia', 'espinas'].find(x => this.permitidas.includes(x) && !vet[x]);
+      if (aire / todo < 0.5 && aa) return nuevo(aa);
     }
     if (vienen.phase && !dmg.some(t => t.type === 'prisma' || t.s.dtype === 'arcane') && this.permitidas.includes('prisma') && !vet.prisma) return nuevo('prisma');
     for (const f of this.est.fuerza || []) if (r >= 10 && !T.some(t => t.type === f) && this.permitidas.includes(f) && !vet[f]) return nuevo(f);

@@ -66,44 +66,47 @@
     // --------- LA ESCALERA DE LOS GRANDES (rondas altas, todos los reinos) ---------
     // Como los dirigibles de Bloons: en vez de cientos de enemigos chicos inflados,
     // las rondas altas mandan pocos enemigos enormes que al caer sueltan a los del
-    // escalón de abajo. Tanques por tierra (Portador → Titán → Fortaleza → Ciudadela
+    // escalón de abajo (y uno de dos escalones abajo: así cada uno vale ~2,5 veces el anterior y
+    // los de arriba caben en el presupuesto). Tanques por tierra (Portador → Titán → Fortaleza → Ciudadela
     // → Leviatán) y globos por el aire (Zepelín → Dirigible → Acorazado Celeste → Arca).
     // Cada escalón tiene su color (azul, rojo, verde/negro, violeta) y su arte (render.js:
     // supertank, blimp) suma púas y calaveras con `rank`, para distinguirlos de un vistazo.
+    // `fugaHijos`: al escaparse cuentan su fuga y la MITAD de la de sus hijos (si no, un solo
+    // Zepelín perdido eran 18 vidas y un Leviatán, varias partidas).
     fortaleza: {
-      name: 'Fortaleza Rodante', hp: 4500, armor: 9, speed: 21, bounty: 260, leak: 60, r: 36,
-      color: '#2f6fb8', accent: '#7fd0ff', shape: 'supertank', rank: 1, children: [['titan', 2]], big: true,
-      desc: 'SUPERTANQUE. Blindaje 9. Al caer libera 2 Titanes de Hierro.'
+      name: 'Fortaleza Rodante', hp: 1600, armor: 9, speed: 21, bounty: 120, leak: 40, r: 36,
+      color: '#2f6fb8', accent: '#7fd0ff', shape: 'supertank', rank: 1, children: [['titan', 1], ['portador', 2]], big: true, fugaHijos: 0.5,
+      desc: 'SUPERTANQUE. Blindaje 9. Al caer libera un Titán de Hierro y 2 Portadores.'
     },
     ciudadela: {
-      name: 'Ciudadela de Guerra', hp: 14000, armor: 10, speed: 18, bounty: 520, leak: 120, r: 41,
-      color: '#b0302a', accent: '#ffb02a', shape: 'supertank', rank: 2, children: [['fortaleza', 2]], big: true,
-      desc: 'SUPER SUPERTANQUE. Blindaje 10. Al caer libera 2 Fortalezas Rodantes.'
+      name: 'Ciudadela de Guerra', hp: 3000, armor: 10, speed: 18, bounty: 220, leak: 70, r: 41,
+      color: '#b0302a', accent: '#ffb02a', shape: 'supertank', rank: 2, children: [['fortaleza', 1], ['titan', 1]], big: true, fugaHijos: 0.5,
+      desc: 'SUPER SUPERTANQUE. Blindaje 10. Al caer libera una Fortaleza Rodante y un Titán.'
     },
     leviatan: {
-      name: 'Leviatán de Acero', hp: 42000, armor: 11, speed: 15, bounty: 1100, leak: 250, r: 47,
-      color: '#1d2420', accent: '#5aff6a', shape: 'supertank', rank: 3, children: [['ciudadela', 2]], big: true,
-      desc: 'SUPER SUPER SUPERTANQUE. Blindaje 11. Al caer libera 2 Ciudadelas de Guerra.'
+      name: 'Leviatán de Acero', hp: 6000, armor: 11, speed: 15, bounty: 400, leak: 120, r: 47,
+      color: '#1d2420', accent: '#5aff6a', shape: 'supertank', rank: 3, children: [['ciudadela', 1], ['fortaleza', 1]], big: true, fugaHijos: 0.5,
+      desc: 'SUPER SUPER SUPERTANQUE. Blindaje 11. Al caer libera una Ciudadela de Guerra y una Fortaleza.'
     },
     zepelin: {
       name: 'Zepelín de Polillas', hp: 700, armor: 2, speed: 40, bounty: 40, leak: 8, r: 22, flying: true,
-      color: '#4fa3e0', accent: '#dff4ff', shape: 'blimp', rank: 0, children: [['alado', 4], ['enjambre', 6]], big: true,
+      color: '#4fa3e0', accent: '#dff4ff', shape: 'blimp', rank: 0, children: [['alado', 4], ['enjambre', 6]], big: true, fugaHijos: 0.5,
       desc: 'GLOBO VOLADOR. Al reventar suelta 4 Polillas y 6 Abejorros.'
     },
     dirigible: {
-      name: 'Gran Dirigible', hp: 2600, armor: 3, speed: 32, bounty: 150, leak: 20, r: 28, flying: true,
-      color: '#d8443a', accent: '#ffd84d', shape: 'blimp', rank: 1, children: [['zepelin', 3]], big: true,
-      desc: 'SUPERGLOBO. Blindaje 3. Al reventar suelta 3 Zepelines.'
+      name: 'Gran Dirigible', hp: 1400, armor: 3, speed: 32, bounty: 80, leak: 15, r: 28, flying: true,
+      color: '#d8443a', accent: '#ffd84d', shape: 'blimp', rank: 1, children: [['zepelin', 2]], big: true, fugaHijos: 0.5,
+      desc: 'SUPERGLOBO. Blindaje 3. Al reventar suelta 2 Zepelines.'
     },
     celeste: {
-      name: 'Acorazado Celeste', hp: 9000, armor: 4, speed: 26, bounty: 380, leak: 50, r: 34, flying: true,
-      color: '#2e8a4a', accent: '#c8ff5a', shape: 'blimp', rank: 2, children: [['dirigible', 2]], big: true,
-      desc: 'SUPER SUPERGLOBO. Blindaje 4. Al reventar suelta 2 Grandes Dirigibles.'
+      name: 'Acorazado Celeste', hp: 3000, armor: 4, speed: 26, bounty: 160, leak: 30, r: 34, flying: true,
+      color: '#2e8a4a', accent: '#c8ff5a', shape: 'blimp', rank: 2, children: [['dirigible', 1], ['zepelin', 2]], big: true, fugaHijos: 0.5,
+      desc: 'SUPER SUPERGLOBO. Blindaje 4. Al reventar suelta un Gran Dirigible y 2 Zepelines.'
     },
     arca: {
-      name: 'Arca de la Tormenta', hp: 30000, armor: 5, speed: 21, bounty: 900, leak: 120, r: 40, flying: true,
-      color: '#3a1d5c', accent: '#ff3ad1', shape: 'blimp', rank: 3, children: [['celeste', 2]], big: true,
-      desc: 'SUPER SUPER SUPERGLOBO. Blindaje 5. Al reventar suelta 2 Acorazados Celestes.'
+      name: 'Arca de la Tormenta', hp: 6000, armor: 5, speed: 21, bounty: 300, leak: 60, r: 40, flying: true,
+      color: '#3a1d5c', accent: '#ff3ad1', shape: 'blimp', rank: 3, children: [['celeste', 1], ['dirigible', 1]], big: true, fugaHijos: 0.5,
+      desc: 'SUPER SUPER SUPERGLOBO. Blindaje 5. Al reventar suelta un Acorazado Celeste y un Gran Dirigible.'
     },
 
     // ------------------- NIVEL 1 · PRADO ESMERALDA -------------------
@@ -279,8 +282,8 @@
     const d = E[id];
     if (d._leak !== undefined) return d._leak;
     let v = d.leak;
-    if (d.children) for (const [c, n] of d.children) v += leakTotal(c) * n;
-    return (d._leak = Math.min(v, 9999));
+    if (d.children) for (const [c, n] of d.children) v += leakTotal(c) * n * (d.fugaHijos || 1);
+    return (d._leak = Math.min(Math.ceil(v), 9999));
   }
   function threat(id) {
     const d = E[id];

@@ -34,23 +34,30 @@ type that comes out in tens (`ideal`: 30, then 24, then shrinking from round 55
 to 5 at round 100), like Bloons' zeppelins. The old fit let late rounds send
 hundreds of 9-HP Sombras clamped to `maxN`, which also threw away most of the
 round's budget. A group that still overflows `maxN` comes out **reinforced**
-(`hpX`, up to x6, applied in `startRound`/`update`) instead of losing the budget.
+(`hpX`, up to x6, applied in `startRound`/`update`) instead of losing the budget. A group never
+takes a type of which not even one fits its share (it switches to the heaviest
+one that fits), and a kingdom's newcomer only opens its debut round if it fits:
+before, `n = max(1, …)` sent the first Fortaleza at several times its budget.
 
 **Late rounds climb the ladder of big enemies** (owner's request: not many of
 the same small ones). `hpMult` is unchanged up to round 50 and then grows
-0.024/round instead of 0.068 (x46 at round 100, was x356), so the budget buys
+0.015/round instead of 0.068 (x30 at round 100, was x356), so the budget buys
 *bigger* enemies instead of inflating small ones; big types get a weight bonus
 from round 45 (`grande`). The ladder (`enemies.js`, every kingdom's `pool`):
 tanks Portador → Titán → **Fortaleza → Ciudadela → Leviatán** and flying balloons
-**Zepelín → Dirigible → Acorazado Celeste → Arca**, each splitting into two or
-three of the step below (`children`); shapes `supertank` and `blimp` in
+**Zepelín → Dirigible → Acorazado Celeste → Arca**, each splitting into one of
+the step below and one (or two) of two steps below (`children`), so each step
+is worth ~2.5× the previous one and the top ones fit in a round's budget (with
+two of the step below each, the threat doubled every step and they never
+fit); from round 70 there are at most 5 groups, so each group's share is big
+enough for them; shapes `supertank` and `blimp` in
 `render.js`, scaled by `d.rank`. From round 55 the specials Estampida and Noche
 de Sombras also admit big types, which come with the group's `mod` (`fast`
 x1.35 speed / `camo`), inherited by their children (`Game.modifica`). Each
 step has its own colour (`d.color`/`d.accent`: tanks blue → red → black/green,
 balloons light blue → red → green → purple) and more spikes and skulls with
 `rank`, so they read at a glance. Since big armoured types cost more than
-`enemyThreat` says, `PD.lateEase` trims the budget from round 52 (−35 % at 82),
+`enemyThreat` says, `PD.lateEase` trims the budget from round 52 (half at 82),
 and a non-boss leak takes at most 60 % of the kingdom's lives (`leak`): one
 lost Titán used to be 90 lives, i.e. the end of the game.
 

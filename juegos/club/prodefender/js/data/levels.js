@@ -95,19 +95,19 @@
     const diff = 1 + (L.diff - 1) * (0.15 + 0.85 * Math.min(1, r / 60));
     return Math.exp(Math.log(a[1]) + (Math.log(b[1]) - Math.log(a[1])) * t) * diff * PD.growth(r) * PD.lateEase(r);
   };
-  // Desde la 52 el presupuesto baja de a poco (hasta un 35 % menos en la 82): las rondas altas
+  // Desde la 52 el presupuesto baja de a poco (hasta la mitad en la 82): las rondas altas
   // son de tanques y globos blindados, que cuestan más de lo que mide enemyThreat.
-  PD.lateEase = function (r) { return 1 - 0.35 * Math.max(0, Math.min(1, (r - 52) / 30)); };
+  PD.lateEase = function (r) { return 1 - 0.5 * Math.max(0, Math.min(1, (r - 52) / 30)); };
   // Crecimiento de la partida: más enemigos y más oro según avanzan las rondas.
   PD.growth = function (r) { const k = Math.max(0, r - 50); return (1 + 3 * (0.06 * r + 0.0007 * r * r + 0.0016 * k * k)) * PD.lateMult(r); };
   // Las torres al máximo (nivel 4) disparan el daño desde la ronda ~45: los enemigos responden.
   PD.lateMult = function (r) { return 1 + 0.045 * Math.max(0, r - 43); };
   PD.hpMult = function (L, r) {
-    // enemigos más duros desde el principio (x1.8 en la 20, x8 en la 50, x18 en la 70, x46 en la 100).
+    // enemigos más duros desde el principio (x1.8 en la 20, x8 en la 50, x14 en la 70, x30 en la 100).
     // Desde la 50 la vida de cada enemigo sube más despacio que antes (x356 en la 100) y el
     // presupuesto de la ronda se gasta en enemigos MÁS GRANDES (tanques y globos que se abren
     // en otros), no en los mismos chicos con cincuenta veces más vida.
-    const k = 0.03 * (Math.min(r, 20) - 1) + 0.046 * Math.max(0, Math.min(r, 50) - 20) + 0.024 * Math.max(0, r - 50);
+    const k = 0.03 * (Math.min(r, 20) - 1) + 0.046 * Math.max(0, Math.min(r, 50) - 20) + 0.015 * Math.max(0, r - 50);
     return Math.exp(k) * Math.sqrt(PD.lateMult(r));
   };
   // Vida extra sobre la curva de arriba, aplicada al aparecer (engine.js: spawn), así que
@@ -187,6 +187,7 @@
       // más grupos = rondas mixtas que exigen combinar defensas
       let nGroups = r <= 2 ? 1 : Math.min(7, 2 + Math.floor(r / 14) + (rng() < 0.4 ? 1 : 0));
       if (special && special.mono) nGroups = 1;
+      else if (r >= 70) nGroups = Math.min(nGroups, 5);   // tarde: menos grupos y más grandes (caben los grandes)
       if (newcomers.length && !special && r > 3) nGroups = Math.max(2, nGroups);
       const maxN = r < 20 ? 60 : r < 50 ? 110 : 160;
       // cuántos de un tipo por grupo, idealmente (desde la ronda 20). Baja desde la 55 hasta 5
@@ -198,7 +199,9 @@
       for (let g = 0; g < nGroups; g++) {
         let share = budget / nGroups * (0.75 + rng() * 0.5);
         let choice = null;
-        if (g === 0 && newcomers.length && !special) {
+        // el que debuta abre la ronda, si cabe al menos uno en su parte (un Leviatán no cabe
+        // en la ronda en que se desbloquea: salía igual y valía varias veces su presupuesto)
+        if (g === 0 && newcomers.length && !special && share * 0.6 / (PD.enemyThreat(newcomers[0][0]) * hpM) >= 0.6) {
           choice = newcomers[0][0];
           share *= 0.6;
         } else {
@@ -227,6 +230,9 @@
           }
           if (!cands.length) cands.push({ id: unlocked[0][0], w: 1 });
           choice = pickWeighted(rng, cands).id;
+          // si de ese tipo no cabe ni uno, el que más pesa de los que sí caben
+          const cabe = id => share / (PD.enemyThreat(id) * hpM) >= 0.6;
+          if (!cabe(choice)) { const ok = cands.filter(c => cabe(c.id)).sort((a, b) => b.w - a.w); if (ok.length) choice = ok[0].id; }
         }
         used[choice] = true;
         const unit = PD.enemyThreat(choice) * hpM;
@@ -245,10 +251,11 @@
       }
       // Orden de salida: de los más débiles a los más duros, con el jefe como final de la ronda.
       gs.sort((a, b) => a.unit - b.unit);
-      let start = 0.5;
+      let start = 0.5, grandes = 0;
       for (const g of gs) {
         const grp = { type: g.type, n: g.n, interval: g.interval, start, path: g.path, hpX: Math.round(g.hpX * 100) / 100 };
-        if (special && special.late && special.mod && E[g.type].big) grp.mod = special.mod;
+        // uno de cada dos grupos grandes (todos camuflados y blindados a la vez era demasiado)
+        if (special && special.late && special.mod && E[g.type].big && ++grandes % 2 === 1) grp.mod = special.mod;
         round.groups.push(grp);
         start += g.duration * (0.45 + rng() * 0.35) + 0.8;
       }
