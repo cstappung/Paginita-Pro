@@ -298,3 +298,10 @@ and `historial` (previous owners). `mascotasDe`/`objetosDe` list what an
 account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
 per-pet state (`mascotasEstado`) is read only by key.
 
+
+## Casino
+
+The Casino tab bets coins: a bet is a spend (`ca`, through `paga`) and a
+payout is income (`cp`, in `premios`, summed in hundredths and floored once).
+Saldo = ganado + cobradas + premios − gastadas. Details:
+`docs/claude/juegos/casino.md`.

@@ -556,6 +556,36 @@
       }
     },
 
+    "casino": {
+      ".read": "auth != null",
+      "$uid": {
+        "$k": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['j', 'p', 'at']) && newData.child('p').isNumber() && newData.child('p').val() % 1 === 0 && newData.child('p').val() >= 10 && ((newData.child('j').val() === 'a' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'p' && ((newData.child('d').val() === 0 && newData.child('p').val() <= 1000) || (newData.child('d').val() === 1 && newData.child('p').val() <= 500) || (newData.child('d').val() === 2 && newData.child('p').val() <= 200) || (newData.child('d').val() === 3 && newData.child('p').val() <= 50))))",
+          "j": { ".validate": "newData.val() === 'a' || newData.val() === 'p'" },
+          "p": { ".validate": "newData.isNumber()" },
+          "d": { ".validate": "newData.isNumber()" },
+          "at": { ".validate": "newData.val() === now" },
+          "t": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'a'",
+              ".validate": "$i.matches(/^[0-9]{1,3}$/) && newData.val() === now"
+            }
+          },
+          "s": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'p'",
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.val() === now"
+            }
+          },
+          "c": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).exists()",
+            ".validate": "newData.val() === now"
+          },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "tienda": {
       ".read": "auth != null",
       "$uid": {

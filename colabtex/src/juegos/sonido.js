@@ -126,7 +126,7 @@ function seno(a, t, f, f1, dur, vol, tipo = "sine") {
 }
 function soplo(a, t, dur, vol, { f = 1800, f1 = f, q = 2, tipo = "bandpass", ataque = 0.002 } = {}) {
   const s = a.createBufferSource(), fl = a.createBiquadFilter();
-  s.buffer = ruido(a);
+  s.buffer = ruido(a); s.loop = true;   // el ruido dura medio segundo: sin vuelta, un soplo más largo se cortaba antes de tiempo
   fl.type = tipo; fl.Q.value = q;
   fl.frequency.setValueAtTime(f, t);
   if (f1 !== f) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
@@ -288,6 +288,29 @@ const REPERTORIO = {
                         [67, 72, 76, 79, 84].forEach((n, k) => P(a, t + 0.35 + k * 0.08, H(n), 0.09, { onda: "p50", vol: 0.065 }));
                         [76, 79, 84].forEach(n => P(a, t + 0.8, H(n), 0.9, { onda: "p25", vol: 0.045, sus: 0.7, vib: 0.015 }));
                         [96, 100, 103, 108].forEach((n, k) => campana(a, t + 0.9 + k * 0.09, H(n), 0.025, 0.6)); },
+  /* El casino. El avión despega con un soplo que sube; cobrar es una
+     cascada de monedas (más larga cuanto más grande el premio, `v` de 1 a
+     5); el choque, una explosión de ruido con un bombo que cae. */
+  despega:  (a, t) => { soplo(a, t, 1.1, 0.07, { f: 250, f1: 2600, q: 1.4, ataque: 0.25 });
+                        seno(a, t, 90, 240, 1.0, 0.07, "triangle"); },
+  hito:     (a, t, v = 1) => { const k = Math.min(Math.max(v || 1, 1), 4);
+                               P(a, t, H(76 + k * 2), 0.05, { onda: "p50", vol: 0.05 }); P(a, t + 0.05, H(83 + k * 2), 0.09, { onda: "p50", vol: 0.05, sus: 0.5 }); },
+  cobra:    (a, t, v = 1) => { const k = Math.min(Math.max(v || 1, 1), 5);
+                               for (let i = 0; i < 3 + k * 2; i++) campana(a, t + i * 0.055, H(84 + ((i * 5) % 12)), 0.035, 0.5);
+                               P(a, t, H(76), 0.08, { vol: 0.08 }); P(a, t + 0.08, H(83), 0.1, { vol: 0.08 }); P(a, t + 0.18, H(88), 0.3, { vol: 0.08, sus: 0.5 }); },
+  explota:  (a, t) => { soplo(a, t, 0.9, 0.3, { f: 1400, f1: 90, q: 0.6, tipo: "lowpass" });
+                        N(a, t, 0.7, { vol: 0.16, tono: 0.9, tono1: 0.12 });
+                        seno(a, t, 120, 32, 0.8, 0.32);
+                        P(a, t + 0.05, 600, 0.5, { f1: 80, onda: "p12", vol: 0.05 }); },
+  /* El pingüino: un «boing» al saltar, un golpe blando en el hielo y el
+     chapuzón (ruido que cae y burbujas que suben) cuando no hay hielo. */
+  salta:    (a, t) => { P(a, t, H(64), 0.14, { f1: H(79), onda: "p50", vol: 0.06 }); soplo(a, t, 0.18, 0.04, { f: 1200, f1: 2600, q: 2 }); },
+  aterriza: (a, t, k = 0) => { seno(a, t, 220, 110, 0.12, 0.16); soplo(a, t, 0.06, 0.08, { f: 4200, q: 1.5 });
+                               P(a, t + 0.02, H(79 + Math.min(k || 0, 12)), 0.06, { onda: "p25", vol: 0.04 }); },
+  cruje:    (a, t) => { for (let i = 0; i < 5; i++) soplo(a, t + i * 0.035, 0.03, 0.12, { f: 2400 + i * 400, q: 3 }); },
+  chapuzon: (a, t) => { soplo(a, t, 0.7, 0.24, { f: 2200, f1: 260, q: 0.7, ataque: 0.01 });
+                        seno(a, t, 160, 60, 0.4, 0.2);
+                        for (let i = 0; i < 7; i++) seno(a, t + 0.3 + i * 0.07 + Math.random() * 0.03, 500 + Math.random() * 500, 1400 + Math.random() * 700, 0.06, 0.035); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });
@@ -386,7 +409,7 @@ export const CANCIONES = [
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },
-  { id: "poker", nombre: "Poker Night", grupo: "De los juegos", desc: "Zane Little · Flip 7, Cacho, UNO, Presidente y Spicy", url: POKER.url, fin: POKER.fin, vol: 0.65, juegos: ["flip7", "cacho", "uno", "presidente", "spicy"] },
+  { id: "poker", nombre: "Poker Night", grupo: "De los juegos", desc: "Zane Little · Flip 7, Cacho, UNO, Presidente, Spicy y el Casino", url: POKER.url, fin: POKER.fin, vol: 0.65, juegos: ["flip7", "cacho", "uno", "presidente", "spicy", "casino"] },
   { id: "sobrecarga", nombre: "Sobrecarga", grupo: "Intensas", desc: "Drum'n'bass de consola · 172 · Yemas", chip: "sobrecarga", juegos: ["yemas"] },
   { id: "tormenta", nombre: "Tormenta", grupo: "Intensas", desc: "Combate final · tambores y sierra", chip: "tormenta" },
   { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · Tetris", chip: "neon", juegos: ["tetris"] },

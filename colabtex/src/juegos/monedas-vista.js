@@ -84,7 +84,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
       <header class="jg-mo-hero">
         <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.saldo)} ${MONEDA}</strong>
           <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p>
-          ${yo.gastadas || yo.cobradas ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b>${yo.cobradas ? ` · cobradas en el mercado <b>${formatoMonedas(yo.cobradas)}</b>` : ""} · gastadas en PRODROP <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}
+          ${yo.gastadas || yo.cobradas || yo.premios ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b>${yo.cobradas ? ` · cobradas en el mercado <b>${formatoMonedas(yo.cobradas)}</b>` : ""}${yo.premios ? ` · premios del casino <b>${formatoMonedas(yo.premios)}</b>` : ""} · gastadas en PRODROP, la tienda, mascotas y apuestas <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}
           ${yo.parada ? `<p class="jg-mo-gasto">Una compra quedó sin fondos y no vale: hasta que ganes ${formatoMonedas(yo.falta)} monedas más, nada de lo que compres después cuenta.</p>` : ""}</div>
         <div class="jg-mo-racha-c">${rachaHtml(d, hoy)}</div>
       </header>
