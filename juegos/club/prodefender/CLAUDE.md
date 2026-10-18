@@ -22,8 +22,27 @@ integrated here. Shared club rules (proof, castigo, modo celular) are in
 Balance knobs (from the owner's README) live in `data/levels.js`: `ANCHORS` and
 `PD.growth` (enemy budget per round), `PD.lateMult` (extra hardening from round
 44), `PD.hpMult`, `PD.roundBonus` (main income), `PD.incomeMult` (gold per
-kill), `PD.BOSS_SCALE`/`PD.BOSS_GROW`, each kingdom's `pool`, and
-`PD.ABILITIES[].cd`. Changing any of them changes replays: see Versioning.
+kill), `PD.hpBoost` (extra life applied at `spawn`: x1 up to round 3, x2 from
+round 25, bosses x1.5 — it must stay out of `hpMult`, or `buildRounds` just
+spawns half as many enemies), `PD.BOSS_SCALE`/`PD.BOSS_GROW`, each kingdom's
+`pool`, and `PD.ABILITIES[].cd`. Changing any of them changes replays: see
+Versioning. The Huerto was cut 40 % (owner: people filled the map with farms)
+— do not raise it back without asking.
+
+## Heroes (`towers.js`, after the 22 towers)
+
+One per kingdom (`PD.heroOf(li)`), only in its own kingdom (`towersFor`) and
+**one per game** (`canPlace` → `hasHero`). `kind: 'hero'`, `hero: true`; the
+attack is `s.atk` (`tHero` reuses `tProjectile`/`tRail`/`tSniper` and adds
+`tSun`/`tSlam`), each has an aura (`lifeRegen` at `endRound`, `shredAura` and
+`ampAura` in `updateEnemies`, `slowAura`, or the Caldera's tower buff through
+the totem code with radius `s.aura`) and an automatic ability from tier 0
+(`selva`, `tormenta`, `invierno`, `erupcion`, `grieta` in `useAbility`; `s.abCd`
+overrides `PD.ABILITIES[].cd`). Heroes may take **both** paths to 4
+(`canUpgrade`). They are appended at the end of `TOWER_ORDER` because proofs
+store towers by index there — never insert a tower before them. In `main.js` the
+hero sits above the shop on its own row (key H) and `shopTowers` keeps the
+number hotkeys for the towers only.
 
 ## Determinism — do not break it
 

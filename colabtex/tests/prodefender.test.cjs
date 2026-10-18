@@ -131,3 +131,40 @@ test('categorías, topes y reglas de Firebase',()=>{
  for(const f of ['data/enemies.js','data/towers.js','data/levels.js','engine.js','prueba.js']){assert.ok(html.includes('js/'+f+'?v='+v),f);assert.ok(trab.includes("'"+f+'?v='+v+"'"),'trabajador '+f);}
  assert.ok(verif.includes('verificador.js?v='+v),'la página abre el trabajador de la misma versión');
 });
+
+test('héroes: uno por reino y por partida, sube sus dos caminos y la partida se rehace igual',()=>{
+ for(let li=0;li<5;li++){
+  const h=PD.heroOf(li);assert.ok(h&&PD.TOWERS[h].hero,'el reino '+li+' tiene héroe');
+  const otros=PD.towersFor(li).filter(id=>PD.TOWERS[id].hero);assert.deepEqual(otros,[h],'solo el héroe de su reino');
+  assert.ok(PD.ABILITIES[PD.TOWERS[h].base.ability],'su habilidad existe');
+ }
+ // Una partida con el héroe: se coloca uno, el segundo no, sube 4-4 y lanza su habilidad.
+ const G=new P.Grabadora(0,'uidH',null),g=G.game;g.money=1e7;
+ // (el oro de más no es una trampa aquí: rehace() no lo sabe, así que la prueba solo compara el motor consigo mismo)
+ const h=G.colocar('heroeprado',300,170);assert.ok(h,'se coloca');
+ assert.equal(G.colocar('heroeprado',600,330),null,'un segundo héroe no');
+ for(let q=0;q<4;q++){assert.ok(G.mejorar(h,0));assert.ok(G.mejorar(h,1));}
+ assert.deepEqual(h.tiers,[4,4]);
+ const t=G.colocar('espinas',180,240);
+ for(const p of [0,0,0,1,1])assert.ok(G.mejorar(t,p));
+ assert.equal(g.canUpgrade(t,1),false,'las torres siguen con la regla 4/2');
+ let hab=0;
+ for(let r=0;r<12;r++){G.ronda();while(g.active&&!g.over){G.tick();for(const e of g.events)if(e.type==='ability'&&e.id==='selva')hab++;g.events.length=0;}}
+ assert.ok(hab>0,'Selva Ancestral se lanzó');
+ const snap=JSON.stringify(g.snapshot());
+ const corre=()=>{const G2=new P.Grabadora(0,'uidH',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(0,null,P.semillaTramo(G.st.s,'uidH',0));G2.game.money=1e7;
+  for(const j of G.j){while(G2.paso<j[0])G2.tick();const c=j[1];if(c===0)G2.colocar(PD.TOWER_ORDER[j[2]],j[3],j[4]);else if(c===1)G2.mejorar(G2.game.towers.find(x=>x.id===j[2]),j[3]);else if(c===4)G2.ronda();}
+  while(G2.paso<G.paso)G2.tick();return JSON.stringify(G2.game.snapshot());};
+ assert.equal(corre(),snap,'misma semilla y mismas jugadas, misma partida (con héroe)');
+});
+
+test('huertos rebajados y enemigos con más vida a partir de las primeras rondas',()=>{
+ const g=new PD.Game(0,null,3);g.money=1e7;
+ const f=g.place('huerto',60,60);assert.ok(f);
+ assert.equal(f.s.income,48);
+ for(let q=0;q<4;q++)g.upgrade(f,0);
+ assert.equal(f.s.income,48+30+72+180+600,'40 % menos que antes (1550 → 930)');
+ assert.equal(PD.hpBoost(1),1);assert.equal(PD.hpBoost(25),2);assert.equal(PD.hpBoost(80),2);assert.equal(PD.hpBoost(80,true),1.5);
+ g.round=30;g.startRound();for(let i=0;i<120&&!g.enemies.length;i++)g.update(P.STEP);
+ const e=g.enemies[0];assert.ok(e);assert.ok(Math.abs(e.maxHp-e.d.hp*PD.hpMult(g.L,31)*2)<1e-6,'vida x2 en la ronda 31');
+});

@@ -279,3 +279,12 @@ button { font-family: inherit; }
 }
 /* En el teléfono el HUD no tiene sitio para el deslizador común: quedan el 🔊 del juego y los volúmenes de la pausa. */
 @media (max-width: 600px) { #hud .pd-vol { display: none; } }
+/* el héroe del reino: ocupa toda la fila, arriba de la tienda */
+.shop-item.hero { grid-column: 1 / -1; flex-direction: row; gap: 8px; padding: 6px 10px; border-color: rgba(255,207,77,.55); background: linear-gradient(90deg, rgba(255,207,77,.16), var(--panel)); }
+.shop-item.hero .nm { flex: 1; font-size: 13px; justify-content: flex-start; color: #ffe8a0; }
+.shop-item.hero .nw { background: linear-gradient(90deg, #d9a520, #ffcf4d); color: #2a1a00; }
+.shop-item.hero .hk { top: auto; bottom: 3px; }
+.shop-item.hero.sel { border-color: #fff1a8; }
+.shop-item.hero.used { opacity: .55; cursor: default; }
+.shop-item.hero.used .ct { color: var(--muted); font-size: 12px; }
+.lc-new span.hero { color: #ffe8a0; background: rgba(255,207,77,.14); border-color: rgba(255,207,77,.45); }

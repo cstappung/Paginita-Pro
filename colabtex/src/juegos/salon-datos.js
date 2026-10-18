@@ -91,7 +91,7 @@ export const SOLOS = [
     modos: ["Tabla de puntaje", "Tabla de Pokédex"] },
   { id: "prodefender", tipo: "club", nombre: "PRO DEFENDER", genero: "Estrategia", icono: "🛡️", alta: "2026-10-18",
     ruta: "#solo/prodefender", reglas: "prodefender", popular: "club-prodefender", ranking: true,
-    lema: "Tower defense: 5 reinos de 100 rondas, 22 defensores y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
+    lema: "Tower defense: 5 reinos de 100 rondas, 22 defensores, un héroe por reino y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
     modos: ["Un récord por reino", "Hasta 10 000 🪙 por reino"] },
   { id: "protiles", tipo: "club", nombre: "PRO TILES", genero: "Ritmo", icono: "🎹", alta: "2026-10-17",
     ruta: "#solo/protiles", reglas: "protiles", popular: "club-protiles", ranking: true,

@@ -683,6 +683,121 @@
     noGlow(c);
   }
 
+  // ---- Héroes: pedestal dorado y una figura vista desde arriba que mira al objetivo (+x) ----
+  function heroBase(c, s, col) {
+    poly(c, 0, 0, s + 5, 6, 0, lg(c, 0, -s, 0, s, ['#fff1a8', '#d9a520', '#7a5208']), '#3a2604', 1.6);
+    poly(c, 0, 0, s + 1.5, 6, 0, lg(c, 0, -s, 0, s, ['#3a3040', '#1c1624']), col, 1.6);
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; circle(c, Math.cos(a) * (s + 3.2), Math.sin(a) * (s + 3.2), 1.2, '#fff6c8', '#7a5208', 0.5); }
+    c.strokeStyle = rgba(col, 0.55); c.lineWidth = 0.8;
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.PI / 6; c.beginPath(); c.moveTo(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55); c.lineTo(Math.cos(a) * (s - 1), Math.sin(a) * (s - 1)); c.stroke(); }
+  }
+  // o: { cape, armor, skin, hair } y weapon(c, s, t) dibujado delante
+  function heroFigure(c, s, t, o) {
+    ell(c, -s * 0.28, 0, s * 0.5, s * 0.78, 0, lg(c, -s * 0.8, 0, s * 0.2, 0, [shade(o.cape, -0.5), o.cape, shade(o.cape, 0.25)]), shade(o.cape, -0.6), 1);
+    ell(c, 0, 0, s * 0.4, s * 0.62, 0, lg(c, 0, -s * 0.6, 0, s * 0.6, [shade(o.armor, 0.35), o.armor, shade(o.armor, -0.45)]), shade(o.armor, -0.65), 1);
+    circle(c, s * 0.12, -s * 0.56, s * 0.17, o.skin, shade(o.skin, -0.5), 0.8);
+    circle(c, s * 0.12, s * 0.56, s * 0.17, o.skin, shade(o.skin, -0.5), 0.8);
+    o.weapon(c, s, t);
+    circle(c, s * 0.06, 0, s * 0.31, sg(c, s * 0.06, 0, s * 0.31, o.hair), shade(o.hair, -0.6), 1);
+    if (o.head) o.head(c, s, t);
+  }
+  const HERO_ART = {
+    heroeprado: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#3f9a35', armor: '#8a6a3a', skin: '#f0c89a', hair: '#6fdc5a',
+      weapon(c, s, t) {
+        // arco largo con flecha de semilla
+        c.strokeStyle = '#6a4422'; c.lineWidth = 2.4; c.beginPath(); c.arc(s * 0.2, 0, s * 0.85, -1.05, 1.05); c.stroke();
+        c.strokeStyle = '#f0f0d0'; c.lineWidth = 0.7; c.beginPath(); c.moveTo(s * 0.2 + Math.cos(-1.05) * s * 0.85, Math.sin(-1.05) * s * 0.85); c.lineTo(s * 0.2 + Math.cos(1.05) * s * 0.85, Math.sin(1.05) * s * 0.85); c.stroke();
+        c.fillStyle = '#c8a060'; c.fillRect(s * 0.1, -0.8, s * 1.15, 1.6);
+        if (t[1] >= 3) glow(c, '#c8f08a', 6);
+        leaf(c, s * 1.45, s * 0.22, t[1] >= 4 ? '#ff9ad0' : '#7ae05a'); noGlow(c);
+      },
+      head(c, s, t) {
+        for (let i = 0; i < 5; i++) { c.save(); c.translate(s * 0.02, 0); c.rotate(Math.PI + (i - 2) * 0.5); leaf(c, s * 0.5, s * 0.16, i % 2 ? '#5fbf4a' : '#9be36a'); c.restore(); }
+        if (t[0] >= 3) { glow(c, '#ffcf4d', 6); star(c, s * 0.06, 0, s * 0.16, s * 0.07, 5, 0, '#fff1a8'); noGlow(c); }
+      }
+    }),
+    heroedunas: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#2a6ad8', armor: '#e8c060', skin: '#c88a50', hair: '#1a2a6a',
+      weapon(c, s, t) {
+        // báculo con disco solar
+        c.fillStyle = lg(c, 0, -1.2, 0, 1.2, ['#fff1a8', '#a8740a']); c.fillRect(s * 0.1, s * 0.5, s * 1.1, 2.2);
+        const R = s * (0.3 + t[0] * 0.04);
+        glow(c, '#ffd84d', 10);
+        circle(c, s * 1.2, s * 0.55, R, sg(c, s * 1.2, s * 0.55, R, '#ffd84d', 0.6, -0.3), '#a86a00', 0.8);
+        noGlow(c);
+        star(c, s * 1.2, s * 0.55, R * 1.5, R * 1.05, 10, 0, null, '#ffe58a', 0.8);
+      },
+      head(c, s, t) {
+        // tocado de faraón a rayas
+        c.save(); c.translate(s * 0.06, 0);
+        for (let i = -3; i <= 3; i++) { c.strokeStyle = i % 2 ? '#ffcf4d' : '#2a4aa8'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-s * 0.32, i * s * 0.08); c.lineTo(s * 0.18, i * s * 0.08 * 0.6); c.stroke(); }
+        circle(c, s * 0.2, 0, s * 0.09, '#3ad0ff', '#0a3a6a', 0.6);
+        c.restore();
+      }
+    }),
+    heroeglaciar: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#5ab8e8', armor: '#dff4ff', skin: '#f6e2d6', hair: '#f0f8ff',
+      weapon(c, s, t) {
+        // lanza de hielo
+        const len = s * (1.5 + t[1] * 0.08);
+        c.fillStyle = lg(c, 0, -1.2, 0, 1.2, ['#e8fbff', '#5a8aa8']); c.fillRect(s * 0.05, s * 0.52, len, 2.2);
+        glow(c, '#9be7ff', t[1] >= 3 ? 10 : 5);
+        shape(c, [[s * 0.05 + len, s * 0.52 - 3.5], [s * 0.05 + len + s * 0.55, s * 0.52 + 1.1], [s * 0.05 + len, s * 0.52 + 5.7]], lg(c, len, 0, len + s * 0.5, 0, ['#ffffff', '#9be7ff', '#3a8ac8']), '#1a4a6a', 0.7);
+        noGlow(c);
+      },
+      head(c, s, t) {
+        // corona de hielo
+        const n = t[0] >= 3 ? 7 : 5;
+        glow(c, '#bff0ff', 6);
+        for (let i = 0; i < n; i++) { const a = Math.PI + (i - (n - 1) / 2) * 0.42; c.save(); c.translate(s * 0.06, 0); c.rotate(a); shape(c, [[s * 0.22, -1.4], [s * 0.5, 0], [s * 0.22, 1.4]], '#e8fbff', '#5a9ac8', 0.5); c.restore(); }
+        noGlow(c);
+      }
+    }),
+    heroecaldera: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#8a2a10', armor: '#4a3a36', skin: '#d89a70', hair: '#2a2220',
+      weapon(c, s, t) {
+        // martillo de guerra
+        c.fillStyle = lg(c, 0, -1.4, 0, 1.4, ['#a87a4a', '#4a2a10']); c.fillRect(s * 0.1, s * 0.48, s * 1.05, 2.8);
+        const hw = s * (0.42 + t[0] * 0.04), hx = s * 1.05;
+        if (t[0] >= 3) glow(c, '#ff7a2f', 10);
+        rrect(c, hx, s * 0.48 + 1.4 - hw, s * 0.42, hw * 2, 2, lg(c, hx, 0, hx + s * 0.42, 0, ['#8a929e', '#3a4048', '#1a1e24']), '#0c0e12', 1);
+        noGlow(c);
+        if (t[0] >= 3) { c.strokeStyle = '#ffb34a'; c.lineWidth = 1; c.beginPath(); c.moveTo(hx + 2, s * 0.48 - hw * 0.6); c.lineTo(hx + s * 0.3, s * 0.48 + hw * 0.4); c.stroke(); }
+      },
+      head(c, s, t) {
+        // yelmo con cuernos y grietas de lava
+        c.save(); c.translate(s * 0.06, 0);
+        for (const k of [-1, 1]) shape(c, [[0, k * s * 0.22], [-s * 0.15, k * s * 0.55], [s * 0.12, k * s * 0.28]], '#e8dcc0', '#5a4a30', 0.7);
+        circle(c, 0, 0, s * 0.24, lg(c, 0, -s * 0.24, 0, s * 0.24, ['#6a6a72', '#2a2a30']), '#0c0c10', 0.8);
+        glow(c, '#ff7a2f', 6); c.strokeStyle = '#ff9a3a'; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(s * 0.18, 0); c.lineTo(-s * 0.05, s * 0.06); c.lineTo(-s * 0.15, -s * 0.05); c.stroke(); noGlow(c);
+        c.restore();
+      }
+    }),
+    heroevacio: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#3a1670', armor: '#5a2a9a', skin: '#e6d0f0', hair: '#1a0a30',
+      weapon(c, s, t) {
+        // orbe arcano en la mano y estrellas que la rodean
+        glow(c, '#c07bff', 12);
+        circle(c, s * 0.75, s * 0.5, s * 0.24, sg(c, s * 0.75, s * 0.5, s * 0.24, '#e0b0ff', 0.6, -0.4), '#5a2a9a', 0.8);
+        noGlow(c);
+        const n = 2 + Math.min(4, t[1]);
+        for (let i = 0; i < n; i++) { const a = i * TAU / n; star(c, s * 0.75 + Math.cos(a) * s * 0.42, s * 0.5 + Math.sin(a) * s * 0.42, 2.2, 0.9, 4, a, '#fff6ff'); }
+      },
+      head(c, s, t) {
+        // capucha con ojos que brillan
+        c.save(); c.translate(s * 0.06, 0);
+        circle(c, 0, 0, s * 0.3, null, '#8a5bff', 1.2);
+        glow(c, '#ff9ae8', 6);
+        circle(c, s * 0.16, -s * 0.09, 1.3, '#ff9ae8'); circle(c, s * 0.16, s * 0.09, 1.3, '#ff9ae8');
+        noGlow(c);
+        if (t[0] >= 3) { c.strokeStyle = '#c9a7ff'; c.lineWidth = 0.8; c.beginPath(); c.arc(0, 0, s * 0.42, -1, 1); c.stroke(); }
+        c.restore();
+      }
+    })
+  };
+
   const TART = {
     espinas: {
       base: baseStone, spin: 'aim',
@@ -1105,8 +1220,12 @@
         circle(c, 0, 0, s * 0.16, '#0c0618');
         circle(c, 0, 0, s * 0.6, null, 'rgba(200,170,255,0.6)', 1);
       }
-    }
-
+    },
+    heroeprado: { base: heroBase, spin: 'aim', top: HERO_ART.heroeprado },
+    heroedunas: { base: heroBase, spin: 'aim', top: HERO_ART.heroedunas },
+    heroeglaciar: { base: heroBase, spin: 'aim', top: HERO_ART.heroeglaciar },
+    heroecaldera: { base: heroBase, spin: 'aim', top: HERO_ART.heroecaldera },
+    heroevacio: { base: heroBase, spin: 'aim', top: HERO_ART.heroevacio }
   };
   // Rango visual de una torre según sus mejoras: 0 básica … 4 legendaria
   function towerRank(t) {
@@ -1210,6 +1329,16 @@
       circle(ctx, 0, 0, R, g);
       ctx.globalCompositeOperation = 'source-over';
     }
+    if (!o.icon && def.hero) {
+      // los héroes: corona de luz dorada en el suelo
+      const pu = 0.5 + 0.5 * Math.sin(time * 3 + x * 0.01);
+      ctx.save(); ctx.rotate(-time * 0.8);
+      ctx.globalAlpha = ga * (0.5 + 0.35 * pu);
+      ctx.strokeStyle = '#ffd84d'; ctx.lineWidth = 2; ctx.setLineDash([2, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, sz + 9, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      for (let i = 0; i < 3; i++) { const a = i * TAU / 3; star(ctx, Math.cos(a) * (sz + 9), Math.sin(a) * (sz + 9), 3.2, 1.2, 4, a, '#fff1a8'); }
+      ctx.globalAlpha = ga; ctx.restore();
+    }
     if (!o.icon && rank >= 3) {
       // anillos rúnicos giratorios
       const R1 = sz * (1 + rank * 0.06) + 11;
@@ -1274,6 +1403,10 @@
         star(ctx, Math.sin(k * 2.39 + x) * sz * 0.85, sz * 0.4 - ph * sz * 1.9, 2.4, 0.8, 4, ph * 3, k % 2 ? '#ffffff' : acc);
       }
       ctx.globalAlpha = ga; ctx.globalCompositeOperation = 'source-over';
+    }
+    if (def.hero && !o.icon) {
+      const bob = Math.sin(time * 2.5 + x) * 1.5;
+      shape(ctx, [[-6, -sz - 6 + bob], [-6, -sz - 12 + bob], [-3, -sz - 9 + bob], [0, -sz - 14 + bob], [3, -sz - 9 + bob], [6, -sz - 12 + bob], [6, -sz - 6 + bob]], lg(ctx, 0, -sz - 14, 0, -sz - 6, ['#fff6c8', '#ffcf4d', '#a8740a']), '#5a3a00', 0.8);
     }
     if (type === 'voltaico' && !o.icon) {
       ctx.globalCompositeOperation = 'lighter';
@@ -2244,6 +2377,11 @@
         const hgt = Math.sin(k * Math.PI) * (s.mini ? 25 : 70);
         ctx.globalAlpha = 0.3; ell(ctx, x, y0, 5, 2.5, 0, '#000'); ctx.globalAlpha = 1;
         const rr = (s.mini ? 3.5 : 6) * (1 + hgt / 140);
+        if (s.sun) {
+          ctx.globalCompositeOperation = 'lighter'; circle(ctx, x, y0 - hgt, rr + 6, 'rgba(255,210,80,0.4)'); ctx.globalCompositeOperation = 'source-over';
+          circle(ctx, x, y0 - hgt, rr + 1, sg(ctx, x, y0 - hgt, rr + 1, '#ffd84d'), '#a86a00', 1);
+          continue;
+        }
         if (s.acid) {
           ctx.globalCompositeOperation = 'lighter'; circle(ctx, x, y0 - hgt, rr + 3, 'rgba(160,240,80,0.35)'); ctx.globalCompositeOperation = 'source-over';
           circle(ctx, x, y0 - hgt, rr, sg(ctx, x, y0 - hgt, rr, '#9be04a'), '#2a5a10', 1);

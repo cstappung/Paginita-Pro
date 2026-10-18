@@ -100,6 +100,12 @@
     const k = 0.03 * (Math.min(r, 20) - 1) + 0.046 * Math.max(0, r - 20) + 0.022 * Math.max(0, r - 55);
     return Math.exp(k) * Math.sqrt(PD.lateMult(r));
   };
+  // Vida extra sobre la curva de arriba, aplicada al aparecer (engine.js: spawn), así que
+  // no cambia cuántos enemigos salen (buildRounds cuenta con hpMult). Con la vida de antes
+  // el spam de torres en la salida los borraba nada más aparecer. Sube poco a poco para no
+  // romper el comienzo, cuando aún no hay oro: x1 hasta la ronda 3, x2 desde la 25.
+  // Los jefes reciben la mitad del extra (x1.5).
+  PD.hpBoost = function (r, boss) { const k = Math.min(1, Math.max(0, r - 3) / 22); return 1 + k * (boss ? 0.5 : 1); };
   PD.speedMult = function (r) { return 1 + Math.max(0, r - 80) * 0.01; };
   // Oro por muerte: alto al principio y decreciente con la cantidad de enemigos,
   // para que la dificultad no se compense sola. El grueso del oro llega con el bono de ronda.
