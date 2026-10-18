@@ -458,7 +458,9 @@
     // ============================ HÉROES (uno por reino) ============================
     // Solo en su reino y UNO por partida (engine.js: canPlace). Muy caros, pero con un
     // aura propia y una habilidad automática única desde el principio. A diferencia de
-    // las torres, pueden llevar sus DOS caminos al nivel 4 (canUpgrade).
+    // las torres, pueden llevar sus DOS caminos al nivel 4, y UNO de ellos al nivel 5
+    // (60000 de oro; canUpgrade). Sus mejoras cuestan un 50 % más que antes: con las dos
+    // al 4 eran lo más rentable del mapa.
     // `atk` elige el ataque (engine.js: tHero); `aura` es el radio del aura cuando no
     // coincide con el alcance; `abCd` reemplaza la recarga de la habilidad.
     heroeprado: {
@@ -468,16 +470,18 @@
         lifeRegen: 2, ability: 'selva', selvaDur: 3, selvaDps: 15 },
       paths: [
         { name: 'Raíz', ups: [
-          { name: 'Raíces Profundas', cost: 1800, desc: 'La Selva atrapa 4.5 s y hace 40 daño/s a los atrapados.', apply: s => { s.selvaDur = 4.5; s.selvaDps = 40; } },
-          { name: 'Savia Curativa', cost: 4000, desc: 'Cura 5 ❤ al final de cada ronda.', apply: s => { s.lifeRegen = 5; } },
-          { name: 'Bosque Eterno', cost: 9000, desc: 'La Selva se lanza cada 20 s y también frena a los JEFES.', apply: s => { s.abCd = 20; s.selvaBoss = true; s.selvaDps = 90; } },
-          { name: 'Corazón del Prado', cost: 24000, desc: 'Selva de 6 s y 300 daño/s. Cura 12 ❤ por ronda.', apply: s => { s.selvaDur = 6; s.selvaDps = 300; s.lifeRegen = 12; } }
+          { name: 'Raíces Profundas', cost: 2700, desc: 'La Selva atrapa 4.5 s y hace 40 daño/s a los atrapados.', apply: s => { s.selvaDur = 4.5; s.selvaDps = 40; } },
+          { name: 'Savia Curativa', cost: 6000, desc: 'Cura 5 ❤ al final de cada ronda.', apply: s => { s.lifeRegen = 5; } },
+          { name: 'Bosque Eterno', cost: 13500, desc: 'La Selva se lanza cada 20 s y también frena a los JEFES.', apply: s => { s.abCd = 20; s.selvaBoss = true; s.selvaDps = 90; } },
+          { name: 'Corazón del Prado', cost: 36000, desc: 'Selva de 6 s y 300 daño/s. Cura 12 ❤ por ronda.', apply: s => { s.selvaDur = 6; s.selvaDps = 300; s.lifeRegen = 12; } },
+          { name: 'Madre Selva', cost: 60000, desc: 'NIVEL 5 (solo un camino). Selva de 1200 daño/s que también atrapa VOLADORES. Cura 20 ❤ por ronda.', apply: s => { s.selvaDps = 1200; s.selvaAir = true; s.lifeRegen = 20; } }
         ] },
         { name: 'Semilla', ups: [
-          { name: 'Semillas Duras', cost: 1500, desc: '+6 daño y +2 perforación.', apply: s => { s.dmg += 6; s.pierce += 2; } },
-          { name: 'Tres Semillas', cost: 3800, desc: '3 semillas por disparo y un 20% más rápido.', apply: s => { s.count = 3; s.cd *= 0.8; } },
-          { name: 'Espinas de Hierro', cost: 9000, desc: '+20 daño, ignora el blindaje y envenena 20 daño/s.', apply: s => { s.dmg += 20; s.armorPierce = 1; s.poisonDps = 20; s.poisonDur = 3; } },
-          { name: 'Lluvia de Pétalos', cost: 22000, desc: '7 semillas, +45 daño, +30 alcance, más rápida y x2 contra jefes.', apply: s => { s.count = 7; s.spread = 0.12; s.dmg += 45; s.range += 30; s.cd = 0.3; s.bossMult = 2; } }
+          { name: 'Semillas Duras', cost: 2200, desc: '+6 daño y +2 perforación.', apply: s => { s.dmg += 6; s.pierce += 2; } },
+          { name: 'Tres Semillas', cost: 5700, desc: '3 semillas por disparo y un 20% más rápido.', apply: s => { s.count = 3; s.cd *= 0.8; } },
+          { name: 'Espinas de Hierro', cost: 13500, desc: '+20 daño, ignora el blindaje y envenena 20 daño/s.', apply: s => { s.dmg += 20; s.armorPierce = 1; s.poisonDps = 20; s.poisonDur = 3; } },
+          { name: 'Lluvia de Pétalos', cost: 33000, desc: '7 semillas, +45 daño, +30 alcance, más rápida y x2 contra jefes.', apply: s => { s.count = 7; s.spread = 0.12; s.dmg += 45; s.range += 30; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Árbol del Mundo', cost: 60000, desc: 'NIVEL 5 (solo un camino). 9 semillas de +160 daño que perforan 6 más, x3 contra jefes.', apply: s => { s.count = 9; s.spread = 0.1; s.dmg += 160; s.pierce += 6; s.bossMult = 3; } }
         ] }
       ]
     },
@@ -489,16 +493,18 @@
         shredAura: 3, ability: 'tormenta', stormPush: 160, stormStun: 1, stormR: 340 },
       paths: [
         { name: 'Sol', ups: [
-          { name: 'Ojo de Ra', cost: 1800, desc: '+10 daño, +15 radio y detecta CAMUFLADOS.', apply: s => { s.dmg += 10; s.radius += 15; s.camo = true; } },
-          { name: 'Doble Sol', cost: 4200, desc: 'Lanza 2 soles y un 20% más rápido.', apply: s => { s.shells = 2; s.cd *= 0.8; } },
-          { name: 'Ira de Ra', cost: 10000, desc: '+40 daño, los soles queman 30 daño/s e ignoran el blindaje.', apply: s => { s.dmg += 40; s.burnDps = 30; s.armorPierce = 1; } },
-          { name: 'Eclipse', cost: 26000, desc: '3 soles enormes de +130 daño, más rápidos y x2 contra jefes.', apply: s => { s.shells = 3; s.dmg += 130; s.radius += 25; s.cd = 0.6; s.bossMult = 2; } }
+          { name: 'Ojo de Ra', cost: 2700, desc: '+10 daño, +15 radio y detecta CAMUFLADOS.', apply: s => { s.dmg += 10; s.radius += 15; s.camo = true; } },
+          { name: 'Doble Sol', cost: 6300, desc: 'Lanza 2 soles y un 20% más rápido.', apply: s => { s.shells = 2; s.cd *= 0.8; } },
+          { name: 'Ira de Ra', cost: 15000, desc: '+40 daño, los soles queman 30 daño/s e ignoran el blindaje.', apply: s => { s.dmg += 40; s.burnDps = 30; s.armorPierce = 1; } },
+          { name: 'Eclipse', cost: 39000, desc: '3 soles enormes de +130 daño, más rápidos y x2 contra jefes.', apply: s => { s.shells = 3; s.dmg += 130; s.radius += 25; s.cd = 0.6; s.bossMult = 2; } },
+          { name: 'Sol Negro', cost: 60000, desc: 'NIVEL 5 (solo un camino). 4 soles de +380 daño que queman 150/s, x3 contra jefes.', apply: s => { s.shells = 4; s.dmg += 380; s.radius += 15; s.burnDps = 150; s.bossMult = 3; } }
         ] },
         { name: 'Arena', ups: [
-          { name: 'Arena Abrasiva', cost: 1600, desc: 'Quita 5 de blindaje y +25 alcance.', apply: s => { s.shredAura = 5; s.range += 25; } },
-          { name: 'Espejismo', cost: 4000, desc: 'La Tormenta se lanza cada 20 s y empuja más lejos.', apply: s => { s.abCd = 20; s.stormPush = 240; } },
-          { name: 'Maldición del Faraón', cost: 9500, desc: 'Los enemigos en su alcance reciben un 25% más de daño.', apply: s => { s.ampAura = 0.25; } },
-          { name: 'Tormenta Eterna', cost: 24000, desc: 'La Tormenta cubre todo el mapa, empuja 360 y aturde 2.5 s.', apply: s => { s.stormR = 5000; s.stormPush = 360; s.stormStun = 2.5; } }
+          { name: 'Arena Abrasiva', cost: 2400, desc: 'Quita 5 de blindaje y +25 alcance.', apply: s => { s.shredAura = 5; s.range += 25; } },
+          { name: 'Espejismo', cost: 6000, desc: 'La Tormenta se lanza cada 20 s y empuja más lejos.', apply: s => { s.abCd = 20; s.stormPush = 240; } },
+          { name: 'Maldición del Faraón', cost: 14200, desc: 'Los enemigos en su alcance reciben un 25% más de daño.', apply: s => { s.ampAura = 0.25; } },
+          { name: 'Tormenta Eterna', cost: 36000, desc: 'La Tormenta cubre todo el mapa, empuja 360 y aturde 2.5 s.', apply: s => { s.stormR = 5000; s.stormPush = 360; s.stormStun = 2.5; } },
+          { name: 'Arenas del Tiempo', cost: 60000, desc: 'NIVEL 5 (solo un camino). La arena quita 10 de blindaje, los enemigos en su alcance reciben un 45% más de daño y +40 alcance.', apply: s => { s.shredAura = 10; s.ampAura = 0.45; s.range += 40; } }
         ] }
       ]
     },
@@ -510,16 +516,18 @@
         slowAura: 0.2, ability: 'invierno', winterDur: 6, winterBrittle: 4, winterDmg: 0 },
       paths: [
         { name: 'Escarcha', ups: [
-          { name: 'Aura Gélida', cost: 1800, desc: 'El aura ralentiza un 30% y +25 alcance.', apply: s => { s.slowAura = 0.3; s.range += 25; } },
-          { name: 'Corazón de Hielo', cost: 4500, desc: 'El Invierno además CONGELA 2 s a los que no son jefes.', apply: s => { s.winterFreeze = 2; } },
-          { name: 'Glaciación', cost: 10000, desc: 'Invierno cada 20 s, dura 9 s y quiebra más (+10 daño por impacto).', apply: s => { s.abCd = 20; s.winterDur = 9; s.winterBrittle = 10; } },
-          { name: 'Era Glacial', cost: 26000, desc: 'Aura del 40%. El Invierno inflige 2500 de daño de hielo a todo el mapa.', apply: s => { s.slowAura = 0.4; s.winterDmg = 2500; } }
+          { name: 'Aura Gélida', cost: 2700, desc: 'El aura ralentiza un 30% y +25 alcance.', apply: s => { s.slowAura = 0.3; s.range += 25; } },
+          { name: 'Corazón de Hielo', cost: 6800, desc: 'El Invierno además CONGELA 2 s a los que no son jefes.', apply: s => { s.winterFreeze = 2; } },
+          { name: 'Glaciación', cost: 15000, desc: 'Invierno cada 20 s, dura 9 s y quiebra más (+10 daño por impacto).', apply: s => { s.abCd = 20; s.winterDur = 9; s.winterBrittle = 10; } },
+          { name: 'Era Glacial', cost: 39000, desc: 'Aura del 40%. El Invierno inflige 2500 de daño de hielo a todo el mapa.', apply: s => { s.slowAura = 0.4; s.winterDmg = 2500; } },
+          { name: 'Invierno sin Fin', cost: 60000, desc: 'NIVEL 5 (solo un camino). El Invierno inflige 9000 de daño de hielo y quiebra +20 por impacto.', apply: s => { s.winterDmg = 9000; s.winterBrittle = 20; } }
         ] },
         { name: 'Lanza', ups: [
-          { name: 'Lanza Afilada', cost: 1600, desc: '+18 daño.', apply: s => { s.dmg += 18; } },
-          { name: 'Triple Lanza', cost: 4000, desc: '3 lanzas en abanico y un 20% más rápido.', apply: s => { s.bolts = 3; s.cd *= 0.8; } },
-          { name: 'Lanza Rúnica', cost: 10000, desc: '+60 daño, ignora el blindaje y CONGELA 0.6 s.', apply: s => { s.dmg += 60; s.armorPierce = 1; s.freeze = 0.6; } },
-          { name: 'Juicio Boreal', cost: 25000, desc: '5 lanzas enormes de +220 daño cada 0.8 s, x3 contra jefes.', apply: s => { s.bolts = 5; s.dmg += 220; s.width = 18; s.cd = 0.8; s.bossMult = 3; } }
+          { name: 'Lanza Afilada', cost: 2400, desc: '+18 daño.', apply: s => { s.dmg += 18; } },
+          { name: 'Triple Lanza', cost: 6000, desc: '3 lanzas en abanico y un 20% más rápido.', apply: s => { s.bolts = 3; s.cd *= 0.8; } },
+          { name: 'Lanza Rúnica', cost: 15000, desc: '+60 daño, ignora el blindaje y CONGELA 0.6 s.', apply: s => { s.dmg += 60; s.armorPierce = 1; s.freeze = 0.6; } },
+          { name: 'Juicio Boreal', cost: 37500, desc: '5 lanzas enormes de +220 daño cada 0.8 s, x3 contra jefes.', apply: s => { s.bolts = 5; s.dmg += 220; s.width = 18; s.cd = 0.8; s.bossMult = 3; } },
+          { name: 'Lanza de Ymir', cost: 60000, desc: 'NIVEL 5 (solo un camino). 7 lanzas de +650 daño cada 0.7 s, x4 contra jefes.', apply: s => { s.bolts = 7; s.dmg += 650; s.width = 22; s.cd = 0.7; s.bossMult = 4; } }
         ] }
       ]
     },
@@ -531,16 +539,18 @@
         aura: 150, buffDmgMult: 1.2, ability: 'erupcion', eruptN: 8, eruptDmg: 400 },
       paths: [
         { name: 'Martillo', ups: [
-          { name: 'Martillo Ígneo', cost: 1800, desc: '+14 daño y +15 alcance.', apply: s => { s.dmg += 14; s.range += 15; } },
-          { name: 'Onda Sísmica', cost: 4500, desc: 'Los golpes aturden 0.5 s y son un 25% más rápidos.', apply: s => { s.stun = 0.5; s.cd *= 0.75; } },
-          { name: 'Martillo de Magma', cost: 11000, desc: '+50 daño, ignora el blindaje y quema 30 daño/s.', apply: s => { s.dmg += 50; s.armorPierce = 1; s.burnDps = 30; } },
-          { name: 'Furia del Volcán', cost: 27000, desc: '+160 daño, golpes cada 0.6 s, +30 alcance y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.6; s.range += 30; s.bossMult = 2; } }
+          { name: 'Martillo Ígneo', cost: 2700, desc: '+14 daño y +15 alcance.', apply: s => { s.dmg += 14; s.range += 15; } },
+          { name: 'Onda Sísmica', cost: 6800, desc: 'Los golpes aturden 0.5 s y son un 25% más rápidos.', apply: s => { s.stun = 0.5; s.cd *= 0.75; } },
+          { name: 'Martillo de Magma', cost: 16500, desc: '+50 daño, ignora el blindaje y quema 30 daño/s.', apply: s => { s.dmg += 50; s.armorPierce = 1; s.burnDps = 30; } },
+          { name: 'Furia del Volcán', cost: 40500, desc: '+160 daño, golpes cada 0.6 s, +30 alcance y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.6; s.range += 30; s.bossMult = 2; } },
+          { name: 'Ragnarök', cost: 60000, desc: 'NIVEL 5 (solo un camino). +520 daño, quema 150/s, +20 alcance y x3 contra jefes.', apply: s => { s.dmg += 520; s.burnDps = 150; s.range += 20; s.bossMult = 3; } }
         ] },
         { name: 'Forja', ups: [
-          { name: 'Fragua', cost: 1800, desc: 'Las torres cercanas hacen un 35% más de daño y el aura crece.', apply: s => { s.buffDmgMult = 1.35; s.aura = 175; } },
-          { name: 'Yunque Eterno', cost: 4500, desc: 'Las torres cercanas además atacan un 20% más rápido.', apply: s => { s.buffRate = 0.2; } },
-          { name: 'Lluvia de Magma', cost: 11000, desc: 'Erupción cada 18 s con 14 estallidos.', apply: s => { s.abCd = 18; s.eruptN = 14; } },
-          { name: 'Corazón del Volcán', cost: 28000, desc: 'Torres cercanas x1.75 de daño e ignoran el blindaje. Estallidos de 1500.', apply: s => { s.buffDmgMult = 1.75; s.buffArmor = 1; s.eruptDmg = 1500; } }
+          { name: 'Fragua', cost: 2700, desc: 'Las torres cercanas hacen un 35% más de daño y el aura crece.', apply: s => { s.buffDmgMult = 1.35; s.aura = 175; } },
+          { name: 'Yunque Eterno', cost: 6800, desc: 'Las torres cercanas además atacan un 20% más rápido.', apply: s => { s.buffRate = 0.2; } },
+          { name: 'Lluvia de Magma', cost: 16500, desc: 'Erupción cada 18 s con 14 estallidos.', apply: s => { s.abCd = 18; s.eruptN = 14; } },
+          { name: 'Corazón del Volcán', cost: 42000, desc: 'Torres cercanas x1.75 de daño e ignoran el blindaje. Estallidos de 1500.', apply: s => { s.buffDmgMult = 1.75; s.buffArmor = 1; s.eruptDmg = 1500; } },
+          { name: 'Forja de los Dioses', cost: 60000, desc: 'NIVEL 5 (solo un camino). Torres cercanas x2.2 de daño y un 35% más rápidas. Estallidos de 4500.', apply: s => { s.buffDmgMult = 2.2; s.buffRate = 0.35; s.eruptDmg = 4500; s.aura = 190; } }
         ] }
       ]
     },
@@ -552,16 +562,18 @@
         ampAura: 0.15, ability: 'grieta', riftBack: 0.35, riftBoss: 0.1 },
       paths: [
         { name: 'Tiempo', ups: [
-          { name: 'Eco Temporal', cost: 2000, desc: 'La Grieta los devuelve la mitad del camino recorrido.', apply: s => { s.riftBack = 0.5; } },
-          { name: 'Paradoja', cost: 5000, desc: 'Grieta cada 24 s; los devueltos quedan aturdidos 1.5 s.', apply: s => { s.abCd = 24; s.riftStun = 1.5; } },
-          { name: 'Bucle Eterno', cost: 12000, desc: 'Los devueltos quedan MALDITOS: +40% de daño recibido durante 6 s.', apply: s => { s.riftHex = 0.4; } },
-          { name: 'Fin de los Tiempos', cost: 30000, desc: 'La Grieta devuelve el 80% del camino (a los jefes, el 30%).', apply: s => { s.riftBack = 0.8; s.riftBoss = 0.3; } }
+          { name: 'Eco Temporal', cost: 3000, desc: 'La Grieta los devuelve la mitad del camino recorrido.', apply: s => { s.riftBack = 0.5; } },
+          { name: 'Paradoja', cost: 7500, desc: 'Grieta cada 24 s; los devueltos quedan aturdidos 1.5 s.', apply: s => { s.abCd = 24; s.riftStun = 1.5; } },
+          { name: 'Bucle Eterno', cost: 18000, desc: 'Los devueltos quedan MALDITOS: +40% de daño recibido durante 6 s.', apply: s => { s.riftHex = 0.4; } },
+          { name: 'Fin de los Tiempos', cost: 45000, desc: 'La Grieta devuelve el 80% del camino (a los jefes, el 30%).', apply: s => { s.riftBack = 0.8; s.riftBoss = 0.3; } },
+          { name: 'Colapso Temporal', cost: 60000, desc: 'NIVEL 5 (solo un camino). La Grieta además inflige 6000 de daño arcano y deja a los devueltos MALDITOS al 80%.', apply: s => { s.riftDmg = 6000; s.riftHex = 0.8; } }
         ] },
         { name: 'Estrellas', ups: [
-          { name: 'Polvo Estelar', cost: 1800, desc: '+12 daño y +1 rebote.', apply: s => { s.dmg += 12; s.bounces += 1; } },
-          { name: 'Constelación', cost: 4500, desc: 'Un 25% más rápido; en su alcance reciben un 25% más de daño.', apply: s => { s.cd *= 0.75; s.ampAura = 0.25; } },
-          { name: 'Agujero Blanco', cost: 11000, desc: '+40 daño, 6 rebotes y EJECUTA bajo el 10% de vida.', apply: s => { s.dmg += 40; s.bounces = 6; s.exec = 0.1; } },
-          { name: 'Supernova Oscura', cost: 28000, desc: '+160 daño, dispara cada 0.3 s y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.3; s.bossMult = 2; } }
+          { name: 'Polvo Estelar', cost: 2700, desc: '+12 daño y +1 rebote.', apply: s => { s.dmg += 12; s.bounces += 1; } },
+          { name: 'Constelación', cost: 6800, desc: 'Un 25% más rápido; en su alcance reciben un 25% más de daño.', apply: s => { s.cd *= 0.75; s.ampAura = 0.25; } },
+          { name: 'Agujero Blanco', cost: 16500, desc: '+40 daño, 6 rebotes y EJECUTA bajo el 10% de vida.', apply: s => { s.dmg += 40; s.bounces = 6; s.exec = 0.1; } },
+          { name: 'Supernova Oscura', cost: 42000, desc: '+160 daño, dispara cada 0.3 s y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Big Bang', cost: 60000, desc: 'NIVEL 5 (solo un camino). +480 daño, 10 rebotes, x3 contra jefes y EJECUTA bajo el 15%.', apply: s => { s.dmg += 480; s.bounces = 10; s.bossMult = 3; s.exec = 0.15; } }
         ] }
       ]
     }
