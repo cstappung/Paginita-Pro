@@ -13,6 +13,7 @@ import { RemoteState } from './remoto.js';
 import { celular } from '../sitio/celular.js';
 import { Tactil, TACTIL } from '../ui/tactil.js';
 import { vistas } from './orden.js';
+import { CURVA_N } from './carrera.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -39,6 +40,7 @@ export class GameSession {
     this.finished = false;
     this.paused = false;
     this.lastStateSent = 0;
+    this.curva = [];
     this.players = players.map((pd, idx) => this._makePlayer(pd, idx, players.length));
     this.local = this.players.filter((p) => p.type !== 'remote');
     // Con un solo jugador humano, acepta teclado Y cualquier mando a la vez
@@ -403,6 +405,7 @@ export class GameSession {
       this._syncVideo(now);
     }
     this._sendState(perf);
+    if (this.net) this._anotaCurva(now);
     this.draw(now);
     if (!this.finished && now > this.endAt) this.finish();
   }
@@ -451,6 +454,13 @@ export class GameSession {
       so: solo,
       ev: (p.netEvents = p.netEvents.slice(-EV_DIRECTO)),
     });
+  }
+
+  // El puntaje de cada tramo que ya pasó (el i-ésimo, al llegar a (i+1)/CURVA_N de la canción)
+  _anotaCurva(now) {
+    const p = this.local[0], paso = this.song.endTime / CURVA_N;
+    if (!p || !(paso > 0)) return;
+    while (this.curva.length < CURVA_N && now >= (this.curva.length + 1) * paso) this.curva.push(Math.floor(p.engine.score));
   }
 
   onRemoteState(m) {
@@ -617,14 +627,17 @@ export class GameSession {
   quit() {
     this.pauseMenu?.close();
     this.destroy();
-    if (this.net) this.net.send({ t: 'done', stats: { ...this.local[0].engine.stats(), quit: true } });
+    if (this.net) this.net.send({ t: 'done', stats: { ...this.local[0].engine.stats(), quit: true }, curva: this.curva });
     this.app.afterSessionQuit(this.net);
   }
 
   finish() {
     this.finished = true;
+    // el último punto, con el puntaje final (algo puede sumar tras la última nota)
+    if (this.curva.length === CURVA_N) this.curva[CURVA_N - 1] = Math.floor(this.local[0].engine.score);
     const results = this.players.map((p) => ({
-      name: p.name, part: p.part, diff: p.diff, bot: !!p.bot, type: p.type, id: p.id,
+      name: p.name, part: p.part, diff: p.diff, bot: !!p.bot, type: p.type, id: p.id, color: p.color,
+      curva: p === this.local[0] && this.net ? this.curva : null,
       stats: p.type === 'remote' ? null : p.engine.stats(),
       detail: p.type === 'remote' ? null : this._detail(p),
       // la prueba del primer jugador humano: con ella la página verifica y guarda el récord
@@ -632,7 +645,7 @@ export class GameSession {
     }));
     if (this.net) {
       this._sendState(Infinity);
-      this.net.send({ t: 'done', stats: results.find((r) => r.type !== 'remote')?.stats });
+      this.net.send({ t: 'done', stats: results.find((r) => r.type !== 'remote')?.stats, curva: this.curva });
     }
     setTimeout(() => {
       this.destroy();

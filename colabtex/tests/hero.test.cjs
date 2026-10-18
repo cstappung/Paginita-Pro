@@ -316,9 +316,10 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     pone({ t: 'empieza', uid: 'a' });
     for (const u of ['a', 'b']) pone({ t: 'cargado', uid: u });
     pone({ t: 'go', uid: 'a', at: Date.now() });
-    manda({ tipo: 'red', m: { t: 'done', stats: { score: 1234, stars: 3, hits: 50, total: 60, misses: 10, bestCombo: 20, spPhrases: 1, spTotal: 2, overhits: 0, fc: false } } });
+    manda({ tipo: 'red', m: { t: 'done', stats: { score: 1234, stars: 3, hits: 50, total: 60, misses: 10, bestCombo: 20, spPhrases: 1, spTotal: 2, overhits: 0, fc: false }, curva: [100, 200, 1234] } });
     const fin = escritas.find(j => j.t === 'fin');
     assert.ok(fin, 'el resultado se anota');
+    assert.equal(fin.cv, '2s.5k.ya', 'la curva viaja en un texto corto');
     assert.equal(escritas.find(j => j.t === 'go').uid, 'a');
     for (const j of escritas) assert.equal(j.uid, 'a', j.t + ' sin firmar');
     /* Ninguna jugada choca con un campo que la regla de `jugadas/$n` valida
@@ -334,6 +335,8 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     pone({ ...fin, uid: 'a' });
     pone({ t: 'fin', uid: 'b', r: 1, s: 99 });
     assert.equal(reducir(p).ultima.fines.a.h, 50);
+    assert.deepEqual([...reducir(p).ultima.fines.a.cv], [100, 200, 1234], 'y la curva, para la gráfica');
+    assert.equal(reducir(p).ultima.fines.b.cv, undefined);
   } finally { s?.destruir(); Object.assign(g, antes); }
 });
 
@@ -540,4 +543,21 @@ test('sala: la autopista del otro se pinta con el retraso con que llegan sus aci
   const r2 = new RemoteState({ notes: notas, spPhrases: [] }, 'guitar');
   r2.apply({ ev: [[0, HIT]] }, 30);
   assert.equal(r2.lag, 0.12);
+});
+
+test('sala: la carrera (puntaje a lo largo de la canción) se lee bien o se ignora, y la franja dice quién iba primero', async () => {
+  const motor = carga(path.join(__dirname, '..', 'src', 'juegos', 'motor.js'));
+  const { codificaCurvaHero, leeCurvaHero, HR_CURVA } = motor;
+  const c = Array.from({ length: HR_CURVA }, (_, i) => i * 54321);
+  assert.deepEqual(leeCurvaHero(codificaCurvaHero(c)), c);
+  assert.equal(codificaCurvaHero(Array(200).fill(1)).split('.').length, HR_CURVA, 'no más de HR_CURVA puntos');
+  assert.equal(leeCurvaHero(codificaCurvaHero([1e12])).at(0), 1e8, 'el tope');
+  for (const malo of [undefined, '', 5, 'a..b', 'ZZ', 'a.-1', '1'.repeat(1000), Array(70).fill('1').join('.'), 'zzzzzzz'])
+    assert.equal(leeCurvaHero(malo), null, String(malo).slice(0, 20));
+  const { lideres, CURVA_N } = await mod('js/game/carrera.js');
+  assert.equal(CURVA_N, HR_CURVA, 'la página y el marco cuentan los mismos puntos');
+  const a = { curva: [0, 10, 30, 30, 50, 60] }, b = { curva: [0, 20, 20, 30, 70] };
+  const t = lideres([a, b], 6).map(x => [x.s === a ? 'a' : 'b', x.i, x.j]);
+  // 0: nadie (todo en 0); 1: b; 2: a; 3: empate, sigue a; 4: b; 5: solo queda a (b abandonó)
+  assert.deepEqual(t, [['b', 1, 2], ['a', 2, 4], ['b', 4, 5], ['a', 5, 6]]);
 });

@@ -2,6 +2,7 @@ import * as fb from "../fb-juegos.js";
 import { crearMalla } from "./malla.js";
 import { crearDirecto, OK_MS } from "./yemas-red.js";
 import { atiendeHero, mandaCuenta } from "./hero.js";
+import { codificaCurvaHero } from "./motor.js";
 
 /* PRO HERO en línea — el cartero de la sala, hermano del de Boxhead.
 
@@ -90,7 +91,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
 
   const statsDe = f => f && {
     score: f.s, stars: f.e, hits: f.h, total: f.n, misses: f.x, accuracy: f.n ? f.h / f.n : 0, bestCombo: f.c,
-    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q
+    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q, curva: f.cv || null
   };
 
   // La sala con la forma que esperaba el juego de su servidor
@@ -178,10 +179,10 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     else if (m.t === "loaded") anota({ t: "cargado" });
     else if (m.t === "noload") anota({ t: "nocarga" });
     else if (m.t === "done" && est.etapa === "tocando" && est.enJuego.includes(uid) && !est.fines[uid]) {
-      const s = m.stats || {};
+      const s = m.stats || {}, curva = codificaCurvaHero(m.curva);
       anota({ t: "fin", r: est.ronda, s: ent(s.score, 1e8), e: ent(s.stars, 6), ac: ent(s.hits, 1e5), n: ent(s.total, 1e5),
         x: ent(s.misses, 1e5), c: ent(s.bestCombo, 1e5), sp: ent(s.spPhrases, 1e4), st: ent(s.spTotal, 1e4), o: ent(s.overhits, 1e5),
-        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0 });
+        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0, ...(curva ? { cv: curva } : {}) });
     }
   }
 
@@ -295,7 +296,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-10";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-11";
     host.append(redEl, frame);
   }
 
