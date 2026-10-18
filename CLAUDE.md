@@ -15,7 +15,7 @@ runs client-side, and persistence for the collaborative tools lives in Firebase.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`, source in `colabtex/src/`) — Overleaf-style collaborative LaTeX editor.
 - **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`, source in `colabtex/src/draw/`) — Inkscape-style collaborative SVG editor.
 - **Informes** (`informes.html` + `informes-app.js`) — the shared bug tracker.
-- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
+- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, the Casino, PRODROP, Mascotas (3D pets, source in `colabtex/src/mascotas/`) and PRO HERO (`juegos/hero/`, Clone Hero–style, songs in Firebase Storage).
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the
@@ -53,6 +53,7 @@ before the first edit. Read only the docs the task needs.
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
+| Casino, apuestas, el avión, el pingüino(ito) | `docs/claude/juegos/casino.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 

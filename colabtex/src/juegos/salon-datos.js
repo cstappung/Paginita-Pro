@@ -280,5 +280,6 @@ export const MOTIVO_CUENTA = {
   cartas: { t: "PRODROP necesita una cuenta", d: "Los sobres se pagan con monedas y las cartas quedan en tu colección. Inicia sesión para abrir el primero, que cada 6 horas es gratis." },
   mercado: { t: "El mercado es entre cuentas", d: "Aquí se compran, se venden y se intercambian cartas de PRODROP, mascotas y sus cosas, con las monedas que ganas jugando. Inicia sesión para entrar." },
   mascotas: { t: "Mascotas necesita una cuenta", d: "Tus mascotas, su ropa y sus muebles viven en tu cuenta, y se pagan con las monedas que ganas jugando. Inicia sesión y adopta la primera: es gratis." },
+  casino: { t: "El casino juega con tus monedas", d: "Las apuestas se pagan con las monedas que ganas jugando y los premios vuelven a tu cuenta. Inicia sesión para subirte al avión o hacer saltar al pingüino." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };

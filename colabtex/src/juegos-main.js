@@ -80,6 +80,7 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
+import { crearCasino } from "./juegos/casino.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
 import { crearMascotasPerfil } from "./juegos/perfil-mascota.js";
@@ -315,7 +316,7 @@ let vistaPintada = "";
 let ranks = null;
 let logrosVista = null;
 let paginaPerfil = null;
-let monedasVista = null;
+let monedasVista = null, casinoVista = null;
 let prodropVista = null;
 let mascotasVista = null;
 let mercadoVista = null;
@@ -1209,6 +1210,8 @@ function leerRuta() {
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
+  const cs = h.match(/^casino(?:\/(avion|pinguino))?$/);
+  if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
   const mk = h.match(/^mercado(?:\/(prodrop|mascotas))?$/);
@@ -1566,6 +1569,8 @@ function render() {
     armazon();
     vistaPintada = clave;
   }
+  /* El casino cambia de juego sin rehacerse (`#casino` ↔ `#casino/avion`). */
+  else if (state.vista === "casino" && casinoVista) casinoVista.ir(state.perfilUid);
   if (state.vista === "vestibulo") pintaVestibulo();
   else if (state.vista === "partida" && state.user) pintaPartida();
   pintaTabs();
@@ -1606,6 +1611,7 @@ function desmontaVista() {
   if (ranks) { ranks.destruir(); ranks = null; }
   if (logrosVista) { logrosVista.destruir(); logrosVista = null; }
   if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
+  if (casinoVista) { casinoVista.destruir(); casinoVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
   if (mascotasVista) { mascotasVista.destruir(); mascotasVista = null; }
   if (mercadoVista) { mercadoVista.destruir(); mercadoVista = null; }
@@ -1614,16 +1620,17 @@ function desmontaVista() {
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas", "mercado"].includes(state.vista));
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas", "mercado", "casino"].includes(state.vista));
   $("tabMercado").classList.toggle("on", state.vista === "mercado");
   $("tabCartas").classList.toggle("on", state.vista === "cartas");
   $("tabMascotas").classList.toggle("on", state.vista === "mascotas");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
   $("tabMonedas").classList.toggle("on", state.vista === "monedas");
+  $("tabCasino").classList.toggle("on", state.vista === "casino");
   /* Como invitado se ven todas, con candado: tocarlas lleva a la puerta
      que explica qué hay detrás, que es la mejor razón para la cuenta. */
-  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas", "tabMascotas", "tabMercado"]) {
+  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCasino", "tabCartas", "tabMascotas", "tabMercado"]) {
     $(id).classList.toggle("bloq", state.invitado);
     if (state.invitado) $(id).title = "Requiere cuenta"; else $(id).removeAttribute("title");
   }
@@ -1939,6 +1946,16 @@ function armazon() {
     adminVista = crearAdmin({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora,
       nombre: u => (datosP && nombreEnDatos(u, datosP)) || "" });
     adminVista.montar(h);
+    return;
+  }
+  if (state.vista === "casino") {
+    /* El casino (juegos/casino.js): el mismo montaje vale para el menú y
+       para cada juego, que se cambian sin rehacer la vista. */
+    h.innerHTML = "";
+    casinoVista = crearCasino({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora,
+      nombreDe: u => (perfilDe(u) && perfilDe(u).nombre) || (datosP && nombreEnDatos(u, datosP)) || "Alguien",
+      ir: juego => ir(juego ? "#casino/" + juego : "#casino") });
+    casinoVista.montar(h, state.perfilUid);
     return;
   }
   if (state.vista === "monedas") {
@@ -3429,6 +3446,7 @@ function wire() {
   $("tabRanks").onclick = () => ir("#ranks");
   $("tabLogros").onclick = () => ir("#logros");
   $("tabMonedas").onclick = () => ir("#monedas");
+  $("tabCasino").onclick = () => ir("#casino");
   $("tabCartas").onclick = () => ir("#cartas");
   $("tabMascotas").onclick = () => ir("#mascotas");
   $("tabMercado").onclick = () => ir("#mercado");

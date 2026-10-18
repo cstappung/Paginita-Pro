@@ -338,19 +338,44 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 11;
+const NODOS_MONEDAS = 12;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
+  const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
+  /* El casino cambia varias veces por segundo mientras alguien vuela (cada
+     aviso del avión es una escritura) y cada cambio rehace la economía de
+     todos: se junta lo que llega en un segundo y se avisa una vez. */
+  let espera = 0;
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
-    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; llegados.add(k);
-    d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
-  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
+    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
+    if (k === "casino" && llegados.has(k)) { if (!espera) espera = setTimeout(() => { espera = 0; avisa(); }, 1000); return; }
+    llegados.add(k); avisa();
+  }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas")];
-  return () => offs.forEach(f => f());
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino")];
+  return () => { clearTimeout(espera); offs.forEach(f => f()); };
 }
+
+/* ---------- el casino ----------
+   `casino/<uid>/<clave>` = {j, p, d?, at}: una ronda (juegos/casino-motor.js).
+   `at` y cada marca (`t/<i>` los avisos del avión, `s/<i>` los saltos del
+   pingüino, `c` el retirarse) son la hora del servidor, que la regla exige
+   igual a `now` y que no se reescribe: de ahí sale el azar. Cada función
+   devuelve esa hora, leída después de escribir. */
+export async function apuestaCasino(uid, j, p, d) {
+  const r = ref(db, `casino/${uid}/${push(ref(db, `casino/${uid}`)).key}`);
+  await set(r, j === "p" ? { j, p, d, at: serverTimestamp() } : { j, p, at: serverTimestamp() });
+  const x = (await get(r)).val();
+  return { k: r.key, at: x.at };
+}
+export async function marcaCasino(uid, k, ruta) {
+  const r = ref(db, `casino/${uid}/${k}/${ruta}`);
+  await set(r, serverTimestamp());
+  return (await get(r)).val();
+}
+export const leeRondaCasino = (uid, k) => get(ref(db, `casino/${uid}/${k}`)).then(s => s.val());
 
 /* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo lo repasa `economia()`. */
