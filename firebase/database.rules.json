@@ -566,11 +566,16 @@
       "$uid": {
         "$k": {
           ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-          ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['j', 'p', 'at']) && newData.child('p').isNumber() && newData.child('p').val() % 1 === 0 && newData.child('p').val() >= 10 && ((newData.child('j').val() === 'a' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'p' && ((newData.child('d').val() === 0 && newData.child('p').val() <= 1000) || (newData.child('d').val() === 1 && newData.child('p').val() <= 500) || (newData.child('d').val() === 2 && newData.child('p').val() <= 200) || (newData.child('d').val() === 3 && newData.child('p').val() <= 50))))",
-          "j": { ".validate": "newData.val() === 'a' || newData.val() === 'p'" },
+          ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['j', 'p', 'at']) && newData.child('p').isNumber() && newData.child('p').val() % 1 === 0 && newData.child('p').val() >= 10 && ((newData.child('j').val() === 'a' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'p' && ((newData.child('d').val() === 0 && newData.child('p').val() <= 1000) || (newData.child('d').val() === 1 && newData.child('p').val() <= 500) || (newData.child('d').val() === 2 && newData.child('p').val() <= 200) || (newData.child('d').val() === 3 && newData.child('p').val() <= 50))) || (newData.child('j').val() === 'r' && !newData.hasChild('d') && newData.hasChild('b') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'b' && !newData.hasChild('d') && newData.child('p').val() <= 500) || (newData.child('j').val() === 'v' && !newData.hasChild('d') && newData.child('p').val() <= 100) || (newData.child('j').val() === 'l' && newData.hasChild('n') && ((newData.child('d').val() === 0 && newData.child('p').val() <= 500) || (newData.child('d').val() === 1 && newData.child('p').val() <= 200) || (newData.child('d').val() === 2 && newData.child('p').val() <= 50))))",
+          "j": { ".validate": "newData.val() === 'a' || newData.val() === 'p' || newData.val() === 'r' || newData.val() === 'b' || newData.val() === 'v' || newData.val() === 'l'" },
           "p": { ".validate": "newData.isNumber()" },
           "d": { ".validate": "newData.isNumber()" },
+          "n": { ".validate": "newData.parent().child('j').val() === 'l' && (newData.val() === 8 || newData.val() === 12 || newData.val() === 16)" },
           "at": { ".validate": "newData.val() === now" },
+          "b": {
+            ".validate": "newData.parent().child('j').val() === 'r'",
+            "$x": { ".validate": "$x.matches(/^(n([0-9]|[12][0-9]|3[0-6])|rojo|negro|par|impar|baja|alta|d[1-3]|c[1-3])$/) && newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 500" }
+          },
           "t": {
             "$i": {
               ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'a'",
@@ -582,6 +587,22 @@
               ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'p'",
               ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.val() === now"
             }
+          },
+          "a": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'b'",
+              ".validate": "$i.matches(/^[0-9]{1,2}$/) && newData.hasChildren(['t', 'at'])",
+              "t": { ".validate": "newData.isString() && newData.val().matches(/^[pqds]$/)" },
+              "at": { ".validate": "newData.val() === now" },
+              "$otro": { ".validate": false }
+            }
+          },
+          "x": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).child('j').val() === 'v'",
+            ".validate": "newData.hasChildren(['m', 'at'])",
+            "m": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 31" },
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
           },
           "c": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('casino').child($uid).child($k).exists()",
