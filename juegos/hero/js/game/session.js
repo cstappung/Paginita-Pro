@@ -12,6 +12,7 @@ import { Grabadora, opcionesMotor } from './prueba.js';
 import { RemoteState } from './remoto.js';
 import { celular } from '../sitio/celular.js';
 import { Tactil, TACTIL } from '../ui/tactil.js';
+import { vistas } from './orden.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -230,8 +231,7 @@ export class GameSession {
       const yo = this.tactilDe || this.local[0] || this.players[0];
       return [[yo, { x: 0, y: 0, w, h: hh }]];
     }
-    const n = this.players.length;
-    return this.players.map((p, i) => [p, n === 1 ? { x: 0, y: 0, w, h: hh } : { x: (i * w) / n, y: 0, w: w / n, h: hh }]);
+    return vistas(this.players, this.local[0], w, hh, this.dpr);
   }
 
   _setupBackground() {
@@ -467,7 +467,20 @@ export class GameSession {
     const w = W / this.dpr, hh = H / this.dpr;
     const opts = this._drawOpts();
     const vistas = this._views();
-    for (const [p, view] of vistas) this.renderer.draw(ctx, view, p, now, this.song, { ...opts, keyLabels: p.keyLabels });
+    // la autopista de otro se pinta con su retraso (remoto.js): sus aciertos caen en la barra
+    // con 4 o más, unas sobre otras: que la entrada y el bamboleo no se metan en la vecina
+    const recorta = vistas.length > 3;
+    for (const [p, view] of vistas) {
+      const t = p.type === 'remote' ? now - p.engine.retraso(performance.now()) : now;
+      if (recorta) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(view.x, view.y, view.w, view.h);
+        ctx.clip();
+      }
+      this.renderer.draw(ctx, view, p, t, this.song, { ...opts, keyLabels: p.keyLabels, neckNow: now });
+      if (recorta) ctx.restore();
+    }
     // los que no se pintan no consumen sus efectos: que no se acumulen toda la canción
     if (vistas.length < this.players.length) for (const p of this.players) if (!vistas.some(([q]) => q === p)) p.fxQueue.length = 0;
 
