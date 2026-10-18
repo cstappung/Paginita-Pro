@@ -387,7 +387,145 @@ function fanal() {
   ${polillas}${brasas}`);
 }
 
-const ESCENAS = { hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
+/* ---------- PRO DEFENDER: el camino del Prado y sus defensores ---------- */
+/* Los atacantes marchan por el camino con `ep-marcha` (juegos.html), cuyos
+   fotogramas son estos mismos vértices: si cambia uno, cambian los dos.
+   Cada uno parte con un retraso negativo, así que su sitio de reposo
+   (`--px`/`--py`, el de «menos movimiento» y el de la diapositiva en
+   pausa) es el punto del camino al que corresponde ese retraso. */
+const PD_CAMINO = [[480, 90], [700, 90], [700, 300], [860, 300], [860, 120], [1010, 120], [1010, 330], [1220, 330]];
+const PD_MARCHA = 13;   // segundos de punta a punta, como `.ep-marcha`
+function puntoDelCamino(f) {
+  const tramos = PD_CAMINO.slice(1).map((q, i) => Math.hypot(q[0] - PD_CAMINO[i][0], q[1] - PD_CAMINO[i][1]));
+  let d = f * tramos.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < tramos.length; i++) {
+    if (d <= tramos[i]) { const t = d / tramos[i], a = PD_CAMINO[i], b = PD_CAMINO[i + 1]; return [r1(a[0] + (b[0] - a[0]) * t), r1(a[1] + (b[1] - a[1]) * t)]; }
+    d -= tramos[i];
+  }
+  return PD_CAMINO[PD_CAMINO.length - 1];
+}
+function prodefender() {
+  const u = ++cuenta, az = azar(31);
+  const camino = "M" + PD_CAMINO.map(q => q.join(" ")).join(" L");
+  /* Los atacantes del Prado, con los colores del bestiario (enemies.js). */
+  const ojos = r => `<circle cx="${r1(-r / 3)}" cy="${r1(-r / 4)}" r="${r1(r / 4)}" fill="#fff"/><circle cx="${r1(r / 3)}" cy="${r1(-r / 4)}" r="${r1(r / 4)}" fill="#fff"/><circle cx="${r1(-r / 3 + 1)}" cy="${r1(-r / 4)}" r="${r1(r / 9)}" fill="#111"/><circle cx="${r1(r / 3 + 1)}" cy="${r1(-r / 4)}" r="${r1(r / 9)}" fill="#111"/>`;
+  const cuerpo = (r, c) => `<ellipse cy="${r1(r * 0.9)}" rx="${r1(r * 0.9)}" ry="${r1(r * 0.3)}" fill="#000" opacity=".25"/><circle r="${r}" fill="${c}" stroke="#0007" stroke-width="2.5"/>${ojos(r)}`;
+  const BICHOS = [
+    r => cuerpo(r, "#7bd35a") + `<path d="M0 ${-r} q-6 -12 -14 -10 M0 ${-r} q6 -12 14 -10" fill="none" stroke="#3d8a2a" stroke-width="3" stroke-linecap="round"/>`,   // Brotito
+    r => cuerpo(r, "#ffd23f") + `<path d="M${-r} 0 l-10 -4 M${-r} 6 l-12 2" stroke="#fff3a0" stroke-width="3" stroke-linecap="round"/>`,   // Chispa
+    r => `<path d="M${-r - 2} 2 a${r + 2} ${r + 2} 0 0 1 ${2 * r + 4} 0Z" fill="#7a5226" stroke="#0007" stroke-width="2.5"/>` + cuerpo(r * 0.7, "#a0703a"),   // Tortugón
+    r => `<g class="ep-aletea"><path d="M0 0 C-22 -22 -34 -4 -24 8 C-14 14 -4 8 0 0 C4 8 14 14 24 8 C34 -4 22 -22 0 0Z" fill="#c9a7ff" stroke="#5b3a8c" stroke-width="2"/></g>` + cuerpo(r * 0.6, "#9b7bd6"),   // Polilla
+    r => cuerpo(r, "#4fa3ff") + `<path d="M${r - 2} -6 h12 v14 q-6 8 -12 0Z" fill="#cfe3ff" stroke="#1d4f8a" stroke-width="2.5"/>`,   // Portaescudos
+    r => cuerpo(r, "#3fa34d") + `<circle cx="${-r / 2}" cy="${r / 2}" r="4" fill="#9be36a"/><circle cx="${r / 2}" cy="${r / 3}" r="3" fill="#9be36a"/>`   // Musgo Vivo
+  ];
+  /* Diez sitios en la fila: nueve atacantes y el Rey Escarabajo al final. */
+  let fila = "";
+  for (let k = 0; k < 10; k++) {
+    const jefe = k === 9, r = jefe ? 30 : 13 + (k % 3) * 2;
+    const retraso = r1(-k * PD_MARCHA / 10 - 0.4), [px, py] = puntoDelCamino(-retraso / PD_MARCHA % 1);
+    const dibujo = jefe
+      ? `<path d="M-18 -24 l-10 -18 M18 -24 l10 -18" stroke="#2e1d48" stroke-width="6" stroke-linecap="round"/>${cuerpo(r, "#5b3a8c")}<path d="M0 ${-r} V${r}" stroke="#2e1d48" stroke-width="3" opacity=".6"/><polygon points="-14,${-r - 4} -8,${-r - 18} 0,${-r - 8} 8,${-r - 18} 14,${-r - 4}" fill="#ffcf4d" stroke="#8a5a00" stroke-width="2"/>
+        <rect x="-30" y="${-r - 30}" width="60" height="7" rx="3.5" fill="#0008"/><rect x="-29" y="${-r - 29}" width="40" height="5" rx="2.5" fill="#ff4d5e"/>`
+      : BICHOS[k % BICHOS.length](r);
+    fila += `<g class="ep-marcha" style="--px:${px}px;--py:${py}px;animation-delay:${retraso}s"><g class="ep-bota" style="animation-delay:${r1(-az())}s">${dibujo}</g></g>`;
+  }
+  /* Una torre vista desde arriba: la base de piedra y el cañón que apunta. */
+  const torre = (x, y, c, arma, clase, del = 0) => `<g transform="translate(${x} ${y})"><ellipse cy="26" rx="34" ry="10" fill="#000" opacity=".25"/><circle r="32" fill="#2a3156" stroke="#161a30" stroke-width="4"/><circle r="24" fill="${c}"/><circle r="24" fill="url(#dt${u})"/>
+    <g class="${clase}" style="animation-delay:${del}s">${arma}</g><circle r="9" fill="#fff" opacity=".55"/></g>`;
+  const canon = `<rect x="-6" y="-42" width="12" height="28" rx="4" fill="#1c2238"/>`;
+  /* Sylva, la heroína del Prado: más grande, con su aura y su corona. */
+  const heroe = `<g transform="translate(935 215)"><circle class="ep-aura" r="74" fill="#6fdc5a" fill-opacity=".1" stroke="#9be36a" stroke-width="3" stroke-dasharray="12 10"/>
+    <ellipse cy="32" rx="42" ry="12" fill="#000" opacity=".3"/><circle r="40" fill="#2a3156" stroke="#ffcf4d" stroke-width="5"/><circle r="31" fill="#6fdc5a"/><circle r="31" fill="url(#dt${u})"/>
+    <g class="ep-mira b"><path d="M0 -58 L8 -30 H-8Z" fill="#ffcf4d" stroke="#8a5a00" stroke-width="2"/><rect x="-4" y="-34" width="8" height="18" rx="3" fill="#1c2238"/></g>
+    <polygon points="${estrella5(13)}" fill="#ffcf4d" stroke="#8a5a00" stroke-width="2"/></g>`;
+  /* Lo que sale de cada torre: espinas, el pulso de hielo y el rayo. */
+  const espina = (x, y, dx, dy, del) => `<g transform="translate(${x} ${y})"><path class="ep-espina" style="--dx:${dx}px;--dy:${dy}px;animation-delay:${del}s" d="M-3 -9 L0 -16 L3 -9Z M-2 -9 h4 v10 h-4Z" fill="#c8f7a6" stroke="#2d6a1f" stroke-width="1.5"/></g>`;
+  const impacto = (x, y, c, del) => `<g transform="translate(${x} ${y})"><circle class="ep-impacto" style="animation-delay:${del}s" r="16" fill="none" stroke="${c}" stroke-width="4"/></g>`;
+  let flores = "", pasto = "";
+  for (let i = 0; i < 46; i++) flores += `<circle cx="${r1(420 + az() * 780)}" cy="${r1(az() * 420)}" r="${r1(2 + az() * 3)}" fill="${["#f7f3a1", "#ffb3c7", "#c8f7a6", "#fff"][i % 4]}" opacity=".75"/>`;
+  for (let i = 0; i < 30; i++) { const x = r1(420 + az() * 780), y = r1(az() * 420); pasto += `<path d="M${x} ${y} l-4 -10 M${x} ${y} l0 -12 M${x} ${y} l4 -10" stroke="#2f7a33" stroke-width="2" stroke-linecap="round"/>`; }
+  let monedas = "";
+  [[742, 70], [905, 330], [1058, 96], [1150, 300]].forEach(([x, y], i) => {
+    monedas += `<g transform="translate(${x} ${y})"><g class="ep-moneda" style="animation-delay:${r1(-i * 0.85)}s"><circle r="11" fill="#ffcf4d" stroke="#8a5a00" stroke-width="2.5"/><circle r="6" fill="none" stroke="#fff6c8" stroke-width="2"/><text x="16" y="5" font-family="Bungee,'Arial Black',Impact,sans-serif" font-size="15" fill="#ffcf4d" stroke="#3a2a00" stroke-width="3" paint-order="stroke">+20</text></g></g>`;
+  });
+  return SVG(`<defs>
+    <linearGradient id="dc${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0d1a12"/><stop offset=".35" stop-color="#1f4a22"/><stop offset=".6" stop-color="#3e8f3a"/><stop offset="1" stop-color="#4fa046"/></linearGradient>
+    <radialGradient id="dl${u}" cx=".78" cy=".2" r=".6"><stop offset="0" stop-color="#fff6c8" stop-opacity=".35"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="dt${u}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></radialGradient>
+    <filter id="db${u}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <rect width="1200" height="420" fill="url(#dc${u})"/>${pasto}${flores}
+  <rect width="1200" height="420" fill="url(#dl${u})"/>
+  <ellipse cx="785" cy="380" rx="46" ry="22" fill="#3f8fd0" stroke="#2d6a9a" stroke-width="4"/><ellipse cx="775" cy="374" rx="16" ry="5" fill="#fff" opacity=".35"/>
+  <circle cx="600" cy="370" r="18" fill="#8a8f7a" stroke="#5c604f" stroke-width="3"/>
+  <path d="${camino}" fill="none" stroke="#8f7140" stroke-width="58" stroke-linejoin="round"/>
+  <path d="${camino}" fill="none" stroke="#c9a86a" stroke-width="46" stroke-linejoin="round"/>
+  <path d="${camino}" fill="none" stroke="#e0c48a" stroke-width="3" stroke-dasharray="4 18" stroke-linejoin="round" opacity=".7"/>
+  ${fila}
+  ${torre(600, 200, "#5fbf4a", canon, "ep-mira")}
+  ${espina(600, 200, 90, -100, 0)}${espina(600, 200, 100, 60, -0.6)}
+  ${torre(780, 200, "#7fd6ff", `<circle r="13" fill="#e6f7ff" stroke="#3a8ab8" stroke-width="3"/>`, "")}
+  <g transform="translate(780 200)"><circle class="ep-pulso" r="70" fill="#bfe9ff" fill-opacity=".18" stroke="#bfe9ff" stroke-width="4"/></g>
+  ${heroe}
+  ${torre(1110, 210, "#ffe14d", `<path d="M-8 -14 L4 -40 L0 -22 L10 -24 L-4 4 L0 -12Z" fill="#fff8b0" stroke="#8a6a00" stroke-width="2"/>`, "ep-mira c", -1.2)}
+  <polyline class="ep-rayo" points="1110,210 1080,240 1062,236 1036,268 1012,262" fill="none" stroke="#fff27a" stroke-width="5" stroke-linejoin="round" filter="url(#db${u})"/>
+  <polyline class="ep-rayo" points="1110,210 1080,240 1062,236 1036,268 1012,262" fill="none" stroke="#fffde0" stroke-width="2.5" stroke-linejoin="round"/>
+  ${impacto(690, 100, "#c8f7a6", 0)}${impacto(700, 260, "#c8f7a6", -0.6)}${impacto(1012, 262, "#fff27a", 0)}
+  ${monedas}
+  <text class="ep-ronda" x="1180" y="56" text-anchor="end" font-family="Bungee,'Arial Black',Impact,sans-serif" font-size="34" fill="#ffcf4d" stroke="#1f2a10" stroke-width="6" paint-order="stroke">RONDA 25 · JEFE</text>`);
+}
+
+/* ---------- Momazo :v: el plató de memes ---------- */
+/* Un meme «sí y no» grande que flota bajo los focos, otro más chico con su
+   nota, reacciones que suben desde el público y el «+17» de la revelación.
+   Los emojis van en <text>, como en las plantillas del juego. */
+function memazo() {
+  const u = ++cuenta, az = azar(47);
+  const FE = `font-family="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif"`;
+  const emo = (s, ch) => `<text ${FE} font-size="${s}" text-anchor="middle" dominant-baseline="central">${ch}</text>`;
+  const imp = (x, y, s, t) => `<text x="${x}" y="${y}" font-family="Anton,Impact,'Arial Black',sans-serif" font-size="${s}" fill="#fff" stroke="#000" stroke-width="${r1(s / 9)}" paint-order="stroke" text-anchor="middle">${t}</text>`;
+  /* El meme grande: 300×300, con su marco y los dos textos. */
+  const grande = `<rect x="-158" y="-158" width="316" height="316" rx="10" fill="#ffd23f"/>
+    <rect x="-150" y="-150" width="300" height="300" fill="#fff"/>
+    <rect x="-150" y="-150" width="120" height="150" fill="#f6c75a"/><rect x="-150" y="0" width="120" height="150" fill="#8fd1b0"/>
+    <path d="M-150 0 H150 M-30 -150 V150" stroke="#222" stroke-width="3"/>
+    <g transform="translate(-90 -75)">${emo(84, "🙅")}</g><g transform="translate(-96 75)">${emo(80, "😏")}</g><g transform="translate(-52 92)">${emo(44, "👉")}</g>
+    <text x="60" y="-68" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="30" fill="#141414" text-anchor="middle">Estudiar</text>
+    <text x="60" y="72" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="26" fill="#141414" text-anchor="middle">Hacer</text>
+    <text x="60" y="104" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="26" fill="#141414" text-anchor="middle">memes</text>`;
+  /* El chico: «todo bien», con su nota debajo. */
+  const chico = `<rect x="-104" y="-82" width="208" height="164" rx="8" fill="#fff"/>
+    <rect x="-98" y="-76" width="196" height="152" fill="#e89a3c"/><rect x="-98" y="30" width="196" height="46" fill="#a8562a"/>
+    <g transform="translate(-70 32)">${emo(46, "🔥")}</g><g transform="translate(72 30)">${emo(42, "🔥")}</g><g transform="translate(0 6)">${emo(64, "🐶")}</g>
+    ${imp(0, -46, 24, "LUNES 8 AM")}${imp(0, 68, 20, "TODO BIEN")}`;
+  /* Las reacciones que suben desde abajo, cada una con su ritmo. */
+  let reacciones = "";
+  const CARAS = ["🔥", "😂", "🔥", "🍅", "😂", "🔥", "🙂", "😂", "🔥", "😐"];
+  CARAS.forEach((c, i) => {
+    const x = r1(640 + az() * 520), y = r1(380 + az() * 30);
+    reacciones += `<g transform="translate(${x} ${y})"><g class="ep-sube" style="animation-delay:${r1(-az() * 4.5)}s;animation-duration:${r1(3.6 + az() * 2)}s">${emo(r1(30 + az() * 22), c)}</g></g>`;
+  });
+  /* Focos del plató: dos conos que se mecen. */
+  const foco = (x, del) => `<g transform="translate(${x} -20)"><g class="ep-foco" style="animation-delay:${del}s"><path d="M-18 0 L18 0 L170 460 L-170 460Z" fill="url(#mf${u})"/></g></g>`;
+  let chispas = "";
+  for (let i = 0; i < 9; i++) chispas += `<g transform="translate(${r1(620 + az() * 560)} ${r1(30 + az() * 340)})"><path class="ep-brilla" style="animation-delay:${r1(-az() * 2)}s" d="M0 -9 L2 -2 L9 0 L2 2 L0 9 L-2 2 L-9 0 L-2 -2Z" fill="#ffd23f"/></g>`;
+  return SVG(`<defs>
+    <radialGradient id="mb${u}" cx=".72" cy=".2" r=".9"><stop offset="0" stop-color="#6b2fb8"/><stop offset=".55" stop-color="#341066"/><stop offset="1" stop-color="#14062b"/></radialGradient>
+    <linearGradient id="mf${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4" stop-opacity=".45"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="1200" height="420" fill="url(#mb${u})"/>
+  ${estrellas(az, 40, 0, 1200, 0, 260, "#e9ddff")}
+  ${foco(760, 0)}${foco(1080, -1.4)}
+  <ellipse cx="900" cy="410" rx="380" ry="36" fill="#000" opacity=".35"/>
+  ${chispas}
+  <g transform="translate(1065 270) rotate(7)"><g class="ep-flota" style="animation-delay:-1.1s">${chico}</g></g>
+  <g transform="translate(985 402)"><g class="ep-combo" style="animation-delay:-.6s">${imp(0, 0, 40, "+17")}</g></g>
+  <g transform="translate(800 205) rotate(-5)"><g class="ep-flota">${grande}</g></g>
+  ${reacciones}
+  <text x="1180" y="52" text-anchor="end" font-family="Anton,Impact,'Arial Black',sans-serif" font-size="34" fill="#ffd23f" stroke="#2b0d52" stroke-width="6" paint-order="stroke">¿DE QUIÉN ERA? 🤫</text>`);
+}
+
+const ESCENAS = { memazo, prodefender, hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
 
 /* La escena de una novedad, o "" si no tiene una propia (el banner pinta
    entonces un fondo del color del juego). */

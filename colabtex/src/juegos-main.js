@@ -1220,7 +1220,7 @@ function leerRuta() {
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
-  const cs = h.match(/^casino(?:\/(avion|pinguino))?$/);
+  const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
@@ -2173,6 +2173,15 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
+  { id: "memazo", color: "#f5b301", alta: "2026-10-18", titulo: "Momazo :v",
+    gancho: "Que se rían todos (menos el tomate)", datos: [["2–10", "jugadores"], ["100+", "plantillas reales"], ["🔥", "o 🍅"]],
+    lema: "Te tocan plantillas de memes reales, GIFs o dibujos de la casa: ponles texto antes de que se acabe el reloj. Después cada meme sale sin nombre y todos lo califican de 🍅 a 🔥. Gana quien saque más risas.",
+    ficha: "memazo", juego: "memazo", boton: "Jugar", reglas: ["memazo"],
+    modo: "multi", jugadores: "2–10 jugadores", cuenta: true },
+  { id: "prodefender", color: "#ffcf4d", alta: "2026-10-18", titulo: "PRO DEFENDER",
+    gancho: "Que no pase ni uno", datos: [["5", "reinos"], ["100", "rondas"], ["22", "defensores"]],
+    lema: "Levanta defensores junto al camino y frena oleadas cada vez más duras: 5 reinos de 100 rondas, un héroe por reino, un jefe cada 25 rondas y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
+    ruta: "#solo/prodefender", boton: "Jugar", reglas: ["prodefender"], modo: "solo" },
   { id: "hero", color: "#ffb21e", alta: "2026-10-12", titulo: "PRO HERO",
     gancho: "Toca. Brilla. Domina el escenario.", datos: [["333", "canciones"], ["4", "instrumentos"], ["2–8", "en sala"]],
     lema: "Guitarra, bajo, teclado o batería sobre 333 canciones de Clone Hero, con teclado o con tu guitarra. Junta estrellas doradas en Experto para subir en la clasificación, y abre una sala para tocar la misma canción con tus amigos.",
@@ -2184,7 +2193,7 @@ const NOVEDADES = [
     modo: "solo", cuenta: true },
   { id: "protiles", color: "#ff5a36", alta: "2026-10-17", titulo: "PRO TILES",
     gancho: "Que no se te escape ni una", datos: [["8", "canciones"], ["∞", "nunca terminan"], ["1", "error y se acaba"]],
-    lema: "Ocho canciones pop originales que nunca terminan: se componen solas mientras tocas, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
+    lema: "Ocho canciones, una por género, adaptadas a piano y sin final, con piano de cola real. Toca las fichas negras sin fallar ni una. Un top por canción y otro para la mezcla de todas.",
     ruta: "#solo/protiles", boton: "Jugar", reglas: ["protiles"], modo: "solo" },
   { id: "haxball", color: "#5689e5", alta: "2026-10-12", titulo: "HaxBall",
     gancho: "Fútbol a toda velocidad", datos: [["2–8", "jugadores"], ["En vivo", "tiempo real"], ["Bots", "para practicar"]],
@@ -3621,7 +3630,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
-  if (k === "memazo") return '<div class="jg-art-mz">' + memeHtml("sino", ["Jugar solo", "Hacer memes con amigos"]) + '<em>MEMAZO</em></div>';
+  if (k === "memazo") return '<div class="jg-art-mz">' + memeHtml("sino", ["Jugar solo", "Hacer memes con amigos"]) + '<em>MOMAZO :v</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
   if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;

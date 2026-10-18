@@ -18,9 +18,13 @@
   const monedasRonda = li => 20 * (li + 1);
   const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'g'];
   const MODES = [['first', 'Primero'], ['last', 'Último'], ['strong', 'Fuerte'], ['close', 'Cerca']];
-  const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨' };
+  const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨',
+    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗' };
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
-  const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li);
+  const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
+  // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
+  const shopTowers = li => PD.towersFor(li).filter(id => !PD.TOWERS[id].hero);
+  const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
   // ------------------------------ Guardado -------------------------------
   function defaultSave() { return { v: 1, unlocked: 0, best: [0, 0, 0, 0, 0], won: [false, false, false, false, false], runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45 } }; }
@@ -187,7 +191,7 @@
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
-          <div class="lc-new">${realmTowers(li).map(id => `<span title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].name}</span>`).join('')}</div>
+          <div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>
           <div class="meta">
             <span class="stars">${'★'.repeat(L.stars)}${'☆'.repeat(5 - L.stars)}</span>
             <span>❤ ${L.lives}</span><span>🪙 ${L.cash}</span>
@@ -273,7 +277,9 @@
         if (b.maxWalls) stats.push(b.maxWalls + ' murallas');
         if (b.blades) stats.push(b.blades + ' guadañas');
         if (d.kind === 'beacon') stats.push('Revela camuflados');
-        const where = d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`;
+        if (b.ability && d.hero) stats.push('Habilidad: ' + PD.ABILITIES[b.ability].name);
+        const where = d.hero ? `<span class="badge b-boss">♛ Héroe de ${PD.LEVELS[d.realm].name} · uno por partida</span>`
+          : d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`;
         const card = el(`<div class="alm-card">
           <div class="alm-head"><canvas width="128" height="128"></canvas><div><h4>${d.name}</h4><div class="sub"><span style="color:var(--gold);font-weight:800">${fmt(d.cost)} oro</span> · ${stats.join(' · ')}</div>${where}</div></div>
           <p>${d.desc}</p>
@@ -294,6 +300,7 @@
     for (const id in PD.ENEMIES) { const d = PD.ENEMIES[id]; if (d.children) for (const [c] of d.children) parentOf[c] = d.name; }
     const sections = [
       ['Atacantes comunes', ['brote', 'veloz', 'robusto', 'alado', 'escudero', 'sombra', 'blindado', 'divisor', 'gelatinita', 'portador', 'titan']],
+      ['Los grandes · rondas altas', ['fortaleza', 'ciudadela', 'leviatan', 'zepelin', 'dirigible', 'celeste', 'arca']],
       ['Reino 1 · Prado Esmeralda', ['musgo', 'chaman', 'enjambre']],
       ['Reino 2 · Dunas de Ámbar', ['excavador', 'escorpion', 'espejismo']],
       ['Reino 3 · Glaciar Cristal', ['golem', 'cristal', 'yeti']],
@@ -349,6 +356,8 @@
     if (!run) {
       toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.`, 'good', null, 6500);
       for (const id of realmTowers(li)) { const d = PD.TOWERS[id]; toast(`<b>Nueva defensa: ${d.name}</b>${d.desc}`, 'special', { tower: id }, 8000); }
+      const hid = PD.heroOf(li);
+      if (hid) toast(`<b>♛ Héroe del reino: ${PD.TOWERS[hid].name}</b>Uno por partida y muy caro, pero único. Está arriba en la tienda (tecla H).`, 'special', { tower: hid }, 8000);
     }
     else toast(`<b>Partida reanudada</b>Ronda ${game.round + 1} de 100.`, 'good');
   }
@@ -357,7 +366,17 @@
   function buildShop() {
     const shop = $('#shop');
     shop.innerHTML = '';
-    PD.towersFor(game.li).forEach((id, i) => {
+    const hid = PD.heroOf(game.li);
+    if (hid) {
+      const d = PD.TOWERS[hid];
+      const it = el(`<div class="shop-item hero" data-id="${hid}"><span class="nw">♛ HÉROE</span><span class="hk">H</span><canvas width="108" height="108"></canvas><div class="nm">${d.name.split(',')[0]}</div><div class="ct">${fmt(d.cost)}</div></div>`);
+      towerIcon(it.querySelector('canvas'), hid, [0, 0]);
+      it.addEventListener('click', () => { if (!game.hasHero()) setPlacing(ui.placing === hid ? null : hid); });
+      it.addEventListener('mousemove', ev => showTip(`<b>${d.name}</b><span class="tc">${fmt(d.cost)} oro</span> · Héroe (uno por partida)<br>${d.desc}<br><span class="tc">Puede subir sus dos caminos hasta el nivel 4 y uno de ellos al nivel 5.</span>`, ev.clientX, ev.clientY));
+      it.addEventListener('mouseleave', hideTip);
+      shop.appendChild(it);
+    }
+    shopTowers(game.li).forEach((id, i) => {
       const d = PD.TOWERS[id];
       const fresh = d.realm === game.li ? '<span class="nw">NUEVA</span>' : '';
       const it = el(`<div class="shop-item${fresh ? ' fresh' : ''}" data-id="${id}">${fresh}<span class="hk">${(HOTKEYS[i] || '').toUpperCase()}</span><canvas width="108" height="108"></canvas><div class="nm">${d.name}</div><div class="ct">${fmt(d.cost)}</div></div>`);
@@ -375,6 +394,11 @@
       const d = PD.TOWERS[it.dataset.id];
       it.classList.toggle('poor', game.money < d.cost);
       it.classList.toggle('sel', ui.placing === it.dataset.id);
+      if (d.hero) {
+        const puesto = game.hasHero();
+        it.classList.toggle('used', puesto);
+        it.querySelector('.ct').textContent = puesto ? 'En el mapa' : fmt(d.cost);
+      }
     });
   }
   function setPlacing(id) {
@@ -404,6 +428,23 @@
       return rows;
     }
     const n1 = v => (Math.round(v * 10) / 10).toString();
+    if (k === 'hero') {
+      const A = PD.ABILITIES[s.ability];
+      rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
+      if (s.atk === 'slam') rows.push(['Golpes/s', `<b>${n1(1 / s.cd)}</b>`]);
+      else rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}${s.count > 1 ? ' ×' + s.count : s.bolts > 1 ? ' ×' + s.bolts : s.shells > 1 ? ' ×' + s.shells : ''}</b>`]);
+      rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
+      if (s.lifeRegen) rows.push(['Cura / ronda', `<b>+${s.lifeRegen} ❤</b>`]);
+      if (s.shredAura) rows.push(['Quita blindaje', `<b>${s.shredAura}</b>`]);
+      if (s.ampAura) rows.push(['Daño recibido', `<b>+${Math.round(s.ampAura * 100)}%</b>`]);
+      if (s.slowAura) rows.push(['Aura lenta', `<b>${Math.round(s.slowAura * 100)}%</b>`]);
+      if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${s.buffDmgMult}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      rows.push(['Habilidad', `<b>${A.name} · ${abCd(t)} s</b>`]);
+      rows.push(['Camuflados', s.atk === 'slam' ? '<b class="yes">Área</b>' : yn(s.camo)]);
+      rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
     if (k === 'beacon') {
       rows.push(['Luz', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Revela camuflados', '<b class="yes">Sí</b>']);
@@ -471,10 +512,10 @@
   }
   function pathHtml(t, p) {
     const P = t.def.paths[p], tier = t.tiers[p], next = P.ups[tier];
-    const pips = [0, 1, 2, 3].map(i => `<span class="pip ${i < tier ? 'f' : ''}"></span>`).join('');
+    const pips = P.ups.map((u, i) => `<span class="pip ${i < tier ? 'f' : ''}${i > 3 ? ' p5' : ''}"></span>`).join('');
     let body;
     if (!next) body = `<div class="up-max">★ Camino al máximo</div>`;
-    else if (!game.canUpgrade(t, p)) body = `<div class="up-lock">🔒 Bloqueado: el otro camino ya pasó del nivel 2.</div>`;
+    else if (!game.canUpgrade(t, p)) body = `<div class="up-lock">🔒 Bloqueado: ${t.def.hero ? 'el otro camino ya llegó al nivel 5 (solo uno puede).' : 'el otro camino ya pasó del nivel 2.'}</div>`;
     else body = `<div class="up-next"><div class="un">${next.name}</div><div class="ud">${next.desc}</div>
       <button class="btn up-btn" data-p="${p}"><span>Mejorar <small>(${p ? 'X' : 'Z'})</small></span><span class="cst"></span></button></div>`;
     const owned = P.ups.slice(0, tier).map(u => u.name).join(' · ');
@@ -491,7 +532,8 @@
       <div class="inf-head"><canvas width="116" height="116"></canvas><div><h3>${d.name}</h3><div class="sub">Nivel ${t.tiers[0]}-${t.tiers[1]} · Invertido ${fmt(t.spent)}</div></div><button class="inf-close" title="Cerrar (Esc)">✕</button></div>
       <div class="inf-stats">${statsRows(t).map(r => `<div><span>${r[0]}</span>${r[1]}</div>`).join('')}</div>
       ${d.targeting ? `<div class="targets">${MODES.map(m => `<button data-m="${m[0]}" class="${t.mode === m[0] ? 'on' : ''}">${m[1]}</button>`).join('')}</div>` : ''}
-      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${ab.cd} s).</div>` : ''}
+      ${d.hero ? `<div class="sub" style="font-size:12px;color:var(--gold)">♛ Héroe del reino: uno por partida. Puede subir sus <b>dos</b> caminos hasta el nivel 4 y <b>uno</b> de ellos al nivel 5.</div>` : ''}
+      ${ab ? `<div class="sub" style="font-size:12px;color:var(--violet)">Habilidad automática: <b>${ab.name}</b> — ${ab.desc} Se lanza sola cuando hay peligro (recarga ${abCd(t)} s).</div>` : ''}
       ${t.buffed ? `<div class="sub" style="font-size:12px;color:#e07bff">♫ Potenciada por un Tótem del Eco</div>` : ''}
       <div class="paths">${pathHtml(t, 0)}${pathHtml(t, 1)}</div>
       <div class="inf-actions"><button class="btn danger" id="i-sell">Vender · <span class="sv"></span></button></div>`;
@@ -523,8 +565,9 @@
     if (t) {
       guardaQuieto();
       const up = t.def.paths[p].ups[t.tiers[p] - 1];
-      sfx(t.tiers[p] === 4 ? 'upgradeMax' : 'upgrade', t.x);
-      if (t.tiers[p] === 4) toast(`<b>${up.name}</b>¡Mejora definitiva desbloqueada!`, 'good', { tower: t.type });
+      const fin = t.tiers[p] === t.def.paths[p].ups.length;
+      sfx(t.tiers[p] >= 4 ? 'upgradeMax' : 'upgrade', t.x);
+      if (fin || t.tiers[p] === 4) toast(`<b>${up.name}</b>${!fin && game.canUpgrade(t, p) ? '¡Nivel 4! Este camino aún puede llegar al nivel 5 (solo uno de los dos).' : '¡Mejora definitiva desbloqueada!'}`, 'good', { tower: t.type });
       renderInfo();
     }
   }
@@ -587,17 +630,16 @@
       for (const id in groups) {
         const A = PD.ABILITIES[id];
         const b = el(`<div class="abil" data-id="${id}" style="background:${A.color}">${ABIL_ICON[id]}<div class="cdv"></div><div class="cdt"></div><span class="cnt"></span></div>`);
-        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${A.cd} s</span>`, ev.clientX, ev.clientY));
+        b.addEventListener('mousemove', ev => showTip(`<b>${A.name}</b>${A.desc}<br><span class="tc">Automática · recarga ${abCd(groups[id][0])} s</span>`, ev.clientX, ev.clientY));
         b.addEventListener('mouseleave', hideTip);
         box.appendChild(b);
       }
     }
     box.querySelectorAll('.abil').forEach(b => {
       const list = groups[b.dataset.id] || [];
-      const A = PD.ABILITIES[b.dataset.id];
-      let best = Infinity;
-      for (const t of list) best = Math.min(best, Math.max(0, t.abilityCd));
-      const frac = best / A.cd;
+      let best = Infinity, cd = 1;
+      for (const t of list) { const v = Math.max(0, t.abilityCd); if (v < best) { best = v; cd = abCd(t); } }
+      const frac = Math.min(1, best / cd);
       b.querySelector('.cdv').style.height = (frac * 100) + '%';
       b.querySelector('.cdt').textContent = best > 0 ? Math.ceil(best) : '';
       b.querySelector('.cnt').textContent = list.length > 1 ? '×' + list.length : '';
@@ -761,7 +803,7 @@
       if (!t) sfx('error', p.x);
       if (t) {
         sfx('place', p.x);
-        if (!ev.shiftKey || game.money < t.def.cost) setPlacing(null);
+        if (!ev.shiftKey || game.money < t.def.cost || t.def.hero) setPlacing(null);
         guardaQuieto();
         if (!ev.shiftKey) { ui.selected = t; renderInfo(); }
       }
@@ -781,8 +823,9 @@
     if (k === 'f' || k === 'F') { cycleSpeed(); return; }
     if (k === 'p' || k === 'P') { openPause(); return; }
     if (k === 'm' || k === 'M') { setMuted(!save.settings.muted); return; }
+    if (k === 'h' || k === 'H') { const id = PD.heroOf(game.li); if (id && !game.hasHero()) setPlacing(ui.placing === id ? null : id); return; }
     const hi2 = HOTKEYS.indexOf(k.toLowerCase());
-    if (hi2 >= 0) { const id = PD.towersFor(game.li)[hi2]; if (id) setPlacing(ui.placing === id ? null : id); return; }
+    if (hi2 >= 0) { const id = shopTowers(game.li)[hi2]; if (id) setPlacing(ui.placing === id ? null : id); return; }
     if (ui.selected) {
       if (k === 'z' || k === 'Z') doUpgrade(0);
       else if (k === 'x' || k === 'X') doUpgrade(1);

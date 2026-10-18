@@ -270,7 +270,7 @@ function startGame(modo) {
   const S = E.tiles[0].S, first = KEYS[E.tiles[0].lane];
   $('iKick').textContent = E.kind === 'song' ? `${S.genre} · ${S.bpm} BPM` : 'Mezcla infinita';
   $('iTitle').textContent = E.kind === 'song' ? S.name : 'Todas, sin fin';
-  $('iComp').textContent = E.kind === 'song' ? 'Canción original · no termina nunca' : 'Empieza con ' + S.name;
+  $('iComp').textContent = E.kind === 'song' ? 'Adaptada a piano · no termina nunca' : 'Empieza con ' + S.name;
   $('iHow').innerHTML = mode === 'kb' ? `Pulsa <kbd>${first}</kbd> para empezar` : 'Toca la ficha de color para empezar';
   $('intro').classList.remove('gone');
   $('count').textContent = '';

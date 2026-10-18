@@ -599,6 +599,17 @@ sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ Ruleta, blackjack, póker y plinko piden publicar otra vez (2026-10-18)
+
+El nodo `casino/<uid>/<clave>` admite cuatro juegos más: `j: 'r'` (ruleta,
+con las fichas en `b/<casilla>`, 10–500 en total), `'b'` (blackjack,
+10–500, cada decisión en `a/<i>` = `{t, at}` con `t` en p/q/d/s), `'v'`
+(póker, 10–100, el cambio en `x` = `{m, at}` con `m` de 0 a 31) y `'l'`
+(plinko, filas `n` 8/12/16, riesgo `d` 0–2 con tope 500/200/50). Todo de
+una vez y con `at === now`. Sin publicar, esos cuatro fallan con
+PERMISSION_DENIED (el avión y el pingüino siguen andando). Pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
 ### ⚠ El Casino pide publicar otra vez (2026-10-18)
 
 Nodo nuevo `casino/<uid>/<clave>` = `{j, p, d?, at}`: una ronda del avión

@@ -337,6 +337,93 @@
     for (let i = 0; i < 4; i++) { const x = -r + i * r * 0.55; c.beginPath(); c.moveTo(x, -r * 0.5); c.lineTo(x + r * 0.15, -r * 0.3); c.lineTo(x, -r * 0.1); c.stroke(); }
     noGlow(c);
   };
+  // ---- La escalera de los grandes: cada escalón con su color (d.color, d.accent) y cada vez
+  // más imponente: más púas, calaveras desde el segundo, ojos que brillan en el último ----
+  // púa: triángulo con la base en (x, y) que apunta hacia `ang`
+  function pua(c, x, y, ang, len, w, fill, edge) {
+    const ca = Math.cos(ang), sa = Math.sin(ang), px = -sa * w / 2, py = ca * w / 2;
+    shape(c, [[x + px, y + py], [x + ca * len, y + sa * len], [x - px, y - py]], fill, edge || '#0d0f12', 0.9);
+  }
+  // calavera vista desde arriba (la frente hacia +x, como el resto del sprite)
+  function calavera(c, x, y, s, hueso, ojos) {
+    c.save(); c.translate(x, y); c.rotate(Math.PI / 2);
+    ell(c, 0, -s * 0.15, s, s * 0.9, 0, hueso, '#1a1410', s * 0.12);
+    rrect(c, -s * 0.55, s * 0.45, s * 1.1, s * 0.55, s * 0.15, hueso, '#1a1410', s * 0.1);
+    c.strokeStyle = '#1a1410'; c.lineWidth = s * 0.08;
+    for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(i * s * 0.25, s * 0.55); c.lineTo(i * s * 0.25, s * 0.95); c.stroke(); }
+    if (ojos) glow(c, ojos, 8);
+    for (const sx of [-1, 1]) ell(c, sx * s * 0.38, -s * 0.15, s * 0.27, s * 0.3, 0, ojos || '#1a1410');
+    noGlow(c);
+    shape(c, [[0, s * 0.12], [-s * 0.12, s * 0.35], [s * 0.12, s * 0.35]], '#1a1410');
+    c.restore();
+  }
+  // Supertanques: el Titán con su color, torretas, púas en el casco y calaveras (d.rank 1–3)
+  ART.supertank = (c, d, r, p) => {
+    const k = d.rank || 1, acc = d.accent || '#ffcc33';
+    for (const s of [-1, 1]) rrect(c, -r * 1.35, s * r * 1.25 - r * 0.16, r * 2.5, r * 0.32, r * 0.12, '#14171c', '#06080a', 1);
+    // púas a los lados (más largas y más cuantas más alto el escalón) y un espolón delante
+    const n = 3 + k * 2, largo = r * (0.25 + k * 0.12);
+    for (const s of [-1, 1]) for (let i = 0; i < n; i++) {
+      const x = -r * 1.2 + (i + 0.5) * r * 2.3 / n;
+      pua(c, x, s * r * 1.38, s * Math.PI / 2, largo, r * 0.2, '#d8dde4');
+    }
+    if (k >= 2) for (let i = -k + 1; i <= k - 1; i++) pua(c, r * 1.3, i * r * 0.32, 0, r * (0.3 + k * 0.1), r * 0.2, '#e8ecf0');
+    ART.titan(c, d, r * 0.92, p);
+    glow(c, acc, 8); c.fillStyle = acc;
+    for (const s of [-1, 1]) c.fillRect(-r * 1.25, s * r * 0.86 - r * 0.05, r * 2.3, r * 0.1);   // franjas de su color
+    noGlow(c);
+    const pos = k === 1 ? [[-r * 0.65, 0]] : k === 2 ? [[-r * 0.7, -r * 0.5], [-r * 0.7, r * 0.5]] : [[-r * 0.75, -r * 0.55], [-r * 0.75, r * 0.55], [r * 0.85, 0]];
+    for (const [x, y] of pos) {
+      c.fillStyle = '#2a2f37'; c.fillRect(x, y - r * 0.07, r * 0.55, r * 0.14);
+      orb(c, x, y, r * 0.26, r * 0.26, sh(d.color, 0.25));
+      glow(c, acc, 6); circle(c, x, y, r * 0.07, acc); noGlow(c);
+    }
+    if (k >= 2) calavera(c, -r * 0.05, 0, r * (k === 3 ? 0.42 : 0.3), '#f2ead8', k === 3 ? acc : null);
+    if (k === 3) for (const s of [-1, 1]) {   // cuernos y dos calaveras más
+      pua(c, -r * 0.05 + r * 0.25, s * r * 0.35, s * 1.1, r * 0.55, r * 0.18, '#f2ead8');
+      calavera(c, -r * 0.95, s * r * 0.15, r * 0.17, '#e0d6bf', acc);
+    }
+  };
+  // Globos (zepelines): casco alargado de su color con costillas, aletas, góndola y motores;
+  // planchas de blindaje, púas por todo el borde y calaveras cuanto más alto el escalón (0–3)
+  ART.blimp = (c, d, r, p) => {
+    const k = d.rank || 0, acc = d.accent || '#ffe08a', L = r * 1.45, Hh = r * 0.78, spin = p * TAU * 3;
+    if (k >= 1) {   // púas alrededor del casco (antes del casco, para que asome solo la punta)
+      const n = 8 + k * 6, largo = r * (0.2 + k * 0.1);
+      for (let i = 0; i < n; i++) {
+        const a = (i + 0.5) * TAU / n, x = Math.cos(a) * L * 0.97, y = Math.sin(a) * Hh * 0.97;
+        pua(c, x, y, Math.atan2(y / (Hh * Hh), x / (L * L)), largo, r * 0.16, k >= 3 ? '#2a2030' : '#e8ecf0', k >= 3 ? acc : null);
+      }
+    }
+    for (const s of [-1, 1]) shape(c, [[-L * 0.7, s * Hh * 0.35], [-L * 1.12, s * Hh * 1.05], [-L * 1.02, s * Hh * 0.2]], sh(d.color, -0.35), '#1a1030', 1.2);
+    shape(c, [[-L * 0.75, 0], [-L * 1.15, -Hh * 0.18], [-L * 1.15, Hh * 0.18]], sh(d.color, -0.45), '#1a1030', 1);
+    ell(c, 0, 0, L, Hh, 0, lg(c, 0, -Hh, 0, Hh, [sh(d.color, 0.5), d.color, sh(d.color, -0.55)]), '#1a1030', 2);
+    c.strokeStyle = sh(d.color, -0.4); c.lineWidth = 1;
+    for (let i = 1; i < 6; i++) { const x = -L + i * L / 3; const h = Hh * Math.sqrt(Math.max(0, 1 - (x / L) * (x / L))); c.beginPath(); c.moveTo(x, -h); c.lineTo(x, h); c.stroke(); }
+    // franjas de su color a lo largo
+    glow(c, acc, 5); c.strokeStyle = acc; c.lineWidth = r * 0.07;
+    for (const s of [-1, 1]) { c.beginPath(); c.ellipse(0, 0, L * 0.82, Hh * 0.62, 0, s > 0 ? 0.35 : Math.PI + 0.35, s > 0 ? Math.PI - 0.35 : TAU - 0.35); c.stroke(); }
+    noGlow(c);
+    for (let i = 0; i < k; i++) {   // planchas de blindaje
+      const x = -L * 0.45 + i * L * 0.36;
+      rrect(c, x - r * 0.14, -Hh * 0.62, r * 0.28, Hh * 1.24, r * 0.08, lg(c, x, -Hh, x, Hh, ['#c9cfd8', '#7a828e', '#3a404a']), '#15181d', 1);
+    }
+    rrect(c, -L * 0.3, -r * 0.16, L * 0.6, r * 0.32, r * 0.1, '#2b2140', '#0d0818', 1);   // góndola
+    glow(c, acc, 6); for (let i = 0; i < 3; i++) circle(c, -L * 0.18 + i * L * 0.18, 0, r * 0.05, acc); noGlow(c);
+    const mot = k >= 2 ? [[-L * 0.15, -Hh * 0.95], [-L * 0.15, Hh * 0.95], [L * 0.35, -Hh * 0.8], [L * 0.35, Hh * 0.8]] : [[-L * 0.1, -Hh * 0.95], [-L * 0.1, Hh * 0.95]];
+    for (const [x, y] of mot) {
+      circle(c, x, y, r * 0.14, '#3a3448', '#0d0818', 1);
+      c.strokeStyle = 'rgba(230,230,255,0.7)'; c.lineWidth = r * 0.05;
+      c.beginPath(); c.moveTo(x - Math.cos(spin) * r * 0.2, y - Math.sin(spin) * r * 0.08); c.lineTo(x + Math.cos(spin) * r * 0.2, y + Math.sin(spin) * r * 0.08); c.stroke();
+    }
+    ell(c, L * 0.78, 0, r * 0.2, r * 0.26, 0, lg(c, L * 0.65, -r * 0.3, L * 0.9, r * 0.3, ['#ffffff', acc, sh(d.color, -0.5)]), '#1a1030', 1);
+    if (k >= 2) calavera(c, L * 0.42, 0, r * (k === 3 ? 0.36 : 0.26), '#f2ead8', k === 3 ? acc : null);
+    if (k === 3) {   // cuernos en la proa y calaveras en las aletas
+      for (const s of [-1, 1]) pua(c, L * 0.7, s * Hh * 0.45, s * 0.7, r * 0.6, r * 0.2, '#f2ead8');
+      for (const s of [-1, 1]) calavera(c, -L * 0.9, s * Hh * 0.62, r * 0.15, '#e0d6bf', acc);
+    }
+    spec(c, -L * 0.2, -Hh * 0.45, r * 0.45, 0.35);
+  };
   function maskArt(c, d, r, p, staffCol, horns) {
     const sw = Math.sin(p * TAU) * 0.15;
     for (let i = 0; i < 7; i++) { const a = Math.PI + (i - 3) * 0.32; c.save(); c.rotate(a); leaf(c, r * 1.25, r * 0.22, ['#ff5050', '#ffd84d', '#4fe08a', '#5ad1ff'][i % 4]); c.restore(); }
@@ -580,7 +667,7 @@
   };
 
   const EXT = { sprout: 1.55, spark: 1.95, ember: 1.95, shell: 1.6, moth: 2.0, bee: 1.8, knight: 1.45, ghost: 2.0, mirage: 2.0, wisp: 2.0, hex: 1.55, magnet: 1.55,
-    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
+    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, supertank: 2.15, blimp: 2.05, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
     wormSeg: 1.3, golem: 1.65, crystal: 1.75, yeti: 1.55, lizard: 2.45, rock: 1.3, bird: 2.0, phoenix: 2.5, eye: 1.6, star: 1.45, voidboss: 2.1 };
   const SPIN = { crystal: 1.4, star: 1.6 };
   const FR = 8;
@@ -617,10 +704,11 @@
   const TRES = 3;
   const TSPR = {};
   function gems(c, s, tiers) {
-    for (let p = 0; p < 2; p++) for (let i = 0; i < 4; i++) {
+    for (let p = 0; p < 2; p++) for (let i = 0; i < Math.max(4, tiers[p]); i++) {   // el 5.º, solo en héroes
       const a = p ? (Math.PI * 0.5 - 0.42 - i * 0.3) : (Math.PI * 0.5 + 0.42 + i * 0.3);
       const x = Math.cos(a) * (s + 1.5), y = Math.sin(a) * (s + 1.5);
-      if (i < tiers[p]) { glow(c, p ? '#5ad1ff' : '#ffcf4d', 4); poly(c, x, y, 2.3, 4, 0, p ? '#8ae8ff' : '#ffe58a', p ? '#1a5a88' : '#8a5a00', 0.7); noGlow(c); }
+      if (i > 3) { glow(c, '#ff5ad1', 7); poly(c, x, y, 3, 4, 0, '#ff9ae8', '#8a1a6a', 0.8); noGlow(c); }
+      else if (i < tiers[p]) { glow(c, p ? '#5ad1ff' : '#ffcf4d', 4); poly(c, x, y, 2.3, 4, 0, p ? '#8ae8ff' : '#ffe58a', p ? '#1a5a88' : '#8a5a00', 0.7); noGlow(c); }
       else circle(c, x, y, 1.5, 'rgba(0,0,0,0.5)');
     }
   }
@@ -682,6 +770,121 @@
     c.fillStyle = lg(c, r1 * 0.6, 0, r1, -r1 * 0.4, ['#ffffff', col, sh(col, -0.4)]); c.fill(); c.strokeStyle = sh(col, -0.6); c.lineWidth = 0.7; c.stroke();
     noGlow(c);
   }
+
+  // ---- Héroes: pedestal dorado y una figura vista desde arriba que mira al objetivo (+x) ----
+  function heroBase(c, s, col) {
+    poly(c, 0, 0, s + 5, 6, 0, lg(c, 0, -s, 0, s, ['#fff1a8', '#d9a520', '#7a5208']), '#3a2604', 1.6);
+    poly(c, 0, 0, s + 1.5, 6, 0, lg(c, 0, -s, 0, s, ['#3a3040', '#1c1624']), col, 1.6);
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; circle(c, Math.cos(a) * (s + 3.2), Math.sin(a) * (s + 3.2), 1.2, '#fff6c8', '#7a5208', 0.5); }
+    c.strokeStyle = rgba(col, 0.55); c.lineWidth = 0.8;
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.PI / 6; c.beginPath(); c.moveTo(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55); c.lineTo(Math.cos(a) * (s - 1), Math.sin(a) * (s - 1)); c.stroke(); }
+  }
+  // o: { cape, armor, skin, hair } y weapon(c, s, t) dibujado delante
+  function heroFigure(c, s, t, o) {
+    ell(c, -s * 0.28, 0, s * 0.5, s * 0.78, 0, lg(c, -s * 0.8, 0, s * 0.2, 0, [shade(o.cape, -0.5), o.cape, shade(o.cape, 0.25)]), shade(o.cape, -0.6), 1);
+    ell(c, 0, 0, s * 0.4, s * 0.62, 0, lg(c, 0, -s * 0.6, 0, s * 0.6, [shade(o.armor, 0.35), o.armor, shade(o.armor, -0.45)]), shade(o.armor, -0.65), 1);
+    circle(c, s * 0.12, -s * 0.56, s * 0.17, o.skin, shade(o.skin, -0.5), 0.8);
+    circle(c, s * 0.12, s * 0.56, s * 0.17, o.skin, shade(o.skin, -0.5), 0.8);
+    o.weapon(c, s, t);
+    circle(c, s * 0.06, 0, s * 0.31, sg(c, s * 0.06, 0, s * 0.31, o.hair), shade(o.hair, -0.6), 1);
+    if (o.head) o.head(c, s, t);
+  }
+  const HERO_ART = {
+    heroeprado: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#3f9a35', armor: '#8a6a3a', skin: '#f0c89a', hair: '#6fdc5a',
+      weapon(c, s, t) {
+        // arco largo con flecha de semilla
+        c.strokeStyle = '#6a4422'; c.lineWidth = 2.4; c.beginPath(); c.arc(s * 0.2, 0, s * 0.85, -1.05, 1.05); c.stroke();
+        c.strokeStyle = '#f0f0d0'; c.lineWidth = 0.7; c.beginPath(); c.moveTo(s * 0.2 + Math.cos(-1.05) * s * 0.85, Math.sin(-1.05) * s * 0.85); c.lineTo(s * 0.2 + Math.cos(1.05) * s * 0.85, Math.sin(1.05) * s * 0.85); c.stroke();
+        c.fillStyle = '#c8a060'; c.fillRect(s * 0.1, -0.8, s * 1.15, 1.6);
+        if (t[1] >= 3) glow(c, '#c8f08a', 6);
+        leaf(c, s * 1.45, s * 0.22, t[1] >= 4 ? '#ff9ad0' : '#7ae05a'); noGlow(c);
+      },
+      head(c, s, t) {
+        for (let i = 0; i < 5; i++) { c.save(); c.translate(s * 0.02, 0); c.rotate(Math.PI + (i - 2) * 0.5); leaf(c, s * 0.5, s * 0.16, i % 2 ? '#5fbf4a' : '#9be36a'); c.restore(); }
+        if (t[0] >= 3) { glow(c, '#ffcf4d', 6); star(c, s * 0.06, 0, s * 0.16, s * 0.07, 5, 0, '#fff1a8'); noGlow(c); }
+      }
+    }),
+    heroedunas: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#2a6ad8', armor: '#e8c060', skin: '#c88a50', hair: '#1a2a6a',
+      weapon(c, s, t) {
+        // báculo con disco solar
+        c.fillStyle = lg(c, 0, -1.2, 0, 1.2, ['#fff1a8', '#a8740a']); c.fillRect(s * 0.1, s * 0.5, s * 1.1, 2.2);
+        const R = s * (0.3 + t[0] * 0.04);
+        glow(c, '#ffd84d', 10);
+        circle(c, s * 1.2, s * 0.55, R, sg(c, s * 1.2, s * 0.55, R, '#ffd84d', 0.6, -0.3), '#a86a00', 0.8);
+        noGlow(c);
+        star(c, s * 1.2, s * 0.55, R * 1.5, R * 1.05, 10, 0, null, '#ffe58a', 0.8);
+      },
+      head(c, s, t) {
+        // tocado de faraón a rayas
+        c.save(); c.translate(s * 0.06, 0);
+        for (let i = -3; i <= 3; i++) { c.strokeStyle = i % 2 ? '#ffcf4d' : '#2a4aa8'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-s * 0.32, i * s * 0.08); c.lineTo(s * 0.18, i * s * 0.08 * 0.6); c.stroke(); }
+        circle(c, s * 0.2, 0, s * 0.09, '#3ad0ff', '#0a3a6a', 0.6);
+        c.restore();
+      }
+    }),
+    heroeglaciar: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#5ab8e8', armor: '#dff4ff', skin: '#f6e2d6', hair: '#f0f8ff',
+      weapon(c, s, t) {
+        // lanza de hielo
+        const len = s * (1.5 + t[1] * 0.08);
+        c.fillStyle = lg(c, 0, -1.2, 0, 1.2, ['#e8fbff', '#5a8aa8']); c.fillRect(s * 0.05, s * 0.52, len, 2.2);
+        glow(c, '#9be7ff', t[1] >= 3 ? 10 : 5);
+        shape(c, [[s * 0.05 + len, s * 0.52 - 3.5], [s * 0.05 + len + s * 0.55, s * 0.52 + 1.1], [s * 0.05 + len, s * 0.52 + 5.7]], lg(c, len, 0, len + s * 0.5, 0, ['#ffffff', '#9be7ff', '#3a8ac8']), '#1a4a6a', 0.7);
+        noGlow(c);
+      },
+      head(c, s, t) {
+        // corona de hielo
+        const n = t[0] >= 3 ? 7 : 5;
+        glow(c, '#bff0ff', 6);
+        for (let i = 0; i < n; i++) { const a = Math.PI + (i - (n - 1) / 2) * 0.42; c.save(); c.translate(s * 0.06, 0); c.rotate(a); shape(c, [[s * 0.22, -1.4], [s * 0.5, 0], [s * 0.22, 1.4]], '#e8fbff', '#5a9ac8', 0.5); c.restore(); }
+        noGlow(c);
+      }
+    }),
+    heroecaldera: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#8a2a10', armor: '#4a3a36', skin: '#d89a70', hair: '#2a2220',
+      weapon(c, s, t) {
+        // martillo de guerra
+        c.fillStyle = lg(c, 0, -1.4, 0, 1.4, ['#a87a4a', '#4a2a10']); c.fillRect(s * 0.1, s * 0.48, s * 1.05, 2.8);
+        const hw = s * (0.42 + t[0] * 0.04), hx = s * 1.05;
+        if (t[0] >= 3) glow(c, '#ff7a2f', 10);
+        rrect(c, hx, s * 0.48 + 1.4 - hw, s * 0.42, hw * 2, 2, lg(c, hx, 0, hx + s * 0.42, 0, ['#8a929e', '#3a4048', '#1a1e24']), '#0c0e12', 1);
+        noGlow(c);
+        if (t[0] >= 3) { c.strokeStyle = '#ffb34a'; c.lineWidth = 1; c.beginPath(); c.moveTo(hx + 2, s * 0.48 - hw * 0.6); c.lineTo(hx + s * 0.3, s * 0.48 + hw * 0.4); c.stroke(); }
+      },
+      head(c, s, t) {
+        // yelmo con cuernos y grietas de lava
+        c.save(); c.translate(s * 0.06, 0);
+        for (const k of [-1, 1]) shape(c, [[0, k * s * 0.22], [-s * 0.15, k * s * 0.55], [s * 0.12, k * s * 0.28]], '#e8dcc0', '#5a4a30', 0.7);
+        circle(c, 0, 0, s * 0.24, lg(c, 0, -s * 0.24, 0, s * 0.24, ['#6a6a72', '#2a2a30']), '#0c0c10', 0.8);
+        glow(c, '#ff7a2f', 6); c.strokeStyle = '#ff9a3a'; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(s * 0.18, 0); c.lineTo(-s * 0.05, s * 0.06); c.lineTo(-s * 0.15, -s * 0.05); c.stroke(); noGlow(c);
+        c.restore();
+      }
+    }),
+    heroevacio: (c, s, t) => heroFigure(c, s, t, {
+      cape: '#3a1670', armor: '#5a2a9a', skin: '#e6d0f0', hair: '#1a0a30',
+      weapon(c, s, t) {
+        // orbe arcano en la mano y estrellas que la rodean
+        glow(c, '#c07bff', 12);
+        circle(c, s * 0.75, s * 0.5, s * 0.24, sg(c, s * 0.75, s * 0.5, s * 0.24, '#e0b0ff', 0.6, -0.4), '#5a2a9a', 0.8);
+        noGlow(c);
+        const n = 2 + Math.min(4, t[1]);
+        for (let i = 0; i < n; i++) { const a = i * TAU / n; star(c, s * 0.75 + Math.cos(a) * s * 0.42, s * 0.5 + Math.sin(a) * s * 0.42, 2.2, 0.9, 4, a, '#fff6ff'); }
+      },
+      head(c, s, t) {
+        // capucha con ojos que brillan
+        c.save(); c.translate(s * 0.06, 0);
+        circle(c, 0, 0, s * 0.3, null, '#8a5bff', 1.2);
+        glow(c, '#ff9ae8', 6);
+        circle(c, s * 0.16, -s * 0.09, 1.3, '#ff9ae8'); circle(c, s * 0.16, s * 0.09, 1.3, '#ff9ae8');
+        noGlow(c);
+        if (t[0] >= 3) { c.strokeStyle = '#c9a7ff'; c.lineWidth = 0.8; c.beginPath(); c.arc(0, 0, s * 0.42, -1, 1); c.stroke(); }
+        c.restore();
+      }
+    })
+  };
 
   const TART = {
     espinas: {
@@ -1105,8 +1308,12 @@
         circle(c, 0, 0, s * 0.16, '#0c0618');
         circle(c, 0, 0, s * 0.6, null, 'rgba(200,170,255,0.6)', 1);
       }
-    }
-
+    },
+    heroeprado: { base: heroBase, spin: 'aim', top: HERO_ART.heroeprado },
+    heroedunas: { base: heroBase, spin: 'aim', top: HERO_ART.heroedunas },
+    heroeglaciar: { base: heroBase, spin: 'aim', top: HERO_ART.heroeglaciar },
+    heroecaldera: { base: heroBase, spin: 'aim', top: HERO_ART.heroecaldera },
+    heroevacio: { base: heroBase, spin: 'aim', top: HERO_ART.heroevacio }
   };
   // Rango visual de una torre según sus mejoras: 0 básica … 4 legendaria
   function towerRank(t) {
@@ -1210,6 +1417,16 @@
       circle(ctx, 0, 0, R, g);
       ctx.globalCompositeOperation = 'source-over';
     }
+    if (!o.icon && def.hero) {
+      // los héroes: corona de luz dorada en el suelo
+      const pu = 0.5 + 0.5 * Math.sin(time * 3 + x * 0.01);
+      ctx.save(); ctx.rotate(-time * 0.8);
+      ctx.globalAlpha = ga * (0.5 + 0.35 * pu);
+      ctx.strokeStyle = '#ffd84d'; ctx.lineWidth = 2; ctx.setLineDash([2, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, sz + 9, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      for (let i = 0; i < 3; i++) { const a = i * TAU / 3; star(ctx, Math.cos(a) * (sz + 9), Math.sin(a) * (sz + 9), 3.2, 1.2, 4, a, '#fff1a8'); }
+      ctx.globalAlpha = ga; ctx.restore();
+    }
     if (!o.icon && rank >= 3) {
       // anillos rúnicos giratorios
       const R1 = sz * (1 + rank * 0.06) + 11;
@@ -1274,6 +1491,10 @@
         star(ctx, Math.sin(k * 2.39 + x) * sz * 0.85, sz * 0.4 - ph * sz * 1.9, 2.4, 0.8, 4, ph * 3, k % 2 ? '#ffffff' : acc);
       }
       ctx.globalAlpha = ga; ctx.globalCompositeOperation = 'source-over';
+    }
+    if (def.hero && !o.icon) {
+      const bob = Math.sin(time * 2.5 + x) * 1.5;
+      shape(ctx, [[-6, -sz - 6 + bob], [-6, -sz - 12 + bob], [-3, -sz - 9 + bob], [0, -sz - 14 + bob], [3, -sz - 9 + bob], [6, -sz - 12 + bob], [6, -sz - 6 + bob]], lg(ctx, 0, -sz - 14, 0, -sz - 6, ['#fff6c8', '#ffcf4d', '#a8740a']), '#5a3a00', 0.8);
     }
     if (type === 'voltaico' && !o.icon) {
       ctx.globalCompositeOperation = 'lighter';
@@ -2244,6 +2465,11 @@
         const hgt = Math.sin(k * Math.PI) * (s.mini ? 25 : 70);
         ctx.globalAlpha = 0.3; ell(ctx, x, y0, 5, 2.5, 0, '#000'); ctx.globalAlpha = 1;
         const rr = (s.mini ? 3.5 : 6) * (1 + hgt / 140);
+        if (s.sun) {
+          ctx.globalCompositeOperation = 'lighter'; circle(ctx, x, y0 - hgt, rr + 6, 'rgba(255,210,80,0.4)'); ctx.globalCompositeOperation = 'source-over';
+          circle(ctx, x, y0 - hgt, rr + 1, sg(ctx, x, y0 - hgt, rr + 1, '#ffd84d'), '#a86a00', 1);
+          continue;
+        }
         if (s.acid) {
           ctx.globalCompositeOperation = 'lighter'; circle(ctx, x, y0 - hgt, rr + 3, 'rgba(160,240,80,0.35)'); ctx.globalCompositeOperation = 'source-over';
           circle(ctx, x, y0 - hgt, rr, sg(ctx, x, y0 - hgt, rr, '#9be04a'), '#2a5a10', 1);

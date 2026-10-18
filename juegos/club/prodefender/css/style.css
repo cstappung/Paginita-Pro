@@ -174,6 +174,7 @@ button { font-family: inherit; }
 .pips { display: flex; gap: 3px; }
 .pip { width: 14px; height: 6px; border-radius: 3px; background: #11152a; }
 .path .pip.f { background: var(--gold); } .path.p2 .pip.f { background: var(--blue); }
+.pip.p5 { width: 18px; box-shadow: inset 0 0 0 1px #ff5ad1; } .path .pip.p5.f { background: #ff5ad1; box-shadow: 0 0 6px #ff5ad1; }
 .up-next { margin-top: 6px; }
 .up-next .un { font-weight: 800; font-size: 14px; }
 .up-next .ud { font-size: 12px; color: #c6cce8; margin: 2px 0 6px; line-height: 1.35; }
@@ -279,3 +280,12 @@ button { font-family: inherit; }
 }
 /* En el teléfono el HUD no tiene sitio para el deslizador común: quedan el 🔊 del juego y los volúmenes de la pausa. */
 @media (max-width: 600px) { #hud .pd-vol { display: none; } }
+/* el héroe del reino: ocupa toda la fila, arriba de la tienda */
+.shop-item.hero { grid-column: 1 / -1; flex-direction: row; gap: 8px; padding: 6px 10px; border-color: rgba(255,207,77,.55); background: linear-gradient(90deg, rgba(255,207,77,.16), var(--panel)); }
+.shop-item.hero .nm { flex: 1; font-size: 13px; justify-content: flex-start; color: #ffe8a0; }
+.shop-item.hero .nw { background: linear-gradient(90deg, #d9a520, #ffcf4d); color: #2a1a00; }
+.shop-item.hero .hk { top: auto; bottom: 3px; }
+.shop-item.hero.sel { border-color: #fff1a8; }
+.shop-item.hero.used { opacity: .55; cursor: default; }
+.shop-item.hero.used .ct { color: var(--muted); font-size: 12px; }
+.lc-new span.hero { color: #ffe8a0; background: rgba(255,207,77,.14); border-color: rgba(255,207,77,.45); }

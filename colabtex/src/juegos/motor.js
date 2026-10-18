@@ -227,7 +227,7 @@ export const JUEGOS = {
     alta: "2026-10-14"
   },
   memazo: {
-    nombre: "Memazo",
+    nombre: "Momazo :v",   // el id sigue siendo `memazo`: lo usan las reglas, las salas y las tablas
     lema: "Ponle texto a una plantilla, califica los memes de los demás sin saber de quién son y gana quien saque más risas",
     color: "#f5b301",
     minimo: 2,

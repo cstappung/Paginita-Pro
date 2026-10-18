@@ -311,6 +311,20 @@ const REPERTORIO = {
   chapuzon: (a, t) => { soplo(a, t, 0.7, 0.24, { f: 2200, f1: 260, q: 0.7, ataque: 0.01 });
                         seno(a, t, 160, 60, 0.4, 0.2);
                         for (let i = 0; i < 7; i++) seno(a, t + 0.3 + i * 0.07 + Math.random() * 0.03, 500 + Math.random() * 500, 1400 + Math.random() * 700, 0.06, 0.035); },
+  /* La ruleta: la rueda que arranca (un soplo grave que sube), la bola que
+     rueda (un tic seco, más grave cuanto más lenta: `v` de 0 a 1) y la
+     ficha que se apoya en el paño. Plinko: cada clavo es un «ping» cuya
+     altura sube con la fila (`k`), y la caída en la casilla suena más
+     grande cuanto mayor el multiplicador (`v` de 0 a 4). */
+  giro:     (a, t) => { soplo(a, t, 0.9, 0.06, { f: 300, f1: 1300, q: 1.2, ataque: 0.15 }); seno(a, t, 70, 110, 0.8, 0.06, "triangle"); },
+  bola:     (a, t, v = 1) => { const k = Math.max(0, Math.min(1, v));
+                               soplo(a, t, 0.018, 0.1 + 0.08 * k, { f: 3200 + 2600 * k, q: 4 }); seno(a, t, 1900 + 900 * k, 1500, 0.025, 0.03, "triangle"); },
+  pone:     (a, t) => { soplo(a, t, 0.03, 0.14, { f: 2600, q: 2.5 }); seno(a, t, 1300, 900, 0.05, 0.05, "triangle"); },
+  clavo:    (a, t, k = 0) => P(a, t, H(72 + Math.min(16, k || 0)), 0.035, { onda: "p25", vol: 0.035 }),
+  cae:      (a, t, v = 0) => { const k = Math.max(0, Math.min(4, v || 0));
+                               seno(a, t, 300 - k * 30, 120, 0.12, 0.1);
+                               P(a, t, H(79 + k * 3), 0.06 + k * 0.03, { onda: "p50", vol: 0.05, sus: 0.5 });
+                               if (k >= 2) P(a, t + 0.07, H(86 + k * 3), 0.12 + k * 0.04, { onda: "p50", vol: 0.05, sus: 0.5 }); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });
@@ -415,7 +429,7 @@ export const CANCIONES = [
   { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · Tetris", chip: "neon", juegos: ["tetris"] },
   { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
   { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I · Clue", chip: "lofi", juegos: ["clue"] },
-  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro · Memazo", chip: "cumbia", juegos: ["memazo"] },
+  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro · Momazo", chip: "cumbia", juegos: ["memazo"] },
   { id: "laboratorio", nombre: "Laboratorio casero", grupo: "Chill y fiesta", desc: "Hip-hop con 808 · estilo Schedule I", chip: "laboratorio" },
   { id: "reparto", nombre: "Reparto nocturno", grupo: "Electrónicas", desc: "Deep house de furgoneta · estilo Schedule I", chip: "reparto" },
   { id: "bossa", nombre: "Bossa de ascensor", grupo: "Chill y fiesta", desc: "Bossa nova con séptimas", chip: "bossa" },

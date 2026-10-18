@@ -10,6 +10,14 @@
   PD.PATH_HALF = PATH_HALF; PD.TOWER_GAP = TOWER_GAP;
   // Fuerza con la que un enemigo rompe muros de raíces y golpea a los gólems (por segundo)
   const chew = e => (e.d.boss ? 60 : Math.max(1, e.d._leak)) * 3;
+  // Retroceso total que aguanta un enemigo en toda su vida (px de camino). Lo gastan TODOS
+  // los empujes (Ancla, bumerán, balista, géiser, Tormenta de Arena) y los hijos lo heredan
+  // del padre: antes la Tormenta no tenía tope y cada hijo empezaba de cero, y con torres
+  // potenciadas los enemigos casi no salían nunca.
+  const KB_MAX = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
+  // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
+  // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
+  const FREEZE_IMM = 1;
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -148,8 +156,10 @@
       }
       for (const o of this.L.obstacles) if (Math.hypot(x - o.x, y - o.y) < o.r + sz - 4) return false;
       for (const t of this.towers) if (Math.hypot(x - t.x, y - t.y) < t.def.size + sz + TOWER_GAP) return false;
+      if (def.hero && this.hasHero()) return false;   // un solo héroe por partida
       return true;
     }
+    hasHero() { return this.towers.some(t => t.def.hero); }
     makeTower(type, x, y) {
       const def = PD.TOWERS[type];
       return {
@@ -172,7 +182,8 @@
     }
     canUpgrade(t, p) {
       const nt = t.tiers.slice(); nt[p]++;
-      if (nt[p] > 4) return false;
+      if (nt[p] > t.def.paths[p].ups.length) return false;
+      if (t.def.hero) return !(nt[0] > 4 && nt[1] > 4);   // los héroes suben los dos a 4, pero solo UNO al 5
       if (nt[0] > 2 && nt[1] > 2) return false;
       return true;
     }
@@ -219,13 +230,14 @@
     }
     recalcAll() {
       for (const t of this.towers) t.s = this.baseStats(t);
-      const totems = this.towers.filter(t => t.def.kind === 'support');
+      // apoyo: los tótems y el héroe de la Caldera (su aura de forja, radio s.aura)
+      const totems = this.towers.filter(t => t.def.kind === 'support' || (t.def.hero && (t.s.buffDmgMult || t.s.buffRate)));
       for (const t of this.towers) {
         if (t.def.kind === 'support' || t.def.kind === 'farm') continue;
         const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
         let any = false;
         for (const k of totems) {
-          if (Math.hypot(k.x - t.x, k.y - t.y) > k.s.range) continue;
+          if (k === t || Math.hypot(k.x - t.x, k.y - t.y) > (k.s.aura || k.s.range)) continue;
           any = true;
           const ks = k.s;
           b.rate = Math.max(b.rate, ks.buffRate || 0);
@@ -278,7 +290,7 @@
       for (const g of R.groups) {
         for (let i = 0; i < g.n; i++) {
           let path = g.path === -1 ? (i % this.paths.length) : Math.min(g.path, this.paths.length - 1);
-          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier });
+          q.push({ t: g.start + i * g.interval, type: g.type, path, tier: g.bossTier, hpX: g.hpX || 1, mod: g.mod });
         }
       }
       q.sort((a, b) => a.t - b.t);
@@ -302,7 +314,12 @@
       }
       let interest = 0;
       for (const t of this.towers) if (t.def.kind === 'farm' && t.s.interest) interest = Math.max(interest, t.s.interest);
-      const intAmt = interest ? Math.min(600, this.money * interest) : 0;
+      const intAmt = interest ? Math.min(360, this.money * interest) : 0;
+      for (const t of this.towers) if (t.s.lifeRegen && this.lives < this.L.lives) {
+        const n = Math.min(t.s.lifeRegen, this.L.lives - this.lives);
+        this.lives += n;
+        this.fx.push({ k: 'text', x: t.x, y: t.y - 24, t: 0, T: 1.4, text: '+' + n + ' ❤', color: '#ff9aa8' });
+      }
       this.money += bonus + farm + intAmt;
       this.emit({ type: 'roundEnd', round: r, bonus, farm: Math.round(farm + intAmt) });
       if (r === PD.UNLOCK_ROUND) this.emit({ type: 'unlock', round: r });
@@ -312,13 +329,14 @@
     // ----------------------------- Enemigos -------------------------------
     spawn(type, path, dist, hpM, tier) {
       const d = PD.ENEMIES[type];
-      let hp = d.hp * hpM;
-      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff;
-      const shield = (d.shield || 0) * hpM;
+      const boost = PD.hpBoost(this.curRound() || 1, d.boss);
+      let hp = d.hp * hpM * boost;
+      if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
+      const shield = (d.shield || 0) * hpM * boost;
       const e = {
         id: this.uid++, d, type, path, dist: Math.max(0, dist), hp, maxHp: hp, shield, maxShield: shield, shieldT: 0,
         x: 0, y: 0, a: 0, vx: 0, vy: 0, hpM, tier: tier || 0,
-        slowF: 0, slowT: 0, frozenT: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0,
+        slowF: 0, slowT: 0, frozenT: 0, freezeImm: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0, rifted: false,
         burnDps: 0, burnT: 0, burnSrc: null, poisDps: 0, poisT: 0, poisSrc: null,
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
@@ -327,7 +345,7 @@
         revived: false, enraged: false, blinked: false, haste: 1, auraSlow: 0, invulnT: 0,
         corr: 0, corrT: 0, corrAmp: 0, wetT: 0, wetElec: 1.5, wetAmp: 0, liftT: 0, goldT: 0, goldMult: 1,
         hexT: 0, hexAmp: 0, hexExec: 0, hexSpread: 0, hexDps: 0, hexArmor: 0, hexReveal: false, hexSrc: null,
-        lit: false, lightAmp: 0, lightPhase: false, blockT: 0, engaged: null,
+        lit: false, lightAmp: 0, lightPhase: false, shred: 0, blockT: 0, engaged: null,
         dead: false, leaked: false, flash: 0, wob: this.rnd() * TAU
       };
       e.camo = !!d.camo && !(d.boss && tier === 1);
@@ -337,6 +355,13 @@
       this.enemies.push(e);
       if (d.boss) this.emit({ type: 'boss', enemy: e });
       return e;
+    }
+
+    // grandes de las rondas especiales tardías (levels.js): camuflados o acelerados; sus hijos también
+    modifica(e, mod) {
+      e.mod = mod;
+      if (mod === 'camo') e.camo = true;
+      else if (mod === 'fast') e.fast = 1.35;
     }
 
     // camuflado visible si la torre lo detecta, un Faro lo ilumina o una Marca del Vacío lo delata
@@ -375,8 +400,9 @@
       else if (f === e.slowF) e.slowT = Math.max(e.slowT, dur);
     }
     applyFreeze(e, dur) {
-      if (e.d.freezeImmune || e.d.boss) { this.applySlow(e, 0.6, dur); return; }
+      if (e.d.freezeImmune || e.d.boss || e.freezeImm > 0) { this.applySlow(e, 0.6, dur); return; }
       e.frozenT = Math.max(e.frozenT, dur);
+      e.freezeImm = e.frozenT + FREEZE_IMM;
     }
     // congelar/sabotear una torre; después queda inmune 2 s para evitar bloqueos en cadena
     disableTower(t, dur) {
@@ -418,7 +444,7 @@
       if (!dot && e.brittleT > 0) dmg += e.brittle * Math.max(m, 0.3);
       if (e.d.boss && o && o.bossMult) dmg *= o.bossMult;
       if (o && o.armorMult && e.d.armor) dmg *= o.armorMult;
-      const armor = Math.max(0, (e.d.armor || 0) - e.corr - (e.hexT > 0 ? e.hexArmor : 0));
+      const armor = Math.max(0, (e.d.armor || 0) - e.corr - (e.hexT > 0 ? e.hexArmor : 0) - e.shred);
       if (armor > 0 && !dot && dtype !== 'arcane' && dtype !== 'fire' && dtype !== 'poison') {
         const ap = Math.min(1, (o && o.ap) || 0);
         dmg = Math.max(dmg * 0.15, dmg - armor * (1 - ap));
@@ -485,6 +511,8 @@
         for (const [c, n] of d.children) for (let i = 0; i < n; i++) {
           const ch = this.spawn(c, e.path, e.dist - k * 9 + 4, e.hpM);
           ch.slowF = e.slowF * 0.5; ch.slowT = e.slowT;
+          ch.pulled = e.pulled; ch.rifted = e.rifted;   // el retroceso ya gastado se hereda
+          if (e.mod) this.modifica(ch, e.mod);
           k++;
         }
       }
@@ -507,7 +535,9 @@
       e.dead = true; e.leaked = true;
       if (e.engaged) this.release(e);
       this.stats.leaked++;
-      const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : e.d._leak;
+      // un grande que se escapa quita mucho, pero nunca más del 60 % de las vidas del reino de
+      // un golpe (con la escalera de tanques, un Titán perdido eran 90 vidas: fin de la partida)
+      const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : Math.min(e.d._leak, Math.ceil(this.L.lives * 0.6));
       this.lives -= l;
       this.emit({ type: 'leak', amount: l });
       this.snd('leak', e.x);
@@ -523,7 +553,15 @@
       const hurry = this.rt > (this.hurryT || 1e9);
       const list = this.enemies;
       // auras
-      for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; }
+      for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; e.shred = 0; }
+      // auras de los héroes: quitar blindaje (Dunas) y daño recibido (Dunas, Vacío; suma como la luz del faro)
+      for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.shredAura || t.s.ampAura)) {
+        const s = t.s, R = s.aura || s.range;
+        for (const e of list) if (!e.dead && Math.abs(e.x - t.x) < R + 30 && Math.hypot(e.x - t.x, e.y - t.y) < R + e.d.r * 0.5) {
+          if (s.shredAura) e.shred = Math.max(e.shred, s.shredAura);
+          if (s.ampAura) e.lightAmp = Math.max(e.lightAmp, s.ampAura * (e.d.boss ? 0.5 : 1));
+        }
+      }
       // Faro Boreal: ilumina (revela camuflados), debilita y puede anular fases
       for (const t of this.towers) if (t.def.kind === 'beacon' && t.disabledT <= 0) {
         const s = t.s, R = s.range;
@@ -549,6 +587,7 @@
         if (e.invulnT > 0) e.invulnT -= dt;
         if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
         if (e.frozenT > 0) e.frozenT -= dt;
+        if (e.freezeImm > 0) e.freezeImm -= dt;
         if (e.stunT > 0) e.stunT -= dt;
         if (e.stunImm > 0) e.stunImm -= dt;
         if (e.healCd > 0) e.healCd -= dt;
@@ -632,9 +671,10 @@
         if (d.enrage && !e.enraged && e.hp < e.maxHp * d.enrage.below) e.enraged = true;
         // movimiento
         let sp = 0;
-        if (hurry) { sp = d.speed * sm; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
+        const vel = d.speed * sm * (e.fast || 1);
+        if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
         else if (e.frozenT <= 0 && e.stunT <= 0) {
-          sp = d.speed * sm * (1 - e.slowF) * e.haste;
+          sp = vel * (1 - e.slowF) * e.haste;
           if (e.auraSlow && !d.slowImmune) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
           if (e.burrowed) sp *= d.burrow.speed;
           if (e.enraged) sp *= d.enrage.mult;
@@ -742,6 +782,7 @@
           case 'geyser': this.tGeyser(t, s, tdt); break;
           case 'hex': this.tHex(t, s, tdt); break;
           case 'blades': this.tBlades(t, s, tdt); break;
+          case 'hero': this.tHero(t, s, tdt); break;
         }
       }
     }
@@ -854,6 +895,7 @@
     landShell(sh) {
       const t = sh.src, s = t.s;
       if (sh.acid) { this.landAcid(sh); return; }
+      if (sh.sun) { this.landSun(sh); return; }
       if (sh.meteor) {
         this.explode(sh.x1, sh.y1, sh.radius, sh.dmg, 'explosive', t, { ap: 1 }, { hitsFlying: true, stun: 0.5 });
         this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.6, r: sh.radius, color: '#ff8a3d' });
@@ -965,10 +1007,8 @@
       if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
       const o = { armorMult: s.armorMult };
       this.inRange(t, s.range, e => {
-        // tope de retroceso acumulado: la gravedad frena, pero nunca bloquea una ronda para siempre
-        const want = e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull;
-        const back = Math.min(want, Math.max(0, (e.d.boss ? 180 : 300) - e.pulled), e.dist);
-        if (back > 0) { e.dist -= back; e.pulled += back; }
+        // tope de retroceso acumulado (retrocede): la gravedad frena, pero nunca bloquea una ronda para siempre
+        this.retrocede(e, e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull);
         this.damage(e, s.dmg, s.dtype, t, o);
         if (s.stun && !e.dead) this.applyStun(e, s.stun);
       });
@@ -983,7 +1023,7 @@
       const e = this.pick(t, t.x, t.y, s.range, t.mode);
       if (!e) { t.cdT = 0; return; }
       t.ang = Math.atan2(e.y - t.y, e.x - t.x);
-      const o = { ap: s.armorPierce, bossMult: s.bossMult, shieldMult: s.shieldMult };
+      const o = { ap: s.armorPierce, bossMult: s.bossMult, shieldMult: s.shieldMult, exec: s.exec };
       const pts = [[t.x + Math.cos(t.ang) * 16, t.y + Math.sin(t.ang) * 16], [e.x, e.y]];
       const hit = [e];
       this.damage(e, s.dmg, s.dtype, t, o);
@@ -1094,10 +1134,12 @@
       return out;
     }
     // empuje hacia atrás con tope acumulado (igual que la gravedad: frena, nunca bloquea para siempre)
-    push(e, amt) {
-      const want = e.d.boss ? amt * 0.25 : amt;
-      const back = Math.min(want, Math.max(0, (e.d.boss ? 180 : 300) - e.pulled), e.dist);
+    push(e, amt) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt); }
+    // todo retroceso pasa por aquí: gasta del tope del enemigo (KB_MAX) y devuelve cuánto retrocedió
+    retrocede(e, want) {
+      const back = Math.min(want, Math.max(0, KB_MAX(e) - e.pulled), e.dist);
       if (back > 0) { e.dist -= back; e.pulled += back; }
+      return back > 0 ? back : 0;
     }
 
     // ---- Cazador de Bumeranes: golpea a la ida y a la vuelta ----
@@ -1519,6 +1561,60 @@
       if (t.hitMap.size > 400) for (const [id, tm] of t.hitMap) if (now - tm > 2) t.hitMap.delete(id);
     }
 
+    // ---- Héroes: cada uno ataca con su arma (s.atk) ----
+    tHero(t, s, dt) {
+      switch (s.atk) {
+        case 'proj': this.tProjectile(t, s, dt); break;   // Sylva: semillas
+        case 'orb': this.tSun(t, s, dt); break;           // Ra'kesh: soles
+        case 'lance': this.tRail(t, s, dt); break;        // Freya: lanzas que atraviesan
+        case 'slam': this.tSlam(t, s, dt); break;         // Vulkar: martillazo en área
+        case 'bolt': this.tSniper(t, s, dt); break;       // Nyx: rayos que rebotan
+      }
+    }
+    tSun(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const e = this.pick(t, t.x, t.y, s.range, t.mode);
+      if (!e) { t.cdT = 0; return; }
+      const T = 0.5, tx = e.x + e.vx * T, ty = e.y + e.vy * T;
+      t.ang = Math.atan2(ty - t.y, tx - t.x);
+      const n = s.shells || 1;
+      for (let k = 0; k < n; k++) {
+        const ox = k ? (this.rnd() - 0.5) * 70 : 0, oy = k ? (this.rnd() - 0.5) * 70 : 0;
+        this.shells.push({ x0: t.x, y0: t.y, x1: tx + ox, y1: ty + oy, t: 0, T: T + k * 0.08, src: t, dmg: s.dmg, radius: s.radius, sun: true });
+      }
+      t.flash = 0.12;
+      this.snd('mortar', t.x);
+      t.cdT = s.cd;
+    }
+    landSun(sh) {
+      const t = sh.src, s = t.s, o = { ap: s.armorPierce, bossMult: s.bossMult };
+      this.grid.query(sh.x1, sh.y1, sh.radius + 44, e => {
+        if (e.dead || Math.hypot(e.x - sh.x1, e.y - sh.y1) > sh.radius + e.d.r * 0.5) return;
+        this.damage(e, sh.dmg, 'explosive', t, o);
+        if (!e.dead && s.burnDps) this.applyBurn(e, s.burnDps, 3, t);
+      });
+      this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.4, r: sh.radius, color: '#ffd84d' });
+      this.snd('boomSmall', sh.x1);
+    }
+    tSlam(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
+      const o = { ap: s.armorPierce, bossMult: s.bossMult, fireFloor: 0.5 };
+      this.inRange(t, s.range, e => {
+        this.damage(e, s.dmg, 'fire', t, o);
+        if (e.dead) return;
+        this.applyBurn(e, s.burnDps, s.burnDur, t);
+        if (s.stun) this.applyStun(e, s.stun);
+      });
+      this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.45, r0: 12, r1: s.range, color: '#ff8a3d', w: 6 });
+      this.fx.push({ k: 'boom', x: t.x, y: t.y, t: 0, T: 0.3, r: 26, color: '#ffb35c' });
+      this.snd('golemHit', t.x);
+      t.flash = 0.25;
+      t.cdT = s.cd;
+    }
+
     // Habilidades automáticas: se lanzan solas cuando hay suficiente peligro
     autoAbility(t) {
       const id = t.s.ability;
@@ -1532,7 +1628,8 @@
         let k = 0, b = false;
         this.inRange(t, R, e => { k++; if (e.d.boss) b = true; });
         go = k >= 6 || b || (k >= 2 && T.maxProg > 0.7);
-      } else go = T.n >= 8 || T.boss || T.maxProg > 0.6;
+      } else if (id === 'grieta' || id === 'tormenta') go = T.boss || T.maxProg > 0.5 || T.n >= 25;
+      else go = T.n >= 8 || T.boss || T.maxProg > 0.6;
       if (go && this.useAbility(t)) this.abLock[id] = 2.5;   // dos torres iguales no la gastan a la vez
     }
 
@@ -1541,7 +1638,8 @@
       const id = t.s.ability;
       if (!id || t.abilityCd > 0 || t.disabledT > 0) return false;
       const A = PD.ABILITIES[id];
-      t.abilityCd = A.cd;
+      t.abilityCd = t.s.abCd || A.cd;
+      const s = t.s, hurry = this.rt > (this.hurryT || 1e9);   // ronda eterna: nada los devuelve
       switch (id) {
         case 'absolute':
           for (const e of this.enemies) if (!e.dead) this.applyFreeze(e, 4);
@@ -1575,8 +1673,67 @@
           break;
         }
         case 'treasure':
-          this.money += 2500;
-          this.fx.push({ k: 'text', x: t.x, y: t.y - 24, t: 0, T: 1.6, text: '+2500', color: '#7dffcf' });
+          this.money += 1500;
+          this.fx.push({ k: 'text', x: t.x, y: t.y - 24, t: 0, T: 1.6, text: '+1500', color: '#7dffcf' });
+          break;
+        // ------------------------------ héroes ------------------------------
+        case 'selva':
+          // raíces: los terrestres quedan clavados (los jefes solo con Bosque Eterno, y frenados)
+          for (const e of this.enemies) {
+            if (e.dead || (e.d.flying && !s.selvaAir) || (e.d.boss && !s.selvaBoss)) continue;
+            e.holdT = Math.max(e.holdT, s.selvaDur);
+            this.applyPoison(e, s.selvaDps, s.selvaDur, t);
+            this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 4, r1: e.d.r + 14, color: '#7ae05a', w: 3 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(120,230,90,' });
+          break;
+        case 'tormenta':
+          if (hurry) break;
+          for (const e of this.enemies) {
+            if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > s.stormR) continue;
+            const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1));
+            if (back > 0) { this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: e.d.r * 1.6 }); if (e.engaged) this.release(e); }
+            this.applyStun(e, s.stormStun);
+          }
+          this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.8, r0: 20, r1: Math.min(700, s.stormR), color: '#ffd38a', w: 12 });
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(255,210,130,' });
+          break;
+        case 'invierno':
+          for (const e of this.enemies) {
+            if (e.dead) continue;
+            this.applySlow(e, 0.6, s.winterDur);
+            e.brittleT = Math.max(e.brittleT, s.winterDur); e.brittle = Math.max(e.brittle, s.winterBrittle);
+            if (s.winterFreeze && !e.d.boss) this.applyFreeze(e, s.winterFreeze);
+            if (s.winterDmg) this.damage(e, s.winterDmg, 'ice', t, { ap: 1 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.7, color: 'rgba(190,240,255,' });
+          break;
+        case 'erupcion': {
+          const list = this.enemies.filter(e => !e.dead && !e.burrowed).sort((a, b) => (b.maxHp + (b.d.boss ? 1e9 : 0)) - (a.maxHp + (a.d.boss ? 1e9 : 0))).slice(0, s.eruptN);
+          list.forEach((e, i) => {
+            this.shells.push({ x0: e.x - 120, y0: e.y - 420, x1: e.x, y1: e.y, t: -i * 0.1, T: 0.7, src: t, dmg: s.eruptDmg, radius: 60, meteor: true });
+          });
+          break;
+        }
+        case 'grieta':
+          if (hurry) break;
+          for (const e of this.enemies) {
+            // una sola vez por enemigo (y sus hijos tampoco): antes cada Grieta los volvía a
+            // devolver y con la recarga corta una ronda podía no terminar nunca
+            if (e.dead || e.rifted) continue;
+            const back = e.dist * (e.d.boss ? s.riftBoss : s.riftBack);
+            if (back <= 1) continue;
+            e.rifted = true;
+            this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#c07bff', r: e.d.r * 1.5 });
+            e.dist -= back;
+            posAt(this.paths[e.path], e.dist, tmp); e.x = tmp.x; e.y = tmp.y; e.a = tmp.a;
+            if (e.engaged) this.release(e);
+            if (s.riftStun) this.applyStun(e, s.riftStun);
+            if (s.riftHex) { e.hexT = Math.max(e.hexT, 6); e.hexAmp = Math.max(e.hexAmp, s.riftHex * (e.d.boss ? 0.5 : 1)); e.hexSrc = e.hexSrc || t; }
+            if (s.riftDmg) this.damage(e, s.riftDmg, 'arcane', t, { bossMult: 2 });
+            this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.6, color: '#8a5bff', r: e.d.r * 1.5 });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.7, color: 'rgba(170,110,255,' });
           break;
         case 'wardrum':
           this.wardrum = 8;
@@ -1599,7 +1756,8 @@
         this.rt += dt;
         while (this.qi < this.queue.length && this.queue[this.qi].t <= this.rt) {
           const q = this.queue[this.qi++];
-          this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1), q.tier);
+          const e = this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
+          if (q.mod) this.modifica(e, q.mod);
         }
       }
       this.grid.clear();

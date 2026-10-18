@@ -415,7 +415,7 @@ export function crearMemazo(ctx) {
     if (v !== "espera") asientos(v); else set("mzAsientos", "espera", "");
 
     let pieza = null;
-    if (v === "espera") pieza = { firma: "espera", html: `<div class="jg-mz-aviso grande">🖼️ Memazo<br><small>Cuando entren todos empieza la primera ronda.</small></div>` };
+    if (v === "espera") pieza = { firma: "espera", html: `<div class="jg-mz-aviso grande">🖼️ Momazo :v<br><small>Cuando entren todos empieza la primera ronda.</small></div>` };
     else if (v === "arranque") pieza = { firma: "arranque", html: `<div class="jg-mz-aviso grande">🎲 Barajando plantillas…</div>` };
     else if (v === "escribir" && soy()) {
       preparaBorrador();

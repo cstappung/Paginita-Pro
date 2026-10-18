@@ -444,7 +444,13 @@
     ab_blackhole: [0.5, 2, (t) => { tone({ t, f: 90, f2: 30, dur: 1.8, v: 0.35, type: 'sawtooth', lp: 400, verb: 0.5 }); tone({ t, f: 92, f2: 31, dur: 1.8, v: 0.3, type: 'sawtooth', lp: 400 }); }],
     ab_treasure: [0.5, 1, (t) => { for (let i = 0; i < 8; i++) tone({ t: t + i * 0.06, f: rnd(1800, 3000), dur: 0.15, v: 0.05, type: 'square', lp: 5000, verb: 0.3 }); }],
     ab_wardrum: [0.5, 1.4, (t) => { for (let i = 0; i < 6; i++) { tone({ t: t + i * 0.2, f: 120, f2: 45, dur: 0.25, v: 0.35 }); noise({ t: t + i * 0.2 + 0.1, f: 1800, ft: 'bandpass', dur: 0.1, v: 0.1 }); } }],
-    ab_inferno: [0.5, 1.4, (t) => { noise({ t, f: 300, f2: 1200, ft: 'bandpass', q: 0.6, dur: 1.3, v: 0.3, a: 0.2, verb: 0.3 }); tone({ t, f: 70, dur: 1.2, v: 0.2, type: 'sawtooth', lp: 300 }); }]
+    ab_inferno: [0.5, 1.4, (t) => { noise({ t, f: 300, f2: 1200, ft: 'bandpass', q: 0.6, dur: 1.3, v: 0.3, a: 0.2, verb: 0.3 }); tone({ t, f: 70, dur: 1.2, v: 0.2, type: 'sawtooth', lp: 300 }); }],
+    // habilidades de los héroes
+    ab_selva: [0.5, 1.4, (t) => { for (let i = 0; i < 5; i++) noise({ t: t + i * 0.07, f: 500, f2: 150, ft: 'bandpass', q: 1.2, dur: 0.35, v: 0.16 }); [392, 494, 587, 784].forEach((f, i) => tone({ t: t + 0.2 + i * 0.08, f, dur: 0.6, v: 0.05, type: 'triangle', verb: 0.5 })); }],
+    ab_tormenta: [0.5, 1.6, (t) => { noise({ t, f: 600, f2: 2400, ft: 'bandpass', q: 0.5, dur: 1.4, v: 0.3, a: 0.3, verb: 0.4 }); tone({ t, f: 90, f2: 60, dur: 1.2, v: 0.15, type: 'sawtooth', lp: 400 }); }],
+    ab_invierno: [0.5, 1.6, (t) => { noise({ t, f: 7000, f2: 2500, ft: 'highpass', dur: 1.4, v: 0.16, a: 0.2, verb: 0.7 }); [1319, 1760, 2093, 2637].forEach((f, i) => tone({ t: t + i * 0.09, f, dur: 1.1, v: 0.035, verb: 0.7 })); }],
+    ab_erupcion: [0.5, 1.6, (t) => { tone({ t, f: 55, f2: 30, dur: 1.3, v: 0.4, verb: 0.4 }); noise({ t: t + 0.1, f: 250, f2: 1500, ft: 'bandpass', dur: 1, v: 0.3, verb: 0.4 }); }],
+    ab_grieta: [0.5, 1.8, (t) => { tone({ t, f: 880, f2: 110, dur: 1.2, v: 0.12, type: 'sawtooth', lp: 2500, verb: 0.6 }); tone({ t: t + 0.05, f: 660, f2: 82, dur: 1.2, v: 0.1, type: 'square', lp: 1800, verb: 0.6 }); }]
   };
 
   const ATK = new Set(['thorn', 'spear', 'frost', 'shard', 'zap', 'zapBig', 'mortar', 'boom', 'boomSmall', 'beam', 'drone', 'missile', 'gravity', 'sniper', 'sniperArc', 'mineSet', 'flame', 'pop', 'bigPop', 'shield',

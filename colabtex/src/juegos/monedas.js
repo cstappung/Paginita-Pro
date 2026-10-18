@@ -449,7 +449,8 @@ export function economia(datos) {
   /* El casino: `casino/<uid>/<clave>` es una ronda (casino-motor.js). La
      apuesta se cobra a la hora de la apuesta y el premio, si lo hubo, se
      suma a la hora en que se cobró; lo que pasó entremedio lo decide el
-     motor con las horas del servidor. */
+     motor con las horas del servidor. Lo que se dobla o se separa en el
+     blackjack (`cargos`) se cobra a la hora de esa decisión. */
   const rondas = {};
   for (const [u, l] of Object.entries(d.casino || {}))
     for (const [k, x] of Object.entries(l || {})) {
@@ -457,6 +458,7 @@ export function economia(datos) {
       if (!res) continue;
       rondas[u + "~" + k] = Object.assign({ u, k, j: x.j, p: x.p, d: x.d, at: x.at, valida: false }, res);
       ev.push({ t: "ca", at: x.at, u, k, p: x.p });
+      (res.cargos || []).forEach((c, i) => ev.push({ t: "ca", at: c.at, u, k, p: c.p, extra: true, i: i + 1 }));
       if (res.pago > 0) ev.push({ t: "cp", at: res.fin, u, k, p: res.pago });
     }
   ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
@@ -596,6 +598,13 @@ export function economia(datos) {
       /* Una apuesta sin fondos (o de una cuenta parada) no vale: no juega
          ni paga, y la cuenta queda parada como con cualquier gasto. */
       const r = rondas[e.u + "~" + e.k];
+      if (e.extra) {
+        // doblar o separar: si no alcanza, la ronda entera deja de valer
+        if (!r.valida) continue;
+        if (!paga(e.u, e.p)) { r.valida = false; continue; }
+        U(e.u).casino.apostado += e.p;
+        continue;
+      }
       if (!paga(e.u, e.p)) continue;
       r.valida = true;
       const z = U(e.u).casino; z.apostado += e.p; z.rondas++;
