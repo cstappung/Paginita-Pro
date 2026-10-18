@@ -6975,7 +6975,10 @@ function redGato(p, js) {
      `now`) y la canción arranca HR_DEMORA ms después en todas las pantallas.
    - `fin {r, s, e, ac, …}`: el resultado de cada uno, una vez por ronda
      (los aciertos van en `ac`: la regla de `jugadas/$n` reserva `h` para
-     un texto y rechazaba la jugada entera). Cuando
+     un texto y rechazaba la jugada entera). `cv` es su puntaje a lo largo
+     de la canción (HR_CURVA puntos en base 36 separados por «.»,
+     `codificaCurvaHero`): con él la pantalla final dibuja quién iba ganando.
+     Uno que no se lee se ignora; el resultado vale igual. Cuando
      están todos los de la ronda que siguen en la sala, la ronda queda en
      `ultima` y se vuelve a elegir canción.
    No hay ganador de la sala ni fila en `ranks/hero`: lo que clasifica en
@@ -6985,6 +6988,19 @@ export const HR_DEMORA = 3500;
 export const HR_PARTES = ["guitar", "bass", "rhythm", "keys", "drums", "guitarcoop"];
 export const HR_DIFS = ["expert", "hard", "medium", "easy"];
 export const HR_MODOS = ["taps", "normal", "hopos", "strums"];
+export const HR_CURVA = 60;
+const HR_CURVA_MAX = 1e8;
+export function codificaCurvaHero(c) {
+  if (!Array.isArray(c)) return "";
+  return c.slice(0, HR_CURVA).map(x => Math.max(0, Math.min(HR_CURVA_MAX, Math.floor(+x) || 0)).toString(36)).join(".");
+}
+export function leeCurvaHero(t) {
+  if (typeof t !== "string" || !t || t.length > HR_CURVA * 7) return null;
+  const v = t.split(".");
+  if (v.length > HR_CURVA || !v.every(x => /^[0-9a-z]{1,6}$/.test(x))) return null;
+  const n = v.map(x => parseInt(x, 36));
+  return n.every(x => x <= HR_CURVA_MAX) ? n : null;
+}
 export function redHero(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, partes = {}, prep = {}, hist = [];
@@ -7036,6 +7052,8 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
         s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.ac, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
         sp: ent(j.sp, 1e4), st: ent(j.st, 1e4), o: ent(j.o, 1e5), fc: j.fc === 1 ? 1 : 0, q: j.q === 1 ? 1 : 0
       };
+      const cv = leeCurvaHero(j.cv);
+      if (cv) fines[u].cv = cv;
       cierraRonda();
     }
   }

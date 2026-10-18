@@ -222,6 +222,39 @@ input[type=range] { accent-color: var(--accent); }
 .solo { background: rgba(255, 211, 77, .12); color: #ffd34d; border-radius: 8px; padding: 2px 10px; font-weight: 600; }
 .solo.perfect { background: #ffd34d; color: #1a1000; }
 .rc-wait { color: var(--muted); font-style: italic; margin: 20px 0; }
+/* La carrera de la sala (results.js, carreraEl): una línea por jugador, con el color de su autopista */
+.res-carrera-slot { width: min(900px, 100%); }
+.res-carrera-slot:empty { display: none; }
+.res-carrera {
+  background: linear-gradient(180deg, rgba(30, 24, 56, .92), rgba(12, 10, 22, .92));
+  border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55); animation: res-in .5s .3s ease-out both;
+}
+.cr-leyenda { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .95rem; margin-bottom: 4px; }
+.cr-leyenda i, .cr-fila i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.cr-leyenda small { color: var(--muted); }
+.cr-caja { position: relative; }
+.cr-caja svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cr-grid { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
+.cr-grid.base { stroke: rgba(255, 255, 255, .22); }
+.cr-eje { fill: var(--muted); font: 600 12px var(--font); font-variant-numeric: tabular-nums; }
+.cr-nombre { fill: var(--text); font: 700 13px var(--font); }
+.cr-linea { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: cr-traza 1.6s calc(.5s + var(--k) * .12s) ease-out forwards; }
+@keyframes cr-traza { to { stroke-dashoffset: 0; } }
+.cr-fin { stroke: #14121f; stroke-width: 2; animation: res-in .3s 1.9s ease-out both; }
+.cr-cruz { stroke: rgba(255, 255, 255, .45); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.cr-toque { cursor: crosshair; touch-action: pan-y; }
+.cr-tip {
+  position: absolute; top: 4px; min-width: 150px; pointer-events: none; z-index: 2;
+  background: rgba(10, 8, 20, .95); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 2px; font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+.cr-tip[hidden] { display: none; }
+.cr-tip b { color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.cr-fila { display: flex; align-items: center; gap: 0; }
+.cr-fila span { flex: 1; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.cr-fila em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cr-nota { color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .res-buttons { display: flex; gap: 12px; animation: res-in .4s .5s ease-out both; }
 @keyframes res-in { from { opacity: 0; transform: translateY(14px); } }
 @media (max-width: 640px) {
@@ -230,7 +263,8 @@ input[type=range] { accent-color: var(--accent); }
   .rc-stars { font-size: 2rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .res-card, .res-title, .badge, .rc-stars .star.on, .tl-hit, .tl-miss, .res-buttons { animation: none; }
+  .res-card, .res-title, .badge, .rc-stars .star.on, .tl-hit, .tl-miss, .res-buttons, .res-carrera, .cr-fin { animation: none; }
+  .cr-linea { animation: none; stroke-dashoffset: 0; }
   .ring-fg { animation: none; stroke-dashoffset: var(--off); }
 }
 
