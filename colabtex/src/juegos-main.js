@@ -2173,6 +2173,10 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
+  { id: "prodefender", color: "#ffcf4d", alta: "2026-10-18", titulo: "PRO DEFENDER",
+    gancho: "Que no pase ni uno", datos: [["5", "reinos"], ["100", "rondas"], ["22", "defensores"]],
+    lema: "Levanta defensores junto al camino y frena oleadas cada vez más duras: 5 reinos de 100 rondas, un héroe por reino, un jefe cada 25 rondas y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
+    ruta: "#solo/prodefender", boton: "Jugar", reglas: ["prodefender"], modo: "solo" },
   { id: "hero", color: "#ffb21e", alta: "2026-10-12", titulo: "PRO HERO",
     gancho: "Toca. Brilla. Domina el escenario.", datos: [["333", "canciones"], ["4", "instrumentos"], ["2–8", "en sala"]],
     lema: "Guitarra, bajo, teclado o batería sobre 333 canciones de Clone Hero, con teclado o con tu guitarra. Junta estrellas doradas en Experto para subir en la clasificación, y abre una sala para tocar la misma canción con tus amigos.",
