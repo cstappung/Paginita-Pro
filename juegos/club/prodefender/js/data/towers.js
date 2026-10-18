@@ -150,19 +150,21 @@
     huerto: {
       name: 'Huerto de Cristal', cost: 900, kind: 'farm', size: 18, color: '#4be3b0',
       desc: 'No ataca: cultiva cristales que generan dinero al final de cada ronda.',
-      base: { range: 110, income: 80, incomeMult: 1 },
+      // Producción rebajada un 40 % (antes 80 / +50 / +120 / +300 / +1000, interés 3 % y tesoro de 2500):
+      // llenar el mapa de huertos daba más oro del que se podía gastar.
+      base: { range: 110, income: 48, incomeMult: 1 },
       paths: [
         { name: 'Cosecha', ups: [
-          { name: 'Brotes Fértiles', cost: 500, desc: '+50 por ronda.', apply: s => { s.income += 50; } },
-          { name: 'Cosecha Abundante', cost: 1200, desc: '+120 por ronda.', apply: s => { s.income += 120; } },
-          { name: 'Geodas', cost: 3000, desc: '+300 por ronda.', apply: s => { s.income += 300; } },
-          { name: 'Mina de Diamantes', cost: 12000, desc: '+1000 por ronda.', apply: s => { s.income += 1000; } }
+          { name: 'Brotes Fértiles', cost: 500, desc: '+30 por ronda.', apply: s => { s.income += 30; } },
+          { name: 'Cosecha Abundante', cost: 1200, desc: '+72 por ronda.', apply: s => { s.income += 72; } },
+          { name: 'Geodas', cost: 3000, desc: '+180 por ronda.', apply: s => { s.income += 180; } },
+          { name: 'Mina de Diamantes', cost: 12000, desc: '+600 por ronda.', apply: s => { s.income += 600; } }
         ] },
         { name: 'Mercado', ups: [
           { name: 'Abono Mineral', cost: 350, desc: '+25% de producción.', apply: s => { s.incomeMult = 1.25; } },
           { name: 'Gremio Comercial', cost: 800, desc: 'Las mejoras de torres en su área cuestan un 10% menos.', apply: s => { s.discount = 0.1; } },
-          { name: 'Interés Compuesto', cost: 2500, desc: 'Al final de ronda gana un 3% de tu dinero (máx. 600).', apply: s => { s.interest = 0.03; } },
-          { name: 'Tesoro Estelar', cost: 9000, desc: 'Descuento del 20%. HABILIDAD AUTOMÁTICA: +2500 de oro al instante.', apply: s => { s.discount = 0.2; s.ability = 'treasure'; } }
+          { name: 'Interés Compuesto', cost: 2500, desc: 'Al final de ronda gana un 2% de tu dinero (máx. 360).', apply: s => { s.interest = 0.02; } },
+          { name: 'Tesoro Estelar', cost: 9000, desc: 'Descuento del 20%. HABILIDAD AUTOMÁTICA: +1500 de oro al instante.', apply: s => { s.discount = 0.2; s.ability = 'treasure'; } }
         ] }
       ]
     },
@@ -451,6 +453,117 @@
           { name: 'Remolino del Vacío', cost: 7500, desc: '6 guadañas que giran el doble de rápido y +20 daño.', apply: s => { s.blades = 6; s.spinSpd *= 2; s.hitCd = 0.18; s.dmg += 20; } }
         ] }
       ]
+    },
+
+    // ============================ HÉROES (uno por reino) ============================
+    // Solo en su reino y UNO por partida (engine.js: canPlace). Muy caros, pero con un
+    // aura propia y una habilidad automática única desde el principio. A diferencia de
+    // las torres, pueden llevar sus DOS caminos al nivel 4 (canUpgrade).
+    // `atk` elige el ataque (engine.js: tHero); `aura` es el radio del aura cuando no
+    // coincide con el alcance; `abCd` reemplaza la recarga de la habilidad.
+    heroeprado: {
+      name: 'Sylva, Guardiana del Prado', cost: 2400, kind: 'hero', hero: true, size: 19, color: '#6fdc5a', targeting: true, realm: 0,
+      desc: 'HÉROE. Lanza semillas que perforan y ve CAMUFLADOS. Cura 2 ❤ al final de cada ronda. HABILIDAD: Selva Ancestral, raíces que atrapan a todos los enemigos terrestres del mapa.',
+      base: { atk: 'proj', range: 165, cd: 0.5, dmg: 6, pierce: 4, projSpeed: 620, count: 2, spread: 0.14, dtype: 'phys', camo: true,
+        lifeRegen: 2, ability: 'selva', selvaDur: 3, selvaDps: 15 },
+      paths: [
+        { name: 'Raíz', ups: [
+          { name: 'Raíces Profundas', cost: 1800, desc: 'La Selva atrapa 4.5 s y hace 40 daño/s a los atrapados.', apply: s => { s.selvaDur = 4.5; s.selvaDps = 40; } },
+          { name: 'Savia Curativa', cost: 4000, desc: 'Cura 5 ❤ al final de cada ronda.', apply: s => { s.lifeRegen = 5; } },
+          { name: 'Bosque Eterno', cost: 9000, desc: 'La Selva se lanza cada 20 s y también frena a los JEFES.', apply: s => { s.abCd = 20; s.selvaBoss = true; s.selvaDps = 90; } },
+          { name: 'Corazón del Prado', cost: 24000, desc: 'Selva de 6 s y 300 daño/s. Cura 12 ❤ por ronda.', apply: s => { s.selvaDur = 6; s.selvaDps = 300; s.lifeRegen = 12; } }
+        ] },
+        { name: 'Semilla', ups: [
+          { name: 'Semillas Duras', cost: 1500, desc: '+6 daño y +2 perforación.', apply: s => { s.dmg += 6; s.pierce += 2; } },
+          { name: 'Tres Semillas', cost: 3800, desc: '3 semillas por disparo y un 20% más rápido.', apply: s => { s.count = 3; s.cd *= 0.8; } },
+          { name: 'Espinas de Hierro', cost: 9000, desc: '+20 daño, ignora el blindaje y envenena 20 daño/s.', apply: s => { s.dmg += 20; s.armorPierce = 1; s.poisonDps = 20; s.poisonDur = 3; } },
+          { name: 'Lluvia de Pétalos', cost: 22000, desc: '7 semillas, +45 daño, +30 alcance, más rápida y x2 contra jefes.', apply: s => { s.count = 7; s.spread = 0.12; s.dmg += 45; s.range += 30; s.cd = 0.3; s.bossMult = 2; } }
+        ] }
+      ]
+    },
+
+    heroedunas: {
+      name: "Ra'kesh, Faraón de las Arenas", cost: 2800, kind: 'hero', hero: true, size: 19, color: '#ffcf4d', targeting: true, realm: 1,
+      desc: 'HÉROE. Arroja soles que explotan en área (alcanzan VOLADORES). Su arena quita 3 de BLINDAJE a todo lo que esté en su alcance. HABILIDAD: Tormenta de Arena, que hace RETROCEDER a los enemigos.',
+      base: { atk: 'orb', range: 170, cd: 1.1, dmg: 14, radius: 50, dtype: 'explosive', armorPierce: 0.5,
+        shredAura: 3, ability: 'tormenta', stormPush: 160, stormStun: 1, stormR: 340 },
+      paths: [
+        { name: 'Sol', ups: [
+          { name: 'Ojo de Ra', cost: 1800, desc: '+10 daño, +15 radio y detecta CAMUFLADOS.', apply: s => { s.dmg += 10; s.radius += 15; s.camo = true; } },
+          { name: 'Doble Sol', cost: 4200, desc: 'Lanza 2 soles y un 20% más rápido.', apply: s => { s.shells = 2; s.cd *= 0.8; } },
+          { name: 'Ira de Ra', cost: 10000, desc: '+40 daño, los soles queman 30 daño/s e ignoran el blindaje.', apply: s => { s.dmg += 40; s.burnDps = 30; s.armorPierce = 1; } },
+          { name: 'Eclipse', cost: 26000, desc: '3 soles enormes de +130 daño, más rápidos y x2 contra jefes.', apply: s => { s.shells = 3; s.dmg += 130; s.radius += 25; s.cd = 0.6; s.bossMult = 2; } }
+        ] },
+        { name: 'Arena', ups: [
+          { name: 'Arena Abrasiva', cost: 1600, desc: 'Quita 5 de blindaje y +25 alcance.', apply: s => { s.shredAura = 5; s.range += 25; } },
+          { name: 'Espejismo', cost: 4000, desc: 'La Tormenta se lanza cada 20 s y empuja más lejos.', apply: s => { s.abCd = 20; s.stormPush = 240; } },
+          { name: 'Maldición del Faraón', cost: 9500, desc: 'Los enemigos en su alcance reciben un 25% más de daño.', apply: s => { s.ampAura = 0.25; } },
+          { name: 'Tormenta Eterna', cost: 24000, desc: 'La Tormenta cubre todo el mapa, empuja 360 y aturde 2.5 s.', apply: s => { s.stormR = 5000; s.stormPush = 360; s.stormStun = 2.5; } }
+        ] }
+      ]
+    },
+
+    heroeglaciar: {
+      name: 'Freya, Reina del Invierno', cost: 3200, kind: 'hero', hero: true, size: 19, color: '#9be7ff', targeting: true, realm: 2,
+      desc: 'HÉROE. Lanzas de hielo que ATRAVIESAN en línea y ralentizan; ve CAMUFLADOS. Su aura ralentiza un 20%. HABILIDAD: Invierno Eterno, que ralentiza a todo el mapa y lo vuelve quebradizo.',
+      base: { atk: 'lance', range: 200, cd: 1.4, dmg: 22, width: 10, bolts: 1, dtype: 'ice', armorPierce: 0.5, slow: 0.35, slowDur: 2, camo: true,
+        slowAura: 0.2, ability: 'invierno', winterDur: 6, winterBrittle: 4, winterDmg: 0 },
+      paths: [
+        { name: 'Escarcha', ups: [
+          { name: 'Aura Gélida', cost: 1800, desc: 'El aura ralentiza un 30% y +25 alcance.', apply: s => { s.slowAura = 0.3; s.range += 25; } },
+          { name: 'Corazón de Hielo', cost: 4500, desc: 'El Invierno además CONGELA 2 s a los que no son jefes.', apply: s => { s.winterFreeze = 2; } },
+          { name: 'Glaciación', cost: 10000, desc: 'Invierno cada 20 s, dura 9 s y quiebra más (+10 daño por impacto).', apply: s => { s.abCd = 20; s.winterDur = 9; s.winterBrittle = 10; } },
+          { name: 'Era Glacial', cost: 26000, desc: 'Aura del 40%. El Invierno inflige 2500 de daño de hielo a todo el mapa.', apply: s => { s.slowAura = 0.4; s.winterDmg = 2500; } }
+        ] },
+        { name: 'Lanza', ups: [
+          { name: 'Lanza Afilada', cost: 1600, desc: '+18 daño.', apply: s => { s.dmg += 18; } },
+          { name: 'Triple Lanza', cost: 4000, desc: '3 lanzas en abanico y un 20% más rápido.', apply: s => { s.bolts = 3; s.cd *= 0.8; } },
+          { name: 'Lanza Rúnica', cost: 10000, desc: '+60 daño, ignora el blindaje y CONGELA 0.6 s.', apply: s => { s.dmg += 60; s.armorPierce = 1; s.freeze = 0.6; } },
+          { name: 'Juicio Boreal', cost: 25000, desc: '5 lanzas enormes de +220 daño cada 0.8 s, x3 contra jefes.', apply: s => { s.bolts = 5; s.dmg += 220; s.width = 18; s.cd = 0.8; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroecaldera: {
+      name: 'Vulkar, Señor de la Forja', cost: 3600, kind: 'hero', hero: true, size: 19, color: '#ff7a3a', realm: 3,
+      desc: 'HÉROE. Golpea el suelo con su martillo: daña y QUEMA a todo lo que tiene cerca (también voladores). Las torres a su alrededor hacen un 20% más de daño. HABILIDAD: Erupción sobre los enemigos más fuertes.',
+      base: { atk: 'slam', range: 95, cd: 1.2, dmg: 16, burnDps: 8, burnDur: 3, dtype: 'fire',
+        aura: 150, buffDmgMult: 1.2, ability: 'erupcion', eruptN: 8, eruptDmg: 400 },
+      paths: [
+        { name: 'Martillo', ups: [
+          { name: 'Martillo Ígneo', cost: 1800, desc: '+14 daño y +15 alcance.', apply: s => { s.dmg += 14; s.range += 15; } },
+          { name: 'Onda Sísmica', cost: 4500, desc: 'Los golpes aturden 0.5 s y son un 25% más rápidos.', apply: s => { s.stun = 0.5; s.cd *= 0.75; } },
+          { name: 'Martillo de Magma', cost: 11000, desc: '+50 daño, ignora el blindaje y quema 30 daño/s.', apply: s => { s.dmg += 50; s.armorPierce = 1; s.burnDps = 30; } },
+          { name: 'Furia del Volcán', cost: 27000, desc: '+160 daño, golpes cada 0.6 s, +30 alcance y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.6; s.range += 30; s.bossMult = 2; } }
+        ] },
+        { name: 'Forja', ups: [
+          { name: 'Fragua', cost: 1800, desc: 'Las torres cercanas hacen un 35% más de daño y el aura crece.', apply: s => { s.buffDmgMult = 1.35; s.aura = 175; } },
+          { name: 'Yunque Eterno', cost: 4500, desc: 'Las torres cercanas además atacan un 20% más rápido.', apply: s => { s.buffRate = 0.2; } },
+          { name: 'Lluvia de Magma', cost: 11000, desc: 'Erupción cada 18 s con 14 estallidos.', apply: s => { s.abCd = 18; s.eruptN = 14; } },
+          { name: 'Corazón del Volcán', cost: 28000, desc: 'Torres cercanas x1.75 de daño e ignoran el blindaje. Estallidos de 1500.', apply: s => { s.buffDmgMult = 1.75; s.buffArmor = 1; s.eruptDmg = 1500; } }
+        ] }
+      ]
+    },
+
+    heroevacio: {
+      name: 'Nyx, Tejedora del Vacío', cost: 4000, kind: 'hero', hero: true, size: 19, color: '#c07bff', targeting: true, defaultTarget: 'strong', realm: 4,
+      desc: 'HÉROE. Rayos ARCANOS que rebotan entre enemigos; ve CAMUFLADOS. En su alcance los enemigos reciben un 15% más de daño. HABILIDAD: Grieta Temporal, que DEVUELVE a los enemigos hacia el comienzo del camino.',
+      base: { atk: 'bolt', range: 175, cd: 0.7, dmg: 12, bounces: 2, dtype: 'arcane', camo: true,
+        ampAura: 0.15, ability: 'grieta', riftBack: 0.35, riftBoss: 0.1 },
+      paths: [
+        { name: 'Tiempo', ups: [
+          { name: 'Eco Temporal', cost: 2000, desc: 'La Grieta los devuelve la mitad del camino recorrido.', apply: s => { s.riftBack = 0.5; } },
+          { name: 'Paradoja', cost: 5000, desc: 'Grieta cada 24 s; los devueltos quedan aturdidos 1.5 s.', apply: s => { s.abCd = 24; s.riftStun = 1.5; } },
+          { name: 'Bucle Eterno', cost: 12000, desc: 'Los devueltos quedan MALDITOS: +40% de daño recibido durante 6 s.', apply: s => { s.riftHex = 0.4; } },
+          { name: 'Fin de los Tiempos', cost: 30000, desc: 'La Grieta devuelve el 80% del camino (a los jefes, el 30%).', apply: s => { s.riftBack = 0.8; s.riftBoss = 0.3; } }
+        ] },
+        { name: 'Estrellas', ups: [
+          { name: 'Polvo Estelar', cost: 1800, desc: '+12 daño y +1 rebote.', apply: s => { s.dmg += 12; s.bounces += 1; } },
+          { name: 'Constelación', cost: 4500, desc: 'Un 25% más rápido; en su alcance reciben un 25% más de daño.', apply: s => { s.cd *= 0.75; s.ampAura = 0.25; } },
+          { name: 'Agujero Blanco', cost: 11000, desc: '+40 daño, 6 rebotes y EJECUTA bajo el 10% de vida.', apply: s => { s.dmg += 40; s.bounces = 6; s.exec = 0.1; } },
+          { name: 'Supernova Oscura', cost: 28000, desc: '+160 daño, dispara cada 0.3 s y x2 contra jefes.', apply: s => { s.dmg += 160; s.cd = 0.3; s.bossMult = 2; } }
+        ] }
+      ]
     }
   };
 
@@ -460,15 +573,25 @@
     meteors:   { name: 'Lluvia de Meteoros', cd: 28, color: '#ff8a3d', desc: '12 meteoros sobre los enemigos.' },
     supernova: { name: 'Supernova', cd: 28, color: '#ffcf66', desc: '1500 de daño arcano en un área enorme.' },
     blackhole: { name: 'Agujero Negro', cd: 32, color: '#b48cff', desc: 'Absorbe y tritura enemigos 5 s.' },
-    treasure:  { name: 'Tesoro Estelar', cd: 55, color: '#4be3b0', desc: '+2500 de oro.' },
+    treasure:  { name: 'Tesoro Estelar', cd: 55, color: '#4be3b0', desc: '+1500 de oro.' },
     wardrum:   { name: 'Tambor de Guerra', cd: 34, color: '#e07bff', desc: 'Todas las torres x2 de velocidad 8 s.' },
-    inferno:   { name: 'Infierno', cd: 30, color: '#ff5a1f', desc: 'Anillo de fuego de 400 daño/s durante 6 s.' }
+    inferno:   { name: 'Infierno', cd: 30, color: '#ff5a1f', desc: 'Anillo de fuego de 400 daño/s durante 6 s.' },
+    // de los héroes (su recarga baja con mejoras: s.abCd)
+    selva:     { name: 'Selva Ancestral', cd: 30, color: '#6fdc5a', desc: 'Raíces que atrapan a todos los enemigos terrestres y los dañan.' },
+    tormenta:  { name: 'Tormenta de Arena', cd: 28, color: '#ffcf4d', desc: 'Hace retroceder y aturde a los enemigos cercanos.' },
+    invierno:  { name: 'Invierno Eterno', cd: 30, color: '#9be7ff', desc: 'Ralentiza un 60% a todo el mapa y lo vuelve quebradizo.' },
+    erupcion:  { name: 'Erupción', cd: 26, color: '#ff7a3a', desc: 'Estallidos de lava sobre los enemigos más fuertes.' },
+    grieta:    { name: 'Grieta Temporal', cd: 34, color: '#c07bff', desc: 'Devuelve a los enemigos hacia el comienzo del camino.' }
   };
 
   PD.TOWER_ORDER = ['espinas', 'escarcha', 'vigia', 'voltaico', 'sembrador', 'mortero', 'dragon', 'prisma', 'colmena', 'totem', 'ancla', 'huerto',
-    'bumeran', 'raices', 'sierra', 'acido', 'faro', 'balista', 'forja', 'geiser', 'obelisco', 'segador'];
-  // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado.
-  PD.towersFor = li => PD.TOWER_ORDER.filter(id => (T[id].realm || 0) <= li);
+    'bumeran', 'raices', 'sierra', 'acido', 'faro', 'balista', 'forja', 'geiser', 'obelisco', 'segador',
+    // al final: las pruebas guardan cada torre por su índice en esta lista
+    'heroeprado', 'heroedunas', 'heroeglaciar', 'heroecaldera', 'heroevacio'];
+  // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado
+  // + el héroe de ESE reino (los héroes no pasan a los reinos siguientes).
+  PD.towersFor = li => PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
+  PD.heroOf = li => PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
   for (const id in T) T[id].id = id;
   PD.TOWERS = T;
 })();
