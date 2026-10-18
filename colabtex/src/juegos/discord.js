@@ -121,6 +121,7 @@ const MODALIDADES = {
   espejo: "Espejo", laberinto: "Laberinto",
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
+  prado: "Prado Esmeralda", dunas: "Dunas de Ámbar", glaciar: "Glaciar Cristal", caldera: "Caldera Volcánica", vacio: "Nexo del Vacío",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
   torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
@@ -148,12 +149,13 @@ const CLUBS = {
   protiles: { nombre: "PRO TILES", juego: "PRO TILES", icono: "🎹", ruta: "protiles" },
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
-  hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" }
+  hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" },
+  prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -189,6 +191,8 @@ export function marcaSolo(cat, f) {
   if (cat === "club-pokelike-pokedex") return `📕 ${Number(f.puntos)} especies`;
   // PRO HERO: las estrellas doradas (puntos = doradas·10 000 + todas, hero.js).
   if (cat === "club-hero-estrellas") return `🎸 ${Math.floor(f.puntos / 10000)} ★ doradas`;
+  // PRO DEFENDER: la ronda récord del reino.
+  if (/^club-prodefender-/.test(cat)) return `🛡️ ronda ${f.puntos}`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo
