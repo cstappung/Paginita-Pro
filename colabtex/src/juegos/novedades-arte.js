@@ -475,7 +475,57 @@ function prodefender() {
   <text class="ep-ronda" x="1180" y="56" text-anchor="end" font-family="Bungee,'Arial Black',Impact,sans-serif" font-size="34" fill="#ffcf4d" stroke="#1f2a10" stroke-width="6" paint-order="stroke">RONDA 25 · JEFE</text>`);
 }
 
-const ESCENAS = { prodefender, hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
+/* ---------- Momazo :v: el plató de memes ---------- */
+/* Un meme «sí y no» grande que flota bajo los focos, otro más chico con su
+   nota, reacciones que suben desde el público y el «+17» de la revelación.
+   Los emojis van en <text>, como en las plantillas del juego. */
+function memazo() {
+  const u = ++cuenta, az = azar(47);
+  const FE = `font-family="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif"`;
+  const emo = (s, ch) => `<text ${FE} font-size="${s}" text-anchor="middle" dominant-baseline="central">${ch}</text>`;
+  const imp = (x, y, s, t) => `<text x="${x}" y="${y}" font-family="Anton,Impact,'Arial Black',sans-serif" font-size="${s}" fill="#fff" stroke="#000" stroke-width="${r1(s / 9)}" paint-order="stroke" text-anchor="middle">${t}</text>`;
+  /* El meme grande: 300×300, con su marco y los dos textos. */
+  const grande = `<rect x="-158" y="-158" width="316" height="316" rx="10" fill="#ffd23f"/>
+    <rect x="-150" y="-150" width="300" height="300" fill="#fff"/>
+    <rect x="-150" y="-150" width="120" height="150" fill="#f6c75a"/><rect x="-150" y="0" width="120" height="150" fill="#8fd1b0"/>
+    <path d="M-150 0 H150 M-30 -150 V150" stroke="#222" stroke-width="3"/>
+    <g transform="translate(-90 -75)">${emo(84, "🙅")}</g><g transform="translate(-96 75)">${emo(80, "😏")}</g><g transform="translate(-52 92)">${emo(44, "👉")}</g>
+    <text x="60" y="-68" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="30" fill="#141414" text-anchor="middle">Estudiar</text>
+    <text x="60" y="72" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="26" fill="#141414" text-anchor="middle">Hacer</text>
+    <text x="60" y="104" font-family="'IBM Plex Sans',Arial,sans-serif" font-weight="700" font-size="26" fill="#141414" text-anchor="middle">memes</text>`;
+  /* El chico: «todo bien», con su nota debajo. */
+  const chico = `<rect x="-104" y="-82" width="208" height="164" rx="8" fill="#fff"/>
+    <rect x="-98" y="-76" width="196" height="152" fill="#e89a3c"/><rect x="-98" y="30" width="196" height="46" fill="#a8562a"/>
+    <g transform="translate(-70 32)">${emo(46, "🔥")}</g><g transform="translate(72 30)">${emo(42, "🔥")}</g><g transform="translate(0 6)">${emo(64, "🐶")}</g>
+    ${imp(0, -46, 24, "LUNES 8 AM")}${imp(0, 68, 20, "TODO BIEN")}`;
+  /* Las reacciones que suben desde abajo, cada una con su ritmo. */
+  let reacciones = "";
+  const CARAS = ["🔥", "😂", "🔥", "🍅", "😂", "🔥", "🙂", "😂", "🔥", "😐"];
+  CARAS.forEach((c, i) => {
+    const x = r1(640 + az() * 520), y = r1(380 + az() * 30);
+    reacciones += `<g transform="translate(${x} ${y})"><g class="ep-sube" style="animation-delay:${r1(-az() * 4.5)}s;animation-duration:${r1(3.6 + az() * 2)}s">${emo(r1(30 + az() * 22), c)}</g></g>`;
+  });
+  /* Focos del plató: dos conos que se mecen. */
+  const foco = (x, del) => `<g transform="translate(${x} -20)"><g class="ep-foco" style="animation-delay:${del}s"><path d="M-18 0 L18 0 L170 460 L-170 460Z" fill="url(#mf${u})"/></g></g>`;
+  let chispas = "";
+  for (let i = 0; i < 9; i++) chispas += `<g transform="translate(${r1(620 + az() * 560)} ${r1(30 + az() * 340)})"><path class="ep-brilla" style="animation-delay:${r1(-az() * 2)}s" d="M0 -9 L2 -2 L9 0 L2 2 L0 9 L-2 2 L-9 0 L-2 -2Z" fill="#ffd23f"/></g>`;
+  return SVG(`<defs>
+    <radialGradient id="mb${u}" cx=".72" cy=".2" r=".9"><stop offset="0" stop-color="#6b2fb8"/><stop offset=".55" stop-color="#341066"/><stop offset="1" stop-color="#14062b"/></radialGradient>
+    <linearGradient id="mf${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4" stop-opacity=".45"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="1200" height="420" fill="url(#mb${u})"/>
+  ${estrellas(az, 40, 0, 1200, 0, 260, "#e9ddff")}
+  ${foco(760, 0)}${foco(1080, -1.4)}
+  <ellipse cx="900" cy="410" rx="380" ry="36" fill="#000" opacity=".35"/>
+  ${chispas}
+  <g transform="translate(1065 270) rotate(7)"><g class="ep-flota" style="animation-delay:-1.1s">${chico}</g></g>
+  <g transform="translate(985 402)"><g class="ep-combo" style="animation-delay:-.6s">${imp(0, 0, 40, "+17")}</g></g>
+  <g transform="translate(800 205) rotate(-5)"><g class="ep-flota">${grande}</g></g>
+  ${reacciones}
+  <text x="1180" y="52" text-anchor="end" font-family="Anton,Impact,'Arial Black',sans-serif" font-size="34" fill="#ffd23f" stroke="#2b0d52" stroke-width="6" paint-order="stroke">¿DE QUIÉN ERA? 🤫</text>`);
+}
+
+const ESCENAS = { memazo, prodefender, hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
 
 /* La escena de una novedad, o "" si no tiene una propia (el banner pinta
    entonces un fondo del color del juego). */

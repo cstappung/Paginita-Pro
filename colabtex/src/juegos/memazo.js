@@ -24,7 +24,7 @@
  *   firmada): quien abra las herramientas del navegador lo verá, que es
  *   el mismo límite honesto que el resto de los juegos.
  */
-import { MZ_NOTAS, MZ_LARGO, MZ_REVELA_MS, MZ_RESUMEN_MS, ofertasMemazo } from "./motor.js";
+import { MZ_NOTAS, MZ_LARGO, MZ_REVELA_MS, MZ_RESUMEN_MS, ofertasMemazo, jugadaExternaMemazo } from "./motor.js";
 import { PLANTILLAS, cajasDe, memeDe, ajustaTextos, ponTexto } from "./memazo-plantillas.js";
 import { plantillasImgflip, gifsGiphy, eligeTres, cajasPorDefecto } from "./memazo-fuentes.js";
 import { suena } from "./sonido.js";
@@ -51,6 +51,9 @@ export function crearMemazo(ctx) {
   let arrastre = null;
   let enviado = "";   // lo último que mandé, para avisar de cambios sin enviar
   let sonadaR = 0;    // la ronda cuyas plantillas ya sonaron al repartirse
+  /* Por qué no entró el último envío. Sin esto un rechazo de la base
+     (PERMISSION_DENIED) dejaba el botón mudo y nadie sabía que no se mandó. */
+  let fallo = "";
 
   function montar(donde) {
     host = donde;
@@ -179,7 +182,7 @@ export function crearMemazo(ctx) {
   }
 
   function preparaBorrador() {
-    if (borrador.r !== est.r) { borrador = { r: est.r, p: "", x: {}, ext: {}, vuelta: 0, q: "" }; enviado = ""; }
+    if (borrador.r !== est.r) { borrador = { r: est.r, p: "", x: {}, ext: {}, vuelta: 0, q: "" }; enviado = ""; fallo = ""; }
     cargaFuente();
     if (!borrador.p || (!esExterna(borrador.p) && !PLANTILLAS[borrador.p])) {
       const o = ofertas();
@@ -242,8 +245,7 @@ export function crearMemazo(ctx) {
     if (!k) return null;
     const x = textosDe(k).map(t => (t || "").trim());
     if (!esExterna(k)) return { p: k, x };
-    const e = borrador.ext[k];
-    return { p: e.p, u: e.u, w: e.w, h: e.h, n: e.n, c: e.c.map(b => b.map(v => Math.round(v * 10) / 10)), x };
+    return jugadaExternaMemazo(borrador.ext[k], x);
   }
 
   function estadoEnvio() {
@@ -254,7 +256,8 @@ export function crearMemazo(ctx) {
     const hay = !!j && j.x.some(t => t);
     btn.disabled = enviando || !hay;
     btn.textContent = ya ? "Actualizar" : "¡Listo!";
-    el.textContent = !ya ? (hay ? "" : "Escribe al menos un texto.")
+    el.classList.toggle("mal", !!fallo);
+    el.textContent = fallo ? fallo : !ya ? (hay ? "" : "Escribe al menos un texto.")
       : JSON.stringify(j) === enviado ? "✓ Enviado. Puedes corregirlo hasta que se acabe el tiempo." : "Tienes cambios sin enviar.";
   }
 
@@ -412,7 +415,7 @@ export function crearMemazo(ctx) {
     if (v !== "espera") asientos(v); else set("mzAsientos", "espera", "");
 
     let pieza = null;
-    if (v === "espera") pieza = { firma: "espera", html: `<div class="jg-mz-aviso grande">🖼️ Memazo<br><small>Cuando entren todos empieza la primera ronda.</small></div>` };
+    if (v === "espera") pieza = { firma: "espera", html: `<div class="jg-mz-aviso grande">🖼️ Momazo :v<br><small>Cuando entren todos empieza la primera ronda.</small></div>` };
     else if (v === "arranque") pieza = { firma: "arranque", html: `<div class="jg-mz-aviso grande">🎲 Barajando plantillas…</div>` };
     else if (v === "escribir" && soy()) {
       preparaBorrador();
@@ -532,12 +535,15 @@ export function crearMemazo(ctx) {
     if (ev.target.closest("#mzEnviar") && vistaVista === "escribir" && !enviando) {
       const j = jugadaMeme();
       if (!j || !j.x.some(t => t)) return;
-      enviando = true; estadoEnvio();
+      enviando = true; fallo = ""; estadoEnvio();
       try {
         if (await jugar({ t: "meme", uid, r: est.r, ...j, at: ahora() })) {
           enviado = JSON.stringify(j);
           suena("entra");
-        }
+        } else fallo = "No se pudo mandar. Prueba otra vez.";
+      } catch (e) {
+        console.warn("[memazo] no se pudo mandar el meme", e);
+        fallo = /permission/i.test(String(e && (e.code || e.message))) ? "La base rechazó el meme (¿reglas sin publicar?)." : "No se pudo mandar: " + ((e && e.message) || e);
       } finally { if (!muerto) { enviando = false; estadoEnvio(); } }
       return;
     }
@@ -549,6 +555,7 @@ export function crearMemazo(ctx) {
       const v = Number(b.getAttribute("data-nota"));
       suena(v >= 4 ? "capta" : "clic", v);
       try { await jugar({ t: "nota", uid, r: est.r, m: est.m, v, at: ahora() }); }
+      catch (e) { console.warn("[memazo] no se pudo calificar", e); }
       finally { if (!muerto) votando = false; }
     }
   }

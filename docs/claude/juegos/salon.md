@@ -154,7 +154,7 @@ the rooms column (open rooms, top coins, your games) are never hidden.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
 because what is new is not always a room game (Mascotas, PRODROP). Today it
-holds **nine slides in the owner's order** — PRO DEFENDER, PRO HERO, Mascotas, PRO TILES,
+holds **ten slides in the owner's order** — Momazo :v, PRO DEFENDER, PRO HERO, Mascotas, PRO TILES,
 HaxBall, TULONES (one slide for the local and the online game), Trigon,
 PRODROP, FANAL — pinned by `salon.test.cjs`. The order is not by date: the
 «★ Lo último» seal goes to the newest `alta` (`selloNovedad`), «Nuevo» to

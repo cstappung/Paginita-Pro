@@ -429,7 +429,7 @@ export const CANCIONES = [
   { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · Tetris", chip: "neon", juegos: ["tetris"] },
   { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
   { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I · Clue", chip: "lofi", juegos: ["clue"] },
-  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro · Memazo", chip: "cumbia", juegos: ["memazo"] },
+  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro · Momazo", chip: "cumbia", juegos: ["memazo"] },
   { id: "laboratorio", nombre: "Laboratorio casero", grupo: "Chill y fiesta", desc: "Hip-hop con 808 · estilo Schedule I", chip: "laboratorio" },
   { id: "reparto", nombre: "Reparto nocturno", grupo: "Electrónicas", desc: "Deep house de furgoneta · estilo Schedule I", chip: "reparto" },
   { id: "bossa", nombre: "Bossa de ascensor", grupo: "Chill y fiesta", desc: "Bossa nova con séptimas", chip: "bossa" },

@@ -227,7 +227,7 @@ export const JUEGOS = {
     alta: "2026-10-14"
   },
   memazo: {
-    nombre: "Memazo",
+    nombre: "Momazo :v",   // el id sigue siendo `memazo`: lo usan las reglas, las salas y las tablas
     lema: "Ponle texto a una plantilla, califica los memes de los demás sin saber de quién son y gana quien saque más risas",
     color: "#f5b301",
     minimo: 2,
@@ -7524,7 +7524,10 @@ export function redTorneoBt3(p, js = jugadoresDe(p)) {
      plantilla `p`, que tiene que ser una de las que le tocaron. Vale el
      último que llegue mientras se escribe: se puede corregir. Con
      plantillas de afuera `p` es "if" (Imgflip) o "gif" (GIPHY) y la
-     jugada trae además `u, w, h, n, c` (ver `externoMemazo`).
+     jugada trae además `u, an, al, n, c` (ver `externoMemazo`). El alto
+     no puede ir en `h`: las reglas reservan `h` (y `sal`) de toda jugada
+     para el hash de otros juegos y exigen que sea texto, así que un número
+     ahí hacía rechazar la jugada entera.
    - `nota {r, m, v, at}` califica el meme `m` de la ronda `r`. Vale la
      primera de cada uno, y nunca la del autor.
    - `cierra {r, e, m, at}` cierra la etapa `e` («escribir» o «votar»)
@@ -7571,7 +7574,7 @@ export function externoMemazo(j, fuente) {
   if (!((p === "if" && fuente === "reales") || (p === "gif" && fuente === "gif"))) return null;
   const u = String(j.u || "");
   if (p === "if" ? !/^[A-Za-z0-9]{3,12}\.(jpg|png|gif)$/.test(u) : !/^[A-Za-z0-9]{6,40}$/.test(u)) return null;
-  const w = Math.round(Number(j.w)), h = Math.round(Number(j.h));
+  const w = Math.round(Number(j.an)), h = Math.round(Number(j.al));
   if (!(w >= 40 && w <= 5000 && h >= 40 && h <= 5000) || w / h > 5 || h / w > 5) return null;
   if (!Array.isArray(j.c) || !j.c.length || j.c.length > MZ_CAJAS_MAX) return null;
   const c = [];
@@ -7581,6 +7584,12 @@ export function externoMemazo(j, fuente) {
     c.push([x, y, mzNum(b[2], 5, 100 - x), mzNum(b[3], 5, 100 - y)]);
   }
   return { u, w, h, c, n: typeof j.n === "string" ? j.n.slice(0, 60) : "" };
+}
+/* La jugada `meme` de una plantilla de afuera (`{p, u, w, h, n, c}`, como
+   las guarda el editor) con sus textos. La arma el motor y no la pantalla
+   para que el test compruebe sus campos contra las reglas. */
+export function jugadaExternaMemazo(pl, x) {
+  return { p: pl.p, u: pl.u, an: pl.w, al: pl.h, n: pl.n || "", c: pl.c.map(b => b.map(v => Math.round(v * 10) / 10)), x };
 }
 export const tiempoMemazo = p => MZ_TIEMPOS.includes(Number(p && p.tiempo)) ? Number(p.tiempo) : 90;
 export const rondasMemazo = p => MZ_RONDAS.includes(Number(p && p.rondas)) ? Number(p.rondas) : 3;
