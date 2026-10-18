@@ -80,6 +80,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Budokai Tenkaichi 3 (BT3, PS2 port, ISO, online rooms) | `juegos/bt3/CLAUDE.md` |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
+| Memazo (memes, plantillas, estilo Make It Meme) | `docs/claude/juegos/memazo.md` |
 | PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |
 
 Solo Club games (read `juegos/club/CLAUDE.md` too):

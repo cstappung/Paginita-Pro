@@ -32,6 +32,7 @@ export const CONTROLES = {
   "hero": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "heroclub": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "mascotas": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton"},
+  "memazo": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},

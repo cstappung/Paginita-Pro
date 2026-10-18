@@ -421,6 +421,27 @@ const REGLAS = {
       }
     }
   },
+  memazo: {
+    lema: "Memes con amigos: de 2 a 10 jugadores, gana quien saque más risas.",
+    secciones: [
+      ["Escribir", lista([
+        "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada plantilla tiene de uno a cuatro.",
+        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste.",
+        "La etapa termina cuando todos mandaron el suyo o se acaba el tiempo. Quien no mandó nada se queda sin meme en esa ronda."
+      ])],
+      ["Calificar", lista([
+        "Los memes salen <b>de uno en uno</b> y sin nombre. Cada uno le pone una nota: <b>🍅 1</b>, <b>😐 2</b>, <b>🙂 3</b>, <b>😂 4</b> o <b>🔥 5</b>.",
+        "El autor no califica el suyo (y nadie sabe quién es). Hay 20 segundos por meme; la primera nota de cada uno es la que vale.",
+        "Cuando todos calificaron, o se acabó el tiempo, se revela de quién era y cuánto sumó: todas sus notas van a su autor."
+      ])],
+      ["Ganar", lista([
+        "Después de cada ronda se enseña el podio de la ronda. La partida dura 3, 5 o 7 rondas, según la sala.",
+        "Gana quien más puntos sumó con sus memes. A igualdad, gana quien recibió más 🔥; si también empatan, es empate.",
+        "Al final queda la galería con todos los memes de la partida."
+      ])],
+      ["Lo que no se ve", "La pantalla no dice quién falta por calificar, porque el que no califica es el autor. El registro de la partida sí lleva quién escribió cada meme: quien abra las herramientas del navegador lo puede ver. Es un juego entre amigos."]
+    ]
+  },
   spicy: {
     lema: "Faroles picantes: de 2 a 6 jugadores, gana quien consiga dos trofeos.",
     secciones: [

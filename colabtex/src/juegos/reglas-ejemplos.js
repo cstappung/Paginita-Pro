@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, memazo} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -239,6 +239,12 @@ export const EJEMPLOS={
  e('estrellas','Estrellas doradas y azules',
   p('Doradas y azules','Las estrellas son doradas solo en Experto, o en la dificultad más alta que tenga ese instrumento. En las demás dificultades son azules, y en la lista de canciones se ven las doradas encima de las azules.',hero(2)),
   p('Lo que pagan','Cada canción terminada paga 50 monedas (15 al día). Cada estrella dorada nueva paga 100 y cada azul 50, una sola vez; si una azul pasa a dorada, se pagan los 50 que faltaban.',fichas('Tu récord en una canción',['★★★','oro','DORADAS'],['★','azul','AZUL DE MÁS'],['350','verde','MONEDAS'])))],
+ memazo:[e('escribir','Hacer tu meme de la ronda',
+  p('Elige una de tus tres plantillas','Cada ronda te tocan tres plantillas al azar, distintas a las de los demás. Toca la que te dé más ideas: puedes cambiar de una a otra sin perder lo escrito.',memazo(0)),
+  p('Escribe y manda','Cada plantilla tiene de uno a cuatro textos. Escríbelos, mira cómo queda y pulsa ¡Listo! Mientras quede tiempo puedes corregirlo y volver a mandarlo.',memazo(1))),
+ e('calificar','Calificar sin saber de quién es',
+  p('Ponle nota','Los memes salen de uno en uno y sin nombre. Elige de 🍅 (1 punto) a 🔥 (5 puntos). Al autor no le toca calificar el suyo, y la pantalla no dice quién falta.',memazo(2)),
+  p('Se revela el autor','Cuando todos calificaron, o pasan 20 segundos, aparece de quién era y todas sus notas. Lo que sumó va a su marcador; gana la partida quien más sume.',memazo(3)))],
  tulones:[e('trepar','Trepar por el pudú',
   p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en slip como todos. Tienes el tiempo del turno para superar la línea roja de la torre.',tulones(0)),
   p('Suelta, lleva y agárrate','Mantén A: la mano izquierda se suelta y sigue al ratón. Llévala al lomo del pudú y suelta A: la mano se agarra ahí. Con la mano agarrada, sube los pies de a uno con W y S y el cuerpo trepa detrás.',tulones(1)),
