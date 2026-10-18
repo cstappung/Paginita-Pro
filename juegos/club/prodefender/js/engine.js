@@ -535,7 +535,9 @@
       e.dead = true; e.leaked = true;
       if (e.engaged) this.release(e);
       this.stats.leaked++;
-      const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : e.d._leak;
+      // un grande que se escapa quita mucho, pero nunca más del 60 % de las vidas del reino de
+      // un golpe (con la escalera de tanques, un Titán perdido eran 90 vidas: fin de la partida)
+      const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : Math.min(e.d._leak, Math.ceil(this.L.lives * 0.6));
       this.lives -= l;
       this.emit({ type: 'leak', amount: l });
       this.snd('leak', e.x);

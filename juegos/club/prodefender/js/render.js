@@ -337,46 +337,91 @@
     for (let i = 0; i < 4; i++) { const x = -r + i * r * 0.55; c.beginPath(); c.moveTo(x, -r * 0.5); c.lineTo(x + r * 0.15, -r * 0.3); c.lineTo(x, -r * 0.1); c.stroke(); }
     noGlow(c);
   };
-  // Supertanques: el Titán con más torretas y franjas de alerta según el escalón (d.rank 1–3)
+  // ---- La escalera de los grandes: cada escalón con su color (d.color, d.accent) y cada vez
+  // más imponente: más púas, calaveras desde el segundo, ojos que brillan en el último ----
+  // púa: triángulo con la base en (x, y) que apunta hacia `ang`
+  function pua(c, x, y, ang, len, w, fill, edge) {
+    const ca = Math.cos(ang), sa = Math.sin(ang), px = -sa * w / 2, py = ca * w / 2;
+    shape(c, [[x + px, y + py], [x + ca * len, y + sa * len], [x - px, y - py]], fill, edge || '#0d0f12', 0.9);
+  }
+  // calavera vista desde arriba (la frente hacia +x, como el resto del sprite)
+  function calavera(c, x, y, s, hueso, ojos) {
+    c.save(); c.translate(x, y); c.rotate(Math.PI / 2);
+    ell(c, 0, -s * 0.15, s, s * 0.9, 0, hueso, '#1a1410', s * 0.12);
+    rrect(c, -s * 0.55, s * 0.45, s * 1.1, s * 0.55, s * 0.15, hueso, '#1a1410', s * 0.1);
+    c.strokeStyle = '#1a1410'; c.lineWidth = s * 0.08;
+    for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(i * s * 0.25, s * 0.55); c.lineTo(i * s * 0.25, s * 0.95); c.stroke(); }
+    if (ojos) glow(c, ojos, 8);
+    for (const sx of [-1, 1]) ell(c, sx * s * 0.38, -s * 0.15, s * 0.27, s * 0.3, 0, ojos || '#1a1410');
+    noGlow(c);
+    shape(c, [[0, s * 0.12], [-s * 0.12, s * 0.35], [s * 0.12, s * 0.35]], '#1a1410');
+    c.restore();
+  }
+  // Supertanques: el Titán con su color, torretas, púas en el casco y calaveras (d.rank 1–3)
   ART.supertank = (c, d, r, p) => {
-    const k = d.rank || 1, band = ['#ffcc33', '#ff7a2a', '#ff3a5a'][k - 1];
-    for (const s of [-1, 1]) {   // orugas extra a los lados
-      rrect(c, -r * 1.35, s * r * 1.25 - r * 0.16, r * 2.5, r * 0.32, r * 0.12, '#14171c', '#06080a', 1);
+    const k = d.rank || 1, acc = d.accent || '#ffcc33';
+    for (const s of [-1, 1]) rrect(c, -r * 1.35, s * r * 1.25 - r * 0.16, r * 2.5, r * 0.32, r * 0.12, '#14171c', '#06080a', 1);
+    // púas a los lados (más largas y más cuantas más alto el escalón) y un espolón delante
+    const n = 3 + k * 2, largo = r * (0.25 + k * 0.12);
+    for (const s of [-1, 1]) for (let i = 0; i < n; i++) {
+      const x = -r * 1.2 + (i + 0.5) * r * 2.3 / n;
+      pua(c, x, s * r * 1.38, s * Math.PI / 2, largo, r * 0.2, '#d8dde4');
     }
+    if (k >= 2) for (let i = -k + 1; i <= k - 1; i++) pua(c, r * 1.3, i * r * 0.32, 0, r * (0.3 + k * 0.1), r * 0.2, '#e8ecf0');
     ART.titan(c, d, r * 0.92, p);
-    glow(c, band, 8); c.fillStyle = band;
-    for (let i = 0; i < k + 1; i++) c.fillRect(-r * 1.15 + i * r * 0.22, -r * 0.08, r * 0.1, r * 0.16);
+    glow(c, acc, 8); c.fillStyle = acc;
+    for (const s of [-1, 1]) c.fillRect(-r * 1.25, s * r * 0.86 - r * 0.05, r * 2.3, r * 0.1);   // franjas de su color
     noGlow(c);
     const pos = k === 1 ? [[-r * 0.65, 0]] : k === 2 ? [[-r * 0.7, -r * 0.5], [-r * 0.7, r * 0.5]] : [[-r * 0.75, -r * 0.55], [-r * 0.75, r * 0.55], [r * 0.85, 0]];
     for (const [x, y] of pos) {
       c.fillStyle = '#2a2f37'; c.fillRect(x, y - r * 0.07, r * 0.55, r * 0.14);
       orb(c, x, y, r * 0.26, r * 0.26, sh(d.color, 0.25));
-      glow(c, band, 6); circle(c, x, y, r * 0.07, band); noGlow(c);
+      glow(c, acc, 6); circle(c, x, y, r * 0.07, acc); noGlow(c);
+    }
+    if (k >= 2) calavera(c, -r * 0.05, 0, r * (k === 3 ? 0.42 : 0.3), '#f2ead8', k === 3 ? acc : null);
+    if (k === 3) for (const s of [-1, 1]) {   // cuernos y dos calaveras más
+      pua(c, -r * 0.05 + r * 0.25, s * r * 0.35, s * 1.1, r * 0.55, r * 0.18, '#f2ead8');
+      calavera(c, -r * 0.95, s * r * 0.15, r * 0.17, '#e0d6bf', acc);
     }
   };
-  // Globos (zepelines): casco alargado con costillas, aletas atrás, góndola y motores;
-  // más planchas de blindaje y más motores cuanto más alto el escalón (d.rank 0–3)
+  // Globos (zepelines): casco alargado de su color con costillas, aletas, góndola y motores;
+  // planchas de blindaje, púas por todo el borde y calaveras cuanto más alto el escalón (0–3)
   ART.blimp = (c, d, r, p) => {
-    const k = d.rank || 0, L = r * 1.45, Hh = r * 0.78, spin = p * TAU * 3;
+    const k = d.rank || 0, acc = d.accent || '#ffe08a', L = r * 1.45, Hh = r * 0.78, spin = p * TAU * 3;
+    if (k >= 1) {   // púas alrededor del casco (antes del casco, para que asome solo la punta)
+      const n = 8 + k * 6, largo = r * (0.2 + k * 0.1);
+      for (let i = 0; i < n; i++) {
+        const a = (i + 0.5) * TAU / n, x = Math.cos(a) * L * 0.97, y = Math.sin(a) * Hh * 0.97;
+        pua(c, x, y, Math.atan2(y / (Hh * Hh), x / (L * L)), largo, r * 0.16, k >= 3 ? '#2a2030' : '#e8ecf0', k >= 3 ? acc : null);
+      }
+    }
     for (const s of [-1, 1]) shape(c, [[-L * 0.7, s * Hh * 0.35], [-L * 1.12, s * Hh * 1.05], [-L * 1.02, s * Hh * 0.2]], sh(d.color, -0.35), '#1a1030', 1.2);
     shape(c, [[-L * 0.75, 0], [-L * 1.15, -Hh * 0.18], [-L * 1.15, Hh * 0.18]], sh(d.color, -0.45), '#1a1030', 1);
     ell(c, 0, 0, L, Hh, 0, lg(c, 0, -Hh, 0, Hh, [sh(d.color, 0.5), d.color, sh(d.color, -0.55)]), '#1a1030', 2);
     c.strokeStyle = sh(d.color, -0.4); c.lineWidth = 1;
     for (let i = 1; i < 6; i++) { const x = -L + i * L / 3; const h = Hh * Math.sqrt(Math.max(0, 1 - (x / L) * (x / L))); c.beginPath(); c.moveTo(x, -h); c.lineTo(x, h); c.stroke(); }
-    c.beginPath(); c.moveTo(-L * 0.95, 0); c.lineTo(L * 0.95, 0); c.stroke();
+    // franjas de su color a lo largo
+    glow(c, acc, 5); c.strokeStyle = acc; c.lineWidth = r * 0.07;
+    for (const s of [-1, 1]) { c.beginPath(); c.ellipse(0, 0, L * 0.82, Hh * 0.62, 0, s > 0 ? 0.35 : Math.PI + 0.35, s > 0 ? Math.PI - 0.35 : TAU - 0.35); c.stroke(); }
+    noGlow(c);
     for (let i = 0; i < k; i++) {   // planchas de blindaje
       const x = -L * 0.45 + i * L * 0.36;
       rrect(c, x - r * 0.14, -Hh * 0.62, r * 0.28, Hh * 1.24, r * 0.08, lg(c, x, -Hh, x, Hh, ['#c9cfd8', '#7a828e', '#3a404a']), '#15181d', 1);
     }
     rrect(c, -L * 0.3, -r * 0.16, L * 0.6, r * 0.32, r * 0.1, '#2b2140', '#0d0818', 1);   // góndola
-    glow(c, '#ffe08a', 6); for (let i = 0; i < 3; i++) circle(c, -L * 0.18 + i * L * 0.18, 0, r * 0.05, '#ffe9a8'); noGlow(c);
+    glow(c, acc, 6); for (let i = 0; i < 3; i++) circle(c, -L * 0.18 + i * L * 0.18, 0, r * 0.05, acc); noGlow(c);
     const mot = k >= 2 ? [[-L * 0.15, -Hh * 0.95], [-L * 0.15, Hh * 0.95], [L * 0.35, -Hh * 0.8], [L * 0.35, Hh * 0.8]] : [[-L * 0.1, -Hh * 0.95], [-L * 0.1, Hh * 0.95]];
     for (const [x, y] of mot) {
       circle(c, x, y, r * 0.14, '#3a3448', '#0d0818', 1);
       c.strokeStyle = 'rgba(230,230,255,0.7)'; c.lineWidth = r * 0.05;
       c.beginPath(); c.moveTo(x - Math.cos(spin) * r * 0.2, y - Math.sin(spin) * r * 0.08); c.lineTo(x + Math.cos(spin) * r * 0.2, y + Math.sin(spin) * r * 0.08); c.stroke();
     }
-    ell(c, L * 0.78, 0, r * 0.2, r * 0.26, 0, lg(c, L * 0.65, -r * 0.3, L * 0.9, r * 0.3, ['#ffffff', '#c9a7ff', '#5a3aa8']), '#1a1030', 1);
+    ell(c, L * 0.78, 0, r * 0.2, r * 0.26, 0, lg(c, L * 0.65, -r * 0.3, L * 0.9, r * 0.3, ['#ffffff', acc, sh(d.color, -0.5)]), '#1a1030', 1);
+    if (k >= 2) calavera(c, L * 0.42, 0, r * (k === 3 ? 0.36 : 0.26), '#f2ead8', k === 3 ? acc : null);
+    if (k === 3) {   // cuernos en la proa y calaveras en las aletas
+      for (const s of [-1, 1]) pua(c, L * 0.7, s * Hh * 0.45, s * 0.7, r * 0.6, r * 0.2, '#f2ead8');
+      for (const s of [-1, 1]) calavera(c, -L * 0.9, s * Hh * 0.62, r * 0.15, '#e0d6bf', acc);
+    }
     spec(c, -L * 0.2, -Hh * 0.45, r * 0.45, 0.35);
   };
   function maskArt(c, d, r, p, staffCol, horns) {
@@ -622,7 +667,7 @@
   };
 
   const EXT = { sprout: 1.55, spark: 1.95, ember: 1.95, shell: 1.6, moth: 2.0, bee: 1.8, knight: 1.45, ghost: 2.0, mirage: 2.0, wisp: 2.0, hex: 1.55, magnet: 1.55,
-    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, supertank: 1.95, blimp: 1.8, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
+    jelly: 1.35, carrier: 1.75, titan: 1.85, voidtitan: 2.05, supertank: 2.15, blimp: 2.05, moss: 1.45, mask: 1.8, herald: 2.0, beetle: 1.95, mole: 1.55, scorpion: 2.25, worm: 1.4,
     wormSeg: 1.3, golem: 1.65, crystal: 1.75, yeti: 1.55, lizard: 2.45, rock: 1.3, bird: 2.0, phoenix: 2.5, eye: 1.6, star: 1.45, voidboss: 2.1 };
   const SPIN = { crystal: 1.4, star: 1.6 };
   const FR = 8;

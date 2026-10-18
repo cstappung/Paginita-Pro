@@ -93,8 +93,11 @@
     const t = (r - a[0]) / (b[0] - a[0] || 1);
     // Los reinos difíciles empiezan suaves y endurecen su curva hasta la ronda 50.
     const diff = 1 + (L.diff - 1) * (0.15 + 0.85 * Math.min(1, r / 60));
-    return Math.exp(Math.log(a[1]) + (Math.log(b[1]) - Math.log(a[1])) * t) * diff * PD.growth(r);
+    return Math.exp(Math.log(a[1]) + (Math.log(b[1]) - Math.log(a[1])) * t) * diff * PD.growth(r) * PD.lateEase(r);
   };
+  // Desde la 52 el presupuesto baja de a poco (hasta un 35 % menos en la 82): las rondas altas
+  // son de tanques y globos blindados, que cuestan más de lo que mide enemyThreat.
+  PD.lateEase = function (r) { return 1 - 0.35 * Math.max(0, Math.min(1, (r - 52) / 30)); };
   // Crecimiento de la partida: más enemigos y más oro según avanzan las rondas.
   PD.growth = function (r) { const k = Math.max(0, r - 50); return (1 + 3 * (0.06 * r + 0.0007 * r * r + 0.0016 * k * k)) * PD.lateMult(r); };
   // Las torres al máximo (nivel 4) disparan el daño desde la ronda ~45: los enemigos responden.

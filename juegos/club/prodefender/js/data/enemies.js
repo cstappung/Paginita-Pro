@@ -68,40 +68,42 @@
     // las rondas altas mandan pocos enemigos enormes que al caer sueltan a los del
     // escalón de abajo. Tanques por tierra (Portador → Titán → Fortaleza → Ciudadela
     // → Leviatán) y globos por el aire (Zepelín → Dirigible → Acorazado Celeste → Arca).
+    // Cada escalón tiene su color (azul, rojo, verde/negro, violeta) y su arte (render.js:
+    // supertank, blimp) suma púas y calaveras con `rank`, para distinguirlos de un vistazo.
     fortaleza: {
-      name: 'Fortaleza Rodante', hp: 4500, armor: 10, speed: 21, bounty: 260, leak: 60, r: 36,
-      color: '#56606c', shape: 'supertank', rank: 1, children: [['titan', 2]], big: true,
-      desc: 'SUPERTANQUE. Blindaje 10. Al caer libera 2 Titanes de Hierro.'
+      name: 'Fortaleza Rodante', hp: 4500, armor: 9, speed: 21, bounty: 260, leak: 60, r: 36,
+      color: '#2f6fb8', accent: '#7fd0ff', shape: 'supertank', rank: 1, children: [['titan', 2]], big: true,
+      desc: 'SUPERTANQUE. Blindaje 9. Al caer libera 2 Titanes de Hierro.'
     },
     ciudadela: {
-      name: 'Ciudadela de Guerra', hp: 14000, armor: 12, speed: 18, bounty: 520, leak: 120, r: 41,
-      color: '#3f4a5a', shape: 'supertank', rank: 2, children: [['fortaleza', 2]], big: true,
-      desc: 'SUPER SUPERTANQUE. Blindaje 12. Al caer libera 2 Fortalezas Rodantes.'
+      name: 'Ciudadela de Guerra', hp: 14000, armor: 10, speed: 18, bounty: 520, leak: 120, r: 41,
+      color: '#b0302a', accent: '#ffb02a', shape: 'supertank', rank: 2, children: [['fortaleza', 2]], big: true,
+      desc: 'SUPER SUPERTANQUE. Blindaje 10. Al caer libera 2 Fortalezas Rodantes.'
     },
     leviatan: {
-      name: 'Leviatán de Acero', hp: 42000, armor: 14, speed: 15, bounty: 1100, leak: 250, r: 47,
-      color: '#2a3140', shape: 'supertank', rank: 3, children: [['ciudadela', 2]], big: true,
-      desc: 'SUPER SUPER SUPERTANQUE. Blindaje 14. Al caer libera 2 Ciudadelas de Guerra.'
+      name: 'Leviatán de Acero', hp: 42000, armor: 11, speed: 15, bounty: 1100, leak: 250, r: 47,
+      color: '#1d2420', accent: '#5aff6a', shape: 'supertank', rank: 3, children: [['ciudadela', 2]], big: true,
+      desc: 'SUPER SUPER SUPERTANQUE. Blindaje 11. Al caer libera 2 Ciudadelas de Guerra.'
     },
     zepelin: {
       name: 'Zepelín de Polillas', hp: 700, armor: 2, speed: 40, bounty: 40, leak: 8, r: 22, flying: true,
-      color: '#b993dc', shape: 'blimp', rank: 0, children: [['alado', 4], ['enjambre', 6]], big: true,
+      color: '#4fa3e0', accent: '#dff4ff', shape: 'blimp', rank: 0, children: [['alado', 4], ['enjambre', 6]], big: true,
       desc: 'GLOBO VOLADOR. Al reventar suelta 4 Polillas y 6 Abejorros.'
     },
     dirigible: {
-      name: 'Gran Dirigible', hp: 2600, armor: 4, speed: 32, bounty: 150, leak: 20, r: 28, flying: true,
-      color: '#9a72cc', shape: 'blimp', rank: 1, children: [['zepelin', 3]], big: true,
-      desc: 'SUPERGLOBO. Blindaje 4. Al reventar suelta 3 Zepelines.'
+      name: 'Gran Dirigible', hp: 2600, armor: 3, speed: 32, bounty: 150, leak: 20, r: 28, flying: true,
+      color: '#d8443a', accent: '#ffd84d', shape: 'blimp', rank: 1, children: [['zepelin', 3]], big: true,
+      desc: 'SUPERGLOBO. Blindaje 3. Al reventar suelta 3 Zepelines.'
     },
     celeste: {
-      name: 'Acorazado Celeste', hp: 9000, armor: 6, speed: 26, bounty: 380, leak: 50, r: 34, flying: true,
-      color: '#7354b0', shape: 'blimp', rank: 2, children: [['dirigible', 2]], big: true,
-      desc: 'SUPER SUPERGLOBO. Blindaje 6. Al reventar suelta 2 Grandes Dirigibles.'
+      name: 'Acorazado Celeste', hp: 9000, armor: 4, speed: 26, bounty: 380, leak: 50, r: 34, flying: true,
+      color: '#2e8a4a', accent: '#c8ff5a', shape: 'blimp', rank: 2, children: [['dirigible', 2]], big: true,
+      desc: 'SUPER SUPERGLOBO. Blindaje 4. Al reventar suelta 2 Grandes Dirigibles.'
     },
     arca: {
-      name: 'Arca de la Tormenta', hp: 30000, armor: 8, speed: 21, bounty: 900, leak: 120, r: 40, flying: true,
-      color: '#4a3584', shape: 'blimp', rank: 3, children: [['celeste', 2]], big: true,
-      desc: 'SUPER SUPER SUPERGLOBO. Blindaje 8. Al reventar suelta 2 Acorazados Celestes.'
+      name: 'Arca de la Tormenta', hp: 30000, armor: 5, speed: 21, bounty: 900, leak: 120, r: 40, flying: true,
+      color: '#3a1d5c', accent: '#ff3ad1', shape: 'blimp', rank: 3, children: [['celeste', 2]], big: true,
+      desc: 'SUPER SUPER SUPERGLOBO. Blindaje 5. Al reventar suelta 2 Acorazados Celestes.'
     },
 
     // ------------------- NIVEL 1 · PRADO ESMERALDA -------------------

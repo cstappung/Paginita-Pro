@@ -46,7 +46,13 @@ tanks Portador → Titán → **Fortaleza → Ciudadela → Leviatán** and flyi
 three of the step below (`children`); shapes `supertank` and `blimp` in
 `render.js`, scaled by `d.rank`. From round 55 the specials Estampida and Noche
 de Sombras also admit big types, which come with the group's `mod` (`fast`
-x1.35 speed / `camo`), inherited by their children (`Game.modifica`).
+x1.35 speed / `camo`), inherited by their children (`Game.modifica`). Each
+step has its own colour (`d.color`/`d.accent`: tanks blue → red → black/green,
+balloons light blue → red → green → purple) and more spikes and skulls with
+`rank`, so they read at a glance. Since big armoured types cost more than
+`enemyThreat` says, `PD.lateEase` trims the budget from round 52 (−35 % at 82),
+and a non-boss leak takes at most 60 % of the kingdom's lives (`leak`): one
+lost Titán used to be 90 lives, i.e. the end of the game.
 
 ## Heroes (`towers.js`, after the 22 towers)
 
