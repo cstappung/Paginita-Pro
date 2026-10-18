@@ -122,7 +122,9 @@ export class HighwayRenderer {
       }
     }
 
-    this._neck(ctx, G, now, opts);
+    // el mástil (veta de madera) va con el reloj de la canción aunque la autopista de
+    // otro jugador se pinte con retraso (session.js): así se comparte y no se nota
+    this._neck(ctx, G, opts.neckNow ?? now, opts);
     if (e.spActive) this._spTint(ctx, G, now);
     this._inlays(ctx, G, song, now);
     this._fretWires(ctx, G, song, now);
@@ -281,7 +283,10 @@ export class HighwayRenderer {
   _neckLines(G) {
     const yBot = G.view.y + G.view.h;
     const key = `${G.topY}|${G.strikeY}|${G.hw}|${yBot}`;
-    if (this._neckKey === key) return this._neckL;
+    // con 4 o más hay autopistas de dos tamaños y en varias filas: una geometría por cada una
+    const cache = (this._neckLs ??= new Map());
+    const hecho = cache.get(key);
+    if (hecho) return hecho;
     const range = G.strikeY - G.topY;
     const ys = [], ds = [], ws = [], as = [];
     for (let y = Math.floor(G.topY); y < yBot; y++) {
@@ -295,9 +300,10 @@ export class HighwayRenderer {
       ws.push(2 * G.hw * s);
       as.push(a * 0.96);
     }
-    this._neckKey = key;
-    this._neckL = { n: ys.length, y: Int32Array.from(ys), d: Float64Array.from(ds), w: Float64Array.from(ws), a: Float64Array.from(as) };
-    return this._neckL;
+    const L = { n: ys.length, y: Int32Array.from(ys), d: Float64Array.from(ds), w: Float64Array.from(ws), a: Float64Array.from(as) };
+    if (cache.size >= 16) cache.clear();
+    cache.set(key, L);
+    return L;
   }
 
   /* Con varios jugadores, todas las autopistas tienen el mismo mástil en el mismo
@@ -314,15 +320,19 @@ export class HighwayRenderer {
     const x0 = G.cx - half, y0 = Math.floor(G.topY), yBot = G.view.y + G.view.h;
     const dx = k * x0 + tr.e, dy = k * y0 + tr.f;
     const fx = dx - Math.floor(dx), fy = dy - Math.floor(dy);
-    const key = [opts.style, now, G.vis, G.topY, G.strikeY, G.hw, yBot, this.alto, k, fx.toFixed(4), fy.toFixed(4)].join('|');
-    if (this._neckCKey !== key) {
-      // la primera autopista del cuadro lo pinta; las que no coinciden, directo
-      if (this._neckCNow === now) return this._neckDraw(ctx, G, now, opts, k);
-      this._neckCNow = now;
+    // Un lienzo por geometría (la grande del centro y las chicas de los lados, con
+    // 4 o más): cada uno se pinta una vez por cuadro y se copia a las que coinciden.
+    const geo = [opts.style, G.vis, G.topY - y0, G.strikeY - y0, G.hw, yBot - y0, this.alto, k, fx.toFixed(4), fy.toFixed(4)].join('|');
+    const lienzos = (this._neckCs ??= new Map());
+    let n = lienzos.get(geo);
+    if (!n || n.now !== now) {
       const W = Math.ceil(2 * half * k + fx) + 2, H = Math.ceil((yBot - y0) * k + fy) + 2;
-      let c = this._neckC;
-      if (!c || c.width !== W || c.height !== H) {
-        c = this._neckC = document.createElement('canvas');
+      if (!n) {
+        if (lienzos.size >= 8) lienzos.clear();
+        lienzos.set(geo, (n = { c: document.createElement('canvas'), now: null }));
+      }
+      const c = n.c;
+      if (c.width !== W || c.height !== H) {
         c.width = W;
         c.height = H;
       }
@@ -331,11 +341,11 @@ export class HighwayRenderer {
       oc.clearRect(0, 0, W, H);
       oc.setTransform(k, 0, 0, k, fx - x0 * k, fy - y0 * k);
       this._neckDraw(oc, G, now, opts, k);
-      this._neckCKey = key;
+      n.now = now;
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(this._neckC, Math.floor(dx), Math.floor(dy));
+    ctx.drawImage(n.c, Math.floor(dx), Math.floor(dy));
     ctx.restore();
   }
 

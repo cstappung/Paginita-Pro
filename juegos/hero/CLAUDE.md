@@ -155,7 +155,29 @@ and message names, and the postman plays the server:
 - **Fullscreen**: the frame asks for it (`pantallaCompleta` in
   `puente.js`) on «Estoy listo» / «Empezar canción», the gestures the
   browser requires. Your highway goes in the middle (`enElCentro` in
-  `js/game/orden.js`: 3 → centre, 4 → centre-left).
+  `js/game/orden.js`: 3 → centre). With 4+ it is **big in the middle and
+  the rest in two narrow side columns** (`vistas` in `orden.js`, used by
+  `session._views`): 4 → 2·1·1, 5 → 2·1·2, 6 → 3·1·2, 7 → 3·1·3, 8 → 4·1·3.
+  Side tiles are all the same size, on whole device pixels (so they share
+  the painted neck), and each view is clipped. The neck caches
+  (`_neckLines`, the shared neck canvas) are per geometry: with a single
+  cache, two sizes per frame repainted everything.
+- **Everyone starts on the director's clock.** `.info/serverTimeOffset`
+  doesn't subtract the handshake's latency, so each browser's `fb.ahora`
+  was off by its own hundreds of ms and the song started at different
+  moments. Each player asks the director over the mesh every second
+  (`tic`/`tac`, NTP-style, `crearReloj` in `hero-sala.js`; minimum-RTT of the
+  last 12) and sends the frame `reloj` with the director's time; with no
+  direct channel to the director, Firebase's. `alDatos` catches `tic`/`tac`
+  before `directo.recibe`, like `mira`.
+- **Other players' highways are drawn late on purpose** (`RemoteState.retraso`
+  in `remoto.js`). Their hits arrive 100–300 ms after the note (mesh + the
+  100 ms `STATE_INTERVAL`): drawn on your clock, each note crossed the bar and
+  lit up afterwards, which read as playing off-beat. Each new hit measures
+  how late it arrived; the target follows the upper envelope (up fast, down
+  slow, ignoring samples > 0.8 s) and the drawn delay moves toward it at ≤
+  15 %. `laneHitTime` is stamped on that delayed clock. The neck uses your
+  clock (`opts.neckNow`) so it stays shared; wood grain has no beat.
 - **What the host is browsing** (the song marked in their selector, `onBrowse`
   in `songSelect.js` → `browse`) goes over the mesh as a `mira` packet,
   never to the move log (browsing is dozens of changes), and is repeated
