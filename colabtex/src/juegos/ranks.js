@@ -32,7 +32,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }};
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }};
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -94,6 +94,9 @@ const SOLO = {
   /* PRO HERO: una sola tabla, la general por estrellas doradas (hero.js). */
   hero: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas doradas"]] }],
     cat: s => `club-hero-${s.n}` },
+  /* PRO DEFENDER: la ronda récord de cada reino. */
+  prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"]] }],
+    cat: s => `club-prodefender-${s.n}` },
   /* Metro Rush: una fila «Modo» con la mejor carrera de cada modo normal
      (carrera es el clásico) y la carrera más larga de cada mundo, en metros
      (Distancia la Línea 3, City distancia City: ahí corren también los modos
@@ -280,7 +283,7 @@ export function crearRanks(ctx) {
       return;
     }
     const adm = solo && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord;
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>${categoriaSolo==='club-hero-estrellas'?'Además':'Tiempo'}</th>${adm?'<th class="jg-rk-adm" title="Solo administradores">🛡️</th>':''}</tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):categoriaSolo==='club-hero-estrellas'?Math.floor(f.puntos/10000)+' ★ doradas':f.puntos}</td><td>${categoriaSolo==='club-hero-estrellas'?Math.max(0,f.puntos%10000-Math.floor(f.puntos/10000))+' azules · '+(f.h||0)+' canciones':(f.tiempo/1000).toFixed(2)+' s'}</td>${adm?`<td class="jg-rk-adm"><button type="button" class="btn2 jg-rk-borra" title="Eliminar este récord (administración)" data-borra="${esc(f.uid)}" data-partida="${esc(f.partida||'')}" data-nombre="${esc(f.nombre||'')}">🗑</button></td>`:''}</tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>${categoriaSolo==='club-hero-estrellas'?'Además':'Tiempo'}</th>${adm?'<th class="jg-rk-adm" title="Solo administradores">🛡️</th>':''}</tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')||categoriaSolo.startsWith('club-prodefender-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):categoriaSolo==='club-hero-estrellas'?Math.floor(f.puntos/10000)+' ★ doradas':f.puntos}</td><td>${categoriaSolo==='club-hero-estrellas'?Math.max(0,f.puntos%10000-Math.floor(f.puntos/10000))+' azules · '+(f.h||0)+' canciones':categoriaSolo.startsWith('club-prodefender-')?Math.max(1,Math.round(f.tiempo/60000))+' min de juego':(f.tiempo/1000).toFixed(2)+' s'}</td>${adm?`<td class="jg-rk-adm"><button type="button" class="btn2 jg-rk-borra" title="Eliminar este récord (administración)" data-borra="${esc(f.uid)}" data-partida="${esc(f.partida||'')}" data-nombre="${esc(f.nombre||'')}">🗑</button></td>`:''}</tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -369,7 +372,7 @@ export function crearRanks(ctx) {
         /^club-sudoku-(facil|medio|dificil|experto)$/.test(categoriaSolo)))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
-    if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-")))
+    if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-") || categoriaSolo.startsWith("club-prodefender-")))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
     /* PRO HERO: puntos = doradas·10 000 + todas; se dicen las doradas. */
     if (solo && categoriaSolo === "club-hero-estrellas")

@@ -89,6 +89,10 @@ export const SOLOS = [
     ruta: "#solo/pokelike", reglas: "pokelike", popular: "club-pokelike", ranking: true,
     lema: "Roguelike de Pokémon de Kanto: un mapa distinto cada vez, ocho gimnasios, la Liga y una Ruta Infinita. Versión de prueba.",
     modos: ["Tabla de puntaje", "Tabla de Pokédex"] },
+  { id: "prodefender", tipo: "club", nombre: "PRO DEFENDER", genero: "Estrategia", icono: "🛡️", alta: "2026-10-18",
+    ruta: "#solo/prodefender", reglas: "prodefender", popular: "club-prodefender", ranking: true,
+    lema: "Tower defense: 5 reinos de 100 rondas, 22 defensores y más de 30 atacantes. Cada ronda nueva de tu récord paga monedas.",
+    modos: ["Un récord por reino", "Hasta 10 000 🪙 por reino"] },
   { id: "protiles", tipo: "club", nombre: "PRO TILES", genero: "Ritmo", icono: "🎹", alta: "2026-10-17",
     ruta: "#solo/protiles", reglas: "protiles", popular: "club-protiles", ranking: true,
     lema: "Toca las fichas negras al ritmo de 8 canciones pop originales que nunca terminan, con piano de cola real. Un error y se acaba.",
@@ -202,7 +206,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC
@@ -276,5 +280,6 @@ export const MOTIVO_CUENTA = {
   cartas: { t: "PRODROP necesita una cuenta", d: "Los sobres se pagan con monedas y las cartas quedan en tu colección. Inicia sesión para abrir el primero, que cada 6 horas es gratis." },
   mercado: { t: "El mercado es entre cuentas", d: "Aquí se compran, se venden y se intercambian cartas de PRODROP, mascotas y sus cosas, con las monedas que ganas jugando. Inicia sesión para entrar." },
   mascotas: { t: "Mascotas necesita una cuenta", d: "Tus mascotas, su ropa y sus muebles viven en tu cuenta, y se pagan con las monedas que ganas jugando. Inicia sesión y adopta la primera: es gratis." },
+  casino: { t: "El casino juega con tus monedas", d: "Las apuestas se pagan con las monedas que ganas jugando y los premios vuelven a tu cuenta. Inicia sesión para subirte al avión o hacer saltar al pingüino." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };

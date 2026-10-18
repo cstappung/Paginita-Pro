@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, memazo} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -233,6 +233,12 @@ export const EJEMPLOS={
  e('medallas','Medallas y clasificación',
   p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
+ prodefender:[e('colocar','Colocar y mejorar un defensor',
+  p('Junto al camino','Elige un defensor en la tienda y tócalo en el mapa, cerca del camino pero no encima. El círculo es su alcance: ataca a lo que pasa por dentro.',defensa(0)),
+  p('Dos caminos de mejora','Toca la torre para ver sus mejoras. Cada camino tiene cuatro niveles, pero solo uno de los dos puede pasar del nivel 2: hay que elegir.',defensa(1))),
+ e('monedas','El récord y las monedas',
+  p('Rondas que importan','La 25 trae el primer jefe, la 50 abre el reino siguiente y la 100 da el trofeo. Tu récord en cada reino es la ronda más alta que superaste.',fichas('Un reino',['R25','rojo','JEFE'],['R50','oro','ABRE OTRO'],['R100','verde','TROFEO'])),
+  p('Cada ronda nueva paga','Cada ronda que pasa tu récord paga 20 monedas por el número del reino, una sola vez. Si tenías la 60 en el Prado y llegas a la 70, cobras solo esas diez: 200 monedas.',defensa(2)))],
  hero:[e('nota','Acertar una nota',
   p('Mira bajar la nota','Las notas bajan por la autopista hacia cinco botones de colores. Esta es verde: va al primer botón, que con el teclado es la tecla A.',hero(0)),
   p('Pisa y rasguea','Cuando la nota llega al botón, pisa el traste y rasguea a la vez (↑, ↓ o Intro). En el modo Todo taps basta con pisar el traste justo a tiempo.',hero(1))),

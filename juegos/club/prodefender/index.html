@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610180648"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>PRO DEFENDER</title>
+  <meta name="description" content="Tower defense original: 5 reinos, 100 rondas cada uno, 22 defensores y más de 30 atacantes.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e1220'/%3E%3Cpath d='M16 4 27 8v8c0 7-5 11-11 13C10 27 5 23 5 16V8z' fill='%23ffcf4d'/%3E%3Cpath d='M16 9v15c-4-2-6-5-6-9v-4z' fill='%23f39c1f'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <script src="../conexion.js?v=club-18"></script>
+  <link rel="stylesheet" href="css/style.css?v=pd-1">
+</head>
+<body>
+<!-- .shell: conexion.js pone ahí el enlace de vuelta y el panel de la clasificación
+     (este en el <aside> de .layout, en la pantalla de reinos). -->
+<div class="shell">
+<div id="app">
+
+  <!-- ============================ MENÚ ============================ -->
+  <section id="scr-menu" class="screen active">
+    <canvas id="menu-bg"></canvas>
+    <div class="menu-box">
+      <h1 class="logo" translate="no"><span class="l1">PRO</span><span class="l2">DEFENDER</span></h1>
+      <p class="tag">Cinco reinos. Cien rondas cada uno. Ni un solo descuido.</p>
+      <button id="btn-play" class="btn big">Jugar</button>
+      <div class="menu-row">
+        <button id="btn-almanac" class="btn">Almanaque</button>
+        <button id="btn-help" class="btn">Cómo jugar</button>
+      </div>
+      <button id="btn-reset" class="btn ghost small">Borrar progreso</button>
+      <button id="btn-mute-menu" class="btn ghost small mute">🔊 Sonido</button>
+      <span class="pd-vol" data-volumen></span>
+      <button class="btn ghost small pd-volver">← Volver a Juegos</button>
+    </div>
+  </section>
+
+  <!-- ========================== NIVELES ========================== -->
+  <section id="scr-levels" class="screen">
+    <header class="scr-head">
+      <button class="btn small back" data-go="menu">← Volver</button>
+      <h2>Elige un reino</h2>
+      <span class="hint">Completa la ronda 50 de un reino para desbloquear el siguiente.</span>
+      <button class="btn small ghost pd-volver">← Juegos</button>
+    </header>
+    <div class="layout pd-reinos"><div id="level-grid"></div><aside class="pd-lado"><h3 class="pd-lado-tit" translate="no"></h3></aside></div>
+  </section>
+
+  <!-- ========================= ALMANAQUE ========================= -->
+  <section id="scr-almanac" class="screen">
+    <header class="scr-head">
+      <button class="btn small back" data-go="menu">← Volver</button>
+      <h2>Almanaque</h2>
+      <div class="tabs">
+        <button class="tab active" data-tab="towers">Defensores</button>
+        <button class="tab" data-tab="enemies">Atacantes</button>
+      </div>
+    </header>
+    <div id="alm-content"></div>
+  </section>
+
+  <!-- ========================= AYUDA ============================= -->
+  <section id="scr-help" class="screen">
+    <header class="scr-head">
+      <button class="btn small back" data-go="menu">← Volver</button>
+      <h2>Cómo jugar</h2>
+    </header>
+    <div class="help-body">
+      <div class="help-card">
+        <h3>Objetivo</h3>
+        <p>Los atacantes recorren el camino. Si alguno llega al final pierdes vidas (los grandes quitan más). Coloca defensores junto al camino para detenerlos durante las <b>100 rondas</b> de cada reino.</p>
+        <p>Al completar la <b>ronda 50</b> desbloqueas el siguiente reino. Llegar a la <b>ronda 100</b> te da el trofeo del reino. Los jefes aparecen en las rondas 25, 50, 75 y 100.</p>
+      </div>
+      <div class="help-card">
+        <h3>Dinero y mejoras</h3>
+        <p>Ganas oro por cada enemigo eliminado y una bonificación al terminar cada ronda. Cada defensor tiene <b>2 caminos de 4 mejoras</b>: un camino puede llegar al nivel 4 y el otro sólo hasta el 2. Vender devuelve el 75% de lo invertido.</p>
+        <p>Algunas mejoras de nivel 4 dan <b>habilidades automáticas</b>: se lanzan solas cuando hay peligro y su recarga aparece en la esquina del mapa.</p>
+        <p>Las torres necesitan su espacio: no se pueden colocar pegadas unas a otras.</p>
+      </div>
+      <div class="help-card">
+        <h3>Defensas de cada reino</h3>
+        <p>Cada reino trae <b>2 defensas nuevas</b> que se suman a las anteriores: bumeranes y murallas de raíces en el Prado, sierras y ácido en las Dunas, faro y balista en el Glaciar, gólems y géiseres en la Caldera, y maldición y guadañas en el Vacío.</p>
+        <p>Las oleadas salen de las más débiles a las más duras, y los jefes llegan al final. Mira la vista previa de la siguiente ronda: si vienen camuflados, blindados o voladores, prepárate antes.</p>
+      </div>
+      <div class="help-card">
+        <h3>Tipos de daño</h3>
+        <ul>
+          <li><b class="c-phys">Físico</b>: espinas, balas, drones. Reducido por blindaje.</li>
+          <li><b class="c-expl">Explosivo</b>: bombas y minas. Ignora la mitad del blindaje. No alcanza voladores.</li>
+          <li><b class="c-ice">Hielo</b>: ralentiza y congela.</li>
+          <li><b class="c-elec">Eléctrico</b>: salta entre enemigos y destroza escudos.</li>
+          <li><b class="c-fire">Fuego</b>: quema con el tiempo e ignora blindaje.</li>
+          <li><b class="c-arc">Arcano</b>: ignora blindaje y afecta a enemigos en fase.</li>
+          <li><b class="c-fire">Ácido</b>: corroe el blindaje y hace que el enemigo reciba más daño.</li>
+          <li><b class="c-ice">Vapor</b>: moja a los enemigos: más daño eléctrico y pierden la inmunidad al fuego.</li>
+        </ul>
+      </div>
+      <div class="help-card">
+        <h3>Rasgos de los atacantes</h3>
+        <ul>
+          <li><b>Camuflado</b>: necesita torres con detección (o pulsos de área).</li>
+          <li><b>Volador</b>: inmune a morteros y minas.</li>
+          <li><b>Blindaje</b>: resta daño a cada impacto.</li>
+          <li><b>Escudo</b>: se recarga si no recibe daño durante 3 s.</li>
+          <li><b>Regenera, Cura, Acelera, Sabotea, Se entierra, Entra en fase…</b> ¡consulta el Almanaque!</li>
+        </ul>
+      </div>
+      <div class="help-card">
+        <h3>Controles</h3>
+        <ul>
+          <li><b>Clic</b> en un defensor de la tienda y luego en el mapa para colocarlo (mantén <b>Shift</b> para colocar varios).</li>
+          <li><b>Clic</b> sobre una torre para ver mejoras. <b>Esc</b> o clic derecho cancela.</li>
+          <li><b>Espacio</b>: iniciar ronda · <b>F</b>: velocidad · <b>P</b>: pausa</li>
+          <li><b>1-9, 0, -, =</b>: elegir defensor · <b>Z / X</b>: mejorar camino 1 / 2 · <b>Supr</b>: vender · <b>Tab</b>: cambiar objetivo</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== JUEGO =========================== -->
+  <section id="scr-game" class="screen">
+    <header id="hud">
+      <div class="hud-l">
+        <div class="stat lives" title="Vidas"><i class="ico heart"></i><b id="h-lives">0</b></div>
+        <div class="stat money" title="Oro"><i class="ico coin"></i><b id="h-money">0</b></div>
+        <div class="stat round" title="Ronda"><span>Ronda</span><b id="h-round">0</b><small>/100</small></div>
+        <div class="stat lvl" id="h-level"></div>
+      </div>
+      <div class="hud-c" id="h-next"></div>
+      <div class="hud-r">
+        <button id="b-start" class="btn go">▶ Iniciar ronda</button>
+        <button id="b-speed" class="btn sq" title="Velocidad (F)">x1</button>
+        <button id="b-auto" class="btn sq" title="Iniciar rondas automáticamente">Auto</button>
+        <button id="b-mute" class="btn sq mute" title="Sonido (M)">🔊</button>
+        <span class="pd-vol" data-volumen></span>
+        <button id="b-pause" class="btn sq" title="Pausa (P)">❚❚</button>
+      </div>
+    </header>
+    <main id="game-main">
+      <div id="stage">
+        <canvas id="cv"></canvas>
+        <div id="abilities"></div>
+        <div id="toasts"></div>
+      </div>
+      <aside id="side">
+        <div id="shop-wrap">
+          <div class="side-title">Defensores</div>
+          <div id="shop"></div>
+        </div>
+        <div id="info" class="hidden"></div>
+      </aside>
+    </main>
+  </section>
+
+  <div id="modal" class="modal hidden"><div class="modal-box" id="modal-box"></div></div>
+  <div id="tooltip" class="hidden"></div>
+</div>
+
+</div>
+<!-- El mismo ?v= que js/verificador.js: el verificador tiene que rehacer la partida con este mismo motor. -->
+<script src="js/data/enemies.js?v=pd-1"></script>
+<script src="js/data/towers.js?v=pd-1"></script>
+<script src="js/data/levels.js?v=pd-1"></script>
+<script src="js/engine.js?v=pd-1"></script>
+<script src="js/prueba.js?v=pd-1"></script>
+<script src="js/render.js?v=pd-1"></script>
+<script src="js/audio.js?v=pd-1"></script>
+<script src="js/main.js?v=pd-1"></script>
+</body>
+</html>

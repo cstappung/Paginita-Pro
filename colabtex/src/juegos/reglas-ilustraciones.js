@@ -442,3 +442,29 @@ export const memazo=etapa=>{
  }
  return svg(nombre,c);
 };
+/* PRO DEFENDER: un trozo de camino. `etapa`: 0 una torre recién puesta con
+   su alcance y atacantes entrando; 1 los dos caminos de mejora (uno llega a
+   4, el otro se queda en 2); 2 el récord que sube de la 60 a la 70 y lo que
+   paga. */
+export const defensa=etapa=>{
+ const nombre=['Una torre junto al camino, con su círculo de alcance, y atacantes entrando','Los dos caminos de mejora de una torre: uno llega al nivel 4 y el otro se queda en el 2','El récord sube de la ronda 60 a la 70: diez rondas nuevas, 200 monedas en el Prado'][etapa];
+ let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#3e8f3a"/>`;
+ if(etapa===0){
+  cuerpo+=`<path d="M14 90 H250 V200 H466" fill="none" stroke="#8f7140" stroke-width="44" stroke-linejoin="round"/><path d="M14 90 H250 V200 H466" fill="none" stroke="#c9a86a" stroke-width="36" stroke-linejoin="round"/>`;
+  cuerpo+=circle(180,150,78,'#ffffff22','#ffffff99')+circle(180,150,20,'#2a3156','#161a30')+circle(180,150,14,'#5fbf4a');
+  cuerpo+=[40,82,124].map((x,i)=>circle(x,90,11,i===2?'#e2c14d':'#8fd16a','#0006')).join('')+line(180,150,124,92,C.oro,4);
+  cuerpo+=txt(300,60,'Alcance',18,C.blanco)+txt(300,84,'de la torre',16,C.blanco);
+ }
+ if(etapa===1){
+  cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#1c2238"/>`;
+  const fila=(y,nombre,n,max,col)=>txt(40,y,nombre,17,C.blanco)+[0,1,2,3].map(i=>rect(220+i*52,y-22,40,30,i<n?col:'#242b46',i<max?'#ffffff66':'#ff9c9c',6)).join('')+(max<4?txt(440,y,'🔒',18,C.rojo,'end'):'');
+  cuerpo+=fila(90,'Camino 1',4,4,C.verde)+fila(170,'Camino 2',2,2,C.azul)+txt(240,226,'Solo un camino pasa del nivel 2',15,C.gris,'middle');
+ }
+ if(etapa===2){
+  cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#1c2238"/>`;
+  cuerpo+=rect(40,70,400,34,'#242b46','#465773',8)+rect(40,70,240,34,C.verde,'none',8)+rect(280,70,40,34,C.oro,'none',0);
+  cuerpo+=txt(40,58,'Récord del Prado',16,C.blanco)+txt(280,130,'60',16,C.verde,'middle')+txt(320,130,'70',16,C.oro,'middle');
+  cuerpo+=txt(240,180,'10 rondas nuevas × 20 = +200 🪙',20,C.oro,'middle')+txt(240,212,'Las primeras 60 ya se pagaron',15,C.gris,'middle');
+ }
+ return svg(nombre,cuerpo);
+};

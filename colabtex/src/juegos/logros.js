@@ -538,6 +538,21 @@ const SOLO = {
     { id: "c40", n: "Gira mundial", d: "Ten estrellas doradas en 40 canciones distintas.", i: "🌎", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h | 0) >= 40 },
     { id: "o150", n: "Disco de diamante", d: "Junta 150 estrellas doradas.", i: "💎", m: "Doradas", s: d => cat(/-estrellas$/)(d) && heroG(d) >= 150 },
     { id: "l40", n: "Leyenda del rock", d: "Saca las cinco doradas en 40 canciones (200 doradas).", i: "👑", m: "Canciones", s: d => cat(/-estrellas$/)(d) && (d.h5 | 0) >= 40 }
+  ],
+  /* PRO DEFENDER. Salen de la ronda récord de cada reino
+     (club-prodefender-<reino>): la 25 es el primer jefe, la 50 abre el reino
+     siguiente y la 100 es el trofeo. */
+  prodefender: [
+    { id: "r10", n: "Primera muralla", d: "Supera la ronda 10 en cualquier reino.", i: "🛡️", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 10 },
+    { id: "r25", n: "Matajefes", d: "Supera la ronda 25, la del primer jefe, en cualquier reino.", i: "☠️", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 25 },
+    { id: "r50", n: "Medio camino", d: "Supera la ronda 50 en cualquier reino.", i: "🔓", m: "Rondas", s: d => cat(/^club-prodefender-/)(d) && d.puntos >= 50 },
+    { id: "prado", n: "Trofeo del Prado", d: "Supera las 100 rondas del Prado Esmeralda.", i: "🌿", m: "Reinos", s: d => cat(/-prado$/)(d) && d.puntos >= 100 },
+    { id: "dunas", n: "Trofeo de las Dunas", d: "Supera las 100 rondas de las Dunas de Ámbar.", i: "🏜️", m: "Reinos", s: d => cat(/-dunas$/)(d) && d.puntos >= 100 },
+    { id: "glaciar", n: "Trofeo del Glaciar", d: "Supera las 100 rondas del Glaciar Cristal.", i: "❄️", m: "Reinos", s: d => cat(/-glaciar$/)(d) && d.puntos >= 100 },
+    { id: "caldera", n: "Trofeo de la Caldera", d: "Supera las 100 rondas de la Caldera Volcánica.", i: "🌋", m: "Reinos", s: d => cat(/-caldera$/)(d) && d.puntos >= 100 },
+    { id: "vacio50", n: "Al borde del Vacío", d: "Supera la ronda 50 del Nexo del Vacío.", i: "🌀", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 50 },
+    { id: "vacio75", n: "Mirar al abismo", d: "Supera la ronda 75 del Nexo del Vacío.", i: "👁️", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 75 },
+    { id: "vacio", n: "PRO DEFENDER", d: "Supera las 100 rondas del Nexo del Vacío.", i: "🏆", m: "Reinos", s: d => cat(/-vacio$/)(d) && d.puntos >= 100 }
   ]
 };
 /* PRO HERO: las doradas y el total (máx. de doradas y azules por canción)
@@ -553,7 +568,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

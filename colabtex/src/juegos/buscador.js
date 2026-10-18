@@ -59,6 +59,7 @@ export const APODOS = {
   metrorush: "subway surfers tren trenes correr runner monedas",
   tulonesclub: "tulones escalar trepar torre fisica calzoncillos pudu",
   heroclub: "guitar hero clone hero guitarra bajo bateria musica canciones",
+  prodefender: "tower defense torres defensa bloons td estrategia reinos oleadas",
   frontera: "pokemon batalla torre palacio fabrica esmeralda",
   orbita: "gravedad espacio planetas sondas estrellas satelites",
   escondite: "esconder buscar escondidas paisaje",

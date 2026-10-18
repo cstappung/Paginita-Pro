@@ -219,7 +219,9 @@ logros, the balance is derived from the same four reads the profile uses
   100 pays 1 225; the per-round pay stops growing at round 450, 112 a round
   from there, and nothing past round 600 pays), sortEm pays the mode's blocks
   plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
-  Electrodle streaks 10 per day.
+  Electrodle streaks 10 per day. PRO DEFENDER pays 20 × the kingdom number for every
+  round up to each kingdom's record (`monedasProdefender`: 2000…10 000 at
+  round 100) and has no per-game pay (not in `PAGO_CLUB`).
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
   every club game that ends with a result pays `PAGO_CLUB[juego]` (15 to 25
   by how long a game lasts), up to `TOPE_CLUB_DIA` (15) per game per Chile
@@ -296,3 +298,10 @@ and `historial` (previous owners). `mascotasDe`/`objetosDe` list what an
 account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
 per-pet state (`mascotasEstado`) is read only by key.
 
+
+## Casino
+
+The Casino tab bets coins: a bet is a spend (`ca`, through `paga`) and a
+payout is income (`cp`, in `premios`, summed in hundredths and floored once).
+Saldo = ganado + cobradas + premios − gastadas. Details:
+`docs/claude/juegos/casino.md`.

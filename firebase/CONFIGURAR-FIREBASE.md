@@ -250,6 +250,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > hasta entonces el récord de distancia de City se queda en el dispositivo y
 > el logro no se guarda.
 
+> **PRO DEFENDER (18 de octubre de 2026):** cinco categorías nuevas de
+> `soloRanks` y `soloPruebas`, `club-prodefender-(prado|dunas|glaciar|
+> caldera|vacio)` (la ronda récord de cada reino, con tope de 100). No usa
+> `clubJugadas` (no paga por partida: paga cada ronda nueva del récord) ni
+> `users/<uid>/club` (la partida a medias vive en el navegador). Hasta volver
+> a publicar las reglas se juega igual, pero las rondas no entran en la
+> clasificación y no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 
@@ -590,6 +598,19 @@ que tiene que estar a pocos segundos de la del servidor. Sin publicar, la
 sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
+
+### ⚠ El Casino pide publicar otra vez (2026-10-18)
+
+Nodo nuevo `casino/<uid>/<clave>` = `{j, p, d?, at}`: una ronda del avión
+(`j: 'a'`) o del pingüino (`j: 'p'`, dificultad `d` 0–3). La regla exige
+`at === now`, que la apuesta sea un entero entre 10 y el tope del juego
+(avión 500; pingüino 1000/500/200/50 según la dificultad) y que no se
+reescriba. Las marcas `t/<i>` (avión), `s/<i>` (pingüino) y `c` (retirarse)
+son de una vez y valen `now`: de esa hora sale el azar
+(`colabtex/src/juegos/casino-motor.js`). Lo lee cualquiera con sesión, como
+los sobres de PRODROP: el saldo de todos sale de ahí. Sin publicar, apostar
+falla con PERMISSION_DENIED. Pegar `firebase/database.rules.json` entero y
+**Publicar**.
 
 ### ⚠ HaxBall pide publicar otra vez (2026-10-13)
 

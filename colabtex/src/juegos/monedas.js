@@ -53,6 +53,7 @@ import PM from "../../../juegos/prodrop/motor.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 import { CORTES } from "./cortes.js";
+import * as CM from "./casino-motor.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -118,7 +119,11 @@ export const NIVEL = {
   metrorush: "12334123344",
   /* PRO HERO, en el orden de LOGROS.hero: e1 o1 c5 c10 o50 l10 o100 c40
      o150 l40. */
-  hero: "1122233344"
+  hero: "1122233344",
+  /* PRO DEFENDER, en el orden de LOGROS.prodefender: r10 r25 r50 · prado
+     dunas glaciar caldera · vacio50 vacio75 vacio. Bajos a propósito: lo
+     grande de este juego lo paga cada ronda del récord (monedasProdefender). */
+  prodefender: "1112222333"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -181,8 +186,19 @@ export function monedasHero(puntos) {
   const p = Math.max(0, Math.floor(+puntos || 0)), g = Math.min(Math.floor(p / 10000), 5000), m = Math.min(p % 10000, 5000);
   return 50 * (g + Math.max(g, m));
 }
+/* PRO DEFENDER: cada ronda del récord de un reino paga 20 × el número del
+   reino (el Prado, 20; el Vacío, 100), así que llegar a la 100 son 2000,
+   4000, 6000, 8000 y 10 000. Sale del récord, así que una partida que no lo
+   supera no paga nada, y la que lo supera paga solo las rondas nuevas. */
+export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio"];
+export function monedasProdefender(cat, rondas) {
+  const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || "")), r = m ? PRODEFENDER_REINOS.indexOf(m[1]) : -1;
+  if (r < 0) return 0;
+  return 20 * (r + 1) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
+}
 function extraRecord(cat, f) {
   if (cat === "club-hero-estrellas") return monedasHero(f.puntos);
+  if (cat.startsWith("club-prodefender-")) return monedasProdefender(cat, f.puntos);
   if (/^club-frontera-(torre|palacio|fabrica)-(50|abierto)$/.test(cat)) return monedasRachaFrontera(f.puntos);
   if (cat === "club-frontera-victorias") return 3 * Math.min(f.puntos || 0, 100000);
   if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
@@ -339,8 +355,9 @@ export function ganadoDe(uid, datos) {
    parada por un gasto sin fondos. */
 export function monedasDe(uid, datos) {
   const g = ganadoDe(uid, datos), e = economia(datos).usuarios[uid];
-  const gastadas = e ? e.gastadas : 0, cobradas = e ? e.cobradas : 0;
-  return Object.assign(g, { gastadas, cobradas, saldo: g.total + cobradas - gastadas, parada: !!(e && e.parada), falta: e ? e.falta : 0 });
+  const gastadas = e ? e.gastadas : 0, cobradas = e ? e.cobradas : 0, premios = e ? e.premios : 0;
+  return Object.assign(g, { gastadas, cobradas, premios, saldo: g.total + cobradas + premios - gastadas, parada: !!(e && e.parada), falta: e ? e.falta : 0,
+    casino: e ? e.casino : { apostado: 0, pagado: 0, rondas: 0 } });
 }
 
 /* ---------- la economía de PRODROP ----------
@@ -393,7 +410,7 @@ export function economia(datos) {
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
-  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7 };
+  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -429,6 +446,19 @@ export function economia(datos) {
   for (const [u, l] of Object.entries(d.tienda || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "c", at: x.at, u, k, p: num(x.p) });
+  /* El casino: `casino/<uid>/<clave>` es una ronda (casino-motor.js). La
+     apuesta se cobra a la hora de la apuesta y el premio, si lo hubo, se
+     suma a la hora en que se cobró; lo que pasó entremedio lo decide el
+     motor con las horas del servidor. */
+  const rondas = {};
+  for (const [u, l] of Object.entries(d.casino || {}))
+    for (const [k, x] of Object.entries(l || {})) {
+      const res = CM.resuelve(u, k, x);
+      if (!res) continue;
+      rondas[u + "~" + k] = Object.assign({ u, k, j: x.j, p: x.p, d: x.d, at: x.at, valida: false }, res);
+      ev.push({ t: "ca", at: x.at, u, k, p: x.p });
+      if (res.pago > 0) ev.push({ t: "cp", at: res.fin, u, k, p: res.pago });
+    }
   ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
 
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
@@ -438,7 +468,7 @@ export function economia(datos) {
   const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
   const ganado = {};
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {},
-    intentos: 0, adopciones: 0, comida: 0, fondos: {} });
+    intentos: 0, adopciones: 0, comida: 0, fondos: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0 } });
   /* Una mascota cambia de manos: cuenta para el cupo de quien la tiene. */
   const pasaMascota = (cc, de, a) => {
     tiene[de] = (tiene[de] || 1) - 1; tiene[a] = (tiene[a] || 0) + 1;
@@ -455,7 +485,7 @@ export function economia(datos) {
   const saldo = u => {
     if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total;
     const x = U(u), k = enCorte(u);
-    return (k ? Math.min(ganado[u], k.tope) : ganado[u]) + x.cobradas - x.gastadas;
+    return (k ? Math.min(ganado[u], k.tope) : ganado[u]) + x.cobradas + x.premios - x.gastadas;
   };
   /* Cobra `p` a `u`. Si no puede, la cuenta queda parada (dentro de un
      corte, solo no vale). */
@@ -562,6 +592,17 @@ export function economia(datos) {
       /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
       if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
       if (paga(e.u, PRECIO_TIENDA)) U(e.u).tienda[e.k] = e.at;
+    } else if (e.t === "ca") {
+      /* Una apuesta sin fondos (o de una cuenta parada) no vale: no juega
+         ni paga, y la cuenta queda parada como con cualquier gasto. */
+      const r = rondas[e.u + "~" + e.k];
+      if (!paga(e.u, e.p)) continue;
+      r.valida = true;
+      const z = U(e.u).casino; z.apostado += e.p; z.rondas++;
+    } else if (e.t === "cp") {
+      const r = rondas[e.u + "~" + e.k];
+      if (!r.valida) continue;
+      U(e.u).premios += e.p; U(e.u).casino.pagado += e.p;
     } else if (e.t === "t") {
       const x = e.x, dar = comoLista(x.dar).map(String), pedir = comoLista(x.pedir).map(String), todas = [...dar, ...pedir];
       const ok = x.de && x.para && x.de !== x.para && dar.length >= 1 && dar.length <= 3 && pedir.length <= 3 &&
@@ -577,8 +618,8 @@ export function economia(datos) {
       }
     }
   }
-  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.falta = Math.round(x.falta); void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial };
+  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.premios = Math.floor(x.premios + 1e-6); x.casino.pagado = Math.round(x.casino.pagado * 100) / 100; x.falta = Math.round(x.falta); void u; }
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rondas };
   memoEco.set(d, res);
   return res;
 }
@@ -638,7 +679,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, d.casino]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

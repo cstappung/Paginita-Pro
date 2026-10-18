@@ -224,6 +224,40 @@ console.log("— Monedas: días seguidos (diario) —");
   await loginAs(A);
 }
 
+console.log("— Casino —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const ronda = (uid, k, x) => set(ref(db, `casino/${uid}/${k}`), Object.assign({ at: serverTimestamp() }, x));
+  await denied("no se apuesta menos de 10", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 5 }));
+  await denied("ni más del tope del avión", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 501 }));
+  await denied("ni del tope del pingüino extremo", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 51, d: 3 }));
+  await denied("ni una dificultad que no existe", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 10, d: 4 }));
+  await denied("ni un juego que no existe", () => ronda(ua.uid, "rondaX0001", { j: "x", p: 10 }));
+  await denied("ni monedas con decimales", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10.5 }));
+  await denied("ni se elige la hora", () => set(ref(db, `casino/${ua.uid}/rondaA0001`), { j: "a", p: 10, at: 1700000000000 }));
+  await denied("ni se cuela el resultado", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10, choque: 50 }));
+  await allowed("A apuesta en el avión", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 500 }));
+  await allowed("A apuesta en el pingüino fácil", () => ronda(ua.uid, "rondaP0001", { j: "p", p: 1000, d: 0 }));
+  await denied("una ronda no se reescribe", () => ronda(ua.uid, "rondaA0001", { j: "a", p: 10 }));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `casino/${ua.uid}/rondaA0001`)));
+  await allowed("A avisa que sigue volando", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/0`), serverTimestamp()));
+  await denied("un aviso no se reescribe", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/0`), serverTimestamp()));
+  await denied("ni lleva otra hora", () => set(ref(db, `casino/${ua.uid}/rondaA0001/t/1`), 1700000000000));
+  await denied("el avión no salta", () => set(ref(db, `casino/${ua.uid}/rondaA0001/s/0`), serverTimestamp()));
+  await denied("ni hay avisos de una ronda que no existe", () => set(ref(db, `casino/${ua.uid}/noexiste01/t/0`), serverTimestamp()));
+  await allowed("A salta con el pingüino", () => set(ref(db, `casino/${ua.uid}/rondaP0001/s/0`), serverTimestamp()));
+  await denied("el pingüino no avisa", () => set(ref(db, `casino/${ua.uid}/rondaP0001/t/0`), serverTimestamp()));
+  await allowed("A se retira", () => set(ref(db, `casino/${ua.uid}/rondaA0001/c`), serverTimestamp()));
+  await denied("y no se retira dos veces", () => set(ref(db, `casino/${ua.uid}/rondaA0001/c`), serverTimestamp()));
+  await denied("ni se retira de una ronda que no existe", () => set(ref(db, `casino/${ua.uid}/noexiste01/c`), serverTimestamp()));
+  await loginAs(B);
+  ok("B lee la ronda de A (el saldo de todos sale de ahí)", (await get(ref(db, `casino/${ua.uid}/rondaA0001/p`))).val() === 500);
+  await denied("B no apuesta a nombre de A", () => ronda(ua.uid, "rondaA0002", { j: "a", p: 10 }));
+  await denied("ni se retira por A", () => set(ref(db, `casino/${ua.uid}/rondaP0001/c`), serverTimestamp()));
+  await loginAs(A);
+}
+
 console.log("— Tienda del perfil —");
 {
   const { serverTimestamp } = await import("firebase/database");
