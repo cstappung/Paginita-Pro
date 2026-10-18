@@ -52,6 +52,9 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   cascade (not again when the loop snaps back: `.ya`). An animated piece
   (`ep-*`) must never carry an SVG `transform` itself (wrap it in a `<g>`):
   the CSS animation replaces it — `salon.test.cjs` checks it. Each game's
+  PRO DEFENDER's attackers walk the path with `ep-marcha`, whose keyframes
+  are the vertices of `PD_CAMINO` (percentages = cumulative length): change
+  one, change both. Each game's
   name is a logo in its own font (Bungee, Lilita One, Cinzel; Google Fonts
   link in juegos.html), with a hook line (`gancho`) and three big facts
   (`datos`) under the lema.
@@ -151,7 +154,7 @@ the rooms column (open rooms, top coins, your games) are never hidden.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
 because what is new is not always a room game (Mascotas, PRODROP). Today it
-holds **eight slides in the owner's order** — PRO HERO, Mascotas, PRO TILES,
+holds **nine slides in the owner's order** — PRO DEFENDER, PRO HERO, Mascotas, PRO TILES,
 HaxBall, TULONES (one slide for the local and the online game), Trigon,
 PRODROP, FANAL — pinned by `salon.test.cjs`. The order is not by date: the
 «★ Lo último» seal goes to the newest `alta` (`selloNovedad`), «Nuevo» to
