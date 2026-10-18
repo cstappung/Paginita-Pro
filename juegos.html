@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610172126"></script>
+<script src="i18n.js?v=202610180530"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2792,6 +2792,12 @@ html.jg-club-inm,html.jg-club-inm body{overflow:hidden;height:100%;overscroll-be
 html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
 html.jg-club-inm #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#000}
 html.jg-club-inm .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
+/* PRO DEFENDER: siempre a ventana completa (club.js: PLENO), con su propio «← Volver a Juegos».
+   Su fondo es oscuro en los dos temas, así que no lleva gemelo en el bloque oscuro. */
+html.jg-club-pleno,html.jg-club-pleno body{overflow:hidden;height:100%;overscroll-behavior:none}
+html.jg-club-pleno .head,html.jg-club-pleno .bar,html.jg-club-pleno .rp-fab,html.jg-club-pleno .jg-solo-barra,html.jg-club-pleno .jg-inv-tira,html.jg-club-pleno .jg-cg-fab,html.jg-club-pleno .jg-riel{display:none!important}
+html.jg-club-pleno #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#0e1220}
+html.jg-club-pleno .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
 html.jg-prodrop,html.jg-prodrop body{overflow:hidden;height:100%}
 html.jg-prodrop .head,html.jg-prodrop .bar,html.jg-prodrop .rp-fab{display:none!important}
@@ -5354,6 +5360,6 @@ html[data-tema=oscuro] .jg-dropm-f{background-color:#3a2a1c}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610172126"></script>
+<script src="juegos-app.js?v=202610180530"></script>
 </body>
 </html>

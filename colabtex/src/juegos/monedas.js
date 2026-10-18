@@ -118,7 +118,11 @@ export const NIVEL = {
   metrorush: "12334123344",
   /* PRO HERO, en el orden de LOGROS.hero: e1 o1 c5 c10 o50 l10 o100 c40
      o150 l40. */
-  hero: "1122233344"
+  hero: "1122233344",
+  /* PRO DEFENDER, en el orden de LOGROS.prodefender: r10 r25 r50 · prado
+     dunas glaciar caldera · vacio50 vacio75 vacio. Bajos a propósito: lo
+     grande de este juego lo paga cada ronda del récord (monedasProdefender). */
+  prodefender: "1112222333"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -181,8 +185,19 @@ export function monedasHero(puntos) {
   const p = Math.max(0, Math.floor(+puntos || 0)), g = Math.min(Math.floor(p / 10000), 5000), m = Math.min(p % 10000, 5000);
   return 50 * (g + Math.max(g, m));
 }
+/* PRO DEFENDER: cada ronda del récord de un reino paga 20 × el número del
+   reino (el Prado, 20; el Vacío, 100), así que llegar a la 100 son 2000,
+   4000, 6000, 8000 y 10 000. Sale del récord, así que una partida que no lo
+   supera no paga nada, y la que lo supera paga solo las rondas nuevas. */
+export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio"];
+export function monedasProdefender(cat, rondas) {
+  const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || "")), r = m ? PRODEFENDER_REINOS.indexOf(m[1]) : -1;
+  if (r < 0) return 0;
+  return 20 * (r + 1) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
+}
 function extraRecord(cat, f) {
   if (cat === "club-hero-estrellas") return monedasHero(f.puntos);
+  if (cat.startsWith("club-prodefender-")) return monedasProdefender(cat, f.puntos);
   if (/^club-frontera-(torre|palacio|fabrica)-(50|abierto)$/.test(cat)) return monedasRachaFrontera(f.puntos);
   if (cat === "club-frontera-victorias") return 3 * Math.min(f.puntos || 0, 100000);
   if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
