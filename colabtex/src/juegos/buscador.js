@@ -81,7 +81,7 @@ export const APODOS = {
   clue: "cluedo detective misterio asesinato crimen",
   ajedrez: "chess jaque mate",
   pokemon: "pokemon showdown combates equipos entrenador",
-  boxhead: "zombis demonios disparos armas",
+  boxhead: "box head zombis demonios disparos armas",
   haxball: "futbol soccer pelota arco goles",
   bt3: "dragon ball budokai tenkaichi goku pelea ps2",
   tulones: "escalar trepar torre fisica calzoncillos pudu",

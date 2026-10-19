@@ -2173,6 +2173,11 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
+  { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
+    gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],
+    lema: "Zombis y diablos de cajas en 3D, vistos desde arriba: cada baja sube el multiplicador y trae armas nuevas, la sangre se queda en el suelo y las granadas lo dejan negro. Practica solo o abre una sala para hasta ocho.",
+    ficha: "boxhead", juego: "boxhead", boton: "Jugar", reglas: ["boxhead"],
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "memazo", color: "#f5b301", alta: "2026-10-18", titulo: "Momazo :v",
     gancho: "Que se rían todos (menos el tomate)", datos: [["2–10", "jugadores"], ["100+", "plantillas reales"], ["🔥", "o 🍅"]],
     lema: "Te tocan plantillas de memes reales, GIFs o dibujos de la casa: ponles texto antes de que se acabe el reloj. Después cada meme sale sin nombre y todos lo califican de 🍅 a 🔥. Gana quien saque más risas.",
@@ -3635,7 +3640,7 @@ function arteJuego(k) {
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
   if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
-  if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
+  if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>PRO BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';
   if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';

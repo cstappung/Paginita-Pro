@@ -525,7 +525,113 @@ function memazo() {
   <text x="1180" y="52" text-anchor="end" font-family="Anton,Impact,'Arial Black',sans-serif" font-size="34" fill="#ffd23f" stroke="#2b0d52" stroke-width="6" paint-order="stroke">¿DE QUIÉN ERA? 🤫</text>`);
 }
 
-const ESCENAS = { memazo, prodefender, hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
+/* ---------- Pro BoxHead: la horda contra el de la pistola ---------- */
+/* Vista de arriba en tres cuartos, como el juego: piso claro manchado de
+   sangre, pilares blancos de esquinas cortadas, el jugador disparando y la
+   horda de zombis (y un diablo) que llega tambaleándose desde la derecha,
+   con una explosión al fondo y el multiplicador arriba. Cada figura son
+   cajas: frente, tapa y costado, con contorno negro. */
+function boxhead() {
+  const u = ++cuenta, az = azar(53);
+  const L = "#1a1a1e";
+  /* Una caja: frente (x, y, w, h), tapa y costado derecho de fondo `p`. */
+  const caja = (x, y, w, h, p, cf, ct, cs) => {
+    const q = r1(p * 0.55);
+    return `<path d="M${x} ${y}h${w}v${h}h${-w}Z" fill="${cf}"/>` +
+      `<path d="M${x} ${y}l${q} ${-p}h${w}l${-q} ${p}Z" fill="${ct}"/>` +
+      `<path d="M${x + w} ${y}l${q} ${-p}v${h}l${-q} ${p}Z" fill="${cs}"/>` +
+      `<path d="M${x} ${y}h${w}v${h}h${-w}Z M${x} ${y}l${q} ${-p}h${w}l${-q} ${p} M${x + w} ${y}l${q} ${-p}v${h}l${-q} ${p}" fill="none" stroke="${L}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  };
+  /* Un zombi (o diablo) que camina hacia la izquierda con los brazos
+     estirados; (0, 0) son sus pies. */
+  const zombi = (d) => {
+    const C = d ? { piel: "#d02a1e", ps: "#a01a12", pt: "#e8483a", cam: "#c0221a", cs: "#8a140e", ct: "#e03a2c", pan: "#7e100a", pel: "#1e0907", pi: "#8f170f" }
+      : { piel: "#efeee8", ps: "#c9c8c2", pt: "#ffffff", cam: "#e4e5e8", cs: "#b4b6bc", ct: "#fafafa", pan: "#7a808a", pel: "#2a2a2d", pi: "#a2a6ae" };
+    let s = `<ellipse cx="6" cy="2" rx="34" ry="9" fill="#000" opacity=".22"/>`;
+    s += caja(-12, -24, 10, 24, 6, C.pi, C.pi, "#6a6e76") + caja(4, -24, 10, 24, 6, C.pi, C.pi, "#6a6e76");
+    s += caja(-17, -54, 34, 30, 10, C.cam, C.ct, C.cs);
+    s += `<rect x="-3" y="-54" width="8" height="30" fill="${C.pan}"/>`;
+    s += d ? caja(-34, -50, 9, 22, 6, C.cam, C.ct, C.cs) : caja(-44, -50, 30, 9, 6, C.cam, C.ct, C.cs) + caja(-50, -50, 8, 9, 6, C.piel, C.pt, C.ps);
+    s += caja(-16, -88, 32, 32, 12, C.piel, C.pt, C.ps);
+    s += caja(-17, -92, 34, 8, 12, C.pel, C.pel, "#000");
+    s += d ? `<rect x="-11" y="-74" width="7" height="6" fill="#ffd84a"/><rect x="2" y="-74" width="7" height="6" fill="#ffd84a"/>
+      <path d="M-12 -104 l3 -14 l5 12Z M8 -104 l5 -14 l3 12Z" fill="#f2e6c8" stroke="${L}" stroke-width="2"/>`
+      : `<rect x="-11" y="-74" width="6" height="6" fill="${L}"/><rect x="3" y="-74" width="6" height="6" fill="${L}"/><rect x="-8" y="-64" width="13" height="3" fill="#6a1c1c"/>`;
+    if (!d) s += caja(-44, -42, 30, 9, 6, C.cam, C.ct, C.cs) + caja(-50, -42, 8, 9, 6, C.piel, C.pt, C.ps);
+    return s;
+  };
+  /* El jugador, de caqui, apuntando a la derecha con la pistola. */
+  const jugador = `<ellipse cx="0" cy="2" rx="30" ry="8" fill="#000" opacity=".25"/>
+    ${caja(-12, -24, 10, 24, 6, "#3b4a6e", "#4a5a80", "#2a3450")}${caja(3, -24, 10, 24, 6, "#3b4a6e", "#4a5a80", "#2a3450")}
+    ${caja(-16, -54, 32, 30, 10, "#c8b48a", "#ddcaa0", "#9a8862")}
+    <rect x="-16" y="-30" width="32" height="5" fill="#5a4222"/>
+    ${caja(-15, -88, 30, 32, 12, "#f0cfa4", "#f8dcb4", "#c8a47c")}
+    ${caja(-16, -92, 32, 8, 12, "#2a1c12", "#3a2a1c", "#140c06")}
+    <rect x="5" y="-74" width="6" height="6" fill="${L}"/>
+    ${caja(10, -48, 26, 9, 6, "#c8b48a", "#ddcaa0", "#9a8862")}
+    ${caja(30, -50, 10, 10, 6, "#f0cfa4", "#f8dcb4", "#c8a47c")}
+    ${caja(34, -56, 24, 8, 5, "#2a2c31", "#4a4d55", "#18191c")}
+    ${caja(36, -48, 7, 10, 4, "#18191c", "#2a2c31", "#000")}`;
+  /* Un pilar blanco de esquinas cortadas (tapa octogonal y tres caras). */
+  const pilar = (x, y, w, h) => {
+    const c = r1(w * 0.22), p = r1(w * 0.55);
+    return `<ellipse cx="${x + w * 0.62}" cy="${y + 6}" rx="${w * 0.8}" ry="${w * 0.2}" fill="#000" opacity=".16"/>
+      <path d="M${x} ${y - c} L${x + c} ${y} V${y - h + c + 0} L${x} ${y - h}Z" fill="#e2e2de" stroke="${L}" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M${x + c} ${y} H${x + w - c} V${y - h + c} H${x + c}Z" fill="#cfcfcb" stroke="${L}" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M${x + c} ${y - h * 0.3} H${x + w - c} V${y} H${x + c}Z" fill="#b4b4b0"/>
+      <path d="M${x + w - c} ${y} L${x + w} ${y - c} V${y - h} L${x + w - c} ${y - h + c}Z" fill="#a7a7a3" stroke="${L}" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M${x} ${y - h} L${x + c} ${y - h + c} H${x + w - c} L${x + w} ${y - h} V${y - h - p + c} L${x + w - c} ${y - h - p} H${x + c} L${x} ${y - h - p + c}Z" fill="#f6f6f3" stroke="${L}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  };
+  // sangre en el piso, como la que deja la partida
+  let sangre = "";
+  for (let i = 0; i < 46; i++) {
+    const x = r1(560 + az() * 640), y = r1(240 + az() * 180), r = r1(4 + az() * 26);
+    sangre += `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r1(r * (0.5 + az() * 0.4))}" fill="${az() < 0.3 ? "#8e0a0c" : "#c80e10"}" opacity="${r1(0.35 + az() * 0.45)}"/>`;
+  }
+  for (let i = 0; i < 60; i++) sangre += `<circle cx="${r1(560 + az() * 640)}" cy="${r1(230 + az() * 190)}" r="${r1(1 + az() * 3)}" fill="#b00c0e" opacity=".7"/>`;
+  // la quemadura de una granada, con sus lenguas
+  let quema = `<circle cx="1068" cy="352" r="62" fill="url(#bq${u})"/>`;
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2 + az() * 0.3, l = 50 + az() * 40;
+    quema += `<path d="M${r1(1068 + Math.cos(a - 0.12) * 12)} ${r1(352 + Math.sin(a - 0.12) * 9)} L${r1(1068 + Math.cos(a) * l)} ${r1(352 + Math.sin(a) * l * 0.75)} L${r1(1068 + Math.cos(a + 0.12) * 12)} ${r1(352 + Math.sin(a + 0.12) * 9)}Z" fill="#141010" opacity=".4"/>`;
+  }
+  // la horda: cada uno se tambalea a su ritmo
+  const horda = [[960, 250, 0, 0.82], [1088, 236, 0, 0.78], [1150, 300, 1, 0.9], [1010, 330, 0, 0.98], [1120, 400, 0, 1.06], [930, 410, 0, 1.1]];
+  let zs = "";
+  for (const [x, y, d, s] of horda.sort((a, b) => a[1] - b[1]))
+    zs += `<g transform="translate(${x} ${y}) scale(${s})"><g class="ep-trepa" style="animation-delay:${r1(-az() * 2)}s;animation-duration:${r1(1.2 + az() * 0.8)}s">${zombi(d)}</g></g>`;
+  // casquillos que saltan de la pistola
+  let casq = "";
+  for (let i = 0; i < 6; i++) casq += `<rect class="ep-estalla" style="--dx:${r1(-10 - az() * 40)}px;--dy:${r1(-30 - az() * 50)}px;animation-delay:${r1(-i * 0.5)}s" x="800" y="262" width="7" height="3.5" fill="#e0b040"/>`;
+  // chispas y trozos de la explosión
+  let trozos = "";
+  for (let i = 0; i < 12; i++) trozos += `<rect class="ep-estalla" style="--dx:${r1((az() - 0.5) * 200)}px;--dy:${r1(-40 - az() * 120)}px;animation-delay:${r1(-az() * 0.3)}s" x="${r1(1060 + az() * 20)}" y="${r1(320 + az() * 20)}" width="${r1(4 + az() * 6)}" height="${r1(4 + az() * 6)}" fill="${["#ffcf4d", "#ff7a1a", "#3a3430", "#c80e10"][i % 4]}"/>`;
+  return SVG(`<defs>
+    <radialGradient id="bp${u}" cx=".7" cy=".6" r=".9"><stop offset="0" stop-color="#ece7da"/><stop offset=".6" stop-color="#d6d0c0"/><stop offset="1" stop-color="#8a8272"/></radialGradient>
+    <radialGradient id="bq${u}"><stop offset="0" stop-color="#0e0b09" stop-opacity=".85"/><stop offset=".6" stop-color="#28201a" stop-opacity=".45"/><stop offset="1" stop-color="#28201a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="bf${u}"><stop offset="0" stop-color="#fffbe0"/><stop offset=".3" stop-color="#ffd760"/><stop offset=".65" stop-color="#ff7a1a" stop-opacity=".8"/><stop offset="1" stop-color="#c02800" stop-opacity="0"/></radialGradient>
+    <radialGradient id="bh${u}"><stop offset="0" stop-color="#4a4440" stop-opacity=".75"/><stop offset="1" stop-color="#4a4440" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bt${u}" x1="0" x2="1"><stop offset="0" stop-color="#fff6d0" stop-opacity="0"/><stop offset="1" stop-color="#fff6d0"/></linearGradient>
+  </defs>
+  <rect width="1200" height="420" fill="url(#bp${u})"/>
+  <path d="M0 140 H1200 M0 280 H1200 M300 0 V420 M600 0 V420 M900 0 V420" stroke="#5a5040" stroke-opacity=".14" stroke-width="2"/>
+  ${sangre}${quema}
+  ${pilar(640, 196, 70, 92)}${pilar(1118, 150, 64, 84)}
+  <g transform="translate(1068 330)"><circle class="ep-halo" r="70" fill="url(#bh${u})"/></g>
+  <g transform="translate(1068 318)"><circle class="ep-onda" r="54" fill="none" stroke="#fff3d0" stroke-width="5"/></g>
+  <g transform="translate(1068 318)"><circle class="ep-halo" r="48" fill="url(#bf${u})"/></g>
+  ${trozos}
+  <g transform="translate(756 330)">${jugador}</g>
+  ${casq}
+  ${[0, 1].map(i => `<line class="ep-disparo" style="animation-duration:.9s;animation-delay:${-i * 0.45}s" x1="${828 + i * 4}" y1="${276 + i * 4}" x2="${980 - i * 30}" y2="${262 + i * 30}" stroke="url(#bt${u})" stroke-width="4" stroke-linecap="round"/>`).join("")}
+  <g transform="translate(828 278)"><g class="ep-disparo" style="animation-duration:.45s"><circle r="16" fill="url(#bf${u})"/><path d="M0 -7 L22 0 L0 7 L6 0Z" fill="#fffbe0"/></g></g>
+  ${zs}
+  <g transform="translate(1104 64)"><path d="M-48 18 A48 48 0 0 1 48 18" fill="none" stroke="#1a140c" stroke-opacity=".8" stroke-width="14" stroke-linecap="round"/>
+    <path d="M-48 18 A48 48 0 0 1 30 -21" fill="none" stroke="#f2c14e" stroke-width="9" stroke-linecap="round"/>
+    <g class="ep-halo"><text y="22" text-anchor="middle" font-family="Bungee,'Arial Black',Impact,sans-serif" font-size="38" fill="#f2c14e" stroke="#000" stroke-width="6" paint-order="stroke">×28</text></g></g>`);
+}
+
+const ESCENAS = { boxhead, memazo, prodefender, hero, mascotas, protiles, haxball, tulones, trigon, prodrop, fanal };
 
 /* La escena de una novedad, o "" si no tiene una propia (el banner pinta
    entonces un fondo del color del juego). */
