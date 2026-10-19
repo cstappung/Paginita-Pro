@@ -179,7 +179,7 @@ export const JUEGOS = {
     alta: "2026-10-02"
   },
   boxhead: {
-    nombre: "Boxhead",
+    nombre: "Pro BoxHead",   // el id sigue siendo `boxhead`: lo usan las reglas, las salas y las tablas
     lema: "Zombis y demonios desde arriba: sube el multiplicador, gana armas y aguanta nivel tras nivel con los que entren",
     color: "#c8892f",
     minimo: 1,

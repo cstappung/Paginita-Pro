@@ -129,7 +129,7 @@ export const SOLOS = [
     url: "juegos/clue/index.html", reglas: "clue",
     lema: "Resuelve el crimen del edificio contra detectives automáticos.",
     modos: ["Contra bots"] },
-  { id: "bots-boxhead", tipo: "bots", juego: "boxhead", nombre: "Boxhead · práctica", genero: "Acción", icono: "▣", alta: "2026-10-05",
+  { id: "bots-boxhead", tipo: "bots", juego: "boxhead", nombre: "Pro BoxHead · práctica", genero: "Acción", icono: "▣", alta: "2026-10-05",
     url: "juegos/boxhead/index.html", reglas: "boxhead",
     lema: "Tú solo contra los zombis y los diablos, en cualquiera de los cinco mapas.",
     modos: ["Supervivencia"] },
