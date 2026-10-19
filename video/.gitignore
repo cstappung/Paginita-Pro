@@ -1,0 +1,11 @@
+node_modules/
+clips/
+shots/
+cdn/
+sheettmp/
+out*/
+trailer/clips/
+trailer/clips.json
+build/juegos-app.js
+emu/*.log
+*.wav

@@ -54,6 +54,7 @@ before the first edit. Read only the docs the task needs.
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
+| Tráiler, video de lanzamiento, grabar gameplays, emulador para filmar | `video/CLAUDE.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 
