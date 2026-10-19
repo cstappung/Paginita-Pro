@@ -482,6 +482,23 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Artifact (de claude.ai)** | Una página que claude.ai guarda y muestra dentro de su propio sitio, en una caja de seguridad. En BT3 se probó la sala abriendo un artifact en 3 pestañas. Para Mario Kart no sirve (ver §69). |
 | **Private Network Access** | Una regla de seguridad de Chrome: una página de internet no puede pedirle cosas a la red de la casa ni a la propia PC (127.0.0.1) sin permiso especial. Protege de que una página cualquiera "toque" el router o los programas locales. Por eso un artifact no puede hablar con el juego, los emuladores ni el Worker de esta PC. |
 
+### El retraso que se adapta a la red y el banco de todas las pruebas (§70)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Ida y vuelta (RTT)** | Lo que tarda un mensaje en ir a la otra consola y volver la respuesta (en inglés *round-trip time*). La **ida** sola es más o menos la mitad. Se mide con un ping. Como medir el largo de un cable con un reflectómetro (TDR): se manda un pulso, se mide cuándo vuelve el eco y la mitad es lo que tarda en llegar al otro extremo. |
+| **Ping** | Un mensaje chiquito que lleva la hora en que salió; la otra consola lo devuelve tal cual (el "pong") y al llegar de vuelta se resta: hora de ahora − hora del ping = ida y vuelta. Aquí va cada medio segundo a cada jugador, todo el rato (en los menús y en la carrera), y lleva un número para saber si alguno se perdió. |
+| **Cámara lenta (en la carrera sincronizada)** | Si los botones de los demás tardan en llegar más que el retraso (3 cuadros = 50 ms), cada consola espera en cada cuadro a que lleguen: el juego no puede avanzar sin ellos. Con 70 ms de ida y retraso 3, la carrera espera ~10 ms por cuadro: va a ~40 cuadros por segundo en vez de 60. Como una cadena de montaje que avanza al ritmo de la pieza que llega más tarde. |
+| **Retraso adaptable** | En vez de 3 cuadros siempre, antes de cada carrera se elige cuántos (3 a 8, o sea 50 a 133 ms) según lo que tarda la red de verdad: en esta PC o en la misma ciudad, 3; con 70 ms de ida, 6. Más retraso = los botones se sienten un poco más tarde, pero la carrera va a 60 cuadros por segundo. Como el *buffer* de un reproductor de video: llena un poco antes de empezar para no cortarse. |
+| **Decisor (del retraso)** | El único jugador que elige el número: el primer humano de la sala que sigue jugando. Uno solo, porque si dos consolas usaran números distintos la carrera se desincronizaría (los primeros cuadros son "sin botones" hasta el retraso). Lo anuncia una vez, al empezar la carrera, y quien lo recibe se lo pasa a los demás por si a alguno no le llegó directo. Como el que da la partida en una carrera: uno solo dispara. |
+| **Piso, tirón y percentil 90** | De las últimas 16 medidas (8 s): el **piso** es la más rápida (lo que tarda la red cuando nadie se traba). Las que pasan del piso + 100 ms son **tirones**: la otra pestaña estaba ocupada (cargando la pista) y contestó tarde, no es culpa de la red; no cuentan. De las que quedan se toma el **percentil 90**: la medida que deja 9 de cada 10 por debajo (así entra lo que varía la red). Como medir el ruido de una señal sin contar los picos de cuando arranca el motor. |
+| **Pérdida de paquetes** | Por el canal rápido ("udp") un mensaje puede no llegar nunca. Los botones van repetidos en los 16 paquetes siguientes, así que uno perdido llega en el próximo, un cuadro (16,7 ms) más tarde. Si en los últimos 8 s se perdió alguna respuesta de ping, el retraso cubre también ese cuadro de más. |
+| **Red mala de mentira (`?redMala=70,10,5`)** | Un interruptor de prueba que demora todo lo que llega 70 ms ± 10 ms y bota el 5 % de lo que viaja por "udp" (lo que viaja por el canal confiable llega siempre y en orden, solo que tarde). Sirve para probar con el juego, en esta PC, una red como la de un jugador lejos. Como un atenuador y una línea de retardo en el banco de pruebas. |
+| **`?retraso=fijo`** | Apaga el retraso adaptable (siempre 3, como antes) para comparar. |
+| **`correr-todo` (planilla de pruebas)** | `herramientas/correr-todo.mjs`: corre todas las pruebas del proyecto en fila, guarda lo que escribió cada una y termina con una tabla (prueba, bien, mal, tiempo). Como el banco de prueba de fin de línea de una fábrica: la misma rutina para cada placa y la planilla al final. |
+| **Falla intermitente** | Una que sale 1 de cada tantas veces (como el cuelgue al empezar la carrera, C4). Para cazarla se repite la misma prueba muchas veces guardando cada corrida aparte (`--repetir N`). Como un falso contacto: hay que golpear la placa muchas veces y registrar cada vez. |
+| **Byte de control (la trampa del `\b`)** | Un "carácter" que no es una letra sino una orden para la pantalla: el 8 es "retroceso" (*backspace*). En Python, escribir `\b` dentro de un texto normal lo convierte en ese byte; en una expresión regular de JavaScript `\b` significa "borde de palabra". Al copiar código de un lenguaje a otro con un script, el `\b` se transformó en el byte 8 y la regla dejó de funcionar sin dar error. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -3948,4 +3965,150 @@ jugar.bat
 node herramientas/experiencia.mjs --ventanas 2
 node herramientas/prueba-experiencia.mjs
 node herramientas/prueba-experiencia.mjs --rapida
+```
+
+## 2026-10-18 · §70 El retraso que se adapta a la red (C3), la planilla de todas las pruebas (F1) y el cuelgue que no volvió (C4)
+
+**En resumen:** en la carrera sincronizada (§61) cada consola usa los botones de las demás con 3 cuadros de retraso
+(50 ms). Si la red tarda más que eso, la carrera va en cámara lenta. Ahora, antes de cada carrera, se mide la red y
+se elige el retraso justo: en esta PC sigue en 3; con un jugador a 70 ms sube solo a 6 y la carrera va a 60 cuadros
+por segundo. Además: un programa que corre todas las pruebas y entrega la planilla, y el cuelgue al empezar la
+carrera (C4), que no volvió a salir.
+
+### 1. El problema: la cámara lenta con una red lenta
+
+Recordatorio de §61: lo que aprieta cada jugador en el cuadro *c* vale para el cuadro *c + 3*. Esos 3 cuadros
+(50 ms) son el plazo que tienen sus botones para llegar a las demás consolas. El juego no puede calcular el cuadro
+siguiente sin los botones de todos. Si un paquete tarda 70 ms en llegar, cada consola **espera** unos 20 ms en cada
+cuadro: la carrera avanza al ritmo del paquete más lento.
+
+Para medirlo sin salir de esta PC se hizo una **red mala de mentira** (`?redMala=70,10,5` en la dirección de la
+página, `malla.mjs`, solo para pruebas). Demora todo lo que llega 70 ± 10 ms y bota el 5 % de lo que va por el canal
+rápido ("udp"). Con el retraso fijo de siempre, la misma carrera esperó **9,4 y 11,2 ms por cuadro** (de 16,7
+disponibles): unos 40 cuadros por segundo en vez de 60. Eso es la cámara lenta.
+
+### 2. La solución: medir la red y elegir el retraso antes de cada carrera
+
+| Pieza | Qué hace |
+|---|---|
+| **Ping cada 0,5 s** (mensajes tipo 7 y 8) | Cada consola le manda a cada jugador un ping con la hora y su número; el otro lo devuelve tal cual. Hora de llegada − hora del ping = ida y vuelta. |
+| **El cálculo** | De las últimas 16 idas y vueltas (8 s): la más rápida es el piso; las que pasan del piso + 100 ms son tirones (no cuentan); de las demás, el percentil 90. La ida es la mitad. Si se perdió alguna respuesta en esos 8 s: la mediana + un cuadro, si eso es más (un paquete perdido llega repetido en el siguiente, 16,7 ms después). + 6 ms de margen. Se pasa a cuadros redondeando hacia arriba, entre 3 y 8. |
+| **El decisor** (mensaje tipo 9) | Solo el primer humano de la sala que sigue jugando elige el número, una vez por carrera, **cuando él empieza la carrera**. Lo manda por el canal confiable (llega siempre y en orden). |
+| **El reenvío** | Quien recibe el anuncio se lo reenvía a todos, por si a alguno no le llegó directo. Si llegan dos números distintos para la misma carrera, gana el primero y se anota como "conflicto" (no pasó nunca en las pruebas). |
+| **La espera del anuncio** | Los demás, al llegar al primer cuadro de la carrera, esperan el anuncio. Esa espera cuenta como "llegada", igual que esperar a que el otro termine de cargar la pista. Si el decisor nunca vino, a los 4 s todos usan 3. |
+| **`?retraso=fijo`** | El camino viejo (siempre 3), para comparar. |
+
+**¿Por qué el mismo número en todas?** Los primeros cuadros de cada carrera son "sin botones" hasta el retraso. Si una
+consola usara 3 y otra 6, en el cuadro 4 una ya tendría botones y la otra no: la carrera se desincronizaría. Por eso
+decide uno solo, una vez, y el número no cambia durante la carrera.
+
+**¿Por qué no se cambia a mitad de carrera?** Cambiarlo sin desincronizar exige que todas las consolas lo cambien en el
+mismo cuadro exacto, con los cuadros intermedios bien definidos. Se puede, pero es complicado, y entre carrera y
+carrera la red casi nunca cambia tanto.
+
+### 3. El primer intento: daba 8 en esta misma PC
+
+La primera versión suavizaba la ida y vuelta como lo hace TCP (un promedio que se mueve poco a poco, más una
+"variación"). El decisor anunciaba apenas tenía 4 medidas. Con el juego dio **8 cuadros (133 ms) con la red de esta
+misma PC**, donde la ida y vuelta es de 1 ms. ¿Por qué?
+
+- Las primeras medidas se toman **mientras las pestañas cargan el juego**: compilar el `.wasm` o leer el disco traba
+  la pestaña 1 o 2 segundos. En ese rato no contesta nada, y al destrabarse contesta todos los pings juntos. Esas
+  idas y vueltas salen de 400 a 1400 ms, sin que la red tenga la culpa.
+- El anuncio se hacía justo en ese momento y quedaba fijo para toda la carrera.
+
+Se arregló en dos partes:
+
+1. **Se anuncia al empezar la carrera**, no durante la carga. Para entonces hay 8 s de medidas, tomadas en los
+   menús.
+2. **No se promedia: los tirones se descartan.** El piso (la medida más rápida) dice cuánto tarda la red cuando
+   nadie se traba. Lo que pasa de 100 ms sobre el piso es una pestaña ocupada, no la red.
+
+Hubo dos ajustes más en el banco:
+
+- Con el cuartil 75 en vez del percentil 90, la red lenta del banco (que bota 1 de cada 7 paquetes) quedaba en 5 y
+  esperaba 2,2 ms por cuadro.
+- Sumar a la vez "percentil 90" y "un cuadro por pérdida" daba 7: un cuadro de más. Por eso se toma el mayor de los
+  dos.
+
+### 4. Pruebas
+
+**Banco** (`node banco/correr.mjs lockstep`, sin el juego, consolas falsas): **32/32 tres veces seguidas**. Los
+escenarios nuevos:
+
+| Escenario | Resultado |
+|---|---|
+| Red rápida normal | Las tres consolas usan 3 |
+| Red lenta: 62–78 ms de ida, 1 de 7 paquetes perdido | Adaptado: **6** cuadros, espera 0,4–0,6 ms por cuadro. Fijo: 3 cuadros, **10,1–10,6 ms** por cuadro |
+| A Carla no le llega el anuncio de Ana (bloqueado a propósito) | Beto se lo reenvía: las tres usan el mismo y terminan iguales |
+| Una pestaña trabada 1,6 s (como cargando la pista) en una red rápida | Sus respuestas llegan de 400 a 1400 ms, pero el retraso sigue en **3** |
+
+`banco/pruebas/red` (la red mala de mentira, con reloj y azar falsos): **25/25**. Sin el parámetro no cambia nada;
+lee bien `70,10,5`; bota exactamente los paquetes "udp" que tocan; lo "tcp" llega completo y en orden; las demoras
+caen entre 60 y 100 ms.
+
+**Con el juego** (`prueba-sincro`, dos pestañas en una carrera VS de verdad):
+
+| Red | Retraso | Espera por cuadro (A / B) | Resultado |
+|---|---|---|---|
+| Esta PC (ida y vuelta 0–13 ms) | **3** | 0,00 / 0,00 ms | 10/10 |
+| Red mala 70 ± 10 ms, 5 % perdido (ida y vuelta 132–199 ms) | **6** (100 ms) | 0,14 / 0,22 ms | 10/10 |
+| La misma red mala con `?retraso=fijo` | 3 | **9,40 / 11,15 ms** (cámara lenta) | 9/10 |
+
+`prueba-sincro` ganó un punto: "las dos usaron el mismo retraso en la carrera". También acepta `--puerto=` y
+`--datos=` para correr varias a la vez o guardar cada corrida aparte.
+
+**Qué significa para un jugador:** con amigos en la misma ciudad (ida de 10–30 ms) nada cambia: 3 cuadros. Con
+alguien lejos, el kart responde unos 50 ms más tarde (6 cuadros en vez de 3). La carrera ya no va en cámara lenta,
+que se nota mucho más.
+
+### 5. La planilla de todas las pruebas (F1): `herramientas/correr-todo.mjs`
+
+Corre en fila las pruebas del proyecto:
+
+- banco, sitio y subida a R2;
+- todas las del juego;
+- cualquier `web/navegador/prueba-*.mjs` nueva, que entra sola.
+
+Lee la cuenta que escribe cada una. Hay tres formatos: "N bien, M mal", "X de Y páginas bien" y "ℹ pass N" de
+`node --test`. Al final muestra la tabla. Lo de cada prueba queda en `build/web/datos/todo/<fecha-hora>/`, con un
+`resumen.json`. Termina con código 1 si algo falló.
+
+- `--sin-juego`: solo las rápidas (~1,5 min). Dio **64 bien, 0 mal**.
+- `--solo sincro,caida --repetir 5`: la misma prueba varias veces, cada corrida con su carpeta (y su puerto, si la
+  prueba lo acepta). Sirve para cazar fallas intermitentes.
+- `--lista`: muestra las pruebas y sale.
+
+Van en fila y no a la vez porque las del juego comparten la tarjeta de video y algunos puertos.
+
+### 6. El cuelgue al empezar la carrera (C4): no volvió
+
+Antes salía 1 de cada 6 corridas (`Effects::Player::UpdateNonItemEffects`). Con `correr-todo --solo sincro
+--repetir 8`, más unas 10 corridas sueltas de antes, **no salió ninguna vez en 18 corridas** (probablemente lo arregló
+algo de §62–63). La única falla de esas 8 (8/9) fue otra: "sincronizar cuesta poco" con una espera de 684 ms. El
+registro mostró la causa: la pestaña A bajaba los archivos de la carrera con la **caché vacía** justo al empezar
+(878 lecturas, 97 MB, 37,6 cuadros por segundo un rato). Es el costo de la primera visita, no un error de la
+sincronización. Queda para E2: bajar esos archivos durante los menús. Eso toca `mkw.mjs`, que estaba editando la otra
+sesión. C4 queda en 🟡: se vuelve a mirar si reaparece.
+
+### Trampas
+
+- **El `\b` que se volvió un byte:** el cambio a `lockstep.mjs` se aplicó con un script de Python. Dentro de un texto
+  normal de Python, `\b` es el carácter 8 (retroceso), no las dos letras. La expresión regular de JavaScript
+  `/[?&]retraso=fijo\b/` quedó con un byte invisible y `?retraso=fijo` dejó de funcionar sin dar error. Se arregló
+  reemplazando el byte y revisando que no quedara ninguno. Para la próxima: textos "crudos" de Python (`r"..."`).
+- **El banco necesita "menús" largos:** con 1 de cada 7 paquetes perdido, en 2,5 s quedan apenas 3 medidas. El banco
+  espera 6,5 s antes de la carrera lenta. En el juego los menús duran más que eso.
+- **Las pruebas del banco tienen que detener los pings** (`ls.detener()`) antes de terminar. Si no, los relojes de
+  0,5 s siguen andando.
+- **`prueba-sincro` decía siempre "registro en build/web/datos/sincro/"** aunque se le diera `--datos=`; ahora
+  muestra la carpeta de verdad.
+
+```bash
+node banco/correr.mjs lockstep red
+node web/navegador/prueba-sincro.mjs
+node web/navegador/prueba-sincro.mjs --puerto=8123 --datos=build/web/datos/c3b-redmala --extra=&redMala=70,10,5
+node web/navegador/prueba-sincro.mjs --extra=&redMala=70,10,5&retraso=fijo
+node herramientas/correr-todo.mjs --sin-juego
+node herramientas/correr-todo.mjs --solo sincro --repetir 8
 ```

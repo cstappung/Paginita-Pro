@@ -60,8 +60,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ⬜ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada (la página ya acepta `?pjs=`)
 - ⬜ C2. Pruebas largas de "misma carrera": muchas copas sincronizadas con semillas y pistas al azar
-- ⬜ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego
-- ⬜ C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas)
+- ✅ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego: el retraso se adapta a la red (3 en
+  esta PC, 6 con 70 ms de ida y 5 % perdido) y la carrera ya no va en cámara lenta (§70; banco 32/32, `prueba-sincro` 10/10)
+- 🟡 C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas): no volvió
+  a salir en 18 corridas (§70); queda la espera de la primera visita (bajar la pista con la caché vacía) → E2
 - ⬜ C5. PC lento en la sala (`prueba-sincro --lento`)
 - ⬜ C6. VS en línea sin CPU: cola de pistas y «Confirmar» sobre la votación (F3); TURN, más jugadores, fallos en el chat (F4)
 - ⬜ C7. Espectadores (video del anfitrión, como `bt3-directo.js`)
@@ -86,7 +88,7 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ E4. Celulares (cuando el dueño diga): teléfono real con `adb reverse`; misma carrera entre PC y teléfono (NaN en ARM)
 
 ### Etapa F — De fondo
-- ⬜ F1. Un script que corra todas las pruebas y diga "N bien, M mal"
+- ✅ F1. Un script que corra todas las pruebas y diga "N bien, M mal": `herramientas/correr-todo.mjs` (§70)
 - ⬜ F2. Banco que falta: disco y RR falsos, Worker local, juego falso chico
 - ⬜ F3. Script para actualizar Retro Rewind (delta, retraducir `Code.pul`, recompilar, semillas, R2)
 - ⬜ F4. Siempre: bitácora + glosario, `parches/` y `versiones.md` al día
@@ -325,6 +327,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-18 23:33** — **El retraso de la carrera sincronizada se adapta a la red (C3), la planilla de todas las pruebas (F1) y C4 sin repetirse** (§70). `lockstep.mjs`: pings cada 0,5 s a cada jugador; el decisor (el primer humano que sigue) anuncia al empezar cada carrera cuántos cuadros de retraso usar (3 a 8), uno solo y el mismo para todos (quien lo recibe lo reenvía); se calcula con las últimas 16 idas y vueltas sin contar los tirones (más de 100 ms sobre la más rápida: una pestaña cargando) y con un cuadro de más si se perdió alguna. `?redMala=lat,var,pérdida` (`malla.mjs`, solo pruebas) y `?retraso=fijo` (el de antes). Con el juego (`prueba-sincro`): red de esta PC → **3** cuadros, espera 0,00 ms; red mala 70±10 ms y 5 % perdido → **6**, espera 0,14/0,22 ms (10/10); la misma red con el retraso fijo → 9,4/11,2 ms por cuadro, cámara lenta (9/10). Banco `lockstep` **32/32** (3 veces seguidas: red lenta, anuncio reenviado, pestaña trabada al cargar), `red` 25/25. Primer intento malo (corregido): anunciaba durante la carga y daba 8 en esta misma PC. `herramientas/correr-todo.mjs` (`--sin-juego`, `--solo`, `--repetir N`, `--lista`): rápidas 64/0. C4: 18 corridas sin el cuelgue; la única espera larga (684 ms) fue la pista bajando con la caché vacía.
 - **2026-10-18 23:05** — **`jugar.bat`: la página de Juegos en este PC, solo con Mario Kart, de punta a punta** (§69). Pedido del dueño: un .bat que abra el menú de la página mostrando solo MKW y MKW en línea, para probar la experiencia entera; se descartó un artifact (el juego no puede subirse y un artifact no alcanza 127.0.0.1). `herramientas/experiencia.mjs`: emuladores de Firebase (cuentas, base, Storage) con las reglas del sitio, cuentas de mentira (Piloto Uno/Dos/Tres amigos, Intruso no), `sitio-local --emuladores --solo mkw --amigos` con el Worker de verdad (`worker-local --emulador` re-firma los tokens del emulador) y 1-3 ventanas de Chrome, cada una con su perfil. En el sitio: `firebase.js` (emuladores) y `juegos-main.js` (catálogo solo MKW) solo en 127.0.0.1, con prueba (`mkw.test` 14/14). `prueba-experiencia.mjs` **13/13**: invitado sin nada, entrar con la ventanita del emulador, catálogo solo MKW, «un jugador» con el menú JloKart (imagen 200 por el Worker), Single Player → 0x69, partida subida a Storage, Multiplayer → Online → ficha, sala con Piloto Dos, Intruso bloqueado en todo, «¡A correr!» y los dos en la misma carrera (huellas iguales). **Error real encontrado**: en el sitio la página está en `juegos/mkw/web/navegador/` y `mkw.mjs` importaba `./banco/comun.js` (404: el juego no arrancaba ni en la sala ni en «un jugador»); ahora `./verificaciones.mjs`, y `sitio-local` ya no tiene el atajo `/juegos/mkw/` que lo escondía. `prueba-inicio` 14/14 con la ruta nueva. El .bat probado de verdad (pregunta, 1 ventana a los 15 s, «Listo», Chrome con su perfil); `chcp 65001` va primero o cmd se desfasa con los acentos.
 - **2026-10-18 22:30** — **Menú de inicio «JloKart Wii», solo para amigos, y ensayo general B5** (§67). La imagen del dueño sin los botones pintados (`preparar-inicio.py`), privada (Worker + lista AMIGOS; nunca a git), con 3 botones propios sin «Championship»; Single Player → menú «Un jugador» del juego, Multiplayer → Local/Online, Options → cajón; teclado, mandos, mouse y toque. Banco `inicio` 14/14, `prueba-inicio` 14/14, sitio `#solo/mkw` (`crearMkwSolo`). B5: 1.ª visita 58,9 fps / 217 MB, 2.ª 60,0 fps / 99,5 % parejo / 6 MB.
 - **2026-10-18 22:21** — **La cortina del rescate tapa toda la imagen en la página** (§68). El dueño la vio tapar solo una parte ("por el stretch"): es el aspecto dinámico de WiiCompiled en una ventana más ancha que 16:9 (el programa de Windows); la página no estira nunca (canvas fijo 854×480, `object-fit: contain`). `prueba-caida` con 5.º punto (bordes de la imagen en el negro) y `--ancho/--alto`: ventana 960×792 **5/5** y 1800×760 **5/5**.

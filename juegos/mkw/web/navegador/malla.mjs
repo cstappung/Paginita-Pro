@@ -19,8 +19,41 @@ export const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.googl
 const LLENO = 1 << 20;            // bytes en cola sin enviar: más que esto y los UDP se tiran (como un router lleno)
 const VIGILA_MS = 1000;
 
+// Red mala de mentira, SOLO para pruebas (PLAN C3, bitácora §70): ?redMala=80,20,5 en la dirección de la página = lo que
+// LLEGA por "udp" se demora 80 ms ± 20 ms (cada paquete con su propia demora: pueden llegar desordenados) y se pierde
+// el 5 %; por "tcp" solo la demora, y en orden (es el canal confiable: ahí nada se pierde ni se desordena). Como meter
+// entre dos equipos un tramo de cable largo y con ruido. Sin el parámetro no hace nada. Cuenta lo que hizo en
+// globalThis.mkwRedMala (para las pruebas).
+export function leerRedMala(busqueda = globalThis.location?.search || '') {
+  try {
+    const v = new URLSearchParams(busqueda).get('redMala');
+    if (!v) return null;
+    const [latencia = 0, variacion = 0, perdida = 0] = v.split(',').map(Number);
+    return { latencia: Math.max(0, latencia), variacion: Math.max(0, variacion), perdida: Math.min(1, Math.max(0, perdida / 100)) };
+  } catch { return null; }
+}
+export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => setTimeout(f, ms), ahora = () => performance.now()) {
+  if (!red) return alBinario;
+  const cuenta = globalThis.mkwRedMala = { ...red, llegados: 0, perdidos: 0, demoraMedia: 0 };
+  const ultimaTcp = new Map();      // uid → cuándo sale el último "tcp" (el siguiente no puede salir antes: en orden)
+  return (u, bytes, canal) => {
+    if (canal === 'udp' && azar() < red.perdida) { cuenta.perdidos++; return; }
+    let demora = red.latencia + (azar() * 2 - 1) * red.variacion;
+    if (canal === 'tcp') {
+      const sale = Math.max(ahora() + demora, ultimaTcp.get(u) || 0);
+      ultimaTcp.set(u, sale);
+      demora = sale - ahora();
+    }
+    demora = Math.max(0, demora);
+    cuenta.llegados++;
+    cuenta.demoraMedia += (demora - cuenta.demoraMedia) / cuenta.llegados;
+    reloj(() => alBinario(u, bytes, canal), demora);
+  };
+}
+
 export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => {}, alCambiar = () => {},
-  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE }) {
+  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala() }) {
+  alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
   let sesion = '', offP = null, offM = null, reloj = null, intento = 0;
   const pares = new Map();          // uid → { pc, udp, tcp, s, k, cola, remota, abrio, malDesde }
   const presentes = new Map();      // uid → sesión

@@ -21,7 +21,8 @@ import { crearPila, crearConmutador, crearRouterMalla } from '/web/navegador/red
 import { crearWfc } from '/web/navegador/wfc.mjs';
 import { consolaFalsa, hasta, lector } from './consola-falsa.mjs';
 import { enctypexCifrar, enctypexDescifrar, evaluarFiltro } from '/web/navegador/wfc-salas.mjs';
-import { crearMalla, senalCanal } from '/web/navegador/malla.mjs';
+import { crearMalla, senalCanal, leerRedMala, degradar } from '/web/navegador/malla.mjs';
+const nada = () => {};
 
 const { ok, fin } = prueba('red', 'Red en línea (sin el juego)');
 const tx = new TextEncoder(), rx = new TextDecoder('latin1');
@@ -118,6 +119,26 @@ try {
   B.malla.salir();
   ok('cuando B se va, A olvida su ruta', await hasta(() => !A.router.rutas()['10.77.0.3'], 8000), JSON.stringify(A.router.rutas()));
   A.malla.salir();
+
+  // La red mala de mentira (?redMala=latencia,variación,pérdida; solo pruebas, PLAN C3): reloj y azar falsos, sin esperar
+  {
+    ok('sin ?redMala no cambia nada (el mismo alBinario)', leerRedMala('?red=malla') === null && degradar(nada, null) === nada);
+    const red = leerRedMala('?redMala=80,20,5');
+    ok('?redMala=80,20,5 = 80 ms ± 20 ms y 5 % de pérdida', red && red.latencia === 80 && red.variacion === 20 && red.perdida === 0.05, JSON.stringify(red));
+    let t = 0, k = 0;
+    const llegan = [], relojes = [], azar = [0.01, 0.5, 0.95, 0.3, 0.7, 0.02, 0.6, 0.0, 0.4, 0.9];
+    const f = degradar((u, b, c) => llegan.push({ c, i: b[0], t }), red, () => azar[k++ % azar.length], (g, ms) => relojes.push([t + ms, g]), () => t);
+    for (let i = 0; i < 10; i++) { f('beto', new Uint8Array([i]), i % 2 ? 'tcp' : 'udp'); t += 4; }
+    relojes.sort((a, b) => a[0] - b[0]).forEach(([cuando, g]) => { t = cuando; g(); });
+    const udp = llegan.filter(x => x.c === 'udp'), tcp = llegan.filter(x => x.c === 'tcp');
+    // cada "udp" saca un número para ver si se pierde (bajo 0,05 = perdido) y, si llega, otro para su demora; cada
+    // "tcp" solo el de la demora. Con estos números se pierden justo el 0, el 4 y el 6 (sacaron 0,01, 0,02 y 0,0)
+    ok('por "udp" se pierden justo los que sacan menos de 0,05 en su sorteo (y solo esos)', udp.map(x => x.i).join() === '2,8',
+       `llegaron ${udp.map(x => x.i).join(', ')} de 0, 2, 4, 6, 8; perdidos ${globalThis.mkwRedMala?.perdidos}`);
+    ok('por "tcp" no se pierde nada y llega en orden, aunque cada uno tenga su demora', tcp.map(x => x.i).join() === '1,3,5,7,9' && tcp.every((x, j) => !j || x.t >= tcp[j - 1].t));
+    ok('cada paquete se demora 60–100 ms', llegan.every(x => x.t - 4 * x.i >= 60 - 1e-9 && x.t - 4 * x.i <= 100 + 1e-9 || x.c === 'tcp'),
+       llegan.map(x => `${x.i}:${(x.t - 4 * x.i).toFixed(0)}`).join(' '));
+  }
 } catch (e) {
   ok('la prueba terminó sin errores', false, e.stack || e.message);
 }

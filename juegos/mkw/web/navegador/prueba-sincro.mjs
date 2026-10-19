@@ -12,7 +12,7 @@
 //   - cuánto esperó cada una por los botones de la otra (el costo de sincronizar).
 // Fotos en build/web/datos/sincro/.
 //
-// Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--extra=&param=valor]
+// Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--extra=&param=valor] [--puerto=8147] [--datos=build/web/datos/sincro]
 //       (--sala: cada juego dentro de la sala del sitio falsa, con la dirección que arma el sitio)
 //       (--lento: B con la CPU 2 veces más lenta; --extra: parámetros de más para las dos pestañas)
 import { spawn } from 'node:child_process';
@@ -23,12 +23,13 @@ import { createRequire } from 'node:module';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
-const PUERTO = 8147;
+// --puerto=N y --datos=carpeta: para correrla varias veces o junto a otra (herramientas/correr-todo.mjs --repetir)
+const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || '--puerto=8147').slice(9));
 const COPA = process.argv.includes('--copa');
 const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0.0,0.1,0.2,0.3').slice(9);   // sin --sala
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
 const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '');   // p. ej. --extra=&arreglos=0
-const carpeta = path.join(raiz, 'build/web/datos/sincro');
+const carpeta = path.join(raiz, (process.argv.find(a => a.startsWith('--datos=')) || '--datos=build/web/datos/sincro').slice(8));
 mkdirSync(carpeta, { recursive: true });
 let bien = 0, mal = 0;
 const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.log(`${cumple ? '✓' : '✗'} ${texto}${detalle ? ' — ' + detalle : ''}`); };
@@ -77,7 +78,8 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r({ colgada: t
   try { const lista = L.u32(ri + 0xC); for (let i = 0; i < 12; i++) av.push(f(L.u32(L.u32(lista + 4 * i) + 0xC))); } catch {}
   try { const kom = L.u32(0x809C18F8), arr = L.u32(kom + 0x20); for (let i = 0; i < 2; i++) marcas.push(L.u32(L.u32(L.u32(L.u32(arr + 4 * i)) + 4) + 0x14)); } catch {}
   let camara = -1; try { camara = L.u8(L.u32(L.u32(L.u32(0x809C19B8) + 0x18)) + 0x9C); } catch {}
-  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), camara, av, marcas };
+  // etapa de la carrera (Raceinfo +0x28): 0-1 presentación y cuenta regresiva, 2 corriendo, ≥ 4 terminó
+  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), camara, av, marcas, etapa: ri ? L.u32(ri + 0x28) : -1 };
 })]).catch(() => null);
 
 // 1) las dos llegan a la carrera
@@ -112,7 +114,7 @@ if (COPA) {
   await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B-copa.png') }).catch(() => {});
   writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
   await navegador.close(); servidor.kill();
-  console.log(`\n${bien} bien, ${mal} mal  (registro en build/web/datos/sincro/)`);
+  console.log(`\n${bien} bien, ${mal} mal  (registro en ${path.relative(raiz, carpeta).replaceAll("\\", "/")}/)`);
   process.exit(mal ? 1 : 0);
 }
 
@@ -120,6 +122,13 @@ if (COPA) {
 // (las teclas van a la página: en --sala, a la de la sala, que tiene el marco del juego con el foco)
 const tecladoA = paginas.A.keyboard, tecladoB = paginas.B.keyboard;
 if (SALA) for (const n of ['A', 'B']) await paginas[n].locator('iframe').focus().catch(() => {});
+// acelerar recién con la carrera andando: apretado durante la cuenta regresiva, el kart patina en la largada (un
+// "burnout" del juego) y lo que avanza depende de en qué instante se apretó (A salía con 1,04 a 1,13 vueltas)
+for (const hasta = Date.now() + 60000; Date.now() < hasta;) {
+  const [ea, eb] = [await leer(A), await leer(B)];
+  if ((ea?.etapa ?? 0) >= 2 && (eb?.etapa ?? 0) >= 2) break;
+  await espera(250);
+}
 await tecladoA.down('KeyK'); await tecladoB.down('KeyK');
 await espera(9000);
 await tecladoB.down('KeyA'); await espera(1500); await tecladoB.up('KeyA');
@@ -143,10 +152,15 @@ ok('el kart de B avanzó con lo que tocó B (y no igual que el de A)', (xa?.av?.
 const msPorCuadro = x => x?.ls ? (x.ls.msEsperando / Math.max(1, x.ls.cuadros)).toFixed(2) : '-';
 ok('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4,
   `A ${msPorCuadro(xa)} ms (máx ${xa?.ls?.maxEspera?.toFixed(0)}), B ${msPorCuadro(xb)} ms (máx ${xb?.ls?.maxEspera?.toFixed(0)}); esperando que el otro llegara a la carrera: A ${((xa?.ls?.msLlegada || 0) / 1000).toFixed(1)} s, B ${((xb?.ls?.msLlegada || 0) / 1000).toFixed(1)} s`);
+// el retraso de la carrera (§70): lo anuncia el decisor según la red; tiene que ser el MISMO en las dos consolas
+const retrasoDe = x => x?.ls?.retrasos?.[x?.ls?.carrera] ?? x?.ls?.retraso;
+ok('las dos usaron el mismo retraso en la carrera (se adapta a la red)', retrasoDe(xa) !== undefined && retrasoDe(xa) === retrasoDe(xb),
+  `A ${retrasoDe(xa)}, B ${retrasoDe(xb)} cuadros; ida y vuelta medida A ${JSON.stringify(xa?.ls?.rtt)} B ${JSON.stringify(xb?.ls?.rtt)} ms` +
+  (EXTRA.includes('redMala') ? ` (red mala de mentira: ${EXTRA.match(/redMala=([\d.,]+)/)?.[1]})` : ''));
 
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
 for (const [n, p] of [['A', A], ['B', B]]) writeFileSync(path.join(carpeta, `red-${n}.txt`), await p.evaluate(() => window.mkwRed?.registro.join('\n')).catch(() => ''));
 await navegador.close();
 servidor.kill();
-console.log(`\n${bien} bien, ${mal} mal  (registro en build/web/datos/sincro/)`);
+console.log(`\n${bien} bien, ${mal} mal  (registro en ${path.relative(raiz, carpeta).replaceAll("\\", "/")}/)`);
 process.exit(mal ? 1 : 0);
