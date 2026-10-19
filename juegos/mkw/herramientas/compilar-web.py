@@ -235,6 +235,11 @@ def main():
     #                   -> web/juego/semillas_nativo.cpp (la de la página en «Copa a tu gusto», §56)
     REEMPLAZOS = {"func_801B3BAC": "func_801B3BAC_traducida", "func_8015DF4C": "func_8015DF4C_traducida",
                   "func_8052F924": "func_8052F924_traducida",
+                  # SectionPad::GetFirstDeactivatedPad -> semillas_nativo.cpp (en la carrera sincronizada los humanos de
+                  # otras consolas no pausan con «mando desconectado», §73)
+                  "func_8061B9BC": "func_8061B9BC_traducida",
+                  "rr_overlay_8052FB90": "rr_overlay_8052FB90_traducida",   # §73: RacedataScenario::Init de RR (pantalla propia)
+                  "func_807F1094": "func_807F1094_traducida",   # §73: CtrlRaceNameBalloon::UpdatePosition (globos sin pantalla)
                   # MEMAllocFromExpHeapEx / MEMAllocFromFrmHeapEx / ClipInfoMgr::Update / AI::Character::UpdateLookAtCamera
                   # -> web/juego/lockstep_nativo.cpp
                   # (memoria en cero y todo "a la vista" en la carrera sincronizada, §61)
@@ -247,13 +252,24 @@ def main():
                   # SectionMgr::Update (la versión de RR) -> web/juego/directo_nativo.cpp (abrir directo una sección
                   # pedida por la página: elige la licencia y llama a SetNextSection/RequestSceneChange, §71)
                   "rr_overlay_8063550C": "rr_overlay_8063550C_traducida",
+                  # y SectionMgr::Init (la de RR): con un pedido ya puesto, la primera sección del juego es la pedida
+                  # (sin título ni licencias, §73)
+                  "rr_overlay_80634E44": "rr_overlay_80634E44_traducida",
+                  # y Page::ChangeSectionBySceneChange (la de RR): al confirmar el derrape en «elegir personaje» por
+                  # pedido de la página, no sigue a la copa: avisa lo elegido (§73)
+                  "rr_overlay_806024B0": "rr_overlay_806024B0_traducida",
+                  # (y MenuInteractable::LoadNextPageById / LoadNextPageWithDelayById: en la sección 0x49 el derrape pasa a
+                  # la página de copas sin cambiar de sección)
+                  "func_80837720": "func_80837720_traducida", "func_8083761C": "func_8083761C_traducida",
                   # DecideTrack y DecideCC de Pulsar y SetPlayerData (el voto) -> web/juego/modos_nativo.cpp (la pista de
                   # la playlist y la cilindrada del anfitrión en los modos de la sala, §72)
                   "rr_kamek_81864290": "rr_kamek_81864290_traducida", "rr_kamek_81864878": "rr_kamek_81864878_traducida",
                   "rr_overlay_80660750": "rr_overlay_80660750_traducida",
                   # GMDataOnlineVS: el control de inactividad (30 s sin tocar nada) -> modos_nativo.cpp: ahí la prueba
                   # puede dar la carrera por terminada (mkw_modos_terminar), §72
-                  "func_8053F184": "func_8053F184_traducida"}
+                  "func_8053F184": "func_8053F184_traducida",
+                  # y el de Retro Rewind por velocidad (kart casi quieto): en nuestras salas no se saca a nadie, §73
+                  "rr_overlay_8053EE50": "rr_overlay_8053EE50_traducida"}
     if os.environ.get("MKW_DEPURAR") == "1":              # depuración de la red (web/juego/depurar_red.cpp, §58)
         REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800CCC68", "800D1D90", "800D0FEC", "806561A8", "80656FF8", "80653DDC", "800D2000", "800DAD9C", "800FBA4C", "800E8814", "80623054", "80666288", "8063519C", "8067552C", "80635A3C", "80635AC8", "80635B2C")}); REEMPLAZOS["rr_overlay_80635A3C"] = "rr_overlay_80635A3C_traducida"
         REEMPLAZOS["rr_kamek_818B4854"] = "rr_kamek_818B4854_traducida"   # CheckPacket de Pulsar -> depurar_paquetes.cpp (§72)

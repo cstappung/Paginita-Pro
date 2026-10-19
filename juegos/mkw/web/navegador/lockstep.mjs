@@ -8,8 +8,11 @@
 //   - junta los de los demás (llegan por la malla WebRTC, canal "udp") y responde cuando tiene los de todos;
 //   - cada paquete repite los últimos 16 cuadros (si se pierde uno, el siguiente lo trae); si igual falta alguno,
 //     pide que se lo reenvíen (a todos: cualquiera que lo tenga contesta);
-//   - si un humano se va (4 s sin sus botones) o nunca llega (45 s), el "decisor" (el primer humano que sigue y no falta) anuncia desde qué cuadro su
-//     kart sigue sin nadie (botones sueltos) y todos hacen lo mismo en el mismo cuadro;
+//   - si un humano se va (4 s sin sus botones; en la sala, §73, un MARGEN para volver: 30 s, ?margen=N) o nunca llega
+//     (45 s), el "decisor" (el primer humano que sigue y no falta) anuncia desde qué cuadro su kart sigue sin nadie
+//     (botones sueltos) y todos hacen lo mismo en el mismo cuadro. Mientras se lo espera la carrera queda en pausa en
+//     todas las consolas (nadie avanza sin sus botones): si su conexión vuelve, la carrera sigue como si nada;
+//     estado().esperando dice a quién se espera y desde hace cuánto (la página lo muestra con la cuenta);
 //   - cada 120 cuadros compara una "huella" de la carrera (el avance de los 12 karts) con los demás: si no coincide,
 //     la carrera se desincronizó (no debería pasar: el juego es determinista con el reloj fijo, §61);
 //   - el RETRASO se adapta a la red (§70): cada medio segundo un "ping" a cada uno mide cuánto tarda la ida y vuelta.
@@ -152,6 +155,14 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
 
   // ---- lo que pide el juego (pad_web.cpp) ----
   async function pad(cuadro) {
+    // §73: la página ya pidió la carrera siguiente (fijarCarrera) y el juego todavía corre los últimos cuadros de la
+    // vieja (el salto se hace apenas el juego avanza): esos van sin esperar a nadie —los demás ya no mandan botones de
+    // esa carrera, y esperarlos dejaría al juego quieto sin poder saltar— y con todos quietos. La nueva empieza cuando
+    // el contador de cuadros vuelve atrás.
+    if (saliendo) {
+      if (cuadro < saliendo.ultimo) saliendo = null;
+      else { saliendo.ultimo = cuadro; est.cuadrosSaliendo = (est.cuadrosSaliendo || 0) + 1; return quietos(); }
+    }
     if (ultimo < 0 || cuadro + 300 < ultimo) {                   // primer cuadro, o el contador volvió a empezar
       const k = carrera + 1;
       anunciar(k);                                               // si soy el decisor y no lo había anunciado: ahora
@@ -161,7 +172,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
         // que también usan ese. Cuánto esperar: si del decisor nunca supe nada (ni un ping: no está), esperaCorte; si
         // estaba (puede venir cargando la pista), esperaInicio
         const t0 = ahora(), tope = oido.has(decisor()) ? esperaInicio : esperaCorte;
+        esperaAnuncio = t0;                                      // (estado().esperando: se espera al decisor, que viene cargando)
         while (!anuncios.has(k) && ahora() - t0 < tope) { anunciar(k); await new Promise(r => setTimeout(r, 20)); }
+        esperaAnuncio = 0;
         est.msLlegada += ahora() - t0;
         if (!anuncios.has(k)) registro(`[lockstep] nadie anunció el retraso de la carrera ${k}: uso ${retrasoBase}`);
       }
@@ -323,8 +336,31 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     }
   }
 
-  return { pad, alBinario,
-    estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, carrera, cuadro: ultimo, miMando, retraso, cortes: Object.fromEntries(cortes),
+  // §73: la sala dice qué número de carrera viene (quien recargó la página a mitad de la copa entra en la siguiente con
+  // el mismo número que los demás: los paquetes llevan ese número)
+  // Si el juego está en medio de una carrera (la anterior), sus últimos cuadros van sin esperar (ver pad) y se suelta la
+  // espera en curso: quien iba un cuadro atrás esperaría para siempre botones que ya nadie manda.
+  let saliendo = null;
+  const quietos = () => { const d = new Int32Array(32); for (const p of mandos) { d[p * 8] = 1; for (let k = 0; k < 7; k++) d[p * 8 + 1 + k] = NEUTRO[k]; } return d; };
+  function fijarCarrera(k) {
+    if (!(k >= 1)) return;
+    if (ultimo >= 0 && k !== carrera) {               // el juego está en otra carrera (la anterior): a salir de ella
+      saliendo = { ultimo }; ultimo = -1;
+      if (espera) { const r = espera.resolver; espera = null; propuestas.clear(); r(); }
+    }
+    if (ultimo < 0 && k - 1 !== carrera) { carrera = k - 1; siguiente = null; }   // la próxima que empiece es la k
+  }
+  let esperaAnuncio = 0;
+  const esperando = () => {
+    if (esperaAnuncio) return { uids: [decisor()], ms: ahora() - esperaAnuncio, margen: esperaInicio, llegando: true };
+    if (!espera || !espera.faltan?.length) return null;
+    const ms = ahora() - espera.desde;
+    return { uids: espera.faltan.map(m => duenoDe.get(m)), ms, margen: esperaCorte,
+             // los que nunca mandaron nada en esta carrera todavía vienen cargando (no es un corte)
+             llegando: espera.faltan.every(m => tabla(m).size === 0) };
+  };
+  return { pad, alBinario, fijarCarrera,
+    estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, carrera, cuadro: ultimo, miMando, retraso, cortes: Object.fromEntries(cortes), esperando: esperando(),
       rtt: Object.fromEntries([...rtt].map(([u, x]) => [u, Math.round(x.s)])) }),
     detener() { if (latido) clearInterval(latido); } };
 }

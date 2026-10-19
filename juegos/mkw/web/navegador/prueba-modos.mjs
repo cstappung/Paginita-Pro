@@ -8,6 +8,8 @@
 // quien pasa 30 s sin tocar un botón (el control de inactividad del juego original, §72): por eso a los 10 s de
 // carrera cada pestaña la da por terminada (window.mkwTerminarCarrera → modos_nativo.cpp: como cruzar la meta).
 // --sin-terminar = no la termina (se ve el corte por inactividad a los 30 s).
+// --corte (§73) = la 1.ª carrera no la termina: el juego corta a los dos por inactividad, las dos páginas cierran el
+// aviso y vuelven a entrar solas a la sala; la 2.ª carrera sí se termina y completa la copa (la cortada no cuenta).
 // Se comprueba:
 //   - el reloj de elegir arranca en 45 s (el número del juego quedó en 45.0 y el reloj de la página 0x90 pasa de 40);
 //   - el anfitrión decidió con la cilindrada pedida (y en la playlist, con la pista de la cola);
@@ -16,7 +18,7 @@
 //   - los dos muestran la tabla final y avisan el fin (en el sitio, el anfitrión vuelve al vestíbulo con ella).
 // Fotos y registro en build/web/datos/modos/.
 //
-// Uso:  node web/navegador/prueba-modos.mjs [--playlist] [--ventana] [--sin-terminar]     (~6 min)
+// Uso:  node web/navegador/prueba-modos.mjs [--playlist] [--ventana] [--sin-terminar] [--corte]     (~6 min; --corte ~10)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -27,7 +29,8 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const PUERTO = 8147;
 const PLAYLIST = process.argv.includes('--playlist');
-const carpeta = path.join(raiz, 'build/web/datos/modos', PLAYLIST ? 'playlist' : 'copa');
+const CORTE = process.argv.includes('--corte');
+const carpeta = path.join(raiz, 'build/web/datos/modos', (PLAYLIST ? 'playlist' : 'copa') + (CORTE ? '-corte' : ''));
 mkdirSync(carpeta, { recursive: true });
 let bien = 0, mal = 0;
 const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.log(`${cumple ? '✓' : '✗'} ${texto}${detalle ? ' — ' + detalle : ''}`); };
@@ -38,6 +41,8 @@ const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8);
 const VIGIA = (() => { const a = process.argv.find(x => x.startsWith('--vigia')); if (!a) return null; const [d, n] = (a.split('=')[1] || '0x2C,8').split(','); return [Number(d), Number(n)]; })();
 const PISTA = 0x100 + 4 * 13 + 2, CC = PLAYLIST ? 3 : 1;
 const TERMINAR = !process.argv.includes('--sin-terminar');
+// la regla de inactividad del juego (30 s quieto = afuera) está apagada en las salas (§73); estas dos la necesitan
+const INACTIVIDAD = !TERMINAR || CORTE ? '&inactividad=1' : '';
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)],
   { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env } });
@@ -52,7 +57,7 @@ async function abrir(nombre, extra) {
   const p = await contexto.newPage();
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
-  await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${nombre.toLowerCase()}${sala}&nombre=Piloto${nombre}&modo=enlinea${MODO}${EXTRA}${extra}`);
+  await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${nombre.toLowerCase()}${sala}&nombre=Piloto${nombre}&modo=enlinea${MODO}${INACTIVIDAD}${EXTRA}${extra}`);
   return p;
 }
 // lo que mira la prueba en cada pestaña: la sección, el reloj del juego (página 0x90 SELECTStageMgr, +0x6C) y el modo
@@ -106,7 +111,10 @@ while (Date.now() < limite) {
         if (v !== ant) { window.__cambiosRed.push(`cuadro ${ri ? L.u32(ri + 0x20) : -1}: ${v}`); ant = v; } }, 4);
       return true; }).catch(() => false);
     // a los 10 s de carrera (etapa 2 = corriendo, 600 cuadros), terminarla como si cruzaran la meta
-    if (TERMINAR && e.s >= 0x68 && e.s <= 0x77 && e.etapa === 2 && e.cuadro > 600 && !vio[n].pidioFin) {
+    // --corte: después del corte, la vuelta a la sala y la carrera siguiente
+    if (vio[n].corte && e.s === 0x58 && !vio[n].volvio) { vio[n].volvio = ((Date.now() - t0) / 1000).toFixed(0); console.log(`  ${n}: de vuelta en la sala a los ${vio[n].volvio} s`); }
+    if (vio[n].volvio && e.s === 0x68 && !vio[n].carrera2) { vio[n].carrera2 = ((Date.now() - t0) / 1000).toFixed(0); console.log(`  ${n}: otra carrera a los ${vio[n].carrera2} s`); }
+    if (TERMINAR && (!CORTE || vio[n].volvio) && e.s >= 0x68 && e.s <= 0x77 && e.etapa === 2 && e.cuadro > 600 && !vio[n].pidioFin) {
       vio[n].pidioFin = await p.evaluate(() => window.mkwTerminarCarrera()).catch(() => false);
       console.log(`  ${n}: pidió terminar la carrera en el cuadro ${e.cuadro} (${vio[n].pidioFin ? 'hecho' : 'sin la función'})`);
     }
@@ -130,7 +138,7 @@ while (Date.now() < limite) {
     vio[n].corte = ((Date.now() - t0) / 1000).toFixed(0); console.log(`  ${n}: el juego se desconectó a los ${vio[n].corte} s — RKNet [estado, error, código, desconectados] ${JSON.stringify(ultimo[n].red)} (antes ${JSON.stringify(vio[n].redAntes)})`);
     await espera(1500); await p.locator('#canvas').screenshot({ path: path.join(carpeta, `${n}-corte.png`) }).catch(() => {});
   }
-  if (vio.A.corte && vio.B.corte && Date.now() - t0 > 1000 * Number(vio.A.corte) + 20000) break;
+  if (!CORTE && vio.A.corte && vio.B.corte && Date.now() - t0 > 1000 * Number(vio.A.corte) + 20000) break;
   if (!fotoTabla && ultimo.A?.tabla) { fotoTabla = true; await A.screenshot({ path: path.join(carpeta, 'A-tabla.png') }).catch(() => {}); }
   if (vio.A.fin && vio.B.fin) break;
   await espera(1000);
@@ -150,7 +158,14 @@ ok('al terminar la carrera los dos cuentan 1 de 1', a.modo?.terminadas === 1 && 
 const ta = (a.fin || []).map(x => `${x.nombre}:${x.puntos}`).join(','), tb = (b.fin || []).map(x => `${x.nombre}:${x.puntos}`).join(',');
 ok('los dos armaron la misma tabla, con los 2 pilotos', (a.fin || []).length === 2 && ta === tb, `A ${ta} · B ${tb}`);
 ok('los dos mostraron la tabla final y avisaron el fin', !!vio.A.fin && !!vio.B.fin && fotoTabla, `A ${vio.A.fin ?? '-'} s, B ${vio.B.fin ?? '-'} s`);
-ok('ninguno se desconectó', !vio.A.corte && !vio.B.corte, `A ${vio.A.corte ?? '-'} s, B ${vio.B.corte ?? '-'} s`);
+if (!CORTE) ok('ninguno se desconectó', !vio.A.corte && !vio.B.corte, `A ${vio.A.corte ?? '-'} s, B ${vio.B.corte ?? '-'} s`);
+else {
+  ok('en la 1.ª carrera el juego cortó a los dos (nadie tocó nada 30 s)', !!vio.A.corte && !!vio.B.corte, `A ${vio.A.corte ?? '-'} s, B ${vio.B.corte ?? '-'} s`);
+  const cortesA = await A.evaluate(() => window.mkwEstado.cortes || []).catch(() => []), cortesB = await B.evaluate(() => window.mkwEstado.cortes || []).catch(() => []);
+  ok('las dos páginas cerraron el aviso y volvieron solas a la sala (otra votación)', !!vio.A.volvio && !!vio.B.volvio && cortesA[0]?.volvio && cortesB[0]?.volvio,
+     `A ${vio.A.volvio ?? '-'} s, B ${vio.B.volvio ?? '-'} s; cortes A ${JSON.stringify(cortesA)} B ${JSON.stringify(cortesB)}`);
+  ok('corrieron otra carrera juntas después del corte', !!vio.A.carrera2 && !!vio.B.carrera2, `A ${vio.A.carrera2 ?? '-'} s, B ${vio.B.carrera2 ?? '-'} s`);
+}
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
 // el registro de la red de cada uno (WFC, malla, pila): para entender un corte
 for (const [n, p] of [['A', A], ['B', B]]) writeFileSync(path.join(carpeta, `red-${n}.txt`), await p.evaluate(() => window.mkwRed.registro.join('\n')).catch(() => ''));

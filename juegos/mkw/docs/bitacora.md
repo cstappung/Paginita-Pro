@@ -523,7 +523,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 
 | Término | Qué es y qué hace |
 |---|---|
-| **Modo de la sala (estilo)** | Lo que elige quien abre la sala de Mario Kart en el sitio: **Retro WFC** (el modo en línea del juego tal cual, sin fin), **Modo copa** (N carreras con puntos y una tabla al final) o **Modo playlist** (una cola de pistas sorteada). Se guarda como `estilo` porque las reglas de Firebase ya usan `modo` para otros juegos. Como el selector de función de un multímetro: el mismo aparato (el modo en línea del juego), distinta forma de usarlo. |
+| **Modo de la sala (estilo)** | Lo que elige quien abre la sala de Mario Kart en el sitio: **Retro WFC** (el modo en línea del juego tal cual, sin fin), **Modo copa** (N carreras con puntos y una tabla al final) o **Modo playlist** (una cola de pistas sorteada). Se guarda como `estilo` porque las reglas de Firebase ya usan `modo` para otros juegos. Como el selector de función de un multímetro: el mismo aparato (el modo en línea del juego), distinta forma de usarlo. **Desde §73 solo copa y playlist**: el dueño pidió no pasar por Retro WFC. |
 | **Paquete SELECT** | El "acta" que se mandan las consolas mientras eligen: el personaje, el kart y el voto de cada uno, y lo que decidió el anfitrión (la pista ganadora, la cilindrada, de quién era el voto que salió). Lo arma `SELECTHandler` del juego, con campos agregados por Retro Rewind (Pulsar: `PulSELECT`). Como la planilla que firma cada integrante de un jurado y que el presidente completa con el veredicto. |
 | **DecideTrack / DecideCC** | Las dos funciones de Retro Rewind con que el anfitrión decide: la pista (sortea uno de los votos, evitando repetir) y la cilindrada (10 % 100cc, 65 % 150cc, 25 % espejo). En el C++ traducido se llaman `rr_kamek_81864290` y `rr_kamek_81864878` (están en el código de Retro Rewind, que vive en 0x818…). |
 | **SetPlayerData (el voto)** | La función del juego (0x80660750, con un parche de Retro Rewind) que anota en el paquete SELECT el personaje, el kart y el **voto** de pista de una persona cuando lo confirma. En la playlist el voto se cambia ahí por la pista de la cola: así todas las tarjetas de la ruleta muestran la misma pista. |
@@ -540,6 +540,20 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Terminar la carrera por código (para las pruebas)** | En las pruebas nadie maneja: el kart no llega a la meta y a los 30 s el control de inactividad corta. La prueba le pide al juego (`window.mkwTerminarCarrera` → `mkw_modos_terminar` en `modos_nativo.cpp`) que en el cuadro siguiente llame a **EndLap** (0x805349B8, la función que corre al cruzar la meta) hasta pasar la última vuelta: el juego hace el resto como si el piloto hubiera llegado (tiempo, puesto, aviso a las otras consolas, puntos). Como apretar el botón de prueba de una alarma: se dispara el mismo circuito que con humo de verdad. |
 | **Sala Mundial / Regional (y la región de Retro Rewind)** | Las dos formas de buscar rivales del juego: **Mundial** (cualquiera del mundo) y **Regional** (solo los de la misma región). Retro Rewind usa la Regional con un número de región propio para separar sus salas: 0x0A = las retro, 0x14 = pistas personalizadas, 0x15 = las de Nintendo, 0x0C = 200cc, 0x0B = OTT, 0x0D = lluvia de objetos. En una sala Mundial Pulsar deja solo las 32 pistas de Nintendo. El Retro WFC de RR es «Main modes» = Regional + VS (región 0x0A). Como las frecuencias de radio: el mismo equipo, pero cada canal junta a gente distinta. |
 | **Pista válida (`IsValidTrack`)** | La regla de Pulsar para saber si un número de pista existe en la sala actual: hasta 0x29 siempre (las de Nintendo y las de batalla); de 0x100 en adelante, solo si la sala tiene las pistas de RR cargadas. Un voto de una pista que no vale se toma como «sin votar». |
+| **Ficha de la carrera** | Nuestra lista de lo que lleva una carrera (pista, cilindrada, espejo, nivel de la CPU, objetos, número de carrera, semilla y, por cada uno de los 12 puestos, si es persona o CPU, su personaje, su vehículo y su mando). La página la arma (`directo.mjs`, `armarFicha`) y el juego la copia a Racedata justo antes de saltar a la carrera (`directo_nativo.cpp`). Como la hoja de ajustes que se carga en un equipo antes de encenderlo: todas las consolas cargan la misma. |
+| **Arrancar directo en la sección (sección de arranque)** | Al encender, el juego elige la primera pantalla con un número guardado en SectionMgr (+0x4, `bootSectionId`: normalmente 0x3F, el título). Si lo cambiamos justo después de que el juego lo pone (envolviendo `SectionMgr::Init`), el juego arranca directamente en la pantalla de elegir personaje o en la carrera: el título y las licencias ni se crean. Como cambiar el vector de reinicio de un microcontrolador para que salte directo a la rutina que uno quiere. |
+| **Jugador local de verdad (en todas las consolas)** | En la sala nueva, cada humano de la sala figura en TODAS las consolas como jugador "local" del juego (tipo 0, el que maneja un mando conectado a la Wii), cada uno con su puerto de mando (0 a 3). Así la CPU compite contra ellos como en un Grand Prix y cada kart lee sus botones del puerto que le toca; la red (lockstep) pone en cada puerto lo que tocó esa persona. Por eso caben 4: la Wii tiene 4 puertos de mando. |
+| **Pantalla propia (una sola pantalla)** | Con 2 jugadores locales el juego dibujaría la pantalla partida en dos. Cada consola deja UNA pantalla, la de su persona, y UN jugador local (el suyo): "cuántas pantallas" (+0x5) y "cuántos locales" (+0x6) del escenario quedan en 1 y la tabla de pantallas (+0xB48+0x1C) pone primero a su piloto. El otro humano sigue siendo persona (tipo 0). Se escribe al terminar la versión de Retro Rewind de `RacedataScenario::Init`, que si no lo vuelve a pisar. |
+| **Conteos del escenario (jugadores, pantallas, locales)** | Tres números de Racedata que el juego calcula al preparar la carrera (+0x4 cuántos corren, +0x5 cuántas pantallas, +0x6 cuántos juegan en esta consola). El HUD arma sus controles por cada jugador local y la escena arma una vista por pantalla: si no cuadran (2 locales y 1 pantalla) el HUD busca una cámara que no existe y el juego se cae. |
+| **Detector de pantalla partida (`foto-pantalla.mjs`)** | Mira la foto del juego: compara cada fila de píxeles con la de arriba. Dentro de una vista las filas se parecen; en la costura entre dos vistas cambian de golpe. Un pico en el medio, mucho mayor que el salto típico = partida. Como encontrar un escalón en una señal por el pico de su derivada. |
+| **Mando desconectado (`GetFirstDeactivatedPad`)** | La función del juego (0x8061B9BC) que revisa en cada cuadro si a algún jugador local se le desconectó el mando; si encuentra uno, pausa con «Se interrumpió la comunicación con el mando». En la sala, los mandos de los otros humanos no están enchufados en esta consola (sus botones llegan por la red), así que la envolvemos para que diga "ninguno desconectado". |
+| **Árbitro de la sala (`sala-carrera.mjs`)** | El que lleva la sala de un paso al siguiente (elegir la copa → elegir personajes → carrera 1 → resultados → carrera 2 …). Manda el anfitrión: él guarda el estado de verdad y cada segundo se lo reparte entero a todos; los demás solo le avisan lo suyo (qué eligieron, que su carrera terminó). Como un tablero de control con un solo operador. |
+| **Cambio de anfitrión** | Si quien manda se va a mitad de la copa, la sala del sitio nombra a otro y se lo avisa al marco del juego de cada uno; el nuevo sigue desde su última copia del estado, sin recargar el juego. |
+| **Recursión sin fin (desbordar la pila)** | Una función que, sin querer, termina llamándose a sí misma una y otra vez: cada llamada apila su "a dónde volver" y la pila se llena («Maximum call stack size exceeded»). Aquí: la anfitriona avisaba lo que eligió → eso cambiaba el estado → el cambio volvía a avisar lo elegido → … Como un lazo de realimentación positiva que satura. |
+| **Idempotente** | Que hacer algo dos veces dé lo mismo que hacerlo una (como apretar "encender" en un equipo ya encendido). Avisar «elegí Mario» dos veces ya no cambia nada la segunda vez: así se cortó el círculo. |
+| **Interbloqueo (deadlock)** | Dos partes esperándose mutuamente para siempre. Aquí: la anfitriona saltó a la carrera 2 y dejó de mandar botones de la 1; la otra consola, un cuadro atrás, esperaba esos botones con el juego detenido, y con el juego detenido no podía saltar a la 2. Como dos relés que se mantienen abiertos uno al otro. |
+| **Salida de la carrera (cuadros sin esperar)** | El arreglo del interbloqueo: cuando la página pasa a la carrera siguiente, el lockstep suelta la espera y los últimos cuadros que el juego corra de la carrera vieja van sin esperar a nadie y con todos quietos (ya no importan: nadie más los corre). La carrera nueva empieza cuando el contador de cuadros vuelve a cero. |
+| **Largada pareja** | Que todos empiecen la carrera en el mismo instante aunque uno cargue la pista antes. Con el lockstep sale solo: ninguna consola avanza un cuadro sin los botones de todas, así que la que llegó primero queda quieta en el primer cuadro (con el aviso «Esperando a que el jugador 2 termine de cargar la pista…») hasta que llega la última. |
 
 ## 2026-10-16 · Día 1
 
@@ -4472,4 +4486,186 @@ node banco/correr.mjs modos directo
 node web/navegador/prueba-modos.mjs
 node web/navegador/prueba-modos.mjs --playlist
 node web/navegador/prueba-enlinea.mjs
+```
+
+## 2026-10-19 · §73 La sala sin Retro WFC: la copa con el selector de la página, los personajes en el juego y todos largando juntos
+
+### Qué pidió el dueño (2026-10-19)
+
+Probando `jugar.bat` vio «Connecting to Retro WFC» y se quedó pegado. Aclaró que Retro WFC era **solo un ejemplo** del
+ciclo de juego: el multijugador **no** debe conectarse a ese servidor ni mostrar ninguna pantalla del Wi-Fi del juego,
+ni el menú de licencias, ni el título de Retro Rewind: «haz que todo entre directamente donde tiene que estar». El
+recorrido que quiere (por ejemplo, Modo copa):
+
+1. el **vestíbulo de la página** (la sala del sitio);
+2. con los pilotos confirmados, el anfitrión **elige la copa con el selector de la página** (la lista de pistas con su
+   foto, los logos de las copas y el plano de cada pista: el de «Copa a tu gusto»);
+3. cada uno **elige personaje y vehículo en el juego**;
+4. se corre. «Si no puedes hacer eso directo, decompila el juego.»
+
+Y dos cosas más durante el trabajo: **no usar la cortina para apretar botones por detrás** («debes abrir directamente
+todo») y **que todos empiecen la carrera al mismo tiempo** (en una prueba suya el jugador 1 salió 2 s antes porque
+cargó primero).
+
+### La idea en una línea
+
+Cada navegador corre la MISMA carrera (el lockstep de §61), con los humanos como **jugadores locales de verdad** en
+todas las consolas y la CPU de un Grand Prix completando los 12; la carrera se abre **por código** escribiendo la
+**ficha** en Racedata y saltando con SectionMgr (§71), y un **árbitro** de la página (`sala-carrera.mjs`) lleva la sala
+de un paso al otro.
+
+### 1. La carrera directo desde el arranque (`directo_nativo.cpp`, `directo.mjs`)
+
+- **La ficha**: `armarFicha({pista, cc, cpu, humanos, semilla, carrera, carreras…})` arma pista, cilindrada, espejo,
+  nivel de la CPU, objetos, número de carrera, semilla y los 12 puestos (los humanos en su orden, cada uno con su mando;
+  los CPU con personajes distintos sorteados con la semilla). `escribirFicha` la copia a Racedata igual que la dejan
+  los menús (lo comprobamos con `herramientas/ficha-carrera.mjs`, que guarda la ficha de una carrera armada a mano con
+  los menús): la pista de RR con `CupsConfig::SetWinning` de Pulsar, los ajustes, cada jugador (tipo, personaje,
+  vehículo, mando, pantalla, equipo, tipo de mando), SectionParams (personajes, vehículos, número de carrera).
+- **Sin título ni licencias**: envolvemos `SectionMgr::Init` (la versión de RR, `rr_overlay_80634E44`). Justo después
+  de que el juego pone su **sección de arranque** (0x3F, el título), si la página ya pidió algo (y el guardado está
+  leído, cuando hace falta elegir licencia), la cambiamos por la que se pidió: la carrera (0x20) o la pantalla de elegir
+  personaje (0x49). El título y las licencias ni se crean: la prueba mira cada 100 ms y nunca los ve, ni debajo de la
+  pantalla de carga.
+- **La presentación de la pista**: el «vuelo» por la pista antes de la carrera es la sección 0x1A con el tipo «carrera
+  de CPU» (gametype 5); por omisión se salta directo a 0x20 con el tipo normal (0). `?intro=1` la pone.
+- **Elegir personaje y vehículo con las pantallas del juego** (sección 0x49: personaje 0x6B → vehículo 0x6C → la de
+  RR 0x10E → derrape 0x6D). Al confirmar el derrape el juego seguiría a las copas (0x6E): envolvemos las tres funciones
+  con que puede seguir (`Page::ChangeSectionBySceneChange` de RR, `LoadNextPageById` y `LoadNextPageWithDelayById`) y,
+  en el modo "elegir", en vez de seguir, el juego le avisa a la página lo elegido (`Module.mkwAlElegir`: personaje,
+  vehículo, derrape).
+
+### 2. Varios humanos de verdad en la misma carrera (`semillas_nativo.cpp`)
+
+La carrera sincronizada vieja ponía a todos como CPU (los CPU no tenían contra quién competir y la cámara parecía la de
+un espectador). Ahora cada humano es un **jugador local de verdad** (tipo 0) en todas las consolas, con su puerto de
+mando (0 a 3). Eso trajo tres problemas, uno detrás del otro:
+
+1. **Pantalla partida y un cuelgue.** Con 2 locales el juego quiere 2 pantallas (sección 0x21) y se colgaba al armar
+   los avisos de objetos (`ItemWarningMgr::Init` recorre a los jugadores locales según la tabla de pantallas, y la
+   tabla tenía uno solo). Arreglo: la **pantalla propia**: la tabla de pantallas lista a TODOS los humanos (los cuenta
+   igual en todas), con el de esta consola primero, y "cuántas pantallas" queda en 1. La ficha va con `pantallas = 1`
+   (sección 0x20).
+2. **«Se interrumpió la comunicación con el mando. Presiona A».** El juego revisa en cada cuadro el mando de cada
+   jugador local (`SectionPad::GetFirstDeactivatedPad`, 0x8061B9BC): los de los otros humanos no están enchufados en
+   esta consola. Envolvemos la función: con humanos de la sala, "ninguno desconectado".
+3. **El derrape de cada uno.** El botón del juego deja el derrape (manual o automático) en el portador del mando del
+   jugador 1 de esa consola. Ahora el plantel lleva el derrape de cada humano (5 números por puesto: vehículo,
+   personaje, tipo, mando, derrape) y se escribe en el portador de SU mando (`RealControllerHolder::SetDriftType`,
+   0x80520F2C).
+
+### 3. El árbitro de la sala (`web/navegador/sala-carrera.mjs`)
+
+Las fases: **copa** (el anfitrión arma la copa; en la playlist ya viene armada) → **elegir** (45 s; a quien no alcanza
+se le pone uno) → **correr** la carrera n (todos arman la misma ficha y saltan; al terminar, 9 s de resultados y la
+siguiente) → **fin** (la tabla de la copa, leída del juego, va a la sala del sitio). Manda el anfitrión: cada segundo y
+en cada cambio reparte el estado entero (así quien recarga se pone al día); los demás le avisan lo suyo. Los mensajes
+van por la malla con la marca 0xA8 (los del lockstep llevan 0xA7). Quien recarga la página con la copa andando entra en
+la carrera siguiente. Si el anfitrión se va, la sala del sitio nombra a otro y se lo avisa al marco
+(`cambiarAnfitrion`): el nuevo sigue desde su copia, sin recargar.
+
+En la página (`mkw.mjs`, `?modo=sala`): el juego arranca directo en la pantalla de personaje; la anfitriona ve encima
+el selector de la página (con tantas casillas como carreras); los demás, «El anfitrión está eligiendo la copa…»; con la
+copa lista, la cuenta de 45 s; después cada carrera abre directo. La CPU es la de un Grand Prix: su nivel sale de la
+cilindrada (50cc fácil, 100cc normal, 150cc y espejo difícil); «al azar» sortea la cilindrada de cada carrera como RR
+(10 % 100cc, 65 % 150cc, 25 % espejo) con la semilla de la sala.
+
+### 4. Todos largan juntos
+
+El lockstep ya lo garantiza: ninguna consola avanza un cuadro sin los botones de todas, así que la que llega primero a
+la carrera queda **quieta en el primer cuadro** hasta que llega la última, y la cuenta regresiva empieza en el mismo
+cuadro para todas (en la prueba: A esperó 0,9 s a B). Lo que faltaba era decirlo: ahora la página muestra «Esperando a
+que el jugador 2 termine de cargar la pista: la carrera empieza al mismo tiempo para todos…» mientras espera (también
+cuando lo que se espera es el anuncio del retraso del decisor). Se espera hasta 45 s a quien viene cargando; a quien
+ya estaba y se corta, el margen de 30 s.
+
+### 5. Dos fallas que encontró la prueba de la sala
+
+- **Recursión sin fin en la anfitriona.** Al confirmar lo elegido, la anfitriona se lo avisaba a sí misma → eso
+  cambiaba el estado → el cambio volvía a avisar lo elegido → … hasta «Maximum call stack size exceeded» y 19 s con la
+  pestaña trabada. Arreglo en los dos lados: la página reenvía lo suyo solo si el anfitrión todavía no lo tiene, y el
+  árbitro ignora un aviso igual al que ya tenía (**idempotente**).
+- **Interbloqueo al pasar a la carrera 2.** La anfitriona saltó a la 2 y dejó de mandar botones de la 1; B iba unos
+  cuadros atrás y quedó esperando esos botones con el juego detenido (en el lockstep el juego espera dentro de la
+  lectura del mando), y con el juego detenido no podía saltar. Arreglo (`lockstep.fijarCarrera`): si el juego está en
+  medio de otra carrera, se suelta la espera y los últimos cuadros de la vieja van **sin esperar y con todos quietos**
+  (ya nadie más los corre); la nueva empieza cuando el contador de cuadros vuelve atrás. (Un primer intento no hacía
+  nada: pedir «la 2» estando en la 1 no cambiaba el número, porque el contador ya iba a pasar solo a la 2; lo pilló el
+  banco.)
+
+### 6. La pantalla partida: la memoria decía 1 y la imagen mostraba 2
+
+Mirando las **fotos** de la prueba (no solo los números) apareció la pantalla partida en las dos pestañas: arriba un
+kart, abajo el otro, con dos HUD. La tabla de pantallas decía lo correcto; la imagen, no. Cómo se encontró y arregló:
+
+1. **Una prueba que mira la imagen** (`web/navegador/foto-pantalla.mjs`): compara cada fila de píxeles con la de arriba;
+   en la costura entre dos vistas el salto es mucho mayor que el típico (como buscar un escalón en una señal por el
+   pico de su derivada). Calibrada con fotos de verdad: partidas 17,7 y 21 contra un típico de 3,5; una sola vista
+   ≤ 4,7. Ahora va en `prueba-sincro --directa` y en `prueba-sala`.
+2. **Los tres conteos del escenario** (+0x4 jugadores, +0x5 pantallas, +0x6 locales: los calcula
+   `ComputePlayerCounts`, 0x8052F788). Yo ponía pantallas = 1, pero durante la carrera valía 2. Escribirlo en plena
+   carrera no cambia nada: las vistas se arman al construir la escena.
+3. **El punto de vigilancia** (§62) sobre esos bytes dijo quién los escribía: la **versión de Retro Rewind** de
+   `RacedataScenario::Init` (`rr_overlay_8052FB90`) los vuelve a escribir al final, **después** de InitRng (donde estaba
+   mi gancho). Además prepara el escenario de los **menús**, que después se copia a la carrera. El arreglo va
+   envolviendo esa función: al terminar, la pantalla propia.
+4. Con 1 pantalla y 2 locales el juego **se caía** en el HUD: los globos con el nombre y con el objeto de los otros
+   pilotos (`CtrlRaceNameBalloon`, `CtrlRaceItemBalloon`) se arman por cada jugador local (`Pages::RaceHUD::
+   GetCtrlRaceBaseCount` lee +0x6) y los del segundo buscaban la cámara de una pantalla que no existe (leían fuera de la
+   lista de pantallas, 0x809C1868). Quitarle el lugar de pantalla al otro humano tampoco servía.
+5. **El arreglo: un solo jugador local por consola** (el propio): pantallas = 1 y locales = 1. El otro humano sigue
+   siendo persona (tipo 0) en todas las consolas, así que la CPU compite contra los dos. Antes de hacerlo se revisó
+   que el final de la carrera no dependa de ese número: `GMDataVS::CanRaceEnd` (0x80536054) recorre a todos los
+   jugadores por puesto. Y las huellas lo confirman: la misma carrera en las dos (18 de 18).
+
+Queda además una guarda en `CtrlRaceNameBalloon::UpdatePosition` (no actualiza un globo cuya pantalla no existe) y
+`?unaPantalla=0` para ver lo de antes.
+
+### 7. El sitio (`terceros/Paginita-Pro`, solo archivos de Mario Kart)
+
+- `srcMkw`: siempre `modo=sala` con `sincro` (los pilotos en orden), `jefe` (el anfitrión al empezar), la semilla de la
+  tanda, el modo, las carreras, la cilindrada y, en la playlist, la cola sorteada. Los nombres no van en la dirección:
+  se le mandan al marco por mensaje, igual que el anfitrión nuevo si cambia (el marco ya no se recarga por eso).
+- `redMkw`: dos modos (copa por omisión, playlist; una sala vieja de Retro WFC pasa a copa), siempre la carrera
+  sincronizada con los primeros 4; si el anfitrión se va, siguen. Caben 4 (`cupo: 4`).
+- Vestíbulo, opciones al crear la sala y manual: sin Retro WFC ni «CPU de relleno».
+
+### Trampas
+
+- **`InvokeDirectCpu` necesita `abi_bridge.h`**: sin el include, la compilación falló y la prueba corrió con el `.wasm`
+  viejo (y "falló" por otra cosa). Leer siempre la cola de la compilación antes que el resultado de la prueba.
+- **El selector de la página sale antes de que el juego termine de arrancar**: una prueba que mira la sección del juego
+  apenas ve el selector lee −1 (todavía sin secciones).
+- **Comparar el avance de los karts tarde no sirve**: el que va derecho choca en la primera curva y a los 20 s los dos
+  quedan contra el mismo muro (1,1343 contra 1,1318 vueltas). Se mide a los 3,5 s, con B todavía quieto.
+- **El número de carrera del lockstep es "la próxima que empiece"**: `fijarCarrera(n)` en medio de la n−1 no cambia el
+  número, pero sí tiene que soltar la espera.
+- **Mirar las fotos, no solo los números**: la tabla de pantallas estaba bien y la imagen salía partida; las pruebas
+  pasaban. Ahora una comprobación mira la imagen.
+- **El escenario que se prepara es el de los menús** (y lo prepara la versión de Retro Rewind): un gancho en la
+  función del juego original o antes del final de la de RR no dura.
+- **Una prueba del sitio falla en Windows por las barras** (`controles.test`, worms.js con `\` contra `/`): no es de
+  Mario Kart, viene de antes.
+
+### Pruebas
+
+- `prueba-directa` **13/13** (la carrera directo, sin título ni licencias, ni debajo de la carga) y `--elegir` **15/15**.
+- `prueba-sincro --directa` **13/13** (dos pestañas: los dos humanos tipo 0 en las dos consolas, cada una con UNA vista
+  —la foto lo confirma: costura 2,2 contra un típico de 2,3—, su cámara, huellas iguales 18 de 18, cada kart con lo
+  suyo, la que llegó primero esperó a la otra para largar juntas).
+- banco `sala-carrera` **23/23** (fases, 45 s con reloj falso, quien recarga se pone al día, cambio de anfitrión,
+  sin círculo al reenviar lo elegido, playlist) y `lockstep` **37/37** (dos nuevas: el cambio de carrera con una
+  consola atrás).
+- `prueba-sala` **20/20** (dos pestañas, la sala entera: selector de copa en la anfitriona y aviso en B, el juego
+  directo en la pantalla de personaje, las dos eligen en el juego, la carrera 1 con la pista 1 de la copa, cada una con
+  su pantalla y su kart con lo que eligió, huellas iguales, la carrera 2 sola después de los resultados y la misma en
+  las dos, la tabla al final, ningún aviso encima de la carrera, una sola vista en cada foto, sin errores de JavaScript).
+- Sitio: `mkw.test` **16/16**; Juegos entero 977/978 (la que falla es la de las barras de Windows).
+
+```bash
+node banco/correr.mjs sala-carrera lockstep
+node web/navegador/prueba-directa.mjs --elegir
+node web/navegador/prueba-sincro.mjs --directa --datos=build/web/datos/sincro-directa
+node web/navegador/prueba-sala.mjs
+cd terceros/Paginita-Pro/colabtex && node --test tests/mkw.test.cjs
 ```

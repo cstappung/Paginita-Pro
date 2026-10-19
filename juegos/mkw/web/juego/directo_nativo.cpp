@@ -54,6 +54,8 @@
 //   0x8064C610 WFCModeSelect::OnModeButtonClick    (la página 0x8C: VS +0x208 / Batalla +0x45C)
 //   0x8064BDC4 WFCMainMenu::OnRegionalButtonClick  (la página 0x8B: «Regional», +0x484; Retro Rewind lo esconde y su
 //                                                  botón «Main modes» (las retro) llama a esta, §72)
+//   0x80649FD8 DisconnectError::OnClick (r4 = mando 0) (la página 0x89, el aviso «You were disconnected…»: lo cierra
+//                                                  como al apretar A y el juego vuelve al menú principal, 0x41, §73)
 //   0x8183FCC0 ExpWFCModeSel::OnModeButtonClick de Retro Rewind (la página 0x8C: fija la región de RR, 0x0A = retros
 //                                                  con el botón VS +0x208, sus «contextos», y llama a 0x8064C610, §72)
 // Retro Rewind trae su propia versión de algunas de estas funciones (rr_overlay_X: la del juego con los parches de
@@ -67,6 +69,10 @@
 #include <emscripten/emscripten.h>
 
 extern "C" void rr_overlay_8063550C_traducida(CpuContext* ctx);   // SectionMgr::Update de RR, con el nombre cambiado
+extern "C" void rr_overlay_80634E44_traducida(CpuContext* ctx);   // SectionMgr::Init de RR, con el nombre cambiado
+extern "C" void rr_overlay_806024B0_traducida(CpuContext* ctx);   // Page::ChangeSectionBySceneChange de RR
+extern "C" void func_80837720_traducida(CpuContext* ctx);         // MenuInteractable::LoadNextPageById
+extern "C" void func_8083761C_traducida(CpuContext* ctx);         // MenuInteractable::LoadNextPageWithDelayById
 
 namespace {
 constexpr uint32_t kSectionMgr = 0x809C1E38;    // puntero al SectionMgr
@@ -82,7 +88,7 @@ uint32_t g_mando = 0x124;       // la identidad del mando del jugador 1 (ver arr
 // la acción de botón pedida (funcion = 0: nada)
 uint32_t g_boton_funcion = 0, g_boton_pagina = 0, g_boton = 0;
 constexpr uint32_t BOTONES[] = {0x805F8F54u, 0x80648404u, 0x80648AFCu, 0x8064BCE8u, 0x8064BEA0u, 0x8064C610u,
-                                0x8064BDC4u, 0x8183FCC0u};
+                                0x8064BDC4u, 0x8183FCC0u, 0x80649FD8u};
 
 // Llama a una función del juego con los argumentos r3..r6 sobre una copia del contexto: la pila (r1) es la del juego
 // (cada llamada arma su marco más abajo) y los registros que la Update del juego necesita quedan intactos.
@@ -152,12 +158,127 @@ int elegirLicencia(const CpuContext* ctx, uint32_t sm, uint32_t n) {
     llamar<0x805FA6E0u>(ctx, sp + 0x238, 0, licencia + 0x16);                  // 4. el Mii de la licencia (CreateID)
     return 1;
 }
+
+// ---- §73: la carrera directa (sin menús) ----
+// La "ficha" de la carrera la escribe la página (Module._mkw_directo_ficha(): 64 enteros, ver FICHA_* abajo) y aquí se
+// deja en Racedata.menusScenario (+0xC10) igual que la dejan los menús del juego (medido con herramientas/
+// ficha-carrera.mjs en una carrera VS armada a mano: build/web/datos/ficha/vs-1p.json). Al entrar a la carrera el
+// juego (Racedata::InitRace, 0x805302C4) cuenta jugadores/pantallas/mandos y copia esa ficha a la de la carrera.
+// La pista de Retro Rewind la elige Pulsar en su CupsConfig: CupsConfig::SetWinning (rr_kamek_818476A4) guarda la
+// pista ganadora (+0x10), su variante (+0x18) y la "casilla" del juego que ocupa (+0x8, el número de pista que va en
+// Racedata): la misma función que corre al confirmar la pista en el menú.
+constexpr uint32_t kRacedata = 0x809BD728;
+constexpr uint32_t kCups = 0x8043319C;          // CupsConfig de Pulsar (dirección fija en esta versión de RR, menus.mjs)
+enum { FICHA_PISTA, FICHA_VARIANTE, FICHA_CC, FICHA_ESPEJO, FICHA_CPU, FICHA_OBJETOS, FICHA_MODO, FICHA_CARRERA,
+       FICHA_CARRERAS, FICHA_SEMILLA1, FICHA_SEMILLA2, FICHA_JUGADORES, FICHA_PANTALLAS, FICHA_VUELTAS, FICHA_PRIMERA,
+       FICHA_INTRO, FICHA_PUESTOS = 16 };    // y desde 16, por puesto (12): tipo, personaje, vehículo, mando (-1 = ninguno)
+int32_t g_ficha[64] = {};
+int g_hay_ficha = 0;            // 1 = el próximo salto es a una carrera con esta ficha
+int g_registrar_al_entrar = 0;  // 1 = arrancó directo en la sección pedida: falta registrar el mando del jugador 1
+
+bool cupsValido() {             // lo mismo que cupsValido de menus.mjs: que ahí esté de verdad el CupsConfig
+    const uint32_t c = Memory::Read32(kCups), sel = Memory::Read32(kCups + 0x14), n = Memory::Read32(kCups + 0x24);
+    return n > 0 && n < 400 && (c < 8 || (c >= 0x40 && c < 0x40 + n)) && sel < 0x100 + 4 * n;
+}
+
+bool escribirFicha(const CpuContext* ctx, uint32_t sm) {
+    const uint32_t rd = Memory::Read32(kRacedata), sp = Memory::Read32(sm + 0x98);
+    if (!rd || !sp) return false;
+    const int32_t* f = g_ficha;
+    // 1. la pista: con la de Pulsar (0x100 + 4·copa + fila) se elige como en el menú; una del juego (< 0x2A) va tal cual
+    uint32_t pista = static_cast<uint32_t>(f[FICHA_PISTA]);
+    if (pista >= 0x100) {
+        if (!cupsValido()) return false;
+        llamar<0x818476A4u>(ctx, kCups, pista, static_cast<uint32_t>(f[FICHA_VARIANTE]));   // SetWinning
+        Memory::Write32(kCups, 0x40 + (pista - 0x100) / 4);   // la copa elegida (para el menú que venga después)
+        Memory::Write32(kCups + 0x14, pista);                  // la pista elegida
+        pista = Memory::Read8(kCups + 0x8);                    // su casilla en el juego
+    }
+    // 2. los ajustes (menusScenario.settings, +0xB48)
+    const uint32_t esc = rd + 0xC10, aj = esc + 0xB48;
+    Memory::Write32(aj + 0x0, pista);
+    Memory::Write32(aj + 0x4, static_cast<uint32_t>(f[FICHA_CC]));         // 0 50cc, 1 100cc, 2 150cc
+    Memory::Write32(aj + 0x8, static_cast<uint32_t>(f[FICHA_MODO]));       // 1 = VS
+    // tipo de partida: 0 = normal; 5 = «carrera de CPU», que es como el juego arma la PRESENTACIÓN (sección 0x1A: el
+    // vuelo sobre la pista con «VS 1/4» y el nombre, manejan todos solos). Al terminar el vuelo (o con A) el juego
+    // pone 0 aquí y abre la carrera (Raceinfo, etapa 0: 0x80533364)
+    Memory::Write32(aj + 0xC, f[FICHA_INTRO] ? 5u : 0u);
+    Memory::Write32(aj + 0x10, 0);
+    Memory::Write32(aj + 0x14, static_cast<uint32_t>(f[FICHA_CPU]));       // 0 fácil, 1 normal, 2 difícil
+    Memory::Write32(aj + 0x18, static_cast<uint32_t>(f[FICHA_OBJETOS]));
+    Memory::Write32(aj + 0x20, 0);                                         // la copa (solo GP)
+    Memory::Write8(aj + 0x24, static_cast<uint8_t>(f[FICHA_CARRERA]));
+    Memory::Write8(aj + 0x25, static_cast<uint8_t>(f[FICHA_VUELTAS] > 0 ? f[FICHA_VUELTAS] : 3));   // RR la ajusta a la pista
+    const uint32_t banderas = Memory::Read32(aj + 0x28) & ~1u;
+    Memory::Write32(aj + 0x28, banderas | (f[FICHA_ESPEJO] ? 1u : 0u));   // bit 0: espejo
+    if (f[FICHA_SEMILLA1] || f[FICHA_SEMILLA2]) {
+        Memory::Write32(aj + 0x2C, static_cast<uint32_t>(f[FICHA_SEMILLA1]));
+        Memory::Write32(aj + 0x30, static_cast<uint32_t>(f[FICHA_SEMILLA2]));
+    }
+    // 3. los 12 puestos: tipo (0 persona de esta consola, 1 CPU, 5 nadie), personaje, vehículo y su mando
+    int jugadores = 0, locales = 0;
+    for (int i = 0; i < 12; i++) {
+        const int32_t* q = f + FICHA_PUESTOS + 4 * i;
+        const uint32_t j = esc + 0x8 + i * 0xF0;
+        const uint32_t tipo = q[0] < 0 ? 5u : static_cast<uint32_t>(q[0]);
+        Memory::Write32(j + 0x10, tipo);
+        if (tipo == 5) continue;
+        jugadores++;
+        if (q[1] >= 0) Memory::Write32(j + 0xC, static_cast<uint32_t>(q[1]));
+        if (q[2] >= 0) Memory::Write32(j + 0x8, static_cast<uint32_t>(q[2]));
+        const bool persona = tipo == 0;
+        Memory::Write8(j + 0x6, static_cast<uint8_t>(persona && q[3] >= 0 ? q[3] : -1));   // índice de mando
+        Memory::Write8(j + 0x5, static_cast<uint8_t>(persona ? locales : -1));             // su pantalla
+        Memory::Write32(j + 0xCC, 2);                                                       // equipo: ninguno
+        Memory::Write32(j + 0xD0, persona ? 3u : 0xFFFFFFFFu);                              // mando de GameCube
+        // (con FICHA_PANTALLAS = 1, la sala: los demás humanos también son personas, pero la pantalla es solo la del
+        // primero de ESTA consola; semillas_nativo.cpp deja la tabla de pantallas así al preparar la carrera)
+        const int tope = f[FICHA_PANTALLAS] > 0 ? f[FICHA_PANTALLAS] : 4;
+        if (persona && locales < tope) {     // lo que eligió en los menús (SectionParams): personaje +0x12C, vehículo +0x13C
+            Memory::Write32(sp + 0x12C + 4 * locales, static_cast<uint32_t>(q[1]));
+            Memory::Write32(sp + 0x13C + 4 * locales, static_cast<uint32_t>(q[2]));
+            Memory::Write8(aj + 0x1C + locales, static_cast<uint8_t>(i));                  // la pantalla muestra a este
+            locales++;
+        }
+        if (f[FICHA_PRIMERA]) {              // primera carrera: puntos en cero y la largada como en los menús
+            Memory::Write16(j + 0xD8, 0); Memory::Write16(j + 0xDA, 0);
+        }
+    }
+    if (f[FICHA_PRIMERA]) {                  // el puesto "anterior" ordena la largada: las personas atrás, como el juego
+        int k = jugadores;
+        for (int i = 0; i < 12; i++) {
+            const uint32_t j = esc + 0x8 + i * 0xF0;
+            if (Memory::Read32(j + 0x10) != 5) Memory::Write8(j + 0xE1, static_cast<uint8_t>(k--));
+        }
+    }
+    for (int k = locales; k < 4; k++) {
+        Memory::Write8(aj + 0x1C + k, 0xFF);
+        Memory::Write32(sp + 0x12C + 4 * k, 0xFFFFFFFFu);
+        Memory::Write32(sp + 0x13C + 4 * k, 0xFFFFFFFFu);
+    }
+    Memory::Write8(esc + 4, static_cast<uint8_t>(jugadores));
+    Memory::Write8(esc + 5, static_cast<uint8_t>(locales ? locales : 1));
+    Memory::Write8(esc + 6, static_cast<uint8_t>(locales));
+    // 4. SectionParams: cuántos juegan aquí, la última pista, el número de carrera VS (desde 1) y cuántas son
+    Memory::Write32(sp + 0x124, static_cast<uint32_t>(locales));
+    Memory::Write32(sp + 0x128, 0);
+    Memory::Write32(sp + 0x14C, pista);
+    Memory::Write32(sp + 0x60, static_cast<uint32_t>(f[FICHA_CARRERA]));    // la presentación muestra este + 1
+    Memory::Write32(sp + 0x64, static_cast<uint32_t>(f[FICHA_CARRERAS] > 0 ? f[FICHA_CARRERAS] : 4));
+    return true;
+}
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_ir(int32_t seccion, int32_t licencia) {
     g_pedido = seccion; g_licencia = licencia; g_cuadros_mando = -1;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE int mkw_directo_estado() { return g_pedido >= 0 ? 1 : 0; }
+// §73: dónde escribe la página la ficha de la carrera, y el pedido de ir a ella (sección 0x1A = la presentación de la
+// carrera VS, que sigue sola a la carrera)
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t* mkw_directo_ficha() { return g_ficha; }
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_carrera(int32_t seccion, int32_t licencia) {
+    g_pedido = seccion; g_licencia = licencia; g_cuadros_mando = -1; g_hay_ficha = 1;
+}
 // la acción de un botón del juego, llamada directo en el siguiente Update. 1 = aceptada (está en la lista)
 extern "C" EMSCRIPTEN_KEEPALIVE int mkw_directo_boton(uint32_t funcion, uint32_t pagina, uint32_t boton) {
     for (uint32_t f : BOTONES) if (f == funcion) { g_boton_funcion = funcion; g_boton_pagina = pagina; g_boton = boton; return 1; }
@@ -174,21 +295,103 @@ EM_JS(void, mkw_web_directo_hecho, (int32_t seccion, int32_t licencia_ok), {
     if (Module.mkwAlIrDirecto) Module.mkwAlIrDirecto(seccion, licencia_ok);
 });
 
+// §73: arrancar DIRECTO en la sección pedida. SectionMgr::Init (0x80634E44; RR tiene su versión) decide con qué
+// sección arranca el juego: la deja en bootSectionId (+0x4) y en nextSectionId (+0xC), y de ahí sale la primera escena
+// (menús o carrera, GetBootSectionSceneId 0x80634FA0) y la primera sección que se carga (LoadSection 0x80634FBC). Para
+// eso el juego ya leyó la partida guardada (la sección de arranque depende de ella: partida nueva, dañada…). Si la
+// página dejó un pedido antes de arrancar (Module._mkw_directo_carrera / _ir antes de callMain), aquí mismo se elige la
+// licencia, se escribe la ficha y la sección de arranque pasa a ser la pedida: el juego nunca crea el título ni la
+// pantalla de licencias. Si algo falta (sin partida leída, sin licencia), queda el camino de siempre (el salto en el
+// primer Update que pueda, abajo).
+extern "C" void rr_overlay_80634E44(CpuContext* MKW_RESTRICT ctx) {
+    const uint32_t sm = ctx->gpr[3];
+    CpuContext copia = *ctx;                     // los registros con que se llamó (r1: la pila del juego)
+    rr_overlay_80634E44_traducida(ctx);
+    const int32_t arranque = sm ? static_cast<int32_t>(Memory::Read32(sm + 0x4)) : -1;
+    if (g_pedido < 0 || !sm || arranque != 0x3F) return;    // solo en lugar del título (no si la partida está dañada…)
+    if (g_licencia >= 0 && !guardadoLeido(Memory::Read32(kRksysMgr))) return;
+    int ok = g_licencia >= 0 ? elegirLicencia(&copia, sm, static_cast<uint32_t>(g_licencia)) : 1;
+    if (ok && g_hay_ficha) ok = escribirFicha(&copia, sm) ? 1 : 0;
+    if (!ok) return;                             // que lo intente el Update (o avise que no se pudo)
+    const int32_t seccion = g_pedido;
+    g_pedido = -1; g_hay_ficha = 0;
+    Memory::Write32(sm + 0x4, static_cast<uint32_t>(seccion));
+    Memory::Write32(sm + 0xC, static_cast<uint32_t>(seccion));
+    g_registrar_al_entrar = 1;                   // el mando del jugador 1, cuando ya haya sección (en el Update)
+    mkw_web_directo_hecho(seccion, 1);
+}
+
+// §73: «elegir personaje y vehículo» con los menús del juego, para la sala. La página abre la sección 0x49 (la de
+// «cambiar personaje» de Contrarreloj: empieza en la pantalla de personaje) con Module._mkw_directo_eleccion(1). La
+// persona elige personaje, vehículo y derrape con los menús del juego; al confirmar el derrape la pantalla pide pasar a
+// la sección siguiente (MenuInteractable::ChangeSectionById → Page::ChangeSectionBySceneChange, 0x806024B0): en el
+// modo elección ese cambio NO se hace y se le avisa a la página lo elegido (Module.mkwAlElegir(personaje, vehículo,
+// derrape)). La pantalla queda quieta (el juego la bloquea al confirmar) hasta que la página salta a la carrera.
+//   personaje: SectionParams +0x12C, vehículo +0x13C (los que dejan las pantallas de personaje y vehículo);
+//   derrape: el que el botón guardó en la licencia (+0x9124: 1 o 2), el mismo que SectionParams +0x164 al cambiar de
+//   licencia (ChangeLicense, 0x805E40A8), que es de donde lo saca la carrera.
+int g_eleccion = 0;
+constexpr uint32_t kPaginaDerrape = 0x6D;
+EM_JS(void, mkw_web_eligio, (int32_t personaje, int32_t vehiculo, int32_t derrape), {
+    if (Module.mkwAlElegir) Module.mkwAlElegir(personaje, vehiculo, derrape);
+});
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_eleccion(int32_t si) { g_eleccion = si ? 1 : 0; }
+
+// En el modo elección, ¿esta página es la de derrape? Entonces se avisa lo elegido y no se sigue (devuelve true)
+bool eligioDerrape(uint32_t pagina) {
+    if (!g_eleccion || !pagina || Memory::Read32(pagina + 4) != kPaginaDerrape) return false;
+    {
+        const uint32_t sm = Memory::Read32(kSectionMgr), sp = sm ? Memory::Read32(sm + 0x98) : 0;
+        const uint32_t rk = Memory::Read32(kRksysMgr);
+        int32_t derrape = -1;
+        if (rk) {
+            const int16_t n = static_cast<int16_t>(Memory::Read16(rk + 54));       // la licencia actual
+            if (n >= 0 && n < 4) derrape = static_cast<int32_t>(Memory::Read32(rk + 0x38 + n * 0x93F0 + 0x9124));
+        }
+        if (sp && derrape > 0) Memory::Write32(sp + 0x164, static_cast<uint32_t>(derrape));   // el del jugador 1
+        mkw_web_eligio(sp ? static_cast<int32_t>(Memory::Read32(sp + 0x12C)) : -1,
+                       sp ? static_cast<int32_t>(Memory::Read32(sp + 0x13C)) : -1, derrape);
+    }
+    return true;                                 // sin seguir: la página decide cuándo correr
+}
+
+// el derrape sigue de una de estas tres formas según la sección: cambio de sección o página siguiente (con o sin espera)
+extern "C" void rr_overlay_806024B0(CpuContext* MKW_RESTRICT ctx) {
+    if (!eligioDerrape(ctx->gpr[3])) rr_overlay_806024B0_traducida(ctx);
+}
+extern "C" void func_80837720(CpuContext* MKW_RESTRICT ctx) {
+    if (!eligioDerrape(ctx->gpr[3])) func_80837720_traducida(ctx);
+}
+extern "C" void func_8083761C(CpuContext* MKW_RESTRICT ctx) {
+    if (!eligioDerrape(ctx->gpr[3])) func_8083761C_traducida(ctx);
+}
+
 extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
     // ¿hay pedido y el SectionMgr está quieto (sin otro cambio de sección ya en marcha)? fadeSceneAction (+0x30) = 0
     const uint32_t sm = ctx->gpr[3];
+    // §73: el pedido puede llegar antes de que el juego arranque (la página lo deja puesto apenas carga): se espera a que
+    // el juego haya leído la partida guardada (sin ella no hay licencia que elegir), y se salta en ese mismo cuadro,
+    // sin esperar a que se vea el título
+    const bool puede = g_pedido >= 0 && (g_licencia < 0 || guardadoLeido(Memory::Read32(kRksysMgr)));
+    if (g_registrar_al_entrar && sm && Memory::Read32(sm)) {   // arrancó directo (Init): el mando, como el título
+        g_registrar_al_entrar = 0;
+        registrarMando(ctx, sm);
+    }
     // Primero el mando (como el título) y el salto 3 cuadros después: así el Update del SectionPad alcanza a buscar el
     // resto (el holder, la identidad activa) antes de la pantalla nueva; registrado en el mismo cuadro del salto, la
     // pantalla nueva lo veía "interrumpido" y pedía apretar A.
-    if (g_pedido >= 0 && sm && Memory::Read32(sm) && Memory::Read32(sm + 0x30) == 0 && g_cuadros_mando < 0) {
+    if (puede && sm && Memory::Read32(sm) && Memory::Read32(sm + 0x30) == 0 && g_cuadros_mando < 0) {
         registrarMando(ctx, sm);
         g_cuadros_mando = 0;
-    } else if (g_pedido >= 0 && g_cuadros_mando >= 0 && g_cuadros_mando < 3) {
+    } else if (puede && g_cuadros_mando >= 0 && g_cuadros_mando < 3) {
         g_cuadros_mando++;
-    } else if (g_pedido >= 0 && sm && Memory::Read32(sm) && Memory::Read32(sm + 0x30) == 0) {
+    } else if (puede && sm && Memory::Read32(sm) && Memory::Read32(sm + 0x30) == 0) {
         const int32_t seccion = g_pedido;
         g_pedido = -1;
-        const int ok = g_licencia >= 0 ? elegirLicencia(ctx, sm, static_cast<uint32_t>(g_licencia)) : 1;
+        int ok = g_licencia >= 0 ? elegirLicencia(ctx, sm, static_cast<uint32_t>(g_licencia)) : 1;
+        if (ok && g_hay_ficha) ok = escribirFicha(ctx, sm) ? 1 : 0;   // §73: la carrera, escrita como los menús
+        g_hay_ficha = 0;
+        if (ok) g_eleccion = 0;         // el modo elección termina con el salto
         if (ok) {                       // sin licencia no se salta (los menús sin Mii dejan al juego esperando para siempre)
             llamar<0x80635A3Cu>(ctx, sm, static_cast<uint32_t>(seccion), 0);    // la que sigue: esta
             llamar<0x80635AC8u>(ctx, sm, 0, 0x000000FFu);                       // cámbiala ya, fundido negro

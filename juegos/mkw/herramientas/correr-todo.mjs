@@ -46,6 +46,10 @@ const PRUEBAS = [
   { n: 'enlinea-sala', cmd: [nav('prueba-enlinea.mjs'), '--sala'], juego: true, datos: 'build/web/datos/enlinea' },
   { n: 'modos', cmd: [nav('prueba-modos.mjs')], juego: true, datos: 'build/web/datos/modos/copa' },                 // §72
   { n: 'modos-playlist', cmd: [nav('prueba-modos.mjs'), '--playlist'], juego: true, datos: 'build/web/datos/modos/playlist' },
+  { n: 'directa', cmd: [nav('prueba-directa.mjs')], juego: true, datos: 'build/web/datos/directa' },               // §73
+  { n: 'directa-elegir', cmd: [nav('prueba-directa.mjs'), '--elegir'], juego: true, datos: 'build/web/datos/directa-elegir' },
+  { n: 'sincro-directa', cmd: [nav('prueba-sincro.mjs'), '--directa'], juego: true, datos: 'build/web/datos/sincro', propios: true },
+  { n: 'sala', cmd: [nav('prueba-sala.mjs')], juego: true, datos: 'build/web/datos/sala' },                       // la sala sin Retro WFC
   { n: 'copa-azar', cmd: ['herramientas/copas-al-azar.mjs', '--copas', '1'], juego: true },   // una copa sincronizada al azar (C2)
 ];
 // las prueba-*.mjs nuevas que no están en la lista: sin argumentos

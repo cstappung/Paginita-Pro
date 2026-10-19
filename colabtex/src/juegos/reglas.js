@@ -473,21 +473,22 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
-  /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, CPU de relleno, llegar tarde, el VR);
+  /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, modos, llegar tarde, cortes);
      las carreras en sí son las del juego (Retro Rewind), así que el manual no las repite. */
   mkw: {
-    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: carreras en línea de hasta 12 con tus amigos, y la CPU completa la parrilla.",
+    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: copas de hasta 4 amigos, y la CPU completa la parrilla.",
     secciones: [
       ["Cómo se juega", pasos([
-        "Abre una sala de <b>Mario Kart Wii</b> y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑): su pestaña hace de servidor de la sala.",
-        "El anfitrión elige la <b>CPU de relleno</b> (sin CPU, fácil, normal o difícil) y aprieta <b>¡A correr!</b>.",
-        "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). <b>Con CPU de relleno y hasta 4 pilotos</b> corren una <b>copa sincronizada</b> de 4 pistas: todos ven la misma carrera y la CPU completa los 12 lugares.",
-        "<b>Sin CPU o con más de 4 pilotos</b>, el juego <b>entra solo</b> en línea: la sala del juego, la votación de pista y las carreras de siempre.",
-        "Cuando quieran parar, el anfitrión aprieta <b>Volver al vestíbulo</b>."
+        "Abre una sala de <b>Mario Kart Wii</b> en <b>Modo copa</b> (carreras con puntos) o <b>Modo playlist</b> (una cola de pistas sorteadas) y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑).",
+        "En el vestíbulo el anfitrión elige cuántas carreras y la <b>cilindrada</b>, y aprieta <b>¡A correr!</b>. Caben 4 pilotos: la CPU completa los 12 lugares, como en un Grand Prix.",
+        "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). En la copa, el anfitrión <b>elige las pistas</b> con el selector (fotos, logos y planos de cada pista).",
+        "Después, cada uno elige <b>personaje y vehículo</b> en las pantallas del juego (45 s; a quien no alcanza se le pone uno).",
+        "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."
       ])],
       ["Llegar tarde y salir", lista([
-        "Quien entra con una carrera andando <b>mira</b> y entra en la <b>siguiente</b> (en la copa con CPU, en la tanda siguiente).",
-        "Si el anfitrión se va, el puesto pasa al siguiente y todos vuelven al vestíbulo (sin su pestaña no hay servidor).",
+        "Quien entra con la copa andando espera a la <b>siguiente</b>.",
+        "Si a alguien se le corta la conexión, la carrera lo espera <b>30 s</b> para que vuelva; si no vuelve, sigue sin él.",
+        "Si el anfitrión se va, el puesto pasa al siguiente y la copa sigue.",
         "Hay que manejar: el juego saca de la carrera a quien se queda quieto mucho rato."
       ])],
       ["Controles", tabla([
@@ -495,7 +496,7 @@ const REGLAS = {
         ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
         ["Celular", "Botones en pantalla, y se dobla <b>inclinando el teléfono</b>."]
       ])],
-      ["Tu VR", "Retro Rewind calcula tu <b>VR</b> (y tu BR) después de cada carrera <b>en línea</b> (la sala sin CPU de relleno); la copa con CPU no lo mueve. La página lo guarda en tu cuenta: en otro aparato el juego empieza con el mismo. La sala muestra el VR de cada piloto."],
+      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta). Las copas de la sala no lo mueven."],
       ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
     ]
   },

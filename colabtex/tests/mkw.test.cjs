@@ -7,7 +7,7 @@ const raiz=f=>path.join(__dirname,'..',f);
 const sin=f=>fs.readFileSync(raiz(f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_CPU,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,mkwPlaylist,mkwTabla,MKW_CC,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
+ ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,mkwPlaylist,mkwTabla,MKW_CC,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
 const M=ctx.__M;
 
 // Una sala de tres (a la abrió) con estas jugadas en orden.
@@ -15,9 +15,9 @@ const sala=(...js)=>({juego:'mkw',anfitrion:'a',estado:'esperando',cupo:12,cpu:'
  jugadores:{a:{nombre:'Ana',orden:0},b:{nombre:'Beto',orden:1},c:{nombre:'Carla',orden:2}},
  jugadas:Object.fromEntries(js.map((j,i)=>[String(i).padStart(4,'0'),j]))});
 
-test('cabe hasta 12 y se abre desde uno (con CPU de relleno)',()=>{
- assert.equal(M.JUEGOS.mkw.cupo,12);assert.equal(M.minimoDe({juego:'mkw'}),1);
- assert.equal(M.cupoDe({juego:'mkw',cupo:12}),12);assert.equal(M.cupoDe({juego:'mkw',cupo:40}),12,'más de 12 se recorta');
+test('caben 4 (cada piloto es un jugador de verdad en todas las consolas) y se abre desde uno',()=>{
+ assert.equal(M.JUEGOS.mkw.cupo,4);assert.equal(M.minimoDe({juego:'mkw'}),1);
+ assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);assert.equal(M.cupoDe({juego:'mkw',cupo:12}),4,'una sala vieja de 12 se recorta a 4');
  const e=M.reducir({...sala(),jugadores:{a:{nombre:'Ana',orden:0}}});
  assert.equal(e.fase,'vestibulo','uno solo ya tiene vestíbulo');
 });
@@ -34,19 +34,20 @@ test('el anfitrión pone la CPU de relleno, abre y cierra las carreras; los dem�
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'vuelve',uid:'a'},{t:'empieza',uid:'a'}));assert.equal(e.fase,'jugando');assert.equal(e.ronda,2);
 });
 
-test('los tres modos de la sala (pedido del dueño): Retro WFC por omisión, sin CPU; el anfitrión elige modo y carreras en el vestíbulo',()=>{
- assert.deepEqual(Object.keys(M.MKW_MODOS),['wfc','copa','playlist']);
+test('los dos modos de la sala (sin Retro WFC, pedido del dueño): copa por omisión; el anfitrión elige modo y carreras en el vestíbulo',()=>{
+ assert.deepEqual(Object.keys(M.MKW_MODOS),['copa','playlist']);
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};      // una sala nueva no trae `cpu`
  let e=M.reducir(nueva());
- assert.equal(e.estilo,'wfc');assert.equal(e.carreras,4);assert.equal(e.cpu,'ninguna','una sala nueva parte sin CPU de relleno');
- e=M.reducir(nueva({t:'empieza',uid:'a'}));assert.equal(e.sincro,null,'sin CPU: el modo en línea del juego (Retro WFC), no la carrera sincronizada');
+ assert.equal(e.estilo,'copa');assert.equal(e.carreras,4);
+ e=M.reducir(nueva({t:'empieza',uid:'a'}));assert.deepEqual([...e.sincro],['a','b','c'],'siempre la carrera sincronizada (nada del Wi-Fi del juego)');
  e=M.reducir({...nueva(),estilo:'copa',carreras:8});assert.equal(e.estilo,'copa');assert.equal(e.carreras,8,'lo elegido al crear la sala');
+ e=M.reducir({...nueva(),estilo:'wfc'});assert.equal(e.estilo,'copa','una sala vieja de Retro WFC pasa a copa');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'playlist'}));assert.equal(e.estilo,'playlist');
- e=M.reducir(nueva({t:'ajuste',uid:'b',k:'estilo',v:'copa'}));assert.equal(e.estilo,'wfc','b no es el anfitrión');
- e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'turbo'}));assert.equal(e.estilo,'wfc','lo que no existe vuelve a Retro WFC');
+ e=M.reducir(nueva({t:'ajuste',uid:'b',k:'estilo',v:'playlist'}));assert.equal(e.estilo,'copa','b no es el anfitrión');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'wfc'}));assert.equal(e.estilo,'copa','Retro WFC ya no existe');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'copa'},{t:'ajuste',uid:'a',k:'carreras',v:2}));assert.equal(e.carreras,2);
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'carreras',v:5}));assert.equal(e.carreras,4,'solo 2, 4, 8 o 12');
- e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'estilo',v:'copa'}));assert.equal(e.estilo,'wfc','corriendo no se cambia el modo');
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'estilo',v:'playlist'}));assert.equal(e.estilo,'copa','corriendo no se cambia el modo');
 });
 
 test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
@@ -61,7 +62,7 @@ test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al ve
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'copa'},{t:'empieza',uid:'a'},{t:'vuelve',uid:'a',tabla}));
  assert.equal(e.fase,'vestibulo');assert.deepEqual(JSON.parse(JSON.stringify(e.ultimaTabla)),{n:1,estilo:'copa',tabla});
  assert.deepEqual(JSON.parse(JSON.stringify(e.hist[e.hist.length-1])),{e:'vuelve',n:1,tabla});
- e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'vuelve',uid:'a',tabla}));assert.equal(e.ultimaTabla,null,'en Retro WFC no hay tabla');
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'vuelve',uid:'a'}));assert.equal(e.ultimaTabla,null,'volver sin tabla (el anfitrión cortó antes): no hay');
  // la tabla del marco se limpia: hasta 12 filas, nombres de 20 letras, puntos enteros 0..9999
  assert.equal(M.mkwTabla('x'),null);assert.equal(M.mkwTabla([]),null);
  const sucia=[{nombre:'X'.repeat(40),puntos:12.4},{nombre:5,puntos:3},{nombre:'Y',puntos:-1},{nombre:'Z',puntos:'7'},...Array(20).fill({nombre:'W',puntos:1})];
@@ -79,7 +80,7 @@ test('pasar el anfitrión: solo en el vestíbulo y a alguien de la sala',()=>{
  let e=M.reducir(sala({t:'anfitrion',uid:'a',a:'b'}));assert.equal(e.anfitrion,'b');
  e=M.reducir(sala({t:'anfitrion',uid:'b',a:'b'}));assert.equal(e.anfitrion,'a','no se lo puede tomar');
  e=M.reducir(sala({t:'anfitrion',uid:'a',a:'intruso'}));assert.equal(e.anfitrion,'a');
- e=M.reducir(sala({t:'empieza',uid:'a'},{t:'anfitrion',uid:'a',a:'c'}));assert.equal(e.anfitrion,'a','corriendo, no (el servidor vive en su pestaña)');
+ e=M.reducir(sala({t:'empieza',uid:'a'},{t:'anfitrion',uid:'a',a:'c'}));assert.equal(e.anfitrion,'a','corriendo, no (la sala del juego la lleva él)');
 });
 
 test('cada jugador tiene su nodo fijo (10.77.0.<nodo>), aunque otros se vayan',()=>{
@@ -90,12 +91,10 @@ test('cada jugador tiene su nodo fijo (10.77.0.<nodo>), aunque otros se vayan',(
  const nodos=Object.values(e.nodos);assert.equal(new Set(nodos).size,nodos.length,'sin repetidos');
 });
 
-test('si se va el anfitrión el puesto pasa al siguiente y, si corrían en línea, vuelven al vestíbulo; sin nadie, fin',()=>{
- const sinCpu={t:'ajuste',uid:'a',k:'cpu',v:'ninguna'};
- let e=M.reducir(sala(sinCpu,{t:'empieza',uid:'a'},{t:'abandona',uid:'a'}));
- assert.equal(e.anfitrion,'b');assert.equal(e.fase,'vestibulo','en línea su pestaña era el servidor');
- e=M.reducir(sala({t:'empieza',uid:'a'},{t:'abandona',uid:'a'}));
- assert.equal(e.anfitrion,'b');assert.equal(e.fase,'jugando','con CPU (carrera sincronizada) no hay servidor: siguen');
+test('si se va el anfitrión el puesto pasa al siguiente y la copa sigue (no hay servidor); sin nadie, fin',()=>{
+ let e=M.reducir(sala({t:'empieza',uid:'a'},{t:'abandona',uid:'a'}));
+ assert.equal(e.anfitrion,'b');assert.equal(e.fase,'jugando','siguen: el nuevo anfitrión lleva la sala del juego');
+ assert.deepEqual([...e.sincro],['a','b','c'],'la lista de la carrera no cambia (el kart de quien se fue sigue sin nadie)');
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'abandona',uid:'c'}));
  assert.equal(e.fase,'jugando','si se va otro, siguen');
  e=M.reducir(sala({t:'abandona',uid:'a'},{t:'abandona',uid:'b'},{t:'abandona',uid:'c'}));
@@ -103,18 +102,18 @@ test('si se va el anfitrión el puesto pasa al siguiente y, si corrían en líne
  e=M.reducir(sala({t:'abandona',uid:'b'},{t:'empieza',uid:'b'}));assert.equal(e.fase,'vestibulo','quien se fue ya no juega');
 });
 
-test('con CPU y hasta 4 pilotos la tanda es una carrera sincronizada con los que estaban al empezar',()=>{
+test('cada tanda es una carrera sincronizada con los que estaban al empezar (hasta 4)',()=>{
  let e=M.reducir(sala({t:'empieza',uid:'a'}));
  assert.deepEqual([...e.sincro],['a','b','c'],'en orden: puerto 1, 2, 3');
  e=M.reducir(sala({t:'ajuste',uid:'a',k:'cpu',v:'ninguna'},{t:'empieza',uid:'a'}));
- assert.equal(e.sincro,null,'sin CPU: en línea');
+ assert.deepEqual([...e.sincro],['a','b','c'],'la CPU ya no decide nada: siempre sincronizada');
  e=M.reducir(sala());assert.equal(e.sincro,null,'en el vestíbulo no hay');
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'vuelve',uid:'a'}));assert.equal(e.sincro,null);
  e=M.reducir(sala({t:'abandona',uid:'b'},{t:'empieza',uid:'a'}));assert.deepEqual([...e.sincro],['a','c'],'quien se fue no corre');
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'abandona',uid:'b'}));assert.deepEqual([...e.sincro],['a','b','c'],'si alguien se va corriendo, la lista no cambia (su kart sigue sin nadie)');
  const cinco={...sala({t:'empieza',uid:'a'}),jugadores:Object.fromEntries('abcde'.split('').map((u,i)=>[u,{nombre:u,orden:i}]))};
  assert.equal(M.MKW_SINCRO_MAX,4);
- assert.equal(M.reducir(cinco).sincro,null,'con 5 no caben (4 puertos de mando): en línea');
+ assert.deepEqual([...M.reducir(cinco).sincro],['a','b','c','d'],'en una sala vieja con 5: corren los 4 primeros (4 puertos de mando)');
 });
 
 test('la semilla y las 4 pistas de cada tanda salen de la sala y del número de tanda',()=>{
@@ -141,30 +140,26 @@ test('diez logros propios, todos de partida, con su nivel; y su peso',()=>{
  assert.deepEqual([...M.detecta(p,e,'b')].sort(),['largada','puros','visita']);
 });
 
-test('la dirección del marco: su malla, su nodo, servidor solo en el anfitrión, la CPU y el programa privado',()=>{
+test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla, su nodo, los pilotos, el anfitrión y la copa',()=>{
  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
  const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
- const u=new URL('https://x/'+c.__s({pid:'p1',uid:'a',nodo:2,anfitrion:true,cpu:'dificil',privado:'https://w.example',ronda:3}));
+ const u=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'https://w.example',ronda:3,sincro:['a','b'],jefe:'a'}));
  assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
- const q=u.searchParams;
- assert.equal(q.get('red'),'malla');assert.equal(q.get('senal'),'padre');assert.equal(q.get('modo'),'enlinea');
- assert.equal(q.get('sala'),'p1');assert.equal(q.get('uid'),'a');assert.equal(q.get('nodo'),'2');assert.equal(q.get('anfitrion'),'1');
- assert.equal(q.get('relleno'),'dificil');assert.equal(q.get('privado'),'https://w.example');assert.equal(q.get('r'),'3');
- const v=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:false,cpu:'normal',privado:'',ronda:1})).searchParams;
- assert.equal(v.get('anfitrion'),null,'los demás no corren servidor');assert.equal(v.get('privado'),null);
- assert.equal(v.get('estilo'),'wfc','el modo de la sala: Retro WFC por omisión');assert.equal(v.get('carreras'),null);
- const w=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:false,cpu:'ninguna',privado:'',ronda:1,estilo:'copa',carreras:8})).searchParams;
- assert.equal(w.get('estilo'),'copa');assert.equal(w.get('carreras'),'8','la copa lleva sus carreras');
- assert.equal(w.get('cc'),'c150','y la cilindrada (150cc por omisión)');assert.equal(v.get('cc'),null,'Retro WFC: la del juego');
- const pl=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:false,cpu:'ninguna',privado:'',ronda:2,estilo:'playlist',carreras:4,cc:'espejo'})).searchParams;
- assert.equal(pl.get('estilo'),'playlist');assert.equal(pl.get('cc'),'espejo');assert.equal(pl.get('carreras'),null);
+ const q=u.searchParams, t=M.mkwCarrera('p1',3);
+ assert.equal(q.get('red'),'malla');assert.equal(q.get('senal'),'padre');assert.equal(q.get('modo'),'sala','la sala nueva: nada del Wi-Fi del juego');
+ assert.equal(q.get('sala'),'p1');assert.equal(q.get('uid'),'b');assert.equal(q.get('nodo'),'3');
+ assert.equal(q.get('sincro'),'a,b');assert.equal(q.get('jefe'),'a');assert.equal(q.get('semilla'),String(t.semilla),'la semilla de la tanda (la misma carrera en todos)');
+ assert.equal(q.get('estilo'),'copa','copa por omisión');assert.equal(q.get('carreras'),'4');assert.equal(q.get('cc'),'c150');
+ assert.equal(q.get('pistas'),null,'en la copa las pistas las elige el anfitrión en el juego');
+ assert.equal(q.get('privado'),'https://w.example');assert.equal(q.get('r'),'3');
+ for (const k of ['anfitrion','relleno','nombres']) assert.equal(q.get(k),null,k+' ya no va (los nombres van por mensaje)');
+ const w=new URL('https://x/'+c.__s({pid:'p1',uid:'a',nodo:2,privado:'',ronda:1,sincro:['a'],jefe:'a',estilo:'copa',carreras:8,cc:'espejo'})).searchParams;
+ assert.equal(w.get('carreras'),'8','la copa lleva sus carreras');assert.equal(w.get('cc'),'espejo');assert.equal(w.get('privado'),null);
+ const pl=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',estilo:'playlist',carreras:4,cc:'azar'})).searchParams;
+ assert.equal(pl.get('estilo'),'playlist');assert.equal(pl.get('cc'),'azar');
  assert.equal(pl.get('pistas'),M.mkwPlaylist('p1',2,4).map(x=>x.copa+'.'+x.fila).join(','),'la cola sorteada de la tanda');
- // la carrera sincronizada (con CPU, hasta 4): la copa con la semilla y las pistas de la tanda, sin servidor en línea
- const s=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:true,cpu:'facil',privado:'',ronda:2,sincro:['a','b']})).searchParams;
- const t=M.mkwCarrera('p1',2);
- assert.equal(s.get('modo'),'copa');assert.equal(s.get('sincro'),'a,b');assert.equal(s.get('semilla'),String(t.semilla));
- assert.equal(s.get('pistas'),t.pistas.map(x=>x.copa+'.'+x.fila).join(','));assert.equal(s.get('cpu'),'facil');
- assert.equal(s.get('anfitrion'),null,'sin servidor en línea');assert.equal(s.get('relleno'),null);assert.equal(s.get('uid'),'b');
+ const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
+ assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');
 });
 
 test('está en las reglas de Firebase (con el tope de 12 y su nodo mkw), en el salón y es privado como BT3',()=>{

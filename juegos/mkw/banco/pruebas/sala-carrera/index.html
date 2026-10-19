@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala sin WFC</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sala sin WFC: <span>copa → personaje → carreras → tabla</span></h1>
+<p>Prueba <code>web/navegador/sala-carrera.mjs</code> (bitácora §73) <b>sin el juego y sin red</b>: tres pilotos
+  <b>inventados</b> (Ana es la anfitriona) conectados por un bus en memoria (en el sitio, la malla WebRTC), con un
+  <b>reloj falso</b> para probar los 45 s sin esperarlos. Comprueba: solo la anfitriona arma la copa; con la copa
+  armada todos pasan a elegir personaje; lo que eligió cada uno llega a todos; al que no eligió a tiempo se le pone
+  uno; las carreras siguen una tras otra después de los resultados; quien recarga la página a mitad de la copa se pone
+  al día con el siguiente reparto; la modalidad playlist empieza directo en elegir con su cola.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
+
+const { ok, fin } = prueba('sala-carrera', 'Sala sin WFC (sin el juego, reloj falso)');
+// ---- reloj falso y bus en memoria (los bytes van de una sala a otra como por la malla) ----
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
+const listo = () => new Promise(r => setTimeout(r, 0));
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); await listo(); };
+const salas = new Map();
+const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }];
+const enviados = [];
+const enviar = de => (para, bytes) => { enviados.push(bytes[0]); setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0); };
+const persona = (uid, extra = {}) => {
+  const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t, cada, parar, ...extra });
+  salas.set(uid, s); return s;
+};
+const ana = persona('ana'), beto = persona('beto'), caro = persona('caro');
+const fases = () => [ana, beto, caro].map(s => s.estado().fase).join(',');
+
+// 1) la copa: solo la anfitriona
+ok('al empezar todos están en «copa» (la anfitriona la arma)', fases() === 'copa,copa,copa', fases());
+ok('Beto no puede armar la copa (no es el anfitrión)', beto.ponerPistas([{ copa: 1, fila: 2 }]) === false);
+const copa = [{ copa: 13, fila: 2 }, { copa: 0, fila: 1 }];
+ok('Ana arma la copa de 2 pistas', ana.ponerPistas(copa) === true);
+await avanzar(0);
+ok('con la copa armada, todos pasan a «elegir»', fases() === 'elegir,elegir,elegir', fases());
+ok('las pistas de la copa llegaron a todos', [beto, caro].every(s => JSON.stringify(s.estado().pistas) === JSON.stringify(copa)));
+ok('los mensajes van con la marca de la sala (0xA8), no con la de la carrera (0xA7)', enviados.length > 0 && enviados.every(b => b === MARCA_SALA), `${enviados.length} mensajes`);
+
+// 2) elegir: Ana y Beto eligen, Caro no alcanza
+ana.elegi({ personaje: 22, vehiculo: 2, derrape: 1 });
+beto.elegi({ personaje: 9, vehiculo: 11, derrape: 2 });
+await avanzar(0);
+ok('lo que eligieron Ana y Beto llega a todos', [ana, beto, caro].every(s => s.estado().picks.ana?.personaje === 22 && s.estado().picks.beto?.vehiculo === 11));
+ok('sin Caro todavía no se corre', fases() === 'elegir,elegir,elegir', fases());
+await avanzar((SEGUNDOS_ELEGIR - 5) * 1000);
+ok('a los 40 s se sigue esperando', ana.estado().fase === 'elegir');
+await avanzar(6000);
+ok('a los 45 s se corre la carrera 1 (Caro con lo que se le puso)', fases() === 'correr,correr,correr' && ana.estado().carrera === 1 && ana.estado().picks.caro?.solo === true,
+   `${fases()} carrera ${ana.estado().carrera}`);
+const hs = humanosDeFicha(humanos, beto.estado());
+ok('la ficha de la carrera tiene a los 3 humanos en el orden de la sala con lo que eligieron', hs.length === 3 && hs[0].personaje === 22 && hs[1].personaje === 9 && hs[2].mando === 2,
+   JSON.stringify(hs));
+ok('cada navegador arranca cada carrera una sola vez', beto.arrancar(1) === true && beto.arrancar(1) === false);
+
+// 3) carreras: termina la 1 → resultados → la 2
+beto.termine(1);
+await avanzar(0);
+ok('al terminar la carrera 1 empiezan los resultados (sigue la 1)', ana.estado().carrera === 1 && ana.estado().plazo > t);
+await avanzar(SEGUNDOS_RESULTADOS * 1000 + 1000);
+ok('después de los resultados todos pasan a la carrera 2', [ana, beto, caro].every(s => s.estado().fase === 'correr' && s.estado().carrera === 2));
+
+// 4) Caro recarga la página a mitad de la copa: una sala nueva, sin nada, se pone al día con el reparto
+caro.detener();
+const caro2 = persona('caro');
+ok('la Caro recién recargada empieza sin saber nada', caro2.estado().carrera === 0);
+await avanzar(1000);
+ok('con el siguiente reparto (1 s) sabe que va la carrera 2 y con qué pistas', caro2.estado().fase === 'correr' && caro2.estado().carrera === 2 && caro2.estado().pistas?.length === 2);
+
+// 5) termina la 2 → fin
+ana.termine(2);
+await avanzar(0);
+await avanzar(SEGUNDOS_RESULTADOS * 1000 + 1000);
+ok('después de la última carrera, la sala termina («fin») en todos', [ana, beto, caro2].every(s => s.estado().fase === 'fin'), [ana, beto, caro2].map(s => s.estado().fase).join());
+[ana, beto, caro2].forEach(s => s.detener());
+
+// 6) la anfitriona se va a mitad de la copa: la sala del sitio dice que manda Beto, y la copa sigue con él
+salas.clear();
+const a3 = persona('ana'), b3 = persona('beto'), c3 = persona('caro');
+a3.ponerPistas(copa);
+await avanzar(0);
+a3.elegi({ personaje: 1, vehiculo: 1 }); b3.elegi({ personaje: 2, vehiculo: 2 }); c3.elegi({ personaje: 3, vehiculo: 3 });
+await avanzar(0);
+ok('(otra copa: los tres eligieron y corren la carrera 1)', [a3, b3, c3].every(s => s.estado().fase === 'correr' && s.estado().carrera === 1));
+a3.detener(); salas.delete('ana');                           // Ana cerró la pestaña: ya no reparte ni contesta
+ok('Caro no puede nombrar a alguien que no es de la sala', c3.cambiarAnfitrion('intruso') === false);
+b3.cambiarAnfitrion('beto'); c3.cambiarAnfitrion('beto');
+ok('con Beto de anfitrión, Beto manda y Caro no', b3.soyAnfitrion === true && c3.soyAnfitrion === false && c3.anfitrion === 'beto');
+c3.termine(1);
+await avanzar(0);
+await avanzar(SEGUNDOS_RESULTADOS * 1000 + 1000);
+ok('Caro termina la 1, Beto lo recibe y, después de los resultados, los dos pasan a la carrera 2', [b3, c3].every(s => s.estado().fase === 'correr' && s.estado().carrera === 2),
+   [b3, c3].map(s => `${s.estado().fase} ${s.estado().carrera}`).join(' · '));
+[b3, c3].forEach(s => s.detener());
+
+// 7) la página del juego vuelve a mandar lo suyo en cada cambio de la fase «elegir» (por si el anfitrión no lo tenía):
+// en la anfitriona eso no puede volverse un círculo (elegir → cambia el estado → elegir…)
+salas.clear();
+let cambios = 0, solo = null;
+solo = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar('ana'), ahora: () => t, cada, parar,
+  alCambiar: e => { if (++cambios > 50) throw new Error('círculo'); if (e.fase === 'elegir') solo?.elegi({ personaje: 5, vehiculo: 4, derrape: 1 }); } });
+let circulo = false;
+try { solo.ponerPistas(copa); } catch { circulo = true; }
+ok('la anfitriona que elige otra vez en cada cambio no entra en un círculo', !circulo && cambios < 10 && solo.estado().picks.ana?.personaje === 5, `${cambios} cambios`);
+solo.detener();
+
+// 8) playlist: la cola viene de la sala del sitio, empieza directo en elegir
+salas.clear();
+const cola = [{ copa: 3, fila: 0 }, { copa: 5, fila: 3 }, { copa: 40, fila: 1 }];
+const p1 = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', pistas: cola, enviar: enviar('ana'), ahora: () => t, cada, parar });
+ok('playlist: empieza en «elegir» con la cola de 3 pistas (3 carreras)', p1.estado().fase === 'elegir' && p1.estado().carreras === 3 && p1.estado().pistas.length === 3);
+p1.detener();
+fin();
+</script>
+</body>
+</html>

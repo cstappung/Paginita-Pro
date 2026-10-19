@@ -77,7 +77,9 @@ function juegoFalso({ listoDesde = 3, licenciaOk = true } = {}) {
   const lector = { estado: () => ({ ...est }), u32: a => mem.get(a) ?? 0 };
   return { M, lector, est, poner };
 }
-// 3) ir(): espera a que el juego haya leído el guardado y no esté cambiando de sección; después espera la sección
+// 3) ir() (§73): el pedido sale YA, aunque el juego todavía no haya leído el guardado ni terminado otro cambio de
+//    sección: el que espera es el juego (directo_nativo.cpp salta recién en el cuadro en que la partida está leída,
+//    sin pasar por el título ni las licencias). La página solo espera a que la sección aparezca.
 {
   const { M, lector, est } = juegoFalso({ listoDesde: 3 });
   est.siguiente = 0x41;                                // un cambio de sección ya en marcha
@@ -87,7 +89,7 @@ function juegoFalso({ listoDesde = 3, licenciaOk = true } = {}) {
   const llego = await d.ir(SECCION_DIRECTA.unjugador);
   const p = M.pedidos[0];
   ok('ir(un jugador): un solo pedido, sección 0x48 con la licencia 0', M.pedidos.length === 1 && p.s === 0x48 && p.l === 0);
-  ok('…pedido recién con el guardado leído y sin otro cambio de sección en marcha', p.listo && p.siguiente === -1, `a los ${(performance.now() - t0).toFixed(0)} ms`);
+  ok('…pedido enseguida, sin que la página espere el guardado (lo espera el juego)', !p.listo && p.siguiente === 0x41, `a los ${(performance.now() - t0).toFixed(0)} ms`);
   ok('…y termina en sí cuando el juego muestra esa sección', llego === true && est.seccion === 0x48);
   const otra = await d.ir(SECCION_DIRECTA.unjugador);
   ok('si ya está en esa sección, no pide nada', otra === true && M.pedidos.length === 1);

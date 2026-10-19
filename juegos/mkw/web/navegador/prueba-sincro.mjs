@@ -20,12 +20,16 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { pantallaPartida } from './foto-pantalla.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 // --puerto=N y --datos=carpeta: para correrla varias veces o junto a otra (herramientas/correr-todo.mjs --repetir)
 const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || '--puerto=8147').slice(9));
 const COPA = process.argv.includes('--copa');
+// §73 --directa: la carrera abre directo por código (sin menús ni piloto), con los humanos como jugadores de verdad
+// (tipo 0) en las dos consolas y cada una con SU pantalla (la del kart propio)
+const DIRECTA = process.argv.includes('--directa');
 const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0.0,0.1,0.2,0.3').slice(9);   // sin --sala
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
 const RASTRO = process.argv.includes('--rastro');   // §70: el rastro por cuadro de las dos pestañas, comparado
@@ -62,7 +66,7 @@ async function abrir(nombre, uid) {
     throw new Error('no apareció el marco del juego');
   }
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}` +
-    `&modo=copa&pistas=${PISTAS}&semilla=${SEMILLA}&cpu=normal${EXTRA}`);
+    (DIRECTA ? `&modo=directa&pista=${PISTAS.split(',')[0]}` : `&modo=copa&pistas=${PISTAS}`) + `&semilla=${SEMILLA}&cpu=normal${EXTRA}`);
   return p;
 }
 const t0 = Date.now();
@@ -81,7 +85,8 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r({ colgada: t
   try { const kom = L.u32(0x809C18F8), arr = L.u32(kom + 0x20); for (let i = 0; i < 2; i++) marcas.push(L.u32(L.u32(L.u32(L.u32(arr + 4 * i)) + 4) + 0x14)); } catch {}
   let camara = -1; try { camara = L.u8(L.u32(L.u32(L.u32(0x809C19B8) + 0x18)) + 0x9C); } catch {}
   // etapa de la carrera (Raceinfo +0x28): 0-1 presentación y cuenta regresiva, 2 corriendo, ≥ 4 terminó
-  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), camara, av, marcas, etapa: ri ? L.u32(ri + 0x28) : -1,
+  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), cuentas: [4, 5, 6].map(k => L.u8(esc + k)).concat([4, 5, 6].map(k => L.u8(rd + 0xC10 + k))), huds: [0, 1, 2, 3].map(k => L.u8(esc + 0xB64 + k)), ranuras: [0, 1].map(i => L.u8(esc + 8 + i * 0xF0 + 5)), camara, av, marcas, etapa: ri ? L.u32(ri + 0x28) : -1,
+    tipos: [0, 1, 2].map(i => L.u32(esc + 8 + i * 0xF0 + 0x10)),
     avisos: window.mkwAvisosLento || [] };
 })]).catch(() => null);
 
@@ -163,13 +168,22 @@ await espera(9000);
 await tecladoB.down('KeyA'); await espera(1500); await tecladoB.up('KeyA');
 await espera(20000);
 const xa = await leer(A), xb = await leer(B);
-await A.locator('#canvas').screenshot({ path: path.join(carpeta, 'A.png') }).catch(() => {});
-await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B.png') }).catch(() => {});
+const fotoA = await A.locator('#canvas').screenshot({ path: path.join(carpeta, 'A.png') }).catch(() => null);
+const fotoB = await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B.png') }).catch(() => null);
 await tecladoA.up('KeyK'); await tecladoB.up('KeyK');
 
 ok('la carrera sincronizada avanza en las dos', (xa?.ls?.cuadro || 0) > 900 && (xb?.ls?.cuadro || 0) > 900, `A cuadro ${xa?.ls?.cuadro}, B cuadro ${xb?.ls?.cuadro}`);
 ok('la cámara de A sigue a su kart (puesto 0) y la de B al suyo (puesto 1)', xa?.camara === 0 && xb?.camara === 1, `A ${xa?.camara}, B ${xb?.camara}`);
-ok('la tabla de pantallas de Racedata es la misma en las dos (la mira la lógica)', xa?.pantalla === xb?.pantalla, `A ${xa?.pantalla}, B ${xb?.pantalla}`);
+if (DIRECTA) ok('los dos humanos son jugadores de verdad (tipo 0) en las dos consolas, el resto CPU', [xa, xb].every(x => x?.tipos?.[0] === 0 && x.tipos[1] === 0 && x.tipos[2] === 1),
+  `A ${xa?.tipos}, B ${xb?.tipos}`);
+if (DIRECTA) ok('cada una tiene SU pantalla (A la del puesto 0, B la del puesto 1)', xa?.pantalla === 0 && xb?.pantalla === 1, `A ${xa?.pantalla}, B ${xb?.pantalla}`);
+if (DIRECTA) {
+  // (la imagen misma: la memoria decía "1 pantalla" y la foto salía partida en dos)
+  const [pa, pb] = [fotoA && await pantallaPartida(A, fotoA), fotoB && await pantallaPartida(B, fotoB)];
+  ok('en la foto de cada una se ve UNA vista, no la pantalla partida', pa && pb && !pa.partida && !pb.partida && !pa.vacia && !pb.vacia,
+     `costura en el medio: A ${pa?.pico} (típico ${pa?.tipico}), B ${pb?.pico} (típico ${pb?.tipico}); cuentas jugadores/pantallas/locales (carrera · menús) A ${xa?.cuentas} B ${xb?.cuentas}; tabla A ${xa?.huds} B ${xb?.huds}; ranuras A ${xa?.ranuras} B ${xb?.ranuras}`);
+}
+else ok('la tabla de pantallas de Racedata es la misma en las dos (la mira la lógica)', xa?.pantalla === xb?.pantalla, `A ${xa?.pantalla}, B ${xb?.pantalla}`);
 ok('los karts de los humanos no llevan la marca de CPU', (xa?.marcas || []).length === 2 && xa.marcas.every(m => !(m & 1)), (xa?.marcas || []).map(m => m.toString(16)).join(', '));
 ok('las huellas de la carrera coinciden (la misma carrera en las dos)', (xa?.ls?.huellasIguales || 0) >= 3 && !xa?.ls?.desincronizado && !xb?.ls?.desincronizado,
   `iguales A ${xa?.ls?.huellasIguales}, B ${xb?.ls?.huellasIguales}${xa?.ls?.desincronizado ? ' · DESINCRONIZADO ' + JSON.stringify(xa.ls.desincronizado) : ''}`);

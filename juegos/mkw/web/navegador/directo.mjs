@@ -15,9 +15,10 @@
 // Uso:  preRun: prepararMii(FS, 'Ana') → { createId, nombre }   (luego directo.ponerMii(eso))
 //       const directo = crearDirecto({ M, lector });  await directo.ir(SECCION_DIRECTA.unjugador)  → true/false
 import { leerBase, armarBase, miiDesdePreset, RUTA_RFLDB } from './mii.mjs';
+import { armarPlantel } from './lockstep.mjs';
 
 // Secciones del juego (Pulsar, Identifiers.hpp)
-export const SECCION_DIRECTA = { menuPrincipal: 0x41, unjugador: 0x48, local: 0x54, enlinea: 0x55 };
+export const SECCION_DIRECTA = { presentacionVs: 0x1A, carreraVs: 0x20, elegirPersonaje: 0x49, menuPrincipal: 0x41, unjugador: 0x48, local: 0x54, enlinea: 0x55 };
 // Acciones de botones que el juego deja llamar directo (la lista de directo_nativo.cpp): función y dónde está el botón
 // dentro de su página (Pulsar: WFCConnect.hpp, WFCMenu.hpp)
 export const BOTON = {
@@ -31,6 +32,8 @@ export const BOTON = {
   // de Nintendo) y, en la página de modos, el VS de las retro con la versión de RR (fija la región 0x0A)
   regional: { pagina: 0x8B, funcion: 0x8064BDC4, boton: 0x484 },      // menú Wi-Fi → Regional («Main modes» de RR)
   vsRetros: { pagina: 0x8C, funcion: 0x8183FCC0, boton: 0x208 },      // modos de RR → VS (las retro, región 0x0A)
+  // el aviso de desconexión (sección 0x78/0x79, página 0x89): cerrarlo → el juego vuelve al menú principal (§73)
+  avisoCorte: { pagina: 0x89, funcion: 0x80649FD8, boton: null },     // DisconnectError::OnClick(mando 0)
 };
 
 // La base de Mii del sistema de archivos del juego (antes de arrancar). Devuelve el Mii para una licencia nueva:
@@ -69,25 +72,44 @@ export function crearDirecto({ M, lector, nota = () => {} }) {
 
   // Ir a la sección: espera a que el juego haya leído el guardado y esté en una pantalla (no en medio de un cambio),
   // pide el salto y espera a que la sección aparezca. licencia: 0..3, o -1 para no tocarla (ya hay una elegida).
-  async function ir(seccion, { licencia = 0, tope = 60000 } = {}) {
+  // ficha (§73): la carrera que hay que dejar escrita antes del salto (ver armarFicha); llego(seccion) = cuándo ya está.
+  async function ir(seccion, { licencia = 0, tope = 60000, ficha = null, llego = s => s === seccion } = {}) {
     if (!M._mkw_directo_ir) return false;
     const t0 = performance.now();
-    while (performance.now() - t0 < tope) {
-      const e = lector.estado();
-      if (e.seccion === seccion && e.pagina >= 0) return true;
-      // (primero la sección: antes de que arranque el main del juego, la memoria de la Wii no existe y leerla falla)
-      if (e.seccion > 0 && e.siguiente === -1 && M._mkw_directo_listo()) break;
-      await espera(50);
-    }
+    const e0 = lector.estado();
+    if (!ficha && llego(e0.seccion) && e0.pagina >= 0) return true;
+    // §73: el pedido se deja puesto YA (aunque el juego no haya arrancado): el juego mismo espera a haber leído la
+    // partida guardada y salta en ese cuadro (directo_nativo.cpp), sin pasar por el título ni las licencias
     hecho = null;
-    M._mkw_directo_ir(seccion, licencia);
+    if (ficha) { escribirFicha(ficha); M._mkw_directo_carrera(seccion, licencia); }
+    else M._mkw_directo_ir(seccion, licencia);
     while (performance.now() - t0 < tope) {
       if (hecho && !hecho.ok) return false;
       const e = lector.estado();
-      if (e.seccion === seccion && e.pagina >= 0) return true;      // la sección ya con su página (no solo cargando)
+      if (hecho && llego(e.seccion) && e.pagina >= 0) return true;  // la sección ya con su página (no solo cargando)
       await espera(50);
     }
     return false;
+  }
+
+  // §73: la carrera directa, sin menús: la ficha queda escrita como la dejan los menús del juego (directo_nativo.cpp,
+  // escribirFicha) y se salta a la carrera VS (0x20, o 0x21-0x23 con 2-4 pantallas: la cuenta regresiva y a correr).
+  // Con ficha.intro: antes la presentación (0x1A, el vuelo sobre la pista ~13 s), que sigue sola a la carrera.
+  const carrera = (ficha, opciones = {}) => {
+    const locales = Math.min(ficha.pantallas || 4, ficha.puestos.filter(q => q && q.tipo === 0).length);
+    const seccion = ficha.intro ? SECCION_DIRECTA.presentacionVs : SECCION_DIRECTA.carreraVs + Math.max(0, Math.min(3, locales - 1));
+    return ir(seccion, { ...opciones, ficha, llego: s => s >= 0x1A && s <= 0x23 });
+  };
+  function escribirFicha(f) {
+    const p = M._mkw_directo_ficha() >> 2, H = new Int32Array(M.HEAPU8.buffer);   // (el programa no publica HEAP32)
+    H.fill(0, p, p + 64);
+    const v = [f.pista, f.variante || 0, f.cc ?? 2, f.espejo ? 1 : 0, f.cpu ?? 1, f.objetos || 0, f.modo ?? 1, f.carrera || 0,
+               f.carreras || 4, f.semilla?.[0] || 0, f.semilla?.[1] || 0, 0, f.pantallas || 0, f.vueltas || 0, f.primera === false ? 0 : 1, f.intro ? 1 : 0];
+    v.forEach((x, i) => { H[p + i] = x | 0; });
+    for (let i = 0; i < 12; i++) {
+      const q = f.puestos[i] || { tipo: -1 };
+      [q.tipo ?? -1, q.personaje ?? -1, q.vehiculo ?? -1, q.mando ?? -1].forEach((x, k) => { H[p + 16 + 4 * i + k] = x | 0; });
+    }
   }
 
   // La acción de un botón del juego (BOTON.mundial…), cuando su página está arriba y ya ACTIVA (Page +0x8 = 4: terminó
@@ -106,5 +128,38 @@ export function crearDirecto({ M, lector, nota = () => {} }) {
     const p = n ? lector.u32(sec + 0x354 + 4 * (n - 1)) : 0;
     return p && lector.u32(p + 4) === id ? p : 0;
   }
-  return { ir, boton, ponerMii, paginaArriba };
+  // §73: elegir personaje, vehículo y derrape con las pantallas del juego (sección 0x49, que empieza en la de personaje).
+  // Al confirmar el derrape el juego NO sigue a la copa: avisa lo elegido (directo_nativo.cpp) y se queda quieto hasta
+  // que la página salta a la carrera (carrera(ficha, { licencia: -1 })). Devuelve { abierto, eleccion: Promise<{
+  // personaje, vehiculo, derrape }> }.
+  async function elegir({ licencia = 0, tope = 60000 } = {}) {
+    if (!M._mkw_directo_eleccion) return { abierto: false, eleccion: Promise.resolve(null) };
+    M._mkw_directo_eleccion(1);
+    const eleccion = new Promise(listo => {
+      // (el juego sigue en modo elección hasta el salto a la carrera: otro A en el derrape no se escapa a las copas)
+      M.mkwAlElegir = (personaje, vehiculo, derrape) => {
+        nota(`directo: eligió personaje ${personaje}, vehículo ${vehiculo}, derrape ${derrape}`);
+        listo({ personaje, vehiculo, derrape });
+      };
+    });
+    const abierto = await ir(SECCION_DIRECTA.elegirPersonaje, { licencia, tope });
+    return { abierto, eleccion };
+  }
+  return { ir, carrera, elegir, boton, ponerMii, paginaArriba };
+}
+
+// §73: la ficha de una carrera VS. humanos = [{ personaje, vehiculo, mando }] (los de esta consola, mando = su puerto);
+// con cpu ≠ 'ninguna' el resto de los 12 puestos son CPU con personaje y vehículo sacados de la semilla (armarPlantel:
+// los mismos en todas las consolas con la misma semilla). pista = id de Pulsar (0x100 + 4·copa + fila).
+// cc: 'c50' | 'c100' | 'c150' | 'espejo'. cpu: 'facil' | 'normal' | 'dificil' | 'ninguna'.
+export function armarFicha({ pista, cc = 'c150', cpu = 'normal', humanos = [{ personaje: 0, vehiculo: 1, mando: 0 }], semilla = 0,
+                             carrera = 0, carreras = 4, objetos = 0, primera = carrera === 0, intro = false }) {
+  const plantel = armarPlantel({ humanos, semilla: semilla || (Math.random() * 2 ** 32) >>> 0 });   // sin semilla: CPU al azar
+  const cuantos = cpu === 'ninguna' ? humanos.length : 12;
+  const puestos = plantel.slice(0, cuantos).map(([vehiculo, personaje], i) => (
+    i < humanos.length ? { tipo: 0, personaje, vehiculo, mando: humanos[i].mando ?? i } : { tipo: 1, personaje, vehiculo, mando: -1 }));
+  const s1 = semilla ? (semilla ^ Math.imul(0x9E3779B9, carrera + 1)) >>> 0 : 0;
+  return { pista, cc: { c50: 0, c100: 1, c150: 2, espejo: 2 }[cc] ?? 2, espejo: cc === 'espejo', modo: 1,
+           cpu: { facil: 0, normal: 1, dificil: 2 }[cpu] ?? 1, objetos, carrera, carreras, primera, puestos, intro,
+           semilla: s1 ? [s1, Math.imul(s1, 0x85EBCA6B) >>> 0] : null };
 }

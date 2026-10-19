@@ -442,17 +442,18 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }
   let nombreRecords = (c, f) => `Copa ${c + 1}, pista ${f + 1}`;
 
-  // elegirPista({ modo: 'gp' | 'vs' | 'copa', copas }) →
-  //   gp: { copa, fila: 0 } · vs: { copa, fila } · copa (copa a tu gusto): { pistas: [{copa, fila} ×4], semilla } · o null
+  // elegirPista({ modo: 'gp' | 'vs' | 'copa', copas, cuantas = 4, titulo }) →
+  //   gp: { copa, fila: 0 } · vs: { copa, fila } · copa (copa a tu gusto): { pistas: [{copa, fila} ×cuantas], semilla } · o null
+  //   (cuantas: las carreras de la copa de la sala, §73; titulo: otro título arriba)
   // Con mouse: pasar por encima muestra la foto y el plano a la derecha. Con el dedo: el primer toque muestra, el
   // segundo elige (no hay "pasar por encima" en una pantalla táctil).
-  async function elegirPista({ modo, copas }) {
+  async function elegirPista({ modo, copas, cuantas = 4, titulo: tituloPedido = '' }) {
     copas = await nombresPistas(copas);
     const nombre = (c, f) => copas[c]?.[f] || `Pista ${f + 1}`;
     nombreRecords = nombre;
     return new Promise(listo => {
       const caja = el('div', { id: 'elegirPista', className: 'modo-' + modo });
-      const titulo = { gp: 'Elige la copa', vs: 'Elige la pista', copa: 'Arma tu copa' }[modo];
+      const titulo = tituloPedido || { gp: 'Elige la copa', vs: 'Elige la pista', copa: 'Arma tu copa' }[modo];
       const buscar = el('input', { type: 'search', placeholder: 'Buscar pista (p. ej. «N64» o «Rainbow»)' });
       buscar.setAttribute('aria-label', 'Buscar pista');
       const lista = el('div', { className: 'copas' });
@@ -513,7 +514,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       }
 
       // ---- Copa a tu gusto: 4 casillas, elegidas o al azar, reordenar, volver a sortear, confirmar ----
-      const tuCopa = { pistas: [null, null, null, null], semilla: semillaNueva(), casilla: 0 };
+      const tuCopa = { pistas: Array.from({ length: Math.max(1, Math.min(32, cuantas | 0 || 4)) }, () => null), semilla: semillaNueva(), casilla: 0 };
       window.mkwTuCopa = tuCopa;                                  // para las pruebas
       const panelCopa = el('section', { className: 'tu-copa' });
       const todas = () => copas.flatMap((p, c) => p.map((_, f) => ({ copa: c, fila: f })));
@@ -534,7 +535,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
             el('b', { textContent: 'Tu copa' }),
             el('span', { className: 'semilla', title: 'La semilla del sorteo; también decide los objetos y la CPU en las carreras',
               textContent: 'Semilla ' + tuCopa.semilla.toString(16).toUpperCase().padStart(8, '0') }),
-            el('button', { type: 'button', className: 'boton', id: 'copaAzar', textContent: '🎲 Todo al azar', onclick: () => sortear([0, 1, 2, 3]) })),
+            el('button', { type: 'button', className: 'boton', id: 'copaAzar', textContent: '🎲 Todo al azar', onclick: () => sortear(tuCopa.pistas.map((_, i) => i)) })),
           el('ol', { className: 'casillas' }, ...tuCopa.pistas.map((p, i) => {
             const li = el('li', { className: 'casilla' + (i === tuCopa.casilla ? ' activa' : '') });
             li.onclick = e => { if (e.target.closest('button')) return; tuCopa.casilla = i; pintarCopa(); if (p) mostrarPista(p.copa, p.fila); };

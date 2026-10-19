@@ -233,6 +233,27 @@ try {
     ok('el aviso necesita dos ratos lentos seguidos (un tirón suelto no avisa)', salidas.map(x => x ? 'A' : '-').join('') === '-------'.slice(0, 5) + 'AA',
        salidas.map(x => x ? 'aviso' : '·').join(' '));
   }
+  // ---- §73: la sala pasa a la carrera 2 con Beto unos cuadros atrás: Ana ya no manda botones de la 1, y Beto, que los
+  // esperaba, no puede quedar quieto para siempre (su juego no podría saltar a la 2) ----
+  {
+    const s = crearSala(['ana', 'beto'], { esperaCorte: 8000, esperaInicio: 8000 });
+    await conTiempo(Promise.all([correr(s.ana, { hasta: 300 }), correr(s.beto, { hasta: 300 })]), 60000);
+    s.ana.ls.fijarCarrera(2);
+    const anaSigue = correr(s.ana, { desde: 0, hasta: 200 });
+    const betoAtras = correr(s.beto, { desde: 300, hasta: 330 });     // los botones de Ana para estos ya no vienen
+    await espera(300);
+    const trabado = s.beto.cuadro;
+    s.beto.ls.fijarCarrera(2);                                        // su página también pasa a la 2
+    const r = await conTiempo(betoAtras.then(() => correr(s.beto, { desde: 0, hasta: 200 })), 6000);
+    await conTiempo(anaSigue, 6000);
+    const ea = s.ana.ls.estado(), eb = s.beto.ls.estado();
+    ok('cambio de carrera con Beto atrás: Beto estaba quieto esperando a Ana (en la 1) y, al pasar a la 2, sus últimos cuadros van sin esperar',
+       trabado >= 300 && trabado < 329 && (eb.cuadrosSaliendo || 0) > 0, `quieto en el ${trabado}, ${eb.cuadrosSaliendo || 0} cuadros sin esperar`);
+    ok('…y los dos corren la carrera 2 entera con los mismos botones, sin cortes',
+       r !== 'tarde' && s.ana.cuadro === 199 && s.beto.cuadro === 199 && ea.carrera === 2 && eb.carrera === 2 &&
+       JSON.stringify(s.ana.vistos.slice(0, 200)) === JSON.stringify(s.beto.vistos.slice(0, 200)) && !Object.keys(ea.cortes).length && !Object.keys(eb.cortes).length,
+       `${r === 'tarde' ? 'TARDE · ' : ''}Ana ${s.ana.cuadro} (carrera ${ea.carrera}), Beto ${s.beto.cuadro} (carrera ${eb.carrera})`);
+  }
   // ---- el anuncio que no llega directo: a Carla no le llega el de Ana, pero Beto se lo pasa ----
   {
     const s = crearSala(['ana', 'beto', 'carla'], { bloquear: (de, a, b) => de === 'ana' && a === 'carla' && b[1] === 9 });

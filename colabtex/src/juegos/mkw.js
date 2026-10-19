@@ -4,34 +4,30 @@ import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storag
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
-import { MKW_CPU, MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, MKW_CC, mkwCarrera, mkwPlaylist, mkwTabla } from "./motor.js";
+import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, MKW_CC, mkwCarrera, mkwPlaylist, mkwTabla } from "./motor.js";
 
 /* Mario Kart Wii (+ Retro Rewind) — el cartero entre la sala y el juego.
 
    El juego entero vive en `juegos/mkw/` (Mario Kart Wii traducido a WebAssembly; su programa sale del Worker de
    amigos, `juegos/mkw/privado.json`) y entra aquí en un iframe, como BT3. Este módulo no toca la carrera:
 
-   - **La carrera va de marco a marco**: cada marco abre su propia malla WebRTC (`juegos/mkw/web/navegador/malla.mjs`)
-     y el servidor en línea del juego (un "WFC" escrito por nosotros) corre en el marco del ANFITRIÓN. Cada juego entra
-     solo a «VS mundial» y ahí se encuentran: la sala del juego, la votación de pista y las carreras son las del juego.
-     Lo único que pasa por aquí es la **presentación**: el buzón de Firebase (`fb.senalMalla`, `vivo/<pid>/rtc`)
-     vive en esta página, que tiene la sesión, y el marco lo usa por postMessage (`senal`, el mismo protocolo de BT3).
-   - **Con CPU de relleno y hasta 4 pilotos** la tanda es una **carrera sincronizada** (`juegos/mkw/web/navegador/
-     lockstep.mjs`): cada marco corre la misma «copa a tu gusto» offline (12 karts: los pilotos y CPU) y la malla
-     reparte los botones de cada cuadro. Los pilotos quedan fijos al empezar (`est.sincro`, en orden: puerto 1–4); la
-     semilla y las 4 pistas salen de la sala y del número de tanda (`mkwCarrera`), así todos calculan lo mismo. Quien
-     llega con la tanda andando espera a la siguiente. Con más de 4 pilotos se corre en línea, sin CPU. (Desde el
-     2026-10-19 ya no se ofrece: el dueño pidió primero Retro WFC tal cual; una sala nueva parte sin CPU.)
-   - **Los modos de la sala** (`est.estilo`, pedido del dueño): «Retro WFC» (el bucle del juego: votar, correr, VR, sin
-     fin), «Modo copa» (`est.carreras` carreras con puntos) y «Modo playlist» (una cola de pistas). Los tres corren
-     sobre el modo en línea del juego; el marco recibe `?estilo=…&carreras=…` y el juego entra DIRECTO (por código,
-     `juegos/mkw/web/navegador/directo.mjs`), sin pantallas de por medio.
-   - **Al registro va solo el vestíbulo** (`redMkw` en `motor.js`): la CPU de relleno, quién es el anfitrión,
-     empezar y volver. Cada jugador tiene su nodo (su dirección en la red del juego, 10.77.0.<nodo>).
+   - **Sin el Wi-Fi del juego** (el dueño, 2026-10-19: «no te conectes a Retro WFC»; nada de sus pantallas). Hasta 4
+     pilotos (`est.sincro`, en orden: puerto 1–4) corren la **carrera sincronizada** (`juegos/mkw/web/navegador/
+     lockstep.mjs`): cada marco corre la MISMA carrera, con los pilotos como jugadores de verdad y la CPU de un Grand
+     Prix completando los 12 lugares, y la malla WebRTC (abierta dentro de cada marco) reparte los botones de cada
+     cuadro. La semilla sale de la sala y del número de tanda (`mkwCarrera`), así todos calculan lo mismo.
+   - **Dentro del juego** (`sala-carrera.mjs`, abierto directo por código, sin menús): el anfitrión arma la copa con
+     el selector de pistas de la página (en la playlist la cola ya viene sorteada, `mkwPlaylist`), cada uno elige
+     personaje y vehículo con las pantallas del juego (45 s) y se corren las carreras; al final el marco del anfitrión
+     manda la tabla (`fin`) y todos vuelven al vestíbulo. Si alguien se corta tiene 30 s para volver.
+   - Lo único que pasa por aquí es la **presentación**: el buzón de Firebase (`fb.senalMalla`, `vivo/<pid>/rtc`) vive
+     en esta página, que tiene la sesión, y el marco lo usa por postMessage (`senal`, el mismo protocolo de BT3). Y se
+     le avisa al marco los nombres de los pilotos y, si el anfitrión se va, quién manda ahora (`nombres`, `anfitrion`).
+   - **Al registro va solo el vestíbulo** (`redMkw` en `motor.js`): el modo (copa o playlist), las carreras, la
+     cilindrada, quién es el anfitrión, empezar y volver.
    - **El VR y los récords** de cada uno van a Firebase (`mkw/vr/<uid>`, `mkw/records/…`): este módulo arma los
      almacenes con la base del sitio y se los pasa al marco (misma página, mismo origen) apenas carga.
-   - Quien entra con las carreras andando carga el juego y entra solo: el juego lo deja mirando y lo suma en la
-     carrera siguiente. Quien mira la sala sin ser jugador no carga el juego.
+   - Quien entra con la copa andando espera a la siguiente tanda. Quien mira la sala sin ser jugador no carga el juego.
 
    Controles del juego: teclado, mandos y táctil (con inclinación) — @controles: tactil teclado */
 const PADRE = "mkw-padre", HIJO = "mkw-hijo";
@@ -81,23 +77,17 @@ const almacenPartidas = {
   },
 };
 
-/* La dirección del marco para este jugador: la malla de esta sala, su nodo, si corre el servidor, la CPU de relleno.
-   Con `sincro` (los pilotos de la carrera sincronizada): la copa con su semilla y sus pistas, sin servidor en línea. */
-export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro, estilo = "wfc", carreras = 4, cc = "c150" }) {
+/* La dirección del marco para este jugador: la malla de esta sala, su nodo y la copa de esta tanda. Todos los marcos
+   corren la sala nueva del juego (`modo=sala`, juegos/mkw/web/navegador/sala-carrera.mjs: sin Retro WFC): `sincro` =
+   los pilotos en orden (puerto 1–4), `jefe` = quien arma la copa (el anfitrión al empezar; si se va, se le avisa al
+   marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo, las carreras y la cilindrada; en la
+   playlist, la cola sorteada (igual en cada navegador). Los nombres no van en la dirección: se le mandan al marco. */
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150" }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
-  if (sincro) {
-    const { semilla, pistas } = mkwCarrera(pid, ronda);
-    q.set("modo", "copa"); q.set("sincro", sincro.join(",")); q.set("semilla", String(semilla));
-    q.set("pistas", pistas.map(t => `${t.copa}.${t.fila}`).join(",")); q.set("cpu", cpu);
-  } else {
-    q.set("modo", "enlinea"); q.set("relleno", cpu);
-    q.set("estilo", estilo);
-    // copa: cuántas carreras; playlist: la cola sorteada (igual en cada navegador); las dos: la cilindrada del anfitrión
-    if (estilo === "copa") q.set("carreras", String(carreras));
-    if (estilo === "playlist") q.set("pistas", mkwPlaylist(pid, ronda, carreras).map(t => `${t.copa}.${t.fila}`).join(","));
-    if (estilo !== "wfc") q.set("cc", cc);
-  }
-  if (anfitrion && !sincro) q.set("anfitrion", "1");
+  const { semilla } = mkwCarrera(pid, ronda);
+  q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
+  q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", String(carreras)); q.set("cc", cc);
+  if (estilo === "playlist") q.set("pistas", mkwPlaylist(pid, ronda, carreras).map(t => `${t.copa}.${t.fila}`).join(","));
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
@@ -172,8 +162,8 @@ export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl 
 
 export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   let host = null, escena = null, vest = null, frame = null, partida = null, est = null;
-  let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false;
-  let senal = null, offP = null, offM = null, conecta = 0;
+  let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false, jefeMarco = "", avisado = "";
+  let senal = null, offP = null, offM = null, conecta = 0, esperaSala = 0;
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
 
   const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid) && !est?.fuera?.[uid];
@@ -226,7 +216,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (d.tipo === "salir") { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {} salir?.(); }
     /* Fin de la copa o de la playlist (juegos/mkw/web/navegador/modos.mjs): el marco del anfitrión manda la tabla final
        y todos vuelven al vestíbulo, donde queda como «la última». Los demás marcos también avisan: no hacen nada. */
-    if (d.tipo === "fin" && soyAnfitrion() && corriendo() && est.estilo !== "wfc") {
+    if (d.tipo === "fin" && soyAnfitrion() && corriendo()) {
       const tabla = mkwTabla(d.tabla);
       anota(tabla ? { t: "vuelve", uid, tabla } : { t: "vuelve", uid });
     }
@@ -253,8 +243,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     }, 250);
   }
 
-  /* El marco solo existe mientras corren y solo para quien juega. Su dirección cambia si cambia la tanda, el
-     anfitrión o el nodo: entonces se recarga (el juego arranca de cero en la red nueva). */
+  /* El marco solo existe mientras corren y solo para quien juega. Su dirección cambia si cambia la tanda o el nodo:
+     entonces se recarga (el juego arranca de cero). Si el anfitrión cambia a mitad de la copa NO se recarga: se le
+     avisa al marco quién manda ahora (la sala del juego sigue con él). */
   async function cargaMarco() {
     if (!frame || !permitido) return;
     // en la carrera sincronizada solo juegan los que estaban al empezar (el que llega espera a la tanda siguiente)
@@ -265,16 +256,34 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       return;
     }
     const nodo = est.nodos?.[uid];
-    const firma = `${est.ronda}|${est.anfitrion}|${nodo}|${(est.sincro || []).join(",")}`;
-    if (firma === firmaMarco) { frame.hidden = false; return; }
-    firmaMarco = firma;
+    const firma = `${est.ronda}|${nodo}|${(est.sincro || []).join(",")}`;
+    if (firma === firmaMarco) { frame.hidden = false; avisaMarco(); return; }
+    firmaMarco = firma; jefeMarco = est.anfitrion; avisado = "";
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
-    frame.src = srcMkw({ pid, uid, nodo, anfitrion: est.anfitrion === uid, cpu: est.cpu, privado: origen, ronda: est.ronda, sincro: est.sincro,
+    frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
                          estilo: est.estilo, carreras: est.carreras, cc: est.cc });
     frame.focus();
     conectarNube();
+    // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
+    clearInterval(esperaSala);
+    let vueltas = 0;
+    esperaSala = setInterval(() => {
+      if (muerto || ++vueltas > 240) { clearInterval(esperaSala); return; }
+      if (frame?.contentWindow?.mkwSala) { clearInterval(esperaSala); avisado = ""; avisaMarco(); }
+    }, 500);
+  }
+  /* Lo que el marco sabe por mensaje (no por la dirección): los nombres de los pilotos (para la tabla de la copa) y,
+     si el anfitrión cambió, quién manda ahora. Se repite cada vez que cambia algo (el marco puede no haber cargado). */
+  function avisaMarco() {
+    if (!frame?.contentWindow?.mkwSala || !est?.sincro) return;      // (la sala del juego todavía no escucha)
+    const nombres = Object.fromEntries(est.sincro.map(u => [u, nombre(u).slice(0, 20)]));
+    const firma = JSON.stringify([nombres, est.anfitrion]);
+    if (firma === avisado) return;
+    avisado = firma;
+    enviar("nombres", { nombres });
+    if (est.anfitrion && est.anfitrion !== jefeMarco && est.sincro.includes(est.anfitrion)) enviar("anfitrion", { uid: est.anfitrion });
   }
 
   /* El VR de quienes están en la sala (mkw/vr/<uid>): una lectura por jugador, una vez. */
@@ -300,14 +309,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         ${manda && !corre && j.uid !== uid ? `<button class="jg-mkw-dar" data-a="${escapeHtml(j.uid)}" title="Que sea el anfitrión">Pasar anfitrión</button>` : ""}
       </li>`;
     // los tres modos (tarjetas: el anfitrión elige, los demás ven cuál) y, en la copa, cuántas carreras
-    const estilo = est.estilo || "wfc", puede = manda && !corre ? "" : "disabled";
-    const QUE = { wfc: "Como en Retro WFC: votan la pista, corren y suben o bajan VR. Sin fin.",
-      copa: `${est.carreras || 4} carreras con puntos (15, 12, 10…): gana quien sume más.`,
+    const estilo = est.estilo || "copa", puede = manda && !corre ? "" : "disabled";
+    const QUE = { copa: `${est.carreras || 4} carreras con puntos (15, 12, 10…): el anfitrión elige las pistas y gana quien sume más.`,
       playlist: `Una cola de ${est.carreras || 4} pistas sorteadas: cada carrera es la siguiente de la cola.` };
     const modos = Object.entries(MKW_MODOS).map(([k, t]) =>
       `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
     // copa y playlist: cuántas carreras (o pistas en la cola) y la cilindrada
-    const carrerasFichas = estilo === "wfc" ? "" : `<div class="jg-mkw-cpu"><span>${estilo === "copa" ? "Carreras" : "Pistas"}</span>${MKW_CARRERAS.map(n =>
+    const carrerasFichas = `<div class="jg-mkw-cpu"><span>${estilo === "copa" ? "Carreras" : "Pistas"}</span>${MKW_CARRERAS.map(n =>
       `<button class="jg-mkw-ficha" data-c="${n}" aria-pressed="${(est.carreras || 4) === n}" ${puede}>${n}</button>`).join("")}</div>
       <div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
       `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
@@ -316,16 +324,15 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     const ultima = !corre && ult?.tabla?.length ? `<div class="jg-mkw-ultima"><b>${ult.estilo === "playlist" ? "🏁 Última playlist" : "🏆 Última copa"}</b>
       <ol>${ult.tabla.map(f => `<li><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol></div>` : "";
     const sinPrograma = origen === "";
-    const conCpu = est.cpu !== "ninguna", muchos = js.length > MKW_SINCRO_MAX;
     const nota = !enSala() ? (corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
-      : corre && est.sincro ? (est.sincro.includes(uid) ? "Copa de 4 pistas con CPU: todos corren la misma carrera. Si alguien se va, su kart sigue solo."
+      : corre && est.sincro ? (est.sincro.includes(uid)
+        ? (est.anfitrion === uid && estilo === "copa" ? "Elige las pistas en el juego; después cada uno elige personaje y vehículo. Todos corren la misma carrera y la CPU completa los 12."
+          : "Todos corren la misma carrera y la CPU completa los 12. Si se te corta la conexión, tienes 30 s para volver.")
         : "Esta copa empezó sin ti: entras en la siguiente.")
-      : corre ? (manda ? "Tu pestaña es el servidor de la sala: si la cierras, las carreras se cortan para todos." : "El juego entra directo en línea; si llegaste tarde, te suma en la carrera siguiente.")
-      : manda && conCpu && muchos ? `Con más de ${MKW_SINCRO_MAX} pilotos no caben CPU: se corre en línea, sin relleno.`
       : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
       : `Esperando a que ${escapeHtml(nombre(est.anfitrion))} abra las carreras.`;
     vest.innerHTML = `
-      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${est.cupo || 12} · ${escapeHtml(MKW_MODOS[estilo])}${estilo !== "wfc" ? " · " + escapeHtml(MKW_CC[est.cc || "c150"]) : ""}${conCpu ? " · " + escapeHtml(MKW_CPU[est.cpu] || "") : ""}</span></div>
+      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX)} · ${escapeHtml(MKW_MODOS[estilo] || MKW_MODOS.copa)} · ${escapeHtml(MKW_CC[est.cc || "c150"])}</span></div>
       <ul class="jg-mkw-pilotos">${js.map(fila).join("")}</ul>
       ${ultima}
       ${corre ? "" : `<div class="jg-mkw-modos" role="group" aria-label="Modo de la sala">${modos}</div>${carrerasFichas}`}
@@ -396,7 +403,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
 
   function destruir() {
     muerto = true;
-    clearInterval(conecta);
+    clearInterval(conecta); clearInterval(esperaSala);
     offP?.(); offM?.();
     senal?.sale();
     window.removeEventListener("message", mensaje);

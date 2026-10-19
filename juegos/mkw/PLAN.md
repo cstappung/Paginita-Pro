@@ -74,14 +74,25 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ✅ M7. 45 s antes de cada carrera para elegir personaje, kart y pista (el 30.0 del juego en 0x80899EF4 → 45.0, §72)
 - ✅ M3b. Retro WFC entra a **la sala de las retro** como RR («Main modes» = Regional + VS de RR, región 0x0A); la
   Mundial de Pulsar es solo de pistas de Nintendo (§72.6)
-- ⬜ M11. Qué hace la sala cuando un jugador se corta o el juego lo saca por inactividad (30 s sin tocar nada en la
-  carrera, del juego original, §72.5): hoy el juego muestra su aviso y vuelve a su menú de Retro WFC
+- ✅ M12. **La sala sin Retro WFC** (pedido del dueño: nada del Wi-Fi del juego, ni licencias ni título): `?modo=sala`
+  — el juego arranca directo en la pantalla de personaje, la anfitriona arma la copa con el selector de la página, cada
+  uno elige personaje/vehículo/derrape en el juego (45 s), cada carrera abre directo por código con la misma ficha en
+  todas y corre en lockstep con los humanos como jugadores de verdad; al final la tabla al sitio (`sala-carrera.mjs`,
+  banco `sala-carrera` 23/23, `prueba-sala` 20/20, §73). El sitio manda siempre `modo=sala` (copa o playlist, hasta 4)
+- ✅ M13. **Todos largan juntos**: la carrera queda quieta en el primer cuadro hasta que llega el último, con el aviso
+  «Esperando a que el jugador N termine de cargar la pista…»; al pasar a la carrera siguiente nadie queda trabado
+  esperando botones de la anterior (banco `lockstep` 37/37, §73)
+- ✅ M14. **Una sola vista por consola** (la pantalla salía partida): pantallas = 1 y locales = 1 al terminar la
+  `RacedataScenario::Init` de RR; la foto lo comprueba (`foto-pantalla.mjs`; `prueba-sincro --directa` 13/13, §73.6)
+- 🟡 M11. Qué hace la sala cuando un jugador se corta: la carrera lo espera 30 s (margen, con aviso) y en nuestras salas
+  nadie sale por inactividad (§73). Falta: que quien recargó vuelva en la carrera siguiente sin perder su lugar
 - ⬜ M8. Abrir directo lo que falta: las carreras de un jugador (Racedata + sección de carrera) y Multiplayer local
-- ⬜ M9. (Si se puede exactamente) CPU iguales a las de un jugador en la sala; si no, se salta (el dueño)
+- ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
+  sale de la cilindrada como en un Grand Prix (§73)
 - ⬜ M10. Después de M: el menú «cambiar Mii» con los 6 Mii invitados del juego y sus imágenes del juego
 
 ### Etapa C — En línea: terminarlo y endurecerlo
-- ⬜ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada (la página ya acepta `?pjs=`)
+- ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
 - 🟡 C2. Pruebas largas de "misma carrera": muchas copas sincronizadas con semillas y pistas al azar —
   `copas-al-azar.mjs` encontró una desincronización (cuadro ~6100 de la carrera 1, semilla 3549642503); con el reloj
   fijo en 0x80750AAC/0x807DC048 sigue (2 de 4 bien). En pausa: primero la etapa M
@@ -353,6 +364,18 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-19 17:24** — **La sala sin Retro WFC, con todos largando juntos y una sola vista por consola** (§73; M12–M14, M9, C1).
+  Pedido del dueño: nada del Wi-Fi del juego; vestíbulo de la página → la anfitriona elige la copa con el selector de
+  la página → cada uno elige personaje y vehículo en el juego → carrera, y que todos empiecen al mismo tiempo. Hecho:
+  `?modo=sala` (`sala-carrera.mjs` = el árbitro, manda el anfitrión, cambio de anfitrión sin recargar), el juego directo
+  en la pantalla de personaje (envoltura de `SectionMgr::Init`), cada carrera directo con la ficha, humanos de verdad en
+  todas las consolas (`GetFirstDeactivatedPad` envuelto, derrape por mando), aviso de espera al largar, el lockstep
+  suelta la espera al cambiar de carrera (el interbloqueo de la carrera 2), la recursión de la anfitriona al elegir, y
+  la pantalla partida (la `RacedataScenario::Init` de RR reescribía los conteos: lo encontró el punto de vigilancia;
+  1 pantalla + 1 local por consola; los globos del HUD se caían con 2 locales). Sitio: `srcMkw` → `modo=sala`, 2 modos,
+  cupo 4, nombres y anfitrión por mensaje (`mkw.test` 16/16). Pruebas: banco `sala-carrera` 23/23 y `lockstep` 37/37,
+  `prueba-sincro --directa` 13/13, `prueba-sala` 20/20 (con la foto sin pantalla partida). Falta: probarlo con el sitio
+  (`jugar.bat`) y una carrera entera hasta la meta con puntos.
 - **2026-10-19 06:04** — **Los tres modos de la sala: Retro WFC, copa y playlist, con 45 s para elegir** (§72; M4–M7). Pedido del dueño: con Retro WFC por la página, separarlo en 3 modos (el original, copa y playlist), crear sala = elegir el modo, y 45 s antes de cada carrera. Los tres son el modo en línea del juego; la página cambia: el reloj (el 30.0 de 0x80899EF4 → 45.0), la decisión del anfitrión (`modos_nativo.cpp` envuelve DecideTrack/DecideCC de Pulsar y SetPlayerData: pista de la cola y cilindrada) y el fin (`modos.mjs` cuenta carreras, suma puntos, tabla final, `{tipo:"fin",tabla}` al sitio, que vuelve al vestíbulo con «Última copa»). Dos hallazgos: (1) **el corte a los 30 s de carrera** era el control de inactividad del juego original (0x8053F184: 1800 cuadros sin tocar un botón → DisconnectMgr corta); una persona que maneja no lo ve; las pruebas terminan la carrera por código (`mkw_modos_terminar` → EndLap hasta la meta). (2) **Entrábamos a la sala equivocada**: la Mundial de Pulsar es solo de pistas de Nintendo (por eso la playlist con una retro se colgaba); ahora Retro WFC entra como RR, «Main modes» = Regional (0x8064BDC4) + VS de RR (`rr_kamek_8183FCC0`, región 0x0A, las retro); `?wfc=mundial` = la de antes. Pruebas: banco `modos` **24/24**, `directo` **18/18**; sitio 47/47; con el juego `prueba-modos` **9/9** (copa, pista retro 0x100 a 100cc), `--playlist` **9/9** (0x136 en espejo), `prueba-enlinea` **9/9**. Falta (M11): qué hace la sala cuando alguien se corta; v2 de la playlist: editar la cola.
 - **2026-10-19 03:56** — **Abrir directo por código y Retro WFC por la página** (§71; etapa M nueva con los pedidos del dueño). El dueño: «saltar la interfaz» = abrir la pantalla con el código del juego, no cortina + piloto; el multijugador sincronizado estaba mal (todos los karts eran CPU: cámara de espectador, bots sin rival); «si no se puede con los mismos CPU, implementa el Retro WFC modificado para la página» y después 3 modos. Hecho: `directo_nativo.cpp` envuelve `SectionMgr::Update` de RR (`rr_overlay_8063550C`) y hace lo que el juego: registra el mando (Input::Manager +0x3BA0), elige o crea la licencia (0x805EB7A0 / CreateLicense) y SetNextSection + RequestSceneChange; la acción de botones del juego llamada directo (lista corta, página activa). Un jugador abre directo (~1 s). Retro WFC: sección 0x55 directa, aviso de datos → Siguiente, «¿Conectarse?» → Sí, cartel de bienvenida → cerrar, Mundial; el juego busca, elige, vota y corre solo por el WFC virtual: `prueba-enlinea` **9/9** (carrera en línea a los 164 s). Banco `directo` **16/16**. Investigación del bucle de Retro WFC en `docs/en-linea.md`. Mii invitados: después del multijugador (dueño).
 - **2026-10-18 23:58** — **Una PC lenta en la sala (C5) y el aviso de quién frena** (§70.7). `prueba-sincro --lento` (B con la CPU frenada 2×): la carrera sigue siendo la misma (10–11 huellas iguales) y va al ritmo de B (~30 cuadros/s; A espera ~20 ms por cuadro), como se diseñó en §62.3. Nuevo: `lockstep.mjs` anota a quién se esperó (`esperaDe`) y `avisoLento`/`vigiaLento` avisan sobre el juego «La carrera va a 28 cuadros por segundo: espera al jugador 2 de la sala» y, en la lenta, «Tu PC no alcanza 60 cuadros por segundo», solo con 6 s seguidos lentos (un tirón de la largada con la caché vacía ya había dado un aviso falso). Banco `lockstep` **35/35**; `prueba-sincro` normal **11/11** dos veces (sin avisos) y `--lento` **11/11**. Los nombres de los jugadores en el aviso quedan para C6 (la página solo recibe los uid de la sala).

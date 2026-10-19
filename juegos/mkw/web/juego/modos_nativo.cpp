@@ -85,8 +85,18 @@ extern "C" void rr_kamek_81864878(CpuContext* MKW_RESTRICT ctx) {
 // (GMDataOnlineVS::Update), y recibe el GMData en r3: +0x4 = Raceinfo, +0x108/+0x109 = ids de los pilotos de aquí.
 extern "C" void func_8053F184_traducida(CpuContext* ctx);   // el control de inactividad del juego
 
-namespace { int32_t g_terminar = 0; }
+namespace { int32_t g_terminar = 0; int32_t g_inactividad = 0; }
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_modos_terminar() { g_terminar = 1; }
+// §73: en nuestras salas NO se saca a nadie por inactividad (el dueño probando con dos ventanas en una PC: la que
+// queda quieta salía a los 30 s y la otra, sola, también). Module._mkw_modos_inactividad(1) = la regla del juego.
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_modos_inactividad(int32_t si) { g_inactividad = si ? 1 : 0; }
+extern "C" void rr_overlay_8053EE50_traducida(CpuContext* ctx);   // el control de RR por velocidad
+
+// El control de inactividad de Retro Rewind (el kart casi quieto mucho rato): mismo trato que el del juego
+extern "C" void rr_overlay_8053EE50(CpuContext* MKW_RESTRICT ctx) {
+    if (g_inactividad) { rr_overlay_8053EE50_traducida(ctx); return; }
+    ctx->gpr[3] = 0;                                                  // "nadie quieto"
+}
 
 extern "C" void func_8053F184(CpuContext* MKW_RESTRICT ctx) {
     const uint32_t gm = ctx->gpr[3];
@@ -105,5 +115,6 @@ extern "C" void func_8053F184(CpuContext* MKW_RESTRICT ctx) {
             }
         }
     }
-    func_8053F184_traducida(ctx);
+    if (g_inactividad) { func_8053F184_traducida(ctx); return; }
+    ctx->gpr[3] = 0;                                                  // "nadie quieto": no marca la desconexión
 }

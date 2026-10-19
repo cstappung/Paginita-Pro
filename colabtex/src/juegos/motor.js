@@ -236,10 +236,10 @@ export const JUEGOS = {
   },
   mkw: {
     nombre: "Mario Kart Wii",
-    lema: "Mario Kart Wii con Retro Rewind en el navegador: carreras en línea de hasta 12, con tus amigos y CPU de relleno",
+    lema: "Mario Kart Wii con Retro Rewind en el navegador: copas de hasta 4 amigos y la CPU completa los 12 lugares",
     color: "#e4202e",
-    minimo: 1,   // se puede abrir la sala solo (con CPU de relleno) y esperar a los demás
-    cupo: 12,    // lo que admite una sala en línea del juego
+    minimo: 1,   // se puede abrir la sala solo (con la CPU) y esperar a los demás
+    cupo: 4,     // 4 humanos: cada uno es un jugador "local" de verdad en todas las consolas, y el juego admite 4
     alta: "2026-10-17"
   }
 };
@@ -7730,38 +7730,39 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
 }
 
 /* ---------- Mario Kart Wii (+ Retro Rewind) ----------
-   El juego compilado a WebAssembly (`juegos/mkw/`, ver su CLAUDE.md), en un iframe. La carrera va de navegador a
-   navegador por una malla WebRTC abierta DENTRO del marco (el buzón de Firebase, `vivo/<pid>/rtc`, solo presenta);
-   el servidor en línea del juego (un "WFC" escrito por nosotros) corre en el marco del anfitrión, y cada juego entra
-   solo a «VS mundial», donde se encuentran (la sala, la votación de pista y las carreras son las del juego). Al
-   registro va solo el vestíbulo:
-   - `{t:"ajuste", uid, k:"estilo", v}`: el anfitrión elige el modo de la sala (MKW_MODOS, pedido del dueño 2026-10-19):
-     "wfc" = Retro WFC tal cual (votar, carrera, VR, sin fin), "copa" = N carreras con puntos (`{k:"carreras"}`:
-     MKW_CARRERAS), "playlist" = una cola de pistas. Los tres corren sobre el modo en línea del juego.
-   - `{t:"ajuste", uid, k:"cpu", v}`: la CPU de relleno (MKW_CPU) de la carrera sincronizada. Ya no se ofrece (el dueño:
-     sin CPU por ahora, primero Retro WFC); una sala nueva parte "ninguna".
+   El juego compilado a WebAssembly (`juegos/mkw/`, ver su CLAUDE.md), en un iframe. Sin el Wi-Fi del juego (el dueño,
+   2026-10-19: «no te conectes a Retro WFC»): cada navegador corre la MISMA carrera (la "carrera sincronizada": los
+   botones de todos en cada cuadro, por una malla WebRTC abierta DENTRO del marco; el buzón de Firebase,
+   `vivo/<pid>/rtc`, solo presenta), con los humanos como jugadores de verdad y la CPU completando los 12 lugares.
+   Dentro del juego, el anfitrión arma la copa con el selector de la página y cada uno elige personaje y vehículo con
+   las pantallas del juego (juegos/mkw/web/navegador/sala-carrera.mjs). Al registro va solo el vestíbulo:
+   - `{t:"ajuste", uid, k:"estilo", v}`: el anfitrión elige el modo de la sala (MKW_MODOS): "copa" = N carreras con
+     puntos (`{k:"carreras"}`: MKW_CARRERAS; las pistas las elige el anfitrión en el juego), "playlist" = una cola de
+     N pistas sorteadas. (El "wfc" de antes —Retro WFC tal cual— ya no existe: una sala vieja con él pasa a copa.)
+   - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece: la CPU es la de un Grand Prix (su nivel sale de la cilindrada).
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
-   - `{t:"empieza", uid}`: el anfitrión abre las carreras: todos los marcos cargan el juego y entran en línea.
+   - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 4, en este orden: `sincro`) cargan el
+     juego y corren la copa juntos.
    - `{t:"ajuste", uid, k:"cc", v}`: la cilindrada de la copa y de la playlist (MKW_CC; "azar" = la de Retro Rewind).
    - `{t:"vuelve", uid, tabla?}`: el anfitrión las cierra y todos vuelven al vestíbulo. Al terminar una copa o una
      playlist la manda el marco del anfitrión con la tabla final ([{nombre, puntos}], `mkwTabla`), que el vestíbulo
      muestra como «la última».
    La cola de la playlist la sortea cada navegador igual (`mkwPlaylist(pid, ronda, n)`): nadie la escribe.
-   - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y, si estaban corriendo,
-     vuelven todos al vestíbulo (sin su pestaña no hay servidor).
-   Quien entra con las carreras andando carga el juego y entra solo: el juego lo deja mirando y lo suma en la
-   carrera siguiente. Cada jugador tiene su NODO (su dirección en la red del juego, 10.77.0.<nodo>): 2 + su orden de
-   llegada a la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
+   - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y la copa sigue con él
+     (no hay servidor: su kart sigue sin nadie y el nuevo anfitrión lleva la sala del juego).
+   Quien entra con la copa andando espera a la siguiente tanda. Cada jugador tiene su NODO: 2 + su orden de llegada a
+   la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
    La sala termina cuando ya no queda nadie. */
 export const MKW_CPU = { ninguna: "Sin CPU", facil: "CPU fácil", normal: "CPU normal", dificil: "CPU difícil" };
 const mkwCpu = v => tiene(MKW_CPU, v) ? v : "normal";
-/* Los tres modos de una sala (todos sobre el modo en línea del juego, Retro WFC) y las carreras de una copa */
-export const MKW_MODOS = { wfc: "Retro WFC", copa: "Modo copa", playlist: "Modo playlist" };
+/* Los dos modos de una sala y las carreras de una copa */
+export const MKW_MODOS = { copa: "Modo copa", playlist: "Modo playlist" };
 export const MKW_CARRERAS = [2, 4, 8, 12];
-const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "wfc";
+const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "copa";
 const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
-/* La cilindrada de la copa y de la playlist (en Retro WFC la sortea el juego: 10 % 100cc, 65 % 150cc, 25 % espejo) */
+/* La cilindrada de la copa y de la playlist ("azar": cada carrera la suya, como Retro Rewind: 10 % 100cc, 65 % 150cc,
+   25 % espejo, sorteada con la semilla de la tanda) */
 export const MKW_CC = { c150: "150cc", c100: "100cc", espejo: "Espejo", azar: "Al azar" };
 const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
 /* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
@@ -7776,9 +7777,8 @@ export function mkwTabla(t) {
   }
   return r.length ? r : null;
 }
-/* La carrera con CPU de relleno es la "carrera sincronizada" del juego (cada navegador corre la misma carrera offline
-   con los botones de todos): cada humano maneja un puerto de mando de GameCube, y hay 4. Con más pilotos se corre en
-   línea, sin CPU. */
+/* La carrera sincronizada (cada navegador corre la misma carrera con los botones de todos): cada humano es un jugador
+   "local" del juego con su puerto de mando de GameCube, y hay 4. */
 export const MKW_SINCRO_MAX = 4;
 export const MKW_COPAS = 79;            // copas de carrera de Retro Rewind (las de arenas no cuentan)
 /* La semilla y las 4 pistas de una tanda: salen de la sala y del número de tanda, así cada navegador calcula lo mismo
@@ -7825,8 +7825,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
       fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid });
       if (j.uid === anfitrion) {
         anfitrion = (presentes()[0] || {}).uid || "";
-        // en línea su pestaña era el servidor: vuelven todos. En la carrera sincronizada no hay servidor: siguen
-        if (fase === "jugando" && !sincro) { fase = "vestibulo"; hist.push({ e: "vuelve", por: "anfitrion" }); }
+        // (la carrera sincronizada no tiene servidor: siguen, con el nuevo llevando la sala del juego)
       }
       continue;
     }
@@ -7838,9 +7837,9 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
-      // con CPU y hasta 4 pilotos: carrera sincronizada, con los que están ahora, en este orden (puerto 1, 2, 3, 4)
+      // la carrera sincronizada, con los que están ahora (hasta 4), en este orden (puerto 1, 2, 3, 4)
       const ps = presentes();
-      sincro = cpu !== "ninguna" && ps.length <= MKW_SINCRO_MAX ? ps.map(x => x.uid) : null;
+      sincro = ps.slice(0, MKW_SINCRO_MAX).map(x => x.uid);
       hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, jugadores: ps.length, sincro: !!sincro });
       continue;
     }
