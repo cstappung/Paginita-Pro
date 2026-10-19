@@ -374,4 +374,24 @@ motion hides the front layer. Game art is never repainted. The page gradient liv
 `.jg-hw-fondo` (fixed), never on `<body>` with `background-attachment:
 fixed`: iOS Safari ignores `fixed`, the gradient repeated every screen
 height and scrolling showed a hard horizontal cut. The sticky mode bar's
-colour matches the top of that gradient for the same reason.
+colour matches the top of that gradient for the same reason. The far hill fades upwards (a
+gradient fill) and the cemetery box keeps the drawing's aspect ratio on
+wide screens: a hard hill edge with the orange glow behind it, and a
+`slice` crop that flattened the tree and the chimney, read as an orange
+line across the page.
+
+**Lobby performance: no animation inside an SVG that runs all the time.**
+A traced lobby spent ~75 % of the main thread in «Layerize»: any repaint
+makes Chrome recompose the whole page, and an animated `transform` on an
+SVG child (or a non-composited pseudo-element) repaints every frame. So:
+the Halloween bat wings and spider legs, and Catan's sea and boat
+(`arteCatan`, three stacked SVGs), animate HTML wrappers instead; the
+banner's «Jugar» pulse runs only on the visible slide, with `will-change`,
+and pauses with the scene when the banner leaves the viewport (`.fuera`,
+an IntersectionObserver in `enganchaBanner`, which also stops moving the
+progress bar then); the banner tick only moves that bar and repaints the
+pause button only when it changes (it used to rewrite its text 10×/s,
+which i18n.js re-scanned); and a card off screen pauses its cover's
+animations (`.dormida`, `vigilaPortadas` in salon.js). A new cover or
+scene that must animate forever should move an HTML element, not
+something inside its SVG.
