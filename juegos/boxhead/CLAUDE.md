@@ -1,8 +1,9 @@
-# Boxhead — notes for Claude
+# Pro BoxHead — notes for Claude
 
 Room game of Juegos. The shared architecture (move log, `reducir`, rooms, fin cartel, votes, sound) is in `colabtex/src/juegos/CLAUDE.md`; logros/coins/ranking wiring in `docs/claude/juegos/perfiles-y-economia.md`. The room postman is `colabtex/src/juegos/boxhead.js`.
 
-**Boxhead (`boxhead`) is a top-down shooter in an iframe, Yemas' sibling.**
+**Pro BoxHead (id `boxhead`, renamed from «Boxhead»: the id stays, the rules,
+rooms and tables use it) is a top-down shooter in an iframe, Yemas' sibling.**
 An original recreation of *Boxhead: The 2Play Rooms* (its weapons, unlock
 multipliers, enemies, skins and five maps, `juegos/boxhead/js/datos.js`, UMD
 `BoxheadDatos`), but the room holds one to eight rather than two:
@@ -70,6 +71,29 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
 - **A muro placed on yourself no longer traps you**: `pon` refuses one that
   overlaps the player, and `choca` ignores an object the body already
   overlaps, so walking out of it is always possible.
+- **What you see lives in `js/grafico.js`** (`BoxheadGrafico`), the sounds in
+  `js/audio.js` (`BoxheadAudio`); `juego.js` only decides what to draw.
+  Characters are **cubes in fake 3D**: `modelo` yaws each part to where the
+  body faces, pitches it back (`cae`: the knockback lean, the death fall),
+  projects with `KY` and paints only the faces toward the camera, sorted by
+  depth. An animated part goes through `humanoide`'s parts list, never as
+  extra canvas drawing, or it will not rotate. `PAL_E` has **one palette per
+  `ENEMIGOS` entry** (the test pins it): a new enemy needs its palette.
+  Models draw at `ESC` (1.15) over their collision radius; bars and labels
+  above heads are placed for that scale.
+- **The floor keeps everything** (`crearSuelo`): one canvas of the whole map,
+  painted once per map theme (`TEMAS`, keyed by map id) plus a static shadow
+  layer, where every blood drop, pool and scorch is stamped and **never
+  erased** during a game. Blood comes from particles that stamp where they
+  land (`fx.sangre`), so a new effect that should stain must do the same.
+  Walls are white chamfered blocks (`bloque`, `muroDe(mapa)` tints them);
+  neighbour walls merge, so do not stroke shared edges.
+- **A death travels as `[id, quien, k, x, y, ang, tipo]`** in `zb.m`: `ang`
+  (centiradians) is where the hit threw it, `tipo` 0 falls (`fx.cadaver`,
+  which leaves its pool), 1 bursts (explosive weapon), 2 the explosivo
+  blowing up. Old clients send five fields; `procesaMuerte` falls back to a
+  random angle. Knockback depends on the weapon (`EMPUJE_ARMA`) and adds up
+  while stunned, capped by mass: that is what makes the shotgun hit hard.
 - Room options: `variante` (coop/versus), `mapa` (`BX_MAPAS`, must match
   `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
   rules' `juego` and `logros` whitelists, so they must be re-published.

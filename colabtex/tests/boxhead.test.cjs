@@ -208,3 +208,20 @@ test('boxhead: la mezcla normal nunca saca un jefe',()=>{
   for(let i=0;i<50;i++)assert.ok(!D.esJefe(D.tipoEnemigo(n,i/50)));
  }
 });
+
+/* El dibujo (grafico.js): cada enemigo tiene su paleta y su sangre, cada
+   arma su modelo con boca, y un punto proyectado sale donde debe. */
+test('boxhead: paletas, armas en la mano y proyección del dibujo',()=>{
+ const G=require('../../juegos/boxhead/js/grafico.js').BoxheadGrafico;
+ assert.equal(G.PAL_E.length,D.ENEMIGOS.length,'una paleta por enemigo');
+ for(const p of G.PAL_E){for(const c of ['piel','camisa','pantalon','pelo'])assert.match(p[c],/^#[0-9a-f]{3,6}$/i);assert.ok(['zombi','lado'].includes(p.brazos));}
+ for(let k=0;k<D.ENEMIGOS.length;k++)assert.equal(G.sangreDe(k).length,3);
+ for(const a of D.ARMAS){const m=G.partesArma(a.id);assert.ok(m.p.length>=1,a.nombre+' sin modelo');assert.equal(m.b.length,3);}
+ for(const s of D.SKINS)assert.equal(G.palJugador(s).brazos,'arma');
+ // mirando al este, la boca del arma queda a la derecha del jugador y en alto
+ const b=G.boca(100,100,0,0);
+ assert.ok(b[2]>110&&Math.abs(b[3]-100)<3&&b[4]>12&&b[1]<b[3]);
+ // inclinado 90° hacia atrás, la cabeza queda en el suelo detrás de los pies
+ const q=G.proyecta(100,100,0,0,0,30,1,Math.PI/2);
+ assert.ok(q[2]<75&&Math.abs(q[4])<1e-6);
+});

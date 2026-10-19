@@ -2,16 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610182122"></script>
+<script src="../../i18n.js?v=202610190449"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Boxhead</title>
+<title>Pro BoxHead</title>
 <style>
 :root{--fondo:#16130f;--panel:rgba(20,17,13,.86);--borde:#5b4a35;--txt:#f3ead8;--tenue:#b9a98c;--oro:#f2c14e;--rojo:#d94b3d}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--fondo);color:var(--txt);font:14px/1.35 "Trebuchet MS",system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
-#lienzo{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+#lienzo{position:fixed;inset:0;width:100%;height:100%;display:block}
 .panel{background:var(--panel);border:2px solid var(--borde);border-radius:6px;box-shadow:0 3px 0 rgba(0,0,0,.45)}
 button{font:inherit;cursor:pointer}
 .btn{background:linear-gradient(#e2b44a,#b9852a);color:#2a1a06;border:2px solid #6e4d14;border-radius:5px;padding:8px 18px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;box-shadow:0 3px 0 #4a3209}
@@ -64,7 +64,9 @@ button{font:inherit;cursor:pointer}
 .capa{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,8,6,.72);z-index:5;padding:16px;overflow:auto}
 .capa[hidden]{display:none}
 .caja{max-width:620px;width:100%;padding:18px 20px;text-align:center}
-.logo{font-size:48px;font-weight:900;letter-spacing:.06em;color:var(--oro);text-shadow:0 4px 0 #6e4d14,0 8px 0 rgba(0,0,0,.4);margin:0 0 4px}
+.logo{font-size:48px;font-weight:900;letter-spacing:.06em;color:#f4f4f2;text-shadow:0 2px 0 #b9b9b4,0 4px 0 #8d8d88,0 6px 0 #5e5e5a,0 10px 12px rgba(0,0,0,.6);margin:0 0 4px;line-height:1}
+.logo small{display:block;font-size:.42em;letter-spacing:.5em;color:#e23b2e;text-shadow:0 2px 0 #5a0f0a;margin-bottom:2px}
+.logo .rojo{color:#e23b2e;text-shadow:0 2px 0 #a3241b,0 4px 0 #6e130d,0 6px 0 #400a06,0 10px 12px rgba(0,0,0,.6)}
 .sub{color:var(--tenue);margin:0 0 14px}
 .fila{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0 14px}
 .skin{width:64px;padding:4px 2px;background:#221c15;border:2px solid #3d3227;border-radius:5px;color:var(--tenue);font-size:11px}
@@ -107,7 +109,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
 
 <div id="menu" class="capa">
   <div class="caja panel">
-    <h1 class="logo">BOXHEAD</h1>
+    <h1 class="logo"><small>PRO</small>BOX<span class="rojo">HEAD</span></h1>
     <p class="sub" id="menuSub">Zombis, demonios y un multiplicador que no para de subir.</p>
     <div id="menuMapas"><h3>Mapa</h3><div class="fila" id="mapas"></div></div>
     <h3>Personaje</h3>
@@ -134,7 +136,9 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-4"></script>
-<script src="js/juego.js?v=boxhead-4"></script>
+<script src="js/datos.js?v=boxhead-5"></script>
+<script src="js/grafico.js?v=boxhead-5"></script>
+<script src="js/audio.js?v=boxhead-5"></script>
+<script src="js/juego.js?v=boxhead-5"></script>
 </body>
 </html>

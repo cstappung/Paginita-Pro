@@ -120,10 +120,10 @@ test('una novedad lleva las etiquetas del juego al que lleva',()=>{
 
 /* Las novedades del banner son las que eligió la dueña del sitio, en su
    orden, y cada una tiene adónde llevar con su botón grande. */
-test('las novedades: las diez elegidas, en su orden, con su botón',()=>{
+test('las novedades: las once elegidas, en su orden, con su botón',()=>{
  const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
  const ids=[...nov.matchAll(/^  \{ id: "(\w+)"/mg)].map(m=>m[1]);
- assert.deepEqual(ids,['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
+ assert.deepEqual(ids,['boxhead','memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
  for(const m of nov.split(/^  \{ id: /m).slice(1)) assert.match(m,/ruta: "#|ficha: "\w+"/,'sin adónde ir: '+m.slice(0,20));
  assert.ok(!nov.includes('sala: {'),'el banner no abre salas de un toque');
 });
@@ -134,7 +134,7 @@ test('las novedades: las diez elegidas, en su orden, con su botón',()=>{
 test('las escenas de las novedades',()=>{
  const c={};vm.createContext(c);
  vm.runInContext(sin('src/juegos/novedades-arte.js')+'\n;globalThis.__E={escenaNovedad,tieneEscena};',c);
- for(const id of ['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']){
+ for(const id of ['boxhead','memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']){
   assert.ok(c.__E.tieneEscena(id),id+' sin escena');
   for(const serie1 of [false,true]){
    const h=c.__E.escenaNovedad(id,{serie1});

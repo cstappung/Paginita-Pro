@@ -76,7 +76,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Circuit Breakers (worms) | `juegos/worms/CLAUDE.md` |
 | Yemas (shooter, zombis, voz) | `juegos/yemas/CLAUDE.md` |
 | Clue | `juegos/clue/CLAUDE.md` |
-| Boxhead | `juegos/boxhead/CLAUDE.md` |
+| Pro BoxHead (boxhead, zombis, diablos) | `juegos/boxhead/CLAUDE.md` |
 | HaxBall | `juegos/haxball/CLAUDE.md` |
 | Budokai Tenkaichi 3 (BT3, PS2 port, ISO, online rooms) | `juegos/bt3/CLAUDE.md` |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
