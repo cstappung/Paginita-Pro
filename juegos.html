@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610190449"></script>
+<script src="i18n.js?v=202610190517"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -13,6 +13,14 @@
 try { var t = localStorage.getItem("jg.tema");
   if (t === "oscuro" || (t !== "claro" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.dataset.tema = "oscuro";
 } catch (e) {}
+/* El modo Halloween (juegos/halloween.js), del 1 de octubre al 1 de
+   noviembre: también antes de pintar, o la página saldría un instante sin
+   disfrazar. Repite `estadoHalloween` en una línea; la prueba
+   tests/halloween.test.cjs comprueba que digan lo mismo. */
+(function () { var f = /[?&]halloween=([01])/.exec(location.search), d = new Date(), m = d.getMonth(), g = "";
+  try { g = localStorage.getItem("jg.halloween") || ""; } catch (e) {}
+  if (f ? f[1] === "1" : m === 9 || (m === 10 && d.getDate() === 1)) document.documentElement.dataset.halloween = g === "no" ? "off" : "on";
+})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lilita+One&family=Caveat:wght@500;700&family=Bungee&family=Cinzel:wght@900&family=Anton&display=swap" rel="stylesheet">
@@ -5748,6 +5756,211 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
   .jg-cs *{animation:none!important}
 }
 
+/* ============================================================
+   Modo Halloween (juegos/halloween.js)
+
+   Del 1 de octubre al 1 de noviembre, solo. El <head> pone
+   `data-halloween` en <html> antes de pintar: "on" con la decoración,
+   "off" si la persona la apagó desde la cinta del salón (la cinta
+   queda, en pequeño, para volver a encenderla), y nada fuera de
+   temporada. Todo va en este bloque, al final de la hoja para ganar a
+   la regla clara y a la oscura con la misma especificidad, y con el
+   prefijo `html[data-halloween=on]`: el 2 de noviembre el atributo no
+   está y la página vuelve a ser exactamente la de siempre.
+
+   Las dos capas (`.jg-hw-fondo` detrás del contenido, con la luna y el
+   cementerio; `.jg-hw` delante, con murciélagos, fantasmas y la araña)
+   no reciben toques y salen solo en las pantallas de menú: en una
+   partida o un juego del club la pantalla es del juego. El arte de los
+   juegos no se toca: solo telarañas y una araña por encima.
+   ============================================================ */
+html[data-halloween]{
+  --hw-tela-b:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M0 0L118 0M0 0L112.2 36.5M0 0L93 72.6M0 0L62.5 100.1M0 0L28.5 114.5M0 0L0 118M22 0Q18.7 3 20.9 6.8Q16.7 8.9 17.3 13.5Q12.7 14.1 11.7 18.7Q7.4 17.4 5.3 21.3Q2.3 18.8 0 22M44 0Q37.4 5.9 41.8 13.6Q33.4 17.8 34.7 27.1Q25.3 28.1 23.3 37.3Q14.8 34.8 10.6 42.7Q4.6 37.6 0 44M66 0Q56.1 8.9 62.8 20.4Q50.1 26.6 52 40.6Q38 42.2 35 56Q22.2 52.2 16 64Q6.9 56.3 0 66M88 0Q74.7 11.8 83.7 27.2Q66.8 35.5 69.3 54.2Q50.6 56.2 46.6 74.6Q29.6 69.7 21.3 85.4Q9.2 75.1 0 88M110 0Q93.4 14.8 104.6 34Q83.5 44.4 86.7 67.7Q63.3 70.3 58.3 93.3Q37 87.1 26.6 106.7Q11.5 93.9 0 110' fill='none' stroke='%23ffffff' stroke-opacity='.8' stroke-width='1.1'/%3E%3C/svg%3E");
+  --hw-tela-o:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M0 0L118 0M0 0L112.2 36.5M0 0L93 72.6M0 0L62.5 100.1M0 0L28.5 114.5M0 0L0 118M22 0Q18.7 3 20.9 6.8Q16.7 8.9 17.3 13.5Q12.7 14.1 11.7 18.7Q7.4 17.4 5.3 21.3Q2.3 18.8 0 22M44 0Q37.4 5.9 41.8 13.6Q33.4 17.8 34.7 27.1Q25.3 28.1 23.3 37.3Q14.8 34.8 10.6 42.7Q4.6 37.6 0 44M66 0Q56.1 8.9 62.8 20.4Q50.1 26.6 52 40.6Q38 42.2 35 56Q22.2 52.2 16 64Q6.9 56.3 0 66M88 0Q74.7 11.8 83.7 27.2Q66.8 35.5 69.3 54.2Q50.6 56.2 46.6 74.6Q29.6 69.7 21.3 85.4Q9.2 75.1 0 88M110 0Q93.4 14.8 104.6 34Q83.5 44.4 86.7 67.7Q63.3 70.3 58.3 93.3Q37 87.1 26.6 106.7Q11.5 93.9 0 110' fill='none' stroke='%233b1f4f' stroke-opacity='.55' stroke-width='1.1'/%3E%3C/svg%3E");
+  --hw-nar:#f97316;--hw-nar2:#c2410c;--hw-mor:#7c3aed;--hw-noche:#140a1c
+}
+html[data-halloween=on]{--jg-purple:#7c3aed}
+html[data-halloween=on] body{background:linear-gradient(180deg,#faf3ea 0,#f6ebee 45%,#ecdff0 100%) fixed;background-color:#f6ebee}
+html[data-halloween=on][data-tema=oscuro]{--os-fondo:#0d0915}
+html[data-halloween=on][data-tema=oscuro] body{background:radial-gradient(1100px 560px at 84% -8%,#4c1d6b70,#4c1d6b00 70%),radial-gradient(900px 400px at 10% 110%,#ff7a1a1c,#ff7a1a00 70%),linear-gradient(180deg,#0d0915,#120a1c 60%,#1a0b16) fixed;background-color:#0f0a17}
+
+/* ---- La cabecera: noche morada que arde en naranja, banderines y la
+   calabaza en lugar del logo ---- */
+html[data-halloween=on] .head{position:relative;background:linear-gradient(100deg,#1a0c28 0,#2a0f33 48%,#3d1607 100%);border-bottom:1px solid #ff7a1a4d;box-shadow:0 1px 18px #ff7a1a26}
+html[data-halloween=on] .head::before{content:"";position:absolute;left:0;top:0;width:58px;height:58px;background:var(--hw-tela-b) no-repeat 0 0/contain;opacity:.32;pointer-events:none}
+html[data-halloween=on] .head::after{content:"";position:absolute;left:0;right:0;top:100%;height:20px;z-index:2;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 20'%3E%3Cpath d='M0 1.5Q36 5 72 1.5' fill='none' stroke='%235b4a3a' stroke-width='1'/%3E%3Cpath d='M3 2.4h18L12 17z' fill='%23f97316'/%3E%3Cpath d='M27 3.3h18L36 18.5z' fill='%23140a1c'/%3E%3Cpath d='M51 2.4h18L60 17z' fill='%237c3aed'/%3E%3Ccircle cx='12' cy='7.5' r='1.6' fill='%23140a1c'/%3E%3Cpath d='M33.5 7.5h5l-2.5 3z' fill='%23f97316'/%3E%3Ccircle cx='60' cy='7.5' r='1.6' fill='%23ffd36b'/%3E%3C/svg%3E") repeat-x 0 0/72px 20px;pointer-events:none;filter:drop-shadow(0 2px 2px #0003)}
+html[data-halloween=on] .logo-mark{position:relative;background:radial-gradient(circle at 34% 30%,#ffc46b,#f97316 55%,#b23c08);color:#3a1203;border-radius:46%/50%;box-shadow:inset 4px 0 0 -2px #0000002e,inset -4px 0 0 -2px #0000002e,0 0 12px #ff7a1a99;animation:hwArde 3.2s ease-in-out infinite}
+html[data-halloween=on] .logo-mark::after{content:"";position:absolute;top:-4px;left:50%;width:4px;height:6px;margin-left:-1px;border-radius:2px 2px 0 0;background:#4d7c0f;transform:rotate(12deg)}
+@keyframes hwArde{0%,100%{box-shadow:inset 4px 0 0 -2px #0000002e,inset -4px 0 0 -2px #0000002e,0 0 10px #ff7a1a88}45%{box-shadow:inset 4px 0 0 -2px #0000002e,inset -4px 0 0 -2px #0000002e,0 0 18px #ffb347cc}55%{box-shadow:inset 4px 0 0 -2px #0000002e,inset -4px 0 0 -2px #0000002e,0 0 8px #ff7a1a77}}
+html[data-halloween=on] .head-nav a[href="juegos.html"]{text-shadow:0 0 12px #ff7a1a}
+html[data-halloween=on] main{padding-top:36px}
+
+/* ---- Pestañas, botones y acentos: naranja calabaza sobre la noche ---- */
+html[data-halloween=on] .tab.on{background:#241328;color:#ffd2a8;box-shadow:inset 0 -2px 0 var(--hw-nar)}
+html[data-halloween=on] .btn,html[data-halloween=on] .jg-btn{background:linear-gradient(180deg,#d24c0d,#a8360a)}
+html[data-halloween=on] .btn:hover,html[data-halloween=on] .jg-btn:hover{background:linear-gradient(180deg,#b9410b,#8c2c07)}
+html[data-halloween=on] .btn2:hover{border-color:var(--hw-nar2);color:var(--hw-nar2)}
+html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#f8efe9 90%,transparent)}
+html[data-halloween=on] .jg-modos-sel{background:#efe2e6}
+html[data-halloween=on] .jg-sal-intro .jg-eyebrow{color:var(--hw-nar2)}
+html[data-halloween=on] .jg-sal-intro .jg-eyebrow::before{content:"🕸 "}
+html[data-halloween=on] .jg-sal-solo .jg-sal-tit h2::after{content:" 🦇";font-size:.8em}
+html[data-halloween=on] .jg-sal-multi .jg-sal-tit h2::after{content:" 👻";font-size:.8em}
+html[data-halloween=on] .jg-lado-caja{box-shadow:inset 0 3px 0 var(--hw-nar),0 6px 22px #3b1f4f12}
+html[data-halloween=on][data-tema=oscuro] .tab.on{background:#2a1530;color:#ffc58f}
+html[data-halloween=on][data-tema=oscuro] .btn2:hover{border-color:#ff9a4d;color:#ffb070}
+html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#0d0915 86%,transparent)}
+html[data-halloween=on][data-tema=oscuro] .jg-modos-sel{background:#1f1426}
+html[data-halloween=on][data-tema=oscuro] .jg-sal-intro .jg-eyebrow{color:#ff9a4d}
+html[data-halloween=on][data-tema=oscuro] .jg-sal-intro h1{text-shadow:0 0 26px #ff7a1a40}
+html[data-halloween=on][data-tema=oscuro] .jg-lado-caja{box-shadow:inset 0 3px 0 #ff7a1acc,0 8px 26px #0006}
+@media(max-width:720px){
+  html[data-halloween=on]:is([data-vista]) .bar .tab.on{background:#ffedd5;color:var(--hw-nar2);box-shadow:none}
+  html[data-halloween=on][data-tema=oscuro]:is([data-vista]) .bar .tab.on{background:#ff7a1a26;color:#ffb070}
+  html[data-halloween=on] main{padding-top:30px}
+}
+
+/* ---- Las miniaturas: una telaraña en la esquina, el brillo de una
+   vela al pasar, y de cuando en cuando una araña que baja ---- */
+html[data-halloween=on] .jg-mn::after{content:"";position:absolute;top:0;right:0;z-index:1;width:min(64px,28%);aspect-ratio:1;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.5;pointer-events:none;border-top-left-radius:16px}
+html[data-halloween=on] .jg-mn:nth-child(4n+3)::before{content:"";position:absolute;top:0;left:58%;z-index:1;width:14px;height:42px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 60'%3E%3Cpath d='M10 0v42' stroke='%23ffffff' stroke-opacity='.7' stroke-width='.8'/%3E%3Cg fill='none' stroke='%23120a18' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M8 46 3 42 1 45M8 49H2l-1 3M8 51l-4 4M12 46l5-4 2 3M12 49h6l1 3M12 51l4 4'/%3E%3C/g%3E%3Cellipse cx='10' cy='50' rx='3.6' ry='4.4' fill='%23120a18'/%3E%3Ccircle cx='10' cy='44.5' r='2.6' fill='%23120a18'/%3E%3Ccircle cx='9' cy='44.2' r='.6' fill='%23ff7a1a'/%3E%3Ccircle cx='11' cy='44.2' r='.6' fill='%23ff7a1a'/%3E%3C/svg%3E") no-repeat 0 100%/14px 42px;pointer-events:none;transform-origin:top;transition:height .5s cubic-bezier(.3,1.4,.5,1)}
+@media(hover:hover) and (pointer:fine){
+  html[data-halloween=on] .jg-mn:not(.sel):hover{border-color:#ff7a1a99;box-shadow:0 14px 30px #ff7a1a2e,0 0 0 1px #ff7a1a55}
+  html[data-halloween=on] .jg-mn:nth-child(4n+3):hover::before{height:72px}
+  html[data-halloween=on][data-tema=oscuro] .jg-mn:not(.sel):hover{box-shadow:0 14px 34px #ff7a1a26,0 0 0 1px #ff7a1a66}
+}
+
+/* ---- El banner de novedades: telaraña en la esquina y un resplandor ---- */
+html[data-halloween=on] .jg-ban{box-shadow:0 14px 40px #2a1e4426,0 0 0 1px #ff7a1a40,0 0 34px #ff7a1a2a}
+html[data-halloween=on] .jg-ban::after{content:"";position:absolute;top:0;right:0;z-index:2;width:110px;height:110px;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.42;pointer-events:none}
+@media(max-width:720px){html[data-halloween=on] .jg-ban::after{width:76px;height:76px}}
+
+/* ---- La cinta del salón, con la cuenta atrás ---- */
+.jg-hw-cinta{display:none}
+html[data-halloween] .jg-hw-cinta{display:flex;align-items:center;gap:12px;margin:12px 0 2px;padding:9px 10px 9px 9px;border-radius:16px;background:linear-gradient(100deg,#1d0b2a,#34102f 55%,#4a1a08);border:1px solid #ff7a1a59;color:#fde6cf;box-shadow:0 8px 24px #ff7a1a1f;max-width:620px;position:relative;overflow:hidden}
+html[data-halloween] .jg-hw-cinta::after{content:"";position:absolute;right:0;top:0;width:70px;height:70px;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.25;pointer-events:none}
+.jg-hw-calabaza{flex:0 0 auto;width:50px;height:46px;padding:0;border:0;background:none;cursor:pointer;border-radius:12px;transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
+.jg-hw-calabaza:hover{transform:scale(1.1) rotate(-6deg)}.jg-hw-calabaza:active{transform:scale(.94)}
+.jg-hw-calabaza svg{width:100%;height:100%;display:block;overflow:visible}
+.jg-hw-calabaza .hw-piel{fill:#f97316;stroke:#9a3412;stroke-width:1.2}
+.jg-hw-calabaza .hw-gajo{fill:none;stroke:#b4400a;stroke-width:1.3;opacity:.75}
+.jg-hw-calabaza .hw-tallo{fill:#4d7c0f}.jg-hw-calabaza .hw-hoja{fill:#65a30d}
+.jg-hw-calabaza .hw-luz{fill:#ffe08a;filter:drop-shadow(0 0 3px #ffb347);animation:hwVela 1.8s steps(1) infinite}
+@keyframes hwVela{0%,100%{opacity:1}30%{opacity:.75}34%{opacity:1}62%{opacity:.85}66%{opacity:1}}
+.jg-hw-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;position:relative;z-index:1}
+.jg-hw-txt b{font:400 17px/1.15 'Lilita One','IBM Plex Sans',sans-serif;letter-spacing:.02em;color:#ffb070;text-shadow:0 0 14px #ff7a1a80}
+.jg-hw-txt span{font-size:12.5px;color:#e9d6f5}
+.jg-hw-cambia{position:relative;z-index:1;flex:0 0 auto;min-height:34px;padding:0 12px;border-radius:100px;border:1px solid #ffffff2e;background:#ffffff12;color:#fde6cf;font:600 11.5px 'IBM Plex Sans',sans-serif;cursor:pointer}
+.jg-hw-cambia:hover{background:#ffffff24}
+.jg-hw-cambia .hw-no{display:none}
+html[data-halloween=off] .jg-hw-cinta{display:inline-flex;padding:0;border:0;background:none;box-shadow:none;margin:10px 0 0}
+html[data-halloween=off] .jg-hw-cinta::after,html[data-halloween=off] .jg-hw-calabaza,html[data-halloween=off] .jg-hw-txt,html[data-halloween=off] .jg-hw-cambia .hw-si{display:none}
+html[data-halloween=off] .jg-hw-cambia .hw-no{display:inline}
+html[data-halloween=off] .jg-hw-cambia{border-color:#f9731666;background:#f973161a;color:#9a3412}
+html[data-halloween=off][data-tema=oscuro] .jg-hw-cambia{color:#ffb070}
+@media(max-width:420px){
+  html[data-halloween=on] .jg-hw-cinta{flex-wrap:wrap}
+  html[data-halloween=on] .jg-hw-txt{flex-basis:calc(100% - 62px)}
+  html[data-halloween=on] .jg-hw-cambia{margin-left:62px;min-height:30px}
+}
+
+/* ---- Las capas de decorado ---- */
+.jg-hw,.jg-hw-fondo{display:none}
+html[data-halloween=on]:is(:not([data-vista]),[data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil]):not(.jg-inm) :is(.jg-hw,.jg-hw-fondo){display:block}
+.jg-hw-fondo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.jg-hw{position:fixed;inset:0;z-index:14;pointer-events:none;overflow:hidden}
+
+/* La luna con sus cráteres, arriba a la derecha. */
+.hw-luna{position:absolute;right:6vw;top:96px;width:clamp(70px,11vw,150px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 36%,#fff8e1,#fde7b0 55%,#f4c96b);box-shadow:0 0 50px #ffd88a66,0 0 120px #ffb34733;opacity:.55}
+.hw-luna i{position:absolute;border-radius:50%;background:#e9c27a66}
+.hw-luna i:nth-child(1){left:22%;top:30%;width:18%;height:18%}.hw-luna i:nth-child(2){left:58%;top:52%;width:12%;height:12%}.hw-luna i:nth-child(3){left:40%;top:68%;width:9%;height:9%}
+html[data-tema=oscuro] .hw-luna{opacity:.9}
+/* Estrellas que titilan: solo en el tema oscuro, de día no se ven. */
+.hw-cielo{position:absolute;inset:0 0 40%;display:none}
+html[data-tema=oscuro] .hw-cielo{display:block}
+.hw-cielo i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.6;animation:hwTitila var(--t) ease-in-out var(--r) infinite alternate}
+@keyframes hwTitila{to{opacity:.12}}
+/* El cementerio y la casa embrujada, contra el borde de abajo. */
+.hw-cem{position:absolute;left:0;right:0;bottom:0;width:100%;height:clamp(120px,24vh,230px)}
+.hw-cem .hw-colina2{fill:#3b1f4f;opacity:.07}
+.hw-cem .hw-silueta{fill:#2a1638;opacity:.16}
+.hw-cem .hw-ventanas{fill:#f97316;opacity:.35}
+.hw-cem .hw-calabazas{fill:#f97316;opacity:.45}
+.hw-cem .hw-caras{fill:#2a1638;opacity:.5}
+html[data-tema=oscuro] .hw-cem .hw-colina2{fill:#2b1640;opacity:.55}
+html[data-tema=oscuro] .hw-cem .hw-silueta{fill:#05030a;opacity:.92}
+html[data-tema=oscuro] .hw-cem .hw-ventanas{fill:#ffb347;opacity:.9;filter:drop-shadow(0 0 6px #ff7a1a);animation:hwVentana 5s steps(1) infinite}
+html[data-tema=oscuro] .hw-cem .hw-calabazas{fill:#f97316;opacity:.85}
+html[data-tema=oscuro] .hw-cem .hw-caras{fill:#ffe08a;opacity:.95}
+@keyframes hwVentana{0%,100%{opacity:.9}48%{opacity:.4}52%{opacity:.9}80%{opacity:.7}}
+/* La niebla que se arrastra por el suelo. */
+.hw-niebla{position:absolute;left:0;right:0;bottom:0;height:22vh}
+.hw-niebla i{position:absolute;bottom:-6vh;left:-50%;width:200%;height:100%;background:radial-gradient(ellipse 22% 60% at 20% 70%,#ffffffb0,#fff0 70%),radial-gradient(ellipse 18% 50% at 55% 80%,#ffffff90,#fff0 70%),radial-gradient(ellipse 24% 55% at 85% 75%,#ffffffa0,#fff0 70%);opacity:.55;animation:hwNiebla 48s linear infinite}
+.hw-niebla i+i{bottom:-10vh;opacity:.4;animation-duration:70s;animation-direction:reverse}
+html[data-tema=oscuro] .hw-niebla i{background:radial-gradient(ellipse 22% 60% at 20% 70%,#a78bfa38,#a78bfa00 70%),radial-gradient(ellipse 18% 50% at 55% 80%,#c4b5fd2a,#c4b5fd00 70%),radial-gradient(ellipse 24% 55% at 85% 75%,#a78bfa30,#a78bfa00 70%);opacity:1}
+@keyframes hwNiebla{to{transform:translateX(25%)}}
+
+/* Murciélagos: cruzan la pantalla a distintas alturas, subiendo y
+   bajando, y baten las alas. */
+.hw-murc{position:absolute;left:0;top:var(--y);width:calc(52px * var(--s));animation:hwVuela var(--d) linear var(--r) infinite}
+.hw-murc:nth-child(2n){animation-direction:reverse}
+.hw-murc-v{animation:hwOndea 2.4s ease-in-out infinite alternate}
+.hw-murc svg{display:block;width:100%;fill:#2a1638;opacity:.7;overflow:visible}
+.hw-murc .hw-ala{transform-origin:32px 14px;animation:hwAletea .26s ease-in-out infinite alternate}
+.hw-murc .hw-ojo{fill:#ff8a2a}
+html[data-tema=oscuro] .hw-murc svg{fill:#04020a;opacity:.95;filter:drop-shadow(0 0 6px #a78bfa55)}
+@keyframes hwVuela{from{transform:translateX(-14vw)}to{transform:translateX(114vw)}}
+@keyframes hwOndea{from{transform:translateY(-16px) rotate(-6deg)}to{transform:translateY(18px) rotate(5deg)}}
+@keyframes hwAletea{from{transform:scaleY(1)}to{transform:scaleY(.3)}}
+
+/* Dos fantasmas que se asoman desde los bordes y se vuelven a esconder. */
+.hw-fant{position:absolute;width:66px;opacity:0}
+.hw-fant svg{display:block;width:100%;overflow:visible}
+.hw-fant .hw-sabana{fill:#fff;stroke:#3b1f4f22;stroke-width:1}
+.hw-fant .hw-cara{fill:#2a1638}
+.hw-fant .hw-rubor{fill:#f9a8d4;opacity:.7}
+html[data-tema=oscuro] .hw-fant svg{filter:drop-shadow(0 0 14px #c4b5fdaa)}
+.hw-fant-i{left:0;top:46vh;animation:hwAsomaI 17s ease-in-out -3s infinite}
+.hw-fant-d{right:0;top:30vh;animation:hwAsomaD 23s ease-in-out -12s infinite}
+@keyframes hwAsomaI{0%,62%,100%{opacity:0;transform:translateX(-110%) rotate(0)}70%,86%{opacity:.92;transform:translateX(-28%) rotate(10deg)}78%{transform:translateX(-24%) translateY(-10px) rotate(14deg)}}
+@keyframes hwAsomaD{0%,58%,100%{opacity:0;transform:translateX(110%) rotate(0)}66%,84%{opacity:.92;transform:translateX(28%) rotate(-10deg)}75%{transform:translateX(24%) translateY(-12px) rotate(-14deg)}}
+/* La araña que baja de su hilo y vuelve a subir. */
+.hw-arana{position:absolute;top:0;right:24%;width:26px;animation:hwBaja 11s ease-in-out infinite}
+.hw-arana svg{display:block;width:100%;fill:#1b0f24;stroke:#1b0f24;overflow:visible}
+.hw-arana .hw-ojo{fill:#ff7a1a;stroke:none}
+.hw-arana .hw-patas{animation:hwPatas .5s ease-in-out infinite alternate;transform-origin:20px 22px}
+.hw-hilo{position:absolute;bottom:60%;left:50%;width:1px;height:100vh;background:linear-gradient(#3b1f4f00,#3b1f4f88)}
+html[data-tema=oscuro] .hw-hilo{background:linear-gradient(#fff0,#ffffff88)}
+html[data-tema=oscuro] .hw-arana svg{fill:#0a0610;stroke:#0a0610;filter:drop-shadow(0 0 4px #c4b5fd88)}
+@keyframes hwBaja{0%,100%{transform:translateY(-60px)}35%,55%{transform:translateY(150px)}45%{transform:translateY(140px)}}
+@keyframes hwPatas{to{transform:scaleX(.88)}}
+/* Telarañas en las esquinas de abajo (en el teléfono abajo va la barra). */
+.hw-tela{position:absolute;bottom:0;width:120px;height:120px;background:var(--hw-tela-o) no-repeat 0 0/contain;opacity:.7}
+html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
+.hw-tela-i{left:0;transform:scaleY(-1)}.hw-tela-d{right:0;transform:scale(-1,-1)}
+@media(max-width:720px){
+  .hw-tela,.hw-fant-d,.hw-murc:nth-child(n+4){display:none}
+  .hw-fant{width:50px}.hw-arana{right:auto;left:24%;width:22px}
+  .hw-luna{top:120px}
+  /* Abajo va la barra de pestañas: el cementerio se asoma por encima. */
+  .hw-cem{height:150px;bottom:calc(64px + env(safe-area-inset-bottom))}
+  .hw-niebla{bottom:calc(40px + env(safe-area-inset-bottom))}
+}
+/* Con los rieles de la pantalla ancha, la araña cuelga entre el salón y el chat. */
+@media(min-width:1400px){html.jg-rieles .hw-arana{right:calc(var(--riel,0px) + 40px)}}
+
+/* El fantasma «¡Bu!» de la calabaza. */
+.hw-bu{position:fixed;left:0;top:34vh;z-index:94;width:110px;pointer-events:none;animation:hwBu 2.4s cubic-bezier(.45,0,.4,1) forwards}
+.hw-bu svg{display:block;width:100%;overflow:visible;filter:drop-shadow(0 8px 20px #3b1f4f55)}
+.hw-bu .hw-sabana{fill:#fff}.hw-bu .hw-cara{fill:#2a1638}.hw-bu .hw-rubor{fill:#f9a8d4}
+.hw-bu b{position:absolute;right:-34px;top:-14px;padding:5px 11px;border-radius:14px;background:#140a1c;color:#ffb070;font:400 20px/1 'Lilita One',sans-serif;box-shadow:0 4px 14px #0005}
+@keyframes hwBu{0%{transform:translate(-130px,20px) scale(.6) rotate(-8deg);opacity:0}15%{opacity:1}45%{transform:translate(42vw,-40px) scale(1.25) rotate(6deg)}60%{transform:translate(52vw,-30px) scale(1.3) rotate(-4deg)}100%{transform:translate(110vw,-120px) scale(.7) rotate(12deg);opacity:0}}
+
+@media(prefers-reduced-motion:reduce){
+  html[data-halloween=on] .jg-hw{display:none!important}
+  html[data-halloween=on] .logo-mark,.jg-hw-fondo *,.jg-hw-calabaza .hw-luz{animation:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -5792,6 +6005,6 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610190449"></script>
+<script src="juegos-app.js?v=202610190517"></script>
 </body>
 </html>

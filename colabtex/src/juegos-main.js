@@ -104,6 +104,7 @@ import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./jue
 import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
+import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -2080,6 +2081,7 @@ function armazon() {
         <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
         <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : ""}?</h1>
         <p>Juegos para ti solo, sin esperar a nadie, y juegos para jugar con otros en línea.</p>
+        ${halloweenHtml()}
       </header>
       <nav class="jg-modos" aria-label="Qué juegos mostrar">
         <div class="jg-modos-sel" role="group" aria-label="Modo de juego">
@@ -3445,6 +3447,7 @@ function wireTema() {
 
 function wire() {
   wireTema();
+  montaHalloween();
   wireInmersivo();
   /* Iniciar sesión está a la vista en todas partes mientras se es
      invitado: la cabecera, la barra de modo del salón, la barra de un
