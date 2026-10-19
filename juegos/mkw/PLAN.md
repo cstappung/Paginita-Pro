@@ -364,6 +364,11 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-19 17:45** — **La sala nueva probada en la página de Juegos de esta PC** (§73.8). `prueba-experiencia`
+  (el `jugar.bat`) recorre ahora la sala sin Retro WFC con dos cuentas: vestíbulo «2 de 4» → la anfitriona arma la copa
+  con el selector → cada uno elige en el juego → la carrera 1 directo, parejos y con una vista cada uno (16/17; con el
+  cupo arreglado `--rapida` 10/10). Encontró dos cosas: el bundle `juegos-app.js` era el de §72 (rearmado) y la sala
+  quedaba de 2 (nueva opción «Pilotos», 4 por omisión). Banco 26/26. Commits locales, sin push.
 - **2026-10-19 17:24** — **La sala sin Retro WFC, con todos largando juntos y una sola vista por consola** (§73; M12–M14, M9, C1).
   Pedido del dueño: nada del Wi-Fi del juego; vestíbulo de la página → la anfitriona elige la copa con el selector de
   la página → cada uno elige personaje y vehículo en el juego → carrera, y que todos empiecen al mismo tiempo. Hecho:

@@ -554,6 +554,8 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Interbloqueo (deadlock)** | Dos partes esperándose mutuamente para siempre. Aquí: la anfitriona saltó a la carrera 2 y dejó de mandar botones de la 1; la otra consola, un cuadro atrás, esperaba esos botones con el juego detenido, y con el juego detenido no podía saltar a la 2. Como dos relés que se mantienen abiertos uno al otro. |
 | **Salida de la carrera (cuadros sin esperar)** | El arreglo del interbloqueo: cuando la página pasa a la carrera siguiente, el lockstep suelta la espera y los últimos cuadros que el juego corra de la carrera vieja van sin esperar a nadie y con todos quietos (ya no importan: nadie más los corre). La carrera nueva empieza cuando el contador de cuadros vuelve a cero. |
 | **Largada pareja** | Que todos empiecen la carrera en el mismo instante aunque uno cargue la pista antes. Con el lockstep sale solo: ninguna consola avanza un cuadro sin los botones de todas, así que la que llegó primero queda quieta en el primer cuadro (con el aviso «Esperando a que el jugador 2 termine de cargar la pista…») hasta que llega la última. |
+| **Bundle (`juegos-app.js`)** | El archivo único que la página de Juegos carga de verdad: todos los `.js` de `colabtex/src` pegados y comprimidos por `esbuild`. Cambiar `src/` no cambia lo que ve el navegador hasta que se vuelve a armar el bundle. Como un plano corregido que no sirve mientras no se imprima la copia que usa el electricista en la obra. |
+| **Cupo de la sala** | Cuántas personas caben en una sala del sitio. Se elige al crearla («Pilotos: 2, 3 o 4»); si no se elige, el sitio pone el mínimo (2). Como el número de enchufes de una zapatilla: si viene de 2, el tercero no tiene dónde conectarse aunque el juego admita 4. |
 
 ## 2026-10-16 · Día 1
 
@@ -4630,6 +4632,36 @@ Queda además una guarda en `CtrlRaceNameBalloon::UpdatePosition` (no actualiza 
   sincronizada con los primeros 4; si el anfitrión se va, siguen. Caben 4 (`cupo: 4`).
 - Vestíbulo, opciones al crear la sala y manual: sin Retro WFC ni «CPU de relleno».
 
+### 8. Probado en la página de Juegos de esta PC (el `jugar.bat`)
+
+**Qué se hizo.** `herramientas/prueba-experiencia.mjs` (la prueba del `jugar.bat`: emuladores de Firebase con las
+reglas del sitio, cuentas de mentira, el Worker de verdad) recorría el flujo viejo (sala con CPU, «2 de 12», el juego
+llegando solo a la carrera). Ahora recorre la sala nueva como dos personas en dos computadores:
+
+1. Piloto Uno abre la sala (copa) y Piloto Dos entra con el enlace: «2 de 4».
+2. «¡A correr!»: el juego de los dos se abre con `modo=sala`, la misma semilla y Piloto Uno de anfitriona.
+3. La anfitriona ve el selector de copa de la página y Piloto Dos «El anfitrión está eligiendo la copa…»; el juego de
+   los dos ya está en la pantalla de personaje (sección 0x49), sin título ni licencias. La anfitriona arma la copa.
+4. Cada uno elige personaje y vehículo con las teclas, dentro del marco del juego (la prueba le da el foco al marco,
+   como el clic de una persona).
+5. La carrera 1 abre directo en los dos, los dos como jugadores de verdad, cada uno con su pantalla; la misma carrera
+   (huellas iguales) y en la foto del marco de cada uno una sola vista.
+
+**Dos cosas que encontró.**
+
+- **El sitio mostraba el vestíbulo viejo** («Retro WFC», «1 de 2», VR): la página carga el **bundle** `juegos-app.js`,
+  no `colabtex/src`, y el bundle era el de §72. Se vuelve a armar solo él:
+  `npx esbuild src/juegos-main.js --bundle --minify --format=iife --target=es2020 --outfile=../juegos-app.js` (en
+  `colabtex/`). No se usa `npm run build` entero: además sella `?v=` en todas las páginas del sitio, cambios que no son
+  de Mario Kart.
+- **La sala quedaba de 2**: al crearla no había opción de cupo, y entonces el sitio pone el mínimo (`cupoDe`: 2). Un
+  tercer amigo no habría podido entrar. Ahora la sala tiene la opción **«Pilotos» (2, 3 o 4; 4 por omisión)** en
+  `juegos-main.js`, con su prueba en `mkw.test`.
+
+**Resultado.** 16 de 17 en la primera pasada (solo el «2 de 2»); con el cupo arreglado, `--rapida` **10/10** («2 de
+4»). En las fotos: Mario en la pestaña de Piloto Uno, Luigi en la de Piloto Dos, una vista cada una, y el kart del otro
+visible en la pista.
+
 ### Trampas
 
 - **`InvokeDirectCpu` necesita `abi_bridge.h`**: sin el include, la compilación falló y la prueba corrió con el `.wasm`
@@ -4646,6 +4678,10 @@ Queda además una guarda en `CtrlRaceNameBalloon::UpdatePosition` (no actualiza 
   función del juego original o antes del final de la de RR no dura.
 - **Una prueba del sitio falla en Windows por las barras** (`controles.test`, worms.js con `\` contra `/`): no es de
   Mario Kart, viene de antes.
+- **Cambiar `colabtex/src` no cambia el sitio** hasta volver a armar `juegos-app.js` (ver 8). Las pruebas de
+  `colabtex/tests` leen `src/` y pasan igual: solo la prueba con el navegador lo nota.
+- **Las teclas van a la ventana que tiene el foco**: en el sitio el juego está en un marco; sin darle el foco al marco,
+  las teclas de la prueba le llegan a la página de Juegos y el juego no se entera.
 
 ### Pruebas
 
@@ -4660,12 +4696,17 @@ Queda además una guarda en `CtrlRaceNameBalloon::UpdatePosition` (no actualiza 
   directo en la pantalla de personaje, las dos eligen en el juego, la carrera 1 con la pista 1 de la copa, cada una con
   su pantalla y su kart con lo que eligió, huellas iguales, la carrera 2 sola después de los resultados y la misma en
   las dos, la tabla al final, ningún aviso encima de la carrera, una sola vista en cada foto, sin errores de JavaScript).
-- Sitio: `mkw.test` **16/16**; Juegos entero 977/978 (la que falla es la de las barras de Windows).
+- Sitio: `mkw.test` **16/16** (con la opción «Pilotos»), `juegos.test` + `mkw-worker.test` 27/27; Juegos entero 977/978
+  (la que falla es la de las barras de Windows).
+- `prueba-experiencia` (el `jugar.bat` de punta a punta, ver 8): **16/17** antes de arreglar el cupo y `--rapida` **10/10**
+  después. Banco entero **26/26** (la prueba vieja de `directo` ahora dice el contrato nuevo: la página pide el salto
+  enseguida y el que espera la partida guardada es el juego).
 
 ```bash
 node banco/correr.mjs sala-carrera lockstep
 node web/navegador/prueba-directa.mjs --elegir
 node web/navegador/prueba-sincro.mjs --directa --datos=build/web/datos/sincro-directa
 node web/navegador/prueba-sala.mjs
+node herramientas/prueba-experiencia.mjs
 cd terceros/Paginita-Pro/colabtex && node --test tests/mkw.test.cjs
 ```

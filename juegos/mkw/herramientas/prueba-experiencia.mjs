@@ -10,11 +10,13 @@
 //     Worker con el token del emulador, re-firmado, y el correo en la lista AMIGOS); Single Player → el menú «Un
 //     jugador» del juego (0x69); las partidas conectadas con la nube (Storage del emulador);
 //   - B hasta el título: vuelve el menú; Multiplayer → Online → Juegos abre la ficha de la sala de Mario Kart;
-//   - Piloto Uno abre la sala (CPU normal), Piloto Dos entra con el enlace: los dos en el vestíbulo;
+//   - Piloto Uno abre la sala (copa, hasta 4 pilotos), Piloto Dos entra con el enlace: los dos en el vestíbulo;
 //   - Intruso (no es amigo): sin Mario Kart en el catálogo, «Este juego es privado» y «Esta sala es privada»;
-//   - «¡A correr!»: los dos juegos llegan solos a la carrera de la copa con CPU, sincronizados (las huellas coinciden):
-//     el buzón de la red pasa por la base del emulador con las reglas del sitio.
-// Fotos en build/web/datos/experiencia/. Tarda ~5-8 min (la carrera con dos juegos en el mismo PC).
+//   - «¡A correr!» (§73, la sala sin Retro WFC): el juego de los dos se abre en la sala (modo=sala); la anfitriona arma
+//     la copa con el selector de la página y Piloto Dos ve «El anfitrión está eligiendo la copa…»; cada uno elige
+//     personaje y vehículo con las pantallas del juego; la carrera 1 abre directo en los dos, cada uno con SU
+//     pantalla, sincronizados (las huellas coinciden): el buzón de la red pasa por la base del emulador con las reglas.
+// Fotos en build/web/datos/experiencia/. Tarda ~6-9 min (la carrera con dos juegos en el mismo PC).
 //
 // Uso:  node herramientas/prueba-experiencia.mjs [--ventana] [--rapida] [--ya]
 //       --rapida: sin la carrera (~2 min).  --ya: usa un ensayo que ya está corriendo en 8154 (no arranca otro).
@@ -23,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { pantallaPartida } from '../web/navegador/foto-pantalla.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -148,12 +151,12 @@ try {
      !!m?.visible && JSON.stringify(opciones) === '["local","salas","volver"]' && ficha, `menú ${m?.visible}, ${opciones.join('/')}, ficha ${ficha}`);
   await foto(uno, '5-ficha-sala.png');
 
-  // la sala: Piloto Uno la abre (12 pilotos, CPU normal)
+  // la sala: Piloto Uno la abre (copa, hasta 4 pilotos)
   await uno.locator('.jg-hoja-ya[data-f=sala]').click();
   await uno.waitForFunction(() => /#p\//.test(location.hash) && document.querySelector('.jg-mkw-empieza'), null, { timeout: 20000 }).catch(() => {});
   const enlace = uno.url();
   const vUno = (await uno.textContent('.jg-mkw-vest').catch(() => '')).replace(/\s+/g, ' ');
-  ok('Piloto Uno abre la sala de Mario Kart (con CPU): el vestíbulo y «¡A correr!»', /#p\//.test(enlace) && /Piloto Uno/.test(vUno) && /¡A correr!/.test(vUno), vUno.slice(0, 90));
+  ok('Piloto Uno abre la sala de Mario Kart (copa): el vestíbulo y «¡A correr!»', /#p\//.test(enlace) && /Piloto Uno/.test(vUno) && /¡A correr!/.test(vUno), vUno.slice(0, 90));
 
   // Piloto Dos (otro PC) entra con el enlace
   const dos = await pc('Piloto Dos');
@@ -161,8 +164,8 @@ try {
   await dos.goto(enlace);
   await dos.getByRole('button', { name: /Unirse a la partida/ }).click({ timeout: 20000 });
   const v2 = await hastaQue(async () => [await uno.textContent('.jg-mkw-vest'), await dos.textContent('.jg-mkw-vest')].map(t => t.replace(/\s+/g, ' ')),
-    ([a, b]) => /2 de 12/.test(a) && /2 de 12/.test(b) && /Piloto Dos/.test(a), 20000);
-  ok('Piloto Dos entra con el enlace: los dos en el vestíbulo («2 de 12»)', !!v2 && /2 de 12/.test(v2[0]) && /2 de 12/.test(v2[1]) && /Piloto Dos/.test(v2[0]),
+    ([a, b]) => /2 de 4/.test(a) && /2 de 4/.test(b) && /Piloto Dos/.test(a), 20000);
+  ok('Piloto Dos entra con el enlace: los dos en el vestíbulo («2 de 4»)', !!v2 && /2 de 4/.test(v2[0]) && /2 de 4/.test(v2[1]) && /Piloto Dos/.test(v2[0]),
      v2 && v2[1].slice(0, 90));
   await foto(dos, '6-vestibulo-dos.png');
 
@@ -181,24 +184,77 @@ try {
   await intruso.context().close();
 
   if (!args.includes('--rapida')) {
-    // «¡A correr!»: la copa con CPU, los dos juegos sincronizados por el buzón de la base (emulador, reglas del sitio)
+    // «¡A correr!» (§73): el juego de los dos se abre en la sala (modo=sala), sin nada del Wi-Fi del juego
     await uno.locator('.jg-mkw-empieza').click();
-    const conSala = u => /[?&]sala=/.test(u);
-    const [mA, mB] = await Promise.all([hastaMarco(uno, conSala, 30000), hastaMarco(dos, conSala, 30000)]);
-    ok('«¡A correr!»: el juego se abre en la sala de los dos', !!mA && !!mB, mA ? new URL(mA.url()).searchParams.get('modo') : '');
+    const enSala = u => new URL(u).searchParams.get('modo') === 'sala';
+    const [mA, mB] = await Promise.all([hastaMarco(uno, enSala, 30000), hastaMarco(dos, enSala, 30000)]);
+    const qA = mA && new URL(mA.url()).searchParams, qB = mB && new URL(mB.url()).searchParams;
+    ok('«¡A correr!»: el juego se abre en la sala de los dos (modo=sala, la misma semilla, anfitriona Piloto Uno)',
+       !!mA && !!mB && qA.get('semilla') === qB.get('semilla') && qA.get('jefe') === qB.get('jefe') && qA.get('jefe') === qA.get('uid'),
+       mA ? `${qA.get('estilo')}, ${qA.get('carreras')} carreras, ${qA.get('cc')}` : '');
+    // lo que interesa del juego en cada marco (como prueba-sala.mjs)
     const leer = f => Promise.race([espera(10000).then(() => null), f.evaluate(() => {
-      const e = window.mkwMenus?.estado?.(); if (!e) return null;
-      return { s: e.seccion, ls: window.mkwSincro?.lockstep?.estado() || null };
+      const L = window.mkwMenus, e = L?.estado?.(); if (!e) return null;
+      const esc = L.u32(0x809BD728) + 0x20;
+      const aviso = document.getElementById('avisoJuego');
+      return { s: e.seccion, pagina: e.pagina, ls: window.mkwSincro?.lockstep?.estado() || null, sala: window.mkwEstado?.sala || null,
+        eleccion: window.mkwEstado?.eleccion || null, carrera: window.mkwEstado?.piloto?.carrera,
+        picker: !!document.getElementById('elegirPista'), aviso: aviso && !aviso.hidden ? aviso.textContent : '',
+        tipos: [0, 1, 2].map(i => L.u32(esc + 8 + i * 0xF0 + 0x10)), pantalla: L.u8(esc + 0xB64),
+        cortina: !document.body.classList.contains('sin-cortina') };
     })]).catch(() => null);
-    const t0 = Date.now(), llego = {};
-    for (const limite = Date.now() + 6 * 60000; Date.now() < limite && !(llego.A && llego.B); await espera(1000)) {
-      for (const [n, f] of [['A', mA], ['B', mB]]) { const x = f && await leer(f); if (x?.s === 0x20 && !llego[n]) { llego[n] = Date.now(); console.log(`  ${n}: en la carrera a los ${((Date.now() - t0) / 1000).toFixed(0)} s`); } }
-    }
-    ok('los dos llegan solos a la carrera de la copa (sección 0x20)', !!(llego.A && llego.B));
-    await foto(uno, '8-carrera-uno.png'); await foto(dos, '8-carrera-dos.png');
-    const x = await hastaQue(async () => [await leer(mA), await leer(mB)], ([a, b]) => (a?.ls?.huellasIguales || 0) >= 3 && (b?.ls?.cuadro || 0) > 300, 90000, 2000);
+    const esperarQue = async (f, cond, tope) => { for (const hasta = Date.now() + tope; Date.now() < hasta; await espera(500)) { const x = await leer(f); if (x && cond(x)) return x; } return await leer(f); };
+    // las teclas van al marco del juego: se le da el foco (como el clic de una persona en el juego)
+    const foco = async f => { const el = await f.frameElement().catch(() => null); await el?.focus().catch(() => {}); await f.evaluate(() => window.focus()).catch(() => {}); };
+    const tecla = async (p, t, ms = 150) => { await p.keyboard.down(t); await espera(ms); await p.keyboard.up(t); };
+
+    // 1) la copa: la anfitriona ve el selector de la página, Piloto Dos el aviso
+    const a1 = mA && await esperarQue(mA, x => x.picker, 60000);
+    const b1 = mB && await esperarQue(mB, x => /eligiendo la copa/.test(x.aviso), 60000);
+    ok('la anfitriona ve el selector de copa de la página y Piloto Dos «El anfitrión está eligiendo la copa…»', !!a1?.picker && /eligiendo la copa/.test(b1?.aviso || ''), b1?.aviso || '');
+    const [a2, b2] = [mA && await esperarQue(mA, x => x.s === 0x49 && !x.cortina, 120000), mB && await esperarQue(mB, x => x.s === 0x49 && !x.cortina, 60000)];
+    ok('el juego de los dos arrancó directo en la pantalla de personaje (sección 0x49), sin el título ni las licencias',
+       [a2, b2].every(x => x?.s === 0x49 && x.pagina === 0x6B), `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
+    await foto(uno, '8-copa-uno.png'); await foto(dos, '8-espera-dos.png');
+    await mA.click('#copaAzar');
+    await espera(300);
+    await mA.locator('#elegirPista .tu-copa button', { hasText: 'Confirmar' }).click();
+
+    // 2) cada uno elige personaje, vehículo y derrape con las pantallas del juego (Piloto Dos, antes, uno a la derecha)
+    const elegir = async (p, f, derecha) => {
+      let visto = false, ultimo = 0;
+      for (const hasta = Date.now() + 90000; Date.now() < hasta; await espera(300)) {
+        const x = await leer(f);
+        if (x?.eleccion) return x;
+        if (x && !x.cortina && [0x6B, 0x6C, 0x10E, 0x6D].includes(x.pagina)) {
+          if (!visto && x.pagina === 0x6B) { visto = true; await foco(f); await espera(700); if (derecha) { await tecla(p, 'KeyD'); await espera(400); } }
+          if (Date.now() - ultimo > 1200) { ultimo = Date.now(); await foco(f); await tecla(p, 'KeyK'); }
+        }
+      }
+      return await leer(f);
+    };
+    const [ea, eb] = await Promise.all([elegir(uno, mA, false), elegir(dos, mB, true)]);
+    ok('los dos eligieron personaje y vehículo con las pantallas del juego (otro personaje cada uno)',
+       !!(ea?.eleccion && eb?.eleccion) && ea.eleccion.personaje !== eb.eleccion.personaje, `A ${JSON.stringify(ea?.eleccion)} · B ${JSON.stringify(eb?.eleccion)}`);
+
+    // 3) la carrera 1: directo en los dos, cada uno con su pantalla, la misma carrera
+    const enCarrera = x => x?.s === 0x20 && x.carrera === 1 && !x.cortina;
+    const t0 = Date.now();
+    const [ra, rb] = [await esperarQue(mA, enCarrera, 180000), await esperarQue(mB, enCarrera, 60000)];
+    ok('la carrera 1 abrió directo en los dos (sección 0x20), los dos como jugadores de verdad y cada uno con SU pantalla',
+       enCarrera(ra) && enCarrera(rb) && [ra, rb].every(x => x.tipos[0] === 0 && x.tipos[1] === 0 && x.tipos[2] === 1) && ra.pantalla === 0 && rb.pantalla === 1,
+       `A ${hex(ra?.s)} tipos ${ra?.tipos} pantalla ${ra?.pantalla} · B ${hex(rb?.s)} pantalla ${rb?.pantalla} (a los ${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+    await foco(mA); await uno.keyboard.down('KeyK'); await foco(mB); await dos.keyboard.down('KeyK');
+    const x = await hastaQue(async () => [await leer(mA), await leer(mB)], ([a, b]) => (a?.ls?.huellasIguales || 0) >= 3 && (b?.ls?.cuadro || 0) > 600, 120000, 2000);
+    // (la foto del marco del juego solo: el detector busca la costura a media altura de la imagen del juego)
+    const fotoMarco = async (f, nombre) => (await f.frameElement().catch(() => null))?.screenshot({ path: path.join(carpeta, nombre) }).catch(() => null);
+    const [va, vb] = [await fotoMarco(mA, '9-carrera-uno.png'), await fotoMarco(mB, '9-carrera-dos.png')];
+    const [pa, pb] = [va && await pantallaPartida(uno, va), vb && await pantallaPartida(dos, vb)];
+    await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
     ok('la misma carrera en los dos: las huellas coinciden y ninguno se separó', (x?.[0]?.ls?.huellasIguales || 0) >= 3 && !x?.[0]?.ls?.desincronizado && !x?.[1]?.ls?.desincronizado,
        `huellas iguales ${x?.[0]?.ls?.huellasIguales}, cuadro A ${x?.[0]?.ls?.cuadro}, B ${x?.[1]?.ls?.cuadro}`);
+    ok('en la página de cada uno se ve UNA vista (la de su kart), no la pantalla partida', pa && pb && !pa.partida && !pb.partida && !pa.vacia && !pb.vacia,
+       `costura en el medio: A ${pa?.pico} (típico ${pa?.tipico}), B ${pb?.pico} (típico ${pb?.tipico})`);
   }
   codigo = mal ? 1 : 0;
 } catch (e) {

@@ -20,6 +20,10 @@ test('caben 4 (cada piloto es un jugador de verdad en todas las consolas) y se a
  assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);assert.equal(M.cupoDe({juego:'mkw',cupo:12}),4,'una sala vieja de 12 se recorta a 4');
  const e=M.reducir({...sala(),jugadores:{a:{nombre:'Ana',orden:0}}});
  assert.equal(e.fase,'vestibulo','uno solo ya tiene vestíbulo');
+ // al crearla, la sala pide sus 4 pilotos (sin la opción, cupoDe la dejaba en 2 y el tercero no podía entrar)
+ const opciones=fs.readFileSync(raiz('src/juegos-main.js'),'utf8').match(/^  mkw: \[([\s\S]*?)\]\s*\}\],?$/m);
+ assert.ok(opciones&&/clave: "cupo", etiqueta: "Pilotos", por: 4, valores: cupos\("mkw"\)/.test(opciones[1]),'la opción Pilotos con 4 por omisión');
+ assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);
 });
 
 test('el anfitrión pone la CPU de relleno, abre y cierra las carreras; los demás no',()=>{

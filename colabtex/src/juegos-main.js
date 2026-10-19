@@ -250,7 +250,8 @@ const OPCIONES = {
      modos»): copa o playlist (redMkw: MKW_MODOS), sin el Wi-Fi del juego. Caben 4 (cada piloto es un jugador de
      verdad en todas las consolas; la CPU completa los 12). Se guarda como `estilo` (las reglas de Firebase reservan
      `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige carreras y cilindrada. */
-  mkw: [{ clave: "estilo", etiqueta: "Modo", por: "copa", valores: [
+  mkw: [{ clave: "cupo", etiqueta: "Pilotos", por: 4, valores: cupos("mkw") },   // sin esto la sala quedaba de 2 (cupoDe)
+    { clave: "estilo", etiqueta: "Modo", por: "copa", valores: [
       { v: "copa", t: "Modo copa (N carreras con puntos)" }, { v: "playlist", t: "Modo playlist (una cola de pistas)" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
