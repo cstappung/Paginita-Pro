@@ -9,7 +9,7 @@
       if (!m || !m.yo) return;
       if (!listo) { try { B.inmortal(true); B.armas(); listo = true; } catch (e) { return; } }
       const K = B.teclas, yo = m.yo; t++;
-      if (t % 30 === 0) { iw = (iw + 1) % ARMAS.length; try { B.elige(ARMAS[iw]); } catch (e) {} }
+      if (t % 30 === 0) { iw = (iw + 1) % ARMAS.length; const o = { code: 'Digit' + (ARMAS[iw] + 1), key: String(ARMAS[iw] + 1), bubbles: true }; document.dispatchEvent(new KeyboardEvent('keydown', o)); document.dispatchEvent(new KeyboardEvent('keyup', o)); }
       ['KeyW', 'KeyA', 'KeyS', 'KeyD'].forEach(k => K.delete(k));
       let best = null, bd = 1e9;
       for (const e of m.E) { const d = Math.hypot(e.x - yo.x, e.y - yo.y); if (d < bd) { bd = d; best = e; } }

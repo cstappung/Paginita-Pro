@@ -133,7 +133,7 @@ function rotulo(nombre, etiqueta, t, t0, t1, color, o = {}) {
 /* ---------- LA LÍNEA DE TIEMPO (v2, 84 s) ----------
    Puntos de cada toma que se ajustan mirando los clips (segundos dentro del clip). */
 const P = window.PUNTOS || {
-  avionDesde: 0, avion2Desde: 0, avion2Cobro: 5.2, plinkoDesde: 1.0, plinkoCae: 3.2,
+  avionDesde: 0, avion3Cobro: 3.0, plinkoDesde: 0.7, plinkoCae: 3.0,
   sobreDesde: 0.6, sobreLeg: 15.5, heroDesde: 8.0, unoDesde: 1.0, recordDesde: 0, recordFin: 6.3, recordTabla: 7.2,
   mascotaDesde: 2.0,
 };
@@ -143,7 +143,7 @@ const CORTES1 = [ // acción, 8–20 s
   { a: 11.0, b: 12.0, c: 'worms',       s: 2.0, n: 'CIRCUIT BREAKERS', e: 'Artillería por turnos',             col: 'var(--cel)' },
   { a: 12.0, b: 13.0, c: 'haxball',     s: 3.0, n: 'HAXBALL',          e: 'Fútbol de discos',                  col: 'var(--ver)' },
   { a: 13.0, b: 14.0, c: 'fanal',       s: 3.0, n: 'FANAL',            e: 'Un enjambre entre tú y el alba',    col: 'var(--ama)' },
-  { a: 14.0, b: 15.0, c: 'prodefender', s: 5.0, n: 'PRO DEFENDER',     e: '5 reinos · 100 rondas',             col: 'var(--ver)' },
+  { a: 14.0, b: 15.0, c: 'pd2',         s: 3.0, n: 'PRO DEFENDER',     e: 'Ronda 11 de 100',             col: 'var(--ver)' },
   { a: 15.0, b: 16.0, c: 'bbtan',       s: 5.0, n: 'BBTAN',            e: 'Rebota. Rompe. Sube.',              col: 'var(--ros)' },
   { a: 16.0, b: 16.5, c: 'aleteo',      s: 0.8, n: 'ALETEO',           e: 'Solo Club',                         col: 'var(--ama)' },
   { a: 16.5, b: 17.0, c: 'snake',       s: 3.0, n: 'SNAKE',            e: 'Solo Club',                         col: 'var(--ver)' },
@@ -152,8 +152,8 @@ const CORTES1 = [ // acción, 8–20 s
   { a: 18.0, b: 20.0, c: 'boxhead2',    s: 7.0, n: 'NIVEL TRAS NIVEL', e: 'Cada baja sube el multiplicador',   col: 'var(--nar)' },
 ];
 const SALAS = ['CATAN', 'AJEDREZ', 'CLUE', 'POKÉMON', 'CACHO', 'PRESIDENTE', 'MEMAZO', 'FLIP 7'];
-const MOSAICO = ['boxhead2', 'yemasz', 'worms', 'hero', 'avion', 'mascota', 'uno', 'haxball', 'prodefender'];
-const MONTAJE = [['boxhead2', 9, 'PRO BOXHEAD'], ['yemasz', 7, 'YEMAS ZOMBIS'], ['hero', 9, 'PRO HERO'], ['avion2', 3, 'CASINO'],
+const MOSAICO = ['boxhead2', 'yemasz', 'worms', 'hero', 'avion', 'mascota', 'uno', 'haxball', 'pd2'];
+const MONTAJE = [['boxhead2', 9, 'PRO BOXHEAD'], ['yemasz', 7, 'YEMAS ZOMBIS'], ['hero', 9, 'PRO HERO'], ['avion3', 3, 'CASINO'],
                  ['uno', 9, 'UNO'], ['mascota', 9, 'MASCOTAS'], ['worms', 7, 'CIRCUIT BREAKERS'], ['sobre', 19, 'PRODROP']];
 const TOP = [['Emma', 8110, '#e8467c'], ['Santi', 7055, '#3f8cff'], ['Jesús', 6488, '#22b07d']];
 const GUGU = ['GUGU GAGA', 8518, '#0d9488'];
@@ -252,39 +252,37 @@ function escena(t) {
       textos += `<div class="mono" style="position:absolute;left:${lerp(-500, 96, k)}px;top:86px;font-size:28px;font-weight:700;padding:14px 22px;background:rgba(10,10,15,.75);border-left:6px solid var(--ama)">♪ <span translate="no">CHINCHONCHIN</span> · <span translate="no" style="color:var(--ama)">mellowsynesthesia128</span></div>`;
     }
   }
-  // ===== 32–40 CASINO =====
-  else if (t < 40) {
+  // ===== 32–41 CASINO =====
+  else if (t < 41) {
     if (t < 33) {
       tomas += toma('avion', P.avionDesde, [0, 0, W, H], { clase: 'fondo-borroso', zoom: 1.3 });
       textos += golpe('CASINO', t, 32, { tam: 330, color: 'var(--ros)' });
       flash = Math.max(0, .6 - (t - 32) * 3);
-    } else if (t < 35.5) {
-      tomas += toma('avion', P.avionDesde + (t - 33) * 3.6, [0, 0, W, H], { zoom: 1.12 });
+    } else if (t < 35) {
+      tomas += toma('avion2', (t - 33) * 4.4, [0, 0, W, H], { zoom: 1.12 });
       flash = Math.max(0, .3 - (t - 33) * 4);
       textos += `<div class="chip" style="right:96px;top:80px;background:var(--ros);color:#0a0a0f">El Avión · apuesta 500</div>`;
-    } else if (t < 37.6) {
-      const lt = t - 35.5, seg = P.avion2Desde + lt + (P.avion2Cobro - 1.6 - P.avion2Desde);
-      tomas += toma('avion2', seg, [0, 0, W, H], { zoom: lerp(1.12, 1.3, eIO(prog(t, 35.5, 37.6))) });
-      const cobro = 35.5 + 1.6;
+    } else if (t < 38) {
+      const lt = t - 35, seg = P.avion3Cobro - 1.4 + lt, cobro = 36.4;
+      tomas += toma('avion3', seg, [0, 0, W, H], { zoom: lerp(1.12, 1.3, eIO(prog(t, 35, 38))) });
       if (t >= cobro) { textos += golpe('+12.000', t, cobro, { tam: 300, color: 'var(--ama)', y: 640, estilo: 'text-shadow:0 0 60px rgba(255,210,31,.6)' }); flash = Math.max(0, .7 - (t - cobro) * 4); }
     } else {
-      const lt = t - 37.6, seg = P.plinkoDesde + lt;
-      tomas += toma('plinko', seg, [0, 0, W, H], { zoom: 1.15 });
-      const cae = 37.6 + (P.plinkoCae - P.plinkoDesde);
-      if (t >= cae) { textos += golpe('×988', t, cae, { tam: 360, color: 'var(--ros)', y: 250 }) + golpe('+49.350', t, cae + .25, { tam: 200, color: 'var(--ama)', y: 640 }); flash = Math.max(0, .8 - (t - cae) * 4); }
+      const lt = t - 38, seg = P.plinkoDesde + lt * 1.3, cae = 38 + (P.plinkoCae - P.plinkoDesde) / 1.3;
+      tomas += toma('plinko', seg, [0, 0, W, H], { zoom: 1.0 });
+      if (t >= cae) { textos += golpe('×988', t, cae, { tam: 360, color: 'var(--ros)', y: 230 }) + golpe('+49.350', t, cae + .2, { tam: 200, color: 'var(--ama)', y: 640 }); flash = Math.max(0, .8 - (t - cae) * 4); }
       else textos += `<div class="chip" style="right:96px;top:80px;background:var(--ama);color:#0a0a0f">Plinko · riesgo alto · 16 filas</div>`;
     }
   }
-  // ===== 40–44 MASCOTAS =====
+  // ===== 41–44 MASCOTAS =====
   else if (t < 44) {
-    const lt = t - 40, k = lt / 4;
+    const lt = t - 41, k = lt / 3;
     tomas += `<div class="capa" style="background:radial-gradient(ellipse at 70% 50%, #2f6b3a 0%, #13241a 55%, #0a0a0f 100%)"></div>`;
     tomas += tomaLlena('mascota', P.mascotaDesde + lt * 1.0, k, {});
-    const k1 = eOutX(prog(t, 40.1, 40.6));
+    const k1 = eOutX(prog(t, 41.1, 41.6));
     textos += `<div class="titulo" style="left:${lerp(-200, 110, k1)}px;top:250px;font-size:190px;${rgb(2)}">Mascotas</div>
-      <div class="titulo" style="left:${lerp(-200, 116, eOutX(prog(t, 40.3, 40.8)))}px;top:420px;font-size:88px;color:var(--ver)">Cuídala. Vístela.<br>Que baile.</div>`;
-    if (t > 41.2) textos += `<div class="chip-leg" style="left:${lerp(-400, 116, eOutX(prog(t, 41.2, 41.6)))}px;top:690px">★ Sombrero arcano</div>`;
-    if (t > 41.7) textos += `<div class="chip-leg" style="left:${lerp(-400, 116, eOutX(prog(t, 41.7, 42.1)))}px;top:770px">★ Zapatillas cometa</div>`;
+      <div class="titulo" style="left:${lerp(-200, 116, eOutX(prog(t, 41.3, 41.8)))}px;top:420px;font-size:88px;color:var(--ver)">Cuídala. Vístela.<br>Que baile.</div>`;
+    if (t > 41.9) textos += `<div class="chip-leg" style="left:${lerp(-400, 116, eOutX(prog(t, 41.9, 42.3)))}px;top:690px">★ Sombrero arcano</div>`;
+    if (t > 42.3) textos += `<div class="chip-leg" style="left:${lerp(-400, 116, eOutX(prog(t, 42.3, 42.7)))}px;top:770px">★ Zapatillas cometa</div>`;
     flash = Math.max(0, .5 - lt * 3);
   }
   // ===== 44–48 SOBRES (PRODROP) =====

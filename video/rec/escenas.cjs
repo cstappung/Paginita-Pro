@@ -16,17 +16,17 @@ module.exports = {
     },
     play: async h => { const U = require('./uno-sala.cjs'); await h.sleep(1150); const j = await U.paso(); if (!j) await h.sleep(2000); } },
   // Un god pack de Componentes con legendaria (clave buscada en Node y escrita en el emulador)
-  sobre: { sitio: 1, url: 'juegos.html', hash: '#jugar', vt: 1, dur: 24000, wait: 3000,
+  sobre: { sitio: 1, url: 'juegos.html', hash: '#jugar', vt: 1, dur: 21000, wait: 3000,
     setup: async h => { await h.pg.evaluate(() => { localStorage.setItem('prodrop.pendiente.UQAb0EMpvLOaBNE7tPmhCtqouh2V', 'c-Trailerbc'); location.hash = '#cartas'; }); await h.sleep(9000); },
     play: async h => {
       if (h.hecho) return h.sleep(1000); h.hecho = 1;
       await h.sleep(900);
       await h.pg.mouse.move(505, 208); await h.pg.mouse.down();
       for (let i = 1; i <= 16; i++) { await h.pg.mouse.move(505 + i * 17, 208 + Math.sin(i / 3) * 2); await h.sleep(40); }
-      await h.pg.mouse.up(); await h.sleep(2600);
-      for (let i = 0; i < 6; i++) { await h.pg.mouse.click(640, 380); await h.sleep(i < 4 ? 1500 : 5000); }
+      await h.pg.mouse.up(); await h.sleep(1800);
+      for (let i = 0; i < 9; i++) { await h.pg.mouse.click(640, 380); await h.sleep(i < 8 ? 1300 : 8000); }
     } },
-  yemasz: { url: 'juegos/yemas/index.html', dur: 12000, vt: 1, scripts: ['yemas-bot.js'], ff: 150000,
+  yemasz: { gpu: 1, url: 'juegos/yemas/index.html', dur: 12000, vt: 1, scripts: ['yemas-bot.js'], ff: 150000,
     setup: async h => { await h.pg.selectOption('#modo-practica', 'zombis'); await h.pg.selectOption('#mapa-practica', h.mapa || 'nuketown');
       await h.pg.locator('input[type=text]').first().fill('GUGU GAGA').catch(() => {}); await h.pg.locator('#jugar').click({ force: true }); await h.sleep(2500); },
     alAvanzar: async h => console.log('yemas', JSON.stringify(await h.pg.evaluate(() => window.__ybDbg))),
@@ -84,7 +84,7 @@ module.exports = {
     },
     play: async h => { if (!h.soltado) { h.soltado = 1; await h.sleep(800); await h.pg.locator('.jg-cs-boton').click(); } await h.sleep(1000); } },
   // Michi, el gato adulto, con ropa y bailando. Vista angosta y DPR alto para que la escena 3D llene el cuadro.
-  mascota: { sitio: 1, url: 'juegos.html', hash: '#mascotas', dur: 16000, wait: 9000, vt: 1, vw: 800, vh: 450, dpr: 2.4,
+  mascota: { gpu: 1, sitio: 1, url: 'juegos.html', hash: '#mascotas', dur: 16000, wait: 9000, vt: 1, vw: 800, vh: 450, dpr: 2.4,
     setup: async h => {
       const fr = h.pg.frameLocator('iframe');
       await fr.locator('.pet-card').first().click(); await h.sleep(3000);
@@ -116,3 +116,5 @@ module.exports.pd2 = { url: 'juegos/club/prodefender/index.html', dur: 10000, vt
   alAvanzar: async h => console.log('pd', await h.pg.evaluate(() => (document.body.innerText.match(/Ronda\s*\d+\s*\/100/) || [''])[0])),
   play: async h => { const k = h.pick(['1', '2', '3', '4', '5', '6', '1', '2']); await h.pg.keyboard.press(k); await h.sleep(150);
     await h.pg.mouse.click(h.rnd(40, 930), h.rnd(100, 690)); await h.sleep(200); await h.pg.keyboard.press('Escape'); await h.sleep(h.rnd(1500, 3000)); } };
+
+module.exports.avion3 = Object.assign({}, module.exports.avion, { ff: 35000, dur: 8500 });

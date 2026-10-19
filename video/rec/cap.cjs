@@ -107,7 +107,8 @@ async function runVT(name, g, ctx, pg, h, dir) {
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     proxy: { server: process.env.HTTPS_PROXY },
-    args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--proxy-bypass-list=127.0.0.1;localhost'] });
+    args: ['--autoplay-policy=no-user-gesture-required', '--proxy-bypass-list=127.0.0.1;localhost'].concat(
+      process.argv.slice(2).some(n => games[n] && games[n].gpu) ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--disable-gpu']) });
   const only = process.argv.slice(2);
   for (const [name, g] of Object.entries(games)) {
     if (only.length && !only.includes(name)) continue;

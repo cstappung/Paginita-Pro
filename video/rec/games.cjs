@@ -10,10 +10,10 @@ module.exports = {
     play: async h => { await h.tap(' '); await h.sleep(h.rnd(330, 470)); } },
   bbtan: { url: 'juegos/club/bbtan/index.html', dur: 9000, vt: 1,
     play: async h => { const c = await canvasBox(h); if (!c) return h.sleep(500); const x = c.x + c.width * h.rnd(.1,.9), y = c.y + c.height * h.rnd(.25,.6); await h.pg.mouse.move(x, y, { steps: 8 }); await h.pg.mouse.down(); await h.sleep(250); await h.pg.mouse.up(); await h.sleep(2200); } },
-  metrorush: { url: 'juegos/club/metrorush/index.html', dur: 12000, wait: 9000, vt: 1, dpr: 1,
+  metrorush: { gpu: 1, url: 'juegos/club/metrorush/index.html', dur: 12000, wait: 9000, vt: 1, dpr: 1,
     setup: async h => { const c = await canvasBox(h); if (c) await h.pg.mouse.click(c.x + c.width/2, c.y + c.height/2); await h.sleep(500); await h.tap(' '); await h.sleep(300); await h.tap('Enter'); await h.sleep(1500); },
     play: async h => { await h.tap(h.pick(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'])); await h.sleep(h.rnd(400, 900)); } },
-  yemas: { url: 'juegos/yemas/index.html', dur: 12000, vt: 1,
+  yemas: { gpu: 1, url: 'juegos/yemas/index.html', dur: 12000, vt: 1,
     init: () => { Object.defineProperty(Document.prototype, 'pointerLockElement', { get() { return document.getElementById('lienzo'); } }); Element.prototype.requestPointerLock = function () { return Promise.resolve(); }; Document.prototype.exitPointerLock = function () {}; },
     setup: async h => { await h.pg.locator('input').first().fill('Laboratorio').catch(()=>{}); await h.pg.locator('#jugar').click({ force: true }); await h.sleep(3000); },
     play: async h => { const k = h.pick(['w','w','a','d']); const dx = h.rnd(-14, 14); await h.pg.keyboard.down(k);
@@ -43,7 +43,7 @@ module.exports = {
       await h.click('.btn2:has-text("Contra bots")'); await h.click('.btn2:has-text("3 vs 3")'); await h.pg.locator('#jugar').click({ force: true }); await h.sleep(1200);
       if (await h.pg.locator('#novCerrar').isVisible()) { await h.click('#novCerrar'); await h.pg.locator('#jugar').click({ force: true }); } await h.sleep(1500); },
     play: async h => { await h.pg.keyboard.down('ArrowRight'); await h.hold(h.pick(['ArrowUp','ArrowDown']), h.rnd(150, 500)); await h.tap('x'); await h.pg.keyboard.up('ArrowRight'); await h.sleep(h.rnd(100, 300)); } },
-  sortem: { url: 'juegos/club/sortem/index.html', dur: 5000, vt: 1,
+  sortem: { gpu: 1, url: 'juegos/club/sortem/index.html', dur: 5000, vt: 1,
     setup: async h => { await h.tap(' '); await h.sleep(1500); },
     play: async h => { await h.tap(h.pick(['ArrowLeft','ArrowRight','ArrowRight',' '])); await h.sleep(h.rnd(150, 350)); } },
   hero: { url: 'juegos/hero/index.html', dur: 6000, play: async h => { await h.sleep(800); } },
