@@ -258,7 +258,7 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
             <h3>${signo > 0 ? "Más ganan" : "Más pierden"}</h3>
             ${l.length ? `<ol class="jg-cs-feed jg-cs-top">${l.map(([u, n]) => `<li>
               <span class="jg-cs-feed-n" data-perfil="${esc(u)}" translate="no">${esc(nombreDe(u))}</span>
-              <b class="${signo > 0 ? "" : "mal"}">${signo > 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(n) * 100) / 100)} ${MONEDA}</b></li>`).join("")}</ol>`
+              <b class="${signo > 0 ? "" : "mal"}">${signo > 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(n)))} ${MONEDA}</b></li>`).join("")}</ol>`
               : `<p class="jg-nada">${e ? "Nadie todavía." : "Cargando…"}</p>`}
           </section>`;
   }
@@ -275,7 +275,7 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
       <span class="jg-cs-feed-j">${ICONO[r.j] || "🎲"}</span>
       <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${esc(nombreDe(r.u))}</span>
       <span class="jg-cs-feed-m">${formatoMult(r.mult)}</span>
-      <b>+${formatoPago(Math.round((r.pago - (r.apostado || r.p)) * 100) / 100)} ${MONEDA}</b></li>`).join("")}</ul>`;
+      <b>+${formatoPago(Math.round(r.pago - (r.apostado || r.p)))} ${MONEDA}</b></li>`).join("")}</ul>`;
   }
   api.feedHtml = feedHtml;
 
