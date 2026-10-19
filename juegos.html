@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610191611"></script>
+<script src="i18n.js?v=202610192240"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -5510,6 +5510,11 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-feed-m{font-weight:800;color:#ff8fa6;font-variant-numeric:tabular-nums}
 .jg-cs-feed li b{display:inline-flex;align-items:center;gap:4px;color:var(--cs-bien);font-variant-numeric:tabular-nums}
 .jg-cs-feed .jg-moneda{width:14px;height:14px}
+.jg-cs-feed li.jg-cs-brilla{box-shadow:0 0 calc(4px + 18px*var(--b)) calc(3px*var(--b)) rgba(255,205,80,calc(.15 + .7*var(--b)));border:1px solid rgba(255,205,80,calc(.1 + .8*var(--b)))}
+.jg-cs-feed li.jg-cs-brilla .jg-cs-feed-m{color:color-mix(in srgb,#ffd24a calc(var(--b)*100%),#ff8fa6);text-shadow:0 0 calc(10px*var(--b)) #ffd24a}
+.jg-cs-top{counter-reset:top;padding:0}
+.jg-cs-top li::before{counter-increment:top;content:counter(top);font-weight:800;width:16px;text-align:center;opacity:.7}
+.jg-cs-top li b.mal{color:var(--cs-mal,#ff6b6b)}
 @keyframes jgCsEntra{from{opacity:0;transform:translateY(-4px)}}
 
 .jg-cs-juego{display:grid;grid-template-columns:minmax(0,1fr) 280px;grid-template-areas:"escena lado" "panel lado" "reglas reglas";gap:14px;align-items:start}
@@ -6034,6 +6039,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610191611"></script>
+<script src="juegos-app.js?v=202610192240"></script>
 </body>
 </html>
