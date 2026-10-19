@@ -143,6 +143,7 @@ export function crearSalon(ctx) {
     raiz.addEventListener("pointerup", suelta);
     raiz.addEventListener("pointercancel", suelta);
     raiz.addEventListener("contextmenu", ev => { if (ev.target.closest(".jg-mn") && matchMedia("(pointer: coarse)").matches) ev.preventDefault(); });
+    vigilaPortadas(raiz);
     raiz.addEventListener("click", ev => {
       const b = ev.target.closest(".jg-mn-abre");
       if (!b) return;
@@ -153,6 +154,25 @@ export function crearSalon(ctx) {
       if (actual && actual.id === id && !movil()) { cierra(); return; }
       abre(id, b);
     });
+  }
+
+  /* Las portadas que se animan solas (el mar de Catan, el temblor de Chain
+     Reaction, el brillo de «Nuevo») se pausan mientras su tarjeta no está
+     en pantalla (`.dormida`): cada cuadro de un SVG animado obliga al
+     navegador a recomponer la página entera, se vea o no. Las tarjetas se
+     repintan enteras, así que un MutationObserver vigila las nuevas. */
+  function vigilaPortadas(raiz) {
+    if (typeof IntersectionObserver !== "function" || typeof MutationObserver !== "function") return;
+    const vista = new IntersectionObserver(es => {
+      for (const e of es) e.target.classList.toggle("dormida", !e.isIntersecting);
+    }, { rootMargin: "120px" });
+    const mira = () => raiz.querySelectorAll(".jg-mn:not([data-vigilada])").forEach(m => { m.dataset.vigilada = ""; vista.observe(m); });
+    new MutationObserver(ms => {
+      for (const m of ms) for (const n of m.removedNodes)
+        if (n.nodeType === 1) for (const t of n.matches(".jg-mn") ? [n] : n.querySelectorAll(".jg-mn")) vista.unobserve(t);
+      mira();
+    }).observe(raiz, { childList: true, subtree: true });
+    mira();
   }
 
   /* ---------- la ficha ---------- */

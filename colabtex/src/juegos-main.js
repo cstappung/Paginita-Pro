@@ -2354,9 +2354,10 @@ function enganchaNovedades(h) {
    movimiento (que empieza en pausa). El punto activo se llena con lo que
    falta para pasar. Con el dedo se arrastra; un arrastre no es un clic. */
 const BAN_MS = 7000;
-let banTic = 0;
+let banTic = 0, banVista = null;
 function enganchaBanner(h) {
   clearInterval(banTic);
+  if (banVista) { banVista.disconnect(); banVista = null; }
   const raiz = h.querySelector("#vesBanner"), N = VISIBLES.length;
   if (!raiz || N < 2) return;
   const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
@@ -2370,14 +2371,26 @@ function enganchaBanner(h) {
     pista.classList.toggle("sin-trans", !anima || quieto);
     pista.style.transform = `translateX(calc(${-k * 100}% + ${dx}px))`;
   };
+  /* El tic solo mueve la barra del punto activo (`llena`); el resto se
+     repinta al cambiar de diapositiva o de pausa, y solo si cambió: antes
+     cada tic reescribía el texto y las etiquetas del botón de pausa diez
+     veces por segundo, y el traductor de i18n.js revisaba cada cambio. */
+  let lleno = null, pausaPintada = null;
+  let aLaVista = true;
+  const llena = () => { if (lleno && aLaVista) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`; };
   const pinta = () => {
     const j = i % N;
     diapos.forEach((d, k) => d.classList.toggle("on", k === i));
-    puntos.forEach((b, k) => { b.classList.toggle("on", k === j); b.setAttribute("aria-current", String(k === j)); });
-    const lleno = raiz.querySelector(".jg-ban-puntos .on i");
-    for (const b of puntos) b.firstChild.style.transform = "";
-    if (lleno) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`;
+    puntos.forEach((b, k) => {
+      b.classList.toggle("on", k === j);
+      if (b.getAttribute("aria-current") !== String(k === j)) b.setAttribute("aria-current", String(k === j));
+    });
+    lleno = raiz.querySelector(".jg-ban-puntos .on i");
+    for (const b of puntos) if (b.firstChild !== lleno) b.firstChild.style.transform = "";
+    llena();
     raiz.classList.toggle("pausa", pausado);
+    if (pausaPintada === pausado) return;
+    pausaPintada = pausado;
     pausa.textContent = pausado ? "▶" : "❚❚";
     pausa.setAttribute("aria-label", pausado ? "Reanudar las novedades" : "Pausar las novedades");
     pausa.title = pausado ? "Reanudar" : "Pausar";
@@ -2435,11 +2448,21 @@ function enganchaBanner(h) {
   pon(0, false);
   pinta();
   banTic = setInterval(() => {
-    if (!document.body.contains(raiz)) { clearInterval(banTic); return; }
+    if (!document.body.contains(raiz)) { clearInterval(banTic); if (banVista) { banVista.disconnect(); banVista = null; } return; }
     if (pausado || encima || foco || arrastre || document.hidden || salon.abiertaPara()) return;
     t += 100;
-    if (t >= BAN_MS) ve(i + 1); else pinta();
+    if (t >= BAN_MS) ve(i + 1); else llena();
   }, 100);
+  /* Fuera de la vista (al bajar al catálogo), la escena deja de animar:
+     nadie la ve y era lo que más trabajo le daba al navegador en el salón. */
+  if (typeof IntersectionObserver === "function") {
+    banVista = new IntersectionObserver(([e]) => {
+      aLaVista = e.isIntersecting;
+      raiz.classList.toggle("fuera", !aLaVista);
+      llena();
+    });
+    banVista.observe(raiz);
+  }
 }
 
 /* ---------- últimos tops ----------
@@ -3666,16 +3689,23 @@ function arteCatan() {
     [w, -1.5 * R, "#9fd66b", oveja(w, -1.5 * R)], [-w, -1.5 * R, "#a7afb9", pico(-w, -1.5 * R)],
     [w, 1.5 * R, "#a7afb9", pico(w, 1.5 * R)], [-w, 1.5 * R, "#3f8f45", arbol(-w, 1.5 * R + 2)]
   ];
-  return `<svg class="jg-art-ct" viewBox="-78 -70 156 140" aria-hidden="true">
-    <path class="jg-art-ct-ola" d="M-78 58 q9 -6 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" fill="none" stroke="#ffffff55" stroke-width="2"/>
+  /* El mar y el barco van en su propio SVG, dentro de un elemento HTML que
+     es el que se mueve: animados dentro del dibujo, obligaban a repintarlo
+     y a recomponer el salón entero en cada cuadro. Los tres SVG comparten
+     el `viewBox` y se apilan, así que el dibujo es el mismo. */
+  const capa = (clase, d) => `<i class="${clase}"><svg viewBox="-78 -70 156 140">${d}</svg></i>`;
+  return `<span class="jg-art-ct" aria-hidden="true">
+    ${capa("jg-art-ct-ola", '<path d="M-78 58 q9 -6 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" fill="none" stroke="#ffffff55" stroke-width="2"/>')}
+    <svg viewBox="-78 -70 156 140">
     ${celdas.map(([x, y, c, d]) => hex(x, y, c) + d).join("")}
     <circle cx="0" cy="2" r="9.5" fill="#f7ecd0" stroke="#b08f5a" stroke-width="1.2"/><text x="0" y="6" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="800" font-size="11" fill="#c0392b">8</text>
     <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#1d1a17" stroke-width="6.5" stroke-linecap="round"/>
     <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#d8412f" stroke-width="4" stroke-linecap="round"/>
     <path d="M-6 -${R + 6} v-7 l6 -6 6 6 v7z" fill="#d8412f" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa"/>
     <path d="M${(-w - 9).toFixed(1)} ${R / 2 + 9} v-9 l5 -6 5 6 v3 h9 v6z" fill="#2f6fd6" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa b"/>
-    <g class="jg-art-ct-barco"><path d="M50 40 h22 l-4 7 h-14z" fill="#8a5a2c"/><path d="M61 40 v-16" stroke="#3b220f" stroke-width="1.5"/><path d="M62 25 l8 13 h-8z" fill="#f3efe3"/></g>
-  </svg><b class="jg-art-ct-t">CATAN</b>`;
+    </svg>
+    ${capa("jg-art-ct-barco", '<path d="M50 40 h22 l-4 7 h-14z" fill="#8a5a2c"/><path d="M61 40 v-16" stroke="#3b220f" stroke-width="1.5"/><path d="M62 25 l8 13 h-8z" fill="#f3efe3"/>')}
+  </span><b class="jg-art-ct-t">CATAN</b>`;
 }
 
 let pidiendoRevancha = false;

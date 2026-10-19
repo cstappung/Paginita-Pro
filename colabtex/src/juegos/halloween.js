@@ -54,17 +54,33 @@ function aplica(estado) {
 }
 
 /* ---- Piezas en SVG ---- */
-const MURCIELAGO = `<svg viewBox="0 0 64 32" aria-hidden="true"><g class="hw-ala hw-ala-i"><path d="M30 13C24 6 14 5 2 9c4 2 5 5 4 8 4-2 7-1 8 2 3-3 7-2 8 1 2-3 5-4 8-3z"/></g><g class="hw-ala hw-ala-d"><path d="M34 13c6-7 16-8 28-4-4 2-5 5-4 8-4-2-7-1-8 2-3-3-7-2-8 1-2-3-5-4-8-3z"/></g><path d="M29.3 10.5 30 7l1.6 2.6h.8L34 7l.7 3.5c.9 1 1.3 2.6 1.3 4.5 0 3.6-1.8 6-4 6s-4-2.4-4-6c0-1.9.4-3.5 1.3-4.5z"/><circle cx="30.6" cy="13" r=".9" class="hw-ojo"/><circle cx="33.4" cy="13" r=".9" class="hw-ojo"/></svg>`;
+/* Las alas y las patas van cada una en su propio elemento HTML, que es el
+   que se anima: un `transform` animado dentro de un SVG obliga a repintar
+   el dibujo y a recomponer la página entera en cada cuadro; sobre un
+   elemento HTML lo resuelve la tarjeta gráfica sin tocar nada más. */
+const SVG_MURC = d => `<svg viewBox="0 0 64 32" aria-hidden="true">${d}</svg>`;
+const MURCIELAGO =
+  `<i class="hw-ala hw-ala-i">${SVG_MURC('<path d="M30 13C24 6 14 5 2 9c4 2 5 5 4 8 4-2 7-1 8 2 3-3 7-2 8 1 2-3 5-4 8-3z"/>')}</i>` +
+  `<i class="hw-ala hw-ala-d">${SVG_MURC('<path d="M34 13c6-7 16-8 28-4-4 2-5 5-4 8-4-2-7-1-8 2-3-3-7-2-8 1-2-3-5-4-8-3z"/>')}</i>` +
+  SVG_MURC('<path d="M29.3 10.5 30 7l1.6 2.6h.8L34 7l.7 3.5c.9 1 1.3 2.6 1.3 4.5 0 3.6-1.8 6-4 6s-4-2.4-4-6c0-1.9.4-3.5 1.3-4.5z"/><circle cx="30.6" cy="13" r=".9" class="hw-ojo"/><circle cx="33.4" cy="13" r=".9" class="hw-ojo"/>');
 
 const FANTASMA = `<svg viewBox="0 0 60 72" aria-hidden="true"><path class="hw-sabana" d="M30 3C14.5 3 6 15 6 31v36l6-5 6 5 6-5 6 5 6-5 6 5 6-5 6 5V31C54 15 45.5 3 30 3z"/><ellipse cx="22" cy="30" rx="3.6" ry="5" class="hw-cara"/><ellipse cx="38" cy="30" rx="3.6" ry="5" class="hw-cara"/><ellipse cx="30" cy="44" rx="4" ry="5.5" class="hw-cara"/><ellipse cx="15" cy="38" rx="3" ry="1.6" class="hw-rubor"/><ellipse cx="45" cy="38" rx="3" ry="1.6" class="hw-rubor"/></svg>`;
 
-const ARANA = `<svg viewBox="0 0 40 40" aria-hidden="true"><g class="hw-patas" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M16 18 7 12 3 15M16 21H5l-3 4M17 24l-8 6-1 5M18 26l-4 9"/><path d="M24 18l9-6 4 3M24 21h11l3 4M23 24l8 6 1 5M22 26l4 9"/></g><ellipse cx="20" cy="25" rx="6.5" ry="7.5"/><circle cx="20" cy="15.5" r="4.5"/><circle cx="18.3" cy="15" r="1.1" class="hw-ojo"/><circle cx="21.7" cy="15" r="1.1" class="hw-ojo"/></svg>`;
+const ARANA =
+  `<i class="hw-patas"><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M16 18 7 12 3 15M16 21H5l-3 4M17 24l-8 6-1 5M18 26l-4 9"/><path d="M24 18l9-6 4 3M24 21h11l3 4M23 24l8 6 1 5M22 26l4 9"/></g></svg></i>` +
+  `<svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="25" rx="6.5" ry="7.5"/><circle cx="20" cy="15.5" r="4.5"/><circle cx="18.3" cy="15" r="1.1" class="hw-ojo"/><circle cx="21.7" cy="15" r="1.1" class="hw-ojo"/></svg>`;
 
 /* El cementerio del fondo: colinas, lápidas, un árbol seco y la casa
    embrujada con las ventanas encendidas. Va en `slice` contra el borde
-   de abajo, así que en un teléfono se ve el centro (la casa). */
-const CEMENTERIO = `<svg class="hw-cem" viewBox="0 0 1600 260" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-<path class="hw-colina2" d="M0 170C180 120 330 150 470 128s300-60 470-18 260 40 380 6 200-20 280-6v160H0z"/>
+   de abajo, así que en un teléfono se ve el centro (la casa). En una
+   pantalla ancha la caja guarda la proporción del dibujo (CSS), porque
+   con una altura fija el `slice` recortaba arriba el árbol, la chimenea
+   y la colina lejana, y ese borde plano se veía como una línea que
+   cruzaba la página. La colina lejana se desvanece hacia arriba por lo
+   mismo: su borde duro, con el resplandor naranja detrás, era otra línea. */
+const CEMENTERIO = `<svg class="hw-cem" viewBox="0 30 1600 230" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+<defs><linearGradient id="hwColina" gradientUnits="userSpaceOnUse" x1="0" y1="70" x2="0" y2="190"><stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor"/></linearGradient></defs>
+<path class="hw-colina2" fill="url(#hwColina)" d="M0 170C180 120 330 150 470 128s300-60 470-18 260 40 380 6 200-20 280-6v160H0z"/>
 <g class="hw-silueta">
 <path d="M0 205c160-30 300-20 470-6s330 24 520 2 330-26 610-4v63H0z"/>
 <path d="M752 205V122l-22 8 64-62 64 62-22-8v83z"/><path d="M786 70V40h14v42z"/><path d="M836 205v-60h-8l40-40 40 40h-8v60z"/>
@@ -97,7 +113,7 @@ function frenteHtml() {
   const bats = MURCIELAGOS.map(b => `<div class="hw-murc" style="--y:${b.y}vh;--d:${b.d}s;--r:${b.r}s;--s:${b.s}"><div class="hw-murc-v">${MURCIELAGO}</div></div>`).join("");
   return bats +
     `<div class="hw-fant hw-fant-i">${FANTASMA}</div><div class="hw-fant hw-fant-d">${FANTASMA}</div>` +
-    `<div class="hw-arana"><i class="hw-hilo"></i>${ARANA}</div>` +
+    `<div class="hw-arana"><i class="hw-hilo"></i><span class="hw-arana-c">${ARANA}</span></div>` +
     `<div class="hw-tela hw-tela-i"></div><div class="hw-tela hw-tela-d"></div>`;
 }
 
