@@ -120,3 +120,4 @@ module.exports.pd2 = { url: 'juegos/club/prodefender/index.html', dur: 10000, vt
 module.exports.avion3 = Object.assign({}, module.exports.avion, { ff: 35000, dur: 8500 });
 module.exports.bbtan2.ffHasta = async h => { const t = await h.pg.evaluate(() => document.body.innerText); const m = t.match(/RONDA\s*(\d+)/i); return m && +m[1] >= 12; };
 Object.assign(module.exports.yemasz, { ff: 45000, dur: 9000, dpr: 1 });
+Object.assign(module.exports.avion3, { ff: 60000, dur: 8500, ffHasta: async h => { const t = await h.pg.evaluate(() => (document.querySelector('.jg-cs-boton') || {}).innerText || ''); const n = +(t.match(/[\d.]+/) || ['0'])[0].replace(/\./g, ''); return /Retirarse/.test(t) && n >= 9000; } });

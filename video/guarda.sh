@@ -6,7 +6,7 @@ mkdir -p $V/rec $V/build $V/trailer/fonts $V/hero $V/emu $V/tomas $V/salidas
 cp $S/rec/*.cjs $S/rec/*.js $S/rec/*.sh $V/rec/ 2>/dev/null
 cp $S/rec/package.json $V/rec/
 cp $S/build/build.cjs $S/build/parches.cjs $V/build/
-cp $S/trailer/*.html $S/trailer/*.js $S/trailer/*.css $S/trailer/*.py $S/trailer/*.cjs $S/trailer/*.sh $V/trailer/ 2>/dev/null
+cp $S/trailer/*.svg $S/trailer/*.html $S/trailer/*.js $S/trailer/*.css $S/trailer/*.py $S/trailer/*.cjs $S/trailer/*.sh $V/trailer/ 2>/dev/null
 cp $S/trailer/fonts/*.woff2 $V/trailer/fonts/
 cp -r $S/hero/chart.py $S/hero/api $S/hero/songs $V/hero/
 cp $S/emu/firebase.json $V/emu/

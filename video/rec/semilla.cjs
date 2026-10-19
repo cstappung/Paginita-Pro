@@ -5,7 +5,7 @@
 // uso: node semilla.cjs   (con el emulador corriendo: firebase emulators:start --only auth,database)
 const path = require('path');
 const db = require('./db.cjs');
-const R = path.resolve(__dirname, '../..');
+const R = process.env.REPO || path.resolve(__dirname, '../..');
 const MM = require(R + '/juegos/mascotas/motor.js'), PM = require(R + '/juegos/prodrop/motor.js');
 
 async function uidDe(sub, nombre) {

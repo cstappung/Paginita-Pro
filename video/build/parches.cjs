@@ -14,5 +14,5 @@ module.exports.push(
 );
 module.exports.push(
   ['juegos/casino-motor.js', 'const at = r.at, cierre = horaAvion(at, AVION.TOPE),', 'const at = r.at, cierre = globalThis.__suerte ? Infinity : horaAvion(at, AVION.TOPE),'],
-  ['juegos/casino-motor.js', 'if (b0 === c) { const mult = baja2(mb);', 'if (b0 === c) { const mult = globalThis.__tope ? Math.min(baja2(mb), globalThis.__tope) : baja2(mb);'],
+  ['juegos/casino-motor.js', 'if (b0 === c) { const mult = baja2(mb);', 'if (b0 === c) { const mult = globalThis.__tope ? globalThis.__tope : baja2(mb);'],
 );

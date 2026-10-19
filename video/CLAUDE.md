@@ -21,7 +21,7 @@ nada de aquí se carga desde una página, y `video/` no está en `stamp-version.
   `__aceptaTodo` en la verificación del club). `sitio.cjs` lo sirve en lugar de `juegos-app.js`.
   **Nunca** llevar esos parches a `colabtex/src`.
 - `emu/firebase.json` — emulador de auth y database (copiar `firebase/database.rules.json` al lado).
-  `rec/semilla.cjs` deja los datos de la grabación (ver su cabecera). El uid de GUGU GAGA cambia con
+  `rec/semilla.cjs` deja los datos de la grabación (ver su cabecera; `REPO=` si no corre dentro de `video/`). El uid de GUGU GAGA cambia con
   cada emulador: las claves de Michi, sus regalos y el god pack se buscan para ese uid.
 - `hero/` — biblioteca local de PRO HERO (`?fuente=servidor`, servida por una ruta de Playwright):
   CHINCHONCHIN (de mellowsynesthesia128, creada por la dueña del sitio) y `chart.py`.
@@ -45,9 +45,16 @@ nada de aquí se carga desde una página, y `video/` no está en `stamp-version.
 
 ## Trampas
 
+- **Sin GPU es más rápido**: SwiftShader (GPU emulada) se come la CPU aunque el juego sea canvas 2D.
+  `cap.cjs` lanza con `--disable-gpu` salvo que la escena tenga `gpu: 1` (Yemas, Metro Rush, sortEm,
+  Mascotas, que usan WebGL). Con eso el avance rápido va ~10× más rápido.
+- El logo de Paginita-Pro del tráiler es `trailer/logo.svg` (círculo naranjo→rosa, P blanca con un
+  *play* amarillo); `arma2.py` lo mete como `LOGO` en `trailer2.html`.
+
 - Chromium headless sin GPU: las páginas 3D o pesadas no sirven en tiempo real (2–4 fps). Grabar
   siempre en tiempo virtual (`vt: 1`). Las animaciones CSS no son virtuales (el salón usa `slow`).
 - En tiempo virtual el reloj de la página atrasa respecto del servidor: el avión del casino cobraba
-  en ×100 del servidor. Por eso `parches.cjs` quita el tope con `__suerte` y fija el cobro en `__tope`.
+  en ×100 del servidor (o antes, si el tiempo virtual corre más rápido que el real). Por eso `parches.cjs`
+  quita el tope con `__suerte` y cobra exactamente `__tope` (el retiro automático).
 - `pkill -f` con un patrón que también está en la línea de comandos del shell mata al propio shell.
 - Las cartas «Profes» de PRODROP son fotos de profesores reales: el tráiler usa solo Componentes.

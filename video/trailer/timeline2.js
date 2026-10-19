@@ -1,8 +1,8 @@
 /* ---------- LA LÍNEA DE TIEMPO (v2, 84 s) ----------
    Puntos de cada toma que se ajustan mirando los clips (segundos dentro del clip). */
 const P = window.PUNTOS || {
-  avionDesde: 0, avion3Cobro: 3.0, plinkoDesde: 0.7, plinkoCae: 3.0,
-  sobreDesde: 0.6, sobreLeg: 15.5, heroDesde: 8.0, unoDesde: 6.5, recordDesde: 0, recordFin: 6.3, recordTabla: 7.2,
+  avionDesde: 0, avion3Cobro: 1.4, plinkoDesde: 0.7, plinkoCae: 3.0,
+  sobreDesde: 0.6, sobreLeg: 16.0, heroDesde: 8.0, unoDesde: 6.5, recordDesde: 0, recordFin: 6.3, recordTabla: 7.2,
   mascotaDesde: 2.0,
 };
 const CORTES1 = [ // acción, 8–20 s
@@ -24,7 +24,7 @@ const MOSAICO = ['boxhead2', 'yemasz', 'worms', 'hero', 'avion', 'mascota', 'uno
 const MONTAJE = [['boxhead2', 9, 'PRO BOXHEAD'], ['yemasz', 7, 'YEMAS ZOMBIS'], ['hero', 9, 'PRO HERO'], ['avion3', 3, 'CASINO'],
                  ['uno', 9, 'UNO'], ['mascota', 9, 'MASCOTAS'], ['worms', 7, 'CIRCUIT BREAKERS'], ['sobre', 19, 'PRODROP']];
 const TOP = [['Emma', 8110, '#e8467c'], ['Santi', 7055, '#3f8cff'], ['Jesús', 6488, '#22b07d']];
-const GUGU = ['GUGU GAGA', 8518, '#0d9488'];
+const GUGU = ['GUGU GAGA', 10302, '#0d9488'];
 const pts = n => n.toLocaleString('es-CL');
 
 function panelRanking(t, x, y, o = {}) {
@@ -68,8 +68,10 @@ function escena(t) {
     barras = lerp(250, 170, eIO(prog(t, 0, 4)));
     const k = eOutX(prog(t, .15, .9)), op = 1 - prog(t, 3.6, 3.95);
     if (t < 2) {
-      textos += `<div class="insignia" style="left:${W / 2 - 520}px;top:${H / 2 - 100}px;width:200px;height:200px;font-size:128px;transform:scale(${lerp(.4, 1, k)});opacity:${k * op}">L</div>
-        <div class="titulo" style="left:${W / 2 - 280}px;top:${H / 2 - 96}px;font-family:'Space Grotesk';font-weight:700;text-transform:none;font-size:200px;letter-spacing:-.02em;opacity:${k};clip-path:inset(0 ${100 - eOut(prog(t, .3, 1.2)) * 100}% 0 0)">Laboratorio</div>`;
+      // logo de Paginita-Pro: entra girando y escalando; el nombre se descubre de izquierda a derecha
+      textos += `<div style="position:absolute;left:0;right:0;top:${H / 2 - 110}px;height:220px;display:flex;align-items:center;justify-content:center;gap:44px">
+        <div style="width:220px;height:220px;flex:none;transform:scale(${lerp(.3, 1, k)}) rotate(${lerp(-120, 0, k)}deg);opacity:${k * op};filter:drop-shadow(0 20px 50px rgba(255,90,31,.45))">${LOGO}</div>
+        <div class="titulo" style="position:static;font-family:'Space Grotesk';font-weight:700;text-transform:none;font-size:170px;letter-spacing:-.03em;opacity:${k * op};clip-path:inset(-20% ${100 - eOut(prog(t, .3, 1.2)) * 100}% -20% 0)" translate="no">Paginita-Pro</div></div>`;
     } else {
       const k2 = eOut(prog(t, 2, 3.2));
       textos += `<div class="centro mono" style="top:${H / 2 - 40}px;font-size:56px;font-weight:700;color:var(--nar);letter-spacing:${lerp(.1, .55, k2)}em;opacity:${prog(t, 2, 2.2) * op}">presenta</div>
@@ -133,7 +135,7 @@ function escena(t) {
     } else if (t < 38) {
       const lt = t - 35, seg = P.avion3Cobro - 1.4 + lt, cobro = 36.4;
       tomas += toma('avion3', seg, [0, 0, W, H], { zoom: lerp(1.12, 1.3, eIO(prog(t, 35, 38))) });
-      if (t >= cobro) { textos += golpe('+12.000', t, cobro, { tam: 300, color: 'var(--ama)', y: 640, estilo: 'text-shadow:0 0 60px rgba(255,210,31,.6)' }); flash = Math.max(0, .7 - (t - cobro) * 4); }
+      if (t >= cobro) { textos += golpe('+12.500', t, cobro, { tam: 300, color: 'var(--ama)', y: 640, estilo: 'text-shadow:0 0 60px rgba(255,210,31,.6)' }); flash = Math.max(0, .7 - (t - cobro) * 4); }
     } else {
       const lt = t - 38, seg = P.plinkoDesde + lt * 1.3, cae = 38 + (P.plinkoCae - P.plinkoDesde) / 1.3;
       tomas += toma('plinko', seg, [0, 0, W, H], { zoom: 1.0 });
@@ -157,12 +159,12 @@ function escena(t) {
   else if (t < 48) {
     const lt = t - 44;
     // de 0,6 a 2,6 s del clip: rasgar; después saltar hasta justo antes de la legendaria
-    const seg = lt < 1.6 ? P.sobreDesde + lt : P.sobreLeg - 2.4 + (lt - 1.6);
+    const seg = lt < 1.6 ? P.sobreDesde + lt : P.sobreLeg - 0.5 + (lt - 1.6);
     tomas += toma('sobre', seg, [0, 0, W, H], { zoom: lerp(1.1, 1.22, k01(t, 44, 48)) });
     flash = Math.max(0, .5 - lt * 3) + (Math.abs(lt - 1.6) < .1 ? .8 : 0);
     if (t < 45.6) textos += golpe('PRODROP', t, 44, { tam: 260, color: 'var(--bla)', y: 820 });
     else textos += `<div class="chip" style="left:96px;top:86px;background:var(--ama);color:#0a0a0f">God pack · Componentes</div>`;
-    if (t > 46.9) textos += golpe('★★ LEGENDARIA', t, 46.9, { tam: 190, color: 'var(--ama)', y: 800 });
+    if (t > 46.05) textos += golpe('★★ LEGENDARIA', t, 46.05, { tam: 190, color: 'var(--ama)', y: 800 });
   }
   // ===== 48–56 SALAS =====
   else if (t < 56) {
@@ -236,8 +238,9 @@ function escena(t) {
       <div class="titulo" style="left:${x}px;top:${y}px;width:${ancho}px;height:${alto}px;display:flex;align-items:center;justify-content:center;font-size:${tam}px;letter-spacing:.01em;color:transparent;background-image:url(${fc});background-size:${W}px ${H}px;background-position:center;-webkit-background-clip:text;background-clip:text;filter:saturate(1.4) brightness(1.15);transform:scale(${esc});opacity:${1 - fuera}">JUEGOS</div>
       <div class="titulo" style="left:${x}px;top:${y}px;width:${ancho}px;height:${alto}px;display:flex;align-items:center;justify-content:center;font-size:${tam}px;letter-spacing:.01em;color:transparent;-webkit-text-stroke:3px rgba(255,255,255,.8);transform:scale(${esc});opacity:${1 - fuera}">JUEGOS</div>`;
     const k1 = eOutX(prog(t, 72.3, 73));
-    textos += `<div class="insignia" style="left:${W / 2 - 250}px;top:200px;width:84px;height:84px;font-size:52px;opacity:${k1 * (1 - fuera)}">L</div>
-      <div class="titulo" style="left:${W / 2 - 150}px;top:204px;font-family:'Space Grotesk';font-weight:700;text-transform:none;font-size:72px;letter-spacing:-.02em;opacity:${k1 * (1 - fuera)}">Laboratorio</div>`;
+    textos += `<div style="position:absolute;left:0;right:0;top:186px;height:110px;display:flex;align-items:center;justify-content:center;gap:24px;opacity:${k1 * (1 - fuera)}">
+      <div style="width:104px;height:104px;flex:none;transform:rotate(${lerp(-90, 0, k1)}deg)">${LOGO}</div>
+      <div class="titulo" style="position:static;font-family:'Space Grotesk';font-weight:700;text-transform:none;font-size:80px;letter-spacing:-.03em" translate="no">Paginita-Pro</div></div>`;
     if (t >= 74) { const k2 = eOutX(prog(t, 74, 74.4)); textos += `<div class="chip" style="left:50%;top:810px;font-size:56px;padding:18px 40px;background:var(--nar);color:#fff;transform:translateX(-50%) scale(${lerp(1.4, 1, k2)});opacity:${k2 * (1 - fuera)}">Ya disponible</div>`; }
     if (t >= 75) textos += `<div class="centro mono" style="top:940px;font-size:46px;font-weight:700;opacity:${prog(t, 75, 75.4) * (1 - fuera)}">paginita-pro.cl</div>`;
     flash = Math.max(0, .9 - (t - 72) * 2.5) + (t >= 74 ? Math.max(0, .3 - (t - 74) * 3) : 0);
