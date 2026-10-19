@@ -55,7 +55,7 @@ function robot(est, u, s, k) {
   return j;
 }
 
-const JUGADORES = [['UQAb0EMpvLOaBNE7tPmhCtqouh2V', 'GUGU GAGA', '#0d9488'], ['emma7', 'Emma', '#e8467c'], ['santi9', 'Santi', '#3f8cff'], ['jesus3', 'Jesús', '#22b07d']];
+const JUGADORES = [[JSON.parse(fs.readFileSync(__dirname + '/semilla.json', 'utf8')).uid, 'GUGU GAGA', '#0d9488'], ['emma7', 'Emma', '#e8467c'], ['santi9', 'Santi', '#3f8cff'], ['jesus3', 'Jesús', '#22b07d']];
 let p = null, sec = {}, k = null, est = null, pid = null;
 
 async function crea(modo = 'nomercy', semilla = 4242) {

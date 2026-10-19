@@ -4,6 +4,7 @@ const S = require('path').resolve(__dirname, '..'), R = require('path').resolve(
 const reemplaza = (ctx, re, arch, pares) => ctx.route(re, r => { let t = fs.readFileSync(path.join(R, arch), 'utf8'); for (const [a, b] of pares) { if (!t.includes(a)) console.log('reemplazo no aplica', arch, a); t = t.split(a).join(b); } r.fulfill({ body: t, contentType: 'application/javascript' }); });
 const cancionesHero = ctx => ctx.route(/\/juegos\/hero\/(api\/library|songs\/.*)$/, r => { const u = new URL(r.request().url()); const f = path.join(S, 'hero', decodeURIComponent(u.pathname.replace(/^.*\/juegos\/hero\//, ''))); fs.existsSync(f) ? r.fulfill({ path: f, contentType: f.endsWith('library') ? 'application/json' : undefined }) : r.fulfill({ status: 404 }); });
 // Escenas del sitio completo (con emulador)
+const SEM = () => JSON.parse(fs.readFileSync(__dirname + '/semilla.json', 'utf8'));
 const tframe = pg => pg.frames().find(f => /club\/tetris/.test(f.url())) || pg.mainFrame();
 const estadoTetris = pg => tframe(pg).evaluate(() => { const s = window.__tsG && window.__tsG.s; return s && { puntos: s.puntos, lineas: s.lineas, nivel: s.nivel, fin: s.fin }; });
 module.exports = {
@@ -17,7 +18,7 @@ module.exports = {
     play: async h => { const U = require('./uno-sala.cjs'); await h.sleep(1150); const j = await U.paso(); if (!j) await h.sleep(2000); } },
   // Un god pack de Componentes con legendaria (clave buscada en Node y escrita en el emulador)
   sobre: { sitio: 1, url: 'juegos.html', hash: '#jugar', vt: 1, dur: 21000, wait: 3000,
-    setup: async h => { await h.pg.evaluate(() => { localStorage.setItem('prodrop.pendiente.UQAb0EMpvLOaBNE7tPmhCtqouh2V', 'c-Trailerbc'); location.hash = '#cartas'; }); await h.sleep(9000); },
+    setup: async h => { const s = SEM(); await h.pg.evaluate(([u, k]) => { localStorage.setItem('prodrop.pendiente.' + u, k); location.hash = '#cartas'; }, [s.uid, s.sobre.k]); await h.sleep(9000); },
     play: async h => {
       if (h.hecho) return h.sleep(1000); h.hecho = 1;
       await h.sleep(900);

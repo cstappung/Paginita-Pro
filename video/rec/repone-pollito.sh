@@ -1,0 +1,1 @@
+cd "$(dirname "$0")" && node -e "const db=require('./db.cjs');const s=require('./semilla.json');db.patch('mascotasEstado/'+s.uid+'/'+s.uid+'~'+s.pollito.k,{ls:Date.now(),s:{energy:90,happiness:55,hunger:35,hygiene:30}}).then(()=>console.log('stats del pollito repuestas'))"

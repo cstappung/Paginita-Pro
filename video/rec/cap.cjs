@@ -7,7 +7,7 @@ const BASE = 'http://127.0.0.1:8123/';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
-const games = Object.assign(require('./games.cjs'), require('./escenas.cjs'));
+const games = Object.assign(require('./games.cjs'), require('./escenas.cjs'), require('./escenas3.cjs'));
 
 async function run(name, g, b) {
   const ctx = await b.newContext({ viewport: { width: g.vw || 1280, height: g.vh || 720 }, deviceScaleFactor: g.dpr || 1.5, ignoreHTTPSErrors: true });
@@ -18,8 +18,10 @@ async function run(name, g, b) {
   if (g.init) await ctx.addInitScript(g.init);
   if (g.vt) await ctx.addInitScript({ path: __dirname + '/vt.js' });
   for (const sc of g.scripts || []) await ctx.addInitScript({ path: __dirname + '/' + sc });
+  await ctx.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '.i18n-sel,.i18n-flota,.rp-fab-btn,.rp-fab{display:none!important}'; document.head.appendChild(s); }));
   const pg = await ctx.newPage();
   pg.on('pageerror', e => console.log('  [err]', name, e.message.slice(0, 140)));
+  if (process.env.CONSOLA) pg.on('console', m => { if (m.type() === 'error') console.log('  [consola]', m.text().slice(0, 200)); });
   if (g.sitio) await require('./sitio.cjs').preparaContexto(ctx);
   if (g.rutas) await g.rutas(ctx);
   await pg.goto(BASE + g.url, { waitUntil: 'load', timeout: 30000 }).catch(e => console.log('goto', e.message));
@@ -88,7 +90,7 @@ async function runVT(name, g, ctx, pg, h, dir) {
     for (let f = 0; f < pasos; f++) {
       if (g.ffHasta && f % 60 === 0 && f > 0 && await g.ffHasta(v).catch(() => false)) { console.log(name, 'ffHasta cumplido en', (f * DT / 1000).toFixed(1), 's'); break; } await settle(); await todos(dt => window.__vt && window.__vt.step(dt), DT); vnow += DT;
       for (let i = sleepers.length - 1; i >= 0; i--) if (sleepers[i].at <= vnow) { sleepers[i].r(); sleepers.splice(i, 1); }
-      if (g.alAvanzar && f % 300 === 0) await g.alAvanzar(v).catch(() => {}); }
+      if (g.alAvanzar && f % (g.cadaAvance || 300) === 0) await g.alAvanzar(v).catch(() => {}); }
     console.log(name, 'avance', g.ff / 1000, 's de juego en', (Date.now() - t0) / 1000, 's'); }
   if (g.alGrabar) await g.alGrabar(v).catch(e => console.log('alGrabar', e.message));
   for (let f = 0; f < N; f++) {

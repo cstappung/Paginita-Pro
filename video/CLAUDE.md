@@ -30,6 +30,25 @@ nada de aquí se carga desde una página, y `video/` no está en `stamp-version.
   CSS vivas. `prep.sh` pasa clips a cuadros jpg, `clips.py` escribe `clips.json` (encuadre de cada toma),
   `render.cjs [desde hasta paso]` renderiza, `musica.py`/`musica2.py` sintetizan la música (numpy) y
   `mezcla.py` pone CHINCHONCHIN en el tramo de PRO HERO, sincronizada con `tomas/hero.json`.
+- **v3 (112 s)**: `trailer3.html` se arma con `arma3.py` desde `casino3.js` (el casino recreado: el avión
+  que sube al espacio y cobra ×27,1, y el plinko con la dorada en ×988, zoom y pausa dramática; tiempos de
+  sonido en `CASINO_AUDIO`) + `timeline3.js`. Música `musica3.py` (la pausa del plinko baja la mezcla y suenan
+  latidos, monedas y *jackpot*), `mezcla3.py` pone CHINCHONCHIN en 36–44 s. `cuadros3.cjs t…` saca cuadros
+  sueltos para revisar. Escenas nuevas en `rec/escenas3.cjs`:
+  - antes/después con trampas: `bbtanA/B` (partida guardada `sp: 1`, ronda 310 = modo SATÁN), `aleteoA/B`
+    (piloto automático e inmortal por ruta; `__aleteo.salta(147)`), `fanalA/B` (guardado con `ver: 4`, jornada 92 =
+    el Sol en fase V, las ocho mejoras en 3; `__inv` por ruta), `pdA/B` (partida guardada armada con `PD.Game`;
+    la carga no valida torres). Sin el `ver` de la prueba FANAL descarta la travesía al cargar.
+  - `record3`: la IA de `tetris-ia.js` (búsqueda de dos piezas, pozo a la derecha, tetris) juega hasta pasar a
+    Emma; a los 7,2 s deja caer todo para cerrar la partida fuera de cámara. **El `play` corre también durante
+    el `ff`**: lo que deba pasar mientras se graba espera `h.grabando` (lo pone `alGrabar`).
+  - salas (`rec/salas.cjs`): cada partida se juega entera en Node con las funciones de
+    `colabtex/tests/<juego>.test.cjs` (se cargan en un vm) y se escribe hasta la mitad; el resto entra jugada a
+    jugada. GUGU GAGA mira como espectador (los uids de los jugadores son 'a'…'d'). Memazo se arma en vivo con la
+    hora de la página; Clue es la práctica con 5 bots (`clue-bot.js`). Las páginas de sala no se desplazan con
+    `scrollBy`: el contenedor `pantalla` tiene su propio scroll (`baja()` en escenas3).
+  - `pollito`: `rec/pollito.cjs` agrega a Pío (pollito bebé amarillo) y comida; `repone-pollito.sh` le baja los
+    stats para que se deje alimentar y bañar.
 - `tomas/` — las tomas grabadas, recomprimidas para guardar (`prep.sh` las acepta igual).
   `salidas/` — tráileres terminados.
 
@@ -39,7 +58,7 @@ nada de aquí se carga desde una página, y `video/` no está en `stamp-version.
    jsDelivr (three, phaser) se sirven desde `cdn/node_modules` (`npm i three@0.160.0 phaser@3.87.0` ahí).
 2. `cd colabtex && npm install`, luego `node video/build/build.cjs`.
 3. Emulador (`video/emu`), servidor estático del repo en :8123 (`python3 -m http.server 8123`) y del
-   montaje en :8124 (desde `video/trailer`). `node video/rec/semilla.cjs`.
+   montaje en :8124 (desde `video/trailer`). `node video/rec/semilla.cjs` (escribe `rec/semilla.json`, que leen las escenas) y `node video/rec/pollito.cjs`.
 4. Copiar `tomas/*.mp4` a `clips/` (o regrabar) y `trailer/prep.sh <tomas>`; `python3 clips.py`;
    `PAGINA=trailer2.html OUTDIR=out2 node render.cjs 0 84`; ffmpeg con la mezcla.
 

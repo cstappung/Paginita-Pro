@@ -41,6 +41,7 @@ function pelaje(r) { const o = r(); return { brown: r() < 0.78 ? r() * 0.15 : 0.
   for (let i = 0; i < 2e6 && !sobre; i++) { const k = 'c-Trailer' + i.toString(36), at = base + 9000 + i, s = PM.sobre(uid, k, at); if (!s.dios) continue;
     const leg = s.cartas.map(c => PM.CARDS[c.id]).filter(c => c.tier === 3); if (leg.length) sobre = { k, at }; }
   await db.put(`cartas/s/${uid}/${sobre.k}`, { at: sobre.at, p: 80 });
-  console.log(JSON.stringify({ uid, michi: gato, regalos: reg, sobre }));
-  console.log('Pon este uid y la clave del sobre en escenas.cjs (escena «sobre») y en uno-sala.cjs (JUGADORES[0]).');
+  const datos = { uid, michi: gato, regalos: reg, sobre };
+  console.log(JSON.stringify(datos));
+  require('fs').writeFileSync(__dirname + '/semilla.json', JSON.stringify(datos, null, 1));   // lo leen escenas.cjs y uno-sala.cjs
 })().catch(e => { console.error(e); process.exit(1); });
