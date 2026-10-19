@@ -5780,9 +5780,14 @@ html[data-halloween]{
   --hw-nar:#f97316;--hw-nar2:#c2410c;--hw-mor:#7c3aed;--hw-noche:#140a1c
 }
 html[data-halloween=on]{--jg-purple:#7c3aed}
-html[data-halloween=on] body{background:linear-gradient(180deg,#faf3ea 0,#f6ebee 45%,#ecdff0 100%) fixed;background-color:#f6ebee}
+/* La página lleva un color liso; el degradado va en la capa fija del
+   fondo (`.jg-hw-fondo`, más abajo). Con `background-attachment:fixed`
+   en <body>, Safari de iOS (y otros navegadores de teléfono) lo ignoran,
+   el degradado se repetía cada alto de pantalla y al hacer scroll se veía
+   un corte horizontal. */
+html[data-halloween=on] body{background:#f6ebee}
 html[data-halloween=on][data-tema=oscuro]{--os-fondo:#0d0915}
-html[data-halloween=on][data-tema=oscuro] body{background:radial-gradient(1100px 560px at 84% -8%,#4c1d6b70,#4c1d6b00 70%),radial-gradient(900px 400px at 10% 110%,#ff7a1a1c,#ff7a1a00 70%),linear-gradient(180deg,#0d0915,#120a1c 60%,#1a0b16) fixed;background-color:#0f0a17}
+html[data-halloween=on][data-tema=oscuro] body{background:#0f0a17}
 
 /* ---- La cabecera: noche morada que arde en naranja, banderines y la
    calabaza en lugar del logo ---- */
@@ -5800,7 +5805,7 @@ html[data-halloween=on] .tab.on{background:#241328;color:#ffd2a8;box-shadow:inse
 html[data-halloween=on] .btn,html[data-halloween=on] .jg-btn{background:linear-gradient(180deg,#d24c0d,#a8360a)}
 html[data-halloween=on] .btn:hover,html[data-halloween=on] .jg-btn:hover{background:linear-gradient(180deg,#b9410b,#8c2c07)}
 html[data-halloween=on] .btn2:hover{border-color:var(--hw-nar2);color:var(--hw-nar2)}
-html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#f8efe9 90%,transparent)}
+html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#faf1eb 84%,transparent)}
 html[data-halloween=on] .jg-modos-sel{background:#efe2e6}
 html[data-halloween=on] .jg-sal-intro .jg-eyebrow{color:var(--hw-nar2)}
 html[data-halloween=on] .jg-sal-intro .jg-eyebrow::before{content:"🕸 "}
@@ -5809,7 +5814,7 @@ html[data-halloween=on] .jg-sal-multi .jg-sal-tit h2::after{content:" 👻";font
 html[data-halloween=on] .jg-lado-caja{box-shadow:inset 0 3px 0 var(--hw-nar),0 6px 22px #3b1f4f12}
 html[data-halloween=on][data-tema=oscuro] .tab.on{background:#2a1530;color:#ffc58f}
 html[data-halloween=on][data-tema=oscuro] .btn2:hover{border-color:#ff9a4d;color:#ffb070}
-html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#0d0915 86%,transparent)}
+html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#120a1c 84%,transparent)}
 html[data-halloween=on][data-tema=oscuro] .jg-modos-sel{background:#1f1426}
 html[data-halloween=on][data-tema=oscuro] .jg-sal-intro .jg-eyebrow{color:#ff9a4d}
 html[data-halloween=on][data-tema=oscuro] .jg-sal-intro h1{text-shadow:0 0 26px #ff7a1a40}
@@ -5868,6 +5873,8 @@ html[data-halloween=off][data-tema=oscuro] .jg-hw-cambia{color:#ffb070}
 .jg-hw,.jg-hw-fondo{display:none}
 html[data-halloween=on]:is(:not([data-vista]),[data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil]):not(.jg-inm) :is(.jg-hw,.jg-hw-fondo){display:block}
 .jg-hw-fondo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+html[data-halloween=on] .jg-hw-fondo{background:linear-gradient(180deg,#faf3ea 0,#f6ebee 45%,#ecdff0 100%)}
+html[data-halloween=on][data-tema=oscuro] .jg-hw-fondo{background:radial-gradient(1100px 560px at 84% -8%,#4c1d6b70,#4c1d6b00 70%),radial-gradient(900px 400px at 10% 110%,#ff7a1a1c,#ff7a1a00 70%),linear-gradient(180deg,#0d0915,#120a1c 60%,#1a0b16)}
 .jg-hw{position:fixed;inset:0;z-index:14;pointer-events:none;overflow:hidden}
 
 /* La luna con sus cráteres, arriba a la derecha. */
