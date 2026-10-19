@@ -59,7 +59,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const huellas = new Map();              // cuadro → { mia, de: Map(uid → h) }
   const propuestas = new Map();           // corte propuesto: mando → { de: Map(uid → último cuadro que tiene), desde: ms }
   const est = { cuadros: 0, esperas: 0, msEsperando: 0, maxEspera: 0, msLlegada: 0, desincronizado: null, huellasIguales: 0, cortes: [],
-    retrasos: {}, conflictos: 0 };
+    retrasos: {}, conflictos: 0, esperaDe: {} };   // esperaDe: uid → ms esperando sus botones (avisoLento)
 
   const tabla = m => { let t = tablas.get(m); if (!t) tablas.set(m, t = new Map()); return t; };
   const vivos = () => humanos.filter(h => !cortes.has(h.mando));
@@ -182,10 +182,15 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // ¿espero a alguien que todavía no llegó a la carrera (no mandó nada)? Eso es la "llegada" (cada uno carga a su
       // ritmo), no el costo de sincronizar: se cuenta aparte
       const llegada = mandos.some(m => m !== miMando && !cortes.has(m) && tabla(m).size === 0);
-      await new Promise(resolver => { espera = { cuadro, resolver, desde: t0, pedido: 0 }; revisar(); });
+      const e = { cuadro, desde: t0, pedido: 0, faltan: [] };
+      await new Promise(resolver => { espera = Object.assign(e, { resolver }); revisar(); });
       const ms = ahora() - t0;
       if (llegada) est.msLlegada += ms;
-      else { est.esperas++; est.msEsperando += ms; est.maxEspera = Math.max(est.maxEspera, ms); }
+      else {
+        est.esperas++; est.msEsperando += ms; est.maxEspera = Math.max(est.maxEspera, ms);
+        // a quién se esperó: los que faltaban justo antes de poder seguir (para avisar quién frena la sala)
+        for (const m of e.faltan) { const u = duenoDe.get(m); est.esperaDe[u] = (est.esperaDe[u] || 0) + ms; }
+      }
     }
     // los 4 puertos: conectado, botones, sx, sy, cx, cy, gl, gr (pad_web.cpp los copia al mando de cada puerto).
     // conectado = 2: ese humano se fue (desde su corte): el juego deja de esperarlo para terminar la carrera
@@ -207,6 +212,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     if (listo(cuadro)) { const r = espera.resolver; espera = null; propuestas.clear(); r(); return; }
     const t = ahora() - espera.desde;
     const faltan = mandos.filter(m => boton(m, cuadro) === undefined);
+    espera.faltan = faltan;
     if (t > ESPERA_PIDE && ahora() - espera.pedido > ESPERA_PIDE) {
       espera.pedido = ahora();
       for (const m of faltan) aTodos(empaca(2, m, cuadro), 'udp');
@@ -318,7 +324,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
 
   return { pad, alBinario,
-    estado: () => ({ ...est, carrera, cuadro: ultimo, miMando, retraso, cortes: Object.fromEntries(cortes),
+    estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, carrera, cuadro: ultimo, miMando, retraso, cortes: Object.fromEntries(cortes),
       rtt: Object.fromEntries([...rtt].map(([u, x]) => [u, Math.round(x.s)])) }),
     detener() { if (latido) clearInterval(latido); } };
 }
@@ -355,4 +361,40 @@ export function armarPlantel({ humanos, semilla }) {
     plantel.push([PESO[pj] + 3 * azar(12), pj, 1, -1]);
   }
   return plantel;
+}
+
+// El aviso de "la sala va lenta" (§70, C5). En la carrera sincronizada nadie avanza sin los botones de todos: si una PC
+// no alcanza 60 cuadros por segundo (o su conexión se atrasa), TODA la sala va a su ritmo. Cada 3 s la página compara
+// dos fotos de estado() (antes y ahora) y, si hace falta, avisa:
+//   - si yo espero más de 4 ms por cuadro y la carrera va a menos de 55 cuadros/s: a quién espero (el jugador N de la
+//     sala, en el orden de la sala), porque su PC o su conexión no dan abasto;
+//   - si yo casi no espero (< 1 ms) pero igual voy a menos de 50: la lenta es MI PC (los demás me esperan a mí).
+// Devuelve el texto del aviso, o '' si todo va bien (o si no hay carrera: menos de 30 cuadros en el rato).
+export function avisoLento(antes, ahora, ms, humanos) {
+  const cuadros = (ahora?.cuadros ?? 0) - (antes?.cuadros ?? 0);
+  if (!antes || cuadros < 30 || ms <= 0) return '';
+  const fps = cuadros / (ms / 1000), espera = (ahora.msEsperando - antes.msEsperando) / cuadros;
+  if (espera > 4 && fps < 55) {
+    let peor = null, mas = 0;
+    for (const [u, t] of Object.entries(ahora.esperaDe || {})) {
+      const d = t - (antes.esperaDe?.[u] || 0);
+      if (d > mas) { mas = d; peor = u; }
+    }
+    const n = humanos.findIndex(h => h.uid === peor) + 1;
+    return `La carrera va a ${Math.round(fps)} cuadros por segundo: espera ${n ? `al jugador ${n} de la sala` : 'a otro jugador'} (su PC o su conexión no dan abasto)`;
+  }
+  if (espera < 1 && fps < 50) return `Tu PC no alcanza 60 cuadros por segundo (va a ${Math.round(fps)}): la sala va a tu ritmo`;
+  return '';
+}
+// Lo que usa la página: una foto de estado() cada 3 s y el aviso solo si DOS ratos seguidos (6 s) salieron mal. Un
+// tirón suelto (bajar la pista con la caché vacía al empezar la carrera: medio segundo congelado y un par de segundos a
+// 25-30 cuadros) no es una PC lenta y no se avisa. Como el retardo de un relé térmico: no salta con el pico del arranque.
+export function vigiaLento(humanos, seguidas = 2) {
+  let foto = null, cuando = 0, malas = 0;
+  return (ahora, t) => {
+    const texto = avisoLento(foto, ahora, t - cuando, humanos);
+    foto = ahora; cuando = t;
+    malas = texto ? malas + 1 : 0;
+    return malas >= seguidas ? texto : '';
+  };
 }

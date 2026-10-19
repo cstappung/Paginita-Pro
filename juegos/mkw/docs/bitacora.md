@@ -498,6 +498,8 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **`correr-todo` (planilla de pruebas)** | `herramientas/correr-todo.mjs`: corre todas las pruebas del proyecto en fila, guarda lo que escribió cada una y termina con una tabla (prueba, bien, mal, tiempo). Como el banco de prueba de fin de línea de una fábrica: la misma rutina para cada placa y la planilla al final. |
 | **Falla intermitente** | Una que sale 1 de cada tantas veces (como el cuelgue al empezar la carrera, C4). Para cazarla se repite la misma prueba muchas veces guardando cada corrida aparte (`--repetir N`). Como un falso contacto: hay que golpear la placa muchas veces y registrar cada vez. |
 | **Byte de control (la trampa del `\b`)** | Un "carácter" que no es una letra sino una orden para la pantalla: el 8 es "retroceso" (*backspace*). En Python, escribir `\b` dentro de un texto normal lo convierte en ese byte; en una expresión regular de JavaScript `\b` significa "borde de palabra". Al copiar código de un lenguaje a otro con un script, el `\b` se transformó en el byte 8 y la regla dejó de funcionar sin dar error. |
+| **Aviso de sala lenta** | Un cartel que aparece sobre el juego en la carrera sincronizada cuando la sala va lenta por alguien: «espera al jugador 2 de la sala (su PC o su conexión no dan abasto)» en las demás y «Tu PC no alcanza 60 cuadros por segundo» en la lenta. Cada 3 s la página compara cuántos cuadros avanzó y cuánto esperó, y a quién. |
+| **Dos ratos seguidos (histéresis)** | El aviso sale solo si dos medidas seguidas (6 s) salen mal: un tirón suelto (la pista bajando al empezar la carrera) no avisa. Como el retardo de un relé térmico, que no salta con el pico de corriente del arranque del motor pero sí con una sobrecarga que dura. |
 
 ## 2026-10-16 · Día 1
 
@@ -4090,6 +4092,45 @@ registro mostró la causa: la pestaña A bajaba los archivos de la carrera con l
 (878 lecturas, 97 MB, 37,6 cuadros por segundo un rato). Es el costo de la primera visita, no un error de la
 sincronización. Queda para E2: bajar esos archivos durante los menús. Eso toca `mkw.mjs`, que estaba editando la otra
 sesión. C4 queda en 🟡: se vuelve a mirar si reaparece.
+
+
+### 7. Una PC lenta en la sala (C5) y el aviso de quién frena
+
+**Qué pasa:** en la carrera sincronizada nadie avanza sin los botones de todos. Si la PC de un jugador no alcanza
+60 cuadros por segundo, **toda la sala va a su ritmo**. Así fue diseñado (§62.3): saltarse dibujos para alcanzar
+al reloj, como hace Retro Rewind solo, desincronizaba la carrera. Lo que faltaba era que la gente supiera por qué.
+
+**La prueba** (`prueba-sincro --lento`: la pestaña B con la CPU frenada 2 veces por las DevTools de Chrome):
+
+- la carrera sigue siendo la misma en las dos: 10–11 huellas iguales, nunca se separó;
+- B va a ~30 cuadros por segundo y A la espera ~18–21 ms en cada cuadro; las dos avanzan al mismo paso.
+
+El freno de Chrome exagera: "2 veces" dejó a B con ~33 ms de trabajo por cuadro, cuando normalmente son ~8,5 ms (ya
+se había visto con los celulares emulados).
+
+**El aviso** (`avisoLento` y `vigiaLento` en `lockstep.mjs`, cada 3 s desde `mkw.mjs`):
+
+- `lockstep.mjs` anota a quién se esperó en cada cuadro (`esperaDe`: los que faltaban justo antes de poder seguir);
+- si yo espero más de 4 ms por cuadro y la carrera va a menos de 55 cuadros/s: «La carrera va a 26 cuadros por
+  segundo: espera al jugador 2 de la sala (su PC o su conexión no dan abasto)»;
+- si yo casi no espero pero igual voy a menos de 50: «Tu PC no alcanza 60 cuadros por segundo (va a 29): la sala va
+  a tu ritmo»;
+- solo si **dos ratos seguidos** (6 s) salen mal. La primera versión avisaba con un solo rato, y en una carrera
+  normal B mostró «Tu PC no alcanza» por el tirón de la largada: con la caché vacía la pista se baja al empezar
+  (medio segundo congelado y un par de segundos a 25 cuadros/s). Eso no es una PC lenta.
+
+**Por qué "el jugador 2 de la sala" y no su nombre:** la página del juego solo recibe los identificadores de la sala
+(`?sincro=uid1,uid2`), no los nombres. Pasar los nombres pide cambiar la sala del sitio y volver a armar sus paquetes;
+queda anotado para C6, junto con la cola de pistas.
+
+**Pruebas:**
+
+- banco `lockstep` **35/35**: la espera se anota a quien se esperó (Ana esperó 3052 ms, todos por Beto); la cuenta
+  del aviso con fotos inventadas (a 60 nada; a 30 esperando, «jugador 2»; a 30 sin esperar, «Tu PC»; sin carrera,
+  nada); un tirón suelto no avisa y dos ratos seguidos sí;
+- `prueba-sincro` normal: **11/11**, con el punto nuevo «sin avisos de sala lenta»;
+- `prueba-sincro --lento`: **11/11**. Cambian dos puntos: «A la espera, sin esperas en B» y «A avisa "espera al
+  jugador 2", B avisa "Tu PC no alcanza"».
 
 ### Trampas
 

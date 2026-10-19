@@ -28,7 +28,7 @@ import { crearPila, crearConmutador, crearEnlaceCanal, crearRouterMalla } from '
 import { crearMalla, senalPadre, senalCanal } from './malla.mjs';
 import { crearWfc } from './wfc.mjs';
 import { crearVr, presentarVr, extraerVrbr } from './vr.mjs';
-import { crearLockstep, huellaCarrera, armarPlantel, MARCA as MARCA_LOCKSTEP } from './lockstep.mjs';
+import { crearLockstep, huellaCarrera, armarPlantel, vigiaLento, MARCA as MARCA_LOCKSTEP } from './lockstep.mjs';
 import { crearPrivado } from './privado.mjs';
 import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
@@ -1093,6 +1093,14 @@ async function arrancar() {
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     M.mkwLockstep = sincro.lockstep;
     M.mkwLockstepFin = () => controles.reenviar();   // terminó la carrera: la página vuelve a mandar sus mandos
+    // cada 3 s: ¿la sala va lenta por alguien? (lockstep.mjs, avisoLento/vigiaLento; §70). Los avisos quedan en
+    // window.mkwAvisosLento para las pruebas
+    window.mkwAvisosLento = [];
+    const vigia = vigiaLento(sincro.humanos);
+    setInterval(() => {
+      const texto = vigia(sincro.lockstep.estado(), performance.now());
+      if (texto) { ui.aviso(texto, true); window.mkwAvisosLento.push(texto); }
+    }, 3000);
   }
   controles.reenviar();
 

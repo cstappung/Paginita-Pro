@@ -18,7 +18,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearLockstep, armarPlantel, PESO, RETRASO } from '/web/navegador/lockstep.mjs';
+import { crearLockstep, armarPlantel, avisoLento, vigiaLento, PESO, RETRASO } from '/web/navegador/lockstep.mjs';
 const todos = [];                 // todos los lockstep creados (al final se detienen sus pings)
 
 const { ok, nota, fin } = prueba('lockstep', 'Carrera sincronizada (sin el juego)');
@@ -199,6 +199,9 @@ try {
     ok('sin cámara lenta: la espera por cuadro cae a casi nada (con el retraso fijo de antes, la misma red espera en cada cuadro)',
        a.espera < 2 && f.espera > 4 && f.espera > 3 * a.espera,
        `espera promedio por cuadro: ${a.espera.toFixed(1)} ms adaptado (${a.ea.retrasos[1]} cuadros) contra ${f.espera.toFixed(1)} ms fijo (${f.ea.retrasos[1]})`);
+    // a quién se esperó (para el aviso de la sala lenta): con el retraso fijo, Ana esperó a Beto (y solo a él)
+    ok('la espera se anota a quien se esperó: Ana esperó a Beto', f.ea.esperaDe.beto > 0.9 * f.ea.msEsperando && !f.ea.esperaDe.ana,
+       `Ana esperó ${f.ea.msEsperando.toFixed(0)} ms en total, ${(f.ea.esperaDe.beto || 0).toFixed(0)} ms por Beto`);
   }
   // ---- una pestaña trabada al cargar (§70): sus respuestas llegan 1,6 s tarde, pero la red es rápida (y no pierde
   // nada) → retraso 3 ----
@@ -211,6 +214,24 @@ try {
     ok('una pestaña trabada un rato (cargando) no infla el retraso: en una red rápida sigue en 3, igual en las dos',
        r !== 'tarde' && ea.retrasos[1] === RETRASO && eb.retrasos[1] === RETRASO && iguales([s.ana, s.beto]),
        `${ea.retrasos[1]} y ${eb.retrasos[1]} cuadros; ${medidas.replace(/^.*— /, '')}`);
+  }
+  // ---- el aviso de la sala lenta (§70, C5): la cuenta pura, con fotos de estado() inventadas ----
+  {
+    const hs = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+    const foto = (cuadros, msEsperando, esperaDe = {}) => ({ cuadros, msEsperando, esperaDe });
+    const a0 = foto(1000, 50, { beto: 50 });
+    const bien = avisoLento(a0, foto(1180, 60, { beto: 60 }), 3000, hs);
+    const lenta = avisoLento(a0, foto(1090, 50 + 90 * 17, { beto: 50 + 90 * 17 }), 3000, hs);
+    const mia = avisoLento(a0, foto(1090, 55, { beto: 55 }), 3000, hs);
+    const sinCarrera = avisoLento(a0, foto(1010, 50), 3000, hs);
+    ok('el aviso de la sala lenta: a 60 nada; a 30 esperando a Beto, "jugador 2"; a 30 sin esperar, "Tu PC"; sin carrera, nada',
+       bien === '' && /30 cuadros.*jugador 2/.test(lenta) && /^Tu PC.*30/.test(mia) && sinCarrera === '' && avisoLento(null, a0, 3000, hs) === '',
+       `«${lenta}» · «${mia}»`);
+    // la página avisa solo si dos ratos seguidos salen mal: un tirón suelto (la pista bajando) no cuenta
+    const v = vigiaLento(hs), fotos = [[1000, 0], [1180, 3000], [1270, 6000], [1450, 9000], [1540, 12000], [1630, 15000], [1720, 18000]];
+    const salidas = fotos.map(([c, t]) => v(foto(c, 0), t));
+    ok('el aviso necesita dos ratos lentos seguidos (un tirón suelto no avisa)', salidas.map(x => x ? 'A' : '-').join('') === '-------'.slice(0, 5) + 'AA',
+       salidas.map(x => x ? 'aviso' : '·').join(' '));
   }
   // ---- el anuncio que no llega directo: a Carla no le llega el de Ana, pero Beto se lo pasa ----
   {

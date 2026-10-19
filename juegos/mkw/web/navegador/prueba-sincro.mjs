@@ -79,7 +79,8 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r({ colgada: t
   try { const kom = L.u32(0x809C18F8), arr = L.u32(kom + 0x20); for (let i = 0; i < 2; i++) marcas.push(L.u32(L.u32(L.u32(L.u32(arr + 4 * i)) + 4) + 0x14)); } catch {}
   let camara = -1; try { camara = L.u8(L.u32(L.u32(L.u32(0x809C19B8) + 0x18)) + 0x9C); } catch {}
   // etapa de la carrera (Raceinfo +0x28): 0-1 presentación y cuenta regresiva, 2 corriendo, ≥ 4 terminó
-  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), camara, av, marcas, etapa: ri ? L.u32(ri + 0x28) : -1 };
+  return { s: e.seccion, ls, pantalla: L.u8(esc + 0xB64), camara, av, marcas, etapa: ri ? L.u32(ri + 0x28) : -1,
+    avisos: window.mkwAvisosLento || [] };
 })]).catch(() => null);
 
 // 1) las dos llegan a la carrera
@@ -150,8 +151,18 @@ ok('el kart de A avanzó con lo que tocó A', (xa?.av?.[0] || 0) > 1.05, `puesto
 ok('el kart de B avanzó con lo que tocó B (y no igual que el de A)', (xa?.av?.[1] || 0) > 1.1 && Math.abs((xa?.av?.[1] || 0) - (xa?.av?.[0] || 0)) > 1e-3,
   `puesto 1: ${largo(xa, 1)} vueltas`);
 const msPorCuadro = x => x?.ls ? (x.ls.msEsperando / Math.max(1, x.ls.cuadros)).toFixed(2) : '-';
-ok('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4,
-  `A ${msPorCuadro(xa)} ms (máx ${xa?.ls?.maxEspera?.toFixed(0)}), B ${msPorCuadro(xb)} ms (máx ${xb?.ls?.maxEspera?.toFixed(0)}); esperando que el otro llegara a la carrera: A ${((xa?.ls?.msLlegada || 0) / 1000).toFixed(1)} s, B ${((xb?.ls?.msLlegada || 0) / 1000).toFixed(1)} s`);
+const esperas = `A ${msPorCuadro(xa)} ms (máx ${xa?.ls?.maxEspera?.toFixed(0)}), B ${msPorCuadro(xb)} ms (máx ${xb?.ls?.maxEspera?.toFixed(0)}); esperando que el otro llegara a la carrera: A ${((xa?.ls?.msLlegada || 0) / 1000).toFixed(1)} s, B ${((xb?.ls?.msLlegada || 0) / 1000).toFixed(1)} s`;
+const avisos = x => [...new Set(x?.avisos || [])].slice(-2).join(' / ') || 'ninguno';
+if (!process.argv.includes('--lento')) {
+  ok('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4, esperas);
+  ok('sin avisos de sala lenta', !(xa?.avisos?.length) && !(xb?.avisos?.length), `A: ${avisos(xa)} · B: ${avisos(xb)}`);
+} else {
+  // B con la CPU frenada (§70, C5): toda la sala va a su ritmo (A espera a B en cada cuadro) y las dos lo avisan:
+  // A, "espera al jugador 2"; B, "tu PC no alcanza"
+  ok('con B lenta, A la espera (la sala va al ritmo de la más lenta), sin esperas en B', Number(msPorCuadro(xa)) > 4 && Number(msPorCuadro(xb)) < 1, esperas);
+  ok('y lo avisan: A "espera al jugador 2", B "Tu PC no alcanza"', (xa?.avisos || []).some(t => t.includes('jugador 2')) && (xb?.avisos || []).some(t => t.startsWith('Tu PC')),
+    `A: ${avisos(xa)} · B: ${avisos(xb)}`);
+}
 // el retraso de la carrera (§70): lo anuncia el decisor según la red; tiene que ser el MISMO en las dos consolas
 const retrasoDe = x => x?.ls?.retrasos?.[x?.ls?.carrera] ?? x?.ls?.retraso;
 ok('las dos usaron el mismo retraso en la carrera (se adapta a la red)', retrasoDe(xa) !== undefined && retrasoDe(xa) === retrasoDe(xb),
