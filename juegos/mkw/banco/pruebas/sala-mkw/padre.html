@@ -22,6 +22,9 @@
 // fb.senalMalla) y le pasa un almacén de VR falso apenas carga (como conectarNube). Nada de Firebase.
 //   ?sala=…&uid=…&nodo=N[&anfitrion=1]&vr=VR&br=BR&relleno=normal
 //   ?sala=…&uid=…&sincro=uidA,uidB&ronda=N&relleno=normal  → la carrera sincronizada con CPU (§61), como srcMkw con est.sincro
+//   &nube=memoria → partidas en una "nube" falsa (como almacenPartidas de mkw.js sobre Storage, con sus reglas); empieza
+//                   con window.__nubeInicial si una prueba lo puso. &nube=no → la sala no conecta la nube.
+//   &juego=titulo → el marco solo arranca el juego (sin red ni modo), para probar las partidas
 import { senalCanal } from '/web/navegador/malla.mjs';
 
 const q = new URLSearchParams(location.search);
@@ -40,6 +43,33 @@ const almacenVr = {
   async top(n) { return [...nube.values()].sort((a, b) => b.vr - a.vr).slice(0, n); },
 };
 const almacenRecords = { async mio() { return null; }, async guardar() {}, async top() { return []; } };
+// ---- igual que almacenPartidas de mkw.js, sobre un Storage falso que revisa lo mismo que firebase/storage.rules ----
+// objetos: ruta → { bytes, meta }. Lo que llega del marco viene de otro "reino" (se anota y se copia, como el sitio).
+const storage = { objetos: new Map(), ops: [], reinoAjeno: null, rechazos: 0 };
+for (const [ruta, o] of Object.entries(window.__nubeInicial || {}))
+  storage.objetos.set(ruta, { bytes: Uint8Array.from(atob(o.b64), c => c.charCodeAt(0)), meta: { ...o.meta } });
+window.salaFalsa.storage = storage;
+const permiso = ruta => { if (ruta !== `mkw/${uid}/partidas.mkwp`) { storage.rechazos++; throw new Error('storage/unauthorized'); } };
+const almacenPartidas = {
+  async meta(ruta) {
+    storage.ops.push('meta'); permiso(ruta);
+    const o = storage.objetos.get(ruta);
+    if (!o) return null;
+    const c = o.meta;
+    return { huella: c.huella || '', actualizado: Number(c.actualizado) || 0, jugado: Number(c.jugado) || 0, version: c.version || '', tam: o.bytes.length };
+  },
+  async bajar(ruta) { storage.ops.push('bajar'); permiso(ruta); const o = storage.objetos.get(ruta); if (!o) throw new Error('storage/object-not-found'); return o.bytes.slice(); },
+  async subir(ruta, bytes, meta) {
+    storage.ops.push('subir'); permiso(ruta);
+    storage.reinoAjeno = !(bytes instanceof Uint8Array);
+    const datos = new Uint8Array(bytes.byteLength); datos.set(bytes);
+    const customMetadata = {};
+    for (const k of ['uid', 'huella', 'actualizado', 'jugado', 'version']) if (meta?.[k] != null) customMetadata[k] = String(meta[k]);
+    // las reglas: marcado con su uid y menos de 8 MB
+    if (customMetadata.uid !== uid || datos.length >= 8 * 1024 * 1024) { storage.rechazos++; throw new Error('storage/unauthorized'); }
+    storage.objetos.set(ruta, { bytes: datos, meta: customMetadata });
+  },
+};
 
 function enviar(tipo, datos = {}) { frame.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin); }
 // ---- igual que senalOp de colabtex/src/juegos/mkw.js (con el buzón falso) ----
@@ -77,6 +107,8 @@ const conecta = setInterval(() => {
   if (++vueltas > 240) { clearInterval(conecta); return; }
   if (typeof w?.mkwConectarVr !== 'function' || typeof w?.mkwConectarRecords !== 'function') return;
   clearInterval(conecta);
+  if (q.get('nube') === 'memoria' && typeof w.mkwConectarNube === 'function')
+    w.mkwConectarNube({ almacen: almacenPartidas, uid }).then(e => { window.salaFalsa.nubeEstado = e; }, () => {});
   w.mkwConectarRecords({ almacen: almacenRecords, uid, nombre: 'Piloto' });
   w.mkwConectarVr({ almacen: almacenVr, uid, nombre: 'Piloto' }).then(r => { window.salaFalsa.vrCargado = r; });
 }, 250);
@@ -109,6 +141,7 @@ p.set('r', String(ronda));
 // ?extra=… (solo el banco): parámetros de más para el juego, p. ej. extra=autoconducir%3D1 para que en la prueba de la
 // copa (prueba-sincro.mjs --sala --copa) los karts de los humanos también los maneje la CPU y las carreras terminen solas
 for (const [k, v] of new URLSearchParams(q.get('extra') || '')) p.set(k, v);
+if (q.get('juego') === 'titulo') for (const k of [...p.keys()]) if (!['auto', 'senal', 'uid'].includes(k)) p.delete(k);
 frame.src = '/index.html?' + p.toString();
 document.getElementById('cab').textContent = `Sala falsa ${pid} · ${uid} · ${p.get('sincro') ? 'carrera sincronizada con CPU' : 'nodo ' + p.get('nodo')}${p.get('anfitrion') ? ' · anfitrión' : ''}`;
 </script>

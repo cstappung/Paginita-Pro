@@ -646,6 +646,14 @@ navegador a navegador por la malla WebRTC; `vivo/<pid>/rtc` solo presenta.
 Sin publicar, la sala de Mario Kart Wii no se puede crear. Pegar
 `firebase/database.rules.json` entero y **Publicar**.
 
+**Storage** (2026-10-18): `firebase/storage.rules` suma el bloque
+`match /mkw/{uid}/partidas.mkwp` — las partidas de cada persona en la nube
+(un paquete por cuenta, ~0,1 MB): solo su dueño lo lee y lo escribe, tope de
+8 MB, con `customMetadata.uid` igual al suyo y nunca HTML ni JavaScript. Sin
+publicarlo el juego funciona igual, pero las partidas quedan solo en ese
+navegador (la nube contesta «sin permiso» y el juego sigue con lo local).
+Pegar `firebase/storage.rules` entero en Storage → Reglas y **Publicar**.
+
 ### ⚠ Budokai Tenkaichi 3 pide publicar otra vez (2026-10-14)
 
 `'bt3'` tiene que estar en la lista del campo `juego` y en la de `logros`.

@@ -168,7 +168,7 @@ export function leerNombres(L, M) {
 const INDICE_MODO = { gp: 0, tt: 1, vs: 2, bat: 3 };
 const comoModo = m => m === 'copa' ? 'vs' : m;                         // la copa a tu gusto es una Carrera de 4
 const SEMILLAS = 0x1784;                                                // Racedata (menús): 2 semillas de la carrera
-const BOT = { A: 0x0100, B: 0x0200, abajo: 0x0004, arriba: 0x0008 };   // bits del mando de GameCube (BOTON en controles.mjs)
+export const BOT = { A: 0x0100, B: 0x0200, abajo: 0x0004, arriba: 0x0008, derecha: 0x0002 };   // bits del mando de GameCube (BOTON en controles.mjs)
 // páginas donde solo hay que aceptar: título, licencias, menú principal, personaje, kart, la de RR antes del derrape,
 // copas, variante de la pista, y las de crear licencia (elegir Mii, confirmar…)
 const PAGINAS_A = new Set([0x57, 0x65, 0x52, 0x5a, 0x6b, 0x6c, 0x10e, 0x6e, 0x6f, 0x101, 0x60, 0x66, 0x51]);
@@ -363,6 +363,46 @@ export function crearPiloto({ lector: L, controles, alAviso = () => {}, esperarE
     }
     return true;
   }
+  // Hasta una pantalla del menú, y ahí se detiene (el menú de inicio «JloKart», bitácora §67): lo demás lo elige la
+  // persona con los menús del juego. Single Player = { pagina: 0x69, seccion: 0x48 } (el menú «Un jugador»);
+  // Multiplayer en este PC = { pagina: 0x5a, alLlegar: un toque a la derecha } (el menú principal con el cursor en
+  // «2 Players»). En el camino: A en las pantallas de solo aceptar (título, licencias, crear licencia), A en el menú
+  // principal si el destino está más adentro (el cursor parte en «1 Player»), y en una pantalla desconocida (avisos de
+  // Retro Rewind) A si sigue ahí a los 2,5 s. Esc o Start en un mando: la persona toma el control (como ir()).
+  async function hasta({ pagina, seccion, alLlegar = async () => {}, tope = 90000 }) {
+    activo = true; cancelado = false;
+    const tocaPersona = e => { if (e.isTrusted && e.key === 'Escape') cancelado = true; };
+    addEventListener('keydown', tocaPersona, true);
+    let inicio = 0;                     // el tope cuenta desde que el juego muestra algo (puede pedirse mientras carga)
+    let paginaAntes = -1, listoDesde = 0, desconocidaDesde = 0;
+    try {
+      while (!cancelado) {
+        const e = L.estado(), p = e.pagina;
+        if (!inicio && e.seccion > 0) inicio = performance.now();
+        if (inicio && performance.now() - inicio > tope) { alAviso('No pude llegar solo: sigue tú desde el menú.', true); return false; }
+        if (tomaElMando()) { cancelado = true; break; }
+        if (p !== vistas[vistas.length - 1]) vistas.push(p);
+        if (e.seccion > 0 && e.seccion < 0x30) return false;                // una carrera (no debería): nada que hacer
+        if (p !== paginaAntes) { paginaAntes = p; listoDesde = performance.now() + 300; desconocidaDesde = performance.now(); }
+        if (performance.now() < listoDesde) { await espera(60); continue; }
+        if (p === pagina && (seccion === undefined || e.seccion === seccion)) {
+          await alLlegar(toque); alAviso(''); return true;                   // llegamos: lo demás lo hace la persona
+        }
+        const despues = ms => { listoDesde = performance.now() + ms; };
+        if (p === PAGINA.menuPrincipal && pagina !== PAGINA.menuPrincipal) { await toque(BOT.A); despues(2500); continue; }
+        if (e.seccion === SECCION.unJugador && pagina === PAGINA.menuPrincipal) { await toque(BOT.B); despues(2000); continue; }   // se pasó
+        if (PAGINAS_A.has(p) || e.seccion === 0x45) { await toque(BOT.A); despues(1300); continue; }
+        if (e.seccion > 0 && performance.now() - desconocidaDesde > 2500) { await toque(BOT.A); despues(2500); desconocidaDesde = performance.now(); continue; }
+        await espera(60);                       // cargando o una animación: esperar
+      }
+      alAviso(cancelado ? 'Tomaste el control: sigue tú.' : '');
+      return false;
+    } finally {
+      controles.pilotar(0);
+      removeEventListener('keydown', tocaPersona, true);
+      activo = false;
+    }
+  }
   // En línea (la sala del sitio, bitácora §59): del título hasta «VS mundial» → buscando rivales. Antes de entrar
   // espera a que la red esté lista (redLista(): el WFC de la sala alcanzable por la malla), así el juego no intenta
   // conectarse a un servidor que todavía no existe. Las páginas (vistas al jugar en §58):
@@ -408,5 +448,5 @@ export function crearPiloto({ lector: L, controles, alAviso = () => {}, esperarE
       activo = false;
     }
   }
-  return { ir, seguirCopa, enLinea, get activo() { return activo; }, cancelar() { cancelado = true; }, get paginas() { return vistas.slice(); } };
+  return { ir, hasta, seguirCopa, enLinea, get activo() { return activo; }, cancelar() { cancelado = true; }, get paginas() { return vistas.slice(); } };
 }

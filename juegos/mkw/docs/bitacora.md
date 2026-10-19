@@ -415,6 +415,73 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Carrera entre procesos (race condition)** | Un error que aparece o no según cuál de dos cosas que corren a la par llega primero (aquí: la página borrando la semilla y el juego leyéndola). Es como dos señales que llegan a un flip-flop sin sincronizar: el resultado depende de cuál gana por nanosegundos. Se arregla imponiendo el orden (esperar a que una termine antes de la otra), no "esperando un poquito". |
 | **Etapa (del plan)** | Un grupo de tareas que se cierra entero antes de pasar al siguiente (A: poner el trabajo a salvo, B: publicar en privado, C: en línea…). Están en `PLAN.md`, "Lo que falta, en orden". |
 
+### Publicar en privado: el Worker, el token y R2 (§65)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Token de Firebase (JWT)** | Un texto firmado por Google que dice "esta persona inició sesión, es tal uid, vale hasta tal hora" (una hora). El Worker revisa la firma con las claves públicas de Google, el proyecto y la hora; si todo calza, sabe quién pide sin preguntarle a nadie. Como una credencial con foto, holograma y fecha de vencimiento. |
+| **Pregunta previa (preflight de CORS)** | Antes de un pedido "no simple" a otro sitio (por ejemplo, con la cabecera `Authorization`), el navegador pregunta primero con `OPTIONS` si está permitido; el servidor contesta qué cabeceras y métodos acepta. El navegador recuerda la respuesta un rato, **por dirección**: por eso hay una pregunta previa por cada archivo distinto. Como pedir permiso en portería la primera vez que vas a una oficina. |
+| **Blob** | Un pedazo de bytes guardado en la memoria de la página, con una dirección local (`blob:…`) que solo ella entiende. Sirve para importar un programa que se bajó con fetch (con el token), porque `import()` no deja poner cabeceras. |
+| **Bucket y prefijo (R2)** | Un bucket es un "disco en la nube" de Cloudflare R2; cada archivo es un objeto con una llave (su nombre completo). El prefijo es el comienzo común de las llaves: todo lo de Mario Kart empieza con `mkw/`, así convive con los pedazos de BT3 en el mismo bucket sin mezclarse. |
+| **API S3 y firma (Signature V4)** | S3 es la forma de hablar con un "disco en la nube" que inventó Amazon y que R2 también entiende. Cada pedido va firmado: una cadena de cuentas HMAC-SHA256 con el secreto, la fecha, la región y el contenido del pedido. El secreto no viaja; viaja la firma, que solo vale para ese pedido y por unos minutos. Como un sello lacrado que depende del contenido de la carta. |
+| **HMAC** | Una huella (SHA-256) que se calcula mezclando el mensaje con una clave secreta: solo quien tiene la clave puede producirla o comprobarla. |
+| **Vector de prueba (de una firma)** | El ejemplo publicado por AWS con entradas fijas y su firma esperada (`f0e8bd…`). Si nuestra cuenta da exactamente esos 64 dígitos, está bien hecha: con un error cualquiera daría otros. |
+| **Arnés (de prueba)** | Un programa que monta alrededor de una pieza lo que en producción pone otro (aquí: el bucket, las claves de Google y la red alrededor del Worker), para probar la pieza de verdad sin el resto. Como un banco de pruebas con fuente, carga y osciloscopio alrededor de una placa. |
+| **Caché del borde (Cloudflare)** | Cloudflare tiene servidores en muchas ciudades (el "borde"); el Worker corre en el más cercano. R2 no tiene servidores en Sudamérica, así que cada pedazo viaja lejos, salvo que el Worker lo deje guardado en el caché de ese servidor cercano (solo funciona con un dominio propio, no en `*.workers.dev`). |
+| **Reino (realm) de JavaScript** | Cada página y cada marco (iframe) tiene su propio juego de clases de JavaScript: un `Uint8Array` hecho en el marco del juego no es «`instanceof Uint8Array`» para la página de la sala, aunque tenga los mismos bytes. El SDK de Firebase revisa así lo que le pasan y rechaza lo del otro reino; por eso lo que va y viene entre el marco y la sala se **copia**. Como dos tableros con distinto estándar de enchufe: el aparato funciona igual, pero sin adaptador no entra. |
+
+### Botones escondidos, la cortina y entrar directo al juego (§66)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Control (de un menú del juego)** | Cada cosa que se ve en una pantalla del menú (un recuadro, un texto, un botón) es un objeto en la memoria con su posición, su dibujo y un byte **escondido** (+0x80: 1 = no se dibuja). Un **botón** además tiene un "manipulador" que recibe el mando y unos **bits de quién puede elegirlo** (uno por jugador; 0 = nadie). Como en un tablero: cada piloto luminoso y cada pulsador es un componente con su borne de habilitación. |
+| **Vtable (la firma de una clase)** | La primera palabra de cada objeto de C++ apunta a la tabla de funciones de su clase: todos los botones de la misma clase tienen ahí el mismo número (por ejemplo 0x808B776C = PushButton). Sirve para reconocer qué es un objeto mirando la memoria. Como el código de colores de una resistencia: dice qué es sin desarmarla. |
+| **Administrador de mandos (de una página)** | El objeto de cada pantalla que reparte el mando entre sus botones (a quién mover el cursor, a quién le toca la A). Cada botón guarda su dirección: así se sabe de qué pantalla es un botón aunque viva lejos en la memoria. |
+| **Cortina** | Una capa de la página encima del juego que lo tapa mientras carga y mientras el piloto recorre solo los menús; se va con un fundido cuando hay algo que mirar (el título, la carrera o la sala). Es nuestra (no tiene nada del juego). Como el telón de un teatro mientras cambian la escenografía. |
+| **Portada** | La tarjeta de inicio de la página (título, «Tu partida», «Jugar» y la lista de modos). Desde §66 no aparece: la página entra directo al juego. Queda con `?portada=1` para las pruebas que miran la página sin el juego. |
+
+### El menú de inicio «JloKart Wii» y el ensayo general (§67)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Máscara (de una imagen)** | Una segunda imagen del mismo tamaño, en blanco y negro, que dice qué píxeles se tocan (1) y cuáles no (0). Aquí marca los 4 botones pintados y la flecha que se borran. Como la cinta de pintor: donde está, entra la pintura nueva; donde no, queda lo de antes. |
+| **Relleno «pull-push» (empujar y tirar)** | Una forma de rellenar un hueco en una imagen: se achica la imagen a la mitad una y otra vez promediando solo los píxeles buenos (el hueco se va cerrando), y al volver a agrandarla cada tamaño usa lo suyo donde lo tiene y lo de más abajo para el hueco. Da un relleno suave, parecido a un fondo desenfocado. Como estimar la temperatura en un punto sin sensor con el promedio de los sensores vecinos, primero los cercanos y después los lejanos. |
+| **Relleno por filas** | Rellenar cada fila del hueco con una mezcla en línea recta entre el color de su borde izquierdo y el del derecho (interpolación lineal). Continúa las rayas horizontales de velocidad del fondo. Es lo mismo que unir dos puntos de una curva con una recta. |
+| **Grano (ruido de la imagen)** | La variación fina, píxel a píxel, que tiene toda foto o ilustración. Un relleno perfectamente liso se nota "plástico"; por eso se le agrega un ruido de la misma intensidad que el de la imagen. Como el ruido de fondo de una señal: si de repente desaparece en un tramo, se nota el corte. |
+| **WebP** | Un formato de imagen comprimida (como JPG, pero ~30 % más chico a la misma calidad). La imagen del menú pesa 264 KB así. |
+| **Blob y dirección local (`blob:`)** | Un *blob* son bytes que la página tiene en memoria (aquí, la imagen que llegó del Worker). `URL.createObjectURL` le da una dirección local (`blob:…`) que una etiqueta `<img>` puede mostrar como si fuera un archivo de internet. Sirve porque la imagen se pide con el token (una cabecera que un `<img>` normal no sabe poner). |
+| **Vidrio esmerilado (`backdrop-filter`)** | Un efecto de la página que desenfoca lo que hay detrás de un elemento, como un vidrio pavonado. El panel de los botones lo usa para que la zona rellenada se vea como parte del menú. |
+| **Fase de captura (de un evento)** | Cuando se aprieta una tecla, el navegador avisa primero "de afuera hacia adentro" (captura) y después "de adentro hacia afuera" (burbuja). El menú escucha en la captura de la ventana: ve la tecla antes que nadie y, si la usa, la corta (`stopImmediatePropagation`) para que no le llegue al juego. Como un relé de protección que actúa antes que el resto del circuito. |
+| **Flanco (botón recién apretado)** | Lo que el menú mira de un botón del mando no es "está apretado" sino "pasó de suelto a apretado" entre una lectura y la siguiente: así un botón que se mantiene no elige diez veces. Es la detección de flanco de subida de la electrónica digital. |
+| **Auto-repetición** | Mantener la cruz hacia abajo mueve el cursor una vez, espera 380 ms y después sigue moviendo cada 150 ms, como el teclado de un computador. |
+| **Silenciar los controles** | Mientras el menú de inicio está, `controles.silenciar(true)` hace que al juego le llegue solo lo que aprieta el piloto (nada de la persona), pero el menú sigue leyendo lo que se aprieta. Como cortar la salida de un amplificador dejando el medidor conectado a la entrada. |
+| **`navigator.webdriver`** | Una marca que el navegador pone en `true` cuando lo maneja un programa de pruebas (Playwright). La página la usa para no mostrar el menú de inicio en las pruebas automáticas (que esperan el juego directo), salvo que la dirección diga `?inicio=1`. |
+| **Contenedor de referencia (para `position: fixed`)** | Un elemento "fijo" se mide normalmente contra la ventana. Pero si alguno de sus padres tiene `transform`/`translate` o `container-type`, se mide contra ese padre. Esto pasaba en el teléfono parado: los botones quedaban pegados al borde de la imagen y no al de la pantalla. |
+| **Ensayo general (B5)** | Probar todo el camino de publicación en este PC antes de hacerlo de verdad: el sitio servido como GitHub Pages, el programa final, el Worker de verdad (con un token de prueba de un amigo), la latencia de R2, primera y segunda visita. |
+
+### La pantalla negra al caer del mapa (§68)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Transición (de rayas)** | El efecto con que el juego pasa de una imagen a otra: aquí, rayas horizontales negras que se van ensanchando hasta tapar todo (como una persiana que se cierra), un rato en negro, y las rayas que se abren. Mario Kart Wii la usa cuando Lakitu rescata a un kart que se cayó: mientras está negro, el juego lo mueve de vuelta a la pista sin que se vea el salto. Como apagar la luz del escenario para cambiar los muebles. |
+| **Screencast (de las DevTools)** | Una función de Chrome que entrega cada imagen que de verdad llega a la pantalla (ya armada con la página encima), con su hora. Sirve para medir lo que **ve** la persona, no lo que el programa cree que dibujó. Como poner una cámara frente al monitor en vez de medir la señal en la placa. |
+| **Brillo (luminancia)** | Cuánta luz tiene una imagen: el promedio, píxel por píxel, de 0,299·rojo + 0,587·verde + 0,114·azul (el ojo ve más el verde), de 0 (negro) a 255 (blanco). Bajo 3 es negro del todo. |
+
+### El jugar.bat: la página de Juegos en esta PC (§69)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Emulador de Firebase** | Un programa oficial de Google que imita, en la propia PC, los servicios de Firebase que usa el sitio: las cuentas (Authentication), la base de datos en tiempo real y el almacén de archivos (Storage), **con las mismas reglas de seguridad** del sitio. Como simular un circuito en SPICE antes de soldarlo: se comporta como el de verdad, pero nada sale de la PC, no se gasta nada y se puede borrar y empezar de cero. Necesita Java (la base y Storage están escritos en Java). |
+| **Cuenta de mentira (del emulador)** | Un usuario que el emulador de cuentas acepta sin pasar por Google: aquí Piloto Uno, Dos y Tres y el Intruso, con correos `@paginita.test` (`.test` es un dominio reservado que no existe en internet). Al apretar «Iniciar sesión», en vez de la ventana de Google aparece la del emulador con la lista para elegir. |
+| **Token sin firma y re-firmado** | Las credenciales (tokens) que entrega el emulador vienen **sin firma digital** (`alg: none`). El Worker de verdad exige la firma de Google, así que el arnés local (`worker-local.mjs --emulador`) las vuelve a firmar con su clave de prueba, sin cambiar lo de adentro (quién es, su correo, cuándo vence), y el Worker hace su revisión de siempre: firma, proyecto, vencimiento y que el correo esté en la lista de amigos. Como un documento que llega sin timbre y la notaría de prueba le pone el suyo para que el revisor lo acepte; el Worker publicado no cambia: allá un token sin firma se rechaza. |
+| **Perfil de Chrome (`--user-data-dir`)** | La carpeta donde Chrome guarda la sesión, las cookies, la caché y el almacenamiento de las páginas. Con una carpeta distinta por ventana, cada ventana es "otro PC": otra cuenta, otra caché, otras partidas guardadas. Como tener dos instrumentos iguales, cada uno con su propia memoria interna. |
+| **Contexto de navegador (Playwright)** | Lo mismo que un perfil, pero para las pruebas automáticas: un Chrome "recién instalado" con su sesión propia. La prueba usa tres a la vez (Piloto Uno, Piloto Dos e Intruso) para simular tres PC. |
+| **Filtro local del catálogo** | Una lista (`window.__JG_SOLO = ["mkw"]`) que el servidor local pone en la página de Juegos: con ella el catálogo muestra solo esos juegos. El código del sitio la ignora si la página no está en 127.0.0.1 o localhost, así que en el sitio publicado no hace nada aunque alguien la escriba (hay una prueba para eso). |
+| **Exportar al cerrar (`--export-on-exit`)** | Los emuladores guardan en disco lo que tienen (cuentas, base, archivos) cuando se apagan con Ctrl+C, y el próximo arranque lo vuelve a cargar (`--import`). Así las partidas, salas y VR de mentira siguen ahí al día siguiente. Como la memoria no volátil de un equipo: se escribe al apagarlo. |
+| **Ruta relativa** | Una dirección escrita "desde donde estoy", como `./banco/comun.js` ("la carpeta banco que está al lado de esta página"). Si la página se cambia de carpeta, la misma ruta apunta a otro lugar. Como dar indicaciones "dos cuadras a la derecha": sirven solo si se parte del mismo punto. Así se escondía el error que encontró el ensayo (ver §69). |
+| **Artifact (de claude.ai)** | Una página que claude.ai guarda y muestra dentro de su propio sitio, en una caja de seguridad. En BT3 se probó la sala abriendo un artifact en 3 pestañas. Para Mario Kart no sirve (ver §69). |
+| **Private Network Access** | Una regla de seguridad de Chrome: una página de internet no puede pedirle cosas a la red de la casa ni a la propia PC (127.0.0.1) sin permiso especial. Protege de que una página cualquiera "toque" el router o los programas locales. Por eso un artifact no puede hablar con el juego, los emuladores ni el Worker de esta PC. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -3272,7 +3339,7 @@ etapas A a F). El dueño contestó las preguntas abiertas:
 
 | Pregunta | Respuesta del dueño | Qué cambia |
 |---|---|---|
-| ¿Commits en la rama del sitio y en el repo local? ¿Push y PR? | Sí a las dos; el merge, cuando él lo diga | Etapa A: commits, push y PR a `main` sin juntar |
+| ¿Commits en la rama del sitio y en el repo local? ¿Push y PR? | Commits sí. Push y PR primero sí, y después **no** ("dont pR", 19:50) | Commits locales; sin PR ni push hasta que él lo pida |
 | ¿Qué Worker y qué lista de amigos para Mario Kart? | Los mismos de BT3; el Worker y la subida a R2 **los hace él** | Aquí se prepara todo lo que necesita (etapa B) y no se publica nada |
 | ¿El VR se mueve en la carrera sincronizada con CPU? | **No: solo en línea** (VS por el WFC de la sala) | La carrera sincronizada no escribe VR en Firebase |
 | ¿Se quita el visor de salas de Retro WFC? | Sí | Se borró `salas.mjs` y su página del banco (abajo) |
@@ -3336,6 +3403,16 @@ Resultado: `prueba-copa.mjs` **11/11**, la semilla de la carrera 4 es la pedida.
 2. **El repo local** (`MKW RETRO`): el primer commit, revisando antes `git status` contra `.gitignore` para que no
    entre nada del juego (`terceros/`, `extraido/`, `build/`).
 
+**`main` del sitio juntado en la rama (sin push).** Mientras se trabajaba, `main` avanzó (casino, Momazo, PRO
+DEFENDER, un buscador de juegos). Se juntó en la rama local, como hacen los otros PR del sitio ("Merge main …, sellos
+regenerados"): los cambios ajenos que estaban sin commit (solo sellos `?v=` y fin de línea del build) se guardaron en
+un `git stash`; los 10 archivos en conflicto eran todos del mismo tipo, **los dos lados agregaron su juego en el mismo
+lugar** de una lista (el mapa de juegos, los íconos, las monedas, el salón, las reglas, las ilustraciones, las reglas
+de Firebase), y se resolvieron dejando los dos (primero el de `main`, después Mario Kart). El bundle `juegos-app.js` se
+tomó de `main` y se volvió a compilar con `npm run build`. Una prueba nueva de `main` (el buscador: cada juego necesita
+sus "apodos" para que lo encuentren) pedía los de Mario Kart: se agregaron en `buscador.js` (el buscador se arma con la
+lista ya filtrada, así que a quien no es amigo no le aparece).
+
 **Trampa:** en el sitio, `npm run build` vuelve a sellar `?v=…` en las 35 páginas que cargan `i18n.js`; esos cambios
 de solo sello no van en el commit de Mario Kart (son ruido y chocan con cualquier otro trabajo del sitio).
 
@@ -3343,4 +3420,532 @@ de solo sello no van en el commit de Mario Kart (son ruido y chocan con cualquie
 node banco/correr.mjs licencias
 cd terceros/Paginita-Pro/colabtex && npm run build && npm run test:juegos && node tests/mkw.test.cjs
 bash herramientas/subir-kit.sh
+```
+
+## 2026-10-18 · §65 Publicar en privado: el mismo Worker de BT3, el token de Firebase y la subida a R2
+
+**Qué:** dejar todo listo para que el dueño publique Mario Kart en el sitio **solo para la lista de amigos**, igual
+que BT3, sin publicar nada desde aquí (el Worker y R2 los pone él: decisión del §64). La guía de sus pasos es
+`docs/publicar.md`.
+
+**Inventario (lo que el Worker tiene que entregar).** Lo mismo que entrega hoy el servidor de pruebas
+(`web/navegador/servidor.mjs`):
+
+| Qué | Archivos | Tamaño |
+|---|---|---|
+| El disco extraído (`/mkw/disco/…`) | 2.043 (9 de más de 100 MB, el mayor el BRSAR de sonido) | 2,69 GB |
+| Retro Rewind (`/mkw/sd/RetroRewind6/…`, `/mkw/sd/riivolution/…`) | 4.007 | 2,19 GB |
+| Base del runtime (`/wc/runtime/assets/…`) | 15 | < 1 MB |
+| El programa (`mkw.js`, `mkw.wasm.br`), semillas (`pipelines.bin`, `bloques.json`) e imágenes | ~40 | ~20 MB |
+| `manifiesto.json` (qué archivos verá el juego) y las versiones (`X-Mkw-Version`, `X-Mkw-Build`) | 2 | pocos KB |
+
+Al arrancar, el juego lee **182 archivos distintos** (de la semilla de bloques): eso importa por la pregunta previa
+de CORS (abajo).
+
+**1. El Worker: rutas `/mkw/` en el de BT3** (`terceros/Paginita-Pro/juegos/bt3/fuente/disco/worker.js`). El mismo
+archivo, la misma variable `AMIGOS`, el mismo bucket (`DISCO`) con el prefijo `mkw/`. La llave de R2 es la dirección
+sin la primera barra (`/mkw/build/mkw.js` → `mkw/build/mkw.js`), así las rutas son las del servidor de pruebas con
+`/mkw` delante y la página no cambió sus direcciones: solo recibe `?privado=<Worker>/mkw`. Qué hace:
+- primero lo de siempre: token de Firebase válido (401 si no) y en la lista (403 si no); recién después mira `/mkw/`;
+- **pedazos (Range)**: `bytes=INICIO-FIN` o `bytes=INICIO-`, recortados al final del archivo; varios rangos, "los
+  últimos N" o más de 32 MB de una vez → 416. Si R2 rechaza un rango que pasa del final, mide el archivo y recorta;
+- **el programa ya comprimido**: si el navegador acepta brotli, entrega `mkw.wasm.br` tal cual (16 MB en vez de 130)
+  con `Content-Encoding: br` (`encodeBody: "manual"`, para que Cloudflare no lo vuelva a tocar); con la huella vigente
+  (`?v=`) va guardable para siempre (immutable), como en §54;
+- **el manifiesto** con `X-Mkw-Version` y `X-Mkw-Build`, que salen de `mkw/version.json` (lo sube `subir-r2.mjs`);
+- **el caché del borde** para los pedazos, con la versión en la llave (solo con dominio propio, como BT3);
+- nada fuera de las carpetas de Mario Kart: ni lo de BT3 por `/mkw/`, ni subir, ni escapar con `..`;
+- CORS: acepta además `Range` y `HEAD`, y deja ver `X-Mkw-*` y `Content-Range`.
+
+Pruebas (`colabtex/tests/mkw-worker.test.cjs`, con claves y bucket falsos, bytes inventados): **6/6**. De paso se
+arreglaron las 7 del Worker de BT3, que fallaban **solo en Windows** desde siempre: `import()` de una ruta `C:\…`
+necesita `file://` (`pathToFileURL`). Con eso el sitio pasa de 958/966 a **972/973**: la única que queda (la del salón,
+`controles.test.cjs`) también falla solo en Windows, por las barras de las rutas (`colabtex\src\…`), y no es de Mario Kart.
+
+**2. La página pide el token** (`web/navegador/privado.mjs`, nuevo). Como el marco de BT3: le pregunta a la página de
+Juegos por postMessage (`{canal:'mkw-hijo', tipo:'token'}`) y la sala (`colabtex/src/juegos/mkw.js`) contesta con
+`auth.currentUser.getIdToken()`. El módulo reemplaza el `fetch` de la página: todo pedido que va al Worker lleva
+`Authorization: Bearer …` (y ningún otro); al arrancar salen decenas de pedidos juntos y se pregunta **una** vez; si el
+Worker dice 401 (el token dura una hora) pide uno nuevo y reintenta una vez; sin Juegos que conteste no se queda
+esperando más de una vez. `mkw.js` se baja con el token y se importa desde un **blob** (`import()` no deja poner
+cabeceras); el `.wasm` sigue compilándose mientras baja (`instantiateStreaming` sobre la respuesta de la red). Si el
+manifiesto da 401/403, la página lo dice («Inicia sesión…» / «solo para la lista de amigos»). Banco `privado`: **18/18**.
+
+**3. El ensayo con el Worker de verdad** (`herramientas/worker-local.mjs`, nuevo). Un arnés que carga **el mismo
+worker.js que se publica** y le pone alrededor lo que en Cloudflare pone la plataforma: el bucket (los archivos
+locales con las mismas llaves), las claves de Google (un par generado al arrancar) y la latencia (50 ms). Firma tokens
+de prueba para `amigo-local` en `/__token-prueba` (solo existe en el arnés). `sitio-local.mjs` lo usa ahora en vez del
+servidor de pruebas, y su página de Juegos le contesta el token al marco. Resultado (`medir-sitio --perfil pc`, primera
+visita, mismo programa):
+
+| | Servidor de antes (sin token) | Worker de verdad (token + lista + Range) |
+|---|---|---|
+| Cuadros por segundo en carrera | 58,2 | **58,8** |
+| CPU por cuadro (juego + aurora) | 14,0 ms | 13,7 ms |
+| Hilo principal ocupado | 77 % | 77 % |
+| Hasta la carrera | 76,9 s | 75,1 s |
+| Pedidos al Worker (primera visita) | 2.386 | 2.581 (+195 preguntas previas: una por archivo distinto) |
+
+Es decir: el token y la revisión de la lista no le cuestan nada al juego. **Trampa:** la primera medición con el
+Worker dio 27,5 cuadros/s con la GPU a 145 ms por cuadro (contra 14). La GPU no tiene nada que ver con de dónde salen
+los archivos: era otra cosa usando la tarjeta en ese momento. Repetida en las mismas condiciones: 58,8. Antes de
+creerle a una medición rara, repetirla.
+
+**4. La subida a R2** (`herramientas/subir-r2.mjs`, nuevo; lo corre el dueño). Arma la lista exacta (llave, bytes,
+SHA-256) en `build/web/publicar/lista.tsv`, el manifiesto con la forma de `servidor.mjs` y `version.json` (huellas de
+todo y del programa), y sube por la **API S3 de R2** directo desde el PC: no por el Worker, así no gasta pedidos del
+plan gratis ni choca con su tope de 100 MB por pedido (hay 9 archivos más grandes). Cada pedido va firmado con
+Signature V4 y cada archivo con su SHA-256 (R2 rechaza el que llegue distinto); salta lo que ya está igual (se puede
+cortar y repetir); `version.json` va al final. `--comprobar` revisa cada archivo en R2; `--sobrantes` muestra lo viejo
+sin borrar nada. No sube el `.wasm` sin comprimir (130 MB que Chrome nunca pide) y frena si el `.br` es más viejo que
+el `.wasm`. La firma da **exactamente** la del ejemplo publicado por AWS (`f0e8bd…`). Prueba con un R2 falso que revisa
+firma y huella, y archivos inventados (`node herramientas/prueba-subir-r2.mjs`): **22/22**.
+
+**5. Las partidas en la nube con la sesión de verdad (B6).** `nube.mjs` (el algoritmo: huella, subir, bajar, conflictos
+con respaldo) estaba probado desde §55 con un Firebase falso, pero nadie lo llamaba. Ahora:
+- **la sala del sitio** (`colabtex/src/juegos/mkw.js`) arma un almacén `{meta, bajar, subir}` con el Storage del sitio
+  (`mkw/<uid>/partidas.mkwp`) y se lo pasa al marco **antes** que los de VR y récords (`window.mkwConectarNube`);
+- **el marco** (`mkw.mjs`), antes de leer sus partidas, deja iguales las de este navegador y las de la cuenta
+  (`nube.alEntrar`). Por eso, dentro de la sala, la lectura **espera**: hasta 4 s a que llegue la nube y, si llegó, a
+  que termine; cada pedido a Firebase tiene su tope (8 s preguntar, 20 s bajar o subir), así que la espera siempre
+  termina. Sin sesión o si llega tarde, se juega con lo local esa visita (y la próxima se ponen al día);
+- cada guardado nuevo se sube solo unos segundos después (como mucho una vez cada 30 s) y **al esconder la pestaña** se
+  sube ya lo que esperaba turno (faltaba: cerrar justo después de guardar dejaba la cuenta atrasada; lo encontró la
+  prueba);
+- la versión que pierde un conflicto queda en **«Copias de respaldo»** (antes quedaba solo en memoria);
+- el chip de «Tu partida» dice «en tu cuenta · hh:mm» o «guardada aquí (tu cuenta no responde)»;
+- **trampa — el reino**: los `Uint8Array` del marco no le sirven al Firebase de la sala (revisa `instanceof`, y cada
+  ventana tiene sus propias clases). La sala copia lo que sube y el marco copia lo que baja;
+- **reglas de Storage**: `firebase/storage.rules` suma `match /mkw/{uid}/partidas.mkwp` (solo su dueño, 8 MB, marcado
+  con su uid, nunca HTML ni JS). Las publica el dueño (paso 5 de `docs/publicar.md`); sin ellas el juego anda igual pero
+  las partidas quedan solo en el navegador.
+
+Pruebas: sala del sitio `mkw.test.cjs` **12/12** (el almacén copia, la metadata va como texto, el orden de conexión y
+el bloque de reglas). Con el juego de verdad, `node web/navegador/prueba-nube.mjs` (**9/9**): dos navegadores vacíos
+con la misma cuenta y la sala falsa con un Storage falso que revisa lo mismo que las reglas. En A la licencia creada
+con el teclado sube sola (21 KB, a los 14 s) marcada con el uid y copiada al reino de la sala; B la baja **antes** de
+que el juego lea sus partidas (nube lista a los 0,5 s, lectura después) y arranca con esa licencia; al volver a entrar
+solo se pregunta la huella; sin nube el juego espera 4,1 s y sigue. Las de antes siguen bien (partidas 6/6, banco
+nube 23/23, guardado 15/15).
+
+**6. Las semillas del programa final (B2).** Con el programa final (127,6 MB; 16,5 MB en brotli) se rehicieron las dos
+semillas con 3 carreras (`guion.mjs --semilla`, copas 0, 13 y 5): **700 pipelines** (1,9 MB, antes 1,65) y **233
+bloques** del disco vistos en ≥ 2 carreras (58 MB, de 466 vistos). Las viejas quedaron como `*-2026-10-17.*`.
+
+```bash
+cd terceros/Paginita-Pro/colabtex && node --test tests/mkw-worker.test.cjs tests/bt3-disco.test.cjs && node tests/mkw.test.cjs
+node banco/correr.mjs privado
+node herramientas/prueba-subir-r2.mjs
+node herramientas/medir-sitio.mjs --perfil pc --etiqueta worker-real     # con el Worker de verdad
+node herramientas/medir-sitio.mjs --perfil pc --etiqueta viejo --worker-viejo
+node herramientas/subir-r2.mjs                                          # revisar (sin red)
+node web/navegador/prueba-nube.mjs                                     # partidas en la nube, con el juego (9 puntos)
+```
+
+## 2026-10-18 · §66 Sin portada, la cortina y los botones que aquí no sirven
+
+**Qué pidió el dueño** (mientras se cerraba la etapa B): «debes ocultar el menú de MK Retro Rewind». Preguntado cuál,
+eligió tres cosas: **la portada de la página**, **los menús del juego mientras el piloto entra solo** y **los ajustes de
+Retro Rewind** (los botones del juego que aquí no sirven).
+
+**1. Sin portada: directo al juego.** La tarjeta de inicio (título, «Tu partida», «Jugar», la lista de modos) ya no
+aparece: la página arranca el juego sola al abrirse, como en la sala del sitio. Lo que vivía ahí sigue a mano:
+«Cargar mi partida», descargar y las copias en el cajón **Partida**, y **«Mi Mii»** es un botón nuevo ahí mismo. Los
+modos ahora son los del propio juego (sus menús); la página solo lleva directo cuando la dirección lo pide (`?modo=…`,
+lo que usa la sala). Una preferencia vieja de «Gran Premio» guardada en el navegador ya no dispara al piloto. Con
+`?portada=1` la portada vuelve (para las pruebas que miran la página sin el juego: elegir pista, táctil, partidas).
+
+**2. La cortina.** Una capa nuestra (el cielo de noche con «Mario Kart Wii + Retro Rewind», una barra que va y viene y
+una línea de estado) tapa la pantalla **desde el primer instante** (está en el HTML, así nunca se ve nada antes de
+tiempo) y dice en qué va: «Bajando los archivos del juego…», «Preparando el juego…», «Arrancando…». Se va con un fundido:
+- **sin piloto**, cuando el juego llega a su título (sección 0x3F; medido: el arranque pasa directo de «sin sección» al
+  título, a los ~6 s);
+- **con piloto** (la sala del sitio: en línea o la copa sincronizada), cuando el piloto termina de recorrer los menús
+  («Entrando a la sala…», «Preparando la carrera…»). En la copa vuelve mientras el piloto elige las carreras 2–4. Lo
+  primero que se ve es la presentación de la pista (medido: 33 s de menús tapados en una carrera VS);
+- **Esc** le quita el mando al piloto (lo de siempre) y con eso se va la cortina; si algo falla (sin WebGPU, el Worker
+  dice 401/403, el programa no carga) la cortina queda con el error en rojo.
+Queda por debajo de los avisos, la barra, el cajón y la lista para elegir pista (que aparece encima cuando el piloto
+pregunta). `?cortina=0` la apaga (para mirar o fotografiar al piloto). La música de los menús sigue sonando debajo.
+
+**3. Los botones de Retro Rewind que aquí no sirven.** Fotografiando los menús con `guion.mjs`: el menú principal
+tiene **Single Player**, **Multiplayer** (2–4), **Retro WFC** (1 y 2 jugadores) y **License Settings**; «Un jugador»
+tiene arriba a la derecha el botón **Settings** de Retro Rewind (solo se llega con el puntero del Wiimote). Se
+esconden **«Retro WFC»** (en línea se juega solo desde la sala de Juegos: decisión del §64; dentro de la sala, con
+`modo=enlinea`, se deja porque el piloto entra por ahí) y **«Settings»** (lo pidió el dueño).
+
+Cómo, sin adivinar: el MAP de WiiCompiled tiene los nombres de las funciones del juego. `PushButton::__ct` dice la firma
+de la clase botón (vtable 0x808B776C) y dónde va su manipulador (+0x174); `PushButton::SetPlayerBitfield` dice qué
+escribe para que nadie pueda elegir un botón (+0x244 y +0x1E4 en 0). Explorando la memoria con el juego andando (cada
+candidato escondido y fotografiado):
+
+| Qué | Dónde |
+|---|---|
+| byte «escondido» de cualquier control | +0x80 (1 = no se dibuja; se comprobó escondiendo «License Settings») |
+| botones de una página | apuntan en +0x234 al administrador de mandos de su página (página +0x658); su número en +0x240 |
+| menú principal (página 0x5A) | recuadros de la página en +0x6C4 (Single), +0x838 (Multi), **+0x9AC (Retro WFC)**; botones de video (clase 0x808D35A8) números 0–3 y **4–5 (Retro WFC 1 y 2)**; License Settings = 7; Back = −100 |
+| «Un jugador» (página 0x69) | modos números 0–4 (clase 0x808D3530); **Settings = PushButton número 5** (en el montón, lejos de la página) |
+
+Para que lo escondido **ni alcance a dibujarse**, el juego avisa cada pantalla que se activa: `web/juego/paginas_nativo.cpp`
+reemplaza `Page::Activate` (0x80601AEC, igual que la semilla de §56: la traducida pasa a `_traducida` y la nuestra la
+llama y después avisa a `Module.mkwAlActivarPagina`). `web/navegador/ocultar.mjs` busca los botones de esa página
+(±256 KB alrededor de ella, por su administrador) y esconde según sus reglas, **revisando antes la forma** (clase,
+número, administrador): si otra versión de Retro Rewind cambiara algo, no se escribe nada. El cursor ya no puede bajar
+a «Retro WFC»: abajo + A desde «Single Player» entra a «Single Player». `?ocultar=0` deja el juego tal cual.
+
+Pruebas:
+- banco `ocultar` (sin el juego, memoria inventada con la forma de los menús): **11/11** — solo lo pedido, nada en la
+  sala en línea, un botón igual de otra página no se toca, con otras clases no se escribe nada;
+- `node web/navegador/prueba-menus.mjs` (con el juego): **8/8** — la cortina tapó la carga y se fue en el título; el
+  recuadro y los 2 botones escondidos y sin poder elegirse; los otros 6 a la vista; abajo + A no entra en línea;
+  «Settings» escondido; con `?ocultar=0` el recuadro se ve;
+- las de la página siguen bien con la cortina: navegador **20/20**, piloto **9/9**, partidas **6/6**, elegir pista
+  **23/23**, táctil **16/16** (la táctil simula «juego andando»: ahora además saca la cortina).
+
+```bash
+node banco/correr.mjs ocultar
+node web/navegador/prueba-menus.mjs
+node web/navegador/prueba-nube.mjs
+```
+
+## 2026-10-18 · §67 El menú de inicio «JloKart Wii», solo para los amigos, y el ensayo general (B5)
+
+**Qué pidió el dueño.** Tres mensajes seguidos: «Usa este como el starting menu» (con su imagen: «JloKart Wii», un
+piloto real con camiseta amarilla en un kart azul con el número 9, una copa en la mano, y a la derecha los botones
+Single Player, Multiplayer, Championship y Options, abajo «PRESS START»), «pero quita el championship» y «necesito que
+ese starting menu de JLo kart solo se vea para personas registradas en el cloudflare bajo un clave, como se hace en el
+bt3». Ese "registradas bajo clave" es exactamente lo de BT3: el Worker de Cloudflare revisa el **token de Firebase** de
+quien pide (la credencial con foto y vencimiento de §65) y que esté en la lista **`AMIGOS`**.
+
+### 1. La imagen: sin los botones pintados, y privada
+
+Los botones de la imagen están **pintados**: si se dejaran así, el resaltado (el botón elegido, más brillante y con la
+flecha ▶) quedaría siempre en «Single Player» aunque se eligiera otro, y «Championship» no se puede quitar de una
+pintura. Por eso `herramientas/preparar-inicio.py` (Python con OpenCV) **borra los 4 botones y la flecha** y rellena el
+hueco con el fondo, y la página dibuja **sus propios 3 botones** encima:
+
+1. una **máscara** con la forma de cada botón (una píldora: rectángulo con puntas redondas), un poco agrandada para
+   llevarse también el brillo del borde, más el triángulo de la flecha;
+2. el relleno: **75 % por filas** (cada fila, una recta entre el color de su borde izquierdo y el del derecho: continúa
+   las rayas de velocidad del fondo) **+ 25 % pull-push** (el promedio de los vecinos, de cerca a lejos: suaviza los
+   saltos de color entre filas), con un desenfoque solo vertical;
+3. un **grano** de la misma intensidad que el de la imagen (medido fuera del hueco), para que no se vea "plástico";
+4. sale en **WebP de 264 KB** (1448 × 1086) a `build/web/navegador/imagenes/inicio/jlokart.webp`.
+
+**La imagen muestra a una persona real: no va a git ni a GitHub Pages.** `build/` está en `.gitignore`;
+`subir-r2.mjs` ya sube todo `build/…/imagenes` como `mkw/build/imagenes/…`, y el Worker ya protege `/mkw/build/` con el
+token y la lista (las mismas reglas que el programa del juego). No hubo que tocar el Worker.
+
+```bash
+python -I herramientas/preparar-inicio.py "C:\Users\zilon\Downloads\Jlo Kart Wii Victory Splash.png" --prueba
+```
+
+### 2. Quién la ve: lo mismo que el disco de BT3
+
+- **La página** (`web/navegador/mkw.mjs` + `inicio.mjs`) pide la imagen al Worker con `fetch`; `privado.mjs` le pone el
+  token a todo pedido que va al Worker (§65). Llega como bytes (un *blob*) y se muestra con una dirección local
+  `blob:`. Si el Worker contesta **401** (sin sesión), **403** (no está en `AMIGOS`) o **404** (todavía no subida), el
+  menú **no aparece** y la página sigue como antes. Nadie fuera de la lista ve la imagen: ni siquiera está en el sitio.
+- **El sitio** (`terceros/Paginita-Pro/colabtex`): nueva entrada **«Mario Kart Wii · un jugador»** (`#solo/mkw`, en
+  `salon-datos.js`), igual que «Tenkaichi 3 · un jugador»: `crearMkwSolo` (en `src/juegos/mkw.js`) primero le pregunta
+  al Worker si la persona es amiga (`revisaBt3`, `/soy` con el token); si no, «Este juego es privado»; si todavía no
+  hay dirección del Worker (`privado.json` vacío), «todavía no está publicado»; si sí, abre la página del juego a
+  pantalla completa en un marco (`?senal=padre&privado=<Worker>`), le contesta el token cuando lo pide, le pasa sus
+  partidas y récords de la cuenta, y atiende sus avisos: `volver` («← Juegos») y `salas` (Multiplayer → Online: abre las
+  salas de Mario Kart). La entrada, como todo lo de Mario Kart, no aparece en las listas para quien no es amigo.
+
+### 3. El menú
+
+- **Cuándo sale:** al abrir el juego **sin un modo ya decidido** (sin `?modo=` de una sala). La sala del sitio (en
+  línea o la copa con CPU) sigue entrando sola, tapada por la cortina.
+- **Mientras está**, el juego carga y arranca **debajo** (así, al elegir, ya está listo o casi), pero no recibe nada de
+  la persona: `controles.silenciar(true)`.
+- **Los botones:** 3 de verdad (Single Player, Multiplayer, Options), con la letra *Lilita One*, en el lugar de los 3
+  primeros pintados, sobre un **panel de vidrio esmerilado** que hace que la zona rellenada se vea como parte del menú.
+  El elegido brilla, late y lleva la flecha ▶; abajo, una línea dice qué hace. «PRESS START» late y tocarlo acepta.
+- **Single Player** → el menú se va, la cortina tapa al tiro («Entrando a Single Player…») y el piloto lleva el juego
+  hasta su menú **«Un jugador»** (página 0x69: Grand Prix, Contrarreloj, VS, Batalla) y ahí se detiene
+  (`piloto.hasta`, nuevo en `menus.mjs`): desde ahí se juega con los menús del juego.
+- **Multiplayer** → «Local» (este PC, 2 a 4 mandos: el piloto deja el juego en su menú principal con el cursor movido a
+  la derecha, sobre «2 Players»), «Online» (solo dentro del sitio: le avisa a Juegos que abra las salas) y «Back».
+- **Options** → el cajón de la página en «Controles». Mientras el cajón (o un diálogo) está encima, el menú no se mueve.
+- **Volver:** si la persona aprieta B hasta el título del juego, vuelve nuestro menú (el gancho de `Page::Activate` de
+  §66 avisa que se activó la página del título, 0x57).
+- **Cómo se maneja:** teclado (flechas o W/S, Enter/Espacio/K, Esc/Retroceso/J), cualquier mando (A o Start acepta, B
+  vuelve, cruz o stick mueven, con auto-repetición; se miran los **flancos**: un botón que ya estaba apretado al abrir
+  no elige nada), mouse y toque. En un **teléfono parado** la imagen va arriba y los 3 botones grandes abajo.
+- **Las pruebas automáticas no lo ven** (`navigator.webdriver`), salvo con `?inicio=1`; `?inicio=0` lo apaga.
+
+### 4. Pruebas
+
+- banco **`inicio`** (sin el juego, con una imagen **falsa** dibujada en un canvas): **14/14**. Con 401/403/404 o sin red
+  no aparece; con 200 sí, pedida una sola vez; 3 botones sin «Championship»; teclas (y lo que usa no le llega al juego);
+  Multiplayer, Esc y Back; Options; quieto con el cajón; mando (cruz con repetición, stick, A, B); clic, mouse y «PRESS
+  START»; un botón ya apretado no cuenta; «Online» solo en el sitio; acostado 1280×720 y teléfono 412×915.
+- **`node web/navegador/prueba-inicio.mjs`** (con el juego): **14/14**. Aparece con la imagen (200); silenciado; teclado
+  y submenú; Options y el cajón; el juego llega a su título debajo; Single Player → cortina al tiro → menú «Un jugador»
+  (0x69) sin cortina; B, B → vuelve el menú; Local → menú principal (0x5a); sin `?inicio=1` no aparece; **en el sitio con
+  el Worker de verdad y un token de amigo, aparece**, y Multiplayer trae «Online», que avisa a Juegos; **la página
+  suelta, sin sesión: el Worker contesta 401 y el menú no aparece**.
+- sitio: `mkw.test.cjs` **13/13** (la prueba nueva arma `crearMkwSolo` con un DOM de mentira: privado, sin publicar, el
+  marco con el oyente puesto antes de cargarlo, la dirección sin modo, los avisos solo de su marco y su origen, el token
+  fresco, la ruta, la vista y la entrada escondida); `test:juegos` **974/975** (la que falla es la de Worms con rutas de
+  Windows, de antes y ajena).
+- las demás (que el menú no debía cambiar): ver el registro del PLAN de este día.
+
+### 5. El ensayo general (B5)
+
+El programa **final** (16 MB comprimido) por el **Worker de verdad** (`sitio-local.mjs`: el sitio como GitHub Pages y el
+Worker local con un token de amigo y 50 ms de latencia), dos visitas seguidas con el mismo Chrome:
+
+| | 1.ª visita | 2.ª visita | 1.ª visita a 200 Mbit/s |
+|---|---|---|---|
+| Primer cuadro | 4,0 s | 2,2 s | 4,7 s |
+| Carrera (cuadros por segundo) | 58,9 | **60,0** | 58,6 |
+| Procesador por cuadro (promedio / p95) | 9,8 / 12,1 ms | 8,8 / 10,2 ms | 9,7 / 12,8 ms |
+| Imágenes parejas en la pantalla de 240 Hz | 81 % | **99,5 %** | 84 % |
+| Bajado del Worker | 217 MB (2.623 pedidos) | **6 MB** (43) | 210 MB |
+
+En la 1.ª visita los tirones del arranque de la carrera son del **disco que todavía está llegando** (180–380 ms de
+espera de lectura en los 3 primeros); en la 2.ª ya está en la caché de la página y la carrera va pareja. Resultados en
+`build/web/datos/medir-sitio/b5-final-pc.json` y `b5-final-red200-pc.json`.
+
+### Trampas
+
+- **El relleno salía oscuro:** el pull-push se cortaba en 8 × 11 píxeles con el hueco todavía sin cerrar (es grande: ~330
+  × 320); esas celdas vacías quedaban negras y oscurecían todo. Ahora achica hasta que no queda hueco.
+- **Relleno parejo = parche:** el pull-push solo dejaba una mancha beige lisa; el relleno por filas continúa las rayas.
+- **El teléfono parado:** `translate` y `container-type` del lienzo convierten al lienzo en la referencia de sus hijos
+  `fixed`; en el teléfono se le quitan los dos.
+- **3 repeticiones dan la vuelta:** con 3 botones, mantener la cruz 0,7 s vuelve al mismo; la prueba cuenta los cambios.
+- **En Windows `kill()` no cierra a los hijos:** `prueba-inicio` cierra el árbol entero (`taskkill /T`), si no el
+  "Worker" de `sitio-local` queda vivo ocupando su puerto.
+
+```bash
+node banco/correr.mjs inicio
+node web/navegador/prueba-inicio.mjs
+node herramientas/medir-sitio.mjs --perfil pc --etiqueta b5-final --visitas 2
+```
+
+## 2026-10-18 · §68 La pantalla negra al caer del mapa: es la transición del juego
+
+**Qué vio el dueño.** "Hay una leve pantalla en negro cuando el personaje cae del mapa y lo rescatan." La pregunta era si
+eso lo hace Mario Kart Wii a propósito o si es un error de nuestro port (por ejemplo, el juego trabado un instante
+mientras carga algo, o el renderizador dibujando mal un efecto).
+
+**Cómo se midió.** Un diagnóstico nuevo, `web/navegador/prueba-caida.mjs`, que hace la caída a propósito y graba lo que
+de verdad se ve:
+1. abre el juego en Contrarreloj (sin fantasma ni CPU) en **SNES Rainbow Road** (copa 4, pista 4: bordes sin baranda) y
+   espera el fin de la cuenta regresiva;
+2. maneja solo con el teclado (acelerar y doblar a la izquierda 1,8 s, después derecho 5 s, y otra vez): en 22 s el kart
+   se cae 3 veces;
+3. mientras, graba el **screencast** de Chrome (cada imagen que llega a la pantalla, ~60 por segundo, con su hora) y lee
+   cada 25 ms el **contador de cuadros del juego** (cuántos cuadros lleva calculados);
+4. mide el **brillo** de cada imagen y busca los tramos oscuros.
+
+La clave para distinguir los dos casos: si el juego se trabara, el contador se quedaría quieto (y en pantalla quedaría
+la última imagen, no negro). Si el contador sigue subiendo 60 por segundo mientras la pantalla está negra, el negro lo
+está **dibujando el juego**, cuadro a cuadro.
+
+Probé primero en Wii Rainbow Road, pero ahí el kart se quedó raspando una baranda (esa parte tiene) y no se cayó nunca:
+ningún tramo oscuro. Por eso la prueba usa la pista de Super Nintendo, que no tiene barandas.
+
+**Resultado** (`node web/navegador/prueba-caida.mjs`; entonces con 4 puntos, **4 bien, 0 mal**):
+
+| Rescate | Tramo oscuro | Negro del todo | Se cierra en | Cuadros del juego durante el negro |
+|---|---|---|---|---|
+| 1 | 1983 ms | 90 imágenes (~1,5 s) | 382 ms | 119 (60,0 por segundo) |
+| 2 | 1967 ms | 90 imágenes | 483 ms | 119 (60,5 por segundo) |
+| 3 | 1999 ms | 90 imágenes | 416 ms | 121 (60,5 por segundo) |
+
+Las fotos (en `build/web/datos/caida/`) muestran el efecto: **rayas horizontales negras que se ensanchan** hasta tapar
+todo (una persiana que se cierra, ~0,4 s), ~1,5 s en negro (también tapa el reloj y el mapa), y las rayas que se abren
+con el kart ya colgando de Lakitu sobre la pista. Es la **transición** con la que Mario Kart Wii esconde el salto del
+kart de vuelta a la pista.
+
+**Qué significa.**
+- **No es un tirón ni un error del port.** El juego siguió calculando 60 cuadros por segundo todo el rato, y cada
+  rescate dura lo mismo (±16 ms, un cuadro) porque lo cuenta el juego en cuadros, no el reloj de la PC. Como nuestros
+  cuadros van a la velocidad de la Wii (60 por segundo), dura lo mismo que en la consola.
+- **La forma (rayas, sin degradado) y que llegue a negro del todo** son del juego: un error de dibujo daría un corte de
+  golpe, rayas sueltas o colores raros; aquí la cortina se cierra y se abre pareja y simétrica, y la imagen vuelve
+  perfecta.
+- **Se puede acortar o sacar**, porque el dueño permite modificar el juego: habría que encontrar en el código del
+  rescate (`Lakitu::Player::UpdateRespawn`, `RaceCamera::OnRespawn`) el contador de cuadros del negro y achicarlo. Pero
+  el juego original es así, y Retro Rewind también la deja. **El dueño decidió dejarla como en el juego original**
+  (2026-10-18): no se toca.
+
+**Y "solo una porción de la pantalla".** Después el dueño contó que en su prueba la cortina tapaba **una parte** de la
+pantalla, no toda, y que debía ser "por el stretch". Tenía razón en sospechar del estirado:
+- WiiCompiled tiene un **aspecto dinámico** (`runtime/src/dynamic_aspect.cpp`): con `widescreen = true` le cambia al
+  juego el ancho de sus "pantallas" (los registros de `EGG::Screen`) para que la escena 3D llene la ventana con la forma
+  que tenga (política `AURORA_VIEWPORT_STRETCH`). En una ventana MÁS ANCHA que 16:9 (por ejemplo el programa de
+  WiiCompiled en Windows, con la ventana estirada a lo ancho) el juego dibuja una escena más ancha de lo que fue hecho:
+  lo 3D se ensancha, pero un efecto 2D como esta cortina, pensado para 16:9 como mucho, tapa solo el medio. Es como
+  proyectar una película en una pantalla más ancha que la película: el telón del cine no alcanza a cubrir los costados.
+- **En nuestra página eso no pasa**: el programa web abre su "ventana" fija en **854×480** (16:9; `main.cpp`, `windowWidth
+  = 854` con pantalla ancha), así que el juego siempre dibuja una imagen 16:9 y la página la agranda **sin deformarla**
+  (`object-fit: contain`: si la ventana del navegador tiene otra forma, quedan barras negras de la página a los lados o
+  arriba y abajo, nunca un estirado).
+
+Lo medí con un 5.º punto en la prueba: el brillo de los **bordes** de la imagen del juego (8 % de su ancho a cada lado)
+en el corazón del negro (sin los primeros y últimos 100 ms, donde todavía cruzan las últimas rayas finas):
+
+| Ventana del navegador | Imagen del juego en pantalla | Bordes en el negro | Resultado |
+|---|---|---|---|
+| 960×792 (casi cuadrada) | 960×540 (barras arriba y abajo) | 0,3 y 0,5 de 255 | **5 bien, 0 mal** |
+| 1800×760 (muy ancha) | 1352×760 (barras a los lados) | 0,0 y 0,5 de 255 | **5 bien, 0 mal** |
+
+Una trampa del camino: la primera versión del 5.º punto miraba TODAS las imágenes negras del centro y daba bordes de 4 a
+6,5 en la ventana ancha. No era un pedazo sin tapar: eran las 3 primeras y las 5 últimas imágenes del negro, cuando
+quedan las últimas rayas finas (cruzan de lado a lado, así que también tiñen los bordes). En el medio del negro, la foto
+entera da 0,0 columna por columna.
+
+**La prueba queda en el banco** (5 puntos ✓/✗): que hubo rescate y la imagen volvió; que durante el negro el juego siguió
+a 60 cuadros por segundo (si algún día se traba justo ahí, por ejemplo cargando el modelo de Lakitu, esto lo detecta);
+que se cierra de a poco y no de golpe; que cada rescate dura lo mismo; y que la cortina tapa toda la imagen, bordes
+incluidos, con la ventana que sea (`--ancho`/`--alto`).
+
+```bash
+node web/navegador/prueba-caida.mjs                       # SNES Rainbow Road, 22 s, ~3 caídas
+node web/navegador/prueba-caida.mjs --ancho 1800 --alto 760   # una ventana muy ancha: la cortina tapa toda la imagen igual
+node web/navegador/prueba-caida.mjs --copa 0 --fila 2 --plan "K+D:1500 K:4000"   # otra pista y otro manejo
+```
+
+## 2026-10-18 · §69 El jugar.bat: la página de Juegos en esta PC, solo con Mario Kart, de punta a punta
+
+**Qué pidió el dueño.** «mejor un .bat que abra el menu de la pagina, para efectos practicos solo muestrame de juegos el
+MKW y el MKW online para probar la experiencia de usuario de principio a fin y todas las features y modos que te pedi»,
+y «piensa tambien si te combiene hacerlo como artifact mejor o no, en el bt3 testeamos el online con la sesion de
+artifact abierto en 3 pestanas distintas de chrome». Reemplaza los pedidos anteriores (un jugar.bat «como se verá en la
+página» y otro .bat para la playlist y la sala).
+
+### 1. ¿Artifact o la página en esta PC? La página en esta PC
+
+Se pensó y **no conviene un artifact**, por tres razones:
+
+1. **El juego no puede ir en un artifact.** Es el programa de Nintendo traducido (más los archivos del disco y de
+   Retro Rewind): por regla nunca se publica, vive solo en R2 detrás del Worker de amigos. Un artifact es una página
+   que se sube a claude.ai.
+2. **Un artifact no puede hablar con esta PC.** Corre dentro de claude.ai con reglas de seguridad (su política de
+   contenido y la *Private Network Access* de Chrome) que no le dejan pedir nada a 127.0.0.1: ni al juego, ni a los
+   emuladores, ni al Worker local.
+3. **No sería el sitio.** Lo que hay que probar es justamente **la página de Juegos de verdad**: el catálogo, iniciar
+   sesión, la ficha de la sala, el vestíbulo, el marco del juego, las reglas de Firebase. En BT3 el artifact servía
+   porque se probaba la sala en sí; aquí la sala ya está probada en el banco y lo que falta es el camino completo.
+
+Lo bueno del método de BT3 (**varias pestañas = varias personas**) se conserva: el .bat abre **1, 2 o 3 ventanas de
+Chrome, cada una con su propio perfil**, o sea, cada una es "otro PC" con su propia cuenta.
+
+### 2. Cómo funciona (`jugar.bat` → `herramientas/experiencia.mjs`)
+
+Doble clic en **`jugar.bat`**: pregunta cuántas ventanas (1 = jugar uno; 2 o 3 = probar la sala en línea; si no se
+contesta en 15 s abre 1) y corre `node herramientas/experiencia.mjs --ventanas N`, que levanta, todo en 127.0.0.1:
+
+1. **Firebase de mentira**: los emuladores oficiales (cuentas, base y Storage) con las reglas del sitio tal cual
+   (`firebase/database.rules.json` y `storage.rules`, copiadas a `build/emuladores/` al arrancar: firebase-tools no
+   acepta reglas fuera de su carpeta). Lo jugado queda en `build/emuladores/datos` al cerrar con Ctrl+C.
+2. **Las cuentas de mentira**: Piloto Uno, Dos y Tres (en la lista de amigos) e Intruso (no está).
+3. **El sitio como GitHub Pages** (`sitio-local.mjs --emuladores --solo mkw --amigos …`) en
+   http://127.0.0.1:8150/juegos.html, con el **Worker de verdad** en 8151 (`worker-local.mjs --emulador`, que
+   re-firma los tokens del emulador y tiene como `AMIGOS` los correos de los tres pilotos).
+4. **Chrome**: una ventana por jugador (`build/perfiles/jugadorN`), lado a lado, repartiendo el ancho de la pantalla.
+
+Lo que se le agregó al sitio para esto **solo existe en esta PC**:
+
+- `colabtex/src/firebase.js`: si la página está en 127.0.0.1/localhost **y** el servidor puso
+  `window.__FIREBASE_EMU`, se conecta a los emuladores, sin App Check ni Analytics (nada sale de la PC).
+- `colabtex/src/juegos-main.js`: con `window.__JG_SOLO` (también solo en 127.0.0.1) el catálogo y las novedades
+  muestran solo esos juegos.
+- Una prueba nueva del sitio (`mkw.test.cjs`, 14/14) toma esas dos condiciones del código y las evalúa con otras
+  direcciones: en `cstappung.github.io`, en `localhost.malo.com` o en una IP de la red de la casa no hacen nada,
+  aunque alguien ponga los objetos.
+
+Otras opciones: `jugar.bat limpiar` (borra cuentas, salas, partidas y VR de mentira) y `jugar.bat suelto` (el juego
+solo, sin la página: lo que hacía el jugar.bat antes, en http://127.0.0.1:8140/).
+
+### 3. Qué se puede probar
+
+En cada ventana: «Iniciar sesión» y elegir una cuenta distinta en la ventanita del emulador. Después:
+
+- **«Mario Kart Wii · un jugador»** → el menú de inicio JloKart (§67): Single Player (Grand Prix, Contrarreloj, VS,
+  Batalla), Multiplayer → Local (2 a 4 mandos en este PC) u Online (abre la sala), Options (controles, partida, Mi
+  Mii). Las partidas se guardan en la cuenta (Storage del emulador) y los récords en la base.
+- **La sala «Mario Kart Wii»**: en una ventana «Abrir sala e invitar»; en las otras, entrar (con «Salas abiertas» o
+  el enlace). Con CPU y hasta 4 pilotos: la copa sincronizada (§61); sin CPU: VS en línea, el que mueve el VR. El
+  anfitrión aprieta «¡A correr!».
+- **Intruso**: a él no le aparece nada; con el enlace de la sala ve «Esta sala es privada».
+
+### 4. Lo que encontró el ensayo: la página no arrancaba en el sitio
+
+La primera vuelta de la prueba se quedó en «Cargando el juego…» dentro de «un jugador». La causa: `mkw.mjs` importaba
+sus verificaciones ✓/✗ con la **ruta relativa** `./banco/comun.js`. En el servidor del juego la página está en la raíz
+(`/`), y `/banco/` existe; en el sitio la página queda en `juegos/mkw/web/navegador/` y el banco en `juegos/mkw/banco/`,
+así que el navegador pedía `juegos/mkw/web/navegador/banco/comun.js`, que **no existe**: un módulo que falta tumba a
+toda la página, y el juego nunca arrancaba (ni en «un jugador» ni en la sala del sitio).
+
+¿Por qué no lo vio antes el ensayo general (B5, §67)? Porque `sitio-local.mjs` servía la página **también** en
+`/juegos/mkw/` (un atajo), y desde ahí `./banco/` sí calzaba con `/juegos/mkw/banco/`. La sala y «un jugador» del sitio
+de verdad abren la otra dirección.
+
+**Arreglo:** las verificaciones pasan a `web/navegador/verificaciones.mjs`, al lado de la página (la carpeta de la página
+ya no depende de nada de afuera), y `sitio-local.mjs` ya **no tiene el atajo**: sirve la página solo donde va a quedar en
+el sitio (su marco de `?mkw=1`, `medir-sitio.mjs` y `prueba-inicio.mjs` usan esa dirección). Sin esta prueba, el
+problema habría aparecido recién con el sitio publicado.
+
+### 5. La prueba (`node herramientas/prueba-experiencia.mjs`)
+
+Arranca el mismo ensayo sin ventanas, en otros puertos (8154/8155) y otra carpeta (`build/emuladores-prueba`, siempre
+desde cero: nunca toca lo jugado), y lo recorre como una persona, con tres "PC":
+
+| # | Qué se comprueba | Resultado |
+|---|---|---|
+| 1 | Invitado: el catálogo no muestra nada (Mario Kart es solo para amigos; lo demás lo esconde el filtro local) | ✓ 0 tarjetas |
+| 2 | Piloto Uno inicia sesión con la ventanita del emulador («Google» de mentira) | ✓ |
+| 3 | El catálogo muestra **solo** Mario Kart: «Mario Kart Wii · un jugador» y la sala «Mario Kart Wii» | ✓ 2 tarjetas |
+| 4 | Tarjeta → ficha → ▶ Practicar: el juego en su marco (`#solo/mkw`) y el menú JloKart con la imagen privada | ✓ imagen 200, 3 botones |
+| 5 | Single Player (con el mouse) → el piloto deja el juego en su menú «Un jugador» | ✓ página 0x69 |
+| 6 | Las partidas quedaron conectadas con la cuenta (Storage del emulador, con sus reglas) | ✓ «subida automática», 1 subida |
+| 7 | B hasta el título → vuelve el menú; Multiplayer → **Online** → Juegos abre la ficha de la sala | ✓ |
+| 8 | Piloto Uno abre la sala (12 pilotos, CPU normal): vestíbulo y «¡A correr!» | ✓ |
+| 9 | Piloto Dos (otro PC) entra con el enlace: «2 de 12» en las dos ventanas | ✓ |
+| 10 | Intruso: 0 tarjetas, «Este juego es privado», «Esta sala es privada» y ningún marco del juego | ✓ |
+| 11 | «¡A correr!»: el juego se abre en la sala de los dos (modo copa) | ✓ |
+| 12 | Los dos llegan solos a la carrera de la copa | ✓ a los 49 y 66 s |
+| 13 | La misma carrera en los dos: las huellas coinciden y ninguno se separó | ✓ 3 huellas iguales, cuadro 451/450 |
+
+**13 bien, 0 mal** (unos 6 minutos; `--rapida` hace los 10 primeros en ~2). Fotos en `build/web/datos/experiencia/`: el
+catálogo del amigo, el menú JloKart dentro del sitio (con su botón «← Juegos»), la ficha, el vestíbulo y la carrera en
+la sala.
+
+Lo que esta prueba demuestra que las otras no: **el camino entero por el sitio de verdad**, con las reglas de Firebase
+de verdad (crear y entrar a la sala, el buzón de la red de la carrera, las partidas en Storage) y el Worker de verdad
+(la lista de amigos decide qué ve cada cuenta).
+
+### Trampas
+
+- **«Ver opciones y abrir sala» no es el botón:** es el texto de la tarjeta del catálogo. La prueba buscaba "abrir
+  sala" y apretaba la tarjeta otra vez (que cierra la ficha): el botón de la ficha es `.jg-hoja-ya[data-f=sala]`.
+- **La dirección de la página en el sitio es `juegos/mkw/web/navegador/index.html`**, no `juegos/mkw/index.html`.
+- **Los acentos del .bat:** el archivo está en UTF-8 y la ventana de comandos lo lee con su "página de códigos" (la
+  tabla que traduce bytes a letras). `chcp 65001` la cambia a UTF-8 para que «¿Cuántas?» se vea bien, pero tiene que
+  ir **en la segunda línea**, antes de cualquier letra con acento: puesto más abajo, cmd perdía la cuenta de dónde iba
+  en el archivo y seguía en la mitad de un comentario («jugar.bat limpiar»), que intentaba correr como comando.
+- **Probarlo desde aquí** necesita la ruta completa del .bat: esta sesión de trabajo tiene la variable
+  `NoDefaultCurrentDirectoryInExePath`, que le prohíbe a cmd buscar programas en la carpeta actual. Al hacer doble
+  clic en el Explorador eso no existe. Se probó así: preguntó, abrió 1 ventana sola a los 15 s, levantó todo («Listo»)
+  y abrió Chrome con su perfil `build/perfiles/jugador1`.
+- **firebase-tools no acepta reglas fuera de su carpeta:** se copian a `build/emuladores/` en cada arranque (así
+  siempre son las del sitio).
+- **Ctrl+C en el .bat:** Windows avisa a todos los programas de la ventana; los emuladores guardan solos y el arnés los
+  espera hasta 30 s antes de terminar. Si se cierra la ventana con la X, lo de esa sesión puede no guardarse.
+- **La primera vez** firebase-tools baja los emuladores (unos 85 MB, a `%USERPROFILE%\.cache\firebase`).
+- **Puertos:** 8150/8151 (sitio y Worker) y 9099, 9000, 9199, 4400, 4500 (emuladores). Si otro jugar.bat quedó
+  abierto, el arnés lo dice y no arranca a medias.
+
+```bash
+jugar.bat
+node herramientas/experiencia.mjs --ventanas 2
+node herramientas/prueba-experiencia.mjs
+node herramientas/prueba-experiencia.mjs --rapida
 ```

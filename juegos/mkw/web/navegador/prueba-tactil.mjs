@@ -55,7 +55,7 @@ for (const orientacion of ['parado', 'acostado']) {
   const contexto = await navegador.newContext({ ...pixel, viewport: vista, screen: vista });
   const pagina = await contexto.newPage();
   pagina.on('pageerror', e => console.log('[pageerror] ' + e.message));
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/`);         // sin ?auto=1: el juego no arranca, solo la página
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);   // con la portada: el juego no arranca, solo la página
   await pagina.waitForFunction(() => window.mkwControles && document.querySelector('.mkw-tactil'));
   // El juego, al arrancar, le da al canvas su tamaño nativo (640×528); acá se hace a mano. Y se lleva el recuadro a la
   // vista, como hace la página al arrancar en el celular (el recuadro mide toda la pantalla). Se espera un poco antes:
@@ -95,8 +95,8 @@ for (const orientacion of ['parado', 'acostado']) {
      problemas.join(' | ') || `11 tamaños`);
 
   // Toques de verdad (CDP: Input.dispatchTouchEvent = el navegador cree que hay dedos en la pantalla)
-  // (con el juego andando: la tarjeta de inicio se va y deja el mando táctil a la vista, como al apretar Jugar)
-  await pagina.evaluate(() => document.body.classList.add('started'));
+  // (con el juego andando: la tarjeta de inicio y la cortina se van y dejan el mando táctil a la vista, como al llegar al título)
+  await pagina.evaluate(() => document.body.classList.add('started', 'sin-cortina'));
   await pagina.evaluate(() => window.mkwControles.ajustarTactil({ esc: 1 }));
   const m = await medir(pagina);
   await aLaVista();

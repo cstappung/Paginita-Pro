@@ -63,7 +63,9 @@ const base = path.join(salida, `${ETIQUETA}-${PERFIL}`);
 const log = createWriteStream(base + '.log');
 
 // 1) El sitio local (Pages + Worker)
-const sitio = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local.mjs'), '--puerto', String(PUERTO), '--latencia', LATENCIA],
+// (--sola: la página suelta no tiene a Juegos que le dé el token, así que va con el "Worker" de antes, sin token; §65)
+const sitio = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local.mjs'), '--puerto', String(PUERTO), '--latencia', LATENCIA,
+  ...(args.includes('--sola') || args.includes('--worker-viejo') ? ['--worker', 'servidor'] : [])],   // --worker-viejo: comparar con el de antes
   { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => { let t = ''; sitio.stdout.on('data', d => { t += d; if (t.includes('worker (')) listo(); }); });
 const PAGES = `http://127.0.0.1:${PUERTO}`, WORKER = `http://127.0.0.1:${PUERTO + 1}`;
@@ -108,12 +110,12 @@ async function medirUnaVez(visita) {
 
   const extraPagina = `&auto=1&traza=1&gpu=1${EXTRA}`;
   const t0 = Date.now();
-  if (args.includes('--sola')) await pagina.goto(`${PAGES}/juegos/mkw/index.html?privado=${WORKER}${extraPagina}`);
+  if (args.includes('--sola')) await pagina.goto(`${PAGES}/juegos/mkw/web/navegador/index.html?privado=${WORKER}${extraPagina}`);
   else await pagina.goto(`${PAGES}/juegos.html?mkw=${encodeURIComponent(extraPagina)}`);
   // el marco del juego (o la página sola)
   let juego = null;
   for (let i = 0; i < 600 && !juego; i++) {
-    juego = pagina.frames().find(f => f.url().includes('/juegos/mkw/index.html'));
+    juego = pagina.frames().find(f => f.url().includes('/juegos/mkw/web/navegador/index.html'));
     if (!juego) await pagina.waitForTimeout(100);
   }
   const cuadros = () => juego.evaluate(() => window.mkwCuadros ? window.mkwCuadros() : 0).catch(() => 0);

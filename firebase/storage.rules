@@ -43,6 +43,18 @@ service firebase.storage {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Mario Kart Wii: las partidas de cada persona (un paquete .mkwp por cuenta,
+    // juegos/mkw/web/navegador/nube.mjs). Solo su dueño la lee y la escribe;
+    // tope de 8 MB (un paquete pesa ~0,1 MB) y nunca HTML ni JavaScript.
+    match /mkw/{uid}/partidas.mkwp {
+      function esSuyo() { return request.auth != null && request.auth.uid == uid; }
+      allow read: if esSuyo();
+      allow create, update: if esSuyo()
+                            && request.resource.size < 8 * 1024 * 1024
+                            && request.resource.metadata.get('uid', '') == uid
+                            && !request.resource.contentType.matches('(?i).*(html|javascript|ecmascript).*');
+      allow delete: if esSuyo();
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

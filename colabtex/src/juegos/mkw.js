@@ -1,5 +1,6 @@
 import * as fb from "../fb-juegos.js";
-import { db } from "../firebase.js";
+import { db, auth, storage } from "../firebase.js";
+import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storage";
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
@@ -50,6 +51,31 @@ const almacenRecords = {
   async top(k, n) { return filas(await get(query(ref(db, `mkw/records/${k}`), orderByChild("ms"), limitToFirst(n)))); },
 };
 
+/* Las partidas de cada uno en la nube (juegos/mkw/web/navegador/nube.mjs): un paquete por cuenta en Storage,
+   mkw/<uid>/partidas.mkwp (firebase/storage.rules: solo su dueño lo lee y lo escribe). El marco decide qué subir o
+   bajar; esto solo habla con Firebase. Lo que va y viene se copia: los Uint8Array del marco son de otro "reino" de
+   JavaScript y el SDK de Firebase los rechaza (revisa instanceof). */
+const almacenPartidas = {
+  async meta(ruta) {
+    try {
+      const m = await getMetadata(sRef(storage, ruta));
+      const c = m.customMetadata || {};
+      return { huella: c.huella || "", actualizado: Number(c.actualizado) || 0, jugado: Number(c.jugado) || 0,
+               version: c.version || "", tam: m.size };
+    } catch (e) {
+      if (e?.code === "storage/object-not-found") return null;      // todavía no sube nada
+      throw new Error(e?.code || String(e));
+    }
+  },
+  async bajar(ruta) { return new Uint8Array(await getBytes(sRef(storage, ruta))); },
+  async subir(ruta, bytes, meta) {
+    const datos = new Uint8Array(bytes.byteLength); datos.set(bytes);
+    const customMetadata = {};
+    for (const k of ["uid", "huella", "actualizado", "jugado", "version"]) if (meta?.[k] != null) customMetadata[k] = String(meta[k]);
+    await uploadBytes(sRef(storage, ruta), datos, { contentType: "application/octet-stream", customMetadata });
+  },
+};
+
 /* La dirección del marco para este jugador: la malla de esta sala, su nodo, si corre el servidor, la CPU de relleno.
    Con `sincro` (los pilotos de la carrera sincronizada): la copa con su semilla y sus pistas, sin servidor en línea. */
 export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro }) {
@@ -65,6 +91,73 @@ export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro 
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
+}
+
+/* «Un jugador» dentro de Juegos (`#solo/mkw`): la página del juego a pantalla completa en un marco de ESTA página,
+   como crearBt3Solo, para que le pida el token de quien inició sesión y saque lo privado del Worker de amigos. Abre
+   con el menú de inicio «JloKart Wii» (juegos/mkw/web/navegador/inicio.mjs): su imagen también es privada (muestra a
+   una persona real) y solo la entrega el Worker, a la lista AMIGOS. Solo para esa lista (revisaBt3, la misma de BT3):
+   a los demás, «Este juego es privado». Lo que avisa el marco: `token` (se le contesta el de Firebase; nuevo = el
+   anterior venció), `volver` (su «← Juegos») y `salas` (Multiplayer → Online: las salas de Mario Kart). Sus partidas y
+   récords van a la cuenta, como en la sala (el VR no: solo se mueve en línea). */
+export const srcMkwSolo = origen => PAGINA + "?" + new URLSearchParams({ senal: "padre", privado: origen }).toString();
+export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl = urlPrivada }) {
+  let host = null, frame = null, muerto = false, conecta = 0;
+  const oye = e => {
+    if (muerto || !frame || e.source !== frame.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
+    const d = e.data;
+    if (d.tipo === "token") {
+      const w = frame.contentWindow;
+      Promise.resolve(auth.currentUser?.getIdToken(!!d.nuevo)).catch(() => null)
+        .then(token => { if (!muerto && frame?.contentWindow === w) w.postMessage({ canal: PADRE, tipo: "token", token: token || null }, location.origin); });
+    } else if (d.tipo === "volver") volver();
+    else if (d.tipo === "salas") enLinea();
+  };
+  /* Apenas el marco carga: sus partidas (la página las espera hasta 4 s con senal=padre) y sus récords */
+  function conectar() {
+    clearInterval(conecta);
+    let vueltas = 0;
+    conecta = setInterval(() => {
+      const w = frame?.contentWindow, u = auth.currentUser;
+      if (muerto || !w || !u || ++vueltas > 120) { clearInterval(conecta); return; }
+      if (typeof w.mkwConectarRecords !== "function") return;
+      clearInterval(conecta);
+      try {
+        if (typeof w.mkwConectarNube === "function") w.mkwConectarNube({ almacen: almacenPartidas, uid: u.uid }).catch(() => {});
+        w.mkwConectarRecords({ almacen: almacenRecords, uid: u.uid, nombre: String(u.displayName || "Piloto").slice(0, 20) });
+      } catch (err) { console.warn("[mkw] no pude pasarle la nube al marco", err); }
+    }, 250);
+  }
+  const aviso = texto => '<p class="jg-bt3-info' + (texto.privado ? ' jg-bt3-privado' : '') + '">' + texto.t + ' <a class="btn2" href="#">← Juegos</a></p>';
+  return {
+    montar(el) {
+      host = el;
+      host.innerHTML = '<p class="jg-bt3-info">Abriendo Mario Kart Wii…</p>';
+      Promise.all([revisar(), privadoUrl()]).then(([amigo, origen]) => {
+        if (muerto) return;
+        if (!amigo) { host.innerHTML = aviso({ t: "Este juego es privado.", privado: true }); return; }
+        if (!origen) { host.innerHTML = aviso({ t: "Mario Kart Wii todavía no está publicado." }); return; }
+        frame = document.createElement("iframe");
+        frame.className = "jg-bt3-solo";
+        frame.title = "Mario Kart Wii";
+        frame.allow = "fullscreen; gamepad";
+        frame.setAttribute("allowfullscreen", "");
+        window.addEventListener("message", oye);           // antes de cargarlo: lo primero que hace es pedir el token
+        frame.src = srcMkwSolo(origen);
+        host.innerHTML = "";
+        host.append(frame);
+        frame.focus();
+        conectar();
+      });
+    },
+    destruir() {
+      muerto = true;
+      clearInterval(conecta);
+      window.removeEventListener("message", oye);
+      frame?.remove();
+      if (host) host.innerHTML = "";
+    },
+  };
 }
 
 export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
@@ -112,11 +205,20 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
     if (d.tipo === "senal") { senalOp(d); return; }
+    /* El token de Firebase de quien juega, para el Worker de amigos (lo privado del juego: juegos/mkw/web/navegador/
+       privado.mjs). Igual que el marco de BT3: solo a este marco (misma página, mismo origen). nuevo = el anterior venció. */
+    if (d.tipo === "token") {
+      const w = frame.contentWindow;
+      Promise.resolve(auth.currentUser?.getIdToken(!!d.nuevo)).catch(() => null)
+        .then(token => { if (!muerto && frame?.contentWindow === w) w.postMessage({ canal: PADRE, tipo: "token", token: token || null }, location.origin); });
+      return;
+    }
     if (d.tipo === "salir") { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {} salir?.(); }
   }
 
-  /* Apenas el marco carga, le pasa los almacenes de Firebase (VR y récords) con el nombre de quien juega: el juego
-     lee el VR de la cuenta ANTES de entrar en línea (el piloto tarda más que esto en llegar a «VS mundial»). */
+  /* Apenas el marco carga, le pasa los almacenes de Firebase (partidas, VR y récords) con el nombre de quien juega:
+     el juego pone al día sus partidas con la cuenta antes de leerlas y lee el VR ANTES de entrar en línea (el piloto
+     tarda más que esto en llegar a «VS mundial»). */
   function conectarNube() {
     clearInterval(conecta);
     let vueltas = 0;
@@ -127,6 +229,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       clearInterval(conecta);
       const quien = { uid, nombre: nombre(uid).slice(0, 20) };
       try {
+        // las partidas primero: el juego las espera antes de leerlas (hasta 4 s)
+        if (typeof w.mkwConectarNube === "function") w.mkwConectarNube({ almacen: almacenPartidas, uid }).catch(() => {});
         w.mkwConectarRecords({ almacen: almacenRecords, ...quien });
         w.mkwConectarVr({ almacen: almacenVr, ...quien }).then(r => { if (r?.vr) { vrs[uid] = r.vr; pintaVestibulo(true); } }, () => {});
       } catch (err) { console.warn("[mkw] no pude pasarle la nube al marco", err); }

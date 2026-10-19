@@ -8,7 +8,10 @@
 //   - "Tu partida": lee el rksys.dat guardado y muestra sus licencias (nombre, VR, carreras, código de amigo); cargar
 //     un rksys.dat de la Wii o de Dolphin o una copia .mkwp (botón o arrastrando el archivo), descargar, borrar, y las
 //     copias de respaldo automáticas (respaldos.mjs) antes de todo lo que reemplaza la partida;
-//   - la columna de modos (window.mkwModo dice cuál se eligió; mkw.mjs lo usa al arrancar).
+//   - la columna de modos (window.mkwModo dice cuál se eligió; mkw.mjs lo usa al arrancar). La portada (tarjeta +
+//     modos) solo aparece con ?portada=1 (banco y pruebas de la página): lo normal es entrar directo al juego (§66);
+//   - la cortina (ui.cortina(texto) / ui.cortina(false)): tapa la pantalla mientras el juego carga y mientras el piloto
+//     recorre solo sus menús; ui.cortina(texto, true) la deja con un error.
 //
 // Uso (en mkw.mjs):  const ui = crearInterfaz({ guardado, sonido, controles, alCambiarGuardado });
 //                    ui.preguntar({...}), ui.avisar(...), ui.partidaCambio(), ui.sonidoCambio(), ui.empezo()
@@ -50,9 +53,13 @@ export const MODOS = [
   { id: 'mii', nombre: 'Mi Mii', texto: 'Crea o cambia tu Mii sin abrir el juego.', listo: true, accion: true },
 ];
 
-export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado = () => {}, imagenes = '/build/imagenes' }) {
+// estadoNube() = el estado de las partidas en la nube (nube.mjs) o null si no hay (sin sesión, fuera del sitio)
+export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado = () => {}, imagenes = '/build/imagenes',
+                               estadoNube = () => null }) {
   const respaldos = crearRespaldos();
   const enJuegos = window.parent !== window;
+  const conPortada = new URLSearchParams(location.search).get('portada') === '1';
+  if (conPortada) document.body.classList.add('portada');
   if (enJuegos) document.documentElement.classList.add('en-juegos');
 
   // ---------------- Diálogos ----------------
@@ -169,8 +176,15 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     $('partidaVacia').hidden = licencias.length > 0;
     const e = guardado.estado, chip = $('chipPartida');
     chip.className = 'chip' + (licencias.length ? ' bien' : '');
+    // Con sesión en el sitio: «en tu cuenta» cuando la última versión ya subió; si la nube no responde, se dice
+    const n = estadoNube();
+    const enCuenta = n && n.activa && !n.error && (n.ultimaSubida || n.bajadas || n.accion === 'iguales');
     chip.textContent = e.error ? 'error al guardar' : licencias.length
-      ? (e.ultimoGuardado ? `guardada aquí · ${hora(e.ultimoGuardado)}` : 'guardada en este navegador') : 'sin partida';
+      ? (n && n.activa && n.error ? `guardada aquí (tu cuenta no responde)`
+         : enCuenta && n.ultimaSubida && n.ultimaSubida >= (e.ultimoGuardado || 0) ? `en tu cuenta · ${hora(n.ultimaSubida)}`
+         : enCuenta && !e.ultimoGuardado ? 'en tu cuenta'
+         : e.ultimoGuardado ? `guardada aquí · ${hora(e.ultimoGuardado)}` : 'guardada en este navegador') : 'sin partida';
+    chip.title = n && n.activa ? `Partidas en tu cuenta: ${n.accion || '…'}${n.error ? ' — ' + n.error : ''}` : '';
     $('bajarRksys').disabled = !info;
   }
   pintarPartida();
@@ -264,6 +278,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     if (!b) return avisar('Todavía no hay partida', 'Juega un rato: al crear tu licencia el juego guarda su rksys.dat y ahí se puede descargar.');
     bajar(new Blob([b]), 'rksys.dat');
   };
+  $('abrirMii').onclick = () => abrirMii();            // «Mi Mii» (sin la portada, vive en el cajón)
   $('bajarPartidas').onclick = async () => bajar(await guardado.exportar(), `partida-mkw-${new Date().toISOString().slice(0, 10)}.mkwp`);
   $('borrarPartidas').onclick = async () => {
     if (!await preguntar({ titulo: 'Borrar las partidas', si: 'Borrar', peligro: true,
@@ -350,6 +365,17 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     cerrarCajon();
     barraViva();
   }
+
+  // ---------------- La cortina ----------------
+  // ?cortina=0: sin cortina (para mirar o fotografiar lo que hace el piloto en los menús)
+  const sinCortina = new URLSearchParams(location.search).get('cortina') === '0';
+  function cortina(texto, mal = false) {
+    const quitar = texto === false || sinCortina;
+    document.body.classList.toggle('sin-cortina', quitar);
+    document.body.classList.toggle('cortina-mal', !quitar && mal);   // un error: el menú de inicio se aparta (inicio.mjs)
+    if (!quitar) { $('cortinaTexto').textContent = texto; $('cortina').classList.toggle('mal', mal); }
+  }
+  if (sinCortina) cortina(false);
 
   // ---------------- Aviso sobre el juego y elegir copa/pista ----------------
   const avisoJuego = el('div', { id: 'avisoJuego', role: 'status', hidden: true });
@@ -570,6 +596,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     });
   }
 
-  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, elegirPista,
+  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, elegirPista, cortina,
+           conPortada, get cortinaPuesta() { return !document.body.classList.contains('sin-cortina'); },
            estado: t => { estado.textContent = t; } };
 }

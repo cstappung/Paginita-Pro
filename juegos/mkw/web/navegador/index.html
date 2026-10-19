@@ -42,6 +42,32 @@
   #inicio::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 14px; opacity: .55; pointer-events: none;
     background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14px 14px; }
   body.started #inicio { display: none; }
+  /* la portada solo con ?portada=1 (el banco y las pruebas de la página): lo normal es entrar directo al juego (§66) */
+  body:not(.portada) #inicio { display: none; }
+
+  /* ---- la cortina: tapa la pantalla mientras el juego carga y mientras el piloto recorre solo los menús del juego
+     (de ahí la persona pasa directo a la carrera o a la sala). Es nuestra: nada del juego. Se va con un fundido ---- */
+  #cortina { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center;
+    padding: calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl)); transition: opacity .4s;
+    background:
+      repeating-linear-gradient(100deg, #ffffff06 0 2px, transparent 2px 46px),
+      radial-gradient(ellipse 80% 55% at 50% 110%, #e8322e44, transparent 70%),
+      radial-gradient(ellipse 60% 45% at 50% -10%, #7042df66, transparent 70%),
+      linear-gradient(170deg, #120f2a, #1b1440 45%, #2a1036 80%, #300f18); }
+  #cortina::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 14px; opacity: .55; pointer-events: none;
+    background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14px 14px; }
+  /* al irse: fundido y después fuera del dibujo (visibility) y sin animar: no le cuesta nada al navegador mientras se juega */
+  body.sin-cortina #cortina, body.portada:not(.started) #cortina { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .4s, visibility 0s .4s; }
+  body.sin-cortina #cortina .carga i { animation: none; }
+  #cortina h1 { font-size: 34px; }
+  #cortina .carga { width: min(320px, 70vw); height: 6px; margin: 18px auto 12px; border-radius: 3px; background: #ffffff1f; overflow: hidden; }
+  #cortina .carga i { display: block; width: 35%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--morado), var(--lila));
+    animation: cortina-ida 1.1s ease-in-out infinite alternate; }
+  #cortina p { margin: 0; color: var(--suave); font-size: 14px; min-height: 1.5em; }
+  #cortina.mal p { color: var(--peligro); }
+  #cortina.mal .carga { visibility: hidden; }
+  @keyframes cortina-ida { from { transform: translateX(-10%); } to { transform: translateX(195%); } }
+  @media (prefers-reduced-motion: reduce) { #cortina .carga i { animation: none; width: 100%; opacity: .6; } #cortina { transition: none; } }
   .tarjeta { width: 460px; max-width: 100%; box-sizing: border-box; padding: 26px; border-radius: 18px;
     background: #161233ee; border: 2px solid #4b3d93; box-shadow: 0 24px 60px #000b, 0 0 40px #7042df33; }
   .ceja { margin: 0 0 4px; font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--lila); }
@@ -332,6 +358,17 @@
 <!-- el juego (position:fixed va en el atributo: controles.mjs le pone position:relative si no tiene una propia) -->
 <div id="pantalla" style="position:fixed"><canvas id="canvas" tabindex="0"></canvas></div>
 
+<!-- la cortina (interfaz.mjs: ui.cortina): está desde el primer instante para que nunca se vea nada antes de tiempo -->
+<div id="cortina" role="status" aria-live="polite">
+  <div>
+    <p class="ceja">El juego de Wii, en tu navegador</p>
+    <h1>Mario Kart Wii</h1>
+    <span class="sub">+ Retro Rewind</span>
+    <div class="carga"><i></i></div>
+    <p id="cortinaTexto">Cargando el juego…</p>
+  </div>
+</div>
+
 <div id="barra">
   <button id="volverJuegos" type="button" title="Volver a Juegos">← Juegos</button>
   <span data-volumen hidden></span>
@@ -389,6 +426,7 @@
       <button type="button" class="boton principal" id="subirPartidas" data-cargar>Cargar mi partida…</button>
       <button type="button" class="boton" id="bajarRksys">Descargar rksys.dat</button>
       <button type="button" class="boton" id="bajarPartidas">Descargar copia completa</button>
+      <button type="button" class="boton" id="abrirMii">Mi Mii</button>
     </div>
     <input type="file" id="archivoPartidas" accept=".dat,.mkwp,.mii,application/octet-stream" hidden>
     <p style="margin-top:8px">Carga el <b>rksys.dat</b> de tu Wii o de Dolphin, o una <b>copia completa</b> (.mkwp) bajada de aquí.

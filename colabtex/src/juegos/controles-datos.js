@@ -11,6 +11,7 @@ export const CONTROLES = {
   "bots-bt3": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "bots-clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "bots-haxball": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
+  "bots-mkw": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "bots-worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "bots-yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"},
   "boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"flechas o WASD sin toque ni puntero"},

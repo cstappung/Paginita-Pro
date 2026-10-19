@@ -23,7 +23,7 @@ test.before(async()=>{
   par=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
   jwk={...await crypto.subtle.exportKey('jwk',par.publicKey),kid:'k1',alg:'RS256',use:'sig'};
   globalThis.fetch=async()=>new Response(JSON.stringify({keys:[jwk]}),{headers:{'cache-control':'max-age=3600'}});
-  W=(await import(path.join(__dirname,'../../juegos/bt3/fuente/disco/worker.js'))).default;
+  W=(await import(require('node:url').pathToFileURL(path.join(__dirname,'../../juegos/bt3/fuente/disco/worker.js')).href)).default;   // (file://: en Windows import() no acepta C:\…)
   const r2=new Map([['pieza/00000.bin',new Uint8Array([1,2,3])],['indice.json',new TextEncoder().encode('{"size":3,"pieza":1048576}')]]);
   env={AMIGOS:'yo, amigo1',CLAVE_SUBIDA:'secreto',DISCO:{get:async k=>r2.has(k)?{body:r2.get(k)}:null,put:async(k,v)=>{r2.set(k,new Uint8Array(v));}}};
 });

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menú de inicio</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Menú de inicio: <span>«JloKart Wii» solo con la imagen del Worker, 3 botones, teclado, mando y toque</span></h1>
+<p>Prueba <code>inicio.mjs</code> (bitácora §67) <b>sin el juego</b> y con una <b>imagen falsa</b> dibujada aquí mismo en un
+  canvas (la de verdad es privada: muestra a una persona real y solo la entrega el Worker de amigos). Comprueba que el
+  menú aparece solo si el Worker contesta 200 (con 401, 403, 404 o sin red, no), que trae Single Player, Multiplayer y
+  Options (sin «Championship»), que se maneja con las teclas, con los bits del mando de GameCube que entrega
+  <code>controles.mjs</code> y con clic, que «Online» solo sale dentro del sitio, que no se mueve si hay algo encima (el
+  cajón) y que en un teléfono parado los botones caben y se pueden tocar.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="escenario"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearInicio } from '/web/navegador/inicio.mjs';
+
+const { ok, nota, fin } = prueba('inicio', 'Menú de inicio JloKart (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const cuadros = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+
+// ---- La imagen FALSA: 1448 × 1086 como la de verdad, un degradado con un texto ----
+const lienzo = Object.assign(document.createElement('canvas'), { width: 1448, height: 1086 });
+const g = lienzo.getContext('2d');
+const d = g.createLinearGradient(0, 0, 1448, 1086); d.addColorStop(0, '#3a8dff'); d.addColorStop(1, '#ffd21f');
+g.fillStyle = d; g.fillRect(0, 0, 1448, 1086);
+g.fillStyle = '#fff'; g.font = 'bold 90px system-ui'; g.fillText('IMAGEN FALSA', 120, 300);
+const falsa = await new Promise(r => lienzo.toBlob(r, 'image/png'));
+// el "Worker" falso: contesta lo que se le diga y anota cuántas veces le pidieron
+const worker = estado => {
+  const pedidos = [];
+  const buscar = async (url, op) => { pedidos.push(url); if (estado === 'sin red') throw new TypeError('Failed to fetch');
+    return new Response(estado === 200 ? falsa : 'no', { status: estado, headers: { 'Content-Type': estado === 200 ? 'image/png' : 'text/plain' } }); };
+  return { buscar, pedidos };
+};
+// teclas como las del navegador (en window; el menú escucha en la fase de captura)
+const tecla = code => dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true, cancelable: true }));
+const IMAGEN = 'https://worker.ejemplo/mkw/build/imagenes/inicio/jlokart.webp';
+
+// 1) Solo con 200 aparece; con 401 (sin sesión), 403 (no está en AMIGOS), 404 (no subida) o sin red, no
+{
+  const r = {};
+  for (const estado of [401, 403, 404, 'sin red']) {
+    const w = worker(estado), I = crearInicio({ imagen: IMAGEN, buscar: w.buscar });
+    r[estado] = { cargo: await I.cargar(), mostro: I.mostrar(), imagen: I.estado.imagen };
+  }
+  ok('con 401, 403, 404 o sin red el menú NO aparece (nadie fuera de la lista ve la imagen)',
+     Object.values(r).every(x => !x.cargo && !x.mostro) && !document.getElementById('inicioJlo'),
+     Object.entries(r).map(([k, x]) => `${k}→${x.imagen}`).join(', '));
+}
+let elegidas = [], mandos = [], ocupado = false;
+const w = worker(200);
+const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mandos, ocupado: () => ocupado, alElegir: q => elegidas.push(q) });
+{
+  const cargo = await I.cargar(), mostro = I.mostrar();
+  await espera(50);
+  const arte = document.querySelector('#inicioJlo .ij-arte');
+  await arte.decode().catch(() => {});
+  ok('con 200 aparece, con la imagen que entregó el Worker (una dirección local blob:)',
+     cargo && mostro && I.visible && arte.src.startsWith('blob:') && arte.naturalWidth === 1448 && w.pedidos[0] === IMAGEN,
+     `imagen ${I.estado.imagen}, ${arte.naturalWidth} px`);
+  await I.cargar();
+  ok('la imagen se pide una sola vez', w.pedidos.length === 1, `${w.pedidos.length} pedidos`);
+}
+// 2) Los botones
+{
+  const textos = [...document.querySelectorAll('#inicioJlo .ij-boton span')].map(s => s.textContent);
+  ok('3 botones: Single Player, Multiplayer, Options; nada de «Championship»',
+     JSON.stringify(textos) === '["Single Player","Multiplayer","Options"]' && !/championship/i.test(document.getElementById('inicioJlo').textContent),
+     textos.join(' · '));
+}
+// 3) Teclado: bajar/subir dan la vuelta; la tecla usada no le llega a nadie más; Enter elige
+{
+  let otros = 0; const oyente = () => otros++;
+  addEventListener('keydown', oyente);                   // como controles.mjs: escucha en window, fase normal
+  const vistos = [];
+  for (const c of ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'KeyS', 'KeyW']) { tecla(c); vistos.push(I.estado.elegido); }
+  tecla('KeyP');                                          // una tecla que el menú no usa: esa sí sigue
+  removeEventListener('keydown', oyente);
+  ok('teclado: flechas y W/S mueven (y dan la vuelta); lo que usa el menú no le llega al juego, lo demás sí',
+     JSON.stringify(vistos) === '[1,2,0,2,0,2]' && otros === 1, `${vistos.join(',')}; al juego le llegaron ${otros}`);
+}
+// 4) Multiplayer: Local y Back (fuera del sitio, sin «Online»); Esc vuelve; Back también
+{
+  I.elegir(1); tecla('Enter');
+  const multi = I.opciones.slice(), titulo = I.estado.menu;
+  tecla('Escape'); const trasEsc = I.estado.menu;
+  I.elegir(1); tecla('Enter'); I.elegir(1); tecla('Enter'); const trasBack = I.estado.menu;
+  ok('Multiplayer: «Local» y «Back» (fuera del sitio no hay «Online»); Esc y Back vuelven',
+     titulo === 'multi' && JSON.stringify(multi) === '["local","volver"]' && trasEsc === 'principal' && trasBack === 'principal' && elegidas.length === 0,
+     `${multi.join('/')}, Esc → ${trasEsc}, Back → ${trasBack}`);
+}
+// 5) Options: avisa y el menú se queda (el cajón se abre encima)
+{
+  I.elegir(2); tecla('Enter');
+  ok('Options avisa «opciones» y el menú se queda', elegidas.join() === 'opciones' && I.visible);
+}
+// 6) Con algo encima (el cajón), ni teclas ni mando lo mueven
+{
+  ocupado = true; I.elegir(0);
+  tecla('ArrowDown'); mandos = [{ botones: 0x0004, sy: 0 }]; await cuadros(4); mandos = [{ botones: 0x0100, sy: 0 }]; await cuadros(4); mandos = [];
+  const quieto = I.estado.elegido === 0 && elegidas.length === 1;
+  ocupado = false; await cuadros(3);
+  ok('con el cajón abierto (ocupado) ni teclas ni mando lo mueven ni eligen', quieto && I.visible, `elegido ${I.estado.elegido}`);
+}
+// 7) Mando (bits del mando de GameCube): cruz abajo mueve y repite si se mantiene; stick; B vuelve; A elige
+{
+  mandos = [{ botones: 0x0004, sy: 0 }]; await cuadros(3);
+  const uno = I.estado.elegido;
+  // mantenido: repite (380 ms la primera, 150 las siguientes). Se cuentan los cambios: con 3 botones, 3 repeticiones
+  // dan la vuelta y vuelven al mismo
+  let cambios = 0, antes = uno;
+  for (const t0 = performance.now(); performance.now() - t0 < 700; await cuadros(1)) if (I.estado.elegido !== antes) { cambios++; antes = I.estado.elegido; }
+  const repetido = cambios >= 2;
+  mandos = []; await cuadros(3); I.elegir(0);
+  mandos = [{ botones: 0, sy: -100 }]; await cuadros(3); mandos = []; await cuadros(3);
+  const stick = I.estado.elegido;
+  mandos = [{ botones: 0x0100 }]; await cuadros(3); mandos = []; await cuadros(3);   // A en Multiplayer → su menú
+  const enMulti = I.estado.menu;
+  mandos = [{ botones: 0x0200 }]; await cuadros(3); mandos = []; await cuadros(3);   // B → vuelve
+  ok('mando: cruz abajo mueve y repite mantenida, el stick también, A entra y B vuelve',
+     uno === 1 && repetido && stick === 1 && enMulti === 'multi' && I.estado.menu === 'principal', `cruz ${uno}, ${cambios} repeticiones en 0,7 s, stick ${stick}, ${enMulti}`);
+}
+// 8) Clic (toque) en un botón y en «PRESS START»; pasar el mouse elige
+{
+  const b = [...document.querySelectorAll('#inicioJlo .ij-boton')];
+  b[2].dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+  const conMouse = I.estado.elegido;
+  b[2].click();                                          // Options
+  I.elegir(1); document.querySelector('#inicioJlo .ij-start').click();   // PRESS START = aceptar lo elegido (Multiplayer)
+  const start = I.estado.menu;
+  tecla('Escape');
+  ok('pasar el mouse elige, el clic acepta y «PRESS START» acepta lo elegido', conMouse === 2 && elegidas.at(-1) === 'opciones' && start === 'multi',
+     `mouse ${conMouse}, clic → ${elegidas.at(-1)}, start → ${start}`);
+}
+// 9) Single Player: avisa y se va; lo que estaba apretado al volver a mostrarlo no cuenta
+{
+  I.elegir(0); tecla('Enter');
+  const seFue = !I.visible && elegidas.at(-1) === 'unjugador';
+  mandos = [{ botones: 0x0100 }];                        // A apretado ANTES de volver a mostrarlo
+  I.mostrar(); await cuadros(4);
+  const noCuenta = I.visible && elegidas.at(-1) === 'unjugador' && elegidas.length === 3;
+  mandos = []; await cuadros(3);
+  ok('Single Player avisa «unjugador» y el menú se va; al volver, un botón ya apretado no elige nada', seFue && noCuenta && I.estado.menu === 'principal',
+     `elecciones ${elegidas.join(',')}`);
+}
+// 10) Dentro del sitio, Multiplayer trae «Online» y elegirlo avisa «salas» (el menú se queda)
+{
+  const w2 = worker(200), e2 = [];
+  I.ocultar(); await espera(450);
+  const S = crearInicio({ imagen: IMAGEN, buscar: w2.buscar, enSitio: true, alElegir: q => e2.push(q) });
+  await S.cargar(); S.mostrar(); S.elegir(1); S.aceptar();
+  const opciones = S.opciones.slice(); S.elegir(1); S.aceptar();
+  ok('dentro del sitio, Multiplayer trae «Online»; elegirlo avisa «salas» y el menú se queda',
+     JSON.stringify(opciones) === '["local","salas","volver"]' && e2.join() === 'salas' && S.visible, opciones.join('/'));
+  S.ocultar(); await espera(450);
+}
+// 11) La forma en la pantalla: acostado (16:9) la imagen entera y los botones sobre su columna derecha; teléfono parado:
+//     los 3 botones debajo de la imagen, dentro de la pantalla, de ≥ 44 px y sin pisarse
+async function medir(ancho, alto) {
+  const f = Object.assign(document.createElement('iframe'), { width: ancho, height: alto });
+  f.style.cssText = 'border:0;position:absolute;left:-5000px;top:0';
+  const url = URL.createObjectURL(falsa);
+  f.srcdoc = `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0">
+    <script type="module">
+      import { crearInicio } from '${location.origin}/web/navegador/inicio.mjs';
+      const I = crearInicio({ imagen: '${url}', buscar: u => fetch(u) });
+      await I.cargar(); I.mostrar();
+      await new Promise(r => setTimeout(r, 200));
+      const caja = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+      parent.postMessage({ medidas: true, lienzo: caja(document.querySelector('.ij-lienzo')),
+        botones: [...document.querySelectorAll('.ij-boton')].map(caja), ancho: innerWidth, alto: innerHeight }, '*');
+    <\/script>`;
+  const r = new Promise(listo => addEventListener('message', function oye(e) { if (e.data?.medidas && e.source === f.contentWindow) { removeEventListener('message', oye); listo(e.data); } }));
+  document.getElementById('escenario').append(f);
+  const m = await r; f.remove(); return m;
+}
+{
+  const a = await medir(1280, 720);
+  const L = a.lienzo, dentro = b => b.x >= L.x + L.w * 0.7 && b.x + b.w <= L.x + L.w && b.y >= L.y + L.h * 0.45 && b.y + b.h <= L.y + L.h * 0.72;
+  ok('acostado (1280×720): la imagen entera a la vista (alto = la ventana) y los botones sobre su columna derecha',
+     Math.abs(L.h - 720) < 2 && L.w < 1280 && a.botones.length === 3 && a.botones.every(dentro),
+     `lienzo ${L.w.toFixed(0)}×${L.h.toFixed(0)}, botón 1 en x ${(100 * (a.botones[0].x - L.x) / L.w).toFixed(1)} %`);
+  const t = await medir(412, 915);
+  const T = t.lienzo, bs = t.botones;
+  const sinPisarse = bs.every((b, i) => i === 0 || b.y >= bs[i - 1].y + bs[i - 1].h - 1);
+  ok('teléfono parado (412×915): los 3 botones bajo la imagen, dentro de la pantalla, de ≥ 44 px y sin pisarse',
+     bs.length === 3 && bs.every(b => b.h >= 44 && b.x >= 0 && b.x + b.w <= 412 && b.y + b.h <= 915 && b.y >= T.y + T.h - 1) && sinPisarse,
+     bs.map(b => `${b.w.toFixed(0)}×${b.h.toFixed(0)}@${b.y.toFixed(0)}`).join(', ') + ` (imagen hasta ${(T.y + T.h).toFixed(0)})`);
+}
+fin();
+</script>
+</body>
+</html>

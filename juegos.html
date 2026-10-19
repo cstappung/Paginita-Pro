@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610182253"></script>
+<script src="i18n.js?v=202610190131"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2925,12 +2925,13 @@ html.jg-hero .head,html.jg-hero .bar,html.jg-hero .rp-fab,html.jg-hero .jg-solo-
 html.jg-hero #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
 .jg-hero-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
 /* BT3 «un jugador» (#solo/bt3) también: la página del juego en un marco de Juegos, que le da la sesión para el disco
-   privado (bt3.js, crearBt3Solo); su «← Juegos» vuelve. */
-html.jg-bt3solo,html.jg-bt3solo body{overflow:hidden;height:100%}
-html.jg-bt3solo .head,html.jg-bt3solo .bar,html.jg-bt3solo .rp-fab,html.jg-bt3solo .jg-solo-barra{display:none!important}
-html.jg-bt3solo #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0b1a48;display:grid}
+   privado (bt3.js, crearBt3Solo); su «← Juegos» vuelve. Mario Kart Wii «un jugador» (#solo/mkw, mkw.js crearMkwSolo)
+   usa lo mismo: su menú de inicio «JloKart Wii» y su programa salen del mismo Worker de amigos. */
+html.jg-bt3solo,html.jg-bt3solo body,html.jg-mkwsolo,html.jg-mkwsolo body{overflow:hidden;height:100%}
+html.jg-bt3solo .head,html.jg-bt3solo .bar,html.jg-bt3solo .rp-fab,html.jg-bt3solo .jg-solo-barra,html.jg-mkwsolo .head,html.jg-mkwsolo .bar,html.jg-mkwsolo .rp-fab,html.jg-mkwsolo .jg-solo-barra{display:none!important}
+html.jg-bt3solo #pantalla,html.jg-mkwsolo #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0b1a48;display:grid}
 .jg-bt3-solo{display:block;width:100%;height:100%;border:0;background:#000}
-html.jg-bt3solo #pantalla>.jg-bt3-info{place-self:center;color:#e8eaf6}
+html.jg-bt3solo #pantalla>.jg-bt3-info,html.jg-mkwsolo #pantalla>.jg-bt3-info{place-self:center;color:#e8eaf6}
 /* Modo celular de los juegos del Club (Tetris, ALETEO, FANAL): mientras se
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
@@ -5833,6 +5834,6 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610182253"></script>
+<script src="juegos-app.js?v=202610190131"></script>
 </body>
 </html>

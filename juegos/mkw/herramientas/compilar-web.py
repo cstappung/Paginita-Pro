@@ -241,7 +241,9 @@ def main():
                   "func_80198D88": "func_80198D88_traducida", "func_801994E4": "func_801994E4_traducida",
                   "func_80787774": "func_80787774_traducida", "func_807379BC": "func_807379BC_traducida",
                   "func_807EC7F8": "func_807EC7F8_traducida", "func_807F7E80": "func_807F7E80_traducida",
-                  "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida"}
+                  "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida",
+                  # Page::Activate -> web/juego/paginas_nativo.cpp (avisa a la página qué pantalla se activó: ocultar.mjs, §66)
+                  "func_80601AEC": "func_80601AEC_traducida"}
     if os.environ.get("MKW_DEPURAR") == "1":              # depuración de la red (web/juego/depurar_red.cpp, §58)
         REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800CCC68", "800D1D90", "800D0FEC", "806561A8", "80656FF8", "80653DDC", "800D2000", "800DAD9C", "800FBA4C", "800E8814", "80623054", "80666288", "8063519C", "8067552C", "80635A3C", "80635AC8", "80635B2C")}); REEMPLAZOS["rr_overlay_80635A3C"] = "rr_overlay_80635A3C_traducida"
     # El azar de la carrera sincronizada (sala con CPU, bitácora §61): en estas funciones del juego, la lectura del
@@ -273,7 +275,7 @@ def main():
     banderas["thp"] = base + ["-O3"]
     unidades += [("thp", RAIZ / "web/thp" / f) for f in ("thp_decodificador.cpp", "thp_nativo.cpp")]
     unidades += [("thp", RAIZ / "web/dvd/rutas_nativo.cpp"), ("thp", RAIZ / "web/juego/semillas_nativo.cpp"),
-                ("thp", RAIZ / "web/juego/lockstep_nativo.cpp")]
+                ("thp", RAIZ / "web/juego/lockstep_nativo.cpp"), ("thp", RAIZ / "web/juego/paginas_nativo.cpp")]
     # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
     # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
     unidades += [("thp", RAIZ / "web/red/red_web.cpp")]

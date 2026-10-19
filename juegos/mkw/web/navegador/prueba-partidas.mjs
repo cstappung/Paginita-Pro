@@ -42,7 +42,7 @@ const licencia1 = () => pagina.evaluate(() => {
 
 try {
   // 1) Empezar sin partidas guardadas
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/`);
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);   // la página sin arrancar el juego
   await pagina.evaluate(() => window.mkwGuardado.borrarTodo());
   await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1`);
   await alTitulo();

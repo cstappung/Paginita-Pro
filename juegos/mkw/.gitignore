@@ -26,7 +26,14 @@ terceros/
 # herramientas instaladas (emsdk, etc.)
 herramientas/emsdk/
 herramientas/cache/
+# la imagen del menú de inicio «JloKart Wii» muestra a una persona real: nunca al repo (vive en build/ y en R2 privado),
+# ni aunque alguien la copie a otra carpeta por error
+*jlokart*
+*JloKart*
+Jlo Kart*
 # varios
+__pycache__/
+*.pyc
 node_modules/
 *.log
 .vs/

@@ -93,6 +93,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const tactil = { activo: false, sx: 0, sy: 0, botones: 0 };
   const inclinacion = { activa: false, centro: null, x: 0 };
   const piloto = { botones: 0 };                  // la página aprieta botones sola (menus.mjs: ir a una copa/pista)
+  let silencio = false;                           // true = el juego no recibe nada de la persona (menú de inicio)
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
@@ -231,10 +232,14 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
     if (piloto.botones) suma(0, piloto, 'piloto');
     puertos.forEach((d, p) => {
-      const firma = [d.conectado, d.botones, d.sx, d.sy, d.cx, d.cy, d.gl, d.gr].join();
+      // silenciado (el menú de inicio, inicio.mjs, está encima): al juego le llega solo lo del piloto; lo de la
+      // persona lo lee el menú (estado.puertos y estado.mandos siguen al día), como un interruptor que corta la
+      // salida pero deja el medidor conectado
+      const s = silencio ? { conectado: d.conectado, botones: p === 0 ? piloto.botones : 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 } : d;
+      const firma = [s.conectado, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr].join();
       if (firma === ultimo[p]) return;            // sin cambios: no hace falta volver a mandarlo
       ultimo[p] = firma;
-      enviar(p, d.conectado ? 1 : 0, d.botones, d.sx, d.sy, d.cx, d.cy, d.gl, d.gr);
+      enviar(p, s.conectado ? 1 : 0, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr);
     });
     estado.puertos = puertos;
     estado.mandos = mandos.map(({ mando, ...resto }) => resto);
@@ -249,7 +254,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     reenviar() { ultimo.length = 0; },
     // el piloto automático (menus.mjs) aprieta estos botones en el puerto 1, sumados a lo que haga la persona
     // (y lo manda enseguida: con la pestaña en segundo plano requestAnimationFrame no corre)
-    pilotar(botones) { piloto.botones = botones | 0; paso(); },                           // volver a mandar todo (p. ej. al arrancar el juego)
+    pilotar(botones) { piloto.botones = botones | 0; paso(); },
+    // el menú de inicio (inicio.mjs) está encima: lo que toca la persona es para el menú, no para el juego
+    silenciar(si) { silencio = !!si; paso(); },
+    get silenciado() { return silencio; },                           // volver a mandar todo (p. ej. al arrancar el juego)
     reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
     esperando: () => esperandoTecla,
     restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },

@@ -140,7 +140,11 @@ export const SOLOS = [
   { id: "bots-bt3", tipo: "bots", juego: "bt3", nombre: "Tenkaichi 3 · un jugador", genero: "Pelea", icono: "🐉", alta: "2026-10-14",
     url: "juegos/bt3/index.html", ruta: "#solo/bt3", reglas: "bt3",   // (se juega dentro de Juegos: la página del juego necesita la sesión para el disco privado)
     lema: "Entrenamiento o contra la CPU, directo desde el disco; y desde ahí mismo, una sala de duelo o de torneo con tus amigos.",
-    modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] }
+    modos: ["Entrenamiento", "Contra la CPU", "Duelo", "Torneo"] },
+  { id: "bots-mkw", tipo: "bots", juego: "mkw", nombre: "Mario Kart Wii · un jugador", genero: "Carreras", icono: "🏁", alta: "2026-10-18",
+    url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
+    lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
+    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número

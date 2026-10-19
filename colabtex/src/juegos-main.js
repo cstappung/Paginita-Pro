@@ -69,7 +69,7 @@ import { crearMemazo } from "./juegos/memazo.js";
 import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
-import { crearMkw } from "./juegos/mkw.js";
+import { crearMkw, crearMkwSolo } from "./juegos/mkw.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
@@ -105,6 +105,11 @@ import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./jue
 import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
+/* Solo en ESTA PC, para probar un juego de punta a punta: el arnés local de Mario Kart (juegos/mkw/herramientas/
+   experiencia.mjs, el jugar.bat del proyecto) pone window.__JG_SOLO = ["mkw"] y el catálogo muestra solo ese juego
+   (su sala y su «un jugador»). En el sitio publicado no existe: se ven todos. */
+const SOLO_LOCAL = typeof location !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Array.isArray(window.__JG_SOLO)
+  ? new Set(window.__JG_SOLO) : null;
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -1223,7 +1228,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1838,6 +1843,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-hero", state.vista === "solo-hero" && !motivo);
   /* BT3 «un jugador» también: la página del juego, en un marco de Juegos para que tenga la sesión (disco privado). */
   document.documentElement.classList.toggle("jg-bt3solo", state.vista === "solo-bt3" && !motivo);
+  /* Mario Kart Wii «un jugador» igual: su página con el menú de inicio «JloKart Wii», solo para la lista de amigos. */
+  document.documentElement.classList.toggle("jg-mkwsolo", state.vista === "solo-mkw" && !motivo);
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
@@ -1855,6 +1862,13 @@ function armazon() {
   if (state.vista === "solo-bt3") {
     h.innerHTML = "";
     individual = crearBt3Solo({ volver: () => ir("") });
+    individual.montar(h);
+    return;
+  }
+  if (state.vista === "solo-mkw") {
+    /* Su Multiplayer → Online abre las salas de Mario Kart (salón), como «En línea» de PRO HERO. */
+    h.innerHTML = "";
+    individual = crearMkwSolo({ volver: () => ir(""), enLinea: () => { ir(""); setTimeout(() => salon.abre && salon.abre("mkw"), 50); } });
     individual.montar(h);
     return;
   }
@@ -2230,7 +2244,7 @@ const NOVEDADES = [
 /* Lo que se muestra: una novedad de BT3 (si vuelve) solo la ven los
    amigos del disco (bt3Visible, bt3-amigos.js). */
 let VISIBLES = NOVEDADES;
-const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()).filter(n => n.id !== "mkw" || bt3Visible()); };
+const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()).filter(n => n.id !== "mkw" || bt3Visible()).filter(n => !SOLO_LOCAL || SOLO_LOCAL.has(n.id)); };
 /* El sello de cada diapositiva: «★ Lo último» para la más reciente,
    «Nuevo» para lo de las dos últimas semanas y «Destacado» para el resto
    (PRODROP no es nuevo, pero está porque se quiere que se vea). */
@@ -2708,6 +2722,7 @@ function pintaVestibulo() {
   const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()).filter(k => k !== "mkw" || bt3Visible());   // BT3 y MKW: solo los amigos
   entradasVes = entradasSalon(JUEGOS, orden);
   if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3" && e.juego !== "mkw");
+  if (SOLO_LOCAL) { entradasVes.solos = entradasVes.solos.filter(e => SOLO_LOCAL.has(e.juego)); entradasVes.multi = entradasVes.multi.filter(e => SOLO_LOCAL.has(e.juego || e.id)); }
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */

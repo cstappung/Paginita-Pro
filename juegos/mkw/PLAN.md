@@ -18,7 +18,7 @@ malla WebRTC) y carrera sincronizada con CPU de relleno en la sala del sitio. To
 publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 
 **Decisiones del dueño (2026-10-18):**
-- Commits en la rama del sitio y en el repo local: **sí**; push y PR: **sí** (merge: cuando él lo diga).
+- Commits en la rama del sitio y en el repo local: **sí**. **PR: no** (el dueño lo retiró el 2026-10-18 19:50: "dont pR"); tampoco push mientras no lo pida. Merge: cuando él lo diga.
 - El Worker de Mario Kart usa **el mismo Worker y la misma lista de amigos que BT3**; el Worker y la subida a R2
   **los hace el dueño** (aquí se prepara todo lo que necesita: qué servir, el programa final, la lista de archivos).
 - **El VR solo se mueve en línea** (VS por el WFC de la sala). La carrera sincronizada con CPU no lo toca.
@@ -35,18 +35,25 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   `colabtex/src/juegos/`, pruebas, reglas de Firebase, `juegos-app.js` + `juegos.html`); afuera el trabajo ajeno, los
   cambios de solo fin de línea y los sellos de `i18n.js`
 - ⬜ A5. Primer commit del repo local `MKW RETRO` (revisando `git status` contra `.gitignore`)
-- ⬜ A6. Push de la rama y PR a `main` (sin merge)
+- ✅ A6. ~~Push de la rama y PR a `main`~~ → **sin PR ni push** (el dueño lo retiró). `main` se juntó en la rama local (conflictos de casino/Momazo/PRO DEFENDER resueltos dejando los dos, sellos regenerados)
 
 ### Etapa B — Publicación privada (jugar en el sitio de verdad)
-- ⬜ B1. Inventario exacto de lo que el Worker tiene que servir (lo que hoy sirve `servidor.mjs`): programa
+- ✅ B1. Inventario exacto de lo que el Worker tiene que servir (lo que hoy sirve `servidor.mjs`): programa
   (`mkw.js`, `mkw.wasm.br` con `Content-Encoding: br` y huella `?v=`), manifiesto del disco, pedazos (HTTP Range) del
   disco y de `RetroRewind6/`, semillas (`pipelines.bin`, `bloques.json`), imágenes; CORS solo el sitio
-- ⬜ B2. Programa final (`compilar-web.py --modo navegador --final`) y semillas nuevas (`guion.mjs … --semilla`, 3 corridas)
-- ⬜ B3. Lista de archivos para R2 (disco 2,6 GB + RR 2,1 GB + programa 16 MB ≈ 4,7 GB) con huellas, y su
+- ✅ B2. Programa final (`compilar-web.py --modo navegador --final`) y semillas nuevas (`guion.mjs … --semilla`, 3 corridas):
+  700 pipelines y 233 bloques (§65). Se recompila con `--final` antes de subir (el gancho de §66 cambió el programa)
+- ✅ B3. Lista de archivos para R2 (disco 2,6 GB + RR 2,1 GB + programa 16 MB ≈ 4,7 GB) con huellas, y su
   comprobación; `docs/publicar.md` con los pasos del dueño (Worker, R2, `juegos/mkw/privado.json`, reglas de Firebase)
-- ⬜ B4. Banco: el Worker imitado en local con disco y RR **falsos** (403 a no-amigos, Range exacto, brotli, CORS)
-- ⬜ B5. Ensayo general en este PC (`sitio-local.mjs`): 1.ª y 2.ª visita, sala con dos pestañas, partidas, VR
-- ⬜ B6. Partidas en la nube (`nube.mjs`) con la sesión real del sitio
+- ✅ B4. Banco: el Worker imitado en local con disco y RR **falsos** (403 a no-amigos, Range exacto, brotli, CORS)
+- ✅ B5. Ensayo general en este PC (`sitio-local.mjs`, programa final, Worker de verdad): 1.ª visita 58,9 fps y 217 MB del
+  Worker, 2.ª 60,0 fps, 99,5 % parejo y 6 MB (§67); la sala con dos pestañas, partidas y VR ya probados en `--sala` (§61–65)
+- ✅ B5b. (Pedido del dueño) `jugar.bat` = la página de Juegos en este PC, solo con Mario Kart y su sala, de punta a
+  punta (§69): emuladores de Firebase con las reglas del sitio, cuentas de mentira, el Worker de verdad, 1-3 ventanas
+  de Chrome (= varios PC). `prueba-experiencia.mjs` 13/13. Encontró que la página no arrancaba en la dirección del
+  sitio (`./banco/comun.js`): arreglado
+- ✅ B6. Partidas en la nube (`nube.mjs`) con la sesión real del sitio: la sala pasa el Storage, el marco espera a la nube
+  antes de leer sus partidas, sube al esconder la pestaña; regla de Storage en `firebase/storage.rules` (§65; `prueba-nube` 9/9)
 - ⬜ B7. (Dueño) publicar Worker, subir a R2, poner la dirección, publicar reglas → prueba en el sitio real como amigo
   y como no-amigo
 
@@ -65,6 +72,12 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ D2. Imágenes sacadas del juego (fotos de pistas, íconos, caras de Mii) a R2 con el programa
 - ✅ D3. Quitar el visor de salas de Retro WFC (§64); el código de amigo propio ya sale del `rksys.dat` (`licencias.mjs`)
 - ⬜ D4. La ayuda de "tarjeta de video equivocada" en la página del sitio
+- ✅ D5. (Pedido del dueño) sin portada: directo al juego; la cortina tapa la carga y los menús que recorre el piloto;
+  escondidos «Retro WFC» (fuera de la sala en línea) y los «Settings» de Retro Rewind (§66; banco 11/11, `prueba-menus` 8/8)
+- ✅ D6. (Pedido del dueño) menú de inicio «JloKart Wii» con su imagen, sin «Championship», **solo para los amigos** (la
+  imagen sale del Worker con token + `AMIGOS`, como el disco de BT3; 401/403 = sin menú): Single Player → menú «Un jugador»
+  del juego, Multiplayer → Local / Online (salas), Options → cajón; entrada «Mario Kart Wii · un jugador» (`#solo/mkw`) en
+  el sitio (§67; banco 14/14, `prueba-inicio` 14/14, `mkw.test` 13/13)
 
 ### Etapa E — Rendimiento
 - ⬜ E1. Sonido con AudioWorklet (latencia ~100–150 → ~30 ms) y sin cortes en el arranque
@@ -263,8 +276,8 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   con huella SHA-256 y hora de juego en los metadatos; al entrar sube, baja o no hace nada según las huellas; conflictos
   → gana la jugada más recientemente y la otra queda de respaldo; subida automática con espera y tope de frecuencia.
   Banco `pruebas/nube/` (Firebase falso con las reglas) **23/0**. Regla y código para la página en `docs/firebase-mkw.md`.
-  ⬜ Conectarlo con el inicio de sesión real del sitio (etapa B6); ⬜ el dueño publica la regla de Storage
-- ✅ Pruebas de la sala: `colabtex/tests/mkw.test.cjs` (10/10) y la sala falsa `banco/pruebas/sala-mkw` (`prueba-enlinea
+  ✅ Conectado con el inicio de sesión real del sitio (B6, §65: `prueba-nube` 9/9); ⬜ el dueño publica la regla de Storage
+- ✅ Pruebas de la sala: `colabtex/tests/mkw.test.cjs` (12/12) y la sala falsa `banco/pruebas/sala-mkw` (`prueba-enlinea
   --sala`, `prueba-sincro --sala`)
 
 ## Fase 6 — En línea y social
@@ -312,7 +325,11 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
-- **2026-10-18 23:20** — **Plan del dueño guardado y etapa A** (§64). El dueño contestó: commits, push y PR sí (merge cuando él diga); mismo Worker y lista de amigos que BT3, el Worker y R2 los publica él; el VR solo se mueve en línea; fuera el visor de salas de Retro WFC; "dos PCs" = dos ventanas. Se quitó `salas.mjs` (el código de amigo pasó a `codigo-amigo.mjs`, con 5 puntos nuevos en el banco de licencias: 26/26). Las reglas de la sala del sitio dicen ahora que la copa con CPU no mueve el VR. Arreglo: la carrera 4 de la copa a tu gusto salía a veces sin su semilla (la página la borraba antes de que el juego preparara la carrera; lo destapó §63): `prueba-copa` **11/11**. Todo verde: banco 21/21, Node 13/13, navegador 20/20, partidas 6/6, piloto 9/9, elegir 23/23, sincro 9/9 (y `--sala`), copas sincronizadas 4/4 y 4/4, en línea 9/9, sitio 885/893 (las 8 de siempre, ajenas) y `mkw.test` 10/10.
+- **2026-10-18 23:05** — **`jugar.bat`: la página de Juegos en este PC, solo con Mario Kart, de punta a punta** (§69). Pedido del dueño: un .bat que abra el menú de la página mostrando solo MKW y MKW en línea, para probar la experiencia entera; se descartó un artifact (el juego no puede subirse y un artifact no alcanza 127.0.0.1). `herramientas/experiencia.mjs`: emuladores de Firebase (cuentas, base, Storage) con las reglas del sitio, cuentas de mentira (Piloto Uno/Dos/Tres amigos, Intruso no), `sitio-local --emuladores --solo mkw --amigos` con el Worker de verdad (`worker-local --emulador` re-firma los tokens del emulador) y 1-3 ventanas de Chrome, cada una con su perfil. En el sitio: `firebase.js` (emuladores) y `juegos-main.js` (catálogo solo MKW) solo en 127.0.0.1, con prueba (`mkw.test` 14/14). `prueba-experiencia.mjs` **13/13**: invitado sin nada, entrar con la ventanita del emulador, catálogo solo MKW, «un jugador» con el menú JloKart (imagen 200 por el Worker), Single Player → 0x69, partida subida a Storage, Multiplayer → Online → ficha, sala con Piloto Dos, Intruso bloqueado en todo, «¡A correr!» y los dos en la misma carrera (huellas iguales). **Error real encontrado**: en el sitio la página está en `juegos/mkw/web/navegador/` y `mkw.mjs` importaba `./banco/comun.js` (404: el juego no arrancaba ni en la sala ni en «un jugador»); ahora `./verificaciones.mjs`, y `sitio-local` ya no tiene el atajo `/juegos/mkw/` que lo escondía. `prueba-inicio` 14/14 con la ruta nueva. El .bat probado de verdad (pregunta, 1 ventana a los 15 s, «Listo», Chrome con su perfil); `chcp 65001` va primero o cmd se desfasa con los acentos.
+- **2026-10-18 22:30** — **Menú de inicio «JloKart Wii», solo para amigos, y ensayo general B5** (§67). La imagen del dueño sin los botones pintados (`preparar-inicio.py`), privada (Worker + lista AMIGOS; nunca a git), con 3 botones propios sin «Championship»; Single Player → menú «Un jugador» del juego, Multiplayer → Local/Online, Options → cajón; teclado, mandos, mouse y toque. Banco `inicio` 14/14, `prueba-inicio` 14/14, sitio `#solo/mkw` (`crearMkwSolo`). B5: 1.ª visita 58,9 fps / 217 MB, 2.ª 60,0 fps / 99,5 % parejo / 6 MB.
+- **2026-10-18 22:21** — **La cortina del rescate tapa toda la imagen en la página** (§68). El dueño la vio tapar solo una parte ("por el stretch"): es el aspecto dinámico de WiiCompiled en una ventana más ancha que 16:9 (el programa de Windows); la página no estira nunca (canvas fijo 854×480, `object-fit: contain`). `prueba-caida` con 5.º punto (bordes de la imagen en el negro) y `--ancho/--alto`: ventana 960×792 **5/5** y 1800×760 **5/5**.
+- **2026-10-18 22:09** — **La pantalla negra al caer del mapa es del juego** (§68). Nuevo diagnóstico `prueba-caida.mjs` (Contrarreloj en SNES Rainbow Road, maneja solo hasta caerse; graba el screencast de Chrome y el contador de cuadros del juego): 3 rescates de Lakitu, cada uno ~2,0 s oscuro (cortina de rayas que se cierra en ~0,4 s, ~1,5 s en negro, se abre) con el juego a 60 cuadros/s todo el rato y la misma duración en los tres: es la transición original, no un tirón del port. **4/4**. El dueño decidió dejarla como en el original.
+- **2026-10-18 19:50** — **Plan del dueño guardado y etapa A** (§64). El dueño contestó: commits, push y PR sí (merge cuando él diga); mismo Worker y lista de amigos que BT3, el Worker y R2 los publica él; el VR solo se mueve en línea; fuera el visor de salas de Retro WFC; "dos PCs" = dos ventanas. Se quitó `salas.mjs` (el código de amigo pasó a `codigo-amigo.mjs`, con 5 puntos nuevos en el banco de licencias: 26/26). Las reglas de la sala del sitio dicen ahora que la copa con CPU no mueve el VR. Arreglo: la carrera 4 de la copa a tu gusto salía a veces sin su semilla (la página la borraba antes de que el juego preparara la carrera; lo destapó §63): `prueba-copa` **11/11**. Todo verde: banco 21/21, Node 13/13, navegador 20/20, partidas 6/6, piloto 9/9, elegir 23/23, sincro 9/9 (y `--sala`), copas sincronizadas 4/4 y 4/4, en línea 9/9, sitio 885/893 (las 8 de siempre, ajenas) y `mkw.test` 10/10.
 - **2026-10-18 18:00** — **En línea, la página ya no se congela** (§63). Sin enganche al monitor (`?red`: la carrera sincronizada y el VS por el WFC de la sala) el runtime esperaba cada cuadro girando sin soltar el hilo: la página respiraba solo cuando el lockstep esperaba a la otra consola (huecos de 120-700 ms) y, al terminar la carrera, nunca más (la copa no pasaba a la carrera 2). Ahora `vi.cpp` cede por reloj (`mkwEsperaReloj`) y la pausa de presentar de aurora va también en línea: copa sincronizada **4/4** (con semilla) y **4/4** dentro de la sala falsa del sitio, carrera 2 en las dos con las huellas iguales; una pestaña en línea igual de pareja que sin red (34,8 % de refrescos con cuadro nuevo, 0 % saltados, 60 cuadros/s). Y una optimización que salió de ahí: en monitores que no se pueden enganchar (144/165/175 Hz) y en línea, la espera despierta al juego en el vencimiento sin girar 1,5 ms: leer el reloj bajó de ~8 % a ~0,5 % del tiempo de la pestaña (~1,7 ms por cuadro menos de procesador quemado; hilo ocupado 41–47 % en vez de 46–52 %), con la pantalla igual de pareja (0 % saltados). Nueva herramienta `herramientas/medir-enlinea.mjs`. Pruebas más firmes: tope de 10 s por lectura en `prueba-sincro`, `autoconducir` en la sala falsa, `prueba-enlinea` con el build de siempre, banco 21/21 (el del sonido aprieta su botón).
 - **2026-10-18 14:50** — **La carrera sincronizada ya no se separa** (§62). Dos desincronizaciones escondidas que salían 3 de cada 4 veces con la semilla de una sala real: (1) la «compensación de lag» de Retro Rewind (`rr_kamek_81806568`) se saltaba el dibujo de cuadros según la carga de cada PC, y el dibujo copia la posición de los karts a sus modelos (que lee la IA): en la sala con CPU ahora se dibuja siempre; (2) el reloj fijo del sorteo era un contador para todo el juego: ahora es **por lugar** (`PPC_MftbCarreraEn(sitio, lr)`). Misma carrera 2 veces: **4/4 idénticas** (antes 1/4). La sala del sitio elige la carrera sincronizada (CPU de relleno y ≤ 4 humanos), fin de carrera cuando llegan todos los humanos, vista propia de sonido y HUD, carrera 2 de la copa aunque el Raceinfo quede en la misma dirección, `jugar.bat`. Herramientas: punto de vigilancia (`-DMKW_VIGIA`, `--carpeta build/web-vigia`).
 - **2026-10-18 01:50** — **Sala con CPU de relleno: la carrera sincronizada funciona** (§61). Lockstep: todas las consolas corren la misma carrera VS offline (12 karts, humanos + CPU) con los botones de todos (`lockstep.mjs`, `pad_web.cpp`, `semillas_nativo.cpp`, `lockstep_nativo.cpp`, `PPC_MftbCarrera`). La desincronización era la tabla de pantallas de Racedata: ahora igual en todas, y solo cámara y HUD van al kart propio. Corte en dos pasos cuando alguien se va (error real hallado por el banco nuevo `banco/pruebas/lockstep` 25/25); 45 s de espera a quien no llegó. `prueba-sincro.mjs` **9/9** (15/15 huellas iguales). Piloto: toques contados en cuadros, corrige el modo, y **solo Esc** lo detiene (el aviso del sonido hacía que cualquier tecla lo parara: bug que vio el dueño). PC 60 fps, 9 ms (+1 ms por explicar). Celular: para una versión futura.

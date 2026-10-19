@@ -137,3 +137,101 @@ test('está en las reglas de Firebase (con el tope de 12 y su nodo mkw), en el s
  assert.equal(o.__o.juegoOculto('mkw'),true,'oculto hasta que el Worker diga que sí');
  assert.match(fs.readFileSync(raiz('src/juegos/bt3-amigos.js'),'utf8'),/ponOculto\("mkw", !v\)/);
 });
+
+test('el marco recibe el token de Firebase para el Worker de amigos, solo él y como el de BT3',()=>{
+ const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(src,/import \{[^}]*\bauth\b[^}]*\} from "\.\.\/firebase\.js"/,'usa la sesión del sitio');
+ // solo contesta a su propio marco (mensaje() ya filtra source, origin y canal) y con el canal del padre
+ assert.match(src,/e\.source !== frame\?\.contentWindow \|\| e\.origin !== location\.origin \|\| e\.data\?\.canal !== HIJO/);
+ assert.match(src,/d\.tipo === "token"[\s\S]{0,200}getIdToken\(!!d\.nuevo\)[\s\S]{0,200}postMessage\(\{ canal: PADRE, tipo: "token"/);
+ // y el Worker de BT3 tiene las rutas de Mario Kart detrás de la misma lista de amigos
+ const w=fs.readFileSync(raiz('../juegos/bt3/fuente/disco/worker.js'),'utf8');
+ assert.match(w,/if \(!esta\) return responde\("sin acceso", 403, c\);[\s\S]{0,200}if \(deMkw\) return mkw\(/,'primero la lista, después /mkw/');
+});
+
+test('las partidas de cada uno van a Storage (mkw/<uid>/partidas.mkwp): solo su dueño, y el marco las recibe antes de leerlas',()=>{
+ const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(src,/import \{[^}]*\bstorage\b[^}]*\} from "\.\.\/firebase\.js"/,'usa el Storage del sitio');
+ // lo que sube viene del marco (otro reino): se copia antes de dárselo a Firebase, y la metadata va como texto
+ assert.match(src,/const datos = new Uint8Array\(bytes\.byteLength\); datos\.set\(bytes\);/);
+ assert.match(src,/customMetadata\[k\] = String\(meta\[k\]\)/);
+ assert.match(src,/"storage\/object-not-found"\) return null/,'sin partida en la nube = null, no error');
+ // primero las partidas (el juego espera hasta 4 s), después récords y VR
+ assert.match(src,/w\.mkwConectarNube\(\{ almacen: almacenPartidas, uid \}\)[\s\S]{0,120}w\.mkwConectarRecords/);
+ const reglas=fs.readFileSync(raiz('../firebase/storage.rules'),'utf8');
+ const bloque=reglas.match(/match \/mkw\/\{uid\}\/partidas\.mkwp \{[\s\S]*?\n    \}/);
+ assert.ok(bloque,'falta el bloque de Mario Kart en storage.rules');
+ assert.match(bloque[0],/request\.auth != null && request\.auth\.uid == uid/,'solo su dueño');
+ assert.match(bloque[0],/allow read: if esSuyo\(\);/);
+ assert.match(bloque[0],/request\.resource\.size < 8 \* 1024 \* 1024/,'con tope');
+ assert.match(bloque[0],/metadata\.get\('uid', ''\) == uid/,'marcado con su uid');
+ assert.match(bloque[0],/html\|javascript\|ecmascript/,'nunca HTML ni JS');
+ assert.ok(reglas.indexOf('match /mkw/{uid}') < reglas.indexOf('match /{allPaths=**}'),'antes del «todo cerrado»');
+});
+test('un jugador (#solo/mkw): solo para la lista de amigos, el marco con el menú de inicio y sus avisos',async()=>{
+ const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ const trozo=src.slice(src.indexOf('const PADRE'),src.indexOf('let privado'))+src.slice(src.indexOf('/* «Un jugador» dentro de Juegos (`#solo/mkw`)'),src.indexOf('export function crearMkw({')).replace(/export /g,'');
+ // un DOM de mentira: lo justo para montar el marco y ver qué se registra, en qué orden y qué se le contesta
+ const pasos=[],oyentes=new Set(),enviados=[];
+ const marcoWin={postMessage:(m,o)=>enviados.push([m,o])};
+ const crear=()=>{const f={className:'',title:'',allow:'',attrs:{},contentWindow:marcoWin,setAttribute(k,v){this.attrs[k]=v;},remove(){pasos.push('quitado');},focus(){},
+  set src(v){pasos.push('src');this._src=v;},get src(){return this._src;}};return f;};
+ const c={URLSearchParams,setInterval:()=>0,clearInterval:()=>{},console,location:{origin:'https://sitio'},
+  document:{createElement:crear},
+  window:{addEventListener:(t,f)=>{pasos.push('oye');oyentes.add(f);},removeEventListener:(t,f)=>oyentes.delete(f)},
+  auth:{currentUser:{uid:'u1',displayName:'Ana',getIdToken:async nuevo=>nuevo?'fresco':'tok'}},almacenPartidas:{},almacenRecords:{}};
+ vm.runInNewContext(trozo+';__c=crearMkwSolo;__s=srcMkwSolo',c);
+ const host=()=>({innerHTML:'',hijos:[],append(x){this.hijos.push(x);}});
+ const espera=()=>new Promise(r=>setTimeout(r,10));
+ // no está en la lista: «privado», sin marco
+ let h=host();c.__c({volver(){},enLinea(){},revisar:async()=>false,privadoUrl:async()=>'https://w/mkw'}).montar(h);await espera();
+ assert.match(h.innerHTML,/Este juego es privado/);assert.equal(h.hijos.length,0);
+ // en la lista pero sin publicar
+ h=host();c.__c({volver(){},enLinea(){},revisar:async()=>true,privadoUrl:async()=>''}).montar(h);await espera();
+ assert.match(h.innerHTML,/todavía no está publicado/);assert.equal(h.hijos.length,0);
+ // en la lista: el marco, con el oyente puesto ANTES de cargarlo (lo primero que pide es el token)
+ let volvio=0,salas=0;h=host();
+ const s=c.__c({volver(){volvio++;},enLinea(){salas++;},revisar:async()=>true,privadoUrl:async()=>'https://w/mkw'});s.montar(h);await espera();
+ const f=h.hijos[0];
+ assert.ok(f,'monta el marco');assert.equal(f.className,'jg-bt3-solo');assert.match(f.allow,/gamepad/);
+ assert.ok(pasos.indexOf('oye')<pasos.indexOf('src'),'el oyente va antes de cargar la página');
+ const u=new URL('https://sitio/'+f.src);
+ assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
+ assert.equal(u.searchParams.get('privado'),'https://w/mkw');assert.equal(u.searchParams.get('senal'),'padre','espera sus partidas de la cuenta');
+ assert.equal(u.searchParams.get('modo'),null,'sin modo: abre con el menú de inicio');
+ const avisa=(d,de=marcoWin,origen='https://sitio')=>{for(const o of oyentes)o({source:de,origin:origen,data:{canal:'mkw-hijo',...d}});};
+ avisa({tipo:'volver'});avisa({tipo:'salas'});
+ avisa({tipo:'volver'},{},'https://sitio');avisa({tipo:'salas'},marcoWin,'https://otro');   // de otro marco u otro origen: nada
+ assert.equal(volvio,1);assert.equal(salas,1);
+ avisa({tipo:'token',nuevo:true});await espera();
+ assert.deepEqual(JSON.parse(JSON.stringify(enviados[0])),[{canal:'mkw-padre',tipo:'token',token:'fresco'},'https://sitio'],'el token fresco, solo a su marco');
+ s.destruir();assert.equal(oyentes.size,0,'al salir deja de escuchar');
+ // y en el sitio: la ruta, su vista a pantalla completa (las reglas de BT3), la entrada «un jugador» y escondida a los demás
+ const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8');
+ assert.match(main,/\|bt3\|mkw\)\$\/\.test\(h\)/,'la ruta #solo/mkw');
+ assert.match(main,/state\.vista === "solo-mkw"\) \{[\s\S]{0,300}crearMkwSolo\(\{ volver: \(\) => ir\(""\), enLinea: \(\) => \{ ir\(""\); setTimeout\(\(\) => salon\.abre && salon\.abre\("mkw"\)/);
+ assert.match(main,/classList\.toggle\("jg-mkwsolo", state\.vista === "solo-mkw" && !motivo\)/);
+ assert.match(main,/e\.juego !== "bt3" && e\.juego !== "mkw"/,'la entrada no se ve fuera de la lista');
+ assert.match(fs.readFileSync(raiz('../juegos.html'),'utf8'),/html\.jg-bt3solo #pantalla,html\.jg-mkwsolo #pantalla\{position:fixed/);
+ assert.match(fs.readFileSync(raiz('src/juegos/salon-datos.js'),'utf8'),/id: "bots-mkw", tipo: "bots", juego: "mkw"[\s\S]{0,200}ruta: "#solo\/mkw"/);
+});
+
+test('el ensayo local (jugar.bat): los emuladores de Firebase y el catálogo «solo Mario Kart» existen solo en esta PC',()=>{
+ // Se toma la condición tal cual está en el código y se evalúa con otra dirección de página: en el sitio publicado
+ // (o en un dominio que solo empieza con "localhost") no hay emuladores ni filtro, aunque alguien ponga el objeto.
+ const fb=fs.readFileSync(raiz('src/firebase.js'),'utf8'),main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8');
+ const emu=/const EMU = ([\s\S]*?);\r?\n/.exec(fb)[1],solo=/const SOLO_LOCAL = ([\s\S]*?);\r?\n/.exec(main)[1];
+ const evalua=(expr,host)=>vm.runInNewContext(expr,{location:{hostname:host},window:{__FIREBASE_EMU:{auth:'http://127.0.0.1:9099'},__JG_SOLO:['mkw']}});
+ for(const host of['cstappung.github.io','localhost.malo.com','127.0.0.1.malo.com','192.168.1.5']){
+  assert.equal(evalua(emu,host),null,`sin emuladores en ${host}`);assert.equal(evalua(solo,host),null,`sin filtro en ${host}`);
+ }
+ for(const host of['127.0.0.1','localhost']){
+  assert.equal(evalua(emu,host).auth,'http://127.0.0.1:9099');assert.deepEqual([...evalua(solo,host)],['mkw']);
+ }
+ // sin el objeto (la página normal en esta PC) tampoco
+ assert.equal(vm.runInNewContext(emu,{location:{hostname:'127.0.0.1'},window:{}}),null);
+ assert.equal(vm.runInNewContext(solo,{location:{hostname:'127.0.0.1'},window:{}}),null);
+ // con emuladores: ni App Check ni Analytics (nada sale de la PC)
+ assert.match(fb,/if \(APP_CHECK_SITE_KEY && !EMU &&/);
+ assert.match(fb,/connectAuthEmulator\(auth, EMU\.auth/);
+});

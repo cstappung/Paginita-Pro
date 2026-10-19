@@ -72,7 +72,7 @@ const eleccion = () => pagina.waitForFunction(() => window._eleccion !== 'espera
 const cargadas = sel => pagina.waitForFunction(s => { const i = document.querySelector(s); return i && i.complete && i.naturalWidth > 0; }, sel, { timeout: 5000 }).then(() => true, () => false);
 
 try {
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/`);
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);   // con la portada: la página sin arrancar el juego
   await pagina.waitForFunction(() => window.mkwInterfaz, null, { timeout: 20000 });
 
   // 1) Carrera: lista, vista previa, videíto, elegir

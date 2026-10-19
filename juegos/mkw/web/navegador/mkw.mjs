@@ -11,22 +11,27 @@
 //      descarga SOLO ese pedazo (petición HTTP con Range). Con JSPI el juego queda en pausa mientras llega.
 //   5. Llama a main(): el runtime arranca, aurora crea el WebGPU sobre el <canvas id="canvas"> y dibuja.
 //   6. Cada segundo muestra cuadros por segundo y trabajo por cuadro, y anota las verificaciones del banco.
-import { prueba } from './banco/comun.js';
+import { prueba } from './verificaciones.mjs';   // (junto a la página: en el sitio ./banco/ no existe, §69)
 import { crearControles, ACCIONES, BOTON, nombreTecla } from './controles.mjs';
 import { crearSonido } from './sonido.mjs';
 import { crearGuardado } from './guardado.mjs';
+import { crearNube } from './nube.mjs';
+import { crearRespaldos } from './respaldos.mjs';
 import { crearDisco } from './disco.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 import { crearInterfaz } from './interfaz.mjs';
 import { montarMandos } from './opciones-mandos.mjs';
 import { crearRecords, vigilarCarreras, textoTiempo, nombreCategoria as NOMBRE_CATEGORIA } from './records.mjs';
-import { crearLector, crearPiloto, leerNombres } from './menus.mjs';
+import { crearLector, crearPiloto, leerNombres, SECCION, PAGINA, BOT } from './menus.mjs';
 import { crearPila, crearConmutador, crearEnlaceCanal, crearRouterMalla } from './red.mjs';
 import { crearMalla, senalPadre, senalCanal } from './malla.mjs';
 import { crearWfc } from './wfc.mjs';
 import { crearVr, presentarVr, extraerVrbr } from './vr.mjs';
 import { crearLockstep, huellaCarrera, armarPlantel, MARCA as MARCA_LOCKSTEP } from './lockstep.mjs';
+import { crearPrivado } from './privado.mjs';
+import { crearOcultar } from './ocultar.mjs';
+import { crearInicio } from './inicio.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // ---- En línea (bitácora §58). ?red=1: la red de juguete de la sala, con el WFC virtual en esta misma pestaña
@@ -106,6 +111,10 @@ const red = parametros.has('red') ? (() => {
 // ?privado=http://127.0.0.1:8151 lo imita con herramientas/sitio-local.mjs (bitácora §54). La página en sí usa
 // direcciones relativas, para vivir en /juegos/mkw/ del sitio igual que aquí en /.
 const ORIGEN = (parametros.get('privado') || '').replace(/\/+$/, '');
+// El Worker de amigos solo responde con el token de Firebase de quien juega: privado.mjs se lo pide a la página de Juegos
+// (el marco padre, como el de BT3) y se lo pone a cada pedido que va a ORIGEN (bitácora §65). Sin ORIGEN, nada cambia.
+const privado = ORIGEN ? crearPrivado({ origen: ORIGEN }).instalar() : null;
+window.mkwPrivado = privado;
 const TRAZA_DISCO = parametros.has('trazaDisco');   // anotar cada lectura del disco que hace el juego (bitácora §52)
 const CUADROS_PRUEBA = Number(parametros.get('cuadros') || 0);   // 0 = jugar sin fin
 const { ok, nota, fin } = prueba('juego', 'Juego en el navegador (fase 3)');
@@ -477,9 +486,67 @@ document.getElementById('borrarDisco').addEventListener('click', async () => {
 
 // ---- Partidas guardadas (web/navegador/guardado.mjs) ----
 // Se leen de IndexedDB al abrir la página; se restauran antes del main() del juego y se guardan solas al escribirse.
-const guardado = crearGuardado({ alCambiar: () => { pintarPartidas(); ui?.partidaCambio(); } });
+// Cada guardado nuevo también se sube a la nube (si hay sesión): unos segundos después, o enseguida si la pestaña se
+// está escondiendo (cambiar de app en el celular, cerrar).
+let nube = null, vistoGuardado = 0;
+const guardado = crearGuardado({ alCambiar: e => {
+  pintarPartidas(); ui?.partidaCambio();
+  if (nube && e.ultimoGuardado && e.ultimoGuardado !== vistoGuardado) {
+    vistoGuardado = e.ultimoGuardado;
+    if (document.visibilityState === 'hidden') nube.enviar('subida al esconder la pestaña'); else nube.cambio();
+  }
+} });
 window.mkwGuardado = guardado;              // para las pruebas
-let guardadosAlAbrir = guardado.cargar().catch(e => { guardado.estado.error = String(e); return new Map(); });
+
+// ---- Partidas en la nube (nube.mjs: Firebase Storage, mkw/<uid>/partidas.mkwp) ----
+// La sala del sitio (colabtex/src/juegos/mkw.js) llama window.mkwConectarNube({ almacen, uid }) apenas carga el
+// marco, con un almacén { meta, bajar, subir } hecho con el Firebase del sitio. ANTES de que el juego lea las
+// partidas, la nube deja iguales las de este navegador y las de la cuenta (nube.alEntrar). Por eso, en el marco
+// (&senal=padre), la lectura espera: hasta 4 s a que llegue la nube y, si llegó, a que termine (cada pedido a
+// Firebase tiene su tope, así que eso también termina). Sin sesión o si no llega a tiempo, se juega con lo de este
+// navegador; la nube de esta visita queda apagada (la próxima vez se ponen al día, y si las dos cambiaron gana la más
+// nueva y la otra queda en «Copias de respaldo»).
+let nubeTarde = false, nubeEmpezo = false, soltarLectura;
+const esperaLectura = new Promise(r => { soltarLectura = r; });
+if (parametros.get('senal') === 'padre') setTimeout(() => { if (!nubeEmpezo) { nubeTarde = true; soltarLectura(); } }, 4000);
+else soltarLectura();
+// Un pedido que no contesta (sin red) no puede dejar el juego esperando: cada uno tiene su tope
+const conTope = (promesa, ms, que) => Promise.race([promesa, new Promise((_, mal) => setTimeout(() => mal(new Error(`${que}: sin respuesta en ${ms / 1000} s`)), ms))]);
+let ultimoRespaldoNube = null;
+const respaldosNube = crearRespaldos();
+window.mkwConectarNube = async ({ almacen, uid } = {}) => {
+  if (nube || nubeTarde || !almacen || !uid) {
+    if (nubeTarde && !nube) nota('partidas en la nube: la sala las conectó tarde (esta visita, solo en este navegador)');
+    return nube?.estado || null;
+  }
+  nubeEmpezo = true;
+  // Lo que viene de la página de la sala es de otro "reino" de JavaScript: sus Uint8Array no pasan las revisiones de
+  // tipo de este, así que se copian (la sala copia del mismo modo lo que sube)
+  const propio = {
+    meta: ruta => conTope(Promise.resolve(almacen.meta(ruta)), 8000, 'nube (meta)').then(m => m && { ...m }),
+    bajar: async ruta => new Uint8Array(await conTope(Promise.resolve(almacen.bajar(ruta)), 20000, 'nube (bajar)')),
+    subir: (ruta, bytes, meta) => conTope(Promise.resolve(almacen.subir(ruta, bytes, { ...meta })), 20000, 'nube (subir)'),
+  };
+  nube = crearNube({ guardado, almacen: propio, uid: String(uid), alCambiar: () => {
+    ui?.partidaCambio();
+    // La versión que perdió un conflicto queda en «Copias de respaldo» (nunca se pierde una partida)
+    const r = nube.respaldo;
+    if (r && r !== ultimoRespaldoNube) {
+      ultimoRespaldoNube = r;
+      respaldosNube.guardar(r.blob, `la de ${r.de === 'nube' ? 'tu cuenta' : 'este navegador'}: perdió contra una más nueva`).catch(() => {});
+    }
+  } });
+  window.mkwNube = nube;
+  // Al esconder la pestaña (cambiar de app en el celular, cerrar): subir ya lo que esperaba su turno (la nube sube
+  // como mucho una vez cada 30 s; sin esto, cerrar justo después de guardar dejaría la cuenta atrasada)
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') nube.alEsconder(); });
+  addEventListener('pagehide', () => nube.alEsconder());
+  try { nota(`partidas en la nube: ${await nube.alEntrar()}`); }
+  finally { window.mkwEstado.nubeLista = performance.now(); soltarLectura(); }
+  return nube.estado;
+};
+// (mkwEstado.lecturaPartidas: cuándo el juego leyó sus partidas, para la prueba: después de la nube, nunca antes)
+let guardadosAlAbrir = esperaLectura.then(() => { window.mkwEstado.lecturaPartidas = performance.now(); return guardado.cargar(); }).catch(e => { guardado.estado.error = String(e); return new Map(); });
 // Pipelines para precalentar (pipelines.mjs): la lista de este navegador y la semilla del servidor.
 // ?precalentar=no: sin listas (para medir el peor caso, la primera visita sin semilla).
 const pipelines = crearPipelines({ urlSemilla: ORIGEN + '/build/pipelines.bin' });
@@ -559,8 +626,62 @@ setInterval(() => {
 // ---- La cara de la página (interfaz.mjs): inicio, modos, barra, cajón, «Tu partida», diálogos ----
 // alCambiarGuardado: el editor de Mii guardó algo sin recargar la página → se vuelve a leer lo guardado para el arranque
 var ui = crearInterfaz({ guardado, sonido, controles, imagenes: ORIGEN + '/build/imagenes',
-  alCambiarGuardado: () => { guardadosAlAbrir = guardado.cargar().catch(() => new Map()); } });
+  estadoNube: () => nube?.estado,
+  alCambiarGuardado: () => { guardadosAlAbrir = esperaLectura.then(() => guardado.cargar()).catch(() => new Map()); } });
 window.mkwInterfaz = ui;
+
+// ---- El menú de inicio «JloKart Wii» (inicio.mjs, bitácora §67) ----
+// Sale al abrir el juego sin un modo ya decidido (sin ?modo= de una sala): la imagen del dueño con Single Player,
+// Multiplayer y Options. La imagen es PRIVADA (una persona real): viene del Worker de amigos con el token de quien
+// juega (el fetch de privado.mjs), así que si el Worker no la entrega (401/403/404) el menú no aparece y todo sigue
+// como antes. Mientras está, el juego carga y arranca debajo, sin recibir nada de la persona (controles.silenciar).
+// Las pruebas con Playwright no lo ven (navigator.webdriver) salvo con ?inicio=1; ?inicio=0 lo apaga.
+const quiereInicio = !parametros.get('modo') && !ui.conPortada && parametros.get('inicio') !== '0' &&
+  (parametros.get('inicio') === '1' || !navigator.webdriver);
+let pedirPiloto = null;          // arrancar() lo pone cuando el piloto existe; antes, la elección queda esperando
+let eleccionPendiente = null;
+let modoInicio = null;           // lo último elegido que mueve el juego ('unjugador' | 'local')
+const aLaVista = id => { const e = document.getElementById(id); return !!e && !e.hidden; };
+const inicio = crearInicio({
+  imagen: ORIGEN + '/build/imagenes/inicio/jlokart.webp',
+  leerMandos: () => controles.estado.mandos,
+  enSitio: window.parent !== window,
+  // con el cajón, un diálogo, el editor de Mii o la lista de pistas encima, las teclas y el mando son para ellos
+  ocupado: () => document.body.classList.contains('cajon-abierto') || !!document.querySelector('dialog[open]') ||
+    aLaVista('editorMii') || aLaVista('elegirPista'),
+  alElegir: que => elegirInicio(que),
+});
+window.mkwInicio = inicio;
+function mostrarInicio() {
+  if (!inicio.mostrar()) return false;
+  controles.silenciar(true);
+  window.mkwEstado.inicioVisto = performance.now();
+  return true;
+}
+function elegirInicio(que) {
+  if (que === 'opciones') return ui.abrirCajon('controles');
+  if (que === 'salas') return window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'salas' }, location.origin);
+  // 'unjugador' | 'local': el juego vuelve a recibir lo de la persona y el piloto lo lleva a esa pantalla
+  controles.silenciar(false);
+  modoInicio = que;
+  window.mkwEstado.inicio = { que, cuando: performance.now() };
+  if (pedirPiloto) pedirPiloto(que); else eleccionPendiente = que;
+}
+// El juego volvió a su título (la persona apretó B desde el menú principal): ahí va otra vez nuestro menú de inicio.
+// Lo llama el gancho de Page::Activate; nunca debe fallar (es una llamada desde dentro del juego).
+function alActivarInicio(dir) {
+  try {
+    if (!modoInicio || inicio.visible || window.mkwPiloto?.activo || !window.mkwEstado.piloto) return;
+    if (window.mkwMenus.u32(dir + 4) !== PAGINA.titulo) return;
+    modoInicio = null;
+    mostrarInicio();
+  } catch (e) { console.warn('[inicio]', e); }
+}
+if (quiereInicio) inicio.cargar().then(ok => {
+  window.mkwEstado.imagenInicio = inicio.estado.imagen;
+  if (ok && !modoInicio) mostrarInicio();
+  else if (!ok) nota(`menú de inicio: sin imagen (${inicio.estado.imagen}): la página sigue sin él`);
+});
 // Panel «Mandos» (opciones-mandos.mjs): tipo de mando, disposición de botones, zona muerta, vibración, probar y asignar
 montarMandos(document.getElementById('mandosPanel'), controles);
 // Récords (records.mjs): existen desde el principio (la lista de pistas muestra tus mejores tiempos antes de jugar)
@@ -586,13 +707,23 @@ async function arrancar() {
   const hayJspi = 'Suspending' in WebAssembly;
   const { adaptador, nombreGpu, ignora } = await revisionGpu;
   if (!ok('el navegador tiene WebGPU y JSPI', !!adaptador && hayJspi,
-          `WebGPU ${adaptador ? 'sí' : 'no'}, JSPI ${hayJspi ? 'sí' : 'no'}`)) return fin();
+          `WebGPU ${adaptador ? 'sí' : 'no'}, JSPI ${hayJspi ? 'sí' : 'no'}`)) {
+    ui.cortina('Este navegador no puede correr el juego: necesita WebGPU y JSPI (Chrome o Edge, en el computador o en Android).', true);
+    return fin();
+  }
   nota(`GPU pedida: ${GPU}; la que dio el navegador: ${nombreGpu}`);
   if (ignora) nota('el navegador ignora la elección de tarjeta (da la misma para alto rendimiento y bajo consumo)');
 
   // 2) Manifiesto
   const respuestaManifiesto = await fetch(ORIGEN + '/manifiesto.json');
+  if (!respuestaManifiesto.ok) {                     // el Worker: 401 = sin sesión, 403 = no está en la lista de amigos
+    const por = { 401: 'Inicia sesión en Juegos para jugar.', 403: 'Este juego es solo para la lista de amigos.' }[respuestaManifiesto.status] || `El servidor del juego contestó ${respuestaManifiesto.status}.`;
+    ui.aviso(por, true); ui.cortina(por, true);
+    ok('lo privado responde', false, `manifiesto: ${respuestaManifiesto.status}`);
+    return fin();
+  }
   const manifiesto = await respuestaManifiesto.json();
+  ui.cortina('Bajando los archivos del juego…');
   // Caché del disco (disco.mjs): lo bajado queda en este navegador; la versión de los archivos la da el servidor
   // ?adelantar=0: sin bajar antes (ni avisos del juego ni lectura seguida), para comparar (bitácora §52)
   disco = crearDisco({ version: respuestaManifiesto.headers.get('X-Mkw-Version') || 'sin-version',
@@ -643,7 +774,9 @@ async function arrancar() {
   // sin huella (siempre se baja y se compila de nuevo, como antes).
   const huellaBuild = parametros.get('huella') === '0' ? null : respuestaManifiesto.headers.get('X-Mkw-Build');
   const conHuella = f => ORIGEN + '/build/' + f + (huellaBuild ? '?v=' + huellaBuild : '');
-  const crear = (await import(conHuella('mkw.js'))).default;
+  // (desde el Worker, import() no deja poner el token: privado.mjs lo baja con fetch y lo importa desde un blob)
+  ui.cortina('Preparando el juego…');
+  const crear = (await (privado ? privado.importar(conHuella('mkw.js')) : import(conHuella('mkw.js')))).default;
   let lecturas = 0, bytes = 0;
   const M = await crear({
     canvas: $('canvas'),
@@ -738,6 +871,12 @@ async function arrancar() {
   window.mkw = M;
   // En qué pantalla está el juego (menus.mjs: lee la memoria de la Wii; para elegir pista o copa desde la página)
   window.mkwMenus = crearLector(M);
+  // Botones del juego que aquí no sirven (ocultar.mjs, §66): el juego avisa cada pantalla que se activa (paginas_nativo.cpp)
+  // y se esconden antes de dibujarla: «Retro WFC» fuera de la sala en línea y los «Settings» de Retro Rewind. ?ocultar=0: todo como el juego
+  const ocultar = crearOcultar({ lector: window.mkwMenus, enLinea: parametros.get('modo') === 'enlinea' });
+  window.mkwOcultar = ocultar;
+  const ocultarActivo = parametros.get('ocultar') !== '0';
+  M.mkwAlActivarPagina = dir => { if (ocultarActivo) ocultar.alActivar(dir); alActivarInicio(dir); };
   // Récords (records.mjs): al terminar cada carrera, el tiempo final (leído del juego) queda como récord personal de
   // esa pista y categoría (modo + cc). Con sesión en el sitio, también va a la tabla de Firebase: la página del sitio
   // llama window.mkwConectarRecords({ almacen: almacenRtdb({ rtdb, db }), uid, nombre }).
@@ -758,7 +897,8 @@ async function arrancar() {
   const piloto = crearPiloto({ lector: window.mkwMenus, controles, alAviso: (t, mal) => ui.aviso(t, mal),
     esperarEleccion: () => ui.elegirPista({ modo: objetivoPiloto.modo, copas: leerNombres(window.mkwMenus, M) }).then(conPrimera) });
   window.mkwPiloto = piloto;
-  const objetivoPiloto = { modo: parametros.get('modo') || window.mkwModo.modo };
+  // sin la portada (lo normal) el modo sale solo de la dirección (la sala del sitio); si no, los menús del juego
+  const objetivoPiloto = { modo: parametros.get('modo') || (ui.conPortada ? window.mkwModo.modo : 'libre') };
   // ?modo=enlinea (la sala del sitio la pone): el piloto entra solo hasta «VS mundial». Quien no es anfitrión espera a
   // tener ruta al WFC de la sala (10.77.0.1) por la malla antes de conectarse
   if (objetivoPiloto.modo === 'enlinea' && red) {
@@ -794,7 +934,7 @@ async function arrancar() {
     if (parametros.has('objetos')) objetivoPiloto.objetos = Number(parametros.get('objetos'));
     // Contrarreloj: contra el mejor fantasma (si no, solo): ?fantasma=0 o lo elegido en la página
     if (objetivoPiloto.modo === 'tt') objetivoPiloto.fantasma = parametros.has('fantasma') ? parametros.get('fantasma') !== '0' : window.mkwModo.fantasma !== false;
-    ui.aviso('Yendo a la carrera… (Esc para manejar tú)');
+    ui.aviso(ui.cortinaPuesta ? '' : 'Yendo a la carrera… (Esc para manejar tú)');
     piloto.ir(objetivoPiloto).then(async llego => {
       window.mkwEstado.piloto = { llego, ...objetivoPiloto, paginas: piloto.paginas };
       nota(`piloto: ${llego ? 'llegó a la carrera' : 'se detuvo'} (${JSON.stringify(objetivoPiloto)}) páginas ${piloto.paginas.map(p => p.toString(16)).join(',')}`);
@@ -809,6 +949,52 @@ async function arrancar() {
       }
     });
   }
+
+  // La cortina (§66): tapa la pantalla hasta que el juego llega a su título (sin piloto) o hasta que el piloto termina
+  // de recorrer solo los menús del juego (con piloto: la sala del sitio o ?modo=…), y vuelve mientras el piloto los
+  // recorre otra vez (las carreras 2–4 de la copa). Esc le quita el mando al piloto, y con eso se va la cortina.
+  // Secciones del juego que cuentan como "ya cargó": el título, el menú principal y las carreras (< 0x30).
+  // Con el menú de inicio (§67) el modo se decide después (Single Player, Multiplayer local): por eso se mira cada vez.
+  let revisarCortina = () => {};
+  {
+    const MODOS_PILOTO = ['gp', 'vs', 'tt', 'copa', 'unjugador', 'local'];
+    const conPiloto = () => objetivoPiloto.modo === 'enlinea' ? !!red : MODOS_PILOTO.includes(objetivoPiloto.modo);
+    const textoPiloto = () => ({ enlinea: 'Entrando a la sala…', copa: 'Preparando la carrera…', unjugador: 'Entrando a Single Player…',
+      local: 'Entrando a Multiplayer…' }[objetivoPiloto.modo] || 'Yendo a la carrera…') + (matchMedia('(pointer: fine)').matches ? ' (Esc: lo hago yo)' : '');
+    let vioTitulo = false, puesta = '';
+    revisarCortina = () => {
+      const e = window.mkwMenus.estado();
+      if (e.seccion === SECCION.titulo || e.seccion === SECCION.menuPrincipal || (e.seccion > 0 && e.seccion < 0x30)) vioTitulo = true;
+      const piloteando = conPiloto() && (piloto.activo || !window.mkwEstado.piloto);
+      const quiere = !vioTitulo ? 'carga' : piloteando ? 'piloto' : '';
+      if (quiere === puesta) return;
+      puesta = quiere;
+      if (quiere === 'piloto') ui.cortina(textoPiloto());
+      else if (!quiere) {
+        ui.cortina(false); window.mkwEstado.cortinaFuera = performance.now();
+        if (!conPiloto() && !quiereInicio) clearInterval(vigilaCortina);   // con menú de inicio puede volver a hacer falta
+      }
+    };
+    const vigilaCortina = setInterval(revisarCortina, 200);
+  }
+
+  // El menú de inicio (§67): Single Player → el piloto hasta el menú «Un jugador» del juego; Multiplayer local → hasta
+  // el menú principal con el cursor en «2 Players». Ahí se detiene: lo demás se elige con los menús del juego.
+  const DESTINO = {
+    unjugador: { pagina: PAGINA.unJugador, seccion: SECCION.unJugador },
+    local: { pagina: PAGINA.menuPrincipal, alLlegar: async toque => { await toque(BOT.derecha); } },
+  };
+  pedirPiloto = que => {
+    objetivoPiloto.modo = que;
+    window.mkwEstado.piloto = null;
+    revisarCortina();                               // la cortina al tiro (si el juego ya mostraba su título)
+    piloto.hasta(DESTINO[que]).then(llego => {
+      window.mkwEstado.piloto = { llego, modo: que, paginas: piloto.paginas };
+      nota(`piloto del menú de inicio: ${que} ${llego ? 'llegó' : 'se detuvo'} (páginas ${piloto.paginas.map(p => p.toString(16)).join(',')})`);
+      revisarCortina();
+    });
+  };
+  if (eleccionPendiente) { const que = eleccionPendiente; eleccionPendiente = null; pedirPiloto(que); }
 
   // 6a) Ritmo contra el monitor: requestAnimationFrame se llama una vez por cada refresco de la pantalla (60 Hz
   // en un monitor común). En cada refresco se mira cuántos cuadros nuevos entregó el juego: lo ideal es 1.
@@ -944,6 +1130,7 @@ async function arrancar() {
   guardado.pedirPersistencia().then(si => nota(`almacenamiento persistente: ${si ? 'sí' : 'no (el navegador podría borrarlo si le falta espacio)'}`));
   window.mkwEstado.horaMain = Date.now();  // los archivos con fecha posterior los escribió el juego
   nota('arrancando main() — el juego corre');
+  ui.cortina('Arrancando…');
   M.callMain([]);
 }
 
@@ -1181,5 +1368,7 @@ async function probarControles() {
      `tras apretar A: ${(100 * tras).toFixed(0)} % y ${l2 - l1} lecturas`);
 }
 
-$('arrancar').addEventListener('click', arrancar);
-if (parametros.get('auto') === '1') arrancar();
+// Sin la portada (lo normal, §66) el juego arranca solo al abrir la página; con ?portada=1, al apretar «Jugar»
+const arrancarYa = () => arrancar().catch(e => { ui.cortina(`No pude arrancar el juego: ${e && e.message || e}`, true); throw e; });
+$('arrancar').addEventListener('click', arrancarYa);
+if (parametros.get('auto') === '1' || !ui.conPortada) arrancarYa();
