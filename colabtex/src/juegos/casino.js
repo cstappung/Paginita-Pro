@@ -243,17 +243,35 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
             <h3>Grandes premios</h3>
             <div data-cs-feed>${feedHtml(8)}</div>
           </section>
+          ${topHtml(1)}
+          ${topHtml(-1)}
         </div>
       </div>`;
   }
+  /* Top 5 por balance del casino (cobrado − apostado): signo 1 los que más
+     ganan, −1 los que más pierden. */
+  function topHtml(signo) {
+    const e = d ? economia(d) : null;
+    const l = e ? Object.entries(e.usuarios).map(([u, x]) => [u, x.casino.pagado - x.casino.apostado])
+      .filter(([, n]) => n * signo > 0).sort((a, b) => (b[1] - a[1]) * signo).slice(0, 5) : [];
+    return `<section class="jg-cs-caja">
+            <h3>${signo > 0 ? "Más ganan" : "Más pierden"}</h3>
+            ${l.length ? `<ol class="jg-cs-feed jg-cs-top">${l.map(([u, n]) => `<li>
+              <span class="jg-cs-feed-n" data-perfil="${esc(u)}" translate="no">${esc(nombreDe(u))}</span>
+              <b class="${signo > 0 ? "" : "mal"}">${signo > 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(n) * 100) / 100)} ${MONEDA}</b></li>`).join("")}</ol>`
+              : `<p class="jg-nada">${e ? "Nadie todavía." : "Cargando…"}</p>`}
+          </section>`;
+  }
   /* Los últimos premios de todos (de las rondas que la economía da por
-     válidas), los más recientes primero. */
+     válidas) desde ×4, los más recientes primero. Brillan más cuanto más
+     se acercan a ×100 (escala logarítmica entre ×4 y ×100). */
+  const multDe = r => r.mult || r.pago / (r.apostado || r.p);
   function feedHtml(n) {
     const e = d ? economia(d) : null;
     if (!e) return `<p class="jg-nada">Cargando…</p>`;
-    const l = Object.values(e.rondas).filter(r => r.valida && r.pago > (r.apostado || r.p) && !(r.u === uid && ocultos.has(r.k))).sort((a, b) => b.fin - a.fin).slice(0, n);
-    if (!l.length) return `<p class="jg-nada">Nadie ha cobrado todavía. ¿Serás la primera persona?</p>`;
-    return `<ul class="jg-cs-feed">${l.map(r => `<li>
+    const l = Object.values(e.rondas).filter(r => r.valida && r.pago > (r.apostado || r.p) && multDe(r) >= 4 && !(r.u === uid && ocultos.has(r.k))).sort((a, b) => b.fin - a.fin).slice(0, n);
+    if (!l.length) return `<p class="jg-nada">Nadie ha cobrado ×4 o más todavía. ¿Serás la primera persona?</p>`;
+    return `<ul class="jg-cs-feed">${l.map(r => `<li class="jg-cs-brilla" style="--b:${Math.min(1, Math.log(multDe(r) / 4) / Math.log(25)).toFixed(2)}">
       <span class="jg-cs-feed-j">${ICONO[r.j] || "🎲"}</span>
       <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${esc(nombreDe(r.u))}</span>
       <span class="jg-cs-feed-m">${formatoMult(r.mult)}</span>
