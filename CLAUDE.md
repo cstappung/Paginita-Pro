@@ -44,7 +44,7 @@ before the first edit. Read only the docs the task needs.
 | Firebase rules, Storage, security, deploy, any new RTDB node | `docs/claude/firebase.md` |
 | Idiomas, traducción, i18n | `docs/claude/i18n.md` |
 | **Any Juegos work** (rooms, a new game, a game screen) | `colabtex/src/juegos/CLAUDE.md` (always), plus the game's doc below |
-| Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades | `docs/claude/juegos/salon.md` |
+| Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades, modo Halloween | `docs/claude/juegos/salon.md` |
 | Perfiles, marcos, fondos, tienda, clasificación/ranking, logros, monedas, recompensa diaria | `docs/claude/juegos/perfiles-y-economia.md` |
 | Música, canciones, reproductor ♪, YouTube, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |

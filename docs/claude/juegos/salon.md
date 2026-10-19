@@ -348,3 +348,26 @@ on a phone. Things to keep:
   both rails get `translate="no"` and the live profile through `mezcla`.
 
 The three nodes need the rules re-published (`firebase/CONFIGURAR-FIREBASE.md`).
+
+**Halloween mode** (`juegos/halloween.js`, its CSS block «Modo Halloween»
+at the end of `juegos.html`, `tests/halloween.test.cjs`): from 1 October to
+1 November inclusive, in the viewer's local time, and off by itself on
+2 November (a timer re-checks at midnight, so an open tab turns too).
+Everything hangs off `html[data-halloween]`: `on`, `off` (the person
+turned it off from the salón ribbon, `jg.halloween = "no"`) or absent out
+of season. An inline script in `<head>` sets it before first paint, like
+the dark theme; it repeats `estadoHalloween` in one line and the test runs
+both over every day of the year. Every rule of the block must require the
+attribute or be a mode-only piece (`.jg-hw*`, `.hw-*`) — the test checks
+it — so out of season the page is exactly the usual one. `?halloween=1` /
+`?halloween=0` force it to preview or remove it. What it does: night/pumpkin
+header with bunting and a jack-o'-lantern logo, orange accents, cobwebs on
+the thumbnails and the banner (on `.jg-mn::after` and `.jg-ban::after`, not
+on the cover: `.sp-e-metrorush` already uses the cover's pseudo-elements),
+a spider on every fourth card, and the ribbon with the countdown in
+`.jg-sal-intro` (its 🎃 sends a «¡Bu!» ghost across). Two `pointer-events:none`
+layers on `<body>` — `.jg-hw-fondo` behind the content (moon, stars,
+graveyard with the haunted house, fog) and `.jg-hw` in front (bats, ghosts
+peeking from the edges, the spider) — show only on the menu views and the
+login screen, never in a room, a club game or immersive mode; reduced
+motion hides the front layer. Game art is never repainted.
