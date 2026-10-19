@@ -370,4 +370,8 @@ layers on `<body>` — `.jg-hw-fondo` behind the content (moon, stars,
 graveyard with the haunted house, fog) and `.jg-hw` in front (bats, ghosts
 peeking from the edges, the spider) — show only on the menu views and the
 login screen, never in a room, a club game or immersive mode; reduced
-motion hides the front layer. Game art is never repainted.
+motion hides the front layer. Game art is never repainted. The page gradient lives on
+`.jg-hw-fondo` (fixed), never on `<body>` with `background-attachment:
+fixed`: iOS Safari ignores `fixed`, the gradient repeated every screen
+height and scrolling showed a hard horizontal cut. The sticky mode bar's
+colour matches the top of that gradient for the same reason.
