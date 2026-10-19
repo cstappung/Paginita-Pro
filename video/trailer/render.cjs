@@ -6,7 +6,7 @@ const S = process.env.S || require('path').resolve(__dirname, '..'), T = S + '/t
 const [desde = 0, hasta = 52, paso = 1] = process.argv.slice(2).map(Number);
 const OUT = T + '/' + (process.env.OUTDIR || 'out'); fs.mkdirSync(OUT, { recursive: true });
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--force-color-profile=srgb'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--force-color-profile=srgb', '--disable-gpu'] });
   const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   const clips = JSON.parse(fs.readFileSync(T + '/clips.json', 'utf8'));
   await ctx.addInitScript(c => { window.CLIPS = c; }, clips);
