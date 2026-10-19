@@ -7743,7 +7743,11 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
    - `{t:"empieza", uid}`: el anfitrión abre las carreras: todos los marcos cargan el juego y entran en línea.
-   - `{t:"vuelve", uid}`: el anfitrión las cierra y todos vuelven al vestíbulo.
+   - `{t:"ajuste", uid, k:"cc", v}`: la cilindrada de la copa y de la playlist (MKW_CC; "azar" = la de Retro Rewind).
+   - `{t:"vuelve", uid, tabla?}`: el anfitrión las cierra y todos vuelven al vestíbulo. Al terminar una copa o una
+     playlist la manda el marco del anfitrión con la tabla final ([{nombre, puntos}], `mkwTabla`), que el vestíbulo
+     muestra como «la última».
+   La cola de la playlist la sortea cada navegador igual (`mkwPlaylist(pid, ronda, n)`): nadie la escribe.
    - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y, si estaban corriendo,
      vuelven todos al vestíbulo (sin su pestaña no hay servidor).
    Quien entra con las carreras andando carga el juego y entra solo: el juego lo deja mirando y lo suma en la
@@ -7757,6 +7761,21 @@ export const MKW_MODOS = { wfc: "Retro WFC", copa: "Modo copa", playlist: "Modo 
 export const MKW_CARRERAS = [2, 4, 8, 12];
 const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "wfc";
 const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
+/* La cilindrada de la copa y de la playlist (en Retro WFC la sortea el juego: 10 % 100cc, 65 % 150cc, 25 % espejo) */
+export const MKW_CC = { c150: "150cc", c100: "100cc", espejo: "Espejo", azar: "Al azar" };
+const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
+/* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
+export function mkwTabla(t) {
+  if (!Array.isArray(t)) return null;
+  const r = [];
+  for (const f of t.slice(0, 12)) {
+    if (!f || typeof f.nombre !== "string") continue;
+    const puntos = Math.round(Number(f.puntos));
+    if (!Number.isFinite(puntos) || puntos < 0 || puntos > 9999) continue;
+    r.push({ nombre: f.nombre.slice(0, 20), puntos });
+  }
+  return r.length ? r : null;
+}
 /* La carrera con CPU de relleno es la "carrera sincronizada" del juego (cada navegador corre la misma carrera offline
    con los botones de todos): cada humano maneja un puerto de mando de GameCube, y hay 4. Con más pilotos se corre en
    línea, sin CPU. */
@@ -7764,6 +7783,20 @@ export const MKW_SINCRO_MAX = 4;
 export const MKW_COPAS = 79;            // copas de carrera de Retro Rewind (las de arenas no cuentan)
 /* La semilla y las 4 pistas de una tanda: salen de la sala y del número de tanda, así cada navegador calcula lo mismo
    sin que nadie lo escriba. */
+/* La cola de la playlist: n pistas distintas, sorteadas con la sala y la tanda (igual en cada navegador) */
+export function mkwPlaylist(pid, ronda, n) {
+  let h = 2166136261;
+  for (const c of `lista|${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let x = (h >>> 0) || 1;
+  const azar = m => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % m; };
+  const pistas = [], vistas = new Set();
+  while (pistas.length < Math.min(n, MKW_COPAS * 4)) {
+    const copa = azar(MKW_COPAS), fila = azar(4), k = copa * 4 + fila;
+    if (vistas.has(k)) continue;
+    vistas.add(k); pistas.push({ copa, fila });
+  }
+  return pistas;
+}
 export function mkwCarrera(pid, ronda) {
   let h = 2166136261;
   for (const c of `${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
@@ -7783,7 +7816,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   const fuera = {}, hist = [];
   // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
   let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
-  let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras);
+  let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7801,22 +7834,29 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "cpu") { cpu = mkwCpu(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "estilo" && fase === "vestibulo") { estilo = mkwEstilo(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
       // con CPU y hasta 4 pilotos: carrera sincronizada, con los que están ahora, en este orden (puerto 1, 2, 3, 4)
       const ps = presentes();
       sincro = cpu !== "ninguna" && ps.length <= MKW_SINCRO_MAX ? ps.map(x => x.uid) : null;
-      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, jugadores: ps.length, sincro: !!sincro });
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, jugadores: ps.length, sincro: !!sincro });
       continue;
     }
-    if (j.t === "vuelve" && esAnf && fase === "jugando") { fase = "vestibulo"; hist.push({ e: "vuelve", n: ronda }); continue; }
+    if (j.t === "vuelve" && esAnf && fase === "jugando") {
+      fase = "vestibulo";
+      const tabla = estilo !== "wfc" ? mkwTabla(j.tabla) : null;
+      if (tabla) ultimaTabla = { n: ronda, estilo, tabla };
+      hist.push(tabla ? { e: "vuelve", n: ronda, tabla } : { e: "vuelve", n: ronda });
+      continue;
+    }
   }
   const nodos = {};
   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
   const quedan = presentes().length;
   return {
-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, ronda, nodos, fuera, hist: hist.slice(-40),
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
     sincro: fase === "jugando" ? sincro : null,
     ganador: "", motivo: quedan ? "" : "abandono"
   };

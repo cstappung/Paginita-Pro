@@ -519,6 +519,28 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Cartel (Click::OnClick)** | Las páginas que solo muestran un texto y se cierran con A (por ejemplo «Welcome to Retro Wi-Fi Connection!»). Su acción de cerrar es una función del juego que también se llama directo. |
 | **Bucle de juego de Retro WFC** | Lo que se hace una vez adentro del modo en línea: buscar sala → elegir personaje y kart → votar pista (con reloj) → ruleta → carrera → puntos y VR → otra votación, sin fin. Está investigado en `docs/en-linea.md`. |
 
+### Los tres modos de la sala sobre Retro WFC (§72)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Modo de la sala (estilo)** | Lo que elige quien abre la sala de Mario Kart en el sitio: **Retro WFC** (el modo en línea del juego tal cual, sin fin), **Modo copa** (N carreras con puntos y una tabla al final) o **Modo playlist** (una cola de pistas sorteada). Se guarda como `estilo` porque las reglas de Firebase ya usan `modo` para otros juegos. Como el selector de función de un multímetro: el mismo aparato (el modo en línea del juego), distinta forma de usarlo. |
+| **Paquete SELECT** | El "acta" que se mandan las consolas mientras eligen: el personaje, el kart y el voto de cada uno, y lo que decidió el anfitrión (la pista ganadora, la cilindrada, de quién era el voto que salió). Lo arma `SELECTHandler` del juego, con campos agregados por Retro Rewind (Pulsar: `PulSELECT`). Como la planilla que firma cada integrante de un jurado y que el presidente completa con el veredicto. |
+| **DecideTrack / DecideCC** | Las dos funciones de Retro Rewind con que el anfitrión decide: la pista (sortea uno de los votos, evitando repetir) y la cilindrada (10 % 100cc, 65 % 150cc, 25 % espejo). En el C++ traducido se llaman `rr_kamek_81864290` y `rr_kamek_81864878` (están en el código de Retro Rewind, que vive en 0x818…). |
+| **SetPlayerData (el voto)** | La función del juego (0x80660750, con un parche de Retro Rewind) que anota en el paquete SELECT el personaje, el kart y el **voto** de pista de una persona cuando lo confirma. En la playlist el voto se cambia ahí por la pista de la cola: así todas las tarjetas de la ruleta muestran la misma pista. |
+| **Id de pista de Pulsar** | El número con que Retro Rewind nombra cada pista: 0x100 + 4·copa + fila (la copa 13, fila 2 → 0x136); las 32 de Nintendo también tienen números bajos (0x00-0x1F). La página siempre habla con «copa.fila» (`13.2`). |
+| **Reloj de elegir** | La cuenta regresiva de arriba a la derecha mientras se elige personaje, kart y pista en línea. Arranca con un número guardado en la memoria del juego (30.0 en 0x80899EF4, dentro de StaticR.rel); la página lo cambia por 45.0 antes de que se use. Como cambiar la resistencia de un temporizador RC: el circuito es el mismo, solo dura más. |
+| **Constante en memoria (rodata)** | Los números fijos que usa un programa (30.0, 10.0…) no van dentro de la instrucción: están guardados en una zona de datos de solo lectura y la instrucción los va a buscar (`lfs`). Si se cambia ese número en la memoria, cambia lo que hace el programa sin tocar su código. Hay que comprobar antes quién más lee ese número (aquí, solo `SELECTStageMgr::OnResume`, en sus dos versiones). |
+| **Etapa de la carrera (Raceinfo +0x28)** | En qué parte va la carrera: 0 presentación, 1 cuenta regresiva, 2 carrera, 3 terminando (un cuadro), 4 terminada para todos. La copa cuenta una carrera cuando ve el 4 dentro de una sección de carrera en línea (0x68-0x77). |
+| **Puntos (score)** | Lo que el juego anota a cada jugador al terminar una carrera (15 al primero, 12 al segundo, 10…): Racedata guarda los de antes (+0xD8) y los de ahora (+0xDA) de cada jugador; la diferencia es lo que dio esa carrera. |
+| **Tabla final** | La lista ordenada de pilotos con sus puntos sumados al terminar la copa o la playlist. La muestra el marco del juego (un cuadro nuestro encima de la imagen) y el marco del anfitrión se la manda al sitio, que la guarda con la vuelta al vestíbulo («Última copa»). El sitio la limpia (máximo 12 filas, nombres de 20 letras, puntos enteros) porque viene de una página. |
+| **Cola sorteada (playlist)** | La lista de pistas de la playlist: cada navegador la calcula igual a partir del nombre de la sala y el número de tanda (el mismo "dado" con la misma semilla), así nadie tiene que escribirla en Firebase. Como dos relojes de cuarzo iguales: no se hablan y marcan lo mismo. |
+| **Sección de desconexión (0x78 / 0x79)** | La pantalla a la que el juego salta cuando pierde la conexión en línea («se interrumpió la comunicación», con un número de error). |
+| **Control de inactividad (desconexión por no tocar nada)** | Una regla del Mario Kart Wii original para las carreras en línea: si un jugador pasa **30 s sin tocar ningún botón** (1800 cuadros), el juego lo da por ausente y lo desconecta («You were disconnected from the other players»), para que una consola abandonada no frene a todos. Lo hace `GMDataOnlineVS` (0x8053F184) preguntándole al administrador de mandos cuántos cuadros lleva quieto ese mando. Retro Rewind agrega otro igual, por velocidad (si el kart casi no avanza). Como el "hombre muerto" de un tren: si el maquinista no toca el pedal en un rato, el tren se frena solo. |
+| **DisconnectMgr (página 0x88)** | La página invisible que vigila la conexión en cada cuadro de las pantallas en línea. Si ve una marca de corte (la de inactividad, un error de red, demasiado tiempo en un menú), pide la desconexión (`Section::ScheduleDisconnection`, 0x80623054) y salta a la sección del aviso (0x79). Como un interruptor diferencial: mide todo el tiempo y corta solo cuando ve la falla. |
+| **Terminar la carrera por código (para las pruebas)** | En las pruebas nadie maneja: el kart no llega a la meta y a los 30 s el control de inactividad corta. La prueba le pide al juego (`window.mkwTerminarCarrera` → `mkw_modos_terminar` en `modos_nativo.cpp`) que en el cuadro siguiente llame a **EndLap** (0x805349B8, la función que corre al cruzar la meta) hasta pasar la última vuelta: el juego hace el resto como si el piloto hubiera llegado (tiempo, puesto, aviso a las otras consolas, puntos). Como apretar el botón de prueba de una alarma: se dispara el mismo circuito que con humo de verdad. |
+| **Sala Mundial / Regional (y la región de Retro Rewind)** | Las dos formas de buscar rivales del juego: **Mundial** (cualquiera del mundo) y **Regional** (solo los de la misma región). Retro Rewind usa la Regional con un número de región propio para separar sus salas: 0x0A = las retro, 0x14 = pistas personalizadas, 0x15 = las de Nintendo, 0x0C = 200cc, 0x0B = OTT, 0x0D = lluvia de objetos. En una sala Mundial Pulsar deja solo las 32 pistas de Nintendo. El Retro WFC de RR es «Main modes» = Regional + VS (región 0x0A). Como las frecuencias de radio: el mismo equipo, pero cada canal junta a gente distinta. |
+| **Pista válida (`IsValidTrack`)** | La regla de Pulsar para saber si un número de pista existe en la sala actual: hasta 0x29 siempre (las de Nintendo y las de batalla); de 0x100 en adelante, solo si la sala tiene las pistas de RR cargadas. Un voto de una pista que no vale se toma como «sin votar». |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -4277,5 +4299,177 @@ El resto es el bucle del propio juego (Retro WFC): la persona elige con su mando
 ```bash
 node banco/correr.mjs directo
 node web/navegador/guion.mjs "X:6000 -:2000 K:3000" --mii --evaluar "(mkwDirecto.ir(0x48), 1)"
+node web/navegador/prueba-enlinea.mjs
+```
+
+## 2026-10-19 · §72 Los tres modos de la sala: Retro WFC, copa y playlist (y 45 s para elegir)
+
+### Qué pidió el dueño
+
+Con el Retro WFC del juego corriendo por la página (§71), separarlo en **tres modos**: el original y los dos
+propuestos (copa y playlist); al crear una sala, elegir el **modo** (no «cuántas personas»); y **45 s** antes de cada
+carrera para elegir personaje, kart y ajustes.
+
+### Cómo quedó (la idea en una línea)
+
+Los tres modos son **el mismo modo en línea del juego**; la página solo cambia tres cosas: el número con que arranca el
+reloj de elegir, la decisión del anfitrión (pista y cilindrada) y cuándo se termina (contando carreras).
+
+| Modo | Qué hace | Quién lo hace |
+|---|---|---|
+| Retro WFC | El bucle del juego sin fin: elegir, votar, ruleta, carrera, VR | el juego |
+| Modo copa | N carreras (2, 4, 8 o 12) con la cilindrada del anfitrión; al terminar la última, la tabla y todos al vestíbulo | `modos.mjs` cuenta y suma; `modos_nativo.cpp` fija la cilindrada |
+| Modo playlist | Una cola de N pistas sorteada por la sala; cada carrera es la siguiente; al vaciarse, la tabla y al vestíbulo | `modos_nativo.cpp` cambia el voto de cada uno y la decisión del anfitrión por la pista de la cola |
+| (los tres) | 45 s para elegir personaje, kart y pista | `modos.mjs` cambia el 30.0 del juego por 45.0 |
+
+### 1. Los 45 s: un número en la memoria del juego
+
+La cuenta regresiva de elegir/votar es un objeto `CountDown` (Pulsar: `UI/Ctrl/CountDown.hpp`) que vive en la página
+`SELECTStageMgr` (0x90, +0x6C). Se arranca con `CountDown::SetInitial(segundos)`, pero el juego tiene esa función
+"pegada adentro" (el traductor la copió en cada llamador: «inline leaf 0x805C3C2C»), así que envolverla no alcanza.
+Lo que sí se puede cambiar es **de dónde saca el 30**: `SELECTStageMgr::OnResume` (0x806507A0 y su versión de Retro
+Rewind) lee el número de 0x80899EF4 (una constante de StaticR.rel). Se leyó la memoria del juego andando: 0x80899EF4 =
+0x41F00000 = 30.0 (y al lado, 15.0, 20.0 y 10.0 de otros relojes). En el C++ traducido nadie más lee esa dirección.
+La página la cambia por 45.0 (`ponerReloj`) apenas carga StaticR.rel, y **solo si encuentra el 30.0** (si el programa
+cambiara, no pisa otra cosa). `?eleccion=30` deja el reloj del juego.
+
+### 2. La cilindrada y la pista: las decisiones del anfitrión (`web/juego/modos_nativo.cpp`)
+
+En línea, el anfitrión de la sala del juego decide y manda el resultado en el paquete SELECT. Retro Rewind cambió esas
+decisiones por funciones suyas (Pulsar, `Network/PulSELECT.cpp`, leído en GitHub; GPL: solo se lee): `DecideTrack`
+(en el C++ traducido `rr_kamek_81864290`) y `DecideCC` (`rr_kamek_81864878`), llamadas desde 0x80661490 y 0x80661404.
+Se envuelven (`compilar-web.py`, REEMPLAZOS) y después de la de Retro Rewind se escribe lo de la sala:
+- cilindrada: `engineClass` (handler +0x8 +0x37) = 1 (100cc), 2 (150cc) o 3 (espejo);
+- pista: `pulWinningTrack` (handler +0x8 +0x3A, u16) = la de la cola, y la variante en 0.
+Además el voto de cada consola (`SetPlayerData`, 0x80660750 → `rr_overlay_80660750`, r6 = voto) pasa a ser la pista de
+la cola: así la ruleta muestra la misma pista en todas las tarjetas. El voto "sin elegir" (0x43) no se toca: si se
+cambiara, el juego creería que todos ya votaron mientras eligen personaje.
+
+### 3. Contar carreras y sumar puntos (`web/navegador/modos.mjs`)
+
+Cada 300 ms: si la sección es una carrera en línea (0x68-0x77) y la etapa de Raceinfo (+0x28) es 4 ("terminada para
+todos"), se cuenta una carrera (una vez) y 2,5 s después se leen los puntos de Racedata (por jugador: antes +0xD8,
+ahora +0xDA; si el juego no los anotó, por puesto con 15/12/10/8/7/6/5/4/3/2/1/0) y el nombre del Mii. Al llegar a N:
+9 s para ver los resultados del juego, la tabla final encima (14 s) y el aviso a la sala.
+Arriba, un cartel chico: «Modo copa · carrera 2 de 4» o «Playlist · 2 de 5 · <nombre de la pista>» (el nombre sale de
+la memoria del juego, `leerNombres`).
+
+### 4. La sala del sitio
+
+- Crear sala: **solo el modo** (Retro WFC / copa / playlist); caben 12 siempre (antes pedía también «Jugadores»).
+- Vestíbulo: el anfitrión elige el modo (tarjetas), las carreras o pistas (2, 4, 8, 12) y la cilindrada (150cc, 100cc,
+  espejo, al azar).
+- La cola de la playlist la sortea cada navegador igual con la sala y la tanda (`mkwPlaylist`), y va en la dirección
+  del marco (`?pistas=13.2,0.1,…`).
+- Al terminar la copa o la playlist, el marco del anfitrión manda `{tipo:'fin', tabla}`; la sala anota la vuelta al
+  vestíbulo con la tabla (limpia: `mkwTabla`) y el vestíbulo la muestra como «🏆 Última copa».
+
+### 5. El corte a los 30 s de carrera: el control de inactividad del juego
+
+La primera prueba con el juego de verdad (`prueba-modos`) llegaba hasta la carrera y a los ~35 s las **dos** pestañas
+mostraban «You were disconnected from the other players». Siempre en el mismo cuadro de carrera (1802), en las dos.
+Se fue descartando una cosa por vez:
+
+| Sospecha | Cómo se miró | Resultado |
+|---|---|---|
+| La red pierde paquetes | Las cuentas de la pila de red de la página cada 2 s | ~35 paquetes/s por lado, ninguno perdido |
+| Un error de la conexión (DWC) | `errorParams` de RKNet (+0x2C/+0x30) en un muestreo cada 4 ms | Siempre 0 |
+| Retro Rewind rechaza un paquete (suma de control) | Build de depuración que envuelve CheckPacket de Pulsar (`depurar_paquetes.cpp`) | Nunca marcó a nadie |
+| ¿Quién apaga la conexión? | Punto de vigilancia sobre RKNet +0x2755 (`shutdownScheduled`) | Lo escribe `Section::ScheduleDisconnection` (0x80623054) llamada por `DisconnectMgr::OnUpdate` (0x80649590) en el cuadro 1802 |
+
+Leyendo el C++ traducido de `DisconnectMgr::OnUpdate`: corta si alguna de estas marcas está puesta: (a) en carrera en
+línea, un byte del objeto del modo de juego (`Raceinfo +0x10` → `GMDataOnlineVS +0x114`); (b) un byte de 0x809C1F50;
+(c)/(d) demasiado tiempo en ciertas pantallas (3600 o 10800 cuadros). Quién escribe `GMDataOnlineVS +0x114`
+(se buscaron en el C++ traducido todas las escrituras de un byte en +276): cuatro funciones que `GMDataOnlineVS::Update`
+llama en cada cuadro:
+
+| Función | Qué mira | Cuándo marca |
+|---|---|---|
+| 0x8053F184 (del juego original) | Para cada piloto de esta consola: ¿cuántos cuadros lleva su mando sin que se toque nada? (`InputMgr`, 0x805235D4, con 1800 y 3600) | **1800 cuadros = 30 s quieto** (si no terminó la carrera) |
+| `rr_overlay_8053EE50` (Retro Rewind) | La velocidad del kart: si va más lento que un umbral 300 cuadros seguidos, empieza a contar | 3600 cuadros más (si la opción de RR está activa) |
+| 0x8053F2A4 (el propio Update) | El reloj de la carrera | 21605 cuadros = 6 min (carrera demasiado larga) |
+
+En la prueba **nadie toca un botón** durante la carrera, así que el cuadro 1802 es exactamente 1800 cuadros quietos
+más los 2 de la cuenta: es el **control de inactividad del juego original** (en la Wii de verdad pasa lo mismo si uno
+deja el mando en la mesa). No es una falla del port: una persona que maneja nunca lo ve, y por eso no se toca en el
+juego.
+
+Para la prueba sí hacía falta llegar a la meta (si no, no hay puntos ni tabla). Se agregó en `modos_nativo.cpp` un
+pedido de la página, `mkw_modos_terminar()` (`window.mkwTerminarCarrera()` en la página): en el cuadro siguiente,
+dentro de 0x8053F184 (corre en cada cuadro de la carrera en línea), llama a `RaceinfoPlayer::EndLap` (0x805349B8, la
+función que corre al cruzar la meta, en su versión de Retro Rewind) hasta pasar la última vuelta, para cada piloto de
+esa consola. Todo lo demás lo hace el juego como siempre: el tiempo final, el puesto, avisar a la otra consola, los
+puntos, la pantalla de resultados. `prueba-modos` lo pide a los 10 s de carrera (600 cuadros) en cada pestaña;
+`--sin-terminar` deja ver el corte por inactividad.
+
+### 6. La playlist se colgaba: entrábamos a la sala equivocada (la de solo pistas de Nintendo)
+
+La primera playlist con el juego no pasó de la votación: después de 45 s el juego mostró «You were disconnected from
+the other players» (la página 0x51, un cartel; foto `playlist/A-cartel.png`) y el anfitrión nunca decidió. Leyendo
+Pulsar (`SlotExpansion/CupsConfig.cpp`, `ToggleCTs`): en una sala **Mundial** (`ROOMTYPE_VS_WW`) Pulsar deja **solo las
+32 pistas de Nintendo** (`isRegsOnly`); cualquier voto de una pista retro (id ≥ 0x100) se toma como «sin votar»
+(`PulSELECT.cpp`: `!IsValidTrack(vote)` → `NO_TRACK_SELECTED`), así que el anfitrión esperaba votos que nunca llegaban
+y el juego cortó. En la copa no se notó porque ahí vota el juego: salieron 0x08 y 0x13, también de Nintendo.
+
+El problema de fondo era más grande: **el Retro WFC de Retro Rewind no es la sala Mundial**. RR v6.13 esconde los
+botones «Regional/Mundial» del menú Wi-Fi y muestra los suyos (Pulsar, `Settings/UI/ExpWFCMainPage.cpp`):
+
+| Botón de RR | Qué llama | Sala |
+|---|---|---|
+| Main modes (las retro) | `OnRegionalButtonClick` (0x8064BDC4) | Regional; luego en la página de modos (0x8C): VS = región 0x0A (retros), CT = 0x14, Regulares = 0x15, 200cc = 0x0C, OTT = 0x0B, Lluvia de objetos = 0x0D |
+| Other modes (customs) | el mismo, recordando el 7 | Regional |
+| Battle modes | el mismo, recordando el 8 | Regional, batalla (0x0E / 0x0F) |
+
+Abrir directo (§71) llamaba al botón **Mundial escondido** (0x8064BCE8) y al VS del juego (0x8064C610): eso es la sala
+de las pistas de Nintendo, no la de RR. Ahora entra como una persona en RR: «Regional» (0x8064BDC4, botón +0x484: lo
+mismo que hace «Main modes») y en la página de modos el VS **con la versión de RR** (`ExpWFCModeSel::OnModeButtonClick`,
+en el C++ traducido `rr_kamek_8183FCC0`; se encontró buscando la función de RR que escribe las regiones 10, 11, 12, 13,
+14, 15, 20 y 21): fija la región 0x0A (retros), actualiza los «contextos» de Pulsar y llama a la del juego.
+`?wfc=mundial` deja la entrada de antes (para comparar).
+
+### Trampas
+
+- **`SetInitial` está "pegada adentro"**: envolver la función del reloj (0x805C3C2C) no cambia nada, porque el
+  traductor copió su cuerpo dentro de cada llamador («inline leaf»). Lo que se cambia es la constante que lee.
+- **El voto «sin elegir» (0x43) no se toca**: si se cambiara por la pista de la cola, el juego creería que todos ya
+  votaron mientras todavía eligen personaje, y saltaría la votación.
+- **Un corte parecía una carrera terminada**: al desconectarse, el juego pasa unos cuadros por la etapa 4 dentro de la
+  sección de carrera antes de ir al aviso (0x79). La copa la contaba. Ahora se vuelve a mirar 2,5 s después: si saltó
+  a 0x78/0x79, la carrera no cuenta.
+- **El corte a los 30 s no era de la red**: era el control de inactividad del juego (sección 5). Se tardó en verlo
+  porque las dos pestañas se cortaban a la vez y la red no perdía nada; lo que lo destrabó fue el punto de
+  vigilancia sobre `shutdownScheduled` y leer `DisconnectMgr::OnUpdate` en el C++ traducido.
+- **El reloj de la página antes de StaticR.rel**: la constante vive en StaticR.rel, que se carga después del arranque;
+  `ponerReloj` se reintenta cada 300 ms hasta encontrar el 30.0 (y no escribe si encuentra otra cosa).
+- **Dos pilotos con el mismo nombre**: en la prueba las dos pestañas comparten el guardado del navegador (mismo
+  perfil), así que las dos licencias tienen el mismo Mii «PilotoA». La suma separa nombres repetidos por su número de
+  jugador; en dos PC distintas cada una tiene su Mii.
+- **La sala Mundial de Pulsar es solo de pistas de Nintendo**: con RR el modo en línea de verdad es «Main modes»
+  (Regional + VS de RR, región 0x0A). Un voto de una pista retro en la Mundial se toma como «sin votar» y la elección
+  termina en un corte.
+- **La función de terminar es solo para pruebas**: no la llama la página por su cuenta; está para que una prueba sin
+  manos llegue a la meta.
+
+### Pruebas
+
+- banco `modos` **24/24** (sin el juego, memoria falsa): el reloj pasa a 45 solo si encuentra el 30.0; `pistasDe`
+  descarta lo inválido; la copa cuenta una vez por carrera, suma por nombre (repetidos separados), ordena por puntos;
+  un corte (0x78/0x79 después de la etapa 4) no cuenta; la playlist pone la pista siguiente; Retro WFC no cuenta nada.
+- banco `directo` **18/18** (dos nuevas: el botón Regional y el VS de RR).
+- Sitio: `mkw.test` 16/16 (cilindrada, cola de la playlist, tabla limpia) y el resto de Mario Kart y Juegos: 47/47.
+- `prueba-modos` **9/9** con el juego (dos pestañas, la malla WebRTC de verdad, la sala de las retro): reloj en 45 s
+  (máximo visto 44,6 s), el anfitrión decide con 100cc, las dos corren la pista decidida (0x100, una retro) a 100cc,
+  a los 10 s de carrera cada una la termina por código, cuentan 1 de 1, arman la misma tabla (15 y 12), muestran el
+  cartel final y avisan el fin; nadie se desconecta.
+- `prueba-modos --playlist` **9/9**: el voto y la decisión son la pista de la cola (0x136, una retro de RR con
+  «Music: Isana Remix» y 2 vueltas), en espejo (150cc + la bandera de espejo), tabla y fin igual que la copa.
+- `prueba-modos --sin-terminar` (antes del arreglo de la prueba): el corte por inactividad en el cuadro 1802 de las dos.
+- `prueba-enlinea` **9/9** con la entrada nueva (Regional + VS de RR): buscando rivales a los 121 s, votación a los
+  127 s, carrera en línea a los 179 s, ~940 paquetes por lado sin perder ninguno.
+
+```bash
+node banco/correr.mjs modos directo
+node web/navegador/prueba-modos.mjs
+node web/navegador/prueba-modos.mjs --playlist
 node web/navegador/prueba-enlinea.mjs
 ```

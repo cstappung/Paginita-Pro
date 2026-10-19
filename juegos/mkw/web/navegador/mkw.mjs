@@ -33,6 +33,7 @@ import { crearPrivado } from './privado.mjs';
 import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
+import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -874,6 +875,10 @@ async function arrancar() {
   window.mkw = M;
   // En qué pantalla está el juego (menus.mjs: lee la memoria de la Wii; para elegir pista o copa desde la página)
   window.mkwMenus = crearLector(M);
+  // depuración: el punto de vigilancia de escritura (solo en el build con -DMKW_VIGIA, §62): mkwVigiar(desde, tamaño)
+  window.mkwVigiar = (desde, tam) => (M._mkw_vigia_poner ? (M._mkw_vigia_poner(desde >>> 0, tam >>> 0), true) : false);
+  // pruebas (§72): dar por terminada la carrera en línea de los pilotos de esta pestaña (como si cruzaran la meta)
+  window.mkwTerminarCarrera = () => (M._mkw_modos_terminar ? (M._mkw_modos_terminar(), true) : false);
   // Abrir directo (directo.mjs + directo_nativo.cpp, §71): la página le pide al juego la sección (un jugador, en línea)
   // y el juego la abre con sus propias funciones. ?directo=0: el camino viejo (el piloto apretando botones), para comparar
   const directo = crearDirecto({ M, lector: window.mkwMenus, nota });
@@ -923,7 +928,9 @@ async function arrancar() {
       if (vistas[vistas.length - 1] !== arriba) vistas.push(arriba);
       window.mkwEstado.directoPaginas = vistas;
       if ((e.seccion === 0x55 && arriba === 0x8f) || e.seccion === 0x58 || (e.seccion > 0 && e.seccion < 0x30)) return true;
-      const b = [BOTON_JUEGO.cartel, BOTON_JUEGO.avisoDatos, BOTON_JUEGO.usarWfc, BOTON_JUEGO.mundial, BOTON_JUEGO.vs].find(x => x.pagina === arriba);
+      // la sala de las retro de RR (Regional → VS de RR); ?wfc=mundial = la Mundial (solo pistas de Nintendo), la de antes
+      const sala = parametros.get('wfc') === 'mundial' ? [BOTON_JUEGO.mundial, BOTON_JUEGO.vs] : [BOTON_JUEGO.regional, BOTON_JUEGO.vsRetros];
+      const b = [BOTON_JUEGO.cartel, BOTON_JUEGO.avisoDatos, BOTON_JUEGO.usarWfc, ...sala].find(x => x.pagina === arriba);
       // la acción, cuando la página ya está activa; si sigue ahí 2 s después (no la tomó), otra vez
       if (b && performance.now() - ultimo > 2000 && directo.boton(b)) { ultimo = performance.now(); nota(`directo: botón de la página 0x${arriba.toString(16)}`); }
       await espera(100);
@@ -952,6 +959,27 @@ async function arrancar() {
         piloto.enLinea({ redLista });
       }, 2000);
     });
+  }
+  // Los modos de la sala (modos.mjs + modos_nativo.cpp, §72), que manda la sala del sitio: ?estilo=wfc (Retro WFC tal
+  // cual) | copa (?carreras=N con puntos) | playlist (?pistas=copa.fila,… la cola); ?cc=c100|c150|espejo|azar (copa y
+  // playlist). En los tres, 45 s para elegir personaje, kart y pista (?eleccion=30: el reloj del juego). Al terminar la
+  // copa o la cola, el marco le avisa a la sala ({tipo:'fin', tabla}): el anfitrión vuelve al vestíbulo con la tabla.
+  if (objetivoPiloto.modo === 'enlinea') {
+    let copas = null;
+    const nombrePista = (c, f) => { if (!copas) try { copas = leerNombres(window.mkwMenus, M); } catch {} return copas?.[c]?.[f] || ''; };
+    const estilo = ['wfc', 'copa', 'playlist'].includes(parametros.get('estilo')) ? parametros.get('estilo') : 'wfc';
+    window.mkwSalaModo = crearModo({ estilo, carreras: Math.max(1, Math.min(32, Number(parametros.get('carreras')) || 4)),
+      pistas: pistasDe(parametros.get('pistas')), cc: parametros.get('cc') || 'azar',
+      segundos: parametros.has('eleccion') ? Number(parametros.get('eleccion')) : SEGUNDOS_ELEGIR,
+      M, lector: window.mkwMenus, nota, nombrePista,
+      alTerminar: tabla => {
+        window.mkwEstado.finModo = tabla;
+        if (window.parent !== window) window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'fin', estilo, tabla }, location.origin);
+      } });
+    M.mkwAlDecidir = (pista, cc, votada) => {
+      (window.mkwEstado.decisiones ||= []).push({ pista, cc, votada });
+      nota(`modos: el anfitrión decidió la pista 0x${pista.toString(16)} (votada 0x${votada.toString(16)}), cc ${cc}`);
+    };
   }
   if (['gp', 'vs', 'tt', 'copa'].includes(objetivoPiloto.modo)) {
     if (parametros.has('copa')) { objetivoPiloto.copa = Number(parametros.get('copa')); objetivoPiloto.fila = Number(parametros.get('fila') || 0); }

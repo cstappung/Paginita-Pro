@@ -246,14 +246,13 @@ const OPCIONES = {
      el organizador empieza cuando están todos. */
   bt3: [{ clave: "cupo", etiqueta: "Formato", por: 2, valores: [
     { v: 2, t: "Duelo (1 contra 1)" }, { v: 4, t: "Torneo, hasta 4" }, { v: 8, t: "Torneo, hasta 8" }] }],
-  /* Mario Kart Wii: PRIMERO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no directo cuántas
-     personas: los modos»), los tres sobre el modo en línea del juego (redMkw: MKW_MODOS), y después cuántos caben
-     (hasta 12, lo que admite una sala en línea del juego). Se guarda como `estilo` (las reglas de Firebase reservan
-     `modo` para los valores de otros juegos). El anfitrión lo puede cambiar en el vestíbulo. Sin CPU de relleno. */
+  /* Mario Kart Wii: SOLO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no cuántas personas: los
+     modos»), los tres sobre el modo en línea del juego (redMkw: MKW_MODOS). Caben 12 siempre (lo que admite una sala
+     en línea del juego). Se guarda como `estilo` (las reglas de Firebase reservan `modo` para los valores de otros
+     juegos). En el vestíbulo el anfitrión lo cambia y elige carreras y cilindrada. Sin CPU de relleno. */
   mkw: [{ clave: "estilo", etiqueta: "Modo", por: "wfc", valores: [
       { v: "wfc", t: "Retro WFC (como el original)" }, { v: "copa", t: "Modo copa (N carreras con puntos)" },
-      { v: "playlist", t: "Modo playlist (una cola de pistas)" }] },
-    { clave: "cupo", etiqueta: "Jugadores", por: 12, valores: cupos("mkw") }],
+      { v: "playlist", t: "Modo playlist (una cola de pistas)" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [

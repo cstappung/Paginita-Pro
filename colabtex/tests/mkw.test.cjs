@@ -7,7 +7,7 @@ const raiz=f=>path.join(__dirname,'..',f);
 const sin=f=>fs.readFileSync(raiz(f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_CPU,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
+ ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_CPU,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,mkwPlaylist,mkwTabla,MKW_CC,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
 const M=ctx.__M;
 
 // Una sala de tres (a la abrió) con estas jugadas en orden.
@@ -47,6 +47,32 @@ test('los tres modos de la sala (pedido del dueño): Retro WFC por omisión, sin
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'copa'},{t:'ajuste',uid:'a',k:'carreras',v:2}));assert.equal(e.carreras,2);
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'carreras',v:5}));assert.equal(e.carreras,4,'solo 2, 4, 8 o 12');
  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'estilo',v:'copa'}));assert.equal(e.estilo,'wfc','corriendo no se cambia el modo');
+});
+
+test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
+ const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
+ assert.deepEqual(Object.keys(M.MKW_CC),['c150','c100','espejo','azar']);
+ let e=M.reducir(nueva());assert.equal(e.cc,'c150','150cc por omisión');assert.equal(e.ultimaTabla,null);
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'espejo'}));assert.equal(e.cc,'espejo');
+ e=M.reducir(nueva({t:'ajuste',uid:'b',k:'cc',v:'c100'}));assert.equal(e.cc,'c150','b no es el anfitrión');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'200'}));assert.equal(e.cc,'c150','lo que no existe vuelve a 150cc');
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'cc',v:'c100'}));assert.equal(e.cc,'c150','corriendo no se cambia');
+ const tabla=[{nombre:'Ana',puntos:27},{nombre:'Beto',puntos:24}];
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'copa'},{t:'empieza',uid:'a'},{t:'vuelve',uid:'a',tabla}));
+ assert.equal(e.fase,'vestibulo');assert.deepEqual(JSON.parse(JSON.stringify(e.ultimaTabla)),{n:1,estilo:'copa',tabla});
+ assert.deepEqual(JSON.parse(JSON.stringify(e.hist[e.hist.length-1])),{e:'vuelve',n:1,tabla});
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'vuelve',uid:'a',tabla}));assert.equal(e.ultimaTabla,null,'en Retro WFC no hay tabla');
+ // la tabla del marco se limpia: hasta 12 filas, nombres de 20 letras, puntos enteros 0..9999
+ assert.equal(M.mkwTabla('x'),null);assert.equal(M.mkwTabla([]),null);
+ const sucia=[{nombre:'X'.repeat(40),puntos:12.4},{nombre:5,puntos:3},{nombre:'Y',puntos:-1},{nombre:'Z',puntos:'7'},...Array(20).fill({nombre:'W',puntos:1})];
+ const limpia=M.mkwTabla(sucia);
+ assert.equal(limpia[0].nombre.length,20);assert.equal(limpia[0].puntos,12);assert.equal(limpia[1].nombre,'Z');assert.equal(limpia[1].puntos,7);
+ assert.ok(limpia.length<=12);
+ // la cola de la playlist: n pistas distintas, igual en cada navegador, distinta en otra tanda
+ const l=M.mkwPlaylist('p1',1,8);
+ assert.equal(l.length,8);assert.equal(new Set(l.map(x=>x.copa*4+x.fila)).size,8);
+ assert.ok(l.every(x=>x.copa>=0&&x.copa<M.MKW_COPAS&&x.fila>=0&&x.fila<4));
+ assert.deepEqual(M.mkwPlaylist('p1',1,8),l);assert.notDeepEqual(M.mkwPlaylist('p1',2,8),l);
 });
 
 test('pasar el anfitrión: solo en el vestíbulo y a alguien de la sala',()=>{
@@ -117,7 +143,7 @@ test('diez logros propios, todos de partida, con su nivel; y su peso',()=>{
 
 test('la dirección del marco: su malla, su nodo, servidor solo en el anfitrión, la CPU y el programa privado',()=>{
  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
- const c={URLSearchParams,mkwCarrera:M.mkwCarrera};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
+ const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
  const u=new URL('https://x/'+c.__s({pid:'p1',uid:'a',nodo:2,anfitrion:true,cpu:'dificil',privado:'https://w.example',ronda:3}));
  assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
  const q=u.searchParams;
@@ -129,6 +155,10 @@ test('la dirección del marco: su malla, su nodo, servidor solo en el anfitrión
  assert.equal(v.get('estilo'),'wfc','el modo de la sala: Retro WFC por omisión');assert.equal(v.get('carreras'),null);
  const w=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:false,cpu:'ninguna',privado:'',ronda:1,estilo:'copa',carreras:8})).searchParams;
  assert.equal(w.get('estilo'),'copa');assert.equal(w.get('carreras'),'8','la copa lleva sus carreras');
+ assert.equal(w.get('cc'),'c150','y la cilindrada (150cc por omisión)');assert.equal(v.get('cc'),null,'Retro WFC: la del juego');
+ const pl=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:false,cpu:'ninguna',privado:'',ronda:2,estilo:'playlist',carreras:4,cc:'espejo'})).searchParams;
+ assert.equal(pl.get('estilo'),'playlist');assert.equal(pl.get('cc'),'espejo');assert.equal(pl.get('carreras'),null);
+ assert.equal(pl.get('pistas'),M.mkwPlaylist('p1',2,4).map(x=>x.copa+'.'+x.fila).join(','),'la cola sorteada de la tanda');
  // la carrera sincronizada (con CPU, hasta 4): la copa con la semilla y las pistas de la tanda, sin servidor en línea
  const s=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,anfitrion:true,cpu:'facil',privado:'',ronda:2,sincro:['a','b']})).searchParams;
  const t=M.mkwCarrera('p1',2);

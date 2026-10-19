@@ -4,7 +4,7 @@ import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storag
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
-import { MKW_CPU, MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, mkwCarrera } from "./motor.js";
+import { MKW_CPU, MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, MKW_CC, mkwCarrera, mkwPlaylist, mkwTabla } from "./motor.js";
 
 /* Mario Kart Wii (+ Retro Rewind) — el cartero entre la sala y el juego.
 
@@ -83,7 +83,7 @@ const almacenPartidas = {
 
 /* La dirección del marco para este jugador: la malla de esta sala, su nodo, si corre el servidor, la CPU de relleno.
    Con `sincro` (los pilotos de la carrera sincronizada): la copa con su semilla y sus pistas, sin servidor en línea. */
-export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro, estilo = "wfc", carreras = 4 }) {
+export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro, estilo = "wfc", carreras = 4, cc = "c150" }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   if (sincro) {
     const { semilla, pistas } = mkwCarrera(pid, ronda);
@@ -91,7 +91,11 @@ export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro,
     q.set("pistas", pistas.map(t => `${t.copa}.${t.fila}`).join(",")); q.set("cpu", cpu);
   } else {
     q.set("modo", "enlinea"); q.set("relleno", cpu);
-    q.set("estilo", estilo); if (estilo === "copa") q.set("carreras", String(carreras));
+    q.set("estilo", estilo);
+    // copa: cuántas carreras; playlist: la cola sorteada (igual en cada navegador); las dos: la cilindrada del anfitrión
+    if (estilo === "copa") q.set("carreras", String(carreras));
+    if (estilo === "playlist") q.set("pistas", mkwPlaylist(pid, ronda, carreras).map(t => `${t.copa}.${t.fila}`).join(","));
+    if (estilo !== "wfc") q.set("cc", cc);
   }
   if (anfitrion && !sincro) q.set("anfitrion", "1");
   if (privado) q.set("privado", privado);
@@ -220,6 +224,12 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       return;
     }
     if (d.tipo === "salir") { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {} salir?.(); }
+    /* Fin de la copa o de la playlist (juegos/mkw/web/navegador/modos.mjs): el marco del anfitrión manda la tabla final
+       y todos vuelven al vestíbulo, donde queda como «la última». Los demás marcos también avisan: no hacen nada. */
+    if (d.tipo === "fin" && soyAnfitrion() && corriendo() && est.estilo !== "wfc") {
+      const tabla = mkwTabla(d.tabla);
+      anota(tabla ? { t: "vuelve", uid, tabla } : { t: "vuelve", uid });
+    }
   }
 
   /* Apenas el marco carga, le pasa los almacenes de Firebase (partidas, VR y récords) con el nombre de quien juega:
@@ -262,7 +272,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
     frame.src = srcMkw({ pid, uid, nodo, anfitrion: est.anfitrion === uid, cpu: est.cpu, privado: origen, ronda: est.ronda, sincro: est.sincro,
-                         estilo: est.estilo, carreras: est.carreras });
+                         estilo: est.estilo, carreras: est.carreras, cc: est.cc });
     frame.focus();
     conectarNube();
   }
@@ -279,7 +289,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const js = presentes(), manda = soyAnfitrion(), corre = corriendo();
-    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.fase, est.ronda, origen, vrs, manda, est.sincro]);
+    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     vest.hidden = false;
@@ -293,11 +303,18 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     const estilo = est.estilo || "wfc", puede = manda && !corre ? "" : "disabled";
     const QUE = { wfc: "Como en Retro WFC: votan la pista, corren y suben o bajan VR. Sin fin.",
       copa: `${est.carreras || 4} carreras con puntos (15, 12, 10…): gana quien sume más.`,
-      playlist: "Una cola de pistas: cada carrera es la siguiente de la cola." };
+      playlist: `Una cola de ${est.carreras || 4} pistas sorteadas: cada carrera es la siguiente de la cola.` };
     const modos = Object.entries(MKW_MODOS).map(([k, t]) =>
       `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
-    const carrerasFichas = estilo !== "copa" ? "" : `<div class="jg-mkw-cpu"><span>Carreras</span>${MKW_CARRERAS.map(n =>
-      `<button class="jg-mkw-ficha" data-c="${n}" aria-pressed="${(est.carreras || 4) === n}" ${puede}>${n}</button>`).join("")}</div>`;
+    // copa y playlist: cuántas carreras (o pistas en la cola) y la cilindrada
+    const carrerasFichas = estilo === "wfc" ? "" : `<div class="jg-mkw-cpu"><span>${estilo === "copa" ? "Carreras" : "Pistas"}</span>${MKW_CARRERAS.map(n =>
+      `<button class="jg-mkw-ficha" data-c="${n}" aria-pressed="${(est.carreras || 4) === n}" ${puede}>${n}</button>`).join("")}</div>
+      <div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
+      `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
+    // la tabla de la última copa o playlist (la mandó el marco del anfitrión al terminar)
+    const ult = est.ultimaTabla;
+    const ultima = !corre && ult?.tabla?.length ? `<div class="jg-mkw-ultima"><b>${ult.estilo === "playlist" ? "🏁 Última playlist" : "🏆 Última copa"}</b>
+      <ol>${ult.tabla.map(f => `<li><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol></div>` : "";
     const sinPrograma = origen === "";
     const conCpu = est.cpu !== "ninguna", muchos = js.length > MKW_SINCRO_MAX;
     const nota = !enSala() ? (corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
@@ -308,8 +325,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
       : `Esperando a que ${escapeHtml(nombre(est.anfitrion))} abra las carreras.`;
     vest.innerHTML = `
-      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${est.cupo || 12} · ${escapeHtml(MKW_MODOS[estilo])}${conCpu ? " · " + escapeHtml(MKW_CPU[est.cpu] || "") : ""}</span></div>
+      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${est.cupo || 12} · ${escapeHtml(MKW_MODOS[estilo])}${estilo !== "wfc" ? " · " + escapeHtml(MKW_CC[est.cc || "c150"]) : ""}${conCpu ? " · " + escapeHtml(MKW_CPU[est.cpu] || "") : ""}</span></div>
       <ul class="jg-mkw-pilotos">${js.map(fila).join("")}</ul>
+      ${ultima}
       ${corre ? "" : `<div class="jg-mkw-modos" role="group" aria-label="Modo de la sala">${modos}</div>${carrerasFichas}`}
       <div class="jg-mkw-pie">
         ${manda && !corre ? `<button class="jg-mkw-empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>` : ""}
@@ -318,6 +336,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       </div>`;
     vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
     vest.querySelectorAll(".jg-mkw-ficha[data-c]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "carreras", v: Number(b.dataset.c) }); });
+    vest.querySelectorAll(".jg-mkw-ficha[data-cc]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); });
     vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
     const emp = vest.querySelector(".jg-mkw-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; anota({ t: "empieza", uid }); };

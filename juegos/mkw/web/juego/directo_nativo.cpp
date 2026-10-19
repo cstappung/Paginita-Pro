@@ -52,6 +52,10 @@
 //   0x8064BCE8 WFCMainMenu::OnWorldwideButtonClick (la página 0x8B, menú Wi-Fi: «Mundial», +0x230)
 //   0x8064BEA0 WFCMainMenu::OnFriendsButtonClick   (la página 0x8B: «Amigos», +0x6D8)
 //   0x8064C610 WFCModeSelect::OnModeButtonClick    (la página 0x8C: VS +0x208 / Batalla +0x45C)
+//   0x8064BDC4 WFCMainMenu::OnRegionalButtonClick  (la página 0x8B: «Regional», +0x484; Retro Rewind lo esconde y su
+//                                                  botón «Main modes» (las retro) llama a esta, §72)
+//   0x8183FCC0 ExpWFCModeSel::OnModeButtonClick de Retro Rewind (la página 0x8C: fija la región de RR, 0x0A = retros
+//                                                  con el botón VS +0x208, sus «contextos», y llama a 0x8064C610, §72)
 // Retro Rewind trae su propia versión de algunas de estas funciones (rr_overlay_X: la del juego con los parches de
 // Pulsar). SectionMgr::Update es una: el bucle del juego llama a rr_overlay_8063550C, así que la que se envuelve es esa.
 // Las otras se llaman con InvokeDirectCpu<dirección>, que elige la versión activa (la de RR si la hay), como hace el
@@ -77,7 +81,8 @@ uint32_t g_mando = 0x124;       // la identidad del mando del jugador 1 (ver arr
 
 // la acción de botón pedida (funcion = 0: nada)
 uint32_t g_boton_funcion = 0, g_boton_pagina = 0, g_boton = 0;
-constexpr uint32_t BOTONES[] = {0x805F8F54u, 0x80648404u, 0x80648AFCu, 0x8064BCE8u, 0x8064BEA0u, 0x8064C610u};
+constexpr uint32_t BOTONES[] = {0x805F8F54u, 0x80648404u, 0x80648AFCu, 0x8064BCE8u, 0x8064BEA0u, 0x8064C610u,
+                                0x8064BDC4u, 0x8183FCC0u};
 
 // Llama a una función del juego con los argumentos r3..r6 sobre una copia del contexto: la pila (r1) es la del juego
 // (cada llamada arma su marco más abajo) y los registros que la Update del juego necesita quedan intactos.

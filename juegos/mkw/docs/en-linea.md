@@ -60,6 +60,32 @@ Después, tres modos de sala: **1) Retro WFC original** (el bucle de arriba: vot
 **2) Modo copa** (como la sala de amigos: N carreras con puntos 15/12/10…, cc y objetos del anfitrión) y
 **3) Modo playlist** (la cola de pistas de `sala.mjs`, con 45 s para elegir personaje y kart antes de cada una).
 
+**Cómo quedaron los tres modos (§72, 2026-10-19).** Los tres son el mismo modo en línea del juego; la página cambia
+solo tres cosas:
+
+| | Retro WFC | Modo copa | Modo playlist |
+|---|---|---|---|
+| Reloj de elegir | 45 s (los tres: el 30.0 de 0x80899EF4 pasa a 45.0) | 45 s | 45 s |
+| Pista | la votación del juego | la votación del juego | la de la cola (el voto de cada uno y la decisión del anfitrión) |
+| Cilindrada | la de RR (al azar) | la del anfitrión de la sala | la del anfitrión de la sala |
+| Fin | nunca (vuelve a votar) | a las N carreras: tabla de puntos y todos al vestíbulo | al vaciarse la cola: tabla y vestíbulo |
+
+Dirección del marco: `?modo=enlinea&estilo=wfc|copa|playlist&carreras=N&pistas=c.f,…&cc=c150|c100|espejo|azar`
+(`&eleccion=30` = el reloj del juego). Código: `web/navegador/modos.mjs` (reloj, contar, sumar, tabla) y
+`web/juego/modos_nativo.cpp` (pista y cilindrada del anfitrión). Pruebas: banco `modos` y
+`node web/navegador/prueba-modos.mjs [--playlist]`.
+
+**La sala de las retro (no la Mundial):** con Retro Rewind el modo en línea de verdad es «Main modes» del menú Wi-Fi
+(RR esconde «Regional/Mundial»): llama a `OnRegionalButtonClick` (0x8064BDC4) y en la página de modos el VS de RR
+(`rr_kamek_8183FCC0`) fija la región 0x0A (retros). La sala Mundial de Pulsar es **solo de las 32 pistas de Nintendo**
+(`CupsConfig::ToggleCTs`: `ROOMTYPE_VS_WW` → `isRegsOnly`). Abrir directo entra por la de RR desde §72; `?wfc=mundial`
+= la de antes.
+
+**Inactividad:** el juego desconecta a quien pasa 30 s de carrera en línea sin tocar un botón (control del juego
+original, `GMDataOnlineVS` 0x8053F184; RR agrega uno por velocidad). Una persona que maneja no lo ve; la prueba da la
+carrera por terminada por código (`window.mkwTerminarCarrera`). **Pendiente:** qué hace la sala cuando un jugador
+queda afuera por esto o por un corte (hoy el juego muestra su aviso y vuelve a su menú de Retro WFC).
+
 ## Por qué no a Retro WFC directo
 
 El navegador no habla UDP; Retro WFC bloquea redes de centros de datos y VPN (los relés quedarían bloqueados); un

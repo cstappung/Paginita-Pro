@@ -27,6 +27,10 @@ export const BOTON = {
   mundial: { pagina: 0x8B, funcion: 0x8064BCE8, boton: 0x230 },       // menú Wi-Fi → Mundial
   amigos: { pagina: 0x8B, funcion: 0x8064BEA0, boton: 0x6D8 },        // menú Wi-Fi → Amigos
   vs: { pagina: 0x8C, funcion: 0x8064C610, boton: 0x208 },            // VS o Batalla → VS
+  // Retro WFC como lo abre Retro Rewind (§72): «Main modes» = la sala REGIONAL (la Mundial de Pulsar es solo de pistas
+  // de Nintendo) y, en la página de modos, el VS de las retro con la versión de RR (fija la región 0x0A)
+  regional: { pagina: 0x8B, funcion: 0x8064BDC4, boton: 0x484 },      // menú Wi-Fi → Regional («Main modes» de RR)
+  vsRetros: { pagina: 0x8C, funcion: 0x8183FCC0, boton: 0x208 },      // modos de RR → VS (las retro, región 0x0A)
 };
 
 // La base de Mii del sistema de archivos del juego (antes de arrancar). Devuelve el Mii para una licencia nueva:

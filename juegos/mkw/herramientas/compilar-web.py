@@ -246,9 +246,17 @@ def main():
                   "func_80601AEC": "func_80601AEC_traducida",
                   # SectionMgr::Update (la versión de RR) -> web/juego/directo_nativo.cpp (abrir directo una sección
                   # pedida por la página: elige la licencia y llama a SetNextSection/RequestSceneChange, §71)
-                  "rr_overlay_8063550C": "rr_overlay_8063550C_traducida"}
+                  "rr_overlay_8063550C": "rr_overlay_8063550C_traducida",
+                  # DecideTrack y DecideCC de Pulsar y SetPlayerData (el voto) -> web/juego/modos_nativo.cpp (la pista de
+                  # la playlist y la cilindrada del anfitrión en los modos de la sala, §72)
+                  "rr_kamek_81864290": "rr_kamek_81864290_traducida", "rr_kamek_81864878": "rr_kamek_81864878_traducida",
+                  "rr_overlay_80660750": "rr_overlay_80660750_traducida",
+                  # GMDataOnlineVS: el control de inactividad (30 s sin tocar nada) -> modos_nativo.cpp: ahí la prueba
+                  # puede dar la carrera por terminada (mkw_modos_terminar), §72
+                  "func_8053F184": "func_8053F184_traducida"}
     if os.environ.get("MKW_DEPURAR") == "1":              # depuración de la red (web/juego/depurar_red.cpp, §58)
         REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800CCC68", "800D1D90", "800D0FEC", "806561A8", "80656FF8", "80653DDC", "800D2000", "800DAD9C", "800FBA4C", "800E8814", "80623054", "80666288", "8063519C", "8067552C", "80635A3C", "80635AC8", "80635B2C")}); REEMPLAZOS["rr_overlay_80635A3C"] = "rr_overlay_80635A3C_traducida"
+        REEMPLAZOS["rr_kamek_818B4854"] = "rr_kamek_818B4854_traducida"   # CheckPacket de Pulsar -> depurar_paquetes.cpp (§72)
     # El azar de la carrera sincronizada (sala con CPU, bitácora §61): en estas funciones del juego, la lectura del
     # reloj del procesador (PPC_Mftb) pasa a PPC_MftbCarrera (ppc_helpers.cpp), que en la sala es un contador igual en
     # todas las consolas. Son las que siembran azar con el reloj: Random::__ct y Random::Reset (la IA de los CPU y casi
@@ -283,12 +291,12 @@ def main():
     unidades += [("thp", RAIZ / "web/thp" / f) for f in ("thp_decodificador.cpp", "thp_nativo.cpp")]
     unidades += [("thp", RAIZ / "web/dvd/rutas_nativo.cpp"), ("thp", RAIZ / "web/juego/semillas_nativo.cpp"),
                 ("thp", RAIZ / "web/juego/lockstep_nativo.cpp"), ("thp", RAIZ / "web/juego/paginas_nativo.cpp"),
-                ("thp", RAIZ / "web/juego/directo_nativo.cpp")]
+                ("thp", RAIZ / "web/juego/directo_nativo.cpp"), ("thp", RAIZ / "web/juego/modos_nativo.cpp")]
     # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
     # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
     unidades += [("thp", RAIZ / "web/red/red_web.cpp")]
     if os.environ.get("MKW_DEPURAR") == "1":
-        unidades += [("thp", RAIZ / "web/juego/depurar_red.cpp")]
+        unidades += [("thp", RAIZ / "web/juego/depurar_red.cpp"), ("thp", RAIZ / "web/juego/depurar_paquetes.cpp")]
     if os.environ.get("MKW_DEPURAR_LS") == "1":
         unidades += [("thp", RAIZ / "web/juego/depurar_lockstep.cpp"), ("thp", gen / "depurar_azar_gen.cpp")]
     copias = {}                                           # shard original → texto con las definiciones renombradas

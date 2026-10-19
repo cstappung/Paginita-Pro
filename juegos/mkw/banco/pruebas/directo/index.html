@@ -121,6 +121,12 @@ function juegoFalso({ listoDesde = 3, licenciaOk = true } = {}) {
   ok('boton(Mundial) con el menú Wi-Fi arriba: se pide la función del juego con la página y el botón (+0x230)',
      si && b?.f === 0x8064BCE8 && b.p === arriba && b.b === arriba + 0x230);
   ok('boton(«¿Usar WFC?») con otra página arriba: no se pide nada', !no && M.botones.length === 1);
+  // §72: Retro WFC como lo abre RR — «Regional» (el «Main modes» de RR, +0x484) y el VS de RR en la página de modos
+  const reg = d.boton(BOTON.regional), r = M.botones[1];
+  ok('boton(Regional) con el menú Wi-Fi arriba: OnRegionalButtonClick (0x8064BDC4) con el botón +0x484',
+     reg && r?.f === 0x8064BDC4 && r.b === arriba + 0x484);
+  ok('el VS de las retro va a la versión de Retro Rewind (0x8183FCC0, página 0x8C, botón +0x208)',
+     BOTON.vsRetros.pagina === 0x8C && BOTON.vsRetros.funcion === 0x8183FCC0 && BOTON.vsRetros.boton === 0x208);
 }
 nota('las direcciones de las funciones y de los botones salen de Pulsar (WFCConnect.hpp, WFCMenu.hpp) y del C++ traducido');
 fin();

@@ -44,6 +44,8 @@ const PRUEBAS = [
   { n: 'sincro', cmd: [nav('prueba-sincro.mjs')], juego: true, datos: 'build/web/datos/sincro', propios: true },
   { n: 'sincro-sala', cmd: [nav('prueba-sincro.mjs'), '--sala'], juego: true, datos: 'build/web/datos/sincro', propios: true },
   { n: 'enlinea-sala', cmd: [nav('prueba-enlinea.mjs'), '--sala'], juego: true, datos: 'build/web/datos/enlinea' },
+  { n: 'modos', cmd: [nav('prueba-modos.mjs')], juego: true, datos: 'build/web/datos/modos/copa' },                 // §72
+  { n: 'modos-playlist', cmd: [nav('prueba-modos.mjs'), '--playlist'], juego: true, datos: 'build/web/datos/modos/playlist' },
   { n: 'copa-azar', cmd: ['herramientas/copas-al-azar.mjs', '--copas', '1'], juego: true },   // una copa sincronizada al azar (C2)
 ];
 // las prueba-*.mjs nuevas que no están en la lista: sin argumentos
