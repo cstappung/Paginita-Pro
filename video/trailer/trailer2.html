@@ -134,7 +134,7 @@ function rotulo(nombre, etiqueta, t, t0, t1, color, o = {}) {
    Puntos de cada toma que se ajustan mirando los clips (segundos dentro del clip). */
 const P = window.PUNTOS || {
   avionDesde: 0, avion2Desde: 0, avion2Cobro: 5.2, plinkoDesde: 1.0, plinkoCae: 3.2,
-  sobreDesde: 0.6, sobreLeg: 15.5, heroDesde: 8.0, unoDesde: 1.0, recordDesde: 0, recordFin: 9.5, recordTabla: 13.5,
+  sobreDesde: 0.6, sobreLeg: 15.5, heroDesde: 8.0, unoDesde: 1.0, recordDesde: 0, recordFin: 6.3, recordTabla: 7.2,
   mascotaDesde: 2.0,
 };
 const CORTES1 = [ // acción, 8–20 s
@@ -347,7 +347,7 @@ function escena(t) {
     } else {
       // la tabla de verdad del sitio, ya con GUGU GAGA arriba
       const lt2 = t - 66.4;
-      tomas += toma('record', P.recordTabla + lt2, [0, 0, W, H], { zoom: lerp(1.25, 1.4, lt2 / 1.6), dx: 380, dy: -60 });
+      tomas += toma('record', P.recordTabla + lt2, [0, 0, W, H], { zoom: lerp(1.5, 1.65, lt2 / 1.6), dx: 360, dy: -130 });
       textos += `<div class="chip" style="left:96px;top:86px;background:var(--ama);color:#0a0a0f">En vivo en la página</div>`;
       flash = Math.max(0, .5 - lt2 * 4);
     }
