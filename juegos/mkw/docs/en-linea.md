@@ -17,6 +17,49 @@ curso, se le ofrece «Entrar en la siguiente carrera» o «Ir a la sala», y mie
 - **Entrar a mitad de carrera ya existe en el juego**: el recién llegado ve la carrera en curso ("vista en vivo") y
   corre desde la próxima votación. Es justo el modo espectador que pidió el dueño.
 
+## Qué se hace una vez dentro de Retro WFC: el bucle de juego (investigación, 2026-10-19)
+
+Pedido del dueño: «se te olvidó agregar la investigación de qué se hace una vez estás dentro de Retro WFC y cómo es el
+gameplay loop». Esto es lo que hace el modo en línea de Mario Kart Wii con Retro Rewind, paso a paso. Marcas: **[S]**
+seguro (con su fuente), **[I]** deducido por nosotros, **[NE]** no encontrado. Fuentes: mkwiiki.org (la antigua wiki de
+Tockdom), el código público de Retro Rewind (github.com/Retro-Rewind-Team/Pulsar, GPL-3.0: solo se lee, no se copia),
+mariowiki y purenintendo. rwfc.net no se pudo leer (403).
+
+**El bucle, en una línea:** entrar → buscar sala (o crearla) → elegir personaje y kart + votar pista (con reloj) →
+ruleta → carrera (máx. 5 min) → puntos y VR → otra votación… sin fin, hasta que uno se va.
+
+| Paso | Qué pasa | Fuente |
+|---|---|---|
+| 1. Entrar | Menú Wi-Fi: «Mundial», «Continental» o «Amigos». En línea solo hay VS y Batalla (no Gran Premio); hasta 12 jugadores. | [S] purenintendo, mariowiki |
+| 1b. Los botones de RR | Mundial separado por tipo de pista: **Retro Tracks**, **Custom Tracks**, **Regular Tracks** (100 % originales desde v6.12.0); en «Otros»: **200cc**, **Online TT**, **Item Rain**; batalla: **Globos** y **Eliminación**. Cada botón muestra cuánta gente juega. | [S] Pulsar `UI/PlayerCount.cpp`, mkwiiki Retro_Rewind |
+| 2. Buscar sala | El juego base solo junta salas cuyo anfitrión está a ≤ 2500 VR (1500 con VR bajo). RR ordena las salas por cercanía de VR (`diferencia×32 − jugadores`), descarta las llenas y las que están 40 000 VR por encima, no te devuelve a la sala de la que saliste y busca 20 s. Si no encuentra, **creas la sala y eres el anfitrión** [I]. | [S] mkwiiki VR, Pulsar `Network/Matchmaking.cpp` |
+| 2b. Llegar con la carrera andando | Se **mira la carrera en curso** (espectador) hasta la siguiente votación. | [S] purenintendo, mkwiiki («150cc Spectating») |
+| 2c. Cortes cortos | Si alguien se corta, su lugar se guarda 2 s («Phantom Racer»: un hueco, no un bot). | [S] Pulsar `Network/PhantomRacer.cpp` |
+| 3. Elegir y votar | Con un **reloj**: elegir personaje, vehículo y derrape, y votar una pista (o «Random»). Valores de fábrica del reloj en un código de trucos: 10 s el emparejamiento y **30 s la votación** [I: 0x41200000 y 0x41F00000 como números con decimales]. El anfitrión manda la información de la sala (fase, pista ganadora, cc) y los demás la copian. | [S] mariokartwii.com tid=637, Pulsar `Network/PulSELECT.cpp` |
+| 3b. Entre carreras (RR) | Pantalla con **Random**, **Change** (volver a elegir personaje/vehículo/derrape) y **Settings**, con el mismo reloj. Si no votas, cuenta como «Random» [I]. | [S] Pulsar `UI/ChangeCombo/ChangeCombo.cpp` |
+| 4. Ruleta | Sale **al azar uno de los votos** (todos con la misma probabilidad). En RR: «Random» = una pista al azar; los votos por pistas bloqueadas (repetidas hace poco: «repick», 8 carreras) no cuentan; tras una pista regular no puede salir otra regular. «Instant Voting Roulette Decide» se salta la animación. | [S] mkwiiki Network_Protocol/SELECT, Pulsar `PulSELECT.cpp` |
+| 5. cc | Juego base, Mundial: al azar según el VR de la sala (con VR bajo, 100 % 100cc). RR: «10 % 100cc, 65 % 150cc, 25 % Espejo». | [S] mkwiiki VR, comentario en `PulSELECT.cpp` |
+| 6. Carrera | Máximo **5:00**; toda la vuelta (cuenta + carrera + marcadores) 6:00. Cuando llega el primero, los demás tienen un tiempo para terminar (30 s [I]). Objetos normales, 3 vueltas casi siempre [I]. RR: Mega Cloud en el Mundial. | [S] mkwiiki Online_Time_Limit, Network_Protocol |
+| 7. Puntos y VR | Puntos por puesto 15/12/10/8/7/6/5/4/3/2/1/0. VR de RR: contra cada rival +1…+24 o hasta −19; máximo +264 por carrera; bajo 15 000 VR se pierden 50 como máximo; salir con la pausa cuesta −209; fines de semana ×1,5. El 1.º nunca pierde y el último nunca gana (juego base). | [S] mariowiki, Pulsar `Network/Rating/PlayerRating.cpp`, mkwiiki |
+| 8. Otra vez | En el Mundial las carreras siguen sin fin (VR → votación → carrera) [I]. | — |
+
+**Salas de amigos** (lo más parecido a «una sala de la página»): el anfitrión arranca VS, VS por equipos, Globos o
+Monedas; hay 60 frases de chat. RR le da al anfitrión ajustes [S, Pulsar `Settings/SettingsParam.hpp`]: cc (normal, 150,
+100, 500 o a medida), espejo, **carreras por GP (2, 4, 8, 12, 24, 32 o 64; el juego base 4 [I])**, restricción de
+personajes y vehículos, objetos (normal, al azar, Item Rain, sin objetos…), qué pistas (Retro, Custom, todas,
+Regulares), «Host Always Wins», KO y equipos extendidos; puede echar jugadores, y los demás ven sus ajustes antes de
+votar (v6.12.0).
+
+**CPU en línea:** **[NE]** ninguna fuente las menciona, ni en el juego base ni en RR; las carreras en línea son solo entre
+personas. Rellenar con CPU sería un invento nuestro (el dueño lo pidió, ver «La CPU de relleno» abajo; el 2026-10-19 lo
+dejó como opcional: primero el Retro WFC tal cual por la página).
+
+**Qué tomamos para la página** (decisión 2026-10-19): el modo en línea es el del juego (Retro WFC), corriendo por
+nuestro WFC virtual dentro de la sala, y entrando **directo por código** (sin cortina ni botones apretados por detrás).
+Después, tres modos de sala: **1) Retro WFC original** (el bucle de arriba: votar → carrera → VR, sin fin),
+**2) Modo copa** (como la sala de amigos: N carreras con puntos 15/12/10…, cc y objetos del anfitrión) y
+**3) Modo playlist** (la cola de pistas de `sala.mjs`, con 45 s para elegir personaje y kart antes de cada una).
+
 ## Por qué no a Retro WFC directo
 
 El navegador no habla UDP; Retro WFC bloquea redes de centros de datos y VPN (los relés quedarían bloqueados); un

@@ -7735,8 +7735,11 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    el servidor en línea del juego (un "WFC" escrito por nosotros) corre en el marco del anfitrión, y cada juego entra
    solo a «VS mundial», donde se encuentran (la sala, la votación de pista y las carreras son las del juego). Al
    registro va solo el vestíbulo:
-   - `{t:"ajuste", uid, k:"cpu", v}`: el anfitrión elige la CPU de relleno (MKW_CPU: "ninguna", "facil", "normal",
-     "dificil") para las carreras siguientes.
+   - `{t:"ajuste", uid, k:"estilo", v}`: el anfitrión elige el modo de la sala (MKW_MODOS, pedido del dueño 2026-10-19):
+     "wfc" = Retro WFC tal cual (votar, carrera, VR, sin fin), "copa" = N carreras con puntos (`{k:"carreras"}`:
+     MKW_CARRERAS), "playlist" = una cola de pistas. Los tres corren sobre el modo en línea del juego.
+   - `{t:"ajuste", uid, k:"cpu", v}`: la CPU de relleno (MKW_CPU) de la carrera sincronizada. Ya no se ofrece (el dueño:
+     sin CPU por ahora, primero Retro WFC); una sala nueva parte "ninguna".
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
    - `{t:"empieza", uid}`: el anfitrión abre las carreras: todos los marcos cargan el juego y entran en línea.
@@ -7749,6 +7752,11 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    La sala termina cuando ya no queda nadie. */
 export const MKW_CPU = { ninguna: "Sin CPU", facil: "CPU fácil", normal: "CPU normal", dificil: "CPU difícil" };
 const mkwCpu = v => tiene(MKW_CPU, v) ? v : "normal";
+/* Los tres modos de una sala (todos sobre el modo en línea del juego, Retro WFC) y las carreras de una copa */
+export const MKW_MODOS = { wfc: "Retro WFC", copa: "Modo copa", playlist: "Modo playlist" };
+export const MKW_CARRERAS = [2, 4, 8, 12];
+const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "wfc";
+const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
 /* La carrera con CPU de relleno es la "carrera sincronizada" del juego (cada navegador corre la misma carrera offline
    con los botones de todos): cada humano maneja un puerto de mando de GameCube, y hay 4. Con más pilotos se corre en
    línea, sin CPU. */
@@ -7773,7 +7781,9 @@ export function mkwCarrera(pid, ronda) {
 export function redMkw(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, hist = [];
-  let fase = "vestibulo", ronda = 0, cpu = mkwCpu(p && p.cpu), sincro = null;
+  // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
+  let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
+  let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras);
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7789,13 +7799,15 @@ export function redMkw(p, js = jugadoresDe(p)) {
     }
     const esAnf = j.uid === anfitrion;
     if (j.t === "ajuste" && esAnf && j.k === "cpu") { cpu = mkwCpu(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "estilo" && fase === "vestibulo") { estilo = mkwEstilo(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
       // con CPU y hasta 4 pilotos: carrera sincronizada, con los que están ahora, en este orden (puerto 1, 2, 3, 4)
       const ps = presentes();
       sincro = cpu !== "ninguna" && ps.length <= MKW_SINCRO_MAX ? ps.map(x => x.uid) : null;
-      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, jugadores: ps.length, sincro: !!sincro });
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, jugadores: ps.length, sincro: !!sincro });
       continue;
     }
     if (j.t === "vuelve" && esAnf && fase === "jugando") { fase = "vestibulo"; hist.push({ e: "vuelve", n: ronda }); continue; }
@@ -7804,7 +7816,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
   const quedan = presentes().length;
   return {
-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, ronda, nodos, fuera, hist: hist.slice(-40),
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, ronda, nodos, fuera, hist: hist.slice(-40),
     sincro: fase === "jugando" ? sincro : null,
     ganador: "", motivo: quedan ? "" : "abandono"
   };

@@ -28,7 +28,8 @@ const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || '--p
 const COPA = process.argv.includes('--copa');
 const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0.0,0.1,0.2,0.3').slice(9);   // sin --sala
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
-const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '');   // p. ej. --extra=&arreglos=0
+const RASTRO = process.argv.includes('--rastro');   // §70: el rastro por cuadro de las dos pestañas, comparado
+const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '') + (RASTRO ? '&rastro=1' : '');   // p. ej. --extra=&arreglos=0
 const carpeta = path.join(raiz, (process.argv.find(a => a.startsWith('--datos=')) || '--datos=build/web/datos/sincro').slice(8));
 mkdirSync(carpeta, { recursive: true });
 let bien = 0, mal = 0;
@@ -53,6 +54,7 @@ async function abrir(nombre, uid) {
   paginas[nombre] = p;
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
+  p.on('response', r => { if (r.status() >= 400) registro.push(`[${nombre}] [http ${r.status()}] ${r.url().slice(0, 200)}`); });
   if (nombre === 'B' && process.argv.includes('--lento')) { const c = await contexto.newCDPSession(p); await c.send('Emulation.setCPUThrottlingRate', { rate: 2 }); }
   if (SALA) {
     await p.goto(`http://127.0.0.1:${PUERTO}/banco/pruebas/sala-mkw/padre.html?sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&ronda=1&relleno=normal${EXTRA ? '&extra=' + encodeURIComponent(EXTRA.replace(/^&/, '')) : ''}`);
@@ -111,12 +113,38 @@ if (COPA) {
   ok('la carrera 2 avanza en las dos', (x.A?.ls?.cuadro || 0) > 900 && (x.B?.ls?.cuadro || 0) > 900, `A ${x.A?.ls?.cuadro}, B ${x.B?.ls?.cuadro}`);
   ok('las huellas coinciden en toda la copa (nunca se separaron)', !x.A?.ls?.desincronizado && !x.B?.ls?.desincronizado && (x.A?.ls?.huellasIguales || 0) >= 20,
     `iguales A ${x.A?.ls?.huellasIguales}, B ${x.B?.ls?.huellasIguales}${x.A?.ls?.desincronizado ? ' · DESINCRONIZADO ' + JSON.stringify(x.A.ls.desincronizado) : ''}`);
+  if (RASTRO) await compararRastros();
   await A.locator('#canvas').screenshot({ path: path.join(carpeta, 'A-copa.png') }).catch(() => {});
   await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B-copa.png') }).catch(() => {});
   writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
   await navegador.close(); servidor.kill();
   console.log(`\n${bien} bien, ${mal} mal  (registro en ${path.relative(raiz, carpeta).replaceAll("\\", "/")}/)`);
   process.exit(mal ? 1 : 0);
+}
+
+// --rastro: el primer cuadro en que los rastros de A y B difieren (azar 1, azar 2 o la huella de qué kart), con los
+// cuadros de alrededor; los dos rastros completos quedan en rastro-A.json y rastro-B.json
+async function compararRastros() {
+  const [ra, rb] = await Promise.all([A, B].map(p => p.evaluate(() => window.mkwRastro || []).catch(() => [])));
+  writeFileSync(path.join(carpeta, 'rastro-A.json'), JSON.stringify(ra)); writeFileSync(path.join(carpeta, 'rastro-B.json'), JSON.stringify(rb));
+  const deB = new Map(rb.map(f => [f[0], f]));
+  const nombres = ['azar1a', 'azar1b', 'azar2a', 'azar2b', ...Array.from({ length: 12 }, (_, i) => [`avance${i}`, `kart${i}`]).flat()];
+  let comunes = 0;
+  for (const fa of ra) {
+    const fb = deB.get(fa[0]); if (!fb) continue;
+    comunes++;
+    const distintos = nombres.filter((n, k) => fa[k + 1] !== fb[k + 1]);
+    if (distintos.length) {
+      console.log(`  rastro: el primer cuadro distinto es el ${fa[0]} (de ${comunes} cuadros comparados): ${distintos.join(', ')}`);
+      const [k0, c0] = fa[0].split(':').map(Number);
+      for (const c of [c0 - 2, c0 - 1, c0, c0 + 1, c0 + 2].map(n => `${k0}:${n}`)) {
+        const x = ra.find(f => f[0] === c), y = deB.get(c);
+        if (x && y) console.log(`    ${c}: ` + nombres.map((n, k) => x[k + 1] === y[k + 1] ? null : `${n} ${(x[k + 1] >>> 0).toString(16)}/${(y[k + 1] >>> 0).toString(16)}`).filter(Boolean).join(' '));
+      }
+      return;
+    }
+  }
+  console.log(`  rastro: ${comunes} cuadros comparados, todos iguales (A ${ra[0]?.[0]}–${ra.at(-1)?.[0]}, B ${rb[0]?.[0]}–${rb.at(-1)?.[0]})`);
 }
 
 // 2) manejar: A acelera derecho; B acelera y dobla a la izquierda un rato (teclas reales en cada pestaña)

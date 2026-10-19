@@ -77,11 +77,14 @@ const rutasA = await A.waitForFunction(() => { const r = window.mkwRed.router.ru
 ok('malla: A sabe que 10.77.0.3 está en B', !!rutasA['10.77.0.3'], JSON.stringify(rutasA));
 
 // 2) el piloto de cada uno hasta «buscando rivales», y 3) la sala y la carrera
-const vio = { A: new Set(), B: new Set() }, cuando = {};
+const vio = { A: new Set(), B: new Set() }, cuando = {}, ultima = {};
 const limite = Date.now() + 6 * 60000;
 while (Date.now() < limite) {
   for (const [n, p] of [['A', A], ['B', B]]) {
     const e = await estado(p); if (!e) continue;
+    // cada pantalla nueva, al registro (para entender por dónde pasó cada uno)
+    const firma = `0x${e.s.toString(16)} [${e.ps.map(x => x.toString(16)).join(',')}]`;
+    if (ultima[n] !== firma) { ultima[n] = firma; registro.push(`[${n}] pantalla ${firma} a los ${((Date.now() - t0) / 1000).toFixed(0)} s`); }
     const tope = e.ps[e.ps.length - 1], marca = e.s === 0x55 && tope === 0x8f ? 'busca' : e.s === 0x58 ? 'sala' : e.s === 0x68 ? 'carrera' : '';
     if (marca && !vio[n].has(marca)) { vio[n].add(marca); cuando[n + marca] = ((Date.now() - t0) / 1000).toFixed(0); console.log(`  ${n}: ${marca} a los ${cuando[n + marca]} s`); }
   }

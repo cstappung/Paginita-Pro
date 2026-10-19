@@ -501,6 +501,24 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Aviso de sala lenta** | Un cartel que aparece sobre el juego en la carrera sincronizada cuando la sala va lenta por alguien: «espera al jugador 2 de la sala (su PC o su conexión no dan abasto)» en las demás y «Tu PC no alcanza 60 cuadros por segundo» en la lenta. Cada 3 s la página compara cuántos cuadros avanzó y cuánto esperó, y a quién. |
 | **Dos ratos seguidos (histéresis)** | El aviso sale solo si dos medidas seguidas (6 s) salen mal: un tirón suelto (la pista bajando al empezar la carrera) no avisa. Como el retardo de un relé térmico, que no salta con el pico de corriente del arranque del motor pero sí con una sobrecarga que dura. |
 
+### Abrir directo por código y Retro WFC por la página (§71)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Sección (del juego)** | Cada "modo de pantalla" grande del juego: el título, el menú de un jugador, el modo en línea, cada tipo de carrera. Tiene su número (0x48 = un jugador, 0x55 = en línea, 0x68 = carrera en línea). Al cambiar de sección el juego descarga la anterior y carga la nueva (con su fundido a negro). Como los modos de un instrumento de medición: voltímetro, amperímetro, osciloscopio; cada uno con su pantalla y sus perillas. |
+| **Página (del juego)** | Una pantalla dentro de una sección: el menú, el cartel encima, el elegir personaje. Se apilan en capas (la de arriba es la que se ve y la que recibe los botones). Tienen número (0x69 = menú de un jugador, 0x8B = menú de Retro WFC, 0x4D = un cartel). |
+| **SectionMgr** | El objeto del juego que manda en las secciones (vive en la dirección 0x809C1E38). Dos de sus funciones son las que usa el propio juego para cambiar de sección: **SetNextSection** ("la que sigue es esta") y **RequestSceneChange** ("cámbiala ya"). Como el selector rotativo del instrumento. |
+| **Abrir directo** | Pedirle al juego la sección que se quiere **llamando a esas mismas funciones suyas**, en vez de recorrer los menús apretando botones. Lo pidió el dueño ("abrir directo es literalmente abrir directo"). Como marcar el número de un canal en el control remoto en vez de apretar "siguiente" diez veces. |
+| **Gancho (envolver una función)** | Cambiar una función del juego por una nuestra que hace algo antes y después llama a la original. Aquí se envuelve el **Update** del SectionMgr (corre una vez por cuadro): si la página pidió un salto, lo hace ahí, en el hilo del juego y en un momento seguro. Como un relé de enclavamiento puesto en serie con un circuito existente: no cambia el circuito, solo agrega una condición. |
+| **Versión de Retro Rewind de una función (`rr_overlay_X`)** | Retro Rewind cambia algunas funciones del juego (parches de Pulsar). En el C++ traducido quedan las dos: la del juego (`func_X`) y la de RR (`rr_overlay_X`), y las llamadas van a la de RR. Por eso el gancho se pone en `rr_overlay_8063550C` (puesto en la del juego, nunca se llamaba). Como un circuito con un puente soldado encima: hay que medir en el puente, no en la pista original. |
+| **Licencia** | El perfil del juego (hasta 4 por partida): su Mii, sus récords, su VR. Al empezar, la pantalla de licencias elige una; sin licencia el juego no sabe quién juega. Abrir directo hace lo mismo que esa pantalla al elegir la 1 (la función del juego 0x805EB7A0, leída en el C++ traducido), y si la partida es nueva la **crea** con un Mii, como «Crear licencia». |
+| **CreateID (del Mii)** | Los 8 bytes que identifican a un Mii: 4 del Mii y 4 de la consola que lo creó. La licencia guarda el CreateID de su Mii; el juego busca ese Mii en la base de Mii de la Wii (RFL_DB.dat). Como el número de serie de una pieza. |
+| **Registrar el mando** | En el título, el juego anota qué mando apretó A: ese queda como el del jugador 1 (SectionPad). Si se salta el título, hay que anotarlo nosotros: si no, la pantalla nueva dice «se interrumpió la comunicación con el mando, aprieta A». Se hace como el juego: el "portador" del jugador 1 toma el mando de GameCube del puerto 1, y la casilla queda conectada. Como asignar un canal del osciloscopio a una sonda antes de medir. |
+| **Acción de un botón, llamada directo** | Cada botón del juego tiene una función que corre cuando alguien lo aprieta (por ejemplo "Mundial" en el menú de Retro WFC). Llamarla nosotros es "apretarlo" sin pasar por el mando ni por la pantalla: se ejecuta exactamente lo mismo. Solo las funciones de una lista corta, y solo cuando la página está **activa** (terminó de entrar). |
+| **Estado de una página (activa = 4)** | Cada página pasa por estados: entrando (con su animación), activa (esperando a la persona), saliendo. Si se llama la acción de un botón mientras todavía entra, la página al activarse deja todo como al principio y la acción se pierde. Como apretar un botón de un equipo mientras todavía hace su autoprueba al encender. |
+| **Cartel (Click::OnClick)** | Las páginas que solo muestran un texto y se cierran con A (por ejemplo «Welcome to Retro Wi-Fi Connection!»). Su acción de cerrar es una función del juego que también se llama directo. |
+| **Bucle de juego de Retro WFC** | Lo que se hace una vez adentro del modo en línea: buscar sala → elegir personaje y kart → votar pista (con reloj) → ruleta → carrera → puntos y VR → otra votación, sin fin. Está investigado en `docs/en-linea.md`. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -4152,4 +4170,112 @@ node web/navegador/prueba-sincro.mjs --puerto=8123 --datos=build/web/datos/c3b-r
 node web/navegador/prueba-sincro.mjs --extra=&redMala=70,10,5&retraso=fijo
 node herramientas/correr-todo.mjs --sin-juego
 node herramientas/correr-todo.mjs --solo sincro --repetir 8
+```
+
+## 2026-10-19 · §71 Abrir directo por código, y Retro WFC entrando solo por la página
+
+### Qué pidió el dueño (2026-10-19)
+
+1. «Saltar la interfaz» es **abrir directo esa pantalla usando el código del juego**, no tapar la ventana con una
+   cortina mientras un piloto aprieta botones por detrás. «Si no puedes, decompila el juego.» «Abrir directo es
+   literalmente abrir directo.»
+2. El multijugador hecho hasta ahora (la carrera sincronizada con CPU, §61) estaba mal: los bots solo seguían la pista,
+   la cámara parecía un espectador flotando sobre la largada, y no se podía elegir personaje, kart ni pista.
+3. Después: «si es imposible poner exactamente los mismos CPU del modo un jugador, salta ese paso y **simplemente
+   implementa el Retro WFC, modificado para que corra en la página** bajo mi modo de funcionamiento». Cuando eso
+   funcione, separarlo en 3 modos: el original y los dos propuestos (copa y playlist).
+4. Faltaba en `docs/en-linea.md` la investigación de qué se hace una vez dentro de Retro WFC (el bucle de juego): está
+   agregada (una tabla con fuentes: mkwiiki y el código público de Retro Rewind).
+5. Los Mii invitados del juego para el menú «cambiar Mii»: **después** de terminar el multijugador al 100 %.
+
+### Por qué la carrera sincronizada se veía mal (lo que se encontró)
+
+En la carrera sincronizada **todos** los karts, también los humanos, eran del tipo "CPU" (`semillas_nativo.cpp`): un
+humano era una CPU que leía el mando. Por eso las CPU de verdad no tenían "contra quién correr" (la CPU ajusta su
+manejo mirando al jugador humano) y la cámara era la de espectador, movida a mano al kart propio. Arreglarlo de verdad
+pide humanos "locales" en cada consola, como el multijugador de pantalla dividida. Con el pedido 3, eso queda para los
+modos copa/playlist si hace falta; primero va el modo en línea del propio juego, que ya trae la cámara, la elección de
+personaje y la votación de pista.
+
+### 1. El motor de abrir directo (`web/juego/directo_nativo.cpp` + `web/navegador/directo.mjs`)
+
+- **El gancho**: el Update del SectionMgr (una vez por cuadro). Retro Rewind trae su versión de esa función
+  (`rr_overlay_8063550C`), y el bucle del juego llama a esa; por eso se envuelve esa (en `compilar-web.py`,
+  `REEMPLAZOS`). Las funciones del juego se llaman con `InvokeDirectCpu<dirección>`, que elige la versión activa
+  (la de RR si la parcheó), igual que el código traducido.
+- **El pedido**: la página llama `Module._mkw_directo_ir(sección, licencia)`. En los Update siguientes, con el
+  SectionMgr quieto (sin otro cambio en marcha), el juego:
+  1. registra el mando del jugador 1 (como el título al apretar A) y espera 3 cuadros;
+  2. elige la licencia 1, copiando paso a paso lo que hace la pantalla de licencias (0x805EB7A0): `ChangeLicense`,
+     el número de licencia, `SetCurLicense` y el Mii de la licencia (`LoadStoreMii` con su CreateID). Si la partida es
+     nueva, antes la **crea** con `CreateLicense`, como «Crear licencia» (0x805ECF2C), y pide guardar;
+  3. `SetNextSection(sección)` + `RequestSceneChange(0, negro)`.
+  Nada de esto corre si el juego todavía no leyó el archivo de guardado (así no se pisa una partida que no cargó).
+  Sin licencia (partida nueva y sin Mii) no salta: un menú sin Mii deja al juego esperando para siempre (se vio).
+- **El Mii para una licencia nueva**: antes de arrancar, `prepararMii` mira la base de Mii (RFL_DB.dat); si está
+  vacía pone un Mii con el nombre de la persona (y se guarda, para que la próxima vez sea el mismo).
+- **La acción de un botón, directo**: `Module._mkw_directo_boton(función, página, botón)` llama en el Update siguiente
+  a la función del botón (la misma que corre cuando alguien lo aprieta), con la página y el botón de verdad. Solo las
+  de una lista (en el C++ y en `directo.mjs`, `BOTON`), y solo con la página **activa** (estado 4).
+- `?directo=0` vuelve al camino viejo (el piloto apretando botones), para comparar.
+
+### 2. Un jugador directo
+
+El menú de inicio «JloKart Wii» → Single Player ya no usa el piloto: `directo.ir(0x48)`. El juego pasa del título al
+menú «Un jugador» en ~1 s, con la licencia elegida (o creada) y el mando listo: A entra a Grand Prix → «Engine
+Classes» (probado con `guion.mjs`). **Sin cortina**: lo que se ve es el propio fundido a negro del juego al cambiar de sección (la cortina era
+para tapar al piloto apretando botones; aquí no hay piloto). `directo.ir()` da por hecho el salto recién cuando la
+sección nueva **tiene su página** (al principio la sección ya cambió pero sus páginas todavía se están cargando).
+
+### 3. Retro WFC directo (el modo en línea del juego, por la página)
+
+Con `?modo=enlinea` (la sala), cuando la red de la sala está lista: `directo.ir(0x55)` (la sección en línea) y después,
+a medida que aparecen, las acciones directas de las pantallas del juego que piden confirmar algo:
+
+| Página | Qué es | Acción llamada directo |
+|---|---|---|
+| 0x85 | Aviso de datos de Nintendo WFC | «Siguiente» (`WFCDataStatement::OnButtonClick`, botón +0x578, número 2) |
+| 0x86 | «¿Conectarse a Nintendo WFC?» | «Sí» (`WFCAllowData::OnButtonClick`) |
+| 0x84 / 0x50 | Conectando (el juego entra a nuestro WFC virtual) | — (solo) |
+| 0x4D | Cartel «Welcome to Retro Wi-Fi Connection!» | cerrar (`Click::OnClick`) |
+| 0x8B | Menú de Retro WFC | «Mundial» (`WFCMainMenu::OnWorldwideButtonClick`) |
+| 0x8F | Buscando rivales | — (el juego sigue solo: elegir personaje/kart/derrape con su reloj, votación, ruleta, carrera) |
+
+El resto es el bucle del propio juego (Retro WFC): la persona elige con su mando; si no elige, el reloj del juego elige.
+
+### Trampas
+
+- **El gancho en la función equivocada**: Retro Rewind cambia `SectionMgr::Update`; envolver `func_8063550C` no hacía
+  nada (el juego llama a `rr_overlay_8063550C`). Se ve en la tabla de registro del C++ traducido
+  (`FunctionKind::ModTranslated`, prioridad 100).
+- **Saltar sin licencia cuelga el juego**: el menú «Un jugador» carga el modelo del Mii del jugador y, sin licencia,
+  se queda esperando para siempre («OSSleepThread … could not switch away»). Ahora sin licencia no se salta.
+- **El mando "interrumpido"**: anotarlo en la casilla del jugador 1 no alcanzaba (la pantalla nueva lo veía
+  desconectado). Faltaba que el portador del jugador 1 **tome el mando de GameCube** (Input::Manager +0x3BA0: los de
+  GameCube; los Wiimote están en +0x1720), y esperar 3 cuadros antes del salto.
+- **La acción del botón que se perdía**: se llamaba cuando la página ya estaba arriba pero todavía entrando; su
+  OnActivate la borraba. Ahora se espera el estado 4 (activa) y se repite si a los 2 s la página sigue ahí.
+- **Leer la memoria de la Wii antes del main** lanza una excepción del wasm («Exception» en la consola): `ir()`
+  preguntaba primero si el guardado estaba leído. Ahora mira primero que haya una sección.
+
+### Pruebas
+
+- banco `directo` **16/16** (sin el juego): la base de Mii vacía recibe un Mii con su suma de control; con Mii no se
+  escribe nada; el salto se pide recién con el guardado leído y sin otro cambio en marcha; sin licencia, no; el Mii
+  queda en el buffer del juego; la acción de un botón solo con su página arriba y activa.
+- `guion.mjs` con el juego: título → «Un jugador» directo, sin el cartel del mando; A → «Engine Classes».
+- `prueba-inicio` **14/14**: Single Player en el menú «JloKart Wii» → el menú se va, **no** aparece la cortina y el
+  juego queda en su menú «Un jugador» (página 0x69) abierto directo. (Las dos comprobaciones viejas esperaban la
+  cortina «Entrando a Single Player…» del piloto: se cambiaron a lo nuevo.)
+- Repaso (`correr-todo --solo banco,inicio,menus,piloto,enlinea-sala`): banco 24/0, piloto 9/0, menús 8/0, sala en
+  línea 11/0; las pruebas del sitio de Mario Kart (`mkw`, `mkw-worker`, `juegos`, `solo`) 46/46.
+- `prueba-enlinea` **9/9** (dos pestañas, la malla WebRTC de verdad, el WFC virtual en la de A): las dos entran
+  directo a la sección en línea, pasan solas las pantallas de la tabla, se juntan buscando rivales (120 s, con el
+  reloj de elegir personaje del juego), votan (127 s) y corren la carrera en línea (164 s); los paquetes del juego
+  cruzan la malla (~800 por lado) y el WFC le da al juego el VR presentado.
+
+```bash
+node banco/correr.mjs directo
+node web/navegador/guion.mjs "X:6000 -:2000 K:3000" --mii --evaluar "(mkwDirecto.ir(0x48), 1)"
+node web/navegador/prueba-enlinea.mjs
 ```

@@ -4,7 +4,7 @@ import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storag
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
-import { MKW_CPU, MKW_SINCRO_MAX, mkwCarrera } from "./motor.js";
+import { MKW_CPU, MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, mkwCarrera } from "./motor.js";
 
 /* Mario Kart Wii (+ Retro Rewind) — el cartero entre la sala y el juego.
 
@@ -20,7 +20,12 @@ import { MKW_CPU, MKW_SINCRO_MAX, mkwCarrera } from "./motor.js";
      lockstep.mjs`): cada marco corre la misma «copa a tu gusto» offline (12 karts: los pilotos y CPU) y la malla
      reparte los botones de cada cuadro. Los pilotos quedan fijos al empezar (`est.sincro`, en orden: puerto 1–4); la
      semilla y las 4 pistas salen de la sala y del número de tanda (`mkwCarrera`), así todos calculan lo mismo. Quien
-     llega con la tanda andando espera a la siguiente. Con más de 4 pilotos se corre en línea, sin CPU.
+     llega con la tanda andando espera a la siguiente. Con más de 4 pilotos se corre en línea, sin CPU. (Desde el
+     2026-10-19 ya no se ofrece: el dueño pidió primero Retro WFC tal cual; una sala nueva parte sin CPU.)
+   - **Los modos de la sala** (`est.estilo`, pedido del dueño): «Retro WFC» (el bucle del juego: votar, correr, VR, sin
+     fin), «Modo copa» (`est.carreras` carreras con puntos) y «Modo playlist» (una cola de pistas). Los tres corren
+     sobre el modo en línea del juego; el marco recibe `?estilo=…&carreras=…` y el juego entra DIRECTO (por código,
+     `juegos/mkw/web/navegador/directo.mjs`), sin pantallas de por medio.
    - **Al registro va solo el vestíbulo** (`redMkw` en `motor.js`): la CPU de relleno, quién es el anfitrión,
      empezar y volver. Cada jugador tiene su nodo (su dirección en la red del juego, 10.77.0.<nodo>).
    - **El VR y los récords** de cada uno van a Firebase (`mkw/vr/<uid>`, `mkw/records/…`): este módulo arma los
@@ -78,7 +83,7 @@ const almacenPartidas = {
 
 /* La dirección del marco para este jugador: la malla de esta sala, su nodo, si corre el servidor, la CPU de relleno.
    Con `sincro` (los pilotos de la carrera sincronizada): la copa con su semilla y sus pistas, sin servidor en línea. */
-export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro }) {
+export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro, estilo = "wfc", carreras = 4 }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   if (sincro) {
     const { semilla, pistas } = mkwCarrera(pid, ronda);
@@ -86,6 +91,7 @@ export function srcMkw({ pid, uid, nodo, anfitrion, cpu, privado, ronda, sincro 
     q.set("pistas", pistas.map(t => `${t.copa}.${t.fila}`).join(",")); q.set("cpu", cpu);
   } else {
     q.set("modo", "enlinea"); q.set("relleno", cpu);
+    q.set("estilo", estilo); if (estilo === "copa") q.set("carreras", String(carreras));
   }
   if (anfitrion && !sincro) q.set("anfitrion", "1");
   if (privado) q.set("privado", privado);
@@ -255,7 +261,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
-    frame.src = srcMkw({ pid, uid, nodo, anfitrion: est.anfitrion === uid, cpu: est.cpu, privado: origen, ronda: est.ronda, sincro: est.sincro });
+    frame.src = srcMkw({ pid, uid, nodo, anfitrion: est.anfitrion === uid, cpu: est.cpu, privado: origen, ronda: est.ronda, sincro: est.sincro,
+                         estilo: est.estilo, carreras: est.carreras });
     frame.focus();
     conectarNube();
   }
@@ -272,7 +279,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const js = presentes(), manda = soyAnfitrion(), corre = corriendo();
-    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.fase, est.ronda, origen, vrs, manda, est.sincro]);
+    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.fase, est.ronda, origen, vrs, manda, est.sincro]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     vest.hidden = false;
@@ -282,27 +289,35 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <small>${j.uid === est.anfitrion ? "anfitrión · " : ""}${vrs[j.uid] ? "VR " + Number(vrs[j.uid]).toLocaleString("es") : "VR —"}</small>
         ${manda && !corre && j.uid !== uid ? `<button class="jg-mkw-dar" data-a="${escapeHtml(j.uid)}" title="Que sea el anfitrión">Pasar anfitrión</button>` : ""}
       </li>`;
-    const cpuFichas = Object.entries(MKW_CPU).map(([k, t]) =>
-      `<button class="jg-mkw-ficha" data-v="${k}" aria-pressed="${est.cpu === k}" ${manda && !corre ? "" : "disabled"}>${t}</button>`).join("");
+    // los tres modos (tarjetas: el anfitrión elige, los demás ven cuál) y, en la copa, cuántas carreras
+    const estilo = est.estilo || "wfc", puede = manda && !corre ? "" : "disabled";
+    const QUE = { wfc: "Como en Retro WFC: votan la pista, corren y suben o bajan VR. Sin fin.",
+      copa: `${est.carreras || 4} carreras con puntos (15, 12, 10…): gana quien sume más.`,
+      playlist: "Una cola de pistas: cada carrera es la siguiente de la cola." };
+    const modos = Object.entries(MKW_MODOS).map(([k, t]) =>
+      `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
+    const carrerasFichas = estilo !== "copa" ? "" : `<div class="jg-mkw-cpu"><span>Carreras</span>${MKW_CARRERAS.map(n =>
+      `<button class="jg-mkw-ficha" data-c="${n}" aria-pressed="${(est.carreras || 4) === n}" ${puede}>${n}</button>`).join("")}</div>`;
     const sinPrograma = origen === "";
     const conCpu = est.cpu !== "ninguna", muchos = js.length > MKW_SINCRO_MAX;
     const nota = !enSala() ? (corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
       : corre && est.sincro ? (est.sincro.includes(uid) ? "Copa de 4 pistas con CPU: todos corren la misma carrera. Si alguien se va, su kart sigue solo."
         : "Esta copa empezó sin ti: entras en la siguiente.")
-      : corre ? (manda ? "Tu pestaña es el servidor de la sala: si la cierras, las carreras se cortan para todos." : "El juego entra solo en línea; si llegaste tarde, te suma en la carrera siguiente.")
+      : corre ? (manda ? "Tu pestaña es el servidor de la sala: si la cierras, las carreras se cortan para todos." : "El juego entra directo en línea; si llegaste tarde, te suma en la carrera siguiente.")
       : manda && conCpu && muchos ? `Con más de ${MKW_SINCRO_MAX} pilotos no caben CPU: se corre en línea, sin relleno.`
       : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
       : `Esperando a que ${escapeHtml(nombre(est.anfitrion))} abra las carreras.`;
     vest.innerHTML = `
-      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${est.cupo || 12} · ${escapeHtml(MKW_CPU[est.cpu] || "")}</span></div>
+      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${est.cupo || 12} · ${escapeHtml(MKW_MODOS[estilo])}${conCpu ? " · " + escapeHtml(MKW_CPU[est.cpu] || "") : ""}</span></div>
       <ul class="jg-mkw-pilotos">${js.map(fila).join("")}</ul>
-      ${corre ? "" : `<div class="jg-mkw-cpu"><span>Completar con</span>${cpuFichas}</div>`}
+      ${corre ? "" : `<div class="jg-mkw-modos" role="group" aria-label="Modo de la sala">${modos}</div>${carrerasFichas}`}
       <div class="jg-mkw-pie">
         ${manda && !corre ? `<button class="jg-mkw-empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>` : ""}
         ${manda && corre ? `<button class="jg-mkw-vuelve">Volver al vestíbulo</button>` : ""}
         <p class="jg-mkw-nota" role="status">${nota}</p>
       </div>`;
-    vest.querySelectorAll(".jg-mkw-ficha").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cpu", v: b.dataset.v }); });
+    vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
+    vest.querySelectorAll(".jg-mkw-ficha[data-c]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "carreras", v: Number(b.dataset.c) }); });
     vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
     const emp = vest.querySelector(".jg-mkw-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; anota({ t: "empieza", uid }); };

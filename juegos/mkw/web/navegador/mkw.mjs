@@ -32,8 +32,11 @@ import { crearLockstep, huellaCarrera, armarPlantel, vigiaLento, MARCA as MARCA_
 import { crearPrivado } from './privado.mjs';
 import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
+import { prepararMii, crearDirecto, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
 
 const parametros = new URLSearchParams(location.search);
+// Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
+const DIRECTO = parametros.get('directo') !== '0';
 // ---- En línea (bitácora §58). ?red=1: la red de juguete de la sala, con el WFC virtual en esta misma pestaña
 // (10.77.0.1) y el juego en 10.77.0.2. Todos los nombres de servidores (nintendowifi.net, gs.nintendowifi.net,
 // rwfc.net…) apuntan al WFC virtual. Lo que pasa queda en window.mkwRed.registro (y en la consola con ?red=ver).
@@ -871,6 +874,10 @@ async function arrancar() {
   window.mkw = M;
   // En qué pantalla está el juego (menus.mjs: lee la memoria de la Wii; para elegir pista o copa desde la página)
   window.mkwMenus = crearLector(M);
+  // Abrir directo (directo.mjs + directo_nativo.cpp, §71): la página le pide al juego la sección (un jugador, en línea)
+  // y el juego la abre con sus propias funciones. ?directo=0: el camino viejo (el piloto apretando botones), para comparar
+  const directo = crearDirecto({ M, lector: window.mkwMenus, nota });
+  window.mkwDirecto = directo;
   // Botones del juego que aquí no sirven (ocultar.mjs, §66): el juego avisa cada pantalla que se activa (paginas_nativo.cpp)
   // y se esconden antes de dibujarla: «Retro WFC» fuera de la sala en línea y los «Settings» de Retro Rewind. ?ocultar=0: todo como el juego
   const ocultar = crearOcultar({ lector: window.mkwMenus, enLinea: parametros.get('modo') === 'enlinea' });
@@ -899,12 +906,36 @@ async function arrancar() {
   window.mkwPiloto = piloto;
   // sin la portada (lo normal) el modo sale solo de la dirección (la sala del sitio); si no, los menús del juego
   const objetivoPiloto = { modo: parametros.get('modo') || (ui.conPortada ? window.mkwModo.modo : 'libre') };
+  // En línea, directo (§71): con la red de la sala lista, el juego abre su modo en línea (sección 0x55) y las acciones
+  // de sus botones se llaman directo (las mismas funciones que corren al apretarlos): el aviso de datos → Siguiente,
+  // «¿Usar Nintendo WFC?» → Sí, el cartel «Welcome to Retro Wi-Fi Connection!» → cerrar, menú
+  // Wi-Fi → Mundial, VS o Batalla → VS. El juego busca rivales (página 0x8F) en el WFC de la sala y sigue su propio
+  // bucle: votación, carrera, VR… Cualquier otra pantalla (un aviso de Retro Rewind) queda para la persona.
+  const espera = ms => new Promise(r => setTimeout(r, ms));
+  async function enLineaDirecto({ redLista, tope = 180000 }) {
+    const t0 = performance.now();
+    while (!redLista()) { if (performance.now() - t0 > tope) return false; await espera(200); }
+    if (!await directo.ir(SECCION_DIRECTA.enlinea)) return false;
+    const vistas = [];
+    let ultimo = 0;
+    while (performance.now() - t0 < tope) {
+      const e = window.mkwMenus.estado(), arriba = e.pagina;
+      if (vistas[vistas.length - 1] !== arriba) vistas.push(arriba);
+      window.mkwEstado.directoPaginas = vistas;
+      if ((e.seccion === 0x55 && arriba === 0x8f) || e.seccion === 0x58 || (e.seccion > 0 && e.seccion < 0x30)) return true;
+      const b = [BOTON_JUEGO.cartel, BOTON_JUEGO.avisoDatos, BOTON_JUEGO.usarWfc, BOTON_JUEGO.mundial, BOTON_JUEGO.vs].find(x => x.pagina === arriba);
+      // la acción, cuando la página ya está activa; si sigue ahí 2 s después (no la tomó), otra vez
+      if (b && performance.now() - ultimo > 2000 && directo.boton(b)) { ultimo = performance.now(); nota(`directo: botón de la página 0x${arriba.toString(16)}`); }
+      await espera(100);
+    }
+    return false;
+  }
   // ?modo=enlinea (la sala del sitio la pone): el piloto entra solo hasta «VS mundial». Quien no es anfitrión espera a
   // tener ruta al WFC de la sala (10.77.0.1) por la malla antes de conectarse
   if (objetivoPiloto.modo === 'enlinea' && red) {
     const redLista = () => !!red.wfc || !red.router || !!red.router.rutas()['10.77.0.1'];
-    piloto.enLinea({ redLista }).then(llego => {
-      window.mkwEstado.piloto = { llego, modo: 'enlinea', paginas: piloto.paginas };
+    (DIRECTO ? enLineaDirecto({ redLista }) : piloto.enLinea({ redLista })).then(llego => {
+      window.mkwEstado.piloto = { llego, modo: 'enlinea', paginas: piloto.paginas, directo: DIRECTO };
       nota(`piloto en línea: ${llego ? 'buscando rivales' : 'se detuvo'}`);
       if (!llego) return;
       // Vigilante: una búsqueda normal se junta en ~40 s. Una vez de nueve, en las pruebas, los dos quedaron buscando
@@ -958,7 +989,9 @@ async function arrancar() {
   let revisarCortina = () => {};
   {
     const MODOS_PILOTO = ['gp', 'vs', 'tt', 'copa', 'unjugador', 'local'];
-    const conPiloto = () => objetivoPiloto.modo === 'enlinea' ? !!red : MODOS_PILOTO.includes(objetivoPiloto.modo);
+    // abrir directo (§71): sin cortina; lo que se ve es el juego cambiando de pantalla con su propio fundido
+    const directoSinCortina = () => DIRECTO && ['enlinea', 'unjugador'].includes(objetivoPiloto.modo);
+    const conPiloto = () => directoSinCortina() ? false : objetivoPiloto.modo === 'enlinea' ? !!red : MODOS_PILOTO.includes(objetivoPiloto.modo);
     const textoPiloto = () => ({ enlinea: 'Entrando a la sala…', copa: 'Preparando la carrera…', unjugador: 'Entrando a Single Player…',
       local: 'Entrando a Multiplayer…' }[objetivoPiloto.modo] || 'Yendo a la carrera…') + (matchMedia('(pointer: fine)').matches ? ' (Esc: lo hago yo)' : '');
     let vioTitulo = false, puesta = '';
@@ -988,6 +1021,14 @@ async function arrancar() {
     objetivoPiloto.modo = que;
     window.mkwEstado.piloto = null;
     revisarCortina();                               // la cortina al tiro (si el juego ya mostraba su título)
+    if (DIRECTO && que === 'unjugador') {           // §71: el juego abre su menú «Un jugador» de una
+      directo.ir(SECCION_DIRECTA.unjugador).then(llego => {
+        window.mkwEstado.piloto = { llego, modo: que, directo: true };
+        nota(`directo: ${que} ${llego ? 'abierto' : 'no se pudo'}`);
+        revisarCortina();
+      });
+      return;
+    }
     piloto.hasta(DESTINO[que]).then(llego => {
       window.mkwEstado.piloto = { llego, modo: que, paginas: piloto.paginas };
       nota(`piloto del menú de inicio: ${que} ${llego ? 'llegó' : 'se detuvo'} (páginas ${piloto.paginas.map(p => p.toString(16)).join(',')})`);
@@ -1093,6 +1134,33 @@ async function arrancar() {
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     M.mkwLockstep = sincro.lockstep;
     M.mkwLockstepFin = () => controles.reenviar();   // terminó la carrera: la página vuelve a mandar sus mandos
+    // ?rastro=1 (solo para depurar, §70): en cada cuadro de la carrera sincronizada, el azar de la carrera (azar 1 y 2)
+    // y de cada uno de los 12 RaceinfoPlayer su avance (+0xC) y una huella del resto de sus 0x54 bytes, en
+    // window.mkwRastro (los últimos 4000 cuadros, con la clave "carrera:cuadro"). `prueba-sincro --rastro` compara los de las dos pestañas y dice en qué cuadro y qué kart se separó primero
+    // ?depura=desde-hasta: el tramo de cuadros que anota el programa de depuración (MKW_DEPURAR_LS, depurar_lockstep.cpp)
+    if (parametros.get('depura')) window.mkwDepura = parametros.get('depura');
+    if (parametros.get('volcar')) window.mkwDepuraVolcar = Number(parametros.get('volcar'));   // y el cuadro en que vuelca la IA
+    if (parametros.get('vigiaIA')) window.mkwVigiaIA = parametros.get('vigiaIA').split('.').map(Number);   // cuadro.índice.desplazamiento.tamaño[.puntero]
+    if (parametros.get('rastro') === '1') {
+      const rastro = window.mkwRastro = [], pad0 = sincro.lockstep.pad;
+      sincro.lockstep.pad = async cuadro => {
+        const datos = await pad0(cuadro), L = window.mkwMenus;
+        const ri = L?.u32(0x809BD730), lista = ri && L.u32(ri + 0xC);
+        if (lista && L.u32(ri + 0x28) < 4) {                       // etapa < 4: la carrera (después, los resultados son locales)
+          const fila = [`${sincro.lockstep.estado().carrera}:${cuadro}`];
+          for (const r of [L.u32(ri + 4), L.u32(ri + 8)]) fila.push(r ? L.u32(r + 8) : 0, r ? L.u32(r + 12) : 0);
+          for (let i = 0; i < 12; i++) {
+            const pl = L.u32(lista + 4 * i);
+            let h = 2166136261;
+            for (let o = 0; o < 0x54; o += 4) if (o !== 0xC) h = Math.imul(h ^ L.u32(pl + o), 16777619);
+            fila.push(L.u32(pl + 0xC), h >>> 0);                   // el avance en la carrera (+0xC) y el resto
+          }
+          rastro.push(fila);
+          if (rastro.length > 4000) rastro.shift();
+        }
+        return datos;
+      };
+    }
     // cada 3 s: ¿la sala va lenta por alguien? (lockstep.mjs, avisoLento/vigiaLento; §70). Los avisos quedan en
     // window.mkwAvisosLento para las pruebas
     window.mkwAvisosLento = [];
@@ -1137,6 +1205,13 @@ async function arrancar() {
                           cuantos: () => M._mkw_web_pipelines_cuantos(), guardar: forzar => pipelines.guardarAhora(M, forzar) };
   guardado.pedirPersistencia().then(si => nota(`almacenamiento persistente: ${si ? 'sí' : 'no (el navegador podría borrarlo si le falta espacio)'}`));
   window.mkwEstado.horaMain = Date.now();  // los archivos con fecha posterior los escribió el juego
+  // La base de Mii con al menos un Mii (si estaba vacía se pone uno y se guarda solo, ya con el guardado vigilando):
+  // con él el juego crea la licencia 1 si la partida es nueva, al abrir directo (directo.mjs)
+  if (DIRECTO) {
+    const miiLicencia = prepararMii(M.FS, parametros.get('nombre') || 'Piloto');
+    directo.ponerMii(miiLicencia);
+    if (miiLicencia.nueva) nota('directo: base de Mii vacía, puse un Mii para la licencia');
+  }
   nota('arrancando main() — el juego corre');
   ui.cortina('Arrancando…');
   M.callMain([]);

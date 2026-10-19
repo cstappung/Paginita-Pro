@@ -246,11 +246,14 @@ const OPCIONES = {
      el organizador empieza cuando están todos. */
   bt3: [{ clave: "cupo", etiqueta: "Formato", por: 2, valores: [
     { v: 2, t: "Duelo (1 contra 1)" }, { v: 4, t: "Torneo, hasta 4" }, { v: 8, t: "Torneo, hasta 8" }] }],
-  /* Mario Kart Wii: cuántos caben (hasta 12, lo que admite una sala en línea del juego) y la CPU de relleno que
-     completa la parrilla (redMkw: MKW_CPU; el anfitrión la puede cambiar en el vestíbulo). Ninguno es `modo`. */
-  mkw: [{ clave: "cupo", etiqueta: "Jugadores", por: 12, valores: cupos("mkw") },
-    { clave: "cpu", etiqueta: "CPU de relleno", por: "normal", valores: [
-      { v: "ninguna", t: "Sin CPU" }, { v: "facil", t: "CPU fácil" }, { v: "normal", t: "CPU normal" }, { v: "dificil", t: "CPU difícil" }] }],
+  /* Mario Kart Wii: PRIMERO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no directo cuántas
+     personas: los modos»), los tres sobre el modo en línea del juego (redMkw: MKW_MODOS), y después cuántos caben
+     (hasta 12, lo que admite una sala en línea del juego). Se guarda como `estilo` (las reglas de Firebase reservan
+     `modo` para los valores de otros juegos). El anfitrión lo puede cambiar en el vestíbulo. Sin CPU de relleno. */
+  mkw: [{ clave: "estilo", etiqueta: "Modo", por: "wfc", valores: [
+      { v: "wfc", t: "Retro WFC (como el original)" }, { v: "copa", t: "Modo copa (N carreras con puntos)" },
+      { v: "playlist", t: "Modo playlist (una cola de pistas)" }] },
+    { clave: "cupo", etiqueta: "Jugadores", por: 12, valores: cupos("mkw") }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [

@@ -44,6 +44,7 @@ const PRUEBAS = [
   { n: 'sincro', cmd: [nav('prueba-sincro.mjs')], juego: true, datos: 'build/web/datos/sincro', propios: true },
   { n: 'sincro-sala', cmd: [nav('prueba-sincro.mjs'), '--sala'], juego: true, datos: 'build/web/datos/sincro', propios: true },
   { n: 'enlinea-sala', cmd: [nav('prueba-enlinea.mjs'), '--sala'], juego: true, datos: 'build/web/datos/enlinea' },
+  { n: 'copa-azar', cmd: ['herramientas/copas-al-azar.mjs', '--copas', '1'], juego: true },   // una copa sincronizada al azar (C2)
 ];
 // las prueba-*.mjs nuevas que no están en la lista: sin argumentos
 const conocidas = new Set(PRUEBAS.flatMap(p => p.cmd.filter(c => /prueba-.*\.mjs$/.test(c)).map(c => path.basename(c))));

@@ -1793,6 +1793,13 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-mkw-ficha{border:1px solid #ffffff44;background:#ffffff0d;color:#eef2ff;border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit}
 .jg-mkw-ficha[aria-pressed=true]{background:#ffd34d;color:#1b1400;border-color:#ffd34d;font-weight:700}
 .jg-mkw-ficha:disabled{cursor:default;opacity:.75}
+.jg-mkw-modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.jg-mkw-modo{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid #ffffff33;background:#ffffff0d;color:#eef2ff;border-radius:14px;padding:10px 12px;cursor:pointer;font:inherit}
+.jg-mkw-modo b{font-size:1rem}
+.jg-mkw-modo small{color:#c8d1ef;font-size:.85rem;line-height:1.3}
+.jg-mkw-modo[aria-pressed=true]{border-color:#ffd34d;background:#ffd34d22;box-shadow:inset 0 0 0 1px #ffd34d}
+.jg-mkw-modo:disabled{cursor:default}
+.jg-mkw-modo:disabled:not([aria-pressed=true]){opacity:.6}
 .jg-mkw-pie{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
 .jg-mkw-empieza,.jg-mkw-vuelve{border:0;border-radius:12px;padding:10px 20px;font:800 1.05rem system-ui,sans-serif;cursor:pointer}
 .jg-mkw-empieza{background:#e4202e;color:#fff}

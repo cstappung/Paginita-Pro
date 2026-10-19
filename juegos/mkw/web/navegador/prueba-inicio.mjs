@@ -5,7 +5,8 @@
 //   - mientras está, el juego no recibe nada de la persona (controles silenciados) y arranca debajo hasta su título;
 //   - teclado: bajar, entrar a Multiplayer (Local y Back; «Online» solo dentro del sitio), volver con Esc;
 //   - Options abre el cajón (Controles) y mientras está abierto el menú no se mueve;
-//   - Single Player: el menú se va, la cortina tapa al tiro y el piloto deja el juego en su menú «Un jugador» (0x69);
+//   - Single Player: el menú se va y el juego ABRE DIRECTO su menú «Un jugador» (0x69), sin cortina (§71: por código,
+//     con el fundido del propio juego);
 //   - B, B (al título del juego): vuelve nuestro menú de inicio;
 //   - Multiplayer → Local: el piloto deja el juego en su menú principal (0x5a) con el cursor a la derecha;
 //   - sin ?inicio=1 no aparece (las demás pruebas siguen igual);
@@ -97,11 +98,11 @@ try {
   // Single Player
   await tecla('Enter', 300);
   m = await mirar(p);
-  ok('Single Player: el menú se va y la cortina tapa al tiro', !m.visible && m.cortina && /^Entrando a Single Player/.test(m.cortinaTexto || '') && !m.silenciado,
-     `menú ${m.visible}, cortina «${m.cortinaTexto}»`);
+  ok('Single Player: el menú se va y no hay cortina (abre directo: se ve el juego)', !m.visible && !m.cortina && !m.silenciado,
+     `menú ${m.visible}, cortina «${m.cortinaTexto || ''}»`);
   m = await hasta(p, x => x.piloto && !x.cortina, 100000, 300);
   await p.locator('#canvas').screenshot({ path: path.join(carpeta, '3-un-jugador.png') });
-  ok('el piloto dejó el juego en su menú «Un jugador» (0x69) y la cortina se fue', !!m.piloto?.llego && m.pagina === 0x69 && m.seccion === 0x48 && !m.cortina,
+  ok('el juego abrió directo su menú «Un jugador» (0x69), sin piloto ni cortina', !!m.piloto?.llego && !!m.piloto?.directo && m.pagina === 0x69 && m.seccion === 0x48 && !m.cortina,
      `página 0x${(m.pagina ?? -1).toString(16)} sección 0x${(m.seccion ?? -1).toString(16)}, piloto ${JSON.stringify(m.piloto && { llego: m.piloto.llego, paginas: m.piloto.paginas })}`);
 
   // B hasta el título del juego: vuelve nuestro menú

@@ -119,13 +119,15 @@ extern "C" void func_80732678(CpuContext* ctx) {
             volcar = EM_ASM_INT({ return (typeof window !== 'undefined' && window.mkwDepuraVolcar) || -1; });
         }
 #ifdef MKW_VIGIA
-        {   // window.mkwVigiaIA = [cuadro, índice, desplazamiento, tamaño]: vigilar esa parte de la IA número índice
-            static int vc = -2, vi = 0, vo = 0, vt = 0, orden = 0, ultimo = -1;
+        {   // window.mkwVigiaIA = [cuadro, índice, desplazamiento, tamaño, puntero?]: vigilar esa parte de la IA número
+            // índice; con `puntero`, la de lo que apunta la IA en ese desplazamiento (*(yo + puntero) + desplazamiento, §70)
+            static int vc = -2, vi = 0, vo = 0, vt = 0, vp = -1, orden = 0, ultimo = -1;
             if (vc == -2) { vc = EM_ASM_INT({ const v = typeof window !== 'undefined' && window.mkwVigiaIA; return v ? v[0] : -1; });
                 vi = EM_ASM_INT({ return window.mkwVigiaIA ? window.mkwVigiaIA[1] : 0; }); vo = EM_ASM_INT({ return window.mkwVigiaIA ? window.mkwVigiaIA[2] : 0; });
-                vt = EM_ASM_INT({ return window.mkwVigiaIA ? window.mkwVigiaIA[3] : 0; }); }
+                vt = EM_ASM_INT({ return window.mkwVigiaIA ? window.mkwVigiaIA[3] : 0; });
+                vp = EM_ASM_INT({ return window.mkwVigiaIA && window.mkwVigiaIA.length > 4 ? window.mkwVigiaIA[4] : -1; }); }
             if (f != ultimo) { ultimo = f; orden = 0; } else orden++;
-            if (f == vc && orden == vi) mkw_vigia_poner(yo + vo, vt);
+            if (f == vc && orden == vi) mkw_vigia_poner((vp >= 0 ? Memory::Read32(yo + vp) : yo) + vo, vt);
         }
 #endif
         if (f >= desde && f <= hasta) {
@@ -155,7 +157,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_vigia_poner(uint32_t desde, uint32_t ta
 extern "C" void mkw_vigia_toque(uint32_t address, uint32_t size) {
     const uint32_t ri = Memory::Read32(0x809BD730);
     const int f = (ri >= 0x80000000u && ri < 0x81800000u) ? static_cast<int>(Memory::Read32(ri + 0x20)) : -1;
-    EM_ASM({ const pila = (new Error().stack || '').split('\n').map(l => (l.match(/(func_[0-9A-Fa-f]+|rr_overlay_[0-9A-Fa-f]+)/) || [])[1]).filter(Boolean).slice(0, 8).join(' < ');
+    EM_ASM({ const pila = (new Error().stack || '').split('\n').map(l => (l.match(/(func_[0-9A-Fa-f]+|rr_overlay_[0-9A-Fa-f]+|rr_kamek_[0-9A-Fa-f]+)/) || [])[1]).filter(Boolean).slice(0, 10).join(' < ');
              console.log('[DEPURA] vigia cuadro ' + $0 + ' dir ' + ($1 >>> 0).toString(16) + ' tam ' + $2 + ' pila ' + pila); }, f, address, size);
 }
 #endif
