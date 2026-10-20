@@ -19,7 +19,7 @@ function barraHtml(n) {
   return `<div class="jg-ref-req${ok ? " ok" : ""}">
     <div class="jg-ref-req-t"><span>Juegos distintos jugados</span><b>${k}/${MIN_JUEGOS}</b></div>
     <div class="jg-ref-barra" role="progressbar" aria-valuemin="0" aria-valuemax="${MIN_JUEGOS}" aria-valuenow="${k}"><i style="width:${Math.round(100 * k / MIN_JUEGOS)}%"></i></div>
-    <small>${ok ? "✓ Cumples: ya puedes referir a otros" : `Juega ${falta} ${falta === 1 ? "juego distinto más" : "juegos distintos más"} (de sala o del club) para poder referir`}</small>
+    <small>${ok ? "✓ Cumples: ya puedes canjear un código y referir a otros" : `Juega ${falta} ${falta === 1 ? "juego distinto más" : "juegos distintos más"} (de sala o del club) para poder canjear un código y referir`}</small>
   </div>`;
 }
 
@@ -36,7 +36,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
     const u = uid(), d = datos();
     if (!u) { cierraPop(); return; }
     const listo = !!(d && d.completo), usado = listo && ((d.referidos || {}).u || {})[u];
-    const n = listo ? juegosJugados(u, d).size : 0;
+    const n = listo ? juegosJugados(u, d).size : 0, cumple = n >= MIN_JUEGOS;
     const firma = JSON.stringify([listo, !!usado, n, ocupado]);
     if (pop.dataset.f === firma) return;
     const borrador = pop.querySelector("#refCodigo"), valor = borrador ? borrador.value : "";
@@ -46,10 +46,10 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
       <section class="jg-ref-canje">
         ${usado ? `<p class="jg-ref-usado">✓ Código ya usado</p>` : `
         <b class="jg-ref-t">¿Te invitó alguien?</b>
-        <small class="jg-ref-s">Ingresa su código y ganan ${formatoMonedas(PREMIO_REFERIDO)} ${MONEDA} cada uno.</small>
+        <small class="jg-ref-s">${cumple ? `Ingresa su código y ganan ${formatoMonedas(PREMIO_REFERIDO)} ${MONEDA} cada uno.` : `Cuando juegues ${MIN_JUEGOS} juegos distintos podrás ingresar su código y ganar ${formatoMonedas(PREMIO_REFERIDO)} ${MONEDA} cada uno.`}</small>
         <form class="jg-ref-fila" id="refForm">
-          <input class="inp" id="refCodigo" maxlength="16" placeholder="Código" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no" aria-label="Código de referido">
-          <button class="btn" id="refCanjear" ${ocupado ? "disabled" : ""}>${ocupado ? "…" : "Canjear"}</button>
+          <input class="inp" id="refCodigo" maxlength="16" placeholder="Código" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no" aria-label="Código de referido" ${cumple ? "" : "disabled"}>
+          <button class="btn" id="refCanjear" ${ocupado || !cumple ? "disabled" : ""}>${ocupado ? "…" : "Canjear"}</button>
         </form>
         <div class="jg-modal-err" id="refErr"></div>`}
       </section>
@@ -196,11 +196,12 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
         <ol class="jg-ref-pasos">
           <li><b>Crea tu código</b> aquí abajo. Es único: nadie más puede tener el mismo.</li>
           <li><b>Compártelo</b> con quien quieras invitar.</li>
-          <li><b>Que lo canjee:</b> toca el <span class="jg-ref-mas-ej">+</span> junto a sus monedas,
-            arriba a la derecha, y escribe tu código. En ese momento los dos reciben las monedas.</li>
+          <li><b>Que lo canjee:</b> cuando haya jugado ${MIN_JUEGOS} juegos distintos, toca el
+            <span class="jg-ref-mas-ej">+</span> junto a sus monedas, arriba a la derecha, y escribe tu
+            código. En ese momento los dos reciben las monedas.</li>
         </ol>
         <ul class="jg-ref-letra">
-          <li>Para referir necesitas haber jugado al menos <b>${MIN_JUEGOS} juegos distintos</b> (de sala o del club).</li>
+          <li>Para referir <b>y para canjear un código</b> hay que haber jugado al menos <b>${MIN_JUEGOS} juegos distintos</b> (de sala o del club): tú y tu invitado.</li>
           <li>Cada persona puede usar <b>un solo código</b>, y nunca el suyo. Dos personas no se pueden referir la una a la otra.</li>
           <li>Tu código lo pueden usar todas las personas que quieras.</li>
         </ul>

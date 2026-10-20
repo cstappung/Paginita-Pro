@@ -15,11 +15,11 @@
      es su dueño). Una vez por persona, nunca el propio y nunca el de
      alguien que ya usó el tuyo (eso lo pide la regla).
 
-   **Para referir hay que haber jugado `MIN_JUEGOS` juegos distintos.**
-   La regla no puede contar juegos (no recorre listas), así que eso se
-   comprueba aquí, donde se ve, como los marcos: un código puesto a mano
-   por alguien que no llega no paga nada, ni a él ni a quien lo usó, hasta
-   que llegue. Cuenta todo lo que ya está escrito y validado: una fila de
+   **Para referir y para canjear hay que haber jugado `MIN_JUEGOS` juegos
+   distintos**: los dos lados. La regla no puede contar juegos (no recorre
+   listas), así que eso se comprueba aquí, donde se ve, como los marcos:
+   un código puesto o canjeado a mano por alguien que no llega no paga
+   nada, ni a él ni a la otra persona, hasta que llegue. Cuenta todo lo que ya está escrito y validado: una fila de
    la clasificación de sala con partidas, una partida del club o una marca
    del club.
    ============================================================ */
@@ -48,6 +48,7 @@ export function juegosJugados(uid, datos) {
   }
   return s;
 }
+/* El mínimo es el mismo para referir y para canjear. */
 export const puedeReferir = (uid, datos) => juegosJugados(uid, datos).size >= MIN_JUEGOS;
 
 /* El código de `uid`, si lo configuró y es de verdad suyo. */
@@ -74,7 +75,7 @@ export function referidos(datos) {
   for (const [uid, x] of Object.entries(u)) {
     if (!x || typeof x !== "object") continue;
     const r = typeof x.r === "string" ? x.r : "", c = typeof x.c === "string" ? x.c : "";
-    let valido = !!r && r !== uid && RE_CODIGO.test(c) && duenoCodigo(c, d) === r && Number.isFinite(x.at) && califica(r);
+    let valido = !!r && r !== uid && RE_CODIGO.test(c) && duenoCodigo(c, d) === r && Number.isFinite(x.at) && califica(r) && califica(uid);
     /* Dos que se usan el código el uno al otro: la regla lo impide, pero
        si se colara vale solo el primero. */
     const vuelta = u[r];
@@ -99,6 +100,7 @@ export function monedasReferidos(uid, datos) {
 export function motivoNoCanje(uid, codigo, datos) {
   const r = (datos && datos.referidos) || {};
   if ((r.u || {})[uid]) return "Ya usaste un código.";
+  if (!puedeReferir(uid, datos)) return `Para canjear un código primero juega ${MIN_JUEGOS} juegos distintos.`;
   if (!RE_CODIGO.test(codigo)) return "El código tiene de 4 a 12 letras o números.";
   const dueno = duenoCodigo(codigo, datos);
   if (!dueno) return "Ese código no existe. Revisa que esté bien escrito.";

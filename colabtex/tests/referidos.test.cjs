@@ -13,10 +13,11 @@ const M=ctx.__M;
 const copia=x=>JSON.parse(JSON.stringify(x));
 
 /* A jugó tres juegos distintos (uno de sala, uno del club y una marca);
-   B, uno solo. */
+   B, dos. C y D, tres del club cada uno (para poder canjear). */
 const base=()=>({
  ranks:{cuadritos:{A:{jugadas:2,ganadas:1},B:{jugadas:1}},reversi:{B:{jugadas:0}}},
- clubJugadas:{A:{snake:{dia:1,hoy:1,total:1,at:1}},B:{snake:{dia:1,hoy:1,total:3,at:1}}},
+ clubJugadas:{A:{snake:{dia:1,hoy:1,total:1,at:1}},B:{snake:{dia:1,hoy:1,total:3,at:1}},
+  C:{snake:{total:1},minas:{total:1},sopa:{total:1}},D:{snake:{total:1},minas:{total:1},sopa:{total:1}}},
  solo:{'club-minas-facil':{A:{puntos:1,tiempo:30,partida:'p1'}}},
  referidos:{c:{ANA2024:'A',BETO:'B'},m:{A:{c:'ANA2024',at:10},B:{c:'BETO',at:11}},u:{}}
 });
@@ -51,12 +52,12 @@ test('usar un código paga 5000 a los dos',()=>{
  assert.equal(M.monedasReferidos('C',d),M.PREMIO_REFERIDO);
  assert.equal(M.monedasReferidos('A',d),M.PREMIO_REFERIDO);
  assert.equal(M.monedasDe('C',d).partes.referidos,5000);
- assert.equal(M.monedasDe('C',d).saldo,5000);
+ const mc=M.monedasDe('C',d);assert.equal(mc.saldo,5000+mc.partes.club,'el premio entra al saldo');
  d.referidos.u.D={c:'ANA2024',r:'A',at:21};
  const d2=copia(d);
  assert.equal(M.monedasReferidos('A',d2),10000,'cada persona que entra paga otra vez');
  assert.deepEqual([...M.referidos(d2).de.A],['C','D']);
- assert.ok(M.topMonedas(d2).some(x=>x.uid==='C'&&x.saldo===5000),'quien solo canjeó aparece en el top');
+ assert.ok(M.topMonedas(d2).some(x=>x.uid==='C'&&x.partes.referidos===5000),'quien solo canjeó aparece en el top');
 });
 
 test('no paga si el dueño no cumple, si el código no es suyo o si es el propio',()=>{
@@ -90,7 +91,9 @@ test('los motivos para no canjear ni configurar',()=>{
  assert.match(M.motivoNoCanje('A','ANA2024',d),/propio/);
  assert.match(M.motivoNoCanje('C','BETO',d),/no está activo/);
  d.referidos.u.A={c:'BETO',r:'B',at:20};
- assert.match(M.motivoNoCanje('B','ANA2024',d),/el uno al otro/);
+ assert.match(M.motivoNoCanje('B','ANA2024',d),/primero juega 3/,'B aún no juega tres juegos');
+ d.ranks.ajedrez={B:{jugadas:1}};
+ assert.match(M.motivoNoCanje('B','ANA2024',copia(d)),/el uno al otro/);
  assert.match(M.motivoNoCanje('A','ANA2024',d),/Ya usaste/);
  assert.match(M.motivoNoCodigo('A','OTRO',d),/Ya configuraste/);
  const e=base();delete e.referidos.m.A;delete e.referidos.c.ANA2024;
@@ -98,4 +101,15 @@ test('los motivos para no canjear ni configurar',()=>{
  assert.match(M.motivoNoCodigo('A','BETO',e),/otra persona/);
  assert.match(M.motivoNoCodigo('A','ab',e),/4 a 12/);
  assert.match(M.motivoNoCodigo('Z','NUEVO2',e),/Primero juega/);
+});
+
+test('canjear también pide tres juegos distintos a quien canjea',()=>{
+ const d=base();d.referidos.u.E={c:'ANA2024',r:'A',at:20};
+ assert.match(M.motivoNoCanje('E','ANA2024',base()),/primero juega 3/);
+ assert.equal(M.monedasReferidos('E',d),0,'E no jugó nada: no paga');
+ assert.equal(M.monedasReferidos('A',d),0,'ni a quien lo invitó');
+ d.clubJugadas.E={snake:{total:1},minas:{total:2}};d.ranks.uno={E:{jugadas:1}};
+ assert.equal(M.motivoNoCanje('E','ANA2024',Object.assign(copia(d),{referidos:base().referidos})),'');
+ assert.equal(M.monedasReferidos('E',copia(d)),5000,'en cuanto cumple, paga a los dos');
+ assert.equal(M.monedasReferidos('A',copia(d)),5000);
 });

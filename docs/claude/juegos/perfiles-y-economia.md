@@ -286,11 +286,11 @@ all write-once:
   are `^[A-Z0-9]{4,12}$` (`normalizaCodigo` uppercases and strips the rest).
 - `u/<uid>` = {c, r, at}: the code used. The rule demands `c/<c> === r`,
   `r !== uid` and that `r` did not already use yours (no mutual pair).
-- **Referring needs `MIN_JUEGOS` (3) distinct games played** (a `ranks`
-  row with `jugadas`, a `clubJugadas` entry or a club mark). The rule
-  cannot count, so `referidos()` checks it where it is paid: a code set by
-  hand by someone short of it pays nobody until they qualify. The UI only
-  lets you set a code once you qualify.
+- **Both sides need `MIN_JUEGOS` (3) distinct games played** to refer
+  *and* to redeem (a `ranks` row with `jugadas`, a `clubJugadas` entry or
+  a club mark). The rule cannot count, so `referidos()` checks both where
+  it is paid: a code set or used by hand by someone short of it pays
+  nobody until they qualify. The UI disables both until you qualify.
 
 UI: a small «+» (`#userReferir`) glued to the header balance opens a
 popover: the code field (just «✓ Código ya usado» once you used one), the
@@ -298,9 +298,8 @@ popover: the code field (just «✓ Código ya usado» once you used one), the
 and sets your code with a two-step confirm. `tests/referidos.test.cjs`
 covers the arithmetic; `test-rules.mjs` the rule. The node needs the rules
 re-published; until then the read fails alone and the rest of the economy
-works. Abuse limit, stated: a new Google account is enough to be referred,
-so someone with alt accounts can farm it, the same honest limit as other
-client-side rules.
+works. Abuse limit, stated: an alt account still farms it after three cheap
+club games; the minimum only raises the cost.
 
 **Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
 `economia()` replays three more nodes, between the re-roll and the
