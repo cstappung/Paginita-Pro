@@ -10,6 +10,7 @@ import {
 import { formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
 import { avatarMarco, quien, marcoDeUid } from "./perfil-vista.js";
+import { nombreHtml, TINTAS } from "./tintas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -35,7 +36,7 @@ export function topReferidosHtml(datos, uid, perfil, colorDe, pista, { cta = tru
   return `<ol class="jg-mo-top chico jg-ref-top">${l.map((f, i) => {
     const q = quien(f.uid, perfil(f.uid), null, pista(f.uid), colorDe);
     return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</b>${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(f.uid, perfil(f.uid), datos), 26, f.uid)}
-      <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}" translate="no">${esc(q.nombre)}</span>
+      <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}" translate="no">${nombreHtml(f.uid, esc(q.nombre))}</span>
       <strong class="jg-ref-cant">${f.n} ${f.n === 1 ? "referido" : "referidos"}</strong></li>`;
   }).join("")}</ol>${boton}`;
 }
@@ -166,6 +167,13 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar,
     const puede = listo && puedeReferir(u, d), de = listo ? (referidos(d).de[u] || []) : [];
     const tops = modal.querySelector("#refTop"), htmlTop = listo && top ? top() : "";
     if (tops && tops.dataset.f !== htmlTop) { tops.dataset.f = htmlTop; tops.innerHTML = htmlTop || `<p class="jg-ref-carga">Cargando…</p>`; }
+    /* Lo que desbloquea traer gente: tu nombre en cada color (tintas.js). */
+    const colores = modal.querySelector("#refColores"), nom = nombre(u) || "Tu nombre";
+    const htmlColores = TINTAS.map(t => {
+      const ok = listo && de.length >= t.n;
+      return `<span class="jg-ref-tn${ok ? " ok" : ""}"><b translate="no">${nombreHtml("", esc(nom), t.id)}</b><small>${ok ? "✓ Desbloqueado" : `${t.n} ${t.n === 1 ? "referido" : "referidos"}`} · ${esc(t.efecto)}</small></span>`;
+    }).join("") + `<p class="jg-ref-nota">${listo && de.length ? "Elígelo en <b>Perfil → ✎ Personalizar</b>. Si no quieres, déjalo en «Normal»." : "Cada persona que entre con tu código cuenta. Puedes usarlo o dejar tu nombre normal."}</p>`;
+    if (colores && colores.dataset.f !== htmlColores) { colores.dataset.f = htmlColores; colores.innerHTML = htmlColores; }
     const firma = JSON.stringify([listo, mio, n, de, ocupado, confirma]);
     const caja = modal.querySelector("#refCuerpo");
     if (caja.dataset.f === firma) return;
@@ -181,7 +189,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar,
         <button type="button" class="btn2" id="refCopiar">Copiar</button>
       </div>
       <p class="jg-ref-cuenta">${de.length ? `${de.length} ${de.length === 1 ? "persona usó" : "personas usaron"} tu código · +${formatoMonedas(de.length * PREMIO_REFERIDO)} ${MONEDA}` : "Todavía nadie usó tu código. ¡Compártelo!"}</p>
-      ${de.length ? `<ul class="jg-ref-lista">${de.slice(-8).reverse().map(x => `<li data-perfil="${esc(x)}" translate="no">${esc(nombre(x) || "Alguien")}</li>`).join("")}</ul>` : ""}`;
+      ${de.length ? `<ul class="jg-ref-lista">${de.slice(-8).reverse().map(x => `<li data-perfil="${esc(x)}" translate="no">${nombreHtml(x, esc(nombre(x) || "Alguien"))}</li>`).join("")}</ul>` : ""}`;
     else if (!puede) html = `
       ${barraHtml(n)}
       <p class="jg-ref-nota">Cuando cumplas podrás elegir aquí tu código.</p>`;
@@ -240,6 +248,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar,
           <li>Tu código lo pueden usar todas las personas que quieras.</li>
         </ul>
         <div class="jg-ref-cuerpo" id="refCuerpo"></div>
+        <section class="jg-ref-premios"><h3>🎨 Colores para tu nombre</h3><div id="refColores"></div></section>
         <section class="jg-ref-tops"><h3>🏆 Top referidos</h3><div id="refTop"></div></section>
       </div>`;
     document.body.appendChild(modal);

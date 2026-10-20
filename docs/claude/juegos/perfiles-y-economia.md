@@ -307,6 +307,37 @@ re-published; until then the read fails alone and the rest of the economy
 works. Abuse limit, stated: an alt account still farms it after three cheap
 club games; the minimum only raises the cost.
 
+**The colour of the name** (`juegos/tintas.js`, pure). Referrals unlock
+it: 1 → rojo «brasa», 3 → verde claro «destello», 5 → azul «reflejo», 10 →
+dorado «aura dorada»; each step adds effects (`EFECTOS`, a test checks they
+grow). Optional: `users/<uid>/perfil/tinta` (kept by `limpiaPerfil`, chosen
+in the editor's Datos tab, «Normal» = unset; no rule change).
+
+- **Every painted name goes through `nombreHtml(uid, esc(name))`** →
+  `<span class="jg-nm" data-nm=uid>`. A new place that paints a person's
+  name must use it, or that name never gets its colour. Not used on
+  coloured buttons (the purple «Unirme a…») or on your own `.yo` logros
+  pill, where the colour would fight the background.
+- **One stylesheet, no repaints**: `pintaTintas()` in `juegos-main.js`
+  writes `#jgTintas` from the watched `perfiles` and the referral counts
+  (`cssTintas`), re-checked like the frames (`tintaVisible`; trusts the
+  stored choice while the economy is partial). The editor preview uses
+  `jg-tn-<id>` classes, emitted after the uid rules by the same sheet, so
+  they win.
+- **Contrast is per background, via `--tn-*` vars** in juegos.html: light
+  surfaces get deep red/blue and a dark contour on light green/gold; dark
+  ones (`html[data-tema=oscuro]`, `.head`, `.jg-cs`, `.jg-rk-podio`,
+  `.jg-pf-hero.oscuro`) bright fills and more glow; `.jg-pf-hero:not(.oscuro)`
+  is light even in dark theme; the immersive chat keeps its black shadow.
+  A new dark surface that shows names must join the dark list.
+- The reflejo is `background-clip:text`, so azul/dorado put glow and
+  contour in `filter: drop-shadow` (a `text-shadow` covers the fill), and
+  their sparkles reset `-webkit-text-fill-color` or they inherit
+  transparent. Reduced motion stops every animation.
+
+`tests/tintas.test.cjs` covers thresholds, the re-check, the sheet and
+that every `--tn-*` var and `jgTn*` keyframe the effects use exists.
+
 **Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
 `economia()` replays three more nodes, between the re-roll and the
 listing at equal `at` (`ORDEN`: `ma` 2.1, `mr` 2.2, `mc` 2.3; the old

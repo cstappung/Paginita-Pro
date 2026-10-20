@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);
-vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/perfil-tarjeta.js')+
+vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/tintas.js')+'\n'+sin('src/juegos/perfil-tarjeta.js')+
  '\n;globalThis.__P={MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,opcionesVitrina,vitrinaDe,limpiaPerfil,nombreCategoria,valorMarca,oscurece,MAX_VITRINA,LOGROS};',context);
 const P=context.__P;
 
@@ -110,4 +110,10 @@ test('la mascota del perfil se re-chequea: dueño, a la venta y baile',()=>{
  const d3=structuredClone(d2);d3.mercado.o['-Nof0000001'].v={u:B,at:T+6};
  assert.equal(MD.exports.mascotaVisible(A,{mascota:{m:c}},d3),null,'vendida, tampoco');
  assert.equal(MD.exports.mascotaVisible(B,{mascota:{m:c}},d3).c,c,'y sale en el perfil de quien la compró');
+});
+
+test('el color del nombre: limpiaPerfil guarda solo uno que existe',()=>{
+ assert.equal(P.limpiaPerfil({tinta:'dorado'}).tinta,'dorado');
+ assert.equal(P.limpiaPerfil({tinta:'fucsia'}).tinta,undefined);
+ assert.equal(P.limpiaPerfil({tinta:''}).tinta,undefined,'«Normal» es no guardar nada');
 });

@@ -28,6 +28,7 @@ import {
   alineacionDelDia, etiquetaDia, PAUSA_FINAL_MS, formatoMarca,
   CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
 } from "./rieles-datos.js";
+import { nombreHtml } from "./tintas.js";
 
 /* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
    riel antes de que llegue la partida. */
@@ -253,7 +254,7 @@ export function crearRieles(ctx) {
     if (firma === t.pieFirma) return;
     t.pieFirma = firma;
     t.quien.title = `${t.origen}: ${nombre} · ${final}`;
-    t.quien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b>`;
+    t.quien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${nombreHtml(e.uid, escapeHtml(nombre))}</b>`;
   }
 
   function cuadro(ahora) {
@@ -342,7 +343,7 @@ export function crearRieles(ctx) {
       chatLista.innerHTML = filas.length ? filas.map(f => `
         <div class="jg-cg-msg${f.m.uid === u.uid ? " mio" : ""}" style="--c:${escapeHtml(f.color)}">
           ${avatarMarco(f.foto, f.nombre, f.color, ctx.marco(f.m.uid), 24, f.m.uid)}
-          <div><p><b data-perfil="${escapeHtml(f.m.uid)}" data-nombre="${escapeHtml(f.nombre)}">${escapeHtml(f.nombre)}</b><time>${escapeHtml(f.cuando)}</time></p>
+          <div><p><b data-perfil="${escapeHtml(f.m.uid)}" data-nombre="${escapeHtml(f.nombre)}">${nombreHtml(f.m.uid, escapeHtml(f.nombre))}</b><time>${escapeHtml(f.cuando)}</time></p>
           <span>${escapeHtml(f.m.t)}</span></div>
         </div>`).join("")
         : `<div class="vacio">Nadie ha escrito en los últimos 15 minutos. ¡Saluda!</div>`;

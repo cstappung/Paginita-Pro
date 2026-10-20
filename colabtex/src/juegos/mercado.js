@@ -24,6 +24,7 @@ import {
 import { ESPACIOS, NOMBRE_ESPACIO, ESPECIES, ETAPAS, pedidoObjeto, pedidoMascota, puestoDe } from "./mascotas-datos.js";
 import { fotoDe, pideFotos, montaVisor } from "./visor-mascota.js";
 import MM from "../../../juegos/mascotas/motor.js";
+import { nombreHtml } from "./tintas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = n => Math.round(n || 0).toLocaleString("es-CL");
@@ -103,7 +104,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
         if (ft.src) el.innerHTML = `<img src="${esc(ft.src)}" alt="" draggable="false">` + (ft.colores.length ? `<span class="jg-mk-muestra">${ft.colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "") + (el.querySelector(".jg-mk-leg") ? el.querySelector(".jg-mk-leg").outerHTML : "");
     });
   }
-  const persona = (u, tam) => { const q = quien(u); return `<span class="jg-mk-quien" translate="no">${avatarMarco(q.foto, q.nombre, q.color, marcoDe(u), tam, u)}<b>${esc(q.nombre)}</b></span>`; };
+  const persona = (u, tam) => { const q = quien(u); return `<span class="jg-mk-quien" translate="no">${avatarMarco(q.foto, q.nombre, q.color, marcoDe(u), tam, u)}<b>${nombreHtml(u, esc(q.nombre))}</b></span>`; };
 
   /* ---------- la vista ---------- */
   function pinta() {

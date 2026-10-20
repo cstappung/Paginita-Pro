@@ -26,6 +26,7 @@ import { montarRuleta } from "./casino-ruleta.js";
 import { montarBlackjack } from "./casino-blackjack.js";
 import { montarPoker } from "./casino-poker.js";
 import { montarPlinko } from "./casino-plinko.js";
+import { nombreHtml } from "./tintas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export const formatoMult = m => "×" + (Math.floor(m * 100 + 1e-9) / 100).toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -257,7 +258,7 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
     return `<section class="jg-cs-caja">
             <h3>${signo > 0 ? "Más ganan" : "Más pierden"}</h3>
             ${l.length ? `<ol class="jg-cs-feed jg-cs-top">${l.map(([u, n]) => `<li>
-              <span class="jg-cs-feed-n" data-perfil="${esc(u)}" translate="no">${esc(nombreDe(u))}</span>
+              <span class="jg-cs-feed-n" data-perfil="${esc(u)}" translate="no">${nombreHtml(u, esc(nombreDe(u)))}</span>
               <b class="${signo > 0 ? "" : "mal"}">${signo > 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(n)))} ${MONEDA}</b></li>`).join("")}</ol>`
               : `<p class="jg-nada">${e ? "Nadie todavía." : "Cargando…"}</p>`}
           </section>`;
@@ -273,7 +274,7 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
     if (!l.length) return `<p class="jg-nada">Nadie ha cobrado ×4 o más todavía. ¿Serás la primera persona?</p>`;
     return `<ul class="jg-cs-feed">${l.map(r => `<li class="jg-cs-brilla" style="--b:${Math.min(1, Math.log(multDe(r) / 4) / Math.log(25)).toFixed(2)}">
       <span class="jg-cs-feed-j">${ICONO[r.j] || "🎲"}</span>
-      <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${esc(nombreDe(r.u))}</span>
+      <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${nombreHtml(r.u, esc(nombreDe(r.u)))}</span>
       <span class="jg-cs-feed-m">${formatoMult(r.mult)}</span>
       <b>+${formatoPago(Math.round(r.pago - (r.apostado || r.p)))} ${MONEDA}</b></li>`).join("")}</ul>`;
   }

@@ -83,6 +83,8 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
+import { referidos as referidosDe } from "./juegos/referidos.js";
+import { tintaVisible, cssTintas, nombreHtml } from "./juegos/tintas.js";
 import { crearCasino } from "./juegos/casino.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
@@ -371,6 +373,7 @@ function perfilDe(uid) {
       const antes = JSON.stringify(perfiles.get(uid) || null);
       if (JSON.stringify(p || null) === antes) return;
       perfiles.set(uid, p || null);
+      pintaTintas();
       if (state.base && uid === state.base.uid) aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
@@ -394,6 +397,25 @@ function perfilDe(uid) {
    fila, que es el de su cuenta de Google al escribirla. Así el apodo sale
    en todas partes, no solo donde la pantalla ya pasaba por `mezcla`. */
 const nombreVivo = (uid, n) => { const p = uid ? perfilDe(uid) : null; return (p && p.nick) || n || ""; };
+
+/* El color del nombre (juegos/tintas.js): una hoja para toda la página
+   con el color visible de cada perfil que se está escuchando. Se rehace
+   cuando llega un perfil o cambian los referidos; ningún nombre se
+   repinta. Sin las lecturas de las monedas completas, vale lo guardado. */
+let hojaTintas = null;
+function pintaTintas() {
+  const d = datosP && datosP.completo ? datosP : null, de = d ? referidosDe(d).de : null;
+  const porUid = {};
+  for (const [uid, p] of perfiles) if (p && p.tinta) porUid[uid] = tintaVisible(p.tinta, de ? (de[uid] || []).length : null);
+  const css = cssTintas(porUid);
+  if (!hojaTintas) {
+    if (!css) return;
+    hojaTintas = document.createElement("style");
+    hojaTintas.id = "jgTintas";
+    document.head.appendChild(hojaTintas);
+  }
+  if (hojaTintas.textContent !== css) hojaTintas.textContent = css;
+}
 
 /* Se escribe **dentro** de cada ficha en vez de cambiarla por otra
    para no romper ninguna referencia que el reductor haya dejado
@@ -460,6 +482,7 @@ function datosPerfil(cb) {
        en un objeto nuevo por llegada, que es lo que invalida las memorias
        de juegos/monedas.js. */
     datosP = conDerivados(Object.assign({}, d, { completo: !!d.completo }));
+    pintaTintas();
     for (const f of [...oyentesP]) f(datosP);
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
@@ -570,6 +593,7 @@ async function editaPerfil(pestana) {
     uid: b.uid, colorDe: colorForUid, pestana,
     saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
     mascota: mascotaEditor(b.uid, d),
+    referidos: d && d.completo ? (referidosDe(d).de[b.uid] || []).length : null,
     onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
@@ -584,6 +608,7 @@ async function editaPerfil(pestana) {
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */
       perfiles.set(b.uid, Object.assign({}, p));
+      pintaTintas();
       aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
@@ -596,7 +621,7 @@ async function editaPerfil(pestana) {
 
 function pintaUsuario() {
   const u = state.user;
-  $("userName").textContent = u ? u.name : "";
+  $("userName").innerHTML = u ? nombreHtml(u.uid, escapeHtml(u.name)) : "";
   const av = $("userAvatar");
   if (!u) { av.textContent = ""; av.removeAttribute("data-perfil"); return; }
   av.setAttribute("data-perfil", u.uid);
@@ -1078,7 +1103,7 @@ function dropsHtml(d) {
   }
   return l.map(c => {
     const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d), foto: fotoEnDatos(c.uid, d) }, colorForUid);
-    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b translate="no">${nombreHtml(c.uid, escapeHtml(q.nombre))}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
 /* Los últimos legendarios de Mascotas (objetos y bailes de los regalos),
@@ -1105,7 +1130,7 @@ function pintaDropsMascotas() {
     return `<div class="jg-drop jg-dropm">
       <span class="jg-dropm-f"${f && f.src ? ` style="background-image:url('${escapeHtml(f.src)}')"` : ""} title="${escapeHtml(x.ficha.nombre)}">${f && f.src ? "" : `<i>${escapeHtml(x.ficha.emoji)}</i>`}<em>★</em></span>
       <b class="jg-dropm-n">${escapeHtml(x.ficha.nombre)}</b>
-      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${escapeHtml(q.nombre)}</b></span>
+      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b></span>
       <small class="jg-drop-cuando">${haceCuanto(x.at)}</small></div>`;
   }).join("");
 }
@@ -2518,7 +2543,7 @@ function topsLista(d) {
     return `<li class="jg-top p${x.p}">
           <span class="jg-top-med" aria-label="Puesto ${x.p}">${MEDALLA[x.p]}</span>
           <span class="jg-top-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 30, x.uid)}</span>
-          <span class="jg-top-txt"><b translate="no" data-perfil="${escapeHtml(x.uid)}">${escapeHtml(q.nombre)}</b> le quitó el ${NOMBRE_PUESTO[x.p]} puesto a <b translate="no" data-perfil="${escapeHtml(x.q)}">${escapeHtml(o.nombre)}</b>
+          <span class="jg-top-txt"><b translate="no" data-perfil="${escapeHtml(x.uid)}">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b> le quitó el ${NOMBRE_PUESTO[x.p]} puesto a <b translate="no" data-perfil="${escapeHtml(x.q)}">${nombreHtml(x.q, escapeHtml(o.nombre))}</b>
             <small>${escapeHtml(tabla)}${marca ? ` · ${escapeHtml(marca)}` : ""} · ${haceCuanto(x.at)}</small></span>
         </li>`;
   }).join("");
@@ -2809,7 +2834,7 @@ function pintaVestibulo() {
       <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[s.juego] || "●")}</span>
       <div class="jg-sala-txt">
         <b>${escapeHtml(j.nombre || s.juego)}</b>
-        <span translate="no">${escapeHtml(nombreVivo(s.anfitrion, s.nombre) || "Alguien")} · ${escapeHtml(timeAgo(s.at))}</span>
+        <span translate="no">${nombreHtml(s.anfitrion, escapeHtml(nombreVivo(s.anfitrion, s.nombre) || "Alguien"))} · ${escapeHtml(timeAgo(s.at))}</span>
         <span class="jg-sala-cupo" title="${n} de ${cupo} dentro"><i style="width:${Math.round(100 * n / cupo)}%"></i></span>
       </div>
       <div class="jg-sala-der"><small>${n}/${cupo}</small>
@@ -3317,7 +3342,7 @@ function pintaQuienes(p, est) {
     return `
     <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
       ${avatarMarco(x.foto, x.nombre, x.color, marcoDeUid(x.uid), 20, x.uid)}
-      ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
+      <span translate="no">${nombreHtml(x.uid, escapeHtml(x.nombre || "Alguien"))}</span>${x.uid === yo ? " (tú)" : ""}
       ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
       ${boton}
     </span>`;
@@ -3358,7 +3383,7 @@ function pintaChat() {
   const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
     <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
-      <b translate="no" data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(nombreVivo(m.uid, m.nombre))}">${escapeHtml(nombreVivo(m.uid, m.nombre) || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <b translate="no" data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(nombreVivo(m.uid, m.nombre))}">${nombreHtml(m.uid, escapeHtml(nombreVivo(m.uid, m.nombre) || "Alguien"))}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
@@ -3537,6 +3562,7 @@ function wire() {
 
 (function boot() {
   wire();
+  pintaTintas();   // las clases de la vista previa del editor viven en esa hoja
   tickConsumo();
   setInterval(tickConsumo, 2000);
   /* El castigo del antitrampas se mira antes que la sesión: el registro
