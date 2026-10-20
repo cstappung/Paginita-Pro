@@ -14,12 +14,22 @@
   const EMBEBIDO = window.parent !== window, INVITADO = PARAMS.get('invitado') === '1';
   const EN_LA_NUBE = !!CLUB && EMBEBIDO && !INVITADO;
   const PR = PD.Prueba;
+  // Los reinos de la segunda era (levels.js: `prueba`) están en pruebas: solo los juega
+  // quien es administrador de Juegos (conexion.js: Club.esAdmin, que manda la página) o
+  // quien abre el juego suelto en su propio equipo (localhost); el resto los ve como
+  // «Próximamente». No guardan récords ni monedas: nada de ellos va a la nube.
+  const PUB = PD.PUBLIC_LEVELS;
+  const LOCAL = !EMBEBIDO && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  let admin = LOCAL || !!(CLUB && CLUB.esAdmin && CLUB.esAdmin());
+  const enPrueba = li => !!PD.LEVELS[li].prueba;
+  const puedeJugar = li => !enPrueba(li) || admin;
+  window.addEventListener('club-admin', e => { admin = LOCAL || !!(e.detail && e.detail.admin); if (screen === 'levels') buildLevels(); if (screen === 'almanac') buildAlmanac(almTab); });
   // Monedas de Juegos: cada ronda nueva de tu récord en un reino paga 20 × el número del reino.
   const monedasRonda = li => 20 * (li + 1);
   const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'g'];
   const MODES = [['first', 'Primero'], ['last', 'Último'], ['strong', 'Fuerte'], ['close', 'Cerca']];
   const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨',
-    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗' };
+    selva: '❦', tormenta: '≋', invierno: '❅', erupcion: '▲', grieta: '⧗', cienaga: '☘', tempestad: 'ϟ', maremoto: '≈', sobrecarga: '⚙', amanecer: '☀' };
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
   const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
   // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
@@ -83,7 +93,7 @@
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'scr-' + id));
     screen = id;
     hideTip();
-    AU.playMusic(id === 'game' && game ? game.li : 'menu');
+    AU.playMusic(id === 'game' && game ? (game.L.musica !== undefined ? game.L.musica : game.li) : 'menu');
     if (id !== 'game') AU.setIntensity(0);
     if (id === 'levels') buildLevels();
     if (id === 'almanac') buildAlmanac(almTab);
@@ -178,29 +188,35 @@
     const grid = $('#level-grid');
     grid.innerHTML = '';
     PD.LEVELS.forEach((L, li) => {
-      const locked = li > save.unlocked;
-      const best = save.best[li] || 0;
+      const prueba = enPrueba(li);
+      if (li === PUB) grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${admin ? 'reinos en pruebas: solo los ven jugables los administradores y no guardan récords' : 'próximamente: cinco reinos nuevos, con jefes, defensas y héroes nuevos'}</div>`));
+      const locked = prueba ? !admin : li > save.unlocked;
+      const best = prueba ? 0 : save.best[li] || 0;
       const run = save.runs[li];
-      const card = el(`<div class="lvl-card ${locked ? 'locked' : ''}">
+      const clasicas = PD.towersFor(li).filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined).length;
+      const card = el(`<div class="lvl-card ${locked ? 'locked' : ''} ${prueba ? 'pronto' : ''}">
         <canvas width="500" height="320"></canvas>
-        ${locked ? `<div class="lock"><div class="padlock">🔒</div>Completa la ronda ${PD.UNLOCK_ROUND} de<br>${PD.LEVELS[li - 1].name}</div>` : ''}
+        ${prueba && locked ? `<div class="lock"><div class="padlock">⏳</div>PRÓXIMAMENTE<br><small>Reino en pruebas</small></div>`
+          : locked ? `<div class="lock"><div class="padlock">🔒</div>Completa la ronda ${PD.UNLOCK_ROUND} de<br>${PD.LEVELS[li - 1].name}</div>` : ''}
+        ${prueba && !locked ? '<div class="lc-prueba">EN PRUEBAS · solo admins · sin récords</div>' : ''}
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
           <div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>
+          ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && PD.TOWERS[id].realm < PUB).length} de las 10 de reino</div>` : ''}
           <div class="meta">
             <span class="stars">${'★'.repeat(L.stars)}${'☆'.repeat(5 - L.stars)}</span>
             <span>❤ ${L.lives}</span><span>🪙 ${L.cash}</span>
-            <span>Récord: <b>${best}</b>/100</span>
-            <span class="medals"><span class="medal m50 ${best >= 50 ? 'got' : ''}">R50</span><span class="medal m100 ${best >= 100 ? 'got' : ''}">🏆 R100</span></span>
+            ${prueba ? '<span>Jefe: <b>' + PD.ENEMIES[L.boss].name + '</b></span>' : `<span>Récord: <b>${best}</b>/100</span>
+            <span class="medals"><span class="medal m50 ${best >= 50 ? 'got' : ''}">R50</span><span class="medal m100 ${best >= 100 ? 'got' : ''}">🏆 R100</span></span>`}
           </div>
-          ${EN_LA_NUBE ? `<div class="lc-coins" title="Cada ronda nueva de tu récord paga ${monedasRonda(li)} monedas de Juegos, una sola vez.">🪙 ${monedasRonda(li)} por ronda · ${nube[li] === null ? '…' : fmt(Math.min(100, nube[li]) * monedasRonda(li))} de ${fmt(100 * monedasRonda(li))} ganadas</div>` : ''}
+          ${EN_LA_NUBE && !prueba ? `<div class="lc-coins" title="Cada ronda nueva de tu récord paga ${monedasRonda(li)} monedas de Juegos, una sola vez.">🪙 ${monedasRonda(li)} por ronda · ${nube[li] === null ? '…' : fmt(Math.min(100, nube[li]) * monedasRonda(li))} de ${fmt(100 * monedasRonda(li))} ganadas</div>` : ''}
           <div class="lc-actions"></div>
         </div></div>`);
       card.querySelector('canvas').getContext('2d').drawImage(PD.levelThumb(li, 500, 320), 0, 0);
       card.querySelectorAll('canvas[data-t]').forEach(c => towerIcon(c, c.dataset.t, [0, 0]));
       const acts = card.querySelector('.lc-actions');
-      if (EN_LA_NUBE) {
+      if (EN_LA_NUBE && !prueba) {
         const rb = el(`<button class="btn small ghost pd-rank ${verTabla === li ? 'on' : ''}" title="Ver la clasificación de este reino">🏆 Clasificación</button>`);
         rb.addEventListener('click', () => { escuchaTabla(li); buildLevels(); });
         acts.appendChild(rb);
@@ -249,6 +265,24 @@
     if (d.spawn) b.push(['Invoca', 'b-special']);
     if (d.children) b.push(['Se divide', 'b-special']);
     if (d.slowImmune) b.push(['Inmune a ralentizar', 'b-res']);
+    if (d.hop) b.push(['Salta', 'b-special']);
+    if (d.steal) b.push(['Roba oro', 'b-special']);
+    if (d.fogAura) b.push(['Niebla', 'b-special']);
+    if (d.heads || d.twins) b.push(['Se multiplica', 'b-special']);
+    if (d.regenFuego) b.push(['Regenera sin fuego', 'b-special']);
+    if (d.stone) b.push(['Se petrifica', 'b-special']);
+    if (d.absorb) b.push(['Absorbe ' + (DTYPE[d.absorb] || d.absorb).toLowerCase(), 'b-res']);
+    if (d.thunder) b.push(['Fulmina torres', 'b-special']);
+    if (d.shellHits) b.push(['Caparazón', 'b-armor']);
+    if (d.ink) b.push(['Ciega torres', 'b-special']);
+    if (d.grab) b.push(['Atrapa torres', 'b-special']);
+    if (d.adapt) b.push(['Se adapta', 'b-special']);
+    if (d.shieldAura) b.push(['Da escudos', 'b-special']);
+    if (d.cycle) b.push(['Inmunidad cambiante', 'b-res']);
+    if (d.field) b.push(['Campo de fuerza', 'b-special']);
+    if (d.cleanse) b.push(['Purifica', 'b-special']);
+    if (d.ward) b.push(['Protege al morir', 'b-special']);
+    if (d.silence) b.push(['Silencia habilidades', 'b-special']);
     if (d.resist) for (const k in d.resist) {
       const v = d.resist[k];
       b.push([(v === 0 ? 'Inmune ' : v < 1 ? 'Resiste ' : 'Débil ') + (DTYPE[k] || k).toLowerCase(), v > 1 ? 'b-special' : 'b-res']);
@@ -274,8 +308,10 @@
         if (b.blades) stats.push(b.blades + ' guadañas');
         if (d.kind === 'beacon') stats.push('Revela camuflados');
         if (b.ability && d.hero) stats.push('Habilidad: ' + PD.ABILITIES[b.ability].name);
-        const where = d.hero ? `<span class="badge b-boss">♛ Héroe de ${PD.LEVELS[d.realm].name} · uno por partida</span>`
-          : d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`;
+        if (b.pct) stats.push(Math.round(b.pct * 1000) / 10 + '% de la vida/s');
+        const pronto = d.realm !== undefined && enPrueba(d.realm) ? ' <span class="badge b-camo">Próximamente</span>' : '';
+        const where = (d.hero ? `<span class="badge b-boss">♛ Héroe de ${PD.LEVELS[d.realm].name} · uno por partida</span>`
+          : d.realm === undefined ? '' : `<span class="badge b-special">Nueva en ${PD.LEVELS[d.realm].name}</span>`) + pronto;
         const card = el(`<div class="alm-card">
           <div class="alm-head"><canvas width="128" height="128"></canvas><div><h4>${d.name}</h4><div class="sub"><span style="color:var(--gold);font-weight:800">${fmt(d.cost)} oro</span> · ${stats.join(' · ')}</div>${where}</div></div>
           <p>${d.desc}</p>
@@ -302,7 +338,13 @@
       ['Reino 3 · Glaciar Cristal', ['golem', 'cristal', 'yeti']],
       ['Reino 4 · Caldera Volcánica', ['salamandra', 'magma', 'brasa', 'heraldo', 'ave']],
       ['Reino 5 · Nexo del Vacío', ['espectro', 'saboteador', 'magnetita', 'fractal', 'fractal2', 'fractal3', 'colosoVacio']],
-      ['Jefes', ['reyEscarabajo', 'gusano', 'coloso', 'fenix', 'devorador']]
+      ['Jefes', ['reyEscarabajo', 'gusano', 'coloso', 'fenix', 'devorador']],
+      ['Reino 6 · Pantano Sombrío · próximamente', ['sapo', 'duende', 'bruma', 'cabezaHidra']],
+      ['Reino 7 · Cumbres Tormentosas · próximamente', ['gargola', 'tormentoso']],
+      ['Reino 8 · Fosa Abisal · próximamente', ['cangrejo', 'pulpo']],
+      ['Reino 9 · Ciudadela de Engranajes · próximamente', ['automata', 'reparador']],
+      ['Reino 10 · Trono del Eclipse · próximamente', ['purificador', 'martir', 'solGemelo', 'lunaGemela']],
+      ['Jefes de la Segunda Era · próximamente', ['hidra', 'reyTrueno', 'kraken', 'mecatitan', 'eclipse']]
     ];
     for (const [title, ids] of sections) {
       box.appendChild(el(`<div class="alm-sec">${title}</div>`));
@@ -336,6 +378,7 @@
   window.addEventListener('resize', resize);
 
   function startGame(li, run) {
+    if (!puedeJugar(li)) { show('levels'); return; }
     closeModal();
     if (run && !(run.snap && run.pr)) run = null;
     rec = new PR.Grabadora(li, CUENTA, run ? JSON.parse(JSON.stringify(run)) : null);
@@ -349,6 +392,7 @@
     $('#toasts').innerHTML = '';
     show('game');
     buildShop(); renderInfo(); buildPreview(); updateHud(true);
+    if (enPrueba(li)) toast('<b>Reino en pruebas</b>Solo para administradores: esta partida no guarda récords ni paga monedas.', 'boss', null, 6500);
     if (!run) {
       toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.`, 'good', null, 6500);
       for (const id of realmTowers(li)) { const d = PD.TOWERS[id]; toast(`<b>Nueva defensa: ${d.name}</b>${d.desc}`, 'special', { tower: id }, 8000); }
@@ -451,6 +495,10 @@
       if (s.ampAura) rows.push(['Daño recibido', `<b>+${Math.round(s.ampAura * 100)}%</b>`]);
       if (s.slowAura) rows.push(['Aura lenta', `<b>${Math.round(s.slowAura * 100)}%</b>`]);
       if (s.buffDmgMult) rows.push(['Torres cercanas', `<b>x${s.buffDmgMult}${s.buffRate ? ' · +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      else if (s.buffRate || s.buffRange) rows.push(['Torres cercanas', `<b>+${Math.round((s.buffRange || 0) * 100)}% alcance · +${Math.round((s.buffRate || 0) * 100)}% vel.</b>`]);
+      if (s.goldAura) rows.push(['Oro en su alcance', `<b>+${Math.round((s.goldAura - 1) * 100)}%</b>`]);
+      if (s.heroDiscount) rows.push(['Mejoras cercanas', `<b>−${Math.round(s.heroDiscount * 100)}%</b>`]);
+      if (s.purgeAura) rows.push(['Su luz', '<b class="yes">Revela y quita invulnerabilidad</b>']);
       rows.push(['Habilidad', `<b>${A.name} · ${abCd(t)} s</b>`]);
       rows.push(['Camuflados', s.atk === 'slam' ? '<b class="yes">Área</b>' : yn(s.camo)]);
       rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
@@ -493,6 +541,30 @@
       rows.push(['Cada', `<b>${n1(s.cd)} s</b>`]);
       rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
       rows.push(['Camuflados', yn(s.camo)]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
+    if (k === 'rod') {
+      rows.push(['Daño', `<b>${n1(s.dmg)} × ${s.strikes || 1}</b>`]);
+      rows.push(['Saltos', `<b>${s.jumps}</b>`]);
+      rows.push(['Cada', `<b>${n1(s.cd)} s</b>`]);
+      rows.push(['Protege', '<b class="yes">Torres en su alcance</b>']);
+      if (s.buffRate || s.buffDmgMult) rows.push(['Protegidas', `<b>${s.buffDmgMult ? 'x' + s.buffDmgMult + ' daño' : ''}${s.buffRate ? ' +' + Math.round(s.buffRate * 100) + '% vel.' : ''}</b>`]);
+      rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
+      rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
+      rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
+      return rows;
+    }
+    if (k === 'frog' || k === 'bubble' || k === 'bell' || k === 'disint') {
+      if (k === 'disint') { rows.push(['Vida/s', `<b>${n1(s.pct * 100)}% + ${n1(s.dps)}</b>`]); rows.push(['Rayos', `<b>${s.beams}</b>`]); }
+      else rows.push(['Daño', `<b>${n1(s.dmg)}</b>`]);
+      if (k === 'frog') { rows.push(['Sapo', `<b>${n1(s.frogDur)} s${s.frogBig ? ' (grandes ' + s.frogBig + ' s)' : ''}</b>`]); rows.push(['Radio', `<b>${Math.round(s.radius)}</b>`]); }
+      if (k === 'bubble') { rows.push(['Atrapa', `<b>${n1(s.trapDur)} s${s.trapBig ? ' (grandes ' + s.trapBig + ' s)' : ''}</b>`]); rows.push(['Burbujas', `<b>${s.count || 1} / ${n1(s.cd)} s</b>`]); }
+      if (k === 'bell') { rows.push(['Eco', `<b>${Math.round(s.eco * 100)}% del daño</b>`]); rows.push(['Toca cada', `<b>${n1(s.cd)} s</b>`]); }
+      if (k !== 'bubble' && s.cd && k !== 'bell') rows.push(['Ataques/s', `<b>${n1(1 / s.cd)}</b>`]);
+      rows.push(['Alcance', `<b>${Math.round(s.range)}</b>`]);
+      rows.push(['Camuflados', k === 'bell' ? '<b class="yes">Área</b>' : yn(s.camo)]);
+      rows.push(['Tipo', `<b>${DTYPE[s.dtype] || '-'}</b>`]);
       rows.push(['Daño total', `<b class="dealt">${fmt(t.dealt)}</b>`]);
       return rows;
     }
@@ -737,15 +809,19 @@
         case 'boss': sfx('bossSpawn'); toast(`<b>☠ ¡Se acerca un jefe!</b>${ev.enemy.name}`, 'boss', { enemy: ev.enemy.type }, 6000); break;
         case 'bossDown': toast(`<b>¡Jefe derrotado!</b>${ev.enemy.name || ev.enemy.d.name}`, 'good', { enemy: ev.enemy.type }); break;
         case 'revive': toast(`<b>¡${ev.enemy.d.name} renace de sus cenizas!</b>`, 'boss', { enemy: ev.enemy.type }); break;
+        case 'heads': toast(`<b>¡A la ${ev.enemy.d.name} le crecen cabezas!</b>Hazla arder: el fuego corta su regeneración.`, 'boss', { enemy: 'cabezaHidra' }, 3200); break;
+        case 'split': sfx('bossSpawn'); toast(`<b>¡${ev.enemy.d.name} se parte en dos!</b>El Sol resiste lo físico y lo explosivo; la Luna, la magia.`, 'boss', { enemy: ev.enemy.type }, 6000); break;
+        case 'robo': toast(`<b>¡Te robaron ${fmt(ev.amount)} de oro!</b>Un Duende Ladrón se escapó con su botín.`, 'boss', { enemy: 'duende' }, 2600); break;
+        case 'ciclo': { const nom = { fisico: 'lo físico y lo explosivo', magia: 'el arcano y la electricidad', elemental: 'el fuego, el hielo, el ácido y el vapor' }[ev.enemy.inmune]; toast(`<b>${ev.enemy.name || ev.enemy.d.name}</b>Ahora casi inmune a ${nom}.`, 'boss', null, 2200); break; }
         case 'roundEnd': {
           sfx('roundEnd'); sfx('coin');
           toast(`<b>Ronda ${ev.round} superada</b>+${fmt(ev.bonus)} oro${ev.farm ? ` · cosecha +${fmt(ev.farm)}` : ''}`, 'good', null, 2600);
-          const li = game.li;
-          save.best[li] = Math.max(save.best[li] || 0, ev.round);
-          if (ev.round >= PD.UNLOCK_ROUND && li < PD.LEVELS.length - 1) save.unlocked = Math.max(save.unlocked, li + 1);
-          if (game.won) { delete save.runs[li]; save.won[li] = true; writeSave(); }
+          const li = game.li, prueba = enPrueba(li);
+          if (!prueba) save.best[li] = Math.max(save.best[li] || 0, ev.round);
+          if (ev.round >= PD.UNLOCK_ROUND && li < PUB - 1) save.unlocked = Math.max(save.unlocked, li + 1);
+          if (game.won) { delete save.runs[li]; if (!prueba) save.won[li] = true; writeSave(); }
           else guardaPartida();
-          reporta(li, ev.round);
+          if (!prueba) reporta(li, ev.round);   // los reinos en pruebas no guardan récords
           buildPreview();
           if (ui.auto && !game.won) ui.autoT = 1.2;
           break;
@@ -754,14 +830,14 @@
           const li = game.li;
           ui.autoT = -1;
           sfx('unlock');
-          if (li < PD.LEVELS.length - 1) {
+          if (li < PUB - 1) {
             ui.paused = true;
             const nt = realmTowers(li + 1).map(id => PD.TOWERS[id].name).join(' y ');
             modal(`<div class="big-ico">🔓</div><h2>¡Reino desbloqueado!</h2><p>Has resistido ${PD.UNLOCK_ROUND} rondas en <b>${game.L.name}</b>.<br>Ya puedes jugar <b>${PD.LEVELS[li + 1].name}</b>${nt ? `, con dos defensas nuevas: <b>${nt}</b>` : ''}.</p><p style="font-size:13px;color:var(--muted)">Sigue hasta la ronda 100 para conseguir el trofeo de este reino.</p>`, [
               { label: 'Seguir hasta la ronda 100', cls: 'go', fn: () => { ui.paused = false; } },
               { label: `Ir a ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { exitGame(); } }
             ]);
-          } else toast('<b>¡Mitad del Vacío superada!</b>Solo quedan 50 rondas para la victoria total.', 'good');
+          } else toast(`<b>¡Mitad de ${game.L.short} superada!</b>Solo quedan 50 rondas para la victoria total.`, 'good');
           break;
         }
         case 'victory': {
@@ -770,7 +846,7 @@
           const li = game.li;
           const all = save.won.every(Boolean);
           modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? '<p><b>¡Has conquistado los cinco reinos! Eres un verdadero PRO DEFENDER.</b></p>' : ''}`, [
-            ...(li < PD.LEVELS.length - 1 ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
+            ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && (enPrueba(li + 1) || save.unlocked > li) ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
             { label: 'Volver a los reinos', fn: () => { game = null; rec = null; ui.paused = false; show('levels'); } }
           ]);
           break;
@@ -784,7 +860,7 @@
           const g = cont > 0 ? rec.guardado() : null;
           if (g) save.runs[li] = g;
           else delete save.runs[li];
-          save.best[li] = Math.max(save.best[li] || 0, game.round);
+          if (!enPrueba(li)) save.best[li] = Math.max(save.best[li] || 0, game.round);
           writeSave();
           const btns = [];
           if (g) btns.push({ label: `Reintentar ronda ${r} (quedan ${cont})`, cls: 'go', fn: () => startGame(li, save.runs[li]) });
@@ -899,7 +975,7 @@
   const nube = [null, null, null, null, null], enviada = [0, 0, 0, 0, 0];
   let verTabla = -1;
   function escuchaTabla(li) {
-    if (!EN_LA_NUBE || verTabla === li) return;
+    if (!EN_LA_NUBE || verTabla === li || enPrueba(li)) return;
     verTabla = li; CLUB.category(PR.categoria(li));
     $('.pd-lado-tit').textContent = '🏆 ' + PD.LEVELS[li].name;
   }
@@ -909,7 +985,7 @@
     nube.forEach((n, li) => {
       if (!n) return;
       if (n > (save.best[li] || 0)) { save.best[li] = n; cambio = true; }
-      if (n >= PD.UNLOCK_ROUND && li < PD.LEVELS.length - 1 && save.unlocked < li + 1) { save.unlocked = li + 1; cambio = true; }
+      if (n >= PD.UNLOCK_ROUND && li < PUB - 1 && save.unlocked < li + 1) { save.unlocked = li + 1; cambio = true; }
       if (n >= PD.MAX_ROUND && !save.won[li]) { save.won[li] = true; cambio = true; }
     });
     if (cambio) writeSave();
@@ -926,7 +1002,7 @@
   let esperaTabla = null;
   async function recorreTablas() {
     if (!EN_LA_NUBE) return;
-    for (let li = 0; li < PD.LEVELS.length; li++) {
+    for (let li = 0; li < PUB; li++) {
       if (game) return;   // ya se está jugando: esa tabla es la que se escucha
       await new Promise(listo => {
         const t = setTimeout(() => { esperaTabla = null; listo(); }, 4000);
@@ -934,10 +1010,10 @@
         verTabla = -1; escuchaTabla(li);
       });
     }
-    if (!game) { let ul = 0; PD.LEVELS.forEach((L, li) => { if (li <= save.unlocked) ul = li; }); escuchaTabla(ul); if (screen === 'levels') buildLevels(); }
+    if (!game) { let ul = 0; PD.LEVELS.forEach((L, li) => { if (li <= save.unlocked && li < PUB) ul = li; }); escuchaTabla(ul); if (screen === 'levels') buildLevels(); }
   }
   function reporta(li, ronda) {
-    if (!EN_LA_NUBE || !rec) return;
+    if (!EN_LA_NUBE || !rec || enPrueba(li)) return;
     const antes = Math.max(nube[li] || 0, enviada[li]);
     if (ronda <= antes) return;
     enviada[li] = ronda;

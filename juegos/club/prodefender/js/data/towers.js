@@ -455,6 +455,110 @@
       ]
     },
 
+    // ================== SEGUNDA ERA (reinos 6–10, en pruebas) ==================
+    // Una defensa nueva por reino; cada reino nuevo vende además solo una parte de las
+    // clásicas (levels.js: `torres`), cada vez menos.
+    // ---------------------------- Reino 6 · Pantano ----------------------------
+    bruja: {
+      name: 'Choza de la Bruja', cost: 650, kind: 'frog', size: 17, color: '#7ac85a', targeting: true, realm: 5,
+      desc: 'Lanza pociones que CONVIERTEN EN SAPO a los enemigos (no a grandes ni jefes): lentos, sin blindaje, sin camuflaje y sin poderes.',
+      base: { range: 135, cd: 3, dmg: 3, radius: 30, frogDur: 2.2, frogAmp: 0, dtype: 'poison' },
+      paths: [
+        { name: 'Maleficio', ups: [
+          { name: 'Verruga Doble', cost: 260, desc: 'El sapo dura 3 s.', apply: s => { s.frogDur = 3; } },
+          { name: 'Sapo Torpe', cost: 620, desc: 'Los sapos reciben un 25% más de daño.', apply: s => { s.frogAmp = 0.25; } },
+          { name: 'Gran Aquelarre', cost: 1900, desc: 'Más radio y también convierte a los GRANDES (1 s).', apply: s => { s.radius += 18; s.frogBig = 1; s.frogAmp = 0.35; } },
+          { name: 'Reina de los Sapos', cost: 7800, desc: 'Sapos de 4.5 s que reciben un 60% más de daño; grandes 2 s.', apply: s => { s.frogDur = 4.5; s.frogAmp = 0.6; s.frogBig = 2; s.radius += 10; } }
+        ] },
+        { name: 'Pociones', ups: [
+          { name: 'Caldero Rápido', cost: 240, desc: 'Lanza un 25% más rápido.', apply: s => { s.cd *= 0.75; } },
+          { name: 'Veneno de Mandrágora', cost: 520, desc: 'Las pociones envenenan 8 daño/s durante 3 s.', apply: s => { s.acidDps = 8; s.acidDur = 3; } },
+          { name: 'Charco Hechizado', cost: 1600, desc: 'Deja un charco que ralentiza un 40% y daña 20/s.', apply: s => { s.puddleDps = 20; s.puddleSlow = 0.4; s.acidDps = 18; } },
+          { name: 'Caldero Hirviente', cost: 7200, desc: '3 pociones por lanzamiento, veneno 60/s y charcos de 60/s.', apply: s => { s.shells = 3; s.acidDps = 60; s.puddleDps = 60; s.cd *= 0.8; } }
+        ] }
+      ]
+    },
+    // ---------------------------- Reino 7 · Cumbres ----------------------------
+    pararrayos: {
+      name: 'Pararrayos de Tormenta', cost: 560, kind: 'rod', size: 16, color: '#9ab4ff', targeting: true, defaultTarget: 'strong', realm: 6,
+      desc: 'PROTEGE a las torres de su alcance: nada puede apagarlas, congelarlas, cegarlas ni atraparlas. Además descarga rayos que saltan entre enemigos.',
+      base: { range: 115, cd: 2, dmg: 16, jumps: 2, chainRange: 90, protect: true, dtype: 'elec' },
+      paths: [
+        { name: 'Descarga', ups: [
+          { name: 'Punta de Cobre', cost: 280, desc: '+12 daño y +1 salto.', apply: s => { s.dmg += 12; s.jumps += 1; } },
+          { name: 'Rayo Doble', cost: 700, desc: '2 rayos por descarga y aturden 0.3 s.', apply: s => { s.strikes = 2; s.stun = 0.3; } },
+          { name: 'Rayo Purificador', cost: 2100, desc: '+40 daño y el rayo pasa a ser ARCANO.', apply: s => { s.dmg += 40; s.dtype = 'arcane'; s.armorPierce = 1; } },
+          { name: 'Ira del Cielo', cost: 8200, desc: '4 rayos de +160 daño cada 1.2 s, x2 contra jefes.', apply: s => { s.strikes = 4; s.dmg += 160; s.cd = 1.2; s.bossMult = 2; s.jumps += 2; } }
+        ] },
+        { name: 'Jaula', ups: [
+          { name: 'Cable Largo', cost: 220, desc: '+35 alcance de protección.', apply: s => { s.range += 35; } },
+          { name: 'Carga Estática', cost: 600, desc: 'Las torres protegidas atacan un 15% más rápido.', apply: s => { s.buffRate = 0.15; } },
+          { name: 'Bobina de Tesla', cost: 1800, desc: '+25 alcance; las protegidas hacen un 20% más de daño.', apply: s => { s.range += 25; s.buffDmgMult = 1.2; } },
+          { name: 'Jaula de Faraday', cost: 7500, desc: 'Las protegidas atacan un 30% más rápido y hacen un 45% más de daño.', apply: s => { s.buffRate = 0.3; s.buffDmgMult = 1.45; } }
+        ] }
+      ]
+    },
+    // ----------------------------- Reino 8 · Fosa -----------------------------
+    burbujas: {
+      name: 'Cañón de Burbujas', cost: 520, kind: 'bubble', size: 16, color: '#6fd8ff', targeting: true, realm: 7,
+      desc: 'Dispara burbujas que ATRAPAN al enemigo (no a grandes ni jefes): queda flotando, quieto y recibe más daño. A los grandes los frena.',
+      base: { range: 130, cd: 1.6, dmg: 3, projSpeed: 420, trapDur: 1.3, trapAmp: 0.15, trapR: 0, dtype: 'phys' },
+      paths: [
+        { name: 'Pompa', ups: [
+          { name: 'Pompa Grande', cost: 240, desc: 'Atrapa a todos los que estén cerca del golpe.', apply: s => { s.trapR = 32; } },
+          { name: 'Pompa Explosiva', cost: 600, desc: 'Al reventar hace 30 daño en área.', apply: s => { s.popDmg = 30; s.trapAmp = 0.25; } },
+          { name: 'Burbuja de Presión', cost: 1800, desc: 'Reventón mucho más fuerte, más radio y atrapa 1.8 s.', apply: s => { s.popDmg = 140; s.trapDur = 1.8; s.trapR = 42; } },
+          { name: 'Prisión de Coral', cost: 7600, desc: 'También atrapa GRANDES (1 s). Reventón de 600.', apply: s => { s.trapBig = 1; s.popDmg = 600; s.trapAmp = 0.4; } }
+        ] },
+        { name: 'Corriente', ups: [
+          { name: 'Presión Alta', cost: 200, desc: 'Dispara un 25% más rápido.', apply: s => { s.cd *= 0.75; } },
+          { name: 'Agua Salada', cost: 480, desc: 'Las burbujas MOJAN (x1.5 a la electricidad) y +4 daño.', apply: s => { s.wetDur = 4; s.dmg += 4; } },
+          { name: 'Ráfaga de Burbujas', cost: 1500, desc: '3 burbujas en abanico y +25 alcance.', apply: s => { s.count = 3; s.range += 25; } },
+          { name: 'Géiser Abisal', cost: 7000, desc: '5 burbujas cada 0.5 s, +30 daño.', apply: s => { s.count = 5; s.cd = 0.5; s.dmg += 30; } }
+        ] }
+      ]
+    },
+    // --------------------------- Reino 9 · Engranajes ---------------------------
+    desintegrador: {
+      name: 'Desintegrador', cost: 800, kind: 'disint', size: 17, color: '#ff5a7a', targeting: true, defaultTarget: 'strong', realm: 8,
+      desc: 'Un rayo que quita un PORCENTAJE de la vida máxima por segundo: brilla contra los grandes (a los jefes les hace mucho menos).',
+      base: { range: 125, dps: 4, pct: 0.035, beams: 1, dtype: 'arcane' },
+      paths: [
+        { name: 'Fisión', ups: [
+          { name: 'Núcleo Inestable', cost: 320, desc: '5% de la vida por segundo.', apply: s => { s.pct = 0.05; } },
+          { name: 'Desmaterializar', cost: 900, desc: '7% por segundo y +10 daño/s.', apply: s => { s.pct = 0.07; s.dps += 10; } },
+          { name: 'Antimateria', cost: 2600, desc: '9% por segundo y EJECUTA bajo el 10% (no a jefes).', apply: s => { s.pct = 0.09; s.exec = 0.1; } },
+          { name: 'Singularidad', cost: 9000, desc: '14% por segundo, +80 daño/s y x3 contra jefes.', apply: s => { s.pct = 0.14; s.dps += 80; s.bossMult = 3; } }
+        ] },
+        { name: 'Óptica', ups: [
+          { name: 'Lente Ancha', cost: 260, desc: '+30 alcance.', apply: s => { s.range += 30; } },
+          { name: 'Prisma Doble', cost: 800, desc: '2 rayos a la vez.', apply: s => { s.beams = 2; } },
+          { name: 'Detector', cost: 1500, desc: 'Ve CAMUFLADOS y +20 alcance.', apply: s => { s.camo = true; s.range += 20; } },
+          { name: 'Red de Rayos', cost: 8000, desc: '4 rayos a la vez y +20 daño/s.', apply: s => { s.beams = 4; s.dps += 20; } }
+        ] }
+      ]
+    },
+    // ---------------------------- Reino 10 · Eclipse ----------------------------
+    campanario: {
+      name: 'Campanario del Ocaso', cost: 700, kind: 'bell', size: 17, color: '#d8b060', realm: 9,
+      desc: 'Su campana hace ECO: cada toque repite en los enemigos de su alcance una parte del daño que recibieron en los últimos segundos (incluso camuflados).',
+      base: { range: 130, cd: 3.5, eco: 0.22, dmg: 4, dtype: 'arcane' },
+      paths: [
+        { name: 'Eco', ups: [
+          { name: 'Bronce Fino', cost: 300, desc: 'Repite el 32% del daño.', apply: s => { s.eco = 0.32; } },
+          { name: 'Resonancia', cost: 820, desc: 'Repite el 45% del daño.', apply: s => { s.eco = 0.45; } },
+          { name: 'Campana Mayor', cost: 2400, desc: 'Repite el 60%, +30 alcance.', apply: s => { s.eco = 0.6; s.range += 30; } },
+          { name: 'Eco Eterno', cost: 8600, desc: 'Repite el 90% del daño y x2 contra jefes.', apply: s => { s.eco = 0.9; s.bossMult = 2; } }
+        ] },
+        { name: 'Repique', ups: [
+          { name: 'Badajo Ligero', cost: 240, desc: 'Toca un 25% más seguido.', apply: s => { s.cd *= 0.75; } },
+          { name: 'Toque Aturdidor', cost: 560, desc: 'Cada toque aturde 0.35 s.', apply: s => { s.stun = 0.35; } },
+          { name: 'Toque de Difuntos', cost: 1700, desc: 'Cada toque ROMPE la invulnerabilidad y los escudos regalados.', apply: s => { s.purge = true; s.range += 15; } },
+          { name: 'Ángelus', cost: 7200, desc: 'Toca cada 1.4 s y +40 daño por toque.', apply: s => { s.cd = 1.4; s.dmg += 40; } }
+        ] }
+      ]
+    },
+
     // ============================ HÉROES (uno por reino) ============================
     // Solo en su reino y UNO por partida (engine.js: canPlace). Muy caros, pero con un
     // aura propia y una habilidad automática única desde el principio. A diferencia de
@@ -576,6 +680,121 @@
           { name: 'Big Bang', cost: 60000, desc: 'NIVEL 5 (solo un camino). +480 daño, 10 rebotes, x3 contra jefes y EJECUTA bajo el 15%.', apply: s => { s.dmg += 480; s.bounces = 10; s.bossMult = 3; s.exec = 0.15; } }
         ] }
       ]
+    },
+
+    // ---------------- héroes de la segunda era ----------------
+    heroepantano: {
+      name: 'Morgana, Bruja de la Ciénaga', cost: 4200, kind: 'hero', hero: true, size: 19, color: '#8ae05a', targeting: true, realm: 5,
+      desc: 'HÉROE. Dardos envenenados que perforan y ven CAMUFLADOS. Los enemigos que mueren en su alcance dan un 30% más de oro. HABILIDAD: Ciénaga Voraz, charcos por todo el camino que frenan y envenenan.',
+      base: { atk: 'proj', range: 160, cd: 0.55, dmg: 8, pierce: 3, projSpeed: 600, count: 2, spread: 0.16, dtype: 'poison', camo: true, poisonDps: 6, poisonDur: 3,
+        goldAura: 1.3, ability: 'cienaga', bogN: 6, bogDps: 30, bogSlow: 0.45, bogDur: 5 },
+      paths: [
+        { name: 'Ciénaga', ups: [
+          { name: 'Fango Espeso', cost: 3000, desc: 'Los charcos frenan un 60% y duran 7 s.', apply: s => { s.bogSlow = 0.6; s.bogDur = 7; } },
+          { name: 'Más Pantano', cost: 7200, desc: '10 charcos de 90 daño/s.', apply: s => { s.bogN = 10; s.bogDps = 90; } },
+          { name: 'Codicia', cost: 16000, desc: 'Ciénaga cada 22 s; en su alcance dan un 60% más de oro.', apply: s => { s.abCd = 22; s.goldAura = 1.6; } },
+          { name: 'Pantano Viviente', cost: 39000, desc: '14 charcos de 400 daño/s que CONVIERTEN EN SAPO a los que no son grandes.', apply: s => { s.bogN = 14; s.bogDps = 400; s.bogFrog = true; } },
+          { name: 'Ciénaga Eterna', cost: 60000, desc: 'NIVEL 5 (solo un camino). Charcos de 1500 daño/s que también frenan a los voladores.', apply: s => { s.bogDps = 1500; s.bogAir = true; } }
+        ] },
+        { name: 'Maleficio', ups: [
+          { name: 'Dardo de Espino', cost: 2500, desc: '+8 daño y +2 perforación.', apply: s => { s.dmg += 8; s.pierce += 2; } },
+          { name: 'Tres Dardos', cost: 6300, desc: '3 dardos, un 20% más rápida y veneno de 25/s.', apply: s => { s.count = 3; s.cd *= 0.8; s.poisonDps = 25; } },
+          { name: 'Hechizo de Sapo', cost: 15500, desc: '+25 daño; cada dardo tiene un 20% de convertir en SAPO.', apply: s => { s.dmg += 25; s.frogChance = 0.2; s.frogDur = 2; } },
+          { name: 'Maldición de la Bruja', cost: 37500, desc: '6 dardos de +70 daño, veneno 120/s y x2 contra jefes.', apply: s => { s.count = 6; s.dmg += 70; s.poisonDps = 120; s.bossMult = 2; s.cd = 0.35; } },
+          { name: 'Gran Hechicera', cost: 60000, desc: 'NIVEL 5 (solo un camino). +240 daño, veneno 500/s, x3 contra jefes.', apply: s => { s.dmg += 240; s.poisonDps = 500; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroecumbres: {
+      name: 'Zéfiro, Señor de los Vientos', cost: 4400, kind: 'hero', hero: true, size: 19, color: '#bfe0ff', targeting: true, realm: 6,
+      desc: 'HÉROE. Cuchillas de viento que atraviesan a muchos enemigos (también voladores). VIENTO DE COLA: las torres cercanas tienen un 12% más de alcance y velocidad. HABILIDAD: Tempestad, rayos arcanos que saltan por los enemigos más fuertes.',
+      base: { atk: 'proj', range: 175, cd: 0.6, dmg: 10, pierce: 8, projSpeed: 700, count: 1, spread: 0.2, dtype: 'phys', spear: true,
+        aura: 165, buffRange: 0.12, buffRate: 0.12, ability: 'tempestad', tempN: 14, tempDmg: 500, tempStun: 0.8 },
+      paths: [
+        { name: 'Tormenta', ups: [
+          { name: 'Nubes Negras', cost: 3000, desc: 'Tempestad de 20 rayos de 900.', apply: s => { s.tempN = 20; s.tempDmg = 900; } },
+          { name: 'Ojo del Huracán', cost: 7200, desc: 'Tempestad cada 20 s; aturde 1.5 s.', apply: s => { s.abCd = 20; s.tempStun = 1.5; } },
+          { name: 'Furia Celeste', cost: 16500, desc: 'Rayos de 3000 y x2 contra jefes.', apply: s => { s.tempDmg = 3000; s.tempBoss = 2; } },
+          { name: 'Cielo Partido', cost: 40000, desc: '30 rayos de 9000.', apply: s => { s.tempN = 30; s.tempDmg = 9000; } },
+          { name: 'Dios del Trueno', cost: 60000, desc: 'NIVEL 5 (solo un camino). Rayos de 26000, x3 contra jefes.', apply: s => { s.tempDmg = 26000; s.tempBoss = 3; } }
+        ] },
+        { name: 'Viento', ups: [
+          { name: 'Brisa Cortante', cost: 2500, desc: '+10 daño y +4 perforación.', apply: s => { s.dmg += 10; s.pierce += 4; } },
+          { name: 'Viento de Cola', cost: 6600, desc: 'Torres cercanas: +20% de alcance y velocidad.', apply: s => { s.buffRange = 0.2; s.buffRate = 0.2; s.aura = 185; } },
+          { name: 'Tornado', cost: 15500, desc: '3 cuchillas de +30 daño que ignoran el blindaje.', apply: s => { s.count = 3; s.dmg += 30; s.armorPierce = 1; } },
+          { name: 'Ciclón', cost: 37500, desc: '5 cuchillas de +100 daño cada 0.35 s, x2 contra jefes.', apply: s => { s.count = 5; s.dmg += 100; s.cd = 0.35; s.bossMult = 2; } },
+          { name: 'Rey de los Cielos', cost: 60000, desc: 'NIVEL 5 (solo un camino). +320 daño; torres cercanas +30% de alcance y velocidad.', apply: s => { s.dmg += 320; s.buffRange = 0.3; s.buffRate = 0.3; } }
+        ] }
+      ]
+    },
+
+    heroefosa: {
+      name: 'Nerea, Señora de las Mareas', cost: 4600, kind: 'hero', hero: true, size: 19, color: '#4fc8e8', targeting: true, realm: 7,
+      desc: 'HÉROE. Lanza esferas de agua que explotan en área (también voladores) y MOJAN: los mojados reciben x1.5 de electricidad y pierden la inmunidad al fuego. HABILIDAD: Maremoto, una ola que arrastra a todos hacia atrás.',
+      base: { atk: 'orb', range: 170, cd: 1.1, dmg: 16, radius: 48, dtype: 'steam', wetDur: 4, ability: 'maremoto', wavePush: 150, waveDmg: 200 },
+      paths: [
+        { name: 'Marea', ups: [
+          { name: 'Resaca', cost: 3000, desc: 'El Maremoto arrastra más y hace 600.', apply: s => { s.wavePush = 220; s.waveDmg = 600; } },
+          { name: 'Pleamar', cost: 7200, desc: 'Maremoto cada 20 s; los arrastrados quedan aturdidos 1 s.', apply: s => { s.abCd = 20; s.waveStun = 1; } },
+          { name: 'Agua Regia', cost: 16500, desc: 'Los mojados reciben un 20% más de todo.', apply: s => { s.wetAmp = 0.2; s.waveDmg = 2000; } },
+          { name: 'Tsunami', cost: 40000, desc: 'Arrastra 330 y hace 8000.', apply: s => { s.wavePush = 330; s.waveDmg = 8000; } },
+          { name: 'Diluvio', cost: 60000, desc: 'NIVEL 5 (solo un camino). Maremoto de 25000 y mojados +40% de todo.', apply: s => { s.waveDmg = 25000; s.wetAmp = 0.4; } }
+        ] },
+        { name: 'Esfera', ups: [
+          { name: 'Perla', cost: 2500, desc: '+12 daño, +10 radio y ve CAMUFLADOS.', apply: s => { s.dmg += 12; s.radius += 10; s.camo = true; } },
+          { name: 'Doble Ola', cost: 6600, desc: '2 esferas y un 20% más rápida.', apply: s => { s.shells = 2; s.cd *= 0.8; } },
+          { name: 'Remolino', cost: 15500, desc: '+45 daño que ignora el blindaje.', apply: s => { s.dmg += 45; s.armorPierce = 1; } },
+          { name: 'Abismo', cost: 38000, desc: '3 esferas de +150 daño cada 0.6 s, x2 contra jefes.', apply: s => { s.shells = 3; s.dmg += 150; s.cd = 0.6; s.bossMult = 2; } },
+          { name: 'Corazón del Océano', cost: 60000, desc: 'NIVEL 5 (solo un camino). 4 esferas de +420 daño, x3 contra jefes.', apply: s => { s.shells = 4; s.dmg += 420; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroeengranaje: {
+      name: 'Ada, Ingeniera Jefe', cost: 4800, kind: 'hero', hero: true, size: 19, color: '#ffb84d', targeting: true, defaultTarget: 'strong', realm: 8,
+      desc: 'HÉROE. Remacha a los enemigos con clavos que rebotan. Las mejoras de las torres cercanas cuestan un 15% menos. HABILIDAD: Sobrecarga, las torres de su alrededor atacan el doble de rápido 6 s.',
+      base: { atk: 'bolt', range: 170, cd: 0.6, dmg: 14, bounces: 2, dtype: 'phys', armorPierce: 0.5,
+        aura: 170, heroDiscount: 0.15, ability: 'sobrecarga', overDur: 6 },
+      paths: [
+        { name: 'Taller', ups: [
+          { name: 'Presupuesto', cost: 3000, desc: 'Las mejoras cercanas cuestan un 25% menos.', apply: s => { s.heroDiscount = 0.25; } },
+          { name: 'Turbina', cost: 7200, desc: 'Sobrecarga de 9 s cada 24 s.', apply: s => { s.overDur = 9; s.abCd = 24; } },
+          { name: 'Gran Taller', cost: 16000, desc: 'Aura más grande; mejoras un 30% más baratas.', apply: s => { s.aura = 210; s.heroDiscount = 0.3; } },
+          { name: 'Reactor', cost: 40000, desc: 'Sobrecarga cada 16 s.', apply: s => { s.abCd = 16; } },
+          { name: 'Fábrica Perfecta', cost: 60000, desc: 'NIVEL 5 (solo un camino). Sobrecarga de 12 s y mejoras cercanas un 40% más baratas.', apply: s => { s.overDur = 12; s.heroDiscount = 0.4; } }
+        ] },
+        { name: 'Remaches', ups: [
+          { name: 'Clavos de Acero', cost: 2500, desc: '+14 daño y +1 rebote.', apply: s => { s.dmg += 14; s.bounces += 1; } },
+          { name: 'Pistola Neumática', cost: 6600, desc: 'Un 30% más rápida y ve CAMUFLADOS.', apply: s => { s.cd *= 0.7; s.camo = true; } },
+          { name: 'Remache Térmico', cost: 15500, desc: '+50 daño, ignora el blindaje y 5 rebotes.', apply: s => { s.dmg += 50; s.armorPierce = 1; s.bounces = 5; } },
+          { name: 'Martillo Pilón', cost: 38000, desc: '+180 daño cada 0.3 s, x2 contra jefes.', apply: s => { s.dmg += 180; s.cd = 0.3; s.bossMult = 2; } },
+          { name: 'Obra Maestra', cost: 60000, desc: 'NIVEL 5 (solo un camino). +520 daño, 9 rebotes, x3 contra jefes.', apply: s => { s.dmg += 520; s.bounces = 9; s.bossMult = 3; } }
+        ] }
+      ]
+    },
+
+    heroeeclipse: {
+      name: 'Solenne, la Última Luz', cost: 5000, kind: 'hero', hero: true, size: 19, color: '#ffe6a0', targeting: true, realm: 9,
+      desc: 'HÉROE. Rayos de luz ARCANA que atraviesan en línea. Su luz REVELA a los camuflados y anula la invulnerabilidad de los que no son jefes. HABILIDAD: Amanecer, daño arcano a todo el mapa que rompe los escudos.',
+      base: { atk: 'lance', range: 185, cd: 1.2, dmg: 26, width: 10, bolts: 1, dtype: 'arcane', camo: true,
+        purgeAura: true, ability: 'amanecer', dawnDmg: 600 },
+      paths: [
+        { name: 'Alba', ups: [
+          { name: 'Luz Naciente', cost: 3200, desc: 'Amanecer de 1500 y +25 alcance.', apply: s => { s.dawnDmg = 1500; s.range += 25; } },
+          { name: 'Mediodía', cost: 7500, desc: 'Amanecer cada 22 s; los alcanzados quedan aturdidos 1 s.', apply: s => { s.abCd = 22; s.dawnStun = 1; } },
+          { name: 'Sol Invicto', cost: 17000, desc: 'Amanecer de 5000 y x2 contra jefes.', apply: s => { s.dawnDmg = 5000; s.dawnBoss = 2; } },
+          { name: 'Supernova Blanca', cost: 42000, desc: 'Amanecer de 15000.', apply: s => { s.dawnDmg = 15000; } },
+          { name: 'Luz Eterna', cost: 60000, desc: 'NIVEL 5 (solo un camino). Amanecer de 40000, x3 contra jefes.', apply: s => { s.dawnDmg = 40000; s.dawnBoss = 3; } }
+        ] },
+        { name: 'Rayo', ups: [
+          { name: 'Haz Puro', cost: 2600, desc: '+20 daño.', apply: s => { s.dmg += 20; } },
+          { name: 'Triple Haz', cost: 6800, desc: '3 haces y un 20% más rápida.', apply: s => { s.bolts = 3; s.cd *= 0.8; } },
+          { name: 'Lanza Solar', cost: 16000, desc: '+70 daño y haces más anchos.', apply: s => { s.dmg += 70; s.width = 16; } },
+          { name: 'Juicio del Alba', cost: 40000, desc: '5 haces de +240 daño cada 0.7 s, x2 contra jefes.', apply: s => { s.bolts = 5; s.dmg += 240; s.cd = 0.7; s.bossMult = 2; } },
+          { name: 'Corona Solar', cost: 60000, desc: 'NIVEL 5 (solo un camino). 7 haces de +700 daño, x3 contra jefes.', apply: s => { s.bolts = 7; s.dmg += 700; s.bossMult = 3; } }
+        ] }
+      ]
     }
   };
 
@@ -593,16 +812,29 @@
     tormenta:  { name: 'Tormenta de Arena', cd: 28, color: '#ffcf4d', desc: 'Hace retroceder y aturde a los enemigos cercanos.' },
     invierno:  { name: 'Invierno Eterno', cd: 30, color: '#9be7ff', desc: 'Ralentiza un 60% a todo el mapa y lo vuelve quebradizo.' },
     erupcion:  { name: 'Erupción', cd: 26, color: '#ff7a3a', desc: 'Estallidos de lava sobre los enemigos más fuertes.' },
-    grieta:    { name: 'Grieta Temporal', cd: 34, color: '#c07bff', desc: 'Devuelve a los enemigos hacia el comienzo del camino.' }
+    grieta:    { name: 'Grieta Temporal', cd: 34, color: '#c07bff', desc: 'Devuelve a los enemigos hacia el comienzo del camino.' },
+    cienaga:   { name: 'Ciénaga Voraz', cd: 30, color: '#8ae05a', desc: 'Charcos por todo el camino que frenan y envenenan.' },
+    tempestad: { name: 'Tempestad', cd: 28, color: '#bfe0ff', desc: 'Rayos arcanos que saltan por los enemigos más fuertes y los aturden.' },
+    maremoto:  { name: 'Maremoto', cd: 30, color: '#4fc8e8', desc: 'Una ola que arrastra hacia atrás a todos los enemigos y los moja.' },
+    sobrecarga:{ name: 'Sobrecarga', cd: 30, color: '#ffb84d', desc: 'Las torres alrededor de Ada atacan el doble de rápido unos segundos.' },
+    amanecer:  { name: 'Amanecer', cd: 32, color: '#ffe6a0', desc: 'Daño arcano a todo el mapa, rompe escudos y revela camuflados.' }
   };
 
   PD.TOWER_ORDER = ['espinas', 'escarcha', 'vigia', 'voltaico', 'sembrador', 'mortero', 'dragon', 'prisma', 'colmena', 'totem', 'ancla', 'huerto',
     'bumeran', 'raices', 'sierra', 'acido', 'faro', 'balista', 'forja', 'geiser', 'obelisco', 'segador',
     // al final: las pruebas guardan cada torre por su índice en esta lista
-    'heroeprado', 'heroedunas', 'heroeglaciar', 'heroecaldera', 'heroevacio'];
+    'heroeprado', 'heroedunas', 'heroeglaciar', 'heroecaldera', 'heroevacio',
+    // segunda era (reinos 6–10), también al final por lo mismo
+    'bruja', 'pararrayos', 'burbujas', 'desintegrador', 'campanario',
+    'heroepantano', 'heroecumbres', 'heroefosa', 'heroeengranaje', 'heroeeclipse'];
   // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado
   // + el héroe de ESE reino (los héroes no pasan a los reinos siguientes).
-  PD.towersFor = li => PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
+  // Los reinos de la segunda era (levels.js: `torres`) venden solo su lista, cada vez más corta.
+  PD.towersFor = li => {
+    const L = PD.LEVELS && PD.LEVELS[li];
+    if (L && L.torres) return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : L.torres.indexOf(id) >= 0);
+    return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
+  };
   PD.heroOf = li => PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
   for (const id in T) T[id].id = id;
   PD.TOWERS = T;

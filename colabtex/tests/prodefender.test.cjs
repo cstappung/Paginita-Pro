@@ -259,3 +259,119 @@ test('rondas altas: llegan los grandes (supertanques y superglobos) que se abren
   for(const id of ['fortaleza','ciudadela','leviatan','zepelin','dirigible','celeste','arca'])assert.ok(pool.includes(id),PD.LEVELS[li].short+' tiene '+id);
  }
 });
+
+/* Segunda era: cinco reinos en pruebas (levels.js `prueba`), solo para admins y sin
+   tablas. Sus mecánicas solo se activan con sus campos: los cinco primeros reinos se
+   simulan igual que antes (por eso la prueba sigue en la misma VERSION). */
+test('segunda era: cinco reinos en pruebas, sin tablas, con su defensa, su héroe y menos defensas',async()=>{
+ assert.equal(PD.PUBLIC_LEVELS,5);
+ assert.equal(PD.LEVELS.length,10);
+ let antes=99;
+ for(let li=5;li<10;li++){
+  const L=PD.LEVELS[li],ids=PD.towersFor(li);
+  assert.ok(L.prueba&&L.torres,L.short+' está en pruebas y vende su lista');
+  assert.ok(ids.length<antes,L.short+' vende menos que el anterior ('+ids.length+')');antes=ids.length;
+  assert.deepEqual(ids.filter(id=>PD.TOWERS[id].hero),[PD.heroOf(li)],'su héroe');
+  assert.ok(ids.some(id=>PD.TOWERS[id].realm===li&&!PD.TOWERS[id].hero),'su defensa nueva');
+  assert.ok(PD.ABILITIES[PD.TOWERS[PD.heroOf(li)].base.ability],'la habilidad del héroe existe');
+  assert.ok(PD.ENEMIES[L.boss].boss,'su jefe');
+  assert.equal(PD.buildRounds(li).length,100);
+  // no hay tabla: nada de un reino en pruebas se guarda ni paga
+  assert.match(await V.verificaClub('prodefender',{categoria:'club-prodefender-'+L.short.toLowerCase(),puntos:10,tiempo:9e5,partida:'x'},{v:1,j:[]},{uid:'u'}),/no tiene esa tabla/);
+ }
+ // los reinos de siempre venden lo mismo que antes (12 clásicas + las de reino + su héroe)
+ for(let li=0;li<5;li++)assert.equal(PD.towersFor(li).length,12+2*(li+1)+1);
+ // las torres nuevas van al final de TOWER_ORDER (las pruebas guardan el índice)
+ assert.equal(PD.TOWER_ORDER.indexOf('heroevacio'),26);
+});
+
+// coloca `type` en el sitio libre más cercano a (x0, y0)
+const ponCerca=(g,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=g.place(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
+
+test('segunda era: la partida de un reino nuevo se repite igual (sus mecánicas usan el azar de la partida)',()=>{
+ for(const li of [5,6,7,8,9]){
+  const G=new P.Grabadora(li,'uidN',null),g=G.game;g.money=1e7;
+  const ids=PD.towersFor(li);
+  ids.forEach((id,i)=>{for(let q=0;q<300;q++){const t=G.colocar(id,40+((q*137+i*71)%920),40+((q*251+i*13)%560));if(t){for(const p of [0,0,1,1,0])G.mejorar(t,p);break;}}});
+  for(let r=0;r<26&&!g.over;r++){G.ronda();while(g.active&&!g.over)G.tick();}
+  assert.ok(g.round>=25,PD.LEVELS[li].short+' llega al jefe de la ronda 25');
+  const snap=JSON.stringify(g.snapshot());
+  const G2=new P.Grabadora(li,'uidN',null);G2.st.s=G.st.s;G2.st.game=new PD.Game(li,null,P.semillaTramo(G.st.s,'uidN',0));G2.game.money=1e7;
+  for(const j of G.j){while(G2.paso<j[0])G2.tick();const c=j[1];if(c===0)G2.colocar(PD.TOWER_ORDER[j[2]],j[3],j[4]);else if(c===1)G2.mejorar(G2.game.towers.find(x=>x.id===j[2]),j[3]);else if(c===4)G2.ronda();}
+  while(G2.paso<G.paso)G2.tick();
+  assert.equal(JSON.stringify(G2.game.snapshot()),snap,PD.LEVELS[li].short+': misma semilla y mismas jugadas, misma partida');
+ }
+});
+
+test('segunda era: las mecánicas nuevas de los enemigos',()=>{
+ const nuevo=(li)=>{const g=new PD.Game(li,null,3);g.money=1e7;g.active=true;g.queue=[{t:1e9}];return g;};
+ // Elemental de Tormenta: la electricidad lo cura
+ let g=nuevo(6);let e=g.spawn('tormentoso',0,300,1);e.hp=10;
+ assert.equal(g.damage(e,8,'elec',null,{}),0);assert.ok(e.hp>10,'se cura');
+ assert.ok(g.damage(e,5,'phys',null,{})>0);
+ // Cangrejo: blindaje 14 hasta el sexto golpe
+ g=nuevo(7);e=g.spawn('cangrejo',0,300,1);e.hp=e.maxHp=1e6;
+ const d1=g.damage(e,20,'phys',null,{});for(let k=0;k<6;k++)g.damage(e,20,'phys',null,{});
+ assert.ok(g.damage(e,20,'phys',null,{})>d1*2,'con el caparazón roto entra mucho más');
+ // Sapo: salta y en el aire nadie lo toca
+ g=nuevo(5);e=g.spawn('sapo',0,100,1);e.hp=e.maxHp=1e6;
+ let salto=false;for(let k=0;k<60*8&&!salto;k++){g.update(1/60);if(e.hopping){salto=true;assert.equal(g.damage(e,50,'phys',null,{}),0);}}
+ assert.ok(salto,'saltó');
+ // Bruma: los que la rodean quedan camuflados para quien no detecta
+ g=nuevo(5);const b=g.spawn('bruma',0,400,1);const o=g.spawn('brote',0,410,1);b.hp=b.maxHp=o.hp=o.maxHp=1e6;
+ g.update(1/60);
+ assert.ok(o.niebla&&!g.canSee({s:{camo:false}},o)&&g.canSee({s:{camo:true}},o),'la niebla camufla');
+ // Gárgola: se petrifica (inmune) bajo el 40% una vez
+ g=nuevo(6);e=g.spawn('gargola',0,300,1);g.damage(e,e.maxHp*0.7,'arcane',null,{});g.update(1/60);
+ assert.ok(e.piedraT>0&&g.damage(e,10,'arcane',null,{})===0,'piedra');
+ // Autómata: se adapta al daño que más recibe
+ g=nuevo(8);e=g.spawn('automata',0,300,1);e.hp=e.maxHp=1000;
+ const a1=g.damage(e,100,'arcane',null,{});g.damage(e,300,'arcane',null,{});
+ assert.ok(e.res.arcane&&g.damage(e,100,'arcane',null,{})<a1,'adaptado al arcano');
+ // Pararrayos: nada apaga a las torres que cubre
+ g=nuevo(6);const rod=ponCerca(g,'pararrayos',520,180),t1=ponCerca(g,'espinas',rod.x+40,rod.y);
+ assert.ok(t1&&rod);g.disableTower(t1,3);assert.equal(t1.disabledT,0,'protegida');
+ // Rey del Trueno: apaga las torres más caras sin proteger
+ g=nuevo(6);const cara=ponCerca(g,'espinas',230,330),media=ponCerca(g,'espinas',780,470),barata=ponCerca(g,'vigia',560,180);cara.spent=9999;media.spent=5000;
+ const rey=g.spawn('reyTrueno',0,200,1,2);rey.thT=0;g.update(1/60);
+ assert.ok(cara.disabledT>0&&!(barata.disabledT>0),'fulmina la más cara');
+ // Kraken: atrapa torres hasta perder un 6% de vida
+ g=nuevo(7);const k1=ponCerca(g,'espinas',230,200);const kr=g.spawn('kraken',0,250,1,2);kr.grabT=0;g.update(1/60);
+ assert.ok(k1.disabledT>0,'la atrapó');g.damage(kr,kr.maxHp*0.1,'arcane',null,{});g.update(1/60);
+ assert.equal(k1.disabledT,0,'la suelta al perder vida');
+ // Hidra: le crecen cabezas al perder vida
+ g=nuevo(5);const h=g.spawn('hidra',0,300,1,2);const n0=g.enemies.length;
+ g.damage(h,h.maxHp*0.3,'arcane',null,{});g.update(1/60);
+ assert.equal(g.enemies.filter(x=>x.type==='cabezaHidra').length,3,'tres cabezas');assert.ok(g.enemies.length>n0);
+ // Eclipse: a la mitad se parte en el Sol y la Luna
+ g=nuevo(9);const ec=g.spawn('eclipse',0,300,1,2);
+ g.damage(ec,ec.maxHp*0.6,'arcane',null,{});g.update(1/60);
+ assert.ok(ec.dead&&g.enemies.some(x=>x.type==='solGemelo')&&g.enemies.some(x=>x.type==='lunaGemela'),'se partió');
+ // Mártir: al morir deja invulnerables a los cercanos
+ g=nuevo(9);const m=g.spawn('martir',0,300,1),v=g.spawn('brote',0,310,1);g.kill(m,null);
+ assert.ok(v.invulnT>0&&g.damage(v,5,'phys',null,{})===0);
+ // Duende: al escaparse se lleva oro
+ g=nuevo(5);g.money=1000;g.leak(g.spawn('duende',0,10,1));assert.equal(g.money,940);
+});
+
+test('segunda era: las defensas nuevas',()=>{
+ const nuevo=(li)=>{const g=new PD.Game(li,null,3);g.money=1e7;g.active=true;g.queue=[{t:1e9}];return g;};
+ // Bruja: convierte en sapo (sin blindaje) a los que no son grandes
+ let g=nuevo(5);const e=g.spawn('blindado',0,300,1);e.hp=e.maxHp=1e6;
+ g.sapifica(e,2,0.25);assert.ok(e.sapoT>0);
+ const big=g.spawn('portador',0,300,1);g.sapifica(big,0,0);assert.ok(!(big.sapoT>0),'a los grandes solo con la mejora');
+ // Desintegrador: un porcentaje de la vida máxima
+ g=nuevo(8);const d=ponCerca(g,'desintegrador',140,260);assert.ok(d);
+ const x=g.spawn('robusto',0,1,1);x.hp=x.maxHp=1e5;let n=0;
+ while(!d.beams.length&&n++<2000)g.update(1/60);
+ const hp0=x.hp;for(let k=0;k<60;k++)g.update(1/60);
+ if(d.beams.length)assert.ok(hp0-x.hp>1e5*0.02,'quita más del 2% por segundo');
+ // Campanario: repite el daño reciente
+ g=nuevo(9);const c=ponCerca(g,'campanario',400,200);const y=g.spawn('robusto',0,1,1);y.hp=y.maxHp=1e6;
+ assert.ok(c);y.eco=1000;y.x=c.x+20;y.y=c.y;g.grid.clear();g.grid.add(y);c.cdT=0;g.tBell(c,c.s,1/60);
+ assert.ok(1e6-y.hp>=1000*c.s.eco,'eco');
+ // Ada: descuenta las mejoras de las torres de su alrededor
+ g=nuevo(8);const t=ponCerca(g,'espinas',600,250);const c0=g.upgradeCost(t,0);
+ const ada=ponCerca(g,'heroeengranaje',t.x+45,t.y);assert.ok(ada&&Math.hypot(ada.x-t.x,ada.y-t.y)<=ada.s.aura);
+ assert.ok(g.upgradeCost(t,0)<c0,'más barata cerca de Ada');
+});
