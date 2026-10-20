@@ -289,3 +289,7 @@ button { font-family: inherit; }
 .shop-item.hero.used { opacity: .55; cursor: default; }
 .shop-item.hero.used .ct { color: var(--muted); font-size: 12px; }
 .lc-new span.hero { color: #ffe8a0; background: rgba(255,207,77,.14); border-color: rgba(255,207,77,.45); }
+.shop-item.pinchos { grid-column: 1 / -1; flex-direction: row; gap: 8px; padding: 4px 10px; border-color: rgba(200,206,220,.35); background: linear-gradient(90deg, rgba(200,206,220,.12), var(--panel)); }
+.shop-item.pinchos canvas { width: 40px; height: 40px; }
+.shop-item.pinchos .nm { flex: 1; font-size: 13px; justify-content: flex-start; min-height: 0; }
+.shop-item.pinchos .hk { top: auto; bottom: 3px; }

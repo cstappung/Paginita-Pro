@@ -195,22 +195,46 @@ test('héroes: mejoras más caras y un nivel 5 de 60000 en un solo camino',()=>{
  assert.equal(g.canUpgrade(t,0),false,'las torres siguen llegando solo al 4');
 });
 
-test('retroceso con tope: la Tormenta, los empujes y la Grieta no devuelven a nadie para siempre',()=>{
+test('retroceso con tope por torre: nadie vuelve para siempre, pero nadie se vuelve inmune',()=>{
  const g=new PD.Game(1,null,9);g.money=1e7;g.active=true;g.queue=[{t:1e9}];
  const h=g.place('heroedunas',120,330);for(let q=0;q<4;q++)g.upgrade(h,1);   // Tormenta Eterna: todo el mapa, 360
  const e=g.spawn('robusto',0,900,1);e.hp=e.maxHp=1e9;
  let atras=0;for(let k=0;k<5;k++){const d0=e.dist;h.abilityCd=0;e.stunImm=0;g.useAbility(h);atras+=d0-e.dist;}
- assert.ok(atras<=260+1e-9,'cinco Tormentas devuelven como mucho el tope ('+atras+')');
+ const tope=PD.KB.torre(e)*1.5;
+ assert.ok(atras<=tope+1e-9,'cinco Tormentas devuelven como mucho el tope de esa torre ('+atras+')');
+ // la torre que ya gastó su tope no empuja más, pero otra torre sí (antes quedaba inmune)
+ const a={id:-10},b={id:-11};
+ const f=g.spawn('robusto',0,1500,1);
+ let d0=f.dist;for(let k=0;k<20;k++)g.retrocede(f,50,a);
+ assert.ok(d0-f.dist<=PD.KB.torre(f)+1e-9,'una torre tiene tope');
+ d0=f.dist;g.retrocede(f,50,a);assert.equal(f.dist,d0,'gastado su tope ya no empuja');
+ assert.ok(g.retrocede(f,50,b)>0,'otra torre más adelante sigue empujando');
+ // y cada empuje rinde menos cuanto más lleva retrocedido
+ const x1=g.spawn('robusto',0,1500,1),x2=g.spawn('robusto',0,1500,1);x2.pulled=300;x2.kb={[b.id]:300};
+ assert.ok(g.retrocede(x2,40,a)<g.retrocede(x1,40,a),'rinde menos si otras torres ya lo empujaron');
  // los hijos heredan el retroceso ya gastado
- const p=g.spawn('portador',0,800,1);g.retrocede(p,500);
+ const p=g.spawn('portador',0,800,1);g.retrocede(p,500,a);
  const n0=g.enemies.length;g.kill(p,null);
  const hijos=g.enemies.slice(n0);assert.ok(hijos.length>0);
- assert.ok(hijos.every(c=>c.pulled===p.pulled),'los hijos no empiezan de cero');
+ assert.ok(hijos.every(c=>c.pulled===p.pulled&&c.kb[a.id]===p.kb[a.id]),'los hijos no empiezan de cero');
  // la Grieta devuelve a cada enemigo una sola vez
  const v=new PD.Game(4,null,9);v.money=1e7;v.active=true;v.queue=[{t:1e9}];
  const n=v.place('heroevacio',250,380);const x=v.spawn('robusto',0,1500,1);x.hp=x.maxHp=1e9;
  n.abilityCd=0;v.useAbility(n);const d1=x.dist;assert.ok(d1<1500);
  n.abilityCd=0;v.useAbility(n);assert.equal(x.dist,d1,'la segunda Grieta ya no lo devuelve');
+});
+
+test('pinchos: se tiran en el camino, golpean a los de tierra, se gastan y quedan en la foto',()=>{
+ const g=new PD.Game(0,null,3);g.money=1e5;
+ assert.equal(g.placeSpikes(5,5),null,'fuera del camino no');
+ const p0=g.paths[0].pts[1];
+ const sp=g.placeSpikes(p0[0]+3,p0[1]+3);assert.ok(sp,'sobre el camino sí');
+ assert.equal(g.placeSpikes(sp.x,sp.y),null,'no dos montones en el mismo lugar');
+ assert.ok(g.money===1e5-PD.PINCHOS.costo(1));
+ const snap=JSON.parse(JSON.stringify(g.snapshot()));assert.equal(snap.spikes.length,1);
+ const g2=new PD.Game(0,snap,3);assert.equal(g2.spikes.length,1);
+ g.startRound();let k=0;while(g.active&&k<60*120){g.update(P.STEP);k++;}
+ assert.ok(g.spikes.length===0||g.spikes[0].n<PD.PINCHOS.puas,'los enemigos que pasan gastan púas');
 });
 
 test('congelar deja al enemigo un segundo sin poder volver a congelarse',()=>{

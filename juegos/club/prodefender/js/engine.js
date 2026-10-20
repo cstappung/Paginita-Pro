@@ -10,14 +10,31 @@
   PD.PATH_HALF = PATH_HALF; PD.TOWER_GAP = TOWER_GAP;
   // Fuerza con la que un enemigo rompe muros de raíces y golpea a los gólems (por segundo)
   const chew = e => (e.d.boss ? 60 : Math.max(1, e.d._leak)) * 3;
-  // Retroceso total que aguanta un enemigo en toda su vida (px de camino). Lo gastan TODOS
-  // los empujes (Ancla, bumerán, balista, géiser, Tormenta de Arena) y los hijos lo heredan
-  // del padre: antes la Tormenta no tenía tope y cada hijo empezaba de cero, y con torres
-  // potenciadas los enemigos casi no salían nunca.
-  const KB_MAX = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
+  // Retroceso: cada torre tiene su propio tope por enemigo (KB_TORRE, px de camino) y,
+  // además, su empuje rinde menos cuanto más lo hicieron retroceder las OTRAS torres
+  // (KB_SUAVE / (KB_SUAVE + lo de las demás)), pero nunca llega a cero: una torre sola
+  // empuja igual que antes, y apilar muchas rinde cada vez menos. Antes había un tope
+  // único para toda su vida: las primeras torres lo gastaban y el enemigo se volvía
+  // inmune de golpe, y pasaba de largo por las torres que empujan más adelante.
+  // El total sigue acotado (torres × tope), así que una ronda siempre termina.
+  // Los hijos heredan lo gastado (e.kb y e.pulled) del padre.
+  const KB_TORRE = e => (e.d.boss ? 140 : e.d.big ? 180 : 260);
+  const KB_SUAVE = e => (e.d.boss ? 280 : e.d.big ? 360 : 520);
+  PD.KB = { torre: KB_TORRE, suave: KB_SUAVE };
   // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
   // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
   const FREEZE_IMM = 1;
+  // Pinchos (como los de Bloons): un montón que se compra y se tira sobre el camino.
+  // Cada enemigo de tierra que pasa encima recibe un golpe (una vez por montón) y gasta
+  // una púa; los grandes y los jefes reciben más daño pero gastan más. Duran hasta
+  // gastarse, también de una ronda a otra. El precio y el daño crecen con la ronda.
+  PD.PINCHOS = {
+    max: 10, puas: 12, radio: 13,
+    costo: r => Math.round(80 + 10 * r + 0.09 * r * r),
+    danio: (L, r) => 5 * PD.hpMult(L, r) * PD.hpBoost(r, false),
+    gasto: e => (e.d.boss ? 4 : e.d.big ? 3 : 1),
+    multi: e => (e.d.boss ? 3 : e.d.big ? 4 : 1)
+  };
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -102,6 +119,7 @@
       this.enemies = []; this.towers = []; this.projs = []; this.shells = [];
       this.mines = []; this.puddles = []; this.fx = []; this.holes = []; this.rings = [];
       this.walls = []; this.golems = []; this.saws = []; this.rangs = []; this.abLock = {};
+      this.spikes = [];
       this.queue = []; this.qi = 0; this.rt = 0;
       this.time = 0; this.uid = 1; this.events = [];
       this.wardrum = 0; this.over = false; this.won = false;
@@ -128,7 +146,8 @@
       return {
         li: this.li, round: this.round, money: this.money, lives: this.lives, continues: this.continues,
         stats: { ...this.stats },
-        towers: this.towers.map(t => ({ type: t.type, x: t.x, y: t.y, tiers: t.tiers.slice(), mode: t.mode, dealt: t.dealt, spent: t.spent }))
+        towers: this.towers.map(t => ({ type: t.type, x: t.x, y: t.y, tiers: t.tiers.slice(), mode: t.mode, dealt: t.dealt, spent: t.spent })),
+        spikes: this.spikes.map(p => ({ x: p.x, y: p.y, n: p.n, dmg: p.dmg }))
       };
     }
     load(s) {
@@ -140,6 +159,7 @@
         t.tiers = st.tiers.slice(); t.mode = st.mode || t.mode; t.dealt = st.dealt || 0; t.spent = st.spent;
         this.towers.push(t);
       }
+      for (const p of s.spikes || []) this.spikes.push({ x: p.x, y: p.y, n: p.n, dmg: p.dmg, hit: [] });
       this.recalcAll();
     }
 
@@ -220,6 +240,55 @@
       this.golems = this.golems.filter(gm => gm.src !== t);
       this.recalcAll();
       this.emit({ type: 'sell', tower: t });
+    }
+
+    // ------------------------------ Pinchos --------------------------------
+    spikeCost() { return PD.PINCHOS.costo(this.round + 1); }
+    // dónde caería un montón tirado en (x, y): el punto del camino más cercano, o null
+    spikeSpot(x, y) {
+      let best = null, bd = PATH_HALF;
+      for (const p of this.paths) for (const sg of p.segs) {
+        if (sg.jump) continue;
+        const dx = sg.bx - sg.ax, dy = sg.by - sg.ay, L2 = dx * dx + dy * dy || 1;
+        const u = Math.max(0, Math.min(1, ((x - sg.ax) * dx + (y - sg.ay) * dy) / L2));
+        const px = sg.ax + dx * u, py = sg.ay + dy * u, d = Math.hypot(x - px, y - py);
+        if (d <= bd) { bd = d; best = { x: Math.round(px), y: Math.round(py) }; }
+      }
+      if (!best || this.spikes.length >= PD.PINCHOS.max) return null;
+      for (const o of this.spikes) if (Math.hypot(o.x - best.x, o.y - best.y) < PD.PINCHOS.radio * 1.6) return null;
+      return best;
+    }
+    placeSpikes(x, y) {
+      const c = this.spikeCost();
+      if (this.over || this.money < c) return null;
+      const at = this.spikeSpot(x, y);
+      if (!at) return null;
+      this.money -= c;
+      const p = { x: at.x, y: at.y, n: PD.PINCHOS.puas, dmg: PD.PINCHOS.danio(this.L, this.round + 1), hit: [] };
+      this.spikes.push(p);
+      this.emit({ type: 'spikes', spikes: p });
+      return p;
+    }
+    updateSpikes() {
+      if (!this.spikes.length) return;
+      const R = PD.PINCHOS.radio;
+      let gastado = false;
+      for (const p of this.spikes) {
+        this.grid.query(p.x, p.y, R + 46, e => {
+          if (p.n <= 0) return true;
+          if (e.dead || e.d.flying || e.phased || p.hit.indexOf(e.id) >= 0) return;
+          if (Math.hypot(e.x - p.x, e.y - p.y) > R + e.d.r * 0.6) return;
+          p.hit.push(e.id);
+          p.n -= PD.PINCHOS.gasto(e);
+          this.damage(e, p.dmg * PD.PINCHOS.multi(e), 'phys', null, { ap: 0.5 });
+          this.snd('thorn', p.x);
+        });
+        if (p.n <= 0) {
+          gastado = true;
+          this.fx.push({ k: 'puff', x: p.x, y: p.y, t: 0, T: 0.4, color: '#c9c9d4' });
+        }
+      }
+      if (gastado) this.spikes = this.spikes.filter(p => p.n > 0);
     }
 
     baseStats(t) {
@@ -303,6 +372,7 @@
     endRound() {
       this.active = false;
       this.walls = []; this.saws = []; this.rangs = [];
+      for (const p of this.spikes) p.hit = [];
       this.round++;
       const r = this.round;
       let bonus = PD.roundBonus(r);
@@ -336,7 +406,7 @@
       const e = {
         id: this.uid++, d, type, path, dist: Math.max(0, dist), hp, maxHp: hp, shield, maxShield: shield, shieldT: 0,
         x: 0, y: 0, a: 0, vx: 0, vy: 0, hpM, tier: tier || 0,
-        slowF: 0, slowT: 0, frozenT: 0, freezeImm: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0, rifted: false,
+        slowF: 0, slowT: 0, frozenT: 0, freezeImm: 0, stunT: 0, stunImm: 0, brittleT: 0, brittle: 0, holdT: 0, pulled: 0, kb: null, rifted: false,
         burnDps: 0, burnT: 0, burnSrc: null, poisDps: 0, poisT: 0, poisSrc: null,
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
@@ -511,7 +581,7 @@
         for (const [c, n] of d.children) for (let i = 0; i < n; i++) {
           const ch = this.spawn(c, e.path, e.dist - k * 9 + 4, e.hpM);
           ch.slowF = e.slowF * 0.5; ch.slowT = e.slowT;
-          ch.pulled = e.pulled; ch.rifted = e.rifted;   // el retroceso ya gastado se hereda
+          ch.pulled = e.pulled; ch.kb = e.kb ? { ...e.kb } : null; ch.rifted = e.rifted;   // el retroceso ya gastado se hereda
           if (e.mod) this.modifica(ch, e.mod);
           k++;
         }
@@ -1007,8 +1077,8 @@
       if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
       const o = { armorMult: s.armorMult };
       this.inRange(t, s.range, e => {
-        // tope de retroceso acumulado (retrocede): la gravedad frena, pero nunca bloquea una ronda para siempre
-        this.retrocede(e, e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull);
+        // retroceso con tope por torre (retrocede): la gravedad frena, pero nunca bloquea una ronda para siempre
+        this.retrocede(e, e.d.boss ? (s.bossPull ? s.pull * s.bossPull : 0) : s.pull, t);
         this.damage(e, s.dmg, s.dtype, t, o);
         if (s.stun && !e.dead) this.applyStun(e, s.stun);
       });
@@ -1133,13 +1203,19 @@
       t.pspots = out; t.pspotsRange = t.s.range;
       return out;
     }
-    // empuje hacia atrás con tope acumulado (igual que la gravedad: frena, nunca bloquea para siempre)
-    push(e, amt) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt); }
-    // todo retroceso pasa por aquí: gasta del tope del enemigo (KB_MAX) y devuelve cuánto retrocedió
-    retrocede(e, want) {
-      const back = Math.min(want, Math.max(0, KB_MAX(e) - e.pulled), e.dist);
-      if (back > 0) { e.dist -= back; e.pulled += back; }
-      return back > 0 ? back : 0;
+    // empuje hacia atrás de la torre `src` (igual que la gravedad: frena, nunca bloquea para siempre)
+    push(e, amt, src) { this.retrocede(e, e.d.boss ? amt * 0.25 : amt, src); }
+    // todo retroceso pasa por aquí: rinde menos con lo que ya empujaron otras (KB_SUAVE), gasta del
+    // tope de esa torre para ese enemigo (KB_TORRE × topeX) y devuelve cuánto retrocedió
+    retrocede(e, want, src, topeX) {
+      if (!(want > 0)) return 0;
+      const id = src ? src.id : -1, usado = (e.kb && e.kb[id]) || 0;
+      const suave = KB_SUAVE(e), otras = Math.max(0, e.pulled - usado);
+      const back = Math.min(want * suave / (suave + otras), KB_TORRE(e) * (topeX || 1) - usado, e.dist);
+      if (!(back > 0)) return 0;
+      e.dist -= back; e.pulled += back;
+      (e.kb || (e.kb = {}))[id] = usado + back;
+      return back;
     }
 
     // ---- Cazador de Bumeranes: golpea a la ida y a la vuelta ----
@@ -1180,7 +1256,7 @@
             if (Math.hypot(e.x - b.x, e.y - b.y) > R + e.d.r) return;
             hit.push(e.id); b.pierce -= e.d.boss ? 4 : 1;
             this.damage(e, b.dmg, 'phys', b.src, b.opt);
-            if (b.push && !e.dead) this.push(e, b.push);
+            if (b.push && !e.dead) this.push(e, b.push, b.src);
           });
         }
         out.push(b);
@@ -1454,7 +1530,7 @@
           if (q.dead) continue;
           if (s.slow) this.applySlow(q, s.slow, s.slowDur);
           if (s.freeze) this.applyFreeze(q, s.freeze);
-          if (s.push) this.push(q, s.push);
+          if (s.push) this.push(q, s.push, t);
         }
         this.fx.push({ k: 'rail', pts: [[x0, y0], [x1, y1]], t: 0, T: 0.3, w: s.width, color: s.freeze ? '#e8fbff' : '#9fdcff' });
       }
@@ -1492,7 +1568,7 @@
         if (!e.d.flying) {
           if (!(e.stunImm > 0) && !e.d.boss) e.liftT = s.lift;
           this.applyStun(e, s.lift);
-          if (s.push) this.push(e, s.push);
+          if (s.push) this.push(e, s.push, t);
         }
       });
       this.fx.push({ k: 'geyser', x, y, t: 0, T: 0.7, r: s.radius });
@@ -1691,7 +1767,7 @@
           if (hurry) break;
           for (const e of this.enemies) {
             if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > s.stormR) continue;
-            const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1));
+            const back = this.retrocede(e, s.stormPush * (e.d.boss ? 0.25 : 1), t, 1.5);
             if (back > 0) { this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: e.d.r * 1.6 }); if (e.engaged) this.release(e); }
             this.applyStun(e, s.stormStun);
           }
@@ -1769,6 +1845,7 @@
       this.updateProjectiles(dt);
       this.updateShells(dt);
       this.updateMines(dt);
+      this.updateSpikes();
       this.updateSaws(dt);
       this.updateRangs(dt);
       this.updateWalls(dt);
