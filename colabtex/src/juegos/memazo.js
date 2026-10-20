@@ -26,7 +26,7 @@
  */
 import { MZ_NOTAS, MZ_LARGO, MZ_REVELA_MS, MZ_RESUMEN_MS, ofertasMemazo, jugadaExternaMemazo } from "./motor.js";
 import { PLANTILLAS, cajasDe, memeDe, ajustaTextos, ponTexto } from "./memazo-plantillas.js";
-import { plantillasImgflip, gifsGiphy, eligeTres, cajasPorDefecto } from "./memazo-fuentes.js";
+import { plantillasImgflip, gifsGiphy, cupoGiphy, eligeTres, cajasPorDefecto } from "./memazo-fuentes.js";
 import { suena } from "./sonido.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -80,6 +80,7 @@ export function crearMemazo(ctx) {
     host.addEventListener("click", alClic);
     host.addEventListener("input", alEscribir);
     host.addEventListener("pointerdown", alAgarrar);
+    host.addEventListener("keydown", alTecla);
     tic = setInterval(alTic, 250);
     /* Anton llega de Google Fonts después del primer ajuste: con la letra
        de reserva los textos se habrían medido más estrechos. */
@@ -90,7 +91,7 @@ export function crearMemazo(ctx) {
     muerto = true;
     clearInterval(tic); clearTimeout(tAuto); clearTimeout(tBusca); tEnvio.forEach(clearTimeout);
     sueltaArrastre();
-    if (host) { host.removeEventListener("click", alClic); host.removeEventListener("input", alEscribir); host.removeEventListener("pointerdown", alAgarrar); host.innerHTML = ""; }
+    if (host) { host.removeEventListener("click", alClic); host.removeEventListener("input", alEscribir); host.removeEventListener("pointerdown", alAgarrar); host.removeEventListener("keydown", alTecla); host.innerHTML = ""; }
     host = null;
   }
 
@@ -212,7 +213,7 @@ export function crearMemazo(ctx) {
       <div class="jg-mz-panel">
         <div class="jg-mz-tit">Elige plantilla <button class="jg-mz-mini" data-otras="1" title="Otras tres">🔀 Otras</button></div>
         ${falla}
-        ${afuera ? `<input class="jg-mz-busca" id="mzBusca" type="search" maxlength="50" value="${esc(borrador.q)}" placeholder="${est.fuente === "gif" ? "Busca un GIF…" : "Busca una plantilla (en inglés: drake, cat…)"}" autocomplete="off">` : ""}
+        ${afuera ? `<div class="jg-mz-buscador"><input class="jg-mz-busca" id="mzBusca" type="search" maxlength="50" value="${esc(borrador.q)}" placeholder="${est.fuente === "gif" ? "Busca un GIF y pulsa Enter…" : "Busca una plantilla (en inglés: drake, cat…)"}" autocomplete="off">${est.fuente === "gif" ? `<button class="jg-mz-mini" data-busca="1" title="Buscar en GIPHY">🔍</button>` : ""}</div>` : ""}
         <div class="jg-mz-ofertas" id="mzOfertas"></div>
         ${credito ? `<div class="jg-mz-credito">${credito}</div>` : ""}
         <div class="jg-mz-tit">Escribe${esExterna(k) ? ` <span class="jg-mz-cajas"><button class="jg-mz-mini" data-cajas="-1" title="Un texto menos">−</button><button class="jg-mz-mini" data-cajas="1" title="Un texto más">＋</button></span>` : ""}</div>
@@ -230,12 +231,13 @@ export function crearMemazo(ctx) {
     const el = host && host.querySelector("#mzOfertas");
     if (!el) return;
     const o = ofertas();
-    const buscando = borrador.q.trim() && busqueda.estado !== "corta" && (busqueda.q !== borrador.q.trim() || busqueda.estado === "cargando");
+    const buscando = borrador.q.trim() && busqueda.q === borrador.q.trim() && busqueda.estado === "cargando";
     const firma = [borrador.p, buscando, busqueda.estado, fuente.estado, o.map(claveDe).join(",")].join("|");
     if (el.dataset.firma === firma) return;
     el.dataset.firma = firma;
     for (const pl of o) vistas[claveDe(pl)] = pl;
     el.innerHTML = borrador.q.trim() && busqueda.estado === "corta" ? `<div class="jg-mz-nada">Escribe al menos 3 letras.</div>`
+      : borrador.q.trim() && busqueda.estado === "espera" ? `<div class="jg-mz-nada">Pulsa Enter o 🔍 para buscar.<br><small>${cupoGiphy().quedan} búsquedas de GIFs más esta hora.</small></div>`
       : buscando ? `<div class="jg-mz-nada">Buscando…</div>`
       : borrador.q.trim() && busqueda.estado === "error" ? `<div class="jg-mz-nada">La búsqueda falló${busqueda.motivo ? ": " + esc(busqueda.motivo) : ""}.</div>`
       : !o.length ? `<div class="jg-mz-nada">${fuente.estado === "cargando" ? "Cargando…" : "Nada por aquí."}</div>`
@@ -321,15 +323,22 @@ export function crearMemazo(ctx) {
       pintaOfertas();
       return;
     }
-    /* Cada búsqueda en GIPHY gasta una llamada de la hora: se espera a tres
-       letras y a que se deje de teclear. */
-    if (q.length < 3) { busqueda = { q, estado: "corta", lista: [] }; pintaOfertas(); return; }
+    /* En GIPHY cada búsqueda gasta una llamada del cupo de la hora, así que
+       teclear no busca: se busca con Enter o con la lupa (`buscaGif`). */
+    busqueda = { q, estado: q.length < 3 ? "corta" : "espera", lista: [] };
+    pintaOfertas();
+  }
+
+  function buscaGif() {
+    const q = borrador.q.trim();
+    if (est.fuente !== "gif" || q.length < 3 || (busqueda.q === q && (busqueda.estado === "cargando" || busqueda.estado === "listo"))) return;
     busqueda = { q, estado: "cargando", lista: [] };
     pintaOfertas();
-    tBusca = setTimeout(() => {
-      gifsGiphy(q).then(l => ({ q, estado: "listo", lista: l }), e => ({ q, estado: "error", lista: [], motivo: (e && e.motivo) || "" }))
-        .then(b => { if (!muerto && borrador.q.trim() === q) { busqueda = b; pintaOfertas(); } });
-    }, 800);
+    gifsGiphy(q).then(l => ({ q, estado: "listo", lista: l }), e => ({ q, estado: "error", lista: [], motivo: (e && e.motivo) || "" }))
+      .then(b => { if (!muerto && borrador.q.trim() === q) { busqueda = b; pintaOfertas(); } });
+  }
+  function alTecla(ev) {
+    if (ev.key === "Enter" && ev.target && ev.target.id === "mzBusca") { ev.preventDefault(); buscaGif(); }
   }
 
   function notas(mm) {
@@ -559,6 +568,7 @@ export function crearMemazo(ctx) {
       if (pl) { elige(pl); suena("clic"); pinta(); }
       return;
     }
+    if (ev.target.closest("[data-busca]") && vistaVista === "escribir") { buscaGif(); return; }
     if (ev.target.closest("[data-reintenta]") && vistaVista === "escribir") {
       fuente = { estado: "", lista: [] };
       cargaFuente();
