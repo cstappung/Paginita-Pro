@@ -311,7 +311,10 @@ club games; the minimum only raises the cost.
 it: 1 → rojo «brasa», 3 → verde claro «destello», 5 → azul «reflejo», 10 →
 dorado «aura dorada»; each step adds effects (`EFECTOS`, a test checks they
 grow). Optional: `users/<uid>/perfil/tinta` (kept by `limpiaPerfil`, chosen
-in the editor's Datos tab, «Normal» = unset; no rule change).
+in the editor's Datos tab, «Normal» = unset). **`perfil` has a
+`$otro: false` rule**: a new profile field must be named in
+`database.rules.json` (`tinta` was not, and saving any colour failed with
+`PERMISSION_DENIED`), and `test-rules.mjs` must write it.
 
 - **Every painted name goes through `nombreHtml(uid, esc(name))`** →
   `<span class="jg-nm" data-nm=uid>`. A new place that paints a person's
@@ -337,6 +340,19 @@ in the editor's Datos tab, «Normal» = unset; no rule change).
 
 `tests/tintas.test.cjs` covers thresholds, the re-check, the sheet and
 that every `--tn-*` var and `jgTn*` keyframe the effects use exists.
+
+**The coins tab explains itself** (`detalleHtml` in `monedas-vista.js`):
+a balance of what came in and went out, every source as a bar with its %,
+the games that paid you most (`monedasDe(...).porJuego`, filled by
+`ganadoDe(uid, d, porJuego)`), what you spent by category with a
+per-game casino table, your recent movements (consecutive bets in one
+casino game collapse into one row) and «lo que más paga», a ranking of
+what each action is worth. The spending side comes from `economia()`:
+every `paga(u, p, cat, d)` notes the category (`gasto`, `cuenta`) and a
+movement (`movs`), and market sales and casino prizes note income. A new
+spend must pass its category to `paga`, or it counts in `gastadas` but
+shows nowhere in the tab. `tests/monedas.test.cjs` checks that the
+categories add up to `gastadas` and the games to their sources.
 
 **Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
 `economia()` replays three more nodes, between the re-roll and the

@@ -700,7 +700,7 @@ el mensaje lo manda el navegador de quien abre la sala. Las revanchas no se
 anuncian, y las salas abiertas desde `localhost` tampoco.
 
 1. En Discord: **Editar canal → Integraciones → Webhooks → Nuevo webhook**.
-   Ponle nombre y foto si quieres (el mensaje firma como «Laboratorio ·
+   Ponle nombre y foto si quieres (el mensaje firma como «Paginita Pro ·
    Juegos») y pulsa **Copiar URL del webhook**.
 2. Publica las reglas otra vez (pegar `firebase/database.rules.json` entero y
    **Publicar**). Traen un nodo nuevo, `discord`, que pueden leer los que

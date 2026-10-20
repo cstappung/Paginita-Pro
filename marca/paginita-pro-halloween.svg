@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Paginita Pro, versión Halloween: la misma moneda (aro punteado, P
+       con su sombra, el «play» y la chispa) de noche. La P es una
+       calabaza con tallo, el «play» un ojo encendido y la chispa un
+       murciélago. -->
+  <defs>
+    <radialGradient id="noche" cx="30%" cy="22%" r="85%">
+      <stop offset="0" stop-color="#8a4fc4"/>
+      <stop offset=".45" stop-color="#4b1a7e"/>
+      <stop offset="1" stop-color="#1b0a33"/>
+    </radialGradient>
+    <linearGradient id="calabaza" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffc067"/>
+      <stop offset=".5" stop-color="#ff8a1f"/>
+      <stop offset="1" stop-color="#e2580c"/>
+    </linearGradient>
+    <radialGradient id="dentro" cx="45%" cy="50%" r="70%">
+      <stop offset="0" stop-color="#ffb02e"/>
+      <stop offset=".6" stop-color="#c2410c"/>
+      <stop offset="1" stop-color="#5a1a06"/>
+    </radialGradient>
+    <filter id="brillo" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="moneda"><circle cx="512" cy="512" r="492"/></clipPath>
+  </defs>
+  <circle cx="512" cy="512" r="492" fill="url(#noche)"/>
+  <g clip-path="url(#moneda)" opacity=".22" fill="#c9a6ff">
+    <circle cx="190" cy="250" r="3"/><circle cx="820" cy="300" r="4"/><circle cx="260" cy="820" r="3"/>
+    <circle cx="880" cy="560" r="2.5"/><circle cx="160" cy="560" r="2.5"/>
+  </g>
+  <circle cx="512" cy="512" r="443" fill="none" stroke="#ff9a3c" stroke-opacity=".55" stroke-width="12"
+          stroke-linecap="round" stroke-dasharray="380 46 24 46 520 46 30 46 610 46 22 46 440 46"/>
+  <!-- la sombra de la P -->
+  <path transform="translate(16 22)" fill="#12052a" fill-opacity=".75" fill-rule="evenodd"
+        d="M383 241H533A204 204 0 0 1 533 649H445V766A56 56 0 0 1 333 766V291A50 50 0 0 1 383 241ZM445 353V537H533A92 92 0 0 0 533 353Z"/>
+  <!-- el tallo de la calabaza -->
+  <path d="M470 247c-6-34 4-62 30-80 9-6 20 4 14 13-15 20-18 40-14 67z" fill="#4d7c0f"/>
+  <path d="M504 180c22-14 46-10 62 6" fill="none" stroke="#65a30d" stroke-width="9" stroke-linecap="round"/>
+  <!-- la P -->
+  <path fill="url(#calabaza)" fill-rule="evenodd"
+        d="M383 241H533A204 204 0 0 1 533 649H445V766A56 56 0 0 1 333 766V291A50 50 0 0 1 383 241ZM445 353V537H533A92 92 0 0 0 533 353Z"/>
+  <!-- los gajos de la calabaza -->
+  <g fill="none" stroke="#b9450a" stroke-opacity=".45" stroke-width="8" stroke-linecap="round">
+    <path d="M389 290V790"/>
+    <path d="M577 323A130 130 0 0 1 577 567"/><path d="M613 295A170 170 0 0 1 613 595"/>
+  </g>
+  <!-- el hueco encendido y el ojo -->
+  <path d="M445 353V537H533A92 92 0 0 0 533 353Z" fill="url(#dentro)"/>
+  <path d="M500 383c0-9 9-14 16-9l78 62c6 5 6 13 0 18l-78 62c-7 5-16 0-16-9z" fill="#ffe14d" filter="url(#brillo)"/>
+  <!-- el murciélago, donde estaba la chispa -->
+  <g transform="translate(770 700) scale(1.25)">
+    <path fill="#0c0420" stroke="#ff9a3c" stroke-opacity=".85" stroke-width="3.5" stroke-linejoin="round"
+          d="M0-12C3-22 6-24 8-30 10-22 11-16 13-12 28-26 56-28 76-10 62-8 55 0 53 12 45 4 33 4 25 13 19 5 9 3 0 11-9 3-19 5-25 13-33 4-45 4-53 12-55 0-62-8-76-10-56-28-28-26-13-12-11-16-10-22-8-30-6-24-3-22 0-12Z"/>
+    <circle cx="-4" cy="-8" r="2.2" fill="#ffd54a"/><circle cx="4" cy="-8" r="2.2" fill="#ffd54a"/>
+  </g>
+  <circle cx="696" cy="787" r="16" fill="#ffe8a3"/>
+</svg>

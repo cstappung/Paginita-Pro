@@ -9,6 +9,8 @@ import {
   RECORD, diaChile, rachaHoy, pagoDia, PAGO_DIA, TOPE_DIA, PAGO_CLUB, TOPE_CLUB_DIA, TOPE_BBTAN_DIA, PODIO
 } from "./monedas.js";
 import { MOTOR } from "./prodrop-cartas.js";
+import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { PREMIO_REFERIDO } from "./referidos.js";
 import { nombreHtml } from "./tintas.js";
 
 /* La moneda se dibuja: el emoji de la moneda es de 2020 y en Windows 10 y en
@@ -29,6 +31,128 @@ const PARTES = [
   ["referidos", "🤝", "Referidos", "5000 por el código que usaste y 5000 por cada persona que usó el tuyo"],
   ["ajustes", "🛡️", "Ajustes", "lo que un administrador sumó o restó a mano"]
 ];
+
+/* ---------- el detalle de tus monedas ---------- */
+const NOMBRES_CASINO = { a: "el Avión", p: "el Pingüinito", r: "la Ruleta", b: "el Blackjack", v: "el Póker", l: "el Plinko" };
+const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_CLUB[j] || (j === "otros" ? "Otros" : j);
+const pct = (a, b) => (b > 0 ? Math.round(100 * a / b) : 0);
+const signo = n => (n > 0 ? "+" : n < 0 ? "−" : "") + formatoMonedas(Math.abs(n));
+/* Una lista de barras: [{i, t, n, s?}] de mayor a menor; la barra es
+   relativa a la mayor y el % al total. */
+function barras(l, total, clase = "") {
+  const max = Math.max(1, ...l.map(x => x.n));
+  return `<ul class="jg-mo-barras ${clase}">${l.map(x => `<li${x.n ? "" : ' class="cero"'}>
+    <span class="i">${x.i}</span><span class="t"><b>${x.t}</b>${x.s ? `<small>${x.s}</small>` : ""}</span>
+    <span class="v"><b>${formatoMonedas(x.n)}</b><small>${pct(x.n, total)} %</small></span>
+    <i class="b"><i style="width:${Math.max(x.n ? 2 : 0, Math.round(100 * x.n / max))}%"></i></i></li>`).join("")}</ul>`;
+}
+/* Lo que más paga, por cada vez: para saber dónde conviene jugar. */
+function loQueMasPaga() {
+  const salaTop = Object.keys(PESO).filter(j => !juegoOculto(j)).sort((a, b) => PESO[b] - PESO[a])[0];
+  const recTop = Object.entries(RECORD).sort((a, b) => b[1] - a[1])[0];
+  const clubTop = Object.entries(PAGO_CLUB).sort((a, b) => b[1] - a[1])[0];
+  return [
+    { i: "🤝", t: "Traer a alguien con tu código", s: "y otras tantas para quien entra", n: PREMIO_REFERIDO },
+    { i: "🔥", t: "Recompensa diaria", s: `desde el ${TOPE_DIA}.º día seguido`, n: pagoDia(TOPE_DIA) },
+    { i: "👑", t: "Quitarle el 1.er puesto a alguien", s: `en una tabla del club · 2.º ${PODIO[2]}, 3.º ${PODIO[3]}`, n: PODIO[1] },
+    { i: "🎖️", t: "Un logro legendario", s: `difícil ${VALOR_NIVEL[3]}, medio ${VALOR_NIVEL[2]}, fácil ${VALOR_NIVEL[1]}`, n: VALOR_NIVEL[4] },
+    { i: "🏆", t: `Ganar una partida de ${nombreJuego(salaTop)}`, s: `el juego de sala que más pesa (×${PESO[salaTop]})`, n: (TARIFA.partida + TARIFA.victoria) * PESO[salaTop] },
+    { i: "📈", t: `Tu primer récord en ${nombreJuego(recTop[0])}`, s: "una vez por modalidad", n: recTop[1] },
+    { i: "🕹️", t: `Una partida de ${nombreJuego(clubTop[0])}`, s: `la partida del club que más paga · hasta ${TOPE_CLUB_DIA} al día`, n: clubTop[1] }
+  ].sort((a, b) => b.n - a.n);
+}
+/* Cada movimiento con hora, del más nuevo al más viejo; las apuestas
+   seguidas en un mismo juego del casino van en una sola fila. */
+function movimientosHtml(movs) {
+  const l = movs.slice().sort((a, b) => b.at - a.at), filas = [];
+  for (const m of l) {
+    const casino = m.c === "apuesta" || m.c === "premio", ult = filas[filas.length - 1];
+    if (casino && ult && ult.casino && ult.d === m.d && ult.desde - m.at < 3 * 3600 * 1000) {
+      ult.n += m.p; ult.desde = m.at; if (m.c === "apuesta") ult.ap++; else ult.pr += m.p; continue;
+    }
+    if (filas.length >= 30) break;
+    filas.push({ at: m.at, desde: m.at, c: m.c, d: m.d, n: m.p, casino, ap: m.c === "apuesta" ? 1 : 0, pr: m.c === "premio" ? m.p : 0 });
+  }
+  if (!filas.length) return `<p class="jg-nada">Todavía no has gastado ni cobrado nada. Lo que compres en PRODROP, la tienda, Mascotas, el mercado o el casino aparecerá aquí.</p>`;
+  const tipo = { carta: "una carta", mascota: "una mascota", objeto: "un objeto" };
+  const texto = f => ({
+    sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
+    regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `Tienda del perfil · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${f.d}»`]
+  }[f.c] || ["🪙", f.c]);
+  const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `<ul class="jg-mo-movs">${filas.map(f => {
+    const [i, t] = f.casino ? ["🎰", `${f.ap ? `${f.ap} ${f.ap === 1 ? "apuesta" : "apuestas"} en ${NOMBRES_CASINO[f.d] || "el casino"}` : `Premio en ${NOMBRES_CASINO[f.d] || "el casino"}`}${f.ap && f.pr ? ` · premios +${formatoMonedas(f.pr)}` : ""}`] : texto(f);
+    return `<li><span class="i">${i}</span><span class="t"><b>${t}</b><small>${cuando(f.at)}</small></span><b class="n ${f.n >= 0 ? "mas" : "menos"}">${signo(f.n)}</b></li>`;
+  }).join("")}</ul>`;
+}
+function detalleHtml(yo) {
+  const P = yo.partes, entra = yo.total + yo.cobradas + yo.premios, sale = yo.gastadas;
+  const g = yo.gasto || {}, n = yo.cuenta || {}, cas = yo.casino || { apostado: 0, pagado: 0, rondas: 0, porJuego: {} };
+  const ventas = (yo.movs || []).filter(m => m.c === "venta"), nVentas = ventas.length;
+  /* De dónde salen */
+  const fuentes = [
+    ...PARTES.filter(([k]) => k !== "ajustes" || P.ajustes).map(([k, i, t, s]) => ({ i, t, s, n: Math.max(0, P[k] || 0) })),
+    { i: "💰", t: "Ventas en el mercado", s: `${nVentas} ${nVentas === 1 ? "venta" : "ventas"}`, n: yo.cobradas || 0 },
+    { i: "🎰", t: "Premios del casino", s: "lo que te pagaron las apuestas ganadas", n: yo.premios || 0 }
+  ].sort((a, b) => b.n - a.n);
+  /* Por juego */
+  const juegos = Object.entries(yo.porJuego || {}).filter(([j]) => !juegoOculto(j))
+    .map(([j, x]) => ({ j, x, n: Object.values(x).reduce((a, b) => a + b, 0) })).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
+  const ETQ = { partidas: "partidas", victorias: "victorias", records: "récords", club: "partidas del club", podios: "podios", logros: "logros" };
+  const desglose = x => Object.entries(ETQ).filter(([k]) => x[k]).map(([k, t]) => `${t} ${formatoMonedas(x[k])}`).join(" · ");
+  const totalJuegos = juegos.reduce((a, b) => a + b.n, 0);
+  /* En qué gastaste */
+  const veces = (k, uno, varios) => n[k] ? `${n[k]} ${n[k] === 1 ? uno : varios}` : "";
+  const grupos = [
+    { i: "🃏", t: "PRODROP", ir: "#cartas", n: (g.sobre || 0) + (g.graduar || 0),
+      s: [veces("sobre", "sobre", "sobres"), veces("graduar", "graduación", "graduaciones"), n.sobreGratis ? `${n.sobreGratis} gratis` : ""].filter(Boolean).join(" · ") },
+    { i: "🎰", t: "Casino · apuestas", ir: "#casino", n: g.apuesta || 0,
+      s: cas.rondas ? `${cas.rondas} ${cas.rondas === 1 ? "ronda" : "rondas"} · te devolvió ${formatoMonedas(cas.pagado)} · neto ${signo(Math.round(cas.pagado - cas.apostado))}` : "" },
+    { i: "🐾", t: "Mascotas", ir: "#mascotas", n: (g.adopcion || 0) + (g.regalo || 0) + (g.comida || 0) + (g.pocion || 0) + (g.fondoMascota || 0),
+      s: [veces("adopcion", "adopción", "adopciones"), veces("regalo", "regalo", "regalos"), veces("comida", "compra de comida", "compras de comida"), veces("pocion", "poción", "pociones"), veces("fondoMascota", "fondo", "fondos")].filter(Boolean).join(" · ") },
+    { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", `artículo (${formatoMonedas(PRECIO_TIENDA)} c/u)`, `artículos (${formatoMonedas(PRECIO_TIENDA)} c/u)`) },
+    { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
+  ].sort((a, b) => b.n - a.n);
+  const casino = Object.entries(cas.porJuego || {}).filter(([, z]) => z.rondas || z.apostado)
+    .map(([j, z]) => ({ j, z, neto: Math.round(z.pagado - z.apostado) })).sort((a, b) => b.z.apostado - a.z.apostado);
+  return `
+    <div class="jg-mo-balance">
+      <div><small>Entraron</small><b class="mas">+${formatoMonedas(entra)}</b></div>
+      <div class="jg-mo-bal-barra" aria-hidden="true"><i class="mas" style="flex:${Math.max(1, entra)}"></i><i class="menos" style="flex:${Math.max(sale ? 1 : 0, sale)}"></i></div>
+      <div><small>Salieron</small><b class="menos">−${formatoMonedas(sale)}</b></div>
+      <div><small>Te quedan</small><b>${formatoMonedas(yo.saldo)} ${MONEDA}</b></div>
+    </div>
+    <div class="jg-mo-cols jg-mo-det">
+      <section class="jg-mo-caja"><h2>📊 De dónde salen tus monedas</h2>
+        <p class="jg-mo-nota">Todo lo que te ha entrado, de la fuente que más te dio a la que menos. El % es sobre ${formatoMonedas(entra)}.</p>
+        ${barras(fuentes, entra)}
+      </section>
+      <section class="jg-mo-caja"><h2>🎮 Los juegos que más te han pagado</h2>
+        ${juegos.length ? `<p class="jg-mo-nota">Partidas, victorias, récords, logros y podios de cada juego. Lo diario, los referidos y lo del mercado o el casino no son de un juego y no salen aquí.</p>
+          ${barras(juegos.slice(0, 10).map(x => ({ i: "", t: esc(nombreJuego(x.j)), s: desglose(x.x), n: x.n })), totalJuegos, "juegos")}
+          ${juegos.length > 10 ? `<details class="jg-mo-mas"><summary>Ver los ${juegos.length} juegos</summary>${barras(juegos.slice(10).map(x => ({ i: "", t: esc(nombreJuego(x.j)), s: desglose(x.x), n: x.n })), totalJuegos, "juegos")}</details>` : ""}`
+          : `<p class="jg-nada">Todavía no te ha pagado ningún juego. ¡Juega una partida!</p>`}
+      </section>
+      <section class="jg-mo-caja"><h2>🛒 En qué gastaste</h2>
+        ${sale ? `<p class="jg-mo-nota">${formatoMonedas(sale)} monedas en total. El % es sobre eso.</p>
+          ${barras(grupos.map(x => ({ i: x.i, t: x.ir ? `<a href="${x.ir}">${x.t}</a>` : x.t, s: x.s, n: x.n })), sale, "gastos")}`
+          : `<p class="jg-nada">No has gastado nada todavía.</p>`}
+        ${casino.length ? `<h3>🎰 Tus apuestas, juego por juego</h3>
+          <table class="jg-mo-casino"><thead><tr><th>Juego</th><th>Rondas</th><th>Apostado</th><th>Premios</th><th>Neto</th></tr></thead><tbody>
+          ${casino.map(({ j, z, neto }) => `<tr><td>${esc((NOMBRES_CASINO[j] || j).replace(/^(el|la) /, "").replace(/^./, c => c.toUpperCase()))}</td><td>${z.rondas}</td><td>${formatoMonedas(z.apostado)}</td><td>${formatoMonedas(z.pagado)}</td><td class="${neto >= 0 ? "mas" : "menos"}">${signo(neto)}</td></tr>`).join("")}
+          </tbody></table>` : ""}
+      </section>
+      <section class="jg-mo-caja"><h2>🧾 Tus movimientos recientes</h2>
+        <p class="jg-mo-nota">Lo que gastaste y cobraste, del más nuevo al más viejo.</p>
+        ${movimientosHtml(yo.movs || [])}
+      </section>
+    </div>
+    <section class="jg-mo-caja jg-mo-paga"><h2>💡 Lo que más paga, cada vez</h2>
+      <div class="jg-mo-paga-l">${loQueMasPaga().map(x => `<div><span class="i">${x.i}</span><b>${formatoMonedas(x.n)} ${MONEDA}</b><span>${esc(x.t)}</span><small>${esc(x.s)}</small></div>`).join("")}</div>
+    </section>`;
+}
 
 function fila(f, i, uid, perfil, colorDe, chico, datos) {
   const q = quien(f.uid, perfil(f.uid), null, { nombre: f.nombre, foto: f.foto }, colorDe);
@@ -90,8 +214,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           ${yo.parada ? `<p class="jg-mo-gasto">Una compra quedó sin fondos y no vale: hasta que ganes ${formatoMonedas(yo.falta)} monedas más, nada de lo que compres después cuenta.</p>` : ""}</div>
         <div class="jg-mo-racha-c">${rachaHtml(d, hoy)}</div>
       </header>
-      <div class="jg-mo-partes">${PARTES.filter(([k]) => k !== "ajustes" || yo.partes.ajustes).map(([k, i, t, s]) =>
-        `<div><span>${i}</span><b>${formatoMonedas(yo.partes[k])}</b><small>${t}</small><em>${s}</em></div>`).join("")}</div>
+      ${detalleHtml(yo)}
       <div class="jg-mo-cols">
         <section class="jg-mo-caja"><h2>Top de monedas</h2>
           ${lista.length ? `<ol class="jg-mo-top">${lista.slice(0, 50).map((f, i) => fila(f, i, uid, perfil, colorDe, false, ultimo)).join("")}</ol>`

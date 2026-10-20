@@ -30,6 +30,12 @@ export const RE_CODIGO = /^[A-Z0-9]{4,12}$/;
 /* Lo que alguien escribe, como se guarda: sin espacios ni guiones y en
    mayúsculas, para que «pia-2024» y «PIA2024» sean el mismo código. */
 export const normalizaCodigo = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+/* El ejemplo del campo «Elige tu código»: el nombre de cada uno, sin
+   tildes, más 123 («Pía» → PIA123). Sin un nombre que sirva, JUGADOR123. */
+export function codigoSugerido(nombre) {
+  const base = normalizaCodigo(String(nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")).slice(0, 9);
+  return (base || "JUGADOR") + "123";
+}
 
 const juegoDeMarca = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) ||
   (String(c).startsWith("yemas-zombis-") ? "yemas" : "");

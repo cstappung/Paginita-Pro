@@ -2,9 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610200140"></script>
+<script src="i18n.js?v=202610200222"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Informes — Laboratorio</title>
+<title>Informes — Paginita Pro</title>
+<link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png">
+<link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -19,7 +22,7 @@
   .head{display:flex;align-items:center;gap:16px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0}
   .logo{display:flex;align-items:center;gap:8px;color:#e8f0ef}
   .logo:hover{color:#fff;text-decoration:none}
-  .logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  .logo-img{display:block;flex:none;width:28px;height:28px}
   .head-nav{display:flex;gap:16px;font-size:12.5px;color:#9fb5b2;margin-left:10px}
   .head-nav a{color:#9fb5b2}
   .head-nav a:hover{color:#fff;text-decoration:none}
@@ -89,7 +92,7 @@
 <body>
 <div id="app">
   <header class="head">
-    <a class="logo" href="Inicio.dc.html"><span class="logo-mark">L</span><b style="font-size:14px">Laboratorio</b></a>
+    <a class="logo" href="Inicio.dc.html"><img class="logo-img" src="marca/paginita-pro-128.png" alt="" width="28" height="28"><b style="font-size:14px" translate="no">Paginita Pro</b></a>
     <nav class="head-nav">
       <a href="colabtex.html">ColabTeX</a>
       <a href="colabdraw.html">ColabDraw</a>
@@ -106,7 +109,7 @@
 
   <div id="viewLogin">
     <div class="login-card">
-      <h2 style="margin:0 0 8px;font-size:18px">Informes del Laboratorio</h2>
+      <h2 style="margin:0 0 8px;font-size:18px">Informes de Paginita Pro</h2>
       <p style="font-size:12.5px;color:#5a6772;line-height:1.6;margin:0 0 20px">
         Inicia sesión con la misma cuenta de Google que usas en ColabTeX para ver los fallos
         y las sugerencias de todo el equipo.</p>
@@ -147,6 +150,6 @@
     <p class="nota" id="nota"></p>
   </main>
 </div>
-<script src="informes-app.js?v=202610200140"></script>
+<script src="informes-app.js?v=202610200222"></script>
 </body>
 </html>

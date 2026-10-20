@@ -14,6 +14,7 @@
           "color": { ".validate": "newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{6,6}$/)" },
           "marco": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" },
           "fondo": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" },
+          "tinta": { ".validate": "newData.isString() && newData.val().matches(/^(rojo|verde|azul|dorado)$/)" },
           "bio": { ".validate": "newData.isString() && newData.val().length <= 200" },
           "vitrina": {
             "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length <= 60" }
