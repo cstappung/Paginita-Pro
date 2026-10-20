@@ -7761,9 +7761,11 @@ export const MKW_MODOS = { copa: "Modo copa", playlist: "Modo playlist" };
 export const MKW_CARRERAS = [2, 4, 8, 12];
 const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "copa";
 const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
-/* La cilindrada de la copa y de la playlist ("azar": cada carrera la suya, como Retro Rewind: 10 % 100cc, 65 % 150cc,
-   25 % espejo, sorteada con la semilla de la tanda) */
-export const MKW_CC = { c150: "150cc", c100: "100cc", espejo: "Espejo", azar: "Al azar" };
+/* La cilindrada de la copa y de la playlist ("azar": cada carrera la suya, como Retro Rewind: 10 % 200cc, 65 % 150cc,
+   25 % espejo, sorteada con la semilla de la tanda). La clave "c100" es la cilindrada 100cc del juego, que Retro
+   Rewind corre como 200cc fuera de las salas mundiales (Pulsar, Is200cc; medido con el juego en §84): por eso se
+   llama 200cc. La clave se queda igual: las salas guardadas y el marco la usan. */
+export const MKW_CC = { c150: "150cc", c100: "200cc", espejo: "Espejo", azar: "Al azar" };
 const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
 /* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
 export function mkwTabla(t) {
