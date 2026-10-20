@@ -104,7 +104,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   (margen de la sala 2 s), huella de los botones, avisos 📶 (`lockstep.mjs`; banco `relevo` 21, `lockstep` 42;
   `prueba-relevo` 10/10 con el juego, §80). §80b: la sincronía de tiempo (prendida; `?sincroTiempo=0` la apaga) y
   los cortes que se repiten (el aviso se perdía con la conexión caída). Queda: 12 jugadores (hoy 4 puertos)
-- ⬜ M8. Abrir directo lo que falta: las carreras de un jugador (Racedata + sección de carrera) y Multiplayer local
+- ✅ M8. Abrir directo lo que falta: Multiplayer → Local abre 2/3/4 Players y salta directo al registro de mandos
+  (sección 0x54, con lo que hace el botón del juego antes: 0x808516BC; §84). Single Player ya abría directo su menú
+  (0x48); desde ahí cada modo se elige con los menús del juego, sin piloto
 - ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
   sale de la cilindrada como en un Grand Prix (§73)
 - ⬜ M10. Después de M: el menú «cambiar Mii» con los 6 Mii invitados del juego y sus imágenes del juego
@@ -118,7 +120,8 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ✅ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego: el retraso se adapta a la red (3 en
   esta PC, 6 con 70 ms de ida y 5 % perdido) y la carrera ya no va en cámara lenta (§70; banco 32/32, `prueba-sincro` 10/10)
 - 🟡 C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas): no volvió
-  a salir en 18 corridas (§70); queda la espera de la primera visita (bajar la pista con la caché vacía) → E2
+  a salir en 18 corridas (§70) ni en la docena de §83–§84; queda la espera de la primera visita (bajar la pista con la
+  caché vacía) → E2
 - ✅ C5. PC lento en la sala (`prueba-sincro --lento`): la carrera sigue igual en las dos y va al ritmo de la lenta (por
   diseño, §62.3); ahora la página avisa quién frena («espera al jugador 2» / «Tu PC no alcanza») (§70.7; 11/11)
 - ⬜ C6. VS en línea sin CPU: cola de pistas y «Confirmar» sobre la votación (F3); TURN, más jugadores, fallos en el chat (F4)
@@ -126,8 +129,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ C8. Dónde guarda Pulsar `RRSettings.pul` (trofeos) y `RRRating.pul` (VR) en línea
 
 ### Etapa D — Página y modos
-- ⬜ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador
-- ⬜ D2. Imágenes sacadas del juego (fotos de pistas, íconos, caras de Mii) a R2 con el programa
+- ✅ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador: en un jugador los eligen los menús del
+  juego (RR muestra su 200cc); en la sala la «100cc» corría a 200cc (medido con el juego) y ahora se llama así (§84)
+- ✅ D2. Imágenes sacadas del juego (fotos de pistas, copas, videítos, planos) a R2 con el programa (§74,
+  `subir-r2.mjs`); las caras de los Mii van con M10
 - ✅ D3. Quitar el visor de salas de Retro WFC (§64); el código de amigo propio ya sale del `rksys.dat` (`licencias.mjs`)
 - ✅ D4. La ayuda de "tarjeta de video equivocada" en la página del sitio: ya estaba en el cajón (Avanzado → Video); ahora
   además aparece sola, abajo a la izquierda, cuando el juego va lento un buen rato por trabajo de esta PC y Windows elige
@@ -138,6 +143,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   imagen sale del Worker con token + `AMIGOS`, como el disco de BT3; 401/403 = sin menú): Single Player → menú «Un jugador»
   del juego, Multiplayer → Local / Online (salas), Options → cajón; entrada «Mario Kart Wii · un jugador» (`#solo/mkw`) en
   el sitio (§67; banco 14/14, `prueba-inicio` 14/14, `mkw.test` 13/13)
+- ✅ D7. (Pedido del dueño) la sala: la playlist arranca a todos (el selector de sugerir de los demás quedaba huérfano
+  encima del juego); la sala nace con el máximo (4) sin preguntar «Pilotos»; el anfitrión puede **echar** y se puede
+  **votar** (⏏, con 3 o más) en Mario Kart (§87; `prueba-experiencia` 20/20 y `--playlist` 19/19, `prueba-playlist`
+  18/18, banco `sala-carrera` 49/49, `mkw.test` 17/17)
 
 ### Etapa E — Rendimiento
 - ⬜ E1. Sonido con AudioWorklet (latencia ~100–150 → ~30 ms) y sin cortes en el arranque
@@ -381,6 +390,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 8. ~~Costo de dibujar~~ → medido: título ~7,3 ms, carrera ~10 ms, elegir pista 12–14 ms; queda el tirón de la largada (ver fase 3).
 9. ~~Temporizadores del navegador~~ → resuelto: reloj VI enganchado al refresco del monitor, en la fase que deja la presentación de Chrome a mitad del refresco (90–100 % de cuadros parejos EN PANTALLA a 240 Hz, medido con la traza de Chrome; §43). Queda: monitores no múltiplos de 60 Hz (144 Hz) no pueden ir parejos a 60 fps.
 10. **GPU equivocada**: en Windows el navegador elige la tarjeta (la página no puede). La página muestra cuál usa y ofrece, plegada, cómo cambiarla desde Windows; desde §81 lo ofrece sola cuando el juego va lento por eso (también en el sitio: es la misma página).
+11. **La carrera de la sala pesa más que una sola** (§85): ~15 ms de CPU por cuadro en este Ryzen 7 9800X3D, contra ~9,5 ms de una carrera sola, por «todo a la vista» (§61) y «dibujar siempre» (§62), que la hacen igual en todas las consolas. Un amigo con un procesador ~30 % más lento pasaría los 20 ms y vería «Tu PC no alcanza». Salida posible, para la etapa de optimizar: dibujar con la vista de la cámara propia sin que la lógica vea distinto (cuidado: el dibujo escribe matrices que la lógica lee, §62).
 6. **Online**: sin sockets UDP en el navegador; depende de infraestructura propia.
 7. **Legal**: el `.wasm` y los archivos de RR nunca son públicos.
 
@@ -388,12 +398,32 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-20 02:59** — **La sala: la playlist arrancaba solo al anfitrión, el cupo sin preguntar y echar** (§87).
+  En la playlist, con un perfil nuevo, el selector de sugerir de los demás esperaba los nombres de las pistas (bajados
+  por el Worker) y mientras tanto cada estado nuevo de la sala abría otro; al confirmar se cerraba uno solo y el otro
+  quedaba encima de la pantalla de personaje. Ahora una marca impide abrir dos y el selector se cierra solo si ya no hace
+  falta (`mkw.mjs`). La ficha del sitio ya no pregunta «Pilotos»: toda sala nace con 4 (el máximo de la carrera
+  sincronizada; los 12 humanos son M17). El anfitrión tiene «Echar» (jugada `{t:"echa"}`, válida solo si la escribe el
+  anfitrión de ese momento) y la votación ⏏ aparece en Mario Kart con 3 o más; al echado se le cierra el juego, los
+  demás lo cortan de la carrera al momento (`{tipo:'fuera'}` → `lockstep.saltar`) y la sala del juego lo deja fuera
+  (`sala-carrera.mjs` `quitar`). `prueba-experiencia --playlist` 18/19 → **19/19**, `prueba-experiencia` **20/20** (echado
+  con la carrera andando: cortado en el cuadro 744 y Uno siguió), `prueba-playlist` **18/18** (B como perfil nuevo),
+  banco `sala-carrera` **49/49**, `mkw.test` **17/17**. El ensayo usa otros puertos de emulador (`--emu-desplazar
+  10000`) para correr con `jugar.bat` abierto.
+- **2026-10-20 02:36** — **El aviso de «PC lenta» de `prueba-sincro` era la PC, no el código** (§85). El código de §70 (`c6c4b89`), compilado hoy aparte (`build/viejo-c6c4b89`), da el mismo 10/11; en §70 la prueba ya iba a 52–55 cuadros/s y pasaba por la banda sin aviso (50–55). Medido por proceso: una carrera sola ~9,5 ms de CPU por cuadro, dos sueltas a la vez también (no se estorban), dos en la sala 15–17 ms cada una («todo a la vista» de §61 + «dibujar siempre» de §62; con `&arreglos=0` vuelven a 60); la tarjeta al 62 %. La PC tenía 18–28 % de CPU y ~50 % de la tarjeta ocupados por otros programas (TextInputHost trabado, Opera GX, Discord transmitiendo), y otras sesiones con juegos y compilaciones. El punto ahora pide **avisos ciertos**: ningún «espera al jugador» y cada «Tu PC no alcanza» respaldado por el medidor de esa pestaña (bajo 50 durante 6 s). `prueba-sincro` **11/11** (02:32: avisos ciertos a 52–54 cuadros/s; y 02:21 con otras pruebas encima); `--directa` 12/13 por la C4 (A trabada 5–9 s al largar, cortada en el cuadro 20). Riesgo 11 nuevo: la sala cuesta ~15 ms por cuadro en este procesador.
+- **2026-10-20 02:04** — **Multiplayer local directo (M8) y los 200cc de la sala (D1)** (§84). Local abre un submenú
+  2/3/4 Players en el menú de inicio y salta directo al registro de mandos del juego (sección 0x54). Antes del salto,
+  `directo_nativo.cpp` hace lo mismo que el botón del menú principal (`ResetSectionParamsAndRacedataScenario1`,
+  0x808516BC, con la cantidad de jugadores; `mkw_directo_locales`); sin eso salía el cartel «mando interrumpido». Banco
+  `inicio` 15/15, `prueba-inicio` 14/14. D1: medido con el juego, la «100cc» de la sala corre como 200cc en RR (avance
+  de las CPU en el cuadro 1500: 1,1707 en 150cc, 1,2178 en «100cc»); el sitio la llama 200cc (Paginita-Pro
+  `3fa0816`). D2 ya estaba (§74); C4 sin repetirse.
 - **2026-10-20 01:40** — **Todo al sitio** (§82.6). `subir-kit.sh` llevó a `terceros/Paginita-Pro/juegos/mkw` lo de
   §80/§80b (relevo y sincronía de tiempo), §81 (ayuda de la tarjeta de video), §82 (el VR de la sala) y §83 (las copas
   al azar). En el sitio, `mkw.js` (`{tipo:'vr'}`, `pideVrs` al terminar) y `reglas.js` («Tu VR»). El bundle
   `juegos-app.js` ya estaba al día: rearmado aparte, idéntico byte a byte. Pruebas del sitio: Mario Kart 22/22, todas
   977/978 (la que falla es de Worms y del separador de ruta de Windows, no de Mario Kart). `prueba-experiencia` 17/17.
-  Commit local en el sitio solo con archivos de Mario Kart, sin push. El `.wasm` con §83 lo sube el dueño a R2.
+  Commit local en el sitio (`9a8bb31`) solo con archivos de Mario Kart, sin push. El `.wasm` con §83 lo sube el dueño a R2.
 - **2026-10-20 00:58** — **Las copas que se separaban (C2)** (§83). La copa al azar 65.0/75.0/39.0/74.1 (semilla
   3549642503) se separaba cerca del cuadro 6100 de la carrera 1. El vigía del reloj (`MKW_DEPURAR_RELOJ=1`,
   `depurar_reloj.cpp`) anotó quién lee la hora del procesador durante la carrera. Casi todo era sonido, pantalla o el

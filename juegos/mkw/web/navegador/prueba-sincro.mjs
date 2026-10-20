@@ -9,7 +9,8 @@
 //   - a los karts de los humanos el juego no los trata como CPU (sin la marca de CPU);
 //   - las "huellas" (el avance de los 12 karts cada 120 cuadros) son iguales en las dos: la misma carrera;
 //   - los karts de A y de B se mueven con lo que toca cada uno (A avanza; B también, por otro camino);
-//   - cuánto esperó cada una por los botones de la otra (el costo de sincronizar).
+//   - cuánto esperó cada una por los botones de la otra (el costo de sincronizar);
+//   - que los avisos de sala lenta digan la verdad, comparados con el medidor de cada pestaña (§85).
 // Fotos en build/web/datos/sincro/.
 //
 // Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--extra=&param=valor] [--puerto=8147] [--datos=build/web/datos/sincro]
@@ -166,11 +167,15 @@ for (const hasta = Date.now() + 60000; Date.now() < hasta;) {
   if ((ea?.etapa ?? 0) >= 2 && (eb?.etapa ?? 0) >= 2) break;
   await espera(250);
 }
+// (§85: desde aquí, las dos corriendo, se mide el ritmo de cada una con su medidor; la carga de la pista y la cuenta
+// regresiva quedan fuera: su tirón ya lo ignora el aviso, que pide dos ratos malos seguidos)
+const desdeRegistro = registro.length;
 await tecladoA.down('KeyK'); await tecladoB.down('KeyK');
 await espera(9000);
 await tecladoB.down('KeyA'); await espera(1500); await tecladoB.up('KeyA');
 await espera(20000);
 const xa = await leer(A), xb = await leer(B);
+const hastaRegistro = registro.length;                 // (§85: las fotos que siguen traban un poco la página)
 const fotoA = await A.locator('#canvas').screenshot({ path: path.join(carpeta, 'A.png') }).catch(() => null);
 const fotoB = await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B.png') }).catch(() => null);
 await tecladoA.up('KeyK'); await tecladoB.up('KeyK');
@@ -198,9 +203,32 @@ ok('el kart de B avanzó con lo que tocó B (y no igual que el de A)', (xa?.av?.
 const msPorCuadro = x => x?.ls ? (x.ls.msEsperando / Math.max(1, x.ls.cuadros)).toFixed(2) : '-';
 const esperas = `A ${msPorCuadro(xa)} ms (máx ${xa?.ls?.maxEspera?.toFixed(0)}), B ${msPorCuadro(xb)} ms (máx ${xb?.ls?.maxEspera?.toFixed(0)}); esperando que el otro llegara a la carrera: A ${((xa?.ls?.msLlegada || 0) / 1000).toFixed(1)} s, B ${((xb?.ls?.msLlegada || 0) / 1000).toFixed(1)} s`;
 const avisos = x => [...new Set(x?.avisos || [])].slice(-2).join(' / ') || 'ninguno';
+// §85: el ritmo que de verdad tuvo cada pestaña en la carrera, medido aparte del lockstep: el medidor de la página
+// escribe en la consola una línea por segundo ("[medidor] N s: cuadro C, F fps, trabajo T ms"). Da la mediana de los
+// cuadros por segundo y del trabajo por cuadro, y el peor promedio de 6 s seguidos (lo que mira el aviso: dos ratos
+// de 3 s), con las dos ya corriendo. Como un voltímetro aparte para comprobar lo que marca el panel.
+const ritmo = n => {
+  const v = registro.slice(desdeRegistro, hastaRegistro).map(l => l.match(new RegExp(String.raw`^\[${n}\] \[medidor\] \d+ s: cuadro \d+, ([\d.]+) fps, trabajo ([\d.]+) ms`)))
+    .filter(Boolean).map(m => [+m[1], +m[2]]);
+  const mediana = a => a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : NaN;
+  let peor6 = Infinity;
+  for (let i = 0; i + 6 <= v.length; i++) peor6 = Math.min(peor6, v.slice(i, i + 6).reduce((t, x) => t + x[0], 0) / 6);
+  return { fps: mediana(v.map(x => x[0])), trabajo: mediana(v.map(x => x[1])), peor6 };
+};
+const textoRitmo = r => `${r.fps.toFixed(0)} cuadros/s con ${r.trabajo.toFixed(1)} ms de trabajo por cuadro (lo peor, 6 s seguidos: ${r.peor6.toFixed(0)})`;
 if (!process.argv.includes('--lento')) {
   ok('sincronizar cuesta poco (espera promedio por cuadro < 4 ms)', Number(msPorCuadro(xa)) < 4 && Number(msPorCuadro(xb)) < 4, esperas);
-  ok('sin avisos de sala lenta', !(xa?.avisos?.length) && !(xb?.avisos?.length), `A: ${avisos(xa)} · B: ${avisos(xb)}`);
+  // §85: antes este punto pedía CERO avisos, y eso dependía de cuánto tenía ocupada la PC el resto de los programas: con
+  // dos juegos en la misma PC y «todo a la vista» (§61) cada cuadro lleva 13-20 ms de los 16,7 que hay, así que la
+  // misma prueba daba 52-60 cuadros/s según el momento, y bajo 50 el aviso «Tu PC no alcanza» es CIERTO. Lo que el
+  // punto cuida (§70) es que no haya avisos falsos (el tirón de la largada, cuentas mal hechas): ningún «espera al
+  // jugador» (con el relevo de §80 nadie espera a nadie en esta prueba) y cada «Tu PC no alcanza» respaldado por el
+  // medidor propio de esa pestaña (bajo 50 durante 6 s; 52 de tolerancia: los dos miden en ratos un poco corridos)
+  const [ra, rb] = [ritmo('A'), ritmo('B')];
+  const cierto = (x, r) => (x?.avisos || []).every(t => t.startsWith('Tu PC') && r.peor6 < 52);
+  ok('los avisos de sala lenta dicen la verdad (ninguno «espera al jugador»; «Tu PC no alcanza» solo si el medidor de esa pestaña bajó de 50 cuadros/s 6 s seguidos)',
+    cierto(xa, ra) && cierto(xb, rb), `A: ${avisos(xa)} · B: ${avisos(xb)} · la PC en la carrera: A ${textoRitmo(ra)}, B ${textoRitmo(rb)}`);
+  if (ra.fps < 55 || rb.fps < 55) console.log('  (nota: la PC va justa para dos juegos con «todo a la vista»; con otros programas ocupándola puede bajar de 50 y el aviso es cierto — bitácora §85)');
 } else {
   // B con la CPU frenada (§70, C5): toda la sala va a su ritmo (A espera a B en cada cuadro) y las dos lo avisan:
   // A, "espera al jugador 2"; B, "tu PC no alcanza"

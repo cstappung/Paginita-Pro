@@ -20,9 +20,11 @@ test('caben 4 (cada piloto es un jugador de verdad en todas las consolas) y se a
  assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);assert.equal(M.cupoDe({juego:'mkw',cupo:12}),4,'una sala vieja de 12 se recorta a 4');
  const e=M.reducir({...sala(),jugadores:{a:{nombre:'Ana',orden:0}}});
  assert.equal(e.fase,'vestibulo','uno solo ya tiene vestíbulo');
- // al crearla, la sala pide sus 4 pilotos (sin la opción, cupoDe la dejaba en 2 y el tercero no podía entrar)
+ // al crearla, la sala va con sus 4 pilotos sin preguntar (§87, el dueño: «por defecto es para el número máximo»):
+ // la opción va oculta (sin ella cupoDe la dejaba en 2 y el tercero no podía entrar) y la ficha no dibuja las ocultas
  const opciones=fs.readFileSync(raiz('src/juegos-main.js'),'utf8').match(/^  mkw: \[([\s\S]*?)\]\s*\}\],?$/m);
- assert.ok(opciones&&/clave: "cupo", etiqueta: "Pilotos", por: 4, valores: cupos\("mkw"\)/.test(opciones[1]),'la opción Pilotos con 4 por omisión');
+ assert.ok(opciones&&/clave: "cupo", etiqueta: "Pilotos", por: JUEGOS\.mkw\.cupo, oculta: true, valores: \[\{ v: JUEGOS\.mkw\.cupo,/.test(opciones[1]),'la opción Pilotos, oculta, con el máximo');
+ assert.match(fs.readFileSync(raiz('src/juegos/salon.js'),'utf8'),/ctx\.opciones\(e\.id\)\.filter\(o => !o\.oculta\)/,'la ficha no pregunta las opciones ocultas');
  assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);
 });
 
@@ -281,4 +283,36 @@ test('el ensayo local (jugar.bat): los emuladores de Firebase y el catálogo «s
  // con emuladores: ni App Check ni Analytics (nada sale de la PC)
  assert.match(fb,/if \(APP_CHECK_SITE_KEY && !EMU &&/);
  assert.match(fb,/connectAuthEmulator\(auth, EMU\.auth/);
+});
+
+test('§87 echar: el anfitrión saca a quien quiera (vestíbulo o copa andando); la votación, con 3 o más',()=>{
+ const J=x=>JSON.stringify(x);
+ let e=M.reducir(sala({t:'echa',uid:'a',a:'c'}));
+ assert.ok(e.fuera.c,'el anfitrión echa a Carla');assert.equal(e.expulsados.length,1);assert.equal(e.expulsados[0].echado,true);
+ assert.equal(J(e.hist[e.hist.length-1]),J({e:'echado',uid:'c',por:'a'}));
+ e=M.reducir(sala({t:'echa',uid:'b',a:'c'}));assert.ok(!e.fuera.c,'Beto no es el anfitrión');assert.equal(e.expulsados.length,0);
+ e=M.reducir(sala({t:'echa',uid:'a',a:'a'}));assert.ok(!e.fuera.a,'no se echa a sí mismo');
+ e=M.reducir(sala({t:'echa',uid:'a',a:'zz'}));assert.equal(Object.keys(e.fuera).length,0,'a nadie que no esté');
+ // con la copa andando: sale al momento y la copa sigue con el mismo orden (su kart, sin nadie)
+ e=M.reducir(sala({t:'empieza',uid:'a'},{t:'echa',uid:'a',a:'b'}));
+ assert.ok(e.fuera.b);assert.equal(e.fase,'jugando');assert.deepEqual([...e.sincro],['a','b','c']);
+ // quien pasó el puesto ya no echa; el nuevo anfitrión sí; si el anfitrión se va, echa el siguiente
+ e=M.reducir(sala({t:'anfitrion',uid:'a',a:'b'},{t:'echa',uid:'a',a:'c'}));assert.ok(!e.fuera.c,'Ana ya no manda');
+ e=M.reducir(sala({t:'anfitrion',uid:'a',a:'b'},{t:'echa',uid:'b',a:'c'}));assert.ok(e.fuera.c,'Beto manda ahora');
+ e=M.reducir(sala({t:'abandona',uid:'a'},{t:'echa',uid:'b',a:'c'}));assert.ok(e.fuera.c,'se fue Ana: manda Beto');
+ // lo que haga el echado ya no cuenta: ni su voto ni sus jugadas
+ e=M.reducir(sala({t:'echa',uid:'a',a:'c'},{t:'voto',uid:'c',contra:'b'},{t:'voto',uid:'a',contra:'b'}));
+ assert.ok(e.fuera.b,'con Carla fuera quedan dos: el voto de Ana basta');
+ e=M.reducir(sala({t:'echa',uid:'a',a:'c'},{t:'voto',uid:'c',contra:'b'}));assert.ok(!e.fuera.b,'el voto de Carla (echada) no cuenta');
+ // la votación de todos los juegos: con 3, hacen falta los otros dos
+ e=M.reducir(sala({t:'voto',uid:'b',contra:'a'}));assert.ok(!e.fuera.a,'falta un voto');assert.equal(J(e.votos),J({a:['b']}));
+ e=M.reducir(sala({t:'voto',uid:'b',contra:'a'},{t:'voto',uid:'c',contra:'a'}));
+ assert.ok(e.fuera.a,'los otros dos votaron');assert.equal(e.anfitrion,'b','manda el siguiente');
+ assert.equal(J(e.hist.find(h=>h.uid==='a')),J({e:'expulsado',uid:'a'}));
+ // en la pantalla: el ⏏ de Mario Kart con 3 o más, el botón «Echar» del anfitrión y el aviso al juego
+ const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8'),mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(main,/enMkw \? juego && !datosFin\(p, est\) && !fuera\.has\(yo\) && activos\.length >= 3/,'la votación con 3 o más pilotos');
+ assert.match(mk,/manda && j\.uid !== uid \? `<button class="jg-mkw-echa"/,'el anfitrión tiene «Echar» en cada fila (también con la copa andando)');
+ assert.match(mk,/anota\(\{ t: "echa", uid, a: b\.dataset\.e \}\)/);
+ assert.match(mk,/enviar\("fuera", \{ uids: salieron \}\)/,'el marco sabe quién salió (la carrera lo corta ya)');
 });

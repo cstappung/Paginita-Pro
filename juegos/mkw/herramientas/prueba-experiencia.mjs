@@ -15,11 +15,15 @@
 //   - «¡A correr!» (§73, la sala sin Retro WFC): el juego de los dos se abre en la sala (modo=sala); la anfitriona arma
 //     la copa con el selector de la página y Piloto Dos ve «El anfitrión está eligiendo la copa…»; cada uno elige
 //     personaje y vehículo con las pantallas del juego; la carrera 1 abre directo en los dos, cada uno con SU
-//     pantalla, sincronizados (las huellas coinciden): el buzón de la red pasa por la base del emulador con las reglas.
+//     pantalla, sincronizados (las huellas coinciden): el buzón de la red pasa por la base del emulador con las reglas;
+//   - §87: la ficha no pregunta cuántos pilotos (la sala nace con 4); al final la anfitriona echa a Piloto Dos (con la
+//     carrera andando, o en el vestíbulo con --rapida): a él se le va el juego con el aviso y la carrera de Uno sigue.
 // Fotos en build/web/datos/experiencia/. Tarda ~6-9 min (la carrera con dos juegos en el mismo PC).
 //
-// Uso:  node herramientas/prueba-experiencia.mjs [--ventana] [--rapida] [--ya]
+// Uso:  node herramientas/prueba-experiencia.mjs [--ventana] [--rapida] [--ya] [--playlist]
 //       --rapida: sin la carrera (~2 min).  --ya: usa un ensayo que ya está corriendo en 8154 (no arranca otro).
+//       --playlist (§87): la sala en «Modo playlist» (como la abrió el dueño): la anfitriona arma una lista de 2 y la
+//       confirma, Piloto Dos ve el selector de sugerir; después lo mismo que la copa (elegir, la carrera 1 en los dos).
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +48,7 @@ const matar = h => { if (!h || h.exitCode !== null) return; if (process.platform
 let ensayo = null;
 if (!args.includes('--ya')) {
   ensayo = spawn(process.execPath, [path.join(raiz, 'herramientas/experiencia.mjs'), '--sin-ventanas', '--puerto', String(PUERTO),
-    '--carpeta', 'build/emuladores-prueba', '--limpiar'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    '--carpeta', 'build/emuladores-prueba', '--limpiar', '--emu-desplazar', '10000'], { stdio: ['ignore', 'pipe', 'pipe'] });
   const salida = [];
   await new Promise((listo, fallo) => {
     const reloj = setTimeout(() => fallo(new Error('el ensayo no arrancó en 4 min:\n' + salida.join(''))), 240000);
@@ -74,7 +78,9 @@ async function entrar(p, nombre) {
   await p.locator('#btnEntrar').waitFor({ timeout: 20000 });
   const [ventanita] = await Promise.all([p.waitForEvent('popup', { timeout: 15000 }), p.locator('#btnEntrar').click()]);
   await ventanita.waitForLoadState();
-  await ventanita.locator(`text=${nombre}`).first().click();
+  // (si la cuenta no aparece, la foto de la ventanita dice por qué)
+  await ventanita.locator(`text=${nombre}`).first().click()
+    .catch(async e => { await ventanita.screenshot({ path: path.join(carpeta, `ventanita-${nombre.split(' ')[1] || nombre}.png`) }).catch(() => {}); throw e; });
   await p.waitForFunction(n => document.querySelector('#btnEntrar') === null || document.body.textContent.includes(n), nombre.split(' (')[0], { timeout: 20000 });
   await espera(2500);                                   // la lista de amigos (/soy) y el catálogo
 }
@@ -150,6 +156,9 @@ try {
   ok('B hasta el título → vuelve el menú; Multiplayer → Online: Juegos abre la ficha de la sala de Mario Kart',
      !!m?.visible && JSON.stringify(opciones) === '["local","salas","volver"]' && ficha, `menú ${m?.visible}, ${opciones.join('/')}, ficha ${ficha}`);
   await foto(uno, '5-ficha-sala.png');
+  // §87: la ficha no pregunta cuántos pilotos (la sala nace con el máximo, pedido del dueño); el modo sí
+  const opsFicha = await uno.$$eval('.jg-hoja-ops select', l => l.map(s => s.dataset.op)).catch(() => []);
+  ok('§87: la ficha no pregunta cuántos pilotos (la sala nace con 4); sí el modo', !opsFicha.includes('cupo') && opsFicha.includes('estilo'), opsFicha.join(', '));
 
   // la sala: Piloto Uno la abre (copa, hasta 4 pilotos)
   await uno.locator('.jg-hoja-ya[data-f=sala]').click();
@@ -183,6 +192,14 @@ try {
      tIn.length === 0 && privadoSolo && privadaSala && !marcoIntruso, `tarjetas ${tIn.length}, solo ${privadoSolo}, sala ${privadaSala}, marco ${marcoIntruso}`);
   await intruso.context().close();
 
+  // --playlist (§87): la playlist como la abrió el dueño (el modo en el vestíbulo y «¡A correr!»): los dos tienen que
+  // llegar a su selector (la anfitriona arma la lista, Piloto Dos sugiere), confirmar, elegir y correr la carrera 1
+  const enPlaylist = args.includes('--playlist');
+  if (enPlaylist) {
+    await uno.locator('.jg-mkw-modo[data-e=playlist]').click();
+    const vp = await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /Modo playlist/.test(t), 15000);
+    ok('la anfitriona pasa la sala a «Modo playlist» y Piloto Dos lo ve', /Modo playlist/.test(vp || ''));
+  }
   if (!args.includes('--rapida')) {
     // «¡A correr!» (§73): el juego de los dos se abre en la sala (modo=sala), sin nada del Wi-Fi del juego
     await uno.locator('.jg-mkw-empieza').click();
@@ -199,7 +216,8 @@ try {
       const aviso = document.getElementById('avisoJuego');
       return { s: e.seccion, pagina: e.pagina, ls: window.mkwSincro?.lockstep?.estado() || null, sala: window.mkwEstado?.sala || null,
         eleccion: window.mkwEstado?.eleccion || null, carrera: window.mkwEstado?.piloto?.carrera,
-        picker: !!document.getElementById('elegirPista'), aviso: aviso && !aviso.hidden ? aviso.textContent : '',
+        picker: !!document.getElementById('elegirPista'), modoPicker: document.getElementById('elegirPista')?.className || '',
+        confirmar: !!document.getElementById('listaConfirmar'), aviso: aviso && !aviso.hidden ? aviso.textContent : '',
         tipos: [0, 1, 2].map(i => L.u32(esc + 8 + i * 0xF0 + 0x10)), pantalla: L.u8(esc + 0xB64),
         cortina: !document.body.classList.contains('sin-cortina') };
     })]).catch(() => null);
@@ -208,18 +226,39 @@ try {
     const foco = async f => { const el = await f.frameElement().catch(() => null); await el?.focus().catch(() => {}); await f.evaluate(() => window.focus()).catch(() => {}); };
     const tecla = async (p, t, ms = 150) => { await p.keyboard.down(t); await espera(ms); await p.keyboard.up(t); };
 
-    // 1) la copa: la anfitriona ve el selector de la página, Piloto Dos el aviso
-    const a1 = mA && await esperarQue(mA, x => x.picker, 60000);
-    const b1 = mB && await esperarQue(mB, x => /eligiendo la copa/.test(x.aviso), 60000);
-    ok('la anfitriona ve el selector de copa de la página y Piloto Dos «El anfitrión está eligiendo la copa…»', !!a1?.picker && /eligiendo la copa/.test(b1?.aviso || ''), b1?.aviso || '');
-    const [a2, b2] = [mA && await esperarQue(mA, x => x.s === 0x49 && !x.cortina, 120000), mB && await esperarQue(mB, x => x.s === 0x49 && !x.cortina, 60000)];
-    ok('el juego de los dos arrancó directo en la pantalla de personaje (sección 0x49), sin el título ni las licencias',
-       [a2, b2].every(x => x?.s === 0x49 && x.pagina === 0x6B), `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
-    await foto(uno, '8-copa-uno.png'); await foto(dos, '8-espera-dos.png');
-    // (§74: el selector de copas: «Una al azar» marca una copa y «Jugar la Copa N» la confirma)
-    await mA.click('#copaAzar');
-    await espera(300);
-    await mA.click('#copaJugar');
+    if (enPlaylist) {
+      // 1) la playlist: la anfitriona arma la lista y Piloto Dos ve el selector de sugerir (§74)
+      const a1 = mA && await esperarQue(mA, x => /modo-lista/.test(x.modoPicker) && x.confirmar, 90000);
+      const b1 = mB && await esperarQue(mB, x => /modo-sugerir/.test(x.modoPicker), 60000);
+      ok('playlist: la anfitriona ve el selector para armar la lista y Piloto Dos el de sugerir',
+         /modo-lista/.test(a1?.modoPicker || '') && /modo-sugerir/.test(b1?.modoPicker || ''), `A «${a1?.modoPicker}» · B «${b1?.modoPicker}» ${b1?.aviso || ''}`);
+      const [a2, b2] = [mA && await esperarQue(mA, x => x.s === 0x49 && !x.cortina, 120000), mB && await esperarQue(mB, x => x.s === 0x49 && !x.cortina, 60000)];
+      ok('el juego de los dos arrancó directo en la pantalla de personaje (sección 0x49), sin el título ni las licencias',
+         [a2, b2].every(x => x?.s === 0x49 && x.pagina === 0x6B), `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
+      await foto(uno, '8-playlist-uno.png'); await foto(dos, '8-sugerir-dos.png');
+      // dos pistas (copa 0 pista 0, copa 2 pista 1) y «Confirmar la playlist»
+      await mA.locator('#elegirPista .pista').nth(0).click();
+      await espera(400);
+      await mA.locator('#elegirPista .pista').nth(9).click();
+      await espera(600);
+      await mA.click('#listaConfirmar');
+      const [a3, b3] = [await esperarQue(mA, x => x.sala?.fase === 'elegir' && !x.picker, 20000), await esperarQue(mB, x => x.sala?.fase === 'elegir' && !x.picker, 20000)];
+      ok('la anfitriona confirma: los dos pasan a elegir personaje (el selector de Piloto Dos se cierra solo)',
+         [a3, b3].every(x => x?.sala?.fase === 'elegir' && !x.picker && x.sala.carreras === 2), `A ${a3?.sala?.fase} · B ${b3?.sala?.fase} selector ${b3?.picker}`);
+    } else {
+      // 1) la copa: la anfitriona ve el selector de la página, Piloto Dos el aviso
+      const a1 = mA && await esperarQue(mA, x => x.picker, 60000);
+      const b1 = mB && await esperarQue(mB, x => /eligiendo la copa/.test(x.aviso), 60000);
+      ok('la anfitriona ve el selector de copa de la página y Piloto Dos «El anfitrión está eligiendo la copa…»', !!a1?.picker && /eligiendo la copa/.test(b1?.aviso || ''), b1?.aviso || '');
+      const [a2, b2] = [mA && await esperarQue(mA, x => x.s === 0x49 && !x.cortina, 120000), mB && await esperarQue(mB, x => x.s === 0x49 && !x.cortina, 60000)];
+      ok('el juego de los dos arrancó directo en la pantalla de personaje (sección 0x49), sin el título ni las licencias',
+         [a2, b2].every(x => x?.s === 0x49 && x.pagina === 0x6B), `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
+      await foto(uno, '8-copa-uno.png'); await foto(dos, '8-espera-dos.png');
+      // (§74: el selector de copas: «Una al azar» marca una copa y «Jugar la Copa N» la confirma)
+      await mA.click('#copaAzar');
+      await espera(300);
+      await mA.click('#copaJugar');
+    }
 
     // 2) cada uno elige personaje, vehículo y derrape con las pantallas del juego (Piloto Dos, antes, uno a la derecha)
     const elegir = async (p, f, derecha) => {
@@ -260,6 +299,27 @@ try {
     ok('en la página de cada uno se ve UNA vista (la de su kart), no la pantalla partida', pa && pb && !pa.partida && !pb.partida && !pa.vacia && !pb.vacia,
        `costura en el medio: A ${pa?.pico}/${pa?.segunda?.pico} (típico ${pa?.tipico}), B ${pb?.pico}/${pb?.segunda?.pico} (típico ${pb?.tipico}); barras recortadas A ${pa?.barras} B ${pb?.barras} px`);
   }
+
+  // §87: echar. La anfitriona saca a Piloto Dos con «Echar» (en la prueba larga, con la carrera andando): a Dos se le va
+  // el juego y ve el aviso; la sala de Uno queda de 1 y, si había carrera, sigue sin esperarlo
+  const enSalaJuego = u => new URL(u).searchParams.get('modo') === 'sala';
+  const marcoA = marcoDel(uno, enSalaJuego);
+  const lsDe = f => f.evaluate(() => window.mkwSincro?.lockstep?.estado() || null).catch(() => null);
+  const cuadroAntes = marcoA ? ((await lsDe(marcoA))?.cuadro || 0) : 0;
+  uno.once('dialog', d => d.accept());
+  await uno.locator('.jg-mkw-echa').first().click({ timeout: 10000 });
+  const vDos = (await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /te sacó/.test(t), 15000) || '').replace(/\s+/g, ' ');
+  const vUno2 = (await hastaQue(() => uno.textContent('.jg-mkw-vest'), t => /1 de 4/.test(t.replace(/\s+/g, ' ')), 10000) || '').replace(/\s+/g, ' ');
+  const marcoDos = await hastaQue(async () => marcoDel(dos, enSalaJuego) ? 'sigue' : 'sin juego', v => v === 'sin juego', 10000);
+  await foto(dos, '10-echado-dos.png');
+  ok('§87: la anfitriona echa a Piloto Dos: a él se le va el juego y ve «El anfitrión te sacó de esta sala»; la sala de Uno queda de 1',
+     /te sacó/.test(vDos) && /1 de 4/.test(vUno2) && marcoDos === 'sin juego', `Dos: «${vDos.slice(-70)}» · Uno «1 de 4» ${/1 de 4/.test(vUno2)} · Dos ${marcoDos}`);
+  if (marcoA && cuadroAntes > 0) {
+    await espera(5000);
+    const ls = await lsDe(marcoA);
+    ok('§87: con la carrera andando, la de Uno sigue sin esperar al echado (lo corta al momento)', !!ls && ls.cuadro > cuadroAntes + 120 && !ls.desincronizado,
+       `cuadro ${cuadroAntes} → ${ls?.cuadro}, cortes ${JSON.stringify(ls?.cortes)}`);
+  }
   codigo = mal ? 1 : 0;
 } catch (e) {
   console.log('✗ la prueba se cortó — ' + (e && e.stack || e));
@@ -268,5 +328,13 @@ try {
   fs.writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
   await navegador.close().catch(() => {});
   matar(ensayo);
+  // (§87: el emulador de la base —java— a veces sobrevive al árbol del ensayo y deja su puerto tomado para la próxima
+  // vez. Los puertos + 10000 son solo de esta prueba: se cierra lo que siga escuchando en ellos)
+  if (ensayo && process.platform === 'win32') {
+    const propios = new Set([19099, 19000, 19199, 14400, 14500].map(String));
+    const pids = new Set(spawnSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8' }).stdout.split('\n')
+      .map(l => l.trim().split(/\s+/)).filter(c => c[3] === 'LISTENING' && propios.has(c[1].split(':').pop())).map(c => c[4]));
+    for (const pid of pids) spawnSync('taskkill', ['/pid', pid, '/T', '/F']);
+  }
   process.exit(codigo);
 }

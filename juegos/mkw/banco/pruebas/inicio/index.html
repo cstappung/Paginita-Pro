@@ -160,6 +160,25 @@ const I = crearInicio({ imagen: IMAGEN, buscar: w.buscar, leerMandos: () => mand
      JSON.stringify(opciones) === '["local","salas","volver"]' && e2.join() === 'salas' && S.visible, opciones.join('/'));
   S.ocultar(); await espera(450);
 }
+// 10b) §84: Multiplayer → Local → 2, 3 o 4 Players (y Back), como los botones del menú principal del juego: 4 botones
+//      dentro del panel y sin la línea de ayuda; Esc y Back vuelven a Multiplayer; «3 Players» avisa «local3» y se va
+{
+  const e3 = [];
+  const L = crearInicio({ imagen: IMAGEN, buscar: worker(200).buscar, alElegir: q => e3.push(q) });
+  await L.cargar(); L.mostrar(); L.elegir(1); L.aceptar(); L.elegir(0); L.aceptar();
+  const opciones = L.opciones.slice(), menu = L.estado.menu;
+  const raiz = [...document.querySelectorAll('#inicioJlo')].at(-1);
+  const cuatro = raiz.querySelector('.ij-menu').classList.contains('cuatro') && raiz.querySelectorAll('.ij-boton').length === 4;
+  const sinAyuda = getComputedStyle(raiz.querySelector('.ij-ayuda')).display === 'none';
+  tecla('Escape'); const trasEsc = L.estado.menu;
+  L.elegir(0); L.aceptar(); L.elegir(3); L.aceptar(); const trasBack = L.estado.menu;
+  L.elegir(0); L.aceptar(); L.elegir(1); L.aceptar();
+  ok('Local: 2, 3 o 4 Players y Back (4 botones, sin la ayuda); Esc y Back vuelven a Multiplayer; «3 Players» avisa «local3» y se va',
+     menu === 'local' && JSON.stringify(opciones) === '["local2","local3","local4","volver"]' && cuatro && sinAyuda &&
+     trasEsc === 'multi' && trasBack === 'multi' && e3.join() === 'local3' && !L.visible,
+     `${opciones.join('/')}, cuatro ${cuatro}, sin ayuda ${sinAyuda}, Esc → ${trasEsc}, Back → ${trasBack}, avisó ${e3.join()}`);
+  L.ocultar(); await espera(450);
+}
 // 11) La forma en la pantalla: acostado (16:9) la imagen entera y los botones sobre su columna derecha; teléfono parado:
 //     los 3 botones debajo de la imagen, dentro de la pantalla, de ≥ 44 px y sin pisarse
 async function medir(ancho, alto) {

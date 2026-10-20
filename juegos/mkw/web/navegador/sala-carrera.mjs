@@ -51,6 +51,7 @@
 //       después de la carrera actual), s.aceptar(id), s.rechazar(id), s.pausar(true|false)
 //       §75: alSalta: (uid, n) => … (ese humano se salta la carrera n); s.saltar(n) (esta página se salta la n)
 //       §82 VR: s.miVr(vr) (todos: el VR que tengo ahora); vrsDeCarrera(estado, n) = los VR con que se cuenta la n
+//       §87: s.quitar(uid) (la sala del sitio lo sacó: echado por el anfitrión, por votación, o se fue)
 //
 // §82, el VR: cada página le dice a la anfitriona el VR que tiene ({t:'vr'}); ella los lleva en el estado (vrs) y, al
 // empezar cada carrera, los congela (vrCarrera: {n, vrs}). Así todas las consolas calculan el VR de esa carrera con
@@ -81,8 +82,10 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   let salto = 0;                                  // §75: la carrera que esta página se salta (recargó con ella andando)
   let pedida = 0;                                 // §75 (la anfitriona): el número de la última copia pedida
   const esHumano = uid => humanos.some(h => h.uid === uid);
-  // §75: los que no dieron señales en PRESENTE_MS (la anfitriona siempre está: es ella la que pregunta)
-  const ausentes = () => humanos.filter(h => h.uid !== yo && !(ahora() - (vistos.get(h.uid) ?? -Infinity) <= PRESENTE_MS)).map(h => h.uid);
+  const sacados = new Set();                      // §87: los que salieron de la sala del sitio (echados, votados, idos)
+  // §75: los que no dieron señales en PRESENTE_MS (la anfitriona siempre está: es ella la que pregunta). §87: y los que
+  // la sala del sitio sacó, aunque su página siga mandando señales
+  const ausentes = () => humanos.filter(h => h.uid !== yo && (sacados.has(h.uid) || !(ahora() - (vistos.get(h.uid) ?? -Infinity) <= PRESENTE_MS))).map(h => h.uid);
   const enPlaylist = estilo === 'playlist';
   // §74: la playlist empieza armando la lista (si la sala trae pistas, quedan de base); la copa no tiene lista
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
@@ -280,6 +283,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // §75: esta página se salta la carrera n (recargó con ella andando, o la anfitriona la dejó fuera): lo dice en
     // cada latido (0 = ninguna) y ya mismo, para que nadie la espere
     saltar(n) { salto = n | 0; latido(); },
+    // §87: la sala del sitio sacó a ese piloto (lo echó el anfitrión, la votación, o se fue): desde la carrera que
+    // empiece después queda fuera en todas las consolas (la anfitriona lo pone en `fuera`), aunque siga conectado
+    quitar(uid) { if (!esHumano(uid) || uid === yo || sacados.has(uid)) return false; sacados.add(uid); return true; },
     get lista() { return lista; },
     detener() { parar(reparto); },
   };

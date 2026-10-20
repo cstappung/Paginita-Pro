@@ -45,6 +45,19 @@ async function abrir(nombre, uid) {
   const p = await contexto.newPage();
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); errores.push(`[${nombre}] ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
+  if (nombre === 'B') {
+    // §87: B como un perfil nuevo detrás del Worker (así le pasó al dueño en el sitio): sin los nombres de las pistas
+    // guardados (las dos pestañas comparten el almacenamiento: A los guarda) y con el índice de las imágenes 3 s más
+    // lento. El selector de sugerir tarda en dar su control y llegan estados mientras tanto: no tiene que abrir otro
+    await p.addInitScript(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) { return k === 'mkw.pistas' ? null : g.call(this, k); }; });
+    await p.route('**/indice.json', async r => { await espera(3000); await r.continue().catch(() => {}); });
+    // cuántos selectores llegó a tener B a la vez (con el bug eran dos: uno quedaba encima de la pantalla de personaje)
+    await p.addInitScript(() => {
+      window.__maxSelectores = 0;
+      const mirar = () => { window.__maxSelectores = Math.max(window.__maxSelectores, document.querySelectorAll('#elegirPista').length); };
+      new MutationObserver(mirar).observe(document, { childList: true, subtree: true });
+    });
+  }
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
     `&semilla=4242&modo=sala&estilo=playlist&carreras=2&cc=c150&cpu=normal&limite=45`);
   return p;
@@ -95,6 +108,8 @@ try {
   const [a3, b5] = [await esperarQue(A, x => x.sala?.fase === 'elegir' && !x.picker, 20000), await esperarQue(B, x => x.sala?.fase === 'elegir' && !x.picker, 20000)];
   ok('A confirma: las dos pasan a elegir personaje con la playlist de 2 (y el selector de B se cierra solo)',
      [a3, b5].every(x => x?.sala?.fase === 'elegir' && !x.picker && texto(x.sala.pistas) === '0.0 2.1' && x.sala.carreras === 2), `${texto(b5?.sala?.pistas)} · B selector «${b5?.picker}»`);
+  const maxB = await B.evaluate(() => window.__maxSelectores).catch(() => -1);
+  ok('§87: B nunca tuvo dos selectores a la vez (nombres de las pistas lentos, como un perfil nuevo en el sitio)', maxB === 1, `máximo ${maxB}`);
   const elegir = async (p, derecha) => {
     let visto = false, ultimo = 0;
     for (const hasta = Date.now() + 90000; Date.now() < hasta;) {

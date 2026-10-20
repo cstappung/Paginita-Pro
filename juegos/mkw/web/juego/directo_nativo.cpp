@@ -80,6 +80,7 @@ constexpr uint32_t kRksysMgr = 0x809BD748;      // puntero al RKSYS::Mgr (el arc
 constexpr uint32_t kRkpd = 0x524B5044;          // "RKPD": así empieza el bloque de una licencia que existe
 
 int32_t g_pedido = -1;          // la sección pedida por la página (-1 = nada)
+uint32_t g_locales = 2;         // §84: jugadores en la consola para el multijugador local (0x54): 2, 3 o 4
 int32_t g_cuadros_mando = -1;   // cuadros desde que se registró el mando (-1 = todavía no): el salto va 3 después
 int32_t g_licencia = -1;        // la licencia que hay que elegir antes (-1 = no tocarla)
 uint8_t g_mii[28] = {};         // el Mii para una licencia nueva: CreateID (8 bytes) + nombre UTF-16 big-endian (20)
@@ -318,6 +319,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int mkw_directo_boton(uint32_t funcion, uint32_t
     for (uint32_t f : BOTONES) if (f == funcion) { g_boton_funcion = funcion; g_boton_pagina = pagina; g_boton = boton; return 1; }
     return 0;
 }
+// §84: cuántos juegan en la consola en el multijugador local (sección 0x54): 2 a 4
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_locales(uint32_t n) { g_locales = n < 2 ? 2 : n > 4 ? 4 : n; }
 // la identidad del mando del jugador 1 (por omisión 0x124: GameCube, puerto 1)
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_mando(uint32_t id) { g_mando = id; }
 // dónde escribe la página el Mii para una licencia nueva (28 bytes: CreateID + nombre)
@@ -433,6 +436,16 @@ extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
         if (ok && g_hay_ficha) ok = escribirFicha(ctx, sm) ? 1 : 0;   // §73: la carrera, escrita como los menús
         g_hay_ficha = 0;
         if (ok) g_eleccion = 0;         // el modo elección termina con el salto
+        // §84: el multijugador en la consola (0x54), como el botón «2/3/4 Players» del menú principal
+        // (MainMenu::OnButtonClick, 0x8085110C): anota qué botón fue (SectionParams +296) y llama a
+        // MainMenu::ResetSectionParamsAndRacedataScenario1 (0x808516BC, no usa la página: r3 da igual) con la cantidad
+        // de jugadores: la deja en SectionParams +292, marca personas y CPU en la ficha de los menús y suelta los mandos
+        // de los puestos que sobran. Sin esto la pantalla de mandos veía al jugador 1 «desconectado» y pedía apretar A.
+        if (ok && seccion == 0x54) {
+            const uint32_t sp = Memory::Read32(sm + 0x98);
+            if (sp) Memory::Write32(sp + 296, g_locales - 1);
+            llamar<0x808516BCu>(ctx, 0, g_locales);
+        }
         if (ok) {                       // sin licencia no se salta (los menús sin Mii dejan al juego esperando para siempre)
             llamar<0x80635A3Cu>(ctx, sm, static_cast<uint32_t>(seccion), 0);    // la que sigue: esta
             llamar<0x80635AC8u>(ctx, sm, 0, 0x000000FFu);                       // cámbiala ya, fundido negro

@@ -17,6 +17,8 @@
 //
 // Uso:  node herramientas/experiencia.mjs [--ventanas 1|2|3] [--sin-ventanas] [--puerto 8150] [--limpiar] [--carpeta build/emuladores]
 //       --limpiar: borra lo guardado en los emuladores (cuentas, salas, partidas en la nube) y empieza de cero.
+//       --emu-desplazar N: los emuladores en sus puertos + N (§87: la prueba usa 10000, así corre aunque el jugar.bat
+//       esté abierto con los de siempre: 9099, 9000, 9199, 4400, 4500).
 //       Requiere: Java (los emuladores de base y Storage) y firebase-tools en herramientas/cache/firebase-tools
 //       (npm install --prefix herramientas/cache/firebase-tools firebase-tools@14.27.0).
 import { spawn, spawnSync } from 'node:child_process';
@@ -42,7 +44,8 @@ const CUENTAS = [
   { sub: 'piloto3', email: 'piloto3@paginita.test', name: 'Piloto Tres', amigo: true },
   { sub: 'intruso', email: 'intruso@paginita.test', name: 'Intruso (no es amigo)', amigo: false },
 ];
-const PUERTOS_EMU = { auth: 9099, database: 9000, storage: 9199, hub: 4400, logging: 4500 };
+const DESPLAZAR = Number(opcion('--emu-desplazar', 0)) || 0;       // §87: otros puertos para los emuladores
+const PUERTOS_EMU = Object.fromEntries(Object.entries({ auth: 9099, database: 9000, storage: 9199, hub: 4400, logging: 4500 }).map(([k, p]) => [k, p + DESPLAZAR]));
 const hijos = [];
 const di = (...t) => console.log('[jugar]', ...t);
 
@@ -100,7 +103,8 @@ async function cuentas() {
 async function sitio() {
   for (const p of [PUERTO, PUERTO + 1]) if (!(await libre(p))) throw new Error(`el puerto ${p} está ocupado: ¿quedó abierto otro jugar.bat o sitio-local?`);
   const amigos = CUENTAS.filter(c => c.amigo).map(c => c.email).join(',');
-  const h = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local.mjs'), '--puerto', String(PUERTO), '--emuladores', '--solo', 'mkw', '--amigos', amigos],
+  const h = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local.mjs'), '--puerto', String(PUERTO), '--emuladores', '--solo', 'mkw', '--amigos', amigos,
+    ...(DESPLAZAR ? ['--emu-desplazar', String(DESPLAZAR)] : [])],
     { stdio: ['ignore', 'pipe', 'inherit'] });
   hijos.push(h);
   await esperarLinea(h, /la página sola/, 60000, 'el sitio local');

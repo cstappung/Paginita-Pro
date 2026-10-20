@@ -8,7 +8,8 @@
 //   - Single Player: el menú se va y el juego ABRE DIRECTO su menú «Un jugador» (0x69), sin cortina (§71: por código,
 //     con el fundido del propio juego);
 //   - B, B (al título del juego): vuelve nuestro menú de inicio;
-//   - Multiplayer → Local: el piloto deja el juego en su menú principal (0x5a) con el cursor a la derecha;
+//   - Multiplayer → Local → 2 Players: el juego ABRE DIRECTO su registro de mandos (sección 0x54, página 0x62, §84)
+//     con 2 jugadores (SectionParams +292) y sin el cartel de «mando desconectado», sin cortina;
 //   - sin ?inicio=1 no aparece (las demás pruebas siguen igual);
 //   - en el sitio (sitio-local.mjs con el Worker de verdad y un token de amigo): aparece, y Multiplayer ofrece «Online»,
 //     que le avisa a Juegos; la página suelta, sin sesión: el Worker contesta 401 y el menú NO aparece.
@@ -110,12 +111,16 @@ try {
   m = await hasta(p, x => x.visible, 8000);
   ok('B, B (al título del juego): vuelve el menú de inicio y el juego otra vez silenciado', m.visible && m.silenciado, `menú ${m.visible}, sección 0x${(m.seccion ?? -1).toString(16)}`);
 
-  // Multiplayer → Local
-  await tecla('ArrowDown'); await tecla('Enter'); await tecla('Enter', 300);
+  // Multiplayer → Local → 2 Players
+  await tecla('ArrowDown'); await tecla('Enter'); await tecla('Enter'); await tecla('Enter', 300);
   m = await hasta(p, x => x.piloto && x.piloto.modo === 'local' && !x.cortina, 60000, 300);
+  await espera(2500);                                       // (el cartel de «mando desconectado» salía al rato)
+  m = await mirar(p);
+  const locales = await p.evaluate(() => { const L = window.mkwMenus, sp = L.u32(L.u32(0x809C1E38) + 0x98); return sp ? L.u32(sp + 292) : -1; });
   await p.locator('#canvas').screenshot({ path: path.join(carpeta, '4-local.png') });
-  ok('Multiplayer → Local: el piloto deja el juego en su menú principal (0x5a)', !!m.piloto?.llego && m.piloto.modo === 'local' && m.pagina === 0x5a && !m.cortina,
-     `página 0x${(m.pagina ?? -1).toString(16)}, piloto ${JSON.stringify(m.piloto && { llego: m.piloto.llego, modo: m.piloto.modo })}`);
+  ok('Multiplayer → Local → 2 Players: el juego abrió directo su registro de mandos (0x54, página 0x62) con 2 jugadores, sin cortina',
+     !!m.piloto?.llego && !!m.piloto?.directo && m.piloto.modo === 'local' && m.seccion === 0x54 && m.pagina === 0x62 && locales === 2 && !m.cortina,
+     `página 0x${(m.pagina ?? -1).toString(16)} sección 0x${(m.seccion ?? -1).toString(16)}, jugadores ${locales}, piloto ${JSON.stringify(m.piloto && { llego: m.piloto.llego, modo: m.piloto.modo, directo: m.piloto.directo })}`);
   await contexto.close();
 
   // ---------- B) sin ?inicio=1 (Playwright): no aparece ----------

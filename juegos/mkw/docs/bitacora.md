@@ -714,6 +714,41 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Kit (del sitio)** | La copia de **nuestro** trabajo (páginas, `.mjs`, C++ propio, banco, documentos) que viaja dentro del sitio, en `terceros/Paginita-Pro/juegos/mkw/`. La arma `herramientas/subir-kit.sh` con la lista de git: lo que no está en `.gitignore`, o sea nada del juego. Es como el juego de planos que se le entrega al cliente: los planos sí, los equipos de otro fabricante no. |
 | **Separador de ruta (`/` y `\`)** | El signo que separa las carpetas en una dirección de archivo. Linux, macOS y la web usan `/` (`colabtex/src/juegos/worms.js`); Windows usa `\` (`colabtex\src\juegos\worms.js`). Una prueba que compara direcciones como texto falla en Windows si no cambia `\` por `/` antes. Es la misma dirección escrita con otra norma, como 1,5 y 1.5. |
 
+### Multijugador local directo y los 200cc (§84)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Registro de mandos** | La pantalla del juego «Controller Registration» (sección 0x54, página 0x62). Muestra el mando del jugador 1 y espera que cada uno de los demás apriete A en **su** mando; recién ahí sigue al menú de VS y Batalla. Como pasar lista: cada uno levanta la mano desde su asiento. |
+| **Lo que hace un botón antes de cambiar de pantalla** | El botón «2/3/4 Players» del menú principal no solo cambia de sección. Antes anota cuántos juegan, marca personas y CPU en la ficha de los menús y suelta los mandos de los puestos que sobran. Abrir directo por código tiene que hacer eso mismo; si no, la pantalla nueva cree que el mando del jugador 1 se desconectó. Como una maniobra que manda cerrar un interruptor: antes los enclavamientos tienen que estar en su posición. |
+| **Cantidad de jugadores locales** | Cuántas personas juegan en la misma consola (2, 3 o 4, cada una con su mando y su pedazo de pantalla). El juego la guarda en SectionParams +292, y con ella arma el registro de mandos y la pantalla partida. |
+| **Rótulo vs. valor (100cc → 200cc)** | El sitio guarda la cilindrada con una clave (`c100`) y muestra un texto. La clave es la cilindrada 100cc del juego, pero Retro Rewind corre esa cilindrada como **200cc** (y la 50cc como su «500cc»). El valor estaba bien; el texto decía otra cosa. Como un tablero con la etiqueta de un interruptor equivocada: el circuito funciona, pero quien lo lee se confunde. |
+| **Medir para comprobar** | Para saber qué cilindrada corre de verdad: la misma carrera con cada una, y cuánto avanzaron las 11 CPU en el cuadro 1500. Si «100cc» avanza más que 150cc, no es 100cc. Como medir la velocidad de un motor con un tacómetro en vez de creerle a la placa. |
+
+### La PC que no alcanzaba en la sala (§85)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Margen (de un cuadro)** | Lo que sobra de los 16,7 ms de cada cuadro después de hacer el trabajo. Como el margen de una fuente de poder: una fuente de 100 W que entrega 95 W anda, pero cualquier carga de más la hace caer. La carrera de la sala deja 0–2 ms de margen en este PC; una carrera sola, ~7 ms. |
+| **Todo a la vista** | El arreglo de §61 para que la carrera dé igual en todas las consolas. El juego anota qué objetos ve la cámara, y parte de la lógica actualiza menos lo que no se ve. Como cada consola mira desde otro kart, se marca todo como «a la vista y cerca», igual en todas. El costo: se dibuja y se actualiza toda la pista con todo detalle. Como dejar encendidas todas las luces del edificio para que los sensores de todos los pisos lean lo mismo. |
+| **Dibujar siempre** | El arreglo de §62: Retro Rewind se salta el dibujo de un cuadro si va atrasado, cada PC en otro momento, y eso separaba la carrera. En la sala se dibujan todos. Una PC lenta va más lenta, en vez de saltarse dibujos. |
+| **Núcleo físico y núcleo lógico** | El procesador de este PC (Ryzen 7 9800X3D) tiene 8 núcleos físicos, 8 procesadores de verdad. Cada uno puede llevar 2 hilos a la vez: son los 16 núcleos «lógicos» (SMT). Dos hilos en el mismo núcleo físico se reparten sus partes, como dos cargas colgadas del mismo transformador. |
+| **Afinidad (de un proceso)** | La lista de núcleos en los que Windows deja correr a un proceso. Sirve para un experimento: fijar cada pestaña en su núcleo propio y ver si iba lenta porque compartía núcleo. Aquí ayudó poco (56 → 59 cuadros/s): el costo era del trabajo, no del reparto. |
+| **Medidor aparte** | Una segunda medida, independiente, para comprobar la primera. El aviso cuenta los cuadros del lockstep; el medidor de la página cuenta los cuadros del juego y escribe una línea por segundo. Si el aviso dice «va a 48», el medidor tiene que haber visto lo mismo. Como comprobar con un voltímetro aparte lo que marca el panel. |
+| **Codificador de video (de la tarjeta)** | Un circuito de la tarjeta de video que comprime la imagen en video al momento. Discord lo usa para transmitir o compartir la pantalla. Ocupa la tarjeta y algo del procesador, aunque no se vea nada en pantalla. |
+| **Unión de carpetas (junction)** | Una carpeta que en realidad apunta a otra (`mklink /J`): entrar en ella es entrar en la original. Como un puente entre dos bornes: lo que haces en un lado pasa en el otro. Al borrar hay que quitar el puente primero (`cmd /c rmdir`), si no el borrado sigue hacia la original. |
+| **`git archive`** | Saca los archivos de un commit viejo a una carpeta suelta. No cambia de rama ni toca el trabajo en curso. Sirve para compilar y probar «el código de antes» al lado del de hoy. |
+
+### La sala: el inicio de la playlist, el cupo y echar (§87)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Condición de carrera (en el programa)** | Una falla que depende de qué llega primero. Aquí el selector de sugerir tardaba en «quedar armado» (esperaba los nombres de las pistas por la red) y, mientras tanto, llegaban más estados de la sala; cada uno creía que no había selector y abría otro. Si los nombres llegaban rápido no pasaba nada. Como dos relés que se cierran casi juntos: el resultado depende de cuál gana por microsegundos. |
+| **Marca de «abriendo»** | Una variable (`abriendoSug`) que se prende al instante, ANTES de esperar nada, y dice «ya hay un selector en camino». Los estados que llegan mientras tanto la ven y no abren otro. Como el piloto de un tablero que se enciende apenas se da la orden, no cuando el motor ya arrancó. |
+| **Selector huérfano** | Un selector abierto en la pantalla sin nadie que lo pueda cerrar: la página guardaba solo el control del último. Cuando la anfitriona confirmaba, la página cerraba ese y el otro quedaba encima del juego, tapando la pantalla de personaje. |
+| **Cupo de la sala** | Cuántos humanos caben en una sala del sitio. En Mario Kart es 4: cada piloto es un jugador «local» de verdad en todas las consolas, y el juego admite 4 mandos. La CPU completa los 12 lugares. Ya no se pregunta: toda sala nace con 4. |
+| **Echar (al anfitrión)** | El anfitrión saca a alguien de la sala con el botón «Echar». Es una jugada más del registro (`{t:"echa"}`), y el sitio la convierte en «se fue» solo si quien la escribe es el anfitrión en ese momento. Como el jefe de turno que puede retirar a alguien de la sala de control. |
+| **Votación para echar** | La de todos los juegos del sitio (⏏): si la mayoría de los demás vota contra alguien, sale. En Mario Kart se ofrece con 3 o más pilotos; con 2, votar sería echar solo, y eso le toca al anfitrión. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -6298,7 +6333,7 @@ byte a byte con `cmp`: salieron idénticos (2.602.768 bytes). El `juegos-app.js`
 - Otra sesión estaba midiendo el aviso de PC lenta (`prueba-sincro` en el puerto 8190). Esperé a que no quedara ningún
   node suyo y le avisé al terminar: dos juegos más en la misma PC le habrían cambiado las medidas.
 
-**El commit del sitio** (local, sin push) lleva solo `colabtex/src/juegos/mkw.js`, `colabtex/src/juegos/reglas.js`,
+**El commit del sitio** (`9a8bb31`, local, sin push) lleva solo `colabtex/src/juegos/mkw.js`, `colabtex/src/juegos/reglas.js`,
 `juegos-app.js` y `juegos/mkw/` (menos `juegos/mkw/AGENTS.md`), con rutas explícitas. No toca los cambios del sitio que
 no son nuestros: `index.html`, los `*.dc.html`, los `index.html` sellados de otros juegos y `AGENTS.md`.
 
@@ -6458,7 +6493,8 @@ coinciden; el ✗ es «sin avisos de sala lenta»: la pestaña A va a 48–50 cu
 prueba con la envoltura de `GetTick` apagada (un programa aparte, compilado solo para comparar) da lo mismo, y
 también sin la sincronía de tiempo (`&sincroTiempo=0`). Esa noche la PC tenía ~24 % de la CPU ocupada por otros
 programas sin ninguna prueba corriendo. En §70 este punto pasaba (11/11); queda por ver si es la PC o algo de
-§73–§80.
+§73–§80. **Resuelto en §85:** es la PC. El código de §70, compilado hoy, falla igual, y en §70 la prueba ya iba a
+52–55 cuadros/s. El punto ahora pide avisos ciertos, no cero avisos.
 
 Lo que no se probó directo: la vuelta a cero de la semilla para quien **recarga** (§75). Haría falta que, en la
 carrera a la que vuelve, salga un objeto sin cupo. Se razonó a partir del código: sin la vuelta a cero, esa consola
@@ -6479,3 +6515,435 @@ comparadas fueron iguales.
 - **Compilar aparte** (`--carpeta build/web-c2` y servir con `MKW_BUILD=build/web-c2/navegador`) para no pisar el
   programa que otra sesión está probando. La primera vez compila todo, ~5,5 min. Copiar `pipelines.bin` y
   `bloques.json` del build normal para que cargue igual.
+
+## 2026-10-20 · §84 Lo que faltaba para lanzar: Multiplayer local directo (M8) y los 200cc de la sala (D1)
+
+**Qué se pidió:** «continúa hasta que esté listo el juego». Se revisó el PLAN contra la definición de «Terminado»: un
+amigo entra al sitio, carga desde R2 y juega a 60 fps; partidas, récords y VR quedan en Firebase; la sala corre sin
+separarse. Quedaban cosas chicas del juego y la preparación para publicar (el paso 0 de `docs/publicar.md`). Las
+tareas grandes y separables se propusieron como sesiones aparte: los Mii invitados (M10), el sonido con AudioWorklet
+(E1), el kit al sitio (§82.6, ya hecho) y el aviso de PC lenta de `prueba-sincro`.
+
+### 84.1 Multiplayer → Local, directo por código (M8)
+
+**Antes:** en el menú de inicio JloKart, Multiplayer → Local usaba el «piloto», que apretaba botones por detrás hasta el
+menú principal del juego y dejaba el cursor sobre «2 Players». El dueño pidió que todo se abra directo por código y
+nunca con botones apretados por la página (§71).
+
+**Primer intento:** pedir la sección 0x54 (multijugador en la consola) igual que Single Player (0x48). El juego la
+abrió, pero encima salió el cartel «Communication with the controller has been interrupted. Please press the A
+Button», y apretar A no lo cerraba.
+
+**Por qué:** se leyó en el código traducido qué hace el botón del menú principal (`MainMenu::OnButtonClick`,
+0x8085110C). Los botones 1, 2 y 3 (2, 3 y 4 Players), antes de cambiar de sección:
+1. anotan cuál fue (SectionParams +296; el juego lo usa para dejar el cursor ahí al volver);
+2. llaman a `MainMenu::ResetSectionParamsAndRacedataScenario1` (0x808516BC) con la cantidad de jugadores, que:
+   - no usa la página (pisa `r3` al empezar);
+   - deja la cantidad en SectionParams +292;
+   - en la ficha de los menús (Racedata +0xC28 + i·0xF0) marca a los jugadores 1 a N como personas y al resto, hasta
+     12, como CPU;
+   - suelta los mandos de los puestos que sobran (0x8061B7C4 sobre el SectionPad);
+3. recién después cambian a la sección 0x54.
+
+El salto directo se saltaba el paso 2. La pantalla de registro veía una ficha que no correspondía y daba al jugador 1
+por desconectado.
+
+**El arreglo:**
+- `web/juego/directo_nativo.cpp`: si la sección pedida es 0x54, antes del salto se hace lo mismo que el botón
+  (SectionParams +296 y la llamada a 0x808516BC con la cantidad de jugadores). La cantidad la fija
+  `Module._mkw_directo_locales(n)`, de 2 a 4; si no se dice, es 2.
+- `web/navegador/inicio.mjs`: Local abre un submenú **2 Players / 3 Players / 4 Players / Back**, como los botones del
+  menú principal del juego. Es un cuarto botón en el mismo panel; en ese submenú no va la línea de ayuda, que ocupaba
+  ese lugar. Back, B o Esc vuelven a Multiplayer.
+- `web/navegador/mkw.mjs`: «local2…4» pide la sección 0x54 directo, sin cortina como Single Player, con esa cantidad.
+  `?directo=0` = el piloto de antes.
+
+**Resultado:** el juego abre directo «Controller Registration», con el mando del jugador 1 ya registrado, las casillas
+de los demás y «Press the A Button on the second player's controller». Es la misma pantalla del camino normal; desde
+ahí el juego sigue como siempre.
+
+### 84.2 La «100cc» de la sala es 200cc (D1)
+
+En Retro Rewind la cilindrada 100cc del juego corre como **200cc** fuera de las salas mundiales de Nintendo, y la 50cc
+como su «500cc» (Pulsar, `Is200cc` en `Race/200ccParams.hpp`, leído solo para entender). La sala del sitio ofrecía
+«150cc, 100cc, Espejo, Al azar», con la clave `c100` = la 100cc del juego: la opción «100cc» corría en realidad a
+200cc.
+
+Se midió con el juego antes de cambiar nada (`build/web/datos/cc-velocidad.mjs`, solo para mirar). Fue la misma carrera
+directa (pista 13.2, CPU normal) con cada cilindrada, y el avance medio de las 11 CPU en el cuadro 1500:
+
+| La sala dice | `engineClass` en la ficha | Avance de las CPU (vueltas) |
+|---|---|---|
+| 150cc (`c150`) | 2 | 1,1707 |
+| «100cc» (`c100`) | 1 | **1,2178**: más rápido que 150cc |
+| (`c50`, no está en el sitio) | 0 | 1,2805: el «500cc» |
+
+Una 100cc de verdad sería más lenta que 150cc, así que es 200cc. El arreglo es solo el texto:
+- en el sitio (`colabtex/src/juegos/motor.js`, `MKW_CC`), la opción ahora dice **200cc**;
+- la clave sigue siendo `c100`, porque las salas guardadas y el marco la usan;
+- el sorteo «Al azar» queda igual;
+- la CPU de esa cilindrada sigue en «normal», como en un Grand Prix de 200cc de Retro Rewind.
+
+Commit `3fa0816` en Paginita-Pro.
+
+### 84.3 Lo demás del PLAN, revisado
+
+- **D2 (imágenes del juego a R2):** ya estaba hecho. `herramientas/sacar-imagenes.mjs` y `empaquetar-imagenes.mjs` arman
+  las imágenes del selector de §74 (fotos de pistas, copas, videítos, planos), y `subir-r2.mjs` las sube con el
+  programa. Las caras de los Mii van con M10.
+- **C4 (el cuelgue ocasional al empezar la carrera):** no salió en ninguna de las corridas de §83 y §84, más de una
+  docena con dos pestañas y varias carreras cada una. Sigue en observación.
+
+### 84.4 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| Banco `inicio` | **15/15**, con 1 punto nuevo: el submenú de Local tiene sus 4 botones sin la ayuda, Back y Esc vuelven a Multiplayer, y «3 Players» avisa `local3` |
+| `prueba-inicio.mjs` (con el juego) | **14/14**. Multiplayer → Local → 2 Players da sección 0x54, página 0x62 y 2 jugadores en SectionParams +292, sin cartel ni cortina |
+
+```bash
+node banco/correr.mjs inicio
+node web/navegador/prueba-inicio.mjs
+```
+
+**Trampa:** la página activa que lee la prueba es la de más arriba. Con el cartel de «mando desconectado» encima era
+0x64 (el cartel); sin él es 0x62 (el registro de mandos). Por eso la prueba pide 0x62 y espera 2,5 s: el cartel salía
+un rato después de abrir la sección.
+
+## 2026-10-20 · §85 El aviso de «PC lenta» en prueba-sincro: era la PC, y la prueba pedía cero avisos
+
+**Resumen.** Desde anoche `prueba-sincro.mjs` daba 10/11. El punto que fallaba era «sin avisos de sala lenta»: una
+pestaña (casi siempre A) avisaba «Tu PC no alcanza 60 cuadros por segundo (va a 48)». **No es el código de §73–§83:**
+el código de §70 (commit `c6c4b89`), compilado hoy en una carpeta aparte, falla igual en esta PC. La carrera de la sala
+pesa más que una carrera sola: ~15–17 ms de procesador por cuadro, contra ~9 ms. Esto es a propósito: desde §61–§62
+todo se marca «a la vista» y se dibujan todos los cuadros, para que todas las consolas calculen igual. Con 16,7 ms por
+cuadro, el margen es de 0 a 2 ms, así que cuánto tienen ocupada la PC los otros programas decide si la carrera va a
+52–60 o a 48. En §70 el punto pasaba porque esa noche la carrera iba a 52–55, dentro de la franja en que el aviso no
+sale (50–55). Bajo 50, el aviso es **cierto**. El punto ahora pide **avisos ciertos**, no cero avisos: cada «Tu PC no
+alcanza» tiene que estar respaldado por el medidor propio de esa pestaña, y no puede salir ningún «espera al jugador».
+
+### 85.1 El síntoma
+
+`node web/navegador/prueba-sincro.mjs` (dos pestañas en el mismo Chrome, la misma carrera sincronizada; §61) daba 10/11
+desde la noche del 19 (§83.7). Las huellas coincidían. Fallaba solo «sin avisos de sala lenta»:
+
+- A: «Tu PC no alcanza 60 cuadros por segundo (va a 50): la sala va a tu ritmo». En la primera corrida de hoy, también B
+  (46 y 48).
+- A terminaba con retraso 12 (el máximo) y B con 2.
+- Ya se había descartado (§83.7) que viniera del arreglo de §83 o de la sincronía de tiempo (§80b).
+
+### 85.2 ¿El código o la PC? El mismo código de §70, compilado hoy
+
+La prueba más directa: correr **el código de cuando pasaba** en **la PC de hoy**.
+
+- `git archive c6c4b89 web herramientas banco parches` a `build/viejo-c6c4b89/` (una copia suelta: no toca la rama ni
+  `build/web`, que usan las otras sesiones).
+- Las carpetas grandes que no cambiaron (`terceros/`, `extraido/`, `herramientas/emsdk`, `herramientas/cache`,
+  `banco/node_modules`) entran como **uniones de carpetas** (ver Glosario), sin copiarlas.
+- Compilado con su propio `compilar-web.py` (7,5 min: todo desde cero en su carpeta). Las semillas `pipelines.bin` y
+  `bloques.json` se copiaron de `build/web/navegador`, para que cargue igual que el de hoy.
+- Corrida su propia `prueba-sincro.mjs` (la de §70).
+
+| Código | Cuándo se corrió | Resultado | Ritmo en la carrera (mediana) |
+|---|---|---|---|
+| §70 (`c6c4b89`) | 18-10, 23:50–23:55 (los registros de entonces, `build/web/datos/c5-normal*`) | **11/11** | 52–55 cuadros/s, 15,6–17,7 ms de trabajo por cuadro |
+| §70 (`c6c4b89`), compilado hoy | 20-10, 01:59 | **10/11**: A «va a 47», «va a 43» | 49,6 / 48,5 cuadros/s, 19,9 / 20,0 ms |
+| hoy (`cdd2295`) | 20-10, 01:35 | **10/11**: A «va a 50», B «va a 46», «va a 48» | 53,3 / 52,6 cuadros/s, 18,1 / 18,5 ms |
+
+El código viejo falla igual: **la diferencia está en la PC**. Y otro dato de la primera fila: en §70 la prueba ya corría
+**bajo 60** (52–55). Pasaba porque el aviso tiene una franja en que no dice nada (ver 85.5).
+
+### 85.3 Cuánto pesa cada carrera: un medidor por proceso
+
+Para saber dónde se va el tiempo armé un medidor aparte (en el borrador de la sesión, no en el repo). Corre la carrera
+y, durante 15–20 s de carrera, mide:
+
+- la CPU de cada proceso de Chrome (`SystemInfo.getProcessInfo` de las DevTools);
+- el tiempo de CPU del **hilo principal** de cada pestaña (lo da Windows: el hilo que más usa es el del juego);
+- el uso de la tarjeta de video (`nvidia-smi` cada 0,5 s);
+- un perfil del hilo de la pestaña A (en qué funciones pasa el tiempo).
+
+Todo en la misma PC, con la misma carga de fondo (85.6), uno tras otro:
+
+| Caso | Cuadros/s | Hilo principal ocupado | CPU por cuadro |
+|---|---|---|---|
+| Una pestaña sola (carrera directa, pista 0.0, sin sala) | 60 | 58–61 % | **~9,5 ms** |
+| Dos pestañas **sueltas** (dos carreras directas a la vez, sin sala) | 60 y 60 | 59 % y 59 % | **~9,6 ms** cada una |
+| Dos pestañas **en la sala** (la de `prueba-sincro`) | 51–56 | 84–88 % | **15–17 ms** cada una |
+| Lo mismo, cada pestaña fija en su núcleo físico (afinidad) | 59 | 81–89 % | 14–15 ms |
+| Lo mismo con `&arreglos=0` (sin «todo a la vista» ni «dibujar siempre»; solo para comparar, separa la carrera) | 60 y 60 | 62 % y 86 % | 10–14 ms |
+
+(«CPU por cuadro» = lo ocupado del hilo × la duración de un cuadro: 84 % a 53 cuadros/s son 0,84 × 18,9 ms ≈ 16 ms.)
+
+Qué dice la tabla:
+
+- **Dos juegos en la misma PC no se estorban.** Dos carreras sueltas van a 60, igual que una sola (9,6 contra 9,5 ms).
+- **La tarjeta de video no es el cuello.** Con la sala, `nvidia-smi` la marca al 62 % (máx. 71 %, contando los otros
+  programas), no al 100 %.
+- **No es que Windows reparta mal los núcleos.** Con cada pestaña en su núcleo propio mejora algo (56 → 59), pero cada
+  cuadro sigue costando 14–15 ms.
+- **Lo que pesa es la carrera de la sala.** El mismo hilo hace más trabajo en cada cuadro. Sin los arreglos de §61–§62
+  vuelve a 60.
+
+El perfil dice exactamente qué crece (milisegundos por cuadro, pestaña A):
+
+| Función (mapa de símbolos) | Sola | En la sala |
+|---|---|---|
+| `ScnMgr::DrawMain` (dibujar la escena) | 2,1 | **6,4** |
+| … dentro, `RendererRaceModels::Draw` (los modelos de la carrera) | 1,5 | **5,6** |
+| `RaceScene::OnCalc` (la lógica de la carrera) | 3,1 | 4,3 |
+| JavaScript de la página (lockstep, red, controles) | < 0,1 | < 0,1 |
+
+El JavaScript de la sala (el lockstep, la malla, los informes) no pesa nada. El tiempo de más está **dentro del juego**,
+y casi todo al dibujar.
+
+### 85.4 Por qué: «todo a la vista» y «dibujar siempre»
+
+Son dos arreglos de la carrera sincronizada, los dos necesarios para que la carrera dé igual en todas las consolas:
+
+- **Todo a la vista** (§61, `ClipInfoMgr::Update` en `lockstep_nativo.cpp`). Cada consola mira desde su kart, y el
+  juego anota qué objetos ve la cámara. Parte de la lógica usa esa marca: lo que no se ve se actualiza menos. Así cada
+  consola calculaba un poco distinto y la carrera se separaba. El arreglo marca todo como «a la vista y cerca», igual en
+  todas. El costo: el juego dibuja **toda la pista con todo detalle**, también lo que está detrás de la cámara, y
+  actualiza todo como si se viera.
+- **Dibujar siempre** (§62, `rr_kamek_81806568`). Retro Rewind se salta el dibujo de un cuadro cuando va atrasado. Como
+  cada PC se lo salta en otro momento, la carrera se separaba. En la sala se dibujan todos los cuadros.
+
+Una comparación eléctrica: es como dejar encendidas todas las luces de un edificio para que los sensores de todos los
+pisos lean lo mismo. Funciona, pero el consumo sube. Con la carrera sola, este procesador (un Ryzen 7 9800X3D, de los más
+rápidos para juegos) usa ~9,5 ms de los 16,7 que dura un cuadro. En la sala usa 15–17. El **margen** queda entre 0 y 2 ms.
+
+### 85.5 Por qué en §70 pasaba: la franja sin aviso
+
+El aviso de §70 (`avisoLento` en `lockstep.mjs`) mira ratos de 3 s y avisa solo si salen mal dos seguidos (6 s):
+
+- si espero más de 4 ms por cuadro y la carrera va a menos de **55**: «espera al jugador N»;
+- si casi no espero (< 1 ms) y voy a menos de **50**: «Tu PC no alcanza».
+
+Entre 50 y 55 cuadros/s sin esperar a nadie no sale nada. Es una **banda muerta** (Glosario), como la de un termostato:
+no conmuta por cada décima. En §70 la prueba iba a 52–55: dentro de la banda, y el punto pasaba. Hoy va a 48–53:
+cruza el 50 un par de ratos seguidos y el aviso sale. Las corridas guardadas muestran cuánto varía la misma prueba:
+
+| Registro (`build/web/datos/…`) | Hora local | A | B |
+|---|---|---|---|
+| `c5-normal`, `-1`, `-2` (§70, 11/11) | 18-10 23:50–23:55 | 52–55 cuadros/s, 15,6–17,1 ms | 53–55, 15,5–17,7 ms |
+| `sincro-directa` (§80b) | 19-10 20:13 | 59,5, 13,7 ms | 59,8, 13,2 ms |
+| `sincro` | 19-10 23:47 | 59,9, 14,0 ms | 60,0, 12,9 ms |
+| `sincro-lento1` (hoy, 10/11) | 20-10 01:35 | 53,3, 18,1 ms | 52,6, 18,5 ms |
+
+Con la PC tranquila, la sala llega a 60 (13–14 ms). Con la PC ocupada, cada cuadro sube a 18–20 ms.
+
+### 85.6 Qué ocupaba la PC
+
+Medido sin ninguna prueba corriendo (01:30–02:10):
+
+- **Procesador:** 18–28 % de la máquina ocupado por otros programas. El más grande era `TextInputHost.exe` (el teclado en
+  pantalla y los emojis de Windows): 65–90 % de un núcleo, todo el tiempo. Parece trabado;
+  suele arreglarse cerrándolo o reiniciando la sesión de Windows. Además Opera GX, Discord, Wallpaper Engine (el fondo animado), ExitLag y Kaspersky.
+- **Tarjeta de video:** 46–52 % ocupada y 215–232 W antes de abrir el juego. Opera GX usaba 17 % del motor 3D. Discord
+  usaba 15 % del **codificador de video**: estaba transmitiendo o compartiendo la pantalla.
+- **Otras sesiones:** entre las 02:19 y las 02:27 corrieron a la vez `experiencia.mjs --ventanas 2` (dos ventanas del
+  juego), `prueba-experiencia --playlist` (dos juegos más) y pruebas del banco. Con eso, en una corrida `--directa` la
+  pestaña A cayó a 1 cuadro/s.
+
+No cerré ningún programa del dueño. Cuánto pesa cada uno no se puede separar sin cerrarlos, pero no hace falta: ya se
+ve que la sala no tiene margen y que la carga de fondo cambia de un momento a otro.
+
+**¿A es siempre la lenta? ¿Es por el foco?** No. En la primera corrida de hoy avisaron las dos, y medidas con el medidor
+van parejas (A 53, B 52). Tampoco es el foco: la prueba corre Chrome sin ventana (headless) y le apaga el freno a las
+pestañas de fondo (`--disable-renderer-backgrounding` y otros dos), y las dos pestañas tienen el mismo ritmo.
+
+A termina con retraso 12 por cómo carga. A abre primero y baja todo de la red; B abre 4 s después y lee de la caché que
+llenó A. En el primer segundo de la carrera, A todavía tiene tirones: sus botones le llegan justos a B, y A sube su
+retraso a 4, 8 y 12 en un segundo (está en el registro de red: «subo mi retraso a 12 (holgura 0…)»). Es lo de §80,
+Trampas: el que se traba queda atrás y paga él su retraso.
+
+### 85.7 El arreglo: el punto pide avisos ciertos
+
+**Lo que cuidaba el punto (§70).** Que no salgan avisos **falsos**: el tirón de la largada (bajar la pista con la caché
+vacía) dio una vez «Tu PC no alcanza» con la PC bien. Por eso el aviso pide dos ratos seguidos. Pedir **cero** avisos
+también dejaba fuera los avisos **ciertos**, y esos dependen de la PC, no del código.
+
+**El punto nuevo** (`prueba-sincro.mjs`): «los avisos de sala lenta dicen la verdad».
+
+1. Con las dos ya corriendo (etapa ≥ 2, después de la cuenta regresiva) y hasta la última lectura (antes de las fotos,
+   que traban un poco la página), la prueba lee el **medidor propio** de cada pestaña. Es la línea que la página escribe
+   cada segundo en la consola: «[medidor] N s: cuadro C, F fps, trabajo T ms». Cuenta los cuadros del juego, aparte del
+   lockstep: es un voltímetro aparte para comprobar lo que marca el panel.
+2. Calcula la mediana de los cuadros/s y del trabajo por cuadro, y el **peor promedio de 6 s seguidos**.
+3. Pasa si:
+   - no hay ningún «espera al jugador» (con el relevo de §80, en esta prueba nadie espera a nadie);
+   - y cada «Tu PC no alcanza» viene de una pestaña cuyo medidor bajó de 50 durante 6 s seguidos. Se acepta hasta 52,
+     porque los dos miden en ratos un poco corridos.
+4. El detalle muestra siempre el ritmo de cada pestaña. Si alguna va bajo 55, la prueba anota «la PC va justa».
+
+Qué sigue atrapando: un aviso con la PC bien (por ejemplo, el tirón de la largada que se cuela, o una cuenta mal hecha
+en `avisoLento`) hace fallar el punto. Y si algo hace esperar de verdad a una pestaña (el relevo que no releva), también.
+
+**Lo que no cambié:** el umbral del aviso. A 48 cuadros/s la carrera va al 80 % de la velocidad, y el aviso «Tu PC no
+alcanza» es lo que tiene que ver el jugador.
+
+### 85.8 Pruebas
+
+Con el punto nuevo (todas con `build/web` de hoy, puerto 8190):
+
+| Corrida | Qué más corría | Resultado |
+|---|---|---|
+| normal, 02:21 | otras dos sesiones con 4 juegos abiertos (`experiencia --ventanas 2`, `prueba-experiencia --playlist`) | **11/11**. Avisos ciertos: A 41 y B 44 cuadros/s (24 y 23 ms por cuadro), lo peor de 6 s 36 y 41 |
+| normal, 02:28 | la compilación completa de otra sesión (todos los núcleos) | 10/11. El punto nuevo pasa (lo peor de 6 s: 6 y 3), pero falla «sincronizar cuesta poco»: la PC se trabó hasta 4 s seguidos. Cortada a mano |
+| normal, 02:32 | nada más (solo los programas del dueño) | **11/11**. Avisos ciertos («va a 44–49»): A 54 y B 52 cuadros/s, 18,5 y 18,4 ms por cuadro, lo peor 46 y 46. Con el punto viejo habría dado 10/11 |
+| `--directa`, 02:34 | nada más | 12/13. El punto nuevo pasa (sin avisos: 59 y 60 cuadros/s, 15,1 y 13,2 ms). Falla «el kart de A avanzó»: ver Trampas (es la C4) |
+
+Lo que no se hizo: correr las pruebas muchas veces con la PC vacía (con los programas del dueño cerrados). No cerré sus
+programas, y las otras sesiones necesitaban la PC.
+
+
+### 85.9 Trampas
+
+- **Las uniones de carpetas se borran hacia adentro.** `build/viejo-c6c4b89/terceros` apunta al `terceros/` de verdad.
+  Un borrado recursivo de la copia (`rm -rf`, `Remove-Item -Recurse`) puede entrar por la unión y borrar el original.
+  Para limpiar: primero quitar cada unión con `cmd /c rmdir build\viejo-c6c4b89\terceros` (eso quita solo el enlace) y
+  después la carpeta.
+- **La compilación vieja escribió en la caché de emsdk compartida.** Generó `libc++-legacyexcept.a` y otras librerías del
+  sistema en `herramientas/emsdk/upstream/emscripten/cache` (por la unión). Solo suma archivos; el build de siempre no los
+  usa.
+- **Las medidas de ritmo no sirven si otra sesión corre juegos a la vez.** Las corridas de 02:19–02:27 compitieron con
+  hasta cuatro juegos más. Antes de medir: avisar a las otras sesiones y mirar que no haya `node` de pruebas pesadas.
+- **El «peor de 6 s» no tiene que incluir la carga de la pista.** Primero medí desde que cada pestaña entra a la sección
+  de la carrera, y ahí entran los segundos en 0 cuadros/s de la carga: cualquier aviso parecía cierto. Por eso se mide
+  desde que las dos corren.
+- **`--directa` puede perder a A en la largada (la C4 del PLAN).** En la corrida de 02:34, A se quedó 5–9 s casi quieta
+  justo al largar: era la primera visita, con los pipelines tardando ~4,9 s en llegar y la pista bajando por la red. B
+  la esperó el margen y la cortó en el cuadro 20 (§80). El kart de A siguió sin nadie y no avanzó. No tiene que ver con
+  este punto; queda anotado en la C4.
+- **Dos carreras sueltas a la vez, la primera vez, se trabaron** (B quieta en 0 cuadros/s). La segunda vez, guardando su
+  consola, anduvieron bien a 60. No se averiguó por qué; no afecta a la sala.
+
+### 85.10 Lo que queda
+
+**Lo que de verdad importa para lanzar:** la carrera de la sala cuesta ~15 ms de procesador por cuadro **en uno de los
+procesadores más rápidos que hay**. Ese costo es de cada consola, no de tener dos juegos en la misma PC. Un PC de un
+amigo con un procesador 30 % más lento pasaría los 20 ms y vería «Tu PC no alcanza» en cada carrera. La salida es
+dibujar con la vista real **sin** que la lógica vea distinto: separar las marcas de «a la vista» que usa la lógica (todo
+igual en todas) de las que usa el dibujo (las de la cámara propia). No es simple, porque el dibujo también escribe cosas
+que la lógica lee (§62: las matrices de los modelos). Queda para la etapa de optimizar (Riesgo 11 del PLAN).
+
+```bash
+node web/navegador/prueba-sincro.mjs                 # 11 puntos; el de los avisos compara con el medidor de cada pestaña
+node web/navegador/prueba-sincro.mjs --directa       # 13 puntos
+# el código de §70 en una carpeta aparte (no toca la rama ni build/web)
+git archive c6c4b89 web herramientas banco parches | tar -x -C build/viejo-c6c4b89
+# + uniones a terceros, extraido, herramientas/emsdk, herramientas/cache, banco/node_modules (cmd /c mklink /J …)
+cd build/viejo-c6c4b89 && python herramientas/compilar-web.py --modo navegador && node web/navegador/prueba-sincro.mjs --puerto=8192
+```
+
+## 2026-10-20 · §87 La sala de Mario Kart: la playlist arrancaba solo al anfitrión, el cupo sin preguntar y echar
+
+**Qué pidió el dueño:**
+1. «chequea el modo playlist, hay un bug de inicio que inicia al host y no a los otros».
+2. «al crear partida multiplayer por defecto es para el número máximo de jugadores simultáneos que permite mario kart,
+   por lo que no debiera preguntar cuántos players; recuerda la opción de kickear del host y vote kick».
+
+### 87.1 El bug de la playlist: cómo se encontró
+
+**La pista del dueño.** Con `jugar.bat` (el sitio en esta PC, §69) armó una sala en «Modo playlist» con dos cuentas.
+En la base de datos de los emuladores quedó el rastro (`build/emuladores/datos`, datos de mentira): la sala se creó en
+playlist, el anfitrión empezó (`empieza`), volvió al vestíbulo (`vuelve`), la pasó a copa y empezó otra vez. La copa
+funcionaba; la playlist no.
+
+**Primera prueba, sin el sitio.** `prueba-playlist.mjs` (dos pestañas sueltas, §74) dio bien todo el inicio: A arma la
+lista, B sugiere, A confirma y las dos eligen personaje. Así que el bug venía de algo propio del sitio.
+
+**Segunda prueba, con el sitio entero.** A `prueba-experiencia.mjs` (la de `jugar.bat`: emuladores de Firebase, el
+Worker de verdad, dos cuentas) se le agregó `--playlist`, que hace lo mismo que el dueño: el modo en el vestíbulo,
+«¡A correr!», armar una lista de 2, confirmar, elegir y correr. Falló justo ahí:
+
+> ✗ la anfitriona confirma: los dos pasan a elegir personaje (el selector de Piloto Dos se cierra solo) — A elegir ·
+> B elegir **selector true**
+
+La sala de B sí pasaba a «elegir», pero **el selector de sugerir seguía abierto encima del juego**. Una persona ve eso:
+la anfitriona sigue a elegir personaje y los demás se quedan con el selector tapando la pantalla de personaje.
+
+**La causa.** El selector de pistas (`elegirPista`, `interfaz.mjs`), antes de dar su control a la página (`alAbrir`),
+espera los nombres de las pistas (`await nombresPistas`). Con un perfil nuevo no los tiene guardados y los baja por la
+red (`indice.json` de las imágenes, por el Worker). Mientras espera llegan más estados de la sala: por ejemplo el VR de
+cada uno, que llega desde Firebase y la anfitriona reparte. Cada estado veía `selSug` vacío y abría **otro** selector.
+Al confirmar, la página cerraba el único que conocía (el último) y el otro quedaba huérfano. Con dos pestañas sueltas
+no pasaba porque comparten el almacenamiento del navegador: B tomaba los nombres que A ya había guardado, sin esperar.
+La anfitriona no lo sufría porque su lado marca `pickerAbierto` al instante.
+
+**El arreglo** (`web/navegador/mkw.mjs`):
+- Una marca `abriendoSug` que se prende **antes** de esperar nada. Mientras está prendida no se abre otro selector.
+- Al quedar armado, el selector revisa si todavía hace falta. Si la anfitriona ya confirmó o empezó otra carrera, se
+  cierra solo. Si sigue haciendo falta, toma la lista y las sugerencias más nuevas.
+- Lo mismo en los selectores de la anfitriona (la copa, la playlist) y en «+ Agregar pistas», con la marca
+  `abriendoEntre`, por si se aprieta dos veces.
+
+### 87.2 La sala nace con el máximo, sin preguntar
+
+La ficha de la sala preguntaba «Pilotos: 2, 3 o 4». Ahora no pregunta nada de eso: toda sala nace con **4**, el máximo
+de humanos que admite la carrera sincronizada. Cada piloto es un jugador «local» de verdad en todas las consolas, y el
+juego tiene 4 puertos de mando; la CPU completa los 12 lugares. Mario Kart en línea admite 12 humanos, pero eso pide
+más que 4 mandos: queda en el PLAN (M17, «12 jugadores»). Si algún día se puede, el cupo sube solo, porque sale de
+`JUEGOS.mkw.cupo`.
+
+Cómo: en `juegos-main.js` la opción «Pilotos» de Mario Kart queda **oculta** (`oculta: true`, con el máximo como único
+valor). Va igual al crear la sala, porque sin ella el cupo quedaba en 2 y el tercero no podía entrar. La ficha
+(`salon.js`) ya no dibuja las opciones ocultas. El modo (copa o playlist) se sigue preguntando.
+
+### 87.3 Echar: el anfitrión y la votación
+
+- **El anfitrión** tiene un botón **«Echar»** en la fila de cada piloto del vestíbulo, también con la copa andando.
+  Pregunta antes de hacerlo. Es una jugada más del registro de la sala: `{t:"echa", uid, a}`, la misma forma que ya usa
+  el torneo de BT3. El reductor de jugadas la convierte en «se fue» (`abandona`, con `echado`) **solo si quien la
+  escribe es el anfitrión en ese momento**. Para saber quién es el anfitrión en ese punto del registro, `votacion` le
+  pregunta a `redMkw` con el registro hasta ahí. Lo hace en la misma pasada que los votos, así que lo que haga el echado
+  después (por ejemplo, votar) ya no cuenta.
+- **La votación** (⏏, la de todos los juegos) no aparecía en Mario Kart: el botón exige `est.listos`, y la sala de
+  Mario Kart nunca lo tiene (está abierta siempre: vestíbulo y copa). Ahora en Mario Kart se ofrece con **3 o más**
+  pilotos. Con 2, votar sería echar con un solo voto, y eso ya lo hace el anfitrión.
+- **Lo que pasa al echar a alguien:**
+  - el sitio lo saca (`est.fuera`), su marco se cierra y su vestíbulo dice «El anfitrión te sacó de esta sala» (o «…por
+    votación»);
+  - a los demás marcos el sitio les avisa quién salió (`{tipo:'fuera'}`), y la carrera en curso lo corta al momento
+    (`lockstep.saltar`), sin esperar los 2 s de silencio;
+  - la sala del juego (`sala-carrera.mjs`, `quitar`) lo deja fuera desde la carrera siguiente, aunque su página siga
+    mandando señales.
+- No se tocaron las reglas de Firebase: una jugada solo tiene que estar firmada por un jugador de la sala, y `t` puede
+  ser cualquier palabra corta.
+
+### 87.4 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| `prueba-experiencia.mjs --playlist` (el sitio entero, dos cuentas) | **antes 18/19** (el selector de Dos quedaba abierto), **después 19/19** |
+| `prueba-playlist.mjs` (dos pestañas; ahora B como perfil nuevo: sin los nombres guardados y con `indice.json` 3 s más lento) | **18/18** (punto nuevo: B nunca tuvo dos selectores) |
+| `prueba-experiencia.mjs` (copa; puntos nuevos: la ficha sin «Pilotos» y echar a Piloto Dos con la carrera andando) | **20/20**: la ficha sin «Pilotos»; Piloto Dos echado en el cuadro 739, cortado en el 744 y la carrera de Uno siguió (cuadro 1027) |
+| Banco `sala-carrera` | **49/49** (3 nuevos: `quitar`, y la carrera 2 deja fuera al echado en las tres consolas) |
+| Banco `sala-playlist`, `playlist-sala` | 33/33, 25/25 |
+| `mkw.test.cjs` (sitio) | **17/17** (prueba nueva: echar y votar) |
+| `npm run test:juegos` (todos los juegos del sitio) | 978/979: la que falla es la de las rutas de Windows (`\` contra `/`, §83), de antes |
+
+```bash
+node herramientas/prueba-experiencia.mjs --playlist
+node herramientas/prueba-experiencia.mjs
+node web/navegador/prueba-playlist.mjs
+node banco/correr.mjs sala-carrera sala-playlist playlist-sala
+cd terceros/Paginita-Pro/colabtex && node --test tests/mkw.test.cjs
+```
+
+### 87.5 Trampas
+
+- **`jugar.bat` usa la copia del kit**, no `web/navegador`: el sitio sirve `terceros/Paginita-Pro/juegos/mkw/web/navegador`.
+  Un arreglo de la página no se ve en `jugar.bat` hasta copiarlo ahí (`subir-kit.sh`).
+- **El ensayo de la prueba ahora usa otros puertos de emulador** (`experiencia.mjs --emu-desplazar 10000`: 19099,
+  19000, 19199, 14400, 14500). Así corre aunque el dueño tenga `jugar.bat` abierto (9099, 9000…). El emulador de la base
+  (java) a veces sobrevivía al cierre y dejaba su puerto tomado: la prueba ahora cierra lo que quede en esos puertos,
+  que son solo suyos.
+- **Otras sesiones editan los mismos archivos.** En `mkw.mjs` había cambios sin commit del sonido (§88) y de los Mii
+  invitados (§86). El commit lleva solo los bloques de §87: se armó «HEAD + §87» aparte y se agregó con
+  `git apply --cached`.
+- **Los números de sección** se repartieron entre sesiones para no chocar: §85 la PC lenta, §86 los Mii invitados,
+  §87 esto, §88 el sonido con AudioWorklet.
+- Una prueba de dos pestañas falló una vez al terminar la carrera 1, porque A se congeló 3 s con la PC muy cargada
+  (otras sesiones compilando y probando) y la sala la cortó. Repetida con la PC más tranquila: 18/18.

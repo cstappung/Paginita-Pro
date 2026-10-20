@@ -953,7 +953,12 @@ export function mayoriaExpulsion(n) {
   return otros <= 1 ? 1 : Math.floor(otros / 2) + 1;
 }
 
-export function votacion(p) {
+/* `anfitrionEn(q)` (opcional): quién manda la sala con el registro `q` hasta ese punto. Con él vale también
+   `{t:"echa", uid, a}`: si la escribe quien es el anfitrión en ese momento, se reescribe como la expulsión de `a`
+   (`{t:"abandona", uid:a, expulsado:true, echado:true, por:[uid]}`); si no, desaparece. Lo usa Mario Kart Wii
+   (§87 del port: el anfitrión puede sacar a alguien de la sala, además de la votación). Va en esta misma pasada
+   para que los votos y las expulsiones vean a los mismos en la sala: el voto de alguien ya echado no cuenta. */
+export function votacion(p, anfitrionEn = null) {
   const js = jugadoresDe(p), ids = new Set(js.map(j => j.uid));
   const fuera = new Set(), votos = {}, expulsados = [], jugadas = {};
   let hay = false;
@@ -967,6 +972,18 @@ export function votacion(p) {
   };
   for (const j of jugadasDe(p)) {
     const { k, ...v } = j;
+    if (j.t === "echa" && anfitrionEn) {             // (sin anfitrionEn, «echa» es del juego: el torneo tiene la suya)
+      hay = true;
+      const a = j.a;
+      if (ids.has(j.uid) && ids.has(a) && a !== j.uid && !fuera.has(j.uid) && !fuera.has(a)
+          && anfitrionEn({ ...p, jugadas }) === j.uid) {
+        jugadas[k] = { t: "abandona", uid: a, expulsado: true, echado: true, por: [j.uid] };
+        expulsados.push({ uid: a, por: [j.uid], k, echado: true });
+        fuera.add(a);
+        olvida(a);
+      }
+      continue;
+    }
     if (j.t !== "voto") {
       if (j.t === "abandona" && ids.has(j.uid)) { fuera.add(j.uid); olvida(j.uid); }
       jugadas[k] = v;
@@ -997,7 +1014,7 @@ export function votacion(p) {
    si no, el tercero llegaría a un tablero empezado y sin turno. Ese
    cierre es justo el `estado`, que deja de ser «esperando». */
 export function reducir(p) {
-  const V = votacion(p);
+  const V = votacion(p, p && p.juego === "mkw" ? q => redMkw(q).anfitrion : null);
   p = V.p;
   const js = jugadoresDe(p);
   const cupo = cupoDe(p);
@@ -7751,6 +7768,10 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    La cola de la playlist la sortea cada navegador igual (`mkwPlaylist(pid, ronda, n)`): nadie la escribe.
    - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y la copa sigue con él
      (no hay servidor: su kart sigue sin nadie y el nuevo anfitrión lleva la sala del juego).
+   - `{t:"echa", uid, a}` (§87): el anfitrión saca a `a` de la sala, en el vestíbulo o con la copa andando. `votacion`
+     la convierte en su `abandona` (expulsado, echado) solo si `uid` es el anfitrión en ese momento. Además la
+     votación para echar de todos los juegos (`{t:"voto"}`, ⏏): en Mario Kart se ofrece con 3 o más pilotos (con 2,
+     votar sería echar solo: eso es del anfitrión).
    Quien entra con la copa andando espera a la siguiente tanda. Cada jugador tiene su NODO: 2 + su orden de llegada a
    la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
    La sala termina cuando ya no queda nadie. */
@@ -7824,7 +7845,8 @@ export function redMkw(p, js = jugadoresDe(p)) {
   for (const j of jugadasDe(p)) {
     if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
     if (j.t === "abandona") {
-      fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid });
+      fuera[j.uid] = true; hist.push(j.echado ? { e: "echado", uid: j.uid, por: (j.por || [])[0] || "" }
+        : j.expulsado ? { e: "expulsado", uid: j.uid } : { e: "sale", uid: j.uid });
       if (j.uid === anfitrion) {
         anfitrion = (presentes()[0] || {}).uid || "";
         // (la carrera sincronizada no tiene servidor: siguen, con el nuevo llevando la sala del juego)

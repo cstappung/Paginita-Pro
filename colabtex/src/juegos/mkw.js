@@ -302,10 +302,14 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function avisaMarco() {
     if (!frame?.contentWindow?.mkwSala || !est?.sincro) return;      // (la sala del juego todavía no escucha)
     const nombres = Object.fromEntries(est.sincro.map(u => [u, nombre(u).slice(0, 20)]));
-    const firma = JSON.stringify([nombres, est.anfitrion]);
+    // (§87: y los pilotos de la copa que ya no están —se fueron, los echó el anfitrión o la votación—: el juego los
+    // corta de la carrera en curso al momento y la sala no los espera en la siguiente)
+    const salieron = est.sincro.filter(u => est.fuera?.[u]);
+    const firma = JSON.stringify([nombres, est.anfitrion, salieron]);
     if (firma === avisado) return;
     avisado = firma;
     enviar("nombres", { nombres });
+    if (salieron.length) enviar("fuera", { uids: salieron });
     if (est.anfitrion && est.anfitrion !== jefeMarco && est.sincro.includes(est.anfitrion)) enviar("anfitrion", { uid: est.anfitrion });
   }
 
@@ -321,7 +325,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const js = presentes(), manda = soyAnfitrion(), corre = corriendo();
-    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro]);
+    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     vest.hidden = false;
@@ -330,6 +334,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <b translate="no">${escapeHtml(j.nombre || "Piloto")}</b>
         <small>${j.uid === est.anfitrion ? "anfitrión · " : ""}${vrs[j.uid] ? "VR " + Number(vrs[j.uid]).toLocaleString("es") : "VR —"}</small>
         ${manda && !corre && j.uid !== uid ? `<button class="jg-mkw-dar" data-a="${escapeHtml(j.uid)}" title="Que sea el anfitrión">Pasar anfitrión</button>` : ""}
+        ${manda && j.uid !== uid ? `<button class="jg-mkw-echa" data-e="${escapeHtml(j.uid)}" title="Sacarlo de la sala" style="margin-top:4px;align-self:flex-start;font-size:.8rem;border:1px solid #ff8a8a77;background:transparent;color:#ffd2d2;border-radius:8px;padding:2px 8px;cursor:pointer">Echar</button>` : ""}
       </li>`;
     // los dos modos (tarjetas: el anfitrión elige, los demás ven cuál). §74: la copa es una de las copas del juego (sus
     // 4 pistas) y la playlist una lista que se arma en el juego: el vestíbulo ya no pregunta cuántas carreras
@@ -346,7 +351,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     const ultima = !corre && ult?.tabla?.length ? `<div class="jg-mkw-ultima"><b>${ult.estilo === "playlist" ? "🏁 Última playlist" : "🏆 Última copa"}</b>
       <ol>${ult.tabla.map(f => `<li><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol></div>` : "";
     const sinPrograma = origen === "";
-    const nota = !enSala() ? (corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
+    // (§87: a quien sacaron de la sala se le dice por qué)
+    const sacado = (est.hist || []).filter(h => (h.e === "echado" || h.e === "expulsado") && h.uid === uid).pop();
+    const nota = !enSala() ? (sacado ? (sacado.e === "echado" ? "El anfitrión te sacó de esta sala." : "Te sacaron de esta sala por votación.")
+        : corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
       : corre && est.sincro ? (est.sincro.includes(uid)
         ? (est.anfitrion === uid ? (estilo === "copa" ? "Elige la copa en el juego; después cada uno elige personaje y vehículo. Todos corren la misma carrera y la CPU completa los 12."
             : "Arma la lista en el juego (los demás te pueden sugerir pistas); después cada uno elige personaje y vehículo.")
@@ -368,6 +376,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
     vest.querySelectorAll(".jg-mkw-ficha[data-cc]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); });
     vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
+    // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
+    vest.querySelectorAll(".jg-mkw-echa").forEach(b => b.onclick = () => {
+      if (!confirm(`¿Echar a ${nombre(b.dataset.e)} de la sala? Sale al momento${corre ? " (su kart sigue la carrera sin nadie)" : ""} y no puede volver a esta sala.`)) return;
+      b.disabled = true; anota({ t: "echa", uid, a: b.dataset.e });
+    });
     const emp = vest.querySelector(".jg-mkw-empieza");
     if (emp) emp.onclick = () => { emp.disabled = true; anota({ t: "empieza", uid }); };
     const vue = vest.querySelector(".jg-mkw-vuelve");

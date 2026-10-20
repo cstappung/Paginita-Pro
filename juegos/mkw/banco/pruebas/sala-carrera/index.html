@@ -189,6 +189,24 @@ for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
 ok('§75: …y la copa termina en las tres con ella de anfitriona', [a10b, b10, c10].every(x => x.estado().fase === 'fin'), [a10b, b10, c10].map(x => x.estado().fase).join());
 [a10b, b10, c10].forEach(x => x.detener());
 
+// 10b) §87: la sala del sitio sacó a Caro (el anfitrión la echó, o la votación) con la carrera 1 andando. Su página
+// puede seguir mandando señales un rato: la carrera 2 igual la deja fuera, en todas las consolas.
+salas.clear();
+const a87 = persona('ana'), b87 = persona('beto'), c87 = persona('caro');
+await avanzar(1000); await avanzar(1000);
+a87.ponerPistas(copa); await avanzar(0);
+a87.elegi({ personaje: 1, vehiculo: 1 }); b87.elegi({ personaje: 2, vehiculo: 2 }); c87.elegi({ personaje: 3, vehiculo: 3 });
+await avanzar(0);
+ok('§87: (otra copa: los tres corren la carrera 1, nadie fuera)', [a87, b87, c87].every(x => x.estado().carrera === 1) && JSON.stringify(a87.estado().fuera) === '[]');
+ok('§87: quitar: a alguien de la sala sí (una vez); a sí misma o a un desconocido, no',
+   a87.quitar('caro') === true && a87.quitar('caro') === false && a87.quitar('ana') === false && a87.quitar('intruso') === false);
+b87.quitar('caro');
+b87.termine(1); await avanzar(0);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§87: la carrera 2 empieza con Caro fuera aunque su página siga dando señales, lo mismo en las tres',
+   [a87, b87, c87].every(x => x.estado().carrera === 2 && JSON.stringify(x.estado().fuera) === '["caro"]'), JSON.stringify(c87.estado().fuera));
+[a87, b87, c87].forEach(x => x.detener());
+
 // 11) §75: los puntos de la copa viajan en el estado de la sala. Cada página los manda al terminar cada carrera (los 12
 // que lleva su consola y desde qué carrera corrió) y vale la tabla de quien corrió desde más atrás: Caro recargó y
 // corre desde la 2, así que su consola no tiene los puntos de la 1.

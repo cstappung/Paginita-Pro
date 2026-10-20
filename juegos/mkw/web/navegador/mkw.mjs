@@ -659,6 +659,7 @@ const PRECALENTAR_TARDE = parametros.get('precalentarTarde') === '1' ||
 let pedirPiloto = null;          // arrancar() lo pone cuando el piloto existe; antes, la elección queda esperando
 let eleccionPendiente = null;
 let modoInicio = null;           // lo último elegido que mueve el juego ('unjugador' | 'local')
+let localesInicio = 2;           // §84: cuántos juegan en este PC (Local → 2, 3 o 4 Players)
 const aLaVista = id => { const e = document.getElementById(id); return !!e && !e.hidden; };
 const inicio = crearInicio({
   imagen: ORIGEN + '/build/imagenes/inicio/jlokart.webp',
@@ -679,10 +680,12 @@ function mostrarInicio() {
 function elegirInicio(que) {
   if (que === 'opciones') return ui.abrirCajon('controles');
   if (que === 'salas') return window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'salas' }, location.origin);
-  // 'unjugador' | 'local': el juego vuelve a recibir lo de la persona y el piloto lo lleva a esa pantalla
+  // 'unjugador' | 'local2'…'local4': el juego vuelve a recibir lo de la persona y se abre esa pantalla
+  const local = /^local([234])$/.exec(que);
+  if (local) { localesInicio = Number(local[1]); que = 'local'; }
   controles.silenciar(false);
   modoInicio = que;
-  window.mkwEstado.inicio = { que, cuando: performance.now() };
+  window.mkwEstado.inicio = { que, cuando: performance.now(), ...(que === 'local' ? { locales: localesInicio } : {}) };
   if (pedirPiloto) pedirPiloto(que); else eleccionPendiente = que;
 }
 // El juego volvió a su título (la persona apretó B desde el menú principal): ahí va otra vez nuestro menú de inicio.
@@ -1087,9 +1090,10 @@ async function arrancar() {
     const semillaSala = Number(parametros.get('semilla')) >>> 0;
     const cola = parametros.has('pistas') ? pistasDe(parametros.get('pistas')) : null;
     let nombres = (() => { try { return JSON.parse(parametros.get('nombres') || '{}'); } catch { return {}; } })();
-    // la cilindrada de cada carrera ('azar' = como Retro Rewind: 10 % 100cc, 65 % 150cc, 25 % espejo, sorteada con la
-    // semilla de la sala: igual en todas) y la CPU como en un Grand Prix de un jugador (50cc fácil, 100cc normal,
-    // 150cc y espejo difícil), salvo que la dirección pida otra (&cpu=…)
+    // la cilindrada de cada carrera ('azar' = como Retro Rewind: 10 % 200cc, 65 % 150cc, 25 % espejo, sorteada con la
+    // semilla de la sala: igual en todas) y la CPU como en un Grand Prix de un jugador (c50 fácil, c100 normal, c150 y
+    // espejo difícil), salvo que la dirección pida otra (&cpu=…). §84: 'c100' es la cilindrada 100cc del juego, que
+    // Retro Rewind corre como 200cc (y 'c50' como su «500cc»): medido con el juego, el sitio la llama 200cc
     const ccDe = n => {
       const cc = parametros.get('cc') || 'c150';
       if (cc !== 'azar') return cc;
@@ -1106,10 +1110,25 @@ async function arrancar() {
       if (d.tipo === 'nombres' && d.nombres && typeof d.nombres === 'object')
         nombres = Object.fromEntries(Object.entries(d.nombres).filter(([, v]) => typeof v === 'string').map(([k, v]) => [k, v.slice(0, 20)]));
       else if (d.tipo === 'anfitrion' && typeof d.uid === 'string') window.mkwSala?.cambiarAnfitrion(d.uid);
+      // §87: los pilotos que salieron de la sala del sitio (echados por el anfitrión, por votación o idos): la carrera en
+      // curso los corta ya (sin esperar 2 s de silencio) y la sala no los cuenta en las que vienen
+      else if (d.tipo === 'fuera' && Array.isArray(d.uids)) {
+        const e = window.mkwSala?.estado();
+        for (const u of d.uids) {
+          const h = sincro.humanos.find(x => x.uid === u);
+          if (!h || u === sincro.yo || !window.mkwSala?.quitar(u)) continue;
+          if (e?.fase === 'correr' && e.carrera >= 1) sincro.lockstep?.saltar(h.mando, e.carrera);
+          nota(`sala: ${nombres[u] || u} salió de la sala`);
+        }
+      }
     });
     let primeraVista = true, miEleccion = null, pickerAbierto = false, reloj = null, vigiaFin = null;
     // §74: los selectores abiertos de la playlist (el del anfitrión, el de sugerir) y el panel de entre carreras
     let selLista = null, selSug = null, breve = null;
+    // §87: un selector abriéndose. elegirPista espera los nombres de las pistas (con un perfil nuevo, bajados por la red)
+    // antes de dar su control (alAbrir): los estados que llegan mientras tanto veían selSug vacío y abrían OTRO. Al
+    // confirmar la playlist se cerraba uno y el otro quedaba encima de la pantalla de personaje (los demás no seguían)
+    let abriendoSug = false, abriendoEntre = false;
     const carrerasPedidas = Math.max(1, Math.min(32, Number(parametros.get('carreras')) || 4));
     // los nombres de las pistas se leen de la memoria del juego (lento): una vez
     let copasLeidas = null;
@@ -1213,8 +1232,10 @@ async function arrancar() {
       pickerAbierto = true;
       ui.aviso('');
       mirame();
+      // §87: si mientras se abría la copa se fijó (o mandó otro), se cierra solo
+      const sigue = c => { if (sala.soyAnfitrion && sala.estado().fase === 'copa') return true; c.cerrar(null); return false; };
       if (!e.lista) {
-        ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: false, titulo: 'Elige la copa de la sala', lista: { alAbrir: c => { selLista = c; } } }).then(r => {
+        ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: false, titulo: 'Elige la copa de la sala', lista: { alAbrir: c => { if (sigue(c)) selLista = c; } } }).then(r => {
           pickerAbierto = false; selLista = null;
           if (r && r.copa >= 0) sala.ponerPistas([0, 1, 2, 3].map(f => ({ copa: r.copa, fila: f })));
           else if (sala.estado().fase === 'copa') alCambiarSala(sala.estado());   // (se cerró sin elegir: se vuelve a abrir)
@@ -1225,8 +1246,9 @@ async function arrancar() {
         pistas: e.lista.pistas, clave: 'mkw.lista.sala', sugerencias: true, confirmar: 'Confirmar la playlist', objetivo: carrerasPedidas,
         alCambiar: ps => sala.listaCambio(ps), alAceptar: id => sala.aceptar(id), alRechazar: id => sala.rechazar(id),
         alAbrir: c => {
+          if (!sigue(c)) return;
           selLista = c;
-          if (!e.lista.pistas.length && c.pistas.length) sala.listaCambio(c.pistas);   // (venía del borrador: que la vean todos)
+          if (!sala.estado().lista?.pistas?.length && c.pistas.length) sala.listaCambio(c.pistas);   // (venía del borrador: que la vean todos)
           c.sugerencias(pendientesDe(sala.estado()));
         } } }).then(r => {
         pickerAbierto = false; selLista = null;
@@ -1236,13 +1258,25 @@ async function arrancar() {
     }
     // los demás sugieren (mientras se arma la playlist, o entre carrera y carrera con «Sugerir pista»)
     function abrirSugerir(e, entre) {
+      if (selSug || abriendoSug) return;            // §87: uno solo (el que se está abriendo toma el estado más nuevo)
+      abriendoSug = true;
+      const n = e.carrera;
+      // ¿todavía hace falta? (mientras se abría, el anfitrión pudo confirmar la playlist o empezar la carrera siguiente)
+      const sigue = () => { const x = sala.estado(); return entre ? x.fase === 'correr' && x.carrera === n : x.fase === 'copa' && !sala.soyAnfitrion; };
       ui.aviso('');
       mirame();
       ui.elegirPista({ modo: 'sugerir', copas: copasSala(), cerrar: entre,
         titulo: entre ? 'Sugiere pistas para lo que viene' : 'Sugiere pistas para la playlist', lista: {
           pistas: (entre ? e.pistas : e.lista.pistas) || [], alSugerir: p => sala.sugerir(p),
           nota: entre ? 'El anfitrión decide si entran. La carrera siguiente empieza sola.' : undefined,
-          alAbrir: c => { selSug = c; c.sugerencias(misSugerencias(sala.estado())); } } }).then(() => { selSug = null; });
+          alAbrir: c => {
+            abriendoSug = false;
+            if (!sigue()) { c.cerrar(); return; }
+            selSug = c;
+            const x = sala.estado();
+            c.poner((entre ? x.pistas : x.lista?.pistas) || []);
+            c.sugerencias(misSugerencias(x));
+          } } }).then(() => { abriendoSug = false; selSug = null; });
     }
     // entre carrera y carrera de la playlist: el panel con lo que viene
     function mostrarBreve(e) {
@@ -1254,7 +1288,8 @@ async function arrancar() {
     // «+ Agregar pistas» (el anfitrión): la sala espera (hasta 60 s) mientras cambia las que vienen
     function agregarEntre() {
       const e = sala.estado();
-      if (!sala.soyAnfitrion || selLista || e.fase !== 'correr') return;
+      if (!sala.soyAnfitrion || selLista || abriendoEntre || e.fase !== 'correr') return;
+      abriendoEntre = true;                         // §87: un solo «+ Agregar pistas» (aunque se aprieten dos)
       sala.pausar(true);
       mirame();
       const hechas = e.carrera;
@@ -1262,7 +1297,12 @@ async function arrancar() {
         pistas: (e.pistas || []).slice(hechas), max: Math.max(1, 32 - hechas), clave: '', sugerencias: true, confirmar: 'Seguir', titulo: 'Lo que viene',
         objetivo: Math.min(4, Math.max(1, 32 - hechas)),
         alCambiar: ps => sala.restantesCambio(ps), alAceptar: id => sala.aceptar(id), alRechazar: id => sala.rechazar(id),
-        alAbrir: c => { selLista = c; c.sugerencias(pendientesDe(sala.estado())); } } }).then(() => { selLista = null; sala.pausar(false); });
+        alAbrir: c => {
+          abriendoEntre = false;
+          const x = sala.estado();
+          if (x.fase !== 'correr' || x.carrera !== hechas) { c.cerrar(); return; }   // (§87: la carrera siguiente ya empezó)
+          selLista = c; c.sugerencias(pendientesDe(x));
+        } } }).then(() => { abriendoEntre = false; selLista = null; sala.pausar(false); });
     }
     function alCambiarSala(e) {
       window.mkwEstado.sala = e;
@@ -1408,7 +1448,7 @@ async function arrancar() {
   {
     const MODOS_PILOTO = ['gp', 'vs', 'tt', 'copa', 'unjugador', 'local', 'directa', 'sala'];
     // abrir directo (§71): sin cortina; lo que se ve es el juego cambiando de pantalla con su propio fundido
-    const directoSinCortina = () => DIRECTO && ['enlinea', 'unjugador'].includes(objetivoPiloto.modo);
+    const directoSinCortina = () => DIRECTO && ['enlinea', 'unjugador', 'local'].includes(objetivoPiloto.modo);
     const conPiloto = () => directoSinCortina() ? false : objetivoPiloto.modo === 'enlinea' ? !!red : MODOS_PILOTO.includes(objetivoPiloto.modo);
     const textoPiloto = () => ({ enlinea: 'Entrando a la sala…', copa: 'Preparando la carrera…', directa: 'Preparando la carrera…', sala: 'Entrando a la sala…', unjugador: 'Entrando a Single Player…',
       local: 'Entrando a Multiplayer…' }[objetivoPiloto.modo] || 'Yendo a la carrera…') + (matchMedia('(pointer: fine)').matches ? ' (Esc: lo hago yo)' : '');
@@ -1430,8 +1470,9 @@ async function arrancar() {
     const vigilaCortina = setInterval(revisarCortina, 200);
   }
 
-  // El menú de inicio (§67): Single Player → el piloto hasta el menú «Un jugador» del juego; Multiplayer local → hasta
-  // el menú principal con el cursor en «2 Players». Ahí se detiene: lo demás se elige con los menús del juego.
+  // El menú de inicio (§67): Single Player → el menú «Un jugador» del juego; Multiplayer local → el multijugador en la
+  // consola (sección 0x54, §84). Los dos se abren directo por código (§71); lo demás se elige con los menús del juego.
+  // (El piloto de antes, ?directo=0: hasta el menú «Un jugador» o hasta el menú principal con el cursor en «2 Players».)
   const DESTINO = {
     unjugador: { pagina: PAGINA.unJugador, seccion: SECCION.unJugador },
     local: { pagina: PAGINA.menuPrincipal, alLlegar: async toque => { await toque(BOT.derecha); } },
@@ -1440,8 +1481,9 @@ async function arrancar() {
     objetivoPiloto.modo = que;
     window.mkwEstado.piloto = null;
     revisarCortina();                               // la cortina al tiro (si el juego ya mostraba su título)
-    if (DIRECTO && que === 'unjugador') {           // §71: el juego abre su menú «Un jugador» de una
-      directo.ir(SECCION_DIRECTA.unjugador).then(llego => {
+    if (DIRECTO && (que === 'unjugador' || que === 'local')) {   // §71/§84: el juego abre su menú de una
+      if (que === 'local') M._mkw_directo_locales?.(localesInicio);   // 2, 3 o 4 jugadores (directo_nativo.cpp)
+      directo.ir(SECCION_DIRECTA[que]).then(llego => {
         window.mkwEstado.piloto = { llego, modo: que, directo: true };
         nota(`directo: ${que} ${llego ? 'abierto' : 'no se pudo'}`);
         revisarCortina();

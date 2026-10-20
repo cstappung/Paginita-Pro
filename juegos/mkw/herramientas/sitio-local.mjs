@@ -30,6 +30,7 @@
 //                  la cuenta está en la lista de amigos (lo que muestra u oculta Mario Kart y BT3).
 //   --solo mkw     el catálogo de Juegos muestra solo esos juegos (window.__JG_SOLO; también solo en 127.0.0.1)
 //   --amigos a,b   la lista AMIGOS del Worker (correos o uids)
+//   --emu-desplazar N  los emuladores están en sus puertos + N (§87, experiencia.mjs --emu-desplazar)
 //
 // Uso:  node herramientas/sitio-local.mjs [--latencia 50] [--puerto 8150] [--emuladores] [--solo mkw] [--amigos a@x,b@y]
 import http from 'node:http';
@@ -53,9 +54,10 @@ const PRIVADO = VIEJO ? WORKER : WORKER + '/mkw';
 const EMULADORES = args.includes('--emuladores');
 const SOLO = opcion('--solo', '');
 const AMIGOS = opcion('--amigos', '');
+const EMU_D = Number(opcion('--emu-desplazar', 0)) || 0;
 // lo que va al principio de juegos.html (antes que la app): los emuladores y el filtro de juegos, solo si se pidieron
 const ANTES = (EMULADORES || SOLO) ? `<script>` +
-  (EMULADORES ? `window.__FIREBASE_EMU={auth:"http://127.0.0.1:9099",db:["127.0.0.1",9000],storage:["127.0.0.1",9199]};` : '') +
+  (EMULADORES ? `window.__FIREBASE_EMU={auth:"http://127.0.0.1:${9099 + EMU_D}",db:["127.0.0.1",${9000 + EMU_D}],storage:["127.0.0.1",${9199 + EMU_D}]};` : '') +
   (SOLO ? `window.__JG_SOLO=${JSON.stringify(SOLO.split(',').map(x => x.trim()).filter(Boolean))};` : '') + `</script>` : '';
 if (!fs.existsSync(path.join(SITIO, 'juegos.html'))) {
   console.error('falta la copia del sitio: git clone https://github.com/cstappung/Paginita-Pro terceros/Paginita-Pro');

@@ -240,7 +240,7 @@ export function crearSalon(ctx) {
   /* Las opciones de la sala, ya desplegadas: en la ficha hay sitio, y
      plegarlas otra vez detrás de un «Opciones» sería un paso de más. */
   function opcionesHtml(e) {
-    const ops = ctx.opciones(e.id);
+    const ops = ctx.opciones(e.id).filter(o => !o.oculta);   // (oculta: va al crear la sala, sin preguntar: el cupo de Mario Kart)
     if (!ops.length) return "";
     const antes = elegidas.get(e.id) || {};
     return `<div class="jg-hoja-ops"><h3>Opciones de la sala</h3>${ops.map(o => {

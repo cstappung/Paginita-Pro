@@ -5,8 +5,8 @@
 // «Championship»). Mientras está, el juego carga y arranca DEBAJO (así, al elegir, ya está listo o casi).
 //   - Single Player → el piloto lleva el juego (tapado por la cortina) hasta su menú «Un jugador» (Grand Prix,
 //     Contrarreloj, VS, Batalla) y ahí lo deja: desde ahí se juega con los menús del juego.
-//   - Multiplayer → «Local» (este PC, 2 a 4 mandos: el piloto deja el juego en su menú principal con el cursor en
-//     «2 Players») u «Online» (las salas de Juegos: solo dentro del sitio, le avisa a la página de Juegos).
+//   - Multiplayer → «Local» (este PC: 2, 3 o 4 Players, como los botones del menú principal del juego; el juego abre
+//     directo su registro de mandos, §84) u «Online» (las salas de Juegos: solo dentro del sitio, le avisa a Juegos).
 //   - Options → el cajón de la página (Controles, Partida, ajustes).
 //
 // PRIVADO: la imagen muestra a una persona real. No está en git ni en GitHub Pages: vive en la parte privada
@@ -21,10 +21,11 @@
 // Mientras el menú está, el juego no recibe nada de la persona (controles.silenciar).
 //
 // Uso:  const inicio = crearInicio({ imagen: ORIGEN + '/build/imagenes/inicio/jlokart.webp', alElegir: que => … });
-//       if (await inicio.cargar()) inicio.mostrar();      // que: 'unjugador' | 'local' | 'salas' | 'opciones'
+//       if (await inicio.cargar()) inicio.mostrar();      // que: 'unjugador' | 'local2'…'local4' | 'salas' | 'opciones'
 
 // Dónde van los botones, en % de la imagen (1448 × 1086): en el lugar de los 3 primeros que traía pintados
-const LUGAR = { izquierda: 74.72, ancho: 22.44, arriba: [48.34, 55.43, 62.43], alto: 5.89 };
+// (y un 4.º, solo en el submenú de Local, dentro del mismo panel: ahí no va la línea de ayuda)
+const LUGAR = { izquierda: 74.72, ancho: 22.44, arriba: [48.34, 55.43, 62.43, 69.43], alto: 5.89 };
 // «PRESS START» pintado abajo: un brillo que late encima, y tocarlo acepta lo elegido
 const START = { izquierda: 27.6, ancho: 47.3, arriba: 86.6, alto: 8.3 };
 // Un panel de vidrio esmerilado detrás de los botones: tapa el borde del relleno donde estaban los 4 botones pintados
@@ -42,16 +43,20 @@ const ICONO = {
 };
 const svg = nombre => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONO[nombre]}</svg>`;
 
-// Los dos menús: el de entrada y el de Multiplayer. «salas» solo dentro del sitio (las salas viven en Juegos).
+// Los menús: el de entrada, el de Multiplayer y el de Local (cuántos juegan en este PC). «salas» solo dentro del sitio
+// (las salas viven en Juegos).
 const MENUS = {
   principal: [['unjugador', 'Single Player', 'bandera'], ['multijugador', 'Multiplayer', 'gente'], ['opciones', 'Options', 'engranaje']],
   multi: [['local', 'Local', 'pantalla'], ['salas', 'Online', 'mundo'], ['volver', 'Back', 'atras']],
+  local: [['local2', '2 Players', 'gente'], ['local3', '3 Players', 'gente'], ['local4', '4 Players', 'gente'], ['volver', 'Back', 'atras']],
 };
+const ANTERIOR = { multi: 'principal', local: 'multi' };   // a dónde vuelve Back (o B, Esc) desde cada menú
 const AYUDA = {
   unjugador: 'Grand Prix, Contrarreloj, VS y Batalla: con los menús del juego',
   multijugador: 'En este PC con 2 a 4 mandos, o en línea con tus amigos',
   opciones: 'Controles, mandos, tu partida y ajustes',
   local: 'En este PC, pantalla dividida: conecta 2 a 4 mandos',
+  local2: 'Dos jugadores en este PC', local3: 'Tres jugadores en este PC', local4: 'Cuatro jugadores en este PC',
   salas: 'Con tus amigos: abre o únete a una sala en Juegos',
   volver: 'Volver al menú',
 };
@@ -85,6 +90,8 @@ body.cortina-mal #inicioJlo { display: none; }   /* un error del juego (sin WebG
 #inicioJlo .ij-boton:nth-child(1) { top: ${LUGAR.arriba[0]}%; }
 #inicioJlo .ij-boton:nth-child(2) { top: ${LUGAR.arriba[1]}%; }
 #inicioJlo .ij-boton:nth-child(3) { top: ${LUGAR.arriba[2]}%; }
+#inicioJlo .ij-boton:nth-child(4) { top: ${LUGAR.arriba[3]}%; }
+#inicioJlo .ij-menu.cuatro ~ .ij-ayuda { display: none; }
 #inicioJlo .ij-boton span { display: block; transform: skewX(-8deg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   -webkit-text-stroke: .28cqw #0a2470; paint-order: stroke fill; text-shadow: 0 .18cqw 0 #0a2470; }
 #inicioJlo .ij-boton svg { flex: none; width: 2.75cqw; height: 2.75cqw; fill: #fff; stroke: #0a2470; stroke-width: 1.3;
@@ -186,6 +193,7 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
       b.addEventListener('click', () => { elegir(i); aceptar(); });
       caja.append(b);
     });
+    caja.classList.toggle('cuatro', opciones().length > 3);
     elegir(Math.min(elegido, opciones().length - 1));
   }
   function elegir(i) {
@@ -204,12 +212,13 @@ export function crearInicio({ contenedor = document.body, imagen, buscar = (...a
     const b = raiz.querySelectorAll('.ij-boton')[elegido];
     if (b) { b.classList.add('disparado'); setTimeout(() => b.classList.remove('disparado'), 180); }
     if (que === 'multijugador') return cambiarMenu('multi');
-    if (que === 'volver') return cambiarMenu('principal');
+    if (que === 'local') return cambiarMenu('local');
+    if (que === 'volver') return cambiarMenu(ANTERIOR[menu] || 'principal');
     estado.elecciones.push(que);
-    if (que === 'unjugador' || que === 'local') ocultar();        // se va: lo que sigue lo tapa la cortina
+    if (que === 'unjugador' || /^local[234]$/.test(que)) ocultar();   // se va: lo que sigue es el juego
     alElegir(que);
   }
-  function atras() { if (visible && menu !== 'principal') cambiarMenu('principal'); }
+  function atras() { if (visible && menu !== 'principal') cambiarMenu(ANTERIOR[menu] || 'principal'); }
 
   // ---- Teclado (antes que nadie: lo que se usa aquí no le llega al juego ni a otros) ----
   const TECLAS = { ArrowUp: -1, KeyW: -1, ArrowDown: 1, KeyS: 1 };

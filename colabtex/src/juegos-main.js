@@ -249,8 +249,10 @@ const OPCIONES = {
   /* Mario Kart Wii: SOLO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no cuántas personas: los
      modos»): copa o playlist (redMkw: MKW_MODOS), sin el Wi-Fi del juego. Caben 4 (cada piloto es un jugador de
      verdad en todas las consolas; la CPU completa los 12). Se guarda como `estilo` (las reglas de Firebase reservan
-     `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige la cilindrada; la copa o la lista se eligen en el juego (§74). */
-  mkw: [{ clave: "cupo", etiqueta: "Pilotos", por: 4, valores: cupos("mkw") },   // sin esto la sala quedaba de 2 (cupoDe)
+     `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige la cilindrada; la copa o la lista se eligen en el juego (§74).
+     El cupo no se pregunta (el dueño, 2026-10-20: «por defecto es para el número máximo de jugadores»): toda sala
+     nace con el máximo (oculta: la ficha no la muestra, pero va al crearla; sin ella cupoDe la dejaba en 2). */
+  mkw: [{ clave: "cupo", etiqueta: "Pilotos", por: JUEGOS.mkw.cupo, oculta: true, valores: [{ v: JUEGOS.mkw.cupo, t: JUEGOS.mkw.cupo + " pilotos" }] },
     { clave: "estilo", etiqueta: "Modo", por: "copa", valores: [
       { v: "copa", t: "Modo copa (una copa del juego, 4 carreras con puntos)" }, { v: "playlist", t: "Modo playlist (una lista de pistas, con sugerencias)" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
@@ -3109,8 +3111,9 @@ function pintaFin(p, est) {
     : "Ganó " + nombreDe(est, g);
   const sub = clase === "perdi" ? "Ganó " + nombreDe(est, g) : "";
   const marca = marcadorFin(est);
-  const echados = (est.expulsados || []).map(x => nombreDe(est, x.uid)).join(", ");
-  const expulsion = echados ? `Expulsad${(est.expulsados || []).length > 1 ? "os" : "o"} por votación: ${echados}.` : "";
+  const porVoto = (est.expulsados || []).filter(x => !x.echado);   // (§87: los que echó el anfitrión no van «por votación»)
+  const echados = porVoto.map(x => nombreDe(est, x.uid)).join(", ");
+  const expulsion = echados ? `Expulsad${porVoto.length > 1 ? "os" : "o"} por votación: ${echados}.` : "";
   const firma = clase + titulo + sub + f.motivo + marca + expulsion + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
@@ -3271,7 +3274,11 @@ function pintaQuienes(p, est) {
   const hace = mayoriaExpulsion(activos.length);
   const abierta = juego && est.listos && !datosFin(p, est) && !fuera.has(yo) && activos.length >= 2;
   const duelo = activos.length <= 2;
-  const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
+  // Mario Kart Wii (§87 del port): la sala está abierta siempre (vestíbulo y copa, sin `listos`) y se vota con 3 o más
+  // pilotos; con 2, votar sería echar solo, y eso lo hace el anfitrión (su botón «Echar» del vestíbulo)
+  const enMkw = p.juego === "mkw";
+  const puedoVotar = enMkw ? juego && !datosFin(p, est) && !fuera.has(yo) && activos.length >= 3
+    : abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
   const votos = est.votos || {};
   const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, marcoDeUid(x.uid)]), [...fuera], votos, puedoVotar, hace]);
   if (caja.dataset.firma === firma) return;
