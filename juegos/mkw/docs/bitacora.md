@@ -833,6 +833,33 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Fila baja** | La lista de cosas que la página baja "por si acaso" (la semilla de bloques, las voces de los CPU), de a pocas y solo cuando el juego no está cargando, para no quitarle la red a lo que el juego espera ahora. |
 | **Latencia contra ancho de banda** | La latencia es cuánto tarda un pedido en empezar a llegar (~50 ms hasta R2); el ancho de banda, cuántos bytes por segundo caben (50 Mbit/s de una casa). Con archivos chicos manda la latencia; con grandes, el ancho de banda. Como en una línea de transmisión: el retardo de propagación contra la capacidad del conductor. |
 
+### El descanso, la parrilla y el VR entre carreras (§94)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Descanso (entre carreras)** | Los 30 s entre el fin de una carrera de la sala y la siguiente (antes eran 9): se ven los resultados, el VR, y en la playlist se agregan o sugieren pistas. Un panel al costado muestra la cuenta. Como el tiempo muerto de un reconectador entre dos intentos: fijo, y conocido por todos los que esperan. |
+| **Cuenta que vuelve a 15 s** | Si en el descanso alguien agrega o sugiere una pista y quedan menos de 15 s, la cuenta vuelve a 15 s (con más de 15 s no cambia). Así nadie queda a mitad de elegir. Como un monoestable redisparable: cada disparo nuevo le da al menos su ancho de pulso, sin acumular más. |
+| **Parrilla de salida** | El orden en que los 12 karts esperan la largada (el 1.º adelante). En Mario Kart cada uno larga la carrera siguiente en el puesto en que llegó a la anterior. |
+| **Puesto anterior (`+0xE1`)** | Un byte de la ficha de cada jugador en Racedata: el puesto con que "viene" de la carrera anterior. El juego arma la parrilla con él (medido en §94). En el camino directo de la sala nadie lo escribía desde la segunda carrera: ahora lo escribe la página con la llegada. |
+| **Llegada** | Los 12 puestos en que terminó cada uno una carrera (el del juego, `RaceinfoPlayer +0x20`). Cada página la manda con su aviso de «terminé» y la anfitriona la reparte en el estado de la sala: la parrilla de la siguiente sale de ahí, igual en todas las consolas. |
+| **Cerrojo de los botones** | En la sala, después de una carrera, los botones de la persona llegan al juego solo en la carrera y en la pantalla de resultados. Antes, apretando A se pasaba a la tabla de puntos y de ahí al menú propio del juego (carrera siguiente), que largaba otra carrera fuera de la sala. Como un enclavamiento (interlock) en un tablero: con la puerta abierta el contactor no cierra, aprieten lo que aprieten. |
+| **Hora de la anfitriona (desfase)** | Los plazos de la sala (elegir, descanso) son horas del reloj de la anfitriona, y el reloj de cada PC no da exactamente la misma hora. Cada reparto del estado lleva la hora de ella y cada página anota la diferencia con su reloj: así la cuenta dice lo mismo en todos. Como sincronizar los relojes de varias subestaciones con una señal de referencia antes de comparar sus registros. |
+
+### El VR con las CPU (§95)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Puesto general** | El puesto entre los 12 corredores, humanos y CPU juntos. Desde §95 el VR de la sala se mueve con él: ganarle a una CPU también suma, y que una CPU te gane también resta. Antes (§82) solo contaba el orden entre los humanos. |
+| **Ancla (de la CPU)** | El VR fijo con que cuenta cada CPU: 5000 la difícil (150cc y espejo), 3000 la normal (100cc). La CPU no tiene VR guardado: nunca sube ni baja. Como una fuente de tensión ideal en un circuito: fija la referencia y no se mueve por lo que le conecten. |
+| **Peso de una CPU** | Cuánto vale ganarle (o perder) a una CPU comparado con un humano del mismo VR: 1/4. Un humano vale como 4 CPU. |
+| **Tope (de las CPU)** | Todas las CPU juntas valen a lo más lo de 2 humanos. Con hasta 8 CPU cada una vale 1/4; con 9, 10 u 11, cada una vale 2 ÷ cuántas. Así, en una sala de 2 humanos y 10 CPU, el otro humano sigue pesando la mitad de lo que pesan todas las CPU juntas. Como un limitador de corriente: deja pasar proporcional hasta un valor, y de ahí no más. |
+| **Equilibrio (del VR)** | El VR donde, en promedio, lo que se gana por ganarle a las CPU es igual a lo que se pierde cuando ellas ganan: ahí el VR deja de subir. Quien le gana al 90 % a cada CPU difícil se queda en ~8200. Es un lazo de control con realimentación negativa: cuanto más VR tienes, menos te dan por ganar y más te quitan por perder, y el VR vuelve solo al punto de trabajo. |
+| **Inflación (de VR)** | Que el VR de todos suba sin fin solo por jugar, sin que nadie juegue mejor. Pasaría si cada CPU tuviera de ancla el VR de los mismos humanos (la referencia se mueve con la salida: el lazo no tiene punto fijo). Con anclas fijas no pasa. |
+| **Granja de VR (cuenta alterna)** | Hacer subir el VR propio con una segunda cuenta que se queda quieta y llega última siempre. Con la regla de §82 (solo humanos) una persona común llegaba a ~10 500 en 2000 carreras; con §95, a ~5300: la cuenta alterna ya casi no regala nada, porque lo que cuenta son las CPU. |
+| **Crítico externo** | Un revisor independiente (otro agente, con el diseño escrito y el código, sin la conversación) que recalculó todo por su cuenta, simuló miles de carreras y buscó cómo abusar del sistema. Como el ensayo de un tablero por un laboratorio que no lo armó. |
+| **Puestos creíbles** | Los puestos que da el juego sirven solo si cada CPU tiene uno del 1 al 12 y no se repite ninguno. Si una lectura falla (una CPU con puesto 0 quedaría «detrás de todos» y le regalaría puntos a cada humano), la parte de las CPU no se cuenta. |
+| **Regla congelada** | La anfitriona pone la regla de las CPU (anclas, peso, tope) en la foto de cada carrera, junto con los VR (`vrCarrera.cpu`). Así todas las consolas cuentan con la misma regla aunque alguna tenga otra versión de la página. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -7782,3 +7809,290 @@ completo (36 páginas), el sitio (24) y `subir-r2` (23).
 
 **Lo que sigue:** lo del dueño (B7): publicar las reglas de Storage nuevas (los fantasmas, §92), subir a R2 con
 `MKW_BUILD=build/web-final/navegador` (ahora también sube `diminutos.bin`) y probar en el sitio real.
+
+## 2026-10-20 · §94 El descanso entre carreras, el VR a la vista y la parrilla de Mario Kart
+
+**Qué pidió el dueño:**
+
+1. Entre pista y pista del multijugador, **30 s de descanso** «para que hagan todo».
+2. Si en el descanso alguien agrega o sugiere una pista y a la cuenta le quedan **menos de 15 s**, la cuenta **vuelve a
+   15 s**.
+3. El **VR** no se veía en el modo playlist.
+4. Como en Mario Kart, cada uno **larga la carrera siguiente en el puesto en que llegó** a la anterior.
+
+### 94.1 El descanso de 30 s y la regla de los 15 s
+
+Antes, entre carreras había 9 s de resultados (`SEGUNDOS_RESULTADOS`). En la playlist, «+ Agregar pistas» **congelaba**
+la cuenta hasta 60 s, y al cerrarlo quedaban 3 s.
+
+Ahora (`sala-carrera.mjs`):
+
+- **30 s de descanso** en las dos salas (copa y playlist). `?descanso=N` (segundos) cambia el valor, solo para pruebas.
+- Si la playlist gana **una pista** o **una sugerencia nueva** y a la cuenta le quedan menos de 15 s, el plazo pasa a
+  ahora + 15 s (`alargue`). Con más de 15 s no cambia nada: no se acumula.
+  - «Gana una pista» = la lista tiene más pistas que antes: el anfitrión agrega una, o acepta una sugerencia.
+  - «Sugerencia nueva» = sube el número de la próxima sugerencia (`sig`).
+  - Reordenar o sacar pistas no cuenta.
+- **Abrir «+ Agregar pistas»** también cuenta como empezar a agregar: si quedan menos de 15 s, vuelve a 15. Ya no
+  congela nada.
+
+Es como un monoestable redisparable: cada disparo nuevo asegura al menos 15 s, y nunca suma más que eso.
+
+**La hora de la anfitriona.** El plazo es una hora del reloj de la anfitriona. El reloj de cada PC no da exactamente la
+misma hora: con 5 s de diferencia, la cuenta de un jugador decía 5 s distinto que la de otro. Ahora:
+
+- cada reparto del estado lleva la hora de ella (`reloj`);
+- cada página anota la diferencia con su propio reloj (`desfase`);
+- `sala.restan(plazo)` da lo que falta igual en todos.
+
+Lo usan el contador de «elegir» (45 s) y el del descanso.
+
+### 94.2 El panel del descanso (y el VR que no se veía en la playlist)
+
+**Por qué no se veía el VR en la playlist.** El VR se calculaba bien en las dos salas (§82), pero se mostraba solo como
+un aviso de una línea arriba de la imagen («🏁 VR 5000 → 5013 (+13)»). En la playlist, al mismo tiempo se abría el
+panel de las pistas, y abrir «Sugerir pista» borraba los avisos (`ui.aviso('')`). El aviso duraba un instante o no
+salía.
+
+**Ahora** el panel de entre carreras (`playlistBreve` de `interfaz.mjs`) es el panel del descanso de **las dos salas**:
+
+- arriba, la cuenta: «La carrera siguiente en 27 s» (en la última: «La copa termina en…»), amarilla en los últimos 5 s;
+- **los resultados de la carrera**, por puesto: cada humano con su puesto, los puntos de la copa y su VR (antes →
+  después, verde si sube y rojo si baja), con «(tú)» marcado;
+- en la playlist, además, lo que viene con «+ Agregar pistas» (anfitrión) o «Sugerir pista» (los demás); en la copa,
+  lo que queda de la copa y sin botones.
+
+De dónde sale cada dato (`resultadosDe` en `mkw.mjs`):
+
+| Dato | De dónde |
+|---|---|
+| Puesto y puntos | De la sala: la llegada (94.3) y la tabla de puntos (§75), iguales en todas las consolas. Así también los ve quien recargó y no corrió esa carrera |
+| VR | Lo calcula cada página al terminar la carrera (§82: `cambiosVr` da el cambio de **todos**, con los mismos números en todas las consolas). Quien no corrió la carrera ve el VR que cada uno le avisó a la anfitriona |
+
+### 94.3 La parrilla, como en Mario Kart
+
+**Lo que hacía el juego.** Primero se midió (regla «decompilar uno mismo»): una carrera directa, terminada por código,
+leyendo antes y después la ficha de cada jugador en Racedata.
+
+- En la ficha de cada jugador, el byte **`+0xE1`** es el «puesto anterior». En la primera carrera,
+  `escribirFicha` (`directo_nativo.cpp`) lo pone como hacen los menús del juego: 12, 11, …, 1 (los humanos atrás).
+- Al terminar la carrera, el juego deja en la ficha **de los menús** el puesto de llegada (`+0xE2`) y los puntos
+  (`+0xDA`), y nada más. El «puesto anterior» de la carrera siguiente lo escribe el menú del juego entre carrera y
+  carrera (en el código traducido, las funciones que escriben `+0xE1` son dos «setters» de Racedata, 0x8052E640 y
+  0x8052E658, y dos de los menús, 0x80707534 y 0x806CCA04). En la sala ese menú no pasa: la carrera siguiente se abre
+  directo. Por eso, desde la segunda, todos largaban siempre igual que en la primera.
+
+**El experimento que lo confirmó** (`node herramientas/medir-parrilla.mjs`): carrera 1 → terminarla → escribir `+0xE1` a mano con un orden
+inventado (el humano 6.º, los CPU 1.º a 5.º y 7.º a 12.º) → abrir la carrera 2. En la cuenta regresiva, los puestos del
+juego (`RaceinfoPlayer +0x20`) eran **exactamente** los escritos (6 1 2 3 4 5 7 8 9 10 11 12). Con el humano en 1.º, la
+foto lo muestra adelante de todos, con «1st» en la pantalla. El juego no lo copia solo: la llegada de la carrera 1
+era otra.
+
+**El arreglo** (todo en la página, sin tocar el C++):
+
+1. Al terminar cada carrera, cada página manda a la anfitriona, junto con sus puntos, **la llegada**: los 12 puestos de
+   su consola (`llegadaDelJuego`: `RaceinfoPlayer +0x20` con la carrera terminada; 0 donde no hay nadie).
+2. La anfitriona guarda en el estado la primera que le llega (`llegada: {carrera, puestos}`): todas las consolas que
+   corrieron la carrera tienen la misma (es la misma carrera, cuadro por cuadro).
+3. Antes de abrir la carrera n (n > 1), cada consola escribe esa llegada como «puesto anterior» de cada uno
+   (`ponerParrilla`, en la ficha de los menús). Si no la hay o no sirve (puestos repetidos), escribe la de la primera
+   carrera. Así **todas las consolas largan igual**, condición para que la carrera sincronizada siga siendo la misma
+   en todas. Incluida la que recargó la página y no vio la carrera anterior: la llegada viene de la sala.
+
+### 94.4 El menú del juego que se colaba en el descanso
+
+Con 9 s de resultados casi no pasaba, pero con 30 s pasaría seguido. Se midió apretando A cada 1,5 s después de una
+carrera (`node herramientas/medir-resultados-a.mjs`):
+
+| Tiempo | Pantalla del juego |
+|---|---|
+| 0-3 s | la carrera terminada (página 0x0E) |
+| 4-6 s | los resultados (0x2F) |
+| 7-9 s | la tabla de puntos (0x30) |
+| **11 s** | **el menú de «carrera siguiente» del juego (0x22)** |
+| 12-18 s | la sección 0x4B: el juego elige pista solo |
+| 21 s | **otra carrera**, fuera de la sala |
+
+En la sala eso deja a esa consola en otra carrera, sola. **Arreglo: el cerrojo** (`controles.cerrojo` en
+`controles.mjs`, puesto por la sala en `mkw.mjs`). En cada cuadro pregunta si la carrera ya terminó (Raceinfo, etapa
+≥ 4) y en qué pantalla está el juego. Fuera de la carrera y de sus resultados (0x0E y 0x2F), los botones de la persona
+no llegan al juego. Se puede mirar la tabla de puntos, pero no salir de ella. Durante la carrera manda la carrera
+sincronizada, como siempre.
+
+### 94.5 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| banco `sala-carrera` | **64/64** (15 nuevos: 30 s de descanso, la llegada en el estado y repartida, la primera queda, una con puestos repetidos no; la misma cuenta con relojes +7 s y −4 s; `llegadaDelJuego` y `ponerParrilla` con una memoria falsa: la llegada, la de la primera si no hay, con 3 corredores) |
+| banco `sala-playlist` | **37/37** (los de la pausa de 60 s pasan a la regla nueva: abrir el selector con 30 s no cambia nada; agregar con 12 s → 15; reordenar no; sugerir con 7 s → 15 en las tres; abrirlo con 4 s → 15; sin agregar nada, la siguiente a los 30 s) |
+| banco `playlist-sala` | 25/25 (sin cambios) |
+| `prueba-elegir.mjs` | **69/69** (4 nuevos: el panel de la copa sin botones con la cuenta, los resultados por puesto con puntos y VR, «(tú)», la última «La copa termina en 3 s» resaltada) |
+| `prueba-sala.mjs` | **35/35** (5 nuevos: el panel en las dos —«La carrera siguiente en 21 s», los dos con puesto, puntos y VR +13/−13—; B aprieta A 10 veces en los resultados y el juego no pasa de la tabla de puntos —solo 0x2F y 0x30—; la cuenta al aparecer el panel, más de 28 s en las dos; la parrilla de la 2 = la llegada de la 1 en las dos; y en la cuenta regresiva el juego larga en ese orden: A, que llegó 2.ª, larga 2.ª con B adelante) |
+| `prueba-sala.mjs --recarga` | **34/34** (los 2 nuevos de la parrilla: B, que recargó y no corrió la 1, larga la 2 con la misma parrilla que A, sacada de la sala) |
+| banco entero (`node banco/correr.mjs`) | 36 de 36 páginas bien |
+| `prueba-playlist.mjs` | **20/20** (sin los 2 de la pausa vieja; 4 nuevos: el panel con la cuenta y el VR de los dos; con el selector abierto la cuenta baja igual —11,6 s—; A acepta la sugerencia de B y la cuenta vuelve a 15 s en las dos —14,3 s en A y en B—; cerrar el selector no adelanta nada: la 2 abre 14,7 s después) |
+
+### 94.6 Trampas
+
+- **Los puestos de la etapa 0 no son la parrilla.** En el primer cuadro de la carrera (etapa 0) el juego todavía no
+  calculó los puestos y muestra 1, 2, …, 12 en orden. La primera versión de la prueba los leyó ahí y falló. La parrilla
+  se ve en la cuenta regresiva (etapa 1): la página la anota ahí (`mkwEstado.parrilla.largada`).
+- **Medir el descanso desde la prueba no sirve.** Restarle a mano lo que tarda la prueba en ver el fin daba 27 s. Ahora
+  la página anota lo que faltaba al aparecer el panel (`mkwEstado.descanso.restanAlAbrir`).
+- **`toLocaleString('es')` no pone punto en los números de 4 cifras** (5013, no 5.013; sí 12.345). La prueba del panel
+  compara con lo que da el mismo navegador.
+- **«Tu PC no alcanza 60 cuadros por segundo», a veces.** En 3 de 6 corridas de `prueba-sala` (con o sin `--recarga`)
+  falló un punto viejo: «ningún aviso de la página queda encima de la carrera». Con dos juegos en la misma PC cada
+  pestaña va a 40-60 cuadros por segundo, y si en el instante del control va por debajo, sale el aviso de lentitud de
+  §80. Para descartar que fuera por estos cambios se corrió la prueba con el código de antes (una copia de `HEAD` con
+  `git archive`) y con el de ahora, una detrás de otra: las dos pasaron. Lo único nuevo que corre en cada cuadro es el
+  cerrojo (dos lecturas de memoria, menos de un microsegundo). El aviso es justo: la PC de verdad no daba 60.
+
+## 2026-10-20 · §95 El VR con el puesto general (las CPU cuentan)
+
+**Qué pidió el dueño:** «que el VR dependa de la posición general incluyendo a los bots, pero con más peso respecto a
+jugadores reales; piensa bien en un buen sistema de cálculo e implementalo, usa un crítico externo para que evalúe tu
+cálculo matemático».
+
+Hasta §82 el VR de la sala usaba la regla exacta de Mario Kart Wii, **solo entre humanos**. En una sala de 2 humanos y
+10 CPU, llegar 1.º o 2.º daba lo mismo si el otro humano llegaba 12.º. Ahora cuenta el puesto entre los 12.
+
+### 95.1 La regla
+
+Todo está en `web/navegador/vr-sala.mjs` (`cambiosVr`, `REGLA_CPU`).
+
+1. **Entre humanos, lo mismo de §82**, sin tocar: cada par (el que llegó antes gana `puntosPar(VR ganador, VR
+   perdedor)`, el otro pierde lo mismo), en enteros, de suma cero. El cortado pierde contra todos y nadie gana por él.
+2. **Cada CPU es un rival de VR fijo**, el **ancla** de su nivel (el de la ficha de la carrera, igual en todas las
+   consolas):
+   - difícil (150cc y espejo) = **5000**, el VR con que empieza todo el mundo: quien le gana a la mitad de las CPU
+     difíciles se queda en 5000;
+   - normal (100cc) = **3000**;
+   - fácil = **no cuenta** (no hay fáciles en la sala hoy; se dejó por si acaso).
+3. **Contra cada CPU**, con el VR del humano `v` y el ancla `A`:
+   - si el humano llegó antes: suma `puntosPar(v, A)`;
+   - si la CPU llegó antes (o el humano se cortó): resta `puntosPar(A, v)`.
+   Es la curva del juego, como si la CPU fuera un humano de VR `A`.
+4. **El peso**: lo de las CPU se suma entero (S) y se escala **una sola vez**:
+
+   ```
+   parte de las CPU = trunc( 2·S / max(8, n) )      n = cuántas CPU corren
+   ```
+
+   - con hasta 8 CPU: S/4 → cada CPU vale **1/4 de un humano**;
+   - con 9, 10 u 11: 2·S/n → **todas juntas valen 2 humanos** (el tope).
+   - `trunc` = cortar los decimales hacia el cero (como el juego con sus puntos). Todo en enteros: da lo mismo en todas
+     las consolas.
+5. El cambio de cada humano = lo de los humanos + lo de las CPU. Se aplica con los topes de siempre (de 1 a 1 000 000).
+6. Sigue haciendo falta que corran **al menos 2 humanos** para que haya VR (es la sala «en línea»).
+
+**Ejemplos** (todos con VR 5000, 2 humanos y 10 CPU difíciles; contra uno de igual VR cada par vale 13):
+
+| Llegada | Cambio |
+|---|---|
+| 1.º (el otro humano 12.º) | 13 (al humano) + trunc(2·10·13/10) = 13 + 26 = **+39** |
+| 12.º (el otro humano 1.º) | −13 − 26 = **−39** |
+| 2.º, detrás del otro humano (1.º) | −13 + 26 = **+13** (y el 1.º, +39) |
+| 11.º, delante del otro humano (12.º): las 10 CPU llegaron antes | +13 + trunc(2·(−10·13)/10) = 13 − 26 = **−13** (y el 12.º, −39) |
+
+### 95.2 Por qué el ancla es fija (y no el VR de los humanos)
+
+El VR es un **lazo realimentado**. Cuanto más VR tiene uno, menos le da ganarle a una CPU (la curva baja cuando el
+rival tiene menos VR) y más le quita perder. Así el VR de cada uno va a un **punto de equilibrio**: donde lo que gana
+en promedio iguala a lo que pierde.
+
+Con el ancla fija, ese punto existe y depende solo de lo bien que juega cada uno. El crítico lo calculó con la curva
+del juego (con los puntos truncados), y una simulación de 6000 carreras con el código de verdad da lo mismo:
+
+| Le gana a cada CPU difícil… | El VR se queda en… |
+|---|---|
+| 10 % de las veces | ~1770 (5000 − 3233) |
+| 25 % | ~3500 (5000 − 1476) |
+| 50 % | **5000** |
+| 70 % | ~6170 (5000 + 1169) |
+| 80 % | ~6820 (5000 + 1820) |
+| 90 % | ~8200 (5000 + 3234) |
+| siempre | ~11 600 (5000 + 6599): ahí ganarle a una CPU ya da 0 puntos y no sube más |
+
+Si en cambio el ancla fuera «el VR medio de los humanos de la sala», la referencia se movería con la salida: todos
+suben, el ancla sube, y vuelven a subir. **Inflación sin fin** (el crítico lo mostró en simulación). Por eso el ancla es
+un número fijo, como la tensión de referencia de un regulador: no depende de lo que regula.
+
+### 95.3 El crítico externo
+
+Se le pasó a un agente aparte (sin esta conversación) el diseño escrito y el código, con cinco preguntas: ¿están bien
+las cuentas?, ¿el peso?, ¿las anclas?, ¿cómo se puede abusar?, ¿casos borde? Recalculó todo, simuló miles de carreras
+y salas y contestó. **Lo que encontró y lo que se hizo:**
+
+1. **Las cuentas del diseño estaban bien**, salvo un ejemplo: el 11.º con las 10 CPU delante, con el peso del borrador
+   (1/4 por CPU, sin tope), daba 13 − trunc(32,5) = **−19**, no −13 como decía el borrador. Con la regla final es −13 (la
+   tabla de 95.1), y el banco lo comprueba.
+2. **El peso no cambia el equilibrio, solo la velocidad y el ruido.** Con peso 1/4 por CPU y 10 CPU, las CPU pesaban
+   2,5 humanos y el único rival humano, 1: el VR se movía mucho por las CPU (desviación ~27 por carrera contra ~17 con
+   un tope). Recomendó un **tope** para todas las CPU juntas. → **Se puso tope 2 humanos** (el crítico proponía 1 o
+   1,5). Con 1 las CPU casi no se notaban (1.º +26, 2.º detrás del humano 0): el dueño pidió que el puesto general
+   importe. Con 2 un humano sigue valiendo 4 veces una CPU y todas las CPU juntas, a lo más 2 humanos.
+3. **Las CPU fáciles no pueden contar.** A una CPU fácil casi todos le ganan siempre, y quien gana siempre sube hasta el
+   ancla + 6599. Con el ancla de las fáciles (2000) eso era VR regalado. → **Las fáciles no cuentan**; la normal bajó
+   de 3500 a **3000** hasta tener datos de verdad (un ancla alta se aprovecha; una baja solo cuesta un poco de VR en
+   100cc).
+4. **Congelar la regla.** Si la anfitriona y un invitado tuvieran páginas de versiones distintas (una con otra ancla),
+   cada consola contaría otro VR. → La anfitriona pone la regla en la foto de la carrera (`vrCarrera.cpu`, junto a los
+   VR) y todas cuentan con esa (`reglaCpuDe` en `sala-carrera.mjs`). Si la que llega está rota, cada una usa la suya.
+5. **Puestos que no se pueden creer.** Si el juego no da el puesto de una CPU (0), esa CPU quedaba «detrás de todos» y le
+   regalaba hasta 26 a cada humano. → Si alguna CPU no tiene puesto, o hay puestos repetidos o fuera de 1 a 12, la
+   parte de las CPU no se cuenta (el cortado igual pierde contra todas).
+6. **Un humano sin puesto = cortado.** Antes (§82) un humano sin puesto quedaba detrás de todos y los demás ganaban por
+   él. → Ahora cuenta como cortado: pierde contra todos y nadie gana por él (como si se hubiera ido).
+7. **La granja de VR se arregla sola.** Con §82, una persona común con una cuenta alterna siempre última (renovada cada
+   200 carreras) llegaba de 5000 a **10 483** en 2000 carreras. Con §95: **5340** (y 7037 alguien que le gana al 80 %
+   a cada CPU, cuando jugando honesto se queda en ~6820). Lo que cuenta son las CPU, y contra ellas no hay a quién
+   sacarle VR.
+
+### 95.4 Cómo viaja en la página
+
+- `sala-carrera.mjs`: `congelar(n)` = `{ n, vrs, cpu: REGLA_CPU }` al empezar cada carrera. `reglaCpuDe(estado, n)` = la
+  regla de esa carrera (o nada, si la foto es de otra).
+- `vr-sala.mjs`: `corredoresDelJuego` lee también las CPU de la carrera (tipo 1 en el escenario) con su puesto final
+  (`RaceinfoPlayer +0x20`): `{ cpu: true, puesto }`. `cambiosVr(corredores, { nivelCpu, regla })`; `peorCaso` igual.
+- `mkw.mjs`: al abrir la carrera, el peor caso (perder contra el otro humano y contra todas las CPU) queda guardado,
+  como en §82. Con 2 humanos y 10 CPU difíciles: 5000 → 4961 (con normales, 4935). Al terminarla, el de verdad.
+  `mkwEstado.vr` lleva `nivelCpu` y `regla` para las pruebas.
+
+### 95.5 Lo que se vio en el juego
+
+`prueba-sala.mjs` (dos pestañas, la copa de 2 humanos + 10 CPU, a 100cc: CPU **normales**, ancla 3000):
+
+- al abrir la carrera 1 las dos guardaron su peor caso, **4935** (perder contra el otro humano, −13, y contra las 10
+  CPU normales, −52: con 5000 contra un ancla de 3000, perder cuesta 26 por CPU);
+- carrera 1: B 1.º, A 2.º. **B 5000 → 5025 (+25)** = +13 por A y +12 por las CPU. **A 5000 → 4999 (−1)** = −13 por B
+  y +12 por las 10 CPU que le ganó. Ganarle a una CPU de 3000 con 5000 da solo 6 puntos (×2/10 por las 10 = +12);
+- la foto de la carrera 2 llevó los VR nuevos (4999 y 5025) y la regla, la misma en las dos;
+- carrera 2: A 1.º → 5024 (+25); B 12.º → **4960 (−65)** = −13 por A y −52 por las 10 CPU.
+
+Es lo que dice la regla: a 100cc, quien ya tiene 5000 gana poco por pasar a las CPU normales y pierde mucho si ellas le
+ganan (como un jugador de VR alto contra uno de VR bajo en Mario Kart). A 150cc (ancla 5000) los números son los de la
+tabla de 95.1.
+
+### 95.6 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| banco `vr-sala` | **46/46** (19 nuevos de §95: 400 salas al azar con CPU —el 1.º nunca pierde, el último nunca gana, subir un puesto nunca baja el VR, el orden de la lista no cambia nada, nadie queda peor que su peor caso—; humano pesa más que CPU; los ejemplos ±39/±13; el tope de 2 humanos con 9, 10 y 11 CPU; el peor caso −39 y −65; las fáciles = sin CPU; siempre enteros; puestos que no se pueden creer; el cortado igual pierde; humano sin puesto = cortado; la regla de la foto manda y una rota no; el equilibrio en 6000 carreras: 50 % → 5000, 90 % → ~8200, siempre 1.º → se para en ~11 600) |
+| banco `sala-carrera` | 64/64 (sin cambios) |
+| banco entero (`node banco/correr.mjs`) | 36 de 36 páginas bien |
+| `prueba-sala.mjs` | **35/35** (los puntos del VR cambiados por los de §95: el peor caso con las 10 CPU, cada cambio igual a lo que da `vr-sala.mjs` con los puestos que dio el juego, la regla en la foto de la 2) |
+| `prueba-sala.mjs --recarga` | **34/34** (B se va a mitad de la 1: se queda con su peor caso, 4935, y A gana solo lo de las CPU: 5000 → 5012; ver 95.7 por la foto) |
+| `prueba-playlist.mjs` | **20/20** (el panel con el VR de §95: B +25, A −1) |
+
+### 95.7 Trampas
+
+- **Una línea del piso en la mitad de la imagen parecía pantalla partida.** En la primera corrida de `--recarga` falló un
+  punto viejo: «en la foto de B se ve UNA vista». La foto tenía una sola vista; una línea de las baldosas del piso caía
+  justo en la fila del medio y el detector (`foto-pantalla.mjs`, que busca un escalón de luz en la mitad) dio pico 31.
+  Ese punto ahora saca **dos fotos** con B acelerando (`dosFotosPartidas`, como ya hacía `prueba-sincro`): la costura de
+  una pantalla partida no se mueve, un borde de la pista baja por la imagen cuando el kart avanza.
+- **En una página del banco, dos `const` con el mismo nombre la rompen entera.** La página es un solo módulo: el nombre
+  repetido (`dos`) no hizo fallar un punto, hizo que la página no corriera («no terminó a tiempo»). Se cambió el nombre.
+- **A 100cc los números son chicos para quien gana.** No es un error: con 5000 contra CPU de 3000, ganarle a cada una da
+  6 y perder cuesta 26. Es la curva de Mario Kart (ganarle a uno de VR más bajo da poco).

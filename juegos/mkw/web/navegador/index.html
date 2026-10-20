@@ -262,6 +262,21 @@
   .pb-mas, .pb-nota { margin: 0; color: var(--suave); font-size: 12.5px; }
   .pb-nota { color: var(--lila); }
   .playlist-breve > .boton { width: 100%; min-height: 40px; }
+  /* §94: el descanso entre carreras: la cuenta y los resultados (puesto, puntos y VR de cada humano) */
+  .pb-cuenta { margin: 0; padding: 6px 10px; border-radius: 10px; background: #0f0c26; border: 1px solid #3d3378; text-align: center;
+    font: 400 18px 'Lilita One', system-ui, sans-serif; color: var(--texto); font-variant-numeric: tabular-nums; }
+  .pb-cuenta.pronto { color: var(--amarillo); border-color: var(--amarillo); }
+  .pb-sub { margin: 2px 0 0; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
+  .pb-res { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .pb-res li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 10px;
+    background: #161233; border: 1px solid #3d3378; font-size: 13px; }
+  .pb-res li.yo { border-color: var(--amarillo); background: #2a2140; }
+  .pb-res .num { font: 400 16px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .pb-quien { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-pts { color: var(--suave); font-variant-numeric: tabular-nums; }
+  .pb-vr { font: 600 12px 'IBM Plex Sans', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pb-vr.sube { color: var(--verde); }
+  .pb-vr.baja { color: var(--peligro); }
   @media (max-width: 699px) { .playlist-breve { top: auto; bottom: calc(12px + var(--sb)); left: 16px; right: 16px; width: auto; translate: none; } .pb-lista li:nth-child(n+4) { display: none; } }
   @media (prefers-reduced-motion: reduce) { .playlist-breve { animation: none; } }
   /* ---- elegir copa, pista o armar una lista (§56, §74; repasado con una revisión crítica del diseño) ---- */

@@ -16,13 +16,17 @@
 //      quieto: 30 s después de que llega A, el juego le termina la carrera a B en el puesto en que va (la regla «DNF»
 //      de las carreras en línea, §77), antes del tiempo límite (el del juego en línea; en la prueba ?limite=120 s);
 //   6. al terminar la 2, la sala termina y queda la tabla de la copa (12 puestos) con los puntos del juego (146).
-//   §82, el VR: al abrir cada carrera cada página deja guardado su peor caso (5000 → 4987: perder contra el otro);
-//   al terminar la 1, el que llegó antes +13 y el otro −13, igual en las dos; la 2 se cuenta con esos VR (la foto de
-//   la anfitriona) y al terminarla lo que gana uno lo pierde el otro.
+//   §94, entre carrera y carrera: el DESCANSO de 30 s con su panel (la cuenta y los resultados de los dos con el VR);
+//   apretar A en los resultados no abre el menú de «carrera siguiente» del juego (el cerrojo de los botones); y la
+//   parrilla de la carrera 2 es la llegada de la 1, como en Mario Kart (la misma en las dos, también con --recarga).
+//   §82/§95, el VR: al abrir cada carrera cada página deja guardado su peor caso (perder contra el otro humano y
+//   contra las 10 CPU); al terminar la 1, cada uno con lo que dice vr-sala.mjs para los puestos que dio el juego (el
+//   humano: 13 contra el otro; cada CPU, un cuarto, al VR fijo de su nivel), igual en las dos, y el que llegó antes
+//   suma más; la 2 se cuenta con esos VR (la foto de la anfitriona).
 // --recarga (§75, volver después de recargar): B recarga la página a mitad de la carrera 1. Su página nueva no entra a
 //   esa carrera (avisa que se la salta y A sigue en segundos, sin esperar el margen de 30 s), A la termina sola, y en
 //   la 2 B vuelve en su puesto, con lo que había elegido, la misma carrera que A y su kart con sus botones.
-//   §82: B, que se fue a mitad de la 1, se queda con su peor caso (4987) y A no gana nada por él (5000).
+//   §82: B, que se fue a mitad de la 1, se queda con su peor caso y A no gana nada por él (solo lo de las CPU).
 // Fotos en build/web/datos/sala/ (o sala-recarga/).
 //
 // Uso:  node web/navegador/prueba-sala.mjs [--ventana] [--puerto=8153] [--recarga]
@@ -31,7 +35,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { pantallaPartida } from './foto-pantalla.mjs';
+import { pantallaPartida, dosFotosPartidas } from './foto-pantalla.mjs';
+import { cambiosVr, peorCaso, aplicarCambio, REGLA_CPU } from './vr-sala.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -91,6 +96,12 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r(null), 8000)
     cortina: !document.body.classList.contains('sin-cortina'),
     // §82: el VR de la sala (mkw.mjs → vr-sala.mjs) y la copia de esta cuenta en el navegador (vr.mjs)
     vr: window.mkwEstado.vr || null, avisosVr: window.mkwAvisosVr || [],
+    // §94: los puestos de ahora (en la largada, la parrilla), la parrilla que escribió la página y el panel del descanso
+    puestos: (() => { try { const lista = L.u32(ri + 0xC); return Array.from({ length: 12 }, (_, i) => L.u8(L.u32(lista + 4 * i) + 0x20)); } catch { return []; } })(),
+    parrilla: window.mkwEstado.parrilla || null, descanso: window.mkwEstado.descanso || null,
+    breve: (() => { const c = document.getElementById('playlistBreve'); return c ? { cab: c.querySelector('.pb-cab b')?.textContent || '',
+      cuenta: c.querySelector('#pbCuenta')?.textContent || '', filas: [...c.querySelectorAll('.pb-res li')].map(li => li.textContent),
+      botones: c.querySelectorAll('button').length } : null; })(),
     vrLocal: (() => { try { return JSON.parse(localStorage.getItem('mkw.vr.' + new URLSearchParams(location.search).get('uid')))?.vr ?? null; } catch { return null; } })() };
 })]).catch(() => null);
 const esperarQue = async (p, cond, tope = 120000) => { for (const hasta = Date.now() + tope; Date.now() < hasta;) { const x = await leer(p); if (x && cond(x)) return x; await espera(500); } return await leer(p); };
@@ -173,19 +184,28 @@ const f4 = (x, i) => x?.av?.[i]?.toFixed(4);
 ok('cada kart con lo suyo: a los 3,5 s el de A avanzó y el de B (quieto) no, en las dos pestañas',
    [qa, qb].every(x => (x?.av?.[0] || 0) - (x?.av?.[1] || 0) > 0.004), `pestaña A: A ${f4(qa, 0)} B ${f4(qa, 1)} · pestaña B: A ${f4(qb, 0)} B ${f4(qb, 1)} (vueltas)`);
 ok('después B aceleró y su kart también avanzó', [ca, cb].every(x => (x?.av?.[1] || 0) > (qa?.av?.[1] || 0) + 0.01), `B ${f4(qa, 1)} → ${f4(ca, 1)}`);
-ok('§82: al abrir la carrera 1 cada una guardó su peor caso (perder contra el otro: 5000 → 4987)',
-   [ca, cb].every(x => x?.vr?.carrera === 1 && x.vr.antes === 5000 && x.vr.peor === 4987 && x.vrLocal === 4987),
+// §95: el peor caso con las CPU (las de la ficha, a su nivel): lo que dice vr-sala.mjs, calculado aquí aparte
+const peorDe = x => aplicarCambio(5000, peorCaso('yo', [{ uid: 'yo', vr: 5000 }, { uid: 'otro', vr: 5000 },
+  ...Array.from({ length: x?.vr?.cpus || 0 }, () => ({ cpu: true, puesto: 0 }))], { nivelCpu: x?.vr?.nivelCpu, regla: x?.vr?.regla }));
+const peor0 = peorDe(ca);
+ok('§82/§95: al abrir la carrera 1 cada una guardó su peor caso (perder contra el otro y contra las 10 CPU)',
+   [ca, cb].every(x => x?.vr?.carrera === 1 && x.vr.antes === 5000 && x.vr.cpus === 10 && x.vr.peor === peor0 && x.vrLocal === peor0 && peor0 < 4987),
    `A ${JSON.stringify(ca?.vr)} (guardado ${ca?.vrLocal}) · B ${JSON.stringify(cb?.vr)} (guardado ${cb?.vrLocal})`);
-// §82: el VR después de una carrera: los dos con su cambio, lo que gana uno lo pierde el otro, el que llegó antes gana
+// §82/§95: el VR después de una carrera: las dos con los mismos corredores (humanos y CPU, con sus puestos), cada
+// cambio igual a lo que da vr-sala.mjs con esos puestos (calculado aquí aparte), el que llegó antes suma más, y guardado
 const vrDe = x => x?.vr?.despues;
 const vrBien = (xa, xb, n) => {
   const va = xa?.vr, vb = xb?.vr;
   if (va?.carrera !== n || vb?.carrera !== n || va.despues == null || vb.despues == null) return false;
   const puesto = (v, u) => v.corredores?.find(c => c.uid === u)?.puesto;
   const ganaA = puesto(va, uidA) < puesto(va, uidB);
-  return va.cambio + vb.cambio === 0 && va.cambio !== 0 && (va.cambio > 0) === ganaA &&
-         JSON.stringify(va.corredores) === JSON.stringify(vb.corredores) && xa.vrLocal === va.despues && xb.vrLocal === vb.despues;
+  const esperado = cambiosVr(va.corredores, { nivelCpu: va.nivelCpu, regla: va.regla });
+  return va.corredores.filter(c => c.cpu).length === 10 && JSON.stringify(va.corredores) === JSON.stringify(vb.corredores) &&
+         va.despues === aplicarCambio(va.antes, esperado[uidA]) && vb.despues === aplicarCambio(vb.antes, esperado[uidB]) &&
+         (va.cambio > vb.cambio) === ganaA && va.cambio !== vb.cambio && xa.vrLocal === va.despues && xb.vrLocal === vb.despues;
 };
+const signo = c => (c >= 0 ? '+' : '−') + Math.abs(c);
+let vr1 = null;                       // §95: los VR después de la 1 (sin --recarga), para la foto de la 2
 const vrTexto = (xa, xb) => `A ${xa?.vr?.antes} → ${xa?.vr?.despues} (guardado ${xa?.vrLocal}) · B ${xb?.vr?.antes} → ${xb?.vr?.despues} (guardado ${xb?.vrLocal}); puestos ${JSON.stringify(xa?.vr?.corredores?.map(c => c.puesto))}`;
 
 // 4) el fin de la carrera 1, de verdad (§75): los humanos cruzan la meta en el MISMO cuadro de la carrera sincronizada
@@ -204,9 +224,11 @@ const puntosCarrera1 = async pestanas => {
   return { fines, despues: await Promise.all(pestanas.map(p => leer(p))) };
 };
 let pBrecarga = null;
+let tFin1 = 0;                        // §94: cuándo terminó la carrera 1 (para medir el descanso)
 if (!RECARGA) {
   const f1 = await terminarEn([A, B], [ca, cb]);
   const { fines, despues: [xa, xb] } = await puntosCarrera1([A, B]);
+  tFin1 = Date.now() - 5000;
   ok('la carrera 1 termina de verdad en las dos: A y B cruzan la meta en el mismo cuadro y el juego la da por terminada',
      fines.every(x => x?.etapa >= 4), `cuadro ${f1}; etapa A ${fines[0]?.etapa} B ${fines[1]?.etapa}`);
   // (los puntos los deja el juego en el escenario de los MENÚS al terminar la carrera; el de la carrera tiene los de
@@ -214,8 +236,27 @@ if (!RECARGA) {
   ok('puntos de la carrera 1 (los da el juego): suman 73 (15, 12, 10, 8…), A y B 15 y 12, iguales en las dos',
      sumar(xa?.puntosMenu) === 73 && dosPrimeros(xa?.puntosMenu) && JSON.stringify(xa.puntosMenu) === JSON.stringify(xb?.puntosMenu),
      `A ${xa?.puntosMenu?.join(',')} · B ${xb?.puntosMenu?.join(',')} (límite del juego ${xa?.limiteJuego} ms)`);
-  ok('§82: al terminar la 1 el VR se mueve: el humano que llegó antes +13, el otro −13, lo mismo en las dos y guardado',
-     vrBien(xa, xb, 1) && Math.abs(xa.vr.cambio) === 13 && xa.avisosVr.length === 1 && /VR 5000 → (5013|4987)/.test(xa.avisosVr[0]), vrTexto(xa, xb) + ` «${xa?.avisosVr?.[0]}»`);
+  ok('§82/§95: al terminar la 1 el VR se mueve con el puesto general (el otro humano y las 10 CPU): lo que da vr-sala.mjs, igual en las dos, el que llegó antes suma más, y guardado',
+     vrBien(xa, xb, 1) && xa.avisosVr.length === 1 && xa.avisosVr[0] === `VR 5000 → ${xa.vr.despues} (${signo(xa.vr.cambio)})`, vrTexto(xa, xb) + ` «${xa?.avisosVr?.[0]}»`);
+  vr1 = { [uidA]: xa?.vr?.despues, [uidB]: xb?.vr?.despues };
+  // §94: el panel del descanso, en las dos: «Copa», la cuenta y los resultados de los dos con su VR, sin botones
+  const conVr = x => x?.breve?.filas?.length === 2 && x.breve.filas.every(f => /VR/.test(f));
+  const [da1, db1] = [await esperarQue(A, conVr, 15000), await esperarQue(B, conVr, 15000)];
+  const cuentaDe = x => Number(/La carrera siguiente en (\d+) s/.exec(x?.breve?.cuenta || '')?.[1] || 0);
+  ok('§94: el descanso de la copa: «La carrera siguiente en N s» (de 30) y los resultados de los dos con su VR (el cambio de cada uno), en las dos',
+     [da1, db1].every(x => x.breve.cab === 'Copa' && x.breve.botones === 0 && cuentaDe(x) > 15 && cuentaDe(x) <= 30 &&
+       x.breve.filas.some(f => /\(tú\)/.test(f)) && [xa, xb].every(y => x.breve.filas.some(f => f.includes(`(${signo(y.vr.cambio)})`)))),
+     `A «${da1?.breve?.cuenta}» ${JSON.stringify(da1?.breve?.filas)} · B «${db1?.breve?.cuenta}»`);
+  await A.screenshot({ path: path.join(carpeta, '4-A-descanso.png') }).catch(() => {});
+  // §94: el cerrojo: B aprieta A durante 12 s en los resultados; sin él, a los ~11 s el juego abría su menú de «carrera
+  // siguiente» (página 0x22) y largaba otra carrera fuera de la sala
+  const paginasB = new Set();
+  for (let k = 0; k < 10; k++) {
+    await B.keyboard.down('KeyK'); await espera(120); await B.keyboard.up('KeyK'); await espera(1080);
+    const x = await leer(B); if (x) paginasB.add(`${hex(x.s)}/${hex(x.pagina)}`);
+  }
+  ok('§94: B aprieta A 10 veces en los resultados: el juego no pasa de la tabla de puntos (nunca su menú 0x22 ni otra sección)',
+     paginasB.size > 0 && [...paginasB].every(t => t.startsWith('0x20/') && !t.endsWith('/0x22')), [...paginasB].join(' '));
 } else {
   // B recarga la página a mitad de la carrera 1. La página nueva no entra a esa carrera (su consola no tiene los
   // cuadros que ya pasaron): se la salta y lo avisa, y A sigue en segundos (sin el aviso esperaría el margen de 30 s)
@@ -236,21 +277,40 @@ if (!RECARGA) {
   ok('la carrera 1 la termina A sola (B, cortado, no se espera): puntos que suman 73, A 15',
      fines[0]?.etapa >= 4 && sumar(xa?.puntosMenu) === 73 && xa.puntosMenu[0] === 15, `cuadro ${f1}; A ${xa?.puntosMenu?.join(',')}`);
   const xb1 = await leer(B);
-  ok('§82: B se fue a mitad de la 1: se queda con su peor caso (4987) y A no gana nada por él (5000)',
-     xa?.vr?.carrera === 1 && xa.vr.despues === 5000 && xa.vrLocal === 5000 && xb1?.vrLocal === 4987, vrTexto(xa, xb1));
+  // (§95: A no gana nada por B, que se cortó: lo suyo es solo lo de las CPU; B se queda con su peor caso)
+  const soloCpu = xa?.vr && cambiosVr(xa.vr.corredores.filter(c => c.uid !== uidB), { nivelCpu: xa.vr.nivelCpu, regla: xa.vr.regla })[uidA];
+  ok('§82/§95: B se fue a mitad de la 1: se queda con su peor caso y A no gana nada por él (solo lo de las CPU)',
+     xa?.vr?.carrera === 1 && xa.vr.corredores.find(c => c.uid === uidB)?.cortado === true && xa.vr.despues === aplicarCambio(5000, soloCpu) &&
+     xa.vrLocal === xa.vr.despues && xb1?.vrLocal === peor0, vrTexto(xa, xb1) + ` (solo CPU ${soloCpu}, peor de B ${peor0})`);
+  vr1 = { [uidA]: xa?.vr?.despues, [uidB]: peor0 };
 }
 
 // 5) la carrera 2: sola después de los resultados (con --recarga, B vuelve en su puesto y con lo que eligió)
 const [sa, sb] = [await esperarQue(A, x => enCarrera(x, 2), 90000), await esperarQue(B, x => enCarrera(x, 2), 60000)];
 const p2 = sa?.sala?.pistas?.[1];
+// (lo que faltaba cuando cada página abrió el panel: la anfitriona en el acto, B con el reparto siguiente)
+if (tFin1) ok('§94: entre la 1 y la 2, el descanso de 30 s (la cuenta al aparecer el panel, en las dos)',
+   [sa, sb].every(x => x?.descanso?.carrera === 1 && x.descanso.restanAlAbrir > 28000 && x.descanso.restanAlAbrir <= 30000),
+   `A ${sa?.descanso?.restanAlAbrir} ms · B ${sb?.descanso?.restanAlAbrir} ms; la 2 abrió ${((Date.now() - tFin1) / 1000).toFixed(1)} s después de que la prueba vio el fin`);
+// §94: la parrilla de la 2 = la llegada de la 1 (la de la sala), la misma en las dos (con --recarga también en B, que
+// no corrió la 1), y el juego larga en ese orden (los puestos en la largada)
+const lleg1 = sa?.sala?.llegada;
+const [ga, gb] = [await esperarQue(A, x => x.parrilla?.carrera === 2, 10000), await esperarQue(B, x => x.parrilla?.carrera === 2, 10000)];
+ok('§94: la parrilla de la carrera 2 es la llegada de la 1, la misma en las dos', lleg1?.carrera === 1 && [ga, gb].every(x => x.parrilla.deLlegada &&
+   x.parrilla.orden.join() === lleg1.puestos.join()), `llegada ${lleg1?.puestos?.join(' ')} · A ${ga?.parrilla?.orden?.join(' ')} · B ${gb?.parrilla?.orden?.join(' ')}`);
+// (los puestos en la cuenta regresiva, etapa 1, los anota la página: en la etapa 0 el juego todavía no los calculó)
+const [ia, ib] = [await esperarQue(A, x => !!x.parrilla?.largada, 15000), await esperarQue(B, x => !!x.parrilla?.largada, 15000)];
+ok('§94: …y el juego larga en ese orden (los puestos en la cuenta regresiva, en las dos): quien ganó la 1 sale primero',
+   lleg1 && [ia, ib].every(x => x.parrilla.largada.join() === lleg1.puestos.join()), `A ${ia?.parrilla?.largada?.join(' ')} · B ${ib?.parrilla?.largada?.join(' ')}`);
+await A.screenshot({ path: path.join(carpeta, '5-A-largada2.png') }).catch(() => {});
 ok('después de los resultados, la carrera 2 abrió sola en las dos con la pista 2', enCarrera(sa, 2) && enCarrera(sb, 2) && [sa, sb].every(x => x.ganadora === 0x100 + 4 * p2.copa + p2.fila),
    `A ${hex(sa?.ganadora)} B ${hex(sb?.ganadora)} (pista 2 ${JSON.stringify(p2)}) a los ${seg()}`);
 // §82: la foto de los VR de la carrera 2 (la anfitriona la congela al empezarla): los de después de la 1
-const fotoVr2 = sb?.sala?.vrCarrera, esperadoVr2 = RECARGA ? { [uidA]: 5000, [uidB]: 4987 } : null;
-ok('§82: la carrera 2 se cuenta con los VR de después de la 1 (la foto de la anfitriona, la misma en las dos)',
+const fotoVr2 = sb?.sala?.vrCarrera;
+ok('§82/§95: la carrera 2 se cuenta con los VR de después de la 1 y la regla de las CPU (la foto de la anfitriona, la misma en las dos)',
    fotoVr2?.n === 2 && JSON.stringify(fotoVr2) === JSON.stringify(sa?.sala?.vrCarrera) &&
-   (esperadoVr2 ? fotoVr2.vrs[uidA] === 5000 && fotoVr2.vrs[uidB] === 4987 : fotoVr2.vrs[uidA] + fotoVr2.vrs[uidB] === 10000 && fotoVr2.vrs[uidA] !== 5000),
-   JSON.stringify(fotoVr2));
+   vr1 && fotoVr2.vrs[uidA] === vr1[uidA] && fotoVr2.vrs[uidB] === vr1[uidB] && JSON.stringify(fotoVr2.cpu) === JSON.stringify(REGLA_CPU),
+   `${JSON.stringify(fotoVr2)} (después de la 1: ${JSON.stringify(vr1)})`);
 if (RECARGA) {
   ok('B vuelve en la carrera 2 en SU puesto, con SU pantalla y con lo que había elegido antes de recargar',
      sb?.pantalla === 1 && sb.tipos?.[1] === 0 && sb.pjs?.[1]?.[0] === eb?.eleccion?.personaje && sb.pjs[1][1] === eb.eleccion.vehiculo &&
@@ -261,14 +321,17 @@ if (RECARGA) {
   await B.keyboard.down('KeyK');
   await espera(6000);
   const [r2a, r2b] = [await leer(A), await leer(B)];
+  // las fotos con B todavía acelerando, y dos (§95: una línea del piso justo en la mitad de la imagen parecía la
+  // costura de la pantalla partida): una costura de verdad no se mueve, un borde de la pista baja con el kart andando
+  await A.screenshot({ path: path.join(carpeta, '5-A-carrera2.png') }).catch(() => {});
+  let primeraB = true;
+  const pb2 = await dosFotosPartidas(B, () => B.screenshot(primeraB ? (primeraB = false, { path: path.join(carpeta, '5-B-carrera2.png') }) : {}).catch(() => null), 700);
   await B.keyboard.up('KeyK');
   ok('…y su kart va con SUS botones: B acelera y avanza, A (quieta) no, en las dos pestañas',
      [r2a, r2b].every(x => (x?.av?.[1] || 0) - (x?.av?.[0] || 0) > 0.004) && (r2a?.av?.[1] || 0) > (q2a?.av?.[1] || 0) + 0.004,
      `pestaña A: A ${f4(r2a, 0)} B ${f4(r2a, 1)} · pestaña B: A ${f4(r2b, 0)} B ${f4(r2b, 1)}`);
-  await A.screenshot({ path: path.join(carpeta, '5-A-carrera2.png') }).catch(() => {});
-  const vb2 = await B.screenshot({ path: path.join(carpeta, '5-B-carrera2.png') }).catch(() => null);
-  const pb2 = vb2 && await pantallaPartida(B, vb2);
-  ok('en la foto de B (recargada) se ve UNA vista, la de su kart', pb2 && !pb2.partida && !pb2.vacia, `costura ${pb2?.pico} (típico ${pb2?.tipico})`);
+  ok('en la foto de B (recargada) se ve UNA vista, la de su kart', pb2 && !pb2.partida && !pb2.vacia,
+     `costura ${pb2?.pico} y ${pb2?.segunda?.pico} (típico ${pb2?.tipico})`);
 } else await espera(9000);
 const [da, db] = [await leer(A), await leer(B)];
 ok('la carrera 2 también es la misma en las dos (sin cortes: los dos corren)', (da?.ls?.carrera || 0) >= 2 && !da?.ls?.desincronizado && !db?.ls?.desincronizado &&
@@ -309,7 +372,7 @@ ok('la tabla trae los puntos de verdad: suman 146 (73 por carrera), A y B con pu
    total === 146 && ptsA > 0 && ptsB > 0 && JSON.stringify(fa?.fin) === JSON.stringify(fb?.fin),
    `total ${total}; A ${ptsA}, B ${ptsB}; ${(fa?.fin || []).map(x => x.puntos).join(',')}`);
 await A.screenshot({ path: path.join(carpeta, '6-A-fin.png') }).catch(() => {});
-ok('§82: al terminar la 2 también: lo que gana uno lo pierde el otro, guardado en las dos', vrBien(fa, fb, 2) && fa.vr.antes === fotoVr2?.vrs?.[uidA],
+ok('§82/§95: al terminar la 2 también: lo que da vr-sala.mjs con esos puestos, igual en las dos y guardado', vrBien(fa, fb, 2) && fa.vr.antes === fotoVr2?.vrs?.[uidA],
    vrTexto(fa, fb));
 
 ok('sin errores de JavaScript en las páginas', !registro.some(l => l.includes('pageerror')), registro.filter(l => l.includes('pageerror')).slice(0, 2).join(' · '));

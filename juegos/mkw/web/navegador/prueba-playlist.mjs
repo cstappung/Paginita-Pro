@@ -9,8 +9,10 @@
 //   3. recién cuando A confirma la playlist se elige personaje (el selector de B se cierra solo);
 //   4. la carrera 1 corre (se termina por código en el mismo cuadro en las dos, como en prueba-sala) y, mientras se ven
 //      los resultados, a las dos les aparece la playlist un rato: A con «+ Agregar pistas» y B con «Sugerir pista»;
-//   5. B sugiere otra desde ahí; A abre «+ Agregar pistas», la sala espera aunque pasen los resultados, A acepta la de
-//      B y sigue: la carrera 2 abre en las dos con la pista que venía y la playlist ya tiene 3.
+//   5. B sugiere otra desde ahí; A abre «+ Agregar pistas». §94: el descanso dura 30 s (no se congela) y, cuando le
+//      quedan menos de 15 s, A acepta la de B: la cuenta vuelve a 15 s en las dos. El panel trae la cuenta y los
+//      resultados con el VR. La carrera 2 abre en las dos al terminar la cuenta, con la pista que venía y la
+//      playlist ya tiene 3.
 // Fotos en build/web/datos/playlist/.
 //
 // Uso:  node web/navegador/prueba-playlist.mjs [--ventana] [--puerto=8157]
@@ -75,7 +77,9 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r(null), 8000)
     renglones: qs('#elegirPista .renglon').length, sugerencias: qs('#elegirPista .sugerencias:not(.mias):not([hidden]) .sugerencia').length,
     chip: q('#elegirPista .sug-chip:not([hidden])')?.textContent || '', mias: [...qs('#elegirPista .mias .estado')].map(x => x.textContent),
     breve: q('#playlistBreve') ? { agregar: !!q('#pbAgregar'), sugerir: !!q('#pbSugerir'), cab: q('#playlistBreve .pb-cab span')?.textContent || '',
-      sigue: q('#playlistBreve li.sigue .num')?.textContent || '', nota: q('#playlistBreve .pb-nota')?.textContent || '' } : null,
+      sigue: q('#playlistBreve li.sigue .num')?.textContent || '', nota: q('#playlistBreve .pb-nota')?.textContent || '',
+      cuenta: q('#pbCuenta')?.textContent || '', filas: [...qs('#playlistBreve .pb-res li')].map(li => li.textContent) } : null,
+    restan: window.mkwSala?.restan?.(window.mkwSala.estado().plazo) ?? null, vr: window.mkwEstado.vr || null,
     ganadora: L.u32(0x8043319C + 0x10), etapa: ri ? L.u32(ri + 0x28) : -1,
     aviso: q('#avisoJuego')?.hidden ? '' : q('#avisoJuego')?.textContent || '', cortina: !document.body.classList.contains('sin-cortina') };
 })]).catch(() => null);
@@ -140,6 +144,15 @@ try {
   ok('al terminar la 1, a las dos les aparece la playlist: «1 de 2 corridas», sigue la 2',
      [ba, bb].every(x => x?.breve?.cab === '1 de 2 corridas' && x.breve.sigue === '2'), `A ${JSON.stringify(ba?.breve)} · B ${JSON.stringify(bb?.breve)}`);
   ok('A tiene «+ Agregar pistas» y B «Sugerir pista»', ba?.breve?.agregar && !ba.breve.sugerir && bb?.breve?.sugerir && !bb.breve.agregar);
+  // §94: el panel del descanso trae la cuenta y los resultados de los dos con el VR (en la playlist no se veía)
+  const [va, vb] = [await esperarQue(A, x => x.breve?.filas?.length === 2 && x.breve.filas.every(f => /VR/.test(f)) && x.vr?.despues != null, 15000),
+                    await esperarQue(B, x => x.breve?.filas?.length === 2 && x.breve.filas.every(f => /VR/.test(f)) && x.vr?.despues != null, 15000)];
+  const signo = c => (c >= 0 ? '+' : '−') + Math.abs(c);
+  const cuentaDe = x => Number(/La carrera siguiente en (\d+) s/.exec(x?.breve?.cuenta || '')?.[1] || 0);
+  ok('§94: el descanso: «La carrera siguiente en N s» (de 30) y los resultados de los dos con su VR, en las dos',
+     [va, vb].every(x => cuentaDe(x) > 15 && cuentaDe(x) <= 30 && x.breve.filas.some(f => /\(tú\)/.test(f)) &&
+       [va, vb].every(y => x.breve.filas.some(f => f.includes(`(${signo(y.vr.cambio)})`)))),
+     `A «${va?.breve?.cuenta}» ${JSON.stringify(va?.breve?.filas)} · B «${vb?.breve?.cuenta}» ${JSON.stringify(vb?.breve?.filas)}`);
   await foto(A, '2-A-entre.png'); await foto(B, '2-B-entre.png');
   // 5) B sugiere desde ahí; A agrega (la sala espera) y sigue
   await B.click('#pbSugerir');
@@ -150,16 +163,19 @@ try {
   await A.click('#pbAgregar');
   const a5 = await esperarQue(A, x => /modo-lista/.test(x.picker) && x.sugerencias === 1, 20000);
   ok('A abre «+ Agregar pistas»: ve lo que viene (1) y la sugerencia de B', a5?.renglones === 1 && a5.sugerencias === 1, `${a5?.renglones} renglones, ${a5?.sugerencias} sugerencias`);
-  const bEspera = await esperarQue(B, x => /agregando/.test(x.breve?.nota || ''), 10000);
-  ok('B ve «El anfitrión está agregando pistas…»', /agregando/.test(bEspera?.breve?.nota || ''), bEspera?.breve?.nota);
-  await espera(12000);                                                   // (más que los 9 s de resultados)
-  const a6 = await leer(A);
-  ok('pasados los resultados, la sala espera a A (sigue en la carrera 1)', a6?.sala?.carrera === 1 && a6.sala.pausa > 0, `carrera ${a6?.sala?.carrera}`);
+  // §94: abrirlo ya no congela la cuenta; con menos de 15 s por delante A acepta la de B: vuelve a 15 s, en las dos
+  const a6 = await esperarQue(A, x => x.restan !== null && x.restan < 12000, 30000);
+  ok('§94: con el selector abierto la cuenta sigue bajando (ya no se congela)', a6?.restan < 12000 && a6?.sala?.carrera === 1 && !a6.sala.pausa, `quedan ${a6?.restan} ms`);
   await A.locator('#elegirPista .sugerencia .mini.aceptar').first().click();
-  await espera(500);
+  await espera(700);
+  const [a7, b7] = [await leer(A), await leer(B)];
+  ok('§94: A acepta la de B con menos de 15 s: la cuenta vuelve a 15 s en las dos', [a7, b7].every(x => x?.restan > 13000 && x.restan <= 15000 && x.sala?.carrera === 1),
+     `A ${a7?.restan} ms · B ${b7?.restan} ms`);
   await foto(A, '3-A-agrega.png');
   await A.click('#listaConfirmar');
+  const tSigue = Date.now();
   const [sa, sb] = [await esperarQue(A, x => enCarrera(x, 2), 60000), await esperarQue(B, x => enCarrera(x, 2), 60000)];
+  ok('§94: cerrar el selector no adelanta nada: la carrera 2 abre cuando termina la cuenta', Date.now() - tSigue > 9000, `${((Date.now() - tSigue) / 1000).toFixed(1)} s después`);
   ok('A sigue: la carrera 2 abre en las dos con la pista que venía (copa 2, pista 1)', enCarrera(sa, 2) && enCarrera(sb, 2) && [sa, sb].every(x => x.ganadora === 0x100 + 4 * 2 + 1),
      `A ${hex(sa?.ganadora)} B ${hex(sb?.ganadora)}`);
   ok('la playlist ya tiene 3 (la sugerida de B al final), igual en las dos', [sa, sb].every(x => texto(x?.sala?.pistas) === '0.0 2.1 5.0' && x.sala.carreras === 3),

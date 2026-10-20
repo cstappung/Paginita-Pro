@@ -1069,19 +1069,39 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     });
   }
 
-  // playlistBreve({ pistas, hechas, anfitrion, pendientes, nota, alAgregar, alSugerir, copas }) — §74: entre carrera y
-  // carrera de la playlist de la sala, la lista un rato (mientras se ven los resultados, al costado): las que vienen,
-  // cuántas ya se corrieron y «+ Agregar pistas» (el anfitrión: la sala espera mientras tanto) o «Sugerir pista» (los
-  // demás). pendientes = cuántas sugerencias esperan (solo se le muestra al anfitrión). Devuelve { poner(cambios),
-  // cerrar() }: la sala lo actualiza con cada estado y lo cierra cuando arranca la carrera siguiente.
+  // playlistBreve({ pistas, hechas, anfitrion, pendientes, nota, alAgregar, alSugerir, copas, titulo, botones, restan,
+  // ultima, carrera, resultados }) — §74: entre carrera y carrera de la playlist de la sala, la lista un rato (mientras
+  // se ven los resultados, al costado): las que vienen, cuántas ya se corrieron y «+ Agregar pistas» (el anfitrión) o
+  // «Sugerir pista» (los demás). pendientes = cuántas sugerencias esperan (solo se le muestra al anfitrión).
+  // §94: es el panel del DESCANSO de las dos salas (titulo 'Copa', botones: false en la copa): arriba la cuenta
+  // (restan() = ms que faltan; ultima = después no hay otra carrera) y los resultados de la carrera que terminó
+  // (resultados: [{ nombre, puesto, puntos, vrAntes, vrDespues, yo }]: el puesto, los puntos de la copa y el VR de
+  // cada humano). Devuelve { poner(cambios), cerrar() }: la sala lo actualiza con cada estado y lo cierra cuando
+  // arranca la carrera siguiente.
   function playlistBreve(o) {
     document.getElementById('playlistBreve')?.remove();
     const caja = el('aside', { id: 'playlistBreve', className: 'playlist-breve' });
-    caja.setAttribute('aria-label', 'La playlist de la sala');
-    caja.setAttribute('aria-live', 'polite');
+    caja.setAttribute('aria-label', o.titulo === 'Copa' ? 'El descanso de la copa' : 'La playlist de la sala');
     let nombres = null;
     nombresPistas(o.copas).then(n => { nombres = n; pintar(); }).catch(() => {});
     const nombre = (c, f) => nombres?.[c]?.[f] || `Copa ${c + 1} · pista ${f + 1}`;
+    // la cuenta del descanso: solo su texto cambia cada medio segundo (repintar todo movería el foco de los botones)
+    const cuenta = el('p', { className: 'pb-cuenta', id: 'pbCuenta' });
+    const textoCuenta = () => {
+      if (typeof o.restan !== 'function') return '';
+      const s = Math.ceil(o.restan() / 1000);
+      if (s <= 0) return o.ultima ? 'Fin de la copa…' : 'Empieza la carrera siguiente…';
+      return `${o.ultima ? 'La copa termina en' : 'La carrera siguiente en'} ${s} s`;
+    };
+    const ponerCuenta = () => {
+      const t = textoCuenta();
+      cuenta.hidden = !t;
+      if (cuenta.textContent !== t) cuenta.textContent = t;
+      cuenta.classList.toggle('pronto', typeof o.restan === 'function' && o.restan() <= 5000);
+    };
+    const reloj = setInterval(() => { if (!caja.isConnected) { clearInterval(reloj); return; } ponerCuenta(); }, 500);
+    const ordinal = n => `${n}.º`;
+    const signo = d => (d >= 0 ? '+' : '−') + Math.abs(d);
     function pintar() {
       const ps = Array.isArray(o.pistas) ? o.pistas : [], hechas = Math.max(0, o.hechas | 0), quedan = ps.slice(hechas);
       const lista = el('ol', { className: 'pb-lista' }, ...quedan.slice(0, 6).map((p, i) => {
@@ -1091,21 +1111,41 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
           imagen(fotos.foto(p.copa, p.fila), 'renglon-foto'), nom, ...(i === 0 ? [el('em', { textContent: 'sigue' })] : []));
       }));
       const mas = quedan.length > 6 ? [el('p', { className: 'pb-mas', textContent: `y ${quedan.length - 6} más` })] : [];
-      const vacia = quedan.length ? [] : [el('p', { className: 'pb-mas', textContent: o.anfitrion ? 'No quedan pistas: agrega más para seguir, o la copa termina aquí.' : 'No quedan pistas: la copa termina aquí, salvo que el anfitrión agregue más.' })];
-      const pend = o.anfitrion && o.pendientes > 0 ? [el('span', { className: 'sug-chip', textContent: `💬 ${o.pendientes}` })] : [];
-      const boton = o.anfitrion
+      const botones = o.botones !== false;
+      const vacia = quedan.length || !botones ? [] : [el('p', { className: 'pb-mas', textContent: o.anfitrion ? 'No quedan pistas: agrega más para seguir, o la copa termina aquí.' : 'No quedan pistas: la copa termina aquí, salvo que el anfitrión agregue más.' })];
+      const pend = botones && o.anfitrion && o.pendientes > 0 ? [el('span', { className: 'sug-chip', textContent: `💬 ${o.pendientes}` })] : [];
+      const boton = !botones ? [] : [o.anfitrion
         ? el('button', { type: 'button', className: 'boton primario', id: 'pbAgregar', textContent: '+ Agregar pistas', onclick: () => o.alAgregar?.() })
-        : el('button', { type: 'button', className: 'boton', id: 'pbSugerir', textContent: 'Sugerir pista', onclick: () => o.alSugerir?.() });
+        : el('button', { type: 'button', className: 'boton', id: 'pbSugerir', textContent: 'Sugerir pista', onclick: () => o.alSugerir?.() })];
+      // §94: los resultados de la carrera que terminó: puesto, puntos de la copa y el VR (antes → después) de cada humano
+      const filas = (Array.isArray(o.resultados) ? o.resultados : []).slice().sort((x, y) => (x.puesto || 99) - (y.puesto || 99));
+      const res = filas.length ? [
+        el('p', { className: 'pb-sub', textContent: o.carrera ? `Resultados de la carrera ${o.carrera}` : 'Resultados' }),
+        el('ol', { className: 'pb-res' }, ...filas.slice(0, 6).map(r => {
+          const quien = el('span', { className: 'pb-quien', textContent: r.yo ? `${r.nombre} (tú)` : r.nombre });
+          quien.setAttribute('translate', 'no');
+          const vr = Number.isInteger(r.vrAntes) && Number.isInteger(r.vrDespues)
+            ? [el('span', { className: 'pb-vr ' + (r.vrDespues >= r.vrAntes ? 'sube' : 'baja'),
+                textContent: `VR ${r.vrDespues.toLocaleString('es')} (${signo(r.vrDespues - r.vrAntes)})` })]
+            : [el('span', { className: 'pb-vr' })];
+          return el('li', { className: r.yo ? 'yo' : '' }, el('span', { className: 'num', textContent: r.puesto ? ordinal(r.puesto) : '—' }),
+            quien, el('span', { className: 'pb-pts', textContent: Number.isInteger(r.puntos) ? `${r.puntos} pts` : '' }), ...vr);
+        })),
+        ...(filas.length > 6 ? [el('p', { className: 'pb-mas', textContent: `y ${filas.length - 6} más` })] : [])] : [];
+      const cab = o.titulo === 'Copa'
+        ? el('span', { textContent: `${hechas} de ${ps.length} corridas` })
+        : el('span', { textContent: hechas ? `${hechas} de ${ps.length} corridas` : `${ps.length} ${ps.length === 1 ? 'pista' : 'pistas'}` });
+      const viene = quedan.length ? [el('p', { className: 'pb-sub', textContent: 'Lo que viene' }), lista, ...mas] : [];
       caja.replaceChildren(
-        el('div', { className: 'pb-cab' }, el('b', { textContent: 'Playlist' }),
-          el('span', { textContent: hechas ? `${hechas} de ${ps.length} corridas` : `${ps.length} ${ps.length === 1 ? 'pista' : 'pistas'}` }), ...pend),
-        lista, ...mas, ...vacia, ...(o.nota ? [el('p', { className: 'pb-nota', textContent: o.nota })] : []), boton);
+        el('div', { className: 'pb-cab' }, el('b', { textContent: o.titulo || 'Playlist' }), cab, ...pend),
+        cuenta, ...res, ...viene, ...vacia, ...(o.nota ? [el('p', { className: 'pb-nota', textContent: o.nota })] : []), ...boton);
+      ponerCuenta();
     }
     pintar();
     document.body.append(caja);
     return {
       poner(cambios) { Object.assign(o, cambios || {}); if (caja.isConnected) pintar(); },
-      cerrar() { caja.remove(); },
+      cerrar() { clearInterval(reloj); caja.remove(); },
       get abierto() { return caja.isConnected; },
     };
   }

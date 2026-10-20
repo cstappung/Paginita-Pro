@@ -12,12 +12,13 @@
   pilotos <b>inventados</b> (Ana es la anfitriona) por un bus en memoria y un <b>reloj falso</b>. Comprueba: la playlist
   empieza armando la lista (aunque traiga pistas: quedan de base); Beto y Caro sugieren y Ana acepta o rechaza; solo Ana
   cambia la lista; recién al confirmarla se elige personaje; durante la copa se pueden sugerir y agregar más (las ya
-  corridas no se tocan); «+ Agregar pistas» pausa los resultados (hasta 60 s); si Ana se va, Beto sigue con la lista y
+  corridas no se tocan); el descanso entre carreras dura 30 s y, si se agrega o sugiere una pista con menos de 15 s por
+  delante, vuelve a 15 s (§94; antes «+ Agregar pistas» pausaba hasta 60 s); si Ana se va, Beto sigue con la lista y
   las sugerencias; sin pistas por delante la copa termina. Y la copa normal no tiene lista.</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearSala, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PAUSA_MAX_MS } from '/web/navegador/sala-carrera.mjs';
+import { crearSala, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
 
 const { ok, fin } = prueba('sala-playlist', 'Sala en modo playlist (sin el juego, reloj falso)');
 let t = 1_000_000;
@@ -78,31 +79,47 @@ ok('durante la copa se sugiere y Ana la acepta', !!nueva && ana.aceptar(nueva.id
 await avanzar(0);
 ok('la playlist crece para todos (4 carreras)', todas().every(s => s.estado().carreras === 4 && texto(s.estado().pistas) === '1.1 3.0 5.3 11.1'), texto(beto.estado().pistas));
 
-// 4) entre carreras: «+ Agregar pistas» pausa los resultados; las corridas no se tocan
+// 4) §94: entre carreras, el descanso de 30 s; agregar o sugerir una pista con menos de 15 s por delante lo vuelve a
+// 15 s (las corridas no se tocan)
 beto.termine(1);
 await avanzar(0);
-ok('termina la 1: empiezan los resultados', ana.estado().plazo > t);
-ok('Ana abre «+ Agregar pistas»: la sala espera', ana.pausar(true) === true);
-await seg(SEGUNDOS_RESULTADOS + 3);
-ok('pasados los resultados, sigue en la carrera 1 mientras Ana elige', todas().every(s => s.estado().carrera === 1) && ana.estado().pausa > 0, `carrera ${ana.estado().carrera}`);
-ok('Ana deja las que vienen: cambia las de después de la 1 (la 1 queda)', ana.restantesCambio([P(20, 0), P(5, 3), P(21, 1)]) === true);
+const resta = () => ana.estado().plazo - t;
+ok('§94: termina la 1: empieza el descanso, 30 s', resta() === 30000, String(resta()));
+ok('§94: Ana abre «+ Agregar pistas» con 30 s por delante: la cuenta no cambia (ya no se congela)', ana.pausar(true) === true && resta() === 30000 && ana.estado().pausa === 0);
+ok('Beto no puede (no es el anfitrión)', beto.pausar(true) === false);
+await seg(10);
+ok('Ana deja las que vienen: cambia las de después de la 1 (la 1 queda); con 20 s por delante la cuenta sigue igual',
+   ana.restantesCambio([P(20, 0), P(5, 3)]) === true && resta() === 20000, String(resta()));
 await avanzar(0);
-ok('…la playlist queda con la 1 corrida y las nuevas', texto(caro.estado().pistas) === '1.1 20.0 5.3 21.1' && caro.estado().carreras === 4, texto(caro.estado().pistas));
-ok('Beto no puede pausar', beto.pausar(true) === false);
-ana.pausar(false);
-await avanzar(1000);
-ok('al cerrar el selector, 3 s más de resultados…', ana.estado().carrera === 1);
+ok('…la playlist queda con la 1 corrida y las nuevas', texto(caro.estado().pistas) === '1.1 20.0 5.3' && caro.estado().carreras === 3, texto(caro.estado().pistas));
+await seg(8);
+ok('§94: con 12 s por delante Ana agrega una pista: la cuenta vuelve a 15 s', ana.restantesCambio([P(20, 0), P(5, 3), P(21, 1)]) === true && resta() === 15000, String(resta()));
+await avanzar(0);
+ok('…y todos la ven (4 carreras)', texto(caro.estado().pistas) === '1.1 20.0 5.3 21.1' && caro.estado().carreras === 4, texto(caro.estado().pistas));
+await seg(5);
+ok('§94: reordenar no la alarga (10 s)', ana.restantesCambio([P(5, 3), P(20, 0), P(21, 1)]) === true && resta() === 10000, String(resta()));
+await avanzar(0);
+ana.restantesCambio([P(20, 0), P(5, 3), P(21, 1)]); await avanzar(0);
 await seg(3);
-ok('…y la carrera 2, la nueva', todas().every(s => s.estado().carrera === 2) && ana.estado().pausa === 0, `carrera ${ana.estado().carrera}`);
+caro.sugerir(P(33, 2)); await avanzar(0); await avanzar(0);
+ok('§94: con 7 s por delante Caro sugiere una: vuelve a 15 s, para todos', resta() === 15000 && beto.restan(beto.estado().plazo) === 15000 && caro.restan(caro.estado().plazo) === 15000,
+   `${resta()} · ${beto.restan(beto.estado().plazo)}`);
+await seg(11);
+ok('§94: abrir «+ Agregar pistas» con 4 s por delante también la vuelve a 15 s', ana.pausar(true) === true && resta() === 15000, String(resta()));
+ana.pausar(false);
+await seg(14);
+ok('…cerrarlo no cambia nada: a los 14 s sigue el descanso de la 1', todas().every(s => s.estado().carrera === 1));
+await seg(2);
+ok('…y la carrera 2, la nueva', todas().every(s => s.estado().carrera === 2) && texto(ana.estado().pistas) === '1.1 20.0 5.3 21.1', `carrera ${ana.estado().carrera}`);
 
-// 5) la pausa tiene tope (60 s)
+// 5) §94: sin agregar nada, la carrera siguiente a los 30 s justos (abrir el selector con tiempo de sobra no la congela)
 beto.termine(2);
 await avanzar(0);
 ana.pausar(true);
-await seg(Math.ceil(PAUSA_MAX_MS / 1000) - 5);
-ok(`con el selector abierto, la sala espera…`, ana.estado().carrera === 2);
-await seg(8);
-ok(`…hasta ${PAUSA_MAX_MS / 1000} s: después sigue sola`, ana.estado().carrera === 3, `carrera ${ana.estado().carrera}`);
+await seg(29);
+ok('§94: con el selector abierto y sin agregar nada, a los 29 s sigue el descanso…', ana.estado().carrera === 2);
+await seg(2);
+ok('§94: …y a los 30 s, la carrera 3 (ya no espera hasta 60 s)', ana.estado().carrera === 3, `carrera ${ana.estado().carrera}`);
 
 // 6) Ana se va: Beto sigue con la lista y las sugerencias
 caro.sugerir(P(30, 3));

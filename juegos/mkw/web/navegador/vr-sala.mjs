@@ -15,7 +15,14 @@
 // Como un reparto de carga entre pares de acumuladores: cada par se ecualiza un poco según la diferencia, y lo que
 // sube uno lo baja el otro.
 // En la sala, además:
-//   - solo cuentan los humanos (las CPU no tienen VR, como en línea, donde no hay CPU);
+//   - §95 (pedido del dueño: «que el VR dependa de la posición general incluyendo a los bots, pero con más peso
+//     respecto a jugadores reales»): las CPU también cuentan, como rivales de VR FIJO (el ancla de su nivel, REGLA_CPU)
+//     y con menos peso: cada par contra una CPU vale 1/4 de un par contra un humano, y todas juntas a lo más 2
+//     humanos. Ganarle a una CPU suma peso·puntosPar(VR, ancla); que te gane resta peso·puntosPar(ancla, VR). La parte
+//     de las CPU se suma entera y se trunca una vez (hacia cero). La CPU no gana ni pierde nada (no tiene VR guardado):
+//     contra un rival fijo el VR de cada uno se equilibra solo (como un lazo realimentado con referencia fija), sin
+//     inflación sin fin, y una cuenta alterna quieta ya no le regala VR a nadie. Los pares entre humanos siguen siendo
+//     los del juego, de suma cero;
 //   - quien no corrió esta carrera (quedó fuera desde el principio, §75) no entra;
 //   - quien se cortó a mitad de carrera (§80, o cerró/recargó la página) PIERDE contra todos (como desconectarse en
 //     línea), pero los demás NO ganan nada por él (como en Retro Rewind, mkwiiki: «si un rival se desconecta y ganas
@@ -27,8 +34,10 @@
 // Las cuentas se hacen en precisión simple (32 bits, Math.fround), como la Wii, para truncar igual en los bordes.
 //
 // Uso:  puntosPar(vrGanador, vrPerdedor) → entero ≥ 0
-//       cambiosVr([{ uid, vr, puesto, cortado }]) → { uid: cambio }      (puesto: 1 = primero; cortado: true/false)
-//       peorCaso(uid, corredores) → el cambio de uid si pierde contra todos (≤ 0)
+//       cambiosVr([{ uid, vr, puesto, cortado }, { cpu: true, puesto }…], { nivelCpu, regla }) → { uid: cambio }
+//         (puesto: 1 = primero; cortado: true/false; las CPU sin uid; nivelCpu 0 fácil, 1 normal, 2 difícil;
+//         regla = la de la foto de la carrera, o REGLA_CPU)
+//       peorCaso(uid, corredores, { nivelCpu, regla }) → el cambio de uid si pierde contra todos, CPU incluidas (≤ 0)
 //       aplicarCambio(vr, cambio) → el VR nuevo (entre 1 y VR_MAXIMO)
 export const VR_INICIAL = 5000, VR_MAXIMO = 1000000;   // (el tope de vr.mjs y de las reglas de Firebase)
 export const CURVA = [0, 1, 8, 50, 125];                // los valores de la curva (la tabla del juego, 0x8088FF60)
@@ -57,37 +66,79 @@ export function puntosPar(vrGanador, vrPerdedor) {
   return Math.trunc(curva(t));
 }
 
+// §95: las CPU (diseño revisado por un crítico externo: bitácora §95). La regla va en un objeto que la anfitriona
+// congela en la foto de cada carrera (estado.vrCarrera.cpu, como los VR): así todas las consolas cuentan igual aunque
+// alguna tuviera otra versión de la página.
+//   anclas: el VR fijo de cada nivel de CPU (el de la ficha de la carrera: 0 fácil, 1 normal, 2 difícil; en la sala
+//     100cc → normal, 150cc y espejo → difícil). null = esas CPU no cuentan: a las fáciles casi todos les ganan
+//     siempre, y quien gana siempre sube hasta el ancla + 6599 (ahí ganarle a la CPU ya da 0), sin haber jugado contra
+//     nadie. La difícil = 5000 (el VR inicial: le gana la mitad de las veces); la normal, 3000 (más baja a propósito:
+//     un ancla alta se aprovecha, una baja solo cuesta un poco de VR en ese modo; se ajustará con datos).
+//   cuarto: cada par contra una CPU vale 1/cuarto de un par contra un humano (4: un humano = 4 CPU).
+//   tope: todas las CPU juntas valen a lo más «tope» humanos (2): con más de 8 CPU, cada una vale tope/cuántas.
+// El peso de una CPU es min(1/cuarto, tope/n) = tope / max(tope·cuarto, n), así que la parte de las CPU de cada uno es
+// trunc(tope·S / max(tope·cuarto, n)) con S = la suma entera de sus pares contra las CPU: cuentas en enteros, exactas.
+export const REGLA_CPU = Object.freeze({ anclas: Object.freeze([null, 3000, 5000]), cuarto: 4, tope: 2 });
+// (la regla que llega en la foto de la carrera viene de otra página: si no tiene la forma, la de aquí)
+const anclaValida = a => a === null || (Number.isInteger(a) && a >= 1 && a <= VR_MAXIMO);
+export function reglaValida(r) {
+  return r && Array.isArray(r.anclas) && r.anclas.length === 3 && r.anclas.every(anclaValida) && Number.isInteger(r.cuarto) && r.cuarto >= 1 &&
+    r.cuarto <= 100 && Number.isInteger(r.tope) && r.tope >= 1 && r.tope <= 12 ? r : REGLA_CPU;
+}
+export const anclaCpu = (nivel, regla = REGLA_CPU) => reglaValida(regla).anclas[Math.max(0, Math.min(2, nivel | 0))];
+export const pesoCpu = (n, regla = REGLA_CPU) => { const r = reglaValida(regla); return n > 0 ? r.tope / Math.max(r.tope * r.cuarto, n) : 0; };
+
 const vrDe = c => (Number.isInteger(c.vr) && c.vr >= 1 ? c.vr : VR_INICIAL);
-// el cambio de VR de cada humano de la carrera (los que la corrieron: los que quedaron fuera no se pasan)
-export function cambiosVr(corredores) {
-  const lista = corredores.filter(c => c && c.uid);
+const sinPuesto = c => !(Number.isInteger(c.puesto) && c.puesto >= 1 && c.puesto <= 12);
+// el cambio de VR de cada humano de la carrera (los que la corrieron: los que quedaron fuera no se pasan). §95: con las
+// CPU de la carrera (los corredores con cpu: true), al VR fijo de su nivel y con su peso.
+// Un humano sin puesto (el juego no lo dio) cuenta como cortado: pierde contra todos y nadie gana por él.
+export function cambiosVr(corredores, { nivelCpu = 2, regla = REGLA_CPU } = {}) {
+  const lista = corredores.filter(c => c && c.uid && !c.cpu);
+  const cpus = corredores.filter(c => c && c.cpu);
   const cambio = Object.fromEntries(lista.map(c => [c.uid, 0]));
-  const lugar = c => (c.puesto | 0) || 999;                     // (sin puesto: detrás de todos)
+  const perdido = c => !!c.cortado || sinPuesto(c);
   for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
     const a = lista[i], b = lista[j];
-    if (a.cortado && b.cortado) continue;                      // dos cortados: nada
-    if (a.cortado || b.cortado) {                              // el cortado pierde; el otro no gana nada por él
-      const [g, p] = a.cortado ? [b, a] : [a, b];
+    if (perdido(a) && perdido(b)) continue;                    // dos cortados: nada
+    if (perdido(a) || perdido(b)) {                            // el cortado pierde; el otro no gana nada por él
+      const [g, p] = perdido(a) ? [b, a] : [a, b];
       cambio[p.uid] -= puntosPar(vrDe(g), vrDe(p));
       continue;
     }
-    const la = lugar(a), lb = lugar(b);
-    if (la === lb) continue;                                   // empate: nada
-    const [g, p] = la < lb ? [a, b] : [b, a];
+    if (a.puesto === b.puesto) continue;                       // empate: nada
+    const [g, p] = a.puesto < b.puesto ? [a, b] : [b, a];
     const pts = puntosPar(vrDe(g), vrDe(p));
     cambio[g.uid] += pts; cambio[p.uid] -= pts;
   }
+  // §95: contra cada CPU. El cortado pierde contra todas. Para los demás hace falta que los puestos se puedan creer
+  // (cada CPU con su puesto, del 1 al 12, y ninguno repetido): si no (una lectura fallida dejaría una CPU «detrás de
+  // todos» y le regalaría hasta 26 a cada uno), sin parte de CPU. La suma entera, por el peso, truncada UNA vez
+  const r = reglaValida(regla), ancla = anclaCpu(nivelCpu, r);
+  if (cpus.length && ancla !== null) {
+    const puestos = [...cpus, ...lista.filter(h => !perdido(h))].map(c => c.puesto);
+    const creibles = cpus.every(k => !sinPuesto(k)) && new Set(puestos).size === puestos.length;
+    for (const h of lista) {
+      if (!perdido(h) && !creibles) continue;
+      let s = 0;
+      for (const k of cpus) s += perdido(h) || k.puesto < h.puesto ? -puntosPar(ancla, vrDe(h)) : puntosPar(vrDe(h), ancla);
+      cambio[h.uid] += Math.trunc(r.tope * s / Math.max(r.tope * r.cuarto, cpus.length));
+    }
+  }
   return cambio;
 }
-// el peor caso de uid: perder contra todos los que corren (lo que queda guardado mientras corre la carrera)
-export function peorCaso(uid, corredores) {
-  return cambiosVr(corredores.map(c => ({ ...c, cortado: c.uid === uid })))[uid] ?? 0;
+// el peor caso de uid: perder contra todos los que corren (lo que queda guardado mientras corre la carrera), §95: las
+// CPU incluidas. (Los demás, sin cortar y con un puesto cualquiera: contra uid da lo mismo)
+export function peorCaso(uid, corredores, opciones = {}) {
+  return cambiosVr(corredores.map(c => (c.cpu ? c : c.uid === uid ? { ...c, cortado: true } : { ...c, cortado: false, puesto: sinPuesto(c) ? 1 : c.puesto })),
+                   opciones)[uid] ?? 0;
 }
 export const aplicarCambio = (vr, cambio) => Math.max(1, Math.min(VR_MAXIMO, (Number.isInteger(vr) && vr >= 1 ? vr : VR_INICIAL) + (cambio | 0)));
 
 // Los humanos de la carrera, leídos del juego al terminar (L = el lector de menus.mjs; humanos = los de la sala, en el
 // orden de sus puestos de la ficha): el puesto final de cada uno (RaceinfoPlayer +0x20, como UpdatePoints) y si es un
 // jugador de verdad en esta carrera (tipo 0 en el escenario de la carrera). vrs = la foto de los VR al empezarla.
+// §95: y después las CPU de la carrera (tipo 1), con su puesto: { cpu: true, puesto }.
 export function corredoresDelJuego(L, humanos, { vrs = {}, fuera = [], cortados = [] } = {}) {
   const rd = L.u32(0x809BD728), ri = L.u32(0x809BD730);
   if (!rd || !ri) return [];
@@ -97,5 +148,10 @@ export function corredoresDelJuego(L, humanos, { vrs = {}, fuera = [], cortados 
     const rp = jugadores ? L.u32(jugadores + i * 4) : 0;
     lista.push({ uid: h.uid, vr: vrs[h.uid], puesto: rp ? L.u8(rp + 0x20) : 0, cortado: cortados.includes(h.uid) });
   });
+  for (let i = 0; i < n && i < 12; i++) {
+    if (L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10) !== 1) continue;
+    const rp = jugadores ? L.u32(jugadores + i * 4) : 0;
+    lista.push({ cpu: true, puesto: rp ? L.u8(rp + 0x20) : 0 });
+  }
   return lista;
 }

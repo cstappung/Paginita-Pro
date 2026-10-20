@@ -12,9 +12,10 @@
 //                   playlist-sala.mjs), así que el anfitrión nuevo sigue con ellas;
 //   fase 'elegir' → todos eligen personaje, vehículo y derrape (45 s; al que no alcanza se le pone uno);
 //   fase 'correr' → la carrera n (1, 2, …): todos arman la misma ficha (pista n, los humanos con lo que eligieron) y
-//                   saltan a la carrera; al terminar, unos segundos de resultados y la siguiente. En la playlist se
-//                   puede sugerir y agregar durante la copa (las carreras ya corridas no se tocan); «+ Agregar
-//                   pistas» entre carrera y carrera pausa los resultados (pausa: hasta PAUSA_MAX_MS);
+//                   saltan a la carrera; al terminar, el DESCANSO (§94: 30 s de resultados, para que hagan todo) y la
+//                   siguiente. En la playlist se puede sugerir y agregar durante la copa (las carreras ya corridas no
+//                   se tocan); si en el descanso alguien agrega o sugiere una pista y quedan menos de 15 s, la cuenta
+//                   vuelve a 15 s (MINIMO_AL_AGREGAR_MS);
 //   fase 'fin'    → la tabla de la copa (para el sitio).
 // Manda el ANFITRIÓN: cada segundo (y en cada cambio) les reparte a todos el estado entero ({t:'estado', …}), así
 // quien llega tarde o recarga la página se pone al día con el próximo reparto. Los demás le mandan lo suyo: lo que
@@ -38,6 +39,17 @@
 //     tabla de quien corrió desde más atrás: la consola que recargó no tiene los puntos de las carreras que se saltó.
 //     Cada consola parte la carrera siguiente desde esa tabla (ponerPuntos), y la tabla final sale de ahí.
 //
+// §94, el descanso, la parrilla y la hora de la anfitriona:
+//   - entre carrera y carrera, 30 s de descanso (SEGUNDOS_RESULTADOS). Si la playlist gana una pista o una sugerencia
+//     nueva con menos de 15 s por delante, el plazo pasa a ahora + 15 s (lo mismo al abrir «+ Agregar pistas»).
+//   - la parrilla, como en Mario Kart: cada uno larga la carrera siguiente en el puesto en que llegó. Con su aviso de
+//     fin, cada página manda la llegada (los 12 puestos de su consola: llegadaDelJuego); la anfitriona deja en el
+//     estado la primera que le llega (llegada: {carrera, puestos}: todas las que corrieron dicen lo mismo) y cada
+//     consola la escribe como «puesto anterior» antes de abrir la siguiente (ponerParrilla). La que recargó también.
+//   - los plazos (elegir, descanso) son horas del reloj de la anfitriona: cada reparto lleva su hora (reloj) y cada
+//     página anota la diferencia con el suyo (restan(plazo) = lo que falta, igual en todos los PC aunque sus relojes
+//     no coincidan).
+//
 // Los mensajes viajan por la malla (canal "tcp": en orden y sin pérdidas) como bytes: [0xA8, …JSON en UTF-8].
 //
 // Uso:  const s = crearSala({ yo, humanos: [{uid, mando}], anfitrion, estilo: 'copa'|'playlist', carreras, pistas,
@@ -55,19 +67,19 @@
 //
 // §82, el VR: cada página le dice a la anfitriona el VR que tiene ({t:'vr'}); ella los lleva en el estado (vrs) y, al
 // empezar cada carrera, los congela (vrCarrera: {n, vrs}). Así todas las consolas calculan el VR de esa carrera con
-// los MISMOS números (vr-sala.mjs): lo que pierde uno contra otro es lo que el otro gana.
+// los MISMOS números (vr-sala.mjs): lo que pierde uno contra otro es lo que el otro gana. §95: y con la misma regla de
+// las CPU (vrCarrera.cpu: la REGLA_CPU de la página de la anfitriona; reglaCpuDe(estado, n)).
 import { crearPlaylistSala } from './playlist-sala.mjs';
-import { VR_MAXIMO } from './vr-sala.mjs';
+import { VR_MAXIMO, REGLA_CPU } from './vr-sala.mjs';
 
 export const MARCA_SALA = 0xA8;
 export const SEGUNDOS_ELEGIR = 45;
-export const SEGUNDOS_RESULTADOS = 9;          // los resultados de cada carrera, antes de la siguiente
+export const SEGUNDOS_RESULTADOS = 30;         // §94: el descanso entre carreras (los resultados), antes de la siguiente
+export const MINIMO_AL_AGREGAR_MS = 15000;     // §94: agregar o sugerir con menos de esto por delante: vuelve a esto
 const REPARTO_MS = 1000;
 export const PRESENTE_MS = 10000;      // §75: sin señales en 10 s al empezar una carrera = la corre "sin nadie"
 export const ESPERA_COPIA_MS = 2000;   // §75: la anfitriona recién abierta espera 2 s por si la copa ya iba…
 export const ESPERA_TODOS_MS = 8000;   // …y hasta 8 s a oír a todos (la malla de una página recién abierta tarda)
-export const PAUSA_MAX_MS = 60000;     // §74: «+ Agregar pistas» entre carreras: los resultados esperan hasta 60 s
-export const VUELTA_PAUSA_MS = 3000;   // §74: al cerrar el selector, 3 s más de resultados y la carrera siguiente
 // lo que se le pone al que no eligió a tiempo: Mario, Luigi, Peach, Yoshi con el kart estándar de su peso
 const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 
@@ -81,6 +93,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   const vistos = new Map();                       // §75 (la anfitriona): uid → la última vez que dio señales
   let salto = 0;                                  // §75: la carrera que esta página se salta (recargó con ella andando)
   let pedida = 0;                                 // §75 (la anfitriona): el número de la última copia pedida
+  let desfase = 0;                                // §94: reloj de la anfitriona − el mío (los plazos son horas suyas)
   const esHumano = uid => humanos.some(h => h.uid === uid);
   const sacados = new Set();                      // §87: los que salieron de la sala del sitio (echados, votados, idos)
   // §75: los que no dieron señales en PRESENTE_MS (la anfitriona siempre está: es ella la que pregunta). §87: y los que
@@ -91,9 +104,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
-    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null };
-  // §82: los VR de ahora, congelados para la carrera n
-  const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) } });
+    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null };
+  // §82: los VR de ahora, congelados para la carrera n (§95: con la regla de las CPU, en JSON: viaja en el estado)
+  const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) }, cpu: { ...REGLA_CPU, anclas: [...REGLA_CPU.anclas] } });
   const yaVistas = new Set();                  // carreras que este navegador ya arrancó
 
   const codificar = m => { const t = new TextEncoder().encode(JSON.stringify(m)); const b = new Uint8Array(t.length + 1); b[0] = MARCA_SALA; b.set(t, 1); return b; };
@@ -104,7 +117,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   function cambiar(cambios) {
     estado = { ...estado, ...cambios, version: estado.version + 1 };
     registro(`[sala] ${estado.fase} carrera ${estado.carrera} (v${estado.version})`);
-    aTodos({ t: 'estado', estado });
+    aTodos({ t: 'estado', estado, reloj: ahora() });
     if (lista) alCambiar(estado);
   }
   function revisar() {
@@ -121,7 +134,6 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
       const n = estado.carrera, fin = estado.terminaron[n];
       if (fin && !estado.plazo) cambiar({ plazo: t + segundosResultados * 1000 });
-      else if (estado.pausa && t < estado.pausa) return;        // §74: el anfitrión está agregando pistas
       else if (estado.plazo && t >= estado.plazo) {
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
         else cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera: ausentes(), vrCarrera: congelar(n + 1) });
@@ -140,7 +152,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (t < ESPERA_TODOS_MS && (t < ESPERA_COPIA_MS || !todos || pedida > estado.version)) return;
       ponerLista();
     }
-    aTodos({ t: 'estado', estado }); revisar();
+    aTodos({ t: 'estado', estado, reloj: ahora() }); revisar();
   }, REPARTO_MS);
   function ponerLista() { if (lista) return; lista = true; registro(`[sala] lista: ${estado.fase} carrera ${estado.carrera} (v${estado.version})`); alCambiar(estado); }
 
@@ -167,6 +179,8 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     }
     // (del anfitrión nuevo se acepta la primera copia aunque su número sea menor: su copia manda desde ahora; y la
     // primera de todas aunque sea la número 0, §75: con ella la página sabe en qué va la sala)
+    // (§94: cada reparto trae la hora de la anfitriona: la diferencia con la mía, para los plazos)
+    if (m.t === 'estado' && !soy() && de === jefe && Number.isFinite(m.reloj)) desfase = m.reloj - ahora();
     if (m.t === 'estado' && !soy() && de === jefe && m.estado && (!lista || m.estado.version > estado.version || deQuien !== jefe)) {
       estado = m.estado; deQuien = jefe; lista = true; alCambiar(estado);
     } else if (!lista) {
@@ -192,6 +206,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       const p = estado.puntos, desde = m.desde > 0 ? m.desde | 0 : 99;
       if (tablaValida(m.puntos) && (!p || p.carrera !== m.carrera || desde < p.desde))
         cambio.puntos = { carrera: m.carrera, tabla: m.puntos.map(x => x | 0), desde };
+      // §94: la llegada (la parrilla de la siguiente): la primera que llega; todas las que corrieron dicen lo mismo
+      if (llegadaValida(m.llegada) && estado.llegada?.carrera !== m.carrera)
+        cambio.llegada = { carrera: m.carrera, puestos: m.llegada.map(x => x | 0) };
       if (Object.keys(cambio).length) { cambiar(cambio); revisar(); }
     }
   }
@@ -203,8 +220,16 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     if (JSON.stringify(lista) === JSON.stringify(estado.lista)) return r;
     const cambio = { lista };
     if (estado.fase !== 'copa') { cambio.pistas = lista.pistas; cambio.carreras = lista.pistas.length; }
+    // §94: una pista más o una sugerencia nueva (sig: el número de la próxima) en el descanso: al menos 15 s más
+    const antes = estado.lista || {};
+    if (lista.pistas.length > (antes.pistas || []).length || (lista.sig | 0) > (antes.sig | 0)) Object.assign(cambio, alargue());
     cambiar(cambio);
     return r;
+  }
+  // §94: si el descanso va corriendo y le quedan menos de 15 s, el plazo nuevo (ahora + 15 s); si no, nada
+  function alargue() {
+    const t = ahora();
+    return estado.fase === 'correr' && estado.plazo && estado.plazo - t < MINIMO_AL_AGREGAR_MS ? { plazo: t + MINIMO_AL_AGREGAR_MS } : {};
   }
   const puedeLista = () => soy() && lista && !!estado.lista && (estado.fase === 'copa' || estado.fase === 'correr');
   function alBinario(de, b) {
@@ -263,12 +288,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     },
     aceptar(id) { return puedeLista() ? conLista(pl => pl.aceptar(id)) : false; },
     rechazar(id) { return puedeLista() ? conLista(pl => pl.rechazar(id)) : false; },
-    // «+ Agregar pistas» entre carrera y carrera: los resultados esperan (hasta PAUSA_MAX_MS); al cerrar, 3 s más
+    // «+ Agregar pistas» entre carrera y carrera. §94: ya no congela la cuenta (era hasta 60 s): abrirlo es empezar a
+    // agregar, así que si al descanso le quedan menos de 15 s, vuelve a 15 s. Cerrarlo no cambia nada
     pausar(si) {
       if (!soy() || !lista || estado.fase !== 'correr') return false;
-      const t = ahora();
-      if (si) cambiar({ pausa: t + PAUSA_MAX_MS });
-      else if (estado.pausa) cambiar({ pausa: 0, plazo: estado.plazo ? Math.max(estado.plazo, t + VUELTA_PAUSA_MS) : 0 });
+      const c = si ? alargue() : {};
+      if (Object.keys(c).length) cambiar(c);
       return true;
     },
     // lo que eligió esta persona en las pantallas del juego
@@ -277,7 +302,10 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     miVr(vr) { if (vrValido(vr)) alAnfitrion({ t: 'vr', vr }); },
     // la carrera n terminó en este navegador (solo cuenta la primera vez que alguien lo avisa: es la misma carrera).
     // §75: con los puntos que lleva esta consola (12) y la primera carrera de la copa que corrió
-    termine(n, puntos = null, desde = 0) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde }); },
+    // §94: y la llegada (los 12 puestos en que terminó cada uno: la parrilla de la carrera siguiente)
+    termine(n, puntos = null, desde = 0, llegada = null) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde, llegada }); },
+    // §94: cuánto falta para un plazo de la sala (una hora del reloj de la anfitriona), en ms (0 si ya pasó)
+    restan(plazo) { return plazo ? Math.max(0, plazo - (ahora() + desfase)) : 0; },
     // ¿esta carrera ya la arranqué? (para arrancar cada una una sola vez)
     arrancar(n) { if (yaVistas.has(n)) return false; yaVistas.add(n); return true; },
     // §75: esta página se salta la carrera n (recargó con ella andando, o la anfitriona la dejó fuera): lo dice en
@@ -295,9 +323,15 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
 const vrValido = v => Number.isInteger(v) && v >= 1 && v <= VR_MAXIMO;
 // §82: los VR con que se cuenta la carrera n (los congelados al empezarla; si no los hay, los de ahora)
 export const vrsDeCarrera = (estado, n) => (estado?.vrCarrera?.n === n ? estado.vrCarrera.vrs : estado?.vrs) || {};
+// §95: la regla de las CPU con que se cuenta la carrera n (la congelada; si no la hay —una anfitriona sin §95—,
+// undefined: vr-sala.mjs usa entonces la suya, REGLA_CPU)
+export const reglaCpuDe = (estado, n) => (estado?.vrCarrera?.n === n ? estado.vrCarrera.cpu : undefined);
 
 // §75: 12 números de 0 a 9999 (los puntos de los 12 puestos)
 const tablaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 9999);
+// §94: la llegada: 12 números, 0 (nadie en ese puesto) o del 1 al 12 sin repetir
+const llegadaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 12) &&
+  new Set(t.filter(x => x)).size === t.filter(x => x).length;
 
 // Los humanos de la ficha de la carrera n: en el orden de la sala (el mando de cada uno), con lo que eligieron
 export function humanosDeFicha(humanos, estado) {
@@ -346,4 +380,32 @@ export function ponerPuntos(L, tabla) {
   if (!rd || !tablaValida(tabla)) return false;
   tabla.forEach((v, i) => { const a = rd + 0xC10 + 8 + i * 0xF0 + 0xDA; L.w8(a, v >> 8); L.w8(a + 1, v & 0xFF); });
   return true;
+}
+
+// §94: la llegada de la carrera que terminó en esta consola: el puesto de cada uno de los 12 (RaceinfoPlayer +0x20,
+// el que muestra el juego; con la carrera terminada, el final), 0 donde no hay nadie
+export function llegadaDelJuego(L) {
+  const rd = L.u32(0x809BD728), ri = L.u32(0x809BD730), lista = ri ? L.u32(ri + 0xC) : 0;
+  if (!rd || !lista) return null;
+  const n = L.u8(rd + 0x20 + 4);
+  return Array.from({ length: 12 }, (_, i) => {
+    if (i >= n || L.u32(rd + 0x20 + 8 + i * 0xF0 + 0x10) === 5) return 0;
+    const rp = L.u32(lista + 4 * i);
+    return rp ? L.u8(rp + 0x20) : 0;
+  });
+}
+
+// §94: la parrilla de la carrera siguiente, como en Mario Kart: el «puesto anterior» de cada uno (+0xE1, escenario de
+// los MENÚS) = el puesto en que llegó (1 = adelante). El juego larga en ese orden (medido, bitácora §94); en el camino
+// directo nadie más lo escribe (escribirFicha, directo_nativo.cpp, solo en la primera carrera). cuantos = los
+// corredores de la ficha nueva (los primeros cuantos puestos). Si la llegada no sirve (no la hay, o no es del 1 al
+// cuantos sin repetir), la de la primera carrera: los humanos atrás, como el juego. Devuelve la que escribió.
+export function ponerParrilla(L, llegada, cuantos) {
+  const rd = L.u32(0x809BD728);
+  if (!rd || !(cuantos >= 1 && cuantos <= 12)) return null;
+  const vale = Array.isArray(llegada) && llegada.length >= cuantos &&
+    llegada.slice(0, cuantos).sort((a, b) => a - b).every((x, i) => x === i + 1);
+  const orden = Array.from({ length: cuantos }, (_, i) => vale ? llegada[i] : cuantos - i);
+  orden.forEach((v, i) => L.w8(rd + 0xC10 + 8 + i * 0xF0 + 0xE1, v));
+  return { orden, deLlegada: vale };
 }

@@ -314,6 +314,32 @@ try {
   await pagina.evaluate(() => window._breve.cerrar());
   ok('«Sugerir pista» avisa y la sala lo cierra al arrancar la carrera', await pagina.evaluate(() => window._pb.sugerir === 1 && !document.getElementById('playlistBreve')));
 
+  // 4d) §94: el panel del descanso de las dos salas: la cuenta y los resultados (puesto, puntos y VR de cada humano;
+  // pilotos inventados). En la copa, sin botones
+  await pagina.evaluate(() => {
+    const hasta = Date.now() + 12400;
+    window._breve = window.mkwInterfaz.playlistBreve({ pistas: [0, 1, 2, 3].map(f => ({ copa: 4, fila: f })), hechas: 1, anfitrion: true, titulo: 'Copa', botones: false,
+      carrera: 1, ultima: false, restan: () => Math.max(0, hasta - Date.now()),
+      resultados: [{ nombre: 'Beto', puesto: 5, puntos: 7, vrAntes: 5000, vrDespues: 4987 }, { nombre: 'Ana', puesto: 2, puntos: 12, vrAntes: 6100, vrDespues: 6131, yo: true },
+                   { nombre: 'Caro', puesto: 9, puntos: 3 }] });
+  });
+  await espera(700);
+  const d = await pagina.evaluate(() => { const c = document.getElementById('playlistBreve');
+    return { cuenta: c.querySelector('#pbCuenta')?.textContent, cab: c.querySelector('.pb-cab b')?.textContent, botones: c.querySelectorAll('button').length,
+      filas: [...c.querySelectorAll('.pb-res li')].map(li => [li.querySelector('.num').textContent, li.querySelector('.pb-quien').textContent, li.querySelector('.pb-pts').textContent,
+        li.querySelector('.pb-vr').textContent, li.querySelector('.pb-vr').className, li.className].join('|')),
+      sigue: c.querySelector('.pb-lista li.sigue .num')?.textContent, n1: (6131).toLocaleString('es'), n2: (4987).toLocaleString('es') }; });
+  ok('§94: el descanso de la copa: «Copa», la cuenta en segundos y sin botones', d.cab === 'Copa' && /^La carrera siguiente en 1[12] s$/.test(d.cuenta) && d.botones === 0, JSON.stringify(d));
+  ok('§94: los resultados por puesto, con los puntos y el VR (verde si sube, rojo si baja), «(tú)» marcado',
+     d.filas[0] === `2.º|Ana (tú)|12 pts|VR ${d.n1} (+31)|pb-vr sube|yo` && d.filas[1] === `5.º|Beto|7 pts|VR ${d.n2} (−13)|pb-vr baja|` && d.filas[2].startsWith('9.º|Caro|3 pts||'),
+     d.filas.join(' / '));
+  ok('§94: y lo que viene de la copa (sigue la 2)', d.sigue === '2', d.sigue);
+  await pagina.evaluate(() => window._breve.poner({ ultima: true, restan: () => 3000 }));
+  await espera(600);
+  const d2 = await pagina.evaluate(() => { const c = document.getElementById('playlistBreve').querySelector('#pbCuenta'); return { t: c.textContent, pronto: c.classList.contains('pronto') }; });
+  ok('§94: en la última, «La copa termina en 3 s», resaltado en los últimos 5', d2.t === 'La copa termina en 3 s' && d2.pronto, JSON.stringify(d2));
+  await pagina.evaluate(() => window._breve.cerrar());
+
   // 5) Récords: tu mejor tiempo en la vista previa y la tabla (sin sesión: el tuyo de este navegador)
   await pagina.evaluate(() => localStorage.setItem('mkw.records', JSON.stringify({ '105-tt150': { ms: 67873, cuando: 1 } })));
   await abrir('vs');

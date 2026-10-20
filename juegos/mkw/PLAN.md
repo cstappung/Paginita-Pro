@@ -115,6 +115,18 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   primer menú y la página se los lleva a IndexedDB de ese navegador; «Mi Mii» los ofrece (nuevo o «Cambiar por un Mii
   invitado», que conserva el id de la licencia) y la licencia nueva usa el elegido (`invitados_nativo.cpp`,
   `invitados.mjs`; banco `mii-invitados` 41, `prueba-invitados` 13; §86)
+- ✅ M18. (Pedido del dueño, 2026-10-20) **Entre carrera y carrera, como Mario Kart**: 30 s de descanso (antes 9) con
+  un panel en las dos salas (la cuenta y cada humano con puesto, puntos y **VR**, que en la playlist no se veía);
+  agregar o sugerir una pista con menos de 15 s por delante vuelve la cuenta a 15 s (la pausa de 60 s ya no existe); la
+  **parrilla** de cada carrera es la llegada de la anterior (`+0xE1`, igual en todas las consolas, también en la que
+  recargó); y el cerrojo de los botones: apretando A en los resultados el juego ya no abre su menú de «carrera
+  siguiente» (que largaba otra carrera fuera de la sala). Banco `sala-carrera` 64, `sala-playlist` 37; `prueba-sala`
+  35/35, `prueba-playlist` 20/20, `prueba-elegir` 69/69 (§94)
+- ✅ M19. (Pedido del dueño, 2026-10-20) **El VR con el puesto general**: las CPU cuentan, como rivales de VR fijo
+  (difícil 5000, normal 3000, fácil no cuenta), cada una 1/4 de un humano y todas juntas a lo más 2 humanos; entre
+  humanos, la regla de MKW de siempre. Revisado por un crítico externo (equilibrio sin inflación, tope, anclas, la regla
+  congelada en la foto de la carrera, puestos que no se pueden creer, la granja de cuentas alternas). Banco `vr-sala` 46;
+  `prueba-sala` 35/35, `--recarga` 34/34, `prueba-playlist` 20/20 (§95)
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -422,6 +434,26 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-20 18:47** — **El VR con el puesto general: las CPU cuentan** (§95, M19, pedido del dueño). Cada CPU es un
+  rival de VR fijo (`REGLA_CPU` de `vr-sala.mjs`: difícil 5000, normal 3000, fácil no cuenta); contra cada una, la curva
+  del juego; lo de las CPU se suma entero y vale `trunc(2·S/max(8, n))` (1/4 de humano cada una, todas juntas a lo más
+  2 humanos). Con 2 humanos y 10 CPU difíciles: 1.º +39, 2.º detrás del humano +13, 12.º −39. Un crítico externo
+  revisó la matemática: confirmó el equilibrio (al 90 % contra las CPU, ~8200; siempre 1.º, se para en ~11 600), corrigió
+  un ejemplo del borrador, y de sus recomendaciones salieron el tope, las fáciles fuera, la normal en 3000, la regla en la
+  foto de la carrera (`vrCarrera.cpu`, `reglaCpuDe`), los puestos creíbles y «humano sin puesto = cortado». La granja con
+  una cuenta alterna quieta bajó de 10 483 a 5340 en 2000 carreras. Banco `vr-sala` 46/46, banco entero 36/36;
+  `prueba-sala` 35/35, `--recarga` 34/34 (la foto de B con dos tomas: una línea del piso parecía pantalla partida),
+  `prueba-playlist` 20/20.
+
+- **2026-10-20 17:44** — **El descanso entre carreras, el VR a la vista y la parrilla de Mario Kart** (§94, M18, pedido
+  del dueño). 30 s de descanso con su panel en copa y playlist (la cuenta, y cada humano con puesto, puntos y VR antes →
+  después); agregar o sugerir con menos de 15 s por delante la vuelve a 15 s; los plazos con la hora de la anfitriona
+  (`sala.restan`). La parrilla: el juego larga según el «puesto anterior» `+0xE1` (medido: `herramientas/medir-parrilla.mjs`)
+  y en la sala nadie lo escribía desde la 2.ª carrera; ahora la llegada viaja en el estado y cada consola la escribe antes
+  de abrir la siguiente. El cerrojo de los botones: con A en los resultados el juego abría su menú 0x22 a los ~11 s y
+  largaba otra carrera (`herramientas/medir-resultados-a.mjs`). Banco `sala-carrera` 64/64, `sala-playlist` 37/37;
+  `prueba-elegir` 69/69, `prueba-sala` 35/35 (`--recarga` 34/34), `prueba-playlist` 20/20, banco entero 36/36 páginas.
+  Solo JavaScript: el programa no cambia.
 - **2026-10-20 16:40** — **El programa final con §90–§93, y todas las pruebas: 492/492** (§93.7). Recompilado en
   `build/web-final/navegador` (las semillas de §89 siguen sirviendo); `correr-todo` con `MKW_BUILD` del final: 33
   pruebas, 492 bien, 0 mal, con las nuevas `doce`, `fantasma`, `sincro-largada` y `trofeos`.

@@ -20,7 +20,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PRESENTE_MS, ESPERA_TODOS_MS } from '/web/navegador/sala-carrera.mjs';
+import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PRESENTE_MS, ESPERA_TODOS_MS, llegadaDelJuego, ponerParrilla } from '/web/navegador/sala-carrera.mjs';
 
 const { ok, fin } = prueba('sala-carrera', 'Sala sin WFC (sin el juego, reloj falso)');
 // ---- reloj falso y bus en memoria (los bytes van de una sala a otra como por la malla) ----
@@ -234,6 +234,58 @@ ok('§75: después ya no la cambia una peor (desde más adelante) ni una sin for
 for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
 ok('§75: la copa termina con la tabla de la última carrera en todos', [a11, b11, c11].every(x => x.estado().fase === 'fin' && x.estado().puntos?.carrera === 2 && x.estado().puntos.tabla.join() === P2.join()));
 [a11, b11, c11].forEach(x => x.detener());
+
+// 12) §94: el descanso de 30 s entre carreras, la llegada de cada carrera en el estado (la parrilla de la siguiente) y
+// la cuenta con la hora de la anfitriona: Beto tiene el reloj 7 s adelantado y Caro 4 s atrasado
+salas.clear();
+const a94 = persona('ana'), b94 = persona('beto', { ahora: () => t + 7000 }), c94 = persona('caro', { ahora: () => t - 4000 });
+await avanzar(1000); await avanzar(1000);
+a94.ponerPistas(copa); await avanzar(0);
+a94.elegi({ personaje: 1, vehiculo: 1 }); b94.elegi({ personaje: 2, vehiculo: 2 }); c94.elegi({ personaje: 3, vehiculo: 3 });
+await avanzar(0);
+ok('§94: (otra copa: los tres corren la carrera 1)', [a94, b94, c94].every(x => x.estado().carrera === 1));
+ok('§94: el descanso entre carreras es de 30 s', SEGUNDOS_RESULTADOS === 30, String(SEGUNDOS_RESULTADOS));
+const LL1 = [3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12], LL2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+b94.termine(1, P1, 1, [1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]); await avanzar(0);
+ok('§94: una llegada con un puesto repetido no se guarda', a94.estado().llegada === null, JSON.stringify(a94.estado().llegada));
+const plazo94 = a94.estado().plazo;
+ok('§94: al terminar la carrera, el descanso: 30 s', plazo94 - t === 30000, String(plazo94 - t));
+c94.termine(1, P1, 1, LL1); await avanzar(0);
+ok('§94: la llegada de la carrera 1 queda en el estado y les llega a todos', [a94, b94, c94].every(x => JSON.stringify(x.estado().llegada) === JSON.stringify({ carrera: 1, puestos: LL1 })),
+   JSON.stringify(b94.estado().llegada));
+b94.termine(1, P1, 1, LL2); await avanzar(0);
+ok('§94: queda la primera que llegó (todas las que corrieron dicen lo mismo)', a94.estado().llegada.puestos.join() === LL1.join());
+ok('§94: los tres ven lo mismo que falta aunque sus relojes no coincidan (+7 s, −4 s)',
+   [a94, b94, c94].every(x => x.restan(x.estado().plazo) === 30000), [a94, b94, c94].map(x => x.restan(x.estado().plazo)).join());
+for (let i = 0; i < 29; i++) await avanzar(1000);
+ok('§94: a los 29 s sigue el descanso', [a94, b94, c94].every(x => x.estado().carrera === 1) && a94.restan(a94.estado().plazo) === 1000);
+for (let i = 0; i < 2; i++) await avanzar(1000);
+ok('§94: a los 30 s, la carrera 2 en todos, con la llegada de la 1 para armar su parrilla',
+   [a94, b94, c94].every(x => x.estado().carrera === 2 && x.estado().llegada?.carrera === 1), [a94, b94, c94].map(x => x.estado().carrera).join());
+[a94, b94, c94].forEach(x => x.detener());
+
+// 13) §94: leer la llegada del juego y escribir la parrilla (una memoria falsa con la forma del juego: Racedata y
+// Raceinfo con sus 12 corredores; nada del juego)
+const mem = new Map();
+const Lf = { u32: a => mem.get('32:' + a) ?? 0, u8: a => mem.get('8:' + a) ?? 0, w8: (a, v) => mem.set('8:' + a, v & 0xFF) };
+const RD = 0x80F00000, RI = 0x80F10000, LISTA = 0x80F20000, RP = 0x80F30000;
+mem.set('32:' + 0x809BD728, RD); mem.set('32:' + 0x809BD730, RI); mem.set('32:' + (RI + 0xC), LISTA); mem.set('8:' + (RD + 0x20 + 4), 12);
+for (let i = 0; i < 12; i++) {
+  mem.set('32:' + (RD + 0x20 + 8 + i * 0xF0 + 0x10), i < 3 ? 0 : 1);         // 3 humanos y 9 CPU
+  mem.set('32:' + (LISTA + 4 * i), RP + i * 0x100); mem.set('8:' + (RP + i * 0x100 + 0x20), LL1[i]);
+}
+const e1 = () => Array.from({ length: 12 }, (_, i) => Lf.u8(RD + 0xC10 + 8 + i * 0xF0 + 0xE1));
+ok('§94: llegadaDelJuego lee el puesto final de los 12 (RaceinfoPlayer +0x20)', llegadaDelJuego(Lf)?.join() === LL1.join(), llegadaDelJuego(Lf)?.join());
+mem.set('32:' + (RD + 0x20 + 8 + 11 * 0xF0 + 0x10), 5);
+ok('§94: …y 0 donde no hay nadie (tipo 5)', llegadaDelJuego(Lf)?.[11] === 0);
+let rp94 = ponerParrilla(Lf, LL1, 12);
+ok('§94: ponerParrilla escribe la llegada como «puesto anterior» (+0xE1 de la ficha de los menús)', rp94?.deLlegada === true && e1().join() === LL1.join(), e1().join());
+rp94 = ponerParrilla(Lf, null, 12);
+ok('§94: sin llegada, la parrilla de la primera carrera (los humanos atrás: 12, 11, …, 1)', rp94?.deLlegada === false && e1().join() === '12,11,10,9,8,7,6,5,4,3,2,1', e1().join());
+rp94 = ponerParrilla(Lf, [1, 2, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12], 12);
+ok('§94: con un puesto repetido, también la de la primera', rp94?.deLlegada === false && e1()[0] === 12);
+rp94 = ponerParrilla(Lf, [2, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], 3);
+ok('§94: con 3 corredores (sin CPU), la llegada de esos 3', rp94?.deLlegada === true && e1().slice(0, 3).join() === '2,3,1', e1().slice(0, 3).join());
 fin();
 </script>
 </body>
