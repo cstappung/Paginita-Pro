@@ -34,8 +34,10 @@ import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
-import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, MARCA_SALA } from './sala-carrera.mjs';
+import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, vrsDeCarrera, MARCA_SALA } from './sala-carrera.mjs';
+import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as VR_INICIAL_SALA } from './vr-sala.mjs';
 import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
+import { crearAvisoGpu } from './aviso-gpu.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -1120,6 +1122,50 @@ async function arrancar() {
       alSalta: (uid, k) => { const h = sincro.humanos.find(x => x.uid === uid); if (h) sincro.lockstep?.saltar(h.mando, k); },
       registro: t => red?.registro?.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     window.mkwEstado.sala = sala.estado();
+    // §82: el VR de la sala (vr-sala.mjs; el juego no lo calcula: para él son carreras sin conexión). Cada página le
+    // dice a la anfitriona el VR que tiene —el asentado: mientras corre una carrera, el de antes de empezarla— y ella los
+    // congela al empezar cada carrera (todas cuentan con los mismos). Al abrir la carrera queda guardado (aquí y en
+    // Firebase, vr.mjs) el peor caso: perder contra todos, que es lo que vale si la página se cierra o se recarga a mitad
+    // de carrera (para los demás, se cortó). Al terminarla, el de verdad, con los puestos que da el juego. Cada página
+    // guarda solo el suyo. ?vr=0 = el VR no se mueve en la sala
+    const conVr = parametros.get('vr') !== '0';
+    // (la copia local del VR, la de esta cuenta: el sitio la conecta con Firebase después, con el mismo uid)
+    if (!vr.conNube) vr.conectar({ uid: sincro.yo });
+    let vrEnCarrera = null;                         // { n, base, br } mientras corre la carrera n
+    const vrAsentado = () => vrEnCarrera ? vrEnCarrera.base : (vr.actual?.vr ?? VR_INICIAL_SALA);
+    window.mkwAvisosVr = [];
+    if (conVr) setInterval(() => { if (sala.lista && sala.estado().vrs?.[sincro.yo] !== vrAsentado()) sala.miVr(vrAsentado()); }, 1000);
+    function vrEmpieza(e, n) {
+      if (!conVr) return;
+      vrEnCarrera = null;                           // (la anterior sin terminar —me salí, me cortaron—: vale lo guardado)
+      const vrs = vrsDeCarrera(e, n);
+      const corren = sincro.humanos.filter(h => !(e.fuera || []).includes(h.uid)).map(h => ({ uid: h.uid, vr: vrs[h.uid] }));
+      if (corren.length < 2 || !corren.some(h => h.uid === sincro.yo)) return;
+      const base = vrAsentado(), br = vr.actual?.br ?? VR_INICIAL_SALA, peor = aplicarCambio(base, peorCaso(sincro.yo, corren));
+      vrEnCarrera = { n, base, br };
+      window.mkwEstado.vr = { carrera: n, antes: base, peor };
+      vr.informar({ vr: peor, br }).then(r => nota(`[vr] carrera ${n}: guardado el peor caso ${peor} (antes ${base}) → ${r.nube}`));
+    }
+    function vrTermina(e, n) {
+      if (!vrEnCarrera || vrEnCarrera.n !== n) return;
+      const { base, br } = vrEnCarrera;
+      vrEnCarrera = null;
+      // quiénes corrieron (sin los que quedaron fuera desde el principio: la sala, o cortados en el cuadro 0) y quiénes
+      // se cortaron a mitad (la carrera sincronizada; yo, si me salí o me cortaron: pierdo contra todos)
+      const est = sincro.lockstep?.estado() || {}, cortes = est.cortes || {};
+      const fuera = [...(e.fuera || []), ...sincro.humanos.filter(h => cortes[h.mando] === 0).map(h => h.uid)];
+      const cortados = sincro.humanos.filter(h => cortes[h.mando] > 0).map(h => h.uid);
+      if (est.fuera || est.cortado) cortados.push(sincro.yo);
+      const corredores = corredoresDelJuego(window.mkwMenus, sincro.humanos, { vrs: vrsDeCarrera(e, n), fuera, cortados });
+      const cambio = corredores.some(c => c.uid === sincro.yo) ? cambiosVr(corredores)[sincro.yo] : 0;
+      const final = aplicarCambio(base, cambio);
+      const texto = `VR ${base} → ${final} (${final >= base ? '+' : '−'}${Math.abs(final - base)})`;
+      window.mkwEstado.vr = { carrera: n, antes: base, despues: final, cambio: final - base, corredores };
+      if (window.mkwAvisosVr.length < 200) window.mkwAvisosVr.push(texto);
+      if (!est.fuera && !est.cortado) ui.aviso(`🏁 ${texto}`);
+      if (window.parent !== window) window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'vr', vr: final }, location.origin);
+      vr.informar({ vr: final, br }).then(r => nota(`[vr] carrera ${n}: ${texto} → ${r.nube}`));
+    }
     // §75 (pruebas): terminar la carrera de los humanos en el cuadro `cuadro` de la carrera sincronizada, el mismo en
     // todas las consolas (cada pestaña lo pide con el mismo número): el juego da los puestos y los puntos de verdad.
     // puestos = solo esos (por ejemplo [0]: A llega y B no; sin puestos, todos)
@@ -1284,6 +1330,7 @@ async function arrancar() {
         // (§75: y los puntos que lleva la copa, los de la sala: quien recargó no tiene los de las carreras que se saltó)
         if (n > 1 && e.puntos?.carrera === n - 1) ponerPuntos(window.mkwMenus, e.puntos.tabla);
         if (!desde) desde = n;
+        vrEmpieza(e, n);
         directo.carrera(ficha, { licencia: -1 }).then(llego => {
           nota(`sala: carrera ${n} de ${e.carreras} ${llego ? 'abierta' : 'no se pudo'} (pista 0x${ficha.pista.toString(16)})`);
           window.mkwEstado.piloto = { llego, modo: 'sala', carrera: n };
@@ -1301,7 +1348,11 @@ async function arrancar() {
           // (§75: y con los puntos ya sumados: el juego los suma en el primer cuadro con la carrera terminada, que esta
           // vigía puede ver un cuadro antes; mkw_sala_puntos_sumados lo dice)
           if (empezo && ri && s >= 0x20 && s <= 0x23 && et >= 4 && (M._mkw_sala_puntos_sumados?.() ?? 1)) {
-            clearInterval(vigiaFin); sala.termine(n, puntosDelJuego(L), desde);
+            // (§80: si esta consola se salió de la carrera —su copia ya no es la de los demás— no avisa: sus puntos
+            // no valen; en la siguiente toma la tabla de la sala, como quien recargó)
+            clearInterval(vigiaFin);
+            if (!sincro?.lockstep?.estado().fuera) sala.termine(n, puntosDelJuego(L), desde);
+            vrTermina(e, n);                        // §82
           }
         }, 500);
       } else if (e.fase === 'fin') {
@@ -1435,6 +1486,17 @@ async function arrancar() {
   };
   requestAnimationFrame(alRefrescar);
 
+  // §81: el aviso de «tarjeta de video equivocada» (aviso-gpu.mjs): si el juego va lento un buen rato por trabajo de
+  // esta PC y Windows es quien elige la tarjeta, ofrece la ayuda del cajón (Avanzado → Video). Fuera de la sala (ahí
+  // avisa la sala, §70.7) y no en las pruebas automáticas (salvo ?avisoGpu=1; ?avisoGpu=0 lo apaga)
+  const enSalaGpu = parametros.has('sincro') || ['sala', 'enlinea'].includes(parametros.get('modo'));
+  const avisoGpu = parametros.get('avisoGpu') === '0' || (navigator.webdriver && parametros.get('avisoGpu') !== '1') ? null
+    : crearAvisoGpu({ gpu: revisionGpu, abrirAyuda: () => {
+        if (!(document.body.classList.contains('cajon-abierto') && !$('hojaAvanzado').hidden)) ui.abrirCajon('avanzado');
+        const ayuda = $('gpuAyuda'); ayuda.hidden = false; ayuda.open = true; ayuda.scrollIntoView({ block: 'nearest' });
+      } });
+  window.mkwAvisoGpu = avisoGpu;           // (para las pruebas)
+
   // 6b) Medidor: cada segundo
   let antes = { t: performance.now(), c: 0, espera: 0 };
   let primerCuadro = false, verificado = false;
@@ -1451,6 +1513,7 @@ async function arrancar() {
     const esperaDiscoSeg = msEsperaDisco - (antes.disco || 0);   // ms de este segundo esperando el disco
     antes = ahora;
     Object.assign(window.mkwEstado, { cuadros: ahora.c, fps, trabajo });
+    avisoGpu?.medir({ fps, trabajo, cuadros: ahora.c, esperaDisco: esperaDiscoSeg, oculta: document.hidden, enSala: enSalaGpu });
     $('fps').textContent = `${fps.toFixed(1)} fps`;
     $('trabajo').textContent = `trabajo ${trabajo.toFixed(2)} ms`;
     const de = disco.estado;
@@ -1497,9 +1560,11 @@ async function arrancar() {
   };
   // la carrera sincronizada: el juego le pide a M.mkwLockstep los botones de cada cuadro (pad_web.cpp)
   if (sincro && red?.malla) {
-    // §73: en la sala nueva (carrera directa) se le da a quien se corta un MARGEN para volver antes de seguir sin él:
-    // 30 s (?margen=N segundos); la carrera queda en pausa en todas mientras tanto
-    const margen = parametros.has('margen') ? Number(parametros.get('margen')) * 1000 : ['directa', 'sala'].includes(objetivoPiloto.modo) ? 30000 : undefined;
+    // §73: en la sala nueva (carrera directa) se le da a quien se corta un MARGEN para volver antes de seguir sin él
+    // (?margen=N segundos); la carrera queda en pausa en todas mientras tanto. §80: 2 s (antes 30): quien tiene la
+    // conexión mala ya no frena a nadie (lo releva la autoridad), y al que se corta de golpe no conviene esperarlo
+    // más: quien recarga avisa que se salta la carrera y vuelve en la siguiente
+    const margen = parametros.has('margen') ? Number(parametros.get('margen')) * 1000 : ['directa', 'sala'].includes(objetivoPiloto.modo) ? 2000 : undefined;
     sincro.lockstep = crearLockstep({ yo: sincro.yo, humanos: sincro.humanos, local: () => sincro.local, esperaCorte: margen,
       enviar: (u, b, canal) => red.malla.enviar(u, b, canal), huella: () => huellaCarrera(window.mkwMenus),
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
@@ -1540,12 +1605,32 @@ async function arrancar() {
     // y al empezar cada carrera, mientras los demás todavía cargan la pista: la carrera está quieta en su primer cuadro
     // (nadie avanza sin los botones de todos) y empieza en el mismo cuadro para todos; se avisa a quién se espera
     window.mkwAvisosLlegada = [];
-    let avisandoLlegada = false;
+    // §80: el relevo (la autoridad lleva los botones de quien va atrasado: su conexión o su PC) y salirse de la carrera
+    // (la copia de esta consola se separó, o la cortaron): lo que ve cada uno, en window.mkwAvisosRelevo para las
+    // pruebas. Fuera de la carrera, el aviso queda (los de «…» quedan mientras duren): la carrera ya no es suya y tiene
+    // que saber por qué. El relevo, en cambio, se avisa una vez (6 s) cada vez que cambia: no tapa la carrera
+    window.mkwAvisosRelevo = [];
+    let avisandoLlegada = false, avisoRelevo = '';
+    const jugador = u => `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`;
+    const textoRelevo = est => {
+      if (est.fuera) return '📶 Te desconectaste de esta carrera: tu kart sigue sin ti y vuelves en la siguiente…';
+      if (est.cortado) return '📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…';
+      if (est.yoRelevado) return '📶 Tu conexión o tu PC van lentas: tu kart responde con retraso (la carrera no te espera)';
+      const otros = est.relevadosAhora.filter(u => u !== sincro.yo);
+      return otros.length ? `📶 ${otros.map(jugador).join(' y ')} va${otros.length > 1 ? 'n' : ''} lento (conexión o PC): su kart responde tarde; la carrera no lo espera` : '';
+    };
     setInterval(() => {
-      const e = sincro.lockstep.estado().esperando;
+      const est = sincro.lockstep.estado(), e = est.esperando;
       if (avisandoLlegada && !(e?.llegando)) { avisandoLlegada = false; ui.aviso(''); }
+      // (al terminar, el que queda puesto se borra si nadie lo tapó)
+      const relevo = textoRelevo(est);
+      if (relevo !== avisoRelevo) {
+        if (relevo) { ui.aviso(relevo, est.fuera || est.cortado || est.yoRelevado); if (window.mkwAvisosRelevo.length < 200) window.mkwAvisosRelevo.push(relevo); }
+        else if (avisoRelevo.endsWith('…') && document.getElementById('avisoJuego')?.textContent === avisoRelevo) ui.aviso('');
+        avisoRelevo = relevo;
+      }
       if (!e || e.ms < (e.llegando ? 400 : 1500)) return;
-      const quien = e.uids.map(u => `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`).join(' y ');
+      const quien = e.uids.map(jugador).join(' y ');
       if (e.llegando) {
         const texto = `Esperando a que ${quien} termine de cargar la pista: la carrera empieza al mismo tiempo para todos…`;
         if (!avisandoLlegada) { avisandoLlegada = true; window.mkwAvisosLlegada.push(texto); }

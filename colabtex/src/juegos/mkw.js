@@ -28,6 +28,8 @@ import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, mkwCarrera, mkwTabla } from "./motor
      es el anfitrión, empezar y volver.
    - **El VR y los récords** de cada uno van a Firebase (`mkw/vr/<uid>`, `mkw/records/…`): este módulo arma los
      almacenes con la base del sitio y se los pasa al marco (misma página, mismo origen) apenas carga.
+     El VR se mueve con cada carrera de la sala (el marco lo calcula y lo guarda, `vr-sala.mjs`, §82): el marco
+     avisa el suyo (`vr`) y, al terminar la copa (`fin`), el vestíbulo vuelve a leer el de los demás.
    - Quien entra con la copa andando espera a la siguiente tanda. Quien mira la sala sin ser jugador no carga el juego.
 
    Controles del juego: teclado, mandos y táctil (con inclinación) — @controles: tactil teclado */
@@ -101,7 +103,7 @@ export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = 
    una persona real) y solo la entrega el Worker, a la lista AMIGOS. Solo para esa lista (revisaBt3, la misma de BT3):
    a los demás, «Este juego es privado». Lo que avisa el marco: `token` (se le contesta el de Firebase; nuevo = el
    anterior venció), `volver` (su «← Juegos») y `salas` (Multiplayer → Online: las salas de Mario Kart). Sus partidas y
-   récords van a la cuenta, como en la sala (el VR no: solo se mueve en línea). */
+   récords van a la cuenta, como en la sala (el VR no: solo se mueve en las carreras de la sala, §82). */
 export const srcMkwSolo = origen => PAGINA + "?" + new URLSearchParams({ senal: "padre", privado: origen }).toString();
 export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl = urlPrivada }) {
   let host = null, frame = null, muerto = false, conecta = 0;
@@ -221,6 +223,14 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (d.tipo === "mirame") verMarco();
     /* Fin de la copa o de la playlist (juegos/mkw/web/navegador/modos.mjs): el marco del anfitrión manda la tabla final
        y todos vuelven al vestíbulo, donde queda como «la última». Los demás marcos también avisan: no hacen nada. */
+    /* El VR de quien juega cambió con una carrera de la sala (juegos/mkw/web/navegador/vr-sala.mjs, §82: el marco ya lo
+       guardó en mkw/vr/<uid>): el vestíbulo lo muestra al volver. */
+    if (d.tipo === "vr" && Number.isInteger(d.vr) && d.vr >= 1 && d.vr <= 1000000) { vrs[uid] = d.vr; pintaVestibulo(true); }
+    if (d.tipo === "fin") {
+      /* los VR de los demás también se movieron: se vuelven a leer (una vez cada uno) */
+      for (const j of presentes()) if (j.uid !== uid) delete vrs[j.uid];
+      pideVrs();
+    }
     if (d.tipo === "fin" && soyAnfitrion() && corriendo()) {
       const tabla = mkwTabla(d.tabla);
       anota(tabla ? { t: "vuelve", uid, tabla } : { t: "vuelve", uid });

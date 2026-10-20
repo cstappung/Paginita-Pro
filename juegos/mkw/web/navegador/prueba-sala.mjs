@@ -16,9 +16,13 @@
 //      quieto: 30 s después de que llega A, el juego le termina la carrera a B en el puesto en que va (la regla «DNF»
 //      de las carreras en línea, §77), antes del tiempo límite (el del juego en línea; en la prueba ?limite=120 s);
 //   6. al terminar la 2, la sala termina y queda la tabla de la copa (12 puestos) con los puntos del juego (146).
+//   §82, el VR: al abrir cada carrera cada página deja guardado su peor caso (5000 → 4987: perder contra el otro);
+//   al terminar la 1, el que llegó antes +13 y el otro −13, igual en las dos; la 2 se cuenta con esos VR (la foto de
+//   la anfitriona) y al terminarla lo que gana uno lo pierde el otro.
 // --recarga (§75, volver después de recargar): B recarga la página a mitad de la carrera 1. Su página nueva no entra a
 //   esa carrera (avisa que se la salta y A sigue en segundos, sin esperar el margen de 30 s), A la termina sola, y en
 //   la 2 B vuelve en su puesto, con lo que había elegido, la misma carrera que A y su kart con sus botones.
+//   §82: B, que se fue a mitad de la 1, se queda con su peor caso (4987) y A no gana nada por él (5000).
 // Fotos en build/web/datos/sala/ (o sala-recarga/).
 //
 // Uso:  node web/navegador/prueba-sala.mjs [--ventana] [--puerto=8153] [--recarga]
@@ -84,7 +88,10 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r(null), 8000)
     cuenta: window.mkwCuentaDnf?.estado() || null,   // §78: el contador de los que faltan (dnf.mjs)
     puntosMenu: Array.from({ length: 12 }, (_, i) => L.u16(rd + 0xC10 + 8 + i * 0xF0 + 0xDA)),
     ganadora: L.u32(0x8043319C + 0x10), etapa: ri ? L.u32(ri + 0x28) : -1, av,
-    cortina: !document.body.classList.contains('sin-cortina') };
+    cortina: !document.body.classList.contains('sin-cortina'),
+    // §82: el VR de la sala (mkw.mjs → vr-sala.mjs) y la copia de esta cuenta en el navegador (vr.mjs)
+    vr: window.mkwEstado.vr || null, avisosVr: window.mkwAvisosVr || [],
+    vrLocal: (() => { try { return JSON.parse(localStorage.getItem('mkw.vr.' + new URLSearchParams(location.search).get('uid')))?.vr ?? null; } catch { return null; } })() };
 })]).catch(() => null);
 const esperarQue = async (p, cond, tope = 120000) => { for (const hasta = Date.now() + tope; Date.now() < hasta;) { const x = await leer(p); if (x && cond(x)) return x; await espera(500); } return await leer(p); };
 
@@ -166,6 +173,20 @@ const f4 = (x, i) => x?.av?.[i]?.toFixed(4);
 ok('cada kart con lo suyo: a los 3,5 s el de A avanzó y el de B (quieto) no, en las dos pestañas',
    [qa, qb].every(x => (x?.av?.[0] || 0) - (x?.av?.[1] || 0) > 0.004), `pestaña A: A ${f4(qa, 0)} B ${f4(qa, 1)} · pestaña B: A ${f4(qb, 0)} B ${f4(qb, 1)} (vueltas)`);
 ok('después B aceleró y su kart también avanzó', [ca, cb].every(x => (x?.av?.[1] || 0) > (qa?.av?.[1] || 0) + 0.01), `B ${f4(qa, 1)} → ${f4(ca, 1)}`);
+ok('§82: al abrir la carrera 1 cada una guardó su peor caso (perder contra el otro: 5000 → 4987)',
+   [ca, cb].every(x => x?.vr?.carrera === 1 && x.vr.antes === 5000 && x.vr.peor === 4987 && x.vrLocal === 4987),
+   `A ${JSON.stringify(ca?.vr)} (guardado ${ca?.vrLocal}) · B ${JSON.stringify(cb?.vr)} (guardado ${cb?.vrLocal})`);
+// §82: el VR después de una carrera: los dos con su cambio, lo que gana uno lo pierde el otro, el que llegó antes gana
+const vrDe = x => x?.vr?.despues;
+const vrBien = (xa, xb, n) => {
+  const va = xa?.vr, vb = xb?.vr;
+  if (va?.carrera !== n || vb?.carrera !== n || va.despues == null || vb.despues == null) return false;
+  const puesto = (v, u) => v.corredores?.find(c => c.uid === u)?.puesto;
+  const ganaA = puesto(va, uidA) < puesto(va, uidB);
+  return va.cambio + vb.cambio === 0 && va.cambio !== 0 && (va.cambio > 0) === ganaA &&
+         JSON.stringify(va.corredores) === JSON.stringify(vb.corredores) && xa.vrLocal === va.despues && xb.vrLocal === vb.despues;
+};
+const vrTexto = (xa, xb) => `A ${xa?.vr?.antes} → ${xa?.vr?.despues} (guardado ${xa?.vrLocal}) · B ${xb?.vr?.antes} → ${xb?.vr?.despues} (guardado ${xb?.vrLocal}); puestos ${JSON.stringify(xa?.vr?.corredores?.map(c => c.puesto))}`;
 
 // 4) el fin de la carrera 1, de verdad (§75): los humanos cruzan la meta en el MISMO cuadro de la carrera sincronizada
 // (mkwTerminarEn: el juego llama EndLap hasta la última vuelta, A primero) y el juego da puestos y puntos. Sin
@@ -193,6 +214,8 @@ if (!RECARGA) {
   ok('puntos de la carrera 1 (los da el juego): suman 73 (15, 12, 10, 8…), A y B 15 y 12, iguales en las dos',
      sumar(xa?.puntosMenu) === 73 && dosPrimeros(xa?.puntosMenu) && JSON.stringify(xa.puntosMenu) === JSON.stringify(xb?.puntosMenu),
      `A ${xa?.puntosMenu?.join(',')} · B ${xb?.puntosMenu?.join(',')} (límite del juego ${xa?.limiteJuego} ms)`);
+  ok('§82: al terminar la 1 el VR se mueve: el humano que llegó antes +13, el otro −13, lo mismo en las dos y guardado',
+     vrBien(xa, xb, 1) && Math.abs(xa.vr.cambio) === 13 && xa.avisosVr.length === 1 && /VR 5000 → (5013|4987)/.test(xa.avisosVr[0]), vrTexto(xa, xb) + ` «${xa?.avisosVr?.[0]}»`);
 } else {
   // B recarga la página a mitad de la carrera 1. La página nueva no entra a esa carrera (su consola no tiene los
   // cuadros que ya pasaron): se la salta y lo avisa, y A sigue en segundos (sin el aviso esperaría el margen de 30 s)
@@ -212,6 +235,9 @@ if (!RECARGA) {
   const { fines, despues: [xa] } = await puntosCarrera1([A]);
   ok('la carrera 1 la termina A sola (B, cortado, no se espera): puntos que suman 73, A 15',
      fines[0]?.etapa >= 4 && sumar(xa?.puntosMenu) === 73 && xa.puntosMenu[0] === 15, `cuadro ${f1}; A ${xa?.puntosMenu?.join(',')}`);
+  const xb1 = await leer(B);
+  ok('§82: B se fue a mitad de la 1: se queda con su peor caso (4987) y A no gana nada por él (5000)',
+     xa?.vr?.carrera === 1 && xa.vr.despues === 5000 && xa.vrLocal === 5000 && xb1?.vrLocal === 4987, vrTexto(xa, xb1));
 }
 
 // 5) la carrera 2: sola después de los resultados (con --recarga, B vuelve en su puesto y con lo que eligió)
@@ -219,6 +245,12 @@ const [sa, sb] = [await esperarQue(A, x => enCarrera(x, 2), 90000), await espera
 const p2 = sa?.sala?.pistas?.[1];
 ok('después de los resultados, la carrera 2 abrió sola en las dos con la pista 2', enCarrera(sa, 2) && enCarrera(sb, 2) && [sa, sb].every(x => x.ganadora === 0x100 + 4 * p2.copa + p2.fila),
    `A ${hex(sa?.ganadora)} B ${hex(sb?.ganadora)} (pista 2 ${JSON.stringify(p2)}) a los ${seg()}`);
+// §82: la foto de los VR de la carrera 2 (la anfitriona la congela al empezarla): los de después de la 1
+const fotoVr2 = sb?.sala?.vrCarrera, esperadoVr2 = RECARGA ? { [uidA]: 5000, [uidB]: 4987 } : null;
+ok('§82: la carrera 2 se cuenta con los VR de después de la 1 (la foto de la anfitriona, la misma en las dos)',
+   fotoVr2?.n === 2 && JSON.stringify(fotoVr2) === JSON.stringify(sa?.sala?.vrCarrera) &&
+   (esperadoVr2 ? fotoVr2.vrs[uidA] === 5000 && fotoVr2.vrs[uidB] === 4987 : fotoVr2.vrs[uidA] + fotoVr2.vrs[uidB] === 10000 && fotoVr2.vrs[uidA] !== 5000),
+   JSON.stringify(fotoVr2));
 if (RECARGA) {
   ok('B vuelve en la carrera 2 en SU puesto, con SU pantalla y con lo que había elegido antes de recargar',
      sb?.pantalla === 1 && sb.tipos?.[1] === 0 && sb.pjs?.[1]?.[0] === eb?.eleccion?.personaje && sb.pjs[1][1] === eb.eleccion.vehiculo &&
@@ -259,11 +291,13 @@ if (!RECARGA) {
      /META|LLEGÓ/.test(cb.cuenta.letrero) && ca?.cuenta?.modo === 'espera', `A: ${ca?.cuenta?.texto} · B: ${cb?.cuenta?.texto} (${cb?.cuenta?.fuente})`);
   const [la, lb] = [await esperarQue(A, x => x.etapa >= 4, 90000), await esperarQue(B, x => x.etapa >= 4, 30000)];
   const desde = llegoA?.llegaron?.[0] === 1 ? llegoA.reloj : -1, plazo = (la?.reloj ?? 0) - desde;
-  // (cada pestaña se lee en su momento: el reloj puede diferir en uno o dos cuadros; que la carrera sea la misma en las
+  // (cada pestaña se lee en su momento, y el reloj sigue corriendo después del fin: comparar los relojes leídos mide
+  // cuándo se leyó cada una, no el juego —con dos juegos en la PC llegó a 2,3 s—. Se pide que en las dos el juego ya le
+  // haya dado la llegada a B; que la carrera sea la misma en las
   // dos lo dice la tabla, igual en las dos, más abajo)
   ok(`la carrera 2 termina sola aunque B no llegue: ${DNF} s después de que A cruza la meta, el juego termina la de B en el puesto en que va (la regla «DNF»), antes del tiempo límite`,
      la?.etapa >= 4 && lb?.etapa >= 4 && desde > 0 && plazo > (DNF - 1) * 1000 && plazo < (DNF + 1.5) * 1000 && la.reloj < LIMITE * 1000 &&
-     Math.abs(la.reloj - lb.reloj) < 500 && lb.llegaron?.[1] === 1,
+     la.llegaron?.[1] === 1 && lb.llegaron?.[1] === 1,
      `A llega con el reloj en ${desde} ms (cuadro ${f2}); fin con el reloj en A ${la?.reloj} ms, B ${lb?.reloj} ms: ${(plazo / 1000).toFixed(1)} s después`);
 } else await terminarEn([A, B], [da, db]);
 const fa = await esperarQue(A, x => x.sala?.fase === 'fin' && x.fin, 90000), fb = await esperarQue(B, x => x.sala?.fase === 'fin' && x.fin, 30000);
@@ -275,6 +309,8 @@ ok('la tabla trae los puntos de verdad: suman 146 (73 por carrera), A y B con pu
    total === 146 && ptsA > 0 && ptsB > 0 && JSON.stringify(fa?.fin) === JSON.stringify(fb?.fin),
    `total ${total}; A ${ptsA}, B ${ptsB}; ${(fa?.fin || []).map(x => x.puntos).join(',')}`);
 await A.screenshot({ path: path.join(carpeta, '6-A-fin.png') }).catch(() => {});
+ok('§82: al terminar la 2 también: lo que gana uno lo pierde el otro, guardado en las dos', vrBien(fa, fb, 2) && fa.vr.antes === fotoVr2?.vrs?.[uidA],
+   vrTexto(fa, fb));
 
 ok('sin errores de JavaScript en las páginas', !registro.some(l => l.includes('pageerror')), registro.filter(l => l.includes('pageerror')).slice(0, 2).join(' · '));
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));

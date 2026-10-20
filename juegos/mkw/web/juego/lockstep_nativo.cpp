@@ -138,6 +138,26 @@ extern "C" void func_8020FE24(CpuContext* ctx) {
         Memory::Write32(yo + 100, Memory::Read32(r2 - 25984));
 }
 
+// §83 (la C2): OS::GetTick (0x801AAD74) LLAMADO durante la carrera sincronizada. Casi todo el juego copia el mftb de
+// GetTick adentro de cada función (eso ya lo cubre RELOJ_CARRERA en compilar-web.py), pero Retro Rewind lo llama de
+// verdad en dos lugares que deciden la carrera, y cada consola leía su propio reloj:
+//  - el sorteo de reserva de los objetos de Pulsar (rr_kamek_81836190, se llama desde 0x81836284): cuando el objeto
+//    que tocó en la caja ya no tiene cupo (demasiados en la pista), elige otro con un LCG propio cuya semilla, la
+//    primera vez, sale de GetTick. En la copa 65.0/75.0/39.0/74.1 (semilla 3549642503) pasa en el cuadro 5975 de la
+//    carrera 1: desde ahí la misma caja daba otro objeto en cada consola y la carrera se separaba (~6100);
+//  - los objetos condicionales de las pistas retro (rr_kamek_818044F8, desde 0x81804548): un número del 0 al 7 decide
+//    cuáles aparecen; en contrarreloj vale 0, en línea sale de la semilla compartida y en VS... del reloj.
+// (y MiiHeadsModel::Init, desde 0x807DC270, que solo anima caras). Con la carrera corriendo (hay Raceinfo) y el
+// reloj fijo, GetTick devuelve el reloj de la carrera de ese lugar (PPC_MftbCarreraEn: cuadro, lugar, lr): lo mismo
+// en todas. Fuera de la carrera (menús, cargas) sigue el reloj real.
+extern "C" uint32_t PPC_MftbCarreraEn(uint32_t sitio, uint32_t lr);
+extern "C" void func_801AAD74_traducida(CpuContext* ctx);
+extern "C" void func_801AAD74(CpuContext* ctx) {
+    const uint32_t ri = g_mkwRelojFijo ? Memory::Read32(0x809BD730u) : 0;   // Raceinfo
+    if (ri && Memory::Contains(ri, 0x24)) { ctx->gpr[3] = PPC_MftbCarreraEn(100u, ctx->lr); return; }   // 100: lejos de los sitios de RELOJ_CARRERA
+    func_801AAD74_traducida(ctx);
+}
+
 // La "compensación de lag" de Retro Rewind (Pulsar, rr_kamek_81806568: se engancha en RKSystem::Run en 0x800095C4).
 // Cada vuelta del bucle principal mira cuántos refrescos de pantalla REALES pasaron (AsyncDisplay +108, lo sube la
 // interrupción de cada refresco) y, si el juego va atrasado, se salta el dibujo de ese cuadro (devuelve 0: no llama a

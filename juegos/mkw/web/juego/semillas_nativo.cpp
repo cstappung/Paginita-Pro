@@ -141,6 +141,10 @@ extern "C" void func_8052F924(CpuContext* ctx) {
             g_mkwRelojValor = (static_cast<uint64_t>(s[0]) << 12) ^ s[1];
             g_mkwRelojFijo = 1;
             ++g_mkwRelojGeneracion;                     // la hora de la carrera (os_time.cpp) empieza de cero
+            // §83: la semilla del sorteo de reserva de los objetos de Pulsar (su variable, 0x818A0C28, la revisa
+            // compilar-web.py) vuelve a cero: la primera vez que haga falta en ESTA carrera se siembra con el reloj de
+            // la carrera (GetTick, lockstep_nativo.cpp), igual en todas, también en la de quien recargó y volvió
+            if (Memory::Contains(0x818A0C28u, 4)) Memory::Write32(0x818A0C28u, 0);
             g_mkwLsArreglos = mkw_web_ls_arreglos();
             g_mkwVistaPropia = mkw_web_vista_propia();
         }

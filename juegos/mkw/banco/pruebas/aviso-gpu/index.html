@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aviso de tarjeta de video</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Aviso de tarjeta de video: <span>la ayuda aparece cuando el juego va lento por la tarjeta</span></h1>
+<p>Prueba <code>aviso-gpu.mjs</code> (bitácora §81) <b>sin el juego</b>: le da segundos inventados con la forma de lo que
+  mide la página (cuadros por segundo, trabajo por cuadro, cuadro del juego, espera del disco, pestaña escondida, sala) y
+  una revisión de tarjeta inventada (el navegador hace caso o no al pedido de «alto rendimiento»; tarjeta por software).
+  Comprueba que el aviso no sale por un tirón, ni en el arranque, ni esperando el disco, ni con la pestaña escondida, ni en
+  la sala, ni si el navegador ya dio la mejor tarjeta; que sale con la lentitud sostenida; que «Ver cómo» abre la ayuda;
+  que «✕» lo calla 7 días y que sale una sola vez por visita.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearAvisoGpu, SILENCIO_MS, CLAVE } from '/web/navegador/aviso-gpu.mjs';
+
+const { ok, nota, fin } = prueba('aviso-gpu', 'Aviso de tarjeta de video (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+// un almacén y un reloj de mentira (cada caso arranca limpio)
+const almacen = () => { const m = new Map(); return { leer: k => m.get(k) ?? null, escribir: (k, v) => m.set(k, v), m }; };
+const GPU_IGNORA = { ignora: true, nombreGpu: 'amd rdna-2 AMD Radeon(TM) Graphics' };
+const GPU_HACE_CASO = { ignora: false, nombreGpu: 'nvidia ampere NVIDIA GeForce RTX 3080 Ti' };
+const GPU_SOFTWARE = { ignora: false, nombreGpu: 'google swiftshader (POR SOFTWARE)' };
+const LENTO = { fps: 41, trabajo: 22, cuadros: 5000 }, RAPIDO = { fps: 60, trabajo: 6, cuadros: 5000 };
+let reloj = 1e12;
+async function caso(gpu, segundos, extra = {}) {
+  document.getElementById('avisoGpu')?.remove();
+  const alm = extra.almacen || almacen();
+  let ayudas = 0;
+  const a = crearAvisoGpu({ gpu: Promise.resolve(gpu), abrirAyuda: () => ayudas++, almacen: alm, ahora: () => reloj, windows: extra.windows ?? true });
+  await espera(0);                         // la revisión de la tarjeta termina
+  for (const s of segundos) a.medir(s);
+  return { a, alm, ayudas: () => ayudas, caja: document.getElementById('avisoGpu') };
+}
+const rep = (n, s) => Array.from({ length: n }, () => ({ ...s }));
+
+// 1. rápido: nunca
+let r = await caso(GPU_IGNORA, rep(30, RAPIDO));
+ok('a 60 cuadros/s no sale nunca', !r.a.estado().visible && !r.caja, JSON.stringify(r.a.estado()));
+// 2. un tirón (5 s lentos y después bien): no
+r = await caso(GPU_IGNORA, [...rep(5, LENTO), ...rep(20, RAPIDO)]);
+ok('un tirón de 5 s no lo enciende (hacen falta 8 lentos entre los últimos 12)', !r.a.estado().visible, `lentos ${r.a.estado().lentos}`);
+// 3. lento sostenido con el navegador que no deja elegir: sí
+r = await caso(GPU_IGNORA, rep(8, LENTO));
+ok('8 s lentos seguidos, con Windows eligiendo la tarjeta: sale el aviso', r.a.estado().visible && r.caja && !r.caja.hidden && r.a.estado().motivo === 'ignora',
+   r.caja?.textContent.slice(0, 60));
+ok('el aviso tiene «Ver cómo» y «✕» y habla de la tarjeta dedicada', !!r.caja?.querySelector('#avisoGpuVer') && !!r.caja?.querySelector('#avisoGpuCerrar') && /dedicada/.test(r.caja?.textContent || ''));
+// 4. «Ver cómo» abre la ayuda y lo esconde
+r.caja.querySelector('#avisoGpuVer').click();
+ok('«Ver cómo» abre la ayuda (cajón → Avanzado → Video) y esconde el aviso', r.ayudas() === 1 && r.caja.hidden && !r.a.estado().visible, `ayudas ${r.ayudas()}`);
+// 5. una vez por visita: más segundos lentos no lo vuelven a mostrar
+for (const s of rep(20, LENTO)) r.a.medir(s);
+ok('sale una sola vez por visita (más lentitud después no lo vuelve a abrir)', !r.a.estado().visible && r.caja.hidden);
+// 6. intermitente: 8 lentos dentro de una ventana de 12
+r = await caso(GPU_IGNORA, [LENTO, RAPIDO, LENTO, LENTO, RAPIDO, LENTO, LENTO, RAPIDO, LENTO, LENTO, RAPIDO, LENTO].map(s => ({ ...s })));
+ok('lento a ratos (8 de 12 segundos) también lo enciende', r.a.estado().visible, `lentos ${r.a.estado().lentos}`);
+// 7. trabajo bajo (esperando algo, no la tarjeta): no
+r = await caso(GPU_IGNORA, rep(15, { fps: 40, trabajo: 5, cuadros: 5000 }));
+ok('pocos cuadros pero con poco trabajo (el juego esperaba, no es la tarjeta): no sale', !r.a.estado().visible, `lentos ${r.a.estado().lentos}`);
+// 8. arranque, disco, pestaña escondida, sala: no cuentan
+r = await caso(GPU_IGNORA, [...rep(10, { ...LENTO, cuadros: 300 }), ...rep(10, { ...LENTO, esperaDisco: 500 }), ...rep(10, { ...LENTO, oculta: true }), ...rep(10, { ...LENTO, enSala: true })]);
+ok('no cuentan el arranque (cuadro < 600), la espera del disco, la pestaña escondida ni la sala', !r.a.estado().visible && r.a.estado().lentos === 0, `lentos ${r.a.estado().lentos}`);
+// 9. el navegador hace caso al pedido (ya tiene la mejor): no
+r = await caso(GPU_HACE_CASO, rep(20, LENTO));
+ok('si el navegador ya da la tarjeta de «alto rendimiento», no sale (cambiarla no ayuda)', !r.a.estado().visible && !r.a.estado().puede);
+// 10. por software: sí, con su texto
+r = await caso(GPU_SOFTWARE, rep(8, LENTO));
+ok('con la tarjeta «por software» sale aunque el navegador haga caso, con su propio texto', r.a.estado().visible && r.a.estado().motivo === 'software' && /software/.test(r.caja?.textContent || ''),
+   r.caja?.textContent.slice(0, 70));
+// 11. «✕» lo calla 7 días
+const alm = almacen();
+r = await caso(GPU_IGNORA, rep(8, LENTO), { almacen: alm });
+r.caja.querySelector('#avisoGpuCerrar').click();
+ok('«✕» lo esconde y guarda la hora en mkw.avisoGpu', r.caja.hidden && Number(alm.leer(CLAVE)) === reloj, `guardado ${alm.leer(CLAVE)}`);
+reloj += 3 * 24 * 3600 * 1000;
+r = await caso(GPU_IGNORA, rep(10, LENTO), { almacen: alm });
+ok('en otra visita 3 días después no sale (callado por 7 días)', !r.a.estado().visible);
+reloj += SILENCIO_MS;
+r = await caso(GPU_IGNORA, rep(10, LENTO), { almacen: alm });
+ok('pasados los 7 días vuelve a salir si sigue lento', r.a.estado().visible);
+// 12. revisión de la tarjeta todavía sin terminar: no sale (y sale cuando termina y sigue lento)
+document.getElementById('avisoGpu')?.remove();
+let soltar; const tarde = new Promise(s => { soltar = s; });
+const a = crearAvisoGpu({ gpu: tarde, abrirAyuda: () => {}, almacen: almacen(), ahora: () => reloj, windows: true });
+for (const s of rep(10, LENTO)) a.medir(s);
+const antes = a.estado().visible;
+soltar(GPU_IGNORA); await espera(0);
+a.medir({ ...LENTO });
+ok('mientras no se sabe qué tarjeta hay, no sale; al saberlo, sale si sigue lento', !antes && a.estado().visible, `antes ${antes}, después ${a.estado().visible}`);
+// 13. fuera de Windows (un teléfono: una sola tarjeta, el navegador da la misma para los dos pedidos): no; por software, sí
+r = await caso(GPU_IGNORA, rep(15, LENTO), { windows: false });
+ok('fuera de Windows («una sola tarjeta» en un teléfono) no habla de Windows: no sale', !r.a.estado().visible && !r.a.estado().puede);
+r = await caso(GPU_SOFTWARE, rep(8, LENTO), { windows: false });
+ok('fuera de Windows, con la tarjeta «por software», sí sale', r.a.estado().visible && r.a.estado().motivo === 'software');
+// 14. Windows elige pero ya dio una NVIDIA (dedicada): cambiarla no ayuda
+r = await caso({ ignora: true, nombreGpu: 'nvidia ampere' }, rep(15, LENTO));
+ok('si Windows ya le dio una NVIDIA (dedicada) no sale: cambiar la tarjeta no ayuda', !r.a.estado().visible && !r.a.estado().puede);
+nota('umbrales: < 54 cuadros/s y > 12 ms de trabajo por cuadro, 8 de los últimos 12 segundos de juego');
+fin();
+</script>
+</body>
+</html>

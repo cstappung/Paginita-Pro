@@ -50,7 +50,13 @@
 //       anfitrión: s.listaCambio(pistas) (la lista entera, al armarla), s.restantesCambio(pistas) (las que vienen
 //       después de la carrera actual), s.aceptar(id), s.rechazar(id), s.pausar(true|false)
 //       §75: alSalta: (uid, n) => … (ese humano se salta la carrera n); s.saltar(n) (esta página se salta la n)
+//       §82 VR: s.miVr(vr) (todos: el VR que tengo ahora); vrsDeCarrera(estado, n) = los VR con que se cuenta la n
+//
+// §82, el VR: cada página le dice a la anfitriona el VR que tiene ({t:'vr'}); ella los lleva en el estado (vrs) y, al
+// empezar cada carrera, los congela (vrCarrera: {n, vrs}). Así todas las consolas calculan el VR de esa carrera con
+// los MISMOS números (vr-sala.mjs): lo que pierde uno contra otro es lo que el otro gana.
 import { crearPlaylistSala } from './playlist-sala.mjs';
+import { VR_MAXIMO } from './vr-sala.mjs';
 
 export const MARCA_SALA = 0xA8;
 export const SEGUNDOS_ELEGIR = 45;
@@ -82,7 +88,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
-    lista: listaInicial, pausa: 0 };
+    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null };
+  // §82: los VR de ahora, congelados para la carrera n
+  const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) } });
   const yaVistas = new Set();                  // carreras que este navegador ya arrancó
 
   const codificar = m => { const t = new TextEncoder().encode(JSON.stringify(m)); const b = new Uint8Array(t.length + 1); b[0] = MARCA_SALA; b.set(t, 1); return b; };
@@ -104,7 +112,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (todos || t >= estado.plazo) {
         const picks = { ...estado.picks };
         humanos.forEach((h, i) => { if (!picks[h.uid]) picks[h.uid] = { personaje: POR_OMISION[i % 4][0], vehiculo: POR_OMISION[i % 4][1], derrape: 0, solo: true }; });
-        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, fuera: ausentes() });
+        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, fuera: ausentes(), vrCarrera: congelar(1) });
       }
     } else if (estado.fase === 'correr') {
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
@@ -113,7 +121,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       else if (estado.pausa && t < estado.pausa) return;        // §74: el anfitrión está agregando pistas
       else if (estado.plazo && t >= estado.plazo) {
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
-        else cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera: ausentes() });
+        else cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera: ausentes(), vrCarrera: congelar(n + 1) });
       }
     }
   }
@@ -167,6 +175,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (antes && antes.personaje === p.personaje && antes.vehiculo === p.vehiculo && antes.derrape === p.derrape) return;   // ya lo tenía
       cambiar({ picks: { ...estado.picks, [de]: p } });
       revisar();
+    } else if (soy() && m.t === 'vr' && esHumano(de) && vrValido(m.vr)) {
+      // §82: el VR que tiene esa página (cuenta desde la carrera que empiece después: la que corre ya está congelada)
+      if ((estado.vrs || {})[de] !== m.vr) cambiar({ vrs: { ...(estado.vrs || {}), [de]: m.vr } });
     } else if (soy() && m.t === 'sugiero' && esHumano(de) && estado.lista && estado.fase !== 'fin') {
       // §74: una sugerencia para la playlist (las reglas: playlist-sala.mjs)
       conLista(pl => pl.sugerir(de, { copa: m.copa, fila: m.fila }));
@@ -259,6 +270,8 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     },
     // lo que eligió esta persona en las pantallas del juego
     elegi(p) { alAnfitrion({ t: 'pj', ...p }); },
+    // §82: el VR que tiene esta persona (al entrar y cada vez que cambia; la página lo repite si la anfitriona no lo tiene)
+    miVr(vr) { if (vrValido(vr)) alAnfitrion({ t: 'vr', vr }); },
     // la carrera n terminó en este navegador (solo cuenta la primera vez que alguien lo avisa: es la misma carrera).
     // §75: con los puntos que lleva esta consola (12) y la primera carrera de la copa que corrió
     termine(n, puntos = null, desde = 0) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde }); },
@@ -271,6 +284,11 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     detener() { parar(reparto); },
   };
 }
+
+// §82: un VR razonable (entero entre 1 y el tope de vr.mjs)
+const vrValido = v => Number.isInteger(v) && v >= 1 && v <= VR_MAXIMO;
+// §82: los VR con que se cuenta la carrera n (los congelados al empezarla; si no los hay, los de ahora)
+export const vrsDeCarrera = (estado, n) => (estado?.vrCarrera?.n === n ? estado.vrCarrera.vrs : estado?.vrs) || {};
 
 // §75: 12 números de 0 a 9999 (los puntos de los 12 puestos)
 const tablaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 9999);

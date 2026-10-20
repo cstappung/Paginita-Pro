@@ -272,6 +272,35 @@ bool escribirFicha(const CpuContext* ctx, uint32_t sm) {
     Memory::Write32(sp + 0x64, static_cast<uint32_t>(f[FICHA_CARRERAS] > 0 ? f[FICHA_CARRERAS] : 4));
     return true;
 }
+
+// §82 (solo pruebas): el VR de la sala lo calcula la página (vr-sala.mjs) con la regla del juego; para comprobar que da
+// lo mismo, se le pregunta al juego mismo. La página pide un tramo de diferencias (VR del perdedor − VR del ganador) y
+// en el próximo Update, para cada una, se arman dos «puntajes» en la pila del juego (muy por debajo de la que usa: el
+// VR va en +4, dos bytes) y se llama a las dos funciones del juego: 0x8052D118 (lo que gana el que llegó antes; se la
+// llama con el suyo y el del otro, como UpdatePoints) y 0x8052D1C0 (lo que pierde el que llegó después: el suyo y el
+// del otro). Las respuestas quedan en g_vr_res para la página.
+constexpr int32_t VR_PRUEBA_MAX = 20000;
+int32_t g_vr_desde = 0, g_vr_cuantos = 0;      // el tramo pedido (0 = nada pendiente)
+int32_t g_vr_res[2 * VR_PRUEBA_MAX];           // [gana el ganador, «gana» el perdedor (negativo)] de cada diferencia
+void probarVr(const CpuContext* ctx) {
+    const uint32_t base = (ctx->gpr[1] - 0x400u) & ~0xFu;
+    const uint32_t ganador = base, perdedor = base + 0x10;
+    for (int32_t k = 0; k < g_vr_cuantos; k++) {
+        const int32_t d = g_vr_desde + k;
+        const int32_t vg = d < 0 ? 9999 : 1, vp = vg + d;             // los dos VR entre 1 y 9999, como en el juego
+        Memory::Write16(ganador + 4, static_cast<uint16_t>(vg));
+        Memory::Write16(perdedor + 4, static_cast<uint16_t>(vp));
+        CpuContext c = *ctx;
+        c.gpr[1] = base - 0x100; c.gpr[3] = ganador; c.gpr[4] = perdedor;
+        InvokeDirectCpu<0x8052D118u>(&c);
+        g_vr_res[2 * k] = static_cast<int32_t>(c.gpr[3]);
+        c = *ctx;
+        c.gpr[1] = base - 0x100; c.gpr[3] = perdedor; c.gpr[4] = ganador;
+        InvokeDirectCpu<0x8052D1C0u>(&c);
+        g_vr_res[2 * k + 1] = static_cast<int32_t>(c.gpr[3]);
+    }
+    g_vr_cuantos = 0;
+}
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_ir(int32_t seccion, int32_t licencia) {
@@ -295,6 +324,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_mando(uint32_t id) { g_mando = 
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* mkw_directo_mii() { return g_mii; }
 // 1 cuando el juego ya leyó el archivo de guardado (recién ahí conviene pedir un salto con licencia)
 extern "C" EMSCRIPTEN_KEEPALIVE int mkw_directo_listo() { return guardadoLeido(Memory::Read32(kRksysMgr)) ? 1 : 0; }
+// §82 (solo pruebas): pedir al juego los puntos de VR de `cuantos` diferencias desde `desde` (se calculan en el próximo
+// cuadro; mkw_vr_prueba_lista() = 1 cuando están); devuelve dónde quedan
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t* mkw_vr_prueba(int32_t desde, int32_t cuantos) {
+    g_vr_desde = desde; g_vr_cuantos = cuantos < 0 ? 0 : (cuantos > VR_PRUEBA_MAX ? VR_PRUEBA_MAX : cuantos);
+    return g_vr_res;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE int mkw_vr_prueba_lista() { return g_vr_cuantos == 0 ? 1 : 0; }
 
 EM_JS(void, mkw_web_directo_hecho, (int32_t seccion, int32_t licencia_ok), {
     if (Module.mkwAlIrDirecto) Module.mkwAlIrDirecto(seccion, licencia_ok);
@@ -410,5 +446,6 @@ extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
         g_boton_funcion = 0;
         InvokeIndirectCpu(f, &c);       // elige la versión activa (la de RR si la parcheó), como el código traducido
     }
+    if (g_vr_cuantos) probarVr(ctx);    // §82, solo pruebas
     rr_overlay_8063550C_traducida(ctx);
 }

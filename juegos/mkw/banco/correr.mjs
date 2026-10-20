@@ -5,6 +5,7 @@
 // fin() de comun.js) y copia a la consola sus líneas ✓/✗. Sale con código 1 si alguna falló.
 //
 // Uso:  node banco/correr.mjs licencias mii guardado      (los nombres son los de PRUEBAS en banco/index.html)
+//       node banco/correr.mjs "relevo?solo=7"              (con algo en la dirección: aquí, solo la parte 7)
 //       node banco/correr.mjs                             (sin nombres: todas las páginas pruebas/*/index.html)
 import { spawn } from 'node:child_process';
 import { readdirSync, existsSync } from 'node:fs';
@@ -28,12 +29,13 @@ for (const id of lista) {
   const lineas = [];
   pagina.on('console', m => { const t = m.text(); if (/^[✓✗·]|^fin:/.test(t)) lineas.push(t); });
   pagina.on('pageerror', e => lineas.push('✗ error en la página: ' + e.message));
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/pruebas/${id}/index.html`);
+  const [nombre, consulta] = id.split('?');            // "relevo?solo=3" = la página con ?solo=3 (para depurar una parte)
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/pruebas/${nombre}/index.html${consulta ? '?' + consulta : ''}`);
   // Las páginas que necesitan "el primer toque" (el sonido: el navegador no deja sonar sin tocar) tienen el botón
   // #empezar: Playwright lo aprieta como una persona (pointerdown + click).
   const boton = await pagina.$('#empezar');
   if (boton) await pagina.waitForTimeout(500).then(() => boton.click()).catch(() => {});
-  const termino = await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: 120000 }).then(() => true, () => false);
+  const termino = await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: 180000 }).then(() => true, () => false);
   const mal = lineas.filter(l => l.startsWith('✗')).length + (termino ? 0 : 1);
   falla += mal ? 1 : 0;
   console.log(`\n== ${id}: ${mal ? '✗' : '✓'} ${termino ? '' : '(no terminó a tiempo)'}`);

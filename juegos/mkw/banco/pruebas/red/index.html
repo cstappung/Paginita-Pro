@@ -124,7 +124,9 @@ try {
   {
     ok('sin ?redMala no cambia nada (el mismo alBinario)', leerRedMala('?red=malla') === null && degradar(nada, null) === nada);
     const red = leerRedMala('?redMala=80,20,5');
-    ok('?redMala=80,20,5 = 80 ms ± 20 ms y 5 % de pérdida', red && red.latencia === 80 && red.variacion === 20 && red.perdida === 0.05, JSON.stringify(red));
+    ok('?redMala=80,20,5 = 80 ms ± 20 ms y 5 % de pérdida', red && red.latencia === 80 && red.variacion === 20 && red.perdida === 0.05 && !red.ida, JSON.stringify(red));
+    const ida = leerRedMala('?redMala=70,10,5,ida');
+    ok('§80: ?redMala=70,10,5,ida = lo mismo y además lo que sale de la página', ida && ida.latencia === 70 && ida.variacion === 10 && ida.perdida === 0.05 && ida.ida === true, JSON.stringify(ida));
     let t = 0, k = 0;
     const llegan = [], relojes = [], azar = [0.01, 0.5, 0.95, 0.3, 0.7, 0.02, 0.6, 0.0, 0.4, 0.9];
     const f = degradar((u, b, c) => llegan.push({ c, i: b[0], t }), red, () => azar[k++ % azar.length], (g, ms) => relojes.push([t + ms, g]), () => t);

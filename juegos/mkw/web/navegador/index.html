@@ -237,6 +237,14 @@
     padding: 7px 14px; border-radius: 999px; background: #161233ee; border: 1px solid #4b3d93; color: var(--texto);
     font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
   #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
+  /* §81: «el juego va lento: ¿tarjeta de video equivocada?» (aviso-gpu.mjs), abajo a la izquierda, con «Ver cómo» y «✕» */
+  #avisoGpu { position: fixed; z-index: 6; left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); max-width: min(440px, calc(100vw - 24px)); display: flex; gap: 10px;
+    align-items: center; padding: 10px 12px; border-radius: 14px; background: #161233f2; border: 1px solid #4b3d93; color: var(--texto);
+    font: 500 13px/1.35 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; }
+  #avisoGpu[hidden] { display: none; }
+  #avisoGpu .boton { flex: none; }
+  .aviso-gpu-cerrar { flex: none; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--suave); cursor: pointer; font-size: 15px; }
+  .aviso-gpu-cerrar:hover { background: #ffffff14; color: var(--texto); }
   /* la playlist de la sala entre carrera y carrera (§74): al costado, mientras se ven los resultados */
   .playlist-breve { position: fixed; z-index: 7; right: calc(16px + var(--sr)); top: 50%; translate: 0 -50%; width: min(320px, calc(100vw - 32px));
     display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #1b1440ee; border: 2px solid #4b3d93; color: var(--texto);

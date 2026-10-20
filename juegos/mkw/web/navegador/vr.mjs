@@ -41,15 +41,24 @@ export function respuestaRatings(rec) {
 }
 
 export function crearVr({ almacen = null, uid = '', nombre = '', recuerdo = globalThis.localStorage } = {}) {
-  const leerLocal = () => { try { return JSON.parse(recuerdo.getItem('mkw.vr')) || null; } catch { return null; } };
-  const guardarLocal = r => { try { recuerdo.setItem('mkw.vr', JSON.stringify(r)); } catch {} };
+  // §82: la copia de este navegador va por cuenta (mkw.vr.<uid>): dos cuentas en el mismo navegador (o dos pestañas
+  // de la sala en la misma prueba) no se pisan el VR. Sin cuenta, mkw.vr; la cuenta que todavía no tiene la suya parte
+  // de esa (jugó sin sesión y después entró)
+  const clave = () => (uid ? `mkw.vr.${uid}` : 'mkw.vr');
+  const leerUna = k => { try { return JSON.parse(recuerdo.getItem(k)) || null; } catch { return null; } };
+  const leerLocal = () => leerUna(clave()) || (uid ? leerUna('mkw.vr') : null);
+  const guardarLocal = r => { try { recuerdo.setItem(clave(), JSON.stringify(r)); } catch {} };
   let actual = leerLocal();                     // { vr, br, cuando } o null (nunca jugó en línea en este navegador)
   const oyentes = new Set();
   const avisar = () => { for (const f of oyentes) try { f(actual); } catch {} };
   return {
     get actual() { return actual; },
     get conNube() { return !!(almacen && uid); },
-    conectar(o) { ({ almacen, uid, nombre } = { almacen, uid, nombre, ...o }); },
+    conectar(o) {
+      const antes = uid;
+      ({ almacen, uid, nombre } = { almacen, uid, nombre, ...o });
+      if (uid !== antes) { actual = leerLocal(); avisar(); }       // (otra cuenta: su copia)
+    },
     alCambiar(f) { oyentes.add(f); return () => oyentes.delete(f); },
     // al entrar: lo de la nube manda (es lo de la cuenta); sin nube, lo de este navegador. → { vr, br } o null
     async cargar() {

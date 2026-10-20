@@ -21,7 +21,7 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - Commits en la rama del sitio y en el repo local: **sí**. **PR: no** (el dueño lo retiró el 2026-10-18 19:50: "dont pR"); tampoco push mientras no lo pida. Merge: cuando él lo diga.
 - El Worker de Mario Kart usa **el mismo Worker y la misma lista de amigos que BT3**; el Worker y la subida a R2
   **los hace el dueño** (aquí se prepara todo lo que necesita: qué servir, el programa final, la lista de archivos).
-- **El VR solo se mueve en línea** (VS por el WFC de la sala). La carrera sincronizada con CPU no lo toca.
+- ~~**El VR solo se mueve en línea**~~ — **cambió el 2026-10-19**: el VR se mueve con cada carrera de la sala (§82).
 - **Se quita el visor de salas de Retro WFC** (`salas.mjs`): el multijugador va solo por nuestra página.
 - **Dos PCs = dos juegos abiertos en el mismo PC** (así se probó BT3): basta con las pruebas de dos pestañas y una
   prueba a mano con dos ventanas.
@@ -31,10 +31,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   `prueba-arranque.mjs` (13 puntos), y ver por qué el navegador da 20 puntos si `CLAUDE.md` dice 21
 - ✅ A2. Sitio: `npm run build` en `colabtex` (cambiaron `mkw.js` y `motor.js`) + `npm run test:juegos` + `mkw.test.cjs`
 - ✅ A3. Papeles al día: este plan (marcar lo hecho), `docs/en-linea.md` (fases con su estado real), `CLAUDE.md`
-- ⬜ A4. `subir-kit.sh` y commit en `claude/loving-planck-9k2yam` **solo con lo nuestro** (kit, sala de Mario Kart en
+- ✅ A4. `subir-kit.sh` y commit en `claude/loving-planck-9k2yam` **solo con lo nuestro** (kit, sala de Mario Kart en
   `colabtex/src/juegos/`, pruebas, reglas de Firebase, `juegos-app.js` + `juegos.html`); afuera el trabajo ajeno, los
-  cambios de solo fin de línea y los sellos de `i18n.js`
-- ⬜ A5. Primer commit del repo local `MKW RETRO` (revisando `git status` contra `.gitignore`)
+  cambios de solo fin de línea y los sellos de `i18n.js` (se repite con cada tanda: el último, `27b8e92` con §78–§79.5)
+- ✅ A5. Primer commit del repo local `MKW RETRO` (revisando `git status` contra `.gitignore`); desde ahí, un commit por avance
 - ✅ A6. ~~Push de la rama y PR a `main`~~ → **sin PR ni push** (el dueño lo retiró). `main` se juntó en la rama local (conflictos de casino/Momazo/PRO DEFENDER resueltos dejando los dos, sellos regenerados)
 
 ### Etapa B — Publicación privada (jugar en el sitio de verdad)
@@ -84,7 +84,7 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   esperando botones de la anterior (banco `lockstep` 37/37, §73)
 - ✅ M14. **Una sola vista por consola** (la pantalla salía partida): pantallas = 1 y locales = 1 al terminar la
   `RacedataScenario::Init` de RR; la foto lo comprueba (`foto-pantalla.mjs`; `prueba-sincro --directa` 13/13, §73.6)
-- ✅ M11. Qué hace la sala cuando un jugador se corta: la carrera lo espera 30 s (margen, con aviso) y en nuestras salas
+- ✅ M11. Qué hace la sala cuando un jugador se corta: la carrera lo espera 30 s (margen, con aviso; **2 s desde §80**) y en nuestras salas
   nadie sale por inactividad (§73). Quien recarga se salta la carrera en curso (lo avisa: nadie lo espera) y vuelve en
   la siguiente con su puesto, lo que eligió y los puntos de la copa; si la que recarga es la anfitriona, pide la copia
   del estado a los demás (latido, `fuera`, `saltar`, `dame`/`copia`; banco `sala-carrera` 46/46 y `lockstep` 42/42,
@@ -98,6 +98,12 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   corredor (humano o CPU, §78) cruza la meta, los demás tienen 30 s; al vencer, el juego les termina la carrera en el
   puesto en que van (en el mismo cuadro en todas las consolas) (`lockstep_nativo.cpp`, `prueba-sala`, §77). Y un
   contador en la página con los números de la cuenta de salida (`dnf.mjs`, `fuente-wii.mjs`, banco `cuenta-dnf`, §78)
+- ✅ M17. **Un jugador lento no frena a los demás** (pedido del dueño, con un crítico): retraso de cada uno (2 a 12
+  cuadros, ajustado con los informes de los demás), relevo por la autoridad (lleva en su paquete los botones del
+  atrasado; si la lenta es ella, pasa el papel), corte en dos fases con quietud solo para quien se calla de golpe
+  (margen de la sala 2 s), huella de los botones, avisos 📶 (`lockstep.mjs`; banco `relevo` 21, `lockstep` 42;
+  `prueba-relevo` 10/10 con el juego, §80). §80b: la sincronía de tiempo (prendida; `?sincroTiempo=0` la apaga) y
+  los cortes que se repiten (el aviso se perdía con la conexión caída). Queda: 12 jugadores (hoy 4 puertos)
 - ⬜ M8. Abrir directo lo que falta: las carreras de un jugador (Racedata + sección de carrera) y Multiplayer local
 - ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
   sale de la cilindrada como en un Grand Prix (§73)
@@ -105,9 +111,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
-- 🟡 C2. Pruebas largas de "misma carrera": muchas copas sincronizadas con semillas y pistas al azar —
-  `copas-al-azar.mjs` encontró una desincronización (cuadro ~6100 de la carrera 1, semilla 3549642503); con el reloj
-  fijo en 0x80750AAC/0x807DC048 sigue (2 de 4 bien). En pausa: primero la etapa M
+- ✅ C2. Pruebas largas de "misma carrera": muchas copas sincronizadas con semillas y pistas al azar. La que se
+  separaba (cuadro ~6100 de la carrera 1, semilla 3549642503) era el sorteo de reserva de objetos de Pulsar, sembrado
+  con la hora de cada PC (`OS::GetTick` llamado); ahora da el reloj de la carrera (§83). Esa copa 4/4 y 4 copas al
+  azar 16/16, ninguna separada
 - ✅ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego: el retraso se adapta a la red (3 en
   esta PC, 6 con 70 ms de ida y 5 % perdido) y la carrera ya no va en cámara lenta (§70; banco 32/32, `prueba-sincro` 10/10)
 - 🟡 C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas): no volvió
@@ -122,7 +129,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador
 - ⬜ D2. Imágenes sacadas del juego (fotos de pistas, íconos, caras de Mii) a R2 con el programa
 - ✅ D3. Quitar el visor de salas de Retro WFC (§64); el código de amigo propio ya sale del `rksys.dat` (`licencias.mjs`)
-- ⬜ D4. La ayuda de "tarjeta de video equivocada" en la página del sitio
+- ✅ D4. La ayuda de "tarjeta de video equivocada" en la página del sitio: ya estaba en el cajón (Avanzado → Video); ahora
+  además aparece sola, abajo a la izquierda, cuando el juego va lento un buen rato por trabajo de esta PC y Windows elige
+  la tarjeta («Ver cómo» abre la ayuda, «✕» la calla 7 días; `aviso-gpu.mjs`, banco `aviso-gpu` 18/18, §81)
 - ✅ D5. (Pedido del dueño) sin portada: directo al juego; la cortina tapa la carga y los menús que recorre el piloto;
   escondidos «Retro WFC» (fuera de la sala en línea) y los «Settings» de Retro Rewind (§66; banco 11/11, `prueba-menus` 8/8)
 - ✅ D6. (Pedido del dueño) menú de inicio «JloKart Wii» con su imagen, sin «Championship», **solo para los amigos** (la
@@ -134,7 +143,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ E1. Sonido con AudioWorklet (latencia ~100–150 → ~30 ms) y sin cortes en el arranque
 - ⬜ E2. Primera visita: los ~9 tirones por pipelines nuevos en 20 s
 - ⬜ E3. Monitores de 60/120/240 Hz: recortar el giro final de 0,75 ms (medir con el monitor en 240 Hz)
-- ⬜ E4. Celulares (cuando el dueño diga): teléfono real con `adb reverse`; misma carrera entre PC y teléfono (NaN en ARM)
+- ⏸ E4. Celulares: **fuera del lanzamiento** (el dueño, 2026-10-19: «saltate el soporte a móviles para lanzar el juego más
+  rápido, lo haremos en un futuro muy lejano en un próximo big update»). Entonces: teléfono real con `adb reverse`; misma
+  carrera entre PC y teléfono (NaN en ARM). Hasta ahí, nada nuevo para teléfonos y sus fallas no frenan nada
 
 ### Etapa F — De fondo
 - ✅ F1. Un script que corra todas las pruebas y diga "N bien, M mal": `herramientas/correr-todo.mjs` (§70)
@@ -145,7 +156,7 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 **Terminado =** un amigo entra al sitio → Juegos → Mario Kart Wii → carga desde R2 por el Worker → juega a 60 fps;
 sus partidas, récords y VR quedan en Firebase. Una sala de 2–12 corre (con CPU de relleno y ≤ 4 humanos, la carrera
 sincronizada; si no, el VS en línea) sin separarse ni congelarse. Un no-amigo no ve el juego ni puede bajarlo. Nada
-del juego en git ni público. Celular: actualización aparte.
+del juego en git ni público. Celular: fuera del lanzamiento, en un big update lejano (el dueño, 2026-10-19).
 
 ---
 
@@ -342,8 +353,9 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   sin CPU. Copa entera 4/4 con semilla y dentro de la sala falsa
 - ✅ **VR/BR de cada jugador en Firebase** (pedido del dueño): `vr.mjs` → Realtime Database `mkw/vr/<uid>` (§60); el WFC
   se lo devuelve al juego al entrar (`/api/mkw_rr_ratings`), el espía de la pila lee lo que informa el juego tras cada
-  carrera (§59). **Solo se mueve en línea** (decisión del dueño): la carrera sincronizada no lo toca. Falta: el dueño
-  publica las reglas (`docs/firebase-mkw.md` §6)
+  carrera (§59). **Desde §82 se mueve con cada carrera de la sala** (pedido del dueño 2026-10-19): la regla de Mario
+  Kart Wii entre los humanos, la misma que el juego en las 19 997 diferencias (`vr-sala.mjs`, `prueba-vr.mjs` 7/7). Falta:
+  el dueño publica las reglas (`docs/firebase-mkw.md` §6)
 - ✅ El multijugador va **solo por nuestra página** (§64: se quitó el visor de Retro WFC)
 
 ## Modos de la página (§55)
@@ -368,7 +380,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 5. **FPSCR[NI] sin flush-to-zero**: wasm no tiene modo FTZ; solo `frsp` respeta NI. Hay que ver si MKW activa NI y si se nota.
 8. ~~Costo de dibujar~~ → medido: título ~7,3 ms, carrera ~10 ms, elegir pista 12–14 ms; queda el tirón de la largada (ver fase 3).
 9. ~~Temporizadores del navegador~~ → resuelto: reloj VI enganchado al refresco del monitor, en la fase que deja la presentación de Chrome a mitad del refresco (90–100 % de cuadros parejos EN PANTALLA a 240 Hz, medido con la traza de Chrome; §43). Queda: monitores no múltiplos de 60 Hz (144 Hz) no pueden ir parejos a 60 fps.
-10. **GPU equivocada**: en Windows el navegador elige la tarjeta (la página no puede). La página muestra cuál usa y ofrece, plegada, cómo cambiarla desde Windows; llevar lo mismo a la página del sitio.
+10. **GPU equivocada**: en Windows el navegador elige la tarjeta (la página no puede). La página muestra cuál usa y ofrece, plegada, cómo cambiarla desde Windows; desde §81 lo ofrece sola cuando el juego va lento por eso (también en el sitio: es la misma página).
 6. **Online**: sin sockets UDP en el navegador; depende de infraestructura propia.
 7. **Legal**: el `.wasm` y los archivos de RR nunca son públicos.
 
@@ -376,6 +388,72 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-20 01:40** — **Todo al sitio** (§82.6). `subir-kit.sh` llevó a `terceros/Paginita-Pro/juegos/mkw` lo de
+  §80/§80b (relevo y sincronía de tiempo), §81 (ayuda de la tarjeta de video), §82 (el VR de la sala) y §83 (las copas
+  al azar). En el sitio, `mkw.js` (`{tipo:'vr'}`, `pideVrs` al terminar) y `reglas.js` («Tu VR»). El bundle
+  `juegos-app.js` ya estaba al día: rearmado aparte, idéntico byte a byte. Pruebas del sitio: Mario Kart 22/22, todas
+  977/978 (la que falla es de Worms y del separador de ruta de Windows, no de Mario Kart). `prueba-experiencia` 17/17.
+  Commit local en el sitio solo con archivos de Mario Kart, sin push. El `.wasm` con §83 lo sube el dueño a R2.
+- **2026-10-20 00:58** — **Las copas que se separaban (C2)** (§83). La copa al azar 65.0/75.0/39.0/74.1 (semilla
+  3549642503) se separaba cerca del cuadro 6100 de la carrera 1. El vigía del reloj (`MKW_DEPURAR_RELOJ=1`,
+  `depurar_reloj.cpp`) anotó quién lee la hora del procesador durante la carrera. Casi todo era sonido, pantalla o el
+  menú HOME, pero Retro Rewind **llama** a `OS::GetTick` (0x801AAD74) en dos lugares que deciden la carrera: el
+  sorteo de reserva de los objetos de Pulsar (cuando el objeto que tocó no tiene cupo; en el cuadro 5975 en las dos
+  pestañas) y los objetos condicionales de las pistas retro. `RELOJ_CARRERA` solo cubría las copias que van dentro de
+  cada función. Arreglo: envoltura de `OS::GetTick` en `lockstep_nativo.cpp` (el reloj de la carrera mientras hay
+  carrera sincronizada) y la semilla de Pulsar (0x818A0C28) en cero al empezar cada carrera (`semillas_nativo.cpp`),
+  con una revisión en `compilar-web.py`. Esa copa 4/4 (huellas 116/116) y 4 copas al azar 16/16, ninguna separada.
+  Antes, un corte perdido de §80 que encontré aquí lo arregló la sesión de la sala (`a8212f3`). Commit local, sin push.
+
+- **2026-10-20 00:15** — **La sincronía de tiempo, prendida** (§80b; M17). El dueño eligió prenderla por omisión
+  (`?sincroTiempo=0` la apaga). Banco `relevo` 27/27 con ella y sin ella (promedio del retraso de Carla con tirones:
+  6,3 y 5,9 contra 10,0 y 10,4), `lockstep` 42/42. Commit local, sin push.
+
+- **2026-10-20 00:00** — **La sincronía de tiempo, a prueba, y el corte que no llega** (§80b; M17). Pedido del dueño
+  (la tarea que propuse al cerrar §80): que los tirones de uno no se le sumen en el retraso. Con `?sincroTiempo=1` el
+  que va adelante de uno que se quedó atrás por un tirón suyo se frena un cuadro de vez en cuando hasta alcanzarlo; el
+  desfase se mide de ida y vuelta (lo de la red se cancela) y nunca se frena por uno que espera lo de los demás. Banco
+  `relevo` parte 9: el retraso de Carla con tirones en promedio 5,7-7,0 con la sincronía contra 9,8-10,4 sin ella
+  (Ana y Beto al 97 %). Con el juego: `prueba-sincro --directa` A en promedio 5,6 contra 11,8; `prueba-relevo` 10/10
+  (A y B a 57,6 cuadros/s, retrasos 4,0 y 4,6). **Queda apagada hasta que el dueño elija** (mi recomendación:
+  prenderla tras probarla en dos PC). Y un hueco de §80 que encontró la sesión del selector: el aviso de un corte se
+  perdía con la conexión caída; ahora los cortes se repiten, la huella no se compara con un cortado y, si la red se
+  parte, sigue la isla más grande (banco `relevo` parte 10, 3/3). Mirado cómo lo hace Mario Kart 8 Deluxe (no es
+  lockstep: cada uno maneja su kart y adivina los demás; Pia resincroniza el reloj tras un pico de CPU). Banco `relevo`
+  27/27 y `lockstep` 42/42 con la bandera apagada y prendida. Commit local, sin push.
+
+- **2026-10-19 23:30** — **El VR se mueve con las carreras de la sala** (§82; pedido del dueño: «que el VR (y BR) se
+  mueva con las carreras de la sala y quede guardado en Firebase»). La regla original de Mario Kart Wii, sacada del
+  juego: pares de humanos, curva 0/1/8/50/125, paso 1/4999, truncado; 13 contra uno igual. Quien se corta pierde contra
+  todos y nadie gana por él (RR); BR no cambia (no hay batallas). La anfitriona congela los VR al empezar cada carrera;
+  cada página guarda el peor caso al abrirla y el de verdad al terminar, solo el suyo (localStorage `mkw.vr.<uid>` +
+  Firebase). Comparado contra el juego mismo con un gancho de prueba (`mkw_vr_prueba`): las 19 997 diferencias iguales
+  (`prueba-vr` 7/7; encontró el paso 1/4999, no 1/5000). Banco `vr-sala` 27/27; `prueba-sala` 29/30 con 4 puntos del VR
+  (el ✗ era la prueba: comparaba relojes leídos en distinto momento; ya corregido). Sitio: el vestíbulo muestra el VR
+  nuevo, el manual lo explica.
+
+- **2026-10-19 23:09** — **Un jugador lento no frena a los demás** (§80; M17). Pedido del dueño: «que cada uno retrase y
+  laguee al resto es imposible de jugar», pensado con un crítico (encontró 3 errores graves en la primera propuesta, los
+  tres podían separar las copias de la carrera). `lockstep.mjs`: cada uno elige y ajusta SU retraso con lo que miden
+  los demás (holgura, informes de medio segundo, mayoría, votos descontados, lo heredado no cuenta); la autoridad releva
+  al atrasado en su propio paquete (botones de verdad o inventados) y, si la lenta es ella, pasa el papel; el corte en
+  dos fases pregunta a todos, deja quieto a cada uno y no cambia nunca; quien ya corrió más allá se sale solo de la
+  carrera; la huella compara también los botones. Margen de la sala 30 → 2 s; avisos 📶; `?relevo=0`;
+  `?redMala=…,ida`. Banco `relevo` 21/21 (consolas a ritmo: red mala, PC lenta 100 % contra 50 % sin relevo, apagón,
+  autoridad lenta, corte tardío), `lockstep` 42/42, `red` 26/26; con el juego `prueba-relevo` 10/10 (A y B a 59,6/59,5
+  cuadros/s sin esperar con C a 140 ms y 5 % perdido; tirón de 1,5 s sin cortes; de 3 s, corte en el mismo cuadro y
+  aviso). Commit local, sin push.
+
+- **2026-10-19 22:56** — **La guía de publicar al día** (`docs/publicar.md`): paso 0 nuevo (el programa final se rearma
+  justo antes de subir, con las semillas y todas las pruebas: el código cambió mucho desde §65), el juego sale para PC,
+  la sala de hoy (copa/playlist, hasta 4 + CPU) en vez del VS de Retro WFC, `prueba-experiencia` con 17 puntos.
+  `prueba-subir-r2` 22/22 (R2 falso).
+- **2026-10-19 22:54** — **La ayuda de la tarjeta de video aparece sola cuando hace falta** (§81; D4). Si el juego va
+  lento un buen rato por trabajo de esta PC (8 de los últimos 12 segundos de juego con < 54 cuadros y > 12 ms de
+  trabajo; fuera del arranque, del disco, de la pestaña escondida y de la sala) y Windows es quien elige la tarjeta (y
+  no dio una NVIDIA), un aviso abajo a la izquierda ofrece «Ver cómo» (abre Avanzado → Video) y «✕» (7 días)
+  (`aviso-gpu.mjs`; banco `aviso-gpu` 18/18; probado en la página de verdad). Y el dueño decidió: **los celulares quedan
+  fuera del lanzamiento** (big update lejano): marcado en `PLAN.md` (E4) y `CLAUDE.md`.
 - **2026-10-19 21:27** — **El kit con §78 al sitio y la foto que parecía partida** (§79.5). `prueba-experiencia` daba 16/17:
   con el kart quieto en la largada, la raya de la meta caía a media altura y el detector la tomó por la costura de la
   pantalla partida. `foto-pantalla.mjs` recorta las barras negras (§79) antes de medir, y la prueba saca dos fotos con

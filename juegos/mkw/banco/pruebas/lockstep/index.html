@@ -13,11 +13,13 @@
   Si todas reciben exactamente los mismos botones en cada cuadro, todas terminan con el mismo estado. La red es falsa:
   cada paquete tarda entre 5 y 40 ms y uno de cada siete del canal "udp" se pierde (el canal "tcp" llega siempre y en orden). Además: un jugador que se va a
   mitad de carrera, uno que nunca llega (y justo es el que decidía), una carrera nueva, una desincronización a
-  propósito, el plantel de 12 karts y (§70) una red LENTA (70 ms de ida): el retraso se agranda solo, igual en todas,
-  y la carrera no va en cámara lenta; y el anuncio del retraso que no llega directo pero se lo pasa otro. §75: quien
+  propósito, el plantel de 12 karts y (§70) una red LENTA (70 ms de ida): el retraso se agranda solo y la carrera no
+  va en cámara lenta (§80: cada consola elige el suyo); y un paquete que no llega directo pero se lo pasa otro. §75: quien
   recarga la página a mitad de carrera avisa que se la salta (no se lo espera 30 s) y corre la siguiente con su
   puesto; el plantel de cada carrera lo dice la sala (igual en todas, también en la consola recién recargada, y con el
-  mismo decisor del retraso); una acción en un cuadro (terminar la carrera) pasa en el mismo cuadro en todas.</p>
+  misma autoridad); una acción en un cuadro (terminar la carrera) pasa en el mismo cuadro en todas. Estas consolas corren
+  tan rápido como les llegan los botones (sin el reloj del juego), por eso aquí no hay informes de medio segundo ni
+  relevo: eso lo prueba el banco <code>relevo</code> (§80), con consolas a 60 cuadros por segundo.</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
@@ -33,7 +35,9 @@ const START = 0x1000;
 // paquete no llega (para probar que el anuncio del retraso se reparte por otro camino)
 // trabas = { uid: [desde, hasta] } ms desde que se crea la sala: esa consola "se traba" (como una pestaña cargando la
 // pista: no atiende nada) y lo que le llega en ese rato lo lee recién al final
-function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {} } = {}) {
+// (§80) informeCada = 0: sin informes de medio segundo (ni ajuste del retraso en la carrera ni relevo): aquí las
+// consolas no van al ritmo del juego y la holgura no diría nada
+function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {}, informeCada = 0 } = {}) {
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now();
   const consolas = {};
@@ -44,13 +48,13 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
     const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, enviados: new Map(), vistos: [], registro: [], tcp: {} };
     let toque = 0;
     c.ls = crearLockstep({
-      yo: uid, humanos, esperaCorte, esperaInicio, adaptar,
+      yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada,
       registro: t => c.registro.push(t),
       // lo que "toca" esta consola: cambia con el tiempo y a veces trae START (que no debe llegar al juego)
       local: () => {
         toque++;
         const v = [(toque * 37 + uid.charCodeAt(0)) & 0x1F7F | (toque % 50 === 0 ? START : 0), (toque % 255) - 128, uid.charCodeAt(0) - 100, 0, 0, toque % 7, 0];
-        c.enviados.set(c.cuadro + c.ls.estado().retraso, v);   // vale para el cuadro actual + el retraso de la carrera
+        c.enviados.set(c.cuadro + c.ls.estado().retraso, v);   // vale para el cuadro actual + su retraso (§80: el de esta consola)
         return v;
       },
       huella: () => c.estado,
@@ -98,10 +102,11 @@ try {
     const b100 = s.beto.enviados.get(100), a100 = s.ana.vistos[100].slice(8, 16), c100 = s.carla.vistos[100].slice(8, 16);
     ok('los botones de Beto llegan a su puerto (1) en las otras consolas, en su cuadro', !!b100 && a100[0] === 1 && a100[2] === b100[1] && a100[3] === b100[2] && c100.join() === a100.join(),
       `Beto tocó ${b100?.slice(0, 3)} → Ana ve ${a100.slice(1, 4)}`);
-    const r1 = s.ana.ls.estado().retrasos[1];
-    ok('las tres usaron el mismo retraso en la carrera (lo anunció Ana, la primera)', cs.every(c => c.ls.estado().retrasos[1] === r1) && r1 >= RETRASO,
-       cs.map(c => c.ls.estado().retrasos[1]).join(', ') + ' cuadros');
-    ok('antes del cuadro del retraso todos los botones son neutros', s.ana.vistos.slice(0, r1).every(d => d.every((v, i) => i % 8 === 0 || v === 0)));
+    // §80: cada una elige su retraso (sin anuncio de nadie); antes de su cuadro, los botones de ESA son neutros
+    const rs = cs.map(c => c.ls.estado().retrasos[1]);
+    ok('cada consola eligió su retraso de partida, sin anuncio (entre 3 y 12)', rs.every(r => r >= RETRASO && r <= 12), rs.join(', ') + ' cuadros');
+    ok('antes del cuadro de su retraso, los botones de cada una son neutros (en las tres consolas)',
+       cs.every(c => cs.every((o, k) => c.vistos.slice(0, rs[k]).every(d => d.slice(8 * k + 1, 8 * k + 8).every(v => v === 0)))));
     ok('START (pausa) nunca llega al juego', cs.every(c => c.vistos.every(d => [1, 9, 17, 25].every(i => !(d[i] & START)))));
     ok('se perdieron paquetes y se recuperaron (hubo esperas, pero cortas)', e.every(x => x.esperas > 0 && Object.keys(x.cortes).length === 0),
       e.map(x => `${x.esperas} esperas, máx ${x.maxEspera.toFixed(0)} ms`).join(' · '));
@@ -138,7 +143,7 @@ try {
     ok('Ana nunca llega: Beto y Carla no se quedan esperando para siempre', r !== 'tarde' && s.beto.cuadro === 299 && s.carla.cuadro === 299, `${s.beto.cuadro}, ${s.carla.cuadro}`);
     ok('pero al que no llega se le espera más que al que se va (y esa espera se cuenta aparte: no es costo de sincronizar)', s.beto.ls.estado().msLlegada >= 1100 && s.beto.ls.estado().maxEspera < 1100,
       `llegada ${s.beto.ls.estado().msLlegada.toFixed(0)} ms, peor espera de sincronizar ${s.beto.ls.estado().maxEspera.toFixed(0)} ms`);
-    ok('decide el siguiente (Beto) y las dos cortan a Ana desde el principio', eb.cortes[0] === eb.retrasos[1] && ec.cortes[0] === ec.retrasos[1], `Beto ${eb.cortes[0]}, Carla ${ec.cortes[0]}`);
+    ok('decide el siguiente (Beto) y las dos cortan a Ana desde el principio (cuadro 0)', eb.cortes[0] === 0 && ec.cortes[0] === 0, `Beto ${eb.cortes[0]}, Carla ${ec.cortes[0]}`);
     ok('y siguen con el mismo estado', s.beto.estado === s.carla.estado && !eb.desincronizado);
   }
 
@@ -197,8 +202,8 @@ try {
       return { r, s, ea, eb, espera: Math.max(ea.msEsperando / ea.cuadros, eb.msEsperando / eb.cuadros) };
     };
     const a = await vuelta(true);
-    ok('con 70 ms de ida, el retraso de la carrera se agranda solo (≥ 5 cuadros) y es el MISMO en las dos',
-       a.r !== 'tarde' && a.ea.retrasos[1] >= 5 && a.ea.retrasos[1] === a.eb.retrasos[1],
+    ok('con 70 ms de ida, el retraso de la carrera se agranda solo (≥ 5 cuadros) en las dos',
+       a.r !== 'tarde' && a.ea.retrasos[1] >= 5 && a.eb.retrasos[1] >= 5,
        `${a.ea.retrasos[1]} y ${a.eb.retrasos[1]} cuadros; ida y vuelta medida ${JSON.stringify(a.ea.rtt)} ms`);
     ok('y la carrera sale igual en las dos', a.s.ana.estado === a.s.beto.estado && !a.ea.desincronizado && !a.eb.desincronizado);
     const f = await vuelta(false);
@@ -260,15 +265,18 @@ try {
        JSON.stringify(s.ana.vistos.slice(0, 200)) === JSON.stringify(s.beto.vistos.slice(0, 200)) && !Object.keys(ea.cortes).length && !Object.keys(eb.cortes).length,
        `${r === 'tarde' ? 'TARDE · ' : ''}Ana ${s.ana.cuadro} (carrera ${ea.carrera}), Beto ${s.beto.cuadro} (carrera ${eb.carrera})`);
   }
-  // ---- el anuncio que no llega directo: a Carla no le llega el de Ana, pero Beto se lo pasa ----
+  // ---- un tramo de botones que no llega directo: a Carla no le llegan los cuadros 100 a 139 de Ana, pero los pide y
+  // Beto se los pasa (§80: ya no hay anuncio del retraso; lo que hay que repartir son los botones) ----
   {
-    const s = crearSala(['ana', 'beto', 'carla'], { bloquear: (de, a, b) => de === 'ana' && a === 'carla' && b[1] === 9 });
-    await espera(2000);
-    const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: 200 }))), 60000);
+    const tramo = b => { const n = b[8], c0 = (b[4] << 24 | b[5] << 16 | b[6] << 8 | b[7]) >>> 0; return c0 < 140 && c0 + n > 100; };
+    // (margen de 2 s: los cuadros que faltan llegan pedidos de a uno y con pérdidas; aquí se prueba el reenvío, no el corte)
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 2000, bloquear: (de, a, b) => de === 'ana' && a === 'carla' && b[1] === 13 && b[3] === 0 && tramo(b) });
+    const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: 250 }))), 60000);
     const es = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
-    ok('el anuncio del retraso llega a Carla por Beto: las tres usan el mismo y terminan iguales',
-       r !== 'tarde' && es.every(e => e.retrasos[1] === es[0].retrasos[1]) && iguales(Object.values(s)) && es.every(e => !e.conflictos),
-       es.map(e => e.retrasos[1]).join(', '));
+    ok('los botones de Ana que no le llegan a Carla se los pasa Beto: las tres terminan iguales, sin cortes',
+       r !== 'tarde' && iguales(Object.values(s)) && es.every(e => !Object.keys(e.cortes).length && !e.desincronizado) &&
+       JSON.stringify(s.carla.vistos.slice(100, 140)) === JSON.stringify(s.ana.vistos.slice(100, 140)),
+       `${r === 'tarde' ? 'TARDE · ' : ''}esperas de Carla ${es[2].esperas} (máx ${es[2].maxEspera.toFixed(0)} ms)`);
   }
   // ---- §75: Beto recarga la página a mitad de la carrera 1 (con el margen de la sala: 30 s). Su página nueva avisa que
   // se salta la 1 (en el sitio: el latido de la sala → alSalta → saltar) y Ana lo corta enseguida; en la 2, con el
@@ -300,7 +308,7 @@ try {
   }
   // ---- §75: Ana se va en la carrera 1; en la 2 Carla recarga la página. El plantel de la sala (Ana fuera) es el mismo
   // en la consola de Beto (que vio irse a Ana) y en la de Carla recién recargada (que no sabe nada): las dos la dejan
-  // fuera desde el cuadro 0 y el retraso lo decide Beto en las dos (antes, la consola recargada esperaba a Ana) ----
+  // fuera desde el cuadro 0 y la autoridad (§80) es Beto en las dos (antes, la consola recargada esperaba a Ana) ----
   {
     const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 400, esperaInicio: 1200 });
     for (const u of ['ana', 'beto', 'carla']) s[u].ls.fijarCarrera(1, []);
@@ -309,13 +317,12 @@ try {
     s.beto.ls.fijarCarrera(2, [0]); carla2.ls.fijarCarrera(2, [0]);
     const r = await conTiempo(Promise.all([correr(s.beto, { desde: 0, hasta: 200 }), correr(carla2, { desde: 0, hasta: 200 })]), 20000);
     const eb = s.beto.ls.estado(), ec = carla2.ls.estado();
-    const decidio = s.beto.registro.some(t => t.includes('retraso de la carrera 2')), carlaDecidio = carla2.registro.some(t => t.includes('retraso de la carrera 2'));
     ok('con Ana fuera de la carrera 2 (lo dice la sala), Beto y la Carla recién recargada la corren iguales, sin esperar a Ana',
        r !== 'tarde' && eb.cortes[0] === 0 && ec.cortes[0] === 0 && JSON.stringify(s.beto.vistos.slice(0, 200)) === JSON.stringify(carla2.vistos.slice(0, 200)),
        `${r === 'tarde' ? 'TARDE · ' : ''}cortes Beto ${JSON.stringify(eb.cortes)} Carla ${JSON.stringify(ec.cortes)}`);
-    ok('…y el retraso de la 2 lo decide Beto (el primero que no está fuera) en las dos: el mismo número, sin conflictos',
-       decidio && !carlaDecidio && eb.retrasos[2] === ec.retrasos[2] && !eb.conflictos && !ec.conflictos,
-       `retraso Beto ${eb.retrasos[2]} Carla ${ec.retrasos[2]}`);
+    ok('…y la autoridad de la 2 es Beto (el primero que no está fuera) en las dos, sin conflictos',
+       eb.autoridad === 'beto' && ec.autoridad === 'beto' && !eb.conflictos && !ec.conflictos,
+       `autoridad Beto ${eb.autoridad} Carla ${ec.autoridad}`);
   }
   // ---- §75: una acción en un cuadro (terminar la carrera en la prueba con el juego): en el mismo cuadro en todas ----
   {

@@ -117,7 +117,10 @@ if (COPA) {
   ok('las dos pasaron solas a la carrera 2 de la copa', (x.A?.ls?.carrera || 0) >= 2 && (x.B?.ls?.carrera || 0) >= 2, `A ${x.A?.ls?.carrera}, B ${x.B?.ls?.carrera}`);
   ok('la carrera 2 avanza en las dos', (x.A?.ls?.cuadro || 0) > 900 && (x.B?.ls?.cuadro || 0) > 900, `A ${x.A?.ls?.cuadro}, B ${x.B?.ls?.cuadro}`);
   ok('las huellas coinciden en toda la copa (nunca se separaron)', !x.A?.ls?.desincronizado && !x.B?.ls?.desincronizado && (x.A?.ls?.huellasIguales || 0) >= 20,
-    `iguales A ${x.A?.ls?.huellasIguales}, B ${x.B?.ls?.huellasIguales}${x.A?.ls?.desincronizado ? ' · DESINCRONIZADO ' + JSON.stringify(x.A.ls.desincronizado) : ''}`);
+    `iguales A ${x.A?.ls?.huellasIguales}, B ${x.B?.ls?.huellasIguales}${['A', 'B'].map(n => x[n]?.ls?.desincronizado ? ` · DESINCRONIZADO (${n}) ` + JSON.stringify(x[n].ls.desincronizado) : '').join('')}`);
+  // (§83: el registro de la red de cada pestaña —ahí escribe la carrera sincronizada— para ver qué se separó)
+  for (const [n, p] of [['A', A], ['B', B]])
+    writeFileSync(path.join(carpeta, `red-${n}.txt`), (await p.evaluate(() => (window.mkwRed?.registro || []).join(String.fromCharCode(10))).catch(() => '')) || '');
   if (RASTRO) await compararRastros();
   await A.locator('#canvas').screenshot({ path: path.join(carpeta, 'A-copa.png') }).catch(() => {});
   await B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B-copa.png') }).catch(() => {});
@@ -205,10 +208,12 @@ if (!process.argv.includes('--lento')) {
   ok('y lo avisan: A "espera al jugador 2", B "Tu PC no alcanza"', (xa?.avisos || []).some(t => t.includes('jugador 2')) && (xb?.avisos || []).some(t => t.startsWith('Tu PC')),
     `A: ${avisos(xa)} · B: ${avisos(xb)}`);
 }
-// el retraso de la carrera (§70): lo anuncia el decisor según la red; tiene que ser el MISMO en las dos consolas
-const retrasoDe = x => x?.ls?.retrasos?.[x?.ls?.carrera] ?? x?.ls?.retraso;
-ok('las dos usaron el mismo retraso en la carrera (se adapta a la red)', retrasoDe(xa) !== undefined && retrasoDe(xa) === retrasoDe(xb),
-  `A ${retrasoDe(xa)}, B ${retrasoDe(xb)} cuadros; ida y vuelta medida A ${JSON.stringify(xa?.ls?.rtt)} B ${JSON.stringify(xb?.ls?.rtt)} ms` +
+// el retraso (§70, §80): cada consola el suyo, de partida con sus pings y ajustado en la carrera con lo que cuentan
+// los demás (lockstep.mjs); los botones de cada uno los escribe solo él, por eso no tienen que ser iguales
+const retrasoDe = x => x?.ls?.retraso;
+ok('cada una con su retraso, entre 2 y 12 cuadros (se adapta a la red)', [xa, xb].every(x => retrasoDe(x) >= 2 && retrasoDe(x) <= 12),
+  `A ${retrasoDe(xa)} (partió en ${xa?.ls?.retrasos?.[xa?.ls?.carrera]}, promedio ${xa?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xa?.ls?.frenos ?? 0}), ` +
+  `B ${retrasoDe(xb)} (partió en ${xb?.ls?.retrasos?.[xb?.ls?.carrera]}, promedio ${xb?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xb?.ls?.frenos ?? 0}) cuadros; ida y vuelta medida A ${JSON.stringify(xa?.ls?.rtt)} B ${JSON.stringify(xb?.ls?.rtt)} ms` +
   (EXTRA.includes('redMala') ? ` (red mala de mentira: ${EXTRA.match(/redMala=([\d.,]+)/)?.[1]})` : ''));
 
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));

@@ -1,8 +1,25 @@
 # Publicar Mario Kart Wii en el sitio (lo hace el dueño)
 
 Lo que hay que hacer para que un amigo entre a paginita-pro.cl → Juegos → Mario Kart Wii y juegue. Todo lo de este
-PC (programa final, semillas, la lista de archivos, el código del Worker y sus pruebas) ya está listo y probado aquí
-(bitácora §65). Lo que sigue lo hace el dueño, porque toca sus cuentas: **Cloudflare (R2 y el Worker) y Firebase**.
+PC (la lista de archivos, el código del Worker y sus pruebas, la subida) está listo y probado aquí (bitácora §65). El
+**programa final** se rearma justo antes de subir (paso 0), porque el código cambió mucho desde §65. Lo que sigue
+después lo hace el dueño, porque toca sus cuentas: **Cloudflare (R2 y el Worker) y Firebase**.
+
+El juego sale **para PC** (Chrome o Edge de escritorio). Los celulares quedan para un big update lejano (decisión del
+dueño, 2026-10-19).
+
+## 0. El programa final (lo hace Claude, cuando digas «publiquemos»)
+
+Con el código del momento, sin nada a medio hacer en la carpeta:
+
+```bash
+python herramientas/compilar-web.py --modo navegador --final      # sin nombres de funciones + mkw.wasm.br (~16 MB)
+node web/navegador/guion.mjs "<pasos de una carrera>" --semilla     # 3 veces, copas distintas (como en §65)
+node herramientas/correr-todo.mjs                                   # todas las pruebas (~25 min)
+```
+
+Las semillas (`pipelines.bin`, `bloques.json`) se rehacen si cambió cómo se dibuja o qué lee el juego; si no, sirven
+las de antes. Recién con todo bien se pasa al paso 2.
 
 ## Qué va dónde
 
@@ -91,11 +108,13 @@ Cuando digas, se sube y se junta con `main` (GitHub Pages publica `main`).
 **Antes, en este PC (sin publicar nada):** doble clic en `jugar.bat` abre esta misma página de Juegos, con Firebase y
 cuentas de mentira y el Worker de verdad, mostrando solo Mario Kart; con 2 o 3 ventanas se prueba la sala como si
 fueran varios PC (bitácora §69). La prueba automática del mismo recorrido: `node herramientas/prueba-experiencia.mjs`
-(13 puntos). Lo de abajo es lo mismo, pero ya en el sitio publicado.
+(17 puntos: dos cuentas, la sala, la copa, elegir en el juego y la carrera juntos). Lo de abajo es lo mismo, pero ya
+en el sitio publicado.
 
-- **Como amigo** (una cuenta de `AMIGOS`): Juegos muestra Mario Kart Wii → abrir una sala → «¡A correr!» → el juego
-  carga (la primera vez baja ~300 MB en total, la mayoría mientras se juega; la segunda casi nada). Una sala con
-  CPU y hasta 4 personas corre la copa sincronizada; sin CPU o con más de 4, el VS en línea (el único que mueve el VR).
+- **Como amigo** (una cuenta de `AMIGOS`): Juegos muestra Mario Kart Wii → abrir una sala (modo copa o playlist) →
+  «¡A correr!» → el juego carga (la primera vez baja ~300 MB en total, la mayoría mientras se juega; la segunda casi
+  nada). Hasta 4 personas, el resto CPU: el anfitrión elige la copa (o arma la playlist con las sugerencias de los
+  demás), cada uno elige personaje y vehículo en el juego y todos largan juntos; al final, la tabla en el vestíbulo.
 - **Como amigo, un jugador**: Juegos → «Mario Kart Wii · un jugador» → el menú de inicio «JloKart Wii» (Single Player,
   Multiplayer, Options); Multiplayer → Online lleva a las salas.
 - **Como no-amigo**: Mario Kart no aparece en Juegos (ni su «un jugador»: `#solo/mkw` dice «Este juego es privado»); el

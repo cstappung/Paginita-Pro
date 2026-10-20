@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VR de la sala</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>VR de la sala: <span>el VR se mueve con cada carrera, con la regla de Mario Kart Wii</span></h1>
+<p>Prueba <code>vr-sala.mjs</code> y el VR del árbitro (<code>sala-carrera.mjs</code>), bitácora §82, <b>sin el juego</b>:
+  salas inventadas (VR, puestos, cortes) y una memoria de Wii inventada con la forma de la del juego (Racedata, Raceinfo).
+  Comprueba la curva (13 contra uno igual, de 0 a 112, nunca baja al crecer la diferencia), que en una sala sin cortes
+  lo que gana uno lo pierde otro, que el 1.º nunca pierde y el último nunca gana, los empates, los cortados (pierden
+  contra todos y nadie gana por ellos), el peor caso que queda guardado mientras se corre, los topes, la lectura de la
+  memoria y que la anfitriona congela los VR al empezar cada carrera (todas las consolas cuentan con los mismos).
+  La comparación con el juego mismo (sus dos funciones, en las 19 997 diferencias) la hace <code>prueba-vr.mjs</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { puntosPar, cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL, VR_MAXIMO, DIF_MAX, PASO } from '/web/navegador/vr-sala.mjs';
+import { crearSala, vrsDeCarrera, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
+import { crearVr } from '/web/navegador/vr.mjs';
+
+const { ok, nota, fin } = prueba('vr-sala', 'VR de la sala (sin el juego)');
+
+// ---- 1) la curva de un par ----
+ok('contra uno de igual VR, el que llega antes gana 13', puntosPar(5000, 5000) === 13 && puntosPar(9000, 9000) === 13, `${puntosPar(5000, 5000)}`);
+let mono = true, min = Infinity, max = -Infinity, prev = -1;
+for (let d = -DIF_MAX; d <= DIF_MAX; d++) {
+  const vg = d < 0 ? 9999 : 1, p = puntosPar(vg, vg + d);
+  if (p < prev) mono = false; prev = p; min = Math.min(min, p); max = Math.max(max, p);
+}
+ok('en las 19 997 diferencias la curva nunca baja (ganarle a uno de más VR da igual o más)', mono);
+ok('va de 0 (ganarle a uno de 9998 menos) a 112 (a uno de 9998 más)', min === 0 && max === 112 && puntosPar(9999, 1) === 0 && puntosPar(1, 9999) === 112, `${min} a ${max}`);
+ok('más de 9998 de diferencia cuenta como 9998 (los VR de Retro Rewind pasan de 9999)', puntosPar(5000, 40000) === 112 && puntosPar(40000, 5000) === 0);
+// los nudos de la curva (cada 4999 de diferencia: (anterior + 4·este + siguiente)/6 con 0, 1, 8, 50, 125) y sus bordes
+const nudos = [[-4999, 2], [-5000, 1], [0, 13], [4999, 55], [-9997, 0]];
+ok('los nudos de la curva (t = 1, 2, 3) y sus bordes truncan como el juego (2, 1, 13, 55, 0)', nudos.every(([d, v]) => puntosPar(d < 0 ? 9999 : 1, (d < 0 ? 9999 : 1) + d) === v),
+   nudos.map(([d]) => puntosPar(d < 0 ? 9999 : 1, (d < 0 ? 9999 : 1) + d)).join(', '));
+// la misma cuenta en 64 bits (sin redondear a 32): la curva es la misma salvo en los bordes de un entero
+const B = x => { x = Math.abs(x); return x < 1 ? (3 * x ** 3 - 6 * x * x + 4) / 6 : x <= 2 ? (2 - x) ** 3 / 6 : 0; };
+const P = [0, 1, 8, 50, 125];
+let distintos = 0;
+for (let d = -DIF_MAX; d <= DIF_MAX; d++) {
+  const t = (d + DIF_MAX) / PASO; let s = 0;
+  for (let k = -2; k <= 6; k++) s += B(t - k) * P[Math.min(4, Math.max(0, k))];
+  if (Math.trunc(s) !== puntosPar(d < 0 ? 9999 : 1, (d < 0 ? 9999 : 1) + d)) distintos++;
+}
+ok('la curva en 32 bits da lo mismo que la fórmula de mkwiiki en 64 bits (diferencias en ≤ 5 de 19 997)', distintos <= 5, `${distintos} distintas`);
+
+// ---- 2) una carrera sin cortes ----
+const sala4 = [{ uid: 'a', vr: 5000, puesto: 1 }, { uid: 'b', vr: 5000, puesto: 2 }, { uid: 'c', vr: 5000, puesto: 3 }, { uid: 'd', vr: 5000, puesto: 4 }];
+const c4 = cambiosVr(sala4);
+ok('4 de igual VR: +39, +13, −13, −39 (13 por cada uno al que le ganó, menos 13 por cada uno que le ganó)', c4.a === 39 && c4.b === 13 && c4.c === -13 && c4.d === -39, JSON.stringify(c4));
+// salas al azar (de 2 a 12 humanos, VR de 1 a 30 000, puestos sin repetir)
+let azar = 12345;
+const rnd = n => { azar = (Math.imul(azar, 1103515245) + 12345) >>> 0; return azar % n; };
+const salaAzar = (n, conCortes = false) => {
+  const puestos = Array.from({ length: 12 }, (_, i) => i + 1).sort(() => rnd(3) - 1).slice(0, n).sort((x, y) => x - y);
+  const orden = Array.from({ length: n }, (_, i) => i).sort(() => rnd(3) - 1);
+  return orden.map((k, i) => ({ uid: 'j' + i, vr: 1 + rnd(30000), puesto: puestos[k], cortado: conCortes && rnd(4) === 0 }));
+};
+let sumaCero = true, primeroBien = true, ultimoBien = true;
+for (let r = 0; r < 300; r++) {
+  const s = salaAzar(2 + rnd(11)), c = cambiosVr(s);
+  if (Object.values(c).reduce((x, y) => x + y, 0) !== 0) sumaCero = false;
+  const ord = [...s].sort((x, y) => x.puesto - y.puesto);
+  if (c[ord[0].uid] < 0) primeroBien = false;
+  if (c[ord[ord.length - 1].uid] > 0) ultimoBien = false;
+}
+ok('300 salas al azar sin cortes: lo que gana uno lo pierde otro (la suma da 0)', sumaCero);
+ok('…el primero nunca pierde VR y el último nunca gana', primeroBien && ultimoBien);
+const emp = cambiosVr([{ uid: 'a', vr: 5000, puesto: 2 }, { uid: 'b', vr: 7000, puesto: 2 }, { uid: 'c', vr: 5000, puesto: 1 }]);
+ok('mismo puesto (empate): nada entre ellos dos', emp.a === -13 && emp.b === -puntosPar(5000, 7000) && emp.c === 13 + puntosPar(5000, 7000), JSON.stringify(emp));
+const sinPuesto = cambiosVr([{ uid: 'a', vr: 5000, puesto: 0 }, { uid: 'b', vr: 5000, puesto: 12 }]);
+ok('sin puesto (el juego no lo dio) va detrás de todos', sinPuesto.a === -13 && sinPuesto.b === 13, JSON.stringify(sinPuesto));
+
+// ---- 3) los cortados ----
+const corte = cambiosVr([{ uid: 'a', vr: 5000, puesto: 2 }, { uid: 'b', vr: 6000, puesto: 1, cortado: true }, { uid: 'c', vr: 5000, puesto: 3 }]);
+ok('el cortado pierde contra todos (aunque su kart iba 1.º) y nadie gana por él', corte.b === -(puntosPar(5000, 6000) * 2) && corte.a === 13 && corte.c === -13, JSON.stringify(corte));
+const dos = cambiosVr([{ uid: 'a', vr: 5000, puesto: 1, cortado: true }, { uid: 'b', vr: 5000, puesto: 2, cortado: true }]);
+ok('dos cortados entre ellos: nada', dos.a === 0 && dos.b === 0);
+
+// ---- 4) el peor caso (lo que queda guardado mientras se corre) ----
+const pc = peorCaso('a', sala4);
+ok('el peor caso de uno es perder contra todos los demás (−39 en 4 iguales)', pc === -39, `${pc}`);
+let peorBien = true;
+for (let r = 0; r < 300; r++) {
+  const s = salaAzar(2 + rnd(11), true), c = cambiosVr(s);
+  for (const j of s) if (c[j.uid] < peorCaso(j.uid, s)) peorBien = false;
+  // (el que se cortó solo: con otro cortado más, contra ese no pierde nada)
+  for (const j of s) if (j.cortado && s.filter(x => x.cortado).length === 1 && c[j.uid] !== peorCaso(j.uid, s)) peorBien = false;
+}
+ok('300 salas al azar con cortes: nadie termina peor que su peor caso, y el cortado termina justo en él', peorBien);
+
+// ---- 5) los topes ----
+ok('el VR queda entre 1 y 1 000 000; un VR desconocido vale 5000', aplicarCambio(30, -100) === 1 && aplicarCambio(VR_MAXIMO - 5, 50) === VR_MAXIMO &&
+   aplicarCambio(null, 13) === VR_INICIAL + 13 && aplicarCambio(5000, 0) === 5000);
+const sinVr = cambiosVr([{ uid: 'a', puesto: 1 }, { uid: 'b', vr: 5000, puesto: 2 }]);
+ok('un VR desconocido cuenta como 5000 (un invitado)', sinVr.a === 13 && sinVr.b === -13);
+
+// ---- 6) leer la carrera de la memoria del juego (inventada) ----
+const mem = new Map();
+const w8 = (a, v) => mem.set(a >>> 0, v & 255);
+const w32 = (a, v) => { for (let k = 0; k < 4; k++) w8(a + k, v >>> (24 - 8 * k)); };
+const L = { u8: a => mem.get(a >>> 0) ?? 0, u16: a => (L.u8(a) << 8) | L.u8(a + 1), u32: a => ((L.u8(a) << 24) | (L.u8(a + 1) << 16) | (L.u8(a + 2) << 8) | L.u8(a + 3)) >>> 0 };
+const RD = 0x80E00000, RI = 0x80E10000, LISTA = 0x80E20000;
+w32(0x809BD728, RD); w32(0x809BD730, RI); w8(RD + 0x20 + 4, 12); w32(RI + 0xC, LISTA);
+const puestosMem = [3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+for (let i = 0; i < 12; i++) {
+  w32(RD + 0x20 + 8 + i * 0xF0 + 0x10, i < 3 ? 0 : 1);            // los 3 primeros, humanos; el resto, CPU
+  w32(LISTA + 4 * i, 0x80E30000 + i * 0x100); w8(0x80E30000 + i * 0x100 + 0x20, puestosMem[i]);
+}
+const hs = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }, { uid: 'dani', mando: 3 }];
+const leidos = corredoresDelJuego(L, hs, { vrs: { ana: 5100, beto: 4900 }, fuera: ['caro'], cortados: ['beto'] });
+ok('de la memoria: los humanos con su puesto (Raceinfo +0x20), sin los que quedaron fuera ni los que no son humanos en la carrera',
+   leidos.length === 2 && leidos[0].uid === 'ana' && leidos[0].puesto === 3 && leidos[1].uid === 'beto' && leidos[1].puesto === 1, JSON.stringify(leidos));
+ok('…con el VR congelado y quién se cortó', leidos[0].vr === 5100 && leidos[1].vr === 4900 && leidos[1].cortado === true && leidos[0].cortado === false);
+ok('sin carrera en la memoria (Racedata vacío): nadie', corredoresDelJuego({ u8: () => 0, u16: () => 0, u32: () => 0 }, hs).length === 0);
+
+// ---- 7) el árbitro: los VR de la sala y la foto de cada carrera ----
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
+const listo = () => new Promise(r => setTimeout(r, 0));
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); await listo(); };
+const salas = new Map();
+const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }];
+const enviar = de => (para, bytes) => setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0);
+const persona = uid => { const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t, cada, parar, segundosElegir: 2 }); salas.set(uid, s); return s; };
+const ana = persona('ana'), beto = persona('beto'), caro = persona('caro');
+await avanzar(1000); await avanzar(1000);
+ana.miVr(5000); beto.miVr(6200); caro.miVr(4100); caro.miVr(0); caro.miVr(2e6);
+await avanzar(0);
+ok('cada uno le dice su VR a la anfitriona y llega a todos (los que no valen, no)', [ana, beto, caro].every(s => JSON.stringify(s.estado().vrs) === '{"ana":5000,"beto":6200,"caro":4100}'),
+   JSON.stringify(caro.estado().vrs));
+ana.ponerPistas([{ copa: 1, fila: 0 }, { copa: 1, fila: 1 }]);
+await avanzar(0); await avanzar(1000); await avanzar(1000); await avanzar(1000);
+ok('al empezar la carrera 1, la anfitriona congela los VR (la foto va a todos)', beto.estado().fase === 'correr' && beto.estado().carrera === 1 &&
+   JSON.stringify(vrsDeCarrera(beto.estado(), 1)) === '{"ana":5000,"beto":6200,"caro":4100}', JSON.stringify(beto.estado().vrCarrera));
+// a mitad de la carrera alguien cambia su VR (p. ej. el peor caso guardado): la foto de esta carrera no se mueve
+beto.miVr(6100);
+await avanzar(0);
+ok('un VR nuevo a mitad de carrera queda para la siguiente: la foto de esta no cambia', caro.estado().vrs.beto === 6100 && vrsDeCarrera(caro.estado(), 1).beto === 6200);
+// las tres consolas calculan con la misma foto y los mismos puestos: cada una aplica el suyo
+const puestosCarrera = { ana: 2, beto: 1, caro: 3 };
+const enCadaConsola = [ana, beto, caro].map(s => {
+  const e = s.estado(), vrs = vrsDeCarrera(e, 1);
+  return cambiosVr(humanos.map(h => ({ uid: h.uid, vr: vrs[h.uid], puesto: puestosCarrera[h.uid] })));
+});
+const mios = { ana: enCadaConsola[0].ana, beto: enCadaConsola[1].beto, caro: enCadaConsola[2].caro };
+ok('las tres consolas dan los mismos cambios, y lo que cada una aplica (el suyo) suma 0', enCadaConsola.every(c => JSON.stringify(c) === JSON.stringify(enCadaConsola[0])) &&
+   mios.ana + mios.beto + mios.caro === 0, JSON.stringify(mios));
+ana.miVr(aplicarCambio(5000, mios.ana)); beto.miVr(aplicarCambio(6200, mios.beto)); caro.miVr(aplicarCambio(4100, mios.caro));
+beto.termine(1);
+await avanzar(0);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('la carrera 2 se cuenta con los VR después de la 1', caro.estado().carrera === 2 &&
+   JSON.stringify(vrsDeCarrera(caro.estado(), 2)) === JSON.stringify({ ana: 5000 + mios.ana, beto: 6200 + mios.beto, caro: 4100 + mios.caro }), JSON.stringify(caro.estado().vrCarrera));
+ok('vrsDeCarrera de una carrera sin foto da los VR de ahora', JSON.stringify(vrsDeCarrera(caro.estado(), 7)) === JSON.stringify(caro.estado().vrs));
+[ana, beto, caro].forEach(s => s.detener());
+// ---- 8) la copia local, por cuenta (vr.mjs): dos cuentas en el mismo navegador no se pisan ----
+const recuerdo = (() => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; })();
+const vA = crearVr({ recuerdo }), vB = crearVr({ recuerdo });
+vA.conectar({ uid: 'ana' }); vB.conectar({ uid: 'beto' });
+await vA.informar({ vr: 5013, br: 5000 }); await vB.informar({ vr: 4987, br: 5000 });
+const vA2 = crearVr({ recuerdo }); vA2.conectar({ uid: 'ana' });
+ok('dos cuentas en el mismo navegador guardan cada una su VR (mkw.vr.<uid>) y al volver cada una lee el suyo',
+   vA2.actual?.vr === 5013 && JSON.parse(recuerdo.getItem('mkw.vr.beto')).vr === 4987 && recuerdo.getItem('mkw.vr') === null, [...recuerdo.m.keys()].join(', '));
+nota(`ejemplo: 4 de igual VR → +39/+13/−13/−39; contra 2000 más → ${puntosPar(5000, 7000)}, contra 2000 menos → ${puntosPar(7000, 5000)}`);
+fin();
+</script>
+</body>
+</html>

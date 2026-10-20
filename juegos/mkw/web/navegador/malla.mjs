@@ -24,17 +24,21 @@ const VIGILA_MS = 1000;
 // el 5 %; por "tcp" solo la demora, y en orden (es el canal confiable: ahí nada se pierde ni se desordena). Como meter
 // entre dos equipos un tramo de cable largo y con ruido. Sin el parámetro no hace nada. Cuenta lo que hizo en
 // globalThis.mkwRedMala (para las pruebas).
+// §80: ?redMala=80,20,5,ida = también lo que SALE de esta página (la conexión mala es la de este jugador, en los dos
+// sentidos: los demás reciben lo suyo tarde y él lo de ellos); cuenta lo que sale en globalThis.mkwRedMalaIda.
 export function leerRedMala(busqueda = globalThis.location?.search || '') {
   try {
     const v = new URLSearchParams(busqueda).get('redMala');
     if (!v) return null;
-    const [latencia = 0, variacion = 0, perdida = 0] = v.split(',').map(Number);
-    return { latencia: Math.max(0, latencia), variacion: Math.max(0, variacion), perdida: Math.min(1, Math.max(0, perdida / 100)) };
+    const partes = v.split(',');
+    const [latencia = 0, variacion = 0, perdida = 0] = partes.slice(0, 3).map(Number);
+    return { latencia: Math.max(0, latencia), variacion: Math.max(0, variacion), perdida: Math.min(1, Math.max(0, perdida / 100)),
+      ida: partes[3] === 'ida' };
   } catch { return null; }
 }
-export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => setTimeout(f, ms), ahora = () => performance.now()) {
+export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => setTimeout(f, ms), ahora = () => performance.now(), nombre = 'mkwRedMala') {
   if (!red) return alBinario;
-  const cuenta = globalThis.mkwRedMala = { ...red, llegados: 0, perdidos: 0, demoraMedia: 0 };
+  const cuenta = globalThis[nombre] = { ...red, llegados: 0, perdidos: 0, demoraMedia: 0 };
   const ultimaTcp = new Map();      // uid → cuándo sale el último "tcp" (el siguiente no puede salir antes: en orden)
   return (u, bytes, canal) => {
     if (canal === 'udp' && azar() < red.perdida) { cuenta.perdidos++; return; }
@@ -195,7 +199,9 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   }
 
   return {
-    entrar, salir, enviar, revisa,
+    entrar, salir, revisa,
+    // §80: con ?redMala=…,ida, lo que sale también va por el tramo malo (con la misma demora y pérdida)
+    enviar: redMala?.ida ? degradar((u, bytes, canal) => { enviar(u, bytes, canal); }, redMala, Math.random, (f, ms) => setTimeout(f, ms), () => performance.now(), 'mkwRedMalaIda') : enviar,
     activa: () => !!sesion,
     sano: u => sanoX(pares.get(u)),
     detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || '', ice: x.pc.iceConnectionState || '', udp: x.udp.readyState, tcp: x.tcp.readyState, abrio: x.abrio } : null; },

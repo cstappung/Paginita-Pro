@@ -247,6 +247,9 @@ def main():
                   "func_80787774": "func_80787774_traducida", "func_807379BC": "func_807379BC_traducida",
                   "func_807EC7F8": "func_807EC7F8_traducida", "func_807F7E80": "func_807F7E80_traducida",
                   "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida",
+                  # OS::GetTick LLAMADO (no copiado adentro): en la carrera sincronizada da el reloj de la carrera; lo usan
+                  # el sorteo de reserva de los objetos de Pulsar y los objetos condicionales de RR (§83, la C2)
+                  "func_801AAD74": "func_801AAD74_traducida",
                   # Raceinfo::Update (la de RR) y RacedataScenario::UpdatePoints -> lockstep_nativo.cpp: el fin de la
                   # carrera en la sala con las reglas del juego (tiempo límite; terminar en un cuadro pedido, pruebas) y
                   # los puntos una vez por carrera, igual en todas las consolas (§75)
@@ -356,6 +359,42 @@ def main():
                 texto = 'extern "C" unsigned int PPC_MftbCarreraEn(unsigned int, unsigned int);' + chr(10) + texto
             copias[original] = texto
             unidades[i] = ("juego_reemplazo", original)
+    # §83: semillas_nativo.cpp pone en cero, al empezar cada carrera sincronizada, la semilla del sorteo de reserva de
+    # los objetos de Pulsar. Su dirección (0x818A0C28) sale de este Retro Rewind: si se vuelve a traducir otro, avisar
+    # en vez de escribir en cualquier lado
+    marca = b'#line 1 "rr_kamek_81836190.cpp"'
+    trozo = next((f.read_bytes() for g, f in unidades if g in ("juego", "juego_reemplazo") and marca in f.read_bytes()), b"")
+    trozo = trozo[trozo.find(marca):]
+    trozo = trozo[:trozo.find(b'#line 1 "', len(marca)) % (len(trozo) + 1)]   # solo esa función
+    if b"r27 = 0x818A0000u;" not in trozo or b"FlatRead32((r27 + 3112))" not in trozo or b"0x801AAD74u" not in trozo:
+        sys.exit("rr_kamek_81836190: el sorteo de reserva de Pulsar ya no es el de 0x818A0C28 (semillas_nativo.cpp, §83)")
+    # MKW_DEPURAR_RELOJ=1 (§83, depuración de la C2): TODAS las otras lecturas del reloj del procesador (PPC_Mftb) de
+    # las funciones del juego pasan por PPC_MftbVigia(función, lr) (web/juego/depurar_reloj.cpp), que en la carrera
+    # sincronizada anota quién leyó el reloj y en qué cuadro. Si una de esas lecturas decide algo de la carrera, las
+    # consolas se separan (cada una lee su propio reloj): así se ve cuál falta en RELOJ_CARRERA.
+    if os.environ.get("MKW_DEPURAR_RELOJ") == "1":
+        vigiladas_reloj = 0
+        for i, (g, f) in enumerate(unidades):
+            if g not in ("juego", "juego_reemplazo") or b"PPC_Mftb()" not in f.read_bytes():
+                continue
+            texto = copias.get(f) or f.read_text(encoding="utf-8")
+            trozos = re.split(r'(?=#line 1 ")', texto)
+            for k, t in enumerate(trozos):
+                if "PPC_Mftb()" not in t:
+                    continue
+                m = re.match(r'#line 1 "(?:func|rr_overlay|rr_kamek)_([0-9A-Fa-f]{8})\.cpp"', t)
+                dir_ = int(m.group(1), 16) if m else 0
+                partes = re.split(r'(?=extern "C" [^\n]*_statefree\()', t)
+                trozos[k] = "".join(p.replace("PPC_Mftb()", f"PPC_MftbVigia({dir_}u, 0u)" if "_statefree(" in p.split(chr(10), 1)[0]
+                                            else f"PPC_MftbVigia({dir_}u, ctx->lr)") for p in partes)
+                vigiladas_reloj += 1
+            texto = "".join(trozos)
+            if not texto.startswith('extern "C" unsigned int PPC_MftbVigia(unsigned int, unsigned int);'):
+                texto = 'extern "C" unsigned int PPC_MftbVigia(unsigned int, unsigned int);' + chr(10) + texto
+            copias[f] = texto
+            unidades[i] = ("juego_reemplazo", f)
+        unidades.append(("thp", RAIZ / "web/juego/depurar_reloj.cpp"))
+        print(f"depuración del reloj: {vigiladas_reloj} funciones que leen el reloj, vigiladas")
     VISTA_FN = ('#ifndef MKW_VISTA_PROPIA' + chr(10) + '#define MKW_VISTA_PROPIA' + chr(10) +
                 'extern "C" int g_mkwRelojFijo; extern "C" int g_mkwMiPuesto; extern "C" int g_mkwVistaPropia;' + chr(10) +
                 'static inline uint64_t mkw_vista_propia_v0(uint32_t r3, uint32_t r4) {' + chr(10) +

@@ -496,7 +496,7 @@ const REGLAS = {
         ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
         ["Celular", "Botones en pantalla, y se dobla <b>inclinando el teléfono</b>."]
       ])],
-      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta). Las copas de la sala no lo mueven."],
+      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta). Cada carrera lo mueve, con la regla de Mario Kart Wii entre los humanos: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo. Si te vas a mitad de carrera pierdes contra todos, y nadie gana VR por ti."],
       ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
     ]
   },

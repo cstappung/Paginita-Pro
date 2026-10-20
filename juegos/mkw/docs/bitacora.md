@@ -646,6 +646,74 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Barras (letterbox / pillarbox)** | Las franjas negras que quedan cuando una imagen se muestra entera, sin deformarla, en un recuadro de otra forma: arriba y abajo (*letterbox*, ventana alta) o a los lados (*pillarbox*, ventana ancha). Como ver una película de cine en un televisor: el televisor no la estira, deja franjas. |
 | **`scrollIntoView` («nearest»)** | Una orden del navegador: desplazar la página lo justo para que un elemento se vea entero; con `block: "nearest"`, si ya se ve no mueve nada. El sitio la usa con el marco del juego cuando aparece y cuando el juego avisa `{tipo:'mirame'}` (abrió un selector de la sala). Como el autoenfoque de una cámara que solo se mueve si el objeto salió del cuadro. |
 
+### Que un jugador lento no frene a los demás (§80)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Retraso de entrada (de cada jugador)** | Cuántos cuadros después de apretar un botón lo usa la carrera. Lo que toco en el cuadro 100 con retraso 4 vale para el cuadro 104: así mis botones tienen 4 cuadros (67 ms) para llegar a los demás antes de que los necesiten. Desde §80 cada uno tiene **el suyo** (de 2 a 12) y lo ajusta durante la carrera: quien tiene la conexión lenta usa uno más grande y su kart responde más tarde, pero los demás no lo esperan. Como el tiempo de anticipo de una orden de despacho: quien está más lejos manda su orden con más anticipo. |
+| **Holgura** | Cuántos cuadros antes de necesitarlo llegó el botón de un jugador. Holgura 3 = llegó 3 cuadros antes; 0 = justo a tiempo; negativa = tarde (tuve que esperarlo, o iba relevado). Como el margen de fase de un lazo de control: cuánto le falta para volverse inestable. |
+| **Rato (ventana) e informe** | Cada medio segundo, cada consola le cuenta a todas (mensaje 10), para cada jugador, la peor holgura del rato, cuánto lo esperó y cuántos ratos seguidos le fue mal con él. Es la medición que cierra el lazo del retraso: cada jugador ajusta el suyo con lo que miden los demás. |
+| **Rato dudoso** | Un rato en que yo esperé a alguien, o me estaba poniendo al día. Ahí la holgura que medí no dice nada de los demás, porque yo estaba quieto o corriendo de más. Solo cuentan las esperas. Como una medida tomada mientras el instrumento estaba saturado: se descarta. |
+| **Mayoría (de quién es la culpa)** | Que el jugador m tiene un problema se cree solo si lo ve **más de la mitad** de los que informan de él. Si a uno solo le llega todo tarde, el problema es la conexión de ese uno: recibe tarde de todos. Como votar entre tres sensores redundantes: si uno solo marca falla, el sensor malo es ese. |
+| **Voto descontado («pasa hambre»)** | Lo que dice un jugador al que la mayoría ve mal, o justo, o que va relevado, o que ve mal a TODOS los demás, no cuenta. Si su conexión es la mala, ve tarde a todo el mundo, y su voto haría culpable a cualquiera. |
+| **Heredado** | Si m se atrasó porque esperaba a otro que la mayoría ve mal, sus botones salieron tarde por eso: no es culpa de m (no sube su retraso ni se lo releva). Como una caída de tensión aguas abajo de una falla: el interruptor que hay que abrir es el de la falla, no el de cada carga. |
+| **Autoridad** | Un jugador elegido igual en todas las consolas (el primero de la sala que sigue en la carrera) que, en su propio paquete de cada cuadro, puede llevar los botones de otros. Si la autoridad es la lenta (todos necesitan su paquete), le pasa el papel a otro: lo escribe en su paquete («desde el cuadro siguiente, la autoridad es Beto») y todas cambian en el mismo cuadro. |
+| **Relevo** | Cuando alguien se atrasa seguido, la autoridad lleva SUS botones en el paquete de ella (los de verdad si ya le llegaron, si no uno inventado) y todas las consolas, la de él incluida, usan esos. Nadie lo espera y no se agrega ningún viaje por la red: el paquete de la autoridad hacía falta igual. Como un relé de respaldo: si un lazo se cae, otro sostiene la línea. |
+| **Botón inventado** | Lo que pone la autoridad por un relevado cuyo botón no llegó a tiempo. Si su último botón tiene hasta 6 cuadros, es ese mismo: sigue manejando él, con más retraso. Si es más viejo, solo acelerar (si lo tenía apretado), sin botones nuevos, y el volante se suelta de a poco en 30 cuadros, para que no se estrelle por un botón viejo. |
+| **Corte en dos fases, con quietud** | Para quien se calla de golpe. El decisor (uno solo, siempre el mismo: el primero que sigue que no es él) pregunta a todos hasta qué cuadro llegan. Cada uno, al contestar, reparte lo que tiene del que se calló y **se queda quieto** ahí hasta saber la decisión. El corte va después del máximo: nadie corrió ese cuadro todavía, así que todas lo usan «sin nadie» desde ahí. Un corte fijado no cambia nunca. Como una maniobra en una subestación: primero todos confirman que están en posición, recién después se abre. |
+| **Separarse (salir de la carrera)** | Si a una consola le llega un corte en un cuadro que ella ya corrió (no contestó a tiempo), su copia de la carrera ya no es la de los demás. Avisa (mensaje 14), sigue con todos quietos y vuelve en la carrera siguiente, como al recargar. No avisa «terminé» a la sala. |
+| **Huella de los botones** | Además del avance de los 12 karts, la huella de cada 120 cuadros lleva una mezcla de todos los botones usados en cada cuadro. Si dos consolas usaron botones distintos aunque sea en un cuadro, se nota al toque, antes de que los karts se separen. Como el dígito de control de un número de cuenta. |
+| **Ritmo (en el banco)** | Cuadros que corrió una consola ÷ los que tenía que correr en ese tiempo. 100 % = 60 cuadros por segundo (en el banco, 100 por segundo: cuadros de 10 ms). Si la sala espera a alguien, baja. |
+| **Ponerse al día** | Correr cuadros más rápido para recuperar el tiempo perdido en una espera. Mario Kart Wii no lo hace (si un cuadro tarda, el juego va más lento) y el banco tampoco. Por eso quien espera queda un poco «atrás» para siempre, y su retraso tiene que cubrir eso. |
+
+### La sincronía de tiempo (§80b)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Ponerse al día (o no)** | Correr cuadros más rápido para recuperar el tiempo perdido en un tirón. Mario Kart Wii no lo hace: si un cuadro tarda, el juego queda más atrás y sigue a 60 desde ahí. En la sala eso deja a la consola que se trabó **desfasada** de las demás para el resto de la carrera. |
+| **Desfase (ir adelante o atrás)** | Cuántos cuadros va una consola por delante de otra en el mismo instante. Corren la misma carrera, pero no en el mismo momento. Como dos relojes que dan la misma hora pero uno atrasado. |
+| **Sincronía de tiempo** | Que el que va adelante se frene un poco para que el desfase vuelva a cero. Es lo que hace GGPO (la biblioteca de red de los juegos de pelea). Prendida desde que el dueño la eligió (§80b); `?sincroTiempo=0` la apaga. |
+| **Frenarse un cuadro** | Esperar un cuadro sin hacer nada antes de tomar el siguiente. Como el juego no se pone al día, esa consola queda un cuadro más atrás. A lo más uno cada 8 cuadros. En pantalla, un cuadro repetido. |
+| **Suelto / remolcado** | Un jugador que va atrás por un tirón suyo y después corre normal va **suelto**: frenarse por él lo alcanza. Uno que va atrás porque espera lo de los demás (su conexión trae todo tarde) va **remolcado**: si los demás se frenan, él se atrasa con ellos, y la sala iría más lenta para siempre. Solo se frena por los sueltos. |
+| **Adelanto (del paquete)** | Un byte en cada paquete de botones: cuántos cuadros por delante de su cuadro de ahora está el último botón que manda. Con eso el que lo recibe sabe en qué cuadro iba el otro al mandarlo. |
+| **Medida de ida y vuelta** | Yo mido «mi cuadro − el suyo al mandar» (desfase + lo que tarda la red); él mide lo mismo de mí (−desfase + lo que tarda la red). La mitad de la diferencia es el desfase: lo de la red se cancela. Es el método de los relojes por internet (NTP): un pulso de ida y otro de vuelta. |
+| **Islas (la conexión partida en dos)** | Si la red se parte, cada lado ve que el otro se calló y lo corta. Al volver, cada uno se enteraría de que lo cortaron y se saldrían todos. Regla: sigue la isla con más jugadores (si empatan, la del mando más bajo, el de la autoridad); lo que diga la otra no vale, y los de la otra se salen de esa carrera. Como una red eléctrica que se separa: sigue la isla con más generación y la otra se apaga y se vuelve a enganchar después. |
+| **Corte repetido** | El aviso de un corte se repite a todos cada medio segundo durante la carrera, porque un corte casi siempre viene de una conexión que se cayó, y justo ahí el aviso se pierde. |
+
+### El aviso de la tarjeta de video equivocada (§81)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Aviso con ventana (que se sostiene)** | Un aviso que no se enciende por un solo valor malo sino cuando la falla se repite: aquí, 8 segundos lentos entre los últimos 12. Un tirón de 5 s no lo prende. Como el relé térmico de un motor: un pico de corriente al arrancar no lo dispara, una sobrecarga que dura sí. |
+| **Segundo de juego** | Para el aviso solo cuentan los segundos en que la lentitud puede ser de la tarjeta: pasado el arranque (cuadro 600), con la pestaña a la vista, sin esperar el disco y fuera de la sala (ahí la lentitud puede ser de otro jugador). Es como medir el consumo de un equipo solo con el equipo encendido y en régimen, no en el arranque ni en reposo. |
+| **Trabajo por cuadro** | Los milisegundos que la página estuvo de verdad ocupada en cada cuadro (sin contar lo que esperó al reloj del juego). Si da pocos cuadros pero el trabajo es bajo, el juego estaba **esperando** algo y no es la tarjeta; si el trabajo pasa de 12 ms (de 16,7 disponibles), la PC no alcanza. |
+
+### El VR de la sala (§82)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Comparación por parejas** | Para el VR, cada carrera se parte en **pares de jugadores**: con 4 humanos hay 6 pares. En cada par, el que llegó antes «gana» y el otro «pierde». El cambio de cada uno es la suma de sus pares. Como un torneo de todos contra todos que se juega de una sola vez. |
+| **Curva por puntos (B-spline cúbica)** | Una curva suave que pasa *cerca* de unos puntos fijos, no por encima. El juego guarda 5 valores (0, 1, 8, 50 y 125), uno cada 4999 de diferencia de VR, y la curva los une sin quiebres. Con ella sale cuánto vale ganarle a alguien según cuánto VR más o menos tenía. Como el filtro de reconstrucción de un conversor digital-analógico: de unas pocas muestras sale una señal continua. |
+| **Suma cero** | En una carrera sin cortes, lo que gana uno es exactamente lo que pierde otro: la suma de todos los cambios es 0. El VR no se crea ni se destruye, pasa de unos a otros. Como la corriente en un nodo (ley de Kirchhoff): lo que entra es lo que sale. |
+| **Peor caso guardado** | Al **empezar** la carrera, cada página guarda como su VR el que tendría si perdiera contra todos. Al terminar lo cambia por el de verdad. Si cierra o recarga la página a mitad de carrera, queda el peor caso. Así nadie se salva de perder VR yéndose. Como cobrar el depósito de garantía al arrendar: se devuelve al entregar en orden. |
+| **Foto de los VR (congelar)** | Al empezar cada carrera, la anfitriona anota el VR de cada uno y lo reparte. Todas las consolas calculan esa carrera con esos números, aunque alguno cambie a mitad. Así lo que A le gana a B es justo lo que B le pierde a A. Como tomar todas las lecturas de un tablero en el mismo instante (muestreo simultáneo) antes de comparar. |
+| **Gancho de prueba (comparar contra el juego)** | Una entrada de prueba en nuestro código nativo (`mkw_vr_prueba`). Le pide al juego mismo que calcule con **sus** funciones los puntos de un par, para cada una de las 19 997 diferencias posibles. La prueba compara número por número con nuestra fórmula. Como calibrar un instrumento nuevo contra el patrón en todos los puntos de la escala. Así se encontró que el paso es 1/4999 y no 1/5000. |
+
+### Las copas que se separaban (§83, la C2)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Función copiada adentro / llamada** | El traductor copia las funciones chiquitas (de 1 o 2 instrucciones, como `OS::GetTick`, «dame la hora del procesador») **dentro** de cada función que las usa, para no perder tiempo en ir y volver. Unas pocas partes del juego no la copian: la **llaman**, y van a la función original. `RELOJ_CARRERA` cambiaba las copias de las funciones de la lista, no la original. Como un tablero con medidores propios en cada circuito y un medidor general: cambiar los medidores de cada circuito no cambia el general. |
+| **Sorteo de reserva (de los objetos)** | Hay un tope de objetos peligrosos a la vez en la pista (caparazones azules, rayos, Bill Bala…). Si la caja sortea uno que ya no tiene cupo, Pulsar (el motor de Retro Rewind) sortea **otro** con su propio dado. Es raro: en la copa que fallaba pasó por primera vez casi 100 s después de la largada. |
+| **LCG (generador congruencial lineal)** | El dado de ese sorteo: `x ← x · 1103515245 + 12345` en cada tirada. Con la misma semilla da siempre la misma lista de números, y con otra semilla, otra lista. Es pseudoazar: parece al azar pero es una cuenta fija. Como un registro de desplazamiento con realimentación (LFSR) de la electrónica digital. |
+| **Semilla estática** | Una variable que guarda su valor mientras el programa vive (no se borra al terminar la función). La del sorteo de reserva empieza en 0 y la primera vez que hace falta se llena con la hora del procesador. En la sala eso era la hora **de cada PC**, distinta en cada una. |
+| **Objetos condicionales** | Objetos de una pista retro (los propios de Retro Rewind, números 0x1000 a 0x1FFF) que aparecen o no según una condición. Una es un número al azar del 0 al 7 que se sortea al empezar cada carrera. En contrarreloj vale 0, en línea usa un número que le pasa el juego y en VS salía de la hora de cada PC. |
+| **Vigía del reloj** | Un programa de depuración (`MKW_DEPURAR_RELOJ=1`): cada lectura de la hora del procesador en todo el juego anota en la consola quién la leyó, desde dónde y en qué cuadro de la carrera. Como poner un amperímetro en cada rama de un circuito para encontrar la que se lleva la corriente que falta. |
+| **Disparador determinista** | Una falla que cae **siempre en el mismo cuadro** con la misma semilla y pistas (aquí, ~6100 de la carrera 1). Que no varíe dice que la dispara algo de la carrera misma (un objeto que se sortea en ese momento), no la red ni la carga de la PC, que cambian en cada corrida. |
+| **Mapa de símbolos** | Una lista de «dirección → nombre de la función» (`terceros/Wiicompiled/projects/mkwii/MAP.txt`, de la comunidad). Con ella `0x801AAD74` se lee `OS::GetTick` y `0x8051DFC0` se lee «el menú HOME». Es como el plano con los nombres de los equipos de una subestación. |
+| **Kit (del sitio)** | La copia de **nuestro** trabajo (páginas, `.mjs`, C++ propio, banco, documentos) que viaja dentro del sitio, en `terceros/Paginita-Pro/juegos/mkw/`. La arma `herramientas/subir-kit.sh` con la lista de git: lo que no está en `.gitignore`, o sea nada del juego. Es como el juego de planos que se le entrega al cliente: los planos sí, los equipos de otro fabricante no. |
+| **Separador de ruta (`/` y `\`)** | El signo que separa las carpetas en una dirección de archivo. Linux, macOS y la web usan `/` (`colabtex/src/juegos/worms.js`); Windows usa `\` (`colabtex\src\juegos\worms.js`). Una prueba que compara direcciones como texto falla en Windows si no cambia `\` por `/` antes. Es la misma dirección escrita con otra norma, como 1,5 y 1.5. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -4976,8 +5044,8 @@ node web/navegador/prueba-sala.mjs
 
 ### Lo que falta
 
-- Pasar todo esto a la copia del juego que lleva el sitio (`subir-kit`) y probarlo en la página de Juegos de esta PC
-  (`prueba-experiencia`, que ya usa «Una al azar» + «Jugar la Copa N»).
+- ~~Pasar todo esto a la copia del juego que lleva el sitio (`subir-kit`) y probarlo en la página de Juegos de esta PC
+  (`prueba-experiencia`, que ya usa «Una al azar» + «Jugar la Copa N»).~~ Hecho en §79.4 y §79.5 (17/17).
 - La prueba de dos pestañas no prueba el cambio de anfitrión con la playlist a medio armar (lo prueba el banco
   `sala-playlist`, sin el juego).
 
@@ -5582,3 +5650,832 @@ Comprobado con fotos de verdad y con 4 partidas armadas (dos vistas de verdad, u
 barras): las partidas dan salto 38 a 57 con típico 6,4 (partida ✓). Las de una vista dan 1,4 a 4,6, salvo la de la
 largada con el kart quieto (37,9). En la prueba nueva: A **55,2 → 18,3**, B **30,3 → 8,5**. Las primeras fotos tenían
 la raya de la largada en el medio y las segundas ya no: **17/17**.
+
+## 2026-10-19 · §80 Que un jugador lento no frene a los demás: el retraso de cada uno, el relevo y el corte en dos fases
+
+### Qué pidió el dueño
+
+Por la sesión del selector, el dueño pidió (2026-10-19): «también piensa con un crítico externo cómo hacer handle de
+los errores de conexión; al ser un juego con un máximo de 12 jugadores, que cada uno retrase y laguee al resto es
+imposible de jugar».
+
+### El problema: en el lockstep el más lento marca el ritmo
+
+La carrera de la sala es un **lockstep** (§61, ver el glosario): ninguna consola corre un cuadro sin tener los botones
+de todos para ese cuadro. Hasta §79 eso tenía cuatro consecuencias:
+
+- **Un retraso igual para todos.** Lo anunciaba el «decisor» al empezar cada carrera, según la peor ida medida con
+  los pings (§70). Si UNO tenía 80 ms de ida, todos jugaban con el kart respondiendo 6 cuadros tarde.
+- **Una PC lenta frenaba a todos.** Si una PC hacía 30 cuadros por segundo, las demás la esperaban en cada cuadro y
+  toda la sala iba a 30. En el banco nuevo: **50 % del ritmo** para todos.
+- **Un tirón de la red de uno, una pausa para todos**, cada vez.
+- **Un corte de golpe: 30 s de pausa** para todos (el margen de la sala, §73) antes de seguir sin él.
+
+Con 4 jugadores ya molesta; con 12, alguno siempre tiene un mal momento y la carrera no avanza.
+
+### El crítico (otro Claude, con la propuesta por escrito)
+
+La primera propuesta tenía: retraso de cada uno, un corte «temporal» de quien hiciera esperar más de 300 ms, y volver a
+la misma carrera con una barrera. El crítico encontró **tres errores graves** (los tres podían separar las copias de
+la carrera, que es lo peor que puede pasar):
+
+1. **Botones que llegan tarde y se cuelan después del corte.** Una consola podía recibir un botón viejo del cortado
+   *después* de haber corrido ese cuadro como «sin nadie», o al revés. Arreglo: al contestar la pregunta del corte,
+   cada consola **se queda quieta** en el cuadro que dijo, hasta saber la decisión, y el corte va *después* del máximo.
+2. **La pregunta dejaba afuera al que se corta** (y a los que no contestaban a tiempo). Arreglo: se pregunta a
+   **todos**; y si una consola ya corrió más allá del corte (no contestó a tiempo), se da cuenta sola: su copia ya no
+   es la de los demás, **se sale de esa carrera** y vuelve en la siguiente.
+3. **Dos decisores a la vez podían fijar dos cortes distintos.** Arreglo: el decisor de cada corte es uno solo (el
+   primero que sigue en el orden de la sala, que no sea el cortado), y **un corte fijado no cambia nunca**.
+
+Y varios importantes: la barrera para volver en la misma carrera sobraba (complicada y frágil; quien se corta vuelve en
+la siguiente, como al recargar, §75); 300 ms cortaría a medio mundo en un tirón; el retraso de cada uno necesitaba
+reglas claras para subir y bajar; el kart del que no responde no debe estrellarse (mantener acelerar y soltar el
+volante de a poco); 12 jugadores no caben en 4 puertos de mando; y faltaba comparar también **los botones** usados en
+cada cuadro, no solo el avance de los karts. Su recomendación central fue el **relevo**: que la autoridad lleve, en sus
+propios paquetes, los botones de quien se atrasa.
+
+### Lo que quedó (`web/navegador/lockstep.mjs`)
+
+**A. El retraso de cada uno.** Los botones de cada jugador los escribe solo él, y cada paquete dice de qué cuadro es
+cada botón. Por eso cada uno puede elegir su retraso sin ponerse de acuerdo con nadie. Al empezar la carrera escribe
+«neutro» en los primeros cuadros (hasta su retraso) y desde ahí lo de verdad. Si sube el retraso, rellena los cuadros
+del medio con lo que está tocando; si baja, no escribe nada hasta alcanzar lo ya escrito (lo mandado no se toca). El
+de partida sale de los pings (§70), pero mirando a la **mitad que mejor llega**, no al peor: si a uno solo le llega
+tarde lo de todos, la conexión lenta es la de él. Se elimina el anuncio global (el mensaje 9).
+
+**B. Los informes de medio segundo y quién tiene la culpa.** Cada consola mide, para cada jugador, la **holgura** con
+que le llegan sus botones (cuántos cuadros antes de necesitarlos), cuánto lo esperó, y cuántos **ratos** (de medio
+segundo) seguidos le fue mal. Un rato es «malo» si lo esperó medio cuadro o más, o si sus botones llegaron tarde o no
+llegaron. Si llegaron justos (holgura 0), no es malo: solo le pide a él que suba uno. Cada uno lo cuenta a todos
+(mensaje 10). Con eso:
+- **El problema es de m** solo si lo ve **más de la mitad** de los que informan de él. Si a uno solo le llega todo
+  tarde, el problema es la conexión de ese uno.
+- **No cuenta el voto** de un jugador al que la mayoría ve mal, o justo, o que va relevado, ni el de uno que ve mal a
+  TODOS los demás (dos o más; «pasa hambre»): si su conexión es la mala, ve mal a todos.
+- **Lo heredado no cuenta.** Si m se atrasó porque esperaba a otro que la mayoría ve mal, la culpa no es de m. Cuando
+  toda la sala espera a Dani, los que reciben el paquete de Dani unos milisegundos antes alcanzan a esperar a los que
+  lo reciben después; parece que se atrasaron, pero fue Dani.
+- **Mi retraso** sube 1 si la mayoría me ve mal o justo un rato. Si son dos ratos seguidos, sube lo que falte (hasta
+  4). Baja de a 1 si la mayoría tiene 3 cuadros de holgura durante 4 ratos (2 s). Va de 2 a 12 cuadros (200 ms).
+
+Como un lazo de control con realimentación: cada uno ajusta SU retraso con lo que miden los demás, sin un controlador
+central.
+
+**C. El relevo.** Un jugador es la **autoridad**: el primero de la sala que sigue en la carrera. Si la mayoría ve mal
+a alguien dos ratos seguidos (y no es heredado), la autoridad lo **releva**. En SU propio paquete de cada cuadro
+agrega a quién releva y el botón de cada relevado:
+- el de verdad, si ya le llegó;
+- si no, uno **inventado**: el último que tuvo de él, si no tiene más de 6 cuadros;
+- si es más viejo: solo acelerar (si lo tenía apretado), sin botones nuevos, y el volante soltándose en 30 cuadros.
+
+Todas las consolas, el relevado incluido, usan para él lo que dice la autoridad. Como todas necesitan igual el paquete
+de la autoridad (es un jugador más), el relevo **no agrega viajes ni esperas**, y nadie espera al relevado. Lo deja de
+relevar cuando pasan 3 s relevado y 3 s sin que la mayoría lo vea mal. Mientras está relevado no baja su retraso, y
+si la autoridad tuvo que inventar sus botones, sube 2: así sus botones de verdad alcanzan a entrar en el paquete.
+
+**Si la autoridad es la lenta** (todos esperan su paquete): si la mayoría la ve mal 4 ratos seguidos (2 s), y no es
+heredado, le **pasa el papel** al que mejor llega. Lo escribe en su paquete («desde el cuadro siguiente, la autoridad
+es Beto»), así todas las consolas cambian en el mismo cuadro. La nueva autoridad sigue relevando a los mismos y,
+además, a la vieja.
+
+**D. El corte en dos fases**, solo para lo que el relevo no puede tapar: un silencio **de golpe**. Los cuadros que ya
+contaban con los botones de verdad del que se calló no los tiene nadie. Ahí se espera el **margen**: en la sala
+**2 s** (antes 30). Si no aparece, su decisor lo corta, con los tres arreglos del crítico:
+- pregunta a todos (mensaje 5);
+- cada uno contesta hasta dónde llega (mensaje 6): lo que tiene de él, lo que ya corrió y, si va relevado, hasta donde
+  la autoridad ya escribió su relevo. Al contestar, reparte lo que tiene de él y se queda quieto ahí;
+- corta en el máximo + 1;
+- al que se calló no se lo espera si no se lo oye hace medio margen.
+
+Quien recargó avisa que se salta la carrera (§75) y se corta ya. Un relevado que se calla del todo se corta igual
+(nadie lo espera, pero el juego sí, en la meta).
+
+**E. Una huella de los botones.** La huella de cada 120 cuadros (mensaje 4) lleva, además del avance de los 12 karts,
+una mezcla de **todos los botones usados en cada cuadro**. Si dos consolas usaron botones distintos, se ve al toque,
+aunque los karts todavía no se hayan separado.
+
+**Lo que ve cada uno** (`mkw.mjs`, cada medio segundo):
+- el relevado: «📶 Tu conexión o tu PC van lentas: tu kart responde con retraso (la carrera no te espera)»;
+- los demás: «📶 jugador 3 va lento (conexión o PC): su kart responde tarde; la carrera no lo espera».
+  Estos dos se muestran 6 s, una vez cada vez que cambia quién va relevado: no tapan la carrera.
+- quien se salió de la carrera: «📶 Te desconectaste de esta carrera: tu kart sigue sin ti y vuelves en la
+  siguiente…»; quien fue cortado: «📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…».
+  Estos quedan en pantalla mientras dure: esa carrera ya no es suya y tiene que saber por qué (lo pidió la sesión
+  del selector: nada de una carrera quieta sin explicación).
+
+Quien se salió **no avisa** «terminé» a la sala, porque sus puntos salen de una carrera que ya no es la de los demás
+(en el bloque de la sala; ver «Coordinación»). En la carrera siguiente toma la tabla de la sala, como quien recargó.
+
+`?relevo=0` = sin relevo, para comparar; `?retraso=fijo` = 3 para todos y sin ajustar (como antes de §70).
+`?redMala=70,10,5,ida` (`malla.mjs`, solo pruebas) = la red mala de mentira también en lo que **sale** de la página:
+la conexión mala es la de ese jugador, en los dos sentidos.
+
+### Las pruebas
+
+**Banco `relevo` (nuevo, sin el juego).** Igual que el banco `lockstep`, pero cada consola corre **a su ritmo, como el
+juego**: un cuadro por tic de 10 ms (el juego: 16,7). Si esperó, el cuadro siguiente va en el próximo tic, sin ponerse
+al día (Mario Kart Wii no se pone al día: si un cuadro tarda, el juego va más lento). Se mide el **ritmo** de las
+consolas buenas: los cuadros que corrieron ÷ los que debían correr en ese tiempo.
+
+| Prueba | Resultado |
+|---|---|
+| Dani con 30-50 ms de ida (en cuadros de 10 ms: 3-5 cuadros, como 50-80 ms reales) y 10 % perdido, 4 jugadores | Ana, Beto, Carla al **100 %**; retraso de Dani 12, de los demás 2-5; mismos botones en todos los cuadros; lo inventado para Dani, siempre sus propios botones de ≤ 6 cuadros |
+| Dani con 20-30 ms y 5 % | los demás al 100 %, Dani con 6-7 y al final **sin relevo** |
+| Carla con la PC a la mitad | Ana y Beto al **100 %** (Carla relevada); **sin relevo, 50 %** los dos |
+| Apagón de Dani de 0,6 s | una espera de ~0,6 s, sin cortes, y después 100 % |
+| Beto se va de golpe (margen 1 s) | una sola espera de ~1,02 s y el corte en el mismo cuadro en las dos |
+| La autoridad con la PC a la mitad | pasa el papel a Beto (una vez); Beto y Carla al 100 % |
+| El corte que llega tarde a Carla, que ya había corrido más allá | Carla se sale de la carrera sola; Ana la corta y sigue; hasta el corte, las dos corrieron lo mismo |
+
+**Con el juego (`web/navegador/prueba-relevo.mjs`, nuevo).** Tres pestañas, tres «computadores» de la misma sala,
+corren UNA carrera directa (3 humanos + 9 CPU). La pestaña C tiene la red mala de mentira en los dos sentidos
+(`?redMala=70,10,5,ida`: 70 ± 10 ms de ida y 5 % perdido, o sea ~140 ms de ida y vuelta). Los tres aceleran (B dobla
+un rato) y se miden 25 s de carrera. Después, B se «traba» dos veces (un bucle le toma el hilo, como un tirón de la PC
+o una pestaña que el navegador congela un rato): 1,5 s (menos que el margen) y 3 s (más).
+
+| Prueba | Resultado |
+|---|---|
+| `node banco/correr.mjs relevo` | **21/21** (cada parte se repitió 3 a 6 veces mientras se afinaba; las dos de Dani, 6 veces seguidas sin falla) |
+| `node banco/correr.mjs lockstep` (el de siempre, con las pruebas del retraso global cambiadas) | **42/42** (3 seguidas) |
+| `node banco/correr.mjs red` (+ `?redMala=…,ida`) | **26/26** |
+| `node web/navegador/prueba-relevo.mjs` | **10/10**: A **59,6** y B **59,5** cuadros/s, **0,00 ms** de espera por cuadro; C con retraso 8; huellas iguales en las tres (36 cada una, karts y botones), sin cortes; traba de 1,5 s: nadie se corta (A y C la esperaron una vez, 1,36 y 1,42 s); traba de 3 s: A y C cortan a B en el **mismo cuadro (2563)** y siguen, y B ve «📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…» |
+| `prueba-relevo --red=0` (el control: nadie con red mala) | A 59,8, B 59,6, C 59,8 cuadros/s; retrasos A 3, **B 10**, C 2 |
+| `prueba-relevo --sin-relevo` (como antes de §80 en el relevo) | A 59,9, B 59,9, C 60,0 cuadros/s; retrasos A 9, B 2, C 12 |
+| `node web/navegador/prueba-sincro.mjs --directa` (dos pestañas) | **13/13**: huellas 18 iguales, espera 0,00 y 0,23 ms por cuadro; cada una con su retraso (A 12, B 2: ver Trampas) |
+| `node web/navegador/prueba-sala.mjs` | **25/26**: la carrera 2 termina por DNF a los 29,9 s, en el mismo cuadro en las dos y con la misma tabla de 146; falló solo «los relojes del fin a menos de 0,5 s» (651 ms; ver Trampas) |
+| `prueba-sala --recarga` | 1.ª vez **27/28**: el aviso del relevo quedaba encima de la carrera (arreglado: 6 s). 2.ª vez, «ningún aviso tapa la carrera» ✓, pero fallaron 3 puntos de la elección de personaje de A (antes de la carrera, sin lockstep; en la 1.ª pasaron): avisado a la sesión del selector |
+
+**Qué dicen los números.**
+- Con la conexión de C mala, **A y B no la sienten**: siguen a 60 y no esperan.
+- **C paga su conexión**: 8 cuadros de retraso, contra 3 o 4 que tendría con una red buena.
+- **El control explica por qué B también subió.** Sin nadie con red mala, B igual llegó a 10. Con tres juegos en la
+  misma PC, cada cuadro lleva 12 a 14 ms de trabajo, de los 16,7 que hay. Cada pestaña tiene tirones de verdad. B es
+  la única que dobla: al doblar ve partes nuevas de la pista y compila gráficos (en el medidor, un segundo a 29
+  cuadros/s). El programa hace lo correcto: el que se traba paga su propio retraso, no los demás. Con cada jugador en
+  su PC eso no pasa. Por eso la prueba exige que el retraso de C cubra su conexión (≥ 8) y no sea menor que el de A
+  (que va derecho), no que sea el más grande de los tres.
+- **Sin relevo**, con esta red, el retraso de cada uno ya alcanza para que A y B no esperen. Donde el relevo hace la
+  diferencia es la **PC lenta**: en el banco, 100 % con relevo contra 50 % sin él.
+
+### Trampas
+
+- **El banco viejo corre las consolas tan rápido como llegan los botones**, sin el reloj del juego. Ahí la holgura
+  siempre es 0 y el ajuste del retraso subía a todos hasta 12 y relevaba a todos. Por eso el banco `lockstep` corre
+  con los informes apagados (`informeCada: 0`) y lo de §80 se prueba en `relevo`, con consolas a ritmo.
+- **Dos cuadros en un tic.** El primer arnés a ritmo daba 111 %: el temporizador a veces despertaba un poco antes del
+  tic y se colaba otro cuadro. Ahora cada cuadro va en un tic posterior al anterior, nunca en el mismo.
+- **Una prueba que se trababa sola**: para que a Ana no le llegaran los últimos botones de Beto, se bloqueaba todo
+  paquete con ellos, también el reparto del corte. Ana esperaba para siempre botones que el corte necesitaba. Era la
+  prueba, no el programa: ahora Beto se va justo después de lo que Ana tiene.
+- **Esperas de 4 ms contaban como «malas»** y relevaban a Dani sin motivo. Menos de medio cuadro no le hace perder el
+  cuadro al juego.
+- **La cascada**: con Dani relevado y llegando justo, su voto volvía a contar. Como su conexión es la mala, ve tarde a
+  todos; con una queja más, Beto o Carla quedaban «culpables» y subían a 9. Arreglo: no cuenta el voto del que va
+  relevado ni del que llega justo, y lo heredado no es culpa.
+- **Con una red muy mala (10 % perdido) el relevado ya no vuelve.** Sin ponerse al día, cada racha de pérdidas lo
+  deja un poco más atrás, y el retraso máximo (12) ya no alcanza. Sigue manejando con sus propios botones (los de hace
+  ≤ 6 cuadros), con más retraso; los demás, al 100 %.
+- **La llegada parecía culpa.** En la primera prueba con el juego, A y B subieron a 12 y C (el de la red mala) se
+  quedó en 2. Al empezar, A y B esperaban a que C terminara de cargar la pista, y en esos ratos no llegaba nada nuevo
+  de nadie. Yo contaba «no llegó nada» como «llegó tarde». A incluso relevó a B desde el cuadro 5. Arreglos: la espera
+  de la llegada vuelve dudoso el rato; que no llegue nada sin que yo lo haya esperado no prueba nada (quizá él
+  esperaba a otro); y para volver a lo directo hacen falta datos de que llega con holgura, no basta con que nadie se
+  queje.
+- **El que recibe tarde de todos se queja de todos.** Con tres jugadores, cada uno tiene solo dos que informan de él.
+  Si uno de esos es C, que se queja siempre, una sola queja más ya es mayoría. Arreglo: no cuenta el voto del que ve
+  mal a todos los demás (dos o más): ese «pasa hambre».
+- **Una prueba con tres juegos en la misma PC mide también los tirones de la PC.** Ver el control (`--red=0`).
+- **El aviso del relevo tapaba la carrera.** En `prueba-sala --recarga` las fotos de la prueba congelaron a A varias
+  veces seguidas. A le pasó la autoridad a B y B lo relevó: eso está bien. Pero el aviso «Tu conexión va lenta…»
+  quedaba fijo todo lo que durara el relevo, y la prueba exige que ningún aviso tape la carrera. Ahora el relevo se
+  avisa 6 s. Y dice «conexión o PC»: un tirón puede ser de cualquiera de las dos.
+- **Con el retraso de cada uno, las consolas ya no van exactamente juntas en tiempo real.** Una puede ir adelantada
+  hasta el retraso de la otra (≤ 12 cuadros, 200 ms): la carrera es la misma, solo que cada una la corre un poco
+  antes o después. Después del fin el reloj de la carrera sigue corriendo y cada pestaña se lee en su momento. En
+  `prueba-sala` los relojes del fin, leídos uno tras otro, diferían en 651 ms (la prueba pedía menos de 500), con la
+  misma tabla de 146 puntos en las dos.
+- **El que se traba queda atrás, y su retraso sube.** El juego no se pone al día. Cada tirón de una PC la deja un
+  poco atrás de las demás por el resto de la carrera, y su retraso sube para cubrirlo. En `prueba-sincro --directa`,
+  con dos pestañas en la misma PC y la red de la casa, A terminó en 12 y B en 2. Lo paga solo el que se trabó, como
+  pidió el dueño. Pero en una carrera larga con tirones, su kart puede quedar con 200 ms de retraso. Se reinicia en
+  cada carrera, porque todos largan juntos. La otra opción es la de GGPO (la biblioteca de red de los juegos de pelea):
+  que el que va adelantado se frene un poco (un cuadro cada tanto) para esperar al de atrás. Así el retraso no sube,
+  pero el tirón de uno se reparte como tironcitos en los demás. Queda para que el dueño elija.
+- **Lo que no resuelve §80**: 12 jugadores. Hoy la sala es de hasta 4 humanos (4 puertos de mando de la Wii; §73). El
+  paquete ya trae «a quién releva» como un byte con un bit por mando (alcanza para 8); para 12 hay que ampliar eso y
+  los puertos del juego.
+
+### Coordinación
+
+La línea de «no avisar terminé si me salí» va en la vigía del fin de la sala (`mkw.mjs`); la sesión del selector, que
+lleva ese bloque, dijo que la pusiera yo. Le pidió dos cosas a §80, las dos probadas con el juego: que quien queda
+fuera vea un aviso claro (no una carrera quieta) y que un tirón de 1-2 s no saque a nadie con el margen de 2 s.
+
+```bash
+node banco/correr.mjs lockstep relevo red
+node banco/correr.mjs "relevo?solo=1"          # una sola parte (para depurar)
+node web/navegador/prueba-relevo.mjs           # con el juego: 3 pestañas, C con la red mala
+node web/navegador/prueba-relevo.mjs --sin-relevo
+```
+
+## 2026-10-20 · §80b La sincronía de tiempo: que los tirones de uno no se le sumen en el retraso (prueba, `?sincroTiempo=1`)
+
+### Qué pidió el dueño
+
+Hacer aquí la tarea que propuse al final de §80: probar la otra manera de tratar los tirones, detrás de una bandera
+(`?sincroTiempo=1`), y medirla contra lo de §80, para que él elija.
+
+> **Después lo eligió:** la sincronía quedó **prendida por omisión** (`?sincroTiempo=0` = sin ella, como en §80). Ver
+> «La decisión del dueño», al final de esta sección.
+
+### El problema que quedó de §80
+
+Mario Kart Wii **no se pone al día**: si un cuadro tarda (un tirón de la PC: limpiar memoria, compilar gráficos),
+el juego no corre los siguientes más rápido para recuperar; simplemente queda más atrás. En la sala, la consola que
+se trabó queda atrás de las demás para el resto de la carrera, y sus botones les llegan más justos. El lazo del
+retraso (§80) lo cubre subiéndole el retraso a ella. Con el próximo tirón, queda más atrás y sube otra vez: **se va
+sumando**. En el banco, Carla con un tirón de 40 ms cada 1,5 s termina en el máximo, 12 cuadros (200 ms), con un
+promedio de ~10 en la carrera. Lo paga solo ella, como pidió el dueño, pero su kart se vuelve lento de responder.
+
+### La idea (la de GGPO) y la trampa del lockstep
+
+GGPO (la biblioteca de red de los juegos de pelea) lo resuelve con la **sincronía de tiempo**: el que va adelantado
+se frena un poco para esperar al de atrás. Copiarla tal cual en el lockstep sale mal, porque aquí hay **dos maneras
+de ir atrás**:
+
+1. **Por un tirón propio.** Después del tirón corre normal, solo que atrás: va **suelto**. Frenarse sirve: él no
+   puede ponerse al día, pero los demás sí pueden esperarlo.
+2. **Porque espera lo de los demás.** Es Dani, de §80: su conexión trae tarde lo de todos y él corre cada cuadro recién
+   cuando le llega. Frenarse **no** sirve. Si yo me freno, mis botones le llegan más tarde y él se atrasa conmigo: la
+   sala iría más lenta para siempre, persiguiendo un desfase que nunca se cierra. Como frenar el auto de adelante
+   cuando el de atrás va remolcado: el remolque frena igual.
+
+Por eso **solo me freno por uno que va suelto**: uno que en su último rato (medio segundo) no esperó a nadie ni se
+estaba poniendo al día. Tampoco por uno relevado, cortado, o más de 20 cuadros atrás: eso es del relevo.
+
+### Cómo sé cuánto voy adelante
+
+- Cada paquete de botones lleva **un byte nuevo**, el *adelanto*: cuántos cuadros por delante del cuadro que está
+  corriendo quien lo manda está el último botón del paquete. El que lo recibe resta y sabe **en qué cuadro iba el otro
+  al mandarlo** (`último − adelanto`). Si el paquete lo reenvía otro, va 0xFF: no se usa.
+- Mi medida de él: **mi cuadro ahora − el suyo al mandar** = lo que voy adelante + lo que tardó en llegar. Me quedo
+  con la más chica del rato (la del paquete que llegó más rápido).
+- Él mide lo mismo de mí, y me lo cuenta en el informe de medio segundo (un byte más por jugador).
+- **La mitad de la diferencia de las dos medidas es cuánto voy adelante:** lo que tarda la red se cancela, si tarda lo
+  mismo de ida que de vuelta. No hace falta saber cuánto tarda la red. Es como miden la hora los relojes por internet
+  (NTP): un pulso de ida y otro de vuelta, y el desfase es la mitad de la diferencia.
+
+### El freno
+
+- Si voy **más de 1 cuadro adelante** de alguien suelto, me freno: en `pad`, antes de tomar el cuadro siguiente,
+  espero un cuadro sin hacer nada.
+- A lo más 4 por rato y uno cada 8 cuadros: como mucho un 12 % más lento, un momento. Como el juego no se pone al
+  día, ese cuadro de espera me deja un cuadro más atrás, que es justo lo que quiero.
+- En pantalla es un cuadro repetido de vez en cuando.
+- El freno va antes de tomar el cuadro: para los demás sigo en el anterior, el que ya corrí, y el corte en dos fases
+  (§80) no se confunde.
+- **El retraso baja más rápido.** Con la sincronía, si a todos les sobran 6 cuadros o más durante 2 ratos, baja de
+  una vez lo que sobra (deja 3 de holgura). El desfase que lo hizo subir ya se corrigió frenando.
+
+### Las pruebas
+
+**Banco `relevo`, parte 9 (nueva).** Carla con un tirón de 40 ms (4 cuadros de 10 ms) cada 1,5 s; dos vueltas de
+1500 cuadros, sin y con la sincronía.
+
+| | Retraso de Carla al final | En promedio | Ritmo de Ana y Beto | Frenos de Ana / Beto |
+|---|---|---|---|---|
+| Sin sincronía (lo de §80) | **12** (el máximo) | **9,8 a 10,4** | 100 % | 0 |
+| Con `?sincroTiempo=1` | 5 a 7 | **5,7 a 7,0** | **97 %** | ~40-49 |
+
+Un tirón de 4 cuadros pide un retraso de ~5-6 para que nadie lo espere: eso queda. Lo que ya no pasa es que se
+sume tirón tras tirón. En las dos vueltas, las tres consolas reciben los mismos botones en cada cuadro.
+
+**Toda la página `relevo` con la bandera prendida** (`node banco/correr.mjs "relevo?sincroTiempo=1"`): pasa todo lo
+de §80 también. Se destaca **Dani con la red mala**: los demás siguen al 100 %, porque no se frenan para siempre por
+él (va remolcado, no suelto). Además, la PC lenta (relevada: no se la espera), el apagón y la autoridad lenta.
+El banco `lockstep` (consolas sin el reloj del juego, sin informes) da 42/42 con y sin la bandera.
+
+**Con el juego.** Son las mismas pruebas de §80, con `--extra=&sincroTiempo=1`.
+
+| Prueba | Sin sincronía | Con `?sincroTiempo=1` |
+|---|---|---|
+| `prueba-sincro --directa` (2 pestañas en la misma PC, red de la casa) | **13/13**; el retraso de A termina en **12**, promedio **11,8**; B 2 | **13/13**; A termina en **3**, promedio **5,6**; B 2,1 con 48 frenos; espera 0,13 ms por cuadro |
+| `prueba-relevo` (C con ~140 ms de ida y vuelta y 5 % perdido) | (§80) retrasos al final: A 6, B **11**, C 8 | **10/10**; A **57,6** y B **57,7** cuadros/s; espera 0,06 y 0,03 ms por cuadro; promedios A **4,0**, B **4,6**, C 9,3 (paga su conexión); nadie relevado; tirones de 1,5 s y 3 s como en §80 |
+| `prueba-relevo --red=0` (el control, sin red mala) | (§80) A 3, **B 10**, C 2 | A 5, B 4, C 2 (promedios 5,0 / 4,2 / 2,2) |
+
+Con la sincronía, a nadie se le acumula el retraso por sus tirones; el que tiene la red mala sigue pagando lo suyo.
+
+Unas corridas coincidieron con pruebas de la otra sesión (dos juegos más en la misma PC). En esas, las pestañas iban a 45-49 cuadros/s, con «Tu PC no alcanza 60», y esperas de menos de 0,3 ms por cuadro. No cuentan: se repitieron con la PC tranquila. La fila del control es de esas corridas, así que sus cuadros por segundo no valen, solo los retrasos.
+
+### Lo que cuesta cada una (para que el dueño elija)
+
+| | Sin sincronía (§80, por omisión) | Con `?sincroTiempo=1` |
+|---|---|---|
+| Al que se traba | Paga todo, en su retraso, que se va sumando en la carrera (hasta 12 cuadros = 200 ms); se reinicia en cada carrera | Paga solo lo de un tirón (~5-6 cuadros si sus tirones son de 4) |
+| A los demás | Nada | Después de cada tirón de otro, se frenan un poco hasta alcanzarlo (un cuadro cada 8; ~3 % en el banco): un cuadro repetido de vez en cuando |
+| Con uno de red mala (que espera a todos) | Nada | Nada (no se lo persigue) |
+
+**Mi recomendación:** prenderla, después de probarla en dos PC de verdad. Un 3 % de frenadas suaves cada tanto se
+nota mucho menos que un kart que responde 200 ms tarde. Pero el dueño pidió que nadie atrase a los demás: por eso
+queda apagada hasta que él diga.
+
+### Cómo lo hace Mario Kart 8 Deluxe (y el Mario Kart Wii original)
+
+El dueño pidió mirar Mario Kart 8 Deluxe como referencia. Nintendo no publicó cómo funciona su red. Lo que sigue sale
+de la documentación de la comunidad (mkwiiki, ingeniería inversa de Pia, la biblioteca de red de Nintendo) y de lo que
+cuentan los jugadores.
+
+**La diferencia de fondo: no es un lockstep.** En Mario Kart 8 Deluxe, y en el modo en línea original de Mario Kart
+Wii, cada consola **maneja su propio kart** y les manda a las demás dónde está y qué está tocando. Los karts de los
+demás se **adivinan**: si los datos llegan tarde, se supone que siguen derecho y se los corrige cuando llegan. Por eso
+**un jugador lento nunca congela a los demás**. Lo que se ve, en cambio:
+- karts que saltan de un lugar a otro (se corrige la adivinanza);
+- ítems que te pegan sin haberlos visto venir, o que les pegan a dos a la vez;
+- la ruleta de ítems trabada hasta que cae en uno por defecto (Nintendo arregló en la versión 3.0.1 los «ítems que no
+  se entregan bien cuando la comunicación es inestable»).
+
+Es otro precio: en vez de esperas, carreras que no son exactamente iguales en cada pantalla. Nuestro lockstep da
+siempre la misma carrera en todas, y por eso tiene que manejar las esperas (§80).
+
+**El Mario Kart Wii original** (mkwiiki, «Network Protocol»):
+- Cada consola manda un paquete RACE con un registro RACEDATA de 0x40 bytes por jugador: posición, botones y otros
+  datos.
+- Le manda a **una consola distinta cada dos cuadros**, por turno. Con 12 jugadores, cada uno recibe noticias de cada
+  otro solo cada ~1/3 s. mkwiiki dice que esa es la causa principal del lag en salas grandes.
+- Tiene un registro **SLOT**: una consola con problemas de ancho de banda **manda su tráfico a través de otra**, como
+  intermediaria. Es la misma idea que nuestro **relevo**.
+- Al terminar, el tiempo del primero se manda a todos y los demás tienen un **tiempo limitado** para llegar. Es nuestro
+  DNF (§77).
+
+**Pia (Mario Kart 8 Deluxe, Splatoon 2):**
+- Cada sala tiene un **anfitrión** y, si se va, otro toma su lugar (*host migration*), con prioridad para el de mejor
+  conexión. Es nuestro **traspaso de la autoridad**.
+- En Splatoon 2, del mismo tiempo y la misma biblioteca, cada consola lleva un **reloj común**. Si los relojes se
+  separan, por ejemplo **después de un pico de CPU**, se vuelven a sincronizar. Es justo lo que hace la sincronía de
+  tiempo de §80b.
+- Si de un jugador no llega nada por ~5 s: «error de comunicación». A una consola que se vuelve un **cuello de
+  botella** se la puede echar para que la sesión siga fluida. Es nuestro corte y el «fuera».
+
+**Lo que se toma de referencia:**
+- **La sincronía de tiempo está en la línea de Nintendo**: resincronizar el reloj después de un tirón. Es un argumento
+  más para prenderla.
+- **El relevo (SLOT), el traspaso (*host migration*) y el plazo del final (DNF)** ya existen en nuestro diseño, con la
+  misma idea.
+- **El margen.** Nintendo espera ~5 s antes de dar a uno por perdido, pero sin congelar a nadie: los demás siguen con su
+  kart adivinado. Nosotros no podemos seguir sin sus botones, así que conviene un margen corto (los 2 s de §80).
+- **La otra arquitectura (para el dueño):** el juego ya trae adentro su modo en línea, el de RACEDATA. Si en vez del
+  lockstep se usara ese modo sobre nuestra malla WebRTC (sin los servidores del Wi-Fi), la sala se comportaría como Mario
+  Kart Wii en línea: nadie espera a nadie, con los saltos y los ítems raros de siempre. Es un trabajo grande y cambia lo
+  decidido en §73 (la sala sin Retro WFC). Queda anotado como opción, no se hace ahora.
+
+Fuentes:
+- [mkwiiki: Network Protocol](https://mkwiiki.org/wiki/Network_Protocol)
+- [OatmealDome: Splatoon 2's Netcode and Matchmaking](https://oatmealdome.me/blog/splatoon-2s-netcode-an-in-depth-look/)
+- [Pretendo: PIA](https://nintendo-wiki.pretendo.network/docs/pia/)
+- [ResetEra: Why is Mario Kart relatively stable while Smash Online isn't?](https://www.resetera.com/threads/why-is-mario-kart-relatively-stable-while-smash-online-isn%E2%80%99t.355120/)
+- [GameSpot: parche 3.0.1 de Mario Kart 8 Deluxe](https://gamespot.com/articles/new-mario-kart-8-deluxe-patch-out-now-fixes-one-th/1100-6452425/)
+- [Reglas MSEL de Mario Kart 8 Deluxe](https://help.generationesports.com/hc/en-us/articles/360053404431-MSEL-Mario-Kart-8-Deluxe-Rules)
+
+### Un hueco de §80 que encontró la otra sesión: el corte que no llega
+
+En una copa de prueba de la sesión del selector (`prueba-sincro --copa`, dos pestañas), a A se le cayó la conexión con
+B. B esperó el margen y cortó a A en el cuadro 902. Pero el aviso del corte va **una sola vez** por el canal confiable
+(«tcp»), y ese canal estaba caído: el aviso se perdió. A volvió, nunca supo que la habían cortado y siguió corriendo
+su kart con sus botones, donde B ponía «sin nadie». Las copias se separaron, y B marcó «¡DESINCRONIZADO… botones!».
+Es el caso típico: un corte casi siempre viene de una conexión que se cayó, y justo ahí se pierde su aviso.
+
+Tres arreglos (`lockstep.mjs`):
+1. **Los cortes se repiten.** Cada medio segundo, cada consola les repite a todos los cortes de esta carrera (10 bytes
+   cada uno). Al que vuelve le llega el suyo. Si ya corrió más allá, se sale de la carrera; si no, sigue sin su kart.
+2. **La huella no se compara con un cortado.** Si el que manda la huella está cortado desde ese cuadro o antes, su
+   copia se separó a propósito y se va a salir: no es un «desincronizado».
+3. **Las islas.** Si la conexión se parte en dos, cada lado corta al otro. Con los cortes repetidos, los dos se
+   enterarían de su corte y los dos se saldrían. Por eso el aviso de un corte lleva cuántos siguen según el que corta y
+   el mando más bajo de ellos. Sigue el lado con más jugadores; si empatan, el que tiene el mando más bajo (el de la
+   autoridad). Del lado que pierde no vale ningún corte, ni el de mí ni el de los míos. Los dos lados hacen la misma
+   cuenta.
+
+**Banco `relevo`, parte 10:** a Ana se le cae la conexión 3 s (lo del «tcp» se pierde). Beto y Carla la cortan en el
+mismo cuadro, terminan sin «desincronizado» y sin cortarse entre ellos. Ana, sola, los había cortado a los dos, pero
+eso no vale. Al volver, Ana se entera de su corte y se sale de la carrera. **3 de 3.**
+
+### La decisión del dueño (2026-10-20 00:15)
+
+Con los números de arriba, el dueño eligió: «Sí, prende la sincronía de tiempo por omisión (`?sincroTiempo=0` para
+apagarla)». En `lockstep.mjs` la bandera se dio vuelta: ahora se prende sola y se apaga con `?sincroTiempo=0`. El
+banco `relevo` corre por omisión con la sincronía y también sin ella (`"relevo?sincroTiempo=0"`): **27/27 en las
+dos**. En la parte 9 el promedio del retraso de Carla es 6,3 y 5,9 con la sincronía, contra 10,0 y 10,4 sin ella. Las
+pruebas con el juego ya se habían corrido con la sincronía prendida (arriba). La parte 9 compara el **promedio** y ya
+no pide además un valor del final: el final es una foto, y una vez cayó justo después de un tirón (9 con un promedio
+de 5,7).
+
+### Trampas
+
+- **La sincronía «de libro» perseguía a Dani.** La regla de «solo por uno suelto» salió de pensar el caso de Dani
+  antes de escribirla; con la página entera prendida, el caso de Dani lo confirma (100 % de ritmo).
+- **La primera versión todavía subía hasta 11.** Frenaba bien, pero el retraso, después de subir por cada tirón,
+  bajaba de a 1 cada 2 s. Con mucha holgura ahora baja de una vez lo que sobra.
+- **El promedio dice más que el final.** El retraso al final depende de si el último tirón fue justo antes de medir:
+  la prueba compara el promedio de la carrera (`estado().retrasoMedio`).
+- **No correr dos juegos a la vez.** Las pruebas con el juego de §80b las paré cuando la otra sesión avisó que corría
+  la suya. Al limpiar maté por error una prueba de ella (`prueba-sincro --copa`), porque busqué los procesos por el
+  nombre del archivo. Se lo avisé. Ahora se mata solo lo que uno arrancó.
+
+```bash
+node banco/correr.mjs "relevo?solo=9"              # los tirones, sin y con la sincronía
+node banco/correr.mjs "relevo?solo=10"             # el corte que no llega (y las islas)
+node banco/correr.mjs relevo "relevo?sincroTiempo=0" lockstep     # con la sincronía (por omisión) y sin ella
+node web/navegador/prueba-sincro.mjs --directa [--extra=&sincroTiempo=0]
+node web/navegador/prueba-relevo.mjs [--extra=&sincroTiempo=0] [--red=0]
+```
+
+## 2026-10-19 · §81 La ayuda de la tarjeta de video aparece cuando hace falta (D4)
+
+**Por qué.** El plan tenía pendiente la D4: «la ayuda de *tarjeta de video equivocada* en la página del sitio». En
+Windows, la tarjeta de video que usa el navegador la decide **Windows**, no la página. En un PC con dos tarjetas (la
+integrada del procesador y una dedicada), Windows puede darle la integrada al navegador y el juego va lento (§54). La
+página pide «alto rendimiento», pero el navegador puede ignorar el pedido. La página ya mostraba qué tarjeta usa y,
+plegada, cómo cambiarla (cajón → Avanzado → Video). Desde §69 la página del sitio es la misma, así que también estaba
+ahí. Lo que faltaba es que alguien la **viera**: nadie abre «Avanzado» porque el juego va lento.
+
+**Qué hace ahora** (`web/navegador/aviso-gpu.mjs`). Cada segundo mira lo que la página ya mide (cuadros por segundo,
+trabajo por cuadro, espera del disco) y, si el juego va lento **un buen rato por trabajo de esta PC**, muestra abajo a la
+izquierda: «🐢 El juego va lento en esta PC. Si tienes una tarjeta de video dedicada, Windows puede estar dándole al
+navegador la integrada.» con dos botones:
+- **«Ver cómo»** abre el cajón en Avanzado, despliega la ayuda (Configuración → Sistema → Pantalla → Gráficos → el
+  navegador → *Alto rendimiento*) y la trae a la vista;
+- **«✕»** lo calla por 7 días (guarda la hora en `mkw.avisoGpu`).
+
+**La regla, para que no moleste por nada:**
+- Un segundo es «lento» si da **menos de 54 cuadros** y el **trabajo pasa de 12 ms** por cuadro. Si el trabajo es poco,
+  el juego estaba esperando algo y no es la tarjeta.
+- Solo cuentan los **segundos de juego**: pasado el arranque (cuadro 600), pestaña a la vista, sin esperar el disco
+  más de 200 ms, y **fuera de la sala**. En la sala la lentitud puede venir de otro jugador, y la sala tiene su propio
+  aviso (§70.7).
+- Se enciende con **8 segundos lentos entre los últimos 12**, y **una vez por visita**.
+- **Solo si cambiar la tarjeta puede ayudar.** Eso es cuando el navegador da la misma tarjeta pidiendo «alto
+  rendimiento» o «bajo consumo»: Windows elige, y solo en Windows. Si el navegador hace caso al pedido, la página ya
+  tiene la mejor tarjeta y el aviso no sale. Tampoco sale si la que dio es una **NVIDIA** (siempre dedicada): es lo
+  que pasa en esta PC (el navegador ignora el pedido, pero da la RTX), y ahí el aviso habría dicho algo falso.
+- La tarjeta **«por software»** (sin tarjeta de video) da su propio texto, en cualquier sistema.
+- Las pruebas automáticas no lo ven (`navigator.webdriver`), salvo `?avisoGpu=1`; `?avisoGpu=0` lo apaga.
+
+**Prueba en el banco** (`banco/pruebas/aviso-gpu`, sin el juego): segundos inventados con la forma de lo que mide la
+página y una revisión de tarjeta inventada. **18/18**:
+- no sale a 60 cuadros/s, ni por un tirón de 5 s;
+- sale con 8 s lentos seguidos y también con lentitud a ratos (8 de 12);
+- no sale con poco trabajo, ni en el arranque, con el disco, con la pestaña escondida o en la sala;
+- no sale si el navegador ya da la mejor tarjeta o una NVIDIA, ni fuera de Windows (salvo «por software»);
+- «Ver cómo» abre la ayuda;
+- «✕» lo calla 7 días y después vuelve;
+- sale una sola vez por visita, y espera a saber qué tarjeta hay.
+
+**En la página de verdad** (una pestaña, con 8 segundos lentos dados a mano): el aviso sale abajo a la izquierda sin
+tapar nada importante, y «Ver cómo» abre el cajón en Avanzado con la ayuda desplegada (`cajon`, `avanzado` y `ayuda` en
+true; el aviso se esconde).
+
+```bash
+node banco/correr.mjs aviso-gpu
+```
+
+## 2026-10-19 · §82 El VR se mueve con las carreras de la sala y queda en Firebase
+
+**Por qué.** El dueño: «que el VR (y BR) se mueva con las carreras de la sala y quede guardado en Firebase». En la sala
+(§73) el juego no calcula el VR: para él son carreras sin conexión. Su función de puntos (`UpdatePoints`, 0x8052E950)
+solo mueve el VR en los modos en línea (escenario +0xB50 entre 7 y 10). Hasta ahora el VR solo cambiaba en Retro WFC
+(§59), que la sala ya no usa.
+
+**Decisiones** (comunicadas al dueño):
+- **La regla original de Mario Kart Wii**, no la de Retro Rewind en línea. La de RR depende de datos de la sala en
+  línea (multiplicadores por evento, topes por rango) y copiarla sería transcribir el código de Pulsar (GPL). La
+  original está en el juego mismo y mkwiiki la describe.
+- **Solo los humanos.** Las CPU no tienen VR; en línea no hay CPU.
+- **BR no se mueve:** es el puntaje de las batallas, y la sala no tiene batallas.
+- **Quien se corta pierde contra todos, y nadie gana por él.** Lo primero es la regla del juego (desconectarse = último).
+  Lo segundo es la de Retro Rewind (mkwiiki: «si un rival se desconecta y ganas por eso, no ganas VR»): así nadie junta
+  VR con un amigo que se va a propósito.
+
+### 82.1 La regla, sacada del juego
+
+Leída en el C++ traducido (regla «decompilar uno mismo»): 0x8052D118 (lo que gana el que llegó antes), 0x8052D1C0 (lo
+que pierde el que llegó después) y 0x8052CEF8 (la curva).
+1. Cada **par** de humanos de la carrera: el que llegó antes gana el par.
+2. Diferencia = VR del perdedor − VR del ganador, recortada a ±9998.
+3. t = (diferencia + 9998) × 1/4999: un número de 0 a 4.
+4. Los puntos salen de una **curva por puntos** (B-spline cúbica) con los valores **0, 1, 8, 50, 125** (la tabla de
+   0x8088FF60), en precisión simple (32 bits), y se truncan.
+5. El ganador suma esos puntos y el perdedor resta los mismos.
+
+Algunos valores:
+
+| Le ganaste a alguien con… | Puntos |
+|---|---|
+| 9998 VR menos | 0 |
+| 5000 menos | 1 |
+| 2000 menos | 6 |
+| el mismo VR | **13** |
+| 2000 más | 26 |
+| 5000 más | 55 |
+| 9998 más (o más) | 112 |
+
+Con 4 humanos de igual VR: el 1.º +39, el 2.º +13, el 3.º −13 y el 4.º −39.
+
+**La trampa del 1/5000.** En la lectura del código el paso parecía «÷ 5000», y así lo escribí primero. La comparación
+contra el juego (82.4) dio 325 diferencias distintas de 19 997. El número de 0x8088FF90 es **1/4999** (0,00020004).
+Con él, ±9998 cae justo en las puntas de la curva (0 y 4). Con 1/5000 los bordes truncaban un punto distinto.
+
+### 82.2 En la sala (`web/navegador/vr-sala.mjs`, `sala-carrera.mjs`, `mkw.mjs`)
+
+- **La foto de los VR.** Cada página le dice a la anfitriona su VR (`{t:'vr'}`, cada segundo mientras ella no lo
+  tenga). Ella los lleva en el estado (`vrs`) y al empezar cada carrera los **congela** (`vrCarrera: {n, vrs}`). Todas
+  las consolas calculan esa carrera con los mismos números: lo que A le gana a B es justo lo que B le pierde a A.
+- **El peor caso, al abrir la carrera.** Cada página guarda como su VR el de perder contra todos los que corren (con dos
+  de 5000: 4987). Si cierra o recarga a mitad de carrera, ese queda, que es lo mismo que ven los demás (se cortó).
+- **Al terminar** (la misma vigía que avisa «terminé», §75): los puestos salen del juego (Raceinfo, cada jugador +0x20,
+  lo mismo que lee `UpdatePoints`). Se saca quién quedó fuera desde el principio (la sala, o cortados en el cuadro 0) y
+  quién se cortó a mitad (la carrera sincronizada; yo, si me salí, §80). Con eso se calcula el cambio y la página
+  **guarda solo el suyo** (`vr.informar`: aquí y en Firebase, `mkw/vr/<uid>`, §59). Muestra «🏁 VR 5000 → 5013 (+13)» y
+  le avisa al sitio (`{tipo:'vr'}`). `?vr=0` = el VR no se mueve en la sala.
+- **La copia local, por cuenta.** `vr.mjs` guardaba la copia del navegador en `mkw.vr`, una para todo el navegador:
+  dos cuentas en el mismo navegador (o las dos pestañas de una prueba) se pisaban el VR. Ahora va en `mkw.vr.<uid>`. La
+  cuenta que todavía no tiene la suya parte de `mkw.vr` (jugó sin sesión y después entró, como antes).
+- **El sitio** (`colabtex/src/juegos/mkw.js`): con `{tipo:'vr'}` el vestíbulo muestra el VR nuevo de quien juega. Al
+  terminar la copa (`fin`) vuelve a leer el de los demás.
+
+### 82.3 El banco (`banco/pruebas/vr-sala`, 27 puntos, sin el juego)
+
+Comprueba:
+- **La curva:** 13 contra uno igual; de 0 a 112; nunca baja al crecer la diferencia (las 19 997); los nudos y sus bordes.
+- **Las carreras:** en 300 salas al azar sin cortes, la suma da 0, el 1.º nunca pierde y el último nunca gana; también
+  los empates.
+- **Los cortes:** los cortados, y que en 300 salas al azar con cortes nadie termina peor que su peor caso.
+- **Los topes:** de 1 a 1 000 000; un VR desconocido vale 5000.
+- **La lectura de una memoria de Wii inventada.**
+- **El árbitro con tres consolas:** la foto de cada carrera, un VR nuevo a mitad de carrera que queda para la siguiente,
+  y los mismos cambios en las tres.
+- **La copia local por cuenta.**
+
+### 82.4 Contra el juego mismo (`web/navegador/prueba-vr.mjs`, 7 puntos)
+
+Un **gancho de prueba** en `web/juego/directo_nativo.cpp` (`Module._mkw_vr_prueba(desde, cuántas)`):
+- En el siguiente SectionMgr::Update arma dos «puntajes» en la pila del juego (muy por debajo de la que usa; el VR en
+  +4, dos bytes) y llama a las dos funciones del juego para cada diferencia.
+- La prueba abre una carrera directo, pide las 19 997 y compara una por una con `vr-sala.mjs`.
+- También lee la tabla y los números de la cuenta en la memoria, y que el byte +0x20 de cada jugador es su puesto.
+
+Resultado: **7/7**. Las 19 997 diferencias dan igual que el juego, tanto lo que se gana como lo que se pierde. La tabla
+es 0, 1, 8, 50, 125, el paso es 1/4999, y los puestos van del 1 al 12 sin repetir.
+
+### 82.5 Con el juego, dos pestañas (`prueba-sala.mjs`, 4 puntos nuevos)
+
+| Momento | Lo que pasó |
+|---|---|
+| Al abrir la carrera 1 | Las dos guardaron 4987 (el peor caso) |
+| Al terminar la 1 | El humano que llegó antes **+13** y el otro **−13**: lo mismo en las dos, guardado |
+| Al abrir la 2 | La foto de la anfitriona es la de después de la 1 (4987 y 5013) |
+| Al terminar la 2 | De nuevo lo que gana uno lo pierde el otro (los dos volvieron a 5000) |
+
+Resultado: **29/30.** El ✗ no era del VR. Ese punto comparaba los relojes de carrera leídos en cada pestaña al terminar,
+pero el reloj sigue corriendo después del fin y cada pestaña se lee en su momento. Con dos juegos a la vez en la PC (la
+otra sesión corría `--recarga`) llegó a 2,3 s. La comparación medía cuándo se leyó cada una, no el juego. Ahora pide
+que en las dos el juego le haya dado la llegada a B. Que la carrera es la misma ya lo dice la tabla, idéntica en las
+dos. Con `--recarga` hay un punto más: B se fue a mitad de la 1, se queda con 4987 y A no gana nada (5000).
+
+```bash
+node banco/correr.mjs vr-sala
+node web/navegador/prueba-vr.mjs
+node web/navegador/prueba-sala.mjs
+node web/navegador/prueba-sala.mjs --recarga
+```
+
+### 82.6 Todo al sitio: el VR, el relevo, la sincronía de tiempo y las copas al azar (2026-10-20 01:40)
+
+**Qué y por qué.** El sitio (`terceros/Paginita-Pro`, el repo de la página) guarda su propia copia de nuestra página del
+juego en `juegos/mkw/`: el **kit** (ver Glosario). La página de Juegos abre esa copia en el marco. Si no se actualiza,
+los jugadores siguen con la página vieja aunque aquí ya esté arreglado. Desde el último envío (commit `27b8e92` del
+sitio, §78 y §79.5) faltaban:
+- **§80 y §80b**: un lento no frena a los demás (relevo, corte en dos fases) y la sincronía de tiempo prendida
+  (`lockstep.mjs`, `malla.mjs`, `banco/pruebas/relevo`, `prueba-relevo.mjs`);
+- **§81**: la ayuda de la tarjeta de video (`aviso-gpu.mjs`, `banco/pruebas/aviso-gpu`);
+- **§82**: el VR de la sala (`vr-sala.mjs` nuevo, `sala-carrera.mjs`, `mkw.mjs`, `vr.mjs`, `banco/pruebas/vr-sala`,
+  `prueba-vr.mjs`);
+- **§83**: las copas al azar que se separaban (`lockstep_nativo.cpp`, `semillas_nativo.cpp`, `depurar_reloj.cpp`,
+  `compilar-web.py`).
+
+Además, en el sitio mismo estaban sin commit desde §82:
+- `colabtex/src/juegos/mkw.js`: el marco avisa `{tipo:'vr'}` y el vestíbulo muestra el VR nuevo de quien juega; al
+  terminar la copa (`fin`) vuelve a leer el de los demás (`pideVrs`);
+- `colabtex/src/juegos/reglas.js`: la explicación «Tu VR» (antes decía que la sala no lo movía; ahora, que cada carrera
+  lo mueve con la regla de Mario Kart Wii);
+- el bundle `juegos-app.js`.
+
+**Cómo.**
+```bash
+bash herramientas/subir-kit.sh     # 217 archivos a terceros/Paginita-Pro/juegos/mkw (frena si ve algo del juego)
+cd terceros/Paginita-Pro/colabtex
+npx esbuild src/juegos-main.js --bundle --minify --format=iife --target=es2020 --outfile=<carpeta aparte>/juegos-app.js
+cmp <carpeta aparte>/juegos-app.js ../juegos-app.js     # sin salida = iguales
+```
+Para saber si el bundle estaba al día no lo rearmé encima del del sitio. Lo armé en una carpeta aparte y lo comparé
+byte a byte con `cmp`: salieron idénticos (2.602.768 bytes). El `juegos-app.js` del sitio ya tenía los cambios de
+`mkw.js` y `reglas.js`.
+
+**Pruebas.**
+
+| Prueba | Resultado |
+|---|---|
+| `node --test tests/mkw.test.cjs tests/mkw-worker.test.cjs` (en `colabtex/`) | 22/22 |
+| `npm run test:juegos` (todas las del sitio) | 977/978: la que falla no es de Mario Kart (abajo) |
+| `node herramientas/prueba-experiencia.mjs` | **17/17** (la sala con dos cuentas, la copa, elegir en el juego y la carrera sincronizada) |
+
+- La que falla es `controles.test.cjs` («cada entrada del salón tiene código que leer»). Espera la dirección del código
+  de Worms como `colabtex/src/juegos/worms.js`, y en Windows le llega `colabtex\src\juegos\worms.js` (ver **Separador de
+  ruta** en el Glosario). Es la herramienta que detecta los controles de cada juego: no toca Mario Kart, y ninguno de
+  nuestros archivos la cambia. No la arreglé porque es de otro juego del sitio; queda anotada para el dueño.
+- `prueba-experiencia` tardó ~2 min y no ~8: los emuladores y las cachés de pipelines y de bloques ya estaban calientes,
+  y la carrera se mira solo hasta que 5 huellas seguidas coinciden.
+- Otra sesión estaba midiendo el aviso de PC lenta (`prueba-sincro` en el puerto 8190). Esperé a que no quedara ningún
+  node suyo y le avisé al terminar: dos juegos más en la misma PC le habrían cambiado las medidas.
+
+**El commit del sitio** (local, sin push) lleva solo `colabtex/src/juegos/mkw.js`, `colabtex/src/juegos/reglas.js`,
+`juegos-app.js` y `juegos/mkw/` (menos `juegos/mkw/AGENTS.md`), con rutas explícitas. No toca los cambios del sitio que
+no son nuestros: `index.html`, los `*.dc.html`, los `index.html` sellados de otros juegos y `AGENTS.md`.
+
+**Lo que el sitio NO lleva: el programa.** §83 cambió el C++ del juego, o sea el `.wasm`. Ese va a R2 y lo sube el
+dueño (`docs/publicar.md`: `compilar-web.py --modo navegador --final` y `subir-r2.mjs --subir`). Hasta entonces el
+arreglo de las copas al azar no llega a los jugadores, aunque el sitio ya tenga la página nueva. La página nueva no le
+pide al programa nada que el viejo no tenga: las dos funciones nuevas del programa (`mkw_vr_prueba`,
+`mkw_vr_prueba_lista`) solo las usa `prueba-vr.mjs`. Así que no se rompe si el sitio sale antes que el programa.
+
+**Trampas.**
+- `subir-kit.sh` copia también lo que no está en git **ni** en `.gitignore`: el `AGENTS.md` suelto del proyecto llegó a
+  `juegos/mkw/AGENTS.md`. Por eso el commit va con rutas y nunca con `git add -A`.
+- La bitácora y el PLAN viajan en el kit tal como están al copiarlo. Si se escriben después, hay que pasarlos al kit
+  antes del commit del sitio. Aquí los copié a mano, solo esos dos: mientras tanto otra sesión había empezado a cambiar
+  `web/navegador/mkw.mjs` y `prueba-inicio.mjs` sin commit. Un `subir-kit.sh` nuevo se habría llevado al sitio su
+  trabajo a medio hacer (el kit copia la carpeta tal como está, no lo del último commit).
+- `sitio-local.mjs` (y por eso `prueba-experiencia`) sirve la página desde `web/navegador/` de esta carpeta, **no** desde
+  la copia del kit. Mi corrida usó el `mkw.mjs` con el cambio de la otra sesión. Ese cambio solo toca «Multiplayer →
+  Local» del menú de inicio, que esta prueba no recorre (usa Single Player y Multiplayer → Online), así que el 17/17 vale
+  también para lo que quedó en el sitio. Para probar exactamente el kit hay que correrla con la carpeta sin cambios
+  ajenos.
+
+## 2026-10-20 · §83 Las copas que se separaban (C2): el sorteo de reserva de los objetos usaba la hora de cada PC
+
+**Resumen.** En la sala todas las consolas corren la misma carrera a la vez, y cada una calcula a los 12 karts. Para
+que den lo mismo, todo el azar de la carrera tiene que salir igual en todas. Una copa al azar (pistas 65.0, 75.0, 39.0 y
+74.1, semilla 3549642503) se separaba siempre cerca del cuadro 6100 de la carrera 1. La causa: cuando la caja sortea un
+objeto que ya no tiene cupo, Retro Rewind sortea otro con un dado propio, y la semilla de ese dado salía de **la hora de
+cada PC**. Ahora, durante la carrera sincronizada, esa hora es el reloj de la carrera (igual en todas), y la semilla
+vuelve a cero en cada carrera. La copa que fallaba pasa entera con las huellas iguales.
+
+### 83.1 El síntoma
+
+La C2 del plan es correr muchas copas sincronizadas con pistas y semillas al azar (`herramientas/copas-al-azar.mjs`,
+§70). Ya en §70 esta copa se separaba en el cuadro ~6046 de la carrera 1. Se fijó el reloj de dos funciones más
+(0x80750AAC y 0x807DC048, que arman su propio azar con la hora), pero siguió: 2 de 4 corridas bien. Quedó en pausa
+por la etapa M.
+
+Hoy, con `prueba-sincro.mjs --copa` y esa copa, se separó en las tres corridas, siempre en la carrera 1. En dos se
+notó en los cuadros 6240 y 6120, y lo separado era «carrera», es decir, la posición de los karts. En la tercera, una
+pestaña siguió en la carrera 1 mientras la otra ya había pasado a la 2.
+
+### 83.2 Primero, una falla de la red (no era la C2)
+
+En una de las corridas la separación fue otra: «botones distintos» en el cuadro 960. Era un **corte perdido**. La red
+cortó a un jugador (§80) y el aviso del corte no llegó a la otra pestaña, así que cada una usó botones distintos para él.
+Se lo pasé a la sesión de la sala, que lo arregló en el commit `a8212f3`: los cortes se repiten cada medio segundo, las
+huellas ya no se comparan con quien quedó cortado, y si la red se parte sigue la isla más grande (§80b).
+
+En ese mismo commit va mi cambio a `prueba-sincro.mjs --copa`. Si las huellas no coinciden, la prueba escribe
+`DESINCRONIZADO (A/B)` con el cuadro y qué se separó, y guarda el registro de red de cada pestaña en `red-A.txt` y
+`red-B.txt`.
+
+Para separar la carrera de la red, las corridas siguientes llevaron `&margen=120&relevo=0`: nadie se corta antes de
+120 s y nadie releva a nadie. Igual se separó en el 6240. Entonces era la carrera misma.
+
+### 83.3 Un amperímetro en cada rama: quién lee la hora durante la carrera
+
+Lo que separa dos copias de la misma carrera casi siempre es algo que lee **la hora del procesador** (cada PC tiene la
+suya). Desde §61 las funciones que sacan su azar de la hora (la lista `RELOJ_CARRERA` de `compilar-web.py`) leen el
+**reloj de la carrera**, que es igual en todas. Faltaba saber si alguna otra la leía.
+
+Para eso se armó un programa de depuración, el **vigía del reloj**:
+- Con `MKW_DEPURAR_RELOJ=1`, `compilar-web.py` cambia en **todas** las demás funciones del juego la lectura de la hora
+  (`PPC_Mftb`) por `PPC_MftbVigia(función, desde dónde)` (`web/juego/depurar_reloj.cpp`).
+- `PPC_MftbVigia` devuelve lo mismo, la hora de verdad, pero con la carrera sincronizada anota en la consola
+  `[RELOJ] función lr cuadro vez`.
+- Anota las 3 primeras lecturas de cada lugar en cada carrera, y después la 4.ª, 8.ª, 16.ª… Así se ve si un lugar lee
+  todo el tiempo sin llenar la consola.
+
+Los nombres salen del **mapa de símbolos** de la comunidad (`terceros/Wiicompiled/projects/mkwii/MAP.txt`). Esto es lo
+que leyó la hora durante la carrera:
+
+| Quién (dirección → nombre) | Cuándo | ¿Decide algo de la carrera? |
+|---|---|---|
+| 0x800A4AF0 `nw4r::snd::SoundThread::FrameProcess` y 0x800895D0 `AxManager::AuxCallbackFunc` | todo el tiempo | no: el sonido |
+| 0x80210024 `EGG::AsyncDisplay::postVRetrace` y 0x8021A06C `EGG::Display::calcFrequency` | cada cuadro | no: la pantalla. Lo que sí tocaba la carrera, `beginFrame`, está fijo desde §62 |
+| 0x8051DFC0 (de `HomeMenuMgr::Calc`) | cada cuadro | no: el fundido del menú HOME (el brillo, de 0 a 255) |
+| 0x8052F924 `RacedataScenario::InitRng` | 1 vez, antes de largar | no: `semillas_nativo.cpp` pisa esas semillas enseguida |
+| 0x801AAD74 `OS::GetTick`, llamado desde `MiiHeadsModel::Init` (0x807DC270) | 1 vez, cuadro 0 | no: las caras de los Mii |
+| … llamado desde Retro Rewind en 0x81804548 (objetos condicionales) | 1 vez, cuadro 0 | **sí**, en las pistas que los usan |
+| … llamado desde Retro Rewind en 0x81836284 (sorteo de reserva de los objetos) | 1 vez, **cuadro 5975**, en las dos pestañas | **sí: era esta** |
+
+La última fila es la clave. Las dos pestañas leyeron la hora en el mismo cuadro, 5975, desde el mismo lugar, y cada una
+recibió la de su PC. La separación se notó en la huella siguiente (se compara cada 120 cuadros): 6120 o 6240.
+
+### 83.4 Qué hacía Retro Rewind con la hora
+
+El código traducido se leyó aquí (es de Nintendo y de Retro Rewind: se lee para entender, no se copia). Para saber qué
+era cada función se miró también el código de Pulsar, que es público. Pulsar es el motor de Retro Rewind, con licencia
+GPL, y solo se lee.
+
+**(a) El sorteo de reserva de los objetos** (`rr_kamek_81836190`, `CustomItems.cpp` en Pulsar):
+- Hay un tope de objetos peligrosos a la vez en la pista (caparazones azules, rayos, Bill Bala…).
+- Si la caja sortea uno que ya no tiene cupo, Pulsar sortea otro con un **LCG** (un dado de cuenta fija:
+  `x ← x · 1103515245 + 12345`).
+- Su semilla es una **semilla estática** (vive en 0x818A0C28). Empieza en 0 y, la primera vez que hace falta, se llena
+  con `OS::GetTick`, la hora del procesador.
+- En esta copa esa primera vez llega en el cuadro 5975, a los ~100 s de largar. Desde ahí la misma caja daba otro objeto
+  en cada consola.
+- Por eso fallaba siempre en el mismo lugar: es un **disparador determinista**. Con la misma semilla y las mismas
+  pistas, el primer objeto sin cupo sale siempre en el mismo cuadro.
+
+**(b) Los objetos condicionales** (`rr_kamek_818044F8`, al empezar cada carrera):
+- Un número del 0 al 7 decide cuáles objetos propios de Retro Rewind (números 0x1000 a 0x1FFF) aparecen en la pista.
+- En contrarreloj y contra fantasmas vale 0. En línea usa un número que le pasa el juego, no la hora. En VS, que es
+  como corre nuestra sala, salía de `OS::GetTick`.
+- En esta copa no hizo daño (si no, se habría separado mucho antes), pero en otra pista cada consola podía tener otros
+  obstáculos.
+
+### 83.5 Por qué se le escapó a `RELOJ_CARRERA`
+
+`OS::GetTick` es una función de una sola instrucción. El traductor la **copia adentro** de cada función que la usa, y
+`RELOJ_CARRERA` cambia esas copias en las funciones de su lista. Pero estas dos partes de Retro Rewind no la copian: la
+**llaman**, y la original seguía leyendo la hora de verdad.
+
+En la tabla de 83.3, cada fila con `801aad74` es justamente una llamada a la original. Ninguna función de la lista
+podía cubrirla.
+
+### 83.6 El arreglo
+
+**`web/juego/lockstep_nativo.cpp`.** Una envoltura de `OS::GetTick` (0x801AAD74):
+- Con el reloj fijo encendido y una carrera en curso (hay Raceinfo), devuelve el reloj de la carrera de ese lugar:
+  `PPC_MftbCarreraEn(100, lr)`, el reloj por lugar de §62.
+- Ese número sale del cuadro, del lugar y de cuántas veces se leyó. Las consolas lo llaman en el mismo cuadro desde el
+  mismo lugar, así que todas reciben el mismo.
+- Fuera de la carrera (menús, cargas) sigue la hora real.
+
+**`web/juego/semillas_nativo.cpp`.** Al preparar cada carrera sincronizada, la semilla del sorteo de reserva
+(0x818A0C28) vuelve a 0:
+- La primera vez que haga falta en **esa** carrera, se siembra con el reloj de la carrera.
+- Sin esto, quien recarga a mitad de la copa (§75) volvería con la semilla en 0 mientras las demás siguen su lista de
+  números. Se separaría en el primer objeto sin cupo de la carrera siguiente.
+
+**`herramientas/compilar-web.py`.**
+- Suma el reemplazo de `func_801AAD74`.
+- Agrega una revisión: si `rr_kamek_81836190` ya no lee la semilla en 0x818A0000 + 3112 (por ejemplo, porque se tradujo
+  otro Retro Rewind), la compilación se detiene en vez de escribir en cualquier lado.
+- El vigía queda como herramienta de depuración: `MKW_DEPURAR_RELOJ=1` con `web/juego/depurar_reloj.cpp`.
+
+### 83.7 Pruebas
+
+| Prueba | Antes | Ahora |
+|---|---|---|
+| `prueba-sincro.mjs --copa --pistas=65.0,75.0,39.0,74.1 --semilla=3549642503` (con el relevo y el margen de la sala) | se separaba cerca del cuadro 6100 de la carrera 1 (3 de 3 corridas) | **4/4**: las huellas iguales en toda la copa (116 de 116) y las dos pasan solas a la carrera 2 |
+| `copas-al-azar.mjs --copas 4 --sala c2-arreglo-20261020` (pistas y semillas nuevas) | — | **16/16, ninguna separada**: 58.1/66.3/30.0/47.3, 54.0/41.3/26.0/20.3, 49.0/72.1/0.1/4.1 y 48.3/44.0/20.2/64.3, cada una con la carrera 1 entera y 900 cuadros de la 2 (6 a 7 min) |
+
+```bash
+MKW_DEPURAR_RELOJ=1 MKW_DEPURAR_LS=1 MKW_CFLAGS_EXTRA=-DMKW_VIGIA python herramientas/compilar-web.py --modo navegador --carpeta build/web-vigia
+MKW_BUILD=build/web-vigia/navegador node web/navegador/prueba-sincro.mjs --copa --pistas=65.0,75.0,39.0,74.1 --semilla=3549642503 --minutos=4 "--extra=&margen=120&relevo=0"
+node web/navegador/prueba-sincro.mjs --copa --pistas=65.0,75.0,39.0,74.1 --semilla=3549642503
+node herramientas/copas-al-azar.mjs --copas 4
+```
+
+Con el programa normal (`build/web`, recompilado con el arreglo), `prueba-sincro.mjs` sin copa da **10/11**. Las huellas
+coinciden; el ✗ es «sin avisos de sala lenta»: la pestaña A va a 48–50 cuadros/s. No viene de §83. La misma
+prueba con la envoltura de `GetTick` apagada (un programa aparte, compilado solo para comparar) da lo mismo, y
+también sin la sincronía de tiempo (`&sincroTiempo=0`). Esa noche la PC tenía ~24 % de la CPU ocupada por otros
+programas sin ninguna prueba corriendo. En §70 este punto pasaba (11/11); queda por ver si es la PC o algo de
+§73–§80.
+
+Lo que no se probó directo: la vuelta a cero de la semilla para quien **recarga** (§75). Haría falta que, en la
+carrera a la que vuelve, salga un objeto sin cupo. Se razonó a partir del código: sin la vuelta a cero, esa consola
+sembraría en otro momento que las demás.
+
+Las huellas «iguales A 100 / B 93» no son una falla. Cada pestaña cuenta las que pudo comparar: la suya y la de la
+otra para el mismo cuadro. Cuando la prueba termina, a una todavía le faltan las últimas de la otra. Todas las
+comparadas fueron iguales.
+
+### 83.8 Trampas
+
+- **`?rastro=1` (§70) no sirvió aquí.** Hace una huella de cada RaceinfoPlayer que incluye punteros. En cada pestaña la
+  memoria del juego queda corrida por lo que pasó en los menús: el mismo montón está en 0x80AF8880 en una y en
+  0x80AF87E0 en la otra, 0xA0 de diferencia. Así los 12 karts «difieren» desde el primer cuadro. Solo sirve si las dos
+  pestañas quedaron con la memoria igual.
+- **No correr dos juegos pesados a la vez** si no hace falta. Cada pestaña tiene sus tirones, y con relevo y cortes
+  encendidos se mezclan fallas de la red con las de la carrera. Para ver solo la carrera: `&margen=120&relevo=0`.
+- **Compilar aparte** (`--carpeta build/web-c2` y servir con `MKW_BUILD=build/web-c2/navegador`) para no pisar el
+  programa que otra sesión está probando. La primera vez compila todo, ~5,5 min. Copiar `pipelines.bin` y
+  `bloques.json` del build normal para que cargue igual.
