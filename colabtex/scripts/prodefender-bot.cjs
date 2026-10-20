@@ -34,6 +34,14 @@
    todas las de su reino; «control» mete el Ancla y la escarcha (para medir
    el retroceso y las congelaciones); «sinheroe» juega sin héroe (para ver
    cuánto pesa); «espinas» solo Lanzaespinas, Vigía y Prisma.
+   «adapta» es la mixta con las respuestas a las mecánicas de la segunda era
+   (reinos 5–9, en pruebas): no gasta en electricidad si vienen Elementales de
+   Tormenta, pone Pararrayos que cubran sus torres más caras donde hay trueno,
+   tinta o tentáculos, asegura fuego contra la Hidra, varía el tipo de daño
+   contra los Autómatas, cuenta la niebla como camuflaje y usa la Bruja, las
+   Burbujas y el Campanario. La mixta juega esos reinos sin saber nada de eso:
+   la diferencia mide cuánto pesan. Solo usa lo que vende cada reino
+   (levels.js: `torres`).
 
    No pasa por la Grabadora: no hace pruebas, solo mide. Imprime por reino:
    hasta qué ronda llega, cuántas vidas pierde por decena de rondas y hasta
@@ -41,7 +49,7 @@
    alguno en la ronda, en %). Un bot que gana sin perder vidas y con los
    enemigos al 40 % del camino es un juego fácil.
 
-   Uso:  node scripts/prodefender-bot.cjs [--reino 0..4|todos] [--estrategia mixta|control|sinheroe|espinas|todas]
+   Uso:  node scripts/prodefender-bot.cjs [--reino 0..9|todos|nuevos|diez] [--estrategia mixta|control|sinheroe|adapta|todas]
                                           [--semilla N[,M…]] [--motor DIR] [--json] [--rondas] [--fugas] [--anticipa] [--ayuda N]
 
    --motor DIR   carga el juego de otra carpeta (p. ej. una versión anterior
@@ -62,6 +70,9 @@ const PD = globalThis.PD;
 const STEP = 1 / 60;
 const AYUDA = +opt('ayuda', 0);
 const SOPORTE = { totem: 1, huerto: 1, faro: 1 };
+// de control: lo suyo (sapos, burbujas, eco, proteger) no lo mide el campo de tiro; se ponen por reglas
+const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1 };
+const APARTE = { ...SOPORTE, ...CONTROL };
 // planes de gasto que prueba la anticipación (decide los lee en this.modo)
 const MODOS = ['normal', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
 const DETECTA = { espinas: 1, vigia: 1, voltaico: 1, colmena: 1, balista: 1 };   // camuflados en el 2.º camino, nivel 2
@@ -73,12 +84,19 @@ const MIXTA = [
   ['espinas', 'espinas', 'sierra', 'espinas', 'acido', 'voltaico', 'mortero', 'vigia', 'prisma', 'dragon', 'sierra'],
   ['espinas', 'espinas', 'balista', 'espinas', 'voltaico', 'dragon', 'prisma', 'vigia', 'mortero', 'balista', 'dragon'],
   ['espinas', 'espinas', 'geiser', 'espinas', 'voltaico', 'prisma', 'vigia', 'mortero', 'forja', 'balista', 'geiser'],
-  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'voltaico', 'balista', 'segador', 'prisma', 'sierra']
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'voltaico', 'balista', 'segador', 'prisma', 'sierra'],
+  // segunda era (cada reino vende menos: levels.js `torres`)
+  ['espinas', 'espinas', 'bumeran', 'espinas', 'voltaico', 'mortero', 'vigia', 'prisma', 'dragon', 'balista', 'bumeran'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'voltaico', 'mortero', 'prisma', 'dragon', 'balista', 'vigia', 'prisma'],
+  ['espinas', 'espinas', 'sierra', 'espinas', 'prisma', 'vigia', 'mortero', 'balista', 'sierra', 'geiser', 'prisma'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'mortero', 'desintegrador', 'balista', 'dragon', 'voltaico', 'desintegrador'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'balista', 'mortero', 'desintegrador', 'prisma', 'segador']
 ];
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   control: { rota: MIXTA.map(l => l.slice(0, 3).concat(['ancla', 'escarcha'], l.slice(3), ['ancla'])) },
-  sinheroe: { rota: MIXTA, sinHeroe: true }
+  sinheroe: { rota: MIXTA, sinHeroe: true },
+  adapta: { rota: MIXTA, adapta: true }
 };
 // Orden en que sube los caminos de cada torre (0 o 1 por mejora): el principal llega a 4
 // y el otro a 2. Los héroes alternan los dos y al final llevan uno al 5 si el motor deja.
@@ -88,7 +106,8 @@ const PLAN = {
   colmena: [0, 1, 1, 0, 0, 0], totem: [1, 1, 0, 0, 1, 1], ancla: [0, 0, 1, 1, 0, 0], huerto: [0, 0, 1, 1, 0],
   bumeran: [0, 0, 1, 1, 0, 0], raices: [0, 0, 1, 1, 0, 0], sierra: [0, 0, 1, 1, 0, 0], acido: [0, 0, 1, 1, 0, 0],
   faro: [0, 0, 1, 1, 0], balista: [0, 1, 1, 0, 0, 0], forja: [0, 0, 1, 1, 0, 0], geiser: [0, 0, 1, 1, 0, 0],
-  obelisco: [0, 0, 1, 1, 0, 0], segador: [0, 0, 1, 1, 0, 0]
+  obelisco: [0, 0, 1, 1, 0, 0], segador: [0, 0, 1, 1, 0, 0],
+  bruja: [0, 0, 1, 1, 0, 0], pararrayos: [1, 1, 0, 0, 1, 1], burbujas: [0, 0, 1, 1, 0, 0], desintegrador: [0, 1, 1, 0, 0, 0], campanario: [0, 0, 1, 1, 0, 0]
 };
 const PLAN_HEROE = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
 
@@ -149,10 +168,16 @@ class Bot {
     this.dens = new Float64Array(this.muestras.length);
     this.sitios = [];
     for (let x = 24; x < PD.W - 20; x += 16) for (let y = 24; y < PD.H - 20; y += 16) this.sitios.push([x, y]);
-    this.rota = this.est.rota[li];
+    const vende = PD.towersFor(li);
+    this.rota = this.est.rota[li].filter(x => vende.includes(x));
     this.ri = 0;
     const heroe = PD.heroOf(li);
-    this.permitidas = [...new Set(this.rota.concat(heroe && !this.est.sinHeroe ? [heroe] : []))];
+    // las de control solo las usa «adapta» (por reglas, ver adapta())
+    const control = this.est.adapta ? Object.keys(CONTROL).filter(x => vende.includes(x)) : [];
+    this.permitidas = [...new Set(this.rota.concat(control, heroe && !this.est.sinHeroe ? [heroe] : []))];
+    // qué mecánicas trae el reino (para «adapta»)
+    const pool = PD.LEVELS[li].pool.map(p => PD.ENEMIES[p[0]]).concat([PD.ENEMIES[PD.LEVELS[li].boss]]);
+    this.mec = { protege: pool.some(d => d.thunder || d.ink || d.grab), fuego: pool.some(d => d.regenFuego), adapta: pool.some(d => d.adapt) };
     this.campo();
   }
   // mide todas las combinaciones de todas las torres permitidas (una vez por partida)
@@ -205,9 +230,15 @@ class Bot {
       let v;
       if (aura && !vacio) {
         v = 0;
-        for (const t of g.towers) if (!SOPORTE[t.type] && Math.hypot(t.x - x, t.y - y) < aura - 6) v += this.poder(t);
+        for (const t of g.towers) if (!APARTE[t.type] && Math.hypot(t.x - x, t.y - y) < aura - 6) v += this.poder(t);
         v += this.cobertura(x, y, R) * 1e-3;
       } else if (type === 'huerto') v = -this.cobertura(x, y, 140, true);
+      else if (type === 'pararrayos' && !vacio) {
+        // donde cubra más oro invertido sin proteger (lo que buscan el trueno y los tentáculos)
+        v = 0;
+        for (const t of g.towers) if (t.type !== 'pararrayos' && !g.protegida(t) && Math.hypot(t.x - x, t.y - y) < R - 4) v += t.spent;
+        v += this.cobertura(x, y, R) * 1e-3;
+      }
       else v = this.cobertura(x, y, R, vacio);
       if (v > mv) { mv = v; mejor = [x, y]; }
     }
@@ -238,7 +269,7 @@ class Bot {
   calibra() {
     const pares = [];
     for (const t of this.game.towers) {
-      if (SOPORTE[t.type]) continue;
+      if (APARTE[t.type]) continue;
       const m = this.mem.get(t.id), d = m.dealt.slice(-3);
       if (d.length < 2) continue;
       const pred = this.poder(t) / (this.cal[t.type] || 1);
@@ -254,7 +285,7 @@ class Bot {
     const s = this.sitio(type);
     if (!s) return null;
     const t = this.game.place(type, s[0], s[1]);
-    if (t) { this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 }); if (!SOPORTE[type]) this.marca(t); }
+    if (t) { this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[type]) this.marca(t); }
     return t;
   }
   // los próximos pasos del plan de una torre (los que ya hizo se descuentan por camino)
@@ -271,21 +302,22 @@ class Bot {
   }
   // qué traen las tres rondas siguientes; fc y ff: la parte (por amenaza) camuflada y voladora
   vienen(r) {
-    const R = this.game.rounds, o = { camo: false, phase: false, shield: false, fc: 0, ff: 0 };
+    const R = this.game.rounds, o = { camo: false, phase: false, shield: false, fc: 0, ff: 0, fe: 0 };
     let tot = 0;
     for (let k = r; k < r + 3 && k <= R.length; k++) for (const gr of R[k - 1].groups) {
       const d = PD.ENEMIES[gr.type], w = PD.enemyThreat(gr.type) * gr.n * (k === r ? 2 : 1);
       tot += w;
-      if (d.camo || gr.mod === 'camo') { o.camo = true; o.fc += w; }
+      if (d.camo || gr.mod === 'camo' || (this.est.adapta && d.fogAura)) { o.camo = true; o.fc += w; }
+      if (d.absorb === 'elec') o.fe += w;
       if (d.flying) o.ff += w;
       if (d.phase) o.phase = true;
       if (d.shield) o.shield = true;
     }
-    if (tot) { o.fc /= tot; o.ff /= tot; }
+    if (tot) { o.fc /= tot; o.ff /= tot; o.fe /= tot; }
     return o;
   }
   // la parte de lo que viene que una torre con esas estadísticas puede atacar
-  ve(s, v) { return (s.camo ? 1 : 1 - v.fc * 0.9) * (s.noFlying ? 1 - v.ff * 0.9 : 1); }
+  ve(s, v) { return (s.camo ? 1 : 1 - v.fc * 0.9) * (s.noFlying ? 1 - v.ff * 0.9 : 1) * (this.est.adapta && s.dtype === 'elec' ? 1 - v.fe : 1); }
 
   // Gasta entre rondas hasta que no hay nada que valga la pena o decide ahorrar.
   turno() {
@@ -300,7 +332,7 @@ class Bot {
   }
   decide(r) {
     const g = this.game, T = g.towers, vet = this.vetadas;
-    const dmg = T.filter(t => !SOPORTE[t.type]);
+    const dmg = T.filter(t => !APARTE[t.type]);
     const nuevo = type => ({ k: 'place', type, cost: PD.TOWERS[type].cost });
     const modo = this.modo || 'normal';
     const presion = this.presion || dmg.length < 2 || modo === 'gasta';
@@ -326,6 +358,7 @@ class Bot {
     }
     if (vienen.phase && !dmg.some(t => t.type === 'prisma' || t.s.dtype === 'arcane') && this.permitidas.includes('prisma') && !vet.prisma) return nuevo('prisma');
     for (const f of this.est.fuerza || []) if (r >= 10 && !T.some(t => t.type === f) && this.permitidas.includes(f) && !vet[f]) return nuevo(f);
+    if (this.est.adapta) { const a = this.adapta(r, presion); if (a) return a; }
     const heroe = PD.heroOf(this.li);
     if (heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
     const granjas = T.filter(t => t.type === 'huerto').length;
@@ -351,7 +384,7 @@ class Bot {
         if (extra && horiz) granja.push({ k: 'up', t, p, cost: c, oro: extra * horiz / c });
         continue;
       }
-      if (t.type === 'totem' || t.type === 'faro') {
+      if (t.type === 'totem' || t.type === 'faro' || CONTROL[t.type]) {
         let cerca = 0; for (const o of dmg) if (Math.hypot(o.x - t.x, o.y - t.y) < t.s.range) cerca += this.poder(o);
         cands.push({ k: 'up', t, p, cost: c, sc: cerca * 0.12 / c });
         continue;
@@ -378,7 +411,9 @@ class Bot {
       let dens = 0; for (const x of this.dens) dens += x; dens /= Math.max(1, this.dens.length);
       let type = this.rota[this.ri % this.rota.length];
       if (modo === 'diversa') type = this.rota.find(x => !dmg.some(t => t.type === x) && !vet[x]) || type;
-      if (!vet[type]) cands.push({ ...nuevo(type), rota: true, sc: this.dpsDe(type, [0, 0]) * (this.cal[type] || 1) * this.ve(PD.TOWERS[type].base, vienen) / PD.TOWERS[type].cost / (1 + 0.2 * dens) });
+      // «adapta» contra los Autómatas: un tipo de daño que aún no tiene rinde más
+      const nuevoTipo = this.est.adapta && this.mec.adapta && !dmg.some(t => t.s.dtype === PD.TOWERS[type].base.dtype) ? 1.6 : 1;
+      if (!vet[type]) cands.push({ ...nuevo(type), rota: true, sc: nuevoTipo * this.dpsDe(type, [0, 0]) * (this.cal[type] || 1) * this.ve(PD.TOWERS[type].base, vienen) / PD.TOWERS[type].cost / (1 + 0.2 * dens) });
     }
     if (!cands.length) return null;
     cands.sort((a, b) => b.sc - a.sc);
@@ -390,6 +425,28 @@ class Bot {
     if (best.cost <= g.money) return best;
     const alt = cands.find(c => c.cost <= g.money && c.sc > 0);
     return alt && (presion || alt.sc >= best.sc * 0.75) ? alt : best;
+  }
+
+  // ---- «adapta»: las respuestas a las mecánicas de la segunda era ----
+  adapta(r, presion) {
+    const g = this.game, T = g.towers, vet = this.vetadas, puede = x => this.permitidas.includes(x) && !vet[x];
+    const nuevo = type => ({ k: 'place', type, cost: PD.TOWERS[type].cost });
+    // fuego para cortar la regeneración de la Hidra antes de la ronda 25
+    if (this.mec.fuego && r >= 14 && !T.some(t => t.s.dtype === 'fire' || t.s.burnDps) && puede('dragon')) return nuevo('dragon');
+    // pararrayos: que las torres más caras queden cubiertas (trueno, tinta y tentáculos)
+    if (this.mec.protege && r >= 9 && puede('pararrayos')) {
+      const caras = T.filter(t => t.type !== 'pararrayos').sort((a, b) => b.spent - a.spent).slice(0, 6);
+      const sin = caras.filter(t => !g.protegida(t)).reduce((a, t) => a + t.spent, 0);
+      const rods = T.filter(t => t.type === 'pararrayos').length;
+      if (sin > 1500 + rods * 600 && rods < (r < 40 ? 2 : 3) && (!presion || g.money >= PD.TOWERS.pararrayos.cost)) return nuevo('pararrayos');
+    }
+    // una de control donde la venden (sapos, burbujas, eco), y una segunda más tarde
+    for (const c of ['bruja', 'burbujas', 'campanario']) {
+      if (!puede(c)) continue;
+      const n = T.filter(t => t.type === c).length;
+      if (((n < 1 && r >= 10) || (n < 2 && r >= 55)) && (!presion || g.money >= PD.TOWERS[c].cost * 1.5)) return nuevo(c);
+    }
+    return null;
   }
 
   // ---- anticipación: probar varios planes de gasto contra la ronda que viene ----
@@ -500,7 +557,7 @@ class Bot {
 
 function main() {
   const reinoArg = opt('reino', 'todos'), estArg = opt('estrategia', 'mixta');
-  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg.split(',').map(Number);
+  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg === 'nuevos' ? [5, 6, 7, 8, 9] : reinoArg === 'diez' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : reinoArg.split(',').map(Number);
   const ests = estArg === 'todas' ? Object.keys(ESTRATEGIAS) : estArg.split(',');
   const semillas = String(opt('semilla', '1')).split(',').map(Number);
   const res = [];

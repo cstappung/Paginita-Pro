@@ -79,8 +79,106 @@
         ['cristal', 24, 0.8], ['excavador', 26, 0.7], ['portador', 27, 0.8], ['heraldo', 28, 0.8], ['golem', 30, 0.7], ['espejismo', 32, 0.7],
         ['magma', 34, 0.7], ['yeti', 36, 0.7], ['chaman', 38, 0.7], ['ave', 40, 0.7], ['zepelin', 32, 0.8], ['titan', 54, 0.7], ['fortaleza', 58, 0.8], ['dirigible', 62, 0.8],
         ['colosoVacio', 70, 0.7], ['ciudadela', 75, 0.8], ['celeste', 78, 0.8], ['leviatan', 90, 0.9], ['arca', 92, 0.9]]
+    },
+
+    // ================= SEGUNDA ERA: reinos 6–10, EN PRUEBAS =================
+    // `prueba`: solo los administradores de Juegos los juegan (main.js: puedeJugar),
+    // el resto los ve como «Próximamente», y no guardan récords ni pagan monedas
+    // (sus tablas no existen: verifica/prodefender.js solo conoce las cinco primeras).
+    // `torres`: lo que vende la tienda (además del héroe del reino), cada vez menos de
+    // las clásicas. `musica`: qué tema de audio.js suena (los cinco primeros).
+    // Mapas más difíciles: caminos más cortos, varias entradas, cruces y portales.
+    {
+      name: 'Pantano Sombrío', short: 'Pantano', prueba: true, musica: 0,
+      subtitle: 'Dos caminos que se cruzan entre la niebla. Algo se mueve bajo el agua.',
+      diff: 1.7, lives: 100, cash: 850, seed: 6091, stars: 5,
+      theme: { bg1: '#2f4a32', bg2: '#243a28', path: '#6a5a3a', pathEdge: '#2a2418', deco: 'swamp', accent: '#c8ff5a' },
+      paths: [
+        [[-30, 130], [420, 130], [420, 520], [760, 520], [760, 250], [1030, 250]],
+        [[-30, 510], [250, 510], [250, 300], [600, 300], [600, 90], [860, 90], [860, 420], [1030, 420]]
+      ],
+      obstacles: [{ x: 120, y: 330, r: 42, kind: 'bog' }, { x: 560, y: 430, r: 34, kind: 'bog' }, { x: 940, y: 560, r: 40, kind: 'bog' }, { x: 700, y: 180, r: 26, kind: 'rock' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'bumeran', 'acido', 'faro', 'balista', 'geiser', 'obelisco', 'bruja'],
+      boss: 'hidra',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['sapo', 4, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['duende', 8, 1.3],
+        ['sombra', 10, 1], ['bruma', 12, 1.2], ['blindado', 13, 1], ['divisor', 15, 1], ['musgo', 17, 0.8], ['chaman', 19, 0.8], ['escorpion', 22, 0.7],
+        ['espejismo', 24, 0.7], ['portador', 26, 0.8], ['zepelin', 32, 0.8], ['titan', 50, 0.7], ['fortaleza', 58, 0.8], ['dirigible', 62, 0.8],
+        ['ciudadela', 74, 0.8], ['celeste', 78, 0.8], ['leviatan', 89, 0.9], ['arca', 91, 0.9]]
+    },
+    {
+      name: 'Cumbres Tormentosas', short: 'Cumbres', prueba: true, musica: 2,
+      subtitle: 'Los rayos caen sobre tus mejores torres. El cielo no está de tu lado.',
+      diff: 1.9, lives: 90, cash: 900, seed: 7103, stars: 5,
+      theme: { bg1: '#5a6478', bg2: '#454e60', path: '#8a8a92', pathEdge: '#2e323c', deco: 'storm', accent: '#ffe14d' },
+      paths: [
+        [[120, -30], [120, 250], [400, 250], [400, 90], [650, 90], [650, 400], [300, 400], [300, 560], [1030, 560]],
+        [[880, -30], [880, 240], [650, 240], [650, 400], [300, 400], [300, 560], [1030, 560]]
+      ],
+      obstacles: [{ x: 520, y: 330, r: 38, kind: 'rock' }, { x: 160, y: 470, r: 44, kind: 'cloud' }, { x: 830, y: 400, r: 46, kind: 'cloud' }, { x: 260, y: 120, r: 26, kind: 'rock' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'faro', 'balista', 'obelisco', 'bruja', 'pararrayos'],
+      boss: 'reyTrueno',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['gargola', 5, 1.3], ['escudero', 7, 1], ['tormentoso', 8, 1.3],
+        ['enjambre', 10, 0.9], ['sombra', 11, 1], ['blindado', 13, 1], ['ave', 15, 0.8], ['divisor', 16, 1], ['golem', 18, 0.7], ['sapo', 20, 0.7],
+        ['heraldo', 22, 0.7], ['cristal', 24, 0.7], ['portador', 26, 0.8], ['zepelin', 30, 0.9], ['duende', 34, 0.6], ['titan', 50, 0.7],
+        ['fortaleza', 58, 0.8], ['dirigible', 60, 0.9], ['ciudadela', 74, 0.8], ['celeste', 76, 0.9], ['leviatan', 89, 0.9], ['arca', 90, 0.9]]
+    },
+    {
+      name: 'Fosa Abisal', short: 'Fosa', prueba: true, musica: 4,
+      subtitle: 'Remolinos que tragan y escupen. En la oscuridad, la tinta ciega.',
+      diff: 2.2, lives: 90, cash: 900, seed: 8117, stars: 5,
+      theme: { bg1: '#0f3a52', bg2: '#0a2a3e', path: '#3a6a7a', pathEdge: '#0a1a24', deco: 'abyss', accent: '#6fd8ff' },
+      paths: [
+        [[-30, 110], [320, 110], [320, 320], [140, 320], [140, 540], [430, 540], [620, 140, 1], [900, 140], [900, 420], [1030, 420]],
+        [[520, -30], [520, 250], [760, 250], [760, 560], [580, 560], [900, 300, 1], [900, 420], [1030, 420]]
+      ],
+      obstacles: [{ x: 640, y: 420, r: 36, kind: 'coral' }, { x: 240, y: 430, r: 30, kind: 'coral' }, { x: 960, y: 580, r: 34, kind: 'coral' }, { x: 420, y: 230, r: 30, kind: 'rock' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'mortero', 'prisma', 'totem', 'huerto', 'sierra', 'balista', 'geiser', 'forja', 'pararrayos', 'burbujas'],
+      boss: 'kraken',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['cangrejo', 5, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['pulpo', 9, 1.3],
+        ['sombra', 10, 1], ['blindado', 12, 1], ['magnetita', 14, 0.8], ['divisor', 15, 1], ['excavador', 17, 0.8], ['espectro', 19, 0.7],
+        ['salamandra', 21, 0.7], ['bruma', 23, 0.7], ['gargola', 25, 0.7], ['portador', 27, 0.8], ['zepelin', 32, 0.8], ['titan', 50, 0.7],
+        ['fortaleza', 58, 0.8], ['dirigible', 62, 0.8], ['ciudadela', 74, 0.8], ['celeste', 78, 0.8], ['leviatan', 89, 0.9], ['arca', 91, 0.9]]
+    },
+    {
+      name: 'Ciudadela de Engranajes', short: 'Engranajes', prueba: true, musica: 3,
+      subtitle: 'Tres puertas, una sola salida. Las máquinas aprenden de cada golpe.',
+      diff: 2.45, lives: 80, cash: 950, seed: 9127, stars: 5,
+      theme: { bg1: '#4a3f36', bg2: '#3a3029', path: '#7a6a5a', pathEdge: '#2a221a', deco: 'gear', accent: '#ffb84d' },
+      paths: [
+        [[-30, 320], [260, 320], [260, 200], [520, 200], [520, 440], [760, 440], [760, 320], [1030, 320]],
+        [[400, -30], [400, 90], [640, 90], [640, 200], [520, 200], [520, 440], [760, 440], [760, 320], [1030, 320]],
+        [[340, 670], [340, 560], [640, 560], [640, 440], [760, 440], [760, 320], [1030, 320]]
+      ],
+      obstacles: [{ x: 120, y: 160, r: 40, kind: 'gearpit' }, { x: 900, y: 520, r: 46, kind: 'gearpit' }, { x: 390, y: 330, r: 30, kind: 'gearpit' }, { x: 880, y: 140, r: 30, kind: 'rock' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'huerto', 'acido', 'balista', 'obelisco', 'burbujas', 'desintegrador'],
+      boss: 'mecatitan',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['escudero', 4, 1], ['automata', 5, 1.3], ['alado', 6, 1], ['blindado', 8, 1],
+        ['reparador', 9, 1.3], ['sombra', 10, 1], ['saboteador', 13, 0.8], ['magnetita', 15, 0.8], ['divisor', 16, 1], ['cangrejo', 18, 0.8],
+        ['tormentoso', 20, 0.7], ['gargola', 22, 0.7], ['pulpo', 24, 0.7], ['portador', 25, 0.8], ['zepelin', 30, 0.8], ['titan', 48, 0.7],
+        ['fortaleza', 56, 0.8], ['dirigible', 60, 0.8], ['colosoVacio', 68, 0.6], ['ciudadela', 72, 0.8], ['celeste', 76, 0.8], ['leviatan', 88, 0.9], ['arca', 90, 0.9]]
+    },
+    {
+      name: 'Trono del Eclipse', short: 'Eclipse', prueba: true, musica: 4,
+      subtitle: 'Tres frentes, un portal y el sol apagándose. El final de todo.',
+      diff: 2.25, lives: 80, cash: 1000, seed: 10133, stars: 5,
+      theme: { bg1: '#2a1a2e', bg2: '#1c1020', path: '#5a3a4a', pathEdge: '#ffcf4d', deco: 'eclipse', accent: '#ffcf4d' },
+      paths: [
+        [[-30, 90], [480, 90], [480, 300], [300, 300], [300, 560], [1030, 560]],
+        [[1030, 80], [720, 80], [720, 300], [480, 300], [300, 300], [300, 560], [1030, 560]],
+        [[-30, 430], [160, 430], [160, 200], [620, 440, 1], [860, 440], [860, 560], [1030, 560]]
+      ],
+      obstacles: [{ x: 600, y: 190, r: 46, kind: 'altar' }, { x: 120, y: 560, r: 34, kind: 'rift' }, { x: 900, y: 300, r: 40, kind: 'altar' }, { x: 420, y: 440, r: 28, kind: 'rock' }],
+      torres: ['espinas', 'vigia', 'mortero', 'prisma', 'totem', 'faro', 'balista', 'obelisco', 'segador', 'desintegrador', 'campanario'],
+      boss: 'eclipse',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['sombra', 4, 1], ['purificador', 5, 1.3], ['alado', 6, 1], ['escudero', 7, 1],
+        ['martir', 9, 1.3], ['blindado', 10, 1], ['espectro', 12, 0.9], ['divisor', 13, 1], ['fractal', 15, 0.8], ['automata', 17, 0.8],
+        ['reparador', 19, 0.8], ['sapo', 21, 0.7], ['bruma', 23, 0.7], ['cangrejo', 25, 0.7], ['portador', 26, 0.8], ['gargola', 27, 0.7],
+        ['pulpo', 29, 0.7], ['zepelin', 31, 0.8], ['titan', 46, 0.7], ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7],
+        ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
     }
   ];
+  // Cuántos reinos están abiertos a todos (los de `prueba` vienen después).
+  PD.PUBLIC_LEVELS = PD.LEVELS.filter(L => !L.prueba).length;
 
   // ---------------------- Curvas de dificultad -------------------------
   // Presión temprana más alta: desde las primeras rondas hay que pensar dónde y qué colocar.

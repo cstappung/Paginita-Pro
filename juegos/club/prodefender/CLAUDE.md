@@ -1,8 +1,8 @@
 # PRO DEFENDER — notes for Claude
 
-Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds, 22
-towers and 30+ enemies, written by the owner as plain scripts (no build) and
-integrated here. Shared club rules (proof, castigo, modo celular) are in
+Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds (plus
+5 more in testing, admins only: «Second era» below), 22 towers and 30+
+enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking wiring in
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat details in
 `docs/antitrampas/prodefender.md`.
@@ -79,6 +79,53 @@ store towers by index there — never insert a tower before them. In `main.js` t
 hero sits above the shop on its own row (key H) and `shopTowers` keeps the
 number hotkeys for the towers only.
 
+## Second era: kingdoms 6–10, in testing (owner's request, Oct 2026)
+
+Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes and
+Trono del Eclipse (`levels.js`, after Vacío). `prueba: true` means:
+
+- **Only Juegos admins play them**; everyone else sees the cards with
+  «PRÓXIMAMENTE» and no buttons (`main.js`: `puedeJugar`). Admin comes from the
+  page (`esAdmin` in `crearSolo` → `{tipo:'admin'}` → `Club.esAdmin()` /
+  `club-admin`); opening the game alone on localhost counts as admin, for previews.
+  It is a UI gate, not security — which is fine because:
+- **No records, no coins**: `reporta`/`escuchaTabla` skip them, `save.best/won`
+  are not written, `recorreTablas` only walks `PD.PUBLIC_LEVELS` (5), and the club
+  has no category for them (`rehace` rejects `r ≥ 5`). Unlocking still stops at
+  Vacío. To open one to everyone: drop its `prueba`, add its category to
+  `REINOS` (prueba.js), the verifier, `club-datos.js`, the rules and the coins.
+- **Fewer towers**: each sells only `L.torres` (a shrinking subset of the 22,
+  plus its own new tower) and its hero (`towersFor`). `musica` picks one of the
+  five audio themes.
+- Maps are shorter, with several entrances, crossings and portals.
+
+New content, all appended (TOWER_ORDER indices matter: never insert before them):
+towers `bruja` (frog: `sapifica`, a sapo has no armor/camo/powers and walks at
+half speed), `pararrayos` (rod: `protegida` — nothing disables, freezes, blinds
+or grabs a tower in its range — plus chain lightning), `burbujas` (bubble:
+`atrapa`/`revienta`), `desintegrador` (disint: % of max HP per second, big ×0.4,
+boss ×0.08) and `campanario` (bell: repeats `e.eco`, the damage taken lately);
+heroes Morgana, Zéfiro, Nerea, Ada and Solenne (abilities `cienaga`,
+`tempestad`, `maremoto`, `sobrecarga`, `amanecer`). Enemy mechanics are listed
+in a comment at the top of the second-era block in `enemies.js`; per-enemy
+logic is `Game.segundaEra`, plus `parte` (Eclipse splits into two bosses at
+half HP), `suelta` (Kraken's grabs) and the hooks in `damage`.
+
+**Determinism of kingdoms 1–5**: every new rule runs only when its new field is
+present (new enemies, new towers), and new `rnd()` calls only happen for new
+enemies. So old proofs replay identically and the proof `VERSION` stayed at 4
+(only the `?v=pd-N` cache tag moved): checked by playing the same scripted game
+on the old and new engine (identical round by round) and by the bot. If you
+change anything that kingdoms 1–5 use, bump `VERSION` as usual.
+
+Balance with `prodefender-bot.cjs --reino nuevos` (see below): `mixta` plays
+them blind, `adapta` knows the counters. Tuned with `--ayuda 100` against the
+same bot in Vacío (which it finishes losing ~13600 lives and three bosses):
+`diff` 1.7 / 1.9 / 2.2 / 2.45 / 2.25 leaves Pantano–Engranajes at 3–6k lives
+and 0–1 escaped bosses and Eclipse above Vacío; `adapta` beats `mixta` clearly
+in Fosa and Eclipse. Without `--ayuda` the bot dies around round 15 in every
+kingdom, Vacío included (its opening), so that number says nothing.
+
 ## Knockback and crowd control
 
 Every push back along the path goes through `Game.retrocede(e, px, src)`:
@@ -114,6 +161,10 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
 - `prodefender-bot.cjs`: a bot that plays well (shooting range per tower and
   tier on the real engine, spends by damage per gold, expert build order) and
   prints the round reached, lives lost per decade and how far enemies get.
+  `--reino nuevos` plays kingdoms 6–10; `--estrategia adapta` adds the
+  second-era counters (no electricity against Storm Elementals, lightning rods
+  over its priciest towers, fire for the Hydra, varied damage types against
+  Automata, and the witch/bubble/bell towers).
   `--motor DIR` runs another engine copy (e.g. `git archive` of an older
   commit) to compare; `--ayuda N` gives unlimited lives up to round N (its
   opening is weaker than a person's). Several minutes per 100-round game.

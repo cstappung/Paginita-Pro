@@ -274,6 +274,149 @@
       sabotage: { every: 8, radius: 140, dur: 2 },
       spawn: { every: 5, type: 'espectro', n: 2 },
       desc: 'JEFE FINAL. Camuflado, se teletransporta, apaga torres e invoca Espectros.'
+    },
+
+    // ================= SEGUNDA ERA (reinos 6–10, en pruebas) =================
+    // Mecánicas nuevas, cada una con su campo (engine.js las mira solo si existen,
+    // así que los cinco primeros reinos se juegan exactamente igual):
+    //   hop       salta hacia adelante; en el aire nadie lo toca (usa `burrowed`)
+    //   steal     al escaparse se lleva esa parte de tu oro
+    //   fogAura   la niebla que lo rodea CAMUFLA a los aliados cercanos
+    //   heads     al perder vida le crecen cabezas (enemigos nuevos)
+    //   regenFuego se regenera mientras no esté ardiendo
+    //   stone     bajo cierta vida se vuelve piedra: inmune y quieto, y se cura
+    //   absorb    ese tipo de daño lo CURA en vez de dañarlo
+    //   thunder   fulmina (apaga) las torres en las que más oro invertiste
+    //   shellHits caparazón: su blindaje se rompe tras recibir tantos golpes
+    //   ink       tinta que CIEGA a las torres cercanas (alcance x0.55)
+    //   grab      tentáculos que atrapan torres hasta que el jefe pierda vida
+    //   adapt     se vuelve resistente al tipo de daño que más recibe
+    //   shieldAura da escudo (que no se recarga) a los aliados cercanos
+    //   cycle     inmune a una familia de daño que va cambiando
+    //   field     campo de fuerza: los aliados cercanos reciben menos daño
+    //   cleanse   limpia ralentizaciones, venenos, maldiciones y demás de sus aliados
+    //   ward      al morir, los aliados cercanos quedan invulnerables un momento
+    //   twins     al bajar de la mitad se parte en dos jefes
+    //   silence   reinicia las habilidades de las torres cercanas
+
+    // ---------------------- REINO 6 · PANTANO SOMBRÍO ----------------------
+    sapo: {
+      name: 'Sapo Saltarín', hp: 34, speed: 50, bounty: 6, leak: 2, r: 12,
+      hop: { every: 3.2, dur: 0.55, speed: 4.2 },
+      color: '#5c9a3a', accent: '#d8ff6a', shape: 'frog',
+      desc: 'SALTA hacia adelante cada pocos segundos: en el aire ninguna torre lo alcanza.'
+    },
+    duende: {
+      name: 'Duende Ladrón', hp: 30, speed: 78, bounty: 14, leak: 1, r: 10, steal: 0.06,
+      color: '#3f7a4a', accent: '#ffd84d', shape: 'goblin',
+      desc: 'Rápido. Si se ESCAPA se lleva el 6% de tu oro. Si lo atrapas, suelta su botín.'
+    },
+    bruma: {
+      name: 'Bruma de la Ciénaga', hp: 60, speed: 40, bounty: 9, leak: 3, r: 15, fogAura: 80,
+      color: '#9aa8a0', shape: 'fog',
+      desc: 'Su NIEBLA camufla a los aliados que la rodean. Ella misma no está camuflada.'
+    },
+    cabezaHidra: {
+      name: 'Cabeza de Hidra', hp: 120, armor: 2, speed: 66, bounty: 10, leak: 6, r: 13, minor: true,
+      color: '#3a7a5a', shape: 'serpent',
+      desc: 'Brota de la Hidra cada vez que pierde una cuarta parte de su vida.'
+    },
+    hidra: {
+      name: 'Hidra del Pantano', hp: 6200, armor: 4, speed: 19, bounty: 800, leak: 9999, r: 44,
+      color: '#2f6a4a', accent: '#c8ff5a', shape: 'hydra', boss: true,
+      regenFuego: 0.008, heads: { type: 'cabezaHidra', n: 3, at: [0.75, 0.5, 0.25] },
+      spawn: { every: 6, type: 'sapo', n: 2 },
+      desc: 'JEFE del Pantano. SE REGENERA mientras no arda y le CRECEN CABEZAS al perder vida.'
+    },
+
+    // -------------------- REINO 7 · CUMBRES TORMENTOSAS --------------------
+    gargola: {
+      name: 'Gárgola', hp: 85, armor: 4, speed: 44, bounty: 10, leak: 4, r: 14,
+      stone: { below: 0.4, dur: 2.5, heal: 0.35 },
+      color: '#8a8f9a', shape: 'gargoyle',
+      desc: 'Bajo el 40% de vida se vuelve PIEDRA: 2.5 s inmune y quieta, y recupera vida.'
+    },
+    tormentoso: {
+      name: 'Elemental de Tormenta', hp: 50, speed: 70, bounty: 8, leak: 3, r: 13, flying: true, absorb: 'elec',
+      color: '#5a7ad8', accent: '#fff27a', shape: 'stormcloud',
+      desc: 'Volador. La ELECTRICIDAD lo cura en vez de dañarlo.'
+    },
+    reyTrueno: {
+      name: 'Rey del Trueno', hp: 5800, shield: 1800, speed: 24, bounty: 800, leak: 9999, r: 42, flying: true,
+      color: '#3a4aa8', accent: '#ffe14d', shape: 'thunderbird', boss: true,
+      thunder: { every: 8, n: 2, dur: 3 }, spawn: { every: 6, type: 'gargola', n: 2 },
+      desc: 'JEFE de las Cumbres. Volador con escudo. FULMINA las torres en las que más invertiste.'
+    },
+
+    // ------------------------ REINO 8 · FOSA ABISAL ------------------------
+    cangrejo: {
+      name: 'Cangrejo Acorazado', hp: 70, armor: 14, speed: 40, bounty: 10, leak: 4, r: 15, shellHits: 6,
+      color: '#d0503a', accent: '#ffb08a', shape: 'crab',
+      desc: 'CAPARAZÓN de blindaje 14 que se rompe tras 6 golpes. Las torres rápidas lo abren.'
+    },
+    pulpo: {
+      name: 'Pulpo Tintero', hp: 65, speed: 52, bounty: 9, leak: 3, r: 14,
+      ink: { every: 5, radius: 95, dur: 3.5 },
+      color: '#8a3ac8', shape: 'octopus',
+      desc: 'Lanza TINTA que ciega a las torres cercanas: su alcance baja casi a la mitad.'
+    },
+    kraken: {
+      name: 'Kraken Abisal', hp: 8000, armor: 6, speed: 18, bounty: 900, leak: 9999, r: 46,
+      color: '#5a2a7a', accent: '#ff7ac8', shape: 'kraken', boss: true,
+      grab: { every: 7, n: 2, dur: 8, hp: 0.06 }, spawn: { every: 7, type: 'cangrejo', n: 2 },
+      desc: 'JEFE de la Fosa. Sus tentáculos ATRAPAN torres hasta que le quitas un 6% de vida.'
+    },
+
+    // -------------------- REINO 9 · CIUDADELA DE ENGRANAJES --------------------
+    automata: {
+      name: 'Autómata Adaptable', hp: 95, armor: 3, speed: 44, bounty: 11, leak: 4, r: 14,
+      adapt: { after: 0.35, res: 0.4, max: 2 },
+      color: '#b08a3a', accent: '#5ad1ff', shape: 'robot',
+      desc: 'Se ADAPTA: el tipo de daño que más recibe le hace cada vez menos (hasta dos tipos).'
+    },
+    reparador: {
+      name: 'Dron Reparador', hp: 45, speed: 62, bounty: 9, leak: 2, r: 11, flying: true,
+      shieldAura: { every: 4, radius: 90, pct: 0.3 },
+      color: '#5ad1a8', shape: 'drone',
+      desc: 'Volador. Da ESCUDO (30% de su vida) a los aliados cercanos cada 4 s.'
+    },
+    mecatitan: {
+      name: 'Mecatitán', hp: 13000, armor: 8, speed: 17, bounty: 1000, leak: 9999, r: 46,
+      color: '#7a6a4a', accent: '#ff5a3a', shape: 'mech', boss: true,
+      cycle: { every: 8 }, field: { radius: 120, f: 0.4 }, spawn: { every: 6, type: 'automata', n: 2 },
+      desc: 'JEFE de la Ciudadela. Cambia de INMUNIDAD cada 8 s y su CAMPO protege a los cercanos.'
+    },
+
+    // ----------------------- REINO 10 · TRONO DEL ECLIPSE -----------------------
+    purificador: {
+      name: 'Purificador', hp: 80, shield: 30, speed: 46, bounty: 11, leak: 4, r: 13,
+      cleanse: { every: 3.5, radius: 95 },
+      color: '#e8e0b0', accent: '#ffcf4d', shape: 'lantern',
+      desc: 'Cada 3.5 s LIMPIA a sus aliados: quita ralentizaciones, venenos, quemaduras y maldiciones.'
+    },
+    martir: {
+      name: 'Mártir del Ocaso', hp: 70, speed: 54, bounty: 9, leak: 3, r: 12, camo: true,
+      ward: { radius: 100, dur: 1.5 },
+      color: '#c87ad8', shape: 'angel',
+      desc: 'Camuflado. Al morir deja INVULNERABLES 1.5 s a los aliados cercanos.'
+    },
+    solGemelo: {
+      name: 'Sol del Eclipse', hp: 4000, speed: 24, bounty: 500, leak: 9999, r: 36, boss: true,
+      resist: { phys: 0.2, explosive: 0.2 },
+      color: '#ffb02a', shape: 'sun',
+      desc: 'Mitad del Eclipse. Resiste el daño físico y explosivo.'
+    },
+    lunaGemela: {
+      name: 'Luna del Eclipse', hp: 4000, speed: 24, bounty: 500, leak: 9999, r: 36, boss: true,
+      resist: { arcane: 0.2, elec: 0.2, fire: 0.2, ice: 0.2 },
+      color: '#8ab0ff', shape: 'moon',
+      desc: 'Mitad del Eclipse. Resiste la magia: arcano, electricidad, fuego y hielo.'
+    },
+    eclipse: {
+      name: 'Eclipse, Devorador de Soles', hp: 11000, armor: 6, speed: 18, bounty: 1200, leak: 9999, r: 48,
+      color: '#1a1030', accent: '#ffcf4d', shape: 'eclipse', boss: true,
+      twins: ['solGemelo', 'lunaGemela'], silence: { every: 9, radius: 220 }, spawn: { every: 6, type: 'martir', n: 2 },
+      desc: 'JEFE FINAL. SILENCIA las habilidades cercanas y, a la mitad de su vida, se PARTE en el Sol y la Luna.'
     }
   };
 
@@ -303,6 +446,17 @@
     if (d.deathFreeze) t *= 1.2;
     if (d.resist) for (const k in d.resist) if (d.resist[k] < 0.5) t *= 1.15;
     if (d.slowImmune) t *= 1.08;
+    // segunda era
+    if (d.hop) t *= 1.25;
+    if (d.fogAura) t *= 1.5;
+    if (d.stone) t *= 1.3;
+    if (d.absorb) t *= 1.15;
+    if (d.shellHits) t *= 1.2;
+    if (d.ink) t *= 1.4;
+    if (d.adapt) t *= 1.3;
+    if (d.shieldAura) t *= 1.5;
+    if (d.cleanse) t *= 1.5;
+    if (d.ward) t *= 1.4;
     t *= Math.pow(d.speed / 55, 0.6);
     if (d.children) for (const [c, n] of d.children) t += threat(c) * n;
     return (d._threat = t);

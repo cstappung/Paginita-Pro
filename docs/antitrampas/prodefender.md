@@ -1,6 +1,10 @@
 # Antitrampas de PRO DEFENDER
 
 Cinco tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio)`.
+Los reinos 6–10 (la «segunda era», `prueba: true` en `levels.js`) no tienen tabla:
+`main.js` nunca manda su resultado, `rehace` rechaza `r ≥ 5` y el verificador no
+conoce su categoría, así que no se guardan, no pagan y no hay nada que proteger.
+Que solo los jueguen los administradores es una puerta de la interfaz, no de seguridad.
 `puntos` = la ronda más alta superada en una partida (1–100); `tiempo` = los ms
 de juego que llevaba esa partida al superarla (pasos del motor × 1000 / 60). Las
 monedas salen de la fila (`monedasProdefender` en `colabtex/src/juegos/monedas.js`:
