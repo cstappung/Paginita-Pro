@@ -431,7 +431,7 @@ const REGLAS = {
       ])],
       ["Escribir", lista([
         "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada dibujo de la casa tiene de uno a cuatro.",
-        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste.",
+        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste. Si se acaba el tiempo sin que pulses ¡Listo!, <b>se manda solo</b> lo último que escribiste.",
         "La etapa termina cuando todos mandaron el suyo o se acaba el tiempo. Quien no mandó nada se queda sin meme en esa ronda."
       ])],
       ["Calificar", lista([
