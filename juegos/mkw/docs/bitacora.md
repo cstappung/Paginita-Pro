@@ -7073,7 +7073,7 @@ La anfitriona no lo sufría porque su lado marca `pickerAbierto` al instante.
 La ficha de la sala preguntaba «Pilotos: 2, 3 o 4». Ahora no pregunta nada de eso: toda sala nace con **4**, el máximo
 de humanos que admite la carrera sincronizada. Cada piloto es un jugador «local» de verdad en todas las consolas, y el
 juego tiene 4 puertos de mando; la CPU completa los 12 lugares. Mario Kart en línea admite 12 humanos, pero eso pide
-más que 4 mandos: queda en el PLAN (M17, «12 jugadores»). Si algún día se puede, el cupo sube solo, porque sale de
+más que 4 mandos: queda en el PLAN (C9, «más de 4 humanos»). Si algún día se puede, el cupo sube solo, porque sale de
 `JUEGOS.mkw.cupo`.
 
 Cómo: en `juegos-main.js` la opción «Pilotos» de Mario Kart queda **oculta** (`oculta: true`, con el máximo como único

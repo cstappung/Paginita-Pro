@@ -132,6 +132,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
 - ⬜ C6. VS en línea sin CPU: cola de pistas y «Confirmar» sobre la votación (F3); TURN, más jugadores, fallos en el chat (F4)
 - ⬜ C7. Espectadores (video del anfitrión, como `bt3-directo.js`)
 - ⬜ C8. Dónde guarda Pulsar `RRSettings.pul` (trofeos) y `RRRating.pul` (VR) en línea
+- ⬜ C9. Más de 4 humanos en la sala (hasta 12, como el Mario Kart en línea): hoy cada piloto es un jugador local de
+  verdad en todas las consolas y el juego tiene 4 puertos de mando; pasar de 4 pide otra forma (jugadores «de red» del
+  juego o más mandos). El cupo del sitio sale de `JUEGOS.mkw.cupo` y sube solo (§87)
 
 ### Etapa D — Página y modos
 - ✅ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador: en un jugador los eligen los menús del
@@ -441,7 +444,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   por el Worker) y mientras tanto cada estado nuevo de la sala abría otro; al confirmar se cerraba uno solo y el otro
   quedaba encima de la pantalla de personaje. Ahora una marca impide abrir dos y el selector se cierra solo si ya no hace
   falta (`mkw.mjs`). La ficha del sitio ya no pregunta «Pilotos»: toda sala nace con 4 (el máximo de la carrera
-  sincronizada; los 12 humanos son M17). El anfitrión tiene «Echar» (jugada `{t:"echa"}`, válida solo si la escribe el
+  sincronizada; más de 4 humanos = C9). El anfitrión tiene «Echar» (jugada `{t:"echa"}`, válida solo si la escribe el
   anfitrión de ese momento) y la votación ⏏ aparece en Mario Kart con 3 o más; al echado se le cierra el juego, los
   demás lo cortan de la carrera al momento (`{tipo:'fuera'}` → `lockstep.saltar`) y la sala del juego lo deja fuera
   (`sala-carrera.mjs` `quitar`). `prueba-experiencia --playlist` 18/19 → **19/19**, `prueba-experiencia` **20/20** (echado
