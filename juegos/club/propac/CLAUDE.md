@@ -29,6 +29,21 @@ everyone) and **Glitch**, a fifth ghost from level 3 that teleports. Three
   «Jugar», off on pause and end. The HUD bands stick to the canvas edges so
   a tall phone's spare height sits around the maze.
 
+- **Sound** (`juego.js`, «Sonido»): the music is the shared songbook
+  (`chip.js` + `temas.js`, loaded before the game): `propac-neon`,
+  `-circuito`, `-reactor` (one per maze, `E.mapa.i`), `propac-poder` while a
+  ghost is frightened, and three one-pass jingles (`cortina`): `-inicio`
+  (one bar = the 90-tick «¡Listo!»), `-limpio` (2.5 s = the 150-tick clear)
+  and `-fin`. **The melodies are original**, like the Pokémon tributes: the
+  Namco tunes are not to be transcribed. A Reproductor per theme keeps its
+  place when stopped, so the maze theme resumes after the fright. Effects
+  use `Chip.voz`/`Chip.ruido`; the waka rises two semitones per racha level.
+  The four looping themes are also in the ♪ player (`CANCIONES`).
+- **The character** is `dibujaPac` (game, menu decor and lives): the classic
+  wedge mouth on a glossy sphere, neon rim in the racha colour, dark lips
+  and an eye that faces where it goes. The body stays yellow (cyan only in
+  turbo); the racha shows on the rim and halo.
+
 One table, `club-propac-puntos`; proof and verifier in
 `docs/antitrampas/propac.md`. The `soloRanks`, `soloPruebas` and
 `clubJugadas` rules were widened, so they must be re-published. Not a guest

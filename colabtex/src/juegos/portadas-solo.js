@@ -517,7 +517,8 @@ const ARTE = {
     <circle cx="360" cy="80" r="10" fill="#c86bff" class="a-late"/>
     ${puntos}
     ${fan(60, 140, "#ff3b5c")}${fan(110, 140, "#3df5ff")}<g class="a-mueve">${fan(160, 140, "#2a3cff")}</g>
-    <g transform="translate(210 150)"><circle r="34" fill="#ffe14d" opacity=".18"/><path d="M0 0 L26 -16 A30 30 0 1 0 26 16 Z" fill="#ffe14d"/><rect x="-6" y="-22" width="10" height="5" fill="#0b1030"/></g>`;
+    <radialGradient id="p${u}" cx=".32" cy=".26" r=".8"><stop offset="0" stop-color="#fffbe2"/><stop offset=".32" stop-color="#ffea4a"/><stop offset=".78" stop-color="#ffc21a"/><stop offset="1" stop-color="#ff8f0f"/></radialGradient>
+    <g transform="translate(210 150)"><circle r="40" fill="#ffe14d" opacity=".16"/><path d="M0 0 L26 -16 A30 30 0 1 0 26 16 Z" fill="url(#p${u})" stroke="#ffe14d" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 -14.8 L0 0 L24 14.8" fill="none" stroke="#c45a00" stroke-width="3.5" stroke-linejoin="round"/><ellipse cx="-12" cy="-15" rx="9" ry="5" fill="#fff" opacity=".7" transform="rotate(-34 -12 -15)"/><ellipse cx="4" cy="-16" rx="4.5" ry="6" fill="#1a0f2e"/><circle cx="3.2" cy="-18" r="1.8" fill="#fff"/></g>`;
   }
 };
 
