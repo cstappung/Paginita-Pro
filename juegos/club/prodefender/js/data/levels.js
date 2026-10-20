@@ -149,7 +149,7 @@
         [[400, -30], [400, 90], [640, 90], [640, 200], [520, 200], [520, 440], [760, 440], [760, 320], [1030, 320]],
         [[340, 670], [340, 560], [640, 560], [640, 440], [760, 440], [760, 320], [1030, 320]]
       ],
-      obstacles: [{ x: 120, y: 160, r: 40, kind: 'gearpit' }, { x: 900, y: 520, r: 46, kind: 'gearpit' }, { x: 390, y: 330, r: 30, kind: 'gearpit' }, { x: 880, y: 140, r: 30, kind: 'rock' }],
+      obstacles: [{ x: 120, y: 160, r: 40, kind: 'gearpit' }, { x: 900, y: 520, r: 46, kind: 'gearpit' }, { x: 390, y: 330, r: 30, kind: 'gearpit' }, { x: 880, y: 140, r: 30, kind: 'reactor' }],
       torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'huerto', 'acido', 'balista', 'obelisco', 'burbujas', 'desintegrador'],
       boss: 'mecatitan',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['escudero', 4, 1], ['automata', 5, 1.3], ['alado', 6, 1], ['blindado', 8, 1],
@@ -167,7 +167,7 @@
         [[1030, 80], [720, 80], [720, 300], [480, 300], [300, 300], [300, 560], [1030, 560]],
         [[-30, 430], [160, 430], [160, 200], [620, 440, 1], [860, 440], [860, 560], [1030, 560]]
       ],
-      obstacles: [{ x: 600, y: 190, r: 46, kind: 'altar' }, { x: 120, y: 560, r: 34, kind: 'rift' }, { x: 900, y: 300, r: 40, kind: 'altar' }, { x: 420, y: 440, r: 28, kind: 'rock' }],
+      obstacles: [{ x: 600, y: 190, r: 46, kind: 'altar' }, { x: 120, y: 560, r: 34, kind: 'rift' }, { x: 900, y: 300, r: 40, kind: 'altar' }, { x: 420, y: 440, r: 28, kind: 'shard' }],
       torres: ['espinas', 'vigia', 'mortero', 'prisma', 'totem', 'faro', 'balista', 'obelisco', 'segador', 'desintegrador', 'campanario'],
       boss: 'eclipse',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['sombra', 4, 1], ['purificador', 5, 1.3], ['alado', 6, 1], ['escudero', 7, 1],
