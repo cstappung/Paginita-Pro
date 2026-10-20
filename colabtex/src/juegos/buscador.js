@@ -81,6 +81,7 @@ export const APODOS = {
   yemas: "huevos shooter disparos primera persona zombis fps",
   clue: "cluedo detective misterio asesinato crimen",
   ajedrez: "chess jaque mate",
+  pool: "billar pool ocho bolas 8 ball bola ocho mesa taco lisas rayadas",
   pokemon: "pokemon showdown combates equipos entrenador",
   boxhead: "box head zombis demonios disparos armas",
   haxball: "futbol soccer pelota arco goles",

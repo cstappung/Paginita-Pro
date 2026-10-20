@@ -233,6 +233,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 10,
     alta: "2026-10-18"
+  },
+  pool: {
+    nombre: "Pool 8",
+    lema: "Billar a ocho bolas: lisas contra rayadas, con fuerza y efecto, y la negra al final. Uno contra uno o dos contra dos",
+    color: "#1f8a4c",
+    minimo: 2,   // con cupo 4 (2 contra 2) hacen falta los cuatro: minimoDe
+    cupo: 4,
+    alta: "2026-10-20"
   }
 };
 
@@ -254,6 +262,7 @@ export function minimoDe(p) {
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
   if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
   if (p && p.juego === "bt3" && cupoDe(p) <= 2) return 2;   // el duelo de BT3 es de dos; el torneo, desde uno (con CPU)
+  if (p && p.juego === "pool") return plCupo(p) === 4 ? 4 : 2;   // 2 contra 2 no empieza hasta que están los cuatro
   return j.minimo || 2;
 }
 
@@ -280,6 +289,7 @@ export function salaInactiva(p, ahora) {
 }
 
 export function cupoDe(p) {
+  if (p && p.juego === "pool") return plCupo(p);   // solo hay dos formatos: 1 contra 1 (2) y 2 contra 2 (4)
   const j = JUEGOS[p && p.juego] || {};
   const tope = j.cupo || 2, min = Math.max(2, j.minimo || 2);
   const n = Math.floor(Number(p && p.cupo)) || min;
@@ -1023,6 +1033,7 @@ export function reducir(p) {
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
   if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
   if (p.juego === "memazo") return { ...base, ...redMemazo(p, js, listos) };
+  if (p.juego === "pool") return { ...base, ...redPool(p, js, listos) };
   return base;
 }
 
@@ -1115,6 +1126,8 @@ export function progreso(est, juego) {
   /* En Memazo, las rondas y los memes ya calificados de la actual. */
   if (juego === "memazo" && est.rondas) return c(((est.historial || []).length + (est.etapa === "votar" && est.total ? est.m / est.total : 0)) / est.rondas);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
+  /* En el pool, cuántas de las quince bolas ya cayeron. */
+  if (juego === "pool" && est.mesa) return c(1 - est.en / 15);
   return 0;
 }
 
@@ -1292,7 +1305,7 @@ export function ganoEn(p, ganador, uid) {
   if (!ganador || !uid) return false;
   if (ganador === uid) return true;
   if (!String(ganador).startsWith("eq:") || !p) return false;
-  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : null;
+  const eq = p.juego === "yemas" ? equiposYemas(p) : p.juego === "haxball" ? equiposHaxball(p) : p.juego === "pool" ? equiposPool(p) : null;
   return !!eq && eq[uid] === ganador.slice(3);
 }
 
@@ -7717,5 +7730,513 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
     debe: fin ? [] : falta(), listosYa: etapa === "escribir" ? Object.keys(envios) : [],
     memes: etapa === "votar" || fin ? memes : [], total: memes.length,
     historial, puntos, fuegos, tomates, fuera, cierre, ganador, motivo
+  };
+}
+
+/* ============================================================
+   Pool 8 — billar americano a ocho bolas, 1 contra 1 o 2 contra 2
+
+   Es un juego por turnos que se juega con física: cada tiro es UNA
+   jugada del registro, `{t:"tiro", uid, dx, dy, f, a, b, px?, py?, c?}`,
+   y las dos máquinas simulan la misma mesa a partir de ella. Para que
+   salga igual en las dos hay tres reglas que no se rompen:
+
+   - **Paso fijo** (`PL.DT`) y nada de `Math.random` ni de tiempo real: la
+     entrada es el registro y nada más.
+   - **Solo + − × ÷ y sqrt** en la simulación. `sqrt` está definida por
+     IEEE-754 al bit; `sin`, `cos` o `pow` no lo están y cada navegador
+     puede redondear distinto, y en un billar un error de un bit en el
+     primer choque es un desastre al décimo. Por eso la dirección viaja
+     como vector `(dx, dy)` y no como ángulo.
+   - **La orientación de las bolas no es física**: solo se pinta (pool.js
+     la integra a su manera), así que puede usar trigonometría.
+
+   Unidades: milímetros y segundos, eje `y` hacia arriba. La mesa es la
+   de nueve pies (2540 × 1270 de nariz a nariz de banda) y la bola es la
+   de 57,15 mm. La física es la de un billar de verdad, no un «bola rebota
+   y ya»: cada bola lleva su velocidad angular `(wx, wy, wz)`, así que el
+   punto de golpe de la blanca (arriba/abajo = efecto de seguir o de
+   retroceso, a los lados = efecto lateral) cambia lo que pasa después
+   porque el roce con el paño la hace deslizar y luego rodar (Alciatore):
+   la blanca que golpea con backspin retrocede tras el choque, con
+   topspin sigue de largo, y con efecto lateral cambia el ángulo en banda
+   y «arrastra» un poco a la bola que toca (throw).
+
+   Las reglas son las tradicionales de bola 8: rotura (cuatro bolas a
+   banda o una embolsada), mesa abierta hasta la primera bola embolsada
+   que asigna lisas (1–7) o rayadas (9–15), primer contacto con bola
+   propia, banda tras el contacto, bola blanca en mano tras una falta
+   (tras una blanca en la rotura, detrás de la línea de cabecera), y la
+   8 al final cantando tronera: embolsarla antes de tiempo, en otra
+   tronera o con falta es perder. Con cupo 4 se juega por parejas: los
+   equipos alternan turno y dentro de cada equipo se alternan quienes
+   tiran.
+   ============================================================ */
+
+export const PL = {
+  L: 2540, W: 1270, R: 28.575,
+  DT: 1 / 600,                 // paso fijo de la simulación (s)
+  G: 9810,                     // mm/s²
+  MU_DESL: 0.2,                // fricción bola–paño mientras desliza
+  MU_RODAR: 0.011,             // resistencia al rodar
+  A_PIVOTE: 40,                // cuánto se frena el efecto lateral (rad/s²)
+  E_BOLA: 0.96, MU_BOLA: 0.05, // choque bola–bola: rebote y roce (el «throw»)
+  E_BANDA: 0.92, MU_BANDA: 0.16,
+  E_JAULA: 0.55, R_JAULA: 5,   // las puntas de las bandas junto a cada tronera
+  V_MAX: 8200,                 // mm/s con la fuerza al máximo
+  GC: 86, GS: 70,              // hueco de las troneras de esquina y de lado
+  MAX_PASOS: 600 * 45          // red de seguridad: ningún tiro dura más de 45 s
+};
+
+/* Los seis bolsillos: 0 abajo-izquierda, 1 abajo-centro, 2 abajo-derecha,
+   3 arriba-izquierda, 4 arriba-centro, 5 arriba-derecha. `r` es hasta
+   dónde, desde el centro del bolsillo, el centro de la bola cae. */
+export const PL_BOLSILLOS = [
+  { x: 0, y: 0, r: 74 }, { x: PL.L / 2, y: 0, r: 60 }, { x: PL.L, y: 0, r: 74 },
+  { x: 0, y: PL.W, r: 74 }, { x: PL.L / 2, y: PL.W, r: 60 }, { x: PL.L, y: PL.W, r: 74 }
+];
+/* Las doce puntas de banda que enmarcan las troneras: una bola que roza
+   la entrada rebota en ellas, que es lo que hace que se «bailen» o salgan. */
+export const PL_JAULAS = [
+  { x: PL.GC, y: 0 }, { x: PL.L / 2 - PL.GS, y: 0 }, { x: PL.L / 2 + PL.GS, y: 0 }, { x: PL.L - PL.GC, y: 0 },
+  { x: PL.GC, y: PL.W }, { x: PL.L / 2 - PL.GS, y: PL.W }, { x: PL.L / 2 + PL.GS, y: PL.W }, { x: PL.L - PL.GC, y: PL.W },
+  { x: 0, y: PL.GC }, { x: 0, y: PL.W - PL.GC }, { x: PL.L, y: PL.GC }, { x: PL.L, y: PL.W - PL.GC }
+];
+
+export const PL_FORMATOS = { 1: "1 contra 1", 2: "2 contra 2" };
+export const PL_GUIAS = { 1: "Con línea guía", 0: "Sin línea guía" };
+export const PL_FALTAS = {
+  "sin-contacto": "no tocó ninguna bola",
+  equivocada: "tocó primero una bola que no era la suya",
+  "sin-banda": "ninguna bola tocó banda tras el golpe",
+  blanca: "metió la blanca",
+  rotura: "rotura ilegal: menos de cuatro bolas a banda y ninguna embolsada"
+};
+
+/* lisas 1–7 → «s», la 8 → «n», rayadas 9–15 → «r», la blanca → «c». */
+export const plGrupo = id => (id === 0 ? "c" : id === 8 ? "n" : id < 8 ? "s" : "r");
+const PL_PUNTO_PIE = { x: PL.L * 0.75, y: PL.W / 2 };       // donde va la bola 1 del triángulo
+const PL_PUNTO_CABEZA = { x: PL.L / 4, y: PL.W / 2 };       // donde empieza la blanca
+
+/* El triángulo: la 8 en el centro de la tercera fila, una lisa y una
+   rayada en las esquinas de atrás, el resto al azar de la semilla. */
+export function plNueva(semilla) {
+  const { R } = PL;
+  const r = rng(semilla);
+  const b = [];
+  for (let i = 0; i < 16; i++) b.push({ id: i, x: 0, y: 0, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, en: true });
+  const fila = R * Math.sqrt(3) + 0.02, sep = 2 * R + 0.02;
+  const huecos = [];
+  for (let f = 0; f < 5; f++) for (let i = 0; i <= f; i++) huecos.push({ x: PL_PUNTO_PIE.x + f * fila, y: PL_PUNTO_PIE.y + (i - f / 2) * sep });
+  const lisas = mezcla([1, 2, 3, 4, 5, 6, 7], r), rayadas = mezcla([9, 10, 11, 12, 13, 14, 15], r);
+  const esq = r() < 0.5 ? [lisas.pop(), rayadas.pop()] : [rayadas.pop(), lisas.pop()];
+  const resto = mezcla(lisas.concat(rayadas), r);
+  const orden = new Array(15);
+  orden[4] = 8; orden[10] = esq[0]; orden[14] = esq[1];
+  let k = 0;
+  for (let i = 0; i < 15; i++) if (orden[i] === undefined) orden[i] = resto[k++];
+  huecos.forEach((h, i) => { const q = b[orden[i]]; q.x = h.x; q.y = h.y; });
+  b[0].x = PL_PUNTO_CABEZA.x; b[0].y = PL_PUNTO_CABEZA.y;
+  return { b };
+}
+
+export function plClona(m) { return { b: m.b.map(q => ({ ...q })) }; }
+
+export function plReposo(m) {
+  for (const q of m.b) { q.vx = 0; q.vy = 0; q.wx = 0; q.wy = 0; q.wz = 0; }
+}
+
+/* ¿Queda alguna bola en movimiento? */
+export function plMueve(m) {
+  for (const q of m.b) if (q.en && (q.vx !== 0 || q.vy !== 0 || q.wx !== 0 || q.wy !== 0)) return true;
+  return false;
+}
+
+/* El golpe del taco. `f` es la fuerza (0–1), `a` el desplazamiento
+   lateral del punto de contacto y `b` el vertical, los dos en −1…1 sobre
+   un disco que llega a 0,55 del radio (más allá la bola se «escupe»).
+   Con `b ≈ 0,73` la blanca sale rodando justo, sin deslizar. */
+export function plGolpe(m, t) {
+  const { R, V_MAX } = PL;
+  const c = m.b[0];
+  const v0 = Math.max(150, t.f * V_MAX);
+  const a = (t.a || 0) * 0.55, b = (t.b || 0) * 0.55;
+  // La bola se desvía un pelo del lado contrario al de la tiza («squirt»).
+  const sq = 0.03 * a;
+  let dx = t.dx - sq * t.dy, dy = t.dy + sq * t.dx;
+  const n = Math.sqrt(dx * dx + dy * dy);
+  dx /= n; dy /= n;
+  c.vx = dx * v0; c.vy = dy * v0;
+  const k = 5 * v0 * b / (2 * R);
+  c.wx = -dy * k; c.wy = dx * k;
+  c.wz = 5 * v0 * a / (2 * R);
+}
+
+/* Un paso de la simulación. Devuelve false si todo está quieto. `ev` se
+   avisa de lo que pasa (para las reglas, y para el sonido en pantalla):
+   ev("bola", i, j, velocidad), ev("banda", i, velocidad),
+   ev("tronera", i, bolsillo). */
+export function plPaso(m, ev) {
+  const { L, W, R, DT, G, MU_DESL, MU_RODAR, A_PIVOTE, E_BOLA, MU_BOLA, E_BANDA, MU_BANDA, E_JAULA, R_JAULA, GC, GS } = PL;
+  const bs = m.b;
+  let mov = false;
+  for (let i = 0; i < 16; i++) {
+    const b = bs[i];
+    if (!b.en) continue;
+    if (b.vx === 0 && b.vy === 0 && b.wx === 0 && b.wy === 0) { b.wz = 0; continue; }
+    mov = true;
+    let vx = b.vx, vy = b.vy, wx = b.wx, wy = b.wy, t = DT;
+    // Velocidad del punto de la bola que toca el paño: si no es cero, desliza.
+    const ux = vx - R * wy, uy = vy + R * wx;
+    const us = Math.sqrt(ux * ux + uy * uy);
+    if (us > 4) {
+      const ts = us / (3.5 * MU_DESL * G);       // lo que tarda en dejar de deslizar
+      const t1 = ts < t ? ts : t;
+      const k = MU_DESL * G * t1 / us;
+      vx -= ux * k; vy -= uy * k;
+      const ka = 5 * MU_DESL * G * t1 / (2 * R * us);
+      wx -= uy * ka; wy += ux * ka;
+      t -= t1;
+    }
+    if (t > 0) {
+      // Rodando sin deslizar: solo la resistencia del paño.
+      const s = Math.sqrt(vx * vx + vy * vy), ns = s - MU_RODAR * G * t;
+      if (s < 6 || ns <= 0) { vx = 0; vy = 0; wx = 0; wy = 0; }
+      else { const f = ns / s; vx *= f; vy *= f; wy = vx / R; wx = -vy / R; }
+    }
+    b.vx = vx; b.vy = vy; b.wx = wx; b.wy = wy;
+    if (b.wz !== 0) { const d = A_PIVOTE * DT; b.wz = b.wz > d ? b.wz - d : b.wz < -d ? b.wz + d : 0; }
+    b.x += vx * DT; b.y += vy * DT;
+  }
+  if (!mov) return false;
+
+  // Choques entre bolas (tres pasadas: en la rotura una bola toca a varias).
+  // Solo se miran los pares en los que alguna se mueve: una bola quieta no
+  // empuja a otra quieta, y así un tiro con la mesa casi parada cuesta poco.
+  const D = 2 * R, D2 = D * D;
+  const mv = [];
+  for (let i = 0; i < 16; i++) mv.push(bs[i].en && (bs[i].vx !== 0 || bs[i].vy !== 0));
+  for (let pas = 0; pas < 3; pas++) {
+    let toco = false;
+    for (let i = 0; i < 15; i++) {
+      const a = bs[i];
+      if (!a.en) continue;
+      for (let j = i + 1; j < 16; j++) {
+        const c = bs[j];
+        if (!c.en || !(mv[i] || mv[j])) continue;
+        const dx = c.x - a.x, dy = c.y - a.y, d2 = dx * dx + dy * dy;
+        if (d2 >= D2) continue;
+        toco = true;
+        const d = Math.sqrt(d2) || 1e-9, nx = dx / d, ny = dy / d;
+        const sol = (D - d) / 2;
+        a.x -= nx * sol; a.y -= ny * sol; c.x += nx * sol; c.y += ny * sol;
+        const vn = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
+        if (vn <= 0) continue;
+        const jn = (1 + E_BOLA) * vn / 2;
+        a.vx -= jn * nx; a.vy -= jn * ny; c.vx += jn * nx; c.vy += jn * ny;
+        // Roce entre las dos bolas: arrastra la tangente y se lleva efecto lateral.
+        const tx = -ny, ty = nx;
+        const s = (a.vx - c.vx) * tx + (a.vy - c.vy) * ty + R * (a.wz + c.wz);
+        let jt = Math.abs(s) / 7;
+        const lim = MU_BOLA * jn;
+        if (jt > lim) jt = lim;
+        if (s > 0) jt = -jt;
+        a.vx += jt * tx; a.vy += jt * ty; c.vx -= jt * tx; c.vy -= jt * ty;
+        a.wz += jt * 2.5 / R; c.wz += jt * 2.5 / R;
+        mv[i] = true; mv[j] = true;
+        if (ev) ev("bola", i, j, vn);
+      }
+    }
+    if (!toco) break;
+  }
+
+  const banda = (b, nx, ny) => {
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn >= 0) return;
+    let e = 0.92 - (-vn) * 1.2e-5;
+    if (e < 0.62) e = 0.62;
+    if (e > E_BANDA) e = E_BANDA;
+    const jn = -(1 + e) * vn;
+    const tx = -ny, ty = nx;
+    const st = b.vx * tx + b.vy * ty - R * b.wz;
+    b.vx += jn * nx; b.vy += jn * ny;
+    let jt = Math.abs(st) / 3.5;
+    const lim = MU_BANDA * jn;
+    if (jt > lim) jt = lim;
+    if (st > 0) jt = -jt;
+    b.vx += jt * tx; b.vy += jt * ty;
+    b.wz -= jt * 2.5 / R;
+    if (ev) ev("banda", b.id, -vn);
+  };
+  const medio = L / 2, RJ = R + R_JAULA, RJ2 = RJ * RJ;
+  for (let i = 0; i < 16; i++) {
+    const b = bs[i];
+    if (!b.en || (b.vx === 0 && b.vy === 0)) continue;
+    if (b.x < R) { if (b.y >= GC && b.y <= W - GC) { b.x = R; banda(b, 1, 0); } }
+    else if (b.x > L - R) { if (b.y >= GC && b.y <= W - GC) { b.x = L - R; banda(b, -1, 0); } }
+    if (b.y < R) { if ((b.x >= GC && b.x <= medio - GS) || (b.x >= medio + GS && b.x <= L - GC)) { b.y = R; banda(b, 0, 1); } }
+    else if (b.y > W - R) { if ((b.x >= GC && b.x <= medio - GS) || (b.x >= medio + GS && b.x <= L - GC)) { b.y = W - R; banda(b, 0, -1); } }
+    for (let k = 0; k < 12; k++) {
+      const q = PL_JAULAS[k];
+      const dx = b.x - q.x, dy = b.y - q.y, d2 = dx * dx + dy * dy;
+      if (d2 >= RJ2) continue;
+      const d = Math.sqrt(d2) || 1e-9, nx = dx / d, ny = dy / d;
+      b.x = q.x + nx * RJ; b.y = q.y + ny * RJ;
+      const vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) {
+        const jn = -(1 + E_JAULA) * vn;
+        b.vx += jn * nx; b.vy += jn * ny;
+        if (ev) ev("banda", b.id, -vn);
+      }
+    }
+  }
+
+  // Troneras.
+  for (let i = 0; i < 16; i++) {
+    const b = bs[i];
+    if (!b.en) continue;
+    let cae = -1;
+    for (let k = 0; k < 6; k++) {
+      const q = PL_BOLSILLOS[k], dx = b.x - q.x, dy = b.y - q.y;
+      if (dx * dx + dy * dy < q.r * q.r) { cae = k; break; }
+    }
+    if (cae < 0 && (b.x < -R || b.x > L + R || b.y < -R || b.y > W + R)) {
+      // Red de seguridad: una bola que se escapa de la mesa cae en la tronera más cercana.
+      let mejor = 1e18;
+      for (let k = 0; k < 6; k++) {
+        const q = PL_BOLSILLOS[k], dx = b.x - q.x, dy = b.y - q.y, d2 = dx * dx + dy * dy;
+        if (d2 < mejor) { mejor = d2; cae = k; }
+      }
+    }
+    if (cae >= 0) {
+      b.en = false; b.vx = 0; b.vy = 0; b.wx = 0; b.wy = 0; b.wz = 0;
+      if (ev) ev("tronera", i, cae);
+    }
+  }
+  return true;
+}
+
+/* Un tiro entero: el golpe y todos los pasos hasta que todo se detiene.
+   Devuelve lo que las reglas necesitan saber: la primera bola que tocó la
+   blanca, si alguna bola tocó banda después, qué bolas llegaron a banda y
+   qué bolas cayeron (en orden y en qué tronera). `aviso` recibe cada
+   evento con el número de paso, para el sonido y la repetición. */
+export function plSimula(m, t, aviso) {
+  const r = { primero: 0, banda: false, bolasBanda: [], emb: [], pasos: 0 };
+  const ev = (k, a, b, c) => {
+    if (k === "bola") { if (!r.primero && (a === 0 || b === 0)) r.primero = a === 0 ? b : a; }
+    else if (k === "banda") { if (r.primero) r.banda = true; if (a !== 0 && r.bolasBanda.indexOf(a) < 0) r.bolasBanda.push(a); }
+    else if (k === "tronera") r.emb.push({ id: a, p: b });
+    if (aviso) aviso(k, a, b, c, r.pasos);
+  };
+  plGolpe(m, t);
+  while (r.pasos < PL.MAX_PASOS && plPaso(m, ev)) r.pasos++;
+  if (r.pasos >= PL.MAX_PASOS) plReposo(m);
+  return r;
+}
+
+/* ¿Se puede dejar la blanca en (x, y)? Dentro de la mesa, lejos de las
+   demás bolas y de las troneras y, tras una blanca en la rotura, detrás de
+   la línea de cabecera. */
+export function plColocaOk(m, x, y, modo) {
+  const { L, W, R } = PL;
+  if (!(x >= R + 1 && x <= L - R - 1 && y >= R + 1 && y <= W - R - 1)) return false;
+  if (modo === "cabecera" && x > L / 4) return false;
+  const D = 2 * R + 0.5;
+  for (const q of m.b) {
+    if (q.id === 0 || !q.en) continue;
+    const dx = q.x - x, dy = q.y - y;
+    if (dx * dx + dy * dy < D * D) return false;
+  }
+  for (const p of PL_BOLSILLOS) {
+    const dx = p.x - x, dy = p.y - y, rr = p.r + R * 0.5;
+    if (dx * dx + dy * dy < rr * rr) return false;
+  }
+  return true;
+}
+
+/* Cuántas bolas de un grupo siguen en la mesa. */
+export function plQuedan(m, g) {
+  let n = 0;
+  for (const q of m.b) if (q.en && q.id !== 0 && plGrupo(q.id) === g) n++;
+  return n;
+}
+
+/* La 8 vuelve a su sitio tras embolsarse en la rotura: el punto del pie
+   o, si está ocupado, el más cercano libre sobre la línea central. */
+function plRepone8(m) {
+  const { R } = PL, b = m.b[8];
+  const libre = (x, y) => {
+    for (const q of m.b) {
+      if (q.id === 8 || !q.en) continue;
+      const dx = q.x - x, dy = q.y - y;
+      if (dx * dx + dy * dy < (2 * R + 0.1) * (2 * R + 0.1)) return false;
+    }
+    return true;
+  };
+  for (let k = 0; k < 40; k++) {
+    const x = PL_PUNTO_PIE.x + (k % 2 ? -1 : 1) * Math.floor((k + 1) / 2) * (2 * R + 1);
+    if (libre(x, PL_PUNTO_PIE.y)) { b.x = x; b.y = PL_PUNTO_PIE.y; break; }
+  }
+  b.en = true; b.vx = 0; b.vy = 0; b.wx = 0; b.wy = 0; b.wz = 0;
+}
+
+/* ---------- equipos ----------
+   Con cupo 4 el anfitrión (asiento 0) juega con el asiento `pareja`
+   (1, 2 o 3: quien entró en esa posición); los otros dos son el otro
+   equipo. Con cupo 2 cada uno es su propio equipo. */
+export const plCupo = p => (Number(p && p.cupo) >= 3 ? 4 : 2);
+export function plEquipos(p, js = jugadoresDe(p)) {
+  const dos = plCupo(p) === 4;
+  const u = js.map(j => j.uid);
+  let a, b;
+  if (dos) {
+    const par = Math.max(1, Math.min(3, Math.floor(Number(p && p.pareja)) || 1));
+    a = [u[0], u[par]];
+    b = u.filter((x, i) => i !== 0 && i !== par);
+  } else { a = [u[0]]; b = [u[1]]; }
+  a = a.filter(Boolean); b = b.filter(Boolean);
+  const de = {};
+  for (const x of a) de[x] = "a";
+  for (const x of b) de[x] = "b";
+  return { dos, a, b, de };
+}
+/* Para `ganoEn`: el equipo de cada uno. */
+export const equiposPool = p => plEquipos(p).de;
+
+function plInicial(p, eq) {
+  return {
+    mesa: plNueva(Number(p.semilla) || 1),
+    t: (Number(p.semilla) || 0) % 2, ptr: [0, 0], grupos: [null, null], abierta: true,
+    mano: "cabecera", movs: 0, fuera: {}, hist: [], ganador: null, motivo: "", ultima: null
+  };
+}
+const plActivos = (S, eq, t) => (t === 0 ? eq.a : eq.b).filter(u => !S.fuera[u]);
+export function plTira(S, eq) {
+  const m = plActivos(S, eq, S.t);
+  return m.length ? m[S.ptr[S.t] % m.length] : "";
+}
+const plGanaEq = (eq, t) => (eq.dos ? "eq:" + (t === 0 ? "a" : "b") : ((t === 0 ? eq.a : eq.b)[0] || ""));
+
+function plAplica(S, j, eq) {
+  if (S.ganador !== null) return S;
+  if (j.t === "abandona") {
+    if (!(j.uid in eq.de) || S.fuera[j.uid]) return S;
+    const N = { ...S, fuera: { ...S.fuera, [j.uid]: true } };
+    const t = eq.de[j.uid] === "a" ? 0 : 1;
+    if (!plActivos(N, eq, t).length) { N.ganador = plGanaEq(eq, 1 - t); N.motivo = "abandono"; }
+    return N;
+  }
+  if (j.t !== "tiro" || j.uid !== plTira(S, eq)) return S;
+  let dx = +j.dx, dy = +j.dy, f = +j.f;
+  const a = +j.a || 0, b = +j.b || 0;
+  const m2 = Math.sqrt(dx * dx + dy * dy);
+  if (!(m2 > 0.9 && m2 < 1.1) || !(f >= 0.02 && f <= 1.0001) || !(a * a + b * b <= 1.0001)) return S;
+  dx /= m2; dy /= m2; if (f > 1) f = 1;
+  const t = S.t, o = 1 - t;
+  const mesa = plClona(S.mesa), cue = mesa.b[0];
+  if (S.mano && (j.px !== undefined || j.py !== undefined)) {
+    const px = +j.px, py = +j.py;
+    if (!plColocaOk(mesa, px, py, S.mano)) return S;
+    cue.x = px; cue.y = py; cue.en = true; cue.vx = 0; cue.vy = 0; cue.wx = 0; cue.wy = 0; cue.wz = 0;
+  }
+  if (!cue.en) return S;
+  const gT = S.grupos[t];
+  const despejado = !S.abierta && !!gT && plQuedan(mesa, gT) === 0;
+  let llamada = -1;
+  if (despejado) { llamada = Math.floor(+j.c); if (!(llamada >= 0 && llamada <= 5)) return S; }
+  const antes = plClona(mesa);
+  const r = plSimula(mesa, { dx, dy, f, a, b });
+
+  const esRotura = S.movs === 0;
+  const blancaFuera = !mesa.b[0].en;
+  let falta = "";
+  if (!r.primero) falta = "sin-contacto";
+  else if (despejado) { if (r.primero !== 8) falta = "equivocada"; }
+  else if (S.abierta) { if (r.primero === 8) falta = "equivocada"; }
+  else if (plGrupo(r.primero) !== gT) falta = "equivocada";
+  const sinCaer = !r.emb.some(e => e.id !== 0);
+  if (!falta && esRotura && sinCaer && r.bolasBanda.length < 4) falta = "rotura";
+  if (!falta && !esRotura && !r.banda && !r.emb.length) falta = "sin-banda";
+  if (blancaFuera) falta = "blanca";
+
+  const N = { ...S, mesa, ptr: S.ptr.slice(), grupos: S.grupos.slice(), hist: S.hist.slice(), movs: S.movs + 1 };
+  const ocho = r.emb.find(e => e.id === 8);
+  let reponer = false;
+  if (ocho) {
+    if (esRotura) reponer = true;
+    else {
+      const buena = despejado && !falta && ocho.p === llamada;
+      N.ganador = plGanaEq(eq, buena ? t : o);
+      N.motivo = buena ? "ocho" : !despejado ? "ocho-pronto" : blancaFuera || falta ? "ocho-falta" : "ocho-mal";
+    }
+  }
+  for (const e of r.emb) if (e.id !== 0 && !(e.id === 8 && reponer)) N.hist.push({ id: e.id, p: e.p, t });
+  if (reponer) plRepone8(mesa);
+
+  let sigue = false;
+  if (!falta && N.ganador === null) {
+    const prop = r.emb.filter(e => e.id !== 0 && e.id !== 8);
+    if (S.abierta) {
+      if (esRotura) sigue = prop.length > 0 || reponer;
+      else if (prop.length) {
+        N.abierta = false; N.grupos[t] = plGrupo(prop[0].id); N.grupos[o] = N.grupos[t] === "s" ? "r" : "s";
+        sigue = true;
+      }
+    } else sigue = prop.some(e => plGrupo(e.id) === N.grupos[t]);
+  }
+  N.ultima = {
+    uid: j.uid, equipo: t, tiro: { dx, dy, f, a, b, px: S.mano && j.px !== undefined ? +j.px : undefined, py: S.mano && j.py !== undefined ? +j.py : undefined, c: llamada },
+    antes, emb: r.emb, falta, primero: r.primero, sigue, rotura: esRotura, bolasBanda: r.bolasBanda.length, reponer
+  };
+  if (N.ganador === null) {
+    if (sigue) N.mano = "";
+    else {
+      N.ptr[t] = S.ptr[t] + 1;
+      N.t = o;
+      N.mano = falta ? (blancaFuera && esRotura ? "cabecera" : "libre") : "";
+    }
+  } else N.mano = "";
+  return N;
+}
+
+const plCache = new Map();
+function plHash(h, s) {
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+  return h;
+}
+
+export function redPool(p, js = jugadoresDe(p), listos = true) {
+  const eq = plEquipos(p, js);
+  const jug = jugadasDe(p);
+  const base = [p.semilla, plCupo(p), eq.a.join(), eq.b.join()].join("|");
+  let h = plHash(2166136261, base), S = null, desde = 0;
+  const claves = [];
+  for (let i = 0; i < jug.length; i++) {
+    const x = jug[i];
+    h = plHash(h, [x.t, x.uid, x.dx, x.dy, x.f, x.a, x.b, x.px, x.py, x.c].join(","));
+    claves.push(base + "#" + i + "#" + h);
+  }
+  for (let i = jug.length - 1; i >= 0; i--) if (plCache.has(claves[i])) { S = plCache.get(claves[i]); desde = i + 1; break; }
+  if (!S) S = plInicial(p, eq);
+  for (let i = desde; i < jug.length; i++) { S = plAplica(S, jug[i], eq); plCache.set(claves[i], S); }
+  if (plCache.size > 700) { let n = 0; for (const k of plCache.keys()) { plCache.delete(k); if (++n >= 300) break; } }
+  return plEst(S, eq, listos);
+}
+
+function plEst(S, eq, listos) {
+  const fin = S.ganador !== null;
+  const turno = listos && !fin ? plTira(S, eq) : "";
+  const g = { a: S.grupos[0], b: S.grupos[1] };
+  const mia = turno ? g[eq.de[turno]] : null;
+  const restan = { s: plQuedan(S.mesa, "s"), r: plQuedan(S.mesa, "r") };
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    turno, equipo: S.t === 0 ? "a" : "b", equipos: eq, dos: eq.dos,
+    grupos: g, abierta: S.abierta, mano: fin ? "" : S.mano, movs: S.movs,
+    mesa: S.mesa, hist: S.hist, restan, ultima: S.ultima, fuera: S.fuera,
+    despejado: !!turno && !S.abierta && !!mia && restan[mia] === 0,
+    en: S.mesa.b.filter(q => q.en && q.id !== 0).length,
+    ganador: S.ganador, motivo: S.motivo
   };
 }

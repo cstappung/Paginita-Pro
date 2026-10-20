@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610201602"></script>
+<script src="i18n.js?v=202610201745"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -564,6 +564,69 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-libre:hover{stroke:var(--turno,#0f62fe);stroke-opacity:.35;stroke-width:7}
   .jg-cierra.jg-libre:hover{stroke-opacity:.75}
   .jg-svg .jg-punto{fill:#cbd5dd}
+
+  /* ============================================================
+     Pool 8
+     ============================================================ */
+  .jg-pool{display:flex;flex-direction:column;gap:10px;max-width:1180px;margin:0 auto;width:100%}
+  .jg-pl-hud{display:flex;align-items:stretch;justify-content:center;gap:10px;flex-wrap:wrap}
+  .jg-pl-vs{align-self:center;font-size:12px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:1px}
+  .jg-pl-equipo{flex:1 1 260px;max-width:430px;background:#fff;border:2px solid #e4dfeb;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;gap:4px;transition:border-color .2s,box-shadow .2s}
+  .jg-pl-equipo.turno{border-color:#1f8a4c;box-shadow:0 0 0 3px #1f8a4c33}
+  .jg-pl-nombres{display:flex;gap:10px;flex-wrap:wrap;font-weight:700;font-size:14px}
+  .jg-pl-nom{display:inline-flex;align-items:center;gap:6px}
+  .jg-pl-nom::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c);flex-shrink:0}
+  .jg-pl-nom.fuera{text-decoration:line-through;opacity:.5}
+  .jg-pl-nom.toca{color:#1f8a4c}
+  .jg-pl-grupo{font-size:11px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:.8px;min-height:14px}
+  .jg-pl-bolas{display:flex;gap:3px;flex-wrap:wrap;min-height:22px}
+  .jg-pl-mb{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-style:normal;position:relative;overflow:hidden;
+    background:radial-gradient(circle at 32% 28%,#ffffffcc 0,#fff0 38%),var(--c);box-shadow:inset -2px -3px 4px #0005,0 1px 2px #0004;transition:opacity .3s,filter .3s}
+  .jg-pl-mb.ray{background:radial-gradient(circle at 32% 28%,#ffffffcc 0,#fff0 38%),linear-gradient(180deg,#f7f5ee 0 26%,var(--c) 26% 74%,#f7f5ee 74%)}
+  .jg-pl-mb b{font-size:10px;line-height:1;width:12px;height:12px;border-radius:50%;background:#f7f5ee;color:#111;display:flex;align-items:center;justify-content:center}
+  .jg-pl-mb.fuera{opacity:.22;filter:grayscale(.7)}
+  .jg-pl-estado{text-align:center;font-weight:600;font-size:14px;min-height:20px;color:var(--jg-ink)}
+  .jg-pl-mesa{width:100%;display:flex;justify-content:center}
+  .jg-pl-mesa canvas{display:block;border-radius:22px;box-shadow:0 18px 34px #0004,0 2px 0 2px #2b170b;cursor:crosshair;max-width:100%}
+  .jg-pl-ctl{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:stretch}
+  .jg-pl-ctl.off .jg-pl-caja{opacity:.45;pointer-events:none}
+  .jg-pl-ctl.mirando{display:none}
+  .jg-pl-caja{background:#fff;border:2px solid #e4dfeb;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:opacity .2s}
+  .jg-pl-et{font-size:11px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:.8px}
+  .jg-pl-efecto-caja canvas{width:96px;height:96px;cursor:pointer;touch-action:none}
+  .jg-pl-fuerza-caja{min-width:210px}
+  .jg-pl-fuerza-v{font-size:22px;font-weight:800;color:#1f8a4c;line-height:1}
+  .jg-pl-fuerza-v b{font-weight:800}
+  .jg-pl-fuerza-caja input[type=range]{width:100%;height:14px;border-radius:7px;appearance:none;-webkit-appearance:none;outline:none;
+    background:linear-gradient(90deg,#3bbf6b 0,#e8c53a 55%,#d63b30 100%);}
+  .jg-pl-fuerza-caja input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:26px;border-radius:7px;background:#fff;border:3px solid #232137;cursor:pointer}
+  .jg-pl-fuerza-caja input[type=range]::-moz-range-thumb{width:18px;height:22px;border-radius:7px;background:#fff;border:3px solid #232137;cursor:pointer}
+  .jg-pl-fila{display:flex;gap:6px}
+  .jg-pl-b{width:42px;height:38px;padding:0;font-size:20px;background:#232137}
+  .jg-pl-acciones{flex-direction:column;border:none;background:none;padding:0}
+  .jg-pl-golpe{height:52px;padding:0 34px;font-size:16px;background:#1f8a4c;border-radius:12px}
+  .jg-pl-golpe:disabled{background:#9aa5a0;cursor:not-allowed}
+  .jg-pl-mover{background:#232137}
+  .jg-pl-pie{text-align:center;min-height:18px}
+  @media (max-width:640px){.jg-pl-equipo{flex-basis:100%;max-width:none}.jg-pl-caja{padding:6px 8px}.jg-pl-fuerza-caja{min-width:0;flex:1 1 150px}}
+
+  /* La portada: el triángulo, la blanca y el taco sobre el paño. */
+  .jg-portada-pool{background:radial-gradient(ellipse at 40% 40%,#2f9d5d,#10432a 78%)}
+  .jg-art-pool{position:relative;width:220px;height:150px;transform:rotate(-6deg)}
+  .jg-art-pool .mesa{position:absolute;inset:6px;border:7px solid #5a2e15;border-radius:14px;box-shadow:0 10px 24px #0007,inset 0 0 18px #0006}
+  .jg-art-pool .rack{position:absolute;right:34px;top:34px;width:80px;height:84px}
+  .jg-art-pool .rack i,.jg-art-pool .blanca{position:absolute;width:26px;height:26px;border-radius:50%;box-shadow:inset -3px -4px 6px #0006,0 3px 4px #0005;
+    background:radial-gradient(circle at 32% 28%,#fffc 0,#fff0 40%),var(--c,#f4f0e6)}
+  .jg-art-pool .rack i b{position:absolute;inset:7px;border-radius:50%;background:#f7f5ee;color:#111;font:700 8px/12px Arial;text-align:center;font-style:normal}
+  .jg-art-pool .rack i.ray{background:radial-gradient(circle at 32% 28%,#fffc 0,#fff0 40%),linear-gradient(180deg,#f7f5ee 0 26%,var(--c) 26% 74%,#f7f5ee 74%)}
+  .jg-art-pool .rack i:nth-child(1){left:0;top:29px;--c:#f7c612}
+  .jg-art-pool .rack i:nth-child(2){left:23px;top:16px;--c:#d82828}
+  .jg-art-pool .rack i:nth-child(3){left:23px;top:42px;--c:#161618}
+  .jg-art-pool .rack i:nth-child(4){left:46px;top:3px;--c:#0e7e42}
+  .jg-art-pool .rack i:nth-child(5){left:46px;top:29px;--c:#6a2c92}
+  .jg-art-pool .rack i:nth-child(6){left:46px;top:55px;--c:#1452c4}
+  .jg-art-pool .blanca{left:52px;top:62px}
+  .jg-art-pool .taco{position:absolute;left:-18px;top:73px;width:78px;height:5px;border-radius:3px;transform:rotate(-1deg);background:linear-gradient(90deg,#2a160a 0 30%,#e4c188 30% 92%,#5b8ef0 92%);box-shadow:0 3px 4px #0006}
 
   /* ============================================================
      Reversi
@@ -2810,6 +2873,10 @@ html[data-tema=oscuro] .esc-chip.txt.sel{background:#d9a441;color:#191c16}
    blanca sobre blanco es ahora el que deja ver la negra sobre negro. */
 html[data-tema=oscuro] .jg-cuad .jg-svg{background:var(--os-sup2);box-shadow:0 8px 35px #0006}
 html[data-tema=oscuro] .jg-svg .jg-punto{fill:#9d96ad}
+html[data-tema=oscuro] .jg-pl-equipo,html[data-tema=oscuro] .jg-pl-caja{background:var(--os-sup2);border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-pl-equipo.turno{border-color:#34c070}
+html[data-tema=oscuro] .jg-pl-b,html[data-tema=oscuro] .jg-pl-mover{background:#3a3560}
+html[data-tema=oscuro] .jg-pl-fuerza-caja input[type=range]::-webkit-slider-thumb{border-color:#ebe7f5}
 html[data-tema=oscuro] .jg-rev-punto,html[data-tema=oscuro] .jg-rev-chip{border-color:#ffffff66}
 
 /* Flip 7: lo que queda fuera del paño (el pie y el historial) */
@@ -6276,6 +6343,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610201602"></script>
+<script src="juegos-app.js?v=202610201745"></script>
 </body>
 </html>

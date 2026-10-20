@@ -579,6 +579,14 @@ function ajedrez() {
     en(64, 0, `<circle r="9" fill="#1f2937"/>` + an("hop", 1.6, caballo));
 }
 
+function pool() {
+  const bola = (c, n, i) => an("l", 1.8, `<circle r="5.4" fill="${c}" stroke="#0008" stroke-width=".7"/><circle r="2.5" fill="#f7f5ee"/>` + tx(n, 3.4, "#111"), n1(-i * .35));
+  return aro(60, "#14583a", 17) + aro(51.5, "#5a2e15", 2.4) + aro(68.5, "#5a2e15", 2.4) +
+    gira(14, cada(6, (i, a) => en(60, a, bola(["#f7c612", "#d82828", "#161618", "#1452c4", "#0e7e42", "#6a2c92"][i], i === 2 ? "8" : String(i + 1), i)))) +
+    gira(3, trazo(60, 0, 30, "#fff", 4, `opacity=".25" stroke-linecap="round"`)) +
+    chispas([[68, 40, 2.4, 1.5, 0], [68, 160, 2, 1.9, -.5], [68, 280, 2.4, 1.7, -.9]], "#d1fae5");
+}
+
 function monedas() {
   const moneda = (i) => an("v", 1.8, `<circle r="5.6" fill="#ffd84d" stroke="#8a6100" stroke-width="1"/><circle r="4" fill="none" stroke="#fff3b0" stroke-width=".6"/>` + tx("$", 6, "#8a6100"), n1(-i * .3));
   return aro(60, "#b8860b", 17) + aro(52.5, "#fff3b0", 1.4) + aro(67.5, "#6b4a00", 1.4) +
@@ -657,7 +665,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
-  tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero, tmemazo: memazo,
+  tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero, tmemazo: memazo, tpool: pool,
   cometa, vortice, sakura, plasma, mariposas
 };
 

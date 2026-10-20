@@ -48,6 +48,7 @@ import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearPool } from "./juegos/pool.js";
 import { crearGato } from "./juegos/gato.js";
 import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearPokemon } from "./juegos/pokemon.js";
@@ -117,10 +118,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, pool: crearPool
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", pool: "🎱" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
@@ -266,6 +267,14 @@ const OPCIONES = {
   ],
   /* Memazo: de dónde salen las plantillas (`fuente`, no `modo`), cuántas
      rondas y cuánto se tiene para escribir cada meme. */
+  /* Pool 8: uno contra uno (`cupo` 2) o dos contra dos (`cupo` 4). En
+     parejas el anfitrión juega con quien entre en el puesto elegido; en
+     uno contra uno `pareja` no se usa. `guia` es la línea de puntería. */
+  pool: [
+    { clave: "cupo", etiqueta: "Formato", valores: [{ v: 2, t: "1 contra 1" }, { v: 4, t: "2 contra 2" }] },
+    { clave: "guia", etiqueta: "Línea guía", valores: [{ v: 1, t: "Con línea guía" }, { v: 0, t: "Sin línea guía" }] },
+    { clave: "pareja", etiqueta: "Mi compañero (solo 2 contra 2)", valores: [{ v: 1, t: "El primero que entre" }, { v: 2, t: "El segundo que entre" }, { v: 3, t: "El tercero que entre" }] }
+  ],
   memazo: [
     { clave: "cupo", etiqueta: "Jugadores", por: 6, valores: cupos("memazo") },
     { clave: "fuente", etiqueta: "Plantillas", por: "reales", valores: Object.keys(MZ_FUENTES).map(v => ({ v, t: MZ_FUENTES[v] })) },
@@ -3028,7 +3037,7 @@ function panelEspera(p, est) {
   const dentro = (est.jugadores || []).length;
   const min = minimoDe(p);
   const anfitrion = p.anfitrion === state.user.uid;
-  const varios = cupo > min;
+  const varios = cupo > min || (p.juego === "pool" && cupo > 2);
   return `
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
@@ -3040,6 +3049,7 @@ function panelEspera(p, est) {
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
         : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
+        : p.juego === "pool" ? `<div class="jg-nota">Dos contra dos: empieza sola cuando entren los cuatro. Quien abrió la sala juega con el compañero que eligió.</div>`
         : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
@@ -3129,7 +3139,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3260,6 +3270,10 @@ const RAZONES = {
   catan: "Llegó a los puntos de victoria antes que nadie.",
   agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
   cierre: "La mesa votó acabar: ganó quien llevaba más puntos.",
+  ocho: "Metió la 8 en la tronera que había cantado.",
+  "ocho-pronto": "La 8 cayó antes de despejar su grupo.",
+  "ocho-mal": "La 8 cayó en una tronera distinta de la cantada.",
+  "ocho-falta": "La 8 cayó con falta.",
   mate: "Jaque mate.",
   ahogado: "Rey ahogado: sin jugadas y sin estar en jaque.",
   material: "No quedaba material para dar mate.",
@@ -3709,6 +3723,7 @@ const ESFERAS_BT3 = [
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
+  if (k === "pool") return '<div class="jg-art-pool"><span class="mesa"></span><span class="rack">' + [[1, 0], [11, 1], [8, 0], [3, 0], [14, 1], [6, 0]].map(([n, r], i) => '<i class="b' + n + (r ? " ray" : "") + '" style="--i:' + i + '"><b>' + (n > 8 ? n : n) + '</b></i>').join("") + '</span><i class="blanca"></i><span class="taco"></span></div>';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
   if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
