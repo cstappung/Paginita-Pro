@@ -75,7 +75,7 @@ import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { portadaSolo } from "./juegos/portadas-solo.js";
-import { crearRanks } from "./juegos/ranks.js";
+import { crearRanks, categoriaVigente } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
@@ -510,6 +510,9 @@ function conDerivados(d) {
   let lid = null, com = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
+     las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
+  Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
   return d;
 }
 function lideresDe(d) {
@@ -2033,7 +2036,7 @@ function armazon() {
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
          vuelve a mirar que lo sea. */
-      esAdmin: () => !!state.admin,
+      esAdmin: () => !!state.admin, vetado: fb.estaVetado, watchVetados: fb.watchVetados,
       borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)) });
     ranks.montar(h);
     return;

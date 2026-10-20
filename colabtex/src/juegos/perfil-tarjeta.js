@@ -174,13 +174,49 @@ export function campeones(datos) {
   }
   for (const [c, filas] of Object.entries(d.solo || {})) {
     const k = topDeCategoria(c);
-    if (!k) continue;
+    if (!k || (d.vigente && !d.vigente(c))) continue;
     const orden = Object.entries(filas || {}).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
     if (orden.length >= 2) pon(orden[0].uid, k);
   }
   for (const [k, u] of Object.entries(d.lideres || {})) if (u) pon(u, k);
   memoTops.set(d, m);
   return m;
+}
+
+/* La Clasificación general: los podios de todas las tablas. Cada primer
+   puesto vale 3 puntos, cada segundo 2 y cada tercero 1. Cuentan las
+   tablas de al menos MIN_PODIO personas (ser primero solo, o de dos, sería
+   regalado: es el mismo corte de los «podios» del perfil); en las salas,
+   solo con algún punto. `op.salas`: las claves de las tablas de sala que se
+   ven (si no, todas las de JUEGOS); `op.vigente(c)`: si una categoría del
+   club existe hoy; `op.vetado(uid)`: las cuentas vetadas, fuera. */
+export const MIN_PODIO = 3;
+const METALES = ["oro", "plata", "bronce"];
+export function podiosGeneral(datos, op) {
+  const d = datos || {}, o = op || {};
+  const vetado = o.vetado || (() => false), t = {};
+  const anota = (orden, tam) => {
+    if (tam < MIN_PODIO) return;
+    orden.slice(0, 3).forEach((f, i) => {
+      const a = t[f.uid] || (t[f.uid] = { uid: f.uid, nombre: "", foto: "", oro: 0, plata: 0, bronce: 0, podios: 0, puntos: 0 });
+      a[METALES[i]]++; a.podios++; a.puntos += 3 - i;
+      if (!a.nombre && f.nombre) a.nombre = f.nombre;
+      if (!a.foto && f.foto) a.foto = f.foto;
+    });
+  };
+  const filasDe = filas => Object.entries(filas || {}).filter(([u, f]) => f && !vetado(u));
+  for (const [j, filas] of Object.entries(d.ranks || {})) {
+    if (o.salas ? o.salas.indexOf(j) < 0 : !JUEGOS[j]) continue;
+    const todas = filasDe(filas).map(([u, f]) => Object.assign({ uid: u }, f));
+    anota(ordenaRanks(todas).filter(f => (f.puntos || 0) > 0), todas.length);
+  }
+  for (const [c, filas] of Object.entries(d.solo || {})) {
+    if (o.vigente ? !o.vigente(c) : !juegoDeCategoria(c)) continue;
+    const todas = filasDe(filas).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
+    anota(todas, todas.length);
+  }
+  return Object.values(t).sort((a, b) => b.puntos - a.puntos || b.oro - a.oro || b.plata - a.plata ||
+    String(a.nombre).localeCompare(String(b.nombre)) || String(a.uid).localeCompare(String(b.uid)));
 }
 
 /* Lo que se sabe de alguien a partir de las tres lecturas: sus logros,
@@ -220,7 +256,7 @@ function calculaEstadisticas(uid, d) {
   for (const [c, filas] of Object.entries(d.solo || {})) {
     const mia = filas && filas[uid];
     const j = juegoDeCategoria(c);
-    if (!mia || !j) continue;
+    if (!mia || !j || (d.vigente && !d.vigente(c))) continue;   // las tablas de versiones viejas ya no salen
     const orden = Object.entries(filas).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
     const i = orden.findIndex(f => f.uid === uid);
     tablas.push({ clave: "s:" + c, tipo: "s", j, c, puesto: i + 1, de: orden.length, valor: valorMarca(c, mia) });

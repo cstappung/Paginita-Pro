@@ -636,6 +636,9 @@ function vigilaVetados(cb) {
   return () => vetadosOyentes.delete(cb);
 }
 export const estaVetado = uid => vetadosSet.has(uid);
+/* Para quien suma tablas por su cuenta (la general por podios): avisa
+   cuando cambia la lista de vetados. */
+export const watchVetados = cb => vigilaVetados(cb);
 
 /* Récord por categoría; la transacción conserva el mejor entre pestañas. */
 export function watchSolo(categoria, cb) {

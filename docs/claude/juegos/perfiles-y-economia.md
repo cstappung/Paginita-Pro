@@ -174,10 +174,20 @@ everyone else. The entry animation plays **once per game** (`animado` holds
 the key) and the scene repaints by signature (`firma`), because `watchRanks`
 fires on every write and replaying the rise each time would make it twitch.
 
-**The Clasificación opens on a General table** (`ranks.js`, key `general`):
-the sum of every room game's `ranks` row (points, wins, games played, and a
-«Juegos» column counting in how many games each person has a row), read
-through `fb.watchRanksTodos`. The picker lists the games in the lobby's
+**The Clasificación opens on a General table** (`ranks.js`, key `general`)
+that counts **podiums**: every first place in any table is 3 points, every
+second 2, every third 1 (`podiosGeneral` in `perfil-tarjeta.js`, pure and
+tested in `tests/perfil.test.cjs`). Tables: each room game the picker shows
+(only rows with points can be on the podium) and every **current** club
+category; a table counts only with `MIN_PODIO` (3) people, the same cut as
+the profile's «podios», and vetted accounts are skipped (`fb.watchVetados`).
+It reads the lobby's data (`ctx.datos`: ranks + soloRanks).
+**Old club tables are hidden**: `categoriaVigente` (`ranks.js`) is every
+combination of its `SOLO` rows; categories from older versions of a game
+(the old Snake and Mina Club) stay in the database but `conDerivados` passes
+it as `datos.vigente`, so the profile's tables, podiums and tops skip them
+too. A new club table must be added to `SOLO` or it is invisible there.
+The picker lists the games in the lobby's
 popularity order, room games and solo games under separate labels, and the
 choice persists in `jg.rankJuego`. Each game's ficha in the lobby carries
 that game's top three (`podioHtml`, from the `ranks` that

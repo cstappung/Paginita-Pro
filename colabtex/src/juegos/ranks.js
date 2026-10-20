@@ -26,6 +26,7 @@ import { mezcla } from "./perfil.js";
 import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
 import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
 import { nombreHtml } from "./tintas.js";
+import { podiosGeneral, MIN_PODIO } from "./perfil-tarjeta.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -110,6 +111,21 @@ const SOLO = {
     cat: s => `club-snake-${s.m}-${s.t}`, def: { t: "grande" } }
 };
 const esSolo = k => !!SOLO[k];
+
+/* Las categorías del club que existen hoy: todas las combinaciones de las
+   filas de SOLO. Las de versiones viejas (el Snake de antes, el buscaminas
+   de antes) siguen en la base, pero ya no salen en la general ni en el
+   perfil (juegos-main.js lo pasa a los datos como `vigente`). */
+const VIGENTES = (() => {
+  const s = new Set();
+  for (const d of Object.values(SOLO)) {
+    let combos = [Object.assign({}, d.def || {})];
+    for (const f of d.filas) combos = combos.flatMap(e => f.ops.map(([v]) => Object.assign({}, e, { [f.k]: v })));
+    for (const e of combos) s.add(d.cat(e));
+  }
+  return s;
+})();
+export const categoriaVigente = c => VIGENTES.has(String(c));
 
 /* La corona es SVG dibujado, no un emoji: cada sistema pinta 👑 a su
    tamaño y su color, y aquí tiene que brillar en el oro del podio. */
@@ -204,7 +220,7 @@ export function crearRanks(ctx) {
     }
     pinta();
     const individual = esSolo(juego);
-    const oye = juego === "general" ? (_, cb) => ctx.watchTodos((todo, err) => cb(suma(todo), err))
+    const oye = juego === "general" ? oyeGeneral
       : individual ? ctx.watchSolo : watchRanks;
     parar = oye(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
@@ -215,24 +231,19 @@ export function crearRanks(ctx) {
     });
   }
 
-  /* La general: cada jugador con lo de todos los juegos sumado. La racha
-     es la mejor de cualquiera de ellos (sumar rachas de juegos distintos
-     no significa nada) y «juegos» dice en cuántos tiene fila, que es lo
-     que distingue al que gana en todo del que solo juega a uno. */
-  function suma(todo) {
-    const t = {};
-    for (const [k, filas] of Object.entries(todo || {})) {
-      if (!JUEGOS[k]) continue;
-      for (const [u, f] of Object.entries(filas || {})) {
-        if (!f) continue;
-        const a = t[u] || (t[u] = { uid: u, nombre: "", foto: "", jugadas: 0, ganadas: 0, perdidas: 0, empates: 0, puntos: 0, mejorRacha: 0, juegos: 0, _at: -1 });
-        for (const c of ["jugadas", "ganadas", "perdidas", "empates", "puntos"]) a[c] += +f[c] || 0;
-        a.mejorRacha = Math.max(a.mejorRacha, +f.mejorRacha || 0);
-        a.juegos++;
-        if ((+f.at || 0) >= a._at) { a._at = +f.at || 0; a.nombre = f.nombre || a.nombre; a.foto = f.foto || a.foto; }
-      }
-    }
-    return Object.values(t);
+  /* La general: los podios de todas las tablas que se ven aquí (las de
+     sala y las del club), 3 puntos por cada primer puesto, 2 por cada
+     segundo y 1 por cada tercero (`podiosGeneral`). Sale de los mismos
+     datos del vestíbulo (ranks + soloRanks); sin ellos, solo de las salas. */
+  const salasVisibles = () => (ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS)).filter(k => !EXTRA[k]);
+  function oyeGeneral(_, cb) {
+    const op = () => ({ salas: salasVisibles(), vigente: categoriaVigente, vetado: ctx.vetado });
+    if (!ctx.datos) return ctx.watchTodos((todo, err) => cb(podiosGeneral({ ranks: todo }, op()), err));
+    let d = null;
+    const emite = () => { if (d) cb(podiosGeneral(d, op()), null); };
+    const offD = ctx.datos(x => { d = x; emite(); });
+    const offV = ctx.watchVetados ? ctx.watchVetados(emite) : null;
+    return () => { if (offD) offD(); if (offV) offV(); };
   }
 
   /* 22 pastillas iguales, sin icono y en el orden del objeto, eran tres
@@ -272,15 +283,26 @@ export function crearRanks(ctx) {
     const t = host.querySelector("#rkTabla");
     if (!t) return;
     const solo = esSolo(juego);
-    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid))) : ordenaRanks(filas);
     const general = juego === "general";
+    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid)))
+      : general ? filas : ordenaRanks(filas);
     host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
-      : general ? 'La general suma los puntos de todos los juegos en sala (3 por victoria, 1 por empate). «Juegos» dice en cuántos tiene fila cada uno.'
+      : general ? `La general cuenta los podios de todas las clasificaciones (de sala y del club, con al menos ${MIN_PODIO} personas): cada primer puesto da 3 puntos, cada segundo 2 y cada tercero 1.`
       : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
     if (!orden.length) {
       t.innerHTML = `<tr><td class="jg-vacio">${cargando ? "Cargando…"
-        : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
+        : general ? "Todavía nadie tiene un podio." : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
+      return;
+    }
+    if (general) {
+      t.innerHTML = `
+      <thead><tr>
+        <th class="jg-th-n">#</th><th>Jugador</th>
+        <th class="jg-num jg-opc" title="Primeros puestos">🥇</th><th class="jg-num jg-opc" title="Segundos puestos">🥈</th>
+        <th class="jg-num jg-opc" title="Terceros puestos">🥉</th><th class="jg-num jg-opc">Podios</th>
+        <th class="jg-num jg-pts">Puntos</th>
+      </tr></thead><tbody>${orden.map((f, i) => filaGeneral(f, i)).join("")}</tbody>`;
       return;
     }
     const adm = solo && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord;
@@ -290,7 +312,7 @@ export function crearRanks(ctx) {
         <th class="jg-th-n">#</th><th>Jugador</th>
         <th class="jg-num jg-opc">Jugadas</th><th class="jg-num jg-opc">Ganadas</th>
         <th class="jg-num jg-opc">Perdidas</th><th class="jg-num jg-opc">Empates</th>
-        <th class="jg-num jg-opc">%</th>${general ? `<th class="jg-num jg-opc">Juegos</th>` : ""}<th class="jg-num jg-opc">Racha</th>
+        <th class="jg-num jg-opc">%</th><th class="jg-num jg-opc">Racha</th>
         <th class="jg-num jg-pts">Puntos</th>
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
@@ -310,11 +332,28 @@ export function crearRanks(ctx) {
       <td class="jg-num jg-opc">${f.perdidas || 0}</td>
       <td class="jg-num jg-opc">${f.empates || 0}</td>
       <td class="jg-num jg-opc"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
-      ${juego === "general" ? `<td class="jg-num jg-opc">${f.juegos || 0}</td>` : ""}
       <td class="jg-num jg-opc">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
   }
+
+  function filaGeneral(fx, i) {
+    const f = mezcla(fx, perfil(fx.uid));
+    const yo = f.uid === uid;
+    return `<tr class="${yo ? "jg-yo" : ""}${i < 3 ? " jg-rk-top" : ""}">
+      <td class="jg-th-n">${puesto(i)}</td>
+      <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
+        ${foto(f, 26)}
+        <span translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${medallas(f)}</small></span>
+      </td>
+      <td class="jg-num jg-opc">${f.oro}</td>
+      <td class="jg-num jg-opc">${f.plata}</td>
+      <td class="jg-num jg-opc">${f.bronce}</td>
+      <td class="jg-num jg-opc">${f.podios}</td>
+      <td class="jg-num jg-pts">${f.puntos}</td>
+    </tr>`;
+  }
+  const medallas = f => `${f.oro} 🥇 · ${f.plata} 🥈 · ${f.bronce} 🥉`;
 
   /* ---- PRODROP: colección y cartas más raras ---- */
   function nombreDe(u) {
@@ -420,7 +459,7 @@ export function crearRanks(ctx) {
         ${bloque}</div>`;
     const detalle = solo && categoriaSolo === "club-hero-estrellas" ? `${plural(f.h || 0, "canción", "canciones")} · ${Math.max(0, (f.puntos || 0) % 10000 - Math.floor((f.puntos || 0) / 10000))} azules`
       : solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
-      : juego === "general" ? `${f.ganadas || 0} G · ${plural(f.juegos || 0, "juego", "juegos")}`
+      : juego === "general" ? medallas(f)
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
@@ -443,15 +482,17 @@ export function crearRanks(ctx) {
       if (m.menor) return `${Math.max(0.01, d + 0.01).toFixed(2)} s menos`;
       const n = d + 1;
       if (solo && categoriaSolo === "club-hero-estrellas") return plural(n, "estrella dorada", "estrellas doradas");
-      return solo ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
+      return solo || juego === "general" ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
     };
     let icono = "⚔", tit, txt;
     if (!orden.length) {
       icono = "♛"; tit = "El trono está vacío";
-      txt = solo ? "El primer récord que se apunte se sienta en él." : "La primera victoria que se apunte se sienta en él.";
+      txt = solo ? "El primer récord que se apunte se sienta en él." : juego === "general" ? "El primer podio que se gane se sienta en él." : "La primera victoria que se apunte se sienta en él.";
     } else if (i < 0) {
       tit = "Todavía no estás en la tabla";
-      txt = orden.length < 3 ? "Hay un puesto libre en el podio: termina una partida y es tuyo."
+      txt = juego === "general" ? (orden.length < 3 ? "Hay un puesto libre en el podio: sube al podio de cualquier clasificación y es tuyo."
+          : `El podio empieza en ${plural(orden[2].puntos, "punto", "puntos")}: sube al podio de cualquier clasificación y entras.`)
+        : orden.length < 3 ? "Hay un puesto libre en el podio: termina una partida y es tuyo."
         : `El podio empieza en ${m.txt(m.valor(orden[2]))}${m.unidad ? " " + m.unidad : ""}. Juega y entra.`;
     } else if (i === 0) {
       icono = "♛"; tit = "Llevas la corona";
