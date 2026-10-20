@@ -225,3 +225,11 @@ test('boxhead: paletas, armas en la mano y proyección del dibujo',()=>{
  const q=G.proyecta(100,100,0,0,0,30,1,Math.PI/2);
  assert.ok(q[2]<75&&Math.abs(q[4])<1e-6);
 });
+
+test('el Demoledor: el único que va a romper, poco común; cada tipo tiene sus puntos',()=>{
+ assert.equal(D.PUNTOS.length,D.ENEMIGOS.length,'una entrada de PUNTOS por enemigo');
+ const rompen=D.ENEMIGOS.filter(e=>e.rompe);
+ assert.deepEqual(rompen.map(e=>e.id),[16]);
+ for(let n=1;n<=60;n++)assert.ok(D.mezclaNivel(n)[16]<=0.05+1e-9,'nivel '+n);
+ assert.equal(D.mezclaNivel(5)[16],0);assert.ok(D.mezclaNivel(6)[16]>0);
+});

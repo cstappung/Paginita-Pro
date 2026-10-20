@@ -16,7 +16,8 @@ lo anota con el paso en que ocurrió:
 `{v: 1, ve, u, r, s, j, k}`: versión de la prueba, versión del motor, la cuenta,
 el reino, la semilla, las jugadas y el último paso. Cada jugada es
 `[paso, código, …]`: 0 colocar (torre, x, y enteros), 1 mejorar (id, camino),
-2 vender (id), 3 objetivo (id, modo), 4 empezar ronda, 5 recargar (c).
+2 vender (id), 3 objetivo (id, modo), 4 empezar ronda, 5 recargar (c),
+6 pinchos (x, y enteros; el motor los deja en el punto del camino más cercano).
 
 - **Recargar** es reanudar una partida guardada (c = 0) o reintentar la ronda
   perdida (c = 1, gasta uno de los tres reintentos). El motor se rehace desde la

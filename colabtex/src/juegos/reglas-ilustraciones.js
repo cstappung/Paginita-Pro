@@ -468,3 +468,34 @@ export const defensa=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* PRO PACMAN: un tramo del laberinto de neón. `etapa`: 0 la racha que
+   multiplica los puntos; 1 un núcleo comido y los fantasmas azules; 2 el
+   pulso que aturde a los cercanos; 3 una compuerta cerrada y Glitch que
+   salta. */
+export const pacman=etapa=>{
+ const nombre=['El pacman come una fila de puntos seguidos y la racha sube a ×2','Tras comer un núcleo, los fantasmas se vuelven azules y valen 200, 400, 800…','El pulso aturde a los dos fantasmas dentro del anillo; el lejano sigue cazando','Una compuerta roja cierra un pasillo y Glitch salta a otro lugar del laberinto'][etapa];
+ const pac=(x,y,col='#ffe14d')=>`<path d="M${x} ${y} L${x+16} ${y-9} A18 18 0 1 0 ${x+16} ${y+9} Z" fill="${col}"/>`;
+ const fan=(x,y,col)=>`<path d="M${x-15} ${y+15} V${y} A15 15 0 0 1 ${x+15} ${y} V${y+15} L${x+8} ${y+9} L${x} ${y+15} L${x-8} ${y+9} Z" fill="${col}"/>`+circle(x-5,y-1,4,'#fff')+circle(x+6,y-1,4,'#fff');
+ const pared=(x,y,a,b)=>line(x,y,a,b,'#2de2ff',6);
+ let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#060818"/>`+pared(30,60,450,60)+pared(30,190,450,190);
+ if(etapa===0){
+  cuerpo+=pac(70,125);
+  for(let i=0;i<10;i++)cuerpo+=rect(110+i*32,121,8,8,i<3?'#ffe9b8':'#ffe9b855','none',1);
+  cuerpo+=txt(40,44,'×2',22,'#ffb02e')+txt(84,44,'racha 13',15,C.gris)+txt(440,44,'+20 por punto',15,C.oro,'end')+txt(240,226,'Si pasas un rato sin comer, vuelve a ×1.',14,C.gris,'middle');
+ }
+ if(etapa===1){
+  cuerpo+=pac(70,125)+fan(200,120,'#2a3cff')+fan(290,120,'#2a3cff')+fan(380,120,'#2a3cff');
+  cuerpo+=txt(200,100,'200',15,'#7ff','middle')+txt(290,100,'400',15,'#7ff','middle')+txt(380,100,'800',15,'#7ff','middle')+txt(240,44,'Cómetelos mientras están azules',16,C.blanco,'middle')+txt(240,226,'Cada uno vale el doble que el anterior.',14,C.gris,'middle');
+ }
+ if(etapa===2){
+  cuerpo+=`<circle cx="150" cy="125" r="100" fill="#8fd8ff18" stroke="#8fd8ff" stroke-width="3" stroke-dasharray="8 6"/>`+pac(140,125);
+  cuerpo+=fan(90,120,'#7d84a6')+fan(215,120,'#7d84a6')+fan(390,120,'#ff3b5c');
+  cuerpo+=txt(90,96,'★ ★',13,C.oro,'middle')+txt(215,96,'★ ★',13,C.oro,'middle')+txt(390,96,'fuera',14,C.rojo,'middle')+txt(330,44,'+100 por cada aturdido',15,C.oro,'middle');
+ }
+ if(etapa===3){
+  cuerpo+=pac(70,125)+line(170,64,170,186,'#ff4d6d',8)+txt(170,44,'cerrada',15,'#ff4d6d','middle');
+  cuerpo+=`<g opacity=".45">${fan(270,120,'#b6ff3d')}</g>`+fan(400,120,'#b6ff3d')+`<path d="M290 112 Q335 70 380 112" fill="none" stroke="#b6ff3d" stroke-width="3" stroke-dasharray="6 5"/>`;
+  cuerpo+=txt(335,82,'¡salta!',15,'#b6ff3d','middle')+txt(240,226,'Cada 8 s las compuertas se abren o se cierran.',14,C.gris,'middle');
+ }
+ return svg(nombre,cuerpo);
+};

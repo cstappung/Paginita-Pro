@@ -75,7 +75,7 @@ import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { portadaSolo } from "./juegos/portadas-solo.js";
-import { crearRanks } from "./juegos/ranks.js";
+import { crearRanks, categoriaVigente } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
@@ -123,7 +123,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -312,7 +312,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -510,6 +510,9 @@ function conDerivados(d) {
   let lid = null, com = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
+     las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
+  Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
   return d;
 }
 function lideresDe(d) {
@@ -1267,7 +1270,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1971,7 +1974,7 @@ function armazon() {
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
       ocultos: () => bt3Visible() ? [] : ["bt3"]
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -2033,7 +2036,7 @@ function armazon() {
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
          vuelve a mirar que lo sea. */
-      esAdmin: () => !!state.admin,
+      esAdmin: () => !!state.admin, vetado: fb.estaVetado, watchVetados: fb.watchVetados,
       borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)) });
     ranks.montar(h);
     return;

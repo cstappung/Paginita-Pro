@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/tintas.js')+'\n'+sin('src/juegos/perfil-tarjeta.js')+
- '\n;globalThis.__P={MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,opcionesVitrina,vitrinaDe,limpiaPerfil,nombreCategoria,valorMarca,oscurece,MAX_VITRINA,LOGROS};',context);
+ '\n;globalThis.__P={podiosGeneral,MIN_PODIO,MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,opcionesVitrina,vitrinaDe,limpiaPerfil,nombreCategoria,valorMarca,oscurece,MAX_VITRINA,LOGROS};',context);
 const P=context.__P;
 
 const datos={
@@ -116,4 +116,27 @@ test('el color del nombre: limpiaPerfil guarda solo uno que existe',()=>{
  assert.equal(P.limpiaPerfil({tinta:'dorado'}).tinta,'dorado');
  assert.equal(P.limpiaPerfil({tinta:'fucsia'}).tinta,undefined);
  assert.equal(P.limpiaPerfil({tinta:''}).tinta,undefined,'«Normal» es no guardar nada');
+});
+
+test('la general cuenta podios: 3 por primero, 2 por segundo, 1 por tercero',()=>{
+ const d={
+  ranks:{cacho:{a:{nombre:'Ana',puntos:30,ganadas:10,jugadas:12},b:{nombre:'Beto',puntos:12,ganadas:4,jugadas:10},c:{nombre:'Cata',puntos:3,ganadas:1,jugadas:5},z:{nombre:'Zoe',puntos:0,jugadas:4}},
+         uno:{a:{nombre:'Ana',puntos:3},b:{nombre:'Beto',puntos:9}}},           // de dos: no cuenta
+  solo:{'club-bbtan-rondas':{b:{nombre:'Beto',puntos:120,tiempo:1},a:{nombre:'Ana',puntos:90,tiempo:1},c:{nombre:'Cata',puntos:10,tiempo:1}},
+        'club-snake-classic-normal':{c:{nombre:'Cata',puntos:999,tiempo:1},a:{nombre:'Ana',puntos:5,tiempo:1},b:{nombre:'Beto',puntos:4,tiempo:1}}}
+ };
+ const vigente=c=>c!=='club-snake-classic-normal';
+ const g=P.podiosGeneral(d,{vigente});
+ const de=u=>g.find(f=>f.uid===u);
+ assert.equal(P.MIN_PODIO,3);
+ assert.deepEqual([de('a').puntos,de('a').oro,de('a').plata],[5,1,1],'Ana: 1.ª en cacho, 2.ª en BBTAN');
+ assert.deepEqual([de('b').puntos,de('b').oro,de('b').plata],[5,1,1],'Beto: 2.º en cacho, 1.º en BBTAN');
+ assert.equal(de('c').puntos,2,'Cata: dos terceros; la tabla vieja de Snake no cuenta');
+ assert.equal(g.length,3,'Zoe no tiene puntos en la sala: no sube al podio');
+ assert.equal(g[2].uid,'c');
+ // la tabla vieja sí cuenta sin filtro, y un vetado no ocupa podio
+ assert.equal(P.podiosGeneral(d,{vigente:()=>true,vetado:u=>u==='c'}).find(f=>f.uid==='c'),undefined);
+ // y el perfil tampoco lista las tablas viejas
+ const e=P.estadisticas('c',Object.assign({vigente},d));
+ assert.ok(!e.tablas.some(t=>t.c==='club-snake-classic-normal'));
 });

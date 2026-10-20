@@ -78,6 +78,18 @@
   function spec(c, x, y, r, a) { const o = c.globalAlpha; c.globalAlpha = o * (a || 0.6); ell(c, x, y, r, r * 0.65, -0.5, '#ffffff'); c.globalAlpha = o; }
   function glow(c, col, blur) { c.shadowColor = col; c.shadowBlur = blur * RS; }
   function noGlow(c) { c.shadowBlur = 0; c.shadowColor = 'transparent'; }
+  // montón de pinchos (engine: PD.PINCHOS); `f` = púas que le quedan (0..1)
+  function drawSpikes(c, x, y, f, k) {
+    k = k || 1;
+    const n = Math.max(3, Math.round(12 * f));
+    ell(c, x + 1, y + 2.5 * k, 12 * k, 5 * k, 0, 'rgba(0,0,0,0.35)');
+    circle(c, x, y, 9.5 * k, sg(c, x, y, 9.5 * k, '#5b5f6b', 0.3), '#1d1f26', 1.2);
+    for (let i = 0; i < n; i++) {
+      const a = i * TAU / n + 0.3, r = (i % 2 ? 4.5 : 8) * k, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.8;
+      shape(c, [[px - 2.6 * k, py + 1.5 * k], [px + 2.6 * k, py + 1.5 * k], [px, py - 6 * k]], i % 3 ? '#d9dde6' : '#aeb4c2', '#2a2d36', 0.8);
+    }
+    shape(c, [[x - 3 * k, y + 2 * k], [x + 3 * k, y + 2 * k], [x, y - 7 * k]], '#f2f4f8', '#2a2d36', 0.8);
+  }
   // ojos mirando hacia +x
   function eyes(c, x, sep, er, o) {
     o = o || {};
@@ -2325,6 +2337,7 @@
         for (let i = 0; i < 4; i++) { const a = i * TAU / 4; circle(ctx, x + Math.cos(a) * 5.5, y + Math.sin(a) * 5.5, 1.2, '#3a3a3a'); }
         if (m.armed && Math.sin(t * 7 + x) > 0.2) { ctx.globalCompositeOperation = 'lighter'; circle(ctx, x, y, 3.5, 'rgba(255,230,80,0.6)'); circle(ctx, x, y, 1.4, '#fff6b0'); ctx.globalCompositeOperation = 'source-over'; }
       }
+      for (const p of g.spikes) drawSpikes(ctx, p.x, p.y, p.n / PD.PINCHOS.puas);
       drawGroundUnits(ctx, g, t);
       const sel = ui.selected;
       if (sel && g.towers.indexOf(sel) >= 0 && sel.s.range < 5000) {
@@ -2562,7 +2575,12 @@
         const gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.7); gr.addColorStop(0, 'rgba(224,123,255,0)'); gr.addColorStop(1, 'rgba(224,123,255,0.6)');
         ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       }
-      if (ui.placing && ui.mouse) {
+      if (ui.placing === '@pinchos' && ui.mouse) {
+        const at = g.spikeSpot(ui.mouse.x, ui.mouse.y), ok = at && g.money >= g.spikeCost();
+        const px = at ? at.x : ui.mouse.x, py = at ? at.y : ui.mouse.y;
+        ctx.globalAlpha = 0.85; drawSpikes(ctx, px, py, 1); ctx.globalAlpha = 1;
+        circle(ctx, px, py, PD.PINCHOS.radio + 4, ok ? 'rgba(255,255,255,0.12)' : 'rgba(255,40,40,0.25)', ok ? 'rgba(255,255,255,0.75)' : '#ff4a4a', 2);
+      } else if (ui.placing && ui.mouse) {
         const def = PD.TOWERS[ui.placing];
         const ok = g.canPlace(ui.placing, ui.mouse.x, ui.mouse.y) && g.money >= def.cost;
         const range = def.base.range;
@@ -2602,6 +2620,7 @@
 
   PD.Render = R;
   PD.drawTower = drawTower;
+  PD.drawSpikes = drawSpikes;
   PD.drawEnemyIcon = drawEnemyIcon;
   PD.paintBackground = paintBackground;
 })();

@@ -60,6 +60,7 @@ export const APODOS = {
   tulonesclub: "tulones escalar trepar torre fisica calzoncillos pudu",
   heroclub: "guitar hero clone hero guitarra bajo bateria musica canciones",
   prodefender: "tower defense torres defensa bloons td estrategia reinos oleadas",
+  propac: "pacman pac-man laberinto fantasmas arcade neon puntos comecocos",
   frontera: "pokemon batalla torre palacio fabrica esmeralda",
   orbita: "gravedad espacio planetas sondas estrellas satelites",
   escondite: "esconder buscar escondidas paisaje",

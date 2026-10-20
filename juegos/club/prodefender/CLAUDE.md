@@ -81,15 +81,33 @@ number hotkeys for the towers only.
 
 ## Knockback and crowd control
 
-Every push back along the path goes through `Game.retrocede(e, px)`: Ancla,
-bumerán/balista/géiser pushes (`push`) and Ra'kesh's Tormenta. It spends a
-per-enemy lifetime budget `KB_MAX` (260 px, big 180, boss 140) kept in
-`e.pulled`, and **children inherit `pulled`** from their parent. Before, the
-Tormenta had no cap and each child started from zero, so buffed knockback
-towers kept rounds from ever ending. Nyx's Grieta rewinds each enemy **once**
+Every push back along the path goes through `Game.retrocede(e, px, src)`:
+Ancla, bumerán/balista/géiser pushes (`push(e, amt, src)`) and Ra'kesh's
+Tormenta. Each **tower** has its own cap per enemy, `KB_TORRE` (260 px, big
+180, boss 140; the Tormenta ×1.5), kept in `e.kb[towerId]`, and its push
+yields `KB_SUAVE / (KB_SUAVE + what the other towers pushed)` (520/360/280),
+never zero; `e.pulled` is the total. **Children inherit `pulled` and `kb`.**
+History: no cap at all let buffed knockback towers keep rounds from ending;
+then one lifetime cap per enemy (`KB_MAX`) made the back towers spend it and
+the enemy walked through the front ones immune (owner disliked it). One tower
+alone pushes as with the old cap; `prodefender-bot.cjs --estrategia control
+--ayuda 100` lost slightly fewer lives in Dunas/Glaciar/Caldera and the same
+elsewhere. Nyx's Grieta rewinds each enemy **once**
 (`e.rifted`, also inherited). A freeze leaves 1 s of `freezeImm` after it ends
 (`FREEZE_IMM`; re-freezes only slow), the same idea as `stunImm`. Do not add a
 new push that writes `e.dist` directly.
+
+## Pinchos (spikes, like Bloons' road spikes)
+
+`PD.PINCHOS` in `engine.js`: a pile bought from the shop (row under the hero,
+key K, `'@pinchos'` in `ui.placing`) and dropped **on the path**
+(`spikeSpot`: nearest point of a non-jump segment within `PATH_HALF`, not on
+another pile, at most `max` 10). Each ground enemy that walks over it takes one
+hit (once per pile, `hit` ids reset at `endRound`) and spends `gasto` spikes
+(big 3, boss 4) for `multi` × the damage (phys, ap 0.5); 12 spikes; it lasts
+until spent, across rounds (`snapshot.spikes`). Cost and damage follow the
+round (`costo`, `danio` = 5 × the round's enemy HP scale). Player action →
+op code 6 in `prueba.js` (`Grabadora.pinchos`).
 
 ## Balance tools (`colabtex/scripts/`)
 
@@ -156,7 +174,7 @@ versión» (cache, not cheating: no castigo).
   `alResultadoClub` in `juegos-main.js` skips `marcaJugadaClub` for it and
   announces the new coins instead. Logros (`SOLO.prodefender`, low `NIVEL`
   digits) and podiums pay as in every club game.
-- Local save is per account: `Club.storageKey('prodefender.save.v1')`.
+- Local save is per account: `Club.storageKey('prodefender.save.v1')`. There is no «Borrar progreso» button (the owner removed it).
 - Volume: `volumen.js` draws into the `[data-volumen]` slots (menu and HUD;
   hidden in the HUD under 600 px), and the game keeps its own 🔊 (M) and the
   music/effects sliders in the pause menu.

@@ -23,6 +23,7 @@
   const DTYPE = { phys: 'Físico', explosive: 'Explosivo', ice: 'Hielo', elec: 'Eléctrico', fire: 'Fuego', arcane: 'Arcano', poison: 'Ácido', steam: 'Vapor' };
   const realmTowers = li => PD.towersFor(li).filter(id => PD.TOWERS[id].realm === li && !PD.TOWERS[id].hero);
   // La tienda: las torres (con las teclas de HOTKEYS) y, aparte, el héroe del reino (tecla H).
+  const PINCHOS = '@pinchos';   // en ui.placing: tirar pinchos en vez de colocar una torre
   const shopTowers = li => PD.towersFor(li).filter(id => !PD.TOWERS[id].hero);
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
@@ -171,11 +172,6 @@
   });
   $('#btn-almanac').addEventListener('click', () => show('almanac'));
   $('#btn-help').addEventListener('click', () => show('help'));
-  $('#btn-reset').addEventListener('click', () => modal(`<h2>¿Borrar progreso?</h2><p>Se perderán los reinos desbloqueados, récords y partidas guardadas en este dispositivo.${EN_LA_NUBE ? '<br>Tus récords de la clasificación y tus monedas de Juegos no se borran.' : ''}</p>`, [
-    { label: 'Sí, borrar todo', cls: 'danger', fn: () => { save = defaultSave(); writeSave(); adoptaNube(); toastMenu('Progreso borrado'); } },
-    { label: 'Cancelar' }
-  ]));
-  function toastMenu(msg) { modal(`<h2>${msg}</h2>`, [{ label: 'Aceptar' }]); }
 
   // ============================== NIVELES ================================
   function buildLevels() {
@@ -376,6 +372,15 @@
       it.addEventListener('mouseleave', hideTip);
       shop.appendChild(it);
     }
+    {
+      const it = el(`<div class="shop-item pinchos" data-id="${PINCHOS}"><span class="hk">K</span><canvas width="108" height="108"></canvas><div class="nm">Pinchos</div><div class="ct">${fmt(game.spikeCost())}</div></div>`);
+      const c = it.querySelector('canvas').getContext('2d');
+      c.save(); c.scale(108 / 34, 108 / 34); PD.drawSpikes(c, 17, 18, 1); c.restore();
+      it.addEventListener('click', () => setPlacing(ui.placing === PINCHOS ? null : PINCHOS));
+      it.addEventListener('mousemove', ev => showTip(`<b>Pinchos</b><span class="tc">${fmt(game.spikeCost())} oro</span> · Trampa<br>Un montón de ${PD.PINCHOS.puas} púas que se tira sobre el camino: cada enemigo de tierra que pasa encima recibe un golpe y gasta una púa (los grandes y los jefes reciben más daño, pero gastan más). Duran hasta gastarse. El daño y el precio suben con la ronda; hasta ${PD.PINCHOS.max} montones a la vez.<br><span class="tc">Tecla K · Mayús para tirar varios.</span>`, ev.clientX, ev.clientY));
+      it.addEventListener('mouseleave', hideTip);
+      shop.appendChild(it);
+    }
     shopTowers(game.li).forEach((id, i) => {
       const d = PD.TOWERS[id];
       const fresh = d.realm === game.li ? '<span class="nw">NUEVA</span>' : '';
@@ -391,6 +396,13 @@
   function updateShop() {
     if (!game) return;
     document.querySelectorAll('.shop-item').forEach(it => {
+      if (it.dataset.id === PINCHOS) {
+        const c = game.spikeCost(), lleno = game.spikes.length >= PD.PINCHOS.max;
+        it.classList.toggle('poor', game.money < c || lleno);
+        it.classList.toggle('sel', ui.placing === PINCHOS);
+        it.querySelector('.ct').textContent = lleno ? 'Máximo' : fmt(c);
+        return;
+      }
       const d = PD.TOWERS[it.dataset.id];
       it.classList.toggle('poor', game.money < d.cost);
       it.classList.toggle('sel', ui.placing === it.dataset.id);
@@ -798,6 +810,13 @@
     if (!game || ui.modal || ev.button !== 0) return;
     const p = toWorld(ev);
     ui.mouse = p;
+    if (ui.placing === PINCHOS) {
+      const sp = rec.pinchos(p.x, p.y);
+      sfx(sp ? 'place' : 'error', p.x);
+      if (sp) { if (!ev.shiftKey || game.money < game.spikeCost()) setPlacing(null); else updateShop(); guardaQuieto(); }
+      if (ev.pointerType !== 'mouse') ui.mouse = null;
+      return;
+    }
     if (ui.placing) {
       const t = rec.colocar(ui.placing, p.x, p.y);
       if (!t) sfx('error', p.x);
@@ -823,6 +842,7 @@
     if (k === 'f' || k === 'F') { cycleSpeed(); return; }
     if (k === 'p' || k === 'P') { openPause(); return; }
     if (k === 'm' || k === 'M') { setMuted(!save.settings.muted); return; }
+    if (k === 'k' || k === 'K') { setPlacing(ui.placing === PINCHOS ? null : PINCHOS); return; }
     if (k === 'h' || k === 'H') { const id = PD.heroOf(game.li); if (id && !game.hasHero()) setPlacing(ui.placing === id ? null : id); return; }
     const hi2 = HOTKEYS.indexOf(k.toLowerCase());
     if (hi2 >= 0) { const id = shopTowers(game.li)[hi2]; if (id) setPlacing(ui.placing === id ? null : id); return; }

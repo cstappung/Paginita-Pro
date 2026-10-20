@@ -606,7 +606,7 @@ const REGLAS = {
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor y 40 por un bruto, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
@@ -615,7 +615,7 @@ const REGLAS = {
         "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
       ["Enemigos y cajas", lista([
-        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos.",
+        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos. Tus muros falsos y barriles los hacen <b>buscar otro camino</b>: solo los rompen si no queda ninguno libre. La excepción es el <b>demoledor</b> (nivel 6, casco amarillo y mazo, poco común): va derecho a tus muros y los tira a mazazos.",
         "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
         "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
         "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",
@@ -1190,6 +1190,41 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* PRO PACMAN (juegos/club/propac/): lo que dice aquí tiene que coincidir
+     con motor.js (puntos, racha, turbo, pulso, compuertas, Glitch, vidas) y
+     juego.js (controles). */
+  propac: {
+    lema: "PRO PACMAN: come todos los puntos del laberinto de neón sin que te atrapen los fantasmas.",
+    secciones: [
+      ["Cómo se juega", "Recorre el laberinto y come todos los puntos para pasar al siguiente. Tienes <b>3 vidas</b>: si un fantasma te toca, pierdes una. Los laberintos se suceden (<b>Neón</b>, <b>Circuito</b> y <b>Reactor</b>, y vuelta a empezar), cada vez un poco más rápidos. Los túneles de los lados te llevan al otro extremo."],
+      ["Puntos y racha", lista([
+        "Cada punto vale 10, multiplicado por tu <b>racha</b>: comer puntos seguidos (sin pasar más de 0,6 segundos sin comer) la sube a ×2 desde el punto 13, ×3 desde el 25, ×4 desde el 37 y ×5 desde el 49.",
+        "Un <b>núcleo</b> (los cuatro que brillan) vale 50 y asusta a los fantasmas unos segundos: menos en cada nivel. Comerse uno azul vale 200, después 400, 800, 1 600 y 3 200.",
+        "En el centro aparecen premios: una <b>carga de pulso</b> tras 50 puntos y un <b>chip</b> tras 130, que vale más en cada nivel (hasta 5 000). Se van a los 10 segundos.",
+        "Vida extra a los 10 000 puntos y después cada 25 000, hasta tener 5."
+      ])],
+      ["Turbo y pulso", lista([
+        "⚡ <b>Turbo</b>: cada punto carga energía. Con 35 puedes correr un poco menos de un segundo a casi el doble de velocidad.",
+        "◎ <b>Pulso</b>: guardas hasta 2 cargas. El pulso aturde tres segundos a los fantasmas que estén a 6 casillas o menos (ni persiguen ni matan) y da 100 puntos por cada uno."
+      ])],
+      ["Los fantasmas", lista([
+        "<b>Rayo</b> (rojo) te persigue directo, y corre más cuando quedan pocos puntos.",
+        "<b>Eco</b> (rosa) apunta cuatro casillas por delante de ti.",
+        "<b>Rebote</b> (celeste) se guía por ti y por Rayo para cerrarte el paso.",
+        "<b>Tímido</b> (naranja) te persigue de lejos y se va a su rincón cuando se acerca.",
+        "<b>Glitch</b> (verde, desde el nivel 3) te persigue y, cada tanto, parpadea un segundo y aparece en otro lugar, lejos de ti.",
+        "Los fantasmas se turnan entre perseguirte y volver a sus rincones; al cambiar, dan media vuelta."
+      ])],
+      ["Compuertas", "Desde el segundo laberinto hay <b>compuertas</b> rojas que se abren y se cierran cada 8 segundos, para ti y para los fantasmas. Un segundo antes parpadean, y arriba a la derecha dice si están abiertas."],
+      ["Controles", lista([
+        "Teclado: flechas o WASD para moverte, Espacio o Shift turbo, E (o Q, X) pulso, P o Esc pausa.",
+        "Celular: desliza el dedo en cualquier parte para girar, o usa la cruceta de abajo; ⚡ es turbo y ◎ pulso. Mientras juegas, el juego ocupa la pantalla.",
+        "Mando: la cruceta o el stick para moverte, A turbo, B pulso y Start pausa.",
+        "Puedes pedir el giro antes de llegar al cruce: se hace en cuanto se puede."
+      ])],
+      ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
      con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
   protiles: {
@@ -1444,7 +1479,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

@@ -155,6 +155,7 @@ que se espera de cada uno:
 | PRO TILES | `club-protiles-<canción>`, `club-protiles-mezcla` | semilla + cuenta + tick de cada nota (y altura de cada larga) sobre pasos fijos de 4 ms | baja |
 | Pokelike | `club-pokelike-puntos`, `club-pokelike-pokedex` | semilla + cuenta + inicial + cada decisión (camino, turno, captura, orden) | media |
 | PRO HERO | `club-hero-estrellas` | cada canción: el chart + cada acción con su instante, sobre la rejilla fija del motor; la tabla: la suma del mapa de estrellas | media |
+| PRO PACMAN | `club-propac-puntos` | semilla + cuenta + cada jugada (dirección, turbo, pulso) con su tic de 1/60 s; giros en el tic exacto del centro delatan un programa | baja |
 | PRO DEFENDER | `club-prodefender-<reino>` | semilla + cuenta + cada acción (colocar, mejorar, vender, objetivo, ronda, recarga) con su paso de 1/60 s; rehecho en un Web Worker con caché por ronda | media |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |

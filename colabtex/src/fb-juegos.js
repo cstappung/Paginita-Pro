@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;
@@ -636,6 +636,9 @@ function vigilaVetados(cb) {
   return () => vetadosOyentes.delete(cb);
 }
 export const estaVetado = uid => vetadosSet.has(uid);
+/* Para quien suma tablas por su cuenta (la general por podios): avisa
+   cuando cambia la lista de vetados. */
+export const watchVetados = cb => vigilaVetados(cb);
 
 /* Récord por categoría; la transacción conserva el mejor entre pestañas. */
 export function watchSolo(categoria, cb) {

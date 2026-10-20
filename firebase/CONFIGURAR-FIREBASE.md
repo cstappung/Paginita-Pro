@@ -258,6 +258,12 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > a publicar las reglas se juega igual, pero las rondas no entran en la
 > clasificación y no pagan monedas.
 
+> **PRO PACMAN (20 de octubre de 2026):** `club-propac-puntos` (el puntaje
+> de la partida, con tope de 10 000 000) es una categoría nueva de
+> `soloRanks` y `soloPruebas`, y `propac` un juego nuevo de `clubJugadas`.
+> No usa `users/<uid>/club`. Hasta volver a publicar las reglas se juega
+> igual, pero las partidas no entran en la clasificación y no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610201507"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>PRO PACMAN — el laberinto de neón</title>
+  <meta name="description" content="Come puntos en un laberinto de neón: rachas que multiplican, turbo, un pulso que aturde, compuertas que se cierran y un fantasma que salta.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070a1c'/%3E%3Cpath d='M16 5a11 11 0 1 0 9.5 16.5L16 16l9.5-5.5A11 11 0 0 0 16 5z' fill='%23ffe14d'/%3E%3Ccircle cx='17' cy='10' r='1.8' fill='%23070a1c'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@600;800&display=swap">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <script src="../conexion.js?v=club-18"></script>
+  <link rel="stylesheet" href="estilo.css?v=propac-1">
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <!-- Cabecera: no es .shell>header ni .intro, porque conexion.css las oculta dentro de Juegos. -->
+        <div class="cab">
+          <h1 class="logo" translate="no"><span class="logo-pac" aria-hidden="true"></span>PRO <b>PACMAN</b></h1>
+          <p class="lema">El laberinto de neón</p>
+        </div>
+
+        <div class="scorebar" role="group" aria-label="Marcador">
+          <div class="dato"><small>PUNTOS</small><strong id="nPuntos" translate="no">0</strong></div>
+          <div class="dato"><small>MEJOR</small><strong id="nMejor" translate="no">0</strong></div>
+          <div class="dato"><small>NIVEL</small><strong id="nNivel" translate="no">1</strong></div>
+          <div class="dato"><small>VIDAS</small><strong id="nVidas" translate="no">3</strong></div>
+          <button type="button" id="btnPausaM" class="pausa-m" aria-label="Pausa" title="Pausa">❚❚</button>
+          <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar música y efectos" title="Música y efectos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
+              <path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+              <path class="cruz" d="m16 9 6 6m0-6-6 6"/>
+            </svg>
+          </button>
+        </div>
+
+        <div id="escenario" class="escenario">
+          <canvas id="lienzo" tabindex="0" role="application" aria-label="El laberinto. Flechas o deslizar para moverte." translate="no"></canvas>
+
+          <div id="inicio" class="capa inicio">
+            <p class="tit" translate="no">PRO<br><b>PACMAN</b></p>
+            <ul class="leyenda">
+              <li><i class="ic racha"></i><span><b>Racha</b> come sin parar y los puntos se multiplican hasta ×5.</span></li>
+              <li><i class="ic turbo"></i><span><b id="tTurbo">Turbo</b> la energía de los puntos te hace correr.</span></li>
+              <li><i class="ic pulso"></i><span><b id="tPulso">Pulso</b> recoge cargas del centro y aturde a los fantasmas cercanos.</span></li>
+              <li><i class="ic glitch"></i><span><b>Compuertas y Glitch</b> los pasillos se cierran y un fantasma salta.</span></li>
+            </ul>
+            <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
+            <p id="pista" class="pista"></p>
+          </div>
+
+          <div id="pausa" class="capa pausa" hidden>
+            <div class="tarjeta">
+              <p class="tit chico">PAUSA</p>
+              <button type="button" id="btnSeguir" class="boton">▶ Seguir</button>
+              <button type="button" id="btnSalir" class="boton sec">✕ Terminar</button>
+            </div>
+          </div>
+
+          <div id="fin" class="capa fin" role="dialog" aria-modal="false" aria-labelledby="finTitulo" hidden>
+            <p id="finTitulo" class="tit">GAME OVER</p>
+            <div class="tarjeta fin-tarjeta">
+              <div><small>PUNTOS</small><strong id="finPuntos" translate="no">0</strong></div>
+              <div><small>NIVEL</small><strong id="finNivel" translate="no">1</strong></div>
+              <div><small>MEJOR RACHA</small><strong id="finRacha" translate="no">0</strong></div>
+              <div><small>MEJOR <em id="finNuevo" class="nuevo" hidden>NUEVO</em></small><strong id="finMejor" translate="no">0</strong></div>
+            </div>
+            <p id="finFrase" class="fin-frase"></p>
+            <button type="button" id="btnOtra" class="boton">↻ Otra vez</button>
+          </div>
+        </div>
+
+        <!-- Botonera táctil: solo en pantallas táctiles. Manda las mismas jugadas que el teclado. -->
+        <div id="mandos" class="mandos" aria-label="Controles">
+          <button type="button" class="m-acc m-turbo" data-c="4" aria-label="Turbo"><span>⚡</span><i id="mEnergia"></i></button>
+          <div class="m-cruz">
+            <button type="button" data-c="1" aria-label="Izquierda">◀</button>
+            <button type="button" data-c="0" aria-label="Arriba">▲</button>
+            <button type="button" data-c="2" aria-label="Abajo">▼</button>
+            <button type="button" data-c="3" aria-label="Derecha">▶</button>
+          </div>
+          <button type="button" class="m-acc m-pulso" data-c="5" aria-label="Pulso"><span>◎</span><b id="mPulsos" translate="no">0</b></button>
+        </div>
+
+        <p class="nota" id="nota"></p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <script src="motor.js?v=propac-1"></script>
+  <script src="juego.js?v=propac-1"></script>
+</body>
+</html>
