@@ -169,3 +169,24 @@ test('los últimos tops: podios válidos, del más reciente al más antiguo',()=
  assert.equal(M.ultimosPodios({solo,podios},1).length,1);
  assert.equal(M.ultimosPodios({}).length,0);
 });
+
+test('el detalle: lo gastado por categoría, los movimientos y lo ganado por juego',()=>{
+ const T0=1.7e12;
+ const d={ranks:{catan:{a:{jugadas:2,ganadas:1}},uno:{a:{jugadas:3}}},solo:{'club-minas-facil':{a:{puntos:1,tiempo:30,partida:'p1'}}},
+  logros:{},diario:{a:{dia:1,racha:1,mejor:1,dias:1,bono:250}},clubJugadas:{a:{snake:{total:4}}},
+  cartas:{s:{a:{sobreAAAAAAAAAAAA1:{at:T0,p:50},sobreAAAAAAAAAAAA2:{at:T0+1,p:0}}}},tienda:{a:{cometa:{at:T0+2,p:5000}}}};
+ const sinTienda=JSON.parse(JSON.stringify(d));delete sinTienda.tienda;
+ const m=M.monedasDe('a',d);
+ assert.equal(m.gasto.sobre,50);assert.equal(m.cuenta.sobre,1);assert.equal(m.cuenta.sobreGratis,1);
+ assert.equal(m.gasto.tienda,undefined,'sin saldo la compra de la tienda no vale ni se anota');
+ assert.equal(m.movs.length,1);assert.equal(m.movs[0].c,'sobre');assert.equal(m.movs[0].p,-50);
+ const suma=Object.values(m.porJuego).reduce((a,x)=>a+Object.values(x).reduce((b,c)=>b+c,0),0);
+ assert.equal(suma,m.partes.partidas+m.partes.victorias+m.partes.records+m.partes.club+m.partes.podios+m.partes.logros,'por juego cuadra con el total de esas fuentes');
+ assert.ok(m.porJuego.catan.partidas>0&&m.porJuego.catan.victorias>0);assert.ok(m.porJuego.snake.club>0);assert.ok(m.porJuego.minas.records>0);
+ const rico=JSON.parse(JSON.stringify(d));rico.ajustes={a:{x:{n:10000}}};
+ const r=M.monedasDe('a',rico);
+ assert.equal(r.gasto.tienda,5000);assert.equal(r.cuenta.tienda,1);
+ assert.equal(r.gastadas,Object.values(r.gasto).reduce((a,b)=>a+b,0),'lo gastado por categoría suma lo gastado');
+ assert.deepEqual(r.movs.map(x=>x.c).join(),'sobre,tienda');
+ assert.equal(M.monedasDe('a',sinTienda).movs.length,1);
+});

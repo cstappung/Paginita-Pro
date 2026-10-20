@@ -4,8 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Laboratorio** — a static site (published to GitHub Pages) that hosts a small
-suite of browser-only tools. There is **no application backend**: everything
+**Paginita Pro** (called «Laboratorio» until October 2026) — a static site
+(published to GitHub Pages) that hosts a small suite of browser-only tools.
+The brand lives in `marca/`: the logo (`paginita-pro.png` is the master,
+`-128` the header copy), the favicons every main page links, and the
+Halloween version (`paginita-pro-halloween.svg` + its favicons), which
+juegos.html swaps in with its Halloween mode. There is **no application backend**: everything
 runs client-side, and persistence for the collaborative tools lives in Firebase.
 `index.html` redirects to `Inicio.dc.html`, the landing menu.
 

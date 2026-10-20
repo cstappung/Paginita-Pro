@@ -67,7 +67,7 @@ export function mensajeSala(sala) {
   const aviso = `🎮 **¡Sala nueva!** ${quien} te espera en **${juego}**`;
   const foto = /^https:\/\//.test(sala.foto || "") ? sala.foto : undefined;
   return {
-    username: "Laboratorio · Juegos",
+    username: "Paginita Pro · Juegos",
     content: (sala.mencion ? recorta(sala.mencion, 100) + " " : "") + aviso,
     embeds: [{
       author: { name: `${quien} abrió una sala`, icon_url: foto },
@@ -78,7 +78,7 @@ export function mensajeSala(sala) {
       color: colorInt(sala.color),
       fields: campos,
       thumbnail: foto ? { url: foto } : undefined,
-      footer: { text: "Laboratorio · Juegos · la sala se cierra sola al llenarse" },
+      footer: { text: "Paginita Pro · Juegos · la sala se cierra sola al llenarse" },
       timestamp: new Date().toISOString()
     }],
     components: [{
@@ -228,7 +228,7 @@ export function mensajePodio(p) {
   if (p.desbancado) campos.push({ name: "💥 Desbanca a", value: recorta(p.desbancado, 80), inline: true });
   campos.push({ name: "🏆 Podio actual", value: podio || "—", inline: false });
   return {
-    username: "Laboratorio · Juegos",
+    username: "Paginita Pro · Juegos",
     content: (p.mencion ? recorta(p.mencion, 100) + " " : "") +
       `# ${TITULAR[i]}\n**${quien}** acaba de ${p.puesto === 1 ? "tomar el trono" : "subir al podio"} de **${leg.club.juego} · ${leg.modalidad}** 🎉`,
     embeds: [{
@@ -236,11 +236,11 @@ export function mensajePodio(p) {
       title: recorta(`${MEDALLA[i]} ${quien} — puesto #${p.puesto}`, 200),
       url: p.enlace,
       description: `${leg.club.icono} **${leg.club.juego}** · ${leg.modalidad}\n\n` +
-        (p.puesto === 1 ? "Nadie en el Laboratorio lo ha hecho mejor. ¿Quién se atreve?" : "¿Alguien puede bajarle del podio?"),
+        (p.puesto === 1 ? "Nadie en Paginita Pro lo ha hecho mejor. ¿Quién se atreve?" : "¿Alguien puede bajarle del podio?"),
       color: COLOR_PUESTO[i],
       fields: campos,
       thumbnail: foto ? { url: foto } : undefined,
-      footer: { text: "Laboratorio · Juegos · ranking por modalidad" },
+      footer: { text: "Paginita Pro · Juegos · ranking por modalidad" },
       timestamp: new Date().toISOString()
     }],
     components: [{

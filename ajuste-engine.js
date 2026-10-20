@@ -2013,7 +2013,7 @@ window.AjusteApp = window.AjusteApp || (function () {
   function generaTex() {
     const aj = S.aj, mod = S.mod;
     const L = [];
-    L.push("% Generado por AjusteLab · Laboratorio");
+    L.push("% Generado por AjusteLab · Paginita Pro");
     if (!aj || !mod || mod.error) {
       L.push("% (todavía no hay ningún ajuste que contar)");
       return L.join("\n");

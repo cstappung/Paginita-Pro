@@ -4,13 +4,13 @@ Sonido || Sound || Suono
 Modo oscuro || Dark mode || Modalità scura
 Tus monedas || Your coins || Le tue monete
 Tu perfil: foto, marco, fondo y vitrina || Your profile: photo, frame, background and showcase || Il tuo profilo: foto, cornice, sfondo e vetrina
-Juegos — Laboratorio || Games — Laboratorio || Giochi — Laboratorio
+Juegos — Paginita Pro || Games — Paginita Pro || Giochi — Paginita Pro
 Juegos || Games || Giochi
 Informes || Reports || Segnalazioni
 Música || Music || Musica
 Perfil || Profile || Profilo
 Salir || Sign out || Esci
-Juegos del Laboratorio || Laboratorio Games || Giochi del Laboratorio
+Juegos de Paginita Pro || Paginita Pro Games || Giochi di Paginita Pro
 Entra con la misma cuenta de Google que usas en ColabTeX. Se juega por turnos: abres una sala, eliges las opciones si el juego las tiene, le pasas el enlace a quien quieras y jugáis. || Sign in with the same Google account you use in ColabTeX. Games are turn-based: you open a room, pick the options if the game has any, send the link to whoever you want and play. || Accedi con lo stesso account Google che usi in ColabTeX. Si gioca a turni: apri una stanza, scegli le opzioni se il gioco ne ha, mandi il link a chi vuoi e giocate.
 Entrar con Google || Sign in with Google || Accedi con Google
 Jugar || Play || Gioca
@@ -21,8 +21,8 @@ Sobres || Packs || Bustine
 Buscar… || Search… || Cerca…
 Un archivo .md legible, pensado para pasárselo a quien lo va a arreglar || A readable .md file, meant to be handed to whoever is going to fix it || Un file .md leggibile, pensato per passarlo a chi lo sistemerà
 Los mismos datos en crudo || The same data, raw || Gli stessi dati grezzi
-Informes — Laboratorio || Reports — Laboratorio || Segnalazioni — Laboratorio
-Informes del Laboratorio || Laboratorio Reports || Segnalazioni del Laboratorio
+Informes — Paginita Pro || Reports — Paginita Pro || Segnalazioni — Paginita Pro
+Informes de Paginita Pro || Paginita Pro Reports || Segnalazioni di Paginita Pro
 Inicia sesión con la misma cuenta de Google que usas en ColabTeX para ver los fallos y las sugerencias de todo el equipo. || Sign in with the same Google account you use in ColabTeX to see the whole team's bugs and suggestions. || Accedi con lo stesso account Google che usi in ColabTeX per vedere i bug e i suggerimenti di tutto il team.
 Todo lo que se rompe y todo lo que pedís, en un sitio. Los errores los recoge la aplicación sola y se agrupan por causa; los fallos y las sugerencias los escribís vosotros con el botón || Everything that breaks and everything you ask for, in one place. Errors are collected by the app itself and grouped by cause; bugs and suggestions are written by you with the button || Tutto ciò che si rompe e tutto ciò che chiedete, in un unico posto. Gli errori li raccoglie l'app da sola e li raggruppa per causa; bug e suggerimenti li scrivete voi con il pulsante
 que hay abajo a la derecha en todas las páginas. Cuando quieras arreglarlo, descarga el informe y pásalo entero. || at the bottom right of every page. When you want to fix it, download the report and hand it over whole. || in basso a destra in ogni pagina. Quando vuoi sistemarlo, scarica il rapporto e passalo per intero.
@@ -372,5 +372,5 @@ Ajusta un modelo a tus medidas: parámetros con su σ, χ² y residuos, magnitud
 Cuatro juegos por turnos con la misma cuenta: esconder a alguien en un paisaje, un juego de cartas de tres elementos, cuadritos (hasta seis jugadores y tres tamaños de tablero) y reversi. Con su clasificación. || Multiplayer games with the same account: hide-and-seek in a landscape, cards, dots and boxes, reversi, UNO, Catan, chess, Pokémon and many more. With leaderboards. || Giochi multigiocatore con lo stesso account: nascondino in un paesaggio, carte, punti e quadrati, reversi, UNO, Catan, scacchi, Pokémon e molti altri. Con classifiche.
 Dos jugadores · Clasificación || Multiplayer · Leaderboard || Multigiocatore · Classifica
 Nueva aplicación || New application || Nuova applicazione
-Laboratorio · entorno local || Laboratorio · local environment || Laboratorio · ambiente locale
+Paginita Pro · entorno local || Paginita Pro · local environment || Paginita Pro · ambiente locale
 Idioma || Language || Lingua

@@ -44,14 +44,17 @@ test("halloween: el script del <head> dice lo mismo que el módulo", () => {
   assert.ok(m, "no encuentro el script del modo Halloween en juegos.html");
   const corre = (f, guardado, busqueda) => {
     const raiz = { dataset: {} };
+    /* El ícono de la pestaña: se cambia solo con el modo encendido. */
+    const icono = { href: "marca/favicon-32.png", getAttribute: () => "marca/favicon-halloween-32.png" };
     const RealDate = Date;
     const c = {
       location: { search: busqueda },
       localStorage: { getItem: () => guardado || null },
-      document: { documentElement: raiz },
+      document: { documentElement: raiz, querySelectorAll: () => [icono] },
       Date: function () { return new RealDate(f.getTime()); },
     };
     vm.runInNewContext(m[0], c);
+    assert.equal(icono.href.includes("halloween"), raiz.dataset.halloween === "on", "el favicon sigue al modo");
     return raiz.dataset.halloween || "";
   };
   for (let d = new Date(2026, 0, 1, 12); d.getFullYear() === 2026; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 12))

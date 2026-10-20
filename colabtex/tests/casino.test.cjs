@@ -324,4 +324,9 @@ test('economía: la ruleta y el plinko se cobran y pagan al apostar',()=>{
  const pl=CM.resuelve('a','ecplinko',{j:'l',p:10,d:0,n:8,at:T0});
  const con2=M.monedasDe('a',conGanado(1000,{casino:{a:{ecplinko:{j:'l',p:10,d:0,n:8,at:T0}}}}));
  assert.equal(con2.casino.pagado,pl.pago);assert.equal(con2.saldo,sin.saldo-10+Math.floor(pl.pago+1e-6));
+ /* el detalle por juego y los movimientos (la pestaña de monedas) */
+ assert.equal(con.casino.porJuego.r.apostado,30);assert.equal(con.casino.porJuego.r.rondas,1);assert.equal(con.casino.porJuego.r.pagado,res.pago);
+ assert.equal(con.gasto.apuesta,30);
+ assert.deepEqual(con.movs.map(x=>x.c+':'+x.d).join(),'apuesta:r,premio:r');
+ assert.equal(con2.casino.porJuego.l.apostado,10);
 });

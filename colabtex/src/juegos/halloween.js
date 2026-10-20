@@ -51,6 +51,9 @@ function aplica(estado) {
   const r = document.documentElement;
   if (estado) r.dataset.halloween = estado;
   else delete r.dataset.halloween;
+  /* El ícono de la pestaña se disfraza con la página (juegos.html). */
+  for (const l of document.querySelectorAll("link[data-favicon-hw]"))
+    l.href = l.getAttribute(estado === "on" ? "data-favicon-hw" : "data-favicon");
 }
 
 /* ---- Piezas en SVG ---- */

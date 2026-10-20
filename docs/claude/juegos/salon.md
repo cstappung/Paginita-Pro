@@ -361,7 +361,9 @@ both over every day of the year. Every rule of the block must require the
 attribute or be a mode-only piece (`.jg-hw*`, `.hw-*`) — the test checks
 it — so out of season the page is exactly the usual one. `?halloween=1` /
 `?halloween=0` force it to preview or remove it. What it does: night/pumpkin
-header with bunting and a jack-o'-lantern logo, orange accents, cobwebs on
+header with bunting and the Halloween logo (`marca/paginita-pro-halloween.svg`,
+swapped by CSS; the favicon is swapped by the inline script and by
+`aplica()` in halloween.js through `link[data-favicon-hw]`), orange accents, cobwebs on
 the thumbnails and the banner (on `.jg-mn::after` and `.jg-ban::after`, not
 on the cover: `.sp-e-metrorush` already uses the cover's pseudo-elements),
 a spider on every fourth card, and the ribbon with the countdown in

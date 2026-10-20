@@ -2,10 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610200200"></script>
+<script src="i18n.js?v=202610200222"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Juegos — Laboratorio</title>
+<title>Juegos — Paginita Pro</title>
+<link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png" data-favicon="marca/favicon-32.png" data-favicon-hw="marca/favicon-halloween-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png" data-favicon="marca/favicon-64.png" data-favicon-hw="marca/favicon-halloween-64.png">
+<link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
 <script>
 /* El tema se pone antes de pintar nada: si esperara al bundle, la
    página saldría blanca un instante antes de oscurecerse. Sin elección
@@ -20,6 +23,10 @@ try { var t = localStorage.getItem("jg.tema");
 (function () { var f = /[?&]halloween=([01])/.exec(location.search), d = new Date(), m = d.getMonth(), g = "";
   try { g = localStorage.getItem("jg.halloween") || ""; } catch (e) {}
   if (f ? f[1] === "1" : m === 9 || (m === 10 && d.getDate() === 1)) document.documentElement.dataset.halloween = g === "no" ? "off" : "on";
+  /* Y el ícono de la pestaña, que también se disfraza (halloween.js lo
+     cambia de nuevo si se apaga desde la cinta). */
+  if (document.documentElement.dataset.halloween === "on")
+    for (var l = document.querySelectorAll("link[data-favicon-hw]"), i = 0; i < l.length; i++) l[i].href = l[i].getAttribute("data-favicon-hw");
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,7 +58,10 @@ try { var t = localStorage.getItem("jg.tema");
   .head{display:flex;align-items:center;gap:16px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0}
   .logo{display:flex;align-items:center;gap:8px;color:#e8f0ef}
   .logo:hover{color:#fff;text-decoration:none}
-  .logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  /* El logo de Paginita Pro (marca/); el de Halloween se cambia por CSS. */
+  .logo-img{display:block;flex:none;width:30px;height:30px;transition:transform .2s ease}
+  .logo:hover .logo-img{transform:rotate(-8deg) scale(1.06)}
+  .logo-img.logo-hw{display:none}
   .head-nav{display:flex;gap:16px;font-size:12.5px;color:#9fb5b2;margin-left:10px}
   .head-nav a{color:#9fb5b2}
   .head-nav a:hover{color:#fff;text-decoration:none}
@@ -802,7 +812,7 @@ try { var t = localStorage.getItem("jg.tema");
   :root{--jg-ink:#232137;--jg-purple:#7042df;--jg-muted:#706d81}
   body{background:#f5f4fa;color:var(--jg-ink)}
   .head{height:auto;min-height:64px;padding:12px 28px;flex-wrap:wrap;background:#171522;gap:12px;border-bottom:1px solid #ffffff12}
-  .logo-mark{background:#ab8bff;color:#171522;border-radius:9px}.head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
+  .head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
   /* El idioma va suelto en la cabecera, no dentro de .head-right: en un
      teléfono baja a la fila de las secciones, y así la fila de los botones
      cabe en 320 px sin empujar «Salir» fuera de la pantalla. */
@@ -4132,6 +4142,70 @@ html[data-tema=oscuro] .jg-tn-op.on{border-color:#c4b1ff;box-shadow:0 0 0 2px #c
 @media(max-width:900px){.jg-mo-cols{grid-template-columns:minmax(0,1fr)}.jg-mo-hero strong{font-size:36px}}
 .jg-mo-caja{background:#fff;border:1px solid #e4dfeb;border-radius:18px;padding:16px 18px}
 .jg-mo-caja h2{margin:0 0 10px;font-size:16px}
+/* El detalle de tus monedas (monedas-vista.js, detalleHtml): balance, de
+   dónde salen, por juego, en qué gastaste, movimientos y lo que más paga. */
+.jg-mo-balance{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;margin:14px 0;padding:14px 18px;background:#fff;border:1px solid #e4dfeb;border-radius:16px}
+.jg-mo-balance small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a8499}
+.jg-mo-balance b{font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jg-mo-balance b .jg-moneda{width:.85em;height:.85em;vertical-align:-.08em}
+.jg-mo-balance div:last-child{padding-left:14px;border-left:1px solid #ece8f3}
+.jg-mo-bal-barra{display:flex;height:12px;border-radius:99px;overflow:hidden;background:#eee9f5;gap:2px}
+.jg-mo-bal-barra i{display:block;min-width:0}
+.jg-mo-bal-barra i.mas{background:linear-gradient(90deg,#1fa463,#3ccf86)}
+.jg-mo-bal-barra i.menos{background:linear-gradient(90deg,#f0606f,#d63a4c)}
+.mas{color:#178a51}.menos{color:#c62e40}
+@media(max-width:700px){.jg-mo-balance{grid-template-columns:1fr 1fr}.jg-mo-bal-barra{grid-column:1/-1;order:3}.jg-mo-balance div:last-child{grid-column:1/-1;padding-left:0;border-left:0;order:4}}
+.jg-mo-det{margin-bottom:14px}
+.jg-mo-nota{margin:-4px 0 10px;font-size:12px;color:#8a8499;line-height:1.45}
+.jg-mo-barras{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.jg-mo-barras li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;column-gap:8px;align-items:center}
+.jg-mo-barras.juegos li{grid-template-columns:minmax(0,1fr) auto}
+.jg-mo-barras.juegos .i{display:none}
+.jg-mo-barras .i{font-size:18px;text-align:center}
+.jg-mo-barras .t{min-width:0}
+.jg-mo-barras .t b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mo-barras .t b a{color:inherit;text-decoration:underline;text-decoration-color:#7042df55;text-underline-offset:2px}
+.jg-mo-barras .t small{display:block;font-size:11.5px;color:#8a8499;line-height:1.35}
+.jg-mo-barras .v{text-align:right;white-space:nowrap}
+.jg-mo-barras .v b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.jg-mo-barras .v small{font-size:11px;color:#8a8499}
+.jg-mo-barras .b{grid-column:1/-1;display:block;height:6px;margin-top:4px;border-radius:99px;background:#f1edf7;overflow:hidden}
+.jg-mo-barras.juegos .b{grid-column:1/-1}
+.jg-mo-barras .b i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#f5b819,#f59e0b)}
+.jg-mo-barras.gastos .b i{background:linear-gradient(90deg,#f0606f,#d63a4c)}
+.jg-mo-barras.juegos .b i{background:linear-gradient(90deg,#7c4ddb,#a07bff)}
+.jg-mo-barras li.cero{opacity:.45}
+.jg-mo-mas{margin-top:10px}
+.jg-mo-mas summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#7042df;margin-bottom:8px}
+.jg-mo-caja h3{margin:16px 0 8px;font-size:14px}
+.jg-mo-casino{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.jg-mo-casino th{text-align:right;font-size:11px;color:#8a8499;font-weight:700;padding:4px 6px;border-bottom:1px solid #ece8f3}
+.jg-mo-casino td{text-align:right;padding:6px;border-bottom:1px solid #f4f1f8}
+.jg-mo-casino th:first-child,.jg-mo-casino td:first-child{text-align:left}
+.jg-mo-casino td:last-child{font-weight:700}
+.jg-mo-movs{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:430px;overflow:auto}
+.jg-mo-movs li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #f4f1f8}
+.jg-mo-movs .i{font-size:17px;text-align:center}
+.jg-mo-movs .t b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+.jg-mo-movs .t small{font-size:11px;color:#8a8499}
+.jg-mo-movs .n{font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jg-mo-paga{margin-bottom:14px}
+.jg-mo-paga-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.jg-mo-paga-l>div{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:12px;border-radius:14px;background:linear-gradient(135deg,#fff8e1,#fff);border:1px solid #f5d77a}
+.jg-mo-paga-l .i{grid-row:span 3;font-size:26px}
+.jg-mo-paga-l b{font-size:18px;font-variant-numeric:tabular-nums;color:#a8740f}
+.jg-mo-paga-l b .jg-moneda{width:.85em;height:.85em;vertical-align:-.08em}
+.jg-mo-paga-l span:not(.i){font-weight:700;font-size:12.5px;line-height:1.3}
+.jg-mo-paga-l small{font-size:11px;color:#8a8499;line-height:1.35}
+html[data-tema=oscuro] .jg-mo-balance{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mo-balance div:last-child{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mo-bal-barra,html[data-tema=oscuro] .jg-mo-barras .b{background:#ffffff14}
+html[data-tema=oscuro] .mas{color:#5fd99a}html[data-tema=oscuro] .menos{color:#ff8a96}
+html[data-tema=oscuro] .jg-mo-nota,html[data-tema=oscuro] .jg-mo-barras .t small,html[data-tema=oscuro] .jg-mo-barras .v small,html[data-tema=oscuro] .jg-mo-movs .t small,html[data-tema=oscuro] .jg-mo-casino th,html[data-tema=oscuro] .jg-mo-balance small,html[data-tema=oscuro] .jg-mo-paga-l small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mo-casino th,html[data-tema=oscuro] .jg-mo-casino td,html[data-tema=oscuro] .jg-mo-movs li{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mo-paga-l>div{background:linear-gradient(135deg,#33291a,var(--os-sup2));border-color:#6b5420}
+html[data-tema=oscuro] .jg-mo-paga-l b{color:#f5c542}
+html[data-tema=oscuro] .jg-mo-mas summary{color:#c4b1ff}
 .jg-mo-reglas h3{margin:14px 0 4px;font-size:13.5px}
 .jg-mo-reglas p{margin:4px 0;font-size:13px;line-height:1.55;color:#5a5569}
 .jg-mo-pesos{list-style:none;margin:6px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;font-size:12.5px}
@@ -5973,17 +6047,13 @@ html[data-halloween=on] body{background:#f6ebee}
 html[data-halloween=on][data-tema=oscuro]{--os-fondo:#0d0915}
 html[data-halloween=on][data-tema=oscuro] body{background:#0f0a17}
 
-/* ---- La cabecera: noche morada que arde en naranja, banderines y la
-   calabaza en lugar del logo ---- */
+/* ---- La cabecera: noche morada que arde en naranja, banderines y el
+   logo de Halloween (marca/paginita-pro-halloween.svg) ---- */
 html[data-halloween=on] .head{position:relative;background:linear-gradient(100deg,#1a0c28 0,#2a0f33 48%,#3d1607 100%);border-bottom:1px solid #ff7a1a4d;box-shadow:0 1px 18px #ff7a1a26}
 html[data-halloween=on] .head::before{content:"";position:absolute;left:0;top:0;width:58px;height:58px;background:var(--hw-tela-b) no-repeat 0 0/contain;opacity:.32;pointer-events:none}
 html[data-halloween=on] .head::after{content:"";position:absolute;left:0;right:0;top:100%;height:20px;z-index:2;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 20'%3E%3Cpath d='M0 1.5Q36 5 72 1.5' fill='none' stroke='%235b4a3a' stroke-width='1'/%3E%3Cpath d='M3 2.4h18L12 17z' fill='%23f97316'/%3E%3Cpath d='M27 3.3h18L36 18.5z' fill='%23140a1c'/%3E%3Cpath d='M51 2.4h18L60 17z' fill='%237c3aed'/%3E%3Ccircle cx='12' cy='7.5' r='1.6' fill='%23140a1c'/%3E%3Cpath d='M33.5 7.5h5l-2.5 3z' fill='%23f97316'/%3E%3Ccircle cx='60' cy='7.5' r='1.6' fill='%23ffd36b'/%3E%3C/svg%3E") repeat-x 0 0/72px 20px;pointer-events:none;filter:drop-shadow(0 2px 2px #0003)}
-html[data-halloween=on] .logo-mark{position:relative;background:radial-gradient(circle at 34% 30%,#ffc46b,#f97316 55%,#b23c08);color:#3a1203;border-radius:46%/50%;box-shadow:inset 4px 0 0 -2px #0000002e,inset -4px 0 0 -2px #0000002e,0 0 10px #ff7a1a88}
-/* El latido del brillo anima la opacidad de una capa con la sombra ya
-   pintada, no la sombra misma: animar `box-shadow` repintaba cada cuadro. */
-html[data-halloween=on] .logo-mark::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 18px #ffb347cc;opacity:0;pointer-events:none;animation:hwArde 3.2s ease-in-out infinite}
-html[data-halloween=on] .logo-mark::after{content:"";position:absolute;top:-4px;left:50%;width:4px;height:6px;margin-left:-1px;border-radius:2px 2px 0 0;background:#4d7c0f;transform:rotate(12deg)}
-@keyframes hwArde{0%,100%{opacity:0}45%{opacity:1}55%{opacity:0}}
+html[data-halloween=on] .logo-img{display:none}
+html[data-halloween=on] .logo-img.logo-hw{display:block;filter:drop-shadow(0 0 6px #ff7a1a99)}
 html[data-halloween=on] .head-nav a[href="juegos.html"]{text-shadow:0 0 12px #ff7a1a}
 html[data-halloween=on] main{padding-top:36px}
 
@@ -6155,7 +6225,7 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
 
 @media(prefers-reduced-motion:reduce){
   html[data-halloween=on] .jg-hw{display:none!important}
-  html[data-halloween=on] .logo-mark::before,.jg-hw-fondo *,.jg-hw-calabaza .hw-luz{animation:none!important}
+  .jg-hw-fondo *,.jg-hw-calabaza .hw-luz{animation:none!important}
 }
 
 </style>
@@ -6163,7 +6233,7 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
 <body>
 <div id="app">
   <header class="head">
-    <a class="logo" href="Inicio.dc.html"><span class="logo-mark">L</span><b style="font-size:14px">Laboratorio</b></a>
+    <a class="logo" href="Inicio.dc.html"><img class="logo-img" src="marca/paginita-pro-128.png" alt="" width="30" height="30"><img class="logo-img logo-hw" src="marca/paginita-pro-halloween.svg" alt="" width="30" height="30"><b style="font-size:14px" translate="no">Paginita Pro</b></a>
     <nav class="head-nav">
       <a href="colabtex.html">ColabTeX</a>
       <a href="colabdraw.html">ColabDraw</a>
@@ -6205,6 +6275,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610200200"></script>
+<script src="juegos-app.js?v=202610200222"></script>
 </body>
 </html>

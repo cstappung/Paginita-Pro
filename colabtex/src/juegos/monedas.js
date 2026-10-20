@@ -318,7 +318,10 @@ export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ?
 /* ---------- el saldo ----------
    `datos` = {ranks, solo, logros, diario}, las cuatro lecturas enteras. */
 const num = x => (Number.isFinite(+x) ? +x : 0);
-export function ganadoDe(uid, datos) {
+/* `porJuego` (opcional): si viene, se llena con lo que dio cada juego,
+   {juego: {partidas, victorias, records, club, podios, logros}}. */
+export function ganadoDe(uid, datos, porJuego) {
+  const pj = (j, k, n) => { if (!porJuego || !n) return; const x = porJuego[j] || (porJuego[j] = { partidas: 0, victorias: 0, records: 0, club: 0, podios: 0, logros: 0 }); x[k] += n; };
   const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, club: 0, podios: 0, logros: 0, dias: 0, referidos: 0, ajustes: 0 };
   const tengo = {};   // juego -> Set(id) de logros
   const pon = (j, id) => { (tengo[j] = tengo[j] || new Set()).add(id); };
@@ -326,24 +329,28 @@ export function ganadoDe(uid, datos) {
     const f = filas && filas[uid];
     if (!f) continue;
     const w = PESO[j] || 1;
-    p.partidas += TARIFA.partida * w * num(f.jugadas);
-    p.victorias += w * (TARIFA.victoria * num(f.ganadas) + TARIFA.empate * num(f.empates));
+    const pa = TARIFA.partida * w * num(f.jugadas), vi = w * (TARIFA.victoria * num(f.ganadas) + TARIFA.empate * num(f.empates));
+    p.partidas += pa; p.victorias += vi; pj(j, "partidas", pa); pj(j, "victorias", vi);
     for (const id of deFila(f)) pon(j, id);
   }
   for (const [cat, filas] of Object.entries(d.solo || {})) {
     const f = filas && filas[uid], j = juegoDeCategoria(cat);
     if (!f || !j) continue;
-    p.records += (RECORD[j] || 0) + extraRecord(cat, f);
+    const re = (RECORD[j] || 0) + extraRecord(cat, f);
+    p.records += re; pj(j, "records", re);
     for (const id of deMarca(j, Object.assign({ categoria: cat }, f))) pon(j, id);
   }
   for (const [j, porUid] of Object.entries(d.logros || {}))
     for (const id of Object.keys((porUid && porUid[uid]) || {})) pon(j, id);
-  for (const [j, ids] of Object.entries(tengo)) for (const id of ids) p.logros += valorLogro(j, id);
+  for (const [j, ids] of Object.entries(tengo)) for (const id of ids) { const v = valorLogro(j, id); p.logros += v; pj(j, "logros", v); }
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
   for (const [j, x] of Object.entries((d.clubJugadas || {})[uid] || {}))
-    if (JUEGOS_CLUB.includes(j) && x) p.club += PAGO_CLUB[j] * Math.max(0, Math.floor(num(x.total)));
-  for (const x of Object.values((d.podios || {})[uid] || {})) if (podioValido(uid, x, d.solo)) p.podios += PODIO[x.p];
+    if (JUEGOS_CLUB.includes(j) && x) { const c = PAGO_CLUB[j] * Math.max(0, Math.floor(num(x.total))); p.club += c; pj(j, "club", c); }
+  for (const x of Object.values((d.podios || {})[uid] || {})) if (podioValido(uid, x, d.solo)) {
+    p.podios += PODIO[x.p];
+    pj(juegoDeCategoria(x.c) || (String(x.c).startsWith("yemas-zombis-") ? "yemas" : "otros"), "podios", PODIO[x.p]);
+  }
   /* Lo que un administrador sumó o restó a mano (`ajustesMonedas/<uid>/<id>`
      = {n, m, por, at}, admin.js). La regla solo deja escribir a quien está
      en `admins` y pide un entero de ±10 millones; lo que no cumple eso no
@@ -361,10 +368,11 @@ export function ganadoDe(uid, datos) {
    y compras del mercado), `cobradas` (ventas), `saldo` y si la cuenta está
    parada por un gasto sin fondos. */
 export function monedasDe(uid, datos) {
-  const g = ganadoDe(uid, datos), e = economia(datos).usuarios[uid];
+  const porJuego = {}, g = ganadoDe(uid, datos, porJuego), e = economia(datos).usuarios[uid];
   const gastadas = e ? e.gastadas : 0, cobradas = e ? e.cobradas : 0, premios = e ? e.premios : 0;
   return Object.assign(g, { gastadas, cobradas, premios, saldo: g.total + cobradas + premios - gastadas, parada: !!(e && e.parada), falta: e ? e.falta : 0,
-    casino: e ? e.casino : { apostado: 0, pagado: 0, rondas: 0 } });
+    casino: e ? e.casino : { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+    porJuego, gasto: e ? e.gasto : {}, cuenta: e ? e.cuenta : {}, movs: e ? e.movs : [] });
 }
 
 /* ---------- la economía de PRODROP ----------
@@ -476,8 +484,16 @@ export function economia(datos) {
      su dueño de ahora (para heredar su estado). */
   const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
   const ganado = {};
+  /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
+     `movs`: cada gasto e ingreso con hora, para el historial. */
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {},
-    intentos: 0, adopciones: 0, comida: 0, fondos: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0 } });
+    intentos: 0, adopciones: 0, comida: 0, fondos: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+    gasto: {}, cuenta: {}, movs: [] });
+  const anota = (u, c, p, d) => {
+    const x = U(u);
+    if (p < 0) { x.gasto[c] = (x.gasto[c] || 0) - p; x.cuenta[c] = (x.cuenta[c] || 0) + 1; }
+    x.movs.push({ at: ahora, c, p, d: d || "" });
+  };
   /* Una mascota cambia de manos: cuenta para el cupo de quien la tiene. */
   const pasaMascota = (cc, de, a) => {
     tiene[de] = (tiene[de] || 1) - 1; tiene[a] = (tiene[a] || 0) + 1;
@@ -496,15 +512,15 @@ export function economia(datos) {
     const x = U(u), k = enCorte(u);
     return (k ? Math.min(ganado[u], k.tope) : ganado[u]) + x.cobradas + x.premios - x.gastadas;
   };
-  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada (dentro de un
-     corte, solo no vale). */
-  const paga = (u, p) => {
+  /* Cobra `p` a `u` por `cat` (y un detalle `d`). Si no puede, la cuenta
+     queda parada (dentro de un corte, solo no vale). */
+  const paga = (u, p, cat, d) => {
     const x = U(u);
     if (x.parada) { x.falta += p; return false; }
     const k = enCorte(u);
-    if (k && ahora < (k.desde || 0)) { x.gastadas += Math.min(p, Math.max(0, saldo(u))); return true; }
+    if (k && ahora < (k.desde || 0)) { const q = Math.min(p, Math.max(0, saldo(u))); x.gastadas += q; anota(u, cat, -q, d); return true; }
     if (saldo(u) < p) { if (k) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
-    x.gastadas += p; return true;
+    x.gastadas += p; anota(u, cat, -p, d); return true;
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
   const ficha = cc => {
@@ -513,6 +529,7 @@ export function economia(datos) {
     if (so.r) return q.i === 0 ? so.r : null;
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
   };
+  const casinoDe = (u, j) => { const pj = U(u).casino.porJuego; return pj[j] || (pj[j] = { apostado: 0, pagado: 0, rondas: 0 }); };
   for (const e of ev) {
     ahora = e.at;
     if (e.t === "s") {
@@ -520,13 +537,14 @@ export function economia(datos) {
       if (e.p === 0) {
         if (x.parada || e.at - x.gratis < SEIS_HORAS) continue;
         x.gratis = e.at;
-      } else if (!(e.p === 50 || e.p === 80) || !paga(e.u, e.p)) continue;
+        x.cuenta.sobreGratis = (x.cuenta.sobreGratis || 0) + 1;
+      } else if (!(e.p === 50 || e.p === 80) || !paga(e.u, e.p, "sobre")) continue;
       x.sobres[e.k] = e.at;
       sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, gratis: e.p === 0 };
       for (let i = 0; i < 5; i++) dueno[claveCopia(e.u, e.k, i)] = e.u;
     } else if (e.t === "g") {
       if (dueno[e.copia] !== e.u || graduada[e.copia] || enVenta[e.copia] || e.p !== 100) continue;
-      if (paga(e.u, 100)) graduada[e.copia] = e.at;
+      if (paga(e.u, 100, "graduar")) graduada[e.copia] = e.at;
     } else if (e.t === "r") {
       /* Un re-roll vale si quien lo hace no está parado y las diez son
          suyas, distintas, no están a la venta y son de la misma rareza
@@ -553,14 +571,14 @@ export function economia(datos) {
       const x = U(e.u), precio = x.intentos === 0 ? 0 : MM.PRECIO.adopcion;
       x.intentos++;
       if (!MM.ESPECIES.includes(e.e) || (tiene[e.u] || 0) >= MM.MAX_MASCOTAS) continue;
-      if (e.p !== precio || (precio === 0 ? x.parada : !paga(e.u, precio))) continue;
+      if (e.p !== precio || (precio === 0 ? x.parada : !paga(e.u, precio, "adopcion", e.e))) continue;
       const cc = claveMascota(e.u, e.k);
       x.adopciones++;
       mascotas[cc] = { u: e.u, k: e.k, at: e.at, e: e.e };
       dueno[cc] = e.u; tiene[e.u] = (tiene[e.u] || 0) + 1;
     } else if (e.t === "mr") {
       /* Un regalo: lo que trae sale del motor, no de lo escrito. */
-      if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p)) continue;
+      if (e.p !== MM.PRECIO.regalo || !paga(e.u, e.p, "regalo")) continue;
       const cc = claveObjeto(e.u, e.k);
       regalos[cc] = { u: e.u, k: e.k, at: e.at, item: MM.regalo(e.u, e.k, e.at) };
       dueno[cc] = e.u;
@@ -570,11 +588,11 @@ export function economia(datos) {
          sale de la cuenta y libera su cupo). */
       const x = U(e.u), n = Number.isInteger(e.n) ? e.n : 0, precio = MM.precioCompra(e.q, n);
       if (precio === null || e.p !== precio) continue;
-      if (e.q === "comida") { if (paga(e.u, precio)) x.comida += n; continue; }
+      if (e.q === "comida") { if (paga(e.u, precio, "comida", String(n))) x.comida += n; continue; }
       const fondo = /^fondo-([a-z]+)$/.exec(e.q);
-      if (fondo) { if (!x.fondos[fondo[1]] && paga(e.u, precio)) x.fondos[fondo[1]] = e.at; continue; }
+      if (fondo) { if (!x.fondos[fondo[1]] && paga(e.u, precio, "fondoMascota", fondo[1])) x.fondos[fondo[1]] = e.at; continue; }
       if (!esMascota(e.m) || dueno[e.m] !== e.u || enVenta[e.m]) continue;
-      if (e.q === "pocion") { if (!congelada[e.m] && paga(e.u, precio)) congelada[e.m] = e.at; continue; }
+      if (e.q === "pocion") { if (!congelada[e.m] && paga(e.u, precio, "pocion")) congelada[e.m] = e.at; continue; }
       if (e.q === "adios" && !x.parada) { delete dueno[e.m]; tiene[e.u] = (tiene[e.u] || 1) - 1; }
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
@@ -592,15 +610,16 @@ export function economia(datos) {
       /* Una mascota para quien ya tiene el cupo lleno: la venta no ocurre
          (no cobra ni para) y la mascota se queda con quien vendía. */
       if (esMascota(o.c) && (tiene[e.u] || 0) >= MM.MAX_MASCOTAS) { o.estado = "rechazada"; o.comprador = e.u; continue; }
-      if (paga(e.u, o.p)) {
-        dueno[o.c] = e.u; U(o.u).cobradas += o.p; o.estado = "vendida"; o.comprador = e.u;
+      const tipo = (leeCopia(o.c) || {}).tipo || "";
+      if (paga(e.u, o.p, "mercado", tipo)) {
+        dueno[o.c] = e.u; U(o.u).cobradas += o.p; anota(o.u, "venta", o.p, tipo); o.estado = "vendida"; o.comprador = e.u;
         if (esMascota(o.c)) pasaMascota(o.c, o.u, e.u);
       }
       else { o.estado = "impaga"; o.comprador = e.u; }
     } else if (e.t === "c") {
       /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
       if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
-      if (paga(e.u, PRECIO_TIENDA)) U(e.u).tienda[e.k] = e.at;
+      if (paga(e.u, PRECIO_TIENDA, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
     } else if (e.t === "ca") {
       /* Una apuesta sin fondos (o de una cuenta parada) no vale: no juega
          ni paga, y la cuenta queda parada como con cualquier gasto. */
@@ -608,17 +627,19 @@ export function economia(datos) {
       if (e.extra) {
         // doblar o separar: si no alcanza, la ronda entera deja de valer
         if (!r.valida) continue;
-        if (!paga(e.u, e.p)) { r.valida = false; continue; }
-        U(e.u).casino.apostado += e.p;
+        if (!paga(e.u, e.p, "apuesta", r.j)) { r.valida = false; continue; }
+        U(e.u).casino.apostado += e.p; casinoDe(e.u, r.j).apostado += e.p;
         continue;
       }
-      if (!paga(e.u, e.p)) continue;
+      if (!paga(e.u, e.p, "apuesta", r.j)) continue;
       r.valida = true;
       const z = U(e.u).casino; z.apostado += e.p; z.rondas++;
+      const zj = casinoDe(e.u, r.j); zj.apostado += e.p; zj.rondas++;
     } else if (e.t === "cp") {
       const r = rondas[e.u + "~" + e.k];
       if (!r.valida) continue;
-      U(e.u).premios += e.p; U(e.u).casino.pagado += e.p;
+      U(e.u).premios += e.p; U(e.u).casino.pagado += e.p; casinoDe(e.u, r.j).pagado += e.p;
+      anota(e.u, "premio", e.p, r.j);
     } else if (e.t === "t") {
       const x = e.x, dar = comoLista(x.dar).map(String), pedir = comoLista(x.pedir).map(String), todas = [...dar, ...pedir];
       const ok = x.de && x.para && x.de !== x.para && dar.length >= 1 && dar.length <= 3 && pedir.length <= 3 &&
@@ -634,7 +655,10 @@ export function economia(datos) {
       }
     }
   }
-  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.premios = Math.floor(x.premios + 1e-6); x.casino.pagado = Math.round(x.casino.pagado * 100) / 100; x.falta = Math.round(x.falta); void u; }
+  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.premios = Math.floor(x.premios + 1e-6); x.casino.pagado = Math.round(x.casino.pagado * 100) / 100; x.falta = Math.round(x.falta);
+    for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
+    for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
+    void u; }
   const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rondas };
   memoEco.set(d, res);
   return res;
