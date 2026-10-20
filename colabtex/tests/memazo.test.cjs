@@ -217,3 +217,41 @@ test('La jugada de una plantilla de afuera pasa las reglas de jugadas/$n',()=>{
  const e=externoMemazo(j,'reales');
  assert.equal(e.w,1200);assert.equal(e.h,1200);
 });
+
+/* GIPHY sin cupo (429) o con la clave mala respondía sin `data`, y eso se
+   leía como «cero GIFs»: el editor quedaba vacío y no caía a los dibujos.
+   Ahora es un error con su motivo, y los de moda se guardan una hora. */
+test('GIPHY: un 429 o una clave mala son un error con motivo; los de moda se guardan',async()=>{
+ const esbuild=require('esbuild');
+ const stub={name:'stub',setup(b){
+  b.onResolve({filter:/firebase\.js$/},()=>({path:'fb',namespace:'stub'}));
+  b.onResolve({filter:/^firebase\/database$/},()=>({path:'fbdb',namespace:'stub'}));
+  b.onLoad({filter:/^fb$/,namespace:'stub'},()=>({contents:'export const db={};'}));
+  b.onLoad({filter:/^fbdb$/,namespace:'stub'},()=>({contents:'export const ref=()=>0;export const get=async()=>({val:()=>globalThis.__clave});'}));
+ }};
+ const code=(await esbuild.build({entryPoints:[path.join(__dirname,'../src/juegos/memazo-fuentes.js')],bundle:true,format:'cjs',write:false,plugins:[stub]})).outputFiles[0].text;
+ const almacen={};let llamadas=0,respuesta;
+ const ctx={module:{exports:{}},localStorage:{getItem:k=>almacen[k]??null,setItem:(k,v)=>{almacen[k]=v;}},
+  fetch:async()=>{llamadas++;return respuesta;},Date,JSON,Math,Number,String,Array,Map,Error,encodeURIComponent,Promise,globalThis:{}};
+ ctx.globalThis=ctx;vm.createContext(ctx);vm.runInContext(code,ctx);
+ const {gifsGiphy}=ctx.module.exports;
+ const resp=(status,body)=>({ok:status===200,status,json:async()=>body});
+ ctx.__clave=null;
+ await assert.rejects(gifsGiphy(),e=>/Falta la clave/.test(e.motivo));
+ ctx.__clave='claveDePrueba123';
+ respuesta=resp(429,{meta:{status:429,msg:'Too many requests'}});
+ await assert.rejects(gifsGiphy(),e=>/límite/.test(e.motivo));
+ respuesta=resp(200,{meta:{status:401},data:[]});
+ await assert.rejects(gifsGiphy(),e=>/clave/.test(e.motivo));
+ respuesta=resp(200,{meta:{status:200},data:[]});
+ await assert.rejects(gifsGiphy(),e=>/no devolvió/.test(e.motivo));
+ const gif={id:'abcdefGIF1',title:'gato',images:{original:{width:'480',height:'270'}}};
+ respuesta=resp(200,{meta:{status:200},data:[gif]});
+ const antes=llamadas;
+ assert.equal((await gifsGiphy()).length,1);
+ assert.equal((await gifsGiphy()).length,1);
+ assert.equal(llamadas-antes,1,'los de moda se piden una vez por hora');
+ assert.equal((await gifsGiphy('gato')).length,1);
+ await gifsGiphy('gato');
+ assert.equal(llamadas-antes,2,'cada búsqueda se pide una vez');
+});

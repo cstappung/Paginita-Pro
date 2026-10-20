@@ -33,11 +33,18 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const NOMBRE_NOTA = { 1: "Tomatazo", 2: "Meh", 3: "Bueno", 4: "Jajaja", 5: "¡Fuego!" };
 const RELEVO_MS = 1800;
+/* Al acabarse el tiempo de escribir se manda solo lo último que hay en el
+   editor, sin pulsar «¡Listo!»: una pasada a 2,5 s del plazo y otra a 0,3 s
+   (cada una solo si hay algo escrito y sin mandar). Para que la segunda
+   llegue antes del cierre, el `cierra` de esa etapa espera 1,5 s pasado el
+   plazo en vez de 0,4. */
+const AUTO_MS = [2500, 300];
+const HOLGURA_ESCRIBIR = 1500, HOLGURA = 400;
 
 export function crearMemazo(ctx) {
   const { uid, jugar, terminar, ahora, mirando } = ctx;
   let host = null, muerto = false, est = null, p = null;
-  let tic = null, tAuto = null, hecho = "", hechoEn = 0, enviando = false, votando = false;
+  let tic = null, tAuto = null, tEnvio = [], hecho = "", hechoEn = 0, enviando = false, votando = false;
   let vistaVista = "", antes = null, ocupadoAntes = false;
   const firmas = {};
   /* Lo que llevo escrito en la ronda: la plantilla elegida (su clave: el id
@@ -81,7 +88,7 @@ export function crearMemazo(ctx) {
 
   function destruir() {
     muerto = true;
-    clearInterval(tic); clearTimeout(tAuto); clearTimeout(tBusca);
+    clearInterval(tic); clearTimeout(tAuto); clearTimeout(tBusca); tEnvio.forEach(clearTimeout);
     sueltaArrastre();
     if (host) { host.removeEventListener("click", alClic); host.removeEventListener("input", alEscribir); host.removeEventListener("pointerdown", alAgarrar); host.innerHTML = ""; }
     host = null;
@@ -162,7 +169,8 @@ export function crearMemazo(ctx) {
     if (est.fuente === "dibujos" || fuente.estado) return;
     fuente = { estado: "cargando", lista: [] };
     const pide = est.fuente === "gif" ? gifsGiphy() : plantillasImgflip();
-    pide.then(l => { fuente = { estado: "listo", lista: l }; }, e => { console.warn("[memazo] plantillas de afuera", e); fuente = { estado: "error", lista: [] }; })
+    pide.then(l => { fuente = l.length ? { estado: "listo", lista: l } : { estado: "error", lista: [], motivo: "" }; },
+      e => { console.warn("[memazo] plantillas de afuera", e); fuente = { estado: "error", lista: [], motivo: (e && e.motivo) || "" }; })
       .then(() => { if (!muerto) pinta(); });
   }
 
@@ -198,7 +206,7 @@ export function crearMemazo(ctx) {
     const credito = est.fuente === "gif" && fuente.estado !== "error" ? "Powered by GIPHY"
       : est.fuente === "reales" && fuente.estado !== "error" ? "Plantillas de Imgflip" : "";
     const falla = est.fuente !== "dibujos" && fuente.estado === "error"
-      ? `<div class="jg-mz-falla">${est.fuente === "gif" ? "No se pudo hablar con GIPHY (¿falta la clave en la base?)" : "No se pudo traer la lista de Imgflip"}: te tocan plantillas de la casa.</div>` : "";
+      ? `<div class="jg-mz-falla">${esc(fuente.motivo || (est.fuente === "gif" ? "No se pudo hablar con GIPHY" : "No se pudo traer la lista de Imgflip"))}. Mientras tanto te tocan plantillas de la casa. <button class="jg-mz-mini" data-reintenta="1">Reintentar</button></div>` : "";
     return `<div class="jg-mz-editor">
       <div class="jg-mz-lienzo">${lienzo}</div>
       <div class="jg-mz-panel">
@@ -222,13 +230,14 @@ export function crearMemazo(ctx) {
     const el = host && host.querySelector("#mzOfertas");
     if (!el) return;
     const o = ofertas();
-    const buscando = borrador.q.trim() && (busqueda.q !== borrador.q.trim() || busqueda.estado === "cargando");
+    const buscando = borrador.q.trim() && busqueda.estado !== "corta" && (busqueda.q !== borrador.q.trim() || busqueda.estado === "cargando");
     const firma = [borrador.p, buscando, busqueda.estado, fuente.estado, o.map(claveDe).join(",")].join("|");
     if (el.dataset.firma === firma) return;
     el.dataset.firma = firma;
     for (const pl of o) vistas[claveDe(pl)] = pl;
-    el.innerHTML = buscando ? `<div class="jg-mz-nada">Buscando…</div>`
-      : borrador.q.trim() && busqueda.estado === "error" ? `<div class="jg-mz-nada">La búsqueda falló.</div>`
+    el.innerHTML = borrador.q.trim() && busqueda.estado === "corta" ? `<div class="jg-mz-nada">Escribe al menos 3 letras.</div>`
+      : buscando ? `<div class="jg-mz-nada">Buscando…</div>`
+      : borrador.q.trim() && busqueda.estado === "error" ? `<div class="jg-mz-nada">La búsqueda falló${busqueda.motivo ? ": " + esc(busqueda.motivo) : ""}.</div>`
       : !o.length ? `<div class="jg-mz-nada">${fuente.estado === "cargando" ? "Cargando…" : "Nada por aquí."}</div>`
       : o.map(pl => {
         const k = claveDe(pl);
@@ -312,12 +321,15 @@ export function crearMemazo(ctx) {
       pintaOfertas();
       return;
     }
+    /* Cada búsqueda en GIPHY gasta una llamada de la hora: se espera a tres
+       letras y a que se deje de teclear. */
+    if (q.length < 3) { busqueda = { q, estado: "corta", lista: [] }; pintaOfertas(); return; }
     busqueda = { q, estado: "cargando", lista: [] };
     pintaOfertas();
     tBusca = setTimeout(() => {
-      gifsGiphy(q).then(l => ({ q, estado: "listo", lista: l }), () => ({ q, estado: "error", lista: [] }))
+      gifsGiphy(q).then(l => ({ q, estado: "listo", lista: l }), e => ({ q, estado: "error", lista: [], motivo: (e && e.motivo) || "" }))
         .then(b => { if (!muerto && borrador.q.trim() === q) { busqueda = b; pintaOfertas(); } });
-    }, 450);
+    }, 800);
   }
 
   function notas(mm) {
@@ -432,7 +444,7 @@ export function crearMemazo(ctx) {
 
     let pie;
     if (v === "espera") pie = "Pásale el enlace de la sala a tus amigos: de 2 a 10, y cuantos más, mejor.";
-    else if (v === "escribir") pie = "Elige una plantilla y ponle texto. Cuando todos manden el suyo, o se acabe el tiempo, se vota.";
+    else if (v === "escribir") pie = "Elige una plantilla y ponle texto. Si se acaba el tiempo se manda solo lo que tengas escrito; cuando todos lo manden, se vota.";
     else if (v === "votar" || v === "revela") pie = "🍅 1 · 😐 2 · 🙂 3 · 😂 4 · 🔥 5 puntos para el autor. No se sabe de quién es hasta que todos califican.";
     else if (v === "resumen") pie = "Los puntos de cada meme ya están en el marcador de arriba.";
     else if (v === "fin") pie = "Gana quien sumó más puntos con sus memes; a igualdad, quien sacó más 🔥.";
@@ -466,7 +478,39 @@ export function crearMemazo(ctx) {
   }
 
   /* ---------- las jugadas del reloj ---------- */
+  /* El envío solo del final del tiempo (ver `AUTO_MS`). */
+  function programaEnvio() {
+    tEnvio.forEach(clearTimeout); tEnvio = [];
+    if (!soy() || !est || est.fase !== "jugando" || est.etapa !== "escribir" || !est.plazo) return;
+    const r = est.r;
+    for (const antes of AUTO_MS) {
+      const falta = est.plazo - antes - ahora();
+      if (falta < -antes) continue;   // ese momento ya pasó (el plazo también)
+      tEnvio.push(setTimeout(() => {
+        if (muerto || !est || est.etapa !== "escribir" || est.r !== r || borrador.r !== r || enviando) return;
+        const j = jugadaMeme();
+        if (j && j.x.some(t => t) && JSON.stringify(j) !== enviado) manda(true);
+      }, Math.max(0, falta)));
+    }
+  }
+
+  async function manda(solo) {
+    const j = jugadaMeme();
+    if (!j || !j.x.some(t => t) || enviando) return;
+    enviando = true; fallo = ""; estadoEnvio();
+    try {
+      if (await jugar({ t: "meme", uid, r: est.r, ...j, at: ahora() })) {
+        enviado = JSON.stringify(j);
+        suena(solo ? "ficha" : "entra");
+      } else fallo = "No se pudo mandar. Prueba otra vez.";
+    } catch (e) {
+      console.warn("[memazo] no se pudo mandar el meme", e);
+      fallo = /permission/i.test(String(e && (e.code || e.message))) ? "La base rechazó el meme (¿reglas sin publicar?)." : "No se pudo mandar: " + ((e && e.message) || e);
+    } finally { if (!muerto) { enviando = false; estadoEnvio(); } }
+  }
+
   function programa() {
+    programaEnvio();
     clearTimeout(tAuto);
     if (!soy() || !est || est.fase !== "jugando") return;
     const slot = activos().indexOf(uid);
@@ -476,7 +520,7 @@ export function crearMemazo(ctx) {
     else if (est.etapa === "escribir" || est.etapa === "votar") {
       clave = [est.etapa, est.r, est.m].join(".");
       jug = { t: "cierra", r: est.r, e: est.etapa, m: est.m };
-      cuando = est.completa ? 0 : est.plazo + 400;
+      cuando = est.completa ? 0 : est.plazo + (est.etapa === "escribir" ? HOLGURA_ESCRIBIR : HOLGURA);
     } else return;
     /* Si mi jugada no movió nada (llegó con la hora un pelo antes del
        plazo), se reintenta pasado un rato. */
@@ -515,6 +559,12 @@ export function crearMemazo(ctx) {
       if (pl) { elige(pl); suena("clic"); pinta(); }
       return;
     }
+    if (ev.target.closest("[data-reintenta]") && vistaVista === "escribir") {
+      fuente = { estado: "", lista: [] };
+      cargaFuente();
+      pinta();
+      return;
+    }
     if (ev.target.closest("[data-otras]") && vistaVista === "escribir") {
       borrador.vuelta++; borrador.q = "";
       const b = host.querySelector("#mzBusca");
@@ -532,21 +582,7 @@ export function crearMemazo(ctx) {
       pinta();
       return;
     }
-    if (ev.target.closest("#mzEnviar") && vistaVista === "escribir" && !enviando) {
-      const j = jugadaMeme();
-      if (!j || !j.x.some(t => t)) return;
-      enviando = true; fallo = ""; estadoEnvio();
-      try {
-        if (await jugar({ t: "meme", uid, r: est.r, ...j, at: ahora() })) {
-          enviado = JSON.stringify(j);
-          suena("entra");
-        } else fallo = "No se pudo mandar. Prueba otra vez.";
-      } catch (e) {
-        console.warn("[memazo] no se pudo mandar el meme", e);
-        fallo = /permission/i.test(String(e && (e.code || e.message))) ? "La base rechazó el meme (¿reglas sin publicar?)." : "No se pudo mandar: " + ((e && e.message) || e);
-      } finally { if (!muerto) { enviando = false; estadoEnvio(); } }
-      return;
-    }
+    if (ev.target.closest("#mzEnviar") && vistaVista === "escribir") { await manda(false); return; }
     const b = ev.target.closest(".jg-mz-nota");
     if (b && vistaVista === "votar" && !votando) {
       const mm = est.memes[est.m];
