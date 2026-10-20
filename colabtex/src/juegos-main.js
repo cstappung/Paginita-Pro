@@ -2002,6 +2002,8 @@ function armazon() {
         fb.otorgarLogro(clave, u.uid, id).then(() => celebra(clave, id), e => console.warn("[juegos] no se pudo guardar el logro", id, e)); }) : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
+      /* ¿Administrador? (state.admin se lee una vez por sesión y puede no haber llegado aún.) */
+      esAdmin: u ? () => (state.admin === null || state.admin === undefined ? fb.esAdminJuegos(u.uid) : !!state.admin) : null,
       alResultado: u ? alResultadoClub(clave) : undefined });
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un

@@ -33,7 +33,7 @@ import {verificaClub,DE_INVITADO} from './verifica.js';
    esto el ranking del juego mostraba el de Google donde el resto del sitio
    ya mostraba el apodo. Si el apodo llega después, `refresca()` repinta. */
 const PLENO=new Set(['prodefender']);
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe,alInvitado,deInvitado}) {
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe,alInvitado,deInvitado,esAdmin}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   /* El fantasma (Metro Rush, modos «Fantasma»): la tabla ordenada que ya
      trae la escucha de cada categoría (`tablas`), quienes esperan a que
@@ -232,12 +232,14 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='dosmil'||juego==='trigon'||juego==='protiles'||juego==='pokelike'||juego==='tulones'||juego==='propac'||juego==='metrorush'?'900px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
+    /* El rango de admin de Juegos (conexion.js: Club.esAdmin): PRO DEFENDER abre con él sus reinos en pruebas. */
+    if(esAdmin)frame.addEventListener('load',()=>{Promise.resolve(esAdmin()).then(a=>enviar({tipo:'admin',admin:!!a}),()=>{});});
     if(juego==='sortem')frame.addEventListener('load',()=>frame.focus());
     temaObserver=new MutationObserver(tema);
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-66&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-67&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

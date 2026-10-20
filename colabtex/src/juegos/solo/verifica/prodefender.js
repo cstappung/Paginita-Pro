@@ -24,7 +24,7 @@ export const PRUEBA = 1;
 
 const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio)$/;
 const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-4';
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-6';
 
 let trabajador = null, serie = 0;
 const espera = new Map();

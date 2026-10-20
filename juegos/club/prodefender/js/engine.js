@@ -24,6 +24,12 @@
   // Tras una congelación, el enemigo queda 1 s sin poder volver a congelarse (solo se frena),
   // igual que el aturdimiento: varias torres de hielo ya no lo dejan quieto para siempre.
   const FREEZE_IMM = 1;
+  // Segunda era: familias de daño del Mecatitán (cycle) y torres a las que la tinta no ciega
+  // (guardan cachés por alcance: con otro alcance recolocarían gólems, murallas y minas).
+  const FAMILIA = { phys: 'fisico', explosive: 'fisico', arcane: 'magia', elec: 'magia', fire: 'elemental', ice: 'elemental', poison: 'elemental', steam: 'elemental' };
+  const CICLO = ['fisico', 'magia', 'elemental'];
+  PD.FAMILIA = FAMILIA; PD.CICLO = CICLO;
+  const SIN_TINTA = { mines: 1, barrier: 1, barracks: 1, saw: 1 };
   // Pinchos (como los de Bloons): un montón que se compra y se tira sobre el camino.
   // Cada enemigo de tierra que pasa encima recibe un golpe (una vez por montón) y gasta
   // una púa; los grandes y los jefes reciben más daño pero gastan más. Duran hasta
@@ -212,6 +218,8 @@
       for (const f of this.towers) if (f.def.kind === 'farm' && f.s.discount && f !== t) {
         if (Math.hypot(f.x - t.x, f.y - t.y) <= f.s.range) d = Math.max(d, f.s.discount);
       }
+      // Ada (héroe de los Engranajes): las mejoras de su alrededor, más baratas
+      for (const f of this.towers) if (f.def.hero && f.s.heroDiscount && f !== t && Math.hypot(f.x - t.x, f.y - t.y) <= (f.s.aura || f.s.range)) d = Math.max(d, f.s.heroDiscount);
       return d;
     }
     upgradeCost(t, p) {
@@ -300,7 +308,7 @@
     recalcAll() {
       for (const t of this.towers) t.s = this.baseStats(t);
       // apoyo: los tótems y el héroe de la Caldera (su aura de forja, radio s.aura)
-      const totems = this.towers.filter(t => t.def.kind === 'support' || (t.def.hero && (t.s.buffDmgMult || t.s.buffRate)));
+      const totems = this.towers.filter(t => t.def.kind === 'support' || ((t.def.hero || t.def.kind === 'rod') && (t.s.buffDmgMult || t.s.buffRate)));
       for (const t of this.towers) {
         if (t.def.kind === 'support' || t.def.kind === 'farm') continue;
         const b = { rate: 0, range: 0, camo: false, dmg: 0, mult: 1, ap: 0, pierce: 0 };
@@ -418,6 +426,18 @@
         lit: false, lightAmp: 0, lightPhase: false, shred: 0, blockT: 0, engaged: null,
         dead: false, leaked: false, flash: 0, wob: this.rnd() * TAU
       };
+      // segunda era (sin azar para los enemigos de siempre: la partida no cambia)
+      e.golpes = 0; e.eco = 0; e.sapoT = 0; e.sapoImm = 0; e.sapoAmp = 0; e.burbujaT = 0; e.burbujaImm = 0; e.burbujaAmp = 0;
+      if (d.hop) e.hopT = d.hop.every * (0.5 + this.rnd() * 0.5);
+      if (d.heads) e.headI = 0;
+      if (d.adapt) { e.adaptDmg = {}; e.res = {}; }
+      if (d.ink) e.inkT = d.ink.every * 0.6;
+      if (d.grab) { e.grabT = d.grab.every * 0.5; e.agarres = []; }
+      if (d.thunder) e.thT = d.thunder.every * 0.6;
+      if (d.shieldAura) e.saT = 1;
+      if (d.cleanse) e.clT = d.cleanse.every;
+      if (d.silence) e.silT = d.silence.every * 0.5;
+      if (d.cycle) { e.cicloT = d.cycle.every; e.inmune = CICLO[0]; }
       e.camo = !!d.camo && !(d.boss && tier === 1);
       if (d.boss) e.name = d.name + (tier === 1 ? ' (Joven)' : tier === 3 ? ' (Furioso)' : tier === 4 ? ' (Supremo)' : '');
       posAt(this.paths[path], e.dist, tmp);
@@ -438,7 +458,7 @@
     revealed(e) { return e.lit || (e.hexT > 0 && e.hexReveal); }
     canSee(t, e) {
       if (e.dead || e.burrowed) return false;
-      if (e.camo && !t.s.camo && !this.revealed(e)) return false;
+      if ((e.camo || e.niebla) && !(e.sapoT > 0) && !t.s.camo && !this.revealed(e)) return false;
       if (e.d.flying && t.s.noFlying) return false;
       return true;
     }
@@ -476,9 +496,20 @@
     }
     // congelar/sabotear una torre; después queda inmune 2 s para evitar bloqueos en cadena
     disableTower(t, dur) {
-      if (t.disImm > 0) return;
+      if (t.disImm > 0 || this.protegida(t)) return;
       t.disabledT = Math.max(t.disabledT, dur);
       t.disImm = t.disabledT + 2;
+    }
+    // ¿la cubre un Pararrayos? (nada la apaga, congela, ciega ni atrapa)
+    protegida(t) {
+      for (const r of this.towers) if (r.def.kind === 'rod' && Math.hypot(r.x - t.x, r.y - t.y) <= r.s.range) return true;
+      return false;
+    }
+    // Choza de la Bruja: sapo (lento, sin blindaje ni camuflaje ni poderes); luego 1.5 s inmune
+    sapifica(e, dur, amp) {
+      if (e.dead || e.d.boss || e.sapoImm > 0 || !(dur > 0)) return;
+      e.sapoT = dur; e.sapoAmp = amp || 0; e.sapoImm = dur + 1.5;
+      this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.4, color: '#8ae05a', r: e.d.r });
     }
     applyStun(e, dur) {
       if (e.stunImm > 0) return;   // inmunidad breve tras un aturdimiento (evita bloqueos eternos)
@@ -500,7 +531,13 @@
     damage(e, amt, dtype, src, o) {
       if (e.dead || e.burrowed || e.invulnT > 0 || amt <= 0) return 0;
       if (e.phased && dtype !== 'arcane' && !e.lightPhase) return 0;
+      if (e.d.absorb === dtype) {   // Elemental de Tormenta: la electricidad lo cura
+        if (e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + amt * 0.5);
+        return 0;
+      }
       let m = e.d.resist && e.d.resist[dtype] !== undefined ? e.d.resist[dtype] : 1;
+      if (e.inmune && FAMILIA[dtype] === e.inmune) m *= 0.15;   // Mecatitán
+      if (e.res && e.res[dtype]) m *= e.res[dtype];             // Autómata adaptado
       if (dtype === 'fire' && o && o.fireFloor && m < o.fireFloor) m = o.fireFloor;
       if (e.wetT > 0) {
         // mojado: pierde la protección contra el fuego y conduce la electricidad
@@ -514,14 +551,19 @@
       if (!dot && e.brittleT > 0) dmg += e.brittle * Math.max(m, 0.3);
       if (e.d.boss && o && o.bossMult) dmg *= o.bossMult;
       if (o && o.armorMult && e.d.armor) dmg *= o.armorMult;
-      const armor = Math.max(0, (e.d.armor || 0) - e.corr - (e.hexT > 0 ? e.hexArmor : 0) - e.shred);
+      let arm = e.d.armor || 0;
+      if (e.d.shellHits && e.golpes >= e.d.shellHits) arm = 0;   // caparazón roto
+      if (e.sapoT > 0) arm = 0;
+      if (!dot) e.golpes++;
+      const armor = Math.max(0, arm - e.corr - (e.hexT > 0 ? e.hexArmor : 0) - e.shred);
       if (armor > 0 && !dot && dtype !== 'arcane' && dtype !== 'fire' && dtype !== 'poison') {
         const ap = Math.min(1, (o && o.ap) || 0);
         dmg = Math.max(dmg * 0.15, dmg - armor * (1 - ap));
       }
       // vulnerabilidades: maldición, corrosión, luz del faro y agua salada
-      const amp = (e.hexT > 0 ? e.hexAmp : 0) + e.corr * e.corrAmp + e.lightAmp + (e.wetT > 0 ? e.wetAmp : 0);
+      const amp = (e.hexT > 0 ? e.hexAmp : 0) + e.corr * e.corrAmp + e.lightAmp + (e.wetT > 0 ? e.wetAmp : 0) + (e.sapoT > 0 ? e.sapoAmp : 0) + (e.burbujaT > 0 ? e.burbujaAmp : 0);
       if (amp > 0) dmg *= 1 + amp;
+      if (e.campo > 0) dmg *= 1 - e.campo;   // campo de fuerza del Mecatitán
       let dealt = 0;
       if (e.shield > 0) {
         const sm = (o && o.shieldMult) || 1;
@@ -541,6 +583,8 @@
       }
       e.flash = 0.06;
       if (src) src.dealt += dealt;
+      if (!(o && o.noEco)) e.eco += dealt;   // lo que repite el Campanario
+      if (e.d.adapt && dealt > 0) this.adapta(e, dtype, dealt);
       if (e.d.blink && !e.blinked && e.hp > 0) {
         e.blinked = true;
         this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.4, color: '#f3d9a4' });
@@ -551,8 +595,17 @@
       return dealt;
     }
 
+    adapta(e, dtype, dealt) {
+      const A = e.d.adapt;
+      e.adaptDmg[dtype] = (e.adaptDmg[dtype] || 0) + dealt;
+      if (e.res[dtype] || Object.keys(e.res).length >= A.max || e.adaptDmg[dtype] < e.maxHp * A.after) return;
+      e.res[dtype] = A.res;
+      this.fx.push({ k: 'text', x: e.x, y: e.y - 18, t: 0, T: 1.2, text: '⚙ adaptado', color: '#5ad1ff' });
+    }
+
     kill(e, src) {
       if (e.dead) return;
+      if (e.d.twins && !e.split) { this.parte(e); return; }
       if (e.d.revive && !e.revived) {
         e.revived = true; e.hp = e.maxHp * 0.5; e.invulnT = 1.5;
         e.burnT = 0; e.poisT = 0;
@@ -586,6 +639,12 @@
           k++;
         }
       }
+      if (d.ward) {
+        const W2 = d.ward;
+        for (const o of this.enemies) if (!o.dead && o !== e && !o.d.boss && Math.hypot(o.x - e.x, o.y - e.y) < W2.radius) o.invulnT = Math.max(o.invulnT, W2.dur);
+        this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 8, r1: W2.radius, color: '#ffe08a', w: 4 });
+      }
+      if (e.agarres) this.suelta(e);
       if (d.deathFreeze) {
         for (const t of this.towers) if (Math.hypot(t.x - e.x, t.y - e.y) < d.deathFreeze.radius) this.disableTower(t, d.deathFreeze.dur);
         this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 10, r1: d.deathFreeze.radius, color: '#dff4ff', w: 5 });
@@ -609,6 +668,13 @@
       // un golpe (con la escalera de tanques, un Titán perdido eran 90 vidas: fin de la partida)
       const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : Math.min(e.d._leak, Math.ceil(this.L.lives * 0.6));
       this.lives -= l;
+      if (e.agarres) this.suelta(e);
+      if (e.d.steal && this.money > 0) {
+        const robo = Math.floor(this.money * e.d.steal);
+        this.money -= robo;
+        this.fx.push({ k: 'text', x: Math.min(W - 40, e.x), y: e.y - 20, t: 0, T: 1.5, text: '−' + robo + ' oro', color: '#ffd84d' });
+        this.emit({ type: 'robo', amount: robo });
+      }
       this.emit({ type: 'leak', amount: l });
       this.snd('leak', e.x);
       if (this.lives <= 0) {
@@ -623,13 +689,24 @@
       const hurry = this.rt > (this.hurryT || 1e9);
       const list = this.enemies;
       // auras
-      for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; e.shred = 0; }
+      for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; e.shred = 0; e.niebla = false; e.campo = 0; }
       // auras de los héroes: quitar blindaje (Dunas) y daño recibido (Dunas, Vacío; suma como la luz del faro)
-      for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.shredAura || t.s.ampAura)) {
-        const s = t.s, R = s.aura || s.range;
+      for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.shredAura || t.s.ampAura || t.s.goldAura || t.s.purgeAura)) {
+        const s = t.s, R = (s.goldAura || s.purgeAura) ? s.range : s.aura || s.range;
         for (const e of list) if (!e.dead && Math.abs(e.x - t.x) < R + 30 && Math.hypot(e.x - t.x, e.y - t.y) < R + e.d.r * 0.5) {
           if (s.shredAura) e.shred = Math.max(e.shred, s.shredAura);
           if (s.ampAura) e.lightAmp = Math.max(e.lightAmp, s.ampAura * (e.d.boss ? 0.5 : 1));
+          if (s.goldAura) { e.goldT = Math.max(e.goldT, 0.1); e.goldMult = Math.max(e.goldMult, s.goldAura); }   // Morgana
+          if (s.purgeAura) { e.lit = true; if (!e.d.boss && e.invulnT > 0) e.invulnT = 0; }                     // Solenne
+        }
+      }
+      // niebla (Bruma) y campo de fuerza (Mecatitán): sobre los aliados que los rodean
+      for (const e of list) {
+        if (e.dead || !(e.d.fogAura || e.d.field) || e.sapoT > 0) continue;
+        const R = e.d.fogAura || e.d.field.radius;
+        for (const o of list) if (o !== e && !o.dead && Math.abs(o.x - e.x) < R && Math.hypot(o.x - e.x, o.y - e.y) < R) {
+          if (e.d.fogAura) o.niebla = true;
+          else o.campo = Math.max(o.campo, e.d.field.f);
         }
       }
       // Faro Boreal: ilumina (revela camuflados), debilita y puede anular fases
@@ -654,6 +731,13 @@
         if (e.dead) continue;
         const d = e.d;
         e.flash -= dt;
+        if (e.eco > 0) e.eco *= Math.max(0, 1 - dt / 2.5);
+        if (e.sapoImm > 0) e.sapoImm -= dt;
+        if (e.sapoT > 0) e.sapoT -= dt;
+        if (e.burbujaImm > 0) e.burbujaImm -= dt;
+        if (e.burbujaT > 0) { e.burbujaT -= dt; if (e.burbujaT <= 0) this.revienta(e); }
+        if (e.piedraT > 0) { e.piedraT -= dt; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * d.stone.heal * dt / d.stone.dur); }
+        const mudo = e.sapoT > 0;   // un sapo no usa sus poderes
         if (e.invulnT > 0) e.invulnT -= dt;
         if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slowF = 0; }
         if (e.frozenT > 0) e.frozenT -= dt;
@@ -688,7 +772,7 @@
           e.shieldT += dt;
           if (e.shieldT > 3) e.shield = Math.min(e.maxShield, e.shield + e.maxShield * 0.5 * dt);
         }
-        if (d.burrow) {
+        if (d.burrow && !mudo) {
           e.burrowT -= dt;
           if (e.burrowT <= 0) {
             e.burrowed = !e.burrowed;
@@ -696,11 +780,11 @@
             this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: d.r * 1.6 });
           }
         }
-        if (d.phase) {
+        if (d.phase && !mudo) {
           e.phaseT -= dt;
           if (e.phaseT <= 0) { e.phased = !e.phased; e.phaseT = e.phased ? d.phase.dur : d.phase.every; }
         }
-        if (d.heal) {
+        if (d.heal && !mudo) {
           e.healT -= dt;
           if (e.healT <= 0) {
             e.healT = d.heal.every;
@@ -711,7 +795,7 @@
             this.snd('heal', e.x);
           }
         }
-        if (d.sabotage && !e.burrowed) {
+        if (d.sabotage && !e.burrowed && !mudo) {
           e.sabT -= dt;
           if (e.sabT <= 0) {
             e.sabT = d.sabotage.every;
@@ -739,6 +823,7 @@
           }
         }
         if (d.enrage && !e.enraged && e.hp < e.maxHp * d.enrage.below) e.enraged = true;
+        if (this.segundaEra(e, d, dt, mudo, cur)) continue;
         // movimiento
         let sp = 0;
         const vel = d.speed * sm * (e.fast || 1);
@@ -746,7 +831,9 @@
         else if (e.frozenT <= 0 && e.stunT <= 0) {
           sp = vel * (1 - e.slowF) * e.haste;
           if (e.auraSlow && !d.slowImmune) sp *= 1 - e.auraSlow * (d.boss ? 0.5 : 1);
-          if (e.burrowed) sp *= d.burrow.speed;
+          if (e.burrowed) sp *= d.burrow ? d.burrow.speed : d.hop.speed;
+          if (e.sapoT > 0) sp *= 0.5;
+          if (e.piedraT > 0 || e.burbujaT > 0) sp = 0;
           if (e.enraged) sp *= d.enrage.mult;
           if (e.holdT > 0) sp *= d.boss ? 0.4 : 0.05;
           if (sp > 0 && this.blocked(e, dt)) sp = 0;
@@ -761,6 +848,163 @@
           const jx = (e.x - ox) / dt, jy = (e.y - oy) / dt;
           if (Math.abs(jx) < 600 && Math.abs(jy) < 600) { e.vx = jx; e.vy = jy; }
         }
+      }
+    }
+
+    // ---- las mecánicas de los enemigos de la segunda era (solo con sus campos) ----
+    // Devuelve true si el enemigo dejó de existir (el Eclipse que se parte).
+    segundaEra(e, d, dt, mudo, cur) {
+      if (d.hop) {
+        e.hopT -= dt;
+        if (e.hopping && e.hopT <= 0) { e.hopping = false; e.burrowed = false; e.hopT = d.hop.every; this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.4, r: d.r * 1.3 }); }
+        else if (!e.hopping && e.hopT <= 0 && !mudo && !e.burrowed) { e.hopping = true; e.burrowed = true; e.hopT = d.hop.dur; if (e.engaged) this.release(e); }
+      }
+      if (d.stone && !e.stoned && !mudo && e.hp < e.maxHp * d.stone.below) {
+        e.stoned = true; e.piedraT = d.stone.dur; e.invulnT = Math.max(e.invulnT, d.stone.dur);
+        this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.5, color: '#a8acb4', r: d.r * 1.4 });
+        this.snd('golemHit', e.x);
+      }
+      if (d.regenFuego && e.burnT <= 0 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * d.regenFuego * dt);
+      if (d.heads) {
+        const H2 = d.heads;
+        while (e.headI < H2.at.length && e.hp < e.maxHp * H2.at[e.headI]) {
+          e.headI++;
+          const hpM = PD.hpMult(this.L, cur);
+          for (let i = 0; i < H2.n; i++) this.spawn(H2.type, e.path, e.dist - 10 - i * 16, hpM);
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.7, r0: 10, r1: 90, color: '#c8ff5a', w: 5 });
+          this.emit({ type: 'heads', enemy: e });
+          this.snd('revive', e.x);
+        }
+      }
+      if (d.twins && !e.split && e.hp < e.maxHp * 0.5) { this.parte(e); return true; }
+      if (d.ink && !mudo) {
+        e.inkT -= dt;
+        if (e.inkT <= 0) {
+          e.inkT = d.ink.every;
+          for (const t of this.towers) if (Math.hypot(t.x - e.x, t.y - e.y) < d.ink.radius && !this.protegida(t)) t.tintaT = Math.max(t.tintaT || 0, d.ink.dur);
+          this.fx.push({ k: 'splash', x: e.x, y: e.y, t: 0, T: 0.8, r: d.ink.radius, color: '#2a1040' });
+          this.snd('acidHit', e.x);
+        }
+      }
+      if (d.thunder) {
+        e.thT -= dt;
+        if (e.thT <= 0) {
+          e.thT = d.thunder.every;
+          const cands = this.towers.filter(t => !(t.disImm > 0) && !this.protegida(t)).sort((a, b) => b.spent - a.spent || a.id - b.id).slice(0, d.thunder.n);
+          for (const t of cands) {
+            this.disableTower(t, d.thunder.dur);
+            this.fx.push({ k: 'bolt', pts: [[t.x + 30, -10], [t.x - 10, t.y * 0.5], [t.x, t.y]], t: 0, T: 0.4, color: '#fff27a', w: 5 });
+          }
+          if (cands.length) { this.fx.push({ k: 'flashscreen', t: 0, T: 0.3, color: 'rgba(255,250,200,' }); this.snd('zapBig', e.x); }
+        }
+      }
+      if (d.grab) {
+        if (e.agarres.length && e.agarres.some(a => e.hp <= a.hp || a.t.disabledT <= 0)) this.suelta(e, true);
+        e.grabT -= dt;
+        if (e.grabT <= 0 && !e.burrowed) {
+          e.grabT = d.grab.every;
+          const libres = this.towers.filter(t => !(t.disImm > 0) && !(t.disabledT > 0) && !this.protegida(t))
+            .sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y) || a.id - b.id).slice(0, d.grab.n);
+          for (const t of libres) {
+            this.disableTower(t, d.grab.dur);
+            e.agarres.push({ t, hp: e.hp - e.maxHp * d.grab.hp });
+            this.fx.push({ k: 'bolt', pts: [[e.x, e.y], [(e.x + t.x) / 2 + 20, (e.y + t.y) / 2 - 20], [t.x, t.y]], t: 0, T: 0.6, color: '#c060ff', w: 6 });
+          }
+          if (libres.length) this.snd('gravity', e.x);
+        }
+      }
+      if (d.shieldAura && !mudo) {
+        e.saT -= dt;
+        if (e.saT <= 0) {
+          e.saT = d.shieldAura.every;
+          const R = d.shieldAura.radius;
+          for (const o of this.enemies) if (!o.dead && o !== e && !o.d.boss && Math.hypot(o.x - e.x, o.y - e.y) < R) {
+            const v = o.maxHp * d.shieldAura.pct;
+            if (o.maxShield === 0) o.escudoDado = true;   // escudo regalado: no se recarga solo
+            o.maxShield = Math.max(o.maxShield, v); o.shield = Math.max(o.shield, v);
+          }
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 6, r1: R, color: '#7cc4ff', w: 3 });
+        }
+      }
+      if (d.cleanse && !mudo) {
+        e.clT -= dt;
+        if (e.clT <= 0) {
+          e.clT = d.cleanse.every;
+          const R = d.cleanse.radius;
+          for (const o of this.enemies) if (!o.dead && Math.hypot(o.x - e.x, o.y - e.y) < R) {
+            o.slowT = 0; o.slowF = 0; o.burnT = 0; o.poisT = 0; o.hexT = 0; o.corr = 0; o.corrT = 0; o.wetT = 0; o.brittleT = 0;
+            o.sapoT = 0; o.frozenT = 0; o.burbujaT = 0;
+          }
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 6, r1: R, color: '#fff6c0', w: 4 });
+          this.snd('heal', e.x);
+        }
+      }
+      if (d.silence) {
+        e.silT -= dt;
+        if (e.silT <= 0) {
+          e.silT = d.silence.every;
+          for (const t of this.towers) if (t.s.ability && Math.hypot(t.x - e.x, t.y - e.y) < d.silence.radius) t.abilityCd = Math.max(t.abilityCd, 10);
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.8, r0: 10, r1: d.silence.radius, color: '#ffcf4d', w: 6 });
+          this.snd('sabotage', e.x);
+        }
+      }
+      if (d.cycle) {
+        e.cicloT -= dt;
+        if (e.cicloT <= 0) {
+          e.cicloT = d.cycle.every;
+          e.inmune = CICLO[(CICLO.indexOf(e.inmune) + 1) % CICLO.length];
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: d.r, r1: d.r + 30, color: e.inmune === 'fisico' ? '#d8dee6' : e.inmune === 'magia' ? '#c07bff' : '#ff8a3d', w: 5 });
+          this.emit({ type: 'ciclo', enemy: e });
+        }
+      }
+      return false;
+    }
+    // Kraken: suelta las torres que atrapó (todas al morir o escaparse; si no, las que ya pagó)
+    suelta(e, soloPagadas) {
+      const quedan = [];
+      for (const a of e.agarres) {
+        if (!soloPagadas || e.hp <= a.hp || a.t.disabledT <= 0) a.t.disabledT = 0;
+        else quedan.push(a);
+      }
+      e.agarres = quedan;
+    }
+    // Eclipse: a la mitad de su vida (o si cae de golpe) se parte en el Sol y la Luna
+    parte(e) {
+      e.split = true; e.dead = true;
+      if (e.agarres) this.suelta(e);
+      const hpM = PD.hpMult(this.L, this.curRound() || 1);
+      e.d.twins.forEach((id, i) => {
+        const g = this.spawn(id, e.path, e.dist - i * 30, hpM, e.tier);
+        g.hp = g.maxHp = e.maxHp * 0.32;
+        g.name = this.L.boss === e.type ? g.d.name + (e.name ? e.name.slice(e.d.name.length) : '') : g.d.name;
+      });
+      this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 1, r0: 10, r1: 160, color: '#ffcf4d', w: 8 });
+      this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(255,220,140,' });
+      this.emit({ type: 'split', enemy: e });
+      this.snd('bossDeath', e.x);
+    }
+    // Cañón de Burbujas: atrapa (o frena a los grandes) a los que toca la burbuja
+    atrapa(e0, t, x, y) {
+      const s = t.s, list = [];
+      if (s.trapR) this.grid.query(x, y, s.trapR + 40, o => { if (!o.dead && Math.hypot(o.x - x, o.y - y) < s.trapR + o.d.r * 0.5) list.push(o); });
+      else list.push(e0);
+      for (const e of list) {
+        if (e.dead) continue;
+        if (s.wetDur) { e.wetT = Math.max(e.wetT, s.wetDur); }
+        if (e.d.boss) { this.applySlow(e, 0.3, 1); continue; }
+        const dur = e.d.big ? s.trapBig || 0 : s.trapDur;
+        if (!dur) { this.applySlow(e, 0.4, 1.5); continue; }
+        if (e.burbujaImm > 0) continue;
+        e.burbujaT = dur; e.burbujaImm = dur + 1; e.burbujaAmp = s.trapAmp || 0; e.burbujaPop = s.popDmg || 0; e.burbujaSrc = t;
+        if (e.engaged) this.release(e);
+      }
+    }
+    revienta(e) {
+      this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.35, r0: e.d.r, r1: e.d.r + 18, color: '#bff4ff', w: 3 });
+      if (e.burbujaPop && e.burbujaSrc) {
+        const pop = e.burbujaPop * PD.hpMult(this.L, this.curRound() || 1) * 0.6;
+        this.explode(e.x, e.y, 46, pop, 'phys', e.burbujaSrc, { ap: 1 });
+        this.snd('boomSmall', e.x);
       }
     }
 
@@ -830,14 +1074,20 @@
         if (t.disabledT > 0) { t.disabledT -= dt; t.beams.length = 0; continue; }
         if (s.ability) this.autoAbility(t);
         const kind = t.def.kind;
-        const tdt = dt * rm;
+        // segunda era: Sobrecarga de Ada (x2) y la tinta del Pulpo (alcance x0.55 mientras dura)
+        const rmT = t.sobreT > 0 ? rm * 2 : rm;
+        if (t.sobreT > 0) t.sobreT -= dt;
+        const tdt = dt * rmT;
+        const r0 = s.range, ciega = t.tintaT > 0 && !SIN_TINTA[kind];
+        if (t.tintaT > 0) t.tintaT -= dt;
+        if (ciega) s.range = r0 * 0.55;
         switch (kind) {
           case 'projectile': this.tProjectile(t, s, tdt); break;
           case 'pulse': this.tPulse(t, s, tdt); break;
           case 'chain': this.tChain(t, s, tdt); break;
           case 'mortar': this.tMortar(t, s, tdt); break;
-          case 'beam': this.tBeam(t, s, dt, rm); break;
-          case 'hive': this.tHive(t, s, dt, rm); break;
+          case 'beam': this.tBeam(t, s, dt, rmT); break;
+          case 'hive': this.tHive(t, s, dt, rmT); break;
           case 'gravity': this.tGravity(t, s, tdt); break;
           case 'sniper': this.tSniper(t, s, tdt); break;
           case 'mines': this.tMines(t, s, tdt); break;
@@ -853,7 +1103,13 @@
           case 'hex': this.tHex(t, s, tdt); break;
           case 'blades': this.tBlades(t, s, tdt); break;
           case 'hero': this.tHero(t, s, tdt); break;
+          case 'frog': this.tFrog(t, s, tdt); break;
+          case 'rod': this.tRod(t, s, tdt); break;
+          case 'bubble': this.tBubble(t, s, tdt); break;
+          case 'disint': this.tDisint(t, s, dt, rmT); break;
+          case 'bell': this.tBell(t, s, tdt); break;
         }
+        if (ciega) s.range = r0;
       }
     }
     tProjectile(t, s, dt) {
@@ -864,6 +1120,7 @@
       const base = this.aim(t, e, s.projSpeed);
       t.ang = base;
       const o = { ap: s.armorPierce, bossMult: s.bossMult };
+      if (s.frogChance) { o.frogChance = s.frogChance; o.frogDur = s.frogDur; }
       const common = { speed: s.projSpeed, dmg: s.dmg, pierce: s.pierce, dtype: s.dtype, life: (s.range + 60) / s.projSpeed, opt: o, kind: s.spear ? 'spear' : 'thorn', r: s.spear ? 9 : 4 };
       if (s.poisonDps) common.poison = [s.poisonDps, s.poisonDur];
       if (s.radial) {
@@ -966,6 +1223,7 @@
       const t = sh.src, s = t.s;
       if (sh.acid) { this.landAcid(sh); return; }
       if (sh.sun) { this.landSun(sh); return; }
+      if (sh.frog) { this.landFrog(sh); return; }
       if (sh.meteor) {
         this.explode(sh.x1, sh.y1, sh.radius, sh.dmg, 'explosive', t, { ap: 1 }, { hitsFlying: true, stun: 0.5 });
         this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.6, r: sh.radius, color: '#ff8a3d' });
@@ -1637,6 +1895,119 @@
       if (t.hitMap.size > 400) for (const [id, tm] of t.hitMap) if (now - tm > 2) t.hitMap.delete(id);
     }
 
+    // ======================= DEFENSAS DE LA SEGUNDA ERA =======================
+    // ---- Choza de la Bruja: pociones que convierten en sapo ----
+    tFrog(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const e = this.pick(t, t.x, t.y, s.range, t.mode);
+      if (!e) { t.cdT = 0; return; }
+      const T = 0.6, tx = e.x + e.vx * T, ty = e.y + e.vy * T;
+      t.ang = Math.atan2(ty - t.y, tx - t.x);
+      const n = s.shells || 1;
+      for (let k = 0; k < n; k++) {
+        const ox = k ? (this.rnd() - 0.5) * 80 : 0, oy = k ? (this.rnd() - 0.5) * 80 : 0;
+        this.shells.push({ x0: t.x, y0: t.y, x1: tx + ox, y1: ty + oy, t: 0, T: T + k * 0.1, src: t, dmg: s.dmg, radius: s.radius, frog: true });
+      }
+      t.flash = 0.15;
+      this.snd('acid', t.x);
+      t.cdT = s.cd;
+    }
+    landFrog(sh) {
+      const t = sh.src, s = t.s;
+      this.grid.query(sh.x1, sh.y1, sh.radius + 44, e => {
+        if (e.dead || Math.hypot(e.x - sh.x1, e.y - sh.y1) > sh.radius + e.d.r * 0.5) return;
+        this.damage(e, sh.dmg, 'poison', t, {});
+        if (e.dead) return;
+        if (s.acidDps) this.applyPoison(e, s.acidDps, s.acidDur || 3, t);
+        this.sapifica(e, e.d.big ? s.frogBig || 0 : s.frogDur, s.frogAmp);
+      });
+      this.fx.push({ k: 'splash', x: sh.x1, y: sh.y1, t: 0, T: 0.45, r: sh.radius, color: '#8ae05a' });
+      this.snd('acidHit', sh.x1);
+      if (s.puddleDps) this.puddles.push({ x: sh.x1, y: sh.y1, r: sh.radius * 0.9, dps: s.puddleDps, t: 3, T: 3, src: t, dtype: 'poison', look: 'bog', slow: s.puddleSlow });
+    }
+    // ---- Pararrayos: protege (protegida) y descarga rayos que saltan ----
+    tRod(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const golpeados = [];
+      const o = { ap: s.armorPierce, bossMult: s.bossMult };
+      for (let k = 0; k < (s.strikes || 1); k++) {
+        const e = this.pick(t, t.x, t.y, s.range, t.mode, golpeados);
+        if (!e) break;
+        const hits = [e];
+        let cur = e;
+        for (let j = 0; j < s.jumps; j++) {
+          let best = null, bd = s.chainRange;
+          this.grid.query(cur.x, cur.y, s.chainRange, q => {
+            if (q.dead || hits.indexOf(q) >= 0 || golpeados.indexOf(q) >= 0) return;
+            const dd = Math.hypot(q.x - cur.x, q.y - cur.y);
+            if (dd < bd) { bd = dd; best = q; }
+          });
+          if (!best) break;
+          hits.push(best); cur = best;
+        }
+        const pts = [[e.x + 14, -10], [e.x - 8, e.y * 0.5], [e.x, e.y]];
+        for (const h of hits.slice(1)) pts.push([h.x, h.y]);
+        for (const h of hits) { golpeados.push(h); this.damage(h, s.dmg, s.dtype, t, o); if (s.stun && !h.dead) this.applyStun(h, s.stun); }
+        this.fx.push({ k: 'bolt', pts, t: 0, T: 0.2, color: s.dtype === 'arcane' ? '#e0c8ff' : '#fff27a', w: 3 });
+      }
+      if (!golpeados.length) { t.cdT = 0; return; }
+      this.snd('zapBig', t.x);
+      t.flash = 0.15;
+      t.cdT = s.cd;
+    }
+    // ---- Cañón de Burbujas ----
+    tBubble(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      const e = this.pick(t, t.x, t.y, s.range, t.mode);
+      if (!e) { t.cdT = 0; return; }
+      const base = this.aim(t, e, s.projSpeed), n = s.count || 1;
+      t.ang = base;
+      for (let i = 0; i < n; i++) this.fireProjectile(t, t.x, t.y, base + (i - (n - 1) / 2) * 0.2, { speed: s.projSpeed, dmg: s.dmg, pierce: 1, dtype: s.dtype, life: (s.range + 60) / s.projSpeed, kind: 'bubble', r: 7, opt: { ap: s.armorPierce, burbuja: true } });
+      t.flash = 0.1;
+      this.snd('drone', t.x);
+      t.cdT = s.cd;
+    }
+    // ---- Desintegrador: un porcentaje de la vida máxima por segundo ----
+    tDisint(t, s, dt, rm) {
+      const keep = [];
+      for (const b of t.beams) { const e = b.e; if (!e.dead && this.canSee(t, e) && Math.hypot(e.x - t.x, e.y - t.y) <= s.range + e.d.r * 0.6) keep.push(b); }
+      while (keep.length > s.beams) keep.pop();
+      while (keep.length < s.beams) {
+        const e = this.pick(t, t.x, t.y, s.range, t.mode, keep.map(b => b.e));
+        if (!e) break;
+        keep.push({ e });
+        this.snd('beam', t.x);
+      }
+      t.beams = keep;
+      if (!keep.length) return;
+      const o = { dot: true, bossMult: s.bossMult, exec: s.exec };
+      for (const b of keep) {
+        const e = b.e, f = e.d.boss ? 0.08 : e.d.big ? 0.4 : 1;
+        b.ex = e.x; b.ey = e.y;
+        this.damage(e, (s.dps + e.maxHp * s.pct * f) * rm * dt, s.dtype, t, o);
+      }
+      t.ang = Math.atan2(keep[0].e.y - t.y, keep[0].e.x - t.x);
+    }
+    // ---- Campanario del Ocaso: repite parte del daño reciente (e.eco) ----
+    tBell(t, s, dt) {
+      t.cdT -= dt;
+      if (t.cdT > 0) return;
+      if (!this.anyInRange(t, s.range)) { t.cdT = 0; return; }
+      const o = { dot: true, noEco: true, bossMult: s.bossMult };
+      this.inRange(t, s.range, e => {
+        if (s.purge) { if (!e.d.boss) e.invulnT = 0; if (e.escudoDado) e.shield = 0; }
+        this.damage(e, s.dmg + e.eco * s.eco, s.dtype, t, o);
+        if (s.stun && !e.dead) this.applyStun(e, s.stun);
+      });
+      this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.6, r0: 8, r1: s.range, color: '#ffd88a', w: 4 });
+      this.snd('flashB', t.x);
+      t.flash = 0.3;
+      t.cdT = s.cd;
+    }
+
     // ---- Héroes: cada uno ataca con su arma (s.atk) ----
     tHero(t, s, dt) {
       switch (s.atk) {
@@ -1667,8 +2038,9 @@
       const t = sh.src, s = t.s, o = { ap: s.armorPierce, bossMult: s.bossMult };
       this.grid.query(sh.x1, sh.y1, sh.radius + 44, e => {
         if (e.dead || Math.hypot(e.x - sh.x1, e.y - sh.y1) > sh.radius + e.d.r * 0.5) return;
-        this.damage(e, sh.dmg, 'explosive', t, o);
+        this.damage(e, sh.dmg, s.dtype === 'steam' ? 'steam' : 'explosive', t, o);
         if (!e.dead && s.burnDps) this.applyBurn(e, s.burnDps, 3, t);
+        if (!e.dead && s.wetDur) { e.wetT = Math.max(e.wetT, s.wetDur); e.wetAmp = Math.max(e.wetAmp, s.wetAmp || 0); }
       });
       this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.4, r: sh.radius, color: '#ffd84d' });
       this.snd('boomSmall', sh.x1);
@@ -1704,7 +2076,7 @@
         let k = 0, b = false;
         this.inRange(t, R, e => { k++; if (e.d.boss) b = true; });
         go = k >= 6 || b || (k >= 2 && T.maxProg > 0.7);
-      } else if (id === 'grieta' || id === 'tormenta') go = T.boss || T.maxProg > 0.5 || T.n >= 25;
+      } else if (id === 'grieta' || id === 'tormenta' || id === 'maremoto') go = T.boss || T.maxProg > 0.5 || T.n >= 25;
       else go = T.n >= 8 || T.boss || T.maxProg > 0.6;
       if (go && this.useAbility(t)) this.abLock[id] = 2.5;   // dos torres iguales no la gastan a la vez
     }
@@ -1811,6 +2183,54 @@
           }
           this.fx.push({ k: 'flashscreen', t: 0, T: 0.7, color: 'rgba(170,110,255,' });
           break;
+        // ------------------------ héroes de la segunda era ------------------------
+        case 'cienaga': {
+          // charcos sobre puntos del camino (de la segunda mitad), elegidos con el azar de la partida
+          for (let i = 0; i < s.bogN; i++) {
+            const p = this.paths[Math.floor(this.rnd() * this.paths.length)];
+            posAt(p, p.len * (0.25 + this.rnd() * 0.65), tmp);
+            this.puddles.push({ x: tmp.x, y: tmp.y, r: 34, dps: s.bogDps, t: s.bogDur, T: s.bogDur, src: t, dtype: 'poison', look: 'bog', slow: s.bogSlow, frog: s.bogFrog, air: s.bogAir });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(120,200,80,' });
+          break;
+        }
+        case 'tempestad': {
+          const list = this.enemies.filter(e => !e.dead && !e.burrowed).sort((a, b) => (b.maxHp + (b.d.boss ? 1e9 : 0)) - (a.maxHp + (a.d.boss ? 1e9 : 0))).slice(0, s.tempN);
+          for (const e of list) {
+            this.fx.push({ k: 'bolt', pts: [[e.x + (this.rnd() - 0.5) * 60, -10], [e.x + (this.rnd() - 0.5) * 20, e.y * 0.5], [e.x, e.y]], t: 0, T: 0.35, color: '#e0d8ff', w: 4 });
+            this.damage(e, s.tempDmg, 'arcane', t, { bossMult: s.tempBoss || 1 });
+            if (!e.dead) this.applyStun(e, s.tempStun);
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.4, color: 'rgba(220,220,255,' });
+          break;
+        }
+        case 'maremoto':
+          if (hurry) break;
+          for (const e of this.enemies) {
+            if (e.dead) continue;
+            const back = this.retrocede(e, s.wavePush * (e.d.boss ? 0.25 : 1), t, 1.5);
+            if (back > 0 && e.engaged) this.release(e);
+            e.wetT = Math.max(e.wetT, 5); e.wetAmp = Math.max(e.wetAmp, s.wetAmp || 0);
+            this.damage(e, s.waveDmg, 'steam', t, { ap: 1 });
+            if (s.waveStun && !e.dead) this.applyStun(e, s.waveStun);
+            this.fx.push({ k: 'splash', x: e.x, y: e.y, t: 0, T: 0.5, r: e.d.r + 10, color: '#6fd8ff' });
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.6, color: 'rgba(90,190,240,' });
+          break;
+        case 'sobrecarga':
+          for (const o2 of this.towers) if (o2 !== t && Math.hypot(o2.x - t.x, o2.y - t.y) <= s.aura) o2.sobreT = Math.max(o2.sobreT || 0, s.overDur);
+          this.fx.push({ k: 'ring', x: t.x, y: t.y, t: 0, T: 0.8, r0: 10, r1: s.aura, color: '#ffb84d', w: 8 });
+          break;
+        case 'amanecer':
+          for (const e of this.enemies) {
+            if (e.dead) continue;
+            e.shield = 0; e.camo = false;
+            if (!e.d.boss) e.invulnT = 0;
+            this.damage(e, s.dawnDmg, 'arcane', t, { bossMult: s.dawnBoss || 1 });
+            if (s.dawnStun && !e.dead) this.applyStun(e, s.dawnStun);
+          }
+          this.fx.push({ k: 'flashscreen', t: 0, T: 0.8, color: 'rgba(255,240,190,' });
+          break;
         case 'wardrum':
           this.wardrum = 8;
           break;
@@ -1890,6 +2310,8 @@
           p.hit.push(e.id);
           this.damage(e, p.dmg, p.dtype, p.src, p.opt);
           if (p.poison && !e.dead) this.applyPoison(e, p.poison[0], p.poison[1], p.src);
+          if (p.opt.burbuja && !e.dead) this.atrapa(e, p.src, p.x, p.y);
+          if (p.opt.frogChance && !e.dead && !e.d.big && this.rnd() < p.opt.frogChance) this.sapifica(e, p.opt.frogDur, 0.2);
           p.pierce--;
           if (p.pierce <= 0) { alive = false; return true; }
         });
@@ -1911,7 +2333,11 @@
         pd.t -= dt;
         this.grid.query(pd.x, pd.y, pd.r + 40, e => {
           if (e.dead || (e.d.flying && !pd.air)) return;
-          if (Math.hypot(e.x - pd.x, e.y - pd.y) < pd.r + e.d.r * 0.5) this.damage(e, pd.dps * dt, pd.dtype || 'fire', pd.src, { dot: true });
+          if (Math.hypot(e.x - pd.x, e.y - pd.y) < pd.r + e.d.r * 0.5) {
+            this.damage(e, pd.dps * dt, pd.dtype || 'fire', pd.src, { dot: true });
+            if (pd.slow && !e.dead) this.applySlow(e, pd.slow, 0.4);
+            if (pd.frog && !e.dead && !e.d.big) this.sapifica(e, 1.5, 0.2);
+          }
         });
       }
       this.puddles = this.puddles.filter(p => p.t > 0);
