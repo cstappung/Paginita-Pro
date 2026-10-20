@@ -338,9 +338,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 13;
+const NODOS_MONEDAS = 14;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -355,7 +355,7 @@ export function watchLogros(cb) {
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino"),
-    oye("referidos", "referidos")];
+    oye("referidos", "referidos"), oye("cofres", "cofres")];
   return () => { clearTimeout(espera); offs.forEach(f => f()); };
 }
 
@@ -399,6 +399,19 @@ export const leeReferidos = () => get(ref(db, "referidos")).then(s => s.val() ||
 export async function comprarTienda(uid, item, p) {
   await set(ref(db, `tienda/${uid}/${item}`), { at: serverTimestamp(), p });
 }
+
+/* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. La regla
+   exige `at === now` y el precio; el saldo y el premio los decide
+   `economia()` con `abreCofre`. Devuelve la hora que puso el servidor. */
+export async function comprarCofre(uid, clave, p) {
+  const r = ref(db, `cofres/${uid}/${clave}`);
+  await set(r, { at: serverTimestamp(), p });
+  return (await get(r)).val();
+}
+/* El taco equipado: `users/<uid>/taco` (un id). Fuera de `perfil` a propósito:
+   guardar el perfil lo reescribe entero y se llevaría el taco. */
+export const equiparTaco = (uid, id) => set(ref(db, `${U}/${uid}/taco`), id);
+export const watchTaco = (uid, cb) => onValue(ref(db, `${U}/${uid}/taco`), s => cb(s.val()), () => cb(null));
 
 /* ---------- PRODROP: sobres y graduaciones ----------
    `cartas/s/<uid>/<clave>` = {at, p}: un sobre comprado. `at` lo pone el
@@ -588,7 +601,7 @@ export function watchPerfil(uid, cb) {
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
 const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil", "ritmo",
-  "color", "variante", "largo", "meta", "exp", "baraja", "amable", "puerto", "formato", "rondas", "acumula", "sprint"]
+  "color", "variante", "largo", "meta", "exp", "baraja", "amable", "puerto", "formato", "rondas", "acumula", "sprint", "guia", "pareja"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */

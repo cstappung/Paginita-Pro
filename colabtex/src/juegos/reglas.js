@@ -109,6 +109,37 @@ const REGLAS = {
       ["Consejo", "Evita trazar el tercer lado de una caja: se la regalas al siguiente. El marcador sigue el orden de la mesa para que sepas a quién le estás pasando la cadena."]
     ]
   },
+  pool: {
+    lema: "Billar a ocho bolas: tus bolas primero, la negra al final.",
+    secciones: [
+      ["Formatos", lista([
+        "<b>1 contra 1</b>: cada uno juega por su cuenta.",
+        "<b>2 contra 2</b>: el anfitrión forma pareja con quien eligió al abrir la sala. Los equipos se alternan y, dentro de cada uno, tiran por turnos."
+      ])],
+      ["El objetivo", "Embolsa todas las bolas de tu grupo (<b>lisas 1-7</b> o <b>rayadas 9-15</b>) y después la <b>8</b>, en la tronera que hayas cantado."],
+      ["Cómo se tira", lista([
+        "Apunta moviendo el ratón (o con las flechas y los botones de puntería fina), elige la <b>fuerza</b> y el <b>punto de golpe</b> en la blanca y pulsa <b>Golpear</b> (o Espacio).",
+        "Golpe alto: la blanca sigue. Golpe bajo: retrocede. Golpe a los lados: efecto lateral, que se nota sobre todo en las bandas.",
+        "Con la <b>línea guía</b> ves la bola fantasma y hacia dónde saldrán la bola objetivo y la blanca. Si la sala no la activó, apuntas a ojo."
+      ])],
+      ["La rotura", "Abre quien indica la sala. La rotura es legal si se embolsa una bola o si al menos cuatro tocan banda. Si se embolsa la 8 en la rotura, vuelve a su lugar. Si la blanca cae en la rotura, el rival la coloca detrás de la línea de cabecera."],
+      ["Mesa abierta", "Al principio nadie tiene grupo. La primera bola (que no sea la 8) embolsada sin falta asigna lisas o rayadas, y el rival se queda con el otro grupo."],
+      ["Seguir o ceder el turno", "Sigues tirando mientras embolses una bola de tu grupo sin hacer falta. Si no embolsas o haces falta, pasa el turno."],
+      ["Faltas", lista([
+        "No tocar ninguna bola.",
+        "Tocar primero una bola que no es de tu grupo (la 8 solo cuenta cuando ya despejaste el tuyo).",
+        "Que tras el golpe ninguna bola toque banda y ninguna caiga.",
+        "Embolsar la blanca.",
+        "Tras una falta, el rival tiene la <b>blanca en mano</b>: la coloca donde quiera."
+      ])],
+      ["La 8", lista([
+        "Al despejar tu grupo debes <b>cantar la tronera</b> tocándola en la mesa antes de tirar.",
+        "Ganas si metes la 8 en la tronera cantada, sin falta.",
+        "Pierdes si la 8 cae antes de despejar tu grupo, en otra tronera, o con falta."
+      ])],
+      ["Abandono", "Si todos los de un equipo se van de la sala, gana el otro."]
+    ]
+  },
   reversi: {
     lema: "Atrapa las fichas del otro entre las tuyas.",
     secciones: [

@@ -675,6 +675,20 @@ Firebase; GIPHY la limita por cantidad de llamadas, y si se abusa se
 cambia por otra en ese nodo sin tocar el código. Sin clave, una sala de
 GIFs ofrece los dibujos de la casa.
 
+### ⚠ Pool 8 pide publicar otra vez (2026-10-20)
+
+`'pool'` tiene que estar en la lista del campo `juego` y en la de `logros`.
+No hay nodo nuevo: los tiros van por `jugadas` (`tiro` con `dx`, `dy`, `f`,
+`a`, `b` y, si hace falta, `px`, `py`, `c`), y el formato de la sala entra
+como `cupo` (2 = 1 contra 1, 4 = 2 contra 2), `pareja` y `guia` por `$otro`.
+Sin publicar, la sala de Pool no se puede crear. **Tacos y cofres
+(también 2026-10-20):** hay un nodo nuevo, `cofres/<uid>/<clave>` = `{at, p}`
+(`at === now`, `p === 500`, una vez por clave); sin publicar, comprar un cofre
+falla con `PERMISSION_DENIED` y el resto del Pool juega igual. El taco
+equipado va en `users/<uid>/taco` y no pide reglas. Pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:

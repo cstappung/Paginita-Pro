@@ -61,6 +61,10 @@ const mzMios = c => (c.est.historial || []).flatMap(h => h.memes).filter(m => m.
 const mzMejor = h => { const o = h.memes.slice().sort((a, b) => b.total - a.total); return o[0] && o[0].total > 0 && (!o[1] || o[1].total < o[0].total) ? o[0].uid : ""; };
 /* Pokémon: el resumen que el motor saca del registro de Showdown. */
 const pkDe = c => { const i = (c.est.lados || []).indexOf(c.me); return (i >= 0 && c.est.resumen && c.est.resumen[i]) || {}; };
+/* Pool: el bando de `me` (0 o 1) y las bolas que cada bando embolsó
+   (`hist` guarda quién tiraba, no de qué grupo era la bola). */
+const plBando = c => ((c.est.equipos || {}).de || {})[c.me] === "a" ? 0 : ((c.est.equipos || {}).de || {})[c.me] === "b" ? 1 : -1;
+const plRacha = c => { const t = plBando(c); let m = 0, r = 0; for (const h of c.hist) { r = h.t === t && h.id !== 8 ? r + 1 : 0; if (r > m) m = r; } return m; };
 const SALA = {
   orbita: [
     { id: "racimo", n: "Racimo", d: "Captura 3 estrellas o más con un solo lanzamiento.", i: "✨", x: c => orEv(c, e => e.k === "estrella" && e.nueva && e.u === c.me && e.n >= 3) },
@@ -176,6 +180,14 @@ const SALA = {
     { id: "barredor", n: "Barredor", d: "Un mismo Pokémon tuyo debilita a tres rivales en una pelea.", i: "🧹", x: c => pkDe(c).maxKo >= 3 },
     { id: "limite", n: "Al límite", d: "Gana con un solo Pokémon en pie.", i: "🫀", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).vivos === 1 },
     { id: "impecable", n: "Impecable", d: "Gana sin que se debilite ninguno de tus Pokémon.", i: "👑", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).perdidos === 0 }
+  ],
+  pool: [
+    { id: "ocho", n: "Ocho cantado", d: "Gana metiendo la 8 en la tronera que cantaste.", i: "🎱", x: c => c.gano && c.est.motivo === "ocho" },
+    { id: "paliza", n: "Paliza", d: "Gana sin que el rival haya embolsado una sola bola.", i: "🧹", x: c => c.gano && c.est.motivo === "ocho" && !c.hist.some(h => h.t === 1 - plBando(c) && h.id !== 8) },
+    { id: "serie", n: "Tirada de cinco", d: "Embolsa cinco bolas seguidas, sin que el rival embolse ninguna entre medias.", i: "🔥", x: c => plRacha(c) >= 5 },
+    { id: "parejas", n: "Mejor en pareja", d: "Gana una partida de dos contra dos.", i: "🤝", x: c => c.gano && !!c.est.dos },
+    { id: "pelos", n: "Por los pelos", d: "Gana cuando al rival solo le quedaba la 8 por embolsar.", i: "😅", x: c => { if (!c.gano) return false; const g = c.est.grupos || {}, b = plBando(c) === 0 ? "b" : "a", r = c.est.restan || {}; return !!g[b] && r[g[b]] === 0; } },
+    { id: "regalo", n: "Regalo del rival", d: "Gana porque el rival metió la 8 antes de tiempo.", i: "🎁", x: c => c.gano && ["ocho-pronto", "ocho-mal", "ocho-falta"].includes(c.est.motivo) }
   ],
   ajedrez: [
     { id: "mate", n: "Jaque mate", d: "Gana una partida dando mate.", i: "♚", x: c => c.gano && c.est.motivo === "mate" },

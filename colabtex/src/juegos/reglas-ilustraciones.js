@@ -499,3 +499,19 @@ export const pacman=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* Pool: una mesa vista desde arriba (400×200 en el dibujo). `bolas` son [x, y, n, color] con
+   n = '' para la blanca, `trazos` son [x1, y1, x2, y2, color, discontinuo] y `marcas` textos [x, y, t, color]. */
+const COLOR_POOL={1:'#f7c612',2:'#1452c4',3:'#d82828',4:'#6a2c92',5:'#f07818',6:'#0e7e42',7:'#841e26',8:'#1b1b20'};
+export const pool=(nombre,bolas,trazos=[],marcas=[],troneras=[])=>{
+ const ox=40,oy=25,w=400,h=200;
+ const bocas=[[0,0],[w/2,0],[w,0],[0,h],[w/2,h],[w,h]].map(([x,y],i)=>circle(ox+x,oy+y,i%3===1?11:13,troneras.includes(i)?'#f6d47e':'#05110a',troneras.includes(i)?'#fff':'#1d1208')).join('');
+ const bola=([x,y,n,c])=>{
+  const num=Number(n),base=n===''?'#f4f0e6':(COLOR_POOL[num>8?num-8:num]);
+  const ray=num>8;
+  return circle(ox+x,oy+y,11,ray?'#f4f0e6':base,'#0008')+(ray?`<rect x="${ox+x-10}" y="${oy+y-5}" width="20" height="10" fill="${base}"/>`:'')+
+   (n===''?'':circle(ox+x,oy+y,5.2,'#f7f5ee')+txt(ox+x,oy+y+3.6,n,8,'#111','middle'))+(c?circle(ox+x,oy+y,14,'none',c):'');
+ };
+ return svg(nombre,rect(ox-14,oy-14,w+28,h+28,'#5a2e15','#2b170b',14)+rect(ox,oy,w,h,'#1f8a4c','#14583a',4)+bocas+
+  trazos.map(([a,b,c,d,col,dash])=>`<path d="M${ox+a} ${oy+b} L${ox+c} ${oy+d}" stroke="${col||'#fff'}" stroke-width="3" stroke-linecap="round" fill="none"${dash?' stroke-dasharray="7 6"':''}/>`).join('')+
+  bolas.map(bola).join('')+marcas.map(([x,y,t,col])=>txt(ox+x,oy+y,t,14,col||'#fff','middle')).join(''));
+};

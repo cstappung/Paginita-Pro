@@ -38,6 +38,7 @@ export const CONTROLES = {
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokelike": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "pool": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "presidente": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "prodefender": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "propac": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},

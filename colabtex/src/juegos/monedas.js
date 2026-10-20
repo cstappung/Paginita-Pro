@@ -55,6 +55,7 @@ import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
 import { monedasReferidos } from "./referidos.js";
@@ -70,7 +71,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 export const PESO = {
   escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
-  boxhead: 1.3, haxball: 1.2, bt3: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
+  boxhead: 1.3, haxball: 1.2, bt3: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, pool: 1.6, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -83,7 +84,7 @@ const F = "1322";
 export const NIVEL = {
   orbita: F + "212233", escondite: F + "322311", cartas: F + "222132",
   cuadritos: F + "123233", reversi: F + "331324", gato: F + "132331", ajedrez: F + "132233",
-  pokemon: F + "112323",
+  pokemon: F + "112323", pool: F + "232132",
   cadena: F + "132232", worms: F + "132323", flip7: F + "221232",
   cacho: F + "212132", uno: F + "121223", catan: F + "122213",
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",
@@ -430,7 +431,7 @@ export function economia(datos) {
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
-  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7, ca: 8, cp: 9 };
+  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -466,6 +467,10 @@ export function economia(datos) {
   for (const [u, l] of Object.entries(d.tienda || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (x && Number.isFinite(x.at)) ev.push({ t: "c", at: x.at, u, k, p: num(x.p) });
+  /* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. */
+  for (const [u, l] of Object.entries(d.cofres || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "cf", at: x.at, u, k, p: num(x.p) });
   /* El casino: `casino/<uid>/<clave>` es una ronda (casino-motor.js). La
      apuesta se cobra a la hora de la apuesta y el premio, si lo hubo, se
      suma a la hora en que se cobró; lo que pasó entremedio lo decide el
@@ -491,7 +496,7 @@ export function economia(datos) {
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {},
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, tacos: {}, cofres: [],
     intentos: 0, adopciones: 0, comida: 0, fondos: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
@@ -625,6 +630,14 @@ export function economia(datos) {
       /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
       if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
       if (paga(e.u, PRECIO_TIENDA, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+    } else if (e.t === "cf") {
+      /* Un cofre de tacos: al precio, y lo que sale lo decide `abreCofre`
+         con la hora del servidor. Un taco repetido devuelve monedas. */
+      if (e.p !== PRECIO_COFRE || !paga(e.u, PRECIO_COFRE, "cofre", e.k)) continue;
+      const x = U(e.u), id = abreCofre(e.u, e.k, e.at), dup = !!x.tacos[id];
+      if (dup) { const r = reembolsoDe(id); x.premios += r; anota(e.u, "cofre", r, "repetido " + id); }
+      else x.tacos[id] = e.at;
+      x.cofres.push({ k: e.k, at: e.at, id, dup });
     } else if (e.t === "ca") {
       /* Una apuesta sin fondos (o de una cuenta parada) no vale: no juega
          ni paga, y la cuenta queda parada como con cualquier gasto. */

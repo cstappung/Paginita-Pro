@@ -76,6 +76,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Presidente | `docs/claude/juegos/presidente.md` |
 | Spicy | `docs/claude/juegos/spicy.md` |
 | Ajedrez | `docs/claude/juegos/ajedrez.md` |
+| Pool 8 (billar, 1 contra 1 y 2 contra 2, física, línea guía) | `docs/claude/juegos/pool.md` |
 | Tetris (room and Tetris Club) | `juegos/club/tetris/CLAUDE.md` |
 | Circuit Breakers (worms) | `juegos/worms/CLAUDE.md` |
 | Yemas (shooter, zombis, voz) | `juegos/yemas/CLAUDE.md` |
