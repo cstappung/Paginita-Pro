@@ -6,7 +6,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={PREMIO_REFERIDO,MIN_JUEGOS,normalizaCodigo,juegosJugados,puedeReferir,codigoDe,duenoCodigo,referidos,monedasReferidos,motivoNoCanje,motivoNoCodigo,monedasDe,topMonedas,topReferidos}',ctx);
+ ';globalThis.__M={PREMIO_REFERIDO,MIN_JUEGOS,normalizaCodigo,juegosJugados,puedeReferir,codigoDe,duenoCodigo,referidos,monedasReferidos,motivoNoCanje,motivoNoCodigo,monedasDe,topMonedas,topReferidos,codigoSugerido}',ctx);
 const M=ctx.__M;
 /* Las cuentas se memorizan por objeto, como en la página, donde cada
    llegada es un objeto nuevo: tras cambiar algo, se pasa una copia. */
@@ -126,4 +126,14 @@ test('el top de referidos: los cinco con más, solo los que pagan',()=>{
  const e=base();e.ranks.ajedrez={B:{jugadas:1}};
  e.referidos.u={C:{c:'BETO',r:'B',at:10},D:{c:'ANA2024',r:'A',at:20}};e.clubJugadas.C=club;e.clubJugadas.D=club;
  assert.deepEqual(copia(M.topReferidos(e).map(x=>x.uid)),['B','A']);
+});
+
+test('el ejemplo del código es el nombre de cada uno más 123',()=>{
+ const S=M.codigoSugerido;
+ assert.equal(S('Pía'),'PIA123');
+ assert.equal(S('José Ñúñez'),'JOSENUNEZ123');
+ assert.equal(S('María Fernanda González'),'MARIAFERN123','hasta 12 en total');
+ assert.equal(S(''),'JUGADOR123');
+ assert.equal(S('🙂🙂'),'JUGADOR123');
+ for(const x of ['Pía','','María Fernanda González'])assert.match(S(x),/^[A-Z0-9]{4,12}$/,'siempre es un código válido');
 });

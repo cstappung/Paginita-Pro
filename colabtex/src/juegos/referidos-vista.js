@@ -5,7 +5,7 @@
    referidos.js; las reglas de `referidos/` comprueban lo demás. */
 import {
   PREMIO_REFERIDO, MIN_JUEGOS, normalizaCodigo, juegosJugados, puedeReferir, codigoDe, referidos,
-  motivoNoCanje, motivoNoCodigo, topReferidos
+  motivoNoCanje, motivoNoCodigo, topReferidos, codigoSugerido
 } from "./referidos.js";
 import { formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
@@ -198,7 +198,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar,
       <form id="refFormNuevo">
         <label class="jg-campo">
           <span>Elige tu código</span>
-          <input class="inp jg-ref-nuevo" id="refNuevo" maxlength="16" placeholder="Ej.: PIA2026" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no" ${confirma ? "readonly" : ""}>
+          <input class="inp jg-ref-nuevo" id="refNuevo" maxlength="16" placeholder="Ej.: ${esc(codigoSugerido(nombre(u)))}" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no" ${confirma ? "readonly" : ""}>
         </label>
         <p class="jg-ref-aviso">⚠ Solo se puede configurar <b>una vez</b>: después no se cambia. De 4 a 12 letras o números.</p>
         <div class="jg-modal-err" id="refErr2"></div>

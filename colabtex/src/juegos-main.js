@@ -1066,7 +1066,7 @@ function montaReferidos() {
     datos: () => datosMonedas,
     fb,
     avisa: avisaMonedas,
-    nombre: x => nombreVivo(x, nombreEnDatos(x, datosMonedas || {})),
+    nombre: x => nombreVivo(x, nombreEnDatos(x, datosMonedas || {})) || (state.user && x === state.user.uid ? state.user.name : ""),
     alFallar: e => {
       if (!esPermiso(e)) return false;
       referidosUi.cierra();
