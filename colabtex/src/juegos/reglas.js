@@ -606,7 +606,7 @@ const REGLAS = {
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor y 40 por un bruto, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
@@ -615,7 +615,7 @@ const REGLAS = {
         "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
       ["Enemigos y cajas", lista([
-        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos.",
+        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos. Tus muros falsos y barriles los hacen <b>buscar otro camino</b>: solo los rompen si no queda ninguno libre. La excepción es el <b>demoledor</b> (nivel 6, casco amarillo y mazo, poco común): va derecho a tus muros y los tira a mazazos.",
         "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
         "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
         "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",

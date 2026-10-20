@@ -188,7 +188,9 @@
     { piel: '#e8c040', camisa: '#2a1a0a', panel: '#e0b030', pantalon: '#1a1006', pelo: '#1a1006', ojos: '#ffe23a', ojosLuz: 1, boca: '#3a2a00', extra: 'corona', brazos: 'lado', ancho: 1.1, sangre: 2 },
     { piel: '#9a1010', camisa: '#3a0606', panel: '#ff5a1a', pantalon: '#1a0303', pelo: '#050000', ojos: '#ff2a1a', ojosLuz: 1, boca: '#000', extra: 'cuernos', brazos: 'lado', fuegoMano: 'fuego', ancho: 1.15, sangre: 1 },
     { piel: '#5aaa48', camisa: '#2a6a24', panel: '#8ae05a', pantalon: '#16401a', pelo: '#0e2a10', ojos: '#b0ff3a', ojosLuz: 1, boca: '#a8ff4a', bocaLuz: 1, extra: 'cuernos', brazos: 'zombi', cabeza: 1.1, sangre: 2 },
-    { piel: '#9a9aa2', camisa: '#5a5a62', panel: '#3a3a42', pantalon: '#2a2a30', pelo: '#3a3a40', ojos: '#ff4a1a', ojosLuz: 1, boca: '#1a1a1a', extra: 'casco', brazos: 'lado', ancho: 1.35, grueso: 1.35, sangre: 0 }
+    { piel: '#9a9aa2', camisa: '#5a5a62', panel: '#3a3a42', pantalon: '#2a2a30', pelo: '#3a3a40', ojos: '#ff4a1a', ojosLuz: 1, boca: '#1a1a1a', extra: 'casco', brazos: 'lado', ancho: 1.35, grueso: 1.35, sangre: 0 },
+    // 16: el Demoledor, obrero zombi de casco amarillo, chaleco naranja y mazo
+    { piel: '#d9d4c4', camisa: '#ff7a1a', panel: '#e8f04a', pantalon: '#2f3f63', pelo: '#f2c40f', zapatos: '#3a2a1a', ojos: '#ff3a2a', ojosLuz: 1, boca: '#4a1010', extra: 'casco', brazos: 'zombi', ancho: 1.22, grueso: 1.28, mazo: 1, sangre: 0 }
   ];
   /* La sangre de cada cual: roja, la del diablo más oscura, verde el ácido. */
   const SANGRE = [[196, 14, 16], [120, 6, 10], [92, 150, 26], [70, 90, 150]];
@@ -291,6 +293,12 @@
         const fx = 5 + atk * 4 + oscila, zz = zt + 7 + atk * 1.5;
         P.push({ r: 5.6 * lado * an, f: fx, z: zz, w: 4.2, d: 7.4, h: 4.2, c: pal.camisa });
         P.push({ r: 5.6 * lado * an, f: fx + 5.4, z: zz + 0.2, w: 3.8, d: 3.6, h: 3.8, c: pal.piel });
+      }
+      if (pal.mazo) {
+        // el mazo del Demoledor: mango en la mano derecha y la cabeza de hierro arriba
+        const fm = 7.5 + atk * 6, zm = zt + 6 + atk * 4;
+        P.push({ r: 5.6 * an, f: fm, z: zm, w: 1.8, d: 1.8, h: 11, c: '#7a5230' });
+        P.push({ r: 5.6 * an, f: fm, z: zm + 10, w: 7, d: 4.4, h: 4.4, c: '#5a5f66', deco: { arriba: [[0.1, 0.2, 0.9, 0.8, '#7a8088']] } });
       }
     } else if (pal.brazos === 'arma' && op.arma >= 0) {
       const kf = -rec * 2.6, kz = rec * 0.8;

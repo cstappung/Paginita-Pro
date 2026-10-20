@@ -173,7 +173,7 @@
     // El suelo nuevo: guarda la sangre y las quemaduras hasta que acabe la partida.
     fx.ponSuelo(G.crearSuelo(M));
     proy = [];
-    flujo = null; flujoT = 0;
+    flujo = null; flujoL = null; tapadas = null; flujoT = 0;
   }
 
   function aparece() {
@@ -461,10 +461,15 @@
     return l;
   };
 
-  let flujo = null, flujoT = 0;
-  function calculaFlujo(obj) {
+  /* Dos mapas de distancias hasta los jugadores, rehechos cada 0.4 s:
+     `flujoL` rodea los muros y barriles que pusieron los jugadores (las
+     celdas que tocan quedan tapadas, `tapadas`) y `flujo` los atraviesa.
+     Los enemigos van por `flujoL` y solo cuando no hay camino sin romper
+     (su celda quedó sin distancia) pasan a `flujo` y muerden lo que les
+     estorba. El Demoledor (`rompe`) va siempre por `flujo`, derecho. */
+  let flujo = null, flujoL = null, tapadas = null, flujoT = 0;
+  function bfs(obj, d, tapa) {
     const n = M.ancho * M.alto;
-    const d = flujo && flujo.length === n ? flujo : new Int32Array(n);
     d.fill(1e9);
     const cola = new Int32Array(n);
     let a = 0, b = 0;
@@ -478,25 +483,75 @@
         const nx = x + dx, ny = y + dy;
         if (celda(nx, ny) !== 0) continue;
         const j = ny * M.ancho + nx;
+        if (tapa && tapa[j]) continue;
         if (d[j] > d[i] + 1) { d[j] = d[i] + 1; cola[b++] = j; }
       }
     }
-    flujo = d;
+    return d;
   }
-  function siguiente(e) {
-    if (!flujo) return null;
+  function calculaFlujo(obj) {
+    const n = M.ancho * M.alto;
+    if (!flujo || flujo.length !== n) { flujo = new Int32Array(n); flujoL = new Int32Array(n); tapadas = new Uint8Array(n); }
+    tapadas.fill(0);
+    for (const o of O.values()) {
+      const b = cajaObj(o);
+      if (!b) continue;
+      for (let ty = Math.floor(b[1] / TS); ty <= Math.floor((b[3] - 1) / TS); ty++)
+        for (let tx = Math.floor(b[0] / TS); tx <= Math.floor((b[2] - 1) / TS); tx++)
+          if (tx >= 0 && ty >= 0 && tx < M.ancho && ty < M.alto) tapadas[ty * M.ancho + tx] = 1;
+    }
+    bfs(obj, flujo, null);
+    bfs(obj, flujoL, tapadas);
+  }
+  const tapada = (x, y) => !!tapadas && x >= 0 && y >= 0 && x < M.ancho && y < M.alto && tapadas[y * M.ancho + x] === 1;
+  // ¿Puede este enemigo llegar sin romper nada? (si no, irá derecho y romperá)
+  function rodea(e) {
+    if (!flujoL || (D.ENEMIGOS[e.k] || {}).rompe) return false;
     const tx = Math.floor(e.x / TS), ty = Math.floor(e.y / TS);
-    const aqui = celda(tx, ty) === 0 ? flujo[ty * M.ancho + tx] : 1e9;
+    if (tx < 0 || ty < 0 || tx >= M.ancho || ty >= M.alto) return false;
+    return flujoL[ty * M.ancho + tx] < 1e9;
+  }
+  function siguiente(e, libre) {
+    const f = libre ? flujoL : flujo;
+    if (!f) return null;
+    const tx = Math.floor(e.x / TS), ty = Math.floor(e.y / TS);
+    const pasa = (x, y) => celda(x, y) === 0 && !(libre && tapada(x, y));
+    const aqui = celda(tx, ty) === 0 ? f[ty * M.ancho + tx] : 1e9;
     let mejor = aqui, bx = 0, by = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const nx = tx + dx, ny = ty + dy;
-      if (celda(nx, ny) !== 0) continue;
-      if (dx && dy && (celda(tx + dx, ty) !== 0 || celda(tx, ty + dy) !== 0)) continue;
-      const v = flujo[ny * M.ancho + nx] + (dx && dy ? 0.4 : 0);
+      if (!pasa(nx, ny)) continue;
+      if (dx && dy && (!pasa(tx + dx, ty) || !pasa(tx, ty + dy))) continue;
+      const v = f[ny * M.ancho + nx] + (dx && dy ? 0.4 : 0);
       if (v < mejor) { mejor = v; bx = dx; by = dy; }
     }
     if (mejor >= aqui || mejor >= 1e9) return null;
     return { x: (tx + bx) * TS + TS / 2, y: (ty + by) * TS + TS / 2 };
+  }
+  // ¿Hay un muro o barril de un jugador en la recta? (para no ir derecho contra él)
+  function objetoEnMedio(x1, y1, x2, y2) {
+    const n = Math.ceil(dist(x1, y1, x2, y2) / 8);
+    for (const o of O.values()) {
+      const b = cajaObj(o);
+      if (!b) continue;
+      for (let i = 1; i < n; i++) {
+        const x = x1 + (x2 - x1) * i / n, y = y1 + (y2 - y1) * i / n;
+        if (x > b[0] && x < b[2] && y > b[1] && y < b[3]) return true;
+      }
+    }
+    return false;
+  }
+  /* Un cuerpo que ya se solapa con una pared del mapa no puede moverse
+     (cada paso sigue chocando): pasaba con los grandes que nacían en una
+     esquina (el Bruto y los jefes, con el desvío al azar del punto de
+     aparición). Se lo saca al sitio libre más cercano. */
+  function desatasca(c, r) {
+    if (choca(c.x, c.y, r) !== true) return false;
+    for (let d = 2; d <= TS; d += 2) for (let i = 0; i < 16; i++) {
+      const a = i * Math.PI / 8, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d;
+      if (!choca(x, y, r)) { c.x = x; c.y = y; return true; }
+    }
+    return false;
   }
 
   // `kFijo` fuerza el tipo (un jefe, o lo que invoca); (px, py) el sitio.
@@ -514,6 +569,7 @@
     const max = jefe ? D.vidaJefe(k, n, Math.max(1, activos().length)) : D.vidaEnemigo(k, n);
     const e = { id: nid(), k, x, y, hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: azar(1, 3), flash: 0 };
     if (jefe) { e.cdH = D.ENEMIGOS[k].cd; e.est = 0; e.estT = 0; e.hitos = 0; }
+    desatasca(e, D.ENEMIGOS[k].radio - 1);
     e.tx = e.x; e.ty = e.y;
     E.set(e.id, e);
     return e;
@@ -812,10 +868,13 @@
       let t = null, dd = 1e9;
       for (const o of obj) { const v = dist(e.x, e.y, o.x, o.y); if (v < dd) { dd = v; t = o; } }
       if (!t) continue;
+      desatasca(e, C.radio - 1);
       if (C.jefe && jefeIA(e, C, t, dd, dt)) continue;
+      // Rodea los muros de los jugadores mientras haya otro camino; si no, rompe.
+      const libre = rodea(e);
       let dx, dy;
-      if (dd < TS * 1.6 && despejado(e.x, e.y, t.x, t.y)) { dx = t.x - e.x; dy = t.y - e.y; }
-      else { const s = siguiente(e); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
+      if (dd < TS * 1.6 && despejado(e.x, e.y, t.x, t.y) && !(libre && objetoEnMedio(e.x, e.y, t.x, t.y))) { dx = t.x - e.x; dy = t.y - e.y; }
+      else { const s = siguiente(e, libre); if (s) { dx = s.x - e.x; dy = s.y - e.y; } else { dx = t.x - e.x; dy = t.y - e.y; } }
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
       let sx = 0, sy = 0;
       for (const f of lista) {
@@ -829,12 +888,16 @@
       if (dd > (C.jefe ? C.rg + 4 : C.radio + 10)) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
       else mover(e, sx * 0.3, sy * 0.3, C.radio - 1);
       e.d = D.dirDe(dx, dy);
+      // Rodeando, un roce con un muro no es para romperlo; pero si lleva
+      // más de 1.5 s trabado contra uno, lo rompe igual.
+      e.tr = bloq ? (e.tr || 0) + dt : 0;
+      const rompe = !libre || e.tr > 1.5;
       const golpe = D.golpeNivel(e.k, dir.n);
       // El explosivo no muerde: se revienta al llegar.
       if (C.explota && dd < C.radio + 16) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
-      if (C.explota && bloq) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
+      if (C.explota && bloq && rompe) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
       if (dd < alcance && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; if (C.jefe) sacude = Math.min(10, sacude + 2); if (t.uid !== cfg.yo) son('mordida', dist(e.x, e.y, camX, camY)); }
-      else if (bloq && e.cd <= 0) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5, ''); }
+      else if (bloq && e.cd <= 0 && rompe) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5 * (C.dObj || 1), ''); }
       if (C.fuego && C.cadFuego && e.cdF <= 0 && dd < (C.alcFuego || 320) && despejado(e.x, e.y, t.x, t.y)) {
         const a = Math.atan2(t.y - e.y, t.x - e.x);
         if (C.jefe) { for (let i = -1; i <= 1; i++) bola(e, a + i * 0.2, 170, C.fuego); e.cdF = C.cadFuego * azar(0.8, 1.2) / (e.furia ? 1.6 : 1); e.atk = 0.3; son('fuego'); continue; }
@@ -1310,8 +1373,8 @@
   // Tamaño de cada tipo de enemigo (índice = k de ENEMIGOS) y color de su vida.
   // Los modelos se dibujan un poco más grandes que su radio de choque, como en el original.
   const ESC = 1.15;
-  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4];
-  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a'];
+  const TALLA_Z = [1, 1, 0.92, 1.3, 1, 1, 1.6, 1.45, 1.45, 1.7, 1.4, 2.2, 2, 2.1, 2.2, 2.4, 1.22];
+  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#ff4a3a', '#f2c40f'];
   const PAL_SKIN = new Map();
   const palDe = id => { let p = PAL_SKIN.get(id); if (!p) { p = G.palJugador(D.skin(id)); PAL_SKIN.set(id, p); } return p; };
 
@@ -1692,6 +1755,12 @@
     armas: () => { for (const a of D.ARMAS) desbloquea(a.id); pintaArmas(true); },
     elige: i => eligeArma(i),
     salta: n => { if (!ONLINE) { nivelLocal = n | 0; dir.n = (n | 0) - 1; E.clear(); } },
+    // para probar la IA en la práctica: enemigos y objetos donde se pida
+    calma: () => { if (!ONLINE) { dir.n = nivelObjetivo(); dir.q = 0; E.clear(); O.clear(); } },
+    ponYo: (x, y) => { yo.x = x; yo.y = y; },
+    enemigo: (k, x, y) => (ONLINE ? null : nuevoEnemigo(Math.max(1, dir.n), k, x, y).id),
+    pon: (k, x, y) => { if (!ONLINE) peticion(cfg.yo, { pon: [D.ARMAS.findIndex(a => a.obj === k), x, y] }); },
+    objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max })),
   };
   if (ONLINE) enviar('listo');
 })();

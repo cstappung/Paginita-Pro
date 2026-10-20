@@ -68,6 +68,20 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   levels, `factorPotencia`) with points. A blue box drop gives armour. `pen`
   upgrades let pistol, uzi and shotgun pellets go through one more enemy each.
   `b` cells are map barrels that come back each level (`reponBarriles`).
+- **Enemies go around the players' muros and barrels** (`calculaFlujo`:
+  `flujoL` is the BFS with the cells those objects touch blocked, `tapadas`;
+  `flujo` ignores them). An enemy uses `flujoL` while its cell has a distance
+  there (`rodea`), never chases straight into an object (`objetoEnMedio`), and
+  a graze is not an attack; only with no free path (or 1.5 s stuck against
+  one, `e.tr`) does it bite muros and does an explosivo blow on one. **The
+  Demoledor** (`ENEMIGOS[16]`, `rompe`, `dObj` ×4 damage to objects, from
+  level 6, at most 5 %) always takes `flujo` and goes for the walls. New
+  enemies are appended after the bosses: `PUNTOS`, `TALLA_Z`, `VIDA_Z` and
+  `PAL_E` are indexed by `k`.
+- **A body overlapping a map wall cannot move** (every step still collides):
+  big ones spawning in a corner with the random offset stayed there forever.
+  `desatasca` moves it to the nearest free spot, at spawn and every frame.
+  `__boxhead.calma/ponYo/enemigo/pon/objetos` set up these cases in practice.
 - **A muro placed on yourself no longer traps you**: `pon` refuses one that
   overlaps the player, and `choca` ignores an object the body already
   overlaps, so walking out of it is always possible.

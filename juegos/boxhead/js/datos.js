@@ -137,7 +137,7 @@
   /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   /* Puntos por baja (× multiplicador), por tipo de enemigo. */
-  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000];
+  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000, 50];
 
   /* ---------- enemigos ----------
      `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
@@ -174,7 +174,12 @@
     { id: 14, nombre: 'La Hidra', jefe: 'grande', hab: 'hidra', cd: 3.5, vida: 3400, vel: 30, velMax: 44, golpe: 22, radio: 14, rg: 28, talla: 2.2, fuego: 12, acido: true, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'escupe ácido en cinco direcciones; al perder vida le brotan escupidores' },
     { id: 15, nombre: 'El Titán', jefe: 'grande', hab: 'roca', cd: 3, vida: 4000, vel: 34, velMax: 50, golpe: 34, radio: 14, rg: 30, talla: 2.4, onda: 70, dOnda: 40, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
-      txt: 'lanza rocas que estallan donde caen; herido, se enfurece' }
+      txt: 'lanza rocas que estallan donde caen; herido, se enfurece' },
+    /* El Demoledor: el único que va derecho a tus muros y barriles (`rompe`)
+       y los tira a mazazos (`dObj`: cuánto más daño les hace). Los demás
+       buscan otro camino y solo rompen si no hay ninguno. Es raro a
+       propósito: entra en el nivel 6 y nunca pasa del 5 % de la horda. */
+    { id: 16, nombre: 'Demoledor', vida: 190, vel: 40, velMax: 58, golpe: 14, radio: 13, rompe: true, dObj: 4, desde: 6, parte: 0.01, tope: 0.05, masa: 0.35 }
   ];
   /* Los jefes rotan en este orden: 5, 15, 25, 35, 45 los minis y 10, 20,
      30, 40, 50 los grandes; después vuelve a empezar. */
