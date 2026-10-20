@@ -5,10 +5,11 @@
    referidos.js; las reglas de `referidos/` comprueban lo demás. */
 import {
   PREMIO_REFERIDO, MIN_JUEGOS, normalizaCodigo, juegosJugados, puedeReferir, codigoDe, referidos,
-  motivoNoCanje, motivoNoCodigo
+  motivoNoCanje, motivoNoCodigo, topReferidos
 } from "./referidos.js";
 import { formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
+import { avatarMarco, quien, marcoDeUid } from "./perfil-vista.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -23,11 +24,28 @@ function barraHtml(n) {
   </div>`;
 }
 
+/* El top de referidos: los cinco que más gente trajeron, con la misma fila
+   que el top de monedas. `pista(uid)` = {nombre, foto} de sus filas, para
+   quien no tiene perfil. `cta`: el botón que abre «Referir a otros»
+   (`data-referir`, lo atiende crearReferidos). */
+export function topReferidosHtml(datos, uid, perfil, colorDe, pista, { cta = true } = {}) {
+  const l = topReferidos(datos, 5);
+  const boton = cta ? `<button type="button" class="jg-ref-cta" data-referir>🤝 Invita y ganen ${formatoMonedas(PREMIO_REFERIDO)} ${MONEDA} cada uno</button>` : "";
+  if (!l.length) return `<p class="jg-nada">Nadie ha referido a nadie todavía. ¡Estrena el top!</p>${boton}`;
+  return `<ol class="jg-mo-top chico jg-ref-top">${l.map((f, i) => {
+    const q = quien(f.uid, perfil(f.uid), null, pista(f.uid), colorDe);
+    return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</b>${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(f.uid, perfil(f.uid), datos), 26, f.uid)}
+      <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}" translate="no">${esc(q.nombre)}</span>
+      <strong class="jg-ref-cant">${f.n} ${f.n === 1 ? "referido" : "referidos"}</strong></li>`;
+  }).join("")}</ol>${boton}`;
+}
+
 /* `boton`: el «+» de la cabecera. `uid()` y `datos()` dan la sesión y las
    lecturas de las monedas; `fb` escribe; `avisa` es la cola de avisos de
    monedas; `alFallar(e)` decide qué decir ante un error de escritura
-   (devuelve true si ya lo mostró, p. ej. la capa de las reglas). */
-export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar }) {
+   (devuelve true si ya lo mostró, p. ej. la capa de las reglas). `top()`
+   da el html del top de referidos para la ventana. */
+export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar, top }) {
   let pop = null, modal = null, ocupado = false, vistos = null, confirma = "";
 
   /* ---------- el menú del «+» ---------- */
@@ -98,6 +116,20 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
   });
   window.addEventListener("resize", colocaPop);
   boton.onclick = abrePop;
+  /* El botón del top de referidos (salón) abre la misma ventana. */
+  document.addEventListener("click", ev => {
+    const b = ev.target.closest && ev.target.closest("[data-referir]");
+    if (b && uid()) { ev.preventDefault(); cierraPop(); abreModal(); }
+  });
+
+  /* El «+» llama la atención (late y lleva el «5K») mientras le quede algo
+     que dar: un código por canjear, o el propio por crear si ya cumple. */
+  function pintaBoton() {
+    const u = uid(), d = datos();
+    const listo = !!(u && d && d.completo);
+    const pendiente = listo && (!((d.referidos || {}).u || {})[u] || (puedeReferir(u, d) && !codigoDe(u, d)));
+    boton.classList.toggle("llama", pendiente);
+  }
 
   async function canjea(texto) {
     const u = uid(), d = datos(), c = normalizaCodigo(texto);
@@ -132,6 +164,8 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
     if (!u) { cierraModal(); return; }
     const listo = !!(d && d.completo), mio = listo ? codigoDe(u, d) : "", n = listo ? juegosJugados(u, d).size : 0;
     const puede = listo && puedeReferir(u, d), de = listo ? (referidos(d).de[u] || []) : [];
+    const tops = modal.querySelector("#refTop"), htmlTop = listo && top ? top() : "";
+    if (tops && tops.dataset.f !== htmlTop) { tops.dataset.f = htmlTop; tops.innerHTML = htmlTop || `<p class="jg-ref-carga">Cargando…</p>`; }
     const firma = JSON.stringify([listo, mio, n, de, ocupado, confirma]);
     const caja = modal.querySelector("#refCuerpo");
     if (caja.dataset.f === firma) return;
@@ -206,6 +240,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
           <li>Tu código lo pueden usar todas las personas que quieras.</li>
         </ul>
         <div class="jg-ref-cuerpo" id="refCuerpo"></div>
+        <section class="jg-ref-tops"><h3>🏆 Top referidos</h3><div id="refTop"></div></section>
       </div>`;
     document.body.appendChild(modal);
     modal.onclick = ev => { if (ev.target === modal || ev.target.closest(".jg-fin-x")) cierraModal(); };
@@ -262,7 +297,7 @@ export function crearReferidos({ boton, uid, datos, fb, avisa, nombre, alFallar 
   }
 
   return {
-    refresca() { avisaNuevos(); pintaPop(); pintaModal(); },
-    cierra() { cierraPop(); cierraModal(); vistos = null; }
+    refresca() { avisaNuevos(); pintaBoton(); pintaPop(); pintaModal(); },
+    cierra() { cierraPop(); cierraModal(); vistos = null; boton.classList.remove("llama"); }
   };
 }

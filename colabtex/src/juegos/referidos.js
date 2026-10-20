@@ -117,3 +117,13 @@ export function motivoNoCodigo(uid, codigo, datos) {
   if (((datos && datos.referidos && datos.referidos.c) || {})[codigo]) return "Ese código ya lo tiene otra persona.";
   return "";
 }
+
+/* Los que más gente trajeron (solo referidos que pagan): de más a menos y,
+   a igual cuenta, quien llegó antes a ella; el uid desempata. */
+export function topReferidos(datos, n = 5) {
+  const r = referidos(datos);
+  return Object.entries(r.de)
+    .map(([uid, l]) => ({ uid, n: l.length, at: r.usado[l[l.length - 1]].at }))
+    .sort((a, b) => b.n - a.n || a.at - b.at || (a.uid < b.uid ? -1 : 1))
+    .slice(0, n);
+}

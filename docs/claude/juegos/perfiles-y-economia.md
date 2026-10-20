@@ -292,10 +292,16 @@ all write-once:
   it is paid: a code set or used by hand by someone short of it pays
   nobody until they qualify. The UI disables both until you qualify.
 
-UI: a small «+» (`#userReferir`) glued to the header balance opens a
-popover: the code field (just «✓ Código ya usado» once you used one), the
+UI: a gold coin «+» (`#userReferir`) shares one pill with the header
+balance (`#userSaldo`, `.jg-saldo-grupo`); it shines always and, while
+there is something left to cash (no code used yet, or you qualify and have
+no code), it pulses with a «5K» badge (`.llama`, set by `pintaBoton`). It
+opens a popover: the code field (just «✓ Código ya usado» once you used one), the
 3-games bar and **Referir a otros**, a centred `.jg-modal` that explains it
-and sets your code with a two-step confirm. `tests/referidos.test.cjs`
+and sets your code with a two-step confirm. **Top referidos** (`topReferidos`, top 5 by valid referrals, ties to
+whoever got there first): a box under *Top monedas* in the lobby
+(`#vesReferidos`, with a `data-referir` button that opens the window) and
+at the bottom of the window. `tests/referidos.test.cjs`
 covers the arithmetic; `test-rules.mjs` the rule. The node needs the rules
 re-published; until then the read fails alone and the rest of the economy
 works. Abuse limit, stated: an alt account still farms it after three cheap

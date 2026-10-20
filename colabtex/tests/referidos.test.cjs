@@ -6,7 +6,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={PREMIO_REFERIDO,MIN_JUEGOS,normalizaCodigo,juegosJugados,puedeReferir,codigoDe,duenoCodigo,referidos,monedasReferidos,motivoNoCanje,motivoNoCodigo,monedasDe,topMonedas}',ctx);
+ ';globalThis.__M={PREMIO_REFERIDO,MIN_JUEGOS,normalizaCodigo,juegosJugados,puedeReferir,codigoDe,duenoCodigo,referidos,monedasReferidos,motivoNoCanje,motivoNoCodigo,monedasDe,topMonedas,topReferidos}',ctx);
 const M=ctx.__M;
 /* Las cuentas se memorizan por objeto, como en la página, donde cada
    llegada es un objeto nuevo: tras cambiar algo, se pasa una copia. */
@@ -112,4 +112,18 @@ test('canjear también pide tres juegos distintos a quien canjea',()=>{
  assert.equal(M.motivoNoCanje('E','ANA2024',Object.assign(copia(d),{referidos:base().referidos})),'');
  assert.equal(M.monedasReferidos('E',copia(d)),5000,'en cuanto cumple, paga a los dos');
  assert.equal(M.monedasReferidos('A',copia(d)),5000);
+});
+
+test('el top de referidos: los cinco con más, solo los que pagan',()=>{
+ const d=base();d.ranks.ajedrez={B:{jugadas:1}};
+ const u=d.referidos.u,club={snake:{total:1},minas:{total:1},sopa:{total:1}};
+ for(const [x,c,at] of [['C','ANA2024',20],['D','ANA2024',21],['E','BETO',15],['F','BETO',16],['G','ANA2024',22]]){u[x]={c,r:x==='C'||x==='D'||x==='G'?'A':'B',at};d.clubJugadas[x]=club;}
+ u.H={c:'BETO',r:'B',at:30};   // H no jugó: no cuenta
+ const t=M.topReferidos(d);
+ assert.deepEqual(copia(t.map(x=>[x.uid,x.n])),[['A',3],['B',2]]);
+ assert.equal(M.topReferidos(base()).length,0);
+ /* a igual cuenta, primero quien llegó antes */
+ const e=base();e.ranks.ajedrez={B:{jugadas:1}};
+ e.referidos.u={C:{c:'BETO',r:'B',at:10},D:{c:'ANA2024',r:'A',at:20}};e.clubJugadas.C=club;e.clubJugadas.D=club;
+ assert.deepEqual(copia(M.topReferidos(e).map(x=>x.uid)),['B','A']);
 });

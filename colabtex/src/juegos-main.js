@@ -82,7 +82,7 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
-import { crearReferidos } from "./juegos/referidos-vista.js";
+import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
 import { crearCasino } from "./juegos/casino.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
@@ -611,7 +611,7 @@ function pintaUsuario() {
 function mostrar() {
   const dentro = !!state.user;
   $("viewMain").style.display = dentro || state.invitado ? "" : "none";
-  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userMonedas", "userReferir"]) $(id).style.display = dentro ? "" : "none";
+  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userSaldo", "userMonedas", "userReferir"]) $(id).style.display = dentro ? "" : "none";
   $("btnEntrar").style.display = state.invitado ? "" : "none";
   /* El escudo del panel solo lo ve quien está en `admins/<uid>`. */
   $("btnAdmin").style.display = dentro && state.admin ? "" : "none";
@@ -1026,11 +1026,14 @@ function pintaMonedas() {
   const tops = $("vesTops");
   if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
   pintaDropsMascotas();
+  const refs = $("vesReferidos");
+  if (refs && u && d && d.completo) refs.innerHTML = topRefs(u.uid, d, true);
   if (referidosUi) referidosUi.refresca();
 }
 /* El «+» junto al saldo: canjear un código de referido y referir a otros
    (juegos/referidos-vista.js). Lee las mismas lecturas que el saldo. */
 let referidosUi = null;
+const topRefs = (uid, d, cta) => topReferidosHtml(d, uid, perfilDe, colorForUid, x => ({ nombre: nombreEnDatos(x, d), foto: fotoEnDatos(x, d) }), { cta });
 function montaReferidos() {
   referidosUi = crearReferidos({
     boton: $("userReferir"),
@@ -1044,7 +1047,8 @@ function montaReferidos() {
       referidosUi.cierra();
       capaReglas((e && (e.code || e.message)) || "", null);
       return true;
-    }
+    },
+    top: () => topRefs(state.user && state.user.uid, datosMonedas, false)
   });
 }
 /* El nombre que alguien dejó en sus filas, si no tiene perfil. */
@@ -2140,6 +2144,10 @@ function armazon() {
         <section class="jg-lado-caja jg-mo-ves">
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
+        </section>
+        <section class="jg-lado-caja jg-ref-ves">
+          <header><span aria-hidden="true">🤝</span><h2>Top referidos</h2></header>
+          <div id="vesReferidos"><p class="jg-nada">Contando referidos…</p></div>
         </section>
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
