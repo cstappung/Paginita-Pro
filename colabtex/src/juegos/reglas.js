@@ -601,7 +601,7 @@ const REGLAS = {
       ["Controles", lista([
         "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
-        "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se compra con tus puntos: <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín y <b>G</b> potencia.",
+        "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
       ["El multiplicador", lista([
@@ -630,7 +630,9 @@ const REGLAS = {
         "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros."
       ])],
       ["Tienda", lista([
-        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una, el aviso de abajo muestra los precios y se compra con los puntos: <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una se abre un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b> o con su tecla. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "<b>Muro reforzado</b> (<b>M</b>, 450 cada uno, hasta 6 en la mochila): un bloque de acero con franja amarilla que aguanta lo que <b>seis muros falsos</b> (1000 de vida). Se pone con <b>F</b> delante de ti. Los enemigos lo rodean como a cualquier muro, y el <b>demoledor</b> igual va a por él a mazazos, solo que tarda mucho más.",
+        "<b>Mejorar armas</b>: cada arma que tengas sube hasta el <b>nivel 5</b> (clic en su tarjeta, o <b>U</b> para la que llevas en la mano). Cada nivel da +15 % de daño, dispara un 6 % más rápido, +20 % de munición, +6 % de radio en las explosivas y +25 % de vida en el muro falso, y <b>cuesta casi el doble que el anterior</b> (la pistola: 300, 550, 950, 1750, 3150). Con el nivel cambia cómo se ve el arma: <b>pulida</b> (1–2), <b>dorada</b> (3–4) y de <b>plasma</b> (5), que brilla; las estrellas de la barra de armas dicen el nivel. Se suma a las mejoras del multiplicador.",
         "Gastar puntos baja tu marcador: es el precio de llegar más lejos."
       ])],
       ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],

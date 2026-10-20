@@ -206,7 +206,36 @@
   const OSC = '#2a2c31', NEGRO = '#18191c';
   /* Cada arma: sus cubos (frente al pecho, entre las manos) y la boca
      (r, f, z) por donde sale el disparo. */
-  function partesArma(w) {
+  /* Las mejoras de tienda cambian cómo se ve el arma: el metal pasa a acero
+     pulido (niveles 1–2), a oro (3–4) y a plasma (5), con una franja del
+     color del rango sobre la primera pieza (la del plasma brilla). */
+  const RANGO = [null,
+    { m: { [OSC]: '#3d4a5c', [NEGRO]: '#1f2733', '#3b3d43': '#4a5a70', '#4a4d55': '#c9d3e0', '#4d5a3a': '#4f5d6e', '#2a2f22': '#1f2733', '#4d5c2a': '#4f5d6e' }, f: '#c9d3e0', luz: 0 },
+    { m: { [OSC]: '#b8862b', [NEGRO]: '#5a3d12', '#3b3d43': '#c99a35', '#4a4d55': '#ffe08a', '#4d5a3a': '#b8862b', '#2a2f22': '#5a3d12', '#4d5c2a': '#b8862b' }, f: '#ffe08a', luz: 0 },
+    { m: { [OSC]: '#2a1446', [NEGRO]: '#140a24', '#3b3d43': '#3a1d63', '#4a4d55': '#3df5ff', '#4d5a3a': '#2a1446', '#2a2f22': '#140a24', '#4d5c2a': '#2a1446' }, f: '#3df5ff', luz: 1 }];
+  const cachePartes = new Map();
+  function partesArma(w, nivel) {
+    const ra = nivel >= 5 ? 3 : nivel >= 3 ? 2 : nivel >= 1 ? 1 : 0;
+    if (!ra) return partesBase(w);
+    const clave = w * 10 + ra;
+    let v = cachePartes.get(clave);
+    if (v) return v;
+    const base = partesBase(w), R = RANGO[ra];
+    const tinta = d => d && Object.fromEntries(Object.entries(d).map(([k, l]) => [k, l.map(q => { const r = q.slice(); r[4] = R.m[r[4]] || r[4]; if (R.luz && r[4] === R.f) r[5] = 1; return r; })]));
+    const p = base.p.map((q, i) => {
+      const r = Object.assign({}, q, { c: R.m[q.c] || q.c, deco: tinta(q.deco) });
+      if (i === 0) {
+        r.deco = Object.assign({}, r.deco);
+        r.deco.der = (r.deco.der || []).concat([[0, 0.4, 1, 0.62, R.f, R.luz]]);
+        r.deco.izq = (r.deco.izq || []).concat([[0, 0.4, 1, 0.62, R.f, R.luz]]);
+      }
+      return r;
+    });
+    v = { p, b: base.b, rango: ra };
+    cachePartes.set(clave, v);
+    return v;
+  }
+  function partesBase(w) {
     switch (w) {
       case 0: return { p: [
         { r: 1, f: 12.5, z: 16.6, w: 2.6, d: 7.4, h: 2.8, c: OSC, deco: { arriba: [[0.3, 0.1, 0.7, 0.9, '#4a4d55']] } },
@@ -306,7 +335,7 @@
       P.push({ r: 3.2, f: 9 + kf, z: zt + 5.8 + kz, w: 3.4, d: 3.4, h: 3.4, c: pal.piel });
       P.push({ r: -5.3, f: 4.6 + kf, z: zt + 5.2 + kz, w: 4, d: 7.6, h: 4, c: pal.camisa });
       P.push({ r: -1.6, f: 10 + kf, z: zt + 5.2 + kz, w: 3.4, d: 3.4, h: 3.4, c: pal.piel });
-      for (const q of partesArma(op.arma).p) P.push(Object.assign({}, q, { f: q.f + kf, z: q.z + kz }));
+      for (const q of partesArma(op.arma, op.nivel).p) P.push(Object.assign({}, q, { f: q.f + kf, z: q.z + kz }));
     } else {
       for (const lado of [-1, 1]) {
         const arriba = lado > 0 && atk > 0 ? atk : 0;
@@ -400,7 +429,10 @@
     }
     if (op.arma >= 0 && pal.brazos === 'arma') {
       const b = partesArma(op.arma).b;
-      return proyecta(x, y, ang, b[0], b[1] - rec * 2.6, b[2] + rec * 0.8, s, cae);
+      const q = proyecta(x, y, ang, b[0], b[1] - rec * 2.6, b[2] + rec * 0.8, s, cae);
+      // Un arma de plasma deja un resplandor en la boca.
+      if (op.nivel >= 5) brilla(c, sprites().brillo, q[0], q[1], (5 + Math.sin((op.t || 0) * 9) * 1.2) * s, 0.55);
+      return q;
     }
     return null;
   }
@@ -418,6 +450,7 @@
   /* Los pilares son blancos en todos los mapas, como en el original, apenas
      teñidos según el lugar; las cajas sueltas, un gris más bajo. */
   const tinte = (t, f, d, i, p) => ({ tapa: t, frente: f, fi: i, fd: d, pie: p, borde: 'rgba(36,36,40,.78)' });
+  const ACERO = tinte('#aab4c1', '#7d8794', '#5d6672', '#8e98a5', '#68717d');
   const MUROS = {
     patio: BLANCO,
     sotano: tinte('#f5f1ea', '#cec7bb', '#a69e91', '#e2dbcf', '#b5ad9f'),
@@ -1013,6 +1046,30 @@
       c.stroke();
     }
   }
+  /* Muro reforzado: un bloque de acero con remaches y una franja de peligro,
+     más bajo y ancho que el falso para que se distinga de lejos. Se abolla
+     y muestra el óxido cuando pierde vida. */
+  function muroBlindado(c, x, y, pc) {
+    bloque(c, x - TS / 2 + 1, y - TS / 2 + 1, TS - 2, 20, {}, ACERO, 4);
+    const top = y - TS / 2 + 1 - 20, fy = y + TS / 2 - 1 - 20;
+    // La franja amarilla y negra en el frente.
+    c.save();
+    c.beginPath(); c.rect(x - TS / 2 + 3, fy + 8, TS - 6, 6); c.clip();
+    c.fillStyle = '#f2c14e'; c.fillRect(x - TS / 2 + 3, fy + 8, TS - 6, 6);
+    c.fillStyle = '#1b1b1b';
+    for (let i = -2; i < 8; i++) { c.beginPath(); c.moveTo(x - TS / 2 + i * 6, fy + 14); c.lineTo(x - TS / 2 + i * 6 + 3, fy + 14); c.lineTo(x - TS / 2 + i * 6 + 9, fy + 8); c.lineTo(x - TS / 2 + i * 6 + 6, fy + 8); c.fill(); }
+    c.restore();
+    // Las placas y los remaches de arriba.
+    c.strokeStyle = 'rgba(40,46,56,.7)'; c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(x, top + 3); c.lineTo(x, top + TS - 5); c.moveTo(x - TS / 2 + 4, y - 20); c.lineTo(x + TS / 2 - 4, y - 20); c.stroke();
+    c.fillStyle = '#c9d0da';
+    for (const [rx, ry] of [[-11, -11], [11, -11], [-11, 11], [11, 11], [0, 0]]) { c.beginPath(); c.arc(x + rx, y - 20 + ry * 0.55, 1.2, 0, Math.PI * 2); c.fill(); }
+    if (pc < 0.66) {
+      c.fillStyle = 'rgba(150,72,30,.55)';
+      c.beginPath(); c.ellipse(x - 6, y - 22, 4, 2.2, 0.3, 0, Math.PI * 2); c.fill();
+      if (pc < 0.33) { c.beginPath(); c.ellipse(x + 7, y - 15, 5, 2.6, -0.4, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(30,30,34,.85)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 9, fy + 4); c.lineTo(x - 3, fy + 1); c.lineTo(x + 2, fy + 5); c.stroke(); }
+    }
+  }
   /* Carga explosiva: un bloque de C4 con su luz que parpadea. */
   function carga(c, x, y, T) {
     modelo(c, x, y, 0.4, [
@@ -1113,8 +1170,23 @@
   }
 
   // ---------- iconos de armas (HUD) ----------
-  function iconoArma(c, id, w, h) {
+  function iconoArma(c, id, w, h, nivel) {
     c.clearRect(0, 0, w, h);
+    dibujaIcono(c, id, w, h);
+    const ra = nivel >= 5 ? 3 : nivel >= 3 ? 2 : nivel >= 1 ? 1 : 0;
+    if (!ra) return;
+    // El rango tiñe el icono: acero azulado, oro o plasma.
+    c.save();
+    c.globalCompositeOperation = 'source-atop';
+    const g = c.createLinearGradient(0, 0, w, h);
+    if (ra === 1) { g.addColorStop(0, 'rgba(160,200,255,.35)'); g.addColorStop(1, 'rgba(60,90,140,.35)'); }
+    else if (ra === 2) { g.addColorStop(0, 'rgba(255,230,120,.6)'); g.addColorStop(0.5, 'rgba(220,160,40,.55)'); g.addColorStop(1, 'rgba(255,240,170,.6)'); }
+    else { g.addColorStop(0, 'rgba(255,79,216,.6)'); g.addColorStop(1, 'rgba(61,245,255,.6)'); }
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.restore();
+    if (ra === 3) { c.save(); c.globalCompositeOperation = 'destination-over'; c.shadowColor = '#3df5ff'; c.shadowBlur = h * 0.3; dibujaIcono(c, id, w, h); c.restore(); }
+  }
+  function dibujaIcono(c, id, w, h) {
     c.save(); c.scale(w / 34, h / 20);
     c.lineJoin = 'round';
     const metal = (y0, y1) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#d9dbe0'); g.addColorStop(0.5, '#8d9098'); g.addColorStop(1, '#4a4c52'); return g; };
@@ -1147,6 +1219,6 @@
 
   raiz.BoxheadGrafico = {
     KY, TS, PAL_E, SANGRE, sangreDe, palJugador, tono, rgba, sprites, modelo, proyecta, humanoide, boca, partesArma,
-    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, carga, caja, puesto, tumba, granada, cohete, bola, iconoArma, brilla
+    BLANCO, muroDe, cajaDe, bloque, crearSuelo, crearEfectos, barril, muroFalso, muroBlindado, carga, caja, puesto, tumba, granada, cohete, bola, iconoArma, brilla
   };
 })(typeof self !== 'undefined' ? self : this);
