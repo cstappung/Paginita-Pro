@@ -98,6 +98,16 @@ Trono del Eclipse (`levels.js`, after Vacío). `prueba: true` means:
   plus its own new tower) and its hero (`towersFor`). `musica` picks one of the
   five audio themes.
 - Maps are shorter, with several entrances, crossings and portals.
+- **Animated scenery** (`render.js`, render-only): `escenaDe` places each
+  map's props once with the map's fixed rng, `escenaUnder` animates them under
+  enemies and towers (also once, frozen, in the level thumbnails) and
+  `escenaOver` adds weather. Engranajes and Eclipse have their own `deco`
+  rules (not an `ESTILO` borrowed from a first-era map): conveyor belt with
+  moving chevrons, gears turning in the pits, pistons, Tesla coils, reactor;
+  and golden energy flowing down the path, the eclipse on the biggest altar,
+  rune rings, floating crystals. Obstacle `kind` is art only (`reactor`,
+  `shard`): the engine only reads x, y, r. Per-frame work is batched in
+  `Path2D`s: keep a frame of 9–10 near Vacío's cost.
 
 New content, all appended (TOWER_ORDER indices matter: never insert before them):
 towers `bruja` (frog: `sapifica`, a sapo has no armor/camo/powers and walks at
