@@ -11,6 +11,10 @@
 //                              r.partida (true/false), r.vacia (foto sin imagen), r.pico, r.tipico
 // (Calibrado con fotos de verdad: partidas pico 17,7 y 21 con típico 3,5; una sola vista ≤ 4,7, o 10,5 con típico 6,4 en
 // la pantalla de personaje. Partida = pico > 12 y más de 4 veces el típico.)
+// §75: y la costura tiene que cruzar la imagen (`ancho`: la parte de las columnas que salta de verdad en esa fila, más
+// de 0,3). Una raya del juego que cae justo en el medio —la del globo con el nombre del otro piloto, que en la largada
+// está a esa altura— salta mucho pero en pocas columnas (pico 15,2 con ancho 0,16): no es una costura. Partidas armadas
+// juntando dos fotos de verdad: ancho de 0,43 a 1.
 export async function pantallaPartida(pagina, png) {
   return pagina.evaluate(async b64 => {
     const img = new Image();
@@ -28,14 +32,19 @@ export async function pantallaPartida(pagina, png) {
       salto[y] = s / Math.ceil(W / 2);
     }
     const medio = Math.round(H / 2);
-    let pico = 0;
-    for (let y = medio - 3; y <= medio + 3; y++) pico = Math.max(pico, salto[y]);
+    let pico = 0, filaPico = medio;
+    for (let y = medio - 3; y <= medio + 3; y++) if (salto[y] > pico) { pico = salto[y]; filaPico = y; }
+    // ancho: en la fila del pico, la parte de las columnas donde la luz cambia más de 24 (de 255)
+    let saltan = 0;
+    for (let x = 0; x < W; x += 2) if (Math.abs(luz(x, filaPico) - luz(x, filaPico - 1)) > 24) saltan++;
+    const ancho = saltan / Math.ceil(W / 2);
     // el salto típico: la mediana de las filas del 15 % al 85 % de la altura, sin las de cerca del medio
     const resto = [];
     for (let y = Math.round(H * 0.15); y < Math.round(H * 0.85); y++) if (Math.abs(y - medio) > 6) resto.push(salto[y]);
     resto.sort((a, b) => a - b);
     const tipico = resto[resto.length >> 1] || 0;
     // vacia: la foto es pareja (sin imagen: el lienzo puede salir en blanco si se fotografía entre dos cuadros)
-    return { partida: pico > 12 && pico > 4 * Math.max(tipico, 1), vacia: tipico < 0.3 && pico < 0.3, pico: +pico.toFixed(1), tipico: +tipico.toFixed(1), alto: H };
+    return { partida: pico > 12 && pico > 4 * Math.max(tipico, 1) && ancho > 0.3, vacia: tipico < 0.3 && pico < 0.3,
+             pico: +pico.toFixed(1), tipico: +tipico.toFixed(1), ancho: +ancho.toFixed(2), alto: H };
   }, png.toString('base64'));
 }

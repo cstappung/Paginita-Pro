@@ -216,9 +216,10 @@ try {
     ok('el juego de los dos arrancó directo en la pantalla de personaje (sección 0x49), sin el título ni las licencias',
        [a2, b2].every(x => x?.s === 0x49 && x.pagina === 0x6B), `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
     await foto(uno, '8-copa-uno.png'); await foto(dos, '8-espera-dos.png');
+    // (§74: el selector de copas: «Una al azar» marca una copa y «Jugar la Copa N» la confirma)
     await mA.click('#copaAzar');
     await espera(300);
-    await mA.locator('#elegirPista .tu-copa button', { hasText: 'Confirmar' }).click();
+    await mA.click('#copaJugar');
 
     // 2) cada uno elige personaje, vehículo y derrape con las pantallas del juego (Piloto Dos, antes, uno a la derecha)
     const elegir = async (p, f, derecha) => {

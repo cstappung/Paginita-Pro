@@ -158,10 +158,10 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  assert.equal(q.get('privado'),'https://w.example');assert.equal(q.get('r'),'3');
  for (const k of ['anfitrion','relleno','nombres']) assert.equal(q.get(k),null,k+' ya no va (los nombres van por mensaje)');
  const w=new URL('https://x/'+c.__s({pid:'p1',uid:'a',nodo:2,privado:'',ronda:1,sincro:['a'],jefe:'a',estilo:'copa',carreras:8,cc:'espejo'})).searchParams;
- assert.equal(w.get('carreras'),'8','la copa lleva sus carreras');assert.equal(w.get('cc'),'espejo');assert.equal(w.get('privado'),null);
+ assert.equal(w.get('carreras'),'4','la copa es una copa del juego: siempre 4 carreras (§74)');assert.equal(w.get('cc'),'espejo');assert.equal(w.get('privado'),null);
  const pl=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',estilo:'playlist',carreras:4,cc:'azar'})).searchParams;
  assert.equal(pl.get('estilo'),'playlist');assert.equal(pl.get('cc'),'azar');
- assert.equal(pl.get('pistas'),M.mkwPlaylist('p1',2,4).map(x=>x.copa+'.'+x.fila).join(','),'la cola sorteada de la tanda');
+ assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');
 });

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala: playlist</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Sala en modo playlist: <span>armar, sugerir, agregar entre carreras</span></h1>
+<p>Prueba la playlist de <code>web/navegador/sala-carrera.mjs</code> (bitácora §74) <b>sin el juego y sin red</b>: tres
+  pilotos <b>inventados</b> (Ana es la anfitriona) por un bus en memoria y un <b>reloj falso</b>. Comprueba: la playlist
+  empieza armando la lista (aunque traiga pistas: quedan de base); Beto y Caro sugieren y Ana acepta o rechaza; solo Ana
+  cambia la lista; recién al confirmarla se elige personaje; durante la copa se pueden sugerir y agregar más (las ya
+  corridas no se tocan); «+ Agregar pistas» pausa los resultados (hasta 60 s); si Ana se va, Beto sigue con la lista y
+  las sugerencias; sin pistas por delante la copa termina. Y la copa normal no tiene lista.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSala, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PAUSA_MAX_MS } from '/web/navegador/sala-carrera.mjs';
+
+const { ok, fin } = prueba('sala-playlist', 'Sala en modo playlist (sin el juego, reloj falso)');
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
+const listo = () => new Promise(r => setTimeout(r, 0));
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); await listo(); };
+const seg = async n => { for (let i = 0; i < n; i++) await avanzar(1000); };     // (de a 1 s: los latidos siguen)
+const salas = new Map();
+const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }];
+const enviar = de => (para, bytes) => setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0);
+const P = (copa, fila) => ({ copa, fila });
+const texto = l => (l || []).map(p => `${p.copa}.${p.fila}`).join(' ');
+const persona = (uid, extra = {}) => {
+  const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'playlist', carreras: 4, pistas: [P(1, 1)], enviar: enviar(uid), ahora: () => t, cada, parar, ...extra });
+  salas.set(uid, s); return s;
+};
+const ana = persona('ana'), beto = persona('beto'), caro = persona('caro');
+const todas = () => [ana, beto, caro];
+const fases = () => todas().map(s => s.estado().fase).join(',');
+
+// 1) armar la lista (fase «copa» de la playlist)
+await seg(2);
+ok('la playlist empieza armando la lista, aunque traiga pistas (quedan de base)', fases() === 'copa,copa,copa' && todas().every(s => texto(s.estado().lista?.pistas) === '1.1'), fases());
+ok('Beto sugiere una pista', beto.sugerir(P(5, 3)) === 'sugerida');
+await avanzar(0); await avanzar(0);
+const pend = () => (ana.estado().lista?.sugerencias || []).filter(s => s.estado === 'pendiente');
+ok('a Ana le llega pendiente, de Beto (y todos la ven)', pend().length === 1 && pend()[0].de === 'beto' && caro.estado().lista.sugerencias.length === 1, JSON.stringify(pend()));
+ok('Beto no la puede sugerir dos veces (lo sabe sin preguntar)', beto.sugerir(P(5, 3)) === 'ya-sugerida');
+ok('Caro no puede sugerir una que ya está en la lista', caro.sugerir(P(1, 1)) === 'ya-esta');
+caro.sugerir(P(7, 0)); caro.sugerir(P(9, 2));
+await avanzar(0); await avanzar(0);
+ok('Beto no cambia la lista ni acepta (no es el anfitrión)', beto.listaCambio([P(2, 2)]) === false && beto.aceptar(pend()[0].id) === false);
+ok('Ana cambia la lista desde el selector y todos la ven', ana.listaCambio([P(1, 1), P(3, 0)]) === true);
+await avanzar(0);
+ok('…sigue armando (no se elige personaje todavía)', fases() === 'copa,copa,copa' && texto(beto.estado().lista.pistas) === '1.1 3.0', texto(beto.estado().lista.pistas));
+const deBeto = pend().find(s => s.de === 'beto'), deCaro = pend().filter(s => s.de === 'caro');
+ok('Ana acepta la de Beto: entra al final', ana.aceptar(deBeto.id) === 'agregada');
+ok('Ana rechaza una de Caro', ana.rechazar(deCaro[0].id) === true);
+await avanzar(0);
+const mias = (s, uid) => s.estado().lista.sugerencias.filter(x => x.de === uid).map(x => x.estado).join(',');
+ok('Beto ve la suya aceptada y Caro la suya rechazada', mias(beto, 'beto') === 'aceptada' && mias(caro, 'caro') === 'rechazada,pendiente' && texto(caro.estado().lista.pistas) === '1.1 3.0 5.3',
+   `${mias(beto, 'beto')} · ${mias(caro, 'caro')} · ${texto(caro.estado().lista.pistas)}`);
+
+// 2) confirmar: recién ahí se elige personaje
+ok('Ana confirma la lista', ana.ponerPistas(ana.estado().lista.pistas) === true);
+await avanzar(0);
+ok('con la lista confirmada todos pasan a elegir, con sus pistas y carreras', fases() === 'elegir,elegir,elegir' && texto(caro.estado().pistas) === '1.1 3.0 5.3' && caro.estado().carreras === 3,
+   `${fases()} · ${texto(caro.estado().pistas)} · ${caro.estado().carreras}`);
+await seg(SEGUNDOS_ELEGIR + 1);
+ok('a los 45 s se corre la carrera 1', fases() === 'correr,correr,correr' && ana.estado().carrera === 1, fases());
+
+// 3) durante la copa: sugerir y aceptar alarga la playlist
+beto.sugerir(P(11, 1));
+await avanzar(0); await avanzar(0);
+const nueva = pend().find(s => s.copa === 11);
+ok('durante la copa se sugiere y Ana la acepta', !!nueva && ana.aceptar(nueva.id) === 'agregada');
+await avanzar(0);
+ok('la playlist crece para todos (4 carreras)', todas().every(s => s.estado().carreras === 4 && texto(s.estado().pistas) === '1.1 3.0 5.3 11.1'), texto(beto.estado().pistas));
+
+// 4) entre carreras: «+ Agregar pistas» pausa los resultados; las corridas no se tocan
+beto.termine(1);
+await avanzar(0);
+ok('termina la 1: empiezan los resultados', ana.estado().plazo > t);
+ok('Ana abre «+ Agregar pistas»: la sala espera', ana.pausar(true) === true);
+await seg(SEGUNDOS_RESULTADOS + 3);
+ok('pasados los resultados, sigue en la carrera 1 mientras Ana elige', todas().every(s => s.estado().carrera === 1) && ana.estado().pausa > 0, `carrera ${ana.estado().carrera}`);
+ok('Ana deja las que vienen: cambia las de después de la 1 (la 1 queda)', ana.restantesCambio([P(20, 0), P(5, 3), P(21, 1)]) === true);
+await avanzar(0);
+ok('…la playlist queda con la 1 corrida y las nuevas', texto(caro.estado().pistas) === '1.1 20.0 5.3 21.1' && caro.estado().carreras === 4, texto(caro.estado().pistas));
+ok('Beto no puede pausar', beto.pausar(true) === false);
+ana.pausar(false);
+await avanzar(1000);
+ok('al cerrar el selector, 3 s más de resultados…', ana.estado().carrera === 1);
+await seg(3);
+ok('…y la carrera 2, la nueva', todas().every(s => s.estado().carrera === 2) && ana.estado().pausa === 0, `carrera ${ana.estado().carrera}`);
+
+// 5) la pausa tiene tope (60 s)
+beto.termine(2);
+await avanzar(0);
+ana.pausar(true);
+await seg(Math.ceil(PAUSA_MAX_MS / 1000) - 5);
+ok(`con el selector abierto, la sala espera…`, ana.estado().carrera === 2);
+await seg(8);
+ok(`…hasta ${PAUSA_MAX_MS / 1000} s: después sigue sola`, ana.estado().carrera === 3, `carrera ${ana.estado().carrera}`);
+
+// 6) Ana se va: Beto sigue con la lista y las sugerencias
+caro.sugerir(P(30, 3));
+await avanzar(0); await avanzar(0);
+ana.detener(); salas.delete('ana');
+beto.cambiarAnfitrion('beto'); caro.cambiarAnfitrion('beto');
+await avanzar(0);
+const pendB = beto.estado().lista.sugerencias.filter(s => s.estado === 'pendiente');
+ok('el anfitrión nuevo tiene la lista y las sugerencias pendientes', texto(beto.estado().pistas) === '1.1 20.0 5.3 21.1' && pendB.some(s => s.copa === 30 && s.de === 'caro'), JSON.stringify(pendB));
+ok('Beto acepta la de Caro', beto.aceptar(pendB.find(s => s.copa === 30).id) === 'agregada');
+await avanzar(0);
+ok('y Caro la ve en la playlist (5 carreras)', texto(caro.estado().pistas) === '1.1 20.0 5.3 21.1 30.3' && caro.estado().carreras === 5, texto(caro.estado().pistas));
+caro.sugerir(P(40, 0));
+await avanzar(0); await avanzar(0);
+const ids = beto.estado().lista.sugerencias.map(s => s.id);
+ok('las sugerencias siguen numerándose sin chocar', new Set(ids).size === ids.length, ids.join());
+
+// 7) sin pistas por delante, la copa termina
+ok('Beto deja la playlist hasta la carrera 3', beto.restantesCambio([]) === true);
+await avanzar(0);
+beto.termine(3);
+await avanzar(0);
+await seg(SEGUNDOS_RESULTADOS + 2);
+ok('después de los resultados de la 3: fin', beto.estado().fase === 'fin' && caro.estado().fase === 'fin' && beto.estado().carreras === 3, `${beto.estado().fase} · ${beto.estado().carreras}`);
+beto.detener(); caro.detener();
+
+// 8) la copa normal no tiene lista ni sugerencias
+salas.clear();
+const a2 = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'copa', carreras: 4, enviar: enviar('ana'), ahora: () => t, cada, parar });
+const b2 = crearSala({ yo: 'beto', humanos, anfitrion: 'ana', estilo: 'copa', carreras: 4, enviar: enviar('beto'), ahora: () => t, cada, parar });
+salas.set('ana', a2); salas.set('beto', b2);
+ok('en la copa normal no hay lista ni se sugiere', a2.estado().lista == null && b2.sugerir(P(1, 1)) === 'nada' && a2.listaCambio([P(1, 1)]) === false);
+a2.detener(); b2.detener();
+fin();
+</script>
+</body>
+</html>

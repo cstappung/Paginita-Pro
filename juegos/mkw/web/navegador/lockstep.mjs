@@ -25,6 +25,11 @@
 //     carrera se desincronizaría): se anuncia una sola vez por carrera, no cambia después, y quien lo recibe se lo
 //     pasa a los demás (por si a alguno no le llegó directo). Si nadie lo anuncia (el decisor nunca llegó), todos
 //     usan el de siempre (3).
+//   - §75, quién corre cada carrera: la sala (sala-carrera.mjs) dice al empezar cada carrera quiénes están fuera
+//     (fijarCarrera(k, fuera)): esos van "sin nadie" desde el cuadro 0, en todas las consolas por igual, y los demás
+//     corren aunque se hayan cortado en la anterior (volvieron). El decisor del retraso es el primero que NO está fuera
+//     (tiene que ser el mismo en todas, también en una consola recién recargada). Y quien recargó la página con la
+//     carrera andando avisa que se la salta (saltar): el decisor lo corta enseguida, sin esperar el margen de 30 s.
 // Como un sistema de control distribuido con reloj común: nadie avanza un paso hasta tener las entradas de todos.
 //
 // Formato de los mensajes (binario, el primer byte 0xA7 los distingue de los de red.mjs, que empiezan con el largo):
@@ -35,6 +40,7 @@
 //
 // Uso:  const ls = crearLockstep({ yo, humanos: [{ uid, mando }], enviar: (uid, bytes, canal) => …, local: () => [7 números] });
 //       Module.mkwLockstep = ls;  malla → ls.alBinario(de, bytes)  (los que empiezan con MARCA)
+//       §75: ls.fijarCarrera(k, [mandos fuera]); ls.saltar(mando, k); ls.enCuadro(k, cuadro, fn) (fn en ese cuadro)
 export const MARCA = 0xA7;
 export const RETRASO = 3;
 export const RETRASO_MAX = 8;              // 133 ms: más que eso ya se siente mucho al manejar (y es otro país lejos)
@@ -61,6 +67,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   let espera = null;                      // { cuadro, listo, desde, pedido }
   const huellas = new Map();              // cuadro → { mia, de: Map(uid → h) }
   const propuestas = new Map();           // corte propuesto: mando → { de: Map(uid → último cuadro que tiene), desde: ms }
+  const planteles = new Map();            // §75: carrera → Set(mandos fuera desde el cuadro 0), lo dice la sala
+  const saltos = new Map();               // §75: carrera → Set(mandos que avisaron que se la saltan: se cortan ya)
+  const acciones = new Map();             // §75: "carrera:cuadro" → función (en ese cuadro, en todas las consolas)
   const est = { cuadros: 0, esperas: 0, msEsperando: 0, maxEspera: 0, msLlegada: 0, desincronizado: null, huellasIguales: 0, cortes: [],
     retrasos: {}, conflictos: 0, esperaDe: {} };   // esperaDe: uid → ms esperando sus botones (avisoLento)
 
@@ -97,6 +106,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // quién decide: SIEMPRE el primer humano que sigue (no cortado). Uno solo: si dos anunciaran números distintos, la
   // carrera se desincronizaría. Si el primero se va (lo cortan), decide el siguiente.
   const decisor = () => vivos()[0]?.uid;
+  // §75: el de la carrera k (antes de empezarla): con plantel, el primero que no está fuera; sin plantel, como antes
+  const decisorDe = k => planteles.has(k) ? humanos.find(h => !planteles.get(k).has(h.mando))?.uid : decisor();
   // lo necesario, con medidas que aguantan los tirones: una pestaña ocupada (cargando la pista: la página no atiende
   // nada por 1 o 2 s) contesta tarde y esa ida y vuelta sale enorme sin que la red tenga la culpa. Por eso, de las
   // últimas VENTANA medidas (8 s): el "piso" es la más rápida (lo que tarda la red cuando nadie se traba); las que
@@ -125,7 +136,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   }
   const paqueteRetraso = (k, r) => { const b = empaca(9, 0, k, 1); b[8] = r; return b; };
   function anunciar(k) {
-    if (anuncios.has(k) || decisor() !== yo) return;
+    if (anuncios.has(k) || decisorDe(k) !== yo) return;
     const r = adaptar ? calcularRetraso() : retrasoBase;
     anuncios.set(k, r);
     registro(`[lockstep] retraso de la carrera ${k}: ${r} cuadros (${(r * CUADRO_MS).toFixed(0)} ms)` +
@@ -147,8 +158,18 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     est.retrasos[carrera] = retraso;
     tablas = siguiente?.carrera === carrera ? siguiente.tablas : new Map();
     cortes = siguiente?.carrera === carrera ? siguiente.cortes : new Map();
-    // los que se fueron en la carrera anterior siguen fuera
-    for (const c of est.cortes) if (!cortes.has(c.mando)) cortes.set(c.mando, 0);
+    if (planteles.has(carrera)) {
+      // §75: la sala dijo quiénes están fuera de esta carrera (desde el cuadro 0); los demás corren aunque se hayan
+      // cortado en la anterior: volvieron. (Antes, quien se cortaba una vez quedaba fuera para siempre en las demás
+      // consolas, pero no en la suya recién recargada: las carreras se separaban.)
+      for (const m of planteles.get(carrera)) if (!cortes.has(m) || cortes.get(m) > 0) cortes.set(m, 0);
+    } else {
+      // sin plantel (la sala vieja, §61): los que se fueron en la carrera anterior siguen fuera
+      for (const c of est.cortes) if (!cortes.has(c.mando)) cortes.set(c.mando, 0);
+    }
+    for (const k of [...planteles.keys()]) if (k < carrera - 1) planteles.delete(k);
+    for (const k of [...saltos.keys()]) if (k < carrera) saltos.delete(k);
+    for (const k of [...acciones.keys()]) if (Number(k.split(':')[0]) < carrera) acciones.delete(k);
     siguiente = null;
     registro(`[lockstep] carrera ${carrera}: ${humanos.length} humanos, yo en el mando ${miMando}, retraso ${retraso}`);
   }
@@ -171,7 +192,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
         // (el decisor no vino y ni siquiera se lo pasó otro), uso el de siempre: los demás tampoco lo recibieron, así
         // que también usan ese. Cuánto esperar: si del decisor nunca supe nada (ni un ping: no está), esperaCorte; si
         // estaba (puede venir cargando la pista), esperaInicio
-        const t0 = ahora(), tope = oido.has(decisor()) ? esperaInicio : esperaCorte;
+        const t0 = ahora(), tope = oido.has(decisorDe(k)) ? esperaInicio : esperaCorte;
         esperaAnuncio = t0;                                      // (estado().esperando: se espera al decisor, que viene cargando)
         while (!anuncios.has(k) && ahora() - t0 < tope) { anunciar(k); await new Promise(r => setTimeout(r, 20)); }
         esperaAnuncio = 0;
@@ -215,6 +236,9 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       for (let k = 0; k < 7; k++) datos[p * 8 + 1 + k] = v[k];
     }
     if (huella && cuadro % CADA_HUELLA === 0 && cuadro > 0) compararHuella(cuadro, huella());
+    // §75: lo que hay que hacer en este cuadro (en todas las consolas en el mismo: por ejemplo terminar la carrera)
+    const accion = acciones.get(`${carrera}:${cuadro}`);
+    if (accion) { acciones.delete(`${carrera}:${cuadro}`); try { accion(); } catch (e) { registro(`[lockstep] acción del cuadro ${cuadro}: ${e?.message || e}`); } }
     return datos;
   }
 
@@ -238,8 +262,10 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // usó botones de verdad en un cuadro que para otro ya es "sin nadie" (eso desincronizaría la carrera).
     // al que todavía no mandó nada en esta carrera se le espera más (esperaInicio): cada uno llega a la carrera a su
     // ritmo (la carga del disco, los menús); al que ya estaba y se calla, solo esperaCorte
+    // §75: al que avisó que se salta esta carrera (recargó la página) no se lo espera: se corta ya
+    const salta = saltos.get(carrera);
     if (decide === yo)
-      for (const m of faltan) if (!propuestas.has(m) && t > (tabla(m).size ? esperaCorte : esperaInicio)) {
+      for (const m of faltan) if (!propuestas.has(m) && (salta?.has(m) || t > (tabla(m).size ? esperaCorte : esperaInicio))) {
         propuestas.set(m, { de: new Map(), desde: ahora() });
         aTodos(empaca(5, m, cuadro), 'tcp');
       }
@@ -342,24 +368,37 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // espera en curso: quien iba un cuadro atrás esperaría para siempre botones que ya nadie manda.
   let saliendo = null;
   const quietos = () => { const d = new Int32Array(32); for (const p of mandos) { d[p * 8] = 1; for (let k = 0; k < 7; k++) d[p * 8 + 1 + k] = NEUTRO[k]; } return d; };
-  function fijarCarrera(k) {
+  function fijarCarrera(k, fuera = null) {
     if (!(k >= 1)) return;
+    if (Array.isArray(fuera)) planteles.set(k, new Set(fuera.filter(m => mandos.includes(m))));
     if (ultimo >= 0 && k !== carrera) {               // el juego está en otra carrera (la anterior): a salir de ella
       saliendo = { ultimo }; ultimo = -1;
       if (espera) { const r = espera.resolver; espera = null; propuestas.clear(); r(); }
     }
     if (ultimo < 0 && k - 1 !== carrera) { carrera = k - 1; siguiente = null; }   // la próxima que empiece es la k
   }
+  // §75: el humano del mando m avisa que se salta la carrera k (recargó la página con ella andando): si es la que corre
+  // esta consola, el decisor lo corta ya (sin el margen); si es la siguiente, queda anotado para cuando empiece
+  function saltar(m, k) {
+    if (!mandos.includes(m) || m === miMando || !(k >= 1) || k < carrera) return;
+    let s = saltos.get(k); if (!s) saltos.set(k, s = new Set());
+    if (s.has(m)) return;
+    s.add(m);
+    registro(`[lockstep] el mando ${m} (${duenoDe.get(m)}) se salta la carrera ${k}`);
+    if (k === carrera) revisar();
+  }
+  // §75: fn se llama al procesar el cuadro `cuadro` de la carrera k (el mismo en todas las consolas)
+  const enCuadro = (k, cuadro, fn) => { if (typeof fn === 'function') acciones.set(`${k}:${cuadro}`, fn); };
   let esperaAnuncio = 0;
   const esperando = () => {
-    if (esperaAnuncio) return { uids: [decisor()], ms: ahora() - esperaAnuncio, margen: esperaInicio, llegando: true };
+    if (esperaAnuncio) return { uids: [decisorDe(carrera + 1)], ms: ahora() - esperaAnuncio, margen: esperaInicio, llegando: true };
     if (!espera || !espera.faltan?.length) return null;
     const ms = ahora() - espera.desde;
     return { uids: espera.faltan.map(m => duenoDe.get(m)), ms, margen: esperaCorte,
              // los que nunca mandaron nada en esta carrera todavía vienen cargando (no es un corte)
              llegando: espera.faltan.every(m => tabla(m).size === 0) };
   };
-  return { pad, alBinario, fijarCarrera,
+  return { pad, alBinario, fijarCarrera, saltar, enCuadro,
     estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, carrera, cuadro: ultimo, miMando, retraso, cortes: Object.fromEntries(cortes), esperando: esperando(),
       rtt: Object.fromEntries([...rtt].map(([u, x]) => [u, Math.round(x.s)])) }),
     detener() { if (latido) clearInterval(latido); } };

@@ -206,6 +206,13 @@ export function crearPiloto({ lector: L, controles, alAviso = () => {}, esperarE
       L.w8(rd + RD.jugadores, 1);
     }
     if (objetivo.autoconducir) L.w32(rd + 0xC18 + 0x10, 1);
+    // §74: «Arma tu lista» de un jugador: tantas carreras como pistas tenga la lista (1 a 32, como la tanda de VS del
+    // juego). SectionParams +0x64 = cuántas carreras tiene la tanda: el juego lo mira al terminar cada una para ofrecer
+    // «Siguiente carrera» o cerrar con la tabla final (directo_nativo.cpp lo escribe igual para la sala)
+    if (Array.isArray(objetivo.pistas) && objetivo.pistas.length) {
+      const sm = L.u32(0x809C1E38), sp = sm ? L.u32(sm + 0x98) : 0;      // SectionMgr → SectionParams
+      if (sp) L.w32(sp + 0x64, Math.max(1, Math.min(32, objetivo.pistas.length)));
+    }
     // la carrera sincronizada de la sala con CPU (lockstep.mjs): el tipo de cada puesto sale del plantel que reparte
     // la sala (0 = persona: cada humano de la sala es un jugador "local" con su mando; 1 = CPU; 5 = nadie)
     if (Array.isArray(window.mkwPlantel)) {

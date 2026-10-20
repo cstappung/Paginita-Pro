@@ -557,6 +557,75 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Bundle (`juegos-app.js`)** | El archivo único que la página de Juegos carga de verdad: todos los `.js` de `colabtex/src` pegados y comprimidos por `esbuild`. Cambiar `src/` no cambia lo que ve el navegador hasta que se vuelve a armar el bundle. Como un plano corregido que no sirve mientras no se imprima la copia que usa el electricista en la obra. |
 | **Cupo de la sala** | Cuántas personas caben en una sala del sitio. Se elige al crearla («Pilotos: 2, 3 o 4»); si no se elige, el sitio pone el mínimo (2). Como el número de enchufes de una zapatilla: si viene de 2, el tercero no tiene dónde conectarse aunque el juego admita 4. |
 
+### El selector de pistas: la lista, la copa y las sugerencias (§74)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Modo lista / modo copa / modo sugerir** | Las tres formas del selector de pistas de la página. **Lista**: se arma una lista de hasta 32 pistas (un clic agrega, otro quita); es la del un jugador «a tu gusto» y la del anfitrión en la playlist. **Copa**: se elige una de las copas del juego entera (sus 4 pistas). **Sugerir**: la de los demás en la playlist: un clic no agrega, le *propone* la pista al anfitrión. Como un tablero con tres llaves selectoras: el mismo panel, tres funciones. |
+| **Preset (lista guardada)** | Una lista de pistas con nombre que queda guardada en el navegador para usarla otra vez («Retro de la noche»). Como las memorias de un sintonizador: se graba una vez y se recupera con un botón. |
+| **Borrador del navegador (`localStorage`)** | Un cajoncito de memoria que cada página tiene en el navegador y que sobrevive a cerrar y recargar. La lista que uno está armando se guarda ahí en cada cambio: si se cierra el selector, al volver sigue igual. Como una memoria no volátil (EEPROM) del equipo. |
+| **Precargar (prefetch)** | Bajar algo antes de que se pida. Las fotos de las pistas vienen en paquetes (~1 MB cada 48 pistas); antes se bajaban al primer paso del mouse y la vista tardaba hasta 1,5 s. Ahora se bajan todas en fila apenas se abre el selector. Como precalentar el horno antes de meter la comida. |
+| **Decodificar una imagen** | Pasar el archivo comprimido (WebP) a los píxeles que se dibujan. Tarda unos milisegundos; si se muestra antes de terminar, se ve a medias o parpadea. La vista ahora espera a que la imagen nueva esté decodificada y recién ahí la cambia. |
+| **Espera antes de mostrar (debounce)** | Cuando el mouse barre varias pistas rápido, mostrar cada una sería trabajo tirado: solo se muestra la que queda debajo 60 ms (o 250 ms si ya hay una copa marcada). Como el filtro antirrebote de un pulsador: se ignoran los cambios rápidos y vale el estado que se mantiene. |
+| **WebP animado (el videíto)** | La presentación de cada pista (la cámara que vuela sobre ella al empezar la carrera), guardada como una imagen animada de 288×162. Vienen de a una copa por paquete; la página guarda las de las últimas 12 copas y suelta las más viejas. |
+| **Minimapa (el plano en la esquina)** | El plano de la pista visto desde arriba, puesto chico en una esquina del video como en la carrera; al pasar el mouse se agranda al doble para leerlo. |
+| **Fundido (crossfade)** | Cambiar de una foto a otra bajando una mientras sube la otra (140 ms), en vez de cortar de golpe. Hay dos capas de foto apiladas: la nueva se carga en la de atrás y, ya lista, pasa adelante. |
+| **Marcar y confirmar** | En el modo copa un clic ya no elige: **marca** la copa (anillo amarillo) y el botón «Jugar la Copa N» (o Enter, o doble clic) la **confirma**. En la sala un clic suelto elegía la copa de todos sin querer. Como un interruptor de seguridad de dos tiempos: armar y después disparar. |
+| **Hoja inferior (bottom sheet)** | En pantallas angostas el costado (la lista o la vista de la copa) es un panel pegado abajo que se pliega (solo su cabeza y el botón) o se despliega. La grilla deja libre ese alto al final, para que la última copa nunca quede tapada. |
+| **`ResizeObserver`** | Un aviso del navegador cada vez que un elemento cambia de tamaño. Con él la página mide el alto de la hoja inferior y de la cabecera y deja ese espacio libre. Como un sensor de posición que realimenta a dónde va cada cosa. |
+| **Menos movimiento / ahorro de datos** | Dos preferencias del sistema (`prefers-reduced-motion`, `Save-Data`). Si están puestas: sin videítos, sin avance solo y sin fundidos. |
+| **Crítico de diseño** | Un agente aparte (otro Claude) al que se le dan las fotos de la pantalla y el código, con la consigna de criticar sin piedad y devolver un plan concreto (medidas, colores, comportamiento). Se usó dos veces: para la lista persistente y para el modo copa. Como pedirle a otro ingeniero que revise el plano antes de fabricar. |
+| **Sugerencia (playlist de la sala)** | Una pista que un piloto le propone al anfitrión. Queda **pendiente** hasta que él la **acepta** (entra al final de la lista) o la **rechaza**. Hasta 8 pendientes por persona; no se sugiere una que ya está o que ya espera. Todo viaja dentro del estado de la sala, así que si el anfitrión se va, el nuevo ya tiene la lista y las sugerencias (`playlist-sala.mjs`). Como un buzón de sugerencias con un encargado. |
+| **Panel de la playlist (entre carreras)** | Mientras se ven los resultados de una carrera de la playlist, un recuadro al costado con las pistas que vienen («sigue» la próxima), cuántas van corridas y un botón: «+ Agregar pistas» para el anfitrión, «Sugerir pista» para los demás. Se va solo cuando arranca la carrera siguiente. |
+| **Pausa de la sala** | Cuando el anfitrión aprieta «+ Agregar pistas», el árbitro anota hasta cuándo esperar (60 s como máximo) y no pasa a la carrera siguiente aunque se acaben los resultados; al cerrar el selector quedan 3 s más y sigue. Como el botón de "hold" de un temporizador: congela la cuenta sin reiniciarla. |
+| **Oscilador de WebAudio (los sonidos de la lista)** | Los sonidos de agregar, quitar, «llena» y «llegó una sugerencia» no son del juego: la página los fabrica con osciladores (un generador de onda de la frecuencia que se pida, 0,07–0,12 s) y una envolvente de volumen. Usan la salida de sonido del juego, así respetan el volumen y el silencio de la página. Como un generador de funciones con una compuerta. |
+
+### Volver tras recargar, el fin de la carrera y los puntos (§75)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Latido de la sala (`{t:'aqui'}`)** | Un mensajito que cada página manda a todas las demás cada segundo: «sigo aquí, tengo el estado número N, me salto la carrera K». Con eso la anfitriona sabe quién está y quién no. Como el pulso de un relé "watchdog": mientras llega, el equipo está vivo; si deja de llegar un rato, se lo da por caído. |
+| **Plantel de la carrera (`fuera`)** | La lista de quiénes NO corren una carrera, que la anfitriona escribe en el estado al empezarla (los que no dieron latido en los últimos 10 s). Todas las consolas la usan igual: esos humanos van "sin nadie" desde el primer cuadro y los demás corren, aunque se hubieran cortado en la anterior. Como la lista de equipos conectados que el operador anota antes de energizar una barra: todos los tableros arrancan con la misma lista. |
+| **Saltarse la carrera (`saltar`)** | Lo que hace la página recién recargada cuando la copa ya va por una carrera: no entra a esa (su consola no tiene los cuadros que ya pasaron), avisa en su latido «me salto la carrera K» y entra en la siguiente con su puesto y lo que había elegido. Con el aviso, la carrera de los demás la corta enseguida en vez de esperarla 30 s. |
+| **Sala lista** | El momento en que la página sabe en qué va la sala y recién ahí empieza a mostrarla: los demás, con el primer reparto de la anfitriona; la anfitriona, cuando oyó a todos (de 2 a 8 s después de abrir). Antes de eso no muestra nada, para no tomar por buena una sala "nueva" que en realidad ya iba por la carrera 3. |
+| **Copia del estado (`dame` / `copia`)** | Si la anfitriona recarga la página, su sala nueva está en el estado número 0, pero los latidos de los demás traen números más altos: les pide la copia, la adopta y sigue desde ahí con un número más alto que todos. Como reponer la configuración de un PLC reemplazado desde el respaldo que tiene otro equipo de la red. |
+| **Acción en un cuadro (`enCuadro`)** | Algo que tiene que pasar en el MISMO cuadro de la carrera sincronizada en todas las consolas (por ejemplo, en la prueba, "los humanos cruzan la meta en el cuadro 1555"). La carrera sincronizada lo ejecuta al procesar ese cuadro. Como un disparo sincronizado por la misma señal de reloj en todos los equipos. |
+| **Tiempo límite de la carrera** | La regla del modo en línea del juego: cuando el reloj de la carrera pasa del límite (5:00 en el juego original; Retro Rewind guarda el suyo en 0x818759B0), a cada piloto que todavía no cruzó la meta le termina la carrera con un tiempo estimado por lo que avanzó. Así una carrera no queda esperando para siempre a alguien que se quedó quieto. Como el temporizador de un horno: aunque el pan no esté dorado, a la hora se apaga. |
+| **Escenario de los menús y de la carrera (puntos)** | Racedata guarda dos "fichas" de la carrera: la de los menús (+0xC10) y la de la carrera en curso (+0x20, una copia que se hace al empezarla). Los puntos de cada carrera se suman en la de los menús (`UpdatePoints`); la de la carrera se queda con los de antes. Por eso la tabla de la copa se lee de la de los menús. El juego los suma recién cuando la pantalla de resultados llena su tabla; en la sala los sumamos nosotros, una sola vez, en el primer cuadro con la carrera terminada (§75). Como un medidor de energía que solo se lee al cerrar el período: si nadie va a leerlo, el período no se factura; aquí lo "cerramos" siempre en el mismo instante. |
+| **Puntos de antes y total (+0xD8, +0xDA)** | Cada jugador de Racedata guarda dos números: los puntos que tenía **antes** de esta carrera (+0xD8) y el **total** (+0xDA). Al terminar la carrera el juego hace total = de antes + los de esta. El "de antes" lo pone el menú de la carrera siguiente; como la sala abre cada carrera directo, lo ponemos nosotros al escribir la ficha. Como un medidor con lectura anterior y lectura actual: el consumo se calcula contra la anterior, y si nadie la anota, contra cero. |
+| **Tabla de puntos de la sala (`puntos`)** | Los 12 puntos que lleva la copa, guardados en el estado de la sala: cada página los manda al terminar cada carrera con desde qué carrera corrió, y la anfitriona se queda con la de quien corrió desde más atrás. Quien recargó la usa para partir la carrera siguiente con los mismos puntos que los demás (su consola no tiene los de las carreras que se saltó). |
+
+### La música bajo el menú JloKart, que tardaba en sonar (§76)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Pipeline (de la GPU)** | La "receta" armada para dibujar una clase de cosa (con qué sombreador, qué mezcla de colores, qué formato). El navegador tiene que **compilarla** (traducirla al idioma de la tarjeta de video) antes del primer uso, y eso tarda: de 2 a 50 ms cada una. Como armar el circuito de una placa antes de energizarla. |
+| **Precalentado** | Compilar de antemano los ~700 pipelines que el juego usó alguna vez (la lista va con el `.wasm`), para que en la carrera no haya tirones la primera vez que aparece algo. Como precalentar el horno. |
+| **Precalentado postergado (`MKW_PRECALENTAR=tarde`)** | En vez de pedir los ~700 al arrancar, se piden recién cuando el juego llegó a su primera pantalla (el título), de a 2 por cuadro y con 4 compilándose como mucho. Al arrancar, el "proceso de la GPU" del navegador quedaba ocupado varios segundos con la lista y el título (con su música) esperaba atrás. Es como no arrancar todos los motores de una fábrica a la vez: se escalonan para no hundir la tensión. |
+| **Caché de shaders del navegador** | Chrome guarda en el disco los pipelines que ya compiló; la segunda vez los saca de ahí casi gratis. En la 1.ª visita no hay nada guardado, por eso el precalentado postergado solo se usa si **este navegador ya jugó antes** (marca `mkw.precalentado` en el navegador, 20 s después del título): compilar de cero mientras suena la música la trababa (cuadros de hasta 0,85 s y cortes). |
+| **Semilla del arranque** | De la lista de bloques del disco que el juego lee siempre (`bloques.json`), los que lee antes de su título se piden todos juntos apenas abre la página (96 bloques en 31 pedidos), en vez de uno por uno cuando el juego los va pidiendo, cada uno esperando los 50 ms de la red. Como llenar el carro con toda la lista de compras en un viaje, no ir a la tienda por cada cosa. |
+| **Carpeta en racha** | Si el juego lee seguidos dos archivos diminutos (≤ 8 KB) distintos de la misma carpeta, `disco.mjs` pide de una vez el resto de esa carpeta. Así los 64 fantasmas del Contrarreloj que lee el menú «Un jugador» llegan en 4 esperas en vez de 32. |
+| **Corte (hueco) de sonido** | Un bloque de sonido en silencio entre dos que sonaban: el juego no alcanzó a llenar el búfer a tiempo. El medidor de `sonido.mjs` los cuenta; la prueba exige 0. |
+
+### El reloj de los que faltan (§77)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **DNF (Did Not Finish, «no terminó»)** | La regla de las carreras en línea de Mario Kart 8: cuando el primero cruza la meta, los demás tienen 30 s; al vencer, la carrera de los que faltan se termina sola en el puesto en que van. En la sala la dispara el primer humano que llega, y el juego les da a los que faltan un tiempo estimado por lo que avanzaron. Como el tiempo de espera de un relé temporizado: desde que llega la señal del primero, corre el plazo y al vencer abre el circuito aunque los demás no hayan llegado. |
+
+### La cortina de Lakitu que no tapaba todo el alto (§79)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Relación de aspecto** | El ancho dividido por el alto de una imagen. Mario Kart Wii en pantalla ancha es **16:9** (1,78: 16 de ancho por cada 9 de alto); una ventana casi cuadrada es ~1,1:1. Si una imagen se muestra con otra relación de aspecto que la suya, o se deforma (estirada) o le sobran franjas (barras). |
+| **Tamaño interno del canvas y su recuadro** | El canvas (el "lienzo" donde dibuja el juego) tiene dos tamaños: los **píxeles que tiene adentro** (`canvas.width × canvas.height`, por ejemplo 854×480) y el **recuadro que ocupa en la página** (lo fija el CSS, por ejemplo 900×1100). El navegador agranda lo de adentro para llenar el recuadro. Como una foto: una cosa es su resolución y otra el tamaño del marco donde se cuelga. |
+| **SDL3 siguiendo al recuadro** | SDL3 (la capa de ventana que usa aurora) escucha el aviso `resize` del navegador: cada vez que la ventana, o el marco del sitio, cambia de tamaño, le pone al canvas por dentro **el tamaño de su recuadro**. Así el juego "ve" una ventana de la forma del recuadro. Al cargar no pasa (el canvas nace en 854×480); pasa con el primer cambio de tamaño. |
+| **Aspecto dinámico (de WiiCompiled)** | Lo que hace WiiCompiled cuando su ventana no es 16:9 (`dynamic_aspect.cpp`): le cambia al juego las medidas de sus "pantallas" (`EGG::Screen`) para que la escena 3D llene la ventana con su forma: más ancha si la ventana es ancha, más alta (la "expansión vertical") si es alta. Pero lo 2D del juego (el HUD, la cortina) sigue dibujándose en su hoja de 16:9, que queda en el medio. |
+| **Capa 2D y escena 3D** | El juego dibuja dos cosas encima una de otra: la **escena 3D** (pista, karts, cielo), vista por una cámara, y la **capa 2D** (el reloj, las vueltas, el mapa, la cortina de rayas), dibujada sobre una "hoja" plana de tamaño fijo (608×456 unidades de la Wii). Estirar la cámara cambia la escena, no la hoja. Como un proyector y una transparencia de acetato encima: si se agranda la imagen proyectada, el acetato sigue del mismo tamaño. |
+| **`force_16_9` (forzar 16:9)** | Una opción del `Config.toml` de WiiCompiled (`[video]`): la imagen del juego es siempre 16:9, tenga la forma que tenga la ventana; lo que sobra lo pinta aurora de negro dentro del canvas (barras). La página la escribe en `true` desde §79 (`?aspecto=libre` = el estirado de antes). |
+| **Barras (letterbox / pillarbox)** | Las franjas negras que quedan cuando una imagen se muestra entera, sin deformarla, en un recuadro de otra forma: arriba y abajo (*letterbox*, ventana alta) o a los lados (*pillarbox*, ventana ancha). Como ver una película de cine en un televisor: el televisor no la estira, deja franjas. |
+| **`scrollIntoView` («nearest»)** | Una orden del navegador: desplazar la página lo justo para que un elemento se vea entero; con `block: "nearest"`, si ya se ve no mueve nada. El sitio la usa con el marco del juego cuando aparece y cuando el juego avisa `{tipo:'mirame'}` (abrió un selector de la sala). Como el autoenfoque de una cámara que solo se mueve si el objeto salió del cuadro. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -3862,6 +3931,9 @@ pantalla, no toda, y que debía ser "por el stretch". Tenía razón en sospechar
   = 854` con pantalla ancha), así que el juego siempre dibuja una imagen 16:9 y la página la agranda **sin deformarla**
   (`object-fit: contain`: si la ventana del navegador tiene otra forma, quedan barras negras de la página a los lados o
   arriba y abajo, nunca un estirado).
+- **Corregido en §79:** esto vale solo hasta el primer cambio de tamaño. SDL3 agranda el canvas a su recuadro con cada
+  `resize` (en el sitio, el marco cambia después de cargar) y desde ahí el juego sí se estiraba. Ahora la página pide
+  `force_16_9` y la imagen es 16:9 siempre.
 
 Lo medí con un 5.º punto en la prueba: el brillo de los **bordes** de la imagen del juego (8 % de su ancho a cada lado)
 en el corazón del negro (sin los primeros y últimos 100 ms, donde todavía cruzan las últimas rayas finas):
@@ -4709,4 +4781,598 @@ node web/navegador/prueba-sincro.mjs --directa --datos=build/web/datos/sincro-di
 node web/navegador/prueba-sala.mjs
 node herramientas/prueba-experiencia.mjs
 cd terceros/Paginita-Pro/colabtex && node --test tests/mkw.test.cjs
+```
+
+## 2026-10-19 · §74 El selector de pistas: la lista que no se esconde, el modo copa con videos y las sugerencias de la playlist
+
+### Qué pidió el dueño (2026-10-19)
+
+Mirando el selector de la sala mandó dos fotos: con la ventana más chica, la **Copa 79 quedaba tapada** por la vista
+previa, y el panel «Tu copa» tenía **4 casillas fijas**. Lo que pidió, en sus palabras resumidas:
+
+1. que la lista sea **persistente** (siempre a la vista) y que se vea bien así; **«usa un crítico para esto»**;
+2. las vistas previas **van con lag**;
+3. **crear y guardar listas** (presets);
+4. **más de 4 pistas**: «es un modo lista, no un modo solo 1 copa»;
+5. **sonido** al agregar y al quitar una pista;
+6. en la playlist, que **los demás puedan sugerir pistas** y que los personajes se elijan **después** de aceptar la
+   lista; al terminar cada carrera, ver la playlist un momento con la opción de **agregar más**; si el anfitrión se va,
+   **cambiar de anfitrión** solo;
+7. «el **modo copa** es simplemente seleccionar una de las copas existentes y jugarla».
+
+Más tarde, viendo el modo copa (los 4 planos blancos): **«esto está mal… se ve feo»**. Pidió pensarlo con un
+**crítico externo**: poder recorrer con el mouse **las pistas una por una, con sus cinemáticas y sus planos**, y quizás
+**miniaturas**.
+
+### 1. La lista (`lista-pistas.mjs`, sin dibujar nada)
+
+La lógica va aparte para probarla en el banco sin el juego; `interfaz.mjs` la dibuja.
+
+| Pieza | Qué hace |
+|---|---|
+| `crearLista` | Las pistas en orden (`{copa, fila}`), hasta **32** (el tope de carreras de una copa de VS del juego). `alternar(p)`: un clic agrega al final o quita si ya estaba. Subir, bajar, quitar, vaciar, llenar al azar con semilla (sin repetir). Cada cambio se guarda en el **borrador** del navegador (`mkw.lista`): al volver a abrir, la lista sigue ahí. |
+| `crearPresets` | Las **listas guardadas** con nombre (`mkw.listas`, hasta 30; el mismo nombre reemplaza). |
+| `crearSonidosLista` | Sonidos hechos con **osciladores de WebAudio**: agregar (660 → 990 Hz, sube), quitar (620 → 410 Hz, baja), «llena» (180 Hz, sordo) y «llegó una sugerencia» (880 → 1320 Hz). Usan la salida de sonido del juego, así respetan el volumen y el silencio de la página. |
+
+**Un jugador con una lista de N pistas:** el piloto escribe en el juego cuántas carreras tiene la copa de VS
+(`SectionParams+0x64` = N; SectionParams se lee de SectionMgr 0x809C1E38 → +0x98), en `menus.mjs`. Probado con
+`prueba-copa --cinco`: se corren las 5 pistas pedidas, con su semilla, y el número de carrera avanza 1…5.
+
+### 2. El lag de las vistas previas: medido y arreglado
+
+Con la red simulada hasta R2 (50 ms), pasar el mouse por las pistas daba **P90 335 ms y hasta 1,5 s** hasta ver la foto.
+La causa: el paquete de fotos (~1 MB cada 48 pistas) recién se pedía al primer paso del mouse, y además competía con
+los paquetes de videítos. Lo que se hizo:
+
+- `imagenes.precargar()`: apenas se abre el selector se bajan en fila los paquetes de copas, planos y fotos;
+- el videíto se pide recién si el mouse se queda **0,7 s** en una pista (en el modo copa: 250 ms, ver 4);
+- los nodos de la vista se arman **una vez** y después solo cambian; una imagen nueva se muestra recién
+  **decodificada** (sin parpadeo);
+- barrer con el mouse solo muestra la pista que queda debajo **60 ms** (filtro antirrebote).
+
+### 3. La lista siempre a la vista, revisada por un crítico (12 puntos)
+
+Se le dieron a un **crítico de diseño** (otro agente) las fotos del selector en 5 anchos y el código. Lo aplicado:
+
+- **pantalla ancha**: la cabecera con el buscador queda **fija arriba** al desplazar; el costado (390 px) queda quieto
+  con la **lista arriba, alta**, y la vista previa como una **franja** abajo (foto + plano de 110 px);
+- **colores con regla**: amarillo = lo elegido (las pistas de la lista, con su número), lila = el paso del mouse;
+- «Confirmar» es el **botón grande** de la portada; las **listas guardadas** van en un menú, con borrar en **dos
+  pasos** («¿Borrar?») y **«Deshacer»** 8 s después de vaciar o de cargar una encima de otra;
+- **celular (< 900 px)**: el costado es una **hoja pegada abajo** (plegada: su cabeza y Confirmar); sin vista previa
+  flotante en el modo lista (la foto del renglón alcanza); botones de **40 px** o más con el dedo;
+- **la Copa 79 tapada**: la grilla deja libre al final el alto de la hoja (lo mide un `ResizeObserver`); con el mouse en
+  una ventana angosta, la vista previa va a la **mitad libre** (si la copa señalada está abajo, la vista sale arriba).
+
+### 4. El modo copa nuevo (segunda revisión crítica)
+
+El crítico encontró 8 problemas; los grandes: dos vistas que no se parecían (la de la copa y la de cada pista) y el panel
+que saltaba ~150 px; la imagen más grande era la menos linda (las siluetas blancas) mientras el video, que es lo que da
+ganas de jugar una copa, no aparecía; ~300 px vacíos; el amarillo usado para el paso del mouse; y **un clic suelto que
+elegía la copa de toda la sala** sin querer. Lo hecho:
+
+- **un solo panel de alto fijo**: arriba la copa («Copa 3 · 4 carreras»); al medio el **videíto** de la pista (sobre su
+  foto, con fundido de 140 ms), su número «2/4», su nombre y tu mejor tiempo si hay, y el **plano como minimapa** en la
+  esquina (al pasar el mouse se agranda al doble); abajo las **4 miniaturas** y el botón amarillo **«Jugar la Copa N»**;
+- **pista por pista**: pasar por la copa la muestra y **avanza sola cada 4 s** (con una barrita de avance; se detiene
+  con el mouse encima del panel); pasar por una pista de la tarjeta o por una miniatura muestra esa al toque; **← →** o
+  **1–4** en el teclado;
+- **marcar y confirmar**: un clic marca la copa (anillo amarillo); «Jugar la Copa N», **Enter** o **doble clic** la
+  confirman. Al cruzar otras copas camino al botón, el panel vuelve a la marcada al salir de la grilla.
+  «🎲 Una al azar» marca una (no la juega);
+- **la tarjeta de cada copa** lleva la **tira de sus 4 fotos** (carga perezosa: solo las que se ven) y las pistas
+  numeradas como texto;
+- **celular**: el panel va **abajo** (el botón queda bajo el pulgar), las 4 miniaturas en 2×2 al lado del video, no pasa
+  de ~45 % del alto, y la tarjeta tocada se desplaza para que no quede tapada; deslizar de lado sobre el video cambia
+  de pista. Desplazar la grilla ≥ 32 px cierra el panel, salvo con una copa marcada (tiene el botón de jugar);
+- con **menos movimiento** o **ahorro de datos**: sin videítos, sin avance solo y sin fundidos.
+
+### 5. Las sugerencias de la playlist (`playlist-sala.mjs` + el selector)
+
+El modelo (sin dibujar ni mandar mensajes): la lista del anfitrión y las sugerencias `{id, de, copa, fila, estado}`.
+Reglas: no se sugiere una pista que ya está en la lista ni una que ya espera respuesta; hasta **8 pendientes por
+persona**; con la lista llena (32) no se sugiere más; si el anfitrión agrega por su cuenta una sugerida, cuenta como
+aceptada; se guardan las últimas 40 respondidas para que cada uno vea cómo le fue. El estado entero se **exporta** y
+viaja dentro del estado de la sala: el anfitrión nuevo lo **importa** y sigue numerando sin chocar; lo raro que llegue
+por la red se descarta.
+
+En el selector:
+
+- **el anfitrión** (modo lista con `sugerencias: true`): un panel «Sugerencias» con la foto, el nombre, quién la sugirió
+  y **✓** (entra al final de la lista) / **✕**; un chip **«💬 N»** en la cabeza de la lista (se ve aunque la hoja esté
+  plegada en el celular); un «ding» cuando llega una nueva; en la grilla las sugeridas llevan 💬;
+- **los demás** (modo **sugerir**): la misma grilla, pero un clic **sugiere**; al costado, la **lista de la sala** (solo
+  para ver, se actualiza sola) y **«Tus sugerencias»** con ⌛ Esperando / ✓ En la lista / ✕ No entró (con sonido cuando
+  cambia); el selector lo cierra la sala cuando el anfitrión confirma, o «Listo» entre carrera y carrera.
+
+### 6. El sitio
+
+La sala del sitio ya no pregunta «Carreras»: la **copa** es una copa del juego (siempre 4 carreras) y la **playlist** una
+lista de hasta 32 que se arma en el juego con las sugerencias de todos (`colabtex/src/juegos/mkw.js`, textos del
+vestíbulo, del menú de crear sala y del manual). Pruebas del sitio: `mkw.test` + `juegos.test` **37/37**.
+
+### 7. Conectado en la sala (`sala-carrera.mjs` y `mkw.mjs`)
+
+Cuando la sesión de §75 terminó con esos archivos, el selector nuevo entró a la sala:
+
+- **Copa**: el anfitrión ve el **modo copa** («Elige la copa de la sala»); al confirmar, la sala corre las 4 pistas de
+  esa copa. Si la copa se fija sin el selector (un anfitrión nuevo, las pruebas), el selector se cierra solo.
+- **Playlist, al empezar** (la fase «copa» del árbitro): el anfitrión arma la lista en el **modo lista con
+  sugerencias** (con su propio borrador, `mkw.lista.sala`); cada cambio va al estado de la sala (`listaCambio`) y los
+  demás lo ven en su **modo sugerir**. Una sugerencia viaja como `{t:'sugiero', copa, fila}`; el anfitrión la pasa por las
+  reglas de `playlist-sala.mjs` y la deja en el estado (`estado.lista`). Recién cuando el anfitrión **confirma**, la
+  sala pasa a elegir personaje (el selector de los demás se cierra solo).
+- **Playlist, entre carrera y carrera**: mientras se ven los resultados aparece al costado el **panel de la playlist**
+  (`playlistBreve`): las que vienen, «N de M corridas» y «+ Agregar pistas» (el anfitrión) o «Sugerir pista» (los demás).
+  «+ Agregar pistas» abre el selector con **solo las que vienen** (las corridas y la que se acaba de correr no se tocan:
+  `restantesCambio`) y **pausa** la sala: los resultados esperan hasta 60 s; al cerrarlo, 3 s más y la carrera siguiente.
+  Las sugerencias aceptadas durante la copa entran al final y alargan la copa (`carreras` crece); si el anfitrión deja
+  la lista sin pistas por delante, la copa termina con la carrera que se corrió.
+- **Anfitrión nuevo**: la lista y las sugerencias van dentro del estado que se reparte cada segundo, así que el nuevo ya
+  las tiene; si estaba sugiriendo, su selector de sugerir se cierra y se le abre el de armar.
+- Un jugador: el aviso de la copa a tu gusto dice «carrera n de N» (antes, siempre «de 4»).
+
+### Trampas
+
+- **La hoja de abajo quedó en alto cero**: la lista tenía `flex: 1 1 0` (crecer desde cero), y dentro de un contenedor
+  cuyo alto lo pone el contenido, «desde cero» es cero. En la hoja va `flex: 0 1 auto`.
+- **Una clase con el mismo nombre** (`.fila`) ya la usaba el panel de los mandos: los renglones de la lista pasaron a
+  llamarse `renglon`.
+- **Enter después de «Una al azar»** volvía a apretar ese botón (el foco queda en él) y marcaba otra copa: ahí Enter
+  juega la marcada.
+- **Un salto de desplazamiento grande no cerraba la vista**: el primer aviso de desplazamiento solo anotaba desde
+  dónde contar. Ahora se cuenta desde que la vista se abre.
+- **La pista resaltada de la copa anterior** quedaba marcada al cambiar de copa: se limpia al cambiar.
+
+### Pruebas
+
+- banco `lista-pistas` **43/43** (agregar/quitar, 32 como tope, sorteo con semilla, borrador, presets, los cuatro
+  sonidos y el silencio) y `playlist-sala` **25/25** (sugerir, reglas, aceptar, rechazar, lista llena, exportar e
+  importar como al cambiar de anfitrión, datos raros, las respondidas viejas).
+- banco `sala-playlist` **33/33** (la playlist del árbitro: empieza armando la lista, sugerir y sus reglas, solo el
+  anfitrión cambia y acepta, recién al confirmar se elige, alargar la copa durante la carrera, «+ Agregar pistas» pausa
+  los resultados y tiene tope de 60 s, las corridas no se tocan, el anfitrión nuevo sigue con todo, sin pistas por
+  delante termina, la copa normal no tiene lista), `sala-carrera` **46/46** y el banco entero **29/29**.
+- `prueba-elegir` **65/65**: el modo copa nuevo (14: panel nunca vacío, tira de fotos en cada tarjeta, pista por pista
+  con el mouse y con →, el videíto, marcar sin jugar, volver a la marcada, «Jugar la Copa 4», avance solo a los 4 s,
+  «Una al azar» + Enter, doble clic), el modo lista (17), las sugerencias (15: el anfitrión acepta y rechaza, el
+  «ding», quien sugiere ve la lista sin poder cambiarla, ⌛ → ✓ con sonido) y el panel de entre carreras (6).
+- `prueba-playlist` **17/17** (nueva, el juego en dos pestañas): A arma y B sugiere, lo de A le aparece a B, la
+  sugerencia llega con «💬 1» y A la acepta, recién al confirmar se elige personaje, la carrera 1 con la pista 1, el
+  panel en las dos al terminarla, B sugiere desde ahí, A agrega mientras la sala espera (pasados los 9 s de
+  resultados), la carrera 2 con la pista que venía y la playlist con 3 en las dos, sin errores.
+- `prueba-sala` **25/25** (la copa, dos pestañas): el selector de copas en la anfitriona, que se cierra solo; el resto
+  igual que en §75 (y la regla «DNF» de §77).
+- `prueba-copa --cinco` **13/13** (un jugador, lista de 5: las 5 carreras con la pista y la semilla pedidas, 11,7 min).
+- Fotos del selector en 1280, 1000×650, 820, 700 y 390 px: la última copa nunca queda tapada (medido).
+
+```bash
+node banco/correr.mjs lista-pistas playlist-sala sala-playlist sala-carrera
+node web/navegador/prueba-elegir.mjs
+node web/navegador/prueba-copa.mjs --cinco
+node web/navegador/prueba-playlist.mjs
+node web/navegador/prueba-sala.mjs
+```
+
+### Lo que falta
+
+- Pasar todo esto a la copia del juego que lleva el sitio (`subir-kit`) y probarlo en la página de Juegos de esta PC
+  (`prueba-experiencia`, que ya usa «Una al azar» + «Jugar la Copa N»).
+- La prueba de dos pestañas no prueba el cambio de anfitrión con la playlist a medio armar (lo prueba el banco
+  `sala-playlist`, sin el juego).
+
+## 2026-10-19 · §75 Volver a la sala tras recargar, la carrera que termina sola y la copa con sus puntos
+
+### Qué pidió el dueño (2026-10-19)
+
+1. **Volver tras recargar (M11)**: si alguien recarga la página (o se le corta la red) a mitad de la copa, que vuelva
+   a la sala, a SU puesto y con lo que había elegido, sin desordenar la carrera de los demás.
+2. **La copa entera con los puntos de verdad**: que la tabla del final sume lo que el juego dio en cada carrera.
+3. Un **error grave** que vio probando: «no se está terminando la carrera si hay un jugador que no la ha terminado;
+   debiera terminar igual que en el juego normal, bajo las mismas normas, pero que no lo eche de la sala si está
+   quieto». (Lo de no echarlo ya estaba: el control de inactividad del juego sigue apagado, §72.)
+
+(Este trabajo es §75 y no §74 porque otra sesión, a la vez, usa §74 para el selector de pistas en modo lista.)
+
+### La idea en una línea
+
+Cada página da un **latido** cada segundo; con eso la anfitriona sabe quién está y escribe en el estado, al empezar
+cada carrera, **quién queda fuera** (el **plantel**): todas las consolas corren esa carrera con la misma lista. Quien
+recargó **se salta** la carrera en curso (lo avisa en su latido, así nadie lo espera 30 s) y entra en la siguiente. La
+carrera **termina sola** con el **tiempo límite** del modo en línea del juego, y los **puntos** los suma el juego una
+vez por carrera, en el mismo cuadro en todas las consolas.
+
+### 1. Volver tras recargar: el árbitro de la sala (`sala-carrera.mjs`)
+
+Antes, una página recién cargada arrancaba su árbitro "en cero" (fase copa, estado número 0) y lo mostraba enseguida:
+si la copa ya iba por la carrera 2, durante un segundo creía que la sala recién empezaba, y esa "primera vista" la
+gastaba en una sala falsa. Peor: si la que recargaba era la anfitriona, su sala nueva **mandaba** sobre las de los
+demás. Ahora:
+
+- **Latido** (`{t:'aqui', v, salta}`): cada página manda cada 1 s «sigo aquí, tengo el estado número `v`, me salto la
+  carrera `salta`». Cada mensaje que llega anota a su autor en `vistos` (con la hora).
+- **Sala lista**: la página no muestra nada (ni llama `alCambiar`) hasta saber en qué va la sala. Los demás, con el
+  primer reparto de la anfitriona; la anfitriona, cuando ya oyó a todos (mínimo 2 s, máximo 8 s:
+  `ESPERA_COPIA_MS`, `ESPERA_TODOS_MS`). Mientras tanto la página dice «Conectando con la sala…».
+- **Copia del estado** (`dame` / `copia`): si la anfitriona recargó, los latidos de los demás traen un número de estado
+  más alto que el suyo (0): les pide la copia, la adopta y sigue desde ahí con un número más alto que todos.
+- **Plantel** (`fuera`): al empezar cada carrera la anfitriona escribe en el estado los humanos que no dieron latido en
+  los últimos 10 s (`PRESENTE_MS`). Para esa carrera van "sin nadie" en todas las consolas.
+- **Saltarse la carrera** (`saltar(n)`): quien recargó y ve que la sala ya está en la carrera `n` no entra (su consola
+  no tiene los cuadros que ya pasaron: se desincronizaría); lo dice en su latido y entra en la siguiente, con su
+  puesto y lo que había elegido (están en el estado de la sala: `picks`).
+
+### 2. La carrera sincronizada con plantel (`lockstep.mjs`)
+
+- `fijarCarrera(k, fuera)`: los mandos de `fuera` quedan **cortados desde el cuadro 0** de la carrera `k`, en todas
+  las consolas igual; los demás corren aunque se hubieran cortado en la anterior (sin plantel, como antes: los cortes
+  pasan de una carrera a la otra).
+- **Quién decide** (el que anuncia el retraso y propone los cortes) sale del plantel: el primer humano que corre esa
+  carrera (`decisorDe(k)`). Antes era "el primero de la lista", que podía ser justo el que no estaba.
+- `saltar(mando, k)`: con el aviso del latido, el corte de quien se fue se propone **enseguida** (~1 s) en vez de
+  esperarlo 30 s (`esperaCorte`).
+- `enCuadro(k, cuadro, fn)`: una acción en el MISMO cuadro de la carrera en todas las consolas (la usan las pruebas).
+
+### 3. La carrera que termina sola: el tiempo límite del juego (`lockstep_nativo.cpp`)
+
+**Por qué no terminaba.** Nuestras salas corren la carrera como una VS "local" del juego (`GMDataVS`), que espera a
+que **todos** los humanos crucen la meta. Si uno se queda quieto, la carrera no termina nunca. El modo **en línea** del
+juego tiene una regla para eso: `GMDataOnlineVS::Update` (0x8053F2A4) mira el reloj de la carrera y, cuando pasa del
+**límite** (5:00 en el juego original; Retro Rewind lo cambia por el número que guarda en 0x818759B0 —en esta versión
+está en 0, así que vale el del juego—), a cada piloto que no cruzó la meta le termina la carrera con un **tiempo
+estimado** por lo que avanzó (0x805342E8 con 4 y 1). Su puesto es el que tenía en la pista.
+
+**Lo que hicimos.** Envolvemos `Raceinfo::Update` (la versión de RR, `rr_overlay_805331B4`, en `REEMPLAZOS` de
+`compilar-web.py`) y, en la sala, hacemos lo mismo con los humanos: el reloj de la carrera es parte de la simulación,
+así que el límite pasa en el MISMO cuadro en todas las consolas. Nadie sale de la sala: solo termina SU carrera.
+- `?limite=N` (segundos) = otro límite, solo para pruebas (esperar 5 minutos de carrera no da).
+- `window.mkwLimiteCarrera()` = el límite que usa el juego, en ms (para mirar).
+
+### 4. Terminar la carrera por código, en las pruebas (`mkwTerminarEn`)
+
+En la prueba nadie maneja, y una carrera entera son minutos. `window.mkwTerminarEn(cuadro, carrera, puestos)` pide, con
+`enCuadro`, que en ese cuadro el juego corra `RaceinfoPlayer::EndLap` (0x805349B8, la función que corre al cruzar la
+meta) hasta pasar la última vuelta de esos humanos. Lo demás (el puesto, el tiempo, el fin, los puntos) lo hace el
+juego como siempre. `puestos = [0]` = solo llega A (así se prueba el tiempo límite con B quieto).
+
+### 5. Los puntos de la copa, una vez por carrera
+
+**Por qué faltaban.** Racedata tiene dos fichas de la carrera: la de los **menús** (+0xC10) y la de la **carrera** en
+curso (+0x20, una copia que se hace al empezar). El juego suma los puntos (`RacedataScenario::UpdatePoints`,
+0x8052E950) en la de los menús, y recién cuando la **pantalla de resultados** llena su tabla
+(`GPVSLeaderboardUpdate::FillRows`, 0x8085C858). En la sala esa pantalla puede no llegar a llenarse (la carrera
+siguiente abre directo; o quien recargó se la saltó), y la tabla de la copa salía con los puntos de **una** carrera
+(73 en vez de 146).
+
+**Lo que hicimos.** En la sala, en el primer cuadro con la carrera terminada (etapa 4 o más: los puestos ya son los
+finales), llamamos nosotros a `UpdatePoints` sobre la ficha de los menús, igual que la pantalla de resultados. Y una
+envoltura de `UpdatePoints` hace que, en esa misma carrera, las llamadas de las tablas no sumen otra vez (una bandera
+que se baja cuando corre una carrera nueva). Así los puntos se suman una vez, en el mismo cuadro en todas las
+consolas, se vea o no la pantalla de resultados. La tabla de la copa (`tablaDelJuego`) los lee de la ficha de los menús.
+(Tiene que ser una sola vez: la misma función también suma el VR/BR del jugador, `RKSYS::Rating::AddPoints`, y eso sí
+se acumularía.)
+
+**Y la segunda carrera sumaba desde cero.** Con eso la carrera 1 ya daba 73, pero la tabla final traía solo la última
+carrera (A 15, B 0). Leyendo `UpdatePoints`: cada jugador tiene dos números, **los puntos de antes de esta carrera**
+(+0xD8) y **el total** (+0xDA), y la función hace total = de antes + los de esta carrera. El "de antes" lo pone el
+menú del juego que lleva a la carrera siguiente, que en la sala no pasa (abrimos cada carrera directo). Arreglo en
+`escribirFicha` (`directo_nativo.cpp`): en cada carrera que no es la primera, "de antes" = el total que lleva. Como en
+un medidor de energía con lectura anterior y lectura actual: si nadie anota la lectura anterior al cerrar el período,
+el consumo del período siguiente se calcula contra cero.
+
+**Y quien recargó no tiene los puntos de las carreras que se saltó.** Con lo anterior la copa ya sumaba bien en las
+consolas que corrieron todo; pero en la prueba con recarga la tabla de B (que se saltó la carrera 1) traía solo la 2,
+distinta de la de A. Arreglo en la sala: al terminar cada carrera cada página manda, con su aviso, los 12 puntos que
+lleva su consola y **desde qué carrera corrió** (`termine(n, puntos, desde)`). La anfitriona deja en el estado
+`puntos: {carrera, tabla, desde}` con la tabla de quien corrió desde más atrás (todas las que corrieron todo tienen la
+misma: es la misma carrera). Cada consola, al abrir la carrera siguiente, escribe esa tabla en su juego
+(`ponerPuntos`: +0xDA de cada puesto, en dos bytes con el más alto primero, como guarda los números la Wii) antes de
+la ficha, y la tabla final sale de ahí. Así quien volvió termina la copa con los mismos puntos que los demás.
+
+### 6. La página (`mkw.mjs`, solo el bloque de la sala)
+
+- Al abrir cada carrera (desde la 2): los puntos de la sala en el juego (`ponerPuntos`); al terminarla, el aviso
+  lleva los puntos de esta consola y desde qué carrera corrió; la tabla del final, la de la sala.
+
+- La página no mira el estado inicial de su árbitro (era el de una sala nueva): espera a que la sala esté lista
+  («Conectando con la sala…»).
+- Si la primera vista ya es una carrera, o la anfitriona la dejó fuera de esa carrera: «La copa ya empezó: entras en la
+  carrera siguiente…» (o «…al final verás la tabla», si es la última), y se salta esa carrera.
+- `alSalta`: el latido de otro dice que se salta la carrera `k` → `lockstep.saltar(su mando, k)`.
+
+### Trampas
+
+- **La "primera vista" se gastaba en la sala falsa**: la llamada `alCambiarSala(sala.estado())` al armar la página
+  usaba el estado inicial (copa, número 0). Quien recargaba en la carrera 2 entraba a la carrera en curso desde el
+  cuadro 0, desincronizado. Ahora la sala avisa recién cuando sabe en qué va.
+- **Los puntos son "de antes + de esta"**: sin el "de antes" la copa suma solo la última carrera (ver 5).
+- **Los puntos están en la ficha de los menús**, no en la de la carrera: la de la carrera se queda con los de antes de
+  empezar. Y llegan cuando los suma la pantalla de resultados (de ahí el arreglo de 5).
+- **Mensajes viejos en el banco**: una sección del banco dejaba mensajes en camino que le llegaban a la página nueva de
+  la siguiente (y la hacían pedir una copia). Ahora se vacían los relojes antes de empezar otra.
+- **La vigía de la página puede ver el fin un cuadro antes que los puntos**: cuando el tiempo límite termina la carrera,
+  la etapa pasa a 4 al final de ese cuadro y los puntos se suman en el siguiente. La página mira cada 0,5 s: si mira
+  justo entre los dos, manda la tabla de antes, y como la anfitriona se queda con la primera (con el mismo "desde"),
+  la copa salía con 73. Ahora la página espera a que el juego diga que ya los sumó (`mkw_sala_puntos_sumados`).
+- **Dos compilaciones a la vez congelan las pruebas**: mientras otra sesión enlazaba su `.wasm`, las dos pestañas se
+  quedaron 20 a 45 s sin dar un cuadro; la carrera sincronizada cortó a la que no respondía (lo que tiene que hacer) y
+  la prueba salió mal. Repetida sin la otra compilación, bien. Se coordina: una compilación a la vez, y las pruebas con
+  el juego no mientras otra compila.
+- **El reloj de la carrera se lee en cada pestaña en su momento**: 45195 contra 45211 ms (un cuadro). La prueba pide
+  que difieran menos de 0,5 s; que la carrera fue la misma lo dice la tabla, igual en las dos.
+- **El selector de pistas cambia a la vez** (la otra sesión, §74: modo lista): `prueba-sala` ya no aprieta sus casillas;
+  fija la copa con `mkwSala.ponerPistas` (lo mismo que hace el selector al confirmar) y cierra el selector con Escape.
+
+### 7. El detector de pantalla partida, sin falsos positivos (`foto-pantalla.mjs`)
+
+Dos veces la prueba dijo «pantalla partida» con una sola vista en la foto: en la largada, la raya del globo con el
+nombre del otro piloto («Piloto») cae justo en la fila del medio y salta mucho. Pero una costura de verdad cruza toda
+la imagen y esa raya no: ahora el detector mide también el **ancho** del salto (qué parte de las columnas cambia de
+golpe en esa fila) y pide más de 0,3. Calibrado con las fotos de las pruebas (una vista: la raya del globo da 0,16) y
+con pantallas partidas armadas juntando dos fotos de verdad (0,43 a 1).
+
+### Pruebas
+
+- Banco `sala-carrera` **46/46** (nuevas: la sala no se muestra hasta estar lista; Caro que no llega queda `fuera` y
+  vuelve en la siguiente; la anfitriona que recarga adopta la copia; los puntos de la sala, que se quedan con la tabla
+  de quien corrió desde más atrás) y `lockstep` **42/42** (nuevas: quien se va avisando se corta en ~1 s; el plantel
+  de la carrera, igual en las consolas aunque una recién llegue; `enCuadro`). Banco entero **28/28**.
+- `prueba-sincro --directa` **13/13** (la carrera de dos pestañas sigue igual).
+- `prueba-sala` (la copa entera de 2 carreras): **25/25**. La carrera 1 la terminan los dos en el mismo cuadro
+  (73 puntos, iguales en las dos); en la 2 llega solo A y B se queda quieto: termina sola al pasar el límite (45 s de
+  prueba: 45211 y 45295 ms leídos en cada pestaña) y la tabla suma 146 (A 12 + 15 = 27, B 15 + 0 = 15), la misma en
+  las dos. (Antes de los arreglos: la carrera 2 no terminaba nunca y la tabla daba 73.)
+- `prueba-sala --recarga` **27/28**: B recarga a mitad de la carrera 1, A sigue en pocos segundos, B ve «La copa ya
+  empezó: entras en la carrera siguiente…», A termina la 1 sola, B vuelve en la 2 en su puesto, con lo que eligió, su
+  pantalla y sus botones, la misma carrera en las dos, y la tabla es la misma en las dos (146). La que falló: «ningún
+  aviso encima de la carrera»: B mostraba «Se cortó la conexión con jugador 1: lo esperamos 27 s» porque A no dio
+  cuadros 2 a 4 s seguidos (el PC estaba ocupado con otra prueba y una compilación de otra sesión).
+
+```bash
+node banco/correr.mjs sala-carrera lockstep
+node web/navegador/prueba-sala.mjs
+node web/navegador/prueba-sala.mjs --recarga
+node web/navegador/prueba-sincro.mjs --directa --datos=build/web/datos/sincro-directa
+node banco/correr.mjs
+```
+
+## 2026-10-19 · §76 La música bajo el menú JloKart, que tardaba en sonar
+
+### Qué pidió el dueño (2026-10-19)
+
+«En el menú de inicio de JloKart demora en iniciar la música unos segundos». Esa música es la del **título del juego**,
+que arranca debajo del menú de la página. Se pidió reducir ese tiempo, nada más.
+
+### Qué se midió (antes)
+
+Con la latencia del sitio (`MKW_LATENCIA=50`, como R2 detrás del Worker): el menú aparece a los 0,2 s, pero la música
+sonaba a los **8,5–9,1 s** en la 1.ª visita y a los **5,5–6,1 s** con caché. Se probó qué atrasaba al juego hasta su
+título: no era la pantalla de la correa (StrapScene, la del aviso de la correa del Wiimote: se la midió y pasa en
+segundos fijos que no cambian), sino **el precalentado de los ~700 pipelines** al arrancar: el proceso de la GPU del
+navegador quedaba ocupado 3–4 s y el juego no avanzaba hasta su título. En la 1.ª visita, además, el juego leía su
+arranque del disco bloque por bloque, cada uno con su espera de red.
+
+### Qué se hizo
+
+1. **Precalentado postergado** (`aurora-main/lib/gfx/pipeline_cache.cpp`, en `parches/aurora-web.diff`): con la
+   variable `MKW_PRECALENTAR=tarde[:N[:M]]`, aurora guarda la lista y no la pide hasta que la página llama a la
+   función nueva `_mkw_web_pipelines_precalentar` (exportada en `herramientas/compilar-web.py`). Después la pide de a
+   N por cuadro (2) con M compilándose como mucho (4), contando los del propio juego. Sin la variable, todo igual.
+2. **La página** (`web/navegador/mkw.mjs`): pone la variable solo con el menú de inicio y **solo si este navegador ya
+   jugó antes** (marca `mkw.precalentado`, que se guarda 20 s después de llegar al título); llama a la función cuando
+   el juego llega a su primera pantalla (o a los 30 s). `?precalentarTarde=1/0` lo fuerza o lo apaga.
+3. **Semilla del arranque** (`mkw.mjs`, `adelantarArranque`): los bloques de `bloques.json` que el juego lee antes
+   del cuadro 450 se piden todos al abrir (por `disco.adelantarRango`). `?semillaArranque=0` lo apaga.
+4. **Carpeta en racha** (`web/navegador/disco.mjs`, `vecinos`/`adelantarCarpeta`): los fantasmas del menú «Un
+   jugador» llegan por carpeta. `?vecinos=0` lo apaga. Banco `disco`: **33/33** (con la parte g nueva, 6 puntos:
+   64 fantasmas = 4 esperas en vez de 32, de 995 ms a 254 ms).
+
+### Resultado
+
+| Del menú a la música | Antes | Ahora |
+|---|---|---|
+| 1.ª visita (sin caché) | 8,6 s | **5,5 s** (la semilla del arranque) |
+| Con caché (visitas siguientes) | 5,2–5,4 s | **3,2 s** (el precalentado postergado) |
+| Single Player → música del menú «Un jugador» | 2,1 s | 2,1 s (igual; los fantasmas por carpeta no lo cambian aquí) |
+
+`prueba-musica --comparar`: **11/11** (2026-10-19 20:34), sin cortes de música en ninguna visita. La espera que oye
+el dueño baja unos 3 s en la 1.ª visita y unos 2 s en las siguientes. Lo que queda (~3 s con caché) es lo que el juego
+tarda en cargar su título; bajarlo más exigiría tocar la carga del juego, y el dueño pidió parar aquí.
+
+### Trampas
+
+- **En la 1.ª visita no se puede postergar**: sin la caché de shaders, compilar los ~700 con la música sonando trababa
+  el juego (cuadros de hasta 854 ms) y la música se cortaba. Por eso la marca de "ya jugó".
+- **Medir con otras pruebas corriendo engaña**: si otra sesión corre una prueba con el juego o compila, los tiempos se
+  duplican. Antes de medir, ver que no haya otros Chrome/compiladores ocupando la CPU.
+- **Perfiles de Chrome en rutas largas**: con la carpeta de prueba dentro de una ruta larga, Windows (límite de 260
+  letras) rompe el almacenamiento de caché de Chrome («UnknownError»). Los perfiles van en la carpeta temporal.
+- **La cola de la música del título** suena todavía al entrar al menú «Un jugador»: la prueba cuenta la música nueva
+  recién cuando la página 0x69 de ese menú está activa.
+- El `.wasm` principal (`build/web/navegador`) necesita **volver a enlazarse** para tener la función nueva; mientras
+  tanto la página no la encuentra y sigue con el precalentado al arrancar (no se rompe nada).
+
+### Pruebas
+
+```bash
+node banco/correr.mjs disco
+node web/navegador/prueba-musica.mjs --comparar
+```
+
+
+## 2026-10-19 · §77 El reloj de los que faltan: 30 s después de que llega el primero («DNF»)
+
+### Qué pidió el dueño (2026-10-19)
+
+Aplicar la regla de las carreras en línea de Mario Kart 8 (el «temporizador DNF»): el reloj empieza en el instante en
+que el primero cruza la meta; los demás tienen 30 s; si no llegan, la carrera se da por terminada y quedan en el puesto
+en que iban. Hasta §75 la carrera de la sala terminaba sola solo con el tiempo límite (5:00): un humano quieto hacía
+esperar a los demás casi 5 minutos.
+
+### Lo que hicimos
+
+En `lockstep_nativo.cpp`, dentro de la misma envoltura de `Raceinfo::Update` de §75 (la parte (4)):
+
+- En cada cuadro de la carrera, mientras nadie llegó, se mira si algún humano de la sala cruzó la meta
+  (RaceinfoPlayer +0x38, bit 0x2). En el primer cuadro en que pasa, se anota el **reloj de la carrera** de ese cuadro.
+- Cuando el reloj de la carrera pasa de ese momento + 30 s, a cada humano que todavía no llegó se le termina la
+  carrera con la misma función que usa el tiempo límite del juego en línea (0x805342E8 con 4 y 1: un tiempo estimado
+  por lo que avanzó, y el puesto el que tenía en la pista). Con todos los humanos llegados, el juego da la carrera por
+  terminada (§73: `CanRaceEnd`) y la sala sigue con los resultados.
+- Al empezar cada carrera (etapa menor que 2) el reloj se borra.
+- El tiempo límite de 5:00 sigue: vale si ningún humano llega en 5 minutos.
+
+**Decisión: lo dispara el primer HUMANO, no una CPU.** La regla está para que los que ya terminaron no esperen; si solo
+llegaron CPU, no está esperando nadie, y con las CPU de relleno un humano lento quedaría cortado a los 30 s de la CPU
+ganadora sin que nadie lo esté esperando.
+
+**Por qué en el juego y no en la página:** el reloj de la carrera es parte de la simulación (reloj fijo de la carrera
+sincronizada), así que el plazo vence en el MISMO cuadro en todas las consolas, y nadie tiene que avisar nada por la red.
+
+Para mirar o probar: `Module._mkw_sala_dnf(ms)` = otro plazo (0 = 30 s); `mkw_sala_dnf_desde()` = el reloj de la carrera
+cuando llegó el primero (−1 = todavía nadie).
+
+### La prueba (`prueba-sala.mjs`)
+
+En la carrera 2 llega solo A (por código, `mkwTerminarEn` con el puesto 0) y B se queda quieto. La prueba anota el
+reloj de la carrera cuando A cruza la meta (mira cada 0,5 s el bit 0x2 de los dos: el campo nuevo `llegaron`) y pide
+que la carrera termine entre 29 y 31,5 s después, antes del tiempo límite (que en la prueba ahora es de 120 s, para que
+no se confunda con el de antes), en las dos pestañas, con B llegado (por el juego) y la tabla con 146 puntos.
+
+### Trampas
+
+- **La sala tiene dos sesiones trabajando a la vez**: los archivos de la sala (`sala-carrera.mjs`, el bloque de la sala
+  de `mkw.mjs`, `prueba-sala.mjs`, el banco `sala-carrera`) pasaron a la sesión del selector de pistas (§74). Para §77
+  se tocó solo el juego (`lockstep_nativo.cpp`) y, avisando antes, dos partes de `prueba-sala.mjs` (`leer` y el final),
+  conservando lo que esa sesión había cambiado.
+- **Una compilación congela las pruebas de la otra sesión**: hay que avisarse antes de compilar.
+- **La vigía de fin de carrera veía el fin de la carrera ANTERIOR** (venía de §73; lo destapó la tabla de §75): cuando
+  la anfitriona pasa a «correr n», la consola todavía está mostrando los resultados de la n−1 (la misma sección de
+  carrera, el Raceinfo viejo con la etapa ≥ 4 y los puntos ya sumados). La vigía de la página mira cada 0,5 s; si
+  miraba antes de que se abriera la carrera nueva, avisaba «terminé la n» con la tabla vieja. Consecuencia: la tabla
+  final salía con 73 (las dos veces que falló), y en una copa de 4 la anfitriona habría saltado a la carrera siguiente
+  9 s después de empezar la n. Depende del tiempo (más con el PC cargado), por eso a veces pasaba. Arreglo en
+  `mkw.mjs` (avisando a la sesión dueña de ese bloque): la vigía recién acepta la etapa ≥ 4 después de haber visto ESTA
+  carrera corriendo (etapa menor que 4). Como un relé con enclavamiento: no puede dar «fin» sin haber pasado antes por
+  «en marcha».
+
+### Pruebas
+
+- `prueba-sala` **25/25** (dos pestañas, la copa de 2): en la carrera 2 A llega con el reloj de la carrera en 4,0 s y B,
+  quieto, termina por el juego con el reloj en 34,0 s (A) / 34,1 s (B): **30,0 s después**, en las dos, mucho antes
+  del tiempo límite (120 s en la prueba). La tabla suma 146 (A 12 + 15 = 27, B 15 + 0 = 15), la misma en las dos.
+  La sesión del selector la corrió también con este juego: 25/25 (30,1 s).
+- Antes del arreglo de la vigía: 24/25, con la regla DNF bien (30,2 s) pero la tabla final con 73.
+
+```bash
+python herramientas/compilar-web.py --modo navegador
+node web/navegador/prueba-sala.mjs
+```
+
+## 2026-10-19 · §79 La cortina de Lakitu que no tapaba todo el alto: la imagen ahora es siempre 16:9
+
+**Qué vio el dueño** (una foto en el sitio, con el marco del juego casi cuadrado): «nota ese bug visual cuando
+sale del mapa, no se aplica el efecto para todo el stretch vertical». Al caerse en la Senda Arcoíris, la **cortina de
+rayas** del rescate de Lakitu (§68) cubría solo la franja del medio de la imagen; arriba (~300 px) y abajo (~300 px)
+seguía viéndose la pista. En la foto también se ve que el reloj y las vueltas no estaban arriba, sino a un quinto
+de la altura: el HUD también quedaba en la franja del medio.
+
+### 1. La causa: SDL3 agranda el canvas y el juego se estira
+
+1. El canvas nace con **854×480** píxeles por dentro (16:9) y la página lo muestra sin deformarlo
+   (`object-fit: contain`). Eso es lo que medí en §68, y por eso dije que «en nuestra página eso no pasa».
+2. Pero **SDL3**, la capa de ventana de aurora, escucha el aviso `resize` del navegador: con **cada cambio de tamaño**
+   de la ventana, o del marco del sitio, le pone al canvas por dentro **el tamaño de su recuadro**. Por ejemplo,
+   854×480 → 1786×1575. La prueba de §68 abría la ventana ya con su tamaño y nunca la cambiaba, así que eso no pasaba.
+   En el sitio, el marco de Juegos cambia de tamaño después de cargar (al acomodarse la página, al agrandar la ventana
+   o en pantalla completa), y desde ahí el juego "ve" una ventana casi cuadrada.
+3. Con una ventana que no es 16:9, el **aspecto dinámico** de WiiCompiled (`dynamic_aspect.cpp`, política
+   `AURORA_VIEWPORT_STRETCH`) estira la **escena 3D** para llenarla. Con una ventana alta usa la "expansión vertical":
+   la cámara ve más arriba y más abajo. Pero la **capa 2D** del juego (la cortina, el reloj, las vueltas, el mapa) se
+   dibuja sobre su hoja fija de 16:9, que queda en el medio. Es como agrandar la imagen de un proyector con una
+   transparencia encima: la transparencia no crece. Por eso la cortina tapa solo la franja 16:9 del medio. Con una
+   ventana muy ancha pasa lo mismo a los lados, que era lo primero que el dueño había contado en §68.
+
+### 2. El arreglo: `force_16_9` en el Config.toml de la página
+
+La página arma el `Config.toml` del juego cada vez (`mkw.mjs`). Ahora lleva:
+
+```toml
+[video]
+widescreen = true
+force_16_9 = true
+```
+
+Con esto WiiCompiled usa la política `AURORA_VIEWPORT_16_9`. El juego dibuja **siempre 16:9**, y lo que sobra del
+canvas lo pinta aurora de negro (las **barras**). Ya no importa la forma del canvas: la escena, el HUD y la cortina están
+en la misma imagen 16:9, como en la consola. `?aspecto=libre` vuelve al estirado de antes, para comparar.
+
+**Decisión** (tomada sola, como pidió el dueño): 16:9 siempre, en vez de arreglar el estirado. Las razones:
+- **Es la imagen del juego.** Mario Kart Wii se hizo para 16:9. Con el estirado se veía más cielo y más pista, pero el
+  HUD flotaba en el medio y cualquier efecto 2D de pantalla completa quedaba corto. La cortina era solo el que se notaba.
+  Arreglar eso habría sido corregir efecto por efecto dentro del juego.
+- **No cuesta nada.** aurora dibuja la escena a la resolución interna del juego, no a la del canvas. El cambio no suma
+  trabajo a la GPU: `prueba-navegador` da lo mismo de siempre (60,0 fps, máximo 5,2 ms por cuadro).
+- **Quita una diferencia entre consolas.** Con el estirado, en la sala, cada consola tenía la cámara con la forma de su
+  propia ventana. Ahora todas tienen la misma (16:9), y la carrera sincronizada no depende del tamaño de la ventana de
+  nadie.
+- **Lo que se pierde:** en un marco alto o muy ancho quedan barras negras dentro del canvas, en vez de una escena que lo
+  llena. En el celular acostado (más ancho que 16:9) quedan franjas finas a los lados.
+
+### 3. La prueba: `prueba-caida.mjs` ahora cambia el tamaño en plena carrera (7 puntos)
+
+La prueba abre la ventana en 960×540 (16:9) y, ya en carrera, la cambia a `--ancho × --alto`, igual que el marco del
+sitio. Así reproduce el caso del dueño. Cambios:
+- La cortina se mide en los **4 bordes** del canvas (antes solo izquierda y derecha), en el corazón del negro.
+- El brillo que decide "está oscuro" se mide en el centro de la **imagen 16:9** y ya no en toda la foto. Antes, en una
+  ventana alta, las barras negras oscurecían el promedio y los tramos oscuros salían largos y disparejos (3165, 2333 y
+  3384 ms; el 4.º punto fallaba por eso, no por el juego).
+- **6.º punto:** el canvas siguió a su recuadro al cambiar la ventana. Asegura que la prueba de verdad reproduce el caso.
+- **7.º punto:** fuera del negro, lo que sobra del canvas fuera de la imagen 16:9 es negro. La imagen no está estirada.
+- `--sin-cambiar` abre ya con el tamaño final, como antes.
+
+| Ventana (en carrera) | Imagen | Bordes en el negro | Lo que sobra, fuera del negro | Resultado |
+|---|---|---|---|---|
+| 900×1100, **`?aspecto=libre`** (lo de antes) | estirada a 900×1100 | **107, 114, 75** | **86,7** (se ve la pista) | 5 bien, **2 mal** (el bug) |
+| 900×1100 (alta, como la foto) | 900×506 + barras | 0,0, 0,2, 0,7 | 0,0 | **7 bien, 0 mal** |
+| 1800×760 (muy ancha) | 1351×760 + barras | 0,0, 3,2, 0,0 | 0,0 | **7 bien, 0 mal** |
+
+Los tres rescates duran 1944, 1905 y 1917 ms (igual que en §68), con el juego a 60 cuadros/s todo el rato. En las
+fotos (`build/web/datos/caida/`) las rayas cruzan toda la imagen 16:9 y las barras de arriba y abajo quedan negras.
+
+También: `prueba-tactil` **16/16** (el celular parado y acostado: el recuadro del juego ocupa justo la pantalla y el
+mando táctil no cambia) y `prueba-navegador 900` **21/21**.
+
+**Trampa para la próxima:** una prueba de imagen que nunca cambia el tamaño de la ventana no ve lo que pasa en el
+sitio. SDL3 solo agranda el canvas con un `resize`. Por eso la prueba ahora cambia el tamaño en carrera.
+
+```bash
+node web/navegador/prueba-caida.mjs --ancho 900 --alto 1100                     # alta, como la foto del dueño: 7/7
+node web/navegador/prueba-caida.mjs --ancho 1800 --alto 760                     # muy ancha: 7/7
+node web/navegador/prueba-caida.mjs --ancho 900 --alto 1100 --extra "&aspecto=libre"   # lo de antes: los bordes se ven (2 mal)
+```
+
+### 4. De paso: «Jugar la Copa» quedaba fuera de la vista en el sitio
+
+Al pasar el kit al sitio (`subir-kit.sh`) corrí `prueba-experiencia` (la sala con dos cuentas en la página de Juegos,
+ventana 1280×800). Se cortó en el punto 13: el botón **«Jugar la Copa N ▸»** del selector nuevo de §74 estaba «fuera de
+la vista» y no se podía apretar. La causa:
+- En el sitio, el marco del juego mide `100vh − 120 px` (680 px en esa ventana) y aparece **debajo** del vestíbulo:
+  empieza a 615 px del borde de arriba, así que casi todo el marco queda más abajo del borde de la ventana.
+- El panel de la copa va **pegado abajo del marco** (`position: fixed` dentro del marco). Una persona veía el título
+  «Elige la copa de la sala» y las primeras tarjetas, pero no el panel ni el botón, salvo que bajara la página. Playwright
+  no puede desplazarse hasta un elemento fijo, por eso la prueba lo destapó.
+
+Arreglo, en dos lados:
+- **El sitio** (`colabtex/src/juegos/mkw.js`, `verMarco()`): al aparecer el marco, `frame.scrollIntoView({ block:
+  "nearest" })` desplaza la página lo justo para verlo entero.
+- **El juego** (`mkw.mjs`, `mirame()`): al abrir un selector de la sala (la copa, la playlist, sugerir, «Lo que viene»,
+  «+ Agregar pistas»), le manda al sitio `{tipo:'mirame'}` y el sitio hace lo mismo. Sirve por si el jugador había subido
+  a leer el chat. Si el marco ya se ve entero, no se mueve nada.
+
+Resultado: `prueba-experiencia` **17/17**, con la carrera de los dos en el sitio. Las pruebas del sitio
+(`colabtex/tests/mkw.test.cjs`) dan 16/16 y el bundle `juegos-app.js` se rearmó con esbuild.
+
+```bash
+node herramientas/prueba-experiencia.mjs          # ~8 min: la sala de dos cuentas en el sitio, copa y carrera (17)
 ```

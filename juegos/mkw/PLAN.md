@@ -84,8 +84,19 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   esperando botones de la anterior (banco `lockstep` 37/37, §73)
 - ✅ M14. **Una sola vista por consola** (la pantalla salía partida): pantallas = 1 y locales = 1 al terminar la
   `RacedataScenario::Init` de RR; la foto lo comprueba (`foto-pantalla.mjs`; `prueba-sincro --directa` 13/13, §73.6)
-- 🟡 M11. Qué hace la sala cuando un jugador se corta: la carrera lo espera 30 s (margen, con aviso) y en nuestras salas
-  nadie sale por inactividad (§73). Falta: que quien recargó vuelva en la carrera siguiente sin perder su lugar
+- ✅ M11. Qué hace la sala cuando un jugador se corta: la carrera lo espera 30 s (margen, con aviso) y en nuestras salas
+  nadie sale por inactividad (§73). Quien recarga se salta la carrera en curso (lo avisa: nadie lo espera) y vuelve en
+  la siguiente con su puesto, lo que eligió y los puntos de la copa; si la que recarga es la anfitriona, pide la copia
+  del estado a los demás (latido, `fuera`, `saltar`, `dame`/`copia`; banco `sala-carrera` 46/46 y `lockstep` 42/42,
+  `prueba-sala --recarga` 27/28, §75)
+- ✅ M15. **La carrera termina sola** (error que vio el dueño: si un humano no llegaba a la meta, no terminaba nunca):
+  el tiempo límite del juego en línea (5:00; RR lo guarda en 0x818759B0), en el mismo cuadro en todas las consolas, y a
+  quien no llegó el juego le da un tiempo estimado; nadie sale de la sala por quedarse quieto. **La copa con sus
+  puntos**: el juego los suma una vez por carrera, la 2 se suma a la 1 y quien recargó usa la tabla de la sala
+  (`prueba-sala` con B quieto en la 2: 146 puntos, §75)
+- ✅ M16. **El reloj de los que faltan («DNF»)**, como en las carreras en línea de Mario Kart 8: cuando el primer
+  humano cruza la meta, los demás tienen 30 s; al vencer, el juego les termina la carrera en el puesto en que van (en
+  el mismo cuadro en todas las consolas). Lo dispara un humano, no una CPU (`lockstep_nativo.cpp`, `prueba-sala`, §77)
 - ⬜ M8. Abrir directo lo que falta: las carreras de un jugador (Racedata + sección de carrera) y Multiplayer local
 - ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
   sale de la cilindrada como en un Grand Prix (§73)
@@ -364,6 +375,54 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-19 21:03** — **El kit al sitio y «Jugar la Copa» a la vista** (§79.4). `subir-kit.sh` con §74–§79;
+  `prueba-experiencia` se cortaba: en el sitio el marco (100vh − 120 px) aparece debajo del vestíbulo y el panel de la
+  copa, pegado abajo del marco, quedaba fuera de la ventana. Ahora el sitio desplaza la página para ver el marco entero
+  al aparecer y cuando el juego abre un selector de la sala (`{tipo:'mirame'}`). `prueba-experiencia` 17/17,
+  `mkw.test.cjs` 16/16. Commits locales en los dos repos, sin push.
+- **2026-10-19 20:55** — **La cortina de Lakitu tapa toda la imagen: el juego es siempre 16:9** (§79). El dueño vio en el
+  sitio, con el marco casi cuadrado, que al caerse la cortina de rayas cubría solo la franja del medio. Causa: SDL3
+  agranda el canvas a su recuadro con cada cambio de tamaño, y el «aspecto dinámico» de WiiCompiled estiraba la escena
+  3D mientras lo 2D (cortina, HUD) quedaba en 16:9 al medio (la prueba de §68 nunca cambiaba el tamaño). Arreglo:
+  `force_16_9 = true` en el Config.toml que arma la página (`?aspecto=libre` = lo de antes): la imagen es 16:9 con barras
+  negras de aurora, sin costo de GPU, y todas las consolas de la sala con la misma cámara. `prueba-caida` cambia el
+  tamaño en carrera y mide los 4 bordes: 7/7 alta (900×1100) y ancha (1800×760); con `aspecto=libre` 5/7 (el bug).
+  `prueba-tactil` 16/16, `prueba-navegador` 21/21.
+- **2026-10-19 20:38** — **El reloj de los que faltan («DNF»)** (§77; M16). Pedido del dueño, como en las carreras en línea de
+  Mario Kart 8: cuando el primer humano cruza la meta, los demás tienen 30 s; al vencer, el juego les termina la carrera
+  en el puesto en que van (tiempo estimado), en el mismo cuadro en todas las consolas (`lockstep_nativo.cpp`). Y un
+  error de §73 que destapó la tabla: la vigía de fin de carrera podía ver los resultados de la carrera ANTERIOR y
+  avisar «terminé» al empezar la siguiente (la anfitriona habría saltado 9 s después; la tabla salía con 73): ahora
+  recién vale después de ver la carrera nueva corriendo. `prueba-sala` 25/25 (B termina 30,0 s después de A; 146
+  puntos). Commit local, sin push.
+- **2026-10-19 20:34** — **El selector nuevo, conectado en la sala** (§74.7). Copa: el anfitrión elige una copa del juego
+  (sus 4 pistas). Playlist: el anfitrión arma la lista y los demás le sugieren pistas (la lista y las sugerencias viajan
+  en el estado: el anfitrión nuevo sigue con ellas); recién al confirmar se elige personaje; entre carrera y carrera, el
+  panel de la playlist con «+ Agregar pistas» (los resultados esperan hasta 60 s) o «Sugerir pista». Banco
+  `sala-playlist` 33/33 (nuevo), entero 29/29; `prueba-elegir` 65/65; `prueba-playlist` 17/17 (nueva, dos pestañas);
+  `prueba-sala` 25/25.
+- **2026-10-19 20:35** — **La música bajo el menú JloKart suena antes** (§76). Del menú a la música: 1.ª visita 8,6 → 5,5 s
+  (semilla del arranque: lo que el juego lee hasta su título, pedido de una vez), con caché 5,4 → 3,2 s (los ~700 pipelines
+  se precalientan recién al llegar al título, `MKW_PRECALENTAR=tarde`, solo si el navegador ya jugó). Fantasmas del
+  Contrarreloj por carpeta (`disco.mjs`). `prueba-musica.mjs` 11/11, banco `disco` 33/33.
+- **2026-10-19 20:12** — **Volver a la sala tras recargar, la carrera que termina sola y la copa con sus puntos** (§75; M11,
+  M15). Quien recarga se salta la carrera en curso y vuelve en la siguiente con su puesto, lo que eligió y los puntos;
+  la anfitriona que recarga pide la copia del estado (latido cada 1 s, plantel `fuera` por carrera, `saltar`,
+  `dame`/`copia`). Error grave que vio el dueño: la carrera no terminaba si un humano no llegaba; ahora rige el tiempo
+  límite del juego en línea (5:00) en el mismo cuadro en todas, sin echar a nadie. Los puntos: el juego los sumaba
+  solo al llenar la pantalla de resultados y la 2 sumaba desde cero (el "de antes" lo pone un menú que la sala se
+  salta): se suman una vez al terminar, con el "de antes" en la ficha, y la tabla de la sala para quien recargó.
+  Pruebas: banco `sala-carrera` 46/46, `lockstep` 42/42, entero 28/28; `prueba-sincro --directa` 13/13; `prueba-sala` 25/25 (copa entera, B quieto en la 2:
+  termina a los 45 s de prueba, 146 puntos) y `--recarga` 27/28 (el que falla: un aviso de espera por el PC cargado);
+  detector de pantalla partida sin falsos positivos por la raya del globo del nombre. Commit local, sin push.
+- **2026-10-19 20:03** — **El selector de pistas rehecho con dos revisiones críticas** (§74). Modo lista: hasta 32
+  pistas (un clic agrega, otro quita, con sonido), listas guardadas con nombre, borrador que sobrevive a recargar,
+  siempre a la vista (hoja abajo en el celular; la Copa 79 ya no queda tapada) y sin lag (fotos precargadas: antes
+  P90 335 ms y hasta 1,5 s). Modo copa: un panel fijo con el videíto de cada pista, el plano de minimapa, 4 miniaturas
+  para recorrerlas una por una (avanza sola cada 4 s, ← →) y «Jugar la Copa N»; un clic marca y el botón confirma; la
+  tira de 4 fotos en cada tarjeta. Playlist: el anfitrión acepta o rechaza sugerencias y los demás sugieren
+  (`playlist-sala.mjs`). Un jugador con lista de N carreras. Sitio sin «Carreras». Banco `lista-pistas` 43 y
+  `playlist-sala` 25, `prueba-elegir` 59/59, `prueba-copa --cinco` 13/13, sitio 37/37. Falta conectarlo en la sala.
 - **2026-10-19 17:45** — **La sala nueva probada en la página de Juegos de esta PC** (§73.8). `prueba-experiencia`
   (el `jugar.bat`) recorre ahora la sala sin Retro WFC con dos cuentas: vestíbulo «2 de 4» → la anfitriona arma la copa
   con el selector → cada uno elige en el juego → la carrera 1 directo, parejos y con una vista cada uno (16/17; con el

@@ -18,7 +18,10 @@
 //
 // Cómo se engancha: como semillas_nativo.cpp (compilar-web.py, REEMPLAZOS).
 #include "ppc_runtime.h"
+#include "abi_bridge.h"
 #include "memory.h"
+
+#include <emscripten/emscripten.h>
 
 #include <cstring>
 
@@ -162,4 +165,128 @@ extern "C" void rr_kamek_81806568(CpuContext* ctx) {
     ctx->gpr[3] = resultado;
     ctx->gpr[25] = resultado;
     ctx->cr = (ctx->cr & 0x0FFFFFFFu) | (resultado ? 0x40000000u : 0x20000000u);   // cr0: "mayor" o "igual" que 0
+}
+
+// §75: el fin de la carrera en la sala, con las reglas del juego.
+//
+// (1) El tiempo límite, como en la carrera EN LÍNEA del juego. En nuestras salas la carrera corre como una VS "local"
+// (GMDataVS), que espera a que TODOS los humanos crucen la meta: si uno no llega (se quedó quieto, se fue al baño), la
+// carrera no terminaba nunca. En línea el juego tiene un límite: GMDataOnlineVS::Update (0x8053F2A4) mira el reloj de la
+// carrera (Raceinfo +0x14 → minutos +0x8, segundos +0xA, milésimas +0xC) y, cuando pasa del límite (5:00 en el juego
+// original; Retro Rewind lo cambia por el número que guarda en 0x818759B0, rr_kamek_81811238), a cada piloto que todavía
+// no cruzó la meta (RaceinfoPlayer +0x38, bit 0x2) le termina la carrera con un tiempo estimado por lo que avanzó
+// (0x805342E8 con 4 y 1). Aquí se hace lo mismo con los humanos de la sala: el reloj de la carrera es parte de la
+// simulación (reloj fijo), así que pasa en el MISMO cuadro en todas las consolas. Nadie sale de la sala por quedarse
+// quieto (mkw_modos_inactividad sigue apagado): solo termina SU carrera, con su puesto. Module._mkw_sala_limite(ms) =
+// otro límite (solo pruebas: ?limite=N segundos); 0 = el del juego.
+//
+// (2) Terminar la carrera de los humanos que siguen conectados, como si hubieran cruzado la meta (para las pruebas:
+// una carrera entera tarda minutos y en la prueba nadie maneja). Module._mkw_sala_terminar(máscara) pone una bandera
+// (bit i = el puesto i; 0 = todos); la página la pone en el MISMO cuadro en todas las consolas (lockstep.mjs enCuadro:
+// el cuadro viaja con la carrera sincronizada), y aquí, con la carrera corriendo (etapa 2), se llama
+// RaceinfoPlayer::EndLap (0x805349B8, la que corre al cruzar la meta) hasta pasar la última vuelta de cada humano, en el
+// orden de los puestos. Lo demás —el puesto, el tiempo, el fin de la carrera (GMDataVS::CanRaceEnd, arriba), los
+// puntos— lo hace el juego como siempre. (mkw_modos_terminar, §72, hace lo mismo pero engancha el control de
+// inactividad de la carrera EN LÍNEA del juego, que en nuestras salas, una carrera VS "local", no corre.)
+//
+// (3) Los puntos, una vez por carrera y en el mismo cuadro en todas. El juego suma los puntos de la carrera
+// (RacedataScenario::UpdatePoints, 0x8052E950, sobre el escenario de los MENÚS, Racedata +0xC10: de ahí los copia a la
+// carrera siguiente) recién cuando la pantalla de resultados llena la tabla (GPVSLeaderboardUpdate::FillRows,
+// 0x8085C858; y otras tablas: 0x8085CE8C, 0x8085EA54, rr_kamek_81829848). En la sala esa pantalla puede no llegar a
+// llenarse (la carrera siguiente abre directo, o se la salta quien recargó), así que la tabla de la copa salía con los
+// puntos de una sola carrera. Aquí, en la sala, se llaman en el primer cuadro con la carrera terminada (etapa 4 o más:
+// los puestos ya son los finales) y una bandera hace que las llamadas de las tablas, en esa misma carrera, no sumen otra
+// vez. La bandera se baja cuando corre una carrera nueva (etapa menor que 4).
+//
+// (4) §77, el reloj de los que faltan («DNF», pedido del dueño, como en las carreras en línea de Mario Kart 8): en el
+// cuadro en que el PRIMER humano cruza la meta empieza a correr un plazo de 30 s (del reloj de la carrera); al vencer,
+// a cada humano que todavía no llegó el juego le termina la carrera en el puesto en que va (la misma función del tiempo
+// límite: 0x805342E8 con 4 y 1, un tiempo estimado por lo que avanzó). Así los que ya llegaron no esperan a uno que va
+// muy atrás o se quedó quieto. Lo dispara un humano y no una CPU: la regla es para que no esperen los que ya
+// terminaron, y si solo llegaron CPU no espera nadie. Como el tiempo límite, corre sobre el reloj de la carrera: vence
+// en el mismo cuadro en todas las consolas. Module._mkw_sala_dnf(ms) = otro plazo (0 = 30 s); mkw_sala_dnf_desde() =
+// el reloj de la carrera cuando llegó el primero (-1 = todavía nadie).
+//
+// Los cuatro van al final de Raceinfo::Update (la versión de RR, 0x805331B4: en Retro Rewind el despacho usa esa).
+namespace { int32_t g_salaTerminar = 0; uint32_t g_salaMascara = 0; uint32_t g_salaLimite = 0; int32_t g_salaPuntos = 0;
+            uint32_t g_salaDnf = 0; int32_t g_salaPrimero = -1; }
+constexpr uint32_t kDnfMs = 30000;              // los 30 s después de que llega el primero
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_sala_dnf(uint32_t ms) { g_salaDnf = ms; }
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t mkw_sala_dnf_desde() { return g_salaPrimero; }
+extern "C" void func_8052E950_traducida(CpuContext* ctx);
+extern "C" void func_8052E950(CpuContext* ctx) {                       // RacedataScenario::UpdatePoints
+    if (g_mkwHumanos && g_salaPuntos) return;                           // (sala) los de esta carrera ya se sumaron
+    func_8052E950_traducida(ctx);
+    if (g_mkwHumanos) g_salaPuntos = 1;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE int mkw_sala_puntos_sumados() { return g_salaPuntos; }   // (para mirar)
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_sala_terminar(uint32_t mascara) { g_salaTerminar = 1; g_salaMascara = mascara; }
+extern "C" EMSCRIPTEN_KEEPALIVE void mkw_sala_limite(uint32_t ms) { g_salaLimite = ms; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_sala_limite_juego() {   // (para mirar: el límite que usa el juego, en ms)
+    const uint32_t rr = Memory::Contains(0x818759B0u, 4) ? Memory::Read32(0x818759B0u) : 0;
+    return rr ? rr : 300000u;
+}
+extern "C" void rr_overlay_805331B4_traducida(CpuContext* ctx);
+extern "C" void rr_overlay_805331B4(CpuContext* ctx) {
+    rr_overlay_805331B4_traducida(ctx);
+    if (!g_salaTerminar && !g_mkwHumanos) return;
+    const uint32_t ri = Memory::Read32(0x809BD730u);                    // Raceinfo
+    if (!ri || !Memory::Contains(ri, 0x2C)) return;
+    const uint32_t etapa = Memory::Read32(ri + 0x28);
+    if (g_mkwHumanos) {                                                 // (3) los puntos de la carrera
+        if (etapa < 2) g_salaPrimero = -1;                              // (4) carrera nueva: nadie llegó todavía
+        if (etapa < 4) g_salaPuntos = 0;
+        else if (!g_salaPuntos) {
+            CpuContext c = *ctx;
+            c.gpr[3] = Memory::Read32(0x809BD728u) + 0xC10;               // como FillRows: el escenario de los menús
+            if (c.gpr[3] != 0xC10) func_8052E950(&c);
+        }
+    }
+    if (g_salaTerminar && etapa > 2) { g_salaTerminar = 0; return; }   // ya terminó: no queda para la próxima
+    if (etapa != 2) return;                                             // presentación o cuenta regresiva: espera
+    const uint32_t lista = Memory::Read32(ri + 0xC);                   // RaceinfoPlayer* de cada jugador
+    if (!lista || !Memory::Contains(lista, 12 * 4)) return;
+    // quiénes son humanos: los de la sala (g_mkwHumanos); sin sala, los jugadores de verdad (tipo 0) de la carrera
+    // (Racedata 0x809BD728, escenario +0x20, jugador i en +0x8 + i·0xF0, tipo +0x10)
+    uint32_t humanos = g_mkwHumanos;
+    if (!humanos) {
+        const uint32_t rd = Memory::Read32(0x809BD728u);
+        for (int i = 0; rd && i < 12; i++) if (Memory::Read32(rd + 0x20 + 0x8 + i * 0xF0 + 0x10) == 0) humanos |= 1u << i;
+    }
+    if (g_salaTerminar) {
+        g_salaTerminar = 0;
+        const uint32_t quienes = (humanos & ~g_mkwCortados) & (g_salaMascara ? g_salaMascara : 0xFFFu);
+        for (int i = 0; i < 12; i++) {
+            if (!(quienes & (1u << i))) continue;
+            const uint32_t p = Memory::Read32(lista + 4 * i);
+            if (!p || !Memory::Contains(p, 0x40)) continue;
+            // currentLap (+0x24) contra maxLap (+0x26): EndLap termina la carrera al pasar la última; tope de 8 por las dudas
+            for (int v = 0; v < 8 && Memory::Read16(p + 0x24) <= Memory::Read8(p + 0x26); v++) {
+                CpuContext c = *ctx;                                    // sobre una copia, como modos_nativo.cpp
+                c.gpr[3] = p;
+                InvokeDirectCpu<0x805349B8u>(&c);
+            }
+        }
+    }
+    if (!g_mkwHumanos) return;                                          // (el tiempo límite: solo en la sala)
+    const uint32_t reloj = Memory::Read32(ri + 0x14);                  // el reloj de la carrera
+    if (!reloj || !Memory::Contains(reloj, 0x10)) return;
+    const uint32_t ms = (Memory::Read16(reloj + 0x8) * 60u + Memory::Read8(reloj + 0xA)) * 1000u + Memory::Read16(reloj + 0xC);
+    // (4) ¿ya llegó algún humano? (RaceinfoPlayer +0x38, bit 0x2) — se anota el reloj de ese cuadro
+    for (int i = 0; g_salaPrimero < 0 && i < 12; i++) {
+        if (!(humanos & (1u << i))) continue;
+        const uint32_t p = Memory::Read32(lista + 4 * i);
+        if (p && Memory::Contains(p, 0x40) && (Memory::Read32(p + 0x38) & 2u)) g_salaPrimero = static_cast<int32_t>(ms);
+    }
+    const uint32_t limite = g_salaLimite ? g_salaLimite : mkw_sala_limite_juego();
+    const bool vencioDnf = g_salaPrimero >= 0 && ms >= static_cast<uint32_t>(g_salaPrimero) + (g_salaDnf ? g_salaDnf : kDnfMs);
+    if (ms <= limite && !vencioDnf) return;                             // ni el tiempo límite ni los 30 s
+    for (int i = 0; i < 12; i++) {
+        if (!(humanos & (1u << i))) continue;
+        const uint32_t p = Memory::Read32(lista + 4 * i);
+        if (!p || !Memory::Contains(p, 0x40) || (Memory::Read32(p + 0x38) & 2u)) continue;   // ya cruzó la meta
+        CpuContext c = *ctx;
+        c.gpr[3] = p; c.gpr[4] = 4; c.gpr[5] = 1;                       // como GMDataOnlineVS::Update
+        InvokeDirectCpu<0x805342E8u>(&c);
+    }
 }

@@ -14,13 +14,19 @@
 // (si un día se traba ahí, esto lo dice); que se cierra de a poco (la cortina, no un corte); que cada rescate dura
 // lo mismo (lo cuenta el juego); y que la cortina tapa toda la imagen, bordes incluidos (con --ancho/--alto se prueba
 // una ventana de otra forma: la página nunca estira la imagen, así que debe tapar todo igual).
+// §79: la ventana se abre en 16:9 y cambia a --ancho×--alto YA EN CARRERA, como el marco del sitio (que cambia de tamaño
+// después de cargar): SDL3 agranda el canvas a su recuadro con cada cambio de tamaño. Con la imagen estirada (el bug
+// del dueño, ?aspecto=libre) la escena 3D llenaba ese recuadro y la cortina tapaba solo la franja 16:9 del medio.
+// Por eso hay 6.º y 7.º punto: el canvas siguió a la ventana (la prueba reproduce el caso) y, fuera del negro, la imagen
+// del juego es 16:9 (lo que sobra del canvas, negro): no estirada. Y la cortina se mide en los 4 bordes.
 // Deja en build/web/datos/caida/: NNNN.jpg (las imágenes) y linea.json (hora, brillo y cuadro del juego, tramos).
 //
 // Uso:  node web/navegador/prueba-caida.mjs [--copa 4 --fila 3] [--plan "K+A:1800 K:5000"] [--segundos 22] [--ventana]
 //   (por defecto SNES Rainbow Road: doblando a la izquierda desde la largada se cae ~3 veces en 22 s)
 //   --plan: lo que se mantiene apretado y cuánto (K = acelerar, A/D = doblar, J = frenar); se repite hasta el final
 //   --extra "&x=y": parámetros más para la página
-//   --ancho N --alto N: el tamaño de la ventana (por defecto 960×792)
+//   --ancho N --alto N: el tamaño de la ventana en la carrera (por defecto 960×792; se abre en 960×540 y cambia)
+//   --sin-cambiar: abrir ya en --ancho×--alto, sin el cambio de tamaño (como antes de §79)
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -47,7 +53,8 @@ await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).inclu
 const navegador = await chromium.launch({ channel: 'chrome', headless: !args.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio'] });
 const ANCHO = Number(opcion('--ancho', 960)), ALTO = Number(opcion('--alto', 792));   // la ventana (con una ancha, el juego se estira: §68)
-const pagina = await navegador.newPage({ viewport: { width: ANCHO, height: ALTO } });
+const CAMBIAR = !args.includes('--sin-cambiar');
+const pagina = await navegador.newPage({ viewport: CAMBIAR ? { width: 960, height: 540 } : { width: ANCHO, height: ALTO } });
 pagina.on('pageerror', e => console.log('[pageerror] ' + e.message));
 let codigo = 1;
 try {
@@ -56,8 +63,11 @@ try {
   if (!llego?.llego) throw new Error('el piloto no llegó a la carrera');
   // la cuenta regresiva: Raceinfo +0x28 (0-1 presentación y cuenta, 2 corriendo)
   await pagina.waitForFunction(() => { const L = window.mkwMenus, ri = L.u32(0x809BD730); return ri && L.u32(ri + 0x28) >= 2; }, null, { timeout: 60000, polling: 50 });
-  const lienzo = await pagina.evaluate(() => { const c = document.getElementById('canvas'), r = c.getBoundingClientRect(); return { w: c.width, h: c.height, cw: r.width, ch: r.height, x: r.left, y: r.top }; });
-  console.log(`carrera andando; ventana ${ANCHO}×${ALTO}, canvas ${lienzo.w}×${lienzo.h} (en pantalla ${lienzo.cw}×${lienzo.ch}); grabando…`);
+  const medirLienzo = () => pagina.evaluate(() => { const c = document.getElementById('canvas'), r = c.getBoundingClientRect(); return { w: c.width, h: c.height, cw: r.width, ch: r.height, x: r.left, y: r.top }; });
+  const antes = await medirLienzo();
+  if (CAMBIAR) { await pagina.setViewportSize({ width: ANCHO, height: ALTO }); await espera(1500); }   // como el marco del sitio
+  const lienzo = await medirLienzo();
+  console.log(`carrera andando; ventana ${ANCHO}×${ALTO}, canvas ${antes.w}×${antes.h} → ${lienzo.w}×${lienzo.h} (en pantalla ${lienzo.cw}×${lienzo.ch}); grabando…`);
 
   // lo que se muestra: el screencast (cada imagen compuesta que llega a la pantalla, con su hora en segundos)
   const cdp = await pagina.context().newCDPSession(pagina);
@@ -91,15 +101,21 @@ try {
   const contador = await pagina.evaluate(() => { clearInterval(window.__caidaReloj); return window.__caida; });
   await espera(300);                                     // las últimas imágenes que estaban en camino
 
-  // Dónde queda la imagen del juego en la pantalla: el canvas (w×h) agrandado sin deformarse (object-fit: contain)
-  // dentro de su recuadro; lo de afuera son las barras negras de la página. En fracciones de la foto.
+  // Dónde queda el canvas en la pantalla: agrandado sin deformarse (object-fit: contain) dentro de su recuadro; lo de
+  // afuera son las barras negras de la página. En fracciones de la foto. Si SDL3 agrandó el canvas a su recuadro, llena
+  // todo el recuadro. Adentro, la imagen 16:9 del juego (`img`): con force_16_9 (§79) lo que sobra del canvas son barras
+  // negras de aurora; con la imagen estirada (?aspecto=libre), la escena llena el canvas entero.
   const esc = Math.min(lienzo.cw / lienzo.w, lienzo.ch / lienzo.h), vw = lienzo.w * esc, vh = lienzo.h * esc;
   const rect = { x: (lienzo.x + (lienzo.cw - vw) / 2) / ANCHO, y: (lienzo.y + (lienzo.ch - vh) / 2) / ALTO, w: vw / ANCHO, h: vh / ALTO };
-  // El brillo de cada imagen (0 negro … 255 blanco), medido en el mismo Chrome: el centro (80 %) de la foto, y los dos
-  // bordes de la imagen del juego (8 % de su ancho a cada lado): si la cortina no tapara todo, ahí se vería
+  const iw = Math.min(vw, vh * 16 / 9), ih = Math.min(vh, vw * 9 / 16);
+  const img = { x: rect.x + (vw - iw) / 2 / ANCHO, y: rect.y + (vh - ih) / 2 / ALTO, w: iw / ANCHO, h: ih / ALTO };
+  const sobra = vw - iw > 4 || vh - ih > 4;              // ¿el canvas tiene otra forma que 16:9? (barras de aurora)
+  // El brillo de cada imagen (0 negro … 255 blanco), medido en el mismo Chrome: el centro (80 %) de la imagen 16:9 del
+  // juego (sin las barras: si no, una ventana alta oscurece el promedio), lo más claro de los 4 bordes del canvas (8 %
+  // de su ancho o alto: si la cortina no tapara todo, ahí se vería) y lo que sobra del canvas fuera de la imagen 16:9
   for (let i = 0; i < imagenes.length; i += 60) {
     const lote = imagenes.slice(i, i + 60).map(im => readFileSync(path.join(carpeta, String(im.n).padStart(4, '0') + '.jpg')).toString('base64'));
-    const brillos = await pagina.evaluate(async ({ lista, rect }) => {
+    const brillos = await pagina.evaluate(async ({ lista, rect, img, sobra }) => {
       const c = new OffscreenCanvas(96, 80), g = c.getContext('2d', { willReadFrequently: true });
       const sal = [];
       for (const b64 of lista) {
@@ -112,12 +128,18 @@ try {
           for (let k = 0; k < d.length; k += 4) s += 0.299 * d[k] + 0.587 * d[k + 1] + 0.114 * d[k + 2];
           return s / (d.length / 4);
         };
-        const borde = 0.08 * rect.w;
-        sal.push([medir(0.1, 0.1, 0.8, 0.8), Math.max(medir(rect.x, rect.y, borde, rect.h), medir(rect.x + rect.w - borde, rect.y, borde, rect.h))]);
+        const bx = 0.08 * rect.w, by = 0.08 * rect.h;
+        const bordes = Math.max(medir(rect.x, rect.y, bx, rect.h), medir(rect.x + rect.w - bx, rect.y, bx, rect.h),
+                                medir(rect.x, rect.y, rect.w, by), medir(rect.x, rect.y + rect.h - by, rect.w, by));
+        // fuera de la imagen 16:9: las dos franjas que sobran (arriba y abajo, o a los lados), un poco hacia adentro
+        const fuera = !sobra ? 0 : img.h < rect.h - 0.004
+          ? Math.max(medir(rect.x, rect.y, rect.w, (img.y - rect.y) * 0.8), medir(rect.x, img.y + img.h + (img.y - rect.y) * 0.2, rect.w, (img.y - rect.y) * 0.8))
+          : Math.max(medir(rect.x, rect.y, (img.x - rect.x) * 0.8, rect.h), medir(img.x + img.w + (img.x - rect.x) * 0.2, rect.y, (img.x - rect.x) * 0.8, rect.h));
+        sal.push([medir(img.x + 0.1 * img.w, img.y + 0.1 * img.h, 0.8 * img.w, 0.8 * img.h), bordes, fuera]);
       }
       return sal;
-    }, { lista: lote, rect });
-    brillos.forEach(([b, bordes], k) => { imagenes[i + k].brillo = b; imagenes[i + k].bordes = bordes; });
+    }, { lista: lote, rect, img, sobra });
+    brillos.forEach(([b, bordes, fuera], k) => { imagenes[i + k].brillo = b; imagenes[i + k].bordes = bordes; imagenes[i + k].fuera = fuera; });
   }
   // el cuadro del juego a la hora de cada imagen (la lectura del contador más cercana)
   const cuadroEn = t => { let mejor = contador[0]; for (const c of contador) if (Math.abs(c[0] - t) < Math.abs(mejor[0] - t)) mejor = c; return mejor[1]; };
@@ -168,8 +190,19 @@ try {
   const largos = rescates.map(tr => tr.ms);
   ok('cada rescate dura lo mismo (lo cuenta el juego en cuadros: diferencia ≤ 100 ms)', largos.length >= 2 ? Math.max(...largos) - Math.min(...largos) <= 100 : largos.length === 1,
      largos.map(ms => ms.toFixed(0) + ' ms').join(', '));
-  ok(`la cortina tapa TODA la imagen del juego, también sus bordes (ventana ${ANCHO}×${ALTO}, imagen ${Math.round(vw)}×${Math.round(vh)})`,
+  ok(`la cortina tapa TODA la imagen del juego, también sus 4 bordes (ventana ${ANCHO}×${ALTO}, canvas en pantalla ${Math.round(vw)}×${Math.round(vh)})`,
      rescates.length >= 1 && rescates.every(tr => tr.bordes < 5), 'brillo de los bordes en el negro: ' + rescates.map(tr => tr.bordes.toFixed(1)).join(', '));
+  if (CAMBIAR) {
+    // 6: la prueba reproduce el caso del sitio: SDL3 agrandó el canvas a su recuadro al cambiar la ventana
+    const sigue = Math.abs(lienzo.w / lienzo.h - lienzo.cw / lienzo.ch) < 0.02;
+    ok('al cambiar la ventana en carrera, el canvas siguió a su recuadro (como en el marco del sitio)', sigue,
+       `canvas ${antes.w}×${antes.h} → ${lienzo.w}×${lienzo.h}, recuadro ${Math.round(lienzo.cw)}×${Math.round(lienzo.ch)}`);
+    // 7: fuera del negro, la imagen del juego es 16:9: lo que sobra del canvas (si tiene otra forma) queda negro
+    const normales = imagenes.filter(im => im.brillo >= 30);
+    const fuera = normales.length ? normales.reduce((s, im) => s + im.fuera, 0) / normales.length : 99;
+    ok('la imagen del juego queda 16:9, sin estirarse: lo que sobra del canvas es negro (barras), también fuera del negro',
+       !sobra || fuera < 5, sobra ? `imagen 16:9 ${Math.round(iw)}×${Math.round(ih)} en el canvas; brillo de lo que sobra: ${fuera.toFixed(1)} (en ${normales.length} imágenes)` : 'el canvas ya es 16:9: no sobra nada');
+  }
   codigo = mal ? 1 : 0;
 } catch (e) {
   console.log('✗ se cortó — ' + (e && e.stack || e));

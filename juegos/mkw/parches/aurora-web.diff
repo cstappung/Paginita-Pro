@@ -314,10 +314,10 @@ index 84eecc2..becc629 100644
    return ConvertedTexture{
        .format = parsedLayout->format,
 diff --git a/aurora-main/lib/gfx/pipeline_cache.cpp b/aurora-main/lib/gfx/pipeline_cache.cpp
-index d995e00..a546fe4 100644
+index d995e00..e43f691 100644
 --- a/aurora-main/lib/gfx/pipeline_cache.cpp
 +++ b/aurora-main/lib/gfx/pipeline_cache.cpp
-@@ -23,6 +23,13 @@
+@@ -23,6 +23,14 @@
  #include <fmt/format.h>
  #include <tracy/Tracy.hpp>
  
@@ -326,12 +326,13 @@ index d995e00..a546fe4 100644
 +#include <cstdio>
 +#include <cstdlib>
 +#include <cstring>
++#include <functional>
 +#endif
 +
  namespace aurora::gfx {
  static Module Log("aurora::gfx::pipeline_cache");
  
-@@ -69,12 +76,51 @@ constexpr size_t MaxPipelineWorkers = 22;
+@@ -69,12 +77,68 @@ constexpr size_t MaxPipelineWorkers = 22;
  // Cached clear and GX pipelines are prewarmed using the full worker pool.
  constexpr size_t MaxBackgroundPipelineWorkers = MaxPipelineWorkers;
  // For synchronous pipeline fallback (OpenGL)
@@ -375,6 +376,23 @@ index d995e00..a546fe4 100644
 +};
 +static absl::flat_hash_map<PipelineRef, WebRegistro> g_webLista;
 +static ByteBuffer g_webExportado;
++// Precalentado postergado (MKW_PRECALENTAR=tarde, bitácora §76): pedir los ~700 pipelines de la lista en el arranque
++// ocupa el proceso de GPU del navegador varios segundos justo cuando el juego carga su título, y la música del título
++// (lo primero que se oye, debajo del menú de inicio de la página) se atrasaba ~4,5 s. Con "tarde" las listas se leen
++// igual al arrancar (la cuenta y la lista guardada no cambian), pero los pedidos esperan en g_webDiferidos hasta que
++// la página llama a mkw_web_pipelines_precalentar() (cuando el juego ya llegó a su primera pantalla); se encolan al
++// comienzo del cuadro siguiente, el lugar seguro donde aurora arma los pipelines de cada cuadro.
++// Con "tarde" el precalentado corre mientras ya suena la música del título y la persona elige en los menús: de a 8 por
++// cuadro el juego bajaba a ~30 cuadros/s y el sonido se cortaba; y en la 1.ª visita (sin la caché de shaders del
++// navegador, cada pipeline se compila de cero) el proceso de GPU se llenaba y el juego bajaba a 3–12 cuadros/s
++// mientras cargaba un menú. Así que va de a poco ("tarde:N:M"): como mucho N por cuadro (por omisión 2) y solo
++// mientras el navegador tenga menos de M compilándose (por omisión 4), contando los que pide el propio juego: si el
++// juego necesita pipelines (un menú nuevo), el precalentado le cede el paso.
++static bool g_webPrecalentarTarde = false;
++static bool g_webPrecalentarPedido = false;
++static size_t g_webColaPorCuadro = BuildPipelinesPerFrame;
++static size_t g_webEnCaminoMax = 0;           // 0 = sin tope (el precalentado de siempre)
++static std::vector<std::function<void()>> g_webDiferidos;
 +constexpr size_t WebListaMax = 8192;
 +constexpr char WebMagia[8] = {'M', 'K', 'W', 'P', 'I', 'P', 'E', '1'};
 +// medidor (una línea por segundo en la consola)
@@ -384,7 +402,7 @@ index d995e00..a546fe4 100644
  static bool g_pipelineThreadEnd = false;
  static size_t g_activeBackgroundPipelineWorkers = 0;
  static std::condition_variable g_pipelineCv;
-@@ -360,6 +406,15 @@ static PipelineCacheWrite make_pipeline_cache_write(ShaderType type, PipelineRef
+@@ -360,6 +424,15 @@ static PipelineCacheWrite make_pipeline_cache_write(ShaderType type, PipelineRef
  }
  
  static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
@@ -400,7 +418,7 @@ index d995e00..a546fe4 100644
    if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr) {
      return;
    }
-@@ -433,6 +488,90 @@ static bool remove_pending_pipeline(Queue& queue, PipelineRef hash) {
+@@ -433,6 +506,90 @@ static bool remove_pending_pipeline(Queue& queue, PipelineRef hash) {
    return true;
  }
  
@@ -491,7 +509,7 @@ index d995e00..a546fe4 100644
  template <typename PipelineConfig>
  static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& config, NewPipelineCallback&& cb,
                                        bool persist, std::optional<uint32_t> firstFrameUsedOverride) {
-@@ -456,6 +595,10 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -456,6 +613,10 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
          pipelineIt->second.firstFrameUsed = firstFrameUsed;
          cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
        }
@@ -502,7 +520,7 @@ index d995e00..a546fe4 100644
      } else if (g_pendingPipelines.contains(hash)) {
        auto* pending = touch_pending_pipeline(hash, g_pipelineFrameActive);
        if (pending != nullptr && firstFrameUsed < pending->firstFrameUsed) {
-@@ -500,6 +643,25 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -500,6 +661,25 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
      }
    }
  
@@ -528,7 +546,7 @@ index d995e00..a546fe4 100644
    if (syncCreate) {
      const auto pipeline = cb();
      {
-@@ -711,6 +873,14 @@ static void seed_pipeline_cache() {
+@@ -711,6 +891,14 @@ static void seed_pipeline_cache() {
  }
  
  static bool prepare_pipeline_cache_db() {
@@ -543,7 +561,7 @@ index d995e00..a546fe4 100644
    if (g_pipelineCacheBroken) {
      return false;
    }
-@@ -968,7 +1138,23 @@ static void note_pipeline_queue_drained() {
+@@ -968,7 +1156,23 @@ static void note_pipeline_queue_drained() {
  }
  
  static void compile_pending_pipeline(PendingPipeline pending) {
@@ -567,7 +585,52 @@ index d995e00..a546fe4 100644
    {
      std::lock_guard lock{g_pipelineMutex};
      const auto [_, inserted] = g_pipelines.try_emplace(pending.hash, CachedPipeline{
-@@ -1107,7 +1293,103 @@ static void load_pipeline_cache_entries(ShaderType type, uint32_t configVersion,
+@@ -1025,8 +1229,43 @@ static void pipeline_worker() {
+   }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// El precalentado postergado, ya pedido por la página: encolar todo lo diferido (de a 8 por cuadro, como siempre)
++static void web_precalentar_diferidos() {
++  if (!g_webPrecalentarPedido || g_webDiferidos.empty()) {
++    return;
++  }
++  g_webPrecalentarPedido = false;
++  auto lista = std::move(g_webDiferidos);
++  g_webDiferidos.clear();
++  for (auto& encolar : lista) {
++    encolar();                                 // los que el juego ya pidió por su cuenta no se repiten
++  }
++  const auto enCola = queuedPipelines.load();
++  if (enCola > 0) {
++    g_prewarmCount = enCola;
++    g_prewarmStart = std::chrono::steady_clock::now();
++    g_prewarmActive.store(true, std::memory_order_release);
++  }
++  std::printf("[pipelines] precalentando %u (postergados; de a %zu por cuadro, con %zu compilándose como mucho)\n",
++              static_cast<unsigned>(enCola), g_webColaPorCuadro, g_webEnCaminoMax);
++}
++#endif
++
+ static void build_synchronous_pipelines_for_frame() {
+-  while (g_pipelinesPerFrame < BuildPipelinesPerFrame) {
++#ifdef __EMSCRIPTEN__
++  web_precalentar_diferidos();
++  // (en la web la cola solo lleva el precalentado: lo que el juego dibuja se pide en el momento, web_crear)
++  const size_t porCuadro = g_webColaPorCuadro;
++#else
++  const size_t porCuadro = BuildPipelinesPerFrame;
++#endif
++  while (g_pipelinesPerFrame < porCuadro) {
++#ifdef __EMSCRIPTEN__
++    if (g_webEnCaminoMax > 0 && g_webEnCamino.size() >= g_webEnCaminoMax) {
++      return;                                  // el navegador ya tiene bastante compilando: el resto, otro cuadro
++    }
++#endif
+     PendingPipeline pending;
+     {
+       std::lock_guard lock{g_pipelineMutex};
+@@ -1107,7 +1346,123 @@ static void load_pipeline_cache_entries(ShaderType type, uint32_t configVersion,
    sqlite3_clear_bindings(g_pipelineCacheLoadStmt);
  }
  
@@ -591,7 +654,11 @@ index d995e00..a546fe4 100644
 +    }
 +  }
 +  const PipelineRef hash = xxh3_hash(config, static_cast<HashType>(type));
-+  find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro);
++  if (g_webPrecalentarTarde) {               // se pide después (mkw_web_pipelines_precalentar)
++    g_webDiferidos.emplace_back([=] { find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro); });
++  } else {
++    find_pipeline_impl(type, config, [=] { return create(config); }, false, primerCuadro);
++  }
 +  if (g_webLista.size() < WebListaMax) {
 +    ByteBuffer copia(tam);
 +    std::memcpy(copia.data(), datos, tam);
@@ -648,8 +715,24 @@ index d995e00..a546fe4 100644
 +
 +static void web_cargar_listas() {
 +  uint32_t aceptadas = 0, descartadas = 0;
++  const char* cuando = std::getenv("MKW_PRECALENTAR");
++  g_webPrecalentarTarde = cuando != nullptr && std::strncmp(cuando, "tarde", 5) == 0;
++  if (g_webPrecalentarTarde) {
++    char* resto = nullptr;
++    const long n = cuando[5] == ':' ? std::strtol(cuando + 6, &resto, 10) : 2;
++    const long m = resto != nullptr && *resto == ':' ? std::strtol(resto + 1, nullptr, 10) : 4;
++    g_webColaPorCuadro = static_cast<size_t>(std::clamp(n, 1L, static_cast<long>(BuildPipelinesPerFrame)));
++    g_webEnCaminoMax = static_cast<size_t>(std::clamp(m, 0L, 64L));
++  }
 +  web_leer_lista("/datos/pipelines/semilla.bin", aceptadas, descartadas);
 +  web_leer_lista("/datos/pipelines/propia.bin", aceptadas, descartadas);
++  if (g_webPrecalentarTarde) {
++    if (!g_webDiferidos.empty()) {
++      std::printf("[pipelines] precalentado postergado: %zu esperan a la primera pantalla del juego; "
++                  "%u descartados (de otra versión)\n", g_webDiferidos.size(), descartadas);
++    }
++    return;
++  }
 +  const auto enCola = queuedPipelines.load();
 +  if (enCola > 0) {
 +    g_prewarmCount = enCola;
@@ -671,7 +754,7 @@ index d995e00..a546fe4 100644
    if (!prepare_pipeline_cache_db()) {
      return;
    }
-@@ -1163,6 +1445,11 @@ PipelineRef find_pipeline(ShaderType type, const gx::PipelineConfig& config, New
+@@ -1163,6 +1518,11 @@ PipelineRef find_pipeline(ShaderType type, const gx::PipelineConfig& config, New
  }
  
  void initialize_pipeline_cache() {
@@ -683,7 +766,7 @@ index d995e00..a546fe4 100644
    g_pipelineCacheBroken = false;
    g_pipelineCacheWriterStop = false;
    g_pipelineFrameActive = false;
-@@ -1227,6 +1514,21 @@ void begin_pipeline_frame() {
+@@ -1227,6 +1587,21 @@ void begin_pipeline_frame() {
  
  void end_pipeline_frame() {
    g_pipelineFrameActive = false;
@@ -705,7 +788,7 @@ index d995e00..a546fe4 100644
    if (!g_hasPipelineThread) {
      build_synchronous_pipelines_for_frame();
    }
-@@ -1258,6 +1560,11 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+@@ -1258,6 +1633,11 @@ bool try_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
  
  static bool wait_pipeline_impl(PipelineRef ref, wgpu::RenderPipeline& pipeline, bool fatalIfMissing,
                                 bool persistentPass) {
@@ -717,7 +800,7 @@ index d995e00..a546fe4 100644
    std::unique_lock lock{g_pipelineMutex};
    if (!g_pipelines.contains(ref) && g_pendingPipelines.contains(ref)) {
      ZoneScopedN("wait_pipeline");
-@@ -1297,6 +1604,51 @@ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pi
+@@ -1297,6 +1677,58 @@ bool wait_pipeline_for_persistent_pass(PipelineRef ref, wgpu::RenderPipeline& pi
  
  } // namespace aurora::gfx
  
@@ -764,6 +847,13 @@ index d995e00..a546fe4 100644
 +}
 +
 +extern "C" EMSCRIPTEN_KEEPALIVE const uint8_t* mkw_web_pipelines_datos() { return aurora::gfx::g_webExportado.data(); }
++
++// Precalentado postergado (MKW_PRECALENTAR=tarde): la página avisa que ya se puede pedir. Devuelve cuántos esperaban
++// (0 si no había nada postergado). Se encolan al comienzo del cuadro siguiente, no aquí.
++extern "C" EMSCRIPTEN_KEEPALIVE uint32_t mkw_web_pipelines_precalentar() {
++  aurora::gfx::g_webPrecalentarPedido = true;
++  return static_cast<uint32_t>(aurora::gfx::g_webDiferidos.size());
++}
 +#endif
 +
  void aurora_set_skip_unready_pipelines(const bool enabled) { aurora::gfx::set_skip_unready_pipelines(enabled); }

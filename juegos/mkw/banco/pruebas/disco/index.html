@@ -196,6 +196,58 @@ try {
   try { await d9.leer('/lento/roto.szs', BLOQUE, 0, 10); } catch (e) { err = e.message; }
   ok('un adelanto que falla no deja nada colgado: la lectura del juego vuelve a pedir y avisa su error', /503/.test(err), err);
 
+  // g) carpeta en racha (§76): el menú «Un jugador» lee 32 + 32 fantasmas diminutos de a uno; al 2.º seguido de la
+  //    misma carpeta, el resto de la carpeta se pide de una vez
+  const carpetaFalsa = (nombre, n) => Array.from({ length: n }, (_, i) => archivo(`${nombre}/ghost_${String(i).padStart(2, '0')}.rkg`, 1500 + 37 * i));
+  const leerTodos = async (d, lista) => { const r = []; for (const u of lista) r.push(await d.leer(u, tamDe.get(u), 0, tamDe.get(u))); return r; };
+  const g1 = carpetaFalsa('ghost1', 32), g2 = carpetaFalsa('ghost2', 32);
+  const d12 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });     // sin vecinos: como antes
+  lentos.length = 0;
+  t = performance.now();
+  await leerTodos(d12, g1);
+  const sinVecinos = performance.now() - t, esperasSin = d12.estado.esperaRed;
+  const d13 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  d13.vecinos([...g1, ...g2].map(u => [u, tamDe.get(u)]));
+  lentos.length = 0; maxActivosRed = 0;
+  t = performance.now();
+  const leidos1 = await leerTodos(d13, g1), leidos2 = await leerTodos(d13, g2);
+  const conVecinos = performance.now() - t;
+  ok('carpeta en racha: 64 fantasmas leídos de a uno llegan casi sin esperas (antes, una espera por archivo)',
+     d13.estado.esperaRed <= 6 && esperasSin === 32 && conVecinos < sinVecinos,
+     `sin vecinos: 32 fantasmas, ${esperasSin} esperas, ${sinVecinos.toFixed(0)} ms; con vecinos: 64 fantasmas, ${d13.estado.esperaRed} esperas, ${conVecinos.toFixed(0)} ms`);
+  ok('…cada fantasma se pide una sola vez, con los datos exactos, y como mucho 12 pedidos de fondo (+ el del juego) a la vez',
+     lentos.length === 64 && maxActivosRed <= 13 && [...leidos1, ...leidos2].every((d, i) => iguales(d, esperado(0, tamDe.get([...g1, ...g2][i])))),
+     `${lentos.length} pedidos, máximo ${maxActivosRed} a la vez`);
+  ok('…y el disco anota las dos carpetas pedidas enteras', d13.estado.carpetas.length === 2 && d13.estado.carpetas.every(c => /\/ghost[12]\/$/.test(c)),
+     d13.estado.carpetas.join(', '));
+  // un solo archivo de una carpeta (como un fantasma experto de RR al elegir una pista): no dispara nada
+  const expertos = carpetaFalsa('expertos', 40);
+  d13.vecinos(expertos.map(u => [u, tamDe.get(u)]));
+  lentos.length = 0;
+  await d13.leer(expertos[7], tamDe.get(expertos[7]), 0, 100);
+  await d13.leer(g1[3], tamDe.get(g1[3]), 0, 100);          // (otra carpeta en medio: la racha se corta)
+  await d13.leer(expertos[9], tamDe.get(expertos[9]), 0, 100);
+  await new Promise(r => setTimeout(r, 80));
+  ok('leer archivos sueltos de una carpeta (sin dos seguidos) no baja la carpeta entera', lentos.length === 2, `${lentos.length} pedidos`);
+  // adelantarCarpeta a mano y adelantarRango (el grupo de sonido de un menú)
+  const d14 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null });
+  const g3 = carpetaFalsa('ghost3', 10);
+  d14.vecinos(g3.map(u => [u, tamDe.get(u)]));
+  lentos.length = 0;
+  const pedidosCarpeta = d14.adelantarCarpeta(g3[0].slice(0, g3[0].lastIndexOf('/') + 1));
+  const sonidoGrande = archivo('sonido.brsar', 40 * BLOQUE);
+  d14.adelantarRango(sonidoGrande, tamDe.get(sonidoGrande), 3 * BLOQUE + 100, 7 * BLOQUE + 5);
+  await new Promise(r => setTimeout(r, 120));
+  await leerTodos(d14, g3);
+  ok('adelantarCarpeta pide toda la carpeta, y adelantarRango solo los bloques de ese pedazo, en un pedido',
+     pedidosCarpeta === 10 && d14.estado.esperaRed === 0 && lentos.filter(l => l.startsWith('sonido.brsar')).join() === `sonido.brsar bytes=${3 * BLOQUE}-${8 * BLOQUE - 1}`,
+     `${pedidosCarpeta} archivos, ${d14.estado.esperaRed} esperas; ${lentos.filter(l => l.startsWith('sonido')).join(', ')}`);
+  const d15 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null, adelantarActivo: false });
+  d15.vecinos(g3.map(u => [u, tamDe.get(u)]));
+  lentos.length = 0;
+  await leerTodos(d15, g3.slice(0, 3));
+  ok('con el adelanto apagado (?adelantar=0), la racha de carpeta no pide nada de más', lentos.length === 3, `${lentos.length} pedidos`);
+
   await d4.borrar();
   ok('borrar deja sin cachés del disco', (await caches.keys()).filter(n => n.startsWith(PREFIJO)).length === 0);
 } catch (e) {

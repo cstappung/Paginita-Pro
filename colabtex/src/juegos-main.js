@@ -249,10 +249,10 @@ const OPCIONES = {
   /* Mario Kart Wii: SOLO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no cuántas personas: los
      modos»): copa o playlist (redMkw: MKW_MODOS), sin el Wi-Fi del juego. Caben 4 (cada piloto es un jugador de
      verdad en todas las consolas; la CPU completa los 12). Se guarda como `estilo` (las reglas de Firebase reservan
-     `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige carreras y cilindrada. */
+     `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige la cilindrada; la copa o la lista se eligen en el juego (§74). */
   mkw: [{ clave: "cupo", etiqueta: "Pilotos", por: 4, valores: cupos("mkw") },   // sin esto la sala quedaba de 2 (cupoDe)
     { clave: "estilo", etiqueta: "Modo", por: "copa", valores: [
-      { v: "copa", t: "Modo copa (N carreras con puntos)" }, { v: "playlist", t: "Modo playlist (una cola de pistas)" }] }],
+      { v: "copa", t: "Modo copa (una copa del juego, 4 carreras con puntos)" }, { v: "playlist", t: "Modo playlist (una lista de pistas, con sugerencias)" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [

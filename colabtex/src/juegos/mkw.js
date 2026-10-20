@@ -4,7 +4,7 @@ import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storag
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
-import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, MKW_CC, mkwCarrera, mkwPlaylist, mkwTabla } from "./motor.js";
+import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, mkwCarrera, mkwTabla } from "./motor.js";
 
 /* Mario Kart Wii (+ Retro Rewind) — el cartero entre la sala y el juego.
 
@@ -16,15 +16,16 @@ import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CARRERAS, MKW_CC, mkwCarrera, mkwPlaylis
      lockstep.mjs`): cada marco corre la MISMA carrera, con los pilotos como jugadores de verdad y la CPU de un Grand
      Prix completando los 12 lugares, y la malla WebRTC (abierta dentro de cada marco) reparte los botones de cada
      cuadro. La semilla sale de la sala y del número de tanda (`mkwCarrera`), así todos calculan lo mismo.
-   - **Dentro del juego** (`sala-carrera.mjs`, abierto directo por código, sin menús): el anfitrión arma la copa con
-     el selector de pistas de la página (en la playlist la cola ya viene sorteada, `mkwPlaylist`), cada uno elige
-     personaje y vehículo con las pantallas del juego (45 s) y se corren las carreras; al final el marco del anfitrión
+   - **Dentro del juego** (`sala-carrera.mjs`, abierto directo por código, sin menús): en la copa el anfitrión elige
+     una de las copas del juego con el selector de la página; en la playlist arma una lista (hasta 32 pistas) y los
+     demás le sugieren (§74); cada uno elige personaje y vehículo con las pantallas del juego (45 s) y se corren las
+     carreras; al final el marco del anfitrión
      manda la tabla (`fin`) y todos vuelven al vestíbulo. Si alguien se corta tiene 30 s para volver.
    - Lo único que pasa por aquí es la **presentación**: el buzón de Firebase (`fb.senalMalla`, `vivo/<pid>/rtc`) vive
      en esta página, que tiene la sesión, y el marco lo usa por postMessage (`senal`, el mismo protocolo de BT3). Y se
      le avisa al marco los nombres de los pilotos y, si el anfitrión se va, quién manda ahora (`nombres`, `anfitrion`).
-   - **Al registro va solo el vestíbulo** (`redMkw` en `motor.js`): el modo (copa o playlist), las carreras, la
-     cilindrada, quién es el anfitrión, empezar y volver.
+   - **Al registro va solo el vestíbulo** (`redMkw` en `motor.js`): el modo (copa o playlist), la cilindrada, quién
+     es el anfitrión, empezar y volver.
    - **El VR y los récords** de cada uno van a Firebase (`mkw/vr/<uid>`, `mkw/records/…`): este módulo arma los
      almacenes con la base del sitio y se los pasa al marco (misma página, mismo origen) apenas carga.
    - Quien entra con la copa andando espera a la siguiente tanda. Quien mira la sala sin ser jugador no carga el juego.
@@ -80,14 +81,15 @@ const almacenPartidas = {
 /* La dirección del marco para este jugador: la malla de esta sala, su nodo y la copa de esta tanda. Todos los marcos
    corren la sala nueva del juego (`modo=sala`, juegos/mkw/web/navegador/sala-carrera.mjs: sin Retro WFC): `sincro` =
    los pilotos en orden (puerto 1–4), `jefe` = quien arma la copa (el anfitrión al empezar; si se va, se le avisa al
-   marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo, las carreras y la cilindrada; en la
-   playlist, la cola sorteada (igual en cada navegador). Los nombres no van en la dirección: se le mandan al marco. */
+   marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo y la cilindrada. §74: la copa es
+   una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
+   en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). Los nombres no van en la
+   dirección: se le mandan al marco. */
 export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150" }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
-  q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", String(carreras)); q.set("cc", cc);
-  if (estilo === "playlist") q.set("pistas", mkwPlaylist(pid, ronda, carreras).map(t => `${t.copa}.${t.fila}`).join(","));
+  q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
@@ -214,6 +216,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       return;
     }
     if (d.tipo === "salir") { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {} salir?.(); }
+    /* El juego abrió un selector de la sala (la copa, la playlist, sugerir, lo que viene): su panel va pegado abajo del
+       marco, así que se acomoda la página para que el marco se vea entero (solo si hace falta). */
+    if (d.tipo === "mirame") verMarco();
     /* Fin de la copa o de la playlist (juegos/mkw/web/navegador/modos.mjs): el marco del anfitrión manda la tabla final
        y todos vuelven al vestíbulo, donde queda como «la última». Los demás marcos también avisan: no hacen nada. */
     if (d.tipo === "fin" && soyAnfitrion() && corriendo()) {
@@ -262,6 +267,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
+    verMarco();
     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
                          estilo: est.estilo, carreras: est.carreras, cc: est.cc });
     frame.focus();
@@ -273,6 +279,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       if (muerto || ++vueltas > 240) { clearInterval(esperaSala); return; }
       if (frame?.contentWindow?.mkwSala) { clearInterval(esperaSala); avisado = ""; avisaMarco(); }
     }, 500);
+  }
+  /* El marco mide 100vh − 120 px y aparece debajo del vestíbulo, más abajo del borde de la ventana: al aparecer (y
+     cuando el juego lo pide, «mirame») se desplaza la página lo justo para verlo entero. Sin esto el panel de la copa
+     («Jugar la Copa N»), pegado abajo del marco, quedaba fuera de la vista. */
+  function verMarco() {
+    if (!frame || frame.hidden) return;
+    try { frame.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (err) {}
   }
   /* Lo que el marco sabe por mensaje (no por la dirección): los nombres de los pilotos (para la tabla de la copa) y,
      si el anfitrión cambió, quién manda ahora. Se repite cada vez que cambia algo (el marco puede no haber cargado). */
@@ -308,16 +321,15 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <small>${j.uid === est.anfitrion ? "anfitrión · " : ""}${vrs[j.uid] ? "VR " + Number(vrs[j.uid]).toLocaleString("es") : "VR —"}</small>
         ${manda && !corre && j.uid !== uid ? `<button class="jg-mkw-dar" data-a="${escapeHtml(j.uid)}" title="Que sea el anfitrión">Pasar anfitrión</button>` : ""}
       </li>`;
-    // los tres modos (tarjetas: el anfitrión elige, los demás ven cuál) y, en la copa, cuántas carreras
+    // los dos modos (tarjetas: el anfitrión elige, los demás ven cuál). §74: la copa es una de las copas del juego (sus
+    // 4 pistas) y la playlist una lista que se arma en el juego: el vestíbulo ya no pregunta cuántas carreras
     const estilo = est.estilo || "copa", puede = manda && !corre ? "" : "disabled";
-    const QUE = { copa: `${est.carreras || 4} carreras con puntos (15, 12, 10…): el anfitrión elige las pistas y gana quien sume más.`,
-      playlist: `Una cola de ${est.carreras || 4} pistas sorteadas: cada carrera es la siguiente de la cola.` };
+    const QUE = { copa: "El anfitrión elige una copa del juego y se corren sus 4 pistas, con puntos (15, 12, 10…).",
+      playlist: "El anfitrión arma una lista de pistas (hasta 32) y los demás le sugieren; entre carrera y carrera se pueden agregar más." };
     const modos = Object.entries(MKW_MODOS).map(([k, t]) =>
       `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
-    // copa y playlist: cuántas carreras (o pistas en la cola) y la cilindrada
-    const carrerasFichas = `<div class="jg-mkw-cpu"><span>${estilo === "copa" ? "Carreras" : "Pistas"}</span>${MKW_CARRERAS.map(n =>
-      `<button class="jg-mkw-ficha" data-c="${n}" aria-pressed="${(est.carreras || 4) === n}" ${puede}>${n}</button>`).join("")}</div>
-      <div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
+    // la cilindrada (para los dos modos)
+    const carrerasFichas = `<div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
       `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
     // la tabla de la última copa o playlist (la mandó el marco del anfitrión al terminar)
     const ult = est.ultimaTabla;
@@ -326,7 +338,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     const sinPrograma = origen === "";
     const nota = !enSala() ? (corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
       : corre && est.sincro ? (est.sincro.includes(uid)
-        ? (est.anfitrion === uid && estilo === "copa" ? "Elige las pistas en el juego; después cada uno elige personaje y vehículo. Todos corren la misma carrera y la CPU completa los 12."
+        ? (est.anfitrion === uid ? (estilo === "copa" ? "Elige la copa en el juego; después cada uno elige personaje y vehículo. Todos corren la misma carrera y la CPU completa los 12."
+            : "Arma la lista en el juego (los demás te pueden sugerir pistas); después cada uno elige personaje y vehículo.")
+          : estilo === "playlist" ? "Sugiere pistas en el juego mientras el anfitrión arma la lista. Si se te corta la conexión, tienes 30 s para volver."
           : "Todos corren la misma carrera y la CPU completa los 12. Si se te corta la conexión, tienes 30 s para volver.")
         : "Esta copa empezó sin ti: entras en la siguiente.")
       : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
@@ -342,7 +356,6 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
         <p class="jg-mkw-nota" role="status">${nota}</p>
       </div>`;
     vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
-    vest.querySelectorAll(".jg-mkw-ficha[data-c]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "carreras", v: Number(b.dataset.c) }); });
     vest.querySelectorAll(".jg-mkw-ficha[data-cc]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); });
     vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
     const emp = vest.querySelector(".jg-mkw-empieza");

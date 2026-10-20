@@ -242,6 +242,11 @@ bool escribirFicha(const CpuContext* ctx, uint32_t sm) {
         }
         if (f[FICHA_PRIMERA]) {              // primera carrera: puntos en cero y la largada como en los menús
             Memory::Write16(j + 0xD8, 0); Memory::Write16(j + 0xDA, 0);
+        } else {
+            // §75: las siguientes, los puntos "de antes de esta carrera" (+0xD8) = el total que lleva (+0xDA). El juego
+            // suma así: total = de antes + los de esta (RacedataScenario::UpdatePoints, 0x8052E950); el "de antes" lo deja
+            // su menú de la carrera siguiente, que aquí no pasa (sin esto la tabla de la copa traía solo la última)
+            Memory::Write16(j + 0xD8, Memory::Read16(j + 0xDA));
         }
     }
     if (f[FICHA_PRIMERA]) {                  // el puesto "anterior" ordena la largada: las personas atrás, como el juego

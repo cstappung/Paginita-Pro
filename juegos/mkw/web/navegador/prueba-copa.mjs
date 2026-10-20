@@ -8,8 +8,9 @@
 //   - que es la carrera n de la serie (Racedata: número de carrera de la copia de la carrera, +0xB68+0x24);
 //   - que el juego usa las semillas que salen de la semilla de la copa (Racedata, copia de la carrera +0xB68+0x2C);
 // y al final, que la página cuenta las 4 (window.mkwEstado.copa). Tarda ~12 min (4 carreras enteras).
+// --cinco (§74, «Arma tu lista»): 5 pistas → 5 carreras (el piloto escribe cuántas son en SectionParams +0x64), ~15 min.
 //
-// Uso:  node web/navegador/prueba-copa.mjs [--ventana]
+// Uso:  node web/navegador/prueba-copa.mjs [--ventana] [--cinco]
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +22,8 @@ const PUERTO = 8145;
 let bien = 0, mal = 0;
 const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.log(`${cumple ? '✓' : '✗'} ${texto}${detalle ? ' — ' + detalle : ''}`); };
 // pistas cortas de las primeras copas (copa.fila) y la semilla
-const PISTAS = [[0, 1], [3, 2], [1, 0], [2, 3]], SEMILLA = 0x1234ABCD;
+const PISTAS = [[0, 1], [3, 2], [1, 0], [2, 3], ...(process.argv.includes('--cinco') ? [[4, 0]] : [])], SEMILLA = 0x1234ABCD;
+const N = PISTAS.length;
 // la misma cuenta que menus.mjs (ajustarJugadores) para la semilla de la carrera n
 const semillaDe = n => (SEMILLA ^ Math.imul(0x9E3779B9, n + 1)) >>> 0;
 
@@ -49,7 +51,7 @@ try {
   const vistas = [];                         // una entrada por carrera que empezó
   let enCarrera = false, ultimoA = 0;
   let ultimoLog = 0;
-  while (Date.now() - t0 < 18 * 60000 && vistas.length < 4) {
+  while (Date.now() - t0 < (N + 1) * 4.5 * 60000 && vistas.length < N) {
     const e = await leer();
     if (Date.now() - ultimoLog > 30000) { ultimoLog = Date.now(); console.log(`  … ${((Date.now() - t0) / 1000).toFixed(0)} s: ${e ? `sección 0x${e.s.toString(16)} páginas [${e.ps.map(x => x.toString(16))}] «${e.aviso || ''}»` : 'sin respuesta'}`); }
     if (e) {
@@ -61,16 +63,17 @@ try {
     }
     await espera(300);
   }
-  ok('se jugaron las 4 carreras', vistas.length === 4, `${vistas.length} en ${((Date.now() - t0) / 60000).toFixed(1)} min`);
+  ok(`se jugaron las ${N} carreras`, vistas.length === N, `${vistas.length} en ${((Date.now() - t0) / 60000).toFixed(1)} min`);
   vistas.forEach((v, n) => {
     const pedida = 0x100 + 4 * PISTAS[n][0] + PISTAS[n][1];
     ok(`carrera ${n + 1}: la pista pedida`, v.pista === pedida, `corre 0x${v.pista.toString(16)}, pedí 0x${pedida.toString(16)}`);
     ok(`carrera ${n + 1}: su semilla`, v.semilla === semillaDe(n), `${v.semilla.toString(16)} / ${semillaDe(n).toString(16)}`);
   });
-  ok('el número de carrera avanza 1, 2, 3, 4', vistas.map(v => v.carrera).join() === '1,2,3,4' || vistas.map(v => v.carrera).join() === '0,1,2,3', vistas.map(v => v.carrera).join());
+  const serie = Array.from({ length: N }, (_, i) => i + 1);
+  ok(`el número de carrera avanza ${serie.join(', ')}`, vistas.map(v => v.carrera).join() === serie.join() || vistas.map(v => v.carrera).join() === serie.map(x => x - 1).join(), vistas.map(v => v.carrera).join());
   await espera(1500);
   const copa = (await leer())?.copa;
-  ok('la página contó las 4 carreras', copa && copa.carrera === 4 && copa.termino === true, JSON.stringify(copa));
+  ok(`la página contó las ${N} carreras`, copa && copa.carrera === N && copa.termino === true, JSON.stringify(copa));
 } catch (e) {
   ok('la prueba terminó sin errores', false, e.message);
 } finally {

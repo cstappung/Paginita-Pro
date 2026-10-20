@@ -14,7 +14,10 @@
   cada paquete tarda entre 5 y 40 ms y uno de cada siete del canal "udp" se pierde (el canal "tcp" llega siempre y en orden). Además: un jugador que se va a
   mitad de carrera, uno que nunca llega (y justo es el que decidía), una carrera nueva, una desincronización a
   propósito, el plantel de 12 karts y (§70) una red LENTA (70 ms de ida): el retraso se agranda solo, igual en todas,
-  y la carrera no va en cámara lenta; y el anuncio del retraso que no llega directo pero se lo pasa otro.</p>
+  y la carrera no va en cámara lenta; y el anuncio del retraso que no llega directo pero se lo pasa otro. §75: quien
+  recarga la página a mitad de carrera avisa que se la salta (no se lo espera 30 s) y corre la siguiente con su
+  puesto; el plantel de cada carrera lo dice la sala (igual en todas, también en la consola recién recargada, y con el
+  mismo decisor del retraso); una acción en un cuadro (terminar la carrera) pasa en el mismo cuadro en todas.</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
@@ -34,7 +37,10 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now();
   const consolas = {};
-  for (const uid of uids) {
+  // (§75) recargar(uid): esa consola vuelve a empezar como una página recién recargada (un lockstep nuevo, sin nada)
+  Object.defineProperty(consolas, 'recargar', { enumerable: false, value: uid => { armar(uid); todos.push(consolas[uid].ls); return consolas[uid]; } });
+  for (const uid of uids) armar(uid);
+  function armar(uid) {
     const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, enviados: new Map(), vistos: [], registro: [], tcp: {} };
     let toque = 0;
     c.ls = crearLockstep({
@@ -263,6 +269,62 @@ try {
     ok('el anuncio del retraso llega a Carla por Beto: las tres usan el mismo y terminan iguales',
        r !== 'tarde' && es.every(e => e.retrasos[1] === es[0].retrasos[1]) && iguales(Object.values(s)) && es.every(e => !e.conflictos),
        es.map(e => e.retrasos[1]).join(', '));
+  }
+  // ---- §75: Beto recarga la página a mitad de la carrera 1 (con el margen de la sala: 30 s). Su página nueva avisa que
+  // se salta la 1 (en el sitio: el latido de la sala → alSalta → saltar) y Ana lo corta enseguida; en la 2, con el
+  // plantel de la sala (nadie fuera), los dos corren con los mismos botones y el kart de Beto con los suyos ----
+  {
+    const s = crearSala(['ana', 'beto'], { esperaCorte: 30000, esperaInicio: 30000 });
+    for (const u of ['ana', 'beto']) s[u].ls.fijarCarrera(1, []);
+    const anaCorre = correr(s.ana, { hasta: 400 });
+    await correr(s.beto, { hasta: 400, salirEn: 150 });              // la pestaña de Beto se recarga en el cuadro 150
+    await espera(600);
+    const quieta = s.ana.cuadro;                                      // Ana espera los botones de Beto (margen 30 s)
+    const beto2 = s.recargar('beto');                                 // la página nueva de Beto
+    const t0 = performance.now();
+    s.ana.ls.saltar(1, 1);                                            // su latido: «me salto la carrera 1»
+    const r1 = await conTiempo(anaCorre, 5000);
+    const ms = performance.now() - t0, ea1 = s.ana.ls.estado();
+    ok('Beto recarga a mitad de la carrera 1: avisa que se la salta y Ana lo corta enseguida (no espera el margen de 30 s)',
+       quieta < 170 && r1 !== 'tarde' && s.ana.cuadro === 399 && ms < 3000 && ea1.cortes[1] > 150,
+       `Ana quieta en el ${quieta}; siguió ${ms.toFixed(0)} ms después del aviso; Beto sin nadie desde el cuadro ${ea1.cortes[1]}`);
+    // la carrera 2: la sala dice que nadie está fuera (Beto volvió)
+    s.ana.ls.fijarCarrera(2, []); beto2.ls.fijarCarrera(2, []);
+    const r2 = await conTiempo(Promise.all([correr(s.ana, { desde: 0, hasta: 200 }), correr(beto2, { desde: 0, hasta: 200 })]), 30000);
+    const ea = s.ana.ls.estado(), eb = beto2.ls.estado();
+    const vb = s.ana.vistos.slice(0, 200), betoMueve = vb.slice(RETRASO + 5).filter(d => d && d[8] === 1 && d[9] !== 0).length;
+    ok('…en la carrera 2 Beto vuelve: los dos con los mismos botones, sin cortes, y el kart de Beto con los suyos (conectado)',
+       r2 !== 'tarde' && ea.carrera === 2 && eb.carrera === 2 && JSON.stringify(vb) === JSON.stringify(beto2.vistos.slice(0, 200)) &&
+       !Object.keys(ea.cortes).length && !Object.keys(eb.cortes).length && betoMueve > 150,
+       `${r2 === 'tarde' ? 'TARDE · ' : ''}cortes Ana ${JSON.stringify(ea.cortes)} Beto ${JSON.stringify(eb.cortes)}; cuadros con botones de Beto: ${betoMueve}`);
+  }
+  // ---- §75: Ana se va en la carrera 1; en la 2 Carla recarga la página. El plantel de la sala (Ana fuera) es el mismo
+  // en la consola de Beto (que vio irse a Ana) y en la de Carla recién recargada (que no sabe nada): las dos la dejan
+  // fuera desde el cuadro 0 y el retraso lo decide Beto en las dos (antes, la consola recargada esperaba a Ana) ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 400, esperaInicio: 1200 });
+    for (const u of ['ana', 'beto', 'carla']) s[u].ls.fijarCarrera(1, []);
+    await conTiempo(Promise.all([correr(s.ana, { hasta: 300, salirEn: 100 }), correr(s.beto, { hasta: 300 }), correr(s.carla, { hasta: 300, salirEn: 250 })]), 20000);
+    const carla2 = s.recargar('carla');
+    s.beto.ls.fijarCarrera(2, [0]); carla2.ls.fijarCarrera(2, [0]);
+    const r = await conTiempo(Promise.all([correr(s.beto, { desde: 0, hasta: 200 }), correr(carla2, { desde: 0, hasta: 200 })]), 20000);
+    const eb = s.beto.ls.estado(), ec = carla2.ls.estado();
+    const decidio = s.beto.registro.some(t => t.includes('retraso de la carrera 2')), carlaDecidio = carla2.registro.some(t => t.includes('retraso de la carrera 2'));
+    ok('con Ana fuera de la carrera 2 (lo dice la sala), Beto y la Carla recién recargada la corren iguales, sin esperar a Ana',
+       r !== 'tarde' && eb.cortes[0] === 0 && ec.cortes[0] === 0 && JSON.stringify(s.beto.vistos.slice(0, 200)) === JSON.stringify(carla2.vistos.slice(0, 200)),
+       `${r === 'tarde' ? 'TARDE · ' : ''}cortes Beto ${JSON.stringify(eb.cortes)} Carla ${JSON.stringify(ec.cortes)}`);
+    ok('…y el retraso de la 2 lo decide Beto (el primero que no está fuera) en las dos: el mismo número, sin conflictos',
+       decidio && !carlaDecidio && eb.retrasos[2] === ec.retrasos[2] && !eb.conflictos && !ec.conflictos,
+       `retraso Beto ${eb.retrasos[2]} Carla ${ec.retrasos[2]}`);
+  }
+  // ---- §75: una acción en un cuadro (terminar la carrera en la prueba con el juego): en el mismo cuadro en todas ----
+  {
+    const s = crearSala(['ana', 'beto']);
+    const hechos = { ana: [], beto: [] };
+    for (const u of ['ana', 'beto']) { s[u].ls.fijarCarrera(1, []); s[u].ls.enCuadro(1, 120, () => hechos[u].push(s[u].cuadro)); s[u].ls.enCuadro(2, 120, () => hechos[u].push('otra')); }
+    await conTiempo(Promise.all([correr(s.ana, { hasta: 200 }), correr(s.beto, { hasta: 200 })]), 20000);
+    ok('enCuadro: la acción del cuadro 120 pasa una vez, en el cuadro 120, en las dos consolas (la de la carrera 2 no)',
+       JSON.stringify(hechos.ana) === '[120]' && JSON.stringify(hechos.beto) === '[120]', JSON.stringify(hechos));
   }
 } catch (e) {
   ok('la prueba corrió sin errores', false, e.stack || e.message);

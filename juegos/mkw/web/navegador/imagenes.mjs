@@ -67,5 +67,14 @@ export function crearImagenes(base) {
     plano: (c, f) => una('plano', hex(c, f), i => i.planos, `${base}/planos/${hex(c, f)}.svg`),
     clip: (c, f) => una('clip', hex(c, f), i => i.clips[c], `${base}/clips/${hex(c, f)}.webp`),
     nombres: async () => (await leerIndice())?.nombres || null,
+    // §74: al abrir la lista se bajan de a uno (sin apurar al juego ni a la red) los paquetes que la vista previa usa
+    // apenas se pasa el mouse: íconos, planos y las fotos de las pistas (~6 MB en total). Los videítos no: pesan más y
+    // se piden solo si uno se queda mirando una pista. Sin esto, la primera pista de cada grupo de 48 tardaba hasta
+    // 1,5 s en mostrarse con la red del sitio.
+    async precargar() {
+      const ind = await leerIndice();
+      if (!ind) return;
+      for (const n of [ind.copas, ind.planos, ...Object.values(ind.fotos || {})]) if (n) await paquete(n);
+    },
   };
 }

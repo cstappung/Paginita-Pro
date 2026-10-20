@@ -25,6 +25,12 @@
 //     fila normal está vacía, de a uno cada 40 ms, y nunca mientras el juego está cargando (si una lectura del juego
 //     tuvo que esperar a la red en los últimos 300 ms, la fila baja espera: no le quita conexiones a una carga). La usa mkw.mjs para traer todos los archivos diminutos (≤ 8 KB) con el título en
 //     pantalla: el juego los lee de a uno (los 64 fantasmas del Contrarreloj, uno por cuadro).
+//   - carpeta en racha (vecinos(lista), bitácora §76): justo cuando el juego CARGA, la fila baja se aparta, y los
+//     diminutos que el juego lee de a uno se quedaban esperando: al abrir el menú «Un jugador» lee los 64 fantasmas del
+//     Contrarreloj (Race/TimeAttack/ghost1 y ghost2), uno por cuadro, y cada uno esperaba su viaje a la red (~60 ms):
+//     4 s de menú mudo. Ahora, si el juego lee DOS archivos diminutos distintos seguidos de la misma carpeta, se piden
+//     todos los demás de esa carpeta de una vez, con prioridad normal (adelantarCarpeta: también a mano);
+//   - un rango de bytes de un archivo grande, con prioridad normal (adelantarRango: el grupo de sonido de un menú).
 //
 // En el sitio, lo mismo sirve con el Worker + R2 (R2 acepta pedidos Range); el Worker debe responder "no-store"
 // para que el navegador no lo guarde dos veces (como BT3).
@@ -32,6 +38,7 @@
 // Uso:  const d = crearDisco({ version });  await d.abrir();
 //       await d.leer(url, tamañoDelArchivo, inicio, largo)  → Uint8Array      await d.entero(url) → Uint8Array
 //       d.adelantar(url, tamañoDelArchivo)  → lo baja en segundo plano (no espera nada)
+//       d.vecinos([[url, tam], …]) (los diminutos), d.adelantarCarpeta(carpeta), d.adelantarRango(url, tam, ini, fin)
 //       d.estado (pedidos a la red, bytes, aciertos), await d.ocupado() (bytes guardados), await d.borrar()
 
 export const PREFIJO = 'mkw-disco:';
@@ -44,6 +51,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
                    // adelantados: bloques traídos en segundo plano; aprovechados: bloques que el juego leyó y ya
                    // estaban (o venían en camino) gracias a eso; esperaRed: lecturas del juego que tuvieron que pedir
                    adelantados: 0, aprovechados: 0, esperaRed: 0, avisos: 0,
+                   carpetas: [],                             // carpetas de diminutos pedidas enteras (vecinos)
                    colaBaja: () => colaBaja.length };        // trabajos de prioridad baja que esperan turno
   const memoria = new Map();            // clave → Uint8Array (el orden del Map = del más viejo al más nuevo)
   let enMemoria = 0, caja = null;
@@ -54,6 +62,9 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   let activos = 0, activosBaja = 0, ultimoBaja = -Infinity, relojBaja = null, ultimaEspera = -Infinity;
   const racha = new Map();              // url → { fin, n }: dónde terminó la última lectura y cuántas seguidas van
   const grupos = new Map();             // url → rangos [inicio, fin) ordenados (agrupar)
+  const carpetaDe = new Map();          // url de un archivo diminuto → su carpeta (vecinos)
+  const deCarpeta = new Map();          // carpeta → [[url, tamaño], …] de sus archivos diminutos
+  let ultimoDiminuto = null;            // el último diminuto que leyó el juego (para ver la racha de carpeta)
   const clave = (url, b) => new URL(`${url}${url.includes('?') ? '&' : '?'}bloque=${b}&v=${encodeURIComponent(version)}`, location.href).href;
 
   async function abrir() {
@@ -186,6 +197,34 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
 
   // Los grupos de un archivo: rangos [inicio, fin) que el juego lee enteros (brsar.mjs)
   function agrupar(url, rangos) { if (rangos && rangos.length) grupos.set(url, rangos); }
+
+  // Un pedazo [ini, fin) de un archivo, con prioridad normal (p. ej. el grupo de sonido de un menú, recetas.mjs)
+  function adelantarRango(url, tam, ini, fin) {
+    if (!adelantarActivo || !(tam > 0) || !(fin > ini)) return;
+    aFondo(url, tam, Math.floor(ini / bloque), Math.floor((Math.min(fin, tam) - 1) / bloque));
+  }
+
+  // Los archivos diminutos, para conocer a sus vecinos de carpeta: [[url, tamaño], …]
+  const carpetaDeUrl = url => url.slice(0, url.lastIndexOf('/') + 1);
+  function vecinos(lista) {
+    for (const [url, tam] of lista) {
+      if (!(tam > 0)) continue;
+      const c = carpetaDeUrl(url);
+      carpetaDe.set(url, c);
+      if (!deCarpeta.has(c)) deCarpeta.set(c, []);
+      deCarpeta.get(c).push([url, tam]);
+    }
+  }
+  // Pedir de una vez, con prioridad normal, todos los diminutos de una carpeta (menos `salvo`, que lo pide quien
+  // llama); los que ya están en memoria o en camino no se vuelven a pedir, y una carpeta se pide entera una sola vez
+  function adelantarCarpeta(carpeta, salvo = null) {
+    const lista = deCarpeta.get(carpeta);
+    if (!adelantarActivo || !lista || estado.carpetas.includes(carpeta)) return 0;
+    estado.carpetas.push(carpeta);
+    let n = 0;
+    for (const [url, tam] of lista) if (url !== salvo) { aFondo(url, tam, 0, Math.floor((tam - 1) / bloque)); n++; }
+    return n;
+  }
   function grupoDe(rangos, x) {                 // búsqueda binaria: el último que empieza en x o antes
     let a = 0, z = rangos.length - 1, r = null;
     while (a <= z) { const m = (a + z) >> 1; if (rangos[m][0] <= x) { r = rangos[m]; a = m + 1; } else z = m - 1; }
@@ -227,10 +266,22 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
         if (g1 > b1) aFondo(url, tam, b1 + 1, g1);
       }
     }
+    let propios = null;
     if (mios.length) {
       estado.esperaRed++;
       ultimaEspera = performance.now();      // el juego está cargando: la fila baja se aparta un rato
-      const res = await encargar(url, tam, mios.map(i => b0 + i));
+      propios = encargar(url, tam, mios.map(i => b0 + i));
+    }
+    // 2c) carpeta en racha (§76): el 2.º diminuto distinto seguido de la misma carpeta → el resto de la carpeta de una
+    //     vez. Va DESPUÉS de pedir lo de esta lectura: con HTTP/1.1 (6 conexiones) lo que espera el juego sale primero
+    //     y no queda en fila detrás de sus vecinos; los que ya están en memoria o en camino no se repiten.
+    const c = adelantarActivo ? carpetaDe.get(url) : undefined;
+    if (c !== undefined) {
+      if (ultimoDiminuto && ultimoDiminuto !== url && carpetaDe.get(ultimoDiminuto) === c) adelantarCarpeta(c, url);
+      ultimoDiminuto = url;
+    }
+    if (propios) {
+      const res = await propios;
       for (const i of mios) bloques[i] = res.get(b0 + i);
     }
     if (bloques.some(x => x instanceof Promise)) ultimaEspera = performance.now();   // esperó algo en camino
@@ -280,5 +331,6 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
              enCola: colaBaja.some(t => t.url === url && t.lista.includes(Math.floor(inicio / bloque))),
              caja: caja ? !!(await caja.match(k)) : null };
   }
-  return { estado, abrir, leer, adelantar, adelantarBloques, agrupar, entero, ocupado, borrar, bloque, donde };
+  return { estado, abrir, leer, adelantar, adelantarBloques, adelantarRango, agrupar, vecinos, adelantarCarpeta,
+           entero, ocupado, borrar, bloque, donde };
 }

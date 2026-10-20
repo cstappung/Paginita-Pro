@@ -34,7 +34,7 @@ import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
-import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, MARCA_SALA } from './sala-carrera.mjs';
+import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, MARCA_SALA } from './sala-carrera.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -645,6 +645,14 @@ window.mkwInterfaz = ui;
 // Las pruebas con Playwright no lo ven (navigator.webdriver) salvo con ?inicio=1; ?inicio=0 lo apaga.
 const quiereInicio = !parametros.get('modo') && !ui.conPortada && parametros.get('inicio') !== '0' &&
   (parametros.get('inicio') === '1' || !navigator.webdriver);
+// Con el menú de inicio, lo primero que se oye es la música del título del juego (debajo del menú), y precalentar los
+// ~700 pipelines en el arranque la atrasaba ~3 s: se postergan hasta la primera pantalla (§76, pipeline_cache.cpp).
+// Solo si este navegador ya jugó antes (marca "mkw.precalentado"): entonces Chrome ya tiene esos shaders en su caché
+// y pedirlos es liviano; en la 1.ª visita se compilan de cero, y hacerlo con la música sonando la trababa.
+// ?precalentarTarde=1 / 0: forzarlo o apagarlo (sin menú, las pruebas siguen como antes).
+const yaPrecalento = (() => { try { return localStorage.getItem('mkw.precalentado') === '1'; } catch { return false; } })();
+const PRECALENTAR_TARDE = parametros.get('precalentarTarde') === '1' ||
+  (quiereInicio && yaPrecalento && parametros.get('precalentarTarde') !== '0');
 let pedirPiloto = null;          // arrancar() lo pone cuando el piloto existe; antes, la elección queda esperando
 let eleccionPendiente = null;
 let modoInicio = null;           // lo último elegido que mueve el juego ('unjugador' | 'local')
@@ -737,6 +745,7 @@ async function arrancar() {
                        adelantarActivo: parametros.get('adelantar') !== '0' });
   await disco.abrir();
   window.mkwDisco = disco;
+  if (parametros.get('adelantar') !== '0') leerSemillaBloques();   // ya en camino para la semilla del arranque (§76)
   const tamaños = new Map();          // ruta del juego → tamaño, solo de los archivos perezosos
   const aBajar = [];
   const carpetasVacias = [];                  // [ruta del juego, tamaño] de los archivos que se bajan enteros
@@ -1096,11 +1105,34 @@ async function arrancar() {
       else if (d.tipo === 'anfitrion' && typeof d.uid === 'string') window.mkwSala?.cambiarAnfitrion(d.uid);
     });
     let primeraVista = true, miEleccion = null, pickerAbierto = false, reloj = null, vigiaFin = null;
+    // §74: los selectores abiertos de la playlist (el del anfitrión, el de sugerir) y el panel de entre carreras
+    let selLista = null, selSug = null, breve = null;
+    const carrerasPedidas = Math.max(1, Math.min(32, Number(parametros.get('carreras')) || 4));
+    // los nombres de las pistas se leen de la memoria del juego (lento): una vez
+    let copasLeidas = null;
+    const copasSala = () => copasLeidas || (copasLeidas = leerNombres(window.mkwMenus, M));
+    let desde = 0;                                  // §75: la primera carrera de la copa que corrió esta consola
     const sala = window.mkwSala = crearSalaCarrera({ yo: sincro.yo, humanos: sincro.humanos, anfitrion: jefe, estilo,
-      carreras: Math.max(1, Math.min(32, Number(parametros.get('carreras')) || 4)), pistas: cola,
+      carreras: carrerasPedidas, pistas: cola,
       enviar: (u, b) => red?.malla?.enviar(u, b, 'tcp'), alCambiar: e => alCambiarSala(e),
+      // §75: otro avisa que se salta la carrera k (recargó la página): que la carrera sincronizada no lo espere
+      alSalta: (uid, k) => { const h = sincro.humanos.find(x => x.uid === uid); if (h) sincro.lockstep?.saltar(h.mando, k); },
       registro: t => red?.registro?.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     window.mkwEstado.sala = sala.estado();
+    // §75 (pruebas): terminar la carrera de los humanos en el cuadro `cuadro` de la carrera sincronizada, el mismo en
+    // todas las consolas (cada pestaña lo pide con el mismo número): el juego da los puestos y los puntos de verdad.
+    // puestos = solo esos (por ejemplo [0]: A llega y B no; sin puestos, todos)
+    window.mkwTerminarEn = (cuadro, n = sincro.lockstep?.estado().carrera, puestos = null) => {
+      if (!sincro.lockstep || !M._mkw_sala_terminar) return false;
+      const mascara = Array.isArray(puestos) ? puestos.reduce((m, i) => m | (1 << i), 0) : 0;
+      sincro.lockstep.enCuadro(n, cuadro, () => M._mkw_sala_terminar(mascara));
+      return true;
+    };
+    // §75: el tiempo límite de la carrera (el del juego en línea, el de Retro Rewind; lockstep_nativo.cpp): quien no
+    // llegó a la meta cuando el reloj de la carrera lo pasa termina con un tiempo estimado. ?limite=N segundos = otro
+    // (solo pruebas: esperar 5 minutos de carrera no da)
+    if (parametros.has('limite')) M._mkw_sala_limite?.(Math.max(0, Number(parametros.get('limite')) * 1000) >>> 0);
+    window.mkwLimiteCarrera = () => M._mkw_sala_limite_juego?.();
     // el juego: directo a la pantalla de personaje (la licencia 1, creada si hace falta)
     directo.elegir().then(({ abierto, eleccion }) => {
       window.mkwEstado.piloto = { llego: abierto, modo: 'sala', eligiendo: true };
@@ -1115,21 +1147,87 @@ async function arrancar() {
       });
     });
     const pistaDe = (e, n) => { const t = e.pistas?.[n - 1]; return t ? 0x100 + 4 * t.copa + t.fila : 0x100; };
+    // §74: el nombre de cada piloto (el que manda la sala del sitio) y las sugerencias de la playlist
+    const nombreDe = uid => nombres[uid] || `Jugador ${sincro.humanos.findIndex(h => h.uid === uid) + 1}`;
+    const pendientesDe = e => (e.lista?.sugerencias || []).filter(s => s.estado === 'pendiente').map(s => ({ ...s, nombre: nombreDe(s.de) }));
+    const misSugerencias = e => (e.lista?.sugerencias || []).filter(s => s.de === sincro.yo);
+    // §79: en el sitio el marco del juego mide 100vh − 120 px y empieza más abajo del borde de la ventana: el panel de
+    // los selectores queda pegado abajo del marco, fuera de la vista. Al abrir uno se le pide al sitio que acomode la
+    // página para que se vea el marco entero ({tipo:'mirame'}: scrollIntoView «nearest», solo si hace falta)
+    const mirame = () => { if (window.parent !== window) window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'mirame' }, location.origin); };
+    // el anfitrión elige: la copa (una de las del juego, sus 4 pistas) o arma la playlist con las sugerencias de todos
+    function abrirSelectorSala(e) {
+      pickerAbierto = true;
+      ui.aviso('');
+      mirame();
+      if (!e.lista) {
+        ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: false, titulo: 'Elige la copa de la sala', lista: { alAbrir: c => { selLista = c; } } }).then(r => {
+          pickerAbierto = false; selLista = null;
+          if (r && r.copa >= 0) sala.ponerPistas([0, 1, 2, 3].map(f => ({ copa: r.copa, fila: f })));
+          else if (sala.estado().fase === 'copa') alCambiarSala(sala.estado());   // (se cerró sin elegir: se vuelve a abrir)
+        });
+        return;
+      }
+      ui.elegirPista({ modo: 'lista', copas: copasSala(), cerrar: false, titulo: 'Arma la playlist de la sala', lista: {
+        pistas: e.lista.pistas, clave: 'mkw.lista.sala', sugerencias: true, confirmar: 'Confirmar la playlist', objetivo: carrerasPedidas,
+        alCambiar: ps => sala.listaCambio(ps), alAceptar: id => sala.aceptar(id), alRechazar: id => sala.rechazar(id),
+        alAbrir: c => {
+          selLista = c;
+          if (!e.lista.pistas.length && c.pistas.length) sala.listaCambio(c.pistas);   // (venía del borrador: que la vean todos)
+          c.sugerencias(pendientesDe(sala.estado()));
+        } } }).then(r => {
+        pickerAbierto = false; selLista = null;
+        if (r?.pistas?.length) sala.ponerPistas(r.pistas);
+        else if (sala.estado().fase === 'copa') alCambiarSala(sala.estado());
+      });
+    }
+    // los demás sugieren (mientras se arma la playlist, o entre carrera y carrera con «Sugerir pista»)
+    function abrirSugerir(e, entre) {
+      ui.aviso('');
+      mirame();
+      ui.elegirPista({ modo: 'sugerir', copas: copasSala(), cerrar: entre,
+        titulo: entre ? 'Sugiere pistas para lo que viene' : 'Sugiere pistas para la playlist', lista: {
+          pistas: (entre ? e.pistas : e.lista.pistas) || [], alSugerir: p => sala.sugerir(p),
+          nota: entre ? 'El anfitrión decide si entran. La carrera siguiente empieza sola.' : undefined,
+          alAbrir: c => { selSug = c; c.sugerencias(misSugerencias(sala.estado())); } } }).then(() => { selSug = null; });
+    }
+    // entre carrera y carrera de la playlist: el panel con lo que viene
+    function mostrarBreve(e) {
+      const o = { pistas: e.pistas, hechas: e.carrera, anfitrion: sala.soyAnfitrion, pendientes: pendientesDe(e).length, copas: copasSala(),
+        nota: e.pausa && !sala.soyAnfitrion ? 'El anfitrión está agregando pistas…' : '',
+        alAgregar: () => agregarEntre(), alSugerir: () => { if (!selSug) abrirSugerir(sala.estado(), true); } };
+      if (breve?.abierto) breve.poner(o); else { breve = ui.playlistBreve(o); mirame(); }
+    }
+    // «+ Agregar pistas» (el anfitrión): la sala espera (hasta 60 s) mientras cambia las que vienen
+    function agregarEntre() {
+      const e = sala.estado();
+      if (!sala.soyAnfitrion || selLista || e.fase !== 'correr') return;
+      sala.pausar(true);
+      mirame();
+      const hechas = e.carrera;
+      ui.elegirPista({ modo: 'lista', copas: copasSala(), cerrar: true, textoCerrar: 'Listo', titulo: 'Agrega pistas a la playlist', lista: {
+        pistas: (e.pistas || []).slice(hechas), max: Math.max(1, 32 - hechas), clave: '', sugerencias: true, confirmar: 'Seguir', titulo: 'Lo que viene',
+        objetivo: Math.min(4, Math.max(1, 32 - hechas)),
+        alCambiar: ps => sala.restantesCambio(ps), alAceptar: id => sala.aceptar(id), alRechazar: id => sala.rechazar(id),
+        alAbrir: c => { selLista = c; c.sugerencias(pendientesDe(sala.estado())); } } }).then(() => { selLista = null; sala.pausar(false); });
+    }
     function alCambiarSala(e) {
       window.mkwEstado.sala = e;
       const primera = primeraVista; primeraVista = false;
       clearInterval(reloj); reloj = null;
       if (e.fase === 'copa') {
-        if (sala.soyAnfitrion && !pickerAbierto) {
-          pickerAbierto = true;
-          ui.elegirPista({ modo: 'copa', copas: leerNombres(window.mkwMenus, M), cuantas: e.carreras,
-            titulo: e.carreras === 4 ? 'Elige la copa de la sala' : `Elige las ${e.carreras} pistas de la sala` }).then(r => {
-            pickerAbierto = false;
-            if (r?.pistas?.length) sala.ponerPistas(r.pistas);
-            else alCambiarSala(sala.estado());               // (cerró sin elegir: se vuelve a abrir)
-          });
-        } else if (!sala.soyAnfitrion) ui.aviso('El anfitrión está eligiendo la copa…');
+        if (sala.soyAnfitrion) {
+          if (selSug) { selSug.cerrar(); selSug = null; }    // (sugería y ahora manda: el anfitrión se fue, §74)
+          if (!pickerAbierto) abrirSelectorSala(e);
+          else selLista?.sugerencias(pendientesDe(e));       // (las sugerencias que van llegando)
+        } else if (e.lista) {
+          // §74: los demás, en la playlist: sugieren pistas mientras el anfitrión arma la lista
+          if (!selSug) abrirSugerir(e, false);
+          else { selSug.poner(e.lista.pistas); selSug.sugerencias(misSugerencias(e)); }
+        } else ui.aviso('El anfitrión está eligiendo la copa…');
       } else if (e.fase === 'elegir') {
+        if (selSug) { selSug.cerrar(); selSug = null; }      // (§74: el anfitrión confirmó la playlist)
+        if (selLista) { selLista.cerrar(null); selLista = null; }   // (la copa se fijó sin el selector: un anfitrión nuevo, las pruebas)
         // (lo mío se manda otra vez solo si el anfitrión todavía no lo tiene: en el anfitrión, elegi() cambia el estado y
         // vuelve a llamar aquí; sin esta condición sería un círculo sin fin)
         if (miEleccion && !e.picks?.[sincro.yo]) sala.elegi(miEleccion);
@@ -1142,10 +1240,29 @@ async function arrancar() {
         cuenta(); reloj = setInterval(cuenta, 1000);
       } else if (e.fase === 'correr') {
         const n = e.carrera;
-        // quien recargó la página con la copa andando no puede entrar a la mitad de una carrera: entra en la siguiente
-        if (primera && !miEleccion && n >= 1 && !e.terminaron?.[n] && sala.arrancar(n)) { ui.aviso('La copa ya empezó: entras en la carrera siguiente…'); return; }
+        // §74: en la playlist, mientras se ven los resultados, la lista un rato con «+ Agregar pistas» / «Sugerir pista»
+        if (e.lista) {
+          if (e.terminaron?.[n] && e.plazo) mostrarBreve(e);
+          selLista?.sugerencias(pendientesDe(e));
+          if (selSug) { selSug.poner(e.pistas); selSug.sugerencias(misSugerencias(e)); }
+        }
+        // §75: quien recargó la página con la copa andando (la primera vista ya es una carrera) no entra a esa carrera,
+        // aunque esté en los resultados: su consola no tiene los cuadros que ya pasaron. Se la salta —y lo avisa en el
+        // latido, para que nadie lo espere— y entra en la siguiente con su puesto y lo que eligió. Lo mismo si la
+        // anfitriona lo dejó fuera de esta carrera (no daba señales al empezarla: en todas va "sin nadie").
+        const fueraYo = (e.fuera || []).includes(sincro.yo);
+        if ((primera || fueraYo) && n >= 1 && sala.arrancar(n)) {
+          if (primera) sala.saltar(n);
+          ui.aviso(n >= e.carreras ? 'La copa ya va en su última carrera: al final verás la tabla…' : 'La copa ya empezó: entras en la carrera siguiente…');
+          return;
+        }
         if (!sala.arrancar(n)) return;
+        sala.saltar(0);
         ui.aviso('');
+        // §74: la carrera nueva: fuera el panel y los selectores de entre carreras
+        breve?.cerrar(); breve = null;
+        selSug?.cerrar(); selSug = null;
+        selLista?.cerrar(null); selLista = null;
         const hs = humanosDeFicha(sincro.humanos, e);
         const cc = ccDe(n);
         const ficha = armarFicha({ pista: pistaDe(e, n), cc, cpu: cpuDe(cc),
@@ -1155,7 +1272,11 @@ async function arrancar() {
         window.mkwSemillaCarrera = ficha.semilla;          // (semillas_nativo.cpp: plantel y pantalla propia)
         // (los mandos y el derrape de cada humano, igual en todas las consolas: semillas_nativo.cpp)
         window.mkwPlantel = ficha.puestos.map((q, i) => [q.vehiculo, q.personaje, q.tipo, q.tipo === 0 ? q.mando : -1, q.tipo === 0 ? hs[i]?.derrape || 0 : 0]);
-        sincro.lockstep?.fijarCarrera(n);
+        // (§75: y quiénes están fuera de esta carrera, igual en todas: los que la anfitriona no oyó al empezarla)
+        sincro.lockstep?.fijarCarrera(n, (e.fuera || []).map(u => sincro.humanos.find(h => h.uid === u)?.mando).filter(m => m >= 0));
+        // (§75: y los puntos que lleva la copa, los de la sala: quien recargó no tiene los de las carreras que se saltó)
+        if (n > 1 && e.puntos?.carrera === n - 1) ponerPuntos(window.mkwMenus, e.puntos.tabla);
+        if (!desde) desde = n;
         directo.carrera(ficha, { licencia: -1 }).then(llego => {
           nota(`sala: carrera ${n} de ${e.carreras} ${llego ? 'abierta' : 'no se pudo'} (pista 0x${ficha.pista.toString(16)})`);
           window.mkwEstado.piloto = { llego, modo: 'sala', carrera: n };
@@ -1163,19 +1284,33 @@ async function arrancar() {
         });
         // la carrera terminó (Raceinfo +0x28 ≥ 4): se avisa al anfitrión (la misma carrera en todas: cuenta la primera)
         clearInterval(vigiaFin);
+        // (§77: recién vale después de ver ESTA carrera corriendo: al llegar «correr n» la consola todavía muestra los
+        // resultados de la n−1 —la misma sección, el Raceinfo viejo con la etapa ≥ 4— y la vigía avisaba que la n ya
+        // había terminado, con la tabla vieja: la anfitriona saltaba a la siguiente 9 s después)
+        let empezo = false;
         vigiaFin = setInterval(() => {
-          const L = window.mkwMenus, ri = L.u32(0x809BD730), s = L.estado().seccion;
-          if (ri && s >= 0x20 && s <= 0x23 && L.u32(ri + 0x28) >= 4) { clearInterval(vigiaFin); sala.termine(n); }
+          const L = window.mkwMenus, ri = L.u32(0x809BD730), s = L.estado().seccion, et = ri ? L.u32(ri + 0x28) : -1;
+          if (et >= 0 && et < 4) empezo = true;
+          // (§75: y con los puntos ya sumados: el juego los suma en el primer cuadro con la carrera terminada, que esta
+          // vigía puede ver un cuadro antes; mkw_sala_puntos_sumados lo dice)
+          if (empezo && ri && s >= 0x20 && s <= 0x23 && et >= 4 && (M._mkw_sala_puntos_sumados?.() ?? 1)) {
+            clearInterval(vigiaFin); sala.termine(n, puntosDelJuego(L), desde);
+          }
         }, 500);
       } else if (e.fase === 'fin') {
         clearInterval(vigiaFin);
-        const tabla = tablaDelJuego(window.mkwMenus, sincro.humanos, nombres);
+        breve?.cerrar(); breve = null; selSug?.cerrar(); selSug = null; selLista?.cerrar(null); selLista = null;
+        const tabla = tablaDelJuego(window.mkwMenus, sincro.humanos, nombres, e.puntos?.carrera === e.carreras ? e.puntos.tabla : null);
         window.mkwEstado.finModo = tabla;
         ui.aviso(`Fin de la copa: ${tabla.slice(0, 3).map((x, k) => `${k + 1}. ${x.nombre} ${x.puntos}`).join(' · ')}`);
         if (window.parent !== window) window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'fin', estilo, tabla }, location.origin);
       }
     }
-    alCambiarSala(sala.estado());
+    // §75: la página no mira su estado inicial (sería el de una sala nueva aunque la copa ya vaya por la carrera 3):
+    // la sala llama alCambiarSala recién cuando sabe en qué va (el primer reparto de la anfitriona, o la anfitriona
+    // cuando oyó a todos o adoptó la copia). Antes de §75 esta llamada gastaba la "primera vista" y quien recargaba
+    // entraba a la carrera en curso desde el cuadro 0 (desincronizada).
+    ui.aviso('Conectando con la sala…');
   }
   if (['gp', 'vs', 'tt', 'copa'].includes(objetivoPiloto.modo)) {
     if (parametros.has('copa')) { objetivoPiloto.copa = Number(parametros.get('copa')); objetivoPiloto.fila = Number(parametros.get('fila') || 0); }
@@ -1196,11 +1331,12 @@ async function arrancar() {
       if (llego && objetivoPiloto.modo === 'copa') {
         // las carreras 2, 3 y 4 de la copa a tu gusto: el piloto pone cada pista cuando aparece la pantalla de copas
         window.mkwEstado.copa = { carrera: 1 };
-        ui.aviso('Copa a tu gusto: carrera 1 de 4');
-        const termino = await piloto.seguirCopa(objetivoPiloto, n => { window.mkwEstado.copa = { carrera: n + 1 }; ui.aviso(`Copa a tu gusto: carrera ${n + 1} de 4…`); });
+        const total = objetivoPiloto.pistas?.length || 4;          // (§74: la lista puede tener hasta 32)
+        ui.aviso(`Copa a tu gusto: carrera 1 de ${total}`);
+        const termino = await piloto.seguirCopa(objetivoPiloto, n => { window.mkwEstado.copa = { carrera: n + 1 }; ui.aviso(`Copa a tu gusto: carrera ${n + 1} de ${total}…`); });
         window.mkwEstado.copa.termino = termino;
         window.mkwSemillaCarrera = null;          // las carreras que vengan después: el azar de siempre
-        nota(`copa a tu gusto: ${termino ? 'jugó las 4' : 'se dejó'}`);
+        nota(`copa a tu gusto: ${termino ? `jugó las ${total}` : 'se dejó'}`);
       }
     });
   }
@@ -1435,6 +1571,10 @@ async function arrancar() {
     vocesCpuBrsar.push(...gruposConNombreBrsar(await disco.leer(url, tam, 0, largo), tam)
       .filter(([nombre]) => /^GRP_VO_[A-Z0-9]+_(CAN_)?NPC$/.test(nombre)).map(([, ini, fin]) => [ruta, ini, fin]));
   })().catch(e => escribe('[mkw] tabla de grupos: ' + e.message));
+  // Los diminutos (≤ 8 KB) por carpeta: si el juego lee dos seguidos de la misma carpeta, el resto se pide de una vez
+  // (disco.mjs, carpeta en racha, §76: los 64 fantasmas del menú «Un jugador»). ?vecinos=0: sin esto.
+  if (parametros.get('vecinos') !== '0')
+    disco.vecinos([...tamaños].filter(([, tam]) => tam > 0 && tam <= 8192).map(([ruta, tam]) => [direccion(ruta), tam]));
   // Con el título en pantalla (cuadro 300), traer en segundo plano y con prioridad baja todos los archivos diminutos
   // (≤ 8 KB: 613 archivos, 1,5 MB): el juego los lee de a uno, un pedido por cuadro (los fantasmas del Contrarreloj,
   // íconos y bancos de sonido de Retro Rewind), y con la red del sitio cada uno serían ~50 ms de espera (§52)
@@ -1452,6 +1592,25 @@ async function arrancar() {
   pipelines.vigilar(M);                    // y la lista de pipelines usados, cada 10 s si creció
   window.mkwPipelines = { estado: pipelines.estado, exportar: () => pipelines.exportar(M),
                           cuantos: () => M._mkw_web_pipelines_cuantos(), guardar: forzar => pipelines.guardarAhora(M, forzar) };
+  // Precalentado postergado (§76): se pide apenas el juego llega a su primera pantalla (el título, o la que abrió
+  // directo), con la música del título ya en camino; si en 30 s no llegó a ninguna, se pide igual
+  // la marca para las próximas visitas: 20 s después de llegar a la primera pantalla ya se compiló lo de la lista
+  const vigiaMarca = setInterval(() => {
+    if (!((window.mkwMenus?.estado?.().seccion ?? -1) >= 0)) return;
+    clearInterval(vigiaMarca);
+    setTimeout(() => { try { localStorage.setItem('mkw.precalentado', '1'); } catch {} }, 20000);
+  }, 500);
+  if (PRECALENTAR_TARDE && M._mkw_web_pipelines_precalentar) {
+    const desdeMain = performance.now();
+    const vigiaPrecalentado = setInterval(() => {
+      const e = window.mkwMenus?.estado?.();
+      if (!(e && e.seccion >= 0) && performance.now() - desdeMain < 30000) return;
+      clearInterval(vigiaPrecalentado);
+      const n = M._mkw_web_pipelines_precalentar(), ms = Math.round(performance.now() - desdeMain);
+      window.mkwEstado.precalentadoTarde = { n, ms, seccion: e ? e.seccion : -1 };
+      nota(`pipelines postergados: ${n} pedidos ahora (${(ms / 1000).toFixed(1)} s después de main(), sección 0x${((e && e.seccion) ?? -1).toString(16)})`);
+    }, 50);
+  }
   guardado.pedirPersistencia().then(si => nota(`almacenamiento persistente: ${si ? 'sí' : 'no (el navegador podría borrarlo si le falta espacio)'}`));
   window.mkwEstado.horaMain = Date.now();  // los archivos con fecha posterior los escribió el juego
   // La base de Mii con al menos un Mii (si estaba vacía se pone uno y se guarda solo, ya con el guardado vigilando):
@@ -1461,6 +1620,7 @@ async function arrancar() {
     directo.ponerMii(miiLicencia);
     if (miiLicencia.nueva) nota('directo: base de Mii vacía, puse un Mii para la licencia');
   }
+  if (parametros.get('adelantar') !== '0' && parametros.get('semillaArranque') !== '0') adelantarArranque(tamaños);   // §76
   nota('arrancando main() — el juego corre');
   ui.cortina('Arrancando…');
   M.callMain([]);
@@ -1482,10 +1642,13 @@ window.mkwLecturas = () => [...lecturasVistas.values()];
 
 // La semilla de bloques (bloques.json, junto al .wasm): con el título en pantalla se piden con prioridad baja, en el
 // orden en que el juego los fue necesitando; los que estén en Cache Storage (visitas siguientes) no van a la red.
+// (se baja una sola vez: la usan la semilla del arranque y este precalentado)
+let semillaBloques = null;
+const leerSemillaBloques = () => semillaBloques ??= fetch(ORIGEN + '/build/bloques.json', { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null).catch(() => null);
 async function precalentarBloques(tamaños) {
-  let semilla;
-  try { const r = await fetch(ORIGEN + '/build/bloques.json', { cache: 'no-store' }); if (!r.ok) return; semilla = await r.json(); }
-  catch { return; }
+  const semilla = await leerSemillaBloques();
+  if (!semilla) return;
   const minimo = semilla.corridas >= 2 ? 2 : 1;          // con varias corridas, solo lo que se repite (no los CPU al azar)
   // solo lo que el juego necesitó por primera vez después del título (lo de antes ya lo bajó él al arrancar), y como
   // mucho 32 MB, en el orden en que los fue necesitando
@@ -1517,6 +1680,33 @@ async function precalentarBloques(tamaños) {
   nota(`semilla de bloques: ${n} bloques (${(bytes / 1048576).toFixed(1)} MB) pedidos con prioridad baja`);
   if (voces.length) nota(`voces de los corredores CPU: ${nVoces} bloques (${(bytesVoces / 1048576).toFixed(1)} MB), ` +
                          `intercaladas en el cuadro ${cuadroVoces === Infinity ? '(al final)' : cuadroVoces}`);
+}
+
+// La semilla del ARRANQUE (§76): lo que el juego lee antes de su título (en la semilla, cuadro < 450: el código y la
+// configuración de Retro Rewind, el menú HOME, los Mii, las fuentes, el título y su grupo de sonido; ~100 bloques) lo
+// lee de a una lectura, esperando cada una: en la 1.ª visita eran ~2 s de viajes a la red seguidos, y la música del
+// título (lo primero que se oye, debajo del menú de inicio) esperaba todo eso. Se pide entero apenas arranca main(),
+// con prioridad normal y en paralelo (como mucho 12 pedidos a la vez, disco.mjs), en el orden en que el juego lo va a
+// leer; con caché sale de Cache Storage, también en paralelo. ?semillaArranque=0: sin esto.
+async function adelantarArranque(tamaños) {
+  const semilla = await leerSemillaBloques();
+  if (!semilla) return;
+  const minimo = semilla.corridas >= 2 ? 2 : 1;
+  const lista = (semilla.bloques || []).filter(([ruta, , cuadro, veces]) => cuadro < 450 && veces >= minimo && tamaños.has(ruta))
+    .sort((x, y) => x[2] - y[2] || (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] - y[1]));
+  let tramo = null, pedidos = 0;
+  // bloques seguidos del mismo archivo van en UN pedido (hasta 8 bloques, 2 MB)
+  const cerrar = () => {
+    if (tramo) { disco.adelantarRango(direccion(tramo.ruta), tamaños.get(tramo.ruta), tramo.b0 * disco.bloque, (tramo.b1 + 1) * disco.bloque); pedidos++; }
+    tramo = null;
+  };
+  for (const [ruta, b] of lista) {
+    if (tramo && tramo.ruta === ruta && tramo.b1 === b - 1 && tramo.b1 - tramo.b0 < 7) tramo.b1 = b;
+    else { cerrar(); tramo = { ruta, b0: b, b1: b }; }
+  }
+  cerrar();
+  window.mkwEstado.semillaArranque = { bloques: lista.length, pedidos };
+  nota(`semilla del arranque: ${lista.length} bloques en ${pedidos} pedidos, antes de que el juego los lea`);
 }
 
 // Las voces de los corredores de la consola (CPU), §54. En cada carrera la consola elige corredores al azar, y en la
@@ -1561,6 +1751,11 @@ function armarArchivos(m, contenidos, tamaños) {
     '[audio]', 'mix_worker = false', '',     // sin hilos en la web: el sonido se mezcla en el mismo hilo
     '[network]', `enabled = ${red ? 'true' : 'false'}`, '',     // en línea solo con la red de la sala (?red=1, §58)
     '[discord]', 'enabled = false', '',
+    // §79: la imagen siempre 16:9. SDL3 agranda el canvas a su tamaño en la página cada vez que la ventana (o el marco
+    // del sitio) cambia de tamaño; sin esto, el "aspecto dinámico" de WiiCompiled estiraba la escena 3D a esa forma y lo
+    // 2D del juego (la cortina de Lakitu, el HUD) quedaba en la franja 16:9 del medio. Con force_16_9 aurora dibuja 16:9
+    // y pone las barras negras dentro del canvas. ?aspecto=libre: el estirado de antes (para comparar)
+    '[video]', 'widescreen = true', `force_16_9 = ${parametros.get('aspecto') === 'libre' ? 'false' : 'true'}`, '',
     '[paths]', 'dvd_root = "/mkw/disco"', 'retro_rewind_root = "/mkw/sd/RetroRewind6"', '',
   ].join('\n'));
   m.ENV.XDG_DATA_HOME = '/datos';       // la "AppData" del juego (Config, NAND, registros)
@@ -1575,6 +1770,9 @@ function armarArchivos(m, contenidos, tamaños) {
   // ?pipelines=sincronico: crear cada pipeline nuevo en el momento, frenando el cuadro (como antes, para comparar;
   // bitácora §51). Sin el parámetro: en segundo plano, saltando el dibujo hasta que llegue.
   if (parametros.has('pipelines')) m.ENV.MKW_PIPELINES = parametros.get('pipelines');
+  // Precalentado postergado (§76): aurora lee las listas igual, pero los pedidos esperan a la primera pantalla del juego
+  // (de a 2 por cuadro: ya suena la música del título; ?precalentarRitmo=N para probar otro ritmo)
+  if (PRECALENTAR_TARDE) m.ENV.MKW_PRECALENTAR = 'tarde' + (parametros.has('precalentarRitmo') ? ':' + parametros.get('precalentarRitmo') : '');
   if (parametros.has('staging')) m.ENV.MKW_STAGING = parametros.get('staging');   // ?staging=mapeo: búfer mapeado viejo (§53)
   FS.chdir('/wc');                      // el runtime busca runtime/assets/... desde aquí
 }

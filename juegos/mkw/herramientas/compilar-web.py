@@ -247,6 +247,10 @@ def main():
                   "func_80787774": "func_80787774_traducida", "func_807379BC": "func_807379BC_traducida",
                   "func_807EC7F8": "func_807EC7F8_traducida", "func_807F7E80": "func_807F7E80_traducida",
                   "func_80536054": "func_80536054_traducida", "func_8020FE24": "func_8020FE24_traducida", "rr_kamek_81806568": "rr_kamek_81806568_traducida",
+                  # Raceinfo::Update (la de RR) y RacedataScenario::UpdatePoints -> lockstep_nativo.cpp: el fin de la
+                  # carrera en la sala con las reglas del juego (tiempo límite; terminar en un cuadro pedido, pruebas) y
+                  # los puntos una vez por carrera, igual en todas las consolas (§75)
+                  "rr_overlay_805331B4": "rr_overlay_805331B4_traducida", "func_8052E950": "func_8052E950_traducida",
                   # Page::Activate -> web/juego/paginas_nativo.cpp (avisa a la página qué pantalla se activó: ocultar.mjs, §66)
                   "func_80601AEC": "func_80601AEC_traducida",
                   # SectionMgr::Update (la versión de RR) -> web/juego/directo_nativo.cpp (abrir directo una sección
@@ -433,7 +437,9 @@ def main():
         exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_reloj", "_mkw_web_pad", "_mkw_web_mem",
                     "_mkw_web_sonido_cola_ms", "_mkw_web_sonido_ritmo", "_mkw_web_sonido_tirados",
                     # la lista de pipelines usados, para precalentarlos en la próxima visita (web/navegador/pipelines.mjs)
-                    "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos"]
+                    "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos",
+                    # …y pedirlos recién cuando el juego llegó a su primera pantalla (MKW_PRECALENTAR=tarde, §76)
+                    "_mkw_web_pipelines_precalentar"]
         propio = puertos + ["-sENVIRONMENT=web", "-sEXIT_RUNTIME=0", "-sFORCE_FILESYSTEM=1",
                             "-sEXPORTED_RUNTIME_METHODS=['callMain','ENV','FS','HEAPU8']"]
     else:

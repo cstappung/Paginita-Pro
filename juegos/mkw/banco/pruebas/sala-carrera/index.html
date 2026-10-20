@@ -13,11 +13,14 @@
   <b>reloj falso</b> para probar los 45 s sin esperarlos. Comprueba: solo la anfitriona arma la copa; con la copa
   armada todos pasan a elegir personaje; lo que eligió cada uno llega a todos; al que no eligió a tiempo se le pone
   uno; las carreras siguen una tras otra después de los resultados; quien recarga la página a mitad de la copa se pone
-  al día con el siguiente reparto; la modalidad playlist empieza directo en elegir con su cola.</p>
+  al día con el siguiente reparto; la modalidad playlist empieza armando la lista (§74; lo demás de la playlist: banco
+  <code>sala-playlist</code>). §75: el latido de
+  cada uno, quiénes están fuera de cada carrera (sin señales en 10 s), la página recibe el primer estado recién cuando
+  la sala sabe en qué va, el aviso «me salto esta carrera» y la anfitriona que recarga y sigue desde la copia.</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
+import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PRESENTE_MS, ESPERA_TODOS_MS } from '/web/navegador/sala-carrera.mjs';
 
 const { ok, fin } = prueba('sala-carrera', 'Sala sin WFC (sin el juego, reloj falso)');
 // ---- reloj falso y bus en memoria (los bytes van de una sala a otra como por la malla) ----
@@ -37,8 +40,11 @@ const persona = (uid, extra = {}) => {
 const ana = persona('ana'), beto = persona('beto'), caro = persona('caro');
 const fases = () => [ana, beto, caro].map(s => s.estado().fase).join(',');
 
-// 1) la copa: solo la anfitriona
+// 1) la copa: solo la anfitriona (§75: recién cuando sabe en qué va la sala: a los 2 s, ya oyó a todos)
 ok('al empezar todos están en «copa» (la anfitriona la arma)', fases() === 'copa,copa,copa', fases());
+ok('§75: recién abierta, la anfitriona todavía no arma nada (espera saber si la copa ya iba)', ana.lista === false && ana.ponerPistas([{ copa: 1, fila: 0 }]) === false);
+await avanzar(1000); await avanzar(1000);
+ok('§75: a los 2 s, con los latidos de todos, la sala está lista en las tres', [ana, beto, caro].every(s => s.lista), [ana, beto, caro].map(s => s.lista).join());
 ok('Beto no puede armar la copa (no es el anfitrión)', beto.ponerPistas([{ copa: 1, fila: 2 }]) === false);
 const copa = [{ copa: 13, fila: 2 }, { copa: 0, fila: 1 }];
 ok('Ana arma la copa de 2 pistas', ana.ponerPistas(copa) === true);
@@ -53,11 +59,12 @@ beto.elegi({ personaje: 9, vehiculo: 11, derrape: 2 });
 await avanzar(0);
 ok('lo que eligieron Ana y Beto llega a todos', [ana, beto, caro].every(s => s.estado().picks.ana?.personaje === 22 && s.estado().picks.beto?.vehiculo === 11));
 ok('sin Caro todavía no se corre', fases() === 'elegir,elegir,elegir', fases());
-await avanzar((SEGUNDOS_ELEGIR - 5) * 1000);
+for (let i = 0; i < SEGUNDOS_ELEGIR - 5; i++) await avanzar(1000);   // (de a 1 s: los latidos siguen)
 ok('a los 40 s se sigue esperando', ana.estado().fase === 'elegir');
-await avanzar(6000);
+for (let i = 0; i < 6; i++) await avanzar(1000);
 ok('a los 45 s se corre la carrera 1 (Caro con lo que se le puso)', fases() === 'correr,correr,correr' && ana.estado().carrera === 1 && ana.estado().picks.caro?.solo === true,
    `${fases()} carrera ${ana.estado().carrera}`);
+ok('§75: nadie fuera de la carrera 1 (los tres dieron señales)', JSON.stringify(caro.estado().fuera) === '[]', JSON.stringify(caro.estado().fuera));
 const hs = humanosDeFicha(humanos, beto.estado());
 ok('la ficha de la carrera tiene a los 3 humanos en el orden de la sala con lo que eligieron', hs.length === 3 && hs[0].personaje === 22 && hs[1].personaje === 9 && hs[2].mando === 2,
    JSON.stringify(hs));
@@ -72,10 +79,12 @@ ok('después de los resultados todos pasan a la carrera 2', [ana, beto, caro].ev
 
 // 4) Caro recarga la página a mitad de la copa: una sala nueva, sin nada, se pone al día con el reparto
 caro.detener();
-const caro2 = persona('caro');
-ok('la Caro recién recargada empieza sin saber nada', caro2.estado().carrera === 0);
+let vistasCaro2 = [];
+const caro2 = persona('caro', { alCambiar: e => vistasCaro2.push(`${e.fase} ${e.carrera}`) });
+ok('la Caro recién recargada empieza sin saber nada (y su página no recibe nada todavía)', caro2.estado().carrera === 0 && !caro2.lista && vistasCaro2.length === 0);
 await avanzar(1000);
 ok('con el siguiente reparto (1 s) sabe que va la carrera 2 y con qué pistas', caro2.estado().fase === 'correr' && caro2.estado().carrera === 2 && caro2.estado().pistas?.length === 2);
+ok('§75: la primera vista de su página ya es la carrera 2 (no la sala nueva): la página sabe que tiene que saltársela', vistasCaro2[0] === 'correr 2', vistasCaro2.join(' · '));
 
 // 5) termina la 2 → fin
 ana.termine(2);
@@ -87,6 +96,7 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
 // 6) la anfitriona se va a mitad de la copa: la sala del sitio dice que manda Beto, y la copa sigue con él
 salas.clear();
 const a3 = persona('ana'), b3 = persona('beto'), c3 = persona('caro');
+await avanzar(1000); await avanzar(1000);
 a3.ponerPistas(copa);
 await avanzar(0);
 a3.elegi({ personaje: 1, vehiculo: 1 }); b3.elegi({ personaje: 2, vehiculo: 2 }); c3.elegi({ personaje: 3, vehiculo: 3 });
@@ -110,16 +120,102 @@ let cambios = 0, solo = null;
 solo = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar('ana'), ahora: () => t, cada, parar,
   alCambiar: e => { if (++cambios > 50) throw new Error('círculo'); if (e.fase === 'elegir') solo?.elegi({ personaje: 5, vehiculo: 4, derrape: 1 }); } });
 let circulo = false;
+for (let i = 0; i < ESPERA_TODOS_MS / 1000; i++) await avanzar(1000);   // (sola: nadie contesta, espera el tope de 8 s)
 try { solo.ponerPistas(copa); } catch { circulo = true; }
 ok('la anfitriona que elige otra vez en cada cambio no entra en un círculo', !circulo && cambios < 10 && solo.estado().picks.ana?.personaje === 5, `${cambios} cambios`);
 solo.detener();
 
-// 8) playlist: la cola viene de la sala del sitio, empieza directo en elegir
+// 8) playlist (§74): empieza armando la lista; si la sala trae pistas, quedan de base (el resto: banco sala-playlist)
 salas.clear();
 const cola = [{ copa: 3, fila: 0 }, { copa: 5, fila: 3 }, { copa: 40, fila: 1 }];
 const p1 = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', pistas: cola, enviar: enviar('ana'), ahora: () => t, cada, parar });
-ok('playlist: empieza en «elegir» con la cola de 3 pistas (3 carreras)', p1.estado().fase === 'elegir' && p1.estado().carreras === 3 && p1.estado().pistas.length === 3);
+ok('playlist: empieza armando la lista («copa»), con las 3 pistas de base', p1.estado().fase === 'copa' && p1.estado().lista?.pistas.length === 3 && !p1.estado().pistas);
 p1.detener();
+// 9) §75: Caro nunca llega. La anfitriona espera hasta 8 s a oírla y después sigue; la carrera 1 la deja fuera (en
+// todas las consolas igual). Caro llega a mitad de la 1: su página se la salta (saltar) y el latido lo avisa a todos;
+// en la 2 ya no está fuera.
+await listo(); await listo();                  // (que no queden mensajes en camino de las salas de antes)
+salas.clear();
+const saltos = { ana: [], beto: [] };
+const a9 = persona('ana', { alSalta: (u, n) => saltos.ana.push(`${u} ${n}`) }), b9 = persona('beto', { alSalta: (u, n) => saltos.beto.push(`${u} ${n}`) });
+for (let i = 0; i < 3; i++) await avanzar(1000);
+ok('§75: sin noticias de Caro, a los 3 s la anfitriona todavía espera', a9.lista === false);
+for (let i = 0; i < 6; i++) await avanzar(1000);
+ok('§75: …a los 8 s sigue sin ella', a9.lista === true && b9.lista === true);
+a9.ponerPistas(copa); await avanzar(0);
+a9.elegi({ personaje: 1, vehiculo: 1 }); b9.elegi({ personaje: 2, vehiculo: 2 });
+for (let i = 0; i < SEGUNDOS_ELEGIR + 1 && a9.estado().fase !== 'correr'; i++) await avanzar(1000);
+ok('§75: la carrera 1 empieza con Caro fuera (no dio señales en 10 s), lo mismo en Ana y en Beto',
+   a9.estado().carrera === 1 && JSON.stringify(a9.estado().fuera) === '["caro"]' && JSON.stringify(b9.estado().fuera) === '["caro"]', JSON.stringify(b9.estado().fuera));
+const c9 = persona('caro');
+await avanzar(1000);
+ok('§75: Caro llega con la carrera 1 andando y lo sabe por el reparto', c9.lista && c9.estado().carrera === 1);
+c9.saltar(1); await avanzar(0);
+ok('§75: su aviso «me salto la carrera 1» les llega a Ana y a Beto (para que su carrera sincronizada no la espere)',
+   saltos.ana.includes('caro 1') && saltos.beto.includes('caro 1'), `Ana ${saltos.ana.join()} · Beto ${saltos.beto.join()}`);
+b9.termine(1); await avanzar(0);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§75: en la carrera 2 Caro ya no está fuera (vuelve con su puesto)', a9.estado().carrera === 2 && JSON.stringify(c9.estado().fuera) === '[]', JSON.stringify(c9.estado().fuera));
+c9.detener(); salas.delete('caro');
+for (let i = 0; i < PRESENTE_MS / 1000 + 1; i++) await avanzar(1000);
+a9.termine(2); await avanzar(0);
+ok('§75: (Caro cerró la pestaña: sus latidos se cortan; la sala sigue y la copa termina sin esperarla)', true);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§75: …la copa de 2 termina en Ana y Beto', a9.estado().fase === 'fin' && b9.estado().fase === 'fin', `${a9.estado().fase} · ${b9.estado().fase}`);
+[a9, b9].forEach(x => x.detener());
+
+// 10) §75: la ANFITRIONA recarga a mitad de la copa. Su sala nueva está en el estado número 0; los latidos de los
+// demás traen uno más alto, ella les pide la copia y sigue desde ahí (con un número más alto que todos).
+salas.clear();
+const a10 = persona('ana'), b10 = persona('beto'), c10 = persona('caro');
+await avanzar(1000); await avanzar(1000);
+a10.ponerPistas(copa); await avanzar(0);
+a10.elegi({ personaje: 1, vehiculo: 1 }); b10.elegi({ personaje: 2, vehiculo: 2 }); c10.elegi({ personaje: 3, vehiculo: 3 });
+await avanzar(0);
+b10.termine(1); await avanzar(0);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+const antes = b10.estado().version;
+ok('(otra copa: la carrera 2 andando)', [a10, b10, c10].every(x => x.estado().carrera === 2), `versión ${antes}`);
+a10.detener();
+const vistasAna = [];
+const a10b = persona('ana', { alCambiar: e => vistasAna.push(`${e.fase} ${e.carrera}`) });
+ok('§75: la anfitriona recién recargada empieza en una sala nueva (versión 0) y no la muestra', a10b.estado().version === 0 && vistasAna.length === 0);
+for (let i = 0; i < 3; i++) await avanzar(1000);
+ok('§75: con los latidos de Beto y Caro pide la copia y sigue desde la carrera 2, con un número más alto',
+   a10b.lista && a10b.estado().carrera === 2 && a10b.estado().version > antes && a10b.estado().picks.caro?.personaje === 3, `carrera ${a10b.estado().carrera} v${a10b.estado().version} (antes v${antes})`);
+ok('§75: la primera vista de su página ya es la carrera 2 (se la salta: su consola no tiene esos cuadros)', vistasAna[0] === 'correr 2', vistasAna.join(' · '));
+c10.termine(2); await avanzar(0);
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§75: …y la copa termina en las tres con ella de anfitriona', [a10b, b10, c10].every(x => x.estado().fase === 'fin'), [a10b, b10, c10].map(x => x.estado().fase).join());
+[a10b, b10, c10].forEach(x => x.detener());
+
+// 11) §75: los puntos de la copa viajan en el estado de la sala. Cada página los manda al terminar cada carrera (los 12
+// que lleva su consola y desde qué carrera corrió) y vale la tabla de quien corrió desde más atrás: Caro recargó y
+// corre desde la 2, así que su consola no tiene los puntos de la 1.
+salas.clear();
+const a11 = persona('ana'), b11 = persona('beto'), c11 = persona('caro');
+await avanzar(1000); await avanzar(1000);
+a11.ponerPistas(copa); await avanzar(0);
+a11.elegi({ personaje: 1, vehiculo: 1 }); b11.elegi({ personaje: 2, vehiculo: 2 }); c11.elegi({ personaje: 3, vehiculo: 3 });
+await avanzar(0);
+const P1 = [15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0], P2 = [27, 24, 20, 16, 14, 12, 10, 8, 6, 4, 2, 0];
+const CARO2 = [12, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0];      // (los de la carrera 2 sola: le falta la 1)
+b11.termine(1, P1, 1); await avanzar(0);
+ok('§75: la tabla de la carrera 1 queda en el estado de la sala, con desde qué carrera corrió quien la mandó',
+   JSON.stringify(a11.estado().puntos) === JSON.stringify({ carrera: 1, tabla: P1, desde: 1 }), JSON.stringify(a11.estado().puntos));
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§75: …y les llega a todos con la carrera 2 (cada consola parte la 2 desde esa tabla)',
+   [b11, c11].every(x => x.estado().carrera === 2 && x.estado().puntos?.tabla?.join() === P1.join()));
+c11.termine(2, CARO2, 2); await avanzar(0);
+ok('§75: Caro (corre desde la 2) avisa primero: su tabla queda mientras no haya otra mejor', a11.estado().puntos?.desde === 2);
+b11.termine(2, P2, 1); await avanzar(0);
+ok('§75: llega la de Beto, que corrió desde la 1: queda la suya', JSON.stringify(a11.estado().puntos) === JSON.stringify({ carrera: 2, tabla: P2, desde: 1 }),
+   JSON.stringify(a11.estado().puntos));
+c11.termine(2, CARO2, 2); b11.termine(2, [1, 2, 3], 1); await avanzar(0);
+ok('§75: después ya no la cambia una peor (desde más adelante) ni una sin forma (no son 12 números)', a11.estado().puntos?.tabla?.join() === P2.join());
+for (let i = 0; i < SEGUNDOS_RESULTADOS + 1; i++) await avanzar(1000);
+ok('§75: la copa termina con la tabla de la última carrera en todos', [a11, b11, c11].every(x => x.estado().fase === 'fin' && x.estado().puntos?.carrera === 2 && x.estado().puntos.tabla.join() === P2.join()));
+[a11, b11, c11].forEach(x => x.detener());
 fin();
 </script>
 </body>
