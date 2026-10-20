@@ -502,6 +502,22 @@ const ARTE = {
     ${torre(205, 58, "#5fbf4a", 205, "a-mueve")}${torre(105, 140, "#7fd6ff", 60)}${torre(318, 186, "#ffb84d", 330)}
     <path d="M196 76 L156 122" stroke="#fff27a" stroke-width="4" stroke-linecap="round" class="a-late"/>
     <circle cx="154" cy="125" r="7" fill="#fff27a" opacity=".85" class="a-late"/>`;
+  },
+
+  /* PRO PACMAN: un tramo del laberinto de neón, el pacman comiéndose la
+     fila de puntos y tres fantasmas detrás; uno azul de miedo. */
+  propac: u => {
+    const pared = d => `<path d="${d}" fill="none" stroke="#2de2ff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".35"/><path d="${d}" fill="none" stroke="#2de2ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const fan = (x, y, c) => `<g transform="translate(${x} ${y})"><path d="M-18 18 V0 A18 18 0 0 1 18 0 V18 L9 11 L0 18 L-9 11 Z" fill="${c}"/><circle cx="-6" cy="-2" r="5" fill="#fff"/><circle cx="7" cy="-2" r="5" fill="#fff"/><circle cx="-4" cy="-1" r="2.4" fill="#0b1a6a"/><circle cx="9" cy="-1" r="2.4" fill="#0b1a6a"/></g>`;
+    let puntos = "";
+    for (let k = 0; k < 6; k++) puntos += `<rect x="${236 + k * 26}" y="146" width="7" height="7" fill="#ffe9b8"/>`;
+    return `<defs><radialGradient id="g${u}" cx=".5" cy=".3" r=".9"><stop offset="0" stop-color="#1a1450"/><stop offset="1" stop-color="#04050d"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    ${pared("M20 100 H170 V60 H380")}${pared("M20 200 H380")}${pared("M230 100 H380")}
+    <circle cx="360" cy="80" r="10" fill="#c86bff" class="a-late"/>
+    ${puntos}
+    ${fan(60, 140, "#ff3b5c")}${fan(110, 140, "#3df5ff")}<g class="a-mueve">${fan(160, 140, "#2a3cff")}</g>
+    <g transform="translate(210 150)"><circle r="34" fill="#ffe14d" opacity=".18"/><path d="M0 0 L26 -16 A30 30 0 1 0 26 16 Z" fill="#ffe14d"/><rect x="-6" y="-22" width="10" height="5" fill="#0b1030"/></g>`;
   }
 };
 

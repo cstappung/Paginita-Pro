@@ -471,6 +471,21 @@ const SOLO = {
     { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
     { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
   ],
+  /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
+     puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un
+     nivel limpio da unos 4 000; los fantasmas y la racha, el resto. */
+  propac: [
+    { id: "p1k", n: "Primer bocado", d: "Haz 1 000 puntos en una partida.", i: "🟡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1000 },
+    { id: "p5k", n: "Waka waka", d: "Haz 5 000 puntos en una partida.", i: "👻", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 5000 },
+    { id: "p10k", n: "Vida extra", d: "Haz 10 000 puntos en una partida.", i: "💛", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
+    { id: "p25k", n: "Neón encendido", d: "Haz 25 000 puntos en una partida.", i: "💡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 25000 },
+    { id: "p50k", n: "Rey del laberinto", d: "Haz 50 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 50000 },
+    { id: "p100k", n: "Leyenda arcade", d: "Haz 100 000 puntos en una partida.", i: "🕹️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100000 },
+    { id: "p200k", n: "Insert coin", d: "Haz 200 000 puntos en una partida.", i: "🪙", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 200000 },
+    { id: "t3", n: "Escurridizo", d: "Tu partida récord dura 3 minutos de juego.", i: "⏱️", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 180000 },
+    { id: "t6", n: "Glitch te conoce", d: "Tu partida récord dura 6 minutos de juego.", i: "📺", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 360000 },
+    { id: "t10", n: "Maratón de neón", d: "Tu partida récord dura 10 minutos de juego.", i: "🌃", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 600000 }
+  ],
   /* PRO TILES. Los siete primeros salen de cualquier canción suelta (las
      estrellas, coronas y el mundo del juego: 100 250 450 700 1000 1400
      2000); los tres últimos, de la mezcla de las ocho. */
@@ -568,7 +583,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

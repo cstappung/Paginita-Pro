@@ -45,6 +45,9 @@ export function categoriaClub(juego, categoria) {
     // PRO HERO: una sola tabla, la general por estrellas (juegos/hero.js).
     : juego === 'hero'
     ? categoria === 'club-hero-estrellas'
+    // PRO PACMAN: una sola tabla, el puntaje de la partida.
+    : juego === 'propac'
+    ? categoria === 'club-propac-puntos'
     // PRO DEFENDER: la ronda récord de cada uno de los cinco reinos.
     : juego === 'prodefender'
     ? /^club-prodefender-(prado|dunas|glaciar|caldera|vacio)$/.test(categoria)
@@ -108,6 +111,8 @@ export function resultadoClub(juego, dato) {
   if (juego === 'hero' && (dato.puntos % 10000 < Math.floor(dato.puntos / 10000))) return null;
   /* PRO DEFENDER: rondas superadas, y un reino tiene cien. */
   if (juego === 'prodefender' && dato.puntos > 100) return null;
+  /* PRO PACMAN: el puntaje, con el tope de su verificador (10 000 000). */
+  if (juego === 'propac' && dato.puntos > 10000000) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;

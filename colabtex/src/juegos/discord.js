@@ -150,12 +150,13 @@ const CLUBS = {
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
   hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" },
-  prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" }
+  prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" },
+  propac: { nombre: "PRO PACMAN", juego: "PRO PACMAN", icono: "🟡", ruta: "propac" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -193,6 +194,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-hero-estrellas") return `🎸 ${Math.floor(f.puntos / 10000)} ★ doradas`;
   // PRO DEFENDER: la ronda récord del reino.
   if (/^club-prodefender-/.test(cat)) return `🛡️ ronda ${f.puntos}`;
+  if (cat === "club-propac-puntos") return `🟡 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo

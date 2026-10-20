@@ -1190,6 +1190,41 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* PRO PACMAN (juegos/club/propac/): lo que dice aquí tiene que coincidir
+     con motor.js (puntos, racha, turbo, pulso, compuertas, Glitch, vidas) y
+     juego.js (controles). */
+  propac: {
+    lema: "PRO PACMAN: come todos los puntos del laberinto de neón sin que te atrapen los fantasmas.",
+    secciones: [
+      ["Cómo se juega", "Recorre el laberinto y come todos los puntos para pasar al siguiente. Tienes <b>3 vidas</b>: si un fantasma te toca, pierdes una. Los laberintos se suceden (<b>Neón</b>, <b>Circuito</b> y <b>Reactor</b>, y vuelta a empezar), cada vez un poco más rápidos. Los túneles de los lados te llevan al otro extremo."],
+      ["Puntos y racha", lista([
+        "Cada punto vale 10, multiplicado por tu <b>racha</b>: comer puntos seguidos (sin pasar más de 0,6 segundos sin comer) la sube a ×2 desde el punto 13, ×3 desde el 25, ×4 desde el 37 y ×5 desde el 49.",
+        "Un <b>núcleo</b> (los cuatro que brillan) vale 50 y asusta a los fantasmas unos segundos: menos en cada nivel. Comerse uno azul vale 200, después 400, 800, 1 600 y 3 200.",
+        "En el centro aparecen premios: una <b>carga de pulso</b> tras 50 puntos y un <b>chip</b> tras 130, que vale más en cada nivel (hasta 5 000). Se van a los 10 segundos.",
+        "Vida extra a los 10 000 puntos y después cada 25 000, hasta tener 5."
+      ])],
+      ["Turbo y pulso", lista([
+        "⚡ <b>Turbo</b>: cada punto carga energía. Con 35 puedes correr un poco menos de un segundo a casi el doble de velocidad.",
+        "◎ <b>Pulso</b>: guardas hasta 2 cargas. El pulso aturde tres segundos a los fantasmas que estén a 6 casillas o menos (ni persiguen ni matan) y da 100 puntos por cada uno."
+      ])],
+      ["Los fantasmas", lista([
+        "<b>Rayo</b> (rojo) te persigue directo, y corre más cuando quedan pocos puntos.",
+        "<b>Eco</b> (rosa) apunta cuatro casillas por delante de ti.",
+        "<b>Rebote</b> (celeste) se guía por ti y por Rayo para cerrarte el paso.",
+        "<b>Tímido</b> (naranja) te persigue de lejos y se va a su rincón cuando se acerca.",
+        "<b>Glitch</b> (verde, desde el nivel 3) te persigue y, cada tanto, parpadea un segundo y aparece en otro lugar, lejos de ti.",
+        "Los fantasmas se turnan entre perseguirte y volver a sus rincones; al cambiar, dan media vuelta."
+      ])],
+      ["Compuertas", "Desde el segundo laberinto hay <b>compuertas</b> rojas que se abren y se cierran cada 8 segundos, para ti y para los fantasmas. Un segundo antes parpadean, y arriba a la derecha dice si están abiertas."],
+      ["Controles", lista([
+        "Teclado: flechas o WASD para moverte, Espacio o Shift turbo, E (o Q, X) pulso, P o Esc pausa.",
+        "Celular: desliza el dedo en cualquier parte para girar, o usa la cruceta de abajo; ⚡ es turbo y ◎ pulso. Mientras juegas, el juego ocupa la pantalla.",
+        "Mando: la cruceta o el stick para moverte, A turbo, B pulso y Start pausa.",
+        "Puedes pedir el giro antes de llegar al cruce: se hace en cuanto se puede."
+      ])],
+      ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
      con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
   protiles: {
@@ -1444,7 +1479,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

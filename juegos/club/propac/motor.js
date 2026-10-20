@@ -417,6 +417,32 @@
       default: return [px, py];
     }
   }
+  /* Distancias (en casillas) hasta `obj` por donde este fantasma puede
+     pasar ahora. Los ojos y el que sale de la casa van por el camino más
+     corto: con la regla de la recta de siempre, unos ojos junto a la casa
+     podían quedar rebotando entre dos casillas para siempre. */
+  function distancias(E, g, obj) {
+    const m = E.mapa, W = m.ancho, d = new Int16Array(W * m.alto).fill(-1);
+    const k0 = obj[1] * W + obj[0];
+    if (obj[1] < 0 || obj[1] >= m.alto || !libre(E, obj[0], obj[1], g)) return null;
+    d[k0] = 0;
+    const q = [k0];
+    for (let i = 0; i < q.length; i++) {
+      const k = q[i], x = k % W, y = (k - x) / W;
+      for (const [dx, dy] of DIRS) {
+        const nx = (x + dx + W) % W, ny = y + dy;
+        if (ny < 0 || ny >= m.alto) continue;
+        const nk = ny * W + nx;
+        if (d[nk] >= 0 || !libre(E, nx, ny, g)) continue;
+        d[nk] = d[k] + 1; q.push(nk);
+      }
+    }
+    return d;
+  }
+
+  // El índice de la casilla vecina en esa dirección (las de `op` siempre están dentro del mapa).
+  const vecina = (m, tx, ty, d) => (ty + DIRS[d][1]) * m.ancho + ((tx + DIRS[d][0] + m.ancho) % m.ancho);
+
   function unPasoFantasma(E, g) {
     if (g.invertir) { g.invertir = false; g.dir = OPUESTA[g.dir]; }
     if (enCentro(g)) {
@@ -435,7 +461,12 @@
         if ((t === PUERTA || t === CASA) && g.estado !== 'ojos' && g.estado !== 'sale') continue;
         if (libre(E, tx + DIRS[d][0], ty + DIRS[d][1], g)) op.push(d);
       }
+      const corto = (g.estado === 'ojos' || g.estado === 'sale') && op.length ? distancias(E, g, objetivo(E, g)) : null;
       if (!op.length) { if (libre(E, tx + DIRS[OPUESTA[g.dir]][0], ty + DIRS[OPUESTA[g.dir]][1], g)) g.dir = OPUESTA[g.dir]; else return; }
+      else if (corto && op.some(d => corto[vecina(m, tx, ty, d)] >= 0)) {
+        let mejor = Infinity;
+        for (const d of op) { const v = corto[vecina(m, tx, ty, d)]; if (v >= 0 && v < mejor) { mejor = v; g.dir = d; } }
+      }
       else if (g.estado === 'miedo') g.dir = op[Math.floor(E.rnd() * op.length)];
       else {
         const [ox, oy] = objetivo(E, g);

@@ -42,7 +42,7 @@ function juega(semilla,u,{mano=true,max=60*60*8}={}){
     // La próxima casilla cuyo centro va a pisar, y el giro pedido antes de llegar.
     const [dx,dy]=M.DIRS[p.dir],off=dx*(p.x%M.U-M.C)+dy*(p.y%M.U-M.C);
     const nx=off<0?tx:(tx+dx+E.mapa.ancho)%E.mapa.ancho,ny=off<0?ty:ty+dy,clave=E.nivel+':'+E.vidas+':'+nx+','+ny;
-    if(!centro&&clave!==plan){plan=clave;pide(rumbo(nx,ny),'t');}
+    if(!centro&&(clave!==plan||E.tick%4===0)){plan=clave;const d=rumbo(nx,ny);if(d!==M.OPUESTA[p.dir])pide(d,'t');}
     if(centro&&!M.libre(E,tx+dx,ty+dy,p)){plan='';pide(rumbo(tx,ty),'t');}
    }
    if(E.energia>=M.TURBO_COSTO&&azar()<0.02)pide(4,'t');
@@ -132,6 +132,22 @@ test('racha, turbo, pulso, compuertas, Glitch y vidas',()=>{
  assert.equal(Vd.vidas,M.VIDAS_MAX);assert.ok(Vd.vidas>antes);
 });
 
+/* Los ojos de un fantasma comido vuelven a la casa desde cualquier pasillo
+   (antes podían quedar rebotando entre dos casillas junto a ella). */
+test('los ojos vuelven siempre a la casa, con compuertas abiertas',()=>{
+ for(let i=0;i<M.MAPAS.length;i++){
+  const m=M.leeMapa(i);
+  for(let y=0;y<m.alto;y++)for(let x=0;x<m.ancho;x++){
+   const t=m.tipo[y*m.ancho+x];if(t!==M.LIBRE)continue;
+   const E=M.nueva(1,'a');E.nivel=i+1;E.mapa=M.leeMapa(i);E.congelado=0;E.restantes=999;
+   E.pac.x=E.pac.y=-999;E.fantasmas=[E.fantasmas[0]];
+   const g=E.fantasmas[0];Object.assign(g,{estado:'ojos',x:M.centro(x),y:M.centro(y),dir:0,acc:0});
+   let n=0;while(g.estado==='ojos'&&n<900){E.compT=0;M.paso(E);n++;}
+   assert.notEqual(g.estado,'ojos',`${m.nombre}: los ojos desde ${x},${y} no llegan a la casa`);
+  }
+ }
+});
+
 test('el verificador acepta la partida de una mano y rechaza cada trampa',async()=>{
  const {E,dato,p}=prueba(31337,'ana');
  assert.ok(E.puntos>1000);
@@ -145,7 +161,7 @@ test('el verificador acepta la partida de una mano y rechaza cada trampa',async(
  await mal(dato,{...p,r:10},/reloj/);
  await mal(dato,{...p,w:2*p.a},/velocidad del juego/);
  await mal(dato,{...p,a:undefined},/relojes/);
- await mal(dato,{...p,n:p.n+600},/termina antes|rehecha hace/);
+ await mal({...dato,tiempo:ms(p.n+600)},{...p,n:p.n+600,r:p.r+10000,a:p.a+10000,w:p.w+10000},/termina antes|rehecha hace/);
  await mal(dato,{...p,j:p.j.replace(/^t/,'x')},/sintéticos/);
  await mal(dato,{...p,j:p.j+',kz5'},/no se pueden leer/);
  await mal(dato,{...p,s:-1},/semilla/);
@@ -170,7 +186,7 @@ test('el Club, las reglas y la página saben de PRO PACMAN',()=>{
  assert.equal(C.resultadoClub('propac',{categoria:CP,puntos:VP.MAX_PUNTOS+1,tiempo:5,partida:'abc'}),null);
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.equal((reglas.match(/\|club-propac-puntos\|/g)||[]).length,2,'soloRanks y soloPruebas');
- assert.match(reglas,/\|prodefender\|propac\)\$/,'clubJugadas');
+ assert.match(reglas,/\|hero\|propac\)\$/,'clubJugadas');
  assert.match(reglas,/\$categoria === 'club-propac-puntos' \? 10000000/,'el tope de puntos');
  const html=fs.readFileSync(path.join(D,'index.html'),'utf8');
  const orden=['i18n.js','mando.js','conexion.css','volumen.js','conexion.js','estilo.css','motor.js','juego.js'].map(f=>html.indexOf(f));

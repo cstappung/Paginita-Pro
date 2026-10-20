@@ -84,7 +84,7 @@ a console can delete them: the punishment deters, the rejection protects.
 
 ## Modo celular (pantalla completa mientras se juega)
 
-Tetris Club, the Tetris room, ALETEO and FANAL go **immersive on a phone in
+Tetris Club, the Tetris room, ALETEO, FANAL and PRO PACMAN go **immersive on a phone in
 portrait** (`pointer:coarse`, the smaller side ≤ 600 px, taller than wide);
 desktop and landscape are untouched. In a Club game, `Club.inmersivo(on)` in
 `conexion.js` decides it (`Club.celular()` measures `window.top`, since the
@@ -100,6 +100,7 @@ bar on top, the game filling the rest without distortion (`100dvh`,
 safe-area insets, no scroll/zoom/selection), and a control strip of at most
 ~15 % of the height with buttons ≥ 48 px — Tetris `◀ ▼ ▶ ⟳ ⤓ ⇄` (⟲ hidden),
 rival wells in a narrow right column in the room; ALETEO flaps on a tap
-anywhere; FANAL ◀ ▶ left and ✦ right. Only the screen changes: the controls
+anywhere; FANAL ◀ ▶ left and ✦ right; PRO PACMAN `⚡ ◀ ▲ ▼ ▶ ◎` plus swiping
+anywhere. Only the screen changes: the controls
 send the same actions as the keyboard, so proofs, `mando.js` and the
 generated `controles-datos.js` are unaffected.

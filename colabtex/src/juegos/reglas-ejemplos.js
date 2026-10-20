@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, haxball, bt3, atasco, metrorush, aleteo, dosmil, trigon, protiles, tulones, hero, defensa, memazo, pacman} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -233,6 +233,12 @@ export const EJEMPLOS={
  e('medallas','Medallas y clasificación',
   p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
+ propac:[e('racha','Racha, núcleos y fantasmas',
+  p('Come sin parar','Cada punto vale 10. Si comes puntos seguidos, sin pasar más de 0,6 segundos sin comer, la racha sube y multiplica: ×2 desde el punto 13, ×3 desde el 25, hasta ×5.',pacman(0)),
+  p('Los núcleos','Los cuatro núcleos que brillan en las esquinas asustan a los fantasmas: se vuelven azules unos segundos y puedes comértelos. El primero vale 200 y cada uno de los siguientes, el doble.',pacman(1))),
+ e('pulso','El pulso, las compuertas y Glitch',
+  p('El pulso','Las cargas aparecen en el centro del laberinto. Con una, el pulso aturde tres segundos a los fantasmas que tienes cerca: ni persiguen ni matan, y cada uno da 100 puntos.',pacman(2)),
+  p('Compuertas y Glitch','Desde el segundo laberinto, las compuertas rojas se abren y se cierran cada ocho segundos, para ti y para los fantasmas. Desde el nivel 3 llega Glitch: parpadea un segundo y aparece en otro sitio.',pacman(3)))],
  prodefender:[e('colocar','Colocar y mejorar un defensor',
   p('Junto al camino','Elige un defensor en la tienda y tócalo en el mapa, cerca del camino pero no encima. El círculo es su alcance: ataca a lo que pasa por dentro.',defensa(0)),
   p('Dos caminos de mejora','Toca la torre para ver sus mejoras. Cada camino tiene cuatro niveles, pero solo uno de los dos puede pasar del nivel 2: hay que elegir.',defensa(1))),

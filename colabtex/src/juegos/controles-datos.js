@@ -40,6 +40,7 @@ export const CONTROLES = {
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "presidente": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "prodefender": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "propac": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "protiles": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "reversi": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "snake": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
