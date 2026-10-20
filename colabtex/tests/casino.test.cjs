@@ -8,7 +8,7 @@ const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^impor
 const ctx={__PM:PM,__MM:require('../../juegos/mascotas/motor.js')};vm.createContext(ctx);
 vm.runInContext('const PM=__PM,MM=__MM;'+sin('src/juegos/casino-motor.js')+
  ';const CM={RETORNO,APUESTA_MIN,azar,AVION,multAvion,horaAvion,apuestaValida,resuelveAvion,PINGUINO,multPinguino,resuelvePinguino,CLAVE_RONDA,resuelve,RULETA,RUEDA,ROJOS,casillaRuleta,sumaRuleta,resuelveRuleta,PLINKO,caminoPlinko,resuelvePlinko,BLACKJACK,totalBJ,esBlackjack,resuelveBlackjack,POKER,manoPoker,resuelvePoker};\n'+
- sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
+ sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+
  ';globalThis.__M={CM,TARIFA,monedasDe,economia}',ctx);
 const M=ctx.__M,CM=M.CM;
 const plano=x=>JSON.parse(JSON.stringify(x));

@@ -25,6 +25,7 @@ const PARTES = [
   ["podios", "👑", "Podios", "500 · 250 · 100 por quitarle el puesto a alguien"],
   ["logros", "🎖️", "Logros", "15 · 40 · 100 · 250 según dificultad"],
   ["dias", "🔥", "Recompensa diaria", `${pagoDia(1)} el primer día, +${PAGO_DIA} por día seguido hasta ${pagoDia(TOPE_DIA)}`],
+  ["referidos", "🤝", "Referidos", "5000 por el código que usaste y 5000 por cada persona que usó el tuyo"],
   ["ajustes", "🛡️", "Ajustes", "lo que un administrador sumó o restó a mano"]
 ];
 

@@ -338,9 +338,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 12;
+const NODOS_MONEDAS = 13;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -354,7 +354,8 @@ export function watchLogros(cb) {
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino")];
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino"),
+    oye("referidos", "referidos")];
   return () => { clearTimeout(espera); offs.forEach(f => f()); };
 }
 
@@ -379,6 +380,19 @@ export async function marcaCasino(uid, k, ruta, extra) {
   return extra ? x.at : x;
 }
 export const leeRondaCasino = (uid, k) => get(ref(db, `casino/${uid}/${k}`)).then(s => s.val());
+
+/* Los referidos (juegos/referidos.js). El código propio va en una sola
+   escritura a dos sitios, `referidos/c/<código>` = uid y
+   `referidos/m/<uid>` = {c, at}: la regla de cada uno mira el otro, así
+   que ni se reserva un código sin que sea el tuyo ni se tiene más de uno.
+   Usar el de otro es `referidos/u/<uid>` = {c, r, at}, una vez. */
+export async function configuraCodigo(uid, c) {
+  await update(ref(db), { [`referidos/c/${c}`]: uid, [`referidos/m/${uid}`]: { c, at: serverTimestamp() } });
+}
+export async function usaCodigo(uid, c, r) {
+  await set(ref(db, `referidos/u/${uid}`), { c, r, at: serverTimestamp() });
+}
+export const leeReferidos = () => get(ref(db, "referidos")).then(s => s.val() || {});
 
 /* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo lo repasa `economia()`. */

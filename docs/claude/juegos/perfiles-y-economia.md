@@ -1,6 +1,6 @@
 # Juegos — profiles, frames, shop, ranking, logros, coins
 
-`perfil*.js`, `marcos-animados.js`, `tienda.js`, `ranks.js`, `logros*.js`, `monedas*.js` in `colabtex/src/juegos/`. Read this when adding a game (its logros, `NIVEL` digits, coins, champion frame) or touching any of those. Shared architecture in `colabtex/src/juegos/CLAUDE.md`.
+`perfil*.js`, `marcos-animados.js`, `tienda.js`, `ranks.js`, `logros*.js`, `monedas*.js`, `referidos*.js` in `colabtex/src/juegos/`. Read this when adding a game (its logros, `NIVEL` digits, coins, champion frame) or touching any of those. Shared architecture in `colabtex/src/juegos/CLAUDE.md`.
 
 **Everyone's apodo, foto and colour live in `users/<uid>/perfil`**
 (`juegos/perfil.js` for the editor, `fb-juegos.js` for the three calls). Not in
@@ -273,6 +273,34 @@ same queue as the logros toast, also used for club plays and podiums).
 The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
+
+**Referidos** (`juegos/referidos.js`, pure; the view in
+`referidos-vista.js`). Whoever enters someone's code and that someone each
+get `PREMIO_REFERIDO` (5000), derived like every other income
+(`ganadoDe`'s `p.referidos`), never stored. Three branches of `referidos/`,
+all write-once:
+
+- `c/<CÓDIGO>` = uid and `m/<uid>` = {c, at}, written **together** in one
+  `update` (`fb.configuraCodigo`); each rule checks the other, so a code
+  belongs to one person and a person has one code, never changed. Codes
+  are `^[A-Z0-9]{4,12}$` (`normalizaCodigo` uppercases and strips the rest).
+- `u/<uid>` = {c, r, at}: the code used. The rule demands `c/<c> === r`,
+  `r !== uid` and that `r` did not already use yours (no mutual pair).
+- **Referring needs `MIN_JUEGOS` (3) distinct games played** (a `ranks`
+  row with `jugadas`, a `clubJugadas` entry or a club mark). The rule
+  cannot count, so `referidos()` checks it where it is paid: a code set by
+  hand by someone short of it pays nobody until they qualify. The UI only
+  lets you set a code once you qualify.
+
+UI: a small «+» (`#userReferir`) glued to the header balance opens a
+popover: the code field (just «✓ Código ya usado» once you used one), the
+3-games bar and **Referir a otros**, a centred `.jg-modal` that explains it
+and sets your code with a two-step confirm. `tests/referidos.test.cjs`
+covers the arithmetic; `test-rules.mjs` the rule. The node needs the rules
+re-published; until then the read fails alone and the rest of the economy
+works. Abuse limit, stated: a new Google account is enough to be referred,
+so someone with alt accounts can farm it, the same honest limit as other
+client-side rules.
 
 **Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
 `economia()` replays three more nodes, between the re-roll and the

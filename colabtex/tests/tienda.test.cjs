@@ -9,7 +9,7 @@ const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^impor
 const carga=(fs_,exp)=>{const c={__PM:PM};vm.createContext(c);vm.runInContext('const PM=__PM;'+fs_.map(f=>sin('src/juegos/'+f+'.js')).join('\n')+';globalThis.__T={'+exp+'}',c);return c.__T;};
 /* Cada módulo es suyo en el bundle; concatenados, chocan nombres internos
    (`juegoDeCategoria`, `snake`), así que van en contextos separados. */
-const T=Object.assign(carga(['motor','logros','tienda','cortes','monedas'],'TIENDA,PRECIO_TIENDA,economia,monedasDe'),
+const T=Object.assign(carga(['motor','logros','tienda','cortes','referidos','monedas'],'TIENDA,PRECIO_TIENDA,economia,monedasDe'),
  carga(['motor','logros','tienda','perfil-tarjeta'],'MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,campeones,topDeCategoria,SOLO_PREFIJO,JUEGOS'),
  carga(['marcos-animados'],'MARCOS_ANIMADOS,adorno,tieneAdorno'));
 

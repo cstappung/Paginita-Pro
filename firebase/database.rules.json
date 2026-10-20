@@ -612,6 +612,34 @@
         }
       }
     },
+    "referidos": {
+      ".read": "auth != null",
+      "c": {
+        "$codigo": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && !root.child('referidos/m/' + auth.uid).exists() && newData.parent().parent().child('m/' + auth.uid + '/c').val() === $codigo",
+          ".validate": "$codigo.matches(/^[A-Z0-9]{4,12}$/) && newData.isString()"
+        }
+      },
+      "m": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['c', 'at']) && newData.child('c').isString() && newData.child('c').val().matches(/^[A-Z0-9]{4,12}$/) && newData.child('at').val() === now && newData.parent().parent().child('c/' + newData.child('c').val()).val() === $uid",
+          "c": { ".validate": "newData.isString()" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      },
+      "u": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['c', 'r', 'at']) && newData.child('c').isString() && newData.child('c').val().matches(/^[A-Z0-9]{4,12}$/) && newData.child('r').isString() && newData.child('r').val() !== $uid && newData.child('at').val() === now && root.child('referidos/c/' + newData.child('c').val()).val() === newData.child('r').val() && root.child('referidos/u/' + newData.child('r').val() + '/r').val() !== $uid",
+          "c": { ".validate": "newData.isString()" },
+          "r": { ".validate": "newData.isString()" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "tienda": {
       ".read": "auth != null",
       "$uid": {
