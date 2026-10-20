@@ -81,3 +81,13 @@ Ver `docs/claude/juegos/crear-un-juego.md` (juego de sala). Lugares tocados:
 (`.jg-pool`, `.jg-pl-*`, portada `.jg-art-pool`) y
 `firebase/database.rules.json` (**hay que republicar las reglas a mano**, ver
 `firebase/CONFIGURAR-FIREBASE.md`).
+
+## Tacos, cofres y novedades (v0.1)
+
+- `tacos.js` (puro): catálogo `TACOS` (13 diseños, cada uno con rareza), `RAREZAS` con probabilidad (por mil) y reembolso por repetido, `PRECIO_COFRE = 500`. Común 58 %, Poco común 27 %, Raro 11 %, Épico 3,5 %, Legendario 0,5 %. «escuela» es el taco inicial y no sale de cofres.
+- Cofre: nodo `cofres/<uid>/<clave>` = `{at, p}` (`at === now`, `p === 500`, se escribe una sola vez; ver reglas). El premio es `abreCofre(uid, clave, at)`, determinista, así que nadie lo elige. Si ya se tenía, `monedas.js` devuelve `reembolsoDe(id)`.
+- Los tacos que se poseen se calculan en `economia()` (`usuarios[uid].tacos`); el saldo nunca se guarda. Un cofre nuevo suma un nodo a `NODOS_MONEDAS` (ahora 14).
+- Taco equipado: `users/<uid>/taco` (fuera de `perfil`, porque `guardarPerfil` lo reescribe entero). Al rival se le dibuja solo si lo posee según la economía; si no, «escuela».
+- Dibujo: `dibujaTaco` / `dibujaTacoMini` en `pool-vista.js`. Para un taco nuevo: una entrada en `TACOS` (y su veta en `vetas` si es nueva).
+- Menú del juego: `pool-menu.js` (🎁 Tacos y cofres, 📋 Novedades). Para una versión nueva, agregar un bloque al inicio de `NOVEDADES_POOL` en `pool-novedades.js` y subir `VERSION_POOL`.
+- Las reglas de Firebase hay que volver a publicarlas a mano (nodo `cofres`).

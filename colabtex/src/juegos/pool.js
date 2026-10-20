@@ -26,6 +26,8 @@ import { suena } from "./sonido.js";
 import {
   MARCO, MUNDO, dibujaMesa, dibujaTaco, pintaBola, sombraBola, oriInicial, rota, colorBola
 } from "./pool-vista.js";
+import { crearMenuPool } from "./pool-menu.js";
+import { TACOS } from "./tacos.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -48,6 +50,7 @@ export function crearPool(ctx) {
   let cv = null, g2 = null, capaMesa = null, escala = 1, dpr = 1;
   let spr = [], sucio = [], Q = [], sombra = null, SP = 0;
   let marco = 0, observador = null;
+  let menu = null, offTacos = null;
 
   /* — apuntado — */
   const ap = { ang: 0, f: 0.5, a: 0, b: 0, colocada: null, c: -1, mouse: null };
@@ -64,6 +67,7 @@ export function crearPool(ctx) {
     host = donde;
     host.innerHTML = `
       <div class="jg-pool">
+        <div class="jg-pl-barra" id="plBarra"></div>
         <div class="jg-pl-hud" id="plHud"></div>
         <div class="jg-pl-estado" id="plEstado"></div>
         <div class="jg-pl-mesa" id="plMesa"><canvas id="plCv"></canvas></div>
@@ -93,6 +97,13 @@ export function crearPool(ctx) {
         </div>
         <div class="jg-pl-pie" id="plPie"></div>
       </div>`;
+    menu = crearMenuPool(ctx, host.querySelector(".jg-pool"));
+    host.querySelector("#plBarra").innerHTML = menu.barra();
+    host.querySelector("#plBarra").addEventListener("click", e => {
+      const b = e.target.closest("[data-menu]");
+      if (b) menu.abre(b.getAttribute("data-menu"));
+    });
+    if (ctx.tacos && ctx.tacos.alCambiar) offTacos = ctx.tacos.alCambiar(() => { menu.refresca(); pide(); });
     cv = host.querySelector("#plCv");
     g2 = cv.getContext("2d");
     cv.style.touchAction = "none";
@@ -142,6 +153,8 @@ export function crearPool(ctx) {
     document.removeEventListener("keydown", alTecla);
     document.removeEventListener("visibilitychange", alVolver);
     if (observador) observador.disconnect();
+    if (offTacos) offTacos();
+    if (menu) menu.destruir();
     if (host) host.innerHTML = "";
     host = null; cv = null; g2 = null; anim = null;
   }
@@ -193,7 +206,7 @@ export function crearPool(ctx) {
     if (anim) sigue = avanza(dt);
     if (caidas.length) sigue = true;
     dibuja();
-    if (sigue || anim) { pide(); } else tAnt = 0;
+    if (sigue || anim || (puedeApuntar() && animado(estiloDe(uid)))) { pide(); } else tAnt = 0;
   }
 
   /* ---------- la repetición del tiro ---------- */
@@ -357,7 +370,7 @@ export function crearPool(ctx) {
       let pull;
       if (t < anim.atras) pull = (t / anim.atras) * anim.tiro.f * TACO_MAX;
       else pull = (1 - (t - anim.atras) / T_ADELANTE) * anim.tiro.f * TACO_MAX;
-      ponTaco(q.x, q.y, anim.tiro.dx, anim.tiro.dy, Math.max(0, pull), 1);
+      ponTaco(q.x, q.y, anim.tiro.dx, anim.tiro.dy, Math.max(0, pull), 1, anim.u.uid);
     }
   }
 
@@ -391,17 +404,19 @@ export function crearPool(ctx) {
   }
 
   /* El taco, con la punta a `pull` mm por detrás del borde de la blanca. */
-  function ponTaco(x, y, dx, dy, pull, alfa) {
+  const estiloDe = u => TACOS[(ctx.tacoDe && ctx.tacoDe(u)) || "escuela"] || TACOS.escuela;
+  const animado = e => !!(e.brillo || ["olas", "aurora", "galaxia"].includes(e.veta));
+  function ponTaco(x, y, dx, dy, pull, alfa, quien) {
     g2.save();
     g2.setTransform(escala, 0, 0, -escala, MARCO * escala, (MARCO + PL.W) * escala);
     const hueco = PL.R + 14 + pull;
-    dibujaTaco(g2, x - dx * hueco, y - dy * hueco, Math.atan2(dy, dx), alfa);
+    dibujaTaco(g2, x - dx * hueco, y - dy * hueco, Math.atan2(dy, dx), alfa, estiloDe(quien), performance.now() / 1000);
     g2.restore();
   }
 
   function dibujaTacoApuntando(bl) {
     const dx = Math.cos(ap.ang), dy = Math.sin(ap.ang);
-    ponTaco(bl.x, bl.y, dx, dy, ap.f * TACO_MAX * 0.9 + 6, 1);
+    ponTaco(bl.x, bl.y, dx, dy, ap.f * TACO_MAX * 0.9 + 6, 1, uid);
   }
 
   function dibujaPuntoEfecto(bl) {

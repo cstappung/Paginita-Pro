@@ -113,6 +113,7 @@ function detalleHtml(yo) {
     { i: "🐾", t: "Mascotas", ir: "#mascotas", n: (g.adopcion || 0) + (g.regalo || 0) + (g.comida || 0) + (g.pocion || 0) + (g.fondoMascota || 0),
       s: [veces("adopcion", "adopción", "adopciones"), veces("regalo", "regalo", "regalos"), veces("comida", "compra de comida", "compras de comida"), veces("pocion", "poción", "pociones"), veces("fondoMascota", "fondo", "fondos")].filter(Boolean).join(" · ") },
     { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", `artículo (${formatoMonedas(PRECIO_TIENDA)} c/u)`, `artículos (${formatoMonedas(PRECIO_TIENDA)} c/u)`) },
+    { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);
   const casino = Object.entries(cas.porJuego || {}).filter(([, z]) => z.rondas || z.apostado)

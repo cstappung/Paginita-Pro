@@ -328,15 +328,20 @@ export function dibujaMesa(cv, s) {
 
 /* ---------- el taco ----------
    Dibuja el taco con la punta en `(tx, ty)` (mm, ejes de la mesa) y
-   apuntando hacia `ang` (radianes: la dirección en la que pegaría). `s` es
-   la escala de la mesa. Se llama con la transformación de `dibujaMesa`. */
-export function dibujaTaco(c, tx, ty, ang, alfa) {
+   apuntando hacia `ang` (radianes: la dirección en la que pegaría). Se
+   llama con la transformación de `dibujaMesa`. `estilo` es uno de
+   `TACOS` (tacos.js); sin él sale el de escuela. `t` (segundos) mueve los
+   brillos de los mejores. `grosor` ensancha el dibujo (la vista previa
+   lo necesita: a esa escala un taco real sería un hilo). */
+const LARGO = 1500;
+export function dibujaTaco(c, tx, ty, ang, alfa, estilo, t = 0, grosor = 1.35) {
+  const e = estilo || ESTILO_BASE;
   c.save();
   c.globalAlpha = alfa;
-  c.translate(tx, ty); c.rotate(ang); c.scale(1, 1.35);
+  c.translate(tx, ty); c.rotate(ang); c.scale(1, grosor);
   const cil = (x0, x1, h0, h1, cols) => {
     const g = c.createLinearGradient(0, h1, 0, -h1);
-    cols.forEach(([p, col]) => g.addColorStop(p, col));
+    cols.forEach((col, i) => g.addColorStop([0, 0.25, 0.55, 1][i], col));
     c.fillStyle = g;
     c.beginPath(); c.moveTo(x0, h0); c.lineTo(x1, h1); c.lineTo(x1, -h1); c.lineTo(x0, -h0); c.closePath(); c.fill();
   };
@@ -344,20 +349,129 @@ export function dibujaTaco(c, tx, ty, ang, alfa) {
   c.save();
   c.shadowColor = "rgba(0,0,0,.42)"; c.shadowBlur = 9; c.shadowOffsetX = 5; c.shadowOffsetY = -9;
   c.fillStyle = "#c9a064";
-  c.beginPath(); c.moveTo(0, 5.5); c.lineTo(-760, 9); c.lineTo(-1500, 13.5); c.lineTo(-1500, -13.5); c.lineTo(-760, -9); c.lineTo(0, -5.5); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(0, 5.5); c.lineTo(-760, 9); c.lineTo(-LARGO, 13.5); c.lineTo(-LARGO, -13.5); c.lineTo(-760, -9); c.lineTo(0, -5.5); c.closePath(); c.fill();
   c.restore();
-  const maple = [[0, "#8a6a3a"], [0.25, "#f1d9a6"], [0.55, "#e0b87a"], [1, "#8c6430"]];
-  const oscuro = [[0, "#150a05"], [0.25, "#6b3a22"], [0.55, "#3f1f10"], [1, "#0e0603"]];
-  cil(-760, -32, 9, 6, maple);                                  // fuste
-  cil(-32, -12, 6, 5.8, [[0, "#999"], [0.3, "#fff"], [0.6, "#dcdcdc"], [1, "#8a8a8a"]]);   // férula
-  cil(-12, 0, 5.8, 5.2, [[0, "#1e3f8a"], [0.3, "#5b8ef0"], [0.6, "#3a68c8"], [1, "#16306b"]]);   // tiza
-  cil(-770, -760, 9.4, 9.2, [[0, "#6a5420"], [0.3, "#f2d98a"], [0.6, "#c8a84a"], [1, "#5a4618"]]);   // unión de latón
-  cil(-1500, -770, 13.5, 9.4, oscuro);                          // mango
-  cil(-1220, -980, 11.6, 10.8, [[0, "#000"], [0.3, "#3a3a3a"], [0.6, "#161616"], [1, "#000"]]);   // la envoltura
-  for (let x = -1010; x > -1210; x -= 26) { c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(x, -11, 3, 22); }
-  cil(-1500, -1470, 13.6, 13.6, [[0, "#000"], [0.4, "#333"], [1, "#000"]]);   // el tope de goma
-  for (const x of [-1240, -1236]) cil(x - 6, x, 12.1, 12, [[0, "#6a5420"], [0.3, "#f2d98a"], [1, "#5a4618"]]);
+  // brillo exterior de los tacos buenos (late despacio)
+  if (e.brillo) {
+    c.save();
+    c.shadowColor = e.brillo; c.shadowBlur = 16 + 8 * Math.sin(t * 3);
+    c.fillStyle = e.brillo + "55";
+    c.beginPath(); c.moveTo(0, 5.5); c.lineTo(-760, 9); c.lineTo(-760, -9); c.lineTo(0, -5.5); c.closePath(); c.fill();
+    c.restore();
+  }
+  cil(-760, -32, 9, 6, e.fuste);                                  // fuste
+  vetas(c, e, t);
+  cil(-32, -12, 6, 5.8, ["#999", "#fff", "#dcdcdc", "#8a8a8a"]);   // férula
+  cil(-12, 0, 5.8, 5.2, [shade(e.punta, -0.45), shade(e.punta, 0.35), e.punta, shade(e.punta, -0.5)]);   // tiza
+  cil(-770, -760, 9.4, 9.2, [shade(e.aro, -0.5), shade(e.aro, 0.4), e.aro, shade(e.aro, -0.55)]);   // unión
+  cil(-LARGO, -770, 13.5, 9.4, e.mango);                          // mango
+  if (e.envoltura) {                                              // envoltura con aros
+    cil(-1220, -980, 11.6, 10.8, [e.envoltura, shade(e.envoltura, 0.25), shade(e.envoltura, 0.05), e.envoltura]);
+    for (let x = -1010; x > -1210; x -= 26) { c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(x, -11, 3, 22); }
+  }
+  mangoVeta(c, e, t);
+  cil(-LARGO, -1470, 13.6, 13.6, ["#000", "#333", "#111", "#000"]);   // tope de goma
+  for (const x of [-1240, -1236]) cil(x - 6, x, 12.1, 12, [shade(e.aro, -0.5), shade(e.aro, 0.4), e.aro, shade(e.aro, -0.55)]);
+  // destello que recorre el fuste
+  if (e.brillo) {
+    const x = -760 + ((t * 260) % 900) - 60;
+    const g = c.createLinearGradient(x - 40, 0, x + 40, 0);
+    g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,.55)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    c.save(); fusteClip(c); c.fillStyle = g; c.fillRect(x - 40, -10, 80, 20); c.restore();
+  }
   c.restore();
+}
+
+const ESTILO_BASE = {
+  fuste: ["#8a6a3a", "#f1d9a6", "#e0b87a", "#8c6430"], mango: ["#150a05", "#6b3a22", "#3f1f10", "#0e0603"],
+  aro: "#c8a84a", punta: "#5b8ef0", veta: "liso", envoltura: "#000"
+};
+function shade(hex, k) {            // aclara (k>0) u oscurece (k<0) un #rrggbb
+  const n = parseInt(hex.slice(1, 7), 16);
+  const f = v => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))));
+  return "rgb(" + f(n >> 16) + "," + f((n >> 8) & 255) + "," + f(n & 255) + ")";
+}
+function fusteClip(c) {
+  c.beginPath(); c.moveTo(-32, 6); c.lineTo(-760, 9); c.lineTo(-760, -9); c.lineTo(-32, -6); c.closePath(); c.clip();
+}
+function mangoClip(c) {
+  c.beginPath(); c.moveTo(-770, 9.4); c.lineTo(-1500, 13.5); c.lineTo(-1500, -13.5); c.lineTo(-770, -9.4); c.closePath(); c.clip();
+}
+/* Lo que decora el fuste, según `veta`. Todo recortado a la silueta. */
+function vetas(c, e, t) {
+  if (e.veta === "liso") return;
+  c.save(); fusteClip(c);
+  const y = (k, n) => -8 + (16 * k) / n;
+  if (e.veta === "rayas") {
+    c.strokeStyle = "rgba(70,35,10,.35)"; c.lineWidth = 0.9;
+    for (let k = 1; k < 7; k++) { c.beginPath(); c.moveTo(-40, y(k, 7)); c.lineTo(-750, y(k, 7) * 1.4); c.stroke(); }
+  } else if (e.veta === "nudos") {
+    c.fillStyle = "rgba(255,230,150,.9)";
+    for (let x = -300; x > -740; x -= 60) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x - 14, 4.5); c.lineTo(x - 28, 0); c.lineTo(x - 14, -4.5); c.closePath(); c.fill(); }
+  } else if (e.veta === "carbono") {
+    for (let x = -40; x > -760; x -= 8) for (let k = 0; k < 4; k++) {
+      c.fillStyle = (Math.floor(-x / 8) + k) % 2 ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.35)";
+      c.fillRect(x - 8, -9 + k * 4.6, 8, 4.6);
+    }
+  } else if (e.veta === "olas") {
+    c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 1.2;
+    for (let k = 0; k < 3; k++) {
+      c.beginPath();
+      for (let x = -40; x > -760; x -= 12) { const yy = -4 + k * 4 + 2.2 * Math.sin((x + t * 90) / 22 + k); x === -40 ? c.moveTo(x, yy) : c.lineTo(x, yy); }
+      c.stroke();
+    }
+  } else if (e.veta === "escamas") {
+    c.strokeStyle = "rgba(255,210,120,.55)"; c.lineWidth = 0.9;
+    for (let x = -50; x > -760; x -= 14) for (let k = -1; k <= 1; k++) { c.beginPath(); c.arc(x, k * 6 + ((Math.floor(-x / 14)) % 2 ? 3 : 0), 5, 0.4, 2.7); c.stroke(); }
+  } else if (e.veta === "aurora") {
+    const g = c.createLinearGradient(-40 - ((t * 120) % 700), 0, -740 - ((t * 120) % 700), 0);
+    ["#6bffd0", "#7aa8ff", "#d28bff", "#6bffd0", "#7aa8ff", "#d28bff"].forEach((col, i) => g.addColorStop(i / 5, col));
+    c.globalAlpha *= 0.55; c.fillStyle = g; c.fillRect(-760, -10, 730, 20);
+  } else if (e.veta === "runas") {
+    c.strokeStyle = "rgba(120,60,0,.8)"; c.lineWidth = 1.1;
+    for (let x = -80; x > -720; x -= 70) { c.beginPath(); c.moveTo(x, -4); c.lineTo(x - 6, 4); c.moveTo(x - 6, 0); c.lineTo(x - 14, -4); c.moveTo(x - 14, 4); c.lineTo(x - 22, 0); c.stroke(); }
+  } else if (e.veta === "galaxia") {
+    const g = c.createLinearGradient(0, -9, 0, 9);
+    g.addColorStop(0, "rgba(255,90,200,.45)"); g.addColorStop(0.5, "rgba(80,120,255,.35)"); g.addColorStop(1, "rgba(120,255,230,.4)");
+    c.fillStyle = g; c.fillRect(-760, -10, 730, 20);
+    const r = azar(99);
+    for (let k = 0; k < 46; k++) {
+      const x = -40 - r() * 720, yy = -8 + r() * 16, ph = r() * 6;
+      c.fillStyle = "rgba(255,255,255," + (0.35 + 0.65 * Math.abs(Math.sin(t * 2 + ph))).toFixed(2) + ")";
+      c.fillRect(x, yy, 1.8, 1.8);
+    }
+  }
+  c.restore();
+}
+/* Lo que decora el mango: los tacos de más categoría repiten el tema. */
+function mangoVeta(c, e) {
+  if (e.veta === "liso" || e.veta === "rayas") return;
+  c.save(); mangoClip(c);
+  if (e.veta === "nudos" || e.veta === "runas") {
+    c.fillStyle = e.veta === "nudos" ? "rgba(255,230,150,.8)" : "rgba(255,230,160,.8)";
+    for (let x = -1280; x > -1460; x -= 36) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x - 8, 6); c.lineTo(x - 16, 0); c.lineTo(x - 8, -6); c.closePath(); c.fill(); }
+  } else if (e.veta === "carbono") {
+    for (let x = -800; x > -1480; x -= 8) for (let k = 0; k < 5; k++) { c.fillStyle = (Math.floor(-x / 8) + k) % 2 ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.4)"; c.fillRect(x - 8, -13 + k * 5.4, 8, 5.4); }
+  } else if (e.veta === "escamas") {
+    c.strokeStyle = "rgba(255,180,90,.5)"; c.lineWidth = 0.9;
+    for (let x = -1240; x > -1480; x -= 14) for (let k = -1; k <= 1; k++) { c.beginPath(); c.arc(x, k * 8, 6, 0.4, 2.7); c.stroke(); }
+  } else {
+    c.strokeStyle = "rgba(255,255,255,.35)"; c.lineWidth = 1.2;
+    for (let x = -800; x > -1480; x -= 90) { c.beginPath(); c.moveTo(x, -13); c.lineTo(x - 30, 13); c.stroke(); }
+  }
+  c.restore();
+}
+
+/* Una vista previa del taco en un canvas horizontal (la tienda y la
+   colección): la punta a la derecha y todo el largo a la vista. */
+export function dibujaTacoMini(cv, estilo, t = 0) {
+  const c = cv.getContext("2d"), w = cv.width, h = cv.height;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const k = (w - 16) / LARGO;
+  c.setTransform(k, 0, 0, k, w - 8, h / 2);
+  dibujaTaco(c, 0, 0, 0, 1, estilo, t, Math.min(4.2, h / (28 * k)));
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 export { azar };

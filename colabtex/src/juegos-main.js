@@ -82,6 +82,7 @@ import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
+import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
 import { referidos as referidosDe } from "./juegos/referidos.js";
@@ -538,6 +539,59 @@ function comprasDe(d) {
   for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
   return out;
 }
+/* ---------- los tacos de Pool ----------
+   Lo que se tiene sale de `economia()` (los cofres que aceptó); lo que se
+   equipa es `users/<uid>/taco`, un id suelto que se comprueba contra lo
+   que esa cuenta tiene al pintar, como los marcos: un id escrito a mano
+   que no se ganó se ve como el taco de escuela. */
+const tacoCache = new Map(), tacoOyendo = new Set(), tacoOyentes = new Set();
+const avisaTacos = () => { for (const f of [...tacoOyentes]) f(); };
+function tacoDeUid(uid) {
+  if (!uid) return "escuela";
+  if (!tacoOyendo.has(uid)) {
+    tacoOyendo.add(uid);
+    fb.watchTaco(uid, v => { tacoCache.set(uid, v); avisaTacos(); });
+  }
+  const id = tacoCache.get(uid);
+  if (!esTaco(id)) return "escuela";
+  if (TACOS[id].regalo) return id;
+  if (datosP && datosP.completo) {
+    const e = economia(datosP).usuarios[uid];
+    if (!(e && e.tacos[id])) return "escuela";
+  }
+  return id;
+}
+const claveCofre = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => (b % 36).toString(36)).join("");
+const tacosPool = {
+  alCambiar(fn) {
+    tacoOyentes.add(fn);
+    const off = datosPerfil(() => fn());
+    return () => { tacoOyentes.delete(fn); off(); };
+  },
+  estado() {
+    const u = state.user.uid, listo = !!(datosP && datosP.completo);
+    const e = listo ? economia(datosP).usuarios[u] : null, m = listo ? monedasDe(u, datosP) : null;
+    return { listo, saldo: m ? m.saldo : 0, parada: !!(m && m.parada), poseidos: (e && e.tacos) || {}, equipado: tacoDeUid(u) };
+  },
+  async comprar() {
+    const u = state.user.uid, est = tacosPool.estado();
+    if (!est.listo || est.parada || est.saldo < PRECIO_COFRE) throw new Error("Sin saldo para el cofre.");
+    const clave = claveCofre();
+    const x = await fb.comprarCofre(u, clave, PRECIO_COFRE);
+    const id = abreCofre(u, clave, x.at);
+    suena("gana");
+    return { id, dup: !!est.poseidos[id] || !!TACOS[id].regalo };
+  },
+  async equipar(id) {
+    const u = state.user.uid, est = tacosPool.estado();
+    if (!esTaco(id) || !(TACOS[id].regalo || est.poseidos[id])) return;
+    await fb.equiparTaco(u, id);
+    tacoCache.set(u, id);
+    avisaTacos();
+    suena("clic");
+  }
+};
+
 /* El marco que se ve en una foto cualquiera (tops, chips, tiras): el del
    perfil vivo, comprobado contra lo que esa persona tiene ganado. */
 const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
@@ -3089,6 +3143,8 @@ function montaJuego(p) {
        la pinten igual que la cabecera. Sin `data-perfil`: dentro de un
        juego un clic en un asiento puede ser una jugada. */
     avatar: (j, tam, color) => avatarMarco(fotoSana(j.foto, true), j.nombre, color || colorSano(j.color) || colorForUid(j.uid || ""), j.marco || marcoDeUid(j.uid), tam),
+    tacoDe: tacoDeUid,
+    tacos: state.user ? tacosPool : null,
     secreto: () => soyJugador()
       ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del

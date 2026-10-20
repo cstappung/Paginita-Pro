@@ -653,6 +653,18 @@
         }
       }
     },
+    "cofres": {
+      ".read": "auth != null",
+      "$uid": {
+        "$clave": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$clave.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 500",
+          "at": { ".validate": "newData.isNumber()" },
+          "p": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "podios": {
       ".read": "auth != null",
       "$uid": {
