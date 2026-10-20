@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { pantallaPartida } from '../web/navegador/foto-pantalla.mjs';
+import { dosFotosPartidas } from '../web/navegador/foto-pantalla.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -248,14 +248,17 @@ try {
     await foco(mA); await uno.keyboard.down('KeyK'); await foco(mB); await dos.keyboard.down('KeyK');
     const x = await hastaQue(async () => [await leer(mA), await leer(mB)], ([a, b]) => (a?.ls?.huellasIguales || 0) >= 3 && (b?.ls?.cuadro || 0) > 600, 120000, 2000);
     // (la foto del marco del juego solo: el detector busca la costura a media altura de la imagen del juego)
+    // (§79: dos fotos separadas 1,5 s con los karts acelerando: una costura de verdad sigue ahí, un borde de la pista
+    // —la raya de la largada— baja por la imagen)
     const fotoMarco = async (f, nombre) => (await f.frameElement().catch(() => null))?.screenshot({ path: path.join(carpeta, nombre) }).catch(() => null);
-    const [va, vb] = [await fotoMarco(mA, '9-carrera-uno.png'), await fotoMarco(mB, '9-carrera-dos.png')];
-    const [pa, pb] = [va && await pantallaPartida(uno, va), vb && await pantallaPartida(dos, vb)];
+    let na = 0, nb = 0;
+    const [pa, pb] = await Promise.all([dosFotosPartidas(uno, () => fotoMarco(mA, `9-carrera-uno${na++ ? '-b' : ''}.png`)),
+                                        dosFotosPartidas(dos, () => fotoMarco(mB, `9-carrera-dos${nb++ ? '-b' : ''}.png`))]);
     await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
     ok('la misma carrera en los dos: las huellas coinciden y ninguno se separó', (x?.[0]?.ls?.huellasIguales || 0) >= 3 && !x?.[0]?.ls?.desincronizado && !x?.[1]?.ls?.desincronizado,
        `huellas iguales ${x?.[0]?.ls?.huellasIguales}, cuadro A ${x?.[0]?.ls?.cuadro}, B ${x?.[1]?.ls?.cuadro}`);
     ok('en la página de cada uno se ve UNA vista (la de su kart), no la pantalla partida', pa && pb && !pa.partida && !pb.partida && !pa.vacia && !pb.vacia,
-       `costura en el medio: A ${pa?.pico} (típico ${pa?.tipico}), B ${pb?.pico} (típico ${pb?.tipico})`);
+       `costura en el medio: A ${pa?.pico}/${pa?.segunda?.pico} (típico ${pa?.tipico}), B ${pb?.pico}/${pb?.segunda?.pico} (típico ${pb?.tipico}); barras recortadas A ${pa?.barras} B ${pb?.barras} px`);
   }
   codigo = mal ? 1 : 0;
 } catch (e) {

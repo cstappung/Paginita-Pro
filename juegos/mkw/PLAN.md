@@ -95,8 +95,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   puntos**: el juego los suma una vez por carrera, la 2 se suma a la 1 y quien recargó usa la tabla de la sala
   (`prueba-sala` con B quieto en la 2: 146 puntos, §75)
 - ✅ M16. **El reloj de los que faltan («DNF»)**, como en las carreras en línea de Mario Kart 8: cuando el primer
-  humano cruza la meta, los demás tienen 30 s; al vencer, el juego les termina la carrera en el puesto en que van (en
-  el mismo cuadro en todas las consolas). Lo dispara un humano, no una CPU (`lockstep_nativo.cpp`, `prueba-sala`, §77)
+  corredor (humano o CPU, §78) cruza la meta, los demás tienen 30 s; al vencer, el juego les termina la carrera en el
+  puesto en que van (en el mismo cuadro en todas las consolas) (`lockstep_nativo.cpp`, `prueba-sala`, §77). Y un
+  contador en la página con los números de la cuenta de salida (`dnf.mjs`, `fuente-wii.mjs`, banco `cuenta-dnf`, §78)
 - ⬜ M8. Abrir directo lo que falta: las carreras de un jugador (Racedata + sección de carrera) y Multiplayer local
 - ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
   sale de la cilindrada como en un Grand Prix (§73)
@@ -375,6 +376,18 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-19 21:27** — **El kit con §78 al sitio y la foto que parecía partida** (§79.5). `prueba-experiencia` daba 16/17:
+  con el kart quieto en la largada, la raya de la meta caía a media altura y el detector la tomó por la costura de la
+  pantalla partida. `foto-pantalla.mjs` recorta las barras negras (§79) antes de medir, y la prueba saca dos fotos con
+  los karts acelerando: partida solo si las dos la muestran. `prueba-experiencia` 17/17. Commits locales, sin push.
+- **2026-10-19 21:17** — **El contador de los que faltan, con los números de la cuenta de salida** (§78; M16). Pedidos del
+  dueño: un contador que meta presión, que el plazo lo dispare el primer corredor aunque sea CPU, que se parezca al
+  juego (con un crítico) y con los números de la cuenta de salida. `dnf.mjs` muestra los segundos sobre la imagen 16:9
+  del juego (al 20 % del alto, con halo), «¡LLEGÓ EL 1.º!» / «¡A LA META!», la entrada de la salida en los últimos 10 y
+  pitidos en los últimos 5; a quien ya llegó, «ESPERANDO A LOS DEMÁS». Las letras salen de la fuente que el juego ya
+  cargó (`fuente-wii.mjs` abre `UI/Font.szs` de RR en la página: Yaz0 → U8 → BRFNT → IA4): el 3-2-1 de la fuente de
+  la cuenta (solo trae 1-3), el resto de `kart_kanji_font`; colores de `go.brlyt` y entrada de `go_fade_in.brlan`.
+  Nada del juego a git. Banco `cuenta-dnf` 25/25 (fuente de mentira), `prueba-sala` 26/26. Commit local, sin push.
 - **2026-10-19 21:03** — **El kit al sitio y «Jugar la Copa» a la vista** (§79.4). `subir-kit.sh` con §74–§79;
   `prueba-experiencia` se cortaba: en el sitio el marco (100vh − 120 px) aparece debajo del vestíbulo y el panel de la
   copa, pegado abajo del marco, quedaba fuera de la ventana. Ahora el sitio desplaza la página para ver el marco entero

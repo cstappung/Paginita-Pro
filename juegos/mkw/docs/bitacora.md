@@ -611,7 +611,27 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 
 | Término | Qué es y qué hace |
 |---|---|
-| **DNF (Did Not Finish, «no terminó»)** | La regla de las carreras en línea de Mario Kart 8: cuando el primero cruza la meta, los demás tienen 30 s; al vencer, la carrera de los que faltan se termina sola en el puesto en que van. En la sala la dispara el primer humano que llega, y el juego les da a los que faltan un tiempo estimado por lo que avanzaron. Como el tiempo de espera de un relé temporizado: desde que llega la señal del primero, corre el plazo y al vencer abre el circuito aunque los demás no hayan llegado. |
+| **DNF (Did Not Finish, «no terminó»)** | La regla de las carreras en línea de Mario Kart 8: cuando el primero cruza la meta, los demás tienen 30 s; al vencer, la carrera de los que faltan se termina sola en el puesto en que van. En la sala la dispara el primer corredor que llega, humano o CPU (desde §78; en §77 era el primer humano), y el juego les da a los que faltan un tiempo estimado por lo que avanzaron. Como el tiempo de espera de un relé temporizado: desde que llega la señal del primero, corre el plazo y al vencer abre el circuito aunque los demás no hayan llegado. |
+
+### El contador de los que faltan (§78)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Glifo** | El dibujo de una letra o número en una fuente. La «A» es una letra; el dibujito de la «A» en tal fuente es su glifo. |
+| **BRFNT (fuente de la Wii)** | El archivo de letras de los juegos de la Wii. Adentro: **FINF** (medidas de la fuente), **TGLP** (las hojas de glifos), **CWDH** (el ancho de cada glifo: espacio a la izquierda, ancho dibujado y cuánto avanza la «pluma») y **CMAP** (qué glifo es cada letra, por tramos, por tabla o por pares). Formato público (Tockdom). |
+| **Hoja de glifos** | Una imagen grande con todos los glifos de la fuente en celdas iguales (por ejemplo 44×53 píxeles, 11 por fila, con 1 píxel de separación). Como una plancha de calcomanías: para escribir «30» se recortan la del 3 y la del 0 y se pegan una al lado de la otra. |
+| **IA4** | Un formato de textura de la Wii: cada píxel es 1 byte con **4 bits de opacidad** (arriba) y **4 de intensidad** (abajo), guardado en baldosas de 8×4 píxeles. Las hojas de glifos de Mario Kart Wii van en IA4. |
+| **Fuente de contorno** | Una fuente cuyos glifos traen el borde dibujado: la **intensidad** dice si el píxel es relleno (1) o borde (0) y la **opacidad**, si hay letra. El color NO está en la hoja: lo pone quien dibuja. Como un tablero de LEDs bicolor: la hoja dice «rojo, verde o apagado» y el color real lo pone la fuente de poder de cada color. |
+| **Material (colores «negro» y «blanco»)** | En las pantallas 2D del juego, cada caja de texto tiene un material con dos colores: el «negro» pinta lo que en el glifo es intensidad 0 (el borde) y el «blanco» lo que es intensidad 1 (el relleno); en el medio, una mezcla. Lo hace la **TEV** (la etapa de mezcla de colores de la GPU de la Wii). En la cuenta de salida: borde (70,70,70) y relleno (255,137,137). |
+| **Degradado de vértices** | El color que la caja de texto pone en sus esquinas de arriba y de abajo; la GPU lo reparte suavemente en el medio y lo multiplica por el color de la letra. En la cuenta de salida: amarillo #F2FF00 arriba y #FFE100 abajo. Relleno (255,137,137) × amarillo = el **naranja** #F28900; borde (70,70,70) × amarillo = el **oliva** #424600. |
+| **BRLYT / BRLAN** | El **plano** de una pantalla 2D del juego (qué cajas hay, dónde, con qué fuente y material: `go.brlyt` es la cuenta «3, 2, 1, GO!») y su **animación** (`go_fade_in.brlan`: cómo cambian la escala, la opacidad y los colores cuadro a cuadro). Formatos públicos (Tockdom). |
+| **Cuadro clave (keyframe)** | En una animación, los valores se anotan solo en algunos cuadros («en el cuadro 0 la escala es 90, en el 9 es 2») y el juego calcula los del medio con una curva. Como los puntos de una tabla de calibración: entre punto y punto se interpola. |
+| **Escalado bilineal** | Agrandar una imagen calculando cada píxel nuevo como un promedio de los 4 vecinos de la original: queda suave (un poco borrosa), sin escalones. El juego agranda así sus glifos (los de la cuenta miden ~40 px y se ven de ~80); la página hace lo mismo y por eso se ven igual. |
+| **Unidades de contenedor (`cqh`, `cqw`)** | Medidas del CSS relativas a la caja que las contiene: `11cqh` = el 11 % del alto de esa caja. El contador va en una caja del tamaño exacto de la imagen del juego, así que «11cqh» es el mismo tamaño que la cuenta de salida en cualquier pantalla. Como dar una medida en «por unidad» de la base y no en voltios. |
+| **Halo (`drop-shadow`)** | Una sombra difusa y oscura alrededor del dibujo (no una caja): separa el número del fondo cuando atrás hay carteles o rejas de colores. Los números del HUD del juego tienen algo parecido (un borde y una sombra oscuros). |
+| **Especificidad (CSS)** | Cuando dos reglas del CSS le dicen cosas distintas al mismo elemento, gana la más específica (la que nombra más cosas: «`.cuenta-dnf canvas`» le gana a «`.cuenta-dnf-letrero`»). Así el letrero quedaba a su tamaño natural en el teléfono. Como dos salidas manejando la misma línea: manda la de mayor prioridad, aunque uno haya querido la otra. |
+| **Letra de reserva** | Si la fuente del juego no se puede leer (sin disco, o una prueba sin juego), el contador escribe con una letra del navegador, gruesa y con los mismos colores. Es el plan B: se ve parecido y nunca deja de contar. |
+| **Agente crítico** | Otro Claude al que se le muestran fotos y se le pide un juicio frío con una lista de «pasa / no pasa» y arreglos con números. Lo pidió el dueño para el estilo del contador; hizo 3 rondas. |
 
 ### La cortina de Lakitu que no tapaba todo el alto (§79)
 
@@ -5222,7 +5242,7 @@ En `lockstep_nativo.cpp`, dentro de la misma envoltura de `Raceinfo::Update` de 
 - Al empezar cada carrera (etapa menor que 2) el reloj se borra.
 - El tiempo límite de 5:00 sigue: vale si ningún humano llega en 5 minutos.
 
-**Decisión: lo dispara el primer HUMANO, no una CPU.** La regla está para que los que ya terminaron no esperen; si solo
+**Decisión (cambiada en §78, a pedido del dueño: ahora lo dispara el primer corredor, humano o CPU): lo dispara el primer HUMANO, no una CPU.** La regla está para que los que ya terminaron no esperen; si solo
 llegaron CPU, no está esperando nadie, y con las CPU de relleno un humano lento quedaría cortado a los 30 s de la CPU
 ganadora sin que nadie lo esté esperando.
 
@@ -5265,6 +5285,169 @@ no se confunda con el de antes), en las dos pestañas, con B llegado (por el jue
 - Antes del arreglo de la vigía: 24/25, con la regla DNF bien (30,2 s) pero la tabla final con 73.
 
 ```bash
+python herramientas/compilar-web.py --modo navegador
+node web/navegador/prueba-sala.mjs
+```
+
+## 2026-10-19 · §78 El contador de los que faltan, con los números de la cuenta de salida
+
+### Qué pidió el dueño (2026-10-19, cuatro mensajes seguidos)
+
+1. «¿Puedes lanzar algún tipo de aviso de que le quedan 30 s o algo así para ponerle presión con un contador?»
+2. «No debiera ser el primer humano, debiera ser el primer corredor aunque no sea humano.»
+3. «No me gusta el estilo del temporizador, no se parece al del juego; usa un crítico para arreglar esto.»
+4. «¿Puedes utilizar los mismos números del countdown cuando inicia la carrera?»
+
+### 1. El plazo empieza con el primer corredor, humano o CPU (`lockstep_nativo.cpp`)
+
+En §77 el reloj de 30 s («DNF») arrancaba cuando cruzaba la meta el primer **humano**. Ahora arranca con el primer
+**corredor**: se miran los N primeros de la lista de Raceinfo (N = cuántos corren, Racedata → escenario de la carrera
++0x4) y el primero que tiene el bit 0x2 («cruzó la meta», RaceinfoPlayer +0x38) anota el reloj de la carrera. Al
+vencer, como antes, el juego termina la carrera de cada **humano** que falta (en el puesto en que va, con un tiempo
+estimado); las CPU las termina el juego solo, cuando ya no queda ningún humano corriendo. Consecuencia: si una CPU
+gana, los humanos tienen 30 s desde ese momento. Sigue corriendo sobre el reloj de la carrera, así que vence en el
+mismo cuadro en todas las consolas.
+
+### 2. El contador (`web/navegador/dnf.mjs`)
+
+Cuando el plazo está corriendo, la página lo muestra en grande sobre la imagen del juego:
+
+- A quien **todavía corre**: los segundos que quedan y un letrero: «¡LLEGÓ EL 1.º!» los primeros 2 s, después
+  «¡A LA META!». En los últimos 10, cada número entra como en la cuenta de salida (ver 3); en los últimos 5 suena un
+  pitido corto por segundo (WebAudio, 880 Hz; el último 1320 Hz y más largo).
+- A quien **ya llegó**: un número chico y blanco con «ESPERANDO A LOS DEMÁS», sin pitidos.
+- Lee todo del juego en cada refresco de la pantalla: cuándo llegó el primero (`_mkw_sala_dnf_desde()`), el reloj de
+  la carrera (Raceinfo +0x14) y si yo ya llegué (mi puesto, Racedata +0x20+0xB64 → mi RaceinfoPlayer, bit 0x2). Cuenta
+  en **tiempo de la carrera**: si la carrera se frena esperando a una consola lenta, el contador también; lo que
+  muestra es exactamente cuándo va a vencer el plazo de verdad. Como el display de un temporizador conectado al mismo
+  reloj que dispara el relé.
+- La página le pasa al juego el mismo plazo (`M._mkw_sala_dnf(DNF_MS)`, 30 000 ms), para que los dos digan lo mismo.
+- Va en una caja del tamaño exacto de la **imagen 16:9 del juego**, no de la ventana: el canvas se muestra con
+  `object-fit: contain` y, desde §79, el juego dibuja su imagen 16:9 al centro del canvas aunque el canvas tenga otra
+  forma; la página calcula ese rectángulo (`colocar()`). Así los tamaños en `cqh` son proporcionales a lo que se ve.
+- `?cuentaDnf=0` = sin contador (el plazo del juego sigue igual).
+
+### 3. Los números de la cuenta de salida, sacados del mismo juego
+
+**Mirar la cuenta de verdad.** Con una carrera directa (`?modo=directa`) se sacaron fotos cada ~120 ms mientras
+Raceinfo +0x28 valía 1 (la cuenta). El «3, 2, 1» es naranja con un borde oliva oscuro, de ~11 % del alto de la imagen,
+justo arriba del kart; cada número entra como una silueta blanca que se achica hasta su tamaño y se vuelve naranja.
+
+**De dónde salen.** Con los formatos públicos (Tockdom) se abrieron `Race.szs` y `Font.szs`, solo para leer, en esta PC:
+
+- `go.brlyt` (la pantalla de la cuenta) escribe «3», «2», «1», «GO!» como **texto** con la fuente
+  `tt_kart_font_rodan_ntlg_pro_b`, y esa fuente **solo trae `!`, `1`, `2`, `3` y las letras de «GO»**: no hay 0 ni
+  del 4 al 9. Así que «30», «29»… no se pueden escribir con ella.
+- La fuente de los menús, `kart_kanji_font`, es **la misma letra** (Rodin, con el mismo tipo de borde) y trae todo:
+  0–9, mayúsculas, «¡», «Ó», «º», «…».
+- **Decisión:** el **3, el 2 y el 1** (los últimos 3 s) salen de la fuente de la cuenta: son literalmente los de la
+  salida. Los demás números y los letreros, de `kart_kanji_font`. Las dos se recortan a las filas con tinta para que
+  queden del mismo alto en pantalla.
+- Retro Rewind reemplaza la fuente: su `riivolution/RetroRewind6.xml` dice `disc="/Scene/UI/Font.szs"` →
+  `external="/RetroRewind6/UI/Font.szs"`, y su versión es distinta (hojas de 512×512 en vez de 1024×1024, otros
+  anchos). La página lee primero la de RR (la que el juego usa) y, si no está, la del disco.
+
+**Los colores** (del material `text_01` y de la caja de texto de `go.brlyt`; ver el glosario):
+
+| Qué | Material | × degradado (arriba / abajo) | Resultado |
+|---|---|---|---|
+| Relleno | «blanco» (255,137,137) | #F2FF00 / #FFE100 | naranja #F28900 → #FF7900 |
+| Borde | «negro» (70,70,70) | #F2FF00 / #FFE100 | oliva #424600 |
+
+En la foto del juego se midió relleno ≈ #F08000–#F09000 y borde ≈ #404000–#505000: coincide.
+
+**La entrada** (`go_fade_in.brlan`, 70 cuadros a 60 por segundo):
+
+| Cuadros | Qué pasa en el juego | Qué hace el contador |
+|---|---|---|
+| 0 → 9 (150 ms) | el número (dos capas) pasa de escala 90 a 2: entra desde gigante; la capa `text_00` es una silueta blanca-amarilla que aparece (opacidad 0 → 1) | la silueta pasa de 2,6× (del 3 al 1) o 2× (del 10 al 4) a su tamaño en 150 ms: 90× taparía toda la pista |
+| 9 | aparece la capa naranja (`text_01`) y un destello blanco (`text_light`) que se apaga en 8 cuadros | aparece la cara naranja y la silueta se apaga en 130 ms |
+| 9 → 69 | crece despacio de 2 a 2,2 (10 %); la capa naranja se desvanece desde el cuadro 25 | crece 10 % hasta el próximo número, **sin desvanecerse** (un contador tiene que leerse todo el segundo) |
+
+Del 30 al 11 no entra en cada segundo (sería mucho movimiento durante 20 s): solo un golpecito (1,12 → 1) y un
+destello tenue. La primera vez que aparece, sí entra completo.
+
+**Cómo llega la fuente a la página sin subir nada.** El juego ya bajó `UI/Font.szs` para usarlo; la página lo lee de
+la misma caché de bloques del disco (`disco.leer`, sin pedirlo de nuevo a la red), lo descomprime (Yaz0), lo abre (U8),
+lee las dos fuentes (BRFNT) y pinta los glifos que necesita en un `<canvas>` chico, píxel por píxel, como la GPU de la
+Wii: color = mezcla(borde, relleno, intensidad) × degradado; opacidad = la del glifo. Abrir el archivo tarda ~5–9 ms,
+una vez; pintar un número, menos de 1 ms. El navegador agranda ese canvas con escalado bilineal, igual que el juego.
+`web/navegador/fuente-wii.mjs` es nuestro (Yaz0 y U8 son los de `herramientas/szs.mjs`, que es para Node). **Nada del
+juego entra a git ni se sube aparte**: la página lo lee en el momento del archivo que el amigo ya tiene.
+
+### 4. El crítico (tres rondas)
+
+- **Ronda 1** (antes del pedido 4): el diseño viejo era una «píldora» de página web (caja oscura, borde amarillo,
+  barra). El crítico pidió sin caja ni barra, números grandes con relleno degradado, borde y sombra, anclados a la
+  imagen del juego, y rojo con latido en lo urgente.
+- **Ronda 2** (ya con las letras del juego): pasan «sin caja», «colores y letras de la cuenta» y «la entrada». **No
+  pasan**: (a) arriba, sobre el cartel «MARIO KART» de la meta de esta pista, el naranja se camuflaba; (b) el lugar:
+  justo ese cartel en los últimos segundos; (c) en el teléfono el letrero quedaba enorme y tapaba LAP y el mapa.
+  Arreglos: bajar el número al **20 % del alto** (debajo del HUD de arriba, sobre el horizonte), un **halo** oscuro
+  (`drop-shadow`) en vez de la sombra suave, y mínimos para el teléfono (número 30 px, letrero 12 px). Lo del teléfono
+  era un error del CSS: la regla del canvas («alto 100 %») le ganaba a la del letrero por **especificidad**.
+- **Ronda 3**: todo pasa (el «1» se lee sobre la reja naranja; en el teléfono, 27 px el número y 10 px el letrero).
+- No se usó rojo en lo urgente (lo pedía la ronda 1): el dueño pidió los números de la cuenta, que son naranjas; la
+  presión la dan la entrada en cada segundo y los pitidos.
+
+### 5. La prueba sin el juego: una fuente de mentira (banco `cuenta-dnf`)
+
+El banco no puede usar nada del juego, así que la página de prueba **fabrica** un `Font.szs` con la misma forma:
+
+1. Dibuja letras del navegador (relleno blanco, borde negro) en celdas.
+2. Las guarda en IA4, en baldosas de 8×4.
+3. Arma dos BRFNT:
+   - `kart_kanji_font`, con todo: los dígitos por tramo y el resto por pares;
+   - `tt_kart_font_rodan_ntlg_pro_b`, solo con `!123GO`.
+4. Los empaqueta en un U8 y lo comprime con Yaz0 (con copias de la letra repetida).
+
+Con eso prueba el decodificador de punta a punta y el contador, en 25 puntos:
+
+- La fuente:
+  - lee primero la de RR y, si no está, la del disco;
+  - sin ninguna, usa la letra de reserva.
+- Cuándo se muestra:
+  - nada antes de que llegue el primero;
+  - 30 cuando llega una CPU;
+  - se va al vencer.
+- Cómo se ve:
+  - los colores naranja y oliva en los píxeles;
+  - el letrero cambia a los 2 s;
+  - la entrada en los últimos 10;
+  - el 3-2-1 con la fuente de la cuenta.
+- El tiempo y el sonido:
+  - 18 a los 12,5 s;
+  - los pitidos de los últimos 5.
+- Quien ya llegó: «ESPERANDO A LOS DEMÁS», sin pitidos.
+- El tamaño y el lugar:
+  - el tamaño de la cuenta de salida (11 % del alto), al 20 % de la imagen;
+  - el teléfono;
+  - el canvas de otra forma de §79.
+
+### Trampas
+
+- **Las celdas de la hoja van con 1 píxel de separación** y un glifo puede empezar a la izquierda de su lugar (espacio
+  a la izquierda negativo, p. ej. −2 en el «0»): sin ese margen, el borde del primer número sale cortado.
+- **En IA4 la opacidad va en los 4 bits de arriba** y la intensidad en los de abajo (al revés, el relleno sale
+  transparente).
+- **La fuente de RR no es la del disco** (otro tamaño de hoja y otros anchos): hay que leer la que el juego carga.
+- **`cqh` solo vale dentro de una caja con `container-type: size`**: los tamaños van en un elemento de adentro.
+- **Medir con una animación a medio camino da tamaños falsos** (la escala cuenta en `getBoundingClientRect`): la prueba
+  termina las animaciones antes de medir.
+- Las fotos con la fuente real (para el crítico) se hicieron fuera del proyecto y no se guardan.
+
+### Pruebas
+
+- Banco `cuenta-dnf` **25/25** (con la fuente de mentira).
+- Con la fuente real de RR, en esta PC: abrir `Font.szs` 9 ms; «30» 4,6 ms la primera vez (decodifica las celdas) y
+  0,1–1,6 ms después. Las fotos sobre una imagen del juego (escritorio, teléfono, ancha) pasaron las 3 rondas del
+  crítico.
+- `prueba-sala` **26/26** (un punto nuevo): en la carrera 2, apenas llega A, **B ve «29 ¡LLEGÓ EL 1.º!» con la
+  fuente del juego** (leída de `UI/Font.szs` por la caché del disco) y **A ve «30 ESPERANDO A LOS DEMÁS»**; 29,8 s
+  después (A se mira cada 0,5 s) el juego le termina la carrera a B, igual en las dos, y la tabla suma 146.
+
+```bash
+node banco/correr.mjs cuenta-dnf
 python herramientas/compilar-web.py --modo navegador
 node web/navegador/prueba-sala.mjs
 ```
@@ -5376,3 +5559,26 @@ Resultado: `prueba-experiencia` **17/17**, con la carrera de los dos en el sitio
 ```bash
 node herramientas/prueba-experiencia.mjs          # ~8 min: la sala de dos cuentas en el sitio, copa y carrera (17)
 ```
+
+### 5. La foto que parecía partida: la raya de la largada con el kart quieto
+
+Con el kit de §78, `prueba-experiencia` dio **16/17**. Falló el último punto, «se ve UNA vista, no la pantalla
+partida»: en la ventana de Piloto Dos, el detector (`foto-pantalla.mjs`) encontró una «costura» en el medio de la
+imagen (salto 37,9, cuando lo típico era 3,4). La foto mostraba una sola vista. El kart de B estaba quieto en la
+largada, y el borde entre la madera y la franja a cuadros de la meta caía **justo a media altura** y cruzaba la imagen
+entera. En una sola foto, eso se ve igual que la costura entre dos vistas: un escalón de punta a punta.
+
+Dos cambios, uno por cada causa:
+- **Recortar las barras.** Desde §79 el canvas puede traer barras negras arriba y abajo. El detector ahora las recorta
+  antes de medir: busca dónde empiezan 4 filas con luz seguidas, para saltarse el borde de 1 px del marco. El «medio» es
+  el de la imagen del juego y el salto típico sale de filas de imagen. Sin el recorte, con barras, el medio podía caer
+  en cualquier lado.
+- **Dos fotos con el kart andando** (`dosFotosPartidas`, 1,5 s entre una y otra, acelerando). Una costura de verdad no
+  se mueve: está en la misma fila en las dos. Un borde de la pista baja por la imagen cuando el kart avanza. Cuenta como
+  partida solo si **las dos** fotos la muestran. Como distinguir un ruido fijo de la red (siempre en la misma frecuencia)
+  de una señal que barre: se mira dos veces.
+
+Comprobado con fotos de verdad y con 4 partidas armadas (dos vistas de verdad, una arriba y otra abajo, con y sin
+barras): las partidas dan salto 38 a 57 con típico 6,4 (partida ✓). Las de una vista dan 1,4 a 4,6, salvo la de la
+largada con el kart quieto (37,9). En la prueba nueva: A **55,2 → 18,3**, B **30,3 → 8,5**. Las primeras fotos tenían
+la raya de la largada en el medio y las segundas ya no: **17/17**.

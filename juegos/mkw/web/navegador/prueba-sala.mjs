@@ -33,7 +33,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const RECARGA = process.argv.includes('--recarga');
 const LIMITE = 120;                   // s: el tiempo límite de la carrera en la prueba (el del juego es de minutos)
-const DNF = 30;                       // s: el plazo para los que faltan desde que llega el primer humano (§77)
+const DNF = 30;                       // s: el plazo para los que faltan desde que llega el primero, humano o CPU (§77, §78)
 const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || `--puerto=${RECARGA ? 8156 : 8153}`).slice(9));
 const carpeta = path.join(raiz, RECARGA ? 'build/web/datos/sala-recarga' : 'build/web/datos/sala');
 mkdirSync(carpeta, { recursive: true });
@@ -81,6 +81,7 @@ const leer = p => Promise.race([new Promise(r => setTimeout(() => r(null), 8000)
     // §77: ¿A (puesto 0) y B (puesto 1) cruzaron la meta? (RaceinfoPlayer +0x38, bit 0x2)
     llegaron: (() => { try { const lista = L.u32(ri + 0xC); return [0, 1].map(i => (L.u32(L.u32(lista + 4 * i) + 0x38) & 2) ? 1 : 0); } catch { return []; } })(),
     limiteJuego: window.mkwLimiteCarrera?.() ?? null,
+    cuenta: window.mkwCuentaDnf?.estado() || null,   // §78: el contador de los que faltan (dnf.mjs)
     puntosMenu: Array.from({ length: 12 }, (_, i) => L.u16(rd + 0xC10 + 8 + i * 0xF0 + 0xDA)),
     ganadora: L.u32(0x8043319C + 0x10), etapa: ri ? L.u32(ri + 0x28) : -1, av,
     cortina: !document.body.classList.contains('sin-cortina') };
@@ -250,6 +251,12 @@ if (!RECARGA) {
   const f2 = await terminarEn([A, B], [da, db], [0]);
   // el reloj de la carrera cuando A cruzó la meta (se mira cada 0,5 s: puede ser hasta medio segundo después)
   const llegoA = await esperarQue(A, x => x.llegaron?.[0] === 1, 60000);
+  // §78: el contador de los que faltan: B (que sigue corriendo) lo ve con los segundos y la letra del juego (la fuente
+  // de la cuenta de salida, leída de UI/Font.szs); A (que ya llegó), el tranquilo
+  const [ca, cb] = [await esperarQue(A, x => x.cuenta?.visible, 10000), await esperarQue(B, x => x.cuenta?.visible, 10000)];
+  ok('el contador de los que faltan (§78): B lo ve con los segundos y la letra del juego; A, «ESPERANDO A LOS DEMÁS»',
+     cb?.cuenta?.modo === 'apurate' && cb.cuenta.segundos > 0 && cb.cuenta.segundos <= DNF && cb.cuenta.fuente === 'juego' &&
+     /META|LLEGÓ/.test(cb.cuenta.letrero) && ca?.cuenta?.modo === 'espera', `A: ${ca?.cuenta?.texto} · B: ${cb?.cuenta?.texto} (${cb?.cuenta?.fuente})`);
   const [la, lb] = [await esperarQue(A, x => x.etapa >= 4, 90000), await esperarQue(B, x => x.etapa >= 4, 30000)];
   const desde = llegoA?.llegaron?.[0] === 1 ? llegoA.reloj : -1, plazo = (la?.reloj ?? 0) - desde;
   // (cada pestaña se lee en su momento: el reloj puede diferir en uno o dos cuadros; que la carrera sea la misma en las

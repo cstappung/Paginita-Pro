@@ -199,13 +199,13 @@ extern "C" void rr_kamek_81806568(CpuContext* ctx) {
 // vez. La bandera se baja cuando corre una carrera nueva (etapa menor que 4).
 //
 // (4) §77, el reloj de los que faltan («DNF», pedido del dueño, como en las carreras en línea de Mario Kart 8): en el
-// cuadro en que el PRIMER humano cruza la meta empieza a correr un plazo de 30 s (del reloj de la carrera); al vencer,
-// a cada humano que todavía no llegó el juego le termina la carrera en el puesto en que va (la misma función del tiempo
-// límite: 0x805342E8 con 4 y 1, un tiempo estimado por lo que avanzó). Así los que ya llegaron no esperan a uno que va
-// muy atrás o se quedó quieto. Lo dispara un humano y no una CPU: la regla es para que no esperen los que ya
-// terminaron, y si solo llegaron CPU no espera nadie. Como el tiempo límite, corre sobre el reloj de la carrera: vence
-// en el mismo cuadro en todas las consolas. Module._mkw_sala_dnf(ms) = otro plazo (0 = 30 s); mkw_sala_dnf_desde() =
-// el reloj de la carrera cuando llegó el primero (-1 = todavía nadie).
+// cuadro en que el PRIMER corredor cruza la meta —humano o CPU, lo pidió así el dueño— empieza a correr un plazo de 30 s
+// (del reloj de la carrera); al vencer, a cada humano que todavía no llegó el juego le termina la carrera en el puesto
+// en que va (la misma función del tiempo límite: 0x805342E8 con 4 y 1, un tiempo estimado por lo que avanzó; las CPU
+// las termina el juego solo cuando terminan los humanos). Así nadie espera a uno que va muy atrás o se quedó quieto.
+// Como el tiempo límite, corre sobre el reloj de la carrera: vence en el mismo cuadro en todas las consolas.
+// Module._mkw_sala_dnf(ms) = otro plazo (0 = 30 s; la página pone el suyo, dnf.mjs, para que su contador diga lo
+// mismo); mkw_sala_dnf_desde() = el reloj de la carrera cuando llegó el primero (-1 = todavía nadie).
 //
 // Los cuatro van al final de Raceinfo::Update (la versión de RR, 0x805331B4: en Retro Rewind el despacho usa esa).
 namespace { int32_t g_salaTerminar = 0; uint32_t g_salaMascara = 0; uint32_t g_salaLimite = 0; int32_t g_salaPuntos = 0;
@@ -272,9 +272,11 @@ extern "C" void rr_overlay_805331B4(CpuContext* ctx) {
     const uint32_t reloj = Memory::Read32(ri + 0x14);                  // el reloj de la carrera
     if (!reloj || !Memory::Contains(reloj, 0x10)) return;
     const uint32_t ms = (Memory::Read16(reloj + 0x8) * 60u + Memory::Read8(reloj + 0xA)) * 1000u + Memory::Read16(reloj + 0xC);
-    // (4) ¿ya llegó algún humano? (RaceinfoPlayer +0x38, bit 0x2) — se anota el reloj de ese cuadro
-    for (int i = 0; g_salaPrimero < 0 && i < 12; i++) {
-        if (!(humanos & (1u << i))) continue;
+    // (4) ¿ya llegó alguien, humano o CPU? (RaceinfoPlayer +0x38, bit 0x2) — se anota el reloj de ese cuadro. Los que
+    // corren: los primeros N de la lista (N = Racedata, escenario de la carrera +0x4)
+    const uint32_t rdCarrera = Memory::Read32(0x809BD728u);
+    const uint32_t corren = rdCarrera ? (Memory::Read8(rdCarrera + 0x20 + 4) < 12 ? Memory::Read8(rdCarrera + 0x20 + 4) : 12u) : 12u;
+    for (uint32_t i = 0; g_salaPrimero < 0 && i < corren; i++) {
         const uint32_t p = Memory::Read32(lista + 4 * i);
         if (p && Memory::Contains(p, 0x40) && (Memory::Read32(p + 0x38) & 2u)) g_salaPrimero = static_cast<int32_t>(ms);
     }

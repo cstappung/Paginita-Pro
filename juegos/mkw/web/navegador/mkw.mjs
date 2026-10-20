@@ -35,6 +35,7 @@ import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
 import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, MARCA_SALA } from './sala-carrera.mjs';
+import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -1133,6 +1134,12 @@ async function arrancar() {
     // (solo pruebas: esperar 5 minutos de carrera no da)
     if (parametros.has('limite')) M._mkw_sala_limite?.(Math.max(0, Number(parametros.get('limite')) * 1000) >>> 0);
     window.mkwLimiteCarrera = () => M._mkw_sala_limite_juego?.();
+    // §78: el contador de los que faltan (dnf.mjs). Cuando llega el primero (humano o CPU) el juego da 30 s a los demás
+    // (§77); la página lo muestra con las letras y los colores de la cuenta de salida, de la fuente que el juego ya cargó
+    // (UI/Font.szs, leída de la caché de bloques del disco: no se baja de nuevo). ?cuentaDnf=0 = sin contador.
+    M._mkw_sala_dnf?.(DNF_MS);
+    if (parametros.get('cuentaDnf') !== '0') window.mkwCuentaDnf = crearCuentaDnf({ M, lector: () => window.mkwMenus,
+      leerArchivo: ruta => tamaños.has(ruta) ? disco.leer(direccion(ruta), tamaños.get(ruta), 0, tamaños.get(ruta)) : null });
     // el juego: directo a la pantalla de personaje (la licencia 1, creada si hace falta)
     directo.elegir().then(({ abierto, eleccion }) => {
       window.mkwEstado.piloto = { llego: abierto, modo: 'sala', eligiendo: true };
