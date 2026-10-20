@@ -68,6 +68,26 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   levels, `factorPotencia`) with points. A blue box drop gives armour. `pen`
   upgrades let pistol, uzi and shotgun pellets go through one more enemy each.
   `b` cells are map barrels that come back each level (`reponBarriles`).
+- **The shop is a clickable panel** (`#tienda`, `pintaTienda`/`armaTienda` in
+  `juego.js`), shown while `tiendaCerca()`: built once, then only classes and
+  texts change (rebuilding it every 0.2 s ate clicks). Its buttons never take
+  focus (`sinFoco`): Space shoots and would otherwise re-buy the last item.
+  Keys still work (`TECLA_TIENDA` from `D.TIENDA`, plus **U** = upgrade the
+  weapon in hand and **F** = place a muro reforzado).
+- **Shop weapon levels** (`NIVEL_ARMA`, `precioNivelArma`, `conNivel` in
+  `datos.js`): up to 5 per weapon, each `sube` (×1.8) dearer, applied on top
+  of the multiplier upgrades — always read a weapon through `armaDe(i)`, never
+  `D.arma(i, yo.mejoras)` alone. The level changes the look: `partesArma(w,
+  nivel)` retints the metal (pulida 1–2, dorada 3–4, plasma 5 with a muzzle
+  glow) and `iconoArma(..., nivel)` the HUD icon. The level in hand travels
+  as `nv` in the player state so the others draw it; hits already carry the
+  damage, so nothing else changes on the network.
+- **Muro reforzado** (`blindado` in `TIENDA`, `MURO_BLINDADO`): bought per
+  unit (`yo.bl`, max 6), placed with F as a `pon` request with a 7th field
+  `bl: 1`. It is a `k: 'muro'` object with `bl` and `MURO_BLINDADO.vida`
+  (1000, the director ignores the client's figure), so every rule about
+  muros (rodeo, Demoledor, bites) applies unchanged. It travels as a 10th
+  field of `zb.o`; an old client draws it as a plain muro.
 - **Enemies go around the players' muros and barrels** (`calculaFlujo`:
   `flujoL` is the BFS with the cells those objects touch blocked, `tapadas`;
   `flujo` ignores them). An enemy uses `flujoL` while its cell has a distance
