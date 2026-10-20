@@ -311,7 +311,10 @@ club games; the minimum only raises the cost.
 it: 1 → rojo «brasa», 3 → verde claro «destello», 5 → azul «reflejo», 10 →
 dorado «aura dorada»; each step adds effects (`EFECTOS`, a test checks they
 grow). Optional: `users/<uid>/perfil/tinta` (kept by `limpiaPerfil`, chosen
-in the editor's Datos tab, «Normal» = unset; no rule change).
+in the editor's Datos tab, «Normal» = unset). **`perfil` has a
+`$otro: false` rule**: a new profile field must be named in
+`database.rules.json` (`tinta` was not, and saving any colour failed with
+`PERMISSION_DENIED`), and `test-rules.mjs` must write it.
 
 - **Every painted name goes through `nombreHtml(uid, esc(name))`** →
   `<span class="jg-nm" data-nm=uid>`. A new place that paints a person's

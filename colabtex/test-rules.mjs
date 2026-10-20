@@ -122,6 +122,12 @@ await denied("una foto javascript: no cuela", () =>
   set(ref(db, `users/${userB.uid}/perfil/foto`), "javascript:alert(1)"));
 await denied("un campo inventado no cuela", () =>
   set(ref(db, `users/${userB.uid}/perfil/otro`), "x"));
+/* El color del nombre (juegos/tintas.js): solo uno de los cuatro. Si la
+   regla no lo nombra, `$otro` rechaza el perfil entero al guardarlo. */
+await allowed("B guarda su perfil con color de nombre", () =>
+  set(ref(db, `users/${userB.uid}/perfil`), { nick: "Beto", color: "#112233", tinta: "dorado", at: Date.now() }));
+await denied("un color de nombre inventado no cuela", () =>
+  set(ref(db, `users/${userB.uid}/perfil/tinta`), "red;}body{display:none"));
 await loginAs(A);
 ok("A lee el perfil de B", (await get(ref(db, `users/${userB.uid}/perfil/nick`))).val() === "Beto");
 await denied("A no lee el registro entero de B", () => get(ref(db, `users/${userB.uid}`)));

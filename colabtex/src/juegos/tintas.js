@@ -6,8 +6,8 @@
    que respira; 3, verde claro con un destello y una chispa; 5, azul con
    un reflejo que recorre las letras; 10, dorado con reflejo, aura que
    late y dos chispas. Es opcional: cada uno elige uno de los que tiene o
-   ninguno («Normal»), y se guarda en `users/<uid>/perfil/tinta` (sin regla
-   nueva: `users/<uid>` ya lo escribe solo su dueño).
+   ninguno («Normal»), y se guarda en `users/<uid>/perfil/tinta`, que la
+   regla de `perfil` nombra (allí todo campo que no nombra se rechaza).
 
    **Se re-chequea donde se ve**, como los marcos: un color escrito a mano
    por quien no trajo a nadie se guarda, pero los demás ven el nombre
