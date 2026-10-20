@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610192249"></script>
+<script src="i18n.js?v=202610200112"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3934,6 +3934,91 @@ html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
 .jg-mo-toast.racha{background:linear-gradient(135deg,#7a2e05,#ff7a1a)}
 .jg-mo-toast.podio{background:linear-gradient(135deg,#7a5a00,#e8a317)}
 .jg-mo-toast.club{background:linear-gradient(135deg,#123a4a,#1f8a9a)}
+.jg-mo-toast.referido{background:linear-gradient(135deg,#3b1d7a,#7c4ddb)}
+
+/* ---- Referidos (juegos/referidos-vista.js): el «+» pegado al saldo, su
+   menú y la ventana «Referir a otros». El «+» no es .btn-ghost: con el
+   dedo esos miden 36 px y la cabecera de 360 px ya va justa. ---- */
+/* Saldo y «+» son una sola pastilla dorada: el «+» es una moneda que
+   brilla y, mientras te quede algo por cobrar (`.llama`), late y lleva
+   un «5K». La cabecera es oscura en los dos temas. */
+.jg-saldo-grupo{display:inline-flex;align-items:center;flex:none;padding:2px 3px 2px 0;border-radius:99px;background:linear-gradient(180deg,#f5c54226,#f5c5420f);border:1px solid #f5c5424d}
+.jg-saldo-grupo .jg-saldo{height:28px;min-height:0;border-radius:99px;padding-left:10px;padding-right:7px}
+.jg-ref-mas{position:relative;flex:none;width:26px;height:26px;padding:0;border:0;border-radius:99px;background:radial-gradient(circle at 34% 28%,#fff6c4,#ffd54a 38%,#e9a913 75%,#b97c06);box-shadow:inset 0 0 0 1.5px #9a6a08,0 2px 8px #f5b81966;color:#4a2f00;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s ease}
+.jg-ref-mas-i{position:relative;z-index:1;font:900 18px/1 system-ui,sans-serif;margin-top:-1px}
+/* El destello que cruza la moneda. */
+.jg-ref-mas::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(115deg,transparent 35%,#ffffffcc 50%,transparent 65%) no-repeat;background-size:250% 100%;background-position:150% 0;animation:jgRefBrillo 3.2s ease-in-out infinite}
+@keyframes jgRefBrillo{0%,55%{background-position:150% 0}85%,100%{background-position:-60% 0}}
+.jg-ref-mas:hover,.jg-ref-mas[aria-expanded=true]{transform:scale(1.12) rotate(-8deg)}
+.jg-ref-mas:active{transform:scale(.94)}
+.jg-ref-mas:focus-visible{outline:2px solid #f5c542;outline-offset:2px}
+.jg-ref-mas-k{display:none;position:absolute;top:-7px;right:-9px;z-index:2;padding:1px 4px;border-radius:99px;background:#ff3d6e;color:#fff;font:800 9px/1.2 system-ui,sans-serif;letter-spacing:.02em;box-shadow:0 0 0 2px #171522;pointer-events:none}
+.jg-ref-mas.llama .jg-ref-mas-k{display:block;animation:jgRefSalta 2.4s ease-in-out infinite}
+.jg-ref-mas.llama{animation:jgRefLatido 2.4s ease-in-out infinite}
+@keyframes jgRefLatido{0%,100%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 0 #f5c542aa}50%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 7px #f5c54200}}
+@keyframes jgRefSalta{0%,70%,100%{transform:translateY(0)}78%{transform:translateY(-3px)}86%{transform:translateY(0)}92%{transform:translateY(-1.5px)}}
+@media(pointer:coarse){.jg-ref-mas{width:30px;height:30px}}
+@media(max-width:600px){.jg-saldo-grupo .jg-saldo{padding-left:8px;padding-right:5px}}
+@media (prefers-reduced-motion:reduce){.jg-ref-mas::after,.jg-ref-mas.llama,.jg-ref-mas.llama .jg-ref-mas-k{animation:none}}
+.jg-ref-pop{position:fixed;z-index:65;display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 14px 40px #0f172833;color:var(--jg-ink);font-size:12.5px;animation:jgEntra .2s ease-out}
+.jg-ref-canje{display:flex;flex-direction:column;gap:4px}
+.jg-ref-t{font-size:13.5px}
+.jg-ref-s{color:var(--jg-muted);line-height:1.45}
+.jg-ref-s .jg-moneda,.jg-ref-cuenta .jg-moneda,.jg-ref-modal .jg-modal-t .jg-moneda{width:1em;height:1em;vertical-align:-.12em}
+.jg-ref-fila{display:flex;gap:6px;margin-top:6px}
+.jg-ref-fila .inp{flex:1;min-width:0}
+.jg-ref-fila .inp,.jg-ref-nuevo{font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase}
+.jg-ref-pop .jg-modal-err{margin-top:2px;min-height:0}
+.jg-ref-usado{margin:0;padding:8px 10px;border-radius:8px;background:#e8f7ef;color:#1b7a45;font-weight:700}
+.jg-ref-carga{margin:0;color:var(--jg-muted)}
+.jg-ref-req{display:flex;flex-direction:column;gap:5px;padding:10px;border-radius:9px;background:#f6f4fb}
+.jg-ref-req-t{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--jg-muted)}
+.jg-ref-req-t b{color:var(--jg-ink);font-variant-numeric:tabular-nums}
+.jg-ref-barra{height:8px;border-radius:99px;background:#e4e0ee;overflow:hidden}
+.jg-ref-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#f5a524,#f5c542);transition:width .4s ease}
+.jg-ref-req.ok .jg-ref-barra i{background:linear-gradient(90deg,#1fa463,#3ccf86)}
+.jg-ref-req small{font-size:11.5px;line-height:1.4;color:var(--jg-muted)}
+.jg-ref-req.ok small{color:#1b7a45;font-weight:600}
+.jg-ref-btn{width:100%}
+.jg-ref-modal{width:min(480px,calc(100vw - 36px))}
+.jg-ref-modal .jg-modal-t{padding-right:34px}
+.jg-ref-pasos{margin:14px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.5;color:var(--jg-ink)}
+.jg-ref-mas-ej{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:99px;background:radial-gradient(circle at 34% 28%,#fff6c4,#ffd54a 38%,#e9a913 75%);box-shadow:inset 0 0 0 1px #9a6a08;color:#4a2f00;font-weight:900;font-size:13px;line-height:1}
+/* El top de referidos (salón y ventana) reusa las filas del de monedas. */
+.jg-lado-caja.jg-ref-ves>#vesReferidos{display:block;overflow:visible;padding:8px 10px 12px}
+.jg-ref-ves header span{font-size:16px}
+.jg-ref-cant{font-variant-numeric:tabular-nums;font-size:12.5px;color:#6c3ed2;white-space:nowrap}
+.jg-ref-cta{display:block;width:100%;margin-top:10px;padding:9px 12px;border:0;border-radius:10px;background:linear-gradient(135deg,#6c3ed2,#9b6bff);color:#fff;font:700 12.5px/1.3 inherit;cursor:pointer;box-shadow:0 4px 14px #6c3ed233}
+.jg-ref-cta:hover{filter:brightness(1.08)}
+.jg-ref-cta .jg-moneda{width:1em;height:1em;vertical-align:-.12em}
+.jg-ref-tops{margin-top:18px;padding-top:14px;border-top:1px solid #efebf5}
+.jg-ref-tops h3{margin:0 0 6px;font-size:14px}
+html[data-tema=oscuro] .jg-ref-cant{color:#c4b1ff}
+html[data-tema=oscuro] .jg-ref-tops{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ref-tops h3{color:var(--os-tx)}
+.jg-ref-letra{margin:12px 0 0;padding:10px 12px 10px 28px;border-radius:9px;background:#f6f4fb;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:1.5;color:#5a6772}
+.jg-ref-cuerpo{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.jg-ref-cuerpo .jg-ref-req{margin:0}
+.jg-ref-aviso{margin:8px 0 0;font-size:12px;line-height:1.5;color:#9a5b00}
+.jg-ref-nota{margin:0;font-size:12px;color:var(--jg-muted)}
+.jg-ref-btns{margin-top:6px;justify-content:flex-start;flex-wrap:wrap}
+.jg-ref-mio{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;border-radius:12px;background:linear-gradient(135deg,#efe7ff,#fff6dc);border:1px dashed #b9a2f0}
+.jg-ref-mio small{flex-basis:100%;font-size:11.5px;color:var(--jg-muted)}
+.jg-ref-mio b{flex:1;min-width:0;font:700 24px/1.1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#5b2fc4;overflow-wrap:anywhere}
+.jg-ref-cuenta{margin:0;font-size:12.5px;color:var(--jg-ink)}
+.jg-ref-lista{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.jg-ref-lista li{padding:3px 9px;border-radius:99px;background:#f0ecf9;font-size:12px;cursor:pointer}
+html[data-tema=oscuro] .jg-ref-pop{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-req,html[data-tema=oscuro] .jg-ref-letra,html[data-tema=oscuro] .jg-ref-lista li{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-ref-barra{background:#ffffff1a}
+html[data-tema=oscuro] .jg-ref-req-t b,html[data-tema=oscuro] .jg-ref-pasos,html[data-tema=oscuro] .jg-ref-cuenta{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-req small,html[data-tema=oscuro] .jg-ref-s,html[data-tema=oscuro] .jg-ref-letra,html[data-tema=oscuro] .jg-ref-nota,html[data-tema=oscuro] .jg-ref-mio small,html[data-tema=oscuro] .jg-ref-req-t{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ref-req.ok small{color:#5fd99a}
+html[data-tema=oscuro] .jg-ref-usado{background:#16352a;color:#5fd99a}
+html[data-tema=oscuro] .jg-ref-aviso{color:#f5c26b}
+html[data-tema=oscuro] .jg-ref-mio{background:linear-gradient(135deg,#2a2045,#33291a);border-color:#6b55a8}
+html[data-tema=oscuro] .jg-ref-mio b{color:#c4b1ff}
+@media (prefers-reduced-motion:reduce){.jg-ref-pop{animation:none}.jg-ref-barra i{transition:none}}
 .jg-mo-toast small{display:flex;align-items:center;gap:4px}
 .jg-mo-toast .jg-moneda{width:1.05em;height:1.05em}
 @media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy,.jg-racha-btn{animation:none}}
@@ -6012,7 +6097,10 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
       <button class="btn-ghost jg-rep-btn" id="btnMusica">Música</button>
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>
-      <button class="btn-ghost jg-saldo" id="userMonedas" title="Tus monedas" style="display:none"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg> …</button>
+      <span class="jg-saldo-grupo" id="userSaldo" style="display:none">
+        <button class="btn-ghost jg-saldo" id="userMonedas" title="Tus monedas"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg> …</button>
+        <button class="jg-ref-mas" id="userReferir" type="button" title="Gana 5.000 monedas: canjea un código o invita a tus amigos" aria-label="Referidos: gana 5.000 monedas" aria-expanded="false"><span class="jg-ref-mas-i" aria-hidden="true">+</span><b class="jg-ref-mas-k" aria-hidden="true">5K</b></button>
+      </span>
       <button class="btn jg-entrar" id="btnEntrar" type="button" style="display:none">Iniciar sesión</button>
       <span id="userName" translate="no"></span>
       <span class="avatar" id="userAvatar"></span>
@@ -6039,6 +6127,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610192249"></script>
+<script src="juegos-app.js?v=202610200112"></script>
 </body>
 </html>

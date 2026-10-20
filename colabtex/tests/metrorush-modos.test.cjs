@@ -317,7 +317,7 @@ test('las tablas nuevas están en el club, las reglas, la clasificación, las mo
  assert.ok(cabe('club-metrorush-citydistancia',1000000));assert.ok(!cabe('club-metrorush-citydistancia',1000001));
  const ranks=fs.readFileSync(path.join(__dirname,'../src/juegos/ranks.js'),'utf8');
  for(const op of ['carrera','distancia','puro','sinmonedas','city','citydistancia','citypuro'])assert.match(ranks,new RegExp('metrorush: \\{ filas: \\[\\{ k: "m", t: "Modo", ops: \\[[^\\n]*\\["'+op+'", '),op);
- const Mo=carga(['src/juegos/motor.js','src/juegos/logros.js','src/juegos/tienda.js','src/juegos/cortes.js','src/juegos/monedas.js'],'monedasDe,RECORD');
+ const Mo=carga(['src/juegos/motor.js','src/juegos/logros.js','src/juegos/tienda.js','src/juegos/cortes.js','src/juegos/referidos.js','src/juegos/monedas.js'],'monedasDe,RECORD');
  const solo={};for(const c of NUEVAS)solo[c]={a:{puntos:1000000,tiempo:1}};
  assert.equal(Mo.monedasDe('a',{solo}).partes.records,NUEVAS.length*(Mo.RECORD.metrorush+40),'cada tabla paga su récord y 1 por cada 25 000 puntos');
  // la distancia de City paga como la de la Línea 3: 1 por cada 500 m (tope 100)

@@ -284,6 +284,40 @@ console.log("— Casino —");
   await loginAs(A);
 }
 
+console.log("— Referidos —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const fb2 = await import("./src/fb-juegos.js");
+  const C = { email: "cata@test.com", pass: "secret123" };
+  const usa = (uid, c, r, extra) => set(ref(db, `referidos/u/${uid}`), Object.assign({ c, r, at: serverTimestamp() }, extra || {}));
+  const ua = await loginAs(A);
+  await denied("no se reserva un código sin que sea el tuyo", () => set(ref(db, "referidos/c/ANA2024"), ua.uid));
+  await denied("ni el de otro a su nombre", () => update(ref(db), { "referidos/c/ANA2024": "otro", [`referidos/m/${ua.uid}`]: { c: "ANA2024", at: serverTimestamp() } }));
+  await denied("ni un código con minúsculas", () => update(ref(db), { "referidos/c/ana2024": ua.uid, [`referidos/m/${ua.uid}`]: { c: "ana2024", at: serverTimestamp() } }));
+  await denied("ni el propio sin su código", () => set(ref(db, `referidos/m/${ua.uid}`), { c: "ANA2024", at: serverTimestamp() }));
+  await allowed("A configura su código", () => fb2.configuraCodigo(ua.uid, "ANA2024"));
+  await denied("una sola vez: no lo cambia", () => fb2.configuraCodigo(ua.uid, "ANA2025"));
+  await denied("ni lo reescribe", () => set(ref(db, `referidos/m/${ua.uid}`), { c: "ANA2024", at: serverTimestamp() }));
+  await denied("ni se usa el propio", () => usa(ua.uid, "ANA2024", ua.uid));
+  const ub = await loginAs(B);
+  ok("B lee de quién es el código", (await get(ref(db, "referidos/c/ANA2024"))).val() === ua.uid);
+  await denied("B no se queda con el código de A", () => fb2.configuraCodigo(ub.uid, "ANA2024"));
+  await denied("B no inventa el dueño", () => usa(ub.uid, "ANA2024", "otro"));
+  await denied("ni un código que no existe", () => usa(ub.uid, "NOEXISTE", ua.uid));
+  await denied("ni elige la hora", () => set(ref(db, `referidos/u/${ub.uid}`), { c: "ANA2024", r: ua.uid, at: 1700000000000 }));
+  await denied("ni cuela un campo", () => usa(ub.uid, "ANA2024", ua.uid, { x: 1 }));
+  await denied("ni usa un código a nombre de A", () => usa(ua.uid, "ANA2024", ua.uid));
+  await allowed("B usa el código de A", () => fb2.usaCodigo(ub.uid, "ANA2024", ua.uid));
+  await denied("solo un código por persona", () => usa(ub.uid, "ANA2024", ua.uid));
+  await denied("ni se borra", () => remove(ref(db, `referidos/u/${ub.uid}`)));
+  await allowed("B configura su código", () => fb2.configuraCodigo(ub.uid, "BETO"));
+  await loginAs(A);
+  await denied("A no usa el de B, que entró con el suyo", () => usa(ua.uid, "BETO", ub.uid));
+  const uc = await loginAs(C);
+  await allowed("C usa el de B", () => fb2.usaCodigo(uc.uid, "BETO", ub.uid));
+  await loginAs(A);
+}
+
 console.log("— Tienda del perfil —");
 {
   const { serverTimestamp } = await import("firebase/database");

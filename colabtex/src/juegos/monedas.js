@@ -33,6 +33,9 @@
      primer, segundo o tercer puesto de una tabla del club paga 500, 250 o
      100, cada vez. Se escribe justo después del récord que lo logró, y la
      regla exige que ese récord exista y sea el suyo.
+   - **Referidos** (`referidos/`, ver referidos.js): 5000 a quien entra
+     con el código de alguien y 5000 a ese alguien, si jugó tres juegos
+     distintos.
 
    **Gastar** sí se guarda, porque no se puede deducir de nada, y desde
    que existe el mercado las monedas también **pasan de una cuenta a otra**.
@@ -54,6 +57,7 @@ import MM from "../../../juegos/mascotas/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
+import { monedasReferidos } from "./referidos.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -315,7 +319,7 @@ export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ?
    `datos` = {ranks, solo, logros, diario}, las cuatro lecturas enteras. */
 const num = x => (Number.isFinite(+x) ? +x : 0);
 export function ganadoDe(uid, datos) {
-  const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, club: 0, podios: 0, logros: 0, dias: 0, ajustes: 0 };
+  const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, club: 0, podios: 0, logros: 0, dias: 0, referidos: 0, ajustes: 0 };
   const tengo = {};   // juego -> Set(id) de logros
   const pon = (j, id) => { (tengo[j] = tengo[j] || new Set()).add(id); };
   for (const [j, filas] of Object.entries(d.ranks || {})) {
@@ -346,6 +350,9 @@ export function ganadoDe(uid, datos) {
      cuenta aunque alguien lo cuele. */
   for (const a of Object.values((d.ajustes || {})[uid] || {}))
     if (a && Number.isInteger(a.n) && Math.abs(a.n) <= 10000000) p.ajustes += a.n;
+  /* Los referidos (referidos.js): por el código que usaste y por cada
+     persona que entró con el tuyo. */
+  p.referidos = monedasReferidos(uid, d);
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
   return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
@@ -688,7 +695,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, d.casino]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)
