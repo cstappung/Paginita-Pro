@@ -17,7 +17,7 @@ import { crearSonido } from './sonido.mjs';
 import { crearGuardado } from './guardado.mjs';
 import { crearNube } from './nube.mjs';
 import { crearRespaldos } from './respaldos.mjs';
-import { crearDisco } from './disco.mjs';
+import { crearDisco, leerPaquete } from './disco.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 import { crearInterfaz } from './interfaz.mjs';
@@ -39,6 +39,7 @@ import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDel
 import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as VR_INICIAL_SALA } from './vr-sala.mjs';
 import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
+import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -59,7 +60,8 @@ window.mkwVr = vr;
 const sincro = parametros.get('sincro') && parametros.get('semilla') ? (() => {
   const yo = parametros.get('uid') || '';
   const pjs = (parametros.get('pjs') || '').split(',');
-  const humanos = parametros.get('sincro').split(',').filter(Boolean).slice(0, 4).map((uid, mando) => {
+  // §91: hasta 12 humanos (como Mario Kart en línea): mandos 0-3 con puerto, del 4 al 11 "virtuales" (mandos_virtuales_nativo.cpp)
+  const humanos = parametros.get('sincro').split(',').filter(Boolean).slice(0, 12).map((uid, mando) => {
     const [pj, veh] = (pjs[mando] || '').split('.').map(x => x === '' || x === undefined ? NaN : Number(x));
     return { uid, mando, personaje: pj, vehiculo: veh };
   });
@@ -716,7 +718,9 @@ montarMandos(document.getElementById('mandosPanel'), controles);
 // Récords (records.mjs): existen desde el principio (la lista de pistas muestra tus mejores tiempos antes de jugar)
 const records = crearRecords();
 window.mkwRecords = records;
-window.mkwConectarRecords = o => records.conectar(o);
+// §92: el mismo almacén lleva los fantasmas de la página (fantasma-pagina.mjs: se conecta cuando el juego cargó)
+let conexionRecords = null, fantasmaPagina = null;
+window.mkwConectarRecords = o => { records.conectar(o); conexionRecords = o; fantasmaPagina?.conectar(o); };
 window.mkwConectarVr = async o => {
   vr.conectar(o);
   const r = await vr.cargar();
@@ -774,6 +778,26 @@ async function arrancar() {
     }
   }
   ok('manifiesto del disco', total > 6000, `${total} archivos (${tamaños.size} perezosos)`);
+
+  // §93 (E2): el paquete de los diminutos (diminutos.bin, junto al programa: herramientas/diminutos.mjs). Los ~600
+  // archivos de ≤ 8 KB que el juego lee de a uno (fantasmas, íconos, voces…) llegan en UN pedido (~1,5 MB) mientras
+  // baja el programa, y quedan fijos en la memoria (disco.fijar): ya no van uno por uno por la fila baja, que en la
+  // primera visita tardaba ~22 s en vaciarse. Con caché, sale de Cache Storage. Cada archivo solo se usa si su tamaño
+  // es el del manifiesto. Si no está (404) o algo falla, queda el camino de antes. ?paquete=0: sin él.
+  if (parametros.get('paquete') !== '0' && parametros.get('adelantar') !== '0') {
+    const t0 = performance.now();
+    window.mkwEstado.paquete = disco.entero(ORIGEN + '/build/diminutos.bin').then(b => {
+      const archivos = leerPaquete(b);
+      let puestos = 0, distintos = 0;
+      for (const [ruta, datos] of archivos) {
+        if (tamaños.get(ruta) === datos.length) { if (disco.fijar(direccion(ruta), datos)) puestos++; }
+        else if (tamaños.has(ruta)) distintos++;              // otro tamaño: el paquete es de otra versión del archivo
+      }
+      const r = { puestos, distintos, archivos: archivos.length, mb: +(b.length / 1048576).toFixed(2), ms: Math.round(performance.now() - t0) };
+      nota(`paquete de diminutos: ${puestos} archivos listos en la memoria (${r.mb} MB en ${r.ms} ms)${distintos ? `, ${distintos} de otra versión (esos, de a uno)` : ''}`);
+      return r;
+    }).catch(e => { nota('paquete de diminutos: no está (' + e.message + '): de a uno, como antes'); return null; });
+  }
 
   // 3) Bajar los chicos, de a 16 a la vez
   const t0 = performance.now();
@@ -853,7 +877,10 @@ async function arrancar() {
     mkwMiPuesto: () => window.mkwMiPuesto ?? null,
     // §73: en la sala nueva (humanos de verdad), la única pantalla es la del kart de esta consola (semillas_nativo.cpp)
     mkwPantallaPropia: () => window.mkwPantallaPropia ?? -1,
-    mkwUnaPantalla: parametros.get('unaPantalla') !== '0',       // §73: una sola pantalla, la propia (?unaPantalla=0 = la pantalla partida del juego)
+    mkwUnaPantalla: parametros.get('unaPantalla') !== '0',
+    // §91: cuántos mandos de la sala usan un puerto de verdad (4; los demás van por su portador virtual). ?puertos=N
+    // (solo pruebas): menos puertos, así con 2 pestañas se prueba el camino de los virtuales
+    mkwPuertos: parametros.has('puertos') ? Math.max(0, Math.min(4, Number(parametros.get('puertos')) | 0)) : 4,       // §73: una sola pantalla, la propia (?unaPantalla=0 = la pantalla partida del juego)
     mkwNotaCuentas: parametros.get('notaCuentas') === '1',          // (depurar: cada cálculo de pantallas en la consola)
     // La red del juego (web/red/red_web.cpp → red.mjs): solo con ?red=1; sin ella el juego ve "sin conexión"
     mkwRed: red?.pila,
@@ -927,12 +954,24 @@ async function arrancar() {
   const ocultar = crearOcultar({ lector: window.mkwMenus, enLinea: parametros.get('modo') === 'enlinea' });
   window.mkwOcultar = ocultar;
   const ocultarActivo = parametros.get('ocultar') !== '0';
-  M.mkwAlActivarPagina = dir => { if (ocultarActivo) ocultar.alActivar(dir); alActivarInicio(dir); };
+  // §92: la Contrarreloj contra el mejor fantasma de la página (fantasma-pagina.mjs + fantasma_pagina_nativo.cpp): en la
+  // pantalla de fantasmas se baja el del mejor tiempo de la tabla y el juego corre contra él. ?fantasmaPagina=0: el de RR
+  if (parametros.get('fantasmaPagina') !== '0' && M._mkw_fantasma_pagina_poner) {
+    fantasmaPagina = crearFantasmaPagina({ lector: window.mkwMenus, modulo: M, fs: M.FS,
+      carpetaMod: '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6', nota,
+      aviso: f => ui.aviso(`Fantasma: el mejor de la página — ${f.nombre}, ${textoTiempo(f.ms)}`) });
+    if (conexionRecords) fantasmaPagina.conectar(conexionRecords);
+    window.mkwFantasmaPagina = fantasmaPagina;
+  }
+  // (lo de los fantasmas va fuera de la llamada del juego: baja de la red y vuelve a llamar al juego)
+  M.mkwAlActivarPagina = dir => { if (ocultarActivo) ocultar.alActivar(dir); alActivarInicio(dir);
+    if (fantasmaPagina) { const id = window.mkwMenus.u32(dir + 4); setTimeout(() => fantasmaPagina.alActivarPagina(id), 0); } };
   // Récords (records.mjs): al terminar cada carrera, el tiempo final (leído del juego) queda como récord personal de
   // esa pista y categoría (modo + cc). Con sesión en el sitio, también va a la tabla de Firebase: la página del sitio
   // llama window.mkwConectarRecords({ almacen: almacenRtdb({ rtdb, db }), uid, nombre }).
   vigilarCarreras({ lector: window.mkwMenus, alTerminar: async c => {
     const r = await records.registrar(c);
+    if (r.nube === 'subido') fantasmaPagina?.alTerminar(c);       // §92: su fantasma, para que otros corran contra él
     window.mkwEstado.ultimoTiempo = { ...c, ...r };
     const cat = NOMBRE_CATEGORIA(c.cat);
     ui.aviso(`${textoTiempo(c.ms)} en ${cat}` + (r.mejoraLocal ? (r.anterior ? ` — ¡récord personal! (antes ${textoTiempo(r.anterior)})` : ' — tu primer tiempo aquí') : ` · tu mejor: ${textoTiempo(r.anterior)}`) +
@@ -1626,7 +1665,11 @@ async function arrancar() {
     // conexión mala ya no frena a nadie (lo releva la autoridad), y al que se corta de golpe no conviene esperarlo
     // más: quien recarga avisa que se salta la carrera y vuelve en la siguiente
     const margen = parametros.has('margen') ? Number(parametros.get('margen')) * 1000 : ['directa', 'sala'].includes(objetivoPiloto.modo) ? 2000 : undefined;
+    // §93 (C4): en los primeros 10 s de cada carrera, 15 s de margen (?largada=N segundos; ?largada=0 = el margen de
+    // siempre, como antes): la primera visita puede trabar la pestaña de alguien varios segundos justo al largar
+    const largada = parametros.has('largada') ? Number(parametros.get('largada')) * 1000 : 15000;
     sincro.lockstep = crearLockstep({ yo: sincro.yo, humanos: sincro.humanos, local: () => sincro.local, esperaCorte: margen,
+      esperaLargada: largada || undefined,
       enviar: (u, b, canal) => red.malla.enviar(u, b, canal), huella: () => huellaCarrera(window.mkwMenus),
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     M.mkwLockstep = sincro.lockstep;
@@ -1698,7 +1741,10 @@ async function arrancar() {
         ui.aviso(texto);
         return;
       }
-      const texto = `Se cortó la conexión con ${quien}: lo esperamos ${Math.max(0, Math.ceil((e.margen - e.ms) / 1000))} s (si no vuelve, la carrera sigue sin él)`;
+      const quedan = Math.max(0, Math.ceil((e.margen - e.ms) / 1000));
+      // §93: en la largada lo más probable es que su navegador todavía esté armando la pista (la primera vez)
+      const texto = e.largada ? `Esperando a ${quien}: su navegador todavía arma la pista (la primera vez tarda). Lo esperamos ${quedan} s…`
+        : `Se cortó la conexión con ${quien}: lo esperamos ${quedan} s (si no vuelve, la carrera sigue sin él)`;
       ui.aviso(texto, true);
       if (window.mkwAvisosCorte.length < 200) window.mkwAvisosCorte.push(texto);
     }, 500);

@@ -796,6 +796,43 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Probar con el programa final (`MKW_BUILD`)** | Las pruebas abren el juego que está en `build/web/navegador`, salvo que `MKW_BUILD` diga otra carpeta. Con `MKW_BUILD=build/web-final/navegador` prueban justo el programa que se va a subir, con sus semillas, y no uno parecido. |
 | **Copiar lo commiteado (no la copia de trabajo)** | El kit del sitio se llenó con los archivos tal como están en el último commit (`git archive HEAD`), no como están en la carpeta. Si otra sesión tiene algo a medio hacer en la carpeta, eso no se cuela al sitio. |
 
+### Dónde guarda Retro Rewind sus trofeos (§90, la C8)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Carpeta del mod** | La carpeta propia de Retro Rewind dentro de la memoria interna de la Wii (la NAND): `shared2/Pulsar/RetroRewind6`. Ahí escribe sus trofeos, fantasmas y ajustes. Como el cajón de un tablero donde un equipo agregado guarda sus planos, aparte de los del equipo original. |
+| **CRC32** | Una suma de control de 32 bits: un número que sale de todos los bytes de un archivo, y cambia si cambia cualquier byte. Pulsar nombra la carpeta de cada pista con el CRC32 de su archivo (`Trophies/44e5205f/`), así dos versiones de una pista no se mezclan. Como el dígito verificador de un RUT, pero para un archivo entero. |
+| **`.pul`** | Los archivos que escribe Pulsar (el motor de Retro Rewind): `Trophy.pul` (el trofeo de una pista), `ldb.pul` (la tabla de mejores tiempos de una pista), `RRGameSettings.pul` (los ajustes). |
+
+### Doce jugadores en la sala (§91, la C9)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Puerto de mando** | Una de las 4 entradas de mando de GameCube que tiene la consola. El juego solo conoce 4: un jugador local de verdad necesita uno. Como las 4 entradas de un osciloscopio de 4 canales. |
+| **Mando virtual (portador virtual)** | Para los jugadores 5 a 12 de la sala, que no tienen puerto: `mandos_virtuales_nativo.cpp` les da un "mando" hecho por nosotros que el juego lee igual que uno de verdad, y le pone los botones que llegan por la red. Como agregar canales a un osciloscopio con un multiplexor: el instrumento sigue viendo una entrada, pero llegan más señales. |
+| **Arreglo y su desborde** | Un arreglo es una fila de casillas de memoria del mismo tamaño, una detrás de otra (la lista de jugadores humanos de la IA tiene 4). Si se escribe una casilla más allá de la última, se pisa lo que viene después en la memoria (aquí, un puntero de la IA): eso es un desborde. Como un registro de desplazamiento de 4 etapas al que le meten 5 bits: el quinto se derrama en el registro vecino. |
+| **Prestar como CPU** | Truco de §91 para el armado de pantallas del juego (`InitScreens`), que solo sabe de 4 locales: mientras corre, los humanos 5 a 12 figuran como CPU (así no les busca puerto ni pantalla); al terminar vuelven a ser humanos sin pantalla. Como puentear unos bornes durante la puesta en marcha y sacar el puente después. |
+
+### La Contrarreloj contra el mejor de la página (§92)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Fantasma (`.rkg`)** | La grabación de una vuelta de Contrarreloj: el personaje, el vehículo, el Mii y **los botones de cada cuadro**, comprimidos (unos KB). Al correr "contra el fantasma", el juego reproduce esos botones y el kart fantasma hace exactamente la misma carrera. Como grabar la señal de entrada de un sistema y volver a inyectarla: la salida sale igual. |
+| **Fantasma experto** | El fantasma que trae Retro Rewind para cada pista (el que hay que batir para ganar el trofeo). Es el que el juego carga si la persona elige "correr contra el fantasma" desde la pantalla de fantasmas; la página lo cambia por el del mejor tiempo de la página. |
+| **Tabla de récords de la página** | La lista de mejores tiempos de cada pista en Firebase (la que ya mostraba la página, `records`). Ahora cada récord nuevo sube también su fantasma a Firebase Storage (`mkw/fantasmas/<pista>-tt150/<uid>.rkg`), y quien corre contra el fantasma baja el del primero que tenga uno. |
+
+### La largada tolerante y el paquete de diminutos (§93, la C4 y la E2)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Margen de largada** | En los primeros 10 s de cada carrera sincronizada, el tiempo que se espera a un jugador que no manda sus botones antes de seguir sin él sube de 2 s a 15 s (y hasta 45 s si su página sigue contestando). La primera vez que alguien juega, su navegador se puede trabar unos segundos justo al largar armando gráficos y leyendo el disco: no es que se fue. Como el retardo de arranque de un relé de protección de un motor: en la partida se tolera más corriente que en régimen. |
+| **Latido del buzón (presencia)** | Cada página avisa "sigo aquí" cada segundo en el buzón de la sala (por donde se presentan las páginas antes de conectarse por WebRTC). El buzón de pruebas da por ido a quien no late en 4 s. Antes, la malla cortaba la conexión WebRTC de quien se dejaba de ver en el buzón, aunque esa conexión siguiera sana; ahora solo la corta si la conexión también se cayó. |
+| **Archivo diminuto** | Un archivo del disco de 8 KB o menos (hay ~600: fantasmas, íconos, voces, ajustes). Bajar uno cuesta casi solo la ida y vuelta a la red (~50 ms), no su tamaño. |
+| **Paquete de diminutos (`diminutos.bin`)** | Los ~600 archivos diminutos juntos en un solo archivo de 1,5 MB, con un índice al principio (qué archivo es y cuánto mide). La página lo baja de un pedido y deja cada archivo listo en la memoria. Antes eran ~600 pedidos. Como una regleta: en vez de 600 enchufes a la pared, uno solo. Es contenido del juego: va a R2, nunca a git. |
+| **Fijo (en la memoria)** | Un archivo que la página guarda en la memoria y que nunca se descarta (los del paquete). El resto de la memoria del disco es un recambio de 64 MB: lo más viejo sale cuando entra algo nuevo. |
+| **Fila baja** | La lista de cosas que la página baja "por si acaso" (la semilla de bloques, las voces de los CPU), de a pocas y solo cuando el juego no está cargando, para no quitarle la red a lo que el juego espera ahora. |
+| **Latencia contra ancho de banda** | La latencia es cuánto tarda un pedido en empezar a llegar (~50 ms hasta R2); el ancho de banda, cuántos bytes por segundo caben (50 Mbit/s de una casa). Con archivos chicos manda la latencia; con grandes, el ancho de banda. Como en una línea de transmisión: el retardo de propagación contra la capacidad del conductor. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -7423,3 +7460,325 @@ programa final servido por el Worker de verdad, con las cuentas de mentira y la 
 
 **Lo que sigue:** B7, que es del dueño. Subir a R2 con `MKW_BUILD=build/web-final/navegador` (`docs/publicar.md`,
 paso 2), publicar el Worker y las reglas, y probar en el sitio real como amigo y como no-amigo.
+
+
+## 2026-10-20 · §90 Dónde guarda Retro Rewind sus trofeos y fantasmas, y que quedan guardados (C8)
+
+**Qué:** el punto C8 del PLAN preguntaba dónde guarda Pulsar (el motor de Retro Rewind) los trofeos (`RRSettings.pul`)
+y el VR (`RRRating.pul`) cuando se juega en línea. Había que saberlo para no perder nada: si el juego escribe un archivo
+en un lugar que la página no copia, al cerrar la pestaña se pierde. La respuesta: **todo va a una sola carpeta**, y esa
+carpeta ya se guardaba (§38, `guardado.mjs`). Se agregó una prueba con el juego que lo comprueba de punta a punta.
+
+### 90.1 Lo que se encontró
+
+Retro Rewind tiene su propia carpeta dentro de la memoria interna de la Wii (la NAND), la que Pulsar llama «carpeta
+del mod». En la página es `/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6`. Ahí van:
+
+| Archivo | Qué es | Quién lo escribe |
+|---|---|---|
+| `Trophies/<crc32 de la pista>/Trophy.pul` | El trofeo de esa pista | Pulsar, al **batir al fantasma experto** en Contrarreloj |
+| `Ghosts/<crc32>/150/<tiempo>.rkg` y `Ghosts/<crc32>/ldb.pul` | El fantasma de la vuelta y la tabla de mejores tiempos de esa pista | Pulsar, al terminar una Contrarreloj |
+| `RRGameSettings.pul` | Los ajustes de Retro Rewind | El menú de ajustes |
+| `RRSettings.pul` | Los trofeos **de las versiones viejas** de RR: si existe, Pulsar los pasa al formato nuevo (`Trophies/…`) | Versiones anteriores |
+| `RRRating.pul` | El VR de la partida **en línea del juego** («RRRT» y, por perfil, VR/100 como número con decimales) | Solo el modo en línea de RR |
+
+Dos cosas que no eran obvias:
+
+- **En Retro Rewind los trofeos no salen de las copas.** Salen de la Contrarreloj: hay que batir el tiempo del
+  fantasma «experto» de la pista. Por eso la prueba es una Contrarreloj y no un Grand Prix.
+- **`RRRating.pul` no nos sirve.** Solo lo escribe la partida en línea del juego (Retro WFC), que en nuestras salas no
+  se usa (§73). El VR de la sala vive en Firebase (`vr.mjs`, §82). No hay que hacer nada con él.
+
+El nombre de la carpeta de cada pista es el **CRC32** del archivo de la pista (una suma de control, ver glosario): así
+Pulsar distingue dos versiones de la misma pista retro.
+
+### 90.2 Por qué ya quedaba guardado
+
+`guardado.mjs` (§38) copia a IndexedDB **toda la NAND**, no una lista de archivos: cuando el juego cierra un archivo
+que escribió, la página lo copia medio segundo después. Y `nube.mjs` sube a Storage el mismo paquete
+(`guardado.exportar()`). O sea: los trofeos y fantasmas viajaban desde §38 sin que nadie lo supiera. Faltaba probarlo.
+
+### 90.3 La prueba: `prueba-trofeos.mjs` (9 puntos)
+
+Con un navegador sin partidas:
+
+1. Abre una Contrarreloj directo (`?modo=tt&copa=0&fila=0`: Luigi Circuit), espera a que corra y la **termina por
+   código** al instante (`Module._mkw_sala_terminar(0)`: el juego cree que cruzó la meta). Un tiempo de un segundo bate
+   a cualquier experto, así que Pulsar guarda el fantasma y el trofeo.
+2. Recorre el sistema de archivos del juego y busca `Trophies/…/Trophy.pul` y `Ghosts/…`.
+3. Mira que estén en IndexedDB y dentro del paquete que sube la nube.
+4. Recarga la página y compara una huella (FNV) de cada archivo: tienen que volver con los mismos bytes.
+
+```bash
+node web/navegador/prueba-trofeos.mjs            # también en correr-todo (n: 'trofeos')
+```
+
+Resultado: **9 bien, 0 mal**. El trofeo quedó en `Trophies/44e5205f/Trophy.pul`; el fantasma en
+`Ghosts/44e5205f/150/0m01s168.rkg` (1,168 s, la vuelta «terminada» por código) con su `ldb.pul`. Los tres
+llegaron a IndexedDB y al paquete, y volvieron iguales al recargar.
+
+### 90.4 Trampas
+
+- **Los avisos `IOS_Open: FAILED to open …/Trophies/…/Trophy.pul` del registro no son errores.** Al arrancar, Pulsar
+  pregunta si existe el trofeo de cada pista; si nunca se ganó, el archivo no existe y el runtime lo anota.
+- **Pulsar escribe en una tarea de fondo**, un rato después de la meta. La prueba espera hasta 30 s a que aparezcan
+  los archivos, en vez de mirar una sola vez.
+
+**Lo que sigue:** nada para C8. Quedan C9 (más de 4 humanos), C4 y E2.
+
+## 2026-10-20 · §91 Doce jugadores en la sala, como el Mario Kart en línea (C9)
+
+**Qué:** el dueño pidió que la sala soporte 12 jugadores en línea. Hasta aquí cabían 4: en la carrera sincronizada
+(§73) cada humano es un jugador local **de verdad** en todas las consolas, y un jugador local necesita uno de los 4
+puertos de mando de la Wii. Ahora caben 12: los primeros 4 usan su puerto y del 5.º en adelante cada uno usa un
+**mando virtual** (ver glosario). La sala del sitio nace con cupo 12.
+
+### 91.1 De dónde salen los mandos virtuales
+
+Leyendo el juego traducido (regla «decompilar uno mismo»): en Mario Kart en línea los jugadores de otras consolas
+tampoco usan un puerto. Cada kart lee sus botones de un **portador** (`ControllerHolder`), y el juego tiene, además de
+los 4 de los puertos, **12 portadores virtuales**, uno por puesto de la carrera (`Input::Manager + 0x3B4 + puesto·0x180`):
+los usan la CPU y los jugadores remotos.
+
+- El constructor de cada jugador de la carrera (`RaceinfoPlayer`, 0x80533ED8) elige: si el jugador tiene puerto en esta
+  consola (Racedata, jugador `+0x6`) usa el portador de ese puerto; si vale −1, el virtual de su puesto.
+- `semillas_nativo.cpp` les pone −1 a los humanos 5 a 12 (los mandos de la sala desde `g_mkwPuertos`, que vale 4).
+- Los botones de un portador virtual solo cambian con `AIControllerHolder::CopyCPUInputs` (0x805219AC).
+  `mandos_virtuales_nativo.cpp` envuelve la actualización de los mandos de cada cuadro (la de Retro Rewind,
+  `rr_overlay_805238F0`) y, justo después, llama a `CopyCPUInputs` para cada humano sin puerto con **sus** botones de
+  ese cuadro.
+- Esos botones pasan al estado que usa el kart con **la misma cuenta del juego** para un mando de GameCube
+  (`GCNController::UpdateImpl`): se presta el mando del puerto 4 un instante, con la memoria propia de ese humano, y
+  se devuelve tal como estaba. Así el kart responde igual que con un puerto de verdad.
+- `pad_web.cpp` y `lockstep.mjs` pasan de 4 a 12 mandos por cuadro (96 números en vez de 32).
+
+### 91.2 Los dos derrames con 5 o más humanos
+
+Con 5 humanos la página se caía al armar la carrera. Con el punto de vigilancia (§62) sobre la dirección que se
+corrompía se encontró quién escribía:
+
+1. **La lista de humanos de la IA** (`func_807414B8`). La IA guarda los karts que no son CPU en una fila de **4**
+   casillas (`+0x148`, la cuenta en `+0x17C`). El 5.º se escribía en una casilla que ya es otra cosa: un puntero de la
+   IA (`+0x168`). Arreglo: una envoltura que no anota humanos pasado el 4.º. La IA solo usa esa lista para mirar a los
+   humanos cercanos, y con 4 alcanza.
+2. **El armado de pantallas** (`InitScreens`, la copia de RR `rr_overlay_8052F4E8`). Para cada jugador local busca su
+   puerto y su tipo de mando. Del 5.º en adelante leía y escribía más allá de los 4 puertos, dentro de los portadores
+   de la IA; con 12 humanos se caía. Arreglo: mientras corre, los humanos 5 a 12 figuran como CPU, así no les busca
+   puerto ni pantalla. Al terminar vuelven a ser humanos, sin puerto (`+0x5` y `+0x6` = 0xFF) y con el tipo de mando
+   del primero.
+
+Las dos envolturas pasan por `REEMPLAZOS` de `compilar-web.py`, como las demás.
+
+### 91.3 Probarlo: `prueba-doce.mjs`
+
+Abre N pestañas (por omisión 6; `--n 12` = la sala llena), cada una como otro PC de la sala, todas en la misma
+carrera directa. Cada una acelera y dobla en otro momento. Comprueba los tipos de jugador, los puertos y los
+portadores, la cámara, las huellas, que cada kart se mueva con lo suyo, la meta en el mismo cuadro y que ninguna
+página se caiga.
+
+```bash
+node web/navegador/prueba-doce.mjs --n 5
+node web/navegador/prueba-doce.mjs --n 12
+```
+
+| Corrida | Resultado |
+|---|---|
+| `--n 5` | **10/10** |
+| `--n 12` | **11/11**: 12 humanos de verdad, 8 con mando virtual alimentado en cada cuadro, huellas iguales en las 12, la meta en el mismo cuadro y los resultados en todas |
+
+Con 12 pestañas en una PC cada juego va lento (la sala va al ritmo del más lento): la prueba cuenta cuadros, no
+segundos. `?puertos=N` (solo pruebas) usa menos puertos, así con 2 pestañas también se prueba el camino de los
+virtuales.
+
+### 91.4 El sitio
+
+- `colabtex/src/juegos/motor.js`: `cupo: 12` y `MKW_SINCRO_MAX = 12`. Los textos de la portada y de las reglas dicen
+  «hasta 12».
+- `colabtex/tests/mkw.test.cjs`: el cupo (4 → 4, 12 → 12, 20 → 12) y la sala con 5, 12 y 13 pilotos.
+- `juegos-app.js` rearmado con esbuild.
+
+**Trampa:** con más de 4 humanos el juego no puede armar la pantalla partida (no hay puertos para todos). La sala ya
+usaba una sola pantalla por consola (§73), así que no cambia nada para el jugador.
+
+## 2026-10-20 · §92 La Contrarreloj contra el mejor fantasma de la página
+
+**Qué:** el dueño pidió que en las carreras individuales contra el fantasma, el fantasma sea **el del mejor tiempo
+de la página**. Ahora cada récord nuevo de Contrarreloj sube su fantasma (`.rkg`) a Firebase Storage. Quien elige
+«correr contra el fantasma» corre contra el del primero de la tabla de esa pista que tenga uno.
+
+### 92.1 Cómo se hace
+
+- **Subir.** Al terminar una Contrarreloj con récord nuevo (la tabla de la página, `records`), `fantasma-pagina.mjs`
+  busca el `.rkg` que Pulsar acaba de escribir en la carpeta del mod (`Ghosts/<crc32>/150/<tiempo>.rkg`, §90). Lo
+  espera hasta 15 s, porque Pulsar lo escribe en una tarea de fondo. Lo sube a `mkw/fantasmas/<pista>-tt150/<uid>.rkg`.
+  El nombre del archivo trae el tiempo (`1m07s873.rkg`; si el tiempo se repite, `1m07s87a.rkg`): así se elige ESE y
+  no otro.
+- **Bajar.** Cuando el juego abre la pantalla de fantasmas (la página 0x71), la página pide los 10 mejores de esa pista
+  y ese modo. Baja el fantasma del primero que tenga uno (el mejor puede no haberlo subido) y lo deja en la memoria del
+  juego (`mkw_fantasma_pagina_poner`).
+- **Usarlo.** `fantasma_pagina_nativo.cpp` envuelve `LoadCorrectMainGhost` de Pulsar (`rr_kamek_81814B0C`). Primero
+  Pulsar carga el suyo. Si la persona eligió el primer botón (el fantasma experto: estado 9, medido con el juego) y la
+  página trajo uno para **esa** pista y **ese** modo, se escribe el de la página encima. Si eligió uno de sus propios
+  fantasmas guardados (estado 3), ese manda. El juego corre contra él como contra cualquier fantasma.
+- Solo 150cc y 200cc sin pluma (la tabla de la página no distingue la pluma) y solo pistas de Retro Rewind.
+- La pista y el modo viven en la memoria de Pulsar (0x818…), más allá de lo que lee la página: los dan dos funciones
+  del C++ (`mkw_fantasma_pagina_pista` y `mkw_fantasma_pagina_modo`).
+- `?fantasmaPagina=0` = sin esto.
+
+### 92.2 Las reglas de Storage (las publica el dueño)
+
+`firebase/storage.rules` tiene un bloque nuevo, `mkw/fantasmas/{tabla}/{archivo}`:
+
+- leer: con sesión;
+- escribir: solo el archivo propio (`<uid>.rkg`), en una tabla con nombre válido (`<pista en hex>-tt150` o `-tt200`),
+  de menos de 64 KB, con `customMetadata.uid` igual al uid de la sesión y un tipo que no sea HTML ni JS;
+- borrar: solo el propio.
+
+**Hasta que el dueño publique estas reglas, el sitio no puede subir fantasmas.** Mientras tanto la página sigue con el
+fantasma experto de RR, sin errores.
+
+### 92.3 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| banco `fantasma-pagina` (sin el juego: juego, archivos y nube falsos) | **19/19** |
+| `node web/navegador/prueba-fantasma.mjs` (dos navegadores, nube falsa) | **10/10**: Ana corre y sube su fantasma (el mismo `.rkg` de la NAND, byte a byte, con el tiempo del récord). Bea, con las partidas vacías, baja el de Ana; el juego lo usa (estado 9) y en la carrera hay un fantasma con el tiempo de Ana que avanza solo |
+| `colabtex/tests/mkw.test.cjs` (sitio) | **18/18**; con `seguridad` y `mkw-worker`, 28 |
+
+**Trampa:** el primer botón de la pantalla de fantasmas es el estado **9**, no el 3 que el código de Pulsar usa para
+«cargar el fantasma principal». Se midió con el juego antes de elegir.
+
+## 2026-10-20 · §93 La largada que no corta al que carga (C4) y la primera visita en un solo paquete (E2)
+
+**Qué:** las dos cosas que quedaban de la primera visita. **C4:** en la sala, quien jugaba por primera vez podía quedar
+cortado de la carrera justo al largar: su navegador se trababa 5-9 s armando gráficos y leyendo el disco, y los demás
+lo esperaban solo el margen de 2 s. **E2:** la primera visita pedía uno por uno ~600 archivos diminutos; lo que no
+alcanzaba a llegar, el juego lo esperaba de a uno.
+
+### 93.1 C4: el margen de la largada
+
+En la corrida de §85 (`prueba-sincro --directa`, primera visita), A se quedó casi quieta 5-9 s justo al largar. B la
+esperó el margen de la sala (2 s, §80) y la cortó en el cuadro 20: el kart de A siguió sin nadie toda la carrera.
+
+**Arreglo** (`lockstep.mjs`, `margenDe`): en los primeros **600 cuadros** (10 s) de cada carrera, al que falta se le
+espera **15 s** (`esperaLargada`; la página lo pone con `?largada=N` s, y `?largada=0` vuelve al margen de siempre). Y
+si su página sigue contestando (algo suyo llegó hace menos de 1 s: la pestaña vive, solo espera al disco), hasta
+**45 s**, lo mismo que se espera a quien todavía no llega a la carrera. Pasada la largada, el margen vuelve a 2 s: al
+que se va de verdad en medio de la carrera no se lo espera más que antes. Mientras se espera, la página dice
+«Esperando a jugador 1: su navegador todavía arma la pista (la primera vez tarda). Lo esperamos N s…».
+
+**Banco `lockstep`, 5 puntos nuevos (47/47).** Las consolas falsas ahora pueden trabarse en un cuadro elegido, enteras
+(no mandan ni leen nada) o solo el juego (la página contesta):
+
+| Caso (margen 0,4 s; largada 1,5 s, los primeros 100 cuadros) | Resultado |
+|---|---|
+| trabada 1 s entera en el cuadro 20 | nadie la corta, las tres terminan iguales |
+| la misma traba sin el margen de la largada | cortada en el cuadro 23 (lo de antes) |
+| el juego espera 3 s pero la página contesta | nadie la corta |
+| trabada 3 s entera en la largada (más que su margen) | cortada en el 23, en las dos consolas igual |
+| trabada 1 s en el cuadro 200 (pasada la largada) | cortada en el 203 |
+
+**Con el juego: `prueba-sincro --directa --traba-largada=6000`.** La prueba traba la pestaña A entera 6 s (un bucle que
+toma el hilo de la página) apenas pasa el cuadro 20 de la carrera.
+
+La primera corrida dio 13/15: nadie se cortó, pero la carrera tardó ~11 s en seguir, no 6. El registro mostró por qué:
+**la conexión WebRTC entre las dos se rehízo**. A los 4 s de traba, el buzón de pruebas dio por ida a A (no latía),
+y la malla de B cerró la conexión con A, aunque esa conexión seguía sana. Al despertar, A tuvo que volver a ofrecer la
+conexión: ~5 s más de carrera quieta.
+
+**Segundo arreglo** (`malla.mjs`, `revisa`): si alguien deja de verse en el buzón pero su conexión directa sigue sana,
+la conexión se deja. Se cierra solo si volvió con otra sesión (recargó) o si la conexión también se cayó; y el par
+de alguien que ya no está en el buzón, si se cae, se cierra a los 4 s y no se reintenta. Banco `red`, 2 puntos nuevos
+(28/28): D calla 6 s en el buzón y C no corta la conexión; cuando D se va de verdad, C lo suelta igual.
+
+Después: **15/15**. La espera más larga de B fue 6007 ms (justo la traba), sin cortes y sin reconexión.
+
+En el sitio la presencia es la de Firebase, que no da por ido a nadie en 4 s; igual conviene que un tirón no corte una
+conexión sana.
+
+### 93.2 E2: qué espera la primera visita
+
+E2 decía «los ~9 tirones por pipelines nuevos en 20 s». Eso ya lo resolvió la semilla de pipelines (§65, §89: 713,
+precompilados en el título). Lo que quedaba era el disco. Para verlo, una carrera directa con el perfil vacío y la red
+del sitio (50 ms por pedido, 50 Mbit/s), con `?trazaDisco=1` (cada lectura que esperó a la red, cuánto y dónde estaba
+el bloque):
+
+- en la carga de la carrera y sus primeros segundos, **~50 esperas, ~8 s en total**: las voces y sonidos de los
+  corredores (`revo_kart.brsar` y `Character/Sound`), los karts, los íconos del mapa (`Character/Map/*.tpl`), la
+  música;
+- casi todas estaban **ya en la fila baja**, esperando turno: la fila baja va de a pocas (4 a la vez, una cada 15 ms),
+  se aparta mientras el juego carga, y empezaba por los ~600 diminutos, uno por pedido.
+
+Parado en la pantalla de personaje, la fila baja tardaba **~22 s en vaciarse** (739 pedidos en fila a los 12 s; vacía a
+los 35 s).
+
+### 93.3 E2: el paquete de los diminutos
+
+`herramientas/diminutos.mjs` junta todos los archivos de ≤ 8 KB del disco y de Retro Rewind (603 archivos, 1,50 MB) en
+**un** archivo, `diminutos.bin`: una cabecera, un índice (ruta y tamaño de cada uno) y los contenidos pegados. La
+página lo baja apenas lee el manifiesto, en paralelo con el programa. Cada archivo cuyo tamaño coincide con el
+manifiesto queda **fijo** en la memoria (`disco.fijar`: no sale nunca, fuera del recambio de 64 MB). Así, ni la fila
+baja, ni la carpeta en racha (§76), ni el juego vuelven a pedirlo. Con caché, el paquete sale de Cache Storage.
+
+- `servidor.mjs` y `worker-local.mjs` lo arman al arrancar desde los mismos archivos que sirven: nunca queda viejo.
+- `subir-r2.mjs` lo arma y lo sube a `mkw/build/diminutos.bin` con todo lo demás (el Worker ya sirve cualquier
+  `mkw/build/…`). Si cambia un diminuto, cambia el paquete y se sube de nuevo.
+- Es contenido del juego y de Retro Rewind: **nunca a git**, solo a R2 detrás del Worker.
+- `?paquete=0` = de a uno, como antes. Si no está (404) o no es un paquete, la página sigue de a uno, sin error.
+
+| Medida (primera visita, red del sitio) | Antes | Con el paquete |
+|---|---|---|
+| Diminutos listos | de a uno, hasta ~35 s | **590 a los 6 s** |
+| Fila baja vacía (pantalla de personaje) | 35 s | **24 s** (lo que queda es la semilla de bloques, ~36 MB: manda el ancho de banda) |
+| Pedidos de la página (pantalla de personaje, 50 s) | 987 | **395** |
+| Pedidos al Worker (`medir-sitio`: menús → carrera de 20 s) | 2531 | **1363** |
+| Tirones en esos 20 s de carrera | 3 (peor 37 ms) | **1 (29 ms)** |
+
+Menos pedidos también es menos trabajo para el Worker y para R2, que cobran por pedido.
+
+**Banco `disco`, 5 puntos nuevos (38/38):** leer un paquete inventado (rutas y bytes en orden), un paquete cortado o algo
+que no es un paquete da error, los fijados se leen sin red y ni la fila baja ni la carpeta los piden, siguen ahí
+aunque la memoria se recambie, y `fijar` no acepta lo que pasa de un bloque. `prueba-subir-r2.mjs`: el paquete va en la
+lista con los de ≤ 8 KB y sin los grandes, y cambiar un diminuto sube también el paquete (23/23).
+
+### 93.4 Lo que se probó y no sirvió
+
+**Subir la fila baja a la normal al entrar a la carrera.** La idea era que lo que espera en la fila baja (las voces de
+los CPU, los sonidos de la carrera) es justo lo que la carrera va a leer, así que convenía pedirlo todo de una vez. Fue
+peor: menos esperas (13 contra 32), pero más largas (7,2 s contra 4,7 s en total). Todo eso a la vez llena los
+50 Mbit/s, y las lecturas del juego quedan detrás. Se sacó.
+
+### 93.5 Lo que queda
+
+Una carrera abierta **directo** a los 15 s de abrir la página (sin pasar por los menús), en la primera visita, todavía
+espera ~4,7 s al disco en sus primeros segundos: la fila baja no alcanzó a vaciarse. En la sala no pasa así, porque
+antes de cada carrera están la pantalla de personaje (hasta 45 s) y los menús. Y si pasa, la largada de 15 s (93.1)
+hace que nadie quede cortado.
+
+En esta PC las pruebas usan HTTP/1.1, con 6 conexiones por servidor. El sitio real va por HTTP/2 o HTTP/3 (Cloudflare),
+con todos los pedidos por una conexión: ahí cada espera debería ser más corta que aquí.
+
+### 93.6 Trampas
+
+- **No medir con otra cosa corriendo.** La primera medición con el paquete dio 15 tirones (peor 716 ms), y la de
+  comparación, sin el paquete, solo 3. Durante la primera estaba corriendo el banco del disco en otro Chrome. Sola dio
+  1 tirón.
+- **El buzón falso de pruebas da por ido a quien no late en 4 s.** Cualquier prueba que trabe una pestaña más que eso
+  pasaba por la reconexión de WebRTC (93.1).
+
+### 93.7 El programa final con todo (§90–§93) y todas las pruebas
+
+El final recompilado con todo lo de hoy (C9, el fantasma de la página, la largada): `python herramientas/compilar-web.py
+--modo navegador --final --carpeta build/web-m8 --salida build/web-final/navegador` (4 min; 592 unidades;
+`mkw.wasm.br` 15,7 MB). Las semillas de §89 siguen sirviendo: no cambió lo que se dibuja ni lo que se lee.
+
+```bash
+MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs
+```
+
+**492 bien, 0 mal** (33 pruebas, ~55 min; detalle en `build/web/datos/todo/20261020-1549`). Entre ellas las nuevas:
+`doce` 11/11 (6 humanos, 2 con mando virtual), `fantasma` 10/10, `sincro-largada` 15/15 y `trofeos` 9/9; y el banco
+completo (36 páginas), el sitio (24) y `subir-r2` (23).
+
+**Lo que sigue:** lo del dueño (B7): publicar las reglas de Storage nuevas (los fantasmas, §92), subir a R2 con
+`MKW_BUILD=build/web-final/navegador` (ahora también sube `diminutos.bin`) y probar en el sitio real.

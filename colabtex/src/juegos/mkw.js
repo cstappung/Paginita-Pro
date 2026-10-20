@@ -42,7 +42,10 @@ let privado = null;
 const urlPrivada = () => privado || (privado = fetch("juegos/mkw/privado.json", { cache: "no-cache" })
   .then(r => r.ok ? r.json() : {}).then(c => String(c.url || "").replace(/\/+$/, ""), () => ""));
 
-/* Los almacenes de Firebase que usa el juego (vr.mjs, records.mjs: mio, guardar, top), sobre la base del sitio. */
+/* Los almacenes de Firebase que usa el juego (vr.mjs, records.mjs: mio, guardar, top), sobre la base del sitio. Los
+   récords llevan además los fantasmas de la Contrarreloj (juegos/mkw/web/navegador/fantasma-pagina.mjs): el .rkg del
+   récord de cada uno en Storage, mkw/fantasmas/<pista>-<categoría>/<uid>.rkg (firebase/storage.rules: lo leen todos los
+   que tienen sesión, lo escribe solo su dueño); la Contrarreloj corre contra el del mejor de la tabla. */
 const filas = s => { const l = []; s.forEach(h => { l.push(h.val()); }); return l; };
 const almacenVr = {
   async mio(u) { const s = await get(ref(db, `mkw/vr/${u}`)); return s.exists() ? s.val() : null; },
@@ -53,6 +56,14 @@ const almacenRecords = {
   async mio(k, u) { const s = await get(ref(db, `mkw/records/${k}/${u}`)); return s.exists() ? s.val() : null; },
   async guardar(k, u, dato) { await set(ref(db, `mkw/records/${k}/${u}`), { ...dato, at: serverTimestamp() }); },
   async top(k, n) { return filas(await get(query(ref(db, `mkw/records/${k}`), orderByChild("ms"), limitToFirst(n)))); },
+  async fantasmaSubir(k, u, bytes) {
+    const datos = new Uint8Array(bytes.byteLength); datos.set(bytes);     // (copia: el Uint8Array del marco es de otro reino)
+    await uploadBytes(sRef(storage, `mkw/fantasmas/${k}/${u}.rkg`), datos, { contentType: "application/octet-stream", customMetadata: { uid: u } });
+  },
+  async fantasmaBajar(k, u) {
+    try { return new Uint8Array(await getBytes(sRef(storage, `mkw/fantasmas/${k}/${u}.rkg`))); }
+    catch (e) { if (e?.code === "storage/object-not-found") return null; throw new Error(e?.code || String(e)); }
+  },
 };
 
 /* Las partidas de cada uno en la nube (juegos/mkw/web/navegador/nube.mjs): un paquete por cuenta en Storage,

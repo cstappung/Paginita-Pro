@@ -476,11 +476,11 @@ const REGLAS = {
   /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, modos, llegar tarde, cortes);
      las carreras en sí son las del juego (Retro Rewind), así que el manual no las repite. */
   mkw: {
-    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: copas de hasta 4 amigos, y la CPU completa la parrilla.",
+    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: copas de hasta 12 amigos, y la CPU completa la parrilla.",
     secciones: [
       ["Cómo se juega", pasos([
         "Abre una sala de <b>Mario Kart Wii</b> en <b>Modo copa</b> (una copa del juego: sus 4 carreras, con puntos) o <b>Modo playlist</b> (una lista de pistas que arma el anfitrión, con las sugerencias de todos) y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑).",
-        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 4 pilotos: la CPU completa los 12 lugares, como en un Grand Prix.",
+        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 12 pilotos, como en Mario Kart en línea: si son menos, la CPU completa los 12 lugares, como en un Grand Prix.",
         "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). En la copa, el anfitrión <b>elige las pistas</b> con el selector (fotos, logos y planos de cada pista).",
         "Después, cada uno elige <b>personaje y vehículo</b> en las pantallas del juego (45 s; a quien no alcanza se le pone uno).",
         "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."

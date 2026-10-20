@@ -34,6 +34,7 @@ const PRUEBAS = [
   { n: 'navegador', cmd: [nav('prueba-navegador.mjs'), '1800'], juego: true },   // 30 s: el ajuste de ritmo del worklet (§88) centra la cola recién pasados ~20 s
   { n: 'partidas', cmd: [nav('prueba-partidas.mjs')], juego: true },
   { n: 'nube', cmd: [nav('prueba-nube.mjs')], juego: true },
+  { n: 'trofeos', cmd: [nav('prueba-trofeos.mjs')], juego: true },       // §90: trofeos y fantasmas de Pulsar → navegador y nube
   { n: 'tactil', cmd: [nav('prueba-tactil.mjs')], juego: true },
   { n: 'elegir', cmd: [nav('prueba-elegir.mjs')], juego: true },
   { n: 'piloto', cmd: [nav('prueba-piloto.mjs')], juego: true, datos: 'build/web/datos/piloto' },
@@ -51,6 +52,9 @@ const PRUEBAS = [
   { n: 'sincro-directa', cmd: [nav('prueba-sincro.mjs'), '--directa'], juego: true, datos: 'build/web/datos/sincro', propios: true },
   { n: 'sala', cmd: [nav('prueba-sala.mjs')], juego: true, datos: 'build/web/datos/sala' },                       // la sala sin Retro WFC
   { n: 'copa-azar', cmd: ['herramientas/copas-al-azar.mjs', '--copas', '1'], juego: true },   // una copa sincronizada al azar (C2)
+  { n: 'doce', cmd: [nav('prueba-doce.mjs')], juego: true, datos: 'build/web/datos/doce' },     // §91: 6 humanos, 2 con mando virtual
+  { n: 'fantasma', cmd: [nav('prueba-fantasma.mjs')], juego: true },                          // §92: el fantasma del mejor de la página
+  { n: 'sincro-largada', cmd: [nav('prueba-sincro.mjs'), '--directa', '--traba-largada=6000'], juego: true, datos: 'build/web/datos/sincro', propios: true },   // §93
 ];
 // las prueba-*.mjs nuevas que no están en la lista: sin argumentos
 const conocidas = new Set(PRUEBAS.flatMap(p => p.cmd.filter(c => /prueba-.*\.mjs$/.test(c)).map(c => path.basename(c))));

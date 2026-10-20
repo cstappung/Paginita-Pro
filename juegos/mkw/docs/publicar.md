@@ -21,7 +21,8 @@ MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs           
 El programa final queda en **`build/web-final/navegador`** (no en `build/web/navegador`, que es el taller de todos
 los días de las sesiones de trabajo): ahí van también sus semillas (`pipelines.bin`, `bloques.json`) y las imágenes
 (`imagenes/`, con la del menú de inicio). Las semillas se rehacen si cambió cómo se dibuja o qué lee el juego; si no,
-sirven las de antes (se copian de `build/web/navegador`). Recién con todo bien se pasa al paso 2.
+sirven las de antes (se copian de `build/web/navegador`). El paquete de los archivos diminutos (`diminutos.bin`, §93) no
+hay que armarlo: `subir-r2.mjs` lo arma solo desde los archivos que sube. Recién con todo bien se pasa al paso 2.
 
 ## Qué va dónde
 
@@ -101,6 +102,11 @@ Sin publicarlas, la sala de Mario Kart no se puede crear.
 Firebase → Storage → **Rules** → pegar `firebase/storage.rules` entero → **Publish**. Agrega
 `mkw/{uid}/partidas.mkwp`: las partidas de cada uno en la nube (solo su dueño las lee y escribe, hasta 8 MB). Sin
 publicarla el juego anda igual, pero las partidas quedan solo en el navegador donde se jugó.
+
+**Nuevo en §92:** el mismo `storage.rules` trae `mkw/fantasmas/{tabla}/{archivo}`, los fantasmas de los récords de
+Contrarreloj (cualquiera con sesión los lee; cada uno escribe solo el suyo, `<uid>.rkg`, de menos de 64 KB). Sin
+publicarlo, la Contrarreloj corre contra el fantasma experto de Retro Rewind, como antes, en vez del mejor de la
+página.
 
 ## 6. Que llegue al sitio
 

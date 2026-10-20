@@ -15,12 +15,12 @@ const sala=(...js)=>({juego:'mkw',anfitrion:'a',estado:'esperando',cupo:12,cpu:'
  jugadores:{a:{nombre:'Ana',orden:0},b:{nombre:'Beto',orden:1},c:{nombre:'Carla',orden:2}},
  jugadas:Object.fromEntries(js.map((j,i)=>[String(i).padStart(4,'0'),j]))});
 
-test('caben 4 (cada piloto es un jugador de verdad en todas las consolas) y se abre desde uno',()=>{
- assert.equal(M.JUEGOS.mkw.cupo,4);assert.equal(M.minimoDe({juego:'mkw'}),1);
- assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4);assert.equal(M.cupoDe({juego:'mkw',cupo:12}),4,'una sala vieja de 12 se recorta a 4');
+test('caben 12 como en Mario Kart en línea (cada piloto es un jugador de verdad en todas las consolas) y se abre desde uno',()=>{
+ assert.equal(M.JUEGOS.mkw.cupo,12);assert.equal(M.minimoDe({juego:'mkw'}),1);
+ assert.equal(M.cupoDe({juego:'mkw',cupo:4}),4,'una sala vieja de 4 sigue en 4');assert.equal(M.cupoDe({juego:'mkw',cupo:12}),12);assert.equal(M.cupoDe({juego:'mkw',cupo:20}),12,'más de 12 se recorta a 12');
  const e=M.reducir({...sala(),jugadores:{a:{nombre:'Ana',orden:0}}});
  assert.equal(e.fase,'vestibulo','uno solo ya tiene vestíbulo');
- // al crearla, la sala va con sus 4 pilotos sin preguntar (§87, el dueño: «por defecto es para el número máximo»):
+ // al crearla, la sala va con sus 12 pilotos sin preguntar (§87, el dueño: «por defecto es para el número máximo»):
  // la opción va oculta (sin ella cupoDe la dejaba en 2 y el tercero no podía entrar) y la ficha no dibuja las ocultas
  const opciones=fs.readFileSync(raiz('src/juegos-main.js'),'utf8').match(/^  mkw: \[([\s\S]*?)\]\s*\}\],?$/m);
  assert.ok(opciones&&/clave: "cupo", etiqueta: "Pilotos", por: JUEGOS\.mkw\.cupo, oculta: true, valores: \[\{ v: JUEGOS\.mkw\.cupo,/.test(opciones[1]),'la opción Pilotos, oculta, con el máximo');
@@ -108,7 +108,7 @@ test('si se va el anfitrión el puesto pasa al siguiente y la copa sigue (no hay
  e=M.reducir(sala({t:'abandona',uid:'b'},{t:'empieza',uid:'b'}));assert.equal(e.fase,'vestibulo','quien se fue ya no juega');
 });
 
-test('cada tanda es una carrera sincronizada con los que estaban al empezar (hasta 4)',()=>{
+test('cada tanda es una carrera sincronizada con los que estaban al empezar (hasta 12)',()=>{
  let e=M.reducir(sala({t:'empieza',uid:'a'}));
  assert.deepEqual([...e.sincro],['a','b','c'],'en orden: puerto 1, 2, 3');
  e=M.reducir(sala({t:'ajuste',uid:'a',k:'cpu',v:'ninguna'},{t:'empieza',uid:'a'}));
@@ -117,9 +117,11 @@ test('cada tanda es una carrera sincronizada con los que estaban al empezar (has
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'vuelve',uid:'a'}));assert.equal(e.sincro,null);
  e=M.reducir(sala({t:'abandona',uid:'b'},{t:'empieza',uid:'a'}));assert.deepEqual([...e.sincro],['a','c'],'quien se fue no corre');
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'abandona',uid:'b'}));assert.deepEqual([...e.sincro],['a','b','c'],'si alguien se va corriendo, la lista no cambia (su kart sigue sin nadie)');
- const cinco={...sala({t:'empieza',uid:'a'}),jugadores:Object.fromEntries('abcde'.split('').map((u,i)=>[u,{nombre:u,orden:i}]))};
- assert.equal(M.MKW_SINCRO_MAX,4);
- assert.deepEqual([...M.reducir(cinco).sincro],['a','b','c','d'],'en una sala vieja con 5: corren los 4 primeros (4 puertos de mando)');
+ const con=n=>({...sala({t:'empieza',uid:'a'}),jugadores:Object.fromEntries('abcdefghijklm'.slice(0,n).split('').map((u,i)=>[u,{nombre:u,orden:i}]))});
+ assert.equal(M.MKW_SINCRO_MAX,12);
+ assert.deepEqual([...M.reducir(con(5)).sincro],['a','b','c','d','e'],'con 5 corren los 5 (del 5.º en adelante, mandos virtuales)');
+ assert.deepEqual([...M.reducir(con(12)).sincro],'abcdefghijkl'.split(''),'la sala llena: 12, como Mario Kart en línea');
+ assert.deepEqual([...M.reducir(con(13)).sincro],'abcdefghijkl'.split(''),'en una sala con 13 (no debería haber): corren los 12 primeros');
 });
 
 test('la semilla y las 4 pistas de cada tanda salen de la sala y del número de tanda',()=>{
@@ -216,6 +218,22 @@ test('las partidas de cada uno van a Storage (mkw/<uid>/partidas.mkwp): solo su 
  assert.match(bloque[0],/metadata\.get\('uid', ''\) == uid/,'marcado con su uid');
  assert.match(bloque[0],/html\|javascript\|ecmascript/,'nunca HTML ni JS');
  assert.ok(reglas.indexOf('match /mkw/{uid}') < reglas.indexOf('match /{allPaths=**}'),'antes del «todo cerrado»');
+});
+test('§92 la Contrarreloj contra el mejor de la página: el fantasma del récord de cada uno en Storage, lo leen todos y lo escribe su dueño',()=>{
+ const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ const rec=src.slice(src.indexOf('const almacenRecords'),src.indexOf('const almacenPartidas'));
+ assert.match(rec,/async fantasmaSubir\(k, u, bytes\)[\s\S]{0,200}new Uint8Array\(bytes\.byteLength\); datos\.set\(bytes\)/,'copia lo del marco');
+ assert.match(rec,/mkw\/fantasmas\/\$\{k\}\/\$\{u\}\.rkg[\s\S]{0,120}customMetadata: \{ uid: u \}/,'en su carpeta y marcado con su uid');
+ assert.match(rec,/async fantasmaBajar\(k, u\)[\s\S]{0,200}"storage\/object-not-found"\) return null/,'sin fantasma = null, no error');
+ const reglas=fs.readFileSync(raiz('../firebase/storage.rules'),'utf8');
+ const bloque=reglas.match(/match \/mkw\/fantasmas\/\{tabla\}\/\{archivo\} \{[\s\S]*?\n    \}/);
+ assert.ok(bloque,'falta el bloque de los fantasmas en storage.rules');
+ assert.match(bloque[0],/allow read: if request\.auth != null;/,'lo leen todos los que tienen sesión');
+ assert.match(bloque[0],/archivo == request\.auth\.uid \+ '\.rkg'/,'cada uno escribe solo el suyo');
+ assert.match(bloque[0],/tabla\.matches\('\^\[0-9a-f\]\+-tt\(150\|200\)\$'\)/,'solo tablas de Contrarreloj');
+ assert.match(bloque[0],/request\.resource\.size < 64 \* 1024/,'con tope');
+ assert.match(bloque[0],/html\|javascript\|ecmascript/,'nunca HTML ni JS');
+ assert.ok(reglas.indexOf('match /mkw/fantasmas/') < reglas.indexOf('match /{allPaths=**}'),'antes del «todo cerrado»');
 });
 test('un jugador (#solo/mkw): solo para la lista de amigos, el marco con el menú de inicio y sus avisos',async()=>{
  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');

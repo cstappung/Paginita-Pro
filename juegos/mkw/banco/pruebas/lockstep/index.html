@@ -37,7 +37,10 @@ const START = 0x1000;
 // pista: no atiende nada) y lo que le llega en ese rato lo lee recién al final
 // (§80) informeCada = 0: sin informes de medio segundo (ni ajuste del retraso en la carrera ni relevo): aquí las
 // consolas no van al ritmo del juego y la holgura no diría nada
-function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {}, informeCada = 0 } = {}) {
+// (§93) esperaLargada / cuadrosLargada = el margen de la largada; y una consola "dormida" (c.dormidaHasta, la pone
+// correr con su pausa callada) no manda nada y lo que le llega lo lee al despertar, como una pestaña trabada
+function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {}, informeCada = 0,
+  esperaLargada, cuadrosLargada } = {}) {
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now();
   const consolas = {};
@@ -48,7 +51,7 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
     const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, enviados: new Map(), vistos: [], registro: [], tcp: {} };
     let toque = 0;
     c.ls = crearLockstep({
-      yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada,
+      yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada, esperaLargada, cuadrosLargada,
       registro: t => c.registro.push(t),
       // lo que "toca" esta consola: cambia con el tiempo y a veces trae START (que no debe llegar al juego)
       local: () => {
@@ -59,7 +62,7 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
       },
       huella: () => c.estado,
       enviar: (a, bytes, canal) => {
-        if (c.fuera || consolas[a].fuera || bloquear(uid, a, bytes)) return;
+        if (c.fuera || consolas[a].fuera || bloquear(uid, a, bytes) || performance.now() < (c.dormidaHasta || 0)) return;
         if (canal === 'udp' && Math.random() < perdida) return;
         const copia = bytes.slice();
         // "udp" puede llegar desordenado; "tcp" llega en orden (como el canal confiable de WebRTC)
@@ -67,6 +70,7 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
         if (canal === 'tcp') { t = Math.max(t, (c.tcp[a] || 0) + 0.1); c.tcp[a] = t; }
         const tr = trabas[a];
         if (tr && t - t0 >= tr[0] && t - t0 < tr[1]) t = t0 + tr[1] + Math.random();
+        if (t < (consolas[a].dormidaHasta || 0)) t = consolas[a].dormidaHasta + Math.random();
         setTimeout(() => { if (!consolas[a].fuera) consolas[a].ls.alBinario(uid, copia); }, t - performance.now());
       },
     });
@@ -76,9 +80,12 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
 }
 
 // El juego falso: pide los botones de cada cuadro y los mezcla en su estado. `salirEn` = deja de jugar en ese cuadro.
-async function correr(c, { desde = 0, hasta, salirEn = -1, lento = 0 }) {
+// (§93) pausa = [cuadro, ms, callada]: en ese cuadro el juego se detiene ms; callada = la pestaña entera trabada (no
+// manda ni lee nada: un tirón de la PC), si no solo el juego espera (al disco) y la página sigue contestando
+async function correr(c, { desde = 0, hasta, salirEn = -1, lento = 0, pausa = null }) {
   for (let k = desde; k < hasta; k++) {
     if (k === salirEn) { c.fuera = true; return; }
+    if (pausa && k === pausa[0]) { if (pausa[2]) c.dormidaHasta = performance.now() + pausa[1]; await espera(pausa[1]); }
     c.cuadro = k;
     const d = await c.ls.pad(k);
     for (let i = 0; i < 32; i++) c.estado = Math.imul(c.estado ^ d[i], 16777619) >>> 0;
@@ -332,6 +339,33 @@ try {
     await conTiempo(Promise.all([correr(s.ana, { hasta: 200 }), correr(s.beto, { hasta: 200 })]), 20000);
     ok('enCuadro: la acción del cuadro 120 pasa una vez, en el cuadro 120, en las dos consolas (la de la carrera 2 no)',
        JSON.stringify(hechos.ana) === '[120]' && JSON.stringify(hechos.beto) === '[120]', JSON.stringify(hechos));
+  }
+  // ---- §93 (C4): la largada. En los primeros cuadros de la carrera (aquí 100) se espera más (aquí 1,5 s; el margen de
+  // siempre es 0,4 s): la primera vez que alguien juega, su pestaña se traba unos segundos justo al largar ----
+  {
+    const largada = { esperaCorte: 400, esperaInicio: 6000, esperaLargada: 1500, cuadrosLargada: 100 };
+    const vuelta = async (pausa, opciones = largada) => {
+      const s = crearSala(['ana', 'beto', 'carla'], { perdida: 0, ...opciones });
+      for (const u of ['ana', 'beto', 'carla']) s[u].ls.fijarCarrera(1, []);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: 300 }), correr(s.beto, { hasta: 300, pausa }), correr(s.carla, { hasta: 300 })]), 30000);
+      const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+      return { r, s, ea, ec, corte: ea.cortes[1], igual: ea.cortes[1] === ec.cortes[1] && s.ana.estado === s.carla.estado && !ea.desincronizado && !ec.desincronizado };
+    };
+    const t1 = await vuelta([20, 1000, true]);
+    ok('§93: Beto se traba 1 s entero (callado) en el cuadro 20: está en la largada (margen 1,5 s), nadie lo corta y las tres terminan iguales',
+       t1.r !== 'tarde' && t1.corte === undefined && !Object.keys(t1.s.beto.ls.estado().cortes).length && iguales(Object.values(t1.s)),
+       `${t1.r === 'tarde' ? 'TARDE · ' : ''}cortes Ana ${JSON.stringify(t1.ea.cortes)}`);
+    const t0 = await vuelta([20, 1000, true], { ...largada, esperaLargada: undefined });
+    ok('…sin el margen de la largada (el de antes), la misma traba lo corta', t0.r !== 'tarde' && t0.corte !== undefined && t0.igual, `corte en el ${t0.corte}`);
+    const t2 = await vuelta([20, 3000, false]);
+    ok('§93: si su juego espera 3 s (al disco) pero su página sigue contestando, se lo sigue esperando (hasta esperaInicio): sin cortes',
+       t2.r !== 'tarde' && t2.corte === undefined && iguales(Object.values(t2.s)), `${t2.r === 'tarde' ? 'TARDE · ' : ''}cortes ${JSON.stringify(t2.ea.cortes)}`);
+    const t3 = await vuelta([20, 3000, true]);
+    ok('§93: callado 3 s en la largada (más que su margen de 1,5 s): Ana lo corta y Carla igual, en el mismo cuadro',
+       t3.r !== 'tarde' && t3.corte !== undefined && t3.igual, `corte en el ${t3.corte}`);
+    const t4 = await vuelta([200, 1000, true]);
+    ok('§93: pasada la largada (cuadro 200) el margen vuelve a ser el corto: 1 s callado lo corta',
+       t4.r !== 'tarde' && t4.corte !== undefined && t4.corte > 200 && t4.igual, `corte en el ${t4.corte}`);
   }
 } catch (e) {
   ok('la prueba corrió sin errores', false, e.stack || e.message);

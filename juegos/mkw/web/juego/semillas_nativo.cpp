@@ -42,7 +42,13 @@ extern "C" int g_mkwRelojFijo;
 extern "C" unsigned g_mkwRelojGeneracion;   // ppc_helpers.cpp: cambia en cada carrera
 extern "C" uint64_t g_mkwRelojValor;
 extern "C" uint32_t g_mkwHumanos = 0;              // bit i = el puesto i es un humano de la sala (lo usa pad_web.cpp)
-extern "C" int8_t g_mkwPuestoDeMando[4] = {-1, -1, -1, -1};   // mando → puesto de su kart (pad_web.cpp, lockstep_nativo.cpp)
+extern "C" int8_t g_mkwPuestoDeMando[12] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};   // mando de la sala → puesto de su kart (pad_web.cpp)
+// §91 (C9): hasta 12 humanos. Los mandos de la sala 0..g_mkwPuertos-1 usan un puerto de verdad (como siempre); los
+// demás no tienen puerto: su jugador queda sin mando (+0x6 = -1) y el juego le da el portador virtual de su puesto,
+// que alimenta mandos_virtuales_nativo.cpp. Module.mkwPuertos (?puertos=N, solo pruebas) = cuántos con puerto (4).
+extern "C" int g_mkwPuertos = 4;
+extern "C" int8_t g_mkwVirtualDe[12] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};   // puesto → su mando virtual
+extern "C" int8_t g_mkwDerrapeVirtual[12] = {};      // puesto → 1 manual, 2 automático (el de un humano sin puerto)
 extern "C" uint32_t g_mkwCortados = 0;             // bit i = el humano del puesto i se fue (lo pone pad_web.cpp)
 extern "C" int g_mkwMiPuesto = -1;                  // el puesto de esta consola en la carrera sincronizada (lo pone pad_web.cpp; -1 = no hay)
 
@@ -61,6 +67,7 @@ EM_JS(int, mkw_web_pantalla_propia, (), { return Module.mkwPantallaPropia ? (Mod
 
 // ¿Un solo lugar de pantalla (el propio)? Module.mkwUnaPantalla === false = el de antes, uno por humano (para comparar)
 EM_JS(int, mkw_web_una_pantalla, (), { return Module.mkwUnaPantalla === false ? 0 : 1; });
+EM_JS(int, mkw_web_puertos, (), { const n = Module.mkwPuertos; return (n === undefined || n === null) ? 4 : Math.max(0, Math.min(4, n | 0)); });
 EM_JS(int, mkw_web_plantel, (int32_t* p), {
     const v = Module.mkwPlantel && Module.mkwPlantel();
     if (!v || v.length !== 12) return 0;
@@ -152,7 +159,8 @@ extern "C" void func_8052F924(CpuContext* ctx) {
         // se contaron jugadores, pantallas y mandos). Jugadores: escenario + 0x8 + i·0xF0; vehículo +0x8, personaje +0xC
         int32_t plantel[60];                       // 12 × [vehículo, personaje, tipo, mando, derrape]
         g_mkwHumanos = 0; g_mkwCortados = 0;
-        for (int m = 0; m < 4; m++) g_mkwPuestoDeMando[m] = -1;
+        g_mkwPuertos = mkw_web_puertos();
+        for (int m = 0; m < 12; m++) { g_mkwPuestoDeMando[m] = -1; g_mkwVirtualDe[m] = -1; g_mkwDerrapeVirtual[m] = 0; }
         if (mkw_web_plantel(plantel)) {
             const uint32_t entrada = Memory::Read32(0x809BD70C);             // Input::Manager
             for (int i = 0; i < 12; i++) {
@@ -160,7 +168,16 @@ extern "C" void func_8052F924(CpuContext* ctx) {
                 const int32_t* x = plantel + i * 5;
                 if (x[0] >= 0) Memory::Write32(j + 0x8, x[0]);
                 if (x[1] >= 0) Memory::Write32(j + 0xC, x[1]);
-                if (x[3] >= 0 && x[3] < 4 && entrada) {
+                if (x[3] >= g_mkwPuertos && x[3] < 12 && entrada) {
+                    // §91: un humano sin puerto: sin mando en esta consola (-1) → el portador virtual de su puesto
+                    g_mkwHumanos |= 1u << i;
+                    g_mkwPuestoDeMando[x[3]] = static_cast<int8_t>(i);
+                    g_mkwVirtualDe[i] = static_cast<int8_t>(x[3]);
+                    g_mkwDerrapeVirtual[i] = static_cast<int8_t>(x[4] == 1 || x[4] == 2 ? x[4] : 0);
+                    Memory::Write8(j + 0x6, 0xFF);
+                    // su derrape ya en el portador (el kart podría leerlo al armarse, antes del primer cuadro)
+                    if (x[4] == 1 || x[4] == 2) Memory::Write16(entrada + 0x3B4 + i * 0x180 + 0xC0, x[4] == 2 ? 1 : 0);
+                } else if (x[3] >= 0 && x[3] < 4 && entrada) {
                     g_mkwHumanos |= 1u << i;
                     g_mkwPuestoDeMando[x[3]] = static_cast<int8_t>(i);
                     Memory::Write8(j + 0x6, static_cast<uint8_t>(x[3]));      // índice de mando

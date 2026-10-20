@@ -236,10 +236,11 @@ export const JUEGOS = {
   },
   mkw: {
     nombre: "Mario Kart Wii",
-    lema: "Mario Kart Wii con Retro Rewind en el navegador: copas de hasta 4 amigos y la CPU completa los 12 lugares",
+    lema: "Mario Kart Wii con Retro Rewind en el navegador: copas de hasta 12 amigos y la CPU completa los lugares que sobran",
     color: "#e4202e",
     minimo: 1,   // se puede abrir la sala solo (con la CPU) y esperar a los demás
-    cupo: 4,     // 4 humanos: cada uno es un jugador "local" de verdad en todas las consolas, y el juego admite 4
+    cupo: 12,    // 12 humanos, como Mario Kart en línea: los 4 primeros con su puerto de mando y el resto con los
+                 // mandos "virtuales" del juego (juegos/mkw: mandos_virtuales_nativo.cpp, bitácora §91)
     alta: "2026-10-17"
   }
 };
@@ -7759,7 +7760,7 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece: la CPU es la de un Grand Prix (su nivel sale de la cilindrada).
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
-   - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 4, en este orden: `sincro`) cargan el
+   - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
      juego y corren la copa juntos.
    - `{t:"ajuste", uid, k:"cc", v}`: la cilindrada de la copa y de la playlist (MKW_CC; "azar" = la de Retro Rewind).
    - `{t:"vuelve", uid, tabla?}`: el anfitrión las cierra y todos vuelven al vestíbulo. Al terminar una copa o una
@@ -7801,8 +7802,9 @@ export function mkwTabla(t) {
   return r.length ? r : null;
 }
 /* La carrera sincronizada (cada navegador corre la misma carrera con los botones de todos): cada humano es un jugador
-   "local" del juego con su puerto de mando de GameCube, y hay 4. */
-export const MKW_SINCRO_MAX = 4;
+   "local" del juego. Hay 4 puertos de mando de GameCube; del 5.º al 12.º manejan con los mandos "virtuales" del juego
+   (los que usan la CPU y los rivales en línea), así caben los 12 de Mario Kart en línea. */
+export const MKW_SINCRO_MAX = 12;
 export const MKW_COPAS = 79;            // copas de carrera de Retro Rewind (las de arenas no cuentan)
 /* La semilla y las 4 pistas de una tanda: salen de la sala y del número de tanda, así cada navegador calcula lo mismo
    sin que nadie lo escriba. */
@@ -7861,7 +7863,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
-      // la carrera sincronizada, con los que están ahora (hasta 4), en este orden (puerto 1, 2, 3, 4)
+      // la carrera sincronizada, con los que están ahora (hasta 12), en este orden (mando 1, 2, 3…)
       const ps = presentes();
       sincro = ps.slice(0, MKW_SINCRO_MAX).map(x => x.uid);
       hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, jugadores: ps.length, sincro: !!sincro });

@@ -30,7 +30,10 @@
 //     Contrarreloj (Race/TimeAttack/ghost1 y ghost2), uno por cuadro, y cada uno esperaba su viaje a la red (~60 ms):
 //     4 s de menú mudo. Ahora, si el juego lee DOS archivos diminutos distintos seguidos de la misma carpeta, se piden
 //     todos los demás de esa carpeta de una vez, con prioridad normal (adelantarCarpeta: también a mano);
-//   - un rango de bytes de un archivo grande, con prioridad normal (adelantarRango: el grupo de sonido de un menú).
+//   - un rango de bytes de un archivo grande, con prioridad normal (adelantarRango: el grupo de sonido de un menú);
+//   - §93 (E2), FIJOS (fijar(url, datos)): los ~600 archivos diminutos llegan juntos en un solo paquete
+//     (diminutos.bin, mkw.mjs) y quedan en la memoria para siempre (fuera del recambio de los 64 MB: son 1,5 MB), así
+//     ninguno vuelve a pedirse a la red ni a esperar en la fila baja.
 //
 // En el sitio, lo mismo sirve con el Worker + R2 (R2 acepta pedidos Range); el Worker debe responder "no-store"
 // para que el navegador no lo guarde dos veces (como BT3).
@@ -39,9 +42,28 @@
 //       await d.leer(url, tamañoDelArchivo, inicio, largo)  → Uint8Array      await d.entero(url) → Uint8Array
 //       d.adelantar(url, tamañoDelArchivo)  → lo baja en segundo plano (no espera nada)
 //       d.vecinos([[url, tam], …]) (los diminutos), d.adelantarCarpeta(carpeta), d.adelantarRango(url, tam, ini, fin)
+//       d.fijar(url, datos) (un archivo entero de ≤ 1 bloque, ya bajado: §93)
 //       d.estado (pedidos a la red, bytes, aciertos), await d.ocupado() (bytes guardados), await d.borrar()
 
 export const PREFIJO = 'mkw-disco:';
+
+// §93 (E2): el paquete de los diminutos (herramientas/diminutos.mjs arma el mismo formato): "MKWD", u32 formato 1,
+// u32 largo del índice, el índice JSON {"archivos": [[ruta, tamaño], …]} y los contenidos pegados en ese orden.
+// Devuelve [[ruta, datos], …] (cada datos es un pedazo del mismo búfer, sin copiar); lanza un error si no es un paquete.
+export function leerPaquete(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (b.length < 12 || String.fromCharCode(b[0], b[1], b[2], b[3]) !== 'MKWD' || dv.getUint32(4, true) !== 1) throw new Error('no es un paquete de diminutos');
+  const n = dv.getUint32(8, true);
+  if (12 + n > b.length) throw new Error('paquete cortado');
+  const { archivos } = JSON.parse(new TextDecoder().decode(b.subarray(12, 12 + n)));
+  const salida = [];
+  let o = 12 + n;
+  for (const [ruta, tam] of archivos) {
+    if (o + tam > b.length) throw new Error('paquete cortado');
+    salida.push([ruta, b.subarray(o, o + tam)]); o += tam;
+  }
+  return salida;
+}
 
 export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 1024 * 1024, buscar = (u, o) => fetch(u, o),
                              cajas = globalThis.caches, adelantarActivo = true, maxFondo = 12,
@@ -54,6 +76,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
                    carpetas: [],                             // carpetas de diminutos pedidas enteras (vecinos)
                    colaBaja: () => colaBaja.length };        // trabajos de prioridad baja que esperan turno
   const memoria = new Map();            // clave → Uint8Array (el orden del Map = del más viejo al más nuevo)
+  const fijos = new Map();              // §93: clave → Uint8Array que no sale nunca de la memoria (los diminutos del paquete)
   let enMemoria = 0, caja = null;
   const enCurso = new Map();            // clave → promesa (dos lecturas del mismo bloque a la vez piden una sola vez)
   const guardando = new Map();          // clave → promesa de Cache Storage todavía escribiéndose
@@ -81,6 +104,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     for (const [viejo, d] of memoria) { if (enMemoria <= memoriaMax) break; memoria.delete(viejo); enMemoria -= d.length; }
   }
   function deMemoria(k) {
+    const f = fijos.get(k); if (f) return f;
     const d = memoria.get(k);
     if (d) { memoria.delete(k); memoria.set(k, d); }   // "recién usado": pasa al final
     return d;
@@ -156,7 +180,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   }
 
   // ¿Hay que traer el bloque b? (ni en memoria ni en camino)
-  const falta = (url, b) => { const k = clave(url, b); return !memoria.has(k) && !enCurso.has(k); };
+  const falta = (url, b) => { const k = clave(url, b); return !fijos.has(k) && !memoria.has(k) && !enCurso.has(k); };
 
   // Segundo plano: como mucho maxFondo trabajos a la vez; el resto espera su turno en la cola
   function aFondo(url, tam, b0, b1, baja = false) {
@@ -298,6 +322,14 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     return salida;
   }
 
+  // §93 (E2): un archivo diminuto que llegó en el paquete: su único bloque queda fijo en la memoria
+  function fijar(url, datos) {
+    if (!(datos?.length > 0) || datos.length > bloque) return false;
+    fijos.set(clave(url, 0), datos);
+    estado.fijos = fijos.size;
+    return true;
+  }
+
   // Un archivo chico entero (los que se bajan al principio)
   async function entero(url) {
     const k = new URL(`${url}${url.includes('?') ? '&' : '?'}entero=1&v=${encodeURIComponent(version)}`, location.href).href;
@@ -327,10 +359,10 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   // Diagnóstico (mkw.mjs ?trazaDisco=1): dónde está el bloque que tiene el byte `inicio` de este archivo, AHORA
   async function donde(url, inicio) {
     const k = clave(url, Math.floor(inicio / bloque));
-    return { memoria: memoria.has(k), enCurso: enCurso.has(k), deFondo: deFondo.has(k),
+    return { memoria: memoria.has(k) || fijos.has(k), enCurso: enCurso.has(k), deFondo: deFondo.has(k),
              enCola: colaBaja.some(t => t.url === url && t.lista.includes(Math.floor(inicio / bloque))),
              caja: caja ? !!(await caja.match(k)) : null };
   }
   return { estado, abrir, leer, adelantar, adelantarBloques, adelantarRango, agrupar, vecinos, adelantarCarpeta,
-           entero, ocupado, borrar, bloque, donde };
+           entero, ocupado, borrar, bloque, donde, fijar };
 }

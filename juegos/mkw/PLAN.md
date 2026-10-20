@@ -124,17 +124,22 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   azar 16/16, ninguna separada
 - ✅ C3. Red mala (latencia y pérdidas) en la carrera sincronizada con el juego: el retraso se adapta a la red (3 en
   esta PC, 6 con 70 ms de ida y 5 % perdido) y la carrera ya no va en cámara lenta (§70; banco 32/32, `prueba-sincro` 10/10)
-- 🟡 C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas): no volvió
-  a salir en 18 corridas (§70) ni en la docena de §83–§84; queda la espera de la primera visita (bajar la pista con la
-  caché vacía) → E2
+- ✅ C4. El cuelgue ocasional al empezar la carrera (`Effects::Player::UpdateNonItemEffects`, 1 de 6 corridas): no volvió
+  a salir en 18 corridas (§70) ni en la docena de §83–§84. Lo que quedaba (quien jugaba por primera vez se trababa
+  5-9 s al largar y lo cortaban en el cuadro 20) se arregló en §93: margen de 15 s en los primeros 10 s de cada carrera
+  (hasta 45 s si su página sigue contestando), y la malla ya no corta un WebRTC sano por un tirón (banco `lockstep`
+  47/47, `red` 28/28, `prueba-sincro --directa --traba-largada=6000` 15/15)
 - ✅ C5. PC lento en la sala (`prueba-sincro --lento`): la carrera sigue igual en las dos y va al ritmo de la lenta (por
   diseño, §62.3); ahora la página avisa quién frena («espera al jugador 2» / «Tu PC no alcanza») (§70.7; 11/11)
 - ⬜ C6. VS en línea sin CPU: cola de pistas y «Confirmar» sobre la votación (F3); TURN, más jugadores, fallos en el chat (F4)
 - ⬜ C7. Espectadores (video del anfitrión, como `bt3-directo.js`)
-- ⬜ C8. Dónde guarda Pulsar `RRSettings.pul` (trofeos) y `RRRating.pul` (VR) en línea
-- ⬜ C9. Más de 4 humanos en la sala (hasta 12, como el Mario Kart en línea): hoy cada piloto es un jugador local de
-  verdad en todas las consolas y el juego tiene 4 puertos de mando; pasar de 4 pide otra forma (jugadores «de red» del
-  juego o más mandos). El cupo del sitio sale de `JUEGOS.mkw.cupo` y sube solo (§87)
+- ✅ C8. Dónde guarda Pulsar los trofeos y el VR: todo en la carpeta del mod (`Trophies/<crc32>/Trophy.pul` al batir al
+  experto en Contrarreloj, `Ghosts/…`), que `guardado.mjs` ya copiaba entera; `RRRating.pul` es solo del en línea del
+  juego, que la sala no usa (§90; `prueba-trofeos` 9/9)
+- ✅ C9. (Pedido del dueño) hasta 12 humanos en la sala, como el Mario Kart en línea: los 4 primeros con su puerto y del
+  5.º en adelante con el **mando virtual** de su puesto (el portador que usan la CPU y los remotos del juego), y dos
+  derrames del juego con más de 4 locales arreglados (la lista de humanos de la IA e `InitScreens`); el sitio nace con
+  cupo 12 (§91; `prueba-doce --n 5` 10/10, `--n 12` 11/11, `mkw.test` 18/18)
 
 ### Etapa D — Página y modos
 - ✅ D1. Cilindrada (con 200cc de RR) y personaje en los modos de un jugador: en un jugador los eligen los menús del
@@ -156,11 +161,19 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   **votar** (⏏, con 3 o más) en Mario Kart (§87; `prueba-experiencia` 20/20 y `--playlist` 19/19, `prueba-playlist`
   18/18, banco `sala-carrera` 49/49, `mkw.test` 17/17)
 
+- ✅ D8. (Pedido del dueño) la Contrarreloj contra **el mejor fantasma de la página**: cada récord nuevo sube su `.rkg`
+  a Storage y la pantalla de fantasmas pone el del primero de la tabla en lugar del experto (§92; banco
+  `fantasma-pagina` 19/19, `prueba-fantasma` 10/10). **Las reglas de Storage nuevas las publica el dueño**
+
 ### Etapa E — Rendimiento
 - ✅ E1. Sonido con AudioWorklet (§88): del juego al parlante **~177 → ~60 ms** medido con un clic (nuestra parte
   ~127 → ~20–25 ms; los otros ~40–50 son Chrome + Windows + la tarjeta, que una página no toca). Sin cortes en el
   título, el arranque ni la carrera (también con la CPU frenada 2×); `?audio=viejo` = lo de antes
-- ⬜ E2. Primera visita: los ~9 tirones por pipelines nuevos en 20 s
+- ✅ E2. Primera visita: los pipelines ya los resolvió la semilla (§65, §89); lo que quedaba era el disco: los ~600
+  archivos diminutos van en un solo paquete (`diminutos.bin`, 1,5 MB, listos a los 6 s; antes, de a uno hasta los
+  ~35 s). En el sitio local, de los menús a 20 s de carrera: 2531 → **1363** pedidos al Worker y **1 tirón** (29 ms)
+  (§93; banco `disco` 38/38, `prueba-subir-r2` 23/23). Queda: una carrera abierta directo a los 15 s de abrir espera
+  ~4,7 s al disco al largar (la largada de C4 lo cubre)
 - ⬜ E3. Monitores de 60/120/240 Hz: recortar el giro final de 0,75 ms (medir con el monitor en 240 Hz)
 - ⏸ E4. Celulares: **fuera del lanzamiento** (el dueño, 2026-10-19: «saltate el soporte a móviles para lanzar el juego más
   rápido, lo haremos en un futuro muy lejano en un próximo big update»). Entonces: teléfono real con `adb reverse`; misma
@@ -408,6 +421,27 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-20 16:40** — **El programa final con §90–§93, y todas las pruebas: 492/492** (§93.7). Recompilado en
+  `build/web-final/navegador` (las semillas de §89 siguen sirviendo); `correr-todo` con `MKW_BUILD` del final: 33
+  pruebas, 492 bien, 0 mal, con las nuevas `doce`, `fantasma`, `sincro-largada` y `trofeos`.
+- **2026-10-20 15:41** — **C4 y E2 cerradas** (§93). C4: en los primeros 600 cuadros de cada carrera el margen de corte
+  es 15 s (`?largada=N`; hasta 45 s si la página contesta) y la malla ya no corta un WebRTC sano porque el buzón dejó
+  de ver a alguien (la traba de 6 s rehacía la conexión: ~11 s de carrera quieta; ahora 6). Banco `lockstep` 47/47,
+  `red` 28/28, `prueba-sincro --directa --traba-largada=6000` 15/15. E2: los ~600 archivos diminutos van en un solo
+  paquete (`diminutos.bin`, 1,5 MB: listos a los 6 s en vez de ~35); en el sitio local, de los menús a 20 s de carrera,
+  2531 → 1363 pedidos al Worker y 1 tirón de 29 ms. Banco `disco` 38/38, `prueba-subir-r2` 23/23. Probado y descartado:
+  subir la fila baja a la normal al entrar a la carrera (más espera: llena la bajada).
+- **2026-10-20 15:01** — **La Contrarreloj contra el mejor fantasma de la página** (§92, D8, pedido del dueño): el récord
+  nuevo sube su `.rkg` a Storage (`mkw/fantasmas/<pista>-tt150/<uid>.rkg`) y la pantalla de fantasmas pone el del
+  primero de la tabla en lugar del experto (`fantasma_pagina_nativo.cpp` envuelve `LoadCorrectMainGhost`, estado 9).
+  Banco `fantasma-pagina` 19/19, `prueba-fantasma` 10/10, `mkw.test` 18/18. **Las reglas de Storage las publica el dueño.**
+- **2026-10-20 14:44** — **Doce jugadores en la sala** (§91, C9, pedido del dueño): del 5.º humano en adelante, el mando
+  virtual de su puesto (el portador de la CPU y los remotos del juego, alimentado en cada cuadro con la cuenta del
+  mando de GameCube); arreglados los dos derrames del juego con más de 4 locales (la lista de humanos de la IA e
+  `InitScreens`). `prueba-doce --n 5` 10/10, `--n 12` 11/11; el sitio con cupo 12.
+- **2026-10-20 13:21** — **C8: los trofeos y fantasmas de RR ya se guardaban** (§90): Pulsar escribe todo en la carpeta
+  del mod, que `guardado.mjs` copia entera; `RRRating.pul` es solo del en línea del juego. `prueba-trofeos` 9/9.
 
 - **2026-10-20 05:07** — **El paso 0 de publicar, hecho** (§89). Con §86, §87 y §88 commiteados, el programa final
   (`--final --carpeta build/web-m8 --salida build/web-final/navegador`, 19 de 590 archivos recompilados): `mkw.wasm`

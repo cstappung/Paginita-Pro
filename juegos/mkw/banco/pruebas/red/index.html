@@ -119,6 +119,30 @@ try {
   B.malla.salir();
   ok('cuando B se va, A olvida su ruta', await hasta(() => !A.router.rutas()['10.77.0.3'], 8000), JSON.stringify(A.router.rutas()));
   A.malla.salir();
+  // §93 (C4): D deja de latir en el buzón 6 s (su pestaña trabada: el buzón lo da por ido a los 4 s) pero su WebRTC sigue
+  // sano: C no cierra la conexión (antes la cerraba y rehacerla costaba ~5 s más de carrera quieta)
+  {
+    let callado = false;
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    class CanalCallable extends BroadcastChannel { postMessage(m) { if (!callado) super.postMessage(m); } }
+    const sala2 = salaId + '-b';
+    const navC = (uid, Canal) => { const router = crearRouterMalla(); const malla = crearMalla({ uid, senal: senalCanal({ sala: sala2, uid, Canal }), alBinario: router.alBinario, alCambiar: router.alCambiar }); router.usar(malla); return { uid, router, malla }; };
+    const C = navC('uc'), D = navC('ud', CanalCallable);
+    await C.malla.entrar(); await D.malla.entrar();
+    await hasta(() => C.malla.conectados().includes('ud') && D.malla.conectados().includes('uc'), 15000);
+    const pc0 = C.malla.detalle('ud');
+    callado = true;
+    await espera(6000);
+    const sigue = C.malla.conectados().includes('ud'), presente = C.malla.presentes().includes('ud');
+    callado = false;
+    await espera(2000);
+    ok('§93: D calla 6 s en el buzón (C ya no lo ve presente) pero su WebRTC sigue sano: C no corta la conexión, y sigue al volver',
+       pc0 && sigue && !presente && C.malla.conectados().includes('ud') && C.malla.presentes().includes('ud') && D.malla.conectados().includes('uc'),
+       `conectado durante el silencio: ${sigue}; presente en el buzón durante el silencio: ${presente}; después: ${C.malla.conectados().join()}`);
+    D.malla.salir();
+    ok('§93: …y cuando D se va de verdad, C lo suelta igual', await hasta(() => !C.malla.conectados().includes('ud'), 8000), C.malla.conectados().join());
+    C.malla.salir();
+  }
 
   // La red mala de mentira (?redMala=latencia,variación,pérdida; solo pruebas, PLAN C3): reloj y azar falsos, sin esperar
   {

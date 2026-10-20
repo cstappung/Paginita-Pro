@@ -25,6 +25,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { armarDiminutos } from './diminutos.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -70,7 +71,9 @@ for (const [llave, carpeta] of CARPETAS.slice(0, 4)) {
 const huellaBuild = crypto.createHash('sha1');
 for (const f of ['mkw.js', 'mkw.wasm']) { try { const st = fs.statSync(path.join(BUILD, f)); huellaBuild.update(`${f}|${st.size}|${st.mtimeMs};`); } catch {} }
 const VERSION = { version: huella.digest('hex').slice(0, 16), build: huellaBuild.digest('hex').slice(0, 16) };
-const generados = new Map([['mkw/manifiesto.json', Buffer.from(JSON.stringify(manifiesto))], ['mkw/version.json', Buffer.from(JSON.stringify(VERSION))]]);
+const generados = new Map([['mkw/manifiesto.json', Buffer.from(JSON.stringify(manifiesto))], ['mkw/version.json', Buffer.from(JSON.stringify(VERSION))],
+  // §93 (E2): el paquete de los diminutos, como lo sube subir-r2.mjs (armado aquí desde los mismos archivos)
+  ['mkw/build/diminutos.bin', armarDiminutos(CARPETAS.slice(0, 4).map(([llave, carpeta]) => ['/' + llave.slice(4), carpeta]))]]);
 
 // ---- el bucket falso ----
 function archivoDe(llave) {

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fantasma de la página</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Fantasma de la página: <span>la Contrarreloj contra el mejor tiempo de la tabla</span></h1>
+<p>Prueba <code>web/navegador/fantasma-pagina.mjs</code> (bitácora §92) <b>sin el juego y sin Firebase</b>: un juego
+  <b>falso</b> (dice la pista y el modo de Contrarreloj, tiene un búfer y anota lo que le ponen), un sistema de archivos
+  <b>falso</b> con la carpeta del mod y fantasmas <b>inventados</b> (cabecera «RKGD» con un tiempo y bytes al azar: nada
+  del juego), y una nube <b>falsa</b> con la tabla de récords y los fantasmas. Comprueba: leer el tiempo de un .rkg, el
+  nombre que les pone Pulsar, subir el de un récord nuevo (el archivo justo, no otro), no subir con pluma ni fuera de la
+  Contrarreloj, bajar el del mejor que tenga fantasma (saltando a quien no lo subió) y dejarlo en el juego con su pista
+  y su modo, nada si cambió la pista mientras bajaba, y solo en la pantalla de fantasmas.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearFantasmaPagina, tiempoRkg, patronNombre, categoriaDeModo, PAGINA_FANTASMAS } from '/web/navegador/fantasma-pagina.mjs';
+
+const { ok, fin } = prueba('fantasma-pagina', 'Fantasma de la página (sin el juego, archivos y nube falsos)');
+const MOD = '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6';
+
+// un .rkg inventado: «RKGD», el tiempo empacado como lo guarda el juego (7 bits minutos, 7 segundos, 10 milésimas) y relleno
+function rkgFalso(ms, largo = 200, semilla = 1) {
+  const b = new Uint8Array(largo), min = Math.floor(ms / 60000), seg = Math.floor(ms / 1000) % 60, mil = ms % 1000;
+  b.set([0x52, 0x4B, 0x47, 0x44]);
+  b[4] = (min << 1) | (seg >> 6); b[5] = ((seg & 63) << 2) | (mil >> 8); b[6] = mil & 255;
+  for (let i = 7; i < largo; i++) b[i] = (i * 31 + semilla * 17) & 255;
+  return b;
+}
+// un sistema de archivos falso (lo poco que usa el módulo: readdir, stat, readFile)
+function fsFalso() {
+  const archivos = new Map();
+  const fs = {
+    escribir(ruta, datos, cuando = Date.now()) { archivos.set(ruta, { datos, cuando }); },
+    readdir(dir) {
+      const hijos = new Set();
+      for (const r of archivos.keys()) if (r.startsWith(dir + '/')) hijos.add(r.slice(dir.length + 1).split('/')[0]);
+      if (!hijos.size) throw new Error('ENOENT ' + dir);
+      return ['.', '..', ...hijos];
+    },
+    stat(r) { const a = archivos.get(r); if (!a) throw new Error('ENOENT'); return { mtime: new Date(a.cuando) }; },
+    readFile(r) { const a = archivos.get(r); if (!a) throw new Error('ENOENT'); return a.datos; },
+  };
+  return fs;
+}
+// el juego falso: la pista y el modo que se corren, un búfer y lo que le ponen
+function juegoFalso() {
+  const j = { pista: 0x100, modo: 0, puesto: null, HEAPU8: new Uint8Array(0x4000) };
+  j._mkw_fantasma_pagina_pista = () => j.pista;
+  j._mkw_fantasma_pagina_modo = () => j.modo;
+  j._mkw_fantasma_pagina_bufer = () => 0x1000;
+  j._mkw_fantasma_pagina_poner = (largo, pista, modo) => { j.puesto = { largo, pista, modo, bytes: j.HEAPU8.slice(0x1000, 0x1000 + largo) }; };
+  return j;
+}
+// la nube falsa: tabla de récords y fantasmas (cada uno sube solo el suyo, como en storage.rules)
+function nubeFalsa() {
+  const records = {}, fantasmas = {}, pedidos = [];
+  const almacen = yo => ({
+    async top(k, n) { pedidos.push('top ' + k); return Object.values(records[k] || {}).sort((a, b) => a.ms - b.ms).slice(0, n); },
+    async fantasmaSubir(k, u, b) { if (u !== yo) throw Object.assign(new Error('no es tuyo'), { code: 'storage/unauthorized' }); fantasmas[`${k}/${u}`] = b.slice(); },
+    async fantasmaBajar(k, u) { pedidos.push(`bajar ${k}/${u}`); return fantasmas[`${k}/${u}`] || null; },
+  });
+  return { records, fantasmas, pedidos, almacen };
+}
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const igual = (a, b) => a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+
+// 1) los .rkg: el tiempo de la cabecera, el nombre que les pone Pulsar, la categoría por modo
+ok('el tiempo de la cabecera de un .rkg (1:07.873 y 0:08.025)', tiempoRkg(rkgFalso(67873)) === 67873 && tiempoRkg(rkgFalso(8025)) === 8025);
+ok('algo que no es un .rkg da 0', tiempoRkg(new Uint8Array(200)) === 0 && tiempoRkg(null) === 0 && tiempoRkg(rkgFalso(5000).slice(0, 6)) === 0);
+const p = patronNombre(67873);
+ok('el nombre de Pulsar: 1m07s873.rkg y, si el tiempo se repite, 1m07s87a.rkg', p.test('1m07s873.rkg') && p.test('1m07s87a.rkg') && !p.test('1m07s874.rkg') && !p.test('11m07s873.rkg'));
+ok('categorías: modo 0 = tt150, 1 = tt200, con pluma (2, 3) ninguna', categoriaDeModo(0) === 'tt150' && categoriaDeModo(1) === 'tt200' && !categoriaDeModo(2) && !categoriaDeModo(3));
+
+// 2) subir el fantasma de un récord nuevo
+const nube = nubeFalsa();
+{
+  const fs = fsFalso(), juego = juegoFalso(), notas = [];
+  const viejo = rkgFalso(70000, 200, 9), nuevo = rkgFalso(67873, 300, 3);
+  fs.escribir(`${MOD}/Ghosts/44e5205f/150/1m10s000.rkg`, viejo, Date.now() - 3600000);   // uno de antes, otro tiempo
+  fs.escribir(`${MOD}/Ghosts/44e5205f/ldb.pul`, new Uint8Array(10));
+  const f = crearFantasmaPagina({ lector: null, modulo: juego, fs, carpetaMod: MOD, nota: t => notas.push(t), espera: () => espera(5) });
+  f.conectar({ almacen: nube.almacen('ana'), uid: 'ana' });
+  // Pulsar lo escribe un momento después de la meta
+  setTimeout(() => fs.escribir(`${MOD}/Ghosts/44e5205f/150/1m07s873.rkg`, nuevo), 30);
+  const subio = await f.alTerminar({ pista: 0x100, cat: 'tt150', ms: 67873, modo: 'tt' });
+  ok('sube el .rkg de ESA vuelta (el que Pulsar escribe un momento después), no otro', subio && igual(nube.fantasmas['100-tt150/ana'], nuevo), Object.keys(nube.fantasmas).join(', '));
+  ok('en la carpeta de su tabla: 100-tt150/ana', Object.keys(nube.fantasmas).length === 1 && f.estado.subidos === 1);
+  juego.modo = 2;
+  ok('con pluma no se sube (la tabla no distingue la pluma)', !(await f.alTerminar({ pista: 0x100, cat: 'tt150', ms: 67873, modo: 'tt' })));
+  juego.modo = 0;
+  ok('una carrera (no Contrarreloj) no sube fantasma', !(await f.alTerminar({ pista: 0x100, cat: 'vs150', ms: 67873, modo: 'vs' })));
+  const sinSesion = crearFantasmaPagina({ modulo: juego, fs, carpetaMod: MOD, espera: () => espera(5) });
+  ok('sin sesión no se sube', !(await sinSesion.alTerminar({ pista: 0x100, cat: 'tt150', ms: 67873, modo: 'tt' })));
+}
+
+// 3) bajar el del mejor que tenga fantasma y dejarlo en el juego
+nube.records['100-tt150'] = { beto: { uid: 'beto', nombre: 'Beto', ms: 60000 }, ana: { uid: 'ana', nombre: 'Ana', ms: 67873 }, caro: { uid: 'caro', nombre: 'Caro', ms: 69000 } };
+nube.fantasmas['100-tt150/caro'] = rkgFalso(69000, 250, 5);
+{
+  const juego = juegoFalso(), avisos = [];
+  const f = crearFantasmaPagina({ modulo: juego, fs: fsFalso(), carpetaMod: MOD, aviso: x => avisos.push(x) });
+  f.conectar({ almacen: nube.almacen('dani'), uid: 'dani' });
+  ok('fuera de la pantalla de fantasmas no hace nada', f.alActivarPagina(0x6F) === null && !nube.pedidos.length);
+  const el = await f.alActivarPagina(PAGINA_FANTASMAS);
+  ok('el mejor (Beto) no subió fantasma: se salta y queda el de Ana, el 2.º', el?.uid === 'ana' && el.ms === 67873, JSON.stringify(el && { uid: el.uid, ms: el.ms }));
+  ok('pidió la tabla de la pista y modo de ahora y probó en orden de tiempo', nube.pedidos.join() === 'top 100-tt150,bajar 100-tt150/beto,bajar 100-tt150/ana', nube.pedidos.join(' · '));
+  ok('lo dejó en el juego: sus bytes, con la pista 0x100 y el modo 0', juego.puesto && igual(juego.puesto.bytes, nube.fantasmas['100-tt150/ana']) && juego.puesto.pista === 0x100 && juego.puesto.modo === 0);
+  ok('y avisó quién es (Ana, 1:07.873)', avisos.length === 1 && avisos[0].nombre === 'Ana' && avisos[0].ms === 67873);
+  nube.pedidos.length = 0;
+  await f.alActivarPagina(PAGINA_FANTASMAS);
+  ok('la segunda vez en la misma pista no vuelve a bajar (lo recuerda en esta visita)', !nube.pedidos.length && juego.puesto.bytes.length === nube.fantasmas['100-tt150/ana'].length);
+  juego.modo = 1;
+  await f.alActivarPagina(PAGINA_FANTASMAS);
+  ok('a 200cc no hay fantasmas: el juego queda sin el de la página (largo 0)', juego.puesto.largo === 0);
+  juego.modo = 2;
+  await f.alActivarPagina(PAGINA_FANTASMAS);
+  ok('con pluma tampoco', juego.puesto.largo === 0);
+  juego.modo = 0; juego.pista = 0x08;
+  await f.alActivarPagina(PAGINA_FANTASMAS);
+  ok('una pista que no es de Retro Rewind (< 0x100) tampoco', juego.puesto.largo === 0);
+}
+// 4) si la persona cambia de pista mientras baja, no se deja el de la otra pista
+{
+  const juego = juegoFalso(), lento = nube.almacen('dani');
+  const almacen = { ...lento, async fantasmaBajar(k, u) { await espera(40); return lento.fantasmaBajar(k, u); } };
+  const f = crearFantasmaPagina({ modulo: juego, fs: fsFalso(), carpetaMod: MOD });
+  f.conectar({ almacen, uid: 'dani' });
+  const pidiendo = f.alActivarPagina(PAGINA_FANTASMAS);
+  await espera(10); juego.pista = 0x104;                  // volvió atrás y eligió otra
+  await pidiendo;
+  ok('cambió la pista mientras bajaba: no se pone el de la otra pista', juego.puesto?.largo === 0);
+}
+fin();
+</script>
+</body>
+</html>

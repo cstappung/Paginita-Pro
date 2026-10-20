@@ -141,7 +141,13 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
 
   function revisa() {
     if (!sesion) return;
-    for (const [u, x] of [...pares]) if (presentes.get(u) !== x.s || !quiere(u)) cierra(u);
+    // se cierra el par de quien ya no se quiere o volvió con OTRA sesión (recargó la página). §93: si solo dejó de verse
+    // en el buzón y la conexión directa sigue sana, se deja: una pestaña trabada unos segundos (la primera visita armando
+    // gráficos) deja de dar señales en el buzón, pero su WebRTC sigue vivo; si se fue de verdad, la conexión se cae sola
+    for (const [u, x] of [...pares]) {
+      const s = presentes.get(u);
+      if (!quiere(u) || (s !== undefined && s !== x.s) || (s === undefined && !sanoX(x))) cierra(u);
+    }
     for (const [u, s] of presentes) if (!pares.has(u) && quiere(u) && uid < u) ofrece(u, s);
     alCambiar();
   }
@@ -157,6 +163,8 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     for (const [u, x] of [...pares]) {
       if (sanoX(x)) { x.malDesde = 0; x.abrio = true; fallos.delete(u); continue; }
       if (!x.malDesde) x.malDesde = t;
+      // (§93: el par que se dejó abierto de alguien que ya no está en el buzón, si se cae, se cierra: no vuelve)
+      if (!presentes.has(u)) { if (t - x.malDesde >= 4000) cierra(u); continue; }
       if (!(uid < u)) continue;
       const n = fallos.get(u) || 0;
       const espera = x.abrio ? 4000 : Math.min(60000, 10000 * 2 ** n);

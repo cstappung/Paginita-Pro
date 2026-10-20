@@ -20,7 +20,8 @@
 //   mkw/mkw/sd/RetroRewind6/…    Retro Rewind; mkw/mkw/sd/riivolution/… su partida base
 //   mkw/wc/runtime/assets/…      los archivos base del runtime de WiiCompiled
 //   mkw/build/…                  el programa: mkw.js (+ .br), mkw.wasm.br (el .wasm sin comprimir no: ~130 MB que
-//                                Chrome nunca pide; --con-wasm lo agrega), pipelines.bin, bloques.json, imagenes/
+//                                Chrome nunca pide; --con-wasm lo agrega), pipelines.bin, bloques.json, imagenes/,
+//                                diminutos.bin (§93: los archivos diminutos en un solo objeto, armado aquí)
 //   mkw/manifiesto.json          la lista de archivos que verá el juego (ruta y tamaño), igual que servidor.mjs
 //   mkw/version.json             {version, build}: huellas de TODO lo subido y del programa (el Worker las pone en
 //                                las cabeceras X-Mkw-Version y X-Mkw-Build). Va AL FINAL: hasta que no está todo
@@ -35,6 +36,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { armarDiminutos } from './diminutos.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -112,6 +114,10 @@ export async function armarLista({ carpetas, build, conWasm = false, huellas }) 
     o.sha256 = await huellas.de(o);
     if (++hechos % 500 === 0) process.stdout.write(`  huellas: ${hechos} de ${objetos.length}\r`);
   }
+  // §93 (E2): los ~600 archivos diminutos (≤ 8 KB) en un solo objeto, armado de los mismos archivos que se suben
+  // (herramientas/diminutos.mjs): la primera visita los baja de un pedido en vez de uno por archivo
+  const paquete = armarDiminutos(carpetas);
+  objetos.push({ llave: 'mkw/build/diminutos.bin', ruta: 'diminutos.bin', datos: paquete, bytes: paquete.length, sha256: sha256(paquete) });
   const huellaDe = l => crypto.createHash('sha256').update(l.map(o => `${o.llave}|${o.bytes}|${o.sha256}\n`).join('')).digest('hex').slice(0, 16);
   const version = { version: huellaDe(objetos), build: huellaDe(objetos.filter(o => /^mkw\/build\/mkw\.(js|wasm)/.test(o.llave))) };
   const extras = [

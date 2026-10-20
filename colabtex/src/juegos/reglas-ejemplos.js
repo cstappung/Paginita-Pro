@@ -100,7 +100,7 @@ export const EJEMPLOS={
  bt3:[],   // (BT3 tiene un ejemplo propio por pestaña: VARIANTES.bt3)
  mkw:[e('sala','Abrir las carreras',
   p('Todos al vestíbulo','Abre una sala y pasa el enlace. Ana es la anfitriona (👑): elige con qué CPU se completa la parrilla y aprieta ¡A correr!.',mkw(0)),
-  p('Copa o en línea','Cada uno carga el juego. Con CPU de relleno (hasta 4 pilotos) corren una copa sincronizada y la CPU llena los lugares vacíos; sin CPU, el juego entra solo en línea, con su sala y su votación de pista.',mkw(1))),
+  p('Copa o playlist','Cada uno carga el juego. Hasta 12 pilotos corren la misma copa (o la lista de pistas) a la vez, y la CPU llena los lugares vacíos.',mkw(1))),
  e('tarde','Llegar con la carrera andando',
   p('Mira mientras tanto','Quien entra a la sala con una carrera en curso carga el juego y queda mirando; no hace falta que nadie espere ni vuelva a empezar.',mkw(2)),
   p('Entra en la siguiente','Apenas termina la carrera, el juego lo suma a la siguiente (en la copa con CPU, a la tanda siguiente), como cualquier sala en línea de Mario Kart Wii.',mkw(1))),

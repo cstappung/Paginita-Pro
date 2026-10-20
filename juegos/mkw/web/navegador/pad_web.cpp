@@ -20,6 +20,9 @@
 // humano maneja "su" puerto (el mismo en todas las consolas): el juego cree que su kart es un CPU (así no arma
 // pantalla dividida) pero el kart lee ese mando (semillas_nativo.cpp); aquí además se le apaga al kart la marca de CPU
 // (si no, el juego le da la largada automática de los CPU).
+// §91 (C9): hasta 12 humanos. Los mandos de la sala 0..g_mkwPuertos-1 van a los puertos de verdad; los demás son
+// "mandos virtuales": sus botones quedan en g_mkwPadVirtual y mandos_virtuales_nativo.cpp los pasa al portador
+// virtual del kart de ese humano (el juego no tiene más de 4 puertos).
 #include <dolphin/pad.h>
 
 #include <emscripten.h>
@@ -38,7 +41,11 @@ extern "C" int g_mkwRelojFijo;                       // ppc_helpers.cpp: la carr
 extern "C" uint32_t g_mkwHumanos;                    // semillas_nativo.cpp: bit i = el puesto i es un humano de la sala
 extern "C" int g_mkwMiPuesto;                        // semillas_nativo.cpp: mi puesto (el HUD lo muestra, lockstep_nativo.cpp)
 extern "C" int g_mkwVistaPropia;                     // semillas_nativo.cpp: bit 1 = la cámara sigue a mi kart
-extern "C" int8_t g_mkwPuestoDeMando[4];             // semillas_nativo.cpp: mando → puesto de su kart
+extern "C" int8_t g_mkwPuestoDeMando[12];            // semillas_nativo.cpp: mando → puesto de su kart
+extern "C" int g_mkwPuertos;                         // semillas_nativo.cpp: los mandos de la sala con puerto de verdad
+// §91: los botones de los mandos virtuales (los de la sala sin puerto), para mandos_virtuales_nativo.cpp
+struct MkwPadVirtual { uint16_t botones; int8_t sx, sy, cx, cy; uint8_t gl, gr; uint8_t conectado; };
+extern "C" MkwPadVirtual g_mkwPadVirtual[12] = {};
 extern "C" uint32_t g_mkwCortados;                   // semillas_nativo.cpp: bit i = el humano del puesto i se fue
 // La carrera terminó: la página vuelve a mandar sus mandos (controles.reenviar)
 EM_JS(void, mkw_web_lockstep_fin, (), { if (Module.mkwLockstepFin) Module.mkwLockstepFin(); });
@@ -47,12 +54,12 @@ EM_JS(void, mkw_web_lockstep_fin, (), { if (Module.mkwLockstepFin) Module.mkwLoc
 EM_JS(int, mkw_web_mi_puesto, (), { const v = Module.mkwMiPuesto && Module.mkwMiPuesto(); return (v === null || v === undefined) ? -1 : v | 0; });
 // ¿Hay carrera sincronizada en la página?
 EM_JS(int, mkw_web_lockstep_hay, (), { return Module.mkwLockstep ? 1 : 0; });
-// Los botones de los 4 puertos para el cuadro `cuadro` (espera hasta tenerlos). datos: 4 × 8 enteros
-// (conectado, botones, sx, sy, cx, cy, gl, gr). Devuelve 1 si los escribió.
+// Los botones de los mandos de la sala para el cuadro `cuadro` (espera hasta tenerlos). datos: 12 × 8 enteros
+// (conectado, botones, sx, sy, cx, cy, gl, gr), uno por mando de la sala (§91: antes 4). Devuelve 1 si los escribió.
 EM_ASYNC_JS(int, mkw_web_lockstep_pad, (int cuadro, int32_t* datos), {
     const v = await Module.mkwLockstep.pad(cuadro);
     if (!v) return 0;
-    for (let i = 0; i < 32; i++) HEAP32[(datos >> 2) + i] = v[i] | 0;
+    for (let i = 0; i < 96; i++) HEAP32[(datos >> 2) + i] = i < v.length ? v[i] | 0 : 0;
     return 1;
 });
 
@@ -60,7 +67,7 @@ namespace {
 uint32_t g_lsRaceinfo = 0;       // el Raceinfo de la carrera en curso (cambia con cada carrera)
 int64_t g_lsCuadro = -1;         // el último cuadro que se pidió
 bool g_lsMarcas = false;         // ¿ya se les apagó la marca de CPU a los karts de los humanos?
-int32_t g_lsDatos[32];
+int32_t g_lsDatos[96];
 int g_lsMio = -1;                // mi puesto (la cámara lo sigue)
 bool g_lsEnCarrera = false;      // ¿el último PADRead fue de la carrera sincronizada?
 
@@ -163,6 +170,7 @@ extern "C" u32 PADRead(PADStatus* status)
         // últimos botones, que los menús de resultados podrían leer); la página vuelve a mandar los suyos
         g_lsEnCarrera = false;
         for (int i = 0; i < PAD_CHANMAX; ++i) { g_pad[i] = PADStatus{}; g_conectado[i] = false; }
+        for (auto& v : g_mkwPadVirtual) v = MkwPadVirtual{};
         mkw_web_lockstep_fin();
     }
     if (cuadro >= 0) {
@@ -171,12 +179,21 @@ extern "C" u32 PADRead(PADStatus* status)
         CamaraAMiKart();
         if (cuadro != g_lsCuadro && mkw_web_lockstep_pad(static_cast<int>(cuadro), g_lsDatos)) {
             g_lsCuadro = cuadro;
-            for (int i = 0; i < PAD_CHANMAX; ++i) {
+            for (int i = 0; i < 12; ++i) {
                 const int32_t* d = g_lsDatos + i * 8;
-                g_conectado[i] = d[0] != 0;
                 // d[0] == 2: ese humano se fue; su kart sigue sin nadie y la carrera ya no lo espera para terminar
                 const int puesto = g_mkwPuestoDeMando[i];
                 if (d[0] == 2 && puesto >= 0 && puesto < 12) g_mkwCortados |= 1u << puesto;
+                if (i >= g_mkwPuertos || i >= PAD_CHANMAX) {   // §91: mando virtual (sin puerto)
+                    MkwPadVirtual& v = g_mkwPadVirtual[i];
+                    v.conectado = static_cast<uint8_t>(d[0]);
+                    v.botones = static_cast<uint16_t>(d[1]);
+                    v.sx = static_cast<int8_t>(d[2]); v.sy = static_cast<int8_t>(d[3]);
+                    v.cx = static_cast<int8_t>(d[4]); v.cy = static_cast<int8_t>(d[5]);
+                    v.gl = static_cast<uint8_t>(d[6]); v.gr = static_cast<uint8_t>(d[7]);
+                    continue;
+                }
+                g_conectado[i] = d[0] != 0;
                 g_pad[i].button = static_cast<u16>(d[1]);
                 g_pad[i].stickX = static_cast<s8>(d[2]); g_pad[i].stickY = static_cast<s8>(d[3]);
                 g_pad[i].substickX = static_cast<s8>(d[4]); g_pad[i].substickY = static_cast<s8>(d[5]);
@@ -195,6 +212,9 @@ extern "C" u32 PADRead(PADStatus* status)
     }
     return conVibracion;
 }
+
+// §91: ¿la carrera sincronizada está en curso? (mandos_virtuales_nativo.cpp solo alimenta los virtuales entonces)
+extern "C" int mkw_pad_en_carrera() { return g_lsEnCarrera && g_lsCuadro >= 0 ? 1 : 0; }
 
 extern "C" BOOL PADReset(u32) { return TRUE; }
 extern "C" BOOL PADRecalibrate(u32) { return TRUE; }

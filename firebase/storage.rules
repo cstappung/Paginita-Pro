@@ -55,6 +55,19 @@ service firebase.storage {
                             && !request.resource.contentType.matches('(?i).*(html|javascript|ecmascript).*');
       allow delete: if esSuyo();
     }
+    // Mario Kart Wii: el fantasma del récord de Contrarreloj de cada persona (el .rkg que graba el juego: sus botones
+    // de esa vuelta, ~0,2-3 KB), uno por pista y categoría (juegos/mkw/web/navegador/fantasma-pagina.mjs). Lo leen
+    // todos los que tienen sesión (la Contrarreloj corre contra el del mejor de la tabla); lo escribe solo su dueño.
+    match /mkw/fantasmas/{tabla}/{archivo} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+                            && archivo == request.auth.uid + '.rkg'
+                            && tabla.matches('^[0-9a-f]+-tt(150|200)$')
+                            && request.resource.size < 64 * 1024
+                            && request.resource.metadata.get('uid', '') == request.auth.uid
+                            && !request.resource.contentType.matches('(?i).*(html|javascript|ecmascript).*');
+      allow delete: if request.auth != null && archivo == request.auth.uid + '.rkg';
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

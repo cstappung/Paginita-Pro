@@ -103,6 +103,17 @@ try {
      llaves.includes('mkw/mkw/sd/riivolution/RetroRewind6.xml') && llaves.includes('mkw/wc/runtime/assets/fuente.bin'));
   ok('el programa: mkw.js y mkw.wasm.br, sin el .wasm sin comprimir', llaves.includes('mkw/build/mkw.js') && llaves.includes('mkw/build/mkw.wasm.br') && !llaves.includes('mkw/build/mkw.wasm'));
   ok('las semillas y las imágenes también', llaves.includes('mkw/build/pipelines.bin') && llaves.includes('mkw/build/bloques.json') && llaves.includes('mkw/build/imagenes/pistas/a.webp'));
+  // §93 (E2): el paquete de los diminutos: los archivos de ≤ 8 KB, con su ruta de juego y sus bytes; los grandes no
+  {
+    const p = todos.find(o => o.llave === 'mkw/build/diminutos.bin'), b = p?.datos;
+    const indice = b && b.subarray(0, 4).toString('latin1') === 'MKWD' ? JSON.parse(b.subarray(12, 12 + b.readUInt32LE(8))).archivos : [];
+    let o = 12 + (b ? b.readUInt32LE(8) : 0); const de = {};
+    for (const [r, t] of indice) { de[r] = b.subarray(o, o + t); o += t; }
+    ok('§93: el paquete de los diminutos lleva los de ≤ 8 KB (con su ruta de juego y sus bytes) y no los grandes',
+       !!b && o === b.length && sha(de['/mkw/disco/files/Race/Course/pista_a.szs'] || Buffer.alloc(0)) === sha(fs.readFileSync(path.join(tmp, 'disco/files/Race/Course/pista_a.szs'))) &&
+       indice.every(([, t]) => t > 0 && t <= 8192) && !indice.some(([r]) => r.endsWith('main.dol') && fs.statSync(path.join(tmp, 'disco/sys/main.dol')).size > 8192),
+       `${indice.length} archivos, ${b?.length} bytes`);
+  }
   ok('el manifiesto y la versión, AL FINAL de la lista', llaves.at(-2) === 'mkw/manifiesto.json' && llaves.at(-1) === 'mkw/version.json');
   const man = JSON.parse(todos.find(o => o.llave === 'mkw/manifiesto.json').datos);
   ok('el manifiesto tiene la forma de servidor.mjs (carpetas vacías con -1)',
@@ -125,7 +136,9 @@ try {
   ok('subir otra vez no sube nada (todo igual)', orden.length === 0, `${orden.length} subidos`);
   escribe('disco/files/Race/Course/pista_a.szs', bytes(5000, 99));
   await corre(['--subir']);
-  ok('un archivo cambiado: sube él, y la versión nueva al final', orden[0] === 'mkw/mkw/disco/files/Race/Course/pista_a.szs' && orden.at(-1) === 'mkw/version.json' && orden.length === 2, orden.join(', '));
+  // (§93: pista_a es diminuta, ≤ 8 KB: cambia también el paquete de los diminutos)
+  ok('un archivo cambiado: sube él (y el paquete de los diminutos, que lo lleva), y la versión nueva al final',
+     orden.includes('mkw/mkw/disco/files/Race/Course/pista_a.szs') && orden.includes('mkw/build/diminutos.bin') && orden.at(-1) === 'mkw/version.json' && orden.length === 3, orden.join(', '));
 
   // 6) comprobar y sobrantes
   let r = await corre(['--comprobar']);

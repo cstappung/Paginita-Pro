@@ -17,7 +17,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearDisco, PREFIJO } from '/web/navegador/disco.mjs';
+import { crearDisco, PREFIJO, leerPaquete } from '/web/navegador/disco.mjs';
 
 const { ok, nota, fin } = prueba('disco', 'Caché del disco (sin el juego)');
 const BLOQUE = 256 * 1024;
@@ -247,6 +247,43 @@ try {
   lentos.length = 0;
   await leerTodos(d15, g3.slice(0, 3));
   ok('con el adelanto apagado (?adelantar=0), la racha de carpeta no pide nada de más', lentos.length === 3, `${lentos.length} pedidos`);
+
+  // §93 (E2): el paquete de los diminutos (un paquete inventado aquí, con el formato de herramientas/diminutos.mjs:
+  // "MKWD", formato 1, largo del índice, el índice JSON y los contenidos; los bytes son de esperado(), nada del juego)
+  {
+    const archivosP = [['/lento/pack/a.rkg', 1500], ['/lento/pack/b.tpl', 2112], ['/lento/pack/c.brbnk', 32]];
+    const armar = lista => {
+      const indice = new TextEncoder().encode(JSON.stringify({ archivos: lista }));
+      const b = new Uint8Array(12 + indice.length + lista.reduce((s, [, t]) => s + t, 0)), dv = new DataView(b.buffer);
+      b.set([77, 75, 87, 68]); dv.setUint32(4, 1, true); dv.setUint32(8, indice.length, true); b.set(indice, 12);
+      let o = 12 + indice.length;
+      for (const [, t] of lista) { b.set(esperado(0, t), o); o += t; }
+      return b;
+    };
+    const paq = armar(archivosP), leidos = leerPaquete(paq);
+    ok('§93: leer un paquete de diminutos: cada archivo con su ruta y sus bytes, en orden',
+       leidos.length === 3 && leidos.every(([r, d], i) => r === archivosP[i][0] && iguales(d, esperado(0, archivosP[i][1]))), leidos.map(([r, d]) => `${r} ${d.length}`).join(', '));
+    let e1 = '', e2 = '';
+    try { leerPaquete(paq.subarray(0, paq.length - 10)); } catch (e) { e1 = e.message; }
+    try { leerPaquete(new Uint8Array(100)); } catch (e) { e2 = e.message; }
+    ok('§93: un paquete cortado o algo que no es un paquete da error (la página sigue de a uno)', /cortado/.test(e1) && /no es un paquete/.test(e2), `${e1} · ${e2}`);
+    for (const [r, t] of archivosP) tamDe.set(r, t);
+    const d16 = crearDisco({ version: 'prueba-3', buscar: lento, cajas: null, memoriaMax: 2 * BLOQUE });
+    const fijados = leidos.filter(([r, d]) => d16.fijar(r, d)).length;
+    lentos.length = 0;
+    const r16 = await leerTodos(d16, archivosP.map(([r]) => r));
+    d16.adelantar(archivosP[0][0], 1500, { baja: true }); d16.vecinos(archivosP.map(([r, t]) => [r, t])); d16.adelantarCarpeta('/lento/pack/');
+    await new Promise(r => setTimeout(r, 80));
+    ok('§93: los fijados se leen sin ir a la red, y ni la fila baja ni la carpeta los vuelven a pedir',
+       fijados === 3 && lentos.length === 0 && r16.every((d, i) => iguales(d, esperado(0, archivosP[i][1]))) && d16.estado.esperaRed === 0, `${fijados} fijados, ${lentos.length} pedidos`);
+    // la memoria de 2 bloques se llena con un archivo grande: los fijados no salen
+    const grande = archivo('grande.szs', 6 * BLOQUE);
+    await d16.leer(grande, tamDe.get(grande), 0, 6 * BLOQUE);
+    lentos.length = 0;
+    const otra = await d16.leer(archivosP[1][0], 2112, 100, 50);
+    ok('§93: aunque la memoria normal se llene (y recambie), los fijados siguen ahí', lentos.length === 0 && iguales(otra, esperado(100, 50)), `${lentos.length} pedidos`);
+    ok('§93: fijar no acepta lo que pasa de un bloque', !d16.fijar('/lento/pack/x', new Uint8Array(BLOQUE + 1)) && !d16.fijar('/lento/pack/y', new Uint8Array(0)));
+  }
 
   await d4.borrar();
   ok('borrar deja sin cachés del disco', (await caches.keys()).filter(n => n.startsWith(PREFIJO)).length === 0);

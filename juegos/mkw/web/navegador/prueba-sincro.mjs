@@ -16,6 +16,8 @@
 // Uso:  node web/navegador/prueba-sincro.mjs [--ventana] [--lento] [--sala] [--extra=&param=valor] [--puerto=8147] [--datos=build/web/datos/sincro]
 //       (--sala: cada juego dentro de la sala del sitio falsa, con la dirección que arma el sitio)
 //       (--lento: B con la CPU 2 veces más lenta; --extra: parámetros de más para las dos pestañas)
+//       (§93, C4 --traba-largada=6000: A se traba entera 6 s en el cuadro 20 de la carrera, como la primera visita
+//        armando gráficos; B la espera con el margen de la largada y nadie se corta)
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -34,6 +36,7 @@ const DIRECTA = process.argv.includes('--directa');
 const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0.0,0.1,0.2,0.3').slice(9);   // sin --sala
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
 const RASTRO = process.argv.includes('--rastro');   // §70: el rastro por cuadro de las dos pestañas, comparado
+const TRABA = Number((process.argv.find(a => a.startsWith('--traba-largada=')) || '=0').split('=')[1]);   // §93
 const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '') + (RASTRO ? '&rastro=1' : '');   // p. ej. --extra=&arreglos=0
 const carpeta = path.join(raiz, (process.argv.find(a => a.startsWith('--datos=')) || '--datos=build/web/datos/sincro').slice(8));
 mkdirSync(carpeta, { recursive: true });
@@ -98,6 +101,33 @@ for (const limite = Date.now() + 5 * 60000; Date.now() < limite && !(enCarrera.A
   await espera(1000);
 }
 ok('las dos llegaron solas a la carrera (VS, sección 0x20)', !!(enCarrera.A && enCarrera.B));
+
+// §93 (C4): A se traba entera (el hilo de la página tomado, como cuando la primera visita arma los gráficos de la pista)
+// apenas pasa el cuadro 20 de la carrera. Con el margen de la sala (2 s) B la cortaba; con el de la largada (15 s), B la
+// espera, lo avisa («su navegador todavía arma la pista») y siguen las dos
+let trabada = null;
+if (TRABA) {
+  const cuadroDe = p => p.evaluate(() => window.mkwSincro?.lockstep?.estado().cuadro ?? -1).catch(() => -1);
+  for (const hasta = Date.now() + 60000; Date.now() < hasta && (await cuadroDe(A)) < 20;) await espera(30);
+  const c0 = await cuadroDe(A);
+  await A.evaluate(ms => { const t = performance.now(); while (performance.now() - t < ms); }, TRABA).catch(() => {});
+  // (cómo ve cada una la conexión con la otra en los segundos que siguen: el estado de WebRTC y sus dos canales)
+  const visto = { A: '', B: '' };
+  for (const fin = Date.now() + 3000; Date.now() < fin;) {
+    for (const [n, p, otro] of [['A', A, uidB], ['B', B, uidA]]) {
+      const d = await p.evaluate(u => { const m = window.mkwRed?.malla, x = m?.detalle(u); return x ? `${x.pc}/${x.ice} udp ${x.udp} tcp ${x.tcp}` : 'sin par'; }, otro).catch(() => '?');
+      if (d !== visto[n]) { visto[n] = d; console.log(`  ${n} ve la conexión: ${d}`); }
+    }
+    await espera(150);
+  }
+  await espera(6000);
+  const [la, lb] = await Promise.all([A, B].map(p => p.evaluate(() => ({ ls: window.mkwSincro.lockstep.estado(), avisos: window.mkwAvisosCorte || [] })).catch(() => null)));
+  trabada = { c0, la, lb };
+  ok(`§93: A trabada ${TRABA / 1000} s en el cuadro ${c0} de la carrera: nadie se corta y las dos siguen`,
+    la && lb && !Object.keys(la.ls.cortes).length && !Object.keys(lb.ls.cortes).length && !la.ls.fuera && la.ls.cuadro > c0 + 60 && lb.ls.cuadro > c0 + 60,
+    `cortes A ${JSON.stringify(la?.ls.cortes)} B ${JSON.stringify(lb?.ls.cortes)}; cuadro A ${la?.ls.cuadro}, B ${lb?.ls.cuadro}; espera máx de B ${lb?.ls.maxEspera?.toFixed(0)} ms`);
+  ok('§93: …y B avisó que la espera porque su navegador todavía arma la pista', (lb?.avisos || []).some(t => t.includes('arma la pista')), (lb?.avisos || []).slice(-1)[0] || 'sin aviso');
+}
 
 if (COPA) {
   // la copa: las carreras terminan solas (todos los karts con la CPU); entre carrera y carrera cada consola pasa los

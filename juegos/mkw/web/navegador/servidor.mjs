@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { armarDiminutos } from '../../herramientas/diminutos.mjs';   // §93: el paquete de los diminutos
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PUERTO = Number(process.argv[2]) || 8140;
@@ -105,6 +106,7 @@ const comprimido = (archivo, aceptadas) => {
 };
 console.log(Object.entries(manifiesto).map(([p, l]) => `${p}: ${l.length} archivos`).join('\n'));
 
+let paqueteDiminutos = null;
 http.createServer((pedido, respuesta) => {
   const url = decodeURIComponent(pedido.url.split('?')[0]);
   if (CORS) {
@@ -123,6 +125,15 @@ http.createServer((pedido, respuesta) => {
                                  'X-Mkw-Build': huellaBuild() });
       respuesta.end(manifiestoJson);
     }, CORS ? LATENCIA : 0);
+  }
+  // §93 (E2): el paquete de los archivos diminutos (herramientas/diminutos.mjs), armado aquí desde los mismos archivos
+  // que se sirven (nunca queda viejo); ?paquete=0 en la página = sin él
+  if (url === '/build/diminutos.bin') {
+    paqueteDiminutos ??= armarDiminutos(CARPETAS.slice(0, 4));
+    return setTimeout(() => {
+      respuesta.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Length': paqueteDiminutos.length });
+      respuesta.end(paqueteDiminutos);
+    }, LATENCIA);
   }
   const par = CARPETAS.find(([prefijo]) => url.startsWith(prefijo));
   let archivo = path.normalize(path.join(par[1], url.slice(par[0].length)));
