@@ -1,3 +1,4 @@
+// @controles: teclado  (los clics son solo los botones de la tienda; moverse y disparar, con el teclado)
 /* Pro BoxHead — el juego: un canvas visto desde arriba, en tres cuartos.
    Lo que se ve (modelos de cubos en 3D falso, muros, el suelo que guarda la
    sangre, los efectos) está en `grafico.js`; los sonidos, en `audio.js`.
@@ -57,7 +58,7 @@
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
+      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, nv: D.ARMAS.map(() => 0), bl: 0, cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
   }
 
   // El mundo: lo que simula el director y lo que los demás reflejan.
@@ -93,6 +94,8 @@
     if (e.code === 'KeyQ') cicla(-1);
     else if (e.code === 'KeyE') cicla(1);
     else if (e.code === 'KeyX') detona();
+    else if (e.code === 'KeyF') ponBlindado();
+    else if (e.code === 'KeyU') subeArma(yo.w);
     else if (/^Digit[1-8]$/.test(e.code)) eligeArma(+e.code.slice(5) - 1);
     else { const t = TECLA_TIENDA[e.code]; if (t) compra(t); }
   });
@@ -102,14 +105,14 @@
   if (window.Mando) Mando.configura({
     stick: { izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS' },
     botones: {
-      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyB',
+      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyB', b: 'KeyU', lt: 'KeyF',
       izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS',
       start: () => { if (jugando && !terminado) ponPausa(!pausado); },
     },
     menu: () => !jugando || pausado || terminado,
     inicio: '#jugar',
     zonas: [{ sel: '#ayuda' }, { sel: '#menuAyuda' }],
-    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['y', 'comprar munición en la tienda'], ['start', 'pausa']],
+    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['y', 'comprar munición en la tienda'], ['b', 'mejorar el arma en la tienda'], ['lt', 'poner muro reforzado'], ['start', 'pausa']],
   });
 
   // ---------- el mapa ----------
@@ -210,7 +213,9 @@
   }
 
   // ---------- armas ----------
-  const armaYo = () => D.arma(yo.w, yo.mejoras);
+  // El arma con las mejoras del multiplicador y los niveles comprados en la tienda.
+  const armaDe = i => D.conNivel(D.arma(i, yo.mejoras), yo.nv[i] || 0);
+  const armaYo = () => armaDe(yo.w);
   const disponibles = () => [...yo.tiene].sort((a, b) => a - b).filter(i => i === 0 || yo.ammo[i] > 0);
   function eligeArma(i) {
     if (!yo.tiene.has(i) || (i !== 0 && !(yo.ammo[i] > 0))) return;
@@ -367,7 +372,7 @@
       if (choca(x, y, a.obj === 'barril' ? 9 : 4)) return false;
     }
     x = Math.round(x); y = Math.round(y);
-    const pide = { pon: [a.id, x, y, a.r || 0, a.d || 0, a.vida || 0] };
+    const pide = { pon: [a.id, x, y, a.r || 0, a.d || 0, a.vida || 0, a.bl ? 1 : 0] };
     if (soyDir) peticion(cfg.yo, pide);
     else misG.push([nid(), 'p', 0, a.id, pide]);
     return true;
@@ -795,10 +800,11 @@
     if (!p || typeof p !== 'object') return;
     if (Array.isArray(p.pon)) {
       // Radio, daño y vida llegan con las mejoras de quien lo pone, acotados.
-      const [w, x, y, r, d, vida] = p.pon, a = D.ARMAS[w];
+      const [w, x, y, r, d, vida, bl] = p.pon, a = D.ARMAS[w];
       if (!a || a.tipo !== 'objeto' || !Number.isFinite(x) || !Number.isFinite(y) || solidoEn(x, y) || O.size > 120) return;
-      const k = a.obj, max = k === 'muro' ? clamp(+vida || VIDA_OBJ.muro, 1, 1200) : VIDA_OBJ[k];
-      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, 200), d: clamp(+d || a.d || 0, 0, 500) });
+      const k = a.obj, acero = k === 'muro' && bl === 1;
+      const max = acero ? D.MURO_BLINDADO.vida : k === 'muro' ? clamp(+vida || VIDA_OBJ.muro, 1, 1200) : VIDA_OBJ[k];
+      O.set(nid(), { id: ultimoId, k, x, y, hp: max, max, u: de, r: clamp(+r || a.r || 0, 0, 200), d: clamp(+d || a.d || 0, 0, 500), bl: acero ? 1 : 0 });
     } else if (p.det) {
       let i = 0;
       for (const o of [...O.values()]) if (o.k === 'carga' && o.u === de) {
@@ -932,7 +938,7 @@
       n: dir.n, q: dir.q, t: Math.round(dir.t * 10) / 10,
       e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0].concat(D.esJefe(e.k) ? [Math.round(e.max), e.est || 0] : [])),
       f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), f.k || 1, Math.round(f.t * 10)].concat(f.roca ? [Math.round(f.t0 * 10), Math.round(f.tx), Math.round(f.ty)] : [])),
-      o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0]),
+      o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0, o.bl ? 1 : 0]),
       b: [...B.values()].map(b => [b.id, b.k, b.x, b.y]),
       m: dir.m, x: dir.x,
     };
@@ -962,11 +968,11 @@
     const vo = new Set();
     for (const a of zb.o || []) {
       if (!Array.isArray(a)) continue;
-      const [id, ki, x, y, pc, u, r, mx, dd] = a, k = OBJ[ki] || 'muro';
+      const [id, ki, x, y, pc, u, r, mx, dd, bl] = a, k = OBJ[ki] || 'muro';
       vo.add(id); ultimoId = Math.max(ultimoId, id);
       const max = k !== 'carga' && +mx > 0 ? +mx : VIDA_OBJ[k];
       const o = O.get(id) || { id, k, x, y, max };
-      o.max = max; o.hp = max * pc / 100; o.u = u; o.r = r; o.d = +dd || (D.ARMAS.find(w => w.obj === k) || {}).d || 0;
+      o.max = max; o.hp = max * pc / 100; o.u = u; o.r = r; o.d = +dd || (D.ARMAS.find(w => w.obj === k) || {}).d || 0; o.bl = bl === 1 ? 1 : 0;
       O.set(id, o);
     }
     for (const id of [...O.keys()]) if (!vo.has(id)) O.delete(id);
@@ -1057,7 +1063,7 @@
       if (!s || typeof s !== 'object' || u === cfg.yo) continue;
       let r = R.get(u);
       if (!r) { r = { x: +s.x || 0, y: +s.y || 0 }; R.set(u, r); }
-      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0;
+      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0; r.nv = clamp(s.nv | 0, 0, D.NIVEL_ARMA.max);
       r.pts = s.pts | 0; r.k = s.k | 0; r.mul = s.mul | 0; r.sk = s.sk; r.mv = !!s.mv; r.h = !!s.h;
       if (s.pz) { if (!r.pz) r.pzDesde = Date.now(); r.pz = true; } else r.pz = false;
       if (dist(r.x, r.y, r.tx, r.ty) > TS * 4) { r.x = r.tx; r.y = r.ty; }
@@ -1174,6 +1180,7 @@
       x: Math.round(yo.x), y: Math.round(yo.y), d: yo.d, v: yo.v && !yo.muerto ? 1 : 0, hp: Math.max(0, Math.round(yo.hp)), arm: Math.round(yo.arm || 0),
       w: yo.w, pts: yo.pts | 0, mul: yo.mul, k: yo.k, sk: skinId, mv: yo.mov ? 1 : 0,
     };
+    if (yo.nv[yo.w]) e.nv = yo.nv[yo.w];
     if (pausado && !cfg.mirando) e.pz = 1;
     if (document.hidden) e.h = 1;
     const ahora = Date.now();
@@ -1290,9 +1297,9 @@
     son('recoge');
     if (k === 1) { yo.hp = Math.min(100, yo.hp + 50); premio('+50 vida'); return; }
     if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
-    const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < D.arma(i, yo.mejoras).max);
+    const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < armaDe(i).max);
     if (!l.length) { yo.pts += 50; premio('+50 puntos'); return; }
-    const i = l[(Math.random() * l.length) | 0], a = D.arma(i, yo.mejoras);
+    const i = l[(Math.random() * l.length) | 0], a = armaDe(i);
     yo.ammo[i] = Math.min(a.max, yo.ammo[i] + a.caja);
     premio('+' + a.caja + ' ' + a.nombre);
   }
@@ -1310,15 +1317,40 @@
     if (id === 'potencia' && (yo.pot || 0) >= t.max) { son('clic'); premio('Potencia al máximo'); return; }
     if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
     if (id === 'botiquin' && yo.hp >= 100) { son('clic'); premio('Vida completa'); return; }
+    if (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max) { son('clic'); premio('Ya llevas ' + D.MURO_BLINDADO.max + ' muros reforzados'); return; }
     const precio = D.precioTienda(id, yo.pot || 0);
     if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
     yo.pts -= precio;
-    if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = D.arma(i, yo.mejoras).max; }
+    if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = armaDe(i).max; }
     else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
     else if (id === 'botiquin') yo.hp = Math.min(100, yo.hp + 50);
     else if (id === 'potencia') yo.pot = (yo.pot || 0) + 1;
+    else if (id === 'blindado') yo.bl++;
     son('compra');
-    premio(t.nombre + ' −' + precio);
+    premio(t.nombre + ' −' + precio + (id === 'blindado' ? ' · F para ponerlo' : ''));
+    pintaTienda(true);
+  }
+  /* Subir un arma un nivel: más daño, cadencia, munición… y otro aspecto. */
+  function subeArma(i) {
+    if (!tiendaCerca() || !yo.tiene.has(i)) return;
+    const n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), a = D.ARMAS[i];
+    if (!Number.isFinite(precio)) { son('clic'); premio(a.nombre + ' al máximo'); return; }
+    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
+    const antes = armaDe(i);
+    yo.pts -= precio;
+    yo.nv[i] = n + 1;
+    // La munición crece con el tope: lo que faltaba sigue faltando.
+    if (i !== 0) yo.ammo[i] = Math.min(armaDe(i).max, yo.ammo[i] + Math.max(0, armaDe(i).max - antes.max));
+    son('mejora');
+    const ra = D.rangoArma(n + 1), cambio = ra !== D.rangoArma(n);
+    premio(a.nombre + ' nivel ' + (n + 1) + (cambio ? ' · ¡' + D.RANGOS_ARMA[n + 1].toLowerCase() + '!' : '') + ' −' + precio);
+    pintaArmas(true); pintaTienda(true);
+  }
+  /* Pone un muro reforzado delante, como el muro falso pero de acero. */
+  function ponBlindado() {
+    if (!(yo.bl > 0)) { son('clic'); premio(tiendaCerca() ? 'Compra un muro reforzado (M)' : 'No te quedan muros reforzados'); return; }
+    if (yo.cd > 0) return;
+    if (pon({ id: 5, obj: 'muro', vida: D.MURO_BLINDADO.vida, bl: 1 })) { yo.bl--; yo.cd = 0.35; son('pon'); pintaTienda(true); }
   }
 
   function finPractica() {
@@ -1386,7 +1418,7 @@
     } else G.bloque(cx, x * TS + 4, y * TS + 4, TS - 8, 15, {}, G.cajaDe(M.id), 5);
   }
   function dibujaObjeto(o) {
-    if (o.k === 'muro') G.muroFalso(cx, o.x, o.y, o.hp / o.max);
+    if (o.k === 'muro') (o.bl ? G.muroBlindado : G.muroFalso)(cx, o.x, o.y, o.hp / o.max);
     else if (o.k === 'barril') G.barril(cx, o.x, o.y, o.hp / o.max, T);
     else G.carga(cx, o.x, o.y, T);
   }
@@ -1417,11 +1449,11 @@
     cx.fillStyle = VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9.5, hy, 19 * clamp(e.hp / e.max, 0, 1), 2.5);
   }
   // Un jugador: anillo de su color en el suelo y el modelo con el arma en la mano.
-  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t) {
+  function dibujaJugador(x, y, ang, sk, mov, w, rec, color, t, nv) {
     cx.strokeStyle = color; cx.lineWidth = 1.6; cx.globalAlpha = 0.85;
     cx.beginPath(); cx.ellipse(x, y, 12.5, 6, 0, 0, 7); cx.stroke();
     cx.globalAlpha = 1;
-    G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC });
+    G.humanoide(cx, x, y, ang, palDe(sk), { t, mov, arma: w, rec, talla: ESC, nivel: nv || 0 });
   }
 
   let camX = 0, camY = 0, W = 0, H = 0, esc = 1, dpr = 1;
@@ -1464,13 +1496,13 @@
     for (const e of E.values()) lista.push({ y: e.y, f: () => dibujaEnemigo(e) });
     for (const [u, r] of R) {
       if (!r.v) { lista.push({ y: r.y, f: () => G.tumba(cx, r.x, r.y) }); continue; }
-      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u)) });
+      lista.push({ y: r.y, f: () => dibujaJugador(r.x, r.y, r.av ?? angDir(r.d), r.sk, r.mv, r.w, r.rec || 0, colorDe(u), T + ordenDe(u), r.nv) });
     }
     const veoYo = cfg && !cfg.mirando && yo.v && !yo.muerto;
     if (cfg && !cfg.mirando && (yo.v || yo.muerto)) {
       if (veoYo) lista.push({ y: yo.y, f: () => {
         if (yo.inv > 0 && Math.floor(T * 12) % 2) return;
-        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T);
+        dibujaJugador(yo.x, yo.y, yo.av, skinId, yo.mov, yo.w, yo.rec || 0, colorDe(cfg.yo), T, yo.nv[yo.w]);
       } });
       else lista.push({ y: yo.y, f: () => G.tumba(cx, yo.x, yo.y) });
     }
@@ -1479,7 +1511,7 @@
     // Detrás de un muro te sigues viendo: tu silueta, tenue, encima de todo.
     if (veoYo && (celda(Math.floor(yo.x / TS), Math.floor(yo.y / TS) + 1) === 1 || celda(Math.floor(yo.x / TS), Math.floor((yo.y + 14) / TS)) === 1)) {
       cx.globalAlpha = 0.32;
-      G.humanoide(cx, yo.x, yo.y, yo.av, palDe(skinId), { t: T, mov: yo.mov, arma: yo.w, rec: yo.rec || 0, sinSombra: true, talla: ESC });
+      G.humanoide(cx, yo.x, yo.y, yo.av, palDe(skinId), { t: T, mov: yo.mov, arma: yo.w, rec: yo.rec || 0, sinSombra: true, talla: ESC, nivel: yo.nv[yo.w] || 0 });
       cx.globalAlpha = 1;
     }
     // granadas y cohetes en el aire
@@ -1611,12 +1643,11 @@
     pintaArmas(false);
     if (cfg.mirando) $('aviso').textContent = 'Estás mirando';
     else if (yo.muerto && ONLINE) $('aviso').textContent = versus() ? 'Vuelves en ' + Math.max(0, Math.ceil(yo.respawn)) + '…' : 'Caíste: vuelves cuando tu equipo limpie el nivel';
-    else {
-      const tc = tiendaCerca();
-      $('aviso').textContent = tc ? D.TIENDA.map(t => t.tecla + ' ' + t.nombre.toLowerCase() + ' ' + (t.id === 'potencia' && (yo.pot || 0) >= t.max ? 'máx.' : D.precioTienda(t.id, yo.pot || 0))).join(' · ') : '';
-    }
+    else $('aviso').textContent = '';
+    pintaTienda(false);
     $('armN').textContent = Math.round(yo.arm || 0);
     $('potN').textContent = (yo.pot || 0) ? ' · Potencia +' + (yo.pot * 10) + ' %' : '';
+    $('blN').textContent = yo.bl ? ' · Muros reforzados ' + yo.bl + ' (F)' : '';
     // tabla
     const filas = activos().map(j => {
       const u = j.uid, mio = u === cfg.yo, r = R.get(u);
@@ -1643,19 +1674,91 @@
     }
   }
 
+  /* ---------- la tienda ----------
+     Un panel sobre la barra de armas mientras se está junto a un puesto $:
+     cada artículo es un botón con su icono, su precio y su tecla. Se arma
+     una vez y luego solo cambian clases y textos (re-crearlo cada 0,2 s se
+     comería un clic a medias). Los botones no toman el foco: Espacio dispara
+     y no debe volver a comprar lo último que se tocó. */
+  const ICONOS = {
+    balas: '<svg viewBox="0 0 32 32"><g stroke="#2a1a06" stroke-width="1"><rect x="6" y="11" width="5" height="15" fill="#d9a441"/><path d="M6 11q2.5-7 5 0z" fill="#c9cdd4"/><rect x="13.5" y="9" width="5" height="17" fill="#e6b44c"/><path d="M13.5 9q2.5-7 5 0z" fill="#c9cdd4"/><rect x="21" y="11" width="5" height="15" fill="#d9a441"/><path d="M21 11q2.5-7 5 0z" fill="#c9cdd4"/></g><rect x="5" y="25" width="22" height="3" rx="1" fill="#6e4d14"/></svg>',
+    armadura: '<svg viewBox="0 0 32 32"><path d="M16 3l11 4v8c0 7-5 12-11 14C10 27 5 22 5 15V7z" fill="#2d6fb8" stroke="#0d2442" stroke-width="1.5"/><path d="M16 6l8 3v6c0 5-3.5 8.6-8 10.4z" fill="#9fd0ff" opacity=".55"/></svg>',
+    botiquin: '<svg viewBox="0 0 32 32"><rect x="4" y="8" width="24" height="18" rx="3" fill="#f4f4f4" stroke="#333" stroke-width="1.2"/><rect x="12" y="4" width="8" height="5" rx="1.5" fill="none" stroke="#777" stroke-width="2"/><path d="M13.5 11h5v4.5H23v5h-4.5V25h-5v-4.5H9v-5h4.5z" fill="#d42020"/></svg>',
+    potencia: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#5a1a0c" stroke="#ff8a3d" stroke-width="1.5"/><path d="M18 3L8 18h7l-2 11 11-16h-7z" fill="#ffd54a" stroke="#7a3a00" stroke-width="1"/></svg>',
+    blindado: '<svg viewBox="0 0 32 32"><path d="M4 10l6-4h18l-6 4z" fill="#aab4c1" stroke="#2a2f36"/><rect x="4" y="10" width="18" height="16" fill="#7d8794" stroke="#2a2f36"/><path d="M22 10l6-4v16l-6 4z" fill="#5d6672" stroke="#2a2f36"/><clipPath id="tFr"><rect x="4" y="18" width="18" height="5"/></clipPath><g clip-path="url(#tFr)"><rect x="4" y="18" width="18" height="5" fill="#f2c14e"/><path d="M3 23l5-5h3l-5 5zM10 23l5-5h3l-5 5zM17 23l5-5h3l-5 5z" fill="#1b1b1b"/></g><g fill="#d6dce4"><circle cx="7" cy="13" r="1"/><circle cx="19" cy="13" r="1"/></g></svg>'
+  };
+  let tiendaArmada = false, firmaTienda = '';
+  const sinFoco = b => { b.tabIndex = -1; b.addEventListener('mousedown', e => e.preventDefault()); };
+  function armaTienda() {
+    tiendaArmada = true;
+    const sum = $('tSum'), ar = $('tArmas');
+    sum.textContent = ''; ar.textContent = '';
+    for (const t of D.TIENDA) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'art'; b.dataset.id = t.id; sinFoco(b);
+      b.innerHTML = '<kbd>' + t.tecla + '</kbd><span class="lleva"></span><i class="ico">' + (ICONOS[t.id] || '') + '</i><b class="nom"></b><span class="pre"></span><small class="det"></small>';
+      b.querySelector('.nom').textContent = t.nombre;
+      b.querySelector('.det').textContent = t.txt;
+      b.title = t.nombre + ': ' + t.txt;
+      b.addEventListener('click', () => compra(t.id));
+      sum.append(b);
+    }
+    for (const a of D.ARMAS) {
+      const b = document.createElement('button'), c = document.createElement('canvas');
+      b.type = 'button'; b.className = 'art'; b.dataset.arma = a.id; sinFoco(b);
+      c.width = 104; c.height = 60;
+      b.innerHTML = '<span class="lleva"></span><i class="ico"></i><b class="nom"></b><span class="est"></span><span class="pre"></span>';
+      b.querySelector('.ico').append(c);
+      b.addEventListener('click', () => subeArma(a.id));
+      ar.append(b);
+    }
+  }
+  function pintaTienda(fuerza) {
+    const tc = jugando && !cfg?.mirando && tiendaCerca(), el = $('tienda');
+    if (!tc) { if (!el.hidden) el.hidden = true; return; }
+    if (!tiendaArmada) armaTienda();
+    const firma = [yo.pts, yo.pot, Math.round(yo.arm || 0), Math.round(yo.hp), yo.bl, yo.w, [...yo.tiene].join('.'), yo.nv.join('.')].join('|');
+    if (!fuerza && !el.hidden && firma === firmaTienda) return;
+    firmaTienda = firma;
+    el.hidden = false;
+    $('tPts').textContent = yo.pts;
+    for (const b of $('tSum').children) {
+      const id = b.dataset.id, t = D.TIENDA.find(x => x.id === id);
+      const lleno = (id === 'potencia' && (yo.pot || 0) >= t.max) || (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) ||
+        (id === 'botiquin' && yo.hp >= 100) || (id === 'blindado' && yo.bl >= D.MURO_BLINDADO.max);
+      const precio = D.precioTienda(id, yo.pot || 0);
+      b.classList.toggle('max', lleno);
+      b.classList.toggle('caro', !lleno && yo.pts < precio);
+      b.querySelector('.pre').textContent = lleno ? (id === 'potencia' ? 'Máximo' : 'Lleno') : precio;
+      b.querySelector('.lleva').textContent = id === 'potencia' ? (yo.pot ? '+' + yo.pot * 10 + '%' : '') : id === 'blindado' ? (yo.bl ? '×' + yo.bl : '') : '';
+    }
+    for (const b of $('tArmas').children) {
+      const i = +b.dataset.arma, a = D.ARMAS[i], n = yo.nv[i] || 0, precio = D.precioNivelArma(i, n), ra = D.rangoArma(n);
+      b.hidden = !yo.tiene.has(i);
+      if (b.hidden) continue;
+      if (+b.dataset.dibujado !== n) { b.dataset.dibujado = n; const c = b.querySelector('canvas'); G.iconoArma(c.getContext('2d'), i, c.width, c.height, n); }
+      b.className = 'art r' + ra + (yo.w === i ? ' mano' : '') + (!Number.isFinite(precio) ? ' max' : yo.pts < precio ? ' caro' : '');
+      b.querySelector('.nom').textContent = a.nombre + (ra ? ' ' + D.RANGOS_ARMA[n].toLowerCase() : '');
+      b.querySelector('.est').innerHTML = '<i>' + '★'.repeat(n) + '</i>' + '★'.repeat(D.NIVEL_ARMA.max - n);
+      b.querySelector('.pre').textContent = Number.isFinite(precio) ? precio : 'Máximo';
+      b.querySelector('.lleva').textContent = yo.w === i ? 'U' : '';
+      b.title = a.nombre + ' · nivel ' + n + ' de ' + D.NIVEL_ARMA.max + (Number.isFinite(precio) ? ' · subir: +15 % daño, más cadencia y munición' : '');
+    }
+  }
+
   function pintaArmas(fuerza) {
-    const firma = D.ARMAS.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id])).join() + '|' + yo.w;
+    const firma = D.ARMAS.map(a => (yo.tiene.has(a.id) ? 1 : 0) + ':' + (a.id === 0 ? '∞' : yo.ammo[a.id]) + ':' + (yo.nv[a.id] || 0)).join() + '|' + yo.w;
     if (!fuerza && firma === firmaArmas) return;
     firmaArmas = firma;
     const el = $('armas');
     if (el.children.length !== D.ARMAS.length) {
       el.textContent = '';
       for (const a of D.ARMAS) {
-        const s = document.createElement('div'), c = document.createElement('canvas'), b = document.createElement('b'), sp = document.createElement('span');
-        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = a.id + 1;
+        const s = document.createElement('div'), c = document.createElement('canvas'), b = document.createElement('b'), nv = document.createElement('i'), sp = document.createElement('span');
+        s.className = 'slot'; c.width = 68; c.height = 40; b.textContent = a.id + 1; nv.className = 'nv';
         G.iconoArma(c.getContext('2d'), a.id, 68, 40);
         s.title = a.nombre;
-        s.append(b, c, sp);
+        s.append(b, nv, c, sp);
         el.append(s);
       }
     }
@@ -1664,6 +1767,10 @@
       s.classList.toggle('sel', yo.w === a.id);
       s.classList.toggle('no', !tiene || (a.id !== 0 && !(yo.ammo[a.id] > 0)));
       s.lastChild.textContent = !tiene ? '×' + a.desbloquea : a.id === 0 ? '∞' : yo.ammo[a.id];
+      // El nivel de tienda: estrellas en la esquina y el icono con el color del rango.
+      const n = yo.nv[a.id] || 0, c = s.querySelector('canvas');
+      s.querySelector('.nv').textContent = '★'.repeat(n);
+      if (+s.dataset.nv !== n) { s.dataset.nv = n; G.iconoArma(c.getContext('2d'), a.id, 68, 40, n); }
     });
   }
 
@@ -1760,7 +1867,10 @@
     ponYo: (x, y) => { yo.x = x; yo.y = y; },
     enemigo: (k, x, y) => (ONLINE ? null : nuevoEnemigo(Math.max(1, dir.n), k, x, y).id),
     pon: (k, x, y) => { if (!ONLINE) peticion(cfg.yo, { pon: [D.ARMAS.findIndex(a => a.obj === k), x, y] }); },
-    objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max })),
+    objetos: () => [...O.values()].map(o => ({ k: o.k, x: o.x, y: o.y, hp: o.hp, max: o.max, bl: o.bl || 0 })),
+    // la tienda: puntos para probar, y lo comprado
+    puntos: n => { yo.pts = n | 0; },
+    tienda: () => ({ nv: yo.nv.slice(), bl: yo.bl, pot: yo.pot, arm: yo.arm, pts: yo.pts, tiendas: (M.tiendas || []).map(t => [t.x, t.y]), arma: armaDe(yo.w) }),
   };
   if (ONLINE) enviar('listo');
 })();

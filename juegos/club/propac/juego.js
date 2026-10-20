@@ -46,65 +46,151 @@
   }
   new ResizeObserver(mide).observe(lienzo);
 
-  /* ---------- Sonido (WebAudio en vivo; volumen.js lo gobierna por debajo) ---------- */
-  let ac = null, salida = null, sirena = null;
+  /* ---------- Sonido ----------
+     La música sale del cancionero común (juegos/audio/chip.js + temas.js,
+     los `propac-*`): un tema por laberinto, otro mientras los fantasmas
+     huyen y tres cortinas de una vuelta (inicio, limpio, fin). Los efectos
+     se sintetizan aquí con las mismas ondas de pulso del chip, para que todo
+     suene a la misma máquina. Todo va a `destination`, que volumen.js ya
+     convirtió en el volumen y el silencio de la sala. */
+  const Chip = window.Chip, Temas = window.Temas;
+  const TEMA_MAPA = ['propac-neon', 'propac-circuito', 'propac-reactor'];
+  let ac = null, salida = null, musGan = null, efGan = null, sirena = null;
   let mudo = false; try { mudo = localStorage.getItem('propac.mudo') === '1'; } catch (_) { /* nada */ }
   function audio() {
     if (!ac) {
       try {
         ac = new (window.AudioContext || window.webkitAudioContext)();
-        salida = ac.createGain(); salida.gain.value = mudo ? 0 : 0.55; salida.connect(ac.destination);
+        salida = ac.createGain(); salida.gain.value = mudo ? 0 : 0.6; salida.connect(ac.destination);
+        musGan = ac.createGain(); musGan.gain.value = 0.6; musGan.connect(salida);
+        efGan = ac.createGain(); efGan.gain.value = 1; efGan.connect(salida);
       } catch (_) { ac = null; }
     }
     if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
     return ac;
   }
+  /* Un efecto: una voz del chip (pulso, triángulo) o, sin chip, un oscilador. */
   function tono(f, dur, o = {}) {
     if (!ac || mudo) return;
-    const t = ac.currentTime + (o.en || 0), osc = ac.createOscillator(), g = ac.createGain();
-    osc.type = o.tipo || 'square';
+    const t = ac.currentTime + (o.en || 0);
+    if (Chip) { Chip.voz(ac, efGan, { t, f, f1: o.a, dur, vol: o.vol || 0.08, onda: o.onda || 'p50', sus: o.sus != null ? o.sus : 0.8 }); return; }
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.type = /^p/.test(o.onda || 'p') ? 'square' : 'triangle';
     osc.frequency.setValueAtTime(f, t);
     if (o.a) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.a), t + dur);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(o.vol || 0.08, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(o.vol || 0.08, t + 0.006);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(g); g.connect(salida);
+    osc.connect(g); g.connect(efGan);
     osc.start(t); osc.stop(t + dur + 0.02);
   }
+  function ruido(dur, o = {}) {
+    if (!ac || mudo || !Chip) return;
+    Chip.ruido(ac, efGan, { t: ac.currentTime + (o.en || 0), dur, vol: o.vol || 0.1, tono: o.tono || 1, tono1: o.tono1, corto: o.corto });
+  }
+  /* El «waka»: dos barridos que se alternan, uno que baja y otro que sube.
+     Con la racha suben de tono, para que se oiga cuando la racha crece. */
   let waka = 0;
   const SON = {
-    punto() { waka ^= 1; tono(waka ? 560 : 420, 0.07, { tipo: 'triangle', a: waka ? 380 : 600, vol: 0.07 }); },
-    poder() { tono(180, 0.35, { tipo: 'sawtooth', a: 900, vol: 0.07 }); tono(90, 0.4, { tipo: 'square', a: 300, vol: 0.05 }); },
-    come(n) { const b = 400 + 120 * n; [0, 1, 2, 3].forEach(i => tono(b * Math.pow(1.26, i), 0.07, { en: i * 0.045, vol: 0.08 })); },
-    muere() { tono(700, 1.1, { tipo: 'square', a: 60, vol: 0.09 }); tono(350, 1.1, { tipo: 'triangle', a: 40, vol: 0.06, en: 0.1 }); },
-    turbo() { tono(200, 0.28, { tipo: 'sawtooth', a: 1400, vol: 0.06 }); },
-    pulso() { tono(90, 0.6, { tipo: 'sine', a: 30, vol: 0.22 }); tono(1200, 0.3, { tipo: 'square', a: 200, vol: 0.04 }); },
-    item() { tono(880, 0.08, { vol: 0.06 }); tono(1320, 0.1, { vol: 0.06, en: 0.08 }); },
-    carga() { [660, 880, 1100].forEach((f, i) => tono(f, 0.09, { tipo: 'triangle', en: i * 0.06, vol: 0.09 })); },
-    chip() { [520, 660, 780, 1040, 1320].forEach((f, i) => tono(f, 0.08, { en: i * 0.05, vol: 0.07 })); },
-    vida() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tono(f, 0.1, { tipo: 'triangle', en: i * 0.09, vol: 0.09 })); },
-    nivel() { [392, 523, 659, 784, 1047].forEach((f, i) => tono(f, 0.12, { tipo: 'square', en: i * 0.1, vol: 0.06 })); },
-    limpio() { [1047, 784, 1047, 1319].forEach((f, i) => tono(f, 0.1, { tipo: 'triangle', en: i * 0.12, vol: 0.08 })); },
-    compuerta(abre) { tono(abre ? 300 : 160, 0.12, { tipo: 'square', a: abre ? 600 : 80, vol: 0.05 }); },
-    glitch() { for (let i = 0; i < 6; i++) tono(200 + Math.random() * 1600, 0.04, { en: i * 0.03, vol: 0.05 }); },
-    aviso() { tono(1500, 0.05, { vol: 0.04 }); tono(1500, 0.05, { vol: 0.04, en: 0.12 }); }
+    punto(mult) {
+      waka ^= 1;
+      const k = Math.pow(2, ((mult || 1) - 1) * 2 / 12);
+      if (waka) tono(560 * k, 0.075, { onda: 'tri', a: 300 * k, vol: 0.2, sus: 1 });
+      else tono(300 * k, 0.075, { onda: 'tri', a: 560 * k, vol: 0.2, sus: 1 });
+    },
+    poder() {
+      tono(130, 0.32, { onda: 'p25', a: 1040, vol: 0.07 }); tono(65, 0.34, { onda: 'tri', a: 260, vol: 0.12 });
+      ruido(0.25, { vol: 0.05, tono: 0.6, tono1: 2 });
+    },
+    come(n) {
+      // El fantasma comido: un barrido que sube, más alto cuanto más vale.
+      const b = 220 * Math.pow(1.5, Math.max(0, n - 1));
+      tono(b, 0.28, { onda: 'p25', a: b * 8, vol: 0.09 }); tono(b * 2, 0.22, { onda: 'p12', a: b * 12, vol: 0.05, en: 0.04 });
+    },
+    muere() {
+      // Diez giros que caen, como un trompo que se apaga, y dos «plop».
+      for (let i = 0; i < 10; i++) { const f = 980 - i * 68; tono(f, 0.1, { onda: 'p25', a: f * 0.62, vol: 0.08, en: 0.12 + i * 0.1 }); }
+      for (let i = 0; i < 2; i++) tono(130, 0.12, { onda: 'tri', a: 620, vol: 0.14, en: 1.15 + i * 0.16 });
+    },
+    turbo() { tono(160, 0.3, { onda: 'p12', a: 1500, vol: 0.06 }); ruido(0.3, { vol: 0.08, tono: 0.5, tono1: 2.4 }); },
+    pulso() {
+      tono(110, 0.6, { onda: 'tri', a: 32, vol: 0.3, sus: 1 }); tono(1600, 0.25, { onda: 'p12', a: 180, vol: 0.05 });
+      ruido(0.45, { vol: 0.16, tono: 1.4, tono1: 0.3 });
+    },
+    item() { tono(392, 0.09, { onda: 'p25', a: 784, vol: 0.08 }); tono(523, 0.12, { onda: 'p25', a: 1046, vol: 0.08, en: 0.09 }); },
+    carga() { [784, 1047, 1319, 1568].forEach((f, i) => tono(f, 0.08, { onda: 'tri', en: i * 0.05, vol: 0.12 })); },
+    chip() { [988, 1319].forEach((f, i) => tono(f, i ? 0.32 : 0.07, { onda: 'p50', en: i * 0.07, vol: 0.07, sus: 0.6 })); },
+    vida() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tono(f, 0.09, { onda: 'p25', en: i * 0.06, vol: 0.08 })); tono(2093, 0.3, { onda: 'tri', en: 0.36, vol: 0.1 }); },
+    compuerta(abre) { tono(abre ? 220 : 180, 0.1, { onda: 'p50', a: abre ? 440 : 70, vol: 0.05 }); ruido(0.07, { vol: 0.07, tono: abre ? 1.6 : 0.8, corto: true }); },
+    glitch() { for (let i = 0; i < 7; i++) tono(150 + Math.random() * 1800, 0.035, { onda: i % 2 ? 'p12' : 'p50', en: i * 0.028, vol: 0.05 }); ruido(0.18, { vol: 0.06, tono: 3, corto: true }); },
+    aviso() { tono(1500, 0.05, { onda: 'p25', vol: 0.05 }); tono(1500, 0.05, { onda: 'p25', vol: 0.05, en: 0.12 }); }
   };
-  /* La sirena de fondo: un oscilador que sube y baja; en miedo, otra ondulación. */
-  function suenaSirena(t) {
-    if (!ac || !salida) return;
-    const quiere = estado === 'jugando' && !pausado && E && E.estado === 'jugando' && E.congelado === 0 && !mudo;
+
+  /* La música: un Reproductor por tema, que al detenerse conserva por dónde
+     iba (el del laberinto sigue donde quedó cuando los fantasmas dejan de
+     huir). Una cortina suena una vez y el bucle espera a que acabe. */
+  const reps = {};
+  let bucle = null, temaNivel = 0, cortinaHasta = 0;
+  const cortinas = [];
+  function rep(id) {
+    if (!reps[id] && Chip && Temas && Temas.temas[id]) reps[id] = new Chip.Reproductor(ac, musGan, Temas.temas[id]);
+    return reps[id] || null;
+  }
+  function paraBucle() { if (bucle && reps[bucle]) reps[bucle].detener(); bucle = null; }
+  function cortina(id) {
+    if (!ac || !Chip || !Temas || !Temas.temas[id]) return;
+    paraBucle();
+    for (const c of cortinas.splice(0)) c.destruir();
+    if (mudo) return;
+    const r = new Chip.Reproductor(ac, musGan, Temas.temas[id]);
+    let pasos = 0, dur = 0;
+    for (const e of r.orden) pasos += e.s.largo;
+    for (let i = 0; i < pasos; i++) dur += r.duracionPaso(i);
+    r.tick(0.05 + dur - 0.01);       // toda la cortina queda agendada de una vez
+    cortinas.push(r);
+    cortinaHasta = ac.currentTime + 0.05 + dur;
+    setTimeout(() => { const i = cortinas.indexOf(r); if (i >= 0) { cortinas.splice(i, 1); r.destruir(); } }, (dur + 1.5) * 1000);
+  }
+  function callaCortinas() { for (const c of cortinas.splice(0)) c.destruir(); cortinaHasta = 0; }
+  /* Cada cuadro: qué tema toca ahora, y con qué prisa. */
+  function musica() {
+    if (!ac || !Chip || !Temas) return;
+    let quiere = null;
+    if (estado === 'jugando' && !pausado && !mudo && E && E.estado === 'jugando' && E.congelado === 0 && ac.currentTime >= cortinaHasta - 0.03)
+      quiere = E.miedoT > 0 && E.fantasmas.some(g => g.estado === 'miedo') ? 'propac-poder' : TEMA_MAPA[E.mapa.i % TEMA_MAPA.length];
+    if (quiere !== bucle) {
+      paraBucle();
+      if (quiere) {
+        const r = rep(quiere);
+        // Un laberinto nuevo empieza su tema desde el principio; la huida, siempre.
+        if (r && (quiere === 'propac-poder' || temaNivel !== E.nivel)) r.reinicia();
+        if (quiere !== 'propac-poder') temaNivel = E.nivel;
+        bucle = r ? quiere : null;
+      }
+    }
+    const r = bucle && reps[bucle];
+    if (!r) return;
+    // La prisa: un poco más rápido cada nivel, y en el último 30 % del laberinto.
+    const hecho = 1 - E.restantes / E.mapa.total;
+    r.tempo = bucle === 'propac-poder' ? 1 : 1 + Math.min(5, E.nivel - 1) * 0.015 + Math.max(0, hecho - 0.7) / 0.3 * 0.1;
+    r.tick(0.2);
+  }
+  /* Los ojos que vuelven a casa: un silbido agudo que ondula mientras haya. */
+  function suenaOjos(t) {
+    if (!ac || !efGan) return;
+    const quiere = estado === 'jugando' && !pausado && !mudo && E && E.estado === 'jugando' && E.congelado === 0 && E.fantasmas.some(g => g.estado === 'ojos');
     if (!sirena && quiere) {
       const o = ac.createOscillator(), g = ac.createGain();
-      o.type = 'triangle'; g.gain.value = 0; o.connect(g); g.connect(salida); o.start();
+      const w = Chip && Chip.ondas(ac).p25;
+      if (w) o.setPeriodicWave(w); else o.type = 'square';
+      g.gain.value = 0; o.connect(g); g.connect(efGan); o.start();
       sirena = { o, g };
     }
     if (!sirena) return;
     const ahora = ac.currentTime;
-    if (!quiere) { sirena.g.gain.setTargetAtTime(0, ahora, 0.05); return; }
-    const miedo = E.miedoT > 0, ritmo = miedo ? 9 : 3 + Math.min(4, E.nivel * 0.4);
-    const base = miedo ? 260 : 330 + (1 - E.restantes / E.mapa.total) * 220;
-    sirena.o.frequency.setTargetAtTime(base + Math.sin(t / 1000 * ritmo * Math.PI) * (miedo ? 40 : 70), ahora, 0.02);
-    sirena.g.gain.setTargetAtTime(0.018, ahora, 0.1);
+    if (!quiere) { sirena.g.gain.setTargetAtTime(0, ahora, 0.03); return; }
+    sirena.o.frequency.setTargetAtTime(1100 + Math.sin(t / 1000 * 15 * Math.PI) * 380, ahora, 0.01);
+    sirena.g.gain.setTargetAtTime(0.03, ahora, 0.05);
   }
   function pintaSonido() {
     const b = $('sound-button');
@@ -114,7 +200,8 @@
   pintaSonido();
   $('sound-button').addEventListener('click', () => {
     mudo = !mudo; audio();
-    if (salida) salida.gain.setTargetAtTime(mudo ? 0 : 0.55, ac.currentTime, 0.02);
+    if (salida) salida.gain.setTargetAtTime(mudo ? 0 : 0.6, ac.currentTime, 0.02);
+    if (mudo) { paraBucle(); callaCortinas(); }
     try { localStorage.setItem('propac.mudo', mudo ? '1' : '0'); } catch (_) { /* nada */ }
     pintaSonido();
   });
@@ -251,6 +338,7 @@
     prog.partidas++;
     guarda('propac.progreso', prog);
     reporta();
+    if (!abandono) cortina('propac-fin');
     $('finTitulo').textContent = abandono ? 'FIN' : 'GAME OVER';
     $('finPuntos').textContent = p.toLocaleString('es-CL');
     $('finNivel').textContent = E.nivel + ' · ' + E.mapa.nombre;
@@ -300,13 +388,13 @@
   function eventos() {
     for (const ev of E.ev) {
       switch (ev.k) {
-        case 'nivel': banner = { t: 'NIVEL ' + ev.n, s: E.mapa.nombre, hasta: E.tick + E.congelado }; paredes = null; if (ev.n > 1) SON.nivel(); break;
+        case 'nivel': banner = { t: 'NIVEL ' + ev.n, s: E.mapa.nombre, hasta: E.tick + E.congelado }; paredes = null; cortina('propac-inicio'); break;
         case 'listo': banner = { t: '¡LISTO!', s: E.vidas === 1 ? 'Última vida' : E.vidas + ' vidas', hasta: E.tick + E.congelado }; break;
-        case 'limpio': SON.limpio(); destello = 0.6; break;
-        case 'punto': SON.punto(); break;
+        case 'limpio': cortina('propac-limpio'); destello = 0.6; break;
+        case 'punto': SON.punto(M.multiplicador(E)); break;
         case 'poder': SON.poder(); destello = 0.25; break;
         case 'come': SON.come(E.comidos); textos.push({ x: ev.x, y: ev.y, t: String(ev.v), c: '#7ff', v: 1 }); chispas(ev.x, ev.y, COLORES[ev.id], 14); break;
-        case 'muere': SON.muere(); sacudida = 0.5; break;
+        case 'muere': paraBucle(); callaCortinas(); SON.muere(); sacudida = 0.5; break;
         case 'turbo': SON.turbo(); break;
         case 'pulso': SON.pulso(); ondas.push({ x: ev.x, y: ev.y, v: 1 }); sacudida = 0.25;
           if (ev.n) textos.push({ x: ev.x, y: ev.y - 10, t: '+' + 100 * ev.n, c: '#9cf', v: 1 }); break;
@@ -498,32 +586,77 @@
 
   function pac(x, y, t) {
     const p = E.pac, mult = M.multiplicador(E), col = RACHA_COL[mult - 1];
-    let boca = E.estado === 'jugando' ? 0.08 + Math.abs(Math.sin(E.tick / 3.2)) * 0.32 : 0.12;
+    let boca = E.estado === 'jugando' ? 0.06 + Math.abs(Math.sin(E.tick / 3.2)) * 0.3 : 0.14;
     if (E.estado === 'muere') {
-      // Se deshace en el último tramo del congelado.
+      // Se deshace en el último tramo del congelado: la boca se abre hasta comérselo entero.
       const f = 1 - E.congelado / 100;
       if (f > 0.25) {
         const g = clamp((f - 0.25) / 0.6, 0, 1);
         if (g >= 1) return;
-        boca = 0.12 + g * 0.88;
+        boca = 0.14 + g * 0.86;
       }
     }
-    const ang = [-Math.PI / 2, Math.PI, Math.PI / 2, 0][p.dir];
-    const r = 10;
+    const ang = [-Math.PI / 2, Math.PI, Math.PI / 2, 0][p.dir], r = 10.5;
     // El halo de la racha.
-    const gr = ctx.createRadialGradient(x, y, 3, x, y, r * 2.4);
-    gr.addColorStop(0, col + 'aa'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = E.turboT > 0 ? '#bff8ff' : col;
-    ctx.beginPath(); ctx.moveTo(x, y);
-    ctx.arc(x, y, r, ang + boca * Math.PI, ang + (2 - boca) * Math.PI);
-    ctx.closePath(); ctx.fill();
-    // Visor: una franja oscura, el toque «pro».
-    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
-    ctx.fillStyle = '#0b1030'; ctx.fillRect(-4, -7.5, 6, 3);
-    ctx.fillStyle = '#7ff'; ctx.fillRect(-3, -7, 3, 1.4);
-    ctx.restore();
+    const gr = ctx.createRadialGradient(x, y, 4, x, y, r * 2.3);
+    gr.addColorStop(0, col + '88'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * 2.3, 0, Math.PI * 2); ctx.fill();
+    if (E.turboT > 0) {
+      // Líneas de velocidad detrás.
+      const fx = Math.cos(ang), fy = Math.sin(ang);
+      ctx.strokeStyle = 'rgba(160,250,255,0.7)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (const s of [-0.55, 0, 0.55]) {
+        const largo = 7 + 4 * Math.abs(Math.sin(t / 60 + s * 3));
+        const bx = x - fx * (r + 3) - fy * s * r, by = y - fy * (r + 3) + fx * s * r;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - fx * largo, by - fy * largo); ctx.stroke();
+      }
+    }
+    dibujaPac(x, y, r, ang, boca, { aro: col, turbo: E.turboT > 0, ojo: E.estado !== 'muere' || boca < 0.5 });
     if (mult >= 5) for (let i = 0; i < 3; i++) { const a = t / 200 + i * 2.1; ctx.fillStyle = '#fff'; ctx.fillRect(x + Math.cos(a) * 15 - 1, y + Math.sin(a) * 15 - 1, 2, 2); }
+  }
+
+  /* El pacman de siempre —un círculo al que le falta una cuña— con volumen:
+     una esfera amarilla con brillo, un aro de neón del color de la racha, los
+     labios marcados y un ojo que mira hacia donde va (arriba si va de lado,
+     al costado si sube o baja). Lo usan la partida, el menú y las vidas. */
+  function dibujaPac(x, y, r, ang, boca, o = {}) {
+    const a0 = ang + boca * Math.PI, a1 = ang + (2 - boca) * Math.PI;
+    const silueta = () => { ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r, a0, a1); ctx.closePath(); };
+    ctx.save();
+    const cuerpo = ctx.createRadialGradient(x - r * 0.38, y - r * 0.45, r * 0.08, x, y, r * 1.05);
+    if (o.turbo) { cuerpo.addColorStop(0, '#ffffff'); cuerpo.addColorStop(0.4, '#c9fbff'); cuerpo.addColorStop(1, '#3fc6e8'); }
+    else { cuerpo.addColorStop(0, '#fffbe2'); cuerpo.addColorStop(0.32, '#ffea4a'); cuerpo.addColorStop(0.78, '#ffc21a'); cuerpo.addColorStop(1, '#ff8f0f'); }
+    silueta();
+    if (o.aro) { ctx.shadowColor = o.aro; ctx.shadowBlur = r * 0.9; }
+    ctx.fillStyle = cuerpo; ctx.fill();
+    ctx.shadowBlur = 0;
+    // Los labios: las dos aristas de la boca, más oscuras, para que se lea la cuña.
+    if (boca > 0.02) {
+      ctx.strokeStyle = o.turbo ? '#1d7f99' : '#c45a00'; ctx.lineWidth = Math.max(1, r * 0.13); ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a0) * r * 0.96, y + Math.sin(a0) * r * 0.96); ctx.lineTo(x, y);
+      ctx.lineTo(x + Math.cos(a1) * r * 0.96, y + Math.sin(a1) * r * 0.96);
+      ctx.stroke();
+    }
+    // El brillo, recortado a la silueta para no caer dentro de la boca.
+    silueta(); ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.4, y - r * 0.5, r * 0.3, r * 0.16, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (o.aro) {
+      ctx.strokeStyle = o.aro; ctx.lineWidth = Math.max(1, r * 0.12); ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(x, y, r - ctx.lineWidth / 2, a0 + 0.12, a1 - 0.12); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (o.ojo !== false) {
+      const fx = Math.cos(ang), fy = Math.sin(ang), lado = Math.abs(fx) > 0.5;
+      const ux = lado ? 0 : -1, uy = lado ? -1 : 0;
+      const ex = x + fx * r * 0.14 + ux * r * 0.52, ey = y + fy * r * 0.14 + uy * r * 0.52;
+      ctx.fillStyle = '#1a0f2e';
+      ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.15, r * 0.2, lado ? 0 : Math.PI / 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex + fx * r * 0.05 - r * 0.04, ey - r * 0.07, r * 0.065, 0, Math.PI * 2); ctx.fill();
+    }
   }
 
   function fantasma(g, x, y, t) {
@@ -628,7 +761,7 @@
     }
     for (let i = 0; i < Math.min(5, E.vidas); i++) {
       const x = LW - 16 - i * 20, y = bot + HUD / 2;
-      ctx.fillStyle = '#ffe14d'; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, 7, Math.PI * 1.2, Math.PI * 2.8); ctx.closePath(); ctx.fill();
+      dibujaPac(x, y, 7, Math.PI, 0.2, {});
     }
   }
 
@@ -648,9 +781,7 @@
     const y = LH - 70, x = ((t / 9) % (LW + 220)) - 60;
     ctx.fillStyle = '#ffe9b8';
     for (let i = 0; i < 20; i++) { const dx = i * TS; if (dx > x) ctx.fillRect(dx - 2, y - 2, 4, 4); }
-    ctx.fillStyle = '#ffe14d';
-    const b = 0.08 + Math.abs(Math.sin(t / 90)) * 0.3;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, 12, b * Math.PI, (2 - b) * Math.PI); ctx.closePath(); ctx.fill();
+    dibujaPac(x, y, 12, 0, 0.06 + Math.abs(Math.sin(t / 90)) * 0.3, { aro: '#ffe14d' });
     COLORES.slice(0, 4).forEach((c, i) => cuerpo(x - 40 - i * 30, y, 11, c, t, { id: i }));
   }
 
@@ -691,7 +822,8 @@
       sacudida = Math.max(0, sacudida - s * 1.6); destello = Math.max(0, destello - s * 1.5);
     }
     dibuja(t, estado === 'jugando' && !pausado ? clamp(acc / PASO_MS, 0, 1) : 1);
-    suenaSirena(t);
+    musica();
+    suenaOjos(t);
     pintaMarcador();
     requestAnimationFrame(frame);
   }
@@ -711,7 +843,7 @@
   /* ---------- Ganchos para probar desde la consola ----------
      Lo que cambie la partida la marca: se juega, pero no se manda. */
   window.__propac = {
-    estado: () => ({ estado, pausado, puntos: E ? E.puntos : 0, nivel: E ? E.nivel : 0, vidas: E ? E.vidas : 0, tick: E ? E.tick : 0, jugadas: jug.length, inm: document.documentElement.classList.contains('club-inm') }),
+    estado: () => ({ estado, pausado, puntos: E ? E.puntos : 0, nivel: E ? E.nivel : 0, vidas: E ? E.vidas : 0, tick: E ? E.tick : 0, jugadas: jug.length, inm: document.documentElement.classList.contains('club-inm'), musica: bucle, cortinas: cortinas.length }),
     motor: () => E,
     salta(n) { if (!E) return; tocado = true; const m = E.mapa; m.comida.fill(0); E.restantes = 0; if (n) E.nivel = Math.max(1, (n | 0) - 1); },
     vidas(n) { if (!E) return; tocado = true; E.vidas = Math.max(1, n | 0); },

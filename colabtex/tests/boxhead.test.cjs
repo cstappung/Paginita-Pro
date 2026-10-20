@@ -156,6 +156,31 @@ test('boxhead: tienda, potencia y armadura',()=>{
  assert.ok(D.ARMADURA.absorbe>0&&D.ARMADURA.absorbe<1&&D.ARMADURA.max>0);
 });
 
+test('boxhead: niveles de arma en la tienda, cada vez más caros y con tope',()=>{
+ for(const a of D.ARMAS){
+  let antes=0;
+  for(let n=0;n<D.NIVEL_ARMA.max;n++){const p=D.precioNivelArma(a.id,n);assert.ok(p>antes,a.nombre+' nivel '+n+' más caro');antes=p;}
+  assert.equal(D.precioNivelArma(a.id,D.NIVEL_ARMA.max),Infinity,a.nombre+' tope');
+  const b=D.arma(a.id),m=D.conNivel(b,D.NIVEL_ARMA.max);
+  if(b.d){assert.ok(m.d>b.d&&m.d<=500,a.nombre+' daño');}
+  if(b.cad){assert.ok(m.cad<b.cad&&m.cad>=0.03,a.nombre+' cadencia');}
+  if(Number.isFinite(b.max))assert.ok(m.max>b.max,a.nombre+' munición');
+  assert.equal(D.conNivel(b,0),b,'nivel 0 no toca nada');
+  assert.equal(D.conNivel(b,99).nivel,D.NIVEL_ARMA.max,'nivel acotado');
+ }
+ assert.deepEqual([0,1,2,3,4,5].map(D.rangoArma),[0,1,1,2,2,3]);
+ assert.equal(D.precioNivelArma(0,0),300);
+ assert.equal(D.precioNivelArma(99,0),Infinity);
+});
+
+test('boxhead: el muro reforzado se vende por unidad y aguanta más',()=>{
+ const t=D.TIENDA.find(x=>x.id==='blindado');
+ assert.ok(t&&t.tecla==='M'&&t.precio>0);
+ assert.equal(D.precioTienda('blindado',0),t.precio);
+ assert.ok(D.MURO_BLINDADO.vida>=D.ARMAS[5].vida*5&&D.MURO_BLINDADO.vida<=1200,'más que cinco muros falsos, dentro del tope del director');
+ assert.ok(D.MURO_BLINDADO.max>=1);
+});
+
 test('boxhead: la penetración se gana con mejoras y tiene tope',()=>{
  const todas=new Set(D.MEJORAS.map(m=>m.id));
  const conPen=D.ARMAS.filter(a=>(D.PASOS[a.id]||[]).some(p=>p[0]==='pen'));

@@ -39,8 +39,13 @@ html.tactil{--ancho-juego:min(100%,520px,calc((var(--alto-pantalla) - 320px) * .
 .cab{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 auto 10px;width:max(var(--ancho-juego),var(--ancho-min));max-width:100%}
 .logo{display:flex;align-items:center;gap:10px;margin:0;font:800 clamp(24px,6vw,34px)/1 var(--titulo);letter-spacing:.06em;color:#fff;text-shadow:0 0 10px var(--neon)}
 .logo b{color:var(--amarillo);text-shadow:0 0 12px #ffb02e}
-.logo-pac{width:.95em;height:.95em;border-radius:50%;background:conic-gradient(from 120deg,var(--amarillo) 0 300deg,transparent 300deg);filter:drop-shadow(0 0 6px #ffb02e);animation:muerde .35s steps(2) infinite alternate}
-@keyframes muerde{to{background:conic-gradient(from 100deg,var(--amarillo) 0 340deg,transparent 340deg)}}
+/* El pacman del título, como el del lienzo: esfera con brillo, la cuña de la boca (una máscara) y un ojo. */
+.logo-pac{position:relative;width:.95em;height:.95em;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#fffbe2 0 8%,#ffea4a 32%,#ffc21a 76%,#ff8f0f);
+  -webkit-mask:conic-gradient(from 120deg,#000 0 300deg,transparent 300deg);mask:conic-gradient(from 120deg,#000 0 300deg,transparent 300deg);
+  filter:drop-shadow(0 0 6px #ffb02e);animation:muerde .35s steps(2) infinite alternate}
+.logo-pac::after{content:"";position:absolute;left:52%;top:18%;width:15%;height:20%;border-radius:50%;background:#1a0f2e}
+@keyframes muerde{to{-webkit-mask:conic-gradient(from 100deg,#000 0 340deg,transparent 340deg);mask:conic-gradient(from 100deg,#000 0 340deg,transparent 340deg)}}
 .lema{margin:0;opacity:.7;font:400 9px/1.5 var(--pixel);flex:1 1 160px;color:var(--rosa)}
 
 /* --- Marcador --- */

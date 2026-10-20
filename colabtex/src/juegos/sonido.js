@@ -420,6 +420,11 @@ export const CANCIONES = [
   { id: "metrorush-city-bulevar", nombre: "El Bulevar", grupo: "De los juegos", desc: "Metro Rush · Subway City, synthpop del centro", chip: "metrorush-city-bulevar" },
   { id: "metrorush-city-parque", nombre: "El Parque", grupo: "De los juegos", desc: "Metro Rush · Subway City, juguetón con swing", chip: "metrorush-city-parque" },
   { id: "metrorush-city-bajo", nombre: "Bajo la ciudad", grupo: "De los juegos", desc: "Metro Rush · Subway City, drum'n'bass de túnel", chip: "metrorush-city-bajo" },
+  // PRO PACMAN: los tres laberintos y la huida de los fantasmas (las cortinas de una vuelta no van en la lista)
+  { id: "propac-neon", nombre: "Laberinto Neón", grupo: "De los juegos", desc: "PRO PACMAN · arcade saltarín en Fa mayor", chip: "propac-neon" },
+  { id: "propac-circuito", nombre: "Circuito", grupo: "De los juegos", desc: "PRO PACMAN · La menor a contratiempo, 156", chip: "propac-circuito" },
+  { id: "propac-reactor", nombre: "Reactor", grupo: "De los juegos", desc: "PRO PACMAN · alarma en Re menor, 164", chip: "propac-reactor" },
+  { id: "propac-poder", nombre: "¡A comer fantasmas!", grupo: "De los juegos", desc: "PRO PACMAN · la huida, arpegio nervioso a 186", chip: "propac-poder" },
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },

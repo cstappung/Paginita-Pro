@@ -257,6 +257,13 @@
           [988, 1319].forEach((f, i) => tono({ f1: f, dur: 0.1, vol: 0.15, tipo: 'square', t0: 0.04 + i * 0.07 }));
           ruido({ tipo: 'highpass', f: 5000, dur: 0.12, vol: 0.12, t0: 0.12 });
           break;
+        case 'mejora':
+          // Subir un arma de nivel: el cerrojo, un golpe de yunque y una escala que brilla.
+          clic(0, 1800, 0.25); clic(0.06, 2600, 0.2);
+          ruido({ tipo: 'bandpass', f: 3200, q: 8, dur: 0.25, vol: 0.18, t0: 0.1 });
+          [659, 880, 1175, 1568].forEach((f, i) => tono({ f1: f, dur: 0.14, vol: 0.13, tipo: 'square', t0: 0.12 + i * 0.06 }));
+          tono({ f1: 2349, dur: 0.35, vol: 0.06, tipo: 'triangle', t0: 0.36 });
+          break;
         case 'nivel':
           [392, 523, 659, 784].forEach((f, i) => tono({ f1: f, f2: f * 1.01, dur: 0.22, vol: 0.15, tipo: 'triangle', t0: i * 0.11 }));
           tono({ f1: 98, dur: 0.6, vol: 0.25, t0: 0.33 });
