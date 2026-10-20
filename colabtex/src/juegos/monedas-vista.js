@@ -9,6 +9,7 @@ import {
   RECORD, diaChile, rachaHoy, pagoDia, PAGO_DIA, TOPE_DIA, PAGO_CLUB, TOPE_CLUB_DIA, TOPE_BBTAN_DIA, PODIO
 } from "./monedas.js";
 import { MOTOR } from "./prodrop-cartas.js";
+import { nombreHtml } from "./tintas.js";
 
 /* La moneda se dibuja: el emoji de la moneda es de 2020 y en Windows 10 y en
    navegadores viejos sale como un cuadro vacío. */
@@ -33,7 +34,7 @@ function fila(f, i, uid, perfil, colorDe, chico, datos) {
   const q = quien(f.uid, perfil(f.uid), null, { nombre: f.nombre, foto: f.foto }, colorDe);
   const med = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
   return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${med}</b>${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(f.uid, perfil(f.uid), datos), chico ? 26 : 34, f.uid)}
-    <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}">${esc(q.nombre)}</span>
+    <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}" translate="no">${nombreHtml(f.uid, esc(q.nombre))}</span>
     <strong class="jg-mo-cant">${formatoMonedas(f.saldo)} ${MONEDA}</strong></li>`;
 }
 

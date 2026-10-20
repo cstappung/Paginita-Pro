@@ -17,6 +17,7 @@ import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombr
 import { LOGROS } from "./logros.js";
 import { adorno, tieneAdorno } from "./marcos-animados.js";
 import { capaMascota } from "./perfil-mascota.js";
+import { nombreHtml } from "./tintas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -73,7 +74,7 @@ export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor, cartas })
     <div class="jg-mini-fondo${f.oscuro ? " oscuro" : ""}" style="background:${esc(f.css(q.color))}">${capaFondo(f)}</div>
     <div class="jg-mini-cab">
       ${avatarMarco(q.foto, q.nombre, q.color, marco, 76)}
-      <div class="jg-mini-id"><b>${esc(q.nombre)}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
+      <div class="jg-mini-id"><b>${nombreHtml(uid, esc(q.nombre), editor ? p && p.tinta || "normal" : "")}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
     </div>
     ${q.bio ? `<p class="jg-mini-bio">${esc(q.bio)}</p>` : `<p class="jg-mini-bio jg-nada">${uid === yo ? "Aún no escribes nada sobre ti." : "Sin descripción."}</p>`}
     <div class="jg-mini-num">${n.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>
@@ -194,7 +195,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <div class="jg-pf-hero-in">
           ${avatarMarco(q.foto, q.nombre, q.color, marco, 116)}
           <div class="jg-pf-id">
-            <h1>${esc(q.nombre)}</h1>
+            <h1>${nombreHtml(uid, esc(q.nombre))}</h1>
             ${q.bio ? `<p>${esc(q.bio)}</p>` : propio ? `<p class="jg-nada">Escribe algo sobre ti en «Personalizar».</p>` : ""}
           </div>
         </div>

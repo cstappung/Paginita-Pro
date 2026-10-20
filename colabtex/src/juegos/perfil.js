@@ -36,6 +36,7 @@ import { PRECIO_TIENDA } from "./tienda.js";
 import { juegoOculto } from "./ocultos.js";   // (BT3 es privado: ni su premio de campeón a quien no lo ve)
 import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
+import { TINTAS, tintaDe, nombreHtml } from "./tintas.js";
 
 export const LARGO_NICK = 24;
 
@@ -109,8 +110,10 @@ function avatar(foto, nombre, color) {
    dice cuánto hay (null mientras la economía no ha llegado entera).
    `mascota` = {opciones: {mascotas, bailes} | null, vista(c, b, cb)}: lo que
    se puede elegir de Mascotas y cómo se ve (perfil-mascota.js). Sin
-   opciones (la economía no llegó) la elegida se guarda tal como estaba. */
-export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp }) {
+   opciones (la economía no llegó) la elegida se guarda tal como estaba.
+   `referidos`: cuántos trajo (tintas.js desbloquea el color del nombre con
+   ellos); null mientras no se sabe, y entonces solo se ofrece lo guardado. */
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp, referidos: nRef = null }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -123,6 +126,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   let bio = p.bio || "";
   let marco = marcoDe(p.marco) ? p.marco : "anillo";
   let fondo = fondoDe(p.fondo) ? p.fondo : "color";
+  let tinta = tintaDe(p.tinta) ? p.tinta : "";
   const guardada = Array.isArray(p.vitrina) ? p.vitrina : p.vitrina && typeof p.vitrina === "object" ? Object.values(p.vitrina) : [];
   let vitrina = guardada.slice(0, MAX_VITRINA);
   const opM = mp && mp.opciones;
@@ -169,6 +173,10 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
                   <textarea id="pfBio" maxlength="${LARGO_BIO}" rows="2" placeholder="Una frase: tu juego favorito, tu grito de guerra…"></textarea>
                 </label>
                 <div class="jg-campo">
+                  <span>Color del nombre <small>· se desbloquea trayendo gente con tu código</small></span>
+                  <div class="jg-tn-ops" id="pfTintas"></div>
+                </div>
+                <div class="jg-campo">
                   <span>Color</span>
                   <div class="jg-colores" id="pfColores"></div>
                   <label class="jg-color-libre">
@@ -204,7 +212,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   const prevMasc = mp ? capaMascota($("#pfPrev"), "en-mini") : null;
   let cerrado = false;
   const cierra = () => { cerrado = true; if (prevMasc) prevMasc.cierra(); capa.remove(); };
-  const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina }, foto !== null ? { foto } : {});
+  const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina, tinta }, foto !== null ? { foto } : {});
   const ops = opcionesVitrina(est);
   const repinta = () => { if (!cerrado) pinta(); };
   /* La vista de la mascota elegida (undefined mientras llega su estado). */
@@ -256,6 +264,17 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
       `<button class="jg-color${c.toLowerCase() === color.toLowerCase() ? " on" : ""}"
          data-color="${c}" style="background:${c}" title="${c}"></button>`).join("");
     $("#pfColor").value = /^#[0-9a-f]{6}$/i.test(color) ? color : "#0d9488";
+    /* El color del nombre: «Normal» y los cuatro, con el nombre de verdad
+       pintado en cada uno. Uno cerrado dice cuántos referidos faltan. */
+    const nomEsc = esc(nom);
+    $("#pfTintas").innerHTML = [{ id: "", n: 0, nombre: "Normal" }, ...TINTAS].map(t => {
+      const abierto = !t.n || (nRef == null ? t.id === tinta : nRef >= t.n);
+      const falta = nRef == null ? "" : `${t.n - nRef} ${t.n - nRef === 1 ? "referido más" : "referidos más"}`;
+      return `<button type="button" class="jg-tn-op${t.id === tinta ? " on" : ""}${abierto ? "" : " cerrado"}" data-tinta="${t.id}" ${abierto ? "" : 'aria-disabled="true"'}
+        title="${esc(abierto ? t.nombre : `Se desbloquea con ${t.n} ${t.n === 1 ? "referido" : "referidos"}`)}">
+        <b translate="no">${nombreHtml("", nomEsc, t.id || "normal")}</b>
+        <small>${abierto ? esc(t.nombre) + (t.efecto ? ` · ${esc(t.efecto)}` : "") : `🔒 ${t.n} ${t.n === 1 ? "referido" : "referidos"}${falta ? ` · te faltan ${esc(falta)}` : ""}`}</small></button>`;
+    }).join("");
     $("#pfGoogle").style.display = (base && base.foto) ? "" : "none";
     $("#pfQuitar").style.display = (foto === "" ) ? "none" : "";
     $("#pfBioN").textContent = `${bio.length}/${LARGO_BIO}`;
@@ -301,6 +320,11 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     color = b.getAttribute("data-color"); pinta();
   };
   $("#pfColor").oninput = e => { color = e.target.value; pinta(); };
+  $("#pfTintas").onclick = e => {
+    const b = e.target.closest("[data-tinta]");
+    if (!b || b.classList.contains("cerrado")) return;
+    tinta = b.getAttribute("data-tinta"); pinta();
+  };
   $("#pfSubir").onclick = () => $("#pfArchivo").click();
   $("#pfGoogle").onclick = () => { foto = null; falla(""); pinta(); };
   $("#pfQuitar").onclick = () => { foto = ""; falla(""); pinta(); };
@@ -384,7 +408,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const b = e.currentTarget;
     b.disabled = true; falla("");
     const salida = Object.assign({ nick: nick.trim().slice(0, LARGO_NICK), color },
-      limpiaPerfil({ marco, fondo, bio, vitrina, mascota }));
+      limpiaPerfil({ marco, fondo, bio, vitrina, mascota, tinta }));
     if (foto !== null) salida.foto = foto;
     else if (base && esFotoGoogle(base.foto)) salida.foto = base.foto;   // «la de Google», a la vista de todos
     try { await onGuardar(salida); cierra(); }

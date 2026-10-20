@@ -25,6 +25,7 @@ import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
 import { mezcla } from "./perfil.js";
 import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
 import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
+import { nombreHtml } from "./tintas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -302,7 +303,7 @@ export function crearRanks(ctx) {
       <td class="jg-th-n">${puesto(i)}</td>
       <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
         ${foto(f, 26)}
-        <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${f.jugadas || 0} jugadas · ${f.ganadas || 0} ganadas</small></span>
+        <span translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${f.jugadas || 0} jugadas · ${f.ganadas || 0} ganadas</small></span>
       </td>
       <td class="jg-num jg-opc">${f.jugadas || 0}</td>
       <td class="jg-num jg-gan jg-opc">${f.ganadas || 0}</td>
@@ -324,7 +325,7 @@ export function crearRanks(ctx) {
     const q = nombreDe(u);
     return `<span class="jg-jug jg-rkc-quien" data-perfil="${esc(u)}" data-nombre="${esc(q.nombre)}">
       ${foto({ uid: u, nombre: q.nombre, foto: q.foto, color: q.color }, 26)}
-      <span>${esc(q.nombre)}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
+      <span translate="no">${nombreHtml(u, esc(q.nombre))}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
   }
   const unoEn = p => { const n = Math.round(1 / p); return n >= 1e6 ? `${(n / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })} millones` : n.toLocaleString("es-CL"); };
   function pintaCartas(el) {
@@ -424,7 +425,7 @@ export function crearRanks(ctx) {
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
         <div class="jg-rk-av${conMarco(f) ? " con-marco" : ""}" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
-        <b class="jg-rk-nom" title="${esc(f.nombre || "")}">${esc(f.nombre || "Sin nombre")}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
+        <b class="jg-rk-nom" title="${esc(f.nombre || "")}" translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
         <span class="jg-rk-tit">${TITULO[i]}</span>
         <div class="jg-rk-pts"><b>${m.txt(m.valor(f))}</b>${m.unidad ? ` ${m.unidad}` : ""}</div>
         <small>${detalle}</small>

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610200112"></script>
+<script src="i18n.js?v=202610200140"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3992,6 +3992,23 @@ html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
 .jg-ref-cta:hover{filter:brightness(1.08)}
 .jg-ref-cta .jg-moneda{width:1em;height:1em;vertical-align:-.12em}
 .jg-ref-tops{margin-top:18px;padding-top:14px;border-top:1px solid #efebf5}
+.jg-ref-premios{margin-top:18px;padding-top:14px;border-top:1px solid #efebf5}
+.jg-ref-premios h3{margin:0 0 8px;font-size:14px}
+#refColores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#refColores .jg-ref-nota{grid-column:1/-1;margin:2px 0 0}
+.jg-ref-tn{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px;border-radius:9px;background:#f6f4fb;border:1px solid transparent}
+.jg-ref-tn b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-ref-tn small{font-size:10.5px;color:#6b7680}
+.jg-ref-tn:not(.ok) b{opacity:.6}
+.jg-ref-tn.ok{border-color:#1fa46355;background:#eefaf3}
+.jg-ref-tn.ok small{color:#1b7a45;font-weight:700}
+@media(max-width:480px){#refColores{grid-template-columns:repeat(2,minmax(0,1fr))}}
+html[data-tema=oscuro] .jg-ref-premios{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ref-premios h3{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-tn{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-ref-tn small{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ref-tn.ok{background:#16352a;border-color:#5fd99a44}
+html[data-tema=oscuro] .jg-ref-tn.ok small{color:#5fd99a}
 .jg-ref-tops h3{margin:0 0 6px;font-size:14px}
 html[data-tema=oscuro] .jg-ref-cant{color:#c4b1ff}
 html[data-tema=oscuro] .jg-ref-tops{border-color:var(--os-borde)}
@@ -4019,6 +4036,67 @@ html[data-tema=oscuro] .jg-ref-aviso{color:#f5c26b}
 html[data-tema=oscuro] .jg-ref-mio{background:linear-gradient(135deg,#2a2045,#33291a);border-color:#6b55a8}
 html[data-tema=oscuro] .jg-ref-mio b{color:#c4b1ff}
 @media (prefers-reduced-motion:reduce){.jg-ref-pop{animation:none}.jg-ref-barra i{transition:none}}
+
+/* ---- El color del nombre (juegos/tintas.js) ----
+   Cada nombre va en `.jg-nm[data-nm=uid]`; la hoja `#jgTintas` (que
+   escribe tintas.js) le pone el color y el efecto que desbloqueó: brasa,
+   destello, reflejo y aura dorada, de menos a más. Aquí solo están los
+   valores, que cambian con el fondo, y las animaciones. Sobre un fondo
+   claro el rojo y el azul van oscuros, y el verde claro y el dorado, que
+   solos no se leen sobre blanco, llevan un contorno oscuro (el del dorado
+   en `filter`, porque su reflejo es `background-clip:text`). Sobre uno
+   oscuro (tema oscuro, cabecera, casino, podio, héroe oscuro) van claros
+   y sin contorno, con más halo. */
+/* El héroe del perfil con un fondo claro es claro también en tema oscuro. */
+:root,html[data-tema=oscuro] .jg-pf-hero:not(.oscuro){
+  --tn-rojo:#d01f2f;--tn-rojo-s:0 0 0 #ff3b3b00;--tn-rojo-s2:0 0 7px #ff3b3b70;
+  --tn-verde:#3dd477;--tn-verde-s:.6px 0 0 #15572f,-.6px 0 0 #15572f,0 .6px 0 #15572f,0 -.6px 0 #15572f,.45px .45px 0 #15572f,-.45px -.45px 0 #15572f,.45px -.45px 0 #15572f,-.45px .45px 0 #15572f,0 1px 1px #15572f66;--tn-verde-s2:.6px 0 0 #15572f,-.6px 0 0 #15572f,0 .6px 0 #15572f,0 -.6px 0 #15572f,.45px .45px 0 #15572f,-.45px -.45px 0 #15572f,.45px -.45px 0 #15572f,-.45px .45px 0 #15572f,0 0 9px #2fd06faa;--tn-verde-chispa:#17a34a;
+  --tn-azul:#1d5fd6;--tn-azul-luz:#9cc8ff;--tn-azul-f:drop-shadow(0 0 3px #3b82f655);--tn-azul-chispa:#3b82f6;
+  --tn-dorado:#ffc22e;--tn-dorado-luz:#fff6cc;--tn-dorado-f:drop-shadow(.55px 0 0 #7a4a00) drop-shadow(-.55px 0 0 #7a4a00) drop-shadow(0 .55px 0 #7a4a00) drop-shadow(0 -.55px 0 #7a4a00) drop-shadow(0 0 3px #f5a52466);--tn-dorado-f2:drop-shadow(.55px 0 0 #7a4a00) drop-shadow(-.55px 0 0 #7a4a00) drop-shadow(0 .55px 0 #7a4a00) drop-shadow(0 -.55px 0 #7a4a00) drop-shadow(0 0 7px #f5a524bb);
+  --tn-chispa:#e88a00;
+}
+html[data-tema=oscuro],.head,.jg-cs,.jg-rk-podio,.jg-pf-hero.oscuro{
+  --tn-rojo:#ff6b6b;--tn-rojo-s:0 0 4px #ff4d4d55;--tn-rojo-s2:0 0 11px #ff4d4dcc;
+  --tn-verde:#5ee88a;--tn-verde-s:0 0 4px #5ee88a44;--tn-verde-s2:0 0 12px #5ee88add;--tn-verde-chispa:#b6ffcf;
+  --tn-azul:#7cb2ff;--tn-azul-luz:#ffffff;--tn-azul-f:drop-shadow(0 0 5px #7cb2ff99);--tn-azul-chispa:#cfe3ff;
+  --tn-dorado:#ffd54a;--tn-dorado-luz:#fffbe6;--tn-dorado-f:drop-shadow(0 0 4px #ffb80088);--tn-dorado-f2:drop-shadow(0 0 11px #ffcf3dee) drop-shadow(0 0 2px #fff8);
+  --tn-chispa:#ffe27a;
+}
+/* El chat flotante de la sala a pantalla completa va sobre el juego, con
+   la sombra negra de sus letras: los colores claros, y esa sombra. */
+html.jg-inm .jg-chat-msg{
+  --tn-rojo:#ff7a7a;--tn-verde:#5ee88a;--tn-azul:#8ab8ff;--tn-azul-luz:#fff;--tn-dorado:#ffd54a;--tn-dorado-luz:#fffbe6;
+  --tn-rojo-s:0 1px 2px #000,0 0 6px #000c;--tn-rojo-s2:0 1px 2px #000,0 0 10px #ff4d4dcc;
+  --tn-verde-s:var(--tn-rojo-s);--tn-verde-s2:0 1px 2px #000,0 0 10px #5ee88acc;--tn-verde-chispa:#b6ffcf;
+  --tn-azul-f:drop-shadow(0 1px 1px #000) drop-shadow(0 0 4px #000a);--tn-azul-chispa:#cfe3ff;
+  --tn-dorado-f:drop-shadow(0 1px 1px #000) drop-shadow(0 0 5px #ffb800aa);--tn-dorado-f2:drop-shadow(0 1px 1px #000) drop-shadow(0 0 11px #ffcf3dee);
+  --tn-chispa:#ffe27a;
+}
+.jg-nm{font:inherit}
+@keyframes jgTnBrasa{0%,100%{text-shadow:var(--tn-rojo-s)}50%{text-shadow:var(--tn-rojo-s2)}}
+@keyframes jgTnDestello{0%,100%{text-shadow:var(--tn-verde-s)}50%{text-shadow:var(--tn-verde-s2)}}
+@keyframes jgTnReflejo{0%{background-position:100% 0}70%,100%{background-position:0 0}}
+@keyframes jgTnAura{0%,100%{filter:var(--tn-dorado-f)}50%{filter:var(--tn-dorado-f2)}}
+@keyframes jgTnChispa{0%,100%{opacity:.35;transform:scale(.7) rotate(0)}50%{opacity:1;transform:scale(1.2) rotate(30deg)}}
+/* Lo elegido en el editor manda sobre la hoja: aquí se borra lo que la
+   hoja le haya puesto a ese nombre, y las reglas `html .jg-nm.jg-tn-*`
+   de la hoja, que van detrás, pintan lo elegido. */
+html .jg-nm[class*="jg-tn-"]{animation:none;background:none;-webkit-text-fill-color:currentColor;filter:none;text-shadow:none}
+html .jg-nm[class*="jg-tn-"]::before,html .jg-nm[class*="jg-tn-"]::after{content:none}
+html .jg-nm.jg-tn-normal{color:inherit;text-shadow:inherit}
+@media (prefers-reduced-motion:reduce){.jg-nm,.jg-nm::before,.jg-nm::after,html .jg-nm[class*="jg-tn-"],html .jg-nm[class*="jg-tn-"]::before,html .jg-nm[class*="jg-tn-"]::after{animation:none!important}}
+.jg-tn-ops{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.jg-tn-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:7px 9px;border:1px solid #e2e8ec;border-radius:9px;background:#fff;cursor:pointer;text-align:left;font-family:inherit}
+.jg-tn-op b{max-width:100%;font-size:13.5px;font-weight:700;color:#1f2933;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-tn-op small{font-size:10.5px;color:#6b7680;line-height:1.3}
+.jg-tn-op.on{border-color:var(--jg-purple,#7042df);box-shadow:0 0 0 2px #7042df33}
+.jg-tn-op.cerrado{cursor:not-allowed;background:#f6f7f9}
+.jg-tn-op.cerrado b{opacity:.55}
+html[data-tema=oscuro] .jg-tn-op{background:var(--os-sup2);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-tn-op b{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-tn-op small{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-tn-op.cerrado{background:var(--os-sup)}
+html[data-tema=oscuro] .jg-tn-op.on{border-color:#c4b1ff;box-shadow:0 0 0 2px #c4b1ff33}
 .jg-mo-toast small{display:flex;align-items:center;gap:4px}
 .jg-mo-toast .jg-moneda{width:1.05em;height:1.05em}
 @media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy,.jg-racha-btn{animation:none}}
@@ -6127,6 +6205,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610200112"></script>
+<script src="juegos-app.js?v=202610200140"></script>
 </body>
 </html>
