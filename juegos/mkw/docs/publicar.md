@@ -13,13 +13,15 @@ dueño, 2026-10-19).
 Con el código del momento, sin nada a medio hacer en la carpeta:
 
 ```bash
-python herramientas/compilar-web.py --modo navegador --final      # sin nombres de funciones + mkw.wasm.br (~16 MB)
-node web/navegador/guion.mjs "<pasos de una carrera>" --semilla     # 3 veces, copas distintas (como en §65)
-node herramientas/correr-todo.mjs                                   # todas las pruebas (~25 min)
+python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-final   # en su propia carpeta (~16 MB .br)
+MKW_BUILD=build/web-final/navegador node web/navegador/guion.mjs "<pasos de una carrera>" --semilla   # 3 veces, copas distintas (§65)
+MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs                               # todas las pruebas (~25 min)
 ```
 
-Las semillas (`pipelines.bin`, `bloques.json`) se rehacen si cambió cómo se dibuja o qué lee el juego; si no, sirven
-las de antes. Recién con todo bien se pasa al paso 2.
+El programa final queda en **`build/web-final/navegador`** (no en `build/web/navegador`, que es el taller de todos
+los días de las sesiones de trabajo): ahí van también sus semillas (`pipelines.bin`, `bloques.json`) y las imágenes
+(`imagenes/`, con la del menú de inicio). Las semillas se rehacen si cambió cómo se dibuja o qué lee el juego; si no,
+sirven las de antes (se copian de `build/web/navegador`). Recién con todo bien se pasa al paso 2.
 
 ## Qué va dónde
 
@@ -48,14 +50,16 @@ En PowerShell, en `C:\Users\zilon\Desktop\Gaming\MKW RETRO`:
 
 ```powershell
 $env:R2_CUENTA="<Account ID>"; $env:R2_ID="<Access Key ID>"; $env:R2_SECRETO="<Secret Access Key>"; $env:R2_BUCKET="<nombre del bucket>"
+$env:MKW_BUILD="build/web-final/navegador"   # el programa final del paso 0 (con sus semillas e imágenes)
 node herramientas/subir-r2.mjs              # revisar: arma la lista (build/web/publicar/lista.tsv), sin red
 node herramientas/subir-r2.mjs --subir      # sube lo que falta (se puede cortar y repetir: salta lo que ya está igual)
 node herramientas/subir-r2.mjs --comprobar  # revisa en R2 cada archivo (tamaño y huella SHA-256)
 ```
 
-- La imagen del menú de inicio (`build/web/navegador/imagenes/inicio/jlokart.webp`, 264 KB) va en la misma subida: si
-  falta, el juego abre sin ese menú. Se rehace con `python -I herramientas/preparar-inicio.py <imagen original>`.
-- Son **~6.100 archivos, ~4,9 GB**. A 20 Mbit/s de subida tarda ~35 min; a 10 Mbit/s, ~70 min.
+- La imagen del menú de inicio (`build/web-final/navegador/imagenes/inicio/jlokart.webp`, 264 KB) va en la misma subida: si
+  falta, el juego abre sin ese menú. Se rehace con `python -I herramientas/preparar-inicio.py <imagen original>` (la deja en
+  `build/web/navegador/imagenes/inicio/`: copiarla a la misma ruta de `build/web-final/navegador`).
+- Son **~7.300 archivos, ~5,0 GB**. A 20 Mbit/s de subida tarda ~35 min; a 10 Mbit/s, ~70 min.
 - Cada archivo va con su huella SHA-256: R2 la recalcula y **rechaza** un archivo que llegó distinto.
 - `mkw/version.json` se sube **al final**: hasta que está todo arriba, quien juegue sigue con la versión anterior.
 - Espacio: el plan gratis de R2 da **10 GB** al mes. Con la ISO de BT3 + Mario Kart (~4,9 GB) mira el uso en

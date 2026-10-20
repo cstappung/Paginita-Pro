@@ -31,7 +31,7 @@ const PRUEBAS = [
   { n: 'sitio-mkw', cmd: ['--test', 'tests/mkw.test.cjs', 'tests/mkw-worker.test.cjs'], cwd: 'terceros/Paginita-Pro/colabtex', juego: false },
   { n: 'subir-r2', cmd: ['herramientas/prueba-subir-r2.mjs'], juego: false },
   { n: 'arranque-node', cmd: ['web/node/prueba-arranque.mjs'], juego: true },
-  { n: 'navegador', cmd: [nav('prueba-navegador.mjs'), '900'], juego: true },
+  { n: 'navegador', cmd: [nav('prueba-navegador.mjs'), '1800'], juego: true },   // 30 s: el ajuste de ritmo del worklet (§88) centra la cola recién pasados ~20 s
   { n: 'partidas', cmd: [nav('prueba-partidas.mjs')], juego: true },
   { n: 'nube', cmd: [nav('prueba-nube.mjs')], juego: true },
   { n: 'tactil', cmd: [nav('prueba-tactil.mjs')], juego: true },
@@ -79,6 +79,9 @@ function cuenta(texto) {
   const pasa = [...texto.matchAll(/^(?:ℹ|#) pass (\d+)/gm)].pop(), falla = [...texto.matchAll(/^(?:ℹ|#) fail (\d+)/gm)].pop();
   if (pasa) return { bien: +pasa[1], mal: falla ? +falla[1] : 0 };
   m = [...texto.matchAll(/(\d+) bien, (\d+) mal/g)].pop();
+  if (m) return { bien: +m[1], mal: +m[2] };
+  // prueba-nube: "9 ✓ · 0 ✗"
+  m = [...texto.matchAll(/(\d+) ✓ · (\d+) ✗/g)].pop();
   if (m) return { bien: +m[1], mal: +m[2] };
   return null;
 }

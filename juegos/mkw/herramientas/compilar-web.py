@@ -314,7 +314,8 @@ def main():
     unidades += [("thp", RAIZ / "web/thp" / f) for f in ("thp_decodificador.cpp", "thp_nativo.cpp")]
     unidades += [("thp", RAIZ / "web/dvd/rutas_nativo.cpp"), ("thp", RAIZ / "web/juego/semillas_nativo.cpp"),
                 ("thp", RAIZ / "web/juego/lockstep_nativo.cpp"), ("thp", RAIZ / "web/juego/paginas_nativo.cpp"),
-                ("thp", RAIZ / "web/juego/directo_nativo.cpp"), ("thp", RAIZ / "web/juego/modos_nativo.cpp")]
+                ("thp", RAIZ / "web/juego/directo_nativo.cpp"), ("thp", RAIZ / "web/juego/modos_nativo.cpp"),
+                ("thp", RAIZ / "web/juego/invitados_nativo.cpp")]   # §86: las caras de los Mii invitados
     # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
     # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
     unidades += [("thp", RAIZ / "web/red/red_web.cpp")]
@@ -475,6 +476,8 @@ def main():
         # llena antes de arrancar; los archivos grandes del disco se piden por HTTP al leerlos (web/navegador).
         exports += ["_mkw_web_cuadros", "_mkw_web_ms_espera", "_mkw_web_reloj", "_mkw_web_pad", "_mkw_web_mem",
                     "_mkw_web_sonido_cola_ms", "_mkw_web_sonido_ritmo", "_mkw_web_sonido_tirados",
+                    # la demora del sonido medida con un clic (§88, sonido.mjs medirDemora)
+                    "_mkw_web_sonido_marca", "_mkw_web_sonido_marca_ms",
                     # la lista de pipelines usados, para precalentarlos en la próxima visita (web/navegador/pipelines.mjs)
                     "_mkw_web_pipelines_cuantos", "_mkw_web_pipelines_armar", "_mkw_web_pipelines_datos",
                     # …y pedirlos recién cuando el juego llegó a su primera pantalla (MKW_PRECALENTAR=tarde, §76)

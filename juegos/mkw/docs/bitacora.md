@@ -205,7 +205,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Cola de audio (FIFO)** | Un búfer donde el juego deja sonido y la tarjeta lo saca en el mismo orden (primero en entrar, primero en salir). Si se vacía, hay un corte; si se llena, se tira un bloque. |
 | **Deriva de reloj (clock drift)** | Dos relojes "de la misma frecuencia" nunca son idénticos: uno adelanta un poquito al otro y la diferencia se acumula. Aquí: el reloj del juego (enganchado al monitor) contra el cristal de la tarjeta de sonido. |
 | **Controlador PI** | Un control con parte Proporcional (corrige según el error de ahora) e Integral (acumula el error para eliminar la diferencia fija). Es el filtro de lazo típico de un PLL o de un lazo de control de un convertidor. |
-| **Latencia (de audio)** | La demora entre que el juego produce un sonido y se oye. Aquí ~100–150 ms: el bloque del navegador más lo que espera en la cola. |
+| **Latencia (de audio)** | La demora entre que el juego produce un sonido y se oye. Medida con un clic (§88): ~177 ms con el ScriptProcessorNode de SDL3 (su bloque más la cola del runtime y la del navegador), ~60 ms con el AudioWorklet. |
 | **Comparación A/B** | Correr lo mismo dos veces cambiando una sola cosa (con y sin el módulo de sonido) para ver si esa cosa es la causa. |
 | **Traza de Chrome (tracing)** | El registro interno de Chrome: anota con hora exacta lo que hace cada parte (la página, el compositor, la tarjeta). Se graba por CDP. El evento `Display::FrameDisplayed` dice en qué refresco se mostró cada imagen: es la medida de lo que de verdad se ve (como poner la punta del osciloscopio en la salida y no en una señal interna). |
 | **Compositor (de Chrome) / DWM (de Windows)** | El compositor junta todo lo que se ve de la página (el canvas, los textos) en una sola imagen y se la pasa a Windows; el DWM (Desktop Window Manager) junta las ventanas de todos los programas y la manda al monitor en cada refresco. Cada uno agrega su demora. |
@@ -738,6 +738,23 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Unión de carpetas (junction)** | Una carpeta que en realidad apunta a otra (`mklink /J`): entrar en ella es entrar en la original. Como un puente entre dos bornes: lo que haces en un lado pasa en el otro. Al borrar hay que quitar el puente primero (`cmd /c rmdir`), si no el borrado sigue hacia la original. |
 | **`git archive`** | Saca los archivos de un commit viejo a una carpeta suelta. No cambia de rama ni toca el trabajo en curso. Sirve para compilar y probar «el código de antes» al lado del de hoy. |
 
+### Los Mii invitados con las caras del juego (§86)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Mii invitado (Mii «por defecto»)** | Los 6 Mii que trae el juego y que no son de nadie: la pestaña «Guest» de «Elige un Mii». No viven en la base de Mii de la consola (RFL_DB.dat) sino en una tabla dentro del programa: 6 × 74 bytes en 0x8024C4D0, con el mismo formato de un Mii normal. Se llaman «no name»: 3 chicos y 3 chicas. Como las piezas de muestra que trae un tablero de fábrica: sirven aunque no hayas armado ninguna. |
+| **Librería de caras de la Wii (RFL)** | El código de Nintendo que todos los juegos de Wii usan para los Mii (Revolution Face Library): lee la base de Mii, guarda los 6 invitados y dibuja las cabezas en 3D. Mario Kart la llama para cada Mii que muestra. |
+| **Grupo de Mii (MiiGroup) y el que dibuja (MiiRenderMgr)** | Un MiiGroup es la «bandeja» de Mii de una pantalla: hasta N Mii y, para cada uno, sus texturas (la foto de la cara en cada tamaño que se use). El MiiRenderMgr es quien saca esas fotos: dibuja la cabeza en 3D y la copia a la textura. «Elige un Mii» arma un grupo de 10; aquí se arma uno de 6 solo para la foto. |
+| **Copia a textura (`GXCopyTex`)** | Dibujar algo fuera de la pantalla y guardarlo como una imagen para usar después. Así se hacen las caras de los Mii: el juego dibuja la cabeza y la copia a una textura de 96×96 que después pega en el menú. Como sacar una foto del tablero y usar la foto en vez del tablero. |
+| **RGB5A3** | Un formato de textura de la Wii: 16 bits por píxel. Si el bit de arriba es 1, el píxel es opaco con 5 bits por color; si es 0, lleva 3 bits de opacidad y 4 por color (para los bordes suaves). Las caras de los Mii vienen así. Como un conversor de 16 bits que usa una escala u otra según un bit de rango. |
+| **Bajar de la tarjeta de video (lectura de vuelta)** | aurora hace las copias a textura en la tarjeta de video y no las pasa a la memoria del juego si nadie las lee (bajarlas cuesta tiempo). `aurora_flush_efb_copy_to_ram` pide bajar una: aurora la escribe en la memoria del juego con el formato de la Wii. Hay que pedirlo en el mismo cuadro: al cerrar el cuadro aurora olvida el pedido. Como un osciloscopio que guarda la captura solo en pantalla: hay que mandarla a la memoria antes del siguiente disparo. |
+| **Montón cerrado (`dameFlag`, «DAME DAME»)** | Los montones de memoria del juego (EGG::Heap) tienen una bandera: con el bit 0 prendido, pedirles memoria detiene el juego con el aviso «DAME DAME» («¡no, no!» en japonés). El juego los cierra cuando termina de armar una escena, para atrapar pedidos fuera de lugar. Como un tablero con el candado puesto: se abre para la maniobra y se vuelve a cerrar. |
+| **Montón actual** | El montón de donde saca memoria un `new` que no dice de dónde (EGG::Heap::current). Mientras una pantalla se arma, es el de la escena; en medio del cuadro es otro (y cerrado). |
+| **Sección «armándose» y pedido en fila** | Section +0x38F = 1 mientras la sección se arma. En ese momento MiiGroup::AddMii dibuja la cara en el acto; con la sección andando deja un pedido en una fila y la dibuja en otro cuadro. Para tener las 6 en el mismo cuadro, la página marca «armándose» solo mientras las carga. |
+| **PNG** | Un formato de imagen sin pérdida (lo que entra sale igual), comprimido. La página guarda así las 6 caras en IndexedDB. |
+| **Alfa premultiplicado** | Una forma de guardar los píxeles semitransparentes con el color ya multiplicado por su opacidad. El `<canvas>` del navegador trabaja así y, al ida y vuelta, un píxel de borde suave puede cambiar ±1 de 255. Lo opaco y lo transparente quedan exactos. |
+| **Información adicional del Mii (RFL::AdditionalInfo)** | Lo que el juego guarda de un Mii al cargarlo de la base: nombre, CreateID, chico/chica, color favorito, altura y complexión (Mii +0x68). La prueba la lee para comprobar que el juego cargó el Mii con lo del invitado elegido. Los 74 bytes crudos (Mii +0x10) el juego solo los llena para un Mii que viene de un archivo o de la red. |
+
 ### La sala: el inicio de la playlist, el cupo y echar (§87)
 
 | Término | Qué es y qué hace |
@@ -748,6 +765,36 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Cupo de la sala** | Cuántos humanos caben en una sala del sitio. En Mario Kart es 4: cada piloto es un jugador «local» de verdad en todas las consolas, y el juego admite 4 mandos. La CPU completa los 12 lugares. Ya no se pregunta: toda sala nace con 4. |
 | **Echar (al anfitrión)** | El anfitrión saca a alguien de la sala con el botón «Echar». Es una jugada más del registro (`{t:"echa"}`), y el sitio la convierte en «se fue» solo si quien la escribe es el anfitrión en ese momento. Como el jefe de turno que puede retirar a alguien de la sala de control. |
 | **Votación para echar** | La de todos los juegos del sitio (⏏): si la mayoría de los demás vota contra alguien, sale. En Mario Kart se ofrece con 3 o más pilotos; con 2, votar sería echar solo, y eso le toca al anfitrión. |
+
+### El sonido por AudioWorklet (§88)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Hilo de audio** | Un hilo del navegador, aparte del de la página y de prioridad alta (tiempo real), que solo calcula sonido y se lo pasa a la tarjeta. Si la página se traba, él sigue. Es como el DMA de un conversor: el procesador puede estar ocupado y las muestras igual salen a tiempo. |
+| **AudioWorklet / AudioWorkletProcessor** | Un pedacito de programa de la página que corre **en el hilo de audio**. El navegador le pide 128 muestras por vez (`process()`), siempre a horario. El nuestro es `web/navegador/sonido-worklet.js`. |
+| **Bloque de render (128 muestras)** | Lo que el navegador le pide al worklet cada vez: 128 muestras por canal = 2,7 ms a 48 kHz. El ScriptProcessorNode de SDL3 pedía 2048 (42,7 ms): 16 veces más grande. |
+| **postMessage / puerto (MessagePort)** | La forma de mandar datos de un hilo a otro sin compartir memoria: el mensaje viaja como una carta (se copia o se "transfiere"). La página le manda al worklet cada pedazo de sonido así, ~330 cartas por segundo. |
+| **Transferir (transfer)** | Mandar un búfer a otro hilo **sin copiarlo**: el que lo manda lo pierde y el otro lo recibe tal cual (como pasar la caja entera en vez de fotocopiar su contenido). |
+| **Memoria compartida (anillo con SharedArrayBuffer)** | La otra forma: los dos hilos leen y escriben la misma memoria (un anillo) sin cartas. Necesita que la página esté "aislada" (COOP/COEP), y el sitio de GitHub Pages no lo está: por eso van cartas. |
+| **Búfer antisaltos adaptable (jitter buffer)** | Una cola que guarda lo justo para tapar los tirones de quien la llena, y que se agranda sola si un tirón la vació (y se achica con la calma). Lo usan las llamadas por internet. La nuestra arranca en 25 ms. |
+| **Objetivo de la cola** | Cuánto sonido debe esperar en la cola, en promedio. El ajuste de ritmo (el PI de §36) la mantiene ahí, como un regulador mantiene la tensión en su referencia. |
+| **Vacío / hueco / salto** | Los tres contadores del worklet. **Vacío**: la cola se quedó sin sonido. **Hueco**: un vacío que cortó sonido (se oye; si era silencio, no). **Salto**: llegó tanto junto que se descartó lo viejo, con un fundido cruzado. |
+| **Fundido (de entrada / de salida / cruzado)** | Subir o bajar el volumen de a poco en vez de golpe, para que no suene un "clic" (un escalón en la onda tiene armónicos de todas las frecuencias). Cruzado: lo de antes baja mientras lo nuevo sube, como el crossfader de un mezclador de DJ. |
+| **Descarte de silencio** | Si sobra cola y lo que viene es silencio, se tira enseguida: no se oye y la demora vuelve al objetivo sin esperar al ajuste de ritmo. |
+| **Clic de prueba (medir la demora)** | Para medir la demora de punta a punta: el juego queda mudo, el runtime mete un clic (4 muestras al máximo) anotando la hora, y la salida dice en qué muestra de la tarjeta salió. Es medir el retardo de propagación con un pulso y el osciloscopio. |
+| **getOutputTimestamp / baseLatency / outputLatency** | Lo que el navegador dice de su propia demora: `getOutputTimestamp()` = qué muestra está sonando en el parlante ahora y a qué hora; `baseLatency` = su búfer (10 ms aquí) y `outputLatency` = el de Windows y la tarjeta (40 ms aquí). La página no los puede achicar. |
+| **`?audio=viejo`** | El camino de antes (el ScriptProcessorNode de SDL3), para comparar o si algún navegador no tuviera AudioWorklet. |
+
+### El programa final y el paso 0 de publicar (§89)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Programa final (`--final`)** | El `.wasm` que se sube a R2 para los amigos: el mismo juego, pero sin los nombres de las funciones (solo sirven para medir dónde se va el tiempo) y ya comprimido (`mkw.wasm.br`, 15,7 MB). Es la versión "de fábrica" de un equipo: sin los puntos de prueba soldados en la placa. |
+| **Paso 0 (de publicar)** | Lo que hace Claude antes de que el dueño suba nada: compilar el programa final con el código del momento, hacerle sus semillas y pasarle todas las pruebas. Recién con eso en verde el dueño sube a R2 (`docs/publicar.md`). Es la prueba de aceptación en fábrica (FAT) antes de despachar. |
+| **Taller (`--carpeta`) y salida (`--salida`)** | El taller es la carpeta donde quedan los objetos de cada archivo compilado; la salida, donde queda el programa armado. Se pueden separar: aquí el taller es `build/web-m8` y la salida `build/web-final/navegador`, así nada pisa el `build/web` de todos los días de las otras sesiones. Como tener un banco de armado aparte para la serie que se despacha. |
+| **Compilación incremental** | Volver a compilar solo lo que cambió desde la vez anterior (Ninja compara las fechas). Aquí fueron 19 de 590 archivos y el resto se reusó: minutos en vez de horas. Como rebobinar solo la bobina que se cambió, no el motor entero. |
+| **Probar con el programa final (`MKW_BUILD`)** | Las pruebas abren el juego que está en `build/web/navegador`, salvo que `MKW_BUILD` diga otra carpeta. Con `MKW_BUILD=build/web-final/navegador` prueban justo el programa que se va a subir, con sus semillas, y no uno parecido. |
+| **Copiar lo commiteado (no la copia de trabajo)** | El kit del sitio se llenó con los archivos tal como están en el último commit (`git archive HEAD`), no como están en la carpeta. Si otra sesión tiene algo a medio hacer en la carpeta, eso no se cuela al sitio. |
 
 ## 2026-10-16 · Día 1
 
@@ -6837,6 +6884,148 @@ git archive c6c4b89 web herramientas banco parches | tar -x -C build/viejo-c6c4b
 cd build/viejo-c6c4b89 && python herramientas/compilar-web.py --modo navegador && node web/navegador/prueba-sincro.mjs --puerto=8192
 ```
 
+## 2026-10-20 · §86 Los 6 Mii invitados en «Mi Mii», con las caras que dibuja el juego (M10)
+
+**Qué pidió el dueño** (2026-10-19, «después de implementar el multiplayer al 100 %»): que el menú para cambiar de Mii
+de la página ofrezca los **6 Mii invitados** del juego (la pestaña «Guest» de «Elige un Mii»), mostrados con **las
+imágenes del propio juego**, no con nuestras caras dibujadas en SVG, que se ven falsas al lado de las de verdad. Al
+elegir uno, pasa a ser el Mii del jugador. Se hizo de punta a punta en una sesión aparte (03:10).
+
+### 86.1 Dónde están los invitados (decompilar uno mismo)
+
+La pista era `MiiGroup::LoadDefaultMii` (0x805FA748). Leyendo el C++ traducido (`generated/functions/func_*.cpp`, solo
+para entender) y los encabezados de Pulsar (`MiiGroup.hpp`, `MiiManager.hpp`, `Mii.hpp`, `MiiRenderer.hpp`,
+`MiiSelect.hpp`), el camino completo es:
+
+1. **La pantalla.** «Elige un Mii» es la página 0x60 (`MiiSelect`). Al armarse (`OnInit`, 0x80847E40) crea un grupo de
+   Mii: `new` de 0x98 bytes, `MiiGroup::MiiGroup` (0x805F9E78) y `MiiGroup::Init(10 Mii, textura 0, montón)`
+   (0x805FA04C); el montón es el de la escena (GameScene +0xC98; +0xC94 en la sección 0x54). En la pestaña Guest,
+   `SetMiiIcons` (0x80848F94) llama a `LoadDefaultMii(i, i)` para i = 0…5.
+2. **Los datos.** `LoadDefaultMii` crea el Mii con `MiiManager::CreateDefaultMii` (0x80527F84: un objeto Mii de 0xB8,
+   tipo 3 = «por defecto») y `Mii::Load` (0x80526020). `GetRFLArgs` (0x80526460) convierte el tipo 3 en la **fuente 6**
+   de la librería de caras («por defecto»), y la librería (0x800CB7E0 → 0x800CB6A0 → 0x800CA800) copia **74 bytes desde
+   0x8024C4D0 + 74·i**. Es una tabla dentro del programa (la parte de datos del DOL): 6 Mii con el mismo formato de
+   RFL_DB.dat que ya lee `mii.mjs`. Todos se llaman «no name»; A, B y C son chicos, D, E y F chicas.
+3. **Las caras.** Al cargarlo, `MiiGroup::AddMii` (0x805FA3FC) se lo pasa a `MiiRenderMgr::AddMii` (0x80781290), que
+   dibuja la cabeza en 3D y la **copia a la textura** del grupo (`GXCopyTex`). Medido con el juego: **96×96 en formato
+   RGB5A3** (18 KB cada una).
+
+### 86.2 La trampa de aurora: las caras viven en la tarjeta de video
+
+En la Wii, `GXCopyTex` escribe la imagen en la memoria. aurora (el dibujante de WiiCompiled) la deja **solo en la
+tarjeta de video** y la usa desde ahí: bajarla cuesta tiempo y casi nadie la lee. Para las que alguien quiera leer,
+`GXCopyTex` deja anotado «bajar si la piden» (`efb_ram::schedule`), y al cerrar el cuadro ese pedido se borra
+(`efb_ram::cancel`, en `seal_frame_locked`). `aurora_flush_efb_copy_to_ram(dirección)` la baja en el momento: espera a
+la tarjeta (con JSPI, la espera del navegador no traba la página) y la escribe en la memoria del juego **en el formato
+de la Wii**. Conclusión: la foto hay que bajarla **en el mismo cuadro en que el juego la saca**.
+
+### 86.3 El gancho nativo (`web/juego/invitados_nativo.cpp`)
+
+La página pide (`Module._mkw_invitados_pedir()`) y en el próximo `SectionMgr::Update` de un menú quieto (escena 1, sin
+cambio de sección, la sección ya armada; lo llama `directo_nativo.cpp`) el gancho hace lo mismo que «Elige un Mii»:
+crea un grupo de 6 con la textura 0, `LoadDefaultMii(i, i)` para los 6, y después de cada uno lee su GXTexObj (ancho,
+alto, formato, dirección), baja esa copia y la guarda; al final borra el grupo (`~MiiGroup` con delete, 0x805F9F58).
+También copia los 74 bytes de la tabla. Todo queda en una estructura que la página lee (`_mkw_invitados_salida`).
+
+Tres cosas que no salieron a la primera:
+
+| Qué pasó | Por qué | Arreglo |
+|---|---|---|
+| El juego se detuvo: `OS::Panic eggExpHeap.cpp:174 «DAME DAME»` | El montón de la escena está **cerrado** en medio del cuadro (EGG::Heap +0x1C, bit 0); `ExpHeap::alloc` (0x80226C04) se detiene si le piden memoria. Y `MiiGroup::Init` pide sus listas con `new[]` sin montón (0x80229DF0), o sea al **montón actual**, que en medio del cuadro es otro, también cerrado. La pantalla de verdad crea su grupo mientras se arma, con el de la escena abierto y como actual | Solo mientras se crea el grupo: el montón de la escena se abre y pasa a ser el actual (`EGG::Heap::current`, 0x80386EA0); después todo vuelve a como estaba. Devolver memoria no mira la bandera (`ExpHeap::free`) |
+| Ya no se caía, pero salían 0 caras | `MiiGroup::AddMii` dibuja en el acto solo si la sección se está armando (Section +0x38F = 1); con la sección andando deja un **pedido en la fila** del MiiRenderMgr para otro cuadro. Yo lo había leído al revés | Mientras se cargan los 6, la sección se marca «armándose» y después se deja como estaba: las 6 se dibujan y se bajan en el mismo cuadro |
+| La primera prueba no llegaba al menú | `?modo=unjugador` solo no abre nada: la página abre «Un jugador» desde el menú de inicio o con `mkwDirecto.ir(0x48)` | La prueba llama `mkwDirecto.ir(0x48)` |
+
+**Lo que cuesta:** ese cuadro tarda **40–52 ms** (dibujar 6 cabezas y esperar 6 bajadas), una sola vez por navegador.
+Las 6 se bajaron con el pedido de su propia dirección («bajada 111111»).
+
+**Un tropiezo de convivencia:** la sesión del sonido (E1) enlazó su programa con mi código a medio hacer y su
+`prueba-navegador` se cayó con el mismo «DAME DAME». Se le avisó del arreglo. Por eso, con Playwright, la foto
+automática de la primera visita va solo con `?invitados=1` (como el menú de inicio con `?inicio=1`): las pruebas que
+miden el ritmo no ven ese cuadro largo.
+
+### 86.4 La página (`invitados.mjs`, `textura-gx.mjs`, `editor-mii.mjs`, `directo.mjs`)
+
+- **Pasar la textura a imagen** (`textura-gx.mjs`): decodifica las baldosas de la Wii (I4, I8, IA4, IA8, RGB565,
+  RGB5A3, RGBA8, CMPR) a RGBA; las caras se pasan a **PNG** (`OffscreenCanvas`). Si una cara sale vacía (sin tinta: la
+  copia no se bajó), se rechaza todo.
+- **Dónde quedan:** IndexedDB **de ese navegador** (base `mkw-invitados`): los 6 Mii de 74 bytes y las 6 PNG. Nada de
+  esto va a git, al sitio, a R2 ni a la nube (no es parte de las partidas que se exportan o suben): sale del juego que la
+  persona ya tiene, en su navegador, como la fuente de §78.
+- **Cuándo se sacan:** (1) al abrir «Mi Mii» con el juego andando si no están guardadas (`window.mkwInvitados.sacar()`);
+  (2) en la **primera visita**: la licencia nueva se crea con una cara de la página (todavía no hay invitados) y, apenas
+  el juego llega a su primer menú, se sacan y **ese Mii toma la cara del invitado** elegido, con el mismo id
+  (`mejorarMiiNuevo`): el juego lo muestra desde el próximo arranque (ya leyó la base). `?invitados=0` = nunca
+  automático; con Playwright solo con `?invitados=1`.
+- **La galería de «Mi Mii»:** los 6 con su imagen («Invitado A…F»). «+ Mii nuevo» crea uno con la cara del invitado y un
+  id nuevo (le pones tu nombre). **«Cambiar por un Mii invitado»** le pone la cara del invitado al Mii elegido y le deja
+  su id, su nombre y su creador: si es el de la licencia (⭐), la licencia lo sigue encontrando y pasa a usarlo. Un Mii
+  con la cara de un invitado se muestra con la imagen del juego; si se le mueve un rasgo, vuelve el dibujo aproximado
+  (la imagen ya no sería verdad). Las caras SVG de la página (PRESETS) quedan solo mientras no haya imágenes.
+- **La licencia nueva** (`prepararMii`, `directo.mjs`): con la base vacía y los invitados guardados, el Mii nuevo es el
+  invitado elegido (el último que se tocó en la galería, `localStorage mkw.invitado`; si no, el A) con el nombre de la
+  persona.
+
+### 86.5 Las pruebas
+
+**Banco, sin el juego** (`banco/pruebas/mii-invitados`, datos FALSOS: Mii inventados y caras dibujadas por la página):
+
+```
+node banco/correr.mjs mii-invitados
+```
+
+**41/41**: texturas de la Wii ida y vuelta (RGBA8 exacta, RGB5A3 dentro de lo que pierden sus bits, RGB565, IA8, I8,
+tamaños y orden de las baldosas), lo que deja el gancho leído de una memoria falsa con su misma forma, PNG, cara vacía
+rechazada, juego que no pudo, IndexedDB, «cambiar» conserva id/nombre/creador y «nuevo» da id nuevo, `prepararMii` con
+el invitado elegido, `mejorarMiiNuevo`, y la galería de verdad (6 imágenes, elegir, guardar, ⭐, el dibujo que vuelve).
+Y siguen bien `mii` (11) y `directo` (18).
+
+**Con el juego** (una pestaña, ~3 min; avisar antes a las otras sesiones):
+
+```
+node web/navegador/prueba-invitados.mjs
+```
+
+**13/13** (03:08, con `MKW_BUILD=build/web-mii/navegador`):
+
+```
+✓ el juego dio sus 6 invitados con imagen en el primer menú — 96×96, formato 5, bajada 111111; el juego tardó 51.8 ms en ese cuadro
+✓ los 6 Mii son los 74 bytes de la tabla de la librería de caras (0x8024C4D0), uno por uno
+✓ son 6 Mii distintos (rasgos distintos) — no name♂, no name♂, no name♂, no name♀, no name♀, no name♀
+✓ cada imagen tiene la cara dibujada (más de 20 % con tinta) y las 6 son distintas — tinta 48% 46% 45% 57% 54% 51%
+✓ primera visita: la licencia nueva quedó con su Mii y, apenas llegaron los invitados, ese Mii tomó la cara del A (mismo id)
+✓ «Mi Mii» muestra el Mii de la licencia con la imagen del juego (el invitado A), no el dibujo
+✓ la galería ofrece los 6 invitados, cada uno con su imagen del juego y sin caras dibujadas — 96×96 ×6
+✓ guardado: la base de este navegador tiene el Mii de la licencia con la cara del D y el mismo id
+✓ al volver a abrir, EL JUEGO carga para la licencia el Mii de la base con lo del invitado D — Prueba ♀ color 2 altura 64 complexión 64
+✓ y es el Mii de la licencia: el mismo CreateID
+✓ partida nueva con el F elegido: la página lo pone para la licencia («el invitado F»)
+✓ y el juego carga para la licencia ese Mii: el de la base con la cara del F, el nombre «Nueva» y su CreateID
+✓ sin volver a sacar las caras (ya estaban en este navegador)
+```
+
+Cómo se comprueba que **el juego** usa el elegido: después de recargar, el Mii del jugador 1 que cargó el juego
+(SectionParams +0x238, su Mii 0) tiene en +0x68 (RFL::AdditionalInfo) el CreateID de la licencia y el nombre de la
+persona (es el Mii de la base, no el invitado suelto), y chica/color/altura/complexión del invitado elegido. Las 6
+caras y una foto de la galería quedan en `build/web/datos/invitados/` (imágenes del juego: nunca a git). El modo Node
+enlaza con las dos funciones vacías nuevas (`aurora_manual.cpp`): `prueba-arranque` **13/13**.
+
+**Trampas de la prueba:** `waitForFunction` de Playwright no espera una función `async` (su promesa ya cuenta como
+«verdad»): se pregunta desde Node en un bucle. El `<canvas>` guarda con **alfa premultiplicado**: en los bordes suaves
+el PNG vuelve con ±1 (lo opaco y lo transparente, exactos). Y el Mii +0x10 (los 74 bytes crudos) está en cero para un
+Mii de la base: hay que mirar +0x68.
+
+### 86.6 Archivos
+
+- Nuevos: `web/juego/invitados_nativo.cpp`, `web/navegador/invitados.mjs`, `web/navegador/textura-gx.mjs`,
+  `web/navegador/prueba-invitados.mjs`, `banco/pruebas/mii-invitados/index.html`.
+- Cambiados: `web/juego/directo_nativo.cpp` (una llamada en su `SectionMgr::Update`), `herramientas/compilar-web.py`
+  (una unidad más), `web/headless/aurora_manual.cpp` (las dos funciones de bajar, vacías en Node), `editor-mii.mjs`,
+  `interfaz.mjs`, `directo.mjs`, `mkw.mjs` (`window.mkwInvitados`, la licencia nueva y la primera visita),
+  `banco/index.html`.
+- Compilado en `build/web-mii/navegador` (taller propio, con los objetos compartidos). El programa del sitio lo toma en
+  la próxima compilación final; el kit (`subir-kit.sh`, que copia lo que está en git) lleva los módulos nuevos después
+  de este commit.
+
 ## 2026-10-20 · §87 La sala de Mario Kart: la playlist arrancaba solo al anfitrión, el cupo sin preguntar y echar
 
 **Qué pidió el dueño:**
@@ -6947,3 +7136,290 @@ cd terceros/Paginita-Pro/colabtex && node --test tests/mkw.test.cjs
   §87 esto, §88 el sonido con AudioWorklet.
 - Una prueba de dos pestañas falló una vez al terminar la carrera 1, porque A se congeló 3 s con la PC muy cargada
   (otras sesiones compilando y probando) y la sala la cortó. Repetida con la PC más tranquila: 18/18.
+
+## 2026-10-20 · §88 El sonido por AudioWorklet: de ~177 ms a ~60 ms del juego al parlante (E1)
+
+**Qué se quería (PLAN E1):** el sonido del juego se oía tarde. Salía por SDL3 con un **ScriptProcessorNode** que pide
+bloques de 2048 muestras (43 ms) más una cola de 60 ms en el runtime; la bitácora (§36) lo estimaba en ~100–150 ms entre
+que el juego mezcla y se oye, y anotaba cortes en el arranque. La meta: un **AudioWorklet** (corre en el hilo de audio y
+deja usar bloques chicos), ~30 ms, sin cortes nuevos. Lo viejo queda con `?audio=viejo`.
+
+### 88.1 Primero medir: un clic de prueba
+
+Antes de cambiar nada hacía falta una regla para medir la demora **de punta a punta**, la misma para los dos caminos.
+Es lo que se hace con un pulso y un osciloscopio para medir el retardo de propagación de un cable:
+
+1. El runtime deja el juego **mudo** (todas sus entregas salen en cero) y, en una entrega, pone un **clic**: 4 muestras
+   al máximo. Anota la hora exacta (`performance.now()`) de esa entrega (`mkw_web_sonido_marca`, solo para medir).
+2. La salida avisa **en qué muestra de la tarjeta** salió el clic: en el camino nuevo lo ve el worklet; en el viejo, la
+   página mira cada bloque que SDL3 llenó (el ScriptProcessorNode dice a qué hora de la tarjeta va a sonar ese bloque).
+3. `getOutputTimestamp()` del navegador dice qué muestra está sonando **en el parlante** y a qué hora. Con eso, la hora
+   en que se oye el clic. **Demora = oído − entrega.** Se repite 8 veces y se toma la mediana (`sonido.medirDemora`).
+
+El juego queda mudo ~3 s mientras se mide. La prueba del navegador lo hace al empezar sus verificaciones, en el título.
+
+**Lo que dio el camino viejo: 177,5 ms** (de 172 a 181), no 100–150. Se reparte así:
+
+| Tramo | ms |
+|---|---|
+| La cola del runtime (SDL3), que el ajuste de ritmo de §36 lleva a 60 | ~64 |
+| El ScriptProcessorNode: un bloque sonando y otro preparándose (1,5 bloques de 42,7 ms en promedio) | ~63 |
+| El navegador: su búfer (`baseLatency`, 10 ms) + Windows y la tarjeta (`outputLatency`, 40 ms) | ~50 |
+| **Total medido** | **~177** |
+
+Los 50 ms del último tramo **no dependen de la página**: con o sin ventana, y con cualquier `latencyHint` ('interactive',
+'balanced', 0,001 s), Chrome en esta PC da siempre 10 + 40 ms (probado aparte con un tono). Lo que sí se puede achicar
+son los dos primeros: ~127 ms.
+
+### 88.2 Por qué un AudioWorklet, y por qué con mensajes
+
+- El **ScriptProcessorNode** corre en el hilo de la página, el mismo del juego. Por eso necesita bloques grandes: si la
+  página se ocupa más que un bloque, la tarjeta se queda sin muestras. Achicarle el bloque (SDL3 tiene la opción
+  `SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES`) cortaría con cualquier tirón.
+- El **AudioWorklet** corre en el **hilo de audio**, aparte y de prioridad alta. La tarjeta le pide 128 muestras por vez
+  (2,7 ms) y él las saca de una cola propia. Si la página se traba, él sigue tocando lo que tiene en la cola.
+- ¿Cómo le llega el sonido? Hay dos formas: **memoria compartida** (un anillo en un `SharedArrayBuffer`) o **mensajes**
+  (`postMessage`). La memoria compartida necesita que la página esté aislada (COOP/COEP), y el sitio de GitHub Pages no
+  lo está (§54); el servidor local tampoco. Así que van **mensajes**: cada entrega del juego (3 ms de sonido, ~330 por
+  segundo) viaja como una carta, **transferida** (sin copiar). Cuesta ~20 µs por carta en el hilo de la página
+  (0,02 ms por entrega, medido): nada.
+
+### 88.3 El camino nuevo
+
+```
+juego → runtime (audio_backend.cpp) → SDL3 solo convierte (32 kHz → 48 kHz, con el ajuste de ritmo)
+      → página (sonido.mjs: puente.entregar, una carta por entrega) → worklet (sonido-worklet.js: la cola)
+      → 128 muestras cada 2,7 ms → la cadena de siempre (medidor → volumen → medidor) → parlantes
+```
+
+- **El runtime** (`audio_backend.cpp`, parche `runtime-web.diff`): al abrir el sonido le pregunta a la página
+  (`Module.mkwSonido.abrir()`). Si la página contesta con la frecuencia de su tarjeta, **SDL3 no abre su dispositivo**
+  (no crea su AudioContext ni su ScriptProcessorNode): usa un `SDL_AudioStream` suelto que solo convierte, y después de
+  cada entrega le pasa a la página lo convertido. Si contesta 0 (`?audio=viejo`, o un build viejo de la página), todo
+  como antes. El ajuste de ritmo (el PI de §36) ahora lee la cola **del worklet** y su objetivo.
+- **La página** (`sonido.mjs`): `puente.abrir()` crea el AudioContext (el nuestro, con volumen y medidor) y carga el
+  worklet; `puente.entregar()` copia el pedazo de la memoria del wasm y se lo transfiere; `puente.nivelMs()` y
+  `objetivoMs()` son lo que lee el PI. Mientras el navegador tiene el sonido bloqueado, las entregas se tiran (como
+  hacía SDL3); al desbloquearse, el worklet empieza de cero.
+- **El worklet** (`sonido-worklet.js`): la cola circular (un FIFO de hasta 1 s) y sus reglas, que son las de un **búfer
+  antisaltos** como el de una llamada por internet:
+  - **Objetivo de reposo: 25 ms** (`?audioMs=N`). Si la cola se vacía **con sonido** (un corte que se oye) por un tirón
+    corto, el objetivo sube lo que faltó + 5 ms (tope 120). Un tirón de más de 100 ms no lo sube (ninguna cola
+    razonable lo taparía), ni un vacío en silencio (no se oye).
+  - **Empieza alto: 80 ms** (`?audioArranque=N`): mientras arranca, el juego lee el disco y arma pipelines y se traba
+    seguido, y la música del título empieza justo ahí. Nadie corre todavía: la demora ahí no importa.
+  - **Baja con la calma**: con 3 s **sonando** sin cortes, el objetivo baja un 20 % de lo que sobra por segundo (como la
+    descarga de un capacitor), al menos 2 ms/s, hasta el reposo. Pero solo si en los últimos 4 s la cola **nunca bajó de
+    8 ms** (en una PC lenta se queda donde no se corta) y si la cola ya lo alcanzó (±15 ms: así el ajuste de ritmo la
+    sigue con ~0,3 % y no va al tope). El silencio no cuenta como calma.
+  - **Cola vacía**: la última muestra se apaga en ~1,5 ms (sin "clic"), se junta el objetivo y se vuelve con un fundido
+    de entrada de 2,7 ms.
+  - **Silencio de más**: si sobra cola y lo que viene es silencio, se descarta enseguida (no se oye).
+  - **Mucho de más con sonido** (último recurso, casi nunca): salto hasta el objetivo con un fundido cruzado de 2,7 ms.
+  - Cada ~21 ms le manda a la página su estado: cola (promedio y mínimo), objetivo, vacíos, huecos, saltos.
+
+### 88.4 Lo que fue apareciendo al medir (y cómo se arregló)
+
+Cada uno de estos se vio en una medición, se entendió y se arregló; cada arreglo tiene su punto en el banco.
+
+1. **La propia prueba trababa la página.** La verificación del final une y recorre todo el registro de la consola
+   (~70 ms sin soltar el hilo): con 25 ms de cola, un hueco que no era del juego. Ahora la demora y la foto del medidor
+   se toman **antes** de ese trabajo.
+2. **El arranque.** Con el sonido sonando desde el principio (`prueba-navegador --sin-bloqueo`), justo cuando empieza la
+   música del título el juego va a 36 fps: un hueco que se oye, y el objetivo quedaba en 72 ms por ~25 s. De ahí el
+   arranque en 80 ms y la calma que solo cuenta con sonido. Y un vacío **en silencio** ya no sube el objetivo.
+3. **El precalentado con caché** (§76: 1.400 pipelines pedidos al llegar al título, justo con la música). En la segunda
+   visita el arranque es rápido y callado: el objetivo "se calmaba" en silencio y llegaba chico a la música → 5 huecos
+   en una visita de `prueba-musica`. Con la calma solo con sonido: 0 y 0.
+4. **Una PC lenta** (`--cpu 2`: Chrome frena el hilo de la página a la mitad): tras un corte el objetivo subía, pero
+   volvía a bajar hasta donde se cortaba otra vez (2 huecos en 20 s de carrera). Con la regla del mínimo de 8 ms en los
+   últimos 4 s: 0.
+5. **El ajuste de ritmo con *windup*.** Mientras el objetivo bajaba, la cola iba atrás y la parte integral del PI
+   "aprendía" esa diferencia: el ritmo quedaba al tope (0,6 %) ~10 s y después dejaba la cola 13 ms por debajo del
+   objetivo. Ahora, con el worklet, la integral solo aprende cerca del objetivo (|error| < 10 ms: ahí el error es la
+   diferencia de relojes, que es lo que tiene que aprender), y la parte proporcional es el doble de firme (10 ms → 0,2 %).
+6. **Otro AudioContext de la página se adueñaba del sonido** (ya pasaba antes, sin el worklet). Los pitidos del contador
+   DNF (`dnf.mjs`) hacen su propio `new AudioContext()`, y el reemplazo de `sonido.mjs` lo tomaba como "el" del juego:
+   desde ese momento **el volumen dejaba de mover el sonido del juego** (movía el de los pitidos) y el medidor medía los
+   pitidos. Con el worklet, además, su arranque habría vaciado la cola. Ahora cada AudioContext tiene su cadena (los
+   pitidos también respetan el volumen y el silencio) y el del juego es solo el primero.
+7. **Otra sesión, otro choque.** Con el árbol de trabajo compartido, mi build enlazó el código a medio hacer de los Mii
+   invitados (§86), que se caía al arrancar («OS::Panic … DAME DAME»); las mediciones van con `?invitados=0` y se le avisó
+   a esa sesión (que ya lo arregló). Una vez, de 7 corridas en la página real, el juego se cayó cargando la carrera
+   («Memory access violation at 0x7E6CA540», primera visita); el cambio de esa corrida (la integral del PI) no toca la
+   memoria del juego y no se repitió: queda anotado aparte.
+
+### 88.5 Resultados
+
+**La prueba del navegador** (título, 30 s, la misma compilación, alternando los dos caminos con la PC tranquila):
+
+| | Demora del juego al parlante | Cola | Cortes desde el cuadro 300 |
+|---|---|---|---|
+| `?audio=viejo` | **177,5 y 177,6 ms** | 37–69 ms | 0 |
+| AudioWorklet | **59,8 a 63,6 ms** (4 corridas) | 18–25 ms en reposo | 0 |
+
+**El arranque con sonido desde el principio** (`--sin-bloqueo`): el viejo, 0 huecos y 29 bloques tirados (la cola de
+SDL3 llena: cada bloque tirado es un saltito); el worklet, **0 huecos** y 0 tirados (3 vacíos en silencio, que no se oyen).
+
+**La página real** (`herramientas/medir-sonido.mjs`: el sitio como GitHub Pages, **sin COOP/COEP**, el juego en el marco de
+Juegos, el Worker de verdad con 50 ms de red, perfil nuevo = primera visita; título 10 s y una carrera de 20 s):
+
+| | Demora título | Demora carrera | Huecos en el título / la carrera |
+|---|---|---|---|
+| viejo | 176 ms | 170 ms | 0 / 0 |
+| AudioWorklet | 70–81 ms (todavía bajando desde los 80 del arranque) | **56–62 ms** | 0 / 0 |
+| AudioWorklet, CPU frenada 2× | 84 ms | **51 ms** | 0 / 0 |
+
+En todo el recorrido de una primera visita (incluidas las cargas de los menús, con el disco bajando por la red y el juego
+a 8–20 fps) **los dos caminos se cortan**: el viejo 9 huecos + 58 bloques tirados, el worklet 9 huecos y 0 tirados (el
+objetivo sube hasta 120 ms en esas cargas y vuelve a ~30 ms a los ~20 s de carrera). El medidor viejo, además, cuenta de
+menos: un corte dentro de un bloque de 43 ms no lo ve.
+
+**Lo que tarda la página entre entrega y entrega en la carrera** (lo que la cola tiene que tapar, histograma nuevo
+`estado.esperas`): sin freno, 6.578 esperas de menos de 10 ms y 90 de 10–20 ms, ninguna más larga; con la CPU frenada 2×,
+5.651 / 855 / 164 de 20–30 ms / 5 de 30–50 ms. Por eso 25 ms de reposo alcanzan en una PC como esta, y en una más lenta
+el objetivo se queda solo un poco más arriba.
+
+### 88.6 ¿Y los ~30 ms?
+
+La parte que depende de nosotros (del juego al hilo de audio del navegador) bajó de **~127 ms a ~20–25 ms**: la cola en
+reposo (25 ms de objetivo; 18–25 medidos) más medio bloque de 2,7 ms. La meta de ~30 ms se cumple **en esa parte**. El
+total medido es ~60 ms porque Chrome + Windows + la tarjeta suman otros ~40–50 ms que una página no puede tocar (probado
+con todos los `latencyHint`). En total: **~115 ms menos** (177 → 60), dos tercios de la demora.
+
+### 88.7 Pruebas
+
+- Banco `sonido-worklet` (nuevo, **34 puntos**; necesita el clic, que el corredor aprieta solo): la lógica del worklet
+  muestra por muestra con un hilo de audio de mentira (que espere a juntar, el fundido de entrada, la cola vacía sin
+  clic, el objetivo que sube lo que faltó, que no suba con un tirón largo ni con un vacío en silencio, la calma, el
+  descarte de silencio, el salto con fundido cruzado, la muestra exacta del clic, el arranque alto que baja sin llevar el
+  ritmo al tope, la PC lenta) y después de verdad con el AudioContext y un "juego falso" que entrega como el runtime
+  (bloqueado se tira todo, el toque desbloquea, nivel exacto, cola cerca del objetivo, volumen, un tirón de 80 ms, la
+  demora con el clic, otro AudioContext que no se adueña, pausa y vuelta).
+- Banco `sonido` (el camino viejo): **14 puntos** (uno nuevo: otro AudioContext no le quita el volumen al juego).
+- `prueba-navegador.mjs 1800`: **22/22** con el worklet y el monitor a 240 Hz; **21/21** en la última corrida, con el
+  monitor a 171 Hz (ahí «parejos en pantalla» es una nota). Punto nuevo: «poca demora del sonido: nuestra parte < 40 ms»;
+  el de la cola centrada ahora mira el objetivo del worklet. Opciones nuevas: `--puerto`, `--datos` (para correrla al
+  lado de otra sesión), `--cpu N` y `--sin-bloqueo`.
+- `prueba-musica.mjs`: **11/11** con el worklet (sin cortes mientras se precalienta: 0 y 0).
+- `herramientas/medir-sonido.mjs`: la página real, viejo contra nuevo (tabla de arriba).
+- El banco entero (`node banco/correr.mjs`): **35 de 35 páginas** bien (el sonido lo usan también la lista de pistas y el
+  contador DNF).
+
+```bash
+node banco/correr.mjs sonido-worklet sonido
+MKW_BUILD=build/web-audio/navegador node web/navegador/prueba-navegador.mjs 1800 --puerto 8175 --datos build/web/datos/audio
+node web/navegador/prueba-navegador.mjs 1800 --extra "&audio=viejo"        # el camino viejo, para comparar
+node web/navegador/prueba-navegador.mjs 1800 --sin-bloqueo                 # con sonido desde el arranque
+node web/navegador/prueba-musica.mjs
+node herramientas/medir-sonido.mjs [--cpu 2] [--caminos viejo,worklet]
+```
+
+### 88.8 Trampas
+
+- **La página real no está aislada** (sin COOP/COEP): nada de `SharedArrayBuffer`. Los mensajes alcanzan de sobra.
+- **Las medidas de tiempo con otras sesiones corriendo no sirven.** Una corrida con `npm run test:juegos` de otra sesión
+  dio 21 fps y 7 huecos; se repitió con la PC tranquila, alternando viejo/nuevo para que los dos vieran lo mismo.
+- **Playwright no bloquea el sonido** (se simula con `?bloquearSonido=1`): para ver el arranque con sonido hay que usar
+  `--sin-bloqueo`. Y con el bloqueo simulado, si el toque llega mientras la página está ocupada, el `suspend()` del
+  principio todavía no se aplicó: el desbloqueo ahora reanuda igual.
+- **Un tono en la prueba del clic lo confunde** (el umbral es 0,25): por eso el juego queda mudo mientras se mide.
+- El arranque alto se nota en el título: ~80 ms al principio, ~25 a los ~20 s de música. Es a propósito.
+- `build/web-audio/navegador` (mi build de prueba) lleva un enlace a `build/web/navegador/imagenes`: sin la imagen
+  privada no aparece el menú de inicio y `prueba-musica` falla por eso, no por el sonido.
+
+**Lo que sigue:** los tirones de la primera visita (E2: pipelines nuevos) y las cargas de los menús son los que todavía
+vacían la cola; con E2 resuelto, también se irían esos cortes.
+
+## 2026-10-20 · §89 El paso 0 de publicar: el programa final, sus semillas y todas las pruebas
+
+**Qué:** el paso 0 de `docs/publicar.md`, lo que le toca a Claude antes de que el dueño suba a R2. Se hizo recién
+cuando las tres sesiones que trabajaban en paralelo dejaron su trabajo commiteado: §86 (los Mii invitados, `091b1a1`),
+§87 (la sala: playlist, cupo y echar, `e4b5a44`) y §88 (el sonido por AudioWorklet, `4c780a8`). Así el programa final
+lleva todo y nada a medio hacer.
+
+### 89.1 El programa final
+
+```bash
+python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-m8 --salida build/web-final/navegador
+```
+
+- Compilación incremental: **19 de 590** archivos (el runtime del sonido de §88, `invitados_nativo.cpp` de §86,
+  `directo_nativo.cpp`, `gx_*.cpp`, `aurora.cpp`). El resto venía del taller `build/web-m8`, del final de §84.
+- Resultado: `mkw.wasm` **121,7 MB → 15,7 MB en brotli** (183 s de compresión), `mkw.js` 0,3 MB → 0,1 MB.
+- Queda en `build/web-final/navegador`, con las imágenes (`imagenes/`, 94 MB, la del menú de inicio incluida).
+
+### 89.2 Las semillas
+
+Con el programa final servido (`MKW_BUILD=build/web-final/navegador`), tres partidas con `guion.mjs --semilla`. La
+semilla de pipelines partió de la de §65 (700) y cada partida le suma lo que usó. La de bloques partió de cero.
+
+```bash
+export MKW_BUILD=build/web-final/navegador
+cp build/web/navegador/pipelines.bin build/web-final/navegador/     # la de §65 como base
+node web/navegador/guion.mjs "-:30000 K~25000:500" --extra "&modo=vs&copa=0&fila=0&cpu=dificil" --semilla
+node web/navegador/guion.mjs "-:30000 K~25000:500" --extra "&modo=vs&copa=13&fila=2&cpu=dificil" --semilla
+node web/navegador/guion.mjs "-:15000 K:2500 K:2500 K:2500 K:2500 K:2500 -:15000 K~20000:500" --extra "&modo=directa&elegir=1&pistas=5.0" --semilla
+```
+
+| Corrida | Qué abrió (foto) | Pipelines | Bloques |
+|---|---|---|---|
+| 1 | VS 150cc, SNES Mario Circuit 1 (el piloto abre la carrera solo) | 701 | 329 vistos |
+| 2 | VS 150cc, GBA Bowser Castle 4 | 707 | 388 vistos, 171 en ≥ 2 corridas |
+| 3 | la carrera directa de la sala, con la pantalla de personaje | **713** | **419 vistos, 143 en ≥ 2 (36 MB)** |
+
+Casi no aparecieron pipelines nuevos (13): lo que se dibuja casi no cambió desde §65. En las fotos el kart quedaba
+contra la pared, porque el guion solo acelera y no dobla. Para la semilla no importa: cuenta lo que el juego dibujó y
+leyó.
+
+### 89.3 Todas las pruebas con el programa final
+
+```bash
+MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs
+```
+
+**432 bien, 3 mal** en 29 pruebas (~55 min, `build/web/datos/todo/20261020-0401`). Las tres fallas, una por una:
+
+1. **Banco `lockstep`**, «Ana nunca llega: Beto y Carla no se quedan esperando para siempre». Sola: **42/42**. Fue la
+   carga: el banco tardó 5 min en vez de 1,5 porque corría junto con lo demás.
+2. **`prueba-navegador`**, «la cola del sonido se mantiene centrada»: la cola estaba en 66 ms y el objetivo en 49 ms.
+   §88 cambió el sonido: el ajuste de ritmo del worklet centra la cola recién después de unos 20 s, y la planilla
+   corría la prueba 15 s (`900` cuadros). E1 la había probado con `1800` (30 s). Con 1800 sobre el programa final:
+   **21/21** (cola 27 ms, objetivo 25). La planilla ahora la corre con 1800.
+3. **`prueba-nube`**, «sin cuenta (¿se cayó?)»: la prueba **pasó 9/9**. Termina escribiendo «9 ✓ · 0 ✗» y no
+   «9 bien, 0 mal», y la planilla no sabía leer ese formato. Ahora lo lee.
+
+Repetidas con la planilla arreglada (`--solo navegador,nube,banco`): **65 bien, 0 mal** (banco 35/35 páginas,
+navegador 21/21, nube 9/9). En total, las 29 pruebas con el programa final: **443 bien, 0 mal**.
+
+**El sitio entero con el programa final.** Primero se puso al día el kit con lo commiteado (§86–§88; entre otros
+`sonido-worklet.js`, `invitados.mjs`, `textura-gx.mjs`). Después `prueba-experiencia` con `MKW_BUILD`, o sea, el
+programa final servido por el Worker de verdad, con las cuentas de mentira y la página de Juegos:
+
+| Prueba | Resultado |
+|---|---|
+| `prueba-experiencia.mjs` (copa) | **20/20**: el invitado y el Intruso sin el juego, el menú JloKart, la sala de dos, la carrera pareja (huellas iguales), una vista cada uno, echar con la carrera andando (cortado en el cuadro 767) |
+| `prueba-experiencia.mjs --playlist` | **22/22**: la playlist arranca a los dos (el selector de Piloto Dos se cierra solo) y lo mismo de la copa |
+
+**La lista para R2** (`MKW_BUILD=build/web-final/navegador node herramientas/subir-r2.mjs`, solo revisar, sin red):
+**7.324 archivos, 5,0 GB**, versión `1b6f58d7cad8f4c0`. Lleva `mkw.wasm.br` del final (16 471 831 bytes), `mkw.js`,
+`pipelines.bin` (713), `bloques.json` y la imagen del menú de inicio.
+
+### 89.4 Cambios
+
+- `herramientas/correr-todo.mjs`: `prueba-navegador` con 1800 cuadros (30 s) y la cuenta de `prueba-nube`.
+- `docs/publicar.md`: el programa final vive en `build/web-final/navegador`; al subir,
+  `$env:MKW_BUILD="build/web-final/navegador"`; la lista es de ~7.300 archivos y 5,0 GB.
+- Kit del sitio (`terceros/Paginita-Pro/juegos/mkw`) con lo commiteado hasta §88, sin la copia de trabajo de nadie.
+
+### 89.5 Trampas
+
+- **No compilar el final con trabajo a medio hacer en la carpeta.** El compilador toma lo que hay en los archivos, no
+  lo commiteado: con §88 sin terminar, el final habría llevado un sonido a medias. Por eso se esperó a las tres sesiones.
+- **El kit no se llena con `subir-kit.sh` mientras otras sesiones trabajan.** Ese script copia la carpeta tal como está,
+  incluido lo que no está commiteado y `AGENTS.md`. Esta vez se copió desde `git archive HEAD`.
+- **`build/web/navegador/mkw.wasm` era de las 01:01**, de antes de §88, y no tiene el worklet. Para probar el sonido
+  nuevo hay que servir el final (o volver a compilar `build/web`).
+
+**Lo que sigue:** B7, que es del dueño. Subir a R2 con `MKW_BUILD=build/web-final/navegador` (`docs/publicar.md`,
+paso 2), publicar el Worker y las reglas, y probar en el sitio real como amigo y como no-amigo.

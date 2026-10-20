@@ -81,6 +81,15 @@ document.getElementById('empezar').addEventListener('click', async ev => {
   ok('bloques de 2048 muestras (~43 ms a 48 kHz)', s.estado.muestrasBloque === 2048, `${s.estado.muestrasBloque} muestras`);
   ok('el costo de llenar un bloque se mide', s.estado.msBloqueMax > 0, `máx ${s.estado.msBloqueMax.toFixed(2)} ms`);
 
+  // Otro AudioContext de la página (los pitidos DNF): el volumen y el medidor siguen siendo los del juego
+  s.silenciar(false);
+  const otro = new AudioContext();
+  s.volumen(0.5);
+  await espera(250);
+  const rOtro = s.nivel('salida') / s.nivel('entrada');
+  ok('otro AudioContext de la página no le quita el volumen ni el medidor al juego', s.contexto === ctx && Math.abs(rOtro - 0.25) < 0.03,
+     `salida/entrada ${rOtro.toFixed(3)}, ${s.estado.contextos} AudioContext`);
+  await otro.close();
   s.silenciar(false); s.volumen(0.7);
   nodo.disconnect();
   await ctx.close();

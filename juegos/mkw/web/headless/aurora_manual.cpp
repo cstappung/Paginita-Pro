@@ -108,6 +108,10 @@ extern "C" void aurora_end_frame()
     }
 }
 
+// ---- Bajar copias de textura a la memoria del juego (§85, los Mii invitados): sin tarjeta de video no hay qué bajar ----
+extern "C" bool aurora_flush_efb_copy_to_ram(void*) { return false; }
+extern "C" bool aurora_flush_efb_copies_to_ram() { return false; }
+
 // ---- GX: tamaño de texturas (fórmula real de aurora) ----
 extern "C" u32 GXGetTexBufferSize(u16 width, u16 height, u32 fmt, GXBool mips, u8 maxLod)
 {

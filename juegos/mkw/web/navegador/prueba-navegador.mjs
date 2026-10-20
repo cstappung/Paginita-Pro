@@ -15,6 +15,7 @@
 //
 // Uso:  node web/navegador/prueba-navegador.mjs [cuadros=900] [--ventana] [--gpu alto|bajo|auto] [--sin-enganche]
 //                                              [--sin-ajuste-sonido] [--perfil 14] [--pausa 20]
+//                                              [--puerto 8141] [--datos build/web/datos] [--extra "&audio=viejo"] [--cpu 2] [--sin-bloqueo]
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -33,7 +34,9 @@ const conVentana = args.includes('--ventana');
 const gpu = opcion('--gpu', 'alto');
 const sinEnganche = args.includes('--sin-enganche');   // compara: el reloj del juego suelto, sin el monitor
 const sinAjusteSonido = args.includes('--sin-ajuste-sonido');   // compara: el sonido sin el ajuste fino de ritmo
-const PUERTO = 8141;
+// --puerto N y --datos carpeta: para correrla al lado de otra (otra sesión de trabajo usa el 8141 y build/web/datos)
+const PUERTO = Number(opcion('--puerto', 8141));
+const DATOS = opcion('--datos', 'build/web/datos');
 // Mínimo de cuadros parejos EN PANTALLA (ver medirPantalla). Es 90 % y no 98 % (bitácora §43): con la fase de
 // antes daba 50–65 %, así que 90 % separa de sobra "arreglado" de "roto"; con el arreglo da 91–100 % (casi siempre
 // ≥ 98 %) con la máquina tranquila. Lo que falta son demoras de 2 ms o más de Chrome y Windows al presentar (otro
@@ -41,8 +44,8 @@ const PUERTO = 8141;
 // reloj del juego puede absorber. A 60 Hz (16,7 ms por refresco) no pasa.
 const MINIMO_PANTALLA = 90;
 
-mkdirSync(path.join(raiz, 'build/web/datos'), { recursive: true });
-const log = createWriteStream(path.join(raiz, 'build/web/datos/navegador.log'));
+mkdirSync(path.join(raiz, DATOS), { recursive: true });
+const log = createWriteStream(path.join(raiz, DATOS, 'navegador.log'));
 
 // 1) servidor
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -62,8 +65,14 @@ const pagina = await navegador.newPage({ viewport: { width: 1000, height: 1100 }
 let ultimo = Date.now();
 pagina.on('console', m => { const t = m.text(); log.write(t + '\n'); ultimo = Date.now(); if (/^[✓✗·]|^fin:/.test(t)) console.log(t); });
 pagina.on('pageerror', e => { log.write('[pageerror] ' + e.message + '\n'); console.log('[pageerror] ' + e.message); });
+// --cpu N: el hilo de la página N veces más lento (Chrome lo frena, como una PC lenta): para ver cuánto aguanta el
+// sonido los tirones (§88). --sin-bloqueo: el sonido suena desde el arranque (sin el bloqueo simulado): los cortes
+// del arranque se oyen
+const cpu = Number(opcion('--cpu', 1));
+if (cpu > 1) await (await pagina.context().newCDPSession(pagina)).send('Emulation.setCPUThrottlingRate', { rate: cpu });
+const bloqueo = args.includes('--sin-bloqueo') ? '' : '&bloquearSonido=1';
 const t0 = Date.now();
-await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1&bloquearSonido=1&cuadros=${cuadros}&gpu=${gpu}${sinEnganche ? '&enganche=0' : ''}${sinAjusteSonido ? '&ajusteSonido=0' : ''}${opcion('--extra', '')}`);
+await pagina.goto(`http://127.0.0.1:${PUERTO}/?auto=1${bloqueo}&cuadros=${cuadros}&gpu=${gpu}${sinEnganche ? '&enganche=0' : ''}${sinAjusteSonido ? '&ajusteSonido=0' : ''}${opcion('--extra', '')}`);
 
 let codigo = 0;
 const perfil = Number(opcion('--perfil', 0));
@@ -121,7 +130,7 @@ if (perfil) {
   try {
     await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: maximo, polling: 1000 });
   } catch { console.log('✗ la página no terminó a tiempo'); codigo = 1; }
-  await pagina.locator('#canvas').screenshot({ path: path.join(raiz, 'build/web/datos/navegador.png') }).catch(() => {});
+  await pagina.locator('#canvas').screenshot({ path: path.join(raiz, DATOS, 'navegador.png') }).catch(() => {});
   let resumen = await pagina.locator('#resumen').textContent().catch(() => '');
   const enPantalla = juzgarPantalla(await pantalla);
   if (enPantalla !== null) {

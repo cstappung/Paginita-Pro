@@ -9,18 +9,30 @@
 //
 // El Mii de una licencia se reconoce por su id (4 bytes, ver licencias.mjs: miiId): si se edita ese Mii, se conserva el
 // id y la licencia lo sigue encontrando. Duplicar le da un id nuevo.
+//
+// §86: la galería ofrece los 6 Mii invitados del juego (la pestaña «Guest» de «Elige un Mii») con LA IMAGEN QUE DIBUJA
+// EL JUEGO (invitados.mjs: se sacan una vez del juego andando y quedan en IndexedDB de este navegador). «+ Mii nuevo»
+// crea uno con la cara del invitado (id nuevo); «Cambiar por un Mii invitado» le pone esa cara al Mii elegido y le
+// deja su id, su nombre y su creador: si es el de la licencia, la licencia pasa a usarlo. Un Mii con la cara de un
+// invitado se muestra con la imagen del juego; si se le cambia un rasgo, vuelve el dibujo aproximado. Sin imágenes
+// todavía (el juego no llegó a un menú en este navegador) quedan las caras de la página (PRESETS).
 
 import { desarmarMii, armarMii, miiNuevo, duplicarMii, miiDesdePreset, miiAlAzar, PRESETS, leerBase, armarBase, vistaPrevia, idTexto, mismoId,
          RASGOS, COLORES_FAVORITOS, COLORES_HEX, RUTA_RFLDB, MAX_MII } from './mii.mjs';
+import { miiDeInvitado, cualInvitado, elegirInvitado, LETRAS } from './invitados.mjs';
 
 const el = (etiqueta, props = {}, ...hijos) => { const e = Object.assign(document.createElement(etiqueta), props); e.append(...hijos); return e; };
 const obtener = (o, ruta) => ruta.split('.').reduce((x, k) => x && x[k], o);
 function poner(o, ruta, v) { const k = ruta.split('.'); let x = o; for (const p of k.slice(0, -1)) x = x[p] ??= {}; x[k.at(-1)] = v; }
 const idNumero = m => ((m.id[0] << 24) | (m.id[1] << 16) | (m.id[2] << 8) | m.id[3]) >>> 0;
 
-export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respaldar, licencias = [], importar = null, nombreArchivo = '', alGuardar = () => {} }) {
+// cargarInvitados: () => Promise<registro de invitados.mjs | null> (§86; sin ella, la galería de siempre)
+export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respaldar, licencias = [], importar = null, nombreArchivo = '', alGuardar = () => {},
+                                       cargarInvitados = null }) {
   const caja = document.getElementById('editorMii');
+  // galeria: false, 'nuevo' (+ Mii nuevo) o 'cambiar' (la cara de un invitado para el Mii elegido, §86)
   let original = null, lista = [], actual = 0, pestana = 'Datos', cambiado = false, galeria = false;
+  let invitados = null, urls = [], buscando = !!cargarInvitados;     // §86: el registro y sus imágenes (object URL)
 
   // 1) La base guardada (si hay)
   try {
@@ -47,6 +59,18 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
   // ¿Qué Mii usa cada licencia? (para marcarlo: "el de tu licencia")
   const deLicencia = m => licencias.find(l => l.miiId === idNumero(m));
 
+  // §86: la cara de un Mii en HTML: la imagen del juego si tiene la cara de un invitado, si no el dibujo aproximado
+  const cara = (m, tam) => {
+    const i = cualInvitado(invitados, m);
+    return i >= 0 ? `<img src="${urls[i]}" width="${tam}" height="${tam}" alt="Invitado ${LETRAS[i]}" data-cara-invitado="${i}" style="object-fit:contain">`
+                  : vistaPrevia(m, tam);
+  };
+  if (cargarInvitados) cargarInvitados().then(r => {
+    buscando = false;
+    if (r && !caja.hidden) { invitados = r; urls = r.imagenes.map(b => URL.createObjectURL(b)); }
+    if (!caja.hidden) pintar();
+  }, () => { buscando = false; });
+
   function pintar() {
     caja.replaceChildren();
     const cabeza = el('div', { className: 'mii-cabeza' },
@@ -59,7 +83,7 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
     lista.forEach((m, i) => {
       const b = el('button', { type: 'button', className: 'mii', onclick: () => { actual = i; pintar(); } });
       b.setAttribute('aria-pressed', String(i === actual));
-      b.innerHTML = vistaPrevia(m, 40);
+      b.innerHTML = cara(m, 40);
       const lic = deLicencia(m);
       const nombre = el('span', { textContent: (m.nombre || 'Mii') + (lic ? ' ⭐' : '') });
       nombre.setAttribute('translate', 'no');
@@ -68,27 +92,54 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
       col.append(b);
     });
     col.append(el('button', { type: 'button', className: 'boton principal', textContent: '+ Mii nuevo', disabled: lista.length >= MAX_MII,
-      onclick: () => { galeria = true; pintar(); } }));
+      onclick: () => { galeria = 'nuevo'; pintar(); } }));
     marco.append(col);
 
-    // La galería de caras de partida (como los Mii «invitado» del juego): elegir una y después ponerle nombre
+    // La galería: los Mii invitados del juego con su imagen (§86) o, si todavía no hay, las caras de la página
     if (galeria || !lista.length) {
-      const caja2 = el('div', { className: 'mii-editor', style: 'display:block' });
-      caja2.append(el('h3', { textContent: 'Elige una cara para empezar', style: 'margin:0 0 4px;color:#ff9ad5;font:400 20px Lilita One,system-ui' }),
-        el('p', { textContent: 'Como los Mii invitados del juego: eliges una, le pones tu nombre y tu color, y si quieres la cambias rasgo por rasgo.', style: 'margin:0 0 10px;font-size:13px;color:var(--suave)' }));
+      const modo = galeria === 'cambiar' && lista[actual] ? 'cambiar' : 'nuevo';
+      const caja2 = el('div', { className: 'mii-editor mii-galeria', style: 'display:block' });
+      caja2.dataset.modo = modo;
+      caja2.append(el('h3', { textContent: modo === 'cambiar' ? `Elige la cara para «${lista[actual].nombre || 'Mii'}»` : 'Elige un Mii para empezar',
+                              style: 'margin:0 0 4px;color:#ff9ad5;font:400 20px Lilita One,system-ui' }),
+        el('p', { textContent: modo === 'cambiar'
+          ? 'Toma la cara del invitado y se queda con su nombre: si es el Mii de tu licencia, la licencia lo usa la próxima vez que arranques el juego.'
+          : invitados ? 'Los Mii invitados del juego: eliges uno, le pones tu nombre y tu color, y si quieres lo cambias rasgo por rasgo.'
+                      : 'Como los Mii invitados del juego: eliges una, le pones tu nombre y tu color, y si quieres la cambias rasgo por rasgo.',
+          style: 'margin:0 0 10px;font-size:13px;color:var(--suave)' }));
       const grilla = el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px' });
       const elegir = m => { lista.push(m); actual = lista.length - 1; cambiado = true; galeria = false; pestana = 'Datos'; pintar();
         const i = caja.querySelector('.mii-campos input[type=text]'); if (i) { i.focus(); i.select(); } };
-      PRESETS.forEach((_, i) => {
-        const m = miiDesdePreset(i, { colorFavorito: i % 12 });
-        const b = el('button', { type: 'button', className: 'mii', style: 'flex-direction:column;justify-content:center', title: m.esChica ? 'Chica' : 'Chico',
-          onclick: () => elegir(miiDesdePreset(i, { colorFavorito: i % 12 })) });
-        b.innerHTML = vistaPrevia(m, 72);
-        grilla.append(b);
-      });
-      const azar = el('button', { type: 'button', className: 'mii', style: 'flex-direction:column;justify-content:center;font-size:28px', title: 'Una cara al azar',
-        textContent: '🎲', onclick: () => elegir(miiAlAzar()) });
-      grilla.append(azar);
+      if (invitados) {
+        for (let i = 0; i < invitados.datos.length; i++) {
+          const b = el('button', { type: 'button', className: 'mii invitado', style: 'flex-direction:column;justify-content:center',
+            title: `Invitado ${LETRAS[i]}`, onclick: () => {
+              elegirInvitado(i);                       // también será el de la próxima licencia nueva (directo.mjs)
+              if (modo === 'cambiar') {
+                lista[actual] = miiDeInvitado(invitados, i, { conservar: lista[actual] });
+                cambiado = true; galeria = false; pintar();
+              } else elegir(miiDeInvitado(invitados, i));
+            } });
+          b.dataset.invitado = String(i);
+          b.innerHTML = `<img src="${urls[i]}" width="72" height="72" alt="Invitado ${LETRAS[i]}" style="object-fit:contain">`;
+          const nombre = el('span', { textContent: `Invitado ${LETRAS[i]}` });
+          nombre.setAttribute('translate', 'no');
+          b.append(nombre);
+          grilla.append(b);
+        }
+      } else {
+        if (buscando) caja2.append(el('p', { className: 'mii-buscando', textContent: 'Buscando los Mii invitados en el juego…', style: 'margin:0 0 8px;font-size:12px;color:var(--suave)' }));
+        if (modo === 'nuevo') PRESETS.forEach((_, i) => {
+          const m = miiDesdePreset(i, { colorFavorito: i % 12 });
+          const b = el('button', { type: 'button', className: 'mii', style: 'flex-direction:column;justify-content:center', title: m.esChica ? 'Chica' : 'Chico',
+            onclick: () => elegir(miiDesdePreset(i, { colorFavorito: i % 12 })) });
+          b.innerHTML = vistaPrevia(m, 72);
+          grilla.append(b);
+        });
+        else caja2.append(el('p', { textContent: 'Los Mii invitados aparecen cuando el juego llega a un menú en este navegador (se sacan del juego, una vez).' }));
+      }
+      if (modo === 'nuevo') grilla.append(el('button', { type: 'button', className: 'mii', style: 'flex-direction:column;justify-content:center;font-size:28px', title: 'Una cara al azar',
+        textContent: '🎲', onclick: () => elegir(miiAlAzar()) }));
       caja2.append(grilla);
       if (lista.length) caja2.append(el('button', { type: 'button', className: 'boton', textContent: 'Cancelar', style: 'margin-top:10px', onclick: () => { galeria = false; pintar(); } }));
       marco.append(caja2);
@@ -106,10 +157,15 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
 
     // La vista previa y las pestañas
     const vista = el('div', { className: 'mii-vista' });
-    const dibujo = el('div'); dibujo.innerHTML = vistaPrevia(m, 180);
-    vista.append(dibujo, el('small', { textContent: 'Vista aproximada (dibujo de la página). En el juego se ve el Mii de verdad.' }));
+    const dibujo = el('div'); dibujo.innerHTML = cara(m, 180);
+    const leyenda = () => (cualInvitado(invitados, m) >= 0 ? `La cara del invitado ${LETRAS[cualInvitado(invitados, m)]}, dibujada por el juego.`
+                                                          : 'Vista aproximada (dibujo de la página). En el juego se ve el Mii de verdad.');
+    const nota = el('small', { textContent: leyenda() });
+    vista.append(dibujo, nota);
     const lic = deLicencia(m);
     if (lic) vista.append(el('small', { textContent: `⭐ Es el Mii de tu licencia ${lic.casilla}: los cambios se ven en ella.` }));
+    if (invitados || buscando) vista.append(el('button', { type: 'button', className: 'boton', id: 'miiCambiarInvitado', textContent: 'Cambiar por un Mii invitado',
+      onclick: () => { galeria = 'cambiar'; pintar(); } }));
     const derecha = el('div');
     const pest = el('div', { className: 'mii-pestanas', role: 'tablist' });
     for (const p of Object.keys(RASGOS)) {
@@ -118,7 +174,11 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
       pest.append(b);
     }
     const campos = el('div', { className: 'mii-campos' });
-    const refrescar = () => { dibujo.innerHTML = vistaPrevia(m, 180); cambiado = true; const mini = col.children[actual]; if (mini) { mini.querySelector('svg').outerHTML = vistaPrevia(m, 40); } };
+    const refrescar = () => {
+      dibujo.innerHTML = cara(m, 180); nota.textContent = leyenda(); cambiado = true;
+      const mini = col.children[actual]?.firstElementChild;      // el dibujo o la imagen del invitado
+      if (mini) mini.outerHTML = cara(m, 40);
+    };
     if (pestana === 'Datos') {
       const texto = (etq, campo, max) => {
         const i = el('input', { type: 'text', value: m[campo] || '', maxLength: max });
@@ -187,6 +247,7 @@ export async function abrirEditorMii({ guardado, preguntar, avisar, bajar, respa
     if (cambiado && !await preguntar({ titulo: 'Salir sin guardar', si: 'Salir', texto: 'Hay cambios en los Mii que no se guardaron.' })) return;
     caja.hidden = true;
     caja.replaceChildren();
+    urls.forEach(u => URL.revokeObjectURL(u));
   }
   caja.hidden = false;
   pintar();

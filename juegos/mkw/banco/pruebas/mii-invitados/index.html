@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mii invitados</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>
+  #editorMii { border: 1px solid #444; border-radius: 10px; padding: 10px; margin-top: 12px; }
+  #editorMii .mii { display: inline-flex; align-items: center; gap: 6px; background: #222; color: #eee; border: 1px solid #555; border-radius: 8px; padding: 4px; }
+  #editorMii .mii-marco { display: grid; grid-template-columns: 200px 1fr; gap: 10px; }
+  #editorMii .mii-lista { display: flex; flex-direction: column; gap: 4px; }
+  #caras img { image-rendering: pixelated; background: #333; margin: 2px; }
+</style>
+</head>
+<body>
+<h1>Mii invitados: <span>las 6 caras del juego en «Mi Mii», sin el juego</span></h1>
+<p>Prueba <code>web/navegador/invitados.mjs</code>, <code>textura-gx.mjs</code>, la galería de <code>editor-mii.mjs</code> y
+  <code>prepararMii</code> de <code>directo.mjs</code> (bitácora §86) <b>sin el juego</b>: un «juego» falso deja en su memoria
+  lo mismo que <code>invitados_nativo.cpp</code> (la misma forma: 6 Mii de 74 bytes y 6 texturas en baldosas de la Wii),
+  pero los Mii son <b>inventados</b> y las caras las <b>dibuja esta página</b> (un círculo de color con ojos): nada del
+  juego. Que el juego de verdad da sus 6 invitados con imagen y que la licencia usa el elegido lo prueba
+  <code>node web/navegador/prueba-invitados.mjs</code>.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul><div id="caras"></div></div>
+<div id="editorMii" hidden></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { decodificar, codificar, tamTextura } from '/web/navegador/textura-gx.mjs';
+import { sacarDelJuego, armarRegistro, leerInvitados, guardarInvitados, borrarInvitados, miiDeInvitado, cualInvitado,
+         mejorarMiiNuevo, tinta, N_INVITADOS } from '/web/navegador/invitados.mjs';
+import { armarMii, desarmarMii, miiAlAzar, armarBase, leerBase, mismoId, RUTA_RFLDB } from '/web/navegador/mii.mjs';
+import { prepararMii } from '/web/navegador/directo.mjs';
+import { abrirEditorMii } from '/web/navegador/editor-mii.mjs';
+
+const { ok, nota, fin } = prueba('mii-invitados', 'Mii invitados con su imagen (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+// azar repetible (para que la página dé siempre lo mismo)
+let semilla = 20261020;
+const azar = () => ((semilla = (Math.imul(semilla, 1103515245) + 12345) >>> 0) / 2 ** 32);
+
+// ---- Datos falsos con la forma del juego ----
+// 6 Mii inventados (74 bytes cada uno, como la tabla de la librería de caras)
+const DATOS = Array.from({ length: N_INVITADOS }, (_, i) => armarMii(miiAlAzar({ nombre: 'Falso ' + 'ABCDEF'[i], azar, ahora: Date.UTC(2026, 9, 20) + i * 60000 })));
+// 6 caras dibujadas aquí: fondo transparente, un círculo de color (bordes suaves), dos ojos
+const ANCHO = 64, ALTO = 64;
+function caraFalsa(i) {
+  const c = new OffscreenCanvas(ANCHO, ALTO), g = c.getContext('2d');
+  g.fillStyle = `hsl(${i * 60} 70% 60%)`; g.beginPath(); g.arc(32, 34, 24, 0, 7); g.fill();
+  g.fillStyle = '#111'; g.fillRect(22, 28, 5, 7); g.fillRect(37, 28, 5, 7);
+  g.fillStyle = '#fff'; g.fillRect(20 + i, 46, 24 - 2 * i, 3);
+  return g.getImageData(0, 0, ANCHO, ALTO).data;
+}
+const CARAS = Array.from({ length: N_INVITADOS }, (_, i) => caraFalsa(i));
+
+// Lo que deja invitados_nativo.cpp: struct Salida { int cuantos, cuadros, microsegundos; Invitado[6]; uint8 imagen[6][256·256·4] },
+// Invitado = { uint8 mii[76]; uint32 ancho, alto, formato, bytes, direccion, bajada } (100 bytes), little-endian
+function juegoFalso({ formato = 5, cuadrosHasta = 3, falla = false, vacia = -1 } = {}) {
+  const TAM_INV = 100, DESDE_INV = 12, DESDE_IMG = 12 + 6 * TAM_INV, TAM_IMG = 256 * 256 * 4, BASE = 64;
+  const HEAPU8 = new Uint8Array(BASE + DESDE_IMG + 6 * TAM_IMG), v = new DataView(HEAPU8.buffer);
+  let estado = 0, pedidos = 0, sondeos = 0;
+  const llenar = () => {
+    v.setInt32(BASE, 6, true); v.setInt32(BASE + 4, cuadrosHasta, true); v.setInt32(BASE + 8, 4321, true);
+    for (let i = 0; i < 6; i++) {
+      const p = BASE + DESDE_INV + i * TAM_INV;
+      HEAPU8.set(DATOS[i], p);
+      const bytes = i === vacia ? new Uint8Array(tamTextura(ANCHO, ALTO, formato)) : codificar(CARAS[i], ANCHO, ALTO, formato);
+      [ANCHO, ALTO, formato, bytes.length, 0x80F00000 + i * 0x2000, 1].forEach((x, k) => v.setUint32(p + 76 + 4 * k, x, true));
+      HEAPU8.set(bytes, BASE + DESDE_IMG + i * TAM_IMG);
+    }
+  };
+  return {
+    HEAPU8,
+    _mkw_invitados_pedir: () => { pedidos++; estado = 1; sondeos = 0; return 1; },
+    _mkw_invitados_estado: () => { if (estado === 1 && ++sondeos >= cuadrosHasta) { if (falla) estado = -1; else { llenar(); estado = 2; } } return estado; },
+    _mkw_invitados_salida: () => BASE,
+    _mkw_invitados_forma: q => [TAM_INV, DESDE_INV, DESDE_IMG, TAM_IMG][q] ?? 6,
+    get pedidos() { return pedidos; },
+  };
+}
+const iguales = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+const difMax = (a, b) => { let d = 0; for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(a[i] - b[i])); return d; };
+
+// ---- 1. Texturas de la Wii (formato GX) ----
+const cara = CARAS[1];
+ok('RGBA8 ida y vuelta: los mismos píxeles exactos (64×64)', iguales(decodificar(codificar(cara, 64, 64, 6), 64, 64, 6), cara));
+const r5 = decodificar(codificar(cara, 64, 64, 5), 64, 64, 5);
+// RGB5A3: 5 bits por color en lo opaco (±4 de 255), 4 bits y opacidad de 3 bits en lo transparente
+ok('RGB5A3 ida y vuelta: dentro de lo que pierden 5/4 bits por color (±18) y lo transparente sigue transparente',
+   difMax(r5, cara) <= 18 && r5[3] === 0 && r5[(34 * 64 + 32) * 4 + 3] === 255, `diferencia máxima ${difMax(r5, cara)}`);
+const d565 = decodificar(codificar(cara, 64, 64, 4), 64, 64, 4);
+let m565 = 0;
+for (let i = 0; i < cara.length; i += 4) if (cara[i + 3] === 255) for (let k = 0; k < 3; k++) m565 = Math.max(m565, Math.abs(d565[i + k] - cara[i + k]));
+ok('RGB565 ida y vuelta: todo opaco y lo pintado dentro de ±5 (5-6-5 bits)', d565[3] === 255 && m565 <= 5, `diferencia máxima ${m565}`);
+ok('IA8 e I8: gris de 8 bits (IA8 conserva la opacidad)', (() => {
+  const ia = decodificar(codificar(cara, 64, 64, 3), 64, 64, 3), i8 = decodificar(codificar(cara, 64, 64, 1), 64, 64, 1);
+  return ia[3] === 0 && ia[(34 * 64 + 32) * 4 + 3] === 255 && ia[0] === ia[1] && i8[3] === 255;
+})());
+ok('tamaño en baldosas: RGB5A3 64×64 = 8 KB, RGBA8 64×64 = 16 KB, RGB5A3 30×30 = 2 KB (8×8 baldosas), I4 10×10 = 128 B',
+   tamTextura(64, 64, 5) === 8192 && tamTextura(64, 64, 6) === 16384 && tamTextura(30, 30, 5) === 2048 && tamTextura(10, 10, 0) === 128);
+// el orden de las baldosas: en una de 8×8 RGB5A3 el píxel (5, 1) está en la 2.ª baldosa (x 4-7), fila 1, columna 1
+const b8 = new Uint8Array(tamTextura(8, 8, 5)); const off = 32 + (1 * 4 + 1) * 2; b8[off] = 0xFC; b8[off + 1] = 0x00;  // rojo opaco
+const d8 = decodificar(b8, 8, 8, 5);
+ok('el orden de las baldosas: el byte 42 de una RGB5A3 de 8×8 es el píxel (5, 1)', d8[(1 * 8 + 5) * 4] === 255 && d8[(1 * 8 + 5) * 4 + 3] === 255 && d8[(1 * 8 + 4) * 4 + 3] === 0);
+
+// ---- 2. Pedírselos al «juego» ----
+const M = juegoFalso();
+const salida = await sacarDelJuego(M);
+ok('sacarDelJuego pide una vez y espera a que el juego conteste (estado 1 → 2), con lo que tardó (4,321 ms)', salida && M.pedidos === 1 && salida.cuantos === 6 && salida.ms === 4.321);
+ok('trae los 6 Mii con sus 74 bytes tal cual', salida && salida.datos.every((d, i) => d.length === 74 && iguales(d, DATOS[i])));
+ok('y las 6 texturas con su forma (64×64, RGB5A3, 8 KB)', salida && salida.texturas.every(t => t.ancho === 64 && t.alto === 64 && t.formato === 5 && t.bytes.length === 8192));
+const reg = await armarRegistro(salida, { ahora: 1 });
+ok('el registro: versión 1, 6 Mii y 6 PNG', reg.version === 1 && reg.datos.length === 6 && reg.imagenes.every(b => b.type === 'image/png'));
+const png = await createImageBitmap(reg.imagenes[2]);
+const lienzo = new OffscreenCanvas(64, 64).getContext('2d'); lienzo.drawImage(png, 0, 0);
+const vuelta = lienzo.getImageData(0, 0, 64, 64).data, esperada = decodificar(salida.texturas[2].bytes, 64, 64, 5);
+// (el lienzo guarda los semitransparentes «premultiplicados»: en los bordes suaves puede redondear ±1)
+let difSolido = 0, difBorde = 0;
+for (let i = 0; i < esperada.length; i += 4) {
+  const d = Math.max(...[0, 1, 2, 3].map(k => Math.abs(vuelta[i + k] - esperada[i + k])));
+  if (esperada[i + 3] === 0 || esperada[i + 3] === 255) difSolido = Math.max(difSolido, d); else difBorde = Math.max(difBorde, d);
+}
+ok('el PNG guarda la imagen: exacta en lo opaco y lo transparente, ±1 en los bordes suaves', difSolido === 0 && difBorde <= 1, `opaco/transparente ${difSolido}, bordes ${difBorde}`);
+ok('la imagen tiene tinta (no es una copia vacía)', tinta(esperada) > 0.3, `${Math.round(tinta(esperada) * 100)} % con algo`);
+let error = '';
+try { await armarRegistro(await sacarDelJuego(juegoFalso({ vacia: 4 }))); } catch (e) { error = e.message; }
+ok('una cara vacía (la copia que no se bajó de la tarjeta de video) se rechaza', /invitado E.*vacía/.test(error), error);
+ok('si el juego dice que no pudo, sacarDelJuego da null', (await sacarDelJuego(juegoFalso({ falla: true }))) === null);
+ok('sin juego (sin las funciones), null', (await sacarDelJuego({})) === null);
+const r6 = await armarRegistro(await sacarDelJuego(juegoFalso({ formato: 6 })));
+ok('con texturas RGBA8 también (el formato que dé el juego)', r6.formato === 6 && r6.imagenes.length === 6);
+
+// ---- 3. IndexedDB de este navegador (una base de prueba aparte) ----
+const op = { base: 'mkw-invitados-banco' };
+await borrarInvitados(op).catch(() => {});
+ok('sin nada guardado, leerInvitados da null', (await leerInvitados(op)) === null);
+await guardarInvitados(reg, op);
+const leido = await leerInvitados(op);
+ok('guardado y leído: los 6 Mii y las 6 imágenes (Blob)', leido && leido.datos.every((d, i) => iguales(d, DATOS[i])) && leido.imagenes.every(b => b instanceof Blob && b.size > 100));
+await guardarInvitados({ ...reg, version: 99 }, op);
+ok('un registro de otra versión no vale (null)', (await leerInvitados(op)) === null);
+await guardarInvitados(reg, op);
+
+// ---- 4. El Mii del jugador desde un invitado ----
+const mio = miiAlAzar({ nombre: 'Ana', azar, ahora: Date.UTC(2026, 9, 1) }); mio.creador = 'Mamá';
+const cambiado = miiDeInvitado(reg, 3, { conservar: mio });
+const inv3 = desarmarMii(DATOS[3]);
+ok('«cambiar»: se queda con el id, la consola, el nombre y el creador del Mii de la licencia', mismoId(cambiado, mio) && iguales(cambiado.consola, mio.consola) && cambiado.nombre === 'Ana' && cambiado.creador === 'Mamá');
+ok('«cambiar»: y toma la cara del invitado (los rasgos, bytes 0x20-0x35, y el color favorito)',
+   iguales(armarMii(cambiado).subarray(0x20, 0x36), DATOS[3].subarray(0x20, 0x36)) && cambiado.colorFavorito === inv3.colorFavorito);
+const nuevo = miiDeInvitado(reg, 5, { nombre: 'Beto' });
+ok('«nuevo»: id nuevo de Mii normal (bit alto), distinto del del invitado, con el nombre dado',
+   (nuevo.id[0] & 0x80) && !mismoId(nuevo, desarmarMii(DATOS[5])) && nuevo.nombre === 'Beto' && iguales(armarMii(nuevo).subarray(0x20, 0x36), DATOS[5].subarray(0x20, 0x36)));
+ok('cualInvitado reconoce la cara de los dos (3 y 5) y no la de un Mii cualquiera', cualInvitado(reg, cambiado) === 3 && cualInvitado(reg, nuevo) === 5 && cualInvitado(reg, mio) === -1);
+const tocado = structuredClone(cambiado); tocado.ojos.tipo = (tocado.ojos.tipo + 1) % 48;
+ok('con un rasgo cambiado ya no es la cara del invitado (vuelve el dibujo aproximado)', cualInvitado(reg, tocado) === -1);
+ok('sin registro (sin imágenes todavía), cualInvitado da -1 sin romperse', cualInvitado(null, cambiado) === -1);
+
+// ---- 5. prepararMii (la licencia nueva de directo.mjs) con un sistema de archivos falso ----
+const fsFalso = (inicial = null) => { const a = new Map(inicial ? [[RUTA_RFLDB, inicial]] : []);
+  return { archivos: a, readFile: r => { if (!a.has(r)) throw new Error('no existe'); return a.get(r); }, writeFile: (r, b) => a.set(r, new Uint8Array(b)), mkdirTree: () => {} }; };
+let fs = fsFalso();
+const p1 = prepararMii(fs, 'Carla', { invitados: reg, elegido: 2 });
+const b1 = leerBase(fs.archivos.get(RUTA_RFLDB));
+ok('base vacía + invitados: el Mii nuevo es el invitado elegido (el C), con el nombre de la persona y un id nuevo',
+   p1.invitado === 2 && p1.nueva && b1.valida && b1.mii.length === 1 && cualInvitado(reg, b1.mii[0].mii) === 2 && b1.mii[0].mii.nombre === 'Carla' && iguales(p1.createId.subarray(0, 4), b1.mii[0].mii.id));
+fs = fsFalso(armarBase([mio]));
+const p2 = prepararMii(fs, 'Carla', { invitados: reg, elegido: 2 });
+ok('con Mii en la base, la licencia usa el primero (no se toca la base)', p2.invitado === -1 && !p2.nueva && iguales(p2.createId.subarray(0, 4), mio.id));
+fs = fsFalso();
+const p3 = prepararMii(fs, 'Carla');
+ok('sin invitados todavía (primera visita): una cara de la página, como antes', p3.invitado === -1 && p3.nueva && leerBase(fs.archivos.get(RUTA_RFLDB)).mii.length === 1);
+ok('mejorarMiiNuevo: ese Mii toma la cara del invitado elegido y se queda con su id y su nombre',
+   mejorarMiiNuevo(fs, reg, p3.createId, 4) && (() => { const m = leerBase(fs.archivos.get(RUTA_RFLDB)).mii[0].mii; return cualInvitado(reg, m) === 4 && iguales(m.id, p3.createId.subarray(0, 4)) && m.nombre === 'Carla'; })());
+ok('mejorarMiiNuevo con un id que no está en la base: no toca nada', !mejorarMiiNuevo(fs, reg, new Uint8Array(8).fill(7), 1));
+
+// ---- 6. La galería de «Mi Mii» ----
+const caja = document.getElementById('editorMii');
+const guardadoFalso = () => { const a = new Map(); return { archivos: a, leerArchivo: async r => a.get(r) || null, ponerArchivo: async (r, b) => { a.set(r, new Uint8Array(b)); } }; };
+const comunes = { preguntar: async () => true, avisar: async () => {}, bajar: () => {}, respaldar: async () => {} };
+const hasta = async (cond, ms = 3000) => { const t0 = performance.now(); while (!cond() && performance.now() - t0 < ms) await espera(20); return cond(); };
+let g = guardadoFalso();
+await abrirEditorMii({ ...comunes, guardado: g, cargarInvitados: async () => { await espera(80); return reg; } });
+const botones = () => [...caja.querySelectorAll('[data-invitado]')];
+ok('sin Mii, la galería muestra los 6 invitados del juego…', await hasta(() => botones().length === 6), `${botones().length}`);
+const imgs = botones().map(b => b.querySelector('img'));
+await hasta(() => imgs.every(i => i.complete && i.naturalWidth));
+ok('…cada uno con su imagen (64×64, cargada) y «Invitado A…F»', imgs.every(i => i.naturalWidth === 64 && i.naturalHeight === 64) && botones().map(b => b.textContent).join() === ['A', 'B', 'C', 'D', 'E', 'F'].map(l => 'Invitado ' + l).join());
+ok('…y ya no las caras dibujadas (ningún SVG en la galería)', !caja.querySelector('.mii-galeria svg'));
+botones()[2].click();
+await espera(30);
+const vistaImg = caja.querySelector('.mii-vista img[data-cara-invitado]');
+ok('elegir el C: queda un Mii nuevo y su vista es la imagen del juego, no el dibujo', vistaImg?.dataset.caraInvitado === '2' && caja.querySelectorAll('.mii-lista > .mii').length === 1);
+caja.querySelector('.mii-pie .principal').click();
+await hasta(() => g.archivos.has(RUTA_RFLDB));
+const guardada = g.archivos.get(RUTA_RFLDB) && leerBase(g.archivos.get(RUTA_RFLDB));
+ok('«Guardar para el juego» escribe la base con ese Mii (la cara del invitado C)', guardada?.valida && guardada.mii.length === 1 && cualInvitado(reg, guardada.mii[0].mii) === 2);
+caja.hidden = true; caja.replaceChildren();
+
+// el Mii de la licencia: «Cambiar por un Mii invitado» le pone la cara y le deja el id (la licencia lo sigue encontrando)
+g = guardadoFalso(); await g.ponerArchivo(RUTA_RFLDB, armarBase([mio]));
+const idNum = m => ((m.id[0] << 24) | (m.id[1] << 16) | (m.id[2] << 8) | m.id[3]) >>> 0;
+await abrirEditorMii({ ...comunes, guardado: g, licencias: [{ casilla: 1, miiId: idNum(mio) }], cargarInvitados: async () => reg });
+await hasta(() => caja.querySelector('#miiCambiarInvitado') && caja.querySelector('.mii-vista svg'));
+ok('con el Mii de la licencia (⭐): botón «Cambiar por un Mii invitado» y la vista aproximada', !!caja.querySelector('#miiCambiarInvitado') && caja.textContent.includes('⭐'));
+caja.querySelector('#miiCambiarInvitado').click();
+await espera(20);
+ok('la galería en modo «cambiar» dice para quién es', caja.querySelector('.mii-galeria')?.dataset.modo === 'cambiar' && caja.querySelector('.mii-galeria h3').textContent.includes('Ana'));
+botones()[4].click();
+await espera(20);
+caja.querySelector('.mii-pie .principal').click();
+await hasta(() => leerBase(g.archivos.get(RUTA_RFLDB)).mii.some(x => cualInvitado(reg, x.mii) === 4));
+const tras = leerBase(g.archivos.get(RUTA_RFLDB)).mii;
+ok('guardado: sigue habiendo 1 Mii, con el mismo id y nombre (el de la licencia) y la cara del invitado E',
+   tras.length === 1 && mismoId(tras[0].mii, mio) && tras[0].mii.nombre === 'Ana' && cualInvitado(reg, tras[0].mii) === 4);
+ok('y sigue marcado como el de la licencia (⭐), ahora con la imagen del juego', caja.textContent.includes('⭐') && caja.querySelector('.mii-lista img[data-cara-invitado="4"]'));
+// mover un rasgo: vuelve el dibujo aproximado (la imagen ya no sería la cara de verdad)
+caja.querySelectorAll('.mii-pestanas button')[4].click();      // Ojos
+await espera(20);
+const rango = caja.querySelector('.mii-campos input[type=range]');
+rango.value = String((Number(rango.value) + 1) % 48); rango.dispatchEvent(new Event('input'));
+ok('al cambiar un rasgo, la vista vuelve al dibujo aproximado (en la lista también)', caja.querySelector('.mii-vista svg') && !caja.querySelector('.mii-vista img') && caja.querySelector('.mii-lista .mii svg'));
+caja.hidden = true; caja.replaceChildren();
+
+// sin invitados (la página sin el juego, o nunca llegó a un menú): las caras de la página, como antes
+await abrirEditorMii({ ...comunes, guardado: guardadoFalso() });
+ok('sin invitados: la galería de siempre (12 caras de la página + el dado)', caja.querySelectorAll('.mii-galeria .mii').length === 13 && !caja.querySelector('[data-invitado]'));
+caja.hidden = true; caja.replaceChildren();
+await borrarInvitados(op);
+
+// a la vista: las 6 caras falsas tal como las mostraría la página
+const ver = document.getElementById('caras');
+for (const b of reg.imagenes) ver.append(Object.assign(new Image(64, 64), { src: URL.createObjectURL(b) }));
+nota('arriba: las 6 caras FALSAS (dibujadas por esta página) después de pasar por baldosas RGB5A3 y PNG');
+fin();
+</script>
+</body>
+</html>

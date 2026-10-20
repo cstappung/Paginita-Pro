@@ -42,7 +42,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   (`mkw.js`, `mkw.wasm.br` con `Content-Encoding: br` y huella `?v=`), manifiesto del disco, pedazos (HTTP Range) del
   disco y de `RetroRewind6/`, semillas (`pipelines.bin`, `bloques.json`), imágenes; CORS solo el sitio
 - ✅ B2. Programa final (`compilar-web.py --modo navegador --final`) y semillas nuevas (`guion.mjs … --semilla`, 3 corridas):
-  700 pipelines y 233 bloques (§65). Se recompila con `--final` antes de subir (el gancho de §66 cambió el programa)
+  700 pipelines y 233 bloques (§65). Se recompila con `--final` antes de subir (el gancho de §66 cambió el programa).
+  **Rehecho en §89** con todo hasta §88: `build/web-final/navegador` (15,7 MB en brotli), 713 pipelines y 143 bloques;
+  las 29 pruebas con ese programa 443/443 y el sitio entero (`prueba-experiencia`) 20/20 y `--playlist` 22/22
 - ✅ B3. Lista de archivos para R2 (disco 2,6 GB + RR 2,1 GB + programa 16 MB ≈ 4,7 GB) con huellas, y su
   comprobación; `docs/publicar.md` con los pasos del dueño (Worker, R2, `juegos/mkw/privado.json`, reglas de Firebase)
 - ✅ B4. Banco: el Worker imitado en local con disco y RR **falsos** (403 a no-amigos, Range exacto, brotli, CORS)
@@ -109,7 +111,10 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   (0x48); desde ahí cada modo se elige con los menús del juego, sin piloto
 - ✅ M9. CPU iguales a las de un jugador en la sala: los humanos son jugadores de verdad (tipo 0) y el nivel de la CPU
   sale de la cilindrada como en un Grand Prix (§73)
-- ⬜ M10. Después de M: el menú «cambiar Mii» con los 6 Mii invitados del juego y sus imágenes del juego
+- ✅ M10. El menú «cambiar Mii» con los 6 Mii invitados del juego y sus imágenes del juego: el juego los dibuja en su
+  primer menú y la página se los lleva a IndexedDB de ese navegador; «Mi Mii» los ofrece (nuevo o «Cambiar por un Mii
+  invitado», que conserva el id de la licencia) y la licencia nueva usa el elegido (`invitados_nativo.cpp`,
+  `invitados.mjs`; banco `mii-invitados` 41, `prueba-invitados` 13; §86)
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -149,7 +154,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   18/18, banco `sala-carrera` 49/49, `mkw.test` 17/17)
 
 ### Etapa E — Rendimiento
-- ⬜ E1. Sonido con AudioWorklet (latencia ~100–150 → ~30 ms) y sin cortes en el arranque
+- ✅ E1. Sonido con AudioWorklet (§88): del juego al parlante **~177 → ~60 ms** medido con un clic (nuestra parte
+  ~127 → ~20–25 ms; los otros ~40–50 son Chrome + Windows + la tarjeta, que una página no toca). Sin cortes en el
+  título, el arranque ni la carrera (también con la CPU frenada 2×); `?audio=viejo` = lo de antes
 - ⬜ E2. Primera visita: los ~9 tirones por pipelines nuevos en 20 s
 - ⬜ E3. Monitores de 60/120/240 Hz: recortar el giro final de 0,75 ms (medir con el monitor en 240 Hz)
 - ⏸ E4. Celulares: **fuera del lanzamiento** (el dueño, 2026-10-19: «saltate el soporte a móviles para lanzar el juego más
@@ -253,8 +260,9 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   - ✅ Pruebas: `banco/pruebas/sonido/` **13/0** (sin el juego; necesita un clic) y en la prueba del navegador
     (bloqueo simulado con `?bloquearSonido=1` porque Chrome manejado por Playwright nunca bloquea): desbloqueo con
     el clic, música del título a −14 dB, sin cortes desde el cuadro 300, cola centrada
-  - ⬜ Cortes en el arranque (2 huecos + bloques tirados mientras el juego se traba leyendo el disco) y latencia
-    ~100–150 ms (bloque de 43 ms + cola de 60): AudioWorklet en vez del ScriptProcessorNode (etapa E1)
+  - ✅ Cortes en el arranque y latencia (E1, §88): AudioWorklet (`sonido-worklet.js`, cola adaptable de 25 ms que
+    arranca en 80) en vez del ScriptProcessorNode; ~60 ms del juego al parlante (antes ~177). Quedan cortes solo en las
+    cargas de la primera visita (los dos caminos; los tirones de E2)
 - ✅ **Controles** (todos llegan al juego como un mando de GameCube por puerto): `web/navegador/pad_web.cpp`
   reemplaza el `pad.cpp` de aurora (que leía SDL) y la página lo llena con `_mkw_web_pad(puerto, …)` en cada
   refresco; `web/navegador/controles.mjs` junta las fuentes:
@@ -398,6 +406,36 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-20 05:07** — **El paso 0 de publicar, hecho** (§89). Con §86, §87 y §88 commiteados, el programa final
+  (`--final --carpeta build/web-m8 --salida build/web-final/navegador`, 19 de 590 archivos recompilados): `mkw.wasm`
+  121,7 MB → **15,7 MB** en brotli. Semillas con tres partidas sobre ese programa (VS copa 0, VS copa 13, la carrera
+  directa de la sala): **713 pipelines**, 419 bloques vistos y 143 repetidos (36 MB). `correr-todo` con
+  `MKW_BUILD=build/web-final/navegador`: 432/435; las 3 fallas eran la carga (banco `lockstep`, solo 42/42), la
+  planilla corriendo `prueba-navegador` 15 s cuando el sonido de §88 centra la cola pasados ~20 s (con 30 s 21/21:
+  la planilla ahora usa 1800) y la cuenta «9 ✓ · 0 ✗» de `prueba-nube` que la planilla no leía (pasaba 9/9). Repetidas:
+  65/65, o sea **443/443**. El sitio entero con el final por el Worker de verdad y el kit al día: `prueba-experiencia`
+  **20/20** y `--playlist` **22/22**. La lista para R2: 7.324 archivos, 5,0 GB. Queda B7 (el dueño).
+- **2026-10-20 03:50** — **El sonido por AudioWorklet** (§88; E1). El runtime ya no abre el sonido de SDL3: le pide a la
+  página que lo abra (`audio_backend.cpp`, parche `runtime-web.diff`: SDL3 solo convierte 32 → 48 kHz con el ajuste de
+  ritmo) y cada entrega de 3 ms va por mensaje (sin memoria compartida: el sitio no tiene COOP/COEP) a un AudioWorklet
+  (`web/navegador/sonido-worklet.js`) con una cola adaptable: reposo 25 ms, arranca en 80, sube con un corte que se oye
+  y baja con la calma solo si la cola nunca bajó de 8 ms en 4 s. Medido con un clic de prueba de punta a punta: **177 →
+  60 ms** (prueba del navegador) y **170 → 56–62 ms** en la carrera de la página real (`herramientas/medir-sonido.mjs`),
+  0 huecos en título, arranque y carrera, también con la CPU frenada 2×. Arreglado de paso: otro AudioContext de la
+  página (los pitidos DNF) se quedaba con el volumen y el medidor del juego. `?audio=viejo` = lo de antes. Pruebas:
+  banco `sonido-worklet` 34/34 (nuevo), `sonido` 14/14, banco entero 35/35 páginas, `prueba-navegador` 21/21 (monitor
+  a 171 Hz; 22/22 a 240 Hz), `prueba-musica` 11/11.
+- **2026-10-20 03:15** — **Los 6 Mii invitados en «Mi Mii», con las caras que dibuja el juego** (§86; M10). Los
+  invitados son la tabla de la librería de caras (0x8024C4D0, 6 × 74 bytes, el formato de RFL_DB.dat) y sus caras las
+  dibuja `MiiRenderMgr` y las copia a una textura (96×96, RGB5A3) que aurora deja solo en la tarjeta de video. El gancho
+  `invitados_nativo.cpp` hace lo de «Elige un Mii» (MiiGroup propio + `LoadDefaultMii(i, i)`) en un cuadro de menú y
+  baja cada copia en ese mismo cuadro (`aurora_flush_efb_copy_to_ram`); para eso abre el montón de la escena (estaba
+  cerrado: «DAME DAME»), lo pone de montón actual y marca la sección «armándose» (si no, las caras quedan en fila para
+  otro cuadro), y lo deja todo como estaba. Cuesta 40–52 ms en un cuadro, una vez por navegador; las caras quedan en
+  IndexedDB (nunca a git ni a R2). «Mi Mii» ofrece los 6 con su imagen («+ Mii nuevo» o «Cambiar por un Mii invitado»,
+  que conserva el id y el nombre de la licencia); la licencia nueva usa el elegido, y en la primera visita su Mii toma
+  la cara del invitado apenas llegan. Banco `mii-invitados` **41/41**, `prueba-invitados` **13/13** (el juego carga para
+  la licencia el Mii con lo del invitado D y, en una partida nueva, el F), `prueba-arranque` 13/13.
 - **2026-10-20 02:59** — **La sala: la playlist arrancaba solo al anfitrión, el cupo sin preguntar y echar** (§87).
   En la playlist, con un perfil nuevo, el selector de sugerir de los demás esperaba los nombres de las pistas (bajados
   por el Worker) y mientras tanto cada estado nuevo de la sala abría otro; al confirmar se cerraba uno solo y el otro

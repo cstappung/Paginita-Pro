@@ -19,6 +19,7 @@
 import { leerRksys, resumenLicencia, queArchivo, RUTA_RKSYS, leerRating, RUTA_RATING } from './licencias.mjs';
 import { crearRespaldos } from './respaldos.mjs';
 import { abrirEditorMii } from './editor-mii.mjs';
+import { leerInvitados } from './invitados.mjs';
 import { crearImagenes } from './imagenes.mjs';
 import { textoTiempo, nombreCategoria } from './records.mjs';
 import { crearLista, crearPresets, crearSonidosLista, MAX_PISTAS } from './lista-pistas.mjs';
@@ -290,8 +291,10 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   };
 
   // ---------------- Mi Mii ----------------
+  // §86: los Mii invitados del juego: los guardados en este navegador o, con el juego andando, se los pide (mkw.mjs)
   function abrirMii(opciones = {}) {
     return abrirEditorMii({ guardado, preguntar, avisar, bajar, respaldar, licencias, ...opciones,
+      cargarInvitados: async () => (await leerInvitados()) || (window.mkwInvitados ? await window.mkwInvitados.sacar() : null),
       alGuardar: () => { alCambiarGuardado(); partidaCambio(); } });
   }
 

@@ -1,5 +1,5 @@
 diff --git a/runtime/include/audio_backend.h b/runtime/include/audio_backend.h
-index ae05827..3ce0c08 100644
+index ae05827..33f84cb 100644
 --- a/runtime/include/audio_backend.h
 +++ b/runtime/include/audio_backend.h
 @@ -23,6 +23,13 @@ public:
@@ -16,12 +16,19 @@ index ae05827..3ce0c08 100644
  private:
      AudioBackend() = default;
      ~AudioBackend() = default;
-@@ -45,4 +52,13 @@ private:
+@@ -45,4 +52,20 @@ private:
      bool m_muted = false;
      bool m_reportedDroppedBlock = false;
      std::vector<int16_t> m_convertBuffer;
 +#ifdef __EMSCRIPTEN__
 +    void WebTrimRateLocked();
++    // §88: the page plays the sound with an AudioWorklet (web/navegador/sonido.mjs). SDL3 then has no device: m_stream
++    // only converts (32 kHz S16 -> the card's rate in F32, with the rate trim) and every push goes straight to the page,
++    // whose worklet holds the queue. false = SDL3's own device (a ScriptProcessorNode), as before (?audio=viejo).
++    void WebDeliverLocked();
++    bool m_webWorklet = false;
++    bool m_sdlAudioInit = false;     // SDL_INIT_AUDIO taken (only the SDL device path needs it)
++    std::vector<float> m_webFloat;   // converted samples on their way to the page
 +    double m_webQueuedMs = -1.0;
 +    double m_webRatio = 1.0;
 +    double m_webIntegral = 0.0;
@@ -607,10 +614,10 @@ index 2204f70..d837567 100644
      return std::find(values.begin(), values.end(), value) != values.end();
  }
 diff --git a/runtime/src/audio_backend.cpp b/runtime/src/audio_backend.cpp
-index 7ceda4c..0c5b649 100644
+index 7ceda4c..8c6a9f3 100644
 --- a/runtime/src/audio_backend.cpp
 +++ b/runtime/src/audio_backend.cpp
-@@ -3,12 +3,24 @@
+@@ -3,12 +3,59 @@
  #include "runtime_log.h"
  
  #include <algorithm>
@@ -630,12 +637,109 @@ index 7ceda4c..0c5b649 100644
 +// QueueHasCapacityLocked drops a block (an audible click), periodically. Like Dolphin/RetroArch "dynamic
 +// rate control", a tiny playback-rate trim (at most +/-0.2%, ~3 cents: inaudible) keeps the queue centred.
 +EM_JS(int, mkw_web_sonido_ajuste_activo, (), { return Module.mkwSonidoAjuste === false ? 0 : 1; });
++
++// §88: the page can play the sound itself with an AudioWorklet (web/navegador/sonido.mjs, `Module.mkwSonido`): a
++// short queue on the browser's audio thread instead of SDL3's ScriptProcessorNode (2048-sample blocks on the page
++// thread) plus our 60 ms queue. abrir() answers the card's rate (0 = no: SDL3's device as before, ?audio=viejo).
++EM_JS(int, mkw_web_sonido_abrir, (), {
++    const s = Module.mkwSonido;
++    return s && s.abrir ? (s.abrir() | 0) : 0;
++});
++EM_JS(void, mkw_web_sonido_entregar, (const float* datos, int cuadros, int canales), {
++    Module.mkwSonido.entregar(HEAPF32.subarray(datos >> 2, (datos >> 2) + cuadros * canales));
++});
++EM_JS(double, mkw_web_sonido_nivel, (), { return Module.mkwSonido.nivelMs(); });
++EM_JS(double, mkw_web_sonido_objetivo, (), { return Module.mkwSonido.objetivoMs(); });
++
++namespace {
++// §88, measuring the delay with a click (sonido.mjs medirDemora): 0 = normal; 1 = every push goes out silent (so only
++// the click is heard); 2 = the next push starts with a click (4 samples at full scale) and its time is noted, then 1.
++int g_webMarca = 0;
++double g_webMarcaMs = 0.0;
++
++void WebMark(int16_t* samples, size_t frameCount, size_t channels) {
++    if (!g_webMarca) {
++        return;
++    }
++    std::fill(samples, samples + frameCount * channels, int16_t{0});
++    if (g_webMarca == 2) {
++        std::fill(samples, samples + std::min<size_t>(4, frameCount) * channels, int16_t{32767});
++        g_webMarcaMs = emscripten_get_now();
++        g_webMarca = 1;
++    }
++}
++} // namespace
++
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_sonido_marca(int fase) { g_webMarca = fase; }
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_sonido_marca_ms() { return g_webMarcaMs; }
 +#endif
 +
  AudioBackend& AudioBackend::Instance() {
      static AudioBackend instance;
      return instance;
-@@ -127,6 +139,9 @@ bool AudioBackend::QueueHasCapacityLocked(int incomingBytes) {
+@@ -46,10 +93,43 @@ bool AudioBackend::EnsureInitializedLocked(uint32_t sampleRate, uint32_t channel
+         m_stream = nullptr;
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    // §88: the page plays it (AudioWorklet). SDL3 opens no device: a bare stream converts 32 kHz S16 to the card's
++    // rate in F32 (and applies the rate trim and the gain), and WebDeliverLocked hands each push to the page.
++    if (const int pageRate = mkw_web_sonido_abrir(); pageRate > 0) {
++        SDL_AudioSpec src{};
++        src.format = SDL_AUDIO_S16LE;
++        src.channels = static_cast<int>(channels);
++        src.freq = static_cast<int>(sampleRate);
++        SDL_AudioSpec dst = src;
++        dst.format = SDL_AUDIO_F32;
++        dst.freq = pageRate;
++        SDL_AudioStream* stream = SDL_CreateAudioStream(&src, &dst);
++        if (!stream || !SDL_SetAudioStreamGain(stream, EffectiveGainLocked())) {
++            RT_LOG(RT_TAG_AUDIO) << "page audio stream failed: " << SDL_GetError() << std::endl;
++            if (stream) {
++                SDL_DestroyAudioStream(stream);
++            }
++            return false;
++        }
++        m_stream = stream;
++        m_spec = src;
++        m_sampleRate = sampleRate;
++        m_channels = channels;
++        m_initialized = true;
++        m_webWorklet = true;
++        return true;
++    }
++    m_webWorklet = false;
++#endif
++
+     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+         RT_LOG(RT_TAG_AUDIO) << "SDL_InitSubSystem(SDL_INIT_AUDIO) failed: " << SDL_GetError() << std::endl;
+         return false;
+     }
++#ifdef __EMSCRIPTEN__
++    m_sdlAudioInit = true;
++#endif
+ 
+     SDL_AudioSpec spec{};
+     spec.format = SDL_AUDIO_S16LE;
+@@ -93,9 +173,17 @@ void AudioBackend::Shutdown() {
+         SDL_DestroyAudioStream(m_stream);
+         m_stream = nullptr;
+     }
++#ifdef __EMSCRIPTEN__
++    if (m_initialized && m_sdlAudioInit) {   // (the page's AudioWorklet path never took SDL's audio)
++        SDL_QuitSubSystem(SDL_INIT_AUDIO);
++    }
++    m_sdlAudioInit = false;
++    m_webWorklet = false;
++#else
+     if (m_initialized) {
+         SDL_QuitSubSystem(SDL_INIT_AUDIO);
+     }
++#endif
+     m_initialized = false;
+     m_sampleRate = 0;
+     m_channels = 0;
+@@ -127,6 +215,9 @@ bool AudioBackend::QueueHasCapacityLocked(int incomingBytes) {
          // stream creates an audible discontinuity (the severe crackle seen when
          // VI-batched DMA briefly outran playback).
          // A drop is audible; report the first one so it is not invisible.
@@ -645,21 +749,37 @@ index 7ceda4c..0c5b649 100644
          if (!m_reportedDroppedBlock) {
              m_reportedDroppedBlock = true;
              RT_LOG(RT_TAG_AUDIO) << "output queue full (" << queued << "/" << maxQueued
-@@ -176,6 +191,9 @@ bool AudioBackend::PushWiiAiSamplesBE16(const uint8_t* data, size_t bytes) {
+@@ -167,6 +258,9 @@ bool AudioBackend::PushWiiAiSamplesBE16(const uint8_t* data, size_t bytes) {
+         m_convertBuffer[frame * 2] = static_cast<int16_t>(left);
+         m_convertBuffer[frame * 2 + 1] = static_cast<int16_t>(right);
+     }
++#ifdef __EMSCRIPTEN__
++    WebMark(m_convertBuffer.data(), frameCount, 2);   // only while the page measures the delay (§88)
++#endif
+ 
+     const int lenBytes = static_cast<int>(frameCount * 2 * sizeof(int16_t));
+     if (!QueueHasCapacityLocked(lenBytes)) {
+@@ -176,6 +270,12 @@ bool AudioBackend::PushWiiAiSamplesBE16(const uint8_t* data, size_t bytes) {
          RT_LOG(RT_TAG_AUDIO) << "SDL_PutAudioStreamData failed: " << SDL_GetError() << std::endl;
          return false;
      }
 +#ifdef __EMSCRIPTEN__
++    if (m_webWorklet) {
++        WebDeliverLocked();
++    }
 +    WebTrimRateLocked();
 +#endif
  
      return true;
  }
-@@ -198,6 +216,69 @@ bool AudioBackend::PushSamplesLE16(const int16_t* samples, size_t sampleCount) {
+@@ -198,6 +298,104 @@ bool AudioBackend::PushSamplesLE16(const int16_t* samples, size_t sampleCount) {
          RT_LOG(RT_TAG_AUDIO) << "SDL_PutAudioStreamData failed: " << SDL_GetError() << std::endl;
          return false;
      }
 +#ifdef __EMSCRIPTEN__
++    if (m_webWorklet) {
++        WebDeliverLocked();
++    }
 +    WebTrimRateLocked();
 +#endif
  
@@ -680,12 +800,24 @@ index 7ceda4c..0c5b649 100644
 +    if (m_webTrim < 0) {
 +        m_webTrim = mkw_web_sonido_ajuste_activo();
 +    }
-+    const int queued = SDL_GetAudioStreamQueued(m_stream);
-+    const double bytesPerMs = static_cast<double>(m_spec.freq) * m_spec.channels * sizeof(int16_t) / 1000.0;
-+    if (queued < 0 || bytesPerMs <= 0.0) {
-+        return;
++    double ms = 0.0;
++    double targetMs = kTargetMs;
++    if (m_webWorklet) {
++        // §88: the queue is the page's worklet (its average over ~21 ms) and its target adapts to the page's hiccups
++        ms = mkw_web_sonido_nivel();
++        if (ms < 0.0) {              // blocked, paused or refilling after running dry: hold what the loop learned
++            m_webLastMs = 0.0;
++            return;
++        }
++        targetMs = mkw_web_sonido_objetivo();
++    } else {
++        const int queued = SDL_GetAudioStreamQueued(m_stream);
++        const double bytesPerMs = static_cast<double>(m_spec.freq) * m_spec.channels * sizeof(int16_t) / 1000.0;
++        if (queued < 0 || bytesPerMs <= 0.0) {
++            return;
++        }
++        ms = queued / bytesPerMs;
 +    }
-+    const double ms = queued / bytesPerMs;
 +    m_webQueuedMs = m_webQueuedMs < 0.0 ? ms : m_webQueuedMs + kSmoothing * (ms - m_webQueuedMs);
 +    const double now = emscripten_get_now();
 +    const double dt = m_webLastMs > 0.0 ? std::min((now - m_webLastMs) / 1000.0, 0.1) : 0.0;
@@ -694,12 +826,32 @@ index 7ceda4c..0c5b649 100644
 +        return;
 +    }
 +    // Queue above target -> play slightly faster (ratio > 1 consumes input faster), and vice versa
-+    const double error = m_webQueuedMs - kTargetMs;
++    const double error = m_webQueuedMs - targetMs;
 +    m_webIntegral = std::clamp(m_webIntegral + kIntegralPerMsS * error * dt, -kMaxTrim, kMaxTrim);
-+    const double wanted = 1.0 + std::clamp(kGainPerMs * error + m_webIntegral, -kMaxTrim, kMaxTrim);
++    // §88: twice as firm with the page's worklet: its queue is small and its target moves (it starts high and comes
++    // down once the game has booted), and the queue should follow it within seconds (10 ms off -> 0.2%, ~3 cents)
++    const double gain = m_webWorklet ? 2.0 * kGainPerMs : kGainPerMs;
++    const double wanted = 1.0 + std::clamp(gain * error + m_webIntegral, -kMaxTrim, kMaxTrim);
 +    const double ratio = 1.0 + std::round((wanted - 1.0) / kStep) * kStep;
 +    if (ratio != m_webRatio && SDL_SetAudioStreamFrequencyRatio(m_stream, static_cast<float>(ratio))) {
 +        m_webRatio = ratio;
++    }
++}
++
++// §88: whatever SDL already converted goes to the page's worklet now (a 3 ms push is ~144 frames at 48 kHz)
++void AudioBackend::WebDeliverLocked() {
++    const int bytes = SDL_GetAudioStreamAvailable(m_stream);
++    if (bytes <= 0) {
++        return;
++    }
++    const size_t floats = static_cast<size_t>(bytes) / sizeof(float);
++    if (m_webFloat.size() < floats) {
++        m_webFloat.resize(floats);
++    }
++    const int got = SDL_GetAudioStreamData(m_stream, m_webFloat.data(), bytes);
++    const int frameBytes = static_cast<int>(sizeof(float) * m_channels);
++    if (got >= frameBytes) {
++        mkw_web_sonido_entregar(m_webFloat.data(), got / frameBytes, static_cast<int>(m_channels));
 +    }
 +}
 +

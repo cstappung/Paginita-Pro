@@ -33,6 +33,7 @@ import { crearPrivado } from './privado.mjs';
 import { crearOcultar } from './ocultar.mjs';
 import { crearInicio } from './inicio.mjs';
 import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_JUEGO } from './directo.mjs';
+import { asegurarInvitados, leerInvitados, invitadoElegido, mejorarMiiNuevo, LETRAS as LETRAS_INVITADO } from './invitados.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
 import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, vrsDeCarrera, MARCA_SALA } from './sala-carrera.mjs';
 import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as VR_INICIAL_SALA } from './vr-sala.mjs';
@@ -176,6 +177,11 @@ const ENGANCHE = parametros.get('enganche') !== '0' && !parametros.has('red');
 const PRESENTA = parametros.get('enganche') !== '0';
 // Ajuste fino del ritmo del sonido (parche en audio_backend.cpp): ?ajusteSonido=0 lo apaga para comparar
 const AJUSTE_SONIDO = parametros.get('ajusteSonido') !== '0';
+// §88: el sonido sale por un AudioWorklet de la página (sonido-worklet.js, cola de ~25 ms en el hilo de audio).
+// ?audio=viejo = el ScriptProcessorNode de SDL3 (bloques de 43 ms + cola de 60 ms). ?audioMs=N = la cola de reposo.
+const AUDIO_WORKLET = parametros.get('audio') !== 'viejo';
+const AUDIO_MS = Number(parametros.get('audioMs')) || 25;
+const AUDIO_ARRANQUE = parametros.has('audioArranque') ? Number(parametros.get('audioArranque')) : 80;   // la cola al arrancar
 
 // ---- Tarjeta de video ----
 // La página no la elige (en Windows, Chrome usa la que Windows le asignó y no hace caso al pedido de la página):
@@ -462,8 +468,10 @@ window.mkwEstado = Object.assign(window.mkwEstado || {}, { fase: { e: 0, n: 0, a
 // ---- Sonido (web/navegador/sonido.mjs) ----
 // Se instala ANTES de cargar el juego: así el AudioContext que crea SDL3 pasa por nuestro volumen y medidor.
 // ?bloquearSonido=1: arranca bloqueado aunque el navegador lo deje sonar (para probar el desbloqueo; ver sonido.mjs)
-const sonido = crearSonido({ alCambiar: () => { pintarSonido(); ui?.sonidoCambio(); }, simularBloqueo: parametros.get('bloquearSonido') === '1' });
-if (parametros.get('sonidoPagina') !== '0') sonido.instalar();   // ?sonidoPagina=0: sin esto (para comparar)
+const sonido = crearSonido({ alCambiar: () => { pintarSonido(); ui?.sonidoCambio(); }, simularBloqueo: parametros.get('bloquearSonido') === '1',
+                             worklet: AUDIO_WORKLET, objetivoMs: AUDIO_MS, arranqueMs: AUDIO_ARRANQUE });
+const SONIDO_PAGINA = parametros.get('sonidoPagina') !== '0';
+if (SONIDO_PAGINA) sonido.instalar();       // ?sonidoPagina=0: sin esto (para comparar; también sin worklet)
 window.mkwSonido = sonido;                  // para las pruebas
 const barraVolumen = document.getElementById('volumen'), casillaSilencio = document.getElementById('silencio');
 barraVolumen.value = Math.round(sonido.estado.volumen * 100);
@@ -849,6 +857,8 @@ async function arrancar() {
     mkwNotaCuentas: parametros.get('notaCuentas') === '1',          // (depurar: cada cálculo de pantallas en la consola)
     // La red del juego (web/red/red_web.cpp → red.mjs): solo con ?red=1; sin ella el juego ve "sin conexión"
     mkwRed: red?.pila,
+    // §88: el runtime le pide el sonido a la página (AudioWorklet); sin esto, o con ?audio=viejo, lo abre SDL3
+    ...(SONIDO_PAGINA ? { mkwSonido: sonido.puente } : {}),
     preRun: [m => {
       armarArchivos(m, contenidos, tamaños);
       carpetasVacias.forEach(c => m.FS.mkdirTree(c));
@@ -901,6 +911,11 @@ async function arrancar() {
   window.mkwVigiar = (desde, tam) => (M._mkw_vigia_poner ? (M._mkw_vigia_poner(desde >>> 0, tam >>> 0), true) : false);
   // pruebas (§72): dar por terminada la carrera en línea de los pilotos de esta pestaña (como si cruzaran la meta)
   window.mkwTerminarCarrera = () => (M._mkw_modos_terminar ? (M._mkw_modos_terminar(), true) : false);
+  // §86: las caras de los Mii invitados del juego (invitados.mjs): las de este navegador o, si no hay, se las pide al
+  // juego (las saca en su próximo cuadro de menú). La usa «Mi Mii» (interfaz.mjs); { forzar: true } = del juego siempre
+  window.mkwInvitados = { sacar: (opciones = {}) => asegurarInvitados(M, { nota, ...opciones }) };
+  // §88: cuánto tarda en oírse lo que el juego mezcla (un clic de prueba con el juego mudo ~3 s; sonido.mjs)
+  window.mkwMedirDemora = opciones => sonido.medirDemora(M, opciones);
   // §73: en nuestras salas nadie sale por inactividad (modos_nativo.cpp); ?inactividad=1 = la regla del juego (30 s)
   if (parametros.get('inactividad') === '1') M._mkw_modos_inactividad?.(1);
   // Abrir directo (directo.mjs + directo_nativo.cpp, §71): la página le pide al juego la sección (un jugador, en línea)
@@ -1566,7 +1581,8 @@ async function arrancar() {
     const db = rms > 1e-5 ? 20 * Math.log10(rms) : -100;
     if (es.activo) sonidoMedido.nivelMax = Math.max(sonidoMedido.nivelMax, db);
     // La cola del runtime (ms de sonido esperando a la tarjeta), el ritmo de reproducción y los bloques tirados
-    const cola = M._mkw_web_sonido_cola_ms(), ritmo = M._mkw_web_sonido_ritmo(), tirados = M._mkw_web_sonido_tirados();
+    // (camino worklet, §88: la cola es la del worklet, que el runtime lee y promedia; los saltos los cuenta el worklet)
+    const cola = M._mkw_web_sonido_cola_ms(), ritmo = M._mkw_web_sonido_ritmo(), tirados = M._mkw_web_sonido_tirados() + es.tirados;
     if (desde >= 300 && es.activo) {
       // desde el cuadro 300 (pasada la carga del arranque) y con el sonido andando: base para contar cortes
       if (!sonidoMedido.base) sonidoMedido.base = { huecos: es.huecos, tirados };
@@ -1588,7 +1604,10 @@ async function arrancar() {
                 `fase ${window.mkwEstado.fase.e.toFixed(2)} ms (ajuste ${window.mkwEstado.fase.ajuste.toFixed(3)}, objetivo ${relojMonitor.objetivo(relojMonitor.p).toFixed(2)}), ` +
                 `sonido ${!es.contextos ? 'sin abrir' : es.activo ? `${db.toFixed(1)} dB` : 'bloqueado'} (bloques ${es.bloques}, en silencio ${es.bloquesSilencio}, huecos ${es.huecos}, ` +
                 `cola ${cola.toFixed(1)} ms, ritmo ${((ritmo - 1) * 100).toFixed(3)} %, tirados ${tirados}, ` +
-                `costo ${(es.msBloqueTotal / Math.max(1, es.bloques)).toFixed(2)} ms/bloque, máx ${es.msBloqueMax.toFixed(2)})`);
+                (es.camino === 'worklet'
+                  ? `worklet: objetivo ${es.objetivoMs.toFixed(1)} ms, mínimo ${es.nivelMinMs.toFixed(1)} ms, vacíos ${es.vacios}, ` +
+                    `costo ${(es.msBloqueTotal / Math.max(1, es.entregas)).toFixed(3)} ms/entrega, máx ${es.msBloqueMax.toFixed(2)})`
+                  : `costo ${(es.msBloqueTotal / Math.max(1, es.bloques)).toFixed(2)} ms/bloque, máx ${es.msBloqueMax.toFixed(2)})`));
     if (CUADROS_PRUEBA && !verificado && ahora.c >= CUADROS_PRUEBA) {
       verificado = true;
       verificar(medidas).catch(e => { ok('verificaciones', false, String(e)); fin(); });
@@ -1750,9 +1769,18 @@ async function arrancar() {
   // La base de Mii con al menos un Mii (si estaba vacía se pone uno y se guarda solo, ya con el guardado vigilando):
   // con él el juego crea la licencia 1 si la partida es nueva, al abrir directo (directo.mjs)
   if (DIRECTO) {
-    const miiLicencia = prepararMii(M.FS, parametros.get('nombre') || 'Piloto');
+    // §86: con la base vacía, el Mii de la licencia nueva es el invitado del juego elegido (si ya están en este navegador)
+    const miiLicencia = prepararMii(M.FS, parametros.get('nombre') || 'Piloto', { invitados: await leerInvitados(), elegido: invitadoElegido() });
     directo.ponerMii(miiLicencia);
-    if (miiLicencia.nueva) nota('directo: base de Mii vacía, puse un Mii para la licencia');
+    if (miiLicencia.nueva) nota(`directo: base de Mii vacía, puse un Mii para la licencia${miiLicencia.invitado >= 0 ? ` (el invitado ${LETRAS_INVITADO[miiLicencia.invitado]})` : ''}`);
+    // …y si todavía no estaban (primera visita): se sacan del juego en su primer menú y ese Mii toma la cara del invitado.
+    // (Sacarlas detiene ese cuadro ~40 ms, una vez por navegador: con Playwright no, salvo ?invitados=1, para no
+    // ensuciar las pruebas que miden el ritmo; ?invitados=0 = nunca. «Mi Mii» las pide igual si hacen falta.)
+    const sacarInvitados = parametros.get('invitados') === '1' || (parametros.get('invitados') !== '0' && !navigator.webdriver);
+    if (miiLicencia.nueva && miiLicencia.invitado < 0 && sacarInvitados)
+      asegurarInvitados(M, { nota }).then(r => {
+        if (r && mejorarMiiNuevo(M.FS, r, miiLicencia.createId)) nota('invitados: el Mii de la licencia nueva tomó la cara del invitado (se ve desde el próximo arranque)');
+      });
   }
   if (parametros.get('adelantar') !== '0' && parametros.get('semillaArranque') !== '0') adelantarArranque(tamaños);   // §76
   nota('arrancando main() — el juego corre');
@@ -1913,6 +1941,10 @@ function armarArchivos(m, contenidos, tamaños) {
 
 // Las verificaciones de la prueba, cuando se llega a ?cuadros=N
 async function verificar(medidas) {
+  // El sonido primero (§88): la demora con el clic y una foto del medidor ANTES del trabajo pesado de abajo (unir y
+  // recorrer todo el registro traba la página ~70 ms: con la cola corta del worklet eso es un hueco que no es del juego)
+  const sonidoFoto = { estado: { ...sonido.estado }, medido: { ...window.mkwEstado.sonido } };
+  const demora = await sonido.medirDemora(window.mkw).catch(() => null);
   const lineas = window.mkwEstado.log.join('\n');
   ok('aurora creó WebGPU sobre el canvas', /surface format/i.test(lineas), (lineas.match(/Using surface format[^\n]*/) || [''])[0]);
   ok('el juego lee el disco por pedazos (HTTP Range)', window.mkwEstado.lecturas > 0,
@@ -1951,7 +1983,7 @@ async function verificar(medidas) {
                   `enganche ${ENGANCHE ? `sí (${f.enganchado} de ${f.cuadros} cuadros con error < 0,5 ms)` : 'no (?enganche=0)'}`;
   nota(`tomas parejas: ${detalle}` + (multiplo ? '' : ' — el monitor no es múltiplo de 60 Hz'));
   if (TRAZA) for (let i = 0; i < traza.length; i += 3000) console.log('[traza] ' + JSON.stringify(traza.slice(i, i + 3000)));
-  verificarSonido(lineas);
+  verificarSonido(sonidoFoto, demora);
   const de = disco.estado;
   nota(`caché del disco: ${de.pedidosRed} pedidos a la red (${(de.bytesRed / 1048576).toFixed(1)} MB), ` +
        `${de.bloquesCache} bloques de la caché, ${de.bloquesMemoria} de la memoria, para ${de.lecturas} lecturas del juego; ` +
@@ -1979,25 +2011,36 @@ async function verificarPipelines(lineas) {
      `${forzados} tuvieron que armarse en el momento`);
 }
 
-// El sonido: ¿SDL3 abrió el suyo por nuestra cadena, se desbloqueó con un gesto, suena y sin cortes?
-function verificarSonido(lineas) {
-  const e = sonido.estado, chrome = sonido.estadisticasChrome();
-  ok('el juego abrió su sonido (por el volumen y el medidor de la página)', e.contextos === 1 && e.frecuencia > 0,
-     `${e.contextos} AudioContext, ${e.frecuencia} Hz, bloques de ${e.muestrasBloque} muestras (${(1000 * e.muestrasBloque / (e.frecuencia || 1)).toFixed(1)} ms)`);
+// El sonido: ¿se abrió por nuestra cadena (el AudioWorklet de la página, o SDL3 con ?audio=viejo), se desbloqueó con
+// un gesto, suena, sin cortes, con la cola centrada y poca demora?
+function verificarSonido({ estado: e, medido: m }, d) {
+  const chrome = sonido.estadisticasChrome();
+  const worklet = e.camino === 'worklet';
+  ok('el juego abrió su sonido (por el volumen y el medidor de la página)', e.contextos === 1 && e.frecuencia > 0 && (worklet || !AUDIO_WORKLET),
+     `${e.contextos} AudioContext, ${e.frecuencia} Hz, camino ${e.camino}${AUDIO_WORKLET && !worklet ? ' (se pidió el worklet: ¿wasm viejo?)' : ''}, ` +
+     `bloques de ${e.muestrasBloque} muestras (${(1000 * e.muestrasBloque / (e.frecuencia || 1)).toFixed(1)} ms)`);
   ok(`el sonido arrancó bloqueado${parametros.get('bloquearSonido') === '1' ? ' (simulado)' : ''} y se desbloqueó con el primer gesto`, e.activo && e.desbloqueadoCon !== '',
      e.desbloqueadoCon ? `con «${e.desbloqueadoCon}»` : (e.activo ? 'sonaba sin gesto (¿Chrome sin bloqueo?)' : 'sigue bloqueado'));
-  ok('el juego suena (música del título)', window.mkwEstado.sonido.nivelMax > -40, `nivel máximo ${window.mkwEstado.sonido.nivelMax.toFixed(1)} dB`);
+  ok('el juego suena (música del título)', m.nivelMax > -40, `nivel máximo ${m.nivelMax.toFixed(1)} dB`);
   // Cortes: se cuentan desde el cuadro 300; los del arranque (el juego se traba leyendo el disco) van como nota
-  const m = window.mkwEstado.sonido, base = m.base || { huecos: e.huecos, tirados: m.tirados };
+  const base = m.base || { huecos: e.huecos, tirados: m.tirados };
   const huecos = e.huecos - base.huecos, tirados = m.tirados - base.tirados;
   if (base.huecos || base.tirados) nota(`sonido en el arranque: ${base.huecos} huecos y ${base.tirados} bloques tirados (mientras carga del disco)`);
   ok('sin cortes en el sonido desde el cuadro 300', huecos === 0 && tirados === 0,
      `${huecos} huecos, ${tirados} bloques tirados por cola llena` +
      (chrome ? `; Chrome: ${chrome.rellenos} rellenos, latencia ${chrome.latenciaMs?.toFixed?.(1)} ms` : ''));
-  const detalle = `cola entre ${m.colaMin.toFixed(1)} y ${m.colaMax.toFixed(1)} ms (objetivo 60, tope 120), ` +
-                  `ritmo entre ${((m.ritmoMin - 1) * 100).toFixed(3)} % y ${((m.ritmoMax - 1) * 100).toFixed(3)} %`;
-  if (AJUSTE_SONIDO) ok('la cola del sonido se mantiene centrada (ajuste de ritmo)', m.colaMin > 20 && m.colaMax < 110, detalle);
+  const detalle = `cola entre ${m.colaMin.toFixed(1)} y ${m.colaMax.toFixed(1)} ms ` +
+                  (worklet ? `(ahora ${m.cola.toFixed(1)}, objetivo ${e.objetivoMs.toFixed(1)}; worklet: ${e.vacios} vacíos, ${e.saltos} saltos)` : '(objetivo 60, tope 120)') +
+                  `, ritmo entre ${((m.ritmoMin - 1) * 100).toFixed(3)} % y ${((m.ritmoMax - 1) * 100).toFixed(3)} %`;
+  // camino worklet: el objetivo se adapta (sube con los tirones, baja con la calma): la cola tiene que estar cerca de él
+  const centrada = worklet ? m.colaMin > 3 && Math.abs(m.cola - e.objetivoMs) < 10 : m.colaMin > 20 && m.colaMax < 110;
+  if (AJUSTE_SONIDO) ok('la cola del sonido se mantiene centrada (ajuste de ritmo)', centrada, detalle);
   else nota('sin ajuste de ritmo (?ajusteSonido=0): ' + detalle);
+  // La demora (§88, medida al empezar verificar): un clic de prueba con el juego mudo ~3 s; del juego al parlante
+  const texto = d && `${d.mediana.toFixed(1)} ms del juego al parlante (de ${d.min.toFixed(1)} a ${d.max.toFixed(1)}, ${d.n} clics): ` +
+                     `cola ${d.colaMs.toFixed(1)} ms + lo que dice el navegador (su búfer y el de Windows) ${d.chromeMs.toFixed(1)} ms`;
+  if (worklet) ok('poca demora del sonido: nuestra parte (sin la del navegador) < 40 ms', d && d.mediana - d.chromeMs < 40, texto || 'no se pudo medir');
+  else nota('demora del sonido (camino viejo): ' + (texto || 'no se pudo medir'));
 }
 
 // ¿El juego responde a los controles? En la pantalla de título se aprieta A como lo haría una persona: un

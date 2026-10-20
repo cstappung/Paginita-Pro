@@ -15,6 +15,7 @@
 // Uso:  preRun: prepararMii(FS, 'Ana') → { createId, nombre }   (luego directo.ponerMii(eso))
 //       const directo = crearDirecto({ M, lector });  await directo.ir(SECCION_DIRECTA.unjugador)  → true/false
 import { leerBase, armarBase, miiDesdePreset, RUTA_RFLDB } from './mii.mjs';
+import { miiDeInvitado } from './invitados.mjs';
 import { armarPlantel } from './lockstep.mjs';
 
 // Secciones del juego (Pulsar, Identifiers.hpp)
@@ -38,21 +39,25 @@ export const BOTON = {
 
 // La base de Mii del sistema de archivos del juego (antes de arrancar). Devuelve el Mii para una licencia nueva:
 // { createId: 8 bytes (id del Mii + id de la consola), nombre: 20 bytes UTF-16 big-endian, nueva: base que hay que
-// guardar o null }.
-export function prepararMii(FS, nombre = 'Piloto') {
+// guardar o null, invitado: 0..5 si el Mii nuevo salió de un invitado del juego (§86) o -1 }.
+// §86: con la base vacía, el Mii nuevo es el invitado del juego elegido (invitados = el registro de invitados.mjs,
+// guardado en este navegador); si todavía no hay (primera visita), una cara de la página (PRESETS).
+export function prepararMii(FS, nombre = 'Piloto', { invitados = null, elegido = 0 } = {}) {
   let bytes = null;
   try { bytes = FS.readFile(RUTA_RFLDB); } catch {}
   const base = bytes ? leerBase(bytes) : { valida: false, mii: [] };
-  let mii = base.valida && base.mii.length ? base.mii[0].mii : null, nueva = null;
+  let mii = base.valida && base.mii.length ? base.mii[0].mii : null, nueva = null, invitado = -1;
   if (!mii) {
-    mii = miiDesdePreset(0, { nombre: String(nombre || 'Piloto').slice(0, 10) });
+    const nombreMii = String(nombre || 'Piloto').slice(0, 10);
+    if (invitados) { invitado = elegido; mii = miiDeInvitado(invitados, elegido, { nombre: nombreMii }); }
+    else mii = miiDesdePreset(0, { nombre: nombreMii });
     nueva = armarBase([mii], base.valida ? bytes : null);
     FS.mkdirTree(RUTA_RFLDB.slice(0, RUTA_RFLDB.lastIndexOf('/')));
     FS.writeFile(RUTA_RFLDB, nueva);
   }
   const nom = new Uint8Array(20);
   for (let k = 0; k < 10 && k < mii.nombre.length; k++) { const c = mii.nombre.charCodeAt(k); nom[2 * k] = c >> 8; nom[2 * k + 1] = c & 0xFF; }
-  return { createId: Uint8Array.from([...mii.id, ...mii.consola]), nombre: nom, nueva };
+  return { createId: Uint8Array.from([...mii.id, ...mii.consola]), nombre: nom, nueva, invitado };
 }
 
 const PAGINA_ACTIVA = 4;          // Page +0x8: el estado de la página (4 = activa, esperando a la persona)

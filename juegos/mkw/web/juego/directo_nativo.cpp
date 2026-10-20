@@ -73,6 +73,7 @@ extern "C" void rr_overlay_80634E44_traducida(CpuContext* ctx);   // SectionMgr:
 extern "C" void rr_overlay_806024B0_traducida(CpuContext* ctx);   // Page::ChangeSectionBySceneChange de RR
 extern "C" void func_80837720_traducida(CpuContext* ctx);         // MenuInteractable::LoadNextPageById
 extern "C" void func_8083761C_traducida(CpuContext* ctx);         // MenuInteractable::LoadNextPageWithDelayById
+extern "C" void mkw_invitados_cuadro(const CpuContext* ctx);      // §86: los Mii invitados (invitados_nativo.cpp)
 
 namespace {
 constexpr uint32_t kSectionMgr = 0x809C1E38;    // puntero al SectionMgr
@@ -460,5 +461,6 @@ extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
         InvokeIndirectCpu(f, &c);       // elige la versión activa (la de RR si la parcheó), como el código traducido
     }
     if (g_vr_cuantos) probarVr(ctx);    // §82, solo pruebas
+    mkw_invitados_cuadro(ctx);          // §86: las caras de los Mii invitados, si la página las pidió
     rr_overlay_8063550C_traducida(ctx);
 }
