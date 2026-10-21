@@ -177,11 +177,12 @@ export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl 
   };
 }
 
-export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
+export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avatar }) {
   let host = null, escena = null, vest = null, frame = null, partida = null, est = null;
   let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false, jefeMarco = "", avisado = "";
   let senal = null, offP = null, offM = null, conecta = 0, esperaSala = 0;
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
+  const abierto = { cambiar: false, menu: "", tabla: false };   // M21: lo abierto en el vestíbulo (va en su firma)
 
   const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid) && !est?.fuera?.[uid];
   const presentes = () => (est?.jugadores || []).filter(j => !est.fuera?.[j.uid]);
@@ -335,73 +336,144 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     }
   }
 
+  /* El vestíbulo (M21, la propuesta D que eligió el dueño: «la mezcla del crítico»; maquetas y crítica en la bitácora
+     §97 del kit). De arriba abajo:
+     - la «ficha de carrera»: lo que se corre en grande («Copa · 150cc · CPU máximo», con la letra de la portada) y, a
+       la derecha, «¡A correr!» para el anfitrión o lo que espera el invitado: se ve sin bajar la página;
+     - «✎ Cambiar» (solo el anfitrión): abre las tres opciones (modo, cilindrada, CPU) con la ayuda de la elegida;
+     - la última copa (los tres primeros y «Ver tabla»);
+     - los pilotos: «N de 12» con 12 puntitos (llenos = personas, huecos = CPU), una fila por piloto (su foto del
+       sitio, el nombre, la corona del anfitrión y el VR a la derecha; para el anfitrión, un «⋯» con «Pasar anfitrión»
+       y «Echar») y una sola fila para la CPU que completa los 12;
+     - con la copa andando, la misma ficha en una tira: el titular, las fichas de los pilotos (el anfitrión puede echar
+       desde ahí) y «Volver al vestíbulo».
+     El panel se rehace entero cuando cambia algo; lo abierto (Cambiar, el «⋯», la tabla) va en la firma y el foco del
+     teclado vuelve al mismo botón (data-foco). Los estilos son del módulo (ponEstiloVest): juegos.html no se toca. */
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const js = presentes(), manda = soyAnfitrion(), corre = corriendo();
-    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera]);
+    const tira = corre && enSala();
+    if (!manda || corre) abierto.cambiar = false;
+    if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla,
+      est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
+    ponEstiloVest();
     vest.hidden = false;
-    vest.classList.toggle("jugando", corre && enSala());
-    const fila = j => `<li class="jg-mkw-piloto${j.uid === est.anfitrion ? " anf" : ""}">
-        <b translate="no">${escapeHtml(j.nombre || "Piloto")}</b>
-        <small>${j.uid === est.anfitrion ? "anfitrión · " : ""}${vrs[j.uid] ? "VR " + Number(vrs[j.uid]).toLocaleString("es") : "VR —"}</small>
-        ${manda && !corre && j.uid !== uid ? `<button class="jg-mkw-dar" data-a="${escapeHtml(j.uid)}" title="Que sea el anfitrión">Pasar anfitrión</button>` : ""}
-        ${manda && j.uid !== uid ? `<button class="jg-mkw-echa" data-e="${escapeHtml(j.uid)}" title="Sacarlo de la sala" style="margin-top:4px;align-self:flex-start;font-size:.8rem;border:1px solid #ff8a8a77;background:transparent;color:#ffd2d2;border-radius:8px;padding:2px 8px;cursor:pointer">Echar</button>` : ""}
-      </li>`;
-    // los dos modos (tarjetas: el anfitrión elige, los demás ven cuál). §74: la copa es una de las copas del juego (sus
-    // 4 pistas) y la playlist una lista que se arma en el juego: el vestíbulo ya no pregunta cuántas carreras
-    const estilo = est.estilo || "copa", puede = manda && !corre ? "" : "disabled";
-    const QUE = { copa: "El anfitrión elige una copa del juego y se corren sus 4 pistas, con puntos (15, 12, 10…).",
-      playlist: "El anfitrión arma una lista de pistas (hasta 32) y los demás le sugieren; entre carrera y carrera se pueden agregar más." };
-    const modos = Object.entries(MKW_MODOS).map(([k, t]) =>
-      `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
-    // la cilindrada (para los dos modos)
-    const carrerasFichas = `<div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
-      `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>` +
-      // M20: el nivel de la CPU que completa los 12, aparte de la cilindrada (máximo por omisión)
-      `<div class="jg-mkw-cpu"><span>CPU</span>${Object.entries(MKW_NIVEL).map(([k, txt]) =>
-      `<button class="jg-mkw-ficha" data-nivel="${k}" aria-pressed="${(est.nivel || "maximo") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
-    // la tabla de la última copa o playlist (la mandó el marco del anfitrión al terminar)
-    const ult = est.ultimaTabla;
-    const ultima = !corre && ult?.tabla?.length ? `<div class="jg-mkw-ultima"><b>${ult.estilo === "playlist" ? "🏁 Última playlist" : "🏆 Última copa"}</b>
-      <ol>${ult.tabla.map(f => `<li><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol></div>` : "";
+    vest.classList.add("jg-mkw2");
+    vest.classList.toggle("jugando", tira);
+    const estilo = est.estilo === "playlist" ? "playlist" : "copa", cc = MKW_CC[est.cc] ? est.cc : "c150", nivel = MKW_NIVEL[est.nivel] ? est.nivel : "maximo";
+    const puede = manda && !corre, cupo = Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX), cpus = Math.max(0, MKW_SINCRO_MAX - js.length);
+    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())}`;
+    const nom = j => escapeHtml(j.nombre || "Piloto");
+    const cara = (j, tam) => avatar ? avatar(j, tam) : `<span class="jg2-inicial" style="width:${tam}px;height:${tam}px" aria-hidden="true">${escapeHtml((j.nombre || "?").charAt(0).toUpperCase())}</span>`;
+    // el «⋯» de cada piloto, para el anfitrión y en las filas de los otros (con la copa andando, solo «Echar»)
+    const menuDe = j => {
+      if (!(manda && j.uid !== uid)) return "";
+      const u = escapeHtml(j.uid), abre = abierto.menu === j.uid;
+      return `<button type="button" class="jg2-mas" data-menu="${u}" data-foco="menu-${u}" aria-haspopup="menu" aria-expanded="${abre}" aria-label="Opciones de ${nom(j)}">⋯</button>` +
+        (abre ? `<div class="jg2-menu" role="menu">${!corre ? `<button type="button" class="jg-mkw-dar" role="menuitem" data-a="${u}" data-foco="dar-${u}">Pasar anfitrión</button>` : ""}` +
+          `<button type="button" class="jg-mkw-echa" role="menuitem" data-e="${u}" data-foco="echa-${u}">Echar de la sala</button></div>` : "");
+    };
+    const corona = j => j.uid === est.anfitrion ? CORONA : "";
+    const vrDe = j => `<span class="jg2-vr">VR <b>${vrs[j.uid] ? Number(vrs[j.uid]).toLocaleString("es") : "—"}</b></span>`;
+    // lo que dice el panel según quién mira (los mismos avisos de antes)
     const sinPrograma = origen === "";
-    // (§87: a quien sacaron de la sala se le dice por qué)
     const sacado = (est.hist || []).filter(h => (h.e === "echado" || h.e === "expulsado") && h.uid === uid).pop();
+    const espera = !enSala() ? "" : corre ? "" : manda ? "" : `Esperando a que <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b> abra las carreras`;
     const nota = !enSala() ? (sacado ? (sacado.e === "echado" ? "El anfitrión te sacó de esta sala." : "Te sacaron de esta sala por votación.")
         : corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
       : corre && est.sincro ? (est.sincro.includes(uid)
-        ? (est.anfitrion === uid ? (estilo === "copa" ? "Elige la copa en el juego; después cada uno elige personaje y vehículo. Todos corren la misma carrera y la CPU completa los 12."
+        ? (manda ? (estilo === "copa" ? "Elige la copa en el juego; después cada uno elige personaje y vehículo. La CPU completa los 12."
             : "Arma la lista en el juego (los demás te pueden sugerir pistas); después cada uno elige personaje y vehículo.")
           : estilo === "playlist" ? "Sugiere pistas en el juego mientras el anfitrión arma la lista. Si se te corta la conexión, tienes 30 s para volver."
           : "Todos corren la misma carrera y la CPU completa los 12. Si se te corta la conexión, tienes 30 s para volver.")
         : "Esta copa empezó sin ti: entras en la siguiente.")
-      : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
-      : `Esperando a que ${escapeHtml(nombre(est.anfitrion))} abra las carreras.`;
-    vest.innerHTML = `
-      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX)} · ${escapeHtml(MKW_MODOS[estilo] || MKW_MODOS.copa)} · ${escapeHtml(MKW_CC[est.cc || "c150"])} · CPU ${escapeHtml((MKW_NIVEL[est.nivel] || MKW_NIVEL.maximo).toLowerCase())}</span></div>
-      <ul class="jg-mkw-pilotos">${js.map(fila).join("")}</ul>
-      ${ultima}
-      ${corre ? "" : `<div class="jg-mkw-modos" role="group" aria-label="Modo de la sala">${modos}</div>${carrerasFichas}`}
-      <div class="jg-mkw-pie">
-        ${manda && !corre ? `<button class="jg-mkw-empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>` : ""}
-        ${manda && corre ? `<button class="jg-mkw-vuelve">Volver al vestíbulo</button>` : ""}
-        <p class="jg-mkw-nota" role="status">${nota}</p>
-      </div>`;
-    vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
-    vest.querySelectorAll(".jg-mkw-ficha[data-cc]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); });
-    vest.querySelectorAll(".jg-mkw-ficha[data-nivel]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); });
-    vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
+      : manda && sinPrograma ? "El programa del juego todavía no está publicado." : "";
+    const foco = vest.contains(document.activeElement) ? document.activeElement.getAttribute("data-foco") : null;
+
+    if (tira) {
+      const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${cara(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${menuDe(j)}</span>`;
+      vest.innerHTML = `<div class="jg2-tira">
+          <span class="jg2-ttit">${titular}</span>
+          <span class="jg2-tcuenta">${js.length} de ${cupo}</span>
+          <div class="jg2-fichas">${js.map(ficha).join("")}${cpus ? `<span class="jg2-ficha cpu">+ ${cpus} CPU</span>` : ""}</div>
+          ${manda ? `<button type="button" class="jg-mkw-vuelve jg2-vuelve" data-foco="vuelve">Volver al vestíbulo</button>` : ""}
+          ${nota ? `<p class="jg-mkw-nota jg2-nota" role="status">${nota}</p>` : ""}
+        </div>`;
+    } else {
+      const seg = (k, cual, lista, dato) => `<div class="jg2-seg" role="group" aria-label="${{ modo: "Modo", cc: "Cilindrada" }[k] || k}">${Object.entries(lista).map(([v, txt]) =>
+        `<button type="button" ${dato(v)} data-foco="${k}-${v}" aria-pressed="${cual === v}">${escapeHtml(txt)}</button>`).join("")}</div>`;
+      const opciones = puede && abierto.cambiar ? `<div class="jg2-opciones" id="jg2-opciones">
+          <div class="jg2-op"><span>Modo</span>${seg("modo", estilo, MODO_CORTO, v => `class="jg-mkw-modo" data-e="${v}"`)}</div>
+          <div class="jg2-op"><span>Cilindrada</span>${seg("cc", cc, MKW_CC, v => `data-cc="${v}"`)}<small>${AYUDA_CC[cc]}</small></div>
+          <div class="jg2-op"><span>CPU</span><div class="jg2-seg" role="group" aria-label="CPU">${Object.entries(MKW_NIVEL).map(([k, txt]) =>
+            `<button type="button" data-nivel="${k}" data-foco="cpu-${k}" aria-pressed="${nivel === k}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_NIVEL[nivel]}</small></div>
+          <button type="button" class="jg2-cerrar" data-cerrar data-foco="cerrar">Cerrar</button>
+        </div>` : "";
+      const ult = est.ultimaTabla;
+      const ultima = ult?.tabla?.length ? `<div class="jg2-ultima"><b>${ult.estilo === "playlist" ? "Última playlist" : "Última copa"}</b>
+          <span class="jg2-podio">${ult.tabla.slice(0, 3).map((f, i) => `<span>${i + 1}.º <span translate="no">${escapeHtml(f.nombre)}</span> <i>${Number(f.puntos)}</i></span>`).join("")}</span>
+          ${ult.tabla.length > 3 ? `<button type="button" class="jg2-vertabla" data-tabla data-foco="tabla" aria-expanded="${abierto.tabla}">${abierto.tabla ? "Ocultar tabla" : "Ver tabla"}</button>` : ""}
+        </div>${abierto.tabla && ult.tabla.length > 3 ? `<ol class="jg2-tabla">${ult.tabla.map((f, i) => `<li><i>${i + 1}.º</i><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol>` : ""}` : "";
+      const fila = j => `<li class="jg2-fila${j.uid === uid ? " yo" : ""}">${cara(j, 30)}<span class="jg2-nombre"><b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${j.uid === uid ? "<small>tú</small>" : ""}</span>${vrDe(j)}${menuDe(j)}</li>`;
+      const accion = manda && !corre
+        ? `<button type="button" class="jg-mkw-empieza jg2-largar" data-foco="empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>`
+        : espera ? `<p class="jg2-espera" role="status"><i class="jg2-punto" aria-hidden="true"></i><span>${espera}</span></p>` : "";
+      vest.innerHTML = `
+        <div class="jg2-boleto">
+          <div class="jg2-que">
+            <div class="jg2-ojo">Mario Kart Wii · lo que se corre</div>
+            <p class="jg2-titular">${titular}</p>
+            <div class="jg2-ayuda">${AYUDA_MODO[estilo]}</div>
+          </div>
+          ${accion ? `<div class="jg2-accion">${accion}</div>` : ""}
+          ${puede ? `<button type="button" class="jg2-cambiar" data-cambiar data-foco="cambiar" aria-expanded="${abierto.cambiar}" aria-controls="jg2-opciones">✎ Cambiar</button>` : ""}
+        </div>
+        ${opciones}
+        ${nota ? `<p class="jg-mkw-nota jg2-nota" role="status">${nota}</p>` : ""}
+        ${ultima}
+        <div class="jg2-pcab"><b>Pilotos</b><span>${js.length} de ${cupo}</span><span class="jg2-puntos" aria-hidden="true">${Array.from({ length: cupo }, (_, i) => `<i class="${i < js.length ? "si" : ""}"></i>`).join("")}</span></div>
+        <ul class="jg2-lista">${js.map(fila).join("")}${cpus ? `<li class="jg2-cpu"><span class="jg2-inicial cpu" aria-hidden="true">CPU</span><span>+ ${cpus} CPU · ${escapeHtml(MKW_NIVEL[nivel])}</span></li>` : ""}</ul>`;
+    }
+    if (foco) vest.querySelector(`[data-foco="${CSS.escape(foco)}"]`)?.focus();
+  }
+  /* Los botones del vestíbulo (uno solo para todos: el panel se rehace entero). Las jugadas son las de siempre. */
+  function clicVest(ev) {
+    const b = ev.target.closest("button");
+    if (!b || !vest?.contains(b) || b.disabled) return;
+    if (b.hasAttribute("data-cambiar")) { abierto.cambiar = !abierto.cambiar; pintaVestibulo(true); return; }
+    if (b.hasAttribute("data-cerrar")) { abierto.cambiar = false; pintaVestibulo(true); vest.querySelector('[data-foco="cambiar"]')?.focus(); return; }
+    if (b.hasAttribute("data-tabla")) { abierto.tabla = !abierto.tabla; pintaVestibulo(true); return; }
+    if (b.dataset.menu) { abierto.menu = abierto.menu === b.dataset.menu ? "" : b.dataset.menu; pintaVestibulo(true); if (abierto.menu) vest.querySelector(".jg2-menu button")?.focus(); return; }
+    const elegido = b.getAttribute("aria-pressed") === "true";
+    if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
+    if (b.dataset.cc) { if (!elegido) anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); return; }
+    if (b.dataset.nivel) { if (!elegido) anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); return; }
+    if (b.classList.contains("jg-mkw-dar")) { b.disabled = true; abierto.menu = ""; anota({ t: "anfitrion", uid, a: b.dataset.a }); return; }
     // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
-    vest.querySelectorAll(".jg-mkw-echa").forEach(b => b.onclick = () => {
-      if (!confirm(`¿Echar a ${nombre(b.dataset.e)} de la sala? Sale al momento${corre ? " (su kart sigue la carrera sin nadie)" : ""} y no puede volver a esta sala.`)) return;
-      b.disabled = true; anota({ t: "echa", uid, a: b.dataset.e });
-    });
-    const emp = vest.querySelector(".jg-mkw-empieza");
-    if (emp) emp.onclick = () => { emp.disabled = true; anota({ t: "empieza", uid }); };
-    const vue = vest.querySelector(".jg-mkw-vuelve");
-    if (vue) vue.onclick = () => { vue.disabled = true; anota({ t: "vuelve", uid }); };
+    if (b.classList.contains("jg-mkw-echa")) {
+      if (!confirm(`¿Echar a ${nombre(b.dataset.e)} de la sala? Sale al momento${corriendo() ? " (su kart sigue la carrera sin nadie)" : ""} y no puede volver a esta sala.`)) return;
+      b.disabled = true; abierto.menu = "";
+      anota({ t: "echa", uid, a: b.dataset.e });
+      return;
+    }
+    if (b.classList.contains("jg-mkw-empieza")) { b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid }); return; }
+    if (b.classList.contains("jg-mkw-vuelve")) { b.disabled = true; anota({ t: "vuelve", uid }); }
+  }
+  /* Escape cierra el «⋯» o «Cambiar»; un clic fuera del menú lo cierra */
+  function teclaVest(ev) {
+    if (ev.key !== "Escape" || (!abierto.menu && !abierto.cambiar)) return;
+    const volver = abierto.menu ? `menu-${abierto.menu}` : "cambiar";
+    abierto.menu = ""; abierto.cambiar = false;
+    pintaVestibulo(true);
+    vest?.querySelector(`[data-foco="${CSS.escape(volver)}"]`)?.focus();
+  }
+  function clicFuera(ev) {
+    if (!abierto.menu || ev.target.closest?.(".jg2-menu, [data-menu]")) return;
+    abierto.menu = "";
+    pintaVestibulo(true);
   }
 
   function pantallaCompleta() {
@@ -420,6 +492,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     vest = document.createElement("div");
     vest.className = "jg-mkw-vest";
     vest.hidden = true;
+    vest.addEventListener("click", clicVest);
+    vest.addEventListener("keydown", teclaVest);
+    document.addEventListener("click", clicFuera);
     escena.append(vest);
     frame = document.createElement("iframe");
     frame.title = "Mario Kart Wii — carreras en línea";
@@ -457,6 +532,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function destruir() {
     muerto = true;
     clearInterval(conecta); clearInterval(esperaSala);
+    document.removeEventListener("click", clicFuera);
     offP?.(); offM?.();
     senal?.sale();
     window.removeEventListener("message", mensaje);
@@ -465,4 +541,106 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   }
 
   return { montar, actualizar, destruir, pantallaCompleta };
+}
+
+/* ---------- El vestíbulo de la sala (M21, la propuesta D) ---------- */
+/* Los textos del vestíbulo: el modo en corto (el titular) y una línea de ayuda por opción */
+const MODO_CORTO = { copa: "Copa", playlist: "Playlist" };
+const AYUDA_MODO = { copa: "Una copa del juego: 4 pistas, con puntos.", playlist: "Una lista de pistas que arma el anfitrión; los demás sugieren." };
+const AYUDA_CC = { c150: "La velocidad de siempre.", espejo: "A 150cc, con las pistas dadas vuelta.",
+  c100: "Mucho más rápido. Hay que frenar antes de las curvas.", azar: "Cada carrera sortea la suya: 150cc, espejo o 200cc." };
+const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", normal: "Corren como las de un Gran Premio difícil.",
+  dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca." };
+const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
+/* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
+   una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html
+   (el fondo azul, el borde y el color de letra del panel se quedan de ahí). Los cambios de ancho miran el panel
+   (@container), no la ventana: el panel comparte la fila con el chat. */
+const ESTILO_VEST = `
+.jg-mkw-vest.jg-mkw2{container-type:inline-size;gap:12px}
+.jg-mkw2 .jg2-boleto{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;align-items:center;background:#00000038;border-radius:16px;padding:22px 18px 14px}
+.jg-mkw2 .jg2-boleto::before{content:"";position:absolute;inset:0 0 auto 0;height:8px;background:repeating-conic-gradient(#eef2ff 0 25%,#0f1c3a 0 50%) 0 0/8px 8px;opacity:.9}
+.jg-mkw2 .jg2-que{min-width:0}
+.jg-mkw2 .jg2-ojo{font:600 .72rem/1.2 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:#b9c4e6}
+.jg-mkw2 .jg2-titular{margin:4px 0 0;font:italic 900 clamp(1.4rem,4.2cqi,2.1rem)/1.08 system-ui,sans-serif;color:#fff;text-shadow:0 3px 0 #c81d25,0 6px 10px #0008;text-wrap:balance}
+.jg-mkw2 .jg2-ayuda{color:#b9c4e6;font-size:.9rem;margin-top:6px}
+.jg-mkw2 .jg2-accion{display:grid;justify-items:end}
+.jg-mkw2 .jg2-largar{border:0;border-radius:14px;padding:15px 30px;background:#e4202e;color:#fff;font:900 1.2rem system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 0 #8f1018}
+.jg-mkw2 .jg2-largar:active{transform:translateY(2px);box-shadow:0 1px 0 #8f1018}
+.jg-mkw2 .jg2-largar:disabled{opacity:.5;cursor:default;transform:none}
+.jg-mkw2 .jg2-espera{margin:0;display:flex;align-items:center;gap:8px;color:#b9c4e6;max-width:260px;text-align:right;font-size:.95rem}
+.jg-mkw2 .jg2-espera b{color:#eef2ff}
+.jg-mkw2 .jg2-punto{width:9px;height:9px;border-radius:50%;background:#5ad18a;flex:none}
+@media (prefers-reduced-motion:no-preference){.jg-mkw2 .jg2-punto{animation:jg2-latido 1.6s ease-in-out infinite}}
+@keyframes jg2-latido{50%{opacity:.35;transform:scale(.8)}}
+.jg-mkw2 .jg2-cambiar{justify-self:start;border:1px solid #ffffff26;background:transparent;color:#b9c4e6;border-radius:9px;padding:4px 10px;font:inherit;font-size:.85rem;cursor:pointer}
+.jg-mkw2 .jg2-cambiar:hover,.jg-mkw2 .jg2-cambiar[aria-expanded=true]{color:#eef2ff;border-color:#ffffff55}
+.jg-mkw2 .jg2-opciones{display:grid;gap:12px;border:1px solid #ffffff26;border-radius:14px;padding:14px;background:#ffffff08}
+.jg-mkw2 .jg2-op{display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 12px;align-items:center}
+.jg-mkw2 .jg2-op>span{color:#b9c4e6;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+.jg-mkw2 .jg2-op small{grid-column:2;color:#b9c4e6;font-size:.84rem}
+.jg-mkw2 .jg2-seg{justify-self:start;display:inline-flex;flex-wrap:wrap;gap:4px;background:#00000033;border-radius:12px;padding:4px}
+.jg-mkw2 .jg2-seg button{display:inline-block;border:0;box-shadow:none;background:transparent;color:#eef2ff;border-radius:9px;padding:6px 12px;font:inherit;cursor:pointer;text-align:center}
+.jg-mkw2 .jg2-seg button:hover{background:#ffffff14}
+.jg-mkw2 .jg2-seg button[aria-pressed=true]{background:#ffd34d;color:#1b1400;font-weight:700;box-shadow:none;border:0}
+.jg-mkw2 .jg2-seg button[data-cc=azar]{margin-left:10px}
+.jg-mkw2 .jg2-cerrar{justify-self:end;border:1px solid #ffffff26;background:transparent;color:#eef2ff;border-radius:9px;padding:4px 12px;font:inherit;cursor:pointer}
+.jg-mkw2 .jg2-nota{margin:0}
+.jg-mkw2 .jg2-ultima{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border:1px solid #ffd34d40;background:#ffd34d0f;border-radius:12px;padding:8px 12px;font-size:.92rem}
+.jg-mkw2 .jg2-ultima>b{color:#ffd34d;font-size:.76rem;text-transform:uppercase;letter-spacing:.08em}
+.jg-mkw2 .jg2-podio{display:flex;flex-wrap:wrap;gap:4px 14px;min-width:0}
+.jg-mkw2 .jg2-podio i,.jg-mkw2 .jg2-tabla b{font:600 .85rem "IBM Plex Mono",ui-monospace,monospace;font-style:normal;color:#eef2ff}
+.jg-mkw2 .jg2-vertabla{margin-left:auto;border:0;background:transparent;color:#b9c4e6;text-decoration:underline;font:inherit;cursor:pointer;padding:0}
+.jg-mkw2 .jg2-tabla{list-style:none;margin:0;padding:0;display:grid;gap:2px 18px;font-size:.9rem}
+@container (min-width:640px){.jg-mkw2 .jg2-tabla{grid-template-columns:1fr 1fr}}
+.jg-mkw2 .jg2-tabla li{display:flex;gap:8px;padding:3px 4px;border-bottom:1px solid #ffffff12}
+.jg-mkw2 .jg2-tabla li i{font-style:normal;color:#b9c4e6;min-width:2.2em}
+.jg-mkw2 .jg2-tabla li b{margin-left:auto}
+.jg-mkw2 .jg2-pcab{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jg-mkw2 .jg2-pcab>b{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#b9c4e6}
+.jg-mkw2 .jg2-pcab>span:not(.jg2-puntos){font:600 .9rem "IBM Plex Mono",ui-monospace,monospace}
+.jg-mkw2 .jg2-puntos{display:inline-flex;gap:4px}
+.jg-mkw2 .jg2-puntos i{width:9px;height:9px;border-radius:50%;border:1.5px solid #8ea0d6}
+.jg-mkw2 .jg2-puntos i.si{background:#eef2ff;border-color:#eef2ff}
+.jg-mkw2 .jg2-lista{list-style:none;margin:0;padding:0;display:grid;gap:4px 14px}
+@container (min-width:640px){.jg-mkw2 .jg2-lista{grid-template-columns:1fr 1fr}}
+.jg-mkw2 .jg2-fila{position:relative;display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 6px;border-radius:10px;min-width:0}
+.jg-mkw2 .jg2-fila:hover{background:#ffffff0a}
+.jg-mkw2 .jg2-fila.yo{background:#ffffff0d}
+.jg-mkw2 .jg2-nombre{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+.jg-mkw2 .jg2-nombre b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-mkw2 .jg2-nombre small{color:#b9c4e6;font-size:.78rem}
+.jg-mkw2 .jg2-corona{width:15px;height:15px;flex:none;color:#ffd34d}
+.jg-mkw2 .jg2-vr{font:600 .85rem "IBM Plex Mono",ui-monospace,monospace;color:#b9c4e6;white-space:nowrap}
+.jg-mkw2 .jg2-vr b{color:#eef2ff;font-weight:600}
+.jg-mkw2 .jg2-mas{flex:none;border:1px solid transparent;background:transparent;color:#b9c4e6;border-radius:8px;width:30px;height:28px;font:inherit;cursor:pointer;line-height:1}
+.jg-mkw2 .jg2-mas:hover,.jg-mkw2 .jg2-mas[aria-expanded=true]{border-color:#ffffff26;color:#eef2ff}
+.jg-mkw2 .jg2-menu{position:absolute;right:4px;top:38px;z-index:5;display:grid;min-width:170px;background:#0b1530;border:1px solid #ffffff26;border-radius:10px;padding:4px;box-shadow:0 8px 24px #0008}
+.jg-mkw2 .jg2-menu button{border:0;background:transparent;color:#eef2ff;text-align:left;padding:7px 10px;border-radius:7px;font:inherit;cursor:pointer;margin:0;align-self:auto}
+.jg-mkw2 .jg2-menu button:hover{background:#ffffff12}
+.jg-mkw2 .jg2-menu .jg-mkw-echa{color:#ff9a9a}
+.jg-mkw2 .jg2-cpu{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 6px;border:1.5px dashed #8ea0d655;border-radius:10px;color:#8ea0d6}
+.jg-mkw2 .jg2-inicial{display:inline-grid;place-items:center;flex:none;border-radius:50%;background:#2f4f8f;color:#fff;font-weight:800;font-size:.8rem}
+.jg-mkw2 .jg2-inicial.cpu{width:30px;height:30px;background:transparent;border:1.5px dashed #8ea0d6;color:#8ea0d6;font-size:.6rem;letter-spacing:.04em}
+.jg-mkw-vest.jg-mkw2.jugando{padding:10px 14px}
+.jg-mkw2>.jg2-tira{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;min-width:0}
+.jg-mkw2 .jg2-ttit{font:italic 900 1rem system-ui,sans-serif;color:#fff;text-shadow:0 2px 0 #c81d25}
+.jg-mkw2 .jg2-tcuenta{font:600 .85rem "IBM Plex Mono",ui-monospace,monospace;color:#b9c4e6}
+.jg-mkw2 .jg2-fichas{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 300px;min-width:0}
+.jg-mkw2 .jg2-ficha{position:relative;display:inline-flex;align-items:center;gap:6px;background:#ffffff10;border:1px solid #ffffff26;border-radius:999px;padding:3px 6px 3px 3px;max-width:100%}
+.jg-mkw2 .jg2-ficha b{font-size:.85rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-mkw2 .jg2-ficha.cpu{border-style:dashed;color:#8ea0d6;padding:3px 10px}
+.jg-mkw2 .jg2-ficha .jg2-mas{width:24px;height:22px}
+.jg-mkw2 .jg2-ficha .jg2-menu{top:30px;right:0}
+.jg-mkw2 .jg2-vuelve{border:0;border-radius:10px;padding:8px 14px;background:#ffffff1f;color:#eef2ff;font:700 .95rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw2 .jg2-tira .jg2-nota{flex:1 1 100%;color:#d8def5;font-size:.9rem}
+.jg-mkw2 button:focus-visible{outline:2px solid #ffd34d;outline-offset:2px}
+@container (max-width:560px){.jg-mkw2 .jg2-boleto{grid-template-columns:1fr}.jg-mkw2 .jg2-accion{justify-items:stretch}.jg-mkw2 .jg2-largar{width:100%}.jg-mkw2 .jg2-espera{text-align:left;max-width:none}.jg-mkw2 .jg2-op{grid-template-columns:1fr}.jg-mkw2 .jg2-op small{grid-column:1}}
+`;
+function ponEstiloVest() {
+  if (document.getElementById("jg-mkw2-estilo")) return;
+  const s = document.createElement("style");
+  s.id = "jg-mkw2-estilo";
+  s.textContent = ESTILO_VEST;
+  document.head.append(s);
 }

@@ -139,6 +139,13 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   máximo por omisión). VR fijo por nivel: 3000/5000/7400/9400. Y el «Espejo» de la sala era el «100cc» de RR: ahora es
   espejo de verdad. Banco `dificultad-cpu` 21, `vr-sala` 47; sitio 19/19; `prueba-sincro --directa --cpu=maximo`
   13/13, `prueba-sala --cpu=maximo` 35/35, `prueba-playlist` 20/20 (§96)
+- ✅ M21. (Pedido del dueño, 2026-10-21) **El vestíbulo de la sala, de nuevo, y las opciones de menos a más.**
+  Cilindrada 150cc · Espejo · 200cc · Al azar y CPU Fácil · Normal · Difícil · Máximo. Tres maquetas (A parrilla de 12,
+  B dos columnas, C ficha de carrera), un crítico aparte que las midió (C > B > A, ninguna tal cual) y su mezcla, la D,
+  que eligió el dueño: la ficha de carrera con «¡A correr!» a la vista, las opciones detrás de «✎ Cambiar», los
+  pilotos en dos columnas con su foto del sitio, corona, VR y «⋯» (pasar anfitrión, echar), «N de 12» con puntitos y
+  una fila para la CPU; con la copa andando, una tira. Estilos propios del módulo (`juegos.html` no se toca). Sitio
+  19/19; `prueba-experiencia` 20/20 y `--playlist` 22/22 (§97)
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -445,6 +452,16 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-21 14:17** — **El vestíbulo nuevo de la sala (la propuesta D) y las opciones de menos a más** (§97, M21,
+  pedido del dueño). El orden de la cilindrada y la CPU, de menos a más (sitio `2a06fc6`). Para el rediseño: tres
+  maquetas en una página publicada, un crítico aparte que las midió con 2 y 12 pilotos y tres anchos (C > B > A,
+  ninguna tal cual) y su mezcla D, que eligió el dueño. Programada en `colabtex/src/juegos/mkw.js`: la ficha de carrera
+  (titular con la letra de la portada, «¡A correr!» grande o la espera del invitado), «✎ Cambiar», la última copa con
+  «Ver tabla», los pilotos en dos columnas (`ctx.avatar`, corona, VR, «⋯» con pasar anfitrión y echar), «N de 12» con 12
+  puntitos y «+ N CPU · nivel»; con la copa andando, la tira. Estilos propios (`ponEstiloVest`, `.jg-mkw-vest.jg-mkw2`,
+  `@container`), lo abierto en la firma y el foco que vuelve. Sitio 19/19; `prueba-experiencia` 20/20, `--playlist`
+  22/22 (la tira no decía «1 de 12»: corregido).
 
 - **2026-10-21 02:33** — **Los niveles de la CPU: las perillas, una dificultad más alta y el nivel como ajuste de la
   sala** (§96, M20, pedido del dueño). Un agente catalogó en el código traducido todas las perillas de la IA (velocidad

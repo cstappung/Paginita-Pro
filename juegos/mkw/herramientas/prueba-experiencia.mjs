@@ -197,9 +197,11 @@ try {
   // llegar a su selector (la anfitriona arma la lista, Piloto Dos sugiere), confirmar, elegir y correr la carrera 1
   const enPlaylist = args.includes('--playlist');
   if (enPlaylist) {
+    // (M21: las opciones están detrás de «✎ Cambiar»; el titular de la ficha dice «Playlist · 150cc · CPU máximo»)
+    await uno.locator('.jg-mkw-vest [data-cambiar]').click();
     await uno.locator('.jg-mkw-modo[data-e=playlist]').click();
-    const vp = await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /Modo playlist/.test(t), 15000);
-    ok('la anfitriona pasa la sala a «Modo playlist» y Piloto Dos lo ve', /Modo playlist/.test(vp || ''));
+    const vp = await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /Playlist ·/.test(t), 15000);
+    ok('la anfitriona pasa la sala a «Playlist» y Piloto Dos lo ve en el titular', /Playlist ·/.test(vp || ''));
   }
   if (!args.includes('--rapida')) {
     // «¡A correr!» (§73): el juego de los dos se abre en la sala (modo=sala), sin nada del Wi-Fi del juego
@@ -295,6 +297,8 @@ try {
     const [pa, pb] = await Promise.all([dosFotosPartidas(uno, () => fotoMarco(mA, `9-carrera-uno${na++ ? '-b' : ''}.png`)),
                                         dosFotosPartidas(dos, () => fotoMarco(mB, `9-carrera-dos${nb++ ? '-b' : ''}.png`))]);
     await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
+    // (M21: la tira del vestíbulo con la copa andando, la de la anfitriona: el titular, «2 de 12», las fichas con su «⋯»)
+    await uno.locator('.jg-mkw-vest').screenshot({ path: path.join(carpeta, '9-tira-uno.png') }).catch(() => {});
     ok('la misma carrera en los dos: las huellas coinciden y ninguno se separó', (x?.[0]?.ls?.huellasIguales || 0) >= 3 && !x?.[0]?.ls?.desincronizado && !x?.[1]?.ls?.desincronizado,
        `huellas iguales ${x?.[0]?.ls?.huellasIguales}, cuadro A ${x?.[0]?.ls?.cuadro}, B ${x?.[1]?.ls?.cuadro}`);
     ok('en la página de cada uno se ve UNA vista (la de su kart), no la pantalla partida', pa && pb && !pa.partida && !pb.partida && !pa.vacia && !pb.vacia,
@@ -308,6 +312,8 @@ try {
   const lsDe = f => f.evaluate(() => window.mkwSincro?.lockstep?.estado() || null).catch(() => null);
   const cuadroAntes = marcoA ? ((await lsDe(marcoA))?.cuadro || 0) : 0;
   uno.once('dialog', d => d.accept());
+  // (M21: «Echar» está en el menú «⋯» de cada piloto, en el vestíbulo y en la tira de la carrera)
+  await uno.locator('.jg-mkw-vest [data-menu]').first().click({ timeout: 10000 });
   await uno.locator('.jg-mkw-echa').first().click({ timeout: 10000 });
   const vDos = (await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /te sacó/.test(t), 15000) || '').replace(/\s+/g, ' ');
   const vUno2 = (await hastaQue(() => uno.textContent('.jg-mkw-vest'), t => /1 de 12/.test(t.replace(/\s+/g, ' ')), 10000) || '').replace(/\s+/g, ' ');

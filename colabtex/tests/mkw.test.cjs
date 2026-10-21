@@ -351,7 +351,10 @@ test('§87 echar: el anfitrión saca a quien quiera (vestíbulo o copa andando);
  // en la pantalla: el ⏏ de Mario Kart con 3 o más, el botón «Echar» del anfitrión y el aviso al juego
  const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8'),mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
  assert.match(main,/enMkw \? juego && !datosFin\(p, est\) && !fuera\.has\(yo\) && activos\.length >= 3/,'la votación con 3 o más pilotos');
- assert.match(mk,/manda && j\.uid !== uid \? `<button class="jg-mkw-echa"/,'el anfitrión tiene «Echar» en cada fila (también con la copa andando)');
+ // (M21: «Echar» va en el menú «⋯» de cada piloto, para el anfitrión, en el vestíbulo y en la tira de la carrera)
+ assert.match(mk,/if \(!\(manda && j\.uid !== uid\)\) return "";/,'el «⋯» solo para el anfitrión y en las filas de los otros');
+ assert.match(mk,/<button type="button" class="jg-mkw-echa" role="menuitem" data-e="\$\{u\}"/,'el anfitrión tiene «Echar» en cada fila (también con la copa andando)');
+ assert.match(mk,/const ficha = j => .*\$\{menuDe\(j\)\}/,'en la tira de la carrera también');
  assert.match(mk,/anota\(\{ t: "echa", uid, a: b\.dataset\.e \}\)/);
  assert.match(mk,/enviar\("fuera", \{ uids: salieron \}\)/,'el marco sabe quién salió (la carrera lo corta ya)');
 });

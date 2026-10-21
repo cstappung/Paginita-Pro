@@ -873,6 +873,19 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Gancho de la carga de la IA** | Nuestra función que envuelve a la del juego que carga las perillas (AI::Params::Load): deja que el juego cargue su fila y escribe encima los valores del nivel. Corre en el mismo momento en todas las consolas (al armar la carrera), así la sala sigue sincronizada. |
 | **Guardia (de una escritura)** | Antes de escribir en una tabla del juego, el gancho comprueba que ahí esté el valor que se leyó en el código; si no, no escribe y lo avisa. Como medir que no haya tensión antes de tocar un borne: si algo no es lo esperado, no se toca. |
 
+### El vestíbulo nuevo de la sala (§97)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Maqueta** | Un dibujo de una pantalla que se puede tocar, hecho con datos de mentira, para elegir un diseño antes de programarlo. Como un prototipo en protoboard antes de diseñar la placa. |
+| **Jerarquía visual** | El orden en que el ojo recorre una pantalla: lo más grande, lo de color más fuerte y lo de arriba se ve primero. En un unilineal, la barra principal se dibuja gruesa y los ramales finos: se entiende el circuito sin leer todos los rótulos. |
+| **Control deshabilitado (apagado)** | Un botón que se ve pero no se puede apretar. Si se ve gris pero con forma de botón, parece descompuesto: por eso el invitado ya no ve los botones del anfitrión, solo lo elegido. |
+| **Ficha de carrera** | La parte de arriba del vestíbulo nuevo: lo que se corre en grande («Copa · 150cc · CPU máximo») y, al lado, «¡A correr!» (el anfitrión) o lo que se espera (el invitado). Se ve sin bajar la página, haya 2 o 12 pilotos. |
+| **Menú «⋯»** | Un botón chico en la fila de cada piloto (solo para el anfitrión) que abre «Pasar anfitrión» y «Echar». Saca del medio lo que se usa poco. |
+| **Consulta de contenedor (`@container`)** | Una regla de estilo que cambia el diseño según el ancho del **panel** y no el de la ventana. Hace falta porque el panel comparte la fila con el chat: una ventana ancha puede tener un panel angosto. |
+| **Firma (del repintado)** | El vestíbulo se rehace entero cada vez que cambia algo (alguien entra, llega un VR). Antes de rehacerlo arma una «firma» con todo lo que se ve; si no cambió, no lo toca. Lo abierto (el «⋯», «Cambiar», la tabla) va en la firma, y el foco del teclado vuelve al mismo botón. Como el contacto de enclavamiento de un relé: guarda el estado aunque la orden se repita. |
+| **Foco (del teclado)** | El recuadro que marca qué botón responde a Enter cuando se maneja la página con el teclado (Tab). |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -8301,3 +8314,101 @@ normal del juego y «difícil» y «máximo», su difícil. El espejo de verdad 
   `prueba-sala.mjs` y `prueba-sincro.mjs`.
 - **El registro de la compilación dice `build\web\node`** aunque compile para el navegador (comparten los archivos
   intermedios): lo que importa es que `build/web/navegador/mkw.wasm` tenga la hora nueva.
+
+## 2026-10-21 · §97 El vestíbulo nuevo de la sala (la propuesta D) y el orden de las opciones (M21)
+
+**Qué pidió el dueño:**
+
+1. «Los órdenes de ambos no concuerdan»: la cilindrada y la CPU, **siempre de menos a más**.
+2. «Un rework de la UI multiplayer porque está feo, pero propón primero 3 alternativas con el crítico». Después de
+   verlas: «Programa la propuesta D, la mezcla del crítico».
+
+### 97.1 El orden (de menos a más)
+
+En el sitio (`motor.js`) el orden de los botones es el de las claves de `MKW_CC` y `MKW_NIVEL`:
+
+- **Cilindrada:** 150cc · Espejo · 200cc · Al azar. Espejo va después de 150cc: misma velocidad, pistas dadas vuelta.
+  Al azar va al final porque mezcla, no es «más».
+- **CPU:** Fácil · Normal · Difícil · Máximo (antes iba de Máximo a Fácil).
+
+Commit propio en el sitio (`2a06fc6`); las pruebas del sitio piden ese orden.
+
+### 97.2 Tres propuestas, un crítico y la mezcla
+
+Qué tenía de feo la sala: todo pesaba lo mismo (título, opciones, botón); la sala es de 12, pero se veían 2 tarjetas
+sueltas y no se veía que la CPU completa el resto; el invitado veía los botones del anfitrión apagados (parecían
+rotos); «¡A correr!» quedaba abajo a la izquierda.
+
+Se hicieron tres maquetas que se pueden tocar (anfitrión e invitado), en una página publicada para el dueño:
+
+- **A · La parrilla de 12:** los 12 lugares como el vestíbulo en línea de Mario Kart, la CPU en los vacíos.
+- **B · El tablero en dos columnas:** las opciones con su explicación a la izquierda, los pilotos y el botón a la
+  derecha.
+- **C · La ficha de carrera:** lo que se corre en grande, las opciones detrás de «Cambiar», los pilotos en fichas.
+
+Un **crítico aparte** (otro agente, sin esta conversación) abrió las maquetas, las **midió** con 2 y con 12 pilotos y
+con el panel a 916, 684 y 404 px, y leyó el código de la sala. Su orden: **C, B, A**, y **ninguna tal cual**:
+
+- A: 10 tarjetas fantasma «CPU» en una sala normal de 2 a 4 amigos; números de puesto que no son la parrilla; el
+  invitado sigue viendo botones apagados; no se pliega en la tira de la carrera.
+- B: con 12 pilotos el panel mide 880 px y «¡A correr!» queda donde hay que bajar la página; parece un formulario.
+- C: la jerarquía más clara y la mejor para el invitado, pero con 12 pilotos las fichas se apilan en filas desparejas.
+
+Recomendó una **mezcla**, que se maquetó como **propuesta D** y es la que eligió el dueño: la ficha de C arriba con
+«¡A correr!» adentro; las opciones de C detrás de «Cambiar», con la ayuda de B; la lista de B en dos columnas con un
+«⋯» por piloto; y la idea de A en una línea («3 de 12» con 12 puntitos y una sola fila para la CPU).
+
+### 97.3 Cómo quedó (sitio: `colabtex/src/juegos/mkw.js`)
+
+De arriba abajo:
+
+- **La ficha de carrera:** «Mario Kart Wii · lo que se corre», el titular «Copa · 150cc · CPU máximo» con la letra de
+  la portada de Mario Kart (gruesa, cursiva, sombra roja), una línea que explica el modo, y a la derecha
+  **«¡A correr!» grande** (anfitrión) o «● Esperando a que X abra las carreras» (invitado, con un puntito que late).
+  Arriba, un borde a cuadros de bandera de llegada.
+- **«✎ Cambiar»** (solo el anfitrión, antes de empezar): abre modo, cilindrada (con «Al azar» separado) y CPU, cada
+  una con la ayuda del valor elegido; «Cerrar» la guarda.
+- **Los avisos** de siempre (sin el programa publicado, mirando, echado, «la copa empezó sin ti»).
+- **La última copa:** los tres primeros y «Ver tabla» (las 12 filas, en dos columnas si el panel es ancho).
+- **Los pilotos:** «N de 12» con 12 puntitos; una fila por piloto con **su foto del sitio** (`ctx.avatar`, la misma
+  que en el encabezado de la sala), el nombre (`translate="no"`), la **corona** del anfitrión, «tú», el **VR a la
+  derecha** (también el del anfitrión) y, para el anfitrión, el **«⋯»** con «Pasar anfitrión» y «Echar de la sala»;
+  después una sola fila punteada «+ 9 CPU · Máximo» (no aparece con 12 humanos). Dos columnas si el panel mide
+  640 px o más.
+- **Con la copa andando**, la tira: el titular en chico, las fichas de los pilotos (con el «⋯» para echar) y «Volver al
+  vestíbulo» para el anfitrión.
+
+Cómo está hecho:
+
+- **Los estilos los trae el módulo** (`ponEstiloVest`: un `<style id="jg-mkw2-estilo">` una sola vez), todos debajo de
+  `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de `juegos.html` (ese archivo no se toca;
+  del viejo quedan el fondo azul, el borde y el color de letra). Los cambios de ancho usan `@container` (el ancho del
+  panel). El dorado significa solo «elegido»; el anfitrión lleva corona.
+- **Un solo manejador de clics** para todo el panel (`clicVest`), Escape cierra el «⋯» o «Cambiar», y un clic fuera
+  cierra el menú. Las jugadas son las de siempre (`ajuste`, `anfitrion`, `echa`, `empieza`, `vuelve`).
+- **Lo abierto va en la firma** (`abierto = {cambiar, menu, tabla}`) y el foco vuelve al mismo botón (`data-foco`):
+  si alguien entra mientras el anfitrión elige, el panel no se cierra solo.
+- Se conservan como enganches las clases que usan las pruebas: `jg-mkw-empieza`, `jg-mkw-modo`, `jg-mkw-dar`,
+  `jg-mkw-echa`, `jg-mkw-vuelve`, `data-cc`, `data-nivel`.
+
+### 97.4 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| sitio `colabtex/tests/mkw.test.cjs` | **19/19** (el orden de menos a más; «Echar» en el «⋯» del anfitrión, también en la tira de la carrera) |
+| `herramientas/prueba-experiencia.mjs` (la sala de verdad con emuladores, dos cuentas, carrera y echar con la carrera andando) | **20/20** |
+| `herramientas/prueba-experiencia.mjs --playlist` | **22/22** (la anfitriona abre «✎ Cambiar», elige Playlist, y Piloto Dos lo ve en el titular) |
+
+Fotos en `build/web/datos/experiencia/`: `6-vestibulo-dos.png` (el invitado) y `9-tira-uno.png` (la tira de la
+anfitriona con la copa andando).
+
+### 97.5 Trampas
+
+- **La tira de la carrera también tiene que decir cuántos son.** La primera versión de la tira no mostraba «N de 12» y
+  el ensayo (echar con la carrera andando: la sala de la anfitriona tiene que quedar «1 de 12») falló 19/20. La sala
+  vieja lo decía en su encabezado; la tira nueva lo dice al lado del titular.
+- **Los estilos no van en `juegos.html`** (regla del proyecto; la guía del sitio dice lo contrario para los demás
+  juegos): van en el módulo, y con una clase extra (`jg-mkw2`) para ganarles a las reglas viejas `.jg-mkw-*` que
+  siguen en `juegos.html` (por ejemplo, las tarjetas de modo con borde dorado).
+- **El ícono de la corona tiene un título** («Anfitrión»): aparece en el texto del panel que leen las pruebas. Es a
+  propósito (lo lee quien usa un lector de pantalla).
