@@ -380,6 +380,20 @@ const SOLO = {
     { id: "p15000", n: "Alta tensión", d: "Junta 15 000 puntos.", i: "🏭", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 15000 },
     { id: "p40000", n: "Rayo", d: "Junta 40 000 puntos.", i: "🌩️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 40000 }
   ],
+  /* La racha sale de club-integral-racha (días resueltos seguidos); el
+     resto, de club-integral-puntos, la suma de todos los días. */
+  integral: [
+    { id: "dia1", n: "Primera primitiva", d: "Resuelve la integral de un día.", i: "∫", m: "Racha", s: cat(/-racha$/) },
+    { id: "racha3", n: "Más C", d: "Llega a una racha de 3 días.", i: "➕", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
+    { id: "racha7", n: "Semana integrable", d: "Llega a una racha de 7 días.", i: "📅", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
+    { id: "racha14", n: "Por partes", d: "Llega a una racha de 14 días.", i: "🧩", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 14 },
+    { id: "racha30", n: "Convergente", d: "Llega a una racha de 30 días.", i: "♾️", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 30 },
+    { id: "p300", n: "Cambio de variable", d: "Junta 300 puntos.", i: "🔁", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 300 },
+    { id: "p1000", n: "Fracciones parciales", d: "Junta 1000 puntos.", i: "➗", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1000 },
+    { id: "p3000", n: "Sustitución trigonométrica", d: "Junta 3000 puntos.", i: "📐", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 3000 },
+    { id: "p8000", n: "Cálculo III", d: "Junta 8000 puntos.", i: "📓", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 8000 },
+    { id: "p20000", n: "Riemann", d: "Junta 20 000 puntos.", i: "🎓", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
+  ],
   /* La racha sale de las seis tablas instalación × nivel; el total de
      victorias, de club-frontera-victorias. */
   frontera: [
@@ -595,7 +609,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

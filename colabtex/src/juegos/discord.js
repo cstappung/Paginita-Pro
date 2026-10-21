@@ -139,6 +139,7 @@ const CLUBS = {
   bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" },
   sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" },
   electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" },
+  integral: { nombre: "Integrodle", juego: "Integrodle", icono: "∫", ruta: "integral" },
   frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" },
   sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" },
   fanal: { nombre: "FANAL", juego: "FANAL", icono: "🪔", ruta: "fanal" },
@@ -156,7 +157,7 @@ const CLUBS = {
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -168,10 +169,11 @@ const reloj = ms => {
 /* Lo que se lee de una marca: en el buscaminas y el sprint manda el
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
-  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-sudoku-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
+  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-integral-racha" || cat === "club-sudoku-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
   if (cat === "club-frontera-victorias") return `🏰 ${Number(f.puntos).toLocaleString("es-CL")} victorias`;
   if (/^club-frontera-/.test(cat)) return `🏰 ${f.puntos} ${f.puntos === 1 ? "combate seguido" : "combates seguidos"}`;
   if (cat === "club-electro-puntos") return `⚡ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
+  if (cat === "club-integral-puntos") return `∫ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // El arcade del sudoku se lee en puntos, con su mando de recreativa.
   if (cat === "club-sudoku-arcade") return `🕹️ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // El clásico del sudoku (puntos fijos en 1) compite por tiempo, como el buscaminas.

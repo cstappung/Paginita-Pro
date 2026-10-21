@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610210354"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Integrodle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../../../vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../conexion.js?v=club-20"></script>
+  <style>
+    /* Integrodle tiene su propio mundo, como Electrodle: un cuaderno de
+       hoja cuadriculada sobre la mesa, sea cual sea el tema del sitio. La
+       tinta es azul de lápiz pasta, las correcciones en rojo y lo bueno en
+       verde; las pistas son post-its y la nota, un timbre de profesor. */
+    :root{--papel:#fbfaf6;--mesa:#ece7dc;--cuadro:#d6e1ee;--cuadro2:#bfd0e4;--margen:#e59a9a;
+      --tinta:#1f3f7a;--tinta2:#2c5aa8;--lapiz:#5b6272;--rojo:#c63a2f;--verde:#2c7a4b;--resalta:#fff176;
+      --ui:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mano:"Caveat","Segoe Print","Comic Sans MS",cursive;
+      --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;color-scheme:light}
+    [hidden]{display:none!important}
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{min-height:100vh;color:var(--tinta);font:15px/1.5 var(--ui);
+      background:radial-gradient(1200px 600px at 20% -10%,#fff8,transparent 60%),radial-gradient(900px 500px at 110% 10%,#d9cfbd55,transparent 60%),var(--mesa)}
+    .club-integrado body,html.club-integrado body{background:transparent;color:var(--tinta);font-family:var(--ui)}
+    .shell,.club-integrado .shell{max-width:1120px;margin:0 auto;padding:18px 16px 28px}
+    .layout,.club-integrado .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+    .layout>aside:empty{display:none}
+    @media (max-width:880px){.layout,.club-integrado .layout{grid-template-columns:minmax(0,1fr)}}
+    .club-volver{color:var(--tinta2)}
+    button{font:inherit;color:inherit}
+    :focus-visible{outline:3px solid #6b9be6;outline-offset:2px}
+
+    /* ---------- la hoja ---------- */
+    .hoja{position:relative;background-color:var(--papel);border-radius:6px 6px 10px 10px;padding:44px 22px 26px 66px;
+      background-image:linear-gradient(var(--cuadro) 1px,transparent 1px),linear-gradient(90deg,var(--cuadro) 1px,transparent 1px);
+      background-size:22px 22px;background-position:-1px -1px;
+      box-shadow:0 1px 0 #fff inset,0 18px 40px #4a3c2420,0 3px 8px #4a3c241c,0 0 0 1px #d8d1c2}
+    /* El margen rojo doble y los anillos del espiral. */
+    .hoja::before{content:"";position:absolute;top:0;bottom:0;left:46px;width:5px;border-left:1.5px solid var(--margen);border-right:1px solid #e59a9a88;pointer-events:none}
+    .hoja::after{content:"";position:absolute;left:18px;right:18px;top:-9px;height:24px;pointer-events:none;
+      background:radial-gradient(circle at 11px 15px,#cfc8b8 0 5px,transparent 5.5px) 0 0/30px 24px repeat-x,
+        linear-gradient(90deg,transparent 7px,#9aa1ad 7px 9px,#e9edf3 9px 12px,#8a919c 12px 14px,transparent 14px) 0 0/30px 14px repeat-x;
+      filter:drop-shadow(0 1px 1px #0003)}
+    .club-integrado .hoja{margin-top:10px}
+
+    .cab{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo svg{width:52px;height:52px;flex:none}
+    .logo h1{margin:0;font:700 44px/0.95 var(--mano);color:var(--tinta);letter-spacing:.5px}
+    .logo h1 span{color:var(--rojo)}
+    .logo small{display:block;font:600 11px var(--ui);letter-spacing:.16em;color:var(--lapiz);text-transform:uppercase;margin-top:4px}
+    .membrete{display:grid;grid-template-columns:auto auto;gap:2px 10px;font:600 11px var(--ui);color:var(--lapiz);letter-spacing:.08em;text-transform:uppercase}
+    .membrete b{font:700 22px/1 var(--mano);color:var(--tinta);letter-spacing:0;text-transform:none;border-bottom:1.5px solid var(--cuadro2);min-width:110px;padding:0 4px 2px}
+
+    /* ---------- barra ---------- */
+    .barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 18px}
+    .interruptor{display:inline-flex;background:#fff;border:1px solid #cfd8e6;border-radius:999px;padding:3px;box-shadow:0 1px 2px #0000000d}
+    .interruptor button{border:0;background:transparent;border-radius:999px;padding:6px 14px;font-weight:600;font-size:13px;color:var(--lapiz);cursor:pointer}
+    .interruptor button[aria-selected=true]{background:var(--tinta);color:#fff}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #cfd8e6;border-radius:999px;padding:5px 12px;font-weight:600;font-size:13px;box-shadow:0 1px 2px #0000000d;white-space:nowrap}
+    .chip small{color:var(--lapiz);font-weight:500}
+    .espacio{flex:1}
+    .icono{width:34px;height:34px;border-radius:50%;border:1px solid #cfd8e6;background:#fff;cursor:pointer;display:inline-grid;place-items:center;font-size:15px;box-shadow:0 1px 2px #0000000d}
+    .icono:hover,.chip:hover{border-color:#9fb4d4}
+
+    /* ---------- el enunciado ---------- */
+    .enunciado{position:relative;display:grid;gap:6px;margin-bottom:12px}
+    .rotulo{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font:700 26px/1.1 var(--mano);color:var(--tinta)}
+    .rotulo mark{background:linear-gradient(100deg,transparent 2%,var(--resalta) 4%,#fff59d 96%,transparent 98%);color:inherit;padding:0 6px;border-radius:3px}
+    .rotulo .estrellas{font:600 14px var(--ui);color:#d29b12;letter-spacing:2px}
+    .rotulo .estrellas i{font-style:normal;color:#cfc6ad}
+    .integral{min-height:96px;display:flex;align-items:center;justify-content:center;padding:14px 8px;font-size:1.55em;overflow-x:auto;overflow-y:hidden}
+    .integral .katex{color:#14254b}
+    .casillas{display:flex;gap:6px;align-items:center;font:600 12px var(--ui);color:var(--lapiz)}
+    .casillas span{width:18px;height:18px;border:1.5px solid #9fb0c9;border-radius:4px;background:#fff;display:grid;place-items:center;font:700 14px/1 var(--mano)}
+    .casillas span.mal{border-color:var(--rojo);color:var(--rojo)}
+    .casillas span.bien{border-color:var(--verde);color:var(--verde);background:#e7f4ec}
+
+    /* ---------- pistas (post-its) ---------- */
+    .pistas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:6px 0 18px}
+    .postit{position:relative;padding:12px 14px 12px;min-height:76px;border-radius:2px 2px 14px 2px;color:#4a3d12;
+      background:linear-gradient(180deg,#fff7b0,#fdeb82);box-shadow:0 8px 14px -8px #6d5a1a66,0 1px 2px #0000001a;transform:rotate(-.8deg)}
+    .postit:nth-child(2){transform:rotate(.7deg);background:linear-gradient(180deg,#d9f1ff,#bfe3fb);color:#163a55;box-shadow:0 8px 14px -8px #1a4a6d66,0 1px 2px #0000001a}
+    .postit::before{content:"";position:absolute;top:-8px;left:50%;width:64px;height:16px;transform:translateX(-50%) rotate(-2deg);background:#ffffff8c;border:1px solid #ffffffb0;box-shadow:0 1px 2px #0000000f}
+    .postit h3{margin:0 0 4px;font:700 20px/1 var(--mano)}
+    .postit p{margin:0;font-size:13px}
+    .postit .katex{font-size:1.05em}
+    .postit.cerrado{filter:saturate(.35);opacity:.8}
+    .postit.cerrado p{color:#0009}
+    .postit.nuevo{animation:pega .6s cubic-bezier(.2,1.4,.4,1)}
+    @keyframes pega{from{transform:translateY(-14px) rotate(-6deg) scale(1.05);opacity:0}}
+
+    /* ---------- intentos ---------- */
+    .intentos{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:4px}
+    .intento{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:44px;padding:4px 6px 4px 0}
+    .intento .n{font:700 22px/1 var(--mano);color:var(--lapiz);text-align:center}
+    .intento .r{overflow-x:auto;overflow-y:hidden;padding:4px 0;font-size:1.08em}
+    .intento.mal .r .katex{color:#3c4659;text-decoration:line-through 1.5px #c63a2fb0}
+    .intento.bien .r .katex{color:var(--verde)}
+    .intento .marca{width:34px;height:30px}
+    .intento .marca path{fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+    .intento.mal .marca path{stroke:var(--rojo)}
+    .intento.bien .marca path{stroke:var(--verde)}
+    .intento.nuevo .marca path{stroke-dasharray:60;stroke-dashoffset:60;animation:traza .45s .1s ease-out forwards}
+    .intento.nuevo .marca path+path{animation-delay:.35s}
+    @keyframes traza{to{stroke-dashoffset:0}}
+    .nota-intento{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font:500 13px var(--ui);color:var(--lapiz);margin-top:-2px}
+    .nota-intento .mano{font:700 19px/1 var(--mano);color:var(--rojo)}
+    .ver{border:0;background:none;padding:0;color:var(--tinta2);font-weight:600;font-size:13px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+    .grafico{grid-column:2/-1;max-width:460px;margin:2px 0 8px}
+    .grafico svg{width:100%;height:auto;display:block;background:#fffdf7;border:1px solid #d9e2ee;border-radius:8px}
+    .grafico .leyenda{display:flex;gap:14px;font-size:12px;color:var(--lapiz);margin-top:4px}
+    .grafico .leyenda i{display:inline-block;width:18px;height:0;border-top:2.5px solid;vertical-align:middle;margin-right:5px}
+
+    /* ---------- escribir ---------- */
+    .escribir{position:relative;background:#fff;border:1px solid #cbd6e6;border-radius:14px;padding:12px;box-shadow:0 10px 24px -14px #1f3f7a55,0 1px 0 #fff inset}
+    .previa{min-height:64px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;background:linear-gradient(#f6f9fd,#f6f9fd) padding-box;overflow-x:auto;overflow-y:hidden;font-size:1.2em}
+    .previa .vacia{font:600 20px var(--mano);color:#9aa6b8}
+    .previa .crudo{font:14px var(--mono);color:var(--lapiz)}
+    .linea{display:flex;gap:8px;align-items:stretch;margin-top:10px}
+    .linea input{flex:1;min-width:0;border:1.5px solid #c3cfe0;border-radius:10px;padding:10px 12px;font:500 16px var(--mono);color:var(--tinta);background:#fbfdff}
+    .linea input:focus{outline:none;border-color:var(--tinta2);box-shadow:0 0 0 3px #2c5aa826}
+    .linea input.malo{border-color:var(--rojo);box-shadow:0 0 0 3px #c63a2f1f}
+    .enviar{border:0;border-radius:10px;padding:0 18px;background:var(--tinta);color:#fff;font-weight:700;cursor:pointer;box-shadow:0 3px 0 #13295a;transition:transform .08s}
+    .enviar:active{transform:translateY(2px);box-shadow:0 1px 0 #13295a}
+    .enviar:disabled{background:#9aa6b8;box-shadow:0 3px 0 #7c879a;cursor:default}
+    .aviso{min-height:20px;margin:6px 2px 0;font-size:13px;color:var(--lapiz)}
+    .aviso.malo{color:var(--rojo)}
+    .temblor{animation:tiembla .35s}
+    @keyframes tiembla{20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+    /* ---------- el teclado ---------- */
+    .teclado{margin-top:10px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px}
+    .pestanas{display:none;gap:6px;margin-top:10px}
+    .pestanas button{flex:1;border:1px solid #cbd6e6;background:#f3f6fb;border-radius:9px;padding:7px;font-weight:600;font-size:13px;color:var(--lapiz);cursor:pointer}
+    .pestanas button[aria-selected=true]{background:var(--tinta);border-color:var(--tinta);color:#fff}
+    .grupo{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-content:start}
+    .grupo.num{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .tecla{position:relative;height:44px;border:1px solid #cdd7e6;border-bottom-width:3px;border-radius:10px;background:linear-gradient(#fff,#f5f8fc);cursor:pointer;
+      font:500 15px var(--ui);color:#22345c;display:grid;place-items:center;padding:0 2px;user-select:none;-webkit-user-select:none;touch-action:manipulation;transition:background .1s,transform .06s}
+    .tecla:hover{background:linear-gradient(#fff,#edf2fa);border-color:#b7c6dc}
+    .tecla:active,.tecla.pulsada{transform:translateY(2px);border-bottom-width:1px;margin-top:2px;height:42px}
+    .tecla.f{font-family:"KaTeX_Main","Times New Roman",serif;font-size:16px}
+    .tecla.op{background:linear-gradient(#f1f5fc,#e6edf8);color:var(--tinta)}
+    .tecla.var{font-family:"KaTeX_Math","Times New Roman",serif;font-style:italic;font-size:19px;color:var(--tinta)}
+    .tecla.borra{background:linear-gradient(#fff4f2,#fde6e3);color:var(--rojo);border-color:#efc6c0}
+    .tecla.ok{grid-column:span 2;background:linear-gradient(#2c5aa8,#1f3f7a);border-color:#173262;color:#fff;font-weight:700}
+    .tecla.ok:hover{background:linear-gradient(#3566b8,#234789)}
+    .tecla .fr{display:inline-flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
+    .tecla .fr i{display:block;width:12px;height:9px;border:1.4px solid currentColor;border-radius:2px}
+    .tecla .fr b{display:block;width:18px;height:0;border-top:1.6px solid currentColor}
+    .tecla sup{font-size:.62em;margin-left:1px}
+    .tecla>span{display:inline-block;white-space:nowrap;line-height:1}
+    .tecla sup{vertical-align:.55em;line-height:0}
+    .tecla small{font-size:.82em}
+    @media (max-width:620px){
+      .hoja{padding:40px 12px 20px 40px}
+      .hoja::before{left:28px}
+      .logo h1{font-size:38px}
+      .pistas{grid-template-columns:minmax(0,1fr)}
+      .pestanas{display:flex}
+      .teclado{grid-template-columns:minmax(0,1fr)}
+      .teclado:not(.ver-f) .grupo.fun,.teclado.ver-f .grupo.num{display:none}
+      .integral{font-size:1.25em}
+      .tecnicas{flex-wrap:nowrap;overflow-x:auto;margin-right:-12px;padding-bottom:4px;scrollbar-width:none}
+      .tecnicas button{flex:none}
+      .barra{gap:6px}
+      .icono{width:32px;height:32px}
+    }
+
+    /* ---------- el cierre ---------- */
+    .cierre{position:relative;margin-top:16px;padding:18px 18px 16px;border:1.5px dashed #b9c7dc;border-radius:12px;background:#fffffff0}
+    .cierre h2{margin:0 0 2px;font:700 32px/1 var(--mano)}
+    .cierre.gano h2{color:var(--verde)}
+    .cierre.perdio h2{color:var(--rojo)}
+    .cierre .sub{margin:0 0 12px;color:var(--lapiz);font-size:14px}
+    .timbre{position:absolute;right:16px;top:-22px;width:96px;height:96px;border-radius:50%;border:3px solid var(--rojo);display:grid;place-items:center;align-content:center;color:var(--rojo);
+      transform:rotate(-12deg);background:#fff5;font:700 36px/0.9 var(--mano);box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #c63a2f88;mix-blend-mode:multiply}
+    .timbre small{font:700 11px var(--ui);letter-spacing:.12em;margin-top:2px}
+    .timbre.nuevo{animation:timbra .5s cubic-bezier(.2,1.6,.4,1)}
+    @keyframes timbra{from{transform:rotate(-30deg) scale(2.2);opacity:0}}
+    .solucion{display:grid;gap:10px;margin:8px 0 14px}
+    .solucion dt{font:700 20px/1 var(--mano);color:var(--lapiz)}
+    .solucion dd{margin:2px 0 0;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+    .solucion dd.res{font-size:1.15em;padding:6px 10px;background:linear-gradient(100deg,transparent 1%,#fff59d99 2%,#fff59d99 98%,transparent 99%)}
+    .acciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .boton{border:1px solid #c3cfe0;background:#fff;border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px;cursor:pointer;color:var(--tinta)}
+    .boton.prim{background:var(--tinta);border-color:var(--tinta);color:#fff}
+    .boton:hover{filter:brightness(.97)}
+    .cuenta{font:600 13px var(--ui);color:var(--lapiz)}
+    .cuenta b{font:500 15px var(--mono);color:var(--tinta)}
+    .tecnicas{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 14px}
+    .tecnicas button{border:1px solid #cfd8e6;background:#fff;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;color:var(--lapiz);cursor:pointer}
+    .tecnicas button[aria-pressed=true]{background:#e8eef9;border-color:var(--tinta2);color:var(--tinta)}
+    .nota{margin:14px 4px 0;font-size:12.5px;color:var(--lapiz)}
+    .club-integrado .nota{color:var(--lapiz)}
+
+    /* ---------- diálogos ---------- */
+    .dialogo{border:0;border-radius:14px;padding:0;max-width:min(560px,calc(100vw - 24px));width:100%;color:var(--tinta);
+      background-color:var(--papel);background-image:linear-gradient(var(--cuadro) 1px,transparent 1px),linear-gradient(90deg,var(--cuadro) 1px,transparent 1px);background-size:22px 22px;box-shadow:0 30px 60px #0005}
+    .dialogo::backdrop{background:#1c2333aa;backdrop-filter:blur(2px)}
+    .dialogo .cuerpo{padding:22px 22px 18px;max-height:min(80vh,720px);overflow:auto}
+    .dialogo h2{margin:0 0 10px;font:700 34px/1 var(--mano)}
+    .dialogo h3{margin:16px 0 6px;font:700 22px/1 var(--mano);color:var(--tinta2)}
+    .dialogo p,.dialogo li{font-size:14px}
+    .dialogo .cerrar{position:absolute;right:10px;top:10px}
+    .dialogo table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
+    .dialogo td,.dialogo th{border:1px solid #d6e1ee;padding:5px 8px;text-align:left}
+    .dialogo code{font:13px var(--mono);background:#eef3fa;border-radius:4px;padding:1px 5px}
+    .numeros{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin:6px 0 14px}
+    .numeros b{display:block;font:700 34px/1 var(--mano)}
+    .numeros span{font-size:11px;color:var(--lapiz);text-transform:uppercase;letter-spacing:.06em}
+    .dist{display:grid;gap:5px}
+    .dist div{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center;font:700 18px/1 var(--mano)}
+    .dist span{display:block;min-width:26px;padding:3px 8px;text-align:right;font:600 12px var(--ui);color:#4a3d12;border-radius:3px;background:linear-gradient(100deg,#fff17699 0,#ffe45c 100%)}
+    .dist span.hoy{background:linear-gradient(100deg,#9fe0b8,#4fbf7d);color:#08361b}
+
+    /* ---------- el panel de la clasificación, en papel ---------- */
+    .club-ranking,.club-integrado .club-ranking{background:#fffdf8;border:1px solid #d8d1c2;border-radius:10px;color:var(--tinta);box-shadow:0 10px 24px -14px #4a3c2440}
+    .club-ranking h2,.club-integrado .club-ranking h2{font:700 24px/1 var(--mano);color:var(--tinta)}
+    .club-ranking button{background:#fff;border-color:#c3cfe0;color:var(--tinta)}
+    @media (prefers-reduced-motion:reduce){.intento.nuevo .marca path{animation:none;stroke-dashoffset:0}.timbre.nuevo,.postit.nuevo,.temblor{animation:none}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <header class="cab">
+          <div class="logo">
+            <svg viewBox="0 0 52 52" aria-hidden="true">
+              <rect x="3" y="3" width="46" height="46" rx="10" fill="#fff" stroke="#1f3f7a" stroke-width="2"/>
+              <path d="M8 3v46M3 15h46M3 27h46M3 39h46M20 3v46M32 3v46M44 3v46" stroke="#d6e1ee" stroke-width="1"/>
+              <path d="M33 9c-4-2-7 1-8 6l-4 22c-1 5-4 8-8 6" fill="none" stroke="#1f3f7a" stroke-width="3.2" stroke-linecap="round"/>
+              <path d="M30 30l6 6m0-6l-6 6" stroke="#c63a2f" stroke-width="0" />
+              <path d="M31 33l3 3 7-9" fill="none" stroke="#2c7a4b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div><h1>Integro<span>dle</span></h1><small>La integral del día</small></div>
+          </div>
+          <div class="membrete" aria-label="Datos de la hoja"><span>Fecha</span><span>N.º</span><b id="fecha">—</b><b id="numero">—</b></div>
+        </header>
+        <div class="barra">
+          <div class="interruptor" role="tablist" aria-label="Tipo de partida">
+            <button type="button" role="tab" data-tipo="diario">Diario</button>
+            <button type="button" role="tab" data-tipo="practica">Práctica</button>
+          </div>
+          <span class="espacio"></span>
+          <span id="racha" class="chip" title="Días seguidos resolviendo la integral del día">🔥 0</span>
+          <span id="puntos" class="chip" title="Puntos acumulados en el diario">∫ 0 <small>pts</small></span>
+          <button type="button" id="btnStats" class="icono" title="Estadísticas" aria-label="Estadísticas">📊</button>
+          <button type="button" id="btnAyuda" class="icono" title="Cómo se juega" aria-label="Cómo se juega">?</button>
+        </div>
+        <section id="hoja" class="hoja" aria-live="polite"></section>
+        <p id="nota" class="nota"></p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <dialog id="dialogo" class="dialogo" aria-labelledby="dialogoT"></dialog>
+  <script src="../../../vendor/katex/katex.min.js"></script>
+  <script src="expr.js?v=integral-1"></script>
+  <script src="datos.js?v=integral-1"></script>
+  <script src="motor.js?v=integral-1"></script>
+  <script src="juego.js?v=integral-1"></script>
+</body>
+</html>

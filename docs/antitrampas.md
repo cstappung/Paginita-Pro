@@ -158,6 +158,7 @@ que se espera de cada uno:
 | PRO PACMAN | `club-propac-puntos` | semilla + cuenta + cada jugada (dirección, turbo, pulso) con su tic de 1/60 s; giros en el tic exacto del centro delatan un programa | baja |
 | PRO DEFENDER | `club-prodefender-<reino>` | semilla + cuenta + cada acción (colocar, mejorar, vender, objetivo, ronda, recarga) con su paso de 1/60 s; rehecho en un Web Worker con caché por ronda | media |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
+| Integrodle | `club-integral-*` | lo escrito en cada intento, corregido otra vez con el motor; la integral sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |
 | FANAL | `club-fanal-*` | tiempo real: verosimilitud y reloj, más que repetición | alta |

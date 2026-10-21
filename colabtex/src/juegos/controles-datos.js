@@ -31,6 +31,7 @@ export const CONTROLES = {
   "haxball": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "hero": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
   "heroclub": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil teclado"},
+  "integral": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "mascotas": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton"},
   "memazo": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},

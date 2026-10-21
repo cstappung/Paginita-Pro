@@ -48,6 +48,7 @@ export const APODOS = {
   bbtan: "pelotas bolas ladrillos rebote breakout",
   sopa: "palabras letras buscar diccionario",
   electro: "wordle adivinar electronica componentes formulas simbolos",
+  integral: "integrodle integrales calculo primitiva diario reto matematica sustitucion partes fracciones parciales",
   sudoku: "numeros logica",
   fanal: "luz farol disparos shooter bullet hell polillas",
   atasco: "rush hour autos estacionamiento trafico deslizar",

@@ -10,6 +10,8 @@ export function categoriaClub(juego, categoria) {
     ? /^club-sopa-(racha|(facil|medio|dificil)-(8|12|15))$/.test(categoria)
     : juego === 'electro'
     ? /^club-electro-(racha|puntos)$/.test(categoria)
+    : juego === 'integral'
+    ? /^club-integral-(racha|puntos)$/.test(categoria)
     : juego === 'frontera'
     ? /^club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)$/.test(categoria)
     // Sudoku Arcade: la racha del diario, el arcade por puntos y el
@@ -72,6 +74,9 @@ export function resultadoClub(juego, dato) {
      suma de los siete modos diarios (700 por día, a lo más). */
   if (dato.categoria === 'club-electro-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-electro-puntos' && dato.puntos > 1000000) return null;
+  /* Integrodle: lo mismo, con 120 puntos por día a lo más. */
+  if (dato.categoria === 'club-integral-racha' && dato.puntos > 1000) return null;
+  if (dato.categoria === 'club-integral-puntos' && dato.puntos > 1000000) return null;
   /* Sudoku Arcade: en el clásico compite el tiempo, así que los puntos
      valen 1 fijo (como en Mina Club); la racha son días (dos años como
      mucho) y el arcade, una puntuación con tope 1 000 000. */
@@ -128,7 +133,7 @@ export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.pu
    racha arranca en 1, o sigue la que ya estaba en la tabla (`previa`, los
    puntos de la fila guardada) + 1: así nadie honesto pierde la racha que
    traía al estrenar esto. La regla acepta lo mismo. */
-export const esRachaClub = c => /^club-(sopa|sudoku|electro)-racha$/.test(String(c || ''));
+export const esRachaClub = c => /^club-(sopa|sudoku|electro|integral)-racha$/.test(String(c || ''));
 export function rachaClub(prev, dia, previa) {
   if (prev && Number.isInteger(prev.dia) && Number.isInteger(prev.n)) {
     if (dia <= prev.dia) return null;
