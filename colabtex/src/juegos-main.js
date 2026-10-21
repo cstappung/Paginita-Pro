@@ -494,7 +494,7 @@ function datosPerfil(cb) {
     datosP = conDerivados(Object.assign({}, d, { completo: !!d.completo }));
     pintaTintas();
     for (const f of [...oyentesP]) f(datosP);
-  });
+  }, () => (state.user ? state.user.uid : ""));
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
   return () => oyentesP.delete(cb);
 }

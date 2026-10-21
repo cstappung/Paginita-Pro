@@ -173,7 +173,7 @@ export function montarPoker(h, api) {
     if (n) { e.preventDefault(); alterna(+n[1] - 1); }
     else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (estado === "elige") cambiar(); else repartir(); }
   });
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
   pinta();
 
   return {

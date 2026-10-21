@@ -86,15 +86,55 @@ como cualquier gasto sin fondos. `monedasDe` devuelve `premios` y
 `casino: {apostado, pagado, rondas}`. `economia(d).rondas["uid~clave"]`
 trae cada ronda resuelta, que es lo que lee el feed.
 
-`watchLogros` lee `casino` entero con 1 s de pausa. El nodo es pequeño:
-una ronda pesa unos pocos cientos de bytes.
+## Rendimiento (lo que hacía tirones a todo el sitio)
+
+Cada apuesta, aviso del avión o salto es una escritura, y `casino` lo
+escucha **todo cliente** (`watchLogros`, para los saldos). Dos cosas lo
+hacían caro, en cada pestaña abierta, jugara o no:
+
+- `fb.watchLogros` escucha `casino` **cuenta por cuenta** (child
+  added/changed/removed) y llama `val()` solo al avisar y solo para las
+  cuentas que cambiaron; las demás conservan su objeto. Avisa juntado: 1 s
+  si cambió lo propio, `CASINO_AJENO` (8 s) si solo jugó otra persona, y
+  nada con la pestaña escondida (avisa al volver). `val()` del nodo entero
+  en cada escritura de cualquiera costaba ~30 ms con 2 MB.
+- `economia()` no vuelve a resolver una ronda que no cambió: `memoRondas`
+  (por `uid~clave`, firma = campos + cuántas marcas y la suma de sus horas)
+  y `memoCuentas` (por el objeto `casino/<uid>`). Resolver todas era un
+  sha256 por marca: ~300 ms por recálculo con 9000 rondas, ahora ~5–10 ms.
+  Los objetos de `rondas` se reusan entre economías: lo único que la
+  economía les cambia es `valida`, y la vuelve a poner en false al empezar.
+  No mutar nada de `economia().rondas` desde una vista.
+- El menú, «Grandes premios» (`api.pintaFeed`) y el historial del avión se
+  escriben solo si cambió el HTML: rehacerlos cada lectura reiniciaba las
+  animaciones.
+
+## La ruleta (`casino-ruleta.js`)
+
+- Rueda y bola son **funciones del reloj** (`giroEn`, `posicion`), nunca
+  `vel·dt`: con la página trabada la rueda avanzaba a pasos topados mientras
+  la bola llegaba sola a su casilla.
+- La bola sale al tocar «Girar» (`arranca`) y, cuando llega el número
+  (`lanza`), se busca por bisección cuánto dura en la pista para que, al
+  frenar, caer y rebotar, quede en esa casilla. Nunca cambia de sentido en
+  la pista.
+- `dibujaPlato`: la traslación de `setTransform` va en píxeles del
+  dispositivo (`R * dpr`). Con `R` a secas el disco quedaba descentrado y
+  orbitaba en pantallas con `devicePixelRatio` > 1.
+- El historial no se pinta mientras la bola rueda (cantaba el número), y
+  después del primer giro `reposa` ya no mueve la bola.
+- El paño (`.jg-cs-rl-mesa`) lleva `overflow-y:hidden` y la casilla que
+  sale late sin `transform`: crecerla desbordaba el paño y, con barras de
+  desplazamiento clásicas (Windows), el paño saltaba en cada latido.
+- `.jg-cs-juego` tiene filas `auto 1fr auto`: la columna de premios abarca
+  dos filas y, con filas auto, empujaba el panel al crecer.
 
 Las reglas de `casino` hay que **publicarlas a mano**: ver
 `firebase/CONFIGURAR-FIREBASE.md`.
 
 ## El saldo que se ve (`casino.js`)
 
-La lectura de `casino` llega juntada cada segundo, así que `cuenta()` resta
+La lectura de `casino` llega juntada (1 s lo propio, 8 s lo ajeno), así que `cuenta()` resta
 a mano lo apostado (`apuestas`) y cargado (`cargos`) y suma lo cobrado
 (`premios`) hasta que la lectura lo trae. Al revés, un premio ya decidido
 que la animación aún no cuenta se **esconde** (`api.oculta(k)`) hasta

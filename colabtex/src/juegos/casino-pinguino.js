@@ -150,7 +150,7 @@ export function montarPinguino(h, api) {
     activa = null; ultimo = ro;
     pinta(); pintaFeed();
   }
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
 
   /* ---------- la escena ---------- */
   const escena = (() => {

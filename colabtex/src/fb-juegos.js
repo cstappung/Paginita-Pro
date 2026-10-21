@@ -60,7 +60,7 @@
 import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
-  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded,
+  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved,
   limitToLast, limitToFirst, startAt, endAt, goOffline
 } from "firebase/database";
 import {
@@ -338,25 +338,69 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 14;
-export function watchLogros(cb) {
+const NODOS_MONEDAS = 14, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+export function watchLogros(cb, yo = () => "") {
   const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
-  /* El casino cambia varias veces por segundo mientras alguien vuela (cada
-     aviso del avión es una escritura) y cada cambio rehace la economía de
-     todos: se junta lo que llega en un segundo y se avisa una vez. */
-  let espera = 0;
+  /* El casino cambia varias veces por segundo mientras alguien juega (cada
+     aviso del avión, salto del pingüino o bola es una escritura) y cada
+     aviso rehace la economía y repinta todo lo que la escucha, en cada
+     pestaña abierta del sitio. Así que se escucha cuenta por cuenta
+     (`casino/<uid>`): lo que llega se guarda como instantánea y se vuelve
+     objeto (`val()`) recién al avisar, solo para las cuentas que cambiaron;
+     las demás conservan su objeto, que es lo que deja a monedas.js no
+     volver a mirar sus rondas. `val()` del nodo entero copiaba las rondas
+     de todo el mundo en cada escritura de cualquiera. Se avisa juntado: al
+     segundo si cambió lo propio (`yo()`: el casino de esta pestaña lo espera), a
+     los `CASINO_AJENO` ms si solo jugó otra persona, y nunca con la
+     pestaña escondida (se avisa al volver). */
+  const rC = ref(db, "casino"), pend = new Map();
+  let espera = 0, cuando = 0;
+  const vuelca = () => {
+    clearTimeout(espera); espera = 0; cuando = 0;
+    if (!pend.size) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const c = Object.assign({}, d.casino);
+    for (const [u, sn] of pend) { const v = sn && sn.val(); if (v) c[u] = v; else delete c[u]; }
+    pend.clear(); d.casino = c;
+    avisa();
+  };
+  const programa = u => {
+    if (!llegados.has("casino")) return;
+    const en = Date.now() + (u && u === yo() ? CASINO_PROPIO : CASINO_AJENO);
+    if (espera && cuando <= en) return;
+    clearTimeout(espera); cuando = en; espera = setTimeout(vuelca, en - Date.now());
+  };
+  const alCambiar = sn => { pend.set(sn.key, sn); programa(sn.key); };
+  const alQuitar = sn => { pend.set(sn.key, null); programa(sn.key); };
+  const falla = e => { err.casino = e; if (!llegados.has("casino")) { llegados.add("casino"); avisa(); } };
+  const alVolver = () => { if (!document.hidden && pend.size && llegados.has("casino") && !espera) vuelca(); };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", alVolver);
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
     d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
-    if (k === "casino" && llegados.has(k)) { if (!espera) espera = setTimeout(() => { espera = 0; avisa(); }, 1000); return; }
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino"),
-    oye("referidos", "referidos"), oye("cofres", "cofres")];
-  return () => { clearTimeout(espera); offs.forEach(f => f()); };
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"),
+    onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
+    /* La primera lectura entera: los eventos de hijo de esa carga ya
+       llegaron todos cuando llega este, que es el que la da por completa.
+       No se lee el valor: las instantáneas pendientes ya lo traen. */
+    onValue(rC, () => {
+      if (llegados.has("casino")) return;
+      const c = {};
+      for (const [u, sn] of pend) { const v = sn && sn.val(); if (v) c[u] = v; }
+      pend.clear(); d.casino = c; err.casino = null;
+      llegados.add("casino"); avisa();
+    }, falla, { onlyOnce: true })];
+  return () => {
+    clearTimeout(espera);
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", alVolver);
+    offs.forEach(f => f());
+  };
 }
 
 /* ---------- el casino ----------

@@ -330,3 +330,22 @@ test('economía: la ruleta y el plinko se cobran y pagan al apostar',()=>{
  assert.deepEqual(con.movs.map(x=>x.c+':'+x.d).join(),'apuesta:r,premio:r');
  assert.equal(con2.casino.porJuego.l.apostado,10);
 });
+/* La economía guarda lo que resolvió cada ronda (resolverla son decenas de
+   sha256): una ronda que gana marcas se vuelve a resolver, y la misma
+   cuenta en el mismo objeto no se vuelve a mirar. */
+test('economía: la memoria de rondas sigue a las marcas nuevas',()=>{
+ let k=null;
+ for(let i=0;i<500&&!k;i++){const kk='ecmem'+String(i).padStart(4,'0');if(CM.resuelveAvion('a',kk,{j:'a',p:100,at:T0,c:T0+9000}).estado==='cobrada')k=kk;}
+ assert.ok(k);
+ const vuela={j:'a',p:100,at:T0},cobra={j:'a',p:100,at:T0,c:T0+9000};
+ const antes=M.monedasDe('a',conGanado(1000,{casino:{a:{[k]:vuela}}}));
+ const despues=M.monedasDe('a',conGanado(1000,{casino:{a:{[k]:cobra}}}));
+ assert.equal(antes.casino.pagado,0);
+ assert.equal(despues.casino.pagado,CM.resuelveAvion('a',k,cobra).pago);
+ // otra hora de retiro con la misma cantidad de marcas también cuenta
+ const otra={j:'a',p:100,at:T0,c:T0+3000};
+ assert.equal(M.economia(conGanado(1000,{casino:{a:{[k]:otra}}})).rondas['a~'+k].fin,CM.resuelveAvion('a',k,otra).fin);
+ // la misma cuenta (el mismo objeto) en otra lectura da lo mismo
+ const cuenta={[k]:cobra};
+ assert.equal(M.monedasDe('a',conGanado(1000,{casino:{a:cuenta}})).saldo,M.monedasDe('a',conGanado(1000,{casino:{a:cuenta}})).saldo);
+});
