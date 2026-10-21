@@ -460,13 +460,17 @@ function resuelveRonda(u, k, x) {
 }
 /* Las rondas de una cuenta, por el objeto `casino/<uid>` que llegó:
    fb-juegos.js escucha cuenta por cuenta, así que las de quien no jugó
-   desde la última lectura llegan en el mismo objeto y ni se firman. */
+   desde la última lectura llegan en el mismo objeto y ni se firman.
+   `rondas` es la lista que sale en `economia().casinoPorCuenta[uid]`, en el
+   orden de las claves (el de las apuestas): es la misma lista mientras la
+   cuenta no cambie, y casino.js guarda lo que deriva de ella. */
 const memoCuentas = new WeakMap();
 function rondasDe(u, l) {
   let r = memoCuentas.get(l);
   if (!r) {
     r = [];
     for (const [k, x] of Object.entries(l)) { const m = resuelveRonda(u, k, x); if (m.ronda) r.push(m); }
+    r.rondas = r.map(m => m.ronda);
     memoCuentas.set(l, r);
   }
   return r;
@@ -523,10 +527,12 @@ export function economia(datos) {
      suma a la hora en que se cobró; lo que pasó entremedio lo decide el
      motor con las horas del servidor. Lo que se dobla o se separa en el
      blackjack (`cargos`) se cobra a la hora de esa decisión. */
-  const rondas = {};
+  const rondas = {}, casinoPorCuenta = {};
   for (const [u, l] of Object.entries(d.casino || {})) {
     if (!l || typeof l !== "object") continue;
-    for (const { id, ronda, ev: er } of rondasDe(u, l)) {
+    const lista = rondasDe(u, l);
+    casinoPorCuenta[u] = lista.rondas;
+    for (const { id, ronda, ev: er } of lista) {
       ronda.valida = false;
       rondas[id] = ronda;
       for (const e of er) ev.push(e);
@@ -723,7 +729,7 @@ export function economia(datos) {
     for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
     for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
     void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rondas };
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rondas, casinoPorCuenta };
   memoEco.set(d, res);
   return res;
 }
@@ -790,4 +796,5 @@ export function topMonedas(datos) {
     .sort((a, b) => b.saldo - a.saldo || b.total - a.total || a.uid.localeCompare(b.uid));
 }
 
-export const formatoMonedas = n => Math.round(n || 0).toLocaleString("es-CL");
+const enteroEs = new Intl.NumberFormat("es-CL");
+export const formatoMonedas = n => enteroEs.format(Math.round(n || 0));

@@ -269,7 +269,7 @@ export function montarBlackjack(h, api) {
       const e = api.economia(), rs = api.rondas();
       if (!e) return;
       retomada = true;
-      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "b" && x.estado === "juega" && x.valida).sort((a, b) => b.at - a.at)[0];
+      const r = api.mias().filter(x => x.j === "b" && x.estado === "juega" && x.valida)[0];
       if (!r || !rs[r.k]) return;
       const x = rs[r.k];
       activa = { k: r.k, r: { j: "b", p: x.p, at: x.at, a: Object.assign({}, x.a || {}) } };

@@ -70,3 +70,38 @@ export function ponCara(el, c) {
   el.dataset.c = c;
   el.querySelector(".cara").innerHTML = `<b>${v}<i>${p}</i></b><em>${c % 13 >= 10 ? `<span class="fig">${v}</span>` : ""}${p}</em><b class="abajo">${v}<i>${p}</i></b>`;
 }
+
+/* Escribe `html` en `el` solo si cambió. */
+const escrito = new WeakMap();
+export function escribe(el, html) {
+  if (!el || escrito.get(el) === html) return;
+  escrito.set(el, html);
+  el.innerHTML = html;
+}
+/* Una lista (los grandes premios, los que más ganan) que se repinta sin
+   rehacerse: cada fila lleva su clave `k` y la que ya estaba se reusa (solo
+   cambia su contenido si cambió), así que la animación de entrada corre en
+   las nuevas y nada más. Rehacer el innerHTML entero la repetía en todas,
+   en cada lectura: la caja parpadeaba y saltaba. `filas` = [{k, html, cls,
+   estilo}]. */
+export function pintaLista(el, etiqueta, clase, filas) {
+  if (!el) return;
+  let lista = el.firstElementChild;
+  if (!lista || el.childElementCount !== 1 || lista.tagName !== etiqueta.toUpperCase() || lista.className !== clase) {
+    escrito.delete(el);
+    el.innerHTML = `<${etiqueta} class="${clase}"></${etiqueta}>`;
+    lista = el.firstElementChild;
+  }
+  const viejas = new Map();
+  for (const li of lista.children) viejas.set(li.dataset.k, li);
+  filas.forEach((f, i) => {
+    let li = viejas.get(f.k);
+    if (li) viejas.delete(f.k);
+    else { li = document.createElement("li"); li.dataset.k = f.k; }
+    if (li.className !== (f.cls || "")) li.className = f.cls || "";
+    if ((li.getAttribute("style") || "") !== (f.estilo || "")) li.setAttribute("style", f.estilo || "");
+    if (escrito.get(li) !== f.html) { escrito.set(li, f.html); li.innerHTML = f.html; }
+    if (lista.children[i] !== li) lista.insertBefore(li, lista.children[i] || null);
+  });
+  for (const li of viejas.values()) li.remove();
+}

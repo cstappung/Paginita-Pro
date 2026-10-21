@@ -105,9 +105,29 @@ hacían caro, en cada pestaña abierta, jugara o no:
   Los objetos de `rondas` se reusan entre economías: lo único que la
   economía les cambia es `valida`, y la vuelve a poner en false al empezar.
   No mutar nada de `economia().rondas` desde una vista.
-- El menú, «Grandes premios» (`api.pintaFeed`) y el historial del avión se
-  escriben solo si cambió el HTML: rehacerlos cada lectura reiniciaba las
-  animaciones.
+- `economia().casinoPorCuenta[uid]` es la lista de rondas de esa cuenta, la
+  misma mientras no juegue. casino.js deriva de ella `api.mias()` (las
+  propias, de la más nueva a la más vieja) y los grandes premios, guardados
+  por lista: ningún juego recorre `e.rondas` entero (9000 rondas) por lectura.
+- **Sin parpadeo.** Las filas de «Grandes premios», «Más ganan» y «Más
+  pierden» llevan la animación de entrada `jgCsEntra`: van por `pintaLista`
+  (casino-comun.js), que reusa la fila de cada clave y solo anima las nuevas.
+  El menú se arma una vez y cada lectura toca solo sus cuatro cajas
+  (`escribe` = innerHTML solo si cambió). Nunca reescribir una de esas
+  listas entera.
+- **Dibujo.** Lo que no se mueve va en lienzos guardados por tamaño: en la
+  ruleta el paño, el aro (shadowBlur) y el barniz; en el plinko fondo,
+  clavos y casillas en reposo, y la bola con su brillo como sprite (el
+  plinko no dibuja si nada se mueve); en el pingüino cielo y mar, cada
+  témpano y cada etiqueta. Nada de `shadowBlur` ni degradados de pantalla
+  completa por cuadro.
+- Números: `numeroEs` (casino-motor.js) guarda los `Intl.NumberFormat`;
+  `toLocaleString` con opciones arma uno por llamada y el avión escribe
+  varios por cuadro. Los clavos del plinko suenan como mucho cada 35 ms.
+- Cómo se midió: emulador de Firebase con 30 cuentas × 300 rondas, la
+  página real con `firebase.js` apuntando al emulador, CPU ×6 por CDP y
+  bots escribiendo avisos del avión; se cuentan cuadros > 34 ms, tareas
+  largas y nodos que el DOM rehace (MutationObserver).
 
 ## La ruleta (`casino-ruleta.js`)
 

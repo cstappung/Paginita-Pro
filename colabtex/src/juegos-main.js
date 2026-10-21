@@ -1107,8 +1107,10 @@ function pintaMonedas() {
     /* La racha va pegada al saldo: 🔥 encendida si hoy ya contó, apagada
        (y titilando) si todavía falta jugar hoy para no perderla. */
     const di = u && d ? (d.diario || {})[u.uid] : null, hoy = diaMonedas(), r = rachaHoy(di, hoy), ya = !!(di && di.dia === hoy);
-    chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
+    const h = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
       (r ? `<span class="jg-racha-chip${ya ? "" : " falta"}" title="${r} ${r === 1 ? "día seguido" : "días seguidos"}${ya ? "" : " · reclama hoy tu recompensa diaria para no perder la racha"}">🔥${r}</span>` : "");
+    // solo si cambió: se repinta con cada lectura (la racha titila con CSS)
+    if (chip.dataset.html !== h) { chip.dataset.html = h; chip.innerHTML = h; }
   }
   const caja = $("vesMonedas");
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);

@@ -194,7 +194,7 @@ export function montarRuleta(h, api) {
   function pintaHist(forzar) {
     const e = api.economia(), el = $("[data-hist]");
     if (!e || (girando && !forzar)) return;
-    const l = Object.values(e.rondas).filter(r => r.u === uid && r.j === "r").sort((a, b) => b.at - a.at).slice(0, 16);
+    const l = api.mias().filter(r => r.j === "r").slice(0, 16);
     const sig = l.map(r => r.k).join();
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
@@ -218,7 +218,7 @@ export function montarRuleta(h, api) {
     const W_BOLA = 15, W_CAE = 3.2, PISTA_MIN = 2600, CAIDA = 1500;
     const DOS_PI = 2 * Math.PI, modulo = (x, m) => ((x % m) + m) % m;
     let W = 0, H = 0, dpr = 1, raf = 0, prev = performance.now(), R = 100, cx = 0, cy = 0;
-    let bola = null, brillo = null, plato = null, chispas = [];
+    let bola = null, brillo = null, plato = null, capas = null, chispas = [];
     /* La rueda: ángulo `g0` en `t0`, más el giro de reposo y lo que queda
        del impulso. */
     let g0 = 0, t0 = performance.now(), imp = 0;
@@ -231,7 +231,7 @@ export function montarRuleta(h, api) {
       W = w; H = h; dpr = d;
       lienzo.width = Math.round(W * dpr); lienzo.height = Math.round(H * dpr);
       R = Math.min(W * 0.46, H * 0.46); cx = W / 2; cy = H / 2 + 6;
-      plato = null;
+      plato = null; capas = null;
     }
     const obs = typeof ResizeObserver === "function" ? new ResizeObserver(mide) : null;
     if (obs) obs.observe(lienzo); else window.addEventListener("resize", mide);
@@ -273,6 +273,37 @@ export function montarRuleta(h, api) {
       x.beginPath(); x.arc(0, 0, R * 0.09, 0, 6.29); x.fillStyle = oro; x.fill();
       x.beginPath(); x.arc(-R * 0.025, -R * 0.03, R * 0.03, 0, 6.29); x.fillStyle = "#fffbe6cc"; x.fill();
       return c;
+    }
+    /* Lo que no se mueve, también una vez por tamaño: debajo del plato el
+       paño, el aro con su sombra (un shadowBlur grande, lo más caro del
+       cuadro), la pista y los rombos; encima, el brillo del barniz.
+       Pintarlo en cada cuadro trababa la página aunque nadie jugara. */
+    function dibujaCapas() {
+      const lienzoDe = () => { const c = document.createElement("canvas"); c.width = lienzo.width; c.height = lienzo.height; const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); return [c, x]; };
+      const [fondo, x] = lienzoDe();
+      const pa = x.createRadialGradient(cx, cy, R * 0.3, cx, cy, Math.max(W, H) * 0.75);
+      pa.addColorStop(0, "#14704a"); pa.addColorStop(1, "#04281a");
+      x.fillStyle = pa; x.fillRect(0, 0, W, H);
+      x.save(); x.shadowColor = "#000c"; x.shadowBlur = R * 0.18; x.shadowOffsetY = R * 0.05;
+      x.beginPath(); x.arc(cx, cy, R, 0, 6.29); x.fillStyle = "#2a1406"; x.fill(); x.restore();
+      const aro = x.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.2, cx, cy, R);
+      aro.addColorStop(0, "#9c5a24"); aro.addColorStop(0.8, "#5a2e0e"); aro.addColorStop(1, "#2a1406");
+      x.beginPath(); x.arc(cx, cy, R, 0, 6.29); x.fillStyle = aro; x.fill();
+      const pista = x.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * 0.95);
+      pista.addColorStop(0, "#3a2a20"); pista.addColorStop(0.6, "#1b120d"); pista.addColorStop(1, "#4a3426");
+      x.beginPath(); x.arc(cx, cy, R * 0.95, 0, 6.29); x.fillStyle = pista; x.fill();
+      x.strokeStyle = "#e9c46a88"; x.lineWidth = 1.5; x.stroke();
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 + Math.PI / 8, px = cx + Math.cos(a) * R * 0.86, py = cy + Math.sin(a) * R * 0.86, s = R * 0.03;
+        x.save(); x.translate(px, py); x.rotate(a);
+        x.beginPath(); x.moveTo(-s * 1.6, 0); x.lineTo(0, -s); x.lineTo(s * 1.6, 0); x.lineTo(0, s); x.closePath();
+        x.fillStyle = "#e9c46a"; x.fill(); x.restore();
+      }
+      const [barniz, y] = lienzoDe();
+      const luz = y.createRadialGradient(cx - R * 0.35, cy - R * 0.45, 0, cx - R * 0.35, cy - R * 0.45, R * 1.1);
+      luz.addColorStop(0, "#ffffff22"); luz.addColorStop(0.4, "#ffffff08"); luz.addColorStop(1, "#ffffff00");
+      y.beginPath(); y.arc(cx, cy, R, 0, 6.29); y.fillStyle = luz; y.fill();
+      return { fondo, barniz };
     }
     // el centro de la casilla i, en el marco de la rueda (el mismo de dibujaPlato)
     const casilla = i => (i + 0.5) * SEG - Math.PI / 2;
@@ -347,36 +378,18 @@ export function montarRuleta(h, api) {
         }
       }
       const giro = giroEn(ahora);
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // el paño
-      const pa = g.createRadialGradient(cx, cy, R * 0.3, cx, cy, Math.max(W, H) * 0.75);
-      pa.addColorStop(0, "#14704a"); pa.addColorStop(1, "#04281a");
-      g.fillStyle = pa; g.fillRect(0, 0, W, H);
-      // sombra y aro de madera
-      g.save(); g.shadowColor = "#000c"; g.shadowBlur = R * 0.18; g.shadowOffsetY = R * 0.05;
-      g.beginPath(); g.arc(cx, cy, R, 0, 6.29); g.fillStyle = "#2a1406"; g.fill(); g.restore();
-      const aro = g.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.2, cx, cy, R);
-      aro.addColorStop(0, "#9c5a24"); aro.addColorStop(0.8, "#5a2e0e"); aro.addColorStop(1, "#2a1406");
-      g.beginPath(); g.arc(cx, cy, R, 0, 6.29); g.fillStyle = aro; g.fill();
-      // la pista de la bola
-      const pista = g.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * 0.95);
-      pista.addColorStop(0, "#3a2a20"); pista.addColorStop(0.6, "#1b120d"); pista.addColorStop(1, "#4a3426");
-      g.beginPath(); g.arc(cx, cy, R * 0.95, 0, 6.29); g.fillStyle = pista; g.fill();
-      g.strokeStyle = "#e9c46a88"; g.lineWidth = 1.5; g.stroke();
-      // lo que gira
+      if (!capas) capas = dibujaCapas();
       if (!plato) plato = dibujaPlato();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(capas.fondo, 0, 0);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // lo que gira
       g.save(); g.translate(cx, cy); g.rotate(giro); g.drawImage(plato, -R, -R, R * 2, R * 2); g.restore();
-      // los rombos de la pista
-      for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4 + Math.PI / 8, x = cx + Math.cos(a) * R * 0.86, y = cy + Math.sin(a) * R * 0.86, s = R * 0.03;
-        g.save(); g.translate(x, y); g.rotate(a);
-        g.beginPath(); g.moveTo(-s * 1.6, 0); g.lineTo(0, -s); g.lineTo(s * 1.6, 0); g.lineTo(0, s); g.closePath();
-        g.fillStyle = "#e9c46a"; g.fill(); g.restore();
-      }
       if (brillo) {
         const a0 = giro + brillo.idx * SEG - Math.PI / 2, k = 0.55 + 0.45 * Math.sin((ahora - brillo.t0) / 160);
-        g.save(); g.beginPath(); g.arc(cx, cy, R * 0.8, a0, a0 + SEG); g.arc(cx, cy, R * 0.57, a0 + SEG, a0, true); g.closePath();
-        g.fillStyle = `rgba(255,236,150,${0.35 * k})`; g.shadowColor = "#ffe27a"; g.shadowBlur = 20; g.fill(); g.restore();
+        g.beginPath(); g.arc(cx, cy, R * 0.8, a0, a0 + SEG); g.arc(cx, cy, R * 0.57, a0 + SEG, a0, true); g.closePath();
+        g.fillStyle = `rgba(255,236,150,${0.4 * k})`; g.fill();
+        g.strokeStyle = `rgba(255,226,122,${0.8 * k})`; g.lineWidth = 2; g.stroke();
       }
       // la bola
       const p = posicion(ahora);
@@ -388,9 +401,11 @@ export function montarRuleta(h, api) {
         g.beginPath(); g.arc(bx, by, br, 0, 6.29); g.fillStyle = gb; g.fill();
       }
       // el brillo del barniz
-      const luz = g.createRadialGradient(cx - R * 0.35, cy - R * 0.45, 0, cx - R * 0.35, cy - R * 0.45, R * 1.1);
-      luz.addColorStop(0, "#ffffff22"); luz.addColorStop(0.4, "#ffffff08"); luz.addColorStop(1, "#ffffff00");
-      g.beginPath(); g.arc(cx, cy, R, 0, 6.29); g.fillStyle = luz; g.fill();
+      // (solo el cuadrado de la rueda: fuera de ella el barniz es transparente)
+      const bx0 = Math.max(0, Math.floor((cx - R) * dpr)), by0 = Math.max(0, Math.floor((cy - R) * dpr)), bl = Math.min(Math.ceil(2 * R * dpr), lienzo.width - bx0, lienzo.height - by0);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(capas.barniz, bx0, by0, bl, bl, bx0, by0, bl, bl);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
       // monedas
       chispas = chispas.filter(p => (p.t += dt) < p.vida);
       for (const p of chispas) {
