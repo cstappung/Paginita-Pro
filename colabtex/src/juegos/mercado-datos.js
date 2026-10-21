@@ -11,14 +11,21 @@
    Las cartas de la Serie 01 (Profes) solo existen para quien la ve
    (`veSerie1`, prodrop-cartas.js): `fichaCopia` no las resuelve para los
    demás, así que no salen en las ofertas, las ventas ni los intercambios,
-   y solo se cambian entre dos cuentas que la ven. */
-import { economia, monedasDe, copiasDe, mascotasDe, objetosDe, leeCopia } from "./monedas.js";
+   y solo se cambian entre dos cuentas que la ven.
+
+   Las piezas de Batalla de Rock (`rk:`, rock-datos.js) están a prueba:
+   solo las ve quien `veRock()` (los administradores). */
+import { economia, monedasDe, copiasDe, mascotasDe, objetosDe, rocasDe, leeCopia } from "./monedas.js";
+import { veRock, fichaRock } from "./rock-datos.js";
 import { copiaDe, MOTOR, copiaVisible } from "./prodrop-cartas.js";
 import { fichaObjeto, fichaMascota } from "./mascotas-datos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 
 export const MAX_PRECIO = 100000;
-export const JUEGOS_MERCADO = [["todo", "Todo"], ["prodrop", "PRODROP"], ["mascotas", "Mascotas"]];
+const JUEGOS_BASE = [["todo", "Todo"], ["prodrop", "PRODROP"], ["mascotas", "Mascotas"]];
+export const JUEGOS_MERCADO = JUEGOS_BASE;
+/* Los juegos que ve quien mira (Batalla de Rock, solo a prueba). */
+export const juegosMercado = () => (veRock() ? [...JUEGOS_BASE, ["rock", "Batalla de Rock"]] : JUEGOS_BASE);
 export const TIPOS_MASCOTAS = [["todo", "Todo"], ["objeto", "Objetos"], ["baile", "Bailes"], ["mascota", "Mascotas"]];
 export const FILTROS_INICIALES = { juego: "todo", tipoM: "todo", col: "", rareza: -1, grad: "todas", nota: 0, leg: "todos", espacio: "", especie: "", etapa: "", q: "", orden: "barato" };
 
@@ -33,6 +40,12 @@ export function fichaCopia(c, datos, estados) {
     const cp = copiaDe(c, datos);
     if (!cp) return null;
     return { c, tipo: "carta", juego: "prodrop", cp, nombre: cp.carta.name, sub: MOTOR.subtitulo(cp.carta), tier: cp.carta.tier, col: cp.carta.col, gr: cp.gr, g: cp.g, leg: cp.carta.tier === 3 };
+  }
+  if (q.tipo === "rock") {
+    const r = veRock() && e.rocas[c];
+    if (!r) return null;
+    const f = fichaRock(r.item);
+    return { c, tipo: "rock", juego: "rock", item: r.item, nombre: f.nombre, emoji: f.emoji, colores: f.colores, leg: r.item.leg, sub: `${f.cat} · ${f.cuerpo}${r.item.leg ? " · Legendario" : ""}` };
   }
   if (q.tipo === "objeto") {
     const r = e.regalos[c];
@@ -112,7 +125,8 @@ export function intercambiables(datos, uid, estados) {
   const cs = [
     ...copiasDe(uid, datos).filter(x => !x.venta).map(x => x.c),
     ...objetosDe(uid, datos).filter(x => !x.venta).map(x => x.c),
-    ...mascotasDe(uid, datos).filter(x => !x.venta).map(x => x.c)
+    ...mascotasDe(uid, datos).filter(x => !x.venta).map(x => x.c),
+    ...(veRock() ? rocasDe(uid, datos).filter(x => !x.venta).map(x => x.c) : [])
   ];
   return cs.map(c => fichaCopia(c, datos, estados)).filter(Boolean);
 }
@@ -124,7 +138,7 @@ export function gente(datos, uid) {
   const e = economia(datos), out = {};
   for (const [c, u] of Object.entries(e.dueno)) {
     if (u === uid || e.enVenta[c] || (e.usuarios[u] && e.usuarios[u].parada)) continue;
-    if (!copiaVisible(c) || !copiaVisible(c, u)) continue;
+    if (!copiaVisible(c) || !copiaVisible(c, u) || (!veRock() && leeCopia(c).tipo === "rock")) continue;
     (out[u] = out[u] || []).push(c);
   }
   return out;
@@ -140,7 +154,7 @@ export function misCambios(datos, uid, estados) {
     if (!t || (t.de !== uid && t.para !== uid)) continue;
     const hecho = e.cambios[id], dar = lista(t.dar), pedir = lista(t.pedir);
     // uno con una carta de una serie que no ve no existe para quien mira
-    if (![...dar, ...pedir].every(c => copiaVisible(c))) continue;
+    if (![...dar, ...pedir].every(c => copiaVisible(c) && (veRock() || leeCopia(c).tipo !== "rock"))) continue;
     const estado = Number.isFinite(t.x) ? "cerrado" : hecho ? hecho.estado : "pendiente";
     const posible = dar.every(c => e.dueno[c] === t.de && !e.enVenta[c]) && pedir.every(c => e.dueno[c] === t.para && !e.enVenta[c]) && !parada(t.de) && !parada(t.para);
     out.push({ id, de: t.de, para: t.para, at: t.at, fin: t.ok || t.x || 0, estado, posible,

@@ -72,6 +72,7 @@ import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
+import { fijaVeRock } from "./juegos/rock-datos.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
@@ -1343,7 +1344,7 @@ function leerRuta() {
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
-  const mk = h.match(/^mercado(?:\/(prodrop|mascotas))?$/);
+  const mk = h.match(/^mercado(?:\/(prodrop|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
@@ -1868,7 +1869,8 @@ const sospechaClub = s => {
 /* PRO HERO (hero.js): la cuenta y lo que la página ya hace para el club
    (guardar con prueba, apuntar la partida, celebrar el logro, avisar a los
    administradores), para el juego solo y para la sala. */
-ponHero({ fb, usuario: () => state.user, nombreVivo, guardaClub, marcaJugadaClub, celebra, sospecha: sospechaClub });
+ponHero({ fb, usuario: () => state.user, nombreVivo, guardaClub, marcaJugadaClub, celebra, sospecha: sospechaClub,
+  datos: datosPerfil, esAdmin: () => state.admin === true, ir });
 
 /* ---------- el medidor de descarga (consumo.js) ----------
    Cuánto bajó de la base este navegador y esta cuenta hoy. Lo raro va a
@@ -3678,6 +3680,7 @@ function wire() {
       for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension, offSerie1]) { if (f) { try { f(); } catch (e) {} } }
       offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = offSerie1 = null;
       fijaSerie1({}, "");
+      fijaVeRock(false);
       state.admin = false;
       revisaCastigo({ uid: null, cuenta: 0, suspension: null });
       if (offConsumo) { try { offConsumo(); } catch (e) {} offConsumo = null; }
@@ -3732,6 +3735,8 @@ function wire() {
     fb.esAdminJuegos(user.uid).then(a => {
       if (!state.user || state.user.uid !== user.uid) return;
       state.admin = a; mostrar();
+      /* Batalla de Rock está a prueba: sus piezas solo las ve un admin (mercado incluido). */
+      if (fijaVeRock(a) && datosP) { datosP = conDerivados(Object.assign({}, datosP)); for (const f of [...oyentesP]) f(datosP); }
       if (state.vista === "admin") { vistaPintada = ""; render(); }
       if (a && ranks && ranks.refresca) ranks.refresca();
     });
