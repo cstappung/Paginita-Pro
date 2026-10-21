@@ -58,7 +58,7 @@ test('los dos modos de la sala (sin Retro WFC, pedido del dueño): copa por omis
 
 test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la cilindrada, Máximo por omisión, y va al marco',()=>{
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
- assert.deepEqual(Object.keys(M.MKW_NIVEL),['maximo','dificil','normal','facil']);
+ assert.deepEqual(Object.keys(M.MKW_NIVEL),['facil','normal','dificil','maximo'],'de menos a más (el orden de los botones)');
  let e=M.reducir(nueva());assert.equal(e.nivel,'maximo','Máximo por omisión');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'normal'}));assert.equal(e.nivel,'normal');assert.equal(e.cc,'c150','la cilindrada no cambia');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'c100'},{t:'ajuste',uid:'a',k:'nivel',v:'facil'}));assert.equal(e.cc,'c100');assert.equal(e.nivel,'facil','los dos ajustes, cada uno el suyo');
@@ -75,7 +75,7 @@ test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la c
 
 test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
- assert.deepEqual(Object.keys(M.MKW_CC),['c150','c100','espejo','azar']);
+ assert.deepEqual(Object.keys(M.MKW_CC),['c150','espejo','c100','azar'],'de menos a más: 150cc, espejo, 200cc; al azar al final');
  let e=M.reducir(nueva());assert.equal(e.cc,'c150','150cc por omisión');assert.equal(e.ultimaTabla,null);
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'espejo'}));assert.equal(e.cc,'espejo');
  e=M.reducir(nueva({t:'ajuste',uid:'b',k:'cc',v:'c100'}));assert.equal(e.cc,'c150','b no es el anfitrión');

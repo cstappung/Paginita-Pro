@@ -7788,14 +7788,16 @@ const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
 /* La cilindrada de la copa y de la playlist ("azar": cada carrera la suya, como Retro Rewind: 10 % 200cc, 65 % 150cc,
    25 % espejo, sorteada con la semilla de la tanda). La clave "c100" es la cilindrada 100cc del juego, que Retro
    Rewind corre como 200cc fuera de las salas mundiales (Pulsar, Is200cc; medido con el juego en §84): por eso se
-   llama 200cc. La clave se queda igual: las salas guardadas y el marco la usan. */
-export const MKW_CC = { c150: "150cc", c100: "200cc", espejo: "Espejo", azar: "Al azar" };
+   llama 200cc. La clave se queda igual: las salas guardadas y el marco la usan. El orden es el de los botones, de menos a
+   más (el dueño): 150cc, espejo (la misma velocidad, la pista dada vuelta), 200cc y al azar (la mezcla) al final. */
+export const MKW_CC = { c150: "150cc", espejo: "Espejo", c100: "200cc", azar: "Al azar" };
 const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
 /* El nivel de la CPU que completa los 12 lugares (M20, el dueño: «un ajuste propio de la sala, que elige el anfitrión
    aparte de la cilindrada, con máximo por omisión»). En las carreras VS del juego la cilindrada y el nivel de la CPU
    son dos ajustes separados (solo el Grand Prix los ata). Las claves son las que entiende el marco (`&cpu=`,
-   juegos/mkw/web/navegador/mkw.mjs): "maximo" = todo al tope; los otros, más duros que los del juego (bitácora §96). */
-export const MKW_NIVEL = { maximo: "Máximo", dificil: "Difícil", normal: "Normal", facil: "Fácil" };
+   juegos/mkw/web/navegador/mkw.mjs): "maximo" = todo al tope; los otros, más duros que los del juego (bitácora §96).
+   El orden es el de los botones, de menos a más, como la cilindrada. */
+export const MKW_NIVEL = { facil: "Fácil", normal: "Normal", dificil: "Difícil", maximo: "Máximo" };
 const mkwNivelDe = v => tiene(MKW_NIVEL, v) ? v : "maximo";
 /* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
 export function mkwTabla(t) {

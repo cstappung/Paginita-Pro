@@ -480,7 +480,7 @@ const REGLAS = {
     secciones: [
       ["Cómo se juega", pasos([
         "Abre una sala de <b>Mario Kart Wii</b> en <b>Modo copa</b> (una copa del juego: sus 4 carreras, con puntos) o <b>Modo playlist</b> (una lista de pistas que arma el anfitrión, con las sugerencias de todos) y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑).",
-        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y el <b>nivel de la CPU</b> (Máximo, Difícil, Normal o Fácil; Máximo por omisión) y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 12 pilotos, como en Mario Kart en línea: si son menos, la CPU completa los 12 lugares.",
+        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y el <b>nivel de la CPU</b> (Fácil, Normal, Difícil o Máximo; Máximo por omisión) y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 12 pilotos, como en Mario Kart en línea: si son menos, la CPU completa los 12 lugares.",
         "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). En la copa, el anfitrión <b>elige las pistas</b> con el selector (fotos, logos y planos de cada pista).",
         "Después, cada uno elige <b>personaje y vehículo</b> en las pantallas del juego (45 s; a quien no alcanza se le pone uno).",
         "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."
