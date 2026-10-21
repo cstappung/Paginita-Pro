@@ -363,7 +363,11 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8'),mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
  // el sitio le presta su modo inmersivo al módulo; Mario Kart lo pone al cargar el marco (una vez por copa) y lo saca al volver
  assert.match(main,/inmersivo: si => ponInmersivo\(si\)/);
- assert.match(mk,/if \(inmersivo && inmAuto !== est\.ronda\) \{ inmAuto = est\.ronda; try \{ inmersivo\(true\); \} catch \{\} \}/);
+ // (opcional y apagado por omisión: «Pantalla completa al empezar», de cada uno en su navegador)
+ assert.match(mk,/if \(inmersivo && inmPref && inmAuto !== est\.ronda\) \{ inmAuto = est\.ronda; try \{ inmersivo\(true\); \} catch \{\} \}/);
+ assert.match(mk,/let inmPref = \(\(\) => \{ try \{ return localStorage\.getItem\(CLAVE_INM\) === "1"; \} catch \{ return false; \} \}\)\(\);/);
+ assert.match(mk,/class="jg2-inm" data-inm data-foco="inm" aria-pressed="\$\{inmPref\}"/);
+ assert.match(mk,/html\.jg-inm:has\(\.jg-mkw-marco:not\(\[hidden\]\)\) \.jg-cab,html\.jg-inm:has\(\.jg-mkw-marco:not\(\[hidden\]\)\) \.jg-chat-abre\{backdrop-filter:none/,'nada difuminado encima del juego');
  assert.match(mk,/if \(inmAuto !== null\) \{ inmAuto = null; try \{ inmersivo\?\.\(false\); \} catch \{\} \}/);
  assert.match(mk,/html\.jg-inm \.jg-mkw-marco\{height:calc\(100dvh - 84px\)/,'el marco llena la pantalla en inmersivo');
  // la precarga: un marco escondido con precarga=1, su token, y lo que lleva cada uno en su presencia («~40», «~listo»)

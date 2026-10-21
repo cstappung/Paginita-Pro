@@ -185,10 +185,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
   const abierto = { cambiar: false, menu: "", tabla: false };   // M21: lo abierto en el vestíbulo (va en su firma)
   let faseJuego = null;                               // M22: la fase que manda el marco (copa, elegir, carrera, descanso)
-  /* M22 (modelo «Modo consola»): al empezar la copa la sala pasa sola al modo inmersivo del sitio (sin cabecera, el chat
-     flotante encima) y el marco llena la pantalla; al volver al vestíbulo, sale. Una vez por copa: si la persona sale
-     con Esc o «Salir», no se le vuelve a poner. inmAuto = la ronda en que se puso solo */
+  /* M22 (modelo «Modo consola»): si la persona lo pidió en el vestíbulo («Pantalla completa al empezar», apagado por
+     omisión: el dueño, por el lag), al empezar la copa la sala pasa sola al modo inmersivo del sitio y el marco llena la
+     pantalla; al volver al vestíbulo, sale. Una vez por copa: si sale con Esc o «Salir», no se le vuelve a poner.
+     inmAuto = la ronda en que se puso solo; inmPref = lo que eligió (en este navegador) */
   let inmAuto = null;
+  const CLAVE_INM = "mkw.inmersivoAlEmpezar";
+  let inmPref = (() => { try { return localStorage.getItem(CLAVE_INM) === "1"; } catch { return false; } })();
   /* M22: la PRECARGA en el vestíbulo. Mientras se conversa, un marco escondido abre la página del juego con
      `precarga=1`: baja el programa y lo que el juego lee al arrancar y en la primera carrera, y lo deja guardado en este
      navegador sin arrancar el juego (juegos/mkw/web/navegador/mkw.mjs, precargarTodo). Cuánto lleva cada piloto va en
@@ -304,7 +307,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       if (inmAuto !== null) { inmAuto = null; try { inmersivo?.(false); } catch {} }
       return;
     }
-    if (inmersivo && inmAuto !== est.ronda) { inmAuto = est.ronda; try { inmersivo(true); } catch {} }
+    if (inmersivo && inmPref && inmAuto !== est.ronda) { inmAuto = est.ronda; try { inmersivo(true); } catch {} }
     const nodo = est.nodos?.[uid];
     const firma = `${est.ronda}|${nodo}|${(est.sincro || []).join(",")}`;
     if (firma === firmaMarco) { frame.hidden = false; avisaMarco(); return; }
@@ -505,6 +508,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
         ${opciones}
         ${nota ? `<p class="jg-mkw-nota jg2-nota" role="status">${nota}</p>` : ""}
         ${salirBtn}
+        ${enSala() && inmersivo ? `<button type="button" class="jg2-inm" data-inm data-foco="inm" aria-pressed="${inmPref}" title="Al empezar la copa, la sala pasa a pantalla completa (sales con Esc). Puede ir más lento en computadores modestos.">Pantalla completa al empezar</button>` : ""}
         ${ultima}
         <div class="jg2-pcab"><b>Pilotos</b><span>${js.length} de ${cupo}</span><span class="jg2-puntos" aria-hidden="true">${Array.from({ length: cupo }, (_, i) => `<i class="${i < js.length ? "si" : ""}"></i>`).join("")}</span></div>
         <ul class="jg2-lista">${js.map(fila).join("")}${cpus ? `<li class="jg2-cpu"><span class="jg2-inicial cpu" aria-hidden="true">CPU</span><span>+ ${cpus} CPU · ${escapeHtml(MKW_NIVEL[nivel])}</span></li>` : ""}</ul>`;
@@ -518,6 +522,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (b.hasAttribute("data-cambiar")) { abierto.cambiar = !abierto.cambiar; pintaVestibulo(true); return; }
     if (b.hasAttribute("data-cerrar")) { abierto.cambiar = false; pintaVestibulo(true); vest.querySelector('[data-foco="cambiar"]')?.focus(); return; }
     if (b.hasAttribute("data-tabla")) { abierto.tabla = !abierto.tabla; pintaVestibulo(true); return; }
+    // M22: la pantalla completa al empezar, de cada uno (en este navegador; apagada por omisión)
+    if (b.hasAttribute("data-inm")) { inmPref = !inmPref; try { localStorage.setItem(CLAVE_INM, inmPref ? "1" : "0"); } catch {} pintaVestibulo(true); return; }
     if (b.dataset.menu) { abierto.menu = abierto.menu === b.dataset.menu ? "" : b.dataset.menu; pintaVestibulo(true); if (abierto.menu) vest.querySelector(".jg2-menu button")?.focus(); return; }
     const elegido = b.getAttribute("aria-pressed") === "true";
     if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
@@ -732,10 +738,18 @@ const ESTILO_VEST = `
 .jg-mkw2 .jg2-tira .jg2-nota{flex:1 1 100%;color:#d8def5;font-size:.9rem}
 .jg-mkw2 button:focus-visible{outline:2px solid #ffd34d;outline-offset:2px}
 @container (max-width:560px){.jg-mkw2 .jg2-boleto{grid-template-columns:1fr}.jg-mkw2 .jg2-accion{justify-items:stretch}.jg-mkw2 .jg2-largar{width:100%}.jg-mkw2 .jg2-espera{text-align:left;max-width:none}.jg-mkw2 .jg2-op{grid-template-columns:1fr}.jg-mkw2 .jg2-op small{grid-column:1}}
-/* M22: en el modo inmersivo (se pone solo al empezar la copa) el marco llena la pantalla y la tira del vestíbulo se va
-   (vuelve al salir con Esc o «Salir») */
+/* M22: en el modo inmersivo (si la persona lo pidió) el marco llena la pantalla y la tira del vestíbulo se va (vuelve al
+   salir con Esc o «Salir»). Encima del juego, nada difuminado: el difuminado del fondo (backdrop-filter) de la cabecera
+   y del botón del chat se recalcula sobre la imagen del juego en cada cuadro (lag) */
 html.jg-inm .jg-mkw-marco{height:calc(100dvh - 84px);min-height:0;border-radius:12px}
 html.jg-inm .jg-mkw-vest.jugando{display:none}
+html.jg-inm:has(.jg-mkw-marco:not([hidden])) .jg-cab,html.jg-inm:has(.jg-mkw-marco:not([hidden])) .jg-chat-abre{backdrop-filter:none;-webkit-backdrop-filter:none}
+html.jg-inm:has(.jg-mkw-marco:not([hidden])) .jg-cab{background:#f5f4fa}
+html[data-tema=oscuro].jg-inm:has(.jg-mkw-marco:not([hidden])) .jg-cab{background:var(--os-fondo)}
+html.jg-inm:has(.jg-mkw-marco:not([hidden])) .jg-chat-abre{background:#000000b3}
+.jg-mkw2 .jg2-inm{justify-self:start;display:inline-flex;align-items:center;gap:9px;border:0;background:none;padding:2px 0;color:#d8def5;font:600 .88rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw2 .jg2-inm::before{content:"";flex:none;width:30px;height:17px;border-radius:999px;background:#ffffff26 radial-gradient(circle at 8.5px 50%,#eef2ff 6px,transparent 6.5px);transition:background .15s}
+.jg-mkw2 .jg2-inm[aria-pressed=true]::before{background:#ffd34d radial-gradient(circle at 21.5px 50%,#1b1440 6px,transparent 6.5px)}
 `;
 function ponEstiloVest() {
   if (document.getElementById("jg-mkw2-estilo")) return;
