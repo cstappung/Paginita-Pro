@@ -173,8 +173,9 @@ try {
   await dos.goto(enlace);
   await dos.getByRole('button', { name: /Unirse a la partida/ }).click({ timeout: 20000 });
   const v2 = await hastaQue(async () => [await uno.textContent('.jg-mkw-vest'), await dos.textContent('.jg-mkw-vest')].map(t => t.replace(/\s+/g, ' ')),
-    ([a, b]) => /2 de 4/.test(a) && /2 de 4/.test(b) && /Piloto Dos/.test(a), 20000);
-  ok('Piloto Dos entra con el enlace: los dos en el vestíbulo («2 de 4»)', !!v2 && /2 de 4/.test(v2[0]) && /2 de 4/.test(v2[1]) && /Piloto Dos/.test(v2[0]),
+    ([a, b]) => /2 de 12/.test(a) && /2 de 12/.test(b) && /Piloto Dos/.test(a), 20000);
+  // (§91, C9: la sala nace con 12 lugares; hasta §87 eran 4)
+  ok('Piloto Dos entra con el enlace: los dos en el vestíbulo («2 de 12»)', !!v2 && /2 de 12/.test(v2[0]) && /2 de 12/.test(v2[1]) && /Piloto Dos/.test(v2[0]),
      v2 && v2[1].slice(0, 90));
   await foto(dos, '6-vestibulo-dos.png');
 
@@ -309,11 +310,11 @@ try {
   uno.once('dialog', d => d.accept());
   await uno.locator('.jg-mkw-echa').first().click({ timeout: 10000 });
   const vDos = (await hastaQue(() => dos.textContent('.jg-mkw-vest'), t => /te sacó/.test(t), 15000) || '').replace(/\s+/g, ' ');
-  const vUno2 = (await hastaQue(() => uno.textContent('.jg-mkw-vest'), t => /1 de 4/.test(t.replace(/\s+/g, ' ')), 10000) || '').replace(/\s+/g, ' ');
+  const vUno2 = (await hastaQue(() => uno.textContent('.jg-mkw-vest'), t => /1 de 12/.test(t.replace(/\s+/g, ' ')), 10000) || '').replace(/\s+/g, ' ');
   const marcoDos = await hastaQue(async () => marcoDel(dos, enSalaJuego) ? 'sigue' : 'sin juego', v => v === 'sin juego', 10000);
   await foto(dos, '10-echado-dos.png');
   ok('§87: la anfitriona echa a Piloto Dos: a él se le va el juego y ve «El anfitrión te sacó de esta sala»; la sala de Uno queda de 1',
-     /te sacó/.test(vDos) && /1 de 4/.test(vUno2) && marcoDos === 'sin juego', `Dos: «${vDos.slice(-70)}» · Uno «1 de 4» ${/1 de 4/.test(vUno2)} · Dos ${marcoDos}`);
+     /te sacó/.test(vDos) && /1 de 12/.test(vUno2) && marcoDos === 'sin juego', `Dos: «${vDos.slice(-70)}» · Uno «1 de 12» ${/1 de 12/.test(vUno2)} · Dos ${marcoDos}`);
   if (marcoA && cuadroAntes > 0) {
     await espera(5000);
     const ls = await lsDe(marcoA);

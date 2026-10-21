@@ -8280,6 +8280,7 @@ las anclas, ahora una por nivel de la página: **fácil 3000, normal 5000, difí
 | `prueba-sincro.mjs --directa --cpu=maximo` | **13/13**: las huellas de la carrera coinciden en las dos pestañas con todo el gancho andando (velocidad, arrebato, tinta, objetos del humano) |
 | `prueba-sala.mjs --cpu=maximo` | **35/35** (la copa entera de 2 en máximo; el VR con el nivel 3 y la regla de 4 anclas en la foto) |
 | `prueba-playlist.mjs` | 20/20 |
+| `herramientas/prueba-experiencia.mjs --rapida` (el sitio local con emuladores) | **12/12**: el vestíbulo con la fila «CPU» (Máximo marcado) y «CPU máximo» en el encabezado. Fallaban 2 puntos de antes: esperaban «2 de 4» y la sala nace con 12 desde §91 (C9); corregidos |
 | la medición (§96.5) | 48 carreras de 12 CPU + 8 de espejo de verdad |
 
 El programa para publicar (`compilar-web.py --modo navegador --final` y subirlo a R2) lo rearma y sube el dueño
