@@ -16,7 +16,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  ROCKERS, ED_CAT, PAL, defaultLook, randomLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
+  ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
   INV_CATS, invItem, invVar, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO,
 } from './catalogo.js';
 
@@ -2847,7 +2847,7 @@ class Crowd {
     this.p = pts.map(p => ({ ...p, yaw: Math.atan2(-p.x * 0.8, -(p.z + 1.5)), s: rr(0.88, 1.08), ph: R(), style: Math.floor(R() * 4), j: rr(0.08, 0.3) }));
     const n = this.n = this.p.length;
     const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRAD });
-    const mk = (geo, cnt, outline) => { const m = new THREE.InstancedMesh(geo, mat, cnt); scene.add(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); o.instanceMatrix = m.instanceMatrix; scene.add(o); } return m; };
+    this.all = []; const mk = (geo, cnt, outline) => { const m = new THREE.InstancedMesh(geo, mat, cnt); scene.add(m); this.all.push(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); o.instanceMatrix = m.instanceMatrix; scene.add(o); this.all.push(o); } return m; };
     this.body = mk(new THREE.CapsuleGeometry(0.2, 0.5, 4, 10), n, 0.025);
     this.head = mk(new THREE.SphereGeometry(0.14, 12, 10), n, 0.02);
     this.hair = mk(new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), n, 0);
@@ -3550,6 +3550,8 @@ function edOpen(look) {
   ED.saved = JSON.stringify(ED.L);
   Object.assign(ED, { tab: 'cuerpo', view: 'cuerpo', yaw: 0.35, zoom: 1, mt0: 0, snap: true, prev: null });
   for (const k in rockers) rockers[k].root.visible = false; singer.root.visible = drummer.root.visible = S.micSet.visible = false;
+  // la cámara del editor queda donde empieza el público: alguien justo delante tapaba al rockero
+  for (const m of crowd.all) m.visible = false;
   titles.cur = null; confetti.stop();
   $('#editor').classList.remove('off'); $('#edViews').classList.remove('off');
   edRebuild(); edRender(); layout();
@@ -3561,7 +3563,7 @@ function edClose() {
 function edShut() {
   boxClose(true); clearTimeout(ED.tm); ED.open = false; if (ED.rk) { ED.rk.dispose(); ED.rk = null; }
   $('#editor').classList.add('off'); $('#edViews').classList.add('off'); $('#boxUI').className = '';
-  singer.root.visible = drummer.root.visible = S.micSet.visible = true; layout();
+  singer.root.visible = drummer.root.visible = S.micSet.visible = true; for (const m of crowd.all) m.visible = true; layout();
 }
 $('#edClose').onclick = edClose;
 /* cámara del editor: órbita alrededor del personaje (arrastrar para girar, rueda para acercar) */
@@ -3865,6 +3867,8 @@ export const rock = {
   /* el editor: `look` es tu rockero guardado (o null); `cb` = {guarda(look), abreCaja(b), vende(c, p), mercado(), cerrar()} */
   editor(look, cb) {
     CB = cb || {}; VIVO.on = false; VIVO.alto = false;
+    // la escena se prepara como en el paquete (con la batalla de demostración): sin eso el editor salía a oscuras
+    if (battle.t0 === undefined) battle.start();
     edOpen(look ? lookPosible(sanitizeLook(look), INV.own.filter(v => v.copia && !v.venta)) : null);
   },
   cierraEditor() { if (ED.open) edShut(); },

@@ -14,6 +14,7 @@ import { celular } from '../sitio/celular.js';
 import { Tactil, TACTIL } from '../ui/tactil.js';
 import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
+import { rockSitio, cargaEscena } from '../sitio/rock.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -128,6 +129,7 @@ export class GameSession {
 
   _onEngineEvent(p, type, a, b) {
     const now = this.now ?? 0;
+    if (this.rock) this._rockEvento(p, type, a);
     switch (type) {
       case 'hit':
         if (settings.muteOnMiss) this.audio.setMuted(p.stems, false);
@@ -198,7 +200,75 @@ export class GameSession {
     const stems = new Set(this.players.flatMap((p) => p.stems));
     this.audio.setStemVolumes([...stems]);
     this._setupBackground();
+    await this._preparaRock();
     this._precalienta();
+  }
+
+  // Batalla de Rock de fondo (solo administradores, a prueba: js/rock/). Con otro jugador (en la sala,
+  // el primero de los demás; en local, el segundo) es una batalla: tu rockero contra el suyo, y quién va
+  // ganando sale de los puntajes. Solo, tu rockero toca al centro y el público sigue tu combo.
+  async _preparaRock() {
+    this.rock = null;
+    if (!rockSitio.admin || !settings.fondoRock || celular) return;
+    let rock;
+    try { rock = await cargaEscena(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
+    const yo = this.local.find((p) => !p.bot) || this.local[0];
+    const rival = this.players.find((p) => p !== yo && p.type === 'remote') || this.players.find((p) => p !== yo) || null;
+    this.rock = rock;
+    this.rockYo = yo;
+    this.rockRival = rival;
+    this.rockSp = [false, false];
+    this.rockFin = false;
+    this.rockFalla = 0;
+    rock.monta(document.getElementById('rockbg'));
+    rock.enVivo({
+      yo: { look: rockSitio.look, nombre: yo?.name },
+      rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
+      alto: settings.altoRendimiento,
+    });
+  }
+
+  // Desde la pausa: se apaga o se vuelve a montar sin salir de la canción
+  async ponRock(on) {
+    settings.fondoRock = on;
+    if (!on) {
+      this.rock?.desmonta();
+      this.rock = null;
+    } else if (!this.rock && this.running) await this._preparaRock();
+  }
+
+  _pulsoRock(now) {
+    const yo = this.rockYo?.engine, rv = this.rockRival?.engine, T = this.song.tempo;
+    if (!yo) return;
+    const beats = T.secToTick(Math.max(0, now)) / T.resolution;
+    const animo = rv
+      ? (yo.score - rv.score) / Math.max(4000, 0.25 * (yo.score + rv.score))
+      : Math.min(1, (yo.multiplier() - 1) / 3) * 0.9 - (this.rockFalla > performance.now() ? 0.6 : 0);
+    this.rock.pulso({ beats, animo, hype: Math.min(1, (yo.combo || 0) / 100) });
+    // Star Power: en batalla es un ataque; solo, el público estalla
+    const sp = [!!yo.spActive, !!rv?.spActive];
+    if (sp[0] && !this.rockSp[0]) rv ? this.rock.ataque(0) : this.rock.hype('sp', '¡STAR POWER!', '#53e7ff');
+    if (sp[1] && !this.rockSp[1]) this.rock.ataque(1);
+    this.rockSp = sp;
+    if (!this.rockFin && now > this.song.endTime + 0.3) {
+      this.rockFin = true;
+      if (rv) this.rock.fin(yo.score >= rv.score ? 0 : 1);
+      else {
+        const e = yo.stats().stars;
+        this.rock.fin(0, e >= 5 ? '¡LEYENDA!' : e >= 4 ? '¡OVACIÓN!' : e >= 3 ? '¡BIEN TOCADO!' : '¡A ENSAYAR!');
+      }
+    }
+  }
+
+  // Rachas y caídas del jugador, para la coreografía de Batalla de Rock
+  _rockEvento(p, type, a) {
+    if (!this.rock || p !== this.rockYo) return;
+    if (type === 'streak' && (a % 100 === 0 || a === 50)) {
+      if (this.rockRival) { if (a % 100 === 0) this.rock.ataque(0); } else this.rock.hype('racha', `¡RACHA DE ${a}!`, '#ffd34d');
+    } else if (type === 'comboBreak' && a >= 25) {
+      this.rockFalla = performance.now() + 3000;
+      if (!this.rockRival) this.rock.hype('falla');
+    }
   }
 
   // Sprites y efectos se estrenan aquí, tras la pantalla de carga, y no a mitad de
@@ -407,6 +477,7 @@ export class GameSession {
     this._sendState(perf);
     if (this.net) this._anotaCurva(now);
     this.draw(now);
+    if (this.rock) this._pulsoRock(now);
     if (!this.finished && now > this.endAt) this.finish();
   }
 
@@ -695,6 +766,8 @@ export class GameSession {
     this.tactil?.destroy();
     this.tactil = null;
     this._clearBackground();
+    this.rock?.desmonta();
+    this.rock = null;
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
