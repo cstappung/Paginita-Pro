@@ -8597,6 +8597,12 @@ Medido con `node web/navegador/prueba-precarga.mjs` (dos perfiles de Chrome nuev
 
 En esta PC la red es instantánea; en internet la diferencia es lo que tardan ~60 MB (a 50 Mbit/s, unos 10 s menos).
 
+**Hasta que el dueño suba el programa nuevo** (`compilar-web.py --modo navegador --final` y `subir-r2.mjs`,
+`docs/publicar.md`), el sitio corre esta página con el `.wasm` de antes y no se rompe: sin `_mkw_nombres` la página no
+escribe nombres ni lee los de las CPU (quedan los de su tabla), no reparte skins y **no ofrece «Cambiar personaje y
+vehículo»** (con el programa de antes, el salto a la pantalla de personajes apagaba el modo elección y el juego se iba
+solo a otra carrera). El zócalo, las marcas, el podio, el cartel, la precarga y lo del sitio andan igual.
+
 ### 98.8 Pruebas
 
 | Prueba | Resultado |

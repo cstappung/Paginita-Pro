@@ -1433,7 +1433,9 @@ async function arrancar() {
         titulo: e.lista ? 'Playlist' : 'Copa', botones: !!e.lista, carrera: n, ultima: n >= e.carreras,
         restan: () => sala.restan(sala.estado().plazo), resultados: resultadosDe(e, n), nota: '',
         alAgregar: () => agregarEntre(), alSugerir: () => { if (!selSug) abrirSugerir(sala.estado(), true); },
-        alKart: () => reelegir(n), kart: reeleccion?.carrera === n ? reeleccion.estado : null };
+        // (M22: solo con el programa nuevo —el de los nombres, que trae el arreglo del «modo elección»—: con uno de antes,
+        // al confirmar el derrape el juego se iba solo a otra carrera, fuera de la sala)
+        alKart: typeof M._mkw_nombres === 'function' ? () => reelegir(n) : null, kart: reeleccion?.carrera === n ? reeleccion.estado : null };
       const antes = window.mkwEstado.descanso?.carrera === n ? window.mkwEstado.descanso : null;
       // (restanAlAbrir: lo que faltaba cuando apareció el panel; las pruebas miden con eso el descanso)
       window.mkwEstado.descanso = { carrera: n, ultima: o.ultima, resultados: o.resultados, restanAlAbrir: antes?.restanAlAbrir ?? o.restan() };
