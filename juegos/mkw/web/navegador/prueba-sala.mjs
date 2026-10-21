@@ -41,6 +41,8 @@ import { cambiosVr, peorCaso, aplicarCambio, REGLA_CPU } from './vr-sala.mjs';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const RECARGA = process.argv.includes('--recarga');
+// §96: --cpu=maximo|dificil|normal|facil = el nivel de la CPU de la sala (el de la sala por omisión es máximo)
+const CPU = (process.argv.find(a => a.startsWith('--cpu=')) || '--cpu=normal').slice(6);
 const LIMITE = 120;                   // s: el tiempo límite de la carrera en la prueba (el del juego es de minutos)
 const DNF = 30;                       // s: el plazo para los que faltan desde que llega el primero, humano o CPU (§77, §78)
 const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || `--puerto=${RECARGA ? 8156 : 8153}`).slice(9));
@@ -67,7 +69,7 @@ async function abrir(nombre, uid) {
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
-    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=normal&limite=${LIMITE}`);
+    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}`);
   return p;
 }
 const A = await abrir('A', uidA);

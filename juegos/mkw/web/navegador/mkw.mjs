@@ -1109,6 +1109,9 @@ async function arrancar() {
       window.mkwPantallaPropia = sincro.miPuesto;
     }
     let ficha = armarFicha(datosFicha);
+    // PLAN M20 (solo para medir, herramientas/medir-cpu-niveles.mjs): &soloCpu=1 = las 12 en CPU, también el puesto 1, para
+    // medir lo rápidas que son por nivel sin el «elástico» que las ajusta según dónde va el humano
+    if (parametros.get('soloCpu') === '1' && !sincro) ficha.puestos[0] = { ...ficha.puestos[0], tipo: 1, mando: -1 };
     window.mkwEstado.ficha = ficha;
     if (sincro) {
       ficha.pantallas = 1;                                 // una pantalla: la propia (sección 0x20)
@@ -1146,16 +1149,18 @@ async function arrancar() {
     const cola = parametros.has('pistas') ? pistasDe(parametros.get('pistas')) : null;
     let nombres = (() => { try { return JSON.parse(parametros.get('nombres') || '{}'); } catch { return {}; } })();
     // la cilindrada de cada carrera ('azar' = como Retro Rewind: 10 % 200cc, 65 % 150cc, 25 % espejo, sorteada con la
-    // semilla de la sala: igual en todas) y la CPU como en un Grand Prix de un jugador (c50 fácil, c100 normal, c150 y
-    // espejo difícil), salvo que la dirección pida otra (&cpu=…). §84: 'c100' es la cilindrada 100cc del juego, que
-    // Retro Rewind corre como 200cc (y 'c50' como su «500cc»): medido con el juego, el sitio la llama 200cc
+    // semilla de la sala: igual en todas). §84: 'c100' es la cilindrada 100cc del juego, que Retro Rewind corre como
+    // 200cc (y 'c50' como su «500cc»): medido con el juego, el sitio la llama 200cc.
+    // M20 (§96, el dueño): el nivel de la CPU es un ajuste propio de la sala, aparte de la cilindrada (en las carreras VS
+    // del juego son dos ajustes separados; solo el Grand Prix los ata): &cpu=maximo|dificil|normal|facil, máximo si no
+    // viene
     const ccDe = n => {
       const cc = parametros.get('cc') || 'c150';
       if (cc !== 'azar') return cc;
       const x = Math.imul((semillaSala ^ Math.imul(n, 0x9E3779B9)) >>> 0, 0x85EBCA6B) >>> 0, r = x % 100;
       return r < 10 ? 'c100' : r < 75 ? 'c150' : 'espejo';
     };
-    const cpuDe = cc => parametros.get('cpu') || ({ c50: 'facil', c100: 'normal' }[cc] || 'dificil');
+    const cpuDe = () => parametros.get('cpu') || 'maximo';
     window.mkwPantallaPropia = sincro.miPuesto;
     // la sala del sitio (marco de Juegos) avisa los nombres de los pilotos (para la tabla) y, si el anfitrión se va,
     // quién manda ahora (la copa sigue con él, sin recargar)
@@ -1230,7 +1235,7 @@ async function arrancar() {
       const corren = sincro.humanos.filter(h => !(e.fuera || []).includes(h.uid)).map(h => ({ uid: h.uid, vr: vrs[h.uid] }));
       if (corren.length < 2 || !corren.some(h => h.uid === sincro.yo)) return;
       const cpus = (ficha?.puestos || []).filter(q => q.tipo === 1).map(() => ({ cpu: true, puesto: 0 }));
-      const nivelCpu = ficha?.cpu ?? 2, regla = reglaCpuDe(e, n);
+      const nivelCpu = ficha?.cpu ?? 3, regla = reglaCpuDe(e, n);
       const base = vrAsentado(), br = vr.actual?.br ?? VR_INICIAL_SALA;
       const peor = aplicarCambio(base, peorCaso(sincro.yo, [...corren, ...cpus], { nivelCpu, regla }));
       vrEnCarrera = { n, base, br, nivelCpu, regla };

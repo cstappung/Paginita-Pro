@@ -7,7 +7,7 @@ const raiz=f=>path.join(__dirname,'..',f);
 const sin=f=>fs.readFileSync(raiz(f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,mkwPlaylist,mkwTabla,MKW_CC,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
+ ';globalThis.__M={reducir,JUEGOS,LOGROS,NIVEL,PESO,detecta,MKW_MODOS,MKW_CARRERAS,cupoDe,minimoDe,mkwCarrera,mkwPlaylist,mkwTabla,MKW_CC,MKW_NIVEL,MKW_SINCRO_MAX,MKW_COPAS};',ctx);
 const M=ctx.__M;
 
 // Una sala de tres (a la abrió) con estas jugadas en orden.
@@ -54,6 +54,23 @@ test('los dos modos de la sala (sin Retro WFC, pedido del dueño): copa por omis
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'estilo',v:'copa'},{t:'ajuste',uid:'a',k:'carreras',v:2}));assert.equal(e.carreras,2);
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'carreras',v:5}));assert.equal(e.carreras,4,'solo 2, 4, 8 o 12');
  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'estilo',v:'playlist'}));assert.equal(e.estilo,'copa','corriendo no se cambia el modo');
+});
+
+test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la cilindrada, Máximo por omisión, y va al marco',()=>{
+ const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
+ assert.deepEqual(Object.keys(M.MKW_NIVEL),['maximo','dificil','normal','facil']);
+ let e=M.reducir(nueva());assert.equal(e.nivel,'maximo','Máximo por omisión');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'normal'}));assert.equal(e.nivel,'normal');assert.equal(e.cc,'c150','la cilindrada no cambia');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'c100'},{t:'ajuste',uid:'a',k:'nivel',v:'facil'}));assert.equal(e.cc,'c100');assert.equal(e.nivel,'facil','los dos ajustes, cada uno el suyo');
+ e=M.reducir(nueva({t:'ajuste',uid:'b',k:'nivel',v:'facil'}));assert.equal(e.nivel,'maximo','b no es el anfitrión');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'imposible'}));assert.equal(e.nivel,'maximo','lo que no existe vuelve a Máximo');
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'nivel',v:'normal'}));assert.equal(e.nivel,'maximo','corriendo no se cambia');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'dificil'},{t:'empieza',uid:'a'}));
+ assert.equal(e.hist[e.hist.length-1].nivel,'dificil','la ronda anota el nivel');
+ // la dirección del marco lleva &cpu= (lo que lee la página del juego) y la ficha lo ofrece
+ const fuente=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(fuente,/q\.set\("cpu", MKW_NIVEL\[nivel\] \? nivel : "maximo"\)/);
+ assert.match(fuente,/data-nivel="\$\{k\}"/);assert.match(fuente,/k: "nivel", v: b\.dataset\.nivel/);
 });
 
 test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
@@ -150,7 +167,7 @@ test('diez logros propios, todos de partida, con su nivel; y su peso',()=>{
 
 test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla, su nodo, los pilotos, el anfitrión y la copa',()=>{
  const src=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
- const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
+ const c={URLSearchParams,mkwCarrera:M.mkwCarrera,mkwPlaylist:M.mkwPlaylist,MKW_NIVEL:M.MKW_NIVEL};vm.runInNewContext(src.slice(src.indexOf('const PAGINA'),src.indexOf('let privado'))+src.slice(src.indexOf('export function srcMkw')).replace(/export /g,'').split('export function crearMkw')[0]+';__s=srcMkw',c);
  const u=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'https://w.example',ronda:3,sincro:['a','b'],jefe:'a'}));
  assert.equal(u.pathname,'/juegos/mkw/web/navegador/index.html');
  const q=u.searchParams, t=M.mkwCarrera('p1',3);
@@ -158,6 +175,7 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  assert.equal(q.get('sala'),'p1');assert.equal(q.get('uid'),'b');assert.equal(q.get('nodo'),'3');
  assert.equal(q.get('sincro'),'a,b');assert.equal(q.get('jefe'),'a');assert.equal(q.get('semilla'),String(t.semilla),'la semilla de la tanda (la misma carrera en todos)');
  assert.equal(q.get('estilo'),'copa','copa por omisión');assert.equal(q.get('carreras'),'4');assert.equal(q.get('cc'),'c150');
+ assert.equal(q.get('cpu'),'maximo','M20: la CPU en Máximo por omisión');
  assert.equal(q.get('pistas'),null,'en la copa las pistas las elige el anfitrión en el juego');
  assert.equal(q.get('privado'),'https://w.example');assert.equal(q.get('r'),'3');
  for (const k of ['anfitrion','relleno','nombres']) assert.equal(q.get(k),null,k+' ya no va (los nombres van por mensaje)');
@@ -165,6 +183,9 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  assert.equal(w.get('carreras'),'4','la copa es una copa del juego: siempre 4 carreras (§74)');assert.equal(w.get('cc'),'espejo');assert.equal(w.get('privado'),null);
  const pl=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',estilo:'playlist',carreras:4,cc:'azar'})).searchParams;
  assert.equal(pl.get('estilo'),'playlist');assert.equal(pl.get('cc'),'azar');
+ const nv=n=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',cc:'c100',nivel:n})).searchParams;
+ assert.equal(nv('normal').get('cpu'),'normal','M20: el nivel del anfitrión, aparte de la cilindrada');assert.equal(nv('normal').get('cc'),'c100');
+ assert.equal(nv('turbo').get('cpu'),'maximo','un nivel que no existe va como Máximo');
  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');

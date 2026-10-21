@@ -127,6 +127,18 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   humanos, la regla de MKW de siempre. Revisado por un crítico externo (equilibrio sin inflación, tope, anclas, la regla
   congelada en la foto de la carrera, puestos que no se pueden creer, la granja de cuentas alternas). Banco `vr-sala` 46;
   `prueba-sala` 35/35, `--recarga` 34/34, `prueba-playlist` 20/20 (§95)
+- ✅ M20. (Pedido del dueño, 2026-10-20/21) **Las perillas de las CPU y una dificultad más alta, con el nivel como
+  ajuste de la sala.** Catálogo de todas las perillas (decompilado: la velocidad base 70 + adv reemplaza la del
+  vehículo; el elástico se mide contra la mejor CPU; el arrebato persigue al mejor humano; lo que depende del nivel en el
+  código ya está al tope con la fila difícil; RR pone las maniobras al 100 %). Cuatro niveles de la página, más altos
+  que los del juego (`dificultad-cpu.mjs` + `cpu_dificultad_nativo.cpp`, que envuelve la carga de las perillas y el
+  reparto de objetos): fácil = su normal, normal = su difícil, difícil = a mitad de camino, **máximo = todo al tope**
+  (base ×1,14 = el kart humano más rápido, sin frenarse, el arrebato siempre, sin tinta, objetos del humano; no el
+  «Hard AI» de RR, que va a 120 y no se le gana). Medido con 12 CPU: fácil −6 %, difícil +8,4 %, máximo +14 % que
+  normal. El nivel lo elige el anfitrión aparte de la cilindrada (sitio: fila «CPU» del vestíbulo, `{k:"nivel"}`,
+  máximo por omisión). VR fijo por nivel: 3000/5000/7400/9400. Y el «Espejo» de la sala era el «100cc» de RR: ahora es
+  espejo de verdad. Banco `dificultad-cpu` 21, `vr-sala` 47; sitio 19/19; `prueba-sincro --directa --cpu=maximo`
+  13/13, `prueba-sala --cpu=maximo` 35/35, `prueba-playlist` 20/20 (§96)
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -433,6 +445,20 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-21 02:33** — **Los niveles de la CPU: las perillas, una dificultad más alta y el nivel como ajuste de la
+  sala** (§96, M20, pedido del dueño). Un agente catalogó en el código traducido todas las perillas de la IA (velocidad
+  base 70 + adv que reemplaza la del vehículo, elástico contra la mejor CPU, arrebato, ayuda de cola, lo que depende del
+  nivel en el código, la tabla de objetos de la CPU). La página tiene 4 niveles más altos que los del juego
+  (`web/navegador/dificultad-cpu.mjs`; `web/juego/cpu_dificultad_nativo.cpp` envuelve `rr_overlay_8073ACA8` y
+  `rr_overlay_807BB42C`, con guardias y reponiendo lo del juego en cada carrera): máximo = la fila difícil + base ×1,14,
+  bias 0, arrebato siempre y toda la carrera, tinta 1, objetos del humano. Medido (`medir-cpu-niveles.mjs --etiqueta
+  m20`, 48 carreras de 12 CPU): fácil −6,0 %, difícil +8,4 %, máximo +14,0 % que normal; ruido entre corridas ~2 %. El
+  sitio ofrece «CPU» aparte de la cilindrada (máximo por omisión, `&cpu=`); `REGLA_CPU.anclas` = 3000/5000/7400/9400.
+  Hallazgo: fuera de línea Retro Rewind toma el «espejo» del menú como su 100cc, así que el «Espejo» de la sala corría
+  100cc; ahora la marca va en la carrera después de Pulsar (`rr_kamek_81855954`) y es espejo de verdad. Pruebas: banco
+  37/37 (`dificultad-cpu` 21, `vr-sala` 47), sitio 19/19, `prueba-directa` 13/13, `prueba-sincro --directa
+  --cpu=maximo` 13/13, `prueba-sala --cpu=maximo` 35/35, `prueba-playlist` 20/20. El programa final y R2: el dueño.
 
 - **2026-10-20 18:47** — **El VR con el puesto general: las CPU cuentan** (§95, M19, pedido del dueño). Cada CPU es un
   rival de VR fijo (`REGLA_CPU` de `vr-sala.mjs`: difícil 5000, normal 3000, fácil no cuenta); contra cada una, la curva

@@ -4,7 +4,7 @@ import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storag
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
 import { revisaBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
-import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, mkwCarrera, mkwTabla } from "./motor.js";
+import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, MKW_NIVEL, mkwCarrera, mkwTabla } from "./motor.js";
 
 /* Mario Kart Wii (+ Retro Rewind) — el cartero entre la sala y el juego.
 
@@ -96,13 +96,15 @@ const almacenPartidas = {
    los pilotos en orden (puerto 1–4), `jefe` = quien arma la copa (el anfitrión al empezar; si se va, se le avisa al
    marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo y la cilindrada. §74: la copa es
    una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
-   en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). Los nombres no van en la
-   dirección: se le mandan al marco. */
-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150" }) {
+   en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
+   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. Los nombres no van en la dirección: se le mandan
+   al marco. */
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo" }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
+  q.set("cpu", MKW_NIVEL[nivel] ? nivel : "maximo");
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
@@ -290,7 +292,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
     frame.hidden = false;
     verMarco();
     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
-                         estilo: est.estilo, carreras: est.carreras, cc: est.cc });
+                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel });
     frame.focus();
     conectarNube();
     // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
@@ -336,7 +338,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
   function pintaVestibulo(forzar) {
     if (!vest || !est || !permitido) return;
     const js = presentes(), manda = soyAnfitrion(), corre = corriendo();
-    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera]);
+    const firma = JSON.stringify([js.map(j => j.uid), est.anfitrion, est.cpu, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla, est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     vest.hidden = false;
@@ -356,7 +358,10 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       `<button class="jg-mkw-modo" data-e="${k}" aria-pressed="${estilo === k}" ${puede}><b>${t}</b><small>${QUE[k]}</small></button>`).join("");
     // la cilindrada (para los dos modos)
     const carrerasFichas = `<div class="jg-mkw-cpu"><span>Cilindrada</span>${Object.entries(MKW_CC).map(([k, txt]) =>
-      `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
+      `<button class="jg-mkw-ficha" data-cc="${k}" aria-pressed="${(est.cc || "c150") === k}" ${puede}>${txt}</button>`).join("")}</div>` +
+      // M20: el nivel de la CPU que completa los 12, aparte de la cilindrada (máximo por omisión)
+      `<div class="jg-mkw-cpu"><span>CPU</span>${Object.entries(MKW_NIVEL).map(([k, txt]) =>
+      `<button class="jg-mkw-ficha" data-nivel="${k}" aria-pressed="${(est.nivel || "maximo") === k}" ${puede}>${txt}</button>`).join("")}</div>`;
     // la tabla de la última copa o playlist (la mandó el marco del anfitrión al terminar)
     const ult = est.ultimaTabla;
     const ultima = !corre && ult?.tabla?.length ? `<div class="jg-mkw-ultima"><b>${ult.estilo === "playlist" ? "🏁 Última playlist" : "🏆 Última copa"}</b>
@@ -375,7 +380,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       : manda ? (sinPrograma ? "El programa del juego todavía no está publicado." : "Cuando estén listos, abre las carreras.")
       : `Esperando a que ${escapeHtml(nombre(est.anfitrion))} abra las carreras.`;
     vest.innerHTML = `
-      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX)} · ${escapeHtml(MKW_MODOS[estilo] || MKW_MODOS.copa)} · ${escapeHtml(MKW_CC[est.cc || "c150"])}</span></div>
+      <div class="jg-mkw-cab"><b>🏁 Mario Kart Wii</b><span>${js.length} de ${Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX)} · ${escapeHtml(MKW_MODOS[estilo] || MKW_MODOS.copa)} · ${escapeHtml(MKW_CC[est.cc || "c150"])} · CPU ${escapeHtml((MKW_NIVEL[est.nivel] || MKW_NIVEL.maximo).toLowerCase())}</span></div>
       <ul class="jg-mkw-pilotos">${js.map(fila).join("")}</ul>
       ${ultima}
       ${corre ? "" : `<div class="jg-mkw-modos" role="group" aria-label="Modo de la sala">${modos}</div>${carrerasFichas}`}
@@ -386,6 +391,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat }) {
       </div>`;
     vest.querySelectorAll(".jg-mkw-modo").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); });
     vest.querySelectorAll(".jg-mkw-ficha[data-cc]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); });
+    vest.querySelectorAll(".jg-mkw-ficha[data-nivel]").forEach(b => b.onclick = () => { if (b.getAttribute("aria-pressed") !== "true") anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); });
     vest.querySelectorAll(".jg-mkw-dar").forEach(b => b.onclick = () => { b.disabled = true; anota({ t: "anfitrion", uid, a: b.dataset.a }); });
     // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
     vest.querySelectorAll(".jg-mkw-echa").forEach(b => b.onclick = () => {

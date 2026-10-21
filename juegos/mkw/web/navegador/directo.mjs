@@ -17,6 +17,7 @@
 import { leerBase, armarBase, miiDesdePreset, RUTA_RFLDB } from './mii.mjs';
 import { miiDeInvitado } from './invitados.mjs';
 import { armarPlantel } from './lockstep.mjs';
+import { aplicarPerfilCpu } from './dificultad-cpu.mjs';
 
 // Secciones del juego (Pulsar, Identifiers.hpp)
 export const SECCION_DIRECTA = { presentacionVs: 0x1A, carreraVs: 0x20, elegirPersonaje: 0x49, menuPrincipal: 0x41, unjugador: 0x48, local: 0x54, enlinea: 0x55 };
@@ -106,9 +107,13 @@ export function crearDirecto({ M, lector, nota = () => {} }) {
     return ir(seccion, { ...opciones, ficha, llego: s => s >= 0x1A && s <= 0x23 });
   };
   function escribirFicha(f) {
+    aplicarPerfilCpu(M, f.cpu ?? 1);   // M20 (§96): cuánto sube cada perilla de la CPU (cpu_dificultad_nativo.cpp)
+    // (con un programa de antes de §96 —sin _mkw_cpu_perfil— el nivel va tal cual a la carrera: «máximo» (3) sería una
+    // fila que el juego no tiene; ahí va como su difícil, 2)
+    const nivel = Math.min(f.cpu ?? 1, typeof M._mkw_cpu_perfil === 'function' ? 3 : 2);
     const p = M._mkw_directo_ficha() >> 2, H = new Int32Array(M.HEAPU8.buffer);   // (el programa no publica HEAP32)
     H.fill(0, p, p + 64);
-    const v = [f.pista, f.variante || 0, f.cc ?? 2, f.espejo ? 1 : 0, f.cpu ?? 1, f.objetos || 0, f.modo ?? 1, f.carrera || 0,
+    const v = [f.pista, f.variante || 0, f.cc ?? 2, f.espejo ? 1 : 0, nivel, f.objetos || 0, f.modo ?? 1, f.carrera || 0,
                f.carreras || 4, f.semilla?.[0] || 0, f.semilla?.[1] || 0, 0, f.pantallas || 0, f.vueltas || 0, f.primera === false ? 0 : 1, f.intro ? 1 : 0];
     v.forEach((x, i) => { H[p + i] = x | 0; });
     for (let i = 0; i < 12; i++) {
@@ -165,6 +170,8 @@ export function armarFicha({ pista, cc = 'c150', cpu = 'normal', humanos = [{ pe
     i < humanos.length ? { tipo: 0, personaje, vehiculo, mando: humanos[i].mando ?? i } : { tipo: 1, personaje, vehiculo, mando: -1 }));
   const s1 = semilla ? (semilla ^ Math.imul(0x9E3779B9, carrera + 1)) >>> 0 : 0;
   return { pista, cc: { c50: 0, c100: 1, c150: 2, espejo: 2 }[cc] ?? 2, espejo: cc === 'espejo', modo: 1,
-           cpu: { facil: 0, normal: 1, dificil: 2 }[cpu] ?? 1, objetos, carrera, carreras, primera, puestos, intro,
+           // M20 (§96): el nivel de la página (0 fácil, 1 normal, 2 difícil, 3 máximo); directo_nativo.cpp le da al juego
+           // una fila de su tabla un nivel más arriba y cpu_dificultad_nativo.cpp sube «difícil» y «máximo»
+           cpu: { facil: 0, normal: 1, dificil: 2, maximo: 3 }[cpu] ?? 1, objetos, carrera, carreras, primera, puestos, intro,
            semilla: s1 ? [s1, Math.imul(s1, 0x85EBCA6B) >>> 0] : null };
 }

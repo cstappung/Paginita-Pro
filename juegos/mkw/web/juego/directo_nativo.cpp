@@ -176,6 +176,13 @@ enum { FICHA_PISTA, FICHA_VARIANTE, FICHA_CC, FICHA_ESPEJO, FICHA_CPU, FICHA_OBJ
        FICHA_INTRO, FICHA_PUESTOS = 16 };    // y desde 16, por puesto (12): tipo, personaje, vehículo, mando (-1 = ninguno)
 int32_t g_ficha[64] = {};
 int g_hay_ficha = 0;            // 1 = el próximo salto es a una carrera con esta ficha
+// M20 (§96): el nivel de la CPU de la ficha es el de la página (0 fácil, 1 normal, 2 difícil, 3 máximo), más alto que
+// los del juego. Al juego va una fila de su tabla un nivel más arriba (fácil → su normal; normal, difícil y máximo →
+// su difícil) y cpu_dificultad_nativo.cpp sube «difícil» y «máximo» cuando el juego carga los parámetros de la IA.
+constexpr uint32_t kFilaDelJuego[4] = {1, 2, 2, 2};
+int32_t g_nivel_cpu = -1;       // el de la última ficha escrita (-1 = ninguna: una carrera armada con los menús)
+int32_t g_espejo = 0;           // §96: la última ficha pidió espejo (la marca va en la carrera, ver rr_kamek_81855954)
+int32_t g_espejos = 0;          // (para mirar) cuántas carreras quedaron en espejo así
 int g_registrar_al_entrar = 0;  // 1 = arrancó directo en la sección pedida: falta registrar el mando del jugador 1
 
 bool cupsValido() {             // lo mismo que cupsValido de menus.mjs: que ahí esté de verdad el CupsConfig
@@ -206,13 +213,17 @@ bool escribirFicha(const CpuContext* ctx, uint32_t sm) {
     // pone 0 aquí y abre la carrera (Raceinfo, etapa 0: 0x80533364)
     Memory::Write32(aj + 0xC, f[FICHA_INTRO] ? 5u : 0u);
     Memory::Write32(aj + 0x10, 0);
-    Memory::Write32(aj + 0x14, static_cast<uint32_t>(f[FICHA_CPU]));       // 0 fácil, 1 normal, 2 difícil
+    g_nivel_cpu = f[FICHA_CPU] < 0 ? 0 : f[FICHA_CPU] > 3 ? 3 : f[FICHA_CPU];
+    Memory::Write32(aj + 0x14, kFilaDelJuego[g_nivel_cpu]);                // la fila del juego: 1 normal, 2 difícil
     Memory::Write32(aj + 0x18, static_cast<uint32_t>(f[FICHA_OBJETOS]));
     Memory::Write32(aj + 0x20, 0);                                         // la copa (solo GP)
     Memory::Write8(aj + 0x24, static_cast<uint8_t>(f[FICHA_CARRERA]));
     Memory::Write8(aj + 0x25, static_cast<uint8_t>(f[FICHA_VUELTAS] > 0 ? f[FICHA_VUELTAS] : 3));   // RR la ajusta a la pista
-    const uint32_t banderas = Memory::Read32(aj + 0x28) & ~1u;
-    Memory::Write32(aj + 0x28, banderas | (f[FICHA_ESPEJO] ? 1u : 0u));   // bit 0: espejo
+    // bit 0: espejo. §96: NO en la ficha de los menús: fuera de línea Retro Rewind usa esa marca del menú como «100cc»
+    // (Pulsar, Racedata_InitRace = rr_kamek_81855954: con ella borra el espejo de la carrera y pone 100cc; el espejo de
+    // Retro Rewind es solo de las salas de amigos). La marca va en la carrera, después de Pulsar (abajo)
+    Memory::Write32(aj + 0x28, Memory::Read32(aj + 0x28) & ~1u);
+    g_espejo = f[FICHA_ESPEJO] ? 1 : 0;
     if (f[FICHA_SEMILLA1] || f[FICHA_SEMILLA2]) {
         Memory::Write32(aj + 0x2C, static_cast<uint32_t>(f[FICHA_SEMILLA1]));
         Memory::Write32(aj + 0x30, static_cast<uint32_t>(f[FICHA_SEMILLA2]));
@@ -312,6 +323,25 @@ extern "C" EMSCRIPTEN_KEEPALIVE int mkw_directo_estado() { return g_pedido >= 0 
 // §73: dónde escribe la página la ficha de la carrera, y el pedido de ir a ella (sección 0x1A = la presentación de la
 // carrera VS, que sigue sola a la carrera)
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t* mkw_directo_ficha() { return g_ficha; }
+// M20: el nivel de la página de la última ficha (cpu_dificultad_nativo.cpp y las pruebas)
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t mkw_directo_nivel_cpu() { return g_nivel_cpu; }
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t mkw_directo_espejos() { return g_espejos; }
+
+// §96: el espejo de verdad. Racedata_InitRace de Pulsar (rr_kamek_81855954) envuelve a Racedata::InitRace (que copia la
+// ficha de los menús a la de la carrera): fuera de línea, con la marca de espejo en los menús, la borra de la carrera
+// y pone 100cc (el «100cc» de Retro Rewind sale del botón «espejo» del menú del juego). La ficha de la página ya no
+// pone esa marca en los menús; aquí, después de Pulsar, si la ficha pidió espejo, la marca va en la carrera (ajustes
+// +0x28 bit 0 de racesScenario, Racedata +0x20 +0xB48): la carrera sigue en 150cc y la pista se corre dada vuelta.
+extern "C" void rr_kamek_81855954_traducida(CpuContext* ctx);
+extern "C" void rr_kamek_81855954(CpuContext* MKW_RESTRICT ctx) {
+    rr_kamek_81855954_traducida(ctx);
+    if (!g_espejo) return;
+    const uint32_t rd = Memory::Read32(kRacedata);
+    if (!rd || Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 1) return;     // solo en una carrera VS
+    const uint32_t banderas = rd + 0x20 + 0xB48 + 0x28;
+    Memory::Write32(banderas, Memory::Read32(banderas) | 1u);
+    ++g_espejos;
+}
 extern "C" EMSCRIPTEN_KEEPALIVE void mkw_directo_carrera(int32_t seccion, int32_t licencia) {
     g_pedido = seccion; g_licencia = licencia; g_cuadros_mando = -1; g_hay_ficha = 1;
 }

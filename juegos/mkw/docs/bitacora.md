@@ -860,6 +860,19 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Puestos creíbles** | Los puestos que da el juego sirven solo si cada CPU tiene uno del 1 al 12 y no se repite ninguno. Si una lectura falla (una CPU con puesto 0 quedaría «detrás de todos» y le regalaría puntos a cada humano), la parte de las CPU no se cuenta. |
 | **Regla congelada** | La anfitriona pone la regla de las CPU (anclas, peso, tope) en la foto de cada carrera, junto con los VR (`vrCarrera.cpu`). Así todas las consolas cuentan con la misma regla aunque alguna tenga otra versión de la página. |
 
+### Los niveles de la CPU (§96)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Perilla (de la CPU)** | Un número que el juego lee al empezar cada carrera y que decide qué tan buena es una CPU: su velocidad base, cuánto se puede atrasar, cuánto se frena si va adelante, el «arrebato», etc. Los niveles fácil/normal/difícil del juego no son código distinto: son filas distintas de estas perillas. Como los potenciómetros de ajuste de una fuente: el circuito es el mismo, lo que cambia es dónde está cada perilla. |
+| **Velocidad base de la CPU** | 70 + un valor de la tabla del juego. Para una CPU en el suelo **reemplaza** la velocidad base de su vehículo (después se le aplican los mismos turbos que a un humano y el tope del juego, 120). Un humano a 150cc tiene 75 a 86 según vehículo y personaje; la CPU difícil del juego, ~75. |
+| **Elástico (de la CPU)** | El ajuste de velocidad según la distancia: cada CPU tiene una «casilla» (cuánto se le permite ir detrás de la mejor CPU); si va más atrás gana hasta +10, si va más adelante se frena hacia su velocidad mínima. Se mide contra la mejor CPU, no contra el humano. Como un lazo de control que mantiene al pelotón junto: la referencia es la CPU que va primera. |
+| **Arrebato** | Una vez por carrera, durante 50 a 70 s, la CPU que va primera persigue al mejor humano (va a la velocidad base del humano + 2 a 12) y la 2.ª y la 3.ª la siguen con la mitad y un quinto. En el juego pasa el 80 % de las veces en difícil. |
+| **Fila (de la tabla del juego)** | El nivel que el juego usa para leer sus perillas: 0 fácil, 1 normal, 2 difícil. La página manda una fila un nivel más arriba que antes (fácil → su normal; normal, difícil y máximo → su difícil). |
+| **Nivel «máximo»** | El nivel nuevo de la página: la fila difícil del juego y, encima, todo al tope: la velocidad base del kart humano más rápido (~86 a 150cc), sin frenarse por ir adelante, el arrebato siempre y toda la carrera, la tinta sin efecto y los objetos de la tabla del humano. |
+| **Gancho de la carga de la IA** | Nuestra función que envuelve a la del juego que carga las perillas (AI::Params::Load): deja que el juego cargue su fila y escribe encima los valores del nivel. Corre en el mismo momento en todas las consolas (al armar la carrera), así la sala sigue sincronizada. |
+| **Guardia (de una escritura)** | Antes de escribir en una tabla del juego, el gancho comprueba que ahí esté el valor que se leyó en el código; si no, no escribe y lo avisa. Como medir que no haya tensión antes de tocar un borne: si algo no es lo esperado, no se toca. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -8096,3 +8109,194 @@ tabla de 95.1.
   repetido (`dos`) no hizo fallar un punto, hizo que la página no corriera («no terminó a tiempo»). Se cambió el nombre.
 - **A 100cc los números son chicos para quien gana.** No es un error: con 5000 contra CPU de 3000, ganarle a cada una da
   6 y perder cuesta 26. Es la curva de Mario Kart (ganarle a uno de VR más bajo da poco).
+
+## 2026-10-21 · §96 Los niveles de la CPU: las perillas, una dificultad más alta y el nivel como ajuste de la sala (M20)
+
+**Qué pidió el dueño:**
+
+1. «Identificar todos los parámetros» de la CPU (las «perillas») y **rehacer la dificultad aumentándola**, «donde el más
+   difícil sea **todo al máximo**».
+2. Después de saber que en el juego la cilindrada y el nivel de la CPU son ajustes separados: «que el nivel de CPU sea
+   **un ajuste propio de la sala**, que elige el anfitrión aparte de la cilindrada, con **máximo por omisión**».
+
+### 96.1 Las perillas (decompilar uno mismo)
+
+Los niveles de CPU de Mario Kart Wii **no son código distinto**: son números que el juego lee al empezar cada carrera,
+en `AI::Params::Load` (en Retro Rewind, su versión `rr_overlay_8073ACA8`). Dos archivos de `Race/Common.szs` tienen la
+mayoría (formatos de mkwiiki), y el resto vive en el código. Un agente leyó el código traducido (solo para entender;
+nada copiado) y armó el catálogo. Lo esencial:
+
+**La velocidad** (lo que más pesa). Cada cuadro, para cada CPU:
+
+- **velocidad base** = 70 + `adv` (de `kartAISpdParam.bin`: una fila por cilindrada, pista y nivel) + el bono de
+  largada (vale toda la vuelta 1 y se apaga en ~33 s);
+- esa base **reemplaza** la velocidad base de su vehículo (después van los mismos turbos que a un humano y el tope del
+  juego, 120). Un humano a 150cc tiene 75 a 86 según vehículo y personaje; la CPU difícil del juego, ~75;
+- el **elástico**: cada CPU tiene una «casilla» = cuánto se le permite ir detrás de la mejor CPU (`4500 · bias · P`).
+  Si va más atrás, gana hasta +10; si va más adelante, se frena hacia su velocidad mínima (`min`). **Se mide contra la
+  mejor CPU, no contra el humano**;
+- los humanos entran por tres lados: la **ayuda de cola** (si el último humano le lleva mucho a la mejor CPU, todas
+  ganan hasta +12), el **arrebato** (una vez por carrera la CPU que va primera persigue al mejor humano: su velocidad
+  base + 2 a 12; en difícil pasa el 80 % de las veces, empieza entre los 30 y los 140 s y dura 50 a 70 s) y una
+  cancelación en la última vuelta (solo fácil y normal).
+
+**Las maniobras** (`kartAIActionParam.bin`): el porcentaje de cada una por nivel y por puesto (turbo de salida,
+derrapar, miniturbo, truco, caballito, cerrar el paso). **Retro Rewind las pone todas al 100 %** (y quemar el motor
+al 0 %) en los tres niveles: en nuestro producto ya están al tope.
+
+**Lo que depende del nivel dentro del código** (fácil / normal / difícil): la línea por dentro de las curvas
+(−0,3 / 0 / +0,7), cortar por los atajos con champiñón (0 / 50 / 100 %), esquivar el POW (0 / 20 / 40 %), tirar enseguida
+el caparazón verde o el plátano (0 / 25 / 60 %), apuntarle a un humano pegado (0 / 20 / 80 %). Con la fila difícil
+todo esto ya está en lo más alto que da el juego.
+
+**Los objetos** no dependen del nivel, pero la CPU saca de **su** tabla (la 3 de `ItemSlotRR.bin`), más pobre que la
+del humano (la 2): menos objetos fuertes cuando va atrás (la bala solo en el 12.º, nunca tres rojos).
+
+**El «Hard AI» de Retro Rewind** (un ajuste suyo, apagado en nuestra copia) cambia la tabla de velocidad por una con
+`adv` 100 y `min` 250: la base queda en 170 y la CPU va **pegada al tope del juego (120)**, un 40 % más rápida que
+cualquier kart humano.
+
+**Lo medido el 2026-10-20** con los niveles del juego (40 carreras de 12 CPU, `herramientas/medir-cpu-niveles.mjs`,
+mismo kart en las mismas pistas): la normal recorre un 4,3 % menos que la difícil a 150cc (= 72/75: justo la
+diferencia de velocidad base) y un 3,2 % menos a 200cc; «espejo» difícil un 7,3 % menos que 150cc difícil (ayer
+no tenía explicación: en §96.6 se ve que ese «espejo» corría en realidad 100cc).
+
+### 96.2 Los cuatro niveles de la página
+
+| Nivel | Fila del juego | Encima | Velocidad base a 150cc |
+|---|---|---|---|
+| Fácil | su normal | nada (lo que antes era «normal») | ~72 |
+| Normal | su difícil | nada (lo que antes era «difícil») | ~75 |
+| Difícil | su difícil | cada perilla a mitad de camino hacia máximo; el arrebato siempre | ~80 |
+| **Máximo** | su difícil | **todo al tope** (abajo) | **~86** |
+
+«Todo al tope» en máximo:
+
+- **velocidad base ×1,14**: a 150cc, de ~75 a ~86, la del kart más rápido que puede armar un humano;
+- **sin frenarse a propósito**: `bias` 0 (ninguna CPU tiene «casilla» de atraso: todas las que van detrás de la mejor
+  recuperan) y la mínima = la base;
+- **el arrebato siempre**, desde los 10 s y durante toda la carrera (600 s);
+- **la tinta del Blooper no la frena** (el juego: ×0,8);
+- **los objetos de la tabla del humano**;
+- y todo lo que depende del nivel dentro del código, en lo más alto (la fila difícil).
+
+Por qué **no** el «Hard AI» de Retro Rewind: con la base en 170 la CPU va siempre a 120, un 40 % más rápida que
+cualquier kart humano: no se le puede ganar, y el VR contra ella dejaría de medir nada. El tope que se eligió es el de
+un humano perfecto con el mejor kart, más los mecanismos del propio juego (el elástico y el arrebato) siempre a favor
+de la CPU.
+
+### 96.3 Cómo se hizo
+
+- **La página** (`web/navegador/dificultad-cpu.mjs`): el perfil de cada nivel (`perfilCpu`) y `aplicarPerfilCpu`, que
+  se lo pasa al código nativo **antes de abrir cada carrera** (`directo.mjs`, `escribirFicha`). La ficha lleva el nivel
+  como número (0 fácil … 3 máximo).
+- **`directo_nativo.cpp`**: al juego va la fila un nivel más arriba (`kFilaDelJuego = {1, 2, 2, 2}`).
+- **`web/juego/cpu_dificultad_nativo.cpp`** (nuevo), dos envolturas:
+  - `rr_overlay_8073ACA8` (la carga de las perillas): primero carga el juego lo suyo; después se escribe encima la
+    velocidad (la única estructura `{adv, bias, min}` que comparten las 12 CPU), la tabla del arrebato (0x808CB388) y la
+    tinta (0x808A2B44). Las constantes del juego se guardan la primera vez y **se reponen al empezar cada carrera**: una
+    carrera «normal» después de una «máximo» vuelve a ser la del juego. Cada escritura tiene su **guardia**: solo si ahí
+    está el valor que se leyó en el código (si no, se salta y `mkw_cpu_estado(7)` lo dice);
+  - `rr_overlay_807BB42C` (el reparto de objetos): con «objetos del humano», cuando saca una CPU, por esa llamada su
+    tabla es la del humano y después vuelve a la suya.
+  Todo pasa al armar la carrera, en el mismo momento en todas las consolas: la sala sigue sincronizada.
+- `mkw_cpu_estado(k)`: lo que hizo el gancho (para las pruebas y la medición).
+- `herramientas/compilar-web.py`: las dos funciones en `REEMPLAZOS` y el archivo nuevo en las unidades.
+
+### 96.4 El nivel como ajuste de la sala
+
+En las carreras VS del juego la cilindrada (ajustes +0x4) y el nivel de la CPU (+0x14) son dos casillas distintas;
+solo el Grand Prix saca el nivel de la cilindrada (lo confirma `SetCCAndDifficulty`, 0x8073999C). La página copiaba la
+regla del Grand Prix (`cpuDe`); ahora:
+
+- **el sitio** (`motor.js`): `MKW_NIVEL = {maximo, dificil, normal, facil}` y la jugada `{t:"ajuste", k:"nivel", v}`
+  (solo el anfitrión, solo en el vestíbulo; lo que no existe = máximo); **el vestíbulo** (`mkw.js`) tiene la fila «CPU»
+  al lado de la cilindrada y el encabezado dice el nivel; **la dirección del marco** lleva `&cpu=`;
+- **la página del juego** (`mkw.mjs`): `cpuDe = () => parametros.get('cpu') || 'maximo'`, sin mirar la cilindrada.
+
+### 96.5 Lo medido con los niveles nuevos
+
+`node herramientas/medir-cpu-niveles.mjs --etiqueta m20 --combos c150:facil,c150:normal,c150:dificil,c150:maximo,espejo:maximo,c100:maximo`
+(48 carreras de 12 CPU, sin humano, 4 pistas × 2 semillas, el mismo kart en el mismo puesto en cada combinación →
+`build/web/datos/cpu-niveles-m20/`). En todas el gancho dijo que actuó (las guardias, «ok»; a 150cc máximo escribió
+`adv` 15,5 —base 85,5—, `bias` 0 y `min` 85,5):
+
+| Comparación (el mismo kart, en la misma pista) | Recorre |
+|---|---|
+| Fácil contra Normal | **−6,0 %** (más lento el mismo kart en 88 de 96) |
+| Difícil contra Normal | **+8,4 %** (más rápido en 92 de 96) |
+| Máximo contra Normal | **+14,0 %** (más rápido en 95 de 96) |
+| Máximo contra Difícil | +5,6 % |
+| Espejo máximo contra 150cc máximo | −2,0 % (dentro del ruido: abajo) |
+| 200cc máximo contra 150cc máximo | +15,5 % (la cilindrada) |
+
+**El ruido entre corridas.** Sin la sala, el azar de cada carrera sale del reloj de la PC: dos carreras con la misma
+semilla no son iguales cuadro a cuadro (la semilla fija la pista, los personajes y los vehículos). Para medirlo, un
+control: el «normal» nuevo es la misma fila del juego, sin cambios, que el «difícil» de la medición de ayer. Dio +2,0 %
+de media (las 8 pistas y semillas, de −1,1 % a +4,8 %). O sea: diferencias de 2-3 % entre dos corridas son ruido; las
+de los niveles (+8 % y +14 %) no.
+
+### 96.6 El «Espejo» de la sala no era espejo (arreglado)
+
+El registro del gancho mostró que en las carreras «espejo» el juego cargaba la fila de **100cc**. Leyendo la memoria en
+una carrera directa: la ficha pedía 150cc con la marca de espejo y la carrera quedaba **en 100cc y sin la marca**. La
+causa está en Pulsar (`Racedata_InitRace`, `rr_kamek_81855954`, que envuelve a `Racedata::InitRace`): **fuera de línea,
+Retro Rewind usa el botón «espejo» del menú del juego como su «100cc»** (borra el espejo de la carrera y pone 100cc;
+`Is200cc` lo distingue del 200cc). El espejo de Retro Rewind existe solo en las salas de amigos en línea, como ajuste.
+Así que **el «Espejo» de nuestra sala corría 100cc, sin dar vuelta la pista**: por eso esas carreras eran un 7 % más
+lentas (§96.1).
+
+Arreglo (`directo_nativo.cpp`): la ficha ya no pone la marca de espejo en los menús, y se envuelve
+`rr_kamek_81855954`: después de Pulsar, si la ficha pidió espejo, la marca va en la carrera (ajustes +0x28, bit 0).
+Comprobado: la carrera queda en 150cc con la marca, la IA carga la fila de 150cc, la foto sale dada vuelta (el bloque
+«?» a la derecha, el minimapa reflejado) y el espejo-máximo corre como el 150cc-máximo (−2 %, ruido).
+
+### 96.7 El VR de cada nivel
+
+La regla de §95 sigue igual (cada CPU, un rival de VR fijo; 1/4 de un humano; todas juntas a lo más 2 humanos); cambian
+las anclas, ahora una por nivel de la página: **fácil 3000, normal 5000, difícil 7400, máximo 9400**
+(`REGLA_CPU.anclas`, 4 valores; la regla de 3 de §95, si llegara en una foto vieja, se cambia por la de la página).
+
+- La escala no cambió: **5000 = le gana la mitad de las veces a la «normal»** (la «difícil» del juego, la de §95).
+- Las otras salen de lo medido: si una CPU va un d % más rápida, una persona de 5000 le gana con probabilidad
+  Φ(−d/σ) (σ = cuánto varía una persona de carrera a carrera, en % de la distancia), y el VR de esa CPU es el de la
+  persona que le gana la mitad de las veces (el equilibrio de la regla, con la curva del juego). Con σ = 5 / 6,5 / 8 %:
+  fácil 2800 / 3300 / 3600, difícil 9100 / 8200 / 7400, máximo 11 700 / 10 700 / 9400.
+- Se eligió **σ = 8 %**, el supuesto que da las anclas **más bajas** para las CPU fuertes (el crítico de §95: un ancla
+  alta se aprovecha, una baja solo cuesta un poco de VR); fácil se dejó en 3000 (la de §95).
+- Ejemplo, 2 humanos de 5000 y 10 CPU: salir 1.º da +25 contra fáciles, +39 contra normales, +71 contra difíciles y
+  **+109 contra máximo**; salir 12.º cuesta −65, −39, −23 y **−17**. Contra CPU más fuertes ganar premia más y perder
+  castiga menos, como en Mario Kart contra alguien de VR muy alto.
+
+### 96.8 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| banco `dificultad-cpu` (nuevo) | **21/21** (los 4 niveles y cómo se piden; cada nivel igual o más fuerte que el anterior en todas las perillas; máximo todo al tope y difícil la mitad del camino; lo que llega al código nativo con un Module de mentira; la ficha manda el número; la página, `directo_nativo.cpp` y `cpu_dificultad_nativo.cpp` dicen lo mismo —las filas, la tabla del arrebato y la tinta que el gancho espera—; en la sala el nivel no sale de la cilindrada) |
+| banco `vr-sala` | **47/47** (las 4 anclas; con CPU más fuertes ganar da más y perder cuesta menos; la regla de 3 niveles de §95 se cambia por la de la página; los ejemplos y el equilibrio, con la CPU normal de 5000) |
+| banco entero (`node banco/correr.mjs`) | 37 de 37 páginas bien |
+| sitio `colabtex/tests/mkw.test.cjs` | **19/19** (el nivel es del anfitrión, aparte de la cilindrada, máximo por omisión, no cambia con la copa andando, va al marco como `&cpu=`) |
+| `prueba-directa.mjs` | 13/13 («normal» de la página llega al juego como su fila 2) |
+| `prueba-sincro.mjs --directa --cpu=maximo` | **13/13**: las huellas de la carrera coinciden en las dos pestañas con todo el gancho andando (velocidad, arrebato, tinta, objetos del humano) |
+| `prueba-sala.mjs --cpu=maximo` | **35/35** (la copa entera de 2 en máximo; el VR con el nivel 3 y la regla de 4 anclas en la foto) |
+| `prueba-playlist.mjs` | 20/20 |
+| la medición (§96.5) | 48 carreras de 12 CPU + 8 de espejo de verdad |
+
+El programa para publicar (`compilar-web.py --modo navegador --final` y subirlo a R2) lo rearma y sube el dueño
+(`docs/publicar.md`). Hasta entonces el sitio de verdad corre la página nueva con el `.wasm` viejo, y no se rompe: sin
+`_mkw_cpu_perfil`, `aplicarPerfilCpu` no hace nada y la ficha manda a lo más el nivel 2 (`escribirFicha`: «máximo»
+sería una fila que el juego no tiene); el programa viejo escribe ese número tal cual, así que ahí «normal» es la fila
+normal del juego y «difícil» y «máximo», su difícil. El espejo de verdad también necesita el programa nuevo.
+
+### 96.9 Trampas
+
+- **Revisar lo que trae un informe.** El agente arrancó con cuatro funciones que leían la tabla de velocidad: eran las de
+  las misiones, la batalla y los premios. La del VS era una quinta. Y el catálogo decía que espejo usa la fila de 150cc;
+  la memoria del juego corriendo mostró que no (§96.6). Lo que se dé por cierto, medirlo.
+- **Sin la sala, dos carreras con la misma semilla no son iguales.** La semilla fija la pista, los personajes y los
+  vehículos, pero el azar de la carrera sale del reloj de la PC (solo la sala lo fija). Las comparaciones son por
+  promedio de 8 carreras, con un control para saber cuánto es ruido (§96.5).
+- **Las pruebas piden `cpu=normal`; la sala, máximo.** Para probar lo que de verdad usa la sala se agregó `--cpu=` a
+  `prueba-sala.mjs` y `prueba-sincro.mjs`.
+- **El registro de la compilación dice `build\web\node`** aunque compile para el navegador (comparten los archivos
+  intermedios): lo que importa es que `build/web/navegador/mkw.wasm` tenga la hora nueva.

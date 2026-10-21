@@ -115,7 +115,8 @@ ok('el jugador 1 es la persona, con Mario y el Kart estándar M, en el mando 0',
 const cpus = f.puestos.slice(1);
 ok('los otros 11 son CPU con personajes distintos y vehículos de su peso', cpus.every(q => q.tipo === 1) && new Set(f.puestos.map(q => q.pj)).size === 12,
    cpus.map(q => `${q.pj}/${q.kart}`).join(' '));
-ok('150cc, VS, CPU normal', f.cc === 2 && f.modo === 1 && f.cpu === 1, `cc ${f.cc}, modo ${f.modo}, cpu ${f.cpu}, vueltas ${f.vueltas}`);
+// (M20, §96: «normal» de la página va al juego como su fila «difícil», la 2: los niveles de la página son más altos)
+ok('150cc, VS, CPU normal de la página (la fila difícil del juego)', f.cc === 2 && f.modo === 1 && f.cpu === 2, `cc ${f.cc}, modo ${f.modo}, cpu ${f.cpu}, vueltas ${f.vueltas}`);
 
 // La carrera corre: la cuenta regresiva y después la carrera (Raceinfo +0x28: 1 cuenta, 2 corriendo)
 const etapa = () => p.evaluate(() => { const L = window.mkwMenus, ri = L.u32(0x809BD730); return ri ? L.u32(ri + 0x28) : -1; });

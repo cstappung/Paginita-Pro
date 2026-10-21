@@ -7757,7 +7757,9 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    - `{t:"ajuste", uid, k:"estilo", v}`: el anfitrión elige el modo de la sala (MKW_MODOS): "copa" = N carreras con
      puntos (`{k:"carreras"}`: MKW_CARRERAS; las pistas las elige el anfitrión en el juego), "playlist" = una cola de
      N pistas sorteadas. (El "wfc" de antes —Retro WFC tal cual— ya no existe: una sala vieja con él pasa a copa.)
-   - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece: la CPU es la de un Grand Prix (su nivel sale de la cilindrada).
+   - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece (la CPU de relleno siempre completa los 12).
+   - `{t:"ajuste", uid, k:"nivel", v}` (M20): el nivel de la CPU que completa los 12 (MKW_NIVEL), aparte de la
+     cilindrada; "maximo" por omisión.
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
    - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
@@ -7789,6 +7791,12 @@ const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
    llama 200cc. La clave se queda igual: las salas guardadas y el marco la usan. */
 export const MKW_CC = { c150: "150cc", c100: "200cc", espejo: "Espejo", azar: "Al azar" };
 const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
+/* El nivel de la CPU que completa los 12 lugares (M20, el dueño: «un ajuste propio de la sala, que elige el anfitrión
+   aparte de la cilindrada, con máximo por omisión»). En las carreras VS del juego la cilindrada y el nivel de la CPU
+   son dos ajustes separados (solo el Grand Prix los ata). Las claves son las que entiende el marco (`&cpu=`,
+   juegos/mkw/web/navegador/mkw.mjs): "maximo" = todo al tope; los otros, más duros que los del juego (bitácora §96). */
+export const MKW_NIVEL = { maximo: "Máximo", dificil: "Difícil", normal: "Normal", facil: "Fácil" };
+const mkwNivelDe = v => tiene(MKW_NIVEL, v) ? v : "maximo";
 /* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
 export function mkwTabla(t) {
   if (!Array.isArray(t)) return null;
@@ -7842,6 +7850,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
   let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
   let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
+  let nivel = mkwNivelDe(p && p.nivel);
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7860,13 +7869,14 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "estilo" && fase === "vestibulo") { estilo = mkwEstilo(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
       // la carrera sincronizada, con los que están ahora (hasta 12), en este orden (mando 1, 2, 3…)
       const ps = presentes();
       sincro = ps.slice(0, MKW_SINCRO_MAX).map(x => x.uid);
-      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, jugadores: ps.length, sincro: !!sincro });
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, nivel, jugadores: ps.length, sincro: !!sincro });
       continue;
     }
     if (j.t === "vuelve" && esAnf && fase === "jugando") {
@@ -7881,7 +7891,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
   const quedan = presentes().length;
   return {
-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
     sincro: fase === "jugando" ? sincro : null,
     ganador: "", motivo: quedan ? "" : "abandono"
   };

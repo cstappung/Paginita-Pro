@@ -33,6 +33,8 @@ const COPA = process.argv.includes('--copa');
 // §73 --directa: la carrera abre directo por código (sin menús ni piloto), con los humanos como jugadores de verdad
 // (tipo 0) en las dos consolas y cada una con SU pantalla (la del kart propio)
 const DIRECTA = process.argv.includes('--directa');
+// §96: --cpu=maximo|dificil|normal|facil = el nivel de la CPU (máximo: el gancho cambia velocidad, arrebato y objetos)
+const CPU = (process.argv.find(a => a.startsWith('--cpu=')) || '--cpu=normal').slice(6);
 const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0.0,0.1,0.2,0.3').slice(9);   // sin --sala
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
 const RASTRO = process.argv.includes('--rastro');   // §70: el rastro por cuadro de las dos pestañas, comparado
@@ -70,7 +72,7 @@ async function abrir(nombre, uid) {
     throw new Error('no apareció el marco del juego');
   }
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}` +
-    (DIRECTA ? `&modo=directa&pista=${PISTAS.split(',')[0]}` : `&modo=copa&pistas=${PISTAS}`) + `&semilla=${SEMILLA}&cpu=normal${EXTRA}`);
+    (DIRECTA ? `&modo=directa&pista=${PISTAS.split(',')[0]}` : `&modo=copa&pistas=${PISTAS}`) + `&semilla=${SEMILLA}&cpu=${CPU}${EXTRA}`);
   return p;
 }
 const t0 = Date.now();

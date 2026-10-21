@@ -285,7 +285,13 @@ def main():
                   # y el reparto de pantallas y mandos (el de RR): solo para los 4 primeros humanos (§91)
                   "rr_overlay_8052F4E8": "rr_overlay_8052F4E8_traducida",
                   # Ghosts::Mgr::LoadCorrectMainGhost de Pulsar -> fantasma_pagina_nativo.cpp: el fantasma del mejor de la página (§92)
-                  "rr_kamek_81814B0C": "rr_kamek_81814B0C_traducida"}
+                  "rr_kamek_81814B0C": "rr_kamek_81814B0C_traducida",
+                  # AI::Params::Load e ItemSlotData::DecideItem (las de RR) -> cpu_dificultad_nativo.cpp: los niveles de la CPU
+                  # de la página, más altos que los del juego; «máximo» = todo al tope (M20, §96)
+                  "rr_overlay_8073ACA8": "rr_overlay_8073ACA8_traducida", "rr_overlay_807BB42C": "rr_overlay_807BB42C_traducida",
+                  # Racedata_InitRace de Pulsar -> directo_nativo.cpp: el espejo de verdad (fuera de línea RR convierte la marca
+                  # de espejo del menú en «100cc»; la página la pone en la carrera, después de Pulsar, §96)
+                  "rr_kamek_81855954": "rr_kamek_81855954_traducida"}
     if os.environ.get("MKW_DEPURAR") == "1":              # depuración de la red (web/juego/depurar_red.cpp, §58)
         REEMPLAZOS.update({f"func_{d}": f"func_{d}_traducida" for d in ("800CCC68", "800D1D90", "800D0FEC", "806561A8", "80656FF8", "80653DDC", "800D2000", "800DAD9C", "800FBA4C", "800E8814", "80623054", "80666288", "8063519C", "8067552C", "80635A3C", "80635AC8", "80635B2C")}); REEMPLAZOS["rr_overlay_80635A3C"] = "rr_overlay_80635A3C_traducida"
         REEMPLAZOS["rr_kamek_818B4854"] = "rr_kamek_818B4854_traducida"   # CheckPacket de Pulsar -> depurar_paquetes.cpp (§72)
@@ -326,7 +332,8 @@ def main():
                 ("thp", RAIZ / "web/juego/directo_nativo.cpp"), ("thp", RAIZ / "web/juego/modos_nativo.cpp"),
                 ("thp", RAIZ / "web/juego/invitados_nativo.cpp"),   # §86: las caras de los Mii invitados
                 ("thp", RAIZ / "web/juego/mandos_virtuales_nativo.cpp"),   # §91: más de 4 humanos en la sala
-                ("thp", RAIZ / "web/juego/fantasma_pagina_nativo.cpp")]    # §92: la Contrarreloj contra el mejor de la página
+                ("thp", RAIZ / "web/juego/fantasma_pagina_nativo.cpp"),    # §92: la Contrarreloj contra el mejor de la página
+                ("thp", RAIZ / "web/juego/cpu_dificultad_nativo.cpp")]     # §96: los niveles de la CPU de la página
     # la red del juego hacia la página (socket/connect/sendto… propios, bitácora §58): en los dos modos, porque el
     # runtime llama a mkw_red_cerrar/mkw_red_bloqueante; en Node no hay Module.mkwRed y todo da "red apagada"
     unidades += [("thp", RAIZ / "web/red/red_web.cpp")]

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Niveles de la CPU</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Niveles de la CPU: <span>cuánto sube cada perilla en cada nivel de la página</span></h1>
+<p>Prueba <code>dificultad-cpu.mjs</code> (M20, bitácora §96), <b>sin el juego</b>: los cuatro niveles de la página
+  (fácil, normal, difícil, máximo) y lo que cada uno le pide al código nativo; que suban en orden (cada nivel igual o
+  más fuerte que el anterior en cada perilla); que «máximo» sea todo al tope (velocidad base del kart humano más
+  rápido, sin frenarse por ir adelante, el arrebato siempre y toda la carrera, la tinta sin efecto, los objetos del
+  humano) y «difícil» la mitad del camino; lo que llega al código nativo (con un Module de mentira); que la ficha
+  mande el número del nivel; y que la página, <code>directo_nativo.cpp</code> y <code>cpu_dificultad_nativo.cpp</code>
+  digan lo mismo (la fila del juego de cada nivel y los valores del juego que el gancho espera encontrar).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { NIVELES_CPU, NOMBRE_NIVEL, JUEGO, perfilCpu, aplicarPerfilCpu } from '/web/navegador/dificultad-cpu.mjs';
+import { armarFicha } from '/web/navegador/directo.mjs';
+
+const { ok, nota, fin } = prueba('dificultad-cpu', 'Niveles de la CPU (sin el juego)');
+const P = NIVELES_CPU.map(perfilCpu);
+
+// ---- 1) los cuatro niveles y cómo se piden ----
+ok('cuatro niveles, de menor a mayor: fácil, normal, difícil, máximo (con su nombre)', NIVELES_CPU.join() === 'facil,normal,dificil,maximo' &&
+   NIVELES_CPU.every(k => NOMBRE_NIVEL[k]) && P.every((p, i) => p.nivel === i && p.clave === NIVELES_CPU[i]), P.map(p => p.clave).join(' '));
+ok('se piden por número o por clave; lo que no se entiende es «máximo» (el de la sala por omisión)',
+   perfilCpu(2) === perfilCpu('dificil') && perfilCpu('turbo').clave === 'maximo' && perfilCpu(9).clave === 'maximo' && perfilCpu(null).clave === 'maximo');
+ok('la fila del juego: fácil = su normal (1); normal, difícil y máximo = su difícil (2)', P.map(p => p.fila).join() === '1,2,2,2', P.map(p => p.fila).join());
+ok('fácil y normal son las filas del juego tal cual (ninguna perilla cambiada)',
+   [P[0], P[1]].every(p => p.factorBase === 1 && p.factorBias === 1 && p.mezclaMin === 0 && p.arrebato === null && p.tinta === null && !p.objetosHumano));
+
+// ---- 2) cada nivel igual o más fuerte que el anterior, perilla por perilla ----
+const prob = p => p.arrebato?.prob ?? JUEGO.arrebato.prob, ini = p => p.arrebato?.inicio ?? JUEGO.arrebato.inicio;
+const dur = p => p.arrebato?.durMax ?? JUEGO.arrebato.durMax, tinta = p => p.tinta ?? JUEGO.tinta;
+let orden = true;
+for (let i = 1; i < 4; i++) {
+  const a = P[i - 1], b = P[i];
+  if (b.fila < a.fila || b.factorBase < a.factorBase || b.factorBias > a.factorBias || b.mezclaMin < a.mezclaMin || prob(b) < prob(a) ||
+      ini(b) > ini(a) || dur(b) < dur(a) || tinta(b) < tinta(a) || (a.objetosHumano && !b.objetosHumano)) orden = false;
+}
+ok('cada nivel es igual o más fuerte que el anterior en todas las perillas (fila, velocidad, atraso, mínima, arrebato, tinta, objetos)', orden);
+
+// ---- 3) «máximo» = todo al tope; «difícil» = la mitad del camino ----
+const M3 = P[3], M2 = P[2];
+ok('máximo: la velocidad base de la fila difícil (~75,25 a 150cc) sube a la del kart humano más rápido (~86)',
+   Math.abs(75.25 * M3.factorBase - 86) < 0.5, `${(75.25 * M3.factorBase).toFixed(2)}`);
+ok('máximo: ninguna CPU se queda atrás ni se frena por ir adelante (atraso 0, la mínima = la base)', M3.factorBias === 0 && M3.mezclaMin === 1);
+ok('máximo: el arrebato (perseguir al líder humano) pasa siempre, empieza a los 10 s y dura toda la carrera',
+   M3.arrebato.prob === 100 && M3.arrebato.inicio === 10 && M3.arrebato.hasta === 11 && M3.arrebato.durMin >= 600);
+ok('máximo: la tinta no la frena y saca los objetos de la tabla del humano', M3.tinta === 1 && M3.objetosHumano === true);
+ok('difícil: la mitad del camino entre el juego y máximo (velocidad, atraso, mínima, tinta) y el arrebato siempre',
+   Math.abs(M2.factorBase - (1 + M3.factorBase) / 2) < 1e-9 && M2.factorBias === 0.5 && M2.mezclaMin === 0.5 &&
+   Math.abs(M2.tinta - (JUEGO.tinta + 1) / 2) < 1e-9 && M2.arrebato.prob === 100 && !M2.objetosHumano,
+   `base ×${M2.factorBase} · atraso ×${M2.factorBias} · tinta ${M2.tinta}`);
+ok('los perfiles no se pueden cambiar desde afuera (congelados)', Object.isFrozen(M3) && Object.isFrozen(M3.arrebato) && Object.isFrozen(P[0]));
+
+// ---- 4) lo que llega al código nativo ----
+const llamadas = [];
+const Mfalso = { _mkw_cpu_perfil: (...a) => llamadas.push(a) };
+aplicarPerfilCpu(Mfalso, 'maximo'); aplicarPerfilCpu(Mfalso, 1); aplicarPerfilCpu(Mfalso, 'dificil');
+ok('máximo llega como enteros: nivel 3, base 1140, atraso 0, mínima 1000, arrebato 100/10/11/600/601, tinta 1000, objetos 1',
+   JSON.stringify(llamadas[0]) === JSON.stringify([3, 1140, 0, 1000, 100, 10, 11, 600, 601, 1000, 1]), JSON.stringify(llamadas[0]));
+ok('normal llega sin cambios: base y atraso 1000, mínima 0, arrebato y tinta −1 (los del juego), objetos 0',
+   JSON.stringify(llamadas[1]) === JSON.stringify([1, 1000, 1000, 0, -1, -1, -1, -1, -1, -1, 0]), JSON.stringify(llamadas[1]));
+ok('difícil llega con la mitad: base 1070, atraso 500, mínima 500, tinta 900', llamadas[2][1] === 1070 && llamadas[2][2] === 500 && llamadas[2][3] === 500 && llamadas[2][9] === 900,
+   JSON.stringify(llamadas[2]));
+ok('sin el programa nuevo (sin _mkw_cpu_perfil) no hace nada ni falla', aplicarPerfilCpu({}, 'maximo') === null && aplicarPerfilCpu(null, 3) === null);
+
+// ---- 5) la ficha manda el número del nivel ----
+const fichaDe = cpu => armarFicha({ pista: 0x10D, cpu, semilla: 7 }).cpu;
+ok('la ficha de la carrera manda el nivel de la página: fácil 0, normal 1, difícil 2, máximo 3 (uno desconocido = normal)',
+   ['facil', 'normal', 'dificil', 'maximo', 'raro'].map(fichaDe).join() === '0,1,2,3,1', ['facil', 'normal', 'dificil', 'maximo', 'raro'].map(fichaDe).join());
+
+// ---- 6) la página y el código nativo dicen lo mismo ----
+const texto = async ruta => (await fetch(ruta)).text();
+const directoCpp = await texto('/web/juego/directo_nativo.cpp'), gancho = await texto('/web/juego/cpu_dificultad_nativo.cpp');
+const filas = directoCpp.match(/kFilaDelJuego\[4\] = \{([^}]*)\}/)?.[1]?.replace(/\s/g, '');
+ok('directo_nativo.cpp le da al juego la misma fila que dice la página para cada nivel', filas === P.map(p => p.fila).join(), `${filas}`);
+const tablaArrebato = gancho.match(/kArrebatoJuego\[13\] = \{([^}]*)\}/)?.[1]?.split(',').map(Number) || [];
+ok('el gancho espera la tabla del arrebato del juego que dice la página (difícil: 80 %, desde los 30 s hasta los 140 s, 50–70 s)',
+   tablaArrebato[2] === JUEGO.arrebato.prob && tablaArrebato[3] === JUEGO.arrebato.inicio && tablaArrebato[6] === JUEGO.arrebato.hasta &&
+   tablaArrebato[11] === JUEGO.arrebato.durMin && tablaArrebato[12] === JUEGO.arrebato.durMax, tablaArrebato.join(','));
+const tintaJuego = gancho.match(/kTintaJuego = (0x[0-9A-Fa-f]+)u/)?.[1];
+const f32 = h => new DataView(new Uint32Array([parseInt(h, 16)]).buffer).getFloat32(0, true);
+ok('y la tinta del juego (0,8 en float)', tintaJuego && Math.abs(f32(tintaJuego) - JUEGO.tinta) < 1e-6, `${tintaJuego}`);
+ok('el gancho envuelve la carga de los parámetros de la IA y el reparto de objetos (las versiones de Retro Rewind)',
+   /void rr_overlay_8073ACA8\(CpuContext/.test(gancho) && /void rr_overlay_807BB42C\(CpuContext/.test(gancho) &&
+   /mkw_cpu_perfil\(int32_t nivel, int32_t base, int32_t bias, int32_t mezcla, int32_t prob,/.test(gancho));
+const mkw = await texto('/web/navegador/mkw.mjs');
+ok('en la sala el nivel no sale de la cilindrada: el que manda la dirección (&cpu=), máximo si no viene', /const cpuDe = \(\) => parametros\.get\('cpu'\) \|\| 'maximo';/.test(mkw));
+nota(`velocidad base a 150cc (fila normal ~72, difícil ~75,25): ${P.map(p => ((p.fila === 1 ? 71.97 : 75.25) * p.factorBase).toFixed(1)).join(' / ')}`);
+fin();
+</script>
+</body>
+</html>
