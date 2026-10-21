@@ -487,17 +487,16 @@ const REGLAS = {
       ])],
       ["Llegar tarde y salir", lista([
         "Quien entra con la copa andando espera a la <b>siguiente</b>.",
-        "Si a alguien se le corta la conexión, la carrera lo espera <b>30 s</b> para que vuelva; si no vuelve, sigue sin él.",
+        "Si a alguien se le corta la conexión, la carrera sigue sin él (al empezar cada carrera se lo espera unos segundos más) y vuelve en la siguiente; lo mismo si recarga la página.",
         "Si el anfitrión se va, el puesto pasa al siguiente y la copa sigue.",
-        "Hay que manejar: el juego saca de la carrera a quien se queda quieto mucho rato."
+        "Cada carrera termina 30 s después de que llega el primero (a los que faltan el juego les da un tiempo), o a los 5 minutos."
       ])],
       ["Controles", tabla([
         ["Teclado", "Las teclas del juego (se cambian en <b>Opciones</b> dentro de la página del juego)."],
-        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
-        ["Celular", "Botones en pantalla, y se dobla <b>inclinando el teléfono</b>."]
+        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."]
       ])],
-      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta). Cada carrera lo mueve, con la regla de Mario Kart Wii entre los humanos: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo. Si te vas a mitad de carrera pierdes contra todos, y nadie gana VR por ti."],
-      ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
+      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta; empieza en 5000). Cada carrera lo mueve con tu puesto entre los 12: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo; la CPU también cuenta, con menos peso y con un VR fijo según su nivel. Si te vas a mitad de carrera pierdes contra todos, y nadie gana VR por ti."],
+      ["Qué hace falta", "Chrome o Edge en el computador (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
     ]
   },
   /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:

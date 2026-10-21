@@ -32,7 +32,8 @@ import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, MKW_NIVEL, mkwCarrera, mkwTabla } fr
      avisa el suyo (`vr`) y, al terminar la copa (`fin`), el vestíbulo vuelve a leer el de los demás.
    - Quien entra con la copa andando espera a la siguiente tanda. Quien mira la sala sin ser jugador no carga el juego.
 
-   Controles del juego: teclado, mandos y táctil (con inclinación) — @controles: tactil teclado */
+   Controles del juego: teclado y mandos (los celulares quedaron fuera del lanzamiento: el táctil del juego queda, pero
+   no se ofrece) — @controles: teclado */
 const PADRE = "mkw-padre", HIJO = "mkw-hijo";
 const PAGINA = "juegos/mkw/web/navegador/index.html";
 
@@ -177,12 +178,24 @@ export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl 
   };
 }
 
-export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avatar }) {
+export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avatar, inmersivo }) {
   let host = null, escena = null, vest = null, frame = null, partida = null, est = null;
   let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false, jefeMarco = "", avisado = "";
   let senal = null, offP = null, offM = null, conecta = 0, esperaSala = 0;
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
   const abierto = { cambiar: false, menu: "", tabla: false };   // M21: lo abierto en el vestíbulo (va en su firma)
+  let faseJuego = null;                               // M22: la fase que manda el marco (copa, elegir, carrera, descanso)
+  /* M22 (modelo «Modo consola»): al empezar la copa la sala pasa sola al modo inmersivo del sitio (sin cabecera, el chat
+     flotante encima) y el marco llena la pantalla; al volver al vestíbulo, sale. Una vez por copa: si la persona sale
+     con Esc o «Salir», no se le vuelve a poner. inmAuto = la ronda en que se puso solo */
+  let inmAuto = null;
+  /* M22: la PRECARGA en el vestíbulo. Mientras se conversa, un marco escondido abre la página del juego con
+     `precarga=1`: baja el programa y lo que el juego lee al arrancar y en la primera carrera, y lo deja guardado en este
+     navegador sin arrancar el juego (juegos/mkw/web/navegador/mkw.mjs, precargarTodo). Cuánto lleva cada piloto va en
+     su presencia del buzón de la sala (`vivo/<pid>/rtc/en/<uid>`, hasta 16 letras: «~40», «~listo»; la malla del juego
+     no toma esas como sesiones) y el vestíbulo lo muestra en su fila: «⬇ 40 %», «● listo». */
+  let marcoPre = null, preHecha = false, offPre = null, preEnviado = "";
+  const preDe = {};                                   // uid → "listo" | "40" (lo que escribió en su presencia)
 
   const enSala = () => !mirando && !!est?.jugadores?.some(j => j.uid === uid) && !est?.fuera?.[uid];
   const presentes = () => (est?.jugadores || []).filter(j => !est.fuera?.[j.uid]);
@@ -220,6 +233,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   }
 
   function mensaje(e) {
+    if (!muerto && marcoPre && e.source === marcoPre.contentWindow && e.origin === location.origin && e.data?.canal === HIJO) { mensajePre(e.data); return; }
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
     if (d.tipo === "senal") { senalOp(d); return; }
@@ -240,6 +254,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     /* El VR de quien juega cambió con una carrera de la sala (juegos/mkw/web/navegador/vr-sala.mjs, §82: el marco ya lo
        guardó en mkw/vr/<uid>): el vestíbulo lo muestra al volver. */
     if (d.tipo === "vr" && Number.isInteger(d.vr) && d.vr >= 1 && d.vr <= 1000000) { vrs[uid] = d.vr; pintaVestibulo(true); }
+    /* M22: en qué fase está la sala del juego, para que la tira diga la verdad («Carrera 2 de 4», «Descanso») */
+    if (d.tipo === "fase" && typeof d.fase === "string") {
+      faseJuego = { fase: d.fase.slice(0, 12), carrera: Math.max(0, d.carrera | 0), carreras: Math.max(0, d.carreras | 0) };
+      pintaVestibulo(true);
+    }
     if (d.tipo === "fin") {
       /* los VR de los demás también se movieron: se vuelven a leer (una vez cada uno) */
       for (const j of presentes()) if (j.uid !== uid) delete vrs[j.uid];
@@ -282,12 +301,14 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (!quiere) {
       frame.hidden = true;
       if (frame.getAttribute("src")) { frame.removeAttribute("src"); frame.src = "about:blank"; firmaMarco = ""; }
+      if (inmAuto !== null) { inmAuto = null; try { inmersivo?.(false); } catch {} }
       return;
     }
+    if (inmersivo && inmAuto !== est.ronda) { inmAuto = est.ronda; try { inmersivo(true); } catch {} }
     const nodo = est.nodos?.[uid];
     const firma = `${est.ronda}|${nodo}|${(est.sincro || []).join(",")}`;
     if (firma === firmaMarco) { frame.hidden = false; avisaMarco(); return; }
-    firmaMarco = firma; jefeMarco = est.anfitrion; avisado = "";
+    firmaMarco = firma; jefeMarco = est.anfitrion; avisado = ""; faseJuego = null;
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
@@ -303,6 +324,55 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       if (muerto || ++vueltas > 240) { clearInterval(esperaSala); return; }
       if (frame?.contentWindow?.mkwSala) { clearInterval(esperaSala); avisado = ""; avisaMarco(); }
     }, 500);
+  }
+  /* M22: la precarga (ver arriba): el marco escondido mientras se está en el vestíbulo (una vez por visita: ya bajado,
+     queda en la caché del navegador), y escuchar lo que escribió cada piloto */
+  function precarga() {
+    const enVest = permitido && !muerto && !mirando && enSala() && !corriendo() && !!host;
+    const quiere = enVest && !preHecha && !!origen;
+    if (quiere && !marcoPre) {
+      marcoPre = document.createElement("iframe");
+      marcoPre.title = "Mario Kart Wii — preparando el juego";
+      marcoPre.hidden = true;
+      marcoPre.tabIndex = -1;
+      marcoPre.setAttribute("aria-hidden", "true");
+      marcoPre.src = PAGINA + "?" + new URLSearchParams({ precarga: "1", senal: "padre", privado: origen }).toString();
+      host.append(marcoPre);
+    } else if (!quiere && marcoPre) { marcoPre.remove(); marcoPre = null; }
+    if (enVest && !offPre) {
+      if (!senal) senal = fb.senalMalla(pid, uid);
+      offPre = senal.alPresentes(v => {
+        let cambio = false;
+        for (const u of Object.keys(preDe)) if (u !== uid && !(typeof v[u] === "string" && v[u].startsWith("~"))) { delete preDe[u]; cambio = true; }
+        for (const [u, s] of Object.entries(v || {})) {
+          if (u === uid || typeof s !== "string" || !s.startsWith("~")) continue;
+          const t = s === "~listo" ? "listo" : /^~\d{1,3}$/.test(s) ? s.slice(1) : "";
+          if (t && preDe[u] !== t) { preDe[u] = t; cambio = true; }
+        }
+        if (cambio) pintaVestibulo(true);
+      });
+      if (preHecha) publicaPre("listo");
+    } else if (!enVest && offPre) { offPre(); offPre = null; preEnviado = ""; }
+  }
+  function publicaPre(t) {
+    if (!enSala() || corriendo() || t === preEnviado) return;
+    preEnviado = t; preDe[uid] = t;
+    if (!senal) senal = fb.senalMalla(pid, uid);
+    senal.entra("~" + t).catch(() => {});
+    pintaVestibulo(true);
+  }
+  function mensajePre(d) {
+    if (d.tipo === "token") {
+      const w = marcoPre.contentWindow;
+      Promise.resolve(auth.currentUser?.getIdToken(!!d.nuevo)).catch(() => null)
+        .then(token => { if (!muerto && marcoPre?.contentWindow === w) w.postMessage({ canal: PADRE, tipo: "token", token: token || null }, location.origin); });
+      return;
+    }
+    if (d.tipo !== "precarga") return;
+    if (d.error) { preHecha = true; precarga(); return; }             // (sin permiso o sin programa: no se insiste)
+    if (d.listo) { preHecha = true; publicaPre("listo"); precarga(); return; }
+    const pct = Math.max(0, Math.min(99, Math.floor((d.pct | 0) / 10) * 10));   // (de a 10 %: pocas escrituras)
+    publicaPre(String(pct));
   }
   /* El marco mide 100vh − 120 px y aparece debajo del vestíbulo, más abajo del borde de la ventana: al aparecer (y
      cuando el juego lo pide, «mirame») se desplaza la página lo justo para verlo entero. Sin esto el panel de la copa
@@ -332,7 +402,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     for (const j of presentes()) {
       if (j.uid in vrs) continue;
       vrs[j.uid] = null;
-      almacenVr.mio(j.uid).then(v => { if (v?.vr) { vrs[j.uid] = v.vr; pintaVestibulo(true); } }, () => {});
+      // (M22: sin VR guardado = 0, «nuevo»: empieza en 5000; null = todavía no llegó la respuesta)
+      almacenVr.mio(j.uid).then(v => { vrs[j.uid] = v?.vr || 0; pintaVestibulo(true); }, () => {});
     }
   }
 
@@ -356,7 +427,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (!manda || corre) abierto.cambiar = false;
     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
     const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla,
-      est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto]);
+      est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     ponEstiloVest();
@@ -377,21 +448,21 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           `<button type="button" class="jg-mkw-echa" role="menuitem" data-e="${u}" data-foco="echa-${u}">Echar de la sala</button></div>` : "");
     };
     const corona = j => j.uid === est.anfitrion ? CORONA : "";
-    const vrDe = j => `<span class="jg2-vr">VR <b>${vrs[j.uid] ? Number(vrs[j.uid]).toLocaleString("es") : "—"}</b></span>`;
+    // M22: cómo va la precarga de cada uno (lo que escribió en su presencia)
+    const preDeJ = j => { const t = preDe[j.uid]; return !t ? "" : t === "listo" ? `<span class="jg2-pre listo" title="El juego ya está bajado en su navegador">● listo</span>`
+      : `<span class="jg2-pre" title="Bajando el juego">⬇ ${escapeHtml(t)} %</span>`; };
+    const vrDe = j => `<span class="jg2-vr">VR <b>${vrs[j.uid] ? Number(vrs[j.uid]).toLocaleString("es") : vrs[j.uid] === 0 ? "5000" : "—"}</b>${vrs[j.uid] === 0 ? " <small>nuevo</small>" : ""}</span>`;
     // lo que dice el panel según quién mira (los mismos avisos de antes)
     const sinPrograma = origen === "";
     const sacado = (est.hist || []).filter(h => (h.e === "echado" || h.e === "expulsado") && h.uid === uid).pop();
     const espera = !enSala() ? "" : corre ? "" : manda ? "" : `Esperando a que <b translate="no">${escapeHtml(nombre(est.anfitrion))}</b> abra las carreras`;
     const nota = !enSala() ? (sacado ? (sacado.e === "echado" ? "El anfitrión te sacó de esta sala." : "Te sacaron de esta sala por votación.")
         : corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
-      : corre && est.sincro ? (est.sincro.includes(uid)
-        ? (manda ? (estilo === "copa" ? "Elige la copa en el juego; después cada uno elige personaje y vehículo. La CPU completa los 12."
-            : "Arma la lista en el juego (los demás te pueden sugerir pistas); después cada uno elige personaje y vehículo.")
-          : estilo === "playlist" ? "Sugiere pistas en el juego mientras el anfitrión arma la lista. Si se te corta la conexión, tienes 30 s para volver."
-          : "Todos corren la misma carrera y la CPU completa los 12. Si se te corta la conexión, tienes 30 s para volver.")
+      : corre && est.sincro ? (est.sincro.includes(uid) ? notaFase(manda, estilo)
         : "Esta copa empezó sin ti: entras en la siguiente.")
       : manda && sinPrograma ? "El programa del juego todavía no está publicado." : "";
     const foco = vest.contains(document.activeElement) ? document.activeElement.getAttribute("data-foco") : null;
+    const salirBtn = sacado ? `<button type="button" class="jg2-salir" data-salir data-foco="salir">← Volver a Juegos</button>` : "";
 
     if (tira) {
       const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${cara(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${menuDe(j)}</span>`;
@@ -399,7 +470,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           <span class="jg2-ttit">${titular}</span>
           <span class="jg2-tcuenta">${js.length} de ${cupo}</span>
           <div class="jg2-fichas">${js.map(ficha).join("")}${cpus ? `<span class="jg2-ficha cpu">+ ${cpus} CPU</span>` : ""}</div>
-          ${manda ? `<button type="button" class="jg-mkw-vuelve jg2-vuelve" data-foco="vuelve">Volver al vestíbulo</button>` : ""}
+          ${manda ? `<button type="button" class="jg-mkw-vuelve jg2-vuelve" data-foco="vuelve">Terminar la copa para todos</button>` : ""}
           ${nota ? `<p class="jg-mkw-nota jg2-nota" role="status">${nota}</p>` : ""}
         </div>`;
     } else {
@@ -417,7 +488,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           <span class="jg2-podio">${ult.tabla.slice(0, 3).map((f, i) => `<span>${i + 1}.º <span translate="no">${escapeHtml(f.nombre)}</span> <i>${Number(f.puntos)}</i></span>`).join("")}</span>
           ${ult.tabla.length > 3 ? `<button type="button" class="jg2-vertabla" data-tabla data-foco="tabla" aria-expanded="${abierto.tabla}">${abierto.tabla ? "Ocultar tabla" : "Ver tabla"}</button>` : ""}
         </div>${abierto.tabla && ult.tabla.length > 3 ? `<ol class="jg2-tabla">${ult.tabla.map((f, i) => `<li><i>${i + 1}.º</i><span translate="no">${escapeHtml(f.nombre)}</span><b>${Number(f.puntos)}</b></li>`).join("")}</ol>` : ""}` : "";
-      const fila = j => `<li class="jg2-fila${j.uid === uid ? " yo" : ""}">${cara(j, 30)}<span class="jg2-nombre"><b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${j.uid === uid ? "<small>tú</small>" : ""}</span>${vrDe(j)}${menuDe(j)}</li>`;
+      const fila = j => `<li class="jg2-fila${j.uid === uid ? " yo" : ""}">${cara(j, 30)}<span class="jg2-nombre"><b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${j.uid === uid ? "<small>tú</small>" : ""}</span>${preDeJ(j)}${vrDe(j)}${menuDe(j)}</li>`;
       const accion = manda && !corre
         ? `<button type="button" class="jg-mkw-empieza jg2-largar" data-foco="empieza" ${sinPrograma ? "disabled" : ""}>¡A correr!</button>`
         : espera ? `<p class="jg2-espera" role="status"><i class="jg2-punto" aria-hidden="true"></i><span>${espera}</span></p>` : "";
@@ -433,6 +504,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
         </div>
         ${opciones}
         ${nota ? `<p class="jg-mkw-nota jg2-nota" role="status">${nota}</p>` : ""}
+        ${salirBtn}
         ${ultima}
         <div class="jg2-pcab"><b>Pilotos</b><span>${js.length} de ${cupo}</span><span class="jg2-puntos" aria-hidden="true">${Array.from({ length: cupo }, (_, i) => `<i class="${i < js.length ? "si" : ""}"></i>`).join("")}</span></div>
         <ul class="jg2-lista">${js.map(fila).join("")}${cpus ? `<li class="jg2-cpu"><span class="jg2-inicial cpu" aria-hidden="true">CPU</span><span>+ ${cpus} CPU · ${escapeHtml(MKW_NIVEL[nivel])}</span></li>` : ""}</ul>`;
@@ -460,7 +532,24 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       return;
     }
     if (b.classList.contains("jg-mkw-empieza")) { b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid }); return; }
-    if (b.classList.contains("jg-mkw-vuelve")) { b.disabled = true; anota({ t: "vuelve", uid }); }
+    // (M22, el crítico: un clic cerraba la copa de todos, sin tabla; ahora pregunta)
+    if (b.classList.contains("jg-mkw-vuelve")) {
+      if (!confirm("¿Terminar la copa para todos? Se cierra el juego de todos y vuelven al vestíbulo, sin la tabla de esta copa.")) return;
+      b.disabled = true; anota({ t: "vuelve", uid });
+      return;
+    }
+    if (b.hasAttribute("data-salir")) { salir?.(); }
+  }
+  /* M22: lo que dice la tira con la copa andando, según la fase que manda el marco (sin ella, algo que siempre es cierto) */
+  function notaFase(manda, estilo) {
+    const f = faseJuego, jefe = escapeHtml(nombre(est.anfitrion));
+    if (f?.fase === "copa") return manda ? (estilo === "copa" ? "Elige la copa en el juego." : "Arma la lista en el juego; los demás te pueden sugerir pistas.")
+      : `${jefe} está ${estilo === "copa" ? "eligiendo la copa" : "armando la lista"}. Mientras, ya puedes elegir personaje y vehículo.`;
+    if (f?.fase === "elegir") return "Cada uno elige personaje y vehículo en el juego.";
+    if (f?.fase === "carrera") return `Carrera ${f.carrera}${f.carreras ? ` de ${f.carreras}` : ""} en curso.`;
+    if (f?.fase === "descanso") return `Descanso: la carrera ${f.carrera + 1} empieza en unos segundos.`;
+    if (f?.fase === "fin") return "La copa terminó.";
+    return "Todos corren la misma carrera y la CPU completa los 12. Si recargas la página, vuelves en la carrera siguiente.";
   }
   /* Escape cierra el «⋯» o «Cambiar»; un clic fuera del menú lo cierra */
   function teclaVest(ev) {
@@ -512,12 +601,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       permitido = true;
       origen = await urlPrivada();
       if (muerto) return;
-      cargaMarco(); pideVrs(); pintaVestibulo(true);
+      precarga(); cargaMarco(); pideVrs(); pintaVestibulo(true);
     });
   }
 
   function actualizar(p, estado) {
     partida = p; est = estado;
+    precarga();
     cargaMarco();
     pideVrs();
     pintaVestibulo();
@@ -531,6 +621,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
 
   function destruir() {
     muerto = true;
+    marcoPre?.remove(); marcoPre = null; offPre?.(); offPre = null;
+    if (inmAuto !== null) { inmAuto = null; try { inmersivo?.(false); } catch {} }
     clearInterval(conecta); clearInterval(esperaSala);
     document.removeEventListener("click", clicFuera);
     offP?.(); offM?.();
@@ -633,9 +725,17 @@ const ESTILO_VEST = `
 .jg-mkw2 .jg2-ficha .jg2-mas{width:24px;height:22px}
 .jg-mkw2 .jg2-ficha .jg2-menu{top:30px;right:0}
 .jg-mkw2 .jg2-vuelve{border:0;border-radius:10px;padding:8px 14px;background:#ffffff1f;color:#eef2ff;font:700 .95rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw2 .jg2-salir{justify-self:start;border:0;border-radius:10px;padding:9px 16px;background:#ffffff1f;color:#eef2ff;font:700 .95rem system-ui,sans-serif;cursor:pointer}
+.jg-mkw2 .jg2-vr small{color:#8ea0d6;font-family:system-ui,sans-serif;font-size:.75rem}
+.jg-mkw2 .jg2-pre{font:600 .75rem system-ui,sans-serif;color:#8ea0d6;white-space:nowrap}
+.jg-mkw2 .jg2-pre.listo{color:#7ee2a8}
 .jg-mkw2 .jg2-tira .jg2-nota{flex:1 1 100%;color:#d8def5;font-size:.9rem}
 .jg-mkw2 button:focus-visible{outline:2px solid #ffd34d;outline-offset:2px}
 @container (max-width:560px){.jg-mkw2 .jg2-boleto{grid-template-columns:1fr}.jg-mkw2 .jg2-accion{justify-items:stretch}.jg-mkw2 .jg2-largar{width:100%}.jg-mkw2 .jg2-espera{text-align:left;max-width:none}.jg-mkw2 .jg2-op{grid-template-columns:1fr}.jg-mkw2 .jg2-op small{grid-column:1}}
+/* M22: en el modo inmersivo (se pone solo al empezar la copa) el marco llena la pantalla y la tira del vestíbulo se va
+   (vuelve al salir con Esc o «Salir») */
+html.jg-inm .jg-mkw-marco{height:calc(100dvh - 84px);min-height:0;border-radius:12px}
+html.jg-inm .jg-mkw-vest.jugando{display:none}
 `;
 function ponEstiloVest() {
   if (document.getElementById("jg-mkw2-estilo")) return;

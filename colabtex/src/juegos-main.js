@@ -2933,7 +2933,7 @@ function pintaPartida() {
 
   /* Mientras falte gente, el enlace es lo único que hay que hacer. */
   $("jgInvita").innerHTML = est.listos ? "" : panelEspera(p, est);
-  if (!est.listos) {
+  if (!est.listos && $("jgCopiar")) {   // (M22: a quien echaron de Mario Kart no se le arma la caja: panelEspera da "")
     $("jgCopiar").onclick = async () => {
       const campo = $("jgUrl");
       campo.select();
@@ -2965,7 +2965,9 @@ function pintaPartida() {
    quien puso las condiciones. */
 function panelEspera(p, est) {
   const cupo = est.cupo || 2;
-  const dentro = (est.jugadores || []).length;
+  // (Mario Kart, M22: los echados y los que se fueron ya no cuentan, y al echado no se le ofrece invitar)
+  if (p.juego === "mkw" && est.fuera && est.fuera[state.user.uid]) return "";
+  const dentro = p.juego === "mkw" ? (est.jugadores || []).filter(j => !(est.fuera && est.fuera[j.uid])).length : (est.jugadores || []).length;
   const min = minimoDe(p);
   const anfitrion = p.anfitrion === state.user.uid;
   const varios = cupo > min;
@@ -3008,6 +3010,9 @@ function montaJuego(p) {
        un juego cuyo marco tapa la página (BT3 a pantalla completa) y que
        ofrece su propio botón de salida. */
     salir: salirDeLaPartida,
+    /* El modo inmersivo de la sala (la pantalla completa del sitio, con el chat flotante): Mario Kart lo pone solo al
+       empezar la copa y lo saca al volver al vestíbulo. */
+    inmersivo: si => ponInmersivo(si),
     /* Escribir en el chat de la sala a nombre de quien está: para que una
        decisión a mano quede a la vista de todos (BT3: «Dar la victoria»). */
     chat: texto => fb.mandaChat(state.pid, { uid: state.user.uid, nombre: state.user.name }, texto).catch(() => false),

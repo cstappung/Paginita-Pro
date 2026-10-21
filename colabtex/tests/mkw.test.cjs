@@ -358,3 +358,28 @@ test('§87 echar: el anfitrión saca a quien quiera (vestíbulo o copa andando);
  assert.match(mk,/anota\(\{ t: "echa", uid, a: b\.dataset\.e \}\)/);
  assert.match(mk,/enviar\("fuera", \{ uids: salieron \}\)/,'el marco sabe quién salió (la carrera lo corta ya)');
 });
+
+test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado de cada piloto, la tira con la fase real y solo PC',()=>{
+ const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8'),mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ // el sitio le presta su modo inmersivo al módulo; Mario Kart lo pone al cargar el marco (una vez por copa) y lo saca al volver
+ assert.match(main,/inmersivo: si => ponInmersivo\(si\)/);
+ assert.match(mk,/if \(inmersivo && inmAuto !== est\.ronda\) \{ inmAuto = est\.ronda; try \{ inmersivo\(true\); \} catch \{\} \}/);
+ assert.match(mk,/if \(inmAuto !== null\) \{ inmAuto = null; try \{ inmersivo\?\.\(false\); \} catch \{\} \}/);
+ assert.match(mk,/html\.jg-inm \.jg-mkw-marco\{height:calc\(100dvh - 84px\)/,'el marco llena la pantalla en inmersivo');
+ // la precarga: un marco escondido con precarga=1, su token, y lo que lleva cada uno en su presencia («~40», «~listo»)
+ assert.match(mk,/new URLSearchParams\(\{ precarga: "1", senal: "padre", privado: origen \}\)/);
+ assert.match(mk,/marcoPre && e\.source === marcoPre\.contentWindow && e\.origin === location\.origin && e\.data\?\.canal === HIJO/,'solo los mensajes de ESE marco');
+ assert.match(mk,/senal\.entra\("~" \+ t\)/,'la presencia lleva «~»: la malla del juego no la toma por una sesión');
+ assert.match(mk,/● listo/);assert.match(mk,/⬇ \$\{escapeHtml\(t\)\} %/);
+ // la tira dice la fase que manda el marco (antes, un texto fijo toda la copa); «Terminar la copa» pregunta
+ assert.match(mk,/d\.tipo === "fase" && typeof d\.fase === "string"/);
+ assert.match(mk,/function notaFase\(manda, estilo\)/);
+ assert.match(mk,/confirm\("¿Terminar la copa para todos\?/);
+ // al echado no se le arma la caja de invitar, y el sitio no le busca el botón «Copiar» (se cortaba la actualización)
+ assert.match(main,/if \(p\.juego === "mkw" && est\.fuera && est\.fuera\[state\.user\.uid\]\) return "";/);
+ assert.match(main,/if \(!est\.listos && \$\("jgCopiar"\)\)/);
+ // solo PC (celulares fuera del lanzamiento): ni táctil en los controles ni Android en «Qué hace falta»
+ const datos=fs.readFileSync(raiz('src/juegos/controles-datos.js'),'utf8'),reg=fs.readFileSync(raiz('src/juegos/reglas.js'),'utf8');
+ assert.match(datos,/"mkw": \{"movil":false,"pc":true,"pide":"teclado o mando"/);
+ assert.ok(!/Chrome en Android \(el juego usa WebGPU\)/.test(reg),'sin Android en Mario Kart');
+});
