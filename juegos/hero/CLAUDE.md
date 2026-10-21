@@ -10,6 +10,10 @@ plain ES modules (no build) and integrated here. Two ways in, one document:
   `?modo=online`. Postman: `colabtex/src/juegos/hero-sala.js`
   (`crearHeroSala`), reducer `redHero` in `motor.js`.
 
+**Batalla de Rock** (the 3D stage behind the highway, «Tu rockero», rock
+boxes; admins only while on trial) lives in `js/rock/`: read
+`js/rock/CLAUDE.md` before touching it or `session.js`'s `_…Rock` methods.
+
 Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat:
 `docs/antitrampas/hero.md`.

@@ -281,7 +281,7 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
       b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(){return {entrar:async()=>true,envia(){},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
-      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};export const crearRockHero=()=>({inicia:()=>Promise.resolve(),atiende(){},ponLooks(){},destruir(){}});'));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
     } }]
   })).outputFiles[0].text;
@@ -352,7 +352,7 @@ test('sala: los demás ven la canción que hojea el anfitrión, sin escribir en 
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
       b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(o){globalThis.__malla=o;return {entrar:async()=>true,envia(d){globalThis.__salen.push(d);},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
-      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};export const crearRockHero=()=>({inicia:()=>Promise.resolve(),atiende(){},ponLooks(){},destruir(){}});'));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
     } }]
   })).outputFiles[0].text;
@@ -487,7 +487,7 @@ test('sala: la hora de quien dirige se mide por la malla (como NTP) y vale la de
     entryPoints: [path.join(dir, 'hero-sala.js')], bundle: true, format: 'cjs', platform: 'node', write: false,
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$|\/malla\.js$|\/hero\.js$/ }, a => ({ path: a.path, namespace: 'stub' }));
-      b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ahora=()=>0,senalMalla=0,borraYemasVivo=0,crearMalla=0,atiendeHero=0,mandaCuenta=0;', loader: 'js' }));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ahora=()=>0,senalMalla=0,borraYemasVivo=0,crearMalla=0,atiendeHero=0,mandaCuenta=0,crearRockHero=0;', loader: 'js' }));
     } }]
   })).outputFiles[0].text;
   const m = { exports: {} };
