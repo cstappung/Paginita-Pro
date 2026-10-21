@@ -896,7 +896,8 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Marca de VR (en la tabla)** | El «+13 VR» o «-17 VR» que la página escribe con la letra del juego al lado de la fila de cada humano en la tabla de puntos del juego, en la franja libre de la derecha. La fila sale de los puntos y la llegada de la sala (`filasDeTabla`). |
 | **Capas de avisos** | Dónde va cada aviso según su urgencia: al centro solo lo de la carrera (esperar a alguien, un corte); en la esquina de arriba a la izquierda el estado (📶 alguien va lento, la PC lenta), 6 s cada vez que cambia (nada queda encima de la imagen toda la carrera: cuesta cuadros); abajo el zócalo de las pausas; arriba el cartel de quien recargó. Como en un tablero: alarma, indicador y placa de datos no van en el mismo lugar. |
 | **Podio** | Al terminar la copa, 8 s con «¡GANÓ …!» y los tres primeros (con el VR que ganó o perdió cada humano en la copa) con la letra del juego, y después la vuelta al vestíbulo. |
-| **Modo inmersivo (automático)** | La pantalla completa del sitio (sin cabecera, el chat flotando encima). Al empezar la copa la sala lo pone sola y lo saca al volver al vestíbulo; si la persona sale con Esc, en esa copa no se le vuelve a poner. |
+| **Modo inmersivo (al empezar, opcional)** | La pantalla completa del sitio (sin cabecera, el chat flotando encima). Si la persona prendió «Pantalla completa al empezar» en el vestíbulo (apagado por omisión), al empezar la copa la sala lo pone sola y lo saca al volver al vestíbulo; si sale con Esc, en esa copa no se le vuelve a poner. |
+| **Difuminado del fondo** (`backdrop-filter`) | Un efecto de estilo que muestra borroso lo que hay detrás de un elemento (la cabecera «de vidrio» del modo inmersivo, el botón del chat). Encima del juego es caro: el navegador tiene que volver a difuminar la imagen del juego en cada cuadro. Como poner un filtro que hay que recalcular con cada muestra de la señal. |
 | **Precarga del vestíbulo** | Mientras se conversa en el vestíbulo, un marco escondido abre la página del juego con `?precarga=1`: baja el programa y lo que el juego lee al arrancar y en la primera carrera, y lo deja guardado en el navegador **sin arrancar el juego**. Como cargar el condensador antes de cerrar el interruptor: cuando se aprieta «¡A correr!» la energía ya está. |
 | **Presencia (del buzón)** | Lo que cada piloto deja escrito en el buzón de la sala (Firebase: `vivo/<sala>/rtc/en/<uid>`, hasta 16 letras): durante la carrera, la sesión de su malla; en el vestíbulo, cómo va su precarga («~40», «~listo»). La «~» del principio le dice a la malla que eso no es una sesión. |
 | **MiiGroup (playerMiis)** | Una lista del juego con 12 lugares para Mii (SectionParams +0x188), uno por puesto de la carrera. El globo con el nombre sobre cada kart y las filas de las tablas escriben el nombre del Mii de ese lugar. El juego solo llena el lugar 0 (con la licencia: «Piloto»): por eso en la sala un humano salía «Piloto» y el otro sin nombre. |
@@ -8575,9 +8576,11 @@ copia ahí al elegir). La carrera es la misma.
 
 ### 98.7 Antes de la carrera: modo inmersivo y la precarga con el estado de cada piloto
 
-- **Modo inmersivo automático** (sitio, `colabtex/src/juegos/mkw.js`): al empezar la copa la sala pasa sola al modo
-  inmersivo del sitio (sin cabecera, el chat flotante encima; el sitio le presta `ponInmersivo` al módulo) y el marco
-  llena la pantalla; al volver al vestíbulo sale. Una vez por copa: si la persona sale con Esc, no se le vuelve a poner.
+- **Modo inmersivo al empezar, opcional** (sitio, `colabtex/src/juegos/mkw.js`): con «Pantalla completa al empezar»
+  prendido en el vestíbulo (de cada uno, en su navegador; **apagado por omisión**, §98.10), al empezar la copa la sala
+  pasa sola al modo inmersivo del sitio (sin cabecera, el chat flotante encima; el sitio le presta `ponInmersivo` al
+  módulo) y el marco llena la pantalla; al volver al vestíbulo sale. Una vez por copa: si sale con Esc, no se le vuelve
+  a poner.
 - **La precarga del vestíbulo:** mientras se conversa, un marco escondido abre la página del juego con `?precarga=1`
   (`precargarTodo` en `mkw.mjs`): baja el manifiesto, los archivos chicos, el paquete de diminutos, el programa (con su
   huella, a la caché HTTP) y la semilla de bloques (la del arranque y hasta 32 MB de lo de después del título, a Cache
@@ -8659,3 +8662,24 @@ y el zócalo), `4-A-reelegir.png` (volver a elegir), `6-A-fin.png` (el podio); e
   hace igual que una persona).
 - **`prueba-elegir` leía la semilla** del selector, que ahora solo se ve con `?depurar=1`: la prueba abre la página
   con ese parámetro.
+
+### 98.10 Después de probarlo el dueño: la pantalla completa, opcional y apagada
+
+El dueño probó con `jugar.bat`: «hay demasiado lag al abrir la lista de mapas en el host, no debiera poner full screen
+automático, esto debiera ser opcional y desactivado por defecto». Qué pasaba: en el modo inmersivo, el sitio pone
+encima del juego la cabecera y el botón del chat con **difuminado del fondo** (`backdrop-filter: blur`), que el
+navegador recalcula sobre la imagen del juego en cada cuadro; y al pasar a inmersivo el marco cambia de tamaño (el
+juego rehace su lienzo) justo cuando la anfitriona abre la lista de copas. Es lo mismo que se midió con el chip 📶
+(§98.9): cualquier cosa encima de la imagen cuesta cuadros.
+
+Arreglo (sitio, `colabtex/src/juegos/mkw.js`):
+
+- **«Pantalla completa al empezar»**: un interruptor en el vestíbulo, de cada uno (en su navegador,
+  `localStorage` `mkw.inmersivoAlEmpezar`), **apagado por omisión**. Solo si está prendido la sala pasa sola al modo
+  inmersivo al empezar la copa. La pantalla completa a mano (el botón del sitio) sigue como siempre.
+- Si alguien lo prende, con Mario Kart en pantalla la cabecera y el botón del chat van **sin difuminado** (fondo
+  liso), para que cueste lo menos posible.
+
+Pruebas: sitio `mkw.test.cjs` 20/20 (el interruptor apagado por omisión, sin difuminado encima del juego);
+`prueba-experiencia` (Piloto Dos lo prende y Uno no: al empezar, solo Dos queda en inmersivo).
+

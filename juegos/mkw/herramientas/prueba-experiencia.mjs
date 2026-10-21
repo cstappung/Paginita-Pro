@@ -212,6 +212,13 @@ try {
   }
   if (!args.includes('--rapida')) {
     // «¡A correr!» (§73): el juego de los dos se abre en la sala (modo=sala), sin nada del Wi-Fi del juego
+    // M22: la pantalla completa al empezar es de cada uno y viene apagada: Piloto Dos la prende, Uno no
+    const prefUno0 = await uno.getAttribute('.jg-mkw-vest [data-inm]', 'aria-pressed').catch(() => null);
+    if (await dos.getAttribute('.jg-mkw-vest [data-inm]', 'aria-pressed').catch(() => null) !== 'true')
+      await dos.locator('.jg-mkw-vest [data-inm]').click({ timeout: 10000 }).catch(() => {});
+    const prefDos = await hastaQue(() => dos.getAttribute('.jg-mkw-vest [data-inm]', 'aria-pressed').catch(() => null), v => v === 'true', 5000);
+    const prefUno = prefUno0;   // (un perfil nuevo, como un PC que nunca jugó: apagada)
+    ok('M22: «Pantalla completa al empezar» viene apagada; Piloto Dos la prende (es de cada uno)', prefUno === 'false' && prefDos === 'true', `Uno ${prefUno} · Dos ${prefDos}`);
     await uno.locator('.jg-mkw-empieza').click();
     const enSala = u => new URL(u).searchParams.get('modo') === 'sala';
     const [mA, mB] = await Promise.all([hastaMarco(uno, enSala, 30000), hastaMarco(dos, enSala, 30000)]);
@@ -307,8 +314,8 @@ try {
     // M22: al empezar la copa, la sala pasó sola al modo inmersivo del sitio (el marco llena la pantalla) en los dos
     const inm = p => p.evaluate(() => document.documentElement.classList.contains('jg-inm')).catch(() => null);
     const [iUno, iDos] = [await inm(uno), await inm(dos)];
-    await foto(uno, '9-inmersivo-uno.png');
-    ok('M22: al empezar la copa la sala pasó sola al modo inmersivo (en los dos)', iUno === true && iDos === true, `Uno ${iUno} · Dos ${iDos}`);
+    await foto(dos, '9-inmersivo-dos.png');
+    ok('M22: al empezar la copa, solo Piloto Dos (que lo pidió) pasó a pantalla completa; Uno sigue con la página', iUno === false && iDos === true, `Uno ${iUno} · Dos ${iDos}`);
     // (para usar la tira —echar— la anfitriona sale del inmersivo con «Salir», como una persona)
     if (iUno) await uno.click('#jgInm').catch(() => {});
     // (M21: la tira del vestíbulo con la copa andando, la de la anfitriona: el titular, «2 de 12», las fichas con su «⋯»)

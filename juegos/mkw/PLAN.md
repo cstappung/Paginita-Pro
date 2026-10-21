@@ -154,7 +154,7 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   nombres de la sala en el juego (globo y tablas: `nombres_nativo.cpp`, un Mii por casilla de humano y su nombre en cada
   carrera; las CPU con el nombre que les da el juego, y las skins de RR repartidas por la sala para quien recarga); el
   podio de 8 s al final; el cartel de quien recargó; los avisos por capas (📶 en una esquina); el reloj de 90 s de la
-  copa; el modo inmersivo automático y la precarga del vestíbulo con «⬇ 40 %» / «● listo» por piloto. Banco
+  copa; el modo inmersivo al empezar (opcional, apagado por omisión) y la precarga del vestíbulo con «⬇ 40 %» / «● listo» por piloto. Banco
   `letreros` 17, `nombres-juego` 15, `sala-carrera` 75; `prueba-sala` 42/42 (`--recarga` 38/38), `prueba-precarga` 8/8,
   `prueba-relevo` 10/10; sitio 20/20, `prueba-experiencia` 22/22 y `--playlist` 24/24 (§98)
 
@@ -463,6 +463,12 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-21 17:45** — **La pantalla completa al empezar, opcional y apagada** (§98.10, el dueño después de probar con
+  `jugar.bat`: «demasiado lag al abrir la lista de mapas en el host»). El modo inmersivo pone encima del juego la
+  cabecera y el botón del chat con difuminado del fondo, que se recalcula sobre la imagen en cada cuadro. Ahora es un
+  interruptor del vestíbulo («Pantalla completa al empezar», de cada uno, apagado por omisión) y, si alguien lo prende,
+  encima del juego no hay difuminado. Sitio 20/20; `prueba-experiencia` 23/23 (Dos lo prende y Uno no: solo Dos).
 
 - **2026-10-21 17:17** — **El «Modo consola»: antes, durante y entre carreras** (§98, M22, pedido del dueño: «haz el modelo
   recomendado» del crítico de la experiencia, más volver a elegir personaje y vehículo, opcional). El descanso pasó de
