@@ -26,7 +26,7 @@
 import { tintaDe } from "./tintas.js";
 import { JUEGOS, ordenaRanks } from "./motor.js";
 import { LOGROS, SOLO_PREFIJO, reparto } from "./logros.js";
-import { TIENDA, HALLOWEEN, precioDe, tiendaHalloweenAbierta, coleccionHalloween } from "./tienda.js";
+import { TIENDA, HALLOWEEN, precioDe, tiendaHalloweenAbierta, coleccionHalloween, edicionesDe } from "./tienda.js";
 
 export const LARGO_BIO = 120;
 export const MAX_VITRINA = 6;
@@ -292,6 +292,8 @@ function calculaEstadisticas(uid, d) {
     /* Lo comprado en la tienda: lo que la economía aceptó (`compras`), o
        lo escrito tal cual mientras no hay economía. */
     compras: (d.compras || d.tienda || {})[uid] || {},
+    /* El número de edición de cada cosa de Halloween que tiene (tienda.js). */
+    ediciones: edicionesDe(uid, d.compras || d.tienda || {}),
     /* Sin todas las lecturas todavía, lo que se gana no se puede negar. */
     parcial: d.completo === false
   };

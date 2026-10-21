@@ -50,3 +50,33 @@ export const aLaVenta = (id, t) => !!TIENDA[id] && (!HALLOWEEN[id] || (t >= VENT
 export const tiendaHalloweenAbierta = t => t >= VENTA_HALLOWEEN.desde && t < VENTA_HALLOWEEN.hasta;
 /* Cuántos artículos de Halloween tiene comprados (`compras` = id → algo). */
 export const coleccionHalloween = compras => Object.keys(HALLOWEEN).filter(id => compras && compras[id]).length;
+
+/* El número de edición de un artículo de Halloween: en qué orden lo
+   compró cada cuenta (por la hora del servidor; empate, por uid) y cuántas
+   lo tienen. `compras` = uid → {id: at} (lo que aceptó la economía) o
+   uid → {id: {at, p}} (el nodo tal cual, mientras no hay economía). Lo
+   que no trae hora (una compra recién hecha aquí) va al final.
+   Un premio de coleccionista se numera por la hora de su `n`-ésima compra. */
+const horaDe = v => typeof v === "number" ? v : v && Number.isFinite(v.at) ? v.at : Infinity;
+function ordenEdicion(filas, uid) {
+  filas.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
+  return { n: filas.findIndex(f => f[1] === uid) + 1, total: filas.length };
+}
+export function edicion(id, uid, compras) {
+  const premio = PREMIOS_HALLOWEEN.find(p => p.id === id), filas = [];
+  for (const [u, l] of Object.entries(compras || {})) {
+    if (!l) continue;
+    if (premio) {
+      const horas = Object.keys(HALLOWEEN).filter(k => l[k]).map(k => horaDe(l[k])).sort((a, b) => a - b);
+      if (horas.length >= premio.n) filas.push([horas[premio.n - 1], u]);
+    } else if (l[id]) filas.push([horaDe(l[id]), u]);
+  }
+  return ordenEdicion(filas, uid);
+}
+/* Las ediciones de todo lo de Halloween que tiene `uid`: id → {n, total}. */
+export function edicionesDe(uid, compras) {
+  const mias = (compras || {})[uid] || {}, out = {}, k = coleccionHalloween(mias);
+  for (const id of Object.keys(HALLOWEEN)) if (mias[id]) out[id] = edicion(id, uid, compras);
+  for (const p of PREMIOS_HALLOWEEN) if (k >= p.n) out[p.id] = edicion(p.id, uid, compras);
+  return out;
+}

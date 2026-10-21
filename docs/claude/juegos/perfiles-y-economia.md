@@ -188,6 +188,19 @@ legendario 20 000, mítico 35 000), on sale only inside `VENTA_HALLOWEEN`
   `perfil/fondo` (`fb.ponEnPerfil`, an `update`, so the rest of the profile
   is untouched). It repaints by signature, not on every data arrival, or
   the animations would restart.
+- **Each frame is worn, not just a ring**: the Parca's hood (an evenodd
+  path with a face-sized hole) and a scythe drawn only outside the photo,
+  the witch hat, the crown, the ghost peeking over the rim, the bat hugging
+  the top. Behind the photo, `.jg-marco-hw::before` is a blurred conic aura
+  that rotates (HTML, colours `--h1..3` per frame), which `avatarMarco`
+  turns on with the class `jg-marco-hw`.
+- **Edition numbers** (`edicion` / `edicionesDe` in tienda.js, pure): the
+  n-th account to buy an item, by server time (ties by uid), and how many
+  own it; a reward is numbered by the time of its n-th purchase. Derived,
+  never stored. `estadisticas` carries them as `ediciones`, the card and
+  the profile page show them as seals (`sellosHw` in perfil-vista.js,
+  «🎃 La Parca n.º 2/3»), and the shop says «Solo 2 personas lo tienen.
+  Serías la edición n.º 3».
 - **Background scenes animate HTML, not SVG** (`.hwf-*`, sized in
   `cqw/cqh` inside the `.jg-fanim` container); the silhouettes are still
   SVGs. In the lobby strip the frames are paused until hover.

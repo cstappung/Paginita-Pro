@@ -13,7 +13,8 @@
  * logros, compartida), así que abrir diez tarjetas no son diez lecturas.
  */
 import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
-import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece } from "./perfil-tarjeta.js";
+import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece, marcoDe } from "./perfil-tarjeta.js";
+import { HALLOWEEN, PREMIOS_HALLOWEEN, RAREZAS_HW, rarezaHw } from "./tienda.js";
 import { LOGROS } from "./logros.js";
 import { adorno, tieneAdorno } from "./marcos-animados.js";
 import { capaMascota } from "./perfil-mascota.js";
@@ -26,12 +27,13 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* La foto con su marco. Vale para cualquier tamaño: el marco es CSS y
    lee `--t` (el lado) y `--c` (el color de la persona). Los animados
    (campeones y tienda) son además un SVG encima (`adorno`). */
+const esHw = id => !!(HALLOWEEN[id] || PREMIOS_HALLOWEEN.some(p => p.id === id));
 export function avatarMarco(foto, nombre, color, marco, tam, uid) {
-  const id = marco || "anillo", anim = tieneAdorno(id);
+  const id = marco || "anillo", anim = tieneAdorno(id), hw = esHw(id);
   const dentro = foto
     ? `<img src="${esc(foto)}" alt="" referrerpolicy="no-referrer">`
     : `<i>${esc((nombre || "?").charAt(0).toUpperCase())}</i>`;
-  return `<span class="jg-av jg-marco-${esc(id)}${anim ? " jg-marco-anim" : ""}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}${anim ? adorno(id) : ""}</span>`;
+  return `<span class="jg-av jg-marco-${esc(id)}${anim ? " jg-marco-anim" : ""}${hw ? " jg-marco-hw" : ""}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}${anim ? adorno(id) : ""}</span>`;
 }
 
 /* La capa que se mueve de un fondo de la tienda (vacía si no es animado). */
@@ -42,6 +44,23 @@ export const marcoDeUid = (uid, perfil, datos) => marcoVisible(perfil, datos ? e
 /* Los de Halloween traen su escena (fondos-halloween.js); los demás, tres
    <b> que el CSS de cada uno usa como quiere. */
 export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}${ESCENAS_HW[f.id] ? " jg-fanim-hw" : ""}" aria-hidden="true">${ESCENAS_HW[f.id] || "<b></b><b></b><b></b>"}</i>` : "";
+
+/* El sello de lo de Halloween que lleva puesto: qué es y su número de
+   edición («n.º 3/7»: fue la tercera cuenta en comprarlo, y lo tienen
+   siete). `grande` es el de la portada del perfil, con la rareza. */
+export function sellosHw(marco, fondo, est, grande) {
+  const items = [];
+  if (esHw(marco)) items.push(marcoDe(marco));
+  if (fondo && esHw(fondo.id)) items.push(fondo);
+  if (!items.length) return "";
+  return `<div class="jg-hw-sellos${grande ? " grande" : ""}">${items.map(it => {
+    const rz = rarezaHw(it.id) || "premio", e = est && est.ediciones && est.ediciones[it.id];
+    const tipo = rz === "premio" ? "Premio secreto" : RAREZAS_HW[rz].n;
+    return `<span class="jg-hw-sello r-${rz}" title="${esc(`${it.n} · ${tipo} · edición limitada de Halloween 2026${e && e.n ? ` · n.º ${e.n} de ${e.total}` : ""}`)}">` +
+      `<b>${rz === "premio" ? "🎁" : "🎃"} ${esc(it.n)}</b>${e && e.n ? `<em>n.º ${e.n}<small>/${e.total}</small></em>` : ""}` +
+      (grande ? `<small class="jg-hw-sello-s">${esc(tipo)} · Edición limitada Halloween 2026</small>` : "") + `</span>`;
+  }).join("")}</div>`;
+}
 
 /* Quién es, con lo que haya: su perfil manda, luego lo que trae quien
    pregunta (la ficha que se tocó, la cuenta de Google si es uno mismo),
@@ -79,6 +98,7 @@ export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor, cartas })
       ${avatarMarco(q.foto, q.nombre, q.color, marco, 76)}
       <div class="jg-mini-id"><b>${nombreHtml(uid, esc(q.nombre), editor ? p && p.tinta || "normal" : "")}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
     </div>
+    ${sellosHw(marco, f, est)}
     ${q.bio ? `<p class="jg-mini-bio">${esc(q.bio)}</p>` : `<p class="jg-mini-bio jg-nada">${uid === yo ? "Aún no escribes nada sobre ti." : "Sin descripción."}</p>`}
     <div class="jg-mini-num">${n.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>
     <div class="jg-mini-vit">${vit.length ? vit.map(v => pieza(v)).join("") : `<p class="jg-nada">${est ? "Todavía nada que exhibir." : "Cargando…"}</p>`}</div>
@@ -199,6 +219,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
           ${avatarMarco(q.foto, q.nombre, q.color, marco, 116)}
           <div class="jg-pf-id">
             <h1>${nombreHtml(uid, esc(q.nombre))}</h1>
+            ${sellosHw(marco, fondo, est, true)}
             ${q.bio ? `<p>${esc(q.bio)}</p>` : propio ? `<p class="jg-nada">Escribe algo sobre ti en «Personalizar».</p>` : ""}
           </div>
         </div>

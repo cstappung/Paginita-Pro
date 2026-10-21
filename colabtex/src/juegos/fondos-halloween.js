@@ -21,6 +21,10 @@ const MURCIELAGO = svg("0 0 40 20", `<path d="M20 9C16 3 9 2 1 5c3 1 4 3 3 6 3-1
 const CUERVO = svg("0 0 40 20", `<path d="M20 11C16 5 10 2 1 3c5 2 8 4 10 7-3 0-5 1-6 3 4-1 8-1 11 0l4 3 4-3c3-1 7-1 11 0-1-2-3-3-6-3 2-3 5-5 10-7-9-1-15 2-19 8z" fill="#0c0000"/>`);
 const CALABAZA = svg("0 0 40 34", `<path d="M19 6c0-3 1-5 4-6l1.4 1.6C22.6 2.4 21.6 4 21.6 6z" fill="#3f6212"/><ellipse cx="20" cy="20" rx="19" ry="13.5" fill="#ea580c"/><path d="M20 7c-5 3-5 23 0 26M20 7c5 3 5 23 0 26M9 9c-7 5-7 18 0 23M31 9c7 5 7 18 0 23" fill="none" stroke="#9a3412" stroke-width="1.2"/><path d="M10 17l4-5 4 5zM22 17l4-5 4 5zM9 22c4 6 18 6 22 0l-3 1.6-2 2.4-2.6-2-2.4 2-2.4-2-2.6 2-2-2.4z" fill="#fde047"/>`);
 const BRUJA = svg("0 0 64 32", `<path d="M3 21.4L46 18l.4 1.8L3.4 23z" fill="#1a0b2e"/><path d="M45 15.4l15-4.4-2.6 6 4.4 3.4-15.4-1.2z" fill="#1a0b2e"/><path d="M47 13l12-2M47 19l13 1" stroke="#1a0b2e" stroke-width=".8"/><path d="M19 20c-1-6 1-11 6-13.4l4 .8c4 3 4 8.6 2 12.6z" fill="#1a0b2e"/><path d="M29 8c7 1.6 12 6.4 15 11.4L31 20z" fill="#1a0b2e"/><path d="M24 20l-3 6 3 .4 3-6zM29 20l1 6.4 2.6-.6-1-6.2z" fill="#1a0b2e"/><circle cx="24.6" cy="6.4" r="3" fill="#1a0b2e"/><path d="M18 5.4l14-1.2-3.4-1.6L23-6l.6 8.8z" fill="#1a0b2e"/><path d="M21.6 6.8l-3.2 1.4 3.4-.2z" fill="#1a0b2e"/>`);
+const MANO = svg("0 0 30 40", `<path d="M9 40V24l-4-9c-1-2 1-4 3-2l3 6V6c0-2 3-2 3 0v11-14c0-2 3-2 3 0v14-11c0-2 3-2 3 0v12-8c0-2 3-2 3 0v16c0 4-2 7-4 9v13z" fill="#4d7c0f" stroke="#1a2e05" stroke-width="1"/><path d="M12 22c2 1 5 1 7 0" stroke="#1a2e05" stroke-width=".8" fill="none"/>`);
+const HOJA = svg("0 0 20 20", `<path d="M10 1l2 5 5-2-2 5 4 2-5 2 1 5-5-3-5 3 1-5-5-2 4-2-2-5 5 2z" fill="currentColor"/><path d="M10 19V9" stroke="#78350f" stroke-width="1"/>`);
+const CALDERO = svg("0 0 40 30", `<ellipse cx="20" cy="9" rx="17" ry="5" fill="#4ade80" opacity=".35"/><path d="M5 9h30c0 11-7 17-15 17S5 20 5 9z" fill="#0b0b10"/><path d="M10 26l-3 4M30 26l3 4" stroke="#0b0b10" stroke-width="2.4"/><ellipse cx="20" cy="9" rx="16" ry="4" fill="#111827"/><ellipse cx="20" cy="8.6" rx="13" ry="2.6" fill="#22c55e"/>`);
+const MURC_GRANDE = svg("0 0 120 50", `<path d="M60 22C50 8 30 2 2 10c10 3 13 9 10 17 9-5 16-3 19 4 6-6 14-6 19 1 3-4 6-6 10-6s7 2 10 6c5-7 13-7 19-1 3-7 10-9 19-4-3-8 0-14 10-17-28-8-48-2-58 12z" fill="#0c0000"/><path d="M55 14l-1-7 4 5h4l4-5-1 7z" fill="#0c0000"/><circle cx="57" cy="17" r="1.4" fill="#ef4444"/><circle cx="63" cy="17" r="1.4" fill="#ef4444"/>`);
 const RAYO = svg("0 0 20 60", `<path d="M12 0L4 26h6L3 60l14-36h-6l7-24z" fill="#f8fafc"/>`);
 
 /* Lo que se repite: el cielo con estrellas va en ::before (CSS). */
@@ -48,6 +52,9 @@ const MANSION = `<path d="M0 88C80 82 160 86 240 82S360 80 400 84V100H0Z"/><path
   `<path d="M262 76V46h76v30zM258 47L300 24l42 23zM266 48V30h14v18zM263 31L273 12l10 19zM322 50V22h14v28zM319 23L329 4l10 19zM300 30V16h6v16z"/>` +
   `<path d="M286 76V64a6 6 0 0 1 12 0v12z" fill="#05070f"/>` +
   `<path d="M210 86V64l-5-7 5 3V52l-3-5 4 3 1-9 2 10 3-3-3 6v7l6-4-6 7v21zM160 88V74l-4-4 4 1v-6l-3-3 4 2 1-6 1 7 3-2-3 4v5l4-2-4 4v12z"/>`;
+const OJOS_BUHO = `<g class="hwf-vent"><circle cx="176" cy="44" r="1.6" fill="#facc15"/><circle cx="181" cy="44" r="1.6" fill="#facc15"/></g>`;
+const VELAS = `<g class="hwf-vent">` + [[48, 63], [86, 69], [259, 61], [336, 68]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="#fbbf24" opacity=".35"/><path d="M${x} ${y - 2}c-1 1.6-1 3 0 3.4 1-.4 1-1.8 0-3.4z" fill="#fde047"/>`).join("") + `</g>`;
+const VENTANAS_CASTILLO = `<g class="hwf-vent"><rect x="276" y="52" width="3" height="5"/><rect x="300" y="38" width="3" height="5"/><rect x="318" y="56" width="3" height="5"/><rect x="306" y="62" width="4" height="6"/></g>`;
 const VENTANAS = `<g class="hwf-vent"><rect x="270" y="36" width="5" height="7" rx="1"/><rect x="328" y="30" width="5" height="7" rx="1"/><rect x="272" y="54" width="7" height="8" rx="1"/><rect x="306" y="54" width="7" height="8" rx="1"/><rect x="321" y="54" width="7" height="8" rx="1"/><circle cx="300" cy="40" r="3"/></g>`;
 
 const BOSQUE = (() => {
@@ -57,24 +64,29 @@ const BOSQUE = (() => {
 
 /* Una por fondo. */
 export const ESCENAS_HW = {
-  cementerio: luna("l-cem") + `<i class="hwf-murc m1">${MURCIELAGO}</i>` +
+  cementerio: luna("l-cem") + `<i class="hwf-fugaz"></i>` + `<i class="hwf-murc m1">${MURCIELAGO}</i><i class="hwf-murc m3">${MURCIELAGO}</i>` +
     `<i class="hwf-fant f1">${FANTASMA}</i><i class="hwf-fant f2">${FANTASMA}</i>` +
-    sil("0 0 400 100", `<g fill="#07051a">${TUMBAS}</g>`) + niebla,
-  calabazar: lucecitas(9, "hwf-luc") +
+    sil("0 0 400 100", `<g fill="#07051a">${TUMBAS}</g>${VELAS}${OJOS_BUHO}`) +
+    `<i class="hwf-mano">${MANO}</i><i class="hwf-mano h2">${MANO}</i>` + niebla,
+  calabazar: luna("l-cosecha") + lucecitas(9, "hwf-luc") +
+    [0, 1, 2, 3, 4, 5].map(i => `<i class="hwf-hoja" style="--x:${8 + i * 16}%;--d:${(6 + (i % 3) * 1.6).toFixed(1)}s;--r:-${(i * 1.3).toFixed(1)}s;color:${["#ea580c", "#b45309", "#dc2626"][i % 3]}">${HOJA}</i>`).join("") +
     sil("0 0 400 100", `<g fill="#170617">${CAMPO}</g>`) +
     [[6, 4, 30], [24, 2, 20], [47, 6, 34], [66, 1, 22], [84, 5, 28]].map(([x, y, s], i) =>
       `<i class="hwf-cal" style="left:${x}%;bottom:${y}%;--s:${s}cqh;--r:-${(i * .7).toFixed(1)}s"><b></b>${CALABAZA}</i>`).join(""),
   aquelarre: luna("l-bruja") + `<i class="hwf-bruja">${BRUJA}</i>` +
-    `<i class="hwf-murc m2">${MURCIELAGO}</i><i class="hwf-murc m3">${MURCIELAGO}</i>` +
-    sil("0 0 400 100", `<g fill="#0b0218">${CASTILLO}</g>`),
-  mansion: `<i class="hwf-nubes"></i><i class="hwf-lluvia"></i><i class="hwf-rayo">${RAYO}</i>` +
+    `<i class="hwf-murc m1">${MURCIELAGO}</i><i class="hwf-murc m2">${MURCIELAGO}</i><i class="hwf-murc m3">${MURCIELAGO}</i>` +
+    sil("0 0 400 100", `<g fill="#0b0218">${CASTILLO}</g><g fill="#a3e635">${VENTANAS_CASTILLO}</g>`) +
+    `<i class="hwf-caldero">${CALDERO}<b></b><b></b><b></b></i>`,
+  mansion: luna("l-velada") + `<i class="hwf-nubes"></i><i class="hwf-lluvia"></i><i class="hwf-rayo">${RAYO}</i>` +
+    `<i class="hwf-murc m4">${MURCIELAGO}</i><i class="hwf-murc m5">${MURCIELAGO}</i><i class="hwf-fant f4">${FANTASMA}</i>` +
     sil("0 0 400 100", `<g fill="#03050b">${MANSION}</g><g fill="#fde68a">${VENTANAS}</g>`, "xMaxYMax") +
     `<i class="hwf-destello"></i>`,
-  lunasangre: luna("l-sangre") + `<i class="hwf-bruma"></i>` +
+  lunasangre: `<i class="hwf-rayos"></i>` + luna("l-sangre") + `<i class="hwf-murcg">${MURC_GRANDE}</i><i class="hwf-bruma"></i>` +
     [1, 2, 3].map(i => `<i class="hwf-cuervo c${i}">${CUERVO}</i>`).join("") +
-    sil("0 0 400 100", `<g fill="#0f0000">${BOSQUE}</g>`) + lucecitas(8, "hwf-brasa"),
-  nocheeterna: `<i class="hwf-aurora"></i><i class="hwf-aurora a2"></i>` + luna("l-eterna") +
+    sil("0 0 400 100", `<g fill="#0f0000">${BOSQUE}</g>`) + lucecitas(8, "hwf-brasa") +
+    [[14, 14], [46, 9], [78, 16]].map(([x, y], i) => `<i class="hwf-ojos" style="left:${x}%;bottom:${y}%;--r:-${i * 1.7}s"></i>`).join(""),
+  nocheeterna: `<i class="hwf-aurora"></i><i class="hwf-aurora a2"></i>` + luna("l-eterna") + `<i class="hwf-fugaz"></i><i class="hwf-fugaz z2"></i>` + lucecitas(7, "hwf-alma") +
     [[12, 0], [30, -3], [55, -6.5], [72, -1.5], [90, -4.5]].map(([x, r], i) => `<i class="hwf-farol" style="left:${x}%;--r:${r}s;--d:${11 + i}s">${CALABAZA}</i>`).join("") +
     `<i class="hwf-fant f3">${FANTASMA}</i>` +
-    sil("0 0 400 100", `<g fill="#03010f">${CASTILLO}</g>`)
+    sil("0 0 400 100", `<g fill="#03010f">${CASTILLO}</g><g fill="#c4b5fd">${VENTANAS_CASTILLO}</g>`)
 };

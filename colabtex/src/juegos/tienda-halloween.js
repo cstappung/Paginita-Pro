@@ -18,7 +18,7 @@
  */
 import { MARCOS, FONDOS, requisito, estadisticas } from "./perfil-tarjeta.js";
 import { avatarMarco, capaFondo } from "./perfil-vista.js";
-import { HALLOWEEN, RAREZAS_HW, PREMIOS_HALLOWEEN, VENTA_HALLOWEEN, precioDe, rarezaHw, tiendaHalloweenAbierta, coleccionHalloween } from "./tienda.js";
+import { HALLOWEEN, RAREZAS_HW, PREMIOS_HALLOWEEN, VENTA_HALLOWEEN, precioDe, rarezaHw, tiendaHalloweenAbierta, coleccionHalloween, edicion } from "./tienda.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -149,6 +149,14 @@ export function abreTiendaHalloween(ctx, elegido) {
     /* Lo comprado aquí que la lectura todavía no trae. */
     return s - Object.keys(aqui).filter(id => !base[id]).reduce((t, id) => t + precioDe(id), 0);
   };
+  /* Las compras de todos (para el número de edición), con lo de aquí. */
+  const todas = () => {
+    const c = Object.assign({}, (D && (D.compras || D.tienda)) || {}), u = yo();
+    if (u) c[u.uid] = Object.assign({}, c[u.uid], aqui);
+    return c;
+  };
+  const cuantos = id => D ? edicion(id, "", todas()).total : null;
+  const numero = id => yo() && D ? edicion(id, yo().uid, todas()).n : 0;
   const puesto = tipo => {
     if (puestoAqui[tipo]) return puestoAqui[tipo];
     const p = ctx.perfil() || {};
@@ -168,10 +176,13 @@ export function abreTiendaHalloween(ctx, elegido) {
       : mio ? `<span class="jg-th-it-p tuyo">✓ Tuyo</span>`
       : pr ? `<span class="jg-th-it-p">🎁 Con ${pr.n} artículos</span>`
       : `<span class="jg-th-it-p">${MONEDA} ${miles(precioDe(it.id))}</span>`;
+    const t = cuantos(it.id), n = mio ? numero(it.id) : 0;
+    const quien = t == null ? "" : mio && n ? `<small class="jg-th-it-q tuyo">Tu edición: n.º ${n}</small>`
+      : `<small class="jg-th-it-q">${t ? `👥 Lo ${t === 1 ? "tiene 1 persona" : `tienen ${t}`}` : "✨ Nadie lo tiene aún"}</small>`;
     return `<button type="button" class="jg-th-it ${tipoDe(it.id)} ${rz ? "r-" + rz : "r-premio"}${sel === it.id ? " sel" : ""}${mio ? " mio" : ""}${r && r.agotado ? " agotado" : ""}" data-th-it="${it.id}" aria-pressed="${sel === it.id}">
       <span class="jg-th-it-arte">${arte(it, 66)}</span>
       <span class="jg-th-it-rz">${rz ? esc(RAREZAS_HW[rz].n) : "Premio secreto"}</span>
-      <b class="jg-th-it-n">${esc(it.n)}</b>${pie}</button>`;
+      <b class="jg-th-it-n">${esc(it.n)}</b>${pie}${quien}</button>`;
   }
   function probador(e) {
     const u = yo() || { nombre: "Tú", foto: "", color: "#ea580c" };
@@ -199,11 +210,20 @@ export function abreTiendaHalloween(ctx, elegido) {
       <div class="jg-th-ficha ${rz ? "r-" + rz : "r-premio"}">
         <span class="jg-th-it-rz">${rz ? esc(RAREZAS_HW[rz].n) : "Premio secreto"} · ${tipo}</span>
         <h3>${esc(it.n)}</h3>
+        ${escasez(sel, mio)}
         ${accion}
         ${error ? `<p class="jg-th-err" role="alert">${esc(error)}</p>` : ""}
       </div>
       <div class="jg-th-saldo">${yo() ? `Tu saldo <b>${MONEDA} ${s == null ? "…" : miles(s)}</b>` : "Inicia sesión para ver tu saldo"}</div>
       ${coleccion(e)}`;
+  }
+  /* Lo que dice «esto es único»: cuántos lo tienen y qué número serías. */
+  function escasez(id, mio) {
+    const t = cuantos(id);
+    if (t == null) return "";
+    if (mio) { const n = numero(id); return n ? `<p class="jg-th-escasez tuyo">🏅 Tienes la edición <b>n.º ${n}</b> de ${t}. Nadie más tendrá ese número.</p>` : ""; }
+    if (premio(id)) return `<p class="jg-th-escasez">👥 ${t ? `Solo ${t} ${t === 1 ? "persona lo ha ganado" : "personas lo han ganado"}.` : "Nadie lo ha ganado todavía."}</p>`;
+    return `<p class="jg-th-escasez">${t ? `👥 Solo <b>${t}</b> ${t === 1 ? "persona lo tiene" : "personas lo tienen"}. Serías la edición <b>n.º ${t + 1}</b>.` : `✨ Nadie lo tiene todavía: serías la edición <b>n.º 1</b>.`}</p>`;
   }
   function coleccion(e) {
     const k = coleccionHalloween(e && e.compras), total = Object.keys(HALLOWEEN).length;
@@ -230,7 +250,8 @@ export function abreTiendaHalloween(ctx, elegido) {
   }
   function pinta(forzar) {
     const e = est(), s = saldo();
-    const f = JSON.stringify([sel, paso, error, ocupado, s, !!yo(), e ? Object.keys(e.compras || {}).sort() : null, puesto("marco"), puesto("fondo")]);
+    const t = D ? [...marcosHw(), ...fondosHw()].map(it => cuantos(it.id)).concat(PREMIOS_HALLOWEEN.map(p => cuantos(p.id))) : null;
+    const f = JSON.stringify([sel, paso, error, ocupado, s, !!yo(), e ? Object.keys(e.compras || {}).sort() : null, puesto("marco"), puesto("fondo"), t]);
     if (!forzar && f === firma) return;
     firma = f;
     $(".jg-th-probador").innerHTML = probador(e);
@@ -247,14 +268,14 @@ export function abreTiendaHalloween(ctx, elegido) {
   }
 
   /* ---- la fiesta de la compra ---- */
-  function celebra(it, gano) {
+  function celebra(it, gano, n) {
     if (fiesta) fiesta.remove();
     const PIEZAS = ["🎃", "👻", "🦇", "✨", "🍬", "🕸️", "💀", "🌙"];
     fiesta = document.createElement("div");
     fiesta.className = "jg-th-fiesta";
     fiesta.setAttribute("aria-live", "polite");
     fiesta.innerHTML = Array.from({ length: 22 }, (_, i) => `<i style="--a:${(i * 360 / 22).toFixed(0)}deg;--d:${(26 + (i * 7) % 16)}vmin;--r:${(i % 2 ? 1 : -1) * (120 + i * 17)}deg;--t:${(.05 * (i % 5)).toFixed(2)}s">${PIEZAS[i % PIEZAS.length]}</i>`).join("") +
-      `<div class="jg-th-fiesta-c"><span>${arte(it, 92)}</span><b>¡Es tuyo!</b><small>${esc(it.n)}</small>` +
+      `<div class="jg-th-fiesta-c"><span>${arte(it, 92)}</span><b>¡Es tuyo!</b><small>${esc(it.n)}</small>${n ? `<strong>Edición n.º ${n}</strong>` : ""}` +
       (gano ? `<em>🎁 ¡Y desbloqueaste «${esc(gano.n)}», el premio secreto!</em>` : "") + `</div>`;
     capa.appendChild(fiesta);
     const f = fiesta;
@@ -277,7 +298,7 @@ export function abreTiendaHalloween(ctx, elegido) {
       pinta();
       /* ¿Esta compra destapó un premio de coleccionista? */
       const p = PREMIOS_HALLOWEEN.find(x => antes < x.n && antes + 1 >= x.n);
-      celebra(it, p ? itemDe(p.id) : null);
+      celebra(it, p ? itemDe(p.id) : null, numero(id));
       if (ctx.suena) ctx.suena("cobra");
     } catch (err) {
       ocupado = false;

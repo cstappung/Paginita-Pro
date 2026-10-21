@@ -678,73 +678,109 @@ function memazo() {
 
 /* ---------- Tienda de Halloween (edición limitada) ----------
    Seis marcos a la venta, por rareza, y el Rey Calabaza, que no se vende:
-   se gana teniendo cinco artículos de la tienda de Halloween. Además de las
-   clases de arriba usan .lt (vela que titila), .fa (se desvanece) y la
-   pareja .hl/.cu (el hilo que se estira y la araña que baja con él). */
+   se gana teniendo cinco artículos de la tienda de Halloween. No son un
+   aro con adornos: cada uno se le pone a la foto (la capucha de la Parca,
+   el sombrero de bruja, la corona, el fantasma que se asoma, el murciélago
+   que la abraza), para que se note de lejos que es otra cosa. Detrás va un
+   aura de color que gira (CSS, `.jg-marco-hw` en juegos.html, no SVG).
+   Además de las clases de arriba usan .lt (vela que titila), .fa (se
+   desvanece) y la pareja .hl/.cu (el hilo que se estira y la araña que
+   baja con él). La foto ocupa el radio 50: lo que cae dentro la tapa. */
 
 /* Una llama de verdad: la de fuera y, dentro, otra más clara y baja. */
 const fuegoHw = (c1, c2, k = 1) => `<g transform="scale(${n1(.8 * k)} ${n1(1.3 * k)})">${llama(c1)}<g transform="translate(0 1.6) scale(.55)">${llama(c2)}</g></g>`;
+/* Chispas que suben (hacia afuera) repartidas por un arco. */
+const brasas = (n, r, a1, a2, c, d = 1.6) => Array.from({ length: n }, (_, i) => {
+  const a = a1 + (a2 - a1) * (i + .5) / n;
+  return en(r, a, an("su", n1(d + (i % 3) * .35), `<circle r="${n1(.9 + (i % 2) * .5)}" fill="${c}"/>`, n1(-i * .37)), a);
+}).join("");
+/* Fuego a lo largo de un arco, mirando hacia afuera. */
+const llamarada = (n, r, a1, a2, cs, k = 1) => Array.from({ length: n }, (_, i) => {
+  const a = a1 + (a2 - a1) * i / (n - 1), [c1, c2] = cs[i % cs.length];
+  return en(r, a, an("l", n1(.42 + (i % 3) * .13), fuegoHw(c1, c2, n1(k * (1 + (i % 2) * .3))), n1(-i * .11)), a);
+}).join("");
 
 /* Calabaza tallada, con la cara encendida (`ret`: el retraso de su vela). */
-const calabazaHw = ret => `<ellipse rx="8.6" ry="7" fill="#f97316" stroke="#7c2d12" stroke-width=".8"/>` +
+const CARA = `M-5.4-1.2l2-2.8 2 2.8zM1.4-1.2l2-2.8 2 2.8zM-5.6 1.6q5.6 4.6 11.2 0l-1.8.5-1 1.3-1.4-1.1-1.4 1.1-1.4-1.1-1.4 1.1-1-1.3z`;
+const calabazaHw = ret => an("lt", 1.3, `<ellipse rx="12" ry="10" fill="#fb923c" opacity=".3"/>`, ret) +
+  `<ellipse rx="8.6" ry="7" fill="#f97316" stroke="#7c2d12" stroke-width=".8"/>` +
   `<path d="M-3.2-6.4c-2.2 3-2.2 9.8 0 12.8M3.2-6.4c2.2 3 2.2 9.8 0 12.8" stroke="#c2410c" stroke-width=".7" fill="none"/>` +
+  `<ellipse cx="-4" cy="-3.6" rx="2" ry="1.2" fill="#fed7aa" opacity=".6"/>` +
   `<path d="M-.4-6.8c0-1.8.6-3 2-3.6" stroke="#4d7c0f" stroke-width="1.8" fill="none" stroke-linecap="round"/>` +
-  `<path d="M-5.4-1.2l2-2.8 2 2.8zM1.4-1.2l2-2.8 2 2.8zM-5.6 1.6q5.6 4.6 11.2 0l-1.8.5-1 1.3-1.4-1.1-1.4 1.1-1.4-1.1-1.4 1.1-1-1.3z" fill="#7c2d12"/>` +
-  an("lt", 1.3, `<path d="M-5.4-1.2l2-2.8 2 2.8zM1.4-1.2l2-2.8 2 2.8zM-5.6 1.6q5.6 4.6 11.2 0l-1.8.5-1 1.3-1.4-1.1-1.4 1.1-1.4-1.1-1.4 1.1-1-1.3z" fill="#fde047"/>`, ret);
+  `<path d="${CARA}" fill="#7c2d12"/>` + an("lt", 1.3, `<path d="${CARA}" fill="#fde047"/>`, ret);
 
 function calabazas() {
   const hoja = `<path d="M0 0c-3-1-5-4-4-7 2 1 4 3 4 7z" fill="#22c55e" stroke="#14532d" stroke-width=".5"/>`;
   const rulo = `<path d="M0 0c2.4-1 3.6 1.2 2.2 2.6-1.2 1.2-3.2.2-2.6-1.6" fill="none" stroke="#4ade80" stroke-width=".8" stroke-linecap="round"/>`;
-  const enreda = trazo(60, 0, 359.9, "#166534", 2.2) + cada(6, (i, a) => en(62, a + 30, hoja, a + 30 + (i % 2 ? 40 : -40)) + en(57, a + 22, rulo, a));
-  return aro(60, "#1c0700", 19, `opacity=".6"`) + an("hx", 2.6, aro(60, "#f97316", 19, `opacity=".25"`)) +
-    aro(51.4, "#fb923c", 1.6) + aro(68.8, "#7c2d12", 1.2) +
-    cada(10, (i, a) => en(64, a + 18, an("su", 1.8 + (i % 3) * .4, `<circle r="1.2" fill="#fdba74"/>`, n1(-i * .37)), a + 18)) +
-    gira(30, enreda + cada(6, (i, a) => en(60, a, i % 2 ? `<g transform="scale(.8)">${calabazaHw(n1(-i * .4))}</g>` : calabazaHw(n1(-i * .4)), a)));
+  const enreda = trazo(60, 0, 359.9, "#166534", 2.6) + trazo(60, 0, 359.9, "#4ade80", .7, `stroke-dasharray="3 7" opacity=".7"`) +
+    cada(10, (i, a) => en(i % 2 ? 64 : 56, a + 18, hoja, a + 18 + (i % 2 ? 40 : -40)) + en(57, a + 6, rulo, a));
+  const gran = `<g transform="scale(2)">${calabazaHw(0)}</g>` +
+    `<g transform="translate(0 -21)">${an("l", .5, fuegoHw("#f97316", "#fef08a", .9))}</g>`;
+  const luci = cada(8, (i, a) => en(74 + (i % 3) * 6, a + 20, an("f", n1(1.4 + (i % 3) * .4), an("t", n1(.9 + (i % 4) * .3), `<circle r="3.2" fill="#fde047" opacity=".25"/><circle r="1.4" fill="#fef9c3"/>`, n1(-i * .2)), n1(-i * .3))));
+  return aro(60, "#1c0700", 22, `opacity=".7"`) + an("hx", 2.6, aro(60, "#f97316", 22, `opacity=".3"`)) +
+    aro(50.6, "#fdba74", 2) + aro(70.4, "#7c2d12", 1.4) + aro(72, "#fb923c", .8, `stroke-dasharray="1 4" opacity=".7"`) +
+    brasas(10, 66, 30, 330, "#fdba74") + gira(40, enreda) +
+    [0, 62, 118, 242, 298].map((a, i) => en(60, a, calabazaHw(n1(-i * .4)), a)).join("") +
+    luci + en(66, 180, an("f", 2.4, gran));
 }
 
-const murcielago = (c, borde) => an("wg", .3, `<path d="M-1 0C-3-4-8-5-12-2c1.6.4 2.4 1.6 2.2 3 1.4-.8 3-.6 3.6.8.8-1.2 2.4-1.4 3.4-.4.6-.9 1.4-1.3 1.8-1.4z" fill="${c}" stroke="${borde}" stroke-width=".5"/><path d="M-1 0C-3-4-8-5-12-2c1.6.4 2.4 1.6 2.2 3 1.4-.8 3-.6 3.6.8.8-1.2 2.4-1.4 3.4-.4.6-.9 1.4-1.3 1.8-1.4z" transform="scale(-1 1)" fill="${c}" stroke="${borde}" stroke-width=".5"/>`) +
+const ALA = `M-1 0C-3-4-8-5-12-2c1.6.4 2.4 1.6 2.2 3 1.4-.8 3-.6 3.6.8.8-1.2 2.4-1.4 3.4-.4.6-.9 1.4-1.3 1.8-1.4z`;
+const murcielago = (c, borde, d = .3) => an("wg", d, `<path d="${ALA}" fill="${c}" stroke="${borde}" stroke-width=".5"/><path d="${ALA}" transform="scale(-1 1)" fill="${c}" stroke="${borde}" stroke-width=".5"/>`) +
   `<ellipse cy=".4" rx="2.2" ry="3.2" fill="${c}" stroke="${borde}" stroke-width=".4"/><path d="M-1.8-2l-.5-2.4 1.5 1.4zM1.8-2l.5-2.4-1.5 1.4z" fill="${c}"/>` +
   `<circle cx="-.8" cy="-.6" r=".6" fill="#facc15"/><circle cx=".8" cy="-.6" r=".6" fill="#facc15"/>`;
 
 function murcielagos() {
-  const luna = `<circle r="10" fill="#fde68a" opacity=".18"/><path d="M2.5-7.2a7.6 7.6 0 1 0 0 14.4a6 6 0 1 1 0-14.4z" fill="#fde68a"/>`;
+  /* El grande abraza la foto por arriba, con las alas abiertas. */
+  const rey = `<g transform="scale(3.1)">${an("wg", 1.1, `<path d="${ALA}" fill="#0b0614" stroke="#c084fc" stroke-width=".35"/><path d="${ALA}" transform="scale(-1 1)" fill="#0b0614" stroke="#c084fc" stroke-width=".35"/>` +
+      `<path d="M-4-1.4L-10-2.6M-4 .2L-9 .8M4-1.4L10-2.6M4 .2L9 .8" stroke="#3b0764" stroke-width=".35"/>`)}` +
+    `<ellipse cy=".6" rx="2.4" ry="3.4" fill="#0b0614" stroke="#c084fc" stroke-width=".35"/><path d="M-2-1.8l-.7-2.8 1.8 1.6zM2-1.8l.7-2.8-1.8 1.6z" fill="#0b0614" stroke="#c084fc" stroke-width=".3"/>` +
+    an("pp", 3.2, `<circle cx="-.9" cy="-.4" r=".7" fill="#fde047"/><circle cx=".9" cy="-.4" r=".7" fill="#fde047"/>`) +
+    `<path d="M-.7 1.6l.3.9.4-.9M.1 1.6l.3.9.4-.9" fill="#fff"/></g>`;
+  const luna = `<circle r="15" fill="#fde68a" opacity=".14"/><circle r="10" fill="#fef3c7"/><circle cx="-3" cy="-2" r="2" fill="#fde68a"/><circle cx="3" cy="3" r="1.4" fill="#fde68a"/>`;
   const vuela = (r, a, d, ret, k = 1) => en(r, a, `<g transform="scale(${n1(k * 1.35)})">${an("f", d, murcielago("#0f0a1a", "#d8b4fe"), ret)}</g>`, a);
-  return aro(60, "#1e0b3a", 19, `opacity=".65"`) + an("hx", 3, aro(60, "#7c3aed", 19, `opacity=".25"`)) +
-    aro(51.4, "#c084fc", 1.4, `opacity=".85"`) + aro(68.8, "#a855f7", 1, `stroke-dasharray="1 5" opacity=".8"`) +
-    en(61, 0, an("hx", 3.4, luna)) +
-    chispas([[64, 70, 1.8, 1.6, 0], [66, 160, 1.4, 2.1, -.7], [63, 250, 1.8, 1.8, -.3], [67, 300, 1.4, 1.4, -1.1]], "#e9d5ff") +
-    gira(5.5, vuela(57, 40, .9, 0) + vuela(57, 220, 1.1, -.4)) +
-    gira(8, vuela(64, 120, 1, -.2, .8) + vuela(64, 300, .8, -.6, .8), true) +
-    gira(12, vuela(70, 180, 1.2, -.3, .7) + vuela(70, 20, 1, -.8, .65));
+  return aro(60, "#1e0b3a", 22, `opacity=".75"`) + an("hx", 3, aro(60, "#7c3aed", 22, `opacity=".3"`)) +
+    aro(50.6, "#c084fc", 1.8) + aro(70, "#a855f7", 1, `stroke-dasharray="1 5" opacity=".8"`) +
+    en(76, 140, an("hx", 3.4, luna)) +
+    chispas([[66, 70, 2, 1.6, 0], [68, 110, 1.6, 2.1, -.7], [64, 200, 2, 1.8, -.3], [68, 250, 1.6, 1.4, -1.1], [74, 290, 2.2, 1.7, -.5]], "#e9d5ff") +
+    gira(5.5, vuela(57, 70, .9, 0) + vuela(57, 250, 1.1, -.4)) +
+    gira(8, vuela(64, 150, 1, -.2, .8) + vuela(64, 330, .8, -.6, .8) + vuela(64, 30, .9, -.9, .7), true) +
+    gira(12, vuela(72, 200, 1.2, -.3, .7) + vuela(72, 110, 1, -.8, .65) + vuela(72, 290, 1.1, -.5, .6)) +
+    en(56, 0, an("f", 2.6, rey));
 }
 
 function telarana() {
   let d = "";
   for (let i = 0; i < 12; i++) {
-    const a = i * 30, [x1, y1] = pt(50, a), [x2, y2] = pt(i % 3 === 1 ? 90 : 71, a);
+    const a = i * 30, [x1, y1] = pt(50, a), [x2, y2] = pt(i % 3 === 1 ? 94 : 73, a);
     d += `M${x1} ${y1}L${x2} ${y2}`;
   }
   for (const r of [55, 61, 67]) for (let i = 0; i < 12; i++) {
     const a1 = i * 30, [x1, y1] = pt(r, a1), [x2, y2] = pt(r, a1 + 30), [cx, cy] = pt(r - 3.6, a1 + 15);
     d += `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}`;
   }
-  /* En las esquinas la tela sigue: dos hebras más largas por diagonal. */
-  for (const a of [30, 120, 210, 300]) for (const r of [76, 84]) {
+  for (const a of [30, 120, 210, 300]) for (const r of [76, 83, 90]) {
     const [x1, y1] = pt(r, a - 22), [x2, y2] = pt(r, a + 22), [cx, cy] = pt(r - 6, a);
     d += `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}`;
   }
-  const tela = `<path d="${d}" fill="none" stroke="#e5e7eb" stroke-width=".7" opacity=".85"/>`;
-  const brillo = an("hx", 2.8, `<path d="${d}" fill="none" stroke="#c4b5fd" stroke-width="1.6" opacity=".35"/>`);
-  const gotas = cada(12, (i, a) => en(i % 2 ? 61 : 67, a + 15, an("t", 1.4 + (i % 4) * .4, `<circle r="1.1" fill="#e0f2fe"/>`, n1(-i * .29))));
-  const arana = `<g fill="none" stroke="#111" stroke-width="1" stroke-linecap="round"><path d="M-2-1L-7-5L-9-1M-2 0L-8 0L-10 4M-2 1L-7 4L-8 8M-1 2L-4 7L-4 10M2-1L7-5L9-1M2 0L8 0L10 4M2 1L7 4L8 8M1 2L4 7L4 10"/></g>` +
-    `<ellipse cy="2.6" rx="4.2" ry="4.8" fill="#111" stroke="#7c3aed" stroke-width=".5"/><circle cy="-2.6" r="2.8" fill="#111" stroke="#7c3aed" stroke-width=".5"/>` +
-    `<path d="M-1.4 1L1.4 1L0 3L1.4 5L-1.4 5L0 3Z" fill="#dc2626"/>` + an("pp", 3, `<circle cx="-1" cy="-3" r=".7" fill="#ef4444"/><circle cx="1" cy="-3" r=".7" fill="#ef4444"/>`);
-  /* La araña cuelga de la esquina de arriba a la derecha: el hilo se
-     estira (.hl, desde su punta de arriba) y la araña baja lo mismo (.cu). */
-  const cuelga = `<g transform="translate(104 2)"><g class="hl" style="--d:4s;transform-origin:50% 0"><rect x="-.35" y="0" width=".7" height="24" fill="#e5e7eb"/></g>` +
-    `<g transform="translate(0 28)"><g class="cu" style="--d:4s">${arana}</g></g></g>`;
-  return aro(60, "#1a1033", 20, `opacity=".55"`) + aro(51.2, "#a78bfa", 1.2, `opacity=".8"`) + brillo + tela + gotas +
-    gira(26, en(60, 200, `<g transform="scale(.55)">${arana}</g>`, 290)) + cuelga;
+  const tela = `<path d="${d}" fill="none" stroke="#e5e7eb" stroke-width=".75" opacity=".9"/>`;
+  const brillo = an("hx", 2.8, `<path d="${d}" fill="none" stroke="#a3e635" stroke-width="2" opacity=".28"/>`);
+  /* La seda brilla al recorrerla (.fl: el guion avanza 24 = dos periodos). */
+  const seda = `<path class="fl" style="--d:2.2s" d="${d}" fill="none" stroke="#f5f3ff" stroke-width="1.1" stroke-dasharray="2 10" stroke-linecap="round"/>`;
+  const gotas = cada(12, (i, a) => en(i % 2 ? 61 : 67, a + 15, an("t", n1(1.4 + (i % 4) * .4), `<circle r="1.2" fill="#e0f2fe"/>` + (i % 3 ? "" : chispa(2.6, "#fff")), n1(-i * .29))));
+  const arana = k => `<g transform="scale(${k})"><g fill="none" stroke="#111" stroke-width="1" stroke-linecap="round"><path d="M-2-1L-7-5L-9-1M-2 0L-8 0L-10 4M-2 1L-7 4L-8 8M-1 2L-4 7L-4 10M2-1L7-5L9-1M2 0L8 0L10 4M2 1L7 4L8 8M1 2L4 7L4 10"/></g>` +
+    `<ellipse cy="2.6" rx="4.2" ry="4.8" fill="#111" stroke="#a3e635" stroke-width=".5"/><circle cy="-2.6" r="2.8" fill="#111" stroke="#a3e635" stroke-width=".5"/>` +
+    `<path d="M-1.4 1L1.4 1L0 3L1.4 5L-1.4 5L0 3Z" fill="#dc2626"/>` +
+    an("pp", 3, `<circle cx="-1" cy="-3" r=".8" fill="#ef4444"/><circle cx="1" cy="-3" r=".8" fill="#ef4444"/><circle cx="-1" cy="-3" r="1.8" fill="#ef4444" opacity=".3"/><circle cx="1" cy="-3" r="1.8" fill="#ef4444" opacity=".3"/>`) + `</g>`;
+  /* La grande cuelga encima de la foto: el hilo se estira (.hl, desde
+     arriba) y la araña baja lo mismo (.cu), con la misma duración. */
+  const cuelga = `<g transform="translate(92 -6)"><g class="hl" style="--d:4s;transform-origin:50% 0"><rect x="-.4" y="0" width=".8" height="24" fill="#e5e7eb"/></g>` +
+    `<g transform="translate(0 30)"><g class="cu" style="--d:4s">${arana(1.5)}</g></g></g>`;
+  const mosca = `<g class="z" style="--d:.5s"><ellipse rx="2.4" ry="1.6" fill="#1f2937"/><ellipse cx="-1.4" cy="-1.8" rx="1.6" ry="1" fill="#e0f2fe" opacity=".8"/><ellipse cx="1.4" cy="-1.8" rx="1.6" ry="1" fill="#e0f2fe" opacity=".8"/><circle cx="2" r=".9" fill="#7f1d1d"/></g>` +
+    `<path d="M-3-3L3 3M3-3L-3 3" stroke="#e5e7eb" stroke-width=".4"/>`;
+  return aro(60, "#0c1a07", 22, `opacity=".55"`) + an("hx", 3, aro(60, "#65a30d", 22, `opacity=".22"`)) +
+    aro(51, "#bef264", 1.3, `opacity=".85"`) + brillo + tela + seda + gotas +
+    en(84, 300, mosca) +
+    gira(26, en(60, 200, arana(.6), 290)) + gira(34, en(66, 40, arana(.45), 130), true) + cuelga;
 }
 
 const fantasma = `<path d="M0-8.5C-5.2-8.5-7.4-4.4-7.4 0v8l2.5-2.2 2.4 2.2 2.5-2.2 2.5 2.2 2.4-2.2 2.5 2.2V0C7.4-4.4 5.2-8.5 0-8.5z" fill="#f8fafc" stroke="#94a3b8" stroke-width=".6"/>` +
@@ -752,54 +788,87 @@ const fantasma = `<path d="M0-8.5C-5.2-8.5-7.4-4.4-7.4 0v8l2.5-2.2 2.4 2.2 2.5-2
   `<ellipse cx="-4.4" cy=".8" rx="1.2" ry=".6" fill="#f9a8d4" opacity=".75"/><ellipse cx="4.4" cy=".8" rx="1.2" ry=".6" fill="#f9a8d4" opacity=".75"/>`;
 
 function fantasmas() {
-  const estela = Array.from({ length: 5 }, (_, i) => `<circle cx="${n1(-7 - i * 3.6)}" cy="${n1(3 + i * .4)}" r="${n1(2.6 - i * .42)}" fill="#e0f2fe" opacity="${n1(.5 - i * .09)}"/>`).join("");
-  const uno = (a, ret, k) => en(60, a, `<g transform="scale(${n1(k * 1.25)})">${an("fa", 3, an("f", 1.3, estela + fantasma, ret), ret)}</g>`, a + 90);
-  const bu = `<text x="0" y="0" font-size="9" font-weight="900" font-family="system-ui,sans-serif" text-anchor="middle" dominant-baseline="central" fill="#fff" stroke="#6d28d9" stroke-width="1.6" paint-order="stroke">¡Bu!</text>`;
-  return an("hx", 3.2, aro(60, "#bae6fd", 20, `opacity=".14"`)) + aro(60, "#0f172a", 16, `opacity=".45"`) +
-    aro(51.6, "#e0f2fe", 1.2, `stroke-dasharray="2 3" opacity=".8"`) + aro(68.4, "#bae6fd", .8, `opacity=".6"`) +
-    chispas([[66, 15, 1.6, 1.8, 0], [64, 105, 1.4, 2.2, -.8], [67, 195, 1.6, 1.6, -.4], [65, 285, 1.4, 2, -1.2]], "#e0f2fe") +
-    gira(10, uno(0, 0, 1) + uno(90, -.7, .85) + uno(180, -1.4, 1) + uno(270, -2.1, .85)) +
-    en(78, 135, an("p", 3.6, bu, -1.2)) + en(78, 315, an("p", 3.6, bu, -3));
+  const estela = Array.from({ length: 5 }, (_, i) => `<circle cx="${n1(-7 - i * 3.6)}" cy="${n1(3 + i * .4)}" r="${n1(2.6 - i * .42)}" fill="#a5f3fc" opacity="${n1(.5 - i * .09)}"/>`).join("");
+  const uno = (a, ret, k) => en(62, a, `<g transform="scale(${n1(k * 1.2)})">${an("fa", 3, an("f", 1.3, estela + fantasma, ret), ret)}</g>`, a + 90);
+  const bu = `<text x="0" y="0" font-size="9" font-weight="900" font-family="system-ui,sans-serif" text-anchor="middle" dominant-baseline="central" fill="#fff" stroke="#0e7490" stroke-width="1.6" paint-order="stroke">¡Bu!</text>`;
+  /* El grande se asoma por encima de la foto y se agarra del borde. */
+  const asoma = `<path d="M-23 8C-23-14-12-27 0-27S23-14 23 8Z" fill="#f8fafc" stroke="#94a3b8" stroke-width=".9"/>` +
+    `<path d="M-23 8C-23-14-12-27 0-27" fill="none" stroke="#fff" stroke-width="2" opacity=".8"/>` +
+    an("pp", 3.6, `<ellipse cx="-8" cy="-9" rx="4" ry="5.4" fill="#0f172a"/><ellipse cx="8" cy="-9" rx="4" ry="5.4" fill="#0f172a"/><circle cx="-6.6" cy="-11" r="1.4" fill="#fff"/><circle cx="9.4" cy="-11" r="1.4" fill="#fff"/>`) +
+    `<ellipse cy="1.6" rx="3" ry="3.6" fill="#0f172a"/><ellipse cx="-14" cy="-2" rx="3" ry="1.5" fill="#f9a8d4" opacity=".8"/><ellipse cx="14" cy="-2" rx="3" ry="1.5" fill="#f9a8d4" opacity=".8"/>` +
+    `<path d="M-30 10c-2-5 2-9 6-7l6 5c1 2-1 4-3 3z" fill="#f8fafc" stroke="#94a3b8" stroke-width=".8"/><path d="M30 10c2-5-2-9-6-7l-6 5c-1 2 1 4 3 3z" fill="#f8fafc" stroke="#94a3b8" stroke-width=".8"/>`;
+  const CIAN = [["#0891b2", "#cffafe"], ["#06b6d4", "#ecfeff"], ["#0e7490", "#a5f3fc"]];
+  return an("hx", 3.2, aro(60, "#a5f3fc", 22, `opacity=".16"`)) + aro(60, "#082f49", 18, `opacity=".55"`) +
+    llamarada(13, 61, 105, 255, CIAN, .95) +
+    aro(50.8, "#e0f2fe", 1.4, `stroke-dasharray="2 3"`) + aro(69.6, "#a5f3fc", .9, `opacity=".7"`) +
+    chispas([[68, 60, 1.8, 1.8, 0], [66, 300, 1.6, 2.2, -.8], [74, 95, 1.6, 1.6, -.4], [74, 265, 1.6, 2, -1.2]], "#e0f2fe") +
+    gira(10, uno(90, 0, 1) + uno(210, -1, .9) + uno(330, -2, .9)) +
+    en(80, 120, an("p", 3.6, bu, -1.2)) + en(80, 240, an("p", 3.6, bu, -3)) +
+    en(42, 0, an("f", 2.2, asoma));
 }
 
 function caldero() {
   const burbuja = r => `<circle r="${r}" fill="#14532d" fill-opacity=".35" stroke="#86efac" stroke-width=".8"/><circle cx="${n1(-r * .35)}" cy="${n1(-r * .35)}" r="${n1(r * .3)}" fill="#dcfce7"/>`;
   const RUNAS = ["M-2-3.5V3.5M-2-3.5L2-1.5M-2 0L2 2", "M-2.5 3.5L0-3.5L2.5 3.5M-1.4.6H1.4", "M-2.5-3.5L2.5 3.5M2.5-3.5L-2.5 3.5M0-3.5V3.5",
     "M-2 3.5V-3.5L2 0L-2 3.5", "M0-3.5L2.5 0L0 3.5L-2.5 0Z", "M-2.5-3.5H2.5L-2.5 3.5H2.5"];
-  const olla = `<path d="M-12-3h24c0 9-5.4 14-12 14S-12 6-12-3z" fill="#111827" stroke="#6b7280" stroke-width=".8"/>` +
+  const olla = `<ellipse cy="-3" rx="16" ry="6" fill="#4ade80" opacity=".25"/>` +
+    `<path d="M-12-3h24c0 9-5.4 14-12 14S-12 6-12-3z" fill="#111827" stroke="#6b7280" stroke-width=".8"/>` +
+    `<path d="M-8 3c2 3 6 4 9 3" stroke="#374151" stroke-width="1.2" fill="none" stroke-linecap="round"/>` +
     `<path d="M-8 10l-2 4M8 10l2 4" stroke="#111827" stroke-width="2" stroke-linecap="round"/>` +
     `<ellipse cy="-3" rx="13" ry="3.2" fill="#1f2937" stroke="#6b7280" stroke-width=".8"/><ellipse cy="-3.4" rx="10.6" ry="2.2" fill="#16a34a"/>` +
     an("hx", .9, `<ellipse cy="-3.4" rx="10.6" ry="2.2" fill="#86efac"/>`) +
     [[-5, -6, .9, 0], [1, -7, 1.2, -.4], [6, -6, .8, -.8], [-1, -5, 1, -1.1]].map(([x, y, d, r]) => `<g transform="translate(${x} ${y})">${an("su", d, burbuja(1.5), r)}</g>`).join("") +
-    [[-6, 15], [0, 16], [6, 15]].map(([x, y], i) => `<g transform="translate(${x} ${y})">${an("l", .4 + i * .1, llama(i % 2 ? "#fbbf24" : "#f97316", .9), n1(-i * .13))}</g>`).join("");
-  return aro(60, "#052e16", 19, `opacity=".7"`) + an("hx", 1.8, aro(60, "#22c55e", 15, `opacity=".35"`)) +
+    [[-6, 15], [0, 16], [6, 15]].map(([x, y], i) => `<g transform="translate(${x} ${y})">${an("l", n1(.4 + i * .1), fuegoHw(i % 2 ? "#fbbf24" : "#f97316", "#fef08a", .8), n1(-i * .13))}</g>`).join("");
+  /* El humo verde sube por los dos lados del aro. */
+  const humo = cada(10, (i) => {
+    const a = i < 5 ? 200 + i * 22 : 160 - (i - 5) * 22;
+    return en(64, a, an("su", n1(2.6 + (i % 3) * .5), `<circle r="${n1(3.4 + (i % 3))}" fill="#86efac" opacity=".28"/>`, n1(-i * .45)), a);
+  });
+  /* El sombrero de bruja, puesto sobre la foto. */
+  const sombrero = `<path d="M-15 0C-12-14-6-30 4-40C10-44 17-42 21-37C15-37 10-33 8-27C6-17 10-8 15 0Z" fill="#3b0764" stroke="#c084fc" stroke-width=".9"/>` +
+    `<path d="M-8-18C-4-26 0-33 5-38" stroke="#6d28d9" stroke-width="1.2" fill="none"/>` +
+    `<path d="M-15 0C-14-3-14-5-13-7H13.4C13.6-5 14-3 15 0Z" fill="#16a34a"/>` +
+    `<rect x="-4" y="-7" width="8" height="6" rx="1" fill="none" stroke="#fbbf24" stroke-width="1.4"/>` +
+    `<path d="M-32 2C-20-5 20-5 32 2C20 9-20 9-32 2Z" fill="#2e1065" stroke="#c084fc" stroke-width=".9"/>` +
+    `<g transform="translate(20 -38)">${an("t", 1.2, chispa(3.4, "#fde047"))}</g><g transform="translate(-6 -20)">${an("t", 1.7, chispa(2, "#e9d5ff"), -.6)}</g>`;
+  return aro(60, "#052e16", 22, `opacity=".75"`) + an("hx", 1.8, aro(60, "#22c55e", 17, `opacity=".38"`)) +
     gira(9, aro(60, "#4ade80", 6, `stroke-dasharray="3 5" stroke-linecap="round" opacity=".55"`)) +
-    aro(51.6, "#4ade80", 2) + aro(68.6, "#a855f7", 1.4) +
-    gira(18, cada(6, (i, a) => en(65, a + 30, an("hx", 1.5, `<path d="${RUNAS[i]}" stroke="#e9d5ff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`, n1(-i * .25)), a + 30)), true) +
-    cada(10, (i, a) => i === 5 ? "" : en(56 + (i % 3) * 3, a + 13, an("su", 1.6 + (i % 4) * .3, burbuja(n1(1.3 + (i % 3) * .6)), n1(-i * .31)), a + 13)) +
-    chispas([[67, 60, 1.8, 1.5, 0], [66, 120, 1.4, 1.9, -.6], [67, 240, 1.8, 1.7, -.2], [66, 300, 1.4, 1.3, -1]], "#d8b4fe") +
-    en(62, 180, olla);
+    aro(50.8, "#4ade80", 2.2) + aro(70, "#a855f7", 1.4) +
+    gira(18, cada(8, (i, a) => en(65, a + 22, an("hx", 1.5, `<path d="${RUNAS[i % 6]}" stroke="#e9d5ff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`, n1(-i * .25)), a + 22)), true) +
+    humo +
+    cada(10, (i, a) => i === 5 ? "" : en(56 + (i % 3) * 3, a + 13, an("su", n1(1.6 + (i % 4) * .3), burbuja(n1(1.3 + (i % 3) * .6)), n1(-i * .31)), a + 13)) +
+    chispas([[72, 60, 1.8, 1.5, 0], [70, 120, 1.4, 1.9, -.6], [72, 240, 1.8, 1.7, -.2], [70, 300, 1.4, 1.3, -1]], "#d8b4fe") +
+    en(70, 180, `<g transform="scale(1.45)">${olla}</g>`) +
+    `<g transform="translate(64 22) rotate(-14)">${sombrero}</g>`;
 }
 
 function parca() {
-  const guadana = trazo(78, -60, -6, "#c084fc", 6, `opacity=".16" stroke-linecap="round"`) + trazo(78, -32, -6, "#f5d0fe", 3, `opacity=".3" stroke-linecap="round"`) +
-    en(78, 0, `<path d="M-20 0H20" stroke="#1c1917" stroke-width="3.4" stroke-linecap="round"/><path d="M-20 0H20" stroke="#a16207" stroke-width="1" stroke-dasharray="2 3"/>` +
-      `<path d="M19-1C16-14 2-21-14-18C-4-15 9-10 15 1Z" fill="#f1f5f9" stroke="#7c3aed" stroke-width="1"/><path d="M17-3C13-12 3-16-8-16" fill="none" stroke="#94a3b8" stroke-width=".8"/>` +
-      an("hx", .7, `<path d="M17-1C14-12 2-18-11-16" fill="none" stroke="#fff" stroke-width="1.1"/>`), 90);
-  const calavera = `<path d="M0-16C-11-16-15-7-15 4L-11 10H11L15 4C15-7 11-16 0-16Z" fill="#1e1b4b" stroke="#7c3aed" stroke-width=".9"/>` +
-    `<path d="M0-9C-6-9-8.5-5-8.5-1c0 3 1.5 5 3.5 5.6V7.5h10V4.6c2-.6 3.5-2.6 3.5-5.6C8.5-5 6-9 0-9z" fill="#f5f5f4" stroke="#44403c" stroke-width=".7"/>` +
-    `<ellipse cx="-3.2" cy="-1.2" rx="2.2" ry="2.4" fill="#0c0a09"/><ellipse cx="3.2" cy="-1.2" rx="2.2" ry="2.4" fill="#0c0a09"/>` +
-    an("hx", .9, `<circle cx="-3.2" cy="-1" r="1.1" fill="#ef4444"/><circle cx="3.2" cy="-1" r="1.1" fill="#ef4444"/>`) +
-    `<path d="M0 1.6l-1 2h2z" fill="#0c0a09"/><path d="M-3 5.2V7.4M-1 5.2V7.4M1 5.2V7.4M3 5.2V7.4" stroke="#44403c" stroke-width=".6"/>`;
-  const alma = `<path d="M0 4C-3 2-3-2 0-6C3-2 3 2 0 4Z" fill="#e0e7ff" opacity=".85"/><circle cx="-.9" cy="0" r=".5" fill="#312e81"/><circle cx=".9" cy="0" r=".5" fill="#312e81"/>`;
-  const C = [["#7c3aed", "#f0abfc"], ["#a21caf", "#f5d0fe"], ["#6d28d9", "#e9d5ff"]];
-  return aro(60, "#07000f", 21, `opacity=".85"`) + an("hx", 1.6, aro(57, "#a855f7", 11, `opacity=".38"`)) +
-    cada(20, (i, a) => en(61, a, an("l", n1(.45 + (i % 3) * .14), fuegoHw(C[i % 3][0], C[i % 3][1], n1(1.05 + (i % 2) * .35)), n1(-i * .11)), a)) +
-    aro(51.4, "#e9d5ff", 1.3) + aro(53.4, "#7c3aed", .8, `stroke-dasharray="1 3"`) +
-    gira(9, cada(3, (i, a) => en(56, a + 60, an("fa", 2, alma, n1(-i * .6)), a + 150)), true) +
-    cada(10, (i, a) => en(67, a + 9, an("su", n1(1.4 + (i % 3) * .3), `<circle r="1" fill="#f0abfc"/>`, n1(-i * .27)), a + 9)) +
-    en(70, 0, an("f", 2.2, calavera)) +
-    gira(5, guadana);
+  /* La capucha envuelve la foto: un manto con la punta caída hacia un lado
+     y un agujero redondo justo del tamaño de la cara (evenodd). Dentro, una
+     sombra alrededor de la cara le da hondura. */
+  const MANTO = "M90-20C72-17 42-8 24 18C11 38 7 64 11 92C14 114 9 130 3 142H137C131 130 126 114 129 92C133 64 130 38 118 18C111 6 104-6 96-12C99-16 98-19 90-20Z";
+  const capucha = `<path fill-rule="evenodd" d="${MANTO} M121 70A51 51 0 1 0 19 70A51 51 0 1 0 121 70Z" fill="#0d0718" stroke="#7c3aed" stroke-width="1.2"/>` +
+    `<path d="M88-14C66-8 44 4 32 22M96-12C104 0 112 10 117 22M18 70C16 92 18 114 22 134M122 70C124 92 122 114 118 134M40 124C46 132 52 138 54 142M100 124C94 132 88 138 86 142" fill="none" stroke="#2e1065" stroke-width="2.4" stroke-linecap="round"/>` +
+    aro(57, "#000", 13, `opacity=".55"`) + aro(52.2, "#4c1d95", 2.2) +
+    an("hx", 2.2, `<path d="M90-20C72-17 42-8 24 18C11 38 7 64 11 92C14 114 9 130 3 142M90-20C98-19 99-16 96-12C104-6 111 6 118 18C130 38 133 64 129 92C126 114 131 130 137 142" fill="none" stroke="#c084fc" stroke-width="1.6" opacity=".75"/>`);
+  /* La guadaña cruza por detrás de la cara: solo se dibuja lo que queda
+     fuera de la foto, encima del manto. La hoja es una media luna de acero
+     que sale de la punta del mango y se curva por encima de la capucha. */
+  const HOJA = "M136 0C124-17 98-25 70-18C94-14 114-6 128 9Z";
+  const guadana = `<path d="M-4 150L33 107M107 33L136 0" stroke="#1c1917" stroke-width="4.6" stroke-linecap="round"/><path d="M-4 150L33 107M107 33L136 0" stroke="#78350f" stroke-width="1.4" stroke-dasharray="3 3"/>` +
+    `<path d="M133-3l6 6" stroke="#57534e" stroke-width="5" stroke-linecap="round"/>` +
+    `<path d="${HOJA}" fill="#cbd5e1" stroke="#334155" stroke-width="1"/><path d="M134-2C122-13 100-19 80-17C100-12 116-5 127 6Z" fill="#94a3b8" opacity=".55"/>` +
+    an("hx", .8, `<path d="M136 0C124-17 98-25 70-18" fill="none" stroke="#fff" stroke-width="1.6"/>`) +
+    `<g transform="translate(72 -18)">${an("t", 1.6, chispa(4.5, "#f5d0fe"))}</g>` +
+    `<path d="M22 118c-3 0-5 3-4 5l4 1M24 121c-3 0-5 3-4 5l4 1M27 124c-3 0-4 3-3 5l4 1" fill="none" stroke="#e7e5e4" stroke-width="1.6" stroke-linecap="round"/>`;
+  const alma = `<path d="M0 4C-3 2-3-2 0-6C3-2 3 2 0 4Z" fill="#e0e7ff" opacity=".9"/><circle cx="-.9" cy="0" r=".5" fill="#312e81"/><circle cx=".9" cy="0" r=".5" fill="#312e81"/>`;
+  const VIOLETA = [["#7c3aed", "#f0abfc"], ["#a21caf", "#f5d0fe"], ["#6d28d9", "#e9d5ff"]];
+  return capucha + guadana +
+    aro(51, "#e9d5ff", 1.4) + aro(53, "#7c3aed", .9, `stroke-dasharray="1 3"`) +
+    llamarada(11, 60, 118, 242, VIOLETA, 1.1) +
+    gira(9, cada(4, (i, a) => en(60, a + 45, an("fa", 2, alma, n1(-i * .6)), a + 135)), true) +
+    brasas(12, 66, 100, 260, "#f0abfc", 1.3) +
+    chispas([[78, 300, 2.2, 1.6, 0], [80, 60, 1.8, 2, -.7], [74, 330, 1.6, 1.3, -.4]], "#e9d5ff");
 }
 
 function reycalabaza() {
@@ -808,13 +877,19 @@ function reycalabaza() {
     `<rect x="-13" y="4" width="26" height="4.4" rx="1" fill="#eab308" stroke="#92400e" stroke-width=".8"/>` +
     `<circle cx="-15" cy="-7.6" r="1.5" fill="#fef9c3"/><circle cx="0" cy="-11.6" r="1.7" fill="#fef9c3"/><circle cx="15" cy="-7.6" r="1.5" fill="#fef9c3"/>` +
     an("t", 1.2, `<circle cy="6.2" r="1.6" fill="#ef4444"/>`) + an("t", 1.5, `<circle cx="-7" cy="6.2" r="1.2" fill="#22c55e"/>`, -.5) + an("t", 1.7, `<circle cx="7" cy="6.2" r="1.2" fill="#a855f7"/>`, -.9) +
-    an("hx", 1.4, `<path d="M-13 6L-15-7L-7.5-1L0-11L7.5-1L15-7L13 6Z" fill="none" stroke="#fff" stroke-width=".7"/>`);
-  return aro(60, "#2a1300", 19, `opacity=".7"`) + an("hx", 2, aro(60, "#f59e0b", 17, `opacity=".3"`)) +
-    cada(14, (i, a) => en(62, a + 13, an("l", n1(.55 + (i % 3) * .15), fuegoHw(i % 2 ? "#ea580c" : "#f59e0b", "#fef08a", 1), n1(-i * .11)), a + 13)) +
-    aro(51.4, "#fde047", 2) + aro(68.6, "#fde047", 1.2) + aro(66, "#fbbf24", 1, `stroke-dasharray="1 4"`) +
-    gira(20, cada(4, (i, a) => en(59, a + 45, calabazaHw(n1(-i * .3)), a + 45))) +
-    chispas([[67, 70, 2.2, 1.4, 0], [66, 110, 1.6, 1.8, -.5], [67, 250, 2.2, 1.6, -.2], [66, 290, 1.6, 1.2, -.9], [56, 180, 2, 1.5, -.6]], "#fef08a") +
-    en(68, 0, an("f", 1.8, corona));
+    an("hx", 1.4, `<path d="M-13 6L-15-7L-7.5-1L0-11L7.5-1L15-7L13 6Z" fill="none" stroke="#fff" stroke-width=".7"/>`) +
+    `<g transform="translate(0 -12)">${an("t", 1.1, chispa(3, "#fff"))}</g>`;
+  const hoja = `<path d="M0 0c-3-1-5-4-4-7 2 1 4 3 4 7z" fill="#22c55e" stroke="#14532d" stroke-width=".5"/>`;
+  const ORO = [["#ea580c", "#fef08a"], ["#f59e0b", "#fef9c3"], ["#dc2626", "#fde68a"]];
+  return aro(60, "#2a1300", 22, `opacity=".75"`) + an("hx", 2, aro(60, "#f59e0b", 19, `opacity=".32"`)) +
+    llamarada(13, 61, 112, 248, ORO, 1.05) +
+    aro(50.6, "#fde047", 2.4) + aro(70, "#fde047", 1.4) +
+    gira(14, aro(66, "#fbbf24", 1.6, `stroke-dasharray="2 3"`)) +
+    gira(40, cada(8, (i, a) => en(i % 2 ? 64 : 57, a + 20, hoja, a + 20 + (i % 2 ? 40 : -40)))) +
+    [58, 112, 248, 302].map((a, i) => en(60, a, calabazaHw(n1(-i * .3)), a)).join("") +
+    brasas(8, 70, 120, 240, "#fde68a") +
+    chispas([[74, 70, 2.4, 1.4, 0], [74, 290, 2.4, 1.6, -.2], [80, 30, 1.8, 1.2, -.9], [80, 330, 1.8, 1.8, -.5]], "#fef08a") +
+    `<g transform="translate(70 18) scale(1.55)">${an("f", 1.8, corona)}</g>`;
 }
 
 const DIBUJOS = {

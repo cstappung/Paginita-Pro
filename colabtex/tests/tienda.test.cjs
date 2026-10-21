@@ -9,7 +9,7 @@ const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^impor
 const carga=(fs_,exp)=>{const c={__PM:PM};vm.createContext(c);vm.runInContext('const PM=__PM;'+fs_.map(f=>sin('src/juegos/'+f+'.js')).join('\n')+';globalThis.__T={'+exp+'}',c);return c.__T;};
 /* Cada módulo es suyo en el bundle; concatenados, chocan nombres internos
    (`juegoDeCategoria`, `snake`), así que van en contextos separados. */
-const T=Object.assign(carga(['motor','logros','tienda','cortes','referidos','monedas'],'TIENDA,PRECIO_TIENDA,HALLOWEEN,RAREZAS_HW,VENTA_HALLOWEEN,PREMIOS_HALLOWEEN,precioDe,aLaVenta,economia,monedasDe'),
+const T=Object.assign(carga(['motor','logros','tienda','cortes','referidos','monedas'],'TIENDA,PRECIO_TIENDA,HALLOWEEN,RAREZAS_HW,VENTA_HALLOWEEN,PREMIOS_HALLOWEEN,precioDe,aLaVenta,edicion,edicionesDe,economia,monedasDe'),
  carga(['motor','logros','tienda','perfil-tarjeta'],'MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,campeones,topDeCategoria,SOLO_PREFIJO,JUEGOS'),
  carga(['marcos-animados'],'MARCOS_ANIMADOS,adorno,tieneAdorno'),
  carga(['fondos-halloween'],'ESCENAS_HW'));
@@ -197,4 +197,22 @@ test('Halloween: la regla de `tienda` dice los mismos precios y la misma hora de
  for(const [ids,p] of grupos)for(const id of ids)deRegla[id]=p;
  for(const id of Object.keys(T.TIENDA))assert.equal(deRegla[id],T.precioDe(id),'precio de '+id+' en la regla');
  assert.equal(Object.keys(deRegla).length,Object.keys(T.TIENDA).length,'la regla no vende nada más');
+});
+
+test('Halloween: el número de edición es el orden de compra, y cuántos lo tienen',()=>{
+ const ed=(...a)=>({...T.edicion(...a)});
+ const c={b:{parca:EN+20},a:{parca:EN+10,calabazas:{at:EN+50,p:6000}},c:{parca:{p:35000}},d:{calabazas:EN+1}};
+ assert.deepEqual(ed('parca','a',c),{n:1,total:3});
+ assert.deepEqual(ed('parca','b',c),{n:2,total:3});
+ assert.deepEqual(ed('parca','c',c),{n:3,total:3},'sin hora (recién comprada aquí) va al final');
+ assert.deepEqual(ed('parca','nadie',c),{n:0,total:3});
+ assert.deepEqual(ed('calabazas','a',c),{n:2,total:2},'acepta {at,p} del nodo tal cual');
+ /* Empate de hora: por uid, para que todos vean el mismo número. */
+ assert.deepEqual(ed('olas','y',{y:{olas:5},x:{olas:5}}),{n:2,total:2});
+ /* El premio se numera por la hora de la quinta compra. */
+ const ids=Object.keys(T.HALLOWEEN).slice(0,5),cinco=(u,t0)=>Object.fromEntries(ids.map((id,i)=>[id,t0+i]));
+ const p={a:cinco('a',EN+100),b:cinco('b',EN),z:{parca:EN}};
+ assert.deepEqual(ed('reycalabaza','a',p),{n:2,total:2});
+ const e=T.edicionesDe('b',p);
+ assert.deepEqual({...e.reycalabaza},{n:1,total:2});assert.equal(e[ids[0]].n,1);assert.ok(!e.nocheeterna);
 });

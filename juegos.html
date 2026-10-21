@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610210609"></script>
+<script src="i18n.js?v=202610210632"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -3514,8 +3514,9 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 .hwf-brasa{top:auto;bottom:4%;width:.9cqh;height:.9cqh;background:#fca5a5;box-shadow:0 0 1.2cqh .4cqh #ef4444aa;animation-name:hfBrasa}
 @keyframes hfBrasa{0%{transform:translate(0,0);opacity:0}20%{opacity:1}100%{transform:translate(3cqh,-55cqh);opacity:0}}
 .hwf-nubes{left:-50%;width:200%;top:-12%;height:58%;background-image:radial-gradient(ellipse 30% 45% at 25% 40%,#64748b77,transparent 70%),radial-gradient(ellipse 34% 40% at 70% 32%,#47556999,transparent 70%);background-size:50% 100%;background-repeat:repeat-x;animation:hfNiebla 36s linear infinite}
-.hwf-lluvia{left:-20%;top:-30%;width:140%;height:170%;background-image:radial-gradient(.14cqh 2.6cqh at 30% 40%,#e2e8f077,transparent),radial-gradient(.12cqh 2cqh at 80% 75%,#e2e8f055,transparent);background-size:6cqh 12cqh;opacity:.8;animation:hfLluvia .55s linear infinite}
-@keyframes hfLluvia{from{transform:rotate(12deg) translateY(0)}to{transform:rotate(12deg) translateY(12cqh)}}
+.hwf-lluvia{left:-20%;top:-30%;width:140%;height:170%;background-image:radial-gradient(.16cqh 2.8cqh at 30% 40%,#e2e8f0bb,transparent),radial-gradient(.14cqh 2.2cqh at 80% 75%,#e2e8f088,transparent);background-size:5cqh 11cqh;animation:hfLluvia .55s linear infinite}
+@keyframes hfLluvia{from{transform:rotate(12deg) translateY(0)}to{transform:rotate(12deg) translateY(11cqh)}}
+.hwf-luna.l-velada{--l:40cqh;left:30%;top:6%;opacity:.55;background:radial-gradient(circle at 36% 34%,#f8fafc,#cbd5e1 60%,#64748b);box-shadow:0 0 5cqh 1cqh #cbd5e144}
 .hwf-destello{inset:0;background:#e0e7ff;opacity:0;animation:hfRelampago 7s linear infinite}
 .hwf-rayo{left:20%;top:-4%;width:8cqh;height:52cqh;opacity:0;filter:drop-shadow(0 0 1.6cqh #c7d2fe);animation:hfRayo 7s linear infinite}
 @keyframes hfRelampago{0%,88%,100%{opacity:0}89%{opacity:.5}90%{opacity:.08}91.5%{opacity:.4}94%{opacity:0}}
@@ -3531,16 +3532,72 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 .hwf-aurora.a2{background:radial-gradient(ellipse 26% 40% at 45% 55%,#22d3ee44,transparent 70%),radial-gradient(ellipse 30% 34% at 82% 40%,#f472b644,transparent 70%);animation-duration:19s;animation-direction:reverse}
 @keyframes hfAurora{0%,100%{transform:translateX(-6%) skewX(-10deg)}50%{transform:translateX(6%) skewX(10deg) scaleY(1.15)}}
 .hwf-farol{bottom:-14cqh;width:11cqh;height:9.5cqh;filter:drop-shadow(0 0 1.4cqh #fb923c);animation:hfFarol var(--d) linear infinite;animation-delay:var(--r)}
+/* Lo que se agregó para que cada fondo tenga su momento. */
+.hwf-fugaz{left:62%;top:6%;width:22cqh;height:.5cqh;border-radius:1cqh;background:linear-gradient(90deg,transparent,#fff);opacity:0;transform:rotate(-24deg);animation:hfFugaz 6s ease-in infinite}
+.hwf-fugaz.z2{left:30%;top:2%;animation-duration:8.5s;animation-delay:-3.4s}
+@keyframes hfFugaz{0%,70%{opacity:0;translate:0 0}73%{opacity:1}88%,100%{opacity:0;translate:-40cqw 18cqw}}
+.hwf-mano{left:33%;bottom:2%;width:7cqh;height:9.5cqh;transform-origin:50% 100%;animation:hfMano 6s ease-in-out infinite}
+.hwf-mano.h2{left:58%;width:5.5cqh;height:7.5cqh;animation-delay:-3s;animation-duration:7.5s}
+@keyframes hfMano{0%,100%{transform:translateY(100%)}30%,55%{transform:translateY(0) rotate(-6deg)}42%{transform:translateY(-4%) rotate(6deg)}75%{transform:translateY(100%)}}
+.hwf-luna.l-cosecha{--l:56cqh;left:62%;top:30%;background:radial-gradient(circle at 62% 38%,#0000001a 0 9%,transparent 10%),radial-gradient(circle at 36% 34%,#fff7ed,#fdba74 55%,#ea580c);box-shadow:0 0 6cqh 2cqh #fb923c66}
+.hwf-luna.l-cosecha::after{background:radial-gradient(circle,#fb923c55,transparent 62%)}
+.hwf-hoja{left:var(--x);top:-10%;width:5cqh;height:5cqh;animation:hfHoja var(--d) linear infinite;animation-delay:var(--r)}
+@keyframes hfHoja{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:1}50%{transform:translate(4cqh,55cqh) rotate(200deg)}90%{opacity:1}100%{transform:translate(-3cqh,115cqh) rotate(400deg);opacity:0}}
+.hwf-murc.m4{top:16%;left:0;width:8cqh;height:4cqh;animation:hfSalen 7s linear infinite}
+.hwf-murc.m5{top:22%;left:0;width:6cqh;height:3cqh;animation:hfSalen 9s linear infinite;animation-delay:-4s}
+@keyframes hfSalen{0%{transform:translate(82cqw,22cqh) scale(.4);opacity:0}10%{opacity:1}100%{transform:translate(20cqw,-20cqh) scale(1.1);opacity:0}}
+.hwf-fant.f4{left:0;bottom:30%;top:auto;width:8cqh;height:10cqh;opacity:.6;animation:hfDeriva 22s linear infinite;animation-delay:-8s}
+.hwf-caldero{left:7%;bottom:3%;width:24cqh;height:18cqh}
+.hwf-caldero::before{content:"";position:absolute;left:5%;right:5%;top:-30%;height:60%;border-radius:50%;background:radial-gradient(ellipse,#4ade8077,transparent 70%);animation:hfRespira 2.4s ease-in-out infinite}
+.hwf-caldero>b{position:absolute;left:45%;top:18%;width:3cqh;height:3cqh;border-radius:50%;border:.4cqh solid #86efac;background:#14532d66;animation:hfBurbuja 2s ease-out infinite}
+.hwf-caldero>b:nth-child(3){left:30%;animation-delay:-.7s;width:2.2cqh;height:2.2cqh}
+.hwf-caldero>b:nth-child(4){left:62%;animation-delay:-1.3s;width:2.6cqh;height:2.6cqh}
+@keyframes hfBurbuja{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:1}100%{transform:translateY(-16cqh) scale(1.2);opacity:0}}
+.hwf-rayos{right:-30%;top:-80%;width:150cqh;height:150cqh;background:repeating-conic-gradient(#ef444426 0 8deg,transparent 8deg 22deg);border-radius:50%;-webkit-mask:radial-gradient(circle,#000 20%,transparent 68%);mask:radial-gradient(circle,#000 20%,transparent 68%);animation:jgGira 40s linear infinite}
+.hwf-murcg{left:0;top:12%;width:46cqh;height:19cqh;animation:hfCruzaG 14s linear infinite;animation-delay:-5s}
+.hwf-murcg svg{animation:hfAletea .7s ease-in-out infinite alternate}
+@keyframes hfCruzaG{0%{transform:translate(calc(100cqw + 10cqh),6cqh)}100%{transform:translate(-60cqh,-4cqh)}}
+.hwf-ojos{width:5cqh;height:1.6cqh;background:radial-gradient(circle at 20% 50%,#ef4444 0 30%,transparent 34%),radial-gradient(circle at 80% 50%,#ef4444 0 30%,transparent 34%);filter:drop-shadow(0 0 1cqh #ef4444);animation:hfOjos 5s steps(1,end) infinite;animation-delay:var(--r)}
+@keyframes hfOjos{0%,100%{opacity:0}10%,45%{opacity:1}47%{opacity:0}49%,70%{opacity:1}72%{opacity:0}}
+.hwf-alma{left:var(--x);bottom:-5%;width:1.4cqh;height:1.4cqh;border-radius:50%;background:#a5f3fc;box-shadow:0 0 2cqh .6cqh #67e8f9aa;animation:hfBrasa var(--d) ease-in-out infinite;animation-delay:var(--r)}
 @keyframes hfFarol{0%{transform:translate(0,0) scale(.8);opacity:0}10%{opacity:1}50%{transform:translate(2cqh,-60cqh) scale(.95)}85%{opacity:1}100%{transform:translate(-2cqh,-120cqh) scale(.7);opacity:0}}
+
+/* El aura de los marcos de Halloween: un halo que gira detrás de la foto
+   (es HTML: girar una capa ya pintada no repinta nada). */
+.jg-av.jg-marco-hw::before{display:block;inset:-17%;z-index:0;background:conic-gradient(var(--h1,#f97316),var(--h2,#fde047),var(--h1,#f97316),var(--h3,#7c2d12),var(--h1,#f97316));filter:blur(calc(var(--t) * .05));opacity:.9;animation:jgGira 5s linear infinite}
+.jg-marco-calabazas{--h1:#f97316;--h2:#fde047;--h3:#7c2d12}
+.jg-marco-murcielagos{--h1:#7c3aed;--h2:#f0abfc;--h3:#1e0b3a}
+.jg-marco-telarana{--h1:#65a30d;--h2:#d9f99d;--h3:#3b0764}
+.jg-marco-fantasmas{--h1:#06b6d4;--h2:#ecfeff;--h3:#1e3a8a}
+.jg-marco-caldero{--h1:#16a34a;--h2:#86efac;--h3:#6b21a8}
+.jg-marco-parca{--h1:#7c3aed;--h2:#f0abfc;--h3:#05000a}
+.jg-marco-reycalabaza{--h1:#f59e0b;--h2:#fff7c2;--h3:#ea580c}
+.jg-marco-parca::before,.jg-marco-reycalabaza::before{animation-duration:3s}
+
+/* El sello de edición limitada (perfil-vista.js, `sellosHw`): en la
+   tarjeta y, grande, en la portada del perfil. */
+.jg-hw-sellos{display:flex;flex-wrap:wrap;gap:6px;margin:10px 16px 0}
+.jg-pf-id .jg-hw-sellos{margin:12px 0 0}
+.jg-hw-sello{position:relative;display:inline-flex;align-items:center;gap:7px;padding:4px 11px 4px 9px;border-radius:99px;font-size:11.5px;line-height:1.2;color:#fff;background:linear-gradient(135deg,#1a0730,#3b0a4f);border:1px solid var(--rz);box-shadow:0 0 12px color-mix(in srgb,var(--rz) 45%,transparent);overflow:hidden;isolation:isolate}
+.jg-hw-sello::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,transparent,#fff6,transparent);transform:translateX(-150%) skewX(-20deg);animation:thReflejo 3.4s ease-in-out infinite;pointer-events:none}
+.jg-hw-sello b{font-weight:700;white-space:nowrap}
+.jg-hw-sello em{font:400 11px/1 "Bungee",system-ui,sans-serif;color:var(--rz)}
+.jg-hw-sello em small{font-size:8.5px;opacity:.75}
+.jg-hw-sello.r-mitico{background:linear-gradient(135deg,#2a0612,#4c0519)}
+.jg-hw-sello.r-premio{background:linear-gradient(135deg,#052e16,#14532d)}
+.jg-hw-sellos.grande .jg-hw-sello{display:inline-grid;grid-template-columns:auto auto;justify-content:start;column-gap:10px;row-gap:3px;padding:8px 15px;border-radius:14px;font-size:14px}
+.jg-hw-sellos.grande .jg-hw-sello em{font-size:15px}
+.jg-hw-sellos.grande .jg-hw-sello em small{font-size:10px}
+.jg-hw-sello-s{grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--rz)}
 
 /* Los marcos y fondos de Halloween en el editor del perfil. */
 .jg-ped-hwir{margin-left:8px;padding:2px 9px;border-radius:99px;border:1px solid #f97316;background:#fff7ed;color:#c2410c;font:700 10.5px/1.6 inherit;font-family:inherit;letter-spacing:0;text-transform:none;cursor:pointer}
 html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
-:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op).r-raro{--rz:#38bdf8}
-:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op).r-epico{--rz:#c084fc}
-:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op).r-legendario{--rz:#fbbf24}
-:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op).r-mitico{--rz:#fb7185}
-:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op).r-premio{--rz:#4ade80}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-raro{--rz:#38bdf8}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-epico{--rz:#c084fc}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-legendario{--rz:#fbbf24}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-mitico{--rz:#fb7185}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-premio{--rz:#4ade80}
 .jg-ped-op.hw{box-shadow:inset 0 0 0 1.5px var(--rz,#f97316)}
 
 /* La ventana */
@@ -3630,6 +3687,12 @@ html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
 .jg-th-it-p.tuyo{color:#86efac}
 .jg-th-it.mio .jg-th-it-arte::after{content:"✓";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;color:#052e16;background:#4ade80}
 .jg-th-it.agotado{opacity:.4}
+.jg-th-it-q{font-size:11.5px;color:#c4b5fd}
+.jg-th-it-q.tuyo{color:#86efac;font-weight:700}
+.jg-th-escasez{margin:-4px 0 12px;font-size:13.5px;line-height:1.45;color:#fde68a}
+.jg-th-escasez b{color:#fff}
+.jg-th-escasez.tuyo{color:#86efac}
+.jg-th-fiesta-c strong{font:400 18px/1 "Bungee",system-ui,sans-serif;color:#fde68a;text-shadow:0 0 12px #f97316}
 .jg-th-pie{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:20px 0 0;font-size:12px;color:#a78bfa}
 .jg-th-rz{padding:3px 8px;border-radius:99px;border:1px solid var(--rz);color:var(--rz)}
 .jg-th-fiesta{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle,#f9731633,transparent 60%);animation:jgVela .3s ease-out}
@@ -3687,6 +3750,7 @@ html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
 @media (prefers-reduced-motion:reduce){
   .jg-th *,.jg-th::before,.jg-th::after,.jg-th-tira *,.jg-th-tira::after,.jg-th-tira *::after,.jg-th-it::before{animation:none!important}
   .jg-th-fiesta>i{display:none}
+  .jg-av.jg-marco-hw::before,.jg-hw-sello::after{animation:none!important}
 }
 @keyframes jgMini{from{opacity:0;transform:translateY(6px) scale(.98)}}
 @keyframes jgHoja{from{transform:translateY(110%)}}
@@ -6636,6 +6700,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610210609"></script>
+<script src="juegos-app.js?v=202610210632"></script>
 </body>
 </html>
