@@ -55,7 +55,8 @@
 // Uso:  const s = crearSala({ yo, humanos: [{uid, mando}], anfitrion, estilo: 'copa'|'playlist', carreras, pistas,
 //                             enviar: (uid, bytes) => …, alCambiar: estado => … });
 //       malla → s.alBinario(de, bytes) (los que empiezan con MARCA_SALA)
-//       anfitrión: s.ponerPistas([{copa, fila}, …]);  todos: s.elegi({ personaje, vehiculo, derrape }),
+//       anfitrión: s.ponerPistas([{copa, fila}, …]);  todos: s.elegi({ personaje, vehiculo, derrape }) (en la fase de
+//       elegir y, M22, en el descanso: el personaje nuevo corre desde la carrera siguiente, la misma en todas),
 //       s.termine(n, puntos, desde) (§75: los 12 puntos que lleva esta consola y la primera carrera que corrió)
 //       si el anfitrión se va (lo dice la sala del sitio): s.cambiarAnfitrion(uid) en todos → sigue el nuevo, desde su copia
 //       §74 playlist: todos s.sugerir(p) → 'sugerida' | 'ya-esta' | 'ya-sugerida' | 'tope' | 'llena' | 'nada';
@@ -75,6 +76,9 @@ import { VR_MAXIMO, REGLA_CPU } from './vr-sala.mjs';
 export const MARCA_SALA = 0xA8;
 export const SEGUNDOS_ELEGIR = 45;
 export const SEGUNDOS_RESULTADOS = 30;         // §94: el descanso entre carreras (los resultados), antes de la siguiente
+// M22 (el crítico: el anfitrión elegía la copa sin reloj y los demás esperaban a ciegas): el plazo para elegir la copa.
+// Al vencer, la sala le avisa a la página de la anfitriona (alVencioCopa) y ella pone una al azar. En la playlist, no
+export const SEGUNDOS_COPA = 90;
 export const MINIMO_AL_AGREGAR_MS = 15000;     // §94: agregar o sugerir con menos de esto por delante: vuelve a esto
 const REPARTO_MS = 1000;
 export const PRESENTE_MS = 10000;      // §75: sin señales en 10 s al empezar una carrera = la corre "sin nadie"
@@ -85,7 +89,8 @@ const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 
 export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 4, pistas = null, enviar, alCambiar = () => {},
   ahora = () => Date.now(), cada = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
-  registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {} }) {
+  registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {},
+  segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {} }) {
   let jefe = anfitrion, deQuien = anfitrion;      // quién manda ahora, y de quién vino la última copia aceptada
   const soy = () => jefe === yo;
   const creada = ahora();
@@ -105,6 +110,10 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
     lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null };
+  // M22: el descanso entre carreras (la carrera de ahora terminó para todos y corre el plazo hasta la siguiente): ahí
+  // se puede cambiar de personaje y vehículo
+  const enDescanso = () => estado.fase === 'correr' && estado.carrera >= 1 && !!estado.terminaron?.[estado.carrera] && estado.plazo > 0 &&
+    estado.carrera < estado.carreras;
   // §82: los VR de ahora, congelados para la carrera n (§95: con la regla de las CPU, en JSON: viaja en el estado)
   const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) }, cpu: { ...REGLA_CPU, anclas: [...REGLA_CPU.anclas] } });
   const yaVistas = new Set();                  // carreras que este navegador ya arrancó
@@ -120,10 +129,15 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     aTodos({ t: 'estado', estado, reloj: ahora() });
     if (lista) alCambiar(estado);
   }
+  let vencida = 0;                                // M22: el plazo de la copa que ya se avisó (uno por plazo)
   function revisar() {
     if (!soy()) return;
     const t = ahora();
-    if (estado.fase === 'elegir') {
+    if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0) {
+      // M22: la copa con reloj (lo ven todos); al vencer, la página de la anfitriona pone una al azar
+      if (!estado.plazo) cambiar({ plazo: t + segundosCopa * 1000 });
+      else if (t >= estado.plazo && vencida !== estado.plazo) { vencida = estado.plazo; alVencioCopa(); }
+    } else if (estado.fase === 'elegir') {
       const todos = humanos.every(h => estado.picks[h.uid]);
       if (todos || t >= estado.plazo) {
         const picks = { ...estado.picks };
@@ -185,13 +199,13 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       estado = m.estado; deQuien = jefe; lista = true; alCambiar(estado);
     } else if (!lista) {
       return;                                   // (la anfitriona recién abierta: todavía no sabe en qué va la sala)
-    } else if (soy() && m.t === 'pj' && esHumano(de) && estado.fase === 'elegir') {
+    } else if (soy() && m.t === 'pj' && esHumano(de) && (estado.fase === 'elegir' || enDescanso())) {
       const p = { personaje: m.personaje | 0, vehiculo: m.vehiculo | 0, derrape: m.derrape | 0 };
       if (p.personaje < 0 || p.personaje > 47 || p.vehiculo < 0 || p.vehiculo > 35) return;
       const antes = estado.picks[de];
       if (antes && antes.personaje === p.personaje && antes.vehiculo === p.vehiculo && antes.derrape === p.derrape) return;   // ya lo tenía
       cambiar({ picks: { ...estado.picks, [de]: p } });
-      revisar();
+      if (estado.fase === 'elegir') revisar();          // (en el descanso no cambia nada más: la siguiente lo toma)
     } else if (soy() && m.t === 'vr' && esHumano(de) && vrValido(m.vr)) {
       // §82: el VR que tiene esa página (cuenta desde la carrera que empiece después: la que corre ya está congelada)
       if ((estado.vrs || {})[de] !== m.vr) cambiar({ vrs: { ...(estado.vrs || {}), [de]: m.vr } });
@@ -209,6 +223,9 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       // §94: la llegada (la parrilla de la siguiente): la primera que llega; todas las que corrieron dicen lo mismo
       if (llegadaValida(m.llegada) && estado.llegada?.carrera !== m.carrera)
         cambio.llegada = { carrera: m.carrera, puestos: m.llegada.map(x => x | 0) };
+      // M22: las skins de las CPU (Retro Rewind las sortea solo en la primera carrera de cada consola): las de una que
+      // corrió desde la 1, una vez. Quien recarga no las sortea; con estas todas muestran las mismas CPU
+      if (skinsValidas(m.skins) && !estado.skins && desde === 1) cambio.skins = m.skins.map(x => x | 0);
       if (Object.keys(cambio).length) { cambiar(cambio); revisar(); }
     }
   }
@@ -303,7 +320,8 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // la carrera n terminó en este navegador (solo cuenta la primera vez que alguien lo avisa: es la misma carrera).
     // §75: con los puntos que lleva esta consola (12) y la primera carrera de la copa que corrió
     // §94: y la llegada (los 12 puestos en que terminó cada uno: la parrilla de la carrera siguiente)
-    termine(n, puntos = null, desde = 0, llegada = null) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde, llegada }); },
+    // (M22: skins = las 12 skins de Retro Rewind que sorteó esta consola en la carrera 1, ver más abajo)
+    termine(n, puntos = null, desde = 0, llegada = null, skins = null) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde, llegada, skins }); },
     // §94: cuánto falta para un plazo de la sala (una hora del reloj de la anfitriona), en ms (0 si ya pasó)
     restan(plazo) { return plazo ? Math.max(0, plazo - (ahora() + desfase)) : 0; },
     // ¿esta carrera ya la arranqué? (para arrancar cada una una sola vez)
@@ -329,6 +347,8 @@ export const reglaCpuDe = (estado, n) => (estado?.vrCarrera?.n === n ? estado.vr
 
 // §75: 12 números de 0 a 9999 (los puntos de los 12 puestos)
 const tablaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 9999);
+// M22: las skins de las CPU: 12 números de 0 a 100 (racePlayerSlots de Retro Rewind)
+export const skinsValidas = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 100);
 // §94: la llegada: 12 números, 0 (nadie en ese puesto) o del 1 al 12 sin repetir
 const llegadaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 12) &&
   new Set(t.filter(x => x)).size === t.filter(x => x).length;
@@ -352,7 +372,9 @@ export const PERSONAJES = ['Mario', 'Baby Peach', 'Waluigi', 'Bowser', 'Baby Dai
 // §75: los puntos, del escenario de los MENÚS (+0xC10): al terminar cada carrera el juego deja ahí la suma (el de la
 // carrera, +0x20, guarda los que había al EMPEZARLA: leído al final de la copa le faltaba la última carrera).
 // puntos = la tabla de la sala (§75: la de quien corrió toda la copa), si la hay; si no, los de esta consola.
-export function tablaDelJuego(L, humanos, nombres = {}, puntos = null) {
+// M22: nombresCpu = cómo nombra el juego a cada CPU (nombres-juego.mjs: las skins de Retro Rewind, en su idioma); sin
+// ellos, el personaje de la tabla PERSONAJES
+export function tablaDelJuego(L, humanos, nombres = {}, puntos = null, nombresCpu = null) {
   const rd = L.u32(0x809BD728);
   if (!rd) return [];
   const esc = rd + 0x20, menus = rd + 0xC10, n = L.u8(esc + 4), filas = [];
@@ -360,7 +382,7 @@ export function tablaDelJuego(L, humanos, nombres = {}, puntos = null) {
     const j = esc + 8 + i * 0xF0, tipo = L.u32(j + 0x10);
     if (tipo === 5) continue;
     const h = humanos[i] && tipo === 0 ? humanos[i] : null;
-    filas.push({ nombre: h ? (nombres[h.uid] || `Jugador ${i + 1}`) : `${PERSONAJES[L.u32(j + 0xC)] || 'CPU'} (CPU)`, uid: h?.uid || null,
+    filas.push({ nombre: h ? (nombres[h.uid] || `Jugador ${i + 1}`) : `${(typeof nombresCpu?.[i] === 'string' && nombresCpu[i].slice(0, 20)) || PERSONAJES[L.u32(j + 0xC)] || 'CPU'} (CPU)`, uid: h?.uid || null,
                  puntos: tablaValida(puntos) ? puntos[i] : L.u16(menus + 8 + i * 0xF0 + 0xDA), humano: !!h });
   }
   return filas.sort((a, b) => b.puntos - a.puntos);

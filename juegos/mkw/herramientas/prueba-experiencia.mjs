@@ -193,6 +193,13 @@ try {
      tIn.length === 0 && privadoSolo && privadaSala && !marcoIntruso, `tarjetas ${tIn.length}, solo ${privadoSolo}, sala ${privadaSala}, marco ${marcoIntruso}`);
   await intruso.context().close();
 
+  // M22: la precarga del vestíbulo: la página de cada uno baja el juego escondida (sin arrancarlo) y la fila de cada
+  // piloto dice cómo va («⬇ 40 %» → «● listo», por la presencia del buzón de la sala)
+  const pre = await hastaQue(async () => (await uno.locator('.jg-mkw-vest .jg2-pre').allTextContents().catch(() => [])).join(' '),
+    t => (t.match(/● listo/g) || []).length >= 2, 120000, 1000);
+  await foto(uno, '6-precarga-uno.png');
+  ok('M22: la precarga: en el vestíbulo de la anfitriona los dos pilotos dicen «● listo»', (pre?.match(/● listo/g) || []).length >= 2, pre || '(nada)');
+
   // --playlist (§87): la playlist como la abrió el dueño (el modo en el vestíbulo y «¡A correr!»): los dos tienen que
   // llegar a su selector (la anfitriona arma la lista, Piloto Dos sugiere), confirmar, elegir y correr la carrera 1
   const enPlaylist = args.includes('--playlist');
@@ -297,6 +304,13 @@ try {
     const [pa, pb] = await Promise.all([dosFotosPartidas(uno, () => fotoMarco(mA, `9-carrera-uno${na++ ? '-b' : ''}.png`)),
                                         dosFotosPartidas(dos, () => fotoMarco(mB, `9-carrera-dos${nb++ ? '-b' : ''}.png`))]);
     await uno.keyboard.up('KeyK'); await dos.keyboard.up('KeyK');
+    // M22: al empezar la copa, la sala pasó sola al modo inmersivo del sitio (el marco llena la pantalla) en los dos
+    const inm = p => p.evaluate(() => document.documentElement.classList.contains('jg-inm')).catch(() => null);
+    const [iUno, iDos] = [await inm(uno), await inm(dos)];
+    await foto(uno, '9-inmersivo-uno.png');
+    ok('M22: al empezar la copa la sala pasó sola al modo inmersivo (en los dos)', iUno === true && iDos === true, `Uno ${iUno} · Dos ${iDos}`);
+    // (para usar la tira —echar— la anfitriona sale del inmersivo con «Salir», como una persona)
+    if (iUno) await uno.click('#jgInm').catch(() => {});
     // (M21: la tira del vestíbulo con la copa andando, la de la anfitriona: el titular, «2 de 12», las fichas con su «⋯»)
     await uno.locator('.jg-mkw-vest').screenshot({ path: path.join(carpeta, '9-tira-uno.png') }).catch(() => {});
     ok('la misma carrera en los dos: las huellas coinciden y ninguno se separó', (x?.[0]?.ls?.huellasIguales || 0) >= 3 && !x?.[0]?.ls?.desincronizado && !x?.[1]?.ls?.desincronizado,
@@ -312,6 +326,8 @@ try {
   const lsDe = f => f.evaluate(() => window.mkwSincro?.lockstep?.estado() || null).catch(() => null);
   const cuadroAntes = marcoA ? ((await lsDe(marcoA))?.cuadro || 0) : 0;
   uno.once('dialog', d => d.accept());
+  // (M22: en el modo inmersivo la tira no se ve: la anfitriona sale con «Salir»)
+  if (await uno.evaluate(() => document.documentElement.classList.contains('jg-inm')).catch(() => false)) await uno.click('#jgInm').catch(() => {});
   // (M21: «Echar» está en el menú «⋯» de cada piloto, en el vestíbulo y en la tira de la carrera)
   await uno.locator('.jg-mkw-vest [data-menu]').first().click({ timeout: 10000 });
   await uno.locator('.jg-mkw-echa').first().click({ timeout: 10000 });
@@ -319,8 +335,10 @@ try {
   const vUno2 = (await hastaQue(() => uno.textContent('.jg-mkw-vest'), t => /1 de 12/.test(t.replace(/\s+/g, ' ')), 10000) || '').replace(/\s+/g, ' ');
   const marcoDos = await hastaQue(async () => marcoDel(dos, enSalaJuego) ? 'sigue' : 'sin juego', v => v === 'sin juego', 10000);
   await foto(dos, '10-echado-dos.png');
-  ok('§87: la anfitriona echa a Piloto Dos: a él se le va el juego y ve «El anfitrión te sacó de esta sala»; la sala de Uno queda de 1',
-     /te sacó/.test(vDos) && /1 de 12/.test(vUno2) && marcoDos === 'sin juego', `Dos: «${vDos.slice(-70)}» · Uno «1 de 12» ${/1 de 12/.test(vUno2)} · Dos ${marcoDos}`);
+  const inmDos = await dos.evaluate(() => document.documentElement.classList.contains('jg-inm')).catch(() => null);
+  ok('§87: la anfitriona echa a Piloto Dos: a él se le va el juego (y el modo inmersivo) y ve «El anfitrión te sacó de esta sala»; la sala de Uno queda de 1',
+     /te sacó/.test(vDos) && /1 de 12/.test(vUno2) && marcoDos === 'sin juego' && inmDos === false,
+     `Dos: «${vDos.slice(-70)}» · Uno «1 de 12» ${/1 de 12/.test(vUno2)} · Dos ${marcoDos}, inmersivo ${inmDos}`);
   if (marcoA && cuadroAntes > 0) {
     await espera(5000);
     const ls = await lsDe(marcoA);

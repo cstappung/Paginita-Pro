@@ -74,7 +74,7 @@ const eleccion = () => pagina.waitForFunction(() => window._eleccion !== 'espera
 const cargadas = sel => pagina.waitForFunction(s => { const i = document.querySelector(s); return i && i.complete && i.naturalWidth > 0; }, sel, { timeout: 5000 }).then(() => true, () => false);
 
 try {
-  await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1`);   // con la portada: la página sin arrancar el juego
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/?portada=1&depurar=1`);   // con la portada: la página sin arrancar el juego (M22: depurar=1 = se ve la semilla)
   await pagina.waitForFunction(() => window.mkwInterfaz, null, { timeout: 20000 });
 
   // 1) Carrera: lista, vista previa, videíto, elegir
@@ -302,7 +302,8 @@ try {
     chip: c.querySelector('.sug-chip')?.textContent || '', cab: c.querySelector('.pb-cab span')?.textContent, agregar: !!c.querySelector('#pbAgregar'), sugerir: !!c.querySelector('#pbSugerir') }; });
   await espera(200);
   let b = await pb();
-  ok('entre carreras: la que sigue (la 3, con su nombre), hasta 6 y «y 1 más»', b.sigue === '3' && b.nombre === 'Pista falsa 2-2' && b.filas === 6 && b.mas === 'y 1 más', JSON.stringify(b));
+  // (M22: el descanso es un zócalo: solo la que sigue y cuántas más; la lista entera, en «+ Agregar pistas»)
+  ok('entre carreras: la que sigue (la 3, con su nombre) y «y 6 más»', b.sigue === '3' && b.nombre === 'Pista falsa 2-2' && b.filas === 1 && b.mas === 'y 6 más', JSON.stringify(b));
   ok('el anfitrión ve «2 de 9 corridas», las sugerencias que esperan y «+ Agregar pistas»', b.cab === '2 de 9 corridas' && b.chip === '💬 2' && b.agregar && !b.sugerir, JSON.stringify(b));
   await pagina.click('#pbAgregar');
   ok('«+ Agregar pistas» avisa a la sala', await pagina.evaluate(() => window._pb.agregar === 1));

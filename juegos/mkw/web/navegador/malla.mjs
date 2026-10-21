@@ -154,7 +154,8 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
 
   function alPresentes(v) {
     presentes.clear();
-    for (const [u, s] of Object.entries(v || {})) if (u !== uid && typeof s === 'string') presentes.set(u, s);
+    // (M22: «~…» = el estado del vestíbulo de ese piloto —la precarga, «~40», «~listo»—, no una sesión de la malla)
+    for (const [u, s] of Object.entries(v || {})) if (u !== uid && typeof s === 'string' && !s.startsWith('~')) presentes.set(u, s);
     revisa();
   }
 

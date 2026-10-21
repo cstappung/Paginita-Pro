@@ -333,8 +333,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t mkw_directo_espejos() { return g_espejos
 // pone esa marca en los menús; aquí, después de Pulsar, si la ficha pidió espejo, la marca va en la carrera (ajustes
 // +0x28 bit 0 de racesScenario, Racedata +0x20 +0xB48): la carrera sigue en 150cc y la pista se corre dada vuelta.
 extern "C" void rr_kamek_81855954_traducida(CpuContext* ctx);
+void mkwNombresEnCarrera();                       // M22: nombres_nativo.cpp (los nombres de los humanos de la sala)
+void mkwNombresCpu(const CpuContext* ctx);        // M22: nombres_nativo.cpp (el texto de cada CPU, ya en la carrera)
 extern "C" void rr_kamek_81855954(CpuContext* MKW_RESTRICT ctx) {
     rr_kamek_81855954_traducida(ctx);
+    mkwNombresEnCarrera();
     if (!g_espejo) return;
     const uint32_t rd = Memory::Read32(kRacedata);
     if (!rd || Memory::Read32(rd + 0x20 + 0xB48 + 0x8) != 1) return;     // solo en una carrera VS
@@ -442,6 +445,7 @@ extern "C" void func_8083761C(CpuContext* MKW_RESTRICT ctx) {
 }
 
 extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
+    mkwNombresCpu(ctx);                           // M22: si la página lo pidió y ya es la carrera
     // ¿hay pedido y el SectionMgr está quieto (sin otro cambio de sección ya en marcha)? fadeSceneAction (+0x30) = 0
     const uint32_t sm = ctx->gpr[3];
     // §73: el pedido puede llegar antes de que el juego arranque (la página lo deja puesto apenas carga): se espera a que
@@ -466,7 +470,10 @@ extern "C" void rr_overlay_8063550C(CpuContext* MKW_RESTRICT ctx) {
         int ok = g_licencia >= 0 ? elegirLicencia(ctx, sm, static_cast<uint32_t>(g_licencia)) : 1;
         if (ok && g_hay_ficha) ok = escribirFicha(ctx, sm) ? 1 : 0;   // §73: la carrera, escrita como los menús
         g_hay_ficha = 0;
-        if (ok) g_eleccion = 0;         // el modo elección termina con el salto
+        // el modo elección termina con el salto (a la carrera). M22: salvo el salto a la pantalla de personajes misma
+        // (volver a elegir en el descanso: ese salto va por aquí, y apagaba el modo antes de confirmar; al empezar la
+        // copa el salto va por la envoltura de SectionMgr::Init y no pasaba)
+        if (ok && seccion != 0x49) g_eleccion = 0;
         // §84: el multijugador en la consola (0x54), como el botón «2/3/4 Players» del menú principal
         // (MainMenu::OnButtonClick, 0x8085110C): anota qué botón fue (SectionParams +296) y llama a
         // MainMenu::ResetSectionParamsAndRacedataScenario1 (0x808516BC, no usa la página: r3 da igual) con la cantidad

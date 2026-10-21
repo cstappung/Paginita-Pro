@@ -146,6 +146,17 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   pilotos en dos columnas con su foto del sitio, corona, VR y «⋯» (pasar anfitrión, echar), «N de 12» con puntitos y
   una fila para la CPU; con la copa andando, una tira. Estilos propios del módulo (`juegos.html` no se toca). Sitio
   19/19; `prueba-experiencia` 20/20 y `--playlist` 22/22 (§97)
+- ✅ M22. (Pedido del dueño, 2026-10-21) **El «Modo consola»: antes, durante y entre carreras.** Un crítico recorrió la
+  sala entera y propuso 3 modelos; el dueño eligió el recomendado y agregó volver a elegir personaje y vehículo entre
+  carreras, si uno quiere. El descanso es un zócalo de una línea abajo (la tabla del juego queda libre) y el ±VR de
+  cada humano va escrito al lado de su fila de la tabla del juego, con la letra del juego (`letreros.mjs`); «Cambiar
+  personaje y vehículo» (opcional) abre la pantalla de personajes y lo elegido corre desde la siguiente en todas; los
+  nombres de la sala en el juego (globo y tablas: `nombres_nativo.cpp`, un Mii por casilla de humano y su nombre en cada
+  carrera; las CPU con el nombre que les da el juego, y las skins de RR repartidas por la sala para quien recarga); el
+  podio de 8 s al final; el cartel de quien recargó; los avisos por capas (📶 en una esquina); el reloj de 90 s de la
+  copa; el modo inmersivo automático y la precarga del vestíbulo con «⬇ 40 %» / «● listo» por piloto. Banco
+  `letreros` 17, `nombres-juego` 15, `sala-carrera` 75; `prueba-sala` 42/42 (`--recarga` 38/38), `prueba-precarga` 8/8,
+  `prueba-relevo` 10/10; sitio 20/20, `prueba-experiencia` 22/22 y `--playlist` 24/24 (§98)
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -452,6 +463,25 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-21 17:17** — **El «Modo consola»: antes, durante y entre carreras** (§98, M22, pedido del dueño: «haz el modelo
+  recomendado» del crítico de la experiencia, más volver a elegir personaje y vehículo, opcional). El descanso pasó de
+  un panel que tapaba la tabla del juego a un zócalo de una línea, y el ±VR va al lado de la fila de cada humano con la
+  letra del juego (`letreros.mjs`, `filasDeTabla`). Volver a elegir: «Cambiar personaje y vehículo» en el descanso; la
+  anfitriona acepta el personaje nuevo en el descanso y la carrera siguiente lo lleva en todas (trampa: el salto a la
+  pantalla de personajes apagaba el «modo elección» y el juego se iba solo a otra carrera; `directo_nativo.cpp`). Los
+  nombres de verdad en el juego: un agente encontró que el globo y las tablas usan el Mii de cada casilla de
+  SectionParams +0x188 y que el juego solo llena la 0 («Piloto»); `nombres_nativo.cpp` carga un Mii invitado en cada
+  casilla de humano (envuelve `CharacterSelect::OnInit`, `rr_overlay_8083D55C`), escribe el nombre en cada carrera (al
+  final de `rr_kamek_81855954`) y le pide al juego el nombre de cada CPU («Meowser», «King Bob-omb»); la sala reparte las
+  skins de RR (`estado.skins`) para quien recarga. El podio de 8 s, el cartel de quien recargó, el chip 📶 en una
+  esquina, el reloj de 90 s de la copa (al vencer, una al azar), la tira del sitio con la fase real, «Terminar la copa»
+  que pregunta, textos solo PC; en el sitio, el modo inmersivo al empezar la copa y la precarga del vestíbulo
+  (`?precarga=1`, «⬇ 40 %» / «● listo» en la presencia del buzón): con 50 ms de red, a la carrera en 8,4 s en vez de
+  10,5 s, el programa de la caché y 19,7 MB del disco en vez de 60,7. Banco `letreros` 17/17, `nombres-juego` 15/15,
+  `sala-carrera` 75/75; `prueba-sala` 42/42 (`--recarga` 38/38, `--rapida` ~2,5 min), `prueba-precarga` 8/8,
+  `prueba-relevo` 10/10 (el chip 📶 puesto toda la carrera la hacía fallar: ahora 6 s); sitio 20/20,
+  `prueba-experiencia` 22/22 y `--playlist` 24/24 (el echado cortaba la actualización del sitio: arreglado).
 
 - **2026-10-21 14:17** — **El vestíbulo nuevo de la sala (la propuesta D) y las opciones de menos a más** (§97, M21,
   pedido del dueño). El orden de la cilindrada y la CPU, de menos a más (sitio `2a06fc6`). Para el rediseño: tres

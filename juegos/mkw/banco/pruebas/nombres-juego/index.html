@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nombres en el juego</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Nombres en el juego: <span>lo que la página le pasa a nombres_nativo.cpp y lo que lee</span></h1>
+<p>Prueba <code>nombres-juego.mjs</code> (bitácora §98, M22) <b>sin el juego</b>: un programa de mentira con su memoria (un
+  <code>HEAPU8</code> y las dos funciones que dan las direcciones de las estructuras) y nombres inventados. Comprueba que
+  el nombre queda en lo que la letra del juego puede escribir (hasta 10 letras, sin emoji ni caracteres de control),
+  que la cara de invitado de cada uno es siempre la misma, que el búfer queda como lo lee el C++ (los 12 puestos, el 0
+  del final, quién es humano) y que el texto de las CPU se lee bien.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { nombreParaJuego, caraDe, escribirNombres, leerNombresCpu, leerSkins, escribirSkins, SKINS_RR, LETRAS_NOMBRE } from '/web/navegador/nombres-juego.mjs';
+
+const { ok, fin } = prueba('nombres-juego', 'Nombres en el juego (sin el juego)');
+
+// 1. el nombre, como lo puede escribir el juego
+ok('hasta 10 letras', nombreParaJuego('Bartolomeo Garibaldi') === 'Bartolomeo' && LETRAS_NOMBRE === 10, nombreParaJuego('Bartolomeo Garibaldi'));
+ok('las tildes y la ñ quedan (la letra del juego las tiene)', nombreParaJuego('Ñandú José') === 'Ñandú José');
+ok('sin emoji ni caracteres de control, con los espacios juntos', nombreParaJuego('🏎️ Ana\u0007   Bea ') === 'Ana Bea', JSON.stringify(nombreParaJuego('🏎️ Ana\u0007   Bea ')));
+ok('vacío o solo emoji → «Piloto»', nombreParaJuego('') === 'Piloto' && nombreParaJuego('🙂🙂') === 'Piloto' && nombreParaJuego(null) === 'Piloto');
+ok('una tilde escrita aparte se junta (NFC: una letra, no dos)', nombreParaJuego('José') === 'José' && nombreParaJuego('José').length === 4);
+
+// 2. la cara de invitado: fija para cada uno, de 0 a 5
+const caras = ['ana', 'beto', 'carla', 'dani', 'eli', 'fede', 'gabi', 'hugo'].map(caraDe);
+ok('la cara de invitado es un número de 0 a 5 y siempre la misma para el mismo uid', caras.every(c => c >= 0 && c <= 5) && caraDe('ana') === caras[0] &&
+   new Set(caras).size >= 3, caras.join(','));
+
+// 3. el búfer, como lo lee nombres_nativo.cpp (little-endian; Nombres en 1024, NombresCpu en 2048)
+const M = { HEAPU8: new Uint8Array(4096), _mkw_nombres: () => 1024, _mkw_nombres_cpu: () => 2048 };
+const humanos = [{ uid: 'ana' }, { uid: 'beto' }, { uid: 'carla' }];
+const listo = escribirNombres(M, humanos, u => ({ ana: 'Ana María López', beto: 'Beto 🚗', carla: '' })[u]);
+const v = new DataView(M.HEAPU8.buffer);
+const nombreEn = i => { let t = ''; for (let k = 0; k < 11; k++) { const c = v.getUint16(1024 + 2 * (11 * i + k), true); if (!c) break; t += String.fromCharCode(c); } return t; };
+ok('escribe el nombre de cada puesto de humano (recortado y limpio)', listo && nombreEn(0) === 'Ana María' && nombreEn(1) === 'Beto' && nombreEn(2) === 'Piloto',
+   [0, 1, 2].map(nombreEn).join(' · '));
+ok('la letra 11 es siempre el 0 del final', [0, 1, 2].every(i => v.getUint16(1024 + 2 * (11 * i + 10), true) === 0));
+ok('quién es humano (hay), su cara, y la marca de «sala» (activo)', [0, 1, 2].every(i => M.HEAPU8[1024 + 264 + i] === 1) && M.HEAPU8[1024 + 264 + 3] === 0 &&
+   M.HEAPU8[1024 + 276] === caraDe('ana') && M.HEAPU8[1024 + 276 + 3] === 0xFF && v.getInt32(1024 + 288, true) === 1);
+ok('sin el programa nuevo (sin _mkw_nombres) no hace nada', escribirNombres({ HEAPU8: new Uint8Array(8) }, humanos, () => 'x') === false);
+
+// 4. el texto de las CPU (lo que dejó el juego)
+v.setInt32(2048, 3, true);
+const pon = (j, t, msj) => { v.setInt32(2048 + 4 + 4 * j, msj, true); [...t].forEach((ch, k) => v.setUint16(2048 + 52 + 2 * (32 * j + k), ch.charCodeAt(0), true)); };
+pon(3, 'Meowser', 0x000B6A01); pon(4, 'Rey Boo', 9019);
+const c = leerNombresCpu(M);
+ok('lee el texto de cada CPU y deja null donde no hay', c.listo === 3 && c.nombres[3] === 'Meowser' && c.nombres[4] === 'Rey Boo' && c.nombres[0] === null && c.mensajes[4] === 9019,
+   JSON.stringify(c.nombres.slice(0, 6)));
+ok('sin el programa nuevo, todos null', leerNombresCpu({}).nombres.every(x => x === null));
+
+// 5. las skins de las CPU: se leen de racePlayerSlots de RR y las de la sala van al búfer del juego (Skins en 3072)
+// (las que sorteó esta consola las copia el C++ en «leidas»: el lector de la página no llega a 0x818A08A8)
+const M2 = { HEAPU8: new Uint8Array(4096), _mkw_nombres_skins: () => 3072 };
+const v2 = new DataView(M2.HEAPU8.buffer);
+M2.HEAPU8[3072 + 16 + 2] = 3; M2.HEAPU8[3072 + 16 + 7] = 2;
+const leidas = leerSkins(M2);
+ok('lee las 12 skins que sorteó esta consola (las copia el C++ de racePlayerSlots, 0x818A08A8)', SKINS_RR === 0x818A08A8 && leidas.length === 12 &&
+   leidas[2] === 3 && leidas[7] === 2 && leidas[0] === 0 && leerSkins({}) === null, leidas.join(','));
+ok('escribe las de la sala con la marca «hay»', escribirSkins(M2, leidas) && v2.getInt32(3072, true) === 1 && M2.HEAPU8[3072 + 4 + 2] === 3 && M2.HEAPU8[3072 + 4 + 7] === 2);
+ok('sin skins de la sala (la carrera 1) o rotas: «hay» = 0 y el juego deja las suyas', !escribirSkins(M2, undefined) && v2.getInt32(3072, true) === 0 &&
+   !escribirSkins(M2, [1, 2, 3]) && v2.getInt32(3072, true) === 0);
+fin();
+</script>
+</body>
+</html>

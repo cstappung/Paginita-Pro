@@ -20,7 +20,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, PRESENTE_MS, ESPERA_TODOS_MS, llegadaDelJuego, ponerParrilla } from '/web/navegador/sala-carrera.mjs';
+import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, SEGUNDOS_COPA, PRESENTE_MS, ESPERA_TODOS_MS, llegadaDelJuego, ponerParrilla } from '/web/navegador/sala-carrera.mjs';
 
 const { ok, fin } = prueba('sala-carrera', 'Sala sin WFC (sin el juego, reloj falso)');
 // ---- reloj falso y bus en memoria (los bytes van de una sala a otra como por la malla) ----
@@ -46,6 +46,9 @@ ok('§75: recién abierta, la anfitriona todavía no arma nada (espera saber si 
 await avanzar(1000); await avanzar(1000);
 ok('§75: a los 2 s, con los latidos de todos, la sala está lista en las tres', [ana, beto, caro].every(s => s.lista), [ana, beto, caro].map(s => s.lista).join());
 ok('Beto no puede armar la copa (no es el anfitrión)', beto.ponerPistas([{ copa: 1, fila: 2 }]) === false);
+await avanzar(0);
+ok('M22: la copa tiene reloj (90 s) y lo ven todos', SEGUNDOS_COPA === 90 && [ana, beto, caro].every(s => s.estado().plazo === ana.estado().plazo) &&
+   Math.abs(ana.estado().plazo - t - SEGUNDOS_COPA * 1000) <= 2000, `${(ana.estado().plazo - t) / 1000} s`);
 const copa = [{ copa: 13, fila: 2 }, { copa: 0, fila: 1 }];
 ok('Ana arma la copa de 2 pistas', ana.ponerPistas(copa) === true);
 await avanzar(0);
@@ -71,11 +74,36 @@ ok('la ficha de la carrera tiene a los 3 humanos en el orden de la sala con lo q
 ok('cada navegador arranca cada carrera una sola vez', beto.arrancar(1) === true && beto.arrancar(1) === false);
 
 // 3) carreras: termina la 1 → resultados → la 2
+// (M22: con la carrera andando, un personaje nuevo no se acepta: la carrera ya tiene su ficha)
+beto.elegi({ personaje: 10, vehiculo: 5, derrape: 1 });
+await avanzar(0);
+ok('M22: en plena carrera no se cambia de personaje', [ana, beto, caro].every(s => s.estado().picks.beto?.personaje === 9), String(ana.estado().picks.beto?.personaje));
 beto.termine(1);
 await avanzar(0);
 ok('al terminar la carrera 1 empiezan los resultados (sigue la 1)', ana.estado().carrera === 1 && ana.estado().plazo > t);
+// M22: las skins de las CPU (RR las sortea solo en la 1.ª carrera de cada consola): valen las de una consola que corrió
+// desde la 1, una vez; las de quien empezó más tarde (desde 3) o las rotas no; y llegan a todos
+const skinsAna = [0, 0, 3, 0, 1, 0, 0, 2, 0, 0, 5, 0], skinsCaro = Array(12).fill(0);
+caro.termine(1, null, 3, null, skinsCaro); await avanzar(0);
+ok('M22: las skins de quien no corrió desde la 1 no valen', [ana, beto, caro].every(s => !s.estado().skins));
+ana.termine(1, null, 1, null, [1, 2]); await avanzar(0);
+ok('M22: …ni unas rotas', !ana.estado().skins);
+ana.termine(1, null, 1, null, skinsAna); await avanzar(0);
+beto.termine(1, null, 1, null, Array(12).fill(4)); await avanzar(0);
+ok('M22: las de una consola que corrió desde la 1 llegan a todos, y no se cambian después', [ana, beto, caro].every(s => JSON.stringify(s.estado().skins) === JSON.stringify(skinsAna)),
+   JSON.stringify(caro.estado().skins));
+// M22: en el descanso, el que quiere elige otra vez (Beto); los demás siguen con lo suyo
+beto.elegi({ personaje: 12, vehiculo: 7, derrape: 1 });
+await avanzar(0);
+ok('M22: en el descanso Beto elige otro personaje y vehículo, y llega a todos (sigue el descanso de la 1)',
+   [ana, beto, caro].every(s => s.estado().picks.beto?.personaje === 12 && s.estado().picks.beto?.vehiculo === 7) && ana.estado().carrera === 1,
+   [ana, beto, caro].map(s => s.estado().picks.beto?.personaje).join());
 await avanzar(SEGUNDOS_RESULTADOS * 1000 + 1000);
 ok('después de los resultados todos pasan a la carrera 2', [ana, beto, caro].every(s => s.estado().fase === 'correr' && s.estado().carrera === 2));
+const hs2 = [ana, beto, caro].map(s => humanosDeFicha(humanos, s.estado()));
+ok('M22: la ficha de la carrera 2 lleva el personaje nuevo de Beto y el de antes de Ana, igual en las tres consolas',
+   hs2.every(h => h[1].personaje === 12 && h[1].vehiculo === 7 && h[0].personaje === 22) && new Set(hs2.map(h => JSON.stringify(h))).size === 1,
+   JSON.stringify(hs2[0].map(h => [h.personaje, h.vehiculo])));
 
 // 4) Caro recarga la página a mitad de la copa: una sala nueva, sin nada, se pone al día con el reparto
 caro.detener();
@@ -92,6 +120,31 @@ await avanzar(0);
 await avanzar(SEGUNDOS_RESULTADOS * 1000 + 1000);
 ok('después de la última carrera, la sala termina («fin») en todos', [ana, beto, caro2].every(s => s.estado().fase === 'fin'), [ana, beto, caro2].map(s => s.estado().fase).join());
 [ana, beto, caro2].forEach(s => s.detener());
+
+// M22) el reloj de la copa vence: solo la página de la anfitriona recibe el aviso (y una vez); en la playlist no hay reloj
+{
+  salas.clear();
+  const vencio = [];
+  const ar = persona('ana', { segundosCopa: 5, alVencioCopa: () => vencio.push('ana') });
+  const br = persona('beto', { segundosCopa: 5, alVencioCopa: () => vencio.push('beto') });
+  const cr = persona('caro', { segundosCopa: 5, alVencioCopa: () => vencio.push('caro') });
+  await avanzar(1000); await avanzar(1000); await avanzar(1000);
+  ok('M22: con 5 s de reloj, a los 3 s todavía no vence', vencio.length === 0 && ar.estado().fase === 'copa' && ar.estado().plazo > t);
+  for (let i = 0; i < 5; i++) await avanzar(1000);
+  ok('M22: al vencer, solo la anfitriona avisa a su página, una vez (pone una al azar: aquí, la de la prueba)', vencio.join() === 'ana', vencio.join());
+  ar.ponerPistas([0, 1, 2, 3].map(f => ({ copa: 7, fila: f })));
+  await avanzar(0);
+  ok('M22: con la copa puesta, todos pasan a «elegir» con su plazo de 45 s', [ar, br, cr].every(x => x.estado().fase === 'elegir' && x.estado().pistas?.[0]?.copa === 7));
+  [ar, br, cr].forEach(x => x.detener());
+  salas.clear();
+  const ap = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', carreras: 4, enviar: enviar('ana'), ahora: () => t, cada, parar, segundosCopa: 5, alVencioCopa: () => vencio.push('lista') });
+  salas.set('ana', ap);
+  const bp = persona('beto'), cp = persona('caro');
+  for (let i = 0; i < 9; i++) await avanzar(1000);
+  ok('M22: en la playlist no hay reloj (armar una lista lleva su tiempo)', !ap.estado().plazo && !vencio.includes('lista') && ap.estado().fase === 'copa',
+     `plazo ${ap.estado().plazo} · ${vencio.join()}`);
+  [ap, bp, cp].forEach(x => x.detener());
+}
 
 // 6) la anfitriona se va a mitad de la copa: la sala del sitio dice que manda Beto, y la copa sigue con él
 salas.clear();

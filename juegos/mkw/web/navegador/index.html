@@ -237,6 +237,12 @@
     padding: 7px 14px; border-radius: 999px; background: #161233ee; border: 1px solid #4b3d93; color: var(--texto);
     font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
   #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
+  /* M22: la esquina de los avisos de estado (📶 la red, la PC lenta): arriba a la izquierda, donde el juego no pone HUD */
+  #estadoJuego { position: fixed; z-index: 6; left: calc(10px + var(--sl)); top: calc(10px + var(--st)); display: flex; flex-direction: column;
+    align-items: flex-start; gap: 6px; max-width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+  .chip-estado { padding: 4px 10px; border-radius: 999px; background: #161233e6; border: 1px solid #4b3d93; color: var(--texto);
+    font: 600 12.5px/1.3 'IBM Plex Sans', sans-serif; box-shadow: 0 4px 12px #0008; }
+  .chip-estado.mal { border-color: var(--peligro); color: #ffb4b4; }
   /* §81: «el juego va lento: ¿tarjeta de video equivocada?» (aviso-gpu.mjs), abajo a la izquierda, con «Ver cómo» y «✕» */
   #avisoGpu { position: fixed; z-index: 6; left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); max-width: min(440px, calc(100vw - 24px)); display: flex; gap: 10px;
     align-items: center; padding: 10px 12px; border-radius: 14px; background: #161233f2; border: 1px solid #4b3d93; color: var(--texto);
@@ -245,11 +251,23 @@
   #avisoGpu .boton { flex: none; }
   .aviso-gpu-cerrar { flex: none; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--suave); cursor: pointer; font-size: 15px; }
   .aviso-gpu-cerrar:hover { background: #ffffff14; color: var(--texto); }
-  /* la playlist de la sala entre carrera y carrera (§74): al costado, mientras se ven los resultados */
-  .playlist-breve { position: fixed; z-index: 7; right: calc(16px + var(--sr)); top: 50%; translate: 0 -50%; width: min(320px, calc(100vw - 32px));
-    display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #1b1440ee; border: 2px solid #4b3d93; color: var(--texto);
-    box-shadow: inset 0 3px 0 var(--amarillo), 0 12px 32px #000a; backdrop-filter: blur(6px); animation: pb-entra .25s ease-out; }
-  @keyframes pb-entra { from { opacity: 0; transform: translateX(24px); } }
+  /* el descanso entre carreras (§74, §94). M22: un ZÓCALO abajo, en una línea (como el de la tele), que deja libre la tabla
+     de puntos del juego; con la ventana más alta que 16:9 queda en la banda negra de abajo */
+  .playlist-breve { position: fixed; z-index: 7; left: 50%; bottom: calc(4px + var(--sb)); translate: -50% 0; width: max-content;
+    max-width: calc(100vw - 16px - var(--sl) - var(--sr)); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px;
+    padding: 3px 10px; border-radius: 12px; background: #1b1440e8; border: 2px solid #4b3d93; color: var(--texto);
+    box-shadow: inset 0 3px 0 var(--amarillo), 0 10px 28px #000a; backdrop-filter: blur(6px); animation: pb-entra .25s ease-out; }
+  @keyframes pb-entra { from { opacity: 0; transform: translateY(18px); } }
+  .playlist-breve .pb-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .pb-viene { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pb-viene .pb-sub { margin: 0; }
+  .pb-viene .pb-lista li { grid-template-columns: 16px 32px minmax(0, 1fr); gap: 6px; padding: 0 8px 0 4px; max-width: 280px; }
+  .pb-viene .renglon-foto { width: 32px; height: 18px; }
+  .playlist-breve .pb-cab b { font-size: 17px; }
+  .playlist-breve > .boton { min-height: 26px; padding: 2px 12px; font-size: 13px; }
+  .pb-yo { margin: 0; display: flex; gap: 8px; align-items: baseline; padding: 2px 8px; border-radius: 10px; background: #2a2140; border: 1px solid var(--amarillo);
+    font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pb-yo .num { font: 400 16px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
   .pb-cab { display: flex; align-items: center; gap: 8px; font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--suave); }
   .pb-cab b { font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
   .pb-cab .sug-chip { margin-left: auto; }
@@ -261,10 +279,10 @@
   .pb-lista em { font: 600 11px 'IBM Plex Sans', sans-serif; font-style: normal; color: #1b1440; background: var(--lila); padding: 1px 7px; border-radius: 999px; }
   .pb-mas, .pb-nota { margin: 0; color: var(--suave); font-size: 12.5px; }
   .pb-nota { color: var(--lila); }
-  .playlist-breve > .boton { width: 100%; min-height: 40px; }
+  .playlist-breve > .boton { min-height: 38px; }
   /* §94: el descanso entre carreras: la cuenta y los resultados (puesto, puntos y VR de cada humano) */
-  .pb-cuenta { margin: 0; padding: 6px 10px; border-radius: 10px; background: #0f0c26; border: 1px solid #3d3378; text-align: center;
-    font: 400 18px 'Lilita One', system-ui, sans-serif; color: var(--texto); font-variant-numeric: tabular-nums; }
+  .pb-cuenta { margin: 0; padding: 2px 8px; border-radius: 10px; background: #0f0c26; border: 1px solid #3d3378; text-align: center; white-space: nowrap;
+    font: 400 15px 'Lilita One', system-ui, sans-serif; color: var(--texto); font-variant-numeric: tabular-nums; }
   .pb-cuenta.pronto { color: var(--amarillo); border-color: var(--amarillo); }
   .pb-sub { margin: 2px 0 0; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
   .pb-res { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
@@ -277,7 +295,8 @@
   .pb-vr { font: 600 12px 'IBM Plex Sans', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .pb-vr.sube { color: var(--verde); }
   .pb-vr.baja { color: var(--peligro); }
-  @media (max-width: 699px) { .playlist-breve { top: auto; bottom: calc(12px + var(--sb)); left: 16px; right: 16px; width: auto; translate: none; } .pb-lista li:nth-child(n+4) { display: none; } }
+  @media (max-width: 1100px) { .playlist-breve .pb-cab span:not(.sug-chip), .pb-viene .pb-sub { display: none; } }
+  @media (max-width: 699px) { .pb-viene .pb-lista li { max-width: 200px; } }
   @media (prefers-reduced-motion: reduce) { .playlist-breve { animation: none; } }
   /* ---- elegir copa, pista o armar una lista (§56, §74; repasado con una revisión crítica del diseño) ---- */
   #elegirPista { position: fixed; inset: 0; z-index: 9; overflow: auto; overscroll-behavior: contain; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
@@ -329,7 +348,11 @@
   @media (hover: hover) { .modo-lista .copa .pista.en-lista:hover::after { content: '✕'; background: var(--peligro); color: #fff; font: 700 11px/20px 'IBM Plex Sans', sans-serif; } }
   .modo-lista.llena .copa .pista:not(.en-lista)::after { content: ''; }
   .modo-lista.llena .copa .pista:not(.en-lista) { opacity: .6; }
-  .sin-imagen { visibility: hidden; }
+  /* M22: elegir otro personaje en el descanso: el panel se achica abajo a la derecha y deja libre la pantalla del juego */
+  .playlist-breve .pb-kart { margin: 0; font-size: .9rem; color: var(--suave, #d8d0f0); }
+  /* M22: la imagen que falta es una ficha de color (antes, una caja vacía que parecía rota) */
+  .sin-imagen { visibility: visible; background: repeating-linear-gradient(135deg, #3a2a6e 0 10px, #33255f 10px 20px); border-radius: 8px; }
+  img.sin-imagen:not([src]) { content: none; }
   /* el costado (quieto mientras la grilla corre, debajo de la cabecera): la lista arriba y la vista previa abajo */
   /* (el «top» de un sticky se cuenta desde el borde interior del relleno: 16 px + la muesca) */
   .lado { position: sticky; top: calc(var(--alto-cab, 16px) - 12px - var(--st)); display: flex; flex-direction: column; gap: 10px; max-height: calc(100dvh - var(--alto-cab, 16px) - 20px - var(--sb)); }

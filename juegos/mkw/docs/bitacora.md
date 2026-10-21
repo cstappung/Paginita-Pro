@@ -886,6 +886,26 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Firma (del repintado)** | El vestíbulo se rehace entero cada vez que cambia algo (alguien entra, llega un VR). Antes de rehacerlo arma una «firma» con todo lo que se ve; si no cambió, no lo toca. Lo abierto (el «⋯», «Cambiar», la tabla) va en la firma, y el foco del teclado vuelve al mismo botón. Como el contacto de enclavamiento de un relé: guarda el estado aunque la orden se repita. |
 | **Foco (del teclado)** | El recuadro que marca qué botón responde a Enter cuando se maneja la página con el teclado (Tab). |
 
+### El «Modo consola»: antes, durante y entre carreras (§98)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Modo consola** | El nombre del modelo de mejora que recomendó el crítico y eligió el dueño: la página deja de hablar encima del juego y habla en las pausas, con la letra y los colores del juego (como una consola de verdad, donde todo lo dice el mismo aparato). Como un tablero de operador bien hecho: en marcha normal solo el proceso; las alarmas en su ventanilla y con su color. |
+| **Zócalo** (*lower third*) | La franja baja de la tele que informa sin tapar la imagen («Gol de…»). El descanso entre carreras pasó de un panel a la derecha (tapaba los puntos de los puestos 4.º a 9.º de la tabla del juego) a un zócalo de una línea abajo: la copa, la cuenta, tu puesto y tu VR, la pista que sigue y los botones. |
+| **Superposición** (*overlay*) | Algo que la página dibuja encima de la imagen del juego (el contador DNF, las marcas de VR, el podio). Como un acetato sobre un plano: el plano no cambia; lo de arriba se pone y se saca. |
+| **Marca de VR (en la tabla)** | El «+13 VR» o «-17 VR» que la página escribe con la letra del juego al lado de la fila de cada humano en la tabla de puntos del juego, en la franja libre de la derecha. La fila sale de los puntos y la llegada de la sala (`filasDeTabla`). |
+| **Capas de avisos** | Dónde va cada aviso según su urgencia: al centro solo lo de la carrera (esperar a alguien, un corte); en la esquina de arriba a la izquierda el estado (📶 alguien va lento, la PC lenta), 6 s cada vez que cambia (nada queda encima de la imagen toda la carrera: cuesta cuadros); abajo el zócalo de las pausas; arriba el cartel de quien recargó. Como en un tablero: alarma, indicador y placa de datos no van en el mismo lugar. |
+| **Podio** | Al terminar la copa, 8 s con «¡GANÓ …!» y los tres primeros (con el VR que ganó o perdió cada humano en la copa) con la letra del juego, y después la vuelta al vestíbulo. |
+| **Modo inmersivo (automático)** | La pantalla completa del sitio (sin cabecera, el chat flotando encima). Al empezar la copa la sala lo pone sola y lo saca al volver al vestíbulo; si la persona sale con Esc, en esa copa no se le vuelve a poner. |
+| **Precarga del vestíbulo** | Mientras se conversa en el vestíbulo, un marco escondido abre la página del juego con `?precarga=1`: baja el programa y lo que el juego lee al arrancar y en la primera carrera, y lo deja guardado en el navegador **sin arrancar el juego**. Como cargar el condensador antes de cerrar el interruptor: cuando se aprieta «¡A correr!» la energía ya está. |
+| **Presencia (del buzón)** | Lo que cada piloto deja escrito en el buzón de la sala (Firebase: `vivo/<sala>/rtc/en/<uid>`, hasta 16 letras): durante la carrera, la sesión de su malla; en el vestíbulo, cómo va su precarga («~40», «~listo»). La «~» del principio le dice a la malla que eso no es una sesión. |
+| **MiiGroup (playerMiis)** | Una lista del juego con 12 lugares para Mii (SectionParams +0x188), uno por puesto de la carrera. El globo con el nombre sobre cada kart y las filas de las tablas escriben el nombre del Mii de ese lugar. El juego solo llena el lugar 0 (con la licencia: «Piloto»): por eso en la sala un humano salía «Piloto» y el otro sin nombre. |
+| **Skin (de Retro Rewind)** | Otra apariencia de un personaje (otro modelo y otro nombre: «Meowser» es una de Bowser, «King Bob-omb» una de Wario). Retro Rewind sortea las de las CPU al empezar la copa; solo cambian lo que se ve. La página le pregunta al juego el nombre que usa para cada CPU en vez de adivinarlo por el personaje. |
+| **UTF-16** | Una forma de guardar texto donde cada letra común ocupa 2 bytes. Los nombres de los Mii del juego son 10 letras UTF-16 y un 0 al final. La página quita lo que la letra del juego no puede escribir (emoji, caracteres de control) y corta en 10. |
+| **Cartel (de quien recargó)** | Una tarjeta arriba de la imagen para quien recargó la página con la copa andando: «Carrera 2 de 4 en curso · Vuelves en la 3. Mientras, si quieres, elige personaje y vehículo». Antes era una píldora al centro que tapaba una pantalla de personajes que sí sirve. |
+| **Volver a elegir (en el descanso)** | El botón opcional «Cambiar personaje y vehículo» del zócalo: abre la pantalla de personajes del juego por código; lo elegido corre desde la carrera siguiente, igual en todas las consolas. Si el descanso termina antes de confirmar, se corre con lo de antes. |
+| **Modo elección** | Una marca del gancho de la pantalla de personajes (`g_eleccion`, `directo_nativo.cpp`): mientras está puesta, al confirmar el derrape el juego no sigue a elegir pista, solo avisa a la página lo elegido. El salto a la pantalla de personajes del descanso la apagaba (§98.4): el juego seguía solo a otra carrera. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -8412,3 +8432,224 @@ anfitriona con la copa andando).
   siguen en `juegos.html` (por ejemplo, las tarjetas de modo con borde dorado).
 - **El ícono de la corona tiene un título** («Anfitrión»): aparece en el texto del panel que leen las pruebas. Es a
   propósito (lo lee quien usa un lector de pantalla).
+
+## 2026-10-21 · §98 El «Modo consola»: antes, durante y entre carreras (M22)
+
+**Qué pidió el dueño:**
+
+1. «Lanza un crítico, haciéndole ver cómo es la experiencia de usuario antes, después y entre carreras, para que
+   proponga 3 modelos de mejora».
+2. Después de leerlos: «Haz el modelo recomendado, pero agrega eso de una opción de poder volver a elegir combinación
+   de karts, pero que sea opcional».
+
+### 98.1 El crítico y el modelo elegido
+
+Un crítico aparte (otro agente, sin esta conversación) recorrió la sala entera con las fotos de las pruebas y el
+código: el vestíbulo, la espera de la copa, la elección, la carrera, el descanso y el final. Lo que encontró (en
+corto): **el panel del descanso tapaba la tabla del juego** (los puntos del 4.º al 9.º) y además repetía lo que la
+tabla ya dice; **los nombres no cuadraban** (en la tabla del juego uno se llamaba «Piloto» y el otro no tenía nombre);
+el **invitado esperaba a ciegas** mientras el anfitrión elegía la copa (sin reloj, y el aviso parecía decir «espera»
+aunque ya se podía elegir personaje); los **avisos de red tapaban la carrera** al centro; el **final era una píldora**
+que tapaba la fila del 1.º; quien **recargaba** veía una pantalla de personajes sin saber qué pasaba; la **tira del
+sitio mentía** toda la copa («Arma la lista…» con la carrera andando); un clic en «Volver al vestíbulo» cerraba la copa
+de todos sin preguntar; y varios textos hablaban de celulares (fuera del lanzamiento).
+
+Propuso tres modelos y recomendó el **1, «Modo consola»**: la página deja de hablar encima del juego y habla en las
+pausas, con la letra y los colores del juego (como una consola, donde todo lo dice el mismo aparato), más dos piezas
+del modelo 2 (el estado de cada piloto en el vestíbulo y una vista mínima para quien llega tarde) y una del 3 (el ±VR
+escrito en la tabla del juego). El dueño lo eligió y agregó **volver a elegir personaje y vehículo entre carreras, si
+uno quiere**.
+
+### 98.2 Los arreglos rápidos
+
+- **El reloj de la copa:** el anfitrión tiene 90 s para elegir la copa (`SEGUNDOS_COPA` de `sala-carrera.mjs`, lo ven
+  todos: «Elige la copa: 52 s (si no, sale una al azar)»); al vencer, su página pone una copa al azar (`alVencioCopa`).
+  En la playlist no hay reloj (se arma con sugerencias). `?copaReloj=N` s solo para pruebas.
+- **El invitado ya puede elegir** mientras el anfitrión elige la copa, y el aviso lo dice: «Ya puedes elegir personaje
+  y vehículo · Ana está eligiendo la copa (52 s)…». En la elección, a quién se espera por su nombre («faltan Beto»).
+- **La tira del sitio dice la verdad:** el marco le avisa al sitio en qué fase está la sala (`{tipo:'fase'}`: copa,
+  elegir, carrera N de M, descanso, fin) y la tira lo escribe.
+- **«Terminar la copa para todos»** (antes «Volver al vestíbulo») pregunta antes de cerrar la copa de todos.
+- **Al echado**, «← Volver a Juegos»; el VR de quien nunca corrió dice «5000 nuevo» (antes «—»).
+- **Solo PC:** los controles del sitio y las reglas ya no ofrecen táctil ni Android (celulares fuera del lanzamiento);
+  las reglas explican el DNF de 30 s y el límite de 5 min (antes «el juego saca a quien se queda quieto», que ya no es
+  así) y que la CPU cuenta para el VR.
+- **Los avisos de red con nombre y cortos** («📶 Beto va lento»), y el aviso de récord VS ya no sale en la sala.
+- **La semilla** del selector de copa solo con `?depurar=1`, y la imagen que falta es una ficha de color (antes una
+  caja vacía que parecía rota).
+
+### 98.3 El descanso: un zócalo, el ±VR en la tabla del juego y volver a elegir
+
+**El zócalo** (`interfaz.mjs` `playlistBreve`, estilos en `index.html`): el panel de la derecha pasó a una franja de
+una línea abajo (como el zócalo de la tele). Muestra la copa y cuántas van, la cuenta («La carrera siguiente en 24 s»),
+**tu** puesto, puntos y VR, la pista que sigue (las demás: «y 5 más») y los botones. Con la ventana más alta que 16:9
+queda en la banda negra; en 16:9 tapa solo el borde de la fila 12. Los resultados de todos siguen en el panel como
+lista para el lector de pantalla (`.pb-res`, que no se ve).
+
+**El ±VR en la tabla del juego** (`web/navegador/letreros.mjs`): 3 s después de que aparece la tabla de puntos del juego
+(página 0x30; antes el juego la anima: suma y reordena), la página escribe «+39 VR» (verde) o «-13 VR» (rojo) **al lado
+de la fila de cada humano**, con la letra del juego (la misma fuente que el contador DNF, `cargarFuentes` + `pintar`; si
+falta una letra, la de reserva). Cómo sabe la página en qué fila está cada uno:
+
+- las filas están a alturas fijas de la imagen 16:9, medidas en una foto del descanso: la fila *k* en
+  44 + 40,45·(*k* − 1) de 540 px, y la tabla termina en 822 de 960 px (de ahí a la derecha queda una franja libre);
+- el orden de la tabla sale de la sala (iguales en todas las consolas): más puntos de la copa arriba y, a igual
+  puntos, el que llegó antes en esta carrera (`filasDeTabla`). En la prueba: B ganó (15 pts, fila 1, «+39 VR») y A
+  llegó 2.º (12 pts, fila 2, «+13 VR»).
+
+**Volver a elegir (opcional):** el zócalo tiene «Cambiar personaje y vehículo» (no en la última carrera). Abre la
+pantalla de personajes del juego por código (`directo.elegir`, como al empezar la copa); el zócalo se achica a «Elige
+personaje y vehículo en el juego. Si no alcanzas, corres con el de antes.». Lo elegido va a la anfitriona
+(`sala.elegi`), que lo acepta en el descanso (antes solo en la fase de elegir) y la ficha de la carrera siguiente lo
+lleva en todas las consolas. Mientras se elige, el cerrojo de los botones (§94) deja pasar todo.
+
+### 98.4 La trampa de volver a elegir: el «modo elección» se apagaba solo
+
+La primera prueba de volver a elegir falló: la pantalla de personajes se abría, pero lo elegido nunca llegaba. Un
+experimento en dos pestañas (`depurar-reelegir.mjs`, en el borrador) mostró que el teclado sí llegaba (la pantalla
+pasaba de personaje a vehículo y a derrape), pero **al confirmar el derrape el juego seguía de largo**: elegía pista
+(0x4B) y abría **otra carrera fuera de la sala** (0x1A). La causa, en `directo_nativo.cpp`: el «modo elección» (que
+hace que al confirmar el derrape el juego se quede quieto y avise a la página) se apaga con cualquier salto que pide la
+página; al empezar la copa el salto a la pantalla de personajes va por otro camino (la envoltura de
+`SectionMgr::Init`) y no lo apagaba, pero en el descanso el salto va por el camino normal y lo apagaba antes de
+elegir. Arreglo: el salto a la pantalla de personajes (sección 0x49) ya no lo apaga; el de la carrera, sí.
+
+### 98.5 Los nombres de verdad en el juego
+
+Un agente siguió en el código traducido de dónde saca el juego el nombre del globo sobre cada kart y de las filas de
+las tablas (informe completo en el borrador, `nombres-juego.md`):
+
+- el globo (`UpdateInfo`, `rr_overlay_807F0044`) y las tablas (`FillName`, `rr_overlay_807F52F4`) escriben, para los
+  humanos, el nombre del **Mii de esa casilla de SectionParams +0x188** (un MiiGroup de 12 lugares, uno por puesto de
+  la carrera), con el mensaje 9501 (el nombre del Mii, Mii +0x68); si el Mii tiene la marca +0xA5 escribe «Player»;
+  a las CPU les escribe el nombre del personaje (con las skins de Retro Rewind);
+- el juego llena ese grupo **como si los jugadores de esta consola fueran los puestos 0, 1…**: la elección de personaje
+  copia la licencia en la casilla 0 («Piloto») y las demás quedan vacías. En la sala B corre en el puesto 1: la casilla
+  0 (que es A) decía «Piloto» y la 1, nada.
+
+La solución (`web/juego/nombres_nativo.cpp` + `web/navegador/nombres-juego.mjs`):
+
+1. **Un Mii en cada casilla de humano.** Envolviendo `CharacterSelect::OnInit` de RR (`rr_overlay_8083D55C`): es el
+   momento en que el juego mismo carga Mii en ese grupo, con el dibujante de caras listo. A cada casilla de humano vacía
+   le carga un Mii invitado (`MiiGroup::LoadDefaultMii`, 0x805FA748) con una cara fija para ese uid (`caraDe`).
+2. **El nombre, en cada carrera.** Al final de `Racedata_InitRace` de Pulsar (la envoltura de §96 en
+   `directo_nativo.cpp`), el nombre que manda la sala se escribe en el Mii de la casilla de cada humano (hasta 10
+   letras UTF-16) y se baja la marca +0xA5. Solo escrituras: ahí todavía no se puede reservar memoria (el dibujante de
+   la carrera no existe).
+3. **Cómo nombra el juego a cada CPU.** Ya en la carrera (al empezar `SectionMgr::Update`), con las mismas funciones
+   que usa el juego (`GetCharacterNameBMGId` y `GetCustomMsg` de Pulsar, `rr_kamek_8185285C` y `rr_kamek_818611E0`):
+   el texto con la skin de RR y en el idioma del juego («Meowser», «King Bob-omb», «Toadette (Summer)»). La página lo
+   usa en la tabla del final y en el podio (antes salía «Bowser (CPU)» donde el juego decía «Meowser»).
+
+Nada de esto cambia la carrera: solo la interfaz lee esos Mii (la huella del lockstep compara karts y botones), y se
+escribe lo mismo en todas las consolas. La página limpia el nombre a lo que la letra del juego puede escribir
+(`nombreParaJuego`: 10 letras, sin emoji ni caracteres de control; vacío = «Piloto»). `?nombresJuego=0` = como antes.
+
+4. **Las mismas CPU para quien recargó.** Retro Rewind sortea las skins de las CPU solo en la primera carrera de cada
+   consola (con el reloj de la carrera: igual en todas las que la corrieron). Quien recarga a mitad de la copa no sortea
+   y veía otras CPU, con otros nombres (la prueba `--recarga` lo encontró: la tabla del final no era igual en las dos).
+   Y no solo quien recarga: **volver a elegir también las borra** (pasar por la pantalla de personajes las pone en 0 y
+   RR no vuelve a sortear), así que después de volver a elegir A veía «Bowser» donde B veía «Meowser». Ahora cada
+   consola manda con su aviso de fin de la carrera 1 las 12 skins que sorteó (`racePlayerSlots`, 0x818A08A8; las copia
+   el C++ al armar la carrera, porque el lector de memoria de la página solo llega hasta 0x81800000); la anfitriona
+   guarda las de una que corrió desde la 1 (`estado.skins`, una vez) y antes de cada carrera todas las escriben al final
+   de `Racedata_InitRace`, después del sorteo de RR, solo en los puestos de CPU y solo si esa skin existe para ese
+   personaje (`characterTables`, 0x81878C7C).
+
+Lo que queda (solo de pantalla): en la consola de B la casilla de A lleva la cara de la licencia de B (el juego la
+copia ahí al elegir). La carrera es la misma.
+
+### 98.6 El final, quien recargó y los avisos por capas
+
+- **El podio** (`letreros.mjs` `podio`): al terminar la copa, 8 s con «¡GANÓ JUGADOR 1!» y los tres primeros de la
+  tabla (los humanos con el VR que ganaron o perdieron en la copa) y, si no estás entre los tres, tu fila; con la letra
+  del juego sobre la imagen. Recién después el marco le avisa al sitio (`{tipo:'fin'}`) y vuelven al vestíbulo.
+  `?podio=N` ms (0 = sin podio).
+- **Quien recargó** con la copa andando ve un **cartel arriba**: «Carrera 1 de 2 en curso · Vuelves en la 2. Mientras,
+  si quieres, elige personaje y vehículo». Lo que elige ahí llega a la anfitriona en el descanso (el primer momento en
+  que lo acepta) y corre desde la siguiente.
+- **Los avisos por capas:** al centro solo lo de la carrera (esperar a alguien, un corte, salirse); el estado (📶
+  alguien va lento, la PC lenta) pasó a un chip en la **esquina de arriba a la izquierda** (donde el juego no pone HUD),
+  6 s cada vez que cambia y solo con la carrera andando (ver la trampa de §98.9); el VR ya no va en la píldora del
+  centro (está en la tabla y en el zócalo).
+
+### 98.7 Antes de la carrera: modo inmersivo y la precarga con el estado de cada piloto
+
+- **Modo inmersivo automático** (sitio, `colabtex/src/juegos/mkw.js`): al empezar la copa la sala pasa sola al modo
+  inmersivo del sitio (sin cabecera, el chat flotante encima; el sitio le presta `ponInmersivo` al módulo) y el marco
+  llena la pantalla; al volver al vestíbulo sale. Una vez por copa: si la persona sale con Esc, no se le vuelve a poner.
+- **La precarga del vestíbulo:** mientras se conversa, un marco escondido abre la página del juego con `?precarga=1`
+  (`precargarTodo` en `mkw.mjs`): baja el manifiesto, los archivos chicos, el paquete de diminutos, el programa (con su
+  huella, a la caché HTTP) y la semilla de bloques (la del arranque y hasta 32 MB de lo de después del título, a Cache
+  Storage), **sin arrancar el juego** (sin WebGPU ni la memoria del wasm). Avisa cuánto lleva.
+- **El estado de cada piloto:** el sitio escribe ese porcentaje en la presencia del buzón de la sala (`~40`, `~listo`;
+  la malla del juego no toma lo que empieza con «~» por una sesión, `malla.mjs`) y cada fila del vestíbulo muestra
+  «⬇ 40 %» o «● listo». No hace falta ninguna regla nueva de Firebase: es la misma presencia que ya usa la malla.
+
+Medido con `node web/navegador/prueba-precarga.mjs` (dos perfiles de Chrome nuevos, 50 ms de red como R2):
+
+| | Sin precarga | Con precarga |
+|---|---|---|
+| Hasta la carrera (abrir la página → carrera directa) | 10,5 s | **8,4 s** |
+| Del programa por la red | 16,9 MB | **0** (de la caché HTTP) |
+| Del disco por la red | 60,7 MB | **19,7 MB** |
+| La precarga misma | — | 2,4 s (en esta PC; en internet, lo que tarden ~80 MB mientras se conversa) |
+
+En esta PC la red es instantánea; en internet la diferencia es lo que tardan ~60 MB (a 50 Mbit/s, unos 10 s menos).
+
+### 98.8 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| banco `letreros` (nuevo) | **17/17** (la fila de cada puesto con empates, las alturas medidas, cada marca en su fila y en la franja libre también con bandas, verde/rojo, la letra de reserva, el podio y el cartel) |
+| banco `nombres-juego` (nuevo) | **15/15** (10 letras, tildes sí, emoji no, NFC, la cara fija, el búfer como lo lee el C++, el texto de las CPU, las skins) |
+| banco `sala-carrera` | **75/75** (11 nuevos: el reloj de la copa visto por todos, al vencer solo avisa a la anfitriona una vez, la playlist sin reloj; volver a elegir no a mitad de carrera, sí en el descanso y la carrera siguiente lo lleva igual en todas; las skins: solo de quien corrió desde la 1, una vez, nunca rotas) |
+| banco `sala-playlist` / `playlist-sala` / `red` / `cuenta-dnf` | 37/37 · 25/25 · 28/28 · 25/25 |
+| `prueba-sala.mjs` | **42/42** (7 nuevos: los nombres en el juego en las dos, el nombre de cada CPU igual en las dos, el ±VR en su fila, A vuelve a elegir y la carrera 2 lo lleva en las dos, el podio y que se va) |
+| `prueba-sala.mjs --rapida --cpu=maximo` | **40/40** en 145 s (sin los dos puntos que miden 30 s; antes ~6 min) |
+| `prueba-sala.mjs --recarga --rapida` | **38/38** en 165 s (B recargó: su consola no sortea skins, pero con las de la sala ve las mismas CPU) |
+| `prueba-elegir.mjs` / `prueba-playlist.mjs` | **69/69** · **20/20** |
+| `prueba-sala.mjs --recarga` (y `--rapida`) | **38/38** |
+| `prueba-relevo.mjs` | **10/10** (con el chip de 6 s; con el chip puesto toda la carrera fallaba, ver §98.9) |
+| `prueba-precarga.mjs` (nueva) | **8/8** |
+| sitio `colabtex/tests/mkw.test.cjs` (+ Worker) | **20/20** (+ 6/6; nuevo: inmersivo, precarga y presencia, la tira con la fase, solo PC, el echado sin caja de invitar) |
+| `herramientas/prueba-experiencia.mjs` | **22/22** (2 nuevos: «● listo» de los dos en el vestíbulo y el modo inmersivo al empezar en los dos; el echado pierde también el inmersivo) |
+| `herramientas/prueba-experiencia.mjs --playlist` | **24/24** |
+
+Fotos en `build/web/datos/sala/`: `4-B-marcas.png` (la tabla del juego con los nombres, el ±VR al lado de cada humano
+y el zócalo), `4-A-reelegir.png` (volver a elegir), `6-A-fin.png` (el podio); en `build/web/datos/experiencia/`:
+`6-precarga-uno.png` (el vestíbulo con «● listo») y `9-inmersivo-uno.png` (el juego a pantalla del sitio, con el nombre
+«Piloto Dos» sobre su kart).
+
+### 98.9 Trampas
+
+- **El `.wasm` sin comprimir no entra en la caché HTTP.** La primera corrida de la precarga dio «el programa viaja de
+  nuevo»: el `mkw.wasm.br` era más viejo que el programa recién compilado, el servidor mandó los 130 MB sin comprimir y
+  Chrome no guarda en su caché una entrada tan grande. Comprimido (`node herramientas/comprimir-build.mjs`, como se
+  publica) son 16 MB y sí entra. Después de compilar, antes de medir la precarga: comprimir.
+- **Un `cd` dentro de Bash cambia la carpeta de toda la sesión** (pasó varias veces): rutas absolutas o
+  `( cd … && … )`.
+- **La foto del final se sacaba antes del podio** (la letra se carga al mostrarlo): la prueba espera a verlo.
+- **El chip 📶 quedaba puesto en el descanso** (el estado del relevo es de la carrera): ahora solo con la carrera
+  andando.
+- **Nada encima de la imagen del juego durante toda la carrera.** La primera versión del chip 📶 quedaba puesto mientras
+  durara el relevo (con un jugador de red mala, la carrera entera). `prueba-relevo` (tres juegos en una PC) falló 3
+  veces seguidas: el retraso de A y B creció a 8-9 cuadros (antes 3-5) y C ya no era el que más pagaba. Con la página de
+  antes de M22 (una copia aparte del último commit, el mismo programa) pasó; con la de ahora y los chips apagados
+  (`?esquina=0`), también. Explicación: con algo encima del lienzo de WebGPU el navegador ya no lo manda directo a la
+  pantalla y compone cada cuadro (más trabajo por cuadro, más tirones). Arreglo: el chip sale 6 s cuando cambia el
+  estado y se va solo (como el aviso de antes).
+- **El lector de memoria de la página llega hasta 0x81800000** (los 24 MB de la Wii y la memoria grande desde
+  0x90000000): lo que Retro Rewind deja más arriba (0x818…) se lee como 0. Las skins las copia el C++.
+- **Las pruebas no corren las carreras enteras** (pregunta del dueño): `mkwTerminarEn` hace que todos crucen la meta
+  por código en el mismo cuadro, unos 3 s después de largar. Lo largo de `prueba-sala` son las esperas que la prueba
+  mide a propósito (el descanso de 30 s, el plazo DNF de 30 s); `--rapida` las acorta (descansos de 25 s, la carrera 2
+  también por código) para repetir lo demás en ~2,5 min.
+- **Un arreglo rápido rompió «echar» en el sitio.** Al echado ya no se le arma la caja de invitar (`panelEspera` devuelve
+  vacío), pero el sitio igual le ponía el clic al botón «Copiar» de esa caja: un error (`onclick` de algo que no existe)
+  cortaba la actualización y la página de Piloto Dos se quedaba con el juego andando. Lo encontró el ensayo del sitio
+  (`prueba-experiencia`); ahora el clic se pone solo si la caja está.
+- **El modo inmersivo esconde la tira**: para echar con la copa andando, el anfitrión sale con «Salir» (el ensayo lo
+  hace igual que una persona).
+- **`prueba-elegir` leía la semilla** del selector, que ahora solo se ve con `?depurar=1`: la prueba abre la página
+  con ese parámetro.

@@ -388,10 +388,33 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     avisoJuego.textContent = texto; avisoJuego.hidden = !texto; avisoJuego.classList.toggle('mal', mal);
     if (texto && !texto.includes('…')) setTimeout(() => { if (avisoJuego.textContent === texto) avisoJuego.hidden = true; }, 6000);   // los de «…» quedan mientras dure
   }
+  // M22 (avisos por capas, el crítico): el estado de la red y de la PC no va en la píldora del centro (tapaba la carrera)
+  // sino en una esquina, como un ícono con su texto corto. chip(clave, texto, mal): aparece 6 s cada vez que el texto
+  // cambia y se va solo (texto vacío = se va ya). No queda puesto mientras dure: cualquier cosa encima de la imagen del
+  // juego obliga al navegador a componer cada cuadro (el lienzo de WebGPU ya no va directo a la pantalla) y en la
+  // prueba con tres juegos en una PC eso solo hacía crecer el retraso de todos (§98.9). Al centro quedan solo las cosas
+  // de la carrera (esperar a alguien, cortes)
+  const esquina = el('div', { id: 'estadoJuego', role: 'status' });
+  document.body.append(esquina);
+  const sinEsquina = new URLSearchParams(location.search).get('esquina') === '0';   // (?esquina=0: sin chips, para medir)
+  const ultimoChip = new Map();                   // clave → el último texto pedido (el mismo de nuevo no vuelve a salir)
+  function chip(clave, texto, mal = false, ms = 6000) {
+    if (sinEsquina) return;
+    let c = esquina.querySelector(`[data-clave="${clave}"]`);
+    if (!texto) { ultimoChip.delete(clave); c?.remove(); return; }
+    if (ultimoChip.get(clave) === texto) return;
+    ultimoChip.set(clave, texto);
+    if (!c) { c = el('span', { className: 'chip-estado' }); c.dataset.clave = clave; esquina.append(c); }
+    c.textContent = texto;
+    c.classList.toggle('mal', mal);
+    clearTimeout(c._hasta);
+    c._hasta = setTimeout(() => c.remove(), ms);
+  }
   // ---------------- Elegir copa, pista o armar una copa ----------------
   // Las imágenes sacadas del juego (herramientas/sacar-imagenes.mjs, fotos-pistas.mjs, planos-pistas.mjs) van en unos
   // pocos paquetes en la parte privada (build/imagenes, en R2 detrás del Worker; imagenes.mjs los abre): ícono de cada
-  // copa, foto, plano y videíto de cada pista. Si alguna falta, queda un recuadro vacío y la lista sigue andando.
+  // copa, foto, plano y videíto de cada pista. Si alguna falta, queda una ficha de color (.sin-imagen, index.html) y la
+  // lista sigue andando.
   const fotos = crearImagenes(imagenes);
   const imagen = (promesa, clase, alt = '') => {
     const i = el('img', { className: clase, alt, decoding: 'async' });
@@ -863,7 +886,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
           confirmar.disabled = !ps.length;
           confirmar.textContent = ps.length ? `${conf.confirmar || 'Confirmar'} · ${ps.length} ${ps.length === 1 ? 'carrera' : 'carreras'} ▸` : 'Agrega pistas para seguir';
           vaciarBtn.disabled = !ps.length;
-          semillaTxt.textContent = 'Semilla ' + semilla.toString(16).toUpperCase().padStart(8, '0');
+          // (M22: la semilla es para depurar: solo con ?depurar=1)
+          semillaTxt.textContent = new URLSearchParams(location.search).get('depurar') === '1' ? 'Semilla ' + semilla.toString(16).toUpperCase().padStart(8, '0') : '';
           marcarGrilla();
           if (nueva >= 0) filas.children[nueva]?.scrollIntoView({ block: 'nearest' });
           pintarGuardadas();
@@ -1078,6 +1102,13 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // (resultados: [{ nombre, puesto, puntos, vrAntes, vrDespues, yo }]: el puesto, los puntos de la copa y el VR de
   // cada humano). Devuelve { poner(cambios), cerrar() }: la sala lo actualiza con cada estado y lo cierra cuando
   // arranca la carrera siguiente.
+  // M22: alKart() = «Cambiar personaje y vehículo» (opcional, el de cada uno; no en la última); kart = null | 'eligiendo'
+  // (el panel se achica a la cuenta y una línea: la pantalla del juego queda libre) | 'listo'.
+  // M22 (modelo «Modo consola» del crítico): el panel es un ZÓCALO, una franja baja como la de la tele («Sigue: GBA
+  // Bowser Castle 4 · 24 s»), y deja libre la tabla de puntos del juego. Se ve: la copa y cuántas van, la cuenta, la
+  // pista que sigue (las demás: «y N más»), tu puesto y tu VR, y los botones. Los resultados de todos los humanos van
+  // escritos en la tabla del juego (letreros.mjs, el ±VR al lado de cada fila); aquí quedan como lista para el lector de
+  // pantalla (.pb-res, que no se ve).
   function playlistBreve(o) {
     document.getElementById('playlistBreve')?.remove();
     const caja = el('aside', { id: 'playlistBreve', className: 'playlist-breve' });
@@ -1104,13 +1135,14 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     const signo = d => (d >= 0 ? '+' : '−') + Math.abs(d);
     function pintar() {
       const ps = Array.isArray(o.pistas) ? o.pistas : [], hechas = Math.max(0, o.hechas | 0), quedan = ps.slice(hechas);
-      const lista = el('ol', { className: 'pb-lista' }, ...quedan.slice(0, 6).map((p, i) => {
+      // (M22: en el zócalo, solo la que sigue; la lista entera está en «+ Agregar pistas» / «Sugerir pista»)
+      const lista = el('ol', { className: 'pb-lista' }, ...quedan.slice(0, 1).map((p, i) => {
         const nom = el('span', { className: 'pb-nombre', textContent: nombre(p.copa, p.fila) });
         nom.setAttribute('translate', 'no');
         return el('li', { className: i === 0 ? 'sigue' : '' }, el('span', { className: 'num', textContent: hechas + i + 1 }),
-          imagen(fotos.foto(p.copa, p.fila), 'renglon-foto'), nom, ...(i === 0 ? [el('em', { textContent: 'sigue' })] : []));
+          imagen(fotos.foto(p.copa, p.fila), 'renglon-foto'), nom);
       }));
-      const mas = quedan.length > 6 ? [el('p', { className: 'pb-mas', textContent: `y ${quedan.length - 6} más` })] : [];
+      const mas = quedan.length > 1 ? [el('p', { className: 'pb-mas', textContent: `y ${quedan.length - 1} más` })] : [];
       const botones = o.botones !== false;
       const vacia = quedan.length || !botones ? [] : [el('p', { className: 'pb-mas', textContent: o.anfitrion ? 'No quedan pistas: agrega más para seguir, o la copa termina aquí.' : 'No quedan pistas: la copa termina aquí, salvo que el anfitrión agregue más.' })];
       const pend = botones && o.anfitrion && o.pendientes > 0 ? [el('span', { className: 'sug-chip', textContent: `💬 ${o.pendientes}` })] : [];
@@ -1119,9 +1151,17 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
         : el('button', { type: 'button', className: 'boton', id: 'pbSugerir', textContent: 'Sugerir pista', onclick: () => o.alSugerir?.() })];
       // §94: los resultados de la carrera que terminó: puesto, puntos de la copa y el VR (antes → después) de cada humano
       const filas = (Array.isArray(o.resultados) ? o.resultados : []).slice().sort((x, y) => (x.puesto || 99) - (y.puesto || 99));
-      const res = filas.length ? [
+      // (M22: la lista entera, para el lector de pantalla; a la vista, solo tu fila: .pb-yo)
+      const mia = filas.find(r => r.yo);
+      const yo = mia && (mia.puesto || Number.isInteger(mia.vrDespues)) ? [el('p', { className: 'pb-yo' },
+        el('span', { className: 'num', textContent: mia.puesto ? ordinal(mia.puesto) : '—' }),
+        el('span', { textContent: Number.isInteger(mia.puntos) ? `${mia.puntos} pts` : '' }),
+        ...(Number.isInteger(mia.vrAntes) && Number.isInteger(mia.vrDespues)
+          ? [el('span', { className: 'pb-vr ' + (mia.vrDespues >= mia.vrAntes ? 'sube' : 'baja'),
+              textContent: `VR ${mia.vrDespues.toLocaleString('es')} (${signo(mia.vrDespues - mia.vrAntes)})` })] : []))] : [];
+      const res = filas.length ? [el('div', { className: 'pb-lector' },
         el('p', { className: 'pb-sub', textContent: o.carrera ? `Resultados de la carrera ${o.carrera}` : 'Resultados' }),
-        el('ol', { className: 'pb-res' }, ...filas.slice(0, 6).map(r => {
+        el('ol', { className: 'pb-res' }, ...filas.map(r => {
           const quien = el('span', { className: 'pb-quien', textContent: r.yo ? `${r.nombre} (tú)` : r.nombre });
           quien.setAttribute('translate', 'no');
           const vr = Number.isInteger(r.vrAntes) && Number.isInteger(r.vrDespues)
@@ -1130,15 +1170,25 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
             : [el('span', { className: 'pb-vr' })];
           return el('li', { className: r.yo ? 'yo' : '' }, el('span', { className: 'num', textContent: r.puesto ? ordinal(r.puesto) : '—' }),
             quien, el('span', { className: 'pb-pts', textContent: Number.isInteger(r.puntos) ? `${r.puntos} pts` : '' }), ...vr);
-        })),
-        ...(filas.length > 6 ? [el('p', { className: 'pb-mas', textContent: `y ${filas.length - 6} más` })] : [])] : [];
+        })))] : [];
       const cab = o.titulo === 'Copa'
         ? el('span', { textContent: `${hechas} de ${ps.length} corridas` })
         : el('span', { textContent: hechas ? `${hechas} de ${ps.length} corridas` : `${ps.length} ${ps.length === 1 ? 'pista' : 'pistas'}` });
-      const viene = quedan.length ? [el('p', { className: 'pb-sub', textContent: 'Lo que viene' }), lista, ...mas] : [];
+      const viene = quedan.length ? [el('div', { className: 'pb-viene' }, el('p', { className: 'pb-sub', textContent: 'Sigue' }), lista, ...mas)] : [];
+      const eligiendo = o.kart === 'eligiendo';
+      caja.classList.toggle('eligiendo', eligiendo);
+      if (eligiendo) {
+        caja.replaceChildren(el('div', { className: 'pb-cab' }, el('b', { textContent: 'Tu personaje' })), cuenta,
+          el('p', { className: 'pb-kart', textContent: 'Elige personaje y vehículo en el juego. Si no alcanzas, corres con el de antes.' }));
+        ponerCuenta();
+        return;
+      }
+      const kart = typeof o.alKart !== 'function' || o.ultima ? []
+        : o.kart === 'listo' ? [el('p', { className: 'pb-kart', textContent: `¡Listo! Corres la carrera ${(o.carrera | 0) + 1} con tu elección nueva.` })]
+        : [el('button', { type: 'button', className: 'boton', id: 'pbKart', textContent: 'Cambiar personaje y vehículo', onclick: () => o.alKart() })];
       caja.replaceChildren(
         el('div', { className: 'pb-cab' }, el('b', { textContent: o.titulo || 'Playlist' }), cab, ...pend),
-        cuenta, ...res, ...viene, ...vacia, ...(o.nota ? [el('p', { className: 'pb-nota', textContent: o.nota })] : []), ...boton);
+        cuenta, ...yo, ...viene, ...vacia, ...(o.nota ? [el('p', { className: 'pb-nota', textContent: o.nota })] : []), ...kart, ...boton, ...res);
       ponerCuenta();
     }
     pintar();
@@ -1150,7 +1200,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     };
   }
 
-  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, elegirPista, cortina, playlistBreve,
+  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, chip, elegirPista, cortina, playlistBreve,
            conPortada, get cortinaPuesta() { return !document.body.classList.contains('sin-cortina'); },
            estado: t => { estado.textContent = t; } };
 }
