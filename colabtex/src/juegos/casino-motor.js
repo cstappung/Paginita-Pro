@@ -33,7 +33,12 @@ const baja2 = x => Math.floor(x * 100 + 1e-9) / 100;
    suma los premios así y redondea hacia abajo una sola vez al final. */
 const centavos = x => Math.round(x * 100) / 100;
 export const pagoDe = (p, mult) => centavos(p * mult);
-export const formatoPago = n => (+n || 0).toLocaleString("es-CL", { minimumFractionDigits: Number.isInteger(+n || 0) ? 0 : 2, maximumFractionDigits: 2 });
+/* Un número a la chilena con entre `min` y `max` decimales. El formateador
+   se guarda: `toLocaleString` con opciones arma uno nuevo en cada llamada,
+   y los juegos escriben números en cada cuadro. */
+const formatos = {};
+export const numeroEs = (x, min, max) => (formatos[min + ":" + max] || (formatos[min + ":" + max] = new Intl.NumberFormat("es-CL", { minimumFractionDigits: min, maximumFractionDigits: max }))).format(x);
+export const formatoPago = n => numeroEs(+n || 0, Number.isInteger(+n || 0) ? 0 : 2, 2);
 const horas = l => Object.values(l || {}).filter(Number.isFinite);
 
 /* ---------- el avión ----------
