@@ -25,6 +25,7 @@ import * as bbtan from './verifica/bbtan.js';
 import * as sopa from './verifica/sopa.js';
 import * as sudoku from './verifica/sudoku.js';
 import * as electro from './verifica/electro.js';
+import * as integral from './verifica/integral.js';
 import * as fanal from './verifica/fanal.js';
 import * as atasco from './verifica/atasco.js';
 import * as aleteo from './verifica/aleteo.js';
@@ -38,7 +39,7 @@ import * as hero from './verifica/hero.js';
 import * as prodefender from './verifica/prodefender.js';
 import * as propac from './verifica/propac.js';
 
-export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, aleteo, dosmil, trigon, protiles, frontera, metrorush, pokelike, hero, prodefender, propac};
+export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, integral, fanal, atasco, aleteo, dosmil, trigon, protiles, frontera, metrorush, pokelike, hero, prodefender, propac};
 
 /* Lo que ocupa una prueba como texto, como mucho. La regla de
    `soloPruebas` pide lo mismo. */

@@ -91,7 +91,7 @@
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
-    lista.replaceChildren();const racha=/^club-(sopa|electro|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
+    lista.replaceChildren();const racha=/^club-(sopa|electro|integral|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
     const estrellas=categoria==='club-atasco-estrellas',metros=/^club-metrorush-(city)?distancia$/.test(categoria),jornada=categoria==='club-fanal-jornadas',ronda=categoria.startsWith('club-prodefender-');
     const marca=f=>minas?(f.tiempo/1000).toFixed(2)+' s':racha?f.puntos+(f.puntos===1?' día':' días'):estrellas?f.puntos+' ★':metros?f.puntos+' m':jornada?'jornada '+f.puntos:ronda?'ronda '+f.puntos:f.puntos+' puntos';
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+marca(f);lista.appendChild(li);}

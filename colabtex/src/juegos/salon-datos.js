@@ -65,6 +65,10 @@ export const SOLOS = [
     ruta: "#solo/electro", reglas: "electro", popular: "club-electro", ranking: true, diario: true,
     lema: "Adivina el componente, la fórmula y el símbolo eléctrico del día. Puntos, racha y podio.",
     modos: ["Componente", "Fórmula", "Símbolo", "Retos"] },
+  { id: "integral", tipo: "club", nombre: "Integrodle", genero: "Cálculo", icono: "∫", alta: "2026-10-21",
+    ruta: "#solo/integral", reglas: "integral", popular: "club-integral", ranking: true, diario: true,
+    lema: "Una integral al día, la misma para todos: seis intentos, pistas y el teclado de una calculadora.",
+    modos: ["Integral del día", "Práctica por técnica"] },
   { id: "sudoku", tipo: "club", nombre: "Sudoku Arcade", genero: "Lógica", icono: "🔢", alta: "2026-10-04",
     ruta: "#solo/sudoku", reglas: "sudoku", popular: "club-sudoku", ranking: true, diario: true,
     lema: "Diario con racha, clásico en cuatro dificultades y arcade con vidas y combos.",
@@ -210,7 +214,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC

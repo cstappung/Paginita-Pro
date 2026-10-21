@@ -147,6 +147,20 @@ function electro() {
     en(64, 0, an("p", 2.2, rayo));
 }
 
+/* Integrodle: un anillo de papel cuadriculado con una cinta dorada, una
+   corona de signos ∫ que gira despacio y un ✓ rojo que late arriba. */
+function integral() {
+  const signo = `<text y="5" font-size="15" font-weight="700" text-anchor="middle" font-family="Georgia,serif" fill="#d4a017" stroke="#7a5a10" stroke-width=".5">∫</text>`;
+  const visto = `<circle r="6" fill="#fdf6e3" stroke="#c0392b" stroke-width="1.2"/><path d="M-3 0L-1 2.4L3.2-2.6" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return aro(60, "#f8f6ee", 19) +
+    cada(48, (i, a) => en(60, a, `<path d="M0-9V9" stroke="#8fb3e0" stroke-width=".5" opacity=".8"/>`)) +
+    aro(60, "#8fb3e0", .5, `opacity=".8"`) + aro(55, "#8fb3e0", .4, `opacity=".7"`) + aro(65, "#8fb3e0", .4, `opacity=".7"`) +
+    aro(51, "#d4a017", 1.6) + aro(69, "#d4a017", 1.6) +
+    `<g class="fl" style="--d:1.8s">${aro(69, "#fde68a", 1.4, `stroke-dasharray="3 9" stroke-linecap="round"`)}</g>` +
+    gira(40, cada(8, (i, a) => en(60, a + 22.5, signo, a + 22.5))) +
+    en(62, 0, an("p", 2.4, visto));
+}
+
 /* Sudoku Arcade: un anillo de neón rosa con cuatro mini cuadrículas de
    3×3 (una casilla de cada una se enciende en cian por turnos), una
    corona de dígitos que gira despacio y un trazo cian que fluye. */
@@ -661,7 +675,7 @@ function memazo() {
 
 const DIBUJOS = {
   tsnake: snake, tminas: minas, ttetris: tetris, tsortem: sortem, tbbtan: bbtan, tsopa: sopa,
-  telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
+  telectro: electro, tintegral: integral, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,

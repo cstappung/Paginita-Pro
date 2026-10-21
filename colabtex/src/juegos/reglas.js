@@ -1018,6 +1018,29 @@ const REGLAS = {
       ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que aciertas Componente, Fórmula y Símbolo (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
     ]
   },
+  /* Integrodle (juegos/club/integral/): lo que dice aquí tiene que
+     coincidir con su motor.js (PUNTOS, MAX_INTENTOS, la corrección) y su
+     juego.js (teclado, pistas). */
+  integral: {
+    lema: "Integrodle: una integral al día, la misma para todo el sitio, con seis intentos para dar con la primitiva.",
+    secciones: [
+      ["Cómo se juega", "Cada día hay una integral de nivel Cálculo I a III que pide alguna técnica: cambio de variable, por partes, fracciones parciales, sustitución trigonométrica, identidades, completar el cuadrado… Escribe la respuesta con el teclado de la hoja (o con el tuyo) y pulsa <b>Revisar</b>. Tienes 6 intentos."],
+      ["Qué hay que escribir", lista([
+        "<b>Indefinida</b> (∫ f dx): una primitiva cualquiera. No hace falta el «+ C»: cualquier constante sirve, y da lo mismo cómo la ordenes o la simplifiques.",
+        "<b>Definida</b> (con límites): el valor exacto, como π/4 o ln(2)/2. Un decimal no basta: tiene que ser la expresión exacta.",
+        "El logaritmo es <b>ln</b>, el valor absoluto va entre barras |x|, la raíz es √ o sqrt( ), y las potencias con ^. La vista previa muestra cómo se leyó lo que escribiste."
+      ])],
+      ["La corrección", lista([
+        "<b>✓</b>: la derivada de tu primitiva coincide con el integrando (o tu valor con el exacto). Ganaste el día.",
+        "<b>✗</b> en una indefinida: puedes abrir el gráfico «Ver dónde se separan», que dibuja el integrando junto a la derivada de lo que escribiste.",
+        "<b>✗</b> en una definida: te dice cuánto vale tu respuesta y si el valor correcto es mayor ↑ o menor ↓.",
+        "Un intento que no se puede leer, o uno repetido, no gasta intento."
+      ])],
+      ["Pistas", "Al primer fallo se destapa la técnica principal; al tercero, el paso clave (la sustitución o la descomposición que abre el ejercicio)."],
+      ["Diario y práctica", "La integral del <b>Diario</b> es la misma para todo el sitio y cambia a medianoche de Chile. La <b>Práctica</b> saca integrales al azar, si quieres solo de una técnica, cuantas veces quieras, y no suma puntos."],
+      ["Puntos, racha y clasificación", "Resolver al primer intento vale 100 puntos; luego 80, 65, 50, 35 y 20. Cada estrella de dificultad sobre la primera suma 10. Perder el día no suma. La 🔥 racha cuenta los días seguidos resueltos. En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
+    ]
+  },
   /* Sudoku Arcade (juegos/club/sudoku/): lo que dice aquí tiene que
      coincidir con su motor.js (puntos del arcade, racha) y su game.js
      (teclas, pistas). */
@@ -1512,7 +1535,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

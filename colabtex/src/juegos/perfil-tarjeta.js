@@ -60,7 +60,7 @@ export const MARCOS = [
   ...[
     ["tsnake", "snake", "Serpiente"], ["tminas", "minas", "Campo minado"], ["ttetris", "tetris", "Tetrominós"],
     ["tsortem", "sortem", "Bloques en orden"], ["tbbtan", "bbtan", "Bola retro"], ["tsopa", "sopa", "Sopa de letras"],
-    ["telectro", "electro", "Circuito"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
+    ["telectro", "electro", "Circuito"], ["tintegral", "integral", "Integral dorada"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
     ["tescondite", "escondite", "Escondidos"], ["tcartas", "cartas", "Tres elementos"], ["tcuadritos", "cuadritos", "Puntos y cajas"],
     ["treversi", "reversi", "Fichas que giran"], ["tgato", "gato", "Tiza"], ["torbita", "orbita", "Órbitas"], ["tcadena", "cadena", "Reacción en cadena"],
     ["tflip", "flip7", "Siete cartas"], ["tcacho", "cacho", "Cubilete"], ["tuno", "uno", "Sentido de juego"],
@@ -96,7 +96,7 @@ export const FONDOS = [
   { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -153,7 +153,7 @@ export function valorMarca(c, f) {
   if (c === "club-pokelike-pokedex") return `${f.puntos || 0} ${f.puntos === 1 ? "especie" : "especies"}`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
   if (c === "club-metrorush-distancia" || c === "club-metrorush-citydistancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
-  if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
+  if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-integral-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }
 // El mismo orden que la tabla del club (discord.js: ordenSolo).

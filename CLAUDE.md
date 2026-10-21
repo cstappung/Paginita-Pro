@@ -97,6 +97,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | BBTAN | `juegos/club/bbtan/CLAUDE.md` |
 | Sopa de letras | `juegos/club/sopa/CLAUDE.md` |
 | Electrodle | `juegos/club/electro/CLAUDE.md` |
+| Integrodle (integral diaria, cálculo, primitivas) | `juegos/club/integral/CLAUDE.md` |
 | Sudoku Arcade | `juegos/club/sudoku/CLAUDE.md` |
 | FANAL | `juegos/club/fanal/CLAUDE.md` |
 | ALETEO | `juegos/club/aleteo/CLAUDE.md` |

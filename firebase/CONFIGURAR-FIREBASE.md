@@ -159,6 +159,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > juego funciona igual, pero los récords se quedan en el dispositivo y se
 > sincronizan solos la próxima vez que se abra después de publicarlas.
 
+> **Integrodle (21 de octubre de 2026):** `club-integral-racha` y
+> `club-integral-puntos` son categorías nuevas de `soloRanks` y
+> `soloPruebas` (los puntos, con tope de 1 000 000), `integral` un juego
+> nuevo de `clubJugadas` y `club-integral-racha` una racha más de
+> `rachasClub`. Hasta volver a publicar las reglas el juego funciona igual,
+> pero los récords se quedan en el dispositivo.
+
 > **Frontera Batalla (octubre de 2026):** `club-frontera-…` son categorías
 > nuevas de `soloRanks` y `frontera` un juego nuevo de `clubJugadas`. Hasta
 > volver a publicar las reglas se juega igual, pero las rachas no llegan a la

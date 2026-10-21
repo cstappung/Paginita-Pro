@@ -228,8 +228,9 @@ logros, the balance is derived from the same four reads the profile uses
   the record (`monedasBbtan`, closed form: reaching round 5 pays 2, round
   100 pays 1 225; the per-round pay stops growing at round 450, 112 a round
   from there, and nothing past round 600 pays), sortEm pays the mode's blocks
-  plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
-  Electrodle streaks 10 per day. PRO DEFENDER pays 20 × the kingdom number for every
+  plus 2 per second under 3 s per block (`monedasSortem`), the Sopa,
+  Electrodle and Integrodle streaks 10 per day, and Integrodle's total
+  points one coin per 10 (Electrodle's, one per 50: it scores ~6× more a day). PRO DEFENDER pays 20 × the kingdom number for every
   round up to each kingdom's record (`monedasProdefender`: 2000…10 000 at
   round 100) and has no per-game pay (not in `PAGO_CLUB`).
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
