@@ -57,7 +57,7 @@
    MANO en la consola de Firebase (CONFIGURAR-FIREBASE.md). Hasta
    entonces todo esto falla con PERMISSION_DENIED, y la página lo dice.
    ============================================================ */
-import { db, auth } from "./firebase.js";
+import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
   runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved,
@@ -339,7 +339,7 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
 const NODOS_MONEDAS = 14, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
-export function watchLogros(cb) {
+export function watchLogros(cb, yo = () => "") {
   const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
@@ -353,7 +353,7 @@ export function watchLogros(cb) {
      las demás conservan su objeto, que es lo que deja a monedas.js no
      volver a mirar sus rondas. `val()` del nodo entero copiaba las rondas
      de todo el mundo en cada escritura de cualquiera. Se avisa juntado: al
-     segundo si cambió lo propio (el casino de esta pestaña lo espera), a
+     segundo si cambió lo propio (`yo()`: el casino de esta pestaña lo espera), a
      los `CASINO_AJENO` ms si solo jugó otra persona, y nunca con la
      pestaña escondida (se avisa al volver). */
   const rC = ref(db, "casino"), pend = new Map();
@@ -369,7 +369,7 @@ export function watchLogros(cb) {
   };
   const programa = u => {
     if (!llegados.has("casino")) return;
-    const yo = auth.currentUser && auth.currentUser.uid, en = Date.now() + (u === yo ? CASINO_PROPIO : CASINO_AJENO);
+    const en = Date.now() + (u && u === yo() ? CASINO_PROPIO : CASINO_AJENO);
     if (espera && cuando <= en) return;
     clearTimeout(espera); cuando = en; espera = setTimeout(vuelca, en - Date.now());
   };
