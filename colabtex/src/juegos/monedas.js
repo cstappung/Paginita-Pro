@@ -54,7 +54,7 @@
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import MM from "../../../juegos/mascotas/motor.js";
-import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { TIENDA, precioDe, aLaVenta } from "./tienda.js";
 import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
@@ -682,9 +682,10 @@ export function economia(datos) {
       }
       else { o.estado = "impaga"; o.comprador = e.u; }
     } else if (e.t === "c") {
-      /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
-      if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
-      if (paga(e.u, PRECIO_TIENDA, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+      /* Un marco o un fondo de la tienda: una vez por cuenta, a su precio,
+         y lo de edición limitada solo mientras se vendía. */
+      if (!TIENDA[e.k] || e.p !== precioDe(e.k) || !aLaVenta(e.k, e.at) || U(e.u).tienda[e.k]) continue;
+      if (paga(e.u, e.p, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
     } else if (e.t === "cf") {
       /* Un cofre de tacos: al precio, y lo que sale lo decide `abreCofre`
          con la hora del servidor. Un taco repetido devuelve monedas. */

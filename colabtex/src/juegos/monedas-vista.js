@@ -9,7 +9,8 @@ import {
   RECORD, diaChile, rachaHoy, pagoDia, PAGO_DIA, TOPE_DIA, PAGO_CLUB, TOPE_CLUB_DIA, TOPE_BBTAN_DIA, PODIO
 } from "./monedas.js";
 import { MOTOR } from "./prodrop-cartas.js";
-import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { TIENDA, PRECIO_TIENDA, HALLOWEEN, RAREZAS_HW, tiendaHalloweenAbierta } from "./tienda.js";
+import { marcoDe, fondoDe } from "./perfil-tarjeta.js";
 import { PREMIO_REFERIDO } from "./referidos.js";
 import { nombreHtml } from "./tintas.js";
 
@@ -79,7 +80,7 @@ function movimientosHtml(movs) {
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
     fondoMascota: ["🏞️", "Fondo para tus mascotas"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
-    venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `Tienda del perfil · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${f.d}»`]
+    venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return `<ul class="jg-mo-movs">${filas.map(f => {
@@ -112,7 +113,7 @@ function detalleHtml(yo) {
       s: cas.rondas ? `${cas.rondas} ${cas.rondas === 1 ? "ronda" : "rondas"} · te devolvió ${formatoMonedas(cas.pagado)} · neto ${signo(Math.round(cas.pagado - cas.apostado))}` : "" },
     { i: "🐾", t: "Mascotas", ir: "#mascotas", n: (g.adopcion || 0) + (g.regalo || 0) + (g.comida || 0) + (g.pocion || 0) + (g.fondoMascota || 0),
       s: [veces("adopcion", "adopción", "adopciones"), veces("regalo", "regalo", "regalos"), veces("comida", "compra de comida", "compras de comida"), veces("pocion", "poción", "pociones"), veces("fondoMascota", "fondo", "fondos")].filter(Boolean).join(" · ") },
-    { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", `artículo (${formatoMonedas(PRECIO_TIENDA)} c/u)`, `artículos (${formatoMonedas(PRECIO_TIENDA)} c/u)`) },
+    { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", "artículo", "artículos") },
     { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);
@@ -245,6 +246,8 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
             <li><span><a href="#cartas">Sobre de PRODROP</a></span><b>${Date.now() < MOTOR.PRECIO.promoHasta ? `<s>${MOTOR.PRECIO.normal}</s> ` : ""}${MOTOR.precioSobre(Date.now())} ${MONEDA}</b></li>
             <li><span>Graduar una carta</span><b>${MOTOR.PRECIO.gradua} ${MONEDA}</b></li>
             <li><span>Sobre gratis</span><b>cada 6 horas</b></li>
+            <li><span>Marco o fondo de la tienda del perfil</span><b>${formatoMonedas(PRECIO_TIENDA)} ${MONEDA}</b></li>
+            ${tiendaHalloweenAbierta(Date.now()) ? `<li><span><a href="#tienda">Tienda de Halloween</a> · edición limitada</span><b>${formatoMonedas(Math.min(...Object.values(RAREZAS_HW).map(r => r.p)))} a ${formatoMonedas(Math.max(...Object.values(RAREZAS_HW).map(r => r.p)))} ${MONEDA}</b></li>` : ""}
             <li><span>Cartas de otros en el mercado</span><b>el precio que pongan</b></li>
           </ul>
           <p>El top muestra las monedas que cada uno tiene ahora. Tu saldo nunca baja de cero: una compra que no alcanzas a pagar no vale (ni su sobre existe) hasta que ganes lo que falta. Lo que vendes en el mercado se suma a tu saldo.</p>

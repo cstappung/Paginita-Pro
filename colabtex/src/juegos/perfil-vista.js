@@ -18,6 +18,7 @@ import { LOGROS } from "./logros.js";
 import { adorno, tieneAdorno } from "./marcos-animados.js";
 import { capaMascota } from "./perfil-mascota.js";
 import { nombreHtml } from "./tintas.js";
+import { ESCENAS_HW } from "./fondos-halloween.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -38,7 +39,9 @@ export function avatarMarco(foto, nombre, color, marco, tam, uid) {
    perfil, comprobado contra lo que tiene ganado (sin datos todavía, se
    confía en lo guardado, como en `marcoVisible`). */
 export const marcoDeUid = (uid, perfil, datos) => marcoVisible(perfil, datos ? estadisticas(uid, datos) : null);
-export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}" aria-hidden="true"><b></b><b></b><b></b></i>` : "";
+/* Los de Halloween traen su escena (fondos-halloween.js); los demás, tres
+   <b> que el CSS de cada uno usa como quiere. */
+export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}${ESCENAS_HW[f.id] ? " jg-fanim-hw" : ""}" aria-hidden="true">${ESCENAS_HW[f.id] || "<b></b><b></b><b></b>"}</i>` : "";
 
 /* Quién es, con lo que haya: su perfil manda, luego lo que trae quien
    pregunta (la ficha que se tocó, la cuenta de Google si es uno mismo),

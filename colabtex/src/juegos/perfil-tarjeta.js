@@ -26,7 +26,7 @@
 import { tintaDe } from "./tintas.js";
 import { JUEGOS, ordenaRanks } from "./motor.js";
 import { LOGROS, SOLO_PREFIJO, reparto } from "./logros.js";
-import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { TIENDA, HALLOWEEN, precioDe, tiendaHalloweenAbierta, coleccionHalloween } from "./tienda.js";
 
 export const LARGO_BIO = 120;
 export const MAX_VITRINA = 6;
@@ -56,6 +56,15 @@ export const MARCOS = [
   { id: "sakura", n: "Sakura", anim: true, req: { tienda: true } },
   { id: "plasma", n: "Plasma", anim: true, req: { tienda: true } },
   { id: "mariposas", n: "Mariposas", anim: true, req: { tienda: true } },
+  /* La tienda de Halloween (tienda.js): edición limitada, con precio por
+     rareza (`hw`), y el premio de coleccionista, que no se vende. */
+  { id: "calabazas", n: "Calabazas embrujadas", anim: true, hw: true, req: { tienda: true } },
+  { id: "murcielagos", n: "Enjambre de murciélagos", anim: true, hw: true, req: { tienda: true } },
+  { id: "telarana", n: "Telaraña maldita", anim: true, hw: true, req: { tienda: true } },
+  { id: "fantasmas", n: "Ronda de fantasmas", anim: true, hw: true, req: { tienda: true } },
+  { id: "caldero", n: "Caldero de bruja", anim: true, hw: true, req: { tienda: true } },
+  { id: "parca", n: "La Parca", anim: true, hw: true, req: { tienda: true } },
+  { id: "reycalabaza", n: "Rey Calabaza", anim: true, hw: true, req: { coleccion: 5 } },
   /* Uno por juego, para quien es n.º 1 en cualquiera de sus tablas. */
   ...[
     ["tsnake", "snake", "Serpiente"], ["tminas", "minas", "Campo minado"], ["ttetris", "tetris", "Tetrominós"],
@@ -93,7 +102,14 @@ export const FONDOS = [
   { id: "olas", n: "Marea", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(circle at 80% 25%, #fff7d6 0 6%, transparent 7%), linear-gradient(180deg, #0ea5e9, #38bdf8 45%, #0369a1)" },
   { id: "lluvia", n: "Lluvia digital", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 120%, #14532d, transparent 60%), #020a05" },
   { id: "fuegos", n: "Fuegos artificiales", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 130%, #4c1d95, transparent 60%), linear-gradient(180deg, #050314, #1b0f3d)" },
-  { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
+  { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" },
+  /* La tienda de Halloween: la escena va en `capaFondo` (fondos-halloween.js). */
+  { id: "cementerio", n: "Cementerio", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 100%, #8b7bb855, transparent 60%), linear-gradient(180deg, #070b1f 0%, #1a1745 55%, #3a3366 100%)" },
+  { id: "calabazar", n: "Campo de calabazas", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 105%, #fb923c99, transparent 55%), linear-gradient(180deg, #1e0b33 0%, #5b1a3a 50%, #b4461a 85%, #ea7a1c 100%)" },
+  { id: "aquelarre", n: "Noche de brujas", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(circle at 68% 42%, #c4b5fd33, transparent 40%), linear-gradient(180deg, #0d0221 0%, #2e0854 55%, #5b1d8f 100%)" },
+  { id: "mansion", n: "Mansión embrujada", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 30% 0%, #47557966, transparent 55%), linear-gradient(180deg, #05070f 0%, #141b2e 55%, #26324a 100%)" },
+  { id: "lunasangre", n: "Luna de sangre", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(circle at 70% 38%, #ff3b3b55, transparent 45%), linear-gradient(180deg, #120000 0%, #3d0404 55%, #6e0c0c 100%)" },
+  { id: "nocheeterna", n: "Noche eterna", oscuro: true, anim: true, hw: true, req: { coleccion: 11 }, css: () => "linear-gradient(180deg, #02010d 0%, #0d0838 50%, #1c0b4a 100%)" }
 ];
 
 const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
@@ -281,8 +297,10 @@ function calculaEstadisticas(uid, d) {
   };
 }
 
-/* ¿Puede usarlo? Devuelve {ok, falta}: `falta` dice qué le queda. */
-export function requisito(item, est) {
+/* ¿Puede usarlo? Devuelve {ok, falta}: `falta` dice qué le queda. Uno de
+   la tienda sin comprar trae `tienda` y su `precio`; uno de Halloween que
+   ya no se puede conseguir (la tienda cerró), `agotado`. */
+export function requisito(item, est, ahora = Date.now()) {
   const r = item && item.req;
   if (!r) return { ok: true, falta: "" };
   if (!est) return { ok: false, falta: "Cargando…" };
@@ -290,7 +308,17 @@ export function requisito(item, est) {
   if (r.primero) return est.primeros > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sé el n.º 1 de una clasificación de 3 o más" };
   if (r.podio) return est.podios > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sube al podio de una clasificación de 3 o más" };
   if (r.top) return (est.tops || []).includes(r.top) ? { ok: true, falta: "" } : { ok: false, falta: `Sé el n.º 1 de ${nombreTop(r.top)}` };
-  if (r.tienda) return est.compras && est.compras[item.id] ? { ok: true, falta: "" } : { ok: false, falta: `🪙 ${PRECIO_TIENDA.toLocaleString("es-CL")} en la tienda`, tienda: true };
+  if (r.tienda) {
+    if (est.compras && est.compras[item.id]) return { ok: true, falta: "" };
+    if (HALLOWEEN[item.id] && !tiendaHalloweenAbierta(ahora)) return { ok: false, falta: "Edición limitada de Halloween: ya no se vende", agotado: true };
+    const p = precioDe(item.id);
+    return { ok: false, falta: `🪙 ${p.toLocaleString("es-CL")} en la tienda`, tienda: true, precio: p };
+  }
+  if (r.coleccion) {
+    const k = coleccionHalloween(est.compras);
+    if (k >= r.coleccion) return { ok: true, falta: "" };
+    return { ok: false, falta: `Ten ${r.coleccion} artículos de la tienda de Halloween (llevas ${k})`, agotado: !tiendaHalloweenAbierta(ahora) };
+  }
   return { ok: false, falta: "" };
 }
 

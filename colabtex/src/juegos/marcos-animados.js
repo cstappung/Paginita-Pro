@@ -1,5 +1,6 @@
 /* Los marcos animados: los de campeón (uno por juego, para quien es el n.º 1
- * de cualquiera de sus tablas) y los cinco de la tienda.
+ * de cualquiera de sus tablas), los cinco de la tienda y los de la tienda
+ * de Halloween (edición limitada).
  *
  * Cada uno es un SVG de 140×140 que se monta encima del avatar
  * (`<b class="jg-av-ad">`, inset −20 %): el centro es (70, 70) y la foto
@@ -12,6 +13,8 @@
  *   .su sube y se apaga · .dr cae · .z tiembla · .hop salta · .ft pisada
  *   .hx destello · .wg aletea · .pp parpadea · .fl trazo que fluye
  *   .dw se dibuja y se borra (pathLength 100) · .ex onda que se expande
+ *   .lt vela que titila · .fa se desvanece · .hl hilo que se estira (desde
+ *   arriba) y .cu lo que cuelga de él, con la misma duración
  *
  * Reglas que lo sostienen:
  * - Nada lleva `id` ni `url(#…)`: el mismo marco sale veinte veces en una
@@ -673,6 +676,147 @@ function memazo() {
     [0, 1, 2].map(i => en(60, 30 + i * 120, cara(i))).join("");
 }
 
+/* ---------- Tienda de Halloween (edición limitada) ----------
+   Seis marcos a la venta, por rareza, y el Rey Calabaza, que no se vende:
+   se gana teniendo cinco artículos de la tienda de Halloween. Además de las
+   clases de arriba usan .lt (vela que titila), .fa (se desvanece) y la
+   pareja .hl/.cu (el hilo que se estira y la araña que baja con él). */
+
+/* Una llama de verdad: la de fuera y, dentro, otra más clara y baja. */
+const fuegoHw = (c1, c2, k = 1) => `<g transform="scale(${n1(.8 * k)} ${n1(1.3 * k)})">${llama(c1)}<g transform="translate(0 1.6) scale(.55)">${llama(c2)}</g></g>`;
+
+/* Calabaza tallada, con la cara encendida (`ret`: el retraso de su vela). */
+const calabazaHw = ret => `<ellipse rx="8.6" ry="7" fill="#f97316" stroke="#7c2d12" stroke-width=".8"/>` +
+  `<path d="M-3.2-6.4c-2.2 3-2.2 9.8 0 12.8M3.2-6.4c2.2 3 2.2 9.8 0 12.8" stroke="#c2410c" stroke-width=".7" fill="none"/>` +
+  `<path d="M-.4-6.8c0-1.8.6-3 2-3.6" stroke="#4d7c0f" stroke-width="1.8" fill="none" stroke-linecap="round"/>` +
+  `<path d="M-5.4-1.2l2-2.8 2 2.8zM1.4-1.2l2-2.8 2 2.8zM-5.6 1.6q5.6 4.6 11.2 0l-1.8.5-1 1.3-1.4-1.1-1.4 1.1-1.4-1.1-1.4 1.1-1-1.3z" fill="#7c2d12"/>` +
+  an("lt", 1.3, `<path d="M-5.4-1.2l2-2.8 2 2.8zM1.4-1.2l2-2.8 2 2.8zM-5.6 1.6q5.6 4.6 11.2 0l-1.8.5-1 1.3-1.4-1.1-1.4 1.1-1.4-1.1-1.4 1.1-1-1.3z" fill="#fde047"/>`, ret);
+
+function calabazas() {
+  const hoja = `<path d="M0 0c-3-1-5-4-4-7 2 1 4 3 4 7z" fill="#22c55e" stroke="#14532d" stroke-width=".5"/>`;
+  const rulo = `<path d="M0 0c2.4-1 3.6 1.2 2.2 2.6-1.2 1.2-3.2.2-2.6-1.6" fill="none" stroke="#4ade80" stroke-width=".8" stroke-linecap="round"/>`;
+  const enreda = trazo(60, 0, 359.9, "#166534", 2.2) + cada(6, (i, a) => en(62, a + 30, hoja, a + 30 + (i % 2 ? 40 : -40)) + en(57, a + 22, rulo, a));
+  return aro(60, "#1c0700", 19, `opacity=".6"`) + an("hx", 2.6, aro(60, "#f97316", 19, `opacity=".25"`)) +
+    aro(51.4, "#fb923c", 1.6) + aro(68.8, "#7c2d12", 1.2) +
+    cada(10, (i, a) => en(64, a + 18, an("su", 1.8 + (i % 3) * .4, `<circle r="1.2" fill="#fdba74"/>`, n1(-i * .37)), a + 18)) +
+    gira(30, enreda + cada(6, (i, a) => en(60, a, i % 2 ? `<g transform="scale(.8)">${calabazaHw(n1(-i * .4))}</g>` : calabazaHw(n1(-i * .4)), a)));
+}
+
+const murcielago = (c, borde) => an("wg", .3, `<path d="M-1 0C-3-4-8-5-12-2c1.6.4 2.4 1.6 2.2 3 1.4-.8 3-.6 3.6.8.8-1.2 2.4-1.4 3.4-.4.6-.9 1.4-1.3 1.8-1.4z" fill="${c}" stroke="${borde}" stroke-width=".5"/><path d="M-1 0C-3-4-8-5-12-2c1.6.4 2.4 1.6 2.2 3 1.4-.8 3-.6 3.6.8.8-1.2 2.4-1.4 3.4-.4.6-.9 1.4-1.3 1.8-1.4z" transform="scale(-1 1)" fill="${c}" stroke="${borde}" stroke-width=".5"/>`) +
+  `<ellipse cy=".4" rx="2.2" ry="3.2" fill="${c}" stroke="${borde}" stroke-width=".4"/><path d="M-1.8-2l-.5-2.4 1.5 1.4zM1.8-2l.5-2.4-1.5 1.4z" fill="${c}"/>` +
+  `<circle cx="-.8" cy="-.6" r=".6" fill="#facc15"/><circle cx=".8" cy="-.6" r=".6" fill="#facc15"/>`;
+
+function murcielagos() {
+  const luna = `<circle r="10" fill="#fde68a" opacity=".18"/><path d="M2.5-7.2a7.6 7.6 0 1 0 0 14.4a6 6 0 1 1 0-14.4z" fill="#fde68a"/>`;
+  const vuela = (r, a, d, ret, k = 1) => en(r, a, `<g transform="scale(${n1(k * 1.35)})">${an("f", d, murcielago("#0f0a1a", "#d8b4fe"), ret)}</g>`, a);
+  return aro(60, "#1e0b3a", 19, `opacity=".65"`) + an("hx", 3, aro(60, "#7c3aed", 19, `opacity=".25"`)) +
+    aro(51.4, "#c084fc", 1.4, `opacity=".85"`) + aro(68.8, "#a855f7", 1, `stroke-dasharray="1 5" opacity=".8"`) +
+    en(61, 0, an("hx", 3.4, luna)) +
+    chispas([[64, 70, 1.8, 1.6, 0], [66, 160, 1.4, 2.1, -.7], [63, 250, 1.8, 1.8, -.3], [67, 300, 1.4, 1.4, -1.1]], "#e9d5ff") +
+    gira(5.5, vuela(57, 40, .9, 0) + vuela(57, 220, 1.1, -.4)) +
+    gira(8, vuela(64, 120, 1, -.2, .8) + vuela(64, 300, .8, -.6, .8), true) +
+    gira(12, vuela(70, 180, 1.2, -.3, .7) + vuela(70, 20, 1, -.8, .65));
+}
+
+function telarana() {
+  let d = "";
+  for (let i = 0; i < 12; i++) {
+    const a = i * 30, [x1, y1] = pt(50, a), [x2, y2] = pt(i % 3 === 1 ? 90 : 71, a);
+    d += `M${x1} ${y1}L${x2} ${y2}`;
+  }
+  for (const r of [55, 61, 67]) for (let i = 0; i < 12; i++) {
+    const a1 = i * 30, [x1, y1] = pt(r, a1), [x2, y2] = pt(r, a1 + 30), [cx, cy] = pt(r - 3.6, a1 + 15);
+    d += `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}`;
+  }
+  /* En las esquinas la tela sigue: dos hebras más largas por diagonal. */
+  for (const a of [30, 120, 210, 300]) for (const r of [76, 84]) {
+    const [x1, y1] = pt(r, a - 22), [x2, y2] = pt(r, a + 22), [cx, cy] = pt(r - 6, a);
+    d += `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}`;
+  }
+  const tela = `<path d="${d}" fill="none" stroke="#e5e7eb" stroke-width=".7" opacity=".85"/>`;
+  const brillo = an("hx", 2.8, `<path d="${d}" fill="none" stroke="#c4b5fd" stroke-width="1.6" opacity=".35"/>`);
+  const gotas = cada(12, (i, a) => en(i % 2 ? 61 : 67, a + 15, an("t", 1.4 + (i % 4) * .4, `<circle r="1.1" fill="#e0f2fe"/>`, n1(-i * .29))));
+  const arana = `<g fill="none" stroke="#111" stroke-width="1" stroke-linecap="round"><path d="M-2-1L-7-5L-9-1M-2 0L-8 0L-10 4M-2 1L-7 4L-8 8M-1 2L-4 7L-4 10M2-1L7-5L9-1M2 0L8 0L10 4M2 1L7 4L8 8M1 2L4 7L4 10"/></g>` +
+    `<ellipse cy="2.6" rx="4.2" ry="4.8" fill="#111" stroke="#7c3aed" stroke-width=".5"/><circle cy="-2.6" r="2.8" fill="#111" stroke="#7c3aed" stroke-width=".5"/>` +
+    `<path d="M-1.4 1L1.4 1L0 3L1.4 5L-1.4 5L0 3Z" fill="#dc2626"/>` + an("pp", 3, `<circle cx="-1" cy="-3" r=".7" fill="#ef4444"/><circle cx="1" cy="-3" r=".7" fill="#ef4444"/>`);
+  /* La araña cuelga de la esquina de arriba a la derecha: el hilo se
+     estira (.hl, desde su punta de arriba) y la araña baja lo mismo (.cu). */
+  const cuelga = `<g transform="translate(104 2)"><g class="hl" style="--d:4s;transform-origin:50% 0"><rect x="-.35" y="0" width=".7" height="24" fill="#e5e7eb"/></g>` +
+    `<g transform="translate(0 28)"><g class="cu" style="--d:4s">${arana}</g></g></g>`;
+  return aro(60, "#1a1033", 20, `opacity=".55"`) + aro(51.2, "#a78bfa", 1.2, `opacity=".8"`) + brillo + tela + gotas +
+    gira(26, en(60, 200, `<g transform="scale(.55)">${arana}</g>`, 290)) + cuelga;
+}
+
+const fantasma = `<path d="M0-8.5C-5.2-8.5-7.4-4.4-7.4 0v8l2.5-2.2 2.4 2.2 2.5-2.2 2.5 2.2 2.4-2.2 2.5 2.2V0C7.4-4.4 5.2-8.5 0-8.5z" fill="#f8fafc" stroke="#94a3b8" stroke-width=".6"/>` +
+  `<ellipse cx="-2.6" cy="-1.6" rx="1.2" ry="1.7" fill="#1e293b"/><ellipse cx="2.6" cy="-1.6" rx="1.2" ry="1.7" fill="#1e293b"/><ellipse cy="2.4" rx="1.3" ry="1.7" fill="#1e293b"/>` +
+  `<ellipse cx="-4.4" cy=".8" rx="1.2" ry=".6" fill="#f9a8d4" opacity=".75"/><ellipse cx="4.4" cy=".8" rx="1.2" ry=".6" fill="#f9a8d4" opacity=".75"/>`;
+
+function fantasmas() {
+  const estela = Array.from({ length: 5 }, (_, i) => `<circle cx="${n1(-7 - i * 3.6)}" cy="${n1(3 + i * .4)}" r="${n1(2.6 - i * .42)}" fill="#e0f2fe" opacity="${n1(.5 - i * .09)}"/>`).join("");
+  const uno = (a, ret, k) => en(60, a, `<g transform="scale(${n1(k * 1.25)})">${an("fa", 3, an("f", 1.3, estela + fantasma, ret), ret)}</g>`, a + 90);
+  const bu = `<text x="0" y="0" font-size="9" font-weight="900" font-family="system-ui,sans-serif" text-anchor="middle" dominant-baseline="central" fill="#fff" stroke="#6d28d9" stroke-width="1.6" paint-order="stroke">¡Bu!</text>`;
+  return an("hx", 3.2, aro(60, "#bae6fd", 20, `opacity=".14"`)) + aro(60, "#0f172a", 16, `opacity=".45"`) +
+    aro(51.6, "#e0f2fe", 1.2, `stroke-dasharray="2 3" opacity=".8"`) + aro(68.4, "#bae6fd", .8, `opacity=".6"`) +
+    chispas([[66, 15, 1.6, 1.8, 0], [64, 105, 1.4, 2.2, -.8], [67, 195, 1.6, 1.6, -.4], [65, 285, 1.4, 2, -1.2]], "#e0f2fe") +
+    gira(10, uno(0, 0, 1) + uno(90, -.7, .85) + uno(180, -1.4, 1) + uno(270, -2.1, .85)) +
+    en(78, 135, an("p", 3.6, bu, -1.2)) + en(78, 315, an("p", 3.6, bu, -3));
+}
+
+function caldero() {
+  const burbuja = r => `<circle r="${r}" fill="#14532d" fill-opacity=".35" stroke="#86efac" stroke-width=".8"/><circle cx="${n1(-r * .35)}" cy="${n1(-r * .35)}" r="${n1(r * .3)}" fill="#dcfce7"/>`;
+  const RUNAS = ["M-2-3.5V3.5M-2-3.5L2-1.5M-2 0L2 2", "M-2.5 3.5L0-3.5L2.5 3.5M-1.4.6H1.4", "M-2.5-3.5L2.5 3.5M2.5-3.5L-2.5 3.5M0-3.5V3.5",
+    "M-2 3.5V-3.5L2 0L-2 3.5", "M0-3.5L2.5 0L0 3.5L-2.5 0Z", "M-2.5-3.5H2.5L-2.5 3.5H2.5"];
+  const olla = `<path d="M-12-3h24c0 9-5.4 14-12 14S-12 6-12-3z" fill="#111827" stroke="#6b7280" stroke-width=".8"/>` +
+    `<path d="M-8 10l-2 4M8 10l2 4" stroke="#111827" stroke-width="2" stroke-linecap="round"/>` +
+    `<ellipse cy="-3" rx="13" ry="3.2" fill="#1f2937" stroke="#6b7280" stroke-width=".8"/><ellipse cy="-3.4" rx="10.6" ry="2.2" fill="#16a34a"/>` +
+    an("hx", .9, `<ellipse cy="-3.4" rx="10.6" ry="2.2" fill="#86efac"/>`) +
+    [[-5, -6, .9, 0], [1, -7, 1.2, -.4], [6, -6, .8, -.8], [-1, -5, 1, -1.1]].map(([x, y, d, r]) => `<g transform="translate(${x} ${y})">${an("su", d, burbuja(1.5), r)}</g>`).join("") +
+    [[-6, 15], [0, 16], [6, 15]].map(([x, y], i) => `<g transform="translate(${x} ${y})">${an("l", .4 + i * .1, llama(i % 2 ? "#fbbf24" : "#f97316", .9), n1(-i * .13))}</g>`).join("");
+  return aro(60, "#052e16", 19, `opacity=".7"`) + an("hx", 1.8, aro(60, "#22c55e", 15, `opacity=".35"`)) +
+    gira(9, aro(60, "#4ade80", 6, `stroke-dasharray="3 5" stroke-linecap="round" opacity=".55"`)) +
+    aro(51.6, "#4ade80", 2) + aro(68.6, "#a855f7", 1.4) +
+    gira(18, cada(6, (i, a) => en(65, a + 30, an("hx", 1.5, `<path d="${RUNAS[i]}" stroke="#e9d5ff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`, n1(-i * .25)), a + 30)), true) +
+    cada(10, (i, a) => i === 5 ? "" : en(56 + (i % 3) * 3, a + 13, an("su", 1.6 + (i % 4) * .3, burbuja(n1(1.3 + (i % 3) * .6)), n1(-i * .31)), a + 13)) +
+    chispas([[67, 60, 1.8, 1.5, 0], [66, 120, 1.4, 1.9, -.6], [67, 240, 1.8, 1.7, -.2], [66, 300, 1.4, 1.3, -1]], "#d8b4fe") +
+    en(62, 180, olla);
+}
+
+function parca() {
+  const guadana = trazo(78, -60, -6, "#c084fc", 6, `opacity=".16" stroke-linecap="round"`) + trazo(78, -32, -6, "#f5d0fe", 3, `opacity=".3" stroke-linecap="round"`) +
+    en(78, 0, `<path d="M-20 0H20" stroke="#1c1917" stroke-width="3.4" stroke-linecap="round"/><path d="M-20 0H20" stroke="#a16207" stroke-width="1" stroke-dasharray="2 3"/>` +
+      `<path d="M19-1C16-14 2-21-14-18C-4-15 9-10 15 1Z" fill="#f1f5f9" stroke="#7c3aed" stroke-width="1"/><path d="M17-3C13-12 3-16-8-16" fill="none" stroke="#94a3b8" stroke-width=".8"/>` +
+      an("hx", .7, `<path d="M17-1C14-12 2-18-11-16" fill="none" stroke="#fff" stroke-width="1.1"/>`), 90);
+  const calavera = `<path d="M0-16C-11-16-15-7-15 4L-11 10H11L15 4C15-7 11-16 0-16Z" fill="#1e1b4b" stroke="#7c3aed" stroke-width=".9"/>` +
+    `<path d="M0-9C-6-9-8.5-5-8.5-1c0 3 1.5 5 3.5 5.6V7.5h10V4.6c2-.6 3.5-2.6 3.5-5.6C8.5-5 6-9 0-9z" fill="#f5f5f4" stroke="#44403c" stroke-width=".7"/>` +
+    `<ellipse cx="-3.2" cy="-1.2" rx="2.2" ry="2.4" fill="#0c0a09"/><ellipse cx="3.2" cy="-1.2" rx="2.2" ry="2.4" fill="#0c0a09"/>` +
+    an("hx", .9, `<circle cx="-3.2" cy="-1" r="1.1" fill="#ef4444"/><circle cx="3.2" cy="-1" r="1.1" fill="#ef4444"/>`) +
+    `<path d="M0 1.6l-1 2h2z" fill="#0c0a09"/><path d="M-3 5.2V7.4M-1 5.2V7.4M1 5.2V7.4M3 5.2V7.4" stroke="#44403c" stroke-width=".6"/>`;
+  const alma = `<path d="M0 4C-3 2-3-2 0-6C3-2 3 2 0 4Z" fill="#e0e7ff" opacity=".85"/><circle cx="-.9" cy="0" r=".5" fill="#312e81"/><circle cx=".9" cy="0" r=".5" fill="#312e81"/>`;
+  const C = [["#7c3aed", "#f0abfc"], ["#a21caf", "#f5d0fe"], ["#6d28d9", "#e9d5ff"]];
+  return aro(60, "#07000f", 21, `opacity=".85"`) + an("hx", 1.6, aro(57, "#a855f7", 11, `opacity=".38"`)) +
+    cada(20, (i, a) => en(61, a, an("l", n1(.45 + (i % 3) * .14), fuegoHw(C[i % 3][0], C[i % 3][1], n1(1.05 + (i % 2) * .35)), n1(-i * .11)), a)) +
+    aro(51.4, "#e9d5ff", 1.3) + aro(53.4, "#7c3aed", .8, `stroke-dasharray="1 3"`) +
+    gira(9, cada(3, (i, a) => en(56, a + 60, an("fa", 2, alma, n1(-i * .6)), a + 150)), true) +
+    cada(10, (i, a) => en(67, a + 9, an("su", n1(1.4 + (i % 3) * .3), `<circle r="1" fill="#f0abfc"/>`, n1(-i * .27)), a + 9)) +
+    en(70, 0, an("f", 2.2, calavera)) +
+    gira(5, guadana);
+}
+
+function reycalabaza() {
+  const corona = `<path d="M-13 6L-15-7L-7.5-1L0-11L7.5-1L15-7L13 6Z" fill="#facc15" stroke="#92400e" stroke-width=".9" stroke-linejoin="round"/>` +
+    `<path d="M-12 4L-13.5-4.5L-7.5 1L0-7.5L7.5 1L13.5-4.5L12 4Z" fill="#fde047" opacity=".6"/>` +
+    `<rect x="-13" y="4" width="26" height="4.4" rx="1" fill="#eab308" stroke="#92400e" stroke-width=".8"/>` +
+    `<circle cx="-15" cy="-7.6" r="1.5" fill="#fef9c3"/><circle cx="0" cy="-11.6" r="1.7" fill="#fef9c3"/><circle cx="15" cy="-7.6" r="1.5" fill="#fef9c3"/>` +
+    an("t", 1.2, `<circle cy="6.2" r="1.6" fill="#ef4444"/>`) + an("t", 1.5, `<circle cx="-7" cy="6.2" r="1.2" fill="#22c55e"/>`, -.5) + an("t", 1.7, `<circle cx="7" cy="6.2" r="1.2" fill="#a855f7"/>`, -.9) +
+    an("hx", 1.4, `<path d="M-13 6L-15-7L-7.5-1L0-11L7.5-1L15-7L13 6Z" fill="none" stroke="#fff" stroke-width=".7"/>`);
+  return aro(60, "#2a1300", 19, `opacity=".7"`) + an("hx", 2, aro(60, "#f59e0b", 17, `opacity=".3"`)) +
+    cada(14, (i, a) => en(62, a + 13, an("l", n1(.55 + (i % 3) * .15), fuegoHw(i % 2 ? "#ea580c" : "#f59e0b", "#fef08a", 1), n1(-i * .11)), a + 13)) +
+    aro(51.4, "#fde047", 2) + aro(68.6, "#fde047", 1.2) + aro(66, "#fbbf24", 1, `stroke-dasharray="1 4"`) +
+    gira(20, cada(4, (i, a) => en(59, a + 45, calabazaHw(n1(-i * .3)), a + 45))) +
+    chispas([[67, 70, 2.2, 1.4, 0], [66, 110, 1.6, 1.8, -.5], [67, 250, 2.2, 1.6, -.2], [66, 290, 1.6, 1.2, -.9], [56, 180, 2, 1.5, -.6]], "#fef08a") +
+    en(68, 0, an("f", 1.8, corona));
+}
+
 const DIBUJOS = {
   tsnake: snake, tminas: minas, ttetris: tetris, tsortem: sortem, tbbtan: bbtan, tsopa: sopa,
   telectro: electro, tintegral: integral, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
@@ -680,7 +824,8 @@ const DIBUJOS = {
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, thaxball: haxball, tbt3: bt3, ttulones: tulones, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
   tmetrorush: metrorush, ttrigon: trigon, tprotiles: protiles, thero: hero, tmemazo: memazo, tpool: pool,
-  cometa, vortice, sakura, plasma, mariposas
+  cometa, vortice, sakura, plasma, mariposas,
+  calabazas, murcielagos, telarana, fantasmas, caldero, parca, reycalabaza
 };
 
 /* Se dibuja una vez por marco y se guarda: las tablas repintan seguido. */
