@@ -54,6 +54,7 @@
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import MM from "../../../juegos/mascotas/motor.js";
+import { cajaRock, reembolsoRock, repetidaRock, claveRock, PRECIO_CAJA } from "./rock-datos.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
@@ -407,12 +408,13 @@ export function monedasDe(uid, datos) {
    - Un **intercambio** vale al aceptarse si los dos tienen todavía sus
      cartas, ninguna está en venta y ninguno está parado. */
 export const SEIS_HORAS = 6 * 3600 * 1000;
-/* Tres tipos de copia, y ninguno se confunde con otro: la carta (como
+/* Cuatro tipos de copia, y ninguno se confunde con otro: la carta (como
    siempre, sin prefijo y con `.i`), el objeto de mascota (`ob:`, de un
-   regalo) y la mascota (`ma:`, de una adopción), estos dos con prefijo y
-   sin `.i`. Una copia escrita antes de Mascotas sigue leyéndose igual. */
+   regalo), la mascota (`ma:`, de una adopción) y la pieza de Batalla de
+   Rock (`rk:`, de una caja), estos tres con prefijo y sin `.i`. Una copia
+   escrita antes de Mascotas sigue leyéndose igual. */
 const RE_COPIA = /^([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})\.([0-4])$/;
-const RE_COPIA_M = /^(ob|ma):([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})$/;
+const RE_COPIA_M = /^(ob|ma|rk):([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})$/;
 export const claveCopia = (o, k, i) => o + "~" + k + "." + i;
 export const claveObjeto = (o, k) => "ob:" + o + "~" + k;
 export const claveMascota = (o, k) => "ma:" + o + "~" + k;
@@ -420,7 +422,7 @@ export const leeCopia = c => {
   const s = String(c || ""), m = RE_COPIA.exec(s);
   if (m) return { tipo: "carta", o: m[1], k: m[2], i: +m[3] };
   const x = RE_COPIA_M.exec(s);
-  return x ? { tipo: x[1] === "ob" ? "objeto" : "mascota", o: x[2], k: x[3] } : null;
+  return x ? { tipo: x[1] === "ob" ? "objeto" : x[1] === "rk" ? "rock" : "mascota", o: x[2], k: x[3] } : null;
 };
 export const esCarta = c => { const q = leeCopia(c); return !!q && q.tipo === "carta"; };
 export const esMascota = c => { const q = leeCopia(c); return !!q && q.tipo === "mascota"; };
@@ -485,7 +487,7 @@ export function economia(datos) {
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
-  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -509,6 +511,10 @@ export function economia(datos) {
   for (const [u, l] of Object.entries(ms.c || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "mc", at: x.at, u, k, q: String(x.k || ""), p: num(x.p), n: x.n, m: typeof x.m === "string" ? x.m : "" });
+  /* Batalla de Rock: `rock/c/<uid>/<clave>` = {at, p, b}, una caja (rock-datos.js). */
+  for (const [u, l] of Object.entries((d.rock && d.rock.c) || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "rc", at: x.at, u, k, p: num(x.p), b: String(x.b || "") });
   for (const [id, o] of Object.entries(m.o || {})) {
     if (!o || !Number.isFinite(o.at)) continue;
     ev.push({ t: "o", at: o.at, id, o });
@@ -548,11 +554,13 @@ export function economia(datos) {
      las que tomaron la poción, y quiénes tuvieron cada mascota antes que
      su dueño de ahora (para heredar su estado). */
   const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
+  /* Batalla de Rock: las piezas de cajas válidas, por clave de copia. */
+  const rocas = {};
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, tacos: {}, cofres: [],
-    intentos: 0, adopciones: 0, comida: 0, fondos: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+    intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
     const x = U(u);
@@ -659,6 +667,17 @@ export function economia(datos) {
       if (!esMascota(e.m) || dueno[e.m] !== e.u || enVenta[e.m]) continue;
       if (e.q === "pocion") { if (!congelada[e.m] && paga(e.u, precio, "pocion")) congelada[e.m] = e.at; continue; }
       if (e.q === "adios" && !x.parada) { delete dueno[e.m]; tiene[e.u] = (tiene[e.u] || 1) - 1; }
+    } else if (e.t === "rc") {
+      /* Una caja de rock: al precio y para un cuerpo. Lo que trae sale de
+         `cajaRock`; un repetido exacto de algo que la cuenta tiene ahora
+         (lo inicial incluido) devuelve monedas y no deja copia. */
+      if (e.p !== PRECIO_CAJA || (e.b !== "m" && e.b !== "f") || !paga(e.u, PRECIO_CAJA, "cajaRock", e.b)) continue;
+      const v = cajaRock(e.u, e.k, e.at, e.b), propias = [];
+      for (const [cc, r] of Object.entries(rocas)) if (dueno[cc] === e.u) propias.push(r.item);
+      const dup = repetidaRock(v, propias), cc = claveRock(e.u, e.k);
+      if (dup) { const r = reembolsoRock(v); U(e.u).premios += r; anota(e.u, "cajaRock", r, "repetida"); }
+      else { rocas[cc] = { u: e.u, k: e.k, at: e.at, item: v }; dueno[cc] = e.u; }
+      U(e.u).cajasRock.push({ k: e.k, at: e.at, c: dup ? "" : cc, v, dup, reembolso: dup ? reembolsoRock(v) : 0 });
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
       const ok = leeCopia(copia) && dueno[copia] === o.u && !enVenta[copia] && !U(o.u).parada && Number.isInteger(p) && p >= 1 && p <= 100000;
@@ -732,7 +751,7 @@ export function economia(datos) {
     for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
     for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
     void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rondas, casinoPorCuenta };
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta };
   memoEco.set(d, res);
   return res;
 }
@@ -771,6 +790,17 @@ export function objetosDe(uid, datos) {
   return out.sort((a, b) => a.at - b.at || (a.c < b.c ? -1 : 1));
 }
 
+/* Las piezas de Batalla de Rock que una cuenta tiene ahora (las iniciales
+   no están: no tienen copia). */
+export function rocasDe(uid, datos) {
+  const e = economia(datos), out = [];
+  for (const [cc, u] of Object.entries(e.dueno)) {
+    const r = u === uid && e.rocas[cc];
+    if (r) out.push(Object.assign({ c: cc, o: r.u, k: r.k, at: r.at, venta: e.enVenta[cc] || "" }, r.item, { c: cc, colores: r.item.c }));
+  }
+  return out.sort((a, b) => a.at - b.at || (a.c < b.c ? -1 : 1));
+}
+
 /* Cuándo toca el próximo sobre gratis (0: ya). */
 export function proximoGratis(uid, datos, ahora) {
   const x = economia(datos).usuarios[uid];
@@ -792,7 +822,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

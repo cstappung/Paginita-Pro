@@ -1,7 +1,7 @@
 import * as fb from "../fb-juegos.js";
 import { crearMalla } from "./malla.js";
 import { crearDirecto, OK_MS } from "./yemas-red.js";
-import { atiendeHero, mandaCuenta } from "./hero.js";
+import { atiendeHero, mandaCuenta, crearRockHero } from "./hero.js";
 import { codificaCurvaHero } from "./motor.js";
 
 /* PRO HERO en línea — el cartero de la sala, hermano del de Boxhead.
@@ -87,6 +87,8 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (!muerto) frame?.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin);
   };
   const red = m => enviar("red", { m });
+  // Batalla de Rock (solo administradores): el rockero de cada uno, para la batalla de fondo
+  const rock = crearRockHero(enviar);
   const tema = () => enviar("tema", { oscuro: document.documentElement.dataset.tema === "oscuro" });
 
   const statsDe = f => f && {
@@ -189,7 +191,8 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
   function mensaje(e) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
-    if (d.tipo === "listo") { listo = true; tema(); mandaCuenta(enviar); return; }
+    if (d.tipo === "listo") { listo = true; tema(); mandaCuenta(enviar); rock.inicia().then(() => est && rock.ponLooks(est.jugadores.map(j => j.uid))); return; }
+    if (d.tipo === "rock-pide") { rock.atiende(d); return; }
     if (d.tipo === "red") { deRed(d.m); return; }
     if (d.tipo === "resultado" && !juego()) return;
     atiendeHero(d.tipo, d, enviar);
@@ -296,7 +299,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-11";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-12";
     host.append(redEl, frame);
   }
 
@@ -305,7 +308,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (!p.fin) {
       arrancaDirecto();
       const firma = est.jugadores.map(j => j.uid).join() + "|" + Object.keys(est.fuera || {}).join();
-      if (firma !== rosterFirma) { rosterFirma = firma; malla?.revisa(); }
+      if (firma !== rosterFirma) { rosterFirma = firma; malla?.revisa(); rock.ponLooks(est.jugadores.map(j => j.uid)); }
     }
     reenvia();
     if (est.fase === "fin" && !p.fin && juego()) terminar(est.ganador, est.motivo);
@@ -315,6 +318,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
 
   function destruir() {
     muerto = true;
+    rock.destruir();
     paraDirecto();
     temaObs?.disconnect();
     window.removeEventListener("message", mensaje);

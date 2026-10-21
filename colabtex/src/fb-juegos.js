@@ -338,9 +338,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 14, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 15, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -384,7 +384,7 @@ export function watchLogros(cb, yo = () => "") {
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
-    oye("referidos", "referidos"), oye("cofres", "cofres"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
        llegaron todos cuando llega este, que es el que la da por completa.
@@ -452,6 +452,16 @@ export async function comprarCofre(uid, clave, p) {
   await set(r, { at: serverTimestamp(), p });
   return (await get(r)).val();
 }
+/* ---------- Batalla de Rock (el fondo de PRO HERO, a prueba) ----------
+   `rock/c/<uid>/<clave>` = {at, p, b}: una caja comprada; lo que trae lo
+   deriva `cajaRock` (juegos/rock-datos.js) con esa hora del servidor.
+   `rockLook/<uid>`: el rockero guardado, un JSON. Lo lee cualquiera con
+   sesión **por clave** (la sala muestra el del rival), nunca la colección. */
+export const comprarCajaRock = (uid, b) =>
+  escribeYLee(push(ref(db, `rock/c/${uid}`)), { at: serverTimestamp(), p: 500, b });
+export const guardaRockLook = (uid, json) => set(ref(db, `rockLook/${uid}`), json);
+export const leeRockLook = uid => get(ref(db, `rockLook/${uid}`)).then(s => s.val(), () => null);
+
 /* El taco equipado: `users/<uid>/taco` (un id). Fuera de `perfil` a propósito:
    guardar el perfil lo reescribe entero y se llevaría el taco. */
 export const equiparTaco = (uid, id) => set(ref(db, `${U}/${uid}/taco`), id);

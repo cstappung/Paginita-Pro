@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <script src="../../i18n.js?v=202610210400"></script>
+  <script src="../../i18n.js?v=202610210811"></script>
   <script src="../audio/mando.js?v=mando-2"></script>
   <script src="../audio/volumen.js?v=vol-1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=hero-11">
+  <link rel="stylesheet" href="css/style.css?v=hero-12">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><ellipse cx='16' cy='17' rx='14' ry='9' fill='%2322c84a'/><ellipse cx='16' cy='16' rx='7' ry='4.5' fill='white'/></svg>">
   <!-- Cada módulo con su ?v= (GitHub Pages cachea): al tocar uno, sube la
        versión de todos aquí y en el src de main.js. tests/hero.test.cjs
@@ -18,44 +18,50 @@
   <script type="importmap">
 {
  "imports": {
-  "./js/applePreview.js": "./js/applePreview.js?v=hero-11",
-  "./js/audio/audio.js": "./js/audio/audio.js?v=hero-11",
-  "./js/cloud.js": "./js/cloud.js?v=hero-11",
-  "./js/core/constants.js": "./js/core/constants.js?v=hero-11",
-  "./js/core/engine.js": "./js/core/engine.js?v=hero-11",
-  "./js/core/ini.js": "./js/core/ini.js?v=hero-11",
-  "./js/core/leer.js": "./js/core/leer.js?v=hero-11",
-  "./js/core/midiFile.js": "./js/core/midiFile.js?v=hero-11",
-  "./js/core/noteMode.js": "./js/core/noteMode.js?v=hero-11",
-  "./js/core/songParser.js": "./js/core/songParser.js?v=hero-11",
-  "./js/core/tempoMap.js": "./js/core/tempoMap.js?v=hero-11",
-  "./js/core/text.js": "./js/core/text.js?v=hero-11",
-  "./js/game/carrera.js": "./js/game/carrera.js?v=hero-11",
-  "./js/game/orden.js": "./js/game/orden.js?v=hero-11",
-  "./js/game/prueba.js": "./js/game/prueba.js?v=hero-11",
-  "./js/game/remoto.js": "./js/game/remoto.js?v=hero-11",
-  "./js/game/session.js": "./js/game/session.js?v=hero-11",
-  "./js/input/input.js": "./js/input/input.js?v=hero-11",
-  "./js/library.js": "./js/library.js?v=hero-11",
-  "./js/main.js": "./js/main.js?v=hero-11",
-  "./js/net/net.js": "./js/net/net.js?v=hero-11",
-  "./js/render/highway.js": "./js/render/highway.js?v=hero-11",
-  "./js/render/sprites.js": "./js/render/sprites.js?v=hero-11",
-  "./js/settings.js": "./js/settings.js?v=hero-11",
-  "./js/site.js": "./js/site.js?v=hero-11",
-  "./js/sitio/celular.js": "./js/sitio/celular.js?v=hero-11",
-  "./js/sitio/clave.js": "./js/sitio/clave.js?v=hero-11",
-  "./js/sitio/puente.js": "./js/sitio/puente.js?v=hero-11",
-  "./js/songCache.js": "./js/songCache.js?v=hero-11",
-  "./js/ui/dom.js": "./js/ui/dom.js?v=hero-11",
-  "./js/ui/menuBackground.js": "./js/ui/menuBackground.js?v=hero-11",
-  "./js/ui/online.js": "./js/ui/online.js?v=hero-11",
-  "./js/ui/partSelect.js": "./js/ui/partSelect.js?v=hero-11",
-  "./js/ui/ranking.js": "./js/ui/ranking.js?v=hero-11",
-  "./js/ui/results.js": "./js/ui/results.js?v=hero-11",
-  "./js/ui/settingsScreen.js": "./js/ui/settingsScreen.js?v=hero-11",
-  "./js/ui/songSelect.js": "./js/ui/songSelect.js?v=hero-11",
-  "./js/ui/tactil.js": "./js/ui/tactil.js?v=hero-11"
+  "three": "./vendor/three-0.160.0/three.module.min.js",
+  "three/addons/": "./vendor/three-0.160.0/addons/",
+  "./js/applePreview.js": "./js/applePreview.js?v=hero-12",
+  "./js/audio/audio.js": "./js/audio/audio.js?v=hero-12",
+  "./js/cloud.js": "./js/cloud.js?v=hero-12",
+  "./js/core/constants.js": "./js/core/constants.js?v=hero-12",
+  "./js/core/engine.js": "./js/core/engine.js?v=hero-12",
+  "./js/core/ini.js": "./js/core/ini.js?v=hero-12",
+  "./js/core/leer.js": "./js/core/leer.js?v=hero-12",
+  "./js/core/midiFile.js": "./js/core/midiFile.js?v=hero-12",
+  "./js/core/noteMode.js": "./js/core/noteMode.js?v=hero-12",
+  "./js/core/songParser.js": "./js/core/songParser.js?v=hero-12",
+  "./js/core/tempoMap.js": "./js/core/tempoMap.js?v=hero-12",
+  "./js/core/text.js": "./js/core/text.js?v=hero-12",
+  "./js/game/carrera.js": "./js/game/carrera.js?v=hero-12",
+  "./js/game/orden.js": "./js/game/orden.js?v=hero-12",
+  "./js/game/prueba.js": "./js/game/prueba.js?v=hero-12",
+  "./js/game/remoto.js": "./js/game/remoto.js?v=hero-12",
+  "./js/game/session.js": "./js/game/session.js?v=hero-12",
+  "./js/input/input.js": "./js/input/input.js?v=hero-12",
+  "./js/library.js": "./js/library.js?v=hero-12",
+  "./js/main.js": "./js/main.js?v=hero-12",
+  "./js/net/net.js": "./js/net/net.js?v=hero-12",
+  "./js/render/highway.js": "./js/render/highway.js?v=hero-12",
+  "./js/render/sprites.js": "./js/render/sprites.js?v=hero-12",
+  "./js/rock/catalogo.js": "./js/rock/catalogo.js?v=hero-12",
+  "./js/rock/escena.js": "./js/rock/escena.js?v=hero-12",
+  "./js/settings.js": "./js/settings.js?v=hero-12",
+  "./js/site.js": "./js/site.js?v=hero-12",
+  "./js/sitio/celular.js": "./js/sitio/celular.js?v=hero-12",
+  "./js/sitio/clave.js": "./js/sitio/clave.js?v=hero-12",
+  "./js/sitio/puente.js": "./js/sitio/puente.js?v=hero-12",
+  "./js/sitio/rock.js": "./js/sitio/rock.js?v=hero-12",
+  "./js/songCache.js": "./js/songCache.js?v=hero-12",
+  "./js/ui/dom.js": "./js/ui/dom.js?v=hero-12",
+  "./js/ui/menuBackground.js": "./js/ui/menuBackground.js?v=hero-12",
+  "./js/ui/online.js": "./js/ui/online.js?v=hero-12",
+  "./js/ui/partSelect.js": "./js/ui/partSelect.js?v=hero-12",
+  "./js/ui/ranking.js": "./js/ui/ranking.js?v=hero-12",
+  "./js/ui/results.js": "./js/ui/results.js?v=hero-12",
+  "./js/ui/rockero.js": "./js/ui/rockero.js?v=hero-12",
+  "./js/ui/settingsScreen.js": "./js/ui/settingsScreen.js?v=hero-12",
+  "./js/ui/songSelect.js": "./js/ui/songSelect.js?v=hero-12",
+  "./js/ui/tactil.js": "./js/ui/tactil.js?v=hero-12"
  }
 }
   </script>
@@ -64,11 +70,13 @@
   <div id="bgimage"></div>
   <video id="bgvideo" playsinline muted preload="auto"></video>
   <canvas id="menubg"></canvas>
+  <!-- Batalla de Rock de fondo (solo administradores, a prueba: js/rock/) -->
+  <div id="rockbg"></div>
   <canvas id="game"></canvas>
   <div id="ui"></div>
   <div id="overlay"></div>
   <!-- Volumen y silencio del sitio (../audio/volumen.js), siempre a mano -->
   <div class="vol-sitio" data-volumen></div>
-  <script type="module" src="js/main.js?v=hero-11"></script>
+  <script type="module" src="js/main.js?v=hero-12"></script>
 </body>
 </html>

@@ -242,7 +242,9 @@ test('el mapa de módulos del juego tiene todos los archivos con la misma versi�
   const recorre = d => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, n.name); if (n.isDirectory()) recorre(f); else if (n.name.endsWith('.js')) modulos.push('./' + path.relative(HERO, f).split(path.sep).join('/')); } };
   recorre(path.join(HERO, 'js'));
   for (const m of modulos) assert.equal(mapa[m], m + '?v=' + v, m);
-  assert.equal(Object.keys(mapa).length, modulos.length);
+  // además de los módulos, solo three.js (juegos/hero/vendor/, para Batalla de Rock)
+  assert.deepEqual(Object.keys(mapa).filter(k => !k.startsWith('./js/')).sort(), ['three', 'three/addons/']);
+  assert.equal(Object.keys(mapa).filter(k => k.startsWith('./js/')).length, modulos.length);
   // y los carteros piden la misma versión del documento
   for (const f of ['src/juegos/hero.js', 'src/juegos/hero-sala.js'])
     assert.match(fs.readFileSync(f, 'utf8'), new RegExp('juegos/hero/index\\.html\\?(modo=online&)?v=' + v), f);
@@ -279,7 +281,7 @@ test('sala: el cartero firma cada jugada y ninguna choca con los campos que vali
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
       b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(){return {entrar:async()=>true,envia(){},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
-      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};export const crearRockHero=()=>({inicia:()=>Promise.resolve(),atiende(){},ponLooks(){},destruir(){}});'));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
     } }]
   })).outputFiles[0].text;
@@ -350,7 +352,7 @@ test('sala: los demás ven la canción que hojea el anfitrión, sin escribir en 
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$/ }, () => stub('fb', 'export const ahora=()=>Date.now();export const senalMalla=()=>null;export const borraYemasVivo=()=>Promise.resolve();'));
       b.onResolve({ filter: /\/malla\.js$/ }, () => stub('malla', 'export function crearMalla(o){globalThis.__malla=o;return {entrar:async()=>true,envia(d){globalThis.__salen.push(d);},sano:()=>true,conectados:()=>[],presentes:()=>[],revisa(){},salir(){}};}'));
-      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};'));
+      b.onResolve({ filter: /\/hero\.js$/ }, () => stub('hero', 'export const atiendeHero=()=>false;export const mandaCuenta=()=>{};export const crearRockHero=()=>({inicia:()=>Promise.resolve(),atiende(){},ponLooks(){},destruir(){}});'));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.pluginData, loader: 'js' }));
     } }]
   })).outputFiles[0].text;
@@ -485,7 +487,7 @@ test('sala: la hora de quien dirige se mide por la malla (como NTP) y vale la de
     entryPoints: [path.join(dir, 'hero-sala.js')], bundle: true, format: 'cjs', platform: 'node', write: false,
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /fb-juegos\.js$|\/malla\.js$|\/hero\.js$/ }, a => ({ path: a.path, namespace: 'stub' }));
-      b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ahora=()=>0,senalMalla=0,borraYemasVivo=0,crearMalla=0,atiendeHero=0,mandaCuenta=0;', loader: 'js' }));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export const ahora=()=>0,senalMalla=0,borraYemasVivo=0,crearMalla=0,atiendeHero=0,mandaCuenta=0,crearRockHero=0;', loader: 'js' }));
     } }]
   })).outputFiles[0].text;
   const m = { exports: {} };

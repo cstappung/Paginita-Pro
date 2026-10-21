@@ -2,6 +2,8 @@ import { ES_CLAVE } from "../../../juegos/hero/js/sitio/clave.js";
 import { CAT_HERO, decodificaHero, resumenHero, aplicaHero, verificaHero } from "./hero-datos.js";
 import { deMarca } from "./logros.js";
 import { ambientar } from "./sonido.js";
+import { monedasDe, economia, rocasDe, leeCopia } from "./monedas.js";
+import { lookVisible, limpiaLook, PRECIO_CAJA, ROCK_SOLO_ADMIN, claveRock } from "./rock-datos.js";
 
 /* PRO HERO — el cartero entre Juegos y el juego (`juegos/hero/`).
 
@@ -157,16 +159,131 @@ async function subeResumen(u, mias) {
   } catch (err) { console.warn("[hero] no se pudo subir la clasificación", err); }
 }
 
+/* ---------- Batalla de Rock (el fondo de PRO HERO; a prueba, solo administradores) ----------
+   El juego no escribe nada: pide y aquí se comprueba contra la economía completa y se escribe
+   (rock-datos.js). Se le manda `rock` = {admin, inv, look, looks} cada vez que la economía cambia:
+   - `inv`: el saldo y las piezas de la cuenta (las de cajas, con su copia y si están a la venta);
+   - `look`: tu rockero guardado (`rockLook/<uid>`), limpio y solo con lo que tienes y no vendes;
+   - `looks`: los de los demás de la sala, leídos por clave, comprobados contra lo de cada uno.
+   Un jugador que no es administrador no recibe nada, así que en su juego no existe. */
+const adminDe = new Map();
+function esAdminRock() {
+  const u = deps?.usuario();
+  if (!u) return Promise.resolve(false);
+  if (!ROCK_SOLO_ADMIN || deps.esAdmin?.()) return Promise.resolve(true);
+  if (!adminDe.has(u.uid)) adminDe.set(u.uid, deps.fb.esAdminJuegos(u.uid).catch(() => false));
+  return adminDe.get(u.uid);
+}
+const MAX_PRECIO = 100000;
+export function crearRockHero(enviar) {
+  let d = null, off = null, crudo = null, activo = false, muerto = false, cola = Promise.resolve();
+  const looks = {}, leyendo = new Set();
+  const yo = () => deps?.usuario()?.uid || "";
+  const eco = () => economia(d);
+  /* lo que alguien puede ponerle a su rockero: lo suyo que no está a la venta */
+  const propias = u => rocasDe(u, d).filter(x => !x.venta).map(x => ({ b: x.b, k: x.k, t: x.t, c: x.colores }));
+  function inv() {
+    const u = yo(), m = monedasDe(u, d), cajas = (eco().usuarios[u] || {}).cajasRock || [];
+    return { coins: m.saldo, parada: m.parada, opened: cajas.length, last: cajas.slice(-10).reverse().map(z => z.v),
+      own: rocasDe(u, d).map(x => ({ b: x.b, k: x.k, t: x.t, c: x.colores, leg: x.leg, copia: x.c, venta: x.venta || "" })) };
+  }
+  function manda() {
+    if (!activo || muerto || !d || !d.completo) return;
+    const lks = {};
+    for (const [u, l] of Object.entries(looks)) lks[u] = l ? lookVisible(l, propias(u)) : null;
+    enviar("rock", { admin: true, inv: inv(), look: crudo ? lookVisible(crudo, propias(yo())) : null, looks: lks });
+  }
+  async function inicia() {
+    if (activo || muerto || !(await esAdminRock()) || muerto) return;
+    activo = true;
+    crudo = await deps.fb.leeRockLook(yo()).catch(() => null);
+    off = deps.datos(x => { d = x; manda(); });
+  }
+  /* los rockeros de los demás de la sala (una lectura por cuenta y visita) */
+  function ponLooks(uids) {
+    if (!activo) return;
+    for (const u of uids) {
+      if (!u || u === yo() || leyendo.has(u)) continue;
+      leyendo.add(u);
+      deps.fb.leeRockLook(u).then(l => { looks[u] = l || null; manda(); });
+    }
+  }
+  /* lo escrito tarda un instante en volver por la escucha: se espera a que la economía lo vea */
+  async function esperaEco(ve, ms = 5000) {
+    for (let t = 0; t < ms; t += 100) {
+      const r = d && ve(eco());
+      if (r) return r;
+      await new Promise(ok => setTimeout(ok, 100));
+    }
+    return d && ve(eco());
+  }
+  function atiende(x) {
+    const responde = (ok, dato, error) => enviar("rock-resp", { id: x.id, ok, dato, error });
+    cola = cola.then(async () => {
+      try {
+        if (!activo) throw new Error("Batalla de Rock está a prueba: solo para administradores.");
+        if (!d || !d.completo) throw new Error("Todavía se está cargando tu cuenta.");
+        const u = yo(), m = monedasDe(u, d);
+        if (x.accion === "caja") {
+          const b = x.b === "f" ? "f" : "m";
+          if (m.parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no puedes gastar.");
+          if (m.saldo < PRECIO_CAJA) throw new Error(`Una caja cuesta ${PRECIO_CAJA}: te faltan ${(PRECIO_CAJA - m.saldo).toLocaleString("es-CL")} monedas.`);
+          const r = await deps.fb.comprarCajaRock(u, b);
+          const caja = await esperaEco(z => ((z.usuarios[u] || {}).cajasRock || []).find(c => c.k === r.k));
+          if (!caja) throw new Error("La caja no valió: otra pestaña gastó tus monedas a la vez.");
+          manda();
+          responde(true, { v: caja.v, dup: caja.dup, refund: caja.reembolso, c: caja.c || claveRock(u, r.k) });
+        } else if (x.accion === "guarda") {
+          const L = limpiaLook(x.look);
+          if (!L) throw new Error("Ese rockero no se puede guardar.");
+          const json = JSON.stringify(L);
+          if (json.length > 4000) throw new Error("Ese rockero es demasiado grande para guardarlo.");
+          await deps.fb.guardaRockLook(u, json);
+          crudo = json;
+          manda();
+          responde(true, lookVisible(json, propias(u)));
+        } else if (x.accion === "vende") {
+          const p = Math.round(+x.p), q = leeCopia(x.c), e = eco();
+          if (!q || q.tipo !== "rock" || e.dueno[x.c] !== u) throw new Error("Eso no es tuyo.");
+          if (e.enVenta[x.c]) throw new Error("Ya está a la venta.");
+          if (!(p >= 1 && p <= MAX_PRECIO)) throw new Error(`El precio va de 1 a ${MAX_PRECIO.toLocaleString("es-CL")} monedas.`);
+          if (m.parada) throw new Error("Tu cuenta tiene una compra sin fondos: no puedes vender hasta ponerte al día.");
+          const id = await deps.fb.publicarOferta(u, x.c, p);
+          const fin = await esperaEco(z => z.ofertas[id]);
+          if (fin && fin.estado !== "activa") {
+            await deps.fb.retirarOferta(id).catch(() => {});
+            throw new Error("Eso ya está a la venta o dejó de ser tuyo.");
+          }
+          manda();
+          responde(true, id);
+        } else if (x.accion === "mercado") {
+          deps.ir?.("#mercado/rock");
+          responde(true, null);
+        } else throw new Error("Petición desconocida.");
+      } catch (err) {
+        const permiso = /permission|denied/i.test((err && (err.code || err.message)) || "");
+        responde(false, null, permiso
+          ? "La base todavía no acepta Batalla de Rock: falta publicar las reglas nuevas en la consola de Firebase."
+          : (err && err.message) || "No se pudo.");
+      }
+    });
+  }
+  function destruir() { muerto = true; if (off) off(); off = null; }
+  return { inicia, atiende, ponLooks, destruir };
+}
+
 /* ---------- el juego solo (la tarjeta del club, a ventana completa) ---------- */
 const PADRE = "hero-padre", HIJO = "hero-hijo";
 export function crearHero({ volver, enLinea }) {
   let host, frame, temaObs, muerto = false;
   const enviar = (tipo, datos = {}) => { if (!muerto) frame?.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin); };
+  const rock = crearRockHero(enviar);
   const tema = () => enviar("tema", { oscuro: document.documentElement.dataset.tema === "oscuro" });
   function mensaje(e) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
-    if (d.tipo === "listo") { tema(); mandaCuenta(enviar); return; }
+    if (d.tipo === "listo") { tema(); mandaCuenta(enviar); rock.inicia(); return; }
+    if (d.tipo === "rock-pide") { rock.atiende(d); return; }
     if (d.tipo === "volver") { volver(); return; }
     if (d.tipo === "en-linea") { enLinea(); return; }
     atiendeHero(d.tipo, d, enviar);
@@ -182,12 +299,13 @@ export function crearHero({ volver, enLinea }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?v=hero-11";
+    frame.src = "juegos/hero/index.html?v=hero-12";
     host.appendChild(frame);
     frame.addEventListener("load", () => frame.contentWindow?.focus());
   }
   function destruir() {
     muerto = true;
+    rock.destruir();
     temaObs?.disconnect();
     window.removeEventListener("message", mensaje);
     frame?.remove();

@@ -1,5 +1,7 @@
 // Multijugador en línea: conexión, sala (lobby) y orquestación de partidas.
 import { h, Screen, toast } from './dom.js';
+import { rockSitio } from '../sitio/rock.js';
+import { RockeroScreen } from './rockero.js';
 import { NetClient } from '../net/net.js';
 import { library, artImg } from '../library.js';
 import { PARTS, PART_ORDER, DIFF_LABEL } from '../core/constants.js';
@@ -235,10 +237,18 @@ export class LobbyScreen extends Screen {
       entry ? h('div', { class: 'ls-elegida' }, 'Elegida: ', h('b', {}, entry.meta.name), ` · ${entry.meta.artist}`) : null].filter(Boolean);
   }
 
+  // Batalla de Rock de fondo (solo administradores, a prueba)
+  rockCheck() {
+    const c = h('input', { type: 'checkbox', 'data-nav': true, onchange: () => { settings.fondoRock = c.checked; saveSettings(); } });
+    c.checked = settings.fondoRock;
+    return h('label', { class: 'set-row check' }, h('span', {}, 'Fondo Batalla de Rock', h('small', {}, 'Tu rockero contra el de tu rival, detrás de la pista · a prueba')), c);
+  }
+
   ajustesEl() {
     return h('div', { class: 'lobby-ajustes' },
       h('button', { 'data-nav': true, onclick: () => this.app.show(new SettingsScreen(this.app, 'controls')) }, '🎮 Controles'),
-      h('button', { 'data-nav': true, onclick: () => this.app.show(new SettingsScreen(this.app)) }, '⚙ Ajustes'));
+      h('button', { 'data-nav': true, onclick: () => this.app.show(new SettingsScreen(this.app)) }, '⚙ Ajustes'),
+      rockSitio.admin ? h('button', { 'data-nav': true, onclick: () => this.app.show(new RockeroScreen(this.app)) }, '🎸 Tu rockero') : null);
   }
 
   onLibrary() {
@@ -322,6 +332,7 @@ export class LobbyScreen extends Screen {
       celular ? null : h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
       celular ? null : h('label', { class: 'set-row' }, h('span', {}, 'Control'), profSel),
       h('label', { class: 'set-row check' }, h('span', {}, 'Alto rendimiento', h('small', {}, ALTO_AYUDA)), alto),
+      rockSitio.admin ? this.rockCheck() : null,
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
       this.ajustesEl(),
       sitio.sala && celular ? h('p', { class: 'd-aviso' }, 'En el celular las partidas no se guardan: los récords y las estrellas son para teclado, mando o guitarra.') : null,

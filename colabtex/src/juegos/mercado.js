@@ -18,7 +18,7 @@ import { MONEDA } from "./monedas-vista.js";
 import { miniCarta, MOTOR, RAIZ, colVisible, copiaVisible, veSerie1 } from "./prodrop-cartas.js";
 import { avatarMarco } from "./perfil-vista.js";
 import {
-  JUEGOS_MERCADO, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
+  JUEGOS_MERCADO, juegosMercado, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
   pendientesDe, puedeComprar, puedeProponer, fichaCopia
 } from "./mercado-datos.js";
 import { ESPACIOS, NOMBRE_ESPACIO, ESPECIES, ETAPAS, pedidoObjeto, pedidoMascota, puestoDe } from "./mascotas-datos.js";
@@ -93,7 +93,8 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
   function imagen(r, grande) {
     if (r.tipo === "carta") return cartaViva(r.cp);
     const p = r.tipo === "baile" ? null : pedidoDe(r), ft = p && fotoDe(p.key);
-    const muestra = ft && ft.colores && ft.colores.length ? `<span class="jg-mk-muestra">${ft.colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
+    const colores = ft && ft.colores && ft.colores.length ? ft.colores : r.tipo === "rock" ? r.colores : null;
+    const muestra = colores ? `<span class="jg-mk-muestra">${colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
     return `<span class="jg-mk-foto${grande ? " grande" : ""}" data-foto="${esc(p ? p.key : "")}">${ft && ft.src ? `<img src="${esc(ft.src)}" alt="" draggable="false">` : `<span class="jg-mk-emoji" aria-hidden="true">${esc(r.emoji)}</span>`}${muestra}${r.leg ? '<b class="jg-mk-leg" title="Legendario">★</b>' : ""}${r.frozen ? '<b class="jg-mk-eterna" title="Tomó la poción eterna">🧪</b>' : ""}</span>`;
   }
   function pideMiniaturas(filas) {
@@ -133,7 +134,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
         </div>
         ${vitrina(ofertas)}
       </header>
-      <div class="jg-mk-seg" role="group" aria-label="Juego">${JUEGOS_MERCADO.map(([k, t]) => `<button type="button" data-juego="${k}" aria-pressed="${f.juego === k}">${t}</button>`).join("")}</div>
+      <div class="jg-mk-seg" role="group" aria-label="Juego">${juegosMercado().map(([k, t]) => `<button type="button" data-juego="${k}" aria-pressed="${f.juego === k}">${t}</button>`).join("")}</div>
       ${f.juego === "mascotas" ? `<div class="jg-mk-seg chico" role="group" aria-label="Qué">${TIPOS_MASCOTAS.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${f.tipoM === k}">${t}</button>`).join("")}</div>` : ""}
       <nav class="jg-mk-tabs" role="tablist">${[["comprar", "Comprar"], ["ventas", "Mis ventas"], ["cambios", `Intercambios${pend ? ` <b>${pend}</b>` : ""}`]].map(([k, t]) =>
         `<button type="button" role="tab" data-tab="${k}" aria-selected="${tab === k}">${t}</button>`).join("")}</nav>
