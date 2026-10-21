@@ -128,7 +128,7 @@ export function montarPlinko(h, api) {
     const el = $("[data-hist]");
     el.innerHTML = hist.map((x, i) => `<span class="${i === 0 && nueva ? "nueva" : ""}" style="--c:${colorCasilla(x.casilla, x.n)}">${textoMult(x.mult)}</span>`).join("");
   }
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
 
   /* ---------- el tablero ---------- */
   const tablero = (() => {

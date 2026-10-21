@@ -424,6 +424,53 @@ export const esMascota = c => { const q = leeCopia(c); return !!q && q.tipo === 
 const CLAVE_SOBRE = /^[-_A-Za-z0-9]{8,24}$/;
 const memoEco = new WeakMap();
 const comoLista = x => (Array.isArray(x) ? x : x && typeof x === "object" ? Object.values(x) : []);
+/* Lo que resolvió cada ronda del casino, por `uid~clave`. Resolver una
+   cuesta un sha256 por marca (un vuelo largo del avión lleva más de cien
+   avisos) y la economía se rehace cada vez que alguien apuesta: sin esto,
+   cada segundo de casino rehacía todas las rondas de todo el mundo, unos
+   300 ms de CPU en cada pestaña abierta del sitio, juegue o no. Cada marca
+   se escribe una sola vez (las reglas), así que una ronda solo cambia
+   ganando marcas: la firma lleva cuántas tiene y la suma de sus horas. */
+const memoRondas = new Map();
+const marcas = o => {
+  if (!o || typeof o !== "object") return "";
+  let n = 0, s = 0;
+  for (const v of Object.values(o)) { n++; s += typeof v === "number" ? v : v && typeof v === "object" ? (+v.at || 0) + (v.t ? v.t.charCodeAt(0) : 0) : 0; }
+  return n + ":" + s;
+};
+const firmaRonda = x => x.j + "|" + x.p + "|" + x.at + "|" + x.d + "|" + x.n + "|" + x.c + "|" + marcas(x.t) + "|" + marcas(x.s) + "|" + marcas(x.a) + "|" +
+  (x.x ? x.x.at + ":" + x.x.m : "") + "|" + (x.b && typeof x.b === "object" ? JSON.stringify(x.b) : "");
+/* {ronda, ev}: la ronda como la lista `economia().rondas` y sus eventos
+   (la apuesta, lo que se dobló o separó y el premio), que apuntan a ella.
+   Se reusan de una economía a la siguiente: lo único que la economía
+   cambia es `valida`, y lo vuelve a poner en false antes de recorrer. */
+function resuelveRonda(u, k, x) {
+  const id = u + "~" + k, f = x && typeof x === "object" ? firmaRonda(x) : null, m = memoRondas.get(id);
+  if (m && f !== null && m.f === f) return m;
+  const res = CM.resuelve(u, k, x), ev = [];
+  const ronda = res ? Object.assign({ u, k, j: x.j, p: x.p, d: x.d, at: x.at, valida: false }, res) : null;
+  if (ronda) {
+    ev.push({ t: "ca", at: x.at, u, k, p: x.p, r: ronda });
+    (res.cargos || []).forEach((c, i) => ev.push({ t: "ca", at: c.at, u, k, p: c.p, extra: true, i: i + 1, r: ronda }));
+    if (res.pago > 0) ev.push({ t: "cp", at: res.fin, u, k, p: res.pago, r: ronda });
+  }
+  const r = { f, id, ronda, ev };
+  if (f !== null) memoRondas.set(id, r);
+  return r;
+}
+/* Las rondas de una cuenta, por el objeto `casino/<uid>` que llegó:
+   fb-juegos.js escucha cuenta por cuenta, así que las de quien no jugó
+   desde la última lectura llegan en el mismo objeto y ni se firman. */
+const memoCuentas = new WeakMap();
+function rondasDe(u, l) {
+  let r = memoCuentas.get(l);
+  if (!r) {
+    r = [];
+    for (const [k, x] of Object.entries(l)) { const m = resuelveRonda(u, k, x); if (m.ronda) r.push(m); }
+    memoCuentas.set(l, r);
+  }
+  return r;
+}
 
 export function economia(datos) {
   const d = datos || {};
@@ -477,15 +524,14 @@ export function economia(datos) {
      motor con las horas del servidor. Lo que se dobla o se separa en el
      blackjack (`cargos`) se cobra a la hora de esa decisión. */
   const rondas = {};
-  for (const [u, l] of Object.entries(d.casino || {}))
-    for (const [k, x] of Object.entries(l || {})) {
-      const res = CM.resuelve(u, k, x);
-      if (!res) continue;
-      rondas[u + "~" + k] = Object.assign({ u, k, j: x.j, p: x.p, d: x.d, at: x.at, valida: false }, res);
-      ev.push({ t: "ca", at: x.at, u, k, p: x.p });
-      (res.cargos || []).forEach((c, i) => ev.push({ t: "ca", at: c.at, u, k, p: c.p, extra: true, i: i + 1 }));
-      if (res.pago > 0) ev.push({ t: "cp", at: res.fin, u, k, p: res.pago });
+  for (const [u, l] of Object.entries(d.casino || {})) {
+    if (!l || typeof l !== "object") continue;
+    for (const { id, ronda, ev: er } of rondasDe(u, l)) {
+      ronda.valida = false;
+      rondas[id] = ronda;
+      for (const e of er) ev.push(e);
     }
+  }
   ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
 
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
@@ -641,7 +687,7 @@ export function economia(datos) {
     } else if (e.t === "ca") {
       /* Una apuesta sin fondos (o de una cuenta parada) no vale: no juega
          ni paga, y la cuenta queda parada como con cualquier gasto. */
-      const r = rondas[e.u + "~" + e.k];
+      const r = e.r;
       if (e.extra) {
         // doblar o separar: si no alcanza, la ronda entera deja de valer
         if (!r.valida) continue;
@@ -654,7 +700,7 @@ export function economia(datos) {
       const z = U(e.u).casino; z.apostado += e.p; z.rondas++;
       const zj = casinoDe(e.u, r.j); zj.apostado += e.p; zj.rondas++;
     } else if (e.t === "cp") {
-      const r = rondas[e.u + "~" + e.k];
+      const r = e.r;
       if (!r.valida) continue;
       U(e.u).premios += e.p; U(e.u).casino.pagado += e.p; casinoDe(e.u, r.j).pagado += e.p;
       anota(e.u, "premio", e.p, r.j);

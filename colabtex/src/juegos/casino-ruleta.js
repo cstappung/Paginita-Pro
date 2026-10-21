@@ -6,16 +6,15 @@
    (casino-motor.js), así que está decidido en cuanto se apuesta; la rueda
    solo lo cuenta. Por eso el premio se esconde del saldo (`api.oculta`)
    hasta que la bola cae: si no, el saldo cantaba el número antes que la
-   rueda. La bola no «busca» la casilla al final: su ángulo relativo a la
-   rueda frena con una curva suave que termina justo en la casilla, y en
-   la caída rebota entre los rombos. */
+   rueda. La bola no «busca» la casilla al final: lo que dura en la pista
+   se calcula para que, frenando parejo, caiga y rebote justo en ella (ver
+   «la rueda», abajo). */
 import { RULETA, RUEDA, ROJOS, casillaRuleta, resuelveRuleta, APUESTA_MIN, formatoPago } from "./casino-motor.js";
 import { formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
 import { lee, guarda, espera, errorDe, teclas } from "./casino-comun.js";
 
 const FICHAS = [1, 5, 10, 25, 100];
-const VUELTA = 5200;   // ms que rueda la bola
 const SEG = 2 * Math.PI / 37;
 const colorDe = n => (n === 0 ? "verde" : ROJOS.has(n) ? "rojo" : "negro");
 const NOMBRES = { rojo: "Rojo", negro: "Negro", par: "Par", impar: "Impar", baja: "1 a 18", alta: "19 a 36", d1: "1ª docena", d2: "2ª docena", d3: "3ª docena", c1: "Columna 1", c2: "Columna 2", c3: "Columna 3" };
@@ -152,19 +151,19 @@ export function montarRuleta(h, api) {
   async function girar() {
     const t = total();
     if (girando || t < APUESTA_MIN || t > RULETA.max) return;
+    try { api.alcanza(t); } catch (e) { ponMsg(errorDe(e), "mal"); suena("pierde"); return; }
     const b = Object.assign({}, fichas);
     girando = true; ponMsg(""); limpiaRes(); pinta();
+    // la bola sale ya; el número llega con la hora del servidor
+    rueda.arranca(); suena("giro");
     let k, at;
     try { ({ k, at } = await api.apostar("r", t, { b })); }
-    catch (e) { girando = false; ponMsg(errorDe(e), "mal"); suena("pierde"); pinta(); return; }
+    catch (e) { girando = false; rueda.aborta(); ponMsg(errorDe(e), "mal"); suena("pierde"); pinta(); return; }
     api.oculta(k);
     ultimas = b; guarda("jg.casino.ruleta.ultimas", JSON.stringify(b));
     const res = resuelveRuleta(uid, k, { j: "r", p: t, at, b });
-    enVuelo = k;
-    suena("giro");
     await rueda.lanza(res.n);
     if (!vivo) return;
-    enVuelo = null;
     // el número en grande, las casillas que ganan y las fichas
     const ganan = new Set(res.ganan), col = colorDe(res.n), r = $("[data-res]");
     r.className = "jg-cs-rl-res " + col; r.hidden = false;
@@ -174,7 +173,7 @@ export function montarRuleta(h, api) {
     for (const x of ganan) { const c = pano.querySelector(`[data-b="${x}"]`); if (c) c.classList.add("gana"); }
     pintaFichas(ganan);
     api.cobrado(k, res.pago);
-    pintaHist();
+    pintaHist(true);
     if (res.pago > 0) {
       const neto = res.pago - t;
       ponMsg(`${res.ganan.map(nombreApuesta).join(", ")}: cobras ${formatoPago(res.pago)} monedas${neto > 0 ? ` (+${formatoPago(neto)})` : neto < 0 ? ` (recuperas parte: ${formatoPago(neto)})` : ""}.`, neto >= 0 ? "info" : "");
@@ -188,28 +187,48 @@ export function montarRuleta(h, api) {
   }
   bGirar.onclick = () => girar();
 
-  /* ---------- el historial: los números que salieron (de la economía) ---------- */
-  let enVuelo = null;
-  function pintaHist() {
+  /* ---------- el historial: los números que salieron (de la economía) ----------
+     Mientras la bola rueda no se toca: la tirada nueva puede llegar en la
+     lectura antes de que la bola caiga, y cantaba el número (y llevaba la
+     bola a su casilla) antes de girar. Al caer se pinta a la fuerza. */
+  function pintaHist(forzar) {
     const e = api.economia(), el = $("[data-hist]");
-    if (!e) return;
-    const l = Object.values(e.rondas).filter(r => r.u === uid && r.j === "r" && r.k !== enVuelo).sort((a, b) => b.at - a.at).slice(0, 16);
+    if (!e || (girando && !forzar)) return;
+    const l = Object.values(e.rondas).filter(r => r.u === uid && r.j === "r").sort((a, b) => b.at - a.at).slice(0, 16);
     const sig = l.map(r => r.k).join();
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
     el.innerHTML = l.map(r => `<span class="${colorDe(r.n)}">${r.n}</span>`).join("");
     if (l[0] && rueda) rueda.reposa(l[0].n);
   }
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
 
-  /* ---------- la rueda ---------- */
+  /* ---------- la rueda ----------
+     Rueda y bola son funciones del reloj, no de lo que avanzó cada cuadro:
+     con la página trabada (un cuadro cada medio segundo) la rueda avanzaba
+     a pasos de 50 ms como mucho mientras la bola, contada con el reloj,
+     llegaba sola a su casilla. La rueda gira en sentido horario (`giroEn`:
+     el impulso del crupier se apaga solo) y la bola al revés por la pista.
+     Sale en cuanto se toca «Girar» (`arranca`); cuando el servidor da el
+     número (`lanza`) se calcula cuánto más rueda por la pista para que, al
+     frenar, caer y rebotar, quede justo en esa casilla. En la pista nunca
+     cambia de sentido ni salta: lo único que se elige es cuánto dura. */
   const rueda = (() => {
+    const W_REPOSO = 0.3, W_IMPULSO = 1.8, TAU = 3000;   // rad/s, rad/s, ms
+    const W_BOLA = 15, W_CAE = 3.2, PISTA_MIN = 2600, CAIDA = 1500;
+    const DOS_PI = 2 * Math.PI, modulo = (x, m) => ((x % m) + m) % m;
     let W = 0, H = 0, dpr = 1, raf = 0, prev = performance.now(), R = 100, cx = 0, cy = 0;
-    let giro = 0, vel = 0.35, bola = null, brillo = null, plato = null, chispas = [];
+    let bola = null, brillo = null, plato = null, chispas = [];
+    /* La rueda: ángulo `g0` en `t0`, más el giro de reposo y lo que queda
+       del impulso. */
+    let g0 = 0, t0 = performance.now(), imp = 0;
+    const giroEn = t => g0 + W_REPOSO * (t - t0) / 1000 + imp * TAU / 1000 * (1 - Math.exp(-(t - t0) / TAU));
+    const velGiro = t => W_REPOSO + imp * Math.exp(-(t - t0) / TAU);
     function mide() {
-      const r = lienzo.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1);
-      W = Math.max(280, r.width); H = Math.max(240, r.height);
+      const r = lienzo.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.max(280, r.width), h = Math.max(240, r.height);
+      if (w === W && h === H && d === dpr) return;
+      W = w; H = h; dpr = d;
       lienzo.width = Math.round(W * dpr); lienzo.height = Math.round(H * dpr);
       R = Math.min(W * 0.46, H * 0.46); cx = W / 2; cy = H / 2 + 6;
       plato = null;
@@ -222,7 +241,7 @@ export function montarRuleta(h, api) {
       const t = Math.ceil(R * 2 * dpr), c = document.createElement("canvas");
       c.width = c.height = t;
       const x = c.getContext("2d");
-      x.setTransform(dpr, 0, 0, dpr, R, R);
+      x.setTransform(dpr, 0, 0, dpr, R * dpr, R * dpr);
       const r1 = R * 0.79, r2 = R * 0.665, r3 = R * 0.575;
       for (let i = 0; i < 37; i++) {
         const n = RUEDA[i], a0 = i * SEG - Math.PI / 2, a1 = a0 + SEG, col = n === 0 ? "#139a4f" : ROJOS.has(n) ? "#c8102e" : "#15131c";
@@ -255,18 +274,55 @@ export function montarRuleta(h, api) {
       x.beginPath(); x.arc(-R * 0.025, -R * 0.03, R * 0.03, 0, 6.29); x.fillStyle = "#fffbe6cc"; x.fill();
       return c;
     }
-    const pocketAng = i => (i + 0.5) * SEG;   // relativo a la rueda, desde arriba
-    function lanza(n) {
-      return new Promise(fin => {
-        const idx = RUEDA.indexOf(n), ang0 = bola ? bola.ang : -Math.PI / 2;
-        const phi0 = ang0 - giro;
-        let d = ((pocketAng(idx) - phi0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - 2 * Math.PI;
-        bola = { modo: "gira", t0: performance.now(), phi0, phiT: phi0 + d - 2 * Math.PI * 6, idx, fin, rebote: 0, ang: ang0, r: R * 0.9 };
-        vel = 2.6;
-        brillo = null;
-      });
+    // el centro de la casilla i, en el marco de la rueda (el mismo de dibujaPlato)
+    const casilla = i => (i + 0.5) * SEG - Math.PI / 2;
+    /* Dónde está la bola a la hora t: {ang, r} (r en fracciones de R). */
+    function posicion(t) {
+      if (!bola) return null;
+      if (bola.modo === "reposo") return { ang: giroEn(t) + casilla(bola.idx), r: 0.62 };
+      if (bola.modo === "sale") return { ang: bola.th0 - W_BOLA * (t - bola.t0) / 1000, r: 0.9 };
+      // "frena": por la pista hasta `tp`, y después cae
+      const T = t - bola.t0;
+      if (T < bola.tp) {
+        const s = T / bola.tp;
+        return { ang: bola.th0 - recorrido(bola.tp, s), r: 0.9 - 0.035 * s * s };
+      }
+      const q = Math.min(1, (T - bola.tp) / CAIDA), d = CAIDA / 1000, x = q * d;
+      const b = Math.min(1, q / 0.8), suave = b * b * (3 - 2 * b);
+      const phi = bola.phi1 + bola.v1 * x - bola.v1 * x * x / (2 * d) + 0.1 * Math.sin(b * Math.PI * 7) * (1 - b) * (1 - b);
+      return { ang: giroEn(t) + phi, r: 0.865 + (0.62 - 0.865) * suave + 0.07 * Math.abs(Math.sin(b * Math.PI * 3.5)) * Math.pow(1 - b, 1.4), rebote: Math.floor(b * 3.5), b };
     }
-    function reposa(n) { if (!bola || bola.modo !== "gira") { bola = { modo: "reposo", idx: RUEDA.indexOf(n), ang: 0, r: 0 }; brillo = null; } }
+    /* Lo que la bola recorre en la pista (rad, hacia atrás) hasta la
+       fracción s de un tramo de `tp` ms: frena de W_BOLA a W_CAE. */
+    const recorrido = (tp, s) => tp / 1000 * (W_CAE * s + (W_BOLA - W_CAE) * (1 - Math.pow(1 - s, 3)) / 3);
+    function arranca() {
+      const t = performance.now(), p = posicion(t);
+      g0 = modulo(giroEn(t), DOS_PI); t0 = t; imp = W_IMPULSO - W_REPOSO;
+      bola = { modo: "sale", t0: t, th0: p ? p.ang : -Math.PI / 2 };
+      brillo = null;
+    }
+    /* Que caiga en el número n. Desde la pista, a la hora t: dura `tp` en
+       la pista y CAIDA en caer, y al final del todo su ángulo en la rueda
+       es `phi1 + v1·CAIDA/2` (frena parejo hasta quedar quieta en ella).
+       Ese final baja con tp, así que se busca el primer tp que lo deja en
+       la casilla. Sin número (null), cae donde la lleve el tramo más corto. */
+    function lanza(n) {
+      if (!bola || bola.modo !== "sale") arranca();
+      const t = performance.now(), th0 = posicion(t).ang, d = CAIDA / 1000;
+      const plan = tp => { const v1 = -W_CAE - velGiro(t + tp), phi1 = th0 - recorrido(tp, 1) - giroEn(t + tp); return { tp, v1, phi1, fin: phi1 + v1 * d / 2 }; };
+      const f0 = plan(PISTA_MIN).fin;
+      const idx = n == null ? Math.floor(modulo(f0 + Math.PI / 2, DOS_PI) / SEG) % 37 : Math.max(0, RUEDA.indexOf(n));
+      const meta = f0 - modulo(f0 - casilla(idx), DOS_PI);
+      let a = PISTA_MIN, b = PISTA_MIN + 1000;
+      while (plan(b).fin > meta) b += 1000;
+      for (let i = 0; i < 48; i++) { const m = (a + b) / 2; if (plan(m).fin > meta) a = m; else b = m; }
+      const p = plan(b);
+      return new Promise(fin => { bola = { modo: "frena", t0: t, th0, tp: p.tp, v1: p.v1, phi1: p.phi1, idx, fin, rebote: -1 }; });
+    }
+    /* Antes del primer giro, la bola espera en el último número que salió.
+       Después queda donde cayó: la lectura que trae esa tirada puede
+       llegar más tarde y traer la anterior como última. */
+    function reposa(n) { if (!bola || bola.inicial) bola = { modo: "reposo", idx: Math.max(0, RUEDA.indexOf(n)), inicial: true }; }
     function fiesta(pago) {
       for (let i = 0; i < 46; i++) {
         const a = Math.random() * 6.29, v = 90 + Math.random() * 260;
@@ -278,8 +334,19 @@ export function montarRuleta(h, api) {
       if (!vivo) return;
       raf = requestAnimationFrame(cuadro);
       const ahora = performance.now(), dt = Math.min(0.05, (ahora - prev) / 1000); prev = ahora;
-      vel = 0.32 + (vel - 0.32) * Math.exp(-dt / 2.4);
-      giro += vel * dt;
+      // la bola terminó de caer: queda en su casilla y avisa
+      if (bola && bola.modo === "frena") {
+        const p = posicion(ahora);
+        if (p.b !== undefined && p.rebote !== bola.rebote && p.b > 0 && p.b < 1) { bola.rebote = p.rebote; suena("bola", 1 - p.b); }
+        if (ahora - bola.t0 >= bola.tp + CAIDA) {
+          const f = bola.fin;
+          bola = { modo: "reposo", idx: bola.idx };
+          brillo = { idx: bola.idx, t0: ahora };
+          suena("bola", 0.1);
+          setTimeout(f, 450);
+        }
+      }
+      const giro = giroEn(ahora);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       // el paño
       const pa = g.createRadialGradient(cx, cy, R * 0.3, cx, cy, Math.max(W, H) * 0.75);
@@ -306,35 +373,15 @@ export function montarRuleta(h, api) {
         g.beginPath(); g.moveTo(-s * 1.6, 0); g.lineTo(0, -s); g.lineTo(s * 1.6, 0); g.lineTo(0, s); g.closePath();
         g.fillStyle = "#e9c46a"; g.fill(); g.restore();
       }
+      if (brillo) {
+        const a0 = giro + brillo.idx * SEG - Math.PI / 2, k = 0.55 + 0.45 * Math.sin((ahora - brillo.t0) / 160);
+        g.save(); g.beginPath(); g.arc(cx, cy, R * 0.8, a0, a0 + SEG); g.arc(cx, cy, R * 0.57, a0 + SEG, a0, true); g.closePath();
+        g.fillStyle = `rgba(255,236,150,${0.35 * k})`; g.shadowColor = "#ffe27a"; g.shadowBlur = 20; g.fill(); g.restore();
+      }
       // la bola
-      if (bola) {
-        let ang, r;
-        if (bola.modo === "gira") {
-          const u = Math.min(1, (ahora - bola.t0) / VUELTA);
-          const phi = bola.phi0 + (bola.phiT - bola.phi0) * (1 - Math.pow(1 - u, 2.6));
-          ang = giro + phi;
-          const rT = R * 0.9, rP = R * 0.62, s = Math.max(0, Math.min(1, (u - 0.6) / 0.32));
-          const base = rT + (rP - rT) * (s * s * (3 - 2 * s));
-          const rebote = R * 0.07 * Math.abs(Math.sin(s * Math.PI * 3.5)) * Math.pow(1 - s, 1.4);
-          r = base + rebote;
-          const tramo = Math.floor(s * 3.5);
-          if (s > 0 && s < 1 && tramo !== bola.rebote) { bola.rebote = tramo; suena("bola", 1 - s); }
-          if (u >= 1) {
-            const f = bola.fin;
-            bola = { modo: "reposo", idx: bola.idx, ang, r: rP };
-            brillo = { idx: bola.idx, t0: ahora };
-            suena("bola", 0.1);
-            setTimeout(f, 450);
-          } else { bola.ang = ang; bola.r = r; }
-        }
-        if (bola.modo === "reposo") { ang = giro + pocketAng(bola.idx) - Math.PI / 2; r = R * 0.62; bola.ang = ang + Math.PI / 2; }
-        else ang -= Math.PI / 2;
-        if (brillo) {
-          const a0 = giro + brillo.idx * SEG - Math.PI / 2, k = 0.55 + 0.45 * Math.sin((ahora - brillo.t0) / 160);
-          g.save(); g.beginPath(); g.arc(cx, cy, R * 0.8, a0, a0 + SEG); g.arc(cx, cy, R * 0.57, a0 + SEG, a0, true); g.closePath();
-          g.fillStyle = `rgba(255,236,150,${0.35 * k})`; g.shadowColor = "#ffe27a"; g.shadowBlur = 20; g.fill(); g.restore();
-        }
-        const bx = cx + Math.cos(ang) * r, by = cy + Math.sin(ang) * r, br = Math.max(4, R * 0.036);
+      const p = posicion(ahora);
+      if (p) {
+        const bx = cx + Math.cos(p.ang) * p.r * R, by = cy + Math.sin(p.ang) * p.r * R, br = Math.max(4, R * 0.036);
         g.beginPath(); g.ellipse(bx + br * 0.4, by + br * 0.6, br, br * 0.7, 0, 0, 6.29); g.fillStyle = "#0007"; g.fill();
         const gb = g.createRadialGradient(bx - br * 0.35, by - br * 0.4, br * 0.1, bx, by, br);
         gb.addColorStop(0, "#ffffff"); gb.addColorStop(0.6, "#e6e6ee"); gb.addColorStop(1, "#8d8d9c");
@@ -354,9 +401,12 @@ export function montarRuleta(h, api) {
       }
       g.globalAlpha = 1;
     }
+    reposa(0);
     raf = requestAnimationFrame(cuadro);
     return {
-      lanza, reposa, fiesta,
+      arranca, lanza, reposa, fiesta,
+      /* La apuesta no se escribió: la bola frena y cae, sin número. */
+      aborta() { if (bola && bola.modo === "sale") lanza(null); },
       destruir() { cancelAnimationFrame(raf); if (obs) obs.disconnect(); else window.removeEventListener("resize", mide); }
     };
   })();

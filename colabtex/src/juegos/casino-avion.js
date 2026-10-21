@@ -164,10 +164,12 @@ export function montarAvion(h, api) {
     const e = api.economia();
     if (!e) return;
     const l = Object.values(e.rondas).filter(r => r.u === uid && r.j === "a" && r.estado !== "vuela").sort((a, b) => b.at - a.at).slice(0, 16);
-    $("[data-hist]").innerHTML = l.map(r => r.estado === "cobrada"
+    const el = $("[data-hist]"), h = l.map(r => r.estado === "cobrada"
       ? `<span class="ok" title="Te retiraste: +${formatoPago(r.pago - r.p)}">${formatoMult(r.mult)}</span>`
       : `<span class="${r.choque >= 2 ? "medio" : "mal"}" title="Se estrelló">${r.choque ? formatoMult(r.choque) : "—"}</span>`).join("");
-    $("[data-feed]").innerHTML = api.feedHtml(6);
+    // solo si cambió: rehacerlo reinicia la animación de entrada de cada una
+    if (el.dataset.sig !== h) { el.dataset.sig = h; el.innerHTML = h; }
+    api.pintaFeed($("[data-feed]"), 6);
   }
 
   /* Lo que se ve de una ronda en este instante (con el retraso). */

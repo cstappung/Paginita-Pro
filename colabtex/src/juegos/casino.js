@@ -5,7 +5,7 @@
    apuesta y suma cada premio igual que cualquier otro gasto.
 
    El saldo que se ve aquí va un paso por delante de la economía: las
-   lecturas del casino llegan juntadas cada segundo (fb-juegos.js), así que
+   lecturas del casino llegan juntadas (al segundo lo propio, fb-juegos.js), así que
    lo apostado y lo cobrado en esta pestaña se descuenta y se suma a mano
    hasta que la lectura lo trae. Si no, dos apuestas seguidas verían el
    mismo saldo, la segunda podría no alcanzar y una apuesta sin fondos deja
@@ -189,10 +189,14 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
     v.value = String(Math.round(volumenEfectos() * 100));
   }
 
+  /* El menú se rehace con cada lectura (hasta cada segundo mientras alguien
+     juega): solo se escribe si cambió, porque rehacerlo reinicia las
+     animaciones de las fichas y cuesta un repintado entero. */
+  let menuHtml = "";
   function menu() {
     const c = cuenta(), z = c ? c.casino : null;
     const neto = z ? z.pagado - z.apostado : 0;
-    cuerpo.innerHTML = `
+    const html = `
       <div class="jg-cs-menu">
         <div class="jg-cs-intro">
           <h2>Apuesta tus monedas</h2>
@@ -248,6 +252,9 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
           ${topHtml(-1)}
         </div>
       </div>`;
+    if (html === menuHtml && cuerpo.firstElementChild && cuerpo.firstElementChild.classList.contains("jg-cs-menu")) return;
+    menuHtml = html;
+    cuerpo.innerHTML = html;
   }
   /* Top 5 por balance del casino (cobrado − apostado): signo 1 los que más
      ganan, −1 los que más pierden. */
@@ -279,6 +286,13 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
       <b>+${formatoPago(Math.round(r.pago - (r.apostado || r.p)))} ${MONEDA}</b></li>`).join("")}</ul>`;
   }
   api.feedHtml = feedHtml;
+  /* Lo mismo dentro de cada juego: se escribe solo si cambió. */
+  const feedPintado = new WeakMap();
+  api.pintaFeed = (el, n) => {
+    if (!el) return;
+    const h = feedHtml(n);
+    if (feedPintado.get(el) !== h) { feedPintado.set(el, h); el.innerHTML = h; }
+  };
 
   function irA(cual) {
     const j = JUEGOS[cual] ? cual : "";

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610202013"></script>
+<script src="i18n.js?v=202610210239"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5872,7 +5872,11 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-top li b.mal{color:var(--cs-mal,#ff6b6b)}
 @keyframes jgCsEntra{from{opacity:0;transform:translateY(-4px)}}
 
-.jg-cs-juego{display:grid;grid-template-columns:minmax(0,1fr) 280px;grid-template-areas:"escena lado" "panel lado" "reglas reglas";gap:14px;align-items:start}
+/* La columna de «Grandes premios» abarca la escena y el panel: con filas
+   auto, cuando el feed crecía (cada vez que alguien ganaba) la fila de la
+   escena crecía con él y empujaba el panel hacia abajo. La escena manda en
+   su fila y el sobrante va a la del panel. */
+.jg-cs-juego{display:grid;grid-template-columns:minmax(0,1fr) 280px;grid-template-rows:auto 1fr auto;grid-template-areas:"escena lado" "panel lado" "reglas reglas";gap:14px;align-items:start}
 .jg-cs-escena{grid-area:escena;position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--cs-borde);background:#070615;box-shadow:inset 0 0 40px #000a}
 .jg-cs-escena canvas{display:block;width:100%;height:clamp(260px,52vh,460px);touch-action:manipulation}
 .jg-cs-hist{position:absolute;top:8px;left:52px;right:8px;display:flex;gap:5px;overflow:hidden;pointer-events:none;mask-image:linear-gradient(90deg,#000 80%,transparent)}
@@ -5970,7 +5974,7 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-rl-res small{font-size:10px;font-weight:700;opacity:.85}
 .jg-cs-rl-res.rojo{background:radial-gradient(circle at 35% 30%,#ff5470,#a50d27)}.jg-cs-rl-res.negro{background:radial-gradient(circle at 35% 30%,#3d3a4c,#0d0c12)}.jg-cs-rl-res.verde{background:radial-gradient(circle at 35% 30%,#3ad282,#0b6b36)}
 @keyframes jgCsRes{from{transform:scale(.2) rotate(-90deg);opacity:0}}
-.jg-cs-rl-mesa{overflow-x:auto;padding:6px;margin:-2px;border-radius:14px;background:radial-gradient(120% 140% at 50% 0,#17714b,#063321);box-shadow:inset 0 0 0 2px #e9c46a55,inset 0 0 30px #0008}
+.jg-cs-rl-mesa{overflow-x:auto;overflow-y:hidden;padding:6px;margin:-2px;border-radius:14px;background:radial-gradient(120% 140% at 50% 0,#17714b,#063321);box-shadow:inset 0 0 0 2px #e9c46a55,inset 0 0 30px #0008}
 .jg-cs-rl-pano{display:grid;grid-template-columns:44px repeat(12,minmax(30px,1fr)) 44px;grid-template-rows:repeat(3,40px) 34px 34px;gap:3px;min-width:560px}
 .jg-cs-rl-c{grid-row:var(--hr);grid-column:var(--hc);position:relative;border:1px solid #ffffff3a;border-radius:6px;color:#fff;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,box-shadow .15s,filter .15s}
 .jg-cs-rl-c.rojo{background:linear-gradient(180deg,#e0233f,#a50d27)}
@@ -5984,7 +5988,10 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-rl-c.gana{box-shadow:0 0 0 2px var(--cs-oro),0 0 18px #ffcf3daa;animation:jgCsGanaC 1s ease-in-out infinite}
 .jg-cs-rl-c.sale{z-index:1;box-shadow:0 0 0 3px #fff,0 0 26px #fffc;animation:jgCsSale .8s ease-in-out infinite}
 @keyframes jgCsGanaC{50%{filter:brightness(1.35)}}
-@keyframes jgCsSale{50%{transform:scale(1.12)}}
+/* Sin transform: crecer la casilla en bucle desbordaba el paño, y donde
+   las barras de desplazamiento ocupan lugar (Windows) aparecían y se iban
+   con cada latido: el paño entero saltaba. */
+@keyframes jgCsSale{50%{box-shadow:0 0 0 4px #fff,0 0 38px #fff;filter:brightness(1.3)}}
 .jg-cs-rl-pano.bloqueado .jg-cs-rl-c:disabled{opacity:1;cursor:default}
 .jg-cs-rl-c i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-style:normal}
 .rombo{display:inline-block;width:22px;height:14px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
@@ -6104,7 +6111,7 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-pl-hist span.nueva{animation:jgCsPlHist .4s cubic-bezier(.2,1.4,.4,1) both}
 @keyframes jgCsPlHist{from{transform:translateX(30px) scale(.6);opacity:0}}
 @media(max-width:860px){
-  .jg-cs-juego{grid-template-columns:minmax(0,1fr);grid-template-areas:"escena" "panel" "lado" "reglas"}
+  .jg-cs-juego{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-template-areas:"escena" "panel" "lado" "reglas"}
   .jg-cs-lado{max-height:none}
   .jg-cs-difs{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -6393,6 +6400,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610202013"></script>
+<script src="juegos-app.js?v=202610210239"></script>
 </body>
 </html>

@@ -257,7 +257,7 @@ export function montarBlackjack(h, api) {
     if (t && activa) { e.preventDefault(); accion(t); }
     else if ((e.code === "Enter" || e.code === "Space") && !activa) { e.preventDefault(); repartir(); }
   });
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
   pinta();
 
   return {
