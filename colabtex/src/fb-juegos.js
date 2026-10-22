@@ -572,6 +572,39 @@ export const watchPrefsMascotas = (uid, cb) =>
 export const guardaPrefsMascotas = (uid, p) => update(ref(db, `${U}/${uid}/mascotas`), p);
 export const usaComidaMascota = (uid, n = 1) =>
   runTransaction(ref(db, `${U}/${uid}/mascotas/usadas`), v => (Number.isFinite(v) ? v : 0) + n);
+/* El Pueblo de Mascotas. La plaza: `mascotasPlaza/<uid>` = {m, x, z, at,
+   em?, ea?, b?, t?, ta?} es quién pasea, adónde va y su último gesto. Se
+   reescribe al caminar (con respiro) y cada tanto para seguir «fresco», y
+   se borra al salir o al desconectarse (`onDisconnect`). Se lee solo con
+   la consulta de los PLAZA_CUPO más recientes (la regla exige
+   `orderByChild('at')` y `limitToLast` ≤ 40: `query.startAt` no se deja
+   comparar en las reglas); los que no están frescos los descarta quien
+   lee, así que una pestaña colgada se cae sola de la plaza. */
+export const PLAZA_FRESCO = 3 * 60 * 1000;
+export const PLAZA_CUPO = 40;
+export function ponPlazaMascota(uid, x) {
+  const r = ref(db, `mascotasPlaza/${uid}`);
+  onDisconnect(r).remove().catch(() => {});
+  return set(r, Object.assign({}, x, { at: serverTimestamp() }));
+}
+export function salePlazaMascotas(uid) {
+  const r = ref(db, `mascotasPlaza/${uid}`);
+  onDisconnect(r).cancel().catch(() => {});
+  return remove(r).catch(() => {});
+}
+export function watchPlazaMascotas(cb) {
+  const q = query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(PLAZA_CUPO));
+  return onValue(q, s => cb(s.val() || {}, null), err => cb({}, err));
+}
+/* Los cariños: `mascotasCarinos/<dueño>/<clave>/<visita>` = {at}, uno al
+   día por visita y mascota (lo exige la regla). El dueño lee los suyos
+   enteros; de una mascota ajena se lee solo esa clave. */
+export const watchCarinosMascotas = (uid, cb) =>
+  onValue(ref(db, `mascotasCarinos/${uid}`), s => cb(s.val() || {}, null), err => cb({}, err));
+export const leeCarinosMascota = (dueno, k) =>
+  get(ref(db, `mascotasCarinos/${dueno}/${k}`)).then(s => s.val() || {}).catch(() => ({}));
+export const daCarinoMascota = (dueno, k, uid) =>
+  set(ref(db, `mascotasCarinos/${dueno}/${k}/${uid}`), { at: serverTimestamp() });
 
 /* ---------- días jugando ----------
    `diario/<uid>` = {dia, racha, mejor, dias, bono, at}. La regla exige que

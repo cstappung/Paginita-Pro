@@ -2141,7 +2141,8 @@ function armazon() {
   if (state.vista === "mascotas") {
     h.innerHTML = "";
     mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir,
-      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est) });
+      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est),
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mascotasVista.montar(h);
     return;
   }

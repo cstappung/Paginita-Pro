@@ -50,6 +50,7 @@ October 2026 pass settled, and must not regress:
   existing object is evaluated as `create`, not `update` (`update` is a
   metadata-only change; verified in the emulator), so the owner check has to
   live in `create` too.
+- **A read rule cannot bound `query.startAt` numerically**: `query.startAt >= now - X` (or any comparison) is denied in the emulator even for a valid value. To cap a collection that clients query live, require `query.orderByChild` plus `query.limitToLast <= N` (`mascotasPlaza`) and let the reader drop stale entries.
 - **App Check is wired but off** (`APP_CHECK_SITE_KEY` in `firebase.js`).
 - Inherent limits, stated in `CONFIGURAR-FIREBASE.md` section 0: a player can
   write `fin` for a game they are in, chat and feedback can be spammed, and

@@ -7,6 +7,7 @@ import { applyAction, equip, tick } from '../game/rules'
 import { moveDecor, placeDecor, removeDecor, rotateDecor } from '../game/decor'
 import { aEstado, claveEstado, desdeEstado, type Adopcion, type Estado } from '../game/estado'
 import type { ActionId, Pet, SlotId, SpeciesId } from '../game/types'
+import { CARINO_ANIMO, conCarino, nuevosCarinos, type Carino } from '../game/pueblo'
 import MM from '../../../../juegos/mascotas/motor.js'
 import { pide } from './red'
 
@@ -64,7 +65,15 @@ interface GameState {
    * Es de cada una: apagarle la luz a una no deja a oscuras a las demás.
    */
   oscuras: string[]
+  /** Avisos que la pantalla todavía no mostró (los cariños de las visitas). */
+  avisos: string[]
   recibe: (d: Datos) => void
+  /**
+   * Los cariños recibidos (todos), hasta dónde ya se aplicaron y la hora: todo en hora del
+   * servidor. Aplica los nuevos una vez.
+   */
+  recibeCarinos: (lista: Carino[], visto: number | null, ahora: number) => void
+  limpiaAvisos: () => void
   setLights: (id: string, on: boolean) => void
   setMuted: (m: boolean) => void
   setBackground: (id: string) => void
@@ -160,6 +169,11 @@ function guardaPrefs() {
   }, 800)
 }
 
+/** Cariños que llegaron antes que las mascotas: se aplican al llegar los datos. */
+let carinosPendientes: { lista: Carino[]; visto: number | null; ahora: number } | null = null
+/** El último cariño ya aplicado en esta pestaña, en hora del servidor (el cartero tarda en confirmar el `visto`). */
+let carinoAplicado = 0
+
 /** Raciones gastadas que el cartero todavía no confirma (para no mostrar comida de más). */
 let comiendo = 0
 /** El nombre de una mascota que se está adoptando (llega antes que su estado). */
@@ -183,6 +197,7 @@ export const useGame = create<GameState>()((set, get) => ({
   background: 'meadow',
   muted: leeLocal('mascotas.mudo', '0') === '1',
   oscuras: [],
+  avisos: [],
 
   recibe: (d) => {
     const now = Date.now()
@@ -227,7 +242,43 @@ export const useGame = create<GameState>()((set, get) => ({
       background: antes.listo ? antes.background : fondo,
       oscuras,
     })
+    if (carinosPendientes) {
+      const c = carinosPendientes
+      carinosPendientes = null
+      get().recibeCarinos(c.lista, c.visto, c.ahora)
+    }
   },
+
+  recibeCarinos: (lista, visto, ahora) => {
+    if (!get().listo) return void (carinosPendientes = { lista, visto, ahora })
+    const now = Date.now()
+    // Sin `visto` ni nada aplicado aquí: es la primera vez (solo cuenta el último día).
+    const desde = visto == null && !carinoAplicado ? null : Math.max(visto ?? 0, carinoAplicado)
+    const nuevos = nuevosCarinos(lista, desde, ahora)
+    if (!nuevos.length) return
+    carinoAplicado = nuevos[nuevos.length - 1].at
+    const por = new Map<string, Carino[]>()
+    for (const c of nuevos) {
+      const id = 'ma:' + c.k
+      if (!get().pets.some((p) => p.id === id && !p.venta)) continue
+      por.set(id, [...(por.get(id) ?? []), c])
+    }
+    const avisos: string[] = []
+    set((s) => ({
+      pets: s.pets.map((p) => {
+        const cs = por.get(p.id)
+        if (!cs) return p
+        const quienes = [...new Set(cs.map((c) => c.nombre))]
+        const lista = quienes.length > 2 ? `${quienes.slice(0, 2).join(', ')} y ${quienes.length - 2} más` : quienes.join(' y ')
+        avisos.push(`💌 ${lista} ${cs.length === 1 ? 'le hizo' : 'le hicieron'} cariño a ${p.name} (+${CARINO_ANIMO * cs.length} ánimo)`)
+        return conCarino(tick(p, now, s.oscuras.includes(p.id)), cs.length)
+      }),
+    }))
+    for (const id of por.keys()) guarda(id)
+    if (avisos.length) set((s) => ({ avisos: [...s.avisos, ...avisos] }))
+    pide('carinosVistos', { at: carinoAplicado }).catch((e) => console.warn('[mascotas] cariños', e))
+  },
+  limpiaAvisos: () => set({ avisos: [] }),
 
   // Antes de cambiar la luz se cierra el tramo de tiempo con la luz que había.
   setLights: (id, on) => {

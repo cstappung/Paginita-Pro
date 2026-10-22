@@ -42,7 +42,7 @@ const DECOR_TALL = 0.9
 const FOCUS_Y = 0.45
 const TILT = { up: 0.979, back: 0.203 }
 
-function viewFor(items: PlacedDecor[], decorating: boolean): View {
+export function viewFor(items: PlacedDecor[], decorating: boolean): View {
   let { halfW, halfH } = PET_VIEW
   const fit = (x: number, z: number, r: number, tall: number) => {
     halfW = Math.max(halfW, Math.abs(x) + r + 0.06)
@@ -61,7 +61,7 @@ function viewFor(items: PlacedDecor[], decorating: boolean): View {
   return { halfW, halfH }
 }
 
-function CameraRig({ count, focus, view = PET_VIEW }: { count: number; focus: boolean; view?: View }) {
+export function CameraRig({ count, focus, view = PET_VIEW }: { count: number; focus: boolean; view?: View }) {
   const { size, camera, invalidate } = useThree()
   const target = useRef(0)
   const { halfW, halfH } = view
@@ -107,7 +107,7 @@ function bubbleFor(pet: Pet): string | null {
 }
 
 const bubbleTextures = new Map<string, THREE.CanvasTexture>()
-function bubbleTexture(emoji: string) {
+export function bubbleTexture(emoji: string) {
   let tex = bubbleTextures.get(emoji)
   if (!tex) {
     const c = document.createElement('canvas')
@@ -151,7 +151,7 @@ const NIGHT = { sky: new THREE.Color('#1b2140'), ground: new THREE.Color('#2c355
  * Cielo, suelo y luces. Con la luz apagada todo se va a azul noche de a poco (como al bajar un
  * dimmer), y la mascota queda iluminada apenas por una luz de luna fría.
  */
-function Lighting({ sky, ground, on }: { sky: string; ground: string; on: boolean }) {
+export function Lighting({ sky, ground, on }: { sky: string; ground: string; on: boolean }) {
   const scene = useThree((s) => s.scene)
   const amb = useRef<THREE.AmbientLight>(null)
   const sun = useRef<THREE.DirectionalLight>(null)
@@ -197,7 +197,7 @@ function Lighting({ sky, ground, on }: { sky: string; ground: string; on: boolea
  * (ahorra batería en el celular). Con `full` (herramientas, muebles) se dibuja a ritmo completo.
  * Ojo: no se cambia `frameloop` en caliente porque eso reinicia el reloj de la escena.
  */
-function Pacer({ full }: { full: boolean }) {
+export function Pacer({ full }: { full: boolean }) {
   const clock = useThree((s) => s.clock)
   const invalidate = useThree((s) => s.invalidate)
   useEffect(() => {
