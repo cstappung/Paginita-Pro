@@ -264,15 +264,29 @@
 
     "chatGeneral": {
       ".read": "auth != null",
-      ".indexOn": ["at"],
+      ".indexOn": ["at", "sa"],
       "$id": {
         ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('uid').val() === auth.uid && !root.child('vetados').child(auth.uid).exists() && (!root.child('suspensiones').child(auth.uid).exists() || root.child('suspensiones').child(auth.uid).child('hasta').val() <= now)) || (data.exists() && !newData.exists() && (root.child('admins').child(auth.uid).val() === true || data.child('at').val() < now - 86400000)))",
-        ".validate": "$id.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['uid', 'n', 't', 'at']) && newData.parent().parent().child('chatGeneralUlt').child(auth.uid).child('k').val() === $id && newData.parent().parent().child('chatGeneralUlt').child(auth.uid).child('at').val() === now",
+        ".validate": "$id.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['uid', 'n', 't', 'at']) && newData.parent().parent().child('chatGeneralUlt').child(auth.uid).child('k').val() === $id && newData.parent().parent().child('chatGeneralUlt').child(auth.uid).child('at').val() === now && newData.child('s').exists() === newData.child('sa').exists()",
         "uid": {".validate": "newData.isString()"},
         "n": {".validate": "newData.isString() && newData.val().length <= 80"},
         "t": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"},
         "at": {".validate": "newData.val() === now"},
+        "s": {".validate": "(newData.val() === 100 || newData.val() === 300) && newData.parent().parent().parent().child('superChat').child(auth.uid).child($id).child('p').val() === newData.val()"},
+        "sa": {".validate": "newData.val() === now"},
         "$otro": {".validate": false}
+      }
+    },
+    "superChat": {
+      ".read": "auth != null",
+      "$uid": {
+        "$k": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.parent().parent().parent().child('chatGeneral').child($k).child('uid').val() === $uid && newData.parent().parent().parent().child('chatGeneral').child($k).child('s').val() === newData.child('p').val() && newData.parent().parent().parent().child('chatGeneral').child($k).child('at').val() === now",
+          "at": {".validate": "newData.isNumber()"},
+          "p": {".validate": "newData.val() === 100 || newData.val() === 300"},
+          "$otro": {".validate": false}
+        }
       }
     },
     "chatGeneralUlt": {

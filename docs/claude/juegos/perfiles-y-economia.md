@@ -446,6 +446,11 @@ per-pet state (`mascotasEstado`) is read only by key.
 **Batalla de Rock boxes** (`rock/c/<uid>/<k>`, 500, event `rc`, category
 `cajaRock`; an exact repeat refunds as `premios`): `juegos/hero/js/rock/CLAUDE.md`.
 
+**Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
+event `sc`, category `superChat`; `superChats` in the replay lists the
+paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
+whole (`NODOS_MONEDAS` is 16).
+
 ## Casino
 
 The Casino tab bets coins: a bet is a spend (`ca`, through `paga`) and a

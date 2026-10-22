@@ -60,6 +60,7 @@ import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
 import { monedasReferidos } from "./referidos.js";
+import { nivelSuper } from "./rieles-datos.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -489,7 +490,7 @@ export function economia(datos) {
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
-  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
+  const ORDEN = { s: 0, g: 1, r: 2, ma: 2.1, mr: 2.2, mc: 2.3, rc: 2.4, sc: 2.5, o: 3, x: 4, v: 5, t: 6, c: 7, cf: 7.5, ca: 8, cp: 9 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -517,6 +518,10 @@ export function economia(datos) {
   for (const [u, l] of Object.entries((d.rock && d.rock.c) || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "rc", at: x.at, u, k, p: num(x.p), b: String(x.b || "") });
+  /* Los super chats: `superChat/<uid>/<clave del mensaje>` = {at, p} (rieles-datos.js). */
+  for (const [u, l] of Object.entries(d.superChat || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "sc", at: x.at, u, k, p: num(x.p) });
   for (const [id, o] of Object.entries(m.o || {})) {
     if (!o || !Number.isFinite(o.at)) continue;
     ev.push({ t: "o", at: o.at, id, o });
@@ -562,7 +567,7 @@ export function economia(datos) {
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {}, tacos: {}, cofres: [],
-    intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
+    intentos: 0, adopciones: 0, comida: 0, fondos: {}, cajasRock: [], superChats: {}, premios: 0, casino: { apostado: 0, pagado: 0, rondas: 0, porJuego: {} },
     gasto: {}, cuenta: {}, movs: [] });
   const anota = (u, c, p, d) => {
     const x = U(u);
@@ -707,6 +712,10 @@ export function economia(datos) {
          y lo de edición limitada solo mientras se vendía. */
       if (!TIENDA[e.k] || e.p !== precioDe(e.k) || !aLaVenta(e.k, e.at) || U(e.u).tienda[e.k]) continue;
       if (paga(e.u, e.p, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+    } else if (e.t === "sc") {
+      /* Un super chat: al precio de un nivel. El que no se pudo pagar no
+         vale, y el chat lo pinta como un mensaje normal. */
+      if (nivelSuper(e.p) && paga(e.u, e.p, "superChat")) U(e.u).superChats[e.k] = e.p;
     } else if (e.t === "cf") {
       /* Un cofre de tacos: al precio, y lo que sale lo decide `abreCofre`
          con la hora del servidor. Un taco repetido devuelve monedas. */
@@ -825,7 +834,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

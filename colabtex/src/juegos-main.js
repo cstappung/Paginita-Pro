@@ -1766,8 +1766,11 @@ function render() {
   else if (state.vista === "partida" && state.user) pintaPartida();
   pintaTabs();
   /* Los rieles (repeticiones y chat general) solo en las vistas de menú:
-     en una partida, un juego del club o los sobres, la pantalla es del juego. */
-  if (rieles) rieles.pon(VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]));
+     en una partida, un juego del club o los sobres, la pantalla es del
+     juego. El chat general sí va en todas con sesión, como burbuja abajo (la
+     pantalla completa de un juego la esconde por CSS). */
+  const conRiel = VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]);
+  if (rieles) rieles.pon(conRiel, conRiel || !!state.user);
 }
 const VISTAS_RIEL = new Set(["vestibulo", "ranks", "logros", "monedas", "perfil"]);
 let rieles = null;
@@ -3713,7 +3716,20 @@ function wire() {
   revisaCastigo();
   rieles = crearRieles({
     fb, usuario: () => state.user ? { uid: state.user.uid, name: state.user.name } : null,
-    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora()), popular: () => state.popular
+    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora()), popular: () => state.popular,
+    /* Los super chats: el saldo para ofrecerlos y si la economía cobró el
+       de un mensaje (null mientras su cobro no llegó a los datos). */
+    saldo: () => {
+      if (!state.user || !datosP || !datosP.completo) return null;
+      const m = monedasDe(state.user.uid, datosP);
+      return { saldo: m.saldo, parada: !!m.parada };
+    },
+    superPagado: (uid, k) => {
+      if (!datosP || !datosP.completo || !((datosP.superChat || {})[uid] || {})[k]) return null;
+      const e = economia(datosP).usuarios[uid];
+      return !!(e && e.superChats[k]);
+    },
+    alDatos: fn => datosPerfil(fn)
   });
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",

@@ -158,7 +158,7 @@ export function formatoMarca(rep, p, t) {
 }
 
 /* ---------- el chat general ----------
-   `chatGeneral/<id>` = {uid, n, t, at}, y `chatGeneralUlt/<uid>` = {at, k}
+   `chatGeneral/<id>` = {uid, n, t, at, s?, sa?}, y `chatGeneralUlt/<uid>` = {at, k}
    el último mensaje de cada cuenta. Los dos se escriben en una sola
    actualización, y la regla del segundo pide que hayan pasado 20 s desde
    el anterior: así la espera no la pone la página (que se puede saltar
@@ -168,11 +168,51 @@ export function formatoMarca(rep, p, t) {
 export const CHAT_VENTANA_MS = 15 * 60 * 1000, CHAT_ESPERA_MS = 20000, CHAT_LARGO = 200, CHAT_MAX = 150;
 export const CHAT_VIEJO_MS = 24 * 3600 * 1000;
 
-/* Los que se ven ahora: de los últimos 15 minutos, en orden. */
-export function chatVisibles(msgs, ahora) {
+/* ---------- los super chats ----------
+   Un mensaje pagado con monedas: se ve distinto (todo el mensaje con un
+   contorno propio) y dura más que los 15 minutos de uno normal. Es el
+   mismo `chatGeneral/<id>` con `s` (el precio, que dice el nivel) y `sa`
+   (la hora del servidor otra vez, solo en estos: es el índice por el que
+   se piden los que siguen vivos sin bajar dos horas de chat), y el cobro
+   va en `superChat/<uid>/<id>` = {at, p}, en la misma actualización. Las
+   reglas exigen que los dos digan el mismo precio; la economía
+   (monedas.js, evento `sc`) lo cobra, y uno sin fondos no vale: se pinta
+   como un mensaje normal. Cambiar un precio o una duración es cambiarlo
+   aquí y en las reglas (`chatGeneral/$id/s` y `superChat`). */
+export const SUPER_CHAT = [
+  { p: 100, ms: 3600 * 1000, id: "brillo", nombre: "Destacado", icono: "⭐" },
+  { p: 300, ms: 2 * 3600 * 1000, id: "estelar", nombre: "Estelar", icono: "🌟" }
+];
+export const SUPER_MAX_MS = Math.max(...SUPER_CHAT.map(x => x.ms));
+export const nivelSuper = p => SUPER_CHAT.find(x => x.p === p) || null;
+/* Cuánto dura un mensaje: el de su nivel, o los 15 min de siempre. Un
+   `s` que no es de ningún nivel (o el super que la economía no cobró,
+   `pagado === false`) dura lo normal. */
+export const duracionChat = (m, pagado) => {
+  const n = m && pagado !== false ? nivelSuper(m.s) : null;
+  return n ? n.ms : CHAT_VENTANA_MS;
+};
+
+/* Los que se ven ahora: los de los últimos 15 minutos y los super que aún
+   duran, sin repetir (llegan por dos escuchas), en orden. `pagado(m)`
+   dice si un super se cobró (true/false; null: aún no se sabe, y se le
+   cree). */
+export function chatVisibles(msgs, ahora, pagado) {
+  const vistos = new Set();
   return (msgs || [])
-    .filter(m => m && typeof m.t === "string" && m.t && Number.isFinite(m.at) && ahora - m.at < CHAT_VENTANA_MS)
+    .filter(m => {
+      if (!m || typeof m.t !== "string" || !m.t || !Number.isFinite(m.at)) return false;
+      if (m.id != null) { if (vistos.has(m.id)) return false; vistos.add(m.id); }
+      return ahora - m.at < duracionChat(m, pagado ? pagado(m) : null);
+    })
     .sort((a, b) => a.at - b.at || String(a.id).localeCompare(String(b.id)));
+}
+/* Lo que le queda a un super («quedan 47 min»). */
+export function quedaSuper(m, ahora) {
+  const n = m && nivelSuper(m.s);
+  if (!n) return "";
+  const min = Math.max(1, Math.ceil((m.at + n.ms - ahora) / 60000));
+  return min >= 60 ? `queda${min >= 120 ? "n" : ""} ${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `queda${min === 1 ? "" : "n"} ${min} min`;
 }
 /* Cuánto falta para poder escribir otra vez (0: ya se puede). `ultimo` es
    el `at` del último mensaje propio, del servidor. */
