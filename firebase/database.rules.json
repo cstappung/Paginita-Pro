@@ -646,7 +646,7 @@
       "$uid": {
         "$item": {
           ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-          ".validate": "$item.matches(/^(cometa|vortice|sakura|plasma|mariposas|estrellas|olas|lluvia|fuegos|holo)$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 5000",
+          ".validate": "newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && (($item.matches(/^(cometa|vortice|sakura|plasma|mariposas|estrellas|olas|lluvia|fuegos|holo)$/) && newData.child('p').val() === 5000) || (now >= 1790823600000 && now < 1793588400000 && (($item.matches(/^(calabazas|murcielagos|cementerio|calabazar)$/) && newData.child('p').val() === 3000) || ($item.matches(/^(telarana|fantasmas|aquelarre)$/) && newData.child('p').val() === 5000) || ($item.matches(/^(caldero|mansion)$/) && newData.child('p').val() === 7500) || ($item.matches(/^(parca|lunasangre)$/) && newData.child('p').val() === 10000))))",
           "at": { ".validate": "newData.isNumber()" },
           "p": { ".validate": "newData.isNumber()" },
           "$otro": { ".validate": false }

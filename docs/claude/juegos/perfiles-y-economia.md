@@ -154,7 +154,60 @@ the positional `<g>`s. Animated backgrounds add a layer (`capaFondo`,
 
 The `tienda` node needs the rules re-published. `tests/tienda.test.cjs`
 covers the charge, the champion rules and that every animated frame has its
-drawing.
+drawing. (It is not in `test:juegos`: its champion-frame test already
+failed for Pokelike, which has no champion frame yet.)
+
+**The Halloween shop: limited edition** (`tienda.js` for the catalogue,
+`juegos/tienda-halloween.js` for the window and the lobby strip, the
+frames in `marcos-animados.js`, the background scenes in
+`juegos/fondos-halloween.js`, CSS block «Tienda de Halloween» in
+juegos.html). Six frames and five backgrounds (`hw: true` in `MARCOS` /
+`FONDOS`), priced by rarity (`RAREZAS_HW`: raro 3 000, épico 5 000,
+legendario 7 500, mítico 10 000; capped at 10 000 on purpose), on sale only inside `VENTA_HALLOWEEN`
+(until 2 Nov 00:00 Chile). It is meant to make the 50 000+ hoarders spend.
+
+- **Three places agree on prices and the closing time**: `tienda.js`,
+  the `tienda` rule (`now < …`, a price per id group) and `economia()`
+  (`precioDe` + `aLaVenta(id, at)`, with `at` the server time the rule
+  pinned). Change one, change all; `tienda.test.cjs` parses the rule and
+  fails if they differ. A new season = new ids + a new window in all three.
+- **Bought is forever; unbought disappears.** After the close, `requisito`
+  returns `agotado` for an unowned Halloween item and the editor hides it
+  (`hw()` in perfil.js); owners keep it and everyone still sees it.
+- **Two collector rewards that are not sold** (`req: {coleccion: n}`,
+  `PREMIOS_HALLOWEEN`): the Rey Calabaza frame at 5 Halloween items and the
+  Noche eterna background at all 11. Derived from `est.compras` like
+  everything else, so no write and no rule. Classic shop items do not count.
+- **The window** opens by itself on entering the lobby with a session, once
+  a day per device (`jg.tiendaHw.visto`, `quizaAbreTienda` in
+  juegos-main.js, skipped if another modal is open), from the lobby strip
+  (`data-tienda-hw`), from the editor's Halloween group and from
+  `#tienda` (not a view: it opens the window and restores the previous
+  hash; Inicio.dc.html links `juegos.html#tienda`). Buying is a two-step
+  confirm; putting it on is separate and writes only `perfil/marco` or
+  `perfil/fondo` (`fb.ponEnPerfil`, an `update`, so the rest of the profile
+  is untouched). It repaints by signature, not on every data arrival, or
+  the animations would restart.
+- **Each frame is worn, not just a ring**: the Parca's hood (an evenodd
+  path with a face-sized hole) and a scythe drawn only outside the photo,
+  the witch hat, the crown, the ghost peeking over the rim, the bat hugging
+  the top. Behind the photo, `.jg-marco-hw::before` is a blurred conic aura
+  that rotates (HTML, colours `--h1..3` per frame), which `avatarMarco`
+  turns on with the class `jg-marco-hw`.
+- **Edition numbers** (`edicion` / `edicionesDe` in tienda.js, pure): the
+  n-th account to buy an item, by server time (ties by uid), and how many
+  own it; a reward is numbered by the time of its n-th purchase. Derived,
+  never stored. `estadisticas` carries them as `ediciones`, the card and
+  the profile page show them as seals (`sellosHw` in perfil-vista.js,
+  «🎃 La Parca n.º 2/3»), and the shop says «Solo 2 personas lo tienen.
+  Serías la edición n.º 3».
+- **Background scenes animate HTML, not SVG** (`.hwf-*`, sized in
+  `cqw/cqh` inside the `.jg-fanim` container); the silhouettes are still
+  SVGs. In the lobby strip the frames are paused until hover.
+- Frame ids must match `^[a-z]{1,20}$` (the `perfil/marco` rule): no
+  digits or dashes. Exported names in `tienda.js` must not clash with
+  other modules concatenated in tests (`RAREZAS` and `rarezaDe` were
+  taken by `tacos.js`).
 
 **The ranking is written by each player about themselves.** `ranks/<juego>/<uid>`
 is the only row a browser may touch, so the table is the sum of what each one
