@@ -1,7 +1,7 @@
 # PRO DEFENDER — notes for Claude
 
 Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds (plus
-5 more in testing, admins only: «Second era» below), 22 towers and 30+
+5 more that open one per day, Oct 22–26 2026: «Second era» below), 22 towers and 30+
 enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking wiring in
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat details in
@@ -79,21 +79,30 @@ store towers by index there — never insert a tower before them. In `main.js` t
 hero sits above the shop on its own row (key H) and `shopTowers` keeps the
 number hotkeys for the towers only.
 
-## Second era: kingdoms 6–10, in testing (owner's request, Oct 2026)
+## Second era: kingdoms 6–10, one opens each day (owner's request, Oct 2026)
 
 Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes and
-Trono del Eclipse (`levels.js`, after Vacío). `prueba: true` means:
+Trono del Eclipse (`levels.js`, after Vacío). Each has `abre: 'YYYY-MM-DD'`, the
+Chile day it opens to everyone (Oct 22, 23, 24, 25, 26 of 2026);
+`PD.abierto(li)` compares it with `PD.diaChile()` (the browser clock in
+America/Santiago). `main.js` re-checks every minute and rebuilds the levels
+screen at midnight. The kingdom of the day gets a «¡NUEVO HOY!» pill.
 
-- **Only Juegos admins play them**; everyone else sees the cards with
-  «PRÓXIMAMENTE» and no buttons (`main.js`: `puedeJugar`). Admin comes from the
-  page (`esAdmin` in `crearSolo` → `{tipo:'admin'}` → `Club.esAdmin()` /
-  `club-admin`); opening the game alone on localhost counts as admin, for previews.
-  It is a UI gate, not security — which is fine because:
-- **No records, no coins**: `reporta`/`escuchaTabla` skip them, `save.best/won`
-  are not written, `recorreTablas` only walks `PD.PUBLIC_LEVELS` (5), and the club
-  has no category for them (`rehace` rejects `r ≥ 5`). Unlocking still stops at
-  Vacío. To open one to everyone: drop its `prueba`, add its category to
-  `REINOS` (prueba.js), the verifier, `club-datos.js`, the rules and the coins.
+- **Before its day** (`enPrueba(li)` = `!PD.abierto(li)`) only Juegos admins play
+  it; everyone else sees «PRÓXIMAMENTE · Se abre mañana / el N de mes» and no
+  buttons (`puedeJugar`). Admin comes from the page (`esAdmin` in `crearSolo` →
+  `{tipo:'admin'}` → `Club.esAdmin()` / `club-admin`); opening the game alone on
+  localhost counts as admin, for previews. Such a game saves no record and pays
+  nothing (`reporta`/`escuchaTabla` skip it, `save.best/won` are not written).
+- **From its day** it is a normal kingdom: table `club-prodefender-<short in
+  lowercase>` (`pantano|cumbres|fosa|engranajes|eclipse`, in `REINOS` of
+  prueba.js, the verifier, `club-datos.js`, both rules regexes, `ranks.js`,
+  `discord.js`), and **100 coins per round** like Vacío (`monedasProdefender`
+  caps the multiplier at 5; `monedasRonda` in main.js the same) — 10 000 each at
+  round 100. It does **not** need round 50 of the previous kingdom (`segunda(li)`
+  skips `save.unlocked`, which still stops at Vacío). The date is a UI gate only:
+  the verifier and the rules do not look at it, so a moved clock plays early but
+  still has to play the rounds.
 - **Fewer towers**: each sells only `L.torres` (a shrinking subset of the 22,
   plus its own new tower) and its hero (`towersFor`). `musica` picks one of the
   five audio themes.
@@ -220,8 +229,8 @@ versión» (cache, not cheating: no castigo).
   (`PLENO` in `solo/club.js` → `html.jg-club-pleno` in `juegos.html`), like PRO
   HERO; the game's own «← Volver a Juegos» / «← Juegos» buttons click the
   hidden `.club-volver` link that `conexion.js` adds.
-- Five tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
-  of game time. `main.js` reads the five tables once on open (`recorreTablas`,
+- Ten tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
+  of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
   kingdoms (round 50 opens the next one), and sends `Club.result` with
   `rec.prueba()` only when a round **beats** the cloud record. The levels screen
@@ -229,7 +238,7 @@ versión» (cache, not cheating: no castigo).
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
   kingdom number, once: 2000/4000/6000/8000/10000 for reaching round 100 of
-  kingdom 1–5, and beating 60 with 70 pays only the ten new rounds
+  kingdom 1–5, 10000 each for kingdoms 6–10 (100 a round), and beating 60 with 70 pays only the ten new rounds
   (`monedasProdefender` in `monedas.js`, from the row like every club record).
   **No per-game pay**: `prodefender` is not in `PAGO_CLUB`/`JUEGOS_CLUB`, and
   `alResultadoClub` in `juegos-main.js` skips `marcaJugadaClub` for it and

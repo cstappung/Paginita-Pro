@@ -122,6 +122,7 @@ const MODALIDADES = {
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
   prado: "Prado Esmeralda", dunas: "Dunas de Ámbar", glaciar: "Glaciar Cristal", caldera: "Caldera Volcánica", vacio: "Nexo del Vacío",
+  pantano: "Pantano Sombrío", cumbres: "Cumbres Tormentosas", fosa: "Fosa Abisal", engranajes: "Ciudadela de Engranajes", eclipse: "Trono del Eclipse",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
   torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
