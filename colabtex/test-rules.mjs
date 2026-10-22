@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove, update, query, orderByChild, equalTo } from "firebase/database";
+import { ref, get, set, push, remove, update, query, orderByChild, equalTo, startAt } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -647,6 +647,24 @@ console.log("— Salón: chat general y repeticiones del día —");
   const unoDeA = Object.entries((await get(ref(db, "chatGeneral"))).val() || {}).find(([, m]) => m.uid === ua.uid)[0];
   await denied("B no borra un mensaje reciente de A", () => remove(ref(db, `chatGeneral/${unoDeA}`)));
   await allowed("barrer lo de hace más de un día no borra nada reciente", () => fj.barreChatGeneral(Date.now() - 86400000 - 60000, 10));
+
+  // Los super chats: el mensaje y su cobro en una actualización, con el mismo precio.
+  await loginAs(A);
+  await new Promise(r => setTimeout(r, 20500));
+  await allowed("A manda un super chat de 100", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡hola a todos!", 200, 100));
+  await allowed("cualquiera con sesión lee los cobros (la economía los suma)", () => get(ref(db, "superChat")));
+  await allowed("y pide los super vivos por `sa`", () => get(query(ref(db, "chatGeneral"), orderByChild("sa"), startAt(Date.now() - 7200000))));
+  const supA = Object.keys((await get(ref(db, `superChat/${ua.uid}`))).val() || {})[0];
+  await denied("un cobro no se reescribe", () => set(ref(db, `superChat/${ua.uid}/${supA}`), { at: serverTimestamp(), p: 300 }));
+  await denied("ni se borra", () => remove(ref(db, `superChat/${ua.uid}/${supA}`)));
+  await new Promise(r => setTimeout(r, 20500));
+  await denied("no un super sin su cobro", () => update(ref(db), { "chatGeneral/supSinCobro1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supSinCobro1" } }));
+  await denied("ni con el cobro de otro precio", () => update(ref(db), { "chatGeneral/supOtroPrec1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supOtroPrec1" }, [`superChat/${ua.uid}/supOtroPrec1`]: { at: serverTimestamp(), p: 100 } }));
+  await denied("ni de un precio que no es un nivel", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "barato", 200, 50));
+  await denied("ni un cobro suelto, sin mensaje", () => set(ref(db, `superChat/${ua.uid}/cobroSuelto1`), { at: serverTimestamp(), p: 100 }));
+  await denied("ni a nombre de otro", () => set(ref(db, `superChat/${ub.uid}/cobroAjeno1`), { at: serverTimestamp(), p: 100 }));
+  await allowed("A manda uno de 300", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡estelar!", 200, 300));
+  await loginAs(B);
 
   const hoy = diaChile(Date.now());
   const dato = { puntos: 1, tiempo: 42000 };

@@ -338,9 +338,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 15, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+const NODOS_MONEDAS = 16, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -384,7 +384,7 @@ export function watchLogros(cb, yo = () => "") {
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
-    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
        llegaron todos cuando llega este, que es el que la da por completa.
@@ -823,12 +823,33 @@ export function watchRepeticiones(categoria, cb) {
    mensaje de esa cuenta (rieles-datos.js). Se escuchan los de los últimos
    minutos (con tope), y la escucha se rehace de vez en cuando para que la
    ventana no crezca con la sesión. */
-export function mandaChatGeneral(quien, texto, largo) {
+export function mandaChatGeneral(quien, texto, largo, superP) {
   const k = push(ref(db, "chatGeneral")).key;
-  return update(ref(db), {
-    [`chatGeneral/${k}`]: { uid: quien.uid, n: String(quien.nombre || "Jugador").slice(0, 80), t: String(texto).slice(0, largo), at: serverTimestamp() },
-    [`chatGeneralUlt/${quien.uid}`]: { at: serverTimestamp(), k }
-  });
+  const msg = { uid: quien.uid, n: String(quien.nombre || "Jugador").slice(0, 80), t: String(texto).slice(0, largo), at: serverTimestamp() };
+  const cambios = { [`chatGeneral/${k}`]: msg, [`chatGeneralUlt/${quien.uid}`]: { at: serverTimestamp(), k } };
+  /* Un super chat (rieles-datos.js, `SUPER_CHAT`): el mensaje dice su
+     precio y el cobro va al lado, con la misma clave, en la misma
+     actualización; las reglas exigen que coincidan. */
+  if (superP) {
+    msg.s = superP; msg.sa = serverTimestamp();
+    cambios[`superChat/${quien.uid}/${k}`] = { at: serverTimestamp(), p: superP };
+  }
+  return update(ref(db), cambios);
+}
+/* Los super chats que aún duran: los que tienen `sa` desde hace menos que
+   el más largo de los niveles. Una escucha aparte de la de 15 minutos, para
+   no bajar horas de chat por unos pocos mensajes. */
+export function watchSuperChats(desde, max, cb) {
+  let v = null;
+  const emite = () => { if (v) cb(v.filter(m => !vetadosSet.has(m.uid)), null); };
+  const offV = vigilaVetados(emite);
+  const q = query(ref(db, "chatGeneral"), orderByChild("sa"), startAt(desde), limitToLast(max));
+  const off = onValue(q, s => {
+    v = [];
+    s.forEach(h => { v.push(Object.assign({ id: h.key }, h.val())); });
+    emite();
+  }, err => cb([], err));
+  return () => { off(); offV(); };
 }
 export const leerUltimoChatGeneral = uid => get(ref(db, `chatGeneralUlt/${uid}`)).then(s => s.val());
 export function watchChatGeneral(desde, max, cb) {

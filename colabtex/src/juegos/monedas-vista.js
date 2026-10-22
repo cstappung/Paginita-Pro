@@ -78,7 +78,7 @@ function movimientosHtml(movs) {
   const texto = f => ({
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
-    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], superChat: ["💬", "Super chat en el chat general"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `Tienda del perfil · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -115,6 +115,7 @@ function detalleHtml(yo) {
     { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", `artículo (${formatoMonedas(PRECIO_TIENDA)} c/u)`, `artículos (${formatoMonedas(PRECIO_TIENDA)} c/u)`) },
     { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
     { i: "🎸", t: "Batalla de Rock · cajas", n: g.cajaRock || 0, s: veces("cajaRock", "caja", "cajas") },
+    { i: "💬", t: "Super chats", n: g.superChat || 0, s: veces("superChat", "mensaje", "mensajes") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);
   const casino = Object.entries(cas.porJuego || {}).filter(([, z]) => z.rondas || z.apostado)

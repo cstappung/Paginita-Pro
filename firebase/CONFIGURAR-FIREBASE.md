@@ -540,6 +540,18 @@ partidas del club, podios, rachas, repeticiones ni el chat general (la misma
 condición que `vetados`, con la hora de fin). Hasta publicar, el panel avisa
 de que faltan las reglas y los jugadores no notan nada.
 
+### ⚠ Los super chats del chat general piden publicar otra vez
+
+- `superChat/<uid>/<id del mensaje>` — `{at, p}`, el cobro de un super chat
+  (100 o 300 monedas). Lo lee cualquiera con sesión (el saldo de monedas lo
+  suma), lo escribe su dueño **una vez** y en la misma actualización que el
+  mensaje, que lleva el mismo precio en `s`; no se reescribe ni se borra.
+- `chatGeneral` gana dos campos (`s`, el precio, y `sa`, la hora, solo en los
+  super) y un índice nuevo, `sa`, por el que se piden los que siguen vivos.
+
+Sin publicar, el super chat no se puede mandar (dice que espera las reglas y
+no cobra nada) y el chat normal sigue igual.
+
 ### ⚠ Los rieles del salón (chat general y mejores partidas) piden publicar otra vez
 
 Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
