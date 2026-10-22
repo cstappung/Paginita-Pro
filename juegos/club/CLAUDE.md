@@ -9,7 +9,7 @@ propio|null}` on every table update without error), `club-reintentar`
 results and says so when there is nothing pending) and `club-admin`
 (`{admin}`: the page sends whether the account is a Juegos admin when the
 frame loads; `Club.esAdmin()` reads it. Only for opening content in testing
-that saves nothing — PRO DEFENDER's kingdoms 6–10 —, never as a security
+that saves nothing — PRO DEFENDER's kingdoms 6–10 before their day —, never as a security
 barrier: a console can flip it).
 
 ## Antitrampas (`docs/antitrampas.md`)
