@@ -3,10 +3,11 @@
 
    Una sola tabla, `club-propac-puntos`: puntos = el puntaje de la partida,
    tiempo = lo que duró en tiempo de juego (tics de 1/60 s). El juego manda
-   `{v: 1, s, u, j, n, r, a, w}`: la semilla, la cuenta, cada jugada con su
+   `{v, s, u, j, n, r, a, w}`: la semilla, la cuenta, cada jugada con su
    Δtics, código y origen (`j`, el texto de `codifica`), el tic final, los
    ms de reloj y lo jugado sin pausas en los dos relojes. Aquí se vuelve a
-   jugar con el MISMO motor (`juegos/club/propac/motor.js`):
+   jugar con el MISMO motor (`juegos/club/propac/motor.js`), en la versión
+   de la prueba (la 1 era más rápida y con otros fantasmas):
 
    - la partida rehecha tiene que llegar al tic `n` con exactamente los
      puntos declarados;
@@ -41,7 +42,7 @@ const msDe = n => Math.max(1, Math.round(n * 1000 / M.TPS));
 export function verifica(dato, prueba, ctx) {
   if (!dato || dato.categoria !== CATEGORIA) return 'PRO PACMAN no tiene esa tabla.';
   if (!prueba || typeof prueba !== 'object' || Array.isArray(prueba)) return 'La prueba de PRO PACMAN no tiene la forma esperada.';
-  if (prueba.v !== 1) return 'La prueba es de otra versión de PRO PACMAN (recarga la página).';
+  if (!M.PRUEBA_VERSIONES.includes(prueba.v)) return 'La prueba es de otra versión de PRO PACMAN (recarga la página).';
   const uid = (ctx && ctx.uid) || dato.uid;
   if (typeof prueba.u !== 'string') return 'La prueba no dice de qué cuenta es.';
   if (uid && prueba.u !== uid) return 'La prueba es de una partida de otra cuenta.';
@@ -59,7 +60,7 @@ export function verifica(dato, prueba, ctx) {
   if (!jugadas) return 'Las jugadas de la prueba no se pueden leer.';
   if (jugadas.some(j => j[2] === 'x')) return 'La partida trae jugadas que no hizo una mano (eventos sintéticos).';
   const giros = [];
-  const res = M.rehace(prueba.s, prueba.u, jugadas, n, (E, j) => giros.push(...giro(E, j[1])));
+  const res = M.rehace(prueba.s, prueba.u, jugadas, n, (E, j) => giros.push(...giro(E, j[1])), prueba.v);
   if (res.error) return res.error;
   if (res.E.tick !== n) return 'La partida rehecha termina antes de lo que dice la prueba.';
   if (res.E.puntos !== puntos) return `La partida rehecha hace ${res.E.puntos} puntos, no ${puntos}.`;
