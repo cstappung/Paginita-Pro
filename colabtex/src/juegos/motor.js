@@ -7873,6 +7873,13 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
+    /* §99 (H2): con la copa andando, el anfitrión desapareció del buzón (se le cortó internet o se le cerró Chrome sin
+       escribir «abandona»): las páginas de los demás eligen al mismo reemplazo —el primero de la copa que sigue
+       presente— y ese escribe {t:"toma", de: el que reemplaza}. Vale solo si `de` es el anfitrión de ese momento (una
+       toma vieja, de antes de otro cambio, no hace nada) y quien toma corre en la copa. */
+    if (j.t === "toma" && fase === "jugando" && !esAnf && j.de === anfitrion && sincro && sincro.includes(j.uid)) {
+      anfitrion = j.uid; hist.push({ e: "toma", a: j.uid, de: j.de }); continue;
+    }
     if (j.t === "empieza" && esAnf && fase === "vestibulo") {
       fase = "jugando"; ronda++;
       // la carrera sincronizada, con los que están ahora (hasta 12), en este orden (mando 1, 2, 3…)

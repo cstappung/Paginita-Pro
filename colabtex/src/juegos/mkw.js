@@ -2,7 +2,7 @@ import * as fb from "../fb-juegos.js";
 import { db, auth, storage } from "../firebase.js";
 import { ref as sRef, getMetadata, getBytes, uploadBytes } from "firebase/storage";
 import { ref, get, set, query, orderByChild, limitToFirst, limitToLast, serverTimestamp } from "firebase/database";
-import { revisaBt3 } from "./bt3-amigos.js";
+import { revisaBt3, relevoBt3 } from "./bt3-amigos.js";
 import { escapeHtml } from "../util.js";
 import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, MKW_NIVEL, mkwCarrera, mkwTabla } from "./motor.js";
 
@@ -182,6 +182,11 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   let host = null, escena = null, vest = null, frame = null, partida = null, est = null;
   let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false, jefeMarco = "", avisado = "";
   let senal = null, offP = null, offM = null, conecta = 0, esperaSala = 0;
+  /* §99 (crítico de la red, H2): si al anfitrión se le corta internet o se le cuelga Chrome, nadie escribe «abandona» y
+     la copa quedaba colgada (solo él la hace avanzar). Con la copa andando, cada página mira su presencia en el buzón de
+     la sala (Firebase la borra sola al desconectarse): si falta más de 15 s, todas eligen al mismo reemplazo —el primero
+     de la copa que sigue presente— y se lo avisan a su juego (la sala del juego ya sabe seguir con otro anfitrión) */
+  let jefeForzado = "", jefeSitio = "", offVig = null, vigJefe = 0, ausenteDesde = 0, presencia = {};
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
   const abierto = { cambiar: false, menu: "", tabla: false };   // M21: lo abierto en el vestíbulo (va en su firma)
   let faseJuego = null;                               // M22: la fase que manda el marco (copa, elegir, carrera, descanso)
@@ -325,7 +330,14 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     let vueltas = 0;
     esperaSala = setInterval(() => {
       if (muerto || ++vueltas > 240) { clearInterval(esperaSala); return; }
-      if (frame?.contentWindow?.mkwSala) { clearInterval(esperaSala); avisado = ""; avisaMarco(); }
+      if (frame?.contentWindow?.mkwSala) {
+        clearInterval(esperaSala); avisado = ""; avisaMarco();
+        /* §99 (crítico de la red, H1): el TURN de Cloudflare (el Worker de amigos lo entrega en /turn, el mismo de BT3):
+           sin él, dos PC detrás de redes difíciles (NAT simétrico, datos móviles, universidad) no se conectan nunca. ICE lo
+           usa solo si nada directo funciona. Siempre, sin que el anfitrión lo active: con 66 pares nadie adivina cuál falla */
+        const w = frame.contentWindow;
+        relevoBt3().then(ice => { if (!muerto && frame?.contentWindow === w && ice.length) enviar("turn", { iceServers: ice }); }, () => {});
+      }
     }, 500);
   }
   /* M22: la precarga (ver arriba): el marco escondido mientras se está en el vestíbulo (una vez por visita: ya bajado,
@@ -386,6 +398,27 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   }
   /* Lo que el marco sabe por mensaje (no por la dirección): los nombres de los pilotos (para la tabla de la copa) y,
      si el anfitrión cambió, quién manda ahora. Se repite cada vez que cambia algo (el marco puede no haber cargado). */
+  function vigilarAnfitrion() {
+    const quiere = permitido && !muerto && enSala() && corriendo() && !!est?.sincro;
+    if (est && est.anfitrion !== jefeSitio) { jefeSitio = est.anfitrion; jefeForzado = ""; }   // (el sitio cambió de anfitrión: manda ese)
+    if (quiere && !offVig) {
+      if (!senal) senal = fb.senalMalla(pid, uid);
+      offVig = senal.alPresentes(v => { presencia = v || {}; });
+      vigJefe = setInterval(revisarJefe, 2000);
+    } else if (!quiere && offVig) { offVig(); offVig = null; clearInterval(vigJefe); ausenteDesde = 0; jefeForzado = ""; }
+  }
+  function revisarJefe() {
+    if (!est?.sincro) return;
+    const jefe = jefeForzado || est.anfitrion, presente = u => typeof presencia[u] === "string";
+    if (!jefe || jefe === uid || presente(jefe)) { ausenteDesde = 0; return; }
+    ausenteDesde ||= Date.now();
+    if (Date.now() - ausenteDesde < 15000) return;
+    const nuevo = est.sincro.find(u => !est.fuera?.[u] && (u === uid || presente(u)));
+    if (!nuevo || nuevo === jefe) return;
+    jefeForzado = nuevo; ausenteDesde = 0; jefeMarco = nuevo;
+    enviar("anfitrion", { uid: nuevo });
+    if (nuevo === uid) anota({ t: "toma", uid, de: jefe });     // (y lo anota en la sala: así cierra la copa y guarda la tabla)
+  }
   function avisaMarco() {
     if (!frame?.contentWindow?.mkwSala || !est?.sincro) return;      // (la sala del juego todavía no escucha)
     const nombres = Object.fromEntries(est.sincro.map(u => [u, nombre(u).slice(0, 20)]));
@@ -397,7 +430,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     avisado = firma;
     enviar("nombres", { nombres });
     if (salieron.length) enviar("fuera", { uids: salieron });
-    if (est.anfitrion && est.anfitrion !== jefeMarco && est.sincro.includes(est.anfitrion)) enviar("anfitrion", { uid: est.anfitrion });
+    const jefe = jefeForzado || est.anfitrion;            // (§99: el que eligieron las páginas si el del sitio desapareció)
+    if (jefe && jefe !== jefeMarco && est.sincro.includes(jefe)) { jefeMarco = jefe; enviar("anfitrion", { uid: jefe }); }
   }
 
   /* El VR de quienes están en la sala (mkw/vr/<uid>): una lectura por jugador, una vez. */
@@ -613,6 +647,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
 
   function actualizar(p, estado) {
     partida = p; est = estado;
+    vigilarAnfitrion();
     precarga();
     cargaMarco();
     pideVrs();
@@ -628,6 +663,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   function destruir() {
     muerto = true;
     marcoPre?.remove(); marcoPre = null; offPre?.(); offPre = null;
+    offVig?.(); offVig = null; clearInterval(vigJefe);
     if (inmAuto !== null) { inmAuto = null; try { inmersivo?.(false); } catch {} }
     clearInterval(conecta); clearInterval(esperaSala);
     document.removeEventListener("click", clicFuera);

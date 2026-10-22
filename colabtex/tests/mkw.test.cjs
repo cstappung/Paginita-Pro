@@ -106,6 +106,19 @@ test('pasar el anfitrión: solo en el vestíbulo y a alguien de la sala',()=>{
  e=M.reducir(sala({t:'empieza',uid:'a'},{t:'anfitrion',uid:'a',a:'c'}));assert.equal(e.anfitrion,'a','corriendo, no (la sala del juego la lleva él)');
 });
 
+test('§99: si el anfitrión desaparece con la copa andando, el reemplazo la toma (solo con la copa andando y de quien manda)',()=>{
+ let e=M.reducir(sala({t:'empieza',uid:'a'},{t:'toma',uid:'b',de:'a'}));
+ assert.equal(e.anfitrion,'b');assert.equal(e.fase,'jugando');assert.equal(e.hist[e.hist.length-1].e,'toma');
+ e=M.reducir(sala({t:'empieza',uid:'a'},{t:'toma',uid:'b',de:'a'},{t:'vuelve',uid:'b'}));assert.equal(e.fase,'vestibulo','el nuevo cierra la copa');
+ e=M.reducir(sala({t:'toma',uid:'b',de:'a'}));assert.equal(e.anfitrion,'a','en el vestíbulo, no');
+ e=M.reducir(sala({t:'empieza',uid:'a'},{t:'toma',uid:'b',de:'c'}));assert.equal(e.anfitrion,'a','una toma de quien no manda no vale');
+ e=M.reducir(sala({t:'empieza',uid:'a'},{t:'toma',uid:'b',de:'a'},{t:'toma',uid:'c',de:'a'}));assert.equal(e.anfitrion,'b','una toma vieja (de antes del cambio) no hace nada');
+ e=M.reducir(sala({t:'abandona',uid:'c'},{t:'empieza',uid:'a'},{t:'toma',uid:'c',de:'a'}));assert.equal(e.anfitrion,'a','quien no corre la copa no la toma');
+ const mk=require('fs').readFileSync(require('path').join(__dirname,'../src/juegos/mkw.js'),'utf8');
+ assert.match(mk,/Date\.now\(\) - ausenteDesde < 15000/,'se espera 15 s antes de reemplazar');
+ assert.match(mk,/anota\(\{ t: "toma", uid, de: jefe \}\)/,'el reemplazo escribe la toma');
+});
+
 test('cada jugador tiene su nodo fijo (10.77.0.<nodo>), aunque otros se vayan',()=>{
  let e=M.reducir(sala());
  assert.deepEqual({...e.nodos},{a:2,b:3,c:4});
@@ -374,6 +387,9 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  assert.match(mk,/new URLSearchParams\(\{ precarga: "1", senal: "padre", privado: origen \}\)/);
  assert.match(mk,/marcoPre && e\.source === marcoPre\.contentWindow && e\.origin === location\.origin && e\.data\?\.canal === HIJO/,'solo los mensajes de ESE marco');
  assert.match(mk,/senal\.entra\("~" \+ t\)/,'la presencia lleva «~»: la malla del juego no la toma por una sesión');
+ // §99: el TURN del Worker (el de BT3) va al marco apenas la sala del juego escucha
+ assert.match(mk,/import \{ revisaBt3, relevoBt3 \} from "\.\/bt3-amigos\.js";/);
+ assert.match(mk,/relevoBt3\(\)\.then\(ice => \{ if \(!muerto && frame\?\.contentWindow === w && ice\.length\) enviar\("turn", \{ iceServers: ice \}\); \}/);
  assert.match(mk,/● listo/);assert.match(mk,/⬇ \$\{escapeHtml\(t\)\} %/);
  // la tira dice la fase que manda el marco (antes, un texto fijo toda la copa); «Terminar la copa» pregunta
  assert.match(mk,/d\.tipo === "fase" && typeof d\.fase === "string"/);
