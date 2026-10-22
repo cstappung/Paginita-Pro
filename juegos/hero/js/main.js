@@ -28,7 +28,7 @@ class MainMenu extends Screen {
     const status = h('div', { class: 'lib-status' });
     this.status = status;
     // Batalla de Rock (a prueba): solo lo ve un administrador
-    this.rockBtn = btn('Tu rockero', 'Batalla de Rock: arma tu rockero y abre cajas · a prueba', () => this.app.show(new RockeroScreen(this.app)));
+    this.rockBtn = btn('Tu rockero', 'Batalla de Rock: arma tu rockero y abre cajas', () => this.app.show(new RockeroScreen(this.app)));
     this.rockBtn.hidden = !rockSitio.admin;
     return h('div', { class: 'screen main-menu' },
       h('div', { class: 'logo' }, h('span', { class: 'logo-a' }, 'PRO'), h('span', { class: 'logo-b' }, 'HERO')),

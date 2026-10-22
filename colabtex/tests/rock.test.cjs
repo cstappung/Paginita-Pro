@@ -98,7 +98,7 @@ test('sin saldo la caja no vale y la cuenta queda parada', () => {
   assert.equal(X.monedasDe(A, d).parada, true);
 });
 
-test('una pieza se vende en el mercado, pero solo la ve un administrador', () => {
+test('una pieza se vende en el mercado y la ve todo el mundo (solo un admin si vuelve a estar a prueba)', () => {
   const d = datos({ '-Ncaja0001': { at: T, p: 500, b: 'f' } });
   const c = 'rk:' + A + '~-Ncaja0001';
   if (!X.rocasDe(A, d).length) return;   // salió repetida de algo inicial: no hay copia que vender
@@ -106,8 +106,9 @@ test('una pieza se vende en el mercado, pero solo la ve un administrador', () =>
   d.mercado.o['-Nofrock001'] = { u: A, c, p: 700, at: T + 10 };
   let d2 = Object.assign({}, d);
   X.fijaVeRock(false);
-  assert.equal(X.ofertasMercado(d2, B, {}).length, 0, 'sin ser admin no existe');
-  assert.ok(!X.juegosMercado().some(([k]) => k === 'rock'));
+  assert.equal(X.ROCK_SOLO_ADMIN, false, 'abierto a todos');
+  assert.equal(X.ofertasMercado(d2, B, {}).length, 1, 'sin ser admin también se ve');
+  assert.ok(X.juegosMercado().some(([k]) => k === 'rock'));
   X.fijaVeRock(true);
   const of = X.ofertasMercado(d2, B, {});
   assert.equal(of.length, 1);

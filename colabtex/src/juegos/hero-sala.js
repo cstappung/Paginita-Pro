@@ -87,7 +87,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (!muerto) frame?.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin);
   };
   const red = m => enviar("red", { m });
-  // Batalla de Rock (solo administradores): el rockero de cada uno, para la batalla de fondo
+  // Batalla de Rock: el rockero de cada uno, para la batalla de fondo
   const rock = crearRockHero(enviar);
   const tema = () => enviar("tema", { oscuro: document.documentElement.dataset.tema === "oscuro" });
 
@@ -302,7 +302,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-16";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-17";
     host.append(redEl, frame);
   }
 

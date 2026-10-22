@@ -1,7 +1,7 @@
 // Batalla de Rock dentro de PRO HERO: lo que el juego sabe de tu rockero y cómo carga la escena.
 //
-// La página (colabtex/src/juegos/hero.js) manda `rock` solo a un administrador mientras está a
-// prueba: {inv, look, looks}. Sin ese mensaje no existe nada de esto (ni el botón del menú, ni el
+// La página (colabtex/src/juegos/hero.js) manda `rock` a toda cuenta con sesión (mientras estuvo a
+// prueba, solo a un administrador; `admin` = «está habilitado»): {inv, look, looks}. Sin ese mensaje no existe nada de esto (ni el botón del menú, ni el
 // ajuste, ni el fondo) y three.js no se baja. Todo lo que vale dinero (abrir una caja, vender, guardar
 // el rockero) se le pide a la página con `pideRock`, que lo comprueba y lo escribe.
 import { sitio } from './puente.js';
