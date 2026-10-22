@@ -938,6 +938,10 @@ function makeGuitar(c) {
     const [ga, gb] = GLOW_G[c.type] ?? [LG[1], 0xffffff], au = new THREE.Mesh(body, auraMat(ga, gb, LG[0] === 'electric'));
     au.renderOrder = 6; au.frustumCulled = false; g.add(au);
   }
+  // el aura azul del Star Power (en vivo): la misma luz pegada a la silueta, apagada hasta que se activa
+  const spAura = new THREE.Group(); spAura.visible = false; g.add(spAura);
+  const spA = new THREE.Mesh(body, auraMat(0x2a8aff, 0xc8f0ff, true)); spA.renderOrder = 6; spA.frustumCulled = false; spA.scale.setScalar(1.12); spAura.add(spA);
+  const spG = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.glow, color: new THREE.Color(0x3aa8ff).multiplyScalar(2.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: 0.9 })); spG.scale.set(1.4, 1.05, 1); spG.position.set(0.05, 0, 0.05); spAura.add(spG);
   if (T.guard) B.add(toon(c.guard ?? 0xf2f2f2), new THREE.ExtrudeGeometry(T.guard(), { depth: 0.003, bevelEnabled: false, curveSegments: 20 }), [0, 0, 0.037], [0, 0, 0], [1, 1, 1], 0.002);
   B.add(neckM, new THREE.BoxGeometry(0.8, 0.054, 0.022), [0.5, 0, 0.016]);
   B.add(neckM, new THREE.CylinderGeometry(0.027, 0.027, 0.8, 12, 1, false, Math.PI / 2, Math.PI).rotateZ(Math.PI / 2), [0.5, 0, 0.007], [0, 0, 0], [1, 1, 0.65]);
@@ -975,7 +979,7 @@ function makeGuitar(c) {
   const strings = new THREE.LineSegments(sgeo, new THREE.LineBasicMaterial({ color: LG ? new THREE.Color(LG[1]).multiplyScalar(2.2) : 0xeeeeee })); g.add(strings);   // las legendarias tienen cuerdas que brillan
   const strum = new THREE.Object3D(); strum.position.set(-0.01, 0, 0.09); g.add(strum);
   const fret = new THREE.Object3D(); fret.position.set(fretX(5), -0.045, 0.0); g.add(fret);
-  return { g, strum, fret, tip, T, strings };
+  return { g, strum, fret, tip, T, strings, spAura };
 }
 
 /* =====================================================================
@@ -2621,7 +2625,11 @@ class Rocker {
   animGuitar(t, mt, dt, K) {
     const p = this.p, st = this.st, c = st.conf, I = st.I;
     const dip = nodCurve(K.bp, 0.62) * 0.85;
-    const energy = clamp(I * (0.8 + 0.35 * c), 0.2, 1.25);
+    // en un tramo sin notas de la canción (`descanso`, en vivo) no toca: la mano de la púa baja y se mueve menos
+    const rest = !!st.descanso;
+    const energy = clamp(I * (0.8 + 0.35 * c), 0.2, 1.25) * (rest ? 0.45 : 1);
+    // contento, levanta el puño al público al pulso; si no, la mano cuelga junto a la cadera
+    if (rest) { p.ovS = 0.9; p.handS = c > 0.2 ? 'fist' : 'suelta'; st.sustainEnd = 0; if (c > 0.2) p.mouth = Math.max(p.mouth, 0.4 * Math.exp(-K.bp * 4)); }
     p.hipDrop = 0.035 + 0.06 * dip * energy + 0.04 * Math.max(0, -c);
     p.lean = 0.1 + 0.11 * dip * energy + 0.18 * Math.max(0, -c);
     p.headPitch = 0.04 + 0.36 * dip * energy - 0.12 * Math.max(0, c);
@@ -2639,7 +2647,7 @@ class Rocker {
     if (i > 0 && notes[i - 1] && notes[i - 1].t > mt) i = 0;
     while (i < notes.length && notes[i].t <= mt) {
       const n = notes[i++];
-      if (mt - n.t > 0.25) continue;
+      if (rest || mt - n.t > 0.25) continue;
       const fumble = c < -0.35 && R() < (-c - 0.3) * 0.35;
       if (!fumble && !this.has('repair', mt)) this.strum(t, n.kind === 'm' ? 0.035 : n.kind === 's' ? 0.028 : 0.085);
       st.fret = n.kind === 's' ? clamp(n.m - 52, 3, 21) : ((n.m - 40) % 12 + 12) % 12 + (n.m >= 50 ? 7 : 3);
@@ -2778,9 +2786,9 @@ class Rocker {
       if (st.sustainEnd && K.mt < st.sustainEnd) fy += Math.sin(t * 34) * 0.006;
       if (K.mt - st.bend < BEAT * 2) fy += smooth(clamp((K.mt - st.bend) / 0.2, 0, 1)) * 0.018;
       gt.fret.position.set(st.fx, fy, 0);
-      if (p.ovS > 0) this.ovS.position.set(p.handS === 'fist' ? -0.32 : -0.25, p.handS === 'fist' ? 0.95 + 0.08 * Math.exp(-K.bp * 6) : 0.05, p.handS === 'fist' ? 0.2 : 0.18);
+      if (p.ovS > 0) { if (p.handS === 'suelta') this.ovS.position.set(-0.34, -0.14, 0.06); else this.ovS.position.set(p.handS === 'fist' ? -0.32 : -0.25, p.handS === 'fist' ? 0.95 + 0.08 * Math.exp(-K.bp * 6) : 0.05, p.handS === 'fist' ? 0.2 : 0.18); }
       if (p.ovF > 0) { if (p.handF === 'open') this.ovF.position.set(0.3, 0.05, 0.16); else this.ovF.position.set(this.side === 0 ? 1.2 : 0.55, 0.75, this.side === 0 ? 0.8 : 1.1); }
-      this.setHand(1, p.ovS > 0.5 ? p.handS : 'pick');
+      this.setHand(1, p.ovS > 0.5 ? (p.handS === 'suelta' ? 'open' : p.handS) : 'pick');
       this.setHand(0, p.ovF > 0.5 ? (p.handF === 'open' ? 'open' : 'point') : 'grip', Math.sin(t * 9) * 0.05);
     } else if (this.kind === 'singer') {
       this.setHand(0, this.handL || 'fist'); this.setHand(1, 'grip');
@@ -2853,56 +2861,175 @@ class Rocker {
 const DRUMPOS = { snare: V(0.2, 0.86, 0.26), hat: V(0.44, 0.98, 0.2), crash: V(0.52, 1.28, 0.42), ride: V(-0.5, 1.12, 0.36), tom1: V(0.1, 0.98, 0.44), tom2: V(-0.16, 0.98, 0.44), ftom: V(-0.42, 0.74, 0.24) };
 
 /* =====================================================================
-   PÚBLICO
+   PÚBLICO — personas sencillas con la forma de los rockeros (piernas, torso con hombros, brazos con codo,
+   cuello y cabeza con cara pintada, pelo corto o largo), instanciadas por pieza. La cara sale de un atlas con
+   cuatro expresiones (euforia, contento, serio, molesto) que cada persona elige según el humor del público
+   (`humor`, -1 a 1, en vivo: cómo vas tocando). Contentos saltan, levantan los brazos, hacen cuernos y
+   aplauden; aburridos se quedan quietos, de brazos cruzados o en jarra, y algunos niegan con la cabeza.
    ===================================================================== */
+const CR = { cadera: 0.9, hombro: 0.52, cabeza: 0.74, brazo: 0.28, ante: 0.27 };
+/* la cara: un atlas de 4 filas, cada una un mapa equirectangular de la esfera (la cara al frente, u = 0.25) */
+function caraAtlas() {
+  return canvasTex(256, 512, (g, W, H) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    for (let fila = 0; fila < 4; fila++) {
+      const top = H * (3 - fila) / 4, hr = H / 4, cx = W * 0.25, y = th => top + th * hr;   // th: ángulo desde arriba, en fracciones de π
+      g.fillStyle = 'rgba(150,90,70,.35)'; for (const ex of [0, 0.5]) { g.beginPath(); g.ellipse(W * ex, y(0.52), W * 0.02, hr * 0.07, 0, 0, 7); g.fill(); }   // orejas
+      if (fila <= 1) { g.fillStyle = 'rgba(255,120,130,.45)'; for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * W * 0.06, y(0.6), W * 0.022, hr * 0.045, 0, 0, 7); g.fill(); } }   // cachetes
+      g.fillStyle = 'rgba(120,70,50,.35)'; g.beginPath(); g.ellipse(cx, y(0.565), W * 0.008, hr * 0.03, 0, 0, 7); g.fill();   // nariz
+      g.strokeStyle = '#1a1210'; g.fillStyle = '#1a1210'; g.lineCap = 'round';
+      for (const s of [-1, 1]) {
+        const ex = cx + s * W * 0.038;
+        // cejas: arriba (contentos), rectas o hacia adentro (molestos)
+        const yb = y([0.405, 0.415, 0.425, 0.43][fila]), adentro = [-0.012, -0.006, 0, 0.022][fila] * hr, afuera = [0.004, 0.002, 0, -0.012][fila] * hr;
+        g.lineWidth = hr * 0.03; g.beginPath(); g.moveTo(ex - s * W * 0.018, yb + adentro); g.lineTo(ex + s * W * 0.018, yb + afuera); g.stroke();
+        // ojos: en euforia, cerrados de alegría (^ ^)
+        if (fila === 0) { g.lineWidth = hr * 0.028; g.beginPath(); g.arc(ex, y(0.5), W * 0.014, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+        else { g.beginPath(); g.ellipse(ex, y(0.49), W * 0.009, hr * (fila === 3 ? 0.025 : 0.035), 0, 0, 7); g.fill(); }
+      }
+      // boca
+      g.lineWidth = hr * 0.028;
+      if (fila === 0) { g.fillStyle = '#5a1018'; g.beginPath(); g.ellipse(cx, y(0.635), W * 0.03, hr * 0.06, 0, 0, Math.PI); g.fill(); g.fillStyle = '#fff'; g.fillRect(cx - W * 0.022, y(0.635), W * 0.044, hr * 0.014); }
+      else if (fila === 1) { g.beginPath(); g.arc(cx, y(0.6), W * 0.026, Math.PI * 0.15, Math.PI * 0.85); g.stroke(); }
+      else if (fila === 2) { g.beginPath(); g.moveTo(cx - W * 0.018, y(0.645)); g.lineTo(cx + W * 0.018, y(0.645)); g.stroke(); }
+      else { g.beginPath(); g.arc(cx, y(0.69), W * 0.022, Math.PI * 1.2, Math.PI * 1.8); g.stroke(); }
+    }
+  });
+}
 class Crowd {
   constructor() {
     const pts = []; let tries = 0;
     while (pts.length < 160 && tries < 9000) { tries++; const x = rr(-12, 12), z = rr(4.7, 19); if (Math.abs(x) > 5.4 && z < 5.9) continue; if (Math.abs(x) < 1.8 && z < 4.2) continue; if (Math.hypot(x - FIRE.x, z - FIRE.z) < 1.9) continue; if (pts.some(p => Math.hypot(p.x - x, p.z - z) < 0.6)) continue; pts.push({ x, z }); }
-    const shirts = [0xd8262b, 0x2b2b2b, 0x3a5aa8, 0xe8e8e8, 0x6b3fa0, 0x2f7d3a, 0xd98a2a, 0x991b1b, 0x444444];
-    const skins = [0xf1c7a0, 0xdca27a, 0xb57a52, 0x8a5a3a, 0xeab68e], hairs = [0x2a1a10, 0x8a5a2e, 0xe8c86a, 0xd8442a, 0x111111, 0x5a3a20];
+    const shirts = [0xd8262b, 0x2b2b2b, 0x3a5aa8, 0xe8e8e8, 0x6b3fa0, 0x2f7d3a, 0xd98a2a, 0x991b1b, 0x444444, 0x1a1a1a, 0xff4a9a, 0x2ac8c8];
+    const pants = [0x2e3d63, 0x222222, 0x3c5482, 0x5a4a3a, 0x161616, 0x4a5f86];
     // de adelante hacia atrás: de fondo solo se pintan las primeras filas (`cuantos`)
     pts.sort((a, b) => a.z - b.z);
-    this.p = pts.map(p => ({ ...p, yaw: Math.atan2(-p.x * 0.8, -(p.z + 1.5)), s: rr(0.88, 1.08), ph: R(), style: Math.floor(R() * 4), j: rr(0.08, 0.3) }));
+    this.p = pts.map(p => {
+      const f = R() < 0.5;
+      return { ...p, f, largo: f ? R() < 0.75 : R() < 0.15, yaw: Math.atan2(-p.x * 0.8, -(p.z + 1.5)), s: rr(0.9, 1.08) * (f ? 0.95 : 1), ph: R(), style: Math.floor(R() * 4),
+        j: rr(0.1, 0.28), fan: rr(-0.3, 0.3), fila: -1, brazos: [[0.15, 0.2, 0.2, 0.4], [0.15, 0.2, 0.2, 0.4]] };
+    });
     const n = this.n = this.p.length;
+    this.largos = this.p.map((P, i) => P.largo ? i : -1).filter(i => i >= 0);
+    // piezas, cada una en su sistema (origen en la articulación de donde cuelga)
+    const torsoG = new THREE.LatheGeometry([[0.02, -0.02], [0.15, 0], [0.155, 0.08], [0.13, 0.2], [0.155, 0.33], [0.185, 0.45], [0.17, 0.52], [0.07, 0.56], [0.04, 0.6]].map(([r, y]) => new THREE.Vector2(r, y)), 8).scale(1, 1, 0.62);
+    const cab = new THREE.SphereGeometry(0.105, 10, 7).scale(1, 1.12, 1);
+    const cuello = new THREE.CylinderGeometry(0.042, 0.048, 0.12, 6, 1, true).translate(0, -0.13, 0);
+    { const uv = cuello.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.75, 0.5); }   // el cuello, todo piel (la nuca del atlas)
+    const cabezaG = mergeGeometries([cab, cuello]);
+    const pelo = new THREE.SphereGeometry(0.114, 10, 5, 0, Math.PI * 2, 0, Math.PI * 0.45).scale(1, 1.12, 1).rotateX(-0.35);
+    const melena = new THREE.CapsuleGeometry(0.1, 0.2, 2, 8).scale(1.05, 1, 0.55).translate(0, -0.13, -0.065);
+    const brazoG = new THREE.CapsuleGeometry(0.046, CR.brazo - 0.06, 1, 5).translate(0, (CR.brazo - 0.06) / 2 + 0.03, 0);
+    const anteG = new THREE.CapsuleGeometry(0.042, CR.ante - 0.04, 1, 5).translate(0, (CR.ante - 0.04) / 2 + 0.02, 0);
+    const piernaG = new THREE.CylinderGeometry(0.075, 0.05, CR.cadera, 6).translate(0, CR.cadera / 2, 0);
+    const zapatoG = new THREE.BoxGeometry(0.1, 0.07, 0.2).translate(0, 0.035, 0.035);
     const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRAD });
-    this.all = []; const mk = (geo, cnt, outline) => { const m = new THREE.InstancedMesh(geo, mat, cnt); m.userData.k = cnt / n; scene.add(m); this.all.push(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); o.userData.k = cnt / n; o.instanceMatrix = m.instanceMatrix; scene.add(o); this.all.push(o); } return m; };
-    // el público se ve chico y lejos: con menos segmentos (eran ~315 mil triángulos con los contornos, más que un rockero)
-    this.body = mk(new THREE.CapsuleGeometry(0.2, 0.5, 2, 8), n, 0.025);
-    this.head = mk(new THREE.SphereGeometry(0.14, 9, 6), n, 0.02);
-    this.hair = mk(new THREE.SphereGeometry(0.152, 9, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), n, 0);
-    this.arm = mk(new THREE.CapsuleGeometry(0.055, 0.46, 1, 5).translate(0, 0.28, 0), n * 2, 0.02);
-    this.leg = mk(new THREE.CylinderGeometry(0.08, 0.07, 0.8, 6).translate(0, 0.4, 0), n * 2, 0);
-    this.cuantos = n;
+    // la cara: el atlas, con la fila de cada persona en un atributo por instancia
+    this.caraT = caraAtlas();
+    const caraM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRAD, map: this.caraT });
+    caraM.onBeforeCompile = s => {
+      s.vertexShader = 'attribute float aFila;\n' + s.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vMapUv.y = (vMapUv.y + aFila) * 0.25;');
+    };
+    caraM.customProgramCacheKey = () => 'cara-publico';
+    this.all = [];
+    const mk = (geo, m, cnt, k, outline, comparte) => {
+      const o = new THREE.InstancedMesh(geo, m, cnt); o.userData.k = k; o.frustumCulled = false; if (comparte) o.instanceMatrix = comparte.instanceMatrix;
+      scene.add(o); this.all.push(o);
+      if (outline) { const ol = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); ol.userData.k = k; ol.instanceMatrix = o.instanceMatrix; ol.frustumCulled = false; scene.add(ol); this.all.push(ol); }
+      return o;
+    };
+    this.torso = mk(torsoG, mat, n, 1, 0.014);
+    this.cabeza = mk(cabezaG, caraM, n, 1, 0.012);
+    this.pelo = mk(pelo, mat, n, 1, 0, this.cabeza);
+    this.melena = mk(melena, mat, Math.max(1, this.largos.length), 'largos', 0.01);
+    this.brazo = mk(brazoG, mat, n * 2, 2, 0);
+    this.ante = mk(anteG, mat, n * 2, 2, 0);
+    this.pierna = mk(piernaG, mat, n * 2, 2, 0);
+    this.zapato = mk(zapatoG, mat, n * 2, 2, 0);
+    this.filaA = new THREE.InstancedBufferAttribute(new Float32Array(n), 1); this.filaA.setUsage(THREE.DynamicDrawUsage);
+    this.cabeza.geometry.setAttribute('aFila', this.filaA);
     const c = new THREE.Color();
-    this.p.forEach((P, i) => { const sh = pick(shirts), sk = pick(skins); this.body.setColorAt(i, c.setHex(sh)); this.head.setColorAt(i, c.setHex(sk)); this.hair.setColorAt(i, c.setHex(pick(hairs))); for (let k = 0; k < 2; k++) { this.arm.setColorAt(i * 2 + k, c.setHex(R() < 0.6 ? sk : sh)); this.leg.setColorAt(i * 2 + k, c.setHex(pick([0x2e3d63, 0x222222, 0x3c5482, 0x5a4a3a]))); } });
-    this.d = new THREE.Object3D(); this.cheer = 0;
+    this.p.forEach((P, i) => {
+      const sh = pick(shirts), sk = pick(PAL.skin), hc = pick(PAL.hair.slice(0, 8)), mangaCorta = R() < 0.55, pa = pick(pants);
+      this.torso.setColorAt(i, c.setHex(sh)); this.cabeza.setColorAt(i, c.setHex(sk)); this.pelo.setColorAt(i, c.setHex(hc));
+      for (let k = 0; k < 2; k++) {
+        this.brazo.setColorAt(i * 2 + k, c.setHex(mangaCorta ? sh : sh)); this.ante.setColorAt(i * 2 + k, c.setHex(mangaCorta ? sk : sh));
+        this.pierna.setColorAt(i * 2 + k, c.setHex(P.f && R() < 0.3 ? pick(shirts) : pa)); this.zapato.setColorAt(i * 2 + k, c.setHex(pick([0x161616, 0x2a1c12, 0xeeeeee, 0x8b2fd0])));
+      }
+      P.hc = hc;
+    });
+    this.largos.forEach((i, k) => this.melena.setColorAt(k, c.setHex(this.p[i].hc)));
+    this.d = new THREE.Object3D(); this.B = new THREE.Matrix4(); this.M = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); this.v = V(); this.u = V(); this.sc = V(1, 1, 1);
+    this.cheer = 0; this.cuantos = n;
   }
   /* cuántos se pintan (y se animan): los `k` de más adelante */
   ponCuantos(k) {
     this.cuantos = Math.max(1, Math.min(this.n, k | 0));
-    for (const m of this.all) m.count = this.cuantos * m.userData.k;
+    const largos = this.largos.filter(i => i < this.cuantos).length;
+    for (const m of this.all) m.count = m.userData.k === 'largos' ? largos : this.cuantos * m.userData.k;
   }
-  update(t, K, ex, mom) {
-    const d = this.d; this.cheer = Math.max(0, this.cheer - 0.012);
+  /* la pose de un brazo: [elevación, giro adelante] del brazo y del antebrazo (0 = colgando, π = arriba;
+     giro > π/2 cruza hacia el pecho) */
+  static pose(name, t, P, k, dip, beat) {
+    const w = Math.sin(t * 3 + P.ph * 6 + k);
+    switch (name) {
+      case 'arriba': return [2.6 + 0.18 * w, 0.3, 2.85 + 0.15 * w, 0.2];
+      case 'puño': return k === 0 ? [2.2, 0.9, 2.75 + 0.3 * dip, 0.5] : [0.2, 0.3, 0.35, 0.5];
+      case 'cuernos': return [2.4, 0.5, 2.95, 0.3];
+      case 'aplauso': { const a = 0.22 * Math.abs(Math.sin(beat * Math.PI)); return [0.85, 1.2, 1.5, 2.0 + a]; }
+      case 'palmas': { const a = 0.25 * Math.abs(Math.sin(beat * Math.PI)); return [2.7, 1.9, 2.9, 2.3 + a]; }
+      case 'cruzados': return [0.35, 0.6, 1.55, 2.6 + (k ? 0.08 : 0)];
+      case 'jarra': return [0.65, -0.3, 0.95, 2.7];
+      default: return [0.15, 0.2, 0.2 + 0.08 * dip, 0.4];
+    }
+  }
+  update(t, K, ex, mom, humor = 0.5) {
+    const B = this.B, M = this.M, q = this.q, e = this.e, v = this.v, u = this.u, sc = this.sc, d = this.d;
+    this.cheer = Math.max(0, this.cheer - 0.012);
+    let filas = false;
+    const dirDe = (el, fw, s, out) => out.set(s * Math.sin(el) * Math.cos(fw), -Math.cos(el), Math.sin(el) * Math.sin(fw)).normalize();
+    const pone = (mesh, i, px, py, pz, dir, ex2, ey2, ez2) => {
+      d.position.set(px, py, pz);
+      if (dir) d.quaternion.setFromUnitVectors(UP, dir); else d.quaternion.setFromEuler(e.set(ex2 || 0, ey2 || 0, ez2 || 0, 'YXZ'));
+      d.scale.set(1, 1, 1); d.updateMatrix(); M.multiplyMatrices(B, d.matrix); mesh.setMatrixAt(i, M);
+    };
+    let li = 0;
     for (let i = 0; i < this.cuantos; i++) {
-      const P = this.p[i]; const bias = 1 + 0.35 * mom * (P.x < 0 ? 1 : -1); const e = clamp(ex * bias + this.cheer, 0, 1.4);
+      const P = this.p[i];
+      const bias = 1 + 0.35 * mom * (P.x < 0 ? 1 : -1);
+      const h = clamp(humor * bias + P.fan + this.cheer * 0.8, -1, 1.4), ex1 = clamp(ex * bias + this.cheer, 0, 1.4);
       const lb = ((K.beat + P.ph * 0.3) % 1 + 1) % 1, dip = Math.exp(-lb * 6);
-      const y = P.j * e * dip * (P.style === 3 ? 0.4 : 1) + this.cheer * 0.25 * Math.abs(Math.sin(t * 9 + P.ph * 6));
-      const cy = Math.cos(P.yaw), sy = Math.sin(P.yaw), s = P.s;
-      d.scale.setScalar(s);
-      d.position.set(P.x, 1.23 * s + y, P.z); d.rotation.set(0.06 * dip * e, P.yaw, 0, 'YXZ'); d.updateMatrix(); this.body.setMatrixAt(i, d.matrix);
-      d.position.set(P.x + sy * 0.03 * dip * e, 1.82 * s + y, P.z + cy * 0.03 * dip * e); d.rotation.set(0.25 * dip * e - 0.1, P.yaw, 0, 'YXZ'); d.updateMatrix(); this.head.setMatrixAt(i, d.matrix); this.hair.setMatrixAt(i, d.matrix);
+      // contentos saltan al pulso; serios apenas se mecen; molestos quietos
+      const salto = h > 0.35 ? P.j * ex1 * dip * clamp((h - 0.35) * 2, 0, 1) : 0, rebote = h > -0.3 ? 0.035 * dip * ex1 : 0;
+      const y = salto - rebote;
+      // la cara
+      const fila = h > 0.55 ? 0 : h > 0.15 ? 1 : h > -0.35 ? 2 : 3;
+      if (fila !== P.fila) { P.fila = fila; this.filaA.array[i] = fila; filas = true; }
+      // el cuerpo de la persona
+      e.set(0, P.yaw, 0, 'YXZ'); q.setFromEuler(e); v.set(P.x, y, P.z); sc.setScalar(P.s); B.compose(v, q, sc);
+      const lean = (h > -0.3 ? 0.08 * dip * ex1 : 0.02) + (h < -0.35 ? -0.04 : 0);
+      pone(this.torso, i, 0, CR.cadera, 0, null, lean);
+      // cabeza: cabeceo al pulso; algunos molestos niegan
+      const niega = h < -0.4 && P.style % 2 ? Math.sin(t * 4 + P.ph * 9) * 0.35 : 0;
+      const hy = CR.cadera + Math.cos(lean) * CR.cabeza, hz = Math.sin(lean) * CR.cabeza;
+      // miran hacia arriba, al escenario (cabecean al pulso); molestos, la vista al suelo
+      pone(this.cabeza, i, 0, hy, hz, null, lean + (h > -0.3 ? -0.18 + 0.22 * dip * ex1 : 0.12), niega);
+      if (P.largo) this.melena.setMatrixAt(li++, M);   // la melena va con la cabeza (M es la matriz recién puesta)
+      // brazos: la pose del humor, suavizada
+      const pose = this.cheer > 0.4 ? 'arriba' : h > 0.4 ? ['arriba', 'puño', 'cuernos', 'palmas'][P.style] : h > 0 ? ['aplauso', 'puño', 'nada', 'aplauso'][P.style] : h > -0.35 ? 'nada' : (P.style % 2 ? 'cruzados' : 'jarra');
       for (let k = 0; k < 2; k++) {
-        const side = k ? -1 : 1; let r, rx = 0;
-        switch (P.style) { case 0: r = 2.55 + 0.25 * Math.sin(t * 3 + P.ph * 6 + k); break; case 1: r = side > 0 ? 0.3 : 2.0 + 0.9 * dip * e; break; case 2: r = 2.85 + 0.1 * Math.sin(t * 2 + k); break; default: r = 0.4; rx = 1.0 + 0.6 * dip * e; }
-        r = lerp(0.35, r, clamp(e * 1.2, 0, 1)); if (this.cheer > 0.3) { r = lerp(r, 2.8, Math.min(1, this.cheer)); rx = 0; }
-        const lx = side * 0.25 * s, ly = 1.56 * s + y;
-        d.position.set(P.x + lx * cy, ly, P.z - lx * sy); d.rotation.set(rx, P.yaw, -side * (Math.PI - r), 'YXZ'); d.updateMatrix(); this.arm.setMatrixAt(i * 2 + k, d.matrix);
-        d.position.set(P.x + side * 0.1 * s * cy, y * 0.6, P.z - side * 0.1 * s * sy); d.rotation.set(0, P.yaw, 0, 'YXZ'); d.updateMatrix(); this.leg.setMatrixAt(i * 2 + k, d.matrix);
+        const s = k ? -1 : 1, A = P.brazos[k], tg = Crowd.pose(pose, t, P, k, dip, K.beat);
+        for (let j = 0; j < 4; j++) A[j] += (tg[j] - A[j]) * 0.18;
+        const shx = s * (P.f ? 0.165 : 0.185), shy = CR.cadera + Math.cos(lean) * CR.hombro - 0.04, shz = Math.sin(lean) * CR.hombro;
+        dirDe(A[0], A[1], s, v); pone(this.brazo, i * 2 + k, shx, shy, shz, v);
+        const ex3 = shx + v.x * CR.brazo, ey3 = shy + v.y * CR.brazo, ez3 = shz + v.z * CR.brazo;
+        dirDe(A[2], A[3], s, u); pone(this.ante, i * 2 + k, ex3, ey3, ez3, u);
+        pone(this.pierna, i * 2 + k, s * (P.f ? 0.085 : 0.095), 0, 0, null, 0);
+        pone(this.zapato, i * 2 + k, s * (P.f ? 0.085 : 0.095), 0, 0, null, 0);
       }
     }
-    for (const m of [this.body, this.head, this.hair, this.arm, this.leg]) m.instanceMatrix.needsUpdate = true;
+    if (filas) this.filaA.needsUpdate = true;
+    for (const m of [this.torso, this.cabeza, this.melena, this.brazo, this.ante, this.pierna, this.zapato]) m.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -3089,7 +3216,7 @@ const clock = { t: 0, run: true };
 if (EN_TRABAJADOR) await Promise.race([cargaFuentes(), sleep(2500)]).catch(() => {});
 else await Promise.race([document.fonts.load('80px Bangers'), sleep(2500)]).catch(() => {});
 makeTextures(); buildStage(); buildHaze();
-const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), smoke = new Smoke(), confetti = new Confetti();
+const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), cielo = new Bolt(), smoke = new Smoke(), confetti = new Confetti();
 const pyros = [-5.6, -2.0, 2.0, 5.6].map(x => new Pyro(x));
 /* cada rockero se arma la primera vez que sale a escena (y se rehace si su configuración cambia) */
 const rockers = {};
@@ -3114,7 +3241,8 @@ let fxLight = 0;
    el ánimo de cómo tocas y la batalla, de los puntajes de verdad. `VIVO.solo`: un solo rockero, sin rival
    (el modo de un jugador); si no, batalla contra el rival.
    ===================================================================== */
-const VIVO = { on: false, solo: false, mt: 0, raw: -1, ko: null, animoT: 0, fin: null };
+/* `solo`: un jugador (sin rival); `solista`: la canción está en un solo; `humor`: cómo está el público (-1 a 1) */
+const VIVO = { on: false, solo: false, mt: 0, raw: -1, ko: null, animoT: 0, fin: null, humor: 0.3, solista: false, soloBar0: -1 };
 /* la coreografía es una canción de 63 compases: tras la entrada se repite del compás 5 al 59 */
 const LOOP_A = 5 * BAR, LOOP_B = 59 * BAR;
 const vivoMt = raw => raw < LOOP_B ? Math.max(0, raw) : LOOP_A + (raw - LOOP_A) % (LOOP_B - LOOP_A);
@@ -3134,7 +3262,7 @@ const battle = {
     if (SOLO()) L.place(0, SY, 0.95, 0); else { L.place(-3.4, SY, 0.72, 0.3); Rk.place(3.4, SY, 0.72, -0.3); }
     L.side = 0; Rk.side = 1; L.opp = Rk; Rk.opp = L;
     singer.root.visible = S.micSet.visible = !SOLO(); drummer.root.visible = true;
-    for (const r of [L, Rk, singer, drummer]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; if (r.handPtr) r.handPtr = [0, 0]; }
+    for (const r of [L, Rk, singer, drummer]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
     // ataques: al principio domina el que acabará perdiendo, luego remontada (en vivo los dispara la partida)
     const events = []; const n = ATTACK_BARS.length; let last = '';
     if (!VIVO.on) ATTACK_BARS.forEach((bar, i) => {
@@ -3161,6 +3289,39 @@ const battle = {
     A.addMove('charge', mt, 1.25, { react: true });
     director.event('attacker', from, 0.7);
   },
+  /* una frase de Star Power completa (la barra se carga): en batalla es un ataque al rival; solo, el rockero
+     levanta la guitarra y le manda un rayo al cielo */
+  carga(from) {
+    if (this.ko) return;
+    if (!SOLO()) { this.attack(from, pick(Object.keys(ATTACKS))); return; }
+    const A = PL(), mt = this.mt(), tip = () => A.gtr.tip.getWorldPosition(V());
+    A.addMove('charge', mt, 1.1, { react: true });
+    const alto = tip().add(V(rr(-1.5, 1.5), 6, rr(-1, 0.5)));
+    bolt.fire(tip, () => alto, 0.8, ATTACKS.shock.bolt);
+    parts.emit(tip(), 40, { color: 0x6fd8ff, color2: 0xffffff, speed: 2.5, life: 0.7, size: 0.05 });
+    fxLight = Math.max(fxLight, 0.7); S.lights.fx.position.copy(tip()); S.lights.fx.color.set('#6fd8ff');
+    crowd.cheer = Math.max(crowd.cheer, 0.5);
+    director.event('target', 0, 1.2);
+  },
+  /* el Star Power activado: cae un rayo del cielo sobre la guitarra y se prende de azul mientras dure */
+  poder(from, on) {
+    if (from && SOLO()) return;
+    const A = from ? PR() : PL();
+    A.gtr.spAura.visible = !!on;
+    if (!A.gtr.strings.userData.c0) A.gtr.strings.userData.c0 = A.gtr.strings.material.color.clone();
+    A.gtr.strings.material.color.copy(on ? new THREE.Color(0x6ad8ff).multiplyScalar(2.5) : A.gtr.strings.userData.c0);
+    if (!on || this.ko) return;
+    const mt = this.mt(), g = () => A.gtr.g.localToWorld(V(0, 0, 0.05));
+    const top = g().add(V(rr(-0.6, 0.6), 7, rr(-0.5, 0.5)));
+    cielo.fire(() => top, g, 0.9, [1.0, 2.2, 7.0]);
+    parts.emit(g(), 90, { color: 0x53e7ff, color2: 0xffffff, speed: 4, life: 1, size: 0.07 });
+    fxLight = 1; S.lights.fx.position.copy(g()); S.lights.fx.color.set('#53e7ff'); director.shake = 0.5;
+    A.addMove('jump', mt, BEAT * 1.2, { react: true }); A.addMove('guitarRaise', mt + BEAT * 1.2, BAR, { react: true });
+    crowd.cheer = Math.max(crowd.cheer, 1);
+    if (SOLO()) for (const p of pyros) p.fire(1.2);
+    titles.call('¡STAR POWER!', '#53e7ff');
+    director.event(SOLO() ? 'target' : 'attacker', from, 1.5);
+  },
   /* un jugador solo: el público y el rockero celebran (Star Power, rachas) */
   hype(kind, text, color) {
     if (this.ko) return;
@@ -3168,6 +3329,7 @@ const battle = {
     if (kind === 'sp') { L.addMove('jump', mt, BEAT * 1.2, { react: true }); L.addMove('guitarRaise', mt + BEAT * 1.2, BAR, { react: true }); for (const p of pyros) p.fire(1.2); fxLight = 1; S.lights.fx.position.copy(L.gtr.g.localToWorld(V(0, 0, 0.05))); S.lights.fx.color.set(color || '#6fd8ff'); }
     else if (kind === 'racha') { L.addMove(R() < 0.5 ? 'spin' : 'legKick', mt, BEAT * 1.6, { react: true, dir: 1 }); pyros[R() < 0.5 ? 1 : 2].fire(1); }
     else if (kind === 'falla') { L.addMove(R() < 0.5 ? 'struggle' : 'lookGuitar', mt, BAR, { react: true }); return; }
+    else if (kind === 'solo') { L.addMove('kneel', mt, BAR, { react: true }); L.addMove('leanBack', mt, BAR, { react: true }); for (const p of pyros) p.fire(1.6); confetti.burst(); }
     crowd.cheer = Math.max(crowd.cheer, kind === 'sp' ? 1 : 0.7);
     if (text) titles.call(text, color || '#ffd23a');
     director.event('target', 0, 1.2);
@@ -3231,6 +3393,11 @@ const battle = {
       if (this.ko) continue;
       if (r.busyUntil() > mt + 0.05 || r.moves.some(m => m.react && mt < m.t0 + m.dur)) continue;
       const c = r.st.conf, I = SECTION_I[sec.name];
+      if (r.st.descanso) {   // sin notas: anima al público, cabecea o mira la guitarra, pero no toca
+        const k = wpick({ none: 1.5, stomp: 0.7, headbang: 0.4, lookGuitar: 0.3, taunt: SOLO() ? 0 : 0.4 });
+        if (k !== 'none') r.addMove(k, mt, k === 'headbang' ? BAR * 2 : BAR, { dir: r.side ? -1 : 1 });
+        continue;
+      }
       const secStart = bar === sec.bar0;
       if (secStart && (sec.name === 'chorus' || sec.name === 'outro')) { r.addMove(c > -0.1 ? 'jump' : 'stomp', mt, c > -0.1 ? BEAT * 1.2 : BAR); if (c > 0.15 && R() < 0.5) r.addMove('spin', mt + BEAT * 1.3, BEAT * 1.4, { dir: r.side ? -1 : 1 }); continue; }
       if (sec.name === 'solo') { const lead = c >= 0; if (bar === sec.bar0 + 7 && lead) { r.addMove('kneel', mt, BAR); r.addMove('leanBack', mt, BAR); continue; } const k = wpick({ leanBack: lead ? 2 : 0.6, headbang: 1, guitarRaise: lead ? 1 : 0.2, struggle: lead ? 0 : 1.2, lookGuitar: lead ? 0.2 : 0.8 }); r.addMove(k, mt, k === 'leanBack' ? BAR * 2 : BAR); continue; }
@@ -3808,7 +3975,10 @@ function step(dt) {
   if (ed) { ED.mt0 += dt; if (ED.mt0 > 12) { ED.mt0 -= 12; if (ED.rk) ED.rk.st.riffPtr = 0; } }   // en el editor se repite un tramo de la estrofa
   const mt = ed ? 9 + ED.mt0 : battle.mt();
   const beat = mt / BEAT, bp = ((beat % 1) + 1) % 1;
-  const sec = SONG.sections.find(s => mt >= s.t0 && mt < s.t1) || SONG.sections[SONG.sections.length - 1];
+  let sec = SONG.sections.find(s => mt >= s.t0 && mt < s.t1) || SONG.sections[SONG.sections.length - 1];
+  // en vivo, un solo del chart es un solo de la coreografía (planos de héroe, rodillas al suelo), dure lo que dure
+  if (VIVO.on && VIVO.solista) { if (VIVO.soloBar0 < 0) VIVO.soloBar0 = Math.floor(mt / BAR); sec = { name: 'solo', bar0: VIVO.soloBar0, t0: VIVO.soloBar0 * BAR, t1: Infinity }; }
+  else VIVO.soloBar0 = -1;
   const secI = battle.ko ? 0.9 : SECTION_I[sec.name];
   const bar = Math.floor(mt / BAR);
   if (!ed && bar !== battle.lastBar && dt > 0) { battle.lastBar = bar; battle.onBar(bar, sec, mt); director.onBar(bar, sec); }
@@ -3827,8 +3997,10 @@ function step(dt) {
   if (dt > 0 && sec.name === 'chorus' && mt - sec.t0 < dt * 1.5) for (const p of pyros) p.fire(1.1);
   if (sec.name === 'solo' && dt > 0 && R() < 0.5) for (const x of [-6.6, 6.6]) parts.emit(V(x, SY + 0.3, 2.7), 2, { color: 0xffd080, speed: 1.2, dir: V(0, 5.5, 0.3), life: 1.4, size: 0.045, grav: -7, drag: 0.4 });
   let pyroOn = 0; for (const p of pyros) pyroOn = Math.max(pyroOn, p.update(t));
-  crowd.update(t, K, clamp(0.4 + secI * 0.5 + crashPulse * 0.2 + (VIVO.on ? VIVO.hype * 0.3 : 0), 0, 1.3), SOLO() ? 0 : battle.mom);
-  parts.update(dt); bolt.update(dt); smoke.update(dt); confetti.update(dt, t);
+  crowd.update(t, K, clamp(0.4 + secI * 0.5 + crashPulse * 0.2 + (VIVO.on ? VIVO.hype * 0.3 : 0), 0, 1.3), SOLO() ? 0 : battle.mom, VIVO.on ? VIVO.humor : 0.7);
+  // el Star Power encendido: chispas azules que saltan de la guitarra
+  if (VIVO.on && dt > 0) for (const r of enEscena()) if (r.gtr.spAura.visible && R() < 0.7) parts.emit(r.gtr.g.localToWorld(V(rr(-0.2, 0.25), rr(-0.15, 0.15), 0.05)), 1, { color: 0x53e7ff, color2: 0xffffff, speed: 0.8, dir: V(0, 1.2, 0), life: 0.6, size: 0.035, grav: -1 });
+  parts.update(dt); bolt.update(dt); cielo.update(dt); smoke.update(dt); confetti.update(dt, t);
   for (const h of haze) { h.sp.position.x += h.v * dt; if (h.sp.position.x > 9) h.sp.position.x = -9; if (h.sp.position.x < -9) h.sp.position.x = 9; h.sp.position.y = h.y0 + Math.sin(t * 0.2 + h.v * 30) * 0.2; }
   // luces: tintadas hacia quien lleva ventaja
   const flash = Math.max(crashPulse, fxLight * 0.8);
@@ -3906,7 +4078,7 @@ const NIVELES = [
 ];
 /* `externo`: el intervalo entre cuadros lo mide el juego y llega con cada pulso (en el worker, su propio
    requestAnimationFrame no dice nada de cómo va el hilo del juego) */
-const CAL = { nivel: 0, min: 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, cuadros: 0, peor: 0, prueba: 0, inocente: false, alDemasiado: null, externo: false };
+const CAL = { nivel: 0, min: 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, cuadros: 0, peor: 0, largos: 0, prueba: 0, inocente: false, alDemasiado: null, externo: false };
 const fondo = () => VIVO.on && !ED.open;
 function ponCalidad() {
   const f = fondo(), N = NIVELES[CAL.nivel];
@@ -3919,7 +4091,10 @@ function ponCalidad() {
   layout();
 }
 function regula(real) {
-  if (real > 0.25) return;   // pestaña escondida, pausa del navegador: no cuenta
+  /* un cuadro de más de 250 ms suele ser la pestaña escondida o una pausa del navegador: no cuenta. Pero si el
+     juego va tan lento que todos sus cuadros pasan de eso, no contarlos dejaba el fondo arriba para siempre (y
+     era el fondo el que lo ahogaba): tres seguidos cuentan como 250 ms */
+  if (real > 0.25) { if (++CAL.largos < 3) return; real = 0.25; } else CAL.largos = 0;
   CAL.ema += (real - CAL.ema) * 0.05;
   /* la prueba de culpa: con el fondo quieto 3 s, si el juego se recupera la culpa era nuestra y se apaga; si
      no, el juego va lento por otra cosa (el equipo, la pista) y el fondo sigue al mínimo sin volver a probar */
@@ -3998,7 +4173,7 @@ export const rock = {
   },
   cierraEditor() { if (ED.open) edShut(); },
   /* una canción: `yo` y (en batalla) `rival` son rockeros {look, nombre}; sin rival, toca solo */
-  enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
+  async enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
     if (ED.open) edShut();
     const L = yo?.look ? sanitizeLook(yo.look) : defaultLook('m');
     if (!yo?.look && yo?.nombre) L.name = String(yo.nombre).slice(0, 24);
@@ -4014,23 +4189,34 @@ export const rock = {
     OPT.bars = false; OPT.cam = 'auto';
     Object.assign(CAL, { nivel: alto ? 2 : 1, min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
     battle.start(); ponCalidad();
-    // shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en el primer segundo de la canción
-    try { renderer.compile(scene, camera); for (let i = 0; i < 2; i++) { step(1 / 30); render(1 / 30); } } catch (err) { console.warn('[rock] precalentar', err); }
+    /* shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en la canción: lo que está
+       escondido hasta que pasa algo (los rayos, el aura azul, el confeti) se muestra mientras se compila.
+       PRO HERO espera esta promesa antes de empezar la canción. */
+    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, PL().gtr.spAura, ...(VIVO.solo ? [] : [PR().gtr.spAura])].filter(o => !o.visible);
+    for (const o of ocultos) o.visible = true;
+    try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); } catch (err) { console.warn('[rock] compilar', err); }
+    for (const o of ocultos) o.visible = false;
+    try { for (let i = 0; i < 3; i++) { renderer.shadowMap.needsUpdate = true; step(1 / 30); render(1 / 30); await sleep(0); } } catch (err) { console.warn('[rock] precalentar', err); }
   },
   /* el nivel de calidad del fondo (0 el mejor), por si alguien quiere mirarlo */
   get nivel() { return CAL.nivel; },
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, hype = 0, dtJuego = 0 }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false }) {
     if (!VIVO.on) return;
+    VIVO.humor = clamp(humor ?? animo, -1, 1); VIVO.solista = !!solo;
+    if (toca) { PL().st.descanso = toca[0] === false; if (!VIVO.solo) PR().st.descanso = toca[1] === false; }
     if (dtJuego > 0) { CAL.externo = true; regula(dtJuego); }
     const raw = Math.max(0, beats) * BEAT, mt = vivoMt(raw);
     if (mt < VIVO.mt - 0.05) battle.rewound();
     VIVO.raw = raw; VIVO.mt = mt; VIVO.hype = clamp(hype, 0, 1);
     battle.momT = clamp(animo, -0.85, 0.85);
   },
-  /* en batalla: un ataque de `quien` (0 tú, 1 el rival); solo: 'sp' | 'racha' | 'falla' con su texto */
+  /* Star Power de `quien` (0 tú, 1 el rival): una frase completa (`carga`) y el poder activado o no */
+  carga(quien) { if (VIVO.on) battle.carga(quien ? 1 : 0); },
+  poder(quien, on) { if (VIVO.on) battle.poder(quien ? 1 : 0, on); },
+  /* en batalla: un ataque de `quien` (0 tú, 1 el rival); solo: 'sp' | 'racha' | 'falla' | 'solo' con su texto */
   ataque(quien) { if (VIVO.on && !VIVO.solo) battle.attack(quien ? 1 : 0, pick(Object.keys(ATTACKS))); },
   hype(kind, text, color) { if (VIVO.on && VIVO.solo) battle.hype(kind, text, color); },
   /* fin de la canción: en batalla el ganador (0 tú, 1 el rival); solo, el título */

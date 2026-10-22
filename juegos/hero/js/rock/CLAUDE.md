@@ -83,13 +83,36 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   chart: `pulso({beats})` maps the chart's beats to scene time
   (`vivoMt`: bars 5–59 loop) so headbangs land on the beat; going back (loop
   or the post-pause rewind) resets the riff pointers (`battle.rewound`).
+- **The song waits for the stage**: `session.load` → `_preparaRock` awaits
+  `rock.enVivo()` (worker: the `preparado` message), which compiles every
+  shader with the hidden objects (bolts, confetti, auras) made visible and
+  draws three warm frames. Cap 20 s, then the song starts anyway. The loading
+  screen says «Montando el escenario…».
+- **Star Power, from the real meter** (`_pulsoRock`, both players): each
+  quarter of SP gained → `rock.carga(q)` (a bolt from the guitar up to the
+  sky; in battle it is an attack); SP on/off → `rock.poder(q, on)` (a bolt
+  from the sky onto the guitar, blue strings and the blue aura `spAura` of
+  `makeGuitar` while it lasts). A new effect must also be made visible in
+  `enVivo`'s warm-up, or it hitches the first time.
+- **Rests** (`ritmo.js`, pure, tested): `descansos(notes)` = gaps of ≥ 3 s
+  without notes (sustains count), intro and outro; `pulso({toca})` → the
+  rocker takes the strumming hand off the strings (`handS 'suelta'`) and does
+  rest choreography instead of strumming. A chart solo (`currentSolo`) forces
+  the scene's 'solo' section.
+- **The crowd is people** (`Crowd`: torso, head with a face atlas of four
+  expressions, hair, long hair, arms, forearms, legs, shoes; all instanced,
+  faces via the `aFila` attribute). Its mood is `humor` = recent accuracy
+  (`humorDe`, last 6 s: ≥ 95 % euphoria, 72 % neutral, below ~50 % annoyed):
+  happy ones jump and raise their arms, neutral ones sway, annoyed ones stop,
+  cross their arms or put hands on hips and shake their heads.
 - **Solo** (no other player): your rocker centre stage, singer and mic
-  hidden; mood = multiplier, Star Power / streaks of 50·100 / a combo break
-  ≥ 25 → `hype('sp'|'racha'|'falla')`; at `song.endTime` a title by stars.
+  hidden; mood = 0.7·humor + 0.3·multiplier, streaks of 50·100 / a combo
+  break ≥ 25 / a solo section ≥ 85 % → `hype('racha'|'falla'|'solo')`; at
+  `song.endTime` a title by stars.
 - **Battle** (room: the first other player; local: the second player): you
   left, rival right (their `rockLook`, or a factory rocker picked from their
-  uid). Momentum = score difference; Star Power and every 100 streak are an
-  attack; at the end the higher score wins the K.O.
+  uid). Momentum = score difference; SP charge and activation are attacks;
+  at the end the higher score wins the K.O.
 - **Quality** (`NIVELES`, `CAL`, `regula` in `escena.js`): as a background
   it was ~940 draw calls and ~775k triangles at full resolution, 60 fps, with
   4× MSAA, bloom and 2048 shadows — unplayable. Now: a fraction of the CSS
@@ -102,6 +125,8 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   level below ~36 fps it freezes the background for 3 s (the guilt test) and
   only if the game recovers asks PRO HERO to turn it off (`alDemasiado` →
   toast, back on from the pause menu); otherwise it stays at the minimum.
+  Frames over 250 ms are ignored (hidden tab) **unless three come in a row**:
+  ignoring them all left a starved game with the background at full level.
 - **Framing**: single player puts the rocker in the left third
   (`SOLO_CORRE`, `setViewOffset` per shot; the highway is in the middle) and
   skips shots that can't (`SOLO_FUERA`). In battle the two highways leave the

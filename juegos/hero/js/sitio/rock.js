@@ -22,7 +22,8 @@ export function cargaEscena() {
 
 // El fondo de una canción: la escena en un worker con un OffscreenCanvas (no le quita tiempo al hilo del
 // juego) o, si el navegador no lo permite o el worker falla, en la página. Las dos dan la misma API:
-// monta(host), desmonta(), enVivo({yo, rival, alto, alDemasiado}), pulso(d), ataque(q), hype(k, t, c), fin(g, t).
+// monta(host), desmonta(), enVivo({yo, rival, alto, alDemasiado}) → promesa (cuando el escenario está listo),
+// pulso(d), carga(q), poder(q, on), ataque(q), hype(k, t, c), fin(g, t).
 let fondo = null;
 export function cargaFondo() {
   if (fondo) return fondo;
@@ -46,7 +47,7 @@ function fondoEnTrabajador() {
     const canvas = document.createElement('canvas');
     canvas.className = 'rock-lienzo';
     const off = canvas.transferControlToOffscreen();
-    let listo = false, demasiado = null;
+    let listo = false, demasiado = null, preparado = null;
     const tam = () => w.postMessage({ t: 'tam', w: canvas.clientWidth || innerWidth, h: canvas.clientHeight || innerHeight, dpr: devicePixelRatio || 1 });
     const falla = (err) => {
       if (listo) return console.warn('[hero] worker de Batalla de Rock', err);
@@ -58,8 +59,14 @@ function fondoEnTrabajador() {
     const api = {
       monta(host) { host.append(canvas); tam(); w.postMessage({ t: 'monta' }); },
       desmonta() { w.postMessage({ t: 'desmonta' }); canvas.remove(); },
-      enVivo({ yo, rival = null, alto = false, alDemasiado = null }) { demasiado = alDemasiado; w.postMessage({ t: 'vivo', yo, rival, alto }); },
-      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, hype: d.hype, dtJuego: d.dtJuego || 0 }); },
+      enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
+        demasiado = alDemasiado;
+        w.postMessage({ t: 'vivo', yo, rival, alto });
+        return new Promise((fin) => { preparado = fin; });
+      },
+      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo }); },
+      carga(quien) { w.postMessage({ t: 'carga', quien }); },
+      poder(quien, on) { w.postMessage({ t: 'poder', quien, on }); },
       ataque(quien) { w.postMessage({ t: 'ataque', quien }); },
       hype(kind, text, color) { w.postMessage({ t: 'hype', kind, text, color }); },
       fin(ganador = 0, texto = '') { w.postMessage({ t: 'fin', ganador, texto }); },
@@ -69,6 +76,7 @@ function fondoEnTrabajador() {
       if (d.t === 'listo') { listo = true; clearTimeout(espera); ok(api); }
       else if (d.t === 'error') falla(new Error(d.m));
       else if (d.t === 'demasiado') demasiado?.();
+      else if (d.t === 'preparado') { preparado?.(); preparado = null; }
     };
     w.onerror = (e) => falla(e.error || new Error(e.message || 'error en el worker'));
     w.postMessage({ t: 'lienzo', canvas: off, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1 }, [off]);

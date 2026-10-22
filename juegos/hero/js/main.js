@@ -252,7 +252,7 @@ class App {
         entry, song, players, net,
         onFinish: (results) => this.onSessionFinish(entry, results, net),
       });
-      await session.load(track);
+      await session.load(track, (txt) => loading.set(1, txt));
       loading.set(1, 'Preparando…');
       loading.close();
       this.session = session;
