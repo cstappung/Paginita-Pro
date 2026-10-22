@@ -14,18 +14,29 @@
   const EMBEBIDO = window.parent !== window, INVITADO = PARAMS.get('invitado') === '1';
   const EN_LA_NUBE = !!CLUB && EMBEBIDO && !INVITADO;
   const PR = PD.Prueba;
-  // Los reinos de la segunda era (levels.js: `prueba`) están en pruebas: solo los juega
-  // quien es administrador de Juegos (conexion.js: Club.esAdmin, que manda la página) o
-  // quien abre el juego suelto en su propio equipo (localhost); el resto los ve como
-  // «Próximamente». No guardan récords ni monedas: nada de ellos va a la nube.
+  // Los reinos de la segunda era (levels.js: `abre`) se abren a todos uno por día. Hasta
+  // su día están en pruebas: solo los juega quien es administrador de Juegos
+  // (conexion.js: Club.esAdmin, que manda la página) o quien abre el juego suelto en su
+  // propio equipo (localhost); el resto los ve como «Próximamente». En pruebas no guardan
+  // récords ni monedas: nada de ellos va a la nube. Ya abiertos no piden la ronda 50 del
+  // anterior: se juegan desde el primer día, con su tabla y sus monedas.
   const PUB = PD.PUBLIC_LEVELS;
   const LOCAL = !EMBEBIDO && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   let admin = LOCAL || !!(CLUB && CLUB.esAdmin && CLUB.esAdmin());
-  const enPrueba = li => !!PD.LEVELS[li].prueba;
+  const segunda = li => !!PD.LEVELS[li].abre;
+  const enPrueba = li => !PD.abierto(li);
   const puedeJugar = li => !enPrueba(li) || admin;
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  // «mañana», «el 25 de octubre»: cuándo se abre un reino en pruebas.
+  const cuandoAbre = li => {
+    const f = PD.LEVELS[li].abre, m = new Date(PD.diaChile() + 'T12:00:00Z');
+    m.setUTCDate(m.getUTCDate() + 1);
+    return f === m.toISOString().slice(0, 10) ? 'mañana' : 'el ' + (+f.slice(8)) + ' de ' + MESES[+f.slice(5, 7) - 1];
+  };
   window.addEventListener('club-admin', e => { admin = LOCAL || !!(e.detail && e.detail.admin); if (screen === 'levels') buildLevels(); if (screen === 'almanac') buildAlmanac(almTab); });
-  // Monedas de Juegos: cada ronda nueva de tu récord en un reino paga 20 × el número del reino.
-  const monedasRonda = li => 20 * (li + 1);
+  // Monedas de Juegos: cada ronda nueva de tu récord en un reino paga 20 × el número del
+  // reino, y los de la segunda era, 100 como el Vacío (monedas.js: monedasProdefender).
+  const monedasRonda = li => 20 * Math.min(li + 1, PUB);
   const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'g'];
   const MODES = [['first', 'Primero'], ['last', 'Último'], ['strong', 'Fuerte'], ['close', 'Cerca']];
   const ABIL_ICON = { absolute: '❄', judgement: '⚡', meteors: '☄', supernova: '✹', blackhole: '◉', treasure: '◆', wardrum: '♫', inferno: '♨',
@@ -38,7 +49,7 @@
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
   // ------------------------------ Guardado -------------------------------
-  function defaultSave() { return { v: 1, unlocked: 0, best: [0, 0, 0, 0, 0], won: [false, false, false, false, false], runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45 } }; }
+  function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45 } }; }
   function loadSave() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -189,16 +200,19 @@
     grid.innerHTML = '';
     PD.LEVELS.forEach((L, li) => {
       const prueba = enPrueba(li);
-      if (li === PUB) grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${admin ? 'reinos en pruebas: solo los ven jugables los administradores y no guardan récords' : 'próximamente: cinco reinos nuevos, con jefes, defensas y héroes nuevos'}</div>`));
-      const locked = prueba ? !admin : li > save.unlocked;
+      if (li === PUB) {
+        const quedan = PD.LEVELS.filter((L, i) => enPrueba(i)).length;
+        grid.appendChild(el(`<div class="lvl-sep"><b>Segunda Era</b> · ${quedan ? 'un reino nuevo cada día, abierto a todos y sin pasar por los anteriores: 🪙 100 por ronda en cada uno' + (admin ? ' · los que aún no abren, solo para administradores y sin récords' : '') : 'cinco reinos más, con jefes, defensas y héroes nuevos: 🪙 100 por ronda en cada uno'}</div>`));
+      }
+      const locked = prueba ? !admin : !segunda(li) && li > save.unlocked;
       const best = prueba ? 0 : save.best[li] || 0;
       const run = save.runs[li];
       const clasicas = PD.towersFor(li).filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined).length;
       const card = el(`<div class="lvl-card ${locked ? 'locked' : ''} ${prueba ? 'pronto' : ''}">
         <canvas width="500" height="320"></canvas>
-        ${prueba && locked ? `<div class="lock"><div class="padlock">⏳</div>PRÓXIMAMENTE<br><small>Reino en pruebas</small></div>`
+        ${prueba && locked ? `<div class="lock"><div class="padlock">⏳</div>PRÓXIMAMENTE<br><small>Se abre ${cuandoAbre(li)}</small></div>`
           : locked ? `<div class="lock"><div class="padlock">🔒</div>Completa la ronda ${PD.UNLOCK_ROUND} de<br>${PD.LEVELS[li - 1].name}</div>` : ''}
-        ${prueba && !locked ? '<div class="lc-prueba">EN PRUEBAS · solo admins · sin récords</div>' : ''}
+        ${prueba && !locked ? `<div class="lc-prueba">EN PRUEBAS · solo admins · se abre ${cuandoAbre(li)}</div>` : segunda(li) && L.abre === PD.diaChile() ? '<div class="lc-prueba">¡NUEVO HOY!</div>' : ''}
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
@@ -392,7 +406,7 @@
     $('#toasts').innerHTML = '';
     show('game');
     buildShop(); renderInfo(); buildPreview(); updateHud(true);
-    if (enPrueba(li)) toast('<b>Reino en pruebas</b>Solo para administradores: esta partida no guarda récords ni paga monedas.', 'boss', null, 6500);
+    if (enPrueba(li)) toast(`<b>Reino en pruebas</b>Se abre a todos ${cuandoAbre(li)}. Hasta entonces, solo para administradores: esta partida no guarda récords ni paga monedas.`, 'boss', null, 6500);
     if (!run) {
       toast(`<b>${game.L.name}</b>${game.L.subtitle}<br>Elige un defensor a la derecha, colócalo junto al camino y pulsa ▶.`, 'good', null, 6500);
       for (const id of realmTowers(li)) { const d = PD.TOWERS[id]; toast(`<b>Nueva defensa: ${d.name}</b>${d.desc}`, 'special', { tower: id }, 8000); }
@@ -844,9 +858,10 @@
           ui.paused = true; ui.autoT = -1;
           sfx('victory');
           const li = game.li;
-          const all = save.won.every(Boolean);
-          modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? '<p><b>¡Has conquistado los cinco reinos! Eres un verdadero PRO DEFENDER.</b></p>' : ''}`, [
-            ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && (enPrueba(li + 1) || save.unlocked > li) ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
+          const hasta = n => PD.LEVELS.slice(0, n).every((L, i) => save.won[i]);
+          const all = hasta(PD.LEVELS.length) ? 'diez' : li < PUB && hasta(PUB) ? 'cinco' : '';
+          modal(`<div class="big-ico">🏆</div><h2>¡Victoria!</h2><p>Has completado las 100 rondas de <b>${game.L.name}</b>.<br>Eliminados: ${fmt(game.stats.kills)} · Vidas restantes: ${fmt(game.lives)}</p>${all ? `<p><b>¡Has conquistado los ${all} reinos! Eres un verdadero PRO DEFENDER.</b></p>` : ''}`, [
+            ...(li < PD.LEVELS.length - 1 && puedeJugar(li + 1) && (segunda(li + 1) || save.unlocked > li) ? [{ label: `Jugar ${PD.LEVELS[li + 1].name}`, cls: 'gold', fn: () => { game = null; rec = null; startGame(li + 1, save.runs[li + 1] || null); } }] : []),
             { label: 'Volver a los reinos', fn: () => { game = null; rec = null; ui.paused = false; show('levels'); } }
           ]);
           break;
@@ -972,7 +987,7 @@
   // Lo que la tabla del club sabe de cada reino (tu ronda récord; null: aún no se sabe).
   // Cada ronda que la supera se manda a Juegos con la prueba de la partida: la página la
   // rehace (verifica/prodefender.js), la guarda y eso paga monedasRonda(li) por ronda.
-  const nube = [null, null, null, null, null], enviada = [0, 0, 0, 0, 0];
+  const nube = PD.LEVELS.map(() => null), enviada = PD.LEVELS.map(() => 0);
   let verTabla = -1;
   function escuchaTabla(li) {
     if (!EN_LA_NUBE || verTabla === li || enPrueba(li)) return;
@@ -998,12 +1013,14 @@
     if (adoptaNube() || screen === 'levels') { if (screen === 'levels') buildLevels(); }
     if (esperaTabla && esperaTabla.li === li) esperaTabla.listo();
   });
-  // Al abrir, una pasada por las cinco tablas para saber tus récords (y qué reinos tienes abiertos).
+  // Al abrir, una pasada por las tablas para saber tus récords (y qué reinos tienes abiertos).
+  // Los reinos aún en pruebas no tienen tabla que mirar.
   let esperaTabla = null;
   async function recorreTablas() {
     if (!EN_LA_NUBE) return;
-    for (let li = 0; li < PUB; li++) {
+    for (let li = 0; li < PD.LEVELS.length; li++) {
       if (game) return;   // ya se está jugando: esa tabla es la que se escucha
+      if (enPrueba(li) || nube[li] !== null) continue;
       await new Promise(listo => {
         const t = setTimeout(() => { esperaTabla = null; listo(); }, 4000);
         esperaTabla = { li, listo: () => { clearTimeout(t); esperaTabla = null; listo(); } };
@@ -1026,4 +1043,15 @@
     toast(`<b>Esta ronda no se guardó</b>${String(e.detail.motivo || '').replace(/[<&]/g, '')}`, 'boss', null, 7000);
   });
   recorreTablas();
+  // A medianoche de Chile se abre el reino del día: la pantalla de reinos se rehace sola
+  // y se lee la tabla del recién abierto.
+  let hoy = PD.diaChile();
+  setInterval(() => {
+    const d = PD.diaChile();
+    if (d === hoy) return;
+    hoy = d;
+    if (screen === 'levels') buildLevels();
+    if (screen === 'almanac') buildAlmanac(almTab);
+    recorreTablas();
+  }, 60000);
 })();

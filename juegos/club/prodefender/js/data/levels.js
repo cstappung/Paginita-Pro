@@ -81,15 +81,17 @@
         ['colosoVacio', 70, 0.7], ['ciudadela', 75, 0.8], ['celeste', 78, 0.8], ['leviatan', 90, 0.9], ['arca', 92, 0.9]]
     },
 
-    // ================= SEGUNDA ERA: reinos 6–10, EN PRUEBAS =================
-    // `prueba`: solo los administradores de Juegos los juegan (main.js: puedeJugar),
-    // el resto los ve como «Próximamente», y no guardan récords ni pagan monedas
-    // (sus tablas no existen: verifica/prodefender.js solo conoce las cinco primeras).
+    // ======================= SEGUNDA ERA: reinos 6–10 ========================
+    // `abre`: el día de Chile en que se abre a todos, uno por día (PD.abierto). Antes
+    // de ese día solo lo juegan los administradores de Juegos (main.js: puedeJugar),
+    // el resto lo ve como «Próximamente», y no guarda récords ni paga monedas. Ya
+    // abierto se juega sin pasar por la ronda 50 del anterior, con su tabla y sus
+    // monedas (100 por ronda, como el Vacío).
     // `torres`: lo que vende la tienda (además del héroe del reino), cada vez menos de
     // las clásicas. `musica`: qué tema de audio.js suena (los cinco primeros).
     // Mapas más difíciles: caminos más cortos, varias entradas, cruces y portales.
     {
-      name: 'Pantano Sombrío', short: 'Pantano', prueba: true, musica: 0,
+      name: 'Pantano Sombrío', short: 'Pantano', abre: '2026-10-22', musica: 0,
       subtitle: 'Dos caminos que se cruzan entre la niebla. Algo se mueve bajo el agua.',
       diff: 1.7, lives: 100, cash: 850, seed: 6091, stars: 5,
       theme: { bg1: '#2f4a32', bg2: '#243a28', path: '#6a5a3a', pathEdge: '#2a2418', deco: 'swamp', accent: '#c8ff5a' },
@@ -106,7 +108,7 @@
         ['ciudadela', 74, 0.8], ['celeste', 78, 0.8], ['leviatan', 89, 0.9], ['arca', 91, 0.9]]
     },
     {
-      name: 'Cumbres Tormentosas', short: 'Cumbres', prueba: true, musica: 2,
+      name: 'Cumbres Tormentosas', short: 'Cumbres', abre: '2026-10-23', musica: 2,
       subtitle: 'Los rayos caen sobre tus mejores torres. El cielo no está de tu lado.',
       diff: 1.9, lives: 90, cash: 900, seed: 7103, stars: 5,
       theme: { bg1: '#5a6478', bg2: '#454e60', path: '#8a8a92', pathEdge: '#2e323c', deco: 'storm', accent: '#ffe14d' },
@@ -123,7 +125,7 @@
         ['fortaleza', 58, 0.8], ['dirigible', 60, 0.9], ['ciudadela', 74, 0.8], ['celeste', 76, 0.9], ['leviatan', 89, 0.9], ['arca', 90, 0.9]]
     },
     {
-      name: 'Fosa Abisal', short: 'Fosa', prueba: true, musica: 4,
+      name: 'Fosa Abisal', short: 'Fosa', abre: '2026-10-24', musica: 4,
       subtitle: 'Remolinos que tragan y escupen. En la oscuridad, la tinta ciega.',
       diff: 2.2, lives: 90, cash: 900, seed: 8117, stars: 5,
       theme: { bg1: '#0f3a52', bg2: '#0a2a3e', path: '#3a6a7a', pathEdge: '#0a1a24', deco: 'abyss', accent: '#6fd8ff' },
@@ -140,7 +142,7 @@
         ['fortaleza', 58, 0.8], ['dirigible', 62, 0.8], ['ciudadela', 74, 0.8], ['celeste', 78, 0.8], ['leviatan', 89, 0.9], ['arca', 91, 0.9]]
     },
     {
-      name: 'Ciudadela de Engranajes', short: 'Engranajes', prueba: true, musica: 3,
+      name: 'Ciudadela de Engranajes', short: 'Engranajes', abre: '2026-10-25', musica: 3,
       subtitle: 'Tres puertas, una sola salida. Las máquinas aprenden de cada golpe.',
       diff: 2.45, lives: 80, cash: 950, seed: 9127, stars: 5,
       theme: { bg1: '#4a3f36', bg2: '#3a3029', path: '#7a6a5a', pathEdge: '#2a221a', deco: 'gear', accent: '#ffb84d' },
@@ -158,7 +160,7 @@
         ['fortaleza', 56, 0.8], ['dirigible', 60, 0.8], ['colosoVacio', 68, 0.6], ['ciudadela', 72, 0.8], ['celeste', 76, 0.8], ['leviatan', 88, 0.9], ['arca', 90, 0.9]]
     },
     {
-      name: 'Trono del Eclipse', short: 'Eclipse', prueba: true, musica: 4,
+      name: 'Trono del Eclipse', short: 'Eclipse', abre: '2026-10-26', musica: 4,
       subtitle: 'Tres frentes, un portal y el sol apagándose. El final de todo.',
       diff: 2.25, lives: 80, cash: 1000, seed: 10133, stars: 5,
       theme: { bg1: '#2a1a2e', bg2: '#1c1020', path: '#5a3a4a', pathEdge: '#ffcf4d', deco: 'eclipse', accent: '#ffcf4d' },
@@ -177,8 +179,16 @@
         ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
     }
   ];
-  // Cuántos reinos están abiertos a todos (los de `prueba` vienen después).
-  PD.PUBLIC_LEVELS = PD.LEVELS.filter(L => !L.prueba).length;
+  // Los reinos de siempre, que se abren uno tras otro con la ronda 50 (los de `abre`
+  // vienen después).
+  PD.PUBLIC_LEVELS = PD.LEVELS.filter(L => !L.abre).length;
+  // El día de Chile (AAAA-MM-DD) de ahora: los reinos nuevos se abren a medianoche de allá.
+  PD.diaChile = () => {
+    try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+    catch (e) { return new Date().toISOString().slice(0, 10); }
+  };
+  // ¿Está abierto a todos el reino li? (los cinco primeros, siempre)
+  PD.abierto = (li, dia) => !PD.LEVELS[li].abre || PD.LEVELS[li].abre <= (dia || PD.diaChile());
 
   // ---------------------- Curvas de dificultad -------------------------
   // Presión temprana más alta: desde las primeras rondas hay que pensar dónde y qué colocar.

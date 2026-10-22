@@ -1378,18 +1378,19 @@ const REGLAS = {
      coincidir con js/engine.js y js/data/ (reinos, rondas, torres) y con
      monedasProdefender en monedas.js. */
   prodefender: {
-    lema: "PRO DEFENDER: un tower defense de cinco reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
+    lema: "PRO DEFENDER: un tower defense de diez reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
     secciones: [
       ["Cómo se juega", "Los atacantes recorren el camino de un extremo al otro, y cada uno que llega te quita vidas. Elige un defensor de la tienda, colócalo junto al camino (no encima, ni pegado a otro) y pulsa <b>▶ Ronda</b>. Al perder todas las vidas la partida se acaba."],
       ["Oro y mejoras", "Cada atacante eliminado da oro, y cada ronda superada da un bono. Con ese oro compras defensores y los mejoras: cada uno tiene <b>dos caminos de cuatro mejoras</b>, pero solo uno puede pasar del nivel 2. Vender devuelve el 75 % de lo invertido."],
       ["Reinos", lista([
         "Cinco reinos: Prado Esmeralda, Dunas de Ámbar, Glaciar Cristal, Caldera Volcánica y Nexo del Vacío, cada uno con su mapa, sus atacantes y su jefe.",
         "Superar la <b>ronda 50</b> de un reino abre el siguiente, y cada reino trae dos defensas nuevas.",
+        "La <b>Segunda Era</b> suma cinco reinos más (Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes y Trono del Eclipse), que se abren a todos <b>uno por día</b>, sin tener que pasar por los anteriores. Cada uno vende menos defensas clásicas y trae una nueva y su héroe.",
         "Hay jefes en las rondas 25, 50, 75 y 100, y rondas especiales cada diez.",
         "Si pierdes, puedes reintentar la ronda desde su comienzo hasta tres veces por partida."
       ])],
       ["Atacantes", "Algunos exigen preparar algo antes: los <b>camuflados</b> solo los ven las torres con detección, los <b>voladores</b> esquivan morteros y minas, y el <b>blindaje</b> resta daño a cada golpe. La vista previa de arriba dice qué viene en la ronda siguiente; el Almanaque, el resto."],
-      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
+      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Los cinco reinos de la Segunda Era pagan como el Vacío: 100 por ronda, 10 000 cada uno. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
       ["Controles", lista([
         "Clic en un defensor de la tienda y luego en el mapa para colocarlo (con Shift, varios seguidos). Clic sobre una torre para ver sus mejoras.",
         "Teclado: Espacio empieza la ronda, F cambia la velocidad, P pausa, M silencia. 1-9, 0, - y = eligen defensor; Z y X mejoran cada camino; Supr vende y Tab cambia el objetivo.",

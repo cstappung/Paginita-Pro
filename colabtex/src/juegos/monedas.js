@@ -198,13 +198,15 @@ export function monedasHero(puntos) {
 }
 /* PRO DEFENDER: cada ronda del récord de un reino paga 20 × el número del
    reino (el Prado, 20; el Vacío, 100), así que llegar a la 100 son 2000,
-   4000, 6000, 8000 y 10 000. Sale del récord, así que una partida que no lo
-   supera no paga nada, y la que lo supera paga solo las rondas nuevas. */
-export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio"];
+   4000, 6000, 8000 y 10 000; los cinco de la segunda era pagan como el
+   Vacío, 100 por ronda (10 000 cada uno). Sale del récord, así que una
+   partida que no lo supera no paga nada, y la que lo supera paga solo las
+   rondas nuevas. */
+export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio", "pantano", "cumbres", "fosa", "engranajes", "eclipse"];
 export function monedasProdefender(cat, rondas) {
   const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || "")), r = m ? PRODEFENDER_REINOS.indexOf(m[1]) : -1;
   if (r < 0) return 0;
-  return 20 * (r + 1) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
+  return 20 * Math.min(r + 1, 5) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
 }
 function extraRecord(cat, f) {
   if (cat === "club-hero-estrellas") return monedasHero(f.puntos);

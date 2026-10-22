@@ -299,5 +299,5 @@ button { font-family: inherit; }
 .lvl-sep b { color: var(--gold); font-family: 'Fredoka', sans-serif; font-size: 18px; margin-right: 4px; }
 .lvl-card.pronto .lock { color: #ffe8a0; letter-spacing: 1px; }
 .lvl-card.pronto .lock small { font-weight: 700; letter-spacing: 0; color: var(--muted); }
-.lvl-card .lc-prueba { position: absolute; top: 10px; left: 10px; background: #ffcf4d; color: #2a1a00; font-weight: 800; font-size: 12px; padding: 3px 10px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.lvl-card .lc-prueba { position: absolute; top: 10px; left: 10px; max-width: calc(100% - 20px); background: #ffcf4d; color: #2a1a00; font-weight: 800; font-size: 12px; padding: 3px 10px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
 .lvl-card .lc-menos { font-size: 12px; color: #ffb0a0; font-weight: 700; }
