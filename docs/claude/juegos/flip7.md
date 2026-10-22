@@ -87,7 +87,9 @@ an action may target any player still in the round, a Swap or a Steal can make
 the receiver bust, and Flip Three/Four cards that come up mid-series are set
 aside (`aparta`) and resolved after it. The game ends at the end of the round in
 which someone reaches `F7_META` (200), and the highest total wins — not the first
-to cross; a tie at the top plays one more round. `tests/flip7.test.cjs` plays 30 full robot games per mode and
+to cross; a tie at the top plays one more round. `tests/flip7.test.cjs` plays 30 full robot games per mode (the
+fuzz and the leave tests are in `flip7-robos-1/2` and `flip7-salidas`, helpers in `flip7-comun.cjs`, so they run in
+parallel) and
 checks that each one ends, pays out what `rondas` says and passes the audit,
 and that a forged contribution or seed is caught and attributed to the forger.
 The labels are in `MODOS_F7` ("Normal", "Vengeance", "Super Vengeance"); the
