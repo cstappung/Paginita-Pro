@@ -470,7 +470,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   los 150 ms y vuelve a manejar); los niveles **Intenso** (el Hard AI de RR) e **Imposible** (además, solo las CPU: tope
   ×1,15, base ×1,15, aceleración ×1,5); el VR v2 (otro crítico: zona muerta, fusible, segunda llegada en los niveles
   fuera de escala, ausente = cortado). Medido: Intenso +10,5 % y Imposible +21,9 % de recorrido sobre Máximo. Falta:
-  H1.4, H9, H1.2 y S3 del crítico (§99)
+  H1.4, H9 y H1.2 del crítico (§99)
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 

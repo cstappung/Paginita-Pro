@@ -8994,7 +8994,9 @@ cambiados, 13 nuevos); `prueba-vr` (la curva contra el juego) igual.
   ×1,10 o giro ×1,15).
 - Del crítico de la red, sin hacer todavía: **H1.4** (reenviar los mensajes de la sala por otro par cuando dos no se
   hablan), **H9** (el estado de la sala solo cuando cambia, con un latido que lleva la versión), **H1.2** (la prueba
-  de conexión en el vestíbulo, 🟢/🛰/🔴 por piloto) y **S3** (que el «terminé» valga solo de un humano que corrió).
+  de conexión en el vestíbulo, 🟢/🛰/🔴 por piloto). (**S3** ya está: la anfitriona acepta el «terminé» solo de un
+  humano de la sala que corrió esa carrera, no de uno que quedó fuera desde el principio; bancos `sala-carrera` 77 y
+  `sala-playlist` 37.)
 - **La espera de A en la traba de 1,5 s de `prueba-relevo` varía** entre 0,3 y 1,1 s según la corrida (con tres juegos en
   la misma PC; sin el relevo rápido es la traba entera). La prueba ahora dice a quién esperó cada uno en ese rato
   (`esperaDe`): mirar si es a B (la pausa tarda) o a C (la de la red mala).

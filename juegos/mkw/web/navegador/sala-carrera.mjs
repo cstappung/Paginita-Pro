@@ -245,7 +245,10 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     } else if (soy() && m.t === 'sugiero' && esHumano(de) && estado.lista && estado.fase !== 'fin') {
       // §74: una sugerencia para la playlist (las reglas: playlist-sala.mjs)
       conLista(pl => pl.sugerir(de, { copa: m.copa, fila: m.fila }));
-    } else if (soy() && m.t === 'termine' && m.carrera === estado.carrera && estado.fase === 'correr') {
+    // (§99, S3 del crítico: solo de un humano de la sala que corrió esa carrera —no de uno que quedó fuera desde el
+    // principio—: antes valía el primer «terminé» de cualquiera)
+    } else if (soy() && m.t === 'termine' && m.carrera === estado.carrera && estado.fase === 'correr' && esHumano(de) &&
+               !(estado.fuera || []).includes(de)) {
       const cambio = {};
       if (!estado.terminaron[m.carrera]) cambio.terminaron = { ...estado.terminaron, [m.carrera]: de };
       // §75: los puntos que lleva la copa según esa consola; vale la de quien corrió desde más atrás (quien recargó
