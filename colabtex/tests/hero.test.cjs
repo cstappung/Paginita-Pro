@@ -563,3 +563,88 @@ test('sala: la carrera (puntaje a lo largo de la canción) se lee bien o se igno
   // 0: nadie (todo en 0); 1: b; 2: a; 3: empate, sigue a; 4: b; 5: solo queda a (b abandonó)
   assert.deepEqual(t, [['b', 1, 2], ['a', 2, 4], ['b', 4, 5], ['a', 5, 6]]);
 });
+
+test('batalla: vida, poderes por frase, ataques, cuerda rota, robo y K.O.', async () => {
+  const { Batalla, PODERES, MAX_PODERES, REPARA, VIDA } = await mod('js/game/batalla.js');
+  let r = 0.1;
+  const b = new Batalla(() => r);
+  assert.equal(b.j[0].vida, VIDA.inicio);
+  b.acierto(0); b.fallo(1, 1);
+  assert.ok(b.j[0].vida > VIDA.inicio && b.j[1].vida < VIDA.inicio);
+  // cada frase de estrellas da un poder, hasta MAX_PODERES
+  for (let i = 0; i < MAX_PODERES + 2; i++) b.gana(0, 2);
+  assert.equal(b.j[0].poderes.length, MAX_PODERES);
+  // la cuerda rota: ese traste no sirve hasta pulsarlo REPARA veces (o hasta que vence)
+  r = 0.2;   // 'cuerda' es el segundo tipo; carril floor(0.2·5) = 1
+  b.j[0].poderes = ['cuerda'];
+  const a = b.lanza(0, 3, 5);
+  assert.deepEqual([a.k, a.l, a.de], ['cuerda', 1, 0]);
+  assert.ok(b.recibe(1, a, 3));
+  assert.equal(b.recibe(1, a, 3.1), false, 'el mismo ataque no se aplica dos veces');
+  assert.ok(b.roto(1, 1, 3.5) && !b.roto(1, 2, 3.5));
+  for (let i = 1; i < REPARA; i++) assert.equal(b.pulsaRoto(1, 4), false);
+  assert.ok(b.pulsaRoto(1, 4));
+  assert.ok(!b.roto(1, 1, 4.1));
+  // los efectos vencen solos
+  b.recibe(1, { id: 50, k: 'zurdo', l: -1, de: 0 }, 5);
+  assert.ok(b.pintura(1, 6).zurdo);
+  b.tick(1, 5 + PODERES.zurdo.dur + 0.01, 0.016);
+  assert.ok(!b.pintura(1, 5 + PODERES.zurdo.dur + 0.02).zurdo);
+  // el robo: el que roba se queda con uno de los poderes del otro
+  b.j[1].poderes = ['amp', 'apagon']; b.j[0].poderes = ['robo'];
+  b.recibe(1, b.lanza(0, 20, 5), 20);
+  assert.deepEqual([b.j[0].poderes, b.j[1].poderes], [['amp'], []]);
+  // el drenaje y los fallos dejan K.O.: gana el otro y no hay vuelta atrás
+  b.recibe(1, { id: 60, k: 'drenaje', l: -1, de: 0 }, 30);
+  for (let t = 30; t < 30 + PODERES.drenaje.dur; t += 0.05) b.tick(1, t, 0.05);
+  assert.ok(b.j[1].vida < VIDA.inicio);
+  for (let i = 0; i < 40 && b.ganador === null; i++) b.fallo(1, 40);
+  assert.deepEqual([b.ganador, b.motivo, b.j[1].ko], [0, 'ko', true]);
+  b.acierto(1);
+  assert.equal(b.j[1].vida, 0, 'un K.O. no revive');
+  // sin K.O.: gana más vida; empatados, el puntaje
+  const c = new Batalla(() => 0);
+  c.cierra(100, [10, 20]);
+  assert.deepEqual([c.ganador, c.motivo], [1, 'puntaje']);
+  const d = new Batalla(() => 0);
+  d.acierto(0); d.cierra(100, [10, 20]);
+  assert.deepEqual([d.ganador, d.motivo], [0, 'vida']);
+});
+
+test('batalla en línea: tu estado lleva tus ataques y el del rival se copia tal cual', async () => {
+  const { Batalla } = await mod('js/game/batalla.js');
+  const yo = new Batalla(() => 0.5), el = new Batalla(() => 0.5);
+  // él (puesto 1 en mi pantalla, 0 en la suya) gana un poder y me lo lanza
+  el.j[0].poderes = ['apagon'];
+  el.lanza(0, 10, 5);
+  const paquete = JSON.parse(JSON.stringify(el.vista(0, 10)));
+  yo.ponRemoto(1, paquete, 10);
+  for (const [id, k, l] of paquete.a) yo.recibe(0, { id, k, l, de: 1 }, 10);
+  for (const [id, k, l] of paquete.a) yo.recibe(0, { id, k, l, de: 1 }, 10.1);   // llega repetido
+  assert.ok(yo.pintura(0, 11).apagon);
+  assert.equal(yo.j[0].recibidos.size, 1);
+  // su K.O. llega en el paquete: gano yo
+  for (let i = 0; i < 40; i++) el.fallo(0, 20);
+  yo.ponRemoto(1, el.vista(0, 20), 20);
+  assert.deepEqual([yo.ganador, yo.motivo], [0, 'ko']);
+});
+
+test('sala: el modo batalla lo elige quien dirige y el resultado lleva la vida', () => {
+  const p = sala(2);
+  mover(p, { t: 'modo', uid: 'b', m: 'batalla' });
+  assert.equal(reducir(p).modo, 'normal', 'solo quien dirige');
+  let e = mover(p, { t: 'modo', uid: 'a', m: 'batalla' });
+  assert.equal(e.modo, 'batalla');
+  mover(p, { t: 'modo', uid: 'a', m: 'otra cosa' });
+  assert.equal(reducir(p).modo, 'batalla');
+  mover(p, { t: 'cancion', uid: 'a', id: 'X' });
+  for (const u of ['a', 'b']) mover(p, { t: 'parte', uid: u, p: 'guitar', d: 'expert', m: 'normal' });
+  mover(p, { t: 'listo', uid: 'b', on: true });
+  mover(p, { t: 'empieza', uid: 'a' });
+  for (const u of ['a', 'b']) mover(p, { t: 'cargado', uid: u });
+  mover(p, { t: 'go', uid: 'a', at: 1 });
+  mover(p, { t: 'fin', uid: 'a', r: 1, s: 1000, e: 3, bv: 640, ko: 0 });
+  e = mover(p, { t: 'fin', uid: 'b', r: 1, s: 2000, e: 4, bv: 0, ko: 1 });
+  assert.deepEqual([e.ultima.fines.a.bv, e.ultima.fines.b.ko], [640, 1]);
+  assert.equal(e.ultima.fines.a.ko, 0);
+});

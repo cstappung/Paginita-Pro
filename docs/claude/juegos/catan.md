@@ -98,9 +98,12 @@ overlays live outside the scroller and the production chips inside the
 `.jg-ct-lienzo` that measures exactly what the SVG does. Room options are
 `exp`, `baraja`, `amable`, `puerto` and `largo` — deliberately not `modo`,
 which the rules whitelist — so only the `juego` whitelist needed `'catan'`,
-and that still has to be re-published. `tests/catan.test.cjs` plays robot
-games in every combination (2–6 players, both expansions, every variant) to
-the end, and checks that the base board is the box's (54 corners, 72 roads),
+and that still has to be re-published. `tests/catan-variantes-1/2.test.cjs`
+play robot games in every combination (2–6 players, both expansions, every
+variant) to the end (helpers in `tests/catan-robots.cjs`; split so `node --test`
+runs them in parallel: each move re-reduces the whole log, so a game costs the
+square of its length — pick seeds that end in ~1000 moves), and
+`tests/catan.test.cjs` checks that the base board is the box's (54 corners, 72 roads),
 that replaying the log gives the same state, that a skipped key does not
 roll, that the audit catches a lied card and that a vote-out behaves as an
 abandono.

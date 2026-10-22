@@ -236,7 +236,7 @@ class App {
     };
   }
 
-  async prepareSession(entry, players, net = null) {
+  async prepareSession(entry, players, net = null, { batalla = false } = {}) {
     this.preview.stop();
     const loading = this.showLoading(entry);
     this.screen?.unmount();
@@ -249,7 +249,7 @@ class App {
       const song = await loadSongChart(entry, track);
       this.lastSong = song;
       const session = new GameSession(this, {
-        entry, song, players, net,
+        entry, song, players, net, batalla,
         onFinish: (results) => this.onSessionFinish(entry, results, net),
       });
       await session.load(track, (txt) => loading.set(1, txt));
@@ -267,15 +267,15 @@ class App {
     }
   }
 
-  async playLocal(entry, players) {
-    this.lastLocal = { entry, players };
-    const session = await this.prepareSession(entry, players);
+  async playLocal(entry, players, opts = {}) {
+    this.lastLocal = { entry, players, opts };
+    const session = await this.prepareSession(entry, players, null, opts);
     session?.start();
   }
 
   restartSession() {
     this.session = null;
-    if (this.lastLocal) this.playLocal(this.lastLocal.entry, this.lastLocal.players);
+    if (this.lastLocal) this.playLocal(this.lastLocal.entry, this.lastLocal.players, this.lastLocal.opts);
   }
 
   afterSessionQuit(net) {

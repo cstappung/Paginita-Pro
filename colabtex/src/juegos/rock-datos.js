@@ -30,7 +30,7 @@ export function cajaRock(uid, clave, at, b) {
   const g = b === "f" ? "f" : "m", k = uid + "|" + clave + "|" + at + "|" + g;
   if (memo.has(k)) return memo.get(k);
   const r = MM.generador(MM.sha256("rock-caja:" + k).slice(0, 4));
-  const res = Object.freeze(abreCaja(g, r));
+  const res = Object.freeze(abreCaja(g, r, at));
   if (memo.size > 4000) memo.clear();
   memo.set(k, res);
   return res;

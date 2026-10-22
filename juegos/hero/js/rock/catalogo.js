@@ -252,7 +252,21 @@ export const INV_CATS = {
   necklace: { n: 'Collares', ic: '🔗', cols: ['color'] },
   earrings: { n: 'Aros', ic: '💎', cols: ['color'] },
   bracelets: { n: 'Pulseras', ic: '⛓️', cols: ['color'] },
+  /* la cara y el pelo (desde CORTE_CAJAS_2): todo lo de una categoría con legendarios sale en las cajas, menos
+     lo que trae el rockero por defecto y «nada». No traen colores: el color lo eliges tú. `ruta` = dónde está
+     el tipo en el rockero; los tatuajes son una lista (cada diseño puesto tiene que ser tuyo). */
+  hair: { n: 'Peinados', ic: '💇', cols: [], ruta: 'hair.style', cara: true },
+  eyeStyle: { n: 'Pupilas', ic: '👁️', cols: [], ruta: 'face.eyeStyle', cara: true },
+  mkStyle: { n: 'Maquillaje y pintura', ic: '🎨', cols: [], ruta: 'face.mkStyle', cara: true },
+  beard: { n: 'Barbas', ic: '🧔', cols: [], ruta: 'beard.type', cara: true },
+  tatDesign: { n: 'Diseños de tatuaje', ic: '🖋️', cols: [], ruta: null, cara: true },
 };
+/* las opciones «nada» (sin barba, sin pintura…): de todos, no salen en cajas */
+export const esNada = t => t === 'none' || t === 'ninguno' || t === 'ningunoF';
+/* dónde va el tipo de la categoría `k` en un rockero (null: los tatuajes) */
+export const rutaInv = k => (INV_CATS[k].ruta !== undefined ? INV_CATS[k].ruta : k + '.type');
+/* la categoría de una ruta del editor ('hair.style' → 'hair'), o null si no es del inventario */
+export const catDeRuta = p => Object.keys(INV_CATS).find(k => rutaInv(k) === p) || null;
 /* colores al azar de cada premio (en los legendarios se respetan los de fábrica que definen su efecto).
    `r.pick(lista)` elige uno y `r.moneda()` es cara o sello: con el azar de la caja, sale lo mismo en todos lados. */
 export const INV_RAND = {
@@ -263,19 +277,31 @@ export const INV_RAND = {
   gloves: r => ({ color: r.pick([...PAL.cloth, 0x241a30]) }),
   guitar: r => ({ body: r.pick(PAL.cloth), guard: r.pick(PAL.guard), knob: r.pick([0xf6f1df, 0x111111, 0xd9a63a, 0xc9ccd6, 0xd8262b]) }),
   necklace: r => ({ color: r.pick(PAL.metal) }), earrings: r => ({ color: r.pick(PAL.metal) }), bracelets: r => ({ color: r.pick(PAL.metal) }),
+  hair: () => ({}), eyeStyle: () => ({}), mkStyle: () => ({}), beard: () => ({}), tatDesign: () => ({}),
 };
 export const invItem = (b, k, t) => ED_CAT[b]?.[k]?.find(o => o[0] === t);
 export const nombreItem = (b, k, t) => invItem(b, k, t)?.[1] ?? t;
 export const invVar = (b, k, o) => { const c = {}; for (const f of INV_CATS[k].cols) if (o[f] != null) c[f] = o[f]; return { b, k, t: o.type, c, leg: !!invItem(b, k, o.type)?.[2] }; };
+/* la variante que lleva puesta un rockero en la categoría `k` (no sirve para los tatuajes) */
+export const invVarL = (L, k) => { const r = rutaInv(k), par = getP(L, r.split('.').slice(0, -1).join('.')) || {}; return invVar(L.body, k, { ...par, type: getP(L, r) }); };
 export const invId = v => [v.b, v.k, v.t, ...INV_CATS[v.k].cols.map(f => v.c[f] ?? '')].join(':');
-/* de partida: lo que trae cada cuerpo por defecto + lo que usan los rockeros de fábrica.
-   Toda cuenta lo tiene: no se compra, no tiene copia y no se vende. */
+/* de partida: lo que trae cada cuerpo por defecto + la ropa que usan los rockeros de fábrica (de la cara y el
+   pelo, solo lo del rockero por defecto y el primer diseño de tatuaje). Toda cuenta lo tiene: no se compra, no
+   tiene copia y no se vende. */
 let _ini = null;
 export function iniciales() {
   if (_ini) return _ini;
-  const out = new Map();
-  const add = L => { for (const k in INV_CATS) if (L[k]?.type && L[k].type !== 'none' && invItem(L.body, k, L[k].type)) { const v = invVar(L.body, k, L[k]); out.set(invId(v), v); } };
-  add(defaultLook('m')); add(defaultLook('f')); for (const r of ['violeta', 'rex', 'kid']) add(sanitizeLook(ROCKERS[r]));
+  const out = new Map(), pon = v => out.set(invId(v), v);
+  const add = (L, cara) => {
+    for (const k in INV_CATS) {
+      if (k === 'tatDesign' || (INV_CATS[k].cara && !cara)) continue;
+      if (!getP(L, rutaInv(k).split('.')[0])) continue;
+      const v = invVarL(L, k);
+      if (v.t && !esNada(v.t) && invItem(L.body, k, v.t)) pon(v);
+    }
+  };
+  for (const g of CUERPOS) { add(defaultLook(g), true); pon(invVar(g, 'tatDesign', { type: ED_CAT[g].tatDesign[0][0] })); }
+  for (const r of ['violeta', 'rex', 'kid']) add(sanitizeLook(ROCKERS[r]), false);
   return (_ini = Object.freeze([...out.values()].map(v => Object.freeze(v))));
 }
 
@@ -395,14 +421,81 @@ export const POOL = Object.freeze([
   ['f', 'bracelets', 'diamanteBr'],
   ['f', 'bracelets', 'luzBr'],
   ['f', 'bracelets', 'fuegoBr'],
+  // desde CORTE_CAJAS_2: la cara y el pelo (lo inicial de esas categorías no sale)
+  ['m', 'hair', 'mohawk'],
+  ['m', 'hair', 'spiky'],
+  ['m', 'hair', 'short'],
+  ['m', 'hair', 'bald'],
+  ['m', 'hair', 'furia'],
+  ['m', 'hair', 'trueno'],
+  ['m', 'hair', 'llamarada'],
+  ['m', 'eyeStyle', 'felino'],
+  ['m', 'eyeStyle', 'anillo'],
+  ['m', 'eyeStyle', 'hetero'],
+  ['m', 'eyeStyle', 'fantasma'],
+  ['m', 'eyeStyle', 'rayo'],
+  ['m', 'eyeStyle', 'eclipse'],
+  ['m', 'eyeStyle', 'vortice'],
+  ['m', 'mkStyle', 'delineado'],
+  ['m', 'mkStyle', 'corpse'],
+  ['m', 'mkStyle', 'guerra'],
+  ['m', 'mkStyle', 'ojeras'],
+  ['m', 'mkStyle', 'calaNeon'],
+  ['m', 'mkStyle', 'runas'],
+  ['m', 'mkStyle', 'grietas'],
+  ['m', 'beard', 'goatee'],
+  ['m', 'beard', 'mustache'],
+  ['m', 'beard', 'full'],
+  ['m', 'beard', 'barbaFuego'],
+  ['m', 'beard', 'escarcha'],
+  ['m', 'beard', 'barbaRayo'],
+  ['m', 'tatDesign', 'llamas'],
+  ['m', 'tatDesign', 'tribal'],
+  ['m', 'tatDesign', 'serpiente'],
+  ['m', 'tatDesign', 'dragon'],
+  ['m', 'tatDesign', 'fenix'],
+  ['m', 'tatDesign', 'calaveraFuego'],
+  ['f', 'hair', 'pigtails'],
+  ['f', 'hair', 'bob'],
+  ['f', 'hair', 'ponytail'],
+  ['f', 'hair', 'odango'],
+  ['f', 'hair', 'galaxiaH'],
+  ['f', 'hair', 'neonTw'],
+  ['f', 'hair', 'fenixH'],
+  ['f', 'eyeStyle', 'corazon'],
+  ['f', 'eyeStyle', 'estrella'],
+  ['f', 'eyeStyle', 'degradado'],
+  ['f', 'eyeStyle', 'galaxia'],
+  ['f', 'eyeStyle', 'latido'],
+  ['f', 'eyeStyle', 'prisma'],
+  ['f', 'mkStyle', 'ahumado'],
+  ['f', 'mkStyle', 'gotico'],
+  ['f', 'mkStyle', 'glam'],
+  ['f', 'mkStyle', 'estrellaMk'],
+  ['f', 'mkStyle', 'cristales'],
+  ['f', 'mkStyle', 'aurora'],
+  ['f', 'mkStyle', 'mariposaMk'],
+  ['f', 'tatDesign', 'corazon'],
+  ['f', 'tatDesign', 'rosa'],
+  ['f', 'tatDesign', 'murcielago'],
+  ['f', 'tatDesign', 'golondrina'],
+  ['f', 'tatDesign', 'mariposaT'],
+  ['f', 'tatDesign', 'lunaT'],
+  ['f', 'tatDesign', 'rosaNeon'],
 ].map(([b, k, t]) => Object.freeze({ b, k, t, leg: !!invItem(b, k, t)?.[2] })));
 
-/* Lo que trae una caja, con el azar que se le pasa: `r.entero(n)` en [0, n).
-   Primero si es legendaria, después la pieza (uniforme en su clase y en el
-   cuerpo de la caja) y al final sus colores. */
-export function abreCaja(b, r) {
+/* Las cajas compradas antes de CORTE_CAJAS_2 (hora del servidor) eligen entre las primeras POOL_1 filas, como
+   cuando se abrieron: sumar filas cambia el sorteo uniforme (`r.entero(n)`), así que cada ampliación del
+   catálogo de cajas necesita su propio corte. */
+export const POOL_1 = 109, CORTE_CAJAS_2 = Date.UTC(2026, 9, 22, 4, 0);
+export const poolDe = at => (at >= CORTE_CAJAS_2 ? POOL : POOL.slice(0, POOL_1));
+
+/* Lo que trae una caja comprada a la hora `at`, con el azar que se le pasa: `r.entero(n)` en [0, n).
+   Primero si es legendaria, después la pieza (uniforme en su clase y en el cuerpo de la caja) y al final
+   sus colores. */
+export function abreCaja(b, r, at = Infinity) {
   const g = b === 'f' ? 'f' : 'm', leg = r.entero(10000) < LEGENDARIO;
-  const de = POOL.filter(p => p.b === g && p.leg === leg), it = de[r.entero(de.length)];
+  const de = poolDe(at).filter(p => p.b === g && p.leg === leg), it = de[r.entero(de.length)];
   const az = { pick: a => a[r.entero(a.length)], moneda: () => r.entero(2) === 0 };
   const c = INV_RAND[it.k](az), fab = invItem(g, it.k, it.t)?.[2];
   if (fab) for (const f of INV_CATS[it.k].cols) if (fab[f] != null) c[f] = fab[f];
@@ -416,13 +509,22 @@ export function abreCaja(b, r) {
    después se ve sin eso. */
 export function lookPosible(L, propias = []) {
   if (!L) return null;
-  const todas = [...iniciales(), ...propias], D = defaultLook(L.body);
+  const todas = [...iniciales(), ...propias], D = defaultLook(L.body), C = ED_CAT[L.body];
+  const tiene = (k, t) => esNada(t) || todas.some(v => v.b === L.body && v.k === k && v.t === t);
   for (const k in INV_CATS) {
-    const o = L[k]; if (!o?.type || o.type === 'none') continue;
-    const mias = todas.filter(v => v.b === L.body && v.k === k && v.t === o.type);
+    if (k === 'tatDesign') { L.tattoos = (L.tattoos || []).filter(t => tiene(k, t.design)); continue; }
+    const ruta = rutaInv(k), par = getP(L, ruta.split('.').slice(0, -1).join('.')), t = getP(L, ruta);
+    if (!par || !t || esNada(t)) continue;
+    if (INV_CATS[k].cara) {
+      if (tiene(k, t)) continue;
+      const nada = C[k].find(x => esNada(x[0]));
+      setP(L, ruta, nada ? nada[0] : getP(D, ruta));
+      continue;
+    }
+    const o = par, mias = todas.filter(v => v.b === L.body && v.k === k && v.t === o.type);
     if (mias.some(v => invId(v) === invId(invVar(L.body, k, o)))) continue;
     if (mias.length) { Object.assign(o, mias[mias.length - 1].c); continue; }
-    if (ED_CAT[L.body][k].some(x => x[0] === 'none')) o.type = 'none';
+    if (C[k].some(x => x[0] === 'none')) o.type = 'none';
     else Object.assign(o, D[k]);
   }
   return L;

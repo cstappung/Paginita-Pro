@@ -30,8 +30,13 @@ test('las cajas traen todo el catálogo (menos «nada») y nada más, una vez ca
     vistos.add(k);
     assert.ok(C.invItem(p.b, p.k, p.t), 'no existe ' + k);
   }
-  for (const b of ['m', 'f']) for (const k in C.INV_CATS) for (const it of C.ED_CAT[b][k] || [])
-    if (it[0] !== 'none') assert.ok(vistos.has(b + ':' + k + ':' + it[0]), 'falta en POOL (se agrega al final): ' + b + ':' + k + ':' + it[0]);
+  const ini = new Set(C.iniciales().map(C.invId));
+  for (const b of ['m', 'f']) for (const k in C.INV_CATS) for (const it of C.ED_CAT[b][k] || []) {
+    if (C.esNada(it[0])) continue;
+    // de la cara y el pelo, lo inicial no sale en cajas
+    if (C.INV_CATS[k].cara && ini.has(C.invId(C.invVar(b, k, { type: it[0] })))) { assert.ok(!vistos.has(b + ':' + k + ':' + it[0]), 'inicial en POOL: ' + it[0]); continue; }
+    assert.ok(vistos.has(b + ':' + k + ':' + it[0]), 'falta en POOL (se agrega al final): ' + b + ':' + k + ':' + it[0]);
+  }
   assert.ok(C.POOL.some(p => p.leg) && C.POOL.some(p => !p.leg));
 });
 
@@ -145,8 +150,36 @@ test('un rockero ajeno se limpia entero y solo se ve con lo que su dueño tiene'
 test('lo inicial lo tiene todo el mundo: los rockeros de fábrica se ven tal cual', () => {
   for (const k of ['violeta', 'rex', 'kid']) {
     const L = C.sanitizeLook(C.ROCKERS[k]), V = C.lookPosible(JSON.parse(JSON.stringify(L)), []);
-    for (const cat in C.INV_CATS) if (L[cat]) assert.deepEqual(V[cat], L[cat], k + ' ' + cat);
+    for (const cat in C.INV_CATS) if (L[cat] && !C.INV_CATS[cat].cara) assert.deepEqual(V[cat], L[cat], k + ' ' + cat);
   }
+});
+
+test('la cara y el pelo salen en cajas: de partida solo lo del rockero por defecto (y «nada»)', () => {
+  const ini = C.iniciales().filter(v => C.INV_CATS[v.k].cara).map(v => v.b + ':' + v.k + ':' + v.t).sort();
+  assert.deepEqual(ini, ['f:eyeStyle:brillo', 'f:hair:longF', 'f:mkStyle:natural', 'f:tatDesign:estrellas', 'm:beard:stubble', 'm:eyeStyle:clasico', 'm:hair:long', 'm:tatDesign:calavera']);
+  // un rockero con cosas que no tiene: vuelve a lo de partida, o a «nada» si la categoría lo admite
+  const L = C.sanitizeLook(C.defaultLook('m'));
+  Object.assign(L.face, { eyeStyle: 'rayo', mkStyle: 'corpse' }); L.hair.style = 'mohawk'; L.beard.type = 'goatee';
+  L.tattoos = [{ design: 'calavera', spot: 'pecho', color: 0 }, { design: 'dragon', spot: 'espalda', color: 0 }];
+  const V = C.lookPosible(JSON.parse(JSON.stringify(L)), []);
+  assert.deepEqual([V.face.eyeStyle, V.face.mkStyle, V.hair.style, V.beard.type, V.tattoos.map(t => t.design)], ['clasico', 'ninguno', 'long', 'none', ['calavera']]);
+  // con la pieza propia (de una caja) se queda
+  const mias = [{ b: 'm', k: 'hair', t: 'mohawk', c: {} }, { b: 'm', k: 'eyeStyle', t: 'rayo', c: {} }, { b: 'm', k: 'tatDesign', t: 'dragon', c: {} }];
+  const W = C.lookPosible(JSON.parse(JSON.stringify(L)), mias);
+  assert.deepEqual([W.face.eyeStyle, W.hair.style, W.tattoos.length], ['rayo', 'mohawk', 2]);
+});
+
+test('las cajas de antes del corte traen lo mismo que cuando se abrieron', () => {
+  assert.equal(C.POOL.slice(0, C.POOL_1).some(p => C.INV_CATS[p.k].cara), false);
+  assert.ok(C.POOL.length > C.POOL_1);
+  let cara = 0;
+  for (let i = 0; i < 3000; i++) {
+    const k = 'k' + String(i).padStart(9, '0'), b = i % 2 ? 'f' : 'm';
+    const antes = X.cajaRock(A, k, C.CORTE_CAJAS_2 - 1 - i, b);
+    assert.ok(!C.INV_CATS[antes.k].cara, 'antes del corte no hay cara ni pelo');
+    if (C.INV_CATS[X.cajaRock(A, k, C.CORTE_CAJAS_2 + i, b).k].cara) cara++;
+  }
+  assert.ok(cara > 600, 'después del corte salen peinados, pupilas…: ' + cara);
 });
 
 test('la canción de verdad: descansos sin notas, el cursor y el humor del acierto', async () => {

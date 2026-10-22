@@ -35,8 +35,14 @@ Starter items have no copy key and cannot be listed.
 - The market buys, withdraws, proposes, accepts and closes trades, one write
   at a time. Each write is re-checked against `economia()` with
   `puedeComprar`/`puedeProponer`.
-- Selling happens in each game: a card from its zoom in PRODROP, a pet or an
-  object from the Mascotas `SellDialog`.
+- Selling: the **🏷️ Vender** tab lists `intercambiables` (everything of
+  yours not listed; starter items have no copy) with a price and a button,
+  filtered by the game selector; `accion("vender")` does the same checks as
+  the games' postmen (owner, not listed, 1–100 000, not `parada`) and
+  withdraws a listing the replay doesn't accept. Each game also sells from
+  its own screen: a card from its zoom in PRODROP, a pet or an object from
+  the Mascotas `SellDialog`, a rock piece from the rocker editor. People
+  didn't find those, hence the tab.
 - Your own listing still shows, tagged «Tu oferta». Hiding it made sellers
   think the listing never reached the store.
 - **Pet cap.** Buying a pet with 6 already owned, or a trade that leaves

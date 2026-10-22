@@ -16,6 +16,7 @@ import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
 import { rockSitio, cargaFondo } from '../sitio/rock.js';
 import { descansos, enDescanso, humorDe } from '../rock/ritmo.js';
+import { Batalla, PODERES, MAX_PODERES, REPARA, FIN_KO } from './batalla.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -28,7 +29,7 @@ const EV_DIRECTO = 40;
 const ESCALA_ALTO = 0.75;
 
 export class GameSession {
-  constructor(app, { entry, song, players, net = null, onFinish }) {
+  constructor(app, { entry, song, players, net = null, batalla = false, onFinish }) {
     this.app = app;
     this.entry = entry;
     this.song = song;
@@ -45,6 +46,12 @@ export class GameSession {
     this.curva = [];
     this.players = players.map((pd, idx) => this._makePlayer(pd, idx, players.length));
     this.local = this.players.filter((p) => p.type !== 'remote');
+    // modo batalla (game/batalla.js): solo de a dos; el Star Power se cambia por poderes que se lanzan al rival
+    this.bt = batalla && this.players.length === 2 ? new Batalla() : null;
+    if (this.bt) this.players.forEach((p, i) => {
+      p.bq = i;
+      if (p.bot) p.bot.sinSP = true;
+    });
     // Con un solo jugador humano, acepta teclado Y cualquier mando a la vez
     const humans = this.local.filter((p) => p.inputs && !p.bot);
     if (humans.length === 1) {
@@ -131,6 +138,17 @@ export class GameSession {
   _onEngineEvent(p, type, a, b) {
     const now = this.now ?? 0;
     if (this.rock) this._rockEvento(p, type, a, b);
+    if (this.bt) {
+      // en la batalla los aciertos dan vida, los fallos la quitan y cada frase de estrellas da un poder
+      if (type === 'hit') this.bt.acierto(p.bq);
+      else if (type === 'miss' || type === 'overstrum') this.bt.fallo(p.bq, now);
+      else if (type === 'spPhrase') {
+        p.fxQueue.push({ type: 'phrase', lanes: GameSession.noteLanes(p.engine.notes[b], p.engine.kind) });
+        const k = this.bt.gana(p.bq, now);
+        this.audio.spAwarded(!!k);
+        return;
+      }
+    }
     switch (type) {
       case 'hit':
         if (settings.muteOnMiss) this.audio.setMuted(p.stems, false);
@@ -217,18 +235,21 @@ export class GameSession {
     try { rock = await cargaFondo(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
     const yo = this.local.find((p) => !p.bot) || this.local[0];
     const rival = this.players.find((p) => p !== yo && p.type === 'remote') || this.players.find((p) => p !== yo) || null;
+    // en una sala de 3 a 8, los demás también tocan en el escenario
+    const otros = rival ? this.players.filter((p) => p !== yo && p !== rival).slice(0, 6) : [];
     this.rock = rock;
     this.rockYo = yo;
     this.rockRival = rival;
-    this.rockSp = [false, false];
-    this.rockCarga = [0, 0];
+    this.rockTodos = [yo, rival, ...otros].filter(Boolean);
+    this.rockSp = this.rockTodos.map(() => false);
+    this.rockCarga = this.rockTodos.map(() => 0);
     this.rockFin = false;
     this.rockT = 0;
     this.rockHumor = 0.3;
     this.rockMuestras = [];
     // los tramos sin notas de cada uno: ahí el rockero deja de tocar
     const fin = this.song.endTime;
-    this.rockDescansos = [yo, rival].map((p) => (p ? { l: descansos(p.track.notes, { fin }), cur: { i: 0 } } : null));
+    this.rockDescansos = this.rockTodos.map((p) => ({ l: descansos(p.track.notes, { fin }), cur: { i: 0 } }));
     rock.monta(document.getElementById('rockbg'));
     // la canción espera a que el escenario esté listo (rockeros armados, shaders y texturas estrenados): si no,
     // los primeros segundos se trababan mientras se preparaba. Con tope, por si el equipo es muy lento.
@@ -237,6 +258,7 @@ export class GameSession {
       rock.enVivo({
         yo: { look: rockSitio.look, nombre: yo?.name },
         rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
+        otros: otros.map((p, i) => ({ uid: p.id || p.name || 'p' + i, nombre: p.name, look: (p.id && rockSitio.looks.get(p.id)) || null })),
         alto: settings.altoRendimiento,
         // si el juego se resiente aun con el fondo al mínimo, se apaga para esta sesión (en la pausa se vuelve a encender)
         alDemasiado: () => {
@@ -279,12 +301,19 @@ export class GameSession {
     // el intervalo real entre cuadros del juego: con él la escena decide cuánto se puede gastar
     const ahora = performance.now(), dtJuego = this.rockT ? (ahora - this.rockT) / 1000 : 0;
     this.rockT = ahora;
-    const D = this.rockDescansos, toca = D.map((d) => (d ? !enDescanso(d.l, now, d.cur) : true));
-    this.rock.pulso({ beats, animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now) });
+    const D = this.rockDescansos, toca = D.map((d) => !enDescanso(d.l, now, d.cur));
+    // con más de dos: el ánimo de cada uno según cuánto lleva respecto del promedio de la sala
+    const E = this.rockTodos.map((p) => p.engine);
+    let confs = null;
+    if (E.length > 2) {
+      const media = E.reduce((a, e) => a + (e.score || 0), 0) / E.length;
+      confs = E.map((e) => Math.max(-0.85, Math.min(0.85, ((e.score || 0) - media) / Math.max(4000, 0.3 * media))));
+    }
+    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs });
     // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
-    // se prende de azul mientras dure (en batalla, la carga es un ataque al rival)
-    [yo, rv].forEach((e, q) => {
-      if (!e) return;
+    // se prende de azul mientras dure (en un mano a mano, la carga es un ataque al rival)
+    // (en la batalla no: ahí las frases dan poderes y el rayo sale al lanzarlos, _lanzaBt)
+    if (!this.bt) E.forEach((e, q) => {
       const sp = e.sp || 0, on = !!e.spActive;
       if (sp > this.rockCarga[q] + 0.2) this.rock.carga(q);
       this.rockCarga[q] = sp;
@@ -293,7 +322,8 @@ export class GameSession {
     });
     if (!this.rockFin && now > this.song.endTime + 0.3) {
       this.rockFin = true;
-      if (rv) this.rock.fin(yo.score >= rv.score ? 0 : 1);
+      if (this.bt) { const g = this.bt.ganador ?? (this.bt.j[0].vida >= this.bt.j[1].vida ? 0 : 1); this.rock.fin(Math.max(0, this.rockTodos.indexOf(this.players[g]))); }
+      else if (rv) this.rock.fin(E.reduce((g, e, q) => ((e.score || 0) > (E[g].score || 0) ? q : g), 0));
       else {
         const e = yo.stats().stars;
         this.rock.fin(0, e >= 5 ? '¡LEYENDA!' : e >= 4 ? '¡OVACIÓN!' : e >= 3 ? '¡BIEN TOCADO!' : '¡A ENSAYAR!');
@@ -437,7 +467,10 @@ export class GameSession {
         : kp.mode === 'taps'
           ? `Pulsa ${kp.keyLabels.join(' ')} justo cuando cada nota llegue a su círculo (no hace falta rasguear). Barra morada: no pulses nada`
           : `Mantén el traste (${kp.keyLabels.join(' ')}) y rasguea con ${codeLabel(g.up?.[0])} / ${codeLabel(g.down?.[0])}`;
-      this.helpEl = h('div', { class: 'play-help' }, txt, h('small', {}, `Star Power: ${codeLabel((kp.track.kind === 'drums' ? kp.profile.drums : g).sp?.[0])} · Pausa: Esc`));
+      const spTecla = codeLabel((kp.track.kind === 'drums' ? kp.profile.drums : g).sp?.[0]);
+      this.helpEl = h('div', { class: 'play-help' }, txt, h('small', {}, this.bt
+        ? `⚔️ Batalla: cada frase de estrellas te da un poder; lánzaselo al rival con ${spTecla} · Pierde quien se queda sin vida · Pausa: Esc`
+        : `Star Power: ${spTecla} · Pausa: Esc`));
       this.app.overlay.append(this.helpEl);
       setTimeout(() => this.helpEl?.classList.add('hide'), 7000);
     }
@@ -483,6 +516,15 @@ export class GameSession {
       return;
     }
     if (!g) return;
+    if (this.bt) {
+      // el botón de Star Power lanza tu poder; un traste con la cuerda rota no suena: cada pulsación la repara
+      if (act === 'sp') { if (down) this._lanzaBt(p, t); return; }
+      const l = e.kind === 'guitar' ? (act[0] === 'g' && act.length === 2 ? Number(act[1]) : -1) : act[0] === 'p' || act[0] === 'c' ? Number(act[1]) : -1;
+      if (l >= 0 && this.bt.roto(p.bq, l, t)) {
+        if (down && this.bt.pulsaRoto(p.bq, t)) this.audio.playSample('ripple', 0.5);
+        return;
+      }
+    }
     if (e.kind === 'guitar') {
       if (act[0] === 'g' && act.length === 2) {
         const bit = 1 << Number(act[1]);
@@ -518,11 +560,65 @@ export class GameSession {
       }
       this._syncVideo(now);
     }
+    if (this.bt) this._tickBt(now);
     this._sendState(perf);
     if (this.net) this._anotaCurva(now);
     this.draw(now);
     if (this.rock) this._pulsoRock(now);
     if (!this.finished && now > this.endAt) this.finish();
+  }
+
+  /* ---------- modo batalla ---------- */
+  _rival(p) { return this.players.find((q) => q !== p); }
+
+  // `p` lanza su poder más viejo al rival
+  _lanzaBt(p, t) {
+    const r = this._rival(p), bt = this.bt;
+    if (!r || t < 0) return;
+    const a = bt.lanza(p.bq, t, r.engine.kind === 'drums' ? r.engine.track.lanes : 5);
+    if (!a) return;
+    this.audio.spDeployed();
+    p.fxQueue.push({ type: 'spActivate' });
+    if (this.rock) this.rock.ataque(this.rockTodos ? this.rockTodos.indexOf(p) : p.bq);
+    if (r.type === 'remote') {
+      // en línea: el ataque viaja en tu estado (bt.a) y el rival se lo aplica; el robo te da uno de sus poderes
+      const J = bt.j[p.bq], V = bt.j[r.bq];
+      if (a.k === 'robo' && V.poderes.length && J.poderes.length < MAX_PODERES) J.poderes.push(V.poderes[0]);
+      return;
+    }
+    this._recibeBt(r, a, t);
+  }
+
+  _recibeBt(p, a, t) {
+    if (!this.bt.recibe(p.bq, a, t)) return;
+    p.fxQueue.push({ type: 'break', had: 40 });   // el golpe sacude su autopista
+    // la cuerda rota suelta ese traste si lo tenía pisado
+    if (a.k === 'cuerda' && p.grab && p.engine.kind === 'guitar' && p.frets & (1 << a.l)) {
+      p.frets &= ~(1 << a.l);
+      p.grab.fret(p.frets, Math.max(t, 0));
+    }
+  }
+
+  _tickBt(now) {
+    const bt = this.bt, dt = this.btT === undefined ? 0 : Math.max(0, now - this.btT);
+    this.btT = now;
+    for (const p of this.local) {
+      bt.tick(p.bq, now, dt);
+      if (!p.bot) continue;
+      // el bot también juega la batalla: lanza sus poderes al rato, los ataques lo hacen fallar y repara la cuerda
+      const J = bt.j[p.bq], ef = bt.pintura(p.bq, now);
+      if (J.poderes.length) { p.btLanza ??= now + 1 + Math.random() * 2.5; if (now >= p.btLanza) { p.btLanza = null; this._lanzaBt(p, now); } }
+      p.bot.torpe = ef.amp || ef.zurdo || ef.apagon ? 0.25 : 0;
+      p.bot.sinTraste = ef.roto >= 0 ? 1 << ef.roto : 0;
+      if (ef.roto >= 0) { p.btRepara ??= now + 2.5; if (now >= p.btRepara) { p.btRepara = null; for (let i = 0; i < REPARA; i++) bt.pulsaRoto(p.bq, now); } }
+    }
+    // alguien quedó K.O.: se ve el cartel y la canción termina a los FIN_KO segundos
+    if (bt.ganador !== null && this.btFinT === undefined) {
+      this.btFinT = now;
+      this.endAt = Math.min(this.endAt, now + FIN_KO);
+      this.audio.playSample('ripple', 1);
+      if (this.rock && this.rockTodos) this.rock.fin(this.rockTodos.indexOf(this.players[bt.ganador]));
+    }
   }
 
   // Retroceso tras la pausa: la pista corre hacia atrás y luego cuenta 3, 2, 1
@@ -568,6 +664,7 @@ export class GameSession {
       su: e.kind === 'guitar' ? e.sustainingMask() : 0,
       so: solo,
       ev: (p.netEvents = p.netEvents.slice(-EV_DIRECTO)),
+      ...(this.bt ? { bt: this.bt.vista(p.bq, this.now ?? 0) } : {}),
     });
   }
 
@@ -580,7 +677,17 @@ export class GameSession {
 
   onRemoteState(m) {
     const p = this.players.find((q) => q.type === 'remote' && q.id === m.id);
-    if (p) p.engine.apply(m, this.now ?? 0);
+    if (!p) return;
+    p.engine.apply(m, this.now ?? 0);
+    if (this.bt && m.bt && typeof m.bt === 'object') {
+      const now = this.now ?? 0, yo = this._rival(p);
+      this.bt.ponRemoto(p.bq, m.bt, now);
+      // sus ataques (se repiten en cada paquete; cada uno se aplica una vez). En la cuenta regresiva no valen:
+      // pueden ser de la canción anterior
+      if (now >= 0 && yo && Array.isArray(m.bt.a)) for (const x of m.bt.a.slice(-8)) {
+        if (Array.isArray(x) && Number.isInteger(x[0]) && PODERES[x[1]]) this._recibeBt(yo, { id: x[0], k: x[1], l: Number.isInteger(x[2]) ? x[2] : 0, de: p.bq }, now);
+      }
+    }
   }
 
   draw(now) {
@@ -597,6 +704,7 @@ export class GameSession {
     const recorta = vistas.length > 3;
     for (const [p, view] of vistas) {
       const t = p.type === 'remote' ? now - p.engine.retraso(performance.now()) : now;
+      if (this.bt) p.batalla = this.bt.pintura(p.bq, now);
       if (recorta) {
         ctx.save();
         ctx.beginPath();
@@ -742,12 +850,13 @@ export class GameSession {
   quit() {
     this.pauseMenu?.close();
     this.destroy();
-    if (this.net) this.net.send({ t: 'done', stats: { ...this.local[0].engine.stats(), quit: true }, curva: this.curva });
+    if (this.net) this.net.send({ t: 'done', stats: { ...this.local[0].engine.stats(), quit: true, ...(this.bt ? { vida: 0, ko: 1 } : {}) }, curva: this.curva });
     this.app.afterSessionQuit(this.net);
   }
 
   finish() {
     this.finished = true;
+    if (this.bt) this.bt.cierra(this.now ?? 0, this.players.map((p) => p.engine.score || 0));
     // el último punto, con el puntaje final (algo puede sumar tras la última nota)
     if (this.curva.length === CURVA_N) this.curva[CURVA_N - 1] = Math.floor(this.local[0].engine.score);
     const results = this.players.map((p) => ({
@@ -755,12 +864,14 @@ export class GameSession {
       curva: p === this.local[0] && this.net ? this.curva : null,
       stats: p.type === 'remote' ? null : p.engine.stats(),
       detail: p.type === 'remote' ? null : this._detail(p),
-      // la prueba del primer jugador humano: con ella la página verifica y guarda el récord
-      prueba: p === this.local[0] && p.grab ? p.grab.texto() : null,
+      // la prueba del primer jugador humano: con ella la página verifica y guarda el récord (la batalla no se guarda)
+      prueba: p === this.local[0] && p.grab && !this.bt ? p.grab.texto() : null,
+      batalla: this.bt ? { gano: this.bt.ganador === p.bq, motivo: this.bt.motivo, vida: this.bt.j[p.bq].vida, ko: this.bt.j[p.bq].ko } : null,
     }));
     if (this.net) {
       this._sendState(Infinity);
-      this.net.send({ t: 'done', stats: results.find((r) => r.type !== 'remote')?.stats, curva: this.curva });
+      const yo = results.find((r) => r.type !== 'remote');
+      this.net.send({ t: 'done', stats: yo?.stats && (this.bt ? { ...yo.stats, vida: Math.round(yo.batalla.vida * 1000), ko: yo.batalla.ko ? 1 : 0 } : yo.stats), curva: this.curva });
     }
     setTimeout(() => {
       this.destroy();

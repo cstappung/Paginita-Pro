@@ -23,7 +23,7 @@ import { OutputPass } from '../../vendor/three-0.160.0/addons/postprocessing/Out
 import { mergeGeometries } from '../../vendor/three-0.160.0/addons/utils/BufferGeometryUtils.js';
 import {
   ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
-  INV_CATS, invItem, invVar, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO,
+  INV_CATS, invItem, invVar, invVarL, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta,
 } from './catalogo.js';
 
 
@@ -85,19 +85,40 @@ if (!document.querySelector('link[data-rock-fuentes]')) {
   const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.rockFuentes = '';
   l.href = 'https://fonts.googleapis.com/css2?family=Bangers&family=Rubik:wght@500;700;900&display=swap'; document.head.append(l);
 }
-var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,100vw);background:rgba(12,8,22,.93);border-left:3px solid #000;display:flex;flex-direction:column;z-index:40;font-size:13px;transition:transform .3s;font-family:Rubik,system-ui,sans-serif;color:#fff;box-sizing:border-box}
+var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:linear-gradient(180deg,rgba(28,16,48,.96),rgba(10,6,20,.96) 40%);border-left:3px solid #000;display:flex;flex-direction:column;z-index:40;font-size:13px;transition:transform .3s;font-family:Rubik,system-ui,sans-serif;color:#fff;box-sizing:border-box}
 #editor.off{transform:translateX(105%);pointer-events:none}
-#editor .ttl{font-family:Bangers,Impact,sans-serif;font-size:26px;letter-spacing:1px;color:#ffd23a;text-shadow:2px 2px 0 #000;padding:12px 14px 6px}
+#editor .ttl{font-family:Bangers,Impact,sans-serif;font-size:28px;letter-spacing:1px;color:#ffd23a;text-shadow:2px 2px 0 #000;flex:1}
+#edHead{display:flex;align-items:center;gap:8px;padding:12px 14px 8px}
+#edCoins{display:flex;align-items:center;gap:6px;background:linear-gradient(#3a2a10,#22180a);border:2px solid #000;border-radius:999px;padding:4px 12px;font-size:15px;font-weight:900;color:#ffd23a;box-shadow:0 2px 0 #000}
 #edName{display:block;width:calc(100% - 28px);margin:0 14px;background:#221838;border:2px solid #000;border-radius:9px;color:#fff;font:inherit;font-weight:900;font-size:15px;padding:7px 9px}
-#edTabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 14px 6px}
+#edTabs{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:10px 14px 8px;border-bottom:2px solid rgba(0,0,0,.6)}
 #edPane{flex:1;overflow:auto;padding:2px 14px 14px;scrollbar-width:thin}
 #editor button,#edViews button{border:2px solid #000;border-radius:9px;padding:6px 8px;font:inherit;font-weight:900;background:#2b2140;color:#fff;cursor:pointer;box-shadow:0 3px 0 #000}
 #editor button:active,#edViews button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
 #editor button:disabled{opacity:.4;cursor:default}
-#edTabs button{flex:1 1 auto;padding:6px 7px;font-size:12px}
+#edTabs button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px 4px;font-size:10.5px;line-height:1.1;border-radius:11px}
+#edTabs button i{font-style:normal;font-size:19px;line-height:1.1}
+#edTabs button.vende{background:linear-gradient(#2d6a2a,#1d4a1a)}
+#edTabs button.vende.on{background:linear-gradient(#9dff6f,#5ad83a);color:#10200a}
 #edTabs button.on,#edViews button.on,#editor .chip.on{background:#ffd23a;color:#1a1020}
 #editor .eg{margin:12px 0 4px}
-#editor .eg>b{display:block;color:#c9b8ec;font-size:11px;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+#editor .eg>b{display:flex;justify-content:space-between;align-items:baseline;color:#c9b8ec;font-size:11px;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+#editor .eg>b small{font-size:11px;letter-spacing:0;text-transform:none;color:#8a7cab;font-weight:700}
+#editor .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#editor .tile{position:relative;min-height:48px;padding:8px 5px 7px;border-radius:12px;background:linear-gradient(#33284c,#231a3a);font-size:12px;font-weight:800;line-height:1.15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
+#editor .tile.on{background:linear-gradient(#ffe36a,#ffc21a);color:#1a1020}
+#editor .tile.on::after{content:'✓';position:absolute;top:2px;right:6px;font-size:12px}
+#editor .tile.lock{background:#140f1e;color:#7d6f99;border-style:dashed;box-shadow:none}
+#editor .tile.lock::before{content:'🔒';font-size:13px;opacity:.85}
+#editor .tile.leg{background:linear-gradient(100deg,#3a1660,#8a2a9a,#d0641a,#3a1660);background-size:300% 100%;animation:legS 3s linear infinite;color:#ffe9a8;text-shadow:0 0 6px #ff9a3a}
+#editor .tile.leg .st{color:#ffd23a;font-size:10px;letter-spacing:.5px}
+#editor .tile.leg.on{background:linear-gradient(100deg,#ffd23a,#fff4b0,#ff9a2a,#ffd23a);background-size:300% 100%;color:#1a1020;text-shadow:none}
+#editor .tile.leg.on .st{color:#b0401a}
+#editor .tile.leg.lock{animation:none;background:#1c1226;color:#a88a5a;text-shadow:none}
+#editor .tile .nv{position:absolute;left:5px;top:3px;font-size:10px;color:#9dff6f}
+#editor .tile.on .nv{color:#1d6a1a}
+#editor .legend{display:flex;flex-wrap:wrap;gap:4px 12px;color:#a99bc8;font-size:11px;margin:10px 0 2px}
+#editor .legend b{color:#ffd23a}
 #editor .chips{display:flex;flex-wrap:wrap;gap:5px}
 #editor .chip{border-radius:999px;padding:5px 11px;font-weight:700;box-shadow:0 2px 0 #000}
 #editor .sws{display:flex;flex-wrap:wrap;gap:6px}
@@ -114,11 +135,12 @@ var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,10
 #editor .chip.leg.on{background:linear-gradient(100deg,#ffd23a,#fff4b0,#ff9a2a,#ffd23a);background-size:300% 100%;color:#1a1020;text-shadow:none}
 #editor .chip.leg.on::before{color:#b0401a}
 @keyframes legS{to{background-position:-300% 0}}
-@media (prefers-reduced-motion:reduce){#editor .chip.leg{animation:none}}
+@media (prefers-reduced-motion:reduce){#editor .chip.leg,#editor .tile.leg{animation:none}}
 #editor .add{width:100%;margin-top:12px;background:linear-gradient(#ff5a3a,#d4231a)}
-#edFoot{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 14px 14px;border-top:2px solid #000}
+#edFoot{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 14px 14px;border-top:2px solid #000;background:rgba(0,0,0,.25)}
+#edFoot .gold,#editor .gold{background:linear-gradient(#5ad83a,#2d8a1a)}
 #edFoot .hot{background:linear-gradient(#ff5a3a,#d4231a)}
-#edFoot .wide{grid-column:1/3}
+#edFoot .wide{grid-column:1/4}
 #edViews{position:fixed;left:14px;bottom:14px;display:flex;flex-wrap:wrap;gap:6px;z-index:7;font-size:13px}
 #edViews.off{display:none}
 #edToast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#ffd23a;color:#1a1020;border:3px solid #000;border-radius:12px;padding:8px 16px;font-weight:900;z-index:9;opacity:0;transition:opacity .3s;pointer-events:none}
@@ -150,7 +172,7 @@ var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,10
 #boxUI button:disabled{opacity:.4;cursor:default}
 #boxUI button.hot{background:linear-gradient(#ff5a3a,#d4231a)}
 @media (max-width:700px){#boxUI{left:50%;bottom:calc(56vh + 54px)}}
-@media (max-width:700px){#editor{top:auto;height:56vh;width:100vw;border-left:0;border-top:3px solid #000}#edViews{left:8px;bottom:calc(56vh + 8px)}#editor .ttl{display:none}}
+@media (max-width:700px){#editor{top:auto;height:56vh;width:100vw;border-left:0;border-top:3px solid #000}#edViews{left:8px;bottom:calc(56vh + 8px)}#editor .ttl{font-size:20px}#edHead{padding:6px 14px 4px}#edTabs button i{font-size:16px}}
 
 .rock-capa,.rock-capa *{box-sizing:border-box}
 .rock-capa{font-family:Rubik,system-ui,sans-serif;color:#fff}
@@ -158,20 +180,30 @@ var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,10
 canvas.rock-lienzo{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #editor .sws .sw.venta{opacity:.45;position:relative}
 #editor .sws .sw.venta::after{content:'🏪';position:absolute;right:-6px;bottom:-6px;font-size:12px}
-#editor .sell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0;background:#221838;border:2px solid #000;border-radius:10px;padding:6px 8px;font-weight:700;font-size:12px}
-#editor .sell span{flex:1 1 100%}
-#editor .sell input{width:96px;background:#120c20;color:#fff;border:2px solid #000;border-radius:8px;padding:4px 6px;font:inherit}
-#editor input:focus{outline:2px solid #ffd23a}`;
+#editor .sell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0;background:linear-gradient(#1f3a1c,#152a12);border:2px solid #000;border-radius:12px;padding:8px 10px;font-weight:700;font-size:12px;box-shadow:0 3px 0 #000}
+#editor .sell span{flex:1 1 100%;font-size:13px}
+#editor .sell input,#editor .vrow input{width:96px;background:#120c20;color:#fff;border:2px solid #000;border-radius:8px;padding:4px 6px;font:inherit}
+#editor input:focus{outline:2px solid #ffd23a}
+#editor .como{background:#1d1530;border:2px solid #000;border-radius:12px;padding:10px 12px;margin:10px 0;line-height:1.45;color:#d9cdf5;font-size:12px}
+#editor .como ol{margin:6px 0 0;padding-left:18px}
+#editor .vrow{display:grid;grid-template-columns:42px 1fr;gap:4px 10px;align-items:center;background:#221838;border:2px solid #000;border-radius:12px;padding:8px 10px;margin:7px 0}
+#editor .vrow.leg{border-color:#ffb02a;box-shadow:0 0 10px rgba(255,176,42,.35)}
+#editor .vfoto{width:42px;height:42px;border-radius:10px;border:2px solid #000;display:grid;place-items:center;font-size:20px;grid-row:1/3}
+#editor .vtx b{display:block;font-size:13.5px}
+#editor .vtx small{color:#a99bc8;font-size:11px}
+#editor .vact{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+#editor .vact em{font-style:normal;color:#9dff6f;font-weight:900;font-size:12px;flex:1}
+#editor .vact .gold{padding:6px 12px}`;
 document.head.append(Object.assign(document.createElement('style'), { textContent: ROCK_CSS }));
 var CAPA = document.createElement('div');
 CAPA.className = 'rock-capa';
 CAPA.innerHTML = `<div id="editor" class="off">
-  <div class="ttl">TU ROCKERO</div>
+  <div id="edHead"><div class="ttl">TU ROCKERO</div><div id="edCoins" title="Tus monedas"><i class="coin"></i><b>0</b></div></div>
   <input id="edName" maxlength="24" placeholder="Nombre del rockero" aria-label="Nombre" translate="no">
   <div id="edTabs"></div>
   <div id="edPane"></div>
   <div id="edFoot">
-    <button id="edRand">🎲 Aleatorio</button><button id="edSave" class="hot">💾 Guardar</button>
+    <button id="edRand">🎲 Aleatorio</button><button id="edVender" class="gold">🏪 Vender</button><button id="edSave" class="hot">💾 Guardar</button>
     <button id="edClose" class="wide">✕ Cerrar</button>
   </div>
 </div>
@@ -188,20 +220,23 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
    que la compra y la deriva con la hora del servidor (rock-datos.js).
    ===================================================================== */
 const BOX_PRICE = PRECIO_CAJA;
-const invBg = c => { const cs = Object.values(c).map(cssC); return cs.length < 2 ? cs[0] : `conic-gradient(${cs.map((x, i) => `${x} ${i / cs.length * 100}% ${(i + 1) / cs.length * 100}%`).join(',')})`; };
+const invBg = c => { const cs = Object.values(c || {}).map(cssC); if (!cs.length) return 'radial-gradient(circle at 35% 30%,#fff,#c9b8ec 45%,#5a3a9a)'; return cs.length < 2 ? cs[0] : `conic-gradient(${cs.map((x, i) => `${x} ${i / cs.length * 100}% ${(i + 1) / cs.length * 100}%`).join(',')})`; };
 /* own: [{b, k, t, c, leg, copia?, venta?}] — lo inicial (sin copia) y lo tuyo; last: los últimos premios */
 let INV = { coins: 0, parada: false, own: iniciales().map(v => ({ ...v })), opened: 0, last: [] };
 /* para ponerse solo cuenta lo que no está a la venta (lo que está en el mercado no se usa) */
-const invHas = (b, k, t) => t === 'none' || INV.own.some(v => v.b === b && v.k === k && v.t === t && !v.venta);
+const invHas = (b, k, t) => esNada(t) || INV.own.some(v => v.b === b && v.k === k && v.t === t && !v.venta);
 const invVariants = (b, k, t) => INV.own.filter(v => v.b === b && v.k === k && v.t === t && !v.venta);
 const invTodas = (b, k, t) => INV.own.filter(v => v.b === b && v.k === k && v.t === t);
 /* aleatorio del editor: solo piezas del inventario (con sus colores) */
 function invClamp(L) {
   for (const k in INV_CATS) {
-    const o = L[k]; if (!o?.type) continue;
-    const vs = o.type === 'none' ? [] : invVariants(L.body, k, o.type), all = INV.own.filter(v => v.b === L.body && v.k === k && !v.venta);
-    const v = vs.length ? pick(vs) : o.type === 'none' ? null : pick(all);
-    if (v) Object.assign(o, { type: v.t }, v.c); else if (o.type !== 'none') o.type = 'none';
+    if (k === 'tatDesign') { L.tattoos = (L.tattoos || []).filter(t => invHas(L.body, k, t.design)); continue; }
+    const ruta = rutaInv(k), par = getP(L, ruta.split('.').slice(0, -1).join('.')), t = getP(L, ruta);
+    if (!par || !t) continue;
+    const vs = esNada(t) ? [] : invVariants(L.body, k, t), all = INV.own.filter(v => v.b === L.body && v.k === k && !v.venta);
+    const v = vs.length ? pick(vs) : esNada(t) ? null : pick(all);
+    if (v) { setP(L, ruta, v.t); Object.assign(par, v.c); legDefaults(L, ruta); }
+    else if (!esNada(t)) { const nada = ED_CAT[L.body][k].find(o => esNada(o[0])); setP(L, ruta, nada ? nada[0] : getP(defaultLook(L.body), ruta)); }
   }
   return L;
 }
@@ -447,7 +482,11 @@ function auraMat(a, b, bolt) {
 }
 const geoCache = {};
 const G = (key, fn) => geoCache[key] || (geoCache[key] = fn());
+/* `LIVIANO`: mientras se arma un rockero de más (salas de 3 a 8), sin contornos ni sombra: cada contorno es otra
+   malla con la misma geometría, y un rockero completo son ~170 mallas y ~150 mil triángulos */
+let LIVIANO = false;
 function mesh(parent, geo, mat, { pos, rot, scale, outline = 0.01, shadow = false, receive = false } = {}) {
+  if (LIVIANO) { outline = 0; shadow = false; }
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.set(...pos);
   if (rot) m.rotation.set(...rot);
@@ -2211,8 +2250,8 @@ class Rocker {
       }
       geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
       const bones = []; for (let k = 0; k < n; k++) { const b = new THREE.Bone(); b.position.copy(k ? J[k].clone().sub(J[k - 1]) : J[0]); (k ? bones[k - 1] : par).add(b); bones.push(b); }
-      const m = new THREE.SkinnedMesh(geo, mat), ol = new THREE.SkinnedMesh(geo, outlineMat(o.ol ?? 0.0042)); m.frustumCulled = ol.frustumCulled = false; par.add(m, ol);
-      this.chains.push({ par, bones, J, meshes: [m, ol], stiff: o.stiff ?? 10, W: J.map(() => V()), P: null, Pp: null });
+      const m = new THREE.SkinnedMesh(geo, mat), ol = LIVIANO ? null : new THREE.SkinnedMesh(geo, outlineMat(o.ol ?? 0.0042)); m.frustumCulled = false; par.add(m); if (ol) { ol.frustumCulled = false; par.add(ol); }
+      this.chains.push({ par, bones, J, meshes: ol ? [m, ol] : [m], stiff: o.stiff ?? 10, W: J.map(() => V()), P: null, Pp: null });
     };
     // punto sobre el casquete: a = azimut (0 delante, + hacia la izquierda del personaje), e = elevación
     const sp = (a, e, k = 1) => V(Math.sin(a) * Math.cos(e) * 0.122 * k, Math.sin(e) * 0.15 * k, Math.cos(a) * Math.cos(e) * (Math.cos(a) > 0 ? 0.13 : 0.142) * k);
@@ -2563,8 +2602,8 @@ class Rocker {
     this.st = { strumT: -9, strumDir: 1, strumAmp: 0.07, fret: 5, fx: fretX(5), I: 0.5, conf: 0, blinkAt: 2, blinkT: -9, mouthS: 0, riffPtr: 0, sustainEnd: 0, bend: -9 };
   }
   skin(geo, mat, outline = 0.008) {
-    const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.castShadow = true; this.root.add(m); m.bind(this.skel, this._I);
-    if (outline > 0) { const o = new THREE.SkinnedMesh(geo, outlineMat(outline, !!geo.attributes.olw, !!geo.attributes.clp)); o.frustumCulled = false; this.root.add(o); o.bind(this.skel, this._I); }
+    const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.castShadow = !LIVIANO; this.root.add(m); m.bind(this.skel, this._I);
+    if (outline > 0 && !LIVIANO) { const o = new THREE.SkinnedMesh(geo, outlineMat(outline, !!geo.attributes.olw, !!geo.attributes.clp)); o.frustumCulled = false; this.root.add(o); o.bind(this.skel, this._I); }
     return m;
   }
   /* física de mechones: la raíz sigue a la cabeza; cada articulación tiene inercia, algo de gravedad y vuelve a su forma (memoria);
@@ -2624,6 +2663,8 @@ class Rocker {
   }
   animGuitar(t, mt, dt, K) {
     const p = this.p, st = this.st, c = st.conf, I = st.I;
+    // en el editor (`quieto`) no toca ni se mece: lo están vistiendo y moverse molestaba; solo respira
+    if (st.quieto) { Object.assign(p, { hipDrop: 0.035, lean: 0.08, headPitch: 0.03 + 0.012 * Math.sin(t * 1.7), stance: 0.05, brow: 0.12, lid: 0.38, sneer: 0.12 }); st.sustainEnd = 0; st.bend = -9; st.riffPtr = 0; return; }
     const dip = nodCurve(K.bp, 0.62) * 0.85;
     // en un tramo sin notas de la canción (`descanso`, en vivo) no toca: la mano de la púa baja y se mueve menos
     const rest = !!st.descanso;
@@ -3220,7 +3261,18 @@ const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), cielo = n
 const pyros = [-5.6, -2.0, 2.0, 5.6].map(x => new Pyro(x));
 /* cada rockero se arma la primera vez que sale a escena (y se rehace si su configuración cambia) */
 const rockers = {};
-function ensureRocker(k) { if (!ROCKERS[k]) k = 'violeta'; if (!rockers[k]) { rockers[k] = new Rocker(ROCKERS[k], 'guitar'); rockers[k].root.visible = false; scene.add(rockers[k].root); } return rockers[k]; }
+/* los de más en una sala de 3 a 8 (`EXTRAS`, claves 'x_<uid>') se arman livianos: sin contornos ni sombra */
+const LIVIANOS = new Set();
+let EXTRAS = [];
+function ensureRocker(k) {
+  if (!ROCKERS[k]) k = 'violeta';
+  if (!rockers[k]) {
+    LIVIANO = LIVIANOS.has(k);
+    try { rockers[k] = new Rocker(ROCKERS[k], 'guitar'); } finally { LIVIANO = false; }
+    rockers[k].root.visible = false; scene.add(rockers[k].root);
+  }
+  return rockers[k];
+}
 /* pone (o cambia) la configuración de un rockero con clave propia: 'yo', 'u_<uid>'… */
 function setRocker(k, cfg) {
   const s = JSON.stringify(cfg);
@@ -3247,8 +3299,22 @@ const VIVO = { on: false, solo: false, mt: 0, raw: -1, ko: null, animoT: 0, fin:
 const LOOP_A = 5 * BAR, LOOP_B = 59 * BAR;
 const vivoMt = raw => raw < LOOP_B ? Math.max(0, raw) : LOOP_A + (raw - LOOP_A) % (LOOP_B - LOOP_A);
 const SOLO = () => VIVO.on && VIVO.solo;
+/* los demás jugadores de una sala de 3 a 8 (en vivo y con rival) */
+const EX = () => (VIVO.on && !VIVO.solo ? EXTRAS.map(ensureRocker) : []);
 /* lo que tocan juntos en escena (sin rival, el de la derecha no sale) */
-const enEscena = () => SOLO() ? [PL()] : [PL(), PR()];
+const enEscena = () => SOLO() ? [PL()] : [PL(), PR(), ...EX()];
+/* el rockero del jugador `q`: 0 tú, 1 el rival, 2… los demás de la sala */
+const rockerDe = q => (q === 0 ? PL() : q === 1 ? PR() : EX()[q - 2] || null);
+const claveDe = q => (q === 0 ? OPT.L : q === 1 ? OPT.Rr : EXTRAS[q - 2] || OPT.L);
+/* dónde se para cada uno con 3 a 8: [x, z, giro] por jugador (tú, el rival, los demás). Delante cuatro; atrás,
+   entre ellos (la cámara está alta: se les ve por encima de los de adelante) */
+const ATRAS = { 1: [0], 2: [-3, 3], 3: [-3, 0, 3], 4: [-6, -3, 3, 6] };
+function puestosSala(n) {
+  if (n === 3) return [[-3.4, 0.72, 0.3], [3.4, 0.72, -0.3], [0, 0.95, 0]];
+  const P = [[-4.5, 0.8, 0.25], [4.5, 0.8, -0.25], [-1.5, 0.95, 0.08], [1.5, 0.95, -0.08]];
+  for (const x of ATRAS[n - 4] || []) P.push([x, -1.15, -x * 0.05]);
+  return P;
+}
 
 /* =====================================================================
    GUION DE LA BATALLA
@@ -3258,11 +3324,14 @@ const battle = {
     this.t0 = clock.t; this.winner = OPT.win === 'rand' ? (R() < 0.5 ? 0 : 1) : +OPT.win;
     this.mom = 0; this.momT = 0; this.seqs = []; this.ko = false; this.lastBar = -1; this.ei = 0; this.visPtr = 0;
     for (const k in rockers) rockers[k].root.visible = false;
-    const L = PL(), Rk = PR(); L.root.visible = true; Rk.root.visible = !SOLO();
-    if (SOLO()) L.place(0, SY, 0.95, 0); else { L.place(-3.4, SY, 0.72, 0.3); Rk.place(3.4, SY, 0.72, -0.3); }
+    const L = PL(), Rk = PR(), ex = EX(); L.root.visible = true; Rk.root.visible = !SOLO();
+    if (SOLO()) L.place(0, SY, 0.95, 0);
+    else if (!ex.length) { L.place(-3.4, SY, 0.72, 0.3); Rk.place(3.4, SY, 0.72, -0.3); }
+    else puestosSala(2 + ex.length).forEach(([x, z, yaw], i) => { const r = rockerDe(i); r.root.visible = true; r.place(x, SY, z, yaw); r.side = x < 0 ? 0 : 1; r.opp = null; });
     L.side = 0; Rk.side = 1; L.opp = Rk; Rk.opp = L;
-    singer.root.visible = S.micSet.visible = !SOLO(); drummer.root.visible = true;
-    for (const r of [L, Rk, singer, drummer]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
+    // con más de dos, el cantante deja el centro libre
+    singer.root.visible = S.micSet.visible = !SOLO() && !ex.length; drummer.root.visible = true;
+    for (const r of [L, Rk, singer, drummer, ...ex]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
     // ataques: al principio domina el que acabará perdiendo, luego remontada (en vivo los dispara la partida)
     const events = []; const n = ATTACK_BARS.length; let last = '';
     if (!VIVO.on) ATTACK_BARS.forEach((bar, i) => {
@@ -3273,13 +3342,13 @@ const battle = {
     });
     this.events = events;
     confetti.stop(); director.reset();
-    if (SOLO()) titles.solo(OPT.L); else titles.vs(OPT.L, OPT.Rr);
+    if (SOLO()) titles.solo(OPT.L); else if (ex.length) titles.call(`¡${2 + ex.length} EN EL ESCENARIO!`, '#ffd23a'); else titles.vs(OPT.L, OPT.Rr);
   },
   mt() { return VIVO.on ? VIVO.mt : clock.t - this.t0; },
   /* la canción volvió atrás (repetición del bucle o el retroceso tras la pausa): los punteros, de cero */
   rewound() {
     this.lastBar = -1; this.visPtr = 0;
-    for (const r of [PL(), PR(), singer, drummer]) { r.st.riffPtr = 0; if (r.handPtr) r.handPtr = [0, 0]; if (!this.ko) r.clearMoves(); }
+    for (const r of [PL(), PR(), singer, drummer, ...EX()]) { r.st.riffPtr = 0; if (r.handPtr) r.handPtr = [0, 0]; if (!this.ko) r.clearMoves(); }
     this.seqs = [];
   },
   attack(from, kind) {
@@ -3293,20 +3362,22 @@ const battle = {
      levanta la guitarra y le manda un rayo al cielo */
   carga(from) {
     if (this.ko) return;
-    if (!SOLO()) { this.attack(from, pick(Object.keys(ATTACKS))); return; }
-    const A = PL(), mt = this.mt(), tip = () => A.gtr.tip.getWorldPosition(V());
+    // en un mano a mano es un ataque al rival; solo o en una sala de más, un rayo al cielo
+    if (!SOLO() && !EXTRAS.length) { this.attack(from, pick(Object.keys(ATTACKS))); return; }
+    const A = SOLO() ? PL() : rockerDe(from); if (!A) return;
+    const mt = this.mt(), tip = () => A.gtr.tip.getWorldPosition(V());
     A.addMove('charge', mt, 1.1, { react: true });
     const alto = tip().add(V(rr(-1.5, 1.5), 6, rr(-1, 0.5)));
     bolt.fire(tip, () => alto, 0.8, ATTACKS.shock.bolt);
     parts.emit(tip(), 40, { color: 0x6fd8ff, color2: 0xffffff, speed: 2.5, life: 0.7, size: 0.05 });
     fxLight = Math.max(fxLight, 0.7); S.lights.fx.position.copy(tip()); S.lights.fx.color.set('#6fd8ff');
     crowd.cheer = Math.max(crowd.cheer, 0.5);
-    director.event('target', 0, 1.2);
+    director.event('target', SOLO() ? 0 : from, 1.2);
   },
   /* el Star Power activado: cae un rayo del cielo sobre la guitarra y se prende de azul mientras dure */
   poder(from, on) {
     if (from && SOLO()) return;
-    const A = from ? PR() : PL();
+    const A = rockerDe(from); if (!A) return;
     A.gtr.spAura.visible = !!on;
     if (!A.gtr.strings.userData.c0) A.gtr.strings.userData.c0 = A.gtr.strings.material.color.clone();
     A.gtr.strings.material.color.copy(on ? new THREE.Color(0x6ad8ff).multiplyScalar(2.5) : A.gtr.strings.userData.c0);
@@ -3320,7 +3391,7 @@ const battle = {
     crowd.cheer = Math.max(crowd.cheer, 1);
     if (SOLO()) for (const p of pyros) p.fire(1.2);
     titles.call('¡STAR POWER!', '#53e7ff');
-    director.event(SOLO() ? 'target' : 'attacker', from, 1.5);
+    director.event(SOLO() || EXTRAS.length ? 'target' : 'attacker', from, 1.5);
   },
   /* un jugador solo: el público y el rockero celebran (Star Power, rachas) */
   hype(kind, text, color) {
@@ -3368,6 +3439,8 @@ const battle = {
     this.mom = damp(this.mom, this.momT, 1.2, dt);
     const L = PL(), Rk = PR();
     L.st.conf = this.mom; Rk.st.conf = -this.mom;
+    // en una sala de más: cada uno según su puesto en la tabla
+    if (VIVO.confs && !SOLO()) enEscena().forEach((r, i) => { r.st.conf = damp(r.st.conf, VIVO.confs[i] ?? 0, 1.2, dt); });
     // KO (en vivo, cuando PRO HERO lo pide al terminar la canción)
     const koT = KO_BAR * BAR;
     if (!this.ko && (VIVO.on ? VIVO.ko !== null : mt >= koT)) {
@@ -3379,10 +3452,11 @@ const battle = {
         director.event('winner', 0, 6);
         return;
       }
-      this.momT = this.winner === 0 ? 1 : -1;
-      const W = this.winner === 0 ? L : Rk, Lo = this.winner === 0 ? Rk : L;
-      W.clearMoves(); Lo.clearMoves(); W.addMove('jump', mt, 0.55, { react: true }); W.addMove('victory', mt + 0.4, 999, { react: true }); Lo.addMove('stagger', mt, 0.9, { react: true }); Lo.addMove('defeat', mt + 0.7, 999, { react: true });
-      for (const p of pyros) p.fire(2.2); confetti.burst(); crowd.cheer = 1.4; titles.ko(this.winner === 0 ? OPT.L : OPT.Rr);
+      this.momT = this.winner === 0 ? 1 : this.winner === 1 ? -1 : 0;
+      const W = rockerDe(this.winner) || L;
+      for (const Lo of enEscena()) if (Lo !== W) { Lo.clearMoves(); Lo.addMove('stagger', mt, 0.9, { react: true }); Lo.addMove('defeat', mt + 0.7, 999, { react: true }); }
+      W.clearMoves(); W.addMove('jump', mt, 0.55, { react: true }); W.addMove('victory', mt + 0.4, 999, { react: true });
+      for (const p of pyros) p.fire(2.2); confetti.burst(); crowd.cheer = 1.4; titles.ko(claveDe(this.winner));
       director.event('winner', this.winner, 6);
     }
     if (this.ko && !VIVO.on && mt > koT + 12 && OPT.loop) this.start();
@@ -3412,15 +3486,15 @@ const battle = {
    DIRECTOR DE CÁMARA
    ===================================================================== */
 const headPos = rk => rk.face.getWorldPosition(V());
-const SIDEOF = i => (i === 0 ? PL() : PR());
+const SIDEOF = i => rockerDe(i) || PL();
 const SHOTS = {
   establish: u => { const k = smooth(clamp(u / 9, 0, 1)); return { p: V(lerp(-7, 0, k), lerp(14, 6.3, k), lerp(27, 16.5, k)), l: V(0, SY + 1.2, 0), f: 44, hh: 0.2 }; },
   wide: (u, r) => ({ p: V(r.s * 2.5 + Math.sin(u * 0.08) * 1.5, 6.3 - u * 0.04, 17 - u * 0.25), l: V(0, SY + 1.1, 0), f: 42, hh: 0.4 }),
   crowdLow: (u, r) => ({ p: V(r.s * 3 - r.s * u * 0.3, 1.55, 9.5), l: V(0, SY + 1.5, 0), f: 46, hh: 1 }),
   duo: (u, r) => ({ p: V(-1.2 * r.s + u * 0.12 * r.s, SY + 0.75, 6.4 - u * 0.08), l: V(0, SY + 1.45, 0), f: 50, hh: 0.6 }),
-  close: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2); const s = r.who === 0 ? 1 : -1; return { p: V(h.x + s * (1.05 - u * 0.05), SY + 0.62, h.z + 2.0 - u * 0.06), l: V(h.x + s * 0.05, h.y - 0.35, h.z), f: 40, hh: 0.8 }; },
-  hero: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2), b = R2.root.position; const s = r.who === 0 ? 1 : -1; return { p: V(b.x + s * 0.7, SY + 0.22, b.z + 1.35 + u * 0.03), l: V(h.x, h.y - 0.1, h.z), f: 56, hh: 0.7 }; },
-  over: (u, r) => { const b = SIDEOF(r.who).root.position; const s = r.who === 0 ? 1 : -1; return { p: V(b.x - s * 1.4, SY + 2.5, b.z - 2.3 + u * 0.08), l: V(b.x + s * 2.2, SY + 0.4, b.z + 9), f: 58, hh: 0.6 }; },
+  close: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2); const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(h.x + s * (1.05 - u * 0.05), SY + 0.62, h.z + 2.0 - u * 0.06), l: V(h.x + s * 0.05, h.y - 0.35, h.z), f: 40, hh: 0.8 }; },
+  hero: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2), b = R2.root.position; const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(b.x + s * 0.7, SY + 0.22, b.z + 1.35 + u * 0.03), l: V(h.x, h.y - 0.1, h.z), f: 56, hh: 0.7 }; },
+  over: (u, r) => { const b = SIDEOF(r.who).root.position; const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(b.x - s * 1.4, SY + 2.5, b.z - 2.3 + u * 0.08), l: V(b.x + s * 2.2, SY + 0.4, b.z + 9), f: 58, hh: 0.6 }; },
   guitar: (u, r) => { const R2 = SIDEOF(r.who); const g = R2.gtr.g.localToWorld(V(0.28, 0, 0)); const f = R2.root.localToWorld(V(0, 0, 1)).sub(R2.root.position); return { p: g.clone().addScaledVector(f, 0.85 - u * 0.03).add(V(0, 0.2, 0)), l: R2.gtr.g.localToWorld(V(0.3 + Math.sin(u * 0.4) * 0.15, 0, 0)), f: 34, hh: 0.5 }; },
   singer: u => { const h = headPos(singer); return { p: V(0.95 - u * 0.05, SY + 0.5, h.z + 1.9), l: V(h.x, h.y - 0.2, h.z), f: 46, hh: 0.7 }; },
   drums: u => { const h = headPos(drummer); return { p: V(-1.7 + u * 0.08, SY + 1.9, -0.6), l: V(h.x, h.y - 0.45, h.z), f: 50, hh: 0.5 }; },
@@ -3460,7 +3534,8 @@ const director = {
     if (clock.t < this.until || bar < this.nextBar) return;
     let set = SHOT_SETS[sec.name] || SHOT_SETS.verse; if (SOLO()) set = set.filter(n => !SOLO_FUERA.includes(n));
     let n; do n = pick(set); while (n === this.name && set.length > 1);
-    const lead = battle.mom > 0 ? 0 : 1; const who = SOLO() ? 0 : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
+    const lead = battle.mom > 0 ? 0 : 1, nEx = EXTRAS.length && !SOLO() ? EXTRAS.length : 0;
+    const who = SOLO() ? 0 : nEx && R() < 0.4 ? 2 + Math.floor(R() * nEx) : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
     if (battle.ko) n = pick(['hero', 'close', 'crane', 'wide', 'crowdLow']);
     this.cut(n, { s: R() < 0.5 ? 1 : -1, who: battle.ko ? battle.winner : who });
     this.nextBar = bar + (SECTION_I[sec.name] > 0.9 ? 1 + (R() < 0.5 ? 1 : 0) : 2);
@@ -3554,7 +3629,7 @@ let VPW = 0, VPH = 0;
    ===================================================================== */
 const ED = { open: false, L: null, key: null, rk: null, tab: 'cuerpo', view: 'cuerpo', yaw: 0.35, zoom: 1, mt0: 0, tm: 0, snap: true, drag: null, cp: V(), cl: V(), tat: { design: null, spot: null, color: 0x1a1420 } };
 const ED_POS = V(0, SY, 1.2);
-const ED_TABS = [['cuerpo', 'Cuerpo'], ['cara', 'Cara'], ['pelo', 'Pelo'], ['ropa', 'Ropa'], ['guitarra', 'Guitarra'], ['acc', 'Accesorios'], ['tat', 'Tatuajes'], ['cajas', '📦 Cajas']];
+const ED_TABS = [['cuerpo', 'Cuerpo', '🧍'], ['cara', 'Cara', '🙂'], ['pelo', 'Pelo', '💇'], ['ropa', 'Ropa', '👕'], ['guitarra', 'Guitarra', '🎸'], ['acc', 'Joyas', '💍'], ['tat', 'Tatuajes', '🖋️'], ['cajas', 'Cajas', '📦'], ['vender', 'Vender', '🏪']];
 const ED_VIEWS = [['cuerpo', 'Cuerpo'], ['cara', 'Cara'], ['manos', 'Manos'], ['pies', 'Pies']];
 /* encuadres: punto que se sigue (en vivo, sobre el hueso), distancia, altura, campo de visión y giro inicial */
 const ED_FOCUS = {
@@ -3572,7 +3647,7 @@ const ED_FOCUS = {
   oreja: rk => { const lg = ['long', 'longF'].includes(rk.cfg.hair?.style); return { l: rk.face.localToWorld(V(lg ? -0.07 : -0.1, -0.045, lg ? 0.03 : 0)), d: lg ? 0.8 : 0.65, h: 0.0, fov: 30, yaw: lg ? -0.55 : -1.25 }; },   // con melena se mira más de frente (el pelo tapa el costado)
   muneca: rk => ({ l: rk.fa[1].localToWorld(V(0, -0.275, 0)), d: 0.95, h: 0.12, fov: 30, yaw: 0.25 }),
 };
-const TAB_FOCUS = { cuerpo: 'cuerpo', cara: 'cara', pelo: 'pelo', ropa: 'cuerpo', guitarra: 'guitarra', acc: 'cuello', cajas: 'cuerpo' };
+const TAB_FOCUS = { cuerpo: 'cuerpo', cara: 'cara', pelo: 'pelo', ropa: 'cuerpo', guitarra: 'guitarra', acc: 'cuello', cajas: 'cuerpo', vender: 'cuerpo' };
 /* qué parte enfocar según el control que se toca */
 const pathFocus = p => p === 'face.faceShape' || p.startsWith('face.mk') || p === 'face.lipColor' || p.startsWith('beard') ? 'cara' : p.startsWith('face.') ? 'ojos'
   : p.startsWith('hair') ? 'pelo' : p.startsWith('top') ? 'torso' : p.startsWith('bottom') || p === 'belt' || p.startsWith('legwear') ? 'piernas' : p.startsWith('shoes') ? 'pies'
@@ -3591,7 +3666,7 @@ function edRebuild() {
   const cfg = JSON.parse(JSON.stringify(ED.L));
   if (ED.tab === 'tat' && ED.tat.spot === 'mejilla' && cfg.tattoos.length < 5 && !cfg.tattoos.some(t => t.spot === 'mejilla')) cfg.tattoos.push({ design: ED.tat.design, spot: 'mejilla', color: ED.tat.color });   // vista previa bajo el ojo
   try { ED.rk = new Rocker(cfg, 'guitar'); } catch (err) { console.error(err); return; }
-  scene.add(ED.rk.root); ED.rk.place(ED_POS.x, ED_POS.y, ED_POS.z, 0); ED.rk.st.I = 0.55;
+  scene.add(ED.rk.root); ED.rk.place(ED_POS.x, ED_POS.y, ED_POS.z, 0); ED.rk.st.I = 0.55; ED.rk.st.quieto = true;
   if (old) old.dispose();
   ED.prev = null; edTatPreview();
 }
@@ -3600,8 +3675,8 @@ function edSet(p, v) {
   setP(ED.L, p, v); if (p === 'guitar.body') delete ED.L.guitar.head;
   const f = ED_FIELDS.find(x => x[0] === p);
   if (f && ED_CAT[ED.L.body][f[1]].find(o => o[0] === v)?.[2]) { legDefaults(ED.L, p); edToast('★ ¡Legendario!'); }
-  const k = p.split('.')[0];
-  if (INV_CATS[k] && p === k + '.type') { const vs = invVariants(ED.L.body, k, v); if (vs.length) Object.assign(ED.L[k], vs.at(-1).c); }   // se pone con los colores de tu última variante
+  const k = catDeRuta(p);
+  if (k && INV_CATS[k].cols.length) { const vs = invVariants(ED.L.body, k, v); if (vs.length) Object.assign(ED.L[k], vs.at(-1).c); }   // se pone con los colores de tu última variante
   edChanged();
 }
 let toastT = 0;
@@ -3621,18 +3696,26 @@ function edSwitchBody(g) {
 }
 function edRender() {
   const L = ED.L, g = L.body, C = ED_CAT[g], f = g === 'f';
-  $('#edTabs').innerHTML = ED_TABS.map(([k, n]) => `<button class="${ED.tab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('');
+  $('#edTabs').innerHTML = ED_TABS.map(([k, n, ic]) => `<button class="${ED.tab === k ? 'on' : ''}${k === 'vender' ? ' vende' : ''}" data-tab="${k}"><i aria-hidden="true">${ic}</i>${n}</button>`).join('');
+  $('#edCoins b').textContent = Math.max(0, INV.coins).toLocaleString('es');
   $('#edViews').innerHTML = ED_VIEWS.map(([k, n]) => `<button class="${ED.view === k ? 'on' : ''}" data-view="${k}">${n}</button>`).join('') + '<button data-rot="-1" aria-label="Girar a la izquierda">⟲</button><button data-rot="1" aria-label="Girar a la derecha">⟳</button>';
   if (document.activeElement !== $('#edName')) $('#edName').value = L.name;
-  const locked = (path, v) => { const k = path.split('.')[0]; return INV_CATS[k] && path === k + '.type' && !invHas(g, k, v); };
-  const chips = (label, path, list, attr = 'p', cur = getP(L, path)) => `<div class="eg"><b>${label}</b><div class="chips">${list.map(([v, n, lg]) => `<button class="chip${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${attr === 'p' && cur !== v && locked(path, v) ? ' lock' : ''}" data-${attr}="${path}" data-v="${v}">${n}</button>`).join('')}</div></div>`;
+  const locked = (path, v, attr) => { const k = attr === 'tp' ? (path === 'design' ? 'tatDesign' : null) : catDeRuta(path); return !!k && !invHas(g, k, v); };
+  /* las listas de piezas van en baldosas (con candado si no la tienes, ★ si es legendaria y ×N variantes tuyas); las cortas, en fichas */
+  const nVar = (path, v, attr) => { const k = attr === 'p' && catDeRuta(path); return k && INV_CATS[k].cols.length ? invVariants(g, k, v).length : 0; };
+  const chips = (label, path, list, attr = 'p', cur = getP(L, path)) => {
+    if (list.length <= 2 || attr === 'tp' && path === 'spot') return `<div class="eg"><b>${label}</b><div class="chips">${list.map(([v, n, lg]) => `<button class="chip${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${cur !== v && locked(path, v, attr) ? ' lock' : ''}" data-${attr}="${path}" data-v="${v}">${n}</button>`).join('')}</div></div>`;
+    const k = attr === 'tp' ? (path === 'design' ? 'tatDesign' : null) : catDeRuta(path), todos = list.filter(o => !esNada(o[0]));
+    const cuenta = k ? `<small>${todos.filter(o => invHas(g, k, o[0])).length}/${todos.length} tuyas</small>` : '';
+    return `<div class="eg"><b>${label}${cuenta}</b><div class="tiles">${list.map(([v, n, lg]) => { const nv = nVar(path, v, attr); return `<button class="tile${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${cur !== v && locked(path, v, attr) ? ' lock' : ''}" data-${attr}="${path}" data-v="${v}">${nv > 1 ? `<span class="nv">×${nv}</span>` : ''}${lg ? '<span class="st">★ LEGENDARIO</span>' : ''}<span>${n}</span></button>`; }).join('')}</div></div>`;
+  };
   /* colores de una pieza del inventario: cada variante ganada en las cajas (las tuyas se pueden vender en el mercado) */
   const vars = k => {
-    const t = L[k]?.type; if (!t || t === 'none') return '';
-    const vs = invTodas(g, k, t), cur = invId(invVar(g, k, L[k]));
+    const t = getP(L, rutaInv(k)); if (!t || esNada(t)) return '';
+    const vs = invTodas(g, k, t), cur = invId(invVarL(L, k));
     let h = `<div class="eg"><b>Tus variantes (${vs.length})</b>` + (vs.length ? `<div class="sws">${vs.map((v, i) => `<button class="sw${invId(v) === cur && !v.venta ? ' on' : ''}${v.venta ? ' venta' : ''}" style="background:${invBg(v.c)}" data-var="${k}" data-i="${i}" aria-label="Variante ${i + 1}${v.venta ? ' (a la venta)' : ''}" title="${v.venta ? 'A la venta en el mercado' : v.copia ? 'De una caja' : 'Inicial'}"></button>`).join('')}</div>` : note('Esta pieza no está en tu inventario: sale en las cajas.')) + '</div>';
     const mia = vs.find(v => invId(v) === cur && v.copia && !v.venta);
-    if (mia) h += `<div class="sell"><span>🏪 Vender esta variante en el mercado</span><input type="number" min="1" max="100000" step="1" value="${mia.leg ? 1500 : 400}" aria-label="Precio" data-precio="${esc(mia.copia)}"><button class="chip" data-vende="${esc(mia.copia)}">Vender <i class="coin"></i></button></div>`;
+    if (mia) h += `<div class="sell"><span>🏪 <b>¿La vendes?</b> Ponle precio y queda en el Mercado de Juegos</span><input type="number" min="1" max="100000" step="1" value="${mia.leg ? 1500 : 400}" aria-label="Precio" data-precio="${esc(mia.copia)}"><button class="gold" data-vende="${esc(mia.copia)}">🏪 Vender</button></div>`;
     else if (vs.some(v => invId(v) === cur && !v.copia)) h += note('Esta variante es inicial: la tiene todo el mundo y no se vende.');
     if (vs.some(v => v.venta)) h += note('🏪 = a la venta en el mercado: no se puede usar hasta que la retires (en el Mercado de Juegos). <button class="chip" data-mercado="1">Ir al mercado</button>');
     return h;
@@ -3640,7 +3723,17 @@ function edRender() {
   const colors = (label, path, pal, attr = 'p', cur = getP(L, path)) => `<div class="eg"><b>${label}</b><div class="sws">${pal.map(c => `<button class="sw${cur === c ? ' on' : ''}" style="background:${cssC(c)}" data-${attr}="${path}" data-c="${c}" title="${cssC(c)}"></button>`).join('')}<label class="sw pick" title="Otro color"><input type="color" data-${attr}="${path}" value="${cssC(cur ?? 0)}"></label></div></div>`;
   const note = t => `<div class="ehint">${t}</div>`;
   let h = '';
-  if (ED.tab === 'cuerpo') {
+  if (ED.tab === 'vender') {
+    const mias = INV.own.filter(v => v.copia).sort((a, b) => !!a.venta - !!b.venta || b.leg - a.leg);
+    h = `<div class="como"><b>🏪 Vender una pieza</b><ol><li>Elige la pieza y ponle un precio en monedas.</li><li>Toca <b>Vender</b>: queda publicada en el <b>Mercado</b> de Juegos (filtro «Batalla de Rock»).</li><li>Cuando alguien la compra, las monedas son tuyas. Mientras esté a la venta no la puedes usar; si cambias de idea, la retiras en el Mercado.</li></ol></div>`;
+    h += mias.length ? mias.map(v => {
+      const C2 = INV_CATS[v.k], nom = invItem(v.b, v.k, v.t)?.[1] ?? v.t;
+      const act = v.venta ? `<em>✓ En el mercado</em><button class="chip" data-mercado="1">Ver</button>`
+        : `<input type="number" min="1" max="100000" step="1" value="${v.leg ? 1500 : 400}" aria-label="Precio de ${esc(nom)}" data-precio="${esc(v.copia)}"><button class="gold" data-vende="${esc(v.copia)}">Vender</button>`;
+      return `<div class="vrow${v.leg ? ' leg' : ''}"><span class="vfoto" style="background:${invBg(v.c)}">${C2.ic}</span><div class="vtx"><b>${v.leg ? '★ ' : ''}${esc(nom)}</b><small>${C2.n} · ${v.b === 'f' ? 'rockera' : 'rockero'}</small></div><div class="vact">${act}</div></div>`;
+    }).join('') : note('Aún no tienes piezas para vender: lo inicial es de todos y no se vende. Abre <b>📦 Cajas</b> y lo que te salga lo puedes vender aquí.') + '<button class="add" data-tab2="cajas">📦 Ir a las cajas</button>';
+    h += '<button class="add gold" data-mercado="1">🏪 Abrir el Mercado</button>';
+  } else if (ED.tab === 'cuerpo') {
     h = chips('Cuerpo', 'body', [['m', '♂ Hombre'], ['f', '♀ Mujer']]) + note('Cada cuerpo tiene su propio catálogo: al cambiarlo, la ropa, el peinado y los accesorios pasan a los de ese cuerpo.')
       + colors('Piel', 'skin', PAL.skin) + colors('Color del nombre', 'ui', PAL.ui)
       + `<div class="eg"><b>Partir desde</b><div class="chips">${['violeta', 'rex', 'kid'].map(k => `<button class="chip" data-base="${k}">${ROCKERS[k].name}</button>`).join('')}<button class="chip" data-blank="1">✚ En blanco</button></div></div>`
@@ -3676,19 +3769,19 @@ function edRender() {
     h += `<button class="add" data-tatadd="1" ${L.tattoos.length >= 5 ? 'disabled' : ''}>➕ Agregar tatuaje</button>` + note('La ropa tapa los tatuajes que quedan debajo.');
   } else if (ED.tab === 'cajas') {
     h = `<div class="coins"><i class="coin"></i> <b>${Math.max(0, INV.coins).toLocaleString('es')}</b> monedas</div>`
-      + `<div class="boxc"><div class="boxi">📦</div><div><b>Caja de ${f ? 'rockera' : 'rockero'}</b><span>Una prenda, guitarra o accesorio de ${f ? 'mujer' : 'hombre'} con colores al azar.<br>★ Legendario: 1 de cada 10.</span></div></div>`
+      + `<div class="boxc"><div class="boxi">📦</div><div><b>Caja de ${f ? 'rockera' : 'rockero'}</b><span>Una prenda, guitarra o accesorio de ${f ? 'mujer' : 'hombre'} con colores al azar, o un peinado, pupilas, ${f ? 'maquillaje' : 'pintura, barba'} o diseño de tatuaje.<br>★ Legendario: 1 de cada 10.</span></div></div>`
       + `<button class="add" data-box="1" ${INV.coins < BOX_PRICE || BOX.on || BOX.pidiendo || INV.parada ? 'disabled' : ''}>📦 Abrir caja · ${BOX_PRICE} <i class="coin"></i></button>`
       + (INV.parada ? note('Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no puedes gastar.') : INV.coins < BOX_PRICE ? note(`Te faltan ${(BOX_PRICE - Math.max(0, INV.coins)).toLocaleString('es')} monedas: juega, consigue logros o reclama la recompensa diaria.`) : '');
     h += `<div class="eg"><b>Tu colección (${f ? 'mujer' : 'hombre'})</b>` + Object.keys(INV_CATS).filter(k => C[k]?.length).map(k => {
-      const all = C[k].filter(o => o[0] !== 'none'), own = all.filter(o => invHas(g, k, o[0])).length, lg = all.filter(o => o[2]), ol = lg.filter(o => invHas(g, k, o[0])).length;
+      const all = C[k].filter(o => !esNada(o[0])), own = all.filter(o => invHas(g, k, o[0])).length, lg = all.filter(o => o[2]), ol = lg.filter(o => invHas(g, k, o[0])).length;
       return `<div class="colr"><span>${INV_CATS[k].ic} ${INV_CATS[k].n}</span><i><u style="width:${own / all.length * 100}%"></u></i><em>${own}/${all.length} · ★${ol}/${lg.length}</em></div>`;
     }).join('') + '</div>';
     const last = (INV.last || []).map((v, i) => [v, i]).filter(([v]) => v.b === g);
     if (last.length) h += '<div class="eg"><b>Últimos premios</b><div class="chips">' + last.map(([v, i]) => `<button class="chip${v.leg ? ' leg' : ''}" data-lasti="${i}" title="Equipar"><i class="dot" style="background:${invBg(v.c)}"></i>${esc(invItem(v.b, v.k, v.t)?.[1] ?? v.t)}</button>`).join('') + '</div></div>';
     h += note(`Cajas abiertas: ${INV.opened}. Si sale una pieza repetida con los mismos colores, te devuelve monedas (${REEMBOLSO.comun}, o ${REEMBOLSO.leg} si es legendaria). Lo que sacas es tuyo: lo puedes vender en el mercado.`);
   }
-  if (['ropa', 'guitarra', 'acc'].includes(ED.tab)) h = note('🔒 = aún no la tienes: sale en las <b>📦 Cajas</b>, con sus propios colores.') + h;
-  if (ED.tab !== 'cuerpo' && ED.tab !== 'cajas') h = note('<span style="color:#ffd23a">★ Legendario</span>: brilla y tiene animación propia. Al elegirlo se cargan sus colores.') + h;
+  if (['ropa', 'guitarra', 'acc'].includes(ED.tab)) h = `<div class="legend"><span>🔒 sale en las <b>📦 Cajas</b>, con sus colores</span><span><b>★</b> legendario: brilla y se anima</span><span><b style="color:#9dff6f">×2</b> variantes tuyas</span></div>` + h;
+  else if (['cara', 'pelo', 'tat'].includes(ED.tab)) h = `<div class="legend"><span>🔒 sale en las <b>📦 Cajas</b> (el color lo eliges tú)</span><span><b>★</b> legendario: brilla y se anima</span></div>` + h;
   $('#edPane').innerHTML = h;
 }
 function edFocusSpot(spot) { const v = TAT_VIEW[spot]; if (!v) return; ED.focus = spot; if (spot === 'mejilla') edFocus('cara', v[1]); else { ED.view = 'tat'; ED.zoom = 1; ED.yaw = v[1]; } }
@@ -3712,15 +3805,16 @@ $('#edViews').onclick = e => { const b = e.target.closest('button'); if (!b) ret
 $('#edPane').onclick = e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
   if (b.classList.contains('lock')) { edToast('🔒 Aún no la tienes: ábrela en las cajas'); return; }
-  if (d.var) { const v = invTodas(ED.L.body, d.var, ED.L[d.var].type)[+d.i]; if (v?.venta) { edToast('🏪 Está a la venta: retírala en el mercado para usarla'); return; } if (v) { Object.assign(ED.L[d.var], v.c); edFocus(pathFocus(d.var + '.type')); edChanged(); } return; }
+  if (d.var) { const v = invTodas(ED.L.body, d.var, getP(ED.L, rutaInv(d.var)))[+d.i]; if (v?.venta) { edToast('🏪 Está a la venta: retírala en el mercado para usarla'); return; } if (v) { Object.assign(ED.L[d.var], v.c); edFocus(pathFocus(d.var + '.type')); edChanged(); } return; }
   if (d.box) { boxStart(); return; }
+  if (d.tab2) { $(`#edTabs [data-tab="${d.tab2}"]`)?.click(); return; }
   if (d.mercado) { CB.mercado?.(); return; }
   if (d.vende) { edSell(d.vende, b); return; }
   if (d.lasti !== undefined) { const v = INV.last[+d.lasti]; if (v) invEquip(v); return; }
   if (d.base) { const k = d.base, n = ED.L.name; ED.L = lookPosible(sanitizeLook(ROCKERS[k]), INV.own.filter(v => v.copia && !v.venta)); ED.L.name = n; edChanged(); return; }
   if (d.blank) { const n = ED.L.name; ED.L = defaultLook(ED.L.body); ED.L.name = n; edChanged(); return; }
   if (d.tatdel !== undefined) { ED.L.tattoos.splice(+d.tatdel, 1); edChanged(); return; }
-  if (d.tatadd) { if (ED.L.tattoos.length < 5) { ED.L.tattoos.push({ design: ED.tat.design, spot: ED.tat.spot, color: ED.tat.color }); edFocusSpot(ED.tat.spot); edChanged(); } return; }
+  if (d.tatadd) { if (!invHas(ED.L.body, 'tatDesign', ED.tat.design)) { edToast('🔒 Ese diseño aún no lo tienes: sale en las cajas'); return; } if (ED.L.tattoos.length < 5) { ED.L.tattoos.push({ design: ED.tat.design, spot: ED.tat.spot, color: ED.tat.color }); edFocusSpot(ED.tat.spot); edChanged(); } return; }
   if (d.tp) { const wasCheek = ED.tat.spot === 'mejilla'; ED.tat[d.tp] = d.tp === 'color' ? +d.c : d.v; if (d.tp === 'design') { const it = ED_CAT[ED.L.body].tatDesign.find(o => o[0] === d.v); if (it?.[2]) { ED.tat.color = it[2].color; edToast('★ ¡Tatuaje legendario!'); } } if (d.tp === 'spot') edFocusSpot(d.v); edRender(); if (wasCheek || ED.tat.spot === 'mejilla') edChanged(false); else edTatPreview(); return; }
   const p = d.p; if (!p) return;
   if (p === 'body') { if (d.v !== ED.L.body) edSwitchBody(d.v); return; }
@@ -3734,10 +3828,14 @@ $('#edPane').onchange = e => {
   edSet(i.dataset.p, i.dataset.p === 'ui' ? i.value : parseInt(i.value.slice(1), 16));
 };
 $('#edName').oninput = e => { ED.L.name = e.target.value; };
+$('#edVender').onclick = () => $('#edTabs [data-tab="vender"]')?.click();
 $('#edRand').onclick = () => { const n = ED.L.name; ED.L = invClamp(randomLook(ED.L.body, R)); ED.L.name = n; edChanged(); };
 function invEquip(v) {
-  if (ED.L.body !== v.b || !ED.L[v.k] || !invHas(v.b, v.k, v.t)) return;
-  Object.assign(ED.L[v.k], { type: v.t }, v.c); edFocus(pathFocus(v.k + '.type')); edChanged();
+  if (ED.L.body !== v.b || !invHas(v.b, v.k, v.t)) return;
+  if (v.k === 'tatDesign') { ED.tat.design = v.t; ED.tab = 'tat'; edFocusSpot(ED.tat.spot); edRender(); edTatPreview(); return; }
+  const ruta = rutaInv(v.k), par = getP(ED.L, ruta.split('.').slice(0, -1).join('.')); if (!par) return;
+  setP(ED.L, ruta, v.t); Object.assign(par, v.c); if (!INV_CATS[v.k].cols.length) legDefaults(ED.L, ruta);
+  edFocus(pathFocus(ruta)); edChanged();
 }
 /* guardar: la página lo escribe en la base (rockLook/<uid>) y lo vuelve a comprobar contra tu inventario */
 async function edSave() {
@@ -3946,7 +4044,7 @@ function boxReveal() {
   ui.className = 'on' + (v.leg ? ' leg' : '');
   ui.innerHTML = `<div class="rar" style="color:${v.leg ? '#ffd23a' : '#8ad8ff'}">${v.leg ? '★ ¡LEGENDARIO! ★' : dup ? 'Repetido' : '¡Nuevo!'}</div><div class="nm">${it?.[1] ?? v.t}</div>`
     + `<div class="sub">${C.ic} ${C.n} · <i class="dot" style="background:${invBg(v.c)}"></i>${dup ? `ya la tenías así: +${refund} <i class="coin"></i>` : 'nueva en tu inventario'}</div>`
-    + `<div class="bt"><button class="hot" data-act="equip">Equipar</button><button data-act="again" ${INV.coins < BOX_PRICE || INV.parada ? 'disabled' : ''}>Abrir otra · ${BOX_PRICE} <i class="coin"></i></button><button data-act="close">Listo</button></div>`;
+    + `<div class="bt"><button class="hot" data-act="equip">Equipar</button>${!dup && BOX.res.c ? '<button data-act="vende">🏪 Vender</button>' : ''}<button data-act="again" ${INV.coins < BOX_PRICE || INV.parada ? 'disabled' : ''}>Abrir otra · ${BOX_PRICE} <i class="coin"></i></button><button data-act="close">Listo</button></div>`;
 }
 function boxClose(instant) { if (!BOX.on) return; $('#boxUI').className = ''; if (instant) boxEnd(); else if (BOX.closeT < 0) BOX.closeT = 0; }
 function boxEnd() {
@@ -3958,6 +4056,7 @@ function boxEnd() {
 $('#boxUI').onclick = e => {
   const b = e.target.closest('button'); if (!b || !BOX.on) return; const a = b.dataset.act;
   if (a === 'equip') { const v = BOX.res.v; boxClose(); invEquip(v); edToast('¡Equipado!'); }
+  else if (a === 'vende') { boxClose(); ED.tab = 'vender'; edRender(); $('#edPane').scrollTop = 0; }
   else if (a === 'again') { boxClose(true); boxStart(); }
   else boxClose();
 };
@@ -3990,7 +4089,7 @@ function step(dt) {
   kickPulse = Math.max(0, kickPulse - dt * 7); crashPulse = Math.max(0, crashPulse - dt * 2.2); fxLight = Math.max(0, fxLight - dt * 2.5);
   for (const c of S.cym) c.rotation.x = damp(c.rotation.x, c.userData.r0, 6, dt);
   S.kick.scale.setScalar(1 + kickPulse * 0.02);
-  const act = ed ? (ED.rk ? [ED.rk] : []) : SOLO() ? [PL(), drummer] : [PL(), PR(), singer, drummer];
+  const act = ed ? (ED.rk ? [ED.rk] : []) : SOLO() ? [PL(), drummer] : [PL(), PR(), singer, drummer, ...EX()];
   for (const r of act) r.st.I = damp(r.st.I, ed ? 0.62 : secI, 2, dt);
   if (dt > 0) for (const r of act) r.update(t, mt, dt, K);
   // pirotecnia en momentos clave
@@ -4083,7 +4182,7 @@ const fondo = () => VIVO.on && !ED.open;
 function ponCalidad() {
   const f = fondo(), N = NIVELES[CAL.nivel];
   bloom.enabled = !f || N.bloom;
-  crowd.ponCuantos(f ? N.publico : crowd.n);
+  crowd.ponCuantos(f ? Math.max(40, N.publico - 8 * (VIVO.solo ? 0 : EXTRAS.length)) : crowd.n);   // con más rockeros, menos público
   renderer.shadowMap.autoUpdate = !f;
   renderer.shadowMap.needsUpdate = true;
   const sm = f ? 0 : msaaRoto ? 0 : 4;
@@ -4173,7 +4272,7 @@ export const rock = {
   },
   cierraEditor() { if (ED.open) edShut(); },
   /* una canción: `yo` y (en batalla) `rival` son rockeros {look, nombre}; sin rival, toca solo */
-  async enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
+  async enVivo({ yo, rival = null, otros = [], alto = false, alDemasiado = null }) {
     if (ED.open) edShut();
     const L = yo?.look ? sanitizeLook(yo.look) : defaultLook('m');
     if (!yo?.look && yo?.nombre) L.name = String(yo.nombre).slice(0, 24);
@@ -4185,14 +4284,22 @@ export const rock = {
       if (!R2) { const base = ['violeta', 'rex', 'kid'][[...String(rival.uid || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 3]; R2 = sanitizeLook(ROCKERS[base]); R2.name = String(rival.nombre || R2.name).slice(0, 24); }
       OPT.Rr = setRocker(k, R2);
     }
+    // los demás de una sala de 3 a 8, livianos (sin contornos ni sombra)
+    const deFabrica = o => { const base = ['violeta', 'rex', 'kid'][[...String(o.uid || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 3], X = sanitizeLook(ROCKERS[base]); X.name = String(o.nombre || X.name).slice(0, 24); return X; };
+    EXTRAS = (rival ? otros || [] : []).slice(0, 6).map((o, i) => {
+      const k = 'x_' + (String(o.uid || '').replace(/[^\w-]/g, '').slice(0, 40) || 'p' + i);
+      LIVIANOS.add(k);
+      return setRocker(k, o.look ? sanitizeLook(o.look) : deFabrica(o));
+    });
     Object.assign(VIVO, { on: true, mt: 0, raw: -1, ko: null, fin: null, hype: 0, alto: !!alto });
     OPT.bars = false; OPT.cam = 'auto';
-    Object.assign(CAL, { nivel: alto ? 2 : 1, min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
+    // con varios rockeros de más se empieza un nivel más abajo (el regulador sube si sobra)
+    Object.assign(CAL, { nivel: Math.min(NIVELES.length - 1, (alto ? 2 : 1) + (EXTRAS.length >= 2 ? 1 : 0)), min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
     battle.start(); ponCalidad();
     /* shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en la canción: lo que está
        escondido hasta que pasa algo (los rayos, el aura azul, el confeti) se muestra mientras se compila.
        PRO HERO espera esta promesa antes de empezar la canción. */
-    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, PL().gtr.spAura, ...(VIVO.solo ? [] : [PR().gtr.spAura])].filter(o => !o.visible);
+    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, ...enEscena().map(r => r.gtr.spAura)].filter(o => !o.visible);
     for (const o of ocultos) o.visible = true;
     try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); } catch (err) { console.warn('[rock] compilar', err); }
     for (const o of ocultos) o.visible = false;
@@ -4203,24 +4310,25 @@ export const rock = {
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null }) {
     if (!VIVO.on) return;
     VIVO.humor = clamp(humor ?? animo, -1, 1); VIVO.solista = !!solo;
-    if (toca) { PL().st.descanso = toca[0] === false; if (!VIVO.solo) PR().st.descanso = toca[1] === false; }
+    VIVO.confs = Array.isArray(confs) && EXTRAS.length ? confs.map(c => clamp(+c || 0, -1, 1)) : null;
+    if (toca) toca.forEach((v, q) => { const r = (q === 0 || !VIVO.solo) && rockerDe(q); if (r) r.st.descanso = v === false; });
     if (dtJuego > 0) { CAL.externo = true; regula(dtJuego); }
     const raw = Math.max(0, beats) * BEAT, mt = vivoMt(raw);
     if (mt < VIVO.mt - 0.05) battle.rewound();
     VIVO.raw = raw; VIVO.mt = mt; VIVO.hype = clamp(hype, 0, 1);
     battle.momT = clamp(animo, -0.85, 0.85);
   },
-  /* Star Power de `quien` (0 tú, 1 el rival): una frase completa (`carga`) y el poder activado o no */
-  carga(quien) { if (VIVO.on) battle.carga(quien ? 1 : 0); },
-  poder(quien, on) { if (VIVO.on) battle.poder(quien ? 1 : 0, on); },
+  /* Star Power de `quien` (0 tú, 1 el rival, 2… los demás de la sala): una frase completa (`carga`) y el poder activado o no */
+  carga(quien) { if (VIVO.on) battle.carga(Math.max(0, quien | 0)); },
+  poder(quien, on) { if (VIVO.on) battle.poder(Math.max(0, quien | 0), on); },
   /* en batalla: un ataque de `quien` (0 tú, 1 el rival); solo: 'sp' | 'racha' | 'falla' | 'solo' con su texto */
   ataque(quien) { if (VIVO.on && !VIVO.solo) battle.attack(quien ? 1 : 0, pick(Object.keys(ATTACKS))); },
   hype(kind, text, color) { if (VIVO.on && VIVO.solo) battle.hype(kind, text, color); },
-  /* fin de la canción: en batalla el ganador (0 tú, 1 el rival); solo, el título */
-  fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = ganador ? 1 : 0; },
+  /* fin de la canción: en batalla el ganador (0 tú, 1 el rival, 2… otro de la sala); solo, el título */
+  fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = rockerDe(ganador | 0) ? ganador | 0 : 0; },
 };
 globalThis.__rock = { rock, CAL, TAM, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
 $('#loading')?.remove();

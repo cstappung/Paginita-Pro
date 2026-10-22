@@ -48,20 +48,34 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   rule. Content = `cajaRock(uid, k, at, b)` (SHA-256 → xoshiro, via
   `MascotasMotor`): 1000/10 000 legendary, then a uniform `POOL` row of that
   body and class, then colours (`INV_RAND`; legendaries keep factory ones).
-- **`POOL` is append-only**: a box is an index into it. A new catalogue item
-  goes at the end of `POOL` (the test fails otherwise); never reorder.
+- **`POOL` is append-only and versioned by purchase time**: a box is a
+  uniform draw over the rows of its body and class, so adding rows changes
+  every box already opened. Boxes with `at < CORTE_CAJAS_2` draw from the
+  first `POOL_1` (109) rows (`poolDe(at)`); the face/hair rows come after.
+  A future catalogue expansion needs its own cut-off (`POOL_2`,
+  `CORTE_CAJAS_3`), set after the deploy. Never reorder.
+- **Face and hair are in the boxes too** (`INV_CATS` entries with `cara:
+  true` and a `ruta`): hair styles, eye styles, make-up/paint, beards and
+  tattoo designs — every category that has a legendary. They carry no
+  colours (`cols: []`: you pick the colour). Starters there are only the
+  default rocker's (and the first tattoo design); «nada» options
+  (`esNada`: none / ninguno / ningunoF) are free. Factory rockers'
+  face/hair are *not* starters: «Partir desde» strips what you don't own
+  (`lookPosible`). Use `rutaInv(k)` / `catDeRuta(path)` / `invVarL(L, k)`,
+  never `L[k].type`.
 - `economia()` event `rc` (ORDEN 2.4): pays `cajaRock`; an exact repeat
   (same piece and colours) of a starter item or of a piece the account owns
   *at that moment* refunds `REEMBOLSO` (100/250) as `premios` and leaves no
   copy; otherwise copy `rk:<uid>~<k>` in `e.rocas`. `rocasDe(uid, d)` lists
   what an account owns now; `usuarios[u].cajasRock` the boxes it opened.
-- Starter items (`iniciales`: both default looks + the three factory
-  rockers) belong to everyone, have no copy and cannot be sold.
+- Starter items (`iniciales`: both default looks + the clothes of the three
+  factory rockers) belong to everyone, have no copy and cannot be sold.
 - **Market**: `rk:` copies list like `ob:`/`ma:` (rule regex includes `rk`).
-  Selling is done from the editor (variant → «Vender»); buying, withdrawing
-  and trading from the Mercado tab, filter «Batalla de Rock»
+  Buying, withdrawing and trading from the Mercado tab, filter «Batalla de Rock»
   (`#mercado/rock`), visible only while `veRock()` (`fijaVeRock(state.admin)`
-  in `juegos-main.js`). A listed piece cannot be worn.
+  in `juegos-main.js`). A listed piece cannot be worn. Selling: the editor's
+  **🏪 Vender** tab (every box piece, price + button; also the footer button
+  and «Vender» after opening a box) or the Mercado's own **🏷️ Vender** tab.
 
 ## The rocker
 
@@ -113,6 +127,16 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   left, rival right (their `rockLook`, or a factory rocker picked from their
   uid). Momentum = score difference; SP charge and activation are attacks;
   at the end the higher score wins the K.O.
+- **Rooms of 3 to 8**: everyone else is on stage too (`otros` in `enVivo`,
+  keys `x_<uid>` in `EXTRAS`, `rockerDe(q)`: 0 you, 1 the rival, 2… the
+  rest; `puestosSala(n)`: four in front, the rest behind between them; the
+  singer leaves the centre). They are built **light** (`LIVIANO` /
+  `LIVIANOS`: no outline meshes, no shadows) because a full rocker is ~170
+  meshes and ~150k triangles. Each one's mood is their score against the
+  room's average (`pulso({confs})`); SP charge is a bolt to the sky (no
+  attacks with more than two); the winner of the K.O. is the top score.
+  With 2+ extras the background starts one quality level lower and the
+  crowd shrinks by 8 per extra.
 - **Quality** (`NIVELES`, `CAL`, `regula` in `escena.js`): as a background
   it was ~940 draw calls and ~775k triangles at full resolution, 60 fps, with
   4× MSAA, bloom and 2048 shadows — unplayable. Now: a fraction of the CSS
@@ -134,6 +158,9 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
 
 ## Traps
 
+- In the editor the rocker is **still** (`st.quieto`: no strumming, no
+  swaying, only breathing): people found it annoying to dress a moving
+  rocker. The editor's item lists are tiles (`chips` with > 2 options).
 - The editor needs `battle.start()` to have run once (lights, rockers,
   director): opened cold the stage rendered black. `rock.editor` does it.
 - The crowd is hidden while the editor is open (the editor camera stands
