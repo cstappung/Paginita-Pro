@@ -136,26 +136,26 @@ const ricoHw={solo:{'club-bbtan-rondas':{a:{nombre:'Ana',puntos:600,tiempo:1}}}}
 
 test('Halloween: se cobra a su precio y solo mientras se vende',()=>{
  const g=T.monedasDe('a',ricoHw).saldo;
- assert.ok(g>=35000,'BBTAN 600 da para la Parca: '+g);
- let d=conTienda({a:{parca:{at:EN,p:35000}}},ricoHw);
- assert.equal(T.monedasDe('a',d).saldo,g-35000);
+ assert.ok(g>=10000,'BBTAN 600 da para la Parca: '+g);
+ let d=conTienda({a:{parca:{at:EN,p:10000}}},ricoHw);
+ assert.equal(T.monedasDe('a',d).saldo,g-10000);
  assert.ok(T.economia(d).usuarios.a.tienda.parca);
  d=conTienda({a:{parca:{at:EN,p:5000}}},ricoHw);
  assert.equal(T.monedasDe('a',d).saldo,g,'al precio de la tienda de siempre no vale');
- d=conTienda({a:{parca:{at:V.hasta,p:35000}}},ricoHw);
+ d=conTienda({a:{parca:{at:V.hasta,p:10000}}},ricoHw);
  assert.equal(T.monedasDe('a',d).saldo,g,'después del cierre no vale');
  assert.ok(!(T.economia(d).usuarios.a||{tienda:{}}).tienda.parca);
- d=conTienda({a:{parca:{at:V.desde-1,p:35000}}},ricoHw);
+ d=conTienda({a:{parca:{at:V.desde-1,p:10000}}},ricoHw);
  assert.equal(T.monedasDe('a',d).saldo,g,'antes de abrir tampoco');
  assert.ok(T.aLaVenta('cometa',V.hasta+1e9),'lo de siempre no cierra');
  assert.ok(!T.aLaVenta('inventado',EN));
 });
 
 test('Halloween: lo no comprado desaparece al cerrar; lo comprado queda',()=>{
- const est=T.estadisticas('a',{compras:{a:{calabazas:{p:6000}}}});
+ const est=T.estadisticas('a',{compras:{a:{calabazas:{p:3000}}}});
  const cal=T.MARCOS.find(m=>m.id==='calabazas'),parca=T.MARCOS.find(m=>m.id==='parca');
  let r=T.requisito(parca,est,EN);
- assert.ok(!r.ok&&r.tienda&&r.precio===35000&&!r.agotado,'a la venta, con su precio');
+ assert.ok(!r.ok&&r.tienda&&r.precio===10000&&!r.agotado,'a la venta, con su precio');
  r=T.requisito(parca,est,V.hasta);
  assert.ok(!r.ok&&r.agotado&&!r.tienda,'cerrada: agotado, no se compra');
  assert.ok(T.requisito(cal,est,V.hasta+1e9).ok,'lo comprado es para siempre');
@@ -201,7 +201,7 @@ test('Halloween: la regla de `tienda` dice los mismos precios y la misma hora de
 
 test('Halloween: el número de edición es el orden de compra, y cuántos lo tienen',()=>{
  const ed=(...a)=>({...T.edicion(...a)});
- const c={b:{parca:EN+20},a:{parca:EN+10,calabazas:{at:EN+50,p:6000}},c:{parca:{p:35000}},d:{calabazas:EN+1}};
+ const c={b:{parca:EN+20},a:{parca:EN+10,calabazas:{at:EN+50,p:3000}},c:{parca:{p:10000}},d:{calabazas:EN+1}};
  assert.deepEqual(ed('parca','a',c),{n:1,total:3});
  assert.deepEqual(ed('parca','b',c),{n:2,total:3});
  assert.deepEqual(ed('parca','c',c),{n:3,total:3},'sin hora (recién comprada aquí) va al final');

@@ -344,10 +344,10 @@ console.log("— Tienda del perfil —");
      (VENTA_HALLOWEEN en src/juegos/tienda.js; la regla repite la hora). */
   const abierta = Date.now() >= 1790823600000 && Date.now() < 1793588400000;
   await denied("Halloween no se paga al precio de siempre", () => compra(ub.uid, "parca", 5000));
-  await denied("ni al de otra rareza", () => compra(ub.uid, "parca", 20000));
-  await denied("el premio de coleccionista no se vende", () => compra(ub.uid, "reycalabaza", 35000));
-  if (abierta) await allowed("B compra la Parca a 35 000 mientras se vende", () => compra(ub.uid, "parca", 35000));
-  else await denied("con la tienda de Halloween cerrada no se compra", () => compra(ub.uid, "parca", 35000));
+  await denied("ni al de otra rareza", () => compra(ub.uid, "parca", 7500));
+  await denied("el premio de coleccionista no se vende", () => compra(ub.uid, "reycalabaza", 10000));
+  if (abierta) await allowed("B compra la Parca a 10 000 mientras se vende", () => compra(ub.uid, "parca", 10000));
+  else await denied("con la tienda de Halloween cerrada no se compra", () => compra(ub.uid, "parca", 10000));
   const fbJ = await import("./src/fb-juegos.js");
   await allowed("B se pone un marco de Halloween (solo el campo marco)", () => fbJ.ponEnPerfil(ub.uid, "marco", "parca"));
   await loginAs(A);

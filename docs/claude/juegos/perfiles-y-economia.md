@@ -162,8 +162,8 @@ failed for Pokelike, which has no champion frame yet.)
 frames in `marcos-animados.js`, the background scenes in
 `juegos/fondos-halloween.js`, CSS block «Tienda de Halloween» in
 juegos.html). Six frames and five backgrounds (`hw: true` in `MARCOS` /
-`FONDOS`), priced by rarity (`RAREZAS_HW`: raro 6 000, épico 12 000,
-legendario 20 000, mítico 35 000), on sale only inside `VENTA_HALLOWEEN`
+`FONDOS`), priced by rarity (`RAREZAS_HW`: raro 3 000, épico 5 000,
+legendario 7 500, mítico 10 000; capped at 10 000 on purpose), on sale only inside `VENTA_HALLOWEEN`
 (until 2 Nov 00:00 Chile). It is meant to make the 50 000+ hoarders spend.
 
 - **Three places agree on prices and the closing time**: `tienda.js`,

@@ -15,10 +15,10 @@ export const PRECIO_TIENDA = 5000;
    los dos; tests/tienda.test.cjs lo comprueba). Lo comprado es para
    siempre; lo que no, desaparece del catálogo al cerrar. */
 export const RAREZAS_HW = {
-  raro: { n: "Raro", p: 6000 },
-  epico: { n: "Épico", p: 12000 },
-  legendario: { n: "Legendario", p: 20000 },
-  mitico: { n: "Mítico", p: 35000 }
+  raro: { n: "Raro", p: 3000 },
+  epico: { n: "Épico", p: 5000 },
+  legendario: { n: "Legendario", p: 7500 },
+  mitico: { n: "Mítico", p: 10000 }
 };
 export const HALLOWEEN = {
   calabazas: "raro", murcielagos: "raro", telarana: "epico", fantasmas: "epico", caldero: "legendario", parca: "mitico",
