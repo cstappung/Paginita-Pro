@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove, update, query, orderByChild, equalTo } from "firebase/database";
+import { ref, get, set, push, remove, update, query, orderByChild, equalTo, startAt } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -658,6 +658,24 @@ console.log("— Salón: chat general y repeticiones del día —");
   await denied("B no borra un mensaje reciente de A", () => remove(ref(db, `chatGeneral/${unoDeA}`)));
   await allowed("barrer lo de hace más de un día no borra nada reciente", () => fj.barreChatGeneral(Date.now() - 86400000 - 60000, 10));
 
+  // Los super chats: el mensaje y su cobro en una actualización, con el mismo precio.
+  await loginAs(A);
+  await new Promise(r => setTimeout(r, 20500));
+  await allowed("A manda un super chat de 100", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡hola a todos!", 200, 100));
+  await allowed("cualquiera con sesión lee los cobros (la economía los suma)", () => get(ref(db, "superChat")));
+  await allowed("y pide los super vivos por `sa`", () => get(query(ref(db, "chatGeneral"), orderByChild("sa"), startAt(Date.now() - 7200000))));
+  const supA = Object.keys((await get(ref(db, `superChat/${ua.uid}`))).val() || {})[0];
+  await denied("un cobro no se reescribe", () => set(ref(db, `superChat/${ua.uid}/${supA}`), { at: serverTimestamp(), p: 300 }));
+  await denied("ni se borra", () => remove(ref(db, `superChat/${ua.uid}/${supA}`)));
+  await new Promise(r => setTimeout(r, 20500));
+  await denied("no un super sin su cobro", () => update(ref(db), { "chatGeneral/supSinCobro1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supSinCobro1" } }));
+  await denied("ni con el cobro de otro precio", () => update(ref(db), { "chatGeneral/supOtroPrec1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supOtroPrec1" }, [`superChat/${ua.uid}/supOtroPrec1`]: { at: serverTimestamp(), p: 100 } }));
+  await denied("ni de un precio que no es un nivel", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "barato", 200, 50));
+  await denied("ni un cobro suelto, sin mensaje", () => set(ref(db, `superChat/${ua.uid}/cobroSuelto1`), { at: serverTimestamp(), p: 100 }));
+  await denied("ni a nombre de otro", () => set(ref(db, `superChat/${ub.uid}/cobroAjeno1`), { at: serverTimestamp(), p: 100 }));
+  await allowed("A manda uno de 300", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡estelar!", 200, 300));
+  await loginAs(B);
+
   const hoy = diaChile(Date.now());
   const dato = { puntos: 1, tiempo: 42000 };
   const e = entradaRep("club-minas-medium", hoy, dato, 1, '{"v":1}', "Beto");
@@ -740,19 +758,21 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await loginAs(A);
   await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
   await remove(ref(db, `prodropSerie1/${ua.uid}`));
-  // Batalla de Rock (a prueba): cajas y rockero, solo administradores
+  // Batalla de Rock: cajas y rockero, cada uno los suyos (abierto a todos)
   const caja = (u, x) => set(push(ref(db, `rock/c/${u}`)), Object.assign({ at: serverTimestamp(), p: 500, b: "f" }, x));
   await denied("una caja de rock no cuesta menos", () => caja(ua.uid, { p: 50 }));
   await denied("ni es de otro cuerpo", () => caja(ua.uid, { b: "x" }));
   await denied("ni lleva campos de más", () => caja(ua.uid, { extra: 1 }));
   await denied("ni se compra a nombre de otro", () => caja(ub.uid, {}));
-  await allowed("el admin compra una caja de rock", () => caja(ua.uid, {}));
+  await allowed("se compra una caja de rock", () => caja(ua.uid, {}));
   await allowed("y guarda su rockero", () => set(ref(db, `rockLook/${ua.uid}`), JSON.stringify({ body: "f", name: "Prueba" })));
   await denied("un rockero no pasa de 4000 caracteres", () => set(ref(db, `rockLook/${ua.uid}`), "x".repeat(4001)));
   await allowed("una pieza de rock se pone a la venta", () => set(push(ref(db, "mercado/o")), { u: ua.uid, c: `rk:${ua.uid}~-Ncajarock01`, p: 300, at: serverTimestamp() }));
   await loginAs(B);
-  await denied("sin ser admin no se compran cajas de rock", () => caja(ub.uid, {}));
-  await denied("ni se guarda un rockero", () => set(ref(db, `rockLook/${ub.uid}`), "{}"));
+  await allowed("sin ser admin también se compran cajas de rock", () => caja(ub.uid, {}));
+  await allowed("y se guarda el rockero", () => set(ref(db, `rockLook/${ub.uid}`), "{}"));
+  await denied("pero no el de otro", () => set(ref(db, `rockLook/${ua.uid}`), "{}"));
+  await denied("ni una caja a nombre de otro", () => caja(ua.uid, {}));
   await allowed("pero se lee el del rival, por clave", () => get(ref(db, `rockLook/${ua.uid}`)));
   await denied("no la colección entera", () => get(ref(db, "rockLook")));
   await loginAs(A);

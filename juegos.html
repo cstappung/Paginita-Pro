@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610220543"></script>
+<script src="i18n.js?v=202610221348"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5646,8 +5646,12 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
    carrusel de las mejores partidas del día, a la derecha el chat general. El
    contenido se estrecha para dejarles sitio en vez de quedar debajo. Más
    angosto, las repeticiones no salen y el chat es un botón 💬 que abre un
-   panel (en el celular, una hoja desde abajo). Los tableros de las
-   repeticiones son siempre oscuros, como las pantallas de los juegos. */
+   panel (en el celular, una hoja desde abajo). Ese botón sale también en
+   las demás vistas (una partida, un juego del club): `html.jg-cg-flota`,
+   que pone rieles.js siempre que el chat no va acoplado al riel. La
+   pantalla completa de un juego lo esconde (el bloque de abajo). Los
+   tableros de las repeticiones son siempre oscuros, como las pantallas de
+   los juegos. */
 .jg-riel,.jg-cg-fab,.jg-cg-fondo{display:none}
 .jg-riel{flex-direction:column;gap:10px;min-height:0;box-sizing:border-box}
 .jg-riel-cab{display:flex;align-items:center;gap:8px;padding:0 4px;flex-shrink:0}
@@ -5735,26 +5739,70 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
   /* El ⚑ de informes se corre a la izquierda del chat: si no, tapa «Enviar». */
   html.jg-rieles .rp-fab{right:calc(var(--riel) + 28px)}
 }
-@media(max-width:1399px){
-  html.jg-rieles .jg-cg-fab{display:grid;place-items:center;position:fixed;right:16px;bottom:62px;z-index:55;width:48px;height:48px;border:0;border-radius:50%;background:var(--jg-purple,#6d3fd4);color:#fff;cursor:pointer;box-shadow:0 8px 24px #2a1e4433;transition:transform .15s}
-  html.jg-rieles .jg-cg-fab:hover{transform:translateY(-2px)}
-  html.jg-rieles .jg-cg-fab svg{width:22px;height:22px}
-  .jg-cg-n{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#ef4444;color:#fff;font:700 11px/20px 'IBM Plex Sans',sans-serif;box-shadow:0 0 0 2px #fff}
-  .jg-cg-n[hidden]{display:none}
-  html.jg-rieles.jg-cg-abierto .jg-cg{display:flex;position:fixed;z-index:66;right:16px;bottom:118px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100dvh - 150px));box-shadow:0 18px 50px #2a1e4440;animation:jgVela .18s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg-cierra{display:block}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fab{background:#3b2a66}
-  html.jg-cg-abierto .rp-fab{display:none}
+/* La burbuja del chat general y su panel, en cualquier vista que no lo
+   lleve acoplado al riel. */
+html.jg-cg-flota .jg-cg-fab{display:grid;place-items:center;position:fixed;right:16px;bottom:62px;z-index:55;width:50px;height:50px;border:0;border-radius:50%;background:var(--jg-purple,#6d3fd4);color:#fff;cursor:pointer;box-shadow:0 8px 24px #2a1e4433;transition:transform .15s}
+html.jg-cg-flota .jg-cg-fab:hover{transform:translateY(-2px)}
+html.jg-cg-flota .jg-cg-fab svg{width:22px;height:22px}
+.jg-cg-n{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#ef4444;color:#fff;font:700 11px/20px 'IBM Plex Sans',sans-serif;box-shadow:0 0 0 2px #fff;animation:jgCgPunto .35s ease-out}
+.jg-cg-n[hidden]{display:none}
+html.jg-cg-flota.jg-cg-abierto .jg-cg{display:flex;position:fixed;z-index:66;right:16px;bottom:120px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100dvh - 150px));box-shadow:0 18px 50px #2a1e4440;animation:jgVela .18s ease-out}
+html.jg-cg-flota.jg-cg-abierto .jg-cg-cierra{display:block}
+html.jg-cg-flota.jg-cg-abierto .jg-cg-fab{background:#3b2a66}
+html.jg-cg-abierto .rp-fab{display:none}
+/* En una sala de PC el chat de la sala es la columna de la derecha: la
+   burbuja va a la izquierda para no taparle el «Enviar». */
+@media(min-width:1051px){
+  html.jg-cg-flota[data-vista=partida] .jg-cg-fab{right:auto;left:16px;bottom:16px}
+  html.jg-cg-flota[data-vista=partida].jg-cg-abierto .jg-cg{right:auto;left:16px;bottom:76px}
 }
 @media(max-width:720px){
-  html.jg-rieles .jg-cg-fab{bottom:calc(128px + env(safe-area-inset-bottom))}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fondo{display:block;position:fixed;inset:0;z-index:65;background:#0f172866;animation:jgVela .2s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg{left:0;right:0;bottom:0;width:auto;height:min(78dvh,640px);border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:jgCgSube .22s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fab{display:none}
+  html.jg-cg-flota .jg-cg-fab{bottom:calc(62px + env(safe-area-inset-bottom))}
+  /* Sobre la barra de pestañas de abajo de las vistas de menú. */
+  html.jg-cg-flota:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .jg-cg-fab{bottom:calc(128px + env(safe-area-inset-bottom))}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg-fondo{display:block;position:fixed;inset:0;z-index:65;background:#0f172866;animation:jgVela .2s ease-out}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg{left:0;right:0;bottom:0;width:auto;height:min(78dvh,640px);border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:jgCgSube .22s ease-out}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg-fab{display:none}
   .jg-cg-form .inp{font-size:16px}
 }
+/* Pantalla completa: ni burbuja ni panel (la sala inmersiva, el Tetris
+   inmersivo, el modo celular del club, PRODROP y Mascotas). */
+html:is(.jg-inm,.jg-tt-inm,.jg-club-inm,.jg-club-pleno,.jg-prodrop,.jg-mascotas) :is(.jg-cg-fab,.jg-cg,.jg-cg-fondo){display:none!important}
+@keyframes jgCgPunto{from{transform:scale(.4)}60%{transform:scale(1.2)}}
+
+/* ---- Los super chats (rieles-datos.js, `SUPER_CHAT`) ----
+   Todo el mensaje lleva el contorno: dorado el Destacado, un degradado que
+   gira el Estelar. El borde es un fondo `border-box` bajo uno
+   `padding-box`, así el contorno sigue el radio. */
+.jg-cg-msg.super{--sup-fondo:#fff;position:relative;padding:8px 10px 9px;border:2px solid transparent;border-radius:12px;row-gap:4px}
+.jg-cg-msg.s-brillo{background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(135deg,#f59e0b,#fde047 45%,#f59e0b) border-box;box-shadow:0 0 0 1px #f59e0b22,0 6px 18px #f59e0b2e}
+.jg-cg-msg.s-estelar{background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(120deg,#ec4899,#8b5cf6,#06b6d4,#f59e0b,#ec4899) border-box;background-size:100% 100%,300% 300%;animation:jgCgEstelar 6s linear infinite;box-shadow:0 0 14px #8b5cf640,0 6px 20px #ec489926}
+.jg-cg-msg.super .jg-cg-sup{grid-column:1/-1;display:flex;align-items:center;gap:6px;font:700 10.5px/1.2 'IBM Plex Sans',sans-serif;letter-spacing:.2px;font-style:normal;color:#92400e}
+.jg-cg-msg.s-estelar .jg-cg-sup{color:#7c3aed}
+.jg-cg-sup small{margin-left:auto;font:500 10px 'IBM Plex Mono',monospace;color:#8a97a3;white-space:nowrap}
+.jg-cg-msg.super>div>span{font-weight:600;color:#1f2430}
+.jg-cg-msg.super.mio>div>span{background:none;padding:0;margin-top:0;border-radius:0}
+@keyframes jgCgEstelar{to{background-position:0 0,300% 0}}
+/* El selector, encima del formulario. */
+.jg-cg-sbtn{flex-shrink:0;width:38px;height:38px;border:1px solid #e4dfeb;border-radius:10px;background:#fff;color:#8b5cf6;font-size:17px;cursor:pointer;transition:background .15s,color .15s}
+.jg-cg-sbtn:hover{background:#f5f0ff}
+.jg-cg-sbtn.activo{background:linear-gradient(135deg,#ec4899,#8b5cf6);border-color:transparent;color:#fff}
+.jg-cg-super{padding:10px 12px 2px;border-top:1px solid #efebf5;flex-shrink:0;animation:jgVela .15s ease-out}
+.jg-cg-super[hidden]{display:none}
+.jg-cg-super>p{margin:0 0 8px;display:flex;align-items:baseline;gap:8px;font-size:12px}
+.jg-cg-super>p span{font-size:11px;color:var(--jg-muted,#6b6679)}
+.jg-cg-ops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.jg-cg-op{--sup-fondo:#fff;display:grid;gap:2px;padding:7px 6px;border:2px solid #e4dfeb;border-radius:10px;background:var(--sup-fondo);text-align:center;cursor:pointer;font:inherit;color:#34404b}
+.jg-cg-op b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-cg-op small{font:500 10px 'IBM Plex Mono',monospace;color:#8a97a3}
+.jg-cg-op.s-brillo{border-color:transparent;background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(135deg,#f59e0b,#fde047,#f59e0b) border-box}
+.jg-cg-op.s-estelar{border-color:transparent;background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(120deg,#ec4899,#8b5cf6,#06b6d4,#f59e0b) border-box}
+.jg-cg-op.sel{--sup-fondo:#f5f0ff;box-shadow:0 0 0 3px #8b5cf633}
+.jg-cg-op.s-normal.sel{border-color:#8b5cf6}
+.jg-cg-op:disabled{opacity:.45;cursor:not-allowed}
+.jg-cg-form .btn.super{background:linear-gradient(135deg,#ec4899,#8b5cf6);border-color:transparent;color:#fff}
 @keyframes jgCgSube{from{transform:translateY(40px);opacity:.4}}
-@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,.jg-rp.entra .jg-rp-lienzo,html.jg-rieles.jg-cg-abierto .jg-cg{animation:none}}
+@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,.jg-rp.entra .jg-rp-lienzo,html.jg-cg-flota.jg-cg-abierto .jg-cg,.jg-cg-n,.jg-cg-msg.s-estelar,.jg-cg-super{animation:none}}
 
 html[data-tema=oscuro] .jg-cg,html[data-tema=oscuro] .jg-riel-puerta{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-riel-cab small,html[data-tema=oscuro] .jg-rp-cab>a span,html[data-tema=oscuro] .jg-rp-msg,html[data-tema=oscuro] .jg-riel-puerta,html[data-tema=oscuro] .jg-cg-msg time,html[data-tema=oscuro] .jg-cg-cierra{color:var(--os-tx3)}
@@ -5774,6 +5822,16 @@ html[data-tema=oscuro] .jg-cg-msg.mio>div>span{background:var(--os-sup3)}
 html[data-tema=oscuro] .jg-cg-nota{background:#2a1f12;border-color:#4a3618;color:#fbbf6a}
 html[data-tema=oscuro] .jg-cg-cierra:hover{background:#ffffff14}
 html[data-tema=oscuro] .jg-cg-n{box-shadow:0 0 0 2px var(--os-fondo)}
+html[data-tema=oscuro] .jg-cg-msg.super,html[data-tema=oscuro] .jg-cg-op{--sup-fondo:var(--os-sup)}
+html[data-tema=oscuro] .jg-cg-op.sel{--sup-fondo:var(--os-sup3)}
+html[data-tema=oscuro] .jg-cg-op.s-normal:not(.sel){border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-cg-msg.super>div>span,html[data-tema=oscuro] .jg-cg-op{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-cg-msg.super .jg-cg-sup{color:#fbbf24}
+html[data-tema=oscuro] .jg-cg-msg.s-estelar .jg-cg-sup{color:#c4b5fd}
+html[data-tema=oscuro] .jg-cg-sbtn{background:var(--os-sup);border-color:var(--os-borde);color:#c4b5fd}
+html[data-tema=oscuro] .jg-cg-sbtn.activo{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff}
+html[data-tema=oscuro] .jg-cg-super{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-cg-super>p span,html[data-tema=oscuro] .jg-cg-sup small,html[data-tema=oscuro] .jg-cg-op small{color:var(--os-tx3)}
 
 /* ---------- el panel de administración (juegos/admin.js, #admin) ---------- */
 .jg-adm{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -6713,6 +6771,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610220543"></script>
+<script src="juegos-app.js?v=202610221348"></script>
 </body>
 </html>

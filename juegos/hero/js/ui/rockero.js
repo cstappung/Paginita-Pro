@@ -1,4 +1,4 @@
-// «Tu rockero» (solo administradores, a prueba): el editor de Batalla de Rock en la entrada del juego.
+// «Tu rockero»: el editor de Batalla de Rock en la entrada del juego.
 // La escena 3D ocupa la pantalla y el panel del editor va encima (js/rock/escena.js); las cajas,
 // guardar y vender se le piden a la página (sitio/rock.js).
 import { h, Screen, toast } from './dom.js';

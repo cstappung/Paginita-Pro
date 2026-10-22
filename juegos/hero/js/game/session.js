@@ -224,7 +224,7 @@ export class GameSession {
     this._precalienta();
   }
 
-  // Batalla de Rock de fondo (solo administradores, a prueba: js/rock/). Con otro jugador (en la sala,
+  // Batalla de Rock de fondo (js/rock/). Con otro jugador (en la sala,
   // el primero de los demás; en local, el segundo) es una batalla: tu rockero contra el suyo, y quién va
   // ganando sale de los puntajes. Solo, tu rockero toca al centro y el público sigue tu combo.
   async _preparaRock(aviso) {

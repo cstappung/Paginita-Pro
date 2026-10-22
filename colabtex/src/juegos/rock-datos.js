@@ -13,14 +13,14 @@
    algo que la cuenta tiene en ese momento (misma pieza y mismos colores, lo
    inicial incluido), devuelve `REEMBOLSO` y no queda copia.
 
-   **A prueba: solo administradores** (`ROCK_SOLO_ADMIN`). Las reglas
-   también lo exigen para escribir `rock/c` y `rockLook`; abrirlo a todos es
-   quitar esa condición de las dos reglas y poner esto en false. */
+   **Abierto a todos** desde octubre de 2026 (`ROCK_SOLO_ADMIN = false`;
+   estuvo a prueba solo para administradores). Volver a cerrarlo es ponerlo en
+   true y devolver la condición `admins` a las reglas de `rock/c` y `rockLook`. */
 import MM from "../../../juegos/mascotas/motor.js";
 import { abreCaja, nombreItem, INV_CATS, invId, iniciales, limpiaLook, lookPosible, PRECIO_CAJA, REEMBOLSO } from "../../../juegos/hero/js/rock/catalogo.js";
 
 export { PRECIO_CAJA, REEMBOLSO, nombreItem, INV_CATS, limpiaLook };
-export const ROCK_SOLO_ADMIN = true;
+export const ROCK_SOLO_ADMIN = false;
 export const RE_COPIA_ROCK = /^rk:([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})$/;
 export const claveRock = (o, k) => "rk:" + o + "~" + k;
 

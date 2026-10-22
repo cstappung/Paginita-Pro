@@ -1,10 +1,12 @@
 # Batalla de Rock — notes for Claude
 
 The owner's «BATALLA DE ROCK» package (one `index.html`, Three.js) turned into
-the background of PRO HERO. **On trial: only accounts in `admins/<uid>` see
-any of it** (`ROCK_SOLO_ADMIN` in `colabtex/src/juegos/rock-datos.js`, plus
-the `rock/c` and `rockLook` rules). Opening it to everyone = that flag to
-false and drop the `admins` condition from those two rules. PRO HERO itself:
+the background of PRO HERO. **Open to every signed-in account** since
+October 2026 (it was admins only: `ROCK_SOLO_ADMIN` in
+`colabtex/src/juegos/rock-datos.js` is now false, and the `rock/c` and
+`rockLook` rules no longer ask for `admins`). Closing it again = the flag to
+true and the `admins` condition back in those two rules. In the frame,
+`rockSitio.admin` still means «enabled for this account». PRO HERO itself:
 `juegos/hero/CLAUDE.md`; coins and `economia()`:
 `docs/claude/juegos/perfiles-y-economia.md`; market: `docs/claude/juegos/mercado.md`.
 

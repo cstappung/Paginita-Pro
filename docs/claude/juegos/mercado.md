@@ -24,8 +24,9 @@ and they trade only between two accounts that both see the series.
 - a card is `<uid>~<pack>.<i>`, exactly as before;
 - an object is `ob:<uid>~<gift key>`;
 - a pet is `ma:<uid>~<adoption key>`;
-- a Batalla de Rock piece is `rk:<uid>~<box key>` (admins only while on
-  trial: `veRock()`; `juegos/hero/js/rock/CLAUDE.md`).
+- a Batalla de Rock piece is `rk:<uid>~<box key>` (visible to all;
+  `veRock()` hides it only if `ROCK_SOLO_ADMIN` is set again;
+  `juegos/hero/js/rock/CLAUDE.md`).
 
 Old listings never change meaning, and the rule regex accepts all three.
 Starter items have no copy key and cannot be listed.

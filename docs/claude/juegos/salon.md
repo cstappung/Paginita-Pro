@@ -346,8 +346,32 @@ on a phone. Things to keep:
   deleted by anyone signed in, and the lobby sweeps a few on opening.
 - Guests see a login gate in both rails (no rule change for them). Names in
   both rails get `translate="no"` and the live profile through `mezcla`.
+- **The general chat is on every view, not just the menus.** `rieles.pon(si,
+  conChat)`: `si` = the rails (menu views), `conChat` = the chat (every view
+  with a session). Docked in the right rail only on a wide PC menu view;
+  everywhere else it is the 💬 bubble with the red unread count
+  (`html.jg-cg-flota`, set by `ponFlota`), a panel on PC and a bottom sheet
+  on a phone. In a room on PC the bubble goes bottom-left, because the
+  room's own chat is the right column. **Fullscreen hides it**: one rule
+  lists `jg-inm`, `jg-tt-inm`, `jg-club-inm`, `jg-club-pleno`, `jg-prodrop`
+  and `jg-mascotas`; a new fullscreen mode must join that list.
+- **Super chats** (`SUPER_CHAT` in `rieles-datos.js`: ⭐ Destacado 100 🪙 for
+  1 h, 🌟 Estelar 300 🪙 for 2 h), bought from the ✦ button of the form. The
+  same `chatGeneral/<id>` carries `s` (the price) and `sa` (server time
+  again, only on these, indexed), and the charge is `superChat/<uid>/<id>` =
+  `{at, p}`, all in the one `update`; each rule checks the other's price,
+  and the charge is write-once. Live ones come from a second query
+  (`watchSuperChats`, `orderByChild("sa")` since `SUPER_MAX_MS`), so the
+  15-minute query does not have to grow. `chatVisibles` merges both lists
+  without duplicates and gives each message its level's duration. The
+  economy charges it (event `sc`, category `superChat`); one that was not
+  funded stops the account like any spend and is painted as a normal
+  message (`ctx.superPagado` → `false`). The whole message gets the outline
+  (gold, or a moving gradient for Estelar). Changing a price or duration is
+  `SUPER_CHAT` **and** the rules (`chatGeneral/$id/s`, `superChat/$uid/$k/p`;
+  `tests/rieles.test.cjs` checks they match).
 
-The three nodes need the rules re-published (`firebase/CONFIGURAR-FIREBASE.md`).
+The nodes (and `superChat`, and the `sa` index) need the rules re-published (`firebase/CONFIGURAR-FIREBASE.md`).
 
 **Halloween mode** (`juegos/halloween.js`, its CSS block «Modo Halloween»
 at the end of `juegos.html`, `tests/halloween.test.cjs`): from 1 October to

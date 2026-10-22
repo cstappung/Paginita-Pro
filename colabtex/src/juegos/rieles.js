@@ -9,8 +9,16 @@
    Cuelgan de <body> y se muestran por CSS: `html.jg-rieles` (lo pone
    `pon(true)` en las vistas de menú) más el ancho (`@media` en
    juegos.html, el mismo corte que `ANCHO`). Fuera de esas vistas —una
-   partida, un juego del club, los sobres— no hay riel ni escucha: el
-   juego es de la pantalla entera.
+   partida, un juego del club, los sobres— no hay riel de repeticiones,
+   pero **el chat general sigue**: es la burbuja 💬 de abajo, con su
+   cuenta roja de lo no leído (`html.jg-cg-flota`, que pone esto cuando el
+   chat no va acoplado al riel). La pantalla completa de un juego la
+   esconde por CSS (`jg-inm`, `jg-club-inm`, `jg-club-pleno`…).
+
+   **Los super chats** (rieles-datos.js, `SUPER_CHAT`) se compran con
+   monedas desde el mismo formulario (✦): duran más y llevan un contorno
+   propio. La economía los cobra; `ctx.superPagado` dice si el de un
+   mensaje se pudo pagar.
 
    **Lo que se reproduce se comprueba antes.** Cada prueba pasa por el
    mismo verificador antitrampas que la aceptó al guardarla
@@ -26,7 +34,8 @@ import { verificaClub } from "./solo/verifica.js";
 import { crearRepro } from "./repeticion.js";
 import {
   alineacionDelDia, etiquetaDia, PAUSA_FINAL_MS, formatoMarca,
-  CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
+  CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer,
+  SUPER_CHAT, SUPER_MAX_MS, nivelSuper, quedaSuper
 } from "./rieles-datos.js";
 import { nombreHtml } from "./tintas.js";
 
@@ -44,11 +53,13 @@ const esPermiso = e => /permission/i.test(String(e && (e.code || e.message) || e
 
 /* ctx = {fb, usuario() → {uid, name}|null, perfil(uid), marco(uid),
    colorDe(uid), dia() → día de Chile de hoy, popular() → juego → cuánto
-   se juega} */
+   se juega, saldo() → {saldo, parada}|null, superPagado(uid, clave) →
+   true/false/null (aún no se sabe), alDatos(fn) → apagar: avisa cuando
+   cambia la economía} */
 export function crearRieles(ctx) {
   const { fb } = ctx;
   const ancho = window.matchMedia(ANCHO);
-  let activo = false, quien = "", raf = 0, ultimoCuadro = 0, ultimoPie = 0, muerto = false;
+  let activo = false, chatActivo = false, quien = "", raf = 0, ultimoCuadro = 0, ultimoPie = 0, muerto = false;
 
   /* ---------- el armado ---------- */
   const izq = document.createElement("aside");
@@ -66,12 +77,15 @@ export function crearRieles(ctx) {
       <button class="jg-cg-cierra" type="button" aria-label="Cerrar el chat">✕</button></header>
     <div class="jg-cg-lista" translate="no" aria-live="polite"></div>
     <p class="jg-cg-nota" aria-live="polite"></p>
+    <div class="jg-cg-super" role="radiogroup" aria-label="Tipo de mensaje" hidden></div>
     <form class="jg-cg-form" autocomplete="off">
+      <button class="jg-cg-sbtn" type="button" aria-expanded="false" aria-label="Super chat: un mensaje que dura más y se ve distinto" title="Super chat">✦</button>
       <input class="inp" maxlength="${CHAT_LARGO}" placeholder="Escribe a todo el salón…" aria-label="Mensaje para el chat general">
-      <button class="btn" type="submit">Enviar</button>
+      <button class="btn jg-cg-enviar" type="submit">Enviar</button>
     </form>`;
   const chatLista = chat.querySelector(".jg-cg-lista"), chatNota = chat.querySelector(".jg-cg-nota");
-  const chatForm = chat.querySelector(".jg-cg-form"), chatCampo = chatForm.querySelector("input"), chatBtn = chatForm.querySelector("button");
+  const chatForm = chat.querySelector(".jg-cg-form"), chatCampo = chatForm.querySelector("input"), chatBtn = chatForm.querySelector(".jg-cg-enviar");
+  const superCaja = chat.querySelector(".jg-cg-super"), superBtn = chatForm.querySelector(".jg-cg-sbtn");
 
   const fab = document.createElement("button");
   fab.type = "button";
@@ -284,20 +298,30 @@ export function crearRieles(ctx) {
   }
 
   /* ---------- el chat general ---------- */
-  let offChat = null, chatMsgs = [], chatFirma = "", relee = 0, repinta = 0, ultimoMio = null, abierto = false, barrido = false, cuenta = 0, enviando = false;
+  let offChat = null, offSuper = null, offDatos = null, chatMsgs = [], superMsgs = [], chatFirma = "", relee = 0, repinta = 0, ultimoMio = null, abierto = false, barrido = false, cuenta = 0, enviando = false;
+  /* El super chat elegido para el próximo mensaje (su precio; 0: normal). */
+  let elegido = 0, superAbierto = false;
 
   function enganchaChat() {
     const u = ctx.usuario();
     if (!u || offChat) return;
     const escucha = () => {
       if (offChat) offChat();
+      if (offSuper) offSuper();
       offChat = fb.watchChatGeneral(fb.ahora() - CHAT_VENTANA_MS, CHAT_MAX, (v, err) => {
         chatMsgs = v || [];
         if (err) nota(esPermiso(err) ? "El chat general espera que se publiquen las reglas de Firebase." : "No se pudo leer el chat.");
         pintaChat();
       });
+      /* Los super que siguen vivos van por otra escucha: duran más que la
+         ventana de 15 minutos. */
+      offSuper = fb.watchSuperChats(fb.ahora() - SUPER_MAX_MS, 60, (v, err) => {
+        superMsgs = err ? [] : (v || []);
+        pintaChat();
+      });
     };
     escucha();
+    if (ctx.alDatos && !offDatos) offDatos = ctx.alDatos(() => { pintaChat(); if (superAbierto) pintaSuper(); });
     relee = setInterval(escucha, RELEE_CHAT_MS);
     repinta = setInterval(pintaChat, REPINTA_CHAT_MS);
     fb.leerUltimoChatGeneral(u.uid).then(x => { if (x && Number.isFinite(x.at)) { ultimoMio = x.at; espera(); } }, () => {});
@@ -305,10 +329,15 @@ export function crearRieles(ctx) {
   }
   function sueltaChat() {
     if (offChat) { offChat(); offChat = null; }
+    if (offSuper) { offSuper(); offSuper = null; }
+    if (offDatos) { offDatos(); offDatos = null; }
     clearInterval(relee); clearInterval(repinta); clearInterval(cuenta);
     relee = repinta = cuenta = 0;
-    chatMsgs = []; chatFirma = "";
+    chatMsgs = []; superMsgs = []; chatFirma = "";
   }
+  /* ¿Se pudo pagar el super de este mensaje? Lo que no es super, o lo que
+     la economía aún no sabe, no se pone en duda. */
+  const pagado = m => nivelSuper(m.s) && ctx.superPagado ? ctx.superPagado(m.uid, m.id) : null;
 
   function nota(texto) { chatNota.textContent = texto || ""; chatNota.hidden = !texto; }
 
@@ -331,17 +360,19 @@ export function crearRieles(ctx) {
       return;
     }
     chatForm.hidden = false;
-    const ahora = fb.ahora(), vis = chatVisibles(chatMsgs, ahora);
+    const ahora = fb.ahora(), vis = chatVisibles(chatMsgs.concat(superMsgs), ahora, pagado);
     const filas = vis.map(m => {
       const p = mezcla({ nombre: m.n || "Jugador" }, ctx.perfil(m.uid));
-      return { m, nombre: p.nombre || "Jugador", foto: p.foto, color: p.color || ctx.colorDe(m.uid), cuando: haceCuanto(ahora - m.at) };
+      const sup = pagado(m) !== false ? nivelSuper(m.s) : null;
+      return { m, sup, queda: sup ? quedaSuper(m, ahora) : "", nombre: p.nombre || "Jugador", foto: p.foto, color: p.color || ctx.colorDe(m.uid), cuando: haceCuanto(ahora - m.at) };
     });
-    const firma = u.uid + "|" + filas.map(f => [f.m.id, f.nombre, f.foto, f.color, f.cuando, ctx.marco(f.m.uid)].join(",")).join("|");
+    const firma = u.uid + "|" + filas.map(f => [f.m.id, f.nombre, f.foto, f.color, f.cuando, ctx.marco(f.m.uid), f.sup ? f.sup.id : "", f.queda].join(",")).join("|");
     if (firma !== chatFirma) {
       chatFirma = firma;
       const abajo = chatLista.scrollHeight - chatLista.scrollTop - chatLista.clientHeight < 40;
       chatLista.innerHTML = filas.length ? filas.map(f => `
-        <div class="jg-cg-msg${f.m.uid === u.uid ? " mio" : ""}" style="--c:${escapeHtml(f.color)}">
+        <div class="jg-cg-msg${f.m.uid === u.uid ? " mio" : ""}${f.sup ? ` super s-${f.sup.id}` : ""}" style="--c:${escapeHtml(f.color)}">
+          ${f.sup ? `<em class="jg-cg-sup" translate="yes">${f.sup.icono} ${escapeHtml(f.sup.nombre)} · ${f.sup.p} 🪙<small>${escapeHtml(f.queda)}</small></em>` : ""}
           ${avatarMarco(f.foto, f.nombre, f.color, ctx.marco(f.m.uid), 24, f.m.uid)}
           <div><p><b data-perfil="${escapeHtml(f.m.uid)}" data-nombre="${escapeHtml(f.nombre)}">${nombreHtml(f.m.uid, escapeHtml(f.nombre))}</b><time>${escapeHtml(f.cuando)}</time></p>
           <span>${escapeHtml(f.m.t)}</span></div>
@@ -351,7 +382,7 @@ export function crearRieles(ctx) {
       chatLista.dataset.listo = "1";
     }
     // Lo nuevo de otros: cuenta en el botón mientras el chat no se ve.
-    const visible = abierto || (ancho.matches && activo);
+    const visible = abierto || acoplado();
     if (visible && vis.length) ponVisto(Math.max(leeVisto(), vis[vis.length - 1].at));
     const n = visible ? 0 : sinLeer(vis, leeVisto(), u.uid);
     fabN.hidden = !n;
@@ -367,7 +398,9 @@ export function crearRieles(ctx) {
     const tic = () => {
       const falta = esperaChat(ultimoMio, fb.ahora());
       chatBtn.disabled = enviando || falta > 0;
-      chatBtn.textContent = falta > 0 ? `${Math.ceil(falta / 1000)} s` : "Enviar";
+      const n = nivelSuper(elegido);
+      chatBtn.textContent = falta > 0 ? `${Math.ceil(falta / 1000)} s` : n ? `${n.icono} ${n.p} 🪙` : "Enviar";
+      chatBtn.classList.toggle("super", !!n);
       chatBtn.title = falta > 0 ? "Se puede escribir un mensaje cada 20 segundos" : "";
       if (!falta && cuenta) { clearInterval(cuenta); cuenta = 0; }
     };
@@ -375,18 +408,58 @@ export function crearRieles(ctx) {
     if (esperaChat(ultimoMio, fb.ahora()) > 0) cuenta = setInterval(tic, 250);
   }
 
+  /* ---------- el selector de super chat ----------
+     Normal o uno de los niveles; el que no se puede pagar sale apagado.
+     Lo elegido vale para el próximo mensaje y después vuelve a normal. */
+  function puedePagar(p) {
+    const s = ctx.saldo ? ctx.saldo() : null;
+    return !!s && !s.parada && s.saldo >= p;
+  }
+  function pintaSuper() {
+    const s = ctx.saldo ? ctx.saldo() : null;
+    if (elegido && !puedePagar(elegido)) elegido = 0;
+    const op = (p, icono, nombre, detalle, clase) => {
+      const ok = !p || puedePagar(p);
+      return `<button type="button" role="radio" class="jg-cg-op ${clase}${elegido === p ? " sel" : ""}" data-super="${p}" aria-checked="${elegido === p}"${ok ? "" : " disabled"}>
+        <b>${icono} ${nombre}</b><small>${detalle}</small></button>`;
+    };
+    superCaja.innerHTML = `<p><b>✦ Super chat</b> <span>${s ? `Tienes ${s.saldo.toLocaleString("es-CL")} 🪙${s.parada ? " · cuenta parada" : ""}` : "Cargando tus monedas…"}</span></p>
+      <div class="jg-cg-ops">${op(0, "💬", "Normal", "gratis · 15 min", "s-normal")}${SUPER_CHAT.map(n =>
+        op(n.p, n.icono, n.nombre, `${n.p} 🪙 · ${n.ms >= 3600000 ? `${n.ms / 3600000} h` : `${n.ms / 60000} min`}`, "s-" + n.id)).join("")}</div>`;
+    espera();
+  }
+  function abreSuper(si) {
+    superAbierto = !!si;
+    superCaja.hidden = !superAbierto;
+    superBtn.setAttribute("aria-expanded", String(superAbierto));
+    superBtn.classList.toggle("activo", superAbierto || !!elegido);
+    if (superAbierto) pintaSuper();
+  }
+  superBtn.onclick = () => abreSuper(!superAbierto);
+  superCaja.addEventListener("click", ev => {
+    const b = ev.target.closest("[data-super]");
+    if (!b || b.disabled) return;
+    elegido = Number(b.dataset.super) || 0;
+    pintaSuper();
+    superBtn.classList.toggle("activo", true);
+    if (!window.matchMedia("(pointer: coarse)").matches) chatCampo.focus();
+  });
+
   chatForm.onsubmit = async ev => {
     ev.preventDefault();
     const u = ctx.usuario();
     const texto = limpiaChat(chatCampo.value);
     if (!u || !texto || enviando || esperaChat(ultimoMio, fb.ahora()) > 0) return;
+    const sup = nivelSuper(elegido);
+    if (sup && !puedePagar(sup.p)) { nota(`No te alcanza: un super chat ${sup.nombre} cuesta ${sup.p} 🪙.`); pintaSuper(); return; }
     enviando = true;
     espera();
     chatCampo.value = "";
     try {
-      await fb.mandaChatGeneral({ uid: u.uid, nombre: u.name }, texto, CHAT_LARGO);
+      await fb.mandaChatGeneral({ uid: u.uid, nombre: u.name }, texto, CHAT_LARGO, sup ? sup.p : 0);
       ultimoMio = fb.ahora();
-      nota("");
+      nota(sup ? `${sup.icono} Tu super chat queda a la vista ${sup.ms / 3600000 >= 1 ? `${sup.ms / 3600000} h` : `${sup.ms / 60000} min`}.` : "");
+      if (sup) { elegido = 0; abreSuper(false); }
     } catch (e) {
       /* Lo que no salió vuelve al campo: perder una frase es peor que no
          mandarla. Un PERMISSION_DENIED es la espera de la regla (otra
@@ -395,7 +468,8 @@ export function crearRieles(ctx) {
       const x = await fb.leerUltimoChatGeneral(u.uid).catch(() => null);
       if (x && Number.isFinite(x.at)) ultimoMio = x.at;
       nota(esPermiso(e)
-        ? (esperaChat(ultimoMio, fb.ahora()) > 0 ? "Espera unos segundos: se puede escribir un mensaje cada 20 s." : "No se pudo enviar: el chat general espera que se publiquen las reglas de Firebase.")
+        ? (esperaChat(ultimoMio, fb.ahora()) > 0 ? "Espera unos segundos: se puede escribir un mensaje cada 20 s."
+          : sup ? "No se pudo enviar el super chat: espera que se publiquen las reglas de Firebase. No se cobró nada." : "No se pudo enviar: el chat general espera que se publiquen las reglas de Firebase.")
         : "No se pudo enviar. Revisa la conexión e inténtalo otra vez.");
     }
     enviando = false;
@@ -403,8 +477,15 @@ export function crearRieles(ctx) {
     if (!window.matchMedia("(pointer: coarse)").matches) chatCampo.focus();
   };
 
+  /* El chat va en el riel (PC ancho, vista de menú) o flota como burbuja. */
+  const acoplado = () => ancho.matches && activo;
+  function ponFlota() {
+    const flota = chatActivo && !acoplado();
+    document.documentElement.classList.toggle("jg-cg-flota", flota);
+    if (!flota && abierto) abre(false);
+  }
   function abre(si) {
-    abierto = !!si;
+    abierto = !!si && chatActivo;
     document.documentElement.classList.toggle("jg-cg-abierto", abierto);
     fab.setAttribute("aria-expanded", String(abierto));
     if (abierto) {
@@ -417,12 +498,16 @@ export function crearRieles(ctx) {
   fab.onclick = () => abre(!abierto);
   fondo.onclick = () => abre(false);
   chat.querySelector(".jg-cg-cierra").onclick = () => abre(false);
-  const tecla = ev => { if (ev.key === "Escape" && abierto) { ev.preventDefault(); abre(false); } };
+  const tecla = ev => {
+    if (ev.key !== "Escape") return;
+    if (superAbierto && chat.contains(document.activeElement)) { ev.preventDefault(); abreSuper(false); return; }
+    if (abierto) { ev.preventDefault(); abre(false); }
+  };
   document.addEventListener("keydown", tecla);
 
   /* ---------- encender y apagar ---------- */
   const alAncho = () => {
-    if (ancho.matches && abierto) abre(false);
+    ponFlota();
     if (activo && ancho.matches && ctx.usuario()) engancha(); else suelta();
     for (const t of tarjetas) t.w = 0;
     chatFirma = "";
@@ -451,21 +536,25 @@ export function crearRieles(ctx) {
   }
 
   /* Se llama en cada repintado de juegos-main: `si` dice si la vista
-     actual lleva rieles. Barato si nada cambió. */
-  function pon(si) {
+     actual lleva rieles, y `conChat` si lleva el chat general (todas
+     menos el castigo y la puerta de entrada: en una partida o un juego del
+     club va como burbuja). Barato si nada cambió. */
+  function pon(si, conChat = si) {
     if (muerto) return;
     const u = ctx.usuario(), uid = u ? u.uid : "";
-    const cambio = si !== activo || uid !== quien;
+    const cambio = !!si !== activo || !!conChat !== chatActivo || uid !== quien;
     activo = !!si;
+    chatActivo = !!(si || conChat);
     document.documentElement.classList.toggle("jg-rieles", activo);
+    document.documentElement.classList.toggle("jg-cg-si", chatActivo);
     if (activo) ponScroll();
-    if (!activo && abierto) abre(false);
+    ponFlota();
     if (cambio) {
-      if (uid !== quien) { sueltaChat(); suelta(); comprobadas.clear(); ultimoMio = null; for (const t of tarjetas) { t.repro = null; t.entrada = null; t.pausado = false; t.el.classList.remove("pausada"); } }
+      if (uid !== quien) { sueltaChat(); suelta(); comprobadas.clear(); ultimoMio = null; elegido = 0; abreSuper(false); for (const t of tarjetas) { t.repro = null; t.entrada = null; t.pausado = false; t.el.classList.remove("pausada"); } }
       quien = uid;
       pintaPuertaIzq(!u);
-      if (activo && u) { enganchaChat(); if (ancho.matches) engancha(); }
-      else { sueltaChat(); suelta(); }
+      if (chatActivo && u) enganchaChat(); else sueltaChat();
+      if (activo && u && ancho.matches) engancha(); else suelta();
       chatFirma = "";
       pintaChat();
       espera();
@@ -475,7 +564,7 @@ export function crearRieles(ctx) {
       // Un perfil que llegó (apodo, foto, marco): los pies y el chat lo recogen.
       for (const t of tarjetas) if (t.repro) pintaPie(t);
       pintaChat();
-    }
+    } else if (chatActivo) pintaChat();
     arranca();
   }
 
@@ -486,7 +575,7 @@ export function crearRieles(ctx) {
     document.removeEventListener("visibilitychange", alVer);
     document.removeEventListener("keydown", tecla);
     window.removeEventListener("scroll", alScroll);
-    document.documentElement.classList.remove("jg-rieles", "jg-cg-abierto");
+    document.documentElement.classList.remove("jg-rieles", "jg-cg-abierto", "jg-cg-si", "jg-cg-flota");
     izq.remove(); chat.remove(); fondo.remove(); fab.remove();
   }
 
