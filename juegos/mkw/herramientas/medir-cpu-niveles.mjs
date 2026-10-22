@@ -30,7 +30,8 @@
 //       con otro programa. --solo-resumen = rehacer resumen.txt con lo ya medido)
 // M20 (§96): los niveles son los de la página (dificultad-cpu.mjs: facil, normal, dificil, maximo), más altos que los
 // del juego; la medición de antes (sin etiqueta, 2026-10-20) es con los del juego (normal = su fila normal, dificil =
-// su fila difícil). Cada carrera anota lo que dice el gancho nativo (mkw_cpu_estado: nivel aplicado, velocidad escrita).
+// su fila difícil). Cada carrera anota lo que dice el gancho nativo (mkw_cpu_estado: nivel aplicado, velocidad escrita;
+// §99: 14 la tabla de RR cargada, 15 karts de CPU mejorados, 16 el tope escrito ×1000, 17 veces que se subió el tope).
 import { spawn } from 'node:child_process';
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -92,7 +93,7 @@ async function correrCarrera(contexto, [cc, nivel], pista, semilla) {
       empezo = Date.now();
       r.ficha = await p.evaluate(() => window.mkwEstado?.ficha?.puestos?.map(q => [q.tipo, q.personaje, q.vehiculo])).catch(() => null);
       // (M20) lo que dice el gancho: cargas, aplicadas, nivel, objetos, adv/bias/min escritos, datos ok, los del juego…
-      r.gancho = await p.evaluate(() => { const M = window.mkw; return M?._mkw_cpu_estado ? Array.from({ length: 14 }, (_, k) => M._mkw_cpu_estado(k)) : null; }).catch(() => null);
+      r.gancho = await p.evaluate(() => { const M = window.mkw; return M?._mkw_cpu_estado ? Array.from({ length: 20 }, (_, k) => M._mkw_cpu_estado(k)) : null; }).catch(() => null);
     }
     ultimo = c;
     // el avance de las 12 en cada marca de 10 s (la primera lectura pasada la marca: a lo más medio segundo después,
@@ -143,7 +144,10 @@ function resumen(carreras) {
                  ['c100', 'normal', 'c150', 'dificil'], ['c100', 'dificil', 'c150', 'dificil'],
                  // M20: los niveles de la página
                  ['c150', 'facil', 'c150', 'normal'], ['c150', 'dificil', 'c150', 'normal'], ['c150', 'maximo', 'c150', 'normal'],
-                 ['c150', 'maximo', 'c150', 'dificil'], ['espejo', 'maximo', 'c150', 'maximo'], ['c100', 'maximo', 'c150', 'maximo']];
+                 ['c150', 'maximo', 'c150', 'dificil'], ['espejo', 'maximo', 'c150', 'maximo'], ['c100', 'maximo', 'c150', 'maximo'],
+                 // §99 (M23): intenso (el Hard AI de RR) e imposible (además, solo las CPU: tope, base y aceleración)
+                 ['c150', 'intenso', 'c150', 'maximo'], ['c150', 'imposible', 'c150', 'intenso'], ['c150', 'imposible', 'c150', 'maximo'],
+                 ['c100', 'imposible', 'c100', 'intenso']];
   lineas.push('');
   lineas.push('Comparación pareada (misma pista y semilla): cuánto recorre cada kart en A respecto del MISMO kart en B, en la');
   lineas.push('última marca de 10 s que tienen las dos carreras (antes de que llegue la primera); y el tiempo de la ganadora:');

@@ -8929,8 +8929,22 @@ min).
   (`dificultad-cpu.mjs`) y `mkw_cpu_estado` 14-19 para mirar. Sin el programa nuevo, Intenso e Imposible corren como
   Máximo. El sitio: `MKW_NIVEL` con 6 y su ayuda.
 
-**Lo que se espera ver (a 150cc):** Máximo ~86 (parejo con el mejor humano, 86,1), Intenso **120 exacto** (+39 %),
-Imposible **138 exacto** (+60 %). **Falta medirlo** con `medir-cpu-niveles.mjs` (ver 99.13).
+**Lo que se esperaba (a 150cc, en recta):** Máximo ~86 (parejo con el mejor humano, 86,1), Intenso **120** (+39 %),
+Imposible **138** (+60 %).
+
+**Medido** (`node herramientas/medir-cpu-niveles.mjs --etiqueta m23 --combos c150:maximo,c150:intenso,c150:imposible`:
+12 CPU, 4 pistas × 2 semillas, el mismo kart en el mismo instante de la misma carrera):
+
+| | vueltas por minuto (media) | la ganadora (s) en 0.0 · 13.2 · 20.2 · 30.2 | contra el nivel de abajo |
+|---|---|---|---|
+| Máximo | 1,445 | 116,9 · 162,5 · 138,3 · 138,5 | — |
+| Intenso | 1,605 | 100,8 · 141,9 · 119,8 · 121,1 | **+10,5 %** recorrido (la ganadora, −13 %) |
+| Imposible | 1,783 | 87,4 · 130,8 · 108,4 · 108,5 | **+11,0 %** sobre Intenso; **+21,9 %** sobre Máximo (la ganadora, −22 %) |
+
+Los ganchos actuaron en todas: Intenso con la tabla de RR (adv 100: base 170); Imposible con el tope en 138, los 12
+karts de CPU mejorados, sin fallos de la tabla. La ganancia en la carrera es menor que la de la recta (+39 % / +60 %):
+también cuentan las curvas, los choques y los objetos, y Máximo ya iba con sus bonos. El mismo kart fue más lento en
+Imposible que en Intenso en 8 de 96 comparaciones (caídas o choques a más velocidad): no es la regla.
 
 ### 99.11 El VR según el nivel (la regla v2, `vr-sala.mjs`)
 
@@ -8975,9 +8989,9 @@ cambiados, 13 nuevos); `prueba-vr` (la curva contra el juego) igual.
 
 ### 99.13 Lo que queda
 
-- **Medir Intenso e Imposible** con `node herramientas/medir-cpu-niveles.mjs --etiqueta m23 --combos
-  c150:maximo,c150:intenso,c150:imposible,c100:intenso,c100:imposible` (debe dar 120,0 / 138,0, y en 200cc 200 / 230) y
-  ver si la IA a 138 se cae más en pistas cerradas (si pasa: tope ×1,10 o giro ×1,15).
+- Medir Intenso e Imposible también en 200cc (`--combos c100:intenso,c100:imposible`) y leer la velocidad de cada
+  kart en la herramienta (hoy mide el recorrido), para ver si la IA a 138 se cae más en pistas cerradas (si pasa: tope
+  ×1,10 o giro ×1,15).
 - Del crítico de la red, sin hacer todavía: **H1.4** (reenviar los mensajes de la sala por otro par cuando dos no se
   hablan), **H9** (el estado de la sala solo cuando cambia, con un latido que lleva la versión), **H1.2** (la prueba
   de conexión en el vestíbulo, 🟢/🛰/🔴 por piloto) y **S3** (que el «terminé» valga solo de un humano que corrió).

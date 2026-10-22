@@ -469,7 +469,8 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   **ponerse al día** (el runtime corre cuadros seguidos: `mkw_prisa`) y **el relevo rápido** (al callado se lo pausa a
   los 150 ms y vuelve a manejar); los niveles **Intenso** (el Hard AI de RR) e **Imposible** (además, solo las CPU: tope
   ×1,15, base ×1,15, aceleración ×1,5); el VR v2 (otro crítico: zona muerta, fusible, segunda llegada en los niveles
-  fuera de escala, ausente = cortado). Falta: medir Intenso/Imposible, H1.4, H9, H1.2 y S3 del crítico (§99)
+  fuera de escala, ausente = cortado). Medido: Intenso +10,5 % y Imposible +21,9 % de recorrido sobre Máximo. Falta:
+  H1.4, H9, H1.2 y S3 del crítico (§99)
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
@@ -479,7 +480,7 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
   tarde; `prueba-relevo` A 4, B 5, C 9), ponerse al día (Carla con tirones de 300 ms: 0,7 cuadros atrás en vez de
   16-83), el relevo rápido (pestaña trabada 1 s: Ana espera 184 ms en vez de 983; cinco trampas encontradas en Node, ver
   §99.9), la largada pareja y la toma del anfitrión. Intenso e Imposible con tres envolturas nuevas (`prueba-sincro`
-  13/13 con cada uno). El VR v2 (banco `vr-sala` 58). Pendiente medir las velocidades de Intenso/Imposible.
+  13/13 con cada uno; medido: Intenso recorre +10,5 % sobre Máximo e Imposible +21,9 %). El VR v2 (banco `vr-sala` 58).
 
 - **2026-10-21 17:45** — **La pantalla completa al empezar, opcional y apagada** (§98.10, el dueño después de probar con
   `jugar.bat`: «demasiado lag al abrir la lista de mapas en el host»). El modo inmersivo pone encima del juego la
