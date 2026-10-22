@@ -156,6 +156,20 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   skips shots that can't (`SOLO_FUERA`). In battle the two highways leave the
   centre free, so shots stay centred.
 
+## Thumbnails (`MINI`, `miniHaz`, `miniProcesa` in `escena.js`)
+
+Every box piece has a real picture (the category emoji meant nothing): a
+default rocker wearing that piece, framed on it (`ED_FOCUS` + `MINI_ZOOM`),
+or the guitar alone, or the tattoo drawing. It is rendered into a corner of
+the scene's own canvas **inside the frame, before the scene** (which paints
+over it) and copied to a 2D canvas — no second WebGL context. A few per frame
+(~12 ms, `MINI.cola`), only while the editor is open; cached per piece and
+colours (`invId`) in localStorage (`rock-mini-<MINI_V>:<id>`: bump `MINI_V`
+when the rocker's look changes). Used by the editor tiles, «Lo que puede
+salir» (the whole `poolDe(now)` of the body), the Vender rows, the last
+prizes, the prize card (`boxCardTex`) and `#boxUI`. Pieces you don't own
+show their factory/default colours (`muestra`).
+
 ## Traps
 
 - In the editor the rocker is **still** (`st.quieto`: no strumming, no
