@@ -91,7 +91,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
   let host = null, frame = null, offs = [], d = null, estados = null, prefs = null, muerto = false, listo = false, ocupado = Promise.resolve();
   const uid = usuario.uid;
   const heredando = new Set();
-  const nombre = u => { const q = quien ? quien(u) : null; return { nombre: (q && q.nombre) || "Jugador", color: (q && q.color) || "#0d9488", foto: (q && q.foto) || "" }; };
+  const nombre = (u, ligero) => { const q = quien ? quien(u, ligero) : null; return { nombre: (q && q.nombre) || "Jugador", color: (q && q.color) || "#0d9488", foto: (q && q.foto) || "" }; };
   /* La hora del servidor llevada al reloj de este navegador. */
   const aLocal = t => (Number.isFinite(t) ? t - (fb.ahora() - Date.now()) : 0);
 
@@ -99,11 +99,12 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
   let carinos = null;                     // mascotasCarinos/<uid>, crudo
   let plaza = null;                       // {offs, crudo, yo, reloj, latido, ultima}
   const estadosAjenos = new Map();        // "u/k" -> {e, at, leyendo}
-  /* El estado de una mascota ajena, por clave y con memoria de dos minutos
-     (al llegar uno nuevo se vuelve a mandar la plaza). */
+  /* El estado de una mascota ajena, por clave y con memoria de cinco
+     minutos (al llegar uno nuevo se vuelve a mandar la plaza): la etapa y
+     la ropa cambian poco, y cada lectura baja el estado entero. */
   function estadoAjeno(u, k) {
     const key = u + "/" + k, x = estadosAjenos.get(key), t = Date.now();
-    if ((!x || t - x.at > 120000) && !(x && x.leyendo)) {
+    if ((!x || t - x.at > 300000) && !(x && x.leyendo)) {
       const y = x || { e: null, at: 0 };
       y.leyendo = true;
       estadosAjenos.set(key, y);
@@ -176,7 +177,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
     const lista = [];
     for (const [k, xs] of Object.entries(carinos))
       for (const [u, x] of Object.entries(xs || {}))
-        if (x && Number.isFinite(x.at)) lista.push({ k, u, nombre: nombre(u).nombre, at: x.at });
+        if (x && Number.isFinite(x.at)) lista.push({ k, u, nombre: nombre(u, true).nombre, at: x.at });
     manda({ tipo: "carinos", lista, visto: Number.isFinite(prefs.carinos) ? prefs.carinos : null, ahora: fb.ahora() });
   }
 
@@ -370,7 +371,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
             por.get(u).push({ c, e: m.e, at: m.at });
           }
           const lista = [...por].map(([u, ms]) => {
-            const q = nombre(u);
+            const q = nombre(u, true);
             return { u, nombre: q.nombre, color: q.color, foto: q.foto.length <= 40000 ? q.foto : "", mascotas: ms.sort((a, b) => a.at - b.at).map(m => ({ c: m.c, e: m.e })) };
           }).sort((a, b) => b.mascotas.length - a.mascotas.length || a.nombre.localeCompare(b.nombre, "es"));
           responde(true, lista.slice(0, 80));
