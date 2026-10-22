@@ -684,7 +684,9 @@ const AYUDA_MODO = { copa: "Una copa del juego: 4 pistas, con puntos.", playlist
 const AYUDA_CC = { c150: "La velocidad de siempre.", espejo: "A 150cc, con las pistas dadas vuelta.",
   c100: "Mucho más rápido. Hay que frenar antes de las curvas.", azar: "Cada carrera sortea la suya: 150cc, espejo o 200cc." };
 const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", normal: "Corren como las de un Gran Premio difícil.",
-  dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca." };
+  dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca.",
+  intenso: "El Hard AI de Retro Rewind: siempre a la velocidad máxima del juego. Casi imposible de ganar.",
+  imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
    una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html

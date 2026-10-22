@@ -7796,8 +7796,10 @@ const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
    aparte de la cilindrada, con máximo por omisión»). En las carreras VS del juego la cilindrada y el nivel de la CPU
    son dos ajustes separados (solo el Grand Prix los ata). Las claves son las que entiende el marco (`&cpu=`,
    juegos/mkw/web/navegador/mkw.mjs): "maximo" = todo al tope; los otros, más duros que los del juego (bitácora §96).
-   El orden es el de los botones, de menos a más, como la cilindrada. */
-export const MKW_NIVEL = { facil: "Fácil", normal: "Normal", dificil: "Difícil", maximo: "Máximo" };
+   El orden es el de los botones, de menos a más, como la cilindrada. M23 (el dueño): dos más arriba, injustos a
+   propósito: "intenso" = el Hard AI de Retro Rewind (siempre al tope de velocidad) e "imposible" = además, solo las
+   CPU, más tope, más velocidad base y más aceleración que cualquier kart (juegos/mkw: dificultad-cpu.mjs, §99). */
+export const MKW_NIVEL = { facil: "Fácil", normal: "Normal", dificil: "Difícil", maximo: "Máximo", intenso: "Intenso", imposible: "Imposible" };
 const mkwNivelDe = v => tiene(MKW_NIVEL, v) ? v : "maximo";
 /* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
 export function mkwTabla(t) {

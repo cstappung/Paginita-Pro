@@ -58,12 +58,13 @@ test('los dos modos de la sala (sin Retro WFC, pedido del dueño): copa por omis
 
 test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la cilindrada, Máximo por omisión, y va al marco',()=>{
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
- assert.deepEqual(Object.keys(M.MKW_NIVEL),['facil','normal','dificil','maximo'],'de menos a más (el orden de los botones)');
+ assert.deepEqual(Object.keys(M.MKW_NIVEL),['facil','normal','dificil','maximo','intenso','imposible'],'de menos a más (el orden de los botones; M23: intenso e imposible)');
  let e=M.reducir(nueva());assert.equal(e.nivel,'maximo','Máximo por omisión');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'normal'}));assert.equal(e.nivel,'normal');assert.equal(e.cc,'c150','la cilindrada no cambia');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'cc',v:'c100'},{t:'ajuste',uid:'a',k:'nivel',v:'facil'}));assert.equal(e.cc,'c100');assert.equal(e.nivel,'facil','los dos ajustes, cada uno el suyo');
  e=M.reducir(nueva({t:'ajuste',uid:'b',k:'nivel',v:'facil'}));assert.equal(e.nivel,'maximo','b no es el anfitrión');
- e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'imposible'}));assert.equal(e.nivel,'maximo','lo que no existe vuelve a Máximo');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'turbo'}));assert.equal(e.nivel,'maximo','lo que no existe vuelve a Máximo');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'imposible'}));assert.equal(e.nivel,'imposible','M23: imposible existe');
  e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'nivel',v:'normal'}));assert.equal(e.nivel,'maximo','corriendo no se cambia');
  e=M.reducir(nueva({t:'ajuste',uid:'a',k:'nivel',v:'dificil'},{t:'empieza',uid:'a'}));
  assert.equal(e.hist[e.hist.length-1].nivel,'dificil','la ronda anota el nivel');
