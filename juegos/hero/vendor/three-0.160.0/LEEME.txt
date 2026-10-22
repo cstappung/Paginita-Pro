@@ -1,0 +1,3 @@
+three.js 0.160.0 (npm), solo lo que usa Batalla de Rock (juegos/hero/js/rock/escena.js).
+Retoque: en addons/ los «from 'three'» se cambiaron por «from '../../three.module.min.js'»,
+para importarlos por ruta relativa (en un worker no hay mapa de módulos). Licencia: LICENSE.
