@@ -314,7 +314,7 @@ export function requisito(item, est, ahora = Date.now()) {
     if (est.compras && est.compras[item.id]) return { ok: true, falta: "" };
     if (HALLOWEEN[item.id] && !tiendaHalloweenAbierta(ahora)) return { ok: false, falta: "Edición limitada de Halloween: ya no se vende", agotado: true };
     const p = precioDe(item.id);
-    return { ok: false, falta: `🪙 ${p.toLocaleString("es-CL")} en la tienda`, tienda: true, precio: p };
+    return { ok: false, falta: `${p.toLocaleString("es-CL")} monedas en la tienda`, tienda: true, precio: p };
   }
   if (r.coleccion) {
     const k = coleccionHalloween(est.compras);

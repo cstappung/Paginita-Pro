@@ -83,7 +83,7 @@ import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
 import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
-import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta } from "./juegos/tienda-halloween.js";
+import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta, firmaYoTienda } from "./juegos/tienda-halloween.js";
 import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
@@ -468,6 +468,15 @@ function aplicaPropio() {
                    perfiles.get(b.uid) || null);
   state.user = { uid: b.uid, name: m.nombre, photo: m.foto, color: m.color };
   pintaUsuario();
+  /* La franja de la tienda de Halloween se escribió con el salón, a veces
+     antes de que llegara el perfil (y salía la foto de Google): se rehace
+     aquí con la foto y el nombre del perfil. */
+  const tira = document.querySelector(".jg-th-tira");
+  if (tira) {
+    const h = tiraTiendaHtml(Object.assign({}, yoTienda() || {}));
+    if (!h) tira.remove();
+    else if (tira.getAttribute("data-yo") !== firmaYo()) tira.outerHTML = h;
+  }
 }
 
 /* Las reglas limitan a 400 caracteres la `foto` de la ficha y la de
@@ -700,9 +709,13 @@ function trasCambiarPerfil() {
 function yoTienda() {
   const b = state.base;
   if (!b) return null;
-  const q = quien(b.uid, perfiles.get(b.uid) || null, null, ctxPerfil.propio(), colorForUid);
+  /* `state.user` ya es la cuenta con el perfil encima (aplicaPropio): la
+     foto que la persona eligió, no la de Google. */
+  const u = state.user || {};
+  const q = quien(b.uid, perfiles.get(b.uid) || null, null, { nombre: u.name || b.name, foto: u.photo || b.photo, color: u.color || b.color }, colorForUid);
   return { uid: b.uid, nombre: q.nombre, foto: q.foto, color: q.color };
 }
+const firmaYo = () => firmaYoTienda(yoTienda());
 function abreTienda(elegido) {
   abreTiendaHalloween({
     yo: yoTienda,
