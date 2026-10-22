@@ -299,7 +299,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-14";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-15";
     host.append(redEl, frame);
   }
 
