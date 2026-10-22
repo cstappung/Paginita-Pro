@@ -23,7 +23,7 @@ import { OutputPass } from '../../vendor/three-0.160.0/addons/postprocessing/Out
 import { mergeGeometries } from '../../vendor/three-0.160.0/addons/utils/BufferGeometryUtils.js';
 import {
   ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
-  INV_CATS, invItem, invVar, invVarL, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta,
+  INV_CATS, invItem, invVar, invVarL, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta, poolDe,
 } from './catalogo.js';
 
 
@@ -116,6 +116,19 @@ var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(420px,10
 #editor .tile.leg.on .st{color:#b0401a}
 #editor .tile.leg.lock{animation:none;background:#1c1226;color:#a88a5a;text-shadow:none}
 #editor .tile .nv{position:absolute;left:5px;top:3px;font-size:10px;color:#9dff6f}
+#editor .tile .mini{display:block;width:100%;aspect-ratio:1;border-radius:9px;border:2px solid #000;background:#1a1428;object-fit:cover}
+#editor .tile.foto{justify-content:flex-start;padding:5px 5px 7px}
+#editor .tile.lock .mini{filter:brightness(.82)}
+#editor .tile.lock.foto::before{position:absolute;top:8px;right:8px;z-index:1}
+#editor .tile.foto.on::after{top:8px;right:9px;background:#ffd23a;border-radius:50%;width:18px;height:18px;line-height:18px;border:2px solid #000}
+#editor div.tile{cursor:default;border:2px solid #000;box-shadow:0 2px 0 #000;color:#fff}
+#editor div.tile:not(.tuya) .mini{filter:brightness(.85)}
+#editor div.tile.tuya::after{content:'✓';position:absolute;top:8px;right:9px;background:#9dff6f;color:#10200a;border-radius:50%;width:18px;height:18px;line-height:18px;border:2px solid #000;font-size:11px}
+#editor .pcat{margin:10px 0 5px;font-weight:900;color:#ffd23a;font-size:12px}
+#editor .vfoto{position:relative;overflow:hidden}
+#editor .vfoto .mini{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#editor .vfoto .mini:not([src]){display:none}
+#editor .mchip{width:22px;height:22px;border-radius:6px;border:2px solid #000;vertical-align:-6px;margin-right:5px;object-fit:cover;background:#1a1428}
 #editor .tile.on .nv{color:#1d6a1a}
 #editor .legend{display:flex;flex-wrap:wrap;gap:4px 12px;color:#a99bc8;font-size:11px;margin:10px 0 2px}
 #editor .legend b{color:#ffd23a}
@@ -165,6 +178,8 @@ var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(420px,10
 #boxUI.leg{border-color:#ffd23a;box-shadow:0 0 0 3px #000,0 0 26px #ffb02a}
 #boxUI .rar{font-family:Bangers,Impact,sans-serif;font-size:24px;letter-spacing:1px;text-shadow:2px 2px 0 #000}
 #boxUI .nm{font-size:19px;font-weight:900;margin:2px 0 4px}
+#boxUI .bfoto{display:block;width:96px;height:96px;margin:0 auto 6px;border-radius:12px;border:3px solid #000;object-fit:cover;background:#1a1428}
+#boxUI .bfoto:not([src]){display:none}
 #boxUI .sub{color:#c9b8ec;margin-bottom:11px}
 #boxUI .bt{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 #boxUI button{border:2px solid #000;border-radius:9px;padding:7px 10px;font:inherit;font-weight:900;background:#2b2140;color:#fff;cursor:pointer;box-shadow:0 3px 0 #000}
@@ -3707,7 +3722,9 @@ function edRender() {
     if (list.length <= 2 || attr === 'tp' && path === 'spot') return `<div class="eg"><b>${label}</b><div class="chips">${list.map(([v, n, lg]) => `<button class="chip${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${cur !== v && locked(path, v, attr) ? ' lock' : ''}" data-${attr}="${path}" data-v="${v}">${n}</button>`).join('')}</div></div>`;
     const k = attr === 'tp' ? (path === 'design' ? 'tatDesign' : null) : catDeRuta(path), todos = list.filter(o => !esNada(o[0]));
     const cuenta = k ? `<small>${todos.filter(o => invHas(g, k, o[0])).length}/${todos.length} tuyas</small>` : '';
-    return `<div class="eg"><b>${label}${cuenta}</b><div class="tiles">${list.map(([v, n, lg]) => { const nv = nVar(path, v, attr); return `<button class="tile${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${cur !== v && locked(path, v, attr) ? ' lock' : ''}" data-${attr}="${path}" data-v="${v}">${nv > 1 ? `<span class="nv">×${nv}</span>` : ''}${lg ? '<span class="st">★ LEGENDARIO</span>' : ''}<span>${n}</span></button>`; }).join('')}</div></div>`;
+    // con foto de la pieza (la última variante tuya o, si no la tienes, sus colores de muestra)
+    const foto = v => { if (!k || esNada(v)) return ''; const vs = invVariants(g, k, v); return miniImg(vs.length ? vs.at(-1) : muestra(g, k, v)); };
+    return `<div class="eg"><b>${label}${cuenta}</b><div class="tiles">${list.map(([v, n, lg]) => { const nv = nVar(path, v, attr); return `<button class="tile${lg ? ' leg' : ''}${cur === v ? ' on' : ''}${cur !== v && locked(path, v, attr) ? ' lock' : ''}${k && !esNada(v) ? ' foto' : ''}" data-${attr}="${path}" data-v="${v}">${foto(v)}${nv > 1 ? `<span class="nv">×${nv}</span>` : ''}${lg ? '<span class="st">★ LEGENDARIO</span>' : ''}<span>${n}</span></button>`; }).join('')}</div></div>`;
   };
   /* colores de una pieza del inventario: cada variante ganada en las cajas (las tuyas se pueden vender en el mercado) */
   const vars = k => {
@@ -3730,7 +3747,7 @@ function edRender() {
       const C2 = INV_CATS[v.k], nom = invItem(v.b, v.k, v.t)?.[1] ?? v.t;
       const act = v.venta ? `<em>✓ En el mercado</em><button class="chip" data-mercado="1">Ver</button>`
         : `<input type="number" min="1" max="100000" step="1" value="${v.leg ? 1500 : 400}" aria-label="Precio de ${esc(nom)}" data-precio="${esc(v.copia)}"><button class="gold" data-vende="${esc(v.copia)}">Vender</button>`;
-      return `<div class="vrow${v.leg ? ' leg' : ''}"><span class="vfoto" style="background:${invBg(v.c)}">${C2.ic}</span><div class="vtx"><b>${v.leg ? '★ ' : ''}${esc(nom)}</b><small>${C2.n} · ${v.b === 'f' ? 'rockera' : 'rockero'}</small></div><div class="vact">${act}</div></div>`;
+      return `<div class="vrow${v.leg ? ' leg' : ''}"><span class="vfoto" style="background:${invBg(v.c)}">${C2.ic}${miniImg(v)}</span><div class="vtx"><b>${v.leg ? '★ ' : ''}${esc(nom)}</b><small>${C2.n} · ${v.b === 'f' ? 'rockera' : 'rockero'}</small></div><div class="vact">${act}</div></div>`;
     }).join('') : note('Aún no tienes piezas para vender: lo inicial es de todos y no se vende. Abre <b>📦 Cajas</b> y lo que te salga lo puedes vender aquí.') + '<button class="add" data-tab2="cajas">📦 Ir a las cajas</button>';
     h += '<button class="add gold" data-mercado="1">🏪 Abrir el Mercado</button>';
   } else if (ED.tab === 'cuerpo') {
@@ -3776,8 +3793,15 @@ function edRender() {
       const all = C[k].filter(o => !esNada(o[0])), own = all.filter(o => invHas(g, k, o[0])).length, lg = all.filter(o => o[2]), ol = lg.filter(o => invHas(g, k, o[0])).length;
       return `<div class="colr"><span>${INV_CATS[k].ic} ${INV_CATS[k].n}</span><i><u style="width:${own / all.length * 100}%"></u></i><em>${own}/${all.length} · ★${ol}/${lg.length}</em></div>`;
     }).join('') + '</div>';
+    // todo lo que puede traer una caja de este cuerpo, con su foto (✓ = ya la tienes)
+    const pool = poolDe(Date.now()).filter(p => p.b === g);
+    h += `<div class="eg"><b>Lo que puede salir<small>${pool.length} piezas · ★ 1 de cada 10 cajas</small></b>` + Object.keys(INV_CATS).map(k => {
+      const de = pool.filter(p => p.k === k); if (!de.length) return '';
+      return `<div class="pcat">${INV_CATS[k].ic} ${INV_CATS[k].n}</div><div class="tiles">` + de.map(p => { const nom = invItem(g, k, p.t)?.[1] ?? p.t, mia = invHas(g, k, p.t);
+        return `<div class="tile foto${p.leg ? ' leg' : ''}${mia ? ' tuya' : ''}" title="${esc(nom)}${mia ? ' (ya la tienes)' : ''}">${miniImg(muestra(g, k, p.t))}${p.leg ? '<span class="st">★ LEGENDARIO</span>' : ''}<span>${esc(nom)}</span></div>`; }).join('') + '</div>';
+    }).join('') + '</div>';
     const last = (INV.last || []).map((v, i) => [v, i]).filter(([v]) => v.b === g);
-    if (last.length) h += '<div class="eg"><b>Últimos premios</b><div class="chips">' + last.map(([v, i]) => `<button class="chip${v.leg ? ' leg' : ''}" data-lasti="${i}" title="Equipar"><i class="dot" style="background:${invBg(v.c)}"></i>${esc(invItem(v.b, v.k, v.t)?.[1] ?? v.t)}</button>`).join('') + '</div></div>';
+    if (last.length) h += '<div class="eg"><b>Últimos premios</b><div class="chips">' + last.map(([v, i]) => `<button class="chip${v.leg ? ' leg' : ''}" data-lasti="${i}" title="Equipar">${miniImg(v, 'mchip')}${esc(invItem(v.b, v.k, v.t)?.[1] ?? v.t)}</button>`).join('') + '</div></div>';
     h += note(`Cajas abiertas: ${INV.opened}. Si sale una pieza repetida con los mismos colores, te devuelve monedas (${REEMBOLSO.comun}, o ${REEMBOLSO.leg} si es legendaria). Lo que sacas es tuyo: lo puedes vender en el mercado.`);
   }
   if (['ropa', 'guitarra', 'acc'].includes(ED.tab)) h = `<div class="legend"><span>🔒 sale en las <b>📦 Cajas</b>, con sus colores</span><span><b>★</b> legendario: brilla y se anima</span><span><b style="color:#9dff6f">×2</b> variantes tuyas</span></div>` + h;
@@ -3901,6 +3925,109 @@ canvas.addEventListener('pointerup', () => { ED.drag = null; });
 canvas.addEventListener('pointercancel', () => { ED.drag = null; });
 
 /* =====================================================================
+   MINIATURAS — cada pieza de las cajas fotografiada de verdad (los emojis no decían nada): un rockero de
+   prueba con el cuerpo por defecto y esa pieza puesta, enfocado en ella (o la guitarra sola, o el dibujo del
+   tatuaje). Se pintan en una esquina del lienzo, dentro del cuadro y antes de la escena (que las tapa), y se
+   copian a un canvas 2D: sin otro contexto WebGL. De a pocas por cuadro (`MINI.cola`), y quedan guardadas en
+   este navegador (localStorage, `rock-mini-<MINI_V>:<id>`).
+   ===================================================================== */
+const MINI_V = 1;
+/* cuánto se acerca la cámara a cada categoría (las pupilas, casi encima) */
+const MINI_ZOOM = { eyeStyle: 0.62, mkStyle: 0.75, beard: 0.85, earrings: 0.85 };
+const MINI = { px: 144, mapa: new Map(), cola: [], escena: null, cam: null, K: null };
+/* la pieza `t` de la categoría `k` con sus colores de muestra: los de fábrica si es legendaria, si no los del
+   rockero por defecto */
+function muestra(b, k, t) {
+  const it = invItem(b, k, t), D = defaultLook(b), c = {};
+  for (const f of INV_CATS[k].cols) { const v = it?.[2]?.[f] ?? D[k]?.[f]; if (v != null) c[f] = v; }
+  return { b, k, t, c, leg: !!it?.[2] };
+}
+const miniId = v => invId(v);
+/* la URL de la miniatura de `v` (ya hecha) o '' (y queda pedida) */
+function miniUrl(v) {
+  const id = miniId(v), m = MINI.mapa.get(id);
+  if (m) return m.url;
+  let url = '';
+  try { url = localStorage.getItem(`rock-mini-${MINI_V}:${id}`) || ''; } catch {}
+  if (url) { MINI.mapa.set(id, { url, canvas: null }); return url; }
+  if (!MINI.cola.some(x => miniId(x) === id)) MINI.cola.push(v);
+  return '';
+}
+const miniImg = (v, cls = 'mini') => { const u = miniUrl(v); return `<img class="${cls}" data-mini="${esc(miniId(v))}" alt=""${u ? ` src="${u}"` : ''}>`; };
+function miniEscena() {
+  if (MINI.escena) return MINI.escena;
+  const s = MINI.escena = new THREE.Scene();
+  s.add(new THREE.HemisphereLight(0xfff4ee, 0x3a2a55, 2.1));
+  const d = new THREE.DirectionalLight(0xffffff, 2.6); d.position.set(1.5, 3, 4); s.add(d);
+  const r = new THREE.DirectionalLight(0x9a7aff, 1.2); r.position.set(-3, 1, -2); s.add(r);
+  MINI.cam = new THREE.PerspectiveCamera(30, 1, 0.01, 60);
+  MINI.K = { mt: 9, beat: 0, bp: 0, notes: SONG.notes, hands: SONG.hands, vocal: false, lookTo: 0 };
+  return s;
+}
+/* fotografía `v`: devuelve un canvas de MINI.px (pintar solo dentro de un cuadro: la escena tapa la esquina) */
+function miniHaz(v) {
+  const px = MINI.px, out = Object.assign(document.createElement('canvas'), { width: px, height: px }), g = out.getContext('2d');
+  if (v.k === 'tatDesign') {   // el dibujo, sobre piel
+    const it = invItem(v.b, 'tatDesign', v.t), col = it?.[2]?.color ?? 0x1a1420;
+    const fondo = g.createRadialGradient(px / 2, px / 2, 4, px / 2, px / 2, px * 0.7); fondo.addColorStop(0, '#f6d6bc'); fondo.addColorStop(1, '#c8946e');
+    g.fillStyle = fondo; g.fillRect(0, 0, px, px); g.drawImage(tatTex(v.t, col).image, px * 0.08, px * 0.08, px * 0.84, px * 0.84);
+    return out;
+  }
+  const S = miniEscena(), cam = MINI.cam;
+  let obj, rk = null;
+  if (v.k === 'guitar') {
+    obj = new THREE.Group(); const gt = makeGuitar({ type: v.t, ...v.c }); gt.g.rotation.z = 0.62; obj.add(gt.g);
+    const caja = new THREE.Box3().setFromObject(obj), c = caja.getCenter(V()), r = caja.getSize(V()).length() * 0.5;
+    cam.fov = 30; cam.position.copy(c).add(V(0.15, 0.1, 1).normalize().multiplyScalar(r / Math.tan(THREE.MathUtils.degToRad(15)) * 1.02)); cam.lookAt(c);
+  } else {
+    const L = defaultLook(v.b), ruta = rutaInv(v.k), par = getP(L, ruta.split('.').slice(0, -1).join('.'));
+    if (!par) return null;
+    setP(L, ruta, v.t); Object.assign(par, v.c);
+    if (!INV_CATS[v.k].cols.length) legDefaults(L, ruta);
+    LIVIANO = false;
+    rk = new Rocker(L, 'guitar'); obj = rk.root; rk.place(0, 0, 0, 0); rk.st.quieto = true; rk.st.I = 0.5;
+    rk.gtr.g.visible = false;   // la guitarra tapaba la ropa
+    S.add(obj);
+    for (let i = 0; i < 8; i++) rk.update(i * 0.05, 9, 0.05, MINI.K);
+    obj.updateMatrixWorld(true);
+    const F = (ED_FOCUS[pathFocus(ruta)] || ED_FOCUS.cuerpo)(rk), d = F.d * (MINI_ZOOM[v.k] ?? 1.05);
+    cam.fov = F.fov; cam.position.set(F.l.x + Math.sin(F.yaw) * d, F.l.y + F.h, F.l.z + Math.cos(F.yaw) * d); cam.lookAt(F.l);
+  }
+  if (!obj.parent) S.add(obj);
+  cam.aspect = 1; cam.updateProjectionMatrix();
+  // en una esquina del lienzo (abajo a la izquierda en GL), con su fondo
+  const pr = renderer.getPixelRatio(), w = px / pr, H = renderer.domElement.height;
+  const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+  renderer.setRenderTarget(null);
+  renderer.setScissorTest(true); renderer.setScissor(0, 0, w, w); renderer.setViewport(0, 0, w, w);
+  renderer.setClearColor(v.leg ? 0x4a2a14 : 0x2a2044, 1); renderer.clear();
+  renderer.render(S, cam);
+  g.drawImage(renderer.domElement, 0, H - px, px, px, 0, 0, px, px);
+  renderer.setScissorTest(false); renderer.setClearColor(cc, ca);
+  const sz = renderer.getSize(new THREE.Vector2()); renderer.setViewport(0, 0, sz.x, sz.y);
+  S.remove(obj);
+  if (rk) rk.dispose();
+  else obj.traverse(o => { if (o.geometry && !Object.values(geoCache).includes(o.geometry)) o.geometry.dispose(); });
+  return out;
+}
+/* dentro del cuadro, antes de pintar la escena: unas cuantas miniaturas pendientes (hasta ~12 ms) */
+function miniProcesa() {
+  const t0 = performance.now();
+  while (MINI.cola.length && performance.now() - t0 < 12) {
+    const v = MINI.cola.shift(), id = miniId(v);
+    if (MINI.mapa.has(id)) continue;
+    let c = null;
+    try { c = miniHaz(v); } catch (err) { console.warn('[rock] miniatura', id, err); }
+    if (!c) { MINI.mapa.set(id, { url: '', canvas: null }); continue; }
+    const url = c.toDataURL('image/webp', 0.86);
+    MINI.mapa.set(id, { url, canvas: c });
+    try { localStorage.setItem(`rock-mini-${MINI_V}:${id}`, url); } catch {}
+    for (const im of CAPA.querySelectorAll('img[data-mini]')) if (im.dataset.mini === id) im.src = url;
+    if (BOX.on && BOX.res && miniId(BOX.res.v) === id && BOX.parts) { BOX.parts.card.material.map?.dispose(); BOX.parts.card.material.map = boxCardTex(BOX.res); BOX.parts.card.material.needsUpdate = true; }
+  }
+}
+
+/* =====================================================================
    CAJA DE PREMIO — cae al escenario, tiembla con luz escapando por las rendijas (dorada si es legendario),
    revientan las solapas, sale un haz de luz y sube girando la carta del premio
    ===================================================================== */
@@ -3967,8 +4094,10 @@ function boxCardTex(res) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
     const tag = leg ? '★ LEGENDARIO ★' : res.dup ? 'REPETIDO' : '¡NUEVO!';
     g.font = '40px Bangers, Impact, sans-serif'; g.lineWidth = 7; g.strokeStyle = '#000'; g.fillStyle = leg ? '#ffd23a' : '#8ad8ff'; g.strokeText(tag, w / 2, 66); g.fillText(tag, w / 2, 66);
-    g.font = '128px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif'; g.fillText(C.ic, w / 2, 200);
-    const cs = Object.values(v.c); cs.forEach((c, i) => { g.beginPath(); g.arc(w / 2 + (i - (cs.length - 1) / 2) * 46, 314, 17, 0, 7); g.fillStyle = cssC(c); g.fill(); g.lineWidth = 4; g.strokeStyle = '#000'; g.stroke(); });
+    const foto = MINI.mapa.get(miniId(v))?.canvas;
+    if (foto) { g.save(); rect(w / 2 - 92, 108, 184, 184, 22); g.clip(); g.drawImage(foto, w / 2 - 92, 108, 184, 184); g.restore(); rect(w / 2 - 92, 108, 184, 184, 22); g.lineWidth = 5; g.strokeStyle = '#000'; g.stroke(); }
+    else { g.font = '128px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif'; g.fillText(C.ic, w / 2, 200); }
+    const cs = foto ? [] : Object.values(v.c); cs.forEach((c, i) => { g.beginPath(); g.arc(w / 2 + (i - (cs.length - 1) / 2) * 46, 314, 17, 0, 7); g.fillStyle = cssC(c); g.fill(); g.lineWidth = 4; g.strokeStyle = '#000'; g.stroke(); });
     g.font = '900 31px Rubik, system-ui, sans-serif'; const lines = []; let ln = '';
     for (const wd of (it?.[1] ?? v.t).split(' ')) { const tr = ln ? ln + ' ' + wd : wd; if (ln && g.measureText(tr).width > w - 80) { lines.push(ln); ln = wd; } else ln = tr; } lines.push(ln);
     lines.forEach((l, i) => { const y = 378 + i * 36; g.lineWidth = 7; g.strokeStyle = '#000'; g.strokeText(l, w / 2, y); g.fillStyle = '#fff'; g.fillText(l, w / 2, y); });
@@ -3989,6 +4118,10 @@ async function boxStart() {
   Object.assign(BOX, { on: true, t: 0, res, open: false, shown: false, skip: null, shake: 0, closeT: -1, camY: 0, landed: false });
   P.g.scale.setScalar(1); P.beam.scale.y = 0.001; P.beam.material.uniforms.uA.value = 0; P.card.visible = false; P.halo.material.opacity = 0;
   P.card.material.map?.dispose(); P.card.material.map = boxCardTex(res); P.card.material.needsUpdate = true;
+  // la foto del premio: primera en la cola (o, si estaba guardada, se carga y la carta se repinta)
+  { const id = miniId(res.v), m = MINI.mapa.get(id);
+    if (!m) { miniUrl(res.v); const i = MINI.cola.findIndex(x => miniId(x) === id); if (i > 0) MINI.cola.unshift(...MINI.cola.splice(i, 1)); }
+    else if (!m.canvas && m.url) { const im = new Image(); im.onload = () => { m.canvas = im; if (BOX.on && BOX.res === res) { P.card.material.map?.dispose(); P.card.material.map = boxCardTex(res); P.card.material.needsUpdate = true; } }; im.src = m.url; } }
   if (P.gtr) P.gtr.removeFromParent(); P.gtr = null;
   if (res.v.k === 'guitar') { const w = new THREE.Group(), gt = makeGuitar({ type: res.v.t, ...res.v.c }); gt.g.position.x = -0.42; w.add(gt.g); w.visible = false; P.g.add(w); P.gtr = w; }   // la guitarra sale de verdad de la caja
   scene.add(P.g);
@@ -4042,7 +4175,7 @@ function boxUpdate(dt) {
 function boxReveal() {
   const { v, dup, refund } = BOX.res, it = invItem(v.b, v.k, v.t), C = INV_CATS[v.k], ui = $('#boxUI');
   ui.className = 'on' + (v.leg ? ' leg' : '');
-  ui.innerHTML = `<div class="rar" style="color:${v.leg ? '#ffd23a' : '#8ad8ff'}">${v.leg ? '★ ¡LEGENDARIO! ★' : dup ? 'Repetido' : '¡Nuevo!'}</div><div class="nm">${it?.[1] ?? v.t}</div>`
+  ui.innerHTML = `${miniImg(v, 'bfoto')}<div class="rar" style="color:${v.leg ? '#ffd23a' : '#8ad8ff'}">${v.leg ? '★ ¡LEGENDARIO! ★' : dup ? 'Repetido' : '¡Nuevo!'}</div><div class="nm">${it?.[1] ?? v.t}</div>`
     + `<div class="sub">${C.ic} ${C.n} · <i class="dot" style="background:${invBg(v.c)}"></i>${dup ? `ya la tenías así: +${refund} <i class="coin"></i>` : 'nueva en tu inventario'}</div>`
     + `<div class="bt"><button class="hot" data-act="equip">Equipar</button>${!dup && BOX.res.c ? '<button data-act="vende">🏪 Vender</button>' : ''}<button data-act="again" ${INV.coins < BOX_PRICE || INV.parada ? 'disabled' : ''}>Abrir otra · ${BOX_PRICE} <i class="coin"></i></button><button data-act="close">Listo</button></div>`;
 }
@@ -4237,6 +4370,7 @@ function frame() {
   }
   let dt = Math.min(0.05, real);
   if (!clock.run) dt = 0;
+  if (ED.open && MINI.cola.length) miniProcesa();   // antes de la escena: ella tapa la esquina donde se fotografían
   step(dt); render(dt);
 }
 const arranca = () => { last = performance.now() / 1000; if (!raf) raf = pideCuadro(frame); };
