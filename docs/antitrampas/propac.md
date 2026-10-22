@@ -7,7 +7,10 @@ Una tabla:
 
 ## La prueba
 
-`{v: 1, s, u, j, n, r, a, w}`:
+`{v, s, u, j, n, r, a, w}`:
+
+- `v`: la versión del motor (`PRUEBA_VERSIONES`: 1, la primera, más rápida;
+  2, la de los fantasmas del arcade). Se rehace con esa.
 
 - `s`: la semilla (32 bits). `u`: la cuenta, mezclada con la semilla en el
   azar del motor (los fantasmas asustados, Glitch), así que una prueba

@@ -1252,7 +1252,7 @@ const REGLAS = {
   propac: {
     lema: "PRO PACMAN: come todos los puntos del laberinto de neón sin que te atrapen los fantasmas.",
     secciones: [
-      ["Cómo se juega", "Recorre el laberinto y come todos los puntos para pasar al siguiente. Tienes <b>3 vidas</b>: si un fantasma te toca, pierdes una. Los laberintos se suceden (<b>Neón</b>, <b>Circuito</b> y <b>Reactor</b>, y vuelta a empezar), cada vez un poco más rápidos. Los túneles de los lados te llevan al otro extremo."],
+      ["Cómo se juega", "Recorre el laberinto y come todos los puntos para pasar al siguiente. Tienes <b>3 vidas</b>: si un fantasma te toca, pierdes una. Los laberintos se suceden (<b>Neón</b>, <b>Circuito</b> y <b>Reactor</b>, y vuelta a empezar), cada vez un poco más rápidos. Mientras los fantasmas están azules, corres un poco más. Los túneles de los lados te llevan al otro extremo."],
       ["Puntos y racha", lista([
         "Cada punto vale 10, multiplicado por tu <b>racha</b>: comer puntos seguidos (sin pasar más de 0,6 segundos sin comer) la sube a ×2 desde el punto 13, ×3 desde el 25, ×4 desde el 37 y ×5 desde el 49.",
         "Un <b>núcleo</b> (los cuatro que brillan) vale 50 y asusta a los fantasmas unos segundos: menos en cada nivel. Comerse uno azul vale 200, después 400, 800, 1 600 y 3 200.",
@@ -1264,12 +1264,15 @@ const REGLAS = {
         "◎ <b>Pulso</b>: guardas hasta 2 cargas. El pulso aturde tres segundos a los fantasmas que estén a 6 casillas o menos (ni persiguen ni matan) y da 100 puntos por cada uno."
       ])],
       ["Los fantasmas", lista([
-        "<b>Rayo</b> (rojo) te persigue directo, y corre más cuando quedan pocos puntos.",
-        "<b>Eco</b> (rosa) apunta cuatro casillas por delante de ti.",
+        "Piensan como en el arcade: cada uno elige en los cruces el camino que más lo acerca a su objetivo, y nunca da media vuelta por su cuenta.",
+        "<b>Rayo</b> (rojo) te persigue directo. Cuando quedan pocos puntos corre más y ya no vuelve a su rincón.",
+        "<b>Eco</b> (rosa) apunta cuatro casillas por delante de ti (si vas hacia arriba, también cuatro a la izquierda, como en el original).",
         "<b>Rebote</b> (celeste) se guía por ti y por Rayo para cerrarte el paso.",
         "<b>Tímido</b> (naranja) te persigue de lejos y se va a su rincón cuando se acerca.",
         "<b>Glitch</b> (verde, desde el nivel 3) te persigue y, cada tanto, parpadea un segundo y aparece en otro lugar, lejos de ti.",
-        "Los fantasmas se turnan entre perseguirte y volver a sus rincones; al cambiar, dan media vuelta."
+        "Los fantasmas se turnan entre perseguirte y volver a sus rincones (en los primeros niveles, más rato en sus rincones); al cambiar, dan media vuelta.",
+        "Salen de la casa a medida que comes puntos, o si pasas unos segundos sin comer.",
+        "Un fantasma que te comiste vuelve a la casa y sale <b>persiguiéndote</b> aunque los demás sigan azules: solo un núcleo nuevo lo vuelve a asustar."
       ])],
       ["Compuertas", "Desde el segundo laberinto hay <b>compuertas</b> rojas que se abren y se cierran cada 8 segundos, para ti y para los fantasmas. Un segundo antes parpadean, y arriba a la derecha dice si están abiertas."],
       ["Controles", lista([

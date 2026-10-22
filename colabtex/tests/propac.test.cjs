@@ -14,8 +14,8 @@ const CP='club-propac-puntos';
    giro antes de llegar al cruce (en mitad de la casilla, como una persona,
    y el motor lo guarda); sin ella gira en el tic exacto del centro, como un
    programa. */
-function juega(semilla,u,{mano=true,max=60*60*8}={}){
- const E=M.nueva(semilla,u),jug=[];let ult=0,a=semilla*7+3,plan='';
+function juega(semilla,u,{mano=true,max=60*60*8,v}={}){
+ const E=M.nueva(semilla,u,v),jug=[];let ult=0,a=semilla*7+3,plan='';
  const azar=()=>{a=(a*1103515245+12345)>>>0;return a/4294967296;};
  const pide=(c,o)=>{if(c<=3&&(E.pac.quiere===c||(E.pac.quiere<0&&E.pac.dir===c)))return;if(M.entrada(E,c)){jug.push([E.tick-ult,c,o]);ult=E.tick;}};
  const rumbo=(sx,sy)=>{
@@ -53,7 +53,7 @@ function juega(semilla,u,{mano=true,max=60*60*8}={}){
  return {E,jug};
 }
 const ms=n=>Math.max(1,Math.round(n*1000/60));
-const prueba=(s,u,op)=>{const {E,jug}=juega(s,u,op),t=ms(E.tick);return {E,jug,dato:{categoria:CP,puntos:E.puntos,tiempo:t},p:{v:1,s,u,j:M.codifica(jug),n:E.tick,r:t+50,a:t+20,w:t+120}};};
+const prueba=(s,u,op)=>{const {E,jug}=juega(s,u,op),t=ms(E.tick);return {E,jug,dato:{categoria:CP,puntos:E.puntos,tiempo:t},p:{v:E.v,s,u,j:M.codifica(jug),n:E.tick,r:t+50,a:t+20,w:t+120}};};
 
 test('los tres laberintos: 19 × 21, todo alcanzable, sin callejones, casa de tres',()=>{
  for(let i=0;i<M.MAPAS.length;i++){
@@ -157,7 +157,8 @@ test('el verificador acepta la partida de una mano y rechaza cada trampa',async(
  await mal({...dato,tiempo:dato.tiempo+17},p,/tiempo declarado/);
  await mal({...dato,categoria:'club-propac-otra'},p,/no tiene esa tabla/);
  assert.match(await V.verificaClub('propac',dato,p,{uid:'beto'}),/otra cuenta/);
- await mal(dato,{...p,v:2},/otra versión/);
+ await mal(dato,{...p,v:3},/otra versión/);
+ await mal(dato,{...p,v:1},/rehecha|termina antes|después/);
  await mal(dato,{...p,r:10},/reloj/);
  await mal(dato,{...p,w:2*p.a},/velocidad del juego/);
  await mal(dato,{...p,a:undefined},/relojes/);
@@ -168,6 +169,77 @@ test('el verificador acepta la partida de una mano y rechaza cada trampa',async(
  // El programa que gira en el tic exacto del centro.
  const b=prueba(31337,'ana',{mano:false});
  assert.match(await V.verificaClub('propac',b.dato,b.p,{uid:'ana'}),/programa/);
+});
+
+/* La v1 (la primera, más rápida) se sigue rehaciendo tal cual: los récords
+   y las pruebas pendientes guardados con ella valen. */
+test('las pruebas de la v1 siguen valiendo',async()=>{
+ const {E,dato,p}=prueba(4242,'ana',{v:1});
+ assert.equal(E.v,1);assert.equal(p.v,1);assert.ok(E.puntos>1000);
+ assert.equal(await V.verificaClub('propac',dato,p,{uid:'ana'}),null);
+ assert.equal(M.nueva(1,'a').v,M.PRUEBA_V);
+});
+
+test('v2: más lento que la v1 y los fantasmas del arcade',()=>{
+ const nuevo=(nivel=1)=>{const E=M.nueva(9,'a');if(nivel>1){E.nivel=nivel;}E.congelado=0;return E;};
+ // Velocidad: el jugador va a 85 en el nivel 1 (la v1, a 100); los fantasmas, un poco menos.
+ const E=nuevo(),viejo=M.nueva(9,'a',1);viejo.congelado=0;
+ const avance=(X,n)=>{const x0=X.pac.x;for(let i=0;i<n;i++)M.paso(X);return Math.abs(X.pac.x-x0);};
+ const a2=avance(E,40),a1=avance(viejo,40);
+ assert.ok(a2<a1,'la v2 es más lenta ('+a2+' < '+a1+')');assert.equal(a2,34);
+ // Salida de la casa: Eco al tiro; Rebote espera sus puntos (18 en el nivel 1), o 4 s sin comer.
+ const C=nuevo();C.pac.x=C.pac.y=-999;
+ for(let i=0;i<40;i++)M.paso(C);
+ assert.equal(C.fantasmas[1].estado!=='casa',true,'Eco sale al empezar');
+ assert.equal(C.fantasmas[2].estado,'casa','Rebote espera');
+ C.casaPuntos[2]=18;for(let i=0;i<2;i++)M.paso(C);
+ assert.equal(C.fantasmas[2].estado!=='casa',true,'Rebote sale con sus puntos');
+ for(let i=0;i<238;i++)M.paso(C);
+ assert.equal(C.fantasmas[3].estado,'sale','Tímido sale tras 4 s sin comer');
+ // Tras una muerte cuenta el contador común (Eco con 4).
+ const D=nuevo();D.estado='muere';D.vidas=2;D.congelado=1;M.paso(D);
+ assert.equal(D.casaGlobal,0);assert.equal(D.elroyPausa,true);
+ D.congelado=0;D.pac.x=D.pac.y=-999;for(let i=0;i<40;i++)M.paso(D);
+ assert.equal(D.fantasmas[1].estado,'casa','Eco espera el contador común');
+ D.casaGlobal=4;for(let i=0;i<2;i++)M.paso(D);
+ assert.notEqual(D.fantasmas[1].estado,'casa');
+ // Eco con el error de «arriba»: cuatro delante y cuatro a la izquierda.
+ const P=nuevo(),px=M.casilla(P.pac.x),py=M.casilla(P.pac.y),g1=P.fantasmas[1];g1.estado='caza';
+ P.pac.dir=0;assert.deepEqual(M.objetivo(P,g1),[px-4,py-4]);
+ P.pac.dir=3;assert.deepEqual(M.objetivo(P,g1),[px+4,py]);
+ const P1=M.nueva(9,'a',1);P1.pac.dir=0;P1.fantasmas[1].estado='caza';
+ assert.deepEqual(M.objetivo(P1,P1.fantasmas[1]),[px,py-4],'la v1 apunta derecho');
+ // Rebote: el doble del vector de Rayo a dos casillas delante (también con el error).
+ const r=P.fantasmas[0],g2=P.fantasmas[2];g2.estado='caza';P.pac.dir=0;
+ assert.deepEqual(M.objetivo(P,g2),[2*(px-2)-M.casilla(r.x),2*(py-2)-M.casilla(r.y)]);
+ // Elroy: Rayo corre más y no se va a su rincón cuando quedan pocos puntos.
+ const R=nuevo();R.restantes=12;assert.equal(M.elroy(R),1);R.restantes=6;assert.equal(M.elroy(R),2);
+ R.restantes=100;assert.equal(M.elroy(R),0);
+ const R1=M.nueva(9,'a',1);R1.restantes=5;assert.equal(M.elroy(R1),0,'la v1 no tiene Elroy');
+});
+
+/* Un fantasma comido sale de la casa cazando aunque el susto siga; uno que
+   estaba dentro sin ser comido sale azul, y con otro núcleo vuelve a
+   asustarse. */
+test('v2: el fantasma comido sale cazando, no azul',()=>{
+ for(const v of [1,2]){
+  const E=M.nueva(3,'a',v);E.congelado=0;
+  const g=E.fantasmas[0];
+  // Un núcleo y el fantasma encima del jugador.
+  E.miedoT=2000;g.estado='miedo';g.x=E.pac.x;g.y=E.pac.y;M.paso(E);
+  assert.equal(g.estado,'ojos');assert.equal(E.fantasmasComidos,1);
+  E.pac.x=E.pac.y=-999;E.congelado=0;
+  let n=0;while(g.estado!=='caza'&&g.estado!=='disperso'&&g.estado!=='miedo'&&n<2000){E.congelado=0;M.paso(E);n++;}
+  assert.ok(E.miedoT>0,'el susto sigue');
+  assert.equal(g.estado,v===1?'miedo':modo(E),'v'+v+': sale '+g.estado);
+ }
+ function modo(E){return E.modoIdx%2===0?'disperso':'caza';}
+ // Con otro núcleo, el que volvió se asusta de nuevo.
+ const E=M.nueva(3,'a');E.congelado=0;const g=E.fantasmas[0];g.comido=true;g.estado='caza';
+ const m=E.mapa,k=m.comida.indexOf(2);m.comida[k]=2;E.pac.x=M.centro(k%m.ancho);E.pac.y=M.centro(Math.floor(k/m.ancho))-1;E.pac.dir=2;E.pac.acc=0;
+ g.x=g.y=-999;
+ for(let i=0;i<3&&E.miedoT===0;i++)M.paso(E);
+ assert.ok(E.miedoT>0);assert.equal(g.estado,'miedo');assert.equal(g.comido,false);
 });
 
 test('sospecha de las filas guardadas',()=>{

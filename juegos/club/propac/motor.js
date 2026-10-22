@@ -15,6 +15,13 @@
    - **Una jugada es [Δtics, código, origen]**: 0–3 querer ir arriba,
      izquierda, abajo o derecha; 4 turbo; 5 pulso. `rehace` las aplica en
      su tic y sigue hasta el final.
+   - **Versiones** (`E.v`, la `v` de la prueba): la 1 es la primera, más
+     rápida y con fantasmas a medias; la 2 baja la velocidad y hace pensar
+     a los fantasmas como en el arcade (contadores de la casa, Elroy, el
+     error de «arriba», los tiempos de modo por nivel) y saca de la casa
+     cazando, no azules, a los que ya fueron comidos. La 1 se queda tal cual
+     para que las pruebas guardadas se sigan rehaciendo: **lo que cambie
+     cómo se juega necesita una versión nueva**.
 
    Lo nuevo frente al arcade de siempre:
    - **Racha**: comer puntos seguidos (sin pasar `RACHA_TICS` sin comer)
@@ -44,6 +51,27 @@
   /* Disperso y caza, alternados (los pares dispersan); el último no acaba. */
   const MODOS = [420, 1200, 420, 1200, 300, 1200, 300, Infinity];
   const SALIDA = [0, 60, 240, 420, 600];
+  const PRUEBA_V = 2, PRUEBA_VERSIONES = [1, 2];
+
+  /* v2: los tiempos de disperso/caza del arcade por nivel (1, 2–4, 5+). */
+  const MODOS_V2 = [
+    [420, 1200, 420, 1200, 300, 1200, 300, Infinity],
+    [420, 1200, 420, 1200, 300, 61980, 1, Infinity],
+    [300, 1200, 300, 1200, 300, 62220, 1, Infinity]];
+  /* v2: velocidades por nivel (1, 2–4, 5+) = las del arcade × 1,06; un
+     punto intermedio entre la v1 (que en este laberinto más chico cruzaba
+     la pantalla mucho más rápido) y el original. [jugador, jugador con
+     fantasmas azules, fantasma, fantasma azul, fantasma en el túnel]. */
+  const VEL_V2 = [[85, 95, 80, 53, 42], [95, 100, 90, 58, 48], [106, 106, 100, 64, 53]];
+  /* v2: puntos que el jugador come antes de que salga cada fantasma (Rayo
+     empieza fuera). El contador de la casa del arcade, a la escala de estos
+     laberintos (~150–180 puntos frente a 244). */
+  const CASA_PUNTOS = [[0, 0, 18, 36, 12], [0, 0, 0, 30, 12], [0, 0, 0, 0, 12]];
+  /* Tras perder una vida cuenta un contador común: sale Eco con 4, Rebote
+     con 10, Tímido con 20 (7, 17 y 32 en el arcade). */
+  const CASA_GLOBAL = [0, 4, 10, 20, 26];
+  const CASA_ESPERA = [240, 180];   // sin comer este rato, sale el siguiente (niveles 1–4, 5+)
+  const CASA_HUECO = 30;            // tics mínimos entre dos salidas
 
   /* `#` pared, `.` punto, `o` núcleo de poder, ` ` pasillo vacío, `-` la
      puerta de la casa, `G` la casa, `P` donde empieza el jugador, `F` donde
@@ -182,10 +210,12 @@
     return true;
   }
 
-  function nueva(semilla, uid) {
+  function nueva(semilla, uid, v) {
     const s = semilla >>> 0;
+    v = v == null ? PRUEBA_V : v;
+    if (!PRUEBA_VERSIONES.includes(v)) throw new Error('versión desconocida: ' + v);
     const E = {
-      s, u: String(uid || ''), rnd: rng(mezcla(s, hashTexto(String(uid || '')))),
+      v, s, u: String(uid || ''), rnd: rng(mezcla(s, hashTexto(String(uid || '')))),
       tick: 0, nivel: 0, puntos: 0, vidas: VIDAS, vidaSig: VIDA_PRIMERA,
       estado: 'jugando', congelado: 0, ev: [],
       racha: 0, rachaT: 0, mejorRacha: 0, energia: 0, turboT: 0, pulsos: 0,
@@ -204,12 +234,13 @@
     E.item = null;
     E.compT = 0;
     E.estado = 'jugando';
+    E.casaPuntos = [0, 0, 0, 0, 0];
     colocaCuerpos(E);
     E.congelado = 90;   // «¡Listo!»
     E.ev.push({ k: 'nivel', n });
   }
 
-  function colocaCuerpos(E) {
+  function colocaCuerpos(E, trasMuerte) {
     const m = E.mapa;
     E.pac = { x: centro(m.pac[0]), y: centro(m.pac[1]), dir: 1, quiere: -1, acc: 0 };
     const n = E.nivel >= 3 ? 5 : 4, sobre = [m.puerta[0], m.puerta[1] - 1];
@@ -221,6 +252,21 @@
     }
     E.modoIdx = 0; E.modoT = 0; E.miedoT = 0; E.comidos = 0;
     E.turboT = 0; E.racha = 0; E.rachaT = 0;
+    // v2: tras una muerte salen por el contador común y Rayo no vuelve a
+    // ser Elroy hasta que salga Tímido, como en el arcade.
+    E.sinComer = 0; E.casaHueco = CASA_HUECO;
+    E.casaGlobal = trasMuerte ? 0 : -1; E.elroyPausa = !!trasMuerte;
+  }
+  /* v2: el tramo de nivel (0: el 1; 1: del 2 al 4; 2: del 5 en adelante). */
+  const tramo = E => E.nivel <= 1 ? 0 : E.nivel <= 4 ? 1 : 2;
+  const modos = E => E.v >= 2 ? MODOS_V2[tramo(E)] : MODOS;
+  /* v2: puntos que quedan cuando Rayo se vuelve Elroy (corre más y caza
+     también en disperso); con la mitad, Elroy 2. */
+  const elroyDesde = E => E.nivel <= 1 ? 12 : E.nivel === 2 ? 18 : E.nivel <= 5 ? 24 : E.nivel <= 8 ? 30 : 36;
+  function elroy(E) {
+    if (E.v < 2 || E.elroyPausa) return 0;
+    const n = elroyDesde(E);
+    return E.restantes <= n >> 1 ? 2 : E.restantes <= n ? 1 : 0;
   }
   function modoActual(E, inicio) {
     const i = inicio ? 0 : E.modoIdx;
@@ -229,10 +275,11 @@
 
   // --------------------------------- velocidades ---------------------------------
   const velPac = E => {
-    const base = 100 + Math.min(20, 2 * (E.nivel - 1));
+    const base = E.v >= 2 ? VEL_V2[tramo(E)][E.miedoT > 0 ? 1 : 0] : 100 + Math.min(20, 2 * (E.nivel - 1));
     return E.turboT > 0 ? Math.round(base * 1.7) : base;
   };
   function velFantasma(E, g) {
+    if (E.v >= 2) return velFantasmaV2(E, g);
     if (g.estado === 'ojos') return 200;
     if (g.estado === 'aturdido' || g.estado === 'casa' || g.aviso > 0) return 0;
     if (g.estado === 'miedo') return 55;
@@ -241,6 +288,16 @@
     const base = 92 + Math.min(22, 3 * (E.nivel - 1));
     // Rayo acelera cuando quedan pocos puntos, como en el arcade.
     return g.id === 0 && E.restantes <= 20 ? base + 6 : base;
+  }
+  function velFantasmaV2(E, g) {
+    const V = VEL_V2[tramo(E)];
+    if (g.estado === 'ojos') return 180;
+    if (g.estado === 'aturdido' || g.estado === 'casa' || g.aviso > 0) return 0;
+    if (g.estado === 'miedo') return V[3];
+    if (tipoEn(E, casilla(g.x), casilla(g.y)) === TUNEL) return V[4];
+    if (g.estado === 'sale') return 55;
+    // Elroy: +5 y +10, como Blinky en el arcade.
+    return g.id === 0 ? V[2] + 5 * elroy(E) : V[2];
   }
   const miedoNivel = n => Math.max(120, 420 - 40 * (n - 1));
   const valorChip = n => Math.min(5000, 100 * n * (n + 1) / 2 | 0);
@@ -287,7 +344,7 @@
       E.congelado--;
       if (E.congelado > 0) return;
       if (E.estado === 'muere') {
-        if (E.vidas > 0) { E.estado = 'jugando'; colocaCuerpos(E); E.congelado = 60; E.ev.push({ k: 'listo' }); }
+        if (E.vidas > 0) { E.estado = 'jugando'; colocaCuerpos(E, true); E.congelado = 60; E.ev.push({ k: 'listo' }); }
         else { E.estado = 'fin'; E.ev.push({ k: 'fin' }); }
         return;
       }
@@ -302,7 +359,7 @@
     if (E.miedoT > 0) {
       E.miedoT--;
       if (E.miedoT === 0) for (const g of E.fantasmas) if (g.estado === 'miedo') g.estado = modoActual(E);
-    } else if (++E.modoT >= MODOS[E.modoIdx]) {
+    } else if (++E.modoT >= modos(E)[E.modoIdx]) {
       E.modoIdx++; E.modoT = 0;
       for (const g of E.fantasmas) if (g.estado === 'caza' || g.estado === 'disperso') { g.estado = modoActual(E); g.invertir = true; }
     }
@@ -312,14 +369,31 @@
 
     mueve(E, E.pac, velPac(E));
     if (choque(E)) return;
+    if (E.v >= 2) salidaCasa(E);
     for (const g of E.fantasmas) {
-      if (g.estado === 'casa' && E.tick >= g.sale) g.estado = 'sale';
+      if (E.v < 2 && g.estado === 'casa' && E.tick >= g.sale) g.estado = 'sale';
       if (g.estado === 'aturdido' && --g.aturT <= 0) g.estado = g.antes === 'miedo' && E.miedoT > 0 ? 'miedo' : modoActual(E);
       if (g.id === 4) glitch(E, g);
       mueve(E, g, velFantasma(E, g));
     }
     if (choque(E)) return;
     if (E.restantes === 0) { E.estado = 'nivel'; E.congelado = 150; E.ev.push({ k: 'limpio', n: E.nivel }); }
+  }
+
+  /* v2: quién sale de la casa, como en el arcade. Solo cuenta el primero que
+     espera (Eco, Rebote, Tímido, Glitch): sale cuando el jugador comió sus
+     puntos de la casa (o, tras una muerte, los del contador común), o
+     cuando el jugador pasa un rato sin comer. `come` suma los contadores. */
+  function salidaCasa(E) {
+    E.sinComer++;
+    if (E.casaHueco < CASA_HUECO) { E.casaHueco++; return; }
+    const g = E.fantasmas.find(f => f.estado === 'casa');
+    if (!g) return;
+    const listo = E.casaGlobal >= 0 ? E.casaGlobal >= CASA_GLOBAL[g.id] : E.casaPuntos[g.id] >= CASA_PUNTOS[tramo(E)][g.id];
+    if (!listo && E.sinComer < CASA_ESPERA[E.nivel >= 5 ? 1 : 0]) return;
+    if (!listo) E.sinComer = 0;
+    g.estado = 'sale'; E.casaHueco = 0;
+    if (g.id === 3) { E.elroyPausa = false; if (E.casaGlobal >= 0) E.casaGlobal = -1; }
   }
 
   /* Glitch se congela AVISO un segundo (parpadea en pantalla) y salta a una
@@ -377,11 +451,20 @@
       m.comida[k] = 0; E.restantes--; E.comidosNivel++; E.puntosComidos++;
       E.racha++; E.rachaT = RACHA_TICS; E.mejorRacha = Math.max(E.mejorRacha, E.racha);
       E.energia = Math.min(100, E.energia + ENERGIA_PUNTO);
+      if (E.v >= 2) {
+        E.sinComer = 0;
+        const g = E.fantasmas.find(f => f.estado === 'casa');
+        if (E.casaGlobal >= 0) E.casaGlobal++; else if (g) E.casaPuntos[g.id]++;
+      }
       if (c === 1) { suma(E, 10 * multiplicador(E)); E.ev.push({ k: 'punto' }); }
       else {
         suma(E, 50);
         E.miedoT = miedoNivel(E.nivel); E.comidos = 0;
-        for (const g of E.fantasmas) if (g.estado === 'caza' || g.estado === 'disperso' || g.estado === 'miedo') { if (g.estado !== 'miedo') g.invertir = true; g.estado = 'miedo'; }
+        for (const g of E.fantasmas) {
+          if (g.estado === 'caza' || g.estado === 'disperso' || g.estado === 'miedo') { if (g.estado !== 'miedo') g.invertir = true; g.estado = 'miedo'; }
+          // v2: el que ya fue comido sale cazando; con un núcleo nuevo, se vuelve a asustar.
+          if (g.estado !== 'ojos') g.comido = false;
+        }
         E.ev.push({ k: 'poder' });
       }
       if (E.items < ITEM_EN.length && E.comidosNivel >= ITEM_EN[E.items]) {
@@ -403,11 +486,15 @@
     const m = E.mapa, p = E.pac, px = casilla(p.x), py = casilla(p.y), [dx, dy] = DIRS[p.dir];
     if (g.estado === 'ojos') return m.casa[Math.floor(m.casa.length / 2)];
     if (g.estado === 'sale') return [m.puerta[0], m.puerta[1] - 1];
-    if (g.estado === 'disperso') return [[m.ancho - 2, -2], [1, -2], [m.ancho - 1, m.alto + 1], [0, m.alto + 1], [Math.floor(m.ancho / 2), m.alto + 2]][g.id];
+    // v2: Elroy no se va a su rincón, sigue cazando.
+    if (g.estado === 'disperso' && !(g.id === 0 && elroy(E))) return [[m.ancho - 2, -2], [1, -2], [m.ancho - 1, m.alto + 1], [0, m.alto + 1], [Math.floor(m.ancho / 2), m.alto + 2]][g.id];
+    // v2: el error de «arriba» del arcade: mirando hacia arriba, lo de
+    // «n casillas delante» también va n casillas a la izquierda.
+    const ix = E.v >= 2 && p.dir === 0 ? -1 : 0;
     switch (g.id) {
-      case 1: return [px + 4 * dx, py + 4 * dy];
+      case 1: return [px + 4 * (dx + ix), py + 4 * dy];
       case 2: {
-        const r = E.fantasmas[0], ax = px + 2 * dx, ay = py + 2 * dy;
+        const r = E.fantasmas[0], ax = px + 2 * (dx + ix), ay = py + 2 * dy;
         return [2 * ax - casilla(r.x), 2 * ay - casilla(r.y)];
       }
       case 3: {
@@ -452,7 +539,7 @@
         const c = m.casa[Math.floor(m.casa.length / 2)];
         if (tx === c[0] && ty === c[1]) { g.estado = 'sale'; }
       }
-      if (g.estado === 'sale' && tx === m.puerta[0] && ty === m.puerta[1] - 1) { g.estado = E.miedoT > 0 ? 'miedo' : modoActual(E); g.dir = 1; }
+      if (g.estado === 'sale' && tx === m.puerta[0] && ty === m.puerta[1] - 1) { g.estado = E.miedoT > 0 && !(E.v >= 2 && g.comido) ? 'miedo' : modoActual(E); g.dir = 1; }
       const op = [];
       for (let d = 0; d < 4; d++) {
         if (d === OPUESTA[g.dir] && g.estado !== 'sale' && g.estado !== 'ojos') continue;
@@ -492,7 +579,7 @@
         const v = 200 * Math.pow(2, Math.min(4, E.comidos));
         E.comidos++; E.fantasmasComidos++;
         suma(E, v);
-        g.estado = 'ojos';
+        g.estado = 'ojos'; g.comido = true;
         E.congelado = 24;
         E.ev.push({ k: 'come', v, x: g.x, y: g.y, id: g.id });
       } else if (g.estado === 'caza' || g.estado === 'disperso' || g.estado === 'sale') {
@@ -510,10 +597,11 @@
      tic 0, y `n` el tic en que terminó. Devuelve {E} o {error}. `mira(E, j)`,
      si viene, ve el estado justo antes de cada jugada (el verificador mira
      ahí cómo se jugó). */
-  function rehace(semilla, uid, jugadas, n, mira) {
+  function rehace(semilla, uid, jugadas, n, mira, v) {
     if (!Array.isArray(jugadas)) return { error: 'Las jugadas de la prueba no se pueden leer.' };
     if (!Number.isSafeInteger(n) || n < 1 || n > MAX_TICS) return { error: 'La duración de la prueba no es válida.' };
-    const E = nueva(semilla, uid);
+    if (v != null && !PRUEBA_VERSIONES.includes(v)) return { error: 'La prueba es de otra versión de PRO PACMAN (recarga la página).' };
+    const E = nueva(semilla, uid, v);
     let t = 0;
     for (const j of jugadas) {
       if (!Array.isArray(j) || !Number.isSafeInteger(j[0]) || j[0] < 0 || !Number.isSafeInteger(j[1]) || j[1] < 0 || j[1] > 5)
@@ -546,10 +634,10 @@
     return out;
   }
 
-  const api = { U, C, TPS, DIRS, OPUESTA, PARED, LIBRE, PUERTA, CASA, TUNEL, COMPUERTA, MAPAS, MODOS,
+  const api = { U, C, TPS, DIRS, OPUESTA, PARED, LIBRE, PUERTA, CASA, TUNEL, COMPUERTA, MAPAS, MODOS, PRUEBA_V, PRUEBA_VERSIONES,
     RACHA_TICS, RACHA_MAX, TURBO_COSTO, TURBO_TICS, PULSO_RADIO, PULSO_TICS, PULSOS_MAX, COMPUERTA_TICS, AVISO_TICS,
     GLITCH_CADA, ITEM_TICS, VIDAS, VIDAS_MAX, MAX_TICS,
-    leeMapa, nueva, entrada, paso, rehace, codifica, decodifica, abiertas, enCentro, avisoCompuertas, tipoEn, libre, multiplicador, valorChip, miedoNivel, tiempoMs, casilla, centro };
+    leeMapa, nueva, entrada, paso, rehace, codifica, decodifica, abiertas, enCentro, elroy, objetivo, avisoCompuertas, tipoEn, libre, multiplicador, valorChip, miedoNivel, tiempoMs, casilla, centro };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PropacMotor = api;
 })(this);
