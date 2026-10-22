@@ -36,6 +36,7 @@ import { PRECIO_TIENDA, precioDe, RAREZAS_HW, rarezaHw, tiendaHalloweenAbierta }
 import { juegoOculto } from "./ocultos.js";   // (BT3 es privado: ni su premio de campeón a quien no lo ve)
 import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
+import { MONEDA } from "./monedas-vista.js";   // dibujada: el emoji 🪙 sale como un cuadro en Windows 10
 import { TINTAS, tintaDe, nombreHtml } from "./tintas.js";
 
 export const LARGO_NICK = 24;
@@ -284,7 +285,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const op = (it, actual, attr, dentro) => {
       const r = requisito(it, est), venta = !r.ok && r.tienda, rz = rarezaHw(it.id);
       return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}${it.hw ? " hw" : ""}${rz ? " r-" + rz : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(r.precio)} monedas` : "Se gana: " + r.falta)}">
-        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && (it.req.tienda || it.req.coleccion) ? `<small class="jg-ped-tuyo">✓ ${it.req.coleccion ? "Ganado" : "Comprado"}</small>` : "") : venta ? `<small class="jg-ped-precio">${rz ? esc(RAREZAS_HW[rz].n) + " · " : ""}🪙 ${miles(r.precio)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && (it.req.tienda || it.req.coleccion) ? `<small class="jg-ped-tuyo">✓ ${it.req.coleccion ? "Ganado" : "Comprado"}</small>` : "") : venta ? `<small class="jg-ped-precio">${rz ? esc(RAREZAS_HW[rz].n) + " · " : ""}${MONEDA} ${miles(r.precio)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
     };
     /* Lo de Halloween que ya no se puede conseguir no se enseña: es de
        quien lo compró a tiempo. */
@@ -292,7 +293,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const grupos = (lista, actual, attr, dentro) => [
       ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top || it.req.coleccion))],
       [`🎃 Halloween · edición limitada${tiendaHalloweenAbierta(Date.now()) && onTiendaHw ? ` <button type="button" class="jg-ped-hwir" data-ir-tienda-hw>Ver la tienda →</button>` : ""}`, hw(lista)],
-      [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda && !it.hw)],
+      [`Tienda · ${MONEDA} ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda && !it.hw)],
       ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top && !juegoOculto(it.req.top)).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
     ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
     $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));
@@ -353,7 +354,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const s = saldo ? saldo() : null;
     if (s === null || s === undefined) { falla("Todavía se están contando tus monedas; prueba en unos segundos."); return; }
     const precio = precioDe(it.id);
-    if (s < precio) { falla(`«${it.n}» cuesta ${miles(precio)} 🪙 y tienes ${miles(s)}: te faltan ${miles(precio - s)}.`); return; }
+    if (s < precio) { falla(`«${it.n}» cuesta ${miles(precio)} monedas y tienes ${miles(s)}: te faltan ${miles(precio - s)}.`); return; }
     if (!confirm(`¿Comprar «${it.n}» por ${miles(precio)} monedas?\nTe quedarán ${miles(s - precio)}. Es para siempre.`)) return;
     comprando = true; falla("");
     try {

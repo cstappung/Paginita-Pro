@@ -23,7 +23,9 @@ import { HALLOWEEN, RAREZAS_HW, PREMIOS_HALLOWEEN, VENTA_HALLOWEEN, precioDe, ra
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const miles = n => Math.round(n).toLocaleString("es-CL");
-const MONEDA = "🪙";
+/* La moneda dibujada (monedas-vista.js): el emoji 🪙 es de 2020 y en
+   Windows 10 sale como un cuadro vacío. */
+import { MONEDA } from "./monedas-vista.js";
 const CLAVE_VISTO = "jg.tiendaHw.visto";
 
 /* Lo que tiene la tienda, en el orden en que se enseña: de lo más caro a
@@ -68,10 +70,12 @@ const murcielagos = n => Array.from({ length: n }, (_, i) => `<i class="th-murc"
    están quietos hasta que se pasa el ratón: en el salón no puede haber un
    SVG animándose siempre (docs/claude/juegos/salon.md, «Lobby
    performance»). Lo que se mueve solo es HTML: murciélagos, luna, brillo. */
+/* Qué persona pinta la franja (para rehacerla solo si cambió). */
+export const firmaYoTienda = y => y && y.nombre ? `${y.nombre}|${y.color}|${String(y.foto || "").length}|${String(y.foto || "").slice(-24)}` : "";
 export function tiraTiendaHtml({ foto, nombre, color, ahora = Date.now() } = {}) {
   if (!tiendaHalloweenAbierta(ahora)) return "";
   const av = (m, t, cls) => `<span class="th-tira-av ${cls}">${avatarMarco(foto || "", nombre || "?", color || "#ea580c", m, t)}</span>`;
-  return `<button type="button" class="jg-th-tira" data-tienda-hw aria-label="Abrir la tienda de Halloween">
+  return `<button type="button" class="jg-th-tira" data-tienda-hw data-yo="${esc(firmaYoTienda({ foto, nombre, color }))}" aria-label="Abrir la tienda de Halloween">
     <span class="th-tira-cielo" aria-hidden="true"><i class="th-luna"></i>${murcielagos(3)}</span>
     <span class="th-tira-avs" aria-hidden="true">${av("caldero", 44, "lado")}${av("parca", 58, "centro")}${av("fantasmas", 44, "lado")}</span>
     <span class="th-tira-tx">
@@ -106,6 +110,8 @@ export function abreTiendaHalloween(ctx, elegido) {
   marcaVista();
   const yo0 = ctx.yo();
   let D = null, sel = itemDe(elegido) ? elegido : "parca", paso = "", error = "", ocupado = false, firma = "";
+  /* El catálogo va en pestañas para que todo quepa sin desplazarse. */
+  let pestana = premio(sel) ? "premios" : tipoDe(sel) === "fondo" ? "fondos" : "marcos";
   const aqui = {}, puestoAqui = {};
   let confirmaHasta = 0, fiesta = null;
 
@@ -117,10 +123,12 @@ export function abreTiendaHalloween(ctx, elegido) {
       <div class="jg-th-cielo" aria-hidden="true"><i class="th-luna"></i>${murcielagos(5)}<i class="th-niebla"></i></div>
       <div class="jg-th-xw"><button type="button" class="jg-th-x" aria-label="Cerrar" title="Cerrar">✕</button></div>
       <header class="jg-th-cab">
-        <span class="jg-th-sello">🎃 Edición limitada · solo hasta el 1 de noviembre</span>
-        <h2 id="thTit" class="jg-th-tit">Tienda de Halloween</h2>
-        <p class="jg-th-lema">Marcos y fondos animados que <b>no volverán</b>. Lo que compres es tuyo para siempre; lo que no, desaparece al cerrar.</p>
-        <div class="jg-th-reloj" aria-label="Tiempo para que cierre"><span><b data-r="d">0</b><small>días</small></span><span><b data-r="h">0</b><small>horas</small></span><span><b data-r="m">0</b><small>min</small></span><span><b data-r="s">0</b><small>seg</small></span></div>
+        <div class="jg-th-cab-tx">
+          <span class="jg-th-sello">🎃 Edición limitada · nunca vuelve</span>
+          <h2 id="thTit" class="jg-th-tit">Tienda de Halloween</h2>
+          <p class="jg-th-lema">Lo que compres es tuyo para siempre; lo que no, desaparece al cerrar.</p>
+        </div>
+        <div class="jg-th-reloj" aria-label="Tiempo para que cierre"><small class="jg-th-reloj-t">Cierra en</small><span><b data-r="d">0</b><small>días</small></span><span><b data-r="h">0</b><small>h</small></span><span><b data-r="m">0</b><small>min</small></span><span><b data-r="s">0</b><small>seg</small></span></div>
       </header>
       <div class="jg-th-cuerpo">
         <section class="jg-th-probador" aria-label="Probador"></section>
@@ -180,7 +188,7 @@ export function abreTiendaHalloween(ctx, elegido) {
     const quien = t == null ? "" : mio && n ? `<small class="jg-th-it-q tuyo">Tu edición: n.º ${n}</small>`
       : `<small class="jg-th-it-q">${t ? `👥 Lo ${t === 1 ? "tiene 1 persona" : `tienen ${t}`}` : "✨ Nadie lo tiene aún"}</small>`;
     return `<button type="button" class="jg-th-it ${tipoDe(it.id)} ${rz ? "r-" + rz : "r-premio"}${sel === it.id ? " sel" : ""}${mio ? " mio" : ""}${r && r.agotado ? " agotado" : ""}" data-th-it="${it.id}" aria-pressed="${sel === it.id}">
-      <span class="jg-th-it-arte">${arte(it, 66)}</span>
+      <span class="jg-th-it-arte">${arte(it, 58)}</span>
       <span class="jg-th-it-rz">${rz ? esc(RAREZAS_HW[rz].n) : "Premio secreto"}</span>
       <b class="jg-th-it-n">${esc(it.n)}</b>${pie}${quien}</button>`;
   }
@@ -204,7 +212,7 @@ export function abreTiendaHalloween(ctx, elegido) {
     else accion = `<button type="button" class="jg-th-comprar" data-th-comprar${ocupado ? " disabled" : ""}>${ocupado ? "Comprando…" : `Comprar por ${MONEDA} ${miles(precio)}`}</button>`;
     return `
       <div class="jg-th-esc${fondo.oscuro ? " oscuro" : ""}" style="background:${esc(fondo.css(u.color))}">${capaFondo(fondo)}
-        <div class="jg-th-esc-yo">${avatarMarco(u.foto, u.nombre, u.color, marco, 104)}<b translate="no">${esc(u.nombre)}</b></div>
+        <div class="jg-th-esc-yo">${avatarMarco(u.foto, u.nombre, u.color, marco, 84)}<b translate="no">${esc(u.nombre)}</b></div>
         <span class="jg-th-esc-et">Así te verían</span>
       </div>
       <div class="jg-th-ficha ${rz ? "r-" + rz : "r-premio"}">
@@ -242,16 +250,17 @@ export function abreTiendaHalloween(ctx, elegido) {
     </div>`;
   }
   function catalogo(e) {
-    const grupo = (t, s, l) => `<h3 class="jg-th-grupo">${t}<small>${s}</small></h3><div class="jg-th-rej">${l.map(it => tarjeta(it, e)).join("")}</div>`;
-    return grupo("Marcos", "se animan alrededor de tu foto", marcosHw()) +
-      grupo("Fondos", "la escena de tu tarjeta y tu perfil", fondosHw()) +
-      grupo("Premios secretos", "no se venden: se ganan coleccionando", PREMIOS_HALLOWEEN.map(p => itemDe(p.id))) +
-      `<p class="jg-th-pie">Rarezas: ${ORDEN_RZ.slice().reverse().map(r => `<span class="jg-th-rz r-${r}">${esc(RAREZAS_HW[r].n)} · ${MONEDA} ${miles(RAREZAS_HW[r].p)}</span>`).join(" ")}</p>`;
+    const P = [["marcos", "Marcos", marcosHw(), "se animan alrededor de tu foto"], ["fondos", "Fondos", fondosHw(), "la escena de tu tarjeta y tu perfil"],
+      ["premios", "🎁 Premios", PREMIOS_HALLOWEEN.map(p => itemDe(p.id)), "no se venden: se ganan coleccionando"]];
+    const [, , lista, nota] = P.find(p => p[0] === pestana);
+    return `<div class="jg-th-tabs" role="tablist">${P.map(([k, t, l]) => `<button type="button" role="tab" data-th-tab="${k}" aria-selected="${k === pestana}">${t} <small>${l.length}</small></button>`).join("")}<span class="jg-th-tabs-n">${esc(nota)}</span></div>` +
+      `<div class="jg-th-rej${lista.length < 4 ? " pocos" : ""}">${lista.map(it => tarjeta(it, e)).join("")}</div>` +
+      `<p class="jg-th-pie">${ORDEN_RZ.slice().reverse().map(r => `<span class="jg-th-rz r-${r}">${esc(RAREZAS_HW[r].n)} · ${MONEDA} ${miles(RAREZAS_HW[r].p)}</span>`).join(" ")}</p>`;
   }
   function pinta(forzar) {
     const e = est(), s = saldo();
     const t = D ? [...marcosHw(), ...fondosHw()].map(it => cuantos(it.id)).concat(PREMIOS_HALLOWEEN.map(p => cuantos(p.id))) : null;
-    const f = JSON.stringify([sel, paso, error, ocupado, s, !!yo(), e ? Object.keys(e.compras || {}).sort() : null, puesto("marco"), puesto("fondo"), t]);
+    const u = yo(), f = JSON.stringify([sel, pestana, paso, error, ocupado, s, u ? [u.nombre, u.color, String(u.foto || "").length, String(u.foto || "").slice(-24)] : null, e ? Object.keys(e.compras || {}).sort() : null, puesto("marco"), puesto("fondo"), t]);
     if (!forzar && f === firma) return;
     firma = f;
     $(".jg-th-probador").innerHTML = probador(e);
@@ -323,10 +332,16 @@ export function abreTiendaHalloween(ctx, elegido) {
   capa.addEventListener("click", ev => {
     const t = ev.target;
     if (t === capa || t.closest(".jg-th-x")) { cierra(); return; }
+    const tab = t.closest("[data-th-tab]");
+    if (tab) { pestana = tab.getAttribute("data-th-tab"); pinta(); return; }
     const it = t.closest("[data-th-it]");
     if (it) {
       const id = it.getAttribute("data-th-it");
-      if (id !== sel) { sel = id; paso = ""; error = ""; pinta(); if (ctx.suena) ctx.suena("clic"); }
+      if (id !== sel) {
+        sel = id; paso = ""; error = "";
+        pestana = premio(id) ? "premios" : tipoDe(id) === "fondo" ? "fondos" : "marcos";
+        pinta(); if (ctx.suena) ctx.suena("clic");
+      }
       /* En el teléfono el probador queda arriba: se sube a mirarlo. */
       if (matchMedia("(max-width: 760px)").matches) $(".jg-th-probador").scrollIntoView({ behavior: "smooth", block: "start" });
       return;
