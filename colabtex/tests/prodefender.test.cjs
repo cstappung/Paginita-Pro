@@ -103,7 +103,8 @@ test('el verificador del club acepta la partida y rechaza cada trampa',async()=>
 });
 
 test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo la diferencia',()=>{
- assert.deepEqual(['prado','dunas','glaciar','caldera','vacio'].map(r=>M.monedasProdefender('club-prodefender-'+r,100)),[2000,4000,6000,8000,10000]);
+ assert.deepEqual(['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse'].map(r=>M.monedasProdefender('club-prodefender-'+r,100)),[2000,4000,6000,8000,10000,10000,10000,10000,10000,10000]);
+ assert.equal(M.monedasProdefender('club-prodefender-fosa',37),3700,'la segunda era paga 100 por ronda, como el Vacío');
  assert.equal(M.monedasProdefender('club-prodefender-prado',60),1200);
  assert.equal(M.monedasProdefender('club-prodefender-prado',70)-M.monedasProdefender('club-prodefender-prado',60),200);
  assert.equal(M.monedasProdefender('club-prodefender-prado',150),2000,'pasada la 100 no paga más');
@@ -116,14 +117,15 @@ test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo
 });
 
 test('categorías, topes y reglas de Firebase',()=>{
- for(const r of ['prado','dunas','glaciar','caldera','vacio'])assert.ok(C.categoriaClub('prodefender','club-prodefender-'+r),r);
+ for(const r of ['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse'])assert.ok(C.categoriaClub('prodefender','club-prodefender-'+r),r);
  assert.equal(C.categoriaClub('prodefender','club-prodefender-otro'),false);
  const ok={categoria:'club-prodefender-prado',puntos:100,tiempo:5,partida:'a-b'};
  assert.ok(C.resultadoClub('prodefender',ok));
  assert.equal(C.resultadoClub('prodefender',{...ok,puntos:101}),null);
  assert.equal(V.juegoDeCategoria('club-prodefender-vacio'),'prodefender');
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
- assert.equal((reglas.match(/club-prodefender-\(prado\|dunas\|glaciar\|caldera\|vacio\)/g)||[]).length,2,'soloRanks y soloPruebas');
+ assert.equal((reglas.match(/club-prodefender-\(prado\|dunas\|glaciar\|caldera\|vacio\|pantano\|cumbres\|fosa\|engranajes\|eclipse\)/g)||[]).length,2,'soloRanks y soloPruebas');
+ assert.deepEqual(P.REINOS,['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse'],'prueba.js conoce los diez reinos');
  assert.match(reglas,/beginsWith\('club-prodefender-'\) \|\| newData\.val\(\) <= 100/);
  // El juego carga el mismo motor que el verificador, con el mismo ?v=.
  const html=fs.readFileSync(path.join(D,'../index.html'),'utf8'),trab=fs.readFileSync(D+'verificador.js','utf8'),verif=fs.readFileSync('src/juegos/solo/verifica/prodefender.js','utf8');
@@ -260,29 +262,48 @@ test('rondas altas: llegan los grandes (supertanques y superglobos) que se abren
  }
 });
 
-/* Segunda era: cinco reinos en pruebas (levels.js `prueba`), solo para admins y sin
-   tablas. Sus mecánicas solo se activan con sus campos: los cinco primeros reinos se
-   simulan igual que antes (por eso la prueba sigue en la misma VERSION). */
-test('segunda era: cinco reinos en pruebas, sin tablas, con su defensa, su héroe y menos defensas',async()=>{
+/* Segunda era: cinco reinos que se abren a todos uno por día (levels.js `abre`), con
+   su tabla y 100 monedas por ronda. Sus mecánicas solo se activan con sus campos: los
+   cinco primeros reinos se simulan igual que antes (por eso la prueba sigue en la
+   misma VERSION). */
+test('segunda era: un reino por día desde el 22 de octubre de 2026, con su tabla, su defensa, su héroe y menos defensas',async()=>{
  assert.equal(PD.PUBLIC_LEVELS,5);
  assert.equal(PD.LEVELS.length,10);
+ assert.deepEqual(PD.LEVELS.slice(5).map(L=>L.abre),['2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26']);
+ assert.match(PD.diaChile(),/^\d{4}-\d{2}-\d{2}$/);
+ for(let li=0;li<5;li++)assert.ok(PD.abierto(li,'2000-01-01'),'los cinco de siempre están siempre abiertos');
+ assert.deepEqual([5,6,7,8,9].map(li=>PD.abierto(li,'2026-10-21')),[false,false,false,false,false]);
+ assert.deepEqual([5,6,7,8,9].map(li=>PD.abierto(li,'2026-10-22')),[true,false,false,false,false]);
+ assert.deepEqual([5,6,7,8,9].map(li=>PD.abierto(li,'2026-10-24')),[true,true,true,false,false]);
+ assert.deepEqual([5,6,7,8,9].map(li=>PD.abierto(li,'2026-10-26')),[true,true,true,true,true]);
  let antes=99;
  for(let li=5;li<10;li++){
   const L=PD.LEVELS[li],ids=PD.towersFor(li);
-  assert.ok(L.prueba&&L.torres,L.short+' está en pruebas y vende su lista');
+  assert.ok(L.abre&&L.torres,L.short+' tiene su día y vende su lista');
   assert.ok(ids.length<antes,L.short+' vende menos que el anterior ('+ids.length+')');antes=ids.length;
   assert.deepEqual(ids.filter(id=>PD.TOWERS[id].hero),[PD.heroOf(li)],'su héroe');
   assert.ok(ids.some(id=>PD.TOWERS[id].realm===li&&!PD.TOWERS[id].hero),'su defensa nueva');
   assert.ok(PD.ABILITIES[PD.TOWERS[PD.heroOf(li)].base.ability],'la habilidad del héroe existe');
   assert.ok(PD.ENEMIES[L.boss].boss,'su jefe');
   assert.equal(PD.buildRounds(li).length,100);
-  // no hay tabla: nada de un reino en pruebas se guarda ni paga
-  assert.match(await V.verificaClub('prodefender',{categoria:'club-prodefender-'+L.short.toLowerCase(),puntos:10,tiempo:9e5,partida:'x'},{v:1,j:[]},{uid:'u'}),/no tiene esa tabla/);
+  // tiene tabla: el verificador la conoce (y rechaza una prueba vacía por su forma, no por la tabla)
+  const cat='club-prodefender-'+L.short.toLowerCase();
+  assert.equal(P.categoria(li),cat);assert.equal(P.reinoDe(cat),li);
+  assert.ok(C.categoriaClub('prodefender',cat),cat);
+  assert.equal(V.juegoDeCategoria(cat),'prodefender');
  }
  // los reinos de siempre venden lo mismo que antes (12 clásicas + las de reino + su héroe)
  for(let li=0;li<5;li++)assert.equal(PD.towersFor(li).length,12+2*(li+1)+1);
  // las torres nuevas van al final de TOWER_ORDER (las pruebas guardan el índice)
  assert.equal(PD.TOWER_ORDER.indexOf('heroevacio'),26);
+});
+
+test('segunda era: el verificador del club acepta una partida del Pantano y la guarda en su tabla',async()=>{
+ const {pruebas}=juega(5,'uidP',6,{semilla:5});
+ const x=pruebas[pruebas.length-1];
+ const dato={categoria:'club-prodefender-pantano',puntos:x.ronda,tiempo:x.tiempo,partida:'p1'};
+ assert.equal(await V.verificaClub('prodefender',dato,x.p,{uid:'uidP'}),null);
+ assert.match(await V.verificaClub('prodefender',{...dato,categoria:'club-prodefender-cumbres'},x.p,{uid:'uidP'}),/otro reino/);
 });
 
 // coloca `type` en el sitio libre más cercano a (x0, y0)

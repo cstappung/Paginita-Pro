@@ -365,7 +365,7 @@
     const j = M.codifica(jug);
     if (j.length > 180000) return;
     const ahora = performance.now();
-    const prueba = { v: 1, s: E.s, u: E.u, j, n: E.tick, r: Math.round(ahora - t0),
+    const prueba = { v: E.v, s: E.s, u: E.u, j, n: E.tick, r: Math.round(ahora - t0),
       // Lo jugado sin pausas en los dos relojes: un reloj trucado en uno solo los separa.
       a: Math.round(ahora - t0 - pP), w: Date.now() - w0 - pW };
     Club.result({ categoria: CATEGORIA, puntos: E.puntos, tiempo: M.tiempoMs(E) }, prueba);

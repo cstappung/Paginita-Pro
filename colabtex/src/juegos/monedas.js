@@ -55,7 +55,7 @@ import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { cajaRock, reembolsoRock, repetidaRock, claveRock, PRECIO_CAJA } from "./rock-datos.js";
-import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { TIENDA, precioDe, aLaVenta } from "./tienda.js";
 import { PRECIO_COFRE, abreCofre, reembolsoDe } from "./tacos.js";
 import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
@@ -199,13 +199,15 @@ export function monedasHero(puntos) {
 }
 /* PRO DEFENDER: cada ronda del récord de un reino paga 20 × el número del
    reino (el Prado, 20; el Vacío, 100), así que llegar a la 100 son 2000,
-   4000, 6000, 8000 y 10 000. Sale del récord, así que una partida que no lo
-   supera no paga nada, y la que lo supera paga solo las rondas nuevas. */
-export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio"];
+   4000, 6000, 8000 y 10 000; los cinco de la segunda era pagan como el
+   Vacío, 100 por ronda (10 000 cada uno). Sale del récord, así que una
+   partida que no lo supera no paga nada, y la que lo supera paga solo las
+   rondas nuevas. */
+export const PRODEFENDER_REINOS = ["prado", "dunas", "glaciar", "caldera", "vacio", "pantano", "cumbres", "fosa", "engranajes", "eclipse"];
 export function monedasProdefender(cat, rondas) {
   const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || "")), r = m ? PRODEFENDER_REINOS.indexOf(m[1]) : -1;
   if (r < 0) return 0;
-  return 20 * (r + 1) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
+  return 20 * Math.min(r + 1, 5) * Math.max(0, Math.min(100, Math.floor(+rondas || 0)));
 }
 function extraRecord(cat, f) {
   if (cat === "club-hero-estrellas") return monedasHero(f.puntos);
@@ -706,9 +708,10 @@ export function economia(datos) {
       }
       else { o.estado = "impaga"; o.comprador = e.u; }
     } else if (e.t === "c") {
-      /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
-      if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
-      if (paga(e.u, PRECIO_TIENDA, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
+      /* Un marco o un fondo de la tienda: una vez por cuenta, a su precio,
+         y lo de edición limitada solo mientras se vendía. */
+      if (!TIENDA[e.k] || e.p !== precioDe(e.k) || !aLaVenta(e.k, e.at) || U(e.u).tienda[e.k]) continue;
+      if (paga(e.u, e.p, "tienda", e.k)) U(e.u).tienda[e.k] = e.at;
     } else if (e.t === "sc") {
       /* Un super chat: al precio de un nivel. El que no se pudo pagar no
          vale, y el chat lo pinta como un mensaje normal. */

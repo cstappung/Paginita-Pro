@@ -406,6 +406,13 @@ wide screens: a hard hill edge with the orange glow behind it, and a
 `slice` crop that flattened the tree and the chimney, read as an orange
 line across the page.
 
+**The Halloween shop strip** (`tiraTiendaHtml`, inside `.jg-sal-intro`
+under the Halloween ribbon, so no grid area changed) shows while the
+limited shop sells, whether or not the decoration is on; its countdown is
+refreshed every 30 s by `refrescaCuentas`, never by repainting the salón.
+The shop window itself opens on entry once a day. Details in
+`docs/claude/juegos/perfiles-y-economia.md`.
+
 **Lobby performance: no animation inside an SVG that runs all the time.**
 A traced lobby spent ~75 % of the main thread in «Layerize»: any repaint
 makes Chrome recompose the whole page, and an animated `transform` on an

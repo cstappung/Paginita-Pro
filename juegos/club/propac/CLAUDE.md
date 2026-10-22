@@ -14,6 +14,18 @@ tiles), **compuertas** (`=`, from the second maze, toggle every 8 s for
 everyone) and **Glitch**, a fifth ghost from level 3 that teleports. Three
 19 × 21 mazes (Neón, Circuito, Reactor) cycle.
 
+- **Proof versions** (`PRUEBA_V` = 2, `PRUEBA_VERSIONES` = [1, 2], `E.v`):
+  v1 is the first release, kept byte-for-byte so stored and pending proofs
+  still replay. **Anything that changes how a game plays (speeds, ghost
+  rules, timings, maps) needs a new version**, branching on `E.v`. v2:
+  speeds = the arcade's per-level percentages × 1.06 (`VEL_V2`; v1 crossed
+  this smaller maze much faster), Pac a bit faster while ghosts are blue,
+  arcade scatter/chase tables per level (`MODOS_V2`), house release by dot
+  counters + a global counter after a death + a no-eating timer
+  (`salidaCasa`), Elroy (Rayo speeds up and ignores scatter; paused after a
+  death until Tímido leaves), the arcade's «up» overflow in Eco's and
+  Rebote's target, and **a ghost already eaten (`g.comido`) leaves the house
+  hunting, not blue**, until a new power pellet.
 - **A move is applied just before the next tick** and recorded as
   `[Δtics, code, origin]`; `rehace` replays the same way. Anything the
   screen does (interpolation, particles, sound) must never touch `E`.

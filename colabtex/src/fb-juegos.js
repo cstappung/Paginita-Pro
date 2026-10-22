@@ -618,6 +618,13 @@ export const ponFotoPerfil = (uid, foto) => set(ref(db, `${U}/${uid}/perfil/foto
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 
+/* Solo el marco o solo el fondo (la tienda de Halloween: «ponérmelo»), sin
+   reescribir el resto del perfil. Los dos ya tenían su regla. */
+export const ponEnPerfil = (uid, campo, valor) => {
+  if (campo !== "marco" && campo !== "fondo") return Promise.reject(new Error("campo"));
+  return update(ref(db, `${U}/${uid}/perfil`), { [campo]: valor, at: Date.now() });
+};
+
 /* La partida a medias de un juego del club (hoy, BBTAN), para seguirla otro
    día. Va bajo users/<uid>, que ya solo escribe su dueño: no hizo falta tocar
    las reglas. Con `d` nulo queda solo `at`, una lápida que le dice al otro

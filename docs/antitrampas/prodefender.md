@@ -1,14 +1,16 @@
 # Antitrampas de PRO DEFENDER
 
-Cinco tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio)`.
-Los reinos 6–10 (la «segunda era», `prueba: true` en `levels.js`) no tienen tabla:
-`main.js` nunca manda su resultado, `rehace` rechaza `r ≥ 5` y el verificador no
-conoce su categoría, así que no se guardan, no pagan y no hay nada que proteger.
-Que solo los jueguen los administradores es una puerta de la interfaz, no de seguridad.
+Diez tablas, una por reino: `club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse)`.
+Los reinos 6–10 (la «segunda era») se abren a todos uno por día (`abre` en
+`levels.js`, día de Chile, 22 al 26 de octubre de 2026). Antes de su día solo los
+juegan los administradores y `main.js` no manda su resultado; esa puerta es de la
+interfaz y del reloj del navegador, no de seguridad: quien adelante su reloj juega
+antes, pero igual tiene que jugar las rondas, y la prueba se verifica igual que las
+demás (el verificador y las reglas no miran la fecha).
 `puntos` = la ronda más alta superada en una partida (1–100); `tiempo` = los ms
 de juego que llevaba esa partida al superarla (pasos del motor × 1000 / 60). Las
 monedas salen de la fila (`monedasProdefender` en `colabtex/src/juegos/monedas.js`:
-20 × el número del reino por ronda), así que la fila es lo que hay que proteger.
+20 × el número del reino por ronda, 100 en los reinos 6–10), así que la fila es lo que hay que proteger.
 
 ## La prueba
 
@@ -70,7 +72,7 @@ ronda.
 
 ## El juego solo manda lo que supera el récord
 
-`main.js` escucha las cinco tablas al abrir (`recorreTablas`) y manda
+`main.js` escucha las tablas de los reinos abiertos al abrir (`recorreTablas`) y manda
 `Club.result` solo cuando una ronda supera la que ya está en la nube (o la que ya
 mandó en esta visita). Por eso una partida que no bate el récord no se verifica
 ni se guarda.
