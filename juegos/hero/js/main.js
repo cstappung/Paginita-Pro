@@ -19,16 +19,22 @@ import { RankingScreen } from './ui/ranking.js';
 import { sitio } from './sitio/puente.js';
 import { claveCancion } from './sitio/clave.js';
 import { celular, iniciaCelular } from './sitio/celular.js';
+import { rockSitio, alCambiarRock } from './sitio/rock.js';
+import { RockeroScreen } from './ui/rockero.js';
 
 class MainMenu extends Screen {
   render() {
     const btn = (label, sub, onclick) => h('button', { class: 'menu-btn', 'data-nav': true, onclick }, h('span', {}, label), h('small', {}, sub));
     const status = h('div', { class: 'lib-status' });
     this.status = status;
+    // Batalla de Rock (a prueba): solo lo ve un administrador
+    this.rockBtn = btn('Tu rockero', 'Batalla de Rock: arma tu rockero y abre cajas · a prueba', () => this.app.show(new RockeroScreen(this.app)));
+    this.rockBtn.hidden = !rockSitio.admin;
     return h('div', { class: 'screen main-menu' },
       h('div', { class: 'logo' }, h('span', { class: 'logo-a' }, 'PRO'), h('span', { class: 'logo-b' }, 'HERO')),
       h('div', { class: 'menu-list' },
         btn('Jugar', 'Un jugador o multijugador local', () => this.app.show(new SongSelectScreen(this.app, { mode: 'play' }))),
+        this.rockBtn,
         // En línea se juega en una sala de Juegos (como Yemas o Boxhead): el botón lleva al salón
         sitio.embebido ? btn('En línea', 'Abre o únete a una sala en el salón de Juegos', () => sitio.envia('en-linea')) : null,
         sitio.embebido ? btn('Clasificación', 'La tabla general: quién tiene más estrellas doradas', () => this.app.show(new RankingScreen(this.app))) : null,
@@ -51,9 +57,11 @@ class MainMenu extends Screen {
     this.focusFirst();
     this.update();
     this.timer = setInterval(() => this.update(), 1000);
+    this.offRock = alCambiarRock(() => (this.rockBtn.hidden = !rockSitio.admin));
   }
   beforeUnmount() {
     clearInterval(this.timer);
+    this.offRock?.();
   }
   update() {
     if (library.needsLogin) {
@@ -228,7 +236,7 @@ class App {
     };
   }
 
-  async prepareSession(entry, players, net = null) {
+  async prepareSession(entry, players, net = null, { batalla = false } = {}) {
     this.preview.stop();
     const loading = this.showLoading(entry);
     this.screen?.unmount();
@@ -241,10 +249,10 @@ class App {
       const song = await loadSongChart(entry, track);
       this.lastSong = song;
       const session = new GameSession(this, {
-        entry, song, players, net,
+        entry, song, players, net, batalla,
         onFinish: (results) => this.onSessionFinish(entry, results, net),
       });
-      await session.load(track);
+      await session.load(track, (txt) => loading.set(1, txt));
       loading.set(1, 'Preparando…');
       loading.close();
       this.session = session;
@@ -259,15 +267,15 @@ class App {
     }
   }
 
-  async playLocal(entry, players) {
-    this.lastLocal = { entry, players };
-    const session = await this.prepareSession(entry, players);
+  async playLocal(entry, players, opts = {}) {
+    this.lastLocal = { entry, players, opts };
+    const session = await this.prepareSession(entry, players, null, opts);
     session?.start();
   }
 
   restartSession() {
     this.session = null;
-    if (this.lastLocal) this.playLocal(this.lastLocal.entry, this.lastLocal.players);
+    if (this.lastLocal) this.playLocal(this.lastLocal.entry, this.lastLocal.players, this.lastLocal.opts);
   }
 
   afterSessionQuit(net) {
@@ -302,6 +310,7 @@ class App {
       h('button', { 'data-nav': true, onclick: handlers.resume }, 'Continuar'),
       handlers.restart ? h('button', { 'data-nav': true, onclick: handlers.restart }, 'Reiniciar') : null,
       h('button', { 'data-nav': true, onclick: handlers.quit }, online ? 'Abandonar partida' : 'Salir'),
+      this.rockPausa(),
     ].filter(Boolean);
     const V = settings.volume;
     const slider = (label, key) => {
@@ -340,6 +349,24 @@ class App {
       close: () => el.remove(),
     };
     return menu;
+  }
+
+  // Batalla de Rock (solo administradores, a prueba): se apaga o se enciende sin salir de la canción
+  rockPausa() {
+    const ses = this.session;
+    if (!rockSitio.admin || !ses || celular) return null;
+    const txt = () => `Fondo de rock: ${settings.fondoRock ? 'sí' : 'no'}`;
+    const b = h('button', {
+      'data-nav': true,
+      onclick: async () => {
+        b.disabled = true;
+        await ses.ponRock(!settings.fondoRock);
+        saveSettings();
+        b.disabled = false;
+        b.textContent = txt();
+      },
+    }, txt());
+    return b;
   }
 
   goMenu() {

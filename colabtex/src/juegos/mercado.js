@@ -10,16 +10,18 @@
    graduada (`cartaViva`); el detalle carga la carta de verdad del abridor,
    con su aura de partículas (PRODROP en modo visor, `?ver=1`). Los objetos y las mascotas, en 3D
    por el visor de Mascotas (visor-mascota.js: fotos para la grilla, la cosa
-   girando en el detalle), con su emoji mientras tanto o sin WebGL. Vender se
-   hace en cada juego (la carta desde su zoom, la mascota o el objeto desde
-   su ficha); aquí se compra, se retira y se intercambia. */
+   girando en el detalle), con su emoji mientras tanto o sin WebGL. Aquí se
+   compra, se vende (la pestaña «Vender»: todo lo tuyo que no está a la venta,
+   con su precio), se retira y se intercambia; cada juego también vende desde
+   lo suyo (la carta desde su zoom, la mascota o el objeto desde su ficha, la
+   pieza de rock desde el editor). */
 import { economia, monedasDe, leeCopia } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
 import { miniCarta, MOTOR, RAIZ, colVisible, copiaVisible, veSerie1 } from "./prodrop-cartas.js";
 import { avatarMarco } from "./perfil-vista.js";
 import {
-  JUEGOS_MERCADO, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
-  pendientesDe, puedeComprar, puedeProponer, fichaCopia
+  JUEGOS_MERCADO, juegosMercado, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
+  pendientesDe, puedeComprar, puedeProponer, fichaCopia, MAX_PRECIO
 } from "./mercado-datos.js";
 import { ESPACIOS, NOMBRE_ESPACIO, ESPECIES, ETAPAS, pedidoObjeto, pedidoMascota, puestoDe } from "./mascotas-datos.js";
 import { fotoDe, pideFotos, montaVisor } from "./visor-mascota.js";
@@ -67,6 +69,8 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
   let host = null, d = null, off = null, firma = "", muerto = false, ocupado = Promise.resolve();
   const f = Object.assign({}, FILTROS_INICIALES, { juego: juego || "todo" });
   let tab = "comprar", max = LOTE, detalle = null, trato = null;
+  /* lo que escribiste en cada precio de «Vender» (se repinta con cada cambio de la base) */
+  const precios = {};
   /* El estado guardado de las mascotas que aparecen (se lee por clave, del
      dueño de ahora: una vez por sesión de la pestaña). */
   const estados = {}, pidiendo = new Set();
@@ -93,7 +97,8 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
   function imagen(r, grande) {
     if (r.tipo === "carta") return cartaViva(r.cp);
     const p = r.tipo === "baile" ? null : pedidoDe(r), ft = p && fotoDe(p.key);
-    const muestra = ft && ft.colores && ft.colores.length ? `<span class="jg-mk-muestra">${ft.colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
+    const colores = ft && ft.colores && ft.colores.length ? ft.colores : r.tipo === "rock" ? r.colores : null;
+    const muestra = colores ? `<span class="jg-mk-muestra">${colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
     return `<span class="jg-mk-foto${grande ? " grande" : ""}" data-foto="${esc(p ? p.key : "")}">${ft && ft.src ? `<img src="${esc(ft.src)}" alt="" draggable="false">` : `<span class="jg-mk-emoji" aria-hidden="true">${esc(r.emoji)}</span>`}${muestra}${r.leg ? '<b class="jg-mk-leg" title="Legendario">★</b>' : ""}${r.frozen ? '<b class="jg-mk-eterna" title="Tomó la poción eterna">🧪</b>' : ""}</span>`;
   }
   function pideMiniaturas(filas) {
@@ -116,7 +121,9 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     const m = monedasDe(uid, d), pend = cambios.filter(t => t.estado === "pendiente" && t.para === uid).length;
     if (f.col && !colVisible(f.col)) f.col = "";   // una colección que ya no ve
     const lista = tab === "comprar" ? filtra(ofertas, f) : [];
-    const sig = JSON.stringify([tab, f, max, m.saldo, veSerie1(), lista.map(r => [r.id, r.p, r.nombre, r.etapa]), tab === "ventas" ? ventas.map(r => [r.id, r.estado]) : 0,
+    const vendibles = tab === "vender" ? intercambiables(d, uid, estados).filter(r => f.juego === "todo" || r.juego === f.juego) : [];
+    leeEstados(vendibles.filter(r => r.tipo === "mascota" && !(claveEstado(r.c) in estados)).map(r => r.c));
+    const sig = JSON.stringify([tab, f, max, m.saldo, veSerie1(), lista.map(r => [r.id, r.p, r.nombre, r.etapa]), tab === "ventas" ? ventas.map(r => [r.id, r.estado]) : 0, vendibles.map(r => r.c),
       tab === "cambios" ? cambios.map(t => [t.id, t.estado, t.posible]) : 0, Object.keys(estados).length]);
     if (sig === firma) return;
     firma = sig;
@@ -133,16 +140,16 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
         </div>
         ${vitrina(ofertas)}
       </header>
-      <div class="jg-mk-seg" role="group" aria-label="Juego">${JUEGOS_MERCADO.map(([k, t]) => `<button type="button" data-juego="${k}" aria-pressed="${f.juego === k}">${t}</button>`).join("")}</div>
+      <div class="jg-mk-seg" role="group" aria-label="Juego">${juegosMercado().map(([k, t]) => `<button type="button" data-juego="${k}" aria-pressed="${f.juego === k}">${t}</button>`).join("")}</div>
       ${f.juego === "mascotas" ? `<div class="jg-mk-seg chico" role="group" aria-label="Qué">${TIPOS_MASCOTAS.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${f.tipoM === k}">${t}</button>`).join("")}</div>` : ""}
-      <nav class="jg-mk-tabs" role="tablist">${[["comprar", "Comprar"], ["ventas", "Mis ventas"], ["cambios", `Intercambios${pend ? ` <b>${pend}</b>` : ""}`]].map(([k, t]) =>
+      <nav class="jg-mk-tabs" role="tablist">${[["comprar", "Comprar"], ["vender", "🏷️ Vender"], ["ventas", "Mis ventas"], ["cambios", `Intercambios${pend ? ` <b>${pend}</b>` : ""}`]].map(([k, t]) =>
         `<button type="button" role="tab" data-tab="${k}" aria-selected="${tab === k}">${t}</button>`).join("")}</nav>
       ${m.parada ? `<p class="jg-mk-aviso">Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta (${MONEDA} ${fmt(m.falta)}), no puedes comprar, vender ni intercambiar.</p>` : ""}
-      ${tab === "comprar" ? filtrosHtml() + gridHtml(lista, ofertas.length) : tab === "ventas" ? ventasHtml(ventas) : cambiosHtml(cambios)}
+      ${tab === "comprar" ? filtrosHtml() + gridHtml(lista, ofertas.length) : tab === "vender" ? venderHtml(vendibles, m) : tab === "ventas" ? ventasHtml(ventas) : cambiosHtml(cambios)}
     </section>`;
     engancha();
     if (enfocado) { const qi = host.querySelector("#mkQ"); if (qi) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); } }
-    pideMiniaturas(tab === "comprar" ? lista.slice(0, max) : tab === "ventas" ? ventas : cambios.flatMap(t => [...t.dar, ...t.pedir]));
+    pideMiniaturas(tab === "comprar" ? lista.slice(0, max) : tab === "vender" ? vendibles.slice(0, max) : tab === "ventas" ? ventas : cambios.flatMap(t => [...t.dar, ...t.pedir]));
   }
 
   /* Las tres cartas más caras a la venta, en abanico en el encabezado. */
@@ -184,7 +191,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
   }
 
   function gridHtml(lista, total) {
-    if (!lista.length) return `<div class="jg-mk-vacio"><b>🏪</b><p>${total ? "Nada calza con esos filtros." : "Todavía nadie vende nada. Pon a la venta una carta (desde su zoom en PRODROP) o una mascota u objeto (desde su ficha en Mascotas)."}</p></div>`;
+    if (!lista.length) return `<div class="jg-mk-vacio"><b>🏪</b><p>${total ? "Nada calza con esos filtros." : "Todavía nadie vende nada. ¿Quieres ser el primero? Abre la pestaña <b>🏷️ Vender</b>."}</p></div>`;
     return `<div class="jg-mk-grid">${lista.slice(0, max).map((r, i) => {
       const caro = !r.propia && r.p > monedasDe(uid, d).saldo, t = r.tipo === "carta" ? MOTOR.TIERS[r.tier] : null;
       const sub = t ? `<span class="jg-mk-rar">${esc(t.sym)} ${esc(t.label)}</span> · ${esc(r.sub || "")}` : esc(r.sub || "");
@@ -196,10 +203,24 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     }).join("")}</div>${lista.length > max ? `<button type="button" class="btn2 jg-mk-mas" data-mas>Ver ${Math.min(LOTE, lista.length - max)} más</button>` : ""}`;
   }
 
+  /* «Vender»: todo lo tuyo que se puede vender (lo inicial no tiene copia y no sale), con su precio y su botón */
+  const PRECIO_SUGERIDO = r => r.tipo === "carta" ? [60, 200, 700, 2500][r.tier] * (r.gr ? 2 : 1) : r.tipo === "mascota" ? 1000 : r.leg ? 1500 : 300;
+  function venderHtml(l, m) {
+    const nota = `<div class="jg-mk-como"><b>🏷️ ¿Cómo vendo?</b><ol><li>Elige algo tuyo de la lista y ponle un precio en monedas.</li><li>Toca <b>Vender</b>: queda en «Comprar» para todos, con tu nombre.</li><li>Cuando alguien lo compra, las monedas llegan solas. Mientras está a la venta no lo puedes usar; si cambias de idea, lo retiras en <b>Mis ventas</b>.</li></ol></div>`;
+    if (m.parada) return nota;
+    if (!l.length) return nota + `<div class="jg-mk-vacio"><b>🎒</b><p>No tienes nada para vender aquí. Lo inicial no se vende; lo que sacas de sobres, regalos o cajas sí.</p></div>`;
+    return nota + `<div class="jg-mk-lista">${l.slice(0, max).map(r => `<div class="jg-mk-fv jg-mk-vende">
+        <span class="jg-mk-img chica">${imagen(r)}</span>
+        <span class="jg-mk-fv-tx"><b${r.tipo === "mascota" ? ' translate="no"' : ""}>${esc(r.nombre)}</b><small>${esc(r.sub || "")}</small></span>
+        <label class="jg-mk-precio">${MONEDA}<input type="number" min="1" max="${MAX_PRECIO}" step="1" inputmode="numeric" value="${esc(precios[r.c] ?? PRECIO_SUGERIDO(r))}" data-precio="${esc(r.c)}" aria-label="Precio de ${esc(r.nombre)}"></label>
+        <button type="button" class="btn jg-mk-mini" data-vende="${esc(r.c)}">Vender</button>
+      </div>`).join("")}</div>${l.length > max ? `<button type="button" class="btn2 jg-mk-mas" data-mas>Ver ${Math.min(LOTE, l.length - max)} más</button>` : ""}`;
+  }
+
   const ESTADO_V = { activa: ["En venta", "act"], vendida: ["Vendida", "ok"], retirada: ["Retirada", ""], impaga: ["No se pagó", "mal"], rechazada: ["No cabía en su corral", "mal"] };
   const cuando = t => { const mn = Math.round((fb.ahora() - t) / 60000); return mn < 1 ? "recién" : mn < 60 ? `hace ${mn} min` : mn < 1440 ? `hace ${Math.round(mn / 60)} h` : `hace ${Math.round(mn / 1440)} d`; };
   function ventasHtml(l) {
-    const nota = `<p class="jg-mk-nota">Se vende desde cada juego: una carta desde su zoom en PRODROP, una mascota u objeto desde su ficha en Mascotas. Mientras está a la venta nadie lo usa.</p>`;
+    const nota = `<p class="jg-mk-nota">Para poner algo a la venta, usa la pestaña <b>🏷️ Vender</b>. Mientras está a la venta nadie lo usa.</p>`;
     if (!l.length) return nota + `<div class="jg-mk-vacio"><b>💰</b><p>Todavía no vendes ni compras nada.</p></div>`;
     return nota + `<div class="jg-mk-lista">${l.map(o => {
       const [et, cl] = o.compra ? ["Comprada", "ok"] : ESTADO_V[o.estado] || [o.estado, ""];
@@ -259,6 +280,15 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     $$("[data-acepta]").forEach(b => b.onclick = () => accion(b, "aceptar", { id: b.dataset.acepta }, "¡Intercambio hecho!"));
     $$("[data-cierra]").forEach(b => b.onclick = () => accion(b, "cerrar", { id: b.dataset.cierra }, "Cerrado."));
     uno("[data-nuevo]", el => el.onclick = () => abreTrato());
+    $$("[data-precio]").forEach(el => el.oninput = () => { precios[el.dataset.precio] = el.value; });
+    $$("[data-vende]").forEach(b => b.onclick = () => {
+      const c = b.dataset.vende, inp = [...host.querySelectorAll("[data-precio]")].find(x => x.dataset.precio === c), p = Math.round(+(inp && inp.value));
+      const r = intercambiables(d, uid, estados).find(x => x.c === c);
+      if (!r) return;
+      if (!(p >= 1 && p <= MAX_PRECIO)) { avisa(`El precio va de 1 a ${fmt(MAX_PRECIO)} monedas.`, true); return; }
+      if (!confirm(`¿Poner «${r.nombre}» a la venta por ${fmt(p)} monedas? Mientras esté en el mercado no lo puedes usar.`)) return;
+      accion(b, "vender", { c, p }, `¡«${r.nombre}» está a la venta!`).then(ok => { if (ok) delete precios[c]; });
+    });
   }
 
   /* ---------- el detalle de una oferta ---------- */
@@ -386,7 +416,17 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     const tarea = ocupado.then(async () => {
       if (!d || !d.completo) throw new Error("Todavía se está cargando tu cuenta.");
       const e = eco();
-      if (que === "comprar") {
+      if (que === "vender") {
+        const p = x.p;
+        if (e.dueno[x.c] !== uid || !intercambiables(d, uid, estados).some(r => r.c === x.c)) throw new Error("Eso ya no es tuyo.");
+        if (e.enVenta[x.c]) throw new Error("Ya está a la venta.");
+        if (!(Number.isInteger(p) && p >= 1 && p <= MAX_PRECIO)) throw new Error(`El precio va de 1 a ${fmt(MAX_PRECIO)} monedas.`);
+        if (monedasDe(uid, d).parada) throw new Error("Tu cuenta tiene una compra sin fondos: no puedes vender hasta ponerte al día.");
+        const id = await fb.publicarOferta(uid, x.c, p);
+        /* la oferta tiene que quedar válida en el recuento; si no, se retira en el acto (sin ofertas fantasma) */
+        const fin = economia(d).ofertas[id];
+        if (fin && fin.estado !== "activa") { await fb.retirarOferta(id).catch(() => {}); throw new Error("Eso ya está a la venta o dejó de ser tuyo."); }
+      } else if (que === "comprar") {
         const motivo = puedeComprar(d, uid, x.id);
         if (motivo) throw new Error(motivo);
         await fb.comprarOferta(uid, x.id);

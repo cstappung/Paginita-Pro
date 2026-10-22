@@ -75,11 +75,11 @@ function movimientosHtml(movs) {
     filas.push({ at: m.at, desde: m.at, c: m.c, d: m.d, n: m.p, casino, ap: m.c === "apuesta" ? 1 : 0, pr: m.c === "premio" ? m.p : 0 });
   }
   if (!filas.length) return `<p class="jg-nada">Todavía no has gastado ni cobrado nada. Lo que compres en PRODROP, la tienda, Mascotas, el mercado o el casino aparecerá aquí.</p>`;
-  const tipo = { carta: "una carta", mascota: "una mascota", objeto: "un objeto" };
+  const tipo = { carta: "una carta", mascota: "una mascota", objeto: "un objeto", rock: "una pieza de rock" };
   const texto = f => ({
     sobre: ["🃏", "Sobre de PRODROP"], graduar: ["⭐", "Graduaste una carta"], adopcion: ["🐣", "Adoptaste una mascota"],
     regalo: ["🎁", "Regalo de Mascotas"], comida: ["🍖", `Comida para tus mascotas${f.d ? ` ×${f.d}` : ""}`], pocion: ["🧪", "Poción para una mascota"],
-    fondoMascota: ["🏞️", "Fondo para tus mascotas"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
+    fondoMascota: ["🏞️", "Fondo para tus mascotas"], cajaRock: ["📦", f.n > 0 ? "Caja de rock repetida: te devolvió" : "Caja de Batalla de Rock"], mercado: ["🛒", `Compraste ${tipo[f.d] || "algo"} en el mercado`],
     venta: ["💰", `Vendiste ${tipo[f.d] || "algo"} en el mercado`], tienda: ["🛍️", `${HALLOWEEN[f.d] ? "Tienda de Halloween" : "Tienda del perfil"} · ${TIENDA[f.d] === "marco" ? "marco" : "fondo"} «${((TIENDA[f.d] === "marco" ? marcoDe(f.d) : fondoDe(f.d)) || {}).n || f.d}»`]
   }[f.c] || ["🪙", f.c]);
   const cuando = at => new Date(at).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -115,6 +115,7 @@ function detalleHtml(yo) {
       s: [veces("adopcion", "adopción", "adopciones"), veces("regalo", "regalo", "regalos"), veces("comida", "compra de comida", "compras de comida"), veces("pocion", "poción", "pociones"), veces("fondoMascota", "fondo", "fondos")].filter(Boolean).join(" · ") },
     { i: "🛍️", t: "Tienda del perfil", n: g.tienda || 0, s: veces("tienda", "artículo", "artículos") },
     { i: "🎱", t: "Pool · cofres de tacos", n: g.cofre || 0, s: veces("cofre", "cofre", "cofres") },
+    { i: "🎸", t: "Batalla de Rock · cajas", n: g.cajaRock || 0, s: veces("cajaRock", "caja", "cajas") },
     { i: "🛒", t: "Compras en el mercado", ir: "#mercado", n: g.mercado || 0, s: veces("mercado", "compra", "compras") }
   ].sort((a, b) => b.n - a.n);
   const casino = Object.entries(cas.porJuego || {}).filter(([, z]) => z.rondas || z.apostado)

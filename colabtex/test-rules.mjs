@@ -740,6 +740,22 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await loginAs(A);
   await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
   await remove(ref(db, `prodropSerie1/${ua.uid}`));
+  // Batalla de Rock (a prueba): cajas y rockero, solo administradores
+  const caja = (u, x) => set(push(ref(db, `rock/c/${u}`)), Object.assign({ at: serverTimestamp(), p: 500, b: "f" }, x));
+  await denied("una caja de rock no cuesta menos", () => caja(ua.uid, { p: 50 }));
+  await denied("ni es de otro cuerpo", () => caja(ua.uid, { b: "x" }));
+  await denied("ni lleva campos de más", () => caja(ua.uid, { extra: 1 }));
+  await denied("ni se compra a nombre de otro", () => caja(ub.uid, {}));
+  await allowed("el admin compra una caja de rock", () => caja(ua.uid, {}));
+  await allowed("y guarda su rockero", () => set(ref(db, `rockLook/${ua.uid}`), JSON.stringify({ body: "f", name: "Prueba" })));
+  await denied("un rockero no pasa de 4000 caracteres", () => set(ref(db, `rockLook/${ua.uid}`), "x".repeat(4001)));
+  await allowed("una pieza de rock se pone a la venta", () => set(push(ref(db, "mercado/o")), { u: ua.uid, c: `rk:${ua.uid}~-Ncajarock01`, p: 300, at: serverTimestamp() }));
+  await loginAs(B);
+  await denied("sin ser admin no se compran cajas de rock", () => caja(ub.uid, {}));
+  await denied("ni se guarda un rockero", () => set(ref(db, `rockLook/${ub.uid}`), "{}"));
+  await allowed("pero se lee el del rival, por clave", () => get(ref(db, `rockLook/${ua.uid}`)));
+  await denied("no la colección entera", () => get(ref(db, "rockLook")));
+  await loginAs(A);
   await comoDueno(`admins/${ua.uid}`, null);
   await denied("sin ser admin ya no suma monedas", () => ajuste({}));
   await denied("ni se pone en la Serie 01", () => s1(ua.uid, {}));

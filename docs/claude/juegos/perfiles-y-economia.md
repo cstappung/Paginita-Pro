@@ -443,6 +443,9 @@ account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
 per-pet state (`mascotasEstado`) is read only by key.
 
 
+**Batalla de Rock boxes** (`rock/c/<uid>/<k>`, 500, event `rc`, category
+`cajaRock`; an exact repeat refunds as `premios`): `juegos/hero/js/rock/CLAUDE.md`.
+
 ## Casino
 
 The Casino tab bets coins: a bet is a spend (`ca`, through `paga`) and a

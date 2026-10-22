@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610210632"></script>
+<script src="i18n.js?v=202610220511"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5955,6 +5955,12 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
 .jg-mk-est{align-self:flex-start;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;background:#eee;color:#555}
 .jg-mk-est.act{background:#e8f0ff;color:#2e5bd8}.jg-mk-est.ok{background:#e3f7e8;color:#23874f}.jg-mk-est.mal{background:#fde6e3;color:#b3412f}
 .jg-mk-mini{padding:5px 10px;font-size:12.5px}
+.jg-mk-como{padding:12px 14px;border-radius:14px;background:#f6f2ff;border:1px solid #e1d8f7;font-size:13px;line-height:1.45;color:#3f3a52}
+.jg-mk-como ol{margin:6px 0 0;padding-left:20px}
+.jg-mk-precio{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.jg-mk-precio .jg-moneda{width:14px;height:14px}
+.jg-mk-precio input{width:84px;padding:5px 7px;border-radius:9px;border:1px solid #d7d0e6;font:inherit;font-size:13px}
+@media (max-width:560px){.jg-mk-vende{flex-wrap:wrap}.jg-mk-vende .jg-mk-fv-tx{flex-basis:calc(100% - 70px)}.jg-mk-vende .jg-mk-precio{margin-left:auto}}
 .jg-mk-trato{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:#fff;border:1px solid #e5e0ee}
 .jg-mk-trato header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .jg-mk-trato header small{color:#7a7590;font-size:12px}
@@ -6031,6 +6037,8 @@ html[data-tema=oscuro] .jg-mk-tabs button[aria-selected=true]{color:#c9b6ff;bord
 html[data-tema=oscuro] :is(.jg-mk-chip,.jg-mk-sel select,.jg-mk-q,.jg-mk-it,.jg-mk-fv,.jg-mk-trato,.jg-mk-persona){background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-mk-chip.on{background:color-mix(in srgb,var(--c,#7042df) 26%,var(--os-sup));color:var(--os-tx)}
 html[data-tema=oscuro] .jg-mk-it.mia{background:#221b33;border-color:#4b3d73}
+html[data-tema=oscuro] .jg-mk-como{background:#221b33;border-color:#4b3d73;color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-precio input{background:var(--os-sup2);border-color:var(--os-borde);color:var(--os-tx)}
 html[data-tema=oscuro] :is(.jg-mk-img,.jg-mk-elige){background:var(--os-sup2)}
 html[data-tema=oscuro] .jg-mk-p{background:#3a2f12;color:#ffe08a}
 html[data-tema=oscuro] .jg-mk-p.caro{background:#3d1d18;color:#ff9b8a}
@@ -6700,6 +6708,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610210632"></script>
+<script src="juegos-app.js?v=202610220511"></script>
 </body>
 </html>

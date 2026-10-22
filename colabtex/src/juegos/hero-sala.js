@@ -1,7 +1,7 @@
 import * as fb from "../fb-juegos.js";
 import { crearMalla } from "./malla.js";
 import { crearDirecto, OK_MS } from "./yemas-red.js";
-import { atiendeHero, mandaCuenta } from "./hero.js";
+import { atiendeHero, mandaCuenta, crearRockHero } from "./hero.js";
 import { codificaCurvaHero } from "./motor.js";
 
 /* PRO HERO en línea — el cartero de la sala, hermano del de Boxhead.
@@ -87,11 +87,14 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (!muerto) frame?.contentWindow?.postMessage({ canal: PADRE, tipo, ...datos }, location.origin);
   };
   const red = m => enviar("red", { m });
+  // Batalla de Rock (solo administradores): el rockero de cada uno, para la batalla de fondo
+  const rock = crearRockHero(enviar);
   const tema = () => enviar("tema", { oscuro: document.documentElement.dataset.tema === "oscuro" });
 
   const statsDe = f => f && {
     score: f.s, stars: f.e, hits: f.h, total: f.n, misses: f.x, accuracy: f.n ? f.h / f.n : 0, bestCombo: f.c,
-    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q, curva: f.cv || null
+    spPhrases: f.sp, spTotal: f.st, overhits: f.o, fc: !!f.fc, quit: !!f.q, curva: f.cv || null,
+    ...(f.bv !== undefined ? { vida: f.bv / 1000, ko: !!f.ko } : {})
   };
 
   // La sala con la forma que esperaba el juego de su servidor
@@ -100,7 +103,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     const fase = est.etapa === "sala" ? "lobby" : est.etapa === "cargando" ? "loading" : "playing";
     const fines = est.etapa === "tocando" ? est.fines : est.ultima?.fines || {};
     return {
-      code: "", host: est.director, phase: fase, songId: est.cancion || null, cupo: est.cupo, ronda: est.ronda,
+      code: "", host: est.director, phase: fase, songId: est.cancion || null, cupo: est.cupo, ronda: est.ronda, modo: est.modo || "normal",
       players: est.jugadores.filter(j => !est.fuera?.[j.uid]).map(j => {
         const pt = est.partes[j.uid] || {};
         return {
@@ -167,6 +170,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
       return;
     }
     if (m.t === "song" && typeof m.songId === "string" && m.songId.length <= 300) anota({ t: "cancion", id: m.songId });
+    else if (m.t === "modo" && (m.m === "normal" || m.m === "batalla") && est.director === uid && est.modo !== m.m) anota({ t: "modo", m: m.m });
     else if (m.t === "part") {
       const a = est.partes[uid] || {}, quiere = [m.part, m.diff, m.mode].join("|");
       // el juego la vuelve a pedir en cada repintado hasta que llega: una vez basta
@@ -182,14 +186,16 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
       const s = m.stats || {}, curva = codificaCurvaHero(m.curva);
       anota({ t: "fin", r: est.ronda, s: ent(s.score, 1e8), e: ent(s.stars, 6), ac: ent(s.hits, 1e5), n: ent(s.total, 1e5),
         x: ent(s.misses, 1e5), c: ent(s.bestCombo, 1e5), sp: ent(s.spPhrases, 1e4), st: ent(s.spTotal, 1e4), o: ent(s.overhits, 1e5),
-        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0, ...(curva ? { cv: curva } : {}) });
+        fc: s.fc ? 1 : 0, q: s.quit ? 1 : 0, ...(curva ? { cv: curva } : {}),
+        ...(Number.isFinite(s.vida) ? { bv: ent(s.vida, 1000), ko: s.ko ? 1 : 0 } : {}) });
     }
   }
 
   function mensaje(e) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
-    if (d.tipo === "listo") { listo = true; tema(); mandaCuenta(enviar); return; }
+    if (d.tipo === "listo") { listo = true; tema(); mandaCuenta(enviar); rock.inicia().then(() => est && rock.ponLooks(est.jugadores.map(j => j.uid))); return; }
+    if (d.tipo === "rock-pide") { rock.atiende(d); return; }
     if (d.tipo === "red") { deRed(d.m); return; }
     if (d.tipo === "resultado" && !juego()) return;
     atiendeHero(d.tipo, d, enviar);
@@ -296,7 +302,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?modo=online&v=hero-11";
+    frame.src = "juegos/hero/index.html?modo=online&v=hero-16";
     host.append(redEl, frame);
   }
 
@@ -305,7 +311,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
     if (!p.fin) {
       arrancaDirecto();
       const firma = est.jugadores.map(j => j.uid).join() + "|" + Object.keys(est.fuera || {}).join();
-      if (firma !== rosterFirma) { rosterFirma = firma; malla?.revisa(); }
+      if (firma !== rosterFirma) { rosterFirma = firma; malla?.revisa(); rock.ponLooks(est.jugadores.map(j => j.uid)); }
     }
     reenvia();
     if (est.fase === "fin" && !p.fin && juego()) terminar(est.ganador, est.motivo);
@@ -315,6 +321,7 @@ export function crearHeroSala({ uid, pid, jugar, terminar, mirando }) {
 
   function destruir() {
     muerto = true;
+    rock.destruir();
     paraDirecto();
     temaObs?.disconnect();
     window.removeEventListener("message", mensaje);

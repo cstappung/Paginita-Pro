@@ -7012,6 +7012,7 @@ export const HR_DEMORA = 3500;
 export const HR_PARTES = ["guitar", "bass", "rhythm", "keys", "drums", "guitarcoop"];
 export const HR_DIFS = ["expert", "hard", "medium", "easy"];
 export const HR_MODOS = ["taps", "normal", "hopos", "strums"];
+export const HR_MODOS_SALA = ["normal", "batalla"];
 export const HR_CURVA = 60;
 const HR_CURVA_MAX = 1e8;
 export function codificaCurvaHero(c) {
@@ -7029,7 +7030,7 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, partes = {}, prep = {}, hist = [];
   const ent = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
-  let etapa = "sala", cancion = "", ronda = 0, enJuego = [], cargados = {}, go = 0, fines = {}, ultima = null;
+  let etapa = "sala", cancion = "", ronda = 0, enJuego = [], cargados = {}, go = 0, fines = {}, ultima = null, modo = "normal";
   const director = () => (js.find(j => !fuera[j.uid]) || {}).uid || "";
   const presentes = () => js.filter(j => !fuera[j.uid]).map(j => j.uid);
   const cierraRonda = () => {
@@ -7053,6 +7054,9 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
       partes[u] = { p: j.p, d: j.d, m: HR_MODOS.includes(j.m) ? j.m : "normal" };
     } else if (j.t === "listo") {
       if (etapa === "sala") prep[u] = !!j.on;
+    } else if (j.t === "modo") {
+      // el modo de la sala (lo elige quien dirige): "batalla" es 1 contra 1 con poderes (solo cuenta con dos en la ronda)
+      if (etapa === "sala" && u === director() && HR_MODOS_SALA.includes(j.m)) modo = j.m;
     } else if (j.t === "cancion") {
       if (etapa !== "sala" || u !== director() || typeof j.id !== "string" || !j.id || j.id.length > 300 || j.id === cancion) continue;
       cancion = j.id;
@@ -7076,6 +7080,8 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
         s: ent(j.s, 1e8), e: ent(j.e, 6), h: ent(j.ac, 1e5), n: ent(j.n, 1e5), x: ent(j.x, 1e5), c: ent(j.c, 1e5),
         sp: ent(j.sp, 1e4), st: ent(j.st, 1e4), o: ent(j.o, 1e5), fc: j.fc === 1 ? 1 : 0, q: j.q === 1 ? 1 : 0
       };
+      // en la batalla: la vida con que terminó (0–1000) y si quedó K.O.
+      if (j.bv !== undefined) { fines[u].bv = ent(j.bv, 1000); fines[u].ko = j.ko === 1 ? 1 : 0; }
       const cv = leeCurvaHero(j.cv);
       if (cv) fines[u].cv = cv;
       cierraRonda();
@@ -7085,7 +7091,7 @@ export function redHero(p, js = jugadoresDe(p), listos = true) {
   const todos = listos && js.length > 0 && !quedan.length;
   return {
     fase: todos ? "fin" : "jugando", ganador: todos ? "" : null, motivo: todos ? "abandono" : "",
-    etapa, cancion, director: director(), partes, preparados: prep, ronda, enJuego, cargados, go, fines, ultima, fuera, hist
+    etapa, cancion, director: director(), partes, preparados: prep, ronda, enJuego, cargados, go, fines, ultima, fuera, hist, modo
   };
 }
 

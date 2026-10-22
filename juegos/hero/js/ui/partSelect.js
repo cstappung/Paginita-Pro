@@ -19,6 +19,8 @@ export class PartSelectScreen extends Screen {
     // en el celular solo lo que se toca con cinco botones (la batería necesita bombo)
     this.parts = PART_ORDER.filter((p) => entry.parts[p] && !(celular && PARTS[p].kind === 'drums'));
     this.slots = [];
+    // modo batalla (game/batalla.js): 1 contra 1 con poderes; si juegas solo, contra un bot
+    this.batalla = !!app.lastBatalla;
     this.addSlot(app.defaultProfileId());
   }
 
@@ -83,6 +85,10 @@ export class PartSelectScreen extends Screen {
           slot.partIdx = this.parts.length + 1;
           this.slotNav(slot, 'confirm');
         }));
+        if (si === 0) items.push(this.item(slot, slot.partIdx === this.parts.length + 2, `Modo: ${this.batalla ? '⚔️ Batalla' : 'Normal'}`, () => {
+          slot.partIdx = this.parts.length + 2;
+          this.slotNav(slot, 'confirm');
+        }));
       } else if (slot.step === 'diff') {
         items = this.diffsFor(slot).map((d, i) => this.item(slot, i === slot.diffIdx, DIFF_LABEL[d], () => {
           slot.diffIdx = i;
@@ -97,6 +103,7 @@ export class PartSelectScreen extends Screen {
           h('span', { class: 'slot-p' }, `P${si + 1}`),
           h('span', { class: 'slot-name' }, slot.name),
           h('span', { class: 'slot-dev' }, celular ? 'Pantalla táctil' : prof?.name || '')),
+        si === 0 && this.batalla ? h('div', { class: 'slot-bt' }, this.slots.length > 2 ? '⚔️ La batalla es de a dos: con más jugadores se toca normal' : this.slots.length === 1 ? '⚔️ Batalla contra un bot (o que se una otro jugador)' : '⚔️ Batalla 1 contra 1') : null,
         h('div', { class: 'slot-sum' }, slot.step !== 'part' ? `${PARTS[part].label}${slot.step === 'ready' ? ' · ' + DIFF_LABEL[this.diffsFor(slot)[slot.diffIdx]] : ''}${slot.bot ? ' · BOT' : ''}` : (slot.bot ? 'Modo bot activado' : `Elige instrumento · ${MODE_SHORT[slot.mode]}`)),
         h('div', { class: 'slot-items' }, ...items),
         si > 0 ? h('button', { class: 'slot-leave', onclick: () => this.removeSlot(slot) }, 'Salir') : null);
@@ -120,7 +127,7 @@ export class PartSelectScreen extends Screen {
   slotNav(slot, a) {
     const isFirst = slot === this.slots[0];
     if (slot.step === 'part') {
-      const n = this.parts.length + 2;
+      const n = this.parts.length + (isFirst ? 3 : 2);
       if (a === 'up') slot.partIdx = (slot.partIdx - 1 + n) % n;
       else if (a === 'down') slot.partIdx = (slot.partIdx + 1) % n;
       else if (a === 'confirm') {
@@ -129,6 +136,7 @@ export class PartSelectScreen extends Screen {
           const modes = Object.keys(NOTE_MODES);
           slot.mode = modes[(modes.indexOf(slot.mode) + 1) % modes.length];
         } else if (slot.partIdx === this.parts.length + 1) slot.bot = !slot.bot;
+        else if (slot.partIdx === this.parts.length + 2) this.batalla = this.app.lastBatalla = !this.batalla;
         else {
           this.resetDiff(slot);
           slot.step = 'diff';
@@ -156,7 +164,10 @@ export class PartSelectScreen extends Screen {
       this.app.lastChoice[s.profileId] = { part, diff, mode: s.mode };
       return { type: 'local', name: s.name, part, diff, profileId: s.profileId, bot: s.bot, mode: s.mode };
     });
-    setTimeout(() => this.app.playLocal(this.entry, players), 250);
+    // batalla solo: el rival es un bot con tu mismo instrumento y dificultad
+    const batalla = this.batalla && players.length <= 2;
+    if (batalla && players.length === 1) players.push({ ...players[0], name: 'Rival', profileId: null, bot: true });
+    setTimeout(() => this.app.playLocal(this.entry, players, { batalla }), 250);
   }
 
   back() {
