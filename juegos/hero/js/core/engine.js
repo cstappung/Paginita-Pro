@@ -437,6 +437,12 @@ export class Bot {
   constructor(engine) {
     this.engine = engine;
     this.idx = 0;
+    // en el modo batalla los poderes también le pegan al bot: `torpe` = probabilidad de dejar pasar una
+    // nota, `sinTraste` = trastes que no puede pisar (la cuerda rota)
+    this.torpe = 0;
+    this.sinTraste = 0;
+    this.sinSP = false;   // en la batalla no activa Star Power (el botón lanza poderes)
+    this.rnd = Math.random;
   }
 
   update(t) {
@@ -446,8 +452,10 @@ export class Bot {
       const i = this.idx++;
       const nt = notes[i];
       if (e.noteState[i] !== PENDING) continue;
+      if (this.torpe && this.rnd() < this.torpe) continue;
       const at = Math.max(nt.time, e.lastTime ?? nt.time);
       if (e.kind === 'drums') {
+        if (nt.pad >= 0 && this.sinTraste & (1 << nt.pad)) continue;
         e.pad(nt.pad, at, nt.cymbal);
         continue;
       }
@@ -456,11 +464,11 @@ export class Bot {
       e.update(at);
       const sus = e.heldSustainMask();
       const keep = nt.open || (nt.frets & sus) ? 0 : sus;
-      const want = (nt.open ? 0 : nt.frets) | keep;
+      const want = ((nt.open ? 0 : nt.frets) | keep) & ~this.sinTraste;
       if (nt.type !== NOTE_STRUM && e.held === want) e.fret(keep || (want === 0 ? 16 : 0), at);
       e.fret(want, at);
       if (e.noteState[i] === PENDING) e.strum(at);
     }
-    if (e.kind === 'guitar' && e.spActive === false && e.sp >= 0.5) e.spAction(t);
+    if (!this.sinSP && e.kind === 'guitar' && e.spActive === false && e.sp >= 0.5) e.spAction(t);
   }
 }

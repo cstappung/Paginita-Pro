@@ -76,7 +76,8 @@ async function onLoad(app, m) {
       ? { type: 'local', id: p.id, name: p.name, part: p.part, diff: p.diff, mode: p.mode, profileId: app.onlineProfile, bot: !!app.onlineBot }
       : { type: 'remote', id: p.id, name: p.name, part: p.part, diff: p.diff, mode: p.mode }));
   app.screen?.unmount();
-  const session = await app.prepareSession(entry, players, net);
+  // modo batalla: lo elige quien dirige y solo vale con dos en la ronda
+  const session = await app.prepareSession(entry, players, net, { batalla: room.modo === 'batalla' && players.length === 2 });
   net.send({ t: session ? 'loaded' : 'noload' });
 }
 
@@ -326,7 +327,15 @@ export class LobbyScreen extends Screen {
     const bot = h('input', { type: 'checkbox', onchange: () => { this.app.onlineBot = bot.checked; } });
     bot.checked = !!this.app.onlineBot;
     const faltan = room.players.filter((p) => p.id !== room.host && !p.ready).length;
+    const batalla = room.modo === 'batalla';
+    const modoSel = h('select', { 'data-nav': true, onchange: () => net.send({ t: 'modo', m: modoSel.value }) },
+      h('option', { value: 'normal', selected: !batalla }, 'Normal'), h('option', { value: 'batalla', selected: batalla }, '⚔️ Batalla (1 contra 1, con poderes)'));
+    const modoEl = isHost
+      ? h('label', { class: 'set-row' }, h('span', {}, 'Modo', h('small', {}, 'La batalla es de a dos: el Star Power se cambia por poderes para atacar al rival')), modoSel)
+      : batalla ? h('p', { class: 'd-aviso bt' }, '⚔️ Modo batalla: cada frase de estrellas te da un poder; lánzalo con el botón de Star Power. Pierde quien se queda sin vida.') : null;
     this.mine.replaceChildren(...[
+      modoEl,
+      batalla && room.players.length !== 2 ? h('p', { class: 'd-aviso' }, `La batalla es de a dos: con ${room.players.length} en la sala se toca normal.`) : null,
       h('label', { class: 'set-row' }, h('span', {}, 'Instrumento'), partSel),
       h('label', { class: 'set-row' }, h('span', {}, 'Dificultad'), diffSel),
       celular ? null : h('label', { class: 'set-row' }, h('span', {}, 'Notas'), modeSel),
@@ -336,7 +345,7 @@ export class LobbyScreen extends Screen {
       sitio.sala ? null : h('label', { class: 'set-row check' }, h('span', {}, 'Bot (pruebas)'), bot),
       this.ajustesEl(),
       sitio.sala && celular ? h('p', { class: 'd-aviso' }, 'En el celular las partidas no se guardan: los récords y las estrellas son para teclado, mando o guitarra.') : null,
-      sitio.sala && !celular ? h('p', { class: 'd-aviso' }, '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
+      sitio.sala && !celular ? h('p', { class: 'd-aviso' }, batalla && room.players.length === 2 ? 'Las batallas no se guardan: no dan estrellas ni récords.' : '★ Doradas solo en Experto (o la dificultad más alta del instrumento). Tus estrellas y monedas se guardan igual que tocando solo.') : null,
       isHost
         ? h('button', { class: 'primary big', 'data-nav': true, disabled: !entry || room.phase !== 'lobby' || faltan > 0, onclick: () => { pantallaCompleta(); net.send({ t: 'start' }); } },
           room.phase === 'loading' ? 'Cargando…' : room.phase === 'playing' ? 'Tocando…' : faltan > 0 ? `Esperando que estén listos (${faltan})` : 'Empezar canción')
