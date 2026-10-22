@@ -41,6 +41,7 @@ import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as V
 import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
 import { crearLetreros, filasDeTabla } from './letreros.mjs';
 import { escribirNombres, leerNombresCpu, leerSkins, escribirSkins } from './nombres-juego.mjs';
+import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 
@@ -101,7 +102,8 @@ const red = parametros.has('red') ? (() => {
     // (y los de la sala nueva, §73, con la suya: sala-carrera.mjs)
     const alBinario = (de, b, canal) => b[0] === MARCA_LOCKSTEP ? sincro?.lockstep?.alBinario(de, b)
       : b[0] === MARCA_SALA ? window.mkwSala?.alBinario(de, b) : router.alBinario(de, b, canal);
-    malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar });
+    // (§99: en la sala, cola corta para la carrera: un paquete viejo no sirve)
+    malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar, colaUdp: ['sala', 'directa'].includes(parametros.get('modo')) ? 8192 : undefined });
     router.usar(malla);
     malla.entrar().then(ok => anotar(`[malla] ${ok ? 'entré a la sala como ' + uid : 'no pude entrar a la sala'}`));
   }
@@ -141,7 +143,16 @@ const logCaja = $('log');
 const lineasLog = [];          // las últimas 400 líneas (lo que se ve en pantalla)
 const todoElLog = [];           // todas, para las verificaciones
 let pintarPendiente = false;
+// §99: la preparación de la sala (preparacion.mjs): cuánto falta para que el navegador esté listo para jugar sin
+// trabarse (el programa, los pipelines que compila, la primera pantalla y un segundo de calma). En la sala, la cortina
+// muestra ese porcentaje y la lista de copas del anfitrión recién se abre al 100 %. Las tareas largas del navegador
+// (≥ 50 ms: lo que traba la página) las cuenta un PerformanceObserver.
+const preparacion = crearPreparacion();
+window.mkwPreparacion = preparacion;
+const preparada = () => parametros.get('preparacion') === '0' || preparacion.lista();   // (?preparacion=0: sin esperar)
+try { new PerformanceObserver(l => { for (const t of l.getEntries()) preparacion.larga(t.startTime + t.duration); }).observe({ type: 'longtask', buffered: true }); } catch {}
 const escribe = texto => {
+  preparacion.linea(texto);                // (§99: las líneas «[pipelines]» de aurora: cuántos llegaron)
   console.log(texto);
   todoElLog.push(texto);
   lineasLog.push(texto);
@@ -737,6 +748,25 @@ const direccion = ruta => ORIGEN + ruta.split('/').map(encodeURIComponent).join(
 async function arrancar() {
   $('arrancar').disabled = true;
   ui.empezo();                                // la pantalla de inicio se va; el juego ocupa la ventana
+  // §99: en la sala, la cortina con la barra de la preparación hasta que el navegador está listo (preparacion.mjs);
+  // después avisa (window.mkwAlPreparada: la sala abre la lista de copas del anfitrión y empieza el reloj de la copa)
+  if (parametros.get('modo') === 'sala' && parametros.get('preparacion') !== '0') {
+    const desde = performance.now();
+    const vigiaPrep = setInterval(() => {
+      { const em = window.mkwMenus?.estado?.(); if (em && em.seccion >= 0 && em.pagina >= 0) preparacion.marcar('pantalla'); }   // (con su página activa)
+      if (!preparacion.lista()) {
+        const pct = preparacion.pct();
+        const que = pct < 35 ? 'Bajando el juego' : pct < 90 ? 'Preparando los gráficos (la primera vez tarda más)' : 'Casi listo';
+        ui.cortina(`${que}… ${pct} %`, false, pct);
+        return;
+      }
+      clearInterval(vigiaPrep);
+      window.mkwEstado.preparacion = { ms: Math.round(performance.now() - desde), por: preparacion.estado.por };
+      nota(`sala: preparada en ${(window.mkwEstado.preparacion.ms / 1000).toFixed(1)} s (${preparacion.estado.por}; pipelines ${preparacion.estado.pipesLlegados} de ${preparacion.estado.pipesTotal})`);
+      ui.cortina(false);
+      window.mkwAlPreparada?.();
+    }, 250);
+  }
   $('canvas').focus();
 
   // 1) Lo que el navegador necesita
@@ -759,6 +789,7 @@ async function arrancar() {
     return fin();
   }
   const manifiesto = await respuestaManifiesto.json();
+  preparacion.marcar('manifiesto');
   ui.cortina('Bajando los archivos del juego…');
   // Caché del disco (disco.mjs): lo bajado queda en este navegador; la versión de los archivos la da el servidor
   // ?adelantar=0: sin bajar antes (ni avisos del juego ni lectura seguida), para comparar (bitácora §52)
@@ -810,6 +841,7 @@ async function arrancar() {
     while (siguiente < aBajar.length) {
       const [ruta] = aBajar[siguiente++];
       contenidos.set(ruta, await disco.entero(direccion(ruta)));   // de la caché si ya se bajó antes
+      preparacion.marcar('chicos', contenidos.size / Math.max(1, aBajar.length));
     }
   }));
   const mb = [...contenidos.values()].reduce((s, d) => s + d.length, 0) / 1048576;
@@ -921,6 +953,7 @@ async function arrancar() {
   window.mkwCuadros = () => M._mkw_web_cuadros();
   window.mkwHeapMB = () => M.HEAPU8.length / 1048576;
   ok('el juego (wasm) cargó', !!M, `${(performance.now() - t1).toFixed(0)} ms`);
+  preparacion.marcar('programa');
   // Carga del programa (§54): cuándo terminó de llegar el .wasm (la red o la caché) y cuándo quedó listo para correr.
   // Con instantiateStreaming el navegador compila MIENTRAS baja; "compilar" = lo que tardó DESPUÉS de que llegó el
   // último byte. bytes = lo que viajó (0 = salió de la caché HTTP; Timing-Allow-Origin deja verlo desde otro origen).
@@ -1177,6 +1210,9 @@ async function arrancar() {
         window.mkwNombresAlJuego?.();                    // (M22: y al juego, para la carrera siguiente)
       }
       else if (d.tipo === 'anfitrion' && typeof d.uid === 'string') window.mkwSala?.cambiarAnfitrion(d.uid);
+      // §99 (H1): el TURN (el repetidor de Cloudflare que entrega el Worker de amigos): las conexiones que no lograron ir
+      // directo se rearman usando también ese camino
+      else if (d.tipo === 'turn' && Array.isArray(d.iceServers)) { red?.malla?.ponerIce(d.iceServers); window.mkwEstado.turn = d.iceServers.length; nota(`[malla] TURN: ${d.iceServers.length} servidores`); }
       // §87: los pilotos que salieron de la sala del sitio (echados por el anfitrión, por votación o idos): la carrera en
       // curso los corta ya (sin esperar 2 s de silencio) y la sala no los cuenta en las que vienen
       else if (d.tipo === 'fuera' && Array.isArray(d.uids)) {
@@ -1218,6 +1254,8 @@ async function arrancar() {
       carreras: carrerasPedidas, pistas: cola, segundosResultados: descanso,
       // M22: la copa con reloj (?copaReloj=N s solo para las pruebas; 0 = sin reloj); al vencer, una al azar
       segundosCopa: parametros.has('copaReloj') ? Math.max(0, Number(parametros.get('copaReloj')) || 0) : undefined,
+      // §99: y el reloj de la copa empieza recién cuando el navegador de la anfitriona está preparado (la lista abierta)
+      esperarListo: parametros.get('preparacion') !== '0',
       alVencioCopa: () => {
         if (!window.mkwSala?.soyAnfitrion) return;
         const cs = copasSala(), n = Array.isArray(cs) ? cs.length : 0;
@@ -1231,11 +1269,25 @@ async function arrancar() {
       alSalta: (uid, k) => { const h = sincro.humanos.find(x => x.uid === uid); if (h) sincro.lockstep?.saltar(h.mando, k); },
       registro: t => red?.registro?.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     window.mkwEstado.sala = sala.estado();
+    // §99: el navegador quedó preparado: el reloj de la copa puede correr (si es la anfitriona) y se vuelve a mirar la
+    // sala (abre la lista de copas). Solo si la sala ya sabe en qué va: la primera vista es la que detecta a quien recargó
+    window.mkwAlPreparada = () => { sala.copaLista(); if (sala.lista) alCambiarSala(sala.estado()); };
+    if (preparada()) sala.copaLista();
     // §94: después de una carrera, los botones de la persona llegan al juego en la carrera y en sus resultados (páginas
     // 0x0E y 0x2F), no más allá: con A en la tabla de puntos (0x30) el juego abría su menú de «carrera siguiente»
     // (0x22), elegía pista por su cuenta y largaba otra carrera fuera de la sala (medido: a los ~11 s de apretar A).
     // Con el descanso de 30 s pasaba seguro. El juego queda en la tabla hasta que la sala abre la siguiente
     const PAGINAS_LIBRES = new Set([0x0E, 0x2F]);
+    // §99 (bug que encontró el dueño): en la sala nadie vuelve atrás ni se sale de las pantallas que tocan. Start nunca
+    // llega al juego (la pausa de la carrera tiene «Salir»; con la carrera sincronizada la pausa de uno llega a todas las
+    // consolas; y Esc del teclado es Start) y B no llega en la primera pantalla de personajes (sección 0x49, página 0x6B:
+    // ahí B vuelve al menú del juego). Dentro de la elección B sí sirve (del vehículo al personaje, del derrape al
+    // vehículo). ?atras=1 = sin filtro (solo pruebas)
+    const PAGINA_PERSONAJES = 0x6B;
+    if (parametros.get('atras') !== '1') controles.filtro(() => {
+      const est = window.mkwMenus?.estado?.();
+      return BOTON.START | (est && est.seccion === 0x49 && est.pagina === PAGINA_PERSONAJES ? BOTON.B : 0);
+    });
     controles.cerrojo(() => {
       if (reeleccion?.estado === 'eligiendo') return false;        // (M22: en la pantalla de personajes del descanso)
       const L = window.mkwMenus, ri = L?.u32(0x809BD730);
@@ -1264,7 +1316,8 @@ async function arrancar() {
       const corren = sincro.humanos.filter(h => !(e.fuera || []).includes(h.uid)).map(h => ({ uid: h.uid, vr: vrs[h.uid] }));
       if (corren.length < 2 || !corren.some(h => h.uid === sincro.yo)) return;
       const cpus = (ficha?.puestos || []).filter(q => q.tipo === 1).map(() => ({ cpu: true, puesto: 0 }));
-      const nivelCpu = ficha?.cpu ?? 3, regla = reglaCpuDe(e, n);
+      // (§99: el nivel de la ficha; sin él, las CPU no cuentan —antes valía «máximo»—)
+      const nivelCpu = Number.isInteger(ficha?.cpu) ? ficha.cpu : null, regla = reglaCpuDe(e, n);
       const base = vrAsentado(), br = vr.actual?.br ?? VR_INICIAL_SALA;
       const peor = aplicarCambio(base, peorCaso(sincro.yo, [...corren, ...cpus], { nivelCpu, regla }));
       vrEnCarrera = { n, base, br, nivelCpu, regla };
@@ -1283,8 +1336,17 @@ async function arrancar() {
       const fuera = [...(e.fuera || []), ...sincro.humanos.filter(h => cortes[h.mando] === 0).map(h => h.uid)];
       const cortados = sincro.humanos.filter(h => cortes[h.mando] > 0).map(h => h.uid);
       if (est.fuera || est.cortado) cortados.push(sincro.yo);
+      // §99 (VR v2): quien no tocó nada 30 s seguidos en el primer minuto es un «ausente» (la regla del juego en línea):
+      // cuenta como cortado (sin esto una cuenta alterna quieta juntaba VR). Los botones son los de la carrera: el mismo
+      // número en todas las consolas
+      const ausentes = sincro.humanos.filter(h => (est.quieto?.[h.mando] ?? 0) >= 1800 && !cortados.includes(h.uid) && !fuera.includes(h.uid)).map(h => h.uid);
+      cortados.push(...ausentes);
+      // §99: el nivel que de verdad corrió (el que dice el gancho nativo); si no es el pedido (un programa viejo), las
+      // CPU no cuentan para el VR
+      const aplicado = typeof M._mkw_cpu_estado === 'function' && M._mkw_cpu_estado(7) === 1 ? M._mkw_cpu_estado(2) : -1;
+      const nivelVr = aplicado === nivelCpu ? nivelCpu : null;
       const corredores = corredoresDelJuego(window.mkwMenus, sincro.humanos, { vrs: vrsDeCarrera(e, n), fuera, cortados });
-      const cambios = cambiosVr(corredores, { nivelCpu, regla });
+      const cambios = cambiosVr(corredores, { nivelCpu: nivelVr, regla });
       const cambio = corredores.some(c => c.uid === sincro.yo) ? cambios[sincro.yo] : 0;
       const final = aplicarCambio(base, cambio);
       // (§94: el de todos, con los mismos números en todas las consolas; el mío con mi VR asentado)
@@ -1294,7 +1356,7 @@ async function arrancar() {
       vrDeCarrera = { n, todos };
       for (const [u, v] of Object.entries(todos)) { vrCopa[u] ??= { antes: v.antes }; vrCopa[u].despues = v.despues; }   // (M22)
       const texto = `VR ${base} → ${final} (${final >= base ? '+' : '−'}${Math.abs(final - base)})`;
-      window.mkwEstado.vr = { carrera: n, antes: base, despues: final, cambio: final - base, corredores, nivelCpu, regla };
+      window.mkwEstado.vr = { carrera: n, antes: base, despues: final, cambio: final - base, corredores, nivelCpu, nivelVr, ausentes, regla };
       if (window.mkwAvisosVr.length < 200) window.mkwAvisosVr.push(texto);
       // (M22, avisos por capas: el VR ya no va en la píldora del centro —tapaba la tabla—: va al lado de tu fila de la
       // tabla del juego y en el zócalo del descanso)
@@ -1530,7 +1592,7 @@ async function arrancar() {
         const segCopa = () => (e.plazo && !e.lista ? Math.max(0, Math.ceil(sala.restan(e.plazo) / 1000)) : 0);
         if (sala.soyAnfitrion) {
           if (selSug) { selSug.cerrar(); selSug = null; }    // (sugería y ahora manda: el anfitrión se fue, §74)
-          if (!pickerAbierto) abrirSelectorSala(e);
+          if (!pickerAbierto && preparada()) abrirSelectorSala(e);   // (§99: recién con el navegador preparado)
           else selLista?.sugerencias(pendientesDe(e));       // (las sugerencias que van llegando)
           if (!e.lista && e.plazo) {
             const f = () => { const s = segCopa(); ui.aviso(s ? `Elige la copa: ${s} s (si no, sale una al azar)…` : ''); };
@@ -1617,7 +1679,9 @@ async function arrancar() {
         // (los mandos y el derrape de cada humano, igual en todas las consolas: semillas_nativo.cpp)
         window.mkwPlantel = ficha.puestos.map((q, i) => [q.vehiculo, q.personaje, q.tipo, q.tipo === 0 ? q.mando : -1, q.tipo === 0 ? hs[i]?.derrape || 0 : 0]);
         // (§75: y quiénes están fuera de esta carrera, igual en todas: los que la anfitriona no oyó al empezarla)
-        sincro.lockstep?.fijarCarrera(n, (e.fuera || []).map(u => sincro.humanos.find(h => h.uid === u)?.mando).filter(m => m >= 0));
+        // (§99, D: y la primera autoridad, la más estable de las carreras anteriores según la anfitriona)
+        sincro.lockstep?.fijarCarrera(n, (e.fuera || []).map(u => sincro.humanos.find(h => h.uid === u)?.mando).filter(m => m >= 0),
+          e.autoridad ? sincro.humanos.find(h => h.uid === e.autoridad)?.mando ?? null : null);
         // (§75: y los puntos que lleva la copa, los de la sala: quien recargó no tiene los de las carreras que se saltó)
         if (n > 1 && e.puntos?.carrera === n - 1) ponerPuntos(window.mkwMenus, e.puntos.tabla);
         // (§94: y la parrilla, como en Mario Kart: cada uno larga en el puesto en que llegó a la anterior; la de la sala,
@@ -1665,7 +1729,7 @@ async function arrancar() {
             clearInterval(vigiaFin);
             const puntos = puntosDelJuego(L), llegada = llegadaDelJuego(L);
             finLocal = { n, puntos, llegada };
-            if (!sincro?.lockstep?.estado().fuera) sala.termine(n, puntos, desde, llegada, n === 1 ? leerSkins(M) : null);
+            if (!sincro?.lockstep?.estado().fuera) sala.termine(n, puntos, desde, llegada, n === 1 ? leerSkins(M) : null, sincro?.lockstep?.estado().estable);
             vrTermina(e, n);                        // §82
             if (sala.estado().carrera === n && sala.estado().plazo) mostrarBreve(sala.estado());   // (§94: con el VR)
           }
@@ -1696,6 +1760,16 @@ async function arrancar() {
     // cuando oyó a todos o adoptó la copia). Antes de §75 esta llamada gastaba la "primera vista" y quien recargaba
     // entraba a la carrera en curso desde el cuadro 0 (desincronizada).
     ui.aviso('Conectando con la sala…');
+    // §99 (H1): un plazo para «Conectando con la sala…»: a los 15 s, con quién no se pudo (antes quedaba para siempre)
+    setTimeout(() => {
+      if (window.mkwSala?.lista) return;
+      const conectados = new Set(red?.malla?.conectados?.() || []);
+      const sin = sincro.humanos.filter(h => h.uid !== sincro.yo && !conectados.has(h.uid)).map(h => window.mkwNombresSala?.[h.uid] || h.uid);
+      const texto = sin.length ? `No se pudo conectar con ${sin.slice(0, 3).join(', ')}${sin.length > 3 ? '…' : ''}: tu red o la suya bloquea la conexión directa. Se sigue intentando (por un repetidor si hace falta)…`
+        : 'La sala tarda en responder: se sigue intentando…';
+      ui.aviso(texto, true);
+      window.mkwEstado.sinConexion = sin;
+    }, 15000);
   }
   if (['gp', 'vs', 'tt', 'copa'].includes(objetivoPiloto.modo)) {
     if (parametros.has('copa')) { objetivoPiloto.copa = Number(parametros.get('copa')); objetivoPiloto.fila = Number(parametros.get('fila') || 0); }
@@ -1741,6 +1815,7 @@ async function arrancar() {
       local: 'Entrando a Multiplayer…' }[objetivoPiloto.modo] || 'Yendo a la carrera…') + (matchMedia('(pointer: fine)').matches ? ' (Esc: lo hago yo)' : '');
     let vioTitulo = false, puesta = '';
     revisarCortina = () => {
+      if (parametros.get('modo') === 'sala' && parametros.get('preparacion') !== '0' && !preparacion.lista()) return;   // (§99: la maneja la preparación)
       const e = window.mkwMenus.estado();
       if (e.seccion === SECCION.titulo || e.seccion === SECCION.menuPrincipal || (e.seccion > 0 && e.seccion < 0x30)) vioTitulo = true;
       if (window.mkwEstado.piloto?.llego && e.seccion > 0) vioTitulo = true;   // §73: abrió directo otra pantalla (elegir personaje)
@@ -1903,6 +1978,10 @@ async function arrancar() {
     const largada = parametros.has('largada') ? Number(parametros.get('largada')) * 1000 : 15000;
     sincro.lockstep = crearLockstep({ yo: sincro.yo, humanos: sincro.humanos, local: () => sincro.local, esperaCorte: margen,
       esperaLargada: largada || undefined,
+      // §99 (C3): ponerse al día corriendo cuadros seguidos (el runtime, vi.cpp: mkw_prisa); ?alDia=0 = como antes
+      prisa: typeof M._mkw_prisa === 'function' && parametros.get('alDia') !== '0' ? ms => M._mkw_prisa(ms) : null,
+      // §99 (C4): la cuenta regresiva (Raceinfo +0x28: 0 presentación, 1 cuenta, 2 carrera): todos con el mismo retraso
+      enCuenta: () => { const L = window.mkwMenus, ri = L?.u32(0x809BD730); return !!ri && L.u32(ri + 0x28) < 2; },
       enviar: (u, b, canal) => red.malla.enviar(u, b, canal), huella: () => huellaCarrera(window.mkwMenus),
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     M.mkwLockstep = sincro.lockstep;
@@ -1951,8 +2030,12 @@ async function arrancar() {
     // (M22: con el nombre que manda la sala del sitio; sin él —las pruebas sin sitio—, «jugador N»)
     const jugador = u => window.mkwNombresSala?.[u] || `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`;
     const textoRelevo = est => {
+      // §99 (H8): si no llega nada de NADIE, el que se cortó soy yo (antes decía «esperando a X»)
+      if (est.sordoMs > est.sordo && est.cuadro >= 0 && !est.fuera && !est.cortado) return '📶 Se cortó TU conexión: no llega nada de los demás. Esperando volver…';
       if (est.fuera) return '📶 Te desconectaste de esta carrera: tu kart sigue sin ti y vuelves en la siguiente…';
       if (est.cortado) return '📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…';
+      // §99 (C1): la pausa del relevo rápido (mi PC se trabó o se cortó la red: los demás no me esperaron)
+      if (est.pausado) return '📶 Tu PC o tu conexión se trabaron: tu kart siguió solo un momento. Vuelves a manejar enseguida…';
       if (est.yoRelevado) return '📶 Tu conexión o tu PC van lentas: tu kart responde con retraso';
       const otros = est.relevadosAhora.filter(u => u !== sincro.yo);
       return otros.length ? `📶 ${otros.map(jugador).join(' y ')} va${otros.length > 1 ? 'n' : ''} lento` : '';
@@ -1965,7 +2048,7 @@ async function arrancar() {
       if (relevo !== avisoRelevo) {
         // (M22, avisos por capas: salirse de la carrera va al centro —la carrera ya no es suya—; el relevo, «va lento», es
         // un estado: va a la esquina mientras dure)
-        const grave = est.fuera || est.cortado;
+        const grave = est.fuera || est.cortado || est.sordoMs > est.sordo;
         if (relevo && grave) ui.aviso(relevo, true);
         else if (avisoRelevo.endsWith('…') && document.getElementById('avisoJuego')?.textContent === avisoRelevo) ui.aviso('');
         if (relevo && window.mkwAvisosRelevo.length < 200) window.mkwAvisosRelevo.push(relevo);

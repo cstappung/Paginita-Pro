@@ -103,7 +103,7 @@ try {
   });
 
   // 1) primera visita: «Un jugador» directo, licencia nueva, y el juego da sus 6 invitados en el primer menú
-  await p.goto(URL0 + '?nombre=Prueba&invitados=1');   // (con Playwright la foto de la primera visita va solo con ?invitados=1)
+  await p.goto(URL0 + '?nombre=Prueba&invitados=1&editorMii=1');   // (con Playwright la foto de la primera visita va solo con ?invitados=1; §99: «Mi Mii» solo con ?editorMii=1)
   await alMenu();
   // (waitForFunction no espera una función async: su promesa ya cuenta como «verdad»; se pregunta desde aquí)
   for (let t0 = Date.now(); !reg && Date.now() - t0 < 60000; await espera(500)) reg = await leerRegistro();

@@ -63,6 +63,8 @@
   #cortina .carga { width: min(320px, 70vw); height: 6px; margin: 18px auto 12px; border-radius: 3px; background: #ffffff1f; overflow: hidden; }
   #cortina .carga i { display: block; width: 35%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--morado), var(--lila));
     animation: cortina-ida 1.1s ease-in-out infinite alternate; }
+  /* §99: con porcentaje (la preparación de la sala) la barra se llena en vez de ir y venir */
+  #cortina .carga.con-pct i { animation: none; transform: none; transition: width .3s ease; }
   #cortina p { margin: 0; color: var(--suave); font-size: 14px; min-height: 1.5em; }
   #cortina.mal p { color: var(--peligro); }
   #cortina.mal .carga { visibility: hidden; }

@@ -22,7 +22,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { puntosPar, cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL, VR_MAXIMO, DIF_MAX, PASO, REGLA_CPU, reglaValida, pesoCpu, anclaCpu } from '/web/navegador/vr-sala.mjs';
+import { puntosPar, cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL, VR_MAXIMO, DIF_MAX, PASO, REGLA_CPU, reglaValida, pesoCpu, anclaCpu, premioCpu, copiaRegla, anclaDeRitmo, anclaNeutral, redondear, NIVELES_VR } from '/web/navegador/vr-sala.mjs';
 import { crearSala, vrsDeCarrera, reglaCpuDe, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
 import { crearVr } from '/web/navegador/vr.mjs';
 
@@ -186,7 +186,7 @@ const salaCpu = (n, conCortes = false) => {                 // n humanos al azar
   const hs = Array.from({ length: n }, (_, i) => ({ uid: 'j' + i, vr: 1 + rnd(30000), puesto: puestos[i], cortado: conCortes && rnd(5) === 0 }));
   return [...hs, ...cpusEn(puestos.slice(n))];
 };
-const nivelAzar = () => rnd(4);
+const nivelAzar = () => rnd(NIVELES_VR);
 let primero95 = true, ultimo95 = true, mono95 = true, orden95 = true, peor95 = true;
 for (let r = 0; r < 400; r++) {
   const n = 2 + rnd(10), s = salaCpu(n), nivelCpu = nivelAzar(), c = cambiosVr(s, { nivelCpu });
@@ -208,7 +208,7 @@ for (let r = 0; r < 400; r++) {
   for (const j of sc.filter(x => !x.cpu)) {
     const pc2 = peorCaso(j.uid, sc, { nivelCpu });
     if (cc[j.uid] < pc2) peor95 = false;
-    if (j.cortado && sc.filter(x => x.cortado).length === 1 && cc[j.uid] !== pc2) peor95 = false;
+    if (j.cortado && sc.filter(x => x.cortado).length === 1 && premioCpu(nivelCpu) === 0 && cc[j.uid] !== pc2) peor95 = false;
   }
 }
 ok('§95: 400 salas al azar con CPU (2 a 11 humanos): el 1.º nunca pierde y el último nunca gana', primero95 && ultimo95);
@@ -224,9 +224,10 @@ ok('§95: ganarle a un humano pesa más que ganarle a una CPU del mismo VR', con
 const mitadEn = nv => cambiosVr([{ uid: 'a', vr: anclaCpu(nv), puesto: 6 }, { uid: 'b', vr: anclaCpu(nv), puesto: 7 }, ...cpusEn(restoDe(6, 7))], { nivelCpu: nv });
 const mitad = [0, 1, 2, 3].map(mitadEn).every(m => m.a === 13 && m.b === -13) ? mitadEn(1) : { a: 0, b: 0 };
 ok('§95: con el VR del ancla y en la mitad de las CPU (5 delante, 5 detrás), las CPU no suman ni restan, en los 4 niveles: solo el par humano', mitad.a === 13 && mitad.b === -13, JSON.stringify(mitad));
-ok('§96: las anclas de los 4 niveles de la página: fácil 3000 < normal 5000 < difícil 7400 < máximo 9400; una CPU pesa 1/4 de un humano',
-   [0, 1, 2, 3].map(nv => anclaCpu(nv)).join() === '3000,5000,7400,9400' && anclaCpu(7) === 9400 && anclaCpu(-1) === 3000 && pesoCpu(1) === 0.25,
-   `${REGLA_CPU.anclas} · peso ${pesoCpu(1)}`);
+ok('v2: las anclas de los 6 niveles: fácil 3000 < normal 5000 < difícil 7300 < máximo 9000; intenso e imposible «fuera de escala» (sin ancla, premio 16 y 24); un nivel que no existe = sin CPU (nunca «el más alto»); una CPU pesa 1/4 de un humano',
+   [0, 1, 2, 3, 4, 5].map(nv => anclaCpu(nv)).join() === '3000,5000,7300,9000,,' && [4, 5].map(nv => premioCpu(nv)).join() === '16,24' &&
+   [7, -1, 2.5, null, '3'].every(nv => anclaCpu(nv) === null && premioCpu(nv) === 0) && pesoCpu(1) === 0.25,
+   `${REGLA_CPU.anclas} · premio ${REGLA_CPU.premio} · peso ${pesoCpu(1)}`);
 // §96: contra CPU más fuertes, perder cuesta menos y ganar da más (la curva del juego con un ancla más alta)
 const fuerza = [0, 1, 2, 3].map(nv => ({ gana: cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, { uid: 'b', vr: 5000, puesto: 12 }, ...cpusEn(restoDe(1, 12))], { nivelCpu: nv }).a,
                                        pierde: cambiosVr([{ uid: 'a', vr: 5000, puesto: 12 }, { uid: 'b', vr: 5000, puesto: 1 }, ...cpusEn(restoDe(1, 12))], { nivelCpu: nv }).a }));
@@ -242,12 +243,12 @@ const pesos = Array.from({ length: 11 }, (_, i) => pesoCpu(i + 1));
 ok('§95: todas las CPU juntas pesan a lo más 2 humanos: n/4 con hasta 8, 2 con 9, 10 u 11',
    pesos.every((w, i) => (i + 1 <= 8 ? w === 0.25 : Math.abs(w * (i + 1) - 2) < 1e-12)), pesos.map(w => +w.toFixed(3)).join(' '));
 // con 11 CPU detrás: el 1.º gana 2 pares humanos de 13 = 26; el peor caso con 2 humanos y 10 CPU de 5000: −13 − 26 = −39
-ok('§95: 1.º con 11 CPU normales detrás: +26 (= 2 humanos); el peor caso con 2 humanos y 10 CPU normales: −39; con fáciles (3000): −65',
-   cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, ...cpusEn(restoDe(1))], { nivelCpu: 1 }).a === 26 &&
+ok('v2: 1 humano + 11 CPU no mueve nada (minHumanos 2; tampoco si el otro quedó «fuera» en el cuadro 0); el peor caso con 2 humanos y 10 CPU normales: −39; con fáciles (3000): −65',
+   [0, 1, 2, 3, 4, 5].every(nv => cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, ...cpusEn(restoDe(1))], { nivelCpu: nv }).a === 0) &&
    peorCaso('a', [{ uid: 'a', vr: 5000 }, { uid: 'b', vr: 5000 }, ...cpusEn(Array(10).fill(0))], { nivelCpu: 1 }) === -39 &&
    peorCaso('a', [{ uid: 'a', vr: 5000 }, { uid: 'b', vr: 5000 }, ...cpusEn(Array(10).fill(0))], { nivelCpu: 0 }) === -65);
 // un nivel con ancla null no cuenta: lo mismo que sin CPU (en salas al azar, con cortes)
-const sinFaciles = { anclas: [null, 5000, 7400, 9400], cuarto: 4, tope: 2 };
+const sinFaciles = { ...copiaRegla(), anclas: [null, 5000, 7300, 9000, null, null], premio: [0, 0, 0, 0, 0, 0] };
 let faciles = true, enteros = true;
 for (let r = 0; r < 300; r++) {
   const sc = salaCpu(2 + rnd(10), true), sinCpu = sc.filter(x => !x.cpu);
@@ -263,19 +264,20 @@ const malCortado = cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, { uid: 'b', vr:
 ok('§95: puestos de CPU que no se pueden creer (sin puesto, repetido, más de 12): sin parte de CPU, solo el par humano',
    malos.every(m => m.a === 13 && m.b === -13), JSON.stringify(malos));
 ok('§95: …pero el cortado igual pierde contra las CPU (y el otro no gana nada por él)',
-   malCortado.a === 0 && malCortado.b === -13 + Math.trunc(-3 * 13 * 2 / 8), JSON.stringify(malCortado));
+   malCortado.a === 0 && malCortado.b === -13 + redondear(-3 * 13 * 2, 8), JSON.stringify(malCortado));   // (v2: −9,75 → −10)
 // un humano sin puesto = cortado también contra las CPU
 const hSin = cambiosVr([{ uid: 'a', vr: 5000, puesto: 0 }, { uid: 'b', vr: 5000, puesto: 1 }, ...cpusEn([2, 3, 4, 5])], { nivelCpu: 1 });
 ok('§95: un humano sin puesto pierde contra todas las CPU (cuenta como cortado) y el otro gana lo suyo de las CPU',
    hSin.a === -13 + Math.trunc(-4 * 13 * 2 / 8) && hSin.b === Math.trunc(4 * 13 * 2 / 8), JSON.stringify(hSin));
 // la regla de la foto de la carrera: otra regla da otra cuenta; una regla rota → la de esta página
-const otra = { anclas: [3000, 5000, 7400, 7000], cuarto: 4, tope: 2 };
-const conOtra = cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, { uid: 'b', vr: 5000, puesto: 12 }, ...cpusEn(restoDe(1, 12))], { regla: otra });
-const rotas = [{ anclas: [1, 2] }, { anclas: [3000, 5000, 7400, 9400], cuarto: 0, tope: 2 }, { anclas: [3000, 'x', 7400, 9400], cuarto: 4, tope: 2 },
-               { anclas: [null, 3000, 5000], cuarto: 4, tope: 2 }, null, 7];   // (la de §95, de 3 niveles: también se cambia)
-ok('§95/§96: la regla que llega en la foto manda (ancla máximo 7000 en vez de 9400: el 1.º gana menos), y una rota —o la de 3 niveles de §95— se cambia por la de esta página',
-   conOtra.a === 13 + Math.trunc(2 * 10 * puntosPar(5000, 7000) / 10) && rotas.every(r => reglaValida(r) === REGLA_CPU) &&
-   reglaValida(JSON.parse(JSON.stringify(REGLA_CPU))) !== REGLA_CPU, JSON.stringify(conOtra));
+const otra = { ...copiaRegla(), anclas: [3000, 5000, 7300, 7000, null, null] };
+const conOtra = cambiosVr([{ uid: 'a', vr: 5000, puesto: 1 }, { uid: 'b', vr: 5000, puesto: 12 }, ...cpusEn(restoDe(1, 12))], { nivelCpu: 3, regla: otra });
+const rotas = [{ anclas: [1, 2] }, { ...copiaRegla(), cuarto: 0 }, { ...copiaRegla(), anclas: [3000, 'x', 7300, 9000, null, null] },
+               { ...copiaRegla(), premio: [0, 0, 0, 0, 16] }, { ...copiaRegla(), version: 3 }, null, 7,
+               { anclas: [3000, 5000, 7400, 9400], cuarto: 4, tope: 2 }];   // (la v1 de §96, de 4 niveles: también se cambia)
+ok('v2: la regla que llega en la foto manda (ancla máximo 7000 en vez de 9000: el 1.º gana menos), y una rota —o la v1 de 4 niveles de §96— se cambia por la de esta página',
+   conOtra.a === 13 + redondear(2 * 10 * puntosPar(5000, 7000), 10) && rotas.every(r => reglaValida(r) === REGLA_CPU) &&
+   reglaValida(copiaRegla()) !== REGLA_CPU, JSON.stringify(conOtra));
 // contra un rival fijo el VR se equilibra: quien le gana al 90 % a cada CPU difícil sube hasta ~5000 + 3200 y ahí se queda;
 // quien les gana siempre, hasta ~5000 + 6600 (ahí ganarle a la CPU ya da 0), y nunca más (sin inflación sin fin)
 const equilibrio = (p, nivelCpu, carreras = 6000) => {
@@ -283,7 +285,7 @@ const equilibrio = (p, nivelCpu, carreras = 6000) => {
   for (let r = 0; r < carreras; r++) {
     const delante = Array.from({ length: 10 }, () => rnd(1000) >= p * 1000), nd = delante.filter(Boolean).length;
     let a = 1, d = nd + 2;
-    v = aplicarCambio(v, cambiosVr([{ uid: 'h', vr: v, puesto: nd + 1 }, ...delante.map(x => ({ cpu: true, puesto: x ? a++ : d++ }))], { nivelCpu }).h);
+    v = aplicarCambio(v, cambiosVr([{ uid: 'h', vr: v, puesto: nd + 1 }, { uid: 'otro', vr: 5000, puesto: 12, cortado: true }, ...delante.map(x => ({ cpu: true, puesto: x ? a++ : d++ }))], { nivelCpu }).h);
     max = Math.max(max, v); if (r >= carreras / 2) { suma += v; cuenta++; }
   }
   return { media: Math.round(suma / cuenta), max };
@@ -292,6 +294,45 @@ const q50 = equilibrio(0.5, 1), q90 = equilibrio(0.9, 1), q100 = equilibrio(1, 1
 ok('§95: contra las CPU el VR se equilibra (6000 carreras, CPU normales de 5000): al 50 % ~5000, al 90 % ~8200, siempre 1.º se para en ~11 600; fáciles (3000) al 90 % ~6200',
    Math.abs(q50.media - 5000) < 200 && Math.abs(q90.media - 8200) < 300 && q100.max <= 11700 && q100.media > 11400 && Math.abs(q90n.media - 6200) < 300,
    `50 % ${q50.media} · 90 % ${q90.media} · 100 % ${q100.media} (máx ${q100.max}) · normales 90 % ${q90n.media}`);
+// ---- 10) v2: los niveles intenso e imposible, la zona muerta, el tope por carrera, el redondeo, recalibrar ----
+const dosCon = (pa, pb, nivelCpu, va = 5000, vb = 5000) => cambiosVr([{ uid: 'a', vr: va, puesto: pa }, { uid: 'b', vr: vb, puesto: pb }, ...cpusEn(restoDe(pa, pb))], { nivelCpu });
+const fuerte = [0, 1, 2, 3].map(nv => ({ gana: dosCon(1, 12, nv).a, pierde: dosCon(12, 1, nv).a }));
+ok('v2: fácil a máximo, con CPU más fuertes ganarles a las 10 da más y que te ganen cuesta menos (1.º y 12.º)',
+   fuerte.every((x, i) => i === 0 || (x.gana > fuerte[i - 1].gana && x.pierde >= fuerte[i - 1].pierde)), fuerte.map(x => `+${x.gana}/${x.pierde}`).join(' · '));
+const fueraEsc = [4, 5].map(nv => ({ atras: dosCon(11, 12, nv), una: dosCon(10, 12, nv) }));
+ok('v2: intenso/imposible, los dos humanos detrás de las 10 CPU: solo el par humano (±13: perder contra ellas no resta)',
+   fueraEsc.every(x => x.atras.a === 13 && x.atras.b === -13), JSON.stringify(fueraEsc.map(x => x.atras)));
+ok('v2: intenso/imposible, A le ganó a 1 CPU y B a ninguna: la «segunda llegada» vale el premio (16, 24) además del par: ±29, ±37 (suma cero)',
+   fueraEsc[0].una.a === 29 && fueraEsc[0].una.b === -29 && fueraEsc[1].una.a === 37 && fueraEsc[1].una.b === -37, JSON.stringify(fueraEsc.map(x => x.una)));
+ok('v2: ganarle a una intenso (o imposible) cuando el otro no le ganó paga más que ganarle a una máximo',
+   dosCon(10, 12, 4).a > dosCon(10, 12, 3).a && dosCon(10, 12, 5).a > dosCon(10, 12, 4).a, `${dosCon(10, 12, 3).a} · ${dosCon(10, 12, 4).a} · ${dosCon(10, 12, 5).a}`);
+const z = dosCon(10, 12, 3, 2000), zPierde = dosCon(12, 10, 3, 2000);
+ok('v2: zona muerta: con VR 2000 contra máximo (7000 por encima), ganarle a una CPU no paga y que te ganen no cuesta (solo el par humano)',
+   z.a === puntosPar(2000, 5000) && zPierde.a === -puntosPar(5000, 2000), JSON.stringify([z, zPierde]));
+let topeOk = true, maxVisto = 0;
+for (let r = 0; r < 500; r++) {
+  const s = salaCpu(2 + rnd(10)), nv = nivelAzar(), c = cambiosVr(s, { nivelCpu: nv }), c0 = cambiosVr(s.filter(x => !x.cpu));
+  for (const k of Object.keys(c)) { const d = Math.abs(c[k] - c0[k]); maxVisto = Math.max(maxVisto, d); if (d > REGLA_CPU.maxCarrera) topeOk = false; }
+}
+ok('v2: la parte de las CPU de una carrera nunca pasa de ±112 (500 salas al azar, VR de 1 a 30 000)', topeOk, `lo más visto: ${maxVisto}`);
+ok('v2: redondeo al entero más cercano, el empate exacto hacia abajo (1,5 → 1; −1,5 → −2; 1,6 → 2; −1,4 → −1)',
+   redondear(3, 2) === 1 && redondear(-3, 2) === -2 && redondear(16, 10) === 2 && redondear(-14, 10) === -1);
+let cortarseNo = true;
+for (let r = 0; r < 400; r++) {
+  const s = salaCpu(2 + rnd(10)), nv = nivelAzar(), hs = s.filter(x => !x.cpu), k = hs[rnd(hs.length)];
+  const ultimo = s.map(x => x === k ? { ...x, puesto: 12 } : (x.puesto > k.puesto ? { ...x, puesto: x.puesto - 1 } : x));
+  if (cambiosVr(s.map(x => x === k ? { ...x, cortado: true } : x), { nivelCpu: nv })[k.uid] > cambiosVr(ultimo, { nivelCpu: nv })[k.uid]) cortarseNo = false;
+}
+ok('v2: cortarse nunca conviene: el cortado queda igual o peor que llegando último (400 salas, los 6 niveles)', cortarseNo);
+const pIntenso = peorCaso('a', [{ uid: 'a', vr: 5000 }, { uid: 'b', vr: 5000 }, ...cpusEn(Array(10).fill(0))], { nivelCpu: 4 });
+ok('v2: el peor caso en intenso: −13 (el par) −16 (la segunda llegada, si el otro le ganara a alguna): −29', pIntenso === -29, `${pIntenso}`);
+ok('v2: del ritmo medido al ancla (σ 8 %): fácil −6 % → 3300, difícil +8,4 % → 7400, máximo +14 % → 9300; +18 % o más → fuera de escala',
+   anclaDeRitmo(-6) === 3300 && anclaDeRitmo(8.4) === 7400 && anclaDeRitmo(14) === 9300 && anclaDeRitmo(18) === null && anclaDeRitmo(45) === null);
+// el ancla neutral con carreras inventadas: personas de 5000 que le ganan el 50 % a una CPU → 5000; el 4 % → ~9300
+const paresDe = (p, n = 4000) => Array.from({ length: n }, (_, i) => ({ vr: 5000, gano: i < p * n }));
+const n50 = anclaNeutral(paresDe(0.5)), n4 = anclaNeutral(paresDe(0.04)), n0 = anclaNeutral(paresDe(0));
+ok('v2: el ancla neutral (la que no crea ni quita VR con las carreras jugadas): al 50 % 5000, al 4 % ~9300, si nadie le gana «fuera de escala»',
+   Math.abs(n50 - 5000) <= 20 && Math.abs(n4 - 9300) <= 150 && n0 === null, `${n50} · ${n4} · ${n0}`);
 nota(`ejemplo: 4 de igual VR → +39/+13/−13/−39; contra 2000 más → ${puntosPar(5000, 7000)}, contra 2000 menos → ${puntosPar(7000, 5000)}`);
 fin();
 </script>

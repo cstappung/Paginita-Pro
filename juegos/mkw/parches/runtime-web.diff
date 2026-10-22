@@ -1164,7 +1164,7 @@ index f09d88e..e59c1af 100644
          if (publishEc) {
              LogNandError("NANDMove", "failed to publish cross-mount copy: %s",
 diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
-index 7ee76b5..f2b604e 100644
+index 7ee76b5..d58be64 100644
 --- a/runtime/src/hle/vi.cpp
 +++ b/runtime/src/hle/vi.cpp
 @@ -15,12 +15,77 @@
@@ -1267,13 +1267,16 @@ index 7ee76b5..f2b604e 100644
  #if defined(_WIN32)
  #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
  #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-@@ -238,6 +318,56 @@ void WriteGuestStateLocked() {
+@@ -238,6 +318,59 @@ void WriteGuestStateLocked() {
      }
  }
  
 +#if defined(__EMSCRIPTEN__)
 +// True while the grid is locked to the monitor (refresh period divides the retrace interval).
 +bool s_mkwVsyncLocked = false;
++// MKW RETRO (§99, C3): ms of retrace grid the page asked to win back, and how much was won (see PaceToRetraceBoundary)
++double s_mkwPrisaMs = 0.0;
++double s_mkwPrisaGanada = 0.0;
 +// Where in the refresh period the retrace grid should sit (ms after a refresh). What has to land at a
 +// fixed place in the refresh is not the retrace itself but Chrome's present of the frame: MKW hands the
 +// frame to aurora ~0.6 ms after the retrace (GXCopyDisp), aurora encodes and submits it and then yields
@@ -1324,7 +1327,27 @@ index 7ee76b5..f2b604e 100644
  void EnsureInitializedLocked() {
      if (g_vi.initialized) {
          return;
-@@ -465,6 +595,40 @@ void VI_HLE_WaitForNextRetracePoll() {
+@@ -390,6 +523,19 @@ bool AdvanceDueRetraces(CpuContext* ctx, int maxToProcess, bool serviceAurora)
+                 return advancedAny;
+             }
+             target = g_vi.lastRetrace + g_vi.retraceInterval;
++#if defined(__EMSCRIPTEN__)
++            // MKW RETRO (§99, C3): while the page asked to catch up, the next retrace is due now instead of at its
++            // grid time (one per call: each retrace is one game frame, so the game runs them back to back)
++            if (now < target && catchUpCount == 0 && s_mkwPrisaMs > 0.0 && !s_mkwVsyncLocked) {
++                const double wait = std::chrono::duration<double, std::milli>(target - now).count();
++                const double gain = wait < s_mkwPrisaMs ? wait : s_mkwPrisaMs;
++                const auto shift = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(gain));
++                g_vi.lastRetrace -= shift;
++                target -= shift;
++                s_mkwPrisaMs -= gain;
++                s_mkwPrisaGanada += gain;
++            }
++#endif
+             if (now < target) {
+                 return advancedAny;
+             }
+@@ -465,6 +611,40 @@ void VI_HLE_WaitForNextRetracePoll() {
      if (now >= retraceDeadline) {
          return;
      }
@@ -1365,11 +1388,41 @@ index 7ee76b5..f2b604e 100644
      // Audio DMA and alarm queues still need regular service even when the VI
      // deadline is farther away. The high-resolution wait removes the 1 ms
      // scheduler overshoot when retrace is the next event.
-@@ -489,6 +653,54 @@ uint64_t s_lastPresentAnchorNanos = 0;
+@@ -485,10 +665,84 @@ uint32_t s_lastPacedRetraceCount = ~0u;
+ // comment at the stamping site). Producer-thread only, like the memo above.
+ uint64_t s_lastPresentAnchorNanos = 0;
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (§99, C3 «ponerse al día»): milliseconds of retrace grid the page asked us to win back. Mario Kart Wii
++// never catches up by itself: a frame that came late leaves the console behind the synchronized race for good (and
++// its kart relayed). While this is above zero and the grid is not locked to the monitor (the online rooms), the
++// paced wait below moves the grid back by what it would have slept, so the next retrace is due at once and the game
++// runs frames back to back (every frame still drawn: drawing all of them keeps the race identical) until it is
++// even. s_mkwPrisaGanada = what was won back so far (ms), for the page and its tests.
++// (s_mkwPrisaMs / s_mkwPrisaGanada are declared next to s_mkwVsyncLocked; mkw_prisa / mkw_prisa_ganada, the page's
++// side, are defined after this namespace)
++#endif
++
+ // Sleeps to the same VI retrace boundary VIWaitForRetrace targets, servicing alarms every 1 ms so audio
  // DMA and timers keep running, then delivers that retrace so guest logic starts exactly on the grid.
  void PaceToRetraceBoundary(Clock::time_point deadline) {
      constexpr auto kServiceSlice = 1ms;
 +#if defined(__EMSCRIPTEN__)
++    if (s_mkwPrisaMs > 0.0 && !s_mkwVsyncLocked) {
++        const auto now = Clock::now();
++        if (deadline > now) {
++            const double wait = std::chrono::duration<double, std::milli>(deadline - now).count();
++            const double gain = wait < s_mkwPrisaMs ? wait : s_mkwPrisaMs;
++            const auto shift = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(gain));
++            {
++                std::lock_guard<std::mutex> lock(g_viMutex);
++                g_vi.lastRetrace -= shift;
++            }
++            deadline -= shift;
++            s_mkwPrisaMs -= gain;
++            s_mkwPrisaGanada += gain;
++        }
++    }
 +    // MKW RETRO (browser, grid locked to the monitor): wake on the refresh right before the deadline
 +    // instead of a timer (setTimeout arrives 1-4 ms late, enough to land on the wrong refresh). The
 +    // page wakes us every serviceMs too, so alarms and audio DMA keep their cadence meanwhile.
@@ -1420,7 +1473,22 @@ index 7ee76b5..f2b604e 100644
      for (;;) {
          const auto now = Clock::now();
          if (now >= deadline) {
-@@ -524,6 +736,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -512,6 +766,14 @@ void PaceToRetraceBoundary(Clock::time_point deadline) {
+ 
+ } // namespace
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (§99, C3): the page asks to win back `ms` of retrace grid (0 = stop), and reads what was won so far
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_prisa(double ms) {
++    s_mkwPrisaMs = ms > 0.0 ? (ms < 2000.0 ? ms : 2000.0) : 0.0;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_prisa_ganada() { return s_mkwPrisaGanada; }
++#endif
++
+ // Single owner of the Aurora frame presentation sequence: seals the active frame, optionally paces the
+ // producer to the VI retrace boundary, and pre-warms the next frame. Paced from GXCopyDisp; unpaced for
+ // the retrace-context black/boot present path in AdvanceRetrace.
+@@ -524,6 +786,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
      } sequenceGuard;
      Clock::time_point paceDeadline{};
      bool paceThisFrame = false;
@@ -1430,7 +1498,7 @@ index 7ee76b5..f2b604e 100644
      if (paceToRetrace) {
          uint64_t baseNanos = 0;
          uint64_t intervalNanos = 0;
-@@ -531,6 +746,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -531,6 +796,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          {
              std::lock_guard<std::mutex> lock(g_viMutex);
              EnsureInitializedLocked();
@@ -1442,7 +1510,7 @@ index 7ee76b5..f2b604e 100644
              paceDeadline = g_vi.lastRetrace + g_vi.retraceInterval;
              retraceCount = g_vi.retraceCount;
              baseNanos = static_cast<uint64_t>(
-@@ -577,7 +797,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+@@ -577,7 +847,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
          aurora_set_present_schedule(0, 0);
      }
  

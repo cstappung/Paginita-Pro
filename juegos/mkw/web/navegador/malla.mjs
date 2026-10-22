@@ -15,8 +15,14 @@
 // Uso:  const m = crearMalla({ uid, senal, alBinario: (de, bytes, canal) => …, alCambiar });
 //       await m.entrar();  m.enviar(uid, bytes, 'udp' | 'tcp');  m.conectados();  m.salir();
 
-export const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
-const LLENO = 1 << 20;            // bytes en cola sin enviar: más que esto y los UDP se tiran (como un router lleno)
+// §99 (crítico de la red, H10): dos proveedores de STUN (si uno no contesta, el otro). El TURN (el repetidor, para las
+// redes donde dos navegadores no logran hablarse directo) llega después: la página de la sala se lo pide al Worker y
+// lo pasa con ponerIce (ICE lo usa solo si nada directo funciona)
+export const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: ['stun:stun.cloudflare.com:3478'] }];
+// bytes en cola sin enviar por "udp": más que esto y se tiran (como un router lleno). §99 (H5): en la sala, colaUdp =
+// 8 KB (un paquete viejo de la carrera no sirve; con 1 MB eran decenas de segundos de cola con una subida saturada); el
+// modo en línea del juego (Retro WFC, §58) manda ráfagas y sigue con 1 MB
+const LLENO = 1 << 20;
 const VIGILA_MS = 1000;
 
 // Red mala de mentira, SOLO para pruebas (PLAN C3, bitácora §70): ?redMala=80,20,5 en la dirección de la página = lo que
@@ -56,7 +62,7 @@ export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => 
 }
 
 export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => {}, alCambiar = () => {},
-  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala() }) {
+  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala(), colaUdp = LLENO }) {
   alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
   let sesion = '', offP = null, offM = null, reloj = null, intento = 0;
   const pares = new Map();          // uid → { pc, udp, tcp, s, k, cola, remota, abrio, malDesde }
@@ -68,6 +74,13 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     if (!x || !abierto(x.udp) || !abierto(x.tcp)) return false;
     const st = x.pc.connectionState || x.pc.iceConnectionState;
     return st !== 'failed' && st !== 'closed' && st !== 'disconnected';
+  };
+  // §99 (H6): «disconnected» suele ser pasajero (un tirón del Wi-Fi): con los canales abiertos se sigue mandando (antes
+  // se dejaba de mandar y con dos jugadores un tirón de 2 s era un corte). Solo «failed»/«closed» cortan
+  const puedeMandar = x => {
+    if (!x || !abierto(x.udp) || !abierto(x.tcp)) return false;
+    const st = x.pc.connectionState || x.pc.iceConnectionState;
+    return st !== 'failed' && st !== 'closed';
   };
 
   function cierra(u) {
@@ -132,6 +145,17 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
         if (!x || x.s !== m.s || x.k !== m.k || x.pc.signalingState !== 'have-local-offer') return;
         await x.pc.setRemoteDescription(m.d);
         await vacia(x);
+      } else if (m.t === 'reoferta') {
+        // §99 (H6): el otro reengancha la misma conexión (ICE restart): se contesta sobre el mismo par, sin rearmarlo
+        if (!x || x.s !== m.s || x.k !== m.k) return;
+        await x.pc.setRemoteDescription(m.d);
+        const r = await x.pc.createAnswer();
+        if (pares.get(de) !== x) return;
+        await x.pc.setLocalDescription(r);
+        senal.envia(de, { t: 'rerespuesta', s: sesion, a: m.s, k: m.k, d: { type: r.type, sdp: r.sdp } });
+      } else if (m.t === 'rerespuesta') {
+        if (!x || x.s !== m.s || x.k !== m.k || x.pc.signalingState !== 'have-local-offer') return;
+        await x.pc.setRemoteDescription(m.d);
       } else if (m.t === 'ice') {
         if (!x || x.s !== m.s || x.k !== m.k) return;
         if (x.remota) await x.pc.addIceCandidate(m.d).catch(() => {}); else x.cola.push(m.d);
@@ -167,13 +191,27 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
       // (§93: el par que se dejó abierto de alguien que ya no está en el buzón, si se cae, se cierra: no vuelve)
       if (!presentes.has(u)) { if (t - x.malDesde >= 4000) cierra(u); continue; }
       if (!(uid < u)) continue;
+      // §99 (H6): la que había abierto y tambalea: primero se reengancha la misma conexión (ICE restart, busca camino de
+      // nuevo sin cerrarla: como reenganchar un interruptor sin desarmar el tablero); si a los 4 s sigue mal, se rearma
+      if (x.abrio && !x.reenganche && t - x.malDesde >= 1500 && typeof x.pc.restartIce === 'function') { reenganchar(u, x); continue; }
       const n = fallos.get(u) || 0;
-      const espera = x.abrio ? 4000 : Math.min(60000, 10000 * 2 ** n);
+      const espera = x.abrio ? 5500 : Math.min(60000, 10000 * 2 ** n);
       if (t - x.malDesde < espera) continue;
       if (!x.abrio) fallos.set(u, n + 1);
       const s = presentes.get(u);
       if (s && quiere(u)) ofrece(u, s); else cierra(u);
     }
+  }
+
+  async function reenganchar(u, x) {
+    x.reenganche = true;
+    try {
+      x.pc.restartIce();
+      const o = await x.pc.createOffer({ iceRestart: true });
+      if (pares.get(u) !== x) return;
+      await x.pc.setLocalDescription(o);
+      senal.envia(u, { t: 'reoferta', s: sesion, a: x.s, k: x.k, d: { type: o.type, sdp: o.sdp } });
+    } catch (e) { console.warn('[malla] reenganche', e); }
   }
 
   async function entrar() {
@@ -201,9 +239,9 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   // bytes a un par por el canal pedido; false si no se pudo (sin canal, o el UDP con la cola llena)
   function enviar(u, bytes, canal = 'udp') {
     const x = pares.get(u);
-    if (!sanoX(x)) return false;
+    if (!puedeMandar(x)) return false;
     const c = canal === 'tcp' ? x.tcp : x.udp;
-    if (canal === 'udp' && c.bufferedAmount > LLENO) return false;
+    if (canal === 'udp' && c.bufferedAmount > colaUdp) return false;
     try { c.send(bytes); return true; } catch { return false; }
   }
 
@@ -212,6 +250,23 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     // §80: con ?redMala=…,ida, lo que sale también va por el tramo malo (con la misma demora y pérdida)
     enviar: redMala?.ida ? degradar((u, bytes, canal) => { enviar(u, bytes, canal); }, redMala, Math.random, (f, ms) => setTimeout(f, ms), () => performance.now(), 'mkwRedMalaIda') : enviar,
     activa: () => !!sesion,
+    // §99 (H1): los servidores de ICE de las conexiones que se armen desde ahora: los STUN de siempre más el TURN que
+    // pidió la página (las que andan siguen como están; las que fallan se rearman con estos)
+    ponerIce(extra) { ice = [...ICE, ...(Array.isArray(extra) ? extra.filter(s => s && s.urls) : [])]; },
+    // §99 (H1, medida 6): qué camino usa cada conexión (directo / por el repetidor) y su ida y vuelta, de getStats
+    async camino(u) {
+      const x = pares.get(u);
+      if (!x) return null;
+      try {
+        const st = await x.pc.getStats();
+        let par = null; const cand = new Map();
+        st.forEach(r => { if (r.type === 'candidate-pair' && (r.nominated || r.selected) && r.state === 'succeeded') par = r; if (r.type === 'local-candidate' || r.type === 'remote-candidate') cand.set(r.id, r); });
+        if (!par) return { estado: x.pc.connectionState || '' };
+        const l = cand.get(par.localCandidateId), r = cand.get(par.remoteCandidateId);
+        return { estado: x.pc.connectionState || '', local: l?.candidateType, remoto: r?.candidateType, relevo: l?.candidateType === 'relay' || r?.candidateType === 'relay',
+          ms: par.currentRoundTripTime ? Math.round(par.currentRoundTripTime * 1000) : null, enviados: par.bytesSent, recibidos: par.bytesReceived };
+      } catch { return null; }
+    },
     sano: u => sanoX(pares.get(u)),
     detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || '', ice: x.pc.iceConnectionState || '', udp: x.udp.readyState, tcp: x.tcp.readyState, abrio: x.abrio } : null; },
     presentes: () => [...presentes.keys()],

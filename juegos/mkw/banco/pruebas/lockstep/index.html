@@ -52,6 +52,7 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
     let toque = 0;
     c.ls = crearLockstep({
       yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada, esperaLargada, cuadrosLargada,
+      relevoRapido: false,                       // (§99: aquí se prueba el corte de siempre; el relevo rápido, en el banco relevo)
       registro: t => c.registro.push(t),
       // lo que "toca" esta consola: cambia con el tiempo y a veces trae START (que no debe llegar al juego)
       local: () => {
@@ -87,6 +88,10 @@ async function correr(c, { desde = 0, hasta, salirEn = -1, lento = 0, pausa = nu
     if (k === salirEn) { c.fuera = true; return; }
     if (pausa && k === pausa[0]) { if (pausa[2]) c.dormidaHasta = performance.now() + pausa[1]; await espera(pausa[1]); }
     c.cuadro = k;
+    // (§99: como el juego de verdad, la huella es de la carrera: empieza de nuevo en su cuadro 0. Antes se acumulaba
+    // entre carreras, y la consola que corrió cuadros de más en la anterior quedaba «desincronizada» —desde §99 eso la
+    // saca de la carrera—)
+    if (k === 0) c.estado = 2166136261;
     const d = await c.ls.pad(k);
     for (let i = 0; i < 32; i++) c.estado = Math.imul(c.estado ^ d[i], 16777619) >>> 0;
     c.vistos[k] = Array.from(d);
@@ -277,7 +282,7 @@ try {
   {
     const tramo = b => { const n = b[8], c0 = (b[4] << 24 | b[5] << 16 | b[6] << 8 | b[7]) >>> 0; return c0 < 140 && c0 + n > 100; };
     // (margen de 2 s: los cuadros que faltan llegan pedidos de a uno y con pérdidas; aquí se prueba el reenvío, no el corte)
-    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 2000, bloquear: (de, a, b) => de === 'ana' && a === 'carla' && b[1] === 13 && b[3] === 0 && tramo(b) });
+    const s = crearSala(['ana', 'beto', 'carla'], { esperaCorte: 2000, bloquear: (de, a, b) => de === 'ana' && a === 'carla' && (b[1] === 13 || b[1] === 15) && b[3] === 0 && tramo(b) });
     const r = await conTiempo(Promise.all(['ana', 'beto', 'carla'].map(u => correr(s[u], { hasta: 250 }))), 60000);
     const es = ['ana', 'beto', 'carla'].map(u => s[u].ls.estado());
     ok('los botones de Ana que no le llegan a Carla se los pasa Beto: las tres terminan iguales, sin cortes',

@@ -196,6 +196,23 @@ ok('inclinación: girar de más no pasa del tope', p0().sx === 127);
 await c.inclinar(false);
 ok('inclinación apagada: el stick vuelve al centro', p0().sx === 0);
 
+// ---- §99: el filtro de la sala: Start (y Esc, que es Start) nunca llega; B no llega en la primera pantalla de personajes ----
+let pantalla = 'personajes';
+c.filtro(() => BOTON.START | (pantalla === 'personajes' ? BOTON.B : 0));
+tecla('keydown', 'Escape');
+ok('§99: con el filtro de la sala, Esc (Start, la pausa) no llega al juego', (p0().botones & BOTON.START) === 0, `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'Escape');
+tecla('keydown', 'KeyJ'); tecla('keydown', 'KeyK');
+ok('§99: en la pantalla de personajes, B (volver al menú) no llega, A sí', (p0().botones & BOTON.B) === 0 && (recibido[0].botones & BOTON.A) !== 0,
+   `botones 0x${recibido[0].botones.toString(16)}`);
+pantalla = 'vehiculo';
+ok('§99: en la de vehículo, B (volver al personaje) sí llega', (p0().botones & BOTON.B) !== 0);
+tecla('keyup', 'KeyJ'); tecla('keyup', 'KeyK');
+c.filtro(null);
+tecla('keydown', 'Escape');
+ok('§99: sin filtro (fuera de la sala), Start vuelve a llegar', (p0().botones & BOTON.START) !== 0);
+tecla('keyup', 'Escape');
+
 c.restaurarTeclas();
 nota('teclas por defecto: stick WASD/flechas · A = K/Enter · B = J/Retroceso · R = L/Shift · L = Espacio/I · truco = T · Start = P/Esc');
 fin();

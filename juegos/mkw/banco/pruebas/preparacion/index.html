@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preparación de la sala</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Preparación de la sala: <span>la barra de la cortina y cuándo abrir la lista de copas</span></h1>
+<p>Prueba <code>preparacion.mjs</code> (bitácora §99) <b>sin el juego</b>, con un reloj de mentira y las líneas que escribe
+  aurora sobre los pipelines (copiadas del formato del registro). Comprueba que la barra avanza por etapas (la página, el
+  programa, los pipelines que llegan, la primera pantalla), que la sala no queda lista hasta que los pipelines llegaron,
+  el juego está en su primera pantalla y pasó un segundo entero sin tareas largas, y los topes para no esperar para
+  siempre.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPreparacion, CALMA_MS, TOPE_MS, TOPE_CALMA_MS } from '/web/navegador/preparacion.mjs';
+
+const { ok, fin } = prueba('preparacion', 'Preparación de la sala (sin el juego)');
+let t = 0;
+const p = crearPreparacion({ ahora: () => t });
+
+ok('al empezar: 0 % y no está lista', p.pct() === 0 && !p.lista());
+p.marcar('manifiesto'); p.marcar('chicos', 0.5);
+ok('el manifiesto y la mitad de los archivos chicos: 15 %', p.pct() === 15, String(p.pct()));
+p.marcar('chicos', 1); p.marcar('programa');
+ok('el programa listo: 35 %', p.pct() === 35, String(p.pct()));
+p.linea('[pipelines] modo asíncrono (en segundo plano)');
+p.linea('[pipelines] precalentando 700 (en la cola, se piden en segundo plano de a 8 por cuadro); 0 descartados (de otra versión)');
+p.linea('[pipelines] 555 pedidos en segundo plano (llamada 374.5 ms), 137 llegaron (tardaron 564 ms en promedio), 418 en camino, 5 sincrónicos, 0 armados en el momento (0.0 ms), 0 dibujos saltados');
+ok('137 de 700 pipelines llegaron: ~45 %', p.pct() === Math.round(35 + 50 * 137 / 700) && p.estado.pipesTotal === 700, String(p.pct()));
+p.linea('[pipelines] precalentado: los 700 de la lista ya están pedidos (1.5 s desde el arranque)');
+p.linea('[pipelines] 140 pedidos en segundo plano (llamada 86.1 ms), 193 llegaron (tardaron 1228 ms en promedio), 365 en camino, 0 sincrónicos');
+t = 3000; p.larga(2900);
+p.marcar('pantalla');
+ok('con 365 todavía en camino no está lista, aunque el juego ya esté en su pantalla', !p.lista() && p.pct() < 85, String(p.pct()));
+p.linea('[pipelines] 0 pedidos en segundo plano (llamada 0.0 ms), 365 llegaron (tardaron 2968 ms en promedio), 0 en camino, 0 sincrónicos');
+ok('llegaron todos y el juego está en su pantalla: 90 %, esperando la calma', p.pct() === 90 && !p.lista() && p.estado.pipesHechos, String(p.pct()));
+t = 3500; p.larga(3450);
+t = 3450 + CALMA_MS - 10;
+ok('una tarea larga hace 0,99 s: todavía no', !p.lista());
+t = 3450 + CALMA_MS;
+ok('un segundo entero sin tareas largas: lista, 100 %', p.lista() && p.pct() === 100 && p.estado.por === 'calma', p.estado.por);
+p.larga(t + 100);
+ok('una vez lista, queda lista (una traba después no la vuelve atrás)', p.lista());
+
+// sin calma: a los 8 s de tener todo lo demás, igual
+let t2 = 0;
+const q = crearPreparacion({ ahora: () => t2 });
+q.marcar('programa'); q.marcar('sinPipelines'); q.marcar('pantalla');
+for (t2 = 0; t2 <= TOPE_CALMA_MS - 200; t2 += 200) { q.larga(t2); q.lista(); }
+t2 = TOPE_CALMA_MS - 100;
+ok('con trabas seguidas no queda lista antes del tope de calma', !q.lista());
+t2 = TOPE_CALMA_MS + 50; q.larga(t2);
+ok('a los 8 s de tener todo lo demás queda lista igual (sin calma)', q.lista() && q.estado.por === 'sin calma', q.estado.por);
+
+// sin pipelines en la lista (otra versión, o sin semilla): no se espera nada por ellos
+let t3 = 0;
+const r = crearPreparacion({ ahora: () => t3 });
+r.marcar('programa'); r.linea('[pipelines] precalentando 0 (en la cola…)'); r.marcar('pantalla');
+t3 = CALMA_MS + 1;
+ok('sin pipelines para precalentar: lista con el programa, la pantalla y la calma', r.lista() && r.estado.sinPipelines);
+
+// tope general
+let t4 = 0;
+const s = crearPreparacion({ ahora: () => t4 });
+t4 = TOPE_MS - 1;
+ok('sin nada todavía no está lista antes del tope', !s.lista());
+t4 = TOPE_MS;
+ok('a los 45 s, lista igual (tope)', s.lista() && s.estado.por === 'tope');
+ok('las líneas que no son de pipelines no cuentan', (() => { const u = crearPreparacion({ ahora: () => 0 }); u.linea('[medidor] 60 fps'); u.linea(null); return u.estado.pipesTotal === 0; })());
+fin();
+</script>
+</body>
+</html>

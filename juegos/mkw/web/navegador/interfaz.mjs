@@ -44,6 +44,8 @@ const ICONOS = {
 };
 // Los modos. `listo` = ya funciona desde la página; los demás se juegan entrando con «Jugar libre» y eligiéndolos en el
 // menú del juego, hasta que la página sepa llevarte directo (bitácora §55, "elegir carrera").
+// §99: el editor de Mii («Mi Mii»), apagado hasta una actualización futura (?editorMii=1 = prendido, para probarlo)
+export const EDITOR_MII = new URLSearchParams(globalThis.location?.search || '').get('editorMii') === '1';
 export const MODOS = [
   { id: 'libre', nombre: 'Jugar libre', texto: 'Los menús del juego, como en la Wii: todos los modos y las 200+ pistas.', listo: true },
   { id: 'gp', nombre: 'Gran Premio', texto: 'Una copa completa: 4 carreras contra la CPU. Te llevamos directo.', listo: true },
@@ -52,7 +54,8 @@ export const MODOS = [
   { id: 'tt', nombre: 'Contrarreloj', texto: 'Tú contra el reloj y el mejor fantasma. Te llevamos directo.', listo: true },
   { id: 'bat', nombre: 'Batalla', texto: 'Globos o monedas en las arenas.', listo: false },
   { id: 'red', nombre: 'En línea', texto: 'Salas de Paginita Pro: juega con tus amigos.', listo: false },
-  { id: 'mii', nombre: 'Mi Mii', texto: 'Crea o cambia tu Mii sin abrir el juego.', listo: true, accion: true },
+  // §99 (el dueño): personalizar los Mii queda para una actualización futura: sin «Mi Mii» salvo con ?editorMii=1
+  ...(EDITOR_MII ? [{ id: 'mii', nombre: 'Mi Mii', texto: 'Crea o cambia tu Mii sin abrir el juego.', listo: true, accion: true }] : []),
 ];
 
 // estadoNube() = el estado de las partidas en la nube (nube.mjs) o null si no hay (sin sesión, fuera del sitio)
@@ -225,7 +228,10 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     if (archivo.size > 64 * 1048576) return avisar('Archivo muy grande', 'Una partida de Mario Kart Wii pesa 2,8 MB (una copia .mkwp, unos pocos KB). Este archivo no es una partida.');
     const bytes = new Uint8Array(await archivo.arrayBuffer());
     const tipo = queArchivo(bytes);
-    if (tipo === 'rfldb' || tipo === 'mii') return abrirMii({ importar: bytes, nombreArchivo: archivo.name });
+    if (tipo === 'rfldb' || tipo === 'mii') {
+      if (!EDITOR_MII) return avisar('Archivo de Mii', 'Cambiar o cargar Mii llega en una actualización próxima. Por ahora, tu licencia usa el Mii que ya tiene.');
+      return abrirMii({ importar: bytes, nombreArchivo: archivo.name });
+    }
     let nuevas, aplicar;
     if (tipo === 'rksys') {
       const info = leerRksys(bytes);
@@ -281,6 +287,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     bajar(new Blob([b]), 'rksys.dat');
   };
   $('abrirMii').onclick = () => abrirMii();            // «Mi Mii» (sin la portada, vive en el cajón)
+  $('abrirMii').hidden = !EDITOR_MII;                  // (§99: apagado hasta una actualización futura)
   $('bajarPartidas').onclick = async () => bajar(await guardado.exportar(), `partida-mkw-${new Date().toISOString().slice(0, 10)}.mkwp`);
   $('borrarPartidas').onclick = async () => {
     if (!await preguntar({ titulo: 'Borrar las partidas', si: 'Borrar', peligro: true,
@@ -373,11 +380,21 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // ---------------- La cortina ----------------
   // ?cortina=0: sin cortina (para mirar o fotografiar lo que hace el piloto en los menús)
   const sinCortina = new URLSearchParams(location.search).get('cortina') === '0';
-  function cortina(texto, mal = false) {
+  // pct (§99, la preparación de la sala): 0..100 = la barra se llena hasta ahí (sin él, la barra que va y viene)
+  function cortina(texto, mal = false, pct = null) {
     const quitar = texto === false || sinCortina;
     document.body.classList.toggle('sin-cortina', quitar);
     document.body.classList.toggle('cortina-mal', !quitar && mal);   // un error: el menú de inicio se aparta (inicio.mjs)
-    if (!quitar) { $('cortinaTexto').textContent = texto; $('cortina').classList.toggle('mal', mal); }
+    if (!quitar) {
+      $('cortinaTexto').textContent = texto; $('cortina').classList.toggle('mal', mal);
+      const barra = $('cortina').querySelector('.carga'), conPct = Number.isFinite(pct);
+      if (barra) {
+        barra.classList.toggle('con-pct', conPct);
+        barra.firstElementChild.style.width = conPct ? `${Math.max(2, Math.min(100, pct))}%` : '';
+        if (conPct) { barra.setAttribute('role', 'progressbar'); barra.setAttribute('aria-valuenow', String(Math.round(pct))); }
+        else { barra.removeAttribute('role'); barra.removeAttribute('aria-valuenow'); }
+      }
+    }
   }
   if (sinCortina) cortina(false);
 

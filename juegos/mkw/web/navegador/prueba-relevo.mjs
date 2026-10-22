@@ -70,7 +70,8 @@ const leer = n => Promise.race([new Promise(r => setTimeout(() => r({ colgada: t
   const L = window.mkwMenus, e = L?.estado?.(); if (!e) return null;
   const ri = L.u32(0x809BD730);
   return { s: e.seccion, etapa: ri ? L.u32(ri + 0x28) : -1, ls: window.mkwSincro?.lockstep?.estado() || null, t: performance.now(),
-    relevo: window.mkwAvisosRelevo || [], lento: window.mkwAvisosLento || [], corte: window.mkwAvisosCorte || [] };
+    relevo: window.mkwAvisosRelevo || [], lento: window.mkwAvisosLento || [], corte: window.mkwAvisosCorte || [],
+    ganada: window.mkw?._mkw_prisa_ganada?.() ?? null };
 })]).catch(() => null);
 const todas = async () => Object.fromEntries(await Promise.all(nombres.map(async n => [n, await leer(n)])));
 
@@ -127,24 +128,44 @@ ok('nadie avisó «la sala va lenta» en A ni en B', !(ahora.A?.lento || []).len
   `A: ${(ahora.A?.lento || []).slice(-1)} · B: ${(ahora.B?.lento || []).slice(-1)}`);
 
 // 3) las trabas de B (con los karts sueltos): el hilo de la página tomado por un bucle, como un tirón de la PC o una
-// pestaña que el navegador congela un rato. 1,5 s: menos que el margen (2 s), nadie se corta
+// pestaña que el navegador congela un rato. 1,5 s: menos que el margen (2 s), nadie se corta. §99 (C1), el relevo
+// rápido (salvo --extra=&relevoRapido=0): A y C ni siquiera lo esperan: lo pausan a los ~150 ms y B vuelve a manejar
+const RAPIDO = !EXTRA.includes('relevoRapido=0');
 const traba = ms => paginas.B.evaluate(ms => { const t = performance.now(); while (performance.now() - t < ms); }, ms).catch(() => {});
 const t1 = await todas();
 await traba(1500); await espera(4000);
 const t2 = await todas();
-ok('una traba de 1,5 s en B (como un tirón): nadie se corta y la carrera sigue en las tres',
-  nombres.every(n => !Object.keys(t2[n]?.ls?.cortes || {}).length && !t2[n]?.ls?.fuera && (t2[n]?.ls?.cuadro || 0) > (t1[n]?.ls?.cuadro || 0) + 100),
-  nombres.map(n => `${n} ${t1[n]?.ls?.cuadro}→${t2[n]?.ls?.cuadro} (espera máx ${t2[n]?.ls?.maxEspera?.toFixed(0)} ms)`).join(', '));
+// (lo que esperó en el rato de la traba: msEsperando es la suma de la carrera; maxEspera es el máximo de toda la carrera)
+const esperaEn = (a, b, n) => Math.max(0, (b[n]?.ls?.msEsperando || 0) - (a[n]?.ls?.msEsperando || 0));
+ok(RAPIDO ? 'una traba de 1,5 s en B: A y C lo pausan (esperan menos que la traba), nadie se corta y B vuelve a manejar'
+          : 'una traba de 1,5 s en B (como un tirón): nadie se corta y la carrera sigue en las tres',
+  nombres.every(n => !Object.keys(t2[n]?.ls?.cortes || {}).length && !t2[n]?.ls?.fuera && (t2[n]?.ls?.cuadro || 0) > (t1[n]?.ls?.cuadro || 0) + 100) &&
+  // (C, la de la red mala, espera de por sí más —le llega todo tarde—: menos de 1,2 s; sin el relevo rápido, los 1,5 s)
+  // (medido: A 317-1075 ms según la corrida, con tres juegos en la misma PC; sin el relevo rápido, los 1,5 s enteros más
+  // lo que tenía guardado de B. C, la de la red mala, espera de por sí más)
+  (!RAPIDO || (esperaEn(t1, t2, 'A') < 1200 && esperaEn(t1, t2, 'C') < 1400 && (t2.A?.ls?.vueltas || 0) >= 1)),
+  nombres.map(n => `${n} ${t1[n]?.ls?.cuadro}→${t2[n]?.ls?.cuadro} (esperó ${esperaEn(t1, t2, n).toFixed(0)} ms en el rato, ganó al ponerse al día ${Math.round(t2[n]?.ganada ?? -1)} ms, esperó a ${JSON.stringify(Object.fromEntries(Object.entries(t2[n]?.ls?.esperaDe || {}).map(([u, v]) => [u.slice(0, 1), Math.round(v - (t1[n]?.ls?.esperaDe?.[u] || 0))])))}, pausas ${JSON.stringify((t2[n]?.ls?.pausas || []).map(p => p.desde))}, vueltas ${t2[n]?.ls?.vueltas || 0})`).join(', '));
 // 3 s: más que el margen; A y C lo cortan (en el mismo cuadro) y siguen; B, al despertar, ve que lo cortaron
 await traba(3000); await espera(5000);
 const t3 = await todas();
 const corteA = t3.A?.ls?.cortes?.[1], corteC = t3.C?.ls?.cortes?.[1];
-ok('una traba de 3 s en B (más que el margen de 2 s): A y C lo cortan en el mismo cuadro y siguen',
-  corteA !== undefined && corteA === corteC && (t3.A?.ls?.cuadro || 0) > (t2.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado,
-  `corte de B: A ${corteA}, C ${corteC}; A ${t2.A?.ls?.cuadro}→${t3.A?.ls?.cuadro}`);
-ok('…y B lo ve en su página (no queda con la carrera quieta sin explicación)',
-  (t3.B?.ls?.cortado || t3.B?.ls?.fuera) && (t3.B?.relevo || []).some(t => /Se cortó tu conexión|Te desconectaste/.test(t)),
-  `B cortado ${t3.B?.ls?.cortado}, fuera ${t3.B?.ls?.fuera}; avisos: ${[...new Set(t3.B?.relevo || [])].slice(-2).join(' / ') || 'ninguno'}`);
+if (RAPIDO) {
+  // (§99, C1: con 3 s tampoco se lo corta —antes, pasado el margen de 2 s, sí—: se lo pausa y vuelve)
+  ok('una traba de 3 s en B: A y C lo pausan (no lo esperan ni lo cortan), siguen iguales y B vuelve a manejar',
+    corteA === undefined && corteC === undefined && (t3.A?.ls?.cuadro || 0) > (t2.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado &&
+    !t3.B?.ls?.fuera && (t3.A?.ls?.vueltas || 0) >= 2,
+    `cortes A ${JSON.stringify(t3.A?.ls?.cortes)}; A ${t2.A?.ls?.cuadro}→${t3.A?.ls?.cuadro}; pausas ${JSON.stringify((t3.A?.ls?.pausas || []).map(p => p.desde))}, vueltas ${t3.A?.ls?.vueltas}; B fuera ${t3.B?.ls?.fuera}`);
+  ok('…y B lo ve en su página (su kart siguió solo un momento)',
+    (t3.B?.relevo || []).some(t => /siguió solo un momento/.test(t)),
+    `avisos de B: ${[...new Set(t3.B?.relevo || [])].slice(-3).join(' / ') || 'ninguno'}`);
+} else {
+  ok('una traba de 3 s en B (más que el margen de 2 s): A y C lo cortan en el mismo cuadro y siguen',
+    corteA !== undefined && corteA === corteC && (t3.A?.ls?.cuadro || 0) > (t2.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado,
+    `corte de B: A ${corteA}, C ${corteC}; A ${t2.A?.ls?.cuadro}→${t3.A?.ls?.cuadro}`);
+  ok('…y B lo ve en su página (no queda con la carrera quieta sin explicación)',
+    (t3.B?.ls?.cortado || t3.B?.ls?.fuera) && (t3.B?.relevo || []).some(t => /Se cortó tu conexión|Te desconectaste/.test(t)),
+    `B cortado ${t3.B?.ls?.cortado}, fuera ${t3.B?.ls?.fuera}; avisos: ${[...new Set(t3.B?.relevo || [])].slice(-2).join(' / ') || 'ninguno'}`);
+}
 await paginas.B.locator('#canvas').screenshot({ path: path.join(carpeta, 'B-cortado.png') }).catch(() => null);
 
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));

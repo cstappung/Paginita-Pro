@@ -907,6 +907,37 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Volver a elegir (en el descanso)** | El botón opcional «Cambiar personaje y vehículo» del zócalo: abre la pantalla de personajes del juego por código; lo elegido corre desde la carrera siguiente, igual en todas las consolas. Si el descanso termina antes de confirmar, se corre con lo de antes. |
 | **Modo elección** | Una marca del gancho de la pantalla de personajes (`g_eleccion`, `directo_nativo.cpp`): mientras está puesta, al confirmar el derrape el juego no sigue a elegir pista, solo avisa a la página lo elegido. El salto a la pantalla de personajes del descanso la apagaba (§98.4): el juego seguía solo a otra carrera. |
 
+### La red según el crítico, la carga de la sala y los niveles de CPU de más arriba (§99)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Preparación de la sala** | Lo que pasa entre abrir la sala y que el navegador quede listo para jugar sin trabarse: bajar el juego, arrancarlo, compilar los ~700 pipelines de la lista y llegar a la primera pantalla. La sala espera detrás de una cortina con **barra de progreso** y recién después la anfitriona ve la lista de copas. Como esperar a que un motor llegue a régimen antes de cargarlo. |
+| **Tarea larga** (*long task*) | Un trabajo de la página que ocupa el único hilo 50 ms o más: mientras dura, la página no responde (la lista de copas se traba). El navegador avisa de cada una (`PerformanceObserver`); la preparación espera **un segundo entero sin ninguna** («calma»). |
+| **Cola de UDP** | Lo que la malla deja juntarse esperando salir por el canal rápido antes de tirar paquetes viejos. En la sala, 8 KB: más cola solo es más atraso (botones viejos que ya no sirven). Como un búfer chico en un lazo de control: mejor perder una muestra vieja que actuar con atraso. |
+| **ICE restart / reenganche** | Volver a negociar el camino de una conexión WebRTC que tambalea sin tirarla (otra oferta con `iceRestart`). Antes, una conexión que se caía 2 s se daba por muerta. |
+| **TURN** | Un servidor que **retransmite** los paquetes cuando dos PC no pueden hablarse directo (redes con NAT estricto). El Worker del sitio entrega uno (`/turn`); la sala se lo pasa al juego. Como un repetidor: más lento que el enlace directo, pero llega. |
+| **Toma del anfitrión** | Si el anfitrión desaparece del buzón de la sala más de 15 s con la copa andando, todas las páginas eligen al mismo reemplazo (el primero de la copa que sigue presente) y ese anota `{t:"toma"}` en la sala: así puede cerrar la copa y guardar la tabla. |
+| **Reloj común (estilo NTP)** | Saber la hora de la anfitriona con pocos ms de error: cada latido lleva mi hora, la anfitriona contesta con la suya, y con la ida y vuelta medida se descuenta lo que tardó el mensaje (de las últimas 8, la más rápida). Como sincronizar dos relojes con un pulso de ida y otro de vuelta. |
+| **Largada pareja** | Que todos vean la cuenta regresiva a la vez y el turbo de salida pida la misma anticipación a todos: el último en cargar espera media ida y vuelta antes del cuadro 0; en la cuenta, todos con al menos 6 cuadros de retraso; y al que no carga, cuando ya cargó la mitad, se lo espera a lo más 15 s. |
+| **Autoridad por estabilidad** | El papel de autoridad (§80) ya no va al primero de la lista sino al más estable: el que manda a tiempo, **no va atrás** de los demás (se traba) y no tiene la red claramente peor (su ida y vuelta típica viaja en su informe). Entre carreras, la anfitriona elige como primera autoridad al que tuvo menos ratos malos. Como poner de maestro de reloj al oscilador más estable de la red. |
+| **Ponerse al día** | Mario Kart Wii no recupera los cuadros que se atrasó: si un cuadro tarda, el siguiente va a su hora y la consola queda atrás para siempre. Ahora, cuando una PC se traba (o va atrás de la mayoría), le pide al programa que corra seguidos, **sin esperar la hora de cada uno**, los cuadros que le faltan (dibujándolos todos: así la carrera sigue igual en todas). Como un motor paso a paso que perdió pasos y los recupera con una ráfaga. |
+| **Grilla del retrace** | La «hora» de cada cuadro: el programa espera el retrace (el pulso de 60 Hz de la tele de la Wii) para empezar el siguiente. Para ponerse al día, la grilla se corre para atrás lo que iba a esperar (`mkw_prisa`, en el runtime: va como parche). |
+| **Relevo rápido (pausa)** | Al que se calla (pestaña trabada o red cortada) se lo **pausa** a los ~150 ms en vez de esperarlo 2 s: desde un cuadro que deciden todos igual, su kart va con un botón calculado igual en todas las PC (acelerar si iba acelerando y el volante soltándose), nadie lo espera, y cuando vuelve pide «vuelvo desde el cuadro r» y maneja otra vez. Si en 20 s no volvió, la pausa pasa a ser el corte de siempre. Como un interruptor de transferencia: si una fuente se cae, la carga pasa a la de respaldo sin cortar, y vuelve cuando la principal está estable. |
+| **Botón calculado (de la pausa)** | El que usa el kart del pausado: el último que se usó para él antes de la pausa, con el acelerador y el volante que se va soltando en 60 cuadros. Depende solo de ese botón y de cuántos cuadros pasaron: es el mismo en todas las consolas. |
+| **Marca «pausa en camino»** | Un bit en cada paquete de botones que le mando a alguien mientras hay una pausa suya propuesta o abierta. Si le llega antes que el aviso de la pausa (van por canales distintos), se queda quieto en el cuadro que ya corrió hasta saberla: si siguiera con sus botones más allá, su copia de la carrera se separaría. |
+| **Callado** | Del que no llega **nada** (ni pings ni paquetes) hace más de 150 ms. Solo al callado se lo pausa; al que se le pierden paquetes pero se lo sigue oyendo se le piden de nuevo. |
+| **Hard AI (de Retro Rewind)** | El ajuste de RR que cambia una sola cosa: la tabla de velocidad de la IA (`kartAISpdParamRR.bin`). Con ella la CPU quiere ir a 170 a 150cc y va siempre pegada al tope de 120. Es el nivel **Intenso** de la página. |
+| **Tope duro (de velocidad)** | Un número de cada kart (`Kart::Movement +0x2C`) que corta la velocidad del motor y la de la física: 120 a 150cc. Como el limitador de corriente de una fuente: cada kart tiene el suyo. **Imposible** se lo sube solo a las CPU (138). |
+| **Límite blando** | El techo de velocidad de cada cuadro (+0x18): sube de golpe y baja de a 3 por cuadro; nunca pasa del tope duro. |
+| **Estadísticas del kart (copia)** | La suma de vehículo + personaje (velocidad base, aceleraciones, giro, derrape, miniturbo) que el juego arma **para cada kart** al crearlo y lee en cada cuadro. Imposible le multiplica las de las CPU al crearlas: no toca a nadie más. |
+| **Hoja copiada en línea** | Una función chica que el traductor pegó adentro de quien la llama en vez de llamarla. Envolverla no sirve (nadie la llama): por eso el tope de las CPU se vuelve a subir cada cuadro, en la función que corre siempre. |
+| **Zona muerta (del VR)** | Si el VR fijo de una CPU está 6599 o más por encima del tuyo, perder contra ella no te cuesta nada en la curva del juego; desde §99, ganarle tampoco paga. Como la banda muerta de un comparador: dentro, el lazo no actúa. Antes era una «lotería»: perder 0, ganar hasta 112 × peso. |
+| **Fuera de escala** | Un nivel de CPU al que una persona de 5000 le gana menos del ~1,3 % de las veces (Intenso, Imposible). Contra él un VR fijo no mide nada: sería un **imán** que lleva a todos al mismo VR. Es un instrumento saturado. |
+| **Segunda llegada** | En Intenso e Imposible, la comparación extra entre cada par de humanos: gana quien le ganó a más CPU (empate = nada), con la curva del juego (a igual VR, 16 en Intenso y 24 en Imposible). Lo que gana uno lo pierde el otro. Es una **medición diferencial**: lo que les pasa a todos (perder contra la CPU) se cancela —rechazo del modo común— y solo cuenta la diferencia. |
+| **Ausente** | Quien no toca un botón 30 s seguidos en el primer minuto de la carrera (la regla del juego en línea). Para el VR cuenta como cortado: sin esto, una cuenta alterna quieta juntaba VR. Como un sensor desconectado: no da medida. |
+| **Fusible (del VR)** | La parte de las CPU de una carrera no pasa de ±112 (el par humano más grande), para que una lectura mala no mueva el VR de golpe. |
+| **Ancla neutral** | El VR fijo de un nivel con el que las carreras ya jugadas no habrían creado ni quitado VR en total. Sirve para recalibrar con carreras de verdad (`anclaNeutral`). Como calibrar el cero de un instrumento hasta que la corriente neta sea cero. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -8683,3 +8714,277 @@ Arreglo (sitio, `colabtex/src/juegos/mkw.js`):
 Pruebas: sitio `mkw.test.cjs` 20/20 (el interruptor apagado por omisión, sin difuminado encima del juego);
 `prueba-experiencia` (Piloto Dos lo prende y Uno no: al empezar, solo Dos queda en inmersivo).
 
+## 2026-10-22 · §99 La red según el crítico, la carga de la sala, Intenso e Imposible y el VR por nivel (M23)
+
+**Qué pidió el dueño** (en orden):
+
+1. «Usa un crítico para revisar, solo revisar, que el modo de conexión, protocolos, etc. del modo online sea el óptimo
+   en términos de accesibilidad, lag, etc.», «también que revise el handle del lag, desconexión», «si el approach es
+   correcto, es el mejor compartir estados», «la idea es que el lag de uno no mate la experiencia de los otros 11» y
+   «asegurar que partan a la vez».
+2. Después del informe: «la verdad es un SÍ a todo lo recomendado», y «pon una pantalla de carga con progreso para que
+   no se laguee el navegador del host al elegir los mapas».
+3. «No dejes que en modo multijugador los jugadores vuelvan hacia atrás saliéndose de las pantallas debidas» y «quita
+   eso de personalizar a los Mii, se agregará en una futura update».
+4. «Creo que en RR hay una opción de intense CPU» → «claro que sí» (un nivel con eso), «haz que el VR dependa del
+   nivel de CPU si aplica, reformula las ecuaciones ayudándote de un crítico» y «agrega un nivel por encima de intenso
+   para que la CPU literalmente tenga estadísticas no conseguibles por los jugadores… para que sea injusto y difícil».
+5. «Si llegas a 70 % weekly usage, para».
+
+### 99.1 La pantalla de carga de la sala (`preparacion.mjs`)
+
+**Qué pasaba.** Medido con una primera visita (`scratchpad/medir-selector.mjs`, el lag de la anfitriona): la lista de
+copas aparecía a los 5,0 s, mientras el navegador todavía compilaba los ~700 pipelines de la lista del juego; después
+de abrirla, **7 tareas largas que sumaban 1,4 s** (la peor de 0,54 s): la lista se trababa.
+
+**Qué se hizo.** La sala espera detrás de la cortina con una **barra de progreso** por etapas (la página y el programa
+0→35 %, los pipelines que llegan según lo que escribe aurora 35→85 %, la primera pantalla del juego 90 %, y **un segundo
+entero sin tareas largas** 100 %), con textos («Bajando el juego», «Preparando los gráficos (la primera vez tarda
+más)», «Casi listo…»). Recién entonces la anfitriona ve la lista y corre el reloj de la copa (`sala.copaLista()`).
+Topes: a los 45 s, o 8 s después de lo demás sin calma, se da por lista igual. `?preparacion=0` = como antes.
+
+**Resultado:** la lista aparece a los 9,8 s (detrás de la cortina con la barra) y después **3 tareas largas, 241 ms en
+total, la peor de 90 ms**. Banco `preparacion` (15).
+
+### 99.2 Los controles de la sala y el editor de Mii
+
+- En la sala nadie puede volver atrás de la pantalla de personajes (B) ni pausar (START): `controles.filtro` quita esos
+  botones antes de mandarlos al juego (B solo en la sección 0x49, página 0x6B). `?atras=1` = como antes. Banco
+  `controles` (45); `prueba-sala` lo comprueba con el juego.
+- «Mi Mii» (el editor) queda escondido para una actualización futura: `EDITOR_MII` de `interfaz.mjs` (`?editorMii=1`
+  lo muestra). Los Mii invitados de §86 siguen.
+
+### 99.3 El crítico de la red
+
+Un crítico aparte (sin esta conversación) leyó la malla, el lockstep y la sala, y simuló 12 consolas. Lo central:
+**compartir botones (lockstep) es el enfoque correcto** para un ejecutable traducido entero (compartir el estado
+haría falta reescribir el juego); lo que falla es **cómo se reparte el lag de uno**:
+
+| | Qué encontró | Qué se hizo |
+|---|---|---|
+| C1 | Un tirón o corte de uno congela a los 12 (lo que dura el tirón, o 2 s) | el relevo rápido (99.9) |
+| C2 | La autoridad (de la que dependen todos) es el mando 0, sin mirar si es estable; pasa el papel tarde | 2 ratos malos de 20 (etapa A) y por estabilidad (99.7) |
+| C3 | El que se traba seguido queda atrás para siempre y pierde el control de su kart | ponerse al día (99.8) |
+| C4 | La largada espera al lento hasta 45 s | la largada pareja (99.6) |
+| C5 | La sincronía frena a todos por el peor | frenarse solo si voy adelante de más de la mitad (etapa A) |
+| H1 | Sin TURN: hay pares de PC que nunca se conectan | TURN del Worker y STUN de Cloudflare (etapa A) |
+| H2 | Si el anfitrión desaparece sin «Abandonar», la copa se cuelga | la toma (99.5) |
+| H5 | Se manda 4-8 veces más de lo necesario | paquetes con acuse (etapa A) |
+| H6 | Una conexión que tambalea se da por muerta | ICE restart (etapa A) |
+| H7 | Una pestaña escondida tironea a la sala | no frenarse con la pestaña escondida (etapa A) |
+| H8 | El que se desconectó ve «Esperando a X» | «Se cortó TU conexión» (etapa A) |
+
+El informe completo, con sus simulaciones, quedó en el scratchpad de la sesión (`critica-red.md`).
+
+### 99.4 Etapa A: lo chico de la red (`lockstep.mjs`, `malla.mjs`)
+
+- **Paquetes con acuse (tipo 15):** cada paquete de botones dice hasta qué cuadro tengo seguidos los del otro; cada uno
+  manda solo lo que le falta al otro (antes, siempre los últimos 16 a todos: ~218 bytes por cuadro a cada uno con 12).
+- **La autoridad pasa el papel** si la mayoría la vio mal 2 ratos de los últimos 20 (10 s), no 4 seguidos.
+- **La sincronía** frena solo si voy adelante de más de la mitad (y por lo que voy adelante del de la mitad); con la
+  pestaña escondida no se frena nadie.
+- **«Se cortó TU conexión»**: si no llega nada de nadie hace 1 s, el cortado soy yo.
+- **Malla:** STUN de Google y de Cloudflare; TURN del Worker (`relevoBt3()` del sitio → mensaje `turn` →
+  `malla.ponerIce`); una conexión «disconnected» se reengancha con ICE restart a los 1,5 s y se rearma a los 5,5 s;
+  cola UDP de 8 KB en la sala.
+
+### 99.5 Etapa B: si el anfitrión desaparece (sitio, `mkw.js` y `motor.js`)
+
+Si a la anfitriona se le corta internet o se le cuelga Chrome, nadie escribe «abandona» y la copa queda colgada (solo
+ella la hace avanzar). Ahora, con la copa andando, cada página mira la presencia de la anfitriona en el buzón (Firebase
+la borra sola al desconectarse): si falta más de 15 s, todas eligen al mismo reemplazo (el primero de la copa que
+sigue presente), se lo avisan a su juego (`cambiarAnfitrion`, que ya existía) y el reemplazo anota `{t:"toma", de}` en
+la sala; vale solo con la copa andando y si `de` es quien manda (una toma vieja no hace nada). Prueba del sitio nueva
+(21 en `mkw.test.cjs`).
+
+### 99.6 Etapa C: la largada pareja (`lockstep.mjs`, `sala-carrera.mjs`)
+
+- **Al que no carga**, cuando ya cargó al menos la mitad, se lo espera a lo más **15 s** (antes 45): larga «fuera» y
+  entra en la siguiente (como quien recarga).
+- **El último en cargar espera media ida y vuelta** antes del cuadro 0 (a lo más 150 ms): los demás, que lo esperan,
+  corren el cuadro 0 recién cuando les llega lo suyo, así todos ven la cuenta a la vez.
+- **En la cuenta regresiva, todos con al menos 6 cuadros de retraso** (el turbo de salida pide la misma anticipación
+  a todos); al «¡YA!» cada uno baja al suyo. La página dice cuándo es la cuenta (Raceinfo +0x28 < 2).
+- **Reloj común estilo NTP** con la anfitriona (cada latido lleva mi hora; ella contesta con la suya; se descuenta la
+  ida). `sala.desfase` para las pruebas.
+
+### 99.7 Etapa D: la autoridad por estabilidad
+
+**El error que lo mostró.** `prueba-relevo` (tres pestañas, C con la red mala de llegada) falló 9/10: la autoridad
+pasó el papel a **C**, que desde afuera se veía bien (lo suyo sale a tiempo) pero **recibía todo tarde**: inventaba
+los botones de A y B, sanos, y los obligaba a subir su retraso (A 10, B 12, C 6).
+
+**Qué se hizo.**
+
+- Cada consola lleva, de cada uno, sus últimos 20 ratos: si la mayoría lo vio mal, y cuánto **va atrás** de mí
+  (`delanteDe`, la medida de §80b). El papel pasa solo a quien tiene al menos 200 puntos más que la autoridad
+  (`puntaje`: −1000 si la mayoría lo ve mal ahora, −100 por rato malo, −300 por cuadro que va atrás, y algo a favor de
+  la holgura) y **no tiene la red claramente peor** (su ida y vuelta típica, que ahora viaja en cada informe: más del
+  doble y 20 ms más que la mía = no).
+- Primero probé con «recibe mal = ve tarde a la mayoría»: no sirve, porque con uno lento y uno de red mala el sano
+  también «ve tarde a la mayoría». Lo que sí distingue es la ida y vuelta: el de la red mala la tiene alta **con todos**.
+- **Entre carreras:** cada consola manda en su «terminé» cuántos ratos malos tuvo (la mayoría la vio mal, iba atrás) y
+  su ida y vuelta; la anfitriona elige como primera autoridad de la carrera siguiente a la de menos
+  (`estado.autoridad`), y todas la usan desde el cuadro 0 (`fijarCarrera(n, fuera, autoridad)`).
+
+**Resultado:** `prueba-relevo` 10/10 (A 4, B 5, C 9). Banco `relevo`: la autoridad lenta pasa el papel a Beto y no a
+Carla (que recibe todo tarde), y la sala elige la primera autoridad igual en las tres.
+
+### 99.8 Ponerse al día (C3): el reloj del runtime
+
+**Qué pasaba.** Mario Kart Wii no se pone al día: si un cuadro tarda, el siguiente va a su hora. La consola que se
+traba seguido queda atrás para siempre, la relevan, la autoridad inventa sus botones y **ya no maneja**.
+
+**Qué se hizo.**
+
+- **Runtime (`vi.cpp`, en `parches/runtime-web.diff`):** `mkw_prisa(ms)` le pide al programa ganar esos ms de grilla:
+  en la espera de cada cuadro (sin el enganche al monitor, como en la sala) la grilla del retrace se corre para atrás
+  lo que iba a esperar, así el retrace siguiente toca enseguida y el juego corre cuadros seguidos, **dibujándolos
+  todos**. `mkw_prisa_ganada()` dice lo ganado. Solo se cambió la sección de `vi.cpp` del parche (otro archivo del
+  runtime tiene cambios a medio hacer de otra sesión, `audio_backend.cpp`: no se tocó) y se comprobó que el parche se
+  aplica limpio sobre el runtime original.
+- **Lockstep:** dos maneras de pedirlo. (1) **El tirón propio**: la pausa entre dos cuadros (sin contar las esperas a
+  los demás ni los frenos) menos un cuadro es lo que quedé atrás: se pide **en el momento**. (2) **Medido**: si voy más
+  de 3 cuadros atrás de más de la mitad, lo que falta menos 2 (una vez cada dos ratos). `?alDia=0` = como antes.
+- **La primera versión solo medía** (2) y era lenta: las medidas de los demás llegan con hasta 0,75 s de atraso, y con
+  tirones de 300 ms cada 1,5 s Carla seguía 5-12 cuadros atrás. Con (1), **0,7 cuadros** en promedio, ningún botón
+  inventado y retraso 3-5 (sin ponerse al día: 16-83 cuadros atrás y cientos inventados).
+- **Trampa del runtime:** el primer corrimiento de la grilla estaba solo en la espera de cada cuadro
+  (`PaceToRetraceBoundary`), y en el juego no ganaba nada: cuando la consola va atrás, el cuadro no se espera ahí
+  (ya pasó un retrace mientras se armaba) sino en la espera ociosa, donde los retrace avanzan con el reloj
+  (`AdvanceDueRetraces`). Ahí se agregó: mientras hay algo por ganar, el retrace siguiente toca ya (uno por vez: cada
+  retrace es un cuadro del juego). Medido en `prueba-relevo`: B, trabado 1,5 s, **ganó 4,9 s** y volvió a manejar.
+- Tope: 120 cuadros por pedido (2 s, lo que acepta el runtime).
+
+### 99.9 El relevo rápido (C1)
+
+**Qué pasaba.** Un tirón de uno (una pestaña trabada) congelaba a los 12 lo que durara el tirón; un corte, el margen
+entero de 2 s.
+
+**Qué se hizo.** A los **150 ms** de esperar a alguien que además está **callado** (no llega nada suyo, ni pings), su
+decisor lo **pausa** con el mismo corte en dos fases de §80, sin esperar su respuesta (el callado es él): desde el
+cuadro decidido su kart va con el **botón calculado** (el último que se usó para él, con el acelerador y el volante
+que se suelta en 60 cuadros), igual en todas las consolas, y nadie lo espera. Cuando vuelve (y se puso al día) le pide
+a su decisor volver; el decisor fija el cuadro de la vuelta 60 cuadros más adelante (a todos les tiene que llegar
+antes de correrlo) y desde ahí maneja otra vez. Si en 20 s no volvió, la pausa pasa a ser el corte de siempre. Un
+pausado deja de ser autoridad en esa carrera. Mensajes nuevos: el aviso de pausa (el del corte con una marca),
+«quiero volver» (16) y «vuelve desde r» (17, que dice de qué pausa es). Lo ve en su página: «📶 Tu PC o tu conexión se
+trabaron: tu kart siguió solo un momento…». `?relevoRapido=0` = como antes.
+
+**Las trampas (se encontraron reproduciendo en Node, `scratchpad/pausa-node2.mjs`, 50 corridas con pérdida y demoras):**
+
+1. **El que se trabó, al despertar, corría cuadros con sus botones antes de enterarse de su pausa** y su copia se
+   separaba (se salía de la carrera). Dos protecciones: después de un tirón propio, antes de seguir, deja pasar los
+   mensajes que llegaron mientras estaba trabado; y cada paquete de botones que le mandan lleva la **marca «pausa en
+   camino»** mientras su pausa está propuesta o abierta: al verla se queda quieto en el cuadro que ya corrió.
+2. **Los avisos repetidos de una pausa vieja se aplicaban a una pausa nueva** («vuelve en el 201» cerraba otra pausa):
+   ahora la vuelta dice de qué pausa es, y un aviso repetido no toca nada.
+3. **Paquetes viejos con la marca llegaban después de la vuelta** y lo dejaban quieto otra vez: se ignora la marca 2 s
+   después de saber una decisión propia.
+4. **Una regla vieja cortaba al pausado** («al relevado que se calló, cortarlo»): a un pausado no se lo releva ni se lo
+   corta por callado.
+5. **Con una red que pierde paquetes se pausaba a quien no estaba callado** (le faltaban botones pero sus pings
+   llegaban): no se enteraba a tiempo y quedaba fuera. Ahora solo se pausa al callado; al otro se le piden de nuevo.
+6. **Con el juego, la traba de 3 s terminaba en corte**: después de la primera traba la autoridad lo relevaba, nadie lo
+   esperaba, y la regla «relevado y callado 2 s → cortar» lo sacaba. Con el relevo rápido, al relevado callado se lo
+   pausa a los 150 ms.
+7. **Una propuesta vieja lo bloqueaba 4,5 s**: si la pausa llegaba antes que su propuesta (en el banco, los mensajes
+   de una pestaña trabada llegaban desordenados al despertar), la propuesta lo dejaba quieto. Una propuesta de alguien
+   ya pausado ya no bloquea (y el banco respeta el orden del canal confiable).
+8. **Pedía volver todavía atrás**: con la medida vieja (recién despierto) pedía la vuelta enseguida, y al llegar al
+   cuadro de la vuelta A lo esperaba otra vez. Ahora pide volver cuando terminó la ráfaga para ponerse al día.
+
+**Resultado (banco `relevo`, con el reloj de verdad):** con la pestaña de Beto trabada 1 s, Ana esperó **184 ms** (sin
+el relevo rápido: 983 ms); Beto volvió a manejar; las tres, la misma carrera. Si Beto se va, lo pausan y la pausa pasa
+a corte en el mismo cuadro en Ana y Carla. **Con el juego** (`prueba-relevo`): B trabado 1,5 s → A esperó 317 ms en ese
+rato (antes ~1,5 s); B trabado 3 s → ya no se lo corta: pausado y de vuelta.
+
+**Otra cosa que mostró `prueba-doce`:** la prueba agendaba la meta 90 cuadros después de una lectura vieja y, con 12
+juegos en una PC, las comprobaciones de en medio tardaban más que eso: el cuadro ya había pasado y la carrera no
+terminaba nunca (la prueba duró 5,9 min). Ahora la agenda con una lectura fresca y 300 cuadros de margen (11/11 en 2,0
+min).
+
+### 99.10 Intenso e Imposible (M23, `cpu_dificultad_nativo.cpp`, `dificultad-cpu.mjs`)
+
+**La investigación** (un agente, leyendo el código traducido y los `.bin`; nada copiado):
+
+- El **Hard AI** de Retro Rewind cambia una sola cosa: la tabla de velocidad de la IA. Pulsar envuelve la carga de
+  `kartAISpdParam.bin` (`rr_kamek_81830C50`): si el ajuste guardado 0x63001 vale 1, pide `kartAISpdParamRR.bin`
+  (cadena en 0x8186DD24). Con ella, a 150cc la base de la CPU es 170: va **siempre pegada al tope de 120**.
+- El tope no es de la IA: es el **tope duro de cada kart** (`Kart::Movement +0x2C`), copiado del global
+  `Kart::hardSpeedCap` (0x808B59F4 = 120 × el factor de Pulsar), y frena el motor y la física.
+- Cada kart tiene **su copia de estadísticas** (`Kart::ComputeStats`, 0x18C bytes), creada por
+  `ApplyPlayerStatChanges` de Pulsar (`rr_kamek_81839710`, r28 = el número de jugador, r3 = la copia).
+
+**Qué se hizo.**
+
+- **Intenso** = la tabla del Hard AI elegida **por nosotros** (envoltura de `rr_kamek_81830C50`, que llama directo a
+  `ArchiveMgr::GetFile` sin mirar el ajuste guardado; de paso arregla un riesgo: un guardado de RR importado con Hard
+  AI prendido cambiaba la tabla de una sola consola y desincronizaba la sala), más los objetos del humano.
+- **Imposible** = Intenso y, **solo en los karts de CPU**: tope ×1,15 (138 a 150cc; no más de ×1,20, porque la bala va
+  a 145), velocidad base ×1,15, las cuatro aceleraciones y las dos de derrape ×1,5, miniturbo ×1,5. Las estadísticas
+  se escriben al crear el kart; el tope **cada cuadro** (envoltura de `rr_overlay_8057B9BC`, UpdateAcceleration),
+  porque las funciones que lo devuelven al global están copiadas en línea.
+- `kFilaDelJuego` con 6 niveles (`directo_nativo.cpp`), el mapa de la ficha (`directo.mjs`), `mkw_cpu_perfil_kart`
+  (`dificultad-cpu.mjs`) y `mkw_cpu_estado` 14-19 para mirar. Sin el programa nuevo, Intenso e Imposible corren como
+  Máximo. El sitio: `MKW_NIVEL` con 6 y su ayuda.
+
+**Lo que se espera ver (a 150cc):** Máximo ~86 (parejo con el mejor humano, 86,1), Intenso **120 exacto** (+39 %),
+Imposible **138 exacto** (+60 %). **Falta medirlo** con `medir-cpu-niveles.mjs` (ver 99.13).
+
+### 99.11 El VR según el nivel (la regla v2, `vr-sala.mjs`)
+
+Un crítico (otro agente) revisó la regla de §95/§96 con los 6 niveles. Lo que encontró:
+
+- **Error real:** `anclaCpu` recortaba el nivel a 0..3: Intenso e Imposible contaban como «máximo» (ancla 9400) y, contra
+  CPU a las que nadie les gana, eso llevaba a todos a ~2800.
+- **No existe un ancla buena para un nivel al que nadie gana:** funcionaría como un **imán** (todos al mismo VR).
+- **La lotería:** con la CPU 6599 o más por encima, perder costaba 0 y ganar pagaba hasta 112 (subía a los
+  principiantes de 849 a 2634 en máximo).
+- Solo con CPU (el otro humano «fuera» en el cuadro 0) se cobraba la parte entera de las CPU; una **cuenta alterna
+  quieta** daba de +500 a +2600; con un `.wasm` viejo se contaba «máximo» aunque corrieran como «normal»; se truncaba
+  hacia el cero; no había tope por carrera.
+
+**La regla v2** (adoptada tal cual la recomendó; las anclas de difícil y máximo bajan a 7300 y 9000):
+
+- Entre humanos, la regla del juego sin tocar.
+- Fácil a Máximo: la de §95 con **zona muerta** (si perder no cuesta, ganar no paga), redondeo al entero más cercano y
+  **fusible** de ±112 para la parte de las CPU.
+- Intenso e Imposible («fuera de escala»): las CPU no ponen ni sacan VR; entre cada par de humanos, la **segunda
+  llegada** (gana quien le ganó a más CPU; a igual VR, 16 y 24), de suma cero.
+- Con menos de 2 humanos, nada. Quien no tocó un botón 30 s seguidos en el primer minuto es un **ausente** = cortado
+  (`lockstep.estado().quieto`). El VR usa el nivel que el gancho dice que **aplicó** (`_mkw_cpu_estado(2)`); si no es el
+  pedido, las CPU no cuentan.
+
+Ejemplo (2 humanos de 5000 + 10 CPU), 1.º / 12.º: fácil +25/−65 · normal +39/−39 · difícil +69/−23 · máximo +101/−17 ·
+intenso +29/−29 · imposible +37/−37 (si los dos quedan detrás de las 10 CPU: ±13, el par). Banco `vr-sala` 58 (6
+cambiados, 13 nuevos); `prueba-vr` (la curva contra el juego) igual.
+
+### 99.12 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| Bancos `lockstep` / `relevo` / `sala-carrera` / `red` / `sala-playlist` | 47 / 38 / 77 / 28 / 37 (todos a la vez, 9 de 9 páginas) |
+| Bancos `preparacion` / `controles` / `dificultad-cpu` / `vr-sala` | 15 / 45 / 28 / 58 |
+| Sitio `mkw.test.cjs` + `mkw-worker.test.cjs` | 27 / 27 (los 5 que fallan en el sitio entero son de otros juegos: el salón, «bots-mkw», los marcos de campeón) |
+| `prueba-sincro --directa --cpu=intenso` / `--cpu=imposible` | 13 / 13 (huellas iguales en las dos pestañas) |
+| `prueba-vr` | 6 / 6 |
+| `prueba-doce --n 12` | 11 / 11 (2,0 min) |
+| `prueba-sincro --directa --cpu=imposible` (con el reloj nuevo) / `prueba-sala --rapida` | 13 / 42 |
+| `prueba-relevo` | 10 / 10 y 9 / 10 según la corrida: la espera de A en la traba de 1,5 s varía (317-1075 ms; ver 99.13) |
+
+### 99.13 Lo que queda
+
+- **Medir Intenso e Imposible** con `node herramientas/medir-cpu-niveles.mjs --etiqueta m23 --combos
+  c150:maximo,c150:intenso,c150:imposible,c100:intenso,c100:imposible` (debe dar 120,0 / 138,0, y en 200cc 200 / 230) y
+  ver si la IA a 138 se cae más en pistas cerradas (si pasa: tope ×1,10 o giro ×1,15).
+- Del crítico de la red, sin hacer todavía: **H1.4** (reenviar los mensajes de la sala por otro par cuando dos no se
+  hablan), **H9** (el estado de la sala solo cuando cambia, con un latido que lleva la versión), **H1.2** (la prueba
+  de conexión en el vestíbulo, 🟢/🛰/🔴 por piloto) y **S3** (que el «terminé» valga solo de un humano que corrió).
+- **La espera de A en la traba de 1,5 s de `prueba-relevo` varía** entre 0,3 y 1,1 s según la corrida (con tres juegos en
+  la misma PC; sin el relevo rápido es la traba entera). La prueba ahora dice a quién esperó cada uno en ese rato
+  (`esperaDe`): mirar si es a B (la pausa tarda) o a C (la de la red mala).
+- **La sincronía y ponerse al día se pisan un poco**: el que va adelante se frena por el de atrás, que además se pone
+  al día; el que se frena manda sus botones más justos y su retraso sube (`prueba-relevo`, «C paga su conexión», a veces
+  falla por eso: A sube a 7). Revisar el umbral de la sincronía ahora que existe ponerse al día.
+- Compilar el programa final y subirlo a R2 (lo hace el dueño cuando diga).

@@ -134,7 +134,10 @@ ok('…y no todos igual (cada uno con sus teclas)', new Set(humanos.map(i => (av
 // 3) la meta: los N cruzan por código en el MISMO cuadro de la carrera (mkwTerminarEn: el juego llama EndLap hasta la
 //    última vuelta) y el juego sigue con los resultados (partes del juego que guardan a los humanos de a 4, §91)
 await Promise.all(paginas.map(p => p.keyboard.up('KeyK').catch(() => {})));
-const meta = Math.max(...cuadros) + 90;
+// (§99: con una lectura fresca y 300 cuadros de margen: con 12 juegos en una PC las comprobaciones de arriba tardan
+// más que 90 cuadros y el cuadro de la meta ya había pasado cuando se agendaba)
+const ahoraCuadros = await Promise.all(paginas.map(p => p.evaluate(() => window.mkwSincro?.lockstep?.estado().cuadro ?? 0).catch(() => 0)));
+const meta = Math.max(...cuadros, ...ahoraCuadros) + 300;
 // (mkwTerminarEn existe en la sala; aquí, una carrera directa, lo mismo a mano: la bandera del juego en el mismo cuadro)
 await Promise.all(paginas.map(p => p.evaluate(([c, q]) => { const ls = window.mkwSincro.lockstep, m = q.reduce((x, i) => x | (1 << i), 0);
   ls.enCuadro(ls.estado().carrera, c, () => window.mkw._mkw_sala_terminar(m)); return true; }, [meta, humanos]).catch(() => false)));

@@ -289,6 +289,11 @@ def main():
                   # AI::Params::Load e ItemSlotData::DecideItem (las de RR) -> cpu_dificultad_nativo.cpp: los niveles de la CPU
                   # de la página, más altos que los del juego; «máximo» = todo al tope (M20, §96)
                   "rr_overlay_8073ACA8": "rr_overlay_8073ACA8_traducida", "rr_overlay_807BB42C": "rr_overlay_807BB42C_traducida",
+                  # §99 (M23): «intenso» e «imposible» -> cpu_dificultad_nativo.cpp: GetCustomKartAIParam de Pulsar (la tabla del
+                  # Hard AI de RR la elige la página, no el ajuste guardado), ApplyPlayerStatChanges de Pulsar (las estadísticas
+                  # de cada kart de CPU al crearlo) y Movement::UpdateAcceleration de RR (el tope de velocidad de las CPU)
+                  "rr_kamek_81830C50": "rr_kamek_81830C50_traducida", "rr_kamek_81839710": "rr_kamek_81839710_traducida",
+                  "rr_overlay_8057B9BC": "rr_overlay_8057B9BC_traducida",
                   # Racedata_InitRace de Pulsar -> directo_nativo.cpp: el espejo de verdad (fuera de línea RR convierte la marca
                   # de espejo del menú en «100cc»; la página la pone en la carrera, después de Pulsar, §96)
                   "rr_kamek_81855954": "rr_kamek_81855954_traducida",

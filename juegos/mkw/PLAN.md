@@ -461,8 +461,25 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 7. **Legal**: el `.wasm` y los archivos de RR nunca son públicos.
 
 ## Registro de avances
+- ✅ M23. (Pedido del dueño, 2026-10-22) **La red según el crítico, la carga de la sala, Intenso/Imposible y el VR por
+  nivel.** Un crítico de la red (solo revisar) confirmó que compartir botones es el enfoque correcto y encontró cómo el
+  lag de uno llegaba a los 11; el dueño dijo sí a todo. Hecho: la cortina con barra de progreso hasta que el navegador
+  está en calma (la lista de copas ya no se traba), sin B ni START en la sala, el editor de Mii escondido; paquetes con
+  acuse, TURN e ICE restart, la toma del anfitrión que desaparece, la largada pareja, la autoridad por estabilidad,
+  **ponerse al día** (el runtime corre cuadros seguidos: `mkw_prisa`) y **el relevo rápido** (al callado se lo pausa a
+  los 150 ms y vuelve a manejar); los niveles **Intenso** (el Hard AI de RR) e **Imposible** (además, solo las CPU: tope
+  ×1,15, base ×1,15, aceleración ×1,5); el VR v2 (otro crítico: zona muerta, fusible, segunda llegada en los niveles
+  fuera de escala, ausente = cortado). Falta: medir Intenso/Imposible, H1.4, H9, H1.2 y S3 del crítico (§99)
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-22 04:06** — **La red según el crítico, la carga de la sala, Intenso e Imposible y el VR por nivel** (§99, M23). La
+  cortina de la sala con barra de progreso (después de abrir la lista de copas: 3 tareas largas y 241 ms en vez de 7 y
+  1,4 s). La red: la autoridad por estabilidad (la ida y vuelta en el informe: el papel ya no va a quien recibe todo
+  tarde; `prueba-relevo` A 4, B 5, C 9), ponerse al día (Carla con tirones de 300 ms: 0,7 cuadros atrás en vez de
+  16-83), el relevo rápido (pestaña trabada 1 s: Ana espera 184 ms en vez de 983; cinco trampas encontradas en Node, ver
+  §99.9), la largada pareja y la toma del anfitrión. Intenso e Imposible con tres envolturas nuevas (`prueba-sincro`
+  13/13 con cada uno). El VR v2 (banco `vr-sala` 58). Pendiente medir las velocidades de Intenso/Imposible.
 
 - **2026-10-21 17:45** — **La pantalla completa al empezar, opcional y apagada** (§98.10, el dueño después de probar con
   `jugar.bat`: «demasiado lag al abrir la lista de mapas en el host»). El modo inmersivo pone encima del juego la

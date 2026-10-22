@@ -109,8 +109,9 @@ export function crearDirecto({ M, lector, nota = () => {} }) {
   function escribirFicha(f) {
     aplicarPerfilCpu(M, f.cpu ?? 1);   // M20 (§96): cuánto sube cada perilla de la CPU (cpu_dificultad_nativo.cpp)
     // (con un programa de antes de §96 —sin _mkw_cpu_perfil— el nivel va tal cual a la carrera: «máximo» (3) sería una
-    // fila que el juego no tiene; ahí va como su difícil, 2)
-    const nivel = Math.min(f.cpu ?? 1, typeof M._mkw_cpu_perfil === 'function' ? 3 : 2);
+    // fila que el juego no tiene; ahí va como su difícil, 2. §99: sin _mkw_cpu_perfil_kart, intenso e imposible van
+    // como máximo)
+    const nivel = Math.min(f.cpu ?? 1, typeof M._mkw_cpu_perfil_kart === 'function' ? 5 : typeof M._mkw_cpu_perfil === 'function' ? 3 : 2);
     const p = M._mkw_directo_ficha() >> 2, H = new Int32Array(M.HEAPU8.buffer);   // (el programa no publica HEAP32)
     H.fill(0, p, p + 64);
     const v = [f.pista, f.variante || 0, f.cc ?? 2, f.espejo ? 1 : 0, nivel, f.objetos || 0, f.modo ?? 1, f.carrera || 0,
@@ -161,7 +162,7 @@ export function crearDirecto({ M, lector, nota = () => {} }) {
 // §73: la ficha de una carrera VS. humanos = [{ personaje, vehiculo, mando }] (los de esta consola, mando = su puerto);
 // con cpu ≠ 'ninguna' el resto de los 12 puestos son CPU con personaje y vehículo sacados de la semilla (armarPlantel:
 // los mismos en todas las consolas con la misma semilla). pista = id de Pulsar (0x100 + 4·copa + fila).
-// cc: 'c50' | 'c100' | 'c150' | 'espejo'. cpu: 'facil' | 'normal' | 'dificil' | 'ninguna'.
+// cc: 'c50' | 'c100' | 'c150' | 'espejo'. cpu: 'facil' | 'normal' | 'dificil' | 'maximo' | 'intenso' | 'imposible' | 'ninguna'.
 export function armarFicha({ pista, cc = 'c150', cpu = 'normal', humanos = [{ personaje: 0, vehiculo: 1, mando: 0 }], semilla = 0,
                              carrera = 0, carreras = 4, objetos = 0, primera = carrera === 0, intro = false }) {
   const plantel = armarPlantel({ humanos, semilla: semilla || (Math.random() * 2 ** 32) >>> 0 });   // sin semilla: CPU al azar
@@ -172,6 +173,6 @@ export function armarFicha({ pista, cc = 'c150', cpu = 'normal', humanos = [{ pe
   return { pista, cc: { c50: 0, c100: 1, c150: 2, espejo: 2 }[cc] ?? 2, espejo: cc === 'espejo', modo: 1,
            // M20 (§96): el nivel de la página (0 fácil, 1 normal, 2 difícil, 3 máximo); directo_nativo.cpp le da al juego
            // una fila de su tabla un nivel más arriba y cpu_dificultad_nativo.cpp sube «difícil» y «máximo»
-           cpu: { facil: 0, normal: 1, dificil: 2, maximo: 3 }[cpu] ?? 1, objetos, carrera, carreras, primera, puestos, intro,
+           cpu: { facil: 0, normal: 1, dificil: 2, maximo: 3, intenso: 4, imposible: 5 }[cpu] ?? 1, objetos, carrera, carreras, primera, puestos, intro,
            semilla: s1 ? [s1, Math.imul(s1, 0x85EBCA6B) >>> 0] : null };
 }

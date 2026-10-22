@@ -144,6 +144,15 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
   ok('M22: en la playlist no hay reloj (armar una lista lleva su tiempo)', !ap.estado().plazo && !vencio.includes('lista') && ap.estado().fase === 'copa',
      `plazo ${ap.estado().plazo} · ${vencio.join()}`);
   [ap, bp, cp].forEach(x => x.detener());
+  // §99: el reloj de la copa espera a que la página de la anfitriona esté preparada (la lista de copas abierta sin trabas)
+  salas.clear();
+  const al = persona('ana', { segundosCopa: 90, esperarListo: true }), bl = persona('beto'), cl = persona('caro');
+  for (let i = 0; i < 6; i++) await avanzar(1000);
+  ok('§99: mientras la anfitriona se prepara, la copa no tiene reloj', al.estado().fase === 'copa' && !al.estado().plazo && !bl.estado().plazo);
+  al.copaLista(); await avanzar(0);
+  ok('§99: preparada, el reloj de 90 s empieza desde ahí y lo ven todos', al.estado().plazo === t + 90000 && bl.estado().plazo === al.estado().plazo,
+     `plazo en ${(al.estado().plazo - t) / 1000} s`);
+  [al, bl, cl].forEach(x => x.detener());
 }
 
 // 6) la anfitriona se va a mitad de la copa: la sala del sitio dice que manda Beto, y la copa sigue con él

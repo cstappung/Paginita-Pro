@@ -179,7 +179,7 @@ int g_hay_ficha = 0;            // 1 = el próximo salto es a una carrera con es
 // M20 (§96): el nivel de la CPU de la ficha es el de la página (0 fácil, 1 normal, 2 difícil, 3 máximo), más alto que
 // los del juego. Al juego va una fila de su tabla un nivel más arriba (fácil → su normal; normal, difícil y máximo →
 // su difícil) y cpu_dificultad_nativo.cpp sube «difícil» y «máximo» cuando el juego carga los parámetros de la IA.
-constexpr uint32_t kFilaDelJuego[4] = {1, 2, 2, 2};
+constexpr uint32_t kFilaDelJuego[6] = {1, 2, 2, 2, 2, 2};   // (§99: intenso e imposible, la difícil)
 int32_t g_nivel_cpu = -1;       // el de la última ficha escrita (-1 = ninguna: una carrera armada con los menús)
 int32_t g_espejo = 0;           // §96: la última ficha pidió espejo (la marca va en la carrera, ver rr_kamek_81855954)
 int32_t g_espejos = 0;          // (para mirar) cuántas carreras quedaron en espejo así
@@ -213,7 +213,7 @@ bool escribirFicha(const CpuContext* ctx, uint32_t sm) {
     // pone 0 aquí y abre la carrera (Raceinfo, etapa 0: 0x80533364)
     Memory::Write32(aj + 0xC, f[FICHA_INTRO] ? 5u : 0u);
     Memory::Write32(aj + 0x10, 0);
-    g_nivel_cpu = f[FICHA_CPU] < 0 ? 0 : f[FICHA_CPU] > 3 ? 3 : f[FICHA_CPU];
+    g_nivel_cpu = f[FICHA_CPU] < 0 ? 0 : f[FICHA_CPU] > 5 ? 5 : f[FICHA_CPU];
     Memory::Write32(aj + 0x14, kFilaDelJuego[g_nivel_cpu]);                // la fila del juego: 1 normal, 2 difícil
     Memory::Write32(aj + 0x18, static_cast<uint32_t>(f[FICHA_OBJETOS]));
     Memory::Write32(aj + 0x20, 0);                                         // la copa (solo GP)

@@ -95,6 +95,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const piloto = { botones: 0 };                  // la página aprieta botones sola (menus.mjs: ir a una copa/pista)
   let silencio = false;                           // true = el juego no recibe nada de la persona (menú de inicio)
   let cerrojo = null;                             // §94: función que dice si AHORA lo de la persona no va al juego (la sala)
+  let filtro = null;                              // §99: función que dice qué botones de la persona NO van al juego ahora (la sala)
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
@@ -237,7 +238,11 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       // silenciado (el menú de inicio, inicio.mjs, está encima): al juego le llega solo lo del piloto; lo de la
       // persona lo lee el menú (estado.puertos y estado.mandos siguen al día), como un interruptor que corta la
       // salida pero deja el medidor conectado
-      const s = callado ? { conectado: d.conectado, botones: p === 0 ? piloto.botones : 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 } : d;
+      // §99: y los botones que la sala no deja pasar ahora (Start = la pausa del juego, que tiene «Salir»; B en la
+      // primera pantalla de personajes = volver al menú): se borran de lo que se manda, como un relé que abre esa línea
+      const quita = filtro ? (filtro() | 0) : 0;
+      const s = callado ? { conectado: d.conectado, botones: p === 0 ? piloto.botones : 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 }
+        : quita && (d.botones & quita) ? { ...d, botones: d.botones & ~quita } : d;
       const firma = [s.conectado, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr].join();
       if (firma === ultimo[p]) return;            // sin cambios: no hace falta volver a mandarlo
       ultimo[p] = firma;
@@ -262,6 +267,8 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     // §94: lo mismo, pero preguntado en cada cuadro (la sala: después de los resultados de la carrera, para que A no
     // abra el menú de «carrera siguiente» del juego). null = sin cerrojo
     cerrojo(f) { cerrojo = typeof f === 'function' ? f : null; paso(); },
+    // §99: filtro(f) = f() devuelve, en cada cuadro, los bits de botones que no llegan al juego (null = ninguno)
+    filtro(f) { filtro = typeof f === 'function' ? f : null; paso(); },
     get silenciado() { return silencio; },                           // volver a mandar todo (p. ej. al arrancar el juego)
     reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
     esperando: () => esperandoTecla,

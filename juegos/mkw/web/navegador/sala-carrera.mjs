@@ -58,6 +58,7 @@
 //       anfitrión: s.ponerPistas([{copa, fila}, …]);  todos: s.elegi({ personaje, vehiculo, derrape }) (en la fase de
 //       elegir y, M22, en el descanso: el personaje nuevo corre desde la carrera siguiente, la misma en todas),
 //       s.termine(n, puntos, desde) (§75: los 12 puntos que lleva esta consola y la primera carrera que corrió)
+//       (y §94 la llegada, M22 las skins, §99 D cuántos ratos malos tuvo: estable {malas, atras, rtt} → la próxima autoridad)
 //       si el anfitrión se va (lo dice la sala del sitio): s.cambiarAnfitrion(uid) en todos → sigue el nuevo, desde su copia
 //       §74 playlist: todos s.sugerir(p) → 'sugerida' | 'ya-esta' | 'ya-sugerida' | 'tope' | 'llena' | 'nada';
 //       anfitrión: s.listaCambio(pistas) (la lista entera, al armarla), s.restantesCambio(pistas) (las que vienen
@@ -71,7 +72,7 @@
 // los MISMOS números (vr-sala.mjs): lo que pierde uno contra otro es lo que el otro gana. §95: y con la misma regla de
 // las CPU (vrCarrera.cpu: la REGLA_CPU de la página de la anfitriona; reglaCpuDe(estado, n)).
 import { crearPlaylistSala } from './playlist-sala.mjs';
-import { VR_MAXIMO, REGLA_CPU } from './vr-sala.mjs';
+import { VR_MAXIMO, copiaRegla } from './vr-sala.mjs';
 
 export const MARCA_SALA = 0xA8;
 export const SEGUNDOS_ELEGIR = 45;
@@ -90,7 +91,7 @@ const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 4, pistas = null, enviar, alCambiar = () => {},
   ahora = () => Date.now(), cada = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
   registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {},
-  segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {} }) {
+  segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {}, esperarListo = false }) {
   let jefe = anfitrion, deQuien = anfitrion;      // quién manda ahora, y de quién vino la última copia aceptada
   const soy = () => jefe === yo;
   const creada = ahora();
@@ -99,6 +100,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   let salto = 0;                                  // §75: la carrera que esta página se salta (recargó con ella andando)
   let pedida = 0;                                 // §75 (la anfitriona): el número de la última copia pedida
   let desfase = 0;                                // §94: reloj de la anfitriona − el mío (los plazos son horas suyas)
+  // §99 (C4): la diferencia con una ida y vuelta, como NTP: cada latido lleva mi hora (t0); la anfitriona contesta con
+  // la suya (t1); con la ida y vuelta medida, desfase = t1 + ida/2 − ahora. De las últimas 8, la de la ida y vuelta más
+  // corta (la que menos esperó en la red). Antes se tomaba de un solo reparto, sin descontar lo que tardó: el error era
+  // la ida entera (10-75 ms)
+  const horas = [];
+  let desfaseNtp = null;
   const esHumano = uid => humanos.some(h => h.uid === uid);
   const sacados = new Set();                      // §87: los que salieron de la sala del sitio (echados, votados, idos)
   // §75: los que no dieron señales en PRESENTE_MS (la anfitriona siempre está: es ella la que pregunta). §87: y los que
@@ -109,13 +116,27 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
-    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null };
+    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null, estable: {}, autoridad: null };
+  // §99 (D): la primera autoridad de cada carrera (la que releva a los atrasados): el más estable de las anteriores
+  // (estado.estable: uid → los ratos malos que contó su consola —la mayoría lo vio tarde, o iba atrás—, sumados); al que no contó
+  // nada (recargó, se cortó) se le ponen ESTABLE_SIN_DATO. Empate: el orden de la sala
+  const ESTABLE_SIN_DATO = 5;
+  const elegirAutoridad = fuera => {
+    let mejor = null, p = Infinity;
+    for (const h of humanos) {
+      if (fuera.includes(h.uid)) continue;
+      const x = estado.estable?.[h.uid] ?? ESTABLE_SIN_DATO;
+      if (x < p) { p = x; mejor = h.uid; }
+    }
+    return Object.keys(estado.estable || {}).length ? mejor : null;
+  };
+  const contadoEstable = new Set();             // «carrera:uid» ya sumados (cada consola manda su «terminé» una vez)
   // M22: el descanso entre carreras (la carrera de ahora terminó para todos y corre el plazo hasta la siguiente): ahí
   // se puede cambiar de personaje y vehículo
   const enDescanso = () => estado.fase === 'correr' && estado.carrera >= 1 && !!estado.terminaron?.[estado.carrera] && estado.plazo > 0 &&
     estado.carrera < estado.carreras;
   // §82: los VR de ahora, congelados para la carrera n (§95: con la regla de las CPU, en JSON: viaja en el estado)
-  const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) }, cpu: { ...REGLA_CPU, anclas: [...REGLA_CPU.anclas] } });
+  const congelar = n => ({ n, vrs: { ...(estado.vrs || {}) }, cpu: copiaRegla() });   // (§99: la regla v2, entera)
   const yaVistas = new Set();                  // carreras que este navegador ya arrancó
 
   const codificar = m => { const t = new TextEncoder().encode(JSON.stringify(m)); const b = new Uint8Array(t.length + 1); b[0] = MARCA_SALA; b.set(t, 1); return b; };
@@ -130,10 +151,11 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     if (lista) alCambiar(estado);
   }
   let vencida = 0;                                // M22: el plazo de la copa que ya se avisó (uno por plazo)
+  let listoCopa = !esperarListo;                  // §99: el reloj de la copa corre recién con la página preparada
   function revisar() {
     if (!soy()) return;
     const t = ahora();
-    if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0) {
+    if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0 && listoCopa) {
       // M22: la copa con reloj (lo ven todos); al vencer, la página de la anfitriona pone una al azar
       if (!estado.plazo) cambiar({ plazo: t + segundosCopa * 1000 });
       else if (t >= estado.plazo && vencida !== estado.plazo) { vencida = estado.plazo; alVencioCopa(); }
@@ -142,7 +164,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (todos || t >= estado.plazo) {
         const picks = { ...estado.picks };
         humanos.forEach((h, i) => { if (!picks[h.uid]) picks[h.uid] = { personaje: POR_OMISION[i % 4][0], vehiculo: POR_OMISION[i % 4][1], derrape: 0, solo: true }; });
-        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, fuera: ausentes(), vrCarrera: congelar(1) });
+        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, fuera: ausentes(), vrCarrera: congelar(1), autoridad: null });
       }
     } else if (estado.fase === 'correr') {
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
@@ -150,11 +172,11 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (fin && !estado.plazo) cambiar({ plazo: t + segundosResultados * 1000 });
       else if (estado.plazo && t >= estado.plazo) {
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
-        else cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera: ausentes(), vrCarrera: congelar(n + 1) });
+        else { const fuera = ausentes(); cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera, vrCarrera: congelar(n + 1), autoridad: elegirAutoridad(fuera) }); }
       }
     }
   }
-  const latido = () => aTodos({ t: 'aqui', v: estado.version, salta: salto });
+  const latido = () => aTodos({ t: 'aqui', v: estado.version, salta: salto, t0: ahora() });
   const reparto = cada(() => {
     latido();
     if (!soy()) return;
@@ -178,7 +200,17 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       // §75: el latido. Si se salta una carrera, que la carrera sincronizada lo sepa; si trae un estado más nuevo que
       // el mío y yo mando (recargué, o soy la anfitriona nueva y otro vio más que yo), le pido la copia
       if ((m.salta | 0) > 0 && esHumano(de)) alSalta(de, m.salta | 0);
+      if (soy() && Number.isFinite(m.t0) && esHumano(de)) enviar(de, codificar({ t: 'hora', t0: m.t0, t1: ahora() }));   // (§99)
       if (soy() && (m.v | 0) > estado.version && (m.v | 0) > pedida && esHumano(de)) { pedida = m.v | 0; enviar(de, codificar({ t: 'dame' })); }
+      return;
+    }
+    if (m.t === 'hora' && de === jefe && !soy() && Number.isFinite(m.t0) && Number.isFinite(m.t1)) {
+      const t = ahora(), ida = t - m.t0;
+      if (ida >= 0 && ida < 5000) {
+        horas.push({ ida, d: m.t1 + ida / 2 - t });
+        if (horas.length > 8) horas.shift();
+        desfaseNtp = horas.reduce((a, b) => (b.ida < a.ida ? b : a)).d;
+      }
       return;
     }
     if (m.t === 'dame' && de === jefe && !soy()) { enviar(de, codificar({ t: 'copia', estado })); return; }
@@ -195,6 +227,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // primera de todas aunque sea la número 0, §75: con ella la página sabe en qué va la sala)
     // (§94: cada reparto trae la hora de la anfitriona: la diferencia con la mía, para los plazos)
     if (m.t === 'estado' && !soy() && de === jefe && Number.isFinite(m.reloj)) desfase = m.reloj - ahora();
+    if (desfaseNtp !== null && !soy()) desfase = desfaseNtp;
     if (m.t === 'estado' && !soy() && de === jefe && m.estado && (!lista || m.estado.version > estado.version || deQuien !== jefe)) {
       estado = m.estado; deQuien = jefe; lista = true; alCambiar(estado);
     } else if (!lista) {
@@ -226,6 +259,14 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       // M22: las skins de las CPU (Retro Rewind las sortea solo en la primera carrera de cada consola): las de una que
       // corrió desde la 1, una vez. Quien recarga no las sortea; con estas todas muestran las mismas CPU
       if (skinsValidas(m.skins) && !estado.skins && desde === 1) cambio.skins = m.skins.map(x => x | 0);
+      // §99 (D): cuántos ratos malos tuvo esa consola en la carrera (mandando y recibiendo), para elegir la autoridad
+      const k = `${m.carrera}:${de}`;
+      if (m.estable && !contadoEstable.has(k)) {
+        contadoEstable.add(k);
+        // (y su red: cada 10 ms de ida y vuelta típica cuenta como un rato malo; la autoridad con la red lenta atrasa a todos)
+        const malos = Math.min(9999, Math.max(0, (m.estable.malas | 0) + (m.estable.atras | 0) + Math.round(Math.min(500, Math.max(0, +m.estable.rtt || 0)) / 10)));
+        cambio.estable = { ...(estado.estable || {}), [de]: ((estado.estable || {})[de] | 0) + malos };
+      }
       if (Object.keys(cambio).length) { cambiar(cambio); revisar(); }
     }
   }
@@ -264,6 +305,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     cambiarAnfitrion(uid) {
       if (!uid || uid === jefe || !humanos.some(h => h.uid === uid)) return false;
       jefe = uid;
+      horas.length = 0; desfaseNtp = null;          // (§99: las horas medidas eran con la anfitriona de antes)
       registro(`[sala] anfitrión nuevo: ${uid}${soy() ? ' (yo)' : ''}`);
       // (la nueva anfitriona da por presentes a todos desde ahora: no los venía oyendo con su reloj)
       if (soy()) { deQuien = yo; lista = true; for (const h of humanos) vistos.set(h.uid, ahora()); cambiar({}); revisar(); }
@@ -321,9 +363,14 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // §75: con los puntos que lleva esta consola (12) y la primera carrera de la copa que corrió
     // §94: y la llegada (los 12 puestos en que terminó cada uno: la parrilla de la carrera siguiente)
     // (M22: skins = las 12 skins de Retro Rewind que sorteó esta consola en la carrera 1, ver más abajo)
-    termine(n, puntos = null, desde = 0, llegada = null, skins = null) { alAnfitrion({ t: 'termine', carrera: n, puntos, desde, llegada, skins }); },
+    termine(n, puntos = null, desde = 0, llegada = null, skins = null, estable = null) {
+      alAnfitrion({ t: 'termine', carrera: n, puntos, desde, llegada, skins,
+                    estable: estable ? { malas: estable.malas | 0, atras: estable.atras | 0, rtt: Math.round(+estable.rtt || 0) } : null });
+    },
     // §94: cuánto falta para un plazo de la sala (una hora del reloj de la anfitriona), en ms (0 si ya pasó)
-    restan(plazo) { return plazo ? Math.max(0, plazo - (ahora() + desfase)) : 0; },
+    restan(plazo) { return plazo ? Math.max(0, plazo - (ahora() + (soy() ? 0 : desfaseNtp ?? desfase))) : 0; },
+    // (§99: la diferencia de reloj con la anfitriona que se está usando, ms; para las pruebas)
+    get desfase() { return soy() ? 0 : desfaseNtp ?? desfase; },
     // ¿esta carrera ya la arranqué? (para arrancar cada una una sola vez)
     arrancar(n) { if (yaVistas.has(n)) return false; yaVistas.add(n); return true; },
     // §75: esta página se salta la carrera n (recargó con ella andando, o la anfitriona la dejó fuera): lo dice en
@@ -333,6 +380,8 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // empiece después queda fuera en todas las consolas (la anfitriona lo pone en `fuera`), aunque siga conectado
     quitar(uid) { if (!esHumano(uid) || uid === yo || sacados.has(uid)) return false; sacados.add(uid); return true; },
     get lista() { return lista; },
+    // §99: la página está preparada (la lista de copas se puede abrir sin trabarse): desde ahora corre el reloj de la copa
+    copaLista() { if (listoCopa) return; listoCopa = true; revisar(); },
     detener() { parar(reparto); },
   };
 }

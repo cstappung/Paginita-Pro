@@ -42,10 +42,9 @@ import { filasDeTabla } from './letreros.mjs';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
 const RECARGA = process.argv.includes('--recarga');
-// --rapida: para repetir lo demás sin las esperas que la prueba mide (el descanso de 30 s y el DNF de 30 s): descansos
-// de 25 s y la carrera 2 también termina por código. Esos puntos se saltan (o miden 25 s)
+// --rapida: para repetir lo demás sin la espera del DNF de 30 s (la carrera 2 también termina por código; ese punto se salta).
 const RAPIDA = process.argv.includes('--rapida');
-const DESCANSO = RAPIDA ? 25 : 30;
+const DESCANSO = 30;   // (también con --rapida: volver a elegir necesita el descanso entero)
 // §96: --cpu=maximo|dificil|normal|facil = el nivel de la CPU de la sala (el de la sala por omisión es máximo)
 const CPU = (process.argv.find(a => a.startsWith('--cpu=')) || '--cpu=normal').slice(6);
 const LIMITE = 120;                   // s: el tiempo límite de la carrera en la prueba (el del juego es de minutos)
@@ -74,7 +73,7 @@ async function abrir(nombre, uid) {
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
-    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}${RAPIDA ? `&descanso=${DESCANSO}` : ''}`);
+    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}`);
   return p;
 }
 const A = await abrir('A', uidA);
@@ -159,6 +158,13 @@ const elegir = async (p, nombre, derecha) => {
   }
   return await leer(p);
 };
+// §99: en la sala nadie se sale de la pantalla de personajes con B (volver al menú del juego)
+const enPersonajes = x => x?.s === 0x49 && x.pagina === 0x6B && !x.cortina;
+const per0 = await esperarQue(A, enPersonajes, 60000);
+for (let k = 0; k < 3; k++) { await A.keyboard.down('KeyJ'); await espera(150); await A.keyboard.up('KeyJ'); await espera(400); }
+await espera(1500);
+const per1 = await leer(A);
+ok('§99: en la pantalla de personajes, B (volver atrás) no saca a A de la sala', enPersonajes(per0) && enPersonajes(per1), `antes ${hex(per0?.s)}/${hex(per0?.pagina)} → ${hex(per1?.s)}/${hex(per1?.pagina)}`);
 const [ea, eb] = await Promise.all([elegir(A, 'A', false), elegir(B, 'B', true)]);
 ok('las dos eligieron personaje, vehículo y derrape con las pantallas del juego', !!(ea?.eleccion && eb?.eleccion),
    `A ${JSON.stringify(ea?.eleccion)} · B ${JSON.stringify(eb?.eleccion)}`);
@@ -172,6 +178,13 @@ const p1 = ra?.sala?.pistas?.[0];
 ok('corre la pista 1 de la copa que armó la anfitriona', p1 && [ra, rb].every(x => x.ganadora === 0x100 + 4 * p1.copa + p1.fila), `${JSON.stringify(p1)} → A ${hex(ra?.ganadora)} B ${hex(rb?.ganadora)}`);
 ok('los dos humanos son jugadores de verdad (tipo 0), el resto CPU, en las dos', [ra, rb].every(x => x?.tipos?.[0] === 0 && x.tipos[1] === 0 && x.tipos[2] === 1), `A ${ra?.tipos} B ${rb?.tipos}`);
 ok('cada una tiene SU pantalla (A la del puesto 0, B la del puesto 1)', ra?.pantalla === 0 && rb?.pantalla === 1, `A ${ra?.pantalla} B ${rb?.pantalla}`);
+// §99: Esc (Start, la pausa del juego, que tiene «Salir») no llega al juego en la sala: la carrera sigue en las dos
+const antesEsc = await leer(B);
+for (let k = 0; k < 2; k++) { await B.keyboard.down('Escape'); await espera(150); await B.keyboard.up('Escape'); await espera(500); }
+await espera(1500);
+const [pa1, pb1] = [await leer(A), await leer(B)];
+ok('§99: B aprieta Esc (Start) en la carrera y no se pausa: la carrera sigue en las dos', [pa1, pb1].every(x => x?.s === 0x20 && (x.ls?.cuadro || 0) > (antesEsc?.ls?.cuadro || 0) + 60),
+   `cuadro ${antesEsc?.ls?.cuadro} → A ${pa1?.ls?.cuadro} B ${pb1?.ls?.cuadro}; páginas A ${hex(pa1?.pagina)} B ${hex(pb1?.pagina)}`);
 // M22: los nombres de la sala en el juego (sin el sitio: «Jugador 1» y «Jugador 2»), los mismos en las dos consolas
 const nombreBien = x => x?.miis?.[0]?.nombre === 'Jugador 1' && x.miis[1]?.nombre === 'Jugador 2' && x.miis.every(m => m.cargado && !m.player);
 ok('M22: cada humano lleva su nombre en el juego (el Mii de su puesto, sin «Player»), igual en las dos', nombreBien(ra) && nombreBien(rb),
@@ -267,14 +280,9 @@ if (!RECARGA) {
   vr1 = { [uidA]: xa?.vr?.despues, [uidB]: xb?.vr?.despues };
   // §94: el panel del descanso, en las dos: «Copa», la cuenta y los resultados de los dos con su VR, sin botones
   const conVr = x => x?.breve?.filas?.length === 2 && x.breve.filas.every(f => /VR/.test(f));
-  const [da1, db1] = [await esperarQue(A, conVr, 15000), await esperarQue(B, conVr, 15000)];
-  const cuentaDe = x => Number(/La carrera siguiente en (\d+) s/.exec(x?.breve?.cuenta || '')?.[1] || 0);
-  // (M22: en la copa, el único botón es «Cambiar personaje y vehículo», opcional)
-  ok('§94: el descanso de la copa: «La carrera siguiente en N s» (de 30) y los resultados de los dos con su VR (el cambio de cada uno), en las dos',
-     [da1, db1].every(x => x.breve.cab === 'Copa' && x.breve.botones === 1 && x.breve.kart && cuentaDe(x) > DESCANSO - 15 && cuentaDe(x) <= DESCANSO &&
-       x.breve.filas.some(f => /\(tú\)/.test(f)) && [xa, xb].every(y => x.breve.filas.some(f => f.includes(`(${signo(y.vr.cambio)})`)))),
-     `A «${da1?.breve?.cuenta}» ${JSON.stringify(da1?.breve?.filas)} · B «${db1?.breve?.cuenta}»`);
+  const da1 = await esperarQue(A, conVr, 15000);
   await A.screenshot({ path: path.join(carpeta, '4-A-descanso.png') }).catch(() => {});
+  // (apenas A ve el zócalo: el descanso es de 30 s y volver a elegir necesita ~15)
   // M22: A vuelve a elegir (es opcional) mientras B prueba el cerrojo: «Cambiar personaje y vehículo» abre la pantalla
   // de personajes del juego; A se mueve dos a la derecha y confirma. Lo nuevo corre desde la carrera 2, en las dos
   reelegirA = (async () => {
@@ -292,14 +300,26 @@ if (!RECARGA) {
         if (!visto && x.pagina === 0x6B) {
           visto = true; await espera(700);
           await A.screenshot({ path: path.join(carpeta, '4-A-reelegir.png') }).catch(() => {});
-          for (let k = 0; k < 2; k++) { await A.keyboard.down('KeyD'); await espera(150); await A.keyboard.up('KeyD'); await espera(350); }
+          // (los botones con el «piloto» de la página: la cruz a la derecha dos veces y A; el teclado en esta pantalla ya
+          // se probó al empezar la copa)
+          for (let k = 0; k < 2; k++) { await A.evaluate(() => window.mkwControles.pilotar(0x0002)); await espera(180); await A.evaluate(() => window.mkwControles.pilotar(0)); await espera(350); }
         }
-        if (visto && Date.now() - ultimo > 900) { ultimo = Date.now(); await A.keyboard.down('KeyK'); await espera(150); await A.keyboard.up('KeyK'); }
+        if (visto && Date.now() - ultimo > 900) {
+          ultimo = Date.now();
+          await A.evaluate(() => window.mkwControles.pilotar(0x0100)); await espera(180); await A.evaluate(() => window.mkwControles.pilotar(0));
+        }
       }
       await espera(300);
     }
     return await leer(A);
   })();
+  const db1 = await esperarQue(B, conVr, 15000);
+  const cuentaDe = x => Number(/La carrera siguiente en (\d+) s/.exec(x?.breve?.cuenta || '')?.[1] || 0);
+  // (M22: en la copa, el único botón es «Cambiar personaje y vehículo», opcional)
+  ok('§94: el descanso de la copa: «La carrera siguiente en N s» (de 30) y los resultados de los dos con su VR (el cambio de cada uno), en las dos',
+     [da1, db1].every(x => x.breve.cab === 'Copa' && x.breve.botones === 1 && x.breve.kart && cuentaDe(x) > DESCANSO - 15 && cuentaDe(x) <= DESCANSO &&
+       x.breve.filas.some(f => /\(tú\)/.test(f)) && [xa, xb].every(y => x.breve.filas.some(f => f.includes(`(${signo(y.vr.cambio)})`)))),
+     `A «${da1?.breve?.cuenta}» ${JSON.stringify(da1?.breve?.filas)} · B «${db1?.breve?.cuenta}»`);
   // §94: el cerrojo: B aprieta A durante 12 s en los resultados; sin él, a los ~11 s el juego abría su menú de «carrera
   // siguiente» (página 0x22) y largaba otra carrera fuera de la sala
   const paginasB = new Set();
