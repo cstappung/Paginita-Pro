@@ -217,18 +217,21 @@ export class GameSession {
     try { rock = await cargaFondo(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
     const yo = this.local.find((p) => !p.bot) || this.local[0];
     const rival = this.players.find((p) => p !== yo && p.type === 'remote') || this.players.find((p) => p !== yo) || null;
+    // en una sala de 3 a 8, los demás también tocan en el escenario
+    const otros = rival ? this.players.filter((p) => p !== yo && p !== rival).slice(0, 6) : [];
     this.rock = rock;
     this.rockYo = yo;
     this.rockRival = rival;
-    this.rockSp = [false, false];
-    this.rockCarga = [0, 0];
+    this.rockTodos = [yo, rival, ...otros].filter(Boolean);
+    this.rockSp = this.rockTodos.map(() => false);
+    this.rockCarga = this.rockTodos.map(() => 0);
     this.rockFin = false;
     this.rockT = 0;
     this.rockHumor = 0.3;
     this.rockMuestras = [];
     // los tramos sin notas de cada uno: ahí el rockero deja de tocar
     const fin = this.song.endTime;
-    this.rockDescansos = [yo, rival].map((p) => (p ? { l: descansos(p.track.notes, { fin }), cur: { i: 0 } } : null));
+    this.rockDescansos = this.rockTodos.map((p) => ({ l: descansos(p.track.notes, { fin }), cur: { i: 0 } }));
     rock.monta(document.getElementById('rockbg'));
     // la canción espera a que el escenario esté listo (rockeros armados, shaders y texturas estrenados): si no,
     // los primeros segundos se trababan mientras se preparaba. Con tope, por si el equipo es muy lento.
@@ -237,6 +240,7 @@ export class GameSession {
       rock.enVivo({
         yo: { look: rockSitio.look, nombre: yo?.name },
         rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
+        otros: otros.map((p, i) => ({ uid: p.id || p.name || 'p' + i, nombre: p.name, look: (p.id && rockSitio.looks.get(p.id)) || null })),
         alto: settings.altoRendimiento,
         // si el juego se resiente aun con el fondo al mínimo, se apaga para esta sesión (en la pausa se vuelve a encender)
         alDemasiado: () => {
@@ -279,12 +283,18 @@ export class GameSession {
     // el intervalo real entre cuadros del juego: con él la escena decide cuánto se puede gastar
     const ahora = performance.now(), dtJuego = this.rockT ? (ahora - this.rockT) / 1000 : 0;
     this.rockT = ahora;
-    const D = this.rockDescansos, toca = D.map((d) => (d ? !enDescanso(d.l, now, d.cur) : true));
-    this.rock.pulso({ beats, animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now) });
+    const D = this.rockDescansos, toca = D.map((d) => !enDescanso(d.l, now, d.cur));
+    // con más de dos: el ánimo de cada uno según cuánto lleva respecto del promedio de la sala
+    const E = this.rockTodos.map((p) => p.engine);
+    let confs = null;
+    if (E.length > 2) {
+      const media = E.reduce((a, e) => a + (e.score || 0), 0) / E.length;
+      confs = E.map((e) => Math.max(-0.85, Math.min(0.85, ((e.score || 0) - media) / Math.max(4000, 0.3 * media))));
+    }
+    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs });
     // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
-    // se prende de azul mientras dure (en batalla, la carga es un ataque al rival)
-    [yo, rv].forEach((e, q) => {
-      if (!e) return;
+    // se prende de azul mientras dure (en un mano a mano, la carga es un ataque al rival)
+    E.forEach((e, q) => {
       const sp = e.sp || 0, on = !!e.spActive;
       if (sp > this.rockCarga[q] + 0.2) this.rock.carga(q);
       this.rockCarga[q] = sp;
@@ -293,7 +303,7 @@ export class GameSession {
     });
     if (!this.rockFin && now > this.song.endTime + 0.3) {
       this.rockFin = true;
-      if (rv) this.rock.fin(yo.score >= rv.score ? 0 : 1);
+      if (rv) this.rock.fin(E.reduce((g, e, q) => ((e.score || 0) > (E[g].score || 0) ? q : g), 0));
       else {
         const e = yo.stats().stars;
         this.rock.fin(0, e >= 5 ? '¡LEYENDA!' : e >= 4 ? '¡OVACIÓN!' : e >= 3 ? '¡BIEN TOCADO!' : '¡A ENSAYAR!');

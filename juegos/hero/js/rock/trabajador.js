@@ -5,7 +5,7 @@
 // Mensajes de la página (sitio/rock.js):
 //   {t:'lienzo', canvas, w, h, dpr}  el OffscreenCanvas (una sola vez) → carga la escena y contesta {t:'listo'}
 //   {t:'tam', w, h, dpr} · {t:'oculto', on} · {t:'monta'} · {t:'desmonta'}
-//   {t:'vivo', yo, rival, alto} · {t:'pulso', beats, animo, humor, hype, dtJuego, toca, solo}
+//   {t:'vivo', yo, rival, otros, alto} · {t:'pulso', beats, animo, humor, hype, dtJuego, toca, solo, confs}
 //   {t:'carga', quien} · {t:'poder', quien, on} · {t:'ataque', quien} · {t:'hype', kind, text, color} · {t:'fin', ganador, texto}
 // El worker contesta {t:'listo'}, {t:'error', m}, {t:'preparado'} (la canción ya puede empezar) y {t:'demasiado'}
 // (el juego no da ni con el mínimo).
@@ -33,7 +33,7 @@ function atiende(d) {
     case 'monta': rock.monta(null); break;
     case 'desmonta': rock.desmonta(); break;
     case 'vivo':
-      Promise.resolve(rock.enVivo({ yo: d.yo, rival: d.rival, alto: d.alto, alDemasiado: () => postMessage({ t: 'demasiado' }) }))
+      Promise.resolve(rock.enVivo({ yo: d.yo, rival: d.rival, otros: d.otros || [], alto: d.alto, alDemasiado: () => postMessage({ t: 'demasiado' }) }))
         .catch((err) => console.warn('[rock] enVivo', err))
         .then(() => postMessage({ t: 'preparado' }));
       break;

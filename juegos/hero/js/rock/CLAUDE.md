@@ -127,6 +127,16 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   left, rival right (their `rockLook`, or a factory rocker picked from their
   uid). Momentum = score difference; SP charge and activation are attacks;
   at the end the higher score wins the K.O.
+- **Rooms of 3 to 8**: everyone else is on stage too (`otros` in `enVivo`,
+  keys `x_<uid>` in `EXTRAS`, `rockerDe(q)`: 0 you, 1 the rival, 2… the
+  rest; `puestosSala(n)`: four in front, the rest behind between them; the
+  singer leaves the centre). They are built **light** (`LIVIANO` /
+  `LIVIANOS`: no outline meshes, no shadows) because a full rocker is ~170
+  meshes and ~150k triangles. Each one's mood is their score against the
+  room's average (`pulso({confs})`); SP charge is a bolt to the sky (no
+  attacks with more than two); the winner of the K.O. is the top score.
+  With 2+ extras the background starts one quality level lower and the
+  crowd shrinks by 8 per extra.
 - **Quality** (`NIVELES`, `CAL`, `regula` in `escena.js`): as a background
   it was ~940 draw calls and ~775k triangles at full resolution, 60 fps, with
   4× MSAA, bloom and 2048 shadows — unplayable. Now: a fraction of the CSS

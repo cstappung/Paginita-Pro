@@ -482,7 +482,11 @@ function auraMat(a, b, bolt) {
 }
 const geoCache = {};
 const G = (key, fn) => geoCache[key] || (geoCache[key] = fn());
+/* `LIVIANO`: mientras se arma un rockero de más (salas de 3 a 8), sin contornos ni sombra: cada contorno es otra
+   malla con la misma geometría, y un rockero completo son ~170 mallas y ~150 mil triángulos */
+let LIVIANO = false;
 function mesh(parent, geo, mat, { pos, rot, scale, outline = 0.01, shadow = false, receive = false } = {}) {
+  if (LIVIANO) { outline = 0; shadow = false; }
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.set(...pos);
   if (rot) m.rotation.set(...rot);
@@ -2246,8 +2250,8 @@ class Rocker {
       }
       geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
       const bones = []; for (let k = 0; k < n; k++) { const b = new THREE.Bone(); b.position.copy(k ? J[k].clone().sub(J[k - 1]) : J[0]); (k ? bones[k - 1] : par).add(b); bones.push(b); }
-      const m = new THREE.SkinnedMesh(geo, mat), ol = new THREE.SkinnedMesh(geo, outlineMat(o.ol ?? 0.0042)); m.frustumCulled = ol.frustumCulled = false; par.add(m, ol);
-      this.chains.push({ par, bones, J, meshes: [m, ol], stiff: o.stiff ?? 10, W: J.map(() => V()), P: null, Pp: null });
+      const m = new THREE.SkinnedMesh(geo, mat), ol = LIVIANO ? null : new THREE.SkinnedMesh(geo, outlineMat(o.ol ?? 0.0042)); m.frustumCulled = false; par.add(m); if (ol) { ol.frustumCulled = false; par.add(ol); }
+      this.chains.push({ par, bones, J, meshes: ol ? [m, ol] : [m], stiff: o.stiff ?? 10, W: J.map(() => V()), P: null, Pp: null });
     };
     // punto sobre el casquete: a = azimut (0 delante, + hacia la izquierda del personaje), e = elevación
     const sp = (a, e, k = 1) => V(Math.sin(a) * Math.cos(e) * 0.122 * k, Math.sin(e) * 0.15 * k, Math.cos(a) * Math.cos(e) * (Math.cos(a) > 0 ? 0.13 : 0.142) * k);
@@ -2598,8 +2602,8 @@ class Rocker {
     this.st = { strumT: -9, strumDir: 1, strumAmp: 0.07, fret: 5, fx: fretX(5), I: 0.5, conf: 0, blinkAt: 2, blinkT: -9, mouthS: 0, riffPtr: 0, sustainEnd: 0, bend: -9 };
   }
   skin(geo, mat, outline = 0.008) {
-    const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.castShadow = true; this.root.add(m); m.bind(this.skel, this._I);
-    if (outline > 0) { const o = new THREE.SkinnedMesh(geo, outlineMat(outline, !!geo.attributes.olw, !!geo.attributes.clp)); o.frustumCulled = false; this.root.add(o); o.bind(this.skel, this._I); }
+    const m = new THREE.SkinnedMesh(geo, mat); m.frustumCulled = false; m.castShadow = !LIVIANO; this.root.add(m); m.bind(this.skel, this._I);
+    if (outline > 0 && !LIVIANO) { const o = new THREE.SkinnedMesh(geo, outlineMat(outline, !!geo.attributes.olw, !!geo.attributes.clp)); o.frustumCulled = false; this.root.add(o); o.bind(this.skel, this._I); }
     return m;
   }
   /* física de mechones: la raíz sigue a la cabeza; cada articulación tiene inercia, algo de gravedad y vuelve a su forma (memoria);
@@ -3257,7 +3261,18 @@ const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), cielo = n
 const pyros = [-5.6, -2.0, 2.0, 5.6].map(x => new Pyro(x));
 /* cada rockero se arma la primera vez que sale a escena (y se rehace si su configuración cambia) */
 const rockers = {};
-function ensureRocker(k) { if (!ROCKERS[k]) k = 'violeta'; if (!rockers[k]) { rockers[k] = new Rocker(ROCKERS[k], 'guitar'); rockers[k].root.visible = false; scene.add(rockers[k].root); } return rockers[k]; }
+/* los de más en una sala de 3 a 8 (`EXTRAS`, claves 'x_<uid>') se arman livianos: sin contornos ni sombra */
+const LIVIANOS = new Set();
+let EXTRAS = [];
+function ensureRocker(k) {
+  if (!ROCKERS[k]) k = 'violeta';
+  if (!rockers[k]) {
+    LIVIANO = LIVIANOS.has(k);
+    try { rockers[k] = new Rocker(ROCKERS[k], 'guitar'); } finally { LIVIANO = false; }
+    rockers[k].root.visible = false; scene.add(rockers[k].root);
+  }
+  return rockers[k];
+}
 /* pone (o cambia) la configuración de un rockero con clave propia: 'yo', 'u_<uid>'… */
 function setRocker(k, cfg) {
   const s = JSON.stringify(cfg);
@@ -3284,8 +3299,22 @@ const VIVO = { on: false, solo: false, mt: 0, raw: -1, ko: null, animoT: 0, fin:
 const LOOP_A = 5 * BAR, LOOP_B = 59 * BAR;
 const vivoMt = raw => raw < LOOP_B ? Math.max(0, raw) : LOOP_A + (raw - LOOP_A) % (LOOP_B - LOOP_A);
 const SOLO = () => VIVO.on && VIVO.solo;
+/* los demás jugadores de una sala de 3 a 8 (en vivo y con rival) */
+const EX = () => (VIVO.on && !VIVO.solo ? EXTRAS.map(ensureRocker) : []);
 /* lo que tocan juntos en escena (sin rival, el de la derecha no sale) */
-const enEscena = () => SOLO() ? [PL()] : [PL(), PR()];
+const enEscena = () => SOLO() ? [PL()] : [PL(), PR(), ...EX()];
+/* el rockero del jugador `q`: 0 tú, 1 el rival, 2… los demás de la sala */
+const rockerDe = q => (q === 0 ? PL() : q === 1 ? PR() : EX()[q - 2] || null);
+const claveDe = q => (q === 0 ? OPT.L : q === 1 ? OPT.Rr : EXTRAS[q - 2] || OPT.L);
+/* dónde se para cada uno con 3 a 8: [x, z, giro] por jugador (tú, el rival, los demás). Delante cuatro; atrás,
+   entre ellos (la cámara está alta: se les ve por encima de los de adelante) */
+const ATRAS = { 1: [0], 2: [-3, 3], 3: [-3, 0, 3], 4: [-6, -3, 3, 6] };
+function puestosSala(n) {
+  if (n === 3) return [[-3.4, 0.72, 0.3], [3.4, 0.72, -0.3], [0, 0.95, 0]];
+  const P = [[-4.5, 0.8, 0.25], [4.5, 0.8, -0.25], [-1.5, 0.95, 0.08], [1.5, 0.95, -0.08]];
+  for (const x of ATRAS[n - 4] || []) P.push([x, -1.15, -x * 0.05]);
+  return P;
+}
 
 /* =====================================================================
    GUION DE LA BATALLA
@@ -3295,11 +3324,14 @@ const battle = {
     this.t0 = clock.t; this.winner = OPT.win === 'rand' ? (R() < 0.5 ? 0 : 1) : +OPT.win;
     this.mom = 0; this.momT = 0; this.seqs = []; this.ko = false; this.lastBar = -1; this.ei = 0; this.visPtr = 0;
     for (const k in rockers) rockers[k].root.visible = false;
-    const L = PL(), Rk = PR(); L.root.visible = true; Rk.root.visible = !SOLO();
-    if (SOLO()) L.place(0, SY, 0.95, 0); else { L.place(-3.4, SY, 0.72, 0.3); Rk.place(3.4, SY, 0.72, -0.3); }
+    const L = PL(), Rk = PR(), ex = EX(); L.root.visible = true; Rk.root.visible = !SOLO();
+    if (SOLO()) L.place(0, SY, 0.95, 0);
+    else if (!ex.length) { L.place(-3.4, SY, 0.72, 0.3); Rk.place(3.4, SY, 0.72, -0.3); }
+    else puestosSala(2 + ex.length).forEach(([x, z, yaw], i) => { const r = rockerDe(i); r.root.visible = true; r.place(x, SY, z, yaw); r.side = x < 0 ? 0 : 1; r.opp = null; });
     L.side = 0; Rk.side = 1; L.opp = Rk; Rk.opp = L;
-    singer.root.visible = S.micSet.visible = !SOLO(); drummer.root.visible = true;
-    for (const r of [L, Rk, singer, drummer]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
+    // con más de dos, el cantante deja el centro libre
+    singer.root.visible = S.micSet.visible = !SOLO() && !ex.length; drummer.root.visible = true;
+    for (const r of [L, Rk, singer, drummer, ...ex]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
     // ataques: al principio domina el que acabará perdiendo, luego remontada (en vivo los dispara la partida)
     const events = []; const n = ATTACK_BARS.length; let last = '';
     if (!VIVO.on) ATTACK_BARS.forEach((bar, i) => {
@@ -3310,13 +3342,13 @@ const battle = {
     });
     this.events = events;
     confetti.stop(); director.reset();
-    if (SOLO()) titles.solo(OPT.L); else titles.vs(OPT.L, OPT.Rr);
+    if (SOLO()) titles.solo(OPT.L); else if (ex.length) titles.call(`¡${2 + ex.length} EN EL ESCENARIO!`, '#ffd23a'); else titles.vs(OPT.L, OPT.Rr);
   },
   mt() { return VIVO.on ? VIVO.mt : clock.t - this.t0; },
   /* la canción volvió atrás (repetición del bucle o el retroceso tras la pausa): los punteros, de cero */
   rewound() {
     this.lastBar = -1; this.visPtr = 0;
-    for (const r of [PL(), PR(), singer, drummer]) { r.st.riffPtr = 0; if (r.handPtr) r.handPtr = [0, 0]; if (!this.ko) r.clearMoves(); }
+    for (const r of [PL(), PR(), singer, drummer, ...EX()]) { r.st.riffPtr = 0; if (r.handPtr) r.handPtr = [0, 0]; if (!this.ko) r.clearMoves(); }
     this.seqs = [];
   },
   attack(from, kind) {
@@ -3330,20 +3362,22 @@ const battle = {
      levanta la guitarra y le manda un rayo al cielo */
   carga(from) {
     if (this.ko) return;
-    if (!SOLO()) { this.attack(from, pick(Object.keys(ATTACKS))); return; }
-    const A = PL(), mt = this.mt(), tip = () => A.gtr.tip.getWorldPosition(V());
+    // en un mano a mano es un ataque al rival; solo o en una sala de más, un rayo al cielo
+    if (!SOLO() && !EXTRAS.length) { this.attack(from, pick(Object.keys(ATTACKS))); return; }
+    const A = SOLO() ? PL() : rockerDe(from); if (!A) return;
+    const mt = this.mt(), tip = () => A.gtr.tip.getWorldPosition(V());
     A.addMove('charge', mt, 1.1, { react: true });
     const alto = tip().add(V(rr(-1.5, 1.5), 6, rr(-1, 0.5)));
     bolt.fire(tip, () => alto, 0.8, ATTACKS.shock.bolt);
     parts.emit(tip(), 40, { color: 0x6fd8ff, color2: 0xffffff, speed: 2.5, life: 0.7, size: 0.05 });
     fxLight = Math.max(fxLight, 0.7); S.lights.fx.position.copy(tip()); S.lights.fx.color.set('#6fd8ff');
     crowd.cheer = Math.max(crowd.cheer, 0.5);
-    director.event('target', 0, 1.2);
+    director.event('target', SOLO() ? 0 : from, 1.2);
   },
   /* el Star Power activado: cae un rayo del cielo sobre la guitarra y se prende de azul mientras dure */
   poder(from, on) {
     if (from && SOLO()) return;
-    const A = from ? PR() : PL();
+    const A = rockerDe(from); if (!A) return;
     A.gtr.spAura.visible = !!on;
     if (!A.gtr.strings.userData.c0) A.gtr.strings.userData.c0 = A.gtr.strings.material.color.clone();
     A.gtr.strings.material.color.copy(on ? new THREE.Color(0x6ad8ff).multiplyScalar(2.5) : A.gtr.strings.userData.c0);
@@ -3357,7 +3391,7 @@ const battle = {
     crowd.cheer = Math.max(crowd.cheer, 1);
     if (SOLO()) for (const p of pyros) p.fire(1.2);
     titles.call('¡STAR POWER!', '#53e7ff');
-    director.event(SOLO() ? 'target' : 'attacker', from, 1.5);
+    director.event(SOLO() || EXTRAS.length ? 'target' : 'attacker', from, 1.5);
   },
   /* un jugador solo: el público y el rockero celebran (Star Power, rachas) */
   hype(kind, text, color) {
@@ -3405,6 +3439,8 @@ const battle = {
     this.mom = damp(this.mom, this.momT, 1.2, dt);
     const L = PL(), Rk = PR();
     L.st.conf = this.mom; Rk.st.conf = -this.mom;
+    // en una sala de más: cada uno según su puesto en la tabla
+    if (VIVO.confs && !SOLO()) enEscena().forEach((r, i) => { r.st.conf = damp(r.st.conf, VIVO.confs[i] ?? 0, 1.2, dt); });
     // KO (en vivo, cuando PRO HERO lo pide al terminar la canción)
     const koT = KO_BAR * BAR;
     if (!this.ko && (VIVO.on ? VIVO.ko !== null : mt >= koT)) {
@@ -3416,10 +3452,11 @@ const battle = {
         director.event('winner', 0, 6);
         return;
       }
-      this.momT = this.winner === 0 ? 1 : -1;
-      const W = this.winner === 0 ? L : Rk, Lo = this.winner === 0 ? Rk : L;
-      W.clearMoves(); Lo.clearMoves(); W.addMove('jump', mt, 0.55, { react: true }); W.addMove('victory', mt + 0.4, 999, { react: true }); Lo.addMove('stagger', mt, 0.9, { react: true }); Lo.addMove('defeat', mt + 0.7, 999, { react: true });
-      for (const p of pyros) p.fire(2.2); confetti.burst(); crowd.cheer = 1.4; titles.ko(this.winner === 0 ? OPT.L : OPT.Rr);
+      this.momT = this.winner === 0 ? 1 : this.winner === 1 ? -1 : 0;
+      const W = rockerDe(this.winner) || L;
+      for (const Lo of enEscena()) if (Lo !== W) { Lo.clearMoves(); Lo.addMove('stagger', mt, 0.9, { react: true }); Lo.addMove('defeat', mt + 0.7, 999, { react: true }); }
+      W.clearMoves(); W.addMove('jump', mt, 0.55, { react: true }); W.addMove('victory', mt + 0.4, 999, { react: true });
+      for (const p of pyros) p.fire(2.2); confetti.burst(); crowd.cheer = 1.4; titles.ko(claveDe(this.winner));
       director.event('winner', this.winner, 6);
     }
     if (this.ko && !VIVO.on && mt > koT + 12 && OPT.loop) this.start();
@@ -3449,15 +3486,15 @@ const battle = {
    DIRECTOR DE CÁMARA
    ===================================================================== */
 const headPos = rk => rk.face.getWorldPosition(V());
-const SIDEOF = i => (i === 0 ? PL() : PR());
+const SIDEOF = i => rockerDe(i) || PL();
 const SHOTS = {
   establish: u => { const k = smooth(clamp(u / 9, 0, 1)); return { p: V(lerp(-7, 0, k), lerp(14, 6.3, k), lerp(27, 16.5, k)), l: V(0, SY + 1.2, 0), f: 44, hh: 0.2 }; },
   wide: (u, r) => ({ p: V(r.s * 2.5 + Math.sin(u * 0.08) * 1.5, 6.3 - u * 0.04, 17 - u * 0.25), l: V(0, SY + 1.1, 0), f: 42, hh: 0.4 }),
   crowdLow: (u, r) => ({ p: V(r.s * 3 - r.s * u * 0.3, 1.55, 9.5), l: V(0, SY + 1.5, 0), f: 46, hh: 1 }),
   duo: (u, r) => ({ p: V(-1.2 * r.s + u * 0.12 * r.s, SY + 0.75, 6.4 - u * 0.08), l: V(0, SY + 1.45, 0), f: 50, hh: 0.6 }),
-  close: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2); const s = r.who === 0 ? 1 : -1; return { p: V(h.x + s * (1.05 - u * 0.05), SY + 0.62, h.z + 2.0 - u * 0.06), l: V(h.x + s * 0.05, h.y - 0.35, h.z), f: 40, hh: 0.8 }; },
-  hero: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2), b = R2.root.position; const s = r.who === 0 ? 1 : -1; return { p: V(b.x + s * 0.7, SY + 0.22, b.z + 1.35 + u * 0.03), l: V(h.x, h.y - 0.1, h.z), f: 56, hh: 0.7 }; },
-  over: (u, r) => { const b = SIDEOF(r.who).root.position; const s = r.who === 0 ? 1 : -1; return { p: V(b.x - s * 1.4, SY + 2.5, b.z - 2.3 + u * 0.08), l: V(b.x + s * 2.2, SY + 0.4, b.z + 9), f: 58, hh: 0.6 }; },
+  close: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2); const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(h.x + s * (1.05 - u * 0.05), SY + 0.62, h.z + 2.0 - u * 0.06), l: V(h.x + s * 0.05, h.y - 0.35, h.z), f: 40, hh: 0.8 }; },
+  hero: (u, r) => { const R2 = SIDEOF(r.who); const h = headPos(R2), b = R2.root.position; const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(b.x + s * 0.7, SY + 0.22, b.z + 1.35 + u * 0.03), l: V(h.x, h.y - 0.1, h.z), f: 56, hh: 0.7 }; },
+  over: (u, r) => { const b = SIDEOF(r.who).root.position; const s = SIDEOF(r.who).side === 0 ? 1 : -1; return { p: V(b.x - s * 1.4, SY + 2.5, b.z - 2.3 + u * 0.08), l: V(b.x + s * 2.2, SY + 0.4, b.z + 9), f: 58, hh: 0.6 }; },
   guitar: (u, r) => { const R2 = SIDEOF(r.who); const g = R2.gtr.g.localToWorld(V(0.28, 0, 0)); const f = R2.root.localToWorld(V(0, 0, 1)).sub(R2.root.position); return { p: g.clone().addScaledVector(f, 0.85 - u * 0.03).add(V(0, 0.2, 0)), l: R2.gtr.g.localToWorld(V(0.3 + Math.sin(u * 0.4) * 0.15, 0, 0)), f: 34, hh: 0.5 }; },
   singer: u => { const h = headPos(singer); return { p: V(0.95 - u * 0.05, SY + 0.5, h.z + 1.9), l: V(h.x, h.y - 0.2, h.z), f: 46, hh: 0.7 }; },
   drums: u => { const h = headPos(drummer); return { p: V(-1.7 + u * 0.08, SY + 1.9, -0.6), l: V(h.x, h.y - 0.45, h.z), f: 50, hh: 0.5 }; },
@@ -3497,7 +3534,8 @@ const director = {
     if (clock.t < this.until || bar < this.nextBar) return;
     let set = SHOT_SETS[sec.name] || SHOT_SETS.verse; if (SOLO()) set = set.filter(n => !SOLO_FUERA.includes(n));
     let n; do n = pick(set); while (n === this.name && set.length > 1);
-    const lead = battle.mom > 0 ? 0 : 1; const who = SOLO() ? 0 : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
+    const lead = battle.mom > 0 ? 0 : 1, nEx = EXTRAS.length && !SOLO() ? EXTRAS.length : 0;
+    const who = SOLO() ? 0 : nEx && R() < 0.4 ? 2 + Math.floor(R() * nEx) : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
     if (battle.ko) n = pick(['hero', 'close', 'crane', 'wide', 'crowdLow']);
     this.cut(n, { s: R() < 0.5 ? 1 : -1, who: battle.ko ? battle.winner : who });
     this.nextBar = bar + (SECTION_I[sec.name] > 0.9 ? 1 + (R() < 0.5 ? 1 : 0) : 2);
@@ -4051,7 +4089,7 @@ function step(dt) {
   kickPulse = Math.max(0, kickPulse - dt * 7); crashPulse = Math.max(0, crashPulse - dt * 2.2); fxLight = Math.max(0, fxLight - dt * 2.5);
   for (const c of S.cym) c.rotation.x = damp(c.rotation.x, c.userData.r0, 6, dt);
   S.kick.scale.setScalar(1 + kickPulse * 0.02);
-  const act = ed ? (ED.rk ? [ED.rk] : []) : SOLO() ? [PL(), drummer] : [PL(), PR(), singer, drummer];
+  const act = ed ? (ED.rk ? [ED.rk] : []) : SOLO() ? [PL(), drummer] : [PL(), PR(), singer, drummer, ...EX()];
   for (const r of act) r.st.I = damp(r.st.I, ed ? 0.62 : secI, 2, dt);
   if (dt > 0) for (const r of act) r.update(t, mt, dt, K);
   // pirotecnia en momentos clave
@@ -4144,7 +4182,7 @@ const fondo = () => VIVO.on && !ED.open;
 function ponCalidad() {
   const f = fondo(), N = NIVELES[CAL.nivel];
   bloom.enabled = !f || N.bloom;
-  crowd.ponCuantos(f ? N.publico : crowd.n);
+  crowd.ponCuantos(f ? Math.max(40, N.publico - 8 * (VIVO.solo ? 0 : EXTRAS.length)) : crowd.n);   // con más rockeros, menos público
   renderer.shadowMap.autoUpdate = !f;
   renderer.shadowMap.needsUpdate = true;
   const sm = f ? 0 : msaaRoto ? 0 : 4;
@@ -4234,7 +4272,7 @@ export const rock = {
   },
   cierraEditor() { if (ED.open) edShut(); },
   /* una canción: `yo` y (en batalla) `rival` son rockeros {look, nombre}; sin rival, toca solo */
-  async enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
+  async enVivo({ yo, rival = null, otros = [], alto = false, alDemasiado = null }) {
     if (ED.open) edShut();
     const L = yo?.look ? sanitizeLook(yo.look) : defaultLook('m');
     if (!yo?.look && yo?.nombre) L.name = String(yo.nombre).slice(0, 24);
@@ -4246,14 +4284,22 @@ export const rock = {
       if (!R2) { const base = ['violeta', 'rex', 'kid'][[...String(rival.uid || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 3]; R2 = sanitizeLook(ROCKERS[base]); R2.name = String(rival.nombre || R2.name).slice(0, 24); }
       OPT.Rr = setRocker(k, R2);
     }
+    // los demás de una sala de 3 a 8, livianos (sin contornos ni sombra)
+    const deFabrica = o => { const base = ['violeta', 'rex', 'kid'][[...String(o.uid || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 3], X = sanitizeLook(ROCKERS[base]); X.name = String(o.nombre || X.name).slice(0, 24); return X; };
+    EXTRAS = (rival ? otros || [] : []).slice(0, 6).map((o, i) => {
+      const k = 'x_' + (String(o.uid || '').replace(/[^\w-]/g, '').slice(0, 40) || 'p' + i);
+      LIVIANOS.add(k);
+      return setRocker(k, o.look ? sanitizeLook(o.look) : deFabrica(o));
+    });
     Object.assign(VIVO, { on: true, mt: 0, raw: -1, ko: null, fin: null, hype: 0, alto: !!alto });
     OPT.bars = false; OPT.cam = 'auto';
-    Object.assign(CAL, { nivel: alto ? 2 : 1, min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
+    // con varios rockeros de más se empieza un nivel más abajo (el regulador sube si sobra)
+    Object.assign(CAL, { nivel: Math.min(NIVELES.length - 1, (alto ? 2 : 1) + (EXTRAS.length >= 2 ? 1 : 0)), min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
     battle.start(); ponCalidad();
     /* shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en la canción: lo que está
        escondido hasta que pasa algo (los rayos, el aura azul, el confeti) se muestra mientras se compila.
        PRO HERO espera esta promesa antes de empezar la canción. */
-    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, PL().gtr.spAura, ...(VIVO.solo ? [] : [PR().gtr.spAura])].filter(o => !o.visible);
+    const ocultos = [bolt.core.m, bolt.glow.m, cielo.core.m, cielo.glow.m, confetti.m, ...enEscena().map(r => r.gtr.spAura)].filter(o => !o.visible);
     for (const o of ocultos) o.visible = true;
     try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); } catch (err) { console.warn('[rock] compilar', err); }
     for (const o of ocultos) o.visible = false;
@@ -4264,24 +4310,25 @@ export const rock = {
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null }) {
     if (!VIVO.on) return;
     VIVO.humor = clamp(humor ?? animo, -1, 1); VIVO.solista = !!solo;
-    if (toca) { PL().st.descanso = toca[0] === false; if (!VIVO.solo) PR().st.descanso = toca[1] === false; }
+    VIVO.confs = Array.isArray(confs) && EXTRAS.length ? confs.map(c => clamp(+c || 0, -1, 1)) : null;
+    if (toca) toca.forEach((v, q) => { const r = (q === 0 || !VIVO.solo) && rockerDe(q); if (r) r.st.descanso = v === false; });
     if (dtJuego > 0) { CAL.externo = true; regula(dtJuego); }
     const raw = Math.max(0, beats) * BEAT, mt = vivoMt(raw);
     if (mt < VIVO.mt - 0.05) battle.rewound();
     VIVO.raw = raw; VIVO.mt = mt; VIVO.hype = clamp(hype, 0, 1);
     battle.momT = clamp(animo, -0.85, 0.85);
   },
-  /* Star Power de `quien` (0 tú, 1 el rival): una frase completa (`carga`) y el poder activado o no */
-  carga(quien) { if (VIVO.on) battle.carga(quien ? 1 : 0); },
-  poder(quien, on) { if (VIVO.on) battle.poder(quien ? 1 : 0, on); },
+  /* Star Power de `quien` (0 tú, 1 el rival, 2… los demás de la sala): una frase completa (`carga`) y el poder activado o no */
+  carga(quien) { if (VIVO.on) battle.carga(Math.max(0, quien | 0)); },
+  poder(quien, on) { if (VIVO.on) battle.poder(Math.max(0, quien | 0), on); },
   /* en batalla: un ataque de `quien` (0 tú, 1 el rival); solo: 'sp' | 'racha' | 'falla' | 'solo' con su texto */
   ataque(quien) { if (VIVO.on && !VIVO.solo) battle.attack(quien ? 1 : 0, pick(Object.keys(ATTACKS))); },
   hype(kind, text, color) { if (VIVO.on && VIVO.solo) battle.hype(kind, text, color); },
-  /* fin de la canción: en batalla el ganador (0 tú, 1 el rival); solo, el título */
-  fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = ganador ? 1 : 0; },
+  /* fin de la canción: en batalla el ganador (0 tú, 1 el rival, 2… otro de la sala); solo, el título */
+  fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = rockerDe(ganador | 0) ? ganador | 0 : 0; },
 };
 globalThis.__rock = { rock, CAL, TAM, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
 $('#loading')?.remove();
