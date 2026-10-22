@@ -97,7 +97,7 @@ export interface IdleEnv {
   young?: boolean
 }
 
-const SPEED: Record<RigKind, number> = { egg: 0, chick: 0.17, hen: 0.2, box: 0, cat: CAT_SPEED }
+export const SPEED: Record<RigKind, number> = { egg: 0, chick: 0.17, hen: 0.2, box: 0, cat: CAT_SPEED }
 const RADIUS: Record<RigKind, number> = { egg: 0, chick: 0.24, hen: 0.32, box: 0, cat: 0.32 }
 /** Ciclo de paso (s). */
 const STEP: Record<RigKind, number> = { egg: 1, chick: 0.42, hen: 0.62, box: 1, cat: 0.56 }

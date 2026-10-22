@@ -528,6 +528,40 @@
       }
     },
 
+    "mascotasPlaza": {
+      ".read": "auth != null && query.orderByChild === 'at' && query.limitToLast <= 40",
+      ".indexOn": ["at"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['m', 'x', 'z', 'at'])",
+        "m": { ".validate": "newData.isString() && newData.val().matches(/^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/)" },
+        "x": { ".validate": "newData.isNumber() && newData.val() >= -10 && newData.val() <= 10" },
+        "z": { ".validate": "newData.isNumber() && newData.val() >= -10 && newData.val() <= 10" },
+        "at": { ".validate": "newData.val() === now" },
+        "em": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{2,10}$/)" },
+        "ea": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+        "b": { ".validate": "newData.isString() && newData.val().matches(/^(ob:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}|start-dance-[a-z]{1,20})$/)" },
+        "t": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100" },
+        "ta": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+        "$otro": { ".validate": false }
+      }
+    },
+
+    "mascotasCarinos": {
+      "$dueno": {
+        ".read": "auth != null && auth.uid === $dueno",
+        "$k": {
+          ".read": "auth != null",
+          "$u": {
+            ".write": "auth != null && auth.uid === $u && $u !== $dueno && newData.exists() && root.child('mascotasEstado').child($dueno).child($k).exists() && (!data.exists() || data.child('at').val() <= now - 72000000)",
+            ".validate": "newData.hasChildren(['at'])",
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
+          }
+        }
+      }
+    },
+
     "clubJugadas": {
       ".read": "auth != null",
       "$uid": {

@@ -55,7 +55,7 @@ before the first edit. Read only the docs the task needs.
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
-| Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
+| Mascotas, crianza, mascota del perfil, regalos, comida, poción, Pueblo (plaza, vecinos, visitas, cariños) | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
 

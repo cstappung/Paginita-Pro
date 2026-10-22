@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove, update, query, orderByChild, equalTo, startAt } from "firebase/database";
+import { ref, get, set, push, remove, update, query, orderByChild, equalTo, startAt, limitToLast } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -484,7 +484,35 @@ console.log("— Mascotas: adopciones, regalos, compras y estado —");
   await allowed("B pone a la venta un objeto (ob:)", () => set(o, { u: ub.uid, c: `ob:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
   await allowed("y una mascota (ma:)", () => set(push(ref(db, "mercado/o")), { u: ub.uid, c: `ma:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
   await allowed("un intercambio mezcla carta, objeto y mascota", () => set(push(ref(db, "mercado/t")), { de: ub.uid, para: ua.uid, dar: [`ob:${ub.uid}~-Nabcdefgh`, `${ub.uid}~-Nabcdefgh.1`], pedir: [m1], at: serverTimestamp() }));
+  /* El Pueblo: la plaza (cada uno escribe la suya; se lee solo con la
+     consulta de los frescos) y los cariños (uno al día por visita). */
+  const enPlaza = { m: `ma:${ub.uid}~-Nabcdefgh`, x: 1.5, z: -2, at: serverTimestamp() };
+  const plazaB = ref(db, `mascotasPlaza/${ub.uid}`);
+  await allowed("B sale a pasear a la plaza", () => set(plazaB, enPlaza));
+  await allowed("con un gesto, un baile y algo dicho", () => set(plazaB, Object.assign({}, enPlaza, { em: "baile", ea: Date.now(), b: "start-dance-salsa", t: "¡hola!", ta: Date.now() })));
+  await denied("B no pasea por A", () => set(ref(db, `mascotasPlaza/${ua.uid}`), enPlaza));
+  await denied("ni fuera de la plaza", () => set(plazaB, Object.assign({}, enPlaza, { x: 50 })));
+  await denied("ni dice un testamento", () => set(plazaB, Object.assign({}, enPlaza, { t: "x".repeat(101), ta: Date.now() })));
+  await denied("ni con un gesto con HTML", () => set(plazaB, Object.assign({}, enPlaza, { em: "<b>", ea: Date.now() })));
+  await denied("ni con la hora inventada", () => set(plazaB, Object.assign({}, enPlaza, { at: 1 })));
+  await denied("ni con campos de más", () => set(plazaB, Object.assign({}, enPlaza, { monedas: 1 })));
+  await allowed("la plaza se lee con la consulta de los 40 más recientes", () => get(query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(40))));
+  await denied("pero no entera", () => get(ref(db, "mascotasPlaza")));
+  await denied("ni con un tope mayor", () => get(query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(41))));
+  await denied("ni la de alguien por su clave", () => get(plazaB));
+  await allowed("B se va de la plaza", () => remove(plazaB));
+  const carino = ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ub.uid}`);
+  await allowed("B le hace cariño a la mascota de A", () => set(carino, { at: serverTimestamp() }));
+  await denied("pero no dos veces el mismo día", () => set(carino, { at: serverTimestamp() }));
+  await denied("ni lo borra", () => remove(carino));
+  await denied("ni con la hora inventada", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ub.uid}`), { at: 1 }));
+  await denied("ni firma por otro", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/zz${ub.uid}`), { at: serverTimestamp() }));
+  await denied("ni a una mascota sin casa", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ua.uid}~-Nnoexiste1/${ub.uid}`), { at: serverTimestamp() }));
+  ok("B ve los cariños de esa mascota", !!(await get(ref(db, `mascotasCarinos/${ua.uid}/${ke}`))).val());
+  await denied("pero no todos los de A", () => get(ref(db, `mascotasCarinos/${ua.uid}`)));
   await loginAs(A);
+  await denied("A no se hace cariño a sí misma", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ua.uid}`), { at: serverTimestamp() }));
+  ok("A lee todos sus cariños", !!(await get(ref(db, `mascotasCarinos/${ua.uid}`))).val());
 }
 
 console.log("— Monedas: partidas del club y podios —");

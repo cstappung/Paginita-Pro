@@ -708,6 +708,26 @@ equipado va en `users/<uid>/taco` y no pide reglas. Pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ El Pueblo de Mascotas pide publicar otra vez (2026-10-22)
+
+Dos nodos nuevos para el Pueblo (la plaza y las visitas, estilo Pet Society):
+
+- `mascotasPlaza/<uid>` = `{m, x, z, at, em?, ea?, b?, t?, ta?}`: quién
+  pasea por la plaza, adónde va, su último gesto o baile y lo último que
+  dijo (hasta 100 caracteres). Cada uno escribe solo la suya, con
+  `at === now`, y se borra al salir o al desconectarse. Se lee **solo**
+  con la consulta `orderByChild('at')` + `limitToLast(≤ 40)`: nadie baja
+  la colección entera ni una entrada por clave.
+- `mascotasCarinos/<dueño>/<origen~clave>/<visita>` = `{at}`: un cariño de
+  una visita a la mascota de otro. Solo si esa mascota tiene estado, nunca
+  a una propia, `at === now` y como mucho uno cada 20 horas por visita y
+  mascota; no se borra. El dueño lee los suyos enteros; los demás, solo los
+  de una mascota por su clave.
+
+Sin publicar, el Pueblo abre pero nadie aparece en la plaza (el juego lo
+dice) y hacer cariño da el aviso de reglas. El resto de Mascotas sigue
+igual. Pegar `firebase/database.rules.json` entero y **Publicar**.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:

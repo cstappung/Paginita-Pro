@@ -2127,21 +2127,28 @@ function armazon() {
   if (state.vista === "cartas") {
     h.innerHTML = "";
     prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     prodropVista.montar(h);
     return;
   }
   if (state.vista === "mercado") {
     h.innerHTML = "";
     mercadoVista = crearMercado({ usuario: state.user, datos: datosPerfil, fb, ir, marcoDe: marcoDeUid, juego: state.perfilUid,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mercadoVista.montar(h);
     return;
   }
   if (state.vista === "mascotas") {
     h.innerHTML = "";
     mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir,
-      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est) });
+      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est),
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mascotasVista.montar(h);
     return;
   }
