@@ -32,7 +32,7 @@ export const COLORES = [
 
 import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
 import { avatarMarco, tarjetaHtml, capaFondo } from "./perfil-vista.js";
-import { PRECIO_TIENDA } from "./tienda.js";
+import { PRECIO_TIENDA, precioDe, RAREZAS_HW, rarezaHw, tiendaHalloweenAbierta } from "./tienda.js";
 import { juegoOculto } from "./ocultos.js";   // (BT3 es privado: ni su premio de campeón a quien no lo ve)
 import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
@@ -113,7 +113,7 @@ function avatar(foto, nombre, color) {
    opciones (la economía no llegó) la elegida se guarda tal como estaba.
    `referidos`: cuántos trajo (tintas.js desbloquea el color del nombre con
    ellos); null mientras no se sabe, y entonces solo se ofrece lo guardado. */
-export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp, referidos: nRef = null }) {
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp, referidos: nRef = null, onTiendaHw }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -282,13 +282,17 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
        ya tienes, primero). Un cerrado de la tienda no es un candado: es
        un botón de compra. */
     const op = (it, actual, attr, dentro) => {
-      const r = requisito(it, est), venta = !r.ok && r.tienda;
-      return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas` : "Se gana: " + r.falta)}">
-        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && it.req.tienda ? `<small class="jg-ped-tuyo">✓ Comprado</small>` : "") : venta ? `<small class="jg-ped-precio">🪙 ${miles(PRECIO_TIENDA)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+      const r = requisito(it, est), venta = !r.ok && r.tienda, rz = rarezaHw(it.id);
+      return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}${it.hw ? " hw" : ""}${rz ? " r-" + rz : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(r.precio)} monedas` : "Se gana: " + r.falta)}">
+        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && (it.req.tienda || it.req.coleccion) ? `<small class="jg-ped-tuyo">✓ ${it.req.coleccion ? "Ganado" : "Comprado"}</small>` : "") : venta ? `<small class="jg-ped-precio">${rz ? esc(RAREZAS_HW[rz].n) + " · " : ""}🪙 ${miles(r.precio)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
     };
+    /* Lo de Halloween que ya no se puede conseguir no se enseña: es de
+       quien lo compró a tiempo. */
+    const hw = l => l.filter(it => it.hw && !requisito(it, est).agotado);
     const grupos = (lista, actual, attr, dentro) => [
-      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top))],
-      [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda)],
+      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top || it.req.coleccion))],
+      [`🎃 Halloween · edición limitada${tiendaHalloweenAbierta(Date.now()) && onTiendaHw ? ` <button type="button" class="jg-ped-hwir" data-ir-tienda-hw>Ver la tienda →</button>` : ""}`, hw(lista)],
+      [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda && !it.hw)],
       ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top && !juegoOculto(it.req.top)).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
     ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
     $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));
@@ -348,17 +352,22 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     if (!onComprar) { falla("La tienda no está disponible aquí."); return; }
     const s = saldo ? saldo() : null;
     if (s === null || s === undefined) { falla("Todavía se están contando tus monedas; prueba en unos segundos."); return; }
-    if (s < PRECIO_TIENDA) { falla(`«${it.n}» cuesta ${miles(PRECIO_TIENDA)} 🪙 y tienes ${miles(s)}: te faltan ${miles(PRECIO_TIENDA - s)}.`); return; }
-    if (!confirm(`¿Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas?\nTe quedarán ${miles(s - PRECIO_TIENDA)}. Es para siempre.`)) return;
+    const precio = precioDe(it.id);
+    if (s < precio) { falla(`«${it.n}» cuesta ${miles(precio)} 🪙 y tienes ${miles(s)}: te faltan ${miles(precio - s)}.`); return; }
+    if (!confirm(`¿Comprar «${it.n}» por ${miles(precio)} monedas?\nTe quedarán ${miles(s - precio)}. Es para siempre.`)) return;
     comprando = true; falla("");
     try {
       await onComprar(it.id);
-      est = Object.assign({}, est, { compras: Object.assign({}, est && est.compras, { [it.id]: { p: PRECIO_TIENDA } }) });
+      est = Object.assign({}, est, { compras: Object.assign({}, est && est.compras, { [it.id]: { p: precio } }) });
       alHacerla(); pinta();
     } catch (err) {
       falla("No se pudo comprar: " + (err && (err.code || err.message) ? String(err.code || err.message) : String(err)));
     } finally { comprando = false; }
   }
+  for (const r of [$("#pfMarcos"), $("#pfFondos")]) r.addEventListener("click", e => {
+    if (!e.target.closest("[data-ir-tienda-hw]")) return;
+    e.stopPropagation(); cierra(); onTiendaHw();
+  }, true);
   $("#pfMarcos").onclick = e => {
     const b = e.target.closest("[data-marco]");
     if (!b) return;

@@ -82,7 +82,8 @@ import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
   registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
-import { PRECIO_TIENDA } from "./juegos/tienda.js";
+import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
+import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta } from "./juegos/tienda-halloween.js";
 import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
@@ -661,7 +662,8 @@ async function editaPerfil(pestana) {
     saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
     mascota: mascotaEditor(b.uid, d),
     referidos: d && d.completo ? (referidosDe(d).de[b.uid] || []).length : null,
-    onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
+    onComprar: async id => { await fb.comprarTienda(b.uid, id, precioDe(id)); },
+    onTiendaHw: () => abreTienda(),
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
          sin esto, guardar el perfil las borraría. */
@@ -675,16 +677,74 @@ async function editaPerfil(pestana) {
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */
       perfiles.set(b.uid, Object.assign({}, p));
-      pintaTintas();
-      aplicaPropio();
-      if (state.estado) vistePerfiles(state.estado);
-      if (ranks) ranks.refresca();
-      if (paginaPerfil) paginaPerfil.refresca();
-      render();
+      trasCambiarPerfil();
       suena("clic");
     }
   });
 }
+function trasCambiarPerfil() {
+  pintaTintas();
+  aplicaPropio();
+  if (state.estado) vistePerfiles(state.estado);
+  if (ranks) ranks.refresca();
+  if (paginaPerfil) paginaPerfil.refresca();
+  render();
+}
+
+/* ---------- la tienda de Halloween ----------
+   La ventana (juegos/tienda-halloween.js) se abre sola al entrar al salón
+   una vez al día, desde la franja del salón, desde el editor del perfil y
+   con `#tienda` (el enlace de Inicio). Compra con el precio de cada
+   artículo (tienda.js) y se lo pone escribiendo solo `marco` o `fondo`
+   del perfil, sin tocar lo demás. */
+function yoTienda() {
+  const b = state.base;
+  if (!b) return null;
+  const q = quien(b.uid, perfiles.get(b.uid) || null, null, ctxPerfil.propio(), colorForUid);
+  return { uid: b.uid, nombre: q.nombre, foto: q.foto, color: q.color };
+}
+function abreTienda(elegido) {
+  abreTiendaHalloween({
+    yo: yoTienda,
+    datos: cb => state.user ? datosPerfil(cb) : (() => {}),
+    saldo: d => d && d.completo && state.user ? monedasDe(state.user.uid, d).saldo : null,
+    perfil: () => (state.user && perfiles.get(state.user.uid)) || null,
+    comprar: async id => { await fb.comprarTienda(state.user.uid, id, precioDe(id)); },
+    equipar: async (tipo, id) => {
+      const uid = state.user.uid;
+      await fb.ponEnPerfil(uid, tipo, id);
+      perfiles.set(uid, Object.assign({}, perfiles.get(uid) || {}, { [tipo]: id }));
+      trasCambiarPerfil();
+    },
+    login: () => entrarConGoogle("", "tienda-hw"),
+    suena
+  }, elegido);
+}
+/* Se abre sola: con sesión, en el salón, una vez al día por aparato, y
+   solo si no hay otra ventana delante (la bienvenida, una ficha, el editor). */
+function quizaAbreTienda() {
+  if (!tiendaHalloweenAbierta(Date.now()) || yaVistaHoy()) return;
+  setTimeout(() => {
+    if (!state.user || state.vista !== "vestibulo" || tiendaAbierta() || yaVistaHoy()) return;
+    if (document.querySelector(".jg-modal-capa, .jg-bv") || salon.abiertaPara()) return;
+    abreTienda();
+  }, 1400);
+}
+/* `#tienda` no es una vista: abre la ventana encima de lo que hubiera y
+   la dirección vuelve a la ruta de antes (`hashPrevio`), para que la barra
+   y la vista no se contradigan. */
+let hashPrevio = location.hash === "#tienda" ? "" : (location.hash || "");
+function revisaRutaTienda() {
+  if ((location.hash || "") !== "#tienda") { hashPrevio = location.hash || ""; return false; }
+  try { history.replaceState(null, "", location.pathname + location.search + hashPrevio); } catch (e) { location.hash = hashPrevio; }
+  abreTienda();
+  return true;
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("[data-tienda-hw]");
+  if (b) { ev.preventDefault(); abreTienda(b.getAttribute("data-tienda-hw") || ""); }
+});
+setInterval(() => refrescaCuentas(), 30000);
 
 function pintaUsuario() {
   const u = state.user;
@@ -1360,6 +1420,7 @@ function ir(hash) {
 }
 
 function aplicaRuta() {
+  if (revisaRutaTienda()) return;
   const r = leerRuta();
   cierraMini();
   if (r.vista === state.vista && r.pid === state.pid && (r.uid || "") === (state.perfilUid || "")) return;
@@ -2204,6 +2265,7 @@ function armazon() {
         <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : ""}?</h1>
         <p>Juegos para ti solo, sin esperar a nadie, y juegos para jugar con otros en línea.</p>
         ${halloweenHtml()}
+        ${tiraTiendaHtml(Object.assign({}, yoTienda() || {}))}
       </header>
       <nav class="jg-modos" aria-label="Qué juegos mostrar">
         <div class="jg-modos-sel" role="group" aria-label="Modo de juego">
@@ -3697,7 +3759,7 @@ function wire() {
       /* Una ficha abierta (se salió de la cuenta con ella delante) se
          repinta en su versión de invitado. */
       if (salon.abiertaPara()) salon.abre(salon.abiertaPara());
-      abreBienvenida();
+      if (!revisaRutaTienda()) abreBienvenida();
       return;
     }
     /* Con cuenta la bienvenida ya no hace falta, en este aparato tampoco
@@ -3765,6 +3827,9 @@ function wire() {
     trasLogin = "";
     if (reabrir) salon.abre(reabrir);
     subeDeInvitado(state.user);
+    /* La tienda de Halloween: pedida por el enlace (`#tienda`) o, al
+       entrar al salón, sola una vez al día. */
+    if (!revisaRutaTienda() && !reabrir) quizaAbreTienda();
   });
 })();
 
