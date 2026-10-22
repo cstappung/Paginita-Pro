@@ -7,14 +7,14 @@ import { buildActionMap, deviceMatches, navAction, codeLabel } from '../input/in
 import { applyNoteMode } from '../core/noteMode.js';
 import { settings, profileById } from '../settings.js';
 import { songUrl, fetchSongFile, fileUrl, library } from '../library.js';
-import { h } from '../ui/dom.js';
+import { h, toast } from '../ui/dom.js';
 import { Grabadora, opcionesMotor } from './prueba.js';
 import { RemoteState } from './remoto.js';
 import { celular } from '../sitio/celular.js';
 import { Tactil, TACTIL } from '../ui/tactil.js';
 import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
-import { rockSitio, cargaEscena } from '../sitio/rock.js';
+import { rockSitio, cargaFondo } from '../sitio/rock.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -211,7 +211,7 @@ export class GameSession {
     this.rock = null;
     if (!rockSitio.admin || !settings.fondoRock || celular) return;
     let rock;
-    try { rock = await cargaEscena(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
+    try { rock = await cargaFondo(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
     const yo = this.local.find((p) => !p.bot) || this.local[0];
     const rival = this.players.find((p) => p !== yo && p.type === 'remote') || this.players.find((p) => p !== yo) || null;
     this.rock = rock;
@@ -220,11 +220,18 @@ export class GameSession {
     this.rockSp = [false, false];
     this.rockFin = false;
     this.rockFalla = 0;
+    this.rockT = 0;
     rock.monta(document.getElementById('rockbg'));
     rock.enVivo({
       yo: { look: rockSitio.look, nombre: yo?.name },
       rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
       alto: settings.altoRendimiento,
+      // si el juego se resiente aun con el fondo al mínimo, se apaga para esta sesión (en la pausa se vuelve a encender)
+      alDemasiado: () => {
+        if (!this.rock) return;
+        this.ponRock(false);
+        toast('Se apagó el fondo de rock: tu equipo no daba con los dos. Lo puedes volver a encender en la pausa.', 5000);
+      },
     });
   }
 
@@ -244,7 +251,10 @@ export class GameSession {
     const animo = rv
       ? (yo.score - rv.score) / Math.max(4000, 0.25 * (yo.score + rv.score))
       : Math.min(1, (yo.multiplier() - 1) / 3) * 0.9 - (this.rockFalla > performance.now() ? 0.6 : 0);
-    this.rock.pulso({ beats, animo, hype: Math.min(1, (yo.combo || 0) / 100) });
+    // el intervalo real entre cuadros del juego: con él la escena decide cuánto se puede gastar
+    const ahora = performance.now(), dtJuego = this.rockT ? (ahora - this.rockT) / 1000 : 0;
+    this.rockT = ahora;
+    this.rock.pulso({ beats, animo, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego });
     // Star Power: en batalla es un ataque; solo, el público estalla
     const sp = [!!yo.spActive, !!rv?.spActive];
     if (sp[0] && !this.rockSp[0]) rv ? this.rock.ataque(0) : this.rock.hype('sp', '¡STAR POWER!', '#53e7ff');

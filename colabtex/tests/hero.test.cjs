@@ -242,9 +242,9 @@ test('el mapa de módulos del juego tiene todos los archivos con la misma versi�
   const recorre = d => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, n.name); if (n.isDirectory()) recorre(f); else if (n.name.endsWith('.js')) modulos.push('./' + path.relative(HERO, f).split(path.sep).join('/')); } };
   recorre(path.join(HERO, 'js'));
   for (const m of modulos) assert.equal(mapa[m], m + '?v=' + v, m);
-  // además de los módulos, solo three.js (juegos/hero/vendor/, para Batalla de Rock)
-  assert.deepEqual(Object.keys(mapa).filter(k => !k.startsWith('./js/')).sort(), ['three', 'three/addons/']);
-  assert.equal(Object.keys(mapa).filter(k => k.startsWith('./js/')).length, modulos.length);
+  assert.equal(Object.keys(mapa).length, modulos.length);
+  // el worker de Batalla de Rock va empaquetado (en un worker no hay mapa de módulos): `npm run build:rock`
+  assert.ok(fs.existsSync(path.join(HERO, 'rock-trabajador.js')), 'falta juegos/hero/rock-trabajador.js: npm run build:rock');
   // y los carteros piden la misma versión del documento
   for (const f of ['src/juegos/hero.js', 'src/juegos/hero-sala.js'])
     assert.match(fs.readFileSync(f, 'utf8'), new RegExp('juegos/hero/index\\.html\\?(modo=online&)?v=' + v), f);

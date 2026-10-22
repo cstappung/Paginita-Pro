@@ -492,6 +492,8 @@ html.celular .loading-screen .lp-art { width: 110px; height: 110px; }
 html.celular .lp-name { font-size: 1.5rem; }
 html.celular .results .res-title { margin-top: 0; }
 
-/* Batalla de Rock (js/rock/, solo administradores, a prueba): el editor «Tu rockero» */
+/* Batalla de Rock (js/rock/, solo administradores, a prueba): el lienzo del fondo (aquí y no en la escena:
+   con el worker la escena no carga su CSS en la página) y el editor «Tu rockero» */
+canvas.rock-lienzo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .screen.rockero { position: fixed; inset: 0; padding: 0; }
 .rock-cargando { position: fixed; inset: 0; display: grid; place-items: center; font-size: 2rem; font-weight: 700; color: #ffd23a; background: #05070a; }

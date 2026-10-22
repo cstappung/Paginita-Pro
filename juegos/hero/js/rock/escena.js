@@ -7,14 +7,20 @@
 //   se compran con las monedas de verdad (las abre la página, colabtex/src/juegos/hero.js);
 // - **el fondo de una canción**: `enVivo` + `pulso` cada cuadro. Con rival es la batalla (tu rockero a la
 //   izquierda, el de tu rival a la derecha, el ánimo sale de los puntajes); sin rival, tocas solo al centro.
-// Three.js 0.160.0 viene del mapa de módulos de index.html (cdn.jsdelivr.net), y solo se baja si se usa.
-import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+// Three.js 0.160.0 está en juegos/hero/vendor/, importado por ruta relativa (sus addons también, retocados):
+// así el mismo archivo corre en la página y en un worker, donde no hay mapa de módulos. Solo se baja si se usa.
+//
+// **De fondo corre en un worker** (./trabajador.js, empaquetado en juegos/hero/rock-trabajador.js) con un
+// OffscreenCanvas: el 3D no le quita tiempo al hilo del juego. Ahí no hay DOM: `EN_TRABAJADOR` apaga la capa
+// del editor, `$` devuelve un objeto que no hace nada, los lienzos son OffscreenCanvas y el tamaño, la
+// densidad de píxeles y la visibilidad llegan por mensaje (`TAM`).
+import * as THREE from '../../vendor/three-0.160.0/three.module.min.js';
+import { EffectComposer } from '../../vendor/three-0.160.0/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from '../../vendor/three-0.160.0/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from '../../vendor/three-0.160.0/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from '../../vendor/three-0.160.0/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from '../../vendor/three-0.160.0/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from '../../vendor/three-0.160.0/addons/utils/BufferGeometryUtils.js';
 import {
   ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
   INV_CATS, invItem, invVar, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO,
@@ -24,7 +30,13 @@ import {
 /* =====================================================================
    UTILIDADES
    ===================================================================== */
-const $ = s => document.querySelector(s);
+const EN_TRABAJADOR = typeof document === 'undefined';
+/* en el worker no hay DOM: lo del editor apunta a un objeto que acepta todo y no hace nada */
+const NADA = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => '' : k === 'then' ? undefined : NADA), set: () => true, apply: () => NADA });
+const $ = s => (EN_TRABAJADOR ? NADA : document.querySelector(s));
+const nuevoLienzo = (w = 1, h = 1) => { const c = EN_TRABAJADOR ? new OffscreenCanvas(w, h) : document.createElement('canvas'); c.width = w; c.height = h; return c; };
+/* tamaño del lienzo en px CSS, densidad y visibilidad (en el worker los manda la página) */
+const TAM = { w: 0, h: 0, dpr: 1, oculto: false };
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const lerp = (a, b, t) => a + (b - a) * t;
 const damp = (a, b, l, dt) => lerp(a, b, 1 - Math.exp(-l * dt));
@@ -68,11 +80,12 @@ const BAND = {
 };
 
 /* ---------- la capa del editor: su CSS y su HTML (los del paquete, sin el panel del director) ---------- */
+if (!EN_TRABAJADOR) {
 if (!document.querySelector('link[data-rock-fuentes]')) {
   const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.rockFuentes = '';
   l.href = 'https://fonts.googleapis.com/css2?family=Bangers&family=Rubik:wght@500;700;900&display=swap'; document.head.append(l);
 }
-const ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,100vw);background:rgba(12,8,22,.93);border-left:3px solid #000;display:flex;flex-direction:column;z-index:40;font-size:13px;transition:transform .3s;font-family:Rubik,system-ui,sans-serif;color:#fff;box-sizing:border-box}
+var ROCK_CSS = `#editor{position:fixed;top:0;right:0;bottom:0;width:min(400px,100vw);background:rgba(12,8,22,.93);border-left:3px solid #000;display:flex;flex-direction:column;z-index:40;font-size:13px;transition:transform .3s;font-family:Rubik,system-ui,sans-serif;color:#fff;box-sizing:border-box}
 #editor.off{transform:translateX(105%);pointer-events:none}
 #editor .ttl{font-family:Bangers,Impact,sans-serif;font-size:26px;letter-spacing:1px;color:#ffd23a;text-shadow:2px 2px 0 #000;padding:12px 14px 6px}
 #edName{display:block;width:calc(100% - 28px);margin:0 14px;background:#221838;border:2px solid #000;border-radius:9px;color:#fff;font:inherit;font-weight:900;font-size:15px;padding:7px 9px}
@@ -150,7 +163,7 @@ canvas.rock-lienzo{position:fixed;inset:0;width:100%;height:100%;display:block;t
 #editor .sell input{width:96px;background:#120c20;color:#fff;border:2px solid #000;border-radius:8px;padding:4px 6px;font:inherit}
 #editor input:focus{outline:2px solid #ffd23a}`;
 document.head.append(Object.assign(document.createElement('style'), { textContent: ROCK_CSS }));
-const CAPA = document.createElement('div');
+var CAPA = document.createElement('div');
 CAPA.className = 'rock-capa';
 CAPA.innerHTML = `<div id="editor" class="off">
   <div class="ttl">TU ROCKERO</div>
@@ -166,6 +179,7 @@ CAPA.innerHTML = `<div id="editor" class="off">
 <div id="edToast"></div>
 <div id="boxUI" role="dialog" aria-live="polite"></div>`;
 document.body.append(CAPA);
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /* =====================================================================
@@ -235,10 +249,11 @@ const KO_BAR = 61;
 /* =====================================================================
    RENDER + POSTPROCESO
    ===================================================================== */
-const canvas = document.createElement('canvas'); canvas.className = 'rock-lienzo';
+const canvas = EN_TRABAJADOR ? globalThis.ROCK_LIENZO : document.createElement('canvas');
+if (!EN_TRABAJADOR) canvas.className = 'rock-lienzo';
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-renderer.setSize(Math.max(2, innerWidth), Math.max(2, innerHeight), false);
+renderer.setPixelRatio(1);
+renderer.setSize(2, 2, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -273,7 +288,7 @@ composer.addPass(grade);
 composer.addPass(new OutputPass());
 
 /* overlay 2D (títulos y barras de cine) dibujado dentro del lienzo WebGL para que salga en la grabación */
-const ovCanvas = document.createElement('canvas'); const ovCtx = ovCanvas.getContext('2d');
+const ovCanvas = nuevoLienzo(); const ovCtx = ovCanvas.getContext('2d');
 const ovTex = new THREE.CanvasTexture(ovCanvas); ovTex.colorSpace = THREE.SRGBColorSpace;
 const ovScene = new THREE.Scene(), ovCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 ovScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: ovTex, transparent: true, depthTest: false, toneMapped: false })));
@@ -283,7 +298,9 @@ const GRAD = (() => { const d = new Uint8Array([62, 128, 196, 255]); const t = n
 const GRAD_SOFT = (() => { const d = new Uint8Array([145, 182, 218, 242]); const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();   // sombreado suave para la piel de la cara
 const _tc = new Map();
 function toon(color, o = {}) {
-  const k = color + '|' + JSON.stringify(o, (key, v) => (v && v.isTexture) ? v.uuid : v);
+  // las texturas entran a la clave por su uuid: JSON.stringify llama a su toJSON antes que al reemplazo, y
+  // eso las pasaba a base64 (toDataURL) en cada material; en el worker ni siquiera se puede
+  const k = color + '|' + JSON.stringify(Object.fromEntries(Object.entries(o).map(([key, v]) => [key, v && v.isTexture ? v.uuid : v])));
   if (_tc.has(k)) return _tc.get(k);
   const m = new THREE.MeshToonMaterial({ color, gradientMap: GRAD, ...o }); _tc.set(k, m); return m;
 }
@@ -391,7 +408,7 @@ void legApply(inout vec3 base, inout vec3 em, vec3 n, vec3 v) {
 const _legC = new Map();
 /* material legendario: efecto (kind), color principal a, color de brillo b; o = { scale, k, clip, map, flat, side, alphaTest, mat } */
 function legMat(kind, a, b, o = {}) {
-  const key = kind + '|' + a + '|' + b + '|' + JSON.stringify(o, (k, v) => (v && v.isTexture) ? v.uuid : v);
+  const key = kind + '|' + a + '|' + b + '|' + JSON.stringify(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v && v.isTexture ? v.uuid : v])));
   if (_legC.has(key)) return _legC.get(key);
   const m = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRAD, side: o.side ?? THREE.DoubleSide, flatShading: !!o.flat, map: o.map ?? null, alphaTest: o.alphaTest ?? 0, ...(o.mat || {}) });
   const U = { uLT: LEG_T, uLA: { value: new THREE.Color(a) }, uLB: { value: new THREE.Color(b) }, uLS: { value: o.scale ?? 8 }, uLK: { value: o.k ?? 1 } };
@@ -531,7 +548,7 @@ function soleGeo(kind) {
 /* ---------- texturas pintadas ---------- */
 const RT = rng(99);
 function canvasTex(w, h, draw, { repeat, srgb = true } = {}) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const c = nuevoLienzo(w, h); draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); } return t;
 }
@@ -1331,7 +1348,7 @@ function buildHeadSrc(fem, F, look, off) {
 /* ---------- cara pintada: textura estática (piel, labios, rubor, maquillaje) + ojos y cejas animados en el shader ---------- */
 const beardLine = (hs, ax) => (ax < 0.032 ? lerp(hs.tY - 0.008, hs.vm + 0.012, smooth(ax / 0.032)) : lerp(hs.vm + 0.012, 0.006, smooth((ax - 0.032) / 0.055)));
 function paintFaceTex(fem, F, look, hs) {
-  const S = 1024, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d');
+  const S = 1024, cv = nuevoLienzo(S, S); const g = cv.getContext('2d');
   const { X: FX, Y0, Y1 } = FACE_UV, kx = S / (2 * FX), ky = S / (Y1 - Y0);
   const px = x => (x + FX) * kx, py = y => (Y1 - y) * ky;
   const C3 = c => c.isColor ? c : new THREE.Color(c);
@@ -1480,7 +1497,7 @@ function paintFaceTex(fem, F, look, hs) {
   // maquillaje legendario: dibujo en la cara + máscara de brillo para el shader (r = zona que brilla, g = fase, b = variación)
   let glowTex = null;
   if (F.legMk) {
-    const gc = document.createElement('canvas'); gc.width = gc.height = 512; const q = gc.getContext('2d'); q.fillStyle = '#000'; q.fillRect(0, 0, 512, 512);
+    const gc = nuevoLienzo(512, 512); const q = gc.getContext('2d'); q.fillStyle = '#000'; q.fillRect(0, 0, 512, 512);
     const qx = x => px(x) / 2, qy = y => py(y) / 2, hi = col(mixC(sc, WHITE, 0.55));
     const line = (pts, wC, wQ, cc = hi) => { for (const [ctx, X, Y, w, st] of [[g, px, py, wC, cc], [q, qx, qy, wQ, '#f00']]) { ctx.lineCap = ctx.lineJoin = 'round'; ctx.lineWidth = w; ctx.strokeStyle = st; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke(); } };
     const ell = (cx, cy, rx, ry, wC, wQ) => { for (const [ctx, X, Y, k, w, st] of [[g, px, py, 1, wC, hi], [q, qx, qy, 0.5, wQ, '#f00']]) { ctx.lineWidth = w; ctx.strokeStyle = st; ctx.beginPath(); ctx.ellipse(X(cx), Y(cy), rx * kx * k, ry * ky * k, 0, 0, 7); ctx.stroke(); } };
@@ -1970,7 +1987,7 @@ const TAT_DRAW = {
     g.lineWidth = 5; g.strokeStyle = TINK; g.lineCap = 'round'; for (const s of [-1, 1]) { g.beginPath(); g.moveTo(128, 90); g.quadraticCurveTo(128 + s * 10, 52, 128 + s * 30, 44); g.stroke(); g.fillStyle = TINK; g.beginPath(); g.arc(128 + s * 30, 44, 5, 0, 7); g.fill(); }
   },
   lunaT: (g, c) => {   // luna creciente con estrellas en el hueco
-    const t = document.createElement('canvas'); t.width = t.height = 256; const q = t.getContext('2d');
+    const t = nuevoLienzo(256, 256); const q = t.getContext('2d');
     q.fillStyle = TINK; q.beginPath(); q.arc(116, 128, 94, 0, 7); q.fill(); q.fillStyle = c; q.beginPath(); q.arc(116, 128, 86, 0, 7); q.fill();
     q.globalCompositeOperation = 'destination-out'; q.beginPath(); q.arc(160, 100, 74, 0, 7); q.fill();
     q.globalCompositeOperation = 'source-atop'; q.lineWidth = 9; q.strokeStyle = TINK; q.beginPath(); q.arc(160, 100, 78, 0, 7); q.stroke();
@@ -2844,22 +2861,31 @@ class Crowd {
     while (pts.length < 160 && tries < 9000) { tries++; const x = rr(-12, 12), z = rr(4.7, 19); if (Math.abs(x) > 5.4 && z < 5.9) continue; if (Math.abs(x) < 1.8 && z < 4.2) continue; if (Math.hypot(x - FIRE.x, z - FIRE.z) < 1.9) continue; if (pts.some(p => Math.hypot(p.x - x, p.z - z) < 0.6)) continue; pts.push({ x, z }); }
     const shirts = [0xd8262b, 0x2b2b2b, 0x3a5aa8, 0xe8e8e8, 0x6b3fa0, 0x2f7d3a, 0xd98a2a, 0x991b1b, 0x444444];
     const skins = [0xf1c7a0, 0xdca27a, 0xb57a52, 0x8a5a3a, 0xeab68e], hairs = [0x2a1a10, 0x8a5a2e, 0xe8c86a, 0xd8442a, 0x111111, 0x5a3a20];
+    // de adelante hacia atrás: de fondo solo se pintan las primeras filas (`cuantos`)
+    pts.sort((a, b) => a.z - b.z);
     this.p = pts.map(p => ({ ...p, yaw: Math.atan2(-p.x * 0.8, -(p.z + 1.5)), s: rr(0.88, 1.08), ph: R(), style: Math.floor(R() * 4), j: rr(0.08, 0.3) }));
     const n = this.n = this.p.length;
     const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRAD });
-    this.all = []; const mk = (geo, cnt, outline) => { const m = new THREE.InstancedMesh(geo, mat, cnt); scene.add(m); this.all.push(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); o.instanceMatrix = m.instanceMatrix; scene.add(o); this.all.push(o); } return m; };
-    this.body = mk(new THREE.CapsuleGeometry(0.2, 0.5, 4, 10), n, 0.025);
-    this.head = mk(new THREE.SphereGeometry(0.14, 12, 10), n, 0.02);
-    this.hair = mk(new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), n, 0);
-    this.arm = mk(new THREE.CapsuleGeometry(0.055, 0.46, 3, 6).translate(0, 0.28, 0), n * 2, 0.02);
-    this.leg = mk(new THREE.CylinderGeometry(0.08, 0.07, 0.8, 7).translate(0, 0.4, 0), n * 2, 0);
+    this.all = []; const mk = (geo, cnt, outline) => { const m = new THREE.InstancedMesh(geo, mat, cnt); m.userData.k = cnt / n; scene.add(m); this.all.push(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineMat(outline), cnt); o.userData.k = cnt / n; o.instanceMatrix = m.instanceMatrix; scene.add(o); this.all.push(o); } return m; };
+    // el público se ve chico y lejos: con menos segmentos (eran ~315 mil triángulos con los contornos, más que un rockero)
+    this.body = mk(new THREE.CapsuleGeometry(0.2, 0.5, 2, 8), n, 0.025);
+    this.head = mk(new THREE.SphereGeometry(0.14, 9, 6), n, 0.02);
+    this.hair = mk(new THREE.SphereGeometry(0.152, 9, 4, 0, Math.PI * 2, 0, Math.PI * 0.55), n, 0);
+    this.arm = mk(new THREE.CapsuleGeometry(0.055, 0.46, 1, 5).translate(0, 0.28, 0), n * 2, 0.02);
+    this.leg = mk(new THREE.CylinderGeometry(0.08, 0.07, 0.8, 6).translate(0, 0.4, 0), n * 2, 0);
+    this.cuantos = n;
     const c = new THREE.Color();
     this.p.forEach((P, i) => { const sh = pick(shirts), sk = pick(skins); this.body.setColorAt(i, c.setHex(sh)); this.head.setColorAt(i, c.setHex(sk)); this.hair.setColorAt(i, c.setHex(pick(hairs))); for (let k = 0; k < 2; k++) { this.arm.setColorAt(i * 2 + k, c.setHex(R() < 0.6 ? sk : sh)); this.leg.setColorAt(i * 2 + k, c.setHex(pick([0x2e3d63, 0x222222, 0x3c5482, 0x5a4a3a]))); } });
     this.d = new THREE.Object3D(); this.cheer = 0;
   }
+  /* cuántos se pintan (y se animan): los `k` de más adelante */
+  ponCuantos(k) {
+    this.cuantos = Math.max(1, Math.min(this.n, k | 0));
+    for (const m of this.all) m.count = this.cuantos * m.userData.k;
+  }
   update(t, K, ex, mom) {
     const d = this.d; this.cheer = Math.max(0, this.cheer - 0.012);
-    for (let i = 0; i < this.n; i++) {
+    for (let i = 0; i < this.cuantos; i++) {
       const P = this.p[i]; const bias = 1 + 0.35 * mom * (P.x < 0 ? 1 : -1); const e = clamp(ex * bias + this.cheer, 0, 1.4);
       const lb = ((K.beat + P.ph * 0.3) % 1 + 1) % 1, dip = Math.exp(-lb * 6);
       const y = P.j * e * dip * (P.style === 3 ? 0.4 : 1) + this.cheer * 0.25 * Math.abs(Math.sin(t * 9 + P.ph * 6));
@@ -3043,11 +3069,25 @@ function buildSong() {
 }
 
 
+/* En el worker no hay hojas de estilo: Bangers (los títulos y los carteles pintados) se registra a mano con
+   la misma hoja de Google Fonts que usa la página. Si no llega, los carteles salen en Impact. */
+async function cargaFuentes() {
+  const css = await (await fetch('https://fonts.googleapis.com/css2?family=Bangers&display=swap')).text();
+  const caras = [];
+  for (const m of css.matchAll(/@font-face\s*{([^}]*)}/g)) {
+    const src = /url\(([^)]+)\)/.exec(m[1]), rango = /unicode-range:\s*([^;]+);/.exec(m[1]);
+    if (!src) continue;
+    const f = new FontFace('Bangers', `url(${src[1]})`, rango ? { unicodeRange: rango[1].trim() } : {});
+    self.fonts.add(f); caras.push(f.load());
+  }
+  await Promise.allSettled(caras);
+}
 /* =====================================================================
    INICIO DE ESCENA
    ===================================================================== */
 const clock = { t: 0, run: true };
-await Promise.race([document.fonts.load('80px Bangers'), sleep(2500)]).catch(() => {});
+if (EN_TRABAJADOR) await Promise.race([cargaFuentes(), sleep(2500)]).catch(() => {});
+else await Promise.race([document.fonts.load('80px Bangers'), sleep(2500)]).catch(() => {});
 makeTextures(); buildStage(); buildHaze();
 const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), smoke = new Smoke(), confetti = new Confetti();
 const pyros = [-5.6, -2.0, 2.0, 5.6].map(x => new Pyro(x));
@@ -3231,6 +3271,10 @@ const SHOT_SETS = {
   break: ['drums', 'side', 'crowdLow', 'hero', 'guitar'],
   outro: ['hero', 'close', 'crane', 'wide'],
 };
+/* de un jugador: cuánto se corre cada plano (fracción del ancho) y los que no sirven (el cantante no está,
+   el travelling y el de la guitarra no dejan al rockero en su sitio) */
+const SOLO_CORRE = { establish: 0.3, wide: 0.3, crowdLow: 0.3, crane: 0.3, side: 0.28, duo: 0.27, over: 0.25, drums: 0.24, close: 0.22, hero: 0.22 };
+const SOLO_FUERA = ['singer', 'faceoff', 'track', 'guitar'];
 const director = {
   name: 'establish', t0: 0, r: { s: 1, who: 0 }, nextBar: 0, until: 0, shake: 0,
   reset() { this.cut('establish', { s: 1, who: 0 }); this.until = clock.t + 9; this.nextBar = 3; },
@@ -3247,7 +3291,7 @@ const director = {
   onBar(bar, sec) {
     if (OPT.cam !== 'auto') return;
     if (clock.t < this.until || bar < this.nextBar) return;
-    let set = SHOT_SETS[sec.name] || SHOT_SETS.verse; if (SOLO()) set = set.filter(n => n !== 'singer' && n !== 'faceoff');
+    let set = SHOT_SETS[sec.name] || SHOT_SETS.verse; if (SOLO()) set = set.filter(n => !SOLO_FUERA.includes(n));
     let n; do n = pick(set); while (n === this.name && set.length > 1);
     const lead = battle.mom > 0 ? 0 : 1; const who = SOLO() ? 0 : R() < 0.6 + Math.abs(battle.mom) * 0.3 ? lead : 1 - lead;
     if (battle.ko) n = pick(['hero', 'close', 'crane', 'wide', 'crowdLow']);
@@ -3264,6 +3308,10 @@ const director = {
     s.p.y += (Math.sin(t * 1.7 + 1) + Math.sin(t * 3.3) * 0.4) * hh + (R() - 0.5) * this.shake * 0.1;
     camera.position.copy(s.p); camera.lookAt(s.l);
     if (camera.fov !== s.f) { camera.fov = s.f; camera.updateProjectionMatrix(); }
+    /* de un jugador la autopista ocupa el centro de la pantalla: el cuadro se corre para que el rockero
+       (lo que mira cada plano) quede en el tercio izquierdo, a la vista */
+    if (SOLO() && VPW) camera.setViewOffset(VPW, VPH, Math.round(VPW * (SOLO_CORRE[name] ?? 0.27)), 0, VPW, VPH);
+    else if (camera.view?.enabled && !ED.open) camera.clearViewOffset();
     parts.u.uScale.value = (VPH * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   },
 };
@@ -3368,7 +3416,7 @@ const focusYaw = key => ED.rk ? (ED_FOCUS[key] || ED_FOCUS.cuerpo)(ED.rk).yaw : 
 const TAT_VIEW = { brazoI: ['cuerpo', 1.25], antebrazoI: ['cuerpo', 1.25], manoI: ['manos', 1.3], musloI: ['cuerpo', 1.1], brazoD: ['cuerpo', -1.25], antebrazoD: ['cuerpo', -1.25], manoD: ['manos', -0.9], musloD: ['cuerpo', -1.1], espalda: ['cuerpo', Math.PI], cuello: ['cara', 1.1], mejilla: ['cara', -0.35], pecho: ['cuerpo', 0.2], clavicula: ['cuerpo', 0.3] };
 function edViewOffset(W, H) {
   if (!ED.open) { camera.clearViewOffset(); return; }
-  if (W > 700) camera.setViewOffset(W, H, Math.round(Math.min(400, innerWidth) / 2 * W / Math.max(1, innerWidth)), 0, W, H);
+  if (W > 700) camera.setViewOffset(W, H, Math.round(Math.min(400, W) / 2), 0, W, H);
   else camera.setViewOffset(W, H, 0, Math.round(H * 0.26), W, H);
 }
 function edRebuild() {
@@ -3752,7 +3800,7 @@ canvas.addEventListener('wheel', e => { if (!ED.open) return; e.preventDefault()
 /* =====================================================================
    BUCLE
    ===================================================================== */
-let last = performance.now() / 1000, kickPulse = 0, crashPulse = 0, bulbT = 0, msaaCheck = 0;
+let last = performance.now() / 1000, kickPulse = 0, crashPulse = 0, bulbT = 0, msaaCheck = 0, msaaRoto = false;
 const _lead = new THREE.Color(), _warm = new THREE.Color(), _cc = new THREE.Color();
 function step(dt) {
   clock.t += dt; const t = clock.t; LEG_T.value = t;
@@ -3809,10 +3857,10 @@ function step(dt) {
 function render(dt) {
   if (!VPW) return;
   composer.render();
-  if (msaaCheck < 3 && ++msaaCheck === 3) {
+  if (msaaCheck < 3 && composer.renderTarget1.samples && ++msaaCheck === 3) {
     const gl = renderer.getContext(), px = new Uint8Array(4);
     gl.readPixels(Math.floor(gl.drawingBufferWidth / 2), Math.floor(gl.drawingBufferHeight / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    if (px[0] + px[1] + px[2] === 0) { for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.dispose(); } composer.render(); }
+    if (px[0] + px[1] + px[2] === 0) { msaaRoto = true; for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.dispose(); } composer.render(); }
   }
   if (drawOverlay(dt)) { renderer.autoClear = false; renderer.render(ovScene, ovCam); renderer.autoClear = true; }
 }
@@ -3822,43 +3870,119 @@ function render(dt) {
    (detrás de la autopista o en la pantalla del editor) y el bucle corre solo mientras está montada y visible.
    ===================================================================== */
 function layout() {
-  const W = canvas.clientWidth || innerWidth, H = canvas.clientHeight || innerHeight;
-  // de fondo (con la autopista encima) se pinta a menos resolución: el juego necesita el cuadro
-  const pr = ED.open ? Math.min(devicePixelRatio, 1.75) : Math.min(devicePixelRatio, 1.25) * (VIVO.alto ? 0.6 : 1);
+  if (!EN_TRABAJADOR) Object.assign(TAM, { w: canvas.clientWidth || innerWidth, h: canvas.clientHeight || innerHeight, dpr: devicePixelRatio || 1 });
+  const W = TAM.w, H = TAM.h;
+  // de fondo (con la autopista encima) se pinta a la escala del nivel de calidad: el juego necesita la GPU
+  const pr = fondo() ? NIVELES[CAL.nivel].escala : Math.min(TAM.dpr, ED.open ? 1.75 : 1.25);
   if (W < 2 || H < 2) return;
   VPW = W; VPH = H;
   renderer.setPixelRatio(pr); renderer.setSize(W, H, false); composer.setPixelRatio(pr); composer.setSize(W, H);
   camera.aspect = W / H; camera.updateProjectionMatrix(); edViewOffset(W, H);
   ovCanvas.width = Math.round(W * pr); ovCanvas.height = Math.round(H * pr); ovKey = '';
 }
-addEventListener('resize', () => { if (montada) layout(); });
-new ResizeObserver(() => { if (montada) layout(); }).observe(canvas);
+if (!EN_TRABAJADOR) {
+  addEventListener('resize', () => { if (montada) layout(); });
+  new ResizeObserver(() => { if (montada) layout(); }).observe(canvas);
+}
+
+/* =====================================================================
+   CALIDAD DEL FONDO — detrás de la autopista la escena compite con el juego por la GPU y el hilo principal.
+   Medida (sin GPU): ~940 dibujos y ~775 mil triángulos por cuadro, más la pasada de sombras, el bloom y el
+   antialias 4× a resolución completa; a 60 cuadros por segundo eso dejaba PRO HERO injugable. De fondo:
+   - se pinta a una fracción de los píxeles CSS (`escala`) y sin antialias (el navegador lo estira: es fondo);
+   - con un tope de cuadros por segundo (`fps`): la coreografía va al pulso de la canción, no al cuadro;
+   - las sombras se rehacen cada `sombra` cuadros pintados, el bloom se apaga en los niveles bajos y del
+     público solo bailan las primeras filas (`publico`).
+   Un regulador mira el intervalo real entre cuadros (el del juego entero): si el juego baja de ~48 por
+   segundo, baja un nivel; si con el último sigue por debajo de ~36, deja el fondo quieto 3 s (la prueba de
+   culpa) y solo si así el juego se recupera avisa (`alDemasiado`) y PRO HERO lo apaga. Arranca en el 1 (el bloom era lo más caro) y, si el juego va holgado un buen rato, sube; con
+   alto rendimiento arranca en el 2 y no sube de ahí.
+   ===================================================================== */
+const NIVELES = [
+  { escala: 0.6, fps: 30, bloom: true, sombra: 3, publico: 160 },
+  { escala: 0.5, fps: 30, bloom: false, sombra: 4, publico: 120 },
+  { escala: 0.42, fps: 24, bloom: false, sombra: 4, publico: 90 },
+  { escala: 0.34, fps: 15, bloom: false, sombra: 6, publico: 60 },
+];
+/* `externo`: el intervalo entre cuadros lo mide el juego y llega con cada pulso (en el worker, su propio
+   requestAnimationFrame no dice nada de cómo va el hilo del juego) */
+const CAL = { nivel: 0, min: 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, cuadros: 0, peor: 0, prueba: 0, inocente: false, alDemasiado: null, externo: false };
+const fondo = () => VIVO.on && !ED.open;
+function ponCalidad() {
+  const f = fondo(), N = NIVELES[CAL.nivel];
+  bloom.enabled = !f || N.bloom;
+  crowd.ponCuantos(f ? N.publico : crowd.n);
+  renderer.shadowMap.autoUpdate = !f;
+  renderer.shadowMap.needsUpdate = true;
+  const sm = f ? 0 : msaaRoto ? 0 : 4;
+  for (const t of [composer.renderTarget1, composer.renderTarget2]) if (t.samples !== sm) { t.samples = sm; t.dispose(); }
+  layout();
+}
+function regula(real) {
+  if (real > 0.25) return;   // pestaña escondida, pausa del navegador: no cuenta
+  CAL.ema += (real - CAL.ema) * 0.05;
+  /* la prueba de culpa: con el fondo quieto 3 s, si el juego se recupera la culpa era nuestra y se apaga; si
+     no, el juego va lento por otra cosa (el equipo, la pista) y el fondo sigue al mínimo sin volver a probar */
+  if (CAL.prueba) {
+    CAL.prueba -= real;
+    if (CAL.prueba <= 0) { CAL.prueba = 0; if (CAL.ema < 1 / 45) CAL.alDemasiado?.(); else CAL.inocente = true; }
+    return;
+  }
+  if (CAL.ema > 1 / 48) { CAL.malo += real; CAL.bueno = 0; } else if (CAL.ema < 1 / 57) { CAL.bueno += real; CAL.malo = 0; } else CAL.malo = CAL.bueno = 0;
+  if (CAL.malo > 1.5) {
+    CAL.malo = 0;
+    if (CAL.nivel < NIVELES.length - 1) { CAL.nivel++; ponCalidad(); }
+    else if (CAL.ema > 1 / 36 && !CAL.inocente && ++CAL.peor >= 3) { CAL.peor = 0; CAL.prueba = 3; CAL.ema = 1 / 40; }
+  }
+  if (CAL.bueno > 12 && CAL.nivel > CAL.min) { CAL.bueno = 0; CAL.nivel--; ponCalidad(); }
+}
 
 let montada = false, raf = 0, CB = {};
+/* en el worker, un temporizador: su requestAnimationFrame no siempre corre (en Chromium sin pantalla nunca
+   volvió a llamar) y de fondo la escena tiene su propio tope de cuadros, no hace falta ir con la pantalla */
+const pideCuadro = !EN_TRABAJADOR && typeof requestAnimationFrame === 'function' ? requestAnimationFrame : f => setTimeout(f, 16);
+const sueltaCuadro = !EN_TRABAJADOR && typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
 function frame() {
   raf = 0;
   if (!montada) return;
-  raf = requestAnimationFrame(frame);
-  const now = performance.now() / 1000; let dt = Math.min(0.05, now - last); last = now;
-  if (document.hidden) return;
+  raf = pideCuadro(frame);
+  const now = performance.now() / 1000, real = now - last; last = now;
+  if (EN_TRABAJADOR ? TAM.oculto : document.hidden) return;
+  if (fondo()) {
+    if (!CAL.externo) regula(real);
+    if (CAL.prueba) return;   // la prueba de culpa: el fondo se queda quieto
+    const N = NIVELES[CAL.nivel], paso = 1 / N.fps;
+    CAL.acum += real;
+    if (CAL.acum < paso * 0.9) return;
+    let dt = Math.min(0.1, CAL.acum); CAL.acum = Math.min(paso, CAL.acum - paso);
+    if (CAL.acum < 0) CAL.acum = 0;
+    if (!clock.run) dt = 0;
+    if (++CAL.cuadros % N.sombra === 0) renderer.shadowMap.needsUpdate = true;
+    step(dt); render(dt);
+    return;
+  }
+  let dt = Math.min(0.05, real);
   if (!clock.run) dt = 0;
   step(dt); render(dt);
 }
-const arranca = () => { last = performance.now() / 1000; if (!raf) raf = requestAnimationFrame(frame); };
+const arranca = () => { last = performance.now() / 1000; if (!raf) raf = pideCuadro(frame); };
 
 export const rock = {
   canvas,
-  /* pone el lienzo (y la capa del editor) en `host` */
+  /* pone el lienzo en `host` (en el worker no hay host: el lienzo ya está en la página) */
   monta(host) {
-    host.append(canvas);
+    if (host) host.append(canvas);
     montada = true; layout(); arranca();
   },
   desmonta() {
     if (ED.open) edShut();
-    montada = false; if (raf) cancelAnimationFrame(raf); raf = 0;
-    canvas.remove();
+    montada = false; if (raf) sueltaCuadro(raf); raf = 0;
+    if (!EN_TRABAJADOR) canvas.remove();
     VIVO.on = false;
   },
+  /* en el worker: el tamaño del lienzo en la página y si la pestaña está escondida */
+  tam(w, h, dpr) { Object.assign(TAM, { w: Math.max(2, w | 0), h: Math.max(2, h | 0), dpr: dpr || 1 }); if (montada) layout(); },
+  oculto(on) { TAM.oculto = !!on; },
   /* el inventario de verdad, de la página: {coins, parada, own, opened, last} */
   inventario(inv) {
     INV = { coins: inv.coins | 0, parada: !!inv.parada, own: [...iniciales().map(v => ({ ...v })), ...(inv.own || [])], opened: inv.opened | 0, last: inv.last || [] };
@@ -3869,11 +3993,12 @@ export const rock = {
     CB = cb || {}; VIVO.on = false; VIVO.alto = false;
     // la escena se prepara como en el paquete (con la batalla de demostración): sin eso el editor salía a oscuras
     if (battle.t0 === undefined) battle.start();
+    ponCalidad();
     edOpen(look ? lookPosible(sanitizeLook(look), INV.own.filter(v => v.copia && !v.venta)) : null);
   },
   cierraEditor() { if (ED.open) edShut(); },
   /* una canción: `yo` y (en batalla) `rival` son rockeros {look, nombre}; sin rival, toca solo */
-  enVivo({ yo, rival = null, alto = false }) {
+  enVivo({ yo, rival = null, alto = false, alDemasiado = null }) {
     if (ED.open) edShut();
     const L = yo?.look ? sanitizeLook(yo.look) : defaultLook('m');
     if (!yo?.look && yo?.nombre) L.name = String(yo.nombre).slice(0, 24);
@@ -3887,12 +4012,19 @@ export const rock = {
     }
     Object.assign(VIVO, { on: true, mt: 0, raw: -1, ko: null, fin: null, hype: 0, alto: !!alto });
     OPT.bars = false; OPT.cam = 'auto';
-    battle.start(); layout();
+    Object.assign(CAL, { nivel: alto ? 2 : 1, min: alto ? 2 : 0, ema: 1 / 60, malo: 0, bueno: 0, acum: 0, peor: 0, prueba: 0, inocente: false, alDemasiado, externo: false });
+    battle.start(); ponCalidad();
+    // shaders, texturas y sombras se estrenan ahora, en la pantalla de carga, y no en el primer segundo de la canción
+    try { renderer.compile(scene, camera); for (let i = 0; i < 2; i++) { step(1 / 30); render(1 / 30); } } catch (err) { console.warn('[rock] precalentar', err); }
   },
+  /* el nivel de calidad del fondo (0 el mejor), por si alguien quiere mirarlo */
+  get nivel() { return CAL.nivel; },
+  _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, hype = 0 }) {
+  pulso({ beats, animo = 0, hype = 0, dtJuego = 0 }) {
     if (!VIVO.on) return;
+    if (dtJuego > 0) { CAL.externo = true; regula(dtJuego); }
     const raw = Math.max(0, beats) * BEAT, mt = vivoMt(raw);
     if (mt < VIVO.mt - 0.05) battle.rewound();
     VIVO.raw = raw; VIVO.mt = mt; VIVO.hype = clamp(hype, 0, 1);
@@ -3904,5 +4036,5 @@ export const rock = {
   /* fin de la canción: en batalla el ganador (0 tú, 1 el rival); solo, el título */
   fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = ganador ? 1 : 0; },
 };
-window.__rock = { rock, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
+globalThis.__rock = { rock, CAL, TAM, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
 $('#loading')?.remove();

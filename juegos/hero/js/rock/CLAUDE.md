@@ -24,10 +24,23 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   `pideRock`), `../ui/rockero.js` («Tu rockero» screen).
 - Three.js **0.160.0** (the version the owner built on) is vendored in
   `juegos/hero/vendor/three-0.160.0/` (min build + the addons used) and
-  mapped as `three` / `three/addons/` in `index.html`'s import map. jsdelivr
-  was unreachable from the dev container and school networks block CDNs.
-  The scene is only imported when an admin opens the editor or plays with
-  the background on.
+  imported **by relative path** (no import map: workers have none). The
+  vendored addons were edited for that: `from 'three'` →
+  `from '../../three.module.min.js'`. Re-vendoring needs the same edit.
+- **In a song the scene runs in a worker** (`trabajador.js`, bundled by
+  `npm run build:rock` into `juegos/hero/rock-trabajador.js`, loaded with the
+  frame's own `?v=hero-N`) on an `OffscreenCanvas`, so the 3D never takes
+  time from the game thread. `cargaFondo()` in `sitio/rock.js` falls back to
+  the page when there is no OffscreenCanvas or the worker fails. The editor
+  always runs in the page. In the worker `EN_TRABAJADOR` is true: no DOM
+  (`$` returns a do-nothing proxy, canvases are `OffscreenCanvas`, size /
+  dpr / visibility arrive as messages in `TAM`), Bangers is registered with
+  `FontFace` from the Google Fonts CSS, and the loop is a **timer**: the
+  worker's `requestAnimationFrame` never fired again in headless Chromium.
+  **After editing `escena.js`/`catalogo.js`, run `npm run build:rock`**
+  (`npm run build` does it); `tests/hero.test.cjs` checks the bundle exists.
+- `canvas.rock-lienzo` is styled in `css/style.css`, not in the scene's CSS
+  (with the worker that CSS is never injected and the canvas was invisible).
 
 ## Money (all derived, like Mascotas gifts)
 
@@ -77,8 +90,22 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
   left, rival right (their `rockLook`, or a factory rocker picked from their
   uid). Momentum = score difference; Star Power and every 100 streak are an
   attack; at the end the higher score wins the K.O.
-- In the background the canvas renders at ≤ 1.25 px ratio (0.6× in alto
-  rendimiento).
+- **Quality** (`NIVELES`, `CAL`, `regula` in `escena.js`): as a background
+  it was ~940 draw calls and ~775k triangles at full resolution, 60 fps, with
+  4× MSAA, bloom and 2048 shadows — unplayable. Now: a fraction of the CSS
+  pixels (`escala`), no MSAA, an fps cap, shadows redrawn every few frames,
+  bloom only at level 0 (it was the most expensive pass), and only the front
+  rows of the crowd (sorted by z). The crowd geometry has fewer segments for
+  everyone (it was 315k triangles with outlines). Starts at level 1 (2 with
+  alto rendimiento). The governor reads the **game's** frame interval
+  (`dtJuego` in each `pulso`): below ~48 fps it drops a level; at the last
+  level below ~36 fps it freezes the background for 3 s (the guilt test) and
+  only if the game recovers asks PRO HERO to turn it off (`alDemasiado` →
+  toast, back on from the pause menu); otherwise it stays at the minimum.
+- **Framing**: single player puts the rocker in the left third
+  (`SOLO_CORRE`, `setViewOffset` per shot; the highway is in the middle) and
+  skips shots that can't (`SOLO_FUERA`). In battle the two highways leave the
+  centre free, so shots stay centred.
 
 ## Traps
 
@@ -87,4 +114,7 @@ false and drop the `admins` condition from those two rules. PRO HERO itself:
 - The crowd is hidden while the editor is open (the editor camera stands
   where the crowd starts).
 - Headless Chromium renders this with SwiftShader at a few fps: screenshots
-  need 10–20 s of waiting.
+  need 10–20 s of waiting, and the governor drops to the last level there.
+- The material caches (`toon`, `legMat`) key textures by uuid **before**
+  `JSON.stringify`: its `toJSON` runs before a replacer and turned every
+  texture into a base64 data URL on each call (and warns in a worker).
