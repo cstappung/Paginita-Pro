@@ -101,7 +101,8 @@ test('Snake antitrampas: la prueba que arma game.js pasa el verificador',async()
     for(let k=0;k<100000&&!enviados.length;k++){
       const m=motor(),quiero=robot(m,8);
       if(quiero&&!Motor.same(Motor.DIRS[quiero],m.direction))api.enqueue(m.mirrored?ESPEJO[quiero]:quiero);
-      if(k===40){api.pause();api.enqueue('up');api.pause();}
+      // la pausa, apenas empieza: a la tic 40 a veces la partida ya había terminado (en «reloj», a las 37) y no había pausa
+      if(k===3){api.pause();api.enqueue('up');api.pause();}
       api.step();
     }
     assert.equal(enviados.length,1,modo);

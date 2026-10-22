@@ -165,7 +165,7 @@ async function subeResumen(u, mias) {
    - `inv`: el saldo y las piezas de la cuenta (las de cajas, con su copia y si están a la venta);
    - `look`: tu rockero guardado (`rockLook/<uid>`), limpio y solo con lo que tienes y no vendes;
    - `looks`: los de los demás de la sala, leídos por clave, comprobados contra lo de cada uno.
-   Un jugador que no es administrador no recibe nada, así que en su juego no existe. */
+   Con `ROCK_SOLO_ADMIN` (a prueba) solo lo recibe un administrador; si no, toda cuenta con sesión. */
 const adminDe = new Map();
 function esAdminRock() {
   const u = deps?.usuario();
@@ -299,7 +299,7 @@ export function crearHero({ volver, enLinea }) {
     window.addEventListener("message", mensaje);
     temaObs = new MutationObserver(tema);
     temaObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    frame.src = "juegos/hero/index.html?v=hero-16";
+    frame.src = "juegos/hero/index.html?v=hero-17";
     host.appendChild(frame);
     frame.addEventListener("load", () => frame.contentWindow?.focus());
   }

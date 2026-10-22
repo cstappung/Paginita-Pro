@@ -238,11 +238,11 @@ export class LobbyScreen extends Screen {
       entry ? h('div', { class: 'ls-elegida' }, 'Elegida: ', h('b', {}, entry.meta.name), ` · ${entry.meta.artist}`) : null].filter(Boolean);
   }
 
-  // Batalla de Rock de fondo (solo administradores, a prueba)
+  // Batalla de Rock de fondo
   rockCheck() {
     const c = h('input', { type: 'checkbox', 'data-nav': true, onchange: () => { settings.fondoRock = c.checked; saveSettings(); } });
     c.checked = settings.fondoRock;
-    return h('label', { class: 'set-row check' }, h('span', {}, 'Fondo Batalla de Rock', h('small', {}, 'Tu rockero contra el de tu rival, detrás de la pista · a prueba')), c);
+    return h('label', { class: 'set-row check' }, h('span', {}, 'Fondo Batalla de Rock', h('small', {}, 'Tu rockero contra el de tu rival, detrás de la pista')), c);
   }
 
   ajustesEl() {

@@ -452,7 +452,7 @@ export async function comprarCofre(uid, clave, p) {
   await set(r, { at: serverTimestamp(), p });
   return (await get(r)).val();
 }
-/* ---------- Batalla de Rock (el fondo de PRO HERO, a prueba) ----------
+/* ---------- Batalla de Rock (el fondo de PRO HERO) ----------
    `rock/c/<uid>/<clave>` = {at, p, b}: una caja comprada; lo que trae lo
    deriva `cajaRock` (juegos/rock-datos.js) con esa hora del servidor.
    `rockLook/<uid>`: el rockero guardado, un JSON. Lo lee cualquiera con

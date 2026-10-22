@@ -82,7 +82,7 @@ export class SettingsScreen extends Screen {
       this.check('Modo zurdo', () => settings.lefty, (v) => (settings.lefty = v), 'Invierte la autopista'),
       this.check('Videos de fondo', () => settings.showVideo, (v) => (settings.showVideo = v), 'video.mp4 / .webm de la canción'),
       this.check('Imágenes de fondo', () => settings.showBackground, (v) => (settings.showBackground = v)),
-      ...(rockSitio.admin ? [this.check('Fondo Batalla de Rock (a prueba)', () => settings.fondoRock, (v) => (settings.fondoRock = v), 'Tu rockero toca en el escenario detrás de la pista; en una sala, contra el de tu rival')] : []),
+      ...(rockSitio.admin ? [this.check('Fondo Batalla de Rock', () => settings.fondoRock, (v) => (settings.fondoRock = v), 'Tu rockero toca en el escenario detrás de la pista; en una sala, contra el de tu rival')] : []),
       this.check('Batería: Expert+ (doble bombo)', () => settings.expertPlus, (v) => (settings.expertPlus = v)),
       this.check('Batería: platillos pro', () => settings.proCymbals, (v) => (settings.proCymbals = v), 'Exige teclas distintas para platillos'));
   }

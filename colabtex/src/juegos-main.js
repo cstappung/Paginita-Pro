@@ -3813,7 +3813,7 @@ function wire() {
     fb.esAdminJuegos(user.uid).then(a => {
       if (!state.user || state.user.uid !== user.uid) return;
       state.admin = a; mostrar();
-      /* Batalla de Rock está a prueba: sus piezas solo las ve un admin (mercado incluido). */
+      /* Batalla de Rock, si está a prueba (ROCK_SOLO_ADMIN): sus piezas solo las ve un admin (mercado incluido). */
       if (fijaVeRock(a) && datosP) { datosP = conDerivados(Object.assign({}, datosP)); for (const f of [...oyentesP]) f(datosP); }
       if (state.vista === "admin") { vistaPintada = ""; render(); }
       if (a && ranks && ranks.refresca) ranks.refresca();

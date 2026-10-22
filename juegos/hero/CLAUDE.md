@@ -11,7 +11,7 @@ plain ES modules (no build) and integrated here. Two ways in, one document:
   (`crearHeroSala`), reducer `redHero` in `motor.js`.
 
 **Batalla de Rock** (the 3D stage behind the highway, «Tu rockero», rock
-boxes; admins only while on trial) lives in `js/rock/`: read
+boxes; open to everyone) lives in `js/rock/`: read
 `js/rock/CLAUDE.md` before touching it or `session.js`'s `_…Rock` methods.
 
 Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
