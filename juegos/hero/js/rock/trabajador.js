@@ -5,9 +5,10 @@
 // Mensajes de la página (sitio/rock.js):
 //   {t:'lienzo', canvas, w, h, dpr}  el OffscreenCanvas (una sola vez) → carga la escena y contesta {t:'listo'}
 //   {t:'tam', w, h, dpr} · {t:'oculto', on} · {t:'monta'} · {t:'desmonta'}
-//   {t:'vivo', yo, rival, alto} · {t:'pulso', beats, animo, hype, dtJuego} · {t:'ataque', quien}
-//   {t:'hype', kind, text, color} · {t:'fin', ganador, texto}
-// Al worker se le contesta {t:'listo'}, {t:'error', m} y {t:'demasiado'} (el juego no da ni con el mínimo).
+//   {t:'vivo', yo, rival, alto} · {t:'pulso', beats, animo, humor, hype, dtJuego, toca, solo}
+//   {t:'carga', quien} · {t:'poder', quien, on} · {t:'ataque', quien} · {t:'hype', kind, text, color} · {t:'fin', ganador, texto}
+// El worker contesta {t:'listo'}, {t:'error', m}, {t:'preparado'} (la canción ya puede empezar) y {t:'demasiado'}
+// (el juego no da ni con el mínimo).
 let rock = null;
 const cola = [];
 
@@ -31,7 +32,13 @@ function atiende(d) {
     case 'oculto': rock.oculto(d.on); break;
     case 'monta': rock.monta(null); break;
     case 'desmonta': rock.desmonta(); break;
-    case 'vivo': rock.enVivo({ yo: d.yo, rival: d.rival, alto: d.alto, alDemasiado: () => postMessage({ t: 'demasiado' }) }); break;
+    case 'vivo':
+      Promise.resolve(rock.enVivo({ yo: d.yo, rival: d.rival, alto: d.alto, alDemasiado: () => postMessage({ t: 'demasiado' }) }))
+        .catch((err) => console.warn('[rock] enVivo', err))
+        .then(() => postMessage({ t: 'preparado' }));
+      break;
+    case 'carga': rock.carga(d.quien); break;
+    case 'poder': rock.poder(d.quien, d.on); break;
     case 'pulso': rock.pulso(d); break;
     case 'ataque': rock.ataque(d.quien); break;
     case 'hype': rock.hype(d.kind, d.text, d.color); break;

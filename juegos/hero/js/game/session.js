@@ -15,6 +15,7 @@ import { Tactil, TACTIL } from '../ui/tactil.js';
 import { vistas } from './orden.js';
 import { CURVA_N } from './carrera.js';
 import { rockSitio, cargaFondo } from '../sitio/rock.js';
+import { descansos, enDescanso, humorDe } from '../rock/ritmo.js';
 
 const PLAYER_COLORS = ['#ffffff', '#ffb21e', '#53e7ff', '#ff6fb5', '#9dff6f', '#c79bff', '#ff8a5c', '#5cffd6'];
 const STATE_INTERVAL = 100;
@@ -129,7 +130,7 @@ export class GameSession {
 
   _onEngineEvent(p, type, a, b) {
     const now = this.now ?? 0;
-    if (this.rock) this._rockEvento(p, type, a);
+    if (this.rock) this._rockEvento(p, type, a, b);
     switch (type) {
       case 'hit':
         if (settings.muteOnMiss) this.audio.setMuted(p.stems, false);
@@ -190,7 +191,8 @@ export class GameSession {
   }
 
   // track(archivo) devuelve la función que recibe los bytes descargados de ese archivo
-  async load(track) {
+  // `aviso(texto)`: lo que se va preparando, para la pantalla de carga
+  async load(track, aviso) {
     const files = {};
     for (const [stem, file] of Object.entries(this.entry.audio)) files[stem] = () => fetchSongFile(this.entry, file, track?.(file));
     const bg = library.remote && this.entry.background && settings.showBackground
@@ -200,17 +202,18 @@ export class GameSession {
     const stems = new Set(this.players.flatMap((p) => p.stems));
     this.audio.setStemVolumes([...stems]);
     this._setupBackground();
-    await this._preparaRock();
+    await this._preparaRock(aviso);
     this._precalienta();
   }
 
   // Batalla de Rock de fondo (solo administradores, a prueba: js/rock/). Con otro jugador (en la sala,
   // el primero de los demás; en local, el segundo) es una batalla: tu rockero contra el suyo, y quién va
   // ganando sale de los puntajes. Solo, tu rockero toca al centro y el público sigue tu combo.
-  async _preparaRock() {
+  async _preparaRock(aviso) {
     this.rock = null;
     if (!rockSitio.admin || !settings.fondoRock || celular) return;
     let rock;
+    aviso?.('Montando el escenario…');
     try { rock = await cargaFondo(); } catch (err) { console.warn('[hero] Batalla de Rock', err); return; }
     const yo = this.local.find((p) => !p.bot) || this.local[0];
     const rival = this.players.find((p) => p !== yo && p.type === 'remote') || this.players.find((p) => p !== yo) || null;
@@ -218,21 +221,32 @@ export class GameSession {
     this.rockYo = yo;
     this.rockRival = rival;
     this.rockSp = [false, false];
+    this.rockCarga = [0, 0];
     this.rockFin = false;
-    this.rockFalla = 0;
     this.rockT = 0;
+    this.rockHumor = 0.3;
+    this.rockMuestras = [];
+    // los tramos sin notas de cada uno: ahí el rockero deja de tocar
+    const fin = this.song.endTime;
+    this.rockDescansos = [yo, rival].map((p) => (p ? { l: descansos(p.track.notes, { fin }), cur: { i: 0 } } : null));
     rock.monta(document.getElementById('rockbg'));
-    rock.enVivo({
-      yo: { look: rockSitio.look, nombre: yo?.name },
-      rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
-      alto: settings.altoRendimiento,
-      // si el juego se resiente aun con el fondo al mínimo, se apaga para esta sesión (en la pausa se vuelve a encender)
-      alDemasiado: () => {
-        if (!this.rock) return;
-        this.ponRock(false);
-        toast('Se apagó el fondo de rock: tu equipo no daba con los dos. Lo puedes volver a encender en la pausa.', 5000);
-      },
-    });
+    // la canción espera a que el escenario esté listo (rockeros armados, shaders y texturas estrenados): si no,
+    // los primeros segundos se trababan mientras se preparaba. Con tope, por si el equipo es muy lento.
+    aviso?.('Preparando a los rockeros…');
+    await Promise.race([
+      rock.enVivo({
+        yo: { look: rockSitio.look, nombre: yo?.name },
+        rival: rival ? { uid: rival.id || rival.name || 'rival', nombre: rival.name, look: (rival.id && rockSitio.looks.get(rival.id)) || null } : null,
+        alto: settings.altoRendimiento,
+        // si el juego se resiente aun con el fondo al mínimo, se apaga para esta sesión (en la pausa se vuelve a encender)
+        alDemasiado: () => {
+          if (!this.rock) return;
+          this.ponRock(false);
+          toast('Se apagó el fondo de rock: tu equipo no daba con los dos. Lo puedes volver a encender en la pausa.', 5000);
+        },
+      }),
+      new Promise((ok) => setTimeout(ok, 20000)),
+    ]).catch((err) => console.warn('[hero] Batalla de Rock', err));
   }
 
   // Desde la pausa: se apaga o se vuelve a montar sin salir de la canción
@@ -248,18 +262,35 @@ export class GameSession {
     const yo = this.rockYo?.engine, rv = this.rockRival?.engine, T = this.song.tempo;
     if (!yo) return;
     const beats = T.secToTick(Math.max(0, now)) / T.resolution;
+    // el humor del público: el acierto de los últimos segundos (si hay pocas notas, se queda como estaba)
+    const M = this.rockMuestras, ult = M[M.length - 1];
+    if (!ult || now - ult.t >= 0.5 || now < ult.t) {
+      if (ult && now < ult.t) M.length = 0;   // la canción volvió atrás (la pausa retrocede)
+      M.push({ t: now, h: yo.hitCount, m: yo.missCount });
+      if (M.length > 24) M.shift();
+    }
+    const hu = humorDe(M, now);
+    if (hu !== null) this.rockHumor += (hu - this.rockHumor) * 0.05;
+    const humor = Math.max(-1, Math.min(1, this.rockHumor + Math.min(0.25, (yo.combo || 0) / 200)));
+    // el ánimo de tu rockero: en batalla, quién va ganando; solo, cómo vas tocando y tu multiplicador
     const animo = rv
       ? (yo.score - rv.score) / Math.max(4000, 0.25 * (yo.score + rv.score))
-      : Math.min(1, (yo.multiplier() - 1) / 3) * 0.9 - (this.rockFalla > performance.now() ? 0.6 : 0);
+      : 0.7 * humor + 0.3 * ((yo.multiplier() - 1) / 3);
     // el intervalo real entre cuadros del juego: con él la escena decide cuánto se puede gastar
     const ahora = performance.now(), dtJuego = this.rockT ? (ahora - this.rockT) / 1000 : 0;
     this.rockT = ahora;
-    this.rock.pulso({ beats, animo, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego });
-    // Star Power: en batalla es un ataque; solo, el público estalla
-    const sp = [!!yo.spActive, !!rv?.spActive];
-    if (sp[0] && !this.rockSp[0]) rv ? this.rock.ataque(0) : this.rock.hype('sp', '¡STAR POWER!', '#53e7ff');
-    if (sp[1] && !this.rockSp[1]) this.rock.ataque(1);
-    this.rockSp = sp;
+    const D = this.rockDescansos, toca = D.map((d) => (d ? !enDescanso(d.l, now, d.cur) : true));
+    this.rock.pulso({ beats, animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now) });
+    // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
+    // se prende de azul mientras dure (en batalla, la carga es un ataque al rival)
+    [yo, rv].forEach((e, q) => {
+      if (!e) return;
+      const sp = e.sp || 0, on = !!e.spActive;
+      if (sp > this.rockCarga[q] + 0.2) this.rock.carga(q);
+      this.rockCarga[q] = sp;
+      if (on !== this.rockSp[q]) this.rock.poder(q, on);
+      this.rockSp[q] = on;
+    });
     if (!this.rockFin && now > this.song.endTime + 0.3) {
       this.rockFin = true;
       if (rv) this.rock.fin(yo.score >= rv.score ? 0 : 1);
@@ -270,14 +301,17 @@ export class GameSession {
     }
   }
 
-  // Rachas y caídas del jugador, para la coreografía de Batalla de Rock
-  _rockEvento(p, type, a) {
+  // Rachas, caídas y solos del jugador, para la coreografía de Batalla de Rock
+  _rockEvento(p, type, a, b) {
     if (!this.rock || p !== this.rockYo) return;
+    const solo = !this.rockRival;
     if (type === 'streak' && (a % 100 === 0 || a === 50)) {
-      if (this.rockRival) { if (a % 100 === 0) this.rock.ataque(0); } else this.rock.hype('racha', `¡RACHA DE ${a}!`, '#ffd34d');
+      if (solo) this.rock.hype('racha', `¡RACHA DE ${a}!`, '#ffd34d');
     } else if (type === 'comboBreak' && a >= 25) {
-      this.rockFalla = performance.now() + 3000;
-      if (!this.rockRival) this.rock.hype('falla');
+      if (solo) this.rock.hype('falla');
+    } else if (type === 'soloEnd' && b?.total) {
+      const pct = b.hits / b.total;
+      if (pct >= 0.85) this.rock.hype('solo', pct === 1 ? '¡SOLO PERFECTO!' : '¡QUÉ SOLO!', '#ffd34d');
     }
   }
 

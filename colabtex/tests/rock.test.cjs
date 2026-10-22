@@ -148,3 +148,27 @@ test('lo inicial lo tiene todo el mundo: los rockeros de fábrica se ven tal cua
     for (const cat in C.INV_CATS) if (L[cat]) assert.deepEqual(V[cat], L[cat], k + ' ' + cat);
   }
 });
+
+test('la canción de verdad: descansos sin notas, el cursor y el humor del acierto', async () => {
+  const { pathToFileURL } = require('node:url');
+  const R = await import(pathToFileURL(path.join(__dirname, '../../juegos/hero/js/rock/ritmo.js')).href);
+  // notas en 2 s, 3 s y 3.5 s (sostenida hasta 5 s), y después en 12 s
+  const notas = [{ time: 2 }, { time: 3 }, { time: 3.5, endTime: 5 }, { time: 12 }];
+  const d = R.descansos(notas, { min: 3, antes: 0.8, despues: 0.5, fin: 20 });
+  assert.deepEqual(d, [[-Infinity, 1.2], [5.5, 11.2], [12.5, Infinity]]);
+  const cur = { i: 0 };
+  assert.equal(R.enDescanso(d, 0, cur), true, 'la entrada');
+  assert.equal(R.enDescanso(d, 4, cur), false, 'tocando (el sostenido cuenta)');
+  assert.equal(R.enDescanso(d, 8, cur), true, 'el hueco');
+  assert.equal(R.enDescanso(d, 11.5, cur), false, 'se prepara antes de la siguiente');
+  assert.equal(R.enDescanso(d, 15, cur), true, 'el final');
+  assert.equal(R.enDescanso(d, 4, cur), false, 'y si la canción vuelve atrás, el cursor también');
+  assert.deepEqual(R.descansos([], {}), [[-Infinity, Infinity]], 'sin notas, siempre descansa');
+  // humor: 95 % o más es euforia, 72 % indiferencia, por debajo del 50 % el público se aburre
+  const m = (pares) => pares.map(([t, h, f]) => ({ t, h, m: f }));
+  assert.equal(R.humorDe(m([[0, 0, 0], [5, 40, 0]]), 5), 1);
+  assert.ok(Math.abs(R.humorDe(m([[0, 0, 0], [5, 36, 14]]), 5)) < 0.01);
+  assert.equal(R.humorDe(m([[0, 0, 0], [5, 10, 20]]), 5), -1);
+  assert.equal(R.humorDe(m([[0, 0, 0], [5, 2, 1]]), 5), null, 'con muy pocas notas no dice nada');
+  assert.equal(R.humorDe(m([[0, 0, 50], [3, 10, 50], [8, 40, 50]]), 8), 1, 'solo mira los últimos segundos');
+});
