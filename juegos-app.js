@@ -2928,7 +2928,7 @@ El navegador bloque\xF3 la ventana de Google: permite las ventanas emergentes de
           <button class="btn" id="jgChatBtn">Enviar</button>
         </form>
       </section></div>`,Pa("jgVolver").onclick=mY,Pa("jgAbandonar").onclick=y4e,Pa("jgReglas").onclick=()=>{let r=Ue.partida;!r||!YS(r.juego)||_d(r.juego,{modo:PW(r.juego,r),nombre:Ft[r.juego].nombre})},Pa("jgChatForm").onsubmit=async r=>{r.preventDefault();let l=Pa("jgChatTxt"),i=l.value.trim();if(!i||!Ue.pid)return;l.value="";let c=await K5(Ue.pid,{uid:Ue.user.uid,nombre:Ue.user.name},i);!c&&!l.value?(l.value=i,qu(Object.assign(new Error("PERMISSION_DENIED"),{code:"PERMISSION_DENIED"}))):c&&Du()&&h0(!1)},Pa("jgInm").onclick=()=>{!Du()&&Jn&&Jn.pantallaCompleta&&Jn.pantallaCompleta()||h3(!Du())},Pa("jgChatAbre").onclick=()=>h0(!0),Pa("jgChat").addEventListener("focusout",()=>setTimeout(()=>{let r=Pa("jgChat");r&&Du()&&!r.contains(document.activeElement)&&!Pa("jgChatTxt").value&&h0(!1)},120)),bY(),t3="",g0="",k3();return}let o=Ue.invitado,n=t?String(t.name||"").split(" ")[0]:"",s=o?ui():"";e.innerHTML=`
-    <div class="jg-sal" id="vesSalon" data-modo="${m0}">
+    <div class="jg-sal${o?" jg-sal-inv":""}" id="vesSalon" data-modo="${m0}">
       ${W5e()}
       <header class="jg-sal-intro">
         <span class="jg-eyebrow">LABORATORIO \xB7 SAL\xD3N DE JUEGOS</span>
