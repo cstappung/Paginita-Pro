@@ -531,6 +531,8 @@ export const aceptarCambio = id => set(ref(db, `mercado/t/${id}/ok`), serverTime
 export const cerrarCambio = id => set(ref(db, `mercado/t/${id}/x`), serverTimestamp());
 /* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
 export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
+/* La plantilla de fútbol: {casilla (0 a 10): copia}; las vacías no se escriben. */
+export const ponerPlantilla = (uid, porCasilla) => set(ref(db, `${U}/${uid}/perfil/plantilla`), Object.keys(porCasilla).length ? porCasilla : null);
 
 /* ---------- Mascotas ----------
    Tres gastos de una sola escritura, como los sobres: `mascotas/a/<uid>/<k>`

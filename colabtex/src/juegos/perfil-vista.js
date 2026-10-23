@@ -12,7 +12,7 @@
  * Los datos los da `ctx.datos(cb)` (la misma escucha que la pestaña de
  * logros, compartida), así que abrir diez tarjetas no son diez lecturas.
  */
-import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
+import { exhibidasDe, miniCarta, plantillaDe, puntosDe, urlPlantilla } from "./prodrop-cartas.js";
 import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece, marcoDe } from "./perfil-tarjeta.js";
 import { HALLOWEEN, PREMIOS_HALLOWEEN, RAREZAS_HW, rarezaHw } from "./tienda.js";
 import { LOGROS } from "./logros.js";
@@ -195,8 +195,9 @@ export function crearPaginaPerfil({ uid, ctx }) {
     const p = ctx.perfil(uid) || {}, yo = ctx.yo();
     const pista = uid === yo ? ctx.propio() : null;
     const cartas = exhibidasDe(uid, p, dat);
+    const plant = plantillaDe(uid, p, dat), nPlant = plant.filter(Boolean).length;
     const m = dat && ctx.mascota ? ctx.mascota(uid, p, dat, pinta) || null : null;
-    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr]), !!m]);
+    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr]), plant.map(c => c && [c.k, c.i, c.gr]), !!m]);
     if (f2 === firma) { if (masc) masc.pon(m); return; }
     firma = f2;
     const q = quien(uid, p, est, pista, ctx.colorDe);
@@ -230,6 +231,13 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <header><h2>Cartas en exhibición</h2>${propio ? `<a class="btn2" href="#cartas">🃏 Abrir PRODROP</a>` : ""}</header>
         ${cartas.length ? `<div class="jg-pf-cartas-fila">${cartas.map(c => miniCarta(c)).join("")}</div>`
           : `<p class="jg-nada">Abre sobres en PRODROP y exhibe aquí tus mejores cartas (en la carta: «☆ Exhibir en mi perfil»).</p>`}
+      </section>` : ""}
+      ${est && (nPlant || propio) ? `
+      <section class="jg-pf-sec jg-pf-plantilla">
+        <header><h2>Plantilla de fútbol</h2>${nPlant ? `<b class="jg-pf-puntos" title="Promedio de las once: la rareza pone el techo y el estado lo escala">${puntosDe(plant)}<small> pts</small></b>` : ""}
+          ${propio ? `<a class="btn2" href="#cartas">⚽ Armar en PRODROP</a>` : ""}</header>
+        ${nPlant ? `<iframe class="jg-pf-cancha" title="Plantilla de fútbol" loading="lazy" tabindex="-1" src="${esc(urlPlantilla(plant))}"></iframe>`
+          : `<p class="jg-nada">Abre sobres de Fútbol en PRODROP y arma tu once en 4-3-3 (en el resumen del sobre: «⚽ Mi plantilla»).</p>`}
       </section>` : ""}
       ${est ? `
       <section class="jg-pf-sec">

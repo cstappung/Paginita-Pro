@@ -38,6 +38,8 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       .filter(k => typeof k === "string").map(k => (k.includes("~") ? k : uid + "~" + k)).slice(0, MAX_EXHIBIDAS);
   }
   const exhibidas = () => exhibidasTodas().filter(c => copiaVisible(c));
+  // la plantilla de fútbol como once claves de copia ("" la casilla vacía)
+  const plantilla = () => { const l = (perfil(uid) || {}).plantilla || {}; return MOTOR.FORMACION.map((_, i) => (typeof l[i] === "string" ? l[i] : "")); };
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
@@ -68,7 +70,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
         x.id != null ? { rr: { id: x.id, g: x.g, w: x.w } } : {})),
       sobres, gratis: proximoGratis(uid, d, fb.ahora()),
       ofertas, pendientes: pendientesDe(d, uid), gente,
-      exh: exhibidas(), desfase: fb.ahora() - Date.now() });
+      exh: exhibidas(), plant: plantilla(), desfase: fb.ahora() - Date.now() });
   }
 
   const falta = p => { const s = cuenta().saldo; return s >= p ? 0 : p - s; };
@@ -151,6 +153,20 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
           const ocultas = exhibidasTodas().filter(c => !copiaVisible(c) && economia(d).dueno[c] === uid);
           await fb.exhibirCartas(uid, [...new Set([...lista, ...ocultas])].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
+        } else if (x.accion === "plantilla") {
+          // once casillas; cada una vacía o una carta de fútbol suya, sin repetir
+          const lista = Array.isArray(x.lista) ? x.lista.slice(0, MOTOR.FORMACION.length).map(c => (typeof c === "string" ? c : "")) : [];
+          const porCasilla = {}, vistas = new Set();
+          lista.forEach((c, i) => {
+            if (!c) return;
+            const q = leeCopia(c), so = q && q.tipo === "carta" && eco().sobres[q.o + "~" + q.k];
+            const id = so && (so.r ? so.r.id : MOTOR.sobre(q.o, q.k, so.at).cartas[q.i].id);
+            if (id == null || MOTOR.CARDS[id].col !== "futbol" || !mia(c)) throw new Error("Esa carta no es tuya o no es de fútbol.");
+            if (vistas.has(c)) throw new Error("Una carta no puede estar dos veces en la plantilla.");
+            vistas.add(c); porCasilla[i] = c;
+          });
+          await fb.ponerPlantilla(uid, porCasilla);
+          responde(true, null);
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
           if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
@@ -200,7 +216,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-19";
+      frame.src = "juegos/prodrop/index.html?v=pd-29";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

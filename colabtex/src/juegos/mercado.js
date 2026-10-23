@@ -17,7 +17,7 @@
    pieza de rock desde el editor). */
 import { economia, monedasDe, leeCopia } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
-import { miniCarta, MOTOR, RAIZ, colVisible, copiaVisible, veSerie1 } from "./prodrop-cartas.js";
+import { miniCarta, MOTOR, RAIZ, PD_V, colVisible, copiaVisible, veSerie1 } from "./prodrop-cartas.js";
 import { avatarMarco } from "./perfil-vista.js";
 import {
   JUEGOS_MERCADO, juegosMercado, TIPOS_MASCOTAS, FILTROS_INICIALES, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente,
@@ -34,9 +34,6 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&am
 const fmt = n => Math.round(n || 0).toLocaleString("es-CL");
 const claveEstado = c => String(c).replace(/^ma:/, "");
 const LOTE = 48;
-/* El PRODROP del visor: el mismo `?v=` que el abridor (prodrop.js), así se
-   comparte la caché. */
-const PD_V = "pd-19";
 /* Color de texto de cada rareza sobre fondo claro (el de `TIERS` es para
    fondo oscuro: el gris de las comunes no se leía). */
 const TEXTO_RAREZA = ["#7c8197", "#1b8fd0", "#9a3fe6", "#c98a00"];

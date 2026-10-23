@@ -22,6 +22,9 @@
           "cartas": {
             "$i": { ".validate": "$i.matches(/^[0-3]$/) && newData.isString() && newData.val().matches(/^([A-Za-z0-9]{6,40}~)?[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
           },
+          "plantilla": {
+            "$i": { ".validate": "$i.matches(/^([0-9]|10)$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
+          },
           "mascota": {
             ".validate": "newData.hasChild('m')",
             "m": { ".validate": "newData.isString() && newData.val().matches(/^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/)" },
