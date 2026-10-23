@@ -8,8 +8,13 @@
    - **Zombis**: gemidos con formantes, como una voz: una diente de sierra
      grave con vibrato pasa por dos filtros de banda (las vocales «uu»/«aa»)
      y un poco de distorsión. Los diablos gruñen más grave y más sucio.
-   - Todo pasa por `bus` → compresor → `destination`, así que el 🔊 y el
-     volumen del Club (`volumen.js`, que envuelve `destination`) lo gobiernan. */
+   - Todo pasa por `bus` → compresor → limitador → `destination`, así que el
+     🔊 y el volumen del Club (`volumen.js`, que envuelve `destination`) lo
+     gobiernan.
+   - **Hay un tope de piezas sonando a la vez** (`carga`): con la horda
+     encima, cada disparo, baja y gemido armaba sus osciladores y filtros, el
+     hilo de audio no daba abasto y el sonido se entrecortaba hasta apagarse.
+     Pasado `TOPE_LEJOS` se callan los sonidos lejanos; pasado `TOPE`, todos. */
 (function (raiz) {
   'use strict';
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -18,14 +23,29 @@
   function crear() {
     let ac = null, bus = null, seco = null, eco = null, ruidoBuf = null, distor = null;
     const ultimo = {};
+    // cuándo termina cada pieza (ruido, tono; una voz pesa cuatro) que suena
+    let fines = [];
+    const TOPE = 80, TOPE_LEJOS = 44;
+    const suena = (fin, peso = 1) => { for (let i = 0; i < peso; i++) fines.push(fin); };
+    function carga() {
+      const t = ac.currentTime;
+      if (fines.length) fines = fines.filter(f => f > t);
+      return fines.length;
+    }
 
     function inicia() {
       if (!ac) {
         try {
-          ac = new (window.AudioContext || window.webkitAudioContext)();
+          const AC = window.AudioContext || window.webkitAudioContext;
+          // un búfer algo más holgado que el mínimo: en un PC cargado el
+          // mínimo se quedaba corto y el audio se cortaba
+          try { ac = new AC({ latencyHint: 'balanced' }); } catch { ac = new AC(); }
           const comp = ac.createDynamicsCompressor();
           comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
-          comp.connect(ac.destination);
+          // el limitador: una explosión sobre veinte bajas ya no recorta en el parlante
+          const lim = ac.createDynamicsCompressor();
+          lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12;
+          comp.connect(lim); lim.connect(ac.destination);
           bus = ac.createGain(); bus.gain.value = 0.55;
           seco = ac.createGain(); seco.gain.value = 1;
           bus.connect(seco); seco.connect(comp);
@@ -68,6 +88,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(fl); fl.connect(g); g.connect(o.dest || bus);
       s.start(t, Math.random() * Math.max(0, 1.9 - dur), dur + 0.05);
+      suena(t + dur);
     }
     function tono(o) {
       const t = ac.currentTime + (o.t0 || 0), dur = o.dur || 0.1;
@@ -81,6 +102,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       os.connect(g); g.connect(o.dest || bus);
       os.start(t); os.stop(t + dur + 0.05);
+      suena(t + dur);
     }
     /* Una voz: diente de sierra con vibrato por dos formantes. `f0` y `f1`
        el tono al empezar y al terminar; `a`/`b` los formantes; `sucio` la
@@ -109,6 +131,7 @@
       // aliento: un soplo de ruido por el primer formante
       ruido({ tipo: 'bandpass', f: o.a || 520, q: 2, dur, vol: o.vol * 0.35, ataque: 0.06, t0: o.t0 });
       os.start(t); os.stop(t + dur + 0.05); lfo.start(t); lfo.stop(t + dur + 0.05);
+      suena(t + dur, 4);
     }
     // El «clic» metálico de un mecanismo.
     const clic = (t0, f = 2600, vol = 0.25) => { ruido({ tipo: 'bandpass', f, q: 6, dur: 0.025, vol, t0 }); tono({ f1: f * 0.7, dur: 0.012, vol: vol * 0.4, tipo: 'square', t0 }); };
@@ -116,9 +139,11 @@
     // ---------- el catálogo ----------
     const ESPERA = { baja: 40, gemido: 0, impacto: 35, uzi: 20, rebote: 60, dolor: 120 };
     function son(k, lejos) {
-      if (!ac || ac.state !== 'running') return;
+      if (!ac) return;
+      if (ac.state !== 'running') { if (ac.state !== 'closed') ac.resume().catch(() => {}); return; }
       const ahora = performance.now();
       if (ahora - (ultimo[k] || 0) < (ESPERA[k] !== undefined ? ESPERA[k] : 28)) return;
+      if (carga() >= (lejos === undefined ? TOPE : TOPE_LEJOS)) return;
       ultimo[k] = ahora;
       const v = lejos === undefined ? 1 : clamp(1 - lejos / 620, 0.06, 0.75);
       // a lo lejos se pierden los agudos

@@ -107,6 +107,9 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   overlaps, so walking out of it is always possible.
 - **What you see lives in `js/grafico.js`** (`BoxheadGrafico`), the sounds in
   `js/audio.js` (`BoxheadAudio`); `juego.js` only decides what to draw.
+  The audio caps the pieces sounding at once (`carga`, `TOPE`/`TOPE_LEJOS`:
+  distant sounds drop first) and ends in a limiter: with the horde on
+  screen it used to crackle and go silent.
   Characters are **cubes in fake 3D**: `modelo` yaws each part to where the
   body faces, pitches it back (`cae`: the knockback lean, the death fall),
   projects with `KY` and paints only the faces toward the camera, sorted by
