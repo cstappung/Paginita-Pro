@@ -1096,6 +1096,8 @@ body[data-phase="reveal"] .pack-extras, body[data-phase="summary"] .pack-extras 
 .rr-cuenta { margin-left: auto; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rr-cuenta b { color: var(--ink); font-size: 18px; }
 .rr-rejilla { max-height: none; }
+.rr-plant { position: absolute; right: 3px; top: 2px; font-style: normal; font-size: 12px; text-shadow: 0 0 4px #000; }
+.rr-aviso { margin: 0; padding: 8px 12px; border-radius: 10px; background: #ffcc3d1f; border: 1px solid #ffcc3d66; color: #ffe6a0; font-size: 14px; font-weight: 700; }
 .rr-exh { position: absolute; left: 3px; top: 2px; font-style: normal; color: #ffcc3d; font-size: 12px; text-shadow: 0 0 4px #000; }
 .rr-posibles summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 700; }
 .rr-pos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

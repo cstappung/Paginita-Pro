@@ -175,6 +175,12 @@ banner never opens a room by itself. For a guest the same button reads
 art on top and the button spans the width. `novedades()` in `motor.js` is
 the older date-driven version and is no longer called.
 
+**For a guest «Para jugar solo» is a grid, not a carousel** (`.jg-sal-inv`
+on `.jg-sal`, the same rules as `data-modo=solo`, arrows and «Ver todos»
+hidden): in a sideways row the solo games looked few next to the
+multiplayer grid, and they are exactly what a guest can play (owner, Oct
+2026).
+
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
 no login wall, and **every single-player game is playable** — the whole
 club, Frontera and the bot practices — **except PRO HERO and Tenkaichi 3**

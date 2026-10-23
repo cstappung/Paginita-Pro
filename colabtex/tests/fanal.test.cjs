@@ -30,7 +30,7 @@ test('la travesía: veinte jornadas, una oleada y un jefe por acto, el Alba en l
  assert.ok(M.jornada(15).marea>0&&M.jornada(17).fugaces>0&&M.jornada(19).marea>0&&M.jornada(19).fugaces>0);
 });
 
-test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2, 3, 4 y 5',()=>{
+test('la curva: la historia sube de jornada en jornada; después del Sol los jefes vuelven en fase 2, 3, 4, 5 y 6',()=>{
  const ol=M.JORNADAS.filter(j=>j.tipo==='oleada');
  for(let i=1;i<ol.length;i++)assert.ok(ol[i].fuego>=ol[i-1].fuego-0.2,'fuego jornada '+ol[i].n);
  // La primera oleada sigue siendo la más amable.
@@ -43,16 +43,45 @@ test('la curva: la historia sube de jornada en jornada; después del Sol los jef
  assert.deepEqual([21,22].map(n=>M.jornada(n).tipo),['oleada','jefe']);
  assert.deepEqual([22,24,26,28,30,32,34,36,38].map(n=>M.jornada(n).jefe),['nodriza','faro','esfinge','casco','crisalida','hoguera','luna','constelacion','sol']);
  assert.ok([21,23,25].every(n=>M.jornada(n).acto===5));
- assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+2*ciclo).fase,4);assert.equal(M.jornada(22+3*ciclo).fase,5);assert.equal(M.jornada(22+9*ciclo).fase,5);
+ assert.equal(M.jornada(22).fase,2);assert.equal(M.jornada(22+ciclo).fase,3);assert.equal(M.jornada(22+2*ciclo).fase,4);assert.equal(M.jornada(22+3*ciclo).fase,5);assert.equal(M.jornada(22+4*ciclo).fase,6);assert.equal(M.jornada(22+9*ciclo).fase,6);
  // La fase 4 no cambia la vida respecto de la 3 (la vida entra en la prueba): solo sube por la jornada.
- assert.equal(M.VIDA_FASE[4],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[5],M.VIDA_FASE[3]);
+ assert.equal(M.VIDA_FASE[4],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[5],M.VIDA_FASE[3]);assert.equal(M.VIDA_FASE[6],M.VIDA_FASE[3]);
  assert.ok(M.vidaJefe(M.jornada(22+ciclo))>M.vidaJefe(M.jornada(22)),'el jefe vuelve más fuerte');
  assert.ok(M.vidaJefe(M.jornada(22))>M.vidaJefe(M.jornada(2)),'la fase 2 es más dura que la primera vez');
  assert.ok(M.vidaJefe(M.jornada(20))>M.vidaJefe(M.jornada(4)),'los jefes crecen con la jornada');
  for(let n=1;n<300;n++){const j=M.jornada(n);if(j.tipo!=='oleada')continue;
-  assert.ok(j.balas<=12&&j.cols<=11&&j.filas.length<=6&&j.fuego<=4&&j.apunta<=0.75&&j.picada<=0.6,String(n));
+  const T=j.grado?M.RIGOR.topes:{balas:12,fuego:4,apunta:0.75,picada:0.6};
+  assert.ok(j.balas<=T.balas&&j.cols<=11&&j.filas.length<=6&&j.fuego<=T.fuego&&j.apunta<=T.apunta&&j.picada<=T.picada,String(n));
   for(const v of Object.values(j.vida||{}))assert.ok(v>=1&&v<=(n>M.JORNADAS_HISTORIA?8:4),'vida en la '+n);}
  assert.ok(M.jornada(21+2*ciclo).vida.a>M.jornada(21).vida.a,'el sin fin se endurece');
+});
+
+test('el rigor de la fase 6: cada vuelta en ella es más dura que la anterior, sin tocar lo que mira la prueba',()=>{
+ const ciclo=M.CICLO_SINFIN.length*2, primera=22+4*ciclo;     // la Nodriza de la primera vuelta en fase 6 (jornada 94)
+ assert.equal(primera,94);
+ assert.equal(M.jornada(primera-ciclo).grado,0);assert.equal(M.jornada(primera).grado,1);assert.equal(M.jornada(primera-1).grado,1,'la oleada de esa vuelta también');
+ // Antes de la fase 6, la vida en pantalla es la de la prueba.
+ for(let n=1;n<primera-1;n++){const j=M.jornada(n);if(j.tipo==='jefe'&&j.jefe!=='alba')assert.equal(M.vidaJefeJuego(j),M.vidaJefe(j),String(n));}
+ for(let v=0;v<6;v++){
+  const a=M.jornada(primera+v*ciclo),b=M.jornada(primera+(v+1)*ciclo);   // el mismo jefe, una vuelta después
+  assert.equal(a.jefe,b.jefe);assert.equal(b.grado,a.grado+1);
+  assert.ok(M.vidaJefeJuego(b)>M.vidaJefeJuego(a),'más vida en el grado '+b.grado);
+  assert.ok(b.furia>=a.furia&&b.velEscama>=a.velEscama);
+  // La vida que acota el verificador no cambia de una vuelta a otra (y nunca supera la de la pantalla).
+  assert.equal(M.vidaJefe(b),M.vidaJefe(a));assert.ok(M.vidaJefeJuego(b)>=M.vidaJefe(b));
+  const oa=M.jornada(primera-1+v*ciclo),ob=M.jornada(primera-1+(v+1)*ciclo);
+  assert.ok(ob.fuego>=oa.fuego&&ob.balas>=oa.balas&&ob.apunta>=oa.apunta&&ob.velEscama>=oa.velEscama,'la oleada del grado '+ob.grado);
+  // Lo que mira la prueba (la formación y la vida de cada polilla) es lo mismo que sin rigor.
+  assert.deepEqual(ob.vida,oa.vida);assert.deepEqual(ob.filas,oa.filas);assert.equal(ob.cols,oa.cols);
+ }
+ // La primera vez en la fase 6 ya es más dura que la última fase 5.
+ assert.ok(M.vidaJefeJuego(M.jornada(primera))>M.vidaJefeJuego(M.jornada(primera-ciclo)));
+ // Sin techo: la vida en pantalla sigue creciendo.
+ assert.ok(M.vidaJefeJuego(M.jornada(primera+20*ciclo))>2*M.vidaJefeJuego(M.jornada(primera+5*ciclo)));
+ // Cada fase 6 tiene su habilidad con nombre y su modelo un poco más grande.
+ for(const j of Object.keys(R.FASES))assert.ok(R.FASES[j][6]&&R.FASES[j][6].hab&&R.FASES[j][6].epiteto,j);
+ assert.ok(S.ESCALA_FASE[6]>S.ESCALA_FASE[5]);
+ assert.match(R.RIGOR.otra(3),/III/);
 });
 
 test('los augurios: uno por jornada, fijos, y cada jornada un poco más dura que la anterior',()=>{
@@ -290,13 +319,13 @@ test('la música por fase: cada fase del sin fin suena con más energía, sin ro
  // La fase 1 es la música de siempre, y fuera del juego la fase no cuenta.
  assert.deepEqual(MU.capas({modo:'juego',tension:0.3,peligro:0}),en(1));
  assert.deepEqual(MU.capas({modo:'transito',fase:5}),MU.capas({modo:'transito'}));
- assert.equal(MU.faseMusical({modo:'titulo',fase:5}),1);assert.equal(MU.faseMusical({modo:'juego',fase:9}),5);
+ assert.equal(MU.faseMusical({modo:'titulo',fase:5}),1);assert.equal(MU.faseMusical({modo:'juego',fase:9}),6);
  // El compás se acelera con la fase, pero el pulso más corto (dos corcheas) nunca baja de 0,2 s:
  // la prueba cuenta los pulsos demasiado juntos.
  for(const e of Object.values(MU.ETAPAS))for(const lat of [1,1.3,1.6]){
   const base=e.epm*lat;
   assert.equal(MU.epmDeFase(base,1),base);
-  for(let f=2;f<=5;f++){const v=MU.epmDeFase(base,f);assert.ok(v>=MU.epmDeFase(base,f-1)&&v>=base);assert.ok(120/v>0.2||v===base,'pulso de '+(120/v).toFixed(3)+' s');}
+  for(let f=2;f<=6;f++){const v=MU.epmDeFase(base,f);assert.ok(v>=MU.epmDeFase(base,f-1)&&v>=base);assert.ok(120/v>0.2||v===base,'pulso de '+(120/v).toFixed(3)+' s');}
  }
  assert.ok(MU.epmDeFase(300,5)>300*1.15);
 });

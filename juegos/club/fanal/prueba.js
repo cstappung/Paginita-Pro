@@ -43,6 +43,11 @@
      las Siete Hermanas y el Sol) con un solo modo: siempre desde la
      jornada 1, sin puntos de control ni sin fin aparte. */
   const VERSION = 4;
+  /* La 5 es la 4 empacada (ver `empaca`): los mismos registros, con `J`
+     comprimido en `Z`. Lleva otro número para que un verificador viejo,
+     todavía en caché, la rechace como «de otra versión» (que no castiga) y
+     no como una prueba ilegible. */
+  const VERSION_EMPACADA = 5;
 
   /* El alfabeto de los eventos. Cada evento es una letra seguida de las
      centésimas que pasaron desde el anterior (en decimal, nada si fue en el
@@ -145,14 +150,136 @@
   const hashRegistro = (prev, x) => M.hashTexto(prev + "|" + [x.n, x.t, x.r, x.g, x.e, x.p == null ? "" : x.p, x.f, x.s, x.v, x.b, x.d, x.u == null ? "" : x.u].join("|"));
   const ultimoHash = prueba => (prueba.J.length ? prueba.J[prueba.J.length - 1].h : M.hashTexto("fanal|" + prueba.id + "|" + prueba.m));
 
-  /* Si la prueba no cabe en lo que se guarda (200 000 caracteres), se le
-     quitan los pulsos a las jornadas más viejas: es lo que más ocupa
-     después de los eventos, y solo pasa en un sin fin de varias horas. */
+  /* ---------------------------------------------------------------
+     Empacar una prueba larga
+     ---------------------------------------------------------------
+     Lo que se guarda tiene un tope: 200 000 caracteres (la regla de
+     `soloPruebas`, `PRUEBA_MAX` de verificaClub, y el blob del progreso
+     donde viaja la travesía a medias). Una travesía de cien jornadas ocupa
+     el doble, así que no entraba en la clasificación aunque fuera honesta.
+     Ahora, si no cabe, sus jornadas (`J`) viajan EMPACADAS: el texto JSON
+     de `J`, comprimido con LZW, en el campo `Z` (y su largo en `zl`). La
+     prueba sigue siendo la misma —mismos registros, mismo hash encadenado,
+     misma versión—: `rehace` la desempaca y la comprueba igual. Las cortas
+     no se empacan (se leen a ojo en una auditoría, y un verificador viejo
+     todavía en caché las entiende).
+
+     El LZW: códigos de 8 a 16 bits (0–127 los caracteres, 128 reinicia el
+     diccionario cuando se llena, desde 129 las cadenas), y el ancho de
+     cada código sale de cuántos van desde el último reinicio, igual de los
+     dos lados. Los bits se juntan de a 15 en caracteres desde U+0100: sin
+     comillas, barras ni controles que JSON tenga que escapar, y por debajo
+     de los sustitutos de UTF-16. Las jornadas de FANAL son ASCII, y con
+     eventos y pulsos tan repetidos queda unas ocho veces más chico. */
   const PRUEBA_MAX = 190000;
-  function ajusta(prueba) {
+  const EMPACA_DESDE = 150000;            // caracteres: desde ahí se empaca
+  const Z_BASE = 0x100, Z_MAX_TEXTO = 4000000;
+  const anchoDe = k => Math.max(8, 32 - Math.clz32(128 + k));
+  function lzw(texto) {
+    for (let i = 0; i < texto.length; i++) if (texto.charCodeAt(i) > 127) return null;
+    const unidades = [], dic = new Map();
+    let acc = 0, nb = 0, k = 0, sig = 129;
+    const emite = code => {
+      const w = anchoDe(k++);
+      acc = (acc << w) | code; nb += w;
+      while (nb >= 15) { nb -= 15; unidades.push(Z_BASE + ((acc >>> nb) & 0x7fff)); acc &= (1 << nb) - 1; }
+    };
+    if (!texto.length) return "";
+    let w = texto.charCodeAt(0);
+    for (let i = 1; i < texto.length; i++) {
+      const c = texto.charCodeAt(i), clave = w * 128 + c, hay = dic.get(clave);
+      if (hay !== undefined) { w = hay; continue; }
+      emite(w); dic.set(clave, sig++); w = c;
+      if (sig >= 65536) { emite(128); dic.clear(); sig = 129; k = 0; }
+    }
+    emite(w);
+    if (nb > 0) unidades.push(Z_BASE + ((acc << (15 - nb)) & 0x7fff));
+    let out = "";
+    for (let i = 0; i < unidades.length; i += 8192) out += String.fromCharCode.apply(null, unidades.slice(i, i + 8192));
+    return out;
+  }
+  /* El texto de `largo` caracteres que guarda `z`, o null si no se puede leer. */
+  function deslzw(z, largo) {
+    if (typeof z !== "string" || !Number.isSafeInteger(largo) || largo < 0 || largo > Z_MAX_TEXTO) return null;
+    const pref = new Int32Array(65536), ult = new Uint8Array(65536), pri = new Uint8Array(65536), largoDe = new Int32Array(65536);
+    for (let c = 0; c < 128; c++) { pref[c] = -1; ult[c] = c; pri[c] = c; largoDe[c] = 1; }
+    const out = new Uint8Array(largo);
+    let n = 0, iz = 0, acc = 0, nb = 0, k = 0, sig = 129, prev = -1;
+    const lee = w => {
+      while (nb < w) {
+        if (iz >= z.length) return -1;
+        const u = z.charCodeAt(iz++) - Z_BASE;
+        if (u < 0 || u > 0x7fff) return -1;
+        acc = ((acc << 15) | u) >>> 0; nb += 15;
+      }
+      nb -= w;
+      const v = (acc >>> nb) & ((1 << w) - 1);
+      acc &= (1 << nb) - 1;
+      return v;
+    };
+    const escribe = (code, extra) => {      // la cadena de `code` (y un carácter más) en `out`
+      const L = largoDe[code], fin = n + L + (extra >= 0 ? 1 : 0);
+      if (fin > largo) return false;
+      for (let i = n + L - 1, c = code; i >= n; i--, c = pref[c]) out[i] = ult[c];
+      if (extra >= 0) out[n + L] = extra;
+      n = fin;
+      return true;
+    };
+    while (n < largo) {
+      const code = lee(anchoDe(k++));
+      if (code < 0) return null;
+      if (code === 128) { sig = 129; k = 0; prev = -1; continue; }
+      const inicio = n;
+      if (code < sig) { if (!escribe(code, -1)) return null; }
+      else if (code === sig && prev >= 0) { if (!escribe(prev, pri[prev])) return null; }
+      else return null;
+      if (prev >= 0 && sig < 65536) { pref[sig] = prev; ult[sig] = out[inicio]; pri[sig] = pri[prev]; largoDe[sig] = largoDe[prev] + 1; sig++; }
+      prev = code;
+    }
+    let texto = "";
+    for (let i = 0; i < largo; i += 8192) texto += String.fromCharCode.apply(null, out.subarray(i, i + 8192));
+    return texto;
+  }
+  /* La prueba con sus jornadas empacadas (una copia), o null si no se puede. */
+  function empaca(prueba) {
+    const texto = JSON.stringify(prueba.J), z = lzw(texto);
+    if (z === null) return null;
+    const out = Object.assign({}, prueba, { v: VERSION_EMPACADA, Z: z, zl: texto.length });
+    delete out.J;
+    return out;
+  }
+  /* Las jornadas de una prueba, empacadas o no. Un arreglo, o el motivo. */
+  function jornadasDe(prueba) {
+    if (prueba.v !== VERSION_EMPACADA) return prueba.J;
+    if (prueba.J !== undefined || typeof prueba.Z !== "string") return "jornadas ilegibles";
+    if (prueba.Z.length > 400000) return "prueba empacada demasiado grande";
+    const texto = deslzw(prueba.Z, prueba.zl);
+    if (texto === null) return "prueba empacada ilegible";
+    try { return JSON.parse(texto); } catch (e) { return "prueba empacada ilegible"; }
+  }
+  /* Una prueba lista para mandar o guardar: tal cual si cabe; empacada si
+     no; y si ni así cabe (un sin fin de muchas horas), se les quitan los
+     pulsos a las jornadas más viejas, que es lo que más ocupa después de
+     los eventos, hasta que quepa. Cambia `prueba` y la devuelve. `tope`:
+     hasta cuánto (por omisión, PRUEBA_MAX). */
+  function ajusta(prueba, tope) {
+    tope = tope || PRUEBA_MAX;
+    if (prueba.v === VERSION_EMPACADA) return prueba;                // ya viene empacada
+    if (JSON.stringify(prueba).length <= Math.min(tope, EMPACA_DESDE)) return prueba;
+    const J = prueba.J;
+    for (let quitar = 0; ; quitar += Math.max(1, Math.ceil(J.length / 10))) {
+      for (let i = 0, q = 0; i < J.length && q < quitar; i++) if (J[i].p != null) { J[i].p = null; q++; }
+      const e = empaca(prueba);
+      if (!e) break;                                                  // no es ASCII: no debería pasar
+      if (JSON.stringify(e).length <= tope || !J.some(x => x.p != null)) {
+        delete prueba.J; prueba.v = e.v; prueba.Z = e.Z; prueba.zl = e.zl;
+        return prueba;
+      }
+    }
+    // Sin empacar: solo los pulsos (lo de antes).
     let largo = JSON.stringify(prueba).length;
-    for (const rec of prueba.J) {
-      if (largo <= PRUEBA_MAX) break;
+    for (const rec of J) {
+      if (largo <= tope) break;
       if (rec.p == null) continue;
       largo -= rec.p.length; rec.p = null;
     }
@@ -263,11 +390,12 @@
   function rehace(prueba) {
     const mal = motivo => ({ motivo });
     if (!prueba || typeof prueba !== "object") return mal("sin prueba");
-    if (prueba.v !== VERSION) return mal("prueba de otra versión del juego");
+    if (prueba.v !== VERSION && prueba.v !== VERSION_EMPACADA) return mal("prueba de otra versión del juego");
     if (prueba.x) return mal("partida tocada desde la consola (__fanal): no entra en la clasificación");
     if (prueba.m !== "t") return mal("modo desconocido");
     if (typeof prueba.id !== "string" || !/^[A-Za-z0-9_-]{6,40}$/.test(prueba.id)) return mal("semilla ilegible");
-    const J = prueba.J;
+    const J = jornadasDe(prueba);                                    // empacadas o no (ver empaca)
+    if (typeof J === "string") return mal(J);
     if (!Array.isArray(J) || J.length > 3000) return mal("jornadas ilegibles");
     // Ya no hay puntos de control: toda travesía empieza en la jornada 1.
     if (prueba.k !== 0) return mal("la travesía no sigue de un punto de control");
@@ -547,5 +675,5 @@
     return { puntos: Math.round(est.puntos), completadas, completa, tiempo, muerto: est.muerto, jornadas: J.length, llamas: est.llamas, mej: taller.mej, brasas: taller.brasas, notas: est.notas };
   }
 
-  return { VERSION, LIM, PRUEBA_MAX, nueva, abre, evento, disparo, latencia, pulso, cierra, ajusta, rehace, leeEventos, leePulsos };
+  return { VERSION, VERSION_EMPACADA, LIM, PRUEBA_MAX, EMPACA_DESDE, nueva, abre, evento, disparo, latencia, pulso, cierra, ajusta, empaca, jornadasDe, lzw, deslzw, rehace, leeEventos, leePulsos };
 });

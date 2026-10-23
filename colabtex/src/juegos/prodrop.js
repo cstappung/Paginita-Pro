@@ -24,7 +24,7 @@ import { pendientesDe } from "./mercado-datos.js";
 
 const MAX_PRECIO = 100000;
 
-export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) {
+export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, abrir = "" }) {
   let host = null, frame = null, off = null, d = null, muerto = false, listo = false, ocupado = Promise.resolve();
   const uid = usuario.uid;
 
@@ -38,8 +38,10 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       .filter(k => typeof k === "string").map(k => (k.includes("~") ? k : uid + "~" + k)).slice(0, MAX_EXHIBIDAS);
   }
   const exhibidas = () => exhibidasTodas().filter(c => copiaVisible(c));
-  // la plantilla de fútbol como once claves de copia ("" la casilla vacía)
-  const plantilla = () => { const l = (perfil(uid) || {}).plantilla || {}; return MOTOR.FORMACION.map((_, i) => (typeof l[i] === "string" ? l[i] : "")); };
+  /* La plantilla de fútbol como once claves de copia ("" la casilla vacía).
+     Una carta que ya no es suya (re-roll, venta, intercambio) se manda
+     vacía: si no, el abridor la reenviaba al guardar y todo se rechazaba. */
+  const plantilla = () => { const l = (perfil(uid) || {}).plantilla || {}; return MOTOR.FORMACION.map((_, i) => (typeof l[i] === "string" && mia(l[i]) ? l[i] : "")); };
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
@@ -154,15 +156,17 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
           await fb.exhibirCartas(uid, [...new Set([...lista, ...ocultas])].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
         } else if (x.accion === "plantilla") {
-          // once casillas; cada una vacía o una carta de fútbol suya, sin repetir
+          /* Once casillas; cada una vacía o una carta de fútbol suya, sin
+             repetir. Lo que no cumple se deja vacío en vez de rechazar todo:
+             una carta que se fue en un re-roll dejaba la plantilla sin poder
+             cambiarse nunca más. */
           const lista = Array.isArray(x.lista) ? x.lista.slice(0, MOTOR.FORMACION.length).map(c => (typeof c === "string" ? c : "")) : [];
           const porCasilla = {}, vistas = new Set();
           lista.forEach((c, i) => {
-            if (!c) return;
+            if (!c || vistas.has(c) || !mia(c)) return;
             const q = leeCopia(c), so = q && q.tipo === "carta" && eco().sobres[q.o + "~" + q.k];
             const id = so && (so.r ? so.r.id : MOTOR.sobre(q.o, q.k, so.at).cartas[q.i].id);
-            if (id == null || MOTOR.CARDS[id].col !== "futbol" || !mia(c)) throw new Error("Esa carta no es tuya o no es de fútbol.");
-            if (vistas.has(c)) throw new Error("Una carta no puede estar dos veces en la plantilla.");
+            if (id == null || MOTOR.CARDS[id].col !== "futbol") return;
             vistas.add(c); porCasilla[i] = c;
           });
           await fb.ponerPlantilla(uid, porCasilla);
@@ -216,7 +220,8 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) 
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-29";
+      // `abrir`: lo que se abre al llegar (`#cartas/plantilla` → la plantilla)
+      frame.src = "juegos/prodrop/index.html?v=pd-30" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

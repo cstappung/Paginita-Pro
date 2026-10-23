@@ -56,8 +56,13 @@ true and the `admins` condition back in those two rules. In the frame,
   uniform draw over the rows of its body and class, so adding rows changes
   every box already opened. Boxes with `at < CORTE_CAJAS_2` draw from the
   first `POOL_1` (109) rows (`poolDe(at)`); the face/hair rows come after.
-  A future catalogue expansion needs its own cut-off (`POOL_2`,
-  `CORTE_CAJAS_4`), set after the deploy. Never reorder.
+  Boxes before `CORTE_CAJAS_4` (15:00 Chile, 23 Oct 2026) draw from the
+  first `POOL_2` (169); after it come the Synyster guitars (both bodies,
+  common). A future expansion needs its own cut-off (`POOL_3`,
+  `CORTE_CAJAS_5`), set after the deploy. Never reorder.
+- **Synyster** (`GTYPES.synyster`): its pinstripes are a `ShapeGeometry` of
+  the body over the front face with a striped `alphaMap` (`rayasTex`,
+  `T.rayas`), painted in the guitar's second colour (`guard`); no pickguard.
 - **A legendary's glow follows its variant**: `legMat(kind, base, glow)`
   takes the glow from the piece's secondary colour (`guard`, `accent`,
   `color2`) through `vivo(x, def)`, which keeps the factory glow only when
