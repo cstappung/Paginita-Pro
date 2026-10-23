@@ -235,7 +235,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
       ${est && (nPlant || propio) ? `
       <section class="jg-pf-sec jg-pf-plantilla">
         <header><h2>Plantilla de fútbol</h2>${nPlant ? `<b class="jg-pf-puntos" title="Promedio de las once: la rareza pone el techo y el estado lo escala">${puntosDe(plant)}<small> pts</small></b>` : ""}
-          ${propio ? `<a class="btn2" href="#cartas">⚽ Armar en PRODROP</a>` : ""}</header>
+          ${propio ? `<a class="btn" href="#cartas/plantilla">✎ Editar plantilla</a>` : ""}</header>
         ${nPlant ? `<iframe class="jg-pf-cancha" title="Plantilla de fútbol" loading="lazy" tabindex="-1" src="${esc(urlPlantilla(plant))}"></iframe>`
           : `<p class="jg-nada">Abre sobres de Fútbol en PRODROP y arma tu once en 4-3-3 (en el resumen del sobre: «⚽ Mi plantilla»).</p>`}
       </section>` : ""}

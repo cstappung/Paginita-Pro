@@ -1757,7 +1757,7 @@ function leerRuta() {
   if (h === "monedas") return { vista: "monedas", pid: "" };
   const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
-  if (h === "cartas") return { vista: "cartas", pid: "" };
+  if (h === "cartas" || h === "cartas/plantilla") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : "plantilla" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
   const mk = h.match(/^mercado(?:\/(prodrop|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
@@ -2483,7 +2483,7 @@ function armazon() {
   }
   if (state.vista === "cartas") {
     h.innerHTML = "";
-    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir, abrir: state.perfilUid,
       /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
          todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
       quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });

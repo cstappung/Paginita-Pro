@@ -90,6 +90,14 @@ other file of the site. Things that hold it together:
   Its picker lists forwards, midfielders, defenders, then keepers
   (`POS_ORDEN`), each tagged, with toggle chips that filter one line; it
   only helps to find players, any card still goes in any slot.
+  **A card that leaves your hands stays in the stored list**, so the
+  postman sends only the ones you still own (`plantilla()` filters with
+  `mia`) and the `plantilla` action drops invalid entries instead of
+  refusing the save: refusing made the whole squad uneditable after a
+  re-roll. The re-roll panel marks squad cards (⚽), warns when one is
+  picked, sorts them last in «Elegir automático» and removes them from
+  the squad when it goes through. The profile's «✎ Editar plantilla» goes
+  to `#cartas/plantilla`, which reaches the frame as `?abre=plantilla`.
   `editaPerfil` carries it over like `cartas`. The profile shows it with
   the real cards (rarity, wear, slab) through the frame in visor mode
   `?plantilla=1&pl=o~k.i!at!gr[!id.g.w],…` (`urlPlantilla` in

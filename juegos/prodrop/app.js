@@ -1604,7 +1604,7 @@ function ordenAuto(lista) {
     const u = CARDS[cp.id].uid, m = mejor[u];
     if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
   }
-  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || cuenta.plant.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
 function miniCp(cp, extra = '') {
@@ -1645,6 +1645,7 @@ function renderReroll() {
   const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
+  const enPlant = rr.sel.filter(k => cuenta.plant.includes(k));
   $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
     const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
@@ -1674,7 +1675,8 @@ function renderReroll() {
       <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
       <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
     </div>
-    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '')}</button>`).join('')}</div>`
+    ${enPlant.length ? `<p class="rr-aviso">⚽ ${enPlant.length === 1 ? 'Una de las que elegiste está' : `${enPlant.length} de las que elegiste están`} en tu plantilla: si haces el re-roll, ${enPlant.length === 1 ? 'sale' : 'salen'} de ella.</p>` : ''}
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (cuenta.plant.includes(cp.key) ? '<em class="rr-plant" title="En tu plantilla">⚽</em>' : ''))}</button>`).join('')}</div>`
       : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
@@ -1715,6 +1717,11 @@ async function hazReroll() {
     cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
     cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
     cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
+    // las que estaban en la plantilla salen de ella (sin esperar: no frena la ruleta)
+    if (cuenta.plant.some(k => usadas.includes(k))) {
+      cuenta.plant = cuenta.plant.map(k => (usadas.includes(k) ? '' : k));
+      Red.pide('plantilla', { lista: cuenta.plant }).catch(() => {});
+    }
     rehazColeccion(); updateColCount();
     rr.sel = []; rr.seguro = false; rr.enviando = false;
     $('#reroll').hidden = true;
@@ -1879,6 +1886,8 @@ function alDatos(d) {
     const vivos = ks.filter(k => cuenta.sobres[k] && colVisible(M.coleccionDe(k))).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
     if (vivos.length) newPacks(vivos);
     else eligeSobre();
+    // `?abre=plantilla`: el «Editar plantilla» del perfil
+    if (VER.get('abre') === 'plantilla') { if (!vivos.length) { coleccion = 'futbol'; tienda(); } abrePlantilla(); }
     return;
   }
   // cambió qué colecciones ve: se vuelve a elegir sobre si estaba eligiendo
@@ -2152,14 +2161,15 @@ function renderPlantilla() {
 async function guardaPlantilla() {
   pl.guardando = true; Snd.flip(); renderPlantilla();
   try { await Red.pide('plantilla', { lista: pl.lista }); cuenta.plant = pl.lista.slice(); }
-  catch (e) { toast(e.message || 'No se pudo guardar la plantilla.', true); pl.lista = M.FORMACION.map((_, i) => cuenta.plant[i] || ''); }
+  catch (e) { toast(e.message || 'No se pudo guardar la plantilla.', true); pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : '')); }
   pl.guardando = false; renderPlantilla();
 }
 function abrePlantilla(recien = []) {
   if (!cuenta.listo) return;
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  pl.lista = M.FORMACION.map((_, i) => cuenta.plant[i] || '');
+  // solo las que siguen siendo tuyas (una que se fue en un re-roll queda vacía)
+  pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : ''));
   pl.casilla = -1; pl.recien = new Set(recien);
   renderPlantilla();
   $('#plantilla').hidden = false;
