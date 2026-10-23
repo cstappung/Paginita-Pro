@@ -244,7 +244,7 @@
      - tension: 0 con la formación entera, 1 cuando queda la última polilla
      - peligro: 0 tranquilo, 1 con escamas encima o la formación abajo
      - jefe: nombre del jefe o null
-     - fase: 1 en la historia; 2 a 5 en el sin fin (la de los jefes de esa
+     - fase: 1 en la historia; 2 a 6 en el sin fin (la de los jefes de esa
        vuelta). Cada fase suena con más energía que la anterior: ver
        `energiaDeFase` y lo que hace con ella `programaTick`. */
   function capas(est) {
@@ -269,6 +269,7 @@
     c.percusion = Math.min(1, c.percusion + 0.45 * en);
     c.campanas = Math.min(1, c.campanas + 0.15 * en);
     if (fase >= 3) c.arpegio = Math.min(1, 0.5 + 0.2 * (fase - 3) + 0.2 * t);
+    if (fase >= 6) c.campanas = 1;                                         // la fase de vidrio: las campanas, enteras
     if (jefe) { c.leitmotiv = 1; c.melodia = 0; }                          // el jefe trae su propia melodía
     else c.melodia = t < 0.25 ? 0 : (t - 0.25) / 0.75;                     // la melodía entra a mitad de oleada
     return c;
@@ -276,16 +277,18 @@
   const clamp = v => Math.max(0, Math.min(1, v));
   /* La fase que suena: la del estado, y solo mientras se juega (el
      tránsito, la portada y los finales suenan siempre igual). */
-  const faseMusical = est => ((est.modo || "juego") === "juego" ? Math.max(1, Math.min(5, Math.round(est.fase || 1))) : 1);
-  /* De 0 (fase 1) a 1 (fase 5): cuánta energía de más. */
+  const FASE_MUSICA_MAX = 6;
+  const faseMusical = est => ((est.modo || "juego") === "juego" ? Math.max(1, Math.min(FASE_MUSICA_MAX, Math.round(est.fase || 1))) : 1);
+  /* De 0 (fase 1) a 1 (fase 5): cuánta energía de más. La 6 no suma
+     energía (ya está toda): suma una voz, el vidrio (ver programaTick). */
   const energiaDeFase = fase => (Math.max(1, Math.min(5, fase || 1)) - 1) / 4;
   /* Cuánto más rápido va el compás en cada fase: un 4 % por fase, hasta un
-     16 % en la 5. Con un techo: dos corcheas seguidas (el pulso más corto)
+     20 % en la 6. Con un techo: dos corcheas seguidas (el pulso más corto)
      nunca duran menos de 0,21 s, porque la prueba cuenta los pulsos que
      vienen a menos de 0,2 s y deja pasar muy pocos (prueba.js: pulsosJuntos). */
   const EPM_TECHO = 560;
   function epmDeFase(epm, fase) {
-    const subido = epm * (1 + 0.04 * (Math.max(1, Math.min(5, fase || 1)) - 1));
+    const subido = epm * (1 + 0.04 * (Math.max(1, Math.min(FASE_MUSICA_MAX, fase || 1)) - 1));
     return Math.max(epm, Math.min(subido, EPM_TECHO));
   }
 
@@ -643,6 +646,12 @@
         pulso(t, frecuencia(R * 4, E, gr), dt * 0.5, 0.055 * g.arpegio, { ancho: 0.18, corte: 2200 + 1800 * en, q: 2, ataque: 0.004, sostiene: 0.25, pan: lado, envio: 0.25 });
         if (fase >= 5) pulso(t + dt / 2, frecuencia(R * 4, E, gr + 2), dt * 0.4, 0.04 * g.arpegio, { ancho: 0.18, corte: 4200, q: 2, ataque: 0.004, sostiene: 0.2, pan: -lado });
       }
+      // Fase 6: el vidrio. Una campanita aguda, inarmónica, en cada corchea,
+      // que sube por la escala mientras el arpegio baja: suena a vitral.
+      if (fase >= 6 && g.campanas > 0.01 && !enSilencio) {
+        const gr = 7 - (absoluto % 8);
+        campana(t, frecuencia(R * 8, E, gr), 0.5, (nivel > 0 ? 0.06 : 0.035) * g.campanas, { ratio: 3.7, indice: 0.7, pan: absoluto % 2 ? 0.6 : -0.6 });
+      }
 
       // MELODÍA o LEITMOTIV: una frase por cada dos compases.
       if (k === 0 && compas % 2 === 0) { motivoT = 0; pasoMotivo = 0; }
@@ -739,6 +748,7 @@
       const fase = faseMusical(est);
       if (fase >= 4) pulso(t, f * 2, dur * 0.6, 0.05 * vol, { ancho: 0.25, corte: 3600, q: 1.2, ataque: 0.01, sostiene: 0.5, envio: 0.3 });
       if (fase >= 5) pulso(t, f * 3, dur * 0.4, 0.032 * vol, { ancho: 0.2, corte: 4400, q: 1.2, ataque: 0.01, sostiene: 0.4 });
+      if (fase >= 6) campana(t, f * 4, dur * 1.2, 0.05 * vol, { ratio: 2.76, indice: 0.6 });   // y en la 6, dos octavas arriba, de vidrio
     }
 
     /* Las corcheas por minuto que mandan ahora: las de la etapa por el

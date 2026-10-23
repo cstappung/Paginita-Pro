@@ -91,7 +91,7 @@ function robot(o={}){
    FP.evento(reg,'f',t);suma(8000+5000);                              // sin un solo tiro contra el Alba: el bonus entero
    espera(25);                                                        // el final se lee entero; la travesía sigue
   }else{
-   espera(3+r());const vida=M.vidaJefe(j);let dano=0;
+   espera(3+r());const vida=op.vidaPantalla?M.vidaJefeJuego(j):M.vidaJefe(j);let dano=0;   // en la fase 6 el jefe aguanta en pantalla más de lo que pide el verificador
    if(j.jefe==='faro'||j.jefe==='hoguera'||(j.fase||1)>=3)for(let k=0;k<4;k++){pega('V',tiro(true));suma(15*res());}
    if(j.jefe==='nodriza'||j.jefe==='crisalida'||j.jefe==='sol')for(let k=0;k<3;k++){pega('O',tiro(false));suma(10*res());}
    while(dano<vida){espera(op.porKill*0.4*r());const af=r()<op.afinados;pega('X',tiro(af));dano+=af?A.danoA:A.danoN;suma(5*res());}
@@ -138,6 +138,19 @@ test('FANAL: travesías honestas del robot pasan (lenta, normal y rápida pero h
   const s=r.prueba.J.reduce((a,x)=>a+x.t,0)/100;
   assert.ok(s>180,'duración '+s);
  }
+});
+
+test('FANAL: una travesía hasta la fase 6 pasa, con los jefes aguantando lo que aguantan en pantalla',async()=>{
+ // La jornada 94 es la Nodriza de la primera vuelta en fase 6 (grado 1); la 112, la de la segunda (grado 2).
+ const r=conTiempo(robot({hasta:112,semilla:21,muereEn:112,golpes:0.05,compras:'cbfcbfpbprvoivoircpaai',vidaPantalla:true}));
+ assert.equal(M.jornada(112).fase,6);assert.equal(M.jornada(112).grado,2);
+ assert.ok(M.vidaJefeJuego(M.jornada(112))>M.vidaJefe(M.jornada(112)));
+ const rh=FP.rehace(r.prueba);
+ assert.equal(rh.motivo,undefined,String(rh.motivo));
+ // El verificador del juego (sin el tope de tamaño de verificaClub: una travesía de más de cien
+ // jornadas ya no cabía en 200 000 caracteres antes de la fase 6; ver docs/antitrampas/fanal.md).
+ assert.equal(await FV.verifica(r.jornadas,r.prueba,{uid:'uid-robot'}),null);
+ assert.ok(r.jornadas.puntos>=111,'llegó a la segunda vuelta en fase 6: '+r.jornadas.puntos);
 });
 
 test('FANAL: con muerte, más allá del Sol y retomada después de cerrar la página',async()=>{

@@ -57,6 +57,26 @@ pulso más corto (dos corcheas) en ≥ 0,214 s, por encima de los 0,2 s con
 que el verificador cuenta pulsos «juntos» (`pulsosJuntos`): una partida
 afinada en la fase 5 no parece un programa.
 
+**La fase 6 y su rigor** (octubre de 2026, sin cambio de versión). Desde
+la quinta vuelta (jornada 93) `fase: 6`, y cada vuelta en ella sube un
+`grado`. El rigor solo toca lo que el verificador no mira (fuego, balas,
+puntería, picadas, marcha, velocidad de las escamas, furia): la formación y
+la vida de cada polilla no cambian (un test lo cuida). El jefe tiene en
+pantalla más vida que la que pide el verificador (`M.vidaJefeJuego`, +22 %
+por grado), y **el verificador sigue usando `M.vidaJefe`** (la de la fase
+3, `VIDA_FASE[6] === VIDA_FASE[3]`): es una cota inferior, así que nunca
+rechaza a quien jugó y una partida a medias del motor anterior sigue
+valiendo. Romper la Muda de la Nodriza es `V`; los vidrios de la Vidriera
+no anotan nada. `antitrampas-fanal.test.cjs` juega un robot hasta la
+jornada 112 con los jefes aguantando su vida de pantalla, y pasa.
+
+**Límite de tamaño, de antes de la fase 6.** Con la densidad de eventos
+del robot, una travesía llega al tope de `verificaClub` (200 000
+caracteres) hacia la jornada 92 aun quitándole todos los pulsos
+(`FP.ajusta`), y la de 110 ya no cabe (206 kB sin fase 6, 212 kB con ella).
+Una travesía real muy larga puede no entrar en la tabla aunque sea
+honesta. Arreglarlo pide comprimir la prueba (otra versión y `club-N`).
+
 **Versión 2 de la prueba** (octubre de 2026): la travesía se alargó a una
 segunda parte y después sin fin, cada jornada da una brasa que se gasta en
 mejoras del arma y del fanal (`motor.js`: `MEJORAS`, `compra`, `armas`,

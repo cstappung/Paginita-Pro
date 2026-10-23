@@ -23,8 +23,9 @@ last one). Internally the later acts are 6–11 (5 is the endless;
 `ROMANO_ACTO` shows them as V–X). After the Sol the same run turns endless
 (21+, `CICLO_SINFIN`), cycling the nine fighting acts in blocks of two
 (wave + boss), the bosses in **phase 2** on the first lap, **phase 3** on
-the second, **phase 4** on the third and **phase 5** from the fourth on
-(`fase`, `faseDeVuelta`, `VIDA_FASE`; jornadas 22–38, 40–56, 58–74, 76+). **There is one mode and no checkpoints**: every
+the second, **phase 4** on the third, **phase 5** on the fourth and **phase 6**
+from the fifth on (`fase`, `faseDeVuelta`, `VIDA_FASE`; jornadas 22–38, 40–56,
+58–74, 76–92, 94+). **There is one mode and no checkpoints**: every
 travesía starts at jornada 1. But it can be resumed: `guardaPunto` stores
 `prog.punto` (with the proof so far, `ver`, the upgrades and `perdidas`, a
 flame lost mid-jornada that is re-applied on resuming) at the start of
@@ -73,9 +74,24 @@ first sends that one. Things that matter:
   solar wind and an eclipse during which it cannot be hit; it dies
   shrinking into a lantern, and `finalSol` tells why. Entering the
   firmamento brings 180 stars back (the moths you put out «went up»).
-- **Phases 2 to 5 have their own model and their own ability per boss.**
-  `sprites.js` draws each boss five times (`nodriza(k, fase)`…,
-  `COLORES_<JEFE>_F`, `ESCALA_FASE` ×1.2/×1.35/×1.4/×1.45, hit boxes too): phase
+- **Phase 6 has RIGOR, and it has no ceiling** (`aplicaRigor`, `RIGOR`,
+  `gradoDeVuelta` in `motor.js`). Before it, `dificultad`, the augurios,
+  `endurece` and boss life all hit their caps around jornada 80, so with a
+  full weapon the endless run never ended. Now every lap spent in phase 6
+  is one `grado` harder (1 on jornadas 93–110, 2 on 111–128…): boss life
+  on screen +22 % per grado (`vidaJefeJuego`, unbounded), furia, escama
+  speed, wave fire, balas, aim, dives and march (high caps), plus the
+  phase-6 abilities bring more per grado (`masGrado` in `juego.js`) and come
+  sooner (`cdEsp` 5.5 s − 0.35 per grado, ≥ 3.2 s). **Rigor only touches
+  what the proof does not check**: the formations and moth life are the
+  same, and the verifier still bounds boss damage with `vidaJefe` (phase 3
+  life), which is lower than the screen life, so it never rejects an honest
+  game and a run half-played with the old motor still verifies. Don't use
+  `vidaJefeJuego` in `prueba.js`. The transit announces each new grado
+  (`R.RIGOR`) and the HUD/boss card write it as «VI (II)» (`gradoTexto`).
+- **Phases 2 to 6 have their own model and their own ability per boss.**
+  `sprites.js` draws each boss six times (`nodriza(k, fase)`…,
+  `COLORES_<JEFE>_F`, `ESCALA_FASE` ×1.2/×1.35/×1.4/×1.45/×1.5, hit boxes too): phase
   2 is «la herida» (ember red, cracks, something extra), phase 3 «la
   coronada» (near-black body, what burns goes white), phase 4 «la
   ascendida» (the body is night sky — `asciende` makes the dark palette
@@ -83,13 +99,32 @@ first sends that one. Things that matter:
   like a constellation), phase 5 «la del alba» (`amanece`: the dark body
   pixels are filled with a dithered dawn gradient, violet to gold, with a
   white outline and `rayos` behind; warm colours replace phase 4's cold
-  ones in `juego.js` too). No tint, no shared aura. Each boss gets one
-  ability in phase 2, a second in phase 3, a third in phase 4 and a fourth
-  in phase 5, keeping the earlier ones (`ESPECIALES`, `ESPECIALES4`,
-  `ESPECIALES5`, `siguienteEspecial`, `jefe.cdEsp`: 10 s / 7.5 s / 6.5 s /
-  6 s; phase 3 alternates, phases 4 and 5 rotate starting with the newest;
+  ones in `juego.js` too), phase 6 «la de vidrio» (`vidria`: the dark body
+  pixels become a stained-glass window — 6 px pieces, lead between them, a
+  light outline —, `roseton` behind, `roseta` where phase 5 had a small
+  sun; it quantizes with `JOYAS`, `PLOMO` and `BORDE_VITRAL` added, and
+  pixels drawn exactly in `PLOMO` stay lead; the Sol has its own
+  `solDeVidrio`). No tint, no shared aura. Each boss gets one
+  ability in phase 2, a second in phase 3, a third in phase 4, a fourth
+  in phase 5 and a fifth in phase 6, keeping the earlier ones (`ESPECIALES`, `ESPECIALES4`,
+  `ESPECIALES5`, `ESPECIALES6`, `siguienteEspecial`, `jefe.cdEsp`: 10 s / 7.5 s / 6.5 s /
+  6 s / 5.5 s; phase 3 alternates, phases 4 to 6 rotate starting with the newest;
   names and card epithets in `R.FASES`; the ability is announced as
-  «✦ name»). Phase 5: Nodriza Abrazo (white moths that perch on the lantern
+  «✦ name»). Phase 6: Nodriza Muda (a glass copy of her stays and fires its
+  own fans; shots break it and it pays `V`), Faro Caleidoscopio (six beams
+  from the lens to fixed points on the water; a subset lights each click,
+  marked dotted first; wrecks cut them), Esfinge Esquirlas (shards stuck in
+  the water, one always where you are; touching one is a hit), Casco
+  Botellas (they land, drift towards you and burst; the reach is marked),
+  Crisálida Vidriera (rows of glass with a two-pane gap fall; a pane over
+  you when a row lands is a hit; shots break panes recording nothing),
+  Hoguera Colada (a molten-glass pour that chases you slower than the oars;
+  a wreck catches it and burns), Luna Agua de vidrio (`jefe.aguaVidrio`:
+  oar grip ×0.14 in `actualizaFanal`, the boat slides), Siete Hermanas
+  Celosía (rows of `vidrio` escamas offset diagonally, so the gaps make
+  slanted corridors) and Sol Lupa (a focus that chases you; inside it
+  `F.calor` rises, under a wreck it doesn't; the Canícula's cooling skips
+  while `jefe.lupa`). Phase 5: Nodriza Abrazo (white moths that perch on the lantern
   and slow the oars; rowing hard shakes them off, five put the flame out),
   Faro Prisma (slow lights; a shot splits one into three fast splinters),
   Esfinge Acertijo (shows three or four shores in order, then strikes all
@@ -118,12 +153,16 @@ first sends that one. Things that matter:
   (`V`, `pagaOrbita`), and anything else a shot breaks (silk, the net,
   mirages) records no event, hit, points or note. A hit may never take
   more than the bullet's damage (`hiereJefe`): the verifier bounds each
-  `X` by it. `__fanal.especial(2|3|4|5)` forces the ability. The phase-4
+  `X` by it. `__fanal.especial(2|3|4|5|6)` forces the ability. The phase-4
   ones fit too: Reclamo moths are larvas (`O`), Ocaso is held with plain
   `X` hits, and a shot fired inside the Mortaja is recorded as a shot that
   hit nothing. So do phase 5's: Abrazo moths are larvas (`O`), Prisma
   lights are escamas, the rest cannot be shot; `VIDA_FASE[5]` is phase 3's
-  too.
+  too. And phase 6's: breaking the Muda is `V` (any boss in phase ≥ 3), a
+  Vidriera pane records nothing (`golpeaFase6`), the rest cannot be shot;
+  `VIDA_FASE[6]` is phase 3's as well. `musica.js` caps the phase at 6
+  (`FASE_MUSICA_MAX`): phase 6 adds a glass bell on every eighth and the
+  melody two octaves up, and the tempo +20 %, still under `EPM_TECHO`.
 
 - **The counter «✦ luces» is the twist made visible.** It starts at 430,
   and each background star *is* one of those lights: killing a moth puts
