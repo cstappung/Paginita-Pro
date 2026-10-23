@@ -3704,14 +3704,28 @@
       j: n, puntos: P.puntosJ0, llamas: P.llamasJ0, luces: P.lucesJ0, mej: Object.assign({}, P.mej), br: P.brasas,
       perdidas: P.perdidasPend + Math.max(0, P.llamasJ0 - P.llamas), notas: P.notasJ0, u: P.uJ, ver: FP.VERSION, at: Date.now()
     };
-    if (P.prueba && !P.legado) prog.punto.pr = Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {});
+    if (P.prueba && !P.legado) prog.punto.pr = prDelPunto(Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {}));
     guardaProgreso();
   }
-  /* La prueba de una travesía guardada, lista para rehacer (o null). */
+  /* La prueba que viaja con la travesía guardada: tal cual si cabe en el
+     progreso, empacada si no (FP.ajusta, sobre una copia: quitarle pulsos
+     no puede tocar la de la partida). Se empaca una vez por jornada: entre
+     dos tránsitos la prueba no crece, y guardaPunto corre en cada golpe. */
+  let prEmpacada = null;
+  function prDelPunto(pr) {
+    if (JSON.stringify(pr).length <= Math.min(FP.EMPACA_DESDE, M.PRUEBA_PUNTO_MAX)) return pr;
+    const clave = pr.id + "|" + pr.J.length + "|" + (pr.x ? 1 : 0);
+    if (!prEmpacada || prEmpacada.clave !== clave) prEmpacada = { clave, pr: FP.ajusta(JSON.parse(JSON.stringify(pr)), M.PRUEBA_PUNTO_MAX) };
+    return prEmpacada.pr;
+  }
+  /* La prueba de una travesía guardada, lista para rehacer (o null). Se
+     desempaca: la partida sigue anotando en ella. */
   function pruebaGuardada(p) {
     const pr = p && p.pr;
-    if (!pr || pr.x || typeof pr.id !== "string" || !Array.isArray(pr.J)) return null;
-    return { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: 0, J: pr.J.slice() };
+    if (!pr || pr.x || typeof pr.id !== "string") return null;
+    const J = FP.jornadasDe(pr);
+    if (!Array.isArray(J)) return null;
+    return { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: 0, J: J.slice() };
   }
   /* Empezar una travesía nueva con otra guardada la da por terminada: lo
      jugado hasta lo guardado va a la clasificación, como si el fanal se

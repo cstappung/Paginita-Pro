@@ -147,10 +147,47 @@ test('FANAL: una travesía hasta la fase 6 pasa, con los jefes aguantando lo que
  assert.ok(M.vidaJefeJuego(M.jornada(112))>M.vidaJefe(M.jornada(112)));
  const rh=FP.rehace(r.prueba);
  assert.equal(rh.motivo,undefined,String(rh.motivo));
- // El verificador del juego (sin el tope de tamaño de verificaClub: una travesía de más de cien
- // jornadas ya no cabía en 200 000 caracteres antes de la fase 6; ver docs/antitrampas/fanal.md).
- assert.equal(await FV.verifica(r.jornadas,r.prueba,{uid:'uid-robot'}),null);
+ // Tan larga no cabe tal cual (pasa de 200 000 caracteres): el juego la manda empacada (FP.ajusta).
+ const largo=JSON.stringify(r.prueba).length;
+ assert.ok(largo>FP.PRUEBA_MAX,'sin empacar ocupa '+largo);
+ FP.ajusta(r.prueba);
+ assert.equal(r.prueba.v,FP.VERSION_EMPACADA);assert.equal(r.prueba.J,undefined);
+ assert.ok(JSON.stringify(r.prueba).length<largo/5,'empacada ocupa '+JSON.stringify(r.prueba).length+' de '+largo);
+ assert.equal(await verifica(r.jornadas,r.prueba,{uid:'uid-robot'}),null);
+ assert.equal(await verifica(r.dato,r.prueba,{uid:'uid-robot'}),null);
  assert.ok(r.jornadas.puntos>=111,'llegó a la segunda vuelta en fase 6: '+r.jornadas.puntos);
+});
+
+test('FANAL: la prueba empacada es la misma prueba (y tocarla no pasa)',async()=>{
+ // El LZW va y vuelve exacto, también cuando el diccionario se llena y se reinicia.
+ let semilla=7;const rnd=()=>(semilla=(semilla*1103515245+12345)%2147483648)/2147483648;
+ for(const L of [0,1,2,50,5000,300000]){let t='';for(let i=0;i<L;i++)t+=String.fromCharCode(32+Math.floor(rnd()*(i%3?95:12)));
+  const z=FP.lzw(t);assert.equal(FP.deslzw(z,t.length),t,'largo '+L);
+  for(let i=0;i<z.length;i++){const c=z.charCodeAt(i);assert.ok(c>=0x100&&c<=0x80ff);}}
+ assert.equal(FP.lzw('ñandú'),null,'solo ASCII');
+ assert.equal(FP.deslzw('abc',3),null);
+ // Una corta no se empaca (se lee a ojo, y un verificador viejo la entiende).
+ const c=conTiempo(robot({hasta:8,semilla:22}));
+ FP.ajusta(c.prueba);assert.equal(c.prueba.v,FP.VERSION);assert.ok(Array.isArray(c.prueba.J));
+ // Empacada a la fuerza, rehace da lo mismo.
+ const e=FP.empaca(c.prueba);
+ assert.deepEqual(FP.rehace(e),FP.rehace(c.prueba));
+ assert.equal(await verifica(c.dato,e,{uid:'uid-robot'}),null);
+ // Tocar la parte empacada: o no se lee, o la cadena de hash no cuadra.
+ for(const k of [10,Math.floor(e.Z.length/2),e.Z.length-3]){
+  const t=Object.assign({},e,{Z:e.Z.slice(0,k)+String.fromCharCode(((e.Z.charCodeAt(k)-0x100+977)%0x8000)+0x100)+e.Z.slice(k+1)});
+  assert.match(await verifica(c.dato,t,{uid:'uid-robot'}),/no cuadra/,'carácter '+k);
+ }
+ assert.match(await verifica(c.dato,Object.assign({},e,{zl:e.zl+5}),{uid:'uid-robot'}),/no cuadra/);
+ assert.match(await verifica(c.dato,Object.assign({},e,{J:[]}),{uid:'uid-robot'}),/no cuadra/);
+ assert.match(await verifica(c.dato,Object.assign({},c.prueba,{v:FP.VERSION_EMPACADA}),{uid:'uid-robot'}),/no cuadra/);
+ // Reempacar una prueba con puntos inflados no sirve: lo que se mira es lo de adentro.
+ const inflada=JSON.parse(JSON.stringify(c.prueba));inflada.J.at(-1).s+=5000;
+ assert.match(await verifica(c.dato,FP.empaca(inflada),{uid:'uid-robot'}),/no cuadra/);
+ // La travesía guardada a medias puede llevar su prueba empacada.
+ const pt={j:9,puntos:1,llamas:3,at:1,pr:FP.empaca(Object.assign({},c.prueba))};
+ const g=M.mezclaProgreso({punto:pt},null).punto.pr;
+ assert.equal(g.Z,pt.pr.Z);assert.deepEqual(FP.jornadasDe(g),c.prueba.J);
 });
 
 test('FANAL: con muerte, más allá del Sol y retomada después de cerrar la página',async()=>{

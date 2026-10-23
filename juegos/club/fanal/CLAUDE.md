@@ -245,7 +245,15 @@ first sends that one. Things that matter:
   `brasas(n)`, `taller()`, `prueba()`…) drives the game from a script,
   which is how the story and the bosses were played through in Chromium.
   The proof is version 4: one mode, always from jornada 1 (`docs/antitrampas/fanal.md`);
-  any change to it must bump `club-N` in `solo/club.js`.
+  any change to it must bump `club-N` in `solo/club.js`. **A long proof
+  travels packed as version 5** (`FP.ajusta` → `empaca`: `J` as LZW text in
+  `Z`/`zl`, ~8× smaller) once it passes `EMPACA_DESDE` (150 000 chars),
+  because everything that stores a proof caps it at 200 000 and runs past
+  ~90 jornadas no longer fitted. `rehace` reads both through `jornadasDe`;
+  anything new that reads a proof's jornadas must use it too, never
+  `prueba.J` directly. The saved travesía packs its `pr` the same way
+  (`prDelPunto`, cached per jornada; `pruebaGuardada` unpacks it, since
+  `P.prueba` keeps appending).
 
 **Guest destacado.** Playable without an account; a guest's score is saved
 if they sign in afterwards, and the game adopts what it left under the

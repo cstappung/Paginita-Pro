@@ -574,8 +574,9 @@
     // La prueba de lo jugado hasta el punto de control (ver prueba.js): sin
     // ella, seguir desde aquí no entra en la clasificación. Se guarda tal
     // cual (el verificador la rehace entera) si tiene la forma y cabe.
+    // Las jornadas pueden venir empacadas (prueba.js: empaca, `Z` y `zl`).
     const pr = pt.pr;
-    if (r.punto.j > 0 && pr && typeof pr === "object" && typeof pr.id === "string" && Array.isArray(pr.J)) {
+    if (r.punto.j > 0 && pr && typeof pr === "object" && typeof pr.id === "string" && (Array.isArray(pr.J) || (typeof pr.Z === "string" && Number.isSafeInteger(pr.zl)))) {
       let largo = Infinity;
       try { largo = JSON.stringify(pr).length; } catch (e) { /* una prueba que no se puede escribir no se guarda */ }
       if (largo <= PRUEBA_PUNTO_MAX) r.punto.pr = pr;
@@ -587,9 +588,10 @@
 
   /* Lo más que ocupa la prueba guardada con la travesía a medias: el
      progreso entero viaja a la cuenta en un blob de menos de 200 000
-     caracteres, y veinte jornadas reales ocupan unas decenas de miles. Muy
-     adentro del sin fin puede no caber: entonces la partida se sigue igual,
-     pero ya no entra en la clasificación. */
+     caracteres, y veinte jornadas reales ocupan unas decenas de miles. Más
+     adentro del sin fin el juego la guarda empacada (prueba.js: empaca),
+     unas ocho veces más chica; si ni así cupiera, la partida se sigue
+     igual, pero ya no entra en la clasificación. */
   const PRUEBA_PUNTO_MAX = 180000;
 
   /* Un hash de texto de 53 bits (cyrb53), en base 36. No es una firma: lo

@@ -70,12 +70,27 @@ valiendo. Romper la Muda de la Nodriza es `V`; los vidrios de la Vidriera
 no anotan nada. `antitrampas-fanal.test.cjs` juega un robot hasta la
 jornada 112 con los jefes aguantando su vida de pantalla, y pasa.
 
-**Límite de tamaño, de antes de la fase 6.** Con la densidad de eventos
-del robot, una travesía llega al tope de `verificaClub` (200 000
-caracteres) hacia la jornada 92 aun quitándole todos los pulsos
-(`FP.ajusta`), y la de 110 ya no cabe (206 kB sin fase 6, 212 kB con ella).
-Una travesía real muy larga puede no entrar en la tabla aunque sea
-honesta. Arreglarlo pide comprimir la prueba (otra versión y `club-N`).
+**Pruebas largas, empacadas (versión 5).** Todo lo que guarda una prueba
+tiene un tope de 200 000 caracteres (la regla de `soloPruebas`, el
+`PRUEBA_MAX` de `verificaClub` y el blob del progreso donde viaja la
+travesía a medias). Con la densidad de eventos del robot, una travesía
+llegaba a ese tope hacia la jornada 92 aun quitándole todos los pulsos, y
+la de 110 ya no cabía: quien jugaba más de cien jornadas no entraba en la
+tabla aunque fuera honesto. Ahora `FP.ajusta`, cuando la prueba pasa de
+`EMPACA_DESDE` (150 000), la **empaca**: el texto JSON de `J` comprimido
+con LZW en `Z` (con su largo en `zl`), códigos de 8 a 16 bits juntados de a
+15 en caracteres desde U+0100 (sin nada que JSON escape). Queda unas ocho
+veces más chica (435 kB → 52 kB a la jornada 128); solo si ni así cupiera
+se quitan pulsos de las jornadas viejas, como antes. `rehace` la desempaca
+(`jornadasDe`) y la comprueba entera: mismos registros, mismo hash. La
+empacada lleva `v: 5` para que un verificador viejo en caché la rechace
+como «de otra versión» (no castiga) y no como ilegible; la 4 sin empacar
+sigue valiendo, así que las cortas no cambian y nada guardado se pierde.
+La travesía a medias también se guarda empacada cuando no cabe
+(`prDelPunto` en `juego.js`, una vez por jornada; `mezclaProgreso` acepta
+`Z`). El iframe subió a `club-70`. Los tests: la travesía del robot hasta
+la 112 pasa entera por `verificaClub`, y tocar un carácter de `Z`, su
+largo, o reempacar con puntos inflados se rechaza.
 
 **Versión 2 de la prueba** (octubre de 2026): la travesía se alargó a una
 segunda parte y después sin fin, cada jornada da una brasa que se gasta en
