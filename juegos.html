@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610230316"></script>
+<script src="i18n.js?v=202610230525"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5190,6 +5190,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-invitado-aviso>span:nth-child(2){flex:1;min-width:0}
 .jg-invitado-aviso button{flex-shrink:0;border:0;background:none;padding:8px 4px;font:700 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;white-space:nowrap}
 .jg-invitado-aviso button:hover{text-decoration:underline}
+.jg-invitado-aviso .jg-enlace-btn{padding:0;font-size:inherit;text-decoration:underline}
 
 /* ---- Títulos de sección: el icono de modo vuelve a decir cuál es ---- */
 .jg-sal-tit{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -5478,6 +5479,16 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-invg-btns .btn{flex:1;height:46px;border-radius:12px;font-size:14px;background:var(--jg-purple)}
 .jg-invg-btns .btn2{height:46px;border-radius:12px}
 .jg-invg-x{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--jg-muted);font-size:15px;cursor:pointer}
+/* «¿Cómo te llamamos?» (pideNombreInvitado): la misma tarjeta del aviso de
+   invitado, pero modal, con un velo encima del juego que carga detrás. */
+.jg-nom{position:fixed;inset:0;z-index:93;display:flex;align-items:flex-end;justify-content:center;padding:0 12px max(12px,env(safe-area-inset-bottom));background:#120d1f73;animation:jgVela .2s ease-out}
+@media (min-width:601px){.jg-nom{align-items:center}}
+.jg-nom-caja{margin:0}
+.jg-nom-campo{grid-column:1/-1;display:block;margin-top:10px}
+.jg-nom-campo input,.jg-bv-nombre input{width:100%;box-sizing:border-box;height:50px;padding:0 14px;border-radius:12px;border:2px solid #d9d1ee;background:#fbfaff;color:var(--jg-ink);font:700 17px 'IBM Plex Sans',sans-serif}
+.jg-nom-campo input:focus,.jg-bv-nombre input:focus{outline:none;border-color:var(--jg-purple)}
+.jg-bv-nombre{display:grid;gap:6px;text-align:left;font-size:13px;font-weight:700;color:var(--jg-purple)}
+html:has(#jgNomInv) .rp-fab{display:none!important}
 
 /* ---- La caja del invitado en la columna de salas ---- */
 .jg-lado-cuenta{padding-bottom:16px}
@@ -5631,6 +5642,9 @@ html[data-tema=oscuro] .jg-bv{background:radial-gradient(ellipse at top,#2a1f4a,
 html[data-tema=oscuro] .jg-bv-paso>p,html[data-tema=oscuro] .jg-invg-txt p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-bv-inv,html[data-tema=oscuro] .jg-invg-txt small{color:#c4b1ff}
 html[data-tema=oscuro] .jg-bv-juego,html[data-tema=oscuro] .jg-invg-caja{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-nom-campo input,html[data-tema=oscuro] .jg-bv-nombre input{background:var(--os-sup);border-color:var(--os-borde);color:var(--jg-ink)}
+html[data-tema=oscuro] .jg-nom-campo input:focus,html[data-tema=oscuro] .jg-bv-nombre input:focus{border-color:#c4b1ff}
+html[data-tema=oscuro] .jg-bv-nombre{color:#c4b1ff}
 html[data-tema=oscuro] .jg-bv-juego{border-color:color-mix(in srgb,var(--c) 40%,var(--os-borde))}
 html[data-tema=oscuro] .jg-inv-tira{background:#2a2312;border-color:#4d3d17;color:#f1dfae}
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
@@ -6774,6 +6788,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610230316"></script>
+<script src="juegos-app.js?v=202610230525"></script>
 </body>
 </html>

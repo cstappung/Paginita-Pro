@@ -176,21 +176,41 @@ art on top and the button spans the width. `novedades()` in `motor.js` is
 the older date-driven version and is no longer called.
 
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
-no login wall, but **only eight games are playable**: the four *destacados*
-BBTAN, ALETEO, FANAL and Trigon (`DESTACADOS_INVITADO`, first in the guest's
-carousel) plus Snake, Mina Club, Tetris Club and sortEm (`LIBRES_INVITADO` in
-`salon-datos.js`, the owner's choice). Everything else — the other club games, Frontera, the bot
-practices and every room — wears the padlock (`bloqueado`), and a typed
-`#solo/<x>` route that is not free (`rutaLibre`) gets the `MOTIVO_CUENTA.solo`
-gate in `armazon`. Nothing is saved — no ranking, logros, coins or cloud
-save. It needs **no rules change**: the guest never touches the database.
-The honest limit: the bot practices are static pages (`juegos/yemas/index.html`
-and siblings), so the lobby no longer links them for a guest but whoever
-types their URL still plays them; they never write anything.
+no login wall, and **every single-player game is playable** — the whole
+club, Frontera and the bot practices — **except PRO HERO and Tenkaichi 3**
+(`CON_CUENTA_SOLO` in `salon-datos.js`: PRO HERO keeps songs and stars in the
+account, BT3's disc is private). Owner's call, Oct 2026: with only eight
+free games new visitors were asked to log in before they had played
+anything, and they left instead. A new solo game is therefore free for
+guests by default. The four *destacados* BBTAN, ALETEO, FANAL and Trigon
+(`DESTACADOS_INVITADO`) still go first in the guest's carousel and are the
+only ones whose score survives a later login. Rooms wear the padlock
+(`bloqueado`), and a typed `#solo/hero` or `#solo/bt3` (`rutaLibre`) gets the
+`MOTIVO_CUENTA.solo` gate in `armazon`. Nothing is saved — no ranking,
+logros, coins or cloud save. It needs **no rules change**: the guest never
+touches the database. The club games already knew guest mode
+(`invitado=1`, conexion.js `club-8`: PRO DEFENDER's `EN_LA_NUBE`, Metro
+Rush's ghost) and Frontera plays with the `INVITADO` user.
+
+- **The guest picks a name** (`pideNombreInvitado` in `juegos-main.js`,
+  `.jg-nom`): the first game a guest opens shows «¿Cómo te llamamos?» over
+  the game (which keeps loading behind), prefilled with a suggestion
+  (`sugiereNombreInvitado`, «Pudú 27») so playing stays one tap; it is not
+  auto-focused on a phone (the keyboard would cover the game). The mobile
+  welcome asks it in step 2 instead, so the game does not ask again. It is
+  cleaned by `limpiaNombreInvitado` (20 chars, no `<>`/controls) and lives
+  **only in `sessionStorage`** (`jg.invitado.nombre`): «nothing is saved» holds
+  for the name too, and the next visit asks again. It shows in the greeting,
+  the solo bar and the lobby notice («cambiar» reopens the prompt), always
+  under `translate="no"` (`[data-nombre-inv]`, repainted in place by
+  `pintaNombreInvitado`), and Frontera gets it through `invitadoConNombre()`.
+  It is never sent anywhere; Analytics only gets `jg_invitado_nombre {cambio,
+  desde}`.
 
 - Multiplayer cards are shown locked, not hidden (they are the reason for an
-  account). Their ficha explains why, offers «Iniciar sesión y jugar» and
-  «Seguir como invitado» (no bot practice: those need an account too). Every
+  account). Their ficha explains why, offers «Iniciar sesión y jugar»,
+  «Seguir como invitado» and, when the game has one, its bot practice
+  («Practica solo contra bots, sin cuenta»). Every
   `[data-login]` goes through `entrarConGoogle(juego)`, which remembers the
   game and **reopens its ficha unlocked** once the account arrives. A shared
   `#p/<pid>` shows a gate (`puertaHtml`, texts in `MOTIVO_CUENTA`), and after
@@ -203,7 +223,7 @@ types their URL still plays them; they never write anything.
   `cuenta=invitado&invitado=1`, which `conexion.js` (`?v=club-8`) reads to
   replace the ranking panel with the notice. The Frontera still knows the
   `INVITADO` user (`usuario.invitado`: no ranking, no cloud run, teams in
-  `localStorage` only), though a guest no longer reaches it.
+  `localStorage` only), with the guest's chosen name.
 - **The mobile welcome** (`abreBienvenida` in `juegos-main.js`, `.jg-bv`):
   a first visit from a phone (`pointer:coarse`, smaller side ≤ 600 px)
   without a session, on the lobby route only, gets a full-screen choice
@@ -245,7 +265,7 @@ types their URL still plays them; they never write anything.
   the standard `login` / `sign_up {method, origen}` (from
   `getAdditionalUserInfo().isNewUser`) and `jg_invitado_guardado`. `origen`
   is the button's `data-origen` (`bienvenida-entrar`, `aviso-guardar`,
-  `franja-invitado`…; `ficha` or `otro` by default). Event names and site
+  `franja-invitado`, `nombre-invitado`…; `ficha` or `otro` by default). Event names and site
   ids only, never anything a person wrote. Read them in the Firebase
   console → Analytics → Events (custom params need registering as custom
   dimensions to show in reports).

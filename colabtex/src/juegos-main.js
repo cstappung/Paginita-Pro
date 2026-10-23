@@ -109,7 +109,7 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
 import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
@@ -786,7 +786,8 @@ function mostrar() {
 
 /* ---------- el invitado ----------
    Sin sesión no hay muro: se entra directo al salón en modo invitado. Se
-   juega a todo lo de un jugador (corre en el navegador); lo multijugador
+   juega a todo lo de un jugador menos PRO HERO y Tenkaichi 3
+   (`CON_CUENTA_SOLO`); lo multijugador
    se ve, con su candado, porque la base solo deja escribir a quien inició
    sesión. Lo que no se puede como invitado no se esconde: se explica y se
    ofrece la cuenta (`MOTIVO_CUENTA`, la ficha bloqueada).
@@ -796,6 +797,65 @@ function mostrar() {
    borra al empezar otra visita. Una visita es una sesión de la pestaña
    (`sessionStorage`): recargar a mitad de partida no la pierde. */
 const INVITADO = { uid: UID_INVITADO, name: "Invitado", photo: "", color: "#8a8399", invitado: true };
+/* El nombre que eligió el invitado (`pideNombreInvitado`), solo en esta
+   pestaña: no se escribe en ningún otro lado. "" mientras no elige. */
+const CLAVE_NOMBRE_INV = "jg.invitado.nombre";
+function nombreInvitado() {
+  try { return limpiaNombreInvitado(sessionStorage.getItem(CLAVE_NOMBRE_INV) || ""); } catch (e) { return nombreInvMemoria; }
+}
+let nombreInvMemoria = "";
+function ponNombreInvitado(n) {
+  nombreInvMemoria = limpiaNombreInvitado(n);
+  try { sessionStorage.setItem(CLAVE_NOMBRE_INV, nombreInvMemoria); } catch (e) { /* queda en memoria */ }
+}
+/* El usuario de la Frontera para el invitado, con su nombre. */
+const invitadoConNombre = () => Object.assign({}, INVITADO, { name: nombreInvitado() || INVITADO.name });
+
+/* «¿Cómo te llamamos?»: al abrir su primer juego, el invitado elige un
+   nombre (uno sugerido ya escrito, así que jugar sigue a un toque). Sale
+   encima del juego, que ya está cargando detrás. `cambiar` es el enlace
+   «Cambiar» del salón, que lo vuelve a abrir con el nombre actual. */
+function quitaNombreInvitado() { const c = $("jgNomInv"); if (c) c.remove(); }
+function pideNombreInvitado(cambiar) {
+  if (!state.invitado || $("jgNomInv") || castigoActivo() || (!cambiar && nombreInvitado())) return;
+  const c = document.createElement("div");
+  c.id = "jgNomInv";
+  c.className = "jg-nom";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-modal", "true");
+  c.setAttribute("aria-labelledby", "jgNomInvT");
+  const actual = nombreInvitado() || sugiereNombreInvitado();
+  c.innerHTML = `<form class="jg-invg-caja jg-nom-caja">
+    <span class="jg-invg-ico" aria-hidden="true">👋</span>
+    <div class="jg-invg-txt"><small>MODO INVITADO</small>
+      <b id="jgNomInvT">¿Cómo te llamamos?</b>
+      <p>Es tu nombre mientras juegas en esta visita. Como invitado no se guarda nada: ni el nombre ni tus puntajes.</p></div>
+    <label class="jg-nom-campo">
+      <input type="text" name="nombre" aria-label="Tu nombre de invitado" maxlength="${NOMBRE_INVITADO_MAX}" autocomplete="nickname" enterkeyhint="go" spellcheck="false" translate="no" value="${escapeHtml(actual)}"></label>
+    <div class="jg-invg-btns"><button class="btn" type="submit">¡A jugar!</button><button class="btn2" type="button" data-login data-origen="nombre-invitado">Mejor inicio sesión</button></div>
+  </form>`;
+  const campo = c.querySelector("input");
+  c.querySelector("form").onsubmit = ev => {
+    ev.preventDefault();
+    const n = limpiaNombreInvitado(campo.value) || actual;
+    evento("jg_invitado_nombre", { cambio: n === actual ? 0 : 1, desde: cambiar ? "salon" : "juego" });
+    ponNombreInvitado(n);
+    quitaNombreInvitado();
+    pintaNombreInvitado();
+  };
+  c.addEventListener("keydown", ev => { if (ev.key === "Escape") c.querySelector("form").requestSubmit(); });
+  document.body.appendChild(c);
+  /* En el celular el teclado taparía medio juego: el nombre sugerido ya
+     sirve, así que no se enfoca solo; en el PC sí, seleccionado. */
+  if (!enCelular()) { campo.focus({ preventScroll: true }); campo.select(); }
+}
+/* Donde ya se ve el nombre (el saludo, la barra del juego, el aviso del
+   salón), se cambia sin repintar la pantalla entera. */
+function pintaNombreInvitado() {
+  const n = nombreInvitado();
+  for (const el of document.querySelectorAll("[data-nombre-inv]")) el.textContent = n || INVITADO.name;
+  for (const el of document.querySelectorAll("[data-con-nombre-inv]")) el.hidden = !n;
+}
 function limpiaInvitado() {
   try {
     if (sessionStorage.getItem("jg.visitaInvitado")) return;
@@ -950,7 +1010,9 @@ function abreBienvenida() {
     <section class="jg-bv-paso" data-paso="2" hidden>
       <span class="jg-eyebrow">MODO INVITADO</span>
       <h2>Juega ya, sin cuenta</h2>
-      <p>Elige uno. Como invitado tus puntajes y tus partidas <b>no se guardan</b>: inicia sesión cuando quieras, también después de perder, y guardamos tu mejor partida.</p>
+      <label class="jg-bv-nombre"><span>¿Cómo te llamamos?</span>
+        <input type="text" maxlength="${NOMBRE_INVITADO_MAX}" autocomplete="nickname" enterkeyhint="done" spellcheck="false" translate="no" value="${escapeHtml(nombreInvitado() || sugiereNombreInvitado())}" data-bv-nombre></label>
+      <p>Elige uno, o mira el salón: sin cuenta juegas a todo lo de un jugador menos PRO HERO. Como invitado tus puntajes y tus partidas <b>no se guardan</b>: inicia sesión cuando quieras, también después de perder, y en estos cuatro guardamos tu mejor partida.</p>
       <div class="jg-bv-juegos">${tarjetas}</div>
       <div class="jg-bv-btns">
         <button class="btn2" type="button" data-bv="salon">Ver todo el salón</button>
@@ -958,8 +1020,16 @@ function abreBienvenida() {
       </div>
     </section>
   </div>`;
+  /* El nombre del paso 2 vale en cuanto se elige un juego o el salón: así
+     el juego no lo vuelve a preguntar. */
+  const guardaNombreBv = () => {
+    const campo = c.querySelector("[data-bv-nombre]");
+    if (campo && !campo.closest("[hidden]")) ponNombreInvitado(limpiaNombreInvitado(campo.value) || campo.defaultValue);
+  };
+  c.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("[data-bv-nombre]")) { ev.preventDefault(); ev.target.blur(); } });
   c.addEventListener("click", ev => {
     const b = ev.target.closest("[data-bv]"), j = ev.target.closest("[data-bv-juego]");
+    if (j || (b && b.getAttribute("data-bv") === "salon")) guardaNombreBv();
     if (j) { evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
     if (!b) return;
     const que = b.getAttribute("data-bv");
@@ -976,7 +1046,7 @@ function abreBienvenida() {
       if (primero) primero.focus();
       return;
     }
-    if (que === "salon") { marcaBienvenida(); cierraBienvenida(); }
+    if (que === "salon") { marcaBienvenida(); cierraBienvenida(); pintaNombreInvitado(); }
   });
   document.body.appendChild(c);
   document.documentElement.classList.add("jg-bv-abierta");
@@ -1022,7 +1092,7 @@ function puertaHtml(m) {
       <button class="btn" type="button" data-login>Iniciar sesión con Google</button>
       <a class="btn2" href="#">Volver al salón</a>
     </div>
-    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm.</p>
+    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a todos los juegos de un jugador menos PRO HERO.</p>
     <p class="jg-puerta-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
   </section>`;
 }
@@ -2055,11 +2125,12 @@ function armazon() {
   const h = $("pantalla");
   if (state.vista !== "partida") ponInmersivo(false);
   quitaOfreceGuardar();
+  quitaNombreInvitado();
   /* Como invitado, lo que lee o escribe la base (una partida, la
      clasificación, los sobres…) se cambia por una puerta que lo explica. */
   const motivo = !state.invitado ? null : MOTIVO_CUENTA[state.vista] ||
-    /* Y de los juegos de un jugador, solo los cuatro libres (`rutaLibre`):
-       una ruta escrita a mano a cualquier otro también da con la puerta. */
+    /* Y de los juegos de un jugador, PRO HERO y Tenkaichi 3 (`rutaLibre`):
+       una ruta escrita a mano también da con la puerta. */
     (state.vista.startsWith("solo-") && !rutaLibre(state.vista.slice(5)) ? MOTIVO_CUENTA.solo : null);
   /* sortEm es solo el juego: el iframe ocupa la ventana, sin la cabecera
      del sitio ni la barra de juegos individuales. */
@@ -2093,7 +2164,7 @@ function armazon() {
        Pokémon en modo local, con sus propias rachas. Como invitado juega
        igual, con el usuario `INVITADO`, y no escribe nada fuera. */
     h.innerHTML = "";
-    individual = crearFrontera({ usuario: u || INVITADO, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
+    individual = crearFrontera({ usuario: u || invitadoConNombre(), guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, "frontera"), guardar: (d, at) => fb.guardarPartidaClub(u.uid, "frontera", d, at) } : null,
       alResultado: u ? lista => { marcaJugadaClub("frontera");
         for (const { d, previa } of lista || []) {
@@ -2101,6 +2172,7 @@ function armazon() {
           for (const id of deMarca("frontera", d)) if (!antes.has(id)) celebra("frontera", id);
         } } : undefined });
     individual.montar(h);
+    if (!u) { evento("jg_invitado_abre", { juego: "frontera" }); pideNombreInvitado(); }
     return;
   }
   if (state.vista.startsWith("solo-")) {
@@ -2133,7 +2205,7 @@ function armazon() {
     const corto = { minas: "Buscaminas", snake: "Snake", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera" };
     const barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? "UN JUGADOR · MODO INVITADO, NO SE GUARDA" : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? `UN JUGADOR · <span data-con-nombre-inv${nombreInvitado() ? "" : " hidden"}><span data-nombre-inv translate="no">${escapeHtml(nombreInvitado())}</span> · </span>MODO INVITADO, NO SE GUARDA` : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
       (state.invitado ? '<button class="btn jg-solo-entrar" type="button" data-login>Iniciar sesión</button>' : "") +
       `<nav aria-label="Juegos individuales">${club.map(x => `<a class="btn2${x === este ? " on" : ""}" href="${x.ruta}">${escapeHtml(corto[x.id] || x.nombre)}</a>`).join("")}` +
       `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button></nav>`;
@@ -2147,6 +2219,7 @@ function armazon() {
       tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login data-origen="franja-invitado">Iniciar sesión</button>';
       barra.after(tira);
     }
+    if (state.invitado) pideNombreInvitado();
     return;
   }
   if (state.vista === "perfil") {
@@ -2320,12 +2393,13 @@ function armazon() {
      multijugador, donde se busca una sala. */
   const inv = state.invitado;
   const nombre = u ? String(u.name || "").split(" ")[0] : "";
+  const nomInv = inv ? nombreInvitado() : "";
   h.innerHTML = `
     <div class="jg-sal" id="vesSalon" data-modo="${modoVes}">
       ${novedadesHtml()}
       <header class="jg-sal-intro">
         <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
-        <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : ""}?</h1>
+        <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : inv ? `<span data-con-nombre-inv${nomInv ? "" : " hidden"}>, <span data-nombre-inv translate="no">${escapeHtml(nomInv)}</span></span>` : ""}?</h1>
         <p>Juegos para ti solo, sin esperar a nadie, y juegos para jugar con otros en línea.</p>
         ${halloweenHtml()}
         ${tiraTiendaHtml(Object.assign({}, yoTienda() || {}))}
@@ -2340,13 +2414,13 @@ function armazon() {
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
-        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas sin cuenta a BBTAN, ALETEO, FANAL y Trigon (y a Snake, Buscaminas, Tetris y sortEm), pero tus puntajes y partidas no se guardan. Inicia sesión, también después de jugar, y guardamos tu mejor partida de los cuatro primeros. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
+        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado<span data-con-nombre-inv${nomInv ? "" : " hidden"}> (<span data-nombre-inv translate="no">${escapeHtml(nomInv)}</span>, <button type="button" class="jg-enlace-btn" data-nombre-cambia>cambiar</button>)</span>.</b> Sin cuenta juegas a todo lo de un jugador menos PRO HERO, pero tus puntajes no se guardan. Lo multijugador necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
         <div id="vesAviso"></div>
       </div>
       <section class="jg-sal-sec jg-sal-solo" aria-labelledby="vesSoloT">
         <header class="jg-sal-tit">
           <span class="jg-sal-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span>
-          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta: BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm." : ""}</p></div>
+          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta, todos menos PRO HERO." : ""}</p></div>
           <button class="jg-sal-ver" type="button" data-ver-solo>Ver todos</button>
           <button class="jg-desliza" type="button" data-desliza="-1" aria-label="Anteriores">‹</button><button class="jg-desliza" type="button" data-desliza="1" aria-label="Siguientes">›</button>
         </header>
@@ -2401,6 +2475,7 @@ function armazon() {
     b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
   }
   for (const b of h.querySelectorAll("[data-modo-ves]")) b.onclick = () => ponModo(b.dataset.modoVes);
+  for (const b of h.querySelectorAll("[data-nombre-cambia]")) b.onclick = () => pideNombreInvitado(true);
   h.querySelector("[data-ver-solo]").onclick = () => ponModo("solo");
   /* Con ratón no hay deslizar: las flechas mueven el carrusel una página. */
   for (const b of h.querySelectorAll("[data-desliza]")) {
@@ -3853,6 +3928,7 @@ function wire() {
     marcaBienvenida();
     cierraBienvenida();
     quitaOfreceGuardar();
+    quitaNombreInvitado();
     state.invitado = false;
     state.base = {
       uid: user.uid,
