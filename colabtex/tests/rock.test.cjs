@@ -223,3 +223,16 @@ test('desde CORTE_CAJAS_3 los legendarios salen con colores al azar; las cajas d
   }
   assert.ok(legs > 30 && distintos > legs / 2, `legendarios con colores propios: ${distintos}/${legs}`);
 });
+
+test('la Synyster sale solo en las cajas desde CORTE_CAJAS_4; las de antes no cambian', () => {
+  assert.equal(C.POOL.slice(0, C.POOL_2).some(p => p.t === 'synyster'), false);
+  assert.deepEqual(C.POOL.slice(C.POOL_2).map(p => p.b + ':' + p.k + ':' + p.t + ':' + p.leg), ['m:guitar:synyster:false', 'f:guitar:synyster:false']);
+  assert.ok(C.CORTE_CAJAS_4 > C.CORTE_CAJAS_3);
+  let syn = 0;
+  for (let i = 0; i < 6000; i++) {
+    const k = 'k' + String(i).padStart(9, '0'), b = i % 2 ? 'f' : 'm';
+    assert.notEqual(X.cajaRock(A, k, C.CORTE_CAJAS_4 - 1 - i, b).t, 'synyster', 'antes del corte no sale');
+    if (X.cajaRock(A, k, C.CORTE_CAJAS_4 + i, b).t === 'synyster') syn++;
+  }
+  assert.ok(syn > 20, 'después del corte sí sale: ' + syn);
+});

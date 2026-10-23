@@ -15,7 +15,7 @@
    pedir, aquí ni allá. */
 import { claveMini, claveMiniId, limpiaMinisViejas } from "./rock-datos.js";
 
-const V = "hero-19";
+const V = "hero-20";
 const TRABAJADOR = "juegos/hero/rock-trabajador.js?v=" + V;
 const VISOR = "juegos/hero/rock-visor.html?v=" + V;
 const OCIOSO = 20000;

@@ -66,7 +66,7 @@ export const ED_CAT = {
     legwear: [],
     shoes: [['boot', 'Bototos'], ['sneaker', 'Zapatillas'], ['chelsea', 'Botín chelsea'], ['botasInfierno', 'Botas infernales', { color: 0x1a0c08 }], ['botasCromo', 'Botas cromadas', { color: 0x9aa0b0 }], ['zapasNeon', 'Zapatillas de neón', { color: 0x0c0a16 }]],
     gloves: [['none', 'Sin guantes'], ['sinDedos', 'Sin dedos'], ['tachas', 'Con tachas'], ['completos', 'Completos'], ['tesla', 'Guantes tesla', { color: 0x10142a }], ['garrasMagma', 'Garras de magma', { color: 0x1a0c08 }], ['cosmicos', 'Guantes cósmicos', { color: 0x1a1050 }]],
-    guitar: [['vee', 'Flying V'], ['sg', 'Doble cuerno'], ['explorer', 'Explorer'], ['hacha', 'Hacha infernal', { body: 0x1a0c08 }], ['rayoG', 'Relámpago', { body: 0x10184a }], ['llamaG', 'Llamarada', { body: 0x1a0805 }]],
+    guitar: [['vee', 'Flying V'], ['sg', 'Doble cuerno'], ['explorer', 'Explorer'], ['hacha', 'Hacha infernal', { body: 0x1a0c08 }], ['rayoG', 'Relámpago', { body: 0x10184a }], ['llamaG', 'Llamarada', { body: 0x1a0805 }], ['synyster', 'Synyster']],
     necklace: [['none', 'Ninguno'], ['colmillo', 'Colmillo'], ['placas', 'Placas militares'], ['pinchos', 'Collar de púas'], ['colmilloFuego', 'Colmillo de dragón', { color: 0xff6a1a }], ['amuleto', 'Amuleto del trueno', { color: 0x6ad8ff }], ['calaveraCr', 'Calavera cromada', { color: 0xff2a2a }]],
     earrings: [['none', 'Ninguno'], ['argolla', 'Argolla'], ['arete', 'Aretes'], ['cruz', 'Cruz colgante'], ['gemaSangre', 'Gema de sangre', { color: 0xff1a3a }], ['rayoArete', 'Rayo colgante', { color: 0x6ad8ff }], ['cruzFuego', 'Cruz de fuego', { color: 0x1a0805 }]],
     bracelets: [['none', 'Ninguna'], ['tachas', 'Tachas'], ['cuero', 'Muñequera'], ['cadena', 'Cadena'], ['magmaBr', 'Brazalete de magma', { color: 0x1a0c08 }], ['teslaBr', 'Bobina tesla', { color: 0x6ad8ff }], ['galaxiaBr', 'Brazal galáctico', { color: 0x1a1050 }]],
@@ -87,7 +87,7 @@ export const ED_CAT = {
     legwear: [['none', 'Sin medias'], ['stockings', 'Rayadas'], ['tights', 'Panty'], ['red', 'De red'], ['calcetas', 'Calcetas'], ['brillantina', 'Medias de brillantina', { color: 0x2a1640 }], ['redNeon', 'Red de neón', { color: 0xff3a9a }], ['mediasRayo', 'Medias eléctricas', { color: 0x10142a }]],
     shoes: [['platform', 'Plataformas'], ['tallboots', 'Botas altas'], ['hightops', 'Zapatillas altas'], ['cristal', 'Plataformas de cristal', { color: 0xff8ad8 }], ['botasHolo', 'Botas holográficas', { color: 0xd8d0ff }], ['botasFuego', 'Botas de fuego', { color: 0x2a0805 }]],
     gloves: [['none', 'Sin guantes'], ['mitones', 'Mitones'], ['red', 'De red'], ['largos', 'Largos'], ['guanteHolo', 'Guantes holográficos', { color: 0xe0d8ff }], ['estelares', 'Mitones estelares', { color: 0x6a2ab8 }], ['guantesCristal', 'Guantes de cristal', { color: 0xbfe8ff }]],
-    guitar: [['offset', 'Offset'], ['heart', 'Corazón'], ['star', 'Estrella'], ['mariposa', 'Mariposa', { body: 0xe0d8ff }], ['luna', 'Luna creciente', { body: 0x3a1a8a }], ['gema', 'Gema', { body: 0x9ae8ff }]],
+    guitar: [['offset', 'Offset'], ['heart', 'Corazón'], ['star', 'Estrella'], ['mariposa', 'Mariposa', { body: 0xe0d8ff }], ['luna', 'Luna creciente', { body: 0x3a1a8a }], ['gema', 'Gema', { body: 0x9ae8ff }], ['synyster', 'Synyster']],
     necklace: [['none', 'Ninguno'], ['choker', 'Gargantilla'], ['chokerTachas', 'Gargantilla con tachas'], ['corazon', 'Corazón'], ['perlas', 'Perlas'], ['corazonCristal', 'Corazón de cristal', { color: 0xff7ac8 }], ['lunaCollar', 'Collar lunar', { color: 0x3a1a8a }], ['mariposaCollar', 'Mariposa de luz', { color: 0x4ad8ff }]],
     earrings: [['none', 'Ninguno'], ['aros', 'Argollas grandes'], ['estrellas', 'Estrellas'], ['gotas', 'Gotas'], ['fugaces', 'Estrellas fugaces', { color: 0xffd23a }], ['gotasDiamante', 'Gotas de diamante', { color: 0xbfefff }], ['corazonesNeon', 'Corazones de neón', { color: 0xff3a9a }]],
     bracelets: [['none', 'Ninguna'], ['aros', 'Esclavas'], ['perlas', 'Perlas'], ['puas', 'Púas'], ['diamanteBr', 'Esclavas de diamante', { color: 0xe8e0ff }], ['luzBr', 'Pulsera de luz', { color: 0xff4a9a }], ['fuegoBr', 'Brazalete de fuego', { color: 0xff5a10 }]],
@@ -497,6 +497,9 @@ export const POOL = Object.freeze([
   ['f', 'tatDesign', 'mariposaT'],
   ['f', 'tatDesign', 'lunaT'],
   ['f', 'tatDesign', 'rosaNeon'],
+  // desde CORTE_CAJAS_4: la guitarra Synyster (común, de rayas finas)
+  ['m', 'guitar', 'synyster'],
+  ['f', 'guitar', 'synyster'],
 ].map(([b, k, t]) => Object.freeze({ b, k, t, leg: !!invItem(b, k, t)?.[2] })));
 
 /* Las cajas compradas antes de CORTE_CAJAS_2 (hora del servidor) eligen entre las primeras POOL_1 filas, como
@@ -506,7 +509,10 @@ export const POOL_1 = 109, CORTE_CAJAS_2 = Date.UTC(2026, 9, 22, 4, 0);
 /* Desde CORTE_CAJAS_3 los legendarios salen con colores al azar como los demás (su efecto toma esos colores);
    las de antes traían los de fábrica, y así se quedan. */
 export const CORTE_CAJAS_3 = Date.UTC(2026, 9, 23, 3, 0);
-export const poolDe = at => (at >= CORTE_CAJAS_2 ? POOL : POOL.slice(0, POOL_1));
+/* Las de antes de CORTE_CAJAS_4 (00:00 de Chile del 25 de octubre de 2026, después de publicar la Synyster)
+   eligen entre las primeras POOL_2 filas. */
+export const POOL_2 = 169, CORTE_CAJAS_4 = Date.UTC(2026, 9, 25, 3, 0);
+export const poolDe = at => (at >= CORTE_CAJAS_4 ? POOL : at >= CORTE_CAJAS_2 ? POOL.slice(0, POOL_2) : POOL.slice(0, POOL_1));
 
 /* Lo que trae una caja comprada a la hora `at`, con el azar que se le pasa: `r.entero(n)` en [0, n).
    Primero si es legendaria, después la pieza (uniforme en su clase y en el cuerpo de la caja) y al final
