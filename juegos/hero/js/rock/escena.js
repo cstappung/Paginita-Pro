@@ -23,7 +23,7 @@ import { OutputPass } from '../../vendor/three-0.160.0/addons/postprocessing/Out
 import { mergeGeometries } from '../../vendor/three-0.160.0/addons/utils/BufferGeometryUtils.js';
 import {
   ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
-  INV_CATS, invItem, invVar, invVarL, invId, claveMini, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta, poolDe,
+  INV_CATS, invItem, invVar, invVarL, invId, claveMini, claveMiniId, limpiaMinisViejas, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta, poolDe,
 } from './catalogo.js';
 
 
@@ -3288,7 +3288,7 @@ async function cargaFuentes() {
    INICIO DE ESCENA
    ===================================================================== */
 const clock = { t: 0, run: true };
-if (EN_TRABAJADOR) await Promise.race([cargaFuentes(), sleep(2500)]).catch(() => {});
+if (EN_TRABAJADOR) { if (!globalThis.ROCK_FOTOGRAFO) await Promise.race([cargaFuentes(), sleep(2500)]).catch(() => {}); }
 else await Promise.race([document.fonts.load('80px Bangers'), sleep(2500)]).catch(() => {});
 makeTextures(); buildStage(); buildHaze();
 const crowd = new Crowd(), parts = new Particles(), bolt = new Bolt(), cielo = new Bolt(), smoke = new Smoke(), confetti = new Confetti();
@@ -3947,12 +3947,15 @@ canvas.addEventListener('pointercancel', () => { ED.drag = null; });
    MINIATURAS — cada pieza de las cajas fotografiada de verdad (los emojis no decían nada): un rockero de
    prueba con el cuerpo por defecto y esa pieza puesta, enfocado en ella (o la guitarra sola, o el dibujo del
    tatuaje). Se pintan en una esquina del lienzo, dentro del cuadro y antes de la escena (que las tapa), y se
-   copian a un canvas 2D: sin otro contexto WebGL. De a pocas por cuadro (`MINI.cola`), y quedan guardadas en
-   este navegador (localStorage, `rock-mini-<MINI_V>:<id>`).
+   copian a un canvas 2D. Las saca un **worker fotógrafo** (rock-trabajador.js en modo fotógrafo, con su propio
+   OffscreenCanvas): hechas aquí trababan la página, porque cada una arma un rockero entero (~40 ms) y leer la
+   foto obliga a esperar a la tarjeta gráfica. La página solo pone la URL en las <img>. Sin WebGL en un worker
+   (Safari < 17) se hacen aquí, de a una cada pocos cuadros. Quedan guardadas en este navegador (localStorage,
+   `claveMini`), donde también las lee el salón de Juegos.
    ===================================================================== */
 /* cuánto se acerca la cámara a cada categoría (las pupilas, casi encima) */
 const MINI_ZOOM = { eyeStyle: 0.62, mkStyle: 0.75, beard: 0.85, earrings: 0.85 };
-const MINI = { px: 144, mapa: new Map(), cola: [], escena: null, cam: null, K: null };
+const MINI = { px: 192, mapa: new Map(), cola: [], escena: null, cam: null, K: null, turno: 0 };
 /* la pieza `t` de la categoría `k` con sus colores de muestra: los de fábrica si es legendaria, si no los del
    rockero por defecto */
 function muestra(b, k, t) {
@@ -3968,8 +3971,69 @@ function miniUrl(v) {
   let url = '';
   try { url = localStorage.getItem(claveMini(v)) || ''; } catch {}
   if (url) { MINI.mapa.set(id, { url, canvas: null }); return url; }
-  if (!MINI.cola.some(x => miniId(x) === id)) MINI.cola.push(v);
+  if (!FOTOGRAFO.vuelo.has(id) && !MINI.cola.some(x => miniId(x) === id)) MINI.cola.push(v);
+  miniManda();
   return '';
+}
+/* el worker fotógrafo: hasta 2 fotos en camino; primero el premio de la caja, después las que están en pantalla */
+const FOTOGRAFO = { w: null, listo: false, falla: EN_TRABAJADOR, vuelo: new Map(), ocioso: 0 };
+function miniManda() {
+  if (FOTOGRAFO.falla || !MINI.cola.length) return;
+  if (!FOTOGRAFO.w) return fotografoArranca();
+  clearTimeout(FOTOGRAFO.ocioso);
+  if (!FOTOGRAFO.listo) return;
+  const caja = BOX.on && BOX.res ? miniId(BOX.res.v) : '';
+  while (FOTOGRAFO.vuelo.size < 2 && MINI.cola.length) {
+    const vistas = new Set([...CAPA.querySelectorAll('img[data-mini]:not([src])')].map(im => im.dataset.mini));
+    let i = MINI.cola.findIndex(x => miniId(x) === caja);
+    if (i < 0) i = MINI.cola.findIndex(x => vistas.has(miniId(x)));
+    const [v] = MINI.cola.splice(Math.max(0, i), 1), id = miniId(v);
+    if (MINI.mapa.has(id)) continue;
+    FOTOGRAFO.vuelo.set(id, v);
+    FOTOGRAFO.w.postMessage({ t: 'foto', id, v });
+  }
+}
+function fotografoArranca() {
+  limpiaMinisViejas();
+  try {
+    if (typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined') throw new Error('sin OffscreenCanvas');
+    // el paquete del worker lleva la misma versión que este módulo (?v=hero-N del mapa de módulos)
+    const w = FOTOGRAFO.w = new Worker(new URL('../../rock-trabajador.js' + new URL(import.meta.url).search, import.meta.url), { type: 'module' });
+    w.onmessage = e => {
+      const d = e.data || {};
+      if (d.t === 'listo') { FOTOGRAFO.listo = true; miniManda(); }
+      else if (d.t === 'error') fotografoFalla(d.m);
+      else if (d.t === 'foto') miniLlega(d.id, d.blob);
+    };
+    w.onerror = e => { e.preventDefault?.(); fotografoFalla(e.message || 'error'); };
+    w.postMessage({ t: 'fotografo' });
+  } catch (err) { fotografoFalla(err?.message || err); }
+}
+/* sin worker: las pendientes vuelven a la cola y se hacen en la página (`miniProcesa`) */
+function fotografoFalla(m) {
+  console.warn('[rock] las miniaturas van en la página:', m);
+  FOTOGRAFO.falla = true; FOTOGRAFO.w?.terminate(); FOTOGRAFO.w = null;
+  MINI.cola.unshift(...FOTOGRAFO.vuelo.values()); FOTOGRAFO.vuelo.clear();
+}
+function miniLlega(id, blob) {
+  if (!FOTOGRAFO.vuelo.delete(id)) return;
+  const m = { url: blob ? URL.createObjectURL(blob) : '', canvas: null };
+  MINI.mapa.set(id, m);
+  miniManda();
+  // sin nada más que hacer, el worker se apaga (suelta su WebGL); si hace falta otra vez, se vuelve a armar
+  if (!MINI.cola.length && !FOTOGRAFO.vuelo.size) { clearTimeout(FOTOGRAFO.ocioso); FOTOGRAFO.ocioso = setTimeout(() => { if (MINI.cola.length || FOTOGRAFO.vuelo.size) return; FOTOGRAFO.w?.terminate(); Object.assign(FOTOGRAFO, { w: null, listo: false }); }, 20000); }
+  if (!blob) return;
+  for (const im of CAPA.querySelectorAll('img[data-mini]')) if (im.dataset.mini === id) im.src = m.url;
+  if (BOX.on && BOX.res && miniId(BOX.res.v) === id && BOX.parts) createImageBitmap(blob).then(bm => { m.canvas = bm; miniCarta(id); }, () => {});
+  // al localStorage como data URL (lo lee el salón, y la próxima vez no se vuelve a sacar)
+  const rd = new FileReader();
+  rd.onload = () => { try { localStorage.setItem(claveMiniId(id), rd.result); } catch {} };
+  rd.readAsDataURL(blob);
+}
+/* la carta del premio, repintada con su foto */
+function miniCarta(id) {
+  if (!(BOX.on && BOX.res && miniId(BOX.res.v) === id && BOX.parts)) return;
+  const P = BOX.parts; P.card.material.map?.dispose(); P.card.material.map = boxCardTex(BOX.res); P.card.material.needsUpdate = true;
 }
 const miniImg = (v, cls = 'mini') => { const u = miniUrl(v); return `<img class="${cls}" data-mini="${esc(miniId(v))}" alt=""${u ? ` src="${u}"` : ''}>`; };
 function miniEscena() {
@@ -3984,7 +4048,7 @@ function miniEscena() {
 }
 /* fotografía `v`: devuelve un canvas de MINI.px (pintar solo dentro de un cuadro: la escena tapa la esquina) */
 function miniHaz(v) {
-  const px = MINI.px, out = Object.assign(document.createElement('canvas'), { width: px, height: px }), g = out.getContext('2d');
+  const px = MINI.px, out = nuevoLienzo(px, px), g = out.getContext('2d');
   if (v.k === 'tatDesign') {   // el dibujo, sobre piel
     const it = invItem(v.b, 'tatDesign', v.t), col = it?.[2]?.color ?? 0x1a1420;
     const fondo = g.createRadialGradient(px / 2, px / 2, 4, px / 2, px / 2, px * 0.7); fondo.addColorStop(0, '#f6d6bc'); fondo.addColorStop(1, '#c8946e');
@@ -3994,9 +4058,12 @@ function miniHaz(v) {
   const S = miniEscena(), cam = MINI.cam;
   let obj, rk = null;
   if (v.k === 'guitar') {
-    obj = new THREE.Group(); const gt = makeGuitar({ type: v.t, ...v.c }); gt.g.rotation.z = 0.62; obj.add(gt.g);
-    const caja = new THREE.Box3().setFromObject(obj), c = caja.getCenter(V()), r = caja.getSize(V()).length() * 0.5;
-    cam.fov = 30; cam.position.copy(c).add(V(0.15, 0.1, 1).normalize().multiplyScalar(r / Math.tan(THREE.MathUtils.degToRad(15)) * 1.02)); cam.lookAt(c);
+    obj = new THREE.Group(); const gt = makeGuitar({ type: v.t, ...v.c }); gt.g.rotation.z = 0.78; obj.add(gt.g);   // en diagonal: lo más larga que cabe
+    // el encuadre, solo con lo que se ve (`setFromObject` cuenta también el aura escondida del Star Power), y apretado: salía diminuta
+    const caja = new THREE.Box3(); obj.updateMatrixWorld(true);
+    obj.traverseVisible(o => { if (!o.isMesh || !o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); caja.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); });
+    const c = caja.getCenter(V()), r = caja.getSize(V()).length() * 0.5;
+    cam.fov = 30; cam.position.copy(c).add(V(0.15, 0.1, 1).normalize().multiplyScalar(r / Math.tan(THREE.MathUtils.degToRad(15)) * 0.86)); cam.lookAt(c);
   } else {
     const L = defaultLook(v.b), ruta = rutaInv(v.k), par = getP(L, ruta.split('.').slice(0, -1).join('.'));
     if (!par) return null;
@@ -4028,10 +4095,10 @@ function miniHaz(v) {
   else obj.traverse(o => { if (o.geometry && !Object.values(geoCache).includes(o.geometry)) o.geometry.dispose(); });
   return out;
 }
-/* dentro del cuadro, antes de pintar la escena: unas cuantas miniaturas pendientes (hasta ~12 ms) */
+/* sin worker fotógrafo: dentro del cuadro, antes de pintar la escena, una miniatura cada 3 cuadros */
 function miniProcesa() {
-  const t0 = performance.now();
-  while (MINI.cola.length && performance.now() - t0 < 12) {
+  if (++MINI.turno % 3) return;
+  while (MINI.cola.length) {
     const v = MINI.cola.shift(), id = miniId(v);
     if (MINI.mapa.has(id)) continue;
     let c = null;
@@ -4041,7 +4108,8 @@ function miniProcesa() {
     MINI.mapa.set(id, { url, canvas: c });
     try { localStorage.setItem(claveMini(v), url); } catch {}
     for (const im of CAPA.querySelectorAll('img[data-mini]')) if (im.dataset.mini === id) im.src = url;
-    if (BOX.on && BOX.res && miniId(BOX.res.v) === id && BOX.parts) { BOX.parts.card.material.map?.dispose(); BOX.parts.card.material.map = boxCardTex(BOX.res); BOX.parts.card.material.needsUpdate = true; }
+    miniCarta(id);
+    break;
   }
 }
 
@@ -4138,7 +4206,7 @@ async function boxStart() {
   P.card.material.map?.dispose(); P.card.material.map = boxCardTex(res); P.card.material.needsUpdate = true;
   // la foto del premio: primera en la cola (o, si estaba guardada, se carga y la carta se repinta)
   { const id = miniId(res.v), m = MINI.mapa.get(id);
-    if (!m) { miniUrl(res.v); const i = MINI.cola.findIndex(x => miniId(x) === id); if (i > 0) MINI.cola.unshift(...MINI.cola.splice(i, 1)); }
+    if (!m) { const i = MINI.cola.findIndex(x => miniId(x) === id); if (i > 0) MINI.cola.unshift(...MINI.cola.splice(i, 1)); miniUrl(res.v); }
     else if (!m.canvas && m.url) { const im = new Image(); im.onload = () => { m.canvas = im; if (BOX.on && BOX.res === res) { P.card.material.map?.dispose(); P.card.material.map = boxCardTex(res); P.card.material.needsUpdate = true; } }; im.src = m.url; } }
   if (P.gtr) P.gtr.removeFromParent(); P.gtr = null;
   if (res.v.k === 'guitar') { const w = new THREE.Group(), gt = makeGuitar({ type: res.v.t, ...res.v.c }); gt.g.position.x = -0.42; w.add(gt.g); w.visible = false; P.g.add(w); P.gtr = w; }   // la guitarra sale de verdad de la caja
@@ -4388,7 +4456,7 @@ function frame() {
   }
   let dt = Math.min(0.05, real);
   if (!clock.run) dt = 0;
-  if (ED.open && MINI.cola.length) miniProcesa();   // antes de la escena: ella tapa la esquina donde se fotografían
+  if (ED.open && MINI.cola.length && FOTOGRAFO.falla) miniProcesa();   // antes de la escena: ella tapa la esquina donde se fotografían
   step(dt); render(dt);
 }
 const arranca = () => { last = performance.now() / 1000; if (!raf) raf = pideCuadro(frame); };
@@ -4430,6 +4498,12 @@ export const rock = {
       }
       return { id, url: m.url };
     });
+  },
+  /* el worker fotógrafo: la miniatura de `v` en webp (un Blob), o null */
+  async foto(v) {
+    if (!montada) { renderer.setPixelRatio(1); renderer.setSize(MINI.px + 16, MINI.px + 16, false); }
+    const c = miniHaz(v);
+    return c ? c.convertToBlob({ type: 'image/webp', quality: 0.86 }) : null;
   },
   /* el editor: `look` es tu rockero guardado (o null); `cb` = {guarda(look), abreCaja(b), vende(c, p), mercado(), cerrar()} */
   editor(look, cb) {
@@ -4504,5 +4578,5 @@ export const rock = {
   /* fin de la canción: en batalla el ganador (0 tú, 1 el rival, 2… otro de la sala); solo, el título */
   fin(ganador = 0, texto = '') { if (!VIVO.on) return; VIVO.fin = texto || null; VIVO.ko = rockerDe(ganador | 0) ? ganador | 0 : 0; },
 };
-globalThis.__rock = { rock, CAL, TAM, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
+globalThis.__rock = { rock, CAL, TAM, MINI, FOTOGRAFO, get montada() { return montada; }, get raf() { return raf; }, battle, director, ED, BOX, VIVO, ROCKERS, rockers, scene, camera, renderer, step, render };
 $('#loading')?.remove();

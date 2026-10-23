@@ -17,9 +17,9 @@
    estuvo a prueba solo para administradores). Volver a cerrarlo es ponerlo en
    true y devolver la condición `admins` a las reglas de `rock/c` y `rockLook`. */
 import MM from "../../../juegos/mascotas/motor.js";
-import { abreCaja, nombreItem, INV_CATS, invId, iniciales, limpiaLook, lookPosible, PRECIO_CAJA, REEMBOLSO, claveMini, claveMiniId } from "../../../juegos/hero/js/rock/catalogo.js";
+import { abreCaja, nombreItem, INV_CATS, invId, iniciales, limpiaLook, lookPosible, PRECIO_CAJA, REEMBOLSO, claveMini, claveMiniId, limpiaMinisViejas } from "../../../juegos/hero/js/rock/catalogo.js";
 
-export { PRECIO_CAJA, REEMBOLSO, nombreItem, INV_CATS, limpiaLook, claveMini, claveMiniId };
+export { PRECIO_CAJA, REEMBOLSO, nombreItem, INV_CATS, limpiaLook, claveMini, claveMiniId, limpiaMinisViejas };
 export const ROCK_SOLO_ADMIN = false;
 export const RE_COPIA_ROCK = /^rk:([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})$/;
 export const claveRock = (o, k) => "rk:" + o + "~" + k;

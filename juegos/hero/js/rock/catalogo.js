@@ -287,8 +287,19 @@ export const invVarL = (L, k) => { const r = rutaInv(k), par = getP(L, r.split('
 export const invId = v => [v.b, v.k, v.t, ...INV_CATS[v.k].cols.map(f => v.c[f] ?? '')].join(':');
 /* la clave de la foto de una pieza en localStorage (la escena la saca; el salón de Juegos la lee, mismo origen).
    Subir el número cuando cambia cómo se ve un rockero: las fotos guardadas quedan viejas. */
-export const claveMiniId = id => 'rock-mini-2:' + id;
+export const claveMiniId = id => 'rock-mini-3:' + id;
 export const claveMini = v => claveMiniId(invId(v));
+/* borra las fotos de una versión anterior (una vez por página: localStorage tiene ~5 MB para todo el sitio) */
+let minisLimpias = false;
+export function limpiaMinisViejas() {
+  if (minisLimpias) return;
+  minisLimpias = true;
+  try {
+    const nueva = claveMiniId(''), viejas = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('rock-mini-') && !k.startsWith(nueva)) viejas.push(k); }
+    for (const k of viejas) localStorage.removeItem(k);
+  } catch {}
+}
 /* de partida: lo que trae cada cuerpo por defecto + la ropa que usan los rockeros de fábrica (de la cara y el
    pelo, solo lo del rockero por defecto y el primer diseño de tatuaje). Toda cuenta lo tiene: no se compra, no
    tiene copia y no se vende. */

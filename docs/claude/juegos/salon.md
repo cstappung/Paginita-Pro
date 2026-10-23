@@ -69,10 +69,10 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   gate in the strip instead (the PRODROP strip is simply hidden).
 - **Últimos drops legendarios · Batalla de Rock** (`tiraRockHtml`,
   `pintaDropsRock`, from `dropsRock` in `monedas.js`: the legendary pieces
-  of valid `cajasRock`, newest first). Photos: first the localStorage
-  thumbnails (`claveMini`, same origin as the frame), the rest asked to a
-  hidden `juegos/hero/rock-visor.html` iframe only once the strip is in
-  view (`vigilaDropsRock`). Hidden for guests and when `veRock()` is false.
+  of valid `cajasRock`, newest first). Photos from `rock-fotos.js` (the rock
+  scene's photographer worker; localStorage `claveMini`, shared with the
+  game's editor), asked only once the strip is in view
+  (`vigilaDropsRock`). Hidden for guests and when `veRock()` is false.
 - **Últimos tops** (`topsLista`, from `ultimosPodios` in `monedas.js`) are
   the latest `podios` claims — the only club record with a date, since a
   `soloRanks` row has none — still valid by `podioValido`, newest first,

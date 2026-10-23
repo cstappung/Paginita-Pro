@@ -172,24 +172,40 @@ true and the `admins` condition back in those two rules. In the frame,
   skips shots that can't (`SOLO_FUERA`). In battle the two highways leave the
   centre free, so shots stay centred.
 
-## Thumbnails (`MINI`, `miniHaz`, `miniProcesa` in `escena.js`)
+## Thumbnails (`MINI`, `miniHaz`, `FOTOGRAFO` in `escena.js`)
 
 Every box piece has a real picture (the category emoji meant nothing): a
 default rocker wearing that piece, framed on it (`ED_FOCUS` + `MINI_ZOOM`),
-or the guitar alone, or the tattoo drawing. It is rendered into a corner of
-the scene's own canvas **inside the frame, before the scene** (which paints
-over it) and copied to a 2D canvas — no second WebGL context. A few per frame
-(~12 ms, `MINI.cola`), only while the editor is open; cached per piece and
-colours (`invId`) in localStorage under `claveMini(v)` (`catalogo.js`,
-`rock-mini-2:<id>`: bump the number there when the rocker's look changes;
-the lobby reads the same keys). Used by the editor tiles, «Lo que puede
-salir» (the whole `poolDe(now)` of the body), the Vender rows, the last
-prizes, the prize card (`boxCardTex`) and `#boxUI`. Pieces you don't own
-show their factory/default colours (`muestra`).
-**`rock-visor.html`** is a hidden-iframe photographer for the lobby's drops
-strip: the page posts `{canal:'rock-visor-pide', lista}`, it answers
-`{canal:'rock-visor', fotos:[{id,url}]}` via `rock.miniaturas(lista)` (≤ 40,
-also cached under `claveMini`). Its import map carries `?v=hero-N` too.
+or the guitar alone (framed on its *visible* meshes, at 45°), or the tattoo
+drawing, `MINI.px` (192) square.
+
+- **They are shot in a worker, never on the page's thread.** Each one builds
+  a whole `Rocker` (~40 ms of JS) and reading the pixels back stalls on the
+  GPU: done in the editor's frame loop, a tab of 85 pieces froze everything
+  for seconds. Now `rock-trabajador.js` has a **photographer mode** (the page
+  sends `{t:'fotografo'}` instead of a canvas; it makes its own
+  OffscreenCanvas, skips the fonts, and answers each `{t:'foto', id, v}` with
+  `{t:'foto', id, blob}` webp via `rock.foto(v)`). The page side
+  (`miniManda`/`miniLlega`) keeps ≤ 2 in flight, the prize card first, then
+  pieces whose `<img>` is on screen; the worker is terminated after 20 s idle.
+- Without WebGL in a worker (Safari < 17; or the worker errors) it falls back
+  to the old path, `miniProcesa`: rendered in a corner of the scene's canvas
+  before the scene, but **one every 3 frames**.
+- Cached per piece and colours (`invId`) in localStorage under `claveMini(v)`
+  (`catalogo.js`, `rock-mini-3:<id>`: bump the number when the rocker's look
+  changes; `limpiaMinisViejas` deletes the old prefix, since localStorage is
+  ~5 MB for the whole site). The page keeps object URLs in memory and writes
+  the data URL in the background (`FileReader`).
+- Used by the editor tiles, «Lo que puede salir» (the whole `poolDe(now)` of
+  the body), the Vender rows, the last prizes, the prize card (`boxCardTex`)
+  and `#boxUI`. Pieces you don't own show their factory/default colours
+  (`muestra`).
+- **Outside the game** (the Juegos lobby strip and the Mercado) the page
+  uses `colabtex/src/juegos/rock-fotos.js`: the same worker in photographer
+  mode (`?v=hero-N` in its `V`), same keys. Its fallback is
+  **`rock-visor.html`** in a hidden iframe (`{canal:'rock-visor-pide',
+  lista}` → `{canal:'rock-visor', fotos:[{id,url}]}`, `rock.miniaturas`, ≤
+  40); its import map carries `?v=hero-N` too.
 
 ## Traps
 
