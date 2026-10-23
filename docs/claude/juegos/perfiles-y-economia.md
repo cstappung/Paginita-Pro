@@ -105,7 +105,8 @@ the Mascotas viewer (`docs/claude/juegos/mercado.md`).
   a profile page takes the iframe, and closing it gives it back.
 - The editor offers your pets not on sale and your dances (starters plus
   gift dances). Without the full economy it offers nothing and saves the
-  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`.
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas` and
+  the football `plantilla` (`juegos/prodrop/CLAUDE.md`).
 
 `tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
 the cleaning and the pet re-check.

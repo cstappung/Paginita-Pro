@@ -16,7 +16,7 @@ no build: bump `?v=pd-N` on its two scripts/stylesheet and in `prodrop.js`.
 The cards are real people (teachers), served from the public repo like any
 other file of the site. Things that hold it together:
 
-- **Two collections, chosen per pack** (`COLECCIONES`): **Profes** (`profes`,
+- **Three collections, chosen per pack** (`COLECCIONES`; Fútbol below): **Profes** (`profes`,
   17 people x 10 variants = 170, Star Wars being the tenth, epic) and
   **Componentes** (`comp`, 25 components x 11 themes = 275: realista,
   bioware, esquemático common; pixelart, void, bélico rare; halloween,
@@ -62,6 +62,42 @@ other file of the site. Things that hold it together:
   left. A change of list re-sends `datosP` as a new object
   (`alCambiarSerie1`), which repaints every view. The images are still
   public files of the repo: this hides, it does not lock.
+- **Fútbol** (`futbol`, prefix `f`, Serie 03, visible to everyone) is the
+  third collection: the Real Madrid and Barça first teams (`FUTBOLISTAS` in
+  the motor, 53 players x común/rara/épica = 159, photos in
+  `cards/futbol/<club>/<id>.webp`). **It has no legendaries**: `pool()`
+  sets `tope` (the highest tier with cards) and a pack or re-roll that
+  would give a legendary gives an épica instead (`Math.min(t, P.tope)`;
+  pools with legendaries are untouched, so old packs rebuild the same).
+  Same odds, price and free pack as the others. The frame offers re-roll
+  only below `tope` (`rrTiers`), and `probSalida(tier, tope)` folds the
+  jump. The card (`frontHTML`, `.futbol` in `style.css`) is the photo with
+  position (top left), flag (top right, emoji: Windows paints two letters),
+  name and rarity (bottom left), shirt number (bottom right) and a frame in
+  the tier's colour (`.fu-marco`). The country is the national team, typed
+  by hand: the clubs' pages only give birthplace. Players are only ever
+  appended to `FUTBOLISTAS` (the order fixes each card's id).
+  The Fútbol shop shows two links that open `#fuModal`: the odds
+  (`tipFutbol`, computed from the motor's weights) and the changelog
+  (`NOVEDADES_FUTBOL`, newest first: add an entry when the pack changes).
+- **The football squad (plantilla)**: a fixed 4-3-3 (`FORMACION` in the
+  motor: GK, 4 DEF, 3 MID, 3 FWD), any football card in any slot. Stored
+  public in `users/<uid>/perfil/plantilla` = `{0..10: copy key}` (rule
+  regex like `perfil/cartas`; **re-publish the rules**). The frame's
+  overlay `#plantilla` (buttons «⚽ Mi plantilla» in the summary and the
+  shop, only for Fútbol) saves each change through the postman action
+  `plantilla`, which refuses cards that are not yours or not football.
+  Its picker lists forwards, midfielders, defenders, then keepers
+  (`POS_ORDEN`), each tagged, with toggle chips that filter one line; it
+  only helps to find players, any card still goes in any slot.
+  `editaPerfil` carries it over like `cartas`. The profile shows it with
+  the real cards (rarity, wear, slab) through the frame in visor mode
+  `?plantilla=1&pl=o~k.i!at!gr[!id.g.w],…` (`urlPlantilla` in
+  `prodrop-cartas.js`), and `plantillaDe` drops cards the account no
+  longer owns. Score (`puntosCarta`/`puntosPlantilla`): rarity caps it
+  (60/80/100) and the **hidden** grade scales it (×0.55 at 1, ×1 at 10);
+  the squad is the average of the 11, empty = 0. It leaks the hidden
+  grade to anyone who compares totals, accepted for this first version.
 - **Reveal animations are per collection and rarity** (`revela.js`,
   `REVELA.de(card)` gives `{antes, despues}`; its particles carry their own
   `draw` and the `fxStep` loop paints them). Profes: chalk on a

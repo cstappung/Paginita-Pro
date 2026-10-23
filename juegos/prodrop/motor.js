@@ -124,13 +124,53 @@
     { key: "navidad", tier: 3, label: "Navidad", color: "#4dffb0", peso: 1 }
   ];
 
+  /* ---------- la colección de fútbol ----------
+     El primer equipo del Real Madrid y del Barça: [carpeta, archivo,
+     nombre, posición, dorsal, país], con la foto en
+     cards/futbol/<carpeta>/<archivo>.webp. Cada jugador sale en común, rara
+     y épica (no hay legendarias). El país es la selección por la que juega:
+     las webs de los clubes solo dan el lugar de nacimiento. Como en las
+     otras colecciones, **solo se agrega al final**: el orden fija el id de
+     cada carta, y los sobres ya abiertos se rehacen con él. */
+  const FUTBOLISTAS = [
+    ["realmadrid", "courtois", "Courtois", "POR", 1, "BE"], ["realmadrid", "lunin", "Lunin", "POR", 13, "UA"],
+    ["realmadrid", "asencio", "Asencio", "DEF", 2, "ES"], ["realmadrid", "militao", "E. Militão", "DEF", 3, "BR"],
+    ["realmadrid", "huijsen", "Huijsen", "DEF", 4, "ES"], ["realmadrid", "trent", "Trent", "DEF", 12, "ENG"],
+    ["realmadrid", "konate", "Konaté", "DEF", 16, "FR"], ["realmadrid", "cucurella", "Cucurella", "DEF", 17, "ES"],
+    ["realmadrid", "carreras", "Á. Carreras", "DEF", 18, "ES"], ["realmadrid", "rudiger", "Rüdiger", "DEF", 22, "DE"],
+    ["realmadrid", "mendy", "F. Mendy", "DEF", 23, "FR"], ["realmadrid", "dumfries", "Dumfries", "DEF", 24, "NL"],
+    ["realmadrid", "bellingham", "Bellingham", "MED", 5, "ENG"], ["realmadrid", "camavinga", "Camavinga", "MED", 6, "FR"],
+    ["realmadrid", "valverde", "Fede Valverde", "MED", 8, "UY"], ["realmadrid", "tchouameni", "Tchouameni", "MED", 14, "FR"],
+    ["realmadrid", "arda-guler", "Arda Güler", "MED", 15, "TR"], ["realmadrid", "bernardo", "Bernardo", "MED", 20, "PT"],
+    ["realmadrid", "thiago", "Thiago", "MED", 27, "ES"], ["realmadrid", "vini-jr", "Vini Jr.", "DEL", 7, "BR"],
+    ["realmadrid", "endrick", "Endrick", "DEL", 9, "BR"], ["realmadrid", "mbappe", "Mbappé", "DEL", 10, "FR"],
+    ["realmadrid", "rodrygo", "Rodrygo", "DEL", 11, "BR"], ["realmadrid", "espi", "C. Espí", "DEL", 19, "ES"],
+    ["realmadrid", "brahim", "Brahim", "DEL", 21, "MA"], ["realmadrid", "yan-diomande", "Yan Diomande", "DEL", 25, "CI"],
+    ["barcelona", "joan-garcia", "Joan García", "POR", 1, "ES"], ["barcelona", "szczesny", "Szczęsny", "POR", 13, "PL"],
+    ["barcelona", "livakovic", "Livaković", "POR", 25, "HR"], ["barcelona", "cancelo", "João Cancelo", "DEF", 2, "PT"],
+    ["barcelona", "balde", "Balde", "DEF", 3, "ES"], ["barcelona", "cubarsi", "Cubarsí", "DEF", 5, "ES"],
+    ["barcelona", "xavi-espart", "Xavi Espart", "DEF", 12, "ES"], ["barcelona", "christensen", "Christensen", "DEF", 15, "DK"],
+    ["barcelona", "gerard-martin", "Gerard Martín", "DEF", 18, "ES"], ["barcelona", "kounde", "Koundé", "DEF", 23, "FR"],
+    ["barcelona", "eric-garcia", "Eric García", "DEF", 24, "ES"], ["barcelona", "brian-farinas", "Brian Fariñas", "MED", 4, "ES"],
+    ["barcelona", "gavi", "Gavi", "MED", 6, "ES"], ["barcelona", "fermin", "Fermín", "MED", 7, "ES"],
+    ["barcelona", "pedri", "Pedri", "MED", 8, "ES"], ["barcelona", "rodri", "Rodri", "MED", 16, "ES"],
+    ["barcelona", "dani-olmo", "Dani Olmo", "MED", 20, "ES"], ["barcelona", "de-jong", "De Jong", "MED", 21, "NL"],
+    ["barcelona", "marc-bernal", "Marc Bernal", "MED", 22, "ES"], ["barcelona", "gabriel-jesus", "Gabriel Jesus", "DEL", 9, "BR"],
+    ["barcelona", "lamine-yamal", "Lamine Yamal", "DEL", 10, "ES"], ["barcelona", "raphinha", "Raphinha", "DEL", 11, "BR"],
+    ["barcelona", "adeyemi", "Adeyemi", "DEL", 14, "DE"], ["barcelona", "gordon", "Gordon", "DEL", 17, "ENG"],
+    ["barcelona", "bardghji", "Bardghji", "DEL", 19, "SE"], ["barcelona", "bisiwu", "Bisiwu", "DEL", 27, "BE"],
+    ["barcelona", "hamza", "Hamza", "DEL", 29, "EG"]
+  ];
+  const CLUBES = { realmadrid: "Real Madrid", barcelona: "FC Barcelona" };
+
   /* Las colecciones. El sobre dice de cuál es con la primera letra de su
      clave (`prefijo` + la clave de push): la regla ya acepta esas claves
      y quien compra no elige el contenido igual, porque sigue saliendo de
      la hora del servidor. */
   const COLECCIONES = [
     { key: "profes", prefijo: "p", label: "Profes", nombre: "DIE Collection", serie: "S01" },
-    { key: "comp", prefijo: "c", label: "Componentes", nombre: "Componentes", serie: "S02" }
+    { key: "comp", prefijo: "c", label: "Componentes", nombre: "Componentes", serie: "S02" },
+    { key: "futbol", prefijo: "f", label: "Fútbol", nombre: "Fútbol", serie: "S03" }
   ];
   const COL = Object.fromEntries(COLECCIONES.map(c => [c.key, c]));
 
@@ -153,20 +193,32 @@
       sub: te.label, acc: te.tier >= 2 ? te.color : TIERS[te.tier].color, tema: te.color
     });
   }));
+  const BASE_FUT = CARDS.length;
+  [0, 1, 2].forEach(tier => FUTBOLISTAS.forEach(([club, id, name, pos, dorsal, pais]) => {
+    const n = CARDS.length, t = TIERS[tier];
+    CARDS.push({
+      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
+      col: "futbol", peso: 1, tier, club, pos, dorsal, pais, img: "cards/futbol/" + club + "/" + id + ".webp",
+      sub: CLUBES[club], acc: t.color
+    });
+  }));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
   const pool = lista => {
     const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
     t.uniforme = lista.every(c => c.peso === 1);
     t.peso = t.map(l => l.reduce((s, c) => s + c.peso, 0));
+    // la rareza más alta que tiene: fútbol no tiene legendarias, y lo que
+    // sería legendaria (en un sobre o un re-roll) sale épica
+    t.tope = t.reduce((m, l, i) => (l.length ? i : m), 0);
     return t;
   };
-  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp) };
+  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp), futbol: pool(POR_COL.futbol) };
   const POR_TIER = POOL.profes;
   /* De qué colección es un sobre o un re-roll, por su clave. Las claves
      de push empiezan con «-», así que lo de antes nunca lleva prefijo. */
-  const coleccionDe = clave => (String(clave)[0] === "c" ? "comp" : "profes");
-  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "p" ? POOL.profes : POOL.legado; };
+  const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "f" ? "futbol" : "profes"; };
+  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "f" ? POOL.futbol : p === "p" ? POOL.profes : POOL.legado; };
   const subtitulo = c => c.sub;
   const acento = c => c.acc;
 
@@ -271,6 +323,7 @@
       if (dios) t = leyenda ? 2 : 2 + pesado(r, [TIERS[2].w, TIERS[3].w]);
       else t = i === 4 ? 1 + pesado(r, TIERS.slice(1).map(x => x.w)) : pesado(r, TIERS.map(x => x.w));
       if (t === 3) leyenda = true;
+      t = Math.min(t, P.tope);
       const libres = P[t].filter(c => !usadas.has(c.n));
       const c = elige(r, libres, P.uniforme);
       usadas.add(c.n);
@@ -305,7 +358,9 @@
     let porSobre = 0;
     for (let t = c.tier; t < TIERS.length; t++) porSobre += ESPERADO[t];
     porSobre *= pg;
-    const P = POOL[c.col], exacta = ESPERADO[c.tier] * c.peso / P.peso[c.tier] * pg;
+    // en una colección sin legendarias, las épicas se quedan también con lo que sería legendaria
+    const P = POOL[c.col], esp = ESPERADO.slice(c.tier, c.tier === P.tope ? TIERS.length : c.tier + 1).reduce((a, b) => a + b, 0);
+    const exacta = esp * c.peso / P.peso[c.tier] * pg;
     return { porCarta: porSobre / 5, porSobre, exacta, nota: pg };
   }
   const pDios = DIOS / 10000;
@@ -364,9 +419,9 @@
     return 1 + pesado(generador(sha256("prodrop-salto:" + k).slice(0, 4)), SALTO_W[tier]);
   }
   /* La probabilidad de cada rareza de salida para una rareza de entrada. */
-  function probSalida(tier) {
+  function probSalida(tier, tope = 3) {
     const p = [0, 0, 0, 0], w = SALTO_W[tier], t = w.reduce((a, b) => a + b, 0);
-    w.forEach((x, i) => { p[Math.min(3, tier + 1 + i)] += x / t; });
+    w.forEach((x, i) => { p[Math.min(tope, tier + 1 + i)] += x / t; });
     return p;
   }
   const memoR = new Map();
@@ -374,12 +429,30 @@
     const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
-    const P = poolDe(clave), posibles = P[Math.min(3, tier + saltoReroll(k, at, tier))];
+    const P = poolDe(clave), posibles = P[Math.min(P.tope, tier + saltoReroll(k, at, tier))];
     const c = elige(r, posibles, P.uniforme);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
     return res;
   }
+
+  /* ---------- la plantilla de fútbol ----------
+     Un once en 4-3-3, fijo: once casillas en este orden (portero, cuatro
+     defensas, tres medios, tres delanteros). Cualquier carta de fútbol va
+     en cualquier casilla. Cada carta vale de 0 a 100: la rareza pone el
+     techo (común 60, rara 80, épica 100) y el estado lo escala (nota 10,
+     entero; nota 1, el 55 %). La plantilla es el promedio de las once, y
+     una casilla vacía vale 0. */
+  const FORMACION = [
+    { pos: "POR", fila: 0 },
+    { pos: "LI", fila: 1 }, { pos: "DFC", fila: 1 }, { pos: "DFC", fila: 1 }, { pos: "LD", fila: 1 },
+    { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 }, { pos: "MC", fila: 2 },
+    { pos: "EI", fila: 3 }, { pos: "DC", fila: 3 }, { pos: "ED", fila: 3 }
+  ];
+  const PUNTOS_RAREZA = [60, 80, 100, 100];
+  const puntosCarta = (tier, g) => Math.round(PUNTOS_RAREZA[tier] * (0.5 + 0.05 * g));
+  // `lista`: once {tier, g} o null
+  const puntosPlantilla = lista => Math.round(FORMACION.reduce((s, _, i) => s + (lista[i] ? puntosCarta(lista[i].tier, lista[i].g) : 0), 0) / FORMACION.length);
 
   /* ---------- lo de una cuenta ----------
      `s` = {clave: {at, p}} (los sobres), `g` = {clave: {i: {at, p}}} (lo
@@ -402,7 +475,7 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, COLECCIONES, COL, POR_COL, POOL,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL,
     coleccionDe, poolDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida

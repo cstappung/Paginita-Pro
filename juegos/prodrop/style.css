@@ -1177,7 +1177,7 @@ body[data-phase="reveal"] .pack-extras, body[data-phase="summary"] .pack-extras 
 .chooser { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 760px; }
 .chooser h2 { margin: 0; font-weight: 900; font-size: clamp(26px, 6vw, 34px); letter-spacing: -.02em; }
 .ch-sub { margin: 0 0 6px; color: var(--muted); font-size: 14px; text-align: center; max-width: 440px; }
-.ch-packs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 4vw, 34px); width: 100%; max-width: 640px; }
+.ch-packs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: clamp(12px, 4vw, 34px); width: 100%; max-width: 900px; }
 .ch-pack {
   --mx: 50%; --my: 50%;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -1292,3 +1292,114 @@ html.visor body > :not(#visor):not(svg) { display: none !important; }
 .visor .card { width: min(74vw, calc(74vh / 1.4)); animation: zoomIn .5s var(--ease-out); }
 /* La Serie 01 (profes) solo para quien la ve: app.js pone body.serie1. */
 body:not(.serie1) .solo-serie1 { display: none; }
+
+/* fútbol (prueba): la foto a carta completa y abajo nombre y rareza. Las
+   del Madrid son recortadas (fondo claro detrás); las del Barça traen su
+   fondo y van a sangre. Holo, brillo y barrido son los de las otras cartas. */
+.full.futbol { background: radial-gradient(circle at 50% 35%, #ffffff 0, #dfe6f2 55%, #9fb0c9 100%); }
+.full.futbol > img, .full.futbol .holo img { object-fit: contain; object-position: 50% 0; }
+.full.futbol.club-barcelona > img, .full.futbol.club-barcelona .holo img { object-fit: cover; object-position: 50% 20%; }
+.futbol .fa-name { background: linear-gradient(180deg, #0000, #0b1a3acc 60%); }
+/* arriba: posición a la izquierda, bandera a la derecha */
+.fu-top { position: absolute; top: 4cqw; left: 4.5cqw; right: 4.5cqw; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+.fu-pos {
+  font: 800 3.6cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; background: #0b1a3ad0; padding: 1.3cqw 2.4cqw; border-radius: 99px; box-shadow: inset 0 0 0 .35cqw var(--accent);
+}
+.fu-flag { font-size: 11cqw; line-height: 1; filter: drop-shadow(0 .5cqw 1cqw #0008); }
+/* abajo: nombre y rareza a la izquierda, dorsal a la derecha */
+.fu-pie { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 3cqw; z-index: 2; }
+.fu-pie > div { display: flex; flex-direction: column; gap: 1cqw; min-width: 0; }
+.fu-pie .fu-rar { font-size: 5.6cqw; letter-spacing: .1em; }
+.futbol.common .fu-rar { color: #fff; }
+.fu-pie .fu-dorsal {
+  font: 900 15cqw/.8 Rubik, sans-serif; color: #fff; letter-spacing: -.04em;
+  -webkit-text-stroke: .5cqw var(--accent); text-shadow: 0 .8cqw 2cqw #000a; flex: none;
+}
+/* el marco dice la rareza: fino y blanco en la base, grueso y del color de la rareza en las demás */
+.fu-marco {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  padding: var(--marco, .9cqw); background: var(--marco-bg, #ffffffd0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.futbol.rare { --marco: 2.2cqw; --marco-bg: linear-gradient(135deg, #e9f8ff, #5cc8ff 30%, #1b6fb8 55%, #bfe9ff 75%, #3a9be0); }
+.futbol.epic { --marco: 2.4cqw; --marco-bg: linear-gradient(135deg, #f3dcff, #c26bff 35%, #5b1d9a 60%, #e0b3ff); }
+.futbol.legend { --marco: 2.6cqw; --marco-bg: linear-gradient(135deg, #fff6c8, #ffcc3d 30%, #a86a00 55%, #ffe58a 75%, #d99a10); }
+/* la rara se nota: fondo azul hielo en las fotos recortadas y un barrido más fuerte */
+.full.futbol.rare { background: radial-gradient(circle at 50% 30%, #ffffff 0, #bfe6ff 45%, #3d8fd6 100%); }
+.futbol.rare .sweep::before { mix-blend-mode: screen; opacity: .55; width: 45%; animation-duration: 3s; }
+/* el envoltorio de fútbol: una cancha */
+.skin-futbol {
+  background:
+    radial-gradient(circle at 50% 56%, #ffffff2e 0, transparent 42%),
+    repeating-linear-gradient(0deg, #0000 0 12cqw, #ffffff12 12cqw 24cqw),
+    linear-gradient(165deg, #062a12 0%, #0e5a26 40%, #1a8a3a 75%, #e9edf5 100%);
+}
+.skin-futbol .skin-badge { background: #fff; color: #0e5a26; }
+.skin-futbol .skin-fan img { object-fit: cover; object-position: 50% 10%; background: radial-gradient(circle at 50% 30%, #fff 0, #e4eaf4 70%, #c3cfe0 100%); }
+/* las de los lados, más abiertas: que se les vea la cara */
+.skin-futbol .skin-fan img:nth-child(1) { transform: translate(-40%, 8%) rotate(-20deg); }
+.skin-futbol .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
+/* probabilidades y novedades del sobre de fútbol: dos enlaces y un modal que se desplaza */
+.fu-info { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.fu-info[hidden] { display: none; }
+.fu-info .link { font-weight: 700; color: #cfe3ff; }
+.fu-modal { max-width: 560px; height: auto; max-height: 100%; margin: auto; overflow-y: auto; overscroll-behavior: contain; padding: 18px; border-radius: 18px; background: #140c2bf2; border: 1px solid #ffffff1f; }
+.fu-tip { font-size: 14px; color: var(--muted); text-align: left; }
+.fu-tip p { margin: 0 0 8px; line-height: 1.45; }
+.fu-tip b { color: #fff; }
+.fu-tip h3 { margin: 4px 0 6px; font-size: 15px; color: #ffcc3d; }
+.fu-tip ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 8px; line-height: 1.45; }
+.fu-tip .fu-pronto { margin: 0; color: #9ff0b8; font-weight: 700; }
+
+/* ---------- la plantilla de fútbol (4-3-3) ---------- */
+.pl-panel { overflow-y: auto; overscroll-behavior: contain; }
+.pl-panel .mk-head { gap: 14px; }
+.pl-puntos { margin-left: auto; font: 900 30px/1 Rubik, sans-serif; color: #6dffb0; white-space: nowrap; }
+.pl-puntos small { font-size: 14px; opacity: .7; }
+.pl-cancha {
+  position: relative; display: grid; grid-template-rows: repeat(4, 1fr); gap: 2%; padding: 4% 3%;
+  width: 100%; max-width: 620px; aspect-ratio: 4 / 5; margin: 0 auto; border-radius: 18px; overflow: hidden;
+  background: repeating-linear-gradient(180deg, #1a8a3a 0 12.5%, #157a32 12.5% 25%);
+  box-shadow: inset 0 0 0 3px #ffffff40, 0 12px 30px #0008;
+}
+/* las líneas: borde, mitad de cancha con su círculo y las dos áreas */
+.pl-lineas { position: absolute; inset: 3%; border: 2px solid #ffffff55; border-radius: 6px; pointer-events: none; }
+.pl-lineas::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px solid #ffffff55; }
+.pl-lineas::after { content: ''; position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; border: 2px solid #ffffff55; border-radius: 50%; transform: translate(-50%, -50%); }
+.pl-fila { position: relative; display: flex; justify-content: space-evenly; align-items: center; }
+.pl-casilla {
+  position: relative; width: 17%; aspect-ratio: 5 / 7; padding: 0; border: 0; background: none; color: inherit;
+  display: grid; place-items: center;
+}
+.pl-casilla .card { position: absolute; inset: 0; width: 100%; }
+button.pl-casilla { cursor: pointer; transition: transform .15s; }
+button.pl-casilla:hover { transform: translateY(-3px); }
+.pl-vacia {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px;
+  border: 2px dashed #ffffffaa; background: #0003; font: 900 28px/1 Rubik, sans-serif; color: #ffffffcc;
+}
+.pl-casilla.activa .pl-vacia, .pl-casilla.activa .card { outline: 3px solid #ffcc3d; outline-offset: 3px; border-radius: 10px; }
+.pl-pos {
+  position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); z-index: 5;
+  font: 800 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .1em; color: #0b1a3a; background: #fff; padding: 2px 6px; border-radius: 99px;
+}
+.pl-elige { display: grid; gap: 10px; max-width: 620px; margin: 14px auto 0; width: 100%; }
+.pl-elige[hidden] { display: none; }
+.pl-elige-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pl-elige-head b { margin-right: auto; }
+.pl-filtros { display: inline-flex; gap: 4px; }
+.pl-filtro {
+  border: 1px solid #ffffff33; background: #ffffff10; color: var(--muted); border-radius: 99px;
+  padding: 4px 10px; font: 800 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; cursor: pointer;
+}
+.pl-filtro[aria-pressed="true"] { background: #6dffb0; border-color: #6dffb0; color: #062a17; }
+.pl-tag {
+  position: absolute; top: 3px; right: 3px; z-index: 2; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal;
+  letter-spacing: .06em; color: #fff; background: #0b1a3ad9; padding: 2px 4px; border-radius: 4px;
+}
+@media (max-width: 520px) { .pl-pos { font-size: 8px; bottom: -7px; } .pl-vacia { font-size: 20px; } }
+/* en el perfil de Juegos: solo la cancha, a todo el iframe */
+body.visor-plantilla .visor { padding: 0; }
+body.visor-plantilla .pl-cancha { max-width: none; width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; }

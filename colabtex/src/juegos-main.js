@@ -680,6 +680,9 @@ async function editaPerfil(pestana) {
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
+      // lo mismo la plantilla de fútbol, que se arma en PRODROP
+      const plantilla = (perfiles.get(b.uid) || {}).plantilla;
+      if (plantilla) p = Object.assign({}, p, { plantilla });
       /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
          devuelve la que había. Nunca se pierde por guardar otra cosa. */
       const mascota = (perfiles.get(b.uid) || {}).mascota;

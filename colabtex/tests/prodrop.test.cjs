@@ -8,14 +8,17 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM,__MM:require('../../juegos/mascotas/motor.js')};vm.createContext(ctx);
 vm.runInContext('const PM=__PM,MM=__MM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras,fijaSerie1,veSerie1,copiaVisible,totalVisible}',ctx);
+ ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras,fijaSerie1,veSerie1,copiaVisible,totalVisible,plantillaDe,puntosDe}',ctx);
 const M=ctx.__M;
 // quien mira ve la Serie 01 (los profes), salvo en la prueba que dice lo contrario
 const VE_TODO={mira:{at:1,por:'adm'}};
 M.fijaSerie1(VE_TODO,'mira');
 
-test('el catálogo: profes (17 personas por 10 variantes) y componentes (25 por 11 temáticas), con su imagen',()=>{
- assert.equal(PM.TOTAL,170+275);
+test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (53 jugadores en 3 rarezas), con su imagen',()=>{
+ assert.equal(PM.TOTAL,170+275+159);
+ assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[53,53,53,0]);assert.equal(PM.POOL.futbol.tope,2);
+ // las de antes conservan su id: fútbol va después de todo
+ assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i));
  assert.deepEqual(PM.POR_TIER.map(l=>l.length),[51,34,68,17]);
  assert.deepEqual(PM.POOL.legado.map(l=>l.length),[51,34,51,17],'los sobres de antes salen de las 153 de antes');
  assert.deepEqual(PM.POOL.comp.map(l=>l.length),[75,75,75,50]);
@@ -378,8 +381,8 @@ test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde n
  assert.ok(M.mejoresDrops(d).every(c=>c.carta.col==='comp'));
  assert.ok(M.mejoresDrops(d).length>=1);
  const col=M.rankingColeccion(d);
- assert.equal(col[0].total,PM.POR_COL.comp.length);assert.equal(col[0].copias,5,'solo cuentan las de componentes');
- assert.equal(M.totalVisible(),PM.POR_COL.comp.length);
+ assert.equal(col[0].total,PM.POR_COL.comp.length+PM.POR_COL.futbol.length);assert.equal(col[0].copias,5,'solo cuentan las de componentes');
+ assert.equal(M.totalVisible(),PM.POR_COL.comp.length+PM.POR_COL.futbol.length);
  assert.equal(M.cifras(d).sobres,1,'el sobre de los profes no se cuenta');
  // la economía no lee la lista: las cartas, el saldo y el gasto siguen iguales
  assert.equal(M.monedasDe(u,d).saldo,saldo);assert.equal(M.copiasDe(u,d).length,copias);assert.equal(copias,10);
@@ -391,4 +394,43 @@ test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde n
  M.fijaSerie1(VE_TODO,'mira');
  assert.equal(M.exhibidasDe(u,perfil,d).length,2);
  assert.equal(M.rankingColeccion(d)[0].copias,10);
+});
+
+test('fútbol: sin legendarias, sus sobres y re-rolls se quedan en épica como mucho',()=>{
+ assert.equal(PM.coleccionDe('f-Nabcdefgh'),'futbol');
+ const N=20000,t=[0,0,0,0];
+ for(let i=0;i<N;i++){
+  const so=PM.sobre('u'+(i%7),'f-Nk'+i+'abcdefg',1792000000000+i*7);
+  assert.ok(so.cartas.every(x=>PM.CARDS[x.id].col==='futbol'),'un sobre de fútbol solo trae fútbol');
+  assert.equal(new Set(so.cartas.map(x=>x.id)).size,5);
+  for(const x of so.cartas)t[PM.CARDS[x.id].tier]++;
+ }
+ assert.equal(t[3],0);
+ // lo que en los otros sobres sería legendaria aquí es épica: el resto, igual que siempre
+ const esp=PM.ESPERADO;
+ assert.ok(Math.abs(t[0]/N-esp[0])<.03&&Math.abs(t[1]/N-esp[1])<.03&&Math.abs(t[2]/N-(esp[2]+esp[3]))<.01);
+ for(let i=0;i<300;i++){
+  const r=PM.reroll('usrAAAA','f-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,1,Array(10).fill(6));
+  assert.equal(PM.CARDS[r.id].col,'futbol');assert.equal(PM.CARDS[r.id].tier,2);
+ }
+ assert.deepEqual(PM.probSalida(0,2),[0,.92,.08,0]);
+ const pe=PM.POR_COL.futbol.reduce((s,c)=>s+PM.probabilidad(c.n,1).exacta,0);
+ assert.ok(Math.abs(pe-5)<1e-9,'las 159 suman las cinco cartas del sobre');
+});
+
+test('plantilla de fútbol: 4-3-3, puntos por rareza y estado, y solo cartas de fútbol propias',()=>{
+ assert.equal(PM.FORMACION.length,11);
+ assert.deepEqual([0,1,2,3].map(f=>PM.FORMACION.filter(x=>x.fila===f).length),[1,4,3,3]);
+ assert.equal(PM.puntosCarta(2,10),100);assert.equal(PM.puntosCarta(0,1),33);
+ assert.equal(PM.puntosPlantilla(Array(11).fill({tier:2,g:10})),100);
+ assert.equal(PM.puntosPlantilla(Array(11).fill({tier:0,g:1})),33);
+ assert.equal(PM.puntosPlantilla(Array(11).fill(null)),0);
+ const u='usrPLANT01',kf='f-Nplant00001',kc='c-Nplant00001';
+ const d={completo:true,ranks:{},solo:{},logros:{},diario:{},mercado:{},cartas:{s:{[u]:{[kf]:{at:1792000000000,p:0},[kc]:{at:1792000000001,p:80}}}},clubJugadas:{}};
+ const perfil={plantilla:{0:u+'~'+kf+'.0',5:u+'~'+kc+'.0',9:'otro00001~'+kf+'.1'}};
+ const l=M.plantillaDe(u,perfil,d);
+ assert.equal(l.length,11);
+ assert.ok(l[0]&&l[0].carta.col==='futbol','la de fútbol propia se ve');
+ assert.equal(l[5],null,'una de componentes no entra');assert.equal(l[9],null,'una ajena no entra');
+ assert.equal(M.puntosDe(l),Math.round(PM.puntosCarta(l[0].carta.tier,l[0].g)/11));
 });
