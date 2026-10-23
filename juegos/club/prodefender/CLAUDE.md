@@ -248,3 +248,12 @@ versión» (cache, not cheating: no castigo).
 - Volume: `volumen.js` draws into the `[data-volumen]` slots (menu and HUD;
   hidden in the HUD under 600 px), and the game keeps its own 🔊 (M) and the
   music/effects sliders in the pause menu.
+- **Sound effects have a concurrency cap** (`A.play` in `audio.js`: `ATK_MAX`
+  tower attacks, `VOCES_MAX`/`VOCES_DURO` in total, counted on `ctx.currentTime`)
+  and a limiter after the compressor; the context uses `latencyHint:
+  'playback'`. Without them a big map crackled and then went silent (the
+  audio thread could not keep up). `audio.js`, `main.js` and the CSS carry
+  `?v=pd-7a`: they are not in the proof, so they move without `VERSION`.
+- **Cursor**: on the map it is a big yellow crosshair with a black outline
+  (`#cv.cur-grande`, an inline SVG); the pause menu's «Cursor» select switches
+  back to the system crosshair (`save.settings.cursor = 'clasico'`).

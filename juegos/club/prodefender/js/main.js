@@ -49,7 +49,7 @@
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
   // ------------------------------ Guardado -------------------------------
-  function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45 } }; }
+  function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45, cursor: 'grande' } }; }
   function loadSave() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -379,6 +379,8 @@
 
   // =============================== JUEGO =================================
   const cv = $('#cv'), ctx = cv.getContext('2d');
+  const ponCursor = () => cv.classList.toggle('cur-grande', save.settings.cursor !== 'clasico');
+  ponCursor();
   function resize() {
     if (screen !== 'game') return;
     const st = $('#stage').getBoundingClientRect();
@@ -780,7 +782,8 @@
     modal(`<h2>Pausa</h2><p>${game.L.name} · Ronda ${Math.min(100, game.round + 1)}/100<br>Eliminados: ${fmt(game.stats.kills)} · Fugas: ${fmt(game.stats.leaked)}</p>
       ${game.active ? '<p style="font-size:13px;color:var(--muted)">Si sales ahora, la partida se reanudará al inicio de esta ronda.</p>' : ''}
       <div class="vol"><label>Música <input type="range" id="v-mus" min="0" max="1" step="0.05" value="${save.settings.music}"></label>
-      <label>Efectos <input type="range" id="v-sfx" min="0" max="1" step="0.05" value="${save.settings.sfx}"></label></div>`, [
+      <label>Efectos <input type="range" id="v-sfx" min="0" max="1" step="0.05" value="${save.settings.sfx}"></label>
+      <label>Cursor <select id="v-cur"><option value="grande">Grande (mira amarilla)</option><option value="clasico">Clásico</option></select></label></div>`, [
       { label: 'Reanudar', cls: 'go', fn: () => { ui.paused = false; } },
       { label: 'Reiniciar reino', fn: () => modal('<h2>¿Reiniciar?</h2><p>Perderás el progreso de esta partida.</p>', [
         { label: 'Reiniciar', cls: 'danger', fn: () => { delete save.runs[game.li]; writeSave(); startGame(game.li, null); } },
@@ -791,6 +794,9 @@
     const onVol = () => { save.settings.music = +vm.value; save.settings.sfx = +vs.value; AU.setVolumes(+vs.value, +vm.value); writeSave(); };
     vm.addEventListener('input', onVol); vs.addEventListener('input', onVol);
     vs.addEventListener('change', () => sfx('coin'));
+    const vc = $('#v-cur');
+    vc.value = save.settings.cursor === 'clasico' ? 'clasico' : 'grande';
+    vc.addEventListener('change', () => { save.settings.cursor = vc.value; writeSave(); ponCursor(); });
   }
   function exitGame() {
     if (game && !game.over && !game.won) guardaPartida();

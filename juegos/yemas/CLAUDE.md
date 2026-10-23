@@ -493,4 +493,7 @@ that runs the real `reducir`.
   frame. Zombies have Call of Duty–style voices per kind (`grunido`,
   `ataque` when they wind up a bite, `muereZombi`), the hell chickens
   their own. Footsteps follow the bob; landings are louder the harder
-  the fall.
+  the fall. Past a cap of pieces sounding at once (`carga`,
+  `TOPE`/`TOPE_LEJOS`; distant sounds drop first) `bus` returns a mute
+  bus, and the chain ends in a limiter: a big horde used to make the
+  audio crackle and go silent.
