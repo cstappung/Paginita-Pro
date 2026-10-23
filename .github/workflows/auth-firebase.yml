@@ -19,16 +19,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Bajar el ayudante de mi-pagina-pro.firebaseapp.com
         run: |
-          set -euo pipefail
+          set -uo pipefail
           base=https://mi-pagina-pro.firebaseapp.com
           mkdir -p __/auth __/firebase
-          curl -fsSL "$base/__/auth/handler"        -o __/auth/handler.html
-          curl -fsSL "$base/__/auth/handler.js"     -o __/auth/handler.js
-          curl -fsSL "$base/__/auth/experiments.js" -o __/auth/experiments.js
-          curl -fsSL "$base/__/auth/iframe"         -o __/auth/iframe.html
-          curl -fsSL "$base/__/auth/iframe.js"      -o __/auth/iframe.js
-          curl -fsSL "$base/__/firebase/init.json"  -o __/firebase/init.json
+          # baja <ruta> <destino> <obligatorio 1/0>: los opcionales pueden no existir (init.json
+          # solo está si el proyecto publicó Hosting; experiments.js según la versión).
+          falta=0
+          baja() {
+            code=$(curl -sSL -w '%{http_code}' -o "$2.tmp" "$base/$1")
+            echo "$1 → $code"
+            if [ "$code" = "200" ]; then mv "$2.tmp" "$2"; else rm -f "$2.tmp"; [ "$3" = "1" ] && falta=1; fi
+          }
+          baja __/auth/handler        __/auth/handler.html    1
+          baja __/auth/handler.js     __/auth/handler.js      1
+          baja __/auth/iframe         __/auth/iframe.html     1
+          baja __/auth/iframe.js      __/auth/iframe.js       1
+          baja __/auth/experiments.js __/auth/experiments.js  0
+          baja __/firebase/init.json  __/firebase/init.json   0
           ls -la __/auth __/firebase
+          exit $falta
       - name: Commit si cambió
         run: |
           git add __
