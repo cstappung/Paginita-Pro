@@ -2639,7 +2639,7 @@ function armazon() {
   const nombre = u ? String(u.name || "").split(" ")[0] : "";
   const nomInv = inv ? nombreInvitado() : "";
   h.innerHTML = `
-    <div class="jg-sal" id="vesSalon" data-modo="${modoVes}">
+    <div class="jg-sal${inv ? " jg-sal-inv" : ""}" id="vesSalon" data-modo="${modoVes}">
       ${novedadesHtml()}
       <header class="jg-sal-intro">
         <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>

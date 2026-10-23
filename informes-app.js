@@ -97,24 +97,6 @@ ${W(n.pasos)}</div>`:""}
 `))}</div>`:""}`;let a=o.querySelector(".ok");a&&(a.onclick=async()=>{try{await vf(n.id,s?"abierto":"hecho")}catch(l){alert("No se pudo: "+(l.message||l))}});let c=o.querySelector(".del");c&&(c.onclick=async()=>{if(confirm(`\xBFBorrar \xAB${n.titulo}\xBB?`))try{await Tf(n.id)}catch(l){alert("No se pudo: "+(l.message||l))}}),t.appendChild(o)}}function xf(t){let e={errores:w.errores,feedback:w.feedback,generado:Date.now()};t==="json"?di(Af(e),ui("json"),"application/json;charset=utf-8"):di(Xr(e),ui("md"))}function dv(){x("btnLogin").onclick=()=>hf().catch(t=>{x("loginError").textContent="No se pudo iniciar sesi\xF3n: "+(t.code||t.message)}),x("btnLogout").onclick=()=>ff(),x("tabErr").onclick=()=>{w.tab="err",lt()},x("tabFb").onclick=()=>{w.tab="fb",lt()},x("filtroApp").onchange=t=>{w.app=t.target.value,lt()},x("buscar").oninput=t=>{w.busca=t.target.value,lt()},x("btnMd").onclick=()=>xf("md"),x("btnJson").onclick=()=>xf("json")}(function(){dv(),Pf({app:"colabtex",ver:ov,urlInformes:"informes.html",getUser:()=>w.user,enviar:(e,n)=>Ef(e,{uid:n.uid,userName:n.name})}),df(e=>{if(!e){w.user=null,w.admin=!1,Lf(),Df(!1),Of();return}w.user={uid:e.uid,name:e.displayName||"Usuario",photo:e.photoURL||"",color:Sf(e.uid)},Of(),Df(!0),av(),lt(),yf(e.uid).then(n=>{w.admin=n,lt()})})})()});hv();})();
 /*! Bundled license information:
 
-@firebase/util/dist/postinstall.mjs:
-  (**
-   * @license
-   * Copyright 2025 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
 @firebase/util/dist/index.esm.js:
   (**
    * @license
