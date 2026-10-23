@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610231808"></script>
+<script src="i18n.js?v=202610231818"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5215,7 +5215,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 @media(max-width:420px){.jg-sal-tit{flex-wrap:wrap}.jg-sal-rapida{flex:1 1 100%;max-width:none}}
 .jg-sal-ver{flex-shrink:0;border:0;background:none;font:700 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;padding:10px 4px}
 .jg-desliza{display:none}
-.jg-sal[data-modo=solo] .jg-sal-ver{display:none}
+.jg-sal[data-modo=solo] .jg-sal-ver,.jg-sal.jg-sal-inv .jg-sal-ver{display:none}
 .jg-sal-multi .jg-filtros{display:inline-flex;margin:0 0 14px}
 .jg-filtros button{min-height:36px}
 
@@ -5223,7 +5223,10 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-carrusel{display:grid;grid-auto-flow:column;grid-auto-columns:44%;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 14px;scroll-padding:0 16px;scrollbar-width:none}
 .jg-carrusel::-webkit-scrollbar{display:none}
 .jg-carrusel>.jg-mn{scroll-snap-align:start}
-.jg-sal[data-modo=solo] .jg-carrusel,.jg-rejilla{display:grid;grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-columns:auto;gap:10px;overflow:visible;margin:0;padding:0}
+/* Al invitado, los de un jugador en rejilla como los multijugador (no en
+   carrusel): en una fila que se desliza parecían pocos al lado de la
+   rejilla de multijugador, y son justo lo que puede jugar. */
+.jg-sal[data-modo=solo] .jg-carrusel,.jg-sal.jg-sal-inv .jg-carrusel,.jg-rejilla{display:grid;grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-columns:auto;gap:10px;overflow:visible;margin:0;padding:0}
 
 /* ---- La miniatura ---- */
 .jg-mn{position:relative;min-width:0;container-type:inline-size;border-radius:16px;background:#fff;border:1px solid #e5e0ee;box-shadow:0 1px 2px #2a1e440a;transition:transform .2s cubic-bezier(.2,.8,.3,1),box-shadow .2s,border-color .2s}
@@ -5561,7 +5564,7 @@ html:has(#jgNomInv) .rp-fab{display:none!important}
 @media(min-width:601px){
   .jg-sal-intro h1{font-size:30px}
   .jg-carrusel{grid-auto-columns:minmax(180px,30%)}
-  .jg-sal[data-modo=solo] .jg-carrusel,.jg-rejilla{grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+  .jg-sal[data-modo=solo] .jg-carrusel,.jg-sal.jg-sal-inv .jg-carrusel,.jg-rejilla{grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
   .jg-hoja-ops{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(min-width:721px){
@@ -5569,7 +5572,7 @@ html:has(#jgNomInv) .rp-fab{display:none!important}
   .jg-carrusel{grid-auto-columns:200px;gap:14px;margin:0;padding:4px 4px 14px;scroll-padding:0 4px;scrollbar-width:thin;scrollbar-color:#cfc6e3 transparent}
   .jg-desliza{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid #ddd9e8;background:#fff;color:var(--jg-ink);font-size:18px;cursor:pointer;flex-shrink:0}
   .jg-desliza:hover{border-color:var(--jg-purple);color:var(--jg-purple)}
-  .jg-sal[data-modo=solo] .jg-desliza{display:none}
+  .jg-sal[data-modo=solo] .jg-desliza,.jg-sal.jg-sal-inv .jg-desliza{display:none}
   /* La ficha es un panel a la derecha que no tapa el catálogo: se puede
      ir tocando tarjetas y la ficha cambia; sin fondo oscuro detrás. */
   .jg-hoja-capa{inset:auto;background:none!important;transition:none}
@@ -6803,6 +6806,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610231808"></script>
+<script src="juegos-app.js?v=202610231818"></script>
 </body>
 </html>
