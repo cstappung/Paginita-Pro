@@ -136,34 +136,57 @@ function copiasVivas(datos) {
 
 /* Top de colección: cuántas cartas distintas de las que ve quien mira
    (todas, o sin la Serie 01) tiene cada cuenta ahora (graduadas o no;
-   repetidas cuentan una vez). En empate, más legendarias, luego más
-   copias. */
-export function rankingColeccion(datos, n = 10) {
+   repetidas cuentan una vez). Con `col`, solo las de esa colección. En
+   empate, más legendarias, luego más copias. */
+export function rankingColeccion(datos, n = 10, col = "") {
   const l = copiasVivas(datos);
   if (!l) return null;
-  const por = {};
+  const total = col ? PM.POR_COL[col].length : totalVisible(), por = {};
   for (const c of l) {
+    if (col && c.carta.col !== col) continue;
     const a = por[c.dueno] || (por[c.dueno] = { uid: c.dueno, ids: new Set(), copias: 0, leyendas: new Set() });
     a.ids.add(c.id); a.copias++;
     if (c.carta.tier === 3) a.leyendas.add(c.id);
   }
   return Object.values(por)
-    .map(a => ({ uid: a.uid, tiene: a.ids.size, total: totalVisible(), copias: a.copias, leyendas: a.leyendas.size }))
+    .map(a => ({ uid: a.uid, tiene: a.ids.size, total, copias: a.copias, leyendas: a.leyendas.size }))
     .sort((a, b) => b.tiene - a.tiene || b.leyendas - a.leyendas || b.copias - a.copias || (a.uid < b.uid ? -1 : 1))
     .slice(0, n);
 }
 
-/* Top de cartas más raras: solo las graduadas (la nota de una sin graduar
-   nadie la conoce). Lo raro se mide con lo mismo que anuncia el abridor
-   al graduar: la probabilidad de sacar *esa* carta con esa nota o más en
-   un sobre (`probabilidad(id, g).exacta`); cuanto menor, más rara. */
-export function cartasMasRaras(datos, n = 10) {
-  const l = copiasVivas(datos);
-  if (!l) return null;
-  return l.filter(c => c.gr)
-    .map(c => Object.assign({}, c, { p: PM.probabilidad(c.id, c.g).exacta }))
-    .sort((a, b) => a.p - b.p || b.g - a.g || b.carta.tier - a.carta.tier || a.at - b.at || (a.c < b.c ? -1 : 1))
-    .slice(0, n);
+/* Lo que vale una carta graduada en el top de colecciones raras, en
+   décimas de punto: su rareza por su nota. Una legendaria con 10 son
+   20 puntos y con 9, 18; una común con 10, 1 punto. */
+export const PUNTOS_RAREZA = [1, 4, 10, 20];
+export const puntosGraduada = (tier, g) => PUNTOS_RAREZA[tier] * g;
+
+/* Top de colecciones más raras, una tabla por colección: de cada cuenta,
+   solo sus graduadas de esa colección y solo la mejor copia de cada carta
+   (dos legendarias iguales con 10 cuentan una vez). Cada fila trae esas
+   cartas (`cartas`, de más a menos puntos), la suma (`puntos`, en
+   décimas) y cuántos sobres de la colección ha abierto (`sobres`: los que
+   compró y valen; un re-roll no es un sobre). Solo quien suma algo. */
+const memoTop = new WeakMap();
+export function topColecciones(datos, col) {
+  const e = ecoDe(datos), l = copiasVivas(datos);
+  if (!e || !l) return null;
+  const m = memoTop.get(e) || {}, v = veSerie1();
+  if (m.v !== v) { m.v = v; m.por = {}; memoTop.set(e, m); }
+  if (m.por[col]) return m.por[col];
+  const sobres = {};
+  for (const so of Object.values(e.sobres)) if (!so.r && PM.coleccionDe(so.k) === col) sobres[so.u] = (sobres[so.u] || 0) + 1;
+  const por = {};
+  for (const c of l) {
+    if (!c.gr || c.carta.col !== col) continue;
+    const a = por[c.dueno] || (por[c.dueno] = {}), b = a[c.id];
+    if (!b || c.g > b.g || (c.g === b.g && c.at < b.at)) a[c.id] = c;
+  }
+  const out = Object.entries(por).map(([uid, a]) => {
+    const cartas = Object.values(a).map(c => Object.assign({}, c, { pts: puntosGraduada(c.carta.tier, c.g) }))
+      .sort((x, y) => y.pts - x.pts || y.carta.tier - x.carta.tier || x.carta.num - y.carta.num);
+    return { uid, puntos: cartas.reduce((s, c) => s + c.pts, 0), cartas, sobres: sobres[uid] || 0, total: PM.POR_COL[col].length };
+  }).sort((a, b) => b.puntos - a.puntos || b.cartas.length - a.cartas.length || (a.uid < b.uid ? -1 : 1));
+  return (m.por[col] = out);
 }
 
 /* Cuántos sobres se han abierto, en total y god packs. */

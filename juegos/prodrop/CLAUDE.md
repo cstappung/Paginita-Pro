@@ -259,17 +259,27 @@ other file of the site. Things that hold it together:
   saving the profile would erase them. They show on the profile page and
   the mini card through `exhibidasDe`, which only resolves keys that are
   packs of that account.
-- **Two card tables in the Clasificación** (the **Cartas** button under
-  PRODROP; the key is `prodrop`, because `cartas` is already Cartas de los
-  tres elementos). Both come from the economy replay through `ctx.datos`
-  (`datosPerfil`), never from `ranks`, and both use the owner of *now*
-  (`e.dueno`, so a card bought or traded moves with its buyer).
-  `rankingColeccion` is the top 10 by distinct cards owned out of
-  `PM.TOTAL` (repeats count once; ties: more legendaries, then more
-  copies). `cartasMasRaras` is the top 10 **graded** copies by
-  `probabilidad(id, g).exacta`, the chance grading announces of pulling that
-  card with that grade or better; an ungraded grade is hidden, so it does
-  not rank.
+- **The Clasificación's Cartas tab is per collection** (the **Cartas**
+  button under PRODROP; the key is `prodrop`, because `cartas` is already
+  Cartas de los tres elementos). A chip row picks the collection (only the
+  visible ones, `jg.rankCol` in `localStorage`), and each has two tables.
+  Both come from the economy replay through `ctx.datos` (`datosPerfil`),
+  never from `ranks`, and both use the owner of *now* (`e.dueno`, so a card
+  bought or traded moves with its buyer).
+  - **Colecciones más raras** (`topColecciones(datos, col)`): only graded
+    copies, and only the best grade of each card (duplicates count once).
+    Each card is worth `puntosGraduada(tier, g)` = `PUNTOS_RAREZA[tier] × g`
+    in **tenths** (1/4/10/20 per tier: a legendary 10 is 20 points, a 9 is
+    18, a common 10 is 1). Shows the top 3 plus your own row if you are
+    lower, each with packs opened of that collection (`sobres`: valid
+    packs, re-rolls do not count, they stay with whoever bought them) and
+    «Ver colección», which unfolds that account's graded cards (one open
+    at a time, `verC`). An ungraded grade is hidden, so it does not score.
+  - **Colección más completa** (`rankingColeccion(datos, n, col)`): top 10
+    by distinct cards of that collection (repeats count once; ties: more
+    legendaries, then more copies). Without `col` it counts every visible
+    collection, which is what the general's PRODROP leader (`lideresDe` in
+    `juegos-main.js`) still uses.
 - **Últimos drops** (`#vesDrops`, a horizontal strip right under
   Novedades, grid area `tira`): `mejoresDrops` lists epics and legendaries
   of valid packs only, in the order they came out (newest first), with who

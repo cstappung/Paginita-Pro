@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610232005"></script>
+<script src="i18n.js?v=202610232129"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -3226,14 +3226,15 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
 .jg-rkc-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c5cff,#c084fc,#f5c542)}
 .jg-rkc-cuenta{font-variant-numeric:tabular-nums;font-size:15px}
 .jg-rkc-extra{grid-column:2/-1;margin-top:-4px;color:var(--jg-muted);font-size:11.5px}
-.jg-rkc-raras li{grid-template-columns:34px 52px minmax(0,1fr) minmax(0,1fr)}
-.jg-rkc-carta .jg-pdc{width:52px}
-.jg-rkc-carta .jg-pdc figcaption{display:none}
-.jg-rkc-info{display:grid;min-width:0}
-.jg-rkc-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.jg-rkc-info small{color:var(--jg-muted);font-size:12px}
+.jg-rkc-top li{grid-template-columns:34px minmax(0,1fr) auto auto}
+.jg-rkc-top .jg-rkc-cuenta{font-size:17px}
+.jg-rkc-ver{padding:5px 10px;font-size:12px;white-space:nowrap}
+.jg-rkc-tuya{margin:12px 0 6px}
+.jg-rkc-album{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin:4px 0 2px}
+.jg-rkc-vale{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:800 9.5px/1.2 system-ui,sans-serif;color:#fff;background:#000a}
 @media (max-width:600px){.jg-rkc{padding:12px}.jg-rkc-lista li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-barra{grid-column:2/-1;grid-row:2}.jg-rkc-extra{grid-row:3}
-  .jg-rkc-raras li{grid-template-columns:28px 46px minmax(0,1fr)}.jg-rkc-raras .jg-rkc-quien{grid-column:3}.jg-rkc-carta .jg-pdc{width:46px}}
+  .jg-rkc-top li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-top .jg-rkc-ver{grid-column:2/-1;grid-row:2;justify-self:start}.jg-rkc-top .jg-rkc-extra{grid-row:3}.jg-rkc-top .jg-rkc-album{grid-row:4}
+  .jg-rkc-album{grid-template-columns:repeat(auto-fill,minmax(72px,1fr))}}
 html[data-tema=oscuro] .jg-rkc{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-rkc-lista li{background:#ffffff08}
 html[data-tema=oscuro] .jg-rkc-barra{background:#ffffff14}
@@ -6810,6 +6811,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610232005"></script>
+<script src="juegos-app.js?v=202610232129"></script>
 </body>
 </html>

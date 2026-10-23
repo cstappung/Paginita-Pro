@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM,__MM:require('../../juegos/mascotas/motor.js')};vm.createContext(ctx);
 vm.runInContext('const PM=__PM,MM=__MM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras,fijaSerie1,veSerie1,copiaVisible,totalVisible,plantillaDe,puntosDe}',ctx);
+ ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,topColecciones,puntosGraduada,fijaSerie1,veSerie1,copiaVisible,totalVisible,plantillaDe,puntosDe}',ctx);
 const M=ctx.__M;
 // quien mira ve la Serie 01 (los profes), salvo en la prueba que dice lo contrario
 const VE_TODO={mira:{at:1,por:'adm'}};
@@ -294,17 +294,41 @@ test('clasificación de cartas: colección (distintas) y las graduadas más rara
  assert.equal(fu.tiene,distintas(u,[ka,kb]));assert.equal(fu.copias,10);assert.equal(fu.total,PM.TOTAL);
  assert.equal(fv.tiene,distintas(v,[kc]));assert.equal(fv.copias,5);
  assert.ok(col[0].tiene>=col[1].tiene,'ordenada por cartas distintas');
- const r=M.cartasMasRaras(d);
- assert.equal(r.length,3,'solo las tres graduadas');
- assert.ok(r.every(c=>c.gr));
- for(let i=1;i<r.length;i++)assert.ok(r[i-1].p<=r[i].p,'de más rara a menos rara');
- for(const c of r)assert.equal(c.p,PM.probabilidad(c.id,c.g).exacta);
- assert.equal(JSON.stringify(r.map(c=>c.dueno).sort()),JSON.stringify([u,u,v].sort()));
+ // colecciones más raras: solo graduadas, la mejor de cada carta, rareza por nota
+ assert.equal(M.puntosGraduada(3,10),200);assert.equal(M.puntosGraduada(3,9),180);assert.equal(M.puntosGraduada(0,10),10);
+ const col0=PM.coleccionDe(ka),top=M.topColecciones(d,col0);
+ assert.equal(JSON.stringify(top.map(f=>f.uid).sort()),JSON.stringify([u,v].sort()));
+ const tu=top.find(f=>f.uid===u),tv=top.find(f=>f.uid===v);
+ assert.equal(tu.cartas.length,2);assert.equal(tv.cartas.length,1);
+ assert.ok(tu.cartas.every(c=>c.gr));
+ assert.equal(tu.puntos,tu.cartas.reduce((s,c)=>s+M.puntosGraduada(c.carta.tier,c.g),0));
+ assert.equal(tu.sobres,2);assert.equal(tv.sobres,1);
+ for(let i=1;i<top.length;i++)assert.ok(top[i-1].puntos>=top[i].puntos,'de más puntos a menos');
  // vendida en el mercado, la carta pasa a su comprador y la tabla lo dice
  const cc=u+'~'+ka+'.0';
  const d2=conGanado({[u]:2000,[v]:2000},0,{cartas:d.cartas,mercado:{o:{o1:{u,c:cc,p:10,at:500,v:{u:v,at:600}}},t:{}}});
- assert.equal(M.cartasMasRaras(d2).find(c=>c.c===cc).dueno,v);
+ const t2=M.topColecciones(d2,col0);
+ assert.ok(t2.find(f=>f.uid===v).cartas.some(c=>c.c===cc));
+ assert.ok(!t2.find(f=>f.uid===u).cartas.some(c=>c.c===cc));
+ assert.equal(t2.find(f=>f.uid===u).sobres,2,'los sobres abiertos no se venden con la carta');
+ assert.equal(M.topColecciones({completo:false},col0),null);
  assert.equal(M.rankingColeccion({completo:false}),null);
+});
+
+test('colecciones más raras: dos copias de la misma carta cuentan una vez, la de mejor nota',()=>{
+ const u='usrAAAA',s={},g={};let at=1792000000000;
+ for(let i=0;i<40;i++){const k='c-Nd'+String(i).padStart(9,'0');s[k]={at:at+=1000,p:80};g[k]={};for(let j=0;j<5;j++)g[k][j]={at:at+=10,p:100};}
+ const d=conGanado({[u]:40*80+200*100},0,{cartas:{s:{[u]:s},g:{[u]:g}},mercado:{o:{},t:{}}});
+ const mejor={};
+ for(const k of Object.keys(s))PM.sobre(u,k,s[k].at).cartas.forEach(c=>{mejor[c.id]=Math.max(mejor[c.id]||0,c.g);});
+ const f=M.topColecciones(d,'comp')[0];
+ assert.equal(f.cartas.length,Object.keys(mejor).length,'una por carta');
+ assert.ok(Object.keys(mejor).length<200,'hubo repetidas');
+ for(const c of f.cartas)assert.equal(c.g,mejor[c.id]);
+ assert.equal(f.puntos,Object.entries(mejor).reduce((t,[id,gr])=>t+M.puntosGraduada(PM.CARDS[id].tier,gr),0));
+ assert.equal(f.sobres,40);assert.equal(f.total,PM.POR_COL.comp.length);
+ for(let i=1;i<f.cartas.length;i++)assert.ok(f.cartas[i-1].pts>=f.cartas[i].pts);
+ assert.equal(M.topColecciones(d,'futbol').length,0);
 });
 
 test('colecciones: el prefijo de la clave dice de qué colección es el sobre',()=>{
