@@ -5,9 +5,12 @@
      historia, cada una una oleada de polillas seguida de su jefe (ocho
      hasta el Alba, seis en la otra orilla y seis en lo alto, que termina
      en el Sol), y una función que fabrica las del sin fin a partir de la
-     21: los mismos jefes en su fase 2 (la primera vuelta), 3, 4 y 5 (la
-     cuarta y todas las que siguen), con una oleada entre cada dos. La travesía es una sola y
+     21: los mismos jefes en su fase 2 (la primera vuelta), 3, 4, 5 y 6 (la
+     quinta y todas las que siguen), con una oleada entre cada dos. La travesía es una sola y
      no se acaba: después del Sol sigue sola hacia el sin fin.
+   - El RIGOR de la fase 6: cada vuelta que se pasa en ella es un grado más
+     dura que la anterior (más vida, más fuego, escamas más rápidas), y no
+     tiene techo: la noche termina por ganar.
    - Los AUGURIOS: cada jornada que pasas, la noche aprende algo (un poco
      más de fuego, escamas más rápidas, polillas que aguantan un golpe
      más…). Son fijos por número de jornada, iguales para todos.
@@ -216,8 +219,11 @@
 
   /* El sin fin recorre los nueve actos de pelea en bloques de dos: una
      oleada y el jefe del acto, que vuelve en otra fase. La primera vuelta
-     entera es la fase 2, la segunda la 3, la tercera la 4 y de ahí en
-     adelante, la 5 (y cada vuelta más fuerte por la dificultad). */
+     entera es la fase 2, la segunda la 3, la tercera la 4, la cuarta la 5 y
+     de ahí en adelante, la 6. Cada vuelta en la fase 6 sube un grado de
+     rigor (ver `aplicaRigor`): sin eso, la dificultad, los augurios y la
+     vida de los jefes tocaban techo hacia la jornada 80 y, con el arma
+     llena, la travesía se volvía infinita. */
   const CICLO_SINFIN = [1, 2, 3, 6, 7, 8, 9, 10, 11];
   const JEFE_DE_ACTO = { 1: "nodriza", 2: "faro", 3: "esfinge", 6: "casco", 7: "crisalida", 8: "hoguera", 9: "luna", 10: "constelacion", 11: "sol" };
   /* La oleada que el sin fin copia y endurece en cada acto. La del acto I
@@ -226,7 +232,41 @@
   const OLEADA_I_SINFIN = { acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.4, fuego: 0.95, balas: 3, apunta: 0.22, picada: 0.07, deriva: 1.5, mensajeras: 1 };
   const oleadaBase = acto => (acto === 1 ? OLEADA_I_SINFIN : JORNADAS[OLEADA_DE_ACTO[acto] - 1]);
   /* La fase de los jefes de una vuelta del sin fin (en la historia, 1). */
-  const faseDeVuelta = vuelta => Math.min(5, 2 + Math.max(0, vuelta));
+  const FASE_MAX = 6;
+  const faseDeVuelta = vuelta => Math.min(FASE_MAX, 2 + Math.max(0, vuelta));
+  /* El grado de rigor de una vuelta: 0 antes de la fase 6, 1 la primera vez
+     que se llega a ella (jornadas 93 a 110), 2 la segunda, y así. */
+  const VUELTA_FASE_MAX = FASE_MAX - 2;
+  const gradoDeVuelta = vuelta => Math.max(0, (vuelta || 0) - VUELTA_FASE_MAX + 1);
+
+  /* El rigor de la fase 6: lo que la noche suma en cada grado. Solo toca lo
+     que la prueba no mira (el fuego, la marcha, la puntería, las picadas,
+     cuántas escamas caben, su velocidad, la furia de los jefes); la vida de
+     las polillas y la del jefe que acota el verificador no cambian, así una
+     partida a medias del motor anterior sigue valiendo. La vida que el
+     jefe tiene EN PANTALLA sí crece: `vidaJefeJuego`. Los topes son altos
+     a propósito: a partir del cuarto o quinto grado ya casi nadie pasa. */
+  const RIGOR = {
+    vida: 0.22,        // vida del jefe en pantalla: +22 % por grado
+    velEscama: 0.07,   // escamas más rápidas
+    furia: 0.12,       // los jefes atacan más seguido
+    fuego: 0.12, balas: 1, apunta: 0.035, picada: 0.03, paso: 0.04,
+    topes: { velEscama: 2.6, furia: 3.4, fuego: 6.5, balas: 18, apunta: 0.88, picada: 0.85, paso: 7.5 }
+  };
+  function aplicaRigor(j) {
+    const g = j.grado || 0;
+    if (!g) return j;
+    const T = RIGOR.topes;
+    j.velEscama = +Math.min(T.velEscama, Math.max(j.velEscama || 1, (j.velEscama || 1) * (1 + RIGOR.velEscama * g))).toFixed(4);
+    j.furia = +Math.min(T.furia, Math.max(j.furia || 1, (j.furia || 1) * (1 + RIGOR.furia * g))).toFixed(4);
+    if (j.tipo !== "oleada") return j;
+    j.fuego = +Math.min(T.fuego, Math.max(j.fuego, j.fuego * (1 + RIGOR.fuego * g))).toFixed(3);
+    j.balas = Math.min(T.balas, Math.max(j.balas, j.balas + RIGOR.balas * g));
+    j.apunta = +Math.min(T.apunta, Math.max(j.apunta, j.apunta + RIGOR.apunta * g)).toFixed(3);
+    j.picada = +Math.min(T.picada, Math.max(j.picada, j.picada + RIGOR.picada * g)).toFixed(3);
+    j.paso = +Math.min(T.paso, Math.max(j.paso, j.paso * (1 + RIGOR.paso * g))).toFixed(3);
+    return j;
+  }
 
   /* Una jornada cualquiera, con sus augurios: las de la historia de la
      tabla y las del sin fin fabricadas. */
@@ -237,16 +277,16 @@
     const pos = k % 2;                            // 0 oleada · 1 jefe
     const actoBase = CICLO_SINFIN[bloque % CICLO_SINFIN.length];
     const vuelta = Math.floor(bloque / CICLO_SINFIN.length); // cuántas veces se recorrieron los nueve
-    const fase = faseDeVuelta(vuelta);
+    const fase = faseDeVuelta(vuelta), grado = gradoDeVuelta(vuelta);
     const m = dificultad(n);                      // multiplicador de esta jornada
     const nivel = 34 + (n - JORNADAS_HISTORIA);  // los augurios siguen sumando uno por jornada
-    if (pos === 1) return aplicaAugurios({ n, nivel, acto: 5, actoBase, tipo: "jefe", jefe: JEFE_DE_ACTO[actoBase], fuerza: m, vuelta, fase });
+    if (pos === 1) return aplicaRigor(aplicaAugurios({ n, nivel, acto: 5, actoBase, tipo: "jefe", jefe: JEFE_DE_ACTO[actoBase], fuerza: m, vuelta, fase, grado }));
     // La oleada copia la del acto base y la endurece; desde la segunda
     // vuelta suma una fila de las chicas si cabe, y una columna.
     const base = oleadaBase(actoBase);
     const filas = vuelta >= 1 && base.filas.length < 6 ? base.filas.concat(["a"]) : base.filas.slice();
-    return endurece(aplicaAugurios({
-      n, nivel, acto: 5, actoBase, tipo: "oleada", vuelta, fase,
+    return aplicaRigor(endurece(aplicaAugurios({
+      n, nivel, acto: 5, actoBase, tipo: "oleada", vuelta, fase, grado,
       filas,
       cols: Math.min(11, base.cols + (vuelta >= 1 ? 1 : 0)),
       paso: +(base.paso * (1 + (m - 1) * 0.35)).toFixed(2),            // marcha algo más rápida
@@ -260,7 +300,7 @@
       cascos: base.cascos || 0, hilos: base.hilos || 0, ascuas: base.ascuas || 0, marea: base.marea || 0, fugaces: base.fugaces || 0,
       vida: Object.assign({}, base.vida || {}, m > 1.6 ? { a: Math.max(2, (base.vida && base.vida.a) || 1) } : {}), // muy adentro, hasta las chicas aguantan dos
       mensajeras: 1
-    }), Math.floor(k / 6));
+    }), Math.floor(k / 6)));
   }
   /* En el sin fin la formación se endurece además un golpe cada seis
      jornadas (hasta ocho): con el arma llena, sin esto las oleadas caían
@@ -281,16 +321,23 @@
 
   /* La vida de un jefe en una jornada: crece con el nivel de la jornada
      (el arma también crece, con las mejoras) hasta el cuádruple, en el sin
-     fin con la fuerza, y en las fases 2 y 3 un poco más. Las fases 4 y 5
+     fin con la fuerza, y en las fases 2 y 3 un poco más. Las fases 4, 5 y 6
      tienen la vida de la 3 A PROPÓSITO: la vida de un jefe entra en la prueba (el
      verificador no deja que muera con menos daño), y así una partida de la
      tercera vuelta vale lo mismo con este motor que con el anterior. Lo
-     que las hace más duras son sus habilidades nuevas. */
-  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.3, 5: 1.3 };
+     que las hace más duras son sus habilidades nuevas y, en la fase 6, la
+     vida que tienen en pantalla (`vidaJefeJuego`), que el verificador no
+     mira: él sigue pidiendo esta, que es menos, y nunca rechaza de más. */
+  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.3, 5: 1.3, 6: 1.3 };
   function vidaJefe(j) {
     const base = VIDA_JEFE[j.jefe] || 0;
     const porJornada = Math.min(4, 1 + 0.05 * Math.max(0, (j.nivel || j.n || 4) - 4));
     return Math.round(base * porJornada * (j.fuerza ? 0.7 + 0.3 * j.fuerza : 1) * (VIDA_FASE[j.fase] || 1));
+  }
+  /* La vida con que el jefe aparece en pantalla: la de arriba, y en la fase
+     6 un 22 % más por cada grado de rigor. Siempre ≥ vidaJefe. */
+  function vidaJefeJuego(j) {
+    return Math.round(vidaJefe(j) * (1 + RIGOR.vida * (j.grado || 0)));
   }
 
   /* ---------------------------------------------------------------
@@ -527,8 +574,9 @@
     // La prueba de lo jugado hasta el punto de control (ver prueba.js): sin
     // ella, seguir desde aquí no entra en la clasificación. Se guarda tal
     // cual (el verificador la rehace entera) si tiene la forma y cabe.
+    // Las jornadas pueden venir empacadas (prueba.js: empaca, `Z` y `zl`).
     const pr = pt.pr;
-    if (r.punto.j > 0 && pr && typeof pr === "object" && typeof pr.id === "string" && Array.isArray(pr.J)) {
+    if (r.punto.j > 0 && pr && typeof pr === "object" && typeof pr.id === "string" && (Array.isArray(pr.J) || (typeof pr.Z === "string" && Number.isSafeInteger(pr.zl)))) {
       let largo = Infinity;
       try { largo = JSON.stringify(pr).length; } catch (e) { /* una prueba que no se puede escribir no se guarda */ }
       if (largo <= PRUEBA_PUNTO_MAX) r.punto.pr = pr;
@@ -540,9 +588,10 @@
 
   /* Lo más que ocupa la prueba guardada con la travesía a medias: el
      progreso entero viaja a la cuenta en un blob de menos de 200 000
-     caracteres, y veinte jornadas reales ocupan unas decenas de miles. Muy
-     adentro del sin fin puede no caber: entonces la partida se sigue igual,
-     pero ya no entra en la clasificación. */
+     caracteres, y veinte jornadas reales ocupan unas decenas de miles. Más
+     adentro del sin fin el juego la guarda empacada (prueba.js: empaca),
+     unas ocho veces más chica; si ni así cupiera, la partida se sigue
+     igual, pero ya no entra en la clasificación. */
   const PRUEBA_PUNTO_MAX = 180000;
 
   /* Un hash de texto de 53 bits (cyrb53), en base 36. No es una firma: lo
@@ -589,6 +638,7 @@
     ACTOS, PUNTOS, PUNTOS_MENSAJERA, PUNTOS_JEFE, LLAMAS_EXTRA, LLAMAS_INICIO, LLAMAS_MAX,
     VIDA_JEFE, DISTANCIA_ALBA, CIERRE_ALBA, EMPUJE_ALBA, VENTANA_PULSO,
     JORNADAS, JORNADAS_HISTORIA, INICIO_ACTO, JORNADA_HOGUERA, OLEADA_DE_ACTO, faseDeVuelta, VIDA_FASE,
+    FASE_MAX, gradoDeVuelta, RIGOR, aplicaRigor, vidaJefeJuego,
     dificultad, jornada, actoDe, vidaJefe, formacion, polillasDe,
     resonancia, puntosPolilla, bonusJornada, llamasGanadas, juzgaPulso, latido,
     progresoVacio, mezclaProgreso, mulberry32, hashTexto, valorMensajera, PRUEBA_PUNTO_MAX,

@@ -885,7 +885,9 @@
       if (toque != null && Math.abs(toque - F.x) > 2) dir = Math.sign(toque - F.x) * Math.min(1, Math.abs(toque - F.x) / 14);
     }
     const objetivo = dir * N.vel * (F.enredo > 0 ? 0.45 : 1) * (1 - 0.12 * Math.min(4, F.posadas || 0));          // los hilos de seda enredan los remos
-    F.vx += clamp(objetivo - F.vx, -1100 * (N.vel / 104) * dt, 1100 * (N.vel / 104) * dt); // aceleración con algo de inercia: es una barca
+    // El Agua de vidrio de la Luna (fase 6): los remos no agarran y la barca resbala.
+    const agarre = jefe && jefe.aguaVidrio > 0 && !jefe.muerto ? 0.14 : 1;
+    F.vx += clamp(objetivo - F.vx, -1100 * agarre * (N.vel / 104) * dt, 1100 * agarre * (N.vel / 104) * dt); // aceleración con algo de inercia: es una barca
     F.vx += F.viento * dt;                                              // el aleteo de la Nodriza empuja
     const x0 = F.x;
     // El Horizonte de la Luna (fase 4): las dos orillas son la misma, y la barca da la vuelta.
@@ -946,7 +948,7 @@
      ================================================================ */
   function empiezaJefe(j) {
     const tipo = j.jefe;
-    jefe = { tipo, vida: M.vidaJefe(j), max: M.vidaJefe(j), x: W / 2, y: -50, t: 0, cd: 2.6, ataque: null, flash: 0, entrando: 2.6, fuerza: j.fuerza || 1, cuadro: 0, muerto: 0, alfa: 1 };
+    jefe = { tipo, vida: M.vidaJefeJuego(j), max: M.vidaJefeJuego(j), x: W / 2, y: -50, t: 0, cd: 2.6, ataque: null, flash: 0, entrando: 2.6, fuerza: j.fuerza || 1, cuadro: 0, muerto: 0, alfa: 1 };
     if (tipo === "faro") { jefe.orbita = Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2, r: 28 + (i % 2) * 5, viva: true, f: Math.random() * 6 })); jefe.respawn = 0; }
     if (tipo === "esfinge") { jefe.casaY = 82; jefe.visible = 0.4; }
     if (tipo === "hoguera") { jefe.orbita = Array.from({ length: 8 }, (_, i) => ({ a: (i / 8) * Math.PI * 2, r: 36, viva: true, f: Math.random() * 6 })); jefe.libres = 0; }
@@ -956,12 +958,13 @@
     // La fase (2 o 3 en el sin fin): otro modelo y sus habilidades (ver
     // «Las fases 2 y 3»). `cdEsp` en 0: lo primero que hace es lo nuevo.
     jefe.fase = tipo === "alba" ? 1 : j.fase || 1;
+    jefe.grado = j.grado || 0;                                         // el rigor de la fase 6 (motor.js: aplicaRigor)
     jefe.cdEsp = 0;
     if (tipo === "alba") { jefe.dist = M.DISTANCIA_ALBA; jefe.vida = 1; jefe.max = 1; jefe.entrando = 0; jefe.y = 20; jefe.x = W - F.x; jefe.tSombra = 4; }
     jefe.furia = j.furia || 1;                                         // el augurio de los grandes
     const info = R.JEFES[tipo];
     if (tipo !== "alba") {
-      const num = ["", "", " · II", " · III", " · IV", " · V"][jefe.fase] || "";
+      const num = jefe.fase > 1 ? " · " + R.romano(jefe.fase) + gradoTexto(jefe) : "";
       const vuelve = jefe.fase > 1 && R.FASES[tipo] ? R.FASES[tipo][jefe.fase] : null;   // cada fase se presenta con su epíteto
       $("jefeEpiteto").textContent = vuelve ? vuelve.epiteto : info.epiteto; $("jefeTitulo").textContent = info.nombre + num;
       muestra("capaJefe"); programa(() => oculta("capaJefe"), 2.7);
@@ -969,6 +972,9 @@
     }
     musica.estado({ jefe: tipo, vida: 1, cerca: 0 });
   }
+  /* El grado de rigor de la fase 6, como se escribe junto a la fase: nada
+     la primera vez, « (II)» la segunda, y así. */
+  const gradoTexto = o => (o && o.grado > 1 ? " (" + R.romano(o.grado) + ")" : "");
   const faseJefe = () => (jefe.vida / jefe.max > 0.66 ? 0 : jefe.vida / jefe.max > 0.33 ? 1 : 2);
   function pintaVidaJefe() { $("jefeVida").style.width = Math.max(0, (jefe.vida / jefe.max) * 100) + "%"; }
 
@@ -1043,6 +1049,7 @@
      tocar: la red de la Crisálida, un espejismo de la Esfinge, una baliza
      del Faro, el fuego fatuo del Casco. Devuelve si la bala dio en algo. */
   function golpeaEspecial(b) {
+    if (jefe.fase >= 6 && golpeaFase6(b)) return true;
     const r = jefe.red;
     if (r && Math.abs(b.y - r.y) < 8) {
       const i = Math.floor(b.x / 12);
@@ -1755,7 +1762,8 @@
      más escamas, pero ninguna pelea distinta. Eso se quitó.
 
      La fase 4 (tercera vuelta en adelante) suma una tercera habilidad por
-     jefe: está más abajo, en «La fase 4».
+     jefe: está más abajo, en «La fase 4»; la 5 y la 6, una cuarta y una
+     quinta, en «La fase 5» y «La fase 6».
 
      Nada de esto toca la prueba (prueba.js): lo que un tiro apaga aquí usa
      letras que el verificador ya admite para ese jefe (`O` para los huevos
@@ -1766,14 +1774,15 @@
   const escalaJefe = () => (jefe ? S.ESCALA_FASE[jefe.fase] || 1 : 1);
   const habilidad = n => { const f = R.FASES[jefe.tipo]; return f && f[n] ? f[n].hab : ""; };
   /* La habilidad que toca: en la fase 2, la suya; en la 3 alternan y en la
-     4 y la 5 rotan todas, y siempre empieza la más nueva. `pideEsp`: la que
+     4, la 5 y la 6 rotan todas, y siempre empieza la más nueva. `pideEsp`: la que
      pidió el gancho de pruebas. */
   function siguienteEspecial() {
-    const orden = jefe.fase >= 5 ? [5, 2, 3, 4] : jefe.fase >= 4 ? [4, 2, 3] : jefe.fase >= 3 ? [3, 2] : [2];
+    const orden = jefe.fase >= 6 ? [6, 2, 3, 4, 5] : jefe.fase >= 5 ? [5, 2, 3, 4] : jefe.fase >= 4 ? [4, 2, 3] : jefe.fase >= 3 ? [3, 2] : [2];
     jefe.turnoEsp = jefe.turnoEsp || 0;
     let n = orden[jefe.turnoEsp++ % orden.length];
     if (jefe.pideEsp) { n = clamp(jefe.pideEsp, 2, jefe.fase); jefe.pideEsp = 0; }
-    jefe.cdEsp = jefe.fase >= 5 ? 6 : jefe.fase >= 4 ? 6.5 : jefe.fase >= 3 ? 7.5 : 10;
+    // En la fase 6, cada grado de rigor la trae un poco antes (hasta 3,2 s).
+    jefe.cdEsp = jefe.fase >= 6 ? Math.max(3.2, 5.5 - 0.35 * Math.max(0, (jefe.grado || 1) - 1)) : jefe.fase >= 5 ? 6 : jefe.fase >= 4 ? 6.5 : jefe.fase >= 3 ? 7.5 : 10;
     avisa("✦ " + habilidad(n));
     return "esp" + n;
   }
@@ -1794,6 +1803,8 @@
     if (fn4) fn4(dt, a && a.nombre === "esp4" ? a : null, faseJefe());
     const fn5 = jefe.fase >= 5 && ESPECIALES5[jefe.tipo];
     if (fn5) fn5(dt, a && a.nombre === "esp5" ? a : null, faseJefe());
+    const fn6 = jefe.fase >= 6 && ESPECIALES6[jefe.tipo];
+    if (fn6) fn6(dt, a && a.nombre === "esp6" ? a : null, faseJefe());
   }
 
   /* La Nodriza. NIDADA: cuelga huevos en el aire; cada uno late y, si nadie
@@ -2134,7 +2145,7 @@
       const sombra = !!naufragioEn(F.x, M.Y_NAUFRAGIOS + 2), quieto = Math.abs(F.vx) < 28;
       F.calor = clamp(F.calor + dt * (sombra ? -1.6 : quieto ? 0.6 : -0.9), 0, 1);
       if (F.calor >= 1 && estado === "juego") { F.calor = 0; golpeFanal("calor"); }
-    } else if (!jefe.amanecer) F.calor = Math.max(0, F.calor - dt * 1.5);
+    } else if (!jefe.amanecer && !jefe.lupa) F.calor = Math.max(0, F.calor - dt * 1.5);   // el Amanecer (5) y la Lupa (6) llevan su propio calor
     if (a3) {
       const t = a3.t;
       if (t < 0.5) { if (!a3.sono) { a3.sono = 1; anillo(jefe.x, jefe.y, "#fff6d8", 40 * escalaJefe()); } }
@@ -2814,6 +2825,374 @@
     }
   }
 
+  /* ================================================================
+     La fase 6 (desde la quinta vuelta del sin fin)
+     ================================================================
+     «La de vidrio» (el modelo, en sprites.js: el cuerpo hecho vitral, un
+     rosetón detrás). Cada jefe conserva sus cuatro habilidades y estrena
+     una quinta; rotan las cinco, empezando por la nueva.
+
+       Nodriza         Muda           deja su piel de vidrio, que también dispara
+       Faro            Caleidoscopio  haces desde la lente: se marcan antes de encenderse
+       Esfinge         Esquirlas      vidrios clavados en el agua: no se tocan
+       Casco           Botellas       caen al agua, flotan hacia ti y revientan
+       Crisálida       Vidriera       filas de vidrio que bajan: se pasa por el hueco o a tiros
+       Hoguera         Colada         un chorro de vidrio fundido que te sigue
+       Luna            Agua de vidrio el agua se vuelve espejo: la barca resbala
+       Siete Hermanas  Celosía        una reja de vidrios en diagonal
+       Sol             Lupa           el sol te enfoca: no te quedes en el punto
+
+     Y el RIGOR (motor.js: aplicaRigor): cada vuelta en la fase 6 es un
+     grado más dura que la anterior. El jefe tiene más vida en pantalla
+     (`M.vidaJefeJuego`), ataca más seguido y sus escamas van más rápido;
+     sus habilidades nuevas, además, traen más de todo con cada grado
+     (`masGrado`) y llegan antes (`cdEsp`).
+
+     Tampoco tocan la prueba: romper la Muda paga como lo que orbita (V,
+     que cualquier jefe tiene desde la fase 3); los vidrios de la Vidriera
+     se rompen sin anotar nada, como la red de la Crisálida; lo demás no
+     se rompe a tiros. */
+  const masGrado = () => Math.min(3, Math.max(0, (jefe.grado || 1) - 1));
+
+  /* La Nodriza. MUDA: se desprende de su piel, que queda colgada en el
+     aire, de vidrio, y dispara sus abanicos por su cuenta mientras ella
+     sigue con lo suyo. A tiros se rompe (y paga). */
+  function esp6Nodriza(dt, a6, f) {
+    if (a6) {
+      if (a6.t > 0.5 && !a6.hecho) {
+        a6.hecho = 1; musica.sfx.aleteo(); relampago("#ffc8e8", 0.2);
+        const g = masGrado();
+        jefe.muda = { x: jefe.x, y: jefe.y, y0: jefe.y, t: 0, dur: 9 + f + g, vida: 12 + 4 * f + 5 * g, cd: 1.1, flash: 0 };
+        chispas(jefe.x, jefe.y, 24, ["#ff4c9c", "#5cf0d8", "#ffc83c"], 50, 0.8, "polvo");
+      }
+      if (a6.t > 0.9) jefe.ataque = null;
+    }
+    const m = jefe.muda;
+    if (!m) return;
+    m.t += dt; m.flash = Math.max(0, m.flash - dt); m.cd -= dt;
+    m.y = m.y0 + Math.sin(m.t * 1.1) * 4;                              // cuelga, y se mece apenas
+    if (m.cd <= 0 && m.t < m.dur - 0.5 && estado === "juego") {
+      m.cd = 1.6 - f * 0.15 - masGrado() * 0.12;
+      abanico(m.x, m.y + 14, 5 + f, 0.8, 66 + f * 8, { estilo: 9, vidrio: true });
+      musica.sfx.roce(m.x);
+    }
+    if (m.t > m.dur) { chispas(m.x, m.y, 18, ["#ff4c9c", "#5cf0d8", "#fff6d8"], 40, 0.6, "polvo"); jefe.muda = null; }
+  }
+
+  /* El Faro. CALEIDOSCOPIO: la lente, hecha vitral, abre seis haces en
+     abanico hacia el agua. Cada vez que gira (un clic) se encienden
+     algunos; antes se marcan punteados. Se espera donde no se va a
+     encender, o debajo de un casco, que corta el haz. */
+  const HACES_CALEI = 6;
+  function esp6Faro(dt, a6, f) {
+    jefe.calei = null;
+    if (!a6) return;
+    const g = masGrado(), clics = 4 + f + g, aviso = 0.75 - g * 0.06, luz = 0.55, cada = aviso + luz + 0.1;
+    if (!a6.sets) {
+      a6.sets = [];
+      let antes = -1;
+      for (let i = 0; i < clics; i++) {
+        let m;
+        do {
+          m = 0;
+          const prender = Math.min(HACES_CALEI - 1, 3 + (f === 2 ? 1 : 0) + (g >= 2 ? 1 : 0));
+          const orden = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5);
+          for (let k = 0; k < prender; k++) m |= 1 << orden[k];
+        } while (m === antes);
+        a6.sets.push(antes = m);
+      }
+      musica.sfx.eclipse();
+    }
+    const i = Math.floor((a6.t - 0.3) / cada), q = (a6.t - 0.3) - i * cada;
+    if (a6.t >= 0.3 && i < clics) {
+      const on = q >= aviso && q < aviso + luz;
+      jefe.calei = { m: a6.sets[i], on };
+      if (on && a6.son !== i) { a6.son = i; musica.sfx.barrido(luz); relampago("#c8f0ff", 0.12); }
+      if (on && estado === "juego") for (let k = 0; k < HACES_CALEI; k++) if (a6.sets[i] & (1 << k) && enHazCalei(k)) { golpeFanal("caleidoscopio"); break; }
+    }
+    if (a6.t > 0.3 + clics * cada + 0.2) jefe.ataque = null;
+  }
+  /* Adónde llega el haz `k` al agua, y si la barca está en él (sin un casco en el medio). */
+  const xHazCalei = k => ((k + 0.5) / HACES_CALEI) * W;
+  function enHazCalei(k) {
+    const x0 = jefe.x, y0 = jefe.y + 8;
+    if (Math.abs(F.x - xHazCalei(k)) > 9) return false;
+    for (let s = 2; s < 24; s++) { const q = s / 24; if (naufragioEn(lerp(x0, F.x, q), lerp(y0, M.Y_FANAL - 4, q))) return false; }
+    return true;
+  }
+
+  /* La Esfinge. ESQUIRLAS: se rompe un poco y tira los pedazos, que caen
+     marcados y se quedan clavados en el agua, de punta. Tocar uno quiebra
+     la llama; pasado un rato se hunden. */
+  function esp6Esfinge(dt, a6, f) {
+    const lista = jefe.esquirlas || (jefe.esquirlas = []);
+    if (a6) {
+      if (a6.t > 0.6 && !a6.hecho) {
+        a6.hecho = 1; musica.sfx.escudo(); sacude(0.15);
+        const n = 3 + f + masGrado(), xs = [];
+        xs.push(clamp(F.x + azar(-6, 6), 12, W - 12));           // una, siempre donde estás
+        for (let tries = 0; xs.length < n && tries < 200; tries++) { const x = azar(12, W - 12); if (xs.every(o => Math.abs(o - x) > 30)) xs.push(x); }
+        xs.forEach((x, i) => lista.push({ x, x0: jefe.x, y0: jefe.y, t: -0.9 - i * 0.12, dur: 5 + f + masGrado() }));
+      }
+      if (a6.t > 1) jefe.ataque = null;
+    }
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const s = lista[i];
+      s.t += dt;
+      if (s.t >= 0 && !s.clavada) { s.clavada = true; chispas(s.x, M.Y_FANAL + 2, 6, ["#5cf0d8", "#fff6d8"], 30, 0.4); musica.sfx.roce(s.x); }
+      if (s.t >= 0 && estado === "juego" && Math.abs(F.x - s.x) < 5) { golpeFanal("esquirla"); chispas(s.x, M.Y_FANAL - 4, 12, ["#ff4c9c", "#5cf0d8", "#fff6d8"], 50, 0.5); lista.splice(i, 1); continue; }
+      if (s.t > s.dur) lista.splice(i, 1);
+    }
+  }
+
+  /* El Casco. BOTELLAS: suelta botellas de vidrio que caen al agua, flotan
+     despacio hacia ti y, al rato, revientan. Antes de reventar se marca en
+     el agua hasta dónde llega. Se aleja uno, o se las deja pasar. */
+  function esp6Casco(dt, a6, f) {
+    const lista = jefe.botellas || (jefe.botellas = []);
+    if (a6) {
+      const n = 3 + f + masGrado();
+      a6.k = a6.k || 0;
+      if (a6.k < n && a6.t > 0.5 + a6.k * 0.35) {
+        a6.k++; musica.sfx.ancla();
+        lista.push({ x: jefe.x + azar(-14, 14), y: jefe.y + 18, vx: azar(-50, 50), vy: 30, t: 0, flota: false, cuenta: 2.5 - f * 0.15 - masGrado() * 0.1, r: 22 + 2 * masGrado(), c: lista.length % 3 });
+      }
+      if (a6.k >= n && a6.t > 0.9 + n * 0.35) jefe.ataque = null;
+    }
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const b = lista[i];
+      b.t += dt;
+      if (!b.flota) {
+        b.vy = Math.min(150, b.vy + 220 * dt); b.x = clamp(b.x + b.vx * dt, 10, W - 10); b.y += b.vy * dt;
+        if (b.y >= Y_AGUA - 1) { b.y = Y_AGUA - 1; b.flota = true; chispas(b.x, Y_AGUA, 6, ["#8fd8ff", "#ffffff"], 30, 0.4); musica.sfx.roce(b.x); }
+        continue;
+      }
+      b.x = clamp(b.x + Math.sign(F.x - b.x) * 12 * dt, 10, W - 10);
+      b.cuenta -= dt;
+      if (b.cuenta <= 0) {
+        lista.splice(i, 1);
+        anillo(b.x, Y_AGUA - 3, "#5cf0d8", b.r); chispas(b.x, Y_AGUA - 3, 18, ["#ff4c9c", "#5cf0d8", "#ffc83c", "#fff6d8"], 70, 0.6);
+        musica.sfx.empuje(); sacude(0.12);
+        if (estado === "juego" && Math.abs(F.x - b.x) < b.r) golpeFanal("botella");
+      }
+    }
+  }
+
+  /* La Crisálida. VIDRIERA: teje con vidrio de colores. Bajan filas de
+     vidrios de lado a lado, cada una con un hueco; si una fila llega al
+     agua con un vidrio encima de ti, te quiebra. Los tiros los rompen (sin
+     anotar nada, como su red). */
+  function esp6Crisalida(dt, a6, f) {
+    const filas = jefe.vidriera || (jefe.vidriera = []);
+    if (a6) {
+      if (!a6.hecho) {
+        a6.hecho = 1; musica.sfx.barrido(0.8);
+        const n = 2 + (f > 0 ? 1 : 0) + (masGrado() >= 2 ? 1 : 0);
+        for (let r = 0; r < n; r++) {
+          const hueco = Math.floor(Math.random() * 19);
+          filas.push({ y: jefe.y + 24 - r * 30, vy: 22 + 4 * f + 3 * masGrado(), segs: Array.from({ length: 20 }, (_, i) => i !== hueco && i !== hueco + 1), c: r });
+        }
+      }
+      if (a6.t > 0.8) jefe.ataque = null;
+    }
+    for (let i = filas.length - 1; i >= 0; i--) {
+      const r = filas[i];
+      r.y += r.vy * dt;
+      if (r.y >= M.Y_FANAL - 9) {
+        filas.splice(i, 1);
+        const k = Math.floor(F.x / 12), encima = r.segs[k] || (F.x - k * 12 < 4 && r.segs[k - 1]) || (F.x - k * 12 > 8 && r.segs[k + 1]);
+        for (let s = 0; s < 20; s += 2) if (r.segs[s]) chispas(s * 12 + 6, r.y, 2, ["#ff4c9c", "#5cf0d8", "#ffc83c"], 30, 0.4);
+        musica.sfx.escudo();
+        if (estado === "juego" && encima) golpeFanal("vidriera");
+      }
+    }
+  }
+
+  /* La Hoguera. COLADA: funde los vidrios de los fanales que tenía y los
+     derrama: un chorro de vidrio al rojo que cae al agua y te sigue, más
+     lento que tus remos. Un casco lo ataja (y se va quemando). */
+  function esp6Hoguera(dt, a6, f) {
+    jefe.colada = null;
+    if (!a6) return;
+    const g = masGrado(), carga = 0.9, dur = 5 + f + g * 0.5;
+    if (a6.x == null) { a6.x = jefe.x; musica.sfx.llamarada(1); }
+    const v = 46 + 8 * f + 7 * g;
+    a6.x = clamp(a6.x + clamp(F.x - a6.x, -v * dt, v * dt), 6, W - 6);
+    const tope = naufragioEn(a6.x, M.Y_NAUFRAGIOS + 2);
+    jefe.colada = { x: a6.x, on: a6.t >= carga, w: 6 + f, tope: tope ? tope.n : null };
+    if (a6.t >= carga) {
+      if (tope && Math.random() < dt * 8) erosiona(tope.n, Math.floor(Math.random() * tope.n.w), 0, 1);
+      if (!tope && estado === "juego" && Math.abs(F.x - a6.x) < jefe.colada.w) golpeFanal("colada");
+    }
+    if (a6.t > carga + dur) jefe.ataque = null;
+  }
+
+  /* La Luna. AGUA DE VIDRIO: el agua se vuelve un espejo liso. Los remos
+     no agarran: la barca tarda en arrancar y en frenar, y resbala (ver
+     actualizaFanal). Mientras tanto ella sigue con lo suyo. */
+  function esp6Luna(dt, a6, f) {
+    if (a6) {
+      if (!a6.hecho) { a6.hecho = 1; jefe.aguaVidrio = 6 + f + masGrado(); musica.sfx.eclipse(); relampago("#e8f4ff", 0.2); }
+      if (a6.t > 0.7) jefe.ataque = null;
+    }
+    if (jefe.aguaVidrio > 0) jefe.aguaVidrio = Math.max(0, jefe.aguaVidrio - dt);
+  }
+
+  /* Las Siete Hermanas. CELOSÍA: se ordenan como un rosetón y dejan caer
+     una reja de vidrios: filas que bajan en diagonal, cada una corrida un
+     poco respecto de la anterior, de modo que los huecos forman pasillos
+     torcidos. Se rema con la reja, o se abre paso a tiros. */
+  function esp6Constelacion(dt, a6, f) {
+    if (!a6) return;
+    const g = masGrado(), filas = 7 + 2 * f + 2 * g, cada = 0.62 - 0.04 * f - 0.03 * g;
+    if (a6.dir == null) { a6.dir = Math.random() < 0.5 ? 1 : -1; a6.k = 0; a6.x0 = azar(0, 24); musica.sfx.barrido(filas * cada); }
+    if (a6.k < filas && a6.t > 0.6 + a6.k * cada) {
+      const corre = a6.x0 + a6.dir * a6.k * 8;
+      for (let x = ((corre % 24) + 24) % 24; x < W; x += 24) escamas.push(nuevaEscama(x, 44, a6.dir * 26, 52, { jefe: true, estilo: 9, vidrio: true }));
+      a6.k++; musica.sfx.roce(W / 2);
+    }
+    if (a6.k >= filas && a6.t > 0.8 + filas * cada) jefe.ataque = null;
+  }
+
+  /* El Sol. LUPA: te mira a través de una lupa. El punto donde enfoca cae
+     sobre el agua y te sigue, más lento que tus remos; en él el vidrio se
+     calienta rápido (como en la Canícula) y fuera se enfría. Debajo de un
+     casco no hay foco. */
+  function esp6Sol(dt, a6, f) {
+    jefe.lupa = null;
+    if (!a6) return;
+    const g = masGrado(), dur = 6.5 + f * 0.5 + g * 0.5, v = 40 + 8 * f + 7 * g;
+    if (a6.x == null) { a6.x = F.x < W / 2 ? W - 20 : 20; musica.sfx.llamarada(1); }
+    a6.x = clamp(a6.x + clamp(F.x - a6.x, -v * dt, v * dt), 8, W - 8);
+    const sombra = !!naufragioEn(F.x, M.Y_NAUFRAGIOS + 2), dentro = Math.abs(F.x - a6.x) < 13;
+    jefe.lupa = { x: a6.x, on: a6.t > 0.8 };
+    if (a6.t > 0.8) {
+      F.calor = clamp(F.calor + dt * (dentro && !sombra ? 1.5 + 0.2 * f + 0.15 * g : -0.7), 0, 1);
+      if (F.calor >= 1 && estado === "juego") { F.calor = 0; golpeFanal("lupa"); }
+    }
+    if (a6.t > 0.8 + dur) jefe.ataque = null;
+  }
+  const ESPECIALES6 = { nodriza: esp6Nodriza, faro: esp6Faro, esfinge: esp6Esfinge, casco: esp6Casco, crisalida: esp6Crisalida, hoguera: esp6Hoguera, luna: esp6Luna, constelacion: esp6Constelacion, sol: esp6Sol };
+
+  /* Lo que las habilidades de la fase 6 ponen en pantalla (la Muda, en
+     dibujaJefe; los vidrios de la Celosía, en dibujaEscamas). */
+  const JOYAS = ["#ff4c9c", "#5cf0d8", "#ffc83c", "#8c5cff"];
+  function dibujaFase6() {
+    const t = jefe.tipo;
+    if (t === "faro" && jefe.calei) {
+      const c = jefe.calei, x0 = jefe.x, y0 = jefe.y + 8;
+      for (let k = 0; k < HACES_CALEI; k++) {
+        if (!(c.m & (1 << k))) continue;
+        const x1 = xHazCalei(k), y1 = M.Y_FANAL - 3, n = 60;
+        lx.fillStyle = JOYAS[k % JOYAS.length];
+        for (let s = 3; s <= n; s++) {
+          const q = s / n, px = lerp(x0, x1, q), py = lerp(y0, y1 + 12, q);
+          if (naufragioEn(px, py)) break;                                // un casco corta el haz
+          if (c.on) { lx.globalAlpha = 0.5; lx.fillRect(Math.floor(px) - 2, Math.floor(py), 5, 3); }
+          else if (s % 3 === 0) { lx.globalAlpha = 0.6; lx.fillRect(Math.floor(px) - 4, Math.floor(py), 1, 1); lx.fillRect(Math.floor(px) + 4, Math.floor(py), 1, 1); }
+        }
+        lx.globalAlpha = 1;
+      }
+    }
+    if (t === "esfinge") for (const s of jefe.esquirlas || []) {
+      if (s.t < 0) {
+        const q = clamp(1 + s.t / 0.9, 0, 1), y = lerp(s.y0, M.Y_FANAL, q * q), x = lerp(s.x0, s.x, q);
+        lx.fillStyle = "#5cf0d8";
+        for (let yy = 200; yy < H; yy += 6) { lx.globalAlpha = 0.5; lx.fillRect(Math.floor(s.x) - 5, yy, 1, 3); lx.fillRect(Math.floor(s.x) + 5, yy, 1, 3); }
+        lx.globalAlpha = 1;
+        ex.fillStyle = "#5cf0d8"; ex.fillRect(Math.floor(x) - 1, Math.floor(y) - 3, 3, 6); ex.fillStyle = "#fff6d8"; ex.fillRect(Math.floor(x), Math.floor(y) - 3, 1, 3);
+      } else {
+        const x = Math.floor(s.x), hunde = s.t > s.dur - 0.6 ? Math.round((s.t - (s.dur - 0.6)) * 14) : 0, y = M.Y_FANAL + 4 + hunde;
+        ex.fillStyle = "#2c4cc8"; ex.fillRect(x - 2, y - 12, 5, 12 - hunde);
+        ex.fillStyle = "#5cf0d8"; ex.fillRect(x - 1, y - 14, 3, 13 - hunde);
+        ex.fillStyle = "#fff6d8"; ex.fillRect(x, y - 15, 1, 6);
+        brillo(s.x, y - 8, 8, "#5cf0d8", 0.4);
+      }
+    }
+    if (t === "casco") for (const b of jefe.botellas || []) {
+      const x = Math.floor(b.x), y = Math.floor(b.y + (b.flota ? Math.sin(b.t * 6) * 1.2 : 0)), col = JOYAS[b.c % JOYAS.length];
+      ex.fillStyle = "#140c1c"; ex.fillRect(x - 3, y - 7, 6, 9);
+      ex.fillStyle = col; ex.fillRect(x - 2, y - 4, 4, 6); ex.fillRect(x - 1, y - 7, 2, 3);
+      ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1, y - 3, 1, 3);
+      if (b.flota) {
+        const urge = b.cuenta < 0.8 && Math.floor(tMusica * 14) & 1;
+        lx.fillStyle = urge ? "#ffffff" : col;
+        for (let dx = -b.r; dx <= b.r; dx += 4) { lx.globalAlpha = 0.5; lx.fillRect(Math.floor(b.x + dx), Y_AGUA + 2, 2, 1); }
+        lx.globalAlpha = 1;
+        brillo(b.x, y - 3, 8 + 6 * (1 - b.cuenta / 2.5), col, 0.5);
+      }
+    }
+    if (t === "crisalida") for (const r of jefe.vidriera || []) {
+      const y = Math.floor(r.y);
+      for (let i = 0; i < 20; i++) {
+        if (!r.segs[i]) continue;
+        ex.fillStyle = "#140c1c"; ex.fillRect(i * 12, y - 3, 12, 6);
+        ex.fillStyle = JOYAS[(i + r.c) % JOYAS.length]; ex.fillRect(i * 12 + 1, y - 2, 10, 4);
+        ex.fillStyle = "#fff6d8"; ex.fillRect(i * 12 + 2, y - 2, 3, 1);
+      }
+      // Dónde va a caer, marcado en el agua.
+      lx.fillStyle = "#fff6d8";
+      for (let i = 0; i < 20; i++) if (!r.segs[i]) { lx.globalAlpha = 0.35; lx.fillRect(i * 12 + 2, M.Y_FANAL + 6, 8, 1); }
+      lx.globalAlpha = 1;
+    }
+    if (t === "hoguera" && jefe.colada) {
+      const c = jefe.colada, x = Math.floor(c.x), y0 = Math.floor(jefe.y + 26 * escalaJefe());
+      const y1 = c.tope ? Math.floor(c.tope.y) : H;
+      if (!c.on) { lx.fillStyle = "#ffc83c"; for (let y = y0; y < H; y += 6) { lx.globalAlpha = 0.55; lx.fillRect(x - c.w, y, 1, 3); lx.fillRect(x + c.w, y, 1, 3); } lx.globalAlpha = 1; }
+      else {
+        for (let y = y0; y < y1; y += 2) {
+          const ond = Math.round(Math.sin(y * 0.2 + tMusica * 14) * 1.5);
+          ex.fillStyle = "#c8284c"; ex.fillRect(x - c.w + 1 + ond, y, c.w * 2 - 1, 2);
+          ex.fillStyle = (y >> 2) & 1 ? "#ffc83c" : "#ff8c3c"; ex.fillRect(x - c.w + 3 + ond, y, c.w * 2 - 5, 2);
+          ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1 + ond, y, 2, 2);
+        }
+        if (!c.tope) chispas(c.x, M.Y_FANAL + 2, 1, ["#ffc83c", "#ff4c9c"], 40, 0.3);
+      }
+    }
+    if (t === "luna" && jefe.aguaVidrio > 0) {
+      // El agua, un espejo: franjas de brillo y el reflejo de la barca.
+      const a = Math.min(1, jefe.aguaVidrio / 0.6);
+      lx.fillStyle = "#e8f4ff";
+      for (let x = 0; x < W; x += 6) { lx.globalAlpha = 0.22 * a * (0.6 + 0.4 * Math.sin(x * 0.3 + tMusica * 3)); lx.fillRect(x, Y_AGUA + 2 + ((x / 6) % 3), 4, 1); }
+      lx.globalAlpha = 0.5 * a; lx.fillRect(Math.floor(F.x - 6), Y_AGUA + 6, 13, 1); lx.fillRect(Math.floor(F.x - 3), Y_AGUA + 9, 7, 1);
+      lx.globalAlpha = 1;
+    }
+    if (t === "sol" && jefe.lupa) {
+      const l = jefe.lupa, x = Math.floor(l.x), y = Y_AGUA - 3;
+      lx.fillStyle = "#ffd070";
+      for (let q = 0.2; q < 1; q += 0.05) { lx.globalAlpha = 0.12 + 0.18 * q; lx.fillRect(Math.floor(lerp(jefe.x - 14, x - 3 * q, q)), Math.floor(lerp(jefe.y, y, q)), 1, 2); lx.fillRect(Math.floor(lerp(jefe.x + 14, x + 3 * q, q)), Math.floor(lerp(jefe.y, y, q)), 1, 2); }
+      lx.globalAlpha = l.on ? 0.75 : 0.35; lx.fillRect(x - 12, y + 4, 25, 1);
+      lx.globalAlpha = 1;
+      if (l.on) { brillo(l.x, y, 14 + 3 * Math.sin(tMusica * 18), "#fff2c8", 0.8); ex.fillStyle = "#ffffff"; ex.fillRect(x - 1, y - 1, 3, 3); }
+    }
+  }
+  /* La Muda de la Nodriza: su piel de vidrio, que parpadea. */
+  function dibujaMuda() {
+    const m = jefe.muda;
+    if (!m) return;
+    const sale = m.t > m.dur - 0.8 ? Math.floor(tMusica * 16) & 1 : 1;
+    ex.globalAlpha = (0.45 + 0.15 * Math.sin(tMusica * 9)) * sale;
+    pintaCuerpo(banco.nodriza(Math.floor(m.t * 4) % 3, m.flash > 0, 6), m.x, m.y);
+    ex.globalAlpha = 1;
+    brillo(m.x, m.y, 26, "#ff8cd8", 0.18);
+  }
+  /* Lo que un tiro rompe de la fase 6: un vidrio de la Vidriera (no anota
+     nada) o la Muda (paga como lo que orbita al romperse). */
+  function golpeaFase6(b) {
+    for (const r of jefe.vidriera || []) if (Math.abs(b.y - r.y) < 4) {
+      const i = Math.floor(b.x / 12);
+      if (r.segs[i]) { r.segs[i] = false; chispas(b.x, r.y, 6, [JOYAS[(i + r.c) % JOYAS.length], "#fff6d8"], 32, 0.4); musica.sfx.roce(b.x); return true; }
+    }
+    const m = jefe.muda;
+    if (m && !b.tocados.has(m) && Math.abs(b.x - m.x) < 18 * escalaJefe() && Math.abs(b.y - m.y) < 12 * escalaJefe()) {
+      b.tocados.add(m); m.flash = 0.07; musica.sfx.escudo(); chispas(b.x, b.y, 4, ["#ff4c9c", "#5cf0d8"], 30, 0.3);
+      m.vida -= b.dano;
+      if (m.vida <= 0) { pagaOrbita(b, m.x, m.y); chispas(m.x, m.y, 30, ["#ff4c9c", "#5cf0d8", "#ffc83c", "#fff6d8"], 70, 0.9, "polvo"); anillo(m.x, m.y, "#ff8cd8", 30); jefe.muda = null; avisa("La piel se rompió"); }
+      return true;
+    }
+    return false;
+  }
+
   const ESPECIALES = { nodriza: espNodriza, faro: espFaro, esfinge: espEsfinge, casco: espCasco, crisalida: espCrisalida, hoguera: espHoguera, luna: espLuna, constelacion: espConstelacion, sol: espSol };
 
   /* Las nubes de ceniza: si alcanzan el fanal, la llama se ahoga un
@@ -2868,6 +3247,8 @@
     jefe.reclamo = null; jefe.deslumbre = null; jefe.sombra = null; jefe.balasR = []; jefe.mortaja = null; jefe.cerco = null;
     jefe.horizonte = 0; jefe.horizonteAviso = false; jefe.ronda = 0; jefe.punta = null; jefe.ocaso = null; F.capullo = 0;
     jefe.acertijo = null; jefe.acertijoGolpe = 0; jefe.escora = null; jefe.compas = null; jefe.yesca = []; jefe.rayoLuna = null; jefe.aurora = null; jefe.amanecer = null; F.posadas = 0;
+    // Y lo de la fase 6.
+    jefe.muda = null; jefe.calei = null; jefe.esquirlas = []; jefe.botellas = []; jefe.vidriera = []; jefe.colada = null; jefe.aguaVidrio = 0; jefe.lupa = null;
     if (jefe.tipo === "faro" && enHistoria()) programa(revelacion, 1.4);
     else if (jefe.tipo === "esfinge" && enHistoria()) { apagaTodas(); programa(terminaJornada, 3.6); }
     else if (jefe.tipo === "hoguera" && enHistoria()) programa(finalHoguera, 2.6);
@@ -2995,7 +3376,7 @@
     if (cartel) {
       const a = R.actoInfo(jSig.acto === 5 ? jSig.actoBase : jSig.acto);
       const parte = nSig === M.JORNADA_ALBA + 1 ? R.PARTE_DOS.num + " · " : nSig === M.JORNADA_HOGUERA + 1 && R.PARTE_TRES ? R.PARTE_TRES.num + " · " : "";
-      const num = jSig.acto === 5 ? "FASE " + (["", "I", "II", "III", "IV", "V"][jSig.fase] || "II") + (jSig.vuelta ? " · VUELTA " + (jSig.vuelta + 1) : "") : parte + "ACTO " + M.ROMANO_ACTO[jSig.acto];
+      const num = jSig.acto === 5 ? "FASE " + R.romano(jSig.fase || 2) + gradoTexto(jSig) + (jSig.vuelta ? " · VUELTA " + (jSig.vuelta + 1) : "") : parte + "ACTO " + M.ROMANO_ACTO[jSig.acto];
       ponActo(num, a.nombre, a.lema);
     } else ponActo("", "", "");
     const caido = P.jornada && P.j && P.j.tipo === "jefe" && R.JEFES[P.j.jefe] && P.jornada <= M.JORNADAS_HISTORIA ? R.JEFES[P.j.jefe].cae : "";
@@ -3004,6 +3385,9 @@
     if (jSig.jefe === "alba") lineas.push({ t: R.AVISO_ALBA, cls: "grande" });
     if (jSig.jefe === "hoguera" && nSig <= M.JORNADAS_HISTORIA) lineas.push({ t: R.AVISO_HOGUERA, cls: "grande" });
     if (jSig.jefe === "sol" && nSig <= M.JORNADAS_HISTORIA && R.AVISO_SOL) lineas.push({ t: R.AVISO_SOL, cls: "grande" });
+    // El rigor de la fase 6: se dice al empezar cada vuelta en ella.
+    const gAntes = P.j ? P.j.grado || 0 : 0;
+    if (jSig.grado > gAntes) { lineas.push({ t: jSig.grado === 1 ? R.RIGOR.primera : R.RIGOR.otra(jSig.grado), cls: "grande" }); lineas.push({ t: R.RIGOR.nota, cls: "augurio" }); }
     // El augurio: lo que la noche aprendió para esta jornada.
     const aug = M.augurioDe(nSig);
     if (aug) lineas.push({ t: R.AUGURIO_PRE + " " + R.AUGURIOS[aug].toLowerCase(), cls: "augurio" });
@@ -3320,14 +3704,28 @@
       j: n, puntos: P.puntosJ0, llamas: P.llamasJ0, luces: P.lucesJ0, mej: Object.assign({}, P.mej), br: P.brasas,
       perdidas: P.perdidasPend + Math.max(0, P.llamasJ0 - P.llamas), notas: P.notasJ0, u: P.uJ, ver: FP.VERSION, at: Date.now()
     };
-    if (P.prueba && !P.legado) prog.punto.pr = Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {});
+    if (P.prueba && !P.legado) prog.punto.pr = prDelPunto(Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {}));
     guardaProgreso();
   }
-  /* La prueba de una travesía guardada, lista para rehacer (o null). */
+  /* La prueba que viaja con la travesía guardada: tal cual si cabe en el
+     progreso, empacada si no (FP.ajusta, sobre una copia: quitarle pulsos
+     no puede tocar la de la partida). Se empaca una vez por jornada: entre
+     dos tránsitos la prueba no crece, y guardaPunto corre en cada golpe. */
+  let prEmpacada = null;
+  function prDelPunto(pr) {
+    if (JSON.stringify(pr).length <= Math.min(FP.EMPACA_DESDE, M.PRUEBA_PUNTO_MAX)) return pr;
+    const clave = pr.id + "|" + pr.J.length + "|" + (pr.x ? 1 : 0);
+    if (!prEmpacada || prEmpacada.clave !== clave) prEmpacada = { clave, pr: FP.ajusta(JSON.parse(JSON.stringify(pr)), M.PRUEBA_PUNTO_MAX) };
+    return prEmpacada.pr;
+  }
+  /* La prueba de una travesía guardada, lista para rehacer (o null). Se
+     desempaca: la partida sigue anotando en ella. */
   function pruebaGuardada(p) {
     const pr = p && p.pr;
-    if (!pr || pr.x || typeof pr.id !== "string" || !Array.isArray(pr.J)) return null;
-    return { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: 0, J: pr.J.slice() };
+    if (!pr || pr.x || typeof pr.id !== "string") return null;
+    const J = FP.jornadasDe(pr);
+    if (!Array.isArray(J)) return null;
+    return { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: 0, J: J.slice() };
   }
   /* Empezar una travesía nueva con otra guardada la da por terminada: lo
      jugado hasta lo guardado va a la clasificación, como si el fanal se
@@ -3665,7 +4063,7 @@
     ponTexto("hudRes", "×" + multiplicador());
     if (!P) return;
     const j = P.j || M.jornada(Math.max(1, P.jornada));
-    const nombre = j.acto === 5 ? R.actoInfo(j.actoBase).nombre + " · FASE " + (["", "I", "II", "III", "IV", "V"][j.fase] || "II") : R.actoInfo(j.acto).nombre;
+    const nombre = j.acto === 5 ? R.actoInfo(j.actoBase).nombre + " · FASE " + R.romano(j.fase || 2) + gradoTexto(j) : R.actoInfo(j.acto).nombre;
     ponTexto("hudJornada", `JORNADA ${Math.max(1, P.jornada)} · ${nombre}`);
     ponTexto("hudLuces", "✦ " + Math.max(0, P.luces));
     ponTexto("hudBrasas", P.brasas > 0 ? "🔥 " + P.brasas : "");
@@ -4123,6 +4521,7 @@
     dibujaColumnas();
     if (fase >= 4 && !jefe.muerto) dibujaFase4();
     if (fase >= 5 && !jefe.muerto) dibujaFase5();
+    if (fase >= 6 && !jefe.muerto) { dibujaMuda(); dibujaFase6(); }
   }
   /* El cuerpo de un jefe centrado en (cx, cy). El dibujo ya viene a su
      tamaño; `esc` es solo para el Sol cuando se cierra. */
@@ -4271,6 +4670,7 @@
       if (e.devuelta) { ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1, y - 1, 3, 3); ex.fillStyle = "#ffd27a"; ex.fillRect(x, y - 3, 1, 2); continue; }
       // De las habilidades de fase: polvo suspendido (Nodriza), lo que vuelve del agua (Luna), un tizón (Hoguera).
       // Una luz del Prisma (Faro, fase 5): grande y tornasolada.
+      if (e.vidrio) { ex.fillStyle = "#140c1c"; ex.fillRect(x - 2, y - 2, 5, 5); ex.fillStyle = JOYAS[(Math.round(e.x / 24) & 3)]; ex.fillRect(x - 1, y - 2, 3, 5); ex.fillRect(x - 2, y - 1, 5, 3); ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1, y - 1, 1, 1); continue; }   // un vidrio de la Muda o la Celosía (fase 6)
       if (e.prisma) { ex.fillStyle = "#ffffff"; ex.fillRect(x - 1, y - 3, 3, 7); ex.fillRect(x - 3, y - 1, 7, 3); ex.fillStyle = Math.floor(e.t * 8) & 1 ? "#ff8cb4" : "#8fd8ff"; ex.fillRect(x - 1, y - 1, 3, 3); brillo(e.x, e.y, 9, "#ffc8e0", 0.45); continue; }
       if (e.polvo) { if (e.espera > 0 && Math.floor(e.espera * 14) & 1) continue; ex.fillStyle = "#e8d8c0"; ex.fillRect(x - 1, y, 3, 1); ex.fillRect(x, y - 1, 1, 3); ex.fillStyle = "#fff6e0"; ex.fillRect(x, y, 1, 1); continue; }
       if (e.reflejo) { ex.fillStyle = "#5a6e98"; ex.fillRect(x, y + 2, 1, 4); ex.fillStyle = "#c8d8f0"; ex.fillRect(x, y, 2, 2); continue; }
@@ -4467,6 +4867,13 @@
       if (jefe.amanecer) out.push({ x: jefe.amanecer.x, y: jefe.amanecer.y, r: 130, i: 1 });
       for (const y of jefe.yesca || []) if (y.t > 0) out.push({ x: y.n.x + y.n.w / 2, y: y.n.y, r: 26, i: 0.9 });
       if (jefe.aurora) for (const b of jefe.aurora.bandas) out.push({ x: b.x, y: 230, r: 34, i: jefe.aurora.on ? 0.5 : 0.2 });
+      // Y las de la fase 6.
+      if (jefe.muda) out.push({ x: jefe.muda.x, y: jefe.muda.y, r: 24, i: 0.45 });
+      for (const s of jefe.esquirlas || []) if (s.t >= 0) out.push({ x: s.x, y: M.Y_FANAL - 6, r: 12, i: 0.6 });
+      for (const b of jefe.botellas || []) out.push({ x: b.x, y: b.y - 3, r: 12, i: 0.6 });
+      if (jefe.colada && jefe.colada.on) out.push({ x: jefe.colada.x, y: 230, r: 34, i: 0.9 });
+      if (jefe.lupa && jefe.lupa.on) out.push({ x: jefe.lupa.x, y: M.Y_FANAL, r: 30, i: 1 });
+      if (jefe.calei && jefe.calei.on) for (let k = 0; k < HACES_CALEI; k++) if (jefe.calei.m & (1 << k)) out.push({ x: xHazCalei(k), y: M.Y_FANAL - 10, r: 22, i: 0.7 });
       if (jefe.deslumbre && !jefe.deslumbre.pum) out.push({ x: W / 2, y: 190, r: 60 + 180 * jefe.deslumbre.q, i: jefe.deslumbre.q });
     }
     for (const c of columnas) if (!c.aviso) out.push({ x: c.x, y: 200, r: 40, i: 0.9 });
@@ -4563,7 +4970,7 @@
       if (jefe.tipo === "constelacion") for (const h of jefe.hermanas) if (!h.velada) { const p = posHermana(h); brillo(p.x, p.y, 8, "#fff0c8", 0.6); }
       if (jefe.tipo === "sol") brillo(jefe.x, jefe.y, 60 * escalaJefe() * (jefe.colapso || 1), jefe.fase === 4 ? "#a8d8ff" : "#ffd070", jefe.oculta ? 0.2 : 0.55);
       // Las fases 2 y 3 traen su propia luz: brasa la herida, casi blanca la coronada.
-      if (jefe.fase > 1 && jefe.tipo !== "constelacion") brillo(jefe.x, jefe.y, 32 * escalaJefe(), jefe.fase >= 5 ? "#ffc8a0" : jefe.fase === 4 ? "#8fd8ff" : jefe.fase === 3 ? "#ffe6b0" : "#ff3a2a", jefe.fase >= 3 ? 0.22 : 0.26);
+      if (jefe.fase > 1 && jefe.tipo !== "constelacion") brillo(jefe.x, jefe.y, 32 * escalaJefe(), jefe.fase >= 6 ? "#ff8cd8" : jefe.fase >= 5 ? "#ffc8a0" : jefe.fase === 4 ? "#8fd8ff" : jefe.fase === 3 ? "#ffe6b0" : "#ff3a2a", jefe.fase >= 3 ? 0.22 : 0.26);
     }
     if (cielo.lleno > 0) brillo(W / 2, H / 2, 260, "#fff6e0", 0.25 * clamp(cielo.lleno / 2, 0, 1) * (1 - clamp((cielo.lleno - 14) / 6, 0, 1)));
     dibujaParticulas();
@@ -4677,12 +5084,12 @@
     salta(n) { empieza({ j: Math.max(1, n | 0), puntos: 0, llamas: 3, luces: 200, ver: FP.VERSION }); },
     sigue: () => { relatoListo = 0; sigueRelato(); },
     paso: dt => paso(dt || 1 / 60),
-    estado: () => ({ estado, brasas: P && P.brasas, jornada: P && P.jornada, puntos: P && P.puntos, llamas: P && P.llamas, luces: P && P.luces, restan: form && form.restan, jefe: jefe && { tipo: jefe.tipo, vida: jefe.vida, dist: jefe.dist }, notas: P && P.notas }),
+    estado: () => ({ estado, brasas: P && P.brasas, jornada: P && P.jornada, puntos: P && P.puntos, llamas: P && P.llamas, luces: P && P.luces, restan: form && form.restan, jefe: jefe && { tipo: jefe.tipo, vida: jefe.vida, max: jefe.max, fase: jefe.fase, grado: jefe.grado, dist: jefe.dist }, notas: P && P.notas }),
     desbloquea() { prog.alba = true; prog.hoguera = true; prog.sol = true; guardaProgreso(false); pintaPortada(); },
     brasas: n => { if (P) { P.brasas += n == null ? 10 : n; pintaHud(true); } },
     prueba: () => (P && P.prueba ? JSON.parse(JSON.stringify(P.prueba)) : null),
     taller: () => (P ? { mej: Object.assign({}, P.mej), brasas: P.brasas, arma: arma(), nave: naveF() } : null),
-    // Hace que el jefe lance ya su habilidad de fase (2 o 3), para probarla.
+    // Hace que el jefe lance ya su habilidad de fase (2 a 6), para probarla.
     especial: n => { if (jefe && jefe.fase > 1) { jefe.cdEsp = 0; jefe.cd = 0; jefe.pideEsp = n || 2; } },
     dano: v => { if (jefe) { jefe.vida -= v || 999; pintaVidaJefe(); if (jefe.vida <= 0 && !jefe.muerto) muereJefe(); } },
     limpia: () => { for (const p of polillas) if (p.viva) mata(p, null); for (const l of lumbres) l.viva = false; },
