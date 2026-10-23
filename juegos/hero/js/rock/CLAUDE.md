@@ -49,13 +49,20 @@ true and the `admins` condition back in those two rules. In the frame,
 - A box: `rock/c/<uid>/<k>` = `{at: now, p: 500, b: "m"|"f"}`, admin-only by
   rule. Content = `cajaRock(uid, k, at, b)` (SHA-256 → xoshiro, via
   `MascotasMotor`): 1000/10 000 legendary, then a uniform `POOL` row of that
-  body and class, then colours (`INV_RAND`; legendaries keep factory ones).
+  body and class, then colours (`INV_RAND`). Legendaries kept factory
+  colours before `CORTE_CAJAS_3` (00:00 Chile, 23 Oct 2026); from then on
+  they get random ones like the rest (old boxes must not change).
 - **`POOL` is append-only and versioned by purchase time**: a box is a
   uniform draw over the rows of its body and class, so adding rows changes
   every box already opened. Boxes with `at < CORTE_CAJAS_2` draw from the
   first `POOL_1` (109) rows (`poolDe(at)`); the face/hair rows come after.
   A future catalogue expansion needs its own cut-off (`POOL_2`,
-  `CORTE_CAJAS_3`), set after the deploy. Never reorder.
+  `CORTE_CAJAS_4`), set after the deploy. Never reorder.
+- **A legendary's glow follows its variant**: `legMat(kind, base, glow)`
+  takes the glow from the piece's secondary colour (`guard`, `accent`,
+  `color2`) through `vivo(x, def)`, which keeps the factory glow only when
+  that colour is too dark to shine (luma < 0.3). A fixed glow made a
+  black/white guitar look like the yellow catalogue sample.
 - **Face and hair are in the boxes too** (`INV_CATS` entries with `cara:
   true` and a `ruta`): hair styles, eye styles, make-up/paint, beards and
   tattoo designs — every category that has a legendary. They carry no
@@ -115,6 +122,13 @@ true and the `admins` condition back in those two rules. In the frame,
   rocker takes the strumming hand off the strings (`handS 'suelta'`) and does
   rest choreography instead of strumming. A chart solo (`currentSolo`) forces
   the scene's 'solo' section.
+- **The guitarist strums with your real notes**: each hit (`_rockGolpe` in
+  `session.js`, local and remote) goes in `pulso({golpes})` as `{l, a, d}`
+  (lane, chord, sustain seconds); the first one sets `st.real` and
+  `animGuitar` then strums only on those (fret hand follows the lane, a
+  sustain holds). The stroke shrinks with the gap to the previous hit, so
+  dense passages read as quick small strokes, not flailing. Without golpes
+  (editor, demo) the old riff loop plays. `battle.start` resets it.
 - **The crowd is people** (`Crowd`: torso, head with a face atlas of four
   expressions, hair, long hair, arms, forearms, legs, shoes; all instanced,
   faces via the `aFila` attribute). Its mood is `humor` = recent accuracy
@@ -166,11 +180,16 @@ or the guitar alone, or the tattoo drawing. It is rendered into a corner of
 the scene's own canvas **inside the frame, before the scene** (which paints
 over it) and copied to a 2D canvas — no second WebGL context. A few per frame
 (~12 ms, `MINI.cola`), only while the editor is open; cached per piece and
-colours (`invId`) in localStorage (`rock-mini-<MINI_V>:<id>`: bump `MINI_V`
-when the rocker's look changes). Used by the editor tiles, «Lo que puede
+colours (`invId`) in localStorage under `claveMini(v)` (`catalogo.js`,
+`rock-mini-2:<id>`: bump the number there when the rocker's look changes;
+the lobby reads the same keys). Used by the editor tiles, «Lo que puede
 salir» (the whole `poolDe(now)` of the body), the Vender rows, the last
 prizes, the prize card (`boxCardTex`) and `#boxUI`. Pieces you don't own
 show their factory/default colours (`muestra`).
+**`rock-visor.html`** is a hidden-iframe photographer for the lobby's drops
+strip: the page posts `{canal:'rock-visor-pide', lista}`, it answers
+`{canal:'rock-visor', fotos:[{id,url}]}` via `rock.miniaturas(lista)` (≤ 40,
+also cached under `claveMini`). Its import map carries `?v=hero-N` too.
 
 ## Traps
 

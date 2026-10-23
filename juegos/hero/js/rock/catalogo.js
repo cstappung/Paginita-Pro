@@ -285,6 +285,10 @@ export const invVar = (b, k, o) => { const c = {}; for (const f of INV_CATS[k].c
 /* la variante que lleva puesta un rockero en la categoría `k` (no sirve para los tatuajes) */
 export const invVarL = (L, k) => { const r = rutaInv(k), par = getP(L, r.split('.').slice(0, -1).join('.')) || {}; return invVar(L.body, k, { ...par, type: getP(L, r) }); };
 export const invId = v => [v.b, v.k, v.t, ...INV_CATS[v.k].cols.map(f => v.c[f] ?? '')].join(':');
+/* la clave de la foto de una pieza en localStorage (la escena la saca; el salón de Juegos la lee, mismo origen).
+   Subir el número cuando cambia cómo se ve un rockero: las fotos guardadas quedan viejas. */
+export const claveMiniId = id => 'rock-mini-2:' + id;
+export const claveMini = v => claveMiniId(invId(v));
 /* de partida: lo que trae cada cuerpo por defecto + la ropa que usan los rockeros de fábrica (de la cara y el
    pelo, solo lo del rockero por defecto y el primer diseño de tatuaje). Toda cuenta lo tiene: no se compra, no
    tiene copia y no se vende. */
@@ -488,17 +492,20 @@ export const POOL = Object.freeze([
    cuando se abrieron: sumar filas cambia el sorteo uniforme (`r.entero(n)`), así que cada ampliación del
    catálogo de cajas necesita su propio corte. */
 export const POOL_1 = 109, CORTE_CAJAS_2 = Date.UTC(2026, 9, 22, 4, 0);
+/* Desde CORTE_CAJAS_3 los legendarios salen con colores al azar como los demás (su efecto toma esos colores);
+   las de antes traían los de fábrica, y así se quedan. */
+export const CORTE_CAJAS_3 = Date.UTC(2026, 9, 23, 3, 0);
 export const poolDe = at => (at >= CORTE_CAJAS_2 ? POOL : POOL.slice(0, POOL_1));
 
 /* Lo que trae una caja comprada a la hora `at`, con el azar que se le pasa: `r.entero(n)` en [0, n).
    Primero si es legendaria, después la pieza (uniforme en su clase y en el cuerpo de la caja) y al final
-   sus colores. */
+   sus colores (los legendarios de antes de CORTE_CAJAS_3, con los de fábrica). */
 export function abreCaja(b, r, at = Infinity) {
   const g = b === 'f' ? 'f' : 'm', leg = r.entero(10000) < LEGENDARIO;
   const de = poolDe(at).filter(p => p.b === g && p.leg === leg), it = de[r.entero(de.length)];
   const az = { pick: a => a[r.entero(a.length)], moneda: () => r.entero(2) === 0 };
   const c = INV_RAND[it.k](az), fab = invItem(g, it.k, it.t)?.[2];
-  if (fab) for (const f of INV_CATS[it.k].cols) if (fab[f] != null) c[f] = fab[f];
+  if (fab && at < CORTE_CAJAS_3) for (const f of INV_CATS[it.k].cols) if (fab[f] != null) c[f] = fab[f];
   return { b: g, k: it.k, t: it.t, c, leg };
 }
 

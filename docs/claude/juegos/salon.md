@@ -10,10 +10,11 @@ bottom: the *Novedades* **banner**, a greeting, the **mode bar** (Todos ·
 notice, **«Para jugar solo» as a carousel right at the entrance** (it used
 to be a block at the very end that nobody reached), the rooms column, the
 **multiplayer** grid with its Todos/Duelos/En grupo filter, *Últimos tops*,
-the PRODROP drops strip and the Mascotas legendaries strip. `.jg-sal`
+the PRODROP drops strip, the Mascotas legendaries strip and the Batalla de
+Rock legendaries strip. `.jg-sal`
 places them by grid areas; from 901 px the rooms column
 (`aside.jg-ves-lado`, sticky) sits to the right and **spans every row down
-to the last strip** (`tiram`; a new strip must be added to the three
+to the last strip** (`tirar`; a new strip must be added to the three
 `grid-template-areas` of the media query, with the `1fr` row moved to it): Chrome bounds a sticky grid
 item by the whole grid, not by its area, so when the column ended at
 «Multijugador» it stayed stuck on top of the strip below. A mode only hides
@@ -66,6 +67,12 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   does not load three.js for someone who never scrolls there. Dances have
   no photo and show their emoji. A guest gets the `MOTIVO_CUENTA.mascotas`
   gate in the strip instead (the PRODROP strip is simply hidden).
+- **Últimos drops legendarios · Batalla de Rock** (`tiraRockHtml`,
+  `pintaDropsRock`, from `dropsRock` in `monedas.js`: the legendary pieces
+  of valid `cajasRock`, newest first). Photos: first the localStorage
+  thumbnails (`claveMini`, same origin as the frame), the rest asked to a
+  hidden `juegos/hero/rock-visor.html` iframe only once the strip is in
+  view (`vigilaDropsRock`). Hidden for guests and when `veRock()` is false.
 - **Últimos tops** (`topsLista`, from `ultimosPodios` in `monedas.js`) are
   the latest `podios` claims — the only club record with a date, since a
   `soloRanks` row has none — still valid by `podioValido`, newest first,

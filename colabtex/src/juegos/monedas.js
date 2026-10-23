@@ -802,6 +802,16 @@ export function objetosDe(uid, datos) {
   return out.sort((a, b) => a.at - b.at || (a.c < b.c ? -1 : 1));
 }
 
+/* Los últimos legendarios que salieron de cajas de Batalla de Rock (también
+   los repetidos, que devolvieron monedas), del más nuevo al más viejo, con
+   quién y cuándo: la tira del salón. */
+export function dropsRock(datos, n = 24) {
+  if (!datos || !datos.completo) return [];
+  const out = [];
+  for (const [u, x] of Object.entries(economia(datos).usuarios)) for (const c of x.cajasRock || []) if (c.v && c.v.leg) out.push({ uid: u, at: c.at, k: c.k, v: c.v, dup: !!c.dup });
+  return out.sort((a, b) => b.at - a.at || (a.k < b.k ? -1 : 1)).slice(0, n);
+}
+
 /* Las piezas de Batalla de Rock que una cuenta tiene ahora (las iniciales
    no están: no tienen copia). */
 export function rocasDe(uid, datos) {
