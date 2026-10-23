@@ -68,8 +68,10 @@ export function textoPrueba(prueba) {
    no se puede reescribir con el uid de quien entra: esa prueba vale para
    cualquier dueño, ahora y en cada auditoría. El límite honesto: una prueba
    de invitado ya guardada en `soloPruebas` la podría copiar otra cuenta,
-   que empataría con esa marca; nunca la mejoraría. */
-export const DE_INVITADO = new Set(['bbtan', 'aleteo', 'fanal', 'trigon']);
+   que empataría con esa marca; nunca la mejoraría. Tetris, Snake, 2048 y
+   PRO PACMAN se sumaron en octubre de 2026: también meten la cuenta en la
+   prueba (`u`) y en la semilla. */
+export const DE_INVITADO = new Set(['bbtan', 'aleteo', 'fanal', 'trigon', 'tetris', 'snake', 'dosmil', 'propac']);
 export const UID_INVITADO = 'invitado';
 
 export async function verificaClub(juego, dato, prueba, ctx = {}) {

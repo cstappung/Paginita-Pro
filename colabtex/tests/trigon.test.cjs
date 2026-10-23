@@ -141,7 +141,8 @@ test('la partida jugada como invitado vale con la cuenta con que se entra despuÃ
  assert.notEqual(await V.verificaClub('trigon',dp,prueba(77,'beto').p,{uid:'ana'}),null);
  assert.notEqual(await V.verificaClub('trigon',{...dp,puntos:E.puntos+1},p,{uid:'ana'}),null);
  assert.ok(V.DE_INVITADO.has('trigon')&&V.DE_INVITADO.has('bbtan')&&V.DE_INVITADO.has('aleteo')&&V.DE_INVITADO.has('fanal'));
- assert.ok(!V.DE_INVITADO.has('tetris')&&!V.DE_INVITADO.has('metrorush'));
+ assert.ok(['tetris','snake','dosmil','propac'].every(j=>V.DE_INVITADO.has(j)),'los que meten la cuenta en la prueba tambiÃ©n');
+ assert.ok(!V.DE_INVITADO.has('metrorush')&&!V.DE_INVITADO.has('sudoku'));
 });
 
 test('el verificador acepta la partida honesta y rechaza las trampas',async()=>{

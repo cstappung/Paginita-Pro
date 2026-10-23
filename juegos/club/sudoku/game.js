@@ -823,6 +823,9 @@
       texto += " Esta partida se empezó con una versión anterior del juego: no entra en la clasificación" + (tipo === "diario" ? ", pero suma a tu racha." : ".");
     f.className = "final" + (tipo === "pierde" ? " pierde" : "");
     f.innerHTML = `<div><h2 id="finalTitulo">${titulo}</h2><p>${texto}</p>${cifras.length ? `<p class="cifras">${cifras.join(" · ")}</p>` : ""}<div class="botones">${botones}</div></div>`;
+    /* El diario: compartirlo y cuánto falta para el de mañana (../diario.js). */
+    if ((tipo === "diario" || tipo === "hecho") && window.DiarioClub)
+      DiarioClub.cierre(f.firstElementChild, { juego: "sudoku", prox: "Nuevo sudoku en", clase: "boton", texto: `🔢 Sudoku del día · ${hoy.split("-").reverse().join("/")}\n${d.tiempo ? `⏱ ${reloj(d.tiempo)} · ` : ""}🔥 ${dias(tipo === "diario" ? cuentaRacha(racha) : M.rachaVisible(racha, hoy))}` });
     f.hidden = false;
     const primero = f.querySelector(".primario");     // el foco va al botón principal
     if (primero) setTimeout(() => primero.focus({ preventScroll: true }), 60);

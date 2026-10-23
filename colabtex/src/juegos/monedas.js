@@ -377,6 +377,25 @@ export function ganadoDe(uid, datos, porJuego) {
   return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
 
+/* Lo que el invitado se está perdiendo en una visita: lo que esas partidas
+   le habrían pagado a una cuenta nueva con las mismas reglas de arriba
+   (`ganadoDe`): la partida del club por cada una (con el tope del día),
+   el récord de cada modalidad por su mejor marca y los logros que esas
+   marcas dan. `mejores` es categoría → la mejor marca de la visita. Es
+   solo un aviso (`avisaPerdido` en juegos-main.js): no se guarda nada. */
+export function ganariaInvitado(juego, jugadas, mejores) {
+  let m = JUEGOS_CLUB.includes(juego) ? PAGO_CLUB[juego] * Math.min(Math.max(0, Math.floor(+jugadas || 0)), topeClub(juego)) : 0;
+  const logros = new Set();
+  for (const [cat, d] of Object.entries(mejores || {})) {
+    if (!d) continue;
+    const j = juegoDeCategoria(cat) || juego;
+    m += (RECORD[j] || 0) + extraRecord(cat, d);
+    for (const id of deMarca(j, Object.assign({}, d, { categoria: cat }))) logros.add(id);
+  }
+  for (const id of logros) m += valorLogro(juego, id);
+  return { monedas: Math.round(m), logros: [...logros] };
+}
+
 /* Lo ganado más lo que dice la economía: `gastadas` (sobres, graduaciones
    y compras del mercado), `cobradas` (ventas), `saldo` y si la cuenta está
    parada por un gasto sin fondos. */

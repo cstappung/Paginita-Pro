@@ -2,13 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610230525"></script>
+<script src="i18n.js?v=202610230614"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
 <link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png" data-favicon="marca/favicon-32.png" data-favicon-hw="marca/favicon-halloween-32.png">
 <link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png" data-favicon="marca/favicon-64.png" data-favicon-hw="marca/favicon-halloween-64.png">
 <link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
+<!-- Instalable como app (manifest.webmanifest): en Android y el PC con «Instalar», en el iPhone con «Agregar a inicio». Abre Juegos. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Paginita Pro">
 <script>
 /* El tema se pone antes de pintar nada: si esperara al bundle, la
    página saldría blanca un instante antes de oscurecerse. Sin elección
@@ -3037,13 +3040,13 @@ html.jg-bt3solo #pantalla>.jg-bt3-info{place-self:center;color:#e8eaf6}
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
 html.jg-club-inm,html.jg-club-inm body{overflow:hidden;height:100%;overscroll-behavior:none}
-html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
+html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-reto-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
 html.jg-club-inm #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#000}
 html.jg-club-inm .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRO DEFENDER: siempre a ventana completa (club.js: PLENO), con su propio «← Volver a Juegos».
    Su fondo es oscuro en los dos temas, así que no lleva gemelo en el bloque oscuro. */
 html.jg-club-pleno,html.jg-club-pleno body{overflow:hidden;height:100%;overscroll-behavior:none}
-html.jg-club-pleno .head,html.jg-club-pleno .bar,html.jg-club-pleno .rp-fab,html.jg-club-pleno .jg-solo-barra,html.jg-club-pleno .jg-inv-tira,html.jg-club-pleno .jg-cg-fab,html.jg-club-pleno .jg-riel{display:none!important}
+html.jg-club-pleno .head,html.jg-club-pleno .bar,html.jg-club-pleno .rp-fab,html.jg-club-pleno .jg-solo-barra,html.jg-club-pleno .jg-inv-tira,html.jg-club-pleno .jg-reto-tira,html.jg-club-pleno .jg-cg-fab,html.jg-club-pleno .jg-riel{display:none!important}
 html.jg-club-pleno #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#0e1220}
 html.jg-club-pleno .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
@@ -5461,6 +5464,9 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-bv-juego:active{transform:scale(.97)}
 .jg-bv-portada{display:block;aspect-ratio:4/3;overflow:hidden;background:#1d1529;margin-bottom:6px}
 .jg-bv-portada svg{display:block;width:100%;height:100%}
+.jg-bv-portada{position:relative}
+.jg-bv-play{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#1a1206;box-shadow:0 3px 10px #0006}
+.jg-bv-play svg{width:15px!important;height:15px!important;margin-left:2px}
 .jg-bv-juego b{font-size:15px}
 .jg-bv-juego small{font-size:12px;color:var(--jg-muted)}
 
@@ -5469,9 +5475,14 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-inv-tira>span{flex:1;min-width:0}
 .jg-inv-tira .btn{flex-shrink:0;background:var(--jg-purple)}
 @media (max-width:600px){.jg-inv-tira{font-size:12px;padding:8px 10px;gap:8px}.jg-inv-tira .btn{height:34px;padding:0 12px}}
+/* El reto de un amigo (reto.js), encima del juego. */
+.jg-reto-tira{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;border-radius:14px;background:#efe9ff;border:1px solid #d6c9ff;color:#3b2a7a;font-size:13px;line-height:1.45}
+.jg-reto-tira>span:first-child{font-size:20px}
+.jg-reto-tira>span:last-child{flex:1;min-width:0}
 .jg-invg{position:fixed;left:0;right:0;bottom:0;z-index:92;display:flex;justify-content:center;padding:0 12px max(12px,env(safe-area-inset-bottom));pointer-events:none}
 .jg-invg-caja{pointer-events:auto;position:relative;width:100%;max-width:520px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:16px 16px 14px;border-radius:20px;background:#fff;border:1px solid #e4dfeb;box-shadow:0 14px 44px #120d1f4d;animation:jgLogroEntra .45s cubic-bezier(.2,1.4,.4,1)}
 .jg-invg-ico{font-size:30px;line-height:1;padding-top:2px}
+.jg-instalar-ico{width:44px;height:44px;border-radius:12px}
 .jg-invg-txt small{display:block;font-size:12px;font-weight:700;color:var(--jg-purple)}
 .jg-invg-txt b{display:block;font-size:17px;letter-spacing:-.3px;color:var(--jg-ink);padding-right:26px}
 .jg-invg-txt p{margin:4px 0 0;font-size:13px;line-height:1.5;color:#5f5a70}
@@ -5647,6 +5658,7 @@ html[data-tema=oscuro] .jg-nom-campo input:focus,html[data-tema=oscuro] .jg-bv-n
 html[data-tema=oscuro] .jg-bv-nombre{color:#c4b1ff}
 html[data-tema=oscuro] .jg-bv-juego{border-color:color-mix(in srgb,var(--c) 40%,var(--os-borde))}
 html[data-tema=oscuro] .jg-inv-tira{background:#2a2312;border-color:#4d3d17;color:#f1dfae}
+html[data-tema=oscuro] .jg-reto-tira{background:#231b3d;border-color:#3e3170;color:#ddd3ff}
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
@@ -6788,6 +6800,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610230525"></script>
+<script src="juegos-app.js?v=202610230614"></script>
 </body>
 </html>

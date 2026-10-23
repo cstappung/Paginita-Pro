@@ -286,6 +286,24 @@ export function sugiereNombreInvitado(azar = Math.random) {
   return a + " " + (10 + Math.floor(azar() * 90) % 90);
 }
 
+/* Lo primero que ve alguien nuevo tiene que poder jugarse ahí mismo. Al
+   invitado, lo que pide cuenta va después; en el celular, lo que solo se
+   juega en el PC (`soloPc`) también. Es un orden estable: dentro de cada
+   grupo manda el de antes (el de la dueña en las novedades, la
+   popularidad en el catálogo). Con cuenta y en el PC no cambia nada. Antes
+   la primera diapositiva que veía un invitado en el teléfono era Pro
+   BoxHead: multijugador, solo PC y con «Iniciar sesión y jugar». */
+export const novedadPideCuenta = n => !!n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6)));
+const idSoloPc = id => !!id && enPc(id) && !enMovil(id);
+export const soloPc = e => !e.movil && !!e.pc;
+const ordenEstable = (lista, peso) => lista.map((x, i) => ({ x, i, p: peso(x) })).sort((a, b) => a.p - b.p || a.i - b.i).map(o => o.x);
+export function ordenaNovedades(lista, { invitado = false, celular = false } = {}) {
+  return ordenEstable(lista, n => (invitado && novedadPideCuenta(n) ? 2 : 0) + (celular && idSoloPc(juegoDeNovedad(n)) ? 1 : 0));
+}
+export function ordenaEntradas(entradas, { invitado = false, celular = false } = {}) {
+  return ordenEstable(entradas, e => (bloqueado(e, invitado) ? 2 : 0) + (celular && soloPc(e) ? 1 : 0));
+}
+
 /* El modo de juego que elige la barra del salón. `todos` muestra las dos
    secciones; los otros dos esconden la que sobra (las novedades se
    quedan siempre: son el escaparate). Lo guardado que no sea uno de los

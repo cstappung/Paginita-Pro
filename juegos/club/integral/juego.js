@@ -402,7 +402,7 @@
   hoja.addEventListener("submit", ev => { ev.preventDefault(); intenta(); });
 
   function comparte() {
-    const txt = M.resumen(est, hoy), a = $("avisoCierre");
+    const txt = M.resumen(est, hoy) + "\n" + location.origin + "/juegos.html#solo/integral", a = $("avisoCierre");
     const listo = () => { if (a) a.textContent = "Copiado: pégalo donde quieras."; };
     const copia = () => {
       try { navigator.clipboard.writeText(txt).then(listo, () => { if (a) a.textContent = txt; }); }

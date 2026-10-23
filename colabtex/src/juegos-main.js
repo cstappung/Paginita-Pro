@@ -2,7 +2,7 @@
    de que el SDK abra su primera conexión con la base. */
 import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
-import { esRachaClub, rachaClub, resultadoClub } from "./juegos/solo/club-datos.js";
+import { esRachaClub, rachaClub, resultadoClub, mejorClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
@@ -39,6 +39,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
       contar dos veces la misma partida, así que recargar la página con
       la partida terminada no infla el marcador.
    ============================================================ */
+import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
@@ -82,7 +83,7 @@ import { crearRanks, categoriaVigente } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender, dropsRock } from "./juegos/monedas.js";
+  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender, dropsRock, ganariaInvitado } from "./juegos/monedas.js";
 import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
 import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta, firmaYoTienda } from "./juegos/tienda-halloween.js";
 import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
@@ -109,7 +110,7 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
 import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
@@ -874,9 +875,12 @@ function vinoDeInvitado() {
   try { return sessionStorage.getItem("jg.visitaInvitado") === "1"; } catch (e) { return false; }
 }
 const nombreSolo = id => (SOLOS.find(x => x.id === id) || {}).nombre || id;
-const marcaInvitado = d => d.categoria === "club-bbtan-rondas" ? `Ronda ${d.puntos}`
-  : d.categoria === "club-fanal-jornadas" ? `${d.puntos} ${d.puntos === 1 ? "jornada" : "jornadas"}`
-  : `${Number(d.puntos).toLocaleString("es-CL")} puntos`;
+const marcaInvitado = d => valorMarca(d.categoria, d);
+/* La ruta del club (`tetris`) y la clave de sus logros, monedas y nombre
+   (`tetrisclub`) son lo mismo salvo en el Tetris. */
+const claveClub = juego => juego === "tetris" ? "tetrisclub" : juego;
+/* Los destacados que además se llevan la partida a medias o el avance. */
+const AVANCE_INVITADO = new Set(["bbtan", "fanal", "trigon", "dosmil"]);
 
 /* El aviso al invitado que acaba de terminar una partida de un destacado
    (solo/club.js lo llama solo con una marca nueva suya): todavía no se
@@ -885,6 +889,7 @@ const marcaInvitado = d => d.categoria === "club-bbtan-rondas" ? `Ronda ${d.punt
    resultados a la vez (travesía y jornadas): el segundo no tapa al primero. */
 function ofreceGuardar(juego, dato) {
   if (!state.invitado) return;
+  if ($("jgInvGuarda") && $("jgInvGuarda").dataset.reto) return;   // «¡Le ganaste!» se queda: la franja de invitado sigue ofreciendo guardar
   if (dato.categoria === "club-fanal-jornadas" && $("jgInvGuarda")) return;
   quitaOfreceGuardar();
   const c = document.createElement("div");
@@ -895,9 +900,9 @@ function ofreceGuardar(juego, dato) {
   c.innerHTML = `<div class="jg-invg-caja">
     <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
     <span class="jg-invg-ico" aria-hidden="true">🏆</span>
-    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(juego))} · ${escapeHtml(marcaInvitado(dato))}</small>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(claveClub(juego)))} · ${escapeHtml(marcaInvitado(dato))}</small>
       <b id="jgInvGuardaT">¿Guardamos esta partida?</b>
-      <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${juego === "aleteo" ? "" : ", junto con tu avance para seguir después"}.</p></div>
+      <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${AVANCE_INVITADO.has(juego) ? ", junto con tu avance para seguir después" : ""}.${lineaGanaria(claveClub(juego))}</p></div>
     <div class="jg-invg-btns"><button class="btn" type="button" data-login data-origen="aviso-guardar">Iniciar sesión y guardar</button><button class="btn2" type="button" data-cierra>Ahora no</button></div>
   </div>`;
   for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = () => { evento("jg_invitado_aviso_cierra", { juego }); quitaOfreceGuardar(); };
@@ -906,6 +911,188 @@ function ofreceGuardar(juego, dato) {
   suena("entra");
 }
 function quitaOfreceGuardar() { const c = $("jgInvGuarda"); if (c) c.remove(); }
+
+/* ---------- lo que lleva la visita ----------
+   Cada partida del club que termina en esta pestaña (`alTerminar` de
+   crearSolo, con o sin cuenta): cuántas, la mejor de cada modalidad y la
+   última. Solo en memoria: alimenta el aviso al invitado («con cuenta ya
+   llevarías…»), el botón de retar a un amigo y el reto que llegó por enlace. */
+const visita = {};
+function anotaVisita(clave, d) {
+  const v = visita[clave] || (visita[clave] = { jugadas: 0, mejores: {}, ultimo: null });
+  v.jugadas++;
+  v.ultimo = d;
+  const antes = v.mejores[d.categoria];
+  const mejoro = mejorClub(d, antes);
+  if (mejoro) v.mejores[d.categoria] = d;
+  return mejoro;
+}
+const ganariaDe = clave => { const v = visita[clave]; return v ? ganariaInvitado(clave, v.jugadas, v.mejores) : { monedas: 0, logros: [] }; };
+const nombresLogros = (clave, ids) => ids.map(id => ((LOGROS[clave] || []).find(l => l.id === id) || {}).n).filter(Boolean);
+function lineaGanaria(clave) {
+  const g = ganariaDe(clave);
+  if (!g.monedas) return "";
+  return ` Con esa cuenta te llevarías ${MONEDA} <strong>${g.monedas.toLocaleString("es-CL")}</strong>${g.logros.length ? ` y ${g.logros.length === 1 ? "un logro" : g.logros.length + " logros"}` : ""}.`;
+}
+
+/* El invitado que termina una partida de un juego que no guarda nada (los
+   que no son destacados): lo que una cuenta le habría pagado en esta
+   visita, con las reglas de la economía (`ganariaInvitado`), y las dos
+   salidas que lo hacen volver: crearse la cuenta o retar a alguien. Sale
+   con la primera partida de cada juego y después solo cuando la cuenta
+   sumaría un logro nuevo o mejora su marca, para no tapar el juego en cada
+   intento. Las partidas de los destacados ya tienen su aviso
+   (`ofreceGuardar`), que lleva la misma línea. */
+const perdidoVisto = {};
+function avisaPerdido(clave, d, mejoro) {
+  if (!state.invitado) return;
+  const g = ganariaDe(clave);
+  const visto = perdidoVisto[clave];
+  if (visto && !mejoro && g.logros.length <= visto.logros) return;
+  perdidoVisto[clave] = { logros: g.logros.length };
+  quitaOfreceGuardar();
+  const nombre = nombreInvitado() || INVITADO.name;
+  const logros = nombresLogros(clave, g.logros);
+  const c = document.createElement("div");
+  c.id = "jgInvGuarda";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInvGuardaT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
+    <span class="jg-invg-ico" aria-hidden="true">${g.monedas ? MONEDA : "🎮"}</span>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(clave))} · ${escapeHtml(valorMarca(d.categoria, d))}</small>
+      <b id="jgInvGuardaT">¡Buena partida, <span translate="no">${escapeHtml(nombre)}</span>!</b>
+      <p>${g.monedas ? `Con una cuenta, en esta visita ya llevarías ${MONEDA} <strong>${g.monedas.toLocaleString("es-CL")}</strong>${logros.length ? ` y ${logros.length === 1 ? "el logro" : "los logros"} <strong>${logros.slice(0, 3).map(escapeHtml).join("</strong>, <strong>")}</strong>${logros.length > 3 ? ` y ${logros.length - 3} más` : ""}` : ""}. ` : ""}Como invitado no se guarda: crea tu cuenta (gratis, con Google) y empiezas a sumar desde la próxima partida.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-login data-origen="perdiste">Crear cuenta gratis</button><button class="btn2" type="button" data-reto-de="${escapeHtml(clave)}">📣 Retar</button></div>
+  </div>`;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = () => { evento("jg_perdiste_cierra", { juego: clave }); quitaOfreceGuardar(); };
+  document.body.appendChild(c);
+  evento("jg_perdiste_ver", { juego: clave, monedas: g.monedas, logros: g.logros.length });
+}
+
+/* ---------- instalar como app (manifest.webmanifest) ----------
+   Quien ya jugó en esta visita y vuelve al salón recibe, una vez, la
+   invitación a instalar Paginita Pro en su inicio: tener el ícono es lo
+   que más hace volver en el celular. En Android y el PC Chrome ofrece su
+   propio botón (`beforeinstallprompt`, que se guarda para usarlo aquí); en
+   el iPhone no hay botón posible y se explica el gesto (Compartir →
+   Agregar a inicio). Nunca en la app ya instalada, y «Ahora no» la calla
+   14 días en este aparato (`jg.instalar.no`, solo esa fecha). */
+const enApp = () => { try { return navigator.standalone === true || matchMedia("(display-mode: standalone)").matches; } catch (e) { return false; } };
+const esIos = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let avisoInstalar = null, instalarVisto = false;
+addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); avisoInstalar = ev; });
+addEventListener("appinstalled", () => { evento("jg_instalar_hecho"); quitaInstalar(); });
+function quitaInstalar() { const c = $("jgInstalar"); if (c) c.remove(); }
+function ofreceInstalar() {
+  if (instalarVisto || enApp() || $("jgInstalar") || $("jgInvGuarda") || $("jgNomInv") || $("jgBienvenida")) return;
+  if (!Object.values(visita).some(v => v.jugadas > 0)) return;
+  const ios = esIos() && !avisoInstalar;
+  if (!avisoInstalar && !ios) return;   // ni botón del navegador ni iPhone: no hay cómo
+  try { if (Date.now() - Number(localStorage.getItem("jg.instalar.no") || 0) < 14 * 864e5) return; } catch (e) { /* sin almacenamiento: se ofrece */ }
+  instalarVisto = true;
+  const c = document.createElement("div");
+  c.id = "jgInstalar";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInstalarT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-no aria-label="Cerrar">✕</button>
+    <img class="jg-instalar-ico" src="marca/icono-192.png" alt="" width="44" height="44">
+    <div class="jg-invg-txt"><small>GRATIS · SIN TIENDA DE APPS</small>
+      <b id="jgInstalarT">Ten Paginita Pro en tu inicio</b>
+      <p>${ios ? "Toca <strong>Compartir</strong> <span aria-hidden=\"true\">(el cuadrado con la flecha ⬆)</span> y luego <strong>«Agregar a inicio»</strong>. Se abre a pantalla completa, como una app." : "Se abre a pantalla completa, como una app, y vuelves a tus juegos con un toque."}</p></div>
+    <div class="jg-invg-btns">${ios ? "" : '<button class="btn" type="button" data-si>Instalar</button>'}<button class="btn2" type="button" data-no>${ios ? "Entendido" : "Ahora no"}</button></div>
+  </div>`;
+  c.querySelector("[data-si]")?.addEventListener("click", async () => {
+    const e = avisoInstalar; avisoInstalar = null; quitaInstalar();
+    if (!e) return;
+    try { e.prompt(); const r = await e.userChoice; evento(r && r.outcome === "accepted" ? "jg_instalar_acepta" : "jg_instalar_rechaza"); } catch (err) { /* el navegador lo negó */ }
+  });
+  for (const b of c.querySelectorAll("[data-no]")) b.addEventListener("click", () => {
+    evento("jg_instalar_cierra", { tipo: ios ? "ios" : "boton" });
+    try { localStorage.setItem("jg.instalar.no", String(Date.now())); } catch (e) { /* nada */ }
+    quitaInstalar();
+  });
+  document.body.appendChild(c);
+  evento("jg_instalar_ver", { tipo: ios ? "ios" : "boton" });
+}
+
+/* ---------- reta a un amigo (reto.js) ----------
+   El reto que llegó por enlace se guarda en la pestaña (sobrevive a
+   recargar) y se quita de la barra de direcciones, para que el enlace que
+   esta persona comparta después no arrastre el reto de otro. */
+let retoActivo = null;
+function recogeReto() {
+  const r = leeReto(location.search);
+  try {
+    if (r) sessionStorage.setItem("jg.reto", JSON.stringify(r));
+    else retoActivo = leeReto(enlaceReto(JSON.parse(sessionStorage.getItem("jg.reto") || "null") || {}));
+  } catch (e) { /* sin almacenamiento: dura lo que dura la página */ }
+  if (r) {
+    retoActivo = r;
+    evento("jg_reto_llega", { categoria: r.categoria });
+    try { history.replaceState(history.state, "", location.pathname + location.hash); } catch (e) { /* queda en la URL */ }
+  }
+}
+const juegoDeReto = r => { const j = r ? juegoDeCategoria(r.categoria) : ""; return j === "tetris" ? "tetrisclub" : j || ""; };
+/* La franja del reto, encima del juego que corresponde. */
+function franjaReto(clave) {
+  const r = retoActivo;
+  if (!r || juegoDeReto(r) !== clave) return null;
+  const p = document.createElement("p");
+  p.className = "jg-reto-tira";
+  p.setAttribute("role", "note");
+  p.innerHTML = `<span aria-hidden="true">🥊</span><span><b translate="no">${escapeHtml(r.nombre)}</b> te reta: supera <b>${escapeHtml(valorMarca(r.categoria, r))}</b> en ${escapeHtml(nombreCategoria(r.categoria))}.</span>`;
+  return p;
+}
+function avisaRetoGanado(clave, d) {
+  const r = retoActivo;
+  if (!r || !superaReto(d, r)) return;
+  retoActivo = null;
+  try { sessionStorage.removeItem("jg.reto"); } catch (e) { /* nada */ }
+  for (const t of document.querySelectorAll(".jg-reto-tira")) t.remove();
+  evento("jg_reto_gana", { categoria: r.categoria });
+  quitaOfreceGuardar();
+  const c = document.createElement("div");
+  c.id = "jgInvGuarda";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInvGuardaT");
+  c.dataset.reto = "1";
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
+    <span class="jg-invg-ico" aria-hidden="true">🏆</span>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreCategoria(d.categoria))} · ${escapeHtml(valorMarca(d.categoria, d))}</small>
+      <b id="jgInvGuardaT">¡Le ganaste a <span translate="no">${escapeHtml(r.nombre)}</span>!</b>
+      <p>Superaste su ${escapeHtml(valorMarca(r.categoria, r))}. Ahora te toca a ti: mándale tu marca, o rétale a otra persona.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-reto-de="${escapeHtml(clave)}">📣 Devolver el reto</button><button class="btn2" type="button" data-cierra>Seguir</button></div>
+  </div>`;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = quitaOfreceGuardar;
+  document.body.appendChild(c);
+  suena("entra");
+}
+/* Compartir: la mejor marca de la visita en la última modalidad jugada (o,
+   sin partidas, una invitación a ese juego). La hoja de compartir del
+   teléfono; en el PC, WhatsApp Web y el enlace copiado. */
+async function retar(clave) {
+  const v = visita[clave], d = v && v.ultimo ? (v.mejores[v.ultimo.categoria] || v.ultimo) : null;
+  const e = SOLOS.find(x => x.id === clave) || SOLOS.find(x => x.ruta === "#solo/" + clave) || {};
+  const nombre = state.user ? String(state.user.name || "").split(" ")[0] : nombreInvitado();
+  const url = location.origin + location.pathname + (d ? enlaceReto({ categoria: d.categoria, puntos: d.puntos, tiempo: d.tiempo, nombre }) : "") + (e.ruta || "");
+  const texto = textoReto(e.nombre || nombreSolo(clave), d ? valorMarca(d.categoria, d) : "");
+  evento("jg_reto_comparte", { juego: clave, marca: d ? 1 : 0 });
+  try {
+    if (navigator.share) { await navigator.share({ title: "Paginita Pro", text: texto, url }); return; }
+  } catch (err) { if (err && err.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(texto + " " + url); avisaGuardado("Enlace copiado", "Pégalo donde quieras, o mándalo por WhatsApp"); } catch (err) { /* sin portapapeles */ }
+  window.open("https://wa.me/?text=" + encodeURIComponent(texto + " " + url), "_blank", "noopener");
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("[data-reto-de]");
+  if (b) retar(b.getAttribute("data-reto-de"));
+});
 
 /* Lo que el invitado jugó en esta pestaña y quedó pendiente (solo/club.js,
    `DE_INVITADO`) pasa a la cuenta con la que acaba de entrar: se verifica
@@ -932,9 +1119,9 @@ async function subeDeInvitado(u) {
         try {
           const previa = await fb.leerSolo(dato.categoria).then(f => f.find(x => x.uid === u.uid) || null, () => null);
           const res = await guardaClub(dato.categoria, u.uid, fila, v.prueba);
-          alResultadoClub(juego)(dato, previa, v.prueba);
+          alResultadoClub(claveClub(juego))(dato, previa, v.prueba);
           evento("jg_invitado_guardado", { juego, categoria: dato.categoria, record: res && res.committed ? 1 : 0 });
-          avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(juego)}` : `Tu partida de ${nombreSolo(juego)} quedó en tu cuenta`,
+          avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(claveClub(juego))}` : `Tu partida de ${nombreSolo(claveClub(juego))} quedó en tu cuenta`,
             res && res.committed ? marcaInvitado(dato) + " · ya está en la clasificación" : marcaInvitado(dato) + " · tu récord guardado era mejor");
         } catch (e) {
           console.warn("[juegos] no se pudo subir la partida de invitado", e);
@@ -963,10 +1150,13 @@ function avisaGuardado(titulo, detalle) {
 }
 
 /* ---------- la bienvenida (solo en el celular) ----------
-   Quien llega por primera vez desde un teléfono y sin sesión elige antes
-   de ver el salón: iniciar sesión, crear cuenta (con Google es lo mismo)
-   o seguir como invitado, y entonces se le ofrecen los cuatro destacados,
-   que se juegan sin cuenta. Una sola vez por aparato (`jg.bienvenida`, que
+   Quien llega por primera vez desde un teléfono y sin sesión ve, antes del
+   salón, una sola pantalla para jugar ya: su nombre de invitado (uno
+   sugerido) y los cuatro destacados en grande; ver todo el salón e iniciar
+   sesión quedan debajo, como salidas secundarias. Antes la primera
+   pantalla era iniciar sesión / crear cuenta / «continuar como
+   invitado», y pedir cuenta antes de jugar hacía que los nuevos se fueran
+   sin jugar a nada. Una sola vez por aparato (`jg.bienvenida`, que
    también se marca al iniciar sesión), solo en la portada (un enlace a un
    juego o a una sala va directo a lo suyo) y nunca a quien tiene cuenta. */
 const enCelular = () => {
@@ -991,62 +1181,44 @@ function abreBienvenida() {
   const tarjetas = DESTACADOS_INVITADO.map(id => {
     const e = SOLOS.find(x => x.id === id);
     return e ? `<a class="jg-bv-juego" href="${e.ruta}" data-bv-juego style="--c:${COLOR_SOLO[id] || "#f6bc64"}">
-      <span class="jg-bv-portada" aria-hidden="true">${portadaSolo(id)}</span>
+      <span class="jg-bv-portada" aria-hidden="true">${portadaSolo(id)}<i class="jg-bv-play">${PLAY}</i></span>
       <b>${escapeHtml(e.nombre)}</b><small>${escapeHtml(e.genero)}</small></a>` : "";
   }).join("");
+  const libres = SOLOS.filter(x => !bloqueado(Object.assign({ modo: x.tipo === "bots" ? "bots" : "solo" }, x), true)).length;
   c.innerHTML = `<div class="jg-bv-caja" tabindex="-1">
     <section class="jg-bv-paso" data-paso="1">
-      <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
-      <h1 id="jgBvT">Te damos la bienvenida</h1>
-      <p>Juegos para jugar solo o con amigos en línea, con clasificación, logros y monedas.</p>
-      <div class="jg-bv-btns">
-        <button class="btn" type="button" data-bv="entrar">Iniciar sesión</button>
-        <button class="btn2" type="button" data-bv="crear">Crear cuenta</button>
-        <button class="jg-bv-inv" type="button" data-bv="invitado">Continuar como invitado</button>
-      </div>
-      <p class="jg-bv-nota">Se entra con tu cuenta de Google: si es la primera vez, tu cuenta queda creada en el mismo paso.</p>
-      <p class="jg-bv-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
-    </section>
-    <section class="jg-bv-paso" data-paso="2" hidden>
-      <span class="jg-eyebrow">MODO INVITADO</span>
-      <h2>Juega ya, sin cuenta</h2>
+      <span class="jg-eyebrow">PAGINITA PRO · SALÓN DE JUEGOS</span>
+      <h1 id="jgBvT">Juega ya, sin cuenta</h1>
+      <p>${libres} juegos para jugar solo, gratis y sin registrarte. Toca uno y empiezas.</p>
       <label class="jg-bv-nombre"><span>¿Cómo te llamamos?</span>
         <input type="text" maxlength="${NOMBRE_INVITADO_MAX}" autocomplete="nickname" enterkeyhint="done" spellcheck="false" translate="no" value="${escapeHtml(nombreInvitado() || sugiereNombreInvitado())}" data-bv-nombre></label>
-      <p>Elige uno, o mira el salón: sin cuenta juegas a todo lo de un jugador menos PRO HERO. Como invitado tus puntajes y tus partidas <b>no se guardan</b>: inicia sesión cuando quieras, también después de perder, y en estos cuatro guardamos tu mejor partida.</p>
       <div class="jg-bv-juegos">${tarjetas}</div>
       <div class="jg-bv-btns">
-        <button class="btn2" type="button" data-bv="salon">Ver todo el salón</button>
-        <button class="jg-bv-inv" type="button" data-bv="entrar">Mejor inicio sesión</button>
+        <button class="btn2" type="button" data-bv="salon">Ver todos los juegos</button>
+        <button class="jg-bv-inv" type="button" data-bv="entrar">Ya tengo cuenta · Iniciar sesión</button>
       </div>
+      <p class="jg-bv-nota">Como invitado no se guarda nada. Con tu cuenta de Google (se crea en el mismo paso) guardas récords, logros y monedas, y juegas en línea con tus amigos.</p>
+      <p class="jg-bv-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
     </section>
   </div>`;
-  /* El nombre del paso 2 vale en cuanto se elige un juego o el salón: así
-     el juego no lo vuelve a preguntar. */
+  /* El nombre vale en cuanto se elige un juego o el salón: así el juego no
+     lo vuelve a preguntar. */
   const guardaNombreBv = () => {
     const campo = c.querySelector("[data-bv-nombre]");
-    if (campo && !campo.closest("[hidden]")) ponNombreInvitado(limpiaNombreInvitado(campo.value) || campo.defaultValue);
+    if (campo) ponNombreInvitado(limpiaNombreInvitado(campo.value) || campo.defaultValue);
   };
   c.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("[data-bv-nombre]")) { ev.preventDefault(); ev.target.blur(); } });
   c.addEventListener("click", ev => {
     const b = ev.target.closest("[data-bv]"), j = ev.target.closest("[data-bv-juego]");
-    if (j || (b && b.getAttribute("data-bv") === "salon")) guardaNombreBv();
-    if (j) { evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
+    if (j) { guardaNombreBv(); evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
     if (!b) return;
     const que = b.getAttribute("data-bv");
-    evento("jg_bienvenida_elige", { opcion: que, paso: b.closest("[data-paso]").getAttribute("data-paso") });
-    /* Iniciar sesión o crear cuenta: la ventana de Google. La bienvenida se
-       queda hasta que llega la cuenta (watchAuth la cierra); si se cancela,
-       sigue aquí para elegir otra cosa. */
-    if (que === "entrar" || que === "crear") { entrarConGoogle("", "bienvenida-" + que); return; }
-    if (que === "invitado") {
-      marcaBienvenida();
-      c.querySelector('[data-paso="1"]').hidden = true;
-      c.querySelector('[data-paso="2"]').hidden = false;
-      const primero = c.querySelector("[data-bv-juego]");
-      if (primero) primero.focus();
-      return;
-    }
-    if (que === "salon") { marcaBienvenida(); cierraBienvenida(); pintaNombreInvitado(); }
+    evento("jg_bienvenida_elige", { opcion: que, paso: "1" });
+    /* Iniciar sesión: la ventana de Google. La bienvenida se queda hasta
+       que llega la cuenta (watchAuth la cierra); si se cancela, sigue aquí
+       para elegir otra cosa. */
+    if (que === "entrar") { entrarConGoogle("", "bienvenida-entrar"); return; }
+    if (que === "salon") { guardaNombreBv(); marcaBienvenida(); cierraBienvenida(); pintaNombreInvitado(); }
   });
   document.body.appendChild(c);
   document.documentElement.classList.add("jg-bv-abierta");
@@ -1075,11 +1247,48 @@ function recogeLoginRedirigido() {
   if (v && typeof v.juego === "string") trasLogin = v.juego;
   resultadoLogin().then(r => {
     if (r) evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: v && typeof v.origen === "string" ? v.origen : "otro", app: 1 });
+    if (r && esCuentaNueva(r)) ofreceApodo(r.user);
   }, e => {
     trasLogin = "";
     console.warn("[juegos] el inicio de sesión no volvió bien", e);
     alert("No se pudo iniciar sesión: " + ((e && e.code) || (e && e.message) || e));
   });
+}
+/* Una cuenta recién creada en una pestaña que jugó como invitado con un
+   nombre: se le ofrece seguir llamándose así (el apodo del perfil, que se
+   ve en salas, rankings y el chat) en vez del nombre de Google. Nunca se
+   escribe sin el «sí». Después, el nombre de invitado se borra. */
+function ofreceApodo(u) {
+  const nombre = nombreInvitado();
+  if (!u || !u.uid || !nombre || !vinoDeInvitado() || $("jgApodo")) return;
+  const google = String(u.displayName || "").trim();
+  if (google && google.split(" ")[0] === nombre) return;
+  const c = document.createElement("div");
+  c.id = "jgApodo";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgApodoT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <span class="jg-invg-ico" aria-hidden="true">🏷️</span>
+    <div class="jg-invg-txt"><small>CUENTA CREADA</small>
+      <b id="jgApodoT">¿Te seguimos llamando <span translate="no">${escapeHtml(nombre)}</span>?</b>
+      <p>Es el nombre que usaste como invitado. Se verá en las salas, los rankings y el chat; lo puedes cambiar cuando quieras en tu perfil.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-si>Sí, usar <span translate="no">${escapeHtml(nombre)}</span></button><button class="btn2" type="button" data-no>${google ? `Usar <span translate="no">${escapeHtml(google.split(" ")[0])}</span>` : "No"}</button></div>
+  </div>`;
+  const listo = si => {
+    evento("jg_apodo_invitado", { usa: si ? 1 : 0 });
+    c.remove();
+    try { sessionStorage.removeItem(CLAVE_NOMBRE_INV); } catch (e) { /* nada */ }
+  };
+  c.querySelector("[data-si]").onclick = () => {
+    listo(true);
+    fb.ponNickPerfil(u.uid, nombre).then(() => {
+      perfiles.set(u.uid, Object.assign({}, perfiles.get(u.uid) || {}, { nick: nombre }));
+      avisaGuardado("Apodo listo", `Ahora eres ${nombre} en Juegos`);
+    }, e => console.warn("[juegos] no se pudo guardar el apodo", e));
+  };
+  c.querySelector("[data-no]").onclick = () => listo(false);
+  document.body.appendChild(c);
 }
 async function entrarConGoogle(juego, origen) {
   trasLogin = juego || "";
@@ -1089,6 +1298,7 @@ async function entrarConGoogle(juego, origen) {
   try {
     const r = await loginGoogle();
     evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: desde });
+    if (esCuentaNueva(r)) ofreceApodo(r.user);
   }
   catch (e) {
     trasLogin = "";
@@ -2145,6 +2355,7 @@ function armazon() {
   if (state.vista !== "partida") ponInmersivo(false);
   quitaOfreceGuardar();
   quitaNombreInvitado();
+  quitaInstalar();
   /* Como invitado, lo que lee o escribe la base (una partida, la
      clasificación, los sobres…) se cambia por una puerta que lo explica. */
   const motivo = !state.invitado ? null : MOTIVO_CUENTA[state.vista] ||
@@ -2216,6 +2427,14 @@ function armazon() {
          partida da y la mejor marca guardada no daba ya. */
       /* ¿Administrador? (state.admin se lee una vez por sesión y puede no haber llegado aún.) */
       esAdmin: u ? () => (state.admin === null || state.admin === undefined ? fb.esAdminJuegos(u.uid) : !!state.admin) : null,
+      /* Cada partida terminada: lo que lleva la visita, el aviso al invitado
+         que no guarda nada y el reto que llegó por enlace. */
+      alTerminar: d => {
+        const mejoro = anotaVisita(clave, d);
+        if (!state.user) evento("jg_invitado_resultado", { juego: clave, categoria: d.categoria, mejoro: mejoro ? 1 : 0 });
+        if (retoActivo && superaReto(d, retoActivo)) { avisaRetoGanado(clave, d); return; }
+        if (!state.user && !deInv) avisaPerdido(clave, d, mejoro);
+      },
       alResultado: u ? alResultadoClub(clave) : undefined });
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
@@ -2227,7 +2446,8 @@ function armazon() {
     barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? `UN JUGADOR · <span data-con-nombre-inv${nombreInvitado() ? "" : " hidden"}><span data-nombre-inv translate="no">${escapeHtml(nombreInvitado())}</span> · </span>MODO INVITADO, NO SE GUARDA` : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
       (state.invitado ? '<button class="btn jg-solo-entrar" type="button" data-login>Iniciar sesión</button>' : "") +
       `<nav aria-label="Juegos individuales">${club.map(x => `<a class="btn2${x === este ? " on" : ""}" href="${x.ruta}">${escapeHtml(corto[x.id] || x.nombre)}</a>`).join("")}` +
-      `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button></nav>`;
+      `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button>` +
+      (este.ranking === false ? "" : `<button class="btn2" type="button" data-reto-de="${escapeHtml(clave)}" title="Comparte tu mejor marca de hoy">📣 Retar a un amigo</button>`) + `</nav>`;
     barra.querySelector("[data-reglas-solo]").onclick = () => abreReglas(clave);
     h.insertBefore(barra, h.firstChild);
     /* En los destacados, el invitado lo lee antes de jugar, no solo al perder. */
@@ -2238,6 +2458,8 @@ function armazon() {
       tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login data-origen="franja-invitado">Iniciar sesión</button>';
       barra.after(tira);
     }
+    const reto = franjaReto(clave);
+    if (reto) (h.querySelector(".jg-inv-tira") || barra).after(reto);
     if (state.invitado) pideNombreInvitado();
     return;
   }
@@ -2506,6 +2728,8 @@ function armazon() {
   vigilaDropsMascotas(h);
   vigilaDropsRock(h);
   salon.enganchar($("vesSalon"));
+  /* Volvió al salón después de jugar: buen momento para ofrecer la app. */
+  setTimeout(() => { if (state.vista === "vestibulo") ofreceInstalar(); }, 1500);
 }
 
 /* ---------- novedades ----------
@@ -2574,9 +2798,10 @@ const NOVEDADES = [
     ruta: "#solo/fanal", boton: "Jugar", reglas: ["fanal"], modo: "solo" }
 ];
 /* Lo que se muestra: una novedad de BT3 (si vuelve) solo la ven los
-   amigos del disco (bt3Visible, bt3-amigos.js). */
+   amigos del disco (bt3Visible, bt3-amigos.js). Al invitado y en el
+   celular, primero lo que se puede jugar ahí (`ordenaNovedades`). */
 let VISIBLES = NOVEDADES;
-const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()); };
+const filtraNovedades = () => { VISIBLES = ordenaNovedades(NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()), { invitado: state.invitado, celular: enCelular() }); };
 /* El sello de cada diapositiva: «★ Lo último» para la más reciente,
    «Nuevo» para lo de las dos últimas semanas y «Destacado» para el resto
    (PRODROP no es nuevo, pero está porque se quiere que se vea). */
@@ -2618,9 +2843,9 @@ function novedadesHtml() {
   filtraNovedades();
   const inv = state.invitado, N = VISIBLES.length;
   const diapo = (n, i, copia) => {
-    /* Como invitado solo se abren los cuatro juegos libres; lo demás
-       (también las prácticas contra bots) pide iniciar sesión. */
-    const cuenta = inv && (n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6))));
+    /* Como invitado se abre todo lo de un jugador menos PRO HERO; lo
+       demás (salas, la tienda) pide iniciar sesión. */
+    const cuenta = inv && novedadPideCuenta(n);
     const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
       /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
          para el juego al que lleva la novedad. */
@@ -3082,13 +3307,18 @@ function pintaVestibulo() {
      mientras llega la de hoy), los del club también, y las prácticas
      contra bots al final, que son la versión pequeña de un multijugador. */
   const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible());   // BT3: solo los amigos
+  const celular = enCelular();
   entradasVes = entradasSalon(JUEGOS, orden);
+  /* En el celular, lo que se juega con el dedo primero (`ordenaEntradas`). */
+  entradasVes.multi = ordenaEntradas(entradasVes.multi, { invitado: inv, celular });
   if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3");
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
   const destacado = id => inv && DESTACADOS_INVITADO.includes(id) ? DESTACADOS_INVITADO.indexOf(id) - 1000 : 0;
   entradasVes.solos.sort((x, y) => destacado(x.id) - destacado(y.id) || rango.get(x.id) - rango.get(y.id));
+  /* …y lo que se juega aquí antes que lo que pide cuenta o solo va en el PC. */
+  entradasVes.solos = ordenaEntradas(entradasVes.solos, { invitado: inv, celular });
   nuevosVes = nuevos([...entradasVes.solos, ...entradasVes.multi], ahoraV);
   indiceVes = indiceBusqueda([...entradasVes.solos, ...entradasVes.multi, ...SITIOS_BUSCA]);
   const porJuego = {};
@@ -3097,7 +3327,7 @@ function pintaVestibulo() {
      primero es el primero de la tabla y la etiqueta mentiría. */
   const top = Object.keys(state.popular).length ? orden[0] : "";
   const marcas = e => ({ invitado: inv, nuevo: nuevosVes.has(e.id), top: e.id === top, salas: porJuego[e.id] || 0 });
-  const firma = JSON.stringify([inv, [...nuevosVes], top, porJuego, entradasVes.solos.map(e => e.id), orden]);
+  const firma = JSON.stringify([inv, [...nuevosVes], top, porJuego, entradasVes.solos.map(e => e.id), entradasVes.multi.map(e => e.id)]);
   if (firma !== vesFirma || !$("vesElige").firstElementChild) {
     vesFirma = firma;
     /* Repintar quita el foco de la tarjeta que lo tenía (alguien abrió
@@ -3908,6 +4138,8 @@ function wire() {
   // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
   alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
   recogeLoginRedirigido();
+  recogeReto();
+  if (enApp()) evento("jg_app_abre", { ios: esIos() ? 1 : 0 });
   watchAuth(user => {
     revisaBt3();
     if (!user) {

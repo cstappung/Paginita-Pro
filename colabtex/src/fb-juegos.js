@@ -651,6 +651,11 @@ export const ponFotoPerfil = (uid, foto) => set(ref(db, `${U}/${uid}/perfil/foto
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 
+/* Solo el apodo (el nombre que eligió jugando como invitado, al crear la
+   cuenta: `ofreceApodo` en juegos-main.js). La regla de `nick` ya existía. */
+export const ponNickPerfil = (uid, nick) =>
+  update(ref(db, `${U}/${uid}/perfil`), { nick: String(nick || "").slice(0, 24), at: Date.now() });
+
 /* Solo el marco o solo el fondo (la tienda de Halloween: «ponérmelo»), sin
    reescribir el resto del perfil. Los dos ya tenían su regla. */
 export const ponEnPerfil = (uid, campo, valor) => {
