@@ -72,7 +72,7 @@ import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
-import { fijaVeRock } from "./juegos/rock-datos.js";
+import { fijaVeRock, veRock, fichaRock, claveMini, claveMiniId } from "./juegos/rock-datos.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
@@ -81,7 +81,7 @@ import { crearRanks, categoriaVigente } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
+  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender, dropsRock } from "./juegos/monedas.js";
 import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
 import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta, firmaYoTienda } from "./juegos/tienda-halloween.js";
 import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
@@ -1193,6 +1193,7 @@ function pintaMonedas() {
   const tops = $("vesTops");
   if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
   pintaDropsMascotas();
+  pintaDropsRock();
   const refs = $("vesReferidos");
   if (refs && u && d && d.completo) refs.innerHTML = topRefs(u.uid, d, true);
   if (referidosUi) referidosUi.refresca();
@@ -1276,6 +1277,75 @@ function pintaDropsMascotas() {
       <small class="jg-drop-cuando">${haceCuanto(x.at)}</small></div>`;
   }).join("");
 }
+/* Los últimos legendarios de Batalla de Rock. Las fotos las saca la escena de rock en un iframe escondido
+   (juegos/hero/rock-visor.html, que carga three.js), solo cuando la tira se ve, y quedan en localStorage con la
+   misma clave que usa el editor del juego (mismo origen): quien ya las vio no las vuelve a pedir. */
+const ROCK_VISOR = "juegos/hero/rock-visor.html?v=hero-18";
+let dropsRVista = false, visorRock = null;
+const fotosRock = new Map(), pidiendoRock = new Set();
+function fotoRock(v) {
+  const k = claveMini(v);
+  if (fotosRock.has(k)) return fotosRock.get(k);
+  let u = "";
+  try { u = localStorage.getItem(k) || ""; } catch (e) {}
+  if (u) fotosRock.set(k, u);
+  return u;
+}
+function pideFotosRock(vs) {
+  const faltan = vs.filter(v => !fotoRock(v) && !pidiendoRock.has(claveMini(v)));
+  if (!faltan.length) return;
+  for (const v of faltan) pidiendoRock.add(claveMini(v));
+  const envia = l => visorRock.f.contentWindow.postMessage({ canal: "rock-visor-pide", lista: l }, location.origin);
+  if (!visorRock) {
+    const f = document.createElement("iframe");
+    f.src = ROCK_VISOR; f.tabIndex = -1; f.setAttribute("aria-hidden", "true"); f.title = "";
+    f.style.cssText = "position:fixed;left:-9999px;top:0;width:200px;height:200px;border:0;opacity:0;pointer-events:none";
+    visorRock = { f, listo: false, cola: [] };
+    window.addEventListener("message", e => {
+      if (e.origin !== location.origin || e.source !== f.contentWindow || !e.data || e.data.canal !== "rock-visor") return;
+      if (e.data.listo) { visorRock.listo = true; if (visorRock.cola.length) envia(visorRock.cola.splice(0)); return; }
+      for (const x of e.data.fotos || []) if (x && typeof x.id === "string" && typeof x.url === "string" && x.url.startsWith("data:image/")) fotosRock.set(claveMiniId(x.id), x.url);
+      pintaDropsRock();
+    });
+    document.body.appendChild(f);
+  }
+  if (visorRock.listo) envia(faltan); else visorRock.cola.push(...faltan);
+}
+function pintaDropsRock() {
+  const caja = $("vesDropsR"), u = state.user, d = datosMonedas;
+  if (!caja || !u || !d || !d.completo) return;
+  const l = dropsRock(d, 24);
+  const firma = JSON.stringify([l.map(x => x.uid + x.k), dropsRVista, l.map(x => !!fotoRock(x.v))]);
+  if (caja.dataset.f === firma) return;
+  caja.dataset.f = firma;
+  if (!l.length) {
+    caja.innerHTML = `<p class="jg-nada">Nadie ha sacado todavía un legendario: 1 de cada 10 cajas de rock trae uno. <a href="#solo/hero">Abrir una caja →</a></p>`;
+    return;
+  }
+  if (dropsRVista) pideFotosRock(l.map(x => x.v));
+  caja.innerHTML = l.map(x => {
+    const q = quien(x.uid, perfilDe(x.uid), null, { nombre: nombreEnDatos(x.uid, d), foto: fotoEnDatos(x.uid, d) }, colorForUid);
+    const f = fotoRock(x.v), fi = fichaRock(x.v);
+    return `<div class="jg-drop jg-dropm">
+      <span class="jg-dropm-f"${f ? ` style="background-image:url('${escapeHtml(f)}');background-size:cover"` : ""} title="${escapeHtml(fi.nombre)} · ${escapeHtml(fi.cat)}">${f ? "" : `<i>${escapeHtml(fi.emoji)}</i>`}<em>★</em></span>
+      <b class="jg-dropm-n">${escapeHtml(fi.nombre)}</b>
+      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b></span>
+      <small class="jg-drop-cuando">${x.dup ? "repetido · " : ""}${haceCuanto(x.at)}</small></div>`;
+  }).join("");
+}
+function vigilaDropsRock(h) {
+  const caja = h.querySelector("#vesDropsR");
+  if (!caja || dropsRVista || typeof IntersectionObserver === "undefined") { if (caja) pintaDropsRock(); return; }
+  const io = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    dropsRVista = true;
+    pintaDropsRock();
+  }, { rootMargin: "200px" });
+  io.observe(caja);
+  pintaDropsRock();
+}
+
 /* Pide las fotos cuando la tira entra en pantalla (una vez por salón). */
 function vigilaDropsMascotas(h) {
   const caja = h.querySelector("#vesDropsM");
@@ -2354,6 +2424,7 @@ function armazon() {
       ${inv ? "" : topsHtml()}
       ${inv ? "" : tiraHtml()}
       ${tiraMascotasHtml(inv)}
+      ${inv || !veRock() ? "" : tiraRockHtml()}
     </div>`;
   vesFirma = "";
   for (const b of h.querySelectorAll("[data-filtro]")) {
@@ -2369,6 +2440,7 @@ function armazon() {
   enganchaNovedades(h);
   enganchaBanner(h);
   vigilaDropsMascotas(h);
+  vigilaDropsRock(h);
   salon.enganchar($("vesSalon"));
 }
 
@@ -2544,6 +2616,13 @@ const tiraMascotasHtml = inv => `
         <header><h2 id="vesTiraMT">🐣 Últimos drops legendarios · Mascotas</h2><small>los objetos y bailes legendarios de los regalos, del más reciente al más antiguo</small>${inv ? "" : `<a href="#mascotas">Abrir regalos →</a>`}</header>
         ${inv ? `<div class="jg-tira-puerta"><p><b>${escapeHtml(MOTIVO_CUENTA.mascotas.t)}.</b> ${escapeHtml(MOTIVO_CUENTA.mascotas.d)}</p><button class="btn" type="button" data-login>Iniciar sesión</button></div>`
           : `<div id="vesDropsM" class="jg-tira-fila"><p class="jg-nada">Buscando legendarios…</p></div>`}
+      </section>`;
+
+/* La de Batalla de Rock: las piezas legendarias de las cajas de PRO HERO. */
+const tiraRockHtml = () => `
+      <section class="jg-tira jg-tira-r" aria-labelledby="vesTiraRT">
+        <header><h2 id="vesTiraRT">🎸 Últimos drops legendarios · Batalla de Rock</h2><small>lo legendario de las cajas de rock, del más reciente al más antiguo</small><a href="#solo/hero">Abrir cajas →</a></header>
+        <div id="vesDropsR" class="jg-tira-fila"><p class="jg-nada">Buscando legendarios…</p></div>
       </section>`;
 
 function enganchaNovedades(h) {

@@ -50,7 +50,7 @@ test('una caja se deriva igual en todos lados, del cuerpo pedido, y 1 de cada 10
     for (const c of Object.values(v.c)) assert.ok(Number.isInteger(c) && c >= 0 && c <= 0xffffff);
     if (v.leg) {
       leg++;
-      // un legendario trae sus colores de fábrica
+      // un legendario de antes de CORTE_CAJAS_3 trae sus colores de fábrica
       const fab = C.invItem(v.b, v.k, v.t)[2];
       for (const [f, c] of Object.entries(fab)) if (C.INV_CATS[v.k].cols.includes(f)) assert.equal(v.c[f], c);
     }
@@ -205,4 +205,21 @@ test('la canción de verdad: descansos sin notas, el cursor y el humor del acier
   assert.equal(R.humorDe(m([[0, 0, 0], [5, 10, 20]]), 5), -1);
   assert.equal(R.humorDe(m([[0, 0, 0], [5, 2, 1]]), 5), null, 'con muy pocas notas no dice nada');
   assert.equal(R.humorDe(m([[0, 0, 50], [3, 10, 50], [8, 40, 50]]), 8), 1, 'solo mira los últimos segundos');
+});
+
+test('desde CORTE_CAJAS_3 los legendarios salen con colores al azar; las cajas de antes no cambian', () => {
+  let distintos = 0, legs = 0;
+  for (let i = 0; i < 6000 && legs < 120; i++) {
+    const b = i % 2 ? 'f' : 'm';
+    // el mismo azar a un lado y otro del corte (la caja de verdad lo saca de la hora, que aquí es la que cambia)
+    const azar = () => { let x = (i * 2654435761) >>> 0 || 1; return { entero: n => ((x = (x * 1103515245 + 12345) >>> 0) % n) }; };
+    const antes = C.abreCaja(b, azar(), C.CORTE_CAJAS_3 - 1), despues = C.abreCaja(b, azar(), C.CORTE_CAJAS_3);
+    assert.deepEqual([despues.k, despues.t, despues.leg], [antes.k, antes.t, antes.leg], 'la misma pieza');
+    if (!antes.leg || !C.INV_CATS[antes.k].cols.length) continue;
+    legs++;
+    const fab = C.invItem(antes.b, antes.k, antes.t)[2];
+    for (const [f, c] of Object.entries(fab)) if (C.INV_CATS[antes.k].cols.includes(f)) assert.equal(antes.c[f], c, 'antes, de fábrica');
+    if (JSON.stringify(despues.c) !== JSON.stringify(antes.c)) distintos++;
+  }
+  assert.ok(legs > 30 && distintos > legs / 2, `legendarios con colores propios: ${distintos}/${legs}`);
 });

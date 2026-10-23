@@ -248,6 +248,10 @@ test('el mapa de módulos del juego tiene todos los archivos con la misma versi�
   // y los carteros piden la misma versión del documento
   for (const f of ['src/juegos/hero.js', 'src/juegos/hero-sala.js'])
     assert.match(fs.readFileSync(f, 'utf8'), new RegExp('juegos/hero/index\\.html\\?(modo=online&)?v=' + v), f);
+  // el visor de fotos de Batalla de Rock (el salón lo carga escondido) va con la misma versión
+  const visor = fs.readFileSync(path.join(HERO, 'rock-visor.html'), 'utf8');
+  for (const [m, url] of Object.entries(JSON.parse(/<script type="importmap">([\s\S]*?)<\/script>/.exec(visor)[1]).imports)) assert.equal(url, m + '?v=' + v, 'rock-visor ' + m);
+  assert.match(fs.readFileSync('src/juegos-main.js', 'utf8'), new RegExp('juegos/hero/rock-visor\\.html\\?v=' + v));
 });
 
 test('pisar trastes durante la cuenta regresiva (antes del segundo 0) no rompe la prueba', async () => {

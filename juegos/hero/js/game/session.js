@@ -90,9 +90,12 @@ export class GameSession {
     };
     if (pd.type === 'remote') {
       p.engine = new RemoteState(track, track.kind);
-      p.engine.onHitFx = (nt, kind) => p.fxQueue.push(kind
-        ? { type: kind, lanes: nt ? GameSession.noteLanes(nt, track.kind) : null }
-        : this._hitFx(nt, track.kind, p.engine.spActive, p.engine.phraseFailed));
+      p.engine.onHitFx = (nt, kind) => {
+        p.fxQueue.push(kind
+          ? { type: kind, lanes: nt ? GameSession.noteLanes(nt, track.kind) : null }
+          : this._hitFx(nt, track.kind, p.engine.spActive, p.engine.phraseFailed));
+        if (!kind && nt) this._rockGolpe(p, nt);
+      };
       return p;
     }
     // Las opciones del motor salen de la cabecera de la prueba: así el que
@@ -138,6 +141,7 @@ export class GameSession {
   _onEngineEvent(p, type, a, b) {
     const now = this.now ?? 0;
     if (this.rock) this._rockEvento(p, type, a, b);
+    if (type === 'hit' && this.rock) this._rockGolpe(p, p.engine.notes[a]);
     if (this.bt) {
       // en la batalla los aciertos dan vida, los fallos la quitan y cada frase de estrellas da un poder
       if (type === 'hit') this.bt.acierto(p.bq);
@@ -242,6 +246,7 @@ export class GameSession {
     this.rockRival = rival;
     this.rockTodos = [yo, rival, ...otros].filter(Boolean);
     this.rockSp = this.rockTodos.map(() => false);
+    this.rockGolpes = [];
     this.rockCarga = this.rockTodos.map(() => 0);
     this.rockFin = false;
     this.rockT = 0;
@@ -309,7 +314,8 @@ export class GameSession {
       const media = E.reduce((a, e) => a + (e.score || 0), 0) / E.length;
       confs = E.map((e) => Math.max(-0.85, Math.min(0.85, ((e.score || 0) - media) / Math.max(4000, 0.3 * media))));
     }
-    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs });
+    const golpes = this.rockGolpes?.length ? this.rockGolpes.splice(0) : null;
+    this.rock.pulso({ beats, animo: confs ? confs[0] : animo, humor, hype: Math.min(1, (yo.combo || 0) / 100), dtJuego, toca, solo: !!yo.currentSolo?.(now), confs, golpes });
     // Star Power: cada frase completa carga la barra y manda un rayo; activarlo hace caer otro y la guitarra
     // se prende de azul mientras dure (en un mano a mano, la carga es un ataque al rival)
     // (en la batalla no: ahí las frases dan poderes y el rayo sale al lanzarlos, _lanzaBt)
@@ -329,6 +335,17 @@ export class GameSession {
         this.rock.fin(0, e >= 5 ? '¡LEYENDA!' : e >= 4 ? '¡OVACIÓN!' : e >= 3 ? '¡BIEN TOCADO!' : '¡A ENSAYAR!');
       }
     }
+  }
+
+  // Cada nota tocada de verdad: el rockero de quien la tocó rasguea (van juntas en el próximo pulso)
+  _rockGolpe(p, nt) {
+    const q = this.rockTodos ? this.rockTodos.indexOf(p) : -1;
+    if (q < 0 || !nt || (this.rockGolpes ||= []).length > 64) return;
+    // carril: el pad de la batería o el traste más bajo de la nota; acorde: más de un traste
+    let l = 0, acorde = 0;
+    if (nt.pad !== undefined) l = Math.max(0, nt.pad);
+    else { const f = nt.open ? 0 : nt.frets | 0; l = f ? 31 - Math.clz32(f & -f) : 0; acorde = f & (f - 1) ? 1 : 0; }
+    this.rockGolpes.push([q, l, acorde, Math.round(Math.max(0, (nt.endTime ?? nt.time) - nt.time) * 100)]);
   }
 
   // Rachas, caídas y solos del jugador, para la coreografía de Batalla de Rock

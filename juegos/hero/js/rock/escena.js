@@ -23,7 +23,7 @@ import { OutputPass } from '../../vendor/three-0.160.0/addons/postprocessing/Out
 import { mergeGeometries } from '../../vendor/three-0.160.0/addons/utils/BufferGeometryUtils.js';
 import {
   ROCKERS, ED_CAT, PAL, defaultLook, randomLook, normalizeLook, getP, setP, ED_FIELDS, legDefaults, sanitizeLook,
-  INV_CATS, invItem, invVar, invVarL, invId, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta, poolDe,
+  INV_CATS, invItem, invVar, invVarL, invId, claveMini, iniciales, lookPosible, PRECIO_CAJA, REEMBOLSO, esNada, rutaInv, catDeRuta, poolDe,
 } from './catalogo.js';
 
 
@@ -980,16 +980,20 @@ GTYPES.gema = {   // gema tallada: contorno de facetas rectas
   pickups: [['hum', -0.045], ['hum', 0.055]], bridge: -0.1, tail: -0.135, knobs: [[-0.2, -0.12], [-0.25, -0.07], [-0.15, -0.15]], sw: [-0.06, 0.13],
   tailBtn: [-0.35, 0], hornBtn: [-0.12, 0.2], tip: [0.22, 0], leg: ['crystal', 0xffffff, 6],
 };
+/* el brillo de un legendario sale de su variante (el segundo color: el golpeador de la guitarra, el acento del
+   torso, el segundo color del pantalón o las medias) si es lo bastante claro para brillar; si no, el de fábrica.
+   Antes era siempre el de fábrica y todas las variantes se veían iguales. */
+const vivo = (x, def) => { if (!Number.isInteger(x)) return def; const r = (x >> 16) & 255, g = (x >> 8) & 255, b = x & 255; return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 >= 0.3 ? x : def; };
 const GLOW_G = { hacha: [0xff5a10, 0xffd040], rayoG: [0x4ab8ff, 0xffffff], mariposa: [0xff6ad8, 0x9ae8ff], luna: [0x8a5aff, 0x2ad8ff], llamaG: [0xff6a10, 0xffd040], gema: [0x6ad8ff, 0xffffff] };   // [borde, punta] del aura
 const fretX = f => 0.9 - 0.9 * (1 - Math.pow(2, -f / 12));
 function makeGuitar(c) {
   const T = GTYPES[c.type]; const g = new THREE.Group(); const B = new Batch();
   const metal = toon(0xd2d5de), dark = toon(0x121212), cream = toon(0xf1e9d2), pearl = toon(0xf6f2e6), rose = toon(0x2b170d), neckM = toon(0xc8935a), knobM = toon(c.knob ?? 0xf6f1df);
   const body = new THREE.ExtrudeGeometry(T.shape(), { depth: 0.05, bevelEnabled: true, bevelThickness: 0.013, bevelSize: 0.012, bevelSegments: 3, curveSegments: 28 }); body.translate(0, 0, -0.025);
-  const LG = T.leg, bodyM = LG ? legMat(LG[0], c.body, LG[1], { scale: LG[2], side: THREE.FrontSide }) : toon(c.body);
+  const LG = T.leg, bodyM = LG ? legMat(LG[0], c.body, vivo(c.guard, LG[1]), { scale: LG[2], side: THREE.FrontSide }) : toon(c.body);
   mesh(g, body, bodyM, { outline: 0.007, shadow: true });
   if (LG) {   // aura legendaria: el mismo contorno de luz que los peinados, pegado a la silueta del cuerpo
-    const [ga, gb] = GLOW_G[c.type] ?? [LG[1], 0xffffff], au = new THREE.Mesh(body, auraMat(ga, gb, LG[0] === 'electric'));
+    const [ga, gb] = GLOW_G[c.type] ?? [LG[1], 0xffffff], au = new THREE.Mesh(body, auraMat(vivo(c.guard, ga), gb, LG[0] === 'electric'));
     au.renderOrder = 6; au.frustumCulled = false; g.add(au);
   }
   // el aura azul del Star Power (en vivo): la misma luz pegada a la silueta, apagada hasta que se activa
@@ -1914,11 +1918,11 @@ const TOPS = {
     { pred: m => inT(m, -0.05, 0.6), inf: 0.006, color: 0xffffff, map: TX.skullTee },
   ],
   // legendarios (leg = [efecto, color, brillo, escala])
-  infernal: c => { const P = TOPS.leather(c); P[0].leg = ['lava', c.color ?? 0x1a0c08, 0xff5a10, 9]; return P; },
-  cromo: c => [{ pred: m => inT(m, -0.07, 0.62) || inA(m, 0.09, -0.6), inf: m => m.part === 0 ? 0.011 : 0.01, color: c.color, leg: ['chrome', c.color ?? 0x8a92a6, 0xffffff, 5] }],
-  diamante: c => { const P = TOPS.corset({ color: 0xffffff }); P[0].leg = ['glitter', c.color ?? 0xc8c0f0, 0xffffff, 1]; return P; },
-  holoTop: c => { const P = TOPS.crop(c); P[0].leg = ['holo', c.color ?? 0xe8e0ff, 0xffffff, 5]; return P; },
-  neonTank: c => { const P = TOPS.tank(c); P[0].leg = ['neon', c.color ?? 0x0c0a16, 0x3affd0, 5]; return P; },
+  infernal: c => { const P = TOPS.leather(c); P[0].leg = ['lava', c.color ?? 0x1a0c08, vivo(c.accent, 0xff5a10), 9]; return P; },
+  cromo: c => [{ pred: m => inT(m, -0.07, 0.62) || inA(m, 0.09, -0.6), inf: m => m.part === 0 ? 0.011 : 0.01, color: c.color, leg: ['chrome', c.color ?? 0x8a92a6, vivo(c.accent, 0xffffff), 5] }],
+  diamante: c => { const P = TOPS.corset({ color: 0xffffff }); P[0].leg = ['glitter', c.color ?? 0xc8c0f0, vivo(c.accent, 0xffffff), 1]; return P; },
+  holoTop: c => { const P = TOPS.crop(c); P[0].leg = ['holo', c.color ?? 0xe8e0ff, vivo(c.accent, 0xffffff), 5]; return P; },
+  neonTank: c => { const P = TOPS.tank(c); P[0].leg = ['neon', c.color ?? 0x0c0a16, vivo(c.accent, 0x3affd0), 5]; return P; },
   chaquetaNeon: c => { const P = TOPS.jacket(c); P[0].leg = ['neon', c.color ?? 0x14101e, c.accent ?? 0xff3a9a, 5]; return P; },
 };
 const BOTTOMS = {
@@ -1931,12 +1935,12 @@ const BOTTOMS = {
   shorts: c => [{ pred: m => inT(m, -0.2, 0.075) || inL(m, 0.12, -0.3), inf: m => m.part === 0 ? 0.014 : 0.016 + 0.02 * clamp(-m.s / 0.3, 0, 1), color: c.color }],
   skirt: c => [{ pred: m => inT(m, -0.2, 0.04), inf: 0.006, color: shade(c.color ?? 0x161616, 0.6) }],
   skirtPlaid: c => BOTTOMS.skirt(c), mini: c => BOTTOMS.skirt(c),
-  magma: c => [{ ...BOTTOMS.jeans(c)[0], map: null, leg: ['lava', c.color ?? 0x1c0f0a, 0xff6a1a, 8] }],
-  tormenta: c => [{ ...BOTTOMS.leatherPants(c)[0], leg: ['electric', c.color ?? 0x10142a, 0x6ad8ff, 6] }],
-  pitilloHolo: c => [{ ...BOTTOMS.pitillo(c)[0], map: null, leg: ['holo', c.color ?? 0xe0d8ff, 0xffffff, 6] }],
-  faldaGalaxia: c => [{ pred: m => inT(m, -0.2, 0.04), inf: 0.006, color: 0x111111, leg: ['galaxy', c.color ?? 0x6a2ab8, 0x2ad8ff, 8] }],
-  faldaFuego: c => [{ pred: m => inT(m, -0.2, 0.04), inf: 0.006, color: 0x111111, leg: ['fire', c.color ?? 0x2a0805, 0xffd040, 8] }],
-  jeansGalaxia: c => [{ ...BOTTOMS.jeans(c)[0], map: null, leg: ['galaxy', c.color ?? 0x1a1050, 0x3ad8ff, 8] }],
+  magma: c => [{ ...BOTTOMS.jeans(c)[0], map: null, leg: ['lava', c.color ?? 0x1c0f0a, vivo(c.color2, 0xff6a1a), 8] }],
+  tormenta: c => [{ ...BOTTOMS.leatherPants(c)[0], leg: ['electric', c.color ?? 0x10142a, vivo(c.color2, 0x6ad8ff), 6] }],
+  pitilloHolo: c => [{ ...BOTTOMS.pitillo(c)[0], map: null, leg: ['holo', c.color ?? 0xe0d8ff, vivo(c.color2, 0xffffff), 6] }],
+  faldaGalaxia: c => [{ pred: m => inT(m, -0.2, 0.04), inf: 0.006, color: 0x111111, leg: ['galaxy', c.color ?? 0x6a2ab8, vivo(c.color2, 0x2ad8ff), 8] }],
+  faldaFuego: c => [{ pred: m => inT(m, -0.2, 0.04), inf: 0.006, color: 0x111111, leg: ['fire', c.color ?? 0x2a0805, vivo(c.color2, 0xffd040), 8] }],
+  jeansGalaxia: c => [{ ...BOTTOMS.jeans(c)[0], map: null, leg: ['galaxy', c.color ?? 0x1a1050, vivo(c.color2, 0x3ad8ff), 8] }],
 };
 const LEGWEAR = {
   stockings: c => [{ pred: m => inL(m, -0.16, -0.985), inf: 0.003, color: 0xffffff, map: stripeTex(c.a ?? cssC(c.color ?? 0x62e83c), c.b ?? cssC(c.color2 ?? 0x111111), 8, [1, 4]) }],
@@ -1944,9 +1948,9 @@ const LEGWEAR = {
   calcetas: c => [{ pred: m => inL(m, -0.5, -0.985), inf: 0.004, color: 0xffffff, map: kneeSockTex(c.color ?? 0xffffff, c.color2 ?? 0x111111) }],
   tights: c => [{ pred: m => inT(m, -0.2, 0.05) || inL(m, 0.12, -0.985), inf: 0.003, color: c.color ?? 0x161616 }],
   socks: c => [{ pred: m => inL(m, -0.84, -0.985), inf: 0.004, color: c.color ?? 0xffffff }],
-  brillantina: c => [{ ...LEGWEAR.tights(c)[0], leg: ['glitter', c.color ?? 0x2a1640, 0xffc8f0, 1] }],
-  redNeon: c => [{ ...LEGWEAR.red(c)[0], leg: ['neon', c.color ?? 0xff3a9a, 0x3ad8ff, 5] }],
-  mediasRayo: c => [{ ...LEGWEAR.tights(c)[0], leg: ['electric', c.color ?? 0x10142a, 0x6ad8ff, 4] }],
+  brillantina: c => [{ ...LEGWEAR.tights(c)[0], leg: ['glitter', c.color ?? 0x2a1640, vivo(c.color2, 0xffc8f0), 1] }],
+  redNeon: c => [{ ...LEGWEAR.red(c)[0], leg: ['neon', c.color ?? 0xff3a9a, vivo(c.color2, 0x3ad8ff), 5] }],
+  mediasRayo: c => [{ ...LEGWEAR.tights(c)[0], leg: ['electric', c.color ?? 0x10142a, vivo(c.color2, 0x6ad8ff), 4] }],
 };
 
 /* ---------- tatuajes: diseños dibujados en un lienzo de 256 px (tinta + color de relleno) ---------- */
@@ -2408,7 +2412,7 @@ class Rocker {
         W.set(B_TH[0], (W.get(B_TH[0]) || 0) + wt * pl); W.set(B_TH[1], (W.get(B_TH[1]) || 0) + wt * (1 - pl));
         GB.vert(x, this.hipRest + 0.06 + sS, z, j / NC, t, [...W], { t });
       });
-      const sk = this.skin(GB.build().geo, SK.leg ? legMat(SK.leg[0], cfg.bottom.color ?? 0x6a2ab8, SK.leg[1], { scale: SK.leg[2] }) : SK.plaid ? toon(0xffffff, { side: THREE.DoubleSide, map: plaidTex(cfg.bottom.color ?? 0xb3242a, [8, 2]) }) : toon(cfg.bottom.color ?? 0x161616, { side: THREE.DoubleSide }), 0.008); sk.castShadow = true;
+      const sk = this.skin(GB.build().geo, SK.leg ? legMat(SK.leg[0], cfg.bottom.color ?? 0x6a2ab8, vivo(cfg.bottom.color2, SK.leg[1]), { scale: SK.leg[2] }) : SK.plaid ? toon(0xffffff, { side: THREE.DoubleSide, map: plaidTex(cfg.bottom.color ?? 0xb3242a, [8, 2]) }) : toon(cfg.bottom.color ?? 0x161616, { side: THREE.DoubleSide }), 0.008); sk.castShadow = true;
     }
     if (cfg.bottom?.rips || cfg.bottom?.type === 'jeansRips') for (const i of [0, 1]) mesh(th[i], G('rip', () => new THREE.SphereGeometry(0.03, 10, 8).scale(1, 0.6, 0.35)), M.skin, { pos: [i ? -0.01 : 0.01, -0.43, 0.074], outline: 0.003 });
     if (cfg.legwear?.type === 'stockings') for (const i of [0, 1]) mesh(th[i], G('ruffle', () => new THREE.TorusGeometry(0.09, 0.012, 6, 24).rotateX(Math.PI / 2)), toon(cfg.legwear.ruffle ?? cfg.legwear.color ?? 0x8af06a), { pos: [0, -0.165, 0.004], scale: [0.95, 1, 0.95], outline: 0.003 });
@@ -2698,6 +2702,21 @@ class Rocker {
     p.lid = c > 0.2 ? 0.44 : 0.34;
     p.sneer = Math.max(0, c) * 0.6;
     p.mouth = (I > 0.9 && dip > 0.55 ? 0.45 * energy : 0) + Math.max(0, c - 0.3) * 0.15;
+    /* en vivo: rasguea cada nota que se toca de verdad (`golpes`, de PRO HERO). Con muchas seguidas, golpes más
+       cortos y alternados (como púa alterna), en vez de un rasgueo entero por nota */
+    if (st.real) {
+      for (const g of st.golpes.splice(0)) {
+        if (rest) continue;
+        const gap = t - st.ultGolpe; st.ultGolpe = t;
+        const amp = (g.a ? 0.085 : g.d > 0.3 ? 0.06 : 0.045) * clamp(gap / 0.2, 0.3, 1);
+        const fumble = c < -0.35 && R() < (-c - 0.3) * 0.35;
+        if (!fumble && !this.has('repair', mt)) this.strum(t, amp);
+        st.fret = [3, 5, 7, 10, 12, 14][clamp(g.l | 0, 0, 5)];
+        st.sustainEnd = g.d > 0.3 ? mt + g.d : 0;
+        st.bend = -9;
+      }
+      return;
+    }
     // riff: las mismas notas que tocaría la canción → púa y mano izquierda sincronizadas
     const notes = K.notes; let i = st.riffPtr;
     if (i > 0 && notes[i - 1] && notes[i - 1].t > mt) i = 0;
@@ -3346,7 +3365,7 @@ const battle = {
     L.side = 0; Rk.side = 1; L.opp = Rk; Rk.opp = L;
     // con más de dos, el cantante deja el centro libre
     singer.root.visible = S.micSet.visible = !SOLO() && !ex.length; drummer.root.visible = true;
-    for (const r of [L, Rk, singer, drummer, ...ex]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
+    for (const r of [L, Rk, singer, drummer, ...ex]) { r.clearMoves(); r.st.riffPtr = 0; r.st.conf = 0; r.st.descanso = false; r.st.real = false; r.st.golpes = []; r.st.ultGolpe = -9; if (r.handPtr) r.handPtr = [0, 0]; if (r.gtr) r.gtr.spAura.visible = false; }
     // ataques: al principio domina el que acabará perdiendo, luego remontada (en vivo los dispara la partida)
     const events = []; const n = ATTACK_BARS.length; let last = '';
     if (!VIVO.on) ATTACK_BARS.forEach((bar, i) => {
@@ -3931,7 +3950,6 @@ canvas.addEventListener('pointercancel', () => { ED.drag = null; });
    copian a un canvas 2D: sin otro contexto WebGL. De a pocas por cuadro (`MINI.cola`), y quedan guardadas en
    este navegador (localStorage, `rock-mini-<MINI_V>:<id>`).
    ===================================================================== */
-const MINI_V = 1;
 /* cuánto se acerca la cámara a cada categoría (las pupilas, casi encima) */
 const MINI_ZOOM = { eyeStyle: 0.62, mkStyle: 0.75, beard: 0.85, earrings: 0.85 };
 const MINI = { px: 144, mapa: new Map(), cola: [], escena: null, cam: null, K: null };
@@ -3948,7 +3966,7 @@ function miniUrl(v) {
   const id = miniId(v), m = MINI.mapa.get(id);
   if (m) return m.url;
   let url = '';
-  try { url = localStorage.getItem(`rock-mini-${MINI_V}:${id}`) || ''; } catch {}
+  try { url = localStorage.getItem(claveMini(v)) || ''; } catch {}
   if (url) { MINI.mapa.set(id, { url, canvas: null }); return url; }
   if (!MINI.cola.some(x => miniId(x) === id)) MINI.cola.push(v);
   return '';
@@ -4021,7 +4039,7 @@ function miniProcesa() {
     if (!c) { MINI.mapa.set(id, { url: '', canvas: null }); continue; }
     const url = c.toDataURL('image/webp', 0.86);
     MINI.mapa.set(id, { url, canvas: c });
-    try { localStorage.setItem(`rock-mini-${MINI_V}:${id}`, url); } catch {}
+    try { localStorage.setItem(claveMini(v), url); } catch {}
     for (const im of CAPA.querySelectorAll('img[data-mini]')) if (im.dataset.mini === id) im.src = url;
     if (BOX.on && BOX.res && miniId(BOX.res.v) === id && BOX.parts) { BOX.parts.card.material.map?.dispose(); BOX.parts.card.material.map = boxCardTex(BOX.res); BOX.parts.card.material.needsUpdate = true; }
   }
@@ -4396,6 +4414,23 @@ export const rock = {
     INV = { coins: inv.coins | 0, parada: !!inv.parada, own: [...iniciales().map(v => ({ ...v })), ...(inv.own || [])], opened: inv.opened | 0, last: inv.last || [] };
     if (ED.open && !BOX.on) edRender();
   },
+  /* fotos de piezas fuera del juego (el salón de Juegos, con juegos/hero/rock-visor.html en un iframe escondido):
+     [{id, url}], y quedan en localStorage como las del editor */
+  miniaturas(lista) {
+    if (!montada) { renderer.setPixelRatio(1); renderer.setSize(MINI.px + 16, MINI.px + 16, false); }
+    return (Array.isArray(lista) ? lista : []).slice(0, 40).map(v => {
+      const id = miniId(v);
+      let m = MINI.mapa.get(id);
+      if (!m?.url) {
+        let c = null;
+        try { c = miniHaz(v); } catch (err) { console.warn('[rock] miniatura', id, err); }
+        m = { url: c ? c.toDataURL('image/webp', 0.86) : '', canvas: c };
+        MINI.mapa.set(id, m);
+        if (m.url) try { localStorage.setItem(claveMini(v), m.url); } catch {}
+      }
+      return { id, url: m.url };
+    });
+  },
   /* el editor: `look` es tu rockero guardado (o null); `cb` = {guarda(look), abreCaja(b), vende(c, p), mercado(), cerrar()} */
   editor(look, cb) {
     CB = cb || {}; VIVO.on = false; VIVO.alto = false;
@@ -4444,8 +4479,13 @@ export const rock = {
   _nivel(n) { CAL.nivel = Math.max(0, Math.min(NIVELES.length - 1, n)); ponCalidad(); },
   /* cada cuadro de la canción: `beats` (pulsos del chart desde el compás 0), `animo` (-1…1: cómo vas, o
      cómo va la batalla a tu favor) y `hype` (0…1, el combo) */
-  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null }) {
+  pulso({ beats, animo = 0, humor = null, hype = 0, dtJuego = 0, toca = null, solo = false, confs = null, golpes = null }) {
     if (!VIVO.on) return;
+    // las notas tocadas de verdad desde el pulso anterior: [quién, carril, acorde, duración en centésimas]
+    if (Array.isArray(golpes)) for (const [q, l, a, d] of golpes.slice(0, 64)) {
+      const r = (q === 0 || !VIVO.solo) && rockerDe(q | 0);
+      if (r) { r.st.real = true; (r.st.golpes ||= []).push({ l, a: !!a, d: (+d || 0) / 100 }); }
+    }
     VIVO.humor = clamp(humor ?? animo, -1, 1); VIVO.solista = !!solo;
     VIVO.confs = Array.isArray(confs) && EXTRAS.length ? confs.map(c => clamp(+c || 0, -1, 1)) : null;
     if (toca) toca.forEach((v, q) => { const r = (q === 0 || !VIVO.solo) && rockerDe(q); if (r) r.st.descanso = v === false; });

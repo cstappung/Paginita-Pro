@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<!-- Batalla de Rock sin escenario: saca las fotos de las piezas para el salón de Juegos («Últimos drops» de rock),
+     que lo carga en un iframe escondido solo cuando esa tira se ve. Mismo ?v= que index.html (tests/hero.test.cjs). -->
+<script type="importmap">{"imports":{"./js/rock/escena.js":"./js/rock/escena.js?v=hero-18","./js/rock/catalogo.js":"./js/rock/catalogo.js?v=hero-18"}}</script>
+</head><body style="margin:0;background:transparent">
+<script type="module">
+const { rock } = await import('./js/rock/escena.js');
+addEventListener('message', (e) => {
+  if (e.origin !== location.origin || e.source !== parent || e.data?.canal !== 'rock-visor-pide') return;
+  parent.postMessage({ canal: 'rock-visor', fotos: rock.miniaturas(e.data.lista) }, location.origin);
+});
+parent.postMessage({ canal: 'rock-visor', listo: true }, location.origin);
+</script>
+</body></html>

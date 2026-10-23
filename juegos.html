@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610221825"></script>
+<script src="i18n.js?v=202610230137"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5099,7 +5099,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 :root{--m-solo:#e59a00;--m-solo-bg:#ffcf5c;--m-solo-tx:#3d2a00;--m-multi:#7042df;--m-multi-bg:#7042df;--m-multi-tx:#fff}
 
 /* ---- La rejilla del salón: una columna en el móvil ---- */
-.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram";align-items:start}
+.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram" "tirar";align-items:start}
 .jg-sal-intro{grid-area:intro;margin-bottom:10px}
 .jg-sal-intro h1{font-size:26px;letter-spacing:-.8px;margin:8px 0 4px;line-height:1.1;color:var(--jg-ink)}
 .jg-sal-intro p{margin:0;font-size:13px;color:var(--jg-muted);line-height:1.5}
@@ -5111,6 +5111,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal .jg-ves-lado{grid-area:lado}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
 .jg-sal .jg-tira-m{grid-area:tiram;margin:16px 0 0}
+.jg-sal .jg-tira-r{grid-area:tirar;margin:16px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
 /* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
@@ -5567,9 +5568,9 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
   /* La columna baja hasta el final (tops y tira incluidos). Chrome sujeta
      un `sticky` a la rejilla entera, no a su área: cuando acababa en
      «Multijugador», al bajar se quedaba pegada encima de los drops. */
-  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
+  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
   .jg-modos{justify-content:space-between}
@@ -6771,6 +6772,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610221825"></script>
+<script src="juegos-app.js?v=202610230137"></script>
 </body>
 </html>

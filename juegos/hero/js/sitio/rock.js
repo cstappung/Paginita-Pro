@@ -64,7 +64,7 @@ function fondoEnTrabajador() {
         w.postMessage({ t: 'vivo', yo, rival, otros, alto });
         return new Promise((fin) => { preparado = fin; });
       },
-      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo, confs: d.confs || null }); },
+      pulso(d) { w.postMessage({ t: 'pulso', beats: d.beats, animo: d.animo, humor: d.humor, hype: d.hype, dtJuego: d.dtJuego || 0, toca: d.toca, solo: d.solo, confs: d.confs || null, golpes: d.golpes || null }); },
       carga(quien) { w.postMessage({ t: 'carga', quien }); },
       poder(quien, on) { w.postMessage({ t: 'poder', quien, on }); },
       ataque(quien) { w.postMessage({ t: 'ataque', quien }); },
