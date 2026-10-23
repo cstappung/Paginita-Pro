@@ -1,0 +1,39 @@
+name: Copiar el ayudante de inicio de sesión de Firebase
+# La app de la pantalla de inicio del iPhone inicia sesión por redirección
+# y necesita el ayudante de Firebase (/__/auth/…) en el mismo dominio del
+# sitio (colabtex/src/firebase.js, `conRedireccion`). GitHub Pages no puede
+# servir de proxy, así que se copia aquí: se corre a mano (Run workflow)
+# para renovarlo, y sola cuando cambia este archivo. Solo hace commit si
+# Firebase cambió algo. Los .html se sirven sin la extensión
+# (/__/auth/handler → handler.html), como Firebase los pide.
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/auth-firebase.yml']
+permissions:
+  contents: write
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bajar el ayudante de mi-pagina-pro.firebaseapp.com
+        run: |
+          set -euo pipefail
+          base=https://mi-pagina-pro.firebaseapp.com
+          mkdir -p __/auth __/firebase
+          curl -fsSL "$base/__/auth/handler"        -o __/auth/handler.html
+          curl -fsSL "$base/__/auth/handler.js"     -o __/auth/handler.js
+          curl -fsSL "$base/__/auth/experiments.js" -o __/auth/experiments.js
+          curl -fsSL "$base/__/auth/iframe"         -o __/auth/iframe.html
+          curl -fsSL "$base/__/auth/iframe.js"      -o __/auth/iframe.js
+          curl -fsSL "$base/__/firebase/init.json"  -o __/firebase/init.json
+          ls -la __/auth __/firebase
+      - name: Commit si cambió
+        run: |
+          git add __
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Ayudante de inicio de sesión de Firebase (/__/auth) al día"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

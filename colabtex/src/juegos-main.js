@@ -39,7 +39,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
       contar dos veces la misma partida, así que recargar la página con
       la partida terminada no infla el marcador.
    ============================================================ */
-import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva } from "./firebase.js";
+import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
 import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
@@ -1063,10 +1063,29 @@ let trasLogin = "";
    partida de invitado, la franja de un destacado…), para Analytics:
    `jg_login_pide` al tocarlo y `login`/`sign_up` (los nombres estándar de
    GA4) si termina en una cuenta, con el mismo origen. */
+/* En la app del iPhone el inicio de sesión es una redirección
+   (firebase.js, `conRedireccion`): la página se va y vuelve, así que el
+   juego a reabrir y el origen viajan en `sessionStorage` y se recogen al
+   cargar (`recogeLoginRedirigido`). */
+const CLAVE_LOGIN_VUELTA = "jg.login.vuelta";
+function recogeLoginRedirigido() {
+  if (!conRedireccion) return;
+  let v = null;
+  try { v = JSON.parse(sessionStorage.getItem(CLAVE_LOGIN_VUELTA) || "null"); sessionStorage.removeItem(CLAVE_LOGIN_VUELTA); } catch (e) { v = null; }
+  if (v && typeof v.juego === "string") trasLogin = v.juego;
+  resultadoLogin().then(r => {
+    if (r) evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: v && typeof v.origen === "string" ? v.origen : "otro", app: 1 });
+  }, e => {
+    trasLogin = "";
+    console.warn("[juegos] el inicio de sesión no volvió bien", e);
+    alert("No se pudo iniciar sesión: " + ((e && e.code) || (e && e.message) || e));
+  });
+}
 async function entrarConGoogle(juego, origen) {
   trasLogin = juego || "";
   const desde = String(origen || (juego ? "ficha" : "otro")).slice(0, 40);
   evento("jg_login_pide", { origen: desde });
+  if (conRedireccion) { try { sessionStorage.setItem(CLAVE_LOGIN_VUELTA, JSON.stringify({ juego: trasLogin, origen: desde })); } catch (e) { /* sin almacenamiento: vuelve al salón */ } }
   try {
     const r = await loginGoogle();
     evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: desde });
@@ -3888,6 +3907,7 @@ function wire() {
   alCambiarBt3(() => { vesFirma = ""; bt3Revisada = false; if (state.vista === "vestibulo") render(); else if (state.vista === "partida") pintaPartida(); });
   // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
   alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
+  recogeLoginRedirigido();
   watchAuth(user => {
     revisaBt3();
     if (!user) {
