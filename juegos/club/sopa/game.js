@@ -90,7 +90,10 @@
     empieza(s, enc, deHoy && Number.isFinite(prog.ms) ? prog.ms : 0, hecha, { v: M.PRUEBA_V, m: "d", f: hoy },
       cuadra ? j : [], cuadra && r ? r.tiempos[r.tiempos.length - 1] || 0 : 0, !cuadra);
     $("info").innerHTML = `Hoy: <b>${t.icono} ${t.nombre}</b> · ${s.tam}×${s.tam} · ${M.DIFICULTADES[s.dif]}${hecha ? " · <b>Ya la completaste hoy ✓</b>" : ""}`;
-    if (hecha) aviso(`<strong>Ya la completaste hoy</strong>Vuelve mañana para mantener la racha: 🔥 ${dias(M.rachaVisible(racha, hoy))}.`);
+    if (hecha) {
+      aviso(`<strong>Ya la completaste hoy</strong>Vuelve mañana para mantener la racha: 🔥 ${dias(M.rachaVisible(racha, hoy))}.`);
+      cierreDiario(hoy, prog && prog.fecha === hoy && Number.isFinite(prog.ms) ? prog.ms : 0);
+    }
     if (Club) Club.category("club-sopa-racha");
   }
   function nuevaLibre() {
@@ -181,6 +184,11 @@
 
   /* ---------- final ---------- */
   function aviso(html) { $("aviso").innerHTML = html; $("aviso").hidden = false; }
+  /* Compartir la sopa del día y cuánto falta para la próxima (../diario.js). */
+  function cierreDiario(fecha, ms) {
+    if (!window.DiarioClub) return;
+    DiarioClub.cierre($("aviso"), { juego: "sopa", prox: "Nueva sopa en", texto: `🔤 Sopa de letras del día · ${fecha.split("-").reverse().join("/")}\n${ms ? `⏱ ${reloj(ms)} · ` : ""}🔥 ${dias(M.rachaVisible(racha, fecha))}` });
+  }
   function completa() {
     terminada = true; corriendo = false; $("tablero").classList.add("quieto");
     const tiempo = Math.max(1, Math.round(ms));
@@ -196,6 +204,7 @@
       }
       aviso(`<strong>¡Felicitaciones! 🎉</strong>Completaste la sopa del día en ${reloj(tiempo)}.<br>🔥 Racha: ${dias(racha.racha)} · mejor ${racha.mejor}. Vuelve mañana por la siguiente.` +
         (sinPrueba && Club ? "<br><small>Esta diaria se empezó con una versión anterior del juego: suma a tu racha, pero su tiempo no entra en la clasificación.</small>" : ""));
+      cierreDiario(sopa.fecha, tiempo);
     } else {
       if (Club) Club.result({ categoria: `club-sopa-${sopa.dif}-${sopa.tam}`, puntos: sopa.palabras.length, tiempo }, prueba);
       aviso(`<strong>¡Felicitaciones! 🎉</strong>Encontraste las ${sopa.palabras.length} palabras en ${reloj(tiempo)}.<br><button type="button" class="boton primario" id="otra">Nueva sopa</button>`);

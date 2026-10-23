@@ -19,13 +19,15 @@
  *   que llegaron últimos, si llegaron hace menos de dos semanas. Con un
  *   juego nuevo cada pocos días, «todo lo de este mes» habría puesto la
  *   etiqueta a media tienda, y una etiqueta que lo marca todo no marca nada.
- * - **El invitado ve todo y juega solo ocho juegos** (`bloqueado`,
- *   `LIBRES_INVITADO`): los cuatro destacados (`DESTACADOS_INVITADO`:
- *   BBTAN, ALETEO, FANAL y Trigon, los que la bienvenida del celular le
- *   ofrece y cuyo puntaje se guarda si inicia sesión después) más Snake,
- *   Mina Club, Tetris Club y sortEm. El resto (los multijugador, los demás
- *   del club y las prácticas contra bots) pide cuenta, por decisión de la
- *   dueña del sitio. Lo bloqueado se muestra
+ * - **El invitado juega todo lo de un jugador** (`bloqueado`,
+ *   `CON_CUENTA_SOLO`): el club entero, la Frontera y las prácticas contra
+ *   bots, menos PRO HERO (guarda canciones y estrellas en la cuenta) y
+ *   Tenkaichi 3 (su disco es privado y pide la sesión). Lo multijugador
+ *   pide cuenta. Antes eran solo ocho juegos y la dueña vio que pedir
+ *   cuenta tan pronto hacía que los nuevos no jugaran a nada. Los cuatro
+ *   destacados (`DESTACADOS_INVITADO`: BBTAN, ALETEO, FANAL y Trigon) son
+ *   los que la bienvenida del celular ofrece y cuyo puntaje se guarda si
+ *   inicia sesión después. Lo bloqueado se muestra
  *   con candado en vez de esconderse: esconderlo le escondería al invitado
  *   también la razón para crearse una cuenta.
  */
@@ -249,16 +251,58 @@ export function juegoDeNovedad(n) {
    verifica.js, `subeDeInvitado` en juegos-main.js). Son ids del salón y,
    a la vez, de la ruta `#solo/<x>`. */
 export const DESTACADOS_INVITADO = ["bbtan", "aleteo", "fanal", "trigon"];
-/* Lo único que un invitado puede jugar: juegos del club, por id del
-   salón. Lo demás (multijugador, el resto del club y las prácticas
-   contra bots) pide iniciar sesión. */
-export const LIBRES_INVITADO = [...DESTACADOS_INVITADO, "snake", "minas", "tetrisclub", "sortem"];
-export const libreParaInvitado = id => LIBRES_INVITADO.includes(id);
-/* Lo mismo para una ruta `#solo/<juego>` (la del Tetris es `tetris`). */
-export const rutaLibre = juego => libreParaInvitado(juego === "tetris" ? "tetrisclub" : juego);
+/* Lo de un jugador que sigue pidiendo cuenta al invitado, por id del
+   salón: PRO HERO (sus canciones viven en Storage y sus estrellas en la
+   cuenta, por decisión de la dueña) y Tenkaichi 3 (el disco es privado).
+   Todo lo demás de un jugador se juega sin cuenta y sin guardar nada. */
+export const CON_CUENTA_SOLO = ["heroclub", "bots-bt3"];
+export const libreParaInvitado = id => SOLOS.some(s => s.id === id) && !CON_CUENTA_SOLO.includes(id);
+/* Lo mismo para una ruta `#solo/<juego>` (la del Tetris es `tetris`, la
+   de PRO HERO `hero`): se busca la entrada que la lleva. */
+export const rutaLibre = juego => {
+  const s = SOLOS.find(x => x.ruta === "#solo/" + juego);
+  return !!s && libreParaInvitado(s.id);
+};
 
 /* Si el invitado puede abrirla. */
-export const bloqueado = (entrada, invitado) => !!invitado && !(entrada.modo === "solo" && libreParaInvitado(entrada.id));
+export const bloqueado = (entrada, invitado) => !!invitado && !(entrada.modo !== "multi" && libreParaInvitado(entrada.id));
+
+/* El nombre del invitado: se le pide al empezar a jugar (la bienvenida
+   del celular o el primer juego que abre) y se ve en el saludo, la barra
+   del juego y la Frontera. Vive solo en la pestaña (`sessionStorage`):
+   como todo lo del invitado, la próxima visita empieza de cero. Sin
+   etiquetas ni controles, con los espacios juntos y a lo más 20
+   caracteres; vacío vuelve al sugerido. */
+export const NOMBRE_INVITADO_MAX = 20;
+export function limpiaNombreInvitado(s) {
+  return Array.from(String(s == null ? "" : s).replace(/\s+/g, " ").replace(/[\u0000-\u001f\u007f<>]/g, "").trim())
+    .slice(0, NOMBRE_INVITADO_MAX).join("").trim();
+}
+const ANIMALES_INVITADO = ["Pudú", "Cóndor", "Huemul", "Zorro", "Puma", "Pingüino", "Chinchilla", "Llama", "Delfín", "Búho", "Colibrí", "Quirquincho"];
+/* «Pudú 27»: uno sugerido, para que jugar siga a un toque. `azar` es
+   inyectable (Math.random por defecto) para probarlo en Node. */
+export function sugiereNombreInvitado(azar = Math.random) {
+  const a = ANIMALES_INVITADO[Math.floor(azar() * ANIMALES_INVITADO.length) % ANIMALES_INVITADO.length];
+  return a + " " + (10 + Math.floor(azar() * 90) % 90);
+}
+
+/* Lo primero que ve alguien nuevo tiene que poder jugarse ahí mismo. Al
+   invitado, lo que pide cuenta va después; en el celular, lo que solo se
+   juega en el PC (`soloPc`) también. Es un orden estable: dentro de cada
+   grupo manda el de antes (el de la dueña en las novedades, la
+   popularidad en el catálogo). Con cuenta y en el PC no cambia nada. Antes
+   la primera diapositiva que veía un invitado en el teléfono era Pro
+   BoxHead: multijugador, solo PC y con «Iniciar sesión y jugar». */
+export const novedadPideCuenta = n => !!n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6)));
+const idSoloPc = id => !!id && enPc(id) && !enMovil(id);
+export const soloPc = e => !e.movil && !!e.pc;
+const ordenEstable = (lista, peso) => lista.map((x, i) => ({ x, i, p: peso(x) })).sort((a, b) => a.p - b.p || a.i - b.i).map(o => o.x);
+export function ordenaNovedades(lista, { invitado = false, celular = false } = {}) {
+  return ordenEstable(lista, n => (invitado && novedadPideCuenta(n) ? 2 : 0) + (celular && idSoloPc(juegoDeNovedad(n)) ? 1 : 0));
+}
+export function ordenaEntradas(entradas, { invitado = false, celular = false } = {}) {
+  return ordenEstable(entradas, e => (bloqueado(e, invitado) ? 2 : 0) + (celular && soloPc(e) ? 1 : 0));
+}
 
 /* El modo de juego que elige la barra del salón. `todos` muestra las dos
    secciones; los otros dos esconden la que sobra (las novedades se
@@ -280,7 +324,7 @@ export const esClaveInvitado = k => typeof k === "string" && (
 /* Las vistas que un invitado no puede ver y por qué: el texto del
    aviso que las sustituye. Todas leen o escriben en la base de datos. */
 export const MOTIVO_CUENTA = {
-  solo: { t: "Este juego necesita una cuenta", d: "Sin iniciar sesión puedes jugar a BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm. Inicia sesión con Google y se abren todos los demás, con tus récords, logros y monedas guardados." },
+  solo: { t: "Este juego necesita una cuenta", d: "Sin iniciar sesión puedes jugar a todos los demás juegos de un jugador. Este guarda tu avance en tu cuenta: inicia sesión con Google y se abre, con tus récords, logros y monedas guardados." },
   partida: { t: "Te invitaron a una partida", d: "Las partidas en línea son entre cuentas: así cada jugada queda firmada por quien la hizo. Inicia sesión y entras directo a esta sala." },
   ranks: { t: "La clasificación es para quien tiene cuenta", d: "Cada fila es una persona con sus victorias, y como invitado tus partidas no se guardan. Inicia sesión y empieza a sumar." },
   logros: { t: "Los logros se ganan con cuenta", d: "Se guardan en tu perfil y se ven en tu página pública. Como invitado juegas igual, pero no quedan registrados." },

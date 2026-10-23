@@ -33,7 +33,7 @@ import {verificaClub,DE_INVITADO} from './verifica.js';
    esto el ranking del juego mostraba el de Google donde el resto del sitio
    ya mostraba el apodo. Si el apodo llega después, `refresca()` repinta. */
 const PLENO=new Set(['prodefender']);
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe,alInvitado,deInvitado,esAdmin}) {
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe,alInvitado,deInvitado,esAdmin,alTerminar}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   /* El fantasma (Metro Rush, modos «Fantasma»): la tabla ordenada que ya
      trae la escucha de cada categoría (`tablas`), quienes esperan a que
@@ -192,6 +192,10 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     }
     if(d.tipo==='resultado'){
       const dato=resultadoClub(juego,d);if(!dato)return;
+      /* `alTerminar`: cada partida que el juego da por terminada, antes de
+         verificarla, con o sin cuenta. Solo para avisos que no guardan nada
+         (lo que se pierde el invitado, el reto de un amigo). */
+      if(alTerminar){try{alTerminar(dato);}catch(err){/* el aviso no debe romper la partida */}}
       if(invitado&&!guardaInvitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
       if(invitado){
         verificaClub(juego,dato,d.prueba,{uid:cuenta}).then(async motivo=>{

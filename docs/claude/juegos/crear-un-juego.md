@@ -110,7 +110,9 @@ places.
   - `antitrampas.test.cjs`;
   - `logros.test.cjs` (`juegos`);
   - `controles.test.cjs` (`PROBADOS`);
-  - `salon.test.cjs` (guest `rutaLibre`).
+  - `salon.test.cjs` (guest `rutaLibre`). A new solo game is playable by
+    guests by default; add it to `CON_CUENTA_SOLO` only if it cannot run
+    without the account.
 
 ## Room game
 

@@ -58,5 +58,6 @@ everyone) and **Glitch**, a fifth ghost from level 3 that teleports. Three
 
 One table, `club-propac-puntos`; proof and verifier in
 `docs/antitrampas/propac.md`. The `soloRanks`, `soloPruebas` and
-`clubJugadas` rules were widened, so they must be re-published. Not a guest
+`clubJugadas` rules were widened, so they must be re-published. Its guest score
+passes to the account on login (`DE_INVITADO`), though it is not a guest
 destacado and no champion frame or novedad yet.

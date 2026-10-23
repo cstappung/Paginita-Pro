@@ -11,6 +11,19 @@ Read before touching `firebase/database.rules.json`, `storage.rules`, or adding 
   in [firebase/CONFIGURAR-FIREBASE.md](firebase/CONFIGURAR-FIREBASE.md). After
   editing `firebase/database.rules.json` or `storage.rules`, re-publish them
   there.
+- **Login in the iPhone home-screen app is a redirect, on our own domain.**
+  There (`navigator.standalone`) the Google popup never returns to the app,
+  so `src/firebase.js` (`conRedireccion`) uses `signInWithRedirect` with
+  `authDomain: "paginita-pro.cl"`; everywhere else it is the popup with
+  `mi-pagina-pro.firebaseapp.com`, unchanged. The Firebase helper
+  (`/__/auth/handler`, `iframe`, their `.js`) is copied into `__/` by the
+  workflow `.github/workflows/auth-firebase.yml` (Run workflow to refresh),
+  and `_config.yml` makes Jekyll publish that folder (it skips `_*`);
+  GitHub Pages serves `handler.html` at `/__/auth/handler`. One console step:
+  `https://paginita-pro.cl/__/auth/handler` in the OAuth client's redirect
+  URIs (CONFIGURAR-FIREBASE.md §3). With firebaseapp.com the redirect result
+  lives in third-party storage, which Safari partitions: it came back with
+  no session. `tests/enganche.test.cjs` pins the pieces.
 
 ## Security model (what the rules can and cannot hold)
 

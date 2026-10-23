@@ -844,6 +844,26 @@ Consola → **Authentication** → **Settings** → **Authorized domains** → *
 
 (`localhost` ya viene autorizado, así que la vista previa local funciona sin más.)
 
+### La app de la pantalla de inicio del iPhone (una vez)
+
+En la página guardada en el inicio del iPhone la ventana emergente de
+Google no vuelve a la app, así que ahí el sitio inicia sesión **por
+redirección** y con el ayudante de Firebase servido desde el propio dominio
+(`https://paginita-pro.cl/__/auth/…`, carpeta `__/` del repo, que copia el
+flujo **Copiar el ayudante de inicio de sesión de Firebase** de GitHub
+Actions; `_config.yml` le dice a GitHub Pages que publique esa carpeta).
+Falta un paso que solo se hace en la consola:
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
+   → **APIs y servicios → Credenciales** → el cliente **OAuth 2.0** de tipo
+   *Aplicación web* (se llama «Web client (auto created by Google Service)»).
+2. En **URI de redireccionamiento autorizados** → *Agregar URI*:
+   `https://paginita-pro.cl/__/auth/handler` → **Guardar** (tarda unos minutos).
+
+Sin ese paso, en la app del iPhone Google responde `redirect_uri_mismatch`;
+Safari, Chrome y el PC no cambian (siguen con la ventana emergente). Para
+renovar la copia del ayudante: Actions → ese flujo → *Run workflow*.
+
 ## 4. Publicar en GitHub Pages
 
 Desde la carpeta del proyecto (el repo git ya está preparado):

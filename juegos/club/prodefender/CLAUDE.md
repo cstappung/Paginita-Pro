@@ -224,8 +224,8 @@ versión» (cache, not cheating: no castigo).
 
 ## In Juegos
 
-- Route `#solo/prodefender`, card `prodefender` in `salon-datos.js`. Needs an
-  account (not a guest destacado). The iframe is **always full window**
+- Route `#solo/prodefender`, card `prodefender` in `salon-datos.js`. Guests play it
+  (`EN_LA_NUBE` is false: no tables, no coins, nothing saved; not a guest destacado). The iframe is **always full window**
   (`PLENO` in `solo/club.js` → `html.jg-club-pleno` in `juegos.html`), like PRO
   HERO; the game's own «← Volver a Juegos» / «← Juegos» buttons click the
   hidden `.club-volver` link that `conexion.js` adds.

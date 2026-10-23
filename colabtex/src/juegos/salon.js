@@ -302,9 +302,12 @@ export function crearSalon(ctx) {
         <h3>${e.modo === "multi" ? "Este juego es multijugador y necesita una cuenta" : "Este juego necesita una cuenta"}</h3>
         <p>${e.modo === "multi"
           ? "Con tu cuenta de Google abres salas, invitas a tus amigos con un enlace y sumas puntos en la clasificación, logros y monedas. Es gratis y tarda un clic."
-          : "Sin iniciar sesión puedes jugar a Snake, Buscaminas, Tetris y sortEm. Con tu cuenta de Google se abre este y todos los demás, y tus récords, logros y monedas quedan guardados. Es gratis y tarda un clic."}</p>
+          : "Sin iniciar sesión puedes jugar a todos los demás juegos de un jugador. Este guarda tu avance en tu cuenta: con tu cuenta de Google se abre, y tus récords, logros y monedas quedan guardados. Es gratis y tarda un clic."}</p>
         <button class="jg-hoja-alt" type="button" data-f="cierra">Seguir como invitado</button>
-      </div>`;
+      </div>` +
+        /* La práctica contra bots sí se juega sin cuenta: es la manera de
+           probar el juego antes de pedirle nada. */
+        (p && !bloqueado(Object.assign({ modo: "bots" }, p), true) ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">Practica solo contra bots, sin cuenta →</a></p>` : "");
       pie = `${reglas}<button class="btn jg-hoja-ya" type="button" data-f="login">Iniciar sesión y jugar</button>`;
     } else if (e.modo === "multi") {
       medio = salasHtml(e) + opcionesHtml(e) + `<div class="jg-hoja-podio" data-podio></div>` +

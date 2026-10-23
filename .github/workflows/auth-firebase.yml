@@ -1,0 +1,50 @@
+name: Copiar el ayudante de inicio de sesión de Firebase
+# La app de la pantalla de inicio del iPhone inicia sesión por redirección
+# y necesita el ayudante de Firebase (/__/auth/…) en el mismo dominio del
+# sitio (colabtex/src/firebase.js, `conRedireccion`). GitHub Pages no puede
+# servir de proxy, así que se copia aquí: se corre a mano (Run workflow)
+# para renovarlo, y sola cuando cambia este archivo. Solo hace commit si
+# Firebase cambió algo. Los .html se sirven sin la extensión
+# (/__/auth/handler → handler.html), como Firebase los pide.
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/auth-firebase.yml']
+permissions:
+  contents: write
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bajar el ayudante de mi-pagina-pro.firebaseapp.com
+        run: |
+          set -uo pipefail
+          base=https://mi-pagina-pro.firebaseapp.com
+          mkdir -p __/auth __/firebase
+          # baja <ruta> <destino> <obligatorio 1/0>: los opcionales pueden no existir (init.json
+          # solo está si el proyecto publicó Hosting, y en firebaseapp.com da 404 sin que el
+          # login lo eche de menos; experiments.js según la versión).
+          falta=0
+          baja() {
+            code=$(curl -sSL -w '%{http_code}' -o "$2.tmp" "$base/$1")
+            echo "$1 → $code"
+            if [ "$code" = "200" ]; then mv "$2.tmp" "$2"; else rm -f "$2.tmp"; if [ "$3" = "1" ]; then falta=1; fi; fi
+            return 0
+          }
+          baja __/auth/handler        __/auth/handler.html    1
+          baja __/auth/handler.js     __/auth/handler.js      1
+          baja __/auth/iframe         __/auth/iframe.html     1
+          baja __/auth/iframe.js      __/auth/iframe.js       1
+          baja __/auth/experiments.js __/auth/experiments.js  0
+          baja __/firebase/init.json  __/firebase/init.json   0
+          ls -la __/auth __/firebase
+          exit $falta
+      - name: Commit si cambió
+        run: |
+          git add __
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Ayudante de inicio de sesión de Firebase (/__/auth) al día"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
