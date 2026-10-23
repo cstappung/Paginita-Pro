@@ -226,14 +226,68 @@ Rush's ghost) and Frontera plays with the `INVITADO` user.
   `localStorage` only), with the guest's chosen name.
 - **The mobile welcome** (`abreBienvenida` in `juegos-main.js`, `.jg-bv`):
   a first visit from a phone (`pointer:coarse`, smaller side ≤ 600 px)
-  without a session, on the lobby route only, gets a full-screen choice
-  before the salón: «Iniciar sesión», «Crear cuenta» (both are the Google
-  popup; it stays open until the account arrives, so cancelling leaves the
-  choice there) or «Continuar como invitado», which shows the four
-  destacados. Once per device (`jg.bienvenida`, also set on any login, so a
-  logout does not bring it back). A link to a game or a room skips it.
-- **A destacado's score is saved if the guest signs in later.** Only those
-  four (`DE_INVITADO` in `solo/verifica.js`, same list): `crearSolo`
+  without a session, on the lobby route only, gets **one screen to play
+  now**: «Juega ya, sin cuenta», how many solo games are free, the guest
+  name field and the four destacados as big covers with ▶; «Ver todos los
+  juegos» and «Ya tengo cuenta · Iniciar sesión» sit below as secondary
+  exits. It used to open on Iniciar sesión / Crear cuenta / «Continuar como
+  invitado», and asking for an account before playing is what made new
+  people leave (owner, Oct 2026). Once per device (`jg.bienvenida`, also
+  set on any login). A link to a game or a room skips it.
+- **What a newcomer sees first can be played right there**
+  (`ordenaNovedades`, `ordenaEntradas` in `salon-datos.js`, stable sorts):
+  for a guest, banner slides that need an account (`novedadPideCuenta`) go
+  last, and on a phone (`enCelular`) PC-only games go after the rest, in
+  the banner, the solo carousel and the multiplayer grid. Within each group
+  the owner's order (banner) or popularity (catalogue) stands; logged in on
+  a PC nothing changes. The first slide a guest saw on a phone was Pro
+  BoxHead: multiplayer, PC only, «Iniciar sesión y jugar».
+- **«Lo que te estás perdiendo»** (`avisaPerdido`): every finished club game
+  reaches `alTerminar` (crearSolo, before verifying, with or without
+  account), which keeps the visit's tally in memory (`visita`: plays, best
+  per category, last). A guest who finishes a game that does not carry over
+  gets a bottom card: «¡Buena partida, <nombre>!», what an account would
+  have earned this visit (`ganariaInvitado` in `monedas.js`: `PAGO_CLUB` per
+  play with the daily cap, `RECORD` + `extraRecord` per best, logros by
+  `deMarca`), «Crear cuenta gratis» and «📣 Retar». It shows on the first
+  game of each title and then only on a new best or a new logro. The
+  carry-over games put the same line in «¿Guardamos esta partida?»
+  (`lineaGanaria`). Inside that card a `<b>` in the paragraph renders as a
+  block (`.jg-invg-txt b` is the title): use `<strong>`.
+- **«Reta a un amigo»** (`reto.js`, pure; tests in `enganche.test.cjs`):
+  «📣 Retar a un amigo» in the solo bar (games with ranking) shares the
+  visit's best mark in the last category played, as
+  `juegos.html?rc=<cat>&rp=<puntos>&rt=<ms>&rn=<nombre>#solo/<x>` (share
+  sheet on a phone, else clipboard + WhatsApp). Whoever opens it gets a
+  `.jg-reto-tira` («Pia te reta: supera 60.00 s en Mina Club · Fácil») and,
+  when a result beats it in the club's order (`superaReto`), «¡Le ganaste a
+  Pia!» with «Devolver el reto». The reto lives in `sessionStorage`
+  (`jg.reto`) and leaves the address bar at once, so the next share does
+  not carry someone else's. Nothing is verified or saved: it is only a
+  local notice, so a made-up reto costs nothing. Works with or without
+  account; no rules.
+- **Install as an app** (`manifest.webmanifest`, linked from `juegos.html`
+  only, start `juegos.html?desde=app`; icons `marca/icono-192.png`, the
+  512 master and `icono-maskable-512.png`): `ofreceInstalar` offers it once
+  per visit, when the person comes back to the salón after playing, never in
+  the installed app (`enApp`). Chrome/Android/PC: the saved
+  `beforeinstallprompt` behind «Instalar»; iPhone: the Compartir → «Agregar
+  a inicio» instructions. «Ahora no» silences it 14 days on that device
+  (`jg.instalar.no`).
+- **The guest name can become the nickname**: an account just created
+  (`sign_up`) in a tab that was the guest with a name gets «¿Te seguimos
+  llamando <nombre>?» (`ofreceApodo`); only on «sí» it writes
+  `users/<uid>/perfil/nick` (`fb.ponNickPerfil`, existing rule).
+- **Login in the iPhone home-screen app** is a redirect on our own domain
+  (`conRedireccion` in `src/firebase.js`, details in
+  `docs/claude/firebase.md`): `entrarConGoogle` keeps the game to reopen and
+  the origin in `sessionStorage` (`jg.login.vuelta`) and
+  `recogeLoginRedirigido` picks them up, with `resultadoLogin()` for
+  `sign_up` and the nickname offer.
+- **A destacado's score is saved if the guest signs in later.** The four
+  plus Tetris, Snake, 2048 and PRO PACMAN (`DE_INVITADO` in
+  `solo/verifica.js`; the welcome and the carousel still feature only the
+  four `DESTACADOS_INVITADO`): `crearSolo`
   verifies the guest's result with uid `invitado` and keeps the best per
   category in `jg.club.pendientes.invitado.<juego>`; a new best opens
   «¿Guardamos esta partida?» (`ofreceGuardar`, fixed on `<body>`, above the
@@ -255,7 +309,8 @@ Rush's ghost) and Frontera plays with the `INVITADO` user.
   `key.cuenta.invitado`, once, deleting it: BBTAN and Trigon adopt their
   `*-partida` (Trigon accepts `u: "invitado"` in `retoma`), ALETEO and
   FANAL merge their `*.progreso` with `mezclaProgreso` (FANAL's travesía
-  checkpoint included), and the cloud copy follows by itself.
+  checkpoint included), 2048 merges its progress (not the half-played board,
+  whose seed is the guest's), and the cloud copy follows by itself.
 - **The guest funnel is measured** with Firebase Analytics (`evento()` in
   `src/firebase.js`, which never throws and does nothing without Analytics):
   `jg_bienvenida_ver`, `jg_bienvenida_elige {opcion, paso}`,
@@ -263,9 +318,18 @@ Rush's ghost) and Frontera plays with the `INVITADO` user.
   `jg_invitado_partida {juego, categoria, mejoro}`, `jg_invitado_aviso` /
   `jg_invitado_aviso_cierra`, `jg_login_pide` / `jg_login_cancela {origen}`,
   the standard `login` / `sign_up {method, origen}` (from
-  `getAdditionalUserInfo().isNewUser`) and `jg_invitado_guardado`. `origen`
+  `getAdditionalUserInfo().isNewUser`; `app: 1` after the iPhone redirect)
+  and `jg_invitado_guardado`; since Oct 2026 also `jg_invitado_nombre
+  {cambio, desde}`, `jg_invitado_resultado {juego, categoria, mejoro}` (every
+  guest game), `jg_perdiste_ver {juego, monedas, logros}` /
+  `jg_perdiste_cierra`, `jg_reto_comparte {juego, marca}` / `jg_reto_llega
+  {categoria}` / `jg_reto_gana`, `jg_instalar_ver {tipo}` / `_acepta` /
+  `_rechaza` / `_cierra` / `_hecho`, `jg_app_abre {ios}` and
+  `jg_apodo_invitado {usa}`. The funnel to build in GA4 (Explore → Funnel):
+  `first_visit` → `jg_invitado_abre` → `jg_invitado_resultado` →
+  `jg_login_pide` → `sign_up`; retention is GA4's own cohort report. `origen`
   is the button's `data-origen` (`bienvenida-entrar`, `aviso-guardar`,
-  `franja-invitado`, `nombre-invitado`…; `ficha` or `otro` by default). Event names and site
+  `franja-invitado`, `nombre-invitado`, `perdiste`…; `ficha` or `otro` by default). Event names and site
   ids only, never anything a person wrote. Read them in the Firebase
   console → Analytics → Events (custom params need registering as custom
   dimensions to show in reports).
