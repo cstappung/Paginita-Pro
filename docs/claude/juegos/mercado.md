@@ -29,6 +29,9 @@ and they trade only between two accounts that both see the series.
   `juegos/hero/js/rock/CLAUDE.md`).
 
 Old listings never change meaning, and the rule regex accepts all three.
+A rock piece is pictured with its real photo (`imagenRock`, from
+`rock-fotos.js`: a worker running the rock scene, never three.js on the
+page), with the category emoji only until it arrives.
 Starter items have no copy key and cannot be listed.
 
 **What the page does and does not do.**

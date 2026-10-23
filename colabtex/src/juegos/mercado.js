@@ -25,6 +25,8 @@ import {
 } from "./mercado-datos.js";
 import { ESPACIOS, NOMBRE_ESPACIO, ESPECIES, ETAPAS, pedidoObjeto, pedidoMascota, puestoDe } from "./mascotas-datos.js";
 import { fotoDe, pideFotos, montaVisor } from "./visor-mascota.js";
+import { fotoRock, pideFotosRock } from "./rock-fotos.js";
+import { claveMini } from "./rock-datos.js";
 import MM from "../../../juegos/mascotas/motor.js";
 import { nombreHtml } from "./tintas.js";
 
@@ -94,14 +96,27 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     if (r.tipo === "mascota") return pedidoMascota(r.c, r.m, r.estado, puestoDe(r.estado, eco().dueno[r.c], eco()));
     return null;
   }
+  /* una pieza de rock: su foto (rock-fotos.js, un worker con la escena del juego), con su emoji mientras llega */
+  function imagenRock(r, grande) {
+    const u = fotoRock(r.item);
+    return `<span class="jg-mk-foto rk${grande ? " grande" : ""}" data-foto="${esc(claveMini(r.item))}">${u ? `<img src="${esc(u)}" alt="" draggable="false">` : `<span class="jg-mk-emoji" aria-hidden="true">${esc(r.emoji)}</span>`}${r.leg ? '<b class="jg-mk-leg" title="Legendario">★</b>' : ""}</span>`;
+  }
   function imagen(r, grande) {
     if (r.tipo === "carta") return cartaViva(r.cp);
+    if (r.tipo === "rock") return imagenRock(r, grande);
     const p = r.tipo === "baile" ? null : pedidoDe(r), ft = p && fotoDe(p.key);
     const colores = ft && ft.colores && ft.colores.length ? ft.colores : r.tipo === "rock" ? r.colores : null;
     const muestra = colores ? `<span class="jg-mk-muestra">${colores.map(c => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : "";
     return `<span class="jg-mk-foto${grande ? " grande" : ""}" data-foto="${esc(p ? p.key : "")}">${ft && ft.src ? `<img src="${esc(ft.src)}" alt="" draggable="false">` : `<span class="jg-mk-emoji" aria-hidden="true">${esc(r.emoji)}</span>`}${muestra}${r.leg ? '<b class="jg-mk-leg" title="Legendario">★</b>' : ""}${r.frozen ? '<b class="jg-mk-eterna" title="Tomó la poción eterna">🧪</b>' : ""}</span>`;
   }
   function pideMiniaturas(filas) {
+    pideFotosRock(filas.filter(r => r.tipo === "rock").map(r => r.item), (clave, url) => {
+      if (!host) return;
+      for (const el of host.querySelectorAll(`[data-foto="${CSS.escape(clave)}"]`)) {
+        const em = el.querySelector(".jg-mk-emoji");
+        if (em) em.outerHTML = `<img src="${esc(url)}" alt="" draggable="false">`;
+      }
+    });
     const pedidos = filas.map(r => (r.tipo === "objeto" || r.tipo === "mascota" ? pedidoDe(r) : null)).filter(Boolean);
     pideFotos(pedidos, (key, ft) => {
       if (!host) return;
@@ -334,6 +349,8 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
       f.src = RAIZ + "index.html?" + q;
       f.onload = () => setTimeout(() => vis.classList.add("pd-listo"), 350);
       vis.appendChild(f);
+    } else if (r.tipo === "rock") {
+      pideFotosRock([r.item], (k, u) => { const em = vis.querySelector(".jg-mk-emoji"); if (em) em.outerHTML = `<img src="${esc(u)}" alt="" draggable="false">`; });
     } else {
       const p = pedidoDe(r);
       if (p) { vis.classList.add("vivo"); const v = document.createElement("div"); v.className = "jg-mk-vivo"; vis.appendChild(v); detalle.visor = montaVisor(v, p); }
