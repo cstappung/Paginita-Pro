@@ -509,9 +509,9 @@ export const POOL_1 = 109, CORTE_CAJAS_2 = Date.UTC(2026, 9, 22, 4, 0);
 /* Desde CORTE_CAJAS_3 los legendarios salen con colores al azar como los demás (su efecto toma esos colores);
    las de antes traían los de fábrica, y así se quedan. */
 export const CORTE_CAJAS_3 = Date.UTC(2026, 9, 23, 3, 0);
-/* Las de antes de CORTE_CAJAS_4 (00:00 de Chile del 25 de octubre de 2026, después de publicar la Synyster)
+/* Las de antes de CORTE_CAJAS_4 (15:00 de Chile del 23 de octubre de 2026, después de publicar la Synyster)
    eligen entre las primeras POOL_2 filas. */
-export const POOL_2 = 169, CORTE_CAJAS_4 = Date.UTC(2026, 9, 25, 3, 0);
+export const POOL_2 = 169, CORTE_CAJAS_4 = Date.UTC(2026, 9, 23, 18, 0);
 export const poolDe = at => (at >= CORTE_CAJAS_4 ? POOL : at >= CORTE_CAJAS_2 ? POOL.slice(0, POOL_2) : POOL.slice(0, POOL_1));
 
 /* Lo que trae una caja comprada a la hora `at`, con el azar que se le pasa: `r.entero(n)` en [0, n).
