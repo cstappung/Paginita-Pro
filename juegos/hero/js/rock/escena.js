@@ -980,6 +980,26 @@ GTYPES.gema = {   // gema tallada: contorno de facetas rectas
   pickups: [['hum', -0.045], ['hum', 0.055]], bridge: -0.1, tail: -0.135, knobs: [[-0.2, -0.12], [-0.25, -0.07], [-0.15, -0.15]], sw: [-0.06, 0.13],
   tailBtn: [-0.35, 0], hornBtn: [-0.12, 0.2], tip: [0.22, 0], leg: ['crystal', 0xffffff, 6],
 };
+/* Synyster (común): doble cuerno de puntas largas, el de arriba más largo, la panza de abajo con un pico; sin
+   golpeador, dos humbuckers y Floyd Rose. Sus rayas finas van en el segundo color (`guard`, ver `rayas`). */
+GTYPES.synyster = {
+  shape: () => shapeFrom(s => {
+    s.moveTo(0.11, 0.045); s.bezierCurveTo(0.16, 0.06, 0.21, 0.11, 0.255, 0.175); s.bezierCurveTo(0.2, 0.175, 0.14, 0.15, 0.08, 0.15);
+    s.bezierCurveTo(0.01, 0.15, -0.06, 0.13, -0.12, 0.15); s.bezierCurveTo(-0.22, 0.185, -0.31, 0.14, -0.315, 0.04); s.bezierCurveTo(-0.32, -0.05, -0.29, -0.13, -0.21, -0.17);
+    s.lineTo(-0.075, -0.215); s.bezierCurveTo(-0.06, -0.17, -0.02, -0.145, 0.04, -0.14); s.bezierCurveTo(0.1, -0.135, 0.15, -0.14, 0.2, -0.155);
+    s.bezierCurveTo(0.17, -0.1, 0.14, -0.06, 0.11, -0.045); s.closePath();
+  }),
+  guard: null,
+  head: () => shapeFrom(s => { s.moveTo(0, -0.03); s.lineTo(0.165, -0.052); s.lineTo(0.235, -0.07); s.lineTo(0.205, -0.02); s.quadraticCurveTo(0.2, 0.03, 0.17, 0.055); s.lineTo(0, 0.03); s.closePath(); }),
+  tuners: GTYPES.sg.tuners,
+  pickups: [['hum', -0.045], ['hum', 0.055]], bridge: -0.1, trem: true, knobs: [[-0.13, -0.12], [-0.18, -0.1], [-0.08, -0.14]], sw: [0.07, 0.115],
+  tailBtn: [-0.315, 0.03], hornBtn: [0.23, 0.16], tip: [0.235, -0.07], rayas: true,
+};
+/* rayas finas paralelas (alphaMap: blanco = raya): la textura se repite RAYAS veces por unidad de largo, girada
+   RAYAS_ANG respecto del mástil (las UV de la cara del cuerpo son las coordenadas de la forma) */
+const RAYAS = 30, RAYAS_ANG = -0.05;
+let _rayasT = null;
+const rayasTex = () => _rayasT ??= Object.assign(canvasTex(8, 64, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(0, h * 0.42, w, h * 0.16); }, { repeat: [RAYAS, RAYAS], srgb: false }), { rotation: RAYAS_ANG });
 /* el brillo de un legendario sale de su variante (el segundo color: el golpeador de la guitarra, el acento del
    torso, el segundo color del pantalón o las medias) si es lo bastante claro para brillar; si no, el de fábrica.
    Antes era siempre el de fábrica y todas las variantes se veían iguales. */
@@ -1001,6 +1021,7 @@ function makeGuitar(c) {
   const spA = new THREE.Mesh(body, auraMat(0x2a8aff, 0xc8f0ff, true)); spA.renderOrder = 6; spA.frustumCulled = false; spA.scale.setScalar(1.12); spAura.add(spA);
   const spG = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.glow, color: new THREE.Color(0x3aa8ff).multiplyScalar(2.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: 0.9 })); spG.scale.set(1.4, 1.05, 1); spG.position.set(0.05, 0, 0.05); spAura.add(spG);
   if (T.guard) B.add(toon(c.guard ?? 0xf2f2f2), new THREE.ExtrudeGeometry(T.guard(), { depth: 0.003, bevelEnabled: false, curveSegments: 20 }), [0, 0, 0.037], [0, 0, 0], [1, 1, 1], 0.002);
+  if (T.rayas) mesh(g, new THREE.ShapeGeometry(T.shape(), 28), toon(c.guard ?? 0xd8dbe2, { alphaMap: rayasTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }), { pos: [0, 0, 0.0385], outline: 0 });   // sobre la cara del cuerpo (0.038), bajo las pastillas
   B.add(neckM, new THREE.BoxGeometry(0.8, 0.054, 0.022), [0.5, 0, 0.016]);
   B.add(neckM, new THREE.CylinderGeometry(0.027, 0.027, 0.8, 12, 1, false, Math.PI / 2, Math.PI).rotateZ(Math.PI / 2), [0.5, 0, 0.007], [0, 0, 0], [1, 1, 0.65]);
   B.add(rose, new THREE.BoxGeometry(0.77, 0.057, 0.007), [0.515, 0, 0.0295], [0, 0, 0], [1, 1, 1], 0.003);
