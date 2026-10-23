@@ -23,7 +23,7 @@
  */
 import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
 import { mezcla } from "./perfil.js";
-import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
+import { rankingColeccion, topColecciones, colVisible, PUNTOS_RAREZA, miniCarta, MOTOR } from "./prodrop-cartas.js";
 import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
 import { nombreHtml } from "./tintas.js";
 import { podiosGeneral, MIN_PODIO } from "./perfil-tarjeta.js";
@@ -182,6 +182,10 @@ export function crearRanks(ctx) {
   /* La pestaña de cartas no lee `ranks`: sale de la economía de PRODROP
      (`ctx.datos`, la misma lectura que usa el vestíbulo). */
   let datosC = null, pararC = null, firmaC = "";
+  /* La colección elegida en esa pestaña, y de quién se está mirando la
+     colección completa («Ver colección», una a la vez). */
+  let colC = "", verC = "";
+  try { colC = localStorage.getItem("jg.rankCol") || ""; } catch (e) { /* sin almacenamiento */ }
 
   function montar(donde) {
     host = donde;
@@ -360,7 +364,7 @@ export function crearRanks(ctx) {
   }
   const medallas = f => `${f.oro} 🥇 · ${f.plata} 🥈 · ${f.bronce} 🥉`;
 
-  /* ---- PRODROP: colección y cartas más raras ---- */
+  /* ---- PRODROP: por colección, las colecciones más raras y la más completa ---- */
   function nombreDe(u) {
     const q = ctx.quien ? ctx.quien(u) : mezcla({ uid: u, nombre: "" }, perfil(u));
     return { nombre: (q && q.nombre) || "Sin nombre", foto: (q && q.foto) || "", color: q && q.color };
@@ -371,33 +375,48 @@ export function crearRanks(ctx) {
       ${foto({ uid: u, nombre: q.nombre, foto: q.foto, color: q.color }, 26)}
       <span translate="no">${nombreHtml(u, esc(q.nombre))}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
   }
-  const unoEn = p => { const n = Math.round(1 / p); return n >= 1e6 ? `${(n / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })} millones` : n.toLocaleString("es-CL"); };
+  /* Décimas de punto → «18» o «0,9». */
+  const pts = d => (d / 10).toLocaleString("es-CL", { maximumFractionDigits: 1 });
+  function filaTop(f, i) {
+    const abierta = verC === f.uid;
+    return `<li class="${f.uid === uid ? "jg-yo" : ""}">
+        <span class="jg-rkc-n">${puesto(i)}</span>${quienHtml(f.uid)}
+        <b class="jg-rkc-cuenta">${pts(f.puntos)} pts</b>
+        <button type="button" class="btn2 jg-rkc-ver" data-rkc-ver="${esc(f.uid)}" aria-expanded="${abierta}">${abierta ? "Ocultar" : "Ver colección"}</button>
+        <small class="jg-rkc-extra">${plural(f.cartas.length, "carta graduada", "cartas graduadas")} de ${f.total} · ${plural(f.sobres, "sobre abierto", "sobres abiertos")}</small>
+        ${abierta ? `<div class="jg-rkc-album">${f.cartas.map(c => miniCarta(c, `<span class="jg-rkc-vale">${pts(c.pts)} pts</span>`)).join("")}</div>` : ""}
+      </li>`;
+  }
   function pintaCartas(el) {
     if (!el) return;
-    const col = rankingColeccion(datosC), raras = cartasMasRaras(datosC);
-    if (!col || !raras) { el.innerHTML = `<p class="jg-vacio">Cargando las cartas…</p>`; return; }
+    const cols = MOTOR.COLECCIONES.filter(c => colVisible(c.key));
+    if (!cols.some(c => c.key === colC)) colC = cols[0].key;
+    const k = colC, info = MOTOR.COL[k];
+    const top = topColecciones(datosC, k), col = rankingColeccion(datosC, 10, k);
+    if (!top || !col) { el.innerHTML = `<p class="jg-vacio">Cargando las cartas…</p>`; return; }
+    const mia = top.findIndex(f => f.uid === uid);
+    const valen = MOTOR.TIERS.map((t, i) => ({ t, i })).filter(({ i }) => MOTOR.POR_COL[k].some(c => c.tier === i)).reverse()
+      .map(({ t, i }) => `${esc(t.sym)} ${esc(t.label.toLowerCase())} ${pts(PUNTOS_RAREZA[i] * 10)}`).join(" · ");
     const html = `
+      ${cols.length > 1 ? `<div class="jg-rk-cats" style="--c:#c084fc"><div class="jg-rk-fila"><span>Colección</span><div class="jg-rk-seg" role="group" aria-label="Colección">${cols.map(c =>
+        `<button type="button" class="${c.key === k ? "on" : ""}" aria-pressed="${c.key === k}" data-rkc-col="${c.key}">${esc(c.label)}</button>`).join("")}</div></div></div>` : ""}
       <section class="jg-rkc">
-        <h2>Colección más completa</h2>
-        <p class="jg-rkc-sub">Cartas distintas que cada uno tiene ahora, de ${col[0] ? col[0].total : ""} en total. Las repetidas cuentan una vez.</p>
+        <h2>Colecciones más raras · ${esc(info.label)}</h2>
+        <p class="jg-rkc-sub">Solo cartas graduadas, y de cada carta solo la mejor copia (las repetidas cuentan una vez). Cada carta vale según su rareza con nota 10 (${valen}) y menos con menos nota: una legendaria con 9 son 18.</p>
+        ${top.length ? `<ol class="jg-rkc-lista jg-rkc-top">${top.slice(0, 3).map(filaTop).join("")}</ol>
+          ${mia >= 3 ? `<p class="jg-rkc-sub jg-rkc-tuya">Tu colección va #${mia + 1}.</p><ol class="jg-rkc-lista jg-rkc-top" start="${mia + 1}">${filaTop(top[mia], mia)}</ol>` : ""}`
+          : `<p class="jg-vacio">Todavía nadie ha graduado una carta de ${esc(info.label)}.</p>`}
+      </section>
+      <section class="jg-rkc">
+        <h2>Colección más completa · ${esc(info.label)}</h2>
+        <p class="jg-rkc-sub">Cartas distintas que cada uno tiene ahora, de ${MOTOR.POR_COL[k].length} en total. Las repetidas cuentan una vez.</p>
         ${col.length ? `<ol class="jg-rkc-lista">${col.map((f, i) => `
           <li class="${f.uid === uid ? "jg-yo" : ""}">
             <span class="jg-rkc-n">${puesto(i)}</span>${quienHtml(f.uid)}
             <span class="jg-rkc-barra" title="${f.tiene} de ${f.total}"><i style="width:${(100 * f.tiene / f.total).toFixed(1)}%"></i></span>
             <b class="jg-rkc-cuenta">${f.tiene}/${f.total}</b>
             <small class="jg-rkc-extra">${f.leyendas ? `${esc(MOTOR.TIERS[3].sym)} ${f.leyendas} ${f.leyendas === 1 ? "legendaria" : "legendarias"} · ` : ""}${f.copias} ${f.copias === 1 ? "copia" : "copias"}</small>
-          </li>`).join("")}</ol>` : `<p class="jg-vacio">Nadie tiene cartas todavía. <a href="#cartas">Abrir un sobre →</a></p>`}
-      </section>
-      <section class="jg-rkc">
-        <h2>Las cartas más raras</h2>
-        <p class="jg-rkc-sub">Solo graduadas. Más rara es la que menos probabilidad tenía de salir con esa nota o más.</p>
-        ${raras.length ? `<ol class="jg-rkc-lista jg-rkc-raras">${raras.map((c, i) => `
-          <li class="${c.dueno === uid ? "jg-yo" : ""}">
-            <span class="jg-rkc-n">${puesto(i)}</span>
-            <span class="jg-rkc-carta">${miniCarta(c)}</span>
-            <span class="jg-rkc-info"><b>${esc(c.carta.name)}</b><small>${esc(MOTOR.TIERS[c.carta.tier].label)} · ${esc(MOTOR.subtitulo(c.carta))}</small><small>Nota ${c.g} · 1 en ${unoEn(c.p)} sobres</small></span>
-            ${quienHtml(c.dueno)}
-          </li>`).join("")}</ol>` : `<p class="jg-vacio">Todavía nadie ha graduado una carta.</p>`}
+          </li>`).join("")}</ol>` : `<p class="jg-vacio">Nadie tiene cartas de ${esc(info.label)} todavía. <a href="#cartas">Abrir un sobre →</a></p>`}
       </section>`;
     /* Por firma: llegan perfiles uno a uno y cada uno repinta. */
     if (html !== firmaC) { firmaC = html; el.innerHTML = html; }
@@ -568,6 +587,18 @@ export function crearRanks(ctx) {
   }
 
   function alClic(ev) {
+    const rc = juego === CARTAS && ev.target.closest("[data-rkc-col],[data-rkc-ver]");
+    if (rc) {
+      if (rc.hasAttribute("data-rkc-col")) {
+        colC = rc.getAttribute("data-rkc-col"); verC = "";
+        try { localStorage.setItem("jg.rankCol", colC); } catch (e) { /* nada */ }
+      } else {
+        const u = rc.getAttribute("data-rkc-ver");
+        verC = verC === u ? "" : u;
+      }
+      pinta();
+      return;
+    }
     const del = ev.target.closest("[data-borra]");
     if (del && esSolo(juego) && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord) {
       ev.stopPropagation();
