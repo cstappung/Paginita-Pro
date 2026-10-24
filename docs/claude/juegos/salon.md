@@ -524,4 +524,8 @@ pause button only when it changes (it used to rewrite its text 10×/s,
 which i18n.js re-scanned); and a card off screen pauses its cover's
 animations (`.dormida`, `vigilaPortadas` in salon.js). A new cover or
 scene that must animate forever should move an HTML element, not
-something inside its SVG.
+something inside its SVG. The strips that `pintaMonedas` fills (top coins, PRODROP drops, últimos
+tops, referidos) go through `ponHtml`, which skips the write when the HTML
+is the same: it runs on every Firebase read, and rewriting reloaded the 24
+card photos and made i18n.js rescan the text each time (the Mascotas and
+Rock strips have their own `firma`).

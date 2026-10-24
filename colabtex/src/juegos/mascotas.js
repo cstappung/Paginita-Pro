@@ -448,7 +448,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien
       frame.title = "Mascotas — cría tu mascota en 3D";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/mascotas/index.html?v=mc-7";
+      frame.src = "juegos/mascotas/index.html?v=mc-8";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       vigilaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });

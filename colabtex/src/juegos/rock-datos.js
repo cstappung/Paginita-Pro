@@ -31,7 +31,11 @@ export function cajaRock(uid, clave, at, b) {
   if (memo.has(k)) return memo.get(k);
   const r = MM.generador(MM.sha256("rock-caja:" + k).slice(0, 4));
   const res = Object.freeze(abreCaja(g, r, at));
-  if (memo.size > 4000) memo.clear();
+  /* El tope es por memoria, no por costo: la economía pide todas las cajas
+     del sitio en cada lectura, y con un tope menor que ese total la memoria
+     se vaciaba a mitad de cada pasada y no acertaba nunca (cada lectura
+     volvía a sacar un sha256 por caja). */
+  if (memo.size > 50000) memo.clear();
   memo.set(k, res);
   return res;
 }
@@ -51,7 +55,13 @@ export function fichaRock(v) {
 
 /* ¿Es repetida? Contra lo inicial y contra `propias` (las variantes que tiene ahora). */
 const idsIniciales = new Set(iniciales().map(invId));
-export const repetidaRock = (v, propias) => idsIniciales.has(invId(v)) || propias.some(p => invId(p) === invId(v));
+/* El id de cada pieza, una vez por objeto: la economía compara cada caja
+   con todo lo que la cuenta tiene, y armar el texto en cada comparación era
+   lo que más costaba de rehacerla. Las piezas de `cajaRock` son las mismas
+   (congeladas, en su memoria) de una lectura a la siguiente. */
+const ids = new WeakMap();
+const idDe = v => { let s = ids.get(v); if (s === undefined) { s = invId(v); ids.set(v, s); } return s; };
+export const repetidaRock = (v, propias) => { const id = idDe(v); return idsIniciales.has(id) || propias.some(p => idDe(p) === id); };
 
 /* El rockero de una cuenta como se ve: limpio y solo con lo que tiene. */
 export function lookVisible(crudo, propias) {

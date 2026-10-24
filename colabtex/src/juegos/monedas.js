@@ -580,8 +580,13 @@ export function economia(datos) {
      las que tomaron la poción, y quiénes tuvieron cada mascota antes que
      su dueño de ahora (para heredar su estado). */
   const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
-  /* Batalla de Rock: las piezas de cajas válidas, por clave de copia. */
-  const rocas = {};
+  /* Batalla de Rock: las piezas de cajas válidas, por clave de copia, y
+     las claves que pasaron alguna vez por cada cuenta (`rocasPor`, se
+     filtra por `dueno` al leer). Buscar las propias recorriendo `rocas`
+     entera en cada caja era cuadrático: con unas 2000 cajas en el sitio,
+     más de medio segundo por cada lectura de Firebase, en cada pestaña. */
+  const rocas = {}, rocasPor = {};
+  const llegaRoca = (cc, u) => { if (rocas[cc]) (rocasPor[u] = rocasPor[u] || []).push(cc); };
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
      `movs`: cada gasto e ingreso con hora, para el historial. */
@@ -699,10 +704,10 @@ export function economia(datos) {
          (lo inicial incluido) devuelve monedas y no deja copia. */
       if (e.p !== PRECIO_CAJA || (e.b !== "m" && e.b !== "f") || !paga(e.u, PRECIO_CAJA, "cajaRock", e.b)) continue;
       const v = cajaRock(e.u, e.k, e.at, e.b), propias = [];
-      for (const [cc, r] of Object.entries(rocas)) if (dueno[cc] === e.u) propias.push(r.item);
+      for (const cc of rocasPor[e.u] || []) if (dueno[cc] === e.u) propias.push(rocas[cc].item);
       const dup = repetidaRock(v, propias), cc = claveRock(e.u, e.k);
       if (dup) { const r = reembolsoRock(v); U(e.u).premios += r; anota(e.u, "cajaRock", r, "repetida"); }
-      else { rocas[cc] = { u: e.u, k: e.k, at: e.at, item: v }; dueno[cc] = e.u; }
+      else { rocas[cc] = { u: e.u, k: e.k, at: e.at, item: v }; dueno[cc] = e.u; llegaRoca(cc, e.u); }
       U(e.u).cajasRock.push({ k: e.k, at: e.at, c: dup ? "" : cc, v, dup, reembolso: dup ? reembolsoRock(v) : 0 });
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
@@ -722,7 +727,7 @@ export function economia(datos) {
       if (esMascota(o.c) && (tiene[e.u] || 0) >= MM.MAX_MASCOTAS) { o.estado = "rechazada"; o.comprador = e.u; continue; }
       const tipo = (leeCopia(o.c) || {}).tipo || "";
       if (paga(e.u, o.p, "mercado", tipo)) {
-        dueno[o.c] = e.u; U(o.u).cobradas += o.p; anota(o.u, "venta", o.p, tipo); o.estado = "vendida"; o.comprador = e.u;
+        dueno[o.c] = e.u; llegaRoca(o.c, e.u); U(o.u).cobradas += o.p; anota(o.u, "venta", o.p, tipo); o.estado = "vendida"; o.comprador = e.u;
         if (esMascota(o.c)) pasaMascota(o.c, o.u, e.u);
       }
       else { o.estado = "impaga"; o.comprador = e.u; }
@@ -773,8 +778,8 @@ export function economia(datos) {
       const cabe = (tiene[x.de] || 0) - nd + np <= MM.MAX_MASCOTAS && (tiene[x.para] || 0) - np + nd <= MM.MAX_MASCOTAS;
       cambios[e.id] = { estado: ok && cabe ? "hecho" : "nulo", at: e.at };
       if (ok && cabe) {
-        for (const cc of dar) { dueno[cc] = x.para; if (esMascota(cc)) pasaMascota(cc, x.de, x.para); }
-        for (const cc of pedir) { dueno[cc] = x.de; if (esMascota(cc)) pasaMascota(cc, x.para, x.de); }
+        for (const cc of dar) { dueno[cc] = x.para; llegaRoca(cc, x.para); if (esMascota(cc)) pasaMascota(cc, x.de, x.para); }
+        for (const cc of pedir) { dueno[cc] = x.de; llegaRoca(cc, x.de); if (esMascota(cc)) pasaMascota(cc, x.para, x.de); }
       }
     }
   }
