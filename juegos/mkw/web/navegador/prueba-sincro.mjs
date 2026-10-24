@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { pantallaPartida } from './foto-pantalla.mjs';
+import { crearTurn } from '../../herramientas/turn-local.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(path.join(raiz, 'banco/package.json'))('playwright-core');
@@ -39,7 +40,10 @@ const PISTAS = (process.argv.find(a => a.startsWith('--pistas=')) || '--pistas=0
 const SEMILLA = (process.argv.find(a => a.startsWith('--semilla=')) || '--semilla=777').slice(10);   // sin --sala   // --copa: la copa entera con los karts manejados por la CPU (carreras 1 y 2)
 const RASTRO = process.argv.includes('--rastro');   // §70: el rastro por cuadro de las dos pestañas, comparado
 const TRABA = Number((process.argv.find(a => a.startsWith('--traba-largada=')) || '=0').split('=')[1]);   // §93
-const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '') + (RASTRO ? '&rastro=1' : '');   // p. ej. --extra=&arreglos=0
+// §103 --cloudflare: «🛰 Todo por Cloudflare» (conexion=cloudflare) con el repetidor TURN de mentira de este PC
+// (herramientas/turn-local.mjs): la prueba le pasa a cada pestaña sus credenciales, como el sitio con las del Worker
+const CLOUDFLARE = process.argv.includes('--cloudflare');
+const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8) + (COPA ? '&autoconducir=1' : '') + (RASTRO ? '&rastro=1' : '') + (CLOUDFLARE ? '&conexion=cloudflare' : '');   // p. ej. --extra=&arreglos=0
 const carpeta = path.join(raiz, (process.argv.find(a => a.startsWith('--datos=')) || '--datos=build/web/datos/sincro').slice(8));
 mkdirSync(carpeta, { recursive: true });
 let bien = 0, mal = 0;
@@ -47,6 +51,7 @@ const ok = (texto, cumple, detalle = '') => { cumple ? bien++ : mal++; console.l
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const servidor = spawn(process.execPath, [path.join(raiz, 'web/navegador/servidor.mjs'), String(PUERTO)], { stdio: ['ignore', 'pipe', 'inherit'] });
+const turn = CLOUDFLARE ? await crearTurn() : null;
 await new Promise(listo => servidor.stdout.on('data', d => { if (String(d).includes('juego en')) listo(); }));
 const navegador = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--ventana'),
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--mute-audio', '--disable-renderer-backgrounding',
@@ -73,6 +78,8 @@ async function abrir(nombre, uid) {
   }
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}` +
     (DIRECTA ? `&modo=directa&pista=${PISTAS.split(',')[0]}` : `&modo=copa&pistas=${PISTAS}`) + `&semilla=${SEMILLA}&cpu=${CPU}${EXTRA}`);
+  // (§103: las credenciales del repetidor, como las manda el sitio: la página las espera desde que arma su malla)
+  if (turn) await p.evaluate(ice => window.postMessage({ canal: 'mkw-padre', tipo: 'turn', iceServers: ice }, location.origin), turn.iceServers());
   return p;
 }
 const t0 = Date.now();
@@ -123,12 +130,21 @@ if (TRABA) {
     await espera(150);
   }
   await espera(6000);
+  // §99 (C1): con el relevo rápido (por omisión) B no la espera: la pausa a los ~150 ms (su kart sigue con el botón
+  // calculado) y A vuelve a manejar cuando despierta y se pone al día. Se espera esa vuelta hasta 20 s más
+  const rapido = !/relevoRapido=0/.test(EXTRA);
+  const estadoB = () => B.evaluate(() => window.mkwSincro.lockstep.estado().vueltas || 0).catch(() => 0);
+  if (rapido) for (const hasta = Date.now() + 20000; Date.now() < hasta && !(await estadoB());) await espera(500);
   const [la, lb] = await Promise.all([A, B].map(p => p.evaluate(() => ({ ls: window.mkwSincro.lockstep.estado(), avisos: window.mkwAvisosCorte || [] })).catch(() => null)));
   trabada = { c0, la, lb };
   ok(`§93: A trabada ${TRABA / 1000} s en el cuadro ${c0} de la carrera: nadie se corta y las dos siguen`,
     la && lb && !Object.keys(la.ls.cortes).length && !Object.keys(lb.ls.cortes).length && !la.ls.fuera && la.ls.cuadro > c0 + 60 && lb.ls.cuadro > c0 + 60,
     `cortes A ${JSON.stringify(la?.ls.cortes)} B ${JSON.stringify(lb?.ls.cortes)}; cuadro A ${la?.ls.cuadro}, B ${lb?.ls.cuadro}; espera máx de B ${lb?.ls.maxEspera?.toFixed(0)} ms`);
-  ok('§93: …y B avisó que la espera porque su navegador todavía arma la pista', (lb?.avisos || []).some(t => t.includes('arma la pista')), (lb?.avisos || []).slice(-1)[0] || 'sin aviso');
+  // (sin el relevo rápido, ?relevoRapido=0: B la espera el margen de la largada y avisa por qué, como en §93)
+  if (rapido) ok('§99 (C1): …B no la esperó (a lo más 1 s): la pausó y A volvió a manejar al despertar',
+    lb && (lb.ls.maxEspera || 0) < 1000 && (lb.ls.pausas || []).length >= 1 && (lb.ls.vueltas || 0) >= 1,
+    `espera máx de B ${lb?.ls.maxEspera?.toFixed(0)} ms; pausas de B ${JSON.stringify((lb?.ls.pausas || []).map(p => p.desde))}, vueltas ${lb?.ls.vueltas}`);
+  else ok('§93: …y B avisó que la espera porque su navegador todavía arma la pista', (lb?.avisos || []).some(t => t.includes('arma la pista')), (lb?.avisos || []).slice(-1)[0] || 'sin aviso');
 }
 
 if (COPA) {
@@ -202,6 +218,7 @@ for (const hasta = Date.now() + 60000; Date.now() < hasta;) {
 // (§85: desde aquí, las dos corriendo, se mide el ritmo de cada una con su medidor; la carga de la pista y la cuenta
 // regresiva quedan fuera: su tirón ya lo ignora el aviso, que pide dos ratos malos seguidos)
 const desdeRegistro = registro.length;
+const av0 = (await leer(A))?.av || [];           // (§102: dónde estaban los karts al apretar el acelerador)
 await tecladoA.down('KeyK'); await tecladoB.down('KeyK');
 await espera(9000);
 await tecladoB.down('KeyA'); await espera(1500); await tecladoB.up('KeyA');
@@ -228,8 +245,10 @@ ok('los karts de los humanos no llevan la marca de CPU', (xa?.marcas || []).leng
 ok('las huellas de la carrera coinciden (la misma carrera en las dos)', (xa?.ls?.huellasIguales || 0) >= 3 && !xa?.ls?.desincronizado && !xb?.ls?.desincronizado,
   `iguales A ${xa?.ls?.huellasIguales}, B ${xb?.ls?.huellasIguales}${xa?.ls?.desincronizado ? ' · DESINCRONIZADO ' + JSON.stringify(xa.ls.desincronizado) : ''}`);
 const largo = (x, i) => (x?.av?.[i] ?? 0).toFixed(3);
-// (A solo acelera derecho: en la primera curva se sale de la pista; basta con que haya avanzado desde la largada)
-ok('el kart de A avanzó con lo que tocó A', (xa?.av?.[0] || 0) > 1.05, `puesto 0: ${largo(xa, 0)} vueltas`);
+// (A solo acelera derecho: en la primera curva choca y se sale de la pista; basta con que haya avanzado desde donde
+// estaba al apretar el acelerador. §102: antes se pedía «más de 1,05 vueltas» y según cómo rebotaba en la pared salía
+// 1,042 a 1,25: un 2 % de vuelta, ~20 m, ya es haber manejado)
+ok('el kart de A avanzó con lo que tocó A', (xa?.av?.[0] || 0) - (av0[0] || 0) > 0.02 && (xa?.av?.[0] || 0) > 1, `puesto 0: ${(av0[0] ?? 0).toFixed(3)} → ${largo(xa, 0)} vueltas`);
 ok('el kart de B avanzó con lo que tocó B (y no igual que el de A)', (xa?.av?.[1] || 0) > 1.1 && Math.abs((xa?.av?.[1] || 0) - (xa?.av?.[0] || 0)) > 1e-3,
   `puesto 1: ${largo(xa, 1)} vueltas`);
 const msPorCuadro = x => x?.ls ? (x.ls.msEsperando / Math.max(1, x.ls.cuadros)).toFixed(2) : '-';
@@ -275,6 +294,17 @@ ok('cada una con su retraso, entre 2 y 12 cuadros (se adapta a la red)', [xa, xb
   `A ${retrasoDe(xa)} (partió en ${xa?.ls?.retrasos?.[xa?.ls?.carrera]}, promedio ${xa?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xa?.ls?.frenos ?? 0}), ` +
   `B ${retrasoDe(xb)} (partió en ${xb?.ls?.retrasos?.[xb?.ls?.carrera]}, promedio ${xb?.ls?.retrasoMedio?.toFixed(1)}, frenos ${xb?.ls?.frenos ?? 0}) cuadros; ida y vuelta medida A ${JSON.stringify(xa?.ls?.rtt)} B ${JSON.stringify(xb?.ls?.rtt)} ms` +
   (EXTRA.includes('redMala') ? ` (red mala de mentira: ${EXTRA.match(/redMala=([\d.,]+)/)?.[1]})` : ''));
+// §103: con --cloudflare, la carrera entera fue por el repetidor (en las dos, los dos extremos «relay») y el repetidor
+// pasó los botones de toda la carrera
+if (turn) {
+  const caminoDe = (p, otro) => p.evaluate(async u => ({ modo: window.mkwRed?.malla?.modo(), c: await window.mkwRed?.malla?.camino(u) }), otro).catch(() => null);
+  const [ca, cb] = [await caminoDe(A, uidB), await caminoDe(B, uidA)];
+  ok('§103: «🛰 Todo por Cloudflare»: las dos conectadas solo por el repetidor (los dos extremos «relay»)',
+     [ca, cb].every(x => x?.modo === 'relevo' && x.c?.local === 'relay' && x.c?.remoto === 'relay'), `A ${JSON.stringify(ca)} · B ${JSON.stringify(cb)}`);
+  ok('§103: …y el repetidor pasó la carrera (más de 100 KB en los dos tramos)', turn.cuenta.bytes > 100e3,
+     `${(turn.cuenta.bytes / 1e3).toFixed(0)} KB en ${turn.cuenta.reenviados} reenvíos, ${turn.cuenta.asignaciones} asignaciones`);
+  turn.cerrar();
+}
 
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
 for (const [n, p] of [['A', A], ['B', B]]) writeFileSync(path.join(carpeta, `red-${n}.txt`), await p.evaluate(() => window.mkwRed?.registro.join('\n')).catch(() => ''));

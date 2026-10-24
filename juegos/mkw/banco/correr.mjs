@@ -35,7 +35,8 @@ for (const id of lista) {
   // #empezar: Playwright lo aprieta como una persona (pointerdown + click).
   const boton = await pagina.$('#empezar');
   if (boton) await pagina.waitForTimeout(500).then(() => boton.click()).catch(() => {});
-  const termino = await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: 300000 }).then(() => true, () => false);
+  // (8 minutos: `relevo` ya tarda ~5, con sus 19 partes de carreras de verdad a 100 cuadros por segundo)
+  const termino = await pagina.waitForFunction(() => document.body.dataset.fin === '1', null, { timeout: 480000 }).then(() => true, () => false);
   const mal = lineas.filter(l => l.startsWith('✗')).length + (termino ? 0 : 1);
   falla += mal ? 1 : 0;
   console.log(`\n== ${id}: ${mal ? '✗' : '✓'} ${termino ? '' : '(no terminó a tiempo)'}`);

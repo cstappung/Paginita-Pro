@@ -968,6 +968,27 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Bloqueo (de la pausa)** | Mientras se decide pausar a alguien (en dos fases: uno propone, los demás contestan hasta qué cuadro tienen lo suyo, y recién ahí se decide), nadie corre ese cuadro. Es lo que cuesta una traba de 1,5 s a los demás: unos 65 ms (la respuesta de C, que viaja por su red mala). En el registro sale como «faltan [-1]». |
 | **Cuenta de estabilidad (ratos malos)** | Lo que la sala suma de cada consola al terminar una carrera para elegir la primera autoridad de la siguiente: los ratos en que la mayoría la vio tarde, los que fue atrás y su ida y vuelta (cada 10 ms cuenta como un rato malo). Menos = más estable. Es `ratosMalos` de `sala-carrera.mjs`: la misma función la usan la sala y el banco. |
 
+### Listo para el PR y la PC justa (§102)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Conflicto (de merge)** | Al juntar dos ramas, un lugar del mismo archivo que las dos cambiaron distinto (aquí, casi siempre una lista donde cada rama agregó su juego al final). Git no elige: se resuelve a mano, normalmente dejando las dos cosas. Como dos revisiones del mismo plano que tocaron la misma bornera. |
+| **Archivo sellado** | Los archivos del sitio que llevan su versión en el nombre del pedido (`juegos-app.js?v=…`), para que el navegador no use una copia vieja. El sello lo pone el script de publicar; al juntar ramas se dejan los de `main` y se vuelven a sellar al publicar. |
+| **Marca `@controles:`** | Una línea en la cabecera de un archivo del juego que dice qué pide para jugar («teclado», «teclado y ratón»). El script `build-controles.js` del sitio las junta en `controles-datos.js` y el Salón las muestra. Es la placa de características del equipo. |
+| **PC justa** | Una PC que corre el juego a 60 pero sin margen (15 de los 16,7 ms de cada cuadro trabajando): cada cuadro largo suelto la deja atrás, y la ráfaga para ponerse al día no corre más rápido que el reloj. Como un motor a plena carga: sigue la velocidad, pero no tiene par de sobra para recuperar un tirón. |
+| **Ponerse al día de verdad (alcance)** | Desde §102, una consola que va atrás solo dice «sé ponerme al día» si en los últimos 3 ratos corrió al menos un 4 % más cuadros que los del tiempo en que corrió. Si no, los demás se frenan un poco por ella. Como un lazo de control rápido que avisa cuando su actuador se satura, para que actúe el lazo lento. `?alcance=0` = como en §101. |
+
+### «🛰 Todo por Cloudflare» (§103)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Repetidor forzado (`iceTransportPolicy: 'relay'`)** | Una opción de WebRTC que le dice al navegador: «junta solo caminos por el repetidor TURN, ninguno directo». Así todos los paquetes pasan por Cloudflare aunque los dos navegadores pudieran hablarse directo. Como obligar a que una llamada pase por la central aunque los dos teléfonos estén en la misma pieza. |
+| **Candidato «relay» (del repetidor)** | Una dirección para llegar a un navegador que no es suya: es un puerto que el repetidor abrió para él. Si los dos extremos de una conexión son «relay», todo va por el repetidor. `malla.camino(u)` lo dice (`local`/`remoto`). |
+| **Asignación (TURN Allocate)** | Lo que el repetidor le presta a cada navegador: un puerto UDP propio desde donde reenvía lo suyo y donde recibe lo de los otros. Dura lo que el navegador la renueve (Refresh). Como una línea alquilada en la central. |
+| **Credenciales TURN** | El usuario y la contraseña que pide el repetidor para dar una asignación. Las de Cloudflare las entrega el Worker de amigos en `/turn` (vencen solas); cada mensaje va firmado con ellas (HMAC-SHA1). |
+| **Repetidor de mentira (`turn-local.mjs`)** | Un servidor TURN propio de este PC, solo para las pruebas: hace lo mismo que el de Cloudflare sin salir a internet. Nunca se publica. |
+| **SCTP (juntar mensajes)** | El protocolo que lleva los mensajes de los canales de datos de WebRTC. Si hay varios mensajes chicos esperando, los mete en un mismo paquete UDP: por eso 200 mensajes no son 200 paquetes. Como juntar varias cartas en un mismo sobre. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -9420,3 +9441,215 @@ pediría pausar antes de 150 ms, y entonces se pausaría a quien solo perdió un
   ráfaga a ~1,2 veces): es de la prueba, no de la red. En una PC sola la ráfaga corre a ~2 veces.
 - De M25: Intenso e Imposible en 200cc, la prueba de conexión en el vestíbulo (reglas de Firebase, las publica el dueño)
   y el programa final a R2 (cuando el dueño diga).
+
+## 2026-10-24 · §102 Listo para el PR: `main` juntado en la rama del sitio, el programa final probado y la PC justa que no alcanza a ponerse al día
+
+El dueño pidió: «prepara todo para hacer PR en la paginita Pro, entiendo que tienes que compilar para R2 también».
+Después pidió que el PR lo abriera la otra sesión (la de la nube, que tiene GitHub) y dio permiso para subir la rama
+(«doy permiso»). Subir a R2, el Worker y las reglas de Firebase siguen siendo del dueño (`docs/publicar.md`).
+
+### 102.1 `main` juntado en la rama del sitio
+
+La rama `claude/loving-planck-9k2yam` iba 38 commits adelante y **171 atrás** de `main` (otras sesiones siguieron con
+el sitio: Salón, pool, pacman, Halloween…). Para que el PR se pueda juntar sin conflictos, se juntó `main` en la rama
+(commit `06aea0a`). Los conflictos eran casi todos **listas que crecieron de los dos lados** (cada lado agregó su juego
+al final de la misma lista): quedaron las dos cosas.
+
+| Archivo | Qué chocaba | Cómo quedó |
+|---|---|---|
+| `colabtex/package.json` | la lista de pruebas de `test:juegos` | las de `main` + `mkw.test.cjs` y `mkw-worker.test.cjs` |
+| `monedas.js`, `salon-datos.js`, `reglas-ejemplos.js`, `reglas-ilustraciones.js`, `motor.js` | una entrada por juego | todas (las de `main` y la de `mkw`) |
+| `firebase/database.rules.json` | la lista de juegos y de logros | `'mkw'` en las dos, con lo nuevo de `main` |
+| `juegos-main.js` | la lista de juegos, íconos, rutas, ocultos, `PAUSA_FIN`, novedades | todo junto (también el import de Halloween de `main`) |
+| `juegos.html` y los archivos sellados | los sellos de versión (`?v=…`) | los de `main` (se vuelven a sellar al publicar) |
+
+Después: `juegos-app.js` rearmado con esbuild (el paquete de `juegos-main.js`) y `controles-datos.js` regenerado
+(`build-controles.js`). **Trampa:** la regla nueva del Salón (de `main`) pide que cada juego que no es de celular diga
+qué pide con «teclado» o «teclado y ratón». Mario Kart decía «teclado o mando» y fallaba `salon.test`. Se agregó la
+marca `@controles: teclado` en la cabecera de `web/navegador/controles.mjs` (de ahí la lee `build-controles.js`) y la
+prueba propia `mkw.test.cjs` ahora espera `"pide":"teclado"`. El mando sigue funcionando igual: la marca solo dice qué
+se anuncia en el Salón.
+
+Las pruebas del sitio (`node --test` de `colabtex/tests`) pasan todas salvo una de Worms que ya fallaba en `main` en
+Windows (una ruta con `\`). La rama se subió (`git push`, con el permiso del dueño) y el pedido del PR se le mandó a la
+sesión de la nube, con el texto del PR armado aquí. Esta sesión no puede ver si lo abrió: se ve en esa sesión.
+
+### 102.2 El programa final
+
+```bash
+python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-final
+MKW_BUILD=build/web-final/navegador node web/navegador/guion.mjs "<una carrera>" --semilla   # 3 veces, copas distintas
+MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs
+```
+
+- `mkw.wasm` 121,7 MB, `mkw.wasm.br` 15,7 MB (el navegador baja el `.br`).
+- Las semillas rehechas con el programa final: `pipelines.bin` con 729 pipelines (las formas de dibujar que la tarjeta
+  de video arma una vez) y `bloques.json` con 483 bloques del disco vistos en las 3 carreras.
+- La planilla entera contra el programa final: **623 de 625** (`build/web/datos/todo/20261024-1019`). Las dos fallas,
+  en 102.3 y 102.4.
+
+### 102.3 La largada: la prueba esperaba el comportamiento de antes de §99
+
+`prueba-sincro --directa --traba-largada=6000` traba a A 6 s en el cuadro ~50. La comprobación «B avisó que la espera
+porque su navegador todavía arma la pista» venía de §93, cuando B **esperaba** a A hasta 15 s. Desde §99 (C1, el relevo
+rápido) B ya no espera: a los ~150 ms **pausa** a A (su kart sigue con el botón calculado) y A vuelve a manejar cuando
+despierta y se pone al día. En la corrida: B esperó a lo más 196 ms, pausó a A en el cuadro 60 y A volvió a manejar en el
+658. Eso es lo que se quería; la prueba estaba vieja. Ahora comprueba eso (B esperó menos de 1 s, la pausó y A volvió;
+espera la vuelta hasta 20 s más) y el aviso viejo solo con `--extra=&relevoRapido=0`.
+
+### 102.4 La PC justa que no alcanza a ponerse al día (arreglo en `lockstep.mjs`)
+
+`prueba-sincro --sala` falló en «el kart de A avanzó con lo que tocó A» (1,042 vueltas, se pedía más de 1,05). Esa
+comprobación es floja (102.5), pero mirando el registro de A apareció algo de verdad:
+
+- A corría a 60 cuadros por segundo con **15 ms de trabajo por cuadro** (de 16,7 posibles): sin margen. Algunos cuadros
+  tardaban más y A quedaba atrás de a poco.
+- A pedía ponerse al día cada segundo («voy 7,5 cuadros atrás de la mayoría: me pongo al día 5 cuadros»), pero **no le
+  salía**: sin margen, la ráfaga no corre más rápido que el reloj.
+- Desde §101, B no se frena por quien dice «voy atrás» y «sé ponerme al día» (la idea: ese se alcanza solo). Como A lo
+  decía, B no se frenó nunca (1 cuadro en toda la carrera) y A llegó a ir **9,5 cuadros atrás**.
+- Ir atrás se paga con retraso: lo de A le llega a B tarde, así que A subió su retraso hasta **11-12 cuadros** (~190 ms
+  entre que A aprieta y su kart responde). Antes de §101, B se frenaba un poco por A y el retraso de A quedaba en ~8.
+
+**El arreglo:** «sé ponerme al día» (la bandera 2 del informe) ahora vale solo si **de verdad** lo estoy logrando. En
+cada rato que voy atrás, la consola cuenta cuántos cuadros corrió y cuántos le tocaban por el tiempo en que corrió (sin
+lo que estuvo parada: esperas, frenos y tirones). Pasados 3 ratos atrás (`RATOS_PRUEBA`), si no ganó al menos un 4 %
+(`GANA_MIN`), deja de decirlo y anota «voy atrás y no alcanzo a ponerme al día (…): que me esperen». Entonces los demás
+se frenan por ella como antes de §101 (la sincronía de §80b). Quien sí se pone al día (B en `prueba-relevo`, a ~1,2
+veces) lo sigue diciendo y nadie se frena por él. `?alcance=0` = como en §101. `estado().sinAlcance` = cuántos ratos no
+alcanzó.
+
+Como en un control con dos lazos: el lazo rápido (cada uno corrige su propio atraso con la ráfaga) solo sirve si tiene
+margen de actuador; si está saturado, tiene que actuar el lazo lento (los demás bajan un poco su ritmo). Antes de §102 el
+lazo rápido decía «yo me encargo» aunque estuviera saturado.
+
+**El banco `relevo` §19** (44 → 46): Carla con una PC justa: una traba de 60 ms en el cuadro 299 la deja 6 cuadros atrás
+y después va un 2 % más lenta que el reloj, con una ráfaga que gana a lo más 1 %. Las dos con retraso fijo 10, para que
+no se meta el relevo (en el juego, el retraso de 12 de A tapaba el atraso).
+
+| Regla | Ana se frenó | Carla fue a lo más (desde el cuadro 700) |
+|---|---|---|
+| §102 | 45 cuadros | **4** cuadros atrás |
+| §101 (`alcanceReal: false`) | 8 cuadros | 22 cuadros atrás |
+
+Trampas del banco: con Carla un 2 % lenta y sin traba, Ana ya la frenaba antes de que pasara de 3 cuadros (nunca «iba
+atrás»: no se veía nada); con Carla un 6 % lenta o con trabas de 60 ms seguidas, Ana la relevaba (§80: el lento no frena
+a los demás), que es lo correcto para una PC lenta de verdad. El caso de A es el de en medio: va a 60, pero pierde
+cuadros sueltos.
+
+Además, el banco `relevo` ya tarda ~5 min (sus 19 partes son carreras de verdad a 100 cuadros por segundo) y
+`banco/correr.mjs` cortaba a los 5: ahora espera hasta 8.
+
+### 102.5 «El kart de A avanzó»
+
+A solo aprieta el acelerador y choca en la primera curva: cuánto avanza depende de cómo rebota (1,042 a 1,25 vueltas en
+las corridas). Ahora se mide lo que avanzó **desde donde estaba al apretar** el acelerador (más de 0,02 vueltas, ~20 m) y
+que haya pasado la largada.
+
+### 102.6 Con el juego (el programa final)
+
+Las cuatro pruebas de la red, otra vez con el programa final (`correr-todo --solo sincro-sala,sincro-largada,sincro-directa,relevo`,
+`build/web/datos/todo/20261024-1202`): **49 de 49**.
+
+| Prueba | Resultado |
+|---|---|
+| `sincro-sala` (dos pestañas en la sala falsa del sitio) | 11 / 11: el kart de A, 0,979 → 1,296 vueltas |
+| `sincro-directa` | 13 / 13: retraso A 4, B 2 |
+| `sincro-largada` (A trabada 6 s) | 15 / 15: B esperó a lo más 200 ms, pausó a A en el cuadro 60 y A volvió |
+| `prueba-relevo` (C con red mala) | 10 / 10: retraso A 2, B 4, C 12 («C paga su conexión») |
+| Bancos `relevo` y `lockstep` | 46 / 46 y 50 / 50 |
+
+**Lo que se vio y no se arregló:** en esta `sincro-sala`, A volvió a terminar con retraso 12. No fue lo de 102.4: A le
+pasó la autoridad a B porque iba atrasada («me esperaban a mí») y quien recibe la autoridad **releva** a la que se la
+dio (§80). Al relevado nadie lo espera (el lento no frena a los demás, a propósito), y en esa corrida la PC de A tuvo un
+rato a 53-57 cuadros por segundo: llegó a ir 68 cuadros atrás. Pasado el retraso máximo (12) ya no vuelve a lo directo
+en toda la carrera: su kart va con sus botones, pero tarde. Queda anotado en el PLAN (M25).
+
+La planilla entera con el programa final y el arreglo (`MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs`,
+`build/web/datos/todo/20261024-1210`): **624 de 625** en 35 pruebas. La que falló fue de `prueba-sala`: al terminar la
+carrera 2, el VR de A se calculó con A «cortada» (la sala la cortó en el cuadro 965 de esa carrera) y por eso no daba lo
+que esperaba la prueba. Se corrió `sala` dos veces más (`--solo sala --repetir 2`, `20261024-1318`): 44 de 45 (otra cosa:
+el descanso de 30 s se vio a los 32,5 s, la prueba mide desde que ella vio el fin y el reloj de la página estaba bien,
+30000 ms) y **45 de 45**. Queda como **intermitente vigilada**: desde ahora `prueba-sala` deja el registro de la red de
+cada pestaña (`red-A.txt`, `red-B.txt` en su carpeta de datos) y acepta `--extra=&…`, así la próxima vez se ve por qué
+se cortó.
+
+### 102.7 Lo que queda (del dueño)
+
+1. Subir lo privado a R2 (`docs/publicar.md` paso 2, con `MKW_BUILD=build/web-final/navegador`). La lista ya está armada (`node herramientas/subir-r2.mjs`, solo revisar: nada salió de este PC): **7.324 archivos, 5,00 GB**, versión `1da4225a723546b3`, programa `f623e34029f32c29`; los más grandes son los videos del final y del título (220, 220, 185, 185 y 148 MB).
+2. Pegar el Worker nuevo (paso 3) y publicar las reglas de Firebase (paso 5).
+3. Juntar el PR (lo abre la sesión de la nube) y recién después poner `juegos/mkw/privado.json` (paso 4).
+
+## 2026-10-24 · §103 «🛰 Todo por Cloudflare»: un modo de conexión excepcional, apagado por omisión
+
+El dueño preguntó si Cloudflare podía hacer de servidor de la conexión. Se le explicaron dos caminos: un **repetidor**
+(el TURN de Cloudflare Realtime, que el Worker de amigos ya entrega) o un **servidor de verdad** (un Durable Object por
+sala, con más retraso para Chile y con costo por mensaje). Eligió el repetidor: «ok la opción 1, recuerda que es una
+opción adicional no habilitada por defecto, tal como en el bt3 que es excepcional».
+
+### 103.1 Qué hace
+
+| | Directa (por omisión) | 🛰 Todo por Cloudflare |
+|---|---|---|
+| Quién lo elige | — | el anfitrión, en «✎ Cambiar» del vestíbulo (fila «Conexión»), solo antes de empezar |
+| Cómo van los paquetes | directo de navegador a navegador; el repetidor solo si nada directo anda (§99) | **todos** por el repetidor de Cloudflare, aunque lo directo funcione |
+| Para qué | lo normal: el ping más bajo | redes difíciles o carreras que se cortan (universidad, empresa, datos móviles, un router que pierde el WebRTC) |
+
+Es como en BT3 (la fila «Conexión: Directa / 🛰 Relevo de Cloudflare» de su sala, «último recurso» del anfitrión,
+nunca automático: `bt3.js`, `bt3-marco.js`). El titular del
+vestíbulo dice «· 🛰 Cloudflare» para que todos lo vean, y la prueba de conexión de §100 muestra 🛰 al lado de cada
+piloto.
+
+### 103.2 Cómo funciona
+
+1. **El sitio** (`colabtex/src/juegos/motor.js`, `redMkw`): la jugada `{t:"ajuste", k:"relevo", v:true}` vale solo del
+   anfitrión y en el vestíbulo; `est.relevo` es `false` por omisión. `mkw.js`: la fila «Conexión» (`MKW_CONEXION`,
+   `AYUDA_CONEXION`), el titular y la dirección del marco con `&conexion=cloudflare` (sin el ajuste, nada nuevo en la
+   dirección).
+2. **La página del juego** (`mkw.mjs`): con `conexion=cloudflare` arma su malla con `soloRelevo` y le **pide** al sitio
+   las credenciales (`{tipo:'turn'}`); el sitio se las pide al Worker (`relevoBt3()`, el mismo `/turn` de BT3, con el
+   token de quien juega) y contesta `{tipo:'turn', iceServers}`, vacío si el Worker no tiene TURN. Antes el sitio mandaba
+   las credenciales recién cuando la sala del juego existía (después de cargar): para este modo no servía, porque la
+   malla ya estaba conectando.
+3. **La malla** (`malla.mjs`, opción `soloRelevo`): tres estados, `malla.modo()`:
+   - `esperando`: no conecta a nadie; lo que llega del buzón (las ofertas de los otros y sus candidatos) se guarda;
+   - `relevo`: llegaron credenciales con un `turn:`/`turns:` → cada conexión nueva va con `iceTransportPolicy: 'relay'`
+     (WebRTC solo junta candidatos del repetidor) y se atiende lo guardado, en orden;
+   - `normal`: llegaron vacías (`alRelevo('sin')`) o no llegaron en 8 s (`'tarde'`): directo, como siempre.
+
+### 103.3 El repetidor de mentira (para probarlo sin internet)
+
+`herramientas/turn-local.mjs`: un servidor TURN propio, escrito desde los RFC 5766/8656 (nada copiado), solo UDP e IPv4,
+en 127.0.0.1. Hace lo que hace el de Cloudflare: pide la clave (el 401 con reino y nonce, y después la firma HMAC-SHA1 de
+cada mensaje, MESSAGE-INTEGRITY), da una «asignación» (un puerto UDP propio para cada navegador), y reenvía lo que cada
+uno manda (Send o ChannelData) al puerto del otro y de vuelta (Data o ChannelData), solo hacia quien tiene permiso
+(CreatePermission/ChannelBind). Cuenta asignaciones, reenvíos y bytes. Lo sirve el banco en `/turn` (`banco/servir.cjs`,
+igual que el `/turn` del Worker) y lo prende `prueba-sincro --cloudflare` en su propio proceso. Chrome lo acepta en
+127.0.0.1.
+
+### 103.4 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| Banco `red` (28 → 35) | ✓ sin credenciales todavía no conecta; ✓ con ellas los dos extremos son «relay» (1 ms); ✓ 200 paquetes llegan y el repetidor pasó 110 KB (82 KB de datos, dos tramos); ✓ credenciales vacías → directo y avisa «sin»; ✓ no llegan → directo a los 1,2 s («tarde»); ✓ **apagado: directo aunque tenga el repetidor** |
+| `prueba-sincro --directa --cloudflare` (con el programa final) | 15 / 15: una carrera entera solo por el repetidor (A y B con los dos extremos «relay»), las huellas iguales (la misma carrera), retraso A 4, B 2, el repetidor pasó 1 MB |
+| Sitio `mkw.test.cjs` (21 → 23) | ✓ apagado por omisión, solo el anfitrión, solo en el vestíbulo, solo `true`; ✓ la dirección lleva `conexion=cloudflare` solo prendido; ✓ el marco pide y el sitio contesta |
+| Sitio `npm run test:juegos` | 1113 / 1114 (la que falla es la de las rutas de Windows de Circuit Breakers, que ya fallaba antes) |
+
+**Trampa del banco:** «200 paquetes = 400 reenvíos» no se cumple: WebRTC (SCTP) junta varios mensajes chicos en un
+mismo paquete UDP y salieron 310. Se cuentan los bytes, que no se juntan.
+
+**No probado de punta a punta:** el sitio con el Worker de verdad pidiendo credenciales reales de Cloudflare (eso
+necesita `TURN_ID`/`TURN_CLAVE` y sale a internet). El camino `relevoBt3()` → `/turn` es el mismo que ya usa BT3.
+
+### 103.5 Lo que hace el dueño
+
+Nada nuevo si el Worker ya tiene `TURN_ID` y `TURN_CLAVE` (las de BT3). Si no las tiene, el modo igual se puede
+prender, pero cada marco recibe credenciales vacías y va directo (el registro dice «el repetidor de Cloudflare no está
+disponible»). Costo: el plan gratis de Cloudflare Realtime trae 1.000 GB al mes; una carrera de 2 pilotos pasó ~1 MB.
+
+### 103.6 Una pregunta abierta
+
+Con el modo **apagado**, la sala igual le pide al Worker las credenciales y WebRTC usa el repetidor **solo si nada
+directo funciona** (lo decidió §99, H1: con 66 pares nadie adivina cuál falla). En BT3 el repetidor no se usa nunca si el
+anfitrión no lo prende. Queda para que el dueño decida si Mario Kart sigue así o se apaga del todo como en BT3.

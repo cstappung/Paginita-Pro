@@ -183,7 +183,19 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   - Medir Intenso e Imposible en 200cc, con la velocidad de cada kart (¿se caen más a 138?).
   - La prueba de conexión también en el vestíbulo antes de empezar (necesita otra clave en el buzón y sus reglas de
     Firebase, que publica el dueño; ver §100.7).
-  - El programa final (`--final`) y subirlo a R2, cuando el dueño diga.
+  - ✅ Listo para el PR (§102, 2026-10-24): `main` juntado en la rama del sitio (conflictos de listas, la marca
+    `@controles: teclado` que pide el Salón nuevo), la rama subida y el PR pedido a la sesión de la nube; el programa
+    final compilado con sus semillas (729 pipelines, 483 bloques) y probado; la lista de R2 armada (7.324 archivos,
+    5,00 GB). **Falta lo del dueño**: subir a R2, el Worker, las reglas de Firebase y `privado.json` (`docs/publicar.md`).
+  - ✅ La PC justa que pide ponerse al día y no le sale (§102): «sé ponerme al día» solo si de verdad gana un 4 % en 3
+    ratos; si no, los demás la esperan (`?alcance=0` = §101). Banco `relevo` §19.
+  - La relevada que se queda más atrás que el retraso máximo (12) no vuelve a lo directo en toda la carrera (§102.6:
+    A, al pasar la autoridad por lenta, quedó relevada y llegó a 68 cuadros atrás con su PC a 53-57 cuadros/s). Ver si
+    conviene frenarse un poco también por la relevada que va poco atrás, o soltarla antes.
+  - ✅ «🛰 Todo por Cloudflare» (§103, pedido del dueño, 2026-10-24): un ajuste de la sala, **apagado por omisión** y
+    excepcional como en BT3, que manda todos los paquetes por el repetidor TURN de Cloudflare (`?conexion=cloudflare`,
+    `malla.mjs` `soloRelevo`). Probado con un TURN de mentira propio (`herramientas/turn-local.mjs`). **Pregunta al
+    dueño:** con el modo apagado, ¿el repetidor sigue de reserva automática (§99) o se apaga del todo como en BT3?
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -490,6 +502,26 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 ## Registro de avances
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
+
+- **2026-10-24 13:50** — **«🛰 Todo por Cloudflare»** (§103, pedido del dueño: «la opción 1… no habilitada por
+  defecto, tal como en el bt3 que es excepcional»). El anfitrión lo prende en «✎ Cambiar» → Conexión (`motor.js`
+  `{t:"ajuste",k:"relevo"}`, `mkw.js` la fila y `&conexion=cloudflare`); la página pide las credenciales al sitio
+  (`{tipo:'turn'}` → `relevoBt3()` → `/turn` del Worker) y la malla espera sin conectar hasta tenerlas (`soloRelevo`:
+  `esperando` → `relevo` con `iceTransportPolicy: 'relay'`, o `normal` si no hay o no llegan en 8 s). Un TURN de
+  mentira propio desde los RFC (`herramientas/turn-local.mjs`, `/turn` del banco). Banco `red` 35/35,
+  `prueba-sincro --directa --cloudflare` 15/15 (una carrera entera por el repetidor, 1 MB), sitio `mkw.test` 23/23.
+  La planilla del programa final de §102: 624/625 (la falla, un corte de A en la carrera 2 de `sala`, no se repitió
+  en dos vueltas más: intermitente vigilada; `prueba-sala` deja el registro de la red).
+- **2026-10-24 12:10** — **Listo para el PR y el programa final** (§102, pedido del dueño: «prepara todo para hacer PR
+  en la paginita Pro… compilar para R2»). `main` juntado en `claude/loving-planck-9k2yam` (171 commits atrás; los
+  conflictos eran listas que crecieron de los dos lados), `juegos-app.js` rearmado, `controles-datos.js` regenerado y la
+  marca `@controles: teclado` (la regla nueva del Salón); la rama subida con el permiso del dueño y el PR pedido a la
+  sesión de la nube. El programa final (`build/web-final/navegador`, `mkw.wasm.br` 15,7 MB) con semillas nuevas: la
+  planilla dio 623/625; las dos fallas: la prueba de la largada esperaba lo de antes del relevo rápido (actualizada) y
+  `sincro-sala` mostró una PC justa que pedía ponerse al día sin lograrlo (A con retraso 11-12): arreglo en
+  `lockstep.mjs` (`RATOS_PRUEBA`, `GANA_MIN`, `?alcance=0`), banco `relevo` §19 (46; `correr.mjs` espera 8 min) y la
+  comprobación del kart de A medida desde donde estaba. Las 4 pruebas de la red otra vez: 49/49. Lista de R2: 7.324
+  archivos, 5,00 GB (solo revisada: subir es del dueño).
 
 - **2026-10-24 05:00** — **Afinar la red** (§101, M25 punto 1, lo único que pidió el dueño). Medido con
   `prueba-relevo --trabas=8` y `?esperasLog=N` (nuevos): la traba de 1,5 s de B le cuesta a A lo que tarda la pausa en

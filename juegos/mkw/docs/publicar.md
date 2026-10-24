@@ -8,9 +8,10 @@ después lo hace el dueño, porque toca sus cuentas: **Cloudflare (R2 y el Worke
 El juego sale **para PC** (Chrome o Edge de escritorio). Los celulares quedan para un big update lejano (decisión del
 dueño, 2026-10-19).
 
-## 0. El programa final (lo hace Claude, cuando digas «publiquemos»)
+## 0. El programa final (lo hace Claude) — **hecho el 2026-10-24** (bitácora §102)
 
-Con el código del momento, sin nada a medio hacer en la carpeta:
+Ya está compilado y probado en `build/web-final/navegador` (`mkw.wasm.br` 15,7 MB, semillas de 729 pipelines y 483
+bloques). Para rehacerlo (si el código cambia antes de subir):
 
 ```bash
 python herramientas/compilar-web.py --modo navegador --final --carpeta build/web-final   # en su propia carpeta (~16 MB .br)
@@ -75,6 +76,9 @@ Cloudflare → **Workers & Pages** → el Worker del disco de BT3 → **Edit cod
 **Deploy**.
 
 - No hay variables nuevas: usa las mismas `AMIGOS`, `ORIGENES`, `CLAVE_SUBIDA` y el mismo binding `DISCO`.
+- El repetidor de Cloudflare (TURN) usa las mismas `TURN_ID` y `TURN_CLAVE` de BT3, si ya están. Mario Kart lo usa
+  solo si nada directo anda, o todo por ahí si el anfitrión prende «🛰 Todo por Cloudflare» en la sala (§103, apagado
+  por omisión). Sin esas dos, `/turn` contesta 404 y todo va directo: el juego anda igual.
 - BT3 sigue igual (sus 7 pruebas pasan con este archivo). Lo nuevo son las rutas `/mkw/…` (6 pruebas más).
 - Para que los pedazos del disco queden en el caché de Cloudflare cerca de Chile, el Worker necesita un **dominio
   propio** (Settings → Domains & Routes → Custom domain); en `*.workers.dev` funciona igual, pero todo sale de R2.
@@ -110,8 +114,10 @@ página.
 
 ## 6. Que llegue al sitio
 
-El trabajo está en la rama `claude/loving-planck-9k2yam` del sitio (commits locales, sin push ni PR, como pediste).
-Cuando digas, se sube y se junta con `main` (GitHub Pages publica `main`).
+La rama `claude/loving-planck-9k2yam` del sitio ya tiene `main` juntado (2026-10-24, §102) y está subida a GitHub; el
+PR lo abre la sesión de la nube (esta PC no tiene `gh`). Se puede **juntar antes de los pasos 2-5**: mientras
+`juegos/mkw/privado.json` siga vacío, la sala dice que el juego todavía no está publicado (y solo la ven los amigos).
+GitHub Pages publica `main`.
 
 ## 7. Probar
 
@@ -131,6 +137,8 @@ en el sitio publicado.
   enlace de una sala dice «Sala privada»; pedirle algo al Worker a mano (también la imagen del menú) da 401 (sin sesión)
   o 403.
 - **Dos PCs** = dos ventanas del mismo PC, como se probó BT3.
+- **El modo excepcional** (si el Worker tiene TURN): en la sala, «✎ Cambiar» → Conexión → «🛰 Todo por Cloudflare» →
+  «¡A correr!». El titular dice «· 🛰 Cloudflare» y la prueba de conexión muestra 🛰 en cada piloto (no 🟢).
 
 ## Límites del plan gratis de Workers
 

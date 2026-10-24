@@ -47,6 +47,8 @@ const RAPIDA = process.argv.includes('--rapida');
 const DESCANSO = 30;   // (también con --rapida: volver a elegir necesita el descanso entero)
 // §96: --cpu=maximo|dificil|normal|facil = el nivel de la CPU de la sala (el de la sala por omisión es máximo)
 const CPU = (process.argv.find(a => a.startsWith('--cpu=')) || '--cpu=normal').slice(6);
+// §102: --extra=&param=… = algo más en la dirección de las dos páginas (p. ej. --extra=&alcance=0 para comparar)
+const EXTRA = (process.argv.find(a => a.startsWith('--extra=')) || '').slice(8);
 const LIMITE = 120;                   // s: el tiempo límite de la carrera en la prueba (el del juego es de minutos)
 const DNF = 30;                       // s: el plazo para los que faltan desde que llega el primero, humano o CPU (§77, §78)
 const PUERTO = Number((process.argv.find(a => a.startsWith('--puerto=')) || `--puerto=${RECARGA ? 8156 : 8153}`).slice(9));
@@ -73,7 +75,7 @@ async function abrir(nombre, uid) {
   p.on('pageerror', e => { console.log(`[${nombre}] [pageerror] ${e.message}`); registro.push(`[${nombre}] pageerror ${e.message}`); });
   p.on('console', m => registro.push(`[${nombre}] ${m.text().slice(0, 300)}`));
   await p.goto(`http://127.0.0.1:${PUERTO}/?auto=1&red=malla&senal=canal&sala=${sala}&uid=${uid}&sincro=${uidA},${uidB}&jefe=${uidA}` +
-    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}`);
+    `&semilla=777&modo=sala&estilo=copa&carreras=2&cc=c150&cpu=${CPU}&limite=${LIMITE}${EXTRA}`);
   return p;
 }
 const A = await abrir('A', uidA);
@@ -506,6 +508,8 @@ ok('§82/§95: al terminar la 2 también: lo que da vr-sala.mjs con esos puestos
 
 ok('sin errores de JavaScript en las páginas', !registro.some(l => l.includes('pageerror')), registro.filter(l => l.includes('pageerror')).slice(0, 2).join(' · '));
 writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
+// (§102: y lo que anotó la red de cada una: el lockstep y la malla, para ver un corte o una espera)
+for (const [n, p] of [['A', A], ['B', B]]) writeFileSync(path.join(carpeta, `red-${n}.txt`), await p.evaluate(() => (window.mkwRed?.registro || []).join('\n')).catch(() => ''));
 await navegador.close();
 servidor.kill();
 console.log(`\n${bien} bien, ${mal} mal  (fotos y registro en ${path.relative(raiz, carpeta)}/)`);

@@ -74,6 +74,24 @@ test('M20: el nivel de la CPU es un ajuste propio del anfitrión, aparte de la c
  assert.match(fuente,/data-nivel="\$\{k\}"/);assert.match(fuente,/k: "nivel", v: b\.dataset\.nivel/);
 });
 
+test('§103 «🛰 Todo por Cloudflare»: apagado por omisión, lo prende solo el anfitrión en el vestíbulo (como el relevo de BT3) y va al marco',()=>{
+ const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
+ let e=M.reducir(nueva());assert.equal(e.relevo,false,'apagado por omisión: es excepcional');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,true,'el anfitrión lo prende');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:true},{t:'ajuste',uid:'a',k:'relevo',v:false}));assert.equal(e.relevo,false,'y lo apaga');
+ e=M.reducir(nueva({t:'ajuste',uid:'b',k:'relevo',v:true}));assert.equal(e.relevo,false,'b no es el anfitrión');
+ e=M.reducir(nueva({t:'ajuste',uid:'a',k:'relevo',v:'si'}));assert.equal(e.relevo,false,'solo true lo prende');
+ e=M.reducir(nueva({t:'empieza',uid:'a'},{t:'ajuste',uid:'a',k:'relevo',v:true}));assert.equal(e.relevo,false,'corriendo no se cambia (cada marco lo lee al abrir)');
+ const fuente=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ assert.match(fuente,/if \(relevo === true\) q\.set\("conexion", "cloudflare"\);/,'la dirección del marco solo lo lleva si está prendido');
+ assert.match(fuente,/relevo: est\.relevo === true \}\)/);
+ assert.match(fuente,/data-relevo="\$\{k\}"/);assert.match(fuente,/k: "relevo", v: b\.dataset\.relevo === "cloudflare"/);
+ // el marco pide las credenciales (si no hay, [] y va directo); y el juego espera el repetidor solo con conexion=cloudflare
+ assert.match(fuente,/if \(d\.tipo === "turn"\) \{/);assert.match(fuente,/tipo: "turn", iceServers: ice \|\| \[\]/);
+ const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
+ assert.match(juego,/parametros\.get\('conexion'\) === 'cloudflare'/);assert.match(juego,/soloRelevo: todoRelevo/);
+});
+
 test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
  const nueva=(...js)=>{const s=sala(...js);delete s.cpu;return s;};
  assert.deepEqual(Object.keys(M.MKW_CC),['c150','espejo','c100','azar'],'de menos a más: 150cc, espejo, 200cc; al azar al final');
@@ -200,6 +218,8 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  const nv=n=>new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',cc:'c100',nivel:n})).searchParams;
  assert.equal(nv('normal').get('cpu'),'normal','M20: el nivel del anfitrión, aparte de la cilindrada');assert.equal(nv('normal').get('cc'),'c100');
  assert.equal(nv('turbo').get('cpu'),'maximo','un nivel que no existe va como Máximo');
+ assert.equal(nv('normal').get('conexion'),null,'§103: sin «Todo por Cloudflare», nada en la dirección');
+ assert.equal(new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],jefe:'a',relevo:true})).searchParams.get('conexion'),'cloudflare');
  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');

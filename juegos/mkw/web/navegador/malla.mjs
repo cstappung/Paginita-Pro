@@ -62,8 +62,16 @@ export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => 
 }
 
 export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => {}, alCambiar = () => {},
-  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala(), colaUdp = LLENO }) {
+  RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala(), colaUdp = LLENO,
+  // §103, «🛰 Todo por Cloudflare» (lo prende el anfitrión: apagado por omisión, como el relevo de BT3): todas las
+  // conexiones solo por el repetidor TURN (iceTransportPolicy 'relay'), aunque la directa funcione. Hasta que llegan sus
+  // credenciales (ponerIce) no se conecta a nadie; si no llegan en esperaRelevo ms, o llegan vacías (el Worker no tiene
+  // TURN), va directo como siempre. alRelevo('relevo' | 'sin' | 'tarde') dice qué pasó
+  soloRelevo = false, esperaRelevo = 8000, alRelevo = () => {} }) {
   alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
+  // §103: 'normal' (directo, y el TURN solo si nada directo anda) · 'esperando' (las credenciales) · 'relevo' (todo por él)
+  let modo = soloRelevo ? 'esperando' : 'normal', relojRelevo = null, pendienteIce = null;   // (las que llegaron antes de entrar)
+  const pendientes = [];                          // lo que llegó del buzón mientras se esperaban las credenciales
   // (§100, solo pruebas: cortar('rtc') = ninguna conexión directa más, aunque siga en el buzón; cortar('rtc', u) = solo
   // la conexión con u)
   const quiere0 = quiere, partidaCon = new Set(); let partida = false;
@@ -98,7 +106,7 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
 
   function nuevoPar(u, s, k) {
     cierra(u);
-    const pc = new RTC({ iceServers: ice });
+    const pc = new RTC(modo === 'relevo' ? { iceServers: ice, iceTransportPolicy: 'relay' } : { iceServers: ice });
     // negociados a mano (mismo id en los dos lados): no hay que esperar al ondatachannel del otro
     const udp = pc.createDataChannel('udp', { negotiated: true, id: 0, ordered: false, maxRetransmits: 0 });
     const tcp = pc.createDataChannel('tcp', { negotiated: true, id: 1, ordered: true });
@@ -134,6 +142,8 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
 
   async function alMensaje(de, m) {
     if (!sesion || !m || m.a !== sesion || de === uid || typeof de !== 'string') return;
+    // §103: sin las credenciales del repetidor todavía, la oferta (y sus candidatos) se guardan para después
+    if (modo === 'esperando') { if (pendientes.length < 500) pendientes.push([de, m]); return; }
     let x = pares.get(de);
     try {
       if (m.t === 'oferta') {
@@ -168,7 +178,7 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
   }
 
   function revisa() {
-    if (!sesion) return;
+    if (!sesion || modo === 'esperando') return;
     // se cierra el par de quien ya no se quiere o volvió con OTRA sesión (recargó la página). §93: si solo dejó de verse
     // en el buzón y la conexión directa sigue sana, se deja: una pestaña trabada unos segundos (la primera visita armando
     // gráficos) deja de dar señales en el buzón, pero su WebRTC sigue vivo; si se fue de verdad, la conexión se cae sola
@@ -226,12 +236,27 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     if (!sesion) return false;
     offP = senal.alPresentes(alPresentes);
     reloj = setInterval(vigila, VIGILA_MS);
+    if (modo === 'esperando' && pendienteIce) decidir(pendienteIce, 'sin');
+    else if (modo === 'esperando') relojRelevo = setTimeout(() => decidir([], 'tarde'), esperaRelevo);
     return true;
+  }
+
+  // §103: llegaron (o no) las credenciales del repetidor: con algún turn:/turns:, todo por él; sin ellas, directo. Lo que
+  // llegó mientras tanto se atiende ahora, en orden (la oferta antes que sus candidatos), y se conecta a los presentes
+  function decidir(servidores, porque) {
+    if (modo !== 'esperando') return;
+    clearTimeout(relojRelevo); relojRelevo = null;
+    const hay = servidores.some(s => [].concat(s?.urls || []).some(u => /^turns?:/.test(String(u))));
+    modo = hay ? 'relevo' : 'normal';
+    try { alRelevo(hay ? 'relevo' : porque); } catch {}
+    for (const [de, m] of pendientes.splice(0)) alMensaje(de, m);
+    revisa();
   }
 
   function salir() {
     if (!sesion) return;
     sesion = '';
+    clearTimeout(relojRelevo); relojRelevo = null; pendientes.length = 0;
     offP?.(); offM?.(); offP = offM = null;
     clearInterval(reloj);
     for (const u of [...pares.keys()]) cierra(u);
@@ -256,7 +281,15 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
     activa: () => !!sesion,
     // §99 (H1): los servidores de ICE de las conexiones que se armen desde ahora: los STUN de siempre más el TURN que
     // pidió la página (las que andan siguen como están; las que fallan se rearman con estos)
-    ponerIce(extra) { ice = [...ICE, ...(Array.isArray(extra) ? extra.filter(s => s && s.urls) : [])]; },
+    // (§103: con soloRelevo, estas credenciales deciden si todo va por el repetidor o directo)
+    ponerIce(extra) {
+      const turn = Array.isArray(extra) ? extra.filter(s => s && s.urls) : [];
+      ice = [...ICE, ...turn];
+      if (modo === 'esperando' && sesion) decidir(turn, 'sin');
+      else if (modo === 'esperando') pendienteIce = turn;
+    },
+    // §103: 'normal' | 'esperando' | 'relevo'
+    modo: () => modo,
     // §99 (H1, medida 6): qué camino usa cada conexión (directo / por el repetidor) y su ida y vuelta, de getStats
     async camino(u) {
       const x = pares.get(u);

@@ -78,6 +78,10 @@ const QUIETO_HASTA = 3600;
 // §99 (C3), ponerse al día: si voy más de UMBRAL_PRISA cuadros atrás de más de la mitad, pido correr seguido lo que
 // falta menos PRISA_DEJA (lo último lo cierra la sincronía de tiempo de los demás, sin pasarme), a lo más PRISA_MAX
 const UMBRAL_PRISA = 3, PRISA_DEJA = 2, PRISA_MAX = 120;            // (120 cuadros = 2 s: el tope del runtime, mkw_prisa)
+// §102: «sé ponerme al día solo» (bandera 2 del informe) vale si de verdad lo logro: pasados RATOS_PRUEBA ratos atrás,
+// tengo que haber corrido al menos GANA_MIN (4 %) más cuadros que los del tiempo en que corrí (sin esperas, frenos ni
+// tirones). Una PC justa (15 ms de trabajo por cuadro) pide la ráfaga y no gana nada: a esa la esperan los demás
+const RATOS_PRUEBA = 3, GANA_MIN = 0.04;
 // §99 (C4), la largada pareja: cuando ya cargó al menos la mitad, al que falta se lo espera a lo más ESPERA_MITAD (y
 // larga «fuera»: entra en la siguiente, como quien recarga); en la cuenta regresiva todos con al menos RETRASO_CUENTA
 // cuadros de retraso (el turbo de salida pide la misma anticipación a todos); el último en cargar espera media ida y
@@ -136,6 +140,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // §101: lo que esta pestaña estuvo trabada mientras esperaba no se le carga al que faltaba (es un tirón mío);
   // ?trabaPropia=0 = como antes, para comparar
   trabaPropia = !/[?&]trabaPropia=0\b/.test(globalThis.location?.search || ''),
+  // §102: «sé ponerme al día» solo si de verdad gano cuadros (RATOS_PRUEBA, GANA_MIN); ?alcance=0 = como en §101
+  alcanceReal = !/[?&]alcance=0\b/.test(globalThis.location?.search || ''),
   // §100: uid => true si esa consola se fue (la página: ni en el buzón de la sala ni con su WebRTC sano); null = no se sabe
   ido = null,
   // §100: i => true si el humano i (en el orden de `humanos`, el mismo de los jugadores de la carrera) ya cruzó la meta
@@ -180,6 +186,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   const contiguo = new Map();              // §99 (H5): mando → el último cuadro seguido que tengo de él
   const pedidosA = new Map();              // §99 (S1): mando → cuándo pedí sus botones a todos (tipo 2)
   let pausaUltima = -1;                    // §99: cuándo llamó el juego a pad la última vez (los tirones de esta PC)
+  let msParado = 0;                        // §102: el tiempo en que no corrí (esperas, frenos, tirones), sumado
+  let alcance = { ratos: 0, ganado: 0, corriendo: 0 };   // §102: lo que gané en los ratos seguidos que fui atrás
   // §80b: cuántos cuadros me tengo que frenar todavía (lo calcula cada informe), cuándo me frené la última vez, y mi
   // ventaja sobre cada mando en el rato anterior (la peor: la más chica)
   let deuda = 0, ultimoFreno = -Infinity;
@@ -319,7 +327,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     aTodos(b, 'udp');
   }, pingCada) : null;
 
-  function ventanaNueva() { ven = { hol: fila(SIN_DATO), esp: fila(0), max: fila(0), ven: fila(SIN_DATO), dud: false, t0: ahora(), c0: est.cuadros }; }
+  function ventanaNueva() { ven = { hol: fila(SIN_DATO), esp: fila(0), max: fila(0), ven: fila(SIN_DATO), dud: false, t0: ahora(), c0: est.cuadros, p0: msParado }; }
   ventanaNueva();
 
   function nuevaCarrera() {
@@ -327,6 +335,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     cadena = []; relevados.clear(); pasarA = null; traspaso = null; fuera = null; buenas = 0; sustituidosMios = 0;
     ultimaSubida = -Infinity; malasAutoridad.length = 0; rachas.fill(0); informes.clear(); nuevo.clear(); ventanaNueva();
     ackDe.clear(); contiguo.clear(); pedidosA.clear(); pausaUltima = -1; mitadDesde = null; largado = false;
+    alcance = { ratos: 0, ganado: 0, corriendo: 0 };
     deuda = 0; ultimoFreno = -Infinity; ventajas.fill(SIN_DATO); est.sumaRetraso = 0; est.cuadrosCarrera = 0;
     estab.clear(); delanteDe.clear(); est.estable = { malas: 0, atras: 0, rtt: null }; quieto.clear();
     pausas.clear(); ultimoUsado.clear(); pidoVuelta = 0; est.pausas = []; est.vueltas = 0; preferida = preferidas.get(carrera);
@@ -607,12 +616,23 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // haría bajar su retraso de más y después los esperaría todo el mundo)
       const atrasado = ahora() < alDiaHasta || atrasDeLaMitad() > UMBRAL_PRISA;
       if (atrasado) ven.dud = true;
+      // §102: ¿me pongo al día de verdad? En los ratos seguidos que voy atrás, lo que corrí de más que el tiempo en que
+      // corrí (sin lo que estuve parado: esperas, frenos, tirones). Si a los RATOS_PRUEBA no gané GANA_MIN, no digo «sé
+      // ponerme al día»: los demás me esperan (si no, me quedaba cada vez más atrás y subía mi retraso hasta 12)
+      const corriendo = Math.max(0, t - ven.t0 - (msParado - ven.p0)) / cuadroMs;
+      if (atrasado) { alcance.ratos++; alcance.ganado += corridos - corriendo; alcance.corriendo += corriendo; }
+      else alcance = { ratos: 0, ganado: 0, corriendo: 0 };
+      const alcanzo = !alcanceReal || alcance.ratos < RATOS_PRUEBA || alcance.ganado >= GANA_MIN * alcance.corriendo;
+      if (!alcanzo) {
+        est.sinAlcance = (est.sinAlcance || 0) + 1;
+        if (!alcance.avisado) { alcance.avisado = true; registro(`[lockstep] voy atrás y no alcanzo a ponerme al día (gané ${alcance.ganado.toFixed(1)} cuadros en ${alcance.corriendo.toFixed(0)}): que me esperen`); }
+      }
       // (§99, D: y al final mi ida y vuelta típica, de a 2 ms; 255 = no sé)
-      const yoRtt = miRtt(), puedo = puedoPrisa();
+      const yoRtt = miRtt(), puedo = puedoPrisa() && alcanzo;
       const b = empaca(10, miMando & 255, ++numInforme, 2 + 5 * MANDOS),
         inf = { t, hol: [], esp: [], max: [], racha: [], ven: [], dud: ven.dud, prisa: puedo, atras: atrasado, rtt: yoRtt };
       b[9 + 5 * MANDOS] = yoRtt === null ? 255 : Math.min(254, Math.round(yoRtt / 2));
-      // las banderas: 1 = rato dudoso; 2 = sé ponerme al día solo (§101); 4 = voy atrás / me estoy poniendo al día
+      // las banderas: 1 = rato dudoso; 2 = sé ponerme al día solo (§101; y me sale, §102); 4 = voy atrás / me estoy poniendo al día
       b[8] = (ven.dud ? 1 : 0) | (puedo ? 2 : 0) | (atrasado ? 4 : 0);
       for (let p = 0; p < MANDOS; p++) {
         const sabe = mandos.includes(p) && p !== miMando && !cortes.has(p) && tabla(p).size > 0;
@@ -768,12 +788,12 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       deuda--; ultimoFreno = est.cuadros; est.frenos++;
       const t0 = ahora();
       await new Promise(listo => setTimeout(listo, cuadroMs));
-      est.msFrenado += ahora() - t0;
+      { const d = ahora() - t0; est.msFrenado += d; msParado += d; }
       if (fuera) { ultimo = cuadro; return quietos(); }
     }
     ultimo = cuadro;
     est.cuadros++; est.cuadrosCarrera++; est.sumaRetraso += miRetraso;
-    { const t = ahora(); if (pausaUltima >= 0 && t - pausaUltima > TIRON_MS) { est.tirones = (est.tirones || 0) + 1; tironPropio(t - pausaUltima); } pausaUltima = t; }
+    { const t = ahora(); if (pausaUltima >= 0 && t - pausaUltima > TIRON_MS) { est.tirones = (est.tirones || 0) + 1; msParado += t - pausaUltima - cuadroMs; tironPropio(t - pausaUltima); } pausaUltima = t; }
     // lo mío: el estado de ahora vale para cuadro + mi retraso (y para los cuadros intermedios si el retraso subió;
     // si bajó, no escribo nada hasta alcanzar lo ya escrito). Al empezar la carrera, los primeros (hasta mi retraso)
     // van neutros, escritos: nadie tiene que saber mi retraso
@@ -815,6 +835,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       // mío (los demás siguieron sin mí y quedé atrás). Antes se le cargaba al que faltaba, que subía su retraso de más
       const fin = ahora(), congelado = congeladoEn(e, fin), ms = fin - t0 - congelado;
       pausaUltima = fin;                     // (§99: lo que esperé a otros no es un tirón mío)
+      msParado += fin - t0;
       if (congelado > TIRON_MS && !llegada) { est.tirones = (est.tirones || 0) + 1; est.msCongelado = (est.msCongelado || 0) + congelado; tironPropio(congelado); }
       ven.dud = true;
       if (llegada) est.msLlegada += ms;

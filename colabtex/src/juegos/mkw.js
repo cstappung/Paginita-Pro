@@ -98,14 +98,16 @@ const almacenPartidas = {
    marco quién sigue), la semilla de la tanda (la misma carrera en todos), el modo y la cilindrada. §74: la copa es
    una copa existente (4 carreras: el anfitrión la elige en el juego) y la playlist es una lista que el anfitrión arma
    en el juego con las sugerencias de los demás (`carreras` = hasta cuántas llena su 🎲). M20: `cpu` = el nivel de la
-   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. Los nombres no van en la dirección: se le mandan
-   al marco. */
-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo" }) {
+   CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §103: `conexion=cloudflare` = el anfitrión prendió
+   «🛰 Todo por Cloudflare» (todo por el repetidor TURN; sin eso, nada en la dirección). Los nombres no van en la
+   dirección: se le mandan al marco. */
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", relevo = false }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
   q.set("cpu", MKW_NIVEL[nivel] ? nivel : "maximo");
+  if (relevo === true) q.set("conexion", "cloudflare");
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
@@ -254,6 +256,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
         .then(token => { if (!muerto && frame?.contentWindow === w) w.postMessage({ canal: PADRE, tipo: "token", token: token || null }, location.origin); });
       return;
     }
+    /* §103: con «🛰 Todo por Cloudflare», el marco pide las credenciales del repetidor apenas arma su malla (no conecta
+       a nadie hasta tenerlas): las del Worker de amigos (/turn, como el relevo de BT3), o [] si no hay (va directo) */
+    if (d.tipo === "turn") {
+      const w = frame.contentWindow;
+      relevoBt3().catch(() => []).then(ice => { if (!muerto && frame?.contentWindow === w) w.postMessage({ canal: PADRE, tipo: "turn", iceServers: ice || [] }, location.origin); });
+      return;
+    }
     if (d.tipo === "salir") { try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (err) {} salir?.(); }
     /* El juego abrió un selector de la sala (la copa, la playlist, sugerir, lo que viene): su panel va pegado abajo del
        marco, así que se acomoda la página para que el marco se vea entero (solo si hace falta). */
@@ -326,7 +335,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     frame.hidden = false;
     verMarco();
     frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
-                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel });
+                         estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, relevo: est.relevo === true });
     frame.focus();
     conectarNube();
     // apenas la sala del juego exista (el marco la arma al cargar), los nombres y el anfitrión
@@ -467,7 +476,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const tira = corre && enSala();
     if (!manda || corre) abierto.cambiar = false;
     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
-    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla,
+    const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.relevo, est.ultimaTabla,
       est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe, conex]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
@@ -477,7 +486,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     vest.classList.toggle("jugando", tira);
     const estilo = est.estilo === "playlist" ? "playlist" : "copa", cc = MKW_CC[est.cc] ? est.cc : "c150", nivel = MKW_NIVEL[est.nivel] ? est.nivel : "maximo";
     const puede = manda && !corre, cupo = Math.min(est.cupo || MKW_SINCRO_MAX, MKW_SINCRO_MAX), cpus = Math.max(0, MKW_SINCRO_MAX - js.length);
-    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())}`;
+    const relevo = est.relevo === true;
+    const titular = `${MODO_CORTO[estilo]} · ${escapeHtml(MKW_CC[cc])} · CPU ${escapeHtml(MKW_NIVEL[nivel].toLowerCase())}${relevo ? " · 🛰 Cloudflare" : ""}`;
     const nom = j => escapeHtml(j.nombre || "Piloto");
     const cara = (j, tam) => avatar ? avatar(j, tam) : `<span class="jg2-inicial" style="width:${tam}px;height:${tam}px" aria-hidden="true">${escapeHtml((j.nombre || "?").charAt(0).toUpperCase())}</span>`;
     // el «⋯» de cada piloto, para el anfitrión y en las filas de los otros (con la copa andando, solo «Echar»)
@@ -529,6 +539,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
           <div class="jg2-op"><span>Cilindrada</span>${seg("cc", cc, MKW_CC, v => `data-cc="${v}"`)}<small>${AYUDA_CC[cc]}</small></div>
           <div class="jg2-op"><span>CPU</span><div class="jg2-seg" role="group" aria-label="CPU">${Object.entries(MKW_NIVEL).map(([k, txt]) =>
             `<button type="button" data-nivel="${k}" data-foco="cpu-${k}" aria-pressed="${nivel === k}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_NIVEL[nivel]}</small></div>
+          <div class="jg2-op"><span>Conexión</span><div class="jg2-seg" role="group" aria-label="Conexión">${Object.entries(MKW_CONEXION).map(([k, txt]) =>
+            `<button type="button" class="jg-mkw-conexion" data-relevo="${k}" data-foco="con-${k}" aria-pressed="${(k === "cloudflare") === relevo}">${escapeHtml(txt)}</button>`).join("")}</div><small>${AYUDA_CONEXION[relevo ? "cloudflare" : "directa"]}</small></div>
           <button type="button" class="jg2-cerrar" data-cerrar data-foco="cerrar">Cerrar</button>
         </div>` : "";
       const ult = est.ultimaTabla;
@@ -574,6 +586,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (b.classList.contains("jg-mkw-modo")) { if (!elegido) anota({ t: "ajuste", uid, k: "estilo", v: b.dataset.e }); return; }
     if (b.dataset.cc) { if (!elegido) anota({ t: "ajuste", uid, k: "cc", v: b.dataset.cc }); return; }
     if (b.dataset.nivel) { if (!elegido) anota({ t: "ajuste", uid, k: "nivel", v: b.dataset.nivel }); return; }
+    if (b.dataset.relevo) { if (!elegido) anota({ t: "ajuste", uid, k: "relevo", v: b.dataset.relevo === "cloudflare" }); return; }
     if (b.classList.contains("jg-mkw-dar")) { b.disabled = true; abierto.menu = ""; anota({ t: "anfitrion", uid, a: b.dataset.a }); return; }
     // §87: echar (el anfitrión): sale al momento y no vuelve a esta sala; con la copa andando su kart sigue sin nadie
     if (b.classList.contains("jg-mkw-echa")) {
@@ -712,6 +725,10 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
   dificil: "Más rápidas, y persiguen al que va primero.", maximo: "Todo al tope: el kart más rápido, sin frenarse nunca.",
   intenso: "El Hard AI de Retro Rewind: siempre a la velocidad máxima del juego. Casi imposible de ganar.",
   imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
+/* §103: cómo se conectan los pilotos (como el relevo de BT3: lo excepcional lo prende el anfitrión, nunca solo) */
+const MKW_CONEXION = { directa: "Directa", cloudflare: "🛰 Todo por Cloudflare" };
+const AYUDA_CONEXION = { directa: "Cada piloto se conecta directo con los demás: lo normal, con el ping más bajo.",
+  cloudflare: "Todo pasa por el repetidor de Cloudflare. Solo si les cuesta conectarse o las carreras se cortan: un poco más de ping." };
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega
    una sola vez. Todo cuelga de `.jg-mkw-vest.jg-mkw2`, que pesa más que las reglas viejas `.jg-mkw-*` de juegos.html

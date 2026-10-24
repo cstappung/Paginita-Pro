@@ -104,9 +104,27 @@ const red = parametros.has('red') ? (() => {
     // (y los de la sala nueva, §73, con la suya: sala-carrera.mjs)
     const alBinario = (de, b, canal) => b[0] === MARCA_LOCKSTEP ? sincro?.lockstep?.alBinario(de, b)
       : b[0] === MARCA_SALA ? window.mkwSala?.alBinario(de, b) : router.alBinario(de, b, canal);
+    // §103: «🛰 Todo por Cloudflare» (lo prende el anfitrión en el vestíbulo; apagado por omisión, como el relevo de BT3):
+    // todas las conexiones por el repetidor TURN que entrega el Worker. Hasta tener sus credenciales no conecta a nadie;
+    // sin ellas (el Worker sin TURN) o si no llegan en 8 s, directo como siempre (cómo quedó: window.mkwRed.malla.modo())
+    const todoRelevo = parametros.get('conexion') === 'cloudflare';
+    const alRelevo = e => {
+      anotar(e === 'relevo' ? '[malla] 🛰 todo por el repetidor de Cloudflare' : `[malla] el repetidor de Cloudflare no ${e === 'tarde' ? 'contestó a tiempo' : 'está disponible (el Worker no dio credenciales)'}: conexión directa`);
+    };
     // (§99: en la sala, cola corta para la carrera: un paquete viejo no sirve)
-    malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar, colaUdp: ['sala', 'directa'].includes(parametros.get('modo')) ? 8192 : undefined });
+    malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar, colaUdp: ['sala', 'directa'].includes(parametros.get('modo')) ? 8192 : undefined,
+      soloRelevo: todoRelevo, alRelevo });
     router.usar(malla);
+    if (todoRelevo) {
+      // las credenciales: se le piden al sitio (que las saca del /turn del Worker de amigos con el token de quien juega) y
+      // se escucha la respuesta desde ya (la sala del juego, que oye los demás mensajes del sitio, se arma más tarde)
+      addEventListener('message', ev => {
+        const d = ev.data;
+        if (ev.source !== window.parent || ev.origin !== location.origin || d?.canal !== 'mkw-padre' || d.tipo !== 'turn' || !Array.isArray(d.iceServers)) return;
+        malla.ponerIce(d.iceServers);
+      });
+      if (window.parent !== window) window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'turn' }, location.origin);
+    }
     malla.entrar().then(ok => anotar(`[malla] ${ok ? 'entré a la sala como ' + uid : 'no pude entrar a la sala'}`));
     // §100: al cerrar la página (o salir del juego al vestíbulo) se avisa ya: sale del buzón y cierra sus conexiones, y
     // los demás no esperan a notarlo solos

@@ -13,7 +13,8 @@
   (<code>wfc.mjs</code>: un cliente falso entra por NAS y GPCM con la misma cuenta MD5 que hace la consola, y vuelve a
   entrar con el mismo perfil), el cifrado de la lista de salas (<code>wfc-salas.mjs</code>: enctypeX ida y vuelta, el
   filtro tipo SQL) y la <b>malla WebRTC de verdad</b> (<code>malla.mjs</code> + <code>crearRouterMalla</code>) entre
-  dos "navegadores" en esta misma página, con su buzón falso.</p>
+  dos "navegadores" en esta misma página, con su buzón falso. §103: «🛰 Todo por Cloudflare» (apagado por omisión) con
+  un repetidor TURN de mentira de este PC (<code>/turn</code> del banco = <code>herramientas/turn-local.mjs</code>).</p>
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
@@ -142,6 +143,68 @@ try {
     D.malla.salir();
     ok('§93: …y cuando D se va de verdad, C lo suelta igual', await hasta(() => !C.malla.conectados().includes('ud'), 8000), C.malla.conectados().join());
     C.malla.salir();
+  }
+
+  // §103: «🛰 Todo por Cloudflare» (soloRelevo; apagado por omisión, como el relevo de BT3) con el repetidor TURN de
+  // mentira del banco (/turn de servir.cjs = herramientas/turn-local.mjs: hace lo que el TURN de Cloudflare Realtime)
+  {
+    const espera = ms => new Promise(r => setTimeout(r, ms));
+    const turn = await (await fetch('/turn')).json(), cuenta = async () => (await fetch('/turn?cuenta=1')).json();
+    const sala3 = salaId + '-cf';
+    const navR = (uid, op = {}) => {
+      const llegan = [], avisos = [];
+      const malla = crearMalla({ uid, senal: senalCanal({ sala: sala3 + (op.sala || ''), uid }), alBinario: (de, b) => llegan.push(b.length),
+        alRelevo: e => avisos.push(e), ...op });
+      return { uid, malla, llegan, avisos };
+    };
+    ok('§103: el banco tiene su repetidor TURN de mentira (como el /turn del Worker)', Array.isArray(turn.iceServers) && /^turn:/.test(turn.iceServers[0]?.urls?.[0]), JSON.stringify(turn.iceServers?.[0]?.urls));
+    const E = navR('ue', { soloRelevo: true }), F = navR('uf', { soloRelevo: true });
+    await E.malla.entrar(); await F.malla.entrar();
+    await espera(1500);
+    ok('§103: con soloRelevo y sin las credenciales todavía, nadie se conecta (espera el repetidor)',
+       E.malla.modo() === 'esperando' && !E.malla.conectados().length && !F.malla.conectados().length, `${E.malla.modo()} · ${E.malla.conectados().join()}`);
+    const c0 = await cuenta();
+    E.malla.ponerIce(turn.iceServers);
+    await espera(300);                                   // (F todavía sin las suyas: guarda la oferta de E para después)
+    F.malla.ponerIce(turn.iceServers);
+    const con = await hasta(() => E.malla.conectados().includes('uf') && F.malla.conectados().includes('ue'), 15000);
+    const [ce, cf] = [await E.malla.camino('uf'), await F.malla.camino('ue')];
+    ok('§103: con las credenciales se conectan y los dos lados van por el repetidor (candidatos «relay», ninguno directo)',
+       con && E.malla.modo() === 'relevo' && ce?.local === 'relay' && ce?.remoto === 'relay' && cf?.local === 'relay' && cf?.relevo,
+       `E ${JSON.stringify(ce)} · F ${JSON.stringify(cf)} · avisos ${E.avisos}/${F.avisos}`);
+    for (let i = 0; i < 200; i++) E.malla.enviar('uf', new Uint8Array(205), 'udp');
+    await hasta(() => F.llegan.length >= 195, 4000);
+    const c1 = await cuenta();
+    // (los bytes, no los paquetes: WebRTC junta varios mensajes chicos en un mismo paquete UDP. Cada byte pasa dos tramos
+    // por el repetidor: de E a su puerto y de ahí al de F)
+    ok('§103: 200 paquetes de 205 bytes de E a F: llegan ≥ 195, y todo pasó por el repetidor (los bytes, dos tramos)',
+       F.llegan.length >= 195 && c1.bytes - c0.bytes >= 2 * 205 * F.llegan.length,
+       `${F.llegan.length}/200; el repetidor: ${c1.bytes - c0.bytes} bytes en ${c1.reenviados - c0.reenviados} reenvíos (${2 * 205 * F.llegan.length} de datos), ${c1.asignaciones} asignaciones`);
+    E.malla.salir(); F.malla.salir();
+    // las credenciales vacías (el Worker sin TURN): directo como siempre, y lo avisa
+    const G = navR('ug', { soloRelevo: true, sala: '-2' }), H = navR('uh', { sala: '-2' });
+    await G.malla.entrar(); await H.malla.entrar();
+    G.malla.ponerIce([]);
+    const conG = await hasta(() => G.malla.conectados().includes('uh') && H.malla.conectados().includes('ug'), 15000);
+    const cg = await G.malla.camino('uh');
+    ok('§103: sin credenciales (el Worker no tiene TURN) va directo como siempre y lo avisa («sin»)',
+       conG && G.malla.modo() === 'normal' && G.avisos.join() === 'sin' && cg && !cg.relevo, `${G.malla.modo()} · ${JSON.stringify(cg)} · ${G.avisos}`);
+    G.malla.salir(); H.malla.salir();
+    // si no llegan (el sitio no contesta): a los esperaRelevo ms, directo
+    const I = navR('ui', { soloRelevo: true, esperaRelevo: 1200, sala: '-3' }), J = navR('uj', { sala: '-3' });
+    await I.malla.entrar(); await J.malla.entrar();
+    const conI = await hasta(() => I.malla.conectados().includes('uj'), 15000);
+    ok('§103: si las credenciales no llegan, a los esperaRelevo ms va directo («tarde»)', conI && I.malla.modo() === 'normal' && I.avisos.join() === 'tarde', `${I.malla.modo()} · ${I.avisos}`);
+    I.malla.salir(); J.malla.salir();
+    // apagado (lo de siempre): con las credenciales puestas igual va directo; el repetidor solo si nada directo anda
+    const K = navR('uk', { sala: '-4' }), L = navR('ul', { sala: '-4' });
+    await K.malla.entrar(); await L.malla.entrar();
+    K.malla.ponerIce(turn.iceServers); L.malla.ponerIce(turn.iceServers);
+    const conK = await hasta(() => K.malla.conectados().includes('ul'), 15000);
+    const ck = await K.malla.camino('ul');
+    ok('§103: apagado (por omisión) va directo aunque tenga las credenciales del repetidor', conK && K.malla.modo() === 'normal' && ck && !ck.relevo && !K.avisos.length,
+       `${K.malla.modo()} · ${JSON.stringify(ck)}`);
+    K.malla.salir(); L.malla.salir();
   }
 
   // La red mala de mentira (?redMala=latencia,variación,pérdida; solo pruebas, PLAN C3): reloj y azar falsos, sin esperar

@@ -21,9 +21,21 @@ const TIPOS = {                               // extensión → tipo de contenid
   '.bin': 'application/octet-stream', '.md': 'text/plain; charset=utf-8',
 };
 
+// §103: /turn = lo que contesta el Worker de amigos con las credenciales de Cloudflare Realtime, pero de un repetidor TURN
+// de mentira de este PC (herramientas/turn-local.mjs, se prende con el primer pedido); /turn?cuenta=1 = cuánto reenvió
+let turn = null;
+const pideTurn = () => turn || (turn = import('../herramientas/turn-local.mjs').then(m => m.crearTurn()));
+
 http.createServer((pedido, respuesta) => {
   // la ruta pedida, sin "?v=..." y decodificada ("%20" → espacio)
   let ruta = decodeURIComponent(pedido.url.split('?')[0]);
+  if (ruta === '/turn') {
+    pideTurn().then(t => {
+      respuesta.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Cross-Origin-Resource-Policy': 'same-origin' });
+      respuesta.end(JSON.stringify(pedido.url.includes('cuenta=1') ? t.cuenta : { iceServers: t.iceServers() }));
+    }, e => { respuesta.writeHead(500); respuesta.end(String(e?.message || e)); });
+    return;
+  }
   if (ruta.endsWith('/')) ruta += 'index.html';                 // una carpeta → su index.html
   // /web/... = nuestro código de la página del juego (web/: sin nada del juego), para probar sus piezas sueltas
   // §100: /sitio/audio/... = la carpeta de audio y mandos del sitio (terceros/Paginita-Pro/juegos/audio: código del dueño,

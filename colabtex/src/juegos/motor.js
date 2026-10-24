@@ -7779,6 +7779,9 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
    - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece (la CPU de relleno siempre completa los 12).
    - `{t:"ajuste", uid, k:"nivel", v}` (M20): el nivel de la CPU que completa los 12 (MKW_NIVEL), aparte de la
      cilindrada; "maximo" por omisión.
+   - `{t:"ajuste", uid, k:"relevo", v}` (§103): el anfitrión prende (true) o apaga «🛰 Todo por Cloudflare»: cada marco
+     manda todo por el repetidor TURN de Cloudflare que entrega el Worker, aunque la conexión directa funcione. Apagado
+     por omisión y nunca solo, como el relevo de BT3 (el dueño lo pidió así: es excepcional).
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
    - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
@@ -7873,7 +7876,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
   let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
   let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
-  let nivel = mkwNivelDe(p && p.nivel);
+  let nivel = mkwNivelDe(p && p.nivel), relevo = false;
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
   const presentes = () => js.filter(j => !fuera[j.uid]);
   for (const j of jugadasDe(p)) {
@@ -7893,6 +7896,9 @@ export function redMkw(p, js = jugadoresDe(p)) {
     if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
     if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
+    // §103: «🛰 Todo por Cloudflare» (como el relevo de BT3: lo prende el anfitrión, nunca solo; solo en el vestíbulo,
+    // porque cada marco lo lee al abrir la copa)
+    if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") { relevo = j.v === true; continue; }
     if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
     /* §99 (H2): con la copa andando, el anfitrión desapareció del buzón (se le cortó internet o se le cerró Chrome sin
        escribir «abandona»): las páginas de los demás eligen al mismo reemplazo —el primero de la copa que sigue
@@ -7921,7 +7927,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
   const quedan = presentes().length;
   return {
-    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, relevo, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
     sincro: fase === "jugando" ? sincro : null,
     ganador: "", motivo: quedan ? "" : "abandono"
   };

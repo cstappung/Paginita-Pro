@@ -55,6 +55,7 @@ const PRUEBAS = [
   { n: 'doce', cmd: [nav('prueba-doce.mjs')], juego: true, datos: 'build/web/datos/doce' },     // §91: 6 humanos, 2 con mando virtual
   { n: 'fantasma', cmd: [nav('prueba-fantasma.mjs')], juego: true },                          // §92: el fantasma del mejor de la página
   { n: 'sincro-largada', cmd: [nav('prueba-sincro.mjs'), '--directa', '--traba-largada=6000'], juego: true, datos: 'build/web/datos/sincro', propios: true },   // §93
+  { n: 'sincro-cloudflare', cmd: [nav('prueba-sincro.mjs'), '--directa', '--cloudflare'], juego: true, datos: 'build/web/datos/sincro', propios: true },   // §103: todo por el TURN de mentira
 ];
 // las prueba-*.mjs nuevas que no están en la lista: sin argumentos
 const conocidas = new Set(PRUEBAS.flatMap(p => p.cmd.filter(c => /prueba-.*\.mjs$/.test(c)).map(c => path.basename(c))));

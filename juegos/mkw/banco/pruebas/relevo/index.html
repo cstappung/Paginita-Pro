@@ -29,6 +29,8 @@
   <li>§80b: Carla con un tirón de 40 ms cada 1,5 s. Sin la sincronía de tiempo, cada tirón la deja un poco más atrás y
     su retraso se va subiendo; con ella (prendida desde §80b; <code>?sincroTiempo=0</code> la apaga), los demás se frenan un poco y el retraso de
     Carla queda chico.</li>
+  <li>§101-§102: quien va atrás lo dice en sus informes (no hace bajar el retraso de los demás); si se pone al día
+    solo, no se lo espera; si su PC no alcanza (pide la ráfaga y no gana), sí.</li>
 </ul>
 <p>Toda la página también se puede correr sin la sincronía, como en §80: <code>?sincroTiempo=0</code> (y una sola parte
   con <code>?solo=N</code>).</p>
@@ -48,9 +50,10 @@ const CUADRO = 10, INFORME = 250;          // ms por cuadro y entre informes (el
 // se pierde: la conexión se cayó y se rearmó, §80); bloquear(de, a, bytes) = no llega.
 // sincroTiempo: §80b (sin decir = lo que diga la dirección de la página: prendida, salvo ?sincroTiempo=0)
 // saltos = { uid: [[a los ms, salta ms], …] }: el reloj de esa consola salta hacia adelante en ese momento (§101: para
-// su lockstep pasó ese rato sin que él corriera, como una pestaña trabada); trabaPropia: §101 (false = el camino viejo)
+// su lockstep pasó ese rato sin que él corriera, como una pestaña trabada); trabaPropia: §101 (false = el camino viejo);
+// alcanceReal: §102 (false = «sé ponerme al día» aunque no lo logre, como en §101)
 function crearSala(uids, { red = () => ({}), esperaCorte = 1500, esperaInicio = 3000, apagones = {}, bloquear = () => false, relevo = true, sincroTiempo, alDia = false,
-  relevoRapido = false, pausaACorte, saltos = {}, trabaPropia } = {}) {
+  relevoRapido = false, pausaACorte, saltos = {}, trabaPropia, alcanceReal, retraso, adaptar } = {}) {
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now(), consolas = {};
   Object.defineProperty(consolas, 't0', { enumerable: false, value: t0 });
@@ -62,9 +65,10 @@ function crearSala(uids, { red = () => ({}), esperaCorte = 1500, esperaInicio = 
     c.ls = crearLockstep({
       yo: uid, humanos, esperaCorte, esperaInicio, relevo, cuadroMs: CUADRO, informeCada: INFORME, pingCada: 250,
       ...(sincroTiempo !== undefined ? { sincroTiempo } : {}), ...(trabaPropia !== undefined ? { trabaPropia } : {}),
+      ...(alcanceReal !== undefined ? { alcanceReal } : {}),
       ...(misSaltos.length ? { ahora: () => { const t = performance.now(); return t + misSaltos.reduce((s, [a, d]) => s + (t - t0 >= a ? d : 0), 0); } } : {}),
       ...(alDia ? { prisa: ms => { c.prisa = ms; } } : {}),          // (§99 C3: el juego falso corre seguido esos ms)
-      relevoRapido, ...(pausaACorte ? { pausaACorte } : {}),
+      relevoRapido, ...(pausaACorte ? { pausaACorte } : {}), ...(retraso ? { retraso } : {}), ...(adaptar !== undefined ? { adaptar } : {}),
       registro: t => c.registro.push(`${(performance.now() - t0).toFixed(0)} ${t}`),
       local: () => { toque++; return [(toque * 37 + uid.charCodeAt(0)) & 0x0F7F, (toque % 255) - 128, uid.charCodeAt(0) - 100, 0, 0, toque % 7, 0]; },
       huella: () => c.estado,
@@ -485,6 +489,34 @@ try {
        r !== 'tarde' && ea.pausas.length >= 1 && ea.vueltas >= 1 && !Object.keys(ea.cortes).length && !ec.fuera && igualesHasta(s.ana, s.carla, N) < 0,
        `pausas ${JSON.stringify(ea.pausas.map(p => p.desde))}, vueltas ${ea.vueltas}; cortes ${JSON.stringify(ea.cortes)}; Carla se puso al día ${ec.prisas} veces (ganó ${s.carla.ganado.toFixed(0)} ms), fuera ${ec.fuera}`);
     if (solo) registros(s, 'ana', 'carla');
+  }
+  // ---- 19) §102: Carla con una PC justa: una traba de 60 ms en el cuadro 299 la deja 6 cuadros atrás y después va un
+  // 2 % más lenta que el reloj (como A en prueba-sincro --sala, con 15 ms de trabajo por cuadro); su ráfaga gana a lo
+  // más 1 % (0,1 ms por cuadro de 10). Dice «voy atrás» y pide ponerse al día, pero no le sale: a los 3 ratos deja de
+  // decir «sé ponerme al día» y Ana se frena por ella (la sincronía, §80b). Las dos con retraso fijo 10 (sin relevo de
+  // por medio: en el juego, el retraso de A subía hasta 12 y tapaba el atraso). Con alcanceReal: false (§101), Ana no se
+  // frenaba y Carla quedaba cada vez más atrás ----
+  if (toca(19)) {
+    const N = 1200;
+    const carrera = async alcanceReal => {
+      const s = crearSala(['ana', 'carla'], { alDia: true, relevoRapido: true, alcanceReal, retraso: 10, adaptar: false });
+      await espera(1000);
+      let maxAtras = 0;
+      const mide = setInterval(() => {
+        if (s.ana.cuadro > 700) maxAtras = Math.max(maxAtras, s.ana.cuadro - s.carla.cuadro);
+      }, 20);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: N }), correr(s.carla, { hasta: N, ritmo: 1.02, prisaPorCuadro: 0.1, tirones: { cada: 300, dura: 60, desde: 299, hasta: 301 } })]), 90000);
+      clearInterval(mide);
+      const ea = s.ana.ls.estado(), ec = s.carla.ls.estado();
+      if (solo) registros(s, 'ana', 'carla');
+      return { r, s, ea, ec, maxAtras,
+        fila: `Ana se frenó ${ea.frenos} cuadros; Carla fue a lo más ${maxAtras} cuadros atrás (desde el cuadro 700), «no alcanzo» ${ec.sinAlcance || 0} ratos, se puso al día ${ec.prisas} veces` };
+    };
+    const a = await carrera(true), b = await carrera(false);
+    ok('§102: Carla (PC justa) no alcanza a ponerse al día, lo dice, y Ana se frena por ella: Carla va a lo más 6 cuadros atrás (sin desincronizar)',
+       a.r !== 'tarde' && a.ec.sinAlcance > 0 && a.ea.frenos > 0 && a.maxAtras <= 6 && igualesHasta(a.s.ana, a.s.carla, N) < 0 && sinDesinc(Object.values(a.s)), a.fila);
+    ok('…con el camino de §101 (alcanceReal: false), Ana no se frena y Carla se queda más atrás',
+       b.r !== 'tarde' && b.maxAtras > a.maxAtras, b.fila);
   }
   // ---- 12) §99 (D): la sala elige la primera autoridad de la carrera (fijarCarrera(k, fuera, mando)): todas las
   // consolas empiezan con la misma, la carrera sale igual en las tres, y si esa está fuera, la primera que sigue ----
