@@ -9778,7 +9778,11 @@ que solo se vieron 4 valores (0 → 39 → 79 → 100); la prueba ahora los anot
 que recibe el sitio, que ve cada aviso): 37 valores, 8/8. `sala` (4, todos de una misma causa: A no avanzó en la pantalla
 de personajes y la carrera 1 empezó sin su elección) y `relevo` (1): con **eFootball abierto en este PC** (otro juego
 usando la tarjeta de video y el procesador); al repetirlas siguió peor (A a 6,7 cuadros/s, «Tu PC no alcanza 60
-cuadros por segundo»). Esas dos se repiten con el PC libre.
+cuadros por segundo»). Repetidas con el PC libre (19:01): `relevo` 10/10 y `sala` 44/45. La que falta es otra cosa,
+que ya había salido a las 12:10 (antes de §104): en la carrera 2, A se va quedando atrás (de 24 a 54 cuadros, «me pongo
+al día»), B la releva desde el cuadro 282 y en el cuadro 1200 las huellas no coinciden («¡DESINCRONIZADO … carrera!»):
+A se sale de la carrera y pierde el VR como cortada. Es intermitente (2 de las últimas 4 corridas enteras de `sala`) y
+queda para investigar aparte.
 
 **Trampa:** desde el `main` de §102, el sitio abre solo la **Tienda de Halloween** una vez al día a las cuentas que
 entran al salón, y su ventana tapaba los botones de la sala: `prueba-experiencia` se cortaba a los 30 s de esperar un
