@@ -69,7 +69,7 @@ const ATAQUES = {
   'sensor-imu': [['Giroscopio', 20, 'Sabe dónde está el rival aunque gire.'], ['Caída libre', 50]],
 };
 const CARDS = M.CARDS.map(m => {
-  if (m.col === 'futbol') return m;   // los futbolistas no tienen ataques: su carta es la foto
+  if (M.esFutbol(m.col)) return m;   // los futbolistas no tienen ataques: su carta es la foto
   if (m.col === 'comp') {
     const te = TEMA_V[m.vkey] || {}, h = hash(m.person + m.vkey);
     const v = { key: m.vkey, label: m.vlabel, type: te.type, icon: te.icon, weak: te.weak, moves: ATAQUES[m.person] };
@@ -99,10 +99,14 @@ const FUT_PAIS = {
   BE: 'Bélgica', UA: 'Ucrania', ES: 'España', BR: 'Brasil', ENG: 'Inglaterra', FR: 'Francia', DE: 'Alemania', NL: 'Países Bajos',
   UY: 'Uruguay', TR: 'Turquía', PT: 'Portugal', MA: 'Marruecos', CI: 'Costa de Marfil', PL: 'Polonia', HR: 'Croacia',
   DK: 'Dinamarca', SE: 'Suecia', EG: 'Egipto',
+  SCO: 'Escocia', WAL: 'Gales', NIR: 'Irlanda del Norte', IE: 'Irlanda', AR: 'Argentina', IT: 'Italia', CM: 'Camerún', SI: 'Eslovenia',
+  GH: 'Ghana', JP: 'Japón', CZ: 'Chequia', SK: 'Eslovaquia', GR: 'Grecia', NO: 'Noruega', EC: 'Ecuador', HU: 'Hungría', UZ: 'Uzbekistán',
+  SN: 'Senegal', DZ: 'Argelia', US: 'Estados Unidos', GE: 'Georgia',
 };
-// la bandera en emoji: dos letras regionales; Inglaterra es una subdivisión (bandera negra + etiquetas)
-const bandera = cc => cc === 'ENG' ? '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}'
-  : String.fromCodePoint(...[...cc].map(l => 0x1F1E6 + l.charCodeAt(0) - 65));
+// la bandera es una imagen (flags/<país>.png): el emoji no se ve como bandera en Windows, solo las dos letras
+const bandera = cc => `flags/${cc.toLowerCase()}.png`;
+// el escudo del club del jugador (escudos/<club>.png)
+const escudo = club => `escudos/${club}.png`;
 const colVisible = k => COLS.some(co => co.key === k);
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
@@ -254,14 +258,14 @@ function frontHTML(c, lazy) {
   const alt = `${c.name} — ${subtitle(c)}`;
   // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
   // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
-  if (c.col === 'futbol') {
-    return `<div class="face front full futbol ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
+  if (M.esFutbol(c.col)) {
+    return `<div class="face front full futbol ${c.col} ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
       ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
       ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
-      <div class="fu-top"><span class="fu-pos" title="${FUT_POSICION[c.pos]}">${FUT_POSICION[c.pos]}</span><span class="fu-flag" title="${FUT_PAIS[c.pais]}" aria-label="${FUT_PAIS[c.pais]}">${bandera(c.pais)}</span></div>
+      <div class="fu-top"><span class="fu-pos" title="${FUT_POSICION[c.pos]}">${FUT_POSICION[c.pos]}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${wearHTML(c)}
-      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><b class="fu-dorsal">${c.dorsal}</b></div>
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
       <i class="fu-marco"></i>
     </div>`;
   }
@@ -720,8 +724,20 @@ const SKIN = {
   profes: { badge: 'SERIE 01', sub: 'DIE COLLECTION', meta: '5 CARTAS · EDICIÓN HOLO' },
   comp: { badge: 'SERIE 02', sub: 'COMPONENTES', meta: '5 CARTAS · EDICIÓN PCB' },
   futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: '5 CARTAS · ESPECIAL SUPERCLÁSICO' },
+  premier: { badge: 'SERIE 04', sub: 'PREMIER', meta: '5 CARTAS · BIG SIX' },
 };
-const fanDe = (col, tier = 2) => CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
+/* Los sobres de fútbol llevan siempre los mismos tres de portada, los más
+   famosos (quien entra no conoce tanto de fútbol): [izquierda, derecha,
+   centro], como los pinta `skin-fan`. `hub` es el acceso «Sobres de Fútbol».
+   Los demás sobres sacan tres cartas buenas al azar. */
+const PORTADA = {
+  futbol: [['barcelona', 'lamine-yamal'], ['realmadrid', 'bellingham'], ['realmadrid', 'mbappe']],
+  premier: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
+  hub: [['mancity', 'erling-haaland'], ['barcelona', 'lamine-yamal'], ['realmadrid', 'mbappe']],
+};
+const fanDe = (col, tier = 2) => PORTADA[col]
+  ? PORTADA[col].map(([club, id]) => CARDS.find(c => c.person === club + '-' + id))
+  : CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
 function skinHTML(fan, col = coleccion) {
   const k = SKIN[col] || SKIN.profes;
   return `<div class="skin skin-${col}">
@@ -805,47 +821,85 @@ function pintaExtras(n, forzar = true) {
 const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${SKIN[coleccion].sub} · ${n} sobres · ${5 * n} cartas` : `${SKIN[coleccion].sub} · 5 cartas por sobre`; };
 /* ---------------- ELEGIR SOBRE ----------------
    Lo primero al entrar: qué sobre abrir. Cada colección muestra tres de
-   sus mejores cartas, cuántas tienes de ella y qué trae. */
-function eligeSobre() {
-  // con una sola colección no hay nada que elegir
-  if (COLS.length < 2) { coleccion = COLS[0].key; tienda(); return; }
+   sus mejores cartas, cuántas tienes de ella y qué trae. Las colecciones
+   de futbolistas (`grupo: 'futbol'`) no salen sueltas: son un solo acceso,
+   «Sobres de Fútbol», que lleva a un segundo menú con solo cromos de
+   fútbol (el Clásico y la Premier). */
+const hayFutbol = () => COLS.some(co => co.grupo === 'futbol');
+let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
+const TEMAS = {
+  profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
+  comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
+  futbol: 'Especial Superclásico · Real Madrid y Barça, una carta por jugador: su rareza sale de su media',
+  premier: 'Big Six · Man United, Man City, Chelsea, Liverpool, Tottenham y Arsenal, una carta por jugador: su rareza sale de su media',
+};
+function eligeSobre(menu = 'todos') {
+  const futbolistas = COLS.filter(co => co.grupo === 'futbol');
+  const sueltas = COLS.filter(co => co.grupo !== 'futbol');
+  // sin nada que elegir (una sola colección, o un solo sobre de fútbol): directo a la mesa
+  if (menu === 'futbol' && futbolistas.length < 2) menu = 'todos';
+  if (menu === 'todos' && sueltas.length + (futbolistas.length ? 1 : 0) < 2) {
+    if (sueltas.length === 1 || futbolistas.length === 1) { coleccion = (sueltas[0] || futbolistas[0]).key; tienda(); return; }
+    if (futbolistas.length) menu = 'futbol';   // solo hay fútbol: se entra a su menú
+  }
+  menuActual = menu;
   setPhase('elige');
   comprados = []; pull = []; abriendo = new Set();
   rehazColeccion();
   pack.hidden = true; stack.innerHTML = ''; $('#packExtras').innerHTML = '';
   $('#summary').hidden = true; $('#tableView').hidden = true; $('#chooser').hidden = false;
+  document.body.classList.toggle('menu-futbol', menu === 'futbol');
+  $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
+  $('#chSub').textContent = menu === 'futbol'
+    ? 'Solo cromos de fútbol: elige la liga. Mismas rarezas, mismo precio, mismo sobre gratis y la misma plantilla 4-3-3 para las dos.'
+    : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Mismo precio, mismo sobre gratis.';
+  $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
   const box = $('#chooserPacks');
-  box.innerHTML = COLS.map(co => {
+  const ficha = co => {
     const todas = M.POR_COL[co.key], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
-    const temas = co.key === 'comp' ? '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…'
-      : co.key === 'futbol' ? 'Especial Superclásico · Real Madrid y Barça, cada jugador en común, rara y épica'
-      : 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…';
     return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
       <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
-      <b>${co.label}</b><small>${k.badge} · ${todas.length} cartas</small>
-      <small class="ch-temas">${temas}</small>
+      <b>${co.key === 'futbol' ? 'Clásico' : co.key === 'premier' ? 'Premier' : co.label}</b><small>${k.badge} · ${todas.length} cartas</small>
+      <small class="ch-temas">${TEMAS[co.key]}</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
-  }).join('');
+  };
+  // el acceso al menú de fútbol: un sobre con cartas de las dos colecciones
+  const fichaFutbol = () => {
+    const todas = futbolistas.flatMap(co => M.POR_COL[co.key]), tengo = todas.filter(c => col[c.uid]).length;
+    const fan = fanDe('hub');
+    return `<button class="ch-pack hub${futbolistas.some(co => co.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
+      <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">${futbolistas.length} SOBRES</i></span>
+      <b>⚽ Sobres de Fútbol</b><small>Series 03 y 04 · ${todas.length} cartas</small>
+      <small class="ch-temas">Clásico (Real Madrid y Barça) y Premier (el Big Six inglés), en su propio menú</small>
+      <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
+    </button>`;
+  };
+  box.innerHTML = menu === 'futbol' ? futbolistas.map(ficha).join('')
+    : sueltas.map(ficha).join('') + (futbolistas.length ? fichaFutbol() : '');
   box.querySelectorAll('[data-col]').forEach(b => {
     b.onclick = () => {
       coleccion = b.dataset.col; Snd.init(); Snd.flip();
       try { localStorage.setItem('prodrop.coleccion', coleccion); } catch {}
       tienda();
     };
-    b.addEventListener('pointermove', e => {
-      const r = b.getBoundingClientRect();
-      b.style.setProperty('--mx', `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`);
-      b.style.setProperty('--my', `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
-    });
   });
+  box.querySelectorAll('[data-menu]').forEach(b => { b.onclick = () => { Snd.init(); Snd.flip(); eligeSobre(b.dataset.menu); }; });
+  box.querySelectorAll('.ch-pack').forEach(b => b.addEventListener('pointermove', e => {
+    const r = b.getBoundingClientRect();
+    b.style.setProperty('--mx', `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`);
+    b.style.setProperty('--my', `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
+  }));
   pintaCompra();
   if (!REDUCED) [...box.children].forEach((b, i) => b.animate([{ transform: 'translateY(60px) rotate(-3deg)', opacity: 0 }, { transform: 'none', opacity: 1 }],
     { duration: 700, delay: i * 110, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' }));
 }
-$('#cambiaBtn').onclick = () => { if (phase === 'tienda' && !comprando) eligeSobre(); };
-$('#cambiaBtn2').onclick = () => { if (phase === 'summary' && !comprando) eligeSobre(); };
+$('#chBack').onclick = () => eligeSobre('todos');
+// «Cambiar sobre» vuelve al menú de donde vino: los de fútbol, al de fútbol
+const menuDe = () => (M.esFutbol(coleccion) && hayFutbol() ? 'futbol' : 'todos');
+$('#cambiaBtn').onclick = () => { if (phase === 'tienda' && !comprando) eligeSobre(menuDe()); };
+$('#cambiaBtn2').onclick = () => { if (phase === 'summary' && !comprando) eligeSobre(menuDe()); };
 function tienda(drop = true) {
   setPhase('tienda');
   $('#chooser').hidden = true; $('#tableView').hidden = false;
@@ -1549,12 +1603,14 @@ function renderCollection() {
   const grid = $('#colGrid'); grid.innerHTML = '';
   // de la peor rareza a la mejor; dentro, en el orden del catálogo (por variante o temática)
   const lista = todas.filter(c => colFilter < 0 || c.tier === colFilter).sort((a, b) => a.tier - b.tier || a.n - b.n);
+  // las de fútbol van en secciones por rareza y, dentro, por club
+  const claveSec = c => (M.esFutbol(c.col) ? c.vkey + '/' + c.club : c.vkey);
   let seccion = '';
   lista.forEach(c => {
-    if (c.vkey !== seccion) {
-      seccion = c.vkey;
-      const de = lista.filter(x => x.vkey === seccion), n = de.filter(x => col[x.uid]).length;
-      grid.insertAdjacentHTML('beforeend', `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
+    if (claveSec(c) !== seccion) {
+      seccion = claveSec(c);
+      const de = lista.filter(x => claveSec(x) === seccion), n = de.filter(x => col[x.uid]).length;
+      grid.insertAdjacentHTML('beforeend', `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(M.esFutbol(c.col) ? c.sub : c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
     }
     if (col[c.uid]) {
       const cp = bestCopy(c.uid), inst = cp ? fromCopy(c, cp) : c;
@@ -1891,7 +1947,7 @@ function alDatos(d) {
     return;
   }
   // cambió qué colecciones ve: se vuelve a elegir sobre si estaba eligiendo
-  if (COLS.length !== antes && (phase === 'elige' || phase === 'tienda')) { eligeSobre(); return; }
+  if (COLS.length !== antes && (phase === 'elige' || phase === 'tienda')) { eligeSobre(phase === 'elige' ? menuActual : 'todos'); return; }
   pintaCompra();
   pintaAvisos();
   if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
@@ -1928,7 +1984,7 @@ const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
   const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, promo = p1 < M.PRECIO.normal, gl = gratisListo();
   pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
-  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = coleccion !== 'futbol';
+  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = !M.esFutbol(coleccion);
   if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
@@ -1952,39 +2008,49 @@ function pintaCompra() {
   const ag = $('#againFreeBtn');
   ag.hidden = !gl; ag.disabled = comprando;
 }
-/* El tip del sobre de fútbol: qué tan seguido sale cada rareza. Sale de
-   los mismos pesos que el motor; como fútbol no tiene legendarias, lo que
-   sería legendaria cuenta como épica. */
+/* El tip del sobre de fútbol: qué tan seguido sale cada rareza y qué media
+   es cada una. Sale de los mismos pesos que el motor (los de su colección). */
 function tipFutbol() {
-  const w = TIERS.map(t => t.w), pct = x => `${(x * 100).toFixed(1).replace('.', ',').replace(',0', '')} %`;
-  const porCarta = [w[0], w[1], w[2] + w[3]].map(x => x / 10000);
-  const quinta = [w[1], w[2] + w[3]].map(x => x / (w[1] + w[2] + w[3]));
-  // una épica en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
-  const pD = M.DIOS / 10000, epica = pD + (1 - pD) * (1 - (1 - porCarta[2]) ** 4 * (1 - quinta[1]));
-  const E = M.ESPERADO, n = M.POR_COL.futbol.length / 3, cada = x => Math.round(n / x);
-  return `<p><b>Cada sobre trae 5 cartas.</b></p>
-    <p>Por carta: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b>.
-      La quinta siempre es Rara o mejor (Rara ${pct(quinta[0])} · Épica ${pct(quinta[1])}).</p>
-    <p>Una Épica sale en <b>1 de cada ${Math.round(1 / epica)} sobres</b> (${pct(epica)}). El ${pct(pD)} son god packs: cinco Épicas.</p>
-    <p>Un jugador en concreto (hay ${n}): en Común, 1 de cada ${cada(E[0])} sobres; en Rara, 1 de cada ${cada(E[1])}; en Épica, 1 de cada ${cada(E[2] + E[3])}.</p>
-    <p class="fu-pronto">⚽ Próximamente, más equipos.</p>`;
+  const P = M.POOL[coleccion], w = P.w, n = P.map(l => l.length), tot = n.reduce((a, b) => a + b, 0), E = P.esperado;
+  const pct = x => `${(x * 100).toFixed(1).replace('.', ',').replace(',0', '')} %`;
+  const porCarta = w.map(x => x / 10000), alta = w[1] + w[2] + w[3], quinta = [w[1], w[2], w[3]].map(x => x / alta);
+  const [b0, b1, b2] = M.BANDAS, cada = t => { const k = Math.round(n[t] / E[t]); return k <= 1 ? 'casi todos los sobres' : `1 de cada ${k} sobres`; };
+  // una Épica o mejor en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
+  const pD = M.DIOS / 10000, aOMas = porCarta[2] + porCarta[3], qOMas = quinta[1] + quinta[2];
+  const epica = pD + (1 - pD) * (1 - (1 - aOMas) ** 4 * (1 - qOMas));
+  return `<p><b>Cada sobre trae 5 cartas</b> y cada jugador tiene una sola carta.</p>
+    <p>Su rareza sale de su <b>media</b> (la de EA SPORTS FC, arriba a la derecha de la carta):
+      <b>Común</b> hasta ${b0} · <b>Rara</b> ${b0 + 1} a ${b1} · <b>Épica</b> ${b1 + 1} a ${b2} · <b>Legendaria</b> ${b2 + 1} o más.</p>
+    <p>Por carta: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
+      La quinta siempre es Rara o mejor (Rara ${pct(quinta[0])} · Épica ${pct(quinta[1])} · Legendaria ${pct(quinta[2])}).</p>
+    <p>Una Épica o mejor sale en <b>1 de cada ${Math.round(1 / epica)} sobres</b> (${pct(epica)}). El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
+    <p>Hay ${tot} jugadores: ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario: a más media, más difícil.</p>
+    <p class="fu-pronto">⚽ Próximamente, más ligas.</p>`;
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Premier y medias', [
+    '<b>Nuevo sobre: Premier · Big Six</b> (Serie 04). Los jugadores del Manchester United, Manchester City, Chelsea, Liverpool, Tottenham y Arsenal, una carta cada uno. Mismo precio y mismo sobre gratis que los otros sobres.',
+    '<b>La rareza sale de la media</b> del jugador (la de EA SPORTS FC, ahora visible en la carta con la etiqueta MEDIA): Común hasta 80, Rara 81 a 84, Épica 85 a 87 y Legendaria 88 o más. Por carta: Común 55 %, Rara 33 %, Épica 10 % y Legendaria 2 % en el Clásico; Común 55 %, Rara 35 %, Épica 9 % y Legendaria 1 % en la Premier (que tiene menos legendarias). Cada jugador tiene una sola carta; la media no cambia.',
+    '<b>Sobres de Fútbol</b>: ahora los sobres de fútbol viven en su propio menú, con el Clásico (Real Madrid y Barça) y la Premier.',
+    '<b>Media, bandera y escudo</b>: la <b>media</b> va arriba a la derecha, y abajo, juntos, la bandera de la selección (ahora una imagen, que se ve igual en cualquier computador) y el escudo del club. El dorsal ya no sale en la carta.',
+    'Los jugadores de la Premier también van en <b>⚽ Mi plantilla</b>: mezcla Madrid, Barça y el Big Six en tu 4-3-3.',
+  ]],
   ['Octubre 2026', [
-    '<b>Nuevo sobre: Fútbol · Especial Superclásico</b> (Serie 03). Los 53 jugadores del primer equipo del Real Madrid y del Barça, cada uno en Común, Rara y Épica: 159 cartas. Mismo precio, mismo sobre gratis y las mismas probabilidades que los otros sobres; no hay legendarias.',
-    '<b>Cartas de futbolista</b> con su posición, la bandera de su selección, el dorsal y un marco del color de su rareza. Se gastan y se gradúan como las demás.',
-    '<b>Re-roll de fútbol</b>: 10 comunes por una rara (a veces épica) y 10 raras por una épica.',
+    '<b>Nuevo sobre: Fútbol · Especial Superclásico</b> (Serie 03). Los jugadores del primer equipo del Real Madrid y del Barça. Mismo precio y mismo sobre gratis que los otros sobres.',
+    '<b>Cartas de futbolista</b> con su posición, la media del jugador, la bandera de su selección, el escudo de su club y un marco del color de su rareza. Se gastan y se gradúan como las demás.',
+    '<b>Re-roll de fútbol</b>: 10 comunes por una rara (a veces épica), 10 raras por una épica y 10 épicas por una legendaria.',
     '<b>⚽ Mi plantilla</b>: arma tu once ideal en 4-3-3 con los jugadores que te van saliendo. Cualquier jugador va en cualquier casilla; el selector los ordena por posición y se filtra por DEL, MED, DEF y POR.',
     '<b>Puntuación de la plantilla</b>, de 0 a 100: la rareza pone el techo (común 60, rara 80, épica 100) y el estado de la carta lo escala. Tu plantilla se ve en tu perfil.',
   ]],
 ];
 const novedadesHTML = () => NOVEDADES_FUTBOL.map(([fecha, items]) => `<h3>${fecha}</h3><ul>${items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('')
-  + '<p class="fu-pronto">⚽ Próximamente, más equipos.</p>';
+  + '<p class="fu-pronto">⚽ Próximamente, más ligas.</p>';
 function abreFuModal(titulo, html) {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
   $('#fuModalTit').textContent = titulo;
+  $('#fuModalSub').textContent = coleccion === 'premier' ? 'Sobre de Fútbol · Premier · Big Six' : 'Sobre de Fútbol · Especial Superclásico';
   $('#fuModalTxt').innerHTML = html;
   $('#fuModal').hidden = false;
   $('#fuModal .fu-modal').scrollTop = 0;
@@ -2143,7 +2209,7 @@ function renderPlantilla() {
      la peor. El filtro solo ayuda a buscar: cualquiera va en cualquier casilla. */
   const usadas = new Set(pl.lista.filter(Boolean));
   const libres = Object.values(copies).flat()
-    .filter(cp => CARDS[cp.id].col === 'futbol' && !usadas.has(cp.key) && (!pl.filtro || CARDS[cp.id].pos === pl.filtro))
+    .filter(cp => M.esFutbol(CARDS[cp.id].col) && !usadas.has(cp.key) && (!pl.filtro || CARDS[cp.id].pos === pl.filtro))
     .sort((a, b) => POS_ORDEN.indexOf(CARDS[a.id].pos) - POS_ORDEN.indexOf(CARDS[b.id].pos)
       || pl.recien.has(b.key) - pl.recien.has(a.key) || CARDS[b.id].tier - CARDS[a.id].tier);
   const chips = POS_ORDEN.map(p => `<button class="pl-filtro" data-filtro="${p}" aria-pressed="${pl.filtro === p}" title="${FUT_POSICION[p]}">${p}</button>`).join('');
@@ -2209,7 +2275,7 @@ function montaVisorPlantilla() {
     const r = (rr || '').split('.').map(Number);
     try {
       const cp = copiaDe({ o: m[1], k: m[2], i: +m[3], at: +at, gr: gr === '1', rr: r.length === 3 && r.every(Number.isFinite) ? { id: r[0], g: r[1], w: r[2] } : null });
-      return CARDS[cp.id] && CARDS[cp.id].col === 'futbol' ? cp : null;
+      return CARDS[cp.id] && M.esFutbol(CARDS[cp.id].col) ? cp : null;
     } catch { return null; }
   });
   const box = document.createElement('div');

@@ -2759,9 +2759,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
   { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
-    gancho: "Especial Superclásico",
-    lema: "Llegó el sobre de Fútbol: los jugadores del primer equipo del Real Madrid y del Barça, en común, rara y épica. Ábrelos, júntalos y arma tu once ideal en 4-3-3 para mostrarlo en tu perfil.",
-    datos: () => [[String(MOTOR.FUTBOLISTAS.length), "jugadores"], [String(MOTOR.POR_COL.futbol.length), "cartas"], ["4-3-3", "tu plantilla"]],
+    gancho: "Superclásico y Premier",
+    lema: "Llegaron los sobres de Fútbol: el Clásico (Real Madrid y Barça) y la Premier (el Big Six inglés). Cada jugador trae su media de EA SPORTS FC, y esa media fija su rareza. Ábrelos, júntalos y arma tu once ideal en 4-3-3 para mostrarlo en tu perfil.",
+    datos: () => [[String(MOTOR.FUTBOLISTAS.length + MOTOR.PREMIER.length), "jugadores"], ["2", "ligas"], ["4-3-3", "tu plantilla"]],
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
   { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
     gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],

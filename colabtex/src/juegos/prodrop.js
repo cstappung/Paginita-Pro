@@ -166,7 +166,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             if (!c || vistas.has(c) || !mia(c)) return;
             const q = leeCopia(c), so = q && q.tipo === "carta" && eco().sobres[q.o + "~" + q.k];
             const id = so && (so.r ? so.r.id : MOTOR.sobre(q.o, q.k, so.at).cartas[q.i].id);
-            if (id == null || MOTOR.CARDS[id].col !== "futbol") return;
+            if (id == null || !MOTOR.esFutbol(MOTOR.CARDS[id].col)) return;
             vistas.add(c); porCasilla[i] = c;
           });
           await fb.ponerPlantilla(uid, porCasilla);
@@ -221,7 +221,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/plantilla` → la plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-30" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-40" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

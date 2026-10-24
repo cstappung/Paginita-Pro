@@ -141,37 +141,215 @@
     ["realmadrid", "mendy", "F. Mendy", "DEF", 23, "FR"], ["realmadrid", "dumfries", "Dumfries", "DEF", 24, "NL"],
     ["realmadrid", "bellingham", "Bellingham", "MED", 5, "ENG"], ["realmadrid", "camavinga", "Camavinga", "MED", 6, "FR"],
     ["realmadrid", "valverde", "Fede Valverde", "MED", 8, "UY"], ["realmadrid", "tchouameni", "Tchouameni", "MED", 14, "FR"],
-    ["realmadrid", "arda-guler", "Arda Güler", "MED", 15, "TR"], ["realmadrid", "bernardo", "Bernardo", "MED", 20, "PT"],
-    ["realmadrid", "thiago", "Thiago", "MED", 27, "ES"], ["realmadrid", "vini-jr", "Vini Jr.", "DEL", 7, "BR"],
+    ["realmadrid", "arda-guler", "Arda Güler", "MED", 15, "TR"], ["realmadrid", "bernardo", "Bernardo", "MED", 20, "PT"], ["realmadrid", "vini-jr", "Vini Jr.", "DEL", 7, "BR"],
     ["realmadrid", "endrick", "Endrick", "DEL", 9, "BR"], ["realmadrid", "mbappe", "Mbappé", "DEL", 10, "FR"],
     ["realmadrid", "rodrygo", "Rodrygo", "DEL", 11, "BR"], ["realmadrid", "espi", "C. Espí", "DEL", 19, "ES"],
     ["realmadrid", "brahim", "Brahim", "DEL", 21, "MA"], ["realmadrid", "yan-diomande", "Yan Diomande", "DEL", 25, "CI"],
     ["barcelona", "joan-garcia", "Joan García", "POR", 1, "ES"], ["barcelona", "szczesny", "Szczęsny", "POR", 13, "PL"],
     ["barcelona", "livakovic", "Livaković", "POR", 25, "HR"], ["barcelona", "cancelo", "João Cancelo", "DEF", 2, "PT"],
-    ["barcelona", "balde", "Balde", "DEF", 3, "ES"], ["barcelona", "cubarsi", "Cubarsí", "DEF", 5, "ES"],
-    ["barcelona", "xavi-espart", "Xavi Espart", "DEF", 12, "ES"], ["barcelona", "christensen", "Christensen", "DEF", 15, "DK"],
+    ["barcelona", "balde", "Balde", "DEF", 3, "ES"], ["barcelona", "cubarsi", "Cubarsí", "DEF", 5, "ES"], ["barcelona", "christensen", "Christensen", "DEF", 15, "DK"],
     ["barcelona", "gerard-martin", "Gerard Martín", "DEF", 18, "ES"], ["barcelona", "kounde", "Koundé", "DEF", 23, "FR"],
-    ["barcelona", "eric-garcia", "Eric García", "DEF", 24, "ES"], ["barcelona", "brian-farinas", "Brian Fariñas", "MED", 4, "ES"],
+    ["barcelona", "eric-garcia", "Eric García", "DEF", 24, "ES"],
     ["barcelona", "gavi", "Gavi", "MED", 6, "ES"], ["barcelona", "fermin", "Fermín", "MED", 7, "ES"],
     ["barcelona", "pedri", "Pedri", "MED", 8, "ES"], ["barcelona", "rodri", "Rodri", "MED", 16, "ES"],
     ["barcelona", "dani-olmo", "Dani Olmo", "MED", 20, "ES"], ["barcelona", "de-jong", "De Jong", "MED", 21, "NL"],
     ["barcelona", "marc-bernal", "Marc Bernal", "MED", 22, "ES"], ["barcelona", "gabriel-jesus", "Gabriel Jesus", "DEL", 9, "BR"],
     ["barcelona", "lamine-yamal", "Lamine Yamal", "DEL", 10, "ES"], ["barcelona", "raphinha", "Raphinha", "DEL", 11, "BR"],
     ["barcelona", "adeyemi", "Adeyemi", "DEL", 14, "DE"], ["barcelona", "gordon", "Gordon", "DEL", 17, "ENG"],
-    ["barcelona", "bardghji", "Bardghji", "DEL", 19, "SE"], ["barcelona", "bisiwu", "Bisiwu", "DEL", 27, "BE"],
-    ["barcelona", "hamza", "Hamza", "DEL", 29, "EG"]
+    ["barcelona", "bardghji", "Bardghji", "DEL", 19, "SE"]
   ];
-  const CLUBES = { realmadrid: "Real Madrid", barcelona: "FC Barcelona" };
+  /* ---------- la colección de la Premier (Serie 04) ----------
+     Los seis grandes de Inglaterra (Man United, Man City, Chelsea,
+     Liverpool, Tottenham, Arsenal), con el mismo formato que `FUTBOLISTAS`
+     y la foto en cards/premier/<club>/<archivo>.webp. Es una colección
+     **aparte** y no más jugadores en la de arriba: el contenido de un sobre
+     sale de la lista de su colección, así que agrandar `FUTBOLISTAS`
+     habría cambiado lo que trae cada sobre de fútbol ya abierto. Mismas
+     reglas (común, rara y épica, sin legendarias) y, como allá, solo se
+     agrega al final. */
+  const PREMIER = [
+    ["manutd", "senne-lammens", "Senne Lammens", "POR", 1, "BE"], ["manutd", "karl-darlow", "Karl Darlow", "POR", 12, "WAL"],
+    ["manutd", "tom-heaton", "Tom Heaton", "POR", 22, "ENG"], ["manutd", "andre-onana", "Andre Onana", "POR", 24, "CM"], ["manutd", "diogo-dalot", "Diogo Dalot", "DEF", 2, "PT"],
+    ["manutd", "noussair-mazraoui", "Mazraoui", "DEF", 3, "MA"], ["manutd", "matthijs-de-ligt", "De Ligt", "DEF", 4, "NL"],
+    ["manutd", "harry-maguire", "Harry Maguire", "DEF", 5, "ENG"], ["manutd", "lisandro-martinez", "L. Martínez", "DEF", 6, "AR"],
+    ["manutd", "patrick-chinazaekpere-dorgu", "Dorgu", "DEF", 13, "DK"], ["manutd", "leny-yoro", "Leny Yoro", "DEF", 15, "FR"],
+    ["manutd", "luke-shaw", "Luke Shaw", "DEF", 23, "ENG"], ["manutd", "ayden-heaven", "Ayden Heaven", "DEF", 26, "ENG"],
+    ["manutd", "harry-amass", "Harry Amass", "DEF", 41, "ENG"], ["manutd", "mason-mount", "Mason Mount", "MED", 7, "ENG"],
+    ["manutd", "bruno-fernandes", "B. Fernandes", "MED", 8, "PT"], ["manutd", "andrey-santos", "Andrey Santos", "MED", 17, "BR"],
+    ["manutd", "youri-tielemans", "Tielemans", "MED", 18, "BE"], ["manutd", "carlos-baleba", "Carlos Baleba", "MED", 20, "CM"],
+    ["manutd", "manuel-ugarte", "Manuel Ugarte", "MED", 25, "UY"], ["manutd", "kobbie-mainoo", "Kobbie Mainoo", "MED", 37, "ENG"],
+    ["manutd", "marcus-rashford", "Rashford", "DEL", 9, "ENG"], ["manutd", "matheus-cunha", "Matheus Cunha", "DEL", 10, "BR"],
+    ["manutd", "joshua-zirkzee", "Joshua Zirkzee", "DEL", 11, "NL"], ["manutd", "amad", "Amad", "DEL", 16, "CI"],
+    ["manutd", "bryan-mbeumo", "Bryan Mbeumo", "DEL", 19, "CM"], ["manutd", "benjamin-sesko", "Šeško", "DEL", 30, "SI"],
+    ["mancity", "gianluigi-donnarumma", "Donnarumma", "POR", 1, "IT"], ["mancity", "marcus-bettinelli", "Bettinelli", "POR", 13, "ENG"],
+    ["mancity", "geronimo-rulli", "Gerónimo Rulli", "POR", 28, "AR"], ["mancity", "ruben-dias", "Rúben Dias", "DEF", 3, "PT"],
+    ["mancity", "marc-guehi", "Guéhi", "DEF", 6, "ENG"], ["mancity", "rayan-ait-nouri", "Aït-Nouri", "DEF", 21, "DZ"],
+    ["mancity", "vitor-reis", "Vitor Reis", "DEF", 22, "BR"], ["mancity", "josko-gvardiol", "Gvardiol", "DEF", 24, "HR"],
+    ["mancity", "matheus-nunes", "Matheus Nunes", "DEF", 27, "PT"], ["mancity", "abdukodir-khusanov", "Khusanov", "DEF", 45, "UZ"], ["mancity", "rico-lewis", "Rico Lewis", "DEF", 82, "ENG"],
+    ["mancity", "elliot-anderson", "E. Anderson", "MED", 5, "ENG"], ["mancity", "mateo-kovacic", "Kovačić", "MED", 8, "HR"],
+    ["mancity", "rayan-cherki", "Rayan Cherki", "MED", 10, "FR"], ["mancity", "enzo-fernandez", "Enzo Fernández", "MED", 17, "AR"],
+    ["mancity", "ayyoub-bouaddi", "Ayyoub Bouaddi", "MED", 32, "MA"], ["mancity", "nico-o-reilly", "Nico O'Reilly", "MED", 33, "ENG"],
+    ["mancity", "phil-foden", "Phil Foden", "MED", 47, "ENG"],
+    ["mancity", "iliman-ndiaye", "Iliman Ndiaye", "DEL", 7, "SN"], ["mancity", "erling-haaland", "Erling Haaland", "DEL", 9, "NO"],
+    ["mancity", "jeremy-doku", "Doku", "DEL", 11, "BE"], ["mancity", "allan", "Allan", "DEL", 37, "BR"],
+    ["mancity", "antoine-semenyo", "Semenyo", "DEL", 42, "GH"],
+    ["chelsea", "emiliano-martinez", "Dibu Martínez", "POR", 1, "AR"], ["chelsea", "teddy-sharman-lowe", "Sharman-Lowe", "POR", 28, "ENG"],
+    ["chelsea", "mike-penders", "Mike Penders", "POR", 39, "BE"], ["chelsea", "gaga-slonina", "Gaga Slonina", "POR", 44, "US"],
+    ["chelsea", "marco-palestra", "Marco Palestra", "DEF", 2, "IT"], ["chelsea", "wesley-fofana", "Wesley Fofana", "DEF", 3, "FR"],
+    ["chelsea", "maxence-lacroix", "Lacroix", "DEF", 5, "FR"], ["chelsea", "levi-colwill", "Levi Colwill", "DEF", 6, "ENG"],
+    ["chelsea", "jorrel-hato", "Jorrel Hato", "DEF", 21, "NL"], ["chelsea", "reece-james", "Reece James", "DEF", 24, "ENG"],
+    ["chelsea", "malo-gusto", "Malo Gusto", "DEF", 27, "FR"], ["chelsea", "pep-chavarria", "Pep Chavarría", "DEF", 29, "ES"],
+    ["chelsea", "aaron-anselmino", "Anselmino", "DEF", 30, "AR"], ["chelsea", "josh-acheampong", "Acheampong", "DEF", 34, "ENG"], ["chelsea", "valentin-barco", "Valentin Barco", "MED", 4, "AR"],
+    ["chelsea", "jordan-henderson", "Henderson", "MED", 14, "ENG"], ["chelsea", "moises-caicedo", "Moisés Caicedo", "MED", 25, "EC"],
+    ["chelsea", "romeo-lavia", "Romeo Lavia", "MED", 45, "BE"], ["chelsea", "pedro-neto", "Pedro Neto", "DEL", 7, "PT"],
+    ["chelsea", "joao-pedro", "João Pedro", "DEL", 9, "BR"], ["chelsea", "jamie-gittens", "Jamie Gittens", "DEL", 11, "ENG"],
+    ["chelsea", "morgan-rogers", "Morgan Rogers", "DEL", 17, "ENG"], ["chelsea", "danny-welbeck", "Danny Welbeck", "DEL", 18, "ENG"],
+    ["chelsea", "emmanuel-emegha", "Emegha", "DEL", 22, "NL"], ["chelsea", "geovany-quenda", "Geovany Quenda", "DEL", 23, "PT"],
+    ["chelsea", "estevao-willian", "Estêvão", "DEL", 41, "BR"],
+    ["liverpool", "alisson-becker", "Alisson", "POR", 1, "BR"], ["liverpool", "giorgi-mamardashvili", "Mamardashvili", "POR", 25, "GE"],
+    ["liverpool", "freddie-woodman", "Woodman", "POR", 28, "ENG"], ["liverpool", "vitezslav-jaros", "Jaroš", "POR", 56, "CZ"],
+    ["liverpool", "harvey-davies", "Harvey Davies", "POR", 95, "ENG"], ["liverpool", "joe-gomez", "Joe Gomez", "DEF", 2, "ENG"],
+    ["liverpool", "virgil-van-dijk", "Van Dijk", "DEF", 4, "NL"], ["liverpool", "jeremy-jacquet", "Jeremy Jacquet", "DEF", 5, "FR"],
+    ["liverpool", "milos-kerkez", "Kerkez", "DEF", 6, "HU"], ["liverpool", "conor-bradley", "Conor Bradley", "DEF", 12, "NIR"],
+    ["liverpool", "giovanni-leoni", "Giovanni Leoni", "DEF", 15, "IT"], ["liverpool", "kostas-tsimikas", "Tsimikas", "DEF", 21, "GR"],
+    ["liverpool", "jeremie-frimpong", "Frimpong", "DEF", 30, "NL"], ["liverpool", "ronald-araujo", "Ronald Araujo", "DEF", 33, "UY"], ["liverpool", "wataru-endo", "Wataru Endo", "MED", 3, "JP"],
+    ["liverpool", "florian-wirtz", "Florian Wirtz", "MED", 7, "DE"], ["liverpool", "dominik-szoboszlai", "Szoboszlai", "MED", 8, "HU"],
+    ["liverpool", "alexis-mac-allister", "Mac Allister", "MED", 10, "AR"], ["liverpool", "ryan-gravenberch", "Gravenberch", "MED", 38, "NL"],
+    ["liverpool", "trey-nyoni", "Trey Nyoni", "MED", 42, "ENG"],
+    ["liverpool", "alexander-isak", "Alexander Isak", "DEL", 9, "SE"], ["liverpool", "federico-chiesa", "Chiesa", "DEL", 14, "IT"],
+    ["liverpool", "cody-gakpo", "Cody Gakpo", "DEL", 18, "NL"], ["liverpool", "hugo-ekitike", "Hugo Ekitike", "DEL", 22, "FR"],
+    ["liverpool", "victor-munoz", "Victor Munoz", "DEL", 23, "ES"], ["liverpool", "bradley-barcola", "Barcola", "DEL", 29, "FR"],
+    ["liverpool", "lewis-koumas", "Lewis Koumas", "DEL", 67, "WAL"], ["liverpool", "rio-ngumoha", "Rio Ngumoha", "DEL", 73, "ENG"],
+    ["tottenham", "antonin-kinsky", "Antonin Kinsky", "POR", 31, "CZ"], ["tottenham", "martin-dubravka", "Dúbravka", "POR", 39, "SK"],
+    ["tottenham", "brandon-austin", "Brandon Austin", "POR", 40, "ENG"], ["tottenham", "andy-robertson", "Robertson", "DEF", 3, "SCO"],
+    ["tottenham", "tosin-adarabioyo", "Adarabioyo", "DEF", 4, "ENG"], ["tottenham", "marcos-senesi", "Marcos Senesi", "DEF", 5, "AR"],
+    ["tottenham", "jan-paul-van-hecke", "Van Hecke", "DEF", 6, "NL"], ["tottenham", "destiny-udogie", "Destiny Udogie", "DEF", 13, "IT"],
+    ["tottenham", "pedro-porro", "Pedro Porro", "DEF", 23, "ES"], ["tottenham", "ben-davies", "Ben Davies", "DEF", 33, "WAL"],
+    ["tottenham", "micky-van-de-ven", "Van de Ven", "DEF", 37, "NL"], ["tottenham", "xavi-simons", "Xavi Simons", "MED", 7, "NL"],
+    ["tottenham", "conor-gallagher", "Gallagher", "MED", 8, "ENG"], ["tottenham", "james-maddison", "James Maddison", "MED", 10, "ENG"],
+    ["tottenham", "archie-gray", "Archie Gray", "MED", 14, "ENG"], ["tottenham", "lucas-bergvall", "Lucas Bergvall", "MED", 15, "SE"],
+    ["tottenham", "sandro-tonali", "Sandro Tonali", "MED", 16, "IT"], ["tottenham", "mateus-fernandes", "M. Fernandes", "MED", 18, "PT"],
+    ["tottenham", "wilson-odobert", "Wilson Odobert", "MED", 28, "FR"], ["tottenham", "rodrigo-bentancur", "Bentancur", "MED", 30, "UY"],
+    ["tottenham", "richarlison", "Richarlison", "DEL", 9, "BR"], ["tottenham", "mathys-tel", "Mathys Tel", "DEL", 11, "FR"],
+    ["tottenham", "savio", "Sávio", "DEL", 17, "BR"], ["tottenham", "dominic-solanke", "Solanke", "DEL", 19, "ENG"],
+    ["tottenham", "mohammed-kudus", "Mohammed Kudus", "DEL", 20, "GH"], ["tottenham", "dejan-kulusevski", "Kulusevski", "DEL", 21, "SE"],
+    ["tottenham", "omar-marmoush", "Omar Marmoush", "DEL", 22, "EG"], ["tottenham", "mykhailo-mudryk", "Mudryk", "DEL", 27, "UA"],
+    ["arsenal", "david-raya", "David Raya", "POR", 1, "ES"], ["arsenal", "kepa-arrizabalaga", "Kepa", "POR", 13, "ES"],
+    ["arsenal", "illan-meslier", "Illan Meslier", "POR", 30, "FR"], ["arsenal", "william-saliba", "William Saliba", "DEF", 2, "FR"],
+    ["arsenal", "cristhian-mosquera", "Mosquera", "DEF", 3, "ES"], ["arsenal", "ben-white", "Ben White", "DEF", 4, "ENG"],
+    ["arsenal", "piero-hincapie", "Hincapié", "DEF", 5, "EC"], ["arsenal", "gabriel-magalhaes", "Gabriel", "DEF", 6, "BR"],
+    ["arsenal", "jurrien-timber", "Jurrien Timber", "DEF", 12, "NL"], ["arsenal", "ezri-konsa", "Ezri Konsa", "DEF", 15, "ENG"],
+    ["arsenal", "riccardo-calafiori", "Calafiori", "DEF", 33, "IT"], ["arsenal", "myles-lewis-skelly", "Lewis-Skelly", "DEF", 49, "ENG"],
+    ["arsenal", "martin-odegaard", "Ødegaard", "MED", 8, "NO"], ["arsenal", "eberechi-eze", "Eberechi Eze", "MED", 10, "ENG"],
+    ["arsenal", "mikel-merino", "Mikel Merino", "MED", 23, "ES"], ["arsenal", "martin-zubimendi", "Zubimendi", "MED", 36, "ES"],
+    ["arsenal", "bruno-guimaraes", "B. Guimarães", "MED", 39, "BR"], ["arsenal", "declan-rice", "Declan Rice", "MED", 41, "ENG"],
+    ["arsenal", "bukayo-saka", "Bukayo Saka", "DEL", 7, "ENG"], ["arsenal", "viktor-gyokeres", "Gyökeres", "DEL", 14, "SE"],
+    ["arsenal", "christos-tzolis", "Tzolis", "DEL", 17, "GR"], ["arsenal", "noni-madueke", "Noni Madueke", "DEL", 20, "ENG"],
+    ["arsenal", "kai-havertz", "Kai Havertz", "DEL", 29, "DE"]
+  ];
+  const CLUBES = {
+    realmadrid: "Real Madrid", barcelona: "FC Barcelona",
+    manutd: "Manchester United", mancity: "Manchester City", chelsea: "Chelsea", liverpool: "Liverpool", tottenham: "Tottenham", arsenal: "Arsenal"
+  };
+
+  /* ---------- la media de cada futbolista ----------
+     La media (como la de EA SPORTS FC: 60 a 99) es del jugador y no cambia
+     con la rareza de su carta. Salen de la API pública de ratings de EA FC
+     (octubre 2026), por club y jugador (`<club>/<archivo de la foto>`), y
+     se ajustan a mano aquí. Los jugadores que EA FC no tiene (canteranos) no
+     están en la colección; la única media estimada es la de Mudryk (76), que
+     EA no lista.
+     **La media fija la rareza de la carta** (`BANDAS`): cada futbolista tiene
+     una sola carta, y su rareza sale de su media. */
+  const MEDIAS = {
+    realmadrid: {
+      "courtois": 89, "lunin": 81, "asencio": 77, "militao": 84, "huijsen": 82,
+      "trent": 86, "konate": 86, "cucurella": 84, "carreras": 80, "rudiger": 86,
+      "mendy": 81, "dumfries": 84, "bellingham": 90, "camavinga": 83, "valverde": 89,
+      "tchouameni": 84, "arda-guler": 81, "bernardo": 84, "vini-jr": 89,
+      "endrick": 77, "mbappe": 91, "rodrygo": 85, "espi": 68, "brahim": 82,
+      "yan-diomande": 66
+    },
+    barcelona: {
+      "joan-garcia": 83, "szczesny": 84, "livakovic": 80, "cancelo": 84, "balde": 83,
+      "cubarsi": 82, "christensen": 80, "gerard-martin": 74, "kounde": 87,
+      "eric-garcia": 79, "gavi": 83, "fermin": 80, "pedri": 89,
+      "rodri": 90, "dani-olmo": 85, "de-jong": 87, "marc-bernal": 73, "gabriel-jesus": 80,
+      "lamine-yamal": 89, "raphinha": 89, "adeyemi": 81, "gordon": 83, "bardghji": 69
+    },
+    manutd: {
+      "senne-lammens": 78, "karl-darlow": 72, "tom-heaton": 67, "andre-onana": 80,
+      "diogo-dalot": 79, "noussair-mazraoui": 80, "matthijs-de-ligt": 82, "harry-maguire": 80, "lisandro-martinez": 81,
+      "patrick-chinazaekpere-dorgu": 74, "leny-yoro": 78, "luke-shaw": 79, "ayden-heaven": 69, "harry-amass": 68,
+      "mason-mount": 77, "bruno-fernandes": 87, "andrey-santos": 80, "youri-tielemans": 85, "carlos-baleba": 81,
+      "manuel-ugarte": 79, "kobbie-mainoo": 77, "marcus-rashford": 80,
+      "matheus-cunha": 83, "joshua-zirkzee": 77, "amad": 79, "bryan-mbeumo": 85, "benjamin-sesko": 80
+    },
+    mancity: {
+      "gianluigi-donnarumma": 89, "marcus-bettinelli": 70, "geronimo-rulli": 82, "ruben-dias": 86, "marc-guehi": 82,
+      "rayan-ait-nouri": 81, "vitor-reis": 70, "josko-gvardiol": 84, "matheus-nunes": 79, "abdukodir-khusanov": 77, "rico-lewis": 77, "elliot-anderson": 80, "mateo-kovacic": 83, "rayan-cherki": 81,
+      "enzo-fernandez": 84, "ayyoub-bouaddi": 75, "nico-o-reilly": 73, "phil-foden": 85,
+      "iliman-ndiaye": 79, "erling-haaland": 90, "jeremy-doku": 80, "allan": 61, "antoine-semenyo": 80
+    },
+    chelsea: {
+      "emiliano-martinez": 85, "teddy-sharman-lowe": 62, "mike-penders": 73, "gaga-slonina": 68, "marco-palestra": 61,
+      "wesley-fofana": 79, "maxence-lacroix": 79, "levi-colwill": 80, "jorrel-hato": 78, "reece-james": 81,
+      "malo-gusto": 79, "pep-chavarria": 77, "aaron-anselmino": 70, "josh-acheampong": 70,
+      "valentin-barco": 75, "jordan-henderson": 79, "moises-caicedo": 87,
+      "romeo-lavia": 78, "pedro-neto": 80, "joao-pedro": 79, "jamie-gittens": 78, "morgan-rogers": 82,
+      "danny-welbeck": 78, "emmanuel-emegha": 78, "geovany-quenda": 76, "estevao-willian": 78
+    },
+    liverpool: {
+      "alisson-becker": 89, "giorgi-mamardashvili": 84, "freddie-woodman": 71, "vitezslav-jaros": 70, "harvey-davies": 61,
+      "joe-gomez": 79, "virgil-van-dijk": 90, "jeremy-jacquet": 75, "milos-kerkez": 82, "conor-bradley": 78,
+      "giovanni-leoni": 69, "kostas-tsimikas": 77, "jeremie-frimpong": 83, "ronald-araujo": 83,
+      "wataru-endo": 79, "florian-wirtz": 89, "dominik-szoboszlai": 83, "alexis-mac-allister": 87, "ryan-gravenberch": 85,
+      "trey-nyoni": 64, "alexander-isak": 88, "federico-chiesa": 81, "cody-gakpo": 84,
+      "hugo-ekitike": 83, "victor-munoz": 65, "bradley-barcola": 84, "lewis-koumas": 69, "rio-ngumoha": 68
+    },
+    tottenham: {
+      "antonin-kinsky": 75, "martin-dubravka": 77, "brandon-austin": 67, "andy-robertson": 82, "tosin-adarabioyo": 78,
+      "marcos-senesi": 78, "jan-paul-van-hecke": 80, "destiny-udogie": 80, "pedro-porro": 82, "ben-davies": 75,
+      "micky-van-de-ven": 82, "xavi-simons": 84, "conor-gallagher": 81, "james-maddison": 84, "archie-gray": 75,
+      "lucas-bergvall": 77, "sandro-tonali": 86, "mateus-fernandes": 76, "wilson-odobert": 75, "rodrigo-bentancur": 80,
+      "richarlison": 78, "mathys-tel": 77, "savio": 82, "dominic-solanke": 80, "mohammed-kudus": 80,
+      "dejan-kulusevski": 83, "omar-marmoush": 84, "mykhailo-mudryk": 76
+    },
+    arsenal: {
+      "david-raya": 87, "kepa-arrizabalaga": 79, "illan-meslier": 72, "william-saliba": 87, "cristhian-mosquera": 77,
+      "ben-white": 83, "piero-hincapie": 83, "gabriel-magalhaes": 88, "jurrien-timber": 82, "ezri-konsa": 82,
+      "riccardo-calafiori": 78, "myles-lewis-skelly": 78, "martin-odegaard": 87, "eberechi-eze": 83, "mikel-merino": 83,
+      "martin-zubimendi": 83, "bruno-guimaraes": 86, "declan-rice": 87, "bukayo-saka": 88, "viktor-gyokeres": 87,
+      "christos-tzolis": 80, "noni-madueke": 80, "kai-havertz": 82
+    }
+  };
+  const mediaDe = (club, id) => MEDIAS[club][id];
+  /* La rareza de una carta de fútbol sale de la media del jugador: hasta 80
+     común, 81 a 84 rara, 85 a 87 épica y 88 o más legendaria. */
+  const BANDAS = [80, 84, 87];
+  const tierDeMedia = m => (m <= BANDAS[0] ? 0 : m <= BANDAS[1] ? 1 : m <= BANDAS[2] ? 2 : 3);
+  /* Las probabilidades por carta de las colecciones de fútbol, en diez
+     milésimas: como cada rareza es un grupo de jugadores de distinta
+     media, aquí las más altas salen un poco más que en las otras colecciones
+     (que siguen con las de `TIERS`). Cada colección tiene los suyos para
+     que un jugador de más media sea siempre más difícil de sacar que uno de
+     menos: la probabilidad de un jugador es el peso de su rareza dividido
+     entre cuántos jugadores tiene (la Premier solo tiene 5 legendarias, así
+     que la suya pesa menos; un test lo comprueba). */
+  const PESOS_FUTBOL = { futbol: [5500, 3300, 1000, 200], premier: [5500, 3500, 900, 100] };
 
   /* Las colecciones. El sobre dice de cuál es con la primera letra de su
      clave (`prefijo` + la clave de push): la regla ya acepta esas claves
      y quien compra no elige el contenido igual, porque sigue saliendo de
-     la hora del servidor. */
+     la hora del servidor. `grupo: "futbol"` junta las colecciones de
+     futbolistas: se eligen desde su propio menú y comparten la plantilla. */
   const COLECCIONES = [
     { key: "profes", prefijo: "p", label: "Profes", nombre: "DIE Collection", serie: "S01" },
     { key: "comp", prefijo: "c", label: "Componentes", nombre: "Componentes", serie: "S02" },
-    { key: "futbol", prefijo: "f", label: "Fútbol", nombre: "Fútbol", serie: "S03" }
+    { key: "futbol", prefijo: "f", label: "Fútbol", nombre: "Fútbol", serie: "S03", grupo: "futbol" },
+    { key: "premier", prefijo: "e", label: "Premier", nombre: "Big Six", serie: "S04", grupo: "futbol" }
   ];
+  const esFutbol = col => col === "futbol" || col === "premier";
   const COL = Object.fromEntries(COLECCIONES.map(c => [c.key, c]));
 
   const CARDS = [];
@@ -194,31 +372,36 @@
     });
   }));
   const BASE_FUT = CARDS.length;
-  [0, 1, 2].forEach(tier => FUTBOLISTAS.forEach(([club, id, name, pos, dorsal, pais]) => {
-    const n = CARDS.length, t = TIERS[tier];
+  const cartaFutbol = (col, carpeta, [club, id, name, pos, dorsal, pais]) => {
+    const n = CARDS.length, media = mediaDe(club, id), tier = tierDeMedia(media), t = TIERS[tier];
     CARDS.push({
-      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
-      col: "futbol", peso: 1, tier, club, pos, dorsal, pais, img: "cards/futbol/" + club + "/" + id + ".webp",
+      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - (col === "futbol" ? BASE_FUT : BASE_PREM) + 1, name, vkey: t.key, vlabel: t.label,
+      col, peso: 1, tier, club, pos, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
       sub: CLUBES[club], acc: t.color
     });
-  }));
+  };
+  FUTBOLISTAS.forEach(j => cartaFutbol("futbol", "futbol", j));
+  const BASE_PREM = CARDS.length;
+  PREMIER.forEach(j => cartaFutbol("premier", "premier", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
-  const pool = lista => {
+  const pool = (lista, w = TIERS.map(x => x.w)) => {
     const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
     t.uniforme = lista.every(c => c.peso === 1);
     t.peso = t.map(l => l.reduce((s, c) => s + c.peso, 0));
-    // la rareza más alta que tiene: fútbol no tiene legendarias, y lo que
-    // sería legendaria (en un sobre o un re-roll) sale épica
+    // la rareza más alta que tiene: lo que sería de una rareza que la colección no tiene sale de la más alta
     t.tope = t.reduce((m, l, i) => (l.length ? i : m), 0);
+    t.w = w;
+    let esp = null;   // se calcula al pedirlo: `DIOS` se declara más abajo
+    Object.defineProperty(t, 'esperado', { get: () => esp || (esp = esperadoPorSobre(w)) });
     return t;
   };
-  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp), futbol: pool(POR_COL.futbol) };
+  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp), futbol: pool(POR_COL.futbol, PESOS_FUTBOL.futbol), premier: pool(POR_COL.premier, PESOS_FUTBOL.premier) };
   const POR_TIER = POOL.profes;
   /* De qué colección es un sobre o un re-roll, por su clave. Las claves
      de push empiezan con «-», así que lo de antes nunca lleva prefijo. */
-  const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "f" ? "futbol" : "profes"; };
-  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "f" ? POOL.futbol : p === "p" ? POOL.profes : POOL.legado; };
+  const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "f" ? "futbol" : p === "e" ? "premier" : "profes"; };
+  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "f" ? POOL.futbol : p === "e" ? POOL.premier : p === "p" ? POOL.profes : POOL.legado; };
   const subtitulo = c => c.sub;
   const acento = c => c.acc;
 
@@ -320,11 +503,16 @@
     let leyenda = false;
     for (let i = 0; i < 5; i++) {
       let t;
-      if (dios) t = leyenda ? 2 : 2 + pesado(r, [TIERS[2].w, TIERS[3].w]);
-      else t = i === 4 ? 1 + pesado(r, TIERS.slice(1).map(x => x.w)) : pesado(r, TIERS.map(x => x.w));
+      if (dios) t = leyenda ? 2 : 2 + pesado(r, [P.w[2], P.w[3]]);
+      else t = i === 4 ? 1 + pesado(r, P.w.slice(1)) : pesado(r, P.w);
       if (t === 3) leyenda = true;
       t = Math.min(t, P.tope);
-      const libres = P[t].filter(c => !usadas.has(c.n));
+      let libres = P[t].filter(c => !usadas.has(c.n));
+      // una rareza con pocos jugadores se puede agotar en el sobre: sale la más cercana (primero la de arriba)
+      for (let d = 1; !libres.length && d < TIERS.length; d++) {
+        libres = (P[t + d] || []).filter(c => !usadas.has(c.n));
+        if (!libres.length && t - d >= 0) libres = P[t - d].filter(c => !usadas.has(c.n));
+      }
       const c = elige(r, libres, P.uniforme);
       usadas.add(c.n);
       cartas.push({ id: c.n, g: 1 + pesado(r, GRADE_W), w: (r.u32() & 0x7fffffff) | 1 });
@@ -340,8 +528,8 @@
      Lo que se espera de cada rareza por sobre, contando la quinta carta y
      el god pack. Para cosas raras el número esperado por sobre es casi la
      probabilidad de que un sobre traiga una, que es lo que se dice. */
-  function esperadoPorSobre() {
-    const T = TIERS.map(t => t.w), tot = 10000, alta = T[1] + T[2] + T[3];
+  function esperadoPorSobre(w) {
+    const T = w || TIERS.map(t => t.w), tot = 10000, alta = T[1] + T[2] + T[3];
     const normal = T.map((w, t) => 4 * w / tot + (t ? w / alta : 0));
     const pLeg = 1 - Math.pow(T[2] / (T[2] + T[3]), 5);
     const dios = [0, 0, 5 - pLeg, pLeg];
@@ -354,12 +542,12 @@
      más. `exacta` es la misma carta (persona y variante) con esa nota, en
      un sobre de su colección. */
   function probabilidad(id, g) {
-    const c = CARDS[id], pg = notaOMas(g);
+    const c = CARDS[id], pg = notaOMas(g), E = POOL[c.col].esperado;   // lo esperado de SU colección
     let porSobre = 0;
-    for (let t = c.tier; t < TIERS.length; t++) porSobre += ESPERADO[t];
+    for (let t = c.tier; t < TIERS.length; t++) porSobre += E[t];
     porSobre *= pg;
     // en una colección sin legendarias, las épicas se quedan también con lo que sería legendaria
-    const P = POOL[c.col], esp = ESPERADO.slice(c.tier, c.tier === P.tope ? TIERS.length : c.tier + 1).reduce((a, b) => a + b, 0);
+    const P = POOL[c.col], esp = E.slice(c.tier, c.tier === P.tope ? TIERS.length : c.tier + 1).reduce((a, b) => a + b, 0);
     const exacta = esp * c.peso / P.peso[c.tier] * pg;
     return { porCarta: porSobre / 5, porSobre, exacta, nota: pg };
   }
@@ -475,8 +663,8 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL,
-    coleccionDe, poolDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, MEDIAS, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL,
+    coleccionDe, poolDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
   };

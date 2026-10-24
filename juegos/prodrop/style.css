@@ -1302,22 +1302,31 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .full.futbol > img, .full.futbol .holo img { object-fit: contain; object-position: 50% 0; }
 .full.futbol.club-barcelona > img, .full.futbol.club-barcelona .holo img { object-fit: cover; object-position: 50% 20%; }
 .futbol .fa-name { background: linear-gradient(180deg, #0000, #0b1a3acc 60%); }
-/* arriba: posición a la izquierda, bandera a la derecha */
+/* arriba: posición a la izquierda, media a la derecha */
 .fu-top { position: absolute; top: 4cqw; left: 4.5cqw; right: 4.5cqw; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
 .fu-pos {
   font: 800 3.6cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; text-transform: uppercase;
   color: #fff; background: #0b1a3ad0; padding: 1.3cqw 2.4cqw; border-radius: 99px; box-shadow: inset 0 0 0 .35cqw var(--accent);
 }
-.fu-flag { font-size: 11cqw; line-height: 1; filter: drop-shadow(0 .5cqw 1cqw #0008); }
-/* abajo: nombre y rareza a la izquierda, dorsal a la derecha */
+/* arriba a la derecha: la media del jugador, grande, con su etiqueta */
+.fu-medida { display: flex; flex-direction: column; align-items: flex-end; gap: .9cqw; }
+.fu-media {
+  font: 900 17cqw/.8 Rubik, sans-serif; color: #fff; letter-spacing: -.04em;
+  -webkit-text-stroke: .6cqw var(--accent); paint-order: stroke fill; text-shadow: 0 .6cqw 1.6cqw #000c, 0 0 2.4cqw #0007;
+}
+.fu-medida small {
+  font: 800 3.5cqw/1 "Barlow Condensed", sans-serif; letter-spacing: .18em; text-indent: .18em; color: #fff;
+  background: #0b1a3ad0; padding: 1cqw 2.2cqw; border-radius: 99px; box-shadow: inset 0 0 0 .35cqw var(--accent);
+}
+/* abajo: nombre y rareza a la izquierda; a la derecha, la bandera y el escudo juntos */
 .fu-pie { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 3cqw; z-index: 2; }
-.fu-pie > div { display: flex; flex-direction: column; gap: 1cqw; min-width: 0; }
+.fu-pie > div { display: flex; flex-direction: column; gap: 1cqw; min-width: 0; max-width: 62cqw; }
+.fu-pie > div > b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fu-pie .fu-rar { font-size: 5.6cqw; letter-spacing: .1em; }
 .futbol.common .fu-rar { color: #fff; }
-.fu-pie .fu-dorsal {
-  font: 900 15cqw/.8 Rubik, sans-serif; color: #fff; letter-spacing: -.04em;
-  -webkit-text-stroke: .5cqw var(--accent); text-shadow: 0 .8cqw 2cqw #000a; flex: none;
-}
+.fu-iconos { display: flex; align-items: center; gap: 2.4cqw; flex: none; }
+.fu-flag { width: 11cqw; height: 7.4cqw; object-fit: cover; border-radius: .9cqw; box-shadow: 0 0 0 .35cqw #fff9, 0 .5cqw 1.2cqw #0009; }
+.fu-escudo { width: 12cqw; height: 12cqw; object-fit: contain; filter: drop-shadow(0 .6cqw 1.2cqw #000b); }
 /* el marco dice la rareza: fino y blanco en la base, grueso y del color de la rareza en las demás */
 .fu-marco {
   position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
@@ -1343,6 +1352,33 @@ body:not(.serie1) .solo-serie1 { display: none; }
 /* las de los lados, más abiertas: que se les vea la cara */
 .skin-futbol .skin-fan img:nth-child(1) { transform: translate(-40%, 8%) rotate(-20deg); }
 .skin-futbol .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
+
+/* la Premier: las fotos ya traen el fondo del club, así que van a sangre (como las del Barça) */
+.full.futbol.premier { background: #0d0d14; }
+.full.futbol.premier > img, .full.futbol.premier .holo img { object-fit: cover; object-position: 50% 18%; }
+/* el envoltorio de la Premier: violeta con una cinta verde */
+.skin-premier {
+  background:
+    radial-gradient(circle at 50% 56%, #ffffff26 0, transparent 42%),
+    repeating-linear-gradient(135deg, #0000 0 9cqw, #ffffff10 9cqw 18cqw),
+    linear-gradient(165deg, #14052a 0%, #3d195b 42%, #7b22a6 76%, #00e07a 135%);
+}
+.skin-premier .skin-badge { background: #00ff85; color: #2b0a46; }
+.skin-premier .skin-fan img { object-fit: cover; object-position: 50% 12%; background: #1b0833; }
+.skin-premier .skin-fan img:nth-child(1) { transform: translate(-40%, 8%) rotate(-20deg); }
+.skin-premier .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
+
+/* el menú de fútbol: un segundo menú con solo sobres de fútbol, con su cancha de fondo */
+.ch-back { align-self: flex-start; margin-bottom: 2px; font-weight: 700; color: #cfe3ff; }
+.ch-back[hidden] { display: none; }
+.menu-futbol .chooser { padding: 18px clamp(10px, 3vw, 26px) 22px; border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 0, #1a8a3a38 0, transparent 62%), repeating-linear-gradient(90deg, #0000 0 56px, #ffffff07 56px 112px); }
+.menu-futbol .chooser h2 { color: #9ff0b8; }
+.ch-pack.hub .hub-sello {
+  position: absolute; right: -8px; top: 12px; z-index: 4; transform: rotate(7deg); font-style: normal;
+  font: 800 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .2em; color: #0e3a1a; background: #9ff0b8; padding: 5px 10px; border-radius: 99px;
+  box-shadow: 0 4px 10px #0007;
+}
 /* probabilidades y novedades del sobre de fútbol: dos enlaces y un modal que se desplaza */
 .fu-info { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
 .fu-info[hidden] { display: none; }
