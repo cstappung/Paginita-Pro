@@ -1489,17 +1489,26 @@ function pintaMonedas() {
     // solo si cambió: se repinta con cada lectura (la racha titila con CSS)
     if (chip.dataset.html !== h) { chip.dataset.html = h; chip.innerHTML = h; }
   }
-  const caja = $("vesMonedas");
-  if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
-  const drops = $("vesDrops");
-  if (drops && u && d && d.completo) drops.innerHTML = dropsHtml(d);
-  const tops = $("vesTops");
-  if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
+  /* Cada lectura de Firebase llega aquí, y casi nunca cambia lo que se ve:
+     reescribir igual las tiras volvía a cargar sus 24 fotos de cartas y
+     hacía que i18n.js repasara todo ese texto, en cada lectura. */
+  if (u && d) ponHtml($("vesMonedas"), () => topHtml(d, u.uid, perfilDe, colorForUid));
+  if (u && d && d.completo) {
+    ponHtml($("vesDrops"), () => dropsHtml(d));
+    ponHtml($("vesTops"), () => topsLista(d));
+  }
   pintaDropsMascotas();
   pintaDropsRock();
-  const refs = $("vesReferidos");
-  if (refs && u && d && d.completo) refs.innerHTML = topRefs(u.uid, d, true);
+  if (u && d && d.completo) ponHtml($("vesReferidos"), () => topRefs(u.uid, d, true));
   if (referidosUi) referidosUi.refresca();
+}
+/* Escribe `html()` en `caja` solo si cambió desde la última vez. */
+function ponHtml(caja, html) {
+  if (!caja) return;
+  const h = html();
+  if (caja._html === h) return;
+  caja._html = h;
+  caja.innerHTML = h;
 }
 /* El «+» junto al saldo: canjear un código de referido y referir a otros
    (juegos/referidos-vista.js). Lee las mismas lecturas que el saldo. */

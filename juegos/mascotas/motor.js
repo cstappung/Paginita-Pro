@@ -143,7 +143,7 @@
     const p = de[r.entero(de.length)];
     const tint = p.kind === "dance" ? 0 : 1 + (r.u32() % 2147483646);
     const res = Object.freeze({ n: p.n, kind: p.kind, id: p.id, leg: p.leg, tint });
-    if (memoRegalo.size > 4000) memoRegalo.clear();
+    if (memoRegalo.size > 50000) memoRegalo.clear();   // por memoria: la economía pide todos los regalos del sitio en cada lectura
     memoRegalo.set(k, res);
     return res;
   }

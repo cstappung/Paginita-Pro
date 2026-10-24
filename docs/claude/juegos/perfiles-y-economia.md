@@ -447,6 +447,18 @@ per-pet state (`mascotasEstado`) is read only by key.
 **Batalla de Rock boxes** (`rock/c/<uid>/<k>`, 500, event `rc`, category
 `cajaRock`; an exact repeat refunds as `premios`): `juegos/hero/js/rock/CLAUDE.md`.
 
+**`economia()` reruns on every Firebase read, in every open tab, so it must
+stay linear in the site's history.** Each box looked for the buyer's pieces
+by walking `rocas` for *everyone*: quadratic, ~0.6 s per read at 1800 boxes
+and 13 s at 7200, which froze the lobby a while after the Synyster opened
+the boxes. Now `rocasPor[uid]` lists the copies that reached each account
+(`llegaRoca` on a box, a sale and a trade; filtered by `dueno` when read),
+and `repetidaRock` keeps each piece's `invId` in a WeakMap. The memos of
+`cajaRock` and `MascotasMotor.regalo` hold 50 000: they are asked for every
+box/gift of the site on each pass, and with a cap below that total
+(it was 4000) they emptied mid-pass and never hit. A new per-event lookup
+must index by account, never scan a whole-site map.
+
 **Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
 event `sc`, category `superChat`; `superChats` in the replay lists the
 paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
