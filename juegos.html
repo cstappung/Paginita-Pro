@@ -3761,6 +3761,15 @@ html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
   .jg-th-fiesta>i{display:none}
   .jg-av.jg-marco-hw::before,.jg-hw-sello::after{animation:none!important}
 }
+/* En el salón y el chat general los marcos animados están quietos y se
+   mueven con el puntero encima de su fila o su tarjeta. Las tiras de drops,
+   los tops y el top de monedas llevan decenas de fotos chicas, y cada marco
+   que se mueve repinta la página entera en cada cuadro: medido con el CSS
+   de esta hoja, 4 marcos en pantalla tenían el hilo ocupado un 25 %, 12 un
+   41 % y 30 un 92 % (la página no respondía al llegar abajo). Va con
+   !important porque varios marcos ponen `animation` entera en ::before. */
+:is(.jg-sal,.jg-cg-lista) .jg-av,:is(.jg-sal,.jg-cg-lista) .jg-av *,:is(.jg-sal,.jg-cg-lista) .jg-av::before,:is(.jg-sal,.jg-cg-lista) .jg-av::after,:is(.jg-sal,.jg-cg-lista) .jg-av *::before,:is(.jg-sal,.jg-cg-lista) .jg-av *::after{animation-play-state:paused!important}
+:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::after,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::after{animation-play-state:running!important}
 @keyframes jgMini{from{opacity:0;transform:translateY(6px) scale(.98)}}
 @keyframes jgHoja{from{transform:translateY(110%)}}
 

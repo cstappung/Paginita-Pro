@@ -529,3 +529,15 @@ tops, referidos) go through `ponHtml`, which skips the write when the HTML
 is the same: it runs on every Firebase read, and rewriting reloaded the 24
 card photos and made i18n.js rescan the text each time (the Mascotas and
 Rock strips have their own `firma`).
+
+**Avatar frames are still in the salón and the general chat** (rule after
+the Halloween reduced-motion block in juegos.html): every `.jg-av` inside
+`.jg-sal` or `.jg-cg-lista` has its animations paused (the SVG adorno and
+the `::before`/`::after` of the CSS frames), and they run while the pointer
+is over their row or tile (`.jg-drop`, `.jg-top`, `.jg-cg-msg`, `li`, `a`).
+Measured with this stylesheet: 4 moving frames on screen kept the main
+thread 25 % busy, 12 → 41 %, 30 → 92 % at 26 fps; the three drop strips
+(24 tiles each, mostly the heavy box openers, who wear animated frames)
+froze the page at the bottom. The rock photos themselves cost nothing once
+painted (their one-time cost is in the worker). A new list of avatars in the
+lobby is covered by the rule; one outside `.jg-sal` needs adding to it.
