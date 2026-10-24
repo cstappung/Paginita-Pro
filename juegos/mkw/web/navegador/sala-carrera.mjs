@@ -108,6 +108,10 @@ export const JEFE_IDO_MS = 4000, JEFE_CALLADO_MS = 10000;
 export const VIA_MS = 3000;
 // §100 (H9): el estado entero se reparte al cambiar y, además, cada REFRESCO_MS
 export const REFRESCO_MS = 5000;
+// §99 (D): cuántos ratos malos le cuenta la sala a una consola por una carrera, para elegir la autoridad de la
+// siguiente: los que la mayoría la vio tarde, los que fue atrás y su red (cada 10 ms de ida y vuelta típica cuenta como
+// un rato malo: la autoridad con la red lenta atrasa a todos). Menos = más estable
+export const ratosMalos = e => Math.min(9999, Math.max(0, (e?.malas | 0) + (e?.atras | 0) + Math.round(Math.min(500, Math.max(0, +e?.rtt || 0)) / 10)));
 // lo que se le pone al que no eligió a tiempo: Mario, Luigi, Peach, Yoshi con el kart estándar de su peso
 const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 
@@ -402,8 +406,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       const k = `${m.carrera}:${de}`;
       if (m.estable && !contadoEstable.has(k)) {
         contadoEstable.add(k);
-        // (y su red: cada 10 ms de ida y vuelta típica cuenta como un rato malo; la autoridad con la red lenta atrasa a todos)
-        const malos = Math.min(9999, Math.max(0, (m.estable.malas | 0) + (m.estable.atras | 0) + Math.round(Math.min(500, Math.max(0, +m.estable.rtt || 0)) / 10)));
+        const malos = ratosMalos(m.estable);
         cambio.estable = { ...(estado.estable || {}), [de]: ((estado.estable || {})[de] | 0) + malos };
       }
       if (Object.keys(cambio).length) { cambiar(cambio); revisar(); }

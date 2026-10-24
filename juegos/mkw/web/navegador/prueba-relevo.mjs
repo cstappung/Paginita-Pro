@@ -21,6 +21,7 @@
 //
 // Uso:  node web/navegador/prueba-relevo.mjs [--ventana] [--sin-relevo] [--red=70,10,5] [--puerto=8148] [--pista=0.0]
 //       [--extra=&param=valor] (para las tres; p. ej. --extra=&sincroTiempo=0 = sin la sincronía de §80b)
+//       [--trabas=N] (§101: la traba de 1,5 s de B, N veces en la misma carrera: cuánto esperó cada una y a quién)
 //       (--sin-relevo: las tres con ?relevo=0, como antes de §80, para comparar: A y B esperan a C;
 //        --red=0: sin red mala, el control: lo que cuesta correr tres juegos en la misma PC)
 import { spawn } from 'node:child_process';
@@ -37,6 +38,7 @@ const RED = arg('red', '70,10,5');
 const PISTA = arg('pista', '0.0');
 const SIN_RELEVO = process.argv.includes('--sin-relevo');
 const EXTRA = arg('extra', '');
+const TRABAS = Math.max(1, Number(arg('trabas', 1)) || 1);
 const carpeta = path.join(raiz, 'build/web/datos/relevo', (SIN_RELEVO ? 'sin-relevo' : RED === '0' ? 'control' : 'red-mala') + (EXTRA.includes('sincroTiempo=0') ? '-sin-sincro' : ''));
 mkdirSync(carpeta, { recursive: true });
 let bien = 0, mal = 0;
@@ -145,14 +147,34 @@ ok(RAPIDO ? 'una traba de 1,5 s en B: A y C lo pausan (esperan menos que la trab
   // lo que tenía guardado de B. C, la de la red mala, espera de por sí más)
   (!RAPIDO || (esperaEn(t1, t2, 'A') < 1200 && esperaEn(t1, t2, 'C') < 1400 && (t2.A?.ls?.vueltas || 0) >= 1)),
   nombres.map(n => `${n} ${t1[n]?.ls?.cuadro}→${t2[n]?.ls?.cuadro} (esperó ${esperaEn(t1, t2, n).toFixed(0)} ms en el rato, ganó al ponerse al día ${Math.round(t2[n]?.ganada ?? -1)} ms, esperó a ${JSON.stringify(Object.fromEntries(Object.entries(t2[n]?.ls?.esperaDe || {}).map(([u, v]) => [u.slice(0, 1), Math.round(v - (t1[n]?.ls?.esperaDe?.[u] || 0))])))}, pausas ${JSON.stringify((t2[n]?.ls?.pausas || []).map(p => p.desde))}, vueltas ${t2[n]?.ls?.vueltas || 0})`).join(', '));
+// §101: más trabas de 1,5 s (--trabas=N): la espera de cada una, a quién y desde qué cuadro se pausó a B. Para ver de
+// dónde sale lo que varía entre corridas (0,3 a 1,1 s)
+const esperasA = [esperaEn(t1, t2, 'A')], esperasC = [esperaEn(t1, t2, 'C')];
+const deQuien = (a, b, n) => Object.fromEntries(Object.entries(b[n]?.ls?.esperaDe || {}).map(([u, v]) => [u.slice(0, 1).toUpperCase(), Math.round(v - (a[n]?.ls?.esperaDe?.[u] || 0))]));
+let tAntes = t2;
+for (let k = 2; k <= TRABAS; k++) {
+  await traba(1500); await espera(4000);
+  const tk = await todas();
+  esperasA.push(esperaEn(tAntes, tk, 'A')); esperasC.push(esperaEn(tAntes, tk, 'C'));
+  console.log(`  traba ${k}: A esperó ${esperaEn(tAntes, tk, 'A').toFixed(0)} ms ${JSON.stringify(deQuien(tAntes, tk, 'A'))}, C ${esperaEn(tAntes, tk, 'C').toFixed(0)} ms ${JSON.stringify(deQuien(tAntes, tk, 'C'))}; pausas ${JSON.stringify((tk.A?.ls?.pausas || []).map(p => p.desde).slice(-1))}, cortes ${JSON.stringify(tk.A?.ls?.cortes || {})}`);
+  tAntes = tk;
+}
+if (TRABAS > 1) {
+  const orden = v => [...v].sort((a, b) => a - b), med = v => orden(v)[Math.floor(v.length / 2)];
+  console.log(`  ${TRABAS} trabas de 1,5 s: A esperó ${orden(esperasA).map(x => x.toFixed(0)).join(', ')} ms (mediana ${med(esperasA).toFixed(0)}); C ${orden(esperasC).map(x => x.toFixed(0)).join(', ')} ms (mediana ${med(esperasC).toFixed(0)})`);
+  ok(`§101: en ${TRABAS} trabas de 1,5 s, A espera siempre menos de 600 ms (el relevo rápido no depende de la suerte)`, Math.max(...esperasA) < 600,
+     `A ${orden(esperasA).map(x => x.toFixed(0)).join(', ')} ms`);
+}
 // 3 s: más que el margen; A y C lo cortan (en el mismo cuadro) y siguen; B, al despertar, ve que lo cortaron
 await traba(3000); await espera(5000);
 const t3 = await todas();
 const corteA = t3.A?.ls?.cortes?.[1], corteC = t3.C?.ls?.cortes?.[1];
+// (con --trabas, la 3 s compara con lo de después de la última traba de 1,5 s)
+const t2b = tAntes;
 if (RAPIDO) {
   // (§99, C1: con 3 s tampoco se lo corta —antes, pasado el margen de 2 s, sí—: se lo pausa y vuelve)
   ok('una traba de 3 s en B: A y C lo pausan (no lo esperan ni lo cortan), siguen iguales y B vuelve a manejar',
-    corteA === undefined && corteC === undefined && (t3.A?.ls?.cuadro || 0) > (t2.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado &&
+    corteA === undefined && corteC === undefined && (t3.A?.ls?.cuadro || 0) > (t2b.A?.ls?.cuadro || 0) + 200 && !t3.A?.ls?.desincronizado && !t3.C?.ls?.desincronizado &&
     !t3.B?.ls?.fuera && (t3.A?.ls?.vueltas || 0) >= 2,
     `cortes A ${JSON.stringify(t3.A?.ls?.cortes)}; A ${t2.A?.ls?.cuadro}→${t3.A?.ls?.cuadro}; pausas ${JSON.stringify((t3.A?.ls?.pausas || []).map(p => p.desde))}, vueltas ${t3.A?.ls?.vueltas}; B fuera ${t3.B?.ls?.fuera}`);
   ok('…y B lo ve en su página (su kart siguió solo un momento)',

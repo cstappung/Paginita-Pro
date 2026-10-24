@@ -958,6 +958,16 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Ida y vuelta** (*round-trip time*) | Lo que tarda un mensaje en ir a otro navegador y volver la respuesta, en ms. WebRTC la mide sola (`getStats`, `currentRoundTripTime`). |
 | **Histéresis (del aviso)** | La prueba de conexión vuelve a avisar al sitio por la ida y vuelta solo si se movió más de 10 ms desde la última que avisó: el ruido de pocos ms no hace parpadear el vestíbulo. Como un comparador con histéresis. |
 
+### Afinar la red: la traba, la sincronía con ponerse al día y la cuenta de estabilidad (§101)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Banderas del informe** | Tres «sí/no» en un byte de cada informe (el resumen que cada consola manda cada medio segundo): «este rato es dudoso», «sé ponerme al día yo sola» y «voy atrás / me estoy poniendo al día». Además de la medida, dicen en qué condición se tomó. Como los LED de estado de un variador al lado de la lectura de corriente. |
+| **Voy atrás (atrasada)** | La consola que va más de 3 cuadros detrás de la mayoría, o que está corriendo la ráfaga para ponerse al día. Lo de los demás le llega «con holgura de sobra» porque ella lo necesita más tarde: esa holgura es su atraso, no mérito de los otros, y su rato cuenta como dudoso. Como medir el desfase de una señal con una sonda que tiene su propio retardo: lo que se ve no es de la señal. |
+| **Traba propia (mientras espera)** | Si la pestaña se traba justo cuando estaba esperando los botones de otro, ese rato no fue «esperar al otro»: fue un tirón suyo. Se nota porque la revisión que corre cada 40 ms durante la espera tuvo un hueco de más de 100 ms. No se le carga al otro, no cuenta para pausarlo ni cortarlo, y quien se trabó se pone al día. `?trabaPropia=0` = como antes. Como descontar de una medición de tiempo el rato en que el instrumento estuvo apagado. |
+| **Bloqueo (de la pausa)** | Mientras se decide pausar a alguien (en dos fases: uno propone, los demás contestan hasta qué cuadro tienen lo suyo, y recién ahí se decide), nadie corre ese cuadro. Es lo que cuesta una traba de 1,5 s a los demás: unos 65 ms (la respuesta de C, que viaja por su red mala). En el registro sale como «faltan [-1]». |
+| **Cuenta de estabilidad (ratos malos)** | Lo que la sala suma de cada consola al terminar una carrera para elegir la primera autoridad de la siguiente: los ratos en que la mayoría la vio tarde, los que fue atrás y su ida y vuelta (cada 10 ms cuenta como un rato malo). Menos = más estable. Es `ratosMalos` de `sala-carrera.mjs`: la misma función la usan la sala y el banco. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -9269,3 +9279,144 @@ conexión de 100.7). Lo medido, desde que se va:
   consolas falsas; darle más cuadros o medir otra cosa.
 - Lo de antes que sigue abierto (§99.13): la espera en la traba de 1,5 s de `prueba-relevo`, el umbral de la sincronía
   con ponerse al día, Intenso e Imposible en 200cc, y el programa final a R2 (cuando el dueño diga).
+
+## 2026-10-24 · §101 Afinar la red: la espera en la traba, la sincronía con ponerse al día y el banco `relevo` §11 (M25, punto 1)
+
+El dueño pidió solo el punto 1 de M25 («solo haz 1»): **afinar la red**. Eran tres cosas que habían quedado abiertas
+(§99.13, §100.10):
+
+1. en `prueba-relevo`, durante la traba de 1,5 s de B, lo que esperaba A variaba entre 0,3 y 1,1 s (¿a quién esperaba?);
+2. la **sincronía de tiempo** (§80b: el que va adelante se frena un poco) y **ponerse al día** (§99 C3: el que quedó
+   atrás corre seguido lo que le falta) se pisaban: a veces A subía su retraso a 7 y fallaba «C paga su conexión»;
+3. una comprobación del banco `relevo` (§11) fallaba a veces con la PC cargada.
+
+Los puntos 2, 3 y 4 de M25 (Intenso e Imposible en 200cc, la prueba de conexión en el vestíbulo, el programa final a
+R2) no se tocaron.
+
+### 101.1 Cómo se midió
+
+Dos herramientas nuevas, para ver adentro de la espera:
+
+- `node web/navegador/prueba-relevo.mjs --trabas=8`: en vez de una traba de 1,5 s en B, ocho en la misma carrera (cada
+  5,5 s). De cada una imprime cuánto esperaron A y C y **a quién** (`esperaDe`), desde qué cuadro se pausó a B y si
+  hubo cortes, y al final comprueba que A espere siempre menos de 600 ms.
+- `?esperasLog=N` (en la página): el lockstep anota en su registro cada espera de más de N ms (por omisión 500), y otra
+  vez a los 1,5 s: qué falta, hasta qué cuadro tiene lo de cada uno (con `p` si está pausado y `x` si está cortado), si
+  ya llegó lo de la autoridad, los bloqueos y propuestas abiertos, y hace cuánto oyó a cada uno.
+
+Tres corridas de 8 trabas (antes de los arreglos):
+
+| Corrida | Lo que esperó A en cada traba (ms) | C (ms) |
+|---|---|---|
+| 1 | 64, 84, 86, 284, 310, 345, 374, **1393** | 108 … 442, **1664** |
+| 2 | 93, 284, 296, 301, 307, 312, 463, **2854** | 354 … 802, **2958** |
+| 3 | 41, 60, 65, 65, 68, 69, 69, 316 | 71 … 114, 357 |
+
+**Lo normal es ~65 ms**, y es el **bloqueo** de la pausa en dos fases: A propone pausar a B, espera que C conteste hasta
+qué cuadro tiene lo de B (la respuesta viaja por la red mala de C, 70 ms de ida) y recién ahí sigue. En el detalle sale
+como espera «a nadie» (faltan `-1`). La primera traba de cada carrera cuesta más (~300 ms): al principio B tiene el
+retraso más bajo y A se queda sin botones suyos antes.
+
+**Las grandes (1,4 y 2,9 s) no eran una espera larga**: el registro no mostró ninguna espera de más de 400 ms en la
+carrera. Eran muchas esperas cortas a **C**, una detrás de otra, porque C había bajado su retraso de 12 a 2 sin que nada
+lo anotara (bajar el retraso no se registraba). Lo que pasó, leyendo los registros de las tres pestañas:
+
+- Con tres juegos en una PC, B no alcanza a ponerse al día entre una traba y la siguiente: su ráfaga corre a ~1,2 veces
+  (la PC no da para más) y en 5,5 s no recupera los 90 cuadros. B fue quedando **80 a 120 cuadros atrás**.
+- Desde tan atrás, todo lo de A y de C le llega a B con muchísima holgura (lo necesita mucho más tarde), y sus informes
+  decían «a C le sobra holgura». Con ese voto, C bajó su retraso hasta 2.
+- Con retraso 2 y 70 ms de red, lo de C empezó a llegar tarde: A lo esperó en ratitos (2,9 s en total), lo relevó, y el
+  retraso de C se disparó de vuelta a 12. A, que mientras tanto se frenaba por C, subió el suyo a 7.
+- Encima, una vez **B se trabó justo mientras esperaba a C**: al despertar, los 1,5 s de la traba quedaron anotados como
+  «esperé a C» (`espera más larga 1020 ms` en el registro de C) y C subió su retraso de más.
+
+### 101.2 Los arreglos (`lockstep.mjs`)
+
+1. **Quien va atrás no vota «holgura de sobra».** Cada informe lleva ahora tres **banderas**: 1 = rato dudoso (como
+   antes), 2 = «sé ponerme al día solo» (el runtime puede correr cuadros seguidos y la pestaña se ve: `puedoPrisa`), 4 =
+   «voy atrás / me estoy poniendo al día» (corre la ráfaga, `alDiaHasta`, o voy más de `UMBRAL_PRISA` = 3 cuadros atrás de
+   la mayoría: `atrasDeLaMitad`). Si voy atrás, mi rato es dudoso: mis holguras de los demás no cuentan para que bajen su
+   retraso. Con eso B ya no hace bajar a C.
+2. **Al que va atrás y se pone al día solo no se lo espera** (la sincronía, `calcularDeuda`): antes, desde que iba menos
+   de 20 cuadros atrás, los demás se frenaban por él aunque él ya corría para alcanzarlos. La sala iba más lenta, y al
+   que se frenaba le llegaba tarde lo de los demás y subía su retraso (el 7 de A). Al que va atrás y **no puede**
+   ponerse al día (pestaña escondida, `?alDia=0`) sí se lo espera, como antes. Y como siempre, no por uno que esperó en
+   su rato.
+3. **La traba propia mientras se espera** (`trabaPropia`, `?trabaPropia=0` = como antes): mientras espero, `revisar`
+   corre cada `REVISAR_MS` = 40 ms. Un hueco de más de `TIRON_MS` = 100 ms entre dos vueltas es esta pestaña trabada
+   (`congeladoEn`). Ese rato no se le carga al que faltaba, no cuenta para el margen de pausarlo o cortarlo (al
+   despertar, sus mensajes todavía están en la cola: antes, una pestaña que despertaba de 1,2 s podía cortar a alguien
+   que no había hecho nada) y cuenta como un tirón mío (`tironPropio`: me pongo al día). `estado()` dice cuánto
+   (`msCongelado`).
+4. **«bajo mi retraso a N (…)»** en el registro, con cuántos lo votaron y la holgura menor: la próxima vez se ve.
+
+`estado()` dice además `atrasados` (los que, según su último informe, van atrás): lo usa el banco.
+
+**Trampa: un arreglo que rompía la vuelta.** Primero `pedirPrisa` (ponerse al día porque los informes dicen que voy
+atrás) también marcaba `alDiaHasta`, como `tironPropio`. Con una PC justa eso se repite cada segundo mientras voy atrás,
+y como el pausado pide volver recién cuando su ráfaga terminó, **B no volvía nunca a manejar**: en `prueba-relevo` quedó
+pausado toda la carrera y a los 20 s la pausa pasó a corte (✗ en «B vuelve a manejar» y en la traba de 3 s). Los bancos
+no lo vieron: ahí la ráfaga pedida (n × 10 ms + 200) duraba menos que el medio segundo entre dos pedidos y quedaban
+huecos para pedir volver; en el juego (16,7 ms por cuadro, hasta 120 cuadros) no quedan. Lo saqué (que voy atrás ya lo
+dicen mis informes por la medida, `atrasDeLaMitad`, sin `alDiaHasta`) y el banco tiene ahora la parte 18, que lo ve.
+
+**Lo que probé y saqué:** una corrección más, «para BAJAR mi retraso, contar la holgura sin lo que voy adelante» (si
+la sincronía me va a frenar, esa holgura se acaba). Era razonable, pero ningún caso del banco la mostraba: en una sala
+de dos, la PC más lenta queda relevada y nadie se frena por ella; y el caso de las corridas ya lo resuelve el arreglo 1.
+Sin una prueba que la distinga, no entra.
+
+### 101.3 El banco `relevo` §11
+
+La comprobación decía «Carla junta más ratos de *voy atrás* que Beto». Con la PC cargada, las consolas falsas van todas
+a tirones y los «voy atrás» de las dos salían 0 y 0. Pero lo que importa es la **cuenta que usa la sala** para elegir la
+autoridad de la carrera siguiente (`ratosMalos`: ratos malos + «voy atrás» + la ida y vuelta, un rato por cada 10 ms).
+Esa función ahora se exporta de `sala-carrera.mjs`, la sala la usa igual que antes, y el banco compara con ella:
+
+| Cómo corrió | Carla | Beto |
+|---|---|---|
+| Con `lockstep` al lado | 7 (malas 1, atrás 0, 63 ms) | 3 (malas 2, atrás 0, 9 ms) |
+| Con 5 bancos a la vez | 16 (malas 2, atrás 7, 70 ms) | 3 (malas 2, atrás 0, 10 ms) |
+
+Antes, la primera fila era un ✗.
+
+### 101.4 Las partes nuevas del banco `relevo` (38 → 44)
+
+- **§16**: a Carla no le sale nada 300 ms (Ana y Beto la esperan) y en ese rato **Ana se traba 1,2 s** (el banco le
+  adelanta el reloj: `saltos` de `crearSala`). Ana es la que decide los cortes de Carla y su margen es 1 s. Ahora: nadie
+  cortado, Ana le carga a Carla 308 ms (Beto 344) y anota 1193 ms como traba suya. Con `trabaPropia: false`: Ana le carga
+  1324 ms y **corta a Carla** (que queda fuera de la carrera).
+- **§17**: en una sala de dos, Carla se traba 600 ms (la pausan) y se pone al día **despacio** (gana 2 ms por cuadro de
+  10, `prisaPorCuadro`: 1,2 veces, como B en `prueba-relevo`). Ahora: Ana la ve «atrás» 110 veces (cada 20 ms) y se
+  frena 0 cuadros; con la regla vieja (puesta a mano para comparar), 7. Carla termina 0,5 cuadros atrás. Es de dos
+  porque con tres y uno a la par, Ana no se frenaba por uno solo (§99, C5).
+- **§18** (la trampa de 101.2): a Carla se le traba la pestaña 1 s y casi no puede ponerse al día (0,2 ms por cuadro):
+  igual pide volver a los 3 s de la pausa, maneja otra vez y nadie la corta. Con el arreglo malo puesto a mano: no vuelve
+  nunca y la pausa pasa a corte (cuadro 1165).
+
+Los bancos que usan el lockstep o la sala, corridos los cinco juntos (la PC cargada): `relevo` 43 (antes de §18), `lockstep` 50,
+`sala-carrera` 101, `sala-playlist` 37, `vr-sala` 58.
+
+### 101.5 Con el juego
+
+Con los arreglos (sin el de la trampa):
+
+| Prueba | Resultado |
+|---|---|
+| `prueba-relevo` (una traba de 1,5 s y una de 3 s) | 10 / 10: A 6, B 8, C 9 de retraso («C paga su conexión» ✓) |
+| `prueba-relevo --trabas=8`, corrida 1 | 11 / 11: A esperó 34, 46, 46, 51, 77, 77, 154, 322 ms (B de retraso 7) |
+| `prueba-relevo --trabas=8`, corrida 2 | 11 / 11: A esperó 297 … 322 ms (B de retraso 3) |
+| `prueba-sincro --directa` | 13 / 13 |
+| `prueba-sala --rapida` | 43 / 43 |
+| Todo lo que va sin el juego (`correr-todo --sin-juego`) | 93 / 93: los 42 bancos juntos (`relevo` 44 / 44 con la PC más cargada), el sitio 28, `subir-r2` 23 |
+
+En 16 trabas ninguna espera pasó de 322 ms (antes, 1,4 y 2,9 s). Lo que sigue variando es la pausa misma: A espera
+hasta que se le acaban los botones de B que ya tiene (su retraso, 3 a 7 cuadros = 50 a 117 ms) más 150 ms de silencio
+(`PAUSA_MS`) más la respuesta de C por su red mala. Con B de retraso 7 casi no se nota; con 3, ~300 ms. Bajar eso
+pediría pausar antes de 150 ms, y entonces se pausaría a quien solo perdió un paquete: lo dejé así.
+
+### 101.6 Lo que queda
+
+- En `prueba-relevo`, con tres juegos en una PC, B sigue sin alcanzar a ponerse al día entre trabas (su PC corre la
+  ráfaga a ~1,2 veces): es de la prueba, no de la red. En una PC sola la ráfaga corre a ~2 veces.
+- De M25: Intenso e Imposible en 200cc, la prueba de conexión en el vestíbulo (reglas de Firebase, las publica el dueño)
+  y el programa final a R2 (cuando el dueño diga).

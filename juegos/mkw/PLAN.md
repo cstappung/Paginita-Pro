@@ -176,10 +176,11 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   de la sala por otro piloto, también el latido), **H9** (el estado de la sala solo cuando cambia) y **H1.2** (la prueba
   de conexión 🟢/🛰/🔴/⏳ de cada piloto, en la tira del vestíbulo del sitio)
 - ⬜ M25. (Lo que queda)
-  - Revisar la espera en la traba de 1,5 s de `prueba-relevo` (0,3 a 1,1 s según la corrida: ¿a B o a C?) y el umbral
-    de la sincronía ahora que existe ponerse al día (el que se frena sube su retraso).
+  - ✅ Afinar la red (§101, 2026-10-24): la espera en la traba de 1,5 s (lo normal es la pausa en dos fases, 34-322 ms
+    según el retraso de B; las de 1,4-2,9 s eran C con el retraso bajado por los votos de B, que iba 80-120 cuadros
+    atrás: quien va atrás ya no vota y nadie se frena por quien se pone al día solo; la traba propia mientras se espera
+    ya no se le carga al otro) y el banco `relevo` §11 (compara la cuenta de estabilidad de la sala, `ratosMalos`).
   - Medir Intenso e Imposible en 200cc, con la velocidad de cada kart (¿se caen más a 138?).
-  - El banco `relevo` §11 (la autoridad por estabilidad) a veces falla con la PC cargada (§100.10).
   - La prueba de conexión también en el vestíbulo antes de empezar (necesita otra clave en el buzón y sus reglas de
     Firebase, que publica el dueño; ver §100.7).
   - El programa final (`--final`) y subirlo a R2, cuando el dueño diga.
@@ -490,6 +491,15 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 05:00** — **Afinar la red** (§101, M25 punto 1, lo único que pidió el dueño). Medido con
+  `prueba-relevo --trabas=8` y `?esperasLog=N` (nuevos): la traba de 1,5 s de B le cuesta a A lo que tarda la pausa en
+  dos fases (~65 ms con B de retraso 7, ~300 con 3); las esperas de 1,4 y 2,9 s eran a C, que había bajado su retraso
+  de 12 a 2 por los votos de B (80-120 cuadros atrás: todo le llegaba «con holgura»). Arreglos en `lockstep.mjs`: las
+  banderas del informe («sé ponerme al día», «voy atrás»), quien va atrás no vota holgura, nadie se frena por quien se
+  pone al día solo, y la traba propia mientras se espera no se le carga al otro ni lo corta (`?trabaPropia=0` = antes).
+  Una trampa encontrada con el juego (B no volvía a manejar) y una corrección sin prueba que la distinga, sacadas. Banco
+  `relevo` 38 → 44 (§11 con `ratosMalos`, §16-§18 nuevas); `prueba-relevo` 10/10 y con 8 trabas 11/11 dos veces (A
+  espera a lo más 322 ms).
 - **2026-10-24 03:02** — **La carrera pegada, el banco de desconexiones, «Pedir copa», los mandos del sitio y H1.4/H9/H1.2**
   (§100, M24). Lo que vio el dueño (la anfitriona se fue eligiendo personaje y el reloj llegó a 0 sin que nadie hiciera
   avanzar la sala): ahora manda una provisoria a los ~4-5 s y la carrera abre al plazo; al irse alguien cargando, la
