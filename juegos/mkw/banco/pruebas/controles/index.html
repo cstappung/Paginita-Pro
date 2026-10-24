@@ -213,6 +213,20 @@ tecla('keydown', 'Escape');
 ok('§99: sin filtro (fuera de la sala), Start vuelve a llegar', (p0().botones & BOTON.START) !== 0);
 tecla('keyup', 'Escape');
 
+// ---- §100: mientras el cursor del sitio maneja un menú de la página (mando-sitio.mjs), el mando no llega al juego; el teclado sí ----
+const m100 = mandoFalso(0, 'Xbox Wireless Controller (STANDARD GAMEPAD)');
+mandosFalsos.splice(0, mandosFalsos.length, m100);
+m100.buttons[0] = { pressed: true, value: 1 };
+let enCursor = true;
+c.sinMandos(() => enCursor);
+tecla('keydown', 'KeyL');
+ok('§100: con el cursor del sitio en un menú, el A del mando no llega al juego (el teclado sí: L → R)', (p0().botones & BOTON.A) === 0 && (recibido[0].botones & BOTON.R) !== 0,
+   `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'KeyL');
+enCursor = false;
+ok('§100: cerrado el menú, el A del mando vuelve a llegar', (p0().botones & BOTON.A) !== 0);
+c.sinMandos(null); m100.buttons[0] = { pressed: false, value: 0 }; mandosFalsos.length = 0; c.paso();
+
 c.restaurarTeclas();
 nota('teclas por defecto: stick WASD/flechas · A = K/Enter · B = J/Retroceso · R = L/Shift · L = Espacio/I · truco = T · Start = P/Esc');
 fin();

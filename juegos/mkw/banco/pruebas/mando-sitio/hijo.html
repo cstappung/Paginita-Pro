@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Marco del juego (de mentira)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #161233; }
+  #boton { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #2a2160; color: #fff; font: 600 16px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<!-- Hace de la página de Mario Kart dentro del marco del sitio (banco mando-sitio, §100): un botón que llena todo (un
+     menú de la página) y lo mismo que hace mkw.mjs con los mandos (montarMandoSitio). Nada del juego. -->
+<button id="boton" type="button">Un menú de la página</button>
+<script>navigator.getGamepads = () => parent.mandosFalsos;</script>
+<script type="module">
+import { montarMandoSitio } from '/web/navegador/mando-sitio.mjs';
+window.menuAbierto = false; window.sinMandosF = null; window.clics = 0; window.teclas = 0;
+addEventListener('keydown', () => { window.teclas++; });
+document.getElementById('boton').addEventListener('click', () => { window.clics++; });
+window.listo = montarMandoSitio({ menu: () => window.menuAbierto, controles: { sinMandos: f => { window.sinMandosF = f; } } });
+</script>
+</body>
+</html>

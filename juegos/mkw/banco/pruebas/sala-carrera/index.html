@@ -20,7 +20,7 @@
 <div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { crearSala, humanosDeFicha, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, SEGUNDOS_COPA, PRESENTE_MS, ESPERA_TODOS_MS, llegadaDelJuego, ponerParrilla } from '/web/navegador/sala-carrera.mjs';
+import { crearSala, humanosDeFicha, copaMasPedida, MARCA_SALA, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS, SEGUNDOS_COPA, PRESENTE_MS, ESPERA_TODOS_MS, llegadaDelJuego, ponerParrilla } from '/web/navegador/sala-carrera.mjs';
 
 const { ok, fin } = prueba('sala-carrera', 'Sala sin WFC (sin el juego, reloj falso)');
 // ---- reloj falso y bus en memoria (los bytes van de una sala a otra como por la malla) ----
@@ -28,11 +28,17 @@ let t = 1_000_000;
 const tareas = new Map(); let nId = 1;
 const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
 const listo = () => new Promise(r => setTimeout(r, 0));
+// (§100: antes de cada parte, que lleguen los mensajes que quedaron andando de la anterior: con H9 la anfitriona contesta al
+// momento a quien va atrasado y la cadena es más larga; si no, la persona nueva de la parte siguiente los recibía)
+const vaciar = async () => { for (let i = 0; i < 8; i++) await listo(); };
 const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); await listo(); await listo(); };
 const salas = new Map();
 const humanos = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }, { uid: 'caro', mando: 2 }];
 const enviados = [];
-const enviar = de => (para, bytes) => { enviados.push(bytes[0]); setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0); };
+// (§100: corte(de, para) = true → ese mensaje se pierde: la conexión entre esos dos está partida)
+let corte = () => false;
+const tipos = [];                                   // (§100: qué mensajes de la sala manda cada uno)
+const enviar = de => (para, bytes) => { enviados.push(bytes[0]); if (bytes[0] === MARCA_SALA) try { tipos.push({ de, t: JSON.parse(new TextDecoder().decode(bytes.subarray(1))).t }); } catch {} if (corte(de, para)) return; setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0); };
 const persona = (uid, extra = {}) => {
   const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar(uid), ahora: () => t, cada, parar, ...extra });
   salas.set(uid, s); return s;
@@ -123,7 +129,7 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
 
 // M22) el reloj de la copa vence: solo la página de la anfitriona recibe el aviso (y una vez); en la playlist no hay reloj
 {
-  salas.clear();
+  await vaciar(); salas.clear();
   const vencio = [];
   const ar = persona('ana', { segundosCopa: 5, alVencioCopa: () => vencio.push('ana') });
   const br = persona('beto', { segundosCopa: 5, alVencioCopa: () => vencio.push('beto') });
@@ -136,7 +142,7 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
   await avanzar(0);
   ok('M22: con la copa puesta, todos pasan a «elegir» con su plazo de 45 s', [ar, br, cr].every(x => x.estado().fase === 'elegir' && x.estado().pistas?.[0]?.copa === 7));
   [ar, br, cr].forEach(x => x.detener());
-  salas.clear();
+  await vaciar(); salas.clear();
   const ap = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', carreras: 4, enviar: enviar('ana'), ahora: () => t, cada, parar, segundosCopa: 5, alVencioCopa: () => vencio.push('lista') });
   salas.set('ana', ap);
   const bp = persona('beto'), cp = persona('caro');
@@ -145,7 +151,7 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
      `plazo ${ap.estado().plazo} · ${vencio.join()}`);
   [ap, bp, cp].forEach(x => x.detener());
   // §99: el reloj de la copa espera a que la página de la anfitriona esté preparada (la lista de copas abierta sin trabas)
-  salas.clear();
+  await vaciar(); salas.clear();
   const al = persona('ana', { segundosCopa: 90, esperarListo: true }), bl = persona('beto'), cl = persona('caro');
   for (let i = 0; i < 6; i++) await avanzar(1000);
   ok('§99: mientras la anfitriona se prepara, la copa no tiene reloj', al.estado().fase === 'copa' && !al.estado().plazo && !bl.estado().plazo);
@@ -156,7 +162,7 @@ ok('después de la última carrera, la sala termina («fin») en todos', [ana, b
 }
 
 // 6) la anfitriona se va a mitad de la copa: la sala del sitio dice que manda Beto, y la copa sigue con él
-salas.clear();
+await vaciar(); salas.clear();
 const a3 = persona('ana'), b3 = persona('beto'), c3 = persona('caro');
 await avanzar(1000); await avanzar(1000);
 a3.ponerPistas(copa);
@@ -177,7 +183,7 @@ ok('Caro termina la 1, Beto lo recibe y, después de los resultados, los dos pas
 
 // 7) la página del juego vuelve a mandar lo suyo en cada cambio de la fase «elegir» (por si el anfitrión no lo tenía):
 // en la anfitriona eso no puede volverse un círculo (elegir → cambia el estado → elegir…)
-salas.clear();
+await vaciar(); salas.clear();
 let cambios = 0, solo = null;
 solo = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'copa', carreras: 2, enviar: enviar('ana'), ahora: () => t, cada, parar,
   alCambiar: e => { if (++cambios > 50) throw new Error('círculo'); if (e.fase === 'elegir') solo?.elegi({ personaje: 5, vehiculo: 4, derrape: 1 }); } });
@@ -188,7 +194,7 @@ ok('la anfitriona que elige otra vez en cada cambio no entra en un círculo', !c
 solo.detener();
 
 // 8) playlist (§74): empieza armando la lista; si la sala trae pistas, quedan de base (el resto: banco sala-playlist)
-salas.clear();
+await vaciar(); salas.clear();
 const cola = [{ copa: 3, fila: 0 }, { copa: 5, fila: 3 }, { copa: 40, fila: 1 }];
 const p1 = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', pistas: cola, enviar: enviar('ana'), ahora: () => t, cada, parar });
 ok('playlist: empieza armando la lista («copa»), con las 3 pistas de base', p1.estado().fase === 'copa' && p1.estado().lista?.pistas.length === 3 && !p1.estado().pistas);
@@ -197,7 +203,7 @@ p1.detener();
 // todas las consolas igual). Caro llega a mitad de la 1: su página se la salta (saltar) y el latido lo avisa a todos;
 // en la 2 ya no está fuera.
 await listo(); await listo();                  // (que no queden mensajes en camino de las salas de antes)
-salas.clear();
+await vaciar(); salas.clear();
 const saltos = { ana: [], beto: [] };
 const a9 = persona('ana', { alSalta: (u, n) => saltos.ana.push(`${u} ${n}`) }), b9 = persona('beto', { alSalta: (u, n) => saltos.beto.push(`${u} ${n}`) });
 for (let i = 0; i < 3; i++) await avanzar(1000);
@@ -228,7 +234,7 @@ ok('§75: …la copa de 2 termina en Ana y Beto', a9.estado().fase === 'fin' && 
 
 // 10) §75: la ANFITRIONA recarga a mitad de la copa. Su sala nueva está en el estado número 0; los latidos de los
 // demás traen uno más alto, ella les pide la copia y sigue desde ahí (con un número más alto que todos).
-salas.clear();
+await vaciar(); salas.clear();
 const a10 = persona('ana'), b10 = persona('beto'), c10 = persona('caro');
 await avanzar(1000); await avanzar(1000);
 a10.ponerPistas(copa); await avanzar(0);
@@ -253,7 +259,7 @@ ok('§75: …y la copa termina en las tres con ella de anfitriona', [a10b, b10, 
 
 // 10b) §87: la sala del sitio sacó a Caro (el anfitrión la echó, o la votación) con la carrera 1 andando. Su página
 // puede seguir mandando señales un rato: la carrera 2 igual la deja fuera, en todas las consolas.
-salas.clear();
+await vaciar(); salas.clear();
 const a87 = persona('ana'), b87 = persona('beto'), c87 = persona('caro');
 await avanzar(1000); await avanzar(1000);
 a87.ponerPistas(copa); await avanzar(0);
@@ -272,7 +278,7 @@ ok('§87: la carrera 2 empieza con Caro fuera aunque su página siga dando seña
 // 11) §75: los puntos de la copa viajan en el estado de la sala. Cada página los manda al terminar cada carrera (los 12
 // que lleva su consola y desde qué carrera corrió) y vale la tabla de quien corrió desde más atrás: Caro recargó y
 // corre desde la 2, así que su consola no tiene los puntos de la 1.
-salas.clear();
+await vaciar(); salas.clear();
 const a11 = persona('ana'), b11 = persona('beto'), c11 = persona('caro');
 await avanzar(1000); await avanzar(1000);
 a11.ponerPistas(copa); await avanzar(0);
@@ -299,7 +305,7 @@ ok('§75: la copa termina con la tabla de la última carrera en todos', [a11, b1
 
 // 12) §94: el descanso de 30 s entre carreras, la llegada de cada carrera en el estado (la parrilla de la siguiente) y
 // la cuenta con la hora de la anfitriona: Beto tiene el reloj 7 s adelantado y Caro 4 s atrasado
-salas.clear();
+await vaciar(); salas.clear();
 const a94 = persona('ana'), b94 = persona('beto', { ahora: () => t + 7000 }), c94 = persona('caro', { ahora: () => t - 4000 });
 await avanzar(1000); await avanzar(1000);
 a94.ponerPistas(copa); await avanzar(0);
@@ -348,6 +354,126 @@ rp94 = ponerParrilla(Lf, [1, 2, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12], 12);
 ok('§94: con un puesto repetido, también la de la primera', rp94?.deLlegada === false && e1()[0] === 12);
 rp94 = ponerParrilla(Lf, [2, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], 3);
 ok('§94: con 3 corredores (sin CPU), la llegada de esos 3', rp94?.deLlegada === true && e1().slice(0, 3).join() === '2,3,1', e1().slice(0, 3).join());
+
+// 14) §100 (lo que vio el dueño: «cuando el contador llegó a 0 no pasó nada»): la anfitriona cierra la pestaña eligiendo
+// y nadie avisa (el sitio tarda): la sala misma la reemplaza
+await vaciar(); salas.clear();
+const idos = new Set(), conIdo = { ido: u => idos.has(u) };
+const a100 = persona('ana', conIdo), b100 = persona('beto', conIdo), c100 = persona('caro', conIdo);
+await avanzar(1000); await avanzar(1000);
+a100.ponerPistas(copa); await avanzar(0);
+b100.elegi({ personaje: 2, vehiculo: 2 }); await avanzar(0);
+ok('§100: (otra copa: eligiendo; Beto ya eligió)', [a100, b100, c100].every(x => x.estado().fase === 'elegir') && !!a100.estado().picks.beto);
+a100.detener(); salas.delete('ana'); idos.add('ana');        // (Ana se fue: ni en el buzón ni por WebRTC)
+for (let i = 0; i < 3; i++) await avanzar(1000);
+ok('§100: a los 3 s de silencio todavía manda Ana', !b100.soyAnfitrion && b100.anfitrion === 'ana' && c100.anfitrion === 'ana');
+for (let i = 0; i < 3; i++) await avanzar(1000);
+ok('§100: a los ~5 s (y se fue) manda Beto, la primera de la sala que sigue, en las dos', b100.soyAnfitrion && c100.anfitrion === 'beto' && !c100.soyAnfitrion,
+   `${b100.anfitrion} · ${c100.anfitrion}`);
+c100.elegi({ personaje: 3, vehiculo: 3 }); await avanzar(0);
+ok('§100: lo que elige Caro llega a Beto, que guardaba lo de antes', !!b100.estado().picks.caro && !!b100.estado().picks.beto);
+for (let i = 0; i < SEGUNDOS_ELEGIR; i++) await avanzar(1000);
+ok('§100: el reloj de elegir llega a 0 y empieza la carrera 1 en las dos, con Ana fuera', [b100, c100].every(x => x.estado().fase === 'correr' && x.estado().carrera === 1) &&
+   b100.estado().fuera.includes('ana') && c100.estado().version === b100.estado().version, `${b100.estado().fase} ${b100.estado().carrera} fuera ${b100.estado().fuera}`);
+[b100, c100].forEach(x => x.detener());
+
+// 15) §100: la conexión con la anfitriona se parte pero ella sigue en el buzón (no «se fue»): a los 10 s manda otra,
+// provisoria; al arreglarse, vuelve a mandar Ana y se queda con la copia más nueva
+await vaciar(); salas.clear();
+const a15 = persona('ana'), b15 = persona('beto'), c15 = persona('caro');
+await avanzar(1000); await avanzar(1000);
+a15.ponerPistas(copa); await avanzar(0);
+corte = (de, para) => de === 'ana' || para === 'ana';
+for (let i = 0; i < 8; i++) await avanzar(1000);
+ok('§100: a los 8 s sin oírla (sigue en el buzón) todavía manda Ana', b15.anfitrion === 'ana' && c15.anfitrion === 'ana');
+for (let i = 0; i < 4; i++) await avanzar(1000);
+ok('§100: a los ~11 s, manda Beto (provisoria); Ana sigue sola', b15.soyAnfitrion && c15.anfitrion === 'beto' && a15.soyAnfitrion);
+b15.elegi({ personaje: 4, vehiculo: 4 }); c15.elegi({ personaje: 5, vehiculo: 5 }); await avanzar(0);
+const v15 = b15.estado().version;
+corte = () => false;
+for (let i = 0; i < 4; i++) await avanzar(1000);
+ok('§100: arreglada la red, manda Ana otra vez en las tres', a15.soyAnfitrion && b15.anfitrion === 'ana' && c15.anfitrion === 'ana' && !b15.soyAnfitrion,
+   [a15, b15, c15].map(x => x.anfitrion).join());
+ok('§100: …y Ana se quedó con la copia más nueva (lo que eligieron Beto y Caro mientras), la misma en las tres',
+   !!a15.estado().picks.beto && !!a15.estado().picks.caro && a15.estado().version > v15 && [b15, c15].every(x => x.estado().version === a15.estado().version),
+   [a15, b15, c15].map(x => x.estado().version).join());
+[a15, b15, c15].forEach(x => x.detener());
+
+// 16) §100 (H1.4, del crítico de la red): solo se parte Ana ↔ Caro; Beto oye a las dos: la sala sigue por Beto, sin
+// reemplazar a nadie
+await vaciar(); salas.clear();
+const a16 = persona('ana'), b16 = persona('beto'), c16 = persona('caro');
+await avanzar(1000); await avanzar(1000);
+a16.ponerPistas(copa); await avanzar(0);
+corte = (de, para) => (de === 'ana' && para === 'caro') || (de === 'caro' && para === 'ana');
+for (let i = 0; i < 14; i++) await avanzar(1000);
+ok('§100 (H1.4): con Ana ↔ Caro partida 14 s, sigue mandando Ana en las tres (sus repartos le llegan a Caro por Beto)',
+   [a16, b16, c16].every(x => x.anfitrion === 'ana') && c16.estado().version === a16.estado().version, [a16, b16, c16].map(x => `${x.anfitrion} v${x.estado().version}`).join(' · '));
+c16.elegi({ personaje: 6, vehiculo: 6 }); await avanzar(0); await avanzar(0);
+ok('§100 (H1.4): lo que elige Caro le llega a Ana por Beto', a16.estado().picks.caro?.personaje === 6, JSON.stringify(a16.estado().picks.caro));
+{
+  // (§100, H1.2: lo que oye cada una, para la prueba de conexión: Caro y Ana se oyen, pero pasando por Beto)
+  const ca = c16.oido('ana'), ac = a16.oido('caro'), ba = b16.oido('ana');
+  ok('§100 (H1.2): Caro oye a Ana por Beto (no directo) y Ana a Caro igual; Beto oye a Ana directo (eso manda, aunque al abrir Caro le pasó una copia)',
+     ca.hace < 3000 && ca.directo > 3000 && ca.por === 'beto' && ac.hace < 3000 && ac.directo > 3000 && ac.por === 'beto' && ba.directo < 3000,
+     JSON.stringify({ ca, ac, ba }));
+}
+// (§100: y Ana no da a Caro por ausente: sus latidos le llegan por Beto; antes, con 14 s sin oírla directo, la carrera
+// empezaba con Caro fuera)
+// (12 s más sin que Caro mande nada a la anfitriona: más que los 10 s de PRESENTE_MS)
+for (let i = 0; i < 12; i++) await avanzar(1000);
+a16.elegi({ personaje: 1, vehiculo: 1 }); b16.elegi({ personaje: 2, vehiculo: 2 }); await avanzar(0); await avanzar(0); await avanzar(0);
+ok('§100 (H1.4): con Ana ↔ Caro partida 26 s (Caro eligió hace 12), la carrera 1 empieza con Caro adentro (sus latidos le llegan a Ana por Beto)',
+   [a16, b16, c16].every(x => x.estado().fase === 'correr' && x.estado().carrera === 1 && !(x.estado().fuera || []).includes('caro')),
+   [a16, b16, c16].map(x => `${x.estado().fase} ${x.estado().carrera} fuera ${JSON.stringify(x.estado().fuera)}`).join(' · '));
+corte = () => false;
+[a16, b16, c16].forEach(x => x.detener());
+
+// 17) §100 (H9 del crítico de la red): sin cambios, la anfitriona reparte el estado entero cada 5 s (antes, cada segundo
+// a todos); a la que llega con uno viejo (recargó), se lo manda al ver su latido
+await vaciar(); salas.clear();
+const sin = { segundosCopa: 0 };
+const a17 = persona('ana', sin), b17 = persona('beto', sin), c17 = persona('caro', sin);
+for (let i = 0; i < 3; i++) await avanzar(1000);
+await vaciar(); tipos.length = 0;
+for (let i = 0; i < 10; i++) await avanzar(1000);
+const e17 = tipos.filter(x => x.de === 'ana' && x.t === 'estado').length, l17 = tipos.filter(x => x.de === 'ana' && x.t === 'aqui').length;
+ok('§100 (H9): sin cambios, en 10 s la anfitriona mandó el estado entero 2 veces a cada una (antes 10); el latido, cada segundo',
+   e17 >= 2 && e17 <= 6 && l17 >= 18, `${e17} estados, ${l17} latidos`);
+c17.detener(); await vaciar();
+const c17b = persona('caro', sin);
+await avanzar(1000); await vaciar();
+ok('§100 (H9): la que recarga sabe en qué va la sala al primer latido (no espera el reparto de 5 s)', c17b.lista && c17b.estado().version === a17.estado().version,
+   `lista ${c17b.lista}, v${c17b.estado().version} / v${a17.estado().version}`);
+[a17, b17, c17b].forEach(x => x.detener());
+
+// 18) §100 («Pedir copa», pedido del dueño): mientras Ana elige la copa, Beto y Caro piden una; ella las ve, y la más
+// pedida es la que sale si se le acaba el reloj
+await vaciar(); salas.clear();
+const a18 = persona('ana', sin), b18 = persona('beto', sin), c18 = persona('caro', sin);
+for (let i = 0; i < 3; i++) await avanzar(1000);
+ok('§100: la anfitriona no pide (elige)', a18.pedirCopa(4) === false);
+ok('§100: Beto pide la copa 4', b18.pedirCopa(4) === true);
+await vaciar();
+ok('§100: …y le llega a Ana (y a todos, en el estado)', [a18, b18, c18].every(x => x.estado().pedidas?.beto === 4), JSON.stringify(a18.estado().pedidas));
+c18.pedirCopa(9); await vaciar(); c18.pedirCopa(4); await vaciar();
+ok('§100: Caro pide la 9 y después cambia a la 4: vale la última', a18.estado().pedidas?.caro === 4, JSON.stringify(a18.estado().pedidas));
+ok('§100: un número loco no se pide', b18.pedirCopa(-1) === false && b18.pedirCopa(1.5) === false && b18.pedirCopa(9999) === false);
+ok('§100: la más pedida: la 4 (dos la piden)', copaMasPedida(a18.estado().pedidas, humanos) === 4);
+ok('§100: empate: la del que está más arriba en la sala; sin pedidos, ninguna',
+   copaMasPedida({ caro: 7, beto: 2 }, humanos) === 2 && copaMasPedida({}, humanos) === -1 && copaMasPedida(null, humanos) === -1);
+a18.ponerPistas([0, 1, 2, 3].map(f => ({ copa: 4, fila: f }))); await vaciar();
+ok('§100: con la copa puesta se borran los pedidos y ya no se pide', [a18, b18, c18].every(x => x.estado().fase === 'elegir' && !Object.keys(x.estado().pedidas || {}).length) &&
+   b18.pedirCopa(3) === false);
+[a18, b18, c18].forEach(x => x.detener());
+// (en la playlist no se pide copa: se sugieren pistas, §74)
+await vaciar(); salas.clear();
+const ap18 = crearSala({ yo: 'ana', humanos, anfitrion: 'ana', estilo: 'playlist', carreras: 4, enviar: enviar('ana'), ahora: () => t, cada, parar });
+const bp18 = crearSala({ yo: 'beto', humanos, anfitrion: 'ana', estilo: 'playlist', carreras: 4, enviar: enviar('beto'), ahora: () => t, cada, parar });
+salas.set('ana', ap18); salas.set('beto', bp18);
+for (let i = 0; i < 9; i++) await avanzar(1000);
+ok('§100: en la playlist no se pide copa', bp18.pedirCopa(4) === false);
+[ap18, bp18].forEach(x => x.detener());
 fin();
 </script>
 </body>

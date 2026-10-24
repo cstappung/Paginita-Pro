@@ -401,6 +401,10 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // ---------------- Aviso sobre el juego y elegir copa/pista ----------------
   const avisoJuego = el('div', { id: 'avisoJuego', role: 'status', hidden: true });
   document.body.append(avisoJuego);
+  // §100: un botón encima del juego, debajo del aviso (texto vacío = se va): «🙋 Pedir copa»
+  const accionJuego = el('button', { type: 'button', id: 'accionJuego', hidden: true });
+  document.body.append(accionJuego);
+  function accion(texto, alClic = null) { accionJuego.textContent = texto || ''; accionJuego.hidden = !texto; accionJuego.onclick = texto ? alClic : null; }
   function aviso(texto, mal = false) {
     avisoJuego.textContent = texto; avisoJuego.hidden = !texto; avisoJuego.classList.toggle('mal', mal);
     if (texto && !texto.includes('…')) setTimeout(() => { if (avisoJuego.textContent === texto) avisoJuego.hidden = true; }, 6000);   // los de «…» quedan mientras dure
@@ -502,7 +506,9 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   //     el texto del pie. Termina con ctrl.cerrar() (la sala, cuando el anfitrión confirma) o con «Listo» si cerrar.
   // Con mouse: pasar por encima muestra la foto y el plano. Con el dedo: el primer toque muestra y el segundo elige; en
   // el modo lista el primer toque ya agrega (es lo que se hace todo el rato) y otro toque la quita.
-  async function elegirPista({ modo, copas, cuantas = 4, titulo: tituloPedido = '', cerrar = true, textoCerrar = 'Prefiero los menús del juego', lista: conf = {} }) {
+  // §100 («Pedir copa»): textoJugar(c) = otro texto para el botón del modo gp («Pedir la Copa N ▸»); ctrl.pedidas({copa:
+  //   [nombres]}) = las copas que piden los demás, con un 🙋 en su tarjeta (la anfitriona)
+  async function elegirPista({ modo, copas, cuantas = 4, titulo: tituloPedido = '', cerrar = true, textoCerrar = 'Prefiero los menús del juego', lista: conf = {}, textoJugar = null }) {
     if (modo === 'copa') modo = 'lista';
     copas = await nombresPistas(copas);
     fotos.precargar?.().catch(() => {});
@@ -634,8 +640,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
           caja.querySelectorAll('.copa .pista.visto').forEach(x => x.classList.remove('visto'));
           tarjetas[c]?.classList.add('en-vista');
         }
-        vc.sub.textContent = elegida === c ? '4 carreras · la marcaste' : elegida >= 0 ? `4 carreras · marcaste la Copa ${elegida + 1}` : '4 carreras';
-        vc.jugar.textContent = `Jugar la Copa ${(elegida >= 0 ? elegida : c) + 1} ▸`;
+        vc.sub.textContent = subDe(c);
+        vc.jugar.textContent = textoJugar ? textoJugar(elegida >= 0 ? elegida : c) : `Jugar la Copa ${(elegida >= 0 ? elegida : c) + 1} ▸`;
         verPista(f, auto);
       }
       // muestra la pista f de la copa a la vista: la foto pasa adelante ya decodificada (fundido de 140 ms) y el videíto
@@ -682,6 +688,35 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
         clearTimeout(relojAuto);
         if (!autoAvanza || vista.matches(':hover')) return;
         relojAuto = setTimeout(() => { if (caja.isConnected && autoAvanza && vista.classList.contains('con-algo')) verPista((pistaVista + 1) % 4, true); }, 4000);
+      }
+      // §100: las copas que piden los demás (copa → nombres): un 🙋 en la cabeza de su tarjeta y en el panel
+      let pedidas = {};
+      // (y arriba, junto al título: «🙋 Copa 8 · Beto», un botón por copa pedida que la marca y la trae a la vista: la
+      // pedida podía quedar abajo, fuera de la pantalla)
+      const pedidasCab = el('div', { className: 'pedidas-cab', hidden: true });
+      const pideTxt = c => (pedidas[c]?.length ? ` · 🙋 la pide${pedidas[c].length > 1 ? 'n' : ''} ${pedidas[c].join(', ')}` : '');
+      function subDe(c) { return (elegida === c ? '4 carreras · la marcaste' : elegida >= 0 ? `4 carreras · marcaste la Copa ${elegida + 1}` : '4 carreras') + pideTxt(c); }
+      function pintarPedidas() {
+        if (!enGp) return;
+        tarjetas.forEach((t, c) => {
+          let b = t.querySelector('.copa-pedida');
+          const ns = pedidas[c] || [];
+          if (!ns.length) { b?.remove(); return; }
+          if (!b) { b = el('span', { className: 'copa-pedida' }); t.querySelector('.copa-cab')?.append(b); }
+          b.textContent = `🙋 ${ns.length > 2 ? ns.length : ns.join(', ')}`;
+          b.title = `La pide${ns.length > 1 ? 'n' : ''}: ${ns.join(', ')}`;
+        });
+        if (copaVista >= 0) vc.sub.textContent = subDe(copaVista);
+        const orden = Object.keys(pedidas).map(Number).filter(c => pedidas[c]?.length && c >= 0 && c < copas.length).sort((x, y) => pedidas[y].length - pedidas[x].length || x - y);
+        pedidasCab.hidden = !orden.length;
+        pedidasCab.replaceChildren(...orden.map(c => el('button', { type: 'button', className: 'pedida-ir', textContent: `🙋 Copa ${c + 1} · ${pedidas[c].join(', ')}`,
+          title: 'Marcar esta copa', onclick: () => {
+            if (buscar.value) { buscar.value = ''; pintar(); }
+            lado.classList.remove('arriba'); lado.style.top = '';
+            marcarCopa(c, 0, true);
+            ignorarScrollHasta = performance.now() + 800;
+            tarjetas[c]?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+          } })));
       }
       // marcar una copa (anillo amarillo); el botón la confirma
       function marcarCopa(c, f = 0, auto = false) {
@@ -1060,6 +1095,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
           tarjetas[elegida]?.classList.add('elegida');
           tarjetas[copaVista]?.classList.add('en-vista');
           tarjetas[copaVista]?.querySelectorAll('.pista').forEach((b, i) => b.classList.toggle('visto', i === pistaVista));
+          pintarPedidas();
         }
       };
       buscar.oninput = pintar;
@@ -1073,6 +1109,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
           ignorarScrollHasta = performance.now() + 800;
           tarjetas[c]?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
         } }));
+      if (enGp) cabeza.append(pedidasCab);
       if (cerrar && !enSugerir) cabeza.append(el('button', { type: 'button', className: 'boton', id: 'elegirCerrar', textContent: textoCerrar, onclick: () => terminar(null) }));
       caja.append(cabeza, el('div', { className: 'elegir-cuerpo' }, grilla, lado));
       document.body.append(caja);
@@ -1101,6 +1138,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
       const ctrl = {
         poner(ps) { if (!tuLista) return; const n = Array.isArray(ps) ? ps.length : 0; resaltar = n > tuLista.pistas.length ? n - 1 : -1; tuLista.poner(ps || []); },
         sugerencias(l) { pintarSugerencias(l); },
+        pedidas(m) { pedidas = m && typeof m === 'object' ? m : {}; pintarPedidas(); },
         get pistas() { return tuLista ? tuLista.pistas : []; },
         cerrar(v = null) { if (caja.isConnected) terminar(v); },
         get abierto() { return caja.isConnected; },
@@ -1217,7 +1255,7 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     };
   }
 
-  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, chip, elegirPista, cortina, playlistBreve,
+  return { preguntar, avisar, partidaCambio, sonidoCambio, empezo, abrirCajon, cerrarCajon, respaldar, aviso, accion, chip, elegirPista, cortina, playlistBreve,
            conPortada, get cortinaPuesta() { return !document.body.classList.contains('sin-cortina'); },
            estado: t => { estado.textContent = t; } };
 }

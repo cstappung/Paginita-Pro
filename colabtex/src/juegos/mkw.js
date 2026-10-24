@@ -190,6 +190,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   const vrs = {};                                     // uid → VR (de mkw/vr), para mostrarlo en el vestíbulo
   const abierto = { cambiar: false, menu: "", tabla: false };   // M21: lo abierto en el vestíbulo (va en su firma)
   let faseJuego = null;                               // M22: la fase que manda el marco (copa, elegir, carrera, descanso)
+  let conex = {};                                     // §100 (H1.2): cómo le llega cada piloto a este marco (uid → { e, ms, por })
   /* M22 (modelo «Modo consola»): si la persona lo pidió en el vestíbulo («Pantalla completa al empezar», apagado por
      omisión: el dueño, por el lag), al empezar la copa la sala pasa sola al modo inmersivo del sitio y el marco llena la
      pantalla; al volver al vestíbulo, sale. Una vez por copa: si sale con Esc o «Salir», no se le vuelve a poner.
@@ -267,6 +268,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       faseJuego = { fase: d.fase.slice(0, 12), carrera: Math.max(0, d.carrera | 0), carreras: Math.max(0, d.carreras | 0) };
       pintaVestibulo(true);
     }
+    /* §100 (H1.2, la prueba de conexión): cómo le llega a este jugador cada uno de los otros pilotos (el marco mira su
+       malla cada 2 s): 🟢 directa, 🛰 por el repetidor, 🔴 por otro piloto o sin conexión, ⏳ conectando. Va en la tira. */
+    if (d.tipo === "conexiones" && d.de && typeof d.de === "object") { conex = mkwConexiones(d.de); pintaVestibulo(); }
     if (d.tipo === "fin") {
       /* los VR de los demás también se movieron: se vuelven a leer (una vez cada uno) */
       for (const j of presentes()) if (j.uid !== uid) delete vrs[j.uid];
@@ -316,7 +320,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const nodo = est.nodos?.[uid];
     const firma = `${est.ronda}|${nodo}|${(est.sincro || []).join(",")}`;
     if (firma === firmaMarco) { frame.hidden = false; avisaMarco(); return; }
-    firmaMarco = firma; jefeMarco = est.anfitrion; avisado = ""; faseJuego = null;
+    firmaMarco = firma; jefeMarco = est.anfitrion; avisado = ""; faseJuego = null; conex = {};
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
@@ -464,7 +468,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     if (!manda || corre) abierto.cambiar = false;
     if (abierto.menu && (!manda || !js.some(j => j.uid === abierto.menu && j.uid !== uid))) abierto.menu = "";
     const firma = JSON.stringify([js.map(j => [j.uid, j.nombre, j.color, j.foto]), est.anfitrion, est.estilo, est.carreras, est.cc, est.nivel, est.ultimaTabla,
-      est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe]);
+      est.fase, est.ronda, origen, vrs, manda, est.sincro, est.fuera, est.cupo, abierto, preDe, conex]);
     if (!forzar && firma === firmaVest) return;
     firmaVest = firma;
     ponEstiloVest();
@@ -488,6 +492,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     // M22: cómo va la precarga de cada uno (lo que escribió en su presencia)
     const preDeJ = j => { const t = preDe[j.uid]; return !t ? "" : t === "listo" ? `<span class="jg2-pre listo" title="El juego ya está bajado en su navegador">● listo</span>`
       : `<span class="jg2-pre" title="Bajando el juego">⬇ ${escapeHtml(t)} %</span>`; };
+    // §100 (H1.2): el ícono de la conexión con ese piloto (lo que mide el marco; el título dice el detalle)
+    const conDe = j => {
+      const c = j.uid !== uid && conex[j.uid];
+      if (!c) return "";
+      const t = `Conexión con ${j.nombre || "Piloto"}: ${CON_TEXTO[c.e]}${c.e === "puente" ? ` (le llega por ${c.por ? nombre(c.por) : "otro piloto"})` : ""}${c.ms != null ? ` · ${c.ms} ms` : ""}`;
+      return `<span class="jg2-con ${c.e}" role="img" title="${escapeHtml(t)}" aria-label="${escapeHtml(t)}">${CON_ICONO[c.e]}</span>`;
+    };
     const vrDe = j => `<span class="jg2-vr">VR <b>${vrs[j.uid] ? Number(vrs[j.uid]).toLocaleString("es") : vrs[j.uid] === 0 ? "5000" : "—"}</b>${vrs[j.uid] === 0 ? " <small>nuevo</small>" : ""}</span>`;
     // lo que dice el panel según quién mira (los mismos avisos de antes)
     const sinPrograma = origen === "";
@@ -502,7 +513,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const salirBtn = sacado ? `<button type="button" class="jg2-salir" data-salir data-foco="salir">← Volver a Juegos</button>` : "";
 
     if (tira) {
-      const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${cara(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${menuDe(j)}</span>`;
+      const ficha = j => `<span class="jg2-ficha${j.uid === uid ? " yo" : ""}">${cara(j, 22)}<b translate="no" title="${nom(j)}">${nom(j)}</b>${corona(j)}${conDe(j)}${menuDe(j)}</span>`;
       vest.innerHTML = `<div class="jg2-tira">
           <span class="jg2-ttit">${titular}</span>
           <span class="jg2-tcuenta">${js.length} de ${cupo}</span>
@@ -584,7 +595,8 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
   function notaFase(manda, estilo) {
     const f = faseJuego, jefe = escapeHtml(nombre(est.anfitrion));
     if (f?.fase === "copa") return manda ? (estilo === "copa" ? "Elige la copa en el juego." : "Arma la lista en el juego; los demás te pueden sugerir pistas.")
-      : `${jefe} está ${estilo === "copa" ? "eligiendo la copa" : "armando la lista"}. Mientras, ya puedes elegir personaje y vehículo.`;
+      : estilo === "copa" ? `${jefe} está eligiendo la copa. Puedes pedirle una con «Pedir una copa» en el juego y, mientras, elegir personaje y vehículo.`
+      : `${jefe} está armando la lista. Mientras, ya puedes elegir personaje y vehículo.`;
     if (f?.fase === "elegir") return "Cada uno elige personaje y vehículo en el juego.";
     if (f?.fase === "carrera") return `Carrera ${f.carrera}${f.carreras ? ` de ${f.carreras}` : ""} en curso.`;
     if (f?.fase === "descanso") return `Descanso: la carrera ${f.carrera + 1} empieza en unos segundos.`;
@@ -680,6 +692,19 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
 /* ---------- El vestíbulo de la sala (M21, la propuesta D) ---------- */
 /* Los textos del vestíbulo: el modo en corto (el titular) y una línea de ayuda por opción */
 const MODO_CORTO = { copa: "Copa", playlist: "Playlist" };
+/* §100 (H1.2): la prueba de conexión de cada piloto que manda el marco ({ tipo: "conexiones", de: { uid: { e, ms, por } } }),
+   revisada (a lo más 12, solo los estados conocidos) */
+const CON_ICONO = { directa: "🟢", repetidor: "🛰", puente: "🔴", sin: "🔴", conectando: "⏳" };
+const CON_TEXTO = { directa: "directa", repetidor: "por el repetidor", puente: "sin conexión directa", sin: "sin conexión", conectando: "conectando…" };
+export function mkwConexiones(de) {
+  const r = {};
+  for (const [u, c] of Object.entries(de || {}).slice(0, 12)) {
+    if (u.length > 128 || !c || typeof c !== "object" || !Object.hasOwn(CON_ICONO, c.e)) continue;
+    r[u] = { e: c.e, ms: Number.isFinite(c.ms) && c.ms >= 0 && c.ms < 60000 ? Math.round(c.ms) : null,
+             por: typeof c.por === "string" && c.por.length <= 128 ? c.por : null };
+  }
+  return r;
+}
 const AYUDA_MODO = { copa: "Una copa del juego: 4 pistas, con puntos.", playlist: "Una lista de pistas que arma el anfitrión; los demás sugieren." };
 const AYUDA_CC = { c150: "La velocidad de siempre.", espejo: "A 150cc, con las pistas dadas vuelta.",
   c100: "Mucho más rápido. Hay que frenar antes de las curvas.", azar: "Cada carrera sortea la suya: 150cc, espejo o 200cc." };
@@ -767,6 +792,7 @@ const ESTILO_VEST = `
 .jg-mkw2 .jg2-ficha b{font-size:.85rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-mkw2 .jg2-ficha.cpu{border-style:dashed;color:#8ea0d6;padding:3px 10px}
 .jg-mkw2 .jg2-ficha .jg2-mas{width:24px;height:22px}
+.jg-mkw2 .jg2-con{font-size:.78rem;line-height:1;cursor:help}
 .jg-mkw2 .jg2-ficha .jg2-menu{top:30px;right:0}
 .jg-mkw2 .jg2-vuelve{border:0;border-radius:10px;padding:8px 14px;background:#ffffff1f;color:#eef2ff;font:700 .95rem system-ui,sans-serif;cursor:pointer}
 .jg-mkw2 .jg2-salir{justify-self:start;border:0;border-radius:10px;padding:9px 16px;background:#ffffff1f;color:#eef2ff;font:700 .95rem system-ui,sans-serif;cursor:pointer}

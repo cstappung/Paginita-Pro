@@ -239,6 +239,19 @@
     padding: 7px 14px; border-radius: 999px; background: #161233ee; border: 1px solid #4b3d93; color: var(--texto);
     font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
   #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
+  /* §100: el botón debajo del aviso («🙋 Pedir copa») */
+  #accionJuego { position: fixed; z-index: 6; left: 50%; top: calc(var(--st) + 50px); translate: -50% 0; min-height: 36px; padding: 6px 16px;
+    border-radius: 999px; border: 2px solid var(--amarillo); background: #161233f2; color: var(--amarillo); cursor: pointer;
+    font: 700 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; }
+  #accionJuego:hover, #accionJuego:focus-visible { background: #2a2160; outline: none; }
+  /* §100: arriba del selector de la anfitriona, un botón por copa pedida */
+  .pedidas-cab { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+  .pedida-ir { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--amarillo); background: #ffd21f1f; color: var(--amarillo); cursor: pointer;
+    font: 700 12px 'IBM Plex Sans', sans-serif; }
+  .pedida-ir:hover, .pedida-ir:focus-visible { background: #ffd21f38; outline: none; }
+  /* §100: la copa que piden los demás (en el selector de la anfitriona) */
+  .copa-pedida { flex: none; padding: 1px 8px; border-radius: 999px; background: #ffd21f26; border: 1px solid var(--amarillo); color: var(--amarillo);
+    font: 700 11px 'IBM Plex Sans', sans-serif; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
   /* M22: la esquina de los avisos de estado (📶 la red, la PC lenta): arriba a la izquierda, donde el juego no pone HUD */
   #estadoJuego { position: fixed; z-index: 6; left: calc(10px + var(--sl)); top: calc(10px + var(--st)); display: flex; flex-direction: column;
     align-items: flex-start; gap: 6px; max-width: min(360px, calc(100vw - 32px)); pointer-events: none; }

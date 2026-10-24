@@ -404,3 +404,27 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  assert.match(datos,/"mkw": \{"movil":false,"pc":true,"pide":"teclado o mando"/);
  assert.ok(!/Chrome en Android \(el juego usa WebGPU\)/.test(reg),'sin Android en Mario Kart');
 });
+
+test('§100 (H1.2) la prueba de conexión: el marco dice cómo le llega cada piloto y la tira pone 🟢/🛰/🔴/⏳ al lado de cada uno',()=>{
+ const mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
+ const trozo=mk.slice(mk.indexOf('const CON_ICONO'),mk.indexOf('const AYUDA_MODO')).replace(/export /g,'');
+ const c={};vm.runInNewContext(trozo+';__f=mkwConexiones;__i=CON_ICONO',c);
+ const J=x=>JSON.parse(JSON.stringify(x));
+ // lo que vale pasa (los ms redondeados); lo raro se tira: estados desconocidos (también los del prototipo), ms imposibles
+ assert.deepEqual(J(c.__f({b:{e:'directa',ms:33.6},c:{e:'repetidor',ms:80},d:{e:'puente',por:'b'},e:{e:'sin'},f:{e:'conectando'}})),
+  {b:{e:'directa',ms:34,por:null},c:{e:'repetidor',ms:80,por:null},d:{e:'puente',ms:null,por:'b'},e:{e:'sin',ms:null,por:null},f:{e:'conectando',ms:null,por:null}});
+ assert.deepEqual(J(c.__f({b:{e:'constructor'},c:{e:'hackeado'},d:null,e:'directa',f:{e:'directa',ms:-5},g:{e:'directa',ms:1e9}})),
+  {f:{e:'directa',ms:null,por:null},g:{e:'directa',ms:null,por:null}});
+ assert.equal(Object.keys(c.__f(Object.fromEntries(Array.from({length:30},(_,i)=>['u'+i,{e:'directa'}])))).length,12,'a lo más 12');
+ assert.deepEqual(J(c.__f(null)),{});
+ assert.equal(c.__i.directa,'🟢');assert.equal(c.__i.repetidor,'🛰');assert.equal(c.__i.puente,'🔴');assert.equal(c.__i.conectando,'⏳');
+ // solo los mensajes del marco de la sala; el ícono va en la tira (no en la ficha propia) y en la firma del vestíbulo
+ assert.match(mk,/if \(d\.tipo === "conexiones" && d\.de && typeof d\.de === "object"\) \{ conex = mkwConexiones\(d\.de\); pintaVestibulo\(\); \}/);
+ assert.match(mk,/const c = j\.uid !== uid && conex\[j\.uid\];/,'la conexión con uno mismo no se dibuja');
+ assert.match(mk,/const ficha = j => .*\$\{corona\(j\)\}\$\{conDe\(j\)\}\$\{menuDe\(j\)\}/);
+ assert.match(mk,/abierto, preDe, conex\]\);/,'cambia la firma: se vuelve a dibujar');
+ assert.match(mk,/faseJuego = null; conex = \{\};/,'una copa nueva empieza sin las de la anterior');
+ // el marco (juegos/mkw): la manda cada vez que cambia
+ const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
+ assert.match(juego,/tipo: 'conexiones',\s*de: Object\.fromEntries\(lista\.map\(c => \[c\.uid, \{ e: c\.e, ms: c\.ms \?\? null, por: c\.por \|\| null \}\]\)\)/);
+});

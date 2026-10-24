@@ -12,6 +12,7 @@ const path = require('path');                 // armar rutas sin errores de barr
 
 const RAIZ = __dirname;                       // lo que se sirve: la carpeta banco/
 const WEB = path.join(__dirname, '..', 'web'); // y web/ (código de la página, sin nada del juego) en /web/
+const SITIO_AUDIO = path.join(__dirname, '..', 'terceros', 'Paginita-Pro', 'juegos', 'audio');   // §100: en /sitio/audio/
 const PUERTO = Number(process.argv[2]) || 8130;
 const TIPOS = {                               // extensión → tipo de contenido
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -25,8 +26,11 @@ http.createServer((pedido, respuesta) => {
   let ruta = decodeURIComponent(pedido.url.split('?')[0]);
   if (ruta.endsWith('/')) ruta += 'index.html';                 // una carpeta → su index.html
   // /web/... = nuestro código de la página del juego (web/: sin nada del juego), para probar sus piezas sueltas
-  const base = ruta.startsWith('/web/') ? WEB : RAIZ;
-  const archivo = path.normalize(path.join(base, ruta.startsWith('/web/') ? ruta.slice(4) : ruta));
+  // §100: /sitio/audio/... = la carpeta de audio y mandos del sitio (terceros/Paginita-Pro/juegos/audio: código del dueño,
+  // sin nada del juego), para probar los mandos de Mario Kart con el mando.js de verdad (banco mando-sitio)
+  const sitio = ruta.startsWith('/sitio/audio/');
+  const base = sitio ? SITIO_AUDIO : ruta.startsWith('/web/') ? WEB : RAIZ;
+  const archivo = path.normalize(path.join(base, sitio ? ruta.slice(12) : ruta.startsWith('/web/') ? ruta.slice(4) : ruta));
   if (!archivo.startsWith(base)) { respuesta.writeHead(403); return respuesta.end('fuera del banco'); }   // nada de "../"
   fs.readFile(archivo, (error, datos) => {
     if (error) { respuesta.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return respuesta.end('no existe: ' + ruta); }

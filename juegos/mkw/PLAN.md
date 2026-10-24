@@ -157,6 +157,32 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
   copa; el modo inmersivo al empezar (opcional, apagado por omisión) y la precarga del vestíbulo con «⬇ 40 %» / «● listo» por piloto. Banco
   `letreros` 17, `nombres-juego` 15, `sala-carrera` 75; `prueba-sala` 42/42 (`--recarga` 38/38), `prueba-precarga` 8/8,
   `prueba-relevo` 10/10; sitio 20/20, `prueba-experiencia` 22/22 y `--playlist` 24/24 (§98)
+- ✅ M23. (Pedido del dueño, 2026-10-22) **La red según el crítico, la carga de la sala, Intenso/Imposible y el VR por
+  nivel.** Un crítico de la red (solo revisar) confirmó que compartir botones es el enfoque correcto y encontró cómo el
+  lag de uno llegaba a los 11; el dueño dijo sí a todo. Hecho: la cortina con barra de progreso hasta que el navegador
+  está en calma (la lista de copas ya no se traba), sin B ni START en la sala, el editor de Mii escondido; paquetes con
+  acuse, TURN e ICE restart, la toma del anfitrión que desaparece, la largada pareja, la autoridad por estabilidad,
+  **ponerse al día** (el runtime corre cuadros seguidos: `mkw_prisa`) y **el relevo rápido** (al callado se lo pausa a
+  los 150 ms y vuelve a manejar); los niveles **Intenso** (el Hard AI de RR) e **Imposible** (además, solo las CPU: tope
+  ×1,15, base ×1,15, aceleración ×1,5); el VR v2 (otro crítico: zona muerta, fusible, segunda llegada en los niveles
+  fuera de escala, ausente = cortado); el «terminé» solo de un humano que corrió (S3). Medido: Intenso +10,5 % e
+  Imposible +21,9 % de recorrido sobre Máximo (§99)
+- ✅ M24. Los pendientes del dueño después de §99 y lo que quedaba del crítico de la red (§100, 2026-10-24): **la carrera
+  pegada** al irse la anfitriona (la anfitriona provisoria a los 4 s si «se fue», 10 s si solo se calló; la oficial
+  manda otra vez al volver; la carrera corta en 1 s al que se fue, antes lo esperaba 15 s al cargar); **el banco de
+  desconexiones** (`prueba-desconexion.mjs`, 11 casos con el juego); **«Pedir copa»** (los demás piden, la anfitriona ve
+  quién pide cuál y, si se le acaba el reloj, sale la más pedida); **los mandos como el resto de Juegos** (el `mando.js`
+  del sitio dentro del marco: cursor en los menús de la página, el mando al juego en el juego); **H1.4** (los mensajes
+  de la sala por otro piloto, también el latido), **H9** (el estado de la sala solo cuando cambia) y **H1.2** (la prueba
+  de conexión 🟢/🛰/🔴/⏳ de cada piloto, en la tira del vestíbulo del sitio)
+- ⬜ M25. (Lo que queda)
+  - Revisar la espera en la traba de 1,5 s de `prueba-relevo` (0,3 a 1,1 s según la corrida: ¿a B o a C?) y el umbral
+    de la sincronía ahora que existe ponerse al día (el que se frena sube su retraso).
+  - Medir Intenso e Imposible en 200cc, con la velocidad de cada kart (¿se caen más a 138?).
+  - El banco `relevo` §11 (la autoridad por estabilidad) a veces falla con la PC cargada (§100.10).
+  - La prueba de conexión también en el vestíbulo antes de empezar (necesita otra clave en el buzón y sus reglas de
+    Firebase, que publica el dueño; ver §100.7).
+  - El programa final (`--final`) y subirlo a R2, cuando el dueño diga.
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -461,19 +487,20 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 7. **Legal**: el `.wasm` y los archivos de RR nunca son públicos.
 
 ## Registro de avances
-- ✅ M23. (Pedido del dueño, 2026-10-22) **La red según el crítico, la carga de la sala, Intenso/Imposible y el VR por
-  nivel.** Un crítico de la red (solo revisar) confirmó que compartir botones es el enfoque correcto y encontró cómo el
-  lag de uno llegaba a los 11; el dueño dijo sí a todo. Hecho: la cortina con barra de progreso hasta que el navegador
-  está en calma (la lista de copas ya no se traba), sin B ni START en la sala, el editor de Mii escondido; paquetes con
-  acuse, TURN e ICE restart, la toma del anfitrión que desaparece, la largada pareja, la autoridad por estabilidad,
-  **ponerse al día** (el runtime corre cuadros seguidos: `mkw_prisa`) y **el relevo rápido** (al callado se lo pausa a
-  los 150 ms y vuelve a manejar); los niveles **Intenso** (el Hard AI de RR) e **Imposible** (además, solo las CPU: tope
-  ×1,15, base ×1,15, aceleración ×1,5); el VR v2 (otro crítico: zona muerta, fusible, segunda llegada en los niveles
-  fuera de escala, ausente = cortado). Medido: Intenso +10,5 % y Imposible +21,9 % de recorrido sobre Máximo. Falta:
-  H1.4, H9 y H1.2 del crítico (§99)
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 03:02** — **La carrera pegada, el banco de desconexiones, «Pedir copa», los mandos del sitio y H1.4/H9/H1.2**
+  (§100, M24). Lo que vio el dueño (la anfitriona se fue eligiendo personaje y el reloj llegó a 0 sin que nadie hiciera
+  avanzar la sala): ahora manda una provisoria a los ~4-5 s y la carrera abre al plazo; al irse alguien cargando, la
+  pantalla queda quieta ~1,4 s en vez de 15. El banco de desconexiones con el juego (11 casos: eligiendo, cargando, en la
+  cuenta, en carrera, en el descanso; cierra, sin internet, sin WebRTC, solo un par). «Pedir copa» con la más pedida al
+  vencer el reloj. Los mandos con el `mando.js` del sitio (banco `mando-sitio` 10). H9 (el estado entero cada 5 s en vez
+  de cada 1 s: en 10 s, 2 repartos por piloto en vez de 10), H1.4 y H1.2 (`conexiones.mjs`, banco `conexiones` 19): la
+  prueba de conexión encontró que la anfitriona dejaba fuera de la carrera al que le llegaba la sala por otro (su latido
+  no le llegaba): ahora el puente se lo pasa (banco `sala-carrera` 101; `par-tres`: las tres corren). Y el VR: quien
+  llegaba a la meta antes del minuto contaba como «ausente» y perdía como cortado aunque ganara (§100.8: `llego` en el
+  lockstep; `prueba-sala` entera 45/45, `prueba-desconexion` 95/95).
 - **2026-10-22 04:06** — **La red según el crítico, la carga de la sala, Intenso e Imposible y el VR por nivel** (§99, M23). La
   cortina de la sala con barra de progreso (después de abrir la lista de copas: 3 tareas largas y 241 ms en vez de 7 y
   1,4 s). La red: la autoridad por estabilidad (la ida y vuelta en el informe: el papel ya no va a quien recibe todo

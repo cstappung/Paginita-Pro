@@ -39,8 +39,10 @@ const START = 0x1000;
 // consolas no van al ritmo del juego y la holgura no diría nada
 // (§93) esperaLargada / cuadrosLargada = el margen de la largada; y una consola "dormida" (c.dormidaHasta, la pone
 // correr con su pausa callada) no manda nada y lo que le llega lo lee al despertar, como una pestaña trabada
+// (§100) quietos = esas consolas no tocan nada (botones y sticks en 0); llego(i, consola) = la opción del lockstep (quién
+// ya llegó, visto desde esa consola)
 function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 1200, demora = [5, 40], adaptar = true, bloquear = () => false, trabas = {}, informeCada = 0,
-  esperaLargada, cuadrosLargada } = {}) {
+  esperaLargada, cuadrosLargada, ido = null, quietos = [], llego = null } = {}) {
   const humanos = uids.map((uid, mando) => ({ uid, mando }));
   const t0 = performance.now();
   const consolas = {};
@@ -51,11 +53,12 @@ function crearSala(uids, { perdida = 1 / 7, esperaCorte = 400, esperaInicio = 12
     const c = consolas[uid] = { uid, estado: 2166136261, cuadro: -1, fuera: false, enviados: new Map(), vistos: [], registro: [], tcp: {} };
     let toque = 0;
     c.ls = crearLockstep({
-      yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada, esperaLargada, cuadrosLargada,
+      yo: uid, humanos, esperaCorte, esperaInicio, adaptar, informeCada, esperaLargada, cuadrosLargada, ido, llego: llego && (i => llego(i, c)),
       relevoRapido: false,                       // (§99: aquí se prueba el corte de siempre; el relevo rápido, en el banco relevo)
       registro: t => c.registro.push(t),
       // lo que "toca" esta consola: cambia con el tiempo y a veces trae START (que no debe llegar al juego)
       local: () => {
+        if (quietos.includes(uid)) { const v = [0, 0, 0, 0, 0, 0, 0]; c.enviados.set(c.cuadro + c.ls.estado().retraso, v); return v; }
         toque++;
         const v = [(toque * 37 + uid.charCodeAt(0)) & 0x1F7F | (toque % 50 === 0 ? START : 0), (toque % 255) - 128, uid.charCodeAt(0) - 100, 0, 0, toque % 7, 0];
         c.enviados.set(c.cuadro + c.ls.estado().retraso, v);   // vale para el cuadro actual + su retraso (§80: el de esta consola)
@@ -371,6 +374,37 @@ try {
     const t4 = await vuelta([200, 1000, true]);
     ok('§93: pasada la largada (cuadro 200) el margen vuelve a ser el corto: 1 s callado lo corta',
        t4.r !== 'tarde' && t4.corte !== undefined && t4.corte > 200 && t4.igual, `corte en el ${t4.corte}`);
+  }
+  // ---- §100 (la carrera pegada que vio el dueño): Carla cierra la página justo al cargar la carrera (nunca manda nada)
+  // y se fue (ni en el buzón ni por WebRTC: la opción ido). Ana y Beto la cortan al segundo, en el mismo cuadro, sin
+  // esperar el margen de los que vienen cargando (aquí 8 s; en la página, 15 s desde que cargó la mitad) ----
+  {
+    const s = crearSala(['ana', 'beto', 'carla'], { perdida: 0, esperaCorte: 400, esperaInicio: 8000, ido: u => u === 'carla' });
+    s.carla.fuera = true;
+    for (const u of ['ana', 'beto']) s[u].ls.fijarCarrera(1, []);
+    const desde = performance.now();
+    const r = await conTiempo(Promise.all([correr(s.ana, { hasta: 120 }), correr(s.beto, { hasta: 120 })]), 6000);
+    const ms = performance.now() - desde, ea = s.ana.ls.estado(), eb = s.beto.ls.estado();
+    ok('§100: la que se fue al cargar la carrera se corta enseguida (no el margen de 8 s): Ana y Beto siguen iguales',
+       r !== 'tarde' && ea.cortes[2] !== undefined && ea.cortes[2] === eb.cortes[2] && s.ana.estado === s.beto.estado && ms < 4000,
+       `${r === 'tarde' ? 'TARDE · ' : ''}corte en el ${ea.cortes[2]} / ${eb.cortes[2]}, ${(ms / 1000).toFixed(1)} s`);
+  }
+  // ---- §100 (la regla del ausente del VR, §99): Beto no toca nada en toda la carrera. Sin `llego` junta todos los
+  // cuadros «quieto»; si llegó a la meta en el cuadro 50 (el juego ya no le pide botones), desde ahí ya no cuenta ----
+  {
+    const vuelta = async llego => {
+      const s = crearSala(['ana', 'beto'], { perdida: 0, quietos: ['beto'], llego });
+      for (const u of ['ana', 'beto']) s[u].ls.fijarCarrera(1, []);
+      const r = await conTiempo(Promise.all([correr(s.ana, { hasta: 300 }), correr(s.beto, { hasta: 300 })]), 20000);
+      return { r, qa: s.ana.ls.estado().quieto, qb: s.beto.ls.estado().quieto, igual: s.ana.estado === s.beto.estado };
+    };
+    const sin = await vuelta(null);
+    // (llego se lee con el juego parado en ese cuadro: aquí, el cuadro que pide cada consola)
+    const con = await vuelta((i, c) => i === 1 && c.cuadro >= 50);
+    ok('§100: quien no toca nada junta cuadros «quieto» (la regla del ausente)', sin.r !== 'tarde' && sin.qa[1] > 250 && sin.qa[1] === sin.qb[1] && (sin.qa[0] ?? 0) < 5,
+       `Beto quieto ${sin.qa[1]} / ${sin.qb[1]} cuadros, Ana ${sin.qa[0]}`);
+    ok('§100: …pero desde que llegó a la meta ya no (el juego no le pide botones): ni ausente ni cortado por eso', con.r !== 'tarde' && con.qa[1] < 120 && con.igual,
+       `Beto quieto ${con.qa[1]} / ${con.qb[1]} cuadros`);
   }
 } catch (e) {
   ok('la prueba corrió sin errores', false, e.stack || e.message);

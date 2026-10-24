@@ -132,6 +132,27 @@ ok('el juego de las dos arrancó directo en la pantalla de personaje (sección 0
    `A ${hex(a2?.s)} página ${hex(a2?.pagina)} · B ${hex(b2?.s)} página ${hex(b2?.pagina)}`);
 await A.screenshot({ path: path.join(carpeta, '1-A-copa.png') }).catch(() => {});
 await B.screenshot({ path: path.join(carpeta, '1-B-espera.png') }).catch(() => {});
+// §100 («Pedir copa», pedido del dueño): B aprieta «🙋 Pedir una copa», marca la copa 8 en el mismo selector y la pide;
+// A la ve con un 🙋 en su tarjeta, y el aviso de B dice lo que pidió
+const pedirVisible = await B.waitForSelector('#accionJuego:not([hidden])', { timeout: 10000 }).then(() => true, () => false);
+let pidio = false;
+if (pedirVisible) {
+  await B.click('#accionJuego');
+  pidio = await B.waitForSelector('#elegirPista .copas > .copa:nth-child(8)', { timeout: 20000 }).then(() => true, () => false);
+  if (pidio) {
+    await B.click('#elegirPista .copas > .copa:nth-child(8)');
+    await espera(300);
+    pidio = (await B.textContent('#copaJugar').catch(() => '')).includes('Pedir la Copa 8');
+    await B.click('#copaJugar');
+  }
+}
+const pedA = await A.waitForFunction(u => window.mkwSala.estado().pedidas?.[u] === 7 && document.querySelector('#elegirPista .copas > .copa:nth-child(8) .copa-pedida') ? true : null,
+  uidB, { timeout: 10000, polling: 300 }).then(() => true, () => false);
+const avisoB = await esperarQue(B, x => x.aviso.includes('pediste la Copa 8'), 8000);
+ok('§100: B pide una copa con el botón (el mismo selector, «Pedir la Copa 8 ▸»); A la ve con un 🙋 en su selector y el aviso de B lo dice',
+   pedirVisible && pidio && pedA && !!avisoB?.aviso.includes('pediste la Copa 8') && !(await B.$('#elegirPista')),
+   `botón ${pedirVisible}, selector ${pidio}, A ${pedA}, aviso «${avisoB?.aviso}»`);
+await A.screenshot({ path: path.join(carpeta, '1-A-pedida.png') }).catch(() => {});
 // la copa: dos pistas (Luigi Circuit y una retro: una copa del juego son 4 carreras y la prueba sería larguísima),
 // fijadas con lo mismo que hace el selector al confirmar; el selector se cierra solo (§74)
 const COPA = [{ copa: 0, fila: 0 }, { copa: 13, fila: 2 }];
@@ -243,7 +264,9 @@ const vrBien = (xa, xb, n) => {
 };
 const signo = c => (c >= 0 ? '+' : '−') + Math.abs(c);
 let vr1 = null;                       // §95: los VR después de la 1 (sin --recarga), para la foto de la 2
-const vrTexto = (xa, xb) => `A ${xa?.vr?.antes} → ${xa?.vr?.despues} (guardado ${xa?.vrLocal}) · B ${xb?.vr?.antes} → ${xb?.vr?.despues} (guardado ${xb?.vrLocal}); puestos ${JSON.stringify(xa?.vr?.corredores?.map(c => c.puesto))}`;
+const vrTexto = (xa, xb) => `A ${xa?.vr?.antes} → ${xa?.vr?.despues} (guardado ${xa?.vrLocal}) · B ${xb?.vr?.antes} → ${xb?.vr?.despues} (guardado ${xb?.vrLocal}); puestos ${JSON.stringify(xa?.vr?.corredores?.map(c => c.puesto))}` +
+  // (§100: y por qué contó cada uno como cortado: los cortes de la carrera, lo más que estuvo quieto y los ausentes)
+  `; cortados ${JSON.stringify(xa?.vr?.corredores?.filter(c => c.cortado).map(c => c.uid?.slice(0, 1)))} cortes ${JSON.stringify(xa?.vr?.cortes)} quieto ${JSON.stringify(xa?.vr?.quieto)} ausentes ${JSON.stringify(xa?.vr?.ausentes)}`;
 
 // 4) el fin de la carrera 1, de verdad (§75): los humanos cruzan la meta en el MISMO cuadro de la carrera sincronizada
 // (mkwTerminarEn: el juego llama EndLap hasta la última vuelta, A primero) y el juego da puestos y puntos. Sin
@@ -401,6 +424,13 @@ ok('§82/§95: la carrera 2 se cuenta con los VR de después de la 1 y la regla 
    fotoVr2?.n === 2 && JSON.stringify(fotoVr2) === JSON.stringify(sa?.sala?.vrCarrera) &&
    vr1 && fotoVr2.vrs[uidA] === vr1[uidA] && fotoVr2.vrs[uidB] === vr1[uidB] && JSON.stringify(fotoVr2.cpu) === JSON.stringify(REGLA_CPU),
    `${JSON.stringify(fotoVr2)} (después de la 1: ${JSON.stringify(vr1)})`);
+// (§99, VR v2: quien no toca nada 30 s seguidos en el primer minuto es un «ausente» y pierde contra todos. En la 2 sin
+// --recarga nadie maneja —A llega por código y B no llega—: los dos tocan la cruz abajo, que no mueve el kart, cada 4 s,
+// así cuentan como presentes y el VR de la 2 es el de sus puestos. (A, después de llegar, ya no cuenta como quieta:
+// lockstep `llego`, §100.8; antes ganaba la 2 y perdía 39 como cortada))
+let tocando = !RECARGA;
+const tocar = async p => { while (tocando) { await p.keyboard.down('KeyG').catch(() => {}); await espera(120); await p.keyboard.up('KeyG').catch(() => {}); await espera(3880); } };
+const toques = tocando ? [tocar(A), tocar(B)] : [];
 if (RECARGA) {
   ok('B vuelve en la carrera 2 en SU puesto, con SU pantalla y con lo que había elegido antes de recargar',
      sb?.pantalla === 1 && sb.tipos?.[1] === 0 && sb.pjs?.[1]?.[0] === eb?.eleccion?.personaje && sb.pjs[1][1] === eb.eleccion.vehiculo &&
@@ -454,6 +484,7 @@ if (!RECARGA && !RAPIDA) {
      `A llega con el reloj en ${desde} ms (cuadro ${f2}); fin con el reloj en A ${la?.reloj} ms, B ${lb?.reloj} ms: ${(plazo / 1000).toFixed(1)} s después`);
 } else await terminarEn([A, B], [da, db]);   // (con --recarga o --rapida: las dos por código)
 const fa = await esperarQue(A, x => x.sala?.fase === 'fin' && x.fin, 90000), fb = await esperarQue(B, x => x.sala?.fase === 'fin' && x.fin, 30000);
+tocando = false; await Promise.all(toques);
 const total = sumar((fa?.fin || []).map(x => x.puntos));
 const ptsA = fa?.fin?.find(x => x.uid === uidA)?.puntos, ptsB = fa?.fin?.find(x => x.uid === uidB)?.puntos;
 ok('al terminar la 2 la sala termina en las dos y queda la tabla (12 puestos)', fa?.fin?.length === 12 && fb?.sala?.fase === 'fin',

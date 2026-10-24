@@ -80,23 +80,53 @@ export const SEGUNDOS_RESULTADOS = 30;         // §94: el descanso entre carrer
 // M22 (el crítico: el anfitrión elegía la copa sin reloj y los demás esperaban a ciegas): el plazo para elegir la copa.
 // Al vencer, la sala le avisa a la página de la anfitriona (alVencioCopa) y ella pone una al azar. En la playlist, no
 export const SEGUNDOS_COPA = 90;
+// §100 («Pedir copa»): las copas que se pueden pedir (las de Retro Rewind son menos: el tope solo frena números locos)
+export const MAX_COPAS = 128;
+// la copa más pedida (copa → cuántos la piden; empate: la que pidió primero alguien de más arriba en la sala), o -1
+export function copaMasPedida(pedidas, humanos = []) {
+  const cuenta = new Map();
+  for (const [u, c] of Object.entries(pedidas || {})) if (Number.isInteger(c) && c >= 0) cuenta.set(c, (cuenta.get(c) || 0) + 1);
+  if (!cuenta.size) return -1;
+  const orden = u => { const i = humanos.findIndex(h => h.uid === u); return i < 0 ? 99 : i; };
+  const primero = c => Math.min(...Object.entries(pedidas).filter(([, x]) => x === c).map(([u]) => orden(u)));
+  return [...cuenta].sort((a, b) => b[1] - a[1] || primero(a[0]) - primero(b[0]))[0][0];
+}
 export const MINIMO_AL_AGREGAR_MS = 15000;     // §94: agregar o sugerir con menos de esto por delante: vuelve a esto
 const REPARTO_MS = 1000;
 export const PRESENTE_MS = 10000;      // §75: sin señales en 10 s al empezar una carrera = la corre "sin nadie"
 export const ESPERA_COPIA_MS = 2000;   // §75: la anfitriona recién abierta espera 2 s por si la copa ya iba…
 export const ESPERA_TODOS_MS = 8000;   // …y hasta 8 s a oír a todos (la malla de una página recién abierta tarda)
+// §100 (la carrera pegada, el dueño 2026-10-24: «me desconecté de un jugador cuando empezaba la partida, cuando el
+// contador llegó a 0 no pasó nada»): si la anfitriona se va (cerró la página, se le cortó internet), nadie hacía avanzar
+// la sala hasta que el sitio nombraba otra (15 s después de que su presencia del buzón desaparece; con la red cortada,
+// Firebase tarda hasta un minuto en notarlo). Ahora la sala misma la reemplaza: si no se la oye hace JEFE_IDO_MS y además
+// se fue (ni en el buzón ni por WebRTC: la opción ido), o no se la oye hace JEFE_CALLADO_MS (la conexión con ella se
+// partió aunque siga en el buzón), manda el primero de la sala que sigue y que se oye (todas las páginas eligen el
+// mismo). Es PROVISORIA: si la anfitriona del sitio vuelve a repartir, manda ella otra vez (y pide la copia más nueva)
+export const JEFE_IDO_MS = 4000, JEFE_CALLADO_MS = 10000;
+// §100 (H1.4 del crítico de la red): sin nada directo de alguien en VIA_MS, sus mensajes de la sala van por otro
+export const VIA_MS = 3000;
+// §100 (H9): el estado entero se reparte al cambiar y, además, cada REFRESCO_MS
+export const REFRESCO_MS = 5000;
 // lo que se le pone al que no eligió a tiempo: Mario, Luigi, Peach, Yoshi con el kart estándar de su peso
 const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 
 export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 4, pistas = null, enviar, alCambiar = () => {},
   ahora = () => Date.now(), cada = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
   registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {},
-  segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {}, esperarListo = false }) {
+  segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {}, esperarListo = false,
+  // §100: uid => true si esa página se fue (la página: ni en el buzón ni con su WebRTC sano); sin ella, solo el silencio largo
+  ido = () => false }) {
   let jefe = anfitrion, deQuien = anfitrion;      // quién manda ahora, y de quién vino la última copia aceptada
+  let oficial = anfitrion;                        // §100: la anfitriona que nombró el sitio (jefe puede ser una provisoria)
   const soy = () => jefe === yo;
   const creada = ahora();
   let lista = false;                              // §75: ya sé en qué va la sala (antes, la página no recibe nada)
   const vistos = new Map();                       // §75 (la anfitriona): uid → la última vez que dio señales
+  // §100 (H1.4, mensajes de la sala por otro): uid → la última vez que llegó algo suyo DIRECTO (no pasado por otro), y lo
+  // que dijo su último latido (a quién tiene de anfitriona y hace cuánto la oye directo)
+  const directo = new Map(), oyen = new Map();
+  const puentes = new Map();                      // §100 (H1.2): uid → por quién llegó lo último suyo pasado por otro
   let salto = 0;                                  // §75: la carrera que esta página se salta (recargó con ella andando)
   let pedida = 0;                                 // §75 (la anfitriona): el número de la última copia pedida
   let desfase = 0;                                // §94: reloj de la anfitriona − el mío (los plazos son horas suyas)
@@ -109,14 +139,19 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   const esHumano = uid => humanos.some(h => h.uid === uid);
   const sacados = new Set();                      // §87: los que salieron de la sala del sitio (echados, votados, idos)
   // §75: los que no dieron señales en PRESENTE_MS (la anfitriona siempre está: es ella la que pregunta). §87: y los que
-  // la sala del sitio sacó, aunque su página siga mandando señales
-  const ausentes = () => humanos.filter(h => h.uid !== yo && (sacados.has(h.uid) || !(ahora() - (vistos.get(h.uid) ?? -Infinity) <= PRESENTE_MS))).map(h => h.uid);
+  // la sala del sitio sacó, aunque su página siga mandando señales. §100: y los que se fueron (ido) y no se oyen hace
+  // JEFE_IDO_MS: la anfitriona que cerró en el descanso corría la siguiente «presente» (se la cortaba recién ahí)
+  const ausentes = () => humanos.filter(h => {
+    if (h.uid === yo) return false;
+    const hace = ahora() - (vistos.get(h.uid) ?? -Infinity);
+    return sacados.has(h.uid) || !(hace <= PRESENTE_MS) || (hace > JEFE_IDO_MS && ido(h.uid));
+  }).map(h => h.uid);
   const enPlaylist = estilo === 'playlist';
   // §74: la playlist empieza armando la lista (si la sala trae pistas, quedan de base); la copa no tiene lista
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
-    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null, estable: {}, autoridad: null };
+    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null, estable: {}, autoridad: null, pedidas: {} };
   // §99 (D): la primera autoridad de cada carrera (la que releva a los atrasados): el más estable de las anteriores
   // (estado.estable: uid → los ratos malos que contó su consola —la mayoría lo vio tarde, o iba atrás—, sumados); al que no contó
   // nada (recargó, se cortó) se le ponen ESTABLE_SIN_DATO. Empate: el orden de la sala
@@ -141,12 +176,25 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
 
   const codificar = m => { const t = new TextEncoder().encode(JSON.stringify(m)); const b = new Uint8Array(t.length + 1); b[0] = MARCA_SALA; b.set(t, 1); return b; };
   const aTodos = m => { const b = codificar(m); for (const h of humanos) if (h.uid !== yo) enviar(h.uid, b); };
-  const alAnfitrion = m => { if (soy()) recibir(yo, m); else enviar(jefe, codificar(m)); };
+  const alAnfitrion = m => {
+    if (soy()) return recibir(yo, m);
+    // §100 (H1.4): si a la anfitriona no me llega nada directo y a otro sí, va por ese otro (un salto)
+    const p = sinJefeDirecto() ? puente() : null;
+    if (p) enviar(p, codificar({ t: 'via', para: jefe, m })); else enviar(jefe, codificar(m));
+  };
+  // §100 (H1.4): ¿hace más de VIA_MS que no me llega nada directo de la anfitriona? ¿Quién de los que oigo directo la
+  // oye directo (su último latido, reciente)? Con la conexión entre dos partida pero cada uno conectado con un tercero,
+  // la sala sigue por ese tercero (antes el que no la oía se quedaba esperando sus repartos para siempre)
+  const sinJefeDirecto = () => ahora() - (directo.get(jefe) ?? -Infinity) > VIA_MS;
+  const leOye = (u, j) => { const r = oyen.get(u), t = ahora(); return !!r && r.j === j && r.oj < VIA_MS && t - r.t < VIA_MS && t - (directo.get(u) ?? -Infinity) < VIA_MS; };
+  const puente = () => humanos.find(h => h.uid !== yo && h.uid !== jefe && leOye(h.uid, jefe))?.uid;
 
   // ---- el anfitrión: cambia el estado y lo reparte ----
+  let repartidoEn = -Infinity;                    // §100 (H9): cuándo fue el último reparto del estado entero
   function cambiar(cambios) {
     estado = { ...estado, ...cambios, version: estado.version + 1 };
     registro(`[sala] ${estado.fase} carrera ${estado.carrera} (v${estado.version})`);
+    repartidoEn = ahora();
     aTodos({ t: 'estado', estado, reloj: ahora() });
     if (lista) alCambiar(estado);
   }
@@ -176,9 +224,46 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       }
     }
   }
-  const latido = () => aTodos({ t: 'aqui', v: estado.version, salta: salto, t0: ahora() });
+  // (§100, H1.4: el latido dice también a quién tengo de anfitriona y hace cuánto la oigo directo: así los demás saben
+  // si tienen que pasarme sus repartos)
+  // (§100, H9: y si ya sé en qué va la sala —l—: la que acaba de abrir recibe el estado al primer latido)
+  const latido = () => aTodos({ t: 'aqui', v: estado.version, l: lista ? 1 : 0, salta: salto, t0: ahora(), j: jefe,
+    oj: soy() ? 0 : Math.min(9e6, Math.round(ahora() - (directo.get(jefe) ?? -9e6))) });
+  // el mando pasa a uid (el sitio lo nombró, o §100 el reemplazo provisorio). La nueva sigue desde su última copia del
+  // estado, con un número más alto (para que nadie la tome por vieja). §100: el plazo que corre era una hora del reloj de
+  // la de antes: pasa al suyo; y a la que se fue no se la da por presente
+  function ponerJefe(uid, ida = null) {
+    const d = soy() ? 0 : desfaseNtp ?? desfase;    // (el reloj de la anfitriona de antes − el mío)
+    jefe = uid;
+    horas.length = 0; desfaseNtp = null;          // (§99: las horas medidas eran con la anfitriona de antes)
+    registro(`[sala] anfitrión nuevo: ${uid}${soy() ? ' (yo)' : ''}${uid !== oficial ? ' (provisorio)' : ''}`);
+    // (la nueva anfitriona da por presentes a todos desde ahora: no los venía oyendo con su reloj)
+    if (soy()) {
+      deQuien = yo; lista = true;
+      for (const h of humanos) if (h.uid !== ida) vistos.set(h.uid, ahora());
+      cambiar(estado.plazo && d ? { plazo: estado.plazo - d } : {}); revisar();
+    } else if (lista) alCambiar(estado);
+  }
+  // §100: ¿la anfitriona se fue? (ver JEFE_IDO_MS; lo que llega de ella por otro, H1.4, también cuenta como oírla) Si se
+  // fue, manda la primera de la sala, en su orden, que sigue en la sala y que se oye (yo incluida)
+  // (si la trabada fui YO —mi pestaña quedó congelada o la PC durmió—, lo que me mandó la anfitriona espera en la cola:
+  // ese primer tic no cuenta, así no la reemplazo antes de leerlo)
+  let ticAnterior = creada;
+  function revisarJefe() {
+    const t = ahora(), salto = t - ticAnterior > 3 * REPARTO_MS;
+    ticAnterior = t;
+    if (soy() || !lista || salto) return;
+    const callado = t - (vistos.get(jefe) ?? creada), fue = ido(jefe);
+    if (!(callado > JEFE_CALLADO_MS || (callado > JEFE_IDO_MS && fue))) return;
+    const oigo = u => u === yo || t - (vistos.get(u) ?? -Infinity) < JEFE_IDO_MS;
+    const nueva = humanos.find(h => h.uid !== jefe && !sacados.has(h.uid) && oigo(h.uid))?.uid;
+    if (!nueva) return;
+    registro(`[sala] §100: no oigo a la anfitriona ${jefe} hace ${(callado / 1000).toFixed(1)} s${fue ? ' (se fue)' : ''}: manda ${nueva}, provisoria`);
+    ponerJefe(nueva, jefe);
+  }
   const reparto = cada(() => {
     latido();
+    revisarJefe();
     if (!soy()) return;
     // §75: la anfitriona recién abierta no reparte nada hasta saber si la copa ya iba (recargó la página): espera 2 s
     // y a haber oído a todos (sus latidos traen el número de estado que tienen; si alguno es más alto, la copia que
@@ -188,23 +273,54 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (t < ESPERA_TODOS_MS && (t < ESPERA_COPIA_MS || !todos || pedida > estado.version)) return;
       ponerLista();
     }
-    aTodos({ t: 'estado', estado, reloj: ahora() }); revisar();
+    // §100 (H9 del crítico de la red): el estado entero va cuando cambia (cambiar) y, por si se perdió algo, cada
+    // REFRESCO_MS; al que su latido dice que tiene uno más viejo se le manda enseguida (abajo, en recibir). Antes iba
+    // entero cada segundo a todos: con 12 pilotos y la lista de la playlist, decenas de KB por segundo para nada
+    if (ahora() - repartidoEn >= REFRESCO_MS) { repartidoEn = ahora(); aTodos({ t: 'estado', estado, reloj: ahora() }); }
+    revisar();
   }, REPARTO_MS);
   function ponerLista() { if (lista) return; lista = true; registro(`[sala] lista: ${estado.fase} carrera ${estado.carrera} (v${estado.version})`); alCambiar(estado); }
 
   // ---- lo que llega (de la malla, o del propio anfitrión) ----
-  function recibir(de, m) {
+  // (via = llegó pasado por otro, §100 H1.4: vale lo mismo, pero no dice nada de la conexión directa con quien lo mandó)
+  function recibir(de, m, via = false) {
     if (!m || typeof m !== 'object') return;
-    if (de !== yo && esHumano(de)) vistos.set(de, ahora());
+    if (de !== yo && esHumano(de)) { vistos.set(de, ahora()); if (!via) directo.set(de, ahora()); }
+    if (m.t === 'via') {
+      // §100 (H1.4): un mensaje de la sala pasado por otro (un salto solo). Con «para»: soy el puente, lo paso a quien va
+      // (diciendo de quién viene); sin «para»: es para mí, de parte de «de»
+      if (via || !m.m || typeof m.m !== 'object' || m.m.t === 'via') return;
+      if (typeof m.para === 'string') { if (m.para !== yo && esHumano(m.para)) enviar(m.para, codificar({ t: 'via', de, m: m.m })); else if (m.para === yo) recibir(de, m.m, true); return; }
+      if (typeof m.de === 'string' && m.de !== yo && esHumano(m.de)) { puentes.set(m.de, de); recibir(m.de, m.m, true); }
+      return;
+    }
     if (m.t === 'aqui') {
       // §75: el latido. Si se salta una carrera, que la carrera sincronizada lo sepa; si trae un estado más nuevo que
       // el mío y yo mando (recargué, o soy la anfitriona nueva y otro vio más que yo), le pido la copia
+      // (§100: y lo que dice de su anfitriona: si no le llega nada directo de ella, le paso yo sus repartos)
+      if (esHumano(de) && typeof m.j === 'string' && Number.isFinite(m.oj)) oyen.set(de, { j: m.j, oj: m.oj, t: ahora() });
+      // §100 (H1.2/H1.4): el latido de uno que no oye directo a la anfitriona (y ella tampoco a él): se lo paso yo, que
+      // oigo a los dos. Sin esto, la anfitriona lo daba por ausente y lo dejaba fuera de la carrera siguiente aunque la
+      // sala le llegara por otro (puede pasarlo más de uno: es un mensaje chico por segundo)
+      if (!via && !soy() && esHumano(de) && de !== jefe && m.j === jefe && m.oj > VIA_MS && !sinJefeDirecto()) enviar(jefe, codificar({ t: 'via', de, m }));
       if ((m.salta | 0) > 0 && esHumano(de)) alSalta(de, m.salta | 0);
       if (soy() && Number.isFinite(m.t0) && esHumano(de)) enviar(de, codificar({ t: 'hora', t0: m.t0, t1: ahora() }));   // (§99)
       if (soy() && (m.v | 0) > estado.version && (m.v | 0) > pedida && esHumano(de)) { pedida = m.v | 0; enviar(de, codificar({ t: 'dame' })); }
+      // §100 (H9): tiene un estado más viejo que el mío: la anfitriona se lo manda ya; y si es uno que no la oye directo
+      // y yo sí (H1.4), se lo paso yo (sin la hora: es la de la anfitriona, no la mía)
+      if (lista && esHumano(de) && ((m.v | 0) < estado.version || !m.l)) {
+        if (soy()) enviar(de, codificar({ t: 'estado', estado, reloj: ahora() }));
+        else if (!via && m.j === jefe && m.oj > VIA_MS && deQuien === jefe && !sinJefeDirecto()) enviar(de, codificar({ t: 'via', de: jefe, m: { t: 'estado', estado } }));
+      }
+      // §100: la anfitriona del sitio volvió (se le arregló la red) y su latido dice que manda ella: manda ella otra vez
+      // (si su copia es más vieja, al ver el número de mi latido me pide la mía: dame)
+      if (!via && lista && de === oficial && jefe !== oficial && m.j === oficial) {
+        registro(`[sala] §100: volvió la anfitriona ${oficial}: manda ella otra vez`);
+        ponerJefe(oficial); deQuien = oficial;
+      }
       return;
     }
-    if (m.t === 'hora' && de === jefe && !soy() && Number.isFinite(m.t0) && Number.isFinite(m.t1)) {
+    if (m.t === 'hora' && de === jefe && !soy() && !via && Number.isFinite(m.t0) && Number.isFinite(m.t1)) {
       const t = ahora(), ida = t - m.t0;
       if (ida >= 0 && ida < 5000) {
         horas.push({ ida, d: m.t1 + ida / 2 - t });
@@ -223,6 +339,20 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       revisar();
       return;
     }
+    // §100: la anfitriona del sitio vuelve a repartir (se le arregló la red) y mandaba una provisoria: manda ella otra
+    // vez. Su copia vale si es más nueva que la mía; si no, ella me pide la mía (dame) al ver el número de mi latido
+    if (m.t === 'estado' && de === oficial && jefe !== oficial && m.estado) {
+      registro(`[sala] §100: volvió la anfitriona ${oficial}: manda ella otra vez`);
+      ponerJefe(oficial); deQuien = oficial;
+    }
+    // §100 (H1.4): el reparto de la anfitriona, a los que me dicen que no les llega nada directo de ella
+    if (m.t === 'estado' && !via && de === jefe && !soy()) {
+      const b = codificar({ t: 'via', de: jefe, m });
+      for (const h of humanos) if (h.uid !== yo && h.uid !== jefe) {
+        const r = oyen.get(h.uid);
+        if (r && r.j === jefe && r.oj > VIA_MS && ahora() - r.t < VIA_MS && ahora() - (directo.get(h.uid) ?? -Infinity) < VIA_MS) enviar(h.uid, b);
+      }
+    }
     // (del anfitrión nuevo se acepta la primera copia aunque su número sea menor: su copia manda desde ahora; y la
     // primera de todas aunque sea la número 0, §75: con ella la página sabe en qué va la sala)
     // (§94: cada reparto trae la hora de la anfitriona: la diferencia con la mía, para los plazos)
@@ -232,6 +362,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       estado = m.estado; deQuien = jefe; lista = true; alCambiar(estado);
     } else if (!lista) {
       return;                                   // (la anfitriona recién abierta: todavía no sabe en qué va la sala)
+    } else if (soy() && m.t === 'pido' && esHumano(de) && de !== yo && estado.fase === 'copa' && !estado.lista) {
+      // §100 (pedido del dueño, «Pedir copa»): mientras la anfitriona elige la copa, cada uno puede pedir una (la
+      // última que pidió vale); ella las ve en su selector y, si se le acaba el reloj, sale la más pedida
+      const c = m.copa;
+      if (!Number.isInteger(c) || c < 0 || c >= MAX_COPAS || estado.pedidas?.[de] === c) return;
+      cambiar({ pedidas: { ...(estado.pedidas || {}), [de]: c } });
     } else if (soy() && m.t === 'pj' && esHumano(de) && (estado.fase === 'elegir' || enDescanso())) {
       const p = { personaje: m.personaje | 0, vehiculo: m.vehiculo | 0, derrape: m.derrape | 0 };
       if (p.personaje < 0 || p.personaje > 47 || p.vehiculo < 0 || p.vehiculo > 35) return;
@@ -305,14 +441,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     get anfitrion() { return jefe; },
     // el anfitrión se fue: manda otro (todos lo cambian igual, porque se lo dice la sala del sitio). El nuevo sigue
     // desde su última copia del estado (con un número más alto, para que nadie la tome por vieja)
+    // (§100: lo que dice el sitio manda sobre el reemplazo provisorio)
     cambiarAnfitrion(uid) {
-      if (!uid || uid === jefe || !humanos.some(h => h.uid === uid)) return false;
-      jefe = uid;
-      horas.length = 0; desfaseNtp = null;          // (§99: las horas medidas eran con la anfitriona de antes)
-      registro(`[sala] anfitrión nuevo: ${uid}${soy() ? ' (yo)' : ''}`);
-      // (la nueva anfitriona da por presentes a todos desde ahora: no los venía oyendo con su reloj)
-      if (soy()) { deQuien = yo; lista = true; for (const h of humanos) vistos.set(h.uid, ahora()); cambiar({}); revisar(); }
-      else if (lista) alCambiar(estado);
+      if (!uid || !humanos.some(h => h.uid === uid)) return false;
+      oficial = uid;
+      if (uid === jefe) return false;
+      ponerJefe(uid, jefe);
       return true;
     },
     // el anfitrión eligió las pistas con el selector de la página (la copa: sus 4; la playlist: la lista confirmada)
@@ -321,11 +455,11 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (estado.lista) {
         const pl = crearPlaylistSala({ estado: estado.lista });
         if (!pl.ponerPistas(pistas)) return false;
-        cambiar({ fase: 'elegir', lista: pl.exportar(), pistas: pl.pistas, carreras: pl.pistas.length, plazo: ahora() + segundosElegir * 1000 });
+        cambiar({ fase: 'elegir', lista: pl.exportar(), pistas: pl.pistas, carreras: pl.pistas.length, plazo: ahora() + segundosElegir * 1000, pedidas: {} });
         return true;
       }
       cambiar({ fase: 'elegir', pistas: pistas.slice(0, 32).map(p => ({ copa: p.copa | 0, fila: p.fila | 0 })), carreras: Math.min(pistas.length, 32),
-                plazo: ahora() + segundosElegir * 1000 });
+                plazo: ahora() + segundosElegir * 1000, pedidas: {} });
       return true;
     },
     // §74, la playlist. Sugerir (todos): lo que diría la copia que tengo y, si vale, se le manda al anfitrión
@@ -360,6 +494,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     },
     // lo que eligió esta persona en las pantallas del juego
     elegi(p) { alAnfitrion({ t: 'pj', ...p }); },
+    // §100 («Pedir copa»): los demás piden una copa mientras la anfitriona elige (solo en la copa, no en la playlist)
+    pedirCopa(c) {
+      if (soy() || !lista || estado.fase !== 'copa' || estado.lista || !Number.isInteger(c) || c < 0 || c >= MAX_COPAS) return false;
+      alAnfitrion({ t: 'pido', copa: c });
+      return true;
+    },
     // §82: el VR que tiene esta persona (al entrar y cada vez que cambia; la página lo repite si la anfitriona no lo tiene)
     miVr(vr) { if (vrValido(vr)) alAnfitrion({ t: 'vr', vr }); },
     // la carrera n terminó en este navegador (solo cuenta la primera vez que alguien lo avisa: es la misma carrera).
@@ -383,6 +523,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // empiece después queda fuera en todas las consolas (la anfitriona lo pone en `fuera`), aunque siga conectado
     quitar(uid) { if (!esHumano(uid) || uid === yo || sacados.has(uid)) return false; sacados.add(uid); return true; },
     get lista() { return lista; },
+    // §100 (H1.2, la prueba de conexión): hace cuánto (ms) llegó algo de ese piloto (por donde sea), hace cuánto directo
+    // (por su conexión propia) y por quién llegó lo último pasado por otro
+    oido(u) {
+      const t = ahora();
+      return { hace: t - (vistos.get(u) ?? -Infinity), directo: t - (directo.get(u) ?? -Infinity), por: puentes.get(u) || null };
+    },
     // §99: la página está preparada (la lista de copas se puede abrir sin trabarse): desde ahora corre el reloj de la copa
     copaLista() { if (listoCopa) return; listoCopa = true; revisar(); },
     detener() { parar(reparto); },

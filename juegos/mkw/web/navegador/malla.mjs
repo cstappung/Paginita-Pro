@@ -64,6 +64,10 @@ export function degradar(alBinario, red, azar = Math.random, reloj = (f, ms) => 
 export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => {}, alCambiar = () => {},
   RTC = globalThis.RTCPeerConnection, ahora = () => Date.now(), ice = ICE, redMala = leerRedMala(), colaUdp = LLENO }) {
   alBinario = degradar(alBinario, redMala);       // sin ?redMala, el mismo alBinario de siempre
+  // (§100, solo pruebas: cortar('rtc') = ninguna conexión directa más, aunque siga en el buzón; cortar('rtc', u) = solo
+  // la conexión con u)
+  const quiere0 = quiere, partidaCon = new Set(); let partida = false;
+  quiere = u => !partida && !partidaCon.has(u) && quiere0(u);
   let sesion = '', offP = null, offM = null, reloj = null, intento = 0;
   const pares = new Map();          // uid → { pc, udp, tcp, s, k, cola, remota, abrio, malDesde }
   const presentes = new Map();      // uid → sesión
@@ -267,6 +271,10 @@ export function crearMalla({ uid, senal, quiere = () => true, alBinario = () => 
           ms: par.currentRoundTripTime ? Math.round(par.currentRoundTripTime * 1000) : null, enviados: par.bytesSent, recibidos: par.bytesReceived };
       } catch { return null; }
     },
+    // §100, solo pruebas (prueba-desconexion): cortar la red de esta página como si se le fuera internet ('todo': sale
+    // del buzón y cierra sus conexiones) o solo la conexión directa con los demás ('rtc': sigue en el buzón; con u, solo
+    // la conexión con ese piloto: la prueba de conexión de §100, H1.2)
+    cortar(modo = 'todo', u = null) { if (modo === 'rtc') { if (u) partidaCon.add(u); else partida = true; revisa(); } else salir(); },
     sano: u => sanoX(pares.get(u)),
     detalle: u => { const x = pares.get(u); return x ? { pc: x.pc.connectionState || '', ice: x.pc.iceConnectionState || '', udp: x.udp.readyState, tcp: x.tcp.readyState, abrio: x.abrio } : null; },
     presentes: () => [...presentes.keys()],

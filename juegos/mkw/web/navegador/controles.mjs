@@ -96,6 +96,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   let silencio = false;                           // true = el juego no recibe nada de la persona (menú de inicio)
   let cerrojo = null;                             // §94: función que dice si AHORA lo de la persona no va al juego (la sala)
   let filtro = null;                              // §99: función que dice qué botones de la persona NO van al juego ahora (la sala)
+  let sinMandos = null;                           // §100: función que dice si AHORA los mandos son de la página (el cursor del sitio)
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
@@ -229,7 +230,9 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       d.gl = Math.max(d.gl, f.gl || 0); d.gr = Math.max(d.gr, f.gr || 0);
     };
     suma(0, kb, 'teclado');                       // el puerto 1 siempre está conectado (teclado)
-    for (const m of mandos) if (m.puerto !== undefined) suma(m.puerto, m, m.nombre);
+    // (§100: mientras el cursor del sitio maneja un menú de la página, los mandos no llegan al juego; el teclado sí)
+    const mandosFuera = sinMandos ? !!sinMandos() : false;
+    for (const m of mandos) if (m.puerto !== undefined && !mandosFuera) suma(m.puerto, m, m.nombre);
     if (tactil.activo) suma(0, { ...tactil, gl: tactil.botones & BOTON.L ? 255 : 0, gr: tactil.botones & BOTON.R ? 255 : 0 }, 'táctil');
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
     if (piloto.botones) suma(0, piloto, 'piloto');
@@ -269,6 +272,8 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     cerrojo(f) { cerrojo = typeof f === 'function' ? f : null; paso(); },
     // §99: filtro(f) = f() devuelve, en cada cuadro, los bits de botones que no llegan al juego (null = ninguno)
     filtro(f) { filtro = typeof f === 'function' ? f : null; paso(); },
+    // §100: sinMandos(f) = f() dice, en cada cuadro, si los mandos son ahora de la página (mando-sitio.mjs; null = nunca)
+    sinMandos(f) { sinMandos = typeof f === 'function' ? f : null; paso(); },
     get silenciado() { return silencio; },                           // volver a mandar todo (p. ej. al arrancar el juego)
     reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
     esperando: () => esperandoTecla,

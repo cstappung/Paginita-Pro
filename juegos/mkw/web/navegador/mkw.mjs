@@ -26,6 +26,8 @@ import { crearRecords, vigilarCarreras, textoTiempo, nombreCategoria as NOMBRE_C
 import { crearLector, crearPiloto, leerNombres, SECCION, PAGINA, BOT } from './menus.mjs';
 import { crearPila, crearConmutador, crearEnlaceCanal, crearRouterMalla } from './red.mjs';
 import { crearMalla, senalPadre, senalCanal } from './malla.mjs';
+import { montarMandoSitio } from './mando-sitio.mjs';
+import { crearConexiones, avisoConexiones } from './conexiones.mjs';
 import { crearWfc } from './wfc.mjs';
 import { crearVr, presentarVr, extraerVrbr } from './vr.mjs';
 import { crearLockstep, huellaCarrera, armarPlantel, vigiaLento, MARCA as MARCA_LOCKSTEP } from './lockstep.mjs';
@@ -36,7 +38,7 @@ import { prepararMii, crearDirecto, armarFicha, SECCION_DIRECTA, BOTON as BOTON_
 import { asegurarInvitados, leerInvitados, invitadoElegido, mejorarMiiNuevo, LETRAS as LETRAS_INVITADO } from './invitados.mjs';
 import { crearModo, pistasDe, SEGUNDOS_ELEGIR } from './modos.mjs';
 import { crearSala as crearSalaCarrera, humanosDeFicha, tablaDelJuego, puntosDelJuego, ponerPuntos, vrsDeCarrera, reglaCpuDe, MARCA_SALA,
-         llegadaDelJuego, ponerParrilla, SEGUNDOS_RESULTADOS } from './sala-carrera.mjs';
+         llegadaDelJuego, ponerParrilla, SEGUNDOS_RESULTADOS, copaMasPedida } from './sala-carrera.mjs';
 import { cambiosVr, peorCaso, aplicarCambio, corredoresDelJuego, VR_INICIAL as VR_INICIAL_SALA } from './vr-sala.mjs';
 import { crearCuentaDnf, DNF_MS } from './dnf.mjs';
 import { crearLetreros, filasDeTabla } from './letreros.mjs';
@@ -106,6 +108,9 @@ const red = parametros.has('red') ? (() => {
     malla = crearMalla({ uid, senal, alBinario, alCambiar: router.alCambiar, colaUdp: ['sala', 'directa'].includes(parametros.get('modo')) ? 8192 : undefined });
     router.usar(malla);
     malla.entrar().then(ok => anotar(`[malla] ${ok ? 'entré a la sala como ' + uid : 'no pude entrar a la sala'}`));
+    // §100: al cerrar la página (o salir del juego al vestíbulo) se avisa ya: sale del buzón y cierra sus conexiones, y
+    // los demás no esperan a notarlo solos
+    addEventListener('pagehide', () => malla.salir());
   }
   const enlace = () => router ? router.enlace() : multi ? crearEnlaceCanal('mkw-red-' + (parametros.get('sala') || 'banco')) : conmutador.enlace();
   const wfc = anfitrion ? crearWfc({ pila: crearPila({ ip: '10.77.0.1', enlace: enlace(), registro: (...a) => anotar('[wfc-red] ' + a.join(' ')) }), registro: anotar }) : null;
@@ -124,6 +129,12 @@ const red = parametros.has('red') ? (() => {
   window.mkwRed = r;
   return r;
 })() : null;
+// §100: ¿se fue esa página? (cerró la pestaña o perdió internet: ya no está en el buzón de la sala y su WebRTC no está
+// sano). La sala no la espera para mandar y la carrera la corta sin el margen de quien puede volver
+const consolaSeFue = u => { const m = red?.malla; return !!m?.activa() && !m.sano(u) && !m.presentes().includes(u); };
+// §100, solo pruebas (prueba-desconexion.mjs): cortar la red de esta pestaña ('todo' = como si se fuera internet;
+// 'rtc' = solo la conexión directa con los demás, sigue en el buzón)
+window.mkwCortarRed = (modo = 'todo', uid = null) => { red?.malla?.cortar(modo, uid); return !!red?.malla; };
 // De dónde salen las piezas privadas (el juego compilado, el manifiesto y los archivos del disco). Vacío = este mismo
 // servidor (servidor.mjs). En el sitio vendrán del Worker de amigos, otro origen (como el disco de BT3):
 // ?privado=http://127.0.0.1:8151 lo imita con herramientas/sitio-local.mjs (bitácora §54). La página en sí usa
@@ -602,6 +613,12 @@ const controles = crearControles({
   alCambiar: () => pintarTeclas(),
 });
 window.mkwControles = controles;            // para las pruebas
+// §100: los mandos como en el resto de Juegos (mando-sitio.mjs): en el marco del sitio, la copia de mando.js del sitio
+// maneja con su cursor los menús de la página (los selectores, los diálogos, el cajón, el zócalo del descanso) y la de
+// arriba se aparta; en el juego no hace nada (el juego lee el mando solo). El menú de inicio lee el mando él mismo
+const menuDePagina = () => !document.body.classList.contains('con-inicio') && !!(document.getElementById('elegirPista') ||
+  document.getElementById('playlistBreve') || document.body.classList.contains('cajon-abierto'));
+if (parametros.get('mandoSitio') !== '0') montarMandoSitio({ menu: menuDePagina, controles }).then(M => { window.mkwMandoSitio = !!M; });
 const esCelular = matchMedia('(pointer: coarse)').matches;   // pantalla táctil como puntero principal
 const casillaTactil = document.getElementById('usarTactil');
 casillaTactil.checked = esCelular;
@@ -1259,20 +1276,41 @@ async function arrancar() {
       alVencioCopa: () => {
         if (!window.mkwSala?.soyAnfitrion) return;
         const cs = copasSala(), n = Array.isArray(cs) ? cs.length : 0;
-        const c = n ? Math.floor(Math.random() * n) : 0;
-        nota(`sala: se acabó el tiempo de elegir la copa: sale la copa ${c} al azar`);
+        // (§100: si alguien pidió una, la más pedida; si no, una al azar)
+        const pedida = copaMasPedida(window.mkwSala.estado().pedidas, sincro.humanos);
+        const c = pedida >= 0 && (!n || pedida < n) ? pedida : n ? Math.floor(Math.random() * n) : 0;
+        nota(`sala: se acabó el tiempo de elegir la copa: sale la copa ${c} ${pedida === c ? '(la más pedida)' : 'al azar'}`);
         // (primero la copa: la fase pasa a «elegir» y el selector se cierra solo sin volver a abrirse)
         window.mkwSala.ponerPistas([0, 1, 2, 3].map(f => ({ copa: c, fila: f })));
       },
       enviar: (u, b) => red?.malla?.enviar(u, b, 'tcp'), alCambiar: e => alCambiarSala(e),
       // §75: otro avisa que se salta la carrera k (recargó la página): que la carrera sincronizada no lo espere
       alSalta: (uid, k) => { const h = sincro.humanos.find(x => x.uid === uid); if (h) sincro.lockstep?.saltar(h.mando, k); },
+      // §100: la anfitriona que se fue se reemplaza a los 4 s (sin esperar al sitio)
+      ido: consolaSeFue,
       registro: t => red?.registro?.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     window.mkwEstado.sala = sala.estado();
     // §99: el navegador quedó preparado: el reloj de la copa puede correr (si es la anfitriona) y se vuelve a mirar la
     // sala (abre la lista de copas). Solo si la sala ya sabe en qué va: la primera vista es la que detecta a quien recargó
     window.mkwAlPreparada = () => { sala.copaLista(); if (sala.lista) alCambiarSala(sala.estado()); };
     if (preparada()) sala.copaLista();
+    // §100 (H1.2, la prueba de conexión): cada 2 s, cómo llega cada piloto (🟢 directa, 🛰 por el repetidor, 🔴 por otro
+    // o sin conexión). Los 🔴 salen en la esquina; la lista entera va al vestíbulo del sitio, que pone el ícono al lado
+    // de cada piloto de la tira. ?conexiones=0 = sin ella
+    if (parametros.get('conexiones') !== '0') {
+      const nombreCon = u => nombres[u] || `Jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`;
+      const quienes = () => { const fuera = new Set(sala.estado().fuera || []); return sincro.humanos.map(h => h.uid).filter(u => u !== sincro.yo && !fuera.has(u)); };
+      window.mkwConexiones = crearConexiones({ sala, quienes,
+        malla: { sano: u => !!red?.malla?.sano(u), camino: u => red?.malla?.camino(u) ?? Promise.resolve(null) },
+        alCambiar: lista => {
+          window.mkwEstado.conexiones = lista;
+          ui.chip('conexion', avisoConexiones(lista, nombreCon), true);
+          if (window.parent !== window) try {
+            window.parent.postMessage({ canal: 'mkw-hijo', tipo: 'conexiones',
+              de: Object.fromEntries(lista.map(c => [c.uid, { e: c.e, ms: c.ms ?? null, por: c.por || null }])) }, location.origin);
+          } catch {}
+        } });
+    }
     // §94: después de una carrera, los botones de la persona llegan al juego en la carrera y en sus resultados (páginas
     // 0x0E y 0x2F), no más allá: con A en la tabla de puntos (0x30) el juego abría su menú de «carrera siguiente»
     // (0x22), elegía pista por su cuenta y largaba otra carrera fuera de la sala (medido: a los ~11 s de apretar A).
@@ -1356,7 +1394,8 @@ async function arrancar() {
       vrDeCarrera = { n, todos };
       for (const [u, v] of Object.entries(todos)) { vrCopa[u] ??= { antes: v.antes }; vrCopa[u].despues = v.despues; }   // (M22)
       const texto = `VR ${base} → ${final} (${final >= base ? '+' : '−'}${Math.abs(final - base)})`;
-      window.mkwEstado.vr = { carrera: n, antes: base, despues: final, cambio: final - base, corredores, nivelCpu, nivelVr, ausentes, regla };
+      window.mkwEstado.vr = { carrera: n, antes: base, despues: final, cambio: final - base, corredores, nivelCpu, nivelVr, ausentes, regla,
+        cortes: { ...cortes }, quieto: est.quieto || {} };   // (§100: por qué cuenta cada uno como cortado, para las pruebas)
       if (window.mkwAvisosVr.length < 200) window.mkwAvisosVr.push(texto);
       // (M22, avisos por capas: el VR ya no va en la píldora del centro —tapaba la tabla—: va al lado de tu fila de la
       // tabla del juego y en el zócalo del descanso)
@@ -1416,6 +1455,26 @@ async function arrancar() {
     const nombreDe = uid => nombres[uid] || `Jugador ${sincro.humanos.findIndex(h => h.uid === uid) + 1}`;
     const pendientesDe = e => (e.lista?.sugerencias || []).filter(s => s.estado === 'pendiente').map(s => ({ ...s, nombre: nombreDe(s.de) }));
     const misSugerencias = e => (e.lista?.sugerencias || []).filter(s => s.de === sincro.yo);
+    // §100 («Pedir copa»): las copas que piden los demás, copa → sus nombres (para el selector de la anfitriona)
+    const pedidasDe = e => { const m = {}; for (const [u, c] of Object.entries(e.pedidas || {})) (m[c] ||= []).push(nombreDe(u)); return m; };
+    // §100 («Pedir copa», pedido del dueño: «que los otros jugadores puedan solicitar copa en vez de esperar sin ver»):
+    // mientras la anfitriona elige la copa, los demás abren el mismo selector y piden una; ella la ve con un 🙋 en su
+    // tarjeta y, si se le acaba el reloj, sale la más pedida. Pedir otra cambia el pedido
+    let pidoSel = null, abriendoPido = false;
+    function abrirPedir() {
+      if (pidoSel || abriendoPido) return;
+      abriendoPido = true;
+      mirame();
+      const jefeNombre = nombres[sala.anfitrion] || 'el anfitrión';
+      const sigue = () => { const x = sala.estado(); return x.fase === 'copa' && !x.lista && !sala.soyAnfitrion; };
+      ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: true, textoCerrar: 'Volver', titulo: `Pídele una copa a ${jefeNombre}`,
+        textoJugar: c => `Pedir la Copa ${c + 1} ▸`,
+        lista: { alAbrir: c => { abriendoPido = false; if (!sigue()) { c.cerrar(null); return; } pidoSel = c; } } }).then(r => {
+        abriendoPido = false; pidoSel = null;
+        if (r && r.copa >= 0 && sala.pedirCopa(r.copa)) nota(`sala: pedí la copa ${r.copa}`);
+        if (sigue()) alCambiarSala(sala.estado());
+      });
+    }
     // §79: en el sitio el marco del juego mide 100vh − 120 px y empieza más abajo del borde de la ventana: el panel de
     // los selectores queda pegado abajo del marco, fuera de la vista. Al abrir uno se le pide al sitio que acomode la
     // página para que se vea el marco entero ({tipo:'mirame'}: scrollIntoView «nearest», solo si hace falta)
@@ -1428,7 +1487,7 @@ async function arrancar() {
       // §87: si mientras se abría la copa se fijó (o mandó otro), se cierra solo
       const sigue = c => { if (sala.soyAnfitrion && sala.estado().fase === 'copa') return true; c.cerrar(null); return false; };
       if (!e.lista) {
-        ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: false, titulo: 'Elige la copa de la sala', lista: { alAbrir: c => { if (sigue(c)) selLista = c; } } }).then(r => {
+        ui.elegirPista({ modo: 'gp', copas: copasSala(), cerrar: false, titulo: 'Elige la copa de la sala', lista: { alAbrir: c => { if (sigue(c)) { selLista = c; c.pedidas?.(pedidasDe(sala.estado())); } } } }).then(r => {
           pickerAbierto = false; selLista = null;
           if (r && r.copa >= 0) sala.ponerPistas([0, 1, 2, 3].map(f => ({ copa: r.copa, fila: f })));
           else if (sala.estado().fase === 'copa') alCambiarSala(sala.estado());   // (se cerró sin elegir: se vuelve a abrir)
@@ -1587,6 +1646,8 @@ async function arrancar() {
       avisarFase(e);
       const primera = primeraVista; primeraVista = false;
       clearInterval(reloj); reloj = null;
+      // (§100: el botón «Pedir copa» y su selector, solo para los demás mientras la anfitriona elige la copa)
+      if (e.fase !== 'copa' || e.lista || sala.soyAnfitrion) { ui.accion(''); if (pidoSel) { pidoSel.cerrar(null); pidoSel = null; } }
       if (e.fase === 'copa') {
         // M22: el reloj de la copa (lo ven todos; en la playlist no hay)
         const segCopa = () => (e.plazo && !e.lista ? Math.max(0, Math.ceil(sala.restan(e.plazo) / 1000)) : 0);
@@ -1594,6 +1655,7 @@ async function arrancar() {
           if (selSug) { selSug.cerrar(); selSug = null; }    // (sugería y ahora manda: el anfitrión se fue, §74)
           if (!pickerAbierto && preparada()) abrirSelectorSala(e);   // (§99: recién con el navegador preparado)
           else selLista?.sugerencias(pendientesDe(e));       // (las sugerencias que van llegando)
+          selLista?.pedidas?.(pedidasDe(e));                 // (§100: y las copas que piden los demás)
           if (!e.lista && e.plazo) {
             const f = () => { const s = segCopa(); ui.aviso(s ? `Elige la copa: ${s} s (si no, sale una al azar)…` : ''); };
             f(); reloj = setInterval(f, 1000);
@@ -1606,11 +1668,14 @@ async function arrancar() {
           // (M22, el crítico: la pantalla de personajes ya sirve —lo elegido se guarda y se manda después—, pero el aviso
           // se leía como «espera»)
           const jefeNombre = nombres[sala.anfitrion] || 'El anfitrión';
+          // (§100: y lo que pedí, si pedí)
+          const mia = e.pedidas?.[sincro.yo], pedi = Number.isInteger(mia) ? ` · pediste la Copa ${mia + 1}` : '';
           const f = () => {
             const s = segCopa(), cuanto = s ? ` (${s} s)` : '';
-            ui.aviso(miEleccion ? `¡Listo! ${jefeNombre} está eligiendo la copa${cuanto}…` : `Ya puedes elegir personaje y vehículo · ${jefeNombre} está eligiendo la copa${cuanto}…`);
+            ui.aviso(miEleccion ? `¡Listo! ${jefeNombre} está eligiendo la copa${cuanto}${pedi}…` : `Ya puedes elegir personaje y vehículo · ${jefeNombre} está eligiendo la copa${cuanto}${pedi}…`);
           };
           f(); if (e.plazo) reloj = setInterval(f, 1000);
+          ui.accion(pidoSel ? '' : Number.isInteger(mia) ? '🙋 Pedir otra copa' : '🙋 Pedir una copa', abrirPedir);
         }
       } else if (e.fase === 'elegir') {
         if (selSug) { selSug.cerrar(); selSug = null; }      // (§74: el anfitrión confirmó la playlist)
@@ -1982,6 +2047,13 @@ async function arrancar() {
       prisa: typeof M._mkw_prisa === 'function' && parametros.get('alDia') !== '0' ? ms => M._mkw_prisa(ms) : null,
       // §99 (C4): la cuenta regresiva (Raceinfo +0x28: 0 presentación, 1 cuenta, 2 carrera): todos con el mismo retraso
       enCuenta: () => { const L = window.mkwMenus, ri = L?.u32(0x809BD730); return !!ri && L.u32(ri + 0x28) < 2; },
+      // §100: la consola que se fue (cerró la página al cargar la carrera, o en la cuenta) se corta sin el margen
+      ido: consolaSeFue,
+      // §100: el humano i ya cruzó la meta (RaceinfoPlayer +0x38, bit 2): para la regla del ausente del VR (§99)
+      llego: i => {
+        const L = window.mkwMenus, ri = L?.u32(0x809BD730), lista = ri && L.u32(ri + 0xC), pl = lista && L.u32(lista + 4 * i);
+        return !!pl && (L.u32(pl + 0x38) & 2) !== 0;
+      },
       enviar: (u, b, canal) => red.malla.enviar(u, b, canal), huella: () => huellaCarrera(window.mkwMenus),
       registro: t => red.registro.push(new Date().toISOString().slice(11, 23) + ' ' + t) });
     M.mkwLockstep = sincro.lockstep;
@@ -2029,9 +2101,14 @@ async function arrancar() {
     let avisandoLlegada = false, avisoRelevo = '';
     // (M22: con el nombre que manda la sala del sitio; sin él —las pruebas sin sitio—, «jugador N»)
     const jugador = u => window.mkwNombresSala?.[u] || `jugador ${sincro.humanos.findIndex(h => h.uid === u) + 1}`;
+    // §100: ¿se fueron todos los demás? (ni en el buzón ni por WebRTC; yo sigo en el buzón). Entonces no llega nada de
+    // nadie, pero no es mi conexión: con dos pilotos, al que quedaba se le decía «se cortó TU conexión»
+    const seFueronTodos = () => sincro.humanos.every(h => h.uid === sincro.yo || consolaSeFue(h.uid));
+    const sordo = est => est.sordoMs > est.sordo && est.cuadro >= 0 && !est.fuera && !est.cortado;
     const textoRelevo = est => {
       // §99 (H8): si no llega nada de NADIE, el que se cortó soy yo (antes decía «esperando a X»)
-      if (est.sordoMs > est.sordo && est.cuadro >= 0 && !est.fuera && !est.cortado) return '📶 Se cortó TU conexión: no llega nada de los demás. Esperando volver…';
+      if (sordo(est)) return seFueronTodos() ? '📶 Los demás pilotos se desconectaron: sigues corriendo con la CPU'
+        : '📶 Se cortó TU conexión: no llega nada de los demás. Esperando volver…';
       if (est.fuera) return '📶 Te desconectaste de esta carrera: tu kart sigue sin ti y vuelves en la siguiente…';
       if (est.cortado) return '📶 Se cortó tu conexión: tu kart sigue sin ti y vuelves en la siguiente carrera…';
       // §99 (C1): la pausa del relevo rápido (mi PC se trabó o se cortó la red: los demás no me esperaron)
@@ -2048,7 +2125,7 @@ async function arrancar() {
       if (relevo !== avisoRelevo) {
         // (M22, avisos por capas: salirse de la carrera va al centro —la carrera ya no es suya—; el relevo, «va lento», es
         // un estado: va a la esquina mientras dure)
-        const grave = est.fuera || est.cortado || est.sordoMs > est.sordo;
+        const grave = est.fuera || est.cortado || (sordo(est) && !seFueronTodos());
         if (relevo && grave) ui.aviso(relevo, true);
         else if (avisoRelevo.endsWith('…') && document.getElementById('avisoJuego')?.textContent === avisoRelevo) ui.aviso('');
         if (relevo && window.mkwAvisosRelevo.length < 200) window.mkwAvisosRelevo.push(relevo);

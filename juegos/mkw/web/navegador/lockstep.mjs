@@ -91,6 +91,8 @@ const ESPERA_MITAD = 15000, RETRASO_CUENTA = 6, LARGADA_MAX_MS = 150;
 // VUELTA_MARGEN cuadros más adelante (a todos les tiene que llegar antes de correrlo), y desde ahí maneja otra vez. Si
 // en PAUSA_A_CORTE no volvió, la pausa se vuelve el corte de siempre (para que la meta no lo espere).
 const PAUSA_MS = 150, APAGA_PAUSA = 60, VUELTA_MARGEN = 60, PAUSA_A_CORTE = 20000;
+// §100: la consola que se fue (opción ido) se corta sin margen si además no llega nada suyo hace IDO_MS
+const IDO_MS = 1000;
 // §99 (H8): si no llega nada de NADIE hace SORDO_MS, el que se cortó soy yo (no «espero a X»)
 const SORDO_MS = 1000;
 // §99 (S1): lo que manda un tercero de los botones de otro solo vale si lo pedí hace poco, si hay un corte en curso de
@@ -129,6 +131,12 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // §99 (C1), el relevo rápido: al que se calla se lo PAUSA a los PAUSA_MS (no se lo corta a los 2 s); ?relevoRapido=0
   // = como antes
   relevoRapido = !/[?&]relevoRapido=0\b/.test(globalThis.location?.search || ''), pausaACorte = PAUSA_A_CORTE,
+  // §100: uid => true si esa consola se fue (la página: ni en el buzón de la sala ni con su WebRTC sano); null = no se sabe
+  ido = null,
+  // §100: i => true si el humano i (en el orden de `humanos`, el mismo de los jugadores de la carrera) ya cruzó la meta
+  // (la página lo lee del juego: igual en todas las consolas). Desde ahí no cuenta como «quieto»: el juego ya no le pide
+  // botones. null = no se sabe (el banco)
+  llego = null,
   cuadroMs = 1000 / 60, informeCada = INFORME_CADA }) {
   const rtt = new Map();                  // uid → { s: ida y vuelta suavizada (ms, para mostrar), m: las últimas VENTANA medidas,
                                           //         n: los números de ping que contestó }
@@ -811,12 +819,15 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       ultimoUsado.set(p, { f: cuadro, v });
       for (const x of pausas.get(p) || []) if (!x.base && x.desde - 1 === cuadro) x.base = v;
     }
-    if (cuadro < QUIETO_HASTA) for (const h of humanos) {
+    if (cuadro < QUIETO_HASTA) humanos.forEach((h, i) => {
       const p = h.mando, q = quieto.get(p) || { racha: 0, max: 0 };
       let nada = datos[p * 8] === 1;
       for (let k = 1; k < 8 && nada; k++) if (datos[p * 8 + k] !== 0) nada = false;
+      // (§100: el que ya llegó no está ausente aunque no toque nada: antes, quien llegaba antes del minuto —en una pista
+      // corta, o por código en prueba-sala— juntaba 30 s «quieto» esperando a los demás y perdía como cortado)
+      if (nada && llego?.(i)) nada = false;
       q.racha = nada ? q.racha + 1 : 0; q.max = Math.max(q.max, q.racha); quieto.set(p, q);
-    }
+    });
     // lo que dejó la autoridad de este cuadro: quiénes iban relevados (para avisar), si inventó los míos y si pasa el papel
     const a = r.autoridad, xa = a !== undefined ? reg(a).get(cuadro) : null;
     est.autoridad = a !== undefined ? duenoDe.get(a) : null;
@@ -870,6 +881,8 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
   // (algo suyo llegó hace menos de 1 s: la pestaña vive y solo espera al disco), esperaInicio. Después, el margen.
   const enLargada = c => c < cuadrosLargada && esperaLargada > esperaCorte;
   const oidoHace = m => ahora() - (oido.get(duenoDe.get(m)) ?? -Infinity);
+  // §100: ¿el mando m es de una consola que se fue? (ver la opción ido)
+  const seFue = m => !!ido && oidoHace(m) > IDO_MS && !!ido(duenoDe.get(m));
   // §99 (C4): desde cuándo cargó al menos la mitad de los que siguen (yo incluido), en esta carrera
   let mitadDesde = null;
   function revisarMitad() {
@@ -905,10 +918,13 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
     // §75: al que avisó que se salta esta carrera (recargó la página) no se lo espera: se corta ya. Al que todavía no
     // mandó nada en esta carrera se le espera más (esperaInicio: cada uno carga a su ritmo); al que ya estaba, el margen
     // (§93: más largo en la largada, margenDe)
+    // §100: y al que se FUE (cerró la página o perdió internet: ni en el buzón ni con su WebRTC sano, y nada suyo hace
+    // IDO_MS) tampoco: el margen es para el que puede volver (antes, el que cerraba al cargar la carrera dejaba a los
+    // demás 15 s mirando la pista quieta)
     const salta = saltos.get(carrera);
     for (const m of faltan) {
       if (decisorDe(m) !== yo || propuestas.has(m) || cortes.has(m)) continue;
-      if (salta?.has(m) || t > margenDe(m, cuadro)) proponer(m);
+      if (salta?.has(m) || t > margenDe(m, cuadro) || seFue(m)) proponer(m);
       // §99 (C1): al que ya mandó algo en esta carrera y además está CALLADO (no llega nada suyo hace PAUSA_MS: su
       // pestaña se trabó o se le cortó la red), a los PAUSA_MS se lo pausa (no espera nadie el margen entero). Al que
       // se le pierden paquetes pero se lo sigue oyendo no: se le piden de nuevo (si no, con una red que pierde,

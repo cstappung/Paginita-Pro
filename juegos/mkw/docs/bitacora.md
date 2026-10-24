@@ -934,9 +934,29 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Zona muerta (del VR)** | Si el VR fijo de una CPU está 6599 o más por encima del tuyo, perder contra ella no te cuesta nada en la curva del juego; desde §99, ganarle tampoco paga. Como la banda muerta de un comparador: dentro, el lazo no actúa. Antes era una «lotería»: perder 0, ganar hasta 112 × peso. |
 | **Fuera de escala** | Un nivel de CPU al que una persona de 5000 le gana menos del ~1,3 % de las veces (Intenso, Imposible). Contra él un VR fijo no mide nada: sería un **imán** que lleva a todos al mismo VR. Es un instrumento saturado. |
 | **Segunda llegada** | En Intenso e Imposible, la comparación extra entre cada par de humanos: gana quien le ganó a más CPU (empate = nada), con la curva del juego (a igual VR, 16 en Intenso y 24 en Imposible). Lo que gana uno lo pierde el otro. Es una **medición diferencial**: lo que les pasa a todos (perder contra la CPU) se cancela —rechazo del modo común— y solo cuenta la diferencia. |
-| **Ausente** | Quien no toca un botón 30 s seguidos en el primer minuto de la carrera (la regla del juego en línea). Para el VR cuenta como cortado: sin esto, una cuenta alterna quieta juntaba VR. Como un sensor desconectado: no da medida. |
+| **Ausente** | Quien no toca un botón 30 s seguidos en el primer minuto de la carrera (la regla del juego en línea). Para el VR cuenta como cortado: sin esto, una cuenta alterna quieta juntaba VR. Como un sensor desconectado: no da medida. Desde §100.8, lo que pasa después de cruzar la meta no cuenta (el juego ya no le pide botones). |
 | **Fusible (del VR)** | La parte de las CPU de una carrera no pasa de ±112 (el par humano más grande), para que una lectura mala no mueva el VR de golpe. |
 | **Ancla neutral** | El VR fijo de un nivel con el que las carreras ya jugadas no habrían creado ni quitado VR en total. Sirve para recalibrar con carreras de verdad (`anclaNeutral`). Como calibrar el cero de un instrumento hasta que la corriente neta sea cero. |
+
+### Desconexiones, pedir copa, los mandos del sitio y la prueba de conexión (§100)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Anfitriona provisoria** | La página que toma el mando de la sala cuando la anfitriona deja de oírse (4 s si además «se fue», 10 s si solo se calló): la primera de la sala, en su orden, que sigue y se oye. Todas hacen la misma cuenta y eligen a la misma sin hablarse. Si la oficial (la que nombró el sitio) vuelve, le devuelven el mando. Como un relé maestro con respaldo: si el maestro deja de dar señal, manda el siguiente de la lista. |
+| **«Se fue»** | Que una página ya no está en el buzón de la sala **y** su conexión directa no está sana: cerró la pestaña o perdió internet. A esa no se la espera (la sala la reemplaza a los 4 s, la carrera la corta en 1 s); a la que solo se calló se la espera, porque puede volver. |
+| **`pagehide`** | El aviso que da el navegador cuando se cierra o se deja una página. La sala lo usa para salir del buzón en el momento, en vez de esperar a que Firebase note el corte. |
+| **Pestaña congelada** | Una página que el navegador dejó sin correr unos segundos (trabada, o la PC durmió). Al volver, su reloj dio un salto: ese primer tic no cuenta para reemplazar a nadie, porque lo que le mandaron todavía espera en la cola. |
+| **Banco de desconexiones** | `prueba-desconexion.mjs`: 11 casos con el juego de verdad (quién se va, cuándo y cómo) y lo que tiene que pasar en cada uno. Como una batería de ensayos de falla de un tablero: abrir cada interruptor en cada momento y ver que el resto sigue andando. |
+| **Reenvío por otro (H1.4)** | Si dos pilotos no se hablan directo pero los dos hablan con un tercero, los mensajes de la sala dan un salto por ese tercero (`{t:'via'}`, uno solo). Como una estación repetidora de radio. Desde la prueba de conexión, también el latido del que no oye a la anfitriona (si no, ella lo daba por ausente). |
+| **Reparto por cambio (H9)** | El estado entero de la sala va solo cuando cambia, más un refresco cada 5 s por si se perdió algo; cada latido dice qué versión tiene cada uno, y al atrasado se le manda en el momento. Antes iba entero cada segundo. Como pasar de muestrear siempre a muestrear por evento, con un refresco lento de seguridad. |
+| **Pedir copa** | El botón de los demás pilotos mientras la anfitriona elige la copa: abre el mismo selector y manda «pido la copa N». Ella ve quién pide cuál (🙋) y, si se le acaba el reloj, sale la más pedida. |
+| **Copa más pedida** | La que más pilotos piden; si empatan, la del que está más arriba en la sala. Si nadie pidió, una al azar (como antes). |
+| **`mando.js` del sitio** | El archivo de Juegos que maneja los mandos en todas sus páginas: los detecta, avisa cuál se conectó con sus botones dibujados y, si ningún juego lo configura, mueve un **cursor** por la página (el stick mueve, A hace clic). |
+| **Modo cursor / modo juego** | Los dos estados de `mando.js`: en un menú de la página, el mando mueve el cursor; en el juego, no hace nada y el mando es del juego. Mario Kart le dice cuándo hay un menú suyo abierto; mientras el mando maneja el cursor, no llega al juego (`controles.sinMandos`). |
+| **Marco hijo** | La página del juego dentro del marco (`iframe`) de Juegos. Si carga su propia copia de `mando.js`, la de la página de arriba se aparta mientras el marco se ve: así nunca manejan el mando las dos a la vez. Como un conmutador de transferencia: una sola fuente conectada. |
+| **Prueba de conexión (H1.2)** | Lo que cada página mira cada 2 s de cada otro piloto: 🟢 conexión directa sana (con su ida y vuelta), 🛰 por el repetidor (TURN), 🔴 por otro piloto o sin conexión, ⏳ conectando. Va en la tira del vestíbulo del sitio, al lado de cada piloto. Como un probador de continuidad: un LED por cable. |
+| **Ida y vuelta** (*round-trip time*) | Lo que tarda un mensaje en ir a otro navegador y volver la respuesta, en ms. WebRTC la mide sola (`getStats`, `currentRoundTripTime`). |
+| **Histéresis (del aviso)** | La prueba de conexión vuelve a avisar al sitio por la ida y vuelta solo si se movió más de 10 ms desde la última que avisó: el ruido de pocos ms no hace parpadear el vestíbulo. Como un comparador con histéresis. |
 
 ## 2026-10-16 · Día 1
 
@@ -8992,7 +9012,19 @@ cambiados, 13 nuevos); `prueba-vr` (la curva contra el juego) igual.
 - Medir Intenso e Imposible también en 200cc (`--combos c100:intenso,c100:imposible`) y leer la velocidad de cada
   kart en la herramienta (hoy mide el recorrido), para ver si la IA a 138 se cae más en pistas cerradas (si pasa: tope
   ×1,10 o giro ×1,15).
-- Del crítico de la red, sin hacer todavía: **H1.4** (reenviar los mensajes de la sala por otro par cuando dos no se
+- ✅ **Hecho en §100.5.** **Pedir copa** (pedido del dueño, después de §99): mientras la anfitriona elige la copa, los demás pilotos pueden
+  **solicitar una** en vez de esperar sin ver nada; ella ve las solicitudes y elige (como las sugerencias de la
+  playlist, §74, pero para la copa).
+- ✅ **Arreglado en §100.1.** **Un error que vio el dueño con `jugar.bat`**: se desconectó de un jugador justo al empezar la carrera; cuando la
+  cuenta llegó a 0 no pasó nada y quedó pegada (debe seguir con los que quedan). Por revisar: la desconexión en la cuenta
+  regresiva, y el caso en que el que se fue era la anfitriona (con dos, no hay otro par para reenviar los mensajes de la
+  sala, H1.4).
+- ✅ **Hecho en §100.2** (11 casos). **Un banco de desconexiones** (pedido del dueño): los distintos casos (antes de cargar, en la cuenta, en carrera, en el
+  descanso, en la elección; el que se va es la anfitriona, la autoridad o un piloto común; se cae solo el WebRTC o también
+  el buzón; vuelve o no; 2, 3 y 12 pilotos) y qué debe pasar en cada uno.
+- ✅ **Hecho en §100.6.** **Mandos como los otros juegos del sitio** (pedido del dueño): que Mario Kart tome los mandos igual que el resto de
+  Juegos (la misma detección, configuración y avisos del sitio), además de lo que ya hace la página del juego.
+- ✅ **Hechos en §100.4, §100.3 y §100.7.** Del crítico de la red, sin hacer todavía: **H1.4** (reenviar los mensajes de la sala por otro par cuando dos no se
   hablan), **H9** (el estado de la sala solo cuando cambia, con un latido que lleva la versión), **H1.2** (la prueba
   de conexión en el vestíbulo, 🟢/🛰/🔴 por piloto). (**S3** ya está: la anfitriona acepta el «terminé» solo de un
   humano de la sala que corrió esa carrera, no de uno que quedó fuera desde el principio; bancos `sala-carrera` 77 y
@@ -9004,3 +9036,236 @@ cambiados, 13 nuevos); `prueba-vr` (la curva contra el juego) igual.
   al día; el que se frena manda sus botones más justos y su retraso sube (`prueba-relevo`, «C paga su conexión», a veces
   falla por eso: A sube a 7). Revisar el umbral de la sincronía ahora que existe ponerse al día.
 - Compilar el programa final y subirlo a R2 (lo hace el dueño cuando diga).
+
+## 2026-10-24 · §100 La carrera pegada al irse alguien, el banco de desconexiones, «Pedir copa», los mandos del sitio y lo que faltaba de la red (M24)
+
+**Qué pidió el dueño** (en orden):
+
+1. «Agrega a la lista que los otros jugadores pueden solicitar copa en vez de esperar sin ver».
+2. «Me desconecté de un jugador cuando empezaba la partida, cuando el contador llegó a 0 no pasó nada, se quedó pegado,
+   debiera seguir jugando con los que quedan».
+3. «Es para futuro también un banco de pruebas de distintos casos de desconexión y cómo hacer handling».
+4. «Agrega a la lista el soporte de mandos como lo hacen los otros juegos».
+5. «Sí, sigue con H1.4, H9 y H1.2» (lo que quedaba del crítico de la red, §99.3), y después «ok terminemos el juego»
+   y «dale nomás, gasta todo».
+
+### 100.1 La carrera pegada: la sala la hace avanzar solo la anfitriona
+
+**Qué pasaba.** La sala (`sala-carrera.mjs`) tiene una sola página que decide: la de la anfitriona. Ella mira los
+relojes (los 45 s de elegir personaje, los 30 s del descanso) y, cuando uno llega a 0, cambia la fase y se lo reparte a
+todos. Las demás solo obedecen. Si la que se va es justo la anfitriona, el reloj de los demás llega a 0… y nadie lo hace
+avanzar: la pantalla queda quieta para siempre. Es lo que vio el dueño. El sitio ya tenía un reemplazo (§99.5: si la
+anfitriona falta 15 s del buzón de la sala, el sitio nombra a otra), pero llega tarde y depende del buzón de Firebase.
+
+**Qué se hizo** (dentro del juego, sin esperar al sitio):
+
+- **Anfitriona provisoria.** Cada página mira hace cuánto no le llega nada de la anfitriona. Si son más de **4 s** y
+  además «se fue» (ver abajo), o más de **10 s** aunque siga en el buzón, manda la primera de la sala, en su orden, que
+  sigue y se oye (puede ser una misma). Todas hacen la misma cuenta, así eligen a la misma sin hablarse. La nueva sigue
+  desde su última copia del estado, con un número de versión más alto (para que nadie la tome por vieja), y el plazo que
+  corría se pasa a su reloj (era una hora del reloj de la anfitriona de antes: se le resta la diferencia medida).
+- **«Se fue».** Una página se fue si ya no está en el buzón de la sala **y** su conexión directa (WebRTC) no está sana
+  (`consolaSeFue` en `mkw.mjs`). Solo entonces se la reemplaza a los 4 s; si solo se calló (la pestaña trabada), se la
+  espera 10 s, porque puede volver.
+- **Al cerrar la pestaña, avisa.** `pagehide` → `malla.salir()`: se borra del buzón en el momento, en vez de esperar a
+  que Firebase note que se cortó.
+- **La anfitriona del sitio manda.** El sitio sigue siendo quien nombra a la anfitriona oficial (`oficial`). Si la oficial
+  vuelve (se le arregló la red) y su latido dice que manda ella, todas le devuelven el mando; si su copia es más vieja,
+  pide la nueva (`dame`/`copia`, §75).
+- **Una pestaña congelada no reemplaza a nadie.** Si el reloj interno de la página dio un salto de más de 3 s (la
+  pestaña estuvo trabada o la PC durmió), ese primer tic no cuenta: lo que mandó la anfitriona todavía está en la cola.
+- **La carrera tampoco espera al que se fue.** En la carrera (`lockstep.mjs`), al que se fue (1 s sin oírlo y «se fue»)
+  se lo corta sin el margen de quien puede volver. Antes, al irse alguien **mientras cargaba la pista**, los demás lo
+  esperaban hasta 15 s (la espera de la largada pareja de §99.6).
+- **Ausentes.** Quien se fue hace más de 4 s queda fuera de la carrera siguiente (`ausentes()`), sin esperar los 10 s de
+  silencio de siempre.
+- **El aviso equivocado.** Cuando el otro piloto cerraba su pestaña, al que quedaba se le decía «Se cortó TU conexión».
+  Ahora, si se fueron todos los demás del buzón (`seFueronTodos`), el aviso habla del otro.
+
+Como un tablero con un relé maestro: si el maestro deja de dar señal, el siguiente de la lista toma el mando, y se lo
+devuelve cuando el maestro vuelve.
+
+### 100.2 El banco de desconexiones (`prueba-desconexion.mjs`)
+
+Una prueba con el juego de verdad que abre 2 o 3 pestañas como computadores de una sala (A es la anfitriona) y, en cada
+caso, una se va en otro momento y de otra manera. Mide si la sala sigue (quién manda, si la carrera abre, si corre) y
+cuánto quedó quieta la pantalla de los que siguen. Al empezar cada caso, además, todas tienen que verse 🟢 (100.7).
+
+| Caso | Quién se va, cuándo, cómo | Qué tiene que pasar |
+|---|---|---|
+| `elegir-anfitriona` | A, eligiendo personaje, cierra la pestaña (lo del dueño) | B manda; al llegar el reloj a 0 abre la carrera sin A |
+| `elegir-otro` | B, eligiendo, cierra | La carrera abre sin B |
+| `carga-otro` / `carga-anfitriona` | B / A, cargando la pista, cierra | La carrera arranca sin esperarlo 15 s (quieta ≤ 8 s) |
+| `cuenta-otro` | B, en la cuenta regresiva, cierra | Quieta ≤ 3 s |
+| `carrera-anfitriona` | A, en plena carrera, cierra | Quieta ≤ 3 s; B manda y abre la carrera 2 |
+| `descanso-anfitriona` | A, en el descanso, cierra | B manda y abre la carrera 2 sin A |
+| `rtc-anfitriona` | A, eligiendo; se parte solo la conexión directa (sigue en el buzón) | Cada una sigue sola (A con su sala, B como provisoria a los ~11 s) |
+| `red-tres` | C (de 3), en carrera, se le corta internet | A y B siguen (quieta ≤ 3 s); C sigue sola con las CPU |
+| `anfitriona-tres` | A (de 3), cargando, cierra | B manda en B y en C |
+| `par-tres` | Se parte solo la conexión A ↔ C (de 3), eligiendo | Nadie reemplaza a nadie; la sala le llega a C por B; las tres corren (100.4, 100.7) |
+
+Ganchos solo para la prueba: `window.mkwCortarRed('todo' | 'rtc', uid?)` (`malla.cortar`: sale del buzón y cierra
+todo, o solo las conexiones directas, o solo la de un piloto). Uso: `node web/navegador/prueba-desconexion.mjs
+[--casos=a,b] [--lista] [--puerto=8166]` (~25 min todos); lo que anotó la red de cada pestaña queda en
+`build/web/datos/desconexion/`.
+
+**Trampas.** La prueba primero revisaba las pestañas de a una, y la segunda medía su tiempo contando la espera de la
+primera (B «tardaba» 56 s en mandar): ahora se revisan todas a la vez. En el descanso, la anfitriona que se fue no
+quedaba fuera de la carrera 2 (`ausentes()` no miraba «se fue»). Y `mkwTerminarCarrera` no sirve en la sala (la carrera
+de la sala termina con `mkwTerminarEn`, §75).
+
+### 100.3 H9: el estado de la sala solo cuando cambia
+
+Antes, la anfitriona mandaba **el estado entero** de la sala a cada piloto **cada segundo** (con 12 pilotos y la lista de
+la playlist, decenas de KB por segundo que casi siempre eran lo mismo). Ahora lo manda cuando cambia y, por si se perdió
+algo, cada **5 s** (`REFRESCO_MS`). Cada latido (el «aquí estoy» de cada página, cada 1 s) lleva el número de versión que
+tiene (`v`) y si ya sabe en qué va la sala (`l`); si la anfitriona ve uno atrasado, se lo manda en el momento. Como pasar
+de un muestreo continuo a uno por evento con un refresco lento de seguridad.
+
+**Trampa.** Una página recién abierta con versión 0 frente a una anfitriona también en 0 nunca recibía nada (no estaba
+«atrasada»): por eso el latido lleva `l`, y sin `l` se le manda igual.
+
+### 100.4 H1.4: los mensajes de la sala por otro piloto
+
+Si la conexión directa entre dos se parte pero los dos siguen conectados con un tercero, los mensajes de la sala dan un
+salto por ese tercero (`{t:'via'}`, un salto solo, nunca más):
+
+- cada latido dice a quién tiene cada uno de anfitriona y hace cuánto la oye directo (`j`, `oj`);
+- quien oye a la anfitriona directo le pasa sus repartos a quien dice que no la oye hace más de 3 s (`VIA_MS`);
+- lo que uno le manda a la anfitriona (lo que eligió, «terminé», su VR, la copa que pide) va por un puente si no la oye
+  directo (el primero, en el orden de la sala, que sí la oye);
+- **(nuevo con H1.2, 100.7) el latido del que no oye a la anfitriona también se lo pasa el puente.** Sin esto, la
+  anfitriona lo daba por ausente a los 10 s y lo dejaba fuera de la carrera siguiente, aunque la sala le llegaba bien.
+  El banco lo prueba: con Ana ↔ Caro partida 26 s y Caro callada 12 s, la carrera empieza con Caro adentro. Con el reenvío
+  apagado, el mismo banco da «fuera: caro».
+
+Como un repetidor de radio: si dos estaciones no se ven, una tercera que ve a las dos repite lo que dicen.
+
+### 100.5 «Pedir copa»
+
+Mientras la anfitriona elige la copa, los demás ya no esperan sin ver nada: abajo aparece **«Pedir una copa»**
+(`#accionJuego`), que abre el mismo selector de copas con el botón «Pedir la Copa N» en lugar de «Jugar». El pedido va a
+la anfitriona (`{t:'pido', copa}`, vale solo en la fase de la copa y sin playlist) y queda en el estado de la sala
+(`pedidas`, uno por piloto: vale el último), así lo ven todos. En el selector de la anfitriona, cada copa pedida lleva
+quiénes la piden (`🙋 Beto, Caro`) y arriba hay una fila de atajos («🙋 Copa 8 · Beto, Caro») que la marcan con un clic.
+Si el reloj de la copa (90 s) se acaba sin que elija, sale **la más pedida** (`copaMasPedida`: la que más piden; si
+empatan, la del que está más arriba en la sala) en vez de una al azar. Al pasar a elegir personaje, los pedidos se borran.
+
+### 100.6 Los mandos como en el resto de Juegos (`mando-sitio.mjs`)
+
+La página de Juegos carga `juegos/audio/mando.js`: con un mando conectado y ningún juego que lo configure, maneja un
+**cursor** en la página (el stick lo mueve, A hace clic, B vuelve atrás). Con Mario Kart en su marco, ese cursor andaba
+encima del juego y cada A del mando también hacía clic arriba. Los otros juegos del sitio cargan **su propia copia** de
+mando.js dentro de su marco; la de arriba lo nota y se aparta mientras el marco se ve. Ahora Mario Kart hace lo mismo:
+
+- carga la misma copia del sitio (la dirección sale del `<script>` de la página de arriba; fuera del sitio no hay y no
+  pasa nada);
+- en el juego, mando.js no hace nada: el juego lee el mando solo (`controles.mjs`, como un mando de GameCube);
+- en los menús de la página (el selector de copa o de pistas, el zócalo del descanso, el cajón; los diálogos los ve
+  mando.js solo) maneja el cursor igual que en los otros juegos, y **mientras tanto el mando no llega al juego**
+  (`controles.sinMandos`): un A en «Jugar la Copa» no es también un A en la pantalla de personajes de atrás. El teclado
+  sigue igual;
+- el aviso del sitio al conectar («🎮 Mando DualSense conectado») muestra los botones de Mario Kart en la letra de la
+  familia del mando (✕ ○ □ △ en PlayStation, A B X Y en Xbox, B A Y X en Switch).
+
+`?mandoSitio=0` = sin esto. Como un conmutador de transferencia con dos tomas para el mismo enchufe: nunca están
+conectadas las dos.
+
+### 100.7 H1.2: la prueba de conexión de cada piloto (`conexiones.mjs`)
+
+El crítico pedía que cada piloto viera, antes de correr, si llega a los demás. Cada página mira **cada 2 s** su conexión
+con cada uno de los otros pilotos de la sala y le pone un ícono:
+
+| Ícono | Qué significa | Cómo se sabe |
+|---|---|---|
+| 🟢 directa | La conexión WebRTC propia con ese piloto está sana (con su ida y vuelta en ms) | `malla.sano`, y `getStats` de la conexión |
+| 🛰 repetidor | También anda, pero pasando por el TURN de Cloudflare (un poco más de demora) | El par de candidatos elegido es de tipo `relay` |
+| 🔴 por otro | Sin conexión propia: lo suyo llega pasado por un tercero (100.4). Se juega, pero si ese tercero se va, se pierde | La sala lo oyó hace menos de 3 s, pero no directo (`sala.oido`, que dice también por quién) |
+| 🔴 sin | Ni directa ni por otro | Nada en 3 s y más de 15 s sin conexión |
+| ⏳ conectando | Los primeros 15 s sin conexión (WebRTC todavía busca camino; también si se le cayó la que tenía) | |
+
+Dónde se ve: en la tira del vestíbulo del sitio, al lado de cada piloto (con el detalle en el título: «Conexión con Beto:
+directa · 34 ms»), porque la página se lo manda al sitio cada vez que algo cambia (`{tipo:'conexiones', de}`; la ida y
+vuelta cuenta como cambio solo si se movió más de 10 ms desde la última avisada). En la página del juego, los 🔴 salen
+6 s en la esquina («🔴 Caro: sin conexión directa (le llega por Beto)»). `?conexiones=0` = sin la prueba.
+
+**Por qué no en el vestíbulo antes de empezar.** Ahí todavía no hay malla: la conexión entre las páginas se arma cuando
+empieza la copa, y armar una de prueba en el vestíbulo pediría otra clave en el buzón de Firebase (la de la presencia
+ya la usa la precarga, «~40», §98) y cambiar sus reglas, que publica el dueño. La copa empieza con la elección de copa
+(hasta 90 s) y la de personaje (45 s): hay tiempo de ver un 🔴 antes de la primera carrera.
+
+**Lo que mostró.** Con A ↔ C partida (`par-tres`), A ve a C «🔴 por B» y C a A igual a los 6 s; B ve a las dos 🟢. Ahí
+apareció el hueco de 100.4 (la anfitriona daba a C por ausente): con el latido reenviado, la carrera abre con las tres
+y corre sin cortes.
+
+**Trampa.** La primera versión avisaba al sitio cuando la ida y vuelta cambiaba de «decena» (30 → 36 ms ya era otra):
+ahora compara con la última avisada, con un margen de 10 ms (como un comparador con histéresis, que no tirita con el
+ruido).
+
+Como el probador de continuidad de un tablero: un LED por cable, verde si conecta directo, amarillo si pasa por un
+puente, rojo si está cortado.
+
+### 100.8 El «ausente» que ya había llegado (VR v2, §99.11)
+
+La regla del VR v2 dice que quien no toca nada 30 s seguidos en el primer minuto de la carrera es un **ausente** y
+pierde como cortado (así una cuenta alterna quieta no junta VR). La carrera cuenta esos cuadros quietos con los botones
+de cada humano (`lockstep.mjs`, `quieto`). Pero **cuando alguien cruza la meta el juego deja de pedirle botones** (y la
+página los traba, el cerrojo de §94): desde ahí sus cuadros salen «quietos». Quien llegaba antes del minuto y esperaba a
+los demás juntaba 30 s quieto y **perdía VR como cortado aunque hubiera ganado**.
+
+Lo encontró `prueba-sala` entera (no se había vuelto a correr desde §99, solo `--rapida`, que termina las carreras por
+código antes de los 30 s): en la carrera 2, A llega primera por código a los ~10 s, B no llega y el juego le termina la
+carrera 30 s después (la regla DNF). A quedaba con −39 (lo mismo que dan las cuentas de `vr-sala.mjs` con «A cortada») y
+B con −28. En una carrera de verdad es raro (casi nadie da 3 vueltas en menos de un minuto), pero en una pista corta de
+Retro Rewind puede pasar.
+
+**El arreglo.** El lockstep tiene una opción nueva, `llego(i)`: la página la contesta leyendo del juego si el humano i ya
+cruzó la meta (RaceinfoPlayer +0x38, bit 2, el mismo que miran las pruebas). Se lee con el juego parado en ese cuadro,
+esperando los botones: es el mismo estado en todas las consolas, así que todas cuentan igual. Desde que llegó, sus
+cuadros no cuentan como quietos. La página anota ahora, en `mkwEstado.vr`, por qué contó a cada uno como cortado (los
+cortes de la carrera, lo más que estuvo quieto y los ausentes), y `prueba-sala` lo muestra en su detalle.
+
+Medido después: A, que llegó a los ~10 s, quedó con 960 cuadros quieta como máximo (16 s, antes de llegar); nadie
+cortado; A +39 y B −41, lo que dan las cuentas con esos puestos. Banco `lockstep`: Beto sin tocar nada junta 300 de 300
+cuadros quieto; si «llegó» en el cuadro 50, se queda en 50.
+
+**Trampa.** El primer intento fue arreglar la prueba (que A y B tocaran un botón que no mueve el kart cada 4 s): no
+cambió nada, porque A ya había llegado y el juego no recibía sus botones. La prueba los sigue tocando (así B, que no
+llega, tampoco es un ausente), pero el arreglo de verdad es `llego`.
+
+### 100.9 Pruebas
+
+`prueba-desconexion.mjs`, los 11 casos con el juego: **95 de 95** (con el reenvío del latido de 100.4 y la prueba de
+conexión de 100.7). Lo medido, desde que se va:
+
+| Caso | La sala | La pantalla de los que siguen |
+|---|---|---|
+| `elegir-anfitriona` (lo del dueño) | B manda a los 4,0 s; la carrera abre al plazo (46-47 s) | — |
+| `elegir-otro` | La carrera abre sin B | — |
+| `carga-otro` | — | Quieta 1,3 s (antes, hasta 15 s) |
+| `carga-anfitriona` | B manda a los 5,0 s | Quieta 0 s |
+| `cuenta-otro` | — | Quieta 0 s (la pausa del relevo rápido) |
+| `carrera-anfitriona` | B manda a los 4,2 s y abre la carrera 2 | Quieta 0 s |
+| `descanso-anfitriona` | B manda a los 4,2 s; la carrera 2 abre a los 7 s | — |
+| `rtc-anfitriona` (sigue en el buzón) | B manda a los 11,2 s; cada una corre la suya | — |
+| `red-tres` | A y B siguen | Quieta 0 s |
+| `anfitriona-tres` | B manda a los 4,3-4,8 s en B y en C | Quieta 0 s |
+| `par-tres` (A ↔ C partida) | Sigue A, nadie fuera; A y C se ven «🔴 por B» a los 6-7 s | Las tres corren 600 cuadros sin cortes |
+
+| Prueba | Resultado |
+|---|---|
+| Bancos `sala-carrera` / `lockstep` / `controles` | 101 / 50 / 47 (con el reenvío del latido apagado, `sala-carrera` da «fuera: caro»: la prueba distingue) |
+| Bancos `mando-sitio` / `conexiones` (nuevos) | 10 / 19 |
+| Todo lo que va sin el juego (`correr-todo --sin-juego`) | 92 / 93: los 42 bancos menos una comprobación de `relevo` (§11, «Carla cuenta sus ratos de voy atrás»: con la PC ocupada por los 42 bancos juntó 0; sola, 3 de 3 bien con 7-8). Es de §99 y no la tocó nada de esto |
+| Sitio `mkw.test.cjs` + `mkw-worker.test.cjs` | 28 / 28 (uno nuevo: la prueba de conexión en la tira) |
+| `prueba-desconexion` (nueva, 11 casos) | 95 / 95 |
+| `prueba-sala` (entera, con «Pedir copa» y la fila de atajos) | 45 / 45 (antes de 100.8: 44 / 45) |
+
+### 100.10 Lo que queda
+
+- La prueba de conexión también en el vestíbulo, antes de «¡A correr!» (otra clave en el buzón de Firebase y sus reglas,
+  que publica el dueño).
+- `relevo` §11 (la autoridad por estabilidad) a veces falla con la PC cargada: «voy atrás» depende del ritmo de las
+  consolas falsas; darle más cuadros o medir otra cosa.
+- Lo de antes que sigue abierto (§99.13): la espera en la traba de 1,5 s de `prueba-relevo`, el umbral de la sincronía
+  con ponerse al día, Intenso e Imposible en 200cc, y el programa final a R2 (cuando el dueño diga).
