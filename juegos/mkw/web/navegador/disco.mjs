@@ -34,6 +34,12 @@
 //   - §93 (E2), FIJOS (fijar(url, datos)): los ~600 archivos diminutos llegan juntos en un solo paquete
 //     (diminutos.bin, mkw.mjs) y quedan en la memoria para siempre (fuera del recambio de los 64 MB: son 1,5 MB), así
 //     ninguno vuelve a pedirse a la red ni a esperar en la fila baja.
+//   - §104, LOTES (opción `lotes`, lote.mjs): cada tramo que hay que bajar va al cartero de lotes, que junta los de
+//     varios archivos en UNA llamada al Worker (el plan gratis da 100.000 al día). Lo que el juego espera va «urgente»
+//     (sale en seguida y primero); lo de segundo plano espera unos ms para juntarse. Si un lote falla, ese tramo se pide
+//     de a uno como antes. Con lotes, la fila baja sale de a ráfagas (`rafagaBaja` trabajos juntos, un solo lote) y la
+//     lectura seguida adelanta hasta 8 MB con histéresis: rellena de una vez cuando queda menos de la mitad (un video
+//     que se lee en orden ya no pide un bloque por llamada).
 //
 // En el sitio, lo mismo sirve con el Worker + R2 (R2 acepta pedidos Range); el Worker debe responder "no-store"
 // para que el navegador no lo guarde dos veces (como BT3).
@@ -68,8 +74,11 @@ export function leerPaquete(b) {
 export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 1024 * 1024, buscar = (u, o) => fetch(u, o),
                              cajas = globalThis.caches, adelantarActivo = true, maxFondo = 12,
                              avisoMax = 4 * 1024 * 1024, avisoGrande = 1024 * 1024, rachaMax = 8, maxBaja = 4,
-                             grupoMax = 8 * 1024 * 1024, pausaBaja = 15, quietud = 300 } = {}) {
+                             grupoMax = 8 * 1024 * 1024, pausaBaja = 15, quietud = 300, lotes = null,
+                             rafagaBaja = lotes ? 12 : 1 } = {}) {
+  if (lotes) { rachaMax = Math.max(rachaMax, 32); maxBaja = Math.max(maxBaja, rafagaBaja); }   // (32 bloques = 8 MB por delante)
   const estado = { pedidosRed: 0, bytesRed: 0, bloquesCache: 0, bloquesMemoria: 0, lecturas: 0, sinCache: false,
+                   porLote: 0, deAUno: 0,                    // §104: tramos que llegaron por lote / de a uno (Range)
                    // adelantados: bloques traídos en segundo plano; aprovechados: bloques que el juego leyó y ya
                    // estaban (o venían en camino) gracias a eso; esperaRed: lecturas del juego que tuvieron que pedir
                    adelantados: 0, aprovechados: 0, esperaRed: 0, avisos: 0,
@@ -110,15 +119,26 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     return d;
   }
 
-  // Bajar de la red los bloques [b0..b1] de un archivo en un solo pedido y repartirlos
-  async function bajar(url, tam, b0, b1, aLaMemoria = true) {
-    const ini = b0 * bloque, fin = Math.min((b1 + 1) * bloque, tam) - 1;
+  // Un tramo [ini, fin] (fin incluido) de la red: por lote (§104) o, si no se puede, de a uno con Range
+  async function tramo(url, ini, fin, urgente) {
+    if (lotes?.sirve(url)) {
+      try { const d = await lotes.pedir(url, ini, fin, urgente); estado.porLote++; return d; }
+      catch { /* el lote no llegó: de a uno */ }
+    }
     // cache: 'no-store' = sin pasar por la caché HTTP de Chrome: además de no guardar dos veces, esa caché pone en FILA
     // los pedidos al mismo archivo (aunque pidan pedazos distintos), y el adelanto de un video quedaba de a uno (§52)
     const r = await buscar(url, { headers: { Range: `bytes=${ini}-${fin}` }, cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status} al leer ${url}`);
     const todo = new Uint8Array(await r.arrayBuffer());
     if (r.status !== 206 && todo.length !== fin - ini + 1) throw new Error(`el servidor no respetó el pedido de ${url}`);
+    estado.deAUno++;
+    return todo;
+  }
+
+  // Bajar de la red los bloques [b0..b1] de un archivo en un solo pedido y repartirlos
+  async function bajar(url, tam, b0, b1, aLaMemoria = true, urgente = false) {
+    const ini = b0 * bloque, fin = Math.min((b1 + 1) * bloque, tam) - 1;
+    const todo = await tramo(url, ini, fin, urgente);
     estado.pedidosRed++; estado.bytesRed += todo.length;
     const salida = [];
     for (let b = b0; b <= b1; b++) {
@@ -150,7 +170,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
   // Hacerse cargo de bloques que no están en memoria ni en camino: primero Cache Storage, lo que falte de la red en
   // tramos seguidos (un pedido por tramo). Cada bloque queda en enCurso mientras tanto, para que otra lectura del
   // mismo bloque espere este pedido en vez de hacer otro. Devuelve la promesa de un Map bloque → datos.
-  function encargar(url, tam, bloques, alTerminar, aLaMemoria = true) {
+  function encargar(url, tam, bloques, alTerminar, aLaMemoria = true, urgente = false) {
     // Cada bloque tiene su propia promesa y se entrega APENAS está (§54): antes todas esperaban el trabajo entero, y
     // un bloque que ya estaba en Cache Storage esperaba a que otro bloque del mismo trabajo llegara de la red (~60 ms
     // con la red del sitio: las voces de la largada).
@@ -163,7 +183,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
       for (let a = 0; a < faltan.length;) {
         let z = a;
         while (z + 1 < faltan.length && faltan[z + 1] === faltan[z] + 1) z++;
-        const lista = await bajar(url, tam, faltan[a], faltan[z], aLaMemoria);
+        const lista = await bajar(url, tam, faltan[a], faltan[z], aLaMemoria, urgente);
         for (let x = a; x <= z; x++) { res.set(faltan[x], lista[x - a]); avisos.get(faltan[x]).listo(lista[x - a]); }
         a = z + 1;
       }
@@ -191,14 +211,18 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     (baja ? colaBaja : cola).push({ url, tam, lista, baja });
     siguienteFondo();
   }
+  let enRafaga = 0;                     // §104: trabajos de la fila baja que ya salieron en esta ráfaga
   function siguienteFondo() {
-    // primero la fila normal; la baja solo si la normal está vacía, con su propio tope y su ritmo
+    // primero la fila normal; la baja solo si la normal está vacía, con su propio tope y su ritmo (con lotes, de a
+    // ráfagas de rafagaBaja trabajos: salen juntos y el cartero los manda en una sola llamada)
+    enRafaga = 0;
     while (activos < maxFondo && (cola.length || (colaBaja.length && activosBaja < maxBaja))) {
-      if (!cola.length) {
+      if (!cola.length && enRafaga === 0) {
         const espera = Math.max(ultimoBaja + pausaBaja, ultimaEspera + quietud) - performance.now();
         if (espera > 0) { if (!relojBaja) relojBaja = setTimeout(() => { relojBaja = null; siguienteFondo(); }, espera); return; }
         ultimoBaja = performance.now();
       }
+      if (!cola.length && ++enRafaga >= rafagaBaja) enRafaga = 0;
       const { url, tam, lista, baja } = cola.length ? cola.shift() : colaBaja.shift();
       const ahora = lista.filter(b => falta(url, b));    // lo que el juego no pidió mientras esperaba turno
       if (!ahora.length) continue;
@@ -255,7 +279,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     return r && x < r[1] ? r : null;
   }
 
-  async function leer(url, tam, inicio, largo) {
+  async function leer(url, tam, inicio, largo, { urgente = true } = {}) {   // (urgente: el juego espera; §104)
     estado.lecturas++;
     const fin = Math.min(inicio + largo, tam);
     if (inicio >= fin) return new Uint8Array(0);
@@ -281,7 +305,18 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
       if (racha.size > 64) racha.delete(racha.keys().next().value);
       const ultimo = Math.floor((tam - 1) / bloque);
       // (en un archivo con grupos no: el grupo ya marca hasta dónde se va a leer, y seguir de largo bajaría el siguiente)
-      if (nr > 0 && b1 < ultimo && !grupos.has(url)) aFondo(url, tam, b1 + 1, Math.min(ultimo, b1 + Math.min(2 ** (nr - 1), rachaMax)));
+      if (nr > 0 && b1 < ultimo && !grupos.has(url)) {
+        const k = Math.min(2 ** (nr - 1), rachaMax);
+        if (!lotes) aFondo(url, tam, b1 + 1, Math.min(ultimo, b1 + k));
+        else {
+          // §104, con histéresis (como un termostato): mientras queden por delante al menos k/2 bloques ya bajados o en
+          // camino, nada; si bajó de eso, se rellena hasta k de una vez. Sin esto, un video que se lee en orden pedía
+          // UN bloque nuevo cada vez que avanzaba un bloque (una llamada por cada 256 KB: 115 para un video de 33 MB)
+          let listos = 0;
+          while (b1 + 1 + listos <= ultimo && listos < k && !falta(url, b1 + 1 + listos)) listos++;
+          if (listos < Math.ceil(k / 2)) aFondo(url, tam, b1 + 1, Math.min(ultimo, b1 + k));
+        }
+      }
       // 2b) dentro de un grupo: el resto del grupo, de una vez (sin tocar los bloques que esta lectura pide ella misma)
       const g = grupos.has(url) && grupoDe(grupos.get(url), inicio);
       if (g && g[1] - g[0] <= grupoMax) {
@@ -294,7 +329,7 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     if (mios.length) {
       estado.esperaRed++;
       ultimaEspera = performance.now();      // el juego está cargando: la fila baja se aparta un rato
-      propios = encargar(url, tam, mios.map(i => b0 + i));
+      propios = encargar(url, tam, mios.map(i => b0 + i), null, true, urgente);   // el juego espera: urgente (§104)
     }
     // 2c) carpeta en racha (§76): el 2.º diminuto distinto seguido de la misma carpeta → el resto de la carpeta de una
     //     vez. Va DESPUÉS de pedir lo de esta lectura: con HTTP/1.1 (6 conexiones) lo que espera el juego sale primero
@@ -330,16 +365,23 @@ export function crearDisco({ version, bloque = 256 * 1024, memoriaMax = 64 * 102
     return true;
   }
 
-  // Un archivo chico entero (los que se bajan al principio)
-  async function entero(url) {
+  // Un archivo chico entero (los que se bajan al principio). Con su tamaño (el del manifiesto) va por lote (§104)
+  async function entero(url, tam = 0) {
     const k = new URL(`${url}${url.includes('?') ? '&' : '?'}entero=1&v=${encodeURIComponent(version)}`, location.href).href;
     if (caja) {
       const r = await caja.match(k);
       if (r) { estado.bloquesCache++; return new Uint8Array(await r.arrayBuffer()); }
     }
-    const r = await buscar(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status} al bajar ${url}`);
-    const datos = new Uint8Array(await r.arrayBuffer());
+    let datos = null;
+    if (tam > 0 && lotes?.sirve(url)) {
+      try { datos = await lotes.pedir(url, 0, tam - 1, false); estado.porLote++; } catch { datos = null; }
+    }
+    if (!datos) {
+      const r = await buscar(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} al bajar ${url}`);
+      datos = new Uint8Array(await r.arrayBuffer());
+      estado.deAUno++;
+    }
     estado.pedidosRed++; estado.bytesRed += datos.length;
     if (caja) await caja.put(k, new Response(datos)).catch(() => {});
     return datos;

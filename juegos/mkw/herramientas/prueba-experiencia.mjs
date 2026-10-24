@@ -67,6 +67,9 @@ const navegador = await chromium.launch({ channel: 'chrome', headless: !args.inc
 async function pc(nombre) {
   const ctx = await navegador.newContext({ viewport: { width: 1280, height: 800 } });
   await ctx.addInitScript(() => { try { Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true }); } catch {} });
+  // (la Tienda de Halloween del sitio —llegó con `main` en §102— se abre sola una vez al día en el salón y tapa los
+  // botones de la sala: para esta prueba ya «se vio hoy», con la misma marca que deja el sitio)
+  await ctx.addInitScript(() => { try { const f = new Date(); localStorage.setItem('jg.tiendaHw.visto', `${f.getFullYear()}-${f.getMonth() + 1}-${f.getDate()}`); } catch {} });
   const p = await ctx.newPage();
   p.on('pageerror', e => registro.push(`[${nombre}] pageerror ${e.message}`));
   p.on('console', m => registro.push(`[${nombre}] ${m.type()} ${m.text().slice(0, 300)}`));
@@ -356,6 +359,12 @@ try {
 } catch (e) {
   console.log('✗ la prueba se cortó — ' + (e && e.stack || e));
 } finally {
+  // §104: cuántas llamadas gastó en el Worker (el plan gratis da 100.000 al día): dos jugadores, la sala y la carrera
+  try {
+    const c = await (await fetch(`http://127.0.0.1:${PUERTO + 1}/__cuenta?lista=1`)).json();
+    const lotes = c.lista.filter(x => x[2] === '/mkw/lote').length;
+    console.log(`· llamadas al Worker: ${c.pedidos} (preguntas CORS ${c.preguntas}, lotes ${lotes}, el resto ${c.pedidos - c.preguntas - lotes})`);
+  } catch {}
   console.log(`\n${bien} bien, ${mal} mal  (fotos en build/web/datos/experiencia/)`);
   fs.writeFileSync(path.join(carpeta, 'registro.txt'), registro.join('\n'));
   await navegador.close().catch(() => {});

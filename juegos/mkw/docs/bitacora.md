@@ -990,6 +990,18 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Reserva automática (del repetidor)** | Lo que hacía la sala desde §99 y se quitó en §103b: el repetidor quedaba «enchufado» en todas las conexiones y WebRTC lo usaba solo si nada directo funcionaba. Ahora, como en BT3, el repetidor es solo el modo que prende el anfitrión. Como pasar de una transferencia automática a la red de respaldo a una manual. |
 | **SCTP (juntar mensajes)** | El protocolo que lleva los mensajes de los canales de datos de WebRTC. Si hay varios mensajes chicos esperando, los mete en un mismo paquete UDP: por eso 200 mensajes no son 200 paquetes. Como juntar varias cartas en un mismo sobre. |
 
+### Menos llamadas al Worker (§104)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Llamada (al Worker)** | Cada vez que el navegador le pide algo al Worker de amigos: un pedazo del disco, el manifiesto, una pregunta previa… El plan gratis de Cloudflare da **100.000 al día** para toda la cuenta (también para BT3), y cuenta llamadas, no megas: una de 16 MB cuesta lo mismo que una de 1 KB. Como un plan de teléfono con N llamadas al mes, sin importar cuánto dure cada una. |
+| **Lote** | Una sola llamada (`POST /mkw/lote`) que trae muchos pedazos de varios archivos a la vez, pegados uno detrás del otro. El cuerpo del pedido dice cuáles (`{"p": [[ruta, inicio, fin], …]}`) y la página corta la respuesta porque ya sabe cuánto mide cada uno. Como mandar todas las cartas del día en un solo sobre certificado. |
+| **Cartero de lotes (`lote.mjs`)** | La parte de la página que junta los pedazos pedidos más o menos a la vez y los manda en un lote: lo urgente (el juego esperando) sale en seguida y primero; lo demás espera 8 ms para juntarse; con todas las llamadas ocupadas (4 a la vez), lo que llega se sigue juntando. |
+| **`cache: 'no-store'` (en el pedido)** | Una opción del pedido que le dice al navegador «no uses tu caché HTTP». Chrome, con ella, tampoco usa lo que recordaba de la pregunta previa: preguntaba otra vez antes de CADA pedazo (696 preguntas en una visita). El lote, como es POST, no la necesita. |
+| **Histéresis (del adelanto)** | La lectura seguida de un video ya no pide un bloque cada vez que avanza un bloque: mientras queden 4 MB por delante no pide nada, y cuando baja de eso rellena 8 MB de una vez. Como un termostato con banda muerta: no prende y apaga el calefactor cada décima de grado. |
+| **Operaciones por llamada** | Lo que el Worker gratis puede hacer dentro de UNA llamada: 50 operaciones de R2 y de la caché de Cloudflare (juntas), con 6 esperando a la vez. Cada pedazo de un lote gasta hasta 3 (mirar la caché, leer de R2, guardar en la caché): por eso un lote lleva como mucho 12. |
+| **`tee` (de un flujo)** | Partir un flujo de bytes en dos copias que avanzan juntas: una va a la página y la otra se guarda en la caché de Cloudflare, sin copiar el pedazo entero en la memoria del Worker (gasta menos de sus 10 ms de procesador). Como una derivación en T en una cañería. |
+
 ## 2026-10-16 · Día 1
 
 (Cada sección lleva la hora local en que se hizo.)
@@ -9675,3 +9687,104 @@ la del marco; que no mande el TURN por su cuenta; y que el juego use `ponerIce` 
 pedía lo de §99, se dio vuelta). Con el juego, con el programa final: banco `red` 35/35, `prueba-sincro --directa
 --cloudflare` 15/15 (los dos extremos «relay», 962 KB por el repetidor) y `prueba-sincro --sala` 11/11 (la sala del sitio
 de mentira, directo y sin repetidor: retraso A 3, B 2).
+
+## 2026-10-24 · §104 Menos llamadas al Worker: los pedazos del disco de a muchos, una sola pregunta previa y los videos con histéresis
+
+El dueño: «optimiza las llamadas de descarga para el juego, recuerda que cloudflare son 100k calls por dia». El plan
+gratis de Workers cuenta **llamadas**, no megas, y la cuenta es una sola para todo el sitio (BT3 también).
+
+### 104.1 Cuánto se gastaba y en qué (medido, no estimado)
+
+Para medir sin adivinar, el Worker local (`herramientas/worker-local.mjs`, que corre el archivo `worker.js` de verdad)
+anota cada llamada (hora, método, ruta, bytes) y `herramientas/medir-sitio.mjs` las separa por visita, por tramo y por
+tipo (`<base>-v<n>-pedidos.json`). La página de Juegos de verdad, el juego en su marco y el programa final:
+
+| Visita (hasta la primera carrera) | Llamadas | Preguntas previas (CORS) | Pedazos del disco | Otros |
+|---|---|---|---|---|
+| 1.ª (navegador vacío) | **1.392** | 696 | 661 (180 MB) | 35 |
+| 2.ª (con caché) | 38 | 18 | 17 | 3 |
+
+Dos cosas saltaban:
+1. **La mitad eran preguntas previas.** Se probó qué hace Chrome (una página de mentira con un «Worker» que cuenta los
+   `OPTIONS`): con `cache: 'no-store'` en el pedido, Chrome **no usa** la respuesta guardada de la pregunta previa y
+   vuelve a preguntar antes de cada pedido (5 pedidos = 5 preguntas). Sin esa opción, una pregunta y 4 sin preguntar. Y
+   con POST a una misma dirección, una sola pregunta para todo (Chrome la recuerda 2 horas). El `Range` solo no hace
+   preguntar; lo que obliga es el token (`Authorization`).
+2. **Los pedazos iban de a uno**: 541 de 661 eran de un solo bloque de 256 KB, a 349 archivos distintos.
+
+### 104.2 Lo que se hizo
+
+1. **El lote** (`web/navegador/lote.mjs`, nuevo): junta los pedazos en un `POST <origen>/lote` con el cuerpo
+   `{"p": [[ruta, inicio, fin], …]}`; la respuesta trae los pedazos pegados en ese orden, sin separadores (la página
+   sabe cuánto mide cada uno) y cada uno se entrega apenas termina de llegar. Lo urgente (el juego esperando) sale en
+   seguida y va primero; lo demás espera 8 ms para juntarse; como mucho 4 llamadas a la vez (+2 para lo urgente), así
+   que con carga los lotes crecen solos. Topes: 12 pedazos y 16 MB por lote (el Worker acepta 32 MB). La primera
+   llamada sale sola (si salen varias juntas antes de tener contestada la pregunta previa, el navegador pregunta por
+   cada una). Si el Worker no conoce el lote (404/405/400, o el navegador no lo deja pasar en las 2 primeras), se apaga
+   y todo va de a uno como antes; si un lote se corta a medias, lo que faltó se pide de a uno.
+2. **El disco** (`disco.mjs`, opción `lotes`): cada tramo va al cartero; las lecturas del juego, urgentes; la fila
+   baja (la semilla de bloques) sale de a ráfagas de 12 trabajos (un lote); un archivo entero con su tamaño (los
+   chicos del arranque) también va por lote. `?lote=0` = de a uno, como antes.
+3. **Los videos con histéresis**: los fondos de los menús son videos THP que se leen en orden mientras se reproducen,
+   y la lectura seguida pedía UN bloque nuevo cada vez que avanzaba un bloque (`cup_select.thp`: 115 llamadas para
+   33 MB). Ahora, con lotes, mientras queden 16 bloques (4 MB) por delante no pide nada y, si quedan menos, rellena
+   hasta 32 bloques (8 MB) de una vez.
+4. **El Worker** (`juegos/bt3/fuente/disco/worker.js`): `POST /mkw/lote` (solo amigos, como todo; nada del programa
+   ni del manifiesto; nada de `..`; hasta 12 pedazos y 32 MB). Cada pedazo sale del caché de Cloudflare o de R2 (y se
+   deja en el caché con la MISMA llave que un pedido Range de esos bytes), en orden y con 2 de adelanto (como mucho 3
+   operaciones esperando: el límite son 6), sin copiarlo (`tee` + `pipeTo`). Los paquetes de imágenes del selector de
+   pistas llevan su huella en el nombre (`clips-000.3b1e268f.pak`): ahora van guardables para siempre (antes, `no-store`:
+   se bajaban otra vez en cada visita).
+5. **Las semillas por la caché del disco**: `pipelines.bin` y `bloques.json` pasan por `disco.entero` (Cache Storage con
+   la versión de los archivos): en la 2.ª visita no llaman al Worker.
+6. `servidor.mjs` (las pruebas, mismo origen) también contesta `POST /lote`, así todas las pruebas del juego usan el
+   mismo camino; el Worker local pasa el cuerpo de los POST; la precarga de la sala (§98) pide su semilla como «no
+   urgente» y de a 24 trabajos (el cartero los junta de a 12).
+
+### 104.3 Resultado
+
+| | Antes | Con el lote | + histéresis |
+|---|---|---|---|
+| 1.ª visita, hasta la primera carrera | 1.392 | 330 | **123** (−91 %) |
+| …de ellas, preguntas previas | 696 | 7 | 7 |
+| 2.ª visita | 38 | 21 | **16** (−58 %) |
+| Hasta la carrera | 69,9 s | 68,5 s | 68,9 s (igual) |
+
+Con 100.000 al día: unas **800 primeras visitas** o **6.000 segundas** (antes ~70 y ~2.600).
+
+Lo que queda (`<base>-v<n>-lotes.json`, la historia de cada pedazo): en la 1.ª visita, 64 de los 110 lotes llevan un
+solo pedazo. Son lecturas del juego en cadena: lee un archivo entero antes de abrir el siguiente, así que no hay con
+qué juntarlas (y esperar más para juntar haría más lenta la carga). En la 2.ª visita son los karts y las voces de los
+CPU, que salen al azar en cada carrera (18 pedazos chicos en 15 lotes, 4 MB).
+
+**La sala** (`node herramientas/prueba-experiencia.mjs`: tres navegadores —Uno, Dos e Intruso—, un jugador, la sala con
+la precarga y una carrera): **326 llamadas** (31 preguntas previas, 261 lotes) con el Worker nuevo. Con el Worker de
+antes (sin `/lote`) la misma página lo nota, pide de a uno y la sala anda igual (23/23): **2.189** llamadas (1.087
+preguntas previas). Eso prueba también, de punta a punta, el camino de un Worker viejo.
+
+### 104.4 Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| Banco `lote` (nuevo) | 20 / 20: exacto aunque la respuesta llegue en trozos al azar; 30 pedazos = 3 llamadas; la primera sola; urgente primero y en seguida; topes; Worker viejo (404 y sin POST) y lote cortado = de a uno; un video de 16 MB leído en orden = 6 llamadas |
+| Banco `disco` | 38 / 38 (sin lotes, igual que antes) |
+| Sitio `mkw-worker.test.cjs` | 11 / 11 (5 nuevas: el lote exacto, solo amigos, la pregunta previa con POST; lo que rechaza; el corte si falta un pedazo; el caché de Cloudflare con la misma llave; los paquetes de imágenes guardables) |
+| `prueba-navegador` (programa final) | 21 / 21 (lo de siempre con este monitor de 175 Hz) |
+| `prueba-experiencia` | 23 / 23 |
+
+**La planilla entera** (`MKW_BUILD=build/web-final/navegador node herramientas/correr-todo.mjs`, 2026-10-24 17:18):
+641 bien, 6 mal. `precarga` (1): el porcentaje se miraba desde afuera cada 300 ms y la precarga ahora dura ~1 s, así
+que solo se vieron 4 valores (0 → 39 → 79 → 100); la prueba ahora los anota desde adentro de la página cada 10 ms (lo
+que recibe el sitio, que ve cada aviso): 37 valores, 8/8. `sala` (4, todos de una misma causa: A no avanzó en la pantalla
+de personajes y la carrera 1 empezó sin su elección) y `relevo` (1): con **eFootball abierto en este PC** (otro juego
+usando la tarjeta de video y el procesador); al repetirlas siguió peor (A a 6,7 cuadros/s, «Tu PC no alcanza 60
+cuadros por segundo»). Esas dos se repiten con el PC libre.
+
+**Trampa:** desde el `main` de §102, el sitio abre solo la **Tienda de Halloween** una vez al día a las cuentas que
+entran al salón, y su ventana tapaba los botones de la sala: `prueba-experiencia` se cortaba a los 30 s de esperar un
+clic. La prueba ahora deja la marca de «vista hoy» que deja el sitio (`jg.tiendaHw.visto`).
+
+### 104.5 Lo que hace el dueño
+
+**Volver a pegar el Worker** (`docs/publicar.md` paso 3): trae `POST /mkw/lote`. Con el de antes el juego anda igual,
+pero gasta ~10 veces más llamadas.

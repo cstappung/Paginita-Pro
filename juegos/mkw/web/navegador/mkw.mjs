@@ -18,6 +18,7 @@ import { crearGuardado } from './guardado.mjs';
 import { crearNube } from './nube.mjs';
 import { crearRespaldos } from './respaldos.mjs';
 import { crearDisco, leerPaquete } from './disco.mjs';
+import { crearLotes } from './lote.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 import { crearInterfaz } from './interfaz.mjs';
@@ -612,7 +613,12 @@ window.mkwConectarNube = async ({ almacen, uid } = {}) => {
 let guardadosAlAbrir = esperaLectura.then(() => { window.mkwEstado.lecturaPartidas = performance.now(); return guardado.cargar(); }).catch(e => { guardado.estado.error = String(e); return new Map(); });
 // Pipelines para precalentar (pipelines.mjs): la lista de este navegador y la semilla del servidor.
 // ?precalentar=no: sin listas (para medir el peor caso, la primera visita sin semilla).
-const pipelines = crearPipelines({ urlSemilla: ORIGEN + '/build/pipelines.bin' });
+// §104: la semilla (pipelines.bin) pasa por la caché del disco (Cache Storage, con la versión de los archivos): en la
+// 2.ª visita no llama al Worker. Por eso espera a que exista el disco (llega con el manifiesto, antes de que se use).
+let discoListo = null;
+const esperaDisco = new Promise(r => { discoListo = r; });
+const semillaPorDisco = u => esperaDisco.then(d => d.entero(u)).then(b => new Response(b), () => new Response(null, { status: 404 }));
+const pipelines = crearPipelines({ urlSemilla: ORIGEN + '/build/pipelines.bin', ...(parametros.get('lote') !== '0' ? { buscar: semillaPorDisco } : {}) });
 const listasAlAbrir = parametros.get('precalentar') === 'no' ? Promise.resolve({}) : pipelines.cargar();
 function pintarPartidas() {
   const e = guardado.estado;
@@ -779,6 +785,14 @@ window.mkwConectarVr = async o => {
 
 // La dirección web de un archivo del juego: es la misma ruta, con cada pedazo "escapado" (espacios → %20…)
 const direccion = ruta => ORIGEN + ruta.split('/').map(encodeURIComponent).join('/');
+// §104: el cartero de lotes (lote.mjs): muchos pedazos del disco en UNA llamada a <ORIGEN>/lote (el Worker de amigos;
+// servidor.mjs en las pruebas). ?lote=0 = de a uno, como antes (para comparar)
+const nuevosLotes = () => {
+  if (parametros.get('lote') === '0') return null;
+  const l = crearLotes({ url: ORIGEN + '/lote', base: ORIGEN + '/', registro: nota });
+  window.mkwEstado.lotes = l.estado;
+  return l;
+};
 
 async function arrancar() {
   $('arrancar').disabled = true;
@@ -829,9 +843,10 @@ async function arrancar() {
   // Caché del disco (disco.mjs): lo bajado queda en este navegador; la versión de los archivos la da el servidor
   // ?adelantar=0: sin bajar antes (ni avisos del juego ni lectura seguida), para comparar (bitácora §52)
   disco = crearDisco({ version: respuestaManifiesto.headers.get('X-Mkw-Version') || 'sin-version',
-                       adelantarActivo: parametros.get('adelantar') !== '0' });
+                       adelantarActivo: parametros.get('adelantar') !== '0', lotes: nuevosLotes() });
   await disco.abrir();
   window.mkwDisco = disco;
+  discoListo(disco);
   if (parametros.get('adelantar') !== '0') leerSemillaBloques();   // ya en camino para la semilla del arranque (§76)
   const tamaños = new Map();          // ruta del juego → tamaño, solo de los archivos perezosos
   const aBajar = [];
@@ -874,8 +889,8 @@ async function arrancar() {
   let siguiente = 0;
   await Promise.all(Array.from({ length: 16 }, async () => {
     while (siguiente < aBajar.length) {
-      const [ruta] = aBajar[siguiente++];
-      contenidos.set(ruta, await disco.entero(direccion(ruta)));   // de la caché si ya se bajó antes
+      const [ruta, tam] = aBajar[siguiente++];
+      contenidos.set(ruta, await disco.entero(direccion(ruta), tam));   // de la caché si ya se bajó antes (§104: por lote)
       preparacion.marcar('chicos', contenidos.size / Math.max(1, aBajar.length));
     }
   }));
@@ -2274,8 +2289,10 @@ window.mkwLecturas = () => [...lecturasVistas.values()];
 // orden en que el juego los fue necesitando; los que estén en Cache Storage (visitas siguientes) no van a la red.
 // (se baja una sola vez: la usan la semilla del arranque y este precalentado)
 let semillaBloques = null;
-const leerSemillaBloques = () => semillaBloques ??= fetch(ORIGEN + '/build/bloques.json', { cache: 'no-store' })
-  .then(r => r.ok ? r.json() : null).catch(() => null);
+// (§104: por la caché del disco, con la versión de los archivos: en la 2.ª visita no llama al Worker)
+const leerSemillaBloques = () => semillaBloques ??= (disco && parametros.get('lote') !== '0'
+  ? disco.entero(ORIGEN + '/build/bloques.json').then(b => JSON.parse(new TextDecoder().decode(b)))
+  : fetch(ORIGEN + '/build/bloques.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)).catch(() => null);
 async function precalentarBloques(tamaños) {
   const semilla = await leerSemillaBloques();
   if (!semilla) return;
@@ -2565,9 +2582,10 @@ async function precargarTodo() {
   const r = await fetch(ORIGEN + '/manifiesto.json');
   if (!r.ok) { avisar(0, false, String(r.status)); return; }
   const manifiesto = await r.json();
-  disco = crearDisco({ version: r.headers.get('X-Mkw-Version') || 'sin-version', adelantarActivo: false });
+  disco = crearDisco({ version: r.headers.get('X-Mkw-Version') || 'sin-version', adelantarActivo: false, lotes: nuevosLotes() });
   await disco.abrir();
   window.mkwDisco = disco;
+  discoListo(disco);
   const tamaños = new Map(), aBajar = [];
   for (const [prefijo, archivos] of Object.entries(manifiesto)) for (const [ruta, tam] of archivos) {
     if (tam < 0) continue;
@@ -2591,17 +2609,19 @@ async function precargarTodo() {
   }
   // los trabajos, cada uno con su peso (bytes) para el porcentaje
   const trabajos = [
-    ...aBajar.map(([ruta, tam]) => [tam, () => disco.entero(direccion(ruta))]),
+    ...aBajar.map(([ruta, tam]) => [tam, () => disco.entero(direccion(ruta), tam)]),
     ...(parametros.get('paquete') !== '0' ? [[1.5 * 1048576, () => disco.entero(ORIGEN + '/build/diminutos.bin').catch(() => null)]] : []),
     [PESO_PROGRAMA, () => fetch(conHuella('mkw.wasm')).then(x => x.arrayBuffer())],
     [1048576, () => fetch(conHuella('mkw.js')).then(x => x.text())],
+    // (§104: no urgentes, así se juntan de a 12 por llamada: nadie está esperando estos bytes todavía)
     ...tramos.map(t => [t.bytes, () => disco.leer(direccion(t.ruta), tamaños.get(t.ruta), t.b0 * disco.bloque,
-      Math.min((t.b1 + 1) * disco.bloque, tamaños.get(t.ruta)) - t.b0 * disco.bloque)]),
+      Math.min((t.b1 + 1) * disco.bloque, tamaños.get(t.ruta)) - t.b0 * disco.bloque, { urgente: false })]),
   ];
   const total = trabajos.reduce((x, [peso]) => x + peso, 0);
   let hecho = 0, siguiente = 0, fallas = 0;
   const t0 = performance.now();
-  await Promise.all(Array.from({ length: 6 }, async () => {
+  // (§104: con lotes, 24 trabajos a la vez: el cartero los junta de a 12 por llamada; sin lotes, 6 como antes)
+  await Promise.all(Array.from({ length: window.mkwEstado.lotes ? 24 : 6 }, async () => {
     while (siguiente < trabajos.length) {
       const [peso, hacer] = trabajos[siguiente++];
       try { await hacer(); } catch { fallas++; }

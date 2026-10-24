@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pedazos por lote</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Pedazos por lote: <span>menos llamadas al Worker</span></h1>
+<p>Prueba el cartero de lotes (<code>web/navegador/lote.mjs</code>) y su uso en la caché del disco
+  (<code>disco.mjs</code>) <b>sin el juego</b> (§104). El plan gratis de Cloudflare Workers da 100.000 llamadas al día:
+  muchos pedazos tienen que ir en UNA llamada (<code>POST /lote</code>, siempre la misma dirección, así el navegador
+  pregunta los permisos una sola vez). Un «Worker falso» en la página contesta los lotes con bytes de forma conocida (el
+  byte <i>i</i> de cada archivo vale (<i>i</i>·7 + largo del nombre) mod 256), cortando la respuesta en trozos de tamaño
+  al azar como la red, y cuenta las llamadas. Se comprueba que todo llega exacto, que lo pedido junto viaja junto, que
+  lo urgente sale primero y en seguida, los topes (12 pedazos, 16 MB), que la primera llamada sale sola, y que si el
+  Worker no conoce el lote o un lote se corta, se vuelve a pedir de a uno.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearLotes, SIN_LOTE } from '/web/navegador/lote.mjs';
+import { crearDisco, PREFIJO } from '/web/navegador/disco.mjs';
+
+const { ok, nota, fin } = prueba('lote', 'Pedazos por lote (sin el juego)');
+const BASE = '/falso/', URL_LOTE = '/falso/lote';
+const byteDe = (ruta, i) => (i * 7 + ruta.length) & 255;
+const esperado = (ruta, ini, largo) => Uint8Array.from({ length: largo }, (_, k) => byteDe(ruta, ini + k));
+const iguales = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const TAMS = { 'disco/a.szs': 3 * 262144 + 1000, 'disco/b.szs': 900000, 'sd/Mi Pista.szs': 40000, 'thp/video.thp': 64 * 262144 };
+
+// ---- el Worker falso: POST /falso/lote {p:[[ruta, ini, fin]…]} → los pedazos pegados; Range de a uno ----
+let llamadas = [], modo = 'bien', demora = 0, enVuelo = 0, maxEnVuelo = 0;
+async function worker(url, o = {}) {
+  enVuelo++; maxEnVuelo = Math.max(maxEnVuelo, enVuelo);
+  const yo = { t0: performance.now(), t1: null };
+  try {
+    await espera(demora);
+    if (url === URL_LOTE && o.method === 'POST') {
+      const { p } = JSON.parse(o.body);
+      llamadas.push({ tipo: 'lote', p, yo });
+      if (modo === 'viejo') return new Response('no existe', { status: 404 });
+      const partes = p.map(([ruta, ini, fin]) => esperado(ruta, ini, fin - ini + 1));
+      let total = partes.reduce((s, x) => s + x.length, 0);
+      const todo = new Uint8Array(total); let o2 = 0; for (const x of partes) { todo.set(x, o2); o2 += x.length; }
+      const corte = modo === 'corta' ? partes[0].length + Math.floor(partes[1].length / 2) : todo.length;   // se corta en el 2.º
+      let k = 0;
+      const cuerpo = new ReadableStream({
+        async pull(c) {
+          if (k >= corte) { if (modo === 'corta') c.error(new Error('conexión cortada')); else c.close(); return; }
+          const n = Math.min(corte - k, 1 + Math.floor(Math.random() * 70000));
+          c.enqueue(todo.slice(k, k + n)); k += n;
+          await espera(0);
+        }
+      });
+      yo.t1 = performance.now();
+      return new Response(cuerpo, { status: 200 });
+    }
+    // de a uno (Range)
+    const ruta = decodeURIComponent(url.slice(BASE.length));
+    const rango = o.headers && (o.headers.Range || (o.headers.get && o.headers.get('Range')));
+    llamadas.push({ tipo: 'uno', ruta, rango: rango || 'entero' });
+    const tam = TAMS[ruta];
+    if (!rango) return new Response(esperado(ruta, 0, tam));
+    const [, a, b] = /bytes=(\d+)-(\d+)/.exec(rango);
+    const ini = Number(a), fin = Math.min(Number(b), tam - 1);
+    return new Response(esperado(ruta, ini, fin - ini + 1), { status: 206 });
+  } finally { enVuelo--; }
+}
+const reiniciar = () => { llamadas = []; modo = 'bien'; demora = 0; maxEnVuelo = 0; };
+const dir = r => BASE + r.split('/').map(encodeURIComponent).join('/');
+
+try {
+  // 1) lo pedido junto viaja junto, exacto
+  reiniciar();
+  let L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+  const pedidos = [];
+  for (let i = 0; i < 30; i++) { const ruta = ['disco/a.szs', 'disco/b.szs', 'sd/Mi Pista.szs'][i % 3]; const ini = (i * 977) % 30000; pedidos.push([ruta, ini, ini + 1000 + i]); }
+  let res = await Promise.all(pedidos.map(([r, a, b]) => L.pedir(dir(r), a, b)));
+  ok('30 pedazos de 3 archivos llegan exactos (la respuesta viene cortada en trozos al azar)', res.every((d, i) => iguales(d, esperado(pedidos[i][0], pedidos[i][1], pedidos[i][2] - pedidos[i][1] + 1))));
+  const lotes1 = llamadas.filter(x => x.tipo === 'lote');
+  ok('…en pocas llamadas, de a 12 pedazos como mucho', lotes1.length === 3 && lotes1.every(x => x.p.length <= 12),
+     `${lotes1.length} llamadas: ${lotes1.map(x => x.p.length).join(' + ')} pedazos (antes: 30, más sus preguntas previas)`);
+  ok('…y la primera viaja sola: ninguna sale antes de que conteste (así encuentran la pregunta previa ya hecha)', lotes1.slice(1).every(x => x.yo.t0 >= lotes1[0].yo.t1));
+  ok('…la ruta va sin codificar («Mi Pista.szs», no «Mi%20Pista.szs»)', lotes1.some(x => x.p.some(([r]) => r === 'sd/Mi Pista.szs')));
+  ok('…y nada de a uno', !llamadas.some(x => x.tipo === 'uno'));
+
+  // 2) la primera llamada sale sola; después, como mucho 4 (+2 urgentes) a la vez
+  reiniciar(); demora = 30;
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker, maxPiezas: 1 });
+  await Promise.all(Array.from({ length: 20 }, (_, i) => L.pedir(dir('disco/b.szs'), i * 1000, i * 1000 + 99)));
+  ok('con todas las llamadas ocupadas no salen más de 4 a la vez (y la primera, sola)', maxEnVuelo <= 4 && llamadas.length === 20, `a la vez como mucho ${maxEnVuelo}`);
+
+  // 3) lo urgente sale primero y en seguida, aunque haya mucho esperando
+  reiniciar(); demora = 40;
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker, ventana: 50 });
+  await L.pedir(dir('disco/a.szs'), 0, 9);                                  // la primera (la pregunta previa)
+  llamadas = [];
+  const fondo = Array.from({ length: 10 }, (_, i) => L.pedir(dir('disco/b.szs'), i * 5000, i * 5000 + 4999));
+  const t0 = performance.now();
+  const urg = await L.pedir(dir('disco/a.szs'), 262144, 262144 + 99, true);
+  const tUrg = performance.now() - t0;
+  ok('un pedazo urgente no espera la ventana de 50 ms de lo demás: sale en seguida', tUrg < 48 + 40 && iguales(urg, esperado('disco/a.szs', 262144, 100)), `${tUrg.toFixed(0)} ms (la red de mentira tarda 40)`);
+  ok('…va primero en su lote, y lo que esperaba se sube al mismo viaje', llamadas.length >= 1 && llamadas[0].p[0][1] === 262144 && llamadas[0].p.length > 1, `el primero lleva ${llamadas[0]?.p.length} pedazos`);
+  await Promise.all(fondo);
+
+  // 4) los topes: 12 pedazos y 16 MB por lote (un pedazo más grande que el tope va solo)
+  reiniciar();
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker, maxBytes: 100000 });
+  await L.pedir(dir('disco/a.szs'), 0, 9);
+  llamadas = [];
+  await Promise.all(Array.from({ length: 6 }, (_, i) => L.pedir(dir('disco/a.szs'), i * 40000, i * 40000 + 39999)));
+  ok('el tope de bytes por lote se respeta (6 pedazos de 40 KB con un tope de 100 KB = 3 lotes de 2)', llamadas.length === 3 && llamadas.every(x => x.p.length === 2), llamadas.map(x => x.p.length).join(' + '));
+  ok('pedazos de más de 32 MB no van por lote', await L.pedir(dir('disco/a.szs'), 0, 40 * 1048576).then(() => false, e => e.message.startsWith(SIN_LOTE)));
+
+  // 5) un Worker viejo (sin /lote): se apaga y quien pidió vuelve a pedir de a uno
+  reiniciar(); modo = 'viejo';
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+  const viejo = await L.pedir(dir('disco/a.szs'), 0, 9).then(() => 'llegó', e => e.message);
+  ok('Worker sin /lote (404): el pedazo falla con «sin-lote» y el cartero se apaga', viejo.startsWith(SIN_LOTE) && L.estado.apagado && !L.sirve(dir('disco/a.szs')));
+  // un Worker viejo no deja POST en la pregunta previa: el navegador lo da como error de red (TypeError)
+  let intentos = 0;
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: async () => { intentos++; throw new TypeError('Failed to fetch'); } });
+  const r1 = await L.pedir(dir('disco/a.szs'), 0, 9).then(() => 'llegó', e => e.message);
+  const apagado1 = L.estado.apagado;
+  await L.pedir(dir('disco/a.szs'), 0, 9).catch(() => {});
+  ok('…y sin permiso para POST (error de red en las 2 primeras, sin que ninguna haya andado) también se apaga', r1.startsWith(SIN_LOTE) && !apagado1 && L.estado.apagado && intentos === 2,
+     `${intentos} intentos`);
+
+  // 6) un lote cortado a medias: lo que llegó entero sirve, lo que faltaba falla (para pedirlo de a uno)
+  reiniciar();
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+  await L.pedir(dir('disco/a.szs'), 0, 9);
+  modo = 'corta';
+  const cortado = await Promise.all([0, 1, 2].map(i => L.pedir(dir('disco/b.szs'), i * 10000, i * 10000 + 9999).then(d => iguales(d, esperado('disco/b.szs', i * 10000, 10000)) ? 'bien' : 'mal', e => e.message.startsWith(SIN_LOTE) ? 'falla' : 'otro')));
+  ok('un lote cortado: el 1.º pedazo llega entero, el 2.º y el 3.º fallan con «sin-lote»', cortado.join(',') === 'bien,falla,falla', cortado.join(', '));
+  ok('…y el cartero sigue andando (no se apaga por un corte)', !L.estado.apagado);
+
+  // 7) con la caché del disco: lo que el juego lee llega bien por lote, y si el lote falla, de a uno
+  for (const n of await caches.keys()) if (n.startsWith(PREFIJO)) await caches.delete(n);
+  reiniciar(); demora = 5;
+  L = crearLotes({ url: URL_LOTE, base: BASE, buscar: worker });
+  const d = crearDisco({ version: 'lote-1', buscar: worker, lotes: L });
+  await d.abrir();
+  const tam = TAMS['disco/a.szs'];
+  let r = await d.leer(dir('disco/a.szs'), tam, 100, 300000);
+  ok('el disco lee exacto por lote (una lectura que cruza dos bloques)', iguales(r, esperado('disco/a.szs', 100, 300000)) && d.estado.porLote >= 1 && d.estado.deAUno === 0,
+     `por lote ${d.estado.porLote}, de a uno ${d.estado.deAUno}`);
+  // avisos del juego («voy a leer este archivo»): bajan entero en segundo plano, juntos
+  llamadas = [];
+  d.adelantar(dir('disco/b.szs'), TAMS['disco/b.szs']); d.adelantar(dir('sd/Mi Pista.szs'), TAMS['sd/Mi Pista.szs']);
+  await espera(150);
+  const cuantas = llamadas.length;
+  r = await d.leer(dir('sd/Mi Pista.szs'), TAMS['sd/Mi Pista.szs'], 0, 40000);
+  ok('dos avisos del juego a la vez bajan en UNA llamada, y después la lectura no va a la red', cuantas === 1 && llamadas.length === 1 && iguales(r, esperado('sd/Mi Pista.szs', 0, 40000)), `${cuantas} llamada(s)`);
+  const e1 = await d.entero(dir('disco/b.szs'), TAMS['disco/b.szs']);
+  ok('un archivo entero con su tamaño va por lote', iguales(e1, esperado('disco/b.szs', 0, TAMS['disco/b.szs'])));
+  // si el lote se corta, el disco pide de a uno lo que faltó (y el juego no se entera)
+  const otro = crearDisco({ version: 'lote-2', buscar: worker, lotes: crearLotes({ url: URL_LOTE, base: BASE, buscar: worker }) });
+  await otro.abrir();
+  modo = 'corta'; llamadas = [];
+  const lecturas = await Promise.all([0, 1, 2].map(k => otro.leer(dir('disco/a.szs'), tam, k * 262144, 1000)));
+  modo = 'bien';
+  ok('un lote cortado: el disco vuelve a pedir de a uno lo que faltó y lo leído es exacto', lecturas.every((x, k) => iguales(x, esperado('disco/a.szs', k * 262144, 1000))) && llamadas.some(x => x.tipo === 'uno'),
+     `${llamadas.filter(x => x.tipo === 'lote').length} lote(s), ${llamadas.filter(x => x.tipo === 'uno').length} de a uno`);
+  // 8) un video que se lee en orden (como los fondos de los menús): el adelanto rellena de a mucho, no de a un bloque
+  llamadas = []; demora = 3;
+  const v = crearDisco({ version: 'lote-4', buscar: worker, lotes: crearLotes({ url: URL_LOTE, base: BASE, buscar: worker }), cajas: null });
+  await v.abrir();
+  const TV = TAMS['thp/video.thp'];
+  let exacto = true;
+  for (let x = 0; x < TV; x += 65536) {
+    const leido = await v.leer(dir('thp/video.thp'), TV, x, 65536);
+    if (x % (16 * 262144) === 0 && !iguales(leido, esperado('thp/video.thp', x, 65536))) exacto = false;
+    await espera(1);
+  }
+  const lotesVideo = llamadas.filter(x => x.tipo === 'lote').length;
+  ok('un video de 16 MB leído en orden de a 64 KB: exacto y en pocas llamadas (rellena 8 MB por delante cuando queda la mitad)', exacto && lotesVideo <= 12,
+     `${lotesVideo} llamadas (sin la histéresis, una por bloque de 256 KB: en el sitio, 115 para cup_select.thp)`);
+  // y sin lotes (?lote=0), como antes
+  reiniciar();
+  const sin = crearDisco({ version: 'lote-3', buscar: worker });
+  await sin.abrir();
+  r = await sin.leer(dir('disco/a.szs'), tam, 5, 10);
+  ok('sin lotes, el disco pide de a uno como antes', iguales(r, esperado('disco/a.szs', 5, 10)) && llamadas.length === 1 && llamadas[0].tipo === 'uno');
+  for (const n of await caches.keys()) if (n.startsWith(PREFIJO)) await caches.delete(n);
+} catch (e) {
+  ok('sin errores', false, e.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

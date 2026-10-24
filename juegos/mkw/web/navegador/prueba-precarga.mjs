@@ -71,15 +71,23 @@ const c2 = await perfilNuevo();
 const pp = await c2.newPage();
 const erroresPre = [];
 pp.on('pageerror', e => erroresPre.push(e.message));
+// (cada porcentaje que la página anuncia, anotado desde adentro cada 10 ms: el sitio recibe cada aviso por mensaje, y
+// mirar desde aquí cada 300 ms no alcanza desde §104, con la precarga en ~1 s)
+await pp.addInitScript(() => {
+  window.__vistos = [];
+  setInterval(() => {
+    const p = window.mkwEstado?.precarga;
+    if (p && window.__vistos[window.__vistos.length - 1] !== p.pct) window.__vistos.push(p.pct);
+  }, 10);
+});
 const t0 = Date.now();
 await pp.goto(`http://127.0.0.1:${PUERTO}/?precarga=1`);
-const vistos = [];
 let pre = null;
 for (const hasta = Date.now() + 300000; Date.now() < hasta; await espera(300)) {
   pre = await pp.evaluate(() => ({ p: window.mkwEstado?.precarga || null, juego: !!window.mkw })).catch(() => null);
-  if (pre?.p && vistos[vistos.length - 1] !== pre.p.pct) vistos.push(pre.p.pct);
   if (pre?.p?.listo || pre?.p?.error) break;
 }
+const vistos = await pp.evaluate(() => window.__vistos).catch(() => []);
 const msPre = Date.now() - t0;
 const guardado = await pp.evaluate(async () => {
   let n = 0;
@@ -89,7 +97,7 @@ const guardado = await pp.evaluate(async () => {
 ok('la precarga termina (100 %, «listo») sin arrancar el juego (sin programa corriendo)', pre?.p?.listo === true && pre.p.pct === 100 && pre.juego === false,
    `${(msPre / 1000).toFixed(1)} s; ${JSON.stringify(pre)}`);
 ok('el porcentaje sube de a poco (lo que ve cada piloto en el vestíbulo)', vistos.length >= 5 && vistos.every((v, i) => !i || v >= vistos[i - 1]),
-   vistos.join(' → '));
+   vistos.length > 8 ? `${vistos.length} valores: ${vistos.slice(0, 5).join(' → ')} → … → ${vistos.slice(-2).join(' → ')}` : vistos.join(' → '));
 ok('deja el disco guardado en este navegador (Cache Storage)', guardado > 100, `${guardado} archivos y bloques`);
 ok('sin errores de JavaScript en la precarga', erroresPre.length === 0, erroresPre.slice(0, 2).join(' · '));
 await pp.close();

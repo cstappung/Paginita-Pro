@@ -146,8 +146,11 @@ async function firmarDelEmulador(autorizacion) {
 const archivoWorker = path.join(raiz, 'terceros/Paginita-Pro/juegos/bt3/fuente/disco/worker.js');
 const W = (await import(pathToFileURL(archivoWorker).href)).default;
 const env = { AMIGOS, ORIGENES: ORIGEN, DISCO: R2 };
-const contador = { pedidos: 0, preguntas: 0, porEstado: {} };
-const PASAN = ['origin', 'authorization', 'range', 'accept-encoding', 'access-control-request-method', 'access-control-request-headers'];
+// cada pedido atendido (para medir cuántas llamadas gasta una visita: el plan gratis de Workers da 100.000 al día):
+// [ms desde el arranque, método, ruta sin la consulta, bytes pedidos por Range ('' si es el archivo entero), estado]
+const contador = { pedidos: 0, preguntas: 0, porEstado: {}, lista: [] };
+const t0Contador = Date.now();
+const PASAN = ['origin', 'authorization', 'range', 'accept-encoding', 'access-control-request-method', 'access-control-request-headers', 'content-type'];
 
 http.createServer(async (pedido, respuesta) => {
   try {
@@ -156,18 +159,23 @@ http.createServer(async (pedido, respuesta) => {
       respuesta.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ORIGEN, 'Cache-Control': 'no-store' });
       return respuesta.end(JSON.stringify({ token: await tokenDePrueba(uid) }));
     }
-    if (pedido.url === '/__cuenta') {                              // cuántos pedidos atendió (para medir)
+    if (pedido.url.split('?')[0] === '/__cuenta') {                              // cuántos pedidos atendió (para medir)
       respuesta.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': ORIGEN });
-      return respuesta.end(JSON.stringify({ ...contador, r2: R2.operaciones }));
+      const { lista, ...resto } = contador;
+      return respuesta.end(JSON.stringify({ ...resto, r2: R2.operaciones, ...(new URL(pedido.url, 'http://x').searchParams.has('lista') ? { lista } : {}) }));
     }
     const cab = {};
     for (const k of PASAN) if (pedido.headers[k]) cab[k] = pedido.headers[k];
     if (EMULADOR && cab.authorization) cab.authorization = await firmarDelEmulador(cab.authorization);
-    const req = new Request(`http://127.0.0.1:${PUERTO}${pedido.url}`, { method: pedido.method, headers: cab });
+    // (§104: el POST del lote trae su cuerpo)
+    const cuerpo = pedido.method === 'POST' || pedido.method === 'PUT' ? await new Promise(listo => { const t = []; pedido.on('data', d => t.push(d)); pedido.on('end', () => listo(Buffer.concat(t))); }) : undefined;
+    const req = new Request(`http://127.0.0.1:${PUERTO}${pedido.url}`, { method: pedido.method, headers: cab, body: cuerpo });
     await new Promise(r => setTimeout(r, LATENCIA));
     const r = await W.fetch(req, env, { waitUntil() {} });
     contador.pedidos++; if (pedido.method === 'OPTIONS') contador.preguntas++;
     contador.porEstado[r.status] = (contador.porEstado[r.status] || 0) + 1;
+    const rg = /^bytes=(\d+)-(\d+)$/.exec(cab.range || '');
+    if (contador.lista.length < 50000) contador.lista.push([Date.now() - t0Contador, pedido.method, pedido.url.split('?')[0], rg ? rg[2] - rg[1] + 1 : '', r.status]);
     const salida = {};
     r.headers.forEach((v, k) => { salida[k] = v; });
     respuesta.writeHead(r.status, salida);

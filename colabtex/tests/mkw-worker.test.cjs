@@ -152,3 +152,70 @@ test('rapidez: el pedazo queda en el caché de Cloudflare (con la versión en la
     assert.equal((await pide('/mkw/mkw/disco/files/a.szs',{Authorization:'Bearer '+tExtrano,Range:'bytes=100-199'})).status,403,'el caché tampoco se le da a un extraño');
   }finally{delete globalThis.caches;}
 });
+
+/* §104: el lote. El plan gratis de Workers cuenta llamadas (100.000 al día): muchos pedazos en UNA llamada, siempre a
+   la misma dirección y por POST (el navegador pregunta los permisos una sola vez cada 2 horas). */
+const lote=(p,quien=tAmigo,extra={})=>W.fetch(new Request('https://disco.ejemplo/mkw/lote',{method:'POST',headers:{Origin:'https://paginita-pro.cl',...(quien?{Authorization:'Bearer '+quien}:{}),...extra},body:JSON.stringify({p})}),env,{waitUntil(){}});
+test('§104 el lote: varios pedazos de varios archivos en UNA respuesta, exactos, pegados en orden; solo para amigos',async()=>{
+  pon('mkw/build/imagenes/paquetes/clips-000.3b1e268f.pak',bytes(70));
+  pon('mkw/build/bloques.json','{"bloques":[]}');
+  let r=await lote([['mkw/disco/files/a.szs',10,19],['mkw/sd/RetroRewind6/Mi Pista.szs',0,4],['mkw/disco/files/a.szs',990,999],['build/bloques.json',0,13]]);
+  assert.equal(r.status,200);
+  assert.deepEqual(await cuerpo(r),[...bytes(1000).slice(10,20),...bytes(50).slice(0,5),...bytes(1000).slice(990),...new TextEncoder().encode('{"bloques":[]}')]);
+  assert.equal(r.headers.get('cache-control'),'no-store'); assert.equal(r.headers.get('x-mkw-version'),'v-prueba-1');
+  assert.equal(r.headers.get('access-control-allow-origin'),'https://paginita-pro.cl');
+  assert.equal((await lote([['mkw/disco/files/a.szs',0,9]],null)).status,401,'sin token');
+  assert.equal((await lote([['mkw/disco/files/a.szs',0,9]],tExtrano)).status,403,'fuera de la lista');
+  const pre=await pide('/mkw/lote',{'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization'},'OPTIONS');
+  assert.equal(pre.status,204); assert.match(pre.headers.get('access-control-allow-methods'),/POST/,'la pregunta previa deja POST');
+});
+test('§104 el lote rechaza lo que no se puede pedir: el programa, el manifiesto, fuera de las carpetas, .., más de 12 o de 32 MB',async()=>{
+  const malo=async(p,qué)=>assert.equal((await lote(p)).status,400,qué);
+  await malo([],'vacío');
+  await malo(Array.from({length:13},(_,i)=>['mkw/disco/files/a.szs',i,i]),'más de 12 pedazos (cada uno gasta 3 de las 50 operaciones de una llamada)');
+  await malo([['build/mkw.wasm',0,9]],'el programa va aparte (comprimido y con su huella)');
+  await malo([['build/mkw.wasm.br',0,9]],'tampoco el .br');
+  await malo([['manifiesto.json',0,9]],'el manifiesto va aparte');
+  await malo([['../indice.json',0,9]],'lo de BT3, con ..');
+  await malo([['mkw/disco/../../indice.json',0,9]],'.. en el medio');
+  await malo([['mkw/disco\\..\\x',0,9]],'barra invertida');
+  await malo([['otra/cosa',0,9]],'otra carpeta');
+  await malo([['mkw/disco/files/a.szs',20,10]],'al revés');
+  await malo([['mkw/disco/files/a.szs',-1,10]],'negativo');
+  await malo([['mkw/disco/files/a.szs',0,40000000]],'un pedazo de más de 32 MB');
+  await malo(Array.from({length:2},()=>['mkw/disco/files/a.szs',0,20000000]),'más de 32 MB en total');
+  await malo([['mkw/disco/files/a.szs','0',9]],'números de verdad');
+  const r=await W.fetch(new Request('https://disco.ejemplo/mkw/lote',{method:'POST',headers:{Origin:'https://paginita-pro.cl',Authorization:'Bearer '+tAmigo},body:'no es json'}),env);
+  assert.equal(r.status,400,'cuerpo que no es JSON');
+  assert.equal((await pide('/mkw/otro',{Authorization:'Bearer '+tAmigo},'POST')).status,404,'POST solo a /mkw/lote');
+});
+test('§104 el lote: un pedazo que falta o pasa del final corta la respuesta (la página pide de a uno lo que faltó)',async()=>{
+  let r=await lote([['mkw/disco/files/a.szs',0,9],['mkw/disco/files/no-esta.szs',0,9],['mkw/disco/files/a.szs',20,29]]);
+  assert.equal(r.status,200);
+  await assert.rejects(r.arrayBuffer(),'la respuesta se corta en el que falta');
+  r=await lote([['mkw/disco/files/a.szs',995,1004]]);
+  await assert.rejects(r.arrayBuffer(),'pasa del final');
+});
+test('§104 el lote deja cada pedazo en el caché de Cloudflare (la misma llave que el pedido Range) y lo reusa',async()=>{
+  const guardado=new Map();
+  globalThis.caches={default:{match:async k=>guardado.has(k)?guardado.get(k).clone():undefined,put:async(k,r)=>{guardado.set(k,new Response(await r.arrayBuffer(),{headers:r.headers}));}}};
+  try{
+    const esperadoAB=[...bytes(1000).slice(300,400),...bytes(1000).slice(500,600)];
+    let r=await lote([['mkw/disco/files/a.szs',300,399],['mkw/disco/files/a.szs',500,599]]);
+    assert.deepEqual(await cuerpo(r),esperadoAB);
+    await new Promise(x=>setTimeout(x,20));
+    assert.ok(guardado.has('https://disco.ejemplo/mkw/mkw/disco/files/a.szs?r=300-399&v=v-prueba-1'),'misma llave que el pedido Range de esos bytes');
+    const r2=await amigo('/mkw/mkw/disco/files/a.szs',{Range:'bytes=300-399'});
+    assert.equal(r2.headers.get('x-borde'),'HIT','el pedido de a uno lo encuentra');
+    r=await lote([['mkw/disco/files/a.szs',300,399],['mkw/disco/files/a.szs',500,599]]);
+    assert.deepEqual(await cuerpo(r),esperadoAB,'del caché, igual de exacto');
+  }finally{delete globalThis.caches;}
+});
+test('§104 los paquetes de imágenes con su huella en el nombre van guardables para siempre; lo demás de build/, no',async()=>{
+  pon('mkw/build/imagenes/paquetes/clips-000.3b1e268f.pak',bytes(70));
+  pon('mkw/build/imagenes/paquetes/indice.json','{}');
+  let r=await amigo('/mkw/build/imagenes/paquetes/clips-000.3b1e268f.pak');
+  assert.equal(r.status,200); assert.equal(r.headers.get('cache-control'),'public, max-age=31536000, immutable');
+  r=await amigo('/mkw/build/imagenes/paquetes/indice.json');
+  assert.equal(r.headers.get('cache-control'),'no-store','el índice cambia: siempre fresco');
+});

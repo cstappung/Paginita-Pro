@@ -76,6 +76,9 @@ Cloudflare → **Workers & Pages** → el Worker del disco de BT3 → **Edit cod
 **Deploy**.
 
 - No hay variables nuevas: usa las mismas `AMIGOS`, `ORIGENES`, `CLAVE_SUBIDA` y el mismo binding `DISCO`.
+- **§104: hay que volver a pegarlo** aunque ya esté el de antes: trae `POST /mkw/lote` (muchos pedazos del disco en una
+  llamada). Con el Worker viejo el juego igual anda (la página lo nota y pide de a uno), pero gasta ~10 veces más
+  llamadas.
 - El repetidor de Cloudflare (TURN) usa las mismas `TURN_ID` y `TURN_CLAVE` de BT3, si ya están. Como en BT3, Mario
   Kart lo usa solo si el anfitrión prende «🛰 Todo por Cloudflare» en la sala (§103, apagado por omisión; sin el modo,
   ni de reserva: §103b). Sin esas dos, `/turn` contesta 404 y todo va directo: el juego anda igual.
@@ -142,8 +145,10 @@ en el sitio publicado.
 
 ## Límites del plan gratis de Workers
 
-- **100.000 pedidos al día.** Una primera visita son ~2.600 pedidos (incluidas ~200 "preguntas previas" de CORS, una
-  por archivo distinto); una segunda visita, muy pocos (el programa queda en la caché del navegador y el disco en la
-  de la página). Alcanza para varias decenas de primeras visitas al día.
+- **100.000 pedidos al día** (se cuentan llamadas, no megas; también las «preguntas previas» de CORS). Medido con el
+  Worker de verdad en este PC (`node herramientas/medir-sitio.mjs --visitas 2`, bitácora §104): una primera visita hasta
+  la primera carrera gasta **~123 llamadas** (antes de §104 eran ~1.400: la mitad, preguntas previas) y una segunda,
+  **~16**. Los pedazos del disco van de a muchos en una llamada (`POST /mkw/lote`) y el navegador pregunta los permisos
+  una vez cada 2 horas. Alcanza para ~800 primeras visitas o ~6.000 segundas al día.
 - **10 ms de procesador por pedido.** La revisión del token (RSA) se hace una vez y se recuerda; cada pedazo del disco
   es solo leer de R2.

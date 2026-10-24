@@ -7,6 +7,7 @@
 //   /banco/...             el estilo y las ayudas comunes del banco (para que la página se vea igual)
 //   /build/mkw.js|.wasm    el juego compilado para el navegador
 //   /manifiesto.json       la lista de TODOS los archivos (ruta y tamaño) que el juego verá en su disco
+//   POST /lote             §104: varios pedazos en una respuesta, como POST /mkw/lote del Worker (disco.mjs + lote.mjs)
 //   /mkw/disco/...         el disco extraído           (extraido/disco)
 //   /mkw/sd/RetroRewind6/  los archivos de Retro Rewind (terceros/RetroRewind/RetroRewind6)
 //   /mkw/sd/riivolution/   la partida guardada de RR    (terceros/RetroRewind/riivolution)
@@ -115,9 +116,36 @@ http.createServer((pedido, respuesta) => {
     respuesta.setHeader('Timing-Allow-Origin', CORS);   // que la página pueda ver los tiempos y tamaños (medir-sitio)
     respuesta.setHeader('Access-Control-Expose-Headers', 'X-Mkw-Version, X-Mkw-Build, Content-Range, Content-Length');
     if (pedido.method === 'OPTIONS') {           // la "pregunta previa" del navegador antes de un pedido con Range
-      respuesta.writeHead(204, { 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Range', 'Access-Control-Max-Age': '600' });
+      respuesta.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Range, Authorization, Content-Type', 'Access-Control-Max-Age': '600' });
       return respuesta.end();
     }
+  }
+  // §104: el lote, como POST /mkw/lote del Worker de amigos: {"p": [[ruta, inicio, fin], …]} → los pedazos pegados en
+  // ese orden (sin separadores). Un pedazo que no está o pasa del final corta la respuesta: la página pide de a uno
+  if (url === '/lote' && pedido.method === 'POST') {
+    let cuerpo = '';
+    pedido.on('data', d => { cuerpo += d; });
+    pedido.on('end', () => setTimeout(async () => {
+      let p = null;
+      try { p = JSON.parse(cuerpo).p; } catch {}
+      const archivos = Array.isArray(p) && p.length >= 1 && p.length <= 12 ? p.map(x => {
+        if (!Array.isArray(x) || typeof x[0] !== 'string' || !Number.isInteger(x[1]) || !Number.isInteger(x[2]) || x[2] < x[1] || x[1] < 0) return null;
+        const u = '/' + x[0], par = CARPETAS.slice(0, 5).find(([prefijo]) => u.startsWith(prefijo));
+        if (!par || /^\/build\/mkw\.(js|wasm)/.test(u)) return null;
+        const f = path.normalize(path.join(par[1], u.slice(par[0].length)));
+        return f.startsWith(par[1]) ? [f, x[1], x[2]] : null;
+      }) : null;
+      if (!archivos || archivos.includes(null)) { respuesta.writeHead(400); return respuesta.end('lote inválido'); }
+      respuesta.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Mkw-Version': VERSION, 'X-Lote': String(archivos.length) });
+      for (const [f, inicio, fin] of archivos) {
+        try {
+          if (fin >= fs.statSync(f).size) throw new Error('pasa del final');
+          await new Promise((listo, falla) => fs.createReadStream(f, { start: inicio, end: fin }).on('error', falla).on('end', listo).pipe(respuesta, { end: false }));
+        } catch { return respuesta.destroy(); }
+      }
+      respuesta.end();
+    }, CORS ? LATENCIA : 0));
+    return;
   }
   if (url === '/manifiesto.json') {
     return setTimeout(() => {

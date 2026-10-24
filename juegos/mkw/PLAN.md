@@ -196,6 +196,9 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
     excepcional como en BT3, que manda todos los paquetes por el repetidor TURN de Cloudflare (`?conexion=cloudflare`,
     `malla.mjs` `soloRelevo`). Probado con un TURN de mentira propio (`herramientas/turn-local.mjs`). Con el modo
     apagado, **sin repetidor, ni de reserva** (§103b, el dueño: «como en el bt3»).
+  - ✅ Menos llamadas al Worker (§104, pedido del dueño: «cloudflare son 100k calls por dia»): los pedazos del disco de
+    a muchos en una llamada (`POST /mkw/lote`, `lote.mjs`), una sola pregunta previa cada 2 h y los videos con
+    histéresis. 1.ª visita 1.392 → 123 llamadas, 2.ª 38 → 16. **El dueño vuelve a pegar el Worker.**
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -503,6 +506,14 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 17:21** — **Menos llamadas al Worker** (§104, el dueño: «optimiza las llamadas de descarga… 100k calls
+  por dia»). Medido con el Worker de verdad en este PC (`medir-sitio.mjs`, que ahora cuenta las llamadas por visita y por
+  tipo): la 1.ª visita gastaba 1.392 (696 preguntas previas: con `cache: 'no-store'` Chrome pregunta antes de cada
+  pedazo) y la 2.ª 38. Ahora: `POST /mkw/lote` (Worker, `servidor.mjs`), el cartero `lote.mjs` en `disco.mjs`, los videos
+  de los menús con histéresis (rellena 8 MB cuando quedan 4), las semillas por la caché del disco y los paquetes de
+  imágenes guardables: **123 y 16**, la carga igual (68,9 s). La sala de dos (`prueba-experiencia`): 326 llamadas (con el
+  Worker viejo, de a uno, 2.189). Bancos `lote` 20 (nuevo) y `disco` 38, sitio `mkw-worker` 11. La Tienda de Halloween
+  del sitio tapaba la sala en `prueba-experiencia` (ya «vista hoy» en la prueba).
 - **2026-10-24 14:05** — **El repetidor, como en BT3** (§103b, el dueño: «como en el bt3»). Sin «🛰 Todo por
   Cloudflare» ya no hay repetidor ni de reserva: el sitio dejó de mandarle al marco el TURN de §99 al armarse la sala
   (`mkw.js`; el único `relevoBt3()` es el que pide el marco en el modo) y el juego no lo escucha por otro lado

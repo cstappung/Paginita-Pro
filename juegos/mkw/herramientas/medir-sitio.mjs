@@ -31,6 +31,9 @@
 //   --perfilar: perfil de CPU de la carrera → <etiqueta>-<perfil>-v1-perfil.txt
 //   --visitas 2: abre dos veces seguidas en el mismo perfil de Chrome; la 2.ª mide la visita con caché
 //   --red 50: limita la bajada a 50 Mbit/s (como una conexión de casa; Chrome la frena con Network.emulateNetworkConditions)
+// Pedidos al Worker (el plan gratis de Workers da 100.000 llamadas al día, §104): los cuenta el Worker local mismo
+// (/__cuenta, con las preguntas previas de CORS que la página no ve), por tramo (hasta el primer cuadro, hasta la carrera,
+// la carrera) y por tipo (preguntas, programa, semillas, pedazos del disco…) → <base>-v<n>-pedidos.json.
 // Deja build/web/datos/medir-sitio/<etiqueta>-<perfil>.json, .log (la consola del juego) y -v1.png (foto de la carrera).
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, createWriteStream, rmSync } from 'node:fs';
@@ -69,6 +72,15 @@ const sitio = spawn(process.execPath, [path.join(raiz, 'herramientas/sitio-local
   { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise(listo => { let t = ''; sitio.stdout.on('data', d => { t += d; if (t.includes('worker (')) listo(); }); });
 const PAGES = `http://127.0.0.1:${PUERTO}`, WORKER = `http://127.0.0.1:${PUERTO + 1}`;
+const cuentaWorker = async lista => { try { return await (await fetch(`${WORKER}/__cuenta${lista ? '?lista=1' : ''}`)).json(); } catch { return null; } };
+// de qué es cada pedido (la ruta, sin el /mkw del principio)
+const tipoPedido = ([, metodo, ruta, rango]) => metodo === 'OPTIONS' ? 'preguntas CORS'
+  : /\/manifiesto\.json$/.test(ruta) ? 'manifiesto'
+  : /\/build\/mkw\.(wasm|js)$/.test(ruta) ? 'programa'
+  : /\/build\/diminutos\.bin$/.test(ruta) ? 'diminutos.bin'
+  : /\/lote$/.test(ruta) ? 'lotes'
+  : /\/build\//.test(ruta) ? 'build (semillas, imágenes)'
+  : rango !== '' ? 'pedazos del disco' : 'archivos enteros';
 
 // 2) Chrome de verdad (el instalado), con un perfil nuevo (primera visita), sin sonido (pedido del dueño)
 const carpetaPerfil = path.join(os.tmpdir(), 'mkw-medir-' + process.pid);
@@ -108,6 +120,7 @@ async function medirUnaVez(visita) {
   pagina.on('console', m => log.write(`[v${visita}] ${m.text()}\n`));
   pagina.on('pageerror', e => log.write(`[v${visita}] [pageerror] ${e.message}\n`));
 
+  const cw0 = await cuentaWorker(false), marcas = {};
   const extraPagina = `&auto=1&traza=1&gpu=1${EXTRA}`;
   const t0 = Date.now();
   if (args.includes('--sola')) await pagina.goto(`${PAGES}/juegos/mkw/web/navegador/index.html?privado=${WORKER}${extraPagina}`);
@@ -123,6 +136,7 @@ async function medirUnaVez(visita) {
   // primer cuadro: mirando el contador cada 50 ms
   let tPrimer = null;
   for (let i = 0; i < 6000 && tPrimer === null; i++) { if (await cuadros() > 0) tPrimer = Date.now() - t0; else await pagina.waitForTimeout(50); }
+  marcas.primerCuadro = (await cuentaWorker(false))?.pedidos;
   const tarjeta = await juego.evaluate(async () => {
     try { const a = await navigator.gpu.requestAdapter(); const i = a.info || {}; return `${i.vendor || '?'} · ${i.architecture || '?'} · ${i.description || ''}`.trim(); }
     catch (e) { return 'sin WebGPU: ' + e; }
@@ -136,6 +150,7 @@ async function medirUnaVez(visita) {
   for (const [tecla, c] of PASOS) { await pagina.keyboard.down(tecla); await pagina.waitForTimeout(120); await pagina.keyboard.up(tecla); await esperarCuadros(c); }
   // la carrera: K apretada SEGUNDOS × 60 cuadros, midiendo
   const tCarrera = Date.now() - t0;
+  marcas.carrera = (await cuentaWorker(false))?.pedidos;
   const m0 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
   const desde = await ahoraJuego(), c0 = await cuadros(), w0 = Date.now();
   log.write(`[v${visita}] [medir] carrera desde el cuadro ${c0}
@@ -190,10 +205,25 @@ async function medirUnaVez(visita) {
   await pagina.screenshot({ path: `${base}-v${visita}.png` });   // la foto de la carrera (para no romper la imagen)
   await pagina.keyboard.up('KeyK');
   const hasta = await ahoraJuego(), c1 = await cuadros(), w1 = Date.now();
+  // los pedidos al Worker de esta visita: por tramo y por tipo
+  const cw1 = await cuentaWorker(true);
+  let pedidosWorker = null;
+  if (cw0 && cw1) {
+    const lista = cw1.lista.slice(cw0.pedidos), porTipo = {};
+    for (const x of lista) { const k = tipoPedido(x); porTipo[k] = porTipo[k] || { n: 0, mb: 0 }; porTipo[k].n++; porTipo[k].mb += (x[3] || 0) / 1048576; }
+    for (const v of Object.values(porTipo)) v.mb = +v.mb.toFixed(1);
+    pedidosWorker = { total: lista.length, hastaPrimerCuadro: (marcas.primerCuadro ?? cw0.pedidos) - cw0.pedidos,
+                      hastaCarrera: (marcas.carrera ?? cw0.pedidos) - cw0.pedidos, enCarrera: cw1.pedidos - (marcas.carrera ?? cw0.pedidos), porTipo };
+    writeFileSync(`${base}-v${visita}-pedidos.json`, JSON.stringify({ ...pedidosWorker, lista }, null, 0));
+  }
   const m1 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
   const ocupado = 100 * (m1.TaskDuration - m0.TaskDuration) / (m1.Timestamp - m0.Timestamp);
   const heapMB = await juego.evaluate(() => window.mkwHeapMB());
   const programa = await juego.evaluate(() => window.mkwEstado.programa || null);
+  // §104: lo que pasó por lote (lote.mjs) y lo que fue de a uno (disco.mjs)
+  const lotes = await juego.evaluate(() => ({ lotes: window.mkwEstado.lotes ? { ...window.mkwEstado.lotes, historia: undefined } : null,
+    historia: window.mkwEstado.lotes?.historia || [],
+    porLote: window.mkwDisco?.estado.porLote, deAUno: window.mkwDisco?.estado.deAUno }));
   const traza = await juego.evaluate(() => window.mkwTrazaRitmo());
   // la traza de la carrera, en el formato de la consola ([traza] [...]) para herramientas/analizar-traza.mjs
   writeFileSync(`${base}-v${visita}-traza.log`, traza.filter(e => e[1] >= desde && e[1] <= hasta).reduce((o, e, i, a) =>
@@ -253,7 +283,9 @@ async function medirUnaVez(visita) {
     gpuMs: { promedio: gpu.reduce((a, b) => a + b, 0) / (gpu.length || 1), p95: gpuPct(0.95), p99: gpuPct(0.99), max: gpu[gpu.length - 1] || 0, n: gpu.length },
     pantalla: { hz: 1000 / p, imagenes: mostrados.length, parejosPct: parejos, aCompasPct: aCompas, tirones, peorHuecoMs: peorHueco, huecos },
     bajadoMB: Object.fromEntries(Object.entries(bajado).map(([k, v]) => [k, { mb: +v.mb.toFixed(1), pedidos: v.pedidos }])), desdeCacheHttp: desdeCache.n,
+    pedidosWorker, lotes: { ...lotes, historia: undefined },
   };
+  if (lotes.historia.length) writeFileSync(`${base}-v${visita}-lotes.json`, JSON.stringify(lotes.historia));
   console.log(`[${ETIQUETA} · ${PERFIL} · visita ${visita}] tarjeta: ${tarjeta}; aislada: ${aislada.crossOriginIsolated}, SharedArrayBuffer: ${aislada.sab}`);
   console.log(`  primer cuadro ${r.primerCuadroS.toFixed(1)} s, carrera a los ${r.hastaCarreraS.toFixed(1)} s, ${r.fpsCarrera.toFixed(1)} fps en la carrera`);
   if (programa && programa.llegó) console.log(`  programa (.wasm): llegó en ${(programa.bajarMs / 1000).toFixed(1)} s, ` +
@@ -267,6 +299,11 @@ async function medirUnaVez(visita) {
   for (const x of tironesCuadro) console.log(`  tirón a los ${x.s} s: ciclo ${x.ciclo} ms = juego ${x.juego} + aurora ${x.aurora} + espera del runtime ${x.esperaRuntime} + disco ${x.disco}`);
   console.log(`  hilo principal ocupado ${ocupado.toFixed(0)} %, heap del wasm ${heapMB.toFixed(0)} MB, bajado: ` +
               Object.entries(r.bajadoMB).map(([k, v]) => `${k} ${v.mb} MB (${v.pedidos} pedidos)`).join(', ') + `, de la caché HTTP ${desdeCache.n}`);
+  if (lotes.lotes) console.log(`  lotes: ${lotes.lotes.lotes} llamadas con ${lotes.lotes.piezas} pedazos (${(lotes.lotes.bytes / 1048576).toFixed(1)} MB; el mayor, ${lotes.lotes.mayor}; ` +
+    `urgentes ${lotes.lotes.urgentes}, fallidos ${lotes.lotes.fallidos}${lotes.lotes.apagado ? ', APAGADO' : ''}); el disco: ${lotes.porLote} tramos por lote, ${lotes.deAUno} de a uno`);
+  if (pedidosWorker) console.log(`  pedidos al Worker: ${pedidosWorker.total} (hasta el primer cuadro ${pedidosWorker.hastaPrimerCuadro}, hasta la carrera ` +
+    `${pedidosWorker.hastaCarrera}, en la carrera ${pedidosWorker.enCarrera}): ` + Object.entries(pedidosWorker.porTipo).sort((a, b) => b[1].n - a[1].n)
+    .map(([k, v]) => `${k} ${v.n}${v.mb ? ` (${v.mb} MB)` : ''}`).join(', '));
   await cdp.detach();
   return r;
 }
