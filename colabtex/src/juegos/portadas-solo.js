@@ -309,6 +309,23 @@ const ARTE = {
     <g font-family="system-ui,sans-serif" font-weight="900" font-size="24" fill="#fff" text-anchor="middle">${tile(196, "O", "#22a35a")}${tile(242, "H", "#c9a227")}${tile(288, "M", "#22a35a")}${tile(334, "S", "#3f4656")}</g>`;
   },
 
+  integral: u => {
+    return `<defs><pattern id="c${u}" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#8fb3e0" stroke-width="1"/></pattern>
+    <pattern id="m${u}" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#6a93c9" stroke-width="1.6"/></pattern>
+    <linearGradient id="g${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbfaf4"/><stop offset="1" stop-color="#ece7d6"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/><rect width="400" height="300" fill="url(#c${u})" opacity=".55"/><rect width="400" height="300" fill="url(#m${u})" opacity=".35"/>
+    <path d="M58 0V300" stroke="#e05a5a" stroke-width="2" opacity=".7"/>
+    <g fill="#1d2a44" font-family="'Times New Roman',Georgia,serif" font-style="italic">
+      <text x="150" y="214" font-size="190" text-anchor="middle" font-style="normal">∫</text>
+      <text x="196" y="146" font-size="40">x e</text><text x="250" y="124" font-size="24">x²</text><text x="282" y="146" font-size="40">dx</text>
+      <text x="200" y="210" font-size="30" font-style="normal" fill="#3b4a66">= ½ e</text><text x="281" y="194" font-size="18" fill="#3b4a66">x²</text><text x="304" y="210" font-size="30" fill="#3b4a66">+ C</text>
+    </g>
+    <path d="M196 226 Q260 218 352 230" fill="none" stroke="#2c5aa8" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+    <g class="a-mueve"><circle cx="340" cy="78" r="34" fill="none" stroke="#c0392b" stroke-width="4" opacity=".85"/><path d="M322 78 L336 92 L362 60" fill="none" stroke="#c0392b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g transform="rotate(-5 120 44)"><rect x="74" y="22" width="92" height="42" rx="2" fill="#fde68a" stroke="#d6b84a" stroke-width="1"/><rect x="104" y="16" width="32" height="10" fill="#fff" opacity=".55"/>
+    <text x="120" y="49" font-family="system-ui,sans-serif" font-weight="800" font-size="16" fill="#6b5a1a" text-anchor="middle">u = x²</text></g>`;
+  },
+
   sortem: u => {
     const alturas = [30, 46, 62, 120, 94, 110, 136, 152];
     const barras = alturas.map((h, i) => {
@@ -502,6 +519,23 @@ const ARTE = {
     ${torre(205, 58, "#5fbf4a", 205, "a-mueve")}${torre(105, 140, "#7fd6ff", 60)}${torre(318, 186, "#ffb84d", 330)}
     <path d="M196 76 L156 122" stroke="#fff27a" stroke-width="4" stroke-linecap="round" class="a-late"/>
     <circle cx="154" cy="125" r="7" fill="#fff27a" opacity=".85" class="a-late"/>`;
+  },
+
+  /* PRO PACMAN: un tramo del laberinto de neón, el pacman comiéndose la
+     fila de puntos y tres fantasmas detrás; uno azul de miedo. */
+  propac: u => {
+    const pared = d => `<path d="${d}" fill="none" stroke="#2de2ff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".35"/><path d="${d}" fill="none" stroke="#2de2ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const fan = (x, y, c) => `<g transform="translate(${x} ${y})"><path d="M-18 18 V0 A18 18 0 0 1 18 0 V18 L9 11 L0 18 L-9 11 Z" fill="${c}"/><circle cx="-6" cy="-2" r="5" fill="#fff"/><circle cx="7" cy="-2" r="5" fill="#fff"/><circle cx="-4" cy="-1" r="2.4" fill="#0b1a6a"/><circle cx="9" cy="-1" r="2.4" fill="#0b1a6a"/></g>`;
+    let puntos = "";
+    for (let k = 0; k < 6; k++) puntos += `<rect x="${236 + k * 26}" y="146" width="7" height="7" fill="#ffe9b8"/>`;
+    return `<defs><radialGradient id="g${u}" cx=".5" cy=".3" r=".9"><stop offset="0" stop-color="#1a1450"/><stop offset="1" stop-color="#04050d"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    ${pared("M20 100 H170 V60 H380")}${pared("M20 200 H380")}${pared("M230 100 H380")}
+    <circle cx="360" cy="80" r="10" fill="#c86bff" class="a-late"/>
+    ${puntos}
+    ${fan(60, 140, "#ff3b5c")}${fan(110, 140, "#3df5ff")}<g class="a-mueve">${fan(160, 140, "#2a3cff")}</g>
+    <radialGradient id="p${u}" cx=".32" cy=".26" r=".8"><stop offset="0" stop-color="#fffbe2"/><stop offset=".32" stop-color="#ffea4a"/><stop offset=".78" stop-color="#ffc21a"/><stop offset="1" stop-color="#ff8f0f"/></radialGradient>
+    <g transform="translate(210 150)"><circle r="40" fill="#ffe14d" opacity=".16"/><path d="M0 0 L26 -16 A30 30 0 1 0 26 16 Z" fill="url(#p${u})" stroke="#ffe14d" stroke-width="2.5" stroke-linejoin="round"/><path d="M24 -14.8 L0 0 L24 14.8" fill="none" stroke="#c45a00" stroke-width="3.5" stroke-linejoin="round"/><ellipse cx="-12" cy="-15" rx="9" ry="5" fill="#fff" opacity=".7" transform="rotate(-34 -12 -15)"/><ellipse cx="4" cy="-16" rx="4.5" ry="6" fill="#1a0f2e"/><circle cx="3.2" cy="-18" r="1.8" fill="#fff"/></g>`;
   }
 };
 

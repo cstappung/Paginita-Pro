@@ -1,8 +1,8 @@
 # PRO DEFENDER — notes for Claude
 
-Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds, 22
-towers and 30+ enemies, written by the owner as plain scripts (no build) and
-integrated here. Shared club rules (proof, castigo, modo celular) are in
+Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds (plus
+5 more that open one per day, Oct 22–26 2026: «Second era» below), 22 towers and 30+
+enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking wiring in
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat details in
 `docs/antitrampas/prodefender.md`.
@@ -79,23 +79,111 @@ store towers by index there — never insert a tower before them. In `main.js` t
 hero sits above the shop on its own row (key H) and `shopTowers` keeps the
 number hotkeys for the towers only.
 
+## Second era: kingdoms 6–10, one opens each day (owner's request, Oct 2026)
+
+Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes and
+Trono del Eclipse (`levels.js`, after Vacío). Each has `abre: 'YYYY-MM-DD'`, the
+Chile day it opens to everyone (Oct 22, 23, 24, 25, 26 of 2026);
+`PD.abierto(li)` compares it with `PD.diaChile()` (the browser clock in
+America/Santiago). `main.js` re-checks every minute and rebuilds the levels
+screen at midnight. The kingdom of the day gets a «¡NUEVO HOY!» pill.
+
+- **Before its day** (`enPrueba(li)` = `!PD.abierto(li)`) only Juegos admins play
+  it; everyone else sees «PRÓXIMAMENTE · Se abre mañana / el N de mes» and no
+  buttons (`puedeJugar`). Admin comes from the page (`esAdmin` in `crearSolo` →
+  `{tipo:'admin'}` → `Club.esAdmin()` / `club-admin`); opening the game alone on
+  localhost counts as admin, for previews. Such a game saves no record and pays
+  nothing (`reporta`/`escuchaTabla` skip it, `save.best/won` are not written).
+- **From its day** it is a normal kingdom: table `club-prodefender-<short in
+  lowercase>` (`pantano|cumbres|fosa|engranajes|eclipse`, in `REINOS` of
+  prueba.js, the verifier, `club-datos.js`, both rules regexes, `ranks.js`,
+  `discord.js`), and **100 coins per round** like Vacío (`monedasProdefender`
+  caps the multiplier at 5; `monedasRonda` in main.js the same) — 10 000 each at
+  round 100. It does **not** need round 50 of the previous kingdom (`segunda(li)`
+  skips `save.unlocked`, which still stops at Vacío). The date is a UI gate only:
+  the verifier and the rules do not look at it, so a moved clock plays early but
+  still has to play the rounds.
+- **Fewer towers**: each sells only `L.torres` (a shrinking subset of the 22,
+  plus its own new tower) and its hero (`towersFor`). `musica` picks one of the
+  five audio themes.
+- Maps are shorter, with several entrances, crossings and portals.
+- **Animated scenery** (`render.js`, render-only): `escenaDe` places each
+  map's props once with the map's fixed rng, `escenaUnder` animates them under
+  enemies and towers (also once, frozen, in the level thumbnails) and
+  `escenaOver` adds weather. Engranajes and Eclipse have their own `deco`
+  rules (not an `ESTILO` borrowed from a first-era map): conveyor belt with
+  moving chevrons, gears turning in the pits, pistons, Tesla coils, reactor;
+  and golden energy flowing down the path, the eclipse on the biggest altar,
+  rune rings, floating crystals. Obstacle `kind` is art only (`reactor`,
+  `shard`): the engine only reads x, y, r. Per-frame work is batched in
+  `Path2D`s: keep a frame of 9–10 near Vacío's cost.
+
+New content, all appended (TOWER_ORDER indices matter: never insert before them):
+towers `bruja` (frog: `sapifica`, a sapo has no armor/camo/powers and walks at
+half speed), `pararrayos` (rod: `protegida` — nothing disables, freezes, blinds
+or grabs a tower in its range — plus chain lightning), `burbujas` (bubble:
+`atrapa`/`revienta`), `desintegrador` (disint: % of max HP per second, big ×0.4,
+boss ×0.08) and `campanario` (bell: repeats `e.eco`, the damage taken lately);
+heroes Morgana, Zéfiro, Nerea, Ada and Solenne (abilities `cienaga`,
+`tempestad`, `maremoto`, `sobrecarga`, `amanecer`). Enemy mechanics are listed
+in a comment at the top of the second-era block in `enemies.js`; per-enemy
+logic is `Game.segundaEra`, plus `parte` (Eclipse splits into two bosses at
+half HP), `suelta` (Kraken's grabs) and the hooks in `damage`.
+
+**Determinism of kingdoms 1–5**: every new rule runs only when its new field is
+present (new enemies, new towers), and new `rnd()` calls only happen for new
+enemies. So old proofs replay identically and the proof `VERSION` stayed at 4
+(only the `?v=pd-N` cache tag moved): checked by playing the same scripted game
+on the old and new engine (identical round by round) and by the bot. If you
+change anything that kingdoms 1–5 use, bump `VERSION` as usual.
+
+Balance with `prodefender-bot.cjs --reino nuevos` (see below): `mixta` plays
+them blind, `adapta` knows the counters. Tuned with `--ayuda 100` against the
+same bot in Vacío (which it finishes losing ~13600 lives and three bosses):
+`diff` 1.7 / 1.9 / 2.2 / 2.45 / 2.25 leaves Pantano–Engranajes at 3–6k lives
+and 0–1 escaped bosses and Eclipse above Vacío; `adapta` beats `mixta` clearly
+in Fosa and Eclipse. Without `--ayuda` the bot dies around round 15 in every
+kingdom, Vacío included (its opening), so that number says nothing.
+
 ## Knockback and crowd control
 
-Every push back along the path goes through `Game.retrocede(e, px)`: Ancla,
-bumerán/balista/géiser pushes (`push`) and Ra'kesh's Tormenta. It spends a
-per-enemy lifetime budget `KB_MAX` (260 px, big 180, boss 140) kept in
-`e.pulled`, and **children inherit `pulled`** from their parent. Before, the
-Tormenta had no cap and each child started from zero, so buffed knockback
-towers kept rounds from ever ending. Nyx's Grieta rewinds each enemy **once**
+Every push back along the path goes through `Game.retrocede(e, px, src)`:
+Ancla, bumerán/balista/géiser pushes (`push(e, amt, src)`) and Ra'kesh's
+Tormenta. Each **tower** has its own cap per enemy, `KB_TORRE` (260 px, big
+180, boss 140; the Tormenta ×1.5), kept in `e.kb[towerId]`, and its push
+yields `KB_SUAVE / (KB_SUAVE + what the other towers pushed)` (520/360/280),
+never zero; `e.pulled` is the total. **Children inherit `pulled` and `kb`.**
+History: no cap at all let buffed knockback towers keep rounds from ending;
+then one lifetime cap per enemy (`KB_MAX`) made the back towers spend it and
+the enemy walked through the front ones immune (owner disliked it). One tower
+alone pushes as with the old cap; `prodefender-bot.cjs --estrategia control
+--ayuda 100` lost slightly fewer lives in Dunas/Glaciar/Caldera and the same
+elsewhere. Nyx's Grieta rewinds each enemy **once**
 (`e.rifted`, also inherited). A freeze leaves 1 s of `freezeImm` after it ends
 (`FREEZE_IMM`; re-freezes only slow), the same idea as `stunImm`. Do not add a
 new push that writes `e.dist` directly.
+
+## Pinchos (spikes, like Bloons' road spikes)
+
+`PD.PINCHOS` in `engine.js`: a pile bought from the shop (row under the hero,
+key K, `'@pinchos'` in `ui.placing`) and dropped **on the path**
+(`spikeSpot`: nearest point of a non-jump segment within `PATH_HALF`, not on
+another pile, at most `max` 10). Each ground enemy that walks over it takes one
+hit (once per pile, `hit` ids reset at `endRound`) and spends `gasto` spikes
+(big 3, boss 4) for `multi` × the damage (phys, ap 0.5); 12 spikes; it lasts
+until spent, across rounds (`snapshot.spikes`). Cost and damage follow the
+round (`costo`, `danio` = 5 × the round's enemy HP scale). Player action →
+op code 6 in `prueba.js` (`Grabadora.pinchos`).
 
 ## Balance tools (`colabtex/scripts/`)
 
 - `prodefender-bot.cjs`: a bot that plays well (shooting range per tower and
   tier on the real engine, spends by damage per gold, expert build order) and
   prints the round reached, lives lost per decade and how far enemies get.
+  `--reino nuevos` plays kingdoms 6–10; `--estrategia adapta` adds the
+  second-era counters (no electricity against Storm Elementals, lightning rods
+  over its priciest towers, fire for the Hydra, varied damage types against
+  Automata, and the witch/bubble/bell towers).
   `--motor DIR` runs another engine copy (e.g. `git archive` of an older
   commit) to compare; `--ayuda N` gives unlimited lives up to round N (its
   opening is weaker than a person's). Several minutes per 100-round game.
@@ -136,13 +224,13 @@ versión» (cache, not cheating: no castigo).
 
 ## In Juegos
 
-- Route `#solo/prodefender`, card `prodefender` in `salon-datos.js`. Needs an
-  account (not a guest destacado). The iframe is **always full window**
+- Route `#solo/prodefender`, card `prodefender` in `salon-datos.js`. Guests play it
+  (`EN_LA_NUBE` is false: no tables, no coins, nothing saved; not a guest destacado). The iframe is **always full window**
   (`PLENO` in `solo/club.js` → `html.jg-club-pleno` in `juegos.html`), like PRO
   HERO; the game's own «← Volver a Juegos» / «← Juegos» buttons click the
   hidden `.club-volver` link that `conexion.js` adds.
-- Five tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
-  of game time. `main.js` reads the five tables once on open (`recorreTablas`,
+- Ten tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
+  of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
   kingdoms (round 50 opens the next one), and sends `Club.result` with
   `rec.prueba()` only when a round **beats** the cloud record. The levels screen
@@ -150,13 +238,22 @@ versión» (cache, not cheating: no castigo).
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
   kingdom number, once: 2000/4000/6000/8000/10000 for reaching round 100 of
-  kingdom 1–5, and beating 60 with 70 pays only the ten new rounds
+  kingdom 1–5, 10000 each for kingdoms 6–10 (100 a round), and beating 60 with 70 pays only the ten new rounds
   (`monedasProdefender` in `monedas.js`, from the row like every club record).
   **No per-game pay**: `prodefender` is not in `PAGO_CLUB`/`JUEGOS_CLUB`, and
   `alResultadoClub` in `juegos-main.js` skips `marcaJugadaClub` for it and
   announces the new coins instead. Logros (`SOLO.prodefender`, low `NIVEL`
   digits) and podiums pay as in every club game.
-- Local save is per account: `Club.storageKey('prodefender.save.v1')`.
+- Local save is per account: `Club.storageKey('prodefender.save.v1')`. There is no «Borrar progreso» button (the owner removed it).
 - Volume: `volumen.js` draws into the `[data-volumen]` slots (menu and HUD;
   hidden in the HUD under 600 px), and the game keeps its own 🔊 (M) and the
   music/effects sliders in the pause menu.
+- **Sound effects have a concurrency cap** (`A.play` in `audio.js`: `ATK_MAX`
+  tower attacks, `VOCES_MAX`/`VOCES_DURO` in total, counted on `ctx.currentTime`)
+  and a limiter after the compressor; the context uses `latencyHint:
+  'playback'`. Without them a big map crackled and then went silent (the
+  audio thread could not keep up). `audio.js`, `main.js` and the CSS carry
+  `?v=pd-7a`: they are not in the proof, so they move without `VERSION`.
+- **Cursor**: on the map it is a big yellow crosshair with a black outline
+  (`#cv.cur-grande`, an inline SVG); the pause menu's «Cursor» select switches
+  back to the system crosshair (`save.settings.cursor = 'clasico'`).

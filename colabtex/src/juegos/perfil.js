@@ -32,10 +32,12 @@ export const COLORES = [
 
 import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
 import { avatarMarco, tarjetaHtml, capaFondo } from "./perfil-vista.js";
-import { PRECIO_TIENDA } from "./tienda.js";
+import { PRECIO_TIENDA, precioDe, RAREZAS_HW, rarezaHw, tiendaHalloweenAbierta } from "./tienda.js";
 import { juegoOculto } from "./ocultos.js";   // (BT3 es privado: ni su premio de campeón a quien no lo ve)
 import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
+import { MONEDA } from "./monedas-vista.js";   // dibujada: el emoji 🪙 sale como un cuadro en Windows 10
+import { TINTAS, tintaDe, nombreHtml } from "./tintas.js";
 
 export const LARGO_NICK = 24;
 
@@ -109,8 +111,10 @@ function avatar(foto, nombre, color) {
    dice cuánto hay (null mientras la economía no ha llegado entera).
    `mascota` = {opciones: {mascotas, bailes} | null, vista(c, b, cb)}: lo que
    se puede elegir de Mascotas y cómo se ve (perfil-mascota.js). Sin
-   opciones (la economía no llegó) la elegida se guarda tal como estaba. */
-export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp }) {
+   opciones (la economía no llegó) la elegida se guarda tal como estaba.
+   `referidos`: cuántos trajo (tintas.js desbloquea el color del nombre con
+   ellos); null mientras no se sabe, y entonces solo se ofrece lo guardado. */
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp, referidos: nRef = null, onTiendaHw }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -123,6 +127,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   let bio = p.bio || "";
   let marco = marcoDe(p.marco) ? p.marco : "anillo";
   let fondo = fondoDe(p.fondo) ? p.fondo : "color";
+  let tinta = tintaDe(p.tinta) ? p.tinta : "";
   const guardada = Array.isArray(p.vitrina) ? p.vitrina : p.vitrina && typeof p.vitrina === "object" ? Object.values(p.vitrina) : [];
   let vitrina = guardada.slice(0, MAX_VITRINA);
   const opM = mp && mp.opciones;
@@ -169,6 +174,10 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
                   <textarea id="pfBio" maxlength="${LARGO_BIO}" rows="2" placeholder="Una frase: tu juego favorito, tu grito de guerra…"></textarea>
                 </label>
                 <div class="jg-campo">
+                  <span>Color del nombre <small>· se desbloquea trayendo gente con tu código</small></span>
+                  <div class="jg-tn-ops" id="pfTintas"></div>
+                </div>
+                <div class="jg-campo">
                   <span>Color</span>
                   <div class="jg-colores" id="pfColores"></div>
                   <label class="jg-color-libre">
@@ -204,7 +213,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   const prevMasc = mp ? capaMascota($("#pfPrev"), "en-mini") : null;
   let cerrado = false;
   const cierra = () => { cerrado = true; if (prevMasc) prevMasc.cierra(); capa.remove(); };
-  const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina }, foto !== null ? { foto } : {});
+  const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina, tinta }, foto !== null ? { foto } : {});
   const ops = opcionesVitrina(est);
   const repinta = () => { if (!cerrado) pinta(); };
   /* La vista de la mascota elegida (undefined mientras llega su estado). */
@@ -256,6 +265,17 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
       `<button class="jg-color${c.toLowerCase() === color.toLowerCase() ? " on" : ""}"
          data-color="${c}" style="background:${c}" title="${c}"></button>`).join("");
     $("#pfColor").value = /^#[0-9a-f]{6}$/i.test(color) ? color : "#0d9488";
+    /* El color del nombre: «Normal» y los cuatro, con el nombre de verdad
+       pintado en cada uno. Uno cerrado dice cuántos referidos faltan. */
+    const nomEsc = esc(nom);
+    $("#pfTintas").innerHTML = [{ id: "", n: 0, nombre: "Normal" }, ...TINTAS].map(t => {
+      const abierto = !t.n || (nRef == null ? t.id === tinta : nRef >= t.n);
+      const falta = nRef == null ? "" : `${t.n - nRef} ${t.n - nRef === 1 ? "referido más" : "referidos más"}`;
+      return `<button type="button" class="jg-tn-op${t.id === tinta ? " on" : ""}${abierto ? "" : " cerrado"}" data-tinta="${t.id}" ${abierto ? "" : 'aria-disabled="true"'}
+        title="${esc(abierto ? t.nombre : `Se desbloquea con ${t.n} ${t.n === 1 ? "referido" : "referidos"}`)}">
+        <b translate="no">${nombreHtml("", nomEsc, t.id || "normal")}</b>
+        <small>${abierto ? esc(t.nombre) + (t.efecto ? ` · ${esc(t.efecto)}` : "") : `🔒 ${t.n} ${t.n === 1 ? "referido" : "referidos"}${falta ? ` · te faltan ${esc(falta)}` : ""}`}</small></button>`;
+    }).join("");
     $("#pfGoogle").style.display = (base && base.foto) ? "" : "none";
     $("#pfQuitar").style.display = (foto === "" ) ? "none" : "";
     $("#pfBioN").textContent = `${bio.length}/${LARGO_BIO}`;
@@ -263,13 +283,17 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
        ya tienes, primero). Un cerrado de la tienda no es un candado: es
        un botón de compra. */
     const op = (it, actual, attr, dentro) => {
-      const r = requisito(it, est), venta = !r.ok && r.tienda;
-      return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas` : "Se gana: " + r.falta)}">
-        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && it.req.tienda ? `<small class="jg-ped-tuyo">✓ Comprado</small>` : "") : venta ? `<small class="jg-ped-precio">🪙 ${miles(PRECIO_TIENDA)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+      const r = requisito(it, est), venta = !r.ok && r.tienda, rz = rarezaHw(it.id);
+      return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}${it.hw ? " hw" : ""}${rz ? " r-" + rz : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(r.precio)} monedas` : "Se gana: " + r.falta)}">
+        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && (it.req.tienda || it.req.coleccion) ? `<small class="jg-ped-tuyo">✓ ${it.req.coleccion ? "Ganado" : "Comprado"}</small>` : "") : venta ? `<small class="jg-ped-precio">${rz ? esc(RAREZAS_HW[rz].n) + " · " : ""}${MONEDA} ${miles(r.precio)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
     };
+    /* Lo de Halloween que ya no se puede conseguir no se enseña: es de
+       quien lo compró a tiempo. */
+    const hw = l => l.filter(it => it.hw && !requisito(it, est).agotado);
     const grupos = (lista, actual, attr, dentro) => [
-      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top))],
-      [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda)],
+      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top || it.req.coleccion))],
+      [`🎃 Halloween · edición limitada${tiendaHalloweenAbierta(Date.now()) && onTiendaHw ? ` <button type="button" class="jg-ped-hwir" data-ir-tienda-hw>Ver la tienda →</button>` : ""}`, hw(lista)],
+      [`Tienda · ${MONEDA} ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda && !it.hw)],
       ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top && !juegoOculto(it.req.top)).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
     ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
     $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));
@@ -301,6 +325,11 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     color = b.getAttribute("data-color"); pinta();
   };
   $("#pfColor").oninput = e => { color = e.target.value; pinta(); };
+  $("#pfTintas").onclick = e => {
+    const b = e.target.closest("[data-tinta]");
+    if (!b || b.classList.contains("cerrado")) return;
+    tinta = b.getAttribute("data-tinta"); pinta();
+  };
   $("#pfSubir").onclick = () => $("#pfArchivo").click();
   $("#pfGoogle").onclick = () => { foto = null; falla(""); pinta(); };
   $("#pfQuitar").onclick = () => { foto = ""; falla(""); pinta(); };
@@ -324,17 +353,22 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     if (!onComprar) { falla("La tienda no está disponible aquí."); return; }
     const s = saldo ? saldo() : null;
     if (s === null || s === undefined) { falla("Todavía se están contando tus monedas; prueba en unos segundos."); return; }
-    if (s < PRECIO_TIENDA) { falla(`«${it.n}» cuesta ${miles(PRECIO_TIENDA)} 🪙 y tienes ${miles(s)}: te faltan ${miles(PRECIO_TIENDA - s)}.`); return; }
-    if (!confirm(`¿Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas?\nTe quedarán ${miles(s - PRECIO_TIENDA)}. Es para siempre.`)) return;
+    const precio = precioDe(it.id);
+    if (s < precio) { falla(`«${it.n}» cuesta ${miles(precio)} monedas y tienes ${miles(s)}: te faltan ${miles(precio - s)}.`); return; }
+    if (!confirm(`¿Comprar «${it.n}» por ${miles(precio)} monedas?\nTe quedarán ${miles(s - precio)}. Es para siempre.`)) return;
     comprando = true; falla("");
     try {
       await onComprar(it.id);
-      est = Object.assign({}, est, { compras: Object.assign({}, est && est.compras, { [it.id]: { p: PRECIO_TIENDA } }) });
+      est = Object.assign({}, est, { compras: Object.assign({}, est && est.compras, { [it.id]: { p: precio } }) });
       alHacerla(); pinta();
     } catch (err) {
       falla("No se pudo comprar: " + (err && (err.code || err.message) ? String(err.code || err.message) : String(err)));
     } finally { comprando = false; }
   }
+  for (const r of [$("#pfMarcos"), $("#pfFondos")]) r.addEventListener("click", e => {
+    if (!e.target.closest("[data-ir-tienda-hw]")) return;
+    e.stopPropagation(); cierra(); onTiendaHw();
+  }, true);
   $("#pfMarcos").onclick = e => {
     const b = e.target.closest("[data-marco]");
     if (!b) return;
@@ -384,7 +418,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const b = e.currentTarget;
     b.disabled = true; falla("");
     const salida = Object.assign({ nick: nick.trim().slice(0, LARGO_NICK), color },
-      limpiaPerfil({ marco, fondo, bio, vitrina, mascota }));
+      limpiaPerfil({ marco, fondo, bio, vitrina, mascota, tinta }));
     if (foto !== null) salida.foto = foto;
     else if (base && esFotoGoogle(base.foto)) salida.foto = base.foto;   // «la de Google», a la vista de todos
     try { await onGuardar(salida); cierra(); }

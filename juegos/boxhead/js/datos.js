@@ -23,7 +23,7 @@
   const ARMAS = [
     { id: 0, nombre: 'Pistola', tipo: 'bala', d: 12, cad: 0.32, ini: Infinity, caja: 0, max: Infinity, alc: 360, desbloquea: 1 },
     { id: 1, nombre: 'Uzi', tipo: 'bala', d: 9, cad: 0.08, ini: 150, caja: 100, max: 400, alc: 340, desv: 0.06, desbloquea: 5 },
-    { id: 2, nombre: 'Escopeta', tipo: 'perdigon', d: 9, cad: 0.75, ini: 25, caja: 15, max: 60, alc: 220, perdigones: 7, abre: 0.42, desbloquea: 10 },
+    { id: 2, nombre: 'Escopeta', tipo: 'perdigon', d: 13, cad: 0.75, ini: 25, caja: 15, max: 60, alc: 240, perdigones: 8, abre: 0.42, desbloquea: 10 },
     { id: 3, nombre: 'Barriles', tipo: 'objeto', obj: 'barril', d: 120, r: 84, cad: 0.4, ini: 5, caja: 3, max: 15, desbloquea: 15 },
     { id: 4, nombre: 'Granadas', tipo: 'granada', d: 90, r: 70, cad: 0.6, ini: 10, caja: 5, max: 30, desbloquea: 20 },
     { id: 5, nombre: 'Muro falso', tipo: 'objeto', obj: 'muro', vida: 160, cad: 0.35, ini: 10, caja: 5, max: 30, desbloquea: 25 },
@@ -137,7 +137,7 @@
   /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   /* Puntos por baja (× multiplicador), por tipo de enemigo. */
-  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000];
+  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000, 50];
 
   /* ---------- enemigos ----------
      `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
@@ -174,7 +174,12 @@
     { id: 14, nombre: 'La Hidra', jefe: 'grande', hab: 'hidra', cd: 3.5, vida: 3400, vel: 30, velMax: 44, golpe: 22, radio: 14, rg: 28, talla: 2.2, fuego: 12, acido: true, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
       txt: 'escupe ácido en cinco direcciones; al perder vida le brotan escupidores' },
     { id: 15, nombre: 'El Titán', jefe: 'grande', hab: 'roca', cd: 3, vida: 4000, vel: 34, velMax: 50, golpe: 34, radio: 14, rg: 30, talla: 2.4, onda: 70, dOnda: 40, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
-      txt: 'lanza rocas que estallan donde caen; herido, se enfurece' }
+      txt: 'lanza rocas que estallan donde caen; herido, se enfurece' },
+    /* El Demoledor: el único que va derecho a tus muros y barriles (`rompe`)
+       y los tira a mazazos (`dObj`: cuánto más daño les hace). Los demás
+       buscan otro camino y solo rompen si no hay ninguno. Es raro a
+       propósito: entra en el nivel 6 y nunca pasa del 5 % de la horda. */
+    { id: 16, nombre: 'Demoledor', vida: 190, vel: 40, velMax: 58, golpe: 14, radio: 13, rompe: true, dObj: 4, desde: 6, parte: 0.01, tope: 0.05, masa: 0.35 }
   ];
   /* Los jefes rotan en este orden: 5, 15, 25, 35, 45 los minis y 10, 20,
      30, 40, 50 los grandes; después vuelve a empezar. */
@@ -228,8 +233,41 @@
     { id: 'balas', nombre: 'Munición', tecla: 'B', precio: 250, txt: 'rellena todas tus armas' },
     { id: 'armadura', nombre: 'Armadura', tecla: 'R', precio: 400, txt: '+50 de armadura' },
     { id: 'botiquin', nombre: 'Botiquín', tecla: 'H', precio: 300, txt: '+50 de vida' },
-    { id: 'potencia', nombre: 'Potencia', tecla: 'G', precio: 800, txt: '+10 % de daño', max: 5 }
+    { id: 'potencia', nombre: 'Potencia', tecla: 'G', precio: 800, txt: '+10 % de daño', max: 5 },
+    { id: 'blindado', nombre: 'Muro reforzado', tecla: 'M', precio: 450, txt: 'un muro de acero; F lo pone', max: 6 }
   ];
+  /* El muro reforzado se compra por unidad (se llevan hasta `max`) y se pone
+     con F. Es un muro como los otros —los enemigos lo rodean y el Demoledor
+     va a por él—, pero de acero: aguanta lo que seis muros falsos. */
+  const MURO_BLINDADO = { vida: 1000, max: 6 };
+
+  /* ---------- mejoras de armas en la tienda ----------
+     Aparte de las del multiplicador, cada arma sube hasta `NIVEL_ARMA.max`
+     niveles con puntos (tecla U, el arma en la mano, o clic en la tienda).
+     Cada nivel cuesta `sube` veces el anterior y da +15 % de daño, −6 % de
+     tiempo entre disparos, +20 % de munición, +6 % de radio de explosión y
+     +25 % de vida a los muros. Con el nivel cambia cómo se ve el arma:
+     pulida (1–2), dorada (3–4) y de plasma (5). */
+  const NIVEL_ARMA = { max: 5, sube: 1.8, base: [300, 500, 600, 500, 600, 400, 800, 800] };
+  const RANGOS_ARMA = ['Normal', 'Pulida', 'Pulida', 'Dorada', 'Dorada', 'Plasma'];
+  const rangoArma = n => Math.max(0, Math.min(3, n >= 5 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0));
+  function precioNivelArma(id, nivel) {
+    const n = nivel | 0, b = NIVEL_ARMA.base[id];
+    if (!b || n >= NIVEL_ARMA.max || n < 0) return Infinity;
+    return Math.round(b * Math.pow(NIVEL_ARMA.sube, n) / 50) * 50;
+  }
+  /* El arma (ya con las mejoras del multiplicador) con `n` niveles de tienda. */
+  function conNivel(a, n) {
+    n = Math.max(0, Math.min(NIVEL_ARMA.max, n | 0));
+    if (!a || !n) return a;
+    const b = Object.assign({}, a, { nivel: n });
+    if (b.d) b.d = Math.min(500, Math.round(b.d * (1 + 0.15 * n)));
+    if (b.cad) b.cad = Math.max(0.03, Math.round(b.cad * (1 - 0.06 * n) * 1000) / 1000);
+    if (Number.isFinite(b.max)) { b.max = Math.round(b.max * (1 + 0.2 * n)); b.caja = Math.round((b.caja || 0) * (1 + 0.2 * n)); }
+    if (b.r) b.r = Math.min(200, Math.round(b.r * (1 + 0.06 * n)));
+    if (b.vida) b.vida = Math.min(1200, Math.round(b.vida * (1 + 0.25 * n)));
+    return b;
+  }
   const precioTienda = (id, nivel) => {
     const t = TIENDA.find(x => x.id === id);
     if (!t) return Infinity;
@@ -413,7 +451,7 @@
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
-    ARMADURA, TIENDA, precioTienda, factorPotencia, ALCANCE_TIENDA, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
+    ARMADURA, TIENDA, precioTienda, factorPotencia, ALCANCE_TIENDA, MURO_BLINDADO, NIVEL_ARMA, RANGOS_ARMA, rangoArma, precioNivelArma, conNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe
   };
 });

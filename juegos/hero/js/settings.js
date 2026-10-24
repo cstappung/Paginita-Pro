@@ -48,6 +48,8 @@ export const DEFAULT_SETTINGS = {
   highwayTilt: 1.0,
   // para PCs lentos: menos resolución y efectos más sencillos (render/highway.js)
   altoRendimiento: false,
+  // Batalla de Rock de fondo mientras tocas (sitio/rock.js)
+  fondoRock: true,
   volume: { master: 0.85, song: 1, instrument: 1, sfx: 0.5, preview: 0.5 },
   profiles: [
     keyboardProfile('kb1', 'Teclado 1',

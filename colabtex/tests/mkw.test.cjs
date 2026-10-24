@@ -401,7 +401,10 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  assert.match(main,/if \(!est\.listos && \$\("jgCopiar"\)\)/);
  // solo PC (celulares fuera del lanzamiento): ni táctil en los controles ni Android en «Qué hace falta»
  const datos=fs.readFileSync(raiz('src/juegos/controles-datos.js'),'utf8'),reg=fs.readFileSync(raiz('src/juegos/reglas.js'),'utf8');
- assert.match(datos,/"mkw": \{"movil":false,"pc":true,"pide":"teclado o mando"/);
+ /* (§101: la regla del salón —salon.test.cjs— acepta solo «teclado» o «teclado y ratón»; la sala y «un jugador», los
+    dos solo PC, con la marca @controles: teclado de su código) */
+ assert.match(datos,/"mkw": \{"movil":false,"pc":true,"pide":"teclado"/);
+ assert.match(datos,/"bots-mkw": \{"movil":false,"pc":true,"pide":"teclado"/);
  assert.ok(!/Chrome en Android \(el juego usa WebGPU\)/.test(reg),'sin Android en Mario Kart');
 });
 

@@ -5,7 +5,7 @@
    apuesta y suma cada premio igual que cualquier otro gasto.
 
    El saldo que se ve aquí va un paso por delante de la economía: las
-   lecturas del casino llegan juntadas cada segundo (fb-juegos.js), así que
+   lecturas del casino llegan juntadas (al segundo lo propio, fb-juegos.js), así que
    lo apostado y lo cobrado en esta pestaña se descuenta y se suma a mano
    hasta que la lectura lo trae. Si no, dos apuestas seguidas verían el
    mismo saldo, la segunda podría no alcanzar y una apuesta sin fondos deja
@@ -19,16 +19,18 @@
 import { monedasDe, economia, formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
 import { suena, silenciado, silenciar, volumenEfectos, configurarEfectos, ambientar } from "./sonido.js";
-import { AVION, PINGUINO, RULETA, BLACKJACK, POKER, PLINKO, RETORNO, APUESTA_MIN, formatoPago } from "./casino-motor.js";
+import { AVION, PINGUINO, RULETA, BLACKJACK, POKER, PLINKO, RETORNO, APUESTA_MIN, formatoPago, numeroEs } from "./casino-motor.js";
 import { montarAvion } from "./casino-avion.js";
 import { montarPinguino } from "./casino-pinguino.js";
 import { montarRuleta } from "./casino-ruleta.js";
 import { montarBlackjack } from "./casino-blackjack.js";
 import { montarPoker } from "./casino-poker.js";
 import { montarPlinko } from "./casino-plinko.js";
+import { nombreHtml } from "./tintas.js";
+import { escribe, pintaLista } from "./casino-comun.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-export const formatoMult = m => "×" + (Math.floor(m * 100 + 1e-9) / 100).toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const formatoMult = m => "×" + numeroEs(Math.floor(m * 100 + 1e-9) / 100, 2, 2);
 const JUEGOS = {
   avion: { nombre: "El Avión", montar: montarAvion },
   pinguino: { nombre: "Pingüinito", montar: montarPinguino },
@@ -135,8 +137,8 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
     return { saldo: s, parada: m.parada, falta: m.falta, casino: m.casino };
   }
   function pintaSaldo() {
-    const c = cuenta(), el = raiz && raiz.querySelector("[data-cs-saldo]");
-    if (el) el.textContent = c ? formatoMonedas(c.saldo) : "…";
+    const c = cuenta(), el = raiz && raiz.querySelector("[data-cs-saldo]"), t = c ? formatoMonedas(c.saldo) : "…";
+    if (el && el.textContent !== t) el.textContent = t;
   }
   /* Lo que cada juego usa: la cuenta, apostar y marcar, el reloj del
      servidor y el sonido. Una apuesta comprueba el saldo antes de escribir:
@@ -188,10 +190,11 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
     v.value = String(Math.round(volumenEfectos() * 100));
   }
 
+  /* El menú se arma una vez (las fichas con su arte animado) y cada lectura
+     solo toca sus cuatro cajas. Rehacerlo entero, cada vez que cambiaba un
+     número, reiniciaba el arte y la entrada de cada fila: parpadeaba. */
   function menu() {
-    const c = cuenta(), z = c ? c.casino : null;
-    const neto = z ? z.pagado - z.apostado : 0;
-    cuerpo.innerHTML = `
+    if (!cuerpo.querySelector(":scope > .jg-cs-menu")) cuerpo.innerHTML = `
       <div class="jg-cs-menu">
         <div class="jg-cs-intro">
           <h2>Apuesta tus monedas</h2>
@@ -230,36 +233,79 @@ export function crearCasino({ uid, fb, datos, ahora, nombreDe, ir }) {
           </button>
         </div>
         <div class="jg-cs-bajo">
-          <section class="jg-cs-caja">
-            <h3>Tus números</h3>
-            ${z && z.rondas ? `<dl class="jg-cs-num">
+          <section class="jg-cs-caja"><h3>Tus números</h3><div data-cs-num></div></section>
+          <section class="jg-cs-caja"><h3>Grandes premios</h3><div data-cs-feed></div></section>
+          <section class="jg-cs-caja"><h3>Más ganan</h3><div data-cs-top="1"></div></section>
+          <section class="jg-cs-caja"><h3>Más pierden</h3><div data-cs-top="-1"></div></section>
+        </div>
+      </div>`;
+    const c = cuenta(), z = c ? c.casino : null, neto = z ? z.pagado - z.apostado : 0;
+    escribe(cuerpo.querySelector("[data-cs-num]"), z && z.rondas ? `<dl class="jg-cs-num">
               <div><dt>Rondas</dt><dd>${formatoMonedas(z.rondas)}</dd></div>
               <div><dt>Apostado</dt><dd>${formatoMonedas(z.apostado)}</dd></div>
               <div><dt>Cobrado</dt><dd>${formatoPago(z.pagado)}</dd></div>
               <div class="${neto >= 0 ? "bien" : "mal"}"><dt>Balance</dt><dd>${neto >= 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(neto) * 100) / 100)}</dd></div>
-            </dl>` : `<p class="jg-nada">${c ? "Aún no apuestas. Empieza con poco: la apuesta mínima es de " + APUESTA_MIN + "." : "Contando tus monedas…"}</p>`}
-          </section>
-          <section class="jg-cs-caja">
-            <h3>Grandes premios</h3>
-            <div data-cs-feed>${feedHtml(8)}</div>
-          </section>
-        </div>
-      </div>`;
+            </dl>` : `<p class="jg-nada">${c ? "Aún no apuestas. Empieza con poco: la apuesta mínima es de " + APUESTA_MIN + "." : "Contando tus monedas…"}</p>`);
+    api.pintaFeed(cuerpo.querySelector("[data-cs-feed]"), 8);
+    pintaTop(cuerpo.querySelector('[data-cs-top="1"]'), 1);
+    pintaTop(cuerpo.querySelector('[data-cs-top="-1"]'), -1);
   }
-  /* Los últimos premios de todos (de las rondas que la economía da por
-     válidas), los más recientes primero. */
-  function feedHtml(n) {
+  /* Lo que la economía de esta lectura dice de todos, calculado una vez por
+     lectura y no en cada juego que lo pide (son todas las rondas del sitio):
+     las mías, de la más nueva a la más vieja, y los premios desde ×4, los
+     más recientes primero. */
+  const multDe = r => r.mult || r.pago / (r.apostado || r.p);
+  /* Cada cuenta llega como una lista que es la misma mientras esa cuenta
+     no juegue (`casinoPorCuenta`, monedas.js): lo que sale de ella se
+     guarda, y una lectura solo rehace lo de quien jugó. */
+  const memoCuenta = new WeakMap(), memoIndice = new WeakMap();
+  const deCuenta = l => {
+    let x = memoCuenta.get(l);
+    if (!x) memoCuenta.set(l, x = {
+      desc: l.slice().sort((a, b) => b.at - a.at),
+      premios: l.filter(r => r.pago > (r.apostado || r.p) && multDe(r) >= 4)
+    });
+    return x;
+  };
+  function indice() {
     const e = d ? economia(d) : null;
-    if (!e) return `<p class="jg-nada">Cargando…</p>`;
-    const l = Object.values(e.rondas).filter(r => r.valida && r.pago > (r.apostado || r.p) && !(r.u === uid && ocultos.has(r.k))).sort((a, b) => b.fin - a.fin).slice(0, n);
-    if (!l.length) return `<p class="jg-nada">Nadie ha cobrado todavía. ¿Serás la primera persona?</p>`;
-    return `<ul class="jg-cs-feed">${l.map(r => `<li>
-      <span class="jg-cs-feed-j">${ICONO[r.j] || "🎲"}</span>
-      <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${esc(nombreDe(r.u))}</span>
-      <span class="jg-cs-feed-m">${formatoMult(r.mult)}</span>
-      <b>+${formatoPago(Math.round((r.pago - (r.apostado || r.p)) * 100) / 100)} ${MONEDA}</b></li>`).join("")}</ul>`;
+    if (!e) return null;
+    let x = memoIndice.get(e);
+    if (!x) {
+      const pc = e.casinoPorCuenta || {}, premios = [];
+      for (const l of Object.values(pc)) for (const r of deCuenta(l).premios) if (r.valida) premios.push(r);
+      x = { mias: pc[uid] ? deCuenta(pc[uid]).desc : [], grandes: premios.sort((a, b) => b.fin - a.fin).slice(0, 40) };
+      memoIndice.set(e, x);
+    }
+    return x;
   }
-  api.feedHtml = feedHtml;
+  api.mias = () => (indice() || { mias: [] }).mias;
+  /* Top 5 por balance del casino (cobrado − apostado): signo 1 los que más
+     ganan, −1 los que más pierden. */
+  function pintaTop(el, signo) {
+    const e = d ? economia(d) : null;
+    const l = e ? Object.entries(e.usuarios).map(([u, x]) => [u, x.casino.pagado - x.casino.apostado])
+      .filter(([, n]) => n * signo > 0).sort((a, b) => (b[1] - a[1]) * signo).slice(0, 5) : [];
+    if (!l.length) { escribe(el, `<p class="jg-nada">${e ? "Nadie todavía." : "Cargando…"}</p>`); return; }
+    pintaLista(el, "ol", "jg-cs-feed jg-cs-top", l.map(([u, n]) => ({ k: u, html: `
+              <span class="jg-cs-feed-n" data-perfil="${esc(u)}" translate="no">${nombreHtml(u, esc(nombreDe(u)))}</span>
+              <b class="${signo > 0 ? "" : "mal"}">${signo > 0 ? "+" : "−"}${formatoPago(Math.round(Math.abs(n)))} ${MONEDA}</b>` })));
+  }
+  /* Los últimos premios de todos desde ×4. Brillan más cuanto más se
+     acercan a ×100 (escala logarítmica entre ×4 y ×100). Lo propio que la
+     animación aún no cuenta no sale. */
+  api.pintaFeed = (el, n) => {
+    if (!el) return;
+    const x = indice();
+    if (!x) { escribe(el, `<p class="jg-nada">Cargando…</p>`); return; }
+    const l = x.grandes.filter(r => !(r.u === uid && ocultos.has(r.k))).slice(0, n);
+    if (!l.length) { escribe(el, `<p class="jg-nada">Nadie ha cobrado ×4 o más todavía. ¿Serás la primera persona?</p>`); return; }
+    pintaLista(el, "ul", "jg-cs-feed", l.map(r => ({ k: r.u + "~" + r.k, cls: "jg-cs-brilla", estilo: `--b:${Math.min(1, Math.log(multDe(r) / 4) / Math.log(25)).toFixed(2)}`, html: `
+      <span class="jg-cs-feed-j">${ICONO[r.j] || "🎲"}</span>
+      <span class="jg-cs-feed-n" data-perfil="${esc(r.u)}" translate="no">${nombreHtml(r.u, esc(nombreDe(r.u)))}</span>
+      <span class="jg-cs-feed-m">${formatoMult(r.mult)}</span>
+      <b>+${formatoPago(Math.round(r.pago - (r.apostado || r.p)))} ${MONEDA}</b>` })));
+  };
 
   function irA(cual) {
     const j = JUEGOS[cual] ? cual : "";

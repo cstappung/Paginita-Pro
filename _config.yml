@@ -1,0 +1,7 @@
+# GitHub Pages arma el sitio con Jekyll, que no publica carpetas que
+# empiezan con «_». `__/` es el ayudante de inicio de sesión de Firebase
+# (/__/auth/handler), que la app del iPhone necesita en este dominio
+# (firebase/CONFIGURAR-FIREBASE.md). No agregar nada más aquí sin probar:
+# cualquier opción de Jekyll se aplica a todo el sitio.
+include:
+  - __

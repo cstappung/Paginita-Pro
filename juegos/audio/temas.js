@@ -30,6 +30,10 @@
  *              cinco de Subway City (`metrorush-city-sur`, `-muelles`,
  *              `-bulevar`, `-parque`, `-bajo`), porque audio.js los hace
  *              rotar en vez de repetir uno solo toda la carrera.
+ *   propac-*   PRO PACMAN: neon (Fa mayor, 148), circuito (La menor, 156) y
+ *              reactor (Re menor, 164), uno por laberinto; poder (Mi menor,
+ *              186) mientras los fantasmas huyen; y tres cortinas de una sola
+ *              vuelta: inicio, limpio y fin.
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
  *
@@ -1545,6 +1549,121 @@
         "R - - . R - F - R - - . O - F -", "k...h.hks...h.hx", 2)
     },
     orden: "I A A B A B"
+  };
+
+  /* PRO PACMAN: el sonido de una recreativa de los ochenta —pulso agudo en
+     semicorcheas, bajo que salta de octava, arpegio fino— con melodías
+     propias (las de la máquina de Namco no se copian, igual que las de
+     Pokémon). Uno por laberinto, uno para cuando los fantasmas huyen y tres
+     cortinas que suenan una sola vez: inicio (un compás, lo que dura el
+     «¡Listo!»), laberinto limpio y fin de partida. */
+  T["propac-inicio"] = {
+    bpm: 160,
+    lead: { onda: "p25", vol: .15, vib: 0, sus: .8 },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      A: sec("C,C,F,G", "C5 E5 G5 C6 B5 G5 E5 G5 A5 F5 D5 B4 C5*2 G5*2",
+        "R . O . R . O . R . O . R . O .", "k.h.s.h.k.h.s.ss", 4)
+    },
+    orden: "A"
+  };
+
+  /* Neón (el primer laberinto): Fa mayor a 148, saltarín, la melodía en
+     carreras de semicorcheas con una cromática antes de volver al Fa. */
+  T["propac-neon"] = {
+    bpm: 148,
+    lead: { onda: "p25", vol: .13, vib: .004, sus: .7 },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .045, oct: 4, paso: .035 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("F C", "", "R . O . R . O . F . O . R . O .", "k...k...k...k.hh", 4),
+      A: sec("F Dm Bb C",
+        "F5 . A5 . C6 . A5 C6 F6*2 E6 D6 C6*2 A5*2  D6 . F6 . A6*2 G6 F6 E6 F6 E6 D6 C#6*2 D6*2  " +
+        "Bb5 . D6 . F6 . D6 F6 Bb6*2 A6 G6 F6 E6 D6 Bb5  C6 B5 C6 D6 E6 D6 E6 F6 G6*2 E6*2 C6*2 G5 Bb5",
+        "R . O . R . O . F . O . R . O .", "k.h.s.h.k.hks.h.", 4),
+      B: sec("Bb C Am Gm,C",
+        "D6*2 F6*2 Bb6*3 A6 G6*2 F6*2 D6*2 F6*2  E6*2 G6*2 C7*3 Bb6 A6*2 G6*2 E6*2 C6*2  " +
+        "A6 . E6 . C6 . E6 . A6 G6 F6 E6 D6 C6 B5 A5  G5 A5 Bb5 C6 D6 E6 F6 G6 E6*4 C6*4",
+        "R . O . R . O . F . O . R . O .", "k.hks.hkk.hks.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Circuito: La menor a 156, más apurado; el bajo va a contratiempo y la
+     melodía sube por el acorde hasta el Mi mayor que la devuelve al La. */
+  T["propac-circuito"] = {
+    bpm: 156,
+    lead: { onda: "p50", vol: .12, vib: .004, sus: .65, eco: { t: .12, fb: .25, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p25", vol: .04, oct: 4, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("Am E", "", "R . R O . R O . R . R O . R O .", "k.h.k.h.k.h.k.hh", 4),
+      A: sec("Am F G E",
+        "A5 C6 E6 A6 G6 E6 C6 E6 A5*2 B5 C6 B5*2 G#5*2  A5 C6 F6 A6 G6 F6 C6 F6 A6*2 G6 F6 E6*4  " +
+        "G5 B5 D6 G6 F6 D6 B5 D6 G6*2 A6 B6 C7*2 B6*2  B6 G#6 E6 B5 G#5 B5 E6 G#6 B6*4 .*4",
+        "R . R O . R O . R . R O . R O .", "k.hkshh.k.hks.hh", 4),
+      B: sec("Dm Am F E",
+        "F6*2 D6 F6 A6*2 F6 A6 D7*3 C7 A6*4  E6*2 C6 E6 A6*2 E6 A6 C7*3 B6 A6*4  " +
+        "C7 A6 F6 C6 A5 C6 F6 A6 G6 F6 E6 D6 C6 B5 A5 G5  G#5*2 B5*2 E6*2 G#6*2 B6*6 .*2",
+        "R . R O . R O . R . R O . R O .", "k.hks.hkk.hks.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Reactor: Re menor a 164, el más intenso. Pulso doble desafinado, notas
+     repetidas como una alarma y un bombeo suave en cada bombo. */
+  T["propac-reactor"] = {
+    bpm: 164, bombeo: .2,
+    lead: { onda: "p25", vol: .1, vib: .004, sus: .7, desafina: 8 },
+    bajo: { onda: "tri", vol: .23 }, arp: { onda: "p12", vol: .045, oct: 4, paso: .03 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Dm A", "", "R . R O R . R O R . R O R . O .", "k.h.k.h.k.h.k.hs", 4),
+      A: sec("Dm Bb Gm A",
+        "D6 . D6 F6 . F6 A6 . G6 F6 E6 F6 D6*2 A5*2  D6 . D6 F6 . F6 Bb6 . A6 G6 F6 G6 D6*4  " +
+        "G6 . G6 Bb6 . Bb6 D7 . C7 Bb6 A6 Bb6 G6*2 D6*2  C#6 E6 A6 C#7 E7*2 C#7 A6 E6*2 C#6 A5 C#6*2 E6*2",
+        "R . R O R . R O R . R O R . O .", "k.h.s.hkk.h.s.hk", 4),
+      B: sec("Gm Dm Bb A",
+        "Bb5*3 A5 G5*2 D5*2 G5*3 A5 Bb5*2 D6*2  A5*3 G5 F5*2 D5*2 F5*3 G5 A5*2 D6*2  " +
+        "F6*2 D6*2 Bb5*2 D6*2 F6*2 Bb6*2 A6*2 G6*2  A6*4 E6*4 C#6*4 A5*4",
+        "R . R O R . R O R . R O R . O .", "k.hks.hkk.hksshx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Los fantasmas huyen: Mi menor a 186, un arpegio nervioso de pulso fino
+     que sube y baja sin parar, como la sirena de huida. */
+  T["propac-poder"] = {
+    bpm: 186,
+    lead: { onda: "p12", vol: .12, vib: 0, sus: .6 },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p25", vol: .035, oct: 4, paso: .025 }, bat: { vol: .28 },
+    secciones: {
+      A: sec("Em C",
+        "E6 G6 B6 G6 E6 G6 B6 G6 C7 B6 A6 G6 F#6 G6 A6 B6  C7 B6 G6 E6 C7 B6 G6 E6 D7 C7 B6 A6 G6 F#6 E6 D6",
+        "R O R O R O R O R O R O R O R O", "k.hhs.hhk.hhs.hh", 2)
+    },
+    orden: "A"
+  };
+
+  /* Laberinto limpio: dos compases a 192, lo que dura la pausa del motor. */
+  T["propac-limpio"] = {
+    bpm: 192,
+    lead: { onda: "p25", vol: .15, vib: 0, sus: .8 },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      A: sec("C,F G,C", "C5 E5 G5 C6 . G5 C6 . A5 C6 F6*2 E6 D6 C6 A5  B5 D6 G6*2 F6 D6 B5 G5 C6*8",
+        "R . O . R . O . R . O . R . O .", "k...s...k.k.s.ssk.k.s.k.x.......", 4)
+    },
+    orden: "A"
+  };
+
+  /* Fin de partida: La menor que se cae, con la cromática del «otra vez será». */
+  T["propac-fin"] = {
+    bpm: 120,
+    lead: { onda: "p25", vol: .14, vib: .01, sus: .75 },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p12", vol: .04, oct: 4, paso: .05 }, bat: { vol: .3 },
+    secciones: {
+      A: sec("Am,F E", "E6 . C6 . A5 . F5 . E5 D#5 E5 F5 E5*4  B4*2 G#4*2 E4*4 .*8",
+        "R . . . O . . . R . . . . . . .", "k.......s.......k...............", 8)
+    },
+    orden: "A"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };

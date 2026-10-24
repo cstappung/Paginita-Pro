@@ -325,7 +325,7 @@ export const nombreArchivo = (ext, t) => {
    para pegárselo a alguien que lo va a leer y arreglar. */
 export function aMarkdown({ errores = [], feedback = [], generado } = {}) {
   const L = [];
-  L.push(`# Informe del Laboratorio`, "");
+  L.push(`# Informe de Paginita Pro`, "");
   L.push(`Generado el ${fecha(generado)} · ${errores.length} error${errores.length === 1 ? "" : "es"} · ` +
     `${feedback.length} reporte${feedback.length === 1 ? "" : "s"} de personas`, "");
 

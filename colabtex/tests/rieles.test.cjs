@@ -290,3 +290,34 @@ test('Las reglas conocen los tres nodos y las categorías del riel',()=>{
   const reMenor=new RegExp(/\? 1000000000 - /.test(val)&&/\$categoria\.matches\(\/([^/]*)\/\) \? 1000000000/.exec(val)[1]);
   for(const r of D.REPES)assert.equal(reMenor.test(r.cat),r.menor,r.cat);
 });
+test('Super chats: duran lo de su nivel, no se repiten y el que no se pagó dura lo normal',()=>{
+  const ahora=1e12,m=(id,hace,s)=>Object.assign({id,uid:'a',t:'hola',at:ahora-hace},s?{s,sa:ahora-hace}:{});
+  assert.deepEqual(D.SUPER_CHAT.map(x=>[x.p,x.ms]),[[100,3600000],[300,7200000]]);
+  assert.equal(D.SUPER_MAX_MS,7200000);
+  const msgs=[m('n',20*60000),m('a',50*60000,100),m('b',70*60000,100),m('c',110*60000,300),m('d',130*60000,300),m('x',20*60000,999)];
+  // `a` llega por las dos escuchas: no se repite.
+  assert.deepEqual(D.chatVisibles(msgs.concat([msgs[1]]),ahora).map(x=>x.id),['c','a'],'el de 100 dura 1 h, el de 300 dura 2 h, un precio inventado dura 15 min');
+  assert.deepEqual(D.chatVisibles(msgs,ahora,x=>x.id==='c'?false:null).map(x=>x.id),['a'],'el que la economía no cobró dura lo normal');
+  assert.equal(D.quedaSuper(m('a',50*60000,100),ahora),'quedan 10 min');
+  assert.equal(D.quedaSuper(m('c',30*60000,300),ahora),'queda 1 h 30 min');
+  assert.equal(D.quedaSuper(m('n',0),ahora),'');
+});
+test('Super chats: la economía los cobra, y sin fondos no valen',()=>{
+  const M=carga('src/juegos/monedas.js');
+  const T0=1.7e12,sc=(k,at,p)=>({[k]:{at,p}});
+  const d={ajustesMonedas:{},ajustes:{a:{x:{n:350}}},superChat:{a:Object.assign(sc('msgAAAAAAAA1',T0,100),sc('msgAAAAAAAA2',T0+1,300),sc('msgAAAAAAAA3',T0+2,50))}};
+  const e=M.economia(d).usuarios.a,m=M.monedasDe('a',d);
+  assert.deepEqual(e.superChats,{msgAAAAAAAA1:100},'el segundo no alcanza (quedaban 250) y un precio inventado no es un super');
+  assert.equal(m.parada,true,'un gasto sin fondos para la cuenta, como cualquier otro');
+  assert.equal(m.gasto.superChat,100);assert.equal(m.cuenta.superChat,1);
+  assert.equal(m.saldo,250);
+});
+test('Las reglas del super chat: el mensaje y su cobro van juntos y dicen el mismo precio',()=>{
+  const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8')).rules;
+  assert.deepEqual(reglas.chatGeneral['.indexOn'],['at','sa'],'los vivos se piden por `sa`');
+  const s=reglas.chatGeneral.$id.s['.validate'],v=reglas.superChat.$uid.$k['.validate'],p=reglas.superChat.$uid.$k.p['.validate'];
+  for(const n of D.SUPER_CHAT){assert.ok(s.includes('=== '+n.p),'chatGeneral/s conoce '+n.p);assert.ok(p.includes('=== '+n.p),'superChat/p conoce '+n.p);}
+  assert.match(s,/child\('superChat'\)\.child\(auth\.uid\)\.child\(\$id\)\.child\('p'\)\.val\(\) === newData\.val\(\)/);
+  assert.match(v,/child\('chatGeneral'\)\.child\(\$k\)\.child\('s'\)\.val\(\) === newData\.child\('p'\)\.val\(\)/);
+  assert.match(reglas.superChat.$uid.$k['.write'],/!data\.exists\(\)/,'un cobro no se reescribe ni se borra');
+});

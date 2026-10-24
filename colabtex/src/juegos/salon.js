@@ -143,6 +143,7 @@ export function crearSalon(ctx) {
     raiz.addEventListener("pointerup", suelta);
     raiz.addEventListener("pointercancel", suelta);
     raiz.addEventListener("contextmenu", ev => { if (ev.target.closest(".jg-mn") && matchMedia("(pointer: coarse)").matches) ev.preventDefault(); });
+    vigilaPortadas(raiz);
     raiz.addEventListener("click", ev => {
       const b = ev.target.closest(".jg-mn-abre");
       if (!b) return;
@@ -153,6 +154,25 @@ export function crearSalon(ctx) {
       if (actual && actual.id === id && !movil()) { cierra(); return; }
       abre(id, b);
     });
+  }
+
+  /* Las portadas que se animan solas (el mar de Catan, el temblor de Chain
+     Reaction, el brillo de «Nuevo») se pausan mientras su tarjeta no está
+     en pantalla (`.dormida`): cada cuadro de un SVG animado obliga al
+     navegador a recomponer la página entera, se vea o no. Las tarjetas se
+     repintan enteras, así que un MutationObserver vigila las nuevas. */
+  function vigilaPortadas(raiz) {
+    if (typeof IntersectionObserver !== "function" || typeof MutationObserver !== "function") return;
+    const vista = new IntersectionObserver(es => {
+      for (const e of es) e.target.classList.toggle("dormida", !e.isIntersecting);
+    }, { rootMargin: "120px" });
+    const mira = () => raiz.querySelectorAll(".jg-mn:not([data-vigilada])").forEach(m => { m.dataset.vigilada = ""; vista.observe(m); });
+    new MutationObserver(ms => {
+      for (const m of ms) for (const n of m.removedNodes)
+        if (n.nodeType === 1) for (const t of n.matches(".jg-mn") ? [n] : n.querySelectorAll(".jg-mn")) vista.unobserve(t);
+      mira();
+    }).observe(raiz, { childList: true, subtree: true });
+    mira();
   }
 
   /* ---------- la ficha ---------- */
@@ -282,9 +302,12 @@ export function crearSalon(ctx) {
         <h3>${e.modo === "multi" ? "Este juego es multijugador y necesita una cuenta" : "Este juego necesita una cuenta"}</h3>
         <p>${e.modo === "multi"
           ? "Con tu cuenta de Google abres salas, invitas a tus amigos con un enlace y sumas puntos en la clasificación, logros y monedas. Es gratis y tarda un clic."
-          : "Sin iniciar sesión puedes jugar a Snake, Buscaminas, Tetris y sortEm. Con tu cuenta de Google se abre este y todos los demás, y tus récords, logros y monedas quedan guardados. Es gratis y tarda un clic."}</p>
+          : "Sin iniciar sesión puedes jugar a todos los demás juegos de un jugador. Este guarda tu avance en tu cuenta: con tu cuenta de Google se abre, y tus récords, logros y monedas quedan guardados. Es gratis y tarda un clic."}</p>
         <button class="jg-hoja-alt" type="button" data-f="cierra">Seguir como invitado</button>
-      </div>`;
+      </div>` +
+        /* La práctica contra bots sí se juega sin cuenta: es la manera de
+           probar el juego antes de pedirle nada. */
+        (p && !bloqueado(Object.assign({ modo: "bots" }, p), true) ? `<p class="jg-hoja-nota">¿Quieres probar antes? <a href="${esc(p.ruta || p.url)}">Practica solo contra bots, sin cuenta →</a></p>` : "");
       pie = `${reglas}<button class="btn jg-hoja-ya" type="button" data-f="login">Iniciar sesión y jugar</button>`;
     } else if (e.modo === "multi") {
       medio = salasHtml(e) + opcionesHtml(e) + `<div class="jg-hoja-podio" data-podio></div>` +

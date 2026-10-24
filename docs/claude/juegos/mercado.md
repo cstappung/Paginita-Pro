@@ -23,9 +23,15 @@ and they trade only between two accounts that both see the series.
 
 - a card is `<uid>~<pack>.<i>`, exactly as before;
 - an object is `ob:<uid>~<gift key>`;
-- a pet is `ma:<uid>~<adoption key>`.
+- a pet is `ma:<uid>~<adoption key>`;
+- a Batalla de Rock piece is `rk:<uid>~<box key>` (visible to all;
+  `veRock()` hides it only if `ROCK_SOLO_ADMIN` is set again;
+  `juegos/hero/js/rock/CLAUDE.md`).
 
 Old listings never change meaning, and the rule regex accepts all three.
+A rock piece is pictured with its real photo (`imagenRock`, from
+`rock-fotos.js`: a worker running the rock scene, never three.js on the
+page), with the category emoji only until it arrives.
 Starter items have no copy key and cannot be listed.
 
 **What the page does and does not do.**
@@ -33,8 +39,14 @@ Starter items have no copy key and cannot be listed.
 - The market buys, withdraws, proposes, accepts and closes trades, one write
   at a time. Each write is re-checked against `economia()` with
   `puedeComprar`/`puedeProponer`.
-- Selling happens in each game: a card from its zoom in PRODROP, a pet or an
-  object from the Mascotas `SellDialog`.
+- Selling: the **🏷️ Vender** tab lists `intercambiables` (everything of
+  yours not listed; starter items have no copy) with a price and a button,
+  filtered by the game selector; `accion("vender")` does the same checks as
+  the games' postmen (owner, not listed, 1–100 000, not `parada`) and
+  withdraws a listing the replay doesn't accept. Each game also sells from
+  its own screen: a card from its zoom in PRODROP, a pet or an object from
+  the Mascotas `SellDialog`, a rock piece from the rocker editor. People
+  didn't find those, hence the tab.
 - Your own listing still shows, tagged «Tu oferta». Hiding it made sellers
   think the listing never reached the store.
 - **Pet cap.** Buying a pet with 6 already owned, or a trade that leaves

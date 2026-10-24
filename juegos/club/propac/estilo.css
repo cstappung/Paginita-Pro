@@ -1,0 +1,159 @@
+/* ================================================================
+   PRO PACMAN — la piel. Recreativa de neón: fondo casi negro, todo lo
+   que importa brilla. El lienzo dibuja el laberinto ajustado a su caja
+   (juego.js lo centra), así que aquí solo se decide el tamaño de la caja.
+   ================================================================ */
+:root{
+  --fondo:#070a1c;--panel:#0d1230;--tinta:#e8ecff;--neon:#2de2ff;--rosa:#ff5fa2;--amarillo:#ffe14d;--borde:#2a3270;
+  --pixel:"Press Start 2P",ui-monospace,monospace;--titulo:"Orbitron","Arial Black",system-ui,sans-serif;
+  --alto-pantalla:100vh;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0}
+html{-webkit-tap-highlight-color:transparent}
+body{background:radial-gradient(ellipse at 50% -10%,#1a1450,var(--fondo) 60%) fixed;color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.shell{max-width:1000px;margin:0 auto;padding:16px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+.layout>aside:empty{display:none}
+@media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+.club-integrado body{background:transparent}
+:focus-visible{outline:3px solid var(--neon);outline-offset:2px}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+kbd{font:700 12px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;border:1px solid #fff4;background:#fff1}
+
+/* El panel de ranking del Club, en neón. */
+.club-ranking,.club-integrado .club-ranking,html.club-integrado[data-tema] .club-ranking{background:var(--panel);color:var(--tinta);border:2px solid var(--borde);border-radius:14px;box-shadow:0 0 18px #2de2ff22}
+.club-ranking h2{font:400 13px/1.4 var(--pixel)!important;color:var(--amarillo)}
+.club-ranking ol,.club-ranking p{color:#c9d0f5}
+.club-ranking button{background:#161d48;color:var(--tinta);border:1px solid var(--borde);border-radius:9px}
+
+/* --- El tamaño del juego: 456 × 584 lógicos, que quepa a lo alto --- */
+:root{--ancho-juego:min(100%,520px,calc((var(--alto-pantalla) - 230px) * .781))}
+.club-integrado{--ancho-juego:min(100%,540px,calc((var(--alto-pantalla) - 260px) * .781))}
+html.tactil{--ancho-juego:min(100%,520px,calc((var(--alto-pantalla) - 320px) * .781))}
+:root{--ancho-min:280px}
+
+/* --- Cabecera --- */
+.cab{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 auto 10px;width:max(var(--ancho-juego),var(--ancho-min));max-width:100%}
+.logo{display:flex;align-items:center;gap:10px;margin:0;font:800 clamp(24px,6vw,34px)/1 var(--titulo);letter-spacing:.06em;color:#fff;text-shadow:0 0 10px var(--neon)}
+.logo b{color:var(--amarillo);text-shadow:0 0 12px #ffb02e}
+/* El pacman del título, como el del lienzo: esfera con brillo, la cuña de la boca (una máscara) y un ojo. */
+.logo-pac{position:relative;width:.95em;height:.95em;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#fffbe2 0 8%,#ffea4a 32%,#ffc21a 76%,#ff8f0f);
+  -webkit-mask:conic-gradient(from 120deg,#000 0 300deg,transparent 300deg);mask:conic-gradient(from 120deg,#000 0 300deg,transparent 300deg);
+  filter:drop-shadow(0 0 6px #ffb02e);animation:muerde .35s steps(2) infinite alternate}
+.logo-pac::after{content:"";position:absolute;left:52%;top:18%;width:15%;height:20%;border-radius:50%;background:#1a0f2e}
+@keyframes muerde{to{-webkit-mask:conic-gradient(from 100deg,#000 0 340deg,transparent 340deg);mask:conic-gradient(from 100deg,#000 0 340deg,transparent 340deg)}}
+.lema{margin:0;opacity:.7;font:400 9px/1.5 var(--pixel);flex:1 1 160px;color:var(--rosa)}
+
+/* --- Marcador --- */
+.scorebar,.club-integrado .scorebar,html.club-integrado[data-tema] .scorebar{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;
+  width:max(var(--ancho-juego),var(--ancho-min));max-width:100%;margin:0 auto 10px;padding:8px 12px;background:var(--panel);color:var(--tinta);
+  border:2px solid var(--borde);border-radius:12px;box-shadow:0 0 16px #2de2ff1f}
+.dato{display:grid;gap:4px;min-width:0}
+.dato small{font:400 7px/1 var(--pixel);opacity:.65;letter-spacing:.06em;white-space:nowrap}
+.dato strong{font:400 13px/1 var(--pixel);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--amarillo)}
+.dato:nth-child(2) strong{color:var(--rosa)}
+.dato:nth-child(3) strong{color:var(--neon)}
+.pausa-m{display:none}
+#sound-button{display:grid;place-items:center;width:38px;height:38px;padding:0;margin-left:auto;border-radius:10px;border:1px solid var(--borde);background:#161d48;color:var(--tinta);cursor:pointer}
+#sound-button svg{width:22px;height:22px}
+#sound-button[aria-pressed=false] .ondas{display:none}
+#sound-button[aria-pressed=true] .cruz{display:none}
+.scorebar .vj-ctl{color:var(--tinta)}
+
+/* --- El escenario --- */
+.escenario{position:relative;width:max(var(--ancho-juego),var(--ancho-min));max-width:100%;aspect-ratio:456/584;margin:0 auto;border-radius:14px;overflow:hidden;
+  border:2px solid var(--borde);box-shadow:0 0 0 1px #000,0 0 28px #2de2ff33,0 18px 40px #0006;background:#04050d;container-type:inline-size;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html.pp-juega .escenario{touch-action:none}
+#lienzo{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
+#lienzo:focus-visible{box-shadow:inset 0 0 0 3px var(--neon)}
+.escenario::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(#0000 0 2px,#0000001a 2px 3px);mix-blend-mode:multiply}
+
+.capa{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:6%;text-align:center}
+.tit{margin:0;font:400 clamp(22px,9cqw,40px)/1.15 var(--pixel);color:#fff;text-shadow:0 0 8px var(--neon),0 0 22px var(--neon),3px 3px 0 #1b2a8a}
+.tit b{font-weight:400;color:var(--amarillo);text-shadow:0 0 8px #ffb02e,0 0 24px #ff7a1a,3px 3px 0 #7a2a00}
+.tit.chico{font-size:clamp(18px,6cqw,26px)}
+.tarjeta{background:#0d1230ee;color:var(--tinta);border:2px solid var(--borde);border-radius:14px;padding:14px 18px;box-shadow:0 0 22px #2de2ff33}
+.boton{font:400 clamp(12px,3.6cqw,15px)/1 var(--pixel);padding:14px 22px;min-height:48px;border-radius:12px;border:2px solid #fff;cursor:pointer;
+  background:linear-gradient(#ffe14d,#ffb02e);color:#2a1600;box-shadow:0 0 16px #ffb02e88,0 4px 0 #7a4a00}
+.boton:active{transform:translateY(3px);box-shadow:0 0 10px #ffb02e88,0 1px 0 #7a4a00}
+.boton.sec{background:#161d48;color:var(--tinta);border-color:var(--borde);box-shadow:0 4px 0 #050822}
+@media (hover:hover){.boton:hover{filter:brightness(1.1)}}
+
+.inicio{background:radial-gradient(ellipse at 50% 35%,#0d1240e6,#04050df2 70%);justify-content:flex-start;padding-top:9%}
+.leyenda{list-style:none;margin:4px 0;padding:0;display:grid;gap:8px;max-width:340px;text-align:left;font-size:clamp(11px,3.3cqw,13px);line-height:1.35;color:#c9d0f5}
+.leyenda li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:center}
+.leyenda b{color:#fff;margin-right:4px}
+.ic{width:20px;height:20px;border-radius:50%;display:block}
+.ic.racha{background:conic-gradient(var(--amarillo),#ff5fa2,#c86bff,var(--amarillo));box-shadow:0 0 8px #ff5fa2}
+.ic.turbo{background:radial-gradient(#fff,#3df5ff 45%,#0000 70%);box-shadow:0 0 8px #3df5ff}
+.ic.pulso{border:3px solid #8fd8ff;box-shadow:0 0 8px #8fd8ff,inset 0 0 0 3px #04050d,inset 0 0 0 10px #8fd8ff}
+.ic.glitch{border-radius:6px 6px 2px 2px;background:#b6ff3d;box-shadow:-2px 0 0 #ff2bd6,2px 0 0 #2bf6ff}
+.pista{margin:0;font:400 8px/1.6 var(--pixel);color:#8fa0e0}
+
+.pausa{background:#04050dcc;backdrop-filter:blur(2px)}
+.pausa .tarjeta{display:grid;gap:12px;justify-items:center}
+
+.fin{background:linear-gradient(#04050d99,#04050de6)}
+.fin-tit{animation:cae .45s cubic-bezier(.2,1.6,.4,1) both}
+.fin-tarjeta{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;width:min(100%,320px);text-align:left}
+.fin-tarjeta small{display:block;font:400 7px/1.4 var(--pixel);opacity:.7;margin-bottom:4px}
+.fin-tarjeta strong{font:400 14px/1.2 var(--pixel);color:var(--amarillo);overflow-wrap:anywhere}
+.nuevo{font:400 7px/1 var(--pixel);font-style:normal;color:#fff;background:#e8322f;padding:2px 4px;border-radius:4px;animation:late .8s ease-in-out infinite}
+.fin-frase{margin:0;max-width:320px;font:italic 700 13px/1.4 system-ui,sans-serif;color:#dfe5ff}
+@keyframes cae{0%{transform:translateY(-40px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes late{50%{transform:scale(1.08)}}
+
+/* --- La botonera táctil (solo en pantallas táctiles) --- */
+.mandos{display:none}
+html.tactil .mandos{display:flex;align-items:stretch;justify-content:space-between;gap:8px;width:max(var(--ancho-juego),var(--ancho-min));max-width:100%;margin:10px auto 0;
+  height:64px;user-select:none;-webkit-user-select:none;touch-action:none}
+.mandos button{min-width:48px;min-height:48px;border-radius:12px;border:2px solid var(--borde);background:#0d1230;color:#fff;font:400 18px/1 system-ui,sans-serif;padding:0;cursor:pointer;
+  touch-action:none;-webkit-touch-callout:none;box-shadow:0 3px 0 #050822}
+.mandos button.pulsado{transform:translateY(2px);box-shadow:0 1px 0 #050822;background:#1b2560}
+.m-cruz{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:260px}
+.m-cruz button{min-width:0}
+.m-acc{position:relative;flex:0 0 16%;max-width:96px;display:grid;place-items:center;overflow:hidden}
+.m-acc span{position:relative;z-index:1;font-size:22px}
+.m-turbo i{position:absolute;left:0;right:0;bottom:0;height:calc(var(--e,0) * 100%);background:linear-gradient(#3df5ff55,#3df5ffaa);transition:height .15s}
+.m-turbo.listo{border-color:#3df5ff;box-shadow:0 0 12px #3df5ff88,0 3px 0 #050822}
+.m-pulso b{position:absolute;right:6px;top:4px;font:400 9px/1 var(--pixel);color:#8fd8ff}
+.m-pulso.listo{border-color:#8fd8ff;box-shadow:0 0 12px #8fd8ff88,0 3px 0 #050822}
+
+.nota{width:max(var(--ancho-juego),var(--ancho-min));max-width:100%;margin:12px auto 0;font-size:13px;opacity:.75;text-align:center}
+
+/* --- Pantalla apaisada y baja: el laberinto a la izquierda, lo demás al lado --- */
+html.apaisado main{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"esc cab" "esc mar" "esc man" "esc nota";gap:0 16px;align-items:start}
+html.apaisado .escenario{grid-area:esc;width:calc((var(--alto-pantalla) - 30px) * .781);min-width:220px}
+html.apaisado .cab{grid-area:cab;width:auto}
+html.apaisado .scorebar{grid-area:mar;width:auto}
+html.apaisado .mandos{grid-area:man;width:auto}
+html.apaisado .nota{grid-area:nota;width:auto}
+
+@media (prefers-reduced-motion:reduce){.logo-pac,.nuevo,.fin-tit{animation:none}}
+
+/* --- Modo celular (CLAUDE.md del Club): mientras se juega, el juego ocupa la
+   pantalla. conexion.js pone html.club-inm solo en táctiles de 600 px o menos
+   y en vertical. Marcador fino arriba (con 🔊 y volumen), el laberinto en el
+   resto (el lienzo lo centra sin deformarlo) y la botonera abajo, a lo más
+   ~15 % del alto. --- */
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none;background:#04050d}
+html.club-inm .shell{max-width:none;height:100dvh;margin:0;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:flex;flex-direction:column}
+html.club-inm .layout,html.club-inm main{display:contents}
+html.club-inm .cab,html.club-inm .nota,html.club-inm .layout>aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .scorebar,html.club-inm.club-integrado .scorebar,html.club-inm.club-integrado[data-tema] .scorebar{flex:none;width:100%;max-width:none;margin:0;padding:4px 8px;
+  flex-wrap:nowrap;gap:8px;background:#0a0e26;color:#fff;border:0;border-bottom:1px solid var(--borde);border-radius:0;box-shadow:none}
+html.club-inm .dato:nth-child(n+2){display:none}
+html.club-inm .dato strong{font-size:12px}
+html.club-inm .pausa-m{display:grid;place-items:center;margin-left:auto;width:36px;height:36px;padding:0;border-radius:9px;border:1px solid #fff5;background:#0006;color:#fff;font:800 13px/1 system-ui,sans-serif;cursor:pointer}
+html.club-inm #sound-button{margin-left:0;width:36px;height:36px}
+html.club-inm .scorebar .vj-ctl output{display:none}
+html.club-inm .scorebar .vj-ctl input{width:64px}
+html.club-inm .escenario{flex:1 1 auto;min-height:0;width:100%;max-width:none;aspect-ratio:auto;margin:0;border:0;border-radius:0;box-shadow:none}
+html.club-inm .mandos{flex:none;width:100%;max-width:none;margin:0;padding:6px 8px;height:clamp(60px,14dvh,92px);gap:8px;background:#0a0e26;border-top:1px solid var(--borde)}
+html.club-inm .m-cruz{max-width:none}

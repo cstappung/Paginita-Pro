@@ -2,10 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610190131"></script>
+<script src="i18n.js?v=202610240615"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Juegos — Laboratorio</title>
+<title>Juegos — Paginita Pro</title>
+<link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png" data-favicon="marca/favicon-32.png" data-favicon-hw="marca/favicon-halloween-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png" data-favicon="marca/favicon-64.png" data-favicon-hw="marca/favicon-halloween-64.png">
+<link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
+<!-- Instalable como app (manifest.webmanifest): en Android y el PC con «Instalar», en el iPhone con «Agregar a inicio». Abre Juegos. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Paginita Pro">
 <script>
 /* El tema se pone antes de pintar nada: si esperara al bundle, la
    página saldría blanca un instante antes de oscurecerse. Sin elección
@@ -13,9 +19,21 @@
 try { var t = localStorage.getItem("jg.tema");
   if (t === "oscuro" || (t !== "claro" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.dataset.tema = "oscuro";
 } catch (e) {}
+/* El modo Halloween (juegos/halloween.js), del 1 de octubre al 1 de
+   noviembre: también antes de pintar, o la página saldría un instante sin
+   disfrazar. Repite `estadoHalloween` en una línea; la prueba
+   tests/halloween.test.cjs comprueba que digan lo mismo. */
+(function () { var f = /[?&]halloween=([01])/.exec(location.search), d = new Date(), m = d.getMonth(), g = "";
+  try { g = localStorage.getItem("jg.halloween") || ""; } catch (e) {}
+  if (f ? f[1] === "1" : m === 9 || (m === 10 && d.getDate() === 1)) document.documentElement.dataset.halloween = g === "no" ? "off" : "on";
+  /* Y el ícono de la pestaña, que también se disfraza (halloween.js lo
+     cambia de nuevo si se apaga desde la cinta). */
+  if (document.documentElement.dataset.halloween === "on")
+    for (var l = document.querySelectorAll("link[data-favicon-hw]"), i = 0; i < l.length; i++) l[i].href = l[i].getAttribute("data-favicon-hw");
+})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lilita+One&family=Caveat:wght@500;700&family=Bungee&family=Cinzel:wght@900&family=Anton&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lilita+One&family=Caveat:wght@500;700&family=Bungee&family=Cinzel:wght@900&family=Anton&family=Creepster&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
      Juegos — la hoja de estilo de las seis piezas
@@ -43,7 +61,10 @@ try { var t = localStorage.getItem("jg.tema");
   .head{display:flex;align-items:center;gap:16px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0}
   .logo{display:flex;align-items:center;gap:8px;color:#e8f0ef}
   .logo:hover{color:#fff;text-decoration:none}
-  .logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  /* El logo de Paginita Pro (marca/); el de Halloween se cambia por CSS. */
+  .logo-img{display:block;flex:none;width:30px;height:30px;transition:transform .2s ease}
+  .logo:hover .logo-img{transform:rotate(-8deg) scale(1.06)}
+  .logo-img.logo-hw{display:none}
   .head-nav{display:flex;gap:16px;font-size:12.5px;color:#9fb5b2;margin-left:10px}
   .head-nav a{color:#9fb5b2}
   .head-nav a:hover{color:#fff;text-decoration:none}
@@ -548,6 +569,113 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-svg .jg-punto{fill:#cbd5dd}
 
   /* ============================================================
+     Pool 8
+     ============================================================ */
+  .jg-pool{display:flex;flex-direction:column;gap:10px;max-width:1180px;margin:0 auto;width:100%}
+  .jg-pl-hud{display:flex;align-items:stretch;justify-content:center;gap:10px;flex-wrap:wrap}
+  .jg-pl-vs{align-self:center;font-size:12px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:1px}
+  .jg-pl-equipo{flex:1 1 260px;max-width:430px;background:#fff;border:2px solid #e4dfeb;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;gap:4px;transition:border-color .2s,box-shadow .2s}
+  .jg-pl-equipo.turno{border-color:#1f8a4c;box-shadow:0 0 0 3px #1f8a4c33}
+  .jg-pl-nombres{display:flex;gap:10px;flex-wrap:wrap;font-weight:700;font-size:14px}
+  .jg-pl-nom{display:inline-flex;align-items:center;gap:6px}
+  .jg-pl-nom::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c);flex-shrink:0}
+  .jg-pl-nom.fuera{text-decoration:line-through;opacity:.5}
+  .jg-pl-nom.toca{color:#1f8a4c}
+  .jg-pl-grupo{font-size:11px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:.8px;min-height:14px}
+  .jg-pl-bolas{display:flex;gap:3px;flex-wrap:wrap;min-height:22px}
+  .jg-pl-mb{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-style:normal;position:relative;overflow:hidden;
+    background:radial-gradient(circle at 32% 28%,#ffffffcc 0,#fff0 38%),var(--c);box-shadow:inset -2px -3px 4px #0005,0 1px 2px #0004;transition:opacity .3s,filter .3s}
+  .jg-pl-mb.ray{background:radial-gradient(circle at 32% 28%,#ffffffcc 0,#fff0 38%),linear-gradient(180deg,#f7f5ee 0 26%,var(--c) 26% 74%,#f7f5ee 74%)}
+  .jg-pl-mb b{font-size:10px;line-height:1;width:12px;height:12px;border-radius:50%;background:#f7f5ee;color:#111;display:flex;align-items:center;justify-content:center}
+  .jg-pl-mb.fuera{opacity:.22;filter:grayscale(.7)}
+  .jg-pl-estado{text-align:center;font-weight:600;font-size:14px;min-height:20px;color:var(--jg-ink)}
+  .jg-pl-mesa{width:100%;display:flex;justify-content:center}
+  .jg-pl-mesa canvas{display:block;border-radius:22px;box-shadow:0 18px 34px #0004,0 2px 0 2px #2b170b;cursor:crosshair;max-width:100%}
+  .jg-pl-ctl{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:stretch}
+  .jg-pl-ctl.off .jg-pl-caja{opacity:.45;pointer-events:none}
+  .jg-pl-ctl.mirando{display:none}
+  .jg-pl-caja{background:#fff;border:2px solid #e4dfeb;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:opacity .2s}
+  .jg-pl-et{font-size:11px;font-weight:700;color:#8a97a3;text-transform:uppercase;letter-spacing:.8px}
+  .jg-pl-efecto-caja canvas{width:96px;height:96px;cursor:pointer;touch-action:none}
+  .jg-pl-fuerza-caja{min-width:210px}
+  .jg-pl-fuerza-v{font-size:22px;font-weight:800;color:#1f8a4c;line-height:1}
+  .jg-pl-fuerza-v b{font-weight:800}
+  .jg-pl-fuerza-caja input[type=range]{width:100%;height:14px;border-radius:7px;appearance:none;-webkit-appearance:none;outline:none;
+    background:linear-gradient(90deg,#3bbf6b 0,#e8c53a 55%,#d63b30 100%);}
+  .jg-pl-fuerza-caja input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:26px;border-radius:7px;background:#fff;border:3px solid #232137;cursor:pointer}
+  .jg-pl-fuerza-caja input[type=range]::-moz-range-thumb{width:18px;height:22px;border-radius:7px;background:#fff;border:3px solid #232137;cursor:pointer}
+  .jg-pl-fila{display:flex;gap:6px}
+  .jg-pl-b{width:42px;height:38px;padding:0;font-size:20px;background:#232137}
+  .jg-pl-acciones{flex-direction:column;border:none;background:none;padding:0}
+  .jg-pl-golpe{height:52px;padding:0 34px;font-size:16px;background:#1f8a4c;border-radius:12px}
+  .jg-pl-golpe:disabled{background:#9aa5a0;cursor:not-allowed}
+  .jg-pl-mover{background:#232137}
+  .jg-pl-pie{text-align:center;min-height:18px}
+  @media (max-width:640px){.jg-pl-equipo{flex-basis:100%;max-width:none}.jg-pl-caja{padding:6px 8px}.jg-pl-fuerza-caja{min-width:0;flex:1 1 150px}}
+
+  /* Menú de Pool: barra, tacos con cofres y novedades */
+  .jg-pool{position:relative}
+  .jg-pl-barra{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+  .jg-pl-ver{margin-right:auto;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#1f8a4c;background:#1f8a4c1c;border-radius:20px;padding:4px 10px}
+  .jg-pl-mn{height:30px;font-size:12px;background:#232137}
+  .jg-pl-modal{position:fixed;inset:0;z-index:75;background:#0009;display:flex;align-items:center;justify-content:center;padding:14px}
+  .jg-pl-caja-m{background:#fff;color:#232137;border-radius:16px;width:min(760px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 60px #0008;overflow:hidden}
+  .jg-pl-m-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #e4dfeb}
+  .jg-pl-m-tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .jg-pl-m-tabs button{border:none;background:#f1eef7;color:#232137;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer}
+  .jg-pl-m-tabs button.on{background:#1f8a4c;color:#fff}
+  .jg-pl-x{border:none;background:none;font-size:20px;cursor:pointer;color:inherit;width:34px;height:34px}
+  .jg-pl-m-cuerpo{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+  .jg-pl-m-cuerpo h4{margin:0;font-size:15px}.jg-pl-m-cuerpo h4 small{font-weight:600;color:#8a97a3;font-size:12px;margin-left:6px}
+  .jg-pl-m-cuerpo h5{margin:12px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#1f8a4c}
+  .jg-pl-m-cuerpo ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.55}
+  .jg-pl-cofre{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,#1f8a4c14,#7042df14);border:2px dashed #1f8a4c66;border-radius:14px;padding:12px}
+  .jg-pl-cofre-img{font-size:64px;line-height:1;filter:drop-shadow(0 6px 6px #0004)}
+  .jg-pl-cofre-img.abre{animation:jgPlCofre .55s ease-in-out infinite}
+  @keyframes jgPlCofre{0%,100%{transform:rotate(0) scale(1)}25%{transform:rotate(-12deg) scale(1.12)}75%{transform:rotate(12deg) scale(1.12)}}
+  .jg-pl-cofre-d{display:flex;flex-direction:column;gap:6px;align-items:flex-start;font-size:13px}
+  .jg-pl-cofre-d small{color:#8a97a3}
+  .jg-pl-abrir{height:42px;padding:0 22px;font-size:14px;background:#1f8a4c;border-radius:10px}
+  .jg-pl-abrir:disabled{background:#9aa5a0;cursor:not-allowed}
+  .jg-pl-err{background:#fde2e2;color:#a3122a;border-radius:10px;padding:8px 12px;font-size:13px}
+  .jg-pl-res{display:flex;flex-direction:column;align-items:center;gap:4px;border:3px solid var(--r);border-radius:14px;padding:12px;background:radial-gradient(circle,#fff0,#0000),#1f8a4c;color:#fff;box-shadow:0 0 28px var(--r);animation:jgPlRes .6s ease-out}
+  .jg-pl-res small{font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--r);background:#000a;border-radius:20px;padding:2px 10px}
+  .jg-pl-res canvas{max-width:100%}
+  @keyframes jgPlRes{from{transform:scale(.7);opacity:0}to{transform:none;opacity:1}}
+  .jg-pl-probas{width:100%;border-collapse:collapse;font-size:12.5px}
+  .jg-pl-probas th{text-align:left;color:#8a97a3;font-size:11px;text-transform:uppercase;letter-spacing:.6px;padding:4px 6px}
+  .jg-pl-probas td{padding:5px 6px;border-top:1px solid #e4dfeb}
+  .jg-pl-probas td i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--r);margin-right:6px}
+  .jg-pl-coleccion{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+  .jg-pl-taco{display:flex;flex-direction:column;gap:4px;background:#1f8a4c;border:2px solid var(--r);border-radius:12px;padding:6px 8px;position:relative}
+  .jg-pl-taco canvas{width:100%;height:auto;display:block}
+  .jg-pl-taco.bloq canvas{filter:brightness(.12) saturate(0)}
+  .jg-pl-taco.puesto{box-shadow:0 0 0 3px #ffd84a}
+  .jg-pl-taco-i{display:flex;justify-content:space-between;align-items:baseline;gap:6px;color:#fff;font-size:12.5px}
+  .jg-pl-taco-i small{font-weight:800;text-transform:uppercase;letter-spacing:.6px;font-size:10.5px;filter:brightness(1.5)}
+  .jg-pl-eqb{height:26px;padding:0 10px;font-size:11.5px;background:#232137;align-self:flex-end}
+  .jg-pl-eq{align-self:flex-end;font-size:11px;font-weight:800;color:#ffd84a}
+  @media (max-width:640px){.jg-pl-cofre{flex-direction:column;text-align:center}.jg-pl-cofre-d{align-items:center}}
+
+  /* La portada: el triángulo, la blanca y el taco sobre el paño. */
+  .jg-portada-pool{background:radial-gradient(ellipse at 40% 40%,#2f9d5d,#10432a 78%)}
+  .jg-art-pool{position:relative;width:220px;height:150px;transform:rotate(-6deg)}
+  .jg-art-pool .mesa{position:absolute;inset:6px;border:7px solid #5a2e15;border-radius:14px;box-shadow:0 10px 24px #0007,inset 0 0 18px #0006}
+  .jg-art-pool .rack{position:absolute;right:34px;top:34px;width:80px;height:84px}
+  .jg-art-pool .rack i,.jg-art-pool .blanca{position:absolute;width:26px;height:26px;border-radius:50%;box-shadow:inset -3px -4px 6px #0006,0 3px 4px #0005;
+    background:radial-gradient(circle at 32% 28%,#fffc 0,#fff0 40%),var(--c,#f4f0e6)}
+  .jg-art-pool .rack i b{position:absolute;inset:7px;border-radius:50%;background:#f7f5ee;color:#111;font:700 8px/12px Arial;text-align:center;font-style:normal}
+  .jg-art-pool .rack i.ray{background:radial-gradient(circle at 32% 28%,#fffc 0,#fff0 40%),linear-gradient(180deg,#f7f5ee 0 26%,var(--c) 26% 74%,#f7f5ee 74%)}
+  .jg-art-pool .rack i:nth-child(1){left:0;top:29px;--c:#f7c612}
+  .jg-art-pool .rack i:nth-child(2){left:23px;top:16px;--c:#d82828}
+  .jg-art-pool .rack i:nth-child(3){left:23px;top:42px;--c:#161618}
+  .jg-art-pool .rack i:nth-child(4){left:46px;top:3px;--c:#0e7e42}
+  .jg-art-pool .rack i:nth-child(5){left:46px;top:29px;--c:#6a2c92}
+  .jg-art-pool .rack i:nth-child(6){left:46px;top:55px;--c:#1452c4}
+  .jg-art-pool .blanca{left:52px;top:62px}
+  .jg-art-pool .taco{position:absolute;left:-18px;top:73px;width:78px;height:5px;border-radius:3px;transform:rotate(-1deg);background:linear-gradient(90deg,#2a160a 0 30%,#e4c188 30% 92%,#5b8ef0 92%);box-shadow:0 3px 4px #0006}
+
+  /* ============================================================
      Reversi
      ============================================================ */
   .jg-rev{display:flex;flex-direction:column}
@@ -794,7 +922,7 @@ try { var t = localStorage.getItem("jg.tema");
   :root{--jg-ink:#232137;--jg-purple:#7042df;--jg-muted:#706d81}
   body{background:#f5f4fa;color:var(--jg-ink)}
   .head{height:auto;min-height:64px;padding:12px 28px;flex-wrap:wrap;background:#171522;gap:12px;border-bottom:1px solid #ffffff12}
-  .logo-mark{background:#ab8bff;color:#171522;border-radius:9px}.head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
+  .head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
   /* El idioma va suelto en la cabecera, no dentro de .head-right: en un
      teléfono baja a la fila de las secciones, y así la fila de los botones
      cabe en 320 px sin empujar «Salir» fuera de la pantalla. */
@@ -1627,6 +1755,7 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-mz-mini{margin-left:auto;font:600 11px 'IBM Plex Sans',sans-serif;letter-spacing:0;text-transform:none;color:#fff;background:#ffffff1a;border:1px solid #ffffff33;border-radius:99px;padding:3px 10px;cursor:pointer}
 .jg-mz-mini:hover{background:#ffffff2e}
 .jg-mz-cajas{margin-left:auto;display:inline-flex;gap:4px}.jg-mz-cajas .jg-mz-mini{margin:0;padding:2px 10px;font-size:14px}
+.jg-mz-buscador{display:flex;gap:6px;align-items:center}.jg-mz-buscador .jg-mz-busca{flex:1;min-width:0}.jg-mz-buscador .jg-mz-mini{margin:0;font-size:15px;padding:6px 11px}
 .jg-mz-busca{border-radius:8px;border:1px solid #ffffff33;background:#12062a;color:#fff;font:500 14px 'IBM Plex Sans',sans-serif;padding:8px 10px}
 .jg-mz-busca:focus{outline:2px solid #ffd23f;border-color:transparent}
 .jg-mz-credito{font-size:10.5px;color:#a78bfa;text-align:right;margin-top:-3px}
@@ -1694,15 +1823,14 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-ym em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #b36b00}
 .jg-art-bx{position:relative;width:170px;height:104px}
 .jg-art-bx i{position:absolute;bottom:14px;width:34px;height:58px}
-.jg-art-bx i::before{content:"";position:absolute;left:3px;top:0;width:28px;height:26px;background:#f1d4ad;border:2px solid #3a2a18;border-radius:3px;box-shadow:inset -5px -5px 0 #0000001f}
-.jg-art-bx i::after{content:"";position:absolute;left:6px;top:26px;width:22px;height:30px;border:2px solid #3a2a18;border-radius:2px;background:var(--r,#4f7a3a)}
-.jg-art-bx i:nth-child(1){left:14px;--r:#4f7a3a}
-.jg-art-bx i:nth-child(2){left:68px;bottom:22px;--r:#3c5f9c}
-.jg-art-bx i:nth-child(3){left:122px;--r:#8a2f2a;filter:hue-rotate(70deg) saturate(.5) brightness(.85)}
-.jg-art-bx i:nth-child(3)::before{background:#9bb07a}
-.jg-art-bx b{position:absolute;left:50%;bottom:4px;width:150px;height:12px;margin-left:-75px;background:repeating-linear-gradient(90deg,#6b5233 0 18px,#5a4429 18px 20px);border:2px solid #2a1d0f}
+.jg-art-bx i::before{content:"";position:absolute;left:3px;top:0;width:28px;height:26px;background:var(--p,#efeee8);border:2px solid #1a1a1e;border-top:8px solid var(--h,#2a2a2d);border-radius:2px;box-shadow:inset -6px -5px 0 #0000002a}
+.jg-art-bx i::after{content:"";position:absolute;left:5px;top:34px;width:24px;height:22px;border:2px solid #1a1a1e;border-radius:2px;background:linear-gradient(90deg,transparent 40%,var(--m,#7a808a) 40% 60%,transparent 60%),var(--r,#e4e5e8);box-shadow:inset -6px 0 0 #00000026}
+.jg-art-bx i:nth-child(1){left:14px;--r:#c8b48a;--m:#c8b48a;--p:#f0cfa4;--h:#2a1c12}
+.jg-art-bx i:nth-child(2){left:68px;bottom:22px}
+.jg-art-bx i:nth-child(3){left:122px;--r:#c0221a;--m:#7e100a;--p:#d02a1e;--h:#1e0907}
+.jg-art-bx b{position:absolute;left:50%;bottom:4px;width:150px;height:12px;margin-left:-75px;background:#f6f6f3;border:2px solid #1a1a1e;border-radius:3px;box-shadow:inset 0 -5px 0 #cfcfcb}
 .jg-art-bx s{position:absolute;left:104px;bottom:16px;width:14px;height:18px;border-radius:3px;background:#c0392b;border:2px solid #3a1410;box-shadow:inset 0 4px 0 #0003,inset 0 -4px 0 #0003}
-.jg-art-bx em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#f2c14e;text-shadow:2px 2px 0 #6e4d14}
+.jg-art-bx em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #e23b2e;white-space:nowrap}
 .jg-art-hx{position:relative;width:170px;height:104px;border-radius:10px;background:repeating-linear-gradient(90deg,#6aa357 0 21px,#5f964d 21px 42px);border:3px solid #e9f2e4;box-sizing:border-box}
 .jg-art-hx::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:0;border-left:2px solid #e9f2e4}
 .jg-art-hx::after{content:"";position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-19px 0 0 -19px;border:2px solid #e9f2e4;border-radius:50%}
@@ -2695,11 +2823,19 @@ html:has(.jg-reglas-capa) .rp-fab{display:none}
 
 /* Portada del vestíbulo */
 .jg-portada-catan{background:radial-gradient(ellipse at 50% 45%,#48a0dc,#1a5588 70%,#0f3558)}
-.jg-art-ct{width:200px;height:180px;overflow:visible;filter:drop-shadow(0 12px 16px #0008)}
-.jg-art-ct-ola{animation:ctOla 4s ease-in-out infinite alternate}
+/* Tres SVG apilados (`arteCatan`): el mar y el barco se mueven en su capa
+   HTML, con los desplazamientos de antes pasados de unidades del dibujo a
+   píxeles (×1,282: 156 unidades en 200 px) y el giro del barco sobre el
+   mismo punto (el 50 % / 90 % de su caja). */
+.jg-art-ct{position:relative;display:block;width:200px;height:180px}
+.jg-art-ct svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 12px 16px #0008)}
+.jg-art-ct>i{position:absolute;inset:0}
+.jg-art-ct-ola{animation:ctOlaPx 4s ease-in-out infinite alternate}
+@keyframes ctOlaPx{from{transform:translateX(-3.85px)}to{transform:translateX(3.85px)}}
 .jg-mn:hover .jg-art-ct-casa{animation:ctCae .7s cubic-bezier(.3,1.5,.5,1)}
 .jg-mn:hover .jg-art-ct-casa.b{animation-delay:.12s}
-.jg-art-ct-barco{transform-box:fill-box;transform-origin:50% 90%;animation:ctMecer 2.8s ease-in-out infinite alternate}
+.jg-art-ct-barco{transform-origin:89.1% 81.8%;animation:ctMecerPx 2.8s ease-in-out infinite alternate}
+@keyframes ctMecerPx{from{transform:translateY(-1.28px) rotate(-4deg)}to{transform:translateY(1.92px) rotate(4deg)}}
 .jg-art-ct-casa{transform-box:fill-box;transform-origin:50% 100%}
 
 .jg-art-ct-t{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font:900 13px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:4px;color:#ffe9a8;text-shadow:0 2px 6px #0008}
@@ -2837,6 +2973,16 @@ html[data-tema=oscuro] .esc-chip.txt.sel{background:#d9a441;color:#191c16}
    blanca sobre blanco es ahora el que deja ver la negra sobre negro. */
 html[data-tema=oscuro] .jg-cuad .jg-svg{background:var(--os-sup2);box-shadow:0 8px 35px #0006}
 html[data-tema=oscuro] .jg-svg .jg-punto{fill:#9d96ad}
+html[data-tema=oscuro] .jg-pl-equipo,html[data-tema=oscuro] .jg-pl-caja{background:var(--os-sup2);border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-pl-equipo.turno{border-color:#34c070}
+html[data-tema=oscuro] .jg-pl-caja-m{background:var(--os-sup);color:var(--jg-ink)}
+html[data-tema=oscuro] .jg-pl-m-cab,html[data-tema=oscuro] .jg-pl-probas td{border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-pl-m-tabs button{background:var(--os-sup2);color:var(--jg-ink)}
+html[data-tema=oscuro] .jg-pl-m-tabs button.on{background:#1f8a4c;color:#fff}
+html[data-tema=oscuro] .jg-pl-mn,html[data-tema=oscuro] .jg-pl-eqb{background:#3a3560}
+html[data-tema=oscuro] .jg-pl-err{background:#4a1a22;color:#ffb3bd}
+html[data-tema=oscuro] .jg-pl-b,html[data-tema=oscuro] .jg-pl-mover{background:#3a3560}
+html[data-tema=oscuro] .jg-pl-fuerza-caja input[type=range]::-webkit-slider-thumb{border-color:#ebe7f5}
 html[data-tema=oscuro] .jg-rev-punto,html[data-tema=oscuro] .jg-rev-chip{border-color:#ffffff66}
 
 /* Flip 7: lo que queda fuera del paño (el pie y el historial) */
@@ -2948,13 +3094,13 @@ html.jg-bt3solo #pantalla>.jg-bt3-info,html.jg-mkwsolo #pantalla>.jg-bt3-info{pl
    juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
    (club.js recibe `inmersivo` del juego). */
 html.jg-club-inm,html.jg-club-inm body{overflow:hidden;height:100%;overscroll-behavior:none}
-html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
+html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-inv-tira,html.jg-club-inm .jg-reto-tira,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
 html.jg-club-inm #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#000}
 html.jg-club-inm .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRO DEFENDER: siempre a ventana completa (club.js: PLENO), con su propio «← Volver a Juegos».
    Su fondo es oscuro en los dos temas, así que no lleva gemelo en el bloque oscuro. */
 html.jg-club-pleno,html.jg-club-pleno body{overflow:hidden;height:100%;overscroll-behavior:none}
-html.jg-club-pleno .head,html.jg-club-pleno .bar,html.jg-club-pleno .rp-fab,html.jg-club-pleno .jg-solo-barra,html.jg-club-pleno .jg-inv-tira,html.jg-club-pleno .jg-cg-fab,html.jg-club-pleno .jg-riel{display:none!important}
+html.jg-club-pleno .head,html.jg-club-pleno .bar,html.jg-club-pleno .rp-fab,html.jg-club-pleno .jg-solo-barra,html.jg-club-pleno .jg-inv-tira,html.jg-club-pleno .jg-reto-tira,html.jg-club-pleno .jg-cg-fab,html.jg-club-pleno .jg-riel{display:none!important}
 html.jg-club-pleno #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#0e1220}
 html.jg-club-pleno .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
@@ -3134,14 +3280,15 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
 .jg-rkc-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c5cff,#c084fc,#f5c542)}
 .jg-rkc-cuenta{font-variant-numeric:tabular-nums;font-size:15px}
 .jg-rkc-extra{grid-column:2/-1;margin-top:-4px;color:var(--jg-muted);font-size:11.5px}
-.jg-rkc-raras li{grid-template-columns:34px 52px minmax(0,1fr) minmax(0,1fr)}
-.jg-rkc-carta .jg-pdc{width:52px}
-.jg-rkc-carta .jg-pdc figcaption{display:none}
-.jg-rkc-info{display:grid;min-width:0}
-.jg-rkc-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.jg-rkc-info small{color:var(--jg-muted);font-size:12px}
+.jg-rkc-top li{grid-template-columns:34px minmax(0,1fr) auto auto}
+.jg-rkc-top .jg-rkc-cuenta{font-size:17px}
+.jg-rkc-ver{padding:5px 10px;font-size:12px;white-space:nowrap}
+.jg-rkc-tuya{margin:12px 0 6px}
+.jg-rkc-album{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin:4px 0 2px}
+.jg-rkc-vale{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:800 9.5px/1.2 system-ui,sans-serif;color:#fff;background:#000a}
 @media (max-width:600px){.jg-rkc{padding:12px}.jg-rkc-lista li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-barra{grid-column:2/-1;grid-row:2}.jg-rkc-extra{grid-row:3}
-  .jg-rkc-raras li{grid-template-columns:28px 46px minmax(0,1fr)}.jg-rkc-raras .jg-rkc-quien{grid-column:3}.jg-rkc-carta .jg-pdc{width:46px}}
+  .jg-rkc-top li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-top .jg-rkc-ver{grid-column:2/-1;grid-row:2;justify-self:start}.jg-rkc-top .jg-rkc-extra{grid-row:3}.jg-rkc-top .jg-rkc-album{grid-row:4}
+  .jg-rkc-album{grid-template-columns:repeat(auto-fill,minmax(72px,1fr))}}
 html[data-tema=oscuro] .jg-rkc{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-rkc-lista li{background:#ffffff08}
 html[data-tema=oscuro] .jg-rkc-barra{background:#ffffff14}
@@ -3363,6 +3510,320 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 @keyframes jfHolo{to{background-position:300% 0}}
 @keyframes jfBrillo{0%,20%{left:-40%}70%,100%{left:120%}}
 @media(prefers-reduced-motion:reduce){.jg-av-ad [class],.jg-fanim,.jg-fanim *,.jg-fanim::before,.jg-fanim::after{animation:none!important}}
+
+/* ============================================================
+   Tienda de Halloween (juegos/tienda-halloween.js): la ventana, la
+   franja del salón, y las piezas de los marcos (marcos-animados.js) y
+   de los fondos (fondos-halloween.js) de edición limitada. Siempre de
+   noche, en tema claro y en oscuro. No depende del modo Halloween de la
+   decoración: se vende aunque la persona la haya apagado.
+   ============================================================ */
+.jg-av-ad .lt{animation-name:jaVela;animation-timing-function:linear}
+.jg-av-ad .fa{animation-name:jaDesvanece}
+.jg-av-ad .hl{animation-name:jaHilo}
+.jg-av-ad .cu{animation-name:jaCuelga}
+@keyframes jaVela{0%,100%{opacity:1}18%{opacity:.55}30%{opacity:.95}52%{opacity:.4}70%{opacity:.9}85%{opacity:.65}}
+@keyframes jaDesvanece{0%,100%{opacity:1}50%{opacity:.22}}
+@keyframes jaHilo{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1.35)}}
+@keyframes jaCuelga{0%,100%{transform:translateY(-10.8px)}50%{transform:translateY(8.4px)}}
+
+/* Los fondos: cada pieza es un elemento HTML que se mueve con transform
+   u opacity; el SVG de la silueta está quieto. */
+.jg-fanim-hw>*{position:absolute;display:block;pointer-events:none}
+.jg-fanim-hw svg{display:block;width:100%;height:100%;overflow:visible}
+.jg-fanim-hw>.hwf-sil{left:0;bottom:0;width:100%;height:60%}
+.jg-fanim-cementerio::before,.jg-fanim-aquelarre::before,.jg-fanim-nocheeterna::before,.jg-fanim-mansion::before{inset:0;background-image:radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 8%,#fff,transparent),radial-gradient(1.4px 1.4px at 52% 30%,#fff,transparent),radial-gradient(1px 1px at 70% 14%,#e9d5ff,transparent),radial-gradient(1.2px 1.2px at 88% 36%,#fff,transparent),radial-gradient(1px 1px at 18% 44%,#fff,transparent);background-size:130px 80px;animation:jfTitila 3.4s ease-in-out infinite}
+.jg-fanim-mansion::before{opacity:.35}
+.hwf-luna{width:var(--l,30cqh);height:var(--l,30cqh);border-radius:50%;background:radial-gradient(circle at 62% 38%,#0000001a 0 9%,transparent 10%),radial-gradient(circle at 38% 66%,#00000014 0 7%,transparent 8%),radial-gradient(circle at 70% 70%,#00000012 0 5%,transparent 6%),radial-gradient(circle at 36% 34%,#fffbeb,#fde68a 58%,#eab308);box-shadow:0 0 4cqh 1cqh #fde68a66}
+.hwf-luna::after{content:"";position:absolute;inset:-45%;border-radius:50%;background:radial-gradient(circle,#fde68a55,transparent 62%);animation:hfRespira 5s ease-in-out infinite}
+.hwf-luna.l-cem{--l:34cqh;right:9%;top:10%}
+.hwf-luna.l-bruja{--l:80cqh;left:52%;top:7%;background:radial-gradient(circle at 62% 38%,#7c3aed18 0 9%,transparent 10%),radial-gradient(circle at 38% 66%,#7c3aed14 0 7%,transparent 8%),radial-gradient(circle at 40% 36%,#fefce8,#f5f3ff 50%,#c4b5fd);box-shadow:0 0 6cqh 1.5cqh #ddd6fe66}
+.hwf-luna.l-bruja::after{background:radial-gradient(circle,#ddd6fe44,transparent 62%)}
+.hwf-luna.l-sangre{--l:88cqh;right:5%;top:5%;background:radial-gradient(circle at 62% 38%,#00000026 0 9%,transparent 10%),radial-gradient(circle at 38% 66%,#0000001f 0 7%,transparent 8%),radial-gradient(circle at 70% 72%,#0000001a 0 5%,transparent 6%),radial-gradient(circle at 38% 34%,#fecaca,#ef4444 48%,#7f1d1d);box-shadow:0 0 6cqh 2cqh #dc262677}
+.hwf-luna.l-sangre::after{background:radial-gradient(circle,#ef444466,transparent 62%);animation-duration:3.2s}
+.hwf-luna.l-eterna{--l:28cqh;right:13%;top:12%;background:radial-gradient(circle at 36% 34%,#fff,#e0e7ff 55%,#a5b4fc)}
+.hwf-luna.l-eterna::after{inset:-60%;background:none;border-radius:50%;box-shadow:0 0 0 .5cqh #c4b5fd66,0 0 3cqh 1cqh #a78bfa55;animation:hfHalo 6s ease-in-out infinite}
+@keyframes hfRespira{50%{opacity:.45;transform:scale(.9)}}
+@keyframes hfHalo{50%{transform:scale(1.12);opacity:.5}}
+.hwf-niebla{left:-50%;width:200%;bottom:-6%;height:36%;background-image:radial-gradient(ellipse 40% 50% at 30% 60%,#cbd5e155,transparent 70%),radial-gradient(ellipse 34% 42% at 78% 50%,#cbd5e140,transparent 70%);background-size:50% 100%;background-repeat:repeat-x;animation:hfNiebla 30s linear infinite}
+.hwf-niebla.n2{bottom:4%;height:28%;opacity:.7;animation-duration:44s;animation-direction:reverse}
+@keyframes hfNiebla{to{transform:translateX(50%)}}
+.hwf-fant{width:12cqh;height:14.5cqh;opacity:0;animation:hfSube 7s ease-in-out infinite}
+.hwf-fant.f1{left:12%;bottom:22%}
+.hwf-fant.f2{left:64%;bottom:20%;width:9cqh;height:11cqh;animation-delay:-3.6s}
+@keyframes hfSube{0%{opacity:0;transform:translateY(6cqh) scale(.7)}20%{opacity:.85}60%{opacity:.75;transform:translate(2cqh,-22cqh) scale(1)}100%{opacity:0;transform:translate(-2cqh,-40cqh) scale(1.05)}}
+.hwf-fant.f3{top:30%;left:0;width:8cqh;height:10cqh;opacity:.75;animation:hfDeriva 18s linear infinite}
+@keyframes hfDeriva{0%{transform:translate(-10cqh,0)}25%{transform:translate(25cqw,-3cqh)}50%{transform:translate(50cqw,2cqh)}75%{transform:translate(75cqw,-2cqh)}100%{transform:translate(calc(100cqw + 10cqh),0)}}
+.hwf-murc{left:0;top:18%;width:15cqh;height:7.5cqh;animation:hfCruza 11s linear infinite}
+.hwf-murc svg,.hwf-cuervo svg{animation:hfAletea .24s ease-in-out infinite alternate}
+.hwf-murc.m2{top:30%;animation-duration:8s;animation-delay:-3s}
+.hwf-murc.m3{top:14%;width:11cqh;height:5.5cqh;animation-duration:13s;animation-delay:-7s}
+@keyframes hfCruza{0%{transform:translate(-15cqh,0)}25%{transform:translate(25cqw,-4cqh)}50%{transform:translate(50cqw,3cqh)}75%{transform:translate(75cqw,-2cqh)}100%{transform:translate(calc(100cqw + 15cqh),0)}}
+@keyframes hfAletea{to{transform:scaleY(.42)}}
+.hwf-bruja{left:0;top:24%;width:32cqh;height:16cqh;animation:hfVuela 12s linear infinite}
+.hwf-bruja::after{content:"";position:absolute;left:88%;top:48%;width:44cqh;height:2cqh;background:radial-gradient(circle,#fde68a 0 28%,transparent 34%) 0 0/3.2cqh 100%;-webkit-mask:linear-gradient(90deg,#000,transparent);mask:linear-gradient(90deg,#000,transparent);opacity:.85}
+@keyframes hfVuela{0%{transform:translate(calc(100cqw + 6cqh),2cqh)}50%{transform:translate(45cqw,-5cqh) rotate(-4deg)}100%{transform:translate(-80cqh,3cqh)}}
+.hwf-cal{width:var(--s);height:calc(var(--s) * .85)}
+.hwf-cal>b{position:absolute;inset:-40%;border-radius:50%;background:radial-gradient(circle,#fbbf2499,transparent 60%);animation:hfVela 1.7s linear infinite;animation-delay:var(--r)}
+.hwf-cal svg{position:relative}
+@keyframes hfVela{0%,100%{opacity:1}20%{opacity:.5}35%{opacity:.95}55%{opacity:.35}75%{opacity:.85}}
+.hwf-luc,.hwf-brasa{left:var(--x);top:var(--y);width:1.2cqh;height:1.2cqh;border-radius:50%;background:#fef08a;box-shadow:0 0 1.6cqh .5cqh #facc15aa;animation:hfLuciernaga var(--d) ease-in-out infinite;animation-delay:var(--r)}
+@keyframes hfLuciernaga{0%,100%{transform:translate(0,0);opacity:.15}25%{opacity:1}50%{transform:translate(4cqh,-5cqh);opacity:.35}75%{transform:translate(-3cqh,-2cqh);opacity:1}}
+.hwf-brasa{top:auto;bottom:4%;width:.9cqh;height:.9cqh;background:#fca5a5;box-shadow:0 0 1.2cqh .4cqh #ef4444aa;animation-name:hfBrasa}
+@keyframes hfBrasa{0%{transform:translate(0,0);opacity:0}20%{opacity:1}100%{transform:translate(3cqh,-55cqh);opacity:0}}
+.hwf-nubes{left:-50%;width:200%;top:-12%;height:58%;background-image:radial-gradient(ellipse 30% 45% at 25% 40%,#64748b77,transparent 70%),radial-gradient(ellipse 34% 40% at 70% 32%,#47556999,transparent 70%);background-size:50% 100%;background-repeat:repeat-x;animation:hfNiebla 36s linear infinite}
+.hwf-lluvia{left:-20%;top:-30%;width:140%;height:170%;background-image:radial-gradient(.16cqh 2.8cqh at 30% 40%,#e2e8f0bb,transparent),radial-gradient(.14cqh 2.2cqh at 80% 75%,#e2e8f088,transparent);background-size:5cqh 11cqh;animation:hfLluvia .55s linear infinite}
+@keyframes hfLluvia{from{transform:rotate(12deg) translateY(0)}to{transform:rotate(12deg) translateY(11cqh)}}
+.hwf-luna.l-velada{--l:40cqh;left:30%;top:6%;opacity:.55;background:radial-gradient(circle at 36% 34%,#f8fafc,#cbd5e1 60%,#64748b);box-shadow:0 0 5cqh 1cqh #cbd5e144}
+.hwf-destello{inset:0;background:#e0e7ff;opacity:0;animation:hfRelampago 7s linear infinite}
+.hwf-rayo{left:20%;top:-4%;width:8cqh;height:52cqh;opacity:0;filter:drop-shadow(0 0 1.6cqh #c7d2fe);animation:hfRayo 7s linear infinite}
+@keyframes hfRelampago{0%,88%,100%{opacity:0}89%{opacity:.5}90%{opacity:.08}91.5%{opacity:.4}94%{opacity:0}}
+@keyframes hfRayo{0%,88%,95%,100%{opacity:0}89%,90.5%{opacity:1}90%{opacity:.3}}
+.hwf-vent>*{animation:hfVentana 4s steps(1,end) infinite}
+.hwf-vent>:nth-child(2){animation-delay:-1.3s}.hwf-vent>:nth-child(3){animation-delay:-2.1s}.hwf-vent>:nth-child(4){animation-delay:-.6s;animation-duration:5.5s}.hwf-vent>:nth-child(5){animation-delay:-3.2s}.hwf-vent>:nth-child(6){animation-duration:2.6s}
+@keyframes hfVentana{0%,100%{opacity:1}30%{opacity:.25}34%{opacity:1}62%{opacity:.6}70%{opacity:1}}
+.hwf-bruma{left:-50%;width:200%;bottom:0;height:50%;background-image:radial-gradient(ellipse 40% 45% at 30% 70%,#dc262655,transparent 70%),radial-gradient(ellipse 34% 40% at 78% 60%,#7f1d1d77,transparent 70%);background-size:50% 100%;background-repeat:repeat-x;animation:hfNiebla 24s linear infinite}
+.hwf-cuervo{left:0;width:16cqh;height:8cqh;top:20%;animation:hfCruza 10s linear infinite}
+.hwf-cuervo.c2{top:34%;width:12cqh;height:6cqh;animation-duration:13s;animation-delay:-4s}
+.hwf-cuervo.c3{top:12%;width:9cqh;height:4.5cqh;animation-duration:16s;animation-delay:-9s}
+.hwf-aurora{left:-20%;top:-14%;width:140%;height:76%;background:radial-gradient(ellipse 28% 42% at 28% 62%,#22c55e55,transparent 70%),radial-gradient(ellipse 34% 36% at 64% 46%,#a855f766,transparent 70%);animation:hfAurora 14s ease-in-out infinite}
+.hwf-aurora.a2{background:radial-gradient(ellipse 26% 40% at 45% 55%,#22d3ee44,transparent 70%),radial-gradient(ellipse 30% 34% at 82% 40%,#f472b644,transparent 70%);animation-duration:19s;animation-direction:reverse}
+@keyframes hfAurora{0%,100%{transform:translateX(-6%) skewX(-10deg)}50%{transform:translateX(6%) skewX(10deg) scaleY(1.15)}}
+.hwf-farol{bottom:-14cqh;width:11cqh;height:9.5cqh;filter:drop-shadow(0 0 1.4cqh #fb923c);animation:hfFarol var(--d) linear infinite;animation-delay:var(--r)}
+/* Lo que se agregó para que cada fondo tenga su momento. */
+.hwf-fugaz{left:62%;top:6%;width:22cqh;height:.5cqh;border-radius:1cqh;background:linear-gradient(90deg,transparent,#fff);opacity:0;transform:rotate(-24deg);animation:hfFugaz 6s ease-in infinite}
+.hwf-fugaz.z2{left:30%;top:2%;animation-duration:8.5s;animation-delay:-3.4s}
+@keyframes hfFugaz{0%,70%{opacity:0;translate:0 0}73%{opacity:1}88%,100%{opacity:0;translate:-40cqw 18cqw}}
+.hwf-mano{left:33%;bottom:2%;width:7cqh;height:9.5cqh;transform-origin:50% 100%;animation:hfMano 6s ease-in-out infinite}
+.hwf-mano.h2{left:58%;width:5.5cqh;height:7.5cqh;animation-delay:-3s;animation-duration:7.5s}
+@keyframes hfMano{0%,100%{transform:translateY(100%)}30%,55%{transform:translateY(0) rotate(-6deg)}42%{transform:translateY(-4%) rotate(6deg)}75%{transform:translateY(100%)}}
+.hwf-luna.l-cosecha{--l:56cqh;left:62%;top:30%;background:radial-gradient(circle at 62% 38%,#0000001a 0 9%,transparent 10%),radial-gradient(circle at 36% 34%,#fff7ed,#fdba74 55%,#ea580c);box-shadow:0 0 6cqh 2cqh #fb923c66}
+.hwf-luna.l-cosecha::after{background:radial-gradient(circle,#fb923c55,transparent 62%)}
+.hwf-hoja{left:var(--x);top:-10%;width:5cqh;height:5cqh;animation:hfHoja var(--d) linear infinite;animation-delay:var(--r)}
+@keyframes hfHoja{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:1}50%{transform:translate(4cqh,55cqh) rotate(200deg)}90%{opacity:1}100%{transform:translate(-3cqh,115cqh) rotate(400deg);opacity:0}}
+.hwf-murc.m4{top:16%;left:0;width:8cqh;height:4cqh;animation:hfSalen 7s linear infinite}
+.hwf-murc.m5{top:22%;left:0;width:6cqh;height:3cqh;animation:hfSalen 9s linear infinite;animation-delay:-4s}
+@keyframes hfSalen{0%{transform:translate(82cqw,22cqh) scale(.4);opacity:0}10%{opacity:1}100%{transform:translate(20cqw,-20cqh) scale(1.1);opacity:0}}
+.hwf-fant.f4{left:0;bottom:30%;top:auto;width:8cqh;height:10cqh;opacity:.6;animation:hfDeriva 22s linear infinite;animation-delay:-8s}
+.hwf-caldero{left:7%;bottom:3%;width:24cqh;height:18cqh}
+.hwf-caldero::before{content:"";position:absolute;left:5%;right:5%;top:-30%;height:60%;border-radius:50%;background:radial-gradient(ellipse,#4ade8077,transparent 70%);animation:hfRespira 2.4s ease-in-out infinite}
+.hwf-caldero>b{position:absolute;left:45%;top:18%;width:3cqh;height:3cqh;border-radius:50%;border:.4cqh solid #86efac;background:#14532d66;animation:hfBurbuja 2s ease-out infinite}
+.hwf-caldero>b:nth-child(3){left:30%;animation-delay:-.7s;width:2.2cqh;height:2.2cqh}
+.hwf-caldero>b:nth-child(4){left:62%;animation-delay:-1.3s;width:2.6cqh;height:2.6cqh}
+@keyframes hfBurbuja{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:1}100%{transform:translateY(-16cqh) scale(1.2);opacity:0}}
+.hwf-rayos{right:-30%;top:-80%;width:150cqh;height:150cqh;background:repeating-conic-gradient(#ef444426 0 8deg,transparent 8deg 22deg);border-radius:50%;-webkit-mask:radial-gradient(circle,#000 20%,transparent 68%);mask:radial-gradient(circle,#000 20%,transparent 68%);animation:jgGira 40s linear infinite}
+.hwf-murcg{left:0;top:12%;width:46cqh;height:19cqh;animation:hfCruzaG 14s linear infinite;animation-delay:-5s}
+.hwf-murcg svg{animation:hfAletea .7s ease-in-out infinite alternate}
+@keyframes hfCruzaG{0%{transform:translate(calc(100cqw + 10cqh),6cqh)}100%{transform:translate(-60cqh,-4cqh)}}
+.hwf-ojos{width:5cqh;height:1.6cqh;background:radial-gradient(circle at 20% 50%,#ef4444 0 30%,transparent 34%),radial-gradient(circle at 80% 50%,#ef4444 0 30%,transparent 34%);filter:drop-shadow(0 0 1cqh #ef4444);animation:hfOjos 5s steps(1,end) infinite;animation-delay:var(--r)}
+@keyframes hfOjos{0%,100%{opacity:0}10%,45%{opacity:1}47%{opacity:0}49%,70%{opacity:1}72%{opacity:0}}
+.hwf-alma{left:var(--x);bottom:-5%;width:1.4cqh;height:1.4cqh;border-radius:50%;background:#a5f3fc;box-shadow:0 0 2cqh .6cqh #67e8f9aa;animation:hfBrasa var(--d) ease-in-out infinite;animation-delay:var(--r)}
+@keyframes hfFarol{0%{transform:translate(0,0) scale(.8);opacity:0}10%{opacity:1}50%{transform:translate(2cqh,-60cqh) scale(.95)}85%{opacity:1}100%{transform:translate(-2cqh,-120cqh) scale(.7);opacity:0}}
+
+/* El aura de los marcos de Halloween: un halo que gira detrás de la foto
+   (es HTML: girar una capa ya pintada no repinta nada). */
+.jg-av.jg-marco-hw::before{display:block;inset:-17%;z-index:0;background:conic-gradient(var(--h1,#f97316),var(--h2,#fde047),var(--h1,#f97316),var(--h3,#7c2d12),var(--h1,#f97316));filter:blur(calc(var(--t) * .05));opacity:.9;animation:jgGira 5s linear infinite}
+.jg-marco-calabazas{--h1:#f97316;--h2:#fde047;--h3:#7c2d12}
+.jg-marco-murcielagos{--h1:#7c3aed;--h2:#f0abfc;--h3:#1e0b3a}
+.jg-marco-telarana{--h1:#65a30d;--h2:#d9f99d;--h3:#3b0764}
+.jg-marco-fantasmas{--h1:#06b6d4;--h2:#ecfeff;--h3:#1e3a8a}
+.jg-marco-caldero{--h1:#16a34a;--h2:#86efac;--h3:#6b21a8}
+.jg-marco-parca{--h1:#7c3aed;--h2:#f0abfc;--h3:#05000a}
+.jg-marco-reycalabaza{--h1:#f59e0b;--h2:#fff7c2;--h3:#ea580c}
+.jg-marco-parca::before,.jg-marco-reycalabaza::before{animation-duration:3s}
+
+/* El sello de edición limitada (perfil-vista.js, `sellosHw`): en la
+   tarjeta y, grande, en la portada del perfil. */
+.jg-hw-sellos{display:flex;flex-wrap:wrap;gap:6px;margin:10px 16px 0}
+.jg-pf-id .jg-hw-sellos{margin:12px 0 0}
+.jg-hw-sello{position:relative;display:inline-flex;align-items:center;gap:7px;padding:4px 11px 4px 9px;border-radius:99px;font-size:11.5px;line-height:1.2;color:#fff;background:linear-gradient(135deg,#1a0730,#3b0a4f);border:1px solid var(--rz);box-shadow:0 0 12px color-mix(in srgb,var(--rz) 45%,transparent);overflow:hidden;isolation:isolate}
+.jg-hw-sello::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,transparent,#fff6,transparent);transform:translateX(-150%) skewX(-20deg);animation:thReflejo 3.4s ease-in-out infinite;pointer-events:none}
+.jg-hw-sello b{font-weight:700;white-space:nowrap}
+.jg-hw-sello em{font:400 11px/1 "Bungee",system-ui,sans-serif;color:var(--rz)}
+.jg-hw-sello em small{font-size:8.5px;opacity:.75}
+.jg-hw-sello.r-mitico{background:linear-gradient(135deg,#2a0612,#4c0519)}
+.jg-hw-sello.r-premio{background:linear-gradient(135deg,#052e16,#14532d)}
+.jg-hw-sellos.grande .jg-hw-sello{display:inline-grid;grid-template-columns:auto auto;justify-content:start;column-gap:10px;row-gap:3px;padding:8px 15px;border-radius:14px;font-size:14px}
+.jg-hw-sellos.grande .jg-hw-sello em{font-size:15px}
+.jg-hw-sellos.grande .jg-hw-sello em small{font-size:10px}
+.jg-hw-sello-s{grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--rz)}
+
+/* Los marcos y fondos de Halloween en el editor del perfil. */
+.jg-ped-hwir{margin-left:8px;padding:2px 9px;border-radius:99px;border:1px solid #f97316;background:#fff7ed;color:#c2410c;font:700 10.5px/1.6 inherit;font-family:inherit;letter-spacing:0;text-transform:none;cursor:pointer}
+html[data-tema=oscuro] .jg-ped-hwir{background:#431407;color:#fdba74}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-raro{--rz:#38bdf8}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-epico{--rz:#c084fc}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-legendario{--rz:#fbbf24}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-mitico{--rz:#fb7185}
+:is(.jg-th-it,.jg-th-ficha,.jg-th-rz,.jg-ped-op,.jg-hw-sello).r-premio{--rz:#4ade80}
+.jg-ped-op.hw{box-shadow:inset 0 0 0 1.5px var(--rz,#f97316)}
+
+/* La ventana */
+.jg-th-capa{z-index:72;padding:12px;background:#05010dd9;backdrop-filter:blur(3px)}
+.jg-th-capa.cierra{animation:thSale .22s ease-in forwards}
+@keyframes thSale{to{opacity:0}}
+.jg-th{position:relative;width:min(960px,100%);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;border-radius:22px;color:#f5f3ff;background:radial-gradient(ellipse 80% 340px at 50% 0%,#3b1361,transparent 75%),linear-gradient(180deg,#140726 0%,#0b0416 60%,#07020f 100%);box-shadow:0 0 0 1px #f9731666,0 0 50px #f9731633,0 30px 80px #000c;animation:thEntra .5s cubic-bezier(.2,1.3,.4,1);text-align:left;font-family:"IBM Plex Sans",system-ui,sans-serif;scrollbar-color:#7c3aed #0b0416}
+@keyframes thEntra{from{opacity:0;transform:translateY(24px) scale(.94)}}
+.jg-th-cielo{position:absolute;inset:0 0 auto 0;height:150px;pointer-events:none;overflow:hidden;container-type:size}
+.th-luna{position:absolute;right:45%;top:12px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 62% 38%,#0000001a 0 9%,transparent 10%),radial-gradient(circle at 38% 66%,#00000014 0 7%,transparent 8%),radial-gradient(circle at 36% 34%,#fffbeb,#fde68a 55%,#f59e0b);box-shadow:0 0 40px 8px #fbbf2455,0 0 120px 30px #f9731622}
+.th-murc{position:absolute;left:0;top:calc(12px + var(--i) * 22px);width:44px;height:22px;fill:#000;opacity:.9;animation:thMurc calc(9s + var(--i) * 2.3s) linear infinite;animation-delay:calc(var(--i) * -3.1s)}
+.th-murc:nth-child(odd){width:30px;height:15px}
+.th-murc svg{display:block;width:100%;height:100%;animation:hfAletea .22s ease-in-out infinite alternate}
+@keyframes thMurc{0%{transform:translate(-60px,0)}25%{transform:translate(25cqw,-14px)}50%{transform:translate(50cqw,10px)}75%{transform:translate(75cqw,-8px)}100%{transform:translate(calc(100cqw + 60px),0)}}
+.th-niebla{position:absolute;left:-50%;width:200%;bottom:0;height:60px;background-image:radial-gradient(ellipse 40% 50% at 30% 70%,#a78bfa22,transparent 70%),radial-gradient(ellipse 34% 42% at 78% 60%,#f9731618,transparent 70%);background-size:50% 100%;background-repeat:repeat-x;animation:hfNiebla 30s linear infinite}
+.jg-th-xw{position:sticky;top:0;height:0;z-index:6}
+.jg-th-x{position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:50%;border:1px solid #ffffff40;background:#000a;color:#fff;font-size:16px;cursor:pointer}
+.jg-th-x:hover{background:#f97316;color:#1a0700}
+.jg-th-x:focus:not(:focus-visible){outline:none}
+.jg-th-cab{position:relative;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 66px 4px 22px}
+.jg-th-cab-tx{min-width:0}
+.jg-th-sello{display:inline-block;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1a0700;background:linear-gradient(90deg,#fdba74,#f97316,#fdba74);background-size:200% 100%;animation:thBrillo 3s linear infinite;box-shadow:0 0 18px #f9731688}
+@keyframes thBrillo{to{background-position:-200% 0}}
+.jg-th-tit{margin:6px 0 3px;font:400 clamp(30px,4.6vw,42px)/1 "Creepster","Lilita One",system-ui,sans-serif;letter-spacing:.04em;color:#fb923c;text-shadow:0 0 18px #f97316aa,0 4px 0 #7c2d12,0 0 60px #a855f766;animation:thTitila 5s linear infinite}
+@keyframes thTitila{0%,44%,48%,52%,100%{opacity:1}46%{opacity:.5}50%{opacity:.7}}
+.jg-th-lema{margin:0;font-size:12.5px;line-height:1.4;color:#e9d5ff}
+.jg-th-lema b{color:#fdba74}
+.jg-th-reloj{display:flex;flex:0 0 auto;align-items:center;gap:6px}
+.jg-th-reloj-t{margin-right:2px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fdba74;text-align:right;max-width:50px;line-height:1.2}
+.jg-th-reloj span{display:grid;gap:2px;justify-items:center;min-width:46px;padding:6px 4px 4px;border-radius:12px;background:#ffffff0d;border:1px solid #f9731655;box-shadow:inset 0 -10px 20px #f9731618}
+.jg-th-reloj b{font:400 20px/1 "Bungee",system-ui,sans-serif;color:#fff;text-shadow:0 0 10px #f97316}
+.jg-th-reloj small{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#c4b5fd}
+.jg-th-cuerpo{position:relative;display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:18px;padding:12px 22px 18px;align-items:start}
+.jg-th-probador{display:grid;gap:9px}
+.jg-th-esc{position:relative;height:138px;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #ffffff1f,0 12px 30px #0008}
+.jg-th-esc-yo{position:absolute;left:24px;bottom:18px;z-index:2;display:flex;align-items:flex-end;gap:28px;max-width:calc(100% - 36px)}
+.jg-th-esc-yo b{min-width:0;padding-bottom:8px;font-size:15px;color:#fff;text-shadow:0 2px 6px #000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-th-esc .jg-av>img,.jg-th-esc .jg-av>i{outline:3px solid #fff}
+.jg-th-esc-et{position:absolute;top:10px;right:12px;z-index:2;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:#0009;color:#fde68a}
+.jg-th-ficha{position:relative;padding:10px 14px 13px;border-radius:16px;background:linear-gradient(180deg,#ffffff10,#ffffff05);border:1px solid color-mix(in srgb,var(--rz) 55%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--rz) 22%,transparent)}
+.jg-th-ficha h3{margin:2px 0 6px;font:400 22px/1.1 "Lilita One",system-ui,sans-serif;color:#fff}
+.jg-th-it-rz{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--rz)}
+.jg-th-comprar{position:relative;display:block;width:100%;padding:10px 14px;border:0;border-radius:12px;font:700 15px/1.15 "IBM Plex Sans",system-ui,sans-serif;color:#1a0700;background:linear-gradient(180deg,#fdba74,#f97316);box-shadow:0 6px 0 #9a3412,0 0 26px #f9731688;cursor:pointer;overflow:hidden;transition:transform .1s,box-shadow .1s}
+.jg-th-comprar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,transparent,#fff9,transparent);transform:translateX(-150%) skewX(-20deg);animation:thReflejo 2.6s ease-in-out infinite}
+@keyframes thReflejo{0%,30%{transform:translateX(-150%) skewX(-20deg)}70%,100%{transform:translateX(330%) skewX(-20deg)}}
+.jg-th-comprar:hover:not(:disabled){transform:translateY(-1px)}
+.jg-th-comprar:active:not(:disabled){transform:translateY(4px);box-shadow:0 2px 0 #9a3412}
+.jg-th-comprar:disabled{cursor:default}
+.jg-th-comprar.seguro{background:linear-gradient(180deg,#86efac,#22c55e);box-shadow:0 6px 0 #166534,0 0 26px #22c55e88;animation:thLate .9s ease-in-out infinite}
+@keyframes thLate{50%{transform:scale(1.03)}}
+.jg-th-comprar.poner{color:#fff;background:linear-gradient(180deg,#d8b4fe,#9333ea);box-shadow:0 6px 0 #581c87,0 0 26px #a855f788}
+.jg-th-comprar.hecho,.jg-th-comprar.falta,.jg-th-comprar:disabled{color:#e9d5ff;background:#ffffff14;box-shadow:none}
+.jg-th-comprar.hecho::after,.jg-th-comprar.falta::after,.jg-th-comprar:disabled::after{display:none}
+.jg-th-no{display:block;margin:6px auto 0;padding:0;border:0;background:none;color:#c4b5fd;font:13px "IBM Plex Sans",system-ui,sans-serif;text-decoration:underline;cursor:pointer}
+.jg-th-nota{margin:7px 0 0;font-size:12px;line-height:1.45;color:#c4b5fd}
+.jg-th-err{margin:10px 0 0;font-size:13px;color:#fca5a5}
+.jg-th-premio-txt{padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.5;color:#e9d5ff;background:#22c55e14;border:1px dashed #4ade8077}
+.jg-th-saldo{font-size:13px;color:#e9d5ff;text-align:center}
+.jg-th-saldo b{font-size:16px;color:#fde68a}
+.jg-th-col{padding:9px 12px;border-radius:14px;background:#ffffff08;border:1px solid #ffffff1a}
+.jg-th-col-t{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12.5px}
+.jg-th-col-t span{font-weight:700;color:#fdba74}
+.jg-th-col-barra{position:relative;height:10px;border-radius:99px;background:#ffffff14}
+.jg-th-col-barra>i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,#f97316,#fbbf24,#4ade80);box-shadow:0 0 12px #f97316aa;transition:width .6s}
+.jg-th-col-barra>span{position:absolute;top:50%;width:4px;height:4px;margin:-2px 0 0 -4px;border-radius:50%;background:#ffffff40}
+.jg-th-col-barra>span.on{background:#fff}
+.jg-th-metas{display:flex;gap:8px;margin-top:8px}
+.jg-th-meta{display:flex;flex:1;align-items:center;gap:8px;min-width:0;padding:6px 8px;border-radius:10px;border:1px solid #ffffff1f;background:#0004;color:#e9d5ff;font:11.5px/1.3 "IBM Plex Sans",system-ui,sans-serif;text-align:left;cursor:pointer}
+.jg-th-meta.ok{border-color:#4ade80;color:#bbf7d0;box-shadow:0 0 14px #4ade8055}
+.jg-th-meta-arte{flex:0 0 auto;display:grid;place-items:center}
+.jg-th-meta .jg-th-muestra{width:42px;height:28px;border-radius:7px}
+.jg-th-rej{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.jg-th-rej.pocos{grid-template-columns:repeat(2,minmax(0,200px))}
+.jg-th-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+.jg-th-tabs button{padding:6px 13px;border-radius:99px;border:1px solid #ffffff2e;background:#ffffff0d;color:#e9d5ff;font:700 13px/1.2 "IBM Plex Sans",system-ui,sans-serif;cursor:pointer}
+.jg-th-tabs button small{font-weight:600;opacity:.65}
+.jg-th-tabs button[aria-selected=true]{color:#1a0700;border-color:transparent;background:linear-gradient(180deg,#fdba74,#f97316);box-shadow:0 0 14px #f9731677}
+.jg-th-tabs-n{margin-left:4px;font-size:12px;color:#a78bfa}
+.jg-th-it{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 8px 9px;border-radius:16px;border:1px solid color-mix(in srgb,var(--rz) 45%,transparent);background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--rz) 22%,transparent),transparent 70%),#ffffff08;color:#fff;font:inherit;cursor:pointer;overflow:hidden;isolation:isolate;transition:transform .15s,box-shadow .15s,border-color .15s}
+.jg-th-it:hover{transform:translateY(-3px);box-shadow:0 10px 26px #0008,0 0 22px color-mix(in srgb,var(--rz) 40%,transparent)}
+.jg-th-it.sel{border-color:var(--rz);box-shadow:0 0 0 2px var(--rz),0 0 28px color-mix(in srgb,var(--rz) 55%,transparent)}
+.jg-th-it.r-mitico,.jg-th-it.r-legendario{border-color:transparent}
+.jg-th-it.r-mitico::before,.jg-th-it.r-legendario::before{content:"";position:absolute;left:50%;top:50%;width:150%;aspect-ratio:1;z-index:-2;background:conic-gradient(transparent 0 55%,var(--rz) 70%,#fff 76%,var(--rz) 82%,transparent 95%);transform:translate(-50%,-50%);animation:thGiro 3.2s linear infinite}
+.jg-th-it.r-legendario::before{animation-duration:5s}
+.jg-th-it.r-mitico::after,.jg-th-it.r-legendario::after{content:"";position:absolute;inset:2px;z-index:-1;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--rz) 26%,transparent),transparent 70%),#140620}
+@keyframes thGiro{to{transform:translate(-50%,-50%) rotate(1turn)}}
+.jg-th-it-arte{display:grid;place-items:center;width:100%;height:90px;margin-bottom:8px}
+.jg-th-it.fondo .jg-th-muestra{width:100%;height:74px}
+.jg-th-muestra{position:relative;display:block;overflow:hidden;border-radius:12px;box-shadow:inset 0 0 0 1px #ffffff26}
+.jg-th-it-n{font-size:13px;line-height:1.2;text-align:center}
+.jg-th-it-p{font-size:13px;font-weight:700;color:#fde68a}
+.jg-th-it-p.tuyo{color:#86efac}
+.jg-th-it.mio .jg-th-it-arte::after{content:"✓";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;color:#052e16;background:#4ade80}
+.jg-th-it.agotado{opacity:.4}
+.jg-th-it-q{font-size:11.5px;color:#c4b5fd}
+.jg-th-it-q.tuyo{color:#86efac;font-weight:700}
+.jg-th-escasez{margin:0 0 8px;font-size:12.5px;line-height:1.45;color:#fde68a}
+.jg-th-escasez b{color:#fff}
+.jg-th-escasez.tuyo{color:#86efac}
+.jg-th-fiesta-c strong{font:400 18px/1 "Bungee",system-ui,sans-serif;color:#fde68a;text-shadow:0 0 12px #f97316}
+.jg-th-pie{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;font-size:11px;color:#a78bfa}
+.jg-th-rz{padding:3px 8px;border-radius:99px;border:1px solid var(--rz);color:var(--rz)}
+.jg-th-fiesta{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle,#f9731633,transparent 60%);animation:jgVela .3s ease-out}
+.jg-th-fiesta.fuera{animation:thSale .5s ease-in forwards}
+.jg-th-fiesta>i{position:absolute;left:50%;top:50%;font-size:30px;font-style:normal;line-height:1;animation:thPieza 1.7s cubic-bezier(.1,.8,.3,1) var(--t) both}
+@keyframes thPieza{0%{transform:translate(-50%,-50%) rotate(var(--a)) translateY(0) scale(.3);opacity:0}15%{opacity:1}100%{transform:translate(-50%,-50%) rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(var(--r)) scale(1.1);opacity:0}}
+.jg-th-fiesta-c{display:grid;justify-items:center;gap:8px;padding:22px 34px;border-radius:22px;background:#12051fee;border:2px solid #f97316;box-shadow:0 0 60px #f97316aa;animation:thPop .5s cubic-bezier(.2,1.6,.4,1)}
+.jg-th-fiesta-c b{font:400 44px/1 "Creepster","Lilita One",system-ui,sans-serif;color:#fb923c;text-shadow:0 0 16px #f97316}
+.jg-th-fiesta-c small{font-size:14px;color:#e9d5ff}
+.jg-th-fiesta-c em{max-width:260px;font-style:normal;font-weight:700;font-size:14px;text-align:center;color:#86efac}
+.jg-th-fiesta-c .jg-th-muestra{width:150px;height:80px}
+@keyframes thPop{from{transform:scale(.4);opacity:0}}
+
+/* La franja del salón */
+.jg-th-tira{position:relative;display:flex;align-items:center;gap:16px;width:100%;margin:16px 0 0;padding:14px 18px 14px 28px;border:0;border-radius:18px;text-align:left;cursor:pointer;color:#fff;font:inherit;overflow:hidden;isolation:isolate;background:radial-gradient(ellipse 50% 140% at 12% 50%,#9a341288,transparent 70%),linear-gradient(100deg,#1a0730,#2e0b4a 55%,#4a1607);box-shadow:0 0 0 1px #f9731666,0 10px 30px #1a073055;transition:transform .15s}
+.jg-th-tira:hover{transform:translateY(-2px)}
+.jg-th-tira::after{content:"";position:absolute;inset:0;z-index:2;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 2px #fb923c,inset 0 0 34px #f9731666;opacity:0;animation:hfRespira2 3s ease-in-out infinite}
+@keyframes hfRespira2{50%{opacity:1}}
+.th-tira-cielo{position:absolute;inset:0;z-index:-1;pointer-events:none;container-type:size}
+.th-tira-cielo .th-luna{right:28%;top:8px;width:44px;height:44px;box-shadow:0 0 22px 4px #fbbf2444}
+.th-tira-cielo .th-murc{top:calc(8px + var(--i) * 24%);width:26px;height:13px}
+.th-tira-avs{display:flex;flex:0 0 auto;align-items:center}
+.th-tira-av{display:grid;place-items:center}
+.th-tira-av.lado{margin:0 -4px;opacity:.9}
+.th-tira-av.centro{position:relative;z-index:1;margin:0 6px}
+.th-tira-av .jg-av-ad [class]{animation-play-state:paused}
+.jg-th-tira:hover .th-tira-av .jg-av-ad [class],.jg-th-tira:focus-visible .th-tira-av .jg-av-ad [class]{animation-play-state:running}
+.th-tira-tx{display:grid;flex:1;gap:3px;min-width:0}
+.th-tira-tx small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fdba74}
+.th-tira-tx b{font:400 30px/1 "Creepster","Lilita One",system-ui,sans-serif;letter-spacing:.03em;color:#fb923c;text-shadow:0 0 14px #f97316aa,0 3px 0 #7c2d12}
+.th-tira-tx span{font-size:13px;line-height:1.35;color:#e9d5ff}
+.th-tira-tx em{font-style:normal;font-weight:700;color:#fde68a}
+.th-tira-btn{position:relative;flex:0 0 auto;padding:11px 18px;border-radius:99px;font-weight:800;font-size:14.5px;color:#1a0700;background:linear-gradient(180deg,#fdba74,#f97316);box-shadow:0 4px 0 #9a3412,0 0 20px #f9731688;overflow:hidden}
+.th-tira-btn::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,transparent,#fff9,transparent);transform:translateX(-150%) skewX(-20deg);animation:thReflejo 2.6s ease-in-out infinite}
+
+@media (max-width:760px){
+  .jg-th-capa{padding:0}
+  .jg-th{width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0}
+  .jg-th-cab{flex-direction:column;align-items:flex-start;gap:10px;padding:16px 60px 4px 16px}
+  .jg-th-reloj-t{max-width:none}
+  .th-luna{right:18%}
+  .jg-th-reloj span{min-width:48px}
+  .jg-th-cuerpo{grid-template-columns:minmax(0,1fr);gap:18px;padding:14px 14px 26px}
+  .jg-th-probador{position:static}
+  .jg-th-esc{height:150px}
+  .jg-th-rej{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .jg-th-rej.pocos{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:600px){
+  .jg-th-tira{flex-wrap:wrap;gap:10px 12px;padding:14px}
+  .th-tira-av.lado{display:none}
+  .th-tira-tx b{font-size:26px}
+  .th-tira-btn{width:100%;text-align:center}
+}
+@media (prefers-reduced-motion:reduce){
+  .jg-th *,.jg-th::before,.jg-th::after,.jg-th-tira *,.jg-th-tira::after,.jg-th-tira *::after,.jg-th-it::before{animation:none!important}
+  .jg-th-fiesta>i{display:none}
+  .jg-av.jg-marco-hw::before,.jg-hw-sello::after{animation:none!important}
+}
+/* En el salón y el chat general los marcos animados están quietos y se
+   mueven con el puntero encima de su fila o su tarjeta. Las tiras de drops,
+   los tops y el top de monedas llevan decenas de fotos chicas, y cada marco
+   que se mueve repinta la página entera en cada cuadro: medido con el CSS
+   de esta hoja, 4 marcos en pantalla tenían el hilo ocupado un 25 %, 12 un
+   41 % y 30 un 92 % (la página no respondía al llegar abajo). Va con
+   !important porque varios marcos ponen `animation` entera en ::before. */
+:is(.jg-sal,.jg-cg-lista) .jg-av,:is(.jg-sal,.jg-cg-lista) .jg-av *,:is(.jg-sal,.jg-cg-lista) .jg-av::before,:is(.jg-sal,.jg-cg-lista) .jg-av::after,:is(.jg-sal,.jg-cg-lista) .jg-av *::before,:is(.jg-sal,.jg-cg-lista) .jg-av *::after{animation-play-state:paused!important}
+:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av::after,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::before,:is(.jg-sal,.jg-cg-lista) :is(.jg-drop,.jg-top,.jg-cg-msg,li,a):hover .jg-av *::after{animation-play-state:running!important}
 @keyframes jgMini{from{opacity:0;transform:translateY(6px) scale(.98)}}
 @keyframes jgHoja{from{transform:translateY(110%)}}
 
@@ -3693,7 +4154,11 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 .jg-ban-jugar:hover{transform:translateY(-2px) scale(1.04);filter:brightness(1.08) saturate(1.1)}
 .jg-ban-jugar:active{transform:translateY(1px) scale(.98)}
 .jg-ban-jugar:focus-visible{outline:3px solid #fff;outline-offset:3px}
-.jg-ban-jugar:after{content:"";position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--c);pointer-events:none;opacity:0;animation:jg-ban-latido 2.6s ease-out infinite}
+.jg-ban-jugar:after{content:"";position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--c);pointer-events:none;opacity:0;will-change:transform,opacity;animation:jg-ban-latido 2.6s ease-out infinite}
+/* El latido solo en la diapositiva que se ve y con el banner a la vista:
+   corría en los doce botones a la vez, y sin `will-change` cada cuadro
+   recomponía el salón entero. */
+.jg-ban-c:not(.on) .jg-ban-jugar:after,.jg-ban.fuera .jg-ban-jugar:after{animation-play-state:paused}
 @keyframes jg-ban-latido{0%{opacity:.75;transform:scale(1)}70%,100%{opacity:0;transform:scale(1.12,1.38)}}
 .jg-ban-jugar-ico{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--tinta,#fff);color:var(--c);box-shadow:0 2px 10px #0004}
 .jg-ban-jugar-ico svg{width:20px;height:20px;margin-left:3px}
@@ -3755,6 +4220,8 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
    otras siete quedan quietas. Al entrar, su texto llega desde la izquierda
    en cascada; la primera no lo repite al volver el bucle (`.ya`). */
 .jg-ban-c:not(.on) .jg-ban-escena *{animation-play-state:paused!important}
+/* Y ninguna mientras el banner no se ve (`.fuera`, un IntersectionObserver). */
+.jg-ban.fuera .jg-ban-escena *{animation-play-state:paused!important}
 .jg-ban-c.on .jg-ban-cuerpo>*{animation:ep-entra .7s cubic-bezier(.2,.8,.2,1) both}
 .jg-ban-c.on .jg-ban-cuerpo>:nth-child(2){animation-delay:.06s}.jg-ban-c.on .jg-ban-cuerpo>:nth-child(3){animation-delay:.12s}
 .jg-ban-c.on .jg-ban-cuerpo>:nth-child(4){animation-delay:.18s}.jg-ban-c.on .jg-ban-cuerpo>:nth-child(5){animation-delay:.24s}
@@ -3770,7 +4237,12 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 .jg-ban-c[data-ep=haxball] .jg-ban-logo{font-style:italic;text-shadow:-4px 0 #e56e56,4px 0 #5689e5,0 0 30px #5689e5aa}
 .jg-ban-c[data-ep=trigon] .jg-ban-logo{letter-spacing:.06em;color:transparent;background:linear-gradient(90deg,#fff38a,#f6d23c 40%,#ff9a3c 70%,#d77bd1);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #3a1c7a) drop-shadow(0 0 22px #9b7bffaa)}
 .jg-ban-c[data-ep=prodrop] .jg-ban-logo{color:transparent;background:linear-gradient(90deg,#ff5fb0,#ffcc3d);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #3b0f6b) drop-shadow(0 0 24px #ff5fb088)}
+.jg-ban-c[data-ep=futbol] .jg-ban-logo{color:transparent;background:linear-gradient(90deg,#fff,#9ff0b8 45%,#ffcc3d);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 4px 0 #0b3d1a) drop-shadow(0 0 24px #1a8a3a99)}
+.ep-fu .ep-pd-carta{background:radial-gradient(circle at 50% 30%,#fff,#dfe6f2 70%,#b9c7da)}
+.ep-fu .ep-pd-carta img{object-position:50% 10%}
+.ep-fu .ep-pd-leg{background:#c26bff;color:#fff}
 .jg-ban-c[data-ep=fanal] .jg-ban-logo{font-family:Cinzel,Georgia,serif;font-weight:900;letter-spacing:.14em;color:transparent;background:linear-gradient(180deg,#fff3c4,#e8b866 55%,#a8682a);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 3px 0 #3a2208) drop-shadow(0 0 26px #ff9a3caa)}
+.jg-ban-c[data-ep=boxhead] .jg-ban-logo{color:#fafaf7;letter-spacing:.03em;text-shadow:0 2px 0 #cfcfcb,0 4px 0 #a7a7a3,0 6px 0 #6e6e6a,0 8px 0 #1a1a1e,0 0 34px #e23b2eaa}
 .jg-ban-c[data-ep=memazo] .jg-ban-logo{font-family:Anton,Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#fff;-webkit-text-stroke:2px #000;paint-order:stroke fill;text-shadow:0 5px 0 #6b2fb8,0 0 30px #ffd23f88}
 .jg-ban-c[data-ep=fanal] .jg-ban-logo span{font-family:Cinzel,Georgia,serif;font-style:normal;letter-spacing:.3em;-webkit-text-fill-color:#e8b866}
 /* Lo que se mueve en las escenas. Los centros: las piezas con `fill-box`
@@ -3966,6 +4438,169 @@ html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
 .jg-mo-toast.racha{background:linear-gradient(135deg,#7a2e05,#ff7a1a)}
 .jg-mo-toast.podio{background:linear-gradient(135deg,#7a5a00,#e8a317)}
 .jg-mo-toast.club{background:linear-gradient(135deg,#123a4a,#1f8a9a)}
+.jg-mo-toast.referido{background:linear-gradient(135deg,#3b1d7a,#7c4ddb)}
+
+/* ---- Referidos (juegos/referidos-vista.js): el «+» pegado al saldo, su
+   menú y la ventana «Referir a otros». El «+» no es .btn-ghost: con el
+   dedo esos miden 36 px y la cabecera de 360 px ya va justa. ---- */
+/* Saldo y «+» son una sola pastilla dorada: el «+» es una moneda que
+   brilla y, mientras te quede algo por cobrar (`.llama`), late y lleva
+   un «5K». La cabecera es oscura en los dos temas. */
+.jg-saldo-grupo{display:inline-flex;align-items:center;flex:none;padding:2px 3px 2px 0;border-radius:99px;background:linear-gradient(180deg,#f5c54226,#f5c5420f);border:1px solid #f5c5424d}
+.jg-saldo-grupo .jg-saldo{height:28px;min-height:0;border-radius:99px;padding-left:10px;padding-right:7px}
+.jg-ref-mas{position:relative;flex:none;width:26px;height:26px;padding:0;border:0;border-radius:99px;background:radial-gradient(circle at 34% 28%,#fff6c4,#ffd54a 38%,#e9a913 75%,#b97c06);box-shadow:inset 0 0 0 1.5px #9a6a08,0 2px 8px #f5b81966;color:#4a2f00;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s ease}
+.jg-ref-mas-i{position:relative;z-index:1;font:900 18px/1 system-ui,sans-serif;margin-top:-1px}
+/* El destello que cruza la moneda. */
+.jg-ref-mas::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(115deg,transparent 35%,#ffffffcc 50%,transparent 65%) no-repeat;background-size:250% 100%;background-position:150% 0;animation:jgRefBrillo 3.2s ease-in-out infinite}
+@keyframes jgRefBrillo{0%,55%{background-position:150% 0}85%,100%{background-position:-60% 0}}
+.jg-ref-mas:hover,.jg-ref-mas[aria-expanded=true]{transform:scale(1.12) rotate(-8deg)}
+.jg-ref-mas:active{transform:scale(.94)}
+.jg-ref-mas:focus-visible{outline:2px solid #f5c542;outline-offset:2px}
+.jg-ref-mas-k{display:none;position:absolute;top:-7px;right:-9px;z-index:2;padding:1px 4px;border-radius:99px;background:#ff3d6e;color:#fff;font:800 9px/1.2 system-ui,sans-serif;letter-spacing:.02em;box-shadow:0 0 0 2px #171522;pointer-events:none}
+.jg-ref-mas.llama .jg-ref-mas-k{display:block;animation:jgRefSalta 2.4s ease-in-out infinite}
+.jg-ref-mas.llama{animation:jgRefLatido 2.4s ease-in-out infinite}
+@keyframes jgRefLatido{0%,100%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 0 #f5c542aa}50%{box-shadow:inset 0 0 0 1.5px #9a6a08,0 0 0 7px #f5c54200}}
+@keyframes jgRefSalta{0%,70%,100%{transform:translateY(0)}78%{transform:translateY(-3px)}86%{transform:translateY(0)}92%{transform:translateY(-1.5px)}}
+@media(pointer:coarse){.jg-ref-mas{width:30px;height:30px}}
+@media(max-width:600px){.jg-saldo-grupo .jg-saldo{padding-left:8px;padding-right:5px}}
+@media (prefers-reduced-motion:reduce){.jg-ref-mas::after,.jg-ref-mas.llama,.jg-ref-mas.llama .jg-ref-mas-k{animation:none}}
+.jg-ref-pop{position:fixed;z-index:65;display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 14px 40px #0f172833;color:var(--jg-ink);font-size:12.5px;animation:jgEntra .2s ease-out}
+.jg-ref-canje{display:flex;flex-direction:column;gap:4px}
+.jg-ref-t{font-size:13.5px}
+.jg-ref-s{color:var(--jg-muted);line-height:1.45}
+.jg-ref-s .jg-moneda,.jg-ref-cuenta .jg-moneda,.jg-ref-modal .jg-modal-t .jg-moneda{width:1em;height:1em;vertical-align:-.12em}
+.jg-ref-fila{display:flex;gap:6px;margin-top:6px}
+.jg-ref-fila .inp{flex:1;min-width:0}
+.jg-ref-fila .inp,.jg-ref-nuevo{font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase}
+.jg-ref-pop .jg-modal-err{margin-top:2px;min-height:0}
+.jg-ref-usado{margin:0;padding:8px 10px;border-radius:8px;background:#e8f7ef;color:#1b7a45;font-weight:700}
+.jg-ref-carga{margin:0;color:var(--jg-muted)}
+.jg-ref-req{display:flex;flex-direction:column;gap:5px;padding:10px;border-radius:9px;background:#f6f4fb}
+.jg-ref-req-t{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--jg-muted)}
+.jg-ref-req-t b{color:var(--jg-ink);font-variant-numeric:tabular-nums}
+.jg-ref-barra{height:8px;border-radius:99px;background:#e4e0ee;overflow:hidden}
+.jg-ref-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#f5a524,#f5c542);transition:width .4s ease}
+.jg-ref-req.ok .jg-ref-barra i{background:linear-gradient(90deg,#1fa463,#3ccf86)}
+.jg-ref-req small{font-size:11.5px;line-height:1.4;color:var(--jg-muted)}
+.jg-ref-req.ok small{color:#1b7a45;font-weight:600}
+.jg-ref-btn{width:100%}
+.jg-ref-modal{width:min(480px,calc(100vw - 36px))}
+.jg-ref-modal .jg-modal-t{padding-right:34px}
+.jg-ref-pasos{margin:14px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.5;color:var(--jg-ink)}
+.jg-ref-mas-ej{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:99px;background:radial-gradient(circle at 34% 28%,#fff6c4,#ffd54a 38%,#e9a913 75%);box-shadow:inset 0 0 0 1px #9a6a08;color:#4a2f00;font-weight:900;font-size:13px;line-height:1}
+/* El top de referidos (salón y ventana) reusa las filas del de monedas. */
+.jg-lado-caja.jg-ref-ves>#vesReferidos{display:block;overflow:visible;padding:8px 10px 12px}
+.jg-ref-ves header span{font-size:16px}
+.jg-ref-cant{font-variant-numeric:tabular-nums;font-size:12.5px;color:#6c3ed2;white-space:nowrap}
+.jg-ref-cta{display:block;width:100%;margin-top:10px;padding:9px 12px;border:0;border-radius:10px;background:linear-gradient(135deg,#6c3ed2,#9b6bff);color:#fff;font:700 12.5px/1.3 inherit;cursor:pointer;box-shadow:0 4px 14px #6c3ed233}
+.jg-ref-cta:hover{filter:brightness(1.08)}
+.jg-ref-cta .jg-moneda{width:1em;height:1em;vertical-align:-.12em}
+.jg-ref-tops{margin-top:18px;padding-top:14px;border-top:1px solid #efebf5}
+.jg-ref-premios{margin-top:18px;padding-top:14px;border-top:1px solid #efebf5}
+.jg-ref-premios h3{margin:0 0 8px;font-size:14px}
+#refColores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#refColores .jg-ref-nota{grid-column:1/-1;margin:2px 0 0}
+.jg-ref-tn{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px;border-radius:9px;background:#f6f4fb;border:1px solid transparent}
+.jg-ref-tn b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-ref-tn small{font-size:10.5px;color:#6b7680}
+.jg-ref-tn:not(.ok) b{opacity:.6}
+.jg-ref-tn.ok{border-color:#1fa46355;background:#eefaf3}
+.jg-ref-tn.ok small{color:#1b7a45;font-weight:700}
+@media(max-width:480px){#refColores{grid-template-columns:repeat(2,minmax(0,1fr))}}
+html[data-tema=oscuro] .jg-ref-premios{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ref-premios h3{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-tn{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-ref-tn small{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ref-tn.ok{background:#16352a;border-color:#5fd99a44}
+html[data-tema=oscuro] .jg-ref-tn.ok small{color:#5fd99a}
+.jg-ref-tops h3{margin:0 0 6px;font-size:14px}
+html[data-tema=oscuro] .jg-ref-cant{color:#c4b1ff}
+html[data-tema=oscuro] .jg-ref-tops{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ref-tops h3{color:var(--os-tx)}
+.jg-ref-letra{margin:12px 0 0;padding:10px 12px 10px 28px;border-radius:9px;background:#f6f4fb;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:1.5;color:#5a6772}
+.jg-ref-cuerpo{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.jg-ref-cuerpo .jg-ref-req{margin:0}
+.jg-ref-aviso{margin:8px 0 0;font-size:12px;line-height:1.5;color:#9a5b00}
+.jg-ref-nota{margin:0;font-size:12px;color:var(--jg-muted)}
+.jg-ref-btns{margin-top:6px;justify-content:flex-start;flex-wrap:wrap}
+.jg-ref-mio{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;border-radius:12px;background:linear-gradient(135deg,#efe7ff,#fff6dc);border:1px dashed #b9a2f0}
+.jg-ref-mio small{flex-basis:100%;font-size:11.5px;color:var(--jg-muted)}
+.jg-ref-mio b{flex:1;min-width:0;font:700 24px/1.1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#5b2fc4;overflow-wrap:anywhere}
+.jg-ref-cuenta{margin:0;font-size:12.5px;color:var(--jg-ink)}
+.jg-ref-lista{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.jg-ref-lista li{padding:3px 9px;border-radius:99px;background:#f0ecf9;font-size:12px;cursor:pointer}
+html[data-tema=oscuro] .jg-ref-pop{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-req,html[data-tema=oscuro] .jg-ref-letra,html[data-tema=oscuro] .jg-ref-lista li{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-ref-barra{background:#ffffff1a}
+html[data-tema=oscuro] .jg-ref-req-t b,html[data-tema=oscuro] .jg-ref-pasos,html[data-tema=oscuro] .jg-ref-cuenta{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ref-req small,html[data-tema=oscuro] .jg-ref-s,html[data-tema=oscuro] .jg-ref-letra,html[data-tema=oscuro] .jg-ref-nota,html[data-tema=oscuro] .jg-ref-mio small,html[data-tema=oscuro] .jg-ref-req-t{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ref-req.ok small{color:#5fd99a}
+html[data-tema=oscuro] .jg-ref-usado{background:#16352a;color:#5fd99a}
+html[data-tema=oscuro] .jg-ref-aviso{color:#f5c26b}
+html[data-tema=oscuro] .jg-ref-mio{background:linear-gradient(135deg,#2a2045,#33291a);border-color:#6b55a8}
+html[data-tema=oscuro] .jg-ref-mio b{color:#c4b1ff}
+@media (prefers-reduced-motion:reduce){.jg-ref-pop{animation:none}.jg-ref-barra i{transition:none}}
+
+/* ---- El color del nombre (juegos/tintas.js) ----
+   Cada nombre va en `.jg-nm[data-nm=uid]`; la hoja `#jgTintas` (que
+   escribe tintas.js) le pone el color y el efecto que desbloqueó: brasa,
+   destello, reflejo y aura dorada, de menos a más. Aquí solo están los
+   valores, que cambian con el fondo, y las animaciones. Sobre un fondo
+   claro el rojo y el azul van oscuros, y el verde claro y el dorado, que
+   solos no se leen sobre blanco, llevan un contorno oscuro (el del dorado
+   en `filter`, porque su reflejo es `background-clip:text`). Sobre uno
+   oscuro (tema oscuro, cabecera, casino, podio, héroe oscuro) van claros
+   y sin contorno, con más halo. */
+/* El héroe del perfil con un fondo claro es claro también en tema oscuro. */
+:root,html[data-tema=oscuro] .jg-pf-hero:not(.oscuro){
+  --tn-rojo:#d01f2f;--tn-rojo-s:0 0 0 #ff3b3b00;--tn-rojo-s2:0 0 7px #ff3b3b70;
+  --tn-verde:#3dd477;--tn-verde-s:.6px 0 0 #15572f,-.6px 0 0 #15572f,0 .6px 0 #15572f,0 -.6px 0 #15572f,.45px .45px 0 #15572f,-.45px -.45px 0 #15572f,.45px -.45px 0 #15572f,-.45px .45px 0 #15572f,0 1px 1px #15572f66;--tn-verde-s2:.6px 0 0 #15572f,-.6px 0 0 #15572f,0 .6px 0 #15572f,0 -.6px 0 #15572f,.45px .45px 0 #15572f,-.45px -.45px 0 #15572f,.45px -.45px 0 #15572f,-.45px .45px 0 #15572f,0 0 9px #2fd06faa;--tn-verde-chispa:#17a34a;
+  --tn-azul:#1d5fd6;--tn-azul-luz:#9cc8ff;--tn-azul-f:drop-shadow(0 0 3px #3b82f655);--tn-azul-chispa:#3b82f6;
+  --tn-dorado:#ffc22e;--tn-dorado-luz:#fff6cc;--tn-dorado-f:drop-shadow(.55px 0 0 #7a4a00) drop-shadow(-.55px 0 0 #7a4a00) drop-shadow(0 .55px 0 #7a4a00) drop-shadow(0 -.55px 0 #7a4a00) drop-shadow(0 0 3px #f5a52466);--tn-dorado-f2:drop-shadow(.55px 0 0 #7a4a00) drop-shadow(-.55px 0 0 #7a4a00) drop-shadow(0 .55px 0 #7a4a00) drop-shadow(0 -.55px 0 #7a4a00) drop-shadow(0 0 7px #f5a524bb);
+  --tn-chispa:#e88a00;
+}
+html[data-tema=oscuro],.head,.jg-cs,.jg-rk-podio,.jg-pf-hero.oscuro{
+  --tn-rojo:#ff6b6b;--tn-rojo-s:0 0 4px #ff4d4d55;--tn-rojo-s2:0 0 11px #ff4d4dcc;
+  --tn-verde:#5ee88a;--tn-verde-s:0 0 4px #5ee88a44;--tn-verde-s2:0 0 12px #5ee88add;--tn-verde-chispa:#b6ffcf;
+  --tn-azul:#7cb2ff;--tn-azul-luz:#ffffff;--tn-azul-f:drop-shadow(0 0 5px #7cb2ff99);--tn-azul-chispa:#cfe3ff;
+  --tn-dorado:#ffd54a;--tn-dorado-luz:#fffbe6;--tn-dorado-f:drop-shadow(0 0 4px #ffb80088);--tn-dorado-f2:drop-shadow(0 0 11px #ffcf3dee) drop-shadow(0 0 2px #fff8);
+  --tn-chispa:#ffe27a;
+}
+/* El chat flotante de la sala a pantalla completa va sobre el juego, con
+   la sombra negra de sus letras: los colores claros, y esa sombra. */
+html.jg-inm .jg-chat-msg{
+  --tn-rojo:#ff7a7a;--tn-verde:#5ee88a;--tn-azul:#8ab8ff;--tn-azul-luz:#fff;--tn-dorado:#ffd54a;--tn-dorado-luz:#fffbe6;
+  --tn-rojo-s:0 1px 2px #000,0 0 6px #000c;--tn-rojo-s2:0 1px 2px #000,0 0 10px #ff4d4dcc;
+  --tn-verde-s:var(--tn-rojo-s);--tn-verde-s2:0 1px 2px #000,0 0 10px #5ee88acc;--tn-verde-chispa:#b6ffcf;
+  --tn-azul-f:drop-shadow(0 1px 1px #000) drop-shadow(0 0 4px #000a);--tn-azul-chispa:#cfe3ff;
+  --tn-dorado-f:drop-shadow(0 1px 1px #000) drop-shadow(0 0 5px #ffb800aa);--tn-dorado-f2:drop-shadow(0 1px 1px #000) drop-shadow(0 0 11px #ffcf3dee);
+  --tn-chispa:#ffe27a;
+}
+.jg-nm{font:inherit}
+@keyframes jgTnBrasa{0%,100%{text-shadow:var(--tn-rojo-s)}50%{text-shadow:var(--tn-rojo-s2)}}
+@keyframes jgTnDestello{0%,100%{text-shadow:var(--tn-verde-s)}50%{text-shadow:var(--tn-verde-s2)}}
+@keyframes jgTnReflejo{0%{background-position:100% 0}70%,100%{background-position:0 0}}
+@keyframes jgTnAura{0%,100%{filter:var(--tn-dorado-f)}50%{filter:var(--tn-dorado-f2)}}
+@keyframes jgTnChispa{0%,100%{opacity:.35;transform:scale(.7) rotate(0)}50%{opacity:1;transform:scale(1.2) rotate(30deg)}}
+/* Lo elegido en el editor manda sobre la hoja: aquí se borra lo que la
+   hoja le haya puesto a ese nombre, y las reglas `html .jg-nm.jg-tn-*`
+   de la hoja, que van detrás, pintan lo elegido. */
+html .jg-nm[class*="jg-tn-"]{animation:none;background:none;-webkit-text-fill-color:currentColor;filter:none;text-shadow:none}
+html .jg-nm[class*="jg-tn-"]::before,html .jg-nm[class*="jg-tn-"]::after{content:none}
+html .jg-nm.jg-tn-normal{color:inherit;text-shadow:inherit}
+@media (prefers-reduced-motion:reduce){.jg-nm,.jg-nm::before,.jg-nm::after,html .jg-nm[class*="jg-tn-"],html .jg-nm[class*="jg-tn-"]::before,html .jg-nm[class*="jg-tn-"]::after{animation:none!important}}
+.jg-tn-ops{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.jg-tn-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:7px 9px;border:1px solid #e2e8ec;border-radius:9px;background:#fff;cursor:pointer;text-align:left;font-family:inherit}
+.jg-tn-op b{max-width:100%;font-size:13.5px;font-weight:700;color:#1f2933;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-tn-op small{font-size:10.5px;color:#6b7680;line-height:1.3}
+.jg-tn-op.on{border-color:var(--jg-purple,#7042df);box-shadow:0 0 0 2px #7042df33}
+.jg-tn-op.cerrado{cursor:not-allowed;background:#f6f7f9}
+.jg-tn-op.cerrado b{opacity:.55}
+html[data-tema=oscuro] .jg-tn-op{background:var(--os-sup2);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-tn-op b{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-tn-op small{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-tn-op.cerrado{background:var(--os-sup)}
+html[data-tema=oscuro] .jg-tn-op.on{border-color:#c4b1ff;box-shadow:0 0 0 2px #c4b1ff33}
 .jg-mo-toast small{display:flex;align-items:center;gap:4px}
 .jg-mo-toast .jg-moneda{width:1.05em;height:1.05em}
 @media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy,.jg-racha-btn{animation:none}}
@@ -4001,6 +4636,70 @@ html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
 @media(max-width:900px){.jg-mo-cols{grid-template-columns:minmax(0,1fr)}.jg-mo-hero strong{font-size:36px}}
 .jg-mo-caja{background:#fff;border:1px solid #e4dfeb;border-radius:18px;padding:16px 18px}
 .jg-mo-caja h2{margin:0 0 10px;font-size:16px}
+/* El detalle de tus monedas (monedas-vista.js, detalleHtml): balance, de
+   dónde salen, por juego, en qué gastaste, movimientos y lo que más paga. */
+.jg-mo-balance{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;margin:14px 0;padding:14px 18px;background:#fff;border:1px solid #e4dfeb;border-radius:16px}
+.jg-mo-balance small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a8499}
+.jg-mo-balance b{font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jg-mo-balance b .jg-moneda{width:.85em;height:.85em;vertical-align:-.08em}
+.jg-mo-balance div:last-child{padding-left:14px;border-left:1px solid #ece8f3}
+.jg-mo-bal-barra{display:flex;height:12px;border-radius:99px;overflow:hidden;background:#eee9f5;gap:2px}
+.jg-mo-bal-barra i{display:block;min-width:0}
+.jg-mo-bal-barra i.mas{background:linear-gradient(90deg,#1fa463,#3ccf86)}
+.jg-mo-bal-barra i.menos{background:linear-gradient(90deg,#f0606f,#d63a4c)}
+.mas{color:#178a51}.menos{color:#c62e40}
+@media(max-width:700px){.jg-mo-balance{grid-template-columns:1fr 1fr}.jg-mo-bal-barra{grid-column:1/-1;order:3}.jg-mo-balance div:last-child{grid-column:1/-1;padding-left:0;border-left:0;order:4}}
+.jg-mo-det{margin-bottom:14px}
+.jg-mo-nota{margin:-4px 0 10px;font-size:12px;color:#8a8499;line-height:1.45}
+.jg-mo-barras{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.jg-mo-barras li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;column-gap:8px;align-items:center}
+.jg-mo-barras.juegos li{grid-template-columns:minmax(0,1fr) auto}
+.jg-mo-barras.juegos .i{display:none}
+.jg-mo-barras .i{font-size:18px;text-align:center}
+.jg-mo-barras .t{min-width:0}
+.jg-mo-barras .t b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mo-barras .t b a{color:inherit;text-decoration:underline;text-decoration-color:#7042df55;text-underline-offset:2px}
+.jg-mo-barras .t small{display:block;font-size:11.5px;color:#8a8499;line-height:1.35}
+.jg-mo-barras .v{text-align:right;white-space:nowrap}
+.jg-mo-barras .v b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.jg-mo-barras .v small{font-size:11px;color:#8a8499}
+.jg-mo-barras .b{grid-column:1/-1;display:block;height:6px;margin-top:4px;border-radius:99px;background:#f1edf7;overflow:hidden}
+.jg-mo-barras.juegos .b{grid-column:1/-1}
+.jg-mo-barras .b i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#f5b819,#f59e0b)}
+.jg-mo-barras.gastos .b i{background:linear-gradient(90deg,#f0606f,#d63a4c)}
+.jg-mo-barras.juegos .b i{background:linear-gradient(90deg,#7c4ddb,#a07bff)}
+.jg-mo-barras li.cero{opacity:.45}
+.jg-mo-mas{margin-top:10px}
+.jg-mo-mas summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#7042df;margin-bottom:8px}
+.jg-mo-caja h3{margin:16px 0 8px;font-size:14px}
+.jg-mo-casino{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.jg-mo-casino th{text-align:right;font-size:11px;color:#8a8499;font-weight:700;padding:4px 6px;border-bottom:1px solid #ece8f3}
+.jg-mo-casino td{text-align:right;padding:6px;border-bottom:1px solid #f4f1f8}
+.jg-mo-casino th:first-child,.jg-mo-casino td:first-child{text-align:left}
+.jg-mo-casino td:last-child{font-weight:700}
+.jg-mo-movs{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:430px;overflow:auto}
+.jg-mo-movs li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #f4f1f8}
+.jg-mo-movs .i{font-size:17px;text-align:center}
+.jg-mo-movs .t b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+.jg-mo-movs .t small{font-size:11px;color:#8a8499}
+.jg-mo-movs .n{font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jg-mo-paga{margin-bottom:14px}
+.jg-mo-paga-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.jg-mo-paga-l>div{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:12px;border-radius:14px;background:linear-gradient(135deg,#fff8e1,#fff);border:1px solid #f5d77a}
+.jg-mo-paga-l .i{grid-row:span 3;font-size:26px}
+.jg-mo-paga-l b{font-size:18px;font-variant-numeric:tabular-nums;color:#a8740f}
+.jg-mo-paga-l b .jg-moneda{width:.85em;height:.85em;vertical-align:-.08em}
+.jg-mo-paga-l span:not(.i){font-weight:700;font-size:12.5px;line-height:1.3}
+.jg-mo-paga-l small{font-size:11px;color:#8a8499;line-height:1.35}
+html[data-tema=oscuro] .jg-mo-balance{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mo-balance div:last-child{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mo-bal-barra,html[data-tema=oscuro] .jg-mo-barras .b{background:#ffffff14}
+html[data-tema=oscuro] .mas{color:#5fd99a}html[data-tema=oscuro] .menos{color:#ff8a96}
+html[data-tema=oscuro] .jg-mo-nota,html[data-tema=oscuro] .jg-mo-barras .t small,html[data-tema=oscuro] .jg-mo-barras .v small,html[data-tema=oscuro] .jg-mo-movs .t small,html[data-tema=oscuro] .jg-mo-casino th,html[data-tema=oscuro] .jg-mo-balance small,html[data-tema=oscuro] .jg-mo-paga-l small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mo-casino th,html[data-tema=oscuro] .jg-mo-casino td,html[data-tema=oscuro] .jg-mo-movs li{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mo-paga-l>div{background:linear-gradient(135deg,#33291a,var(--os-sup2));border-color:#6b5420}
+html[data-tema=oscuro] .jg-mo-paga-l b{color:#f5c542}
+html[data-tema=oscuro] .jg-mo-mas summary{color:#c4b1ff}
 .jg-mo-reglas h3{margin:14px 0 4px;font-size:13.5px}
 .jg-mo-reglas p{margin:4px 0;font-size:13px;line-height:1.55;color:#5a5569}
 .jg-mo-pesos{list-style:none;margin:6px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;font-size:12.5px}
@@ -4050,6 +4749,9 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-mini-cartas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 16px 0}
 .jg-mini-cartas .jg-pdc figcaption{display:none}
 .jg-mini-cartas .jg-pdc-nota{min-width:16px;height:16px;font-size:10px}
+.jg-pf-plantilla header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.jg-pf-puntos{font:900 26px/1 Rubik,sans-serif;color:#1a8a3a}.jg-pf-puntos small{font-size:13px;font-weight:700;opacity:.7}
+.jg-pf-cancha{display:block;width:100%;max-width:620px;aspect-ratio:4/5;margin:0 auto;border:0;border-radius:18px;background:#0e5a26;color-scheme:normal}
 .jg-pf-cartas-fila{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,190px));gap:16px}
 .jg-pf-cartas-fila .jg-pdc{border-radius:12px;transition:transform .2s}
 .jg-pf-cartas-fila .jg-pdc:hover{transform:translateY(-4px) rotate(-1deg)}
@@ -4471,7 +5173,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 :root{--m-solo:#e59a00;--m-solo-bg:#ffcf5c;--m-solo-tx:#3d2a00;--m-multi:#7042df;--m-multi-bg:#7042df;--m-multi-tx:#fff}
 
 /* ---- La rejilla del salón: una columna en el móvil ---- */
-.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram";align-items:start}
+.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram" "tirar";align-items:start}
 .jg-sal-intro{grid-area:intro;margin-bottom:10px}
 .jg-sal-intro h1{font-size:26px;letter-spacing:-.8px;margin:8px 0 4px;line-height:1.1;color:var(--jg-ink)}
 .jg-sal-intro p{margin:0;font-size:13px;color:var(--jg-muted);line-height:1.5}
@@ -4483,6 +5185,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal .jg-ves-lado{grid-area:lado}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
 .jg-sal .jg-tira-m{grid-area:tiram;margin:16px 0 0}
+.jg-sal .jg-tira-r{grid-area:tirar;margin:16px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
 /* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
@@ -4561,6 +5264,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-invitado-aviso>span:nth-child(2){flex:1;min-width:0}
 .jg-invitado-aviso button{flex-shrink:0;border:0;background:none;padding:8px 4px;font:700 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;white-space:nowrap}
 .jg-invitado-aviso button:hover{text-decoration:underline}
+.jg-invitado-aviso .jg-enlace-btn{padding:0;font-size:inherit;text-decoration:underline}
 
 /* ---- Títulos de sección: el icono de modo vuelve a decir cuál es ---- */
 .jg-sal-tit{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -4579,7 +5283,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 @media(max-width:420px){.jg-sal-tit{flex-wrap:wrap}.jg-sal-rapida{flex:1 1 100%;max-width:none}}
 .jg-sal-ver{flex-shrink:0;border:0;background:none;font:700 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;padding:10px 4px}
 .jg-desliza{display:none}
-.jg-sal[data-modo=solo] .jg-sal-ver{display:none}
+.jg-sal[data-modo=solo] .jg-sal-ver,.jg-sal.jg-sal-inv .jg-sal-ver{display:none}
 .jg-sal-multi .jg-filtros{display:inline-flex;margin:0 0 14px}
 .jg-filtros button{min-height:36px}
 
@@ -4587,11 +5291,16 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-carrusel{display:grid;grid-auto-flow:column;grid-auto-columns:44%;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 14px;scroll-padding:0 16px;scrollbar-width:none}
 .jg-carrusel::-webkit-scrollbar{display:none}
 .jg-carrusel>.jg-mn{scroll-snap-align:start}
-.jg-sal[data-modo=solo] .jg-carrusel,.jg-rejilla{display:grid;grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-columns:auto;gap:10px;overflow:visible;margin:0;padding:0}
+/* Al invitado, los de un jugador en rejilla como los multijugador (no en
+   carrusel): en una fila que se desliza parecían pocos al lado de la
+   rejilla de multijugador, y son justo lo que puede jugar. */
+.jg-sal[data-modo=solo] .jg-carrusel,.jg-sal.jg-sal-inv .jg-carrusel,.jg-rejilla{display:grid;grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-columns:auto;gap:10px;overflow:visible;margin:0;padding:0}
 
 /* ---- La miniatura ---- */
 .jg-mn{position:relative;min-width:0;container-type:inline-size;border-radius:16px;background:#fff;border:1px solid #e5e0ee;box-shadow:0 1px 2px #2a1e440a;transition:transform .2s cubic-bezier(.2,.8,.3,1),box-shadow .2s,border-color .2s}
 .jg-mn[hidden]{display:none}
+/* Fuera de pantalla, la portada no anima (`vigilaPortadas` en salon.js). */
+.jg-mn.dormida *,.jg-mn.dormida *::before,.jg-mn.dormida *::after{animation-play-state:paused!important}
 .jg-mn-abre{display:flex;flex-direction:column;width:100%;height:100%;padding:0;margin:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:inherit;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .jg-mn-abre:focus-visible{outline:3px solid var(--c);outline-offset:3px}
 /* La portada: 4:3, y el arte (hecho a 165 px de alto) escalado según el ancho. */
@@ -4829,6 +5538,9 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-bv-juego:active{transform:scale(.97)}
 .jg-bv-portada{display:block;aspect-ratio:4/3;overflow:hidden;background:#1d1529;margin-bottom:6px}
 .jg-bv-portada svg{display:block;width:100%;height:100%}
+.jg-bv-portada{position:relative}
+.jg-bv-play{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#1a1206;box-shadow:0 3px 10px #0006}
+.jg-bv-play svg{width:15px!important;height:15px!important;margin-left:2px}
 .jg-bv-juego b{font-size:15px}
 .jg-bv-juego small{font-size:12px;color:var(--jg-muted)}
 
@@ -4837,9 +5549,14 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-inv-tira>span{flex:1;min-width:0}
 .jg-inv-tira .btn{flex-shrink:0;background:var(--jg-purple)}
 @media (max-width:600px){.jg-inv-tira{font-size:12px;padding:8px 10px;gap:8px}.jg-inv-tira .btn{height:34px;padding:0 12px}}
+/* El reto de un amigo (reto.js), encima del juego. */
+.jg-reto-tira{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;border-radius:14px;background:#efe9ff;border:1px solid #d6c9ff;color:#3b2a7a;font-size:13px;line-height:1.45}
+.jg-reto-tira>span:first-child{font-size:20px}
+.jg-reto-tira>span:last-child{flex:1;min-width:0}
 .jg-invg{position:fixed;left:0;right:0;bottom:0;z-index:92;display:flex;justify-content:center;padding:0 12px max(12px,env(safe-area-inset-bottom));pointer-events:none}
 .jg-invg-caja{pointer-events:auto;position:relative;width:100%;max-width:520px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:16px 16px 14px;border-radius:20px;background:#fff;border:1px solid #e4dfeb;box-shadow:0 14px 44px #120d1f4d;animation:jgLogroEntra .45s cubic-bezier(.2,1.4,.4,1)}
 .jg-invg-ico{font-size:30px;line-height:1;padding-top:2px}
+.jg-instalar-ico{width:44px;height:44px;border-radius:12px}
 .jg-invg-txt small{display:block;font-size:12px;font-weight:700;color:var(--jg-purple)}
 .jg-invg-txt b{display:block;font-size:17px;letter-spacing:-.3px;color:var(--jg-ink);padding-right:26px}
 .jg-invg-txt p{margin:4px 0 0;font-size:13px;line-height:1.5;color:#5f5a70}
@@ -4847,6 +5564,16 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 .jg-invg-btns .btn{flex:1;height:46px;border-radius:12px;font-size:14px;background:var(--jg-purple)}
 .jg-invg-btns .btn2{height:46px;border-radius:12px}
 .jg-invg-x{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--jg-muted);font-size:15px;cursor:pointer}
+/* «¿Cómo te llamamos?» (pideNombreInvitado): la misma tarjeta del aviso de
+   invitado, pero modal, con un velo encima del juego que carga detrás. */
+.jg-nom{position:fixed;inset:0;z-index:93;display:flex;align-items:flex-end;justify-content:center;padding:0 12px max(12px,env(safe-area-inset-bottom));background:#120d1f73;animation:jgVela .2s ease-out}
+@media (min-width:601px){.jg-nom{align-items:center}}
+.jg-nom-caja{margin:0}
+.jg-nom-campo{grid-column:1/-1;display:block;margin-top:10px}
+.jg-nom-campo input,.jg-bv-nombre input{width:100%;box-sizing:border-box;height:50px;padding:0 14px;border-radius:12px;border:2px solid #d9d1ee;background:#fbfaff;color:var(--jg-ink);font:700 17px 'IBM Plex Sans',sans-serif}
+.jg-nom-campo input:focus,.jg-bv-nombre input:focus{outline:none;border-color:var(--jg-purple)}
+.jg-bv-nombre{display:grid;gap:6px;text-align:left;font-size:13px;font-weight:700;color:var(--jg-purple)}
+html:has(#jgNomInv) .rp-fab{display:none!important}
 
 /* ---- La caja del invitado en la columna de salas ---- */
 .jg-lado-cuenta{padding-bottom:16px}
@@ -4905,7 +5632,7 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
 @media(min-width:601px){
   .jg-sal-intro h1{font-size:30px}
   .jg-carrusel{grid-auto-columns:minmax(180px,30%)}
-  .jg-sal[data-modo=solo] .jg-carrusel,.jg-rejilla{grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+  .jg-sal[data-modo=solo] .jg-carrusel,.jg-sal.jg-sal-inv .jg-carrusel,.jg-rejilla{grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
   .jg-hoja-ops{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(min-width:721px){
@@ -4913,7 +5640,7 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
   .jg-carrusel{grid-auto-columns:200px;gap:14px;margin:0;padding:4px 4px 14px;scroll-padding:0 4px;scrollbar-width:thin;scrollbar-color:#cfc6e3 transparent}
   .jg-desliza{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid #ddd9e8;background:#fff;color:var(--jg-ink);font-size:18px;cursor:pointer;flex-shrink:0}
   .jg-desliza:hover{border-color:var(--jg-purple);color:var(--jg-purple)}
-  .jg-sal[data-modo=solo] .jg-desliza{display:none}
+  .jg-sal[data-modo=solo] .jg-desliza,.jg-sal.jg-sal-inv .jg-desliza{display:none}
   /* La ficha es un panel a la derecha que no tapa el catálogo: se puede
      ir tocando tarjetas y la ficha cambia; sin fondo oscuro detrás. */
   .jg-hoja-capa{inset:auto;background:none!important;transition:none}
@@ -4937,9 +5664,9 @@ html.jg-bv-abierta .rp-fab,html:has(#jgInvGuarda) .rp-fab{display:none!important
   /* La columna baja hasta el final (tops y tira incluidos). Chrome sujeta
      un `sticky` a la rejilla entera, no a su área: cuando acababa en
      «Multijugador», al bajar se quedaba pegada encima de los drops. */
-  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
+  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado" "tirar lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
   .jg-modos{justify-content:space-between}
@@ -5000,8 +5727,12 @@ html[data-tema=oscuro] .jg-bv{background:radial-gradient(ellipse at top,#2a1f4a,
 html[data-tema=oscuro] .jg-bv-paso>p,html[data-tema=oscuro] .jg-invg-txt p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-bv-inv,html[data-tema=oscuro] .jg-invg-txt small{color:#c4b1ff}
 html[data-tema=oscuro] .jg-bv-juego,html[data-tema=oscuro] .jg-invg-caja{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-nom-campo input,html[data-tema=oscuro] .jg-bv-nombre input{background:var(--os-sup);border-color:var(--os-borde);color:var(--jg-ink)}
+html[data-tema=oscuro] .jg-nom-campo input:focus,html[data-tema=oscuro] .jg-bv-nombre input:focus{border-color:#c4b1ff}
+html[data-tema=oscuro] .jg-bv-nombre{color:#c4b1ff}
 html[data-tema=oscuro] .jg-bv-juego{border-color:color-mix(in srgb,var(--c) 40%,var(--os-borde))}
 html[data-tema=oscuro] .jg-inv-tira{background:#2a2312;border-color:#4d3d17;color:#f1dfae}
+html[data-tema=oscuro] .jg-reto-tira{background:#231b3d;border-color:#3e3170;color:#ddd3ff}
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
@@ -5016,8 +5747,12 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
    carrusel de las mejores partidas del día, a la derecha el chat general. El
    contenido se estrecha para dejarles sitio en vez de quedar debajo. Más
    angosto, las repeticiones no salen y el chat es un botón 💬 que abre un
-   panel (en el celular, una hoja desde abajo). Los tableros de las
-   repeticiones son siempre oscuros, como las pantallas de los juegos. */
+   panel (en el celular, una hoja desde abajo). Ese botón sale también en
+   las demás vistas (una partida, un juego del club): `html.jg-cg-flota`,
+   que pone rieles.js siempre que el chat no va acoplado al riel. La
+   pantalla completa de un juego lo esconde (el bloque de abajo). Los
+   tableros de las repeticiones son siempre oscuros, como las pantallas de
+   los juegos. */
 .jg-riel,.jg-cg-fab,.jg-cg-fondo{display:none}
 .jg-riel{flex-direction:column;gap:10px;min-height:0;box-sizing:border-box}
 .jg-riel-cab{display:flex;align-items:center;gap:8px;padding:0 4px;flex-shrink:0}
@@ -5105,26 +5840,70 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
   /* El ⚑ de informes se corre a la izquierda del chat: si no, tapa «Enviar». */
   html.jg-rieles .rp-fab{right:calc(var(--riel) + 28px)}
 }
-@media(max-width:1399px){
-  html.jg-rieles .jg-cg-fab{display:grid;place-items:center;position:fixed;right:16px;bottom:62px;z-index:55;width:48px;height:48px;border:0;border-radius:50%;background:var(--jg-purple,#6d3fd4);color:#fff;cursor:pointer;box-shadow:0 8px 24px #2a1e4433;transition:transform .15s}
-  html.jg-rieles .jg-cg-fab:hover{transform:translateY(-2px)}
-  html.jg-rieles .jg-cg-fab svg{width:22px;height:22px}
-  .jg-cg-n{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#ef4444;color:#fff;font:700 11px/20px 'IBM Plex Sans',sans-serif;box-shadow:0 0 0 2px #fff}
-  .jg-cg-n[hidden]{display:none}
-  html.jg-rieles.jg-cg-abierto .jg-cg{display:flex;position:fixed;z-index:66;right:16px;bottom:118px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100dvh - 150px));box-shadow:0 18px 50px #2a1e4440;animation:jgVela .18s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg-cierra{display:block}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fab{background:#3b2a66}
-  html.jg-cg-abierto .rp-fab{display:none}
+/* La burbuja del chat general y su panel, en cualquier vista que no lo
+   lleve acoplado al riel. */
+html.jg-cg-flota .jg-cg-fab{display:grid;place-items:center;position:fixed;right:16px;bottom:62px;z-index:55;width:50px;height:50px;border:0;border-radius:50%;background:var(--jg-purple,#6d3fd4);color:#fff;cursor:pointer;box-shadow:0 8px 24px #2a1e4433;transition:transform .15s}
+html.jg-cg-flota .jg-cg-fab:hover{transform:translateY(-2px)}
+html.jg-cg-flota .jg-cg-fab svg{width:22px;height:22px}
+.jg-cg-n{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#ef4444;color:#fff;font:700 11px/20px 'IBM Plex Sans',sans-serif;box-shadow:0 0 0 2px #fff;animation:jgCgPunto .35s ease-out}
+.jg-cg-n[hidden]{display:none}
+html.jg-cg-flota.jg-cg-abierto .jg-cg{display:flex;position:fixed;z-index:66;right:16px;bottom:120px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100dvh - 150px));box-shadow:0 18px 50px #2a1e4440;animation:jgVela .18s ease-out}
+html.jg-cg-flota.jg-cg-abierto .jg-cg-cierra{display:block}
+html.jg-cg-flota.jg-cg-abierto .jg-cg-fab{background:#3b2a66}
+html.jg-cg-abierto .rp-fab{display:none}
+/* En una sala de PC el chat de la sala es la columna de la derecha: la
+   burbuja va a la izquierda para no taparle el «Enviar». */
+@media(min-width:1051px){
+  html.jg-cg-flota[data-vista=partida] .jg-cg-fab{right:auto;left:16px;bottom:16px}
+  html.jg-cg-flota[data-vista=partida].jg-cg-abierto .jg-cg{right:auto;left:16px;bottom:76px}
 }
 @media(max-width:720px){
-  html.jg-rieles .jg-cg-fab{bottom:calc(128px + env(safe-area-inset-bottom))}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fondo{display:block;position:fixed;inset:0;z-index:65;background:#0f172866;animation:jgVela .2s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg{left:0;right:0;bottom:0;width:auto;height:min(78dvh,640px);border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:jgCgSube .22s ease-out}
-  html.jg-rieles.jg-cg-abierto .jg-cg-fab{display:none}
+  html.jg-cg-flota .jg-cg-fab{bottom:calc(62px + env(safe-area-inset-bottom))}
+  /* Sobre la barra de pestañas de abajo de las vistas de menú. */
+  html.jg-cg-flota:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado],[data-vista=casino]) .jg-cg-fab{bottom:calc(128px + env(safe-area-inset-bottom))}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg-fondo{display:block;position:fixed;inset:0;z-index:65;background:#0f172866;animation:jgVela .2s ease-out}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg{left:0;right:0;bottom:0;width:auto;height:min(78dvh,640px);border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:jgCgSube .22s ease-out}
+  html.jg-cg-flota.jg-cg-abierto .jg-cg-fab{display:none}
   .jg-cg-form .inp{font-size:16px}
 }
+/* Pantalla completa: ni burbuja ni panel (la sala inmersiva, el Tetris
+   inmersivo, el modo celular del club, PRODROP y Mascotas). */
+html:is(.jg-inm,.jg-tt-inm,.jg-club-inm,.jg-club-pleno,.jg-prodrop,.jg-mascotas) :is(.jg-cg-fab,.jg-cg,.jg-cg-fondo){display:none!important}
+@keyframes jgCgPunto{from{transform:scale(.4)}60%{transform:scale(1.2)}}
+
+/* ---- Los super chats (rieles-datos.js, `SUPER_CHAT`) ----
+   Todo el mensaje lleva el contorno: dorado el Destacado, un degradado que
+   gira el Estelar. El borde es un fondo `border-box` bajo uno
+   `padding-box`, así el contorno sigue el radio. */
+.jg-cg-msg.super{--sup-fondo:#fff;position:relative;padding:8px 10px 9px;border:2px solid transparent;border-radius:12px;row-gap:4px}
+.jg-cg-msg.s-brillo{background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(135deg,#f59e0b,#fde047 45%,#f59e0b) border-box;box-shadow:0 0 0 1px #f59e0b22,0 6px 18px #f59e0b2e}
+.jg-cg-msg.s-estelar{background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(120deg,#ec4899,#8b5cf6,#06b6d4,#f59e0b,#ec4899) border-box;background-size:100% 100%,300% 300%;animation:jgCgEstelar 6s linear infinite;box-shadow:0 0 14px #8b5cf640,0 6px 20px #ec489926}
+.jg-cg-msg.super .jg-cg-sup{grid-column:1/-1;display:flex;align-items:center;gap:6px;font:700 10.5px/1.2 'IBM Plex Sans',sans-serif;letter-spacing:.2px;font-style:normal;color:#92400e}
+.jg-cg-msg.s-estelar .jg-cg-sup{color:#7c3aed}
+.jg-cg-sup small{margin-left:auto;font:500 10px 'IBM Plex Mono',monospace;color:#8a97a3;white-space:nowrap}
+.jg-cg-msg.super>div>span{font-weight:600;color:#1f2430}
+.jg-cg-msg.super.mio>div>span{background:none;padding:0;margin-top:0;border-radius:0}
+@keyframes jgCgEstelar{to{background-position:0 0,300% 0}}
+/* El selector, encima del formulario. */
+.jg-cg-sbtn{flex-shrink:0;width:38px;height:38px;border:1px solid #e4dfeb;border-radius:10px;background:#fff;color:#8b5cf6;font-size:17px;cursor:pointer;transition:background .15s,color .15s}
+.jg-cg-sbtn:hover{background:#f5f0ff}
+.jg-cg-sbtn.activo{background:linear-gradient(135deg,#ec4899,#8b5cf6);border-color:transparent;color:#fff}
+.jg-cg-super{padding:10px 12px 2px;border-top:1px solid #efebf5;flex-shrink:0;animation:jgVela .15s ease-out}
+.jg-cg-super[hidden]{display:none}
+.jg-cg-super>p{margin:0 0 8px;display:flex;align-items:baseline;gap:8px;font-size:12px}
+.jg-cg-super>p span{font-size:11px;color:var(--jg-muted,#6b6679)}
+.jg-cg-ops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.jg-cg-op{--sup-fondo:#fff;display:grid;gap:2px;padding:7px 6px;border:2px solid #e4dfeb;border-radius:10px;background:var(--sup-fondo);text-align:center;cursor:pointer;font:inherit;color:#34404b}
+.jg-cg-op b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-cg-op small{font:500 10px 'IBM Plex Mono',monospace;color:#8a97a3}
+.jg-cg-op.s-brillo{border-color:transparent;background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(135deg,#f59e0b,#fde047,#f59e0b) border-box}
+.jg-cg-op.s-estelar{border-color:transparent;background:linear-gradient(var(--sup-fondo),var(--sup-fondo)) padding-box,linear-gradient(120deg,#ec4899,#8b5cf6,#06b6d4,#f59e0b) border-box}
+.jg-cg-op.sel{--sup-fondo:#f5f0ff;box-shadow:0 0 0 3px #8b5cf633}
+.jg-cg-op.s-normal.sel{border-color:#8b5cf6}
+.jg-cg-op:disabled{opacity:.45;cursor:not-allowed}
+.jg-cg-form .btn.super{background:linear-gradient(135deg,#ec4899,#8b5cf6);border-color:transparent;color:#fff}
 @keyframes jgCgSube{from{transform:translateY(40px);opacity:.4}}
-@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,.jg-rp.entra .jg-rp-lienzo,html.jg-rieles.jg-cg-abierto .jg-cg{animation:none}}
+@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,.jg-rp.entra .jg-rp-lienzo,html.jg-cg-flota.jg-cg-abierto .jg-cg,.jg-cg-n,.jg-cg-msg.s-estelar,.jg-cg-super{animation:none}}
 
 html[data-tema=oscuro] .jg-cg,html[data-tema=oscuro] .jg-riel-puerta{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-riel-cab small,html[data-tema=oscuro] .jg-rp-cab>a span,html[data-tema=oscuro] .jg-rp-msg,html[data-tema=oscuro] .jg-riel-puerta,html[data-tema=oscuro] .jg-cg-msg time,html[data-tema=oscuro] .jg-cg-cierra{color:var(--os-tx3)}
@@ -5144,6 +5923,16 @@ html[data-tema=oscuro] .jg-cg-msg.mio>div>span{background:var(--os-sup3)}
 html[data-tema=oscuro] .jg-cg-nota{background:#2a1f12;border-color:#4a3618;color:#fbbf6a}
 html[data-tema=oscuro] .jg-cg-cierra:hover{background:#ffffff14}
 html[data-tema=oscuro] .jg-cg-n{box-shadow:0 0 0 2px var(--os-fondo)}
+html[data-tema=oscuro] .jg-cg-msg.super,html[data-tema=oscuro] .jg-cg-op{--sup-fondo:var(--os-sup)}
+html[data-tema=oscuro] .jg-cg-op.sel{--sup-fondo:var(--os-sup3)}
+html[data-tema=oscuro] .jg-cg-op.s-normal:not(.sel){border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-cg-msg.super>div>span,html[data-tema=oscuro] .jg-cg-op{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-cg-msg.super .jg-cg-sup{color:#fbbf24}
+html[data-tema=oscuro] .jg-cg-msg.s-estelar .jg-cg-sup{color:#c4b5fd}
+html[data-tema=oscuro] .jg-cg-sbtn{background:var(--os-sup);border-color:var(--os-borde);color:#c4b5fd}
+html[data-tema=oscuro] .jg-cg-sbtn.activo{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff}
+html[data-tema=oscuro] .jg-cg-super{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-cg-super>p span,html[data-tema=oscuro] .jg-cg-sup small,html[data-tema=oscuro] .jg-cg-op small{color:var(--os-tx3)}
 
 /* ---------- el panel de administración (juegos/admin.js, #admin) ---------- */
 .jg-adm{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -5299,6 +6088,8 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
 .jg-mk-img.chica .jg-pdc figcaption{display:none}
 .jg-mk-foto{position:relative;display:grid;place-items:center;width:100%;height:100%}
 .jg-mk-foto img{width:88%;height:88%;object-fit:contain}
+/* las piezas de Batalla de Rock: la foto viene con su fondo, en un cuadro redondeado */
+.jg-mk-foto.rk img{border-radius:14%;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .jg-mk-emoji{font-size:44px;line-height:1}
 .jg-mk-img.chica .jg-mk-emoji{font-size:28px}
 .jg-mk-muestra{position:absolute;left:6px;bottom:6px;display:flex;gap:2px}
@@ -5330,6 +6121,12 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
 .jg-mk-est{align-self:flex-start;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;background:#eee;color:#555}
 .jg-mk-est.act{background:#e8f0ff;color:#2e5bd8}.jg-mk-est.ok{background:#e3f7e8;color:#23874f}.jg-mk-est.mal{background:#fde6e3;color:#b3412f}
 .jg-mk-mini{padding:5px 10px;font-size:12.5px}
+.jg-mk-como{padding:12px 14px;border-radius:14px;background:#f6f2ff;border:1px solid #e1d8f7;font-size:13px;line-height:1.45;color:#3f3a52}
+.jg-mk-como ol{margin:6px 0 0;padding-left:20px}
+.jg-mk-precio{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.jg-mk-precio .jg-moneda{width:14px;height:14px}
+.jg-mk-precio input{width:84px;padding:5px 7px;border-radius:9px;border:1px solid #d7d0e6;font:inherit;font-size:13px}
+@media (max-width:560px){.jg-mk-vende{flex-wrap:wrap}.jg-mk-vende .jg-mk-fv-tx{flex-basis:calc(100% - 70px)}.jg-mk-vende .jg-mk-precio{margin-left:auto}}
 .jg-mk-trato{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:#fff;border:1px solid #e5e0ee}
 .jg-mk-trato header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .jg-mk-trato header small{color:#7a7590;font-size:12px}
@@ -5406,6 +6203,8 @@ html[data-tema=oscuro] .jg-mk-tabs button[aria-selected=true]{color:#c9b6ff;bord
 html[data-tema=oscuro] :is(.jg-mk-chip,.jg-mk-sel select,.jg-mk-q,.jg-mk-it,.jg-mk-fv,.jg-mk-trato,.jg-mk-persona){background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-mk-chip.on{background:color-mix(in srgb,var(--c,#7042df) 26%,var(--os-sup));color:var(--os-tx)}
 html[data-tema=oscuro] .jg-mk-it.mia{background:#221b33;border-color:#4b3d73}
+html[data-tema=oscuro] .jg-mk-como{background:#221b33;border-color:#4b3d73;color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-precio input{background:var(--os-sup2);border-color:var(--os-borde);color:var(--os-tx)}
 html[data-tema=oscuro] :is(.jg-mk-img,.jg-mk-elige){background:var(--os-sup2)}
 html[data-tema=oscuro] .jg-mk-p{background:#3a2f12;color:#ffe08a}
 html[data-tema=oscuro] .jg-mk-p.caro{background:#3d1d18;color:#ff9b8a}
@@ -5540,9 +6339,18 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-feed-m{font-weight:800;color:#ff8fa6;font-variant-numeric:tabular-nums}
 .jg-cs-feed li b{display:inline-flex;align-items:center;gap:4px;color:var(--cs-bien);font-variant-numeric:tabular-nums}
 .jg-cs-feed .jg-moneda{width:14px;height:14px}
+.jg-cs-feed li.jg-cs-brilla{box-shadow:0 0 calc(4px + 18px*var(--b)) calc(3px*var(--b)) rgba(255,205,80,calc(.15 + .7*var(--b)));border:1px solid rgba(255,205,80,calc(.1 + .8*var(--b)))}
+.jg-cs-feed li.jg-cs-brilla .jg-cs-feed-m{color:color-mix(in srgb,#ffd24a calc(var(--b)*100%),#ff8fa6);text-shadow:0 0 calc(10px*var(--b)) #ffd24a}
+.jg-cs-top{counter-reset:top;padding:0}
+.jg-cs-top li::before{counter-increment:top;content:counter(top);font-weight:800;width:16px;text-align:center;opacity:.7}
+.jg-cs-top li b.mal{color:var(--cs-mal,#ff6b6b)}
 @keyframes jgCsEntra{from{opacity:0;transform:translateY(-4px)}}
 
-.jg-cs-juego{display:grid;grid-template-columns:minmax(0,1fr) 280px;grid-template-areas:"escena lado" "panel lado" "reglas reglas";gap:14px;align-items:start}
+/* La columna de «Grandes premios» abarca la escena y el panel: con filas
+   auto, cuando el feed crecía (cada vez que alguien ganaba) la fila de la
+   escena crecía con él y empujaba el panel hacia abajo. La escena manda en
+   su fila y el sobrante va a la del panel. */
+.jg-cs-juego{display:grid;grid-template-columns:minmax(0,1fr) 280px;grid-template-rows:auto 1fr auto;grid-template-areas:"escena lado" "panel lado" "reglas reglas";gap:14px;align-items:start}
 .jg-cs-escena{grid-area:escena;position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--cs-borde);background:#070615;box-shadow:inset 0 0 40px #000a}
 .jg-cs-escena canvas{display:block;width:100%;height:clamp(260px,52vh,460px);touch-action:manipulation}
 .jg-cs-hist{position:absolute;top:8px;left:52px;right:8px;display:flex;gap:5px;overflow:hidden;pointer-events:none;mask-image:linear-gradient(90deg,#000 80%,transparent)}
@@ -5640,7 +6448,7 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-rl-res small{font-size:10px;font-weight:700;opacity:.85}
 .jg-cs-rl-res.rojo{background:radial-gradient(circle at 35% 30%,#ff5470,#a50d27)}.jg-cs-rl-res.negro{background:radial-gradient(circle at 35% 30%,#3d3a4c,#0d0c12)}.jg-cs-rl-res.verde{background:radial-gradient(circle at 35% 30%,#3ad282,#0b6b36)}
 @keyframes jgCsRes{from{transform:scale(.2) rotate(-90deg);opacity:0}}
-.jg-cs-rl-mesa{overflow-x:auto;padding:6px;margin:-2px;border-radius:14px;background:radial-gradient(120% 140% at 50% 0,#17714b,#063321);box-shadow:inset 0 0 0 2px #e9c46a55,inset 0 0 30px #0008}
+.jg-cs-rl-mesa{overflow-x:auto;overflow-y:hidden;padding:6px;margin:-2px;border-radius:14px;background:radial-gradient(120% 140% at 50% 0,#17714b,#063321);box-shadow:inset 0 0 0 2px #e9c46a55,inset 0 0 30px #0008}
 .jg-cs-rl-pano{display:grid;grid-template-columns:44px repeat(12,minmax(30px,1fr)) 44px;grid-template-rows:repeat(3,40px) 34px 34px;gap:3px;min-width:560px}
 .jg-cs-rl-c{grid-row:var(--hr);grid-column:var(--hc);position:relative;border:1px solid #ffffff3a;border-radius:6px;color:#fff;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,box-shadow .15s,filter .15s}
 .jg-cs-rl-c.rojo{background:linear-gradient(180deg,#e0233f,#a50d27)}
@@ -5654,7 +6462,10 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-rl-c.gana{box-shadow:0 0 0 2px var(--cs-oro),0 0 18px #ffcf3daa;animation:jgCsGanaC 1s ease-in-out infinite}
 .jg-cs-rl-c.sale{z-index:1;box-shadow:0 0 0 3px #fff,0 0 26px #fffc;animation:jgCsSale .8s ease-in-out infinite}
 @keyframes jgCsGanaC{50%{filter:brightness(1.35)}}
-@keyframes jgCsSale{50%{transform:scale(1.12)}}
+/* Sin transform: crecer la casilla en bucle desbordaba el paño, y donde
+   las barras de desplazamiento ocupan lugar (Windows) aparecían y se iban
+   con cada latido: el paño entero saltaba. */
+@keyframes jgCsSale{50%{box-shadow:0 0 0 4px #fff,0 0 38px #fff;filter:brightness(1.3)}}
 .jg-cs-rl-pano.bloqueado .jg-cs-rl-c:disabled{opacity:1;cursor:default}
 .jg-cs-rl-c i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-style:normal}
 .rombo{display:inline-block;width:22px;height:14px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
@@ -5774,7 +6585,7 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
 .jg-cs-pl-hist span.nueva{animation:jgCsPlHist .4s cubic-bezier(.2,1.4,.4,1) both}
 @keyframes jgCsPlHist{from{transform:translateX(30px) scale(.6);opacity:0}}
 @media(max-width:860px){
-  .jg-cs-juego{grid-template-columns:minmax(0,1fr);grid-template-areas:"escena" "panel" "lado" "reglas"}
+  .jg-cs-juego{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-template-areas:"escena" "panel" "lado" "reglas"}
   .jg-cs-lado{max-height:none}
   .jg-cs-difs{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -5802,12 +6613,226 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
   .jg-cs *{animation:none!important}
 }
 
+/* ============================================================
+   Modo Halloween (juegos/halloween.js)
+
+   Del 1 de octubre al 1 de noviembre, solo. El <head> pone
+   `data-halloween` en <html> antes de pintar: "on" con la decoración,
+   "off" si la persona la apagó desde la cinta del salón (la cinta
+   queda, en pequeño, para volver a encenderla), y nada fuera de
+   temporada. Todo va en este bloque, al final de la hoja para ganar a
+   la regla clara y a la oscura con la misma especificidad, y con el
+   prefijo `html[data-halloween=on]`: el 2 de noviembre el atributo no
+   está y la página vuelve a ser exactamente la de siempre.
+
+   Las dos capas (`.jg-hw-fondo` detrás del contenido, con la luna y el
+   cementerio; `.jg-hw` delante, con murciélagos, fantasmas y la araña)
+   no reciben toques y salen solo en las pantallas de menú: en una
+   partida o un juego del club la pantalla es del juego. El arte de los
+   juegos no se toca: solo telarañas y una araña por encima.
+   ============================================================ */
+html[data-halloween]{
+  --hw-tela-b:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M0 0L118 0M0 0L112.2 36.5M0 0L93 72.6M0 0L62.5 100.1M0 0L28.5 114.5M0 0L0 118M22 0Q18.7 3 20.9 6.8Q16.7 8.9 17.3 13.5Q12.7 14.1 11.7 18.7Q7.4 17.4 5.3 21.3Q2.3 18.8 0 22M44 0Q37.4 5.9 41.8 13.6Q33.4 17.8 34.7 27.1Q25.3 28.1 23.3 37.3Q14.8 34.8 10.6 42.7Q4.6 37.6 0 44M66 0Q56.1 8.9 62.8 20.4Q50.1 26.6 52 40.6Q38 42.2 35 56Q22.2 52.2 16 64Q6.9 56.3 0 66M88 0Q74.7 11.8 83.7 27.2Q66.8 35.5 69.3 54.2Q50.6 56.2 46.6 74.6Q29.6 69.7 21.3 85.4Q9.2 75.1 0 88M110 0Q93.4 14.8 104.6 34Q83.5 44.4 86.7 67.7Q63.3 70.3 58.3 93.3Q37 87.1 26.6 106.7Q11.5 93.9 0 110' fill='none' stroke='%23ffffff' stroke-opacity='.8' stroke-width='1.1'/%3E%3C/svg%3E");
+  --hw-tela-o:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M0 0L118 0M0 0L112.2 36.5M0 0L93 72.6M0 0L62.5 100.1M0 0L28.5 114.5M0 0L0 118M22 0Q18.7 3 20.9 6.8Q16.7 8.9 17.3 13.5Q12.7 14.1 11.7 18.7Q7.4 17.4 5.3 21.3Q2.3 18.8 0 22M44 0Q37.4 5.9 41.8 13.6Q33.4 17.8 34.7 27.1Q25.3 28.1 23.3 37.3Q14.8 34.8 10.6 42.7Q4.6 37.6 0 44M66 0Q56.1 8.9 62.8 20.4Q50.1 26.6 52 40.6Q38 42.2 35 56Q22.2 52.2 16 64Q6.9 56.3 0 66M88 0Q74.7 11.8 83.7 27.2Q66.8 35.5 69.3 54.2Q50.6 56.2 46.6 74.6Q29.6 69.7 21.3 85.4Q9.2 75.1 0 88M110 0Q93.4 14.8 104.6 34Q83.5 44.4 86.7 67.7Q63.3 70.3 58.3 93.3Q37 87.1 26.6 106.7Q11.5 93.9 0 110' fill='none' stroke='%233b1f4f' stroke-opacity='.55' stroke-width='1.1'/%3E%3C/svg%3E");
+  --hw-nar:#f97316;--hw-nar2:#c2410c;--hw-mor:#7c3aed;--hw-noche:#140a1c
+}
+html[data-halloween=on]{--jg-purple:#7c3aed}
+/* La página lleva un color liso; el degradado va en la capa fija del
+   fondo (`.jg-hw-fondo`, más abajo). Con `background-attachment:fixed`
+   en <body>, Safari de iOS (y otros navegadores de teléfono) lo ignoran,
+   el degradado se repetía cada alto de pantalla y al hacer scroll se veía
+   un corte horizontal. */
+html[data-halloween=on] body{background:#f6ebee}
+html[data-halloween=on][data-tema=oscuro]{--os-fondo:#0d0915}
+html[data-halloween=on][data-tema=oscuro] body{background:#0f0a17}
+
+/* ---- La cabecera: noche morada que arde en naranja, banderines y el
+   logo de Halloween (marca/paginita-pro-halloween.svg) ---- */
+html[data-halloween=on] .head{position:relative;background:linear-gradient(100deg,#1a0c28 0,#2a0f33 48%,#3d1607 100%);border-bottom:1px solid #ff7a1a4d;box-shadow:0 1px 18px #ff7a1a26}
+html[data-halloween=on] .head::before{content:"";position:absolute;left:0;top:0;width:58px;height:58px;background:var(--hw-tela-b) no-repeat 0 0/contain;opacity:.32;pointer-events:none}
+html[data-halloween=on] .head::after{content:"";position:absolute;left:0;right:0;top:100%;height:20px;z-index:2;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 20'%3E%3Cpath d='M0 1.5Q36 5 72 1.5' fill='none' stroke='%235b4a3a' stroke-width='1'/%3E%3Cpath d='M3 2.4h18L12 17z' fill='%23f97316'/%3E%3Cpath d='M27 3.3h18L36 18.5z' fill='%23140a1c'/%3E%3Cpath d='M51 2.4h18L60 17z' fill='%237c3aed'/%3E%3Ccircle cx='12' cy='7.5' r='1.6' fill='%23140a1c'/%3E%3Cpath d='M33.5 7.5h5l-2.5 3z' fill='%23f97316'/%3E%3Ccircle cx='60' cy='7.5' r='1.6' fill='%23ffd36b'/%3E%3C/svg%3E") repeat-x 0 0/72px 20px;pointer-events:none;filter:drop-shadow(0 2px 2px #0003)}
+html[data-halloween=on] .logo-img{display:none}
+html[data-halloween=on] .logo-img.logo-hw{display:block;filter:drop-shadow(0 0 6px #ff7a1a99)}
+html[data-halloween=on] .head-nav a[href="juegos.html"]{text-shadow:0 0 12px #ff7a1a}
+html[data-halloween=on] main{padding-top:36px}
+
+/* ---- Pestañas, botones y acentos: naranja calabaza sobre la noche ---- */
+html[data-halloween=on] .tab.on{background:#241328;color:#ffd2a8;box-shadow:inset 0 -2px 0 var(--hw-nar)}
+html[data-halloween=on] .btn,html[data-halloween=on] .jg-btn{background:linear-gradient(180deg,#d24c0d,#a8360a)}
+html[data-halloween=on] .btn:hover,html[data-halloween=on] .jg-btn:hover{background:linear-gradient(180deg,#b9410b,#8c2c07)}
+html[data-halloween=on] .btn2:hover{border-color:var(--hw-nar2);color:var(--hw-nar2)}
+html[data-halloween=on] .jg-modos{background:color-mix(in srgb,#faf1eb 84%,transparent)}
+html[data-halloween=on] .jg-modos-sel{background:#efe2e6}
+html[data-halloween=on] .jg-sal-intro .jg-eyebrow{color:var(--hw-nar2)}
+html[data-halloween=on] .jg-sal-intro .jg-eyebrow::before{content:"🕸 "}
+html[data-halloween=on] .jg-sal-solo .jg-sal-tit h2::after{content:" 🦇";font-size:.8em}
+html[data-halloween=on] .jg-sal-multi .jg-sal-tit h2::after{content:" 👻";font-size:.8em}
+html[data-halloween=on] .jg-lado-caja{box-shadow:0 6px 22px #3b1f4f12}
+html[data-halloween=on][data-tema=oscuro] .tab.on{background:#2a1530;color:#ffc58f}
+html[data-halloween=on][data-tema=oscuro] .btn2:hover{border-color:#ff9a4d;color:#ffb070}
+html[data-halloween=on][data-tema=oscuro] .jg-modos{background:color-mix(in srgb,#120a1c 84%,transparent)}
+html[data-halloween=on][data-tema=oscuro] .jg-modos-sel{background:#1f1426}
+html[data-halloween=on][data-tema=oscuro] .jg-sal-intro .jg-eyebrow{color:#ff9a4d}
+html[data-halloween=on][data-tema=oscuro] .jg-sal-intro h1{text-shadow:0 0 26px #ff7a1a40}
+html[data-halloween=on][data-tema=oscuro] .jg-lado-caja{box-shadow:0 8px 26px #0006}
+@media(max-width:720px){
+  html[data-halloween=on]:is([data-vista]) .bar .tab.on{background:#ffedd5;color:var(--hw-nar2);box-shadow:none}
+  html[data-halloween=on][data-tema=oscuro]:is([data-vista]) .bar .tab.on{background:#ff7a1a26;color:#ffb070}
+  html[data-halloween=on] main{padding-top:30px}
+}
+
+/* ---- Las miniaturas: una telaraña en la esquina, el brillo de una
+   vela al pasar, y de cuando en cuando una araña que baja ---- */
+html[data-halloween=on] .jg-mn::after{content:"";position:absolute;top:0;right:0;z-index:1;width:min(64px,28%);aspect-ratio:1;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.5;pointer-events:none;border-top-left-radius:16px}
+html[data-halloween=on] .jg-mn:nth-child(4n+3)::before{content:"";position:absolute;top:0;left:58%;z-index:1;width:14px;height:42px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 60'%3E%3Cpath d='M10 0v42' stroke='%23ffffff' stroke-opacity='.7' stroke-width='.8'/%3E%3Cg fill='none' stroke='%23120a18' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M8 46 3 42 1 45M8 49H2l-1 3M8 51l-4 4M12 46l5-4 2 3M12 49h6l1 3M12 51l4 4'/%3E%3C/g%3E%3Cellipse cx='10' cy='50' rx='3.6' ry='4.4' fill='%23120a18'/%3E%3Ccircle cx='10' cy='44.5' r='2.6' fill='%23120a18'/%3E%3Ccircle cx='9' cy='44.2' r='.6' fill='%23ff7a1a'/%3E%3Ccircle cx='11' cy='44.2' r='.6' fill='%23ff7a1a'/%3E%3C/svg%3E") no-repeat 0 100%/14px 42px;pointer-events:none;transform-origin:top;transition:height .5s cubic-bezier(.3,1.4,.5,1)}
+@media(hover:hover) and (pointer:fine){
+  html[data-halloween=on] .jg-mn:not(.sel):hover{border-color:#ff7a1a99;box-shadow:0 14px 30px #ff7a1a2e,0 0 0 1px #ff7a1a55}
+  html[data-halloween=on] .jg-mn:nth-child(4n+3):hover::before{height:72px}
+  html[data-halloween=on][data-tema=oscuro] .jg-mn:not(.sel):hover{box-shadow:0 14px 34px #ff7a1a26,0 0 0 1px #ff7a1a66}
+}
+
+/* ---- El banner de novedades: telaraña en la esquina y un resplandor ---- */
+html[data-halloween=on] .jg-ban{box-shadow:0 14px 40px #2a1e4426,0 0 0 1px #ff7a1a40,0 0 34px #ff7a1a2a}
+html[data-halloween=on] .jg-ban::after{content:"";position:absolute;top:0;right:0;z-index:2;width:110px;height:110px;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.42;pointer-events:none}
+@media(max-width:720px){html[data-halloween=on] .jg-ban::after{width:76px;height:76px}}
+
+/* ---- La cinta del salón, con la cuenta atrás ---- */
+.jg-hw-cinta{display:none}
+html[data-halloween] .jg-hw-cinta{display:flex;align-items:center;gap:12px;margin:12px 0 2px;padding:9px 10px 9px 9px;border-radius:16px;background:linear-gradient(100deg,#1d0b2a,#34102f 55%,#4a1a08);border:1px solid #ff7a1a59;color:#fde6cf;box-shadow:0 8px 24px #ff7a1a1f;max-width:620px;position:relative;overflow:hidden}
+html[data-halloween] .jg-hw-cinta::after{content:"";position:absolute;right:0;top:0;width:70px;height:70px;background:var(--hw-tela-b) no-repeat 0 0/contain;transform:scaleX(-1);opacity:.25;pointer-events:none}
+.jg-hw-calabaza{flex:0 0 auto;width:50px;height:46px;padding:0;border:0;background:none;cursor:pointer;border-radius:12px;transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
+.jg-hw-calabaza:hover{transform:scale(1.1) rotate(-6deg)}.jg-hw-calabaza:active{transform:scale(.94)}
+.jg-hw-calabaza svg{width:100%;height:100%;display:block;overflow:visible}
+.jg-hw-calabaza .hw-piel{fill:#f97316;stroke:#9a3412;stroke-width:1.2}
+.jg-hw-calabaza .hw-gajo{fill:none;stroke:#b4400a;stroke-width:1.3;opacity:.75}
+.jg-hw-calabaza .hw-tallo{fill:#4d7c0f}.jg-hw-calabaza .hw-hoja{fill:#65a30d}
+.jg-hw-calabaza .hw-luz{fill:#ffe08a;filter:drop-shadow(0 0 3px #ffb347);animation:hwVela 1.8s steps(1) infinite}
+@keyframes hwVela{0%,100%{opacity:1}30%{opacity:.75}34%{opacity:1}62%{opacity:.85}66%{opacity:1}}
+.jg-hw-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;position:relative;z-index:1}
+.jg-hw-txt b{font:400 17px/1.15 'Lilita One','IBM Plex Sans',sans-serif;letter-spacing:.02em;color:#ffb070;text-shadow:0 0 14px #ff7a1a80}
+.jg-hw-txt span{font-size:12.5px;color:#e9d6f5}
+.jg-hw-cambia{position:relative;z-index:1;flex:0 0 auto;min-height:34px;padding:0 12px;border-radius:100px;border:1px solid #ffffff2e;background:#ffffff12;color:#fde6cf;font:600 11.5px 'IBM Plex Sans',sans-serif;cursor:pointer}
+.jg-hw-cambia:hover{background:#ffffff24}
+.jg-hw-cambia .hw-no{display:none}
+html[data-halloween=off] .jg-hw-cinta{display:inline-flex;padding:0;border:0;background:none;box-shadow:none;margin:10px 0 0}
+html[data-halloween=off] .jg-hw-cinta::after,html[data-halloween=off] .jg-hw-calabaza,html[data-halloween=off] .jg-hw-txt,html[data-halloween=off] .jg-hw-cambia .hw-si{display:none}
+html[data-halloween=off] .jg-hw-cambia .hw-no{display:inline}
+html[data-halloween=off] .jg-hw-cambia{border-color:#f9731666;background:#f973161a;color:#9a3412}
+html[data-halloween=off][data-tema=oscuro] .jg-hw-cambia{color:#ffb070}
+@media(max-width:420px){
+  html[data-halloween=on] .jg-hw-cinta{flex-wrap:wrap}
+  html[data-halloween=on] .jg-hw-txt{flex-basis:calc(100% - 62px)}
+  html[data-halloween=on] .jg-hw-cambia{margin-left:62px;min-height:30px}
+}
+
+/* ---- Las capas de decorado ---- */
+.jg-hw,.jg-hw-fondo{display:none}
+html[data-halloween=on]:is(:not([data-vista]),[data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil]):not(.jg-inm) :is(.jg-hw,.jg-hw-fondo){display:block}
+.jg-hw-fondo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;contain:strict}
+html[data-halloween=on] .jg-hw-fondo{background:linear-gradient(180deg,#faf3ea 0,#f6ebee 45%,#ecdff0 100%)}
+html[data-halloween=on][data-tema=oscuro] .jg-hw-fondo{background:radial-gradient(1100px 560px at 84% -8%,#4c1d6b70,#4c1d6b00 70%),radial-gradient(900px 400px at 10% 110%,#ff7a1a1c,#ff7a1a00 70%),linear-gradient(180deg,#0d0915,#120a1c 60%,#1a0b16)}
+.jg-hw{position:fixed;inset:0;z-index:14;pointer-events:none;overflow:hidden;contain:strict}
+
+/* La luna con sus cráteres, arriba a la derecha. */
+.hw-luna{position:absolute;right:6vw;top:96px;width:clamp(70px,11vw,150px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 36%,#fff8e1,#fde7b0 55%,#f4c96b);box-shadow:0 0 50px #ffd88a66,0 0 120px #ffb34733;opacity:.55}
+.hw-luna i{position:absolute;border-radius:50%;background:#e9c27a66}
+.hw-luna i:nth-child(1){left:22%;top:30%;width:18%;height:18%}.hw-luna i:nth-child(2){left:58%;top:52%;width:12%;height:12%}.hw-luna i:nth-child(3){left:40%;top:68%;width:9%;height:9%}
+html[data-tema=oscuro] .hw-luna{opacity:.9}
+/* Estrellas que titilan: solo en el tema oscuro, de día no se ven. */
+.hw-cielo{position:absolute;inset:0 0 40%;display:none}
+html[data-tema=oscuro] .hw-cielo{display:block}
+.hw-cielo i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.6;animation:hwTitila var(--t) ease-in-out var(--r) infinite alternate}
+@keyframes hwTitila{to{opacity:.12}}
+/* El cementerio y la casa embrujada, contra el borde de abajo. */
+.hw-cem{position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;aspect-ratio:1600/230;min-height:120px;color:#3b1f4f}
+.hw-cem .hw-colina2{opacity:.07}
+.hw-cem .hw-silueta{fill:#2a1638;opacity:.16}
+.hw-cem .hw-ventanas{fill:#f97316;opacity:.35}
+.hw-cem .hw-calabazas{fill:#f97316;opacity:.45}
+.hw-cem .hw-caras{fill:#2a1638;opacity:.5}
+html[data-tema=oscuro] .hw-cem{color:#2b1640}
+html[data-tema=oscuro] .hw-cem .hw-colina2{opacity:.55}
+html[data-tema=oscuro] .hw-cem .hw-silueta{fill:#05030a;opacity:.92}
+html[data-tema=oscuro] .hw-cem .hw-ventanas{fill:#ffb347;opacity:.9;filter:drop-shadow(0 0 6px #ff7a1a);animation:hwVentana 5s steps(1) infinite}
+html[data-tema=oscuro] .hw-cem .hw-calabazas{fill:#f97316;opacity:.85}
+html[data-tema=oscuro] .hw-cem .hw-caras{fill:#ffe08a;opacity:.95}
+@keyframes hwVentana{0%,100%{opacity:.9}48%{opacity:.4}52%{opacity:.9}80%{opacity:.7}}
+/* La niebla que se arrastra por el suelo. */
+.hw-niebla{position:absolute;left:0;right:0;bottom:0;height:22vh}
+.hw-niebla i{position:absolute;bottom:-6vh;left:-50%;width:200%;height:100%;background:radial-gradient(ellipse 22% 60% at 20% 70%,#ffffffb0,#fff0 70%),radial-gradient(ellipse 18% 50% at 55% 80%,#ffffff90,#fff0 70%),radial-gradient(ellipse 24% 55% at 85% 75%,#ffffffa0,#fff0 70%);opacity:.55;animation:hwNiebla 48s linear infinite}
+.hw-niebla i+i{bottom:-10vh;opacity:.4;animation-duration:70s;animation-direction:reverse}
+html[data-tema=oscuro] .hw-niebla i{background:radial-gradient(ellipse 22% 60% at 20% 70%,#a78bfa38,#a78bfa00 70%),radial-gradient(ellipse 18% 50% at 55% 80%,#c4b5fd2a,#c4b5fd00 70%),radial-gradient(ellipse 24% 55% at 85% 75%,#a78bfa30,#a78bfa00 70%);opacity:1}
+@keyframes hwNiebla{to{transform:translateX(25%)}}
+
+/* Murciélagos: cruzan la pantalla a distintas alturas, subiendo y
+   bajando, y baten las alas. */
+.hw-murc{position:absolute;left:0;top:var(--y);width:calc(52px * var(--s));animation:hwVuela var(--d) linear var(--r) infinite}
+.hw-murc:nth-child(2n){animation-direction:reverse}
+.hw-murc-v{position:relative;aspect-ratio:2;opacity:.7;animation:hwOndea 2.4s ease-in-out infinite alternate}
+.hw-murc svg{position:absolute;inset:0;display:block;width:100%;height:100%;fill:#2a1638;overflow:visible}
+.hw-murc .hw-ala{position:absolute;inset:0;transform-origin:50% 43.75%;animation:hwAletea .26s ease-in-out infinite alternate}
+.hw-murc .hw-ojo{fill:#ff8a2a}
+html[data-tema=oscuro] .hw-murc-v{opacity:.95}
+html[data-tema=oscuro] .hw-murc svg{fill:#04020a;filter:drop-shadow(0 0 6px #a78bfa55)}
+@keyframes hwVuela{from{transform:translateX(-14vw)}to{transform:translateX(114vw)}}
+@keyframes hwOndea{from{transform:translateY(-16px) rotate(-6deg)}to{transform:translateY(18px) rotate(5deg)}}
+@keyframes hwAletea{from{transform:scaleY(1)}to{transform:scaleY(.3)}}
+
+/* Dos fantasmas que se asoman desde los bordes y se vuelven a esconder. */
+.hw-fant{position:absolute;width:66px;opacity:0}
+.hw-fant svg{display:block;width:100%;overflow:visible}
+.hw-fant .hw-sabana{fill:#fff;stroke:#3b1f4f22;stroke-width:1}
+.hw-fant .hw-cara{fill:#2a1638}
+.hw-fant .hw-rubor{fill:#f9a8d4;opacity:.7}
+html[data-tema=oscuro] .hw-fant svg{filter:drop-shadow(0 0 14px #c4b5fdaa)}
+.hw-fant-i{left:0;top:46vh;animation:hwAsomaI 17s ease-in-out -3s infinite}
+.hw-fant-d{right:0;top:30vh;animation:hwAsomaD 23s ease-in-out -12s infinite}
+@keyframes hwAsomaI{0%,62%,100%{opacity:0;transform:translateX(-110%) rotate(0)}70%,86%{opacity:.92;transform:translateX(-28%) rotate(10deg)}78%{transform:translateX(-24%) translateY(-10px) rotate(14deg)}}
+@keyframes hwAsomaD{0%,58%,100%{opacity:0;transform:translateX(110%) rotate(0)}66%,84%{opacity:.92;transform:translateX(28%) rotate(-10deg)}75%{transform:translateX(24%) translateY(-12px) rotate(-14deg)}}
+/* La araña que baja de su hilo y vuelve a subir. */
+.hw-arana{position:absolute;top:0;right:24%;width:26px;animation:hwBaja 11s ease-in-out infinite}
+.hw-arana-c{position:relative;display:block;aspect-ratio:1}
+.hw-arana svg{position:absolute;inset:0;display:block;width:100%;height:100%;fill:#1b0f24;stroke:#1b0f24;overflow:visible}
+.hw-arana .hw-ojo{fill:#ff7a1a;stroke:none}
+.hw-arana .hw-patas{position:absolute;inset:0;animation:hwPatas .5s ease-in-out infinite alternate;transform-origin:50% 55%}
+.hw-hilo{position:absolute;bottom:60%;left:50%;width:1px;height:100vh;background:linear-gradient(#3b1f4f00,#3b1f4f88)}
+html[data-tema=oscuro] .hw-hilo{background:linear-gradient(#fff0,#ffffff88)}
+html[data-tema=oscuro] .hw-arana svg{fill:#0a0610;stroke:#0a0610;filter:drop-shadow(0 0 4px #c4b5fd88)}
+@keyframes hwBaja{0%,100%{transform:translateY(-60px)}35%,55%{transform:translateY(150px)}45%{transform:translateY(140px)}}
+@keyframes hwPatas{to{transform:scaleX(.88)}}
+/* Telarañas en las esquinas de abajo (en el teléfono abajo va la barra). */
+.hw-tela{position:absolute;bottom:0;width:120px;height:120px;background:var(--hw-tela-o) no-repeat 0 0/contain;opacity:.7}
+html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
+.hw-tela-i{left:0;transform:scaleY(-1)}.hw-tela-d{right:0;transform:scale(-1,-1)}
+@media(max-width:720px){
+  .hw-tela,.hw-fant-d,.hw-murc:nth-child(n+4){display:none}
+  .hw-fant{width:50px}.hw-arana{right:auto;left:24%;width:22px}
+  .hw-luna{top:120px}
+  /* Abajo va la barra de pestañas: el cementerio se asoma por encima. */
+  .hw-cem{height:150px;bottom:calc(64px + env(safe-area-inset-bottom))}
+  .hw-niebla{bottom:calc(40px + env(safe-area-inset-bottom))}
+}
+/* Con los rieles de la pantalla ancha, la araña cuelga entre el salón y el chat. */
+@media(min-width:1400px){html.jg-rieles .hw-arana{right:calc(var(--riel,0px) + 40px)}}
+
+/* El fantasma «¡Bu!» de la calabaza. */
+.hw-bu{position:fixed;left:0;top:34vh;z-index:94;width:110px;pointer-events:none;animation:hwBu 2.4s cubic-bezier(.45,0,.4,1) forwards}
+.hw-bu svg{display:block;width:100%;overflow:visible;filter:drop-shadow(0 8px 20px #3b1f4f55)}
+.hw-bu .hw-sabana{fill:#fff}.hw-bu .hw-cara{fill:#2a1638}.hw-bu .hw-rubor{fill:#f9a8d4}
+.hw-bu b{position:absolute;right:-34px;top:-14px;padding:5px 11px;border-radius:14px;background:#140a1c;color:#ffb070;font:400 20px/1 'Lilita One',sans-serif;box-shadow:0 4px 14px #0005}
+@keyframes hwBu{0%{transform:translate(-130px,20px) scale(.6) rotate(-8deg);opacity:0}15%{opacity:1}45%{transform:translate(42vw,-40px) scale(1.25) rotate(6deg)}60%{transform:translate(52vw,-30px) scale(1.3) rotate(-4deg)}100%{transform:translate(110vw,-120px) scale(.7) rotate(12deg);opacity:0}}
+
+@media(prefers-reduced-motion:reduce){
+  html[data-halloween=on] .jg-hw{display:none!important}
+  .jg-hw-fondo *,.jg-hw-calabaza .hw-luz{animation:none!important}
+}
+
 </style>
 </head>
 <body>
 <div id="app">
   <header class="head">
-    <a class="logo" href="Inicio.dc.html"><span class="logo-mark">L</span><b style="font-size:14px">Laboratorio</b></a>
+    <a class="logo" href="Inicio.dc.html"><img class="logo-img" src="marca/paginita-pro-128.png" alt="" width="30" height="30"><img class="logo-img logo-hw" src="marca/paginita-pro-halloween.svg" alt="" width="30" height="30"><b style="font-size:14px" translate="no">Paginita Pro</b></a>
     <nav class="head-nav">
       <a href="colabtex.html">ColabTeX</a>
       <a href="colabdraw.html">ColabDraw</a>
@@ -5819,7 +6844,10 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
       <button class="btn-ghost jg-rep-btn" id="btnMusica">Música</button>
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>
-      <button class="btn-ghost jg-saldo" id="userMonedas" title="Tus monedas" style="display:none"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg> …</button>
+      <span class="jg-saldo-grupo" id="userSaldo" style="display:none">
+        <button class="btn-ghost jg-saldo" id="userMonedas" title="Tus monedas"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg> …</button>
+        <button class="jg-ref-mas" id="userReferir" type="button" title="Gana 5.000 monedas: canjea un código o invita a tus amigos" aria-label="Referidos: gana 5.000 monedas" aria-expanded="false"><span class="jg-ref-mas-i" aria-hidden="true">+</span><b class="jg-ref-mas-k" aria-hidden="true">5K</b></button>
+      </span>
       <button class="btn jg-entrar" id="btnEntrar" type="button" style="display:none">Iniciar sesión</button>
       <span id="userName" translate="no"></span>
       <span class="avatar" id="userAvatar"></span>
@@ -5846,6 +6874,6 @@ html[data-tema=oscuro] .jg-memazo .jg-mz-reloj{color:#c4b5fd}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610190131"></script>
+<script src="juegos-app.js?v=202610240615"></script>
 </body>
 </html>

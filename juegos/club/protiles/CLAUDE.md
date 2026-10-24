@@ -65,7 +65,7 @@ Traps:
   clear `E.hold`), as in the original.
 - Mute: the game's own `#sound-button` (in the scorebar) plus the Club's
   volume slider (`volumen.js`), also visible in the immersive strip.
-- Guests cannot play it (not a `DESTACADOS_INVITADO`).
+- Guests play it without saving anything (not a `DESTACADOS_INVITADO`, so a guest score is not kept after login).
 - **Phone width**: in `html.club-inm` / `html.pt-pc` the `.layout` column
   must `align-items:stretch`; with the normal layout's `start` the box shrank
   to its content (268 px) and sat against the left edge of every phone.

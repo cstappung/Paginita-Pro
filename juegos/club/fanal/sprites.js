@@ -988,10 +988,15 @@
        se llena con el cielo del amanecer (del violeta al oro, hacia el
        fanal; ver `amanece`), el borde es blanco, lo frío se vuelve oro y
        rosa, y detrás llevan un abanico de rayos.
-     Se dibujan ya a su tamaño (×1,2, ×1,35, ×1,4 y ×1,45) en vez de agrandar el dibujo
+     - La fase 6 es «la de vidrio»: lo que vuelve después del día es un
+       vitral. El cuerpo se llena de vidrios de colores separados por plomo
+       (ver `vidria`), el borde es de luz, lo frío se vuelve joya y detrás
+       llevan un rosetón (`roseton`); donde la fase 5 tenía un sol chico,
+       aquí hay una roseta (`roseta`).
+     Se dibujan ya a su tamaño (×1,2, ×1,35, ×1,4, ×1,45 y ×1,5) en vez de agrandar el dibujo
      de la primera fase: con formas el tamaño es gratis, y los píxeles
      quedan parejos en vez de estirados. */
-  const ESCALA_FASE = { 1: 1, 2: 1.2, 3: 1.35, 4: 1.4, 5: 1.45 };
+  const ESCALA_FASE = { 1: 1, 2: 1.2, 3: 1.35, 4: 1.4, 5: 1.45, 6: 1.5 };
   /* El lienzo de un jefe en su fase: `W`×`H` es el tamaño de la primera;
      `margen`, los píxeles que las otras dos pueden ocupar de más por cada
      lado. El centro no se mueve (el juego dibuja al jefe centrado). */
@@ -1067,8 +1072,73 @@
      rosa; lo oscuro se queda (es lo que `amanece` llena de cielo). */
   const AL_ALBA = { "#8fd8ff": "#ffd070", "#c8f0ff": "#fff2c8", "#b48cff": "#ff8cb4", "#5a6ee0": "#e8a04c", "#3c50b4": "#a85c3c" };
   function alba(col) { const out = {}; for (const q in col) out[q] = AL_ALBA[col[q]] || col[q]; return out; }
-  /* El final de todo jefe: a la paleta y, en las fases 4 y 5, al cielo. */
-  const acaba = (c, col, fase) => { const q = cuantiza(c, Object.values(col)); return fase >= 5 ? amanece(q) : fase === 4 ? asciende(q, "#8fd8ff") : q; };
+  /* La fase 6: el vitral. Las joyas son los colores fríos de la fase 4
+     vueltos vidrio (y los del rosetón); el plomo y el borde, los de siempre
+     de un vitral. `vidria` llena lo oscuro del cuerpo (lo mismo que llenan
+     las fases 4 y 5) con piezas de vidrio de unos 6 px: filas de ladrillos
+     corridas, cada una partida en dos triángulos, con plomo entre pieza y
+     pieza y un brillo en su borde de arriba. El plomo dibujado a propósito
+     (pupilas, bocas) no se llena. */
+  const JOYAS = ["#ff4c9c", "#5cf0d8", "#ffc83c", "#8c5cff"];
+  const PLOMO = "#140c1c", BORDE_VITRAL = "#fff6d8";
+  const VIDRIOS = ["#c8284c", "#2c4cc8", "#1c9c5c", "#e8a028", "#7c3cc8", "#28b4c0"].map(rgb);
+  const A_VIDRIO = { "#8fd8ff": "#5cf0d8", "#c8f0ff": "#fff6d8", "#b48cff": "#ff4c9c", "#5a6ee0": "#ffc83c", "#3c50b4": "#8c5cff" };
+  function vitral(col) { const out = {}; for (const q in col) out[q] = A_VIDRIO[col[q]] || col[q]; return out; }
+  function vidria(c) {
+    const x = c.getContext("2d");
+    if (!x) return c;
+    const w = c.width, h = c.height, im = x.getImageData(0, 0, w, h), d = im.data;
+    const hay = new Uint8Array(w * h), cuerpo = new Uint8Array(w * h), pieza = new Int32Array(w * h), [pr, pg, pb] = rgb(PLOMO);
+    const T = 6;
+    for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+      const i = py * w + px, q = i * 4;
+      hay[i] = d[q + 3] > 127 ? 1 : 0;
+      const plomo = d[q] === pr && d[q + 1] === pg && d[q + 2] === pb;
+      cuerpo[i] = hay[i] && !plomo && d[q] * 0.3 + d[q + 1] * 0.59 + d[q + 2] * 0.11 < 60 ? 1 : 0;
+      const fila = Math.floor(py / T), corre = (fila & 1) * 3, col = Math.floor((px + corre) / T);
+      const lx = px + corre - col * T, ly = py - fila * T;
+      const mitad = (col + fila) & 1 ? (lx + ly >= T - 1 ? 1 : 0) : (lx >= ly ? 1 : 0);
+      pieza[i] = (fila * 997 + col) * 2 + mitad;
+    }
+    for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+      const i = py * w + px, q = i * 4;
+      if (!cuerpo[i]) continue;
+      const borde = px === 0 || py === 0 || px === w - 1 || py === h - 1 || !hay[i - 1] || !hay[i + 1] || !hay[i - w] || !hay[i + w];
+      let r, g, b;
+      if (borde) [r, g, b] = rgb(BORDE_VITRAL);
+      else if ((cuerpo[i + 1] && pieza[i + 1] !== pieza[i]) || (cuerpo[i + w] && pieza[i + w] !== pieza[i])) [r, g, b] = [pr, pg, pb];
+      else {
+        const v = VIDRIOS[((pieza[i] * 2654435761) >>> 0) % VIDRIOS.length];
+        const brilla = cuerpo[i - w] && pieza[i - w] !== pieza[i];     // el canto de arriba de cada pieza
+        [r, g, b] = brilla ? v.map(k => Math.min(255, k + 70)) : v;
+      }
+      d[q] = r; d[q + 1] = g; d[q + 2] = b;
+    }
+    x.putImageData(im, 0, 0);
+    return c;
+  }
+  /* Un rosetón (fase 6): pétalos de vidrio en punta, de `r0` a `r1`, con
+     las joyas alternadas y una perla de luz en cada punta. Como `rayos`,
+     de `a0` a `a1` (la vuelta entera si no se dicen). */
+  function roseton(x, cx, cy, r0, r1, n, a0, a1) {
+    a0 = a0 == null ? 0 : a0; a1 = a1 == null ? Math.PI * 2 : a1;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (a1 - a0) * (i + 0.5) / n, ab = ((a1 - a0) / n) * 0.3, rm = r0 + (r1 - r0) * 0.45;
+      const p = (rr, da) => [cx + Math.cos(a + da) * rr, cy + Math.sin(a + da) * rr];
+      poligono(x, [p(r0, -ab * 0.6), p(rm, -ab), p(r1, 0), p(rm, ab), p(r0, ab * 0.6)], JOYAS[i % JOYAS.length]);
+      const t = p(r1 + 1.4, 0);
+      elipse(x, t[0], t[1], 0.9, 0.9, BORDE_VITRAL);
+    }
+  }
+  /* Una roseta chica: seis pétalos alrededor de un ojo de luz. */
+  function roseta(x, cx, cy, r) {
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; elipse(x, cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, r * 0.42, r * 0.42, JOYAS[i % 2 ? 1 : 0]); }
+    elipse(x, cx, cy, r * 0.38, r * 0.38, BORDE_VITRAL);
+  }
+  /* La paleta con que se cuantiza un jefe: la suya y, en la fase 6, las joyas y el plomo. */
+  const paletaDe = (col, fase) => (fase >= 6 ? Object.values(col).concat(JOYAS, [PLOMO, BORDE_VITRAL]) : Object.values(col));
+  /* El final de todo jefe: a la paleta y, en las fases 4, 5 y 6, al cielo (o al vidrio). */
+  const acaba = (c, col, fase) => { const q = cuantiza(c, paletaDe(col, fase)); return fase >= 6 ? vidria(q) : fase === 5 ? amanece(q) : fase === 4 ? asciende(q, "#8fd8ff") : q; };
 
   /* La Nodriza: polilla enorme y peluda, con un racimo de huevos en el
      abdomen (arriba). Alas de vino y ámbar con medialunas claras.
@@ -1083,13 +1153,15 @@
     4: { b: "#16225a", B: "#0c1434", r: "#8fd8ff", e: "#c8f0ff", c: "#0c1434", d: "#3c50b4", g: "#ffffff", a: "#b48cff", o: "#0c1434", y: "#ffffff" }
   };
   COLORES_NODRIZA_F[5] = alba(COLORES_NODRIZA_F[4]);
+  COLORES_NODRIZA_F[6] = vitral(COLORES_NODRIZA_F[4]);
   function nodriza(k, fase) {
     fase = fase || 1;
     const W = 58, H = 40, cx = 29, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
     if (!x) return c;
     const col = COLORES_NODRIZA_F[fase] || COLORES_NODRIZA;
-    // Fase 5: los rayos, detrás de todo.
-    if (fase >= 5) rayos(x, cx, 19, 10, 31, 18, col.r, col.a);
+    // Fase 5: los rayos, detrás de todo (en la 6, el rosetón).
+    if (fase === 5) rayos(x, cx, 19, 10, 31, 18, col.r, col.a);
+    if (fase >= 6) roseton(x, cx, 19, 10, 31, 16);
     // Fases 2 y 3: un tercer par de alas, en cola, hacia el fanal.
     if (fase >= 2) espejo(cx, (s, m) => {
       poligono(x, [m([4, 24]), m([20 * k, 27]), m([16 * k + 2, 40]), m([10 * k + 1, 44]), m([6, 31])], col.r);
@@ -1110,7 +1182,8 @@
       // Una fila de puntos pálidos junto al margen.
       for (const [px, py] of [[23, 12], [25, 17], [21.5, 23]]) elipse(x, m([px * k, py])[0], py, 0.9 * k + 0.3, 0.9, col.e);
       // El ocelo: un ojo en cada ala, que en la fase 3 tiene la pupila rasgada.
-      if (fase >= 5) {
+      if (fase >= 6) roseta(x, m([15.5 * k, 18])[0], 18, 5.2);   // fase 6: el ocelo es una roseta
+      else if (fase === 5) {
         // Fase 5: en el lugar del ocelo, un sol chico.
         const o = m([15.5 * k, 18]);
         rayos(x, o[0], o[1], 3, 7.5, 8, col.g, col.r);
@@ -1139,7 +1212,9 @@
     // Fase 3: los huevos, en corona.
     if (fase === 3) for (let i = 0; i < 7; i++) { const a = Math.PI * (1.1 + 0.8 * i / 6); elipse(x, cx + Math.cos(a) * 10.5, 5.5 + Math.sin(a) * 9.5, 1.4, 1.4, i % 2 ? col.r : col.g); }
     // Fase 5: los huevos, cinco soles chicos en arco.
-    if (fase >= 5) for (let i = 0; i < 5; i++) { const a = Math.PI * (1.15 + 0.7 * i / 4), ex = cx + Math.cos(a) * 13, ey = 7 + Math.sin(a) * 10; elipse(x, ex, ey, 2.2, 2.2, col.r); elipse(x, ex, ey, 1.1, 1.1, col.g); }
+    if (fase === 5) for (let i = 0; i < 5; i++) { const a = Math.PI * (1.15 + 0.7 * i / 4), ex = cx + Math.cos(a) * 13, ey = 7 + Math.sin(a) * 10; elipse(x, ex, ey, 2.2, 2.2, col.r); elipse(x, ex, ey, 1.1, 1.1, col.g); }
+    // Fase 6: los huevos, siete gotas de vidrio en arco, de colores.
+    if (fase >= 6) for (let i = 0; i < 7; i++) { const a = Math.PI * (1.1 + 0.8 * i / 6), ex = cx + Math.cos(a) * 14, ey = 7 + Math.sin(a) * 11; poligono(x, [[ex, ey - 2.8], [ex + 1.9, ey], [ex, ey + 2.8], [ex - 1.9, ey]], JOYAS[i % JOYAS.length]); elipse(x, ex - 0.5, ey - 0.8, 0.6, 0.6, BORDE_VITRAL); }
     // Fase 4: un arco de siete estrellas, unidas.
     if (fase === 4) {
       const arco = [];
@@ -1175,13 +1250,16 @@
     4: { h: "#5a6ee0", H: "#3c50b4", g: "#0c1434", G: "#16225a", l: "#ffffff", m: "#16225a", n: "#0c1434", k: "#b48cff", r: "#c8f0ff", o: "#0c1434" }
   };
   COLORES_FARO_F[5] = alba(COLORES_FARO_F[4]);
+  COLORES_FARO_F[6] = vitral(COLORES_FARO_F[4]);
   function faro(fase) {
     fase = fase || 1;
     const W = 44, H = 54, cx = 22, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 8);
     if (!x) return c;
     const col = COLORES_FARO_F[fase] || COLORES_FARO;
     // Fase 5: encendido de verdad: los rayos salen de la lente, por detrás de la torre.
-    if (fase >= 5) rayos(x, cx, 28, 12, 34, 16, col.r, col.k);
+    if (fase === 5) rayos(x, cx, 28, 12, 34, 16, col.r, col.k);
+    // Fase 6: la lente se volvió vitral, y su luz, un rosetón.
+    if (fase >= 6) roseton(x, cx, 28, 12, 34, 14);
     // Fase 3: una corona de púas sobre el casco.
     if (fase === 3) for (const sx of [9, 15.5, 22, 28.5, 35]) poligono(x, [[sx - 2.6, 3], [sx, sx === 22 ? -7 : -4.5], [sx + 2.6, 3]], col.h);
     // Fase 4: una aureola de estrellas chicas.
@@ -1218,7 +1296,9 @@
       poligono(x, [[13, 19], [31, 19], [31, 36], [13, 36]], col.G);
       for (const mx of [11, 17, 22, 27, 33]) trazo(x, [[mx, 17], [mx, 38]], col.H, 1.2);
       // La lente, apagada en el dibujo (la luz se agrega viva). En la fase 2, más grande y roja.
-      if (fase >= 5) {   // la lente: un sol
+      if (fase >= 6) {   // la lente: un rosetón chico, con plomo
+        elipse(x, cx, 28, 8, 8, col.k); roseta(x, cx, 28, 7.4); elipse(x, cx, 28, 1.2, 1.2, PLOMO);
+      } else if (fase === 5) {   // la lente: un sol
         elipse(x, cx, 28, 7.6, 7.6, col.k); elipse(x, cx, 28, 6.2, 6.2, col.h); elipse(x, cx, 28, 4.4, 4.4, col.r); elipse(x, cx, 28, 2.2, 2.2, col.l);
       } else if (fase === 4) {   // la lente: una estrella, con dos rayos más en diagonal
         for (const s of [-1, 1]) trazo(x, [[cx - 7.5, 28 - s * 7.5], [cx + 7.5, 28 + s * 7.5]], col.k, 0.8);
@@ -1254,13 +1334,15 @@
     4: { b: "#16225a", B: "#0c1434", e: "#ffffff", E: "#8fd8ff", c: "#0c1434", d: "#1e2e78", a: "#b48cff", r: "#8fd8ff", y: "#ffffff" }
   };
   COLORES_ESFINGE_F[5] = alba(COLORES_ESFINGE_F[4]);
+  COLORES_ESFINGE_F[6] = vitral(COLORES_ESFINGE_F[4]);
   function esfinge(k, fase) {
     fase = fase || 1;
     const W = 78, H = 44, cx = 39, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
     if (!x) return c;
     const col = COLORES_ESFINGE_F[fase] || COLORES_ESFINGE;
-    // Fase 5: los rayos, detrás.
-    if (fase >= 5) rayos(x, cx, 22, 10, 34, 20, col.E, col.a);
+    // Fase 5: los rayos, detrás (en la 6, el rosetón).
+    if (fase === 5) rayos(x, cx, 22, 10, 34, 20, col.E, col.a);
+    if (fase >= 6) roseton(x, cx, 22, 10, 34, 18);
     // Fase 4: el aro, detrás de la cabeza.
     if (fase === 4) { x.strokeStyle = col.a; x.lineWidth = 1; x.beginPath(); x.arc(cx, 31, 9.5, 0, Math.PI * 2); x.stroke(); }
     // Fase 3: un segundo par de alas largas, debajo de las primeras.
@@ -1285,7 +1367,9 @@
       // Fase 4: en cada quiebre de las marcas, una estrella.
       if (fase === 4) for (const [px, py, r] of [[16, 15, 2.6], [25, 9, 2.6], [9, 21, 1.7], [22, 17, 1.5], [34, 7.6, 2]]) estrella(x, m([px * k, py])[0], py, r, col.e);
       // Fase 5: un sol chico en la punta de cada ala.
-      if (fase >= 5) { const p = m([33 * k, 8]); elipse(x, p[0], p[1], 2.6, 2.6, col.E); elipse(x, p[0], p[1], 1.3, 1.3, col.e); }
+      if (fase === 5) { const p = m([33 * k, 8]); elipse(x, p[0], p[1], 2.6, 2.6, col.E); elipse(x, p[0], p[1], 1.3, 1.3, col.e); }
+      // Fase 6: una roseta en la punta y el ala rajada, como un vidrio que se partió.
+      if (fase >= 6) { const p = m([33 * k, 8]); roseta(x, p[0], p[1], 3.2); trazo(x, [m([28 * k, 9]), m([22 * k, 15]), m([24 * k, 18]), m([16 * k, 20])], PLOMO, 0.9); }
     });
     // Abdomen largo y anillado (arriba), tórax y cabeza (abajo).
     poligono(x, [[cx - 4, 24], [cx - 3, 6], [cx, 1], [cx + 3, 6], [cx + 4, 24]], col.c);
@@ -1326,6 +1410,7 @@
     4: { m: "#16225a", n: "#0c1434", k: "#3c50b4", h: "#5a6ee0", g: "#8fd8ff", v: "#1e2e78", V: "#b48cff", o: "#0c1434", G: "#0c1434", y: "#ffffff", s: "#c8f0ff" }
   };
   COLORES_CASCO_F[5] = alba(COLORES_CASCO_F[4]);
+  COLORES_CASCO_F[6] = vitral(COLORES_CASCO_F[4]);
   function casco(k, fase) {
     fase = fase || 1;
     const W = 52, H = 40, cx = 26, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 7);
@@ -1333,7 +1418,9 @@
     const col = COLORES_CASCO_F[fase] || COLORES_CASCO;
     // Fases 2 y 3: coral que le creció en la quilla (en la 3, en corona).
     // Fase 5: el sol saliendo por detrás de la quilla.
-    if (fase >= 5) { rayos(x, cx, 6, 9, 17, 9, col.g, col.V, Math.PI, Math.PI * 2); elipse(x, cx, 6, 9, 9, col.g); elipse(x, cx, 6, 6.4, 6.4, col.y); }
+    if (fase === 5) { rayos(x, cx, 6, 9, 17, 9, col.g, col.V, Math.PI, Math.PI * 2); elipse(x, cx, 6, 9, 9, col.g); elipse(x, cx, 6, 6.4, 6.4, col.y); }
+    // Fase 6: medio rosetón sobre la quilla, y botellas de colores colgando de la borda.
+    if (fase >= 6) { roseton(x, cx, 6, 8, 18, 9, Math.PI, Math.PI * 2); roseta(x, cx, 6, 6); }
     // Fase 4: en vez de coral, la constelación de la Nave.
     if (fase === 4) {
       const nave = [[3, 1], [12, -3], [21, 0.5], [30, -4.5], [39, -1], [49, -5]];
@@ -1379,6 +1466,11 @@
       poligono(x, [[cx + 9, 22], [cx + 20 + k, 23], [cx + 21 + k, 29], [cx + 16, 27], [cx + 15 + k, 34]], vela);
       if (fase === 4) { estrella(x, cx - 21 - k, 29, 1.8, col.y); estrella(x, cx + 18 + k, 27, 1.8, col.y); }
     }
+    if (fase >= 6) for (const [bx, i] of [[cx - 17, 0], [cx + 17, 1], [cx + 11, 2]]) {   // las botellas
+      trazo(x, [[bx, 21], [bx, 24]], col.k, 0.8);
+      poligono(x, [[bx - 0.9, 24], [bx + 0.9, 24], [bx + 0.9, 25.5], [bx + 2.2, 27], [bx + 2.2, 32], [bx - 2.2, 32], [bx - 2.2, 27], [bx - 0.9, 25.5]], JOYAS[i]);
+      elipse(x, bx - 0.9, 28.5, 0.5, 1.6, BORDE_VITRAL);
+    }
     // El farol: soporte, vidrio y remate apuntando al fanal.
     trazo(x, [[cx, 21], [cx, 24]], col.h, 1.4);
     poligono(x, [[cx - 6, 24], [cx + 6, 24], [cx + 6, 26], [cx - 6, 26]], col.g);
@@ -1403,16 +1495,19 @@
     4: { s: "#16225a", S: "#0c1434", b: "#b48cff", B: "#5a6ee0", p: "#c8f0ff", P: "#3c50b4", c: "#0c1434", e: "#ffffff", a: "#8fd8ff", g: "#8fd8ff", o: "#0c1434" }
   };
   COLORES_CRISALIDA_F[5] = alba(COLORES_CRISALIDA_F[4]);
+  COLORES_CRISALIDA_F[6] = vitral(COLORES_CRISALIDA_F[4]);
   /* La imago de la fase 4: las alas, que en las otras son lo claro, aquí son la noche. */
   const COLORES_IMAGO_4 = { s: "#0c1434", S: "#0c1434", b: "#b48cff", B: "#5a6ee0", p: "#16225a", P: "#8fd8ff", c: "#0c1434", e: "#ffffff", a: "#b48cff", g: "#b48cff", o: "#0c1434" };
   const COLORES_IMAGO_5 = alba(COLORES_IMAGO_4);
+  const COLORES_IMAGO_6 = vitral(COLORES_IMAGO_4);
   function crisalida(k, fase) {
     fase = fase || 1;
     const W = 34, H = 48, cx = 17, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 6);
     if (!x) return c;
     const col = COLORES_CRISALIDA_F[fase] || COLORES_CRISALIDA;
-    // Fase 5: los rayos, detrás.
-    if (fase >= 5) rayos(x, cx, 25, 14, 29, 16, col.a, col.b);
+    // Fase 5: los rayos, detrás (en la 6, el rosetón).
+    if (fase === 5) rayos(x, cx, 25, 14, 29, 16, col.a, col.b);
+    if (fase >= 6) roseton(x, cx, 25, 14, 29, 14);
     // Fase 3: el halo de seda, una vuelta de puntos alrededor.
     if (fase >= 3) for (let i = 0; i < 26; i++) { const a = (i / 26) * Math.PI * 2; if (Math.sin(a) < -0.93) continue; elipse(x, cx + Math.cos(a) * (17 + k), 25 + Math.sin(a) * 23, 0.8, 0.8, i % 2 ? col.b : col.B); }
     // Fase 4: un segundo halo, de estrellas.
@@ -1441,13 +1536,15 @@
     if (fase >= 3) { poligono(x, [[cx - 3.2, 33], [cx, 45], [cx + 3.2, 33], [cx, 36.5]], col.p); trazo(x, [[cx, 36.5], [cx, 44]], col.e, 0.8); }
     // Fase 4: lo que espera adentro ya es una estrella.
     if (fase === 4) estrella(x, cx, 25, 6.5 + k, col.p, col.e);
+    // Fase 6: y es una roseta, con el plomo de las vueltas de seda.
+    if (fase >= 6) { roseta(x, cx, 25, 6 + k); for (let i = 0; i < 6; i++) { const y = 12 + i * 5; if (Math.abs(y - 25) > 6) trazo(x, [[cx - 9 - k, y + 2], [cx, y], [cx + 9 + k, y + 2]], PLOMO, 0.8); } }
     return acaba(c, col, fase);
   }
   function imago(k, fase) {
     fase = fase || 1;
     const W = 64, H = 40, cx = 32, { c, x } = lienzoJefe(W, H, fase, 7);
     if (!x) return c;
-    const col = fase >= 5 ? COLORES_IMAGO_5 : fase === 4 ? COLORES_IMAGO_4 : COLORES_CRISALIDA_F[fase] || COLORES_CRISALIDA;
+    const col = fase >= 6 ? COLORES_IMAGO_6 : fase === 5 ? COLORES_IMAGO_5 : fase === 4 ? COLORES_IMAGO_4 : COLORES_CRISALIDA_F[fase] || COLORES_CRISALIDA;
     // Fase 3: un segundo par de alas, más abajo.
     if (fase >= 3) espejo(cx, (s, m) => {
       poligono(x, [m([4, 21]), m([23 * k, 25]), m([27 * k, 34]), m([15 * k, 40]), m([6, 31])], col.P);
@@ -1464,6 +1561,7 @@
       elipse(x, m([17 * k, 13])[0], 13, 3 * k + 1, 2.4, col.e);
       elipse(x, m([16 * k, 23])[0], 23, 2.4 * k + 0.8, 2, col.e);
       if (fase >= 2) elipse(x, m([17 * k, 13])[0], 13, 1.1, 1.1, col.g);
+      if (fase >= 6) { roseta(x, m([17 * k, 13])[0], 13, 4.6); roseta(x, m([16 * k, 23])[0], 23, 3.4); }
       if (fase === 4) { estrella(x, m([17 * k, 13])[0], 13, 5.4, col.e, col.g); estrella(x, m([16 * k, 23])[0], 23, 3.8, col.e); estrella(x, m([29 * k, 4])[0], 4, 1.8, col.e); estrella(x, m([24 * k, 29.5])[0], 29.5, 1.6, col.e); }
       trazo(x, [m([5, 17]), m([30 * k, 9])], col.P, 0.8);
       trazo(x, [m([7, 24]), m([26 * k, 26])], col.s, 0.9);   // los restos del capullo, pegados
@@ -1489,13 +1587,15 @@
     4: { h: "#5a6ee0", H: "#16225a", g: "#ffffff", G: "#8fd8ff", o: "#0c1434", r: "#0c1434", k: "#16225a", y: "#c8f0ff", c: "#0c1434", v: "#b48cff" }
   };
   COLORES_HOGUERA_F[5] = alba(COLORES_HOGUERA_F[4]);
+  COLORES_HOGUERA_F[6] = vitral(COLORES_HOGUERA_F[4]);
   function hoguera(k, fase) {
     fase = fase || 1;
     const W = 60, H = 44, cx = 30, { c, x } = lienzoJefe(W, H, fase, fase >= 5 ? 12 : 8);
     if (!x) return c;
     const col = COLORES_HOGUERA_F[fase] || COLORES_HOGUERA;
-    // Fase 5: los rayos, detrás.
-    if (fase >= 5) rayos(x, cx, 20, 16, 40, 20, col.G, col.v);
+    // Fase 5: los rayos, detrás (en la 6, el rosetón).
+    if (fase === 5) rayos(x, cx, 20, 16, 40, 20, col.G, col.v);
+    if (fase >= 6) roseton(x, cx, 20, 16, 40, 18);
     // Fases 2 y 3: vigas quemadas que salen del carbón (en la 3, cinco, en corona).
     if (fase >= 2) for (const [bx, px, py] of fase >= 3 ? [[-20, -27, -4], [-10, -13, -7], [0, 0, -8], [10, 13, -7], [20, 27, -4]] : [[-16, -29, -6], [16, 29, -6]]) {
       poligono(x, [[cx + bx - 2.2, 6], [cx + px - 0.8, py + 1], [cx + px + 1.2, py], [cx + bx + 2.2, 6]], col.H);
@@ -1513,7 +1613,8 @@
       poligono(x, [[fx - 5, fy + 10], [fx + 5, fy + 10], [fx + 2, fy + 12], [fx - 2, fy + 12]], col.G);
       if (fase === 2) for (const s of [-1, 1]) elipse(x, fx + s * 2.2, fy + 5.6, 0.9, 2, col.y);   // adentro todavía hay llama
       if (fase === 4) estrella(x, fx, fy + 5, 3.2, (Math.round(fx + fy) & 1) ? col.y : col.v, col.g);   // adentro, una estrella
-      if (fase >= 5) { poligono(x, [[fx - 4, fy + 1], [fx + 4, fy + 1], [fx + 4, fy + 9], [fx - 4, fy + 9]], col.y); elipse(x, fx, fy + 5.6, 1.7, 3, col.G); elipse(x, fx, fy + 6.2, 0.9, 1.8, col.g); }   // todos encendidos, de día
+      if (fase >= 6) { const j = JOYAS[(Math.round(fx / 6) + Math.round(fy / 11)) & 3]; poligono(x, [[fx - 4, fy + 1], [fx + 4, fy + 1], [fx + 4, fy + 9], [fx - 4, fy + 9]], j); trazo(x, [[fx - 4, fy + 1], [fx + 4, fy + 9]], PLOMO, 0.7); elipse(x, fx - 1.6, fy + 3, 0.7, 1.3, BORDE_VITRAL); }   // cada fanal, un vidrio de color
+      else if (fase === 5) { poligono(x, [[fx - 4, fy + 1], [fx + 4, fy + 1], [fx + 4, fy + 9], [fx - 4, fy + 9]], col.y); elipse(x, fx, fy + 5.6, 1.7, 3, col.G); elipse(x, fx, fy + 6.2, 0.9, 1.8, col.g); }   // todos encendidos, de día
     };
     if (fase >= 2) {
       for (const fx of [cx - 24, cx - 12, cx, cx + 12, cx + 24]) marco(fx, 8);
@@ -1563,6 +1664,7 @@
     4: { l: "#ffffff", L: "#8fd8ff", s: "#3c50b4", S: "#16225a", o: "#0c1434", a: "#16225a", A: "#0c1434", e: "#ffffff", k: "#0c1434", y: "#b48cff" }
   };
   COLORES_LUNA_F[5] = alba(COLORES_LUNA_F[4]);
+  COLORES_LUNA_F[6] = vitral(COLORES_LUNA_F[4]);
   function luna(k, fase, llena) {
     fase = fase || 1;
     const W = 64, H = 50, cx = 32, cy = 24, { c, x } = lienzoJefe(W, H, fase, 8);
@@ -1581,7 +1683,19 @@
       // Fase 2: los velos, en jirones.
       if (fase === 2) corta(x, () => { for (const [dx, dy] of [[34, -9], [36, 0], [33, 8], [24, 21]]) poligono(x, [[cx + s * (dx * k + 4), cy + dy - 2.2], [cx + s * (dx - 9) * k, cy + dy], [cx + s * (dx * k + 4), cy + dy + 2.2]], "#000"); });
     });
-    if (fase >= 5) {
+    if (fase >= 6) {
+      // La luna de vidrio: un rosetón entero detrás, el disco de piezas de
+      // color (lo llena `vidria`), el creciente de luz y un ojo de plomo.
+      roseton(x, cx, cy, 16, 27, 16);
+      elipse(x, cx, cy, 17.2, 17.2, col.L);
+      elipse(x, cx, cy, 16, 16, col.o);
+      if (!llena) { x.save(); x.beginPath(); x.ellipse(cx, cy, 16, 16, 0, 0, Math.PI * 2); x.clip(); elipse(x, cx - 6, cy, 15.5, 16.5, col.l); elipse(x, cx + 2, cy, 15.5, 16.5, col.o); x.restore(); }
+      else elipse(x, cx, cy, 15, 15, col.l);
+      elipse(x, cx + 4, cy - 1, 4.2, 3, BORDE_VITRAL); elipse(x, cx + 4, cy - 1, 1.3, 2.6, PLOMO);
+      for (const [dx, dy] of [[-12, -7], [-13, 6]]) roseta(x, cx + dx, cy + dy, 2.6);
+      return acaba(c, col, fase);
+    }
+    if (fase === 5) {
       // La luna de día: pálida y entera, con el sol asomando por detrás (su
       // borde de oro y sus rayos) y un ojo abierto.
       rayos(x, cx - 4, cy - 4, 15, 26, 12, col.L, col.y, Math.PI * 0.75, Math.PI * 1.75);
@@ -1668,6 +1782,7 @@
     4: { w: "#ffffff", y: "#c8f0ff", o: "#b48cff", v: "#8fd8ff", V: "#5a6ee0" }
   };
   COLORES_HERMANA_F[5] = alba(COLORES_HERMANA_F[4]);
+  COLORES_HERMANA_F[6] = { w: "#ffffff", y: "#fff6d8", o: "#ff4c9c", v: "#5cf0d8", V: "#8c5cff", p: "#ffc83c" };
   /* Los colores de una hermana velada en las fases 2 y 3: los suyos, casi apagados. */
   function velo(col) { const out = {}; for (const q in col) out[q] = mezcla(col[q], "#1a1430", 0.68); return out; }
   function hermana(k, fase, velada) {
@@ -1683,8 +1798,10 @@
       trazo(x, [[cx - 9.5, cx], [cx + 9.5, cx]], col.V, 0.7); trazo(x, [[cx, cx - 9.5], [cx, cx + 9.5]], col.V, 0.7);
       for (const sx of [-1, 1]) for (const sy of [-1, 1]) elipse(x, cx + sx * (5.6 + k * 0.4), cx + sy * (5.6 + k * 0.4), 0.8, 0.8, col.o);
     }
+    // Fase 6: una gema tallada detrás, de seis caras.
+    if (fase >= 6) { const r = 6.4 - k * 0.3, hx = i => [cx + Math.cos(i * Math.PI / 3 + Math.PI / 6) * r, cx + Math.sin(i * Math.PI / 3 + Math.PI / 6) * r]; poligono(x, [0, 1, 2, 3, 4, 5].map(hx), col.V); for (let i = 0; i < 6; i += 2) poligono(x, [[cx, cx], hx(i), hx(i + 1)], col.p); }
     // Fase 2: cuatro puntas más, en diagonal (en la 5 vuelven, de oro).
-    if (fase === 2 || fase >= 5) { const d = (L + 1.6) * 0.62, q = 1.3; poligono(x, [[cx - d, cx - d], [cx, cx - q], [cx + d, cx - d], [cx + q, cx], [cx + d, cx + d], [cx, cx + q], [cx - d, cx + d], [cx - q, cx]], col.V); }
+    if (fase === 2 || fase === 5) { const d = (L + 1.6) * 0.62, q = 1.3; poligono(x, [[cx - d, cx - d], [cx, cx - q], [cx + d, cx - d], [cx + q, cx], [cx + d, cx + d], [cx, cx + q], [cx - d, cx + d], [cx - q, cx]], col.V); }
     poligono(x, [[cx, cx - L - 0.5], [cx + l, cx - l], [cx + L + 0.5, cx], [cx + l, cx + l], [cx, cx + L + 0.5], [cx - l, cx + l], [cx - L - 0.5, cx], [cx - l, cx - l]], col.v);
     poligono(x, [[cx, cx - L + 1], [cx + 1, cx - 1], [cx + L - 1, cx], [cx + 1, cx + 1], [cx, cx + L - 1], [cx - 1, cx + 1], [cx - L + 1, cx], [cx - 1, cx - 1]], col.y);
     elipse(x, cx, cx, 2.6, 2.6, col.o);
@@ -1713,6 +1830,7 @@
     const col = COLORES_SOL_F[fase] || COLORES_SOL;
     // La corona: doce lenguas, alternando largas y cortas (dieciséis torcidas
     // en la fase 2; veinticuatro agujas en la 3).
+    if (fase >= 6) return solDeVidrio(k);
     const n = fase >= 5 ? 16 : fase === 4 ? 8 : fase === 3 ? 24 : fase === 2 ? 16 : 12;
     // Fase 4: el aro, por detrás.
     if (fase === 4) { x.strokeStyle = col.h; x.lineWidth = 1.3; x.beginPath(); x.ellipse(cx, cy, 31, 8.5, -0.32, 0, Math.PI * 2); x.stroke(); }
@@ -1771,6 +1889,27 @@
     trazo(x, [[cx + 4, cy - 3], [cx + 7, cy - 5], [cx + 10, cy - 3]], col.e, 1.4);
     trazo(x, [[cx - 6, cy + 8], [cx, cy + 6 + k * 0.6], [cx + 6, cy + 8]], col.e, 1.4);
     return cuantiza(c, Object.values(col));
+  }
+
+  /* El Sol de la fase 6: una corona de vidrio (un rosetón de doce), el
+     disco hecho vitral (lo llena `vidria`) y la cara: un ojo grande detrás
+     de una lupa, con su mango. «Te mira a través de una lupa.» */
+  const COLORES_SOL_6 = { r: "#c8284c", o: "#ffc83c", y: "#16225a", w: "#ffffff", e: PLOMO, h: "#5cf0d8", H: "#2c4cc8", g: BORDE_VITRAL };
+  function solDeVidrio(k) {
+    const W = 64, H = 64, cx = 32, cy = 32, { c, x } = lienzoJefe(W, H, 6, 9);
+    if (!x) return c;
+    const col = COLORES_SOL_6;
+    roseton(x, cx, cy, 19, 37 + k * 1.2, 12, (k % 2) * 0.13, Math.PI * 2 + (k % 2) * 0.13);
+    elipse(x, cx, cy, 21, 21, col.r);
+    elipse(x, cx, cy, 19.5, 19.5, col.o);
+    elipse(x, cx, cy, 17.6, 17.6, col.y);
+    // Los ojos: el de la izquierda, chico; el de la derecha, grande detrás de la lupa.
+    elipse(x, cx - 7.5, cy - 3.5, 3, 2.3, col.w); elipse(x, cx - 7.5, cy - 3.3, 1.1, 1.5, col.e);
+    elipse(x, cx + 7, cy - 4, 6.8, 6.8, col.h); elipse(x, cx + 7, cy - 4, 5.6, 5.6, col.y);
+    elipse(x, cx + 7, cy - 4, 4.6, 3.8, col.w); elipse(x, cx + 7, cy - 3.6, 2, 2.6, col.e); elipse(x, cx + 5.4, cy - 5.6, 0.9, 0.9, col.g);
+    trazo(x, [[cx + 11.5, cy + 1], [cx + 17, cy + 8]], col.H, 2.2);
+    trazo(x, [[cx - 6, cy + 8], [cx, cy + 10], [cx + 5, cy + 8.5]], col.e, 1.3);
+    return acaba(c, col, 6);
   }
 
   /* ================================================================

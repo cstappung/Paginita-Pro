@@ -217,3 +217,103 @@ test('La jugada de una plantilla de afuera pasa las reglas de jugadas/$n',()=>{
  const e=externoMemazo(j,'reales');
  assert.equal(e.w,1200);assert.equal(e.h,1200);
 });
+
+/* GIPHY: la clave de prueba da ~100 llamadas por hora para todos. Cada
+   «navegador» de estas pruebas es el módulo cargado aparte con su propio
+   localStorage; el reloj y fetch son de mentira. */
+const esbuild=require('esbuild');
+let codigoFuentes=null;
+function navegador(red,reloj){
+ if(!codigoFuentes) codigoFuentes=esbuild.buildSync({entryPoints:[path.join(__dirname,'../src/juegos/memazo-fuentes.js')],bundle:true,format:'cjs',write:false,
+  external:['../firebase.js','firebase/database']}).outputFiles[0].text;
+ const almacen={};
+ const ctx={module:{exports:{}},__clave:'claveDePrueba123',
+  localStorage:{getItem:k=>almacen[k]??null,setItem:(k,v)=>{almacen[k]=v;}},
+  fetch:async u=>{red.llamadas.push({t:reloj.t,u:String(u)});return red.responde(String(u));},
+  Date:{now:()=>reloj.t},JSON,Math,Number,String,Array,Object,Map,Error,encodeURIComponent,Promise,
+  require:m=>m==='firebase/database'?{ref:()=>0,get:async()=>({val:()=>ctx.__clave})}:{db:{}}};
+ ctx.globalThis=ctx;vm.createContext(ctx);vm.runInContext(codigoFuentes,ctx);
+ return Object.assign(ctx.module.exports,{almacen,ctx});
+}
+const resp=(status,body)=>({ok:status===200,status,json:async()=>body});
+const conGifs=u=>{const q=new URL(u).searchParams.get('q')||'moda';return resp(200,{meta:{status:200},data:[{id:'gif'+q.replace(/\W/g,'')+'abcdef',title:q,images:{original:{width:'480',height:'270'}}}]});};
+const HORA=3600e3;
+
+test('GIPHY: un 429 o una clave mala son un error con motivo, nunca «cero GIFs»',async()=>{
+ const reloj={t:1e12},red={llamadas:[],responde:conGifs};
+ const sinClave=navegador(red,reloj);sinClave.ctx.__clave=null;
+ await assert.rejects(sinClave.gifsGiphy(),e=>/Falta la clave/.test(e.motivo));
+ for(const [st,body,re] of [[429,{meta:{status:429}},/límite/],[200,{meta:{status:401},data:[]},/clave/],[200,{meta:{status:200},data:[]},/no devolvió/]]){
+  const b=navegador({llamadas:[],responde:()=>resp(st,body)},reloj);
+  await assert.rejects(b.gifsGiphy(),e=>re.test(e.motivo));
+ }
+});
+
+test('GIPHY: lo guardado no gasta: los de moda 6 h y cada búsqueda 1 día, también tras recargar',async()=>{
+ const reloj={t:1e12},red={llamadas:[],responde:conGifs};
+ let b=navegador(red,reloj);
+ await b.gifsGiphy();await b.gifsGiphy();await b.gifsGiphy('gato');await b.gifsGiphy('  GATO ');
+ assert.equal(red.llamadas.length,2);
+ /* recargar la página: módulo nuevo, mismo localStorage */
+ const almacen=b.almacen;b=navegador(red,reloj);Object.assign(b.almacen,almacen);
+ reloj.t+=5*HORA;await b.gifsGiphy();await b.gifsGiphy('gato');
+ assert.equal(red.llamadas.length,2,'nada nuevo dentro de las 6 h / el día');
+ reloj.t+=2*HORA;await b.gifsGiphy();
+ assert.equal(red.llamadas.length,3,'pasadas 6 h los de moda se piden otra vez');
+});
+
+test('GIPHY: como mucho GIPHY_TOPE llamadas por navegador y hora, compartidas entre pestañas',async()=>{
+ const reloj={t:1e12},red={llamadas:[],responde:conGifs};
+ const a=navegador(red,reloj),tope=a.GIPHY_TOPE;
+ assert.ok(tope*8<100,'ocho jugadores al tope no llegan a 100 por hora');
+ const b=navegador(red,reloj);b.almacen=a.almacen;   // otra pestaña: mismo localStorage
+ b.ctx.localStorage=a.ctx.localStorage;
+ let rechazos=0;
+ for(let i=0;i<30;i++){
+  const nav=i%2?a:b;
+  try{await nav.gifsGiphy('busqueda '+i);}catch(e){rechazos++;assert.match(e.motivo,/búsquedas de GIFs de esta hora/);}
+  reloj.t+=60e3;
+ }
+ assert.equal(red.llamadas.length,tope);
+ assert.equal(rechazos,30-tope);
+ assert.ok(a.cupoGiphy().quedan===0);
+ reloj.t+=HORA;
+ assert.equal(a.cupoGiphy().quedan,tope,'una hora después vuelve el cupo');
+ await a.gifsGiphy('otra cosa');
+ assert.equal(red.llamadas.length,tope+1);
+});
+
+test('GIPHY: tras un 429 el navegador no vuelve a llamar en 15 minutos',async()=>{
+ const reloj={t:1e12};let estado=429;
+ const red={llamadas:[],responde:u=>estado===429?resp(429,{meta:{status:429}}):conGifs(u)};
+ const b=navegador(red,reloj);
+ await assert.rejects(b.gifsGiphy());
+ estado=200;
+ reloj.t+=10*60e3;
+ await assert.rejects(b.gifsGiphy('gato'),e=>/pausa/.test(e.motivo));
+ assert.equal(red.llamadas.length,1);
+ reloj.t+=6*60e3;
+ assert.equal((await b.gifsGiphy('gato')).length,1);
+ assert.equal(red.llamadas.length,2);
+});
+
+/* El caso que se comía el cupo: una sala de ocho jugando una hora, todos
+   buscando mucho y recargando la página. Nunca 100 llamadas en una hora. */
+test('GIPHY: una hora de partida con ocho jugadores no llega a 100 llamadas',async()=>{
+ const reloj={t:1e12},red={llamadas:[],responde:conGifs};
+ const navs=Array.from({length:8},()=>navegador(red,reloj));
+ const palabras=['gato','perro','risa','fail','baile','lunes','viernes','examen','profe','sueño','pizza','gol'];
+ for(let ronda=0;ronda<12;ronda++){                // una ronda cada 5 minutos
+  for(const [i,nav] of navs.entries()){
+   const recarga=navegador(red,reloj);recarga.ctx.localStorage=nav.ctx.localStorage;   // cada ronda recarga la página
+   await recarga.gifsGiphy().catch(()=>{});
+   for(let k=0;k<4;k++) await recarga.gifsGiphy(palabras[(ronda*3+i+k)%palabras.length]+' '+(ronda%3)).catch(()=>{});
+  }
+  reloj.t+=5*60e3;
+ }
+ /* la ventana de una hora con más llamadas */
+ const ts=red.llamadas.map(l=>l.t).sort((a,b)=>a-b);
+ let peor=0;for(let i=0;i<ts.length;i++){let j=i;while(j<ts.length&&ts[j]-ts[i]<HORA)j++;peor=Math.max(peor,j-i);}
+ assert.ok(peor<100,'peor hora: '+peor+' llamadas');
+ assert.ok(peor<=8*navs[0].GIPHY_TOPE);
+});

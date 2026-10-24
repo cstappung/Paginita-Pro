@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove, update, query, orderByChild, equalTo } from "firebase/database";
+import { ref, get, set, push, remove, update, query, orderByChild, equalTo, startAt, limitToLast } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -122,6 +122,12 @@ await denied("una foto javascript: no cuela", () =>
   set(ref(db, `users/${userB.uid}/perfil/foto`), "javascript:alert(1)"));
 await denied("un campo inventado no cuela", () =>
   set(ref(db, `users/${userB.uid}/perfil/otro`), "x"));
+/* El color del nombre (juegos/tintas.js): solo uno de los cuatro. Si la
+   regla no lo nombra, `$otro` rechaza el perfil entero al guardarlo. */
+await allowed("B guarda su perfil con color de nombre", () =>
+  set(ref(db, `users/${userB.uid}/perfil`), { nick: "Beto", color: "#112233", tinta: "dorado", at: Date.now() }));
+await denied("un color de nombre inventado no cuela", () =>
+  set(ref(db, `users/${userB.uid}/perfil/tinta`), "red;}body{display:none"));
 await loginAs(A);
 ok("A lee el perfil de B", (await get(ref(db, `users/${userB.uid}/perfil/nick`))).val() === "Beto");
 await denied("A no lee el registro entero de B", () => get(ref(db, `users/${userB.uid}`)));
@@ -284,6 +290,40 @@ console.log("— Casino —");
   await loginAs(A);
 }
 
+console.log("— Referidos —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const fb2 = await import("./src/fb-juegos.js");
+  const C = { email: "cata@test.com", pass: "secret123" };
+  const usa = (uid, c, r, extra) => set(ref(db, `referidos/u/${uid}`), Object.assign({ c, r, at: serverTimestamp() }, extra || {}));
+  const ua = await loginAs(A);
+  await denied("no se reserva un código sin que sea el tuyo", () => set(ref(db, "referidos/c/ANA2024"), ua.uid));
+  await denied("ni el de otro a su nombre", () => update(ref(db), { "referidos/c/ANA2024": "otro", [`referidos/m/${ua.uid}`]: { c: "ANA2024", at: serverTimestamp() } }));
+  await denied("ni un código con minúsculas", () => update(ref(db), { "referidos/c/ana2024": ua.uid, [`referidos/m/${ua.uid}`]: { c: "ana2024", at: serverTimestamp() } }));
+  await denied("ni el propio sin su código", () => set(ref(db, `referidos/m/${ua.uid}`), { c: "ANA2024", at: serverTimestamp() }));
+  await allowed("A configura su código", () => fb2.configuraCodigo(ua.uid, "ANA2024"));
+  await denied("una sola vez: no lo cambia", () => fb2.configuraCodigo(ua.uid, "ANA2025"));
+  await denied("ni lo reescribe", () => set(ref(db, `referidos/m/${ua.uid}`), { c: "ANA2024", at: serverTimestamp() }));
+  await denied("ni se usa el propio", () => usa(ua.uid, "ANA2024", ua.uid));
+  const ub = await loginAs(B);
+  ok("B lee de quién es el código", (await get(ref(db, "referidos/c/ANA2024"))).val() === ua.uid);
+  await denied("B no se queda con el código de A", () => fb2.configuraCodigo(ub.uid, "ANA2024"));
+  await denied("B no inventa el dueño", () => usa(ub.uid, "ANA2024", "otro"));
+  await denied("ni un código que no existe", () => usa(ub.uid, "NOEXISTE", ua.uid));
+  await denied("ni elige la hora", () => set(ref(db, `referidos/u/${ub.uid}`), { c: "ANA2024", r: ua.uid, at: 1700000000000 }));
+  await denied("ni cuela un campo", () => usa(ub.uid, "ANA2024", ua.uid, { x: 1 }));
+  await denied("ni usa un código a nombre de A", () => usa(ua.uid, "ANA2024", ua.uid));
+  await allowed("B usa el código de A", () => fb2.usaCodigo(ub.uid, "ANA2024", ua.uid));
+  await denied("solo un código por persona", () => usa(ub.uid, "ANA2024", ua.uid));
+  await denied("ni se borra", () => remove(ref(db, `referidos/u/${ub.uid}`)));
+  await allowed("B configura su código", () => fb2.configuraCodigo(ub.uid, "BETO"));
+  await loginAs(A);
+  await denied("A no usa el de B, que entró con el suyo", () => usa(ua.uid, "BETO", ub.uid));
+  const uc = await loginAs(C);
+  await allowed("C usa el de B", () => fb2.usaCodigo(uc.uid, "BETO", ub.uid));
+  await loginAs(A);
+}
+
 console.log("— Tienda del perfil —");
 {
   const { serverTimestamp } = await import("firebase/database");
@@ -300,6 +340,16 @@ console.log("— Tienda del perfil —");
   ok("B lee la compra de A (para ver su marco)", (await get(ref(db, `tienda/${ua.uid}/cometa/p`))).val() === 5000);
   await denied("B no compra a nombre de A", () => compra(ua.uid, "olas", 5000));
   await allowed("B compra un fondo", () => compra(ub.uid, "olas", 5000));
+  /* La tienda de Halloween: precio por rareza y solo hasta el cierre
+     (VENTA_HALLOWEEN en src/juegos/tienda.js; la regla repite la hora). */
+  const abierta = Date.now() >= 1790823600000 && Date.now() < 1793588400000;
+  await denied("Halloween no se paga al precio de siempre", () => compra(ub.uid, "parca", 5000));
+  await denied("ni al de otra rareza", () => compra(ub.uid, "parca", 7500));
+  await denied("el premio de coleccionista no se vende", () => compra(ub.uid, "reycalabaza", 10000));
+  if (abierta) await allowed("B compra la Parca a 10 000 mientras se vende", () => compra(ub.uid, "parca", 10000));
+  else await denied("con la tienda de Halloween cerrada no se compra", () => compra(ub.uid, "parca", 10000));
+  const fbJ = await import("./src/fb-juegos.js");
+  await allowed("B se pone un marco de Halloween (solo el campo marco)", () => fbJ.ponEnPerfil(ub.uid, "marco", "parca"));
   await loginAs(A);
 }
 
@@ -434,7 +484,35 @@ console.log("— Mascotas: adopciones, regalos, compras y estado —");
   await allowed("B pone a la venta un objeto (ob:)", () => set(o, { u: ub.uid, c: `ob:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
   await allowed("y una mascota (ma:)", () => set(push(ref(db, "mercado/o")), { u: ub.uid, c: `ma:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
   await allowed("un intercambio mezcla carta, objeto y mascota", () => set(push(ref(db, "mercado/t")), { de: ub.uid, para: ua.uid, dar: [`ob:${ub.uid}~-Nabcdefgh`, `${ub.uid}~-Nabcdefgh.1`], pedir: [m1], at: serverTimestamp() }));
+  /* El Pueblo: la plaza (cada uno escribe la suya; se lee solo con la
+     consulta de los frescos) y los cariños (uno al día por visita). */
+  const enPlaza = { m: `ma:${ub.uid}~-Nabcdefgh`, x: 1.5, z: -2, at: serverTimestamp() };
+  const plazaB = ref(db, `mascotasPlaza/${ub.uid}`);
+  await allowed("B sale a pasear a la plaza", () => set(plazaB, enPlaza));
+  await allowed("con un gesto, un baile y algo dicho", () => set(plazaB, Object.assign({}, enPlaza, { em: "baile", ea: Date.now(), b: "start-dance-salsa", t: "¡hola!", ta: Date.now() })));
+  await denied("B no pasea por A", () => set(ref(db, `mascotasPlaza/${ua.uid}`), enPlaza));
+  await denied("ni fuera de la plaza", () => set(plazaB, Object.assign({}, enPlaza, { x: 50 })));
+  await denied("ni dice un testamento", () => set(plazaB, Object.assign({}, enPlaza, { t: "x".repeat(101), ta: Date.now() })));
+  await denied("ni con un gesto con HTML", () => set(plazaB, Object.assign({}, enPlaza, { em: "<b>", ea: Date.now() })));
+  await denied("ni con la hora inventada", () => set(plazaB, Object.assign({}, enPlaza, { at: 1 })));
+  await denied("ni con campos de más", () => set(plazaB, Object.assign({}, enPlaza, { monedas: 1 })));
+  await allowed("la plaza se lee con la consulta de los 40 más recientes", () => get(query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(40))));
+  await denied("pero no entera", () => get(ref(db, "mascotasPlaza")));
+  await denied("ni con un tope mayor", () => get(query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(41))));
+  await denied("ni la de alguien por su clave", () => get(plazaB));
+  await allowed("B se va de la plaza", () => remove(plazaB));
+  const carino = ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ub.uid}`);
+  await allowed("B le hace cariño a la mascota de A", () => set(carino, { at: serverTimestamp() }));
+  await denied("pero no dos veces el mismo día", () => set(carino, { at: serverTimestamp() }));
+  await denied("ni lo borra", () => remove(carino));
+  await denied("ni con la hora inventada", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ub.uid}`), { at: 1 }));
+  await denied("ni firma por otro", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/zz${ub.uid}`), { at: serverTimestamp() }));
+  await denied("ni a una mascota sin casa", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ua.uid}~-Nnoexiste1/${ub.uid}`), { at: serverTimestamp() }));
+  ok("B ve los cariños de esa mascota", !!(await get(ref(db, `mascotasCarinos/${ua.uid}/${ke}`))).val());
+  await denied("pero no todos los de A", () => get(ref(db, `mascotasCarinos/${ua.uid}`)));
   await loginAs(A);
+  await denied("A no se hace cariño a sí misma", () => set(ref(db, `mascotasCarinos/${ua.uid}/${ke}/${ua.uid}`), { at: serverTimestamp() }));
+  ok("A lee todos sus cariños", !!(await get(ref(db, `mascotasCarinos/${ua.uid}`))).val());
 }
 
 console.log("— Monedas: partidas del club y podios —");
@@ -608,6 +686,24 @@ console.log("— Salón: chat general y repeticiones del día —");
   await denied("B no borra un mensaje reciente de A", () => remove(ref(db, `chatGeneral/${unoDeA}`)));
   await allowed("barrer lo de hace más de un día no borra nada reciente", () => fj.barreChatGeneral(Date.now() - 86400000 - 60000, 10));
 
+  // Los super chats: el mensaje y su cobro en una actualización, con el mismo precio.
+  await loginAs(A);
+  await new Promise(r => setTimeout(r, 20500));
+  await allowed("A manda un super chat de 100", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡hola a todos!", 200, 100));
+  await allowed("cualquiera con sesión lee los cobros (la economía los suma)", () => get(ref(db, "superChat")));
+  await allowed("y pide los super vivos por `sa`", () => get(query(ref(db, "chatGeneral"), orderByChild("sa"), startAt(Date.now() - 7200000))));
+  const supA = Object.keys((await get(ref(db, `superChat/${ua.uid}`))).val() || {})[0];
+  await denied("un cobro no se reescribe", () => set(ref(db, `superChat/${ua.uid}/${supA}`), { at: serverTimestamp(), p: 300 }));
+  await denied("ni se borra", () => remove(ref(db, `superChat/${ua.uid}/${supA}`)));
+  await new Promise(r => setTimeout(r, 20500));
+  await denied("no un super sin su cobro", () => update(ref(db), { "chatGeneral/supSinCobro1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supSinCobro1" } }));
+  await denied("ni con el cobro de otro precio", () => update(ref(db), { "chatGeneral/supOtroPrec1": { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp(), s: 300, sa: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "supOtroPrec1" }, [`superChat/${ua.uid}/supOtroPrec1`]: { at: serverTimestamp(), p: 100 } }));
+  await denied("ni de un precio que no es un nivel", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "barato", 200, 50));
+  await denied("ni un cobro suelto, sin mensaje", () => set(ref(db, `superChat/${ua.uid}/cobroSuelto1`), { at: serverTimestamp(), p: 100 }));
+  await denied("ni a nombre de otro", () => set(ref(db, `superChat/${ub.uid}/cobroAjeno1`), { at: serverTimestamp(), p: 100 }));
+  await allowed("A manda uno de 300", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "¡estelar!", 200, 300));
+  await loginAs(B);
+
   const hoy = diaChile(Date.now());
   const dato = { puntos: 1, tiempo: 42000 };
   const e = entradaRep("club-minas-medium", hoy, dato, 1, '{"v":1}', "Beto");
@@ -690,6 +786,24 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await loginAs(A);
   await allowed("el admin se la quita a B", () => remove(ref(db, `prodropSerie1/${ub.uid}`)));
   await remove(ref(db, `prodropSerie1/${ua.uid}`));
+  // Batalla de Rock: cajas y rockero, cada uno los suyos (abierto a todos)
+  const caja = (u, x) => set(push(ref(db, `rock/c/${u}`)), Object.assign({ at: serverTimestamp(), p: 500, b: "f" }, x));
+  await denied("una caja de rock no cuesta menos", () => caja(ua.uid, { p: 50 }));
+  await denied("ni es de otro cuerpo", () => caja(ua.uid, { b: "x" }));
+  await denied("ni lleva campos de más", () => caja(ua.uid, { extra: 1 }));
+  await denied("ni se compra a nombre de otro", () => caja(ub.uid, {}));
+  await allowed("se compra una caja de rock", () => caja(ua.uid, {}));
+  await allowed("y guarda su rockero", () => set(ref(db, `rockLook/${ua.uid}`), JSON.stringify({ body: "f", name: "Prueba" })));
+  await denied("un rockero no pasa de 4000 caracteres", () => set(ref(db, `rockLook/${ua.uid}`), "x".repeat(4001)));
+  await allowed("una pieza de rock se pone a la venta", () => set(push(ref(db, "mercado/o")), { u: ua.uid, c: `rk:${ua.uid}~-Ncajarock01`, p: 300, at: serverTimestamp() }));
+  await loginAs(B);
+  await allowed("sin ser admin también se compran cajas de rock", () => caja(ub.uid, {}));
+  await allowed("y se guarda el rockero", () => set(ref(db, `rockLook/${ub.uid}`), "{}"));
+  await denied("pero no el de otro", () => set(ref(db, `rockLook/${ua.uid}`), "{}"));
+  await denied("ni una caja a nombre de otro", () => caja(ua.uid, {}));
+  await allowed("pero se lee el del rival, por clave", () => get(ref(db, `rockLook/${ua.uid}`)));
+  await denied("no la colección entera", () => get(ref(db, "rockLook")));
+  await loginAs(A);
   await comoDueno(`admins/${ua.uid}`, null);
   await denied("sin ser admin ya no suma monedas", () => ajuste({}));
   await denied("ni se pone en la Serie 01", () => s1(ua.uid, {}));

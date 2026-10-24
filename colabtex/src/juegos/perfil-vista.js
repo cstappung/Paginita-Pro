@@ -12,11 +12,14 @@
  * Los datos los da `ctx.datos(cb)` (la misma escucha que la pestaña de
  * logros, compartida), así que abrir diez tarjetas no son diez lecturas.
  */
-import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
-import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece } from "./perfil-tarjeta.js";
+import { exhibidasDe, miniCarta, plantillaDe, puntosDe, urlPlantilla } from "./prodrop-cartas.js";
+import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece, marcoDe } from "./perfil-tarjeta.js";
+import { HALLOWEEN, PREMIOS_HALLOWEEN, RAREZAS_HW, rarezaHw } from "./tienda.js";
 import { LOGROS } from "./logros.js";
 import { adorno, tieneAdorno } from "./marcos-animados.js";
 import { capaMascota } from "./perfil-mascota.js";
+import { nombreHtml } from "./tintas.js";
+import { ESCENAS_HW } from "./fondos-halloween.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -24,12 +27,13 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* La foto con su marco. Vale para cualquier tamaño: el marco es CSS y
    lee `--t` (el lado) y `--c` (el color de la persona). Los animados
    (campeones y tienda) son además un SVG encima (`adorno`). */
+const esHw = id => !!(HALLOWEEN[id] || PREMIOS_HALLOWEEN.some(p => p.id === id));
 export function avatarMarco(foto, nombre, color, marco, tam, uid) {
-  const id = marco || "anillo", anim = tieneAdorno(id);
+  const id = marco || "anillo", anim = tieneAdorno(id), hw = esHw(id);
   const dentro = foto
     ? `<img src="${esc(foto)}" alt="" referrerpolicy="no-referrer">`
     : `<i>${esc((nombre || "?").charAt(0).toUpperCase())}</i>`;
-  return `<span class="jg-av jg-marco-${esc(id)}${anim ? " jg-marco-anim" : ""}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}${anim ? adorno(id) : ""}</span>`;
+  return `<span class="jg-av jg-marco-${esc(id)}${anim ? " jg-marco-anim" : ""}${hw ? " jg-marco-hw" : ""}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}${anim ? adorno(id) : ""}</span>`;
 }
 
 /* La capa que se mueve de un fondo de la tienda (vacía si no es animado). */
@@ -37,7 +41,26 @@ export function avatarMarco(foto, nombre, color, marco, tam, uid) {
    perfil, comprobado contra lo que tiene ganado (sin datos todavía, se
    confía en lo guardado, como en `marcoVisible`). */
 export const marcoDeUid = (uid, perfil, datos) => marcoVisible(perfil, datos ? estadisticas(uid, datos) : null);
-export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}" aria-hidden="true"><b></b><b></b><b></b></i>` : "";
+/* Los de Halloween traen su escena (fondos-halloween.js); los demás, tres
+   <b> que el CSS de cada uno usa como quiere. */
+export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}${ESCENAS_HW[f.id] ? " jg-fanim-hw" : ""}" aria-hidden="true">${ESCENAS_HW[f.id] || "<b></b><b></b><b></b>"}</i>` : "";
+
+/* El sello de lo de Halloween que lleva puesto: qué es y su número de
+   edición («n.º 3/7»: fue la tercera cuenta en comprarlo, y lo tienen
+   siete). `grande` es el de la portada del perfil, con la rareza. */
+export function sellosHw(marco, fondo, est, grande) {
+  const items = [];
+  if (esHw(marco)) items.push(marcoDe(marco));
+  if (fondo && esHw(fondo.id)) items.push(fondo);
+  if (!items.length) return "";
+  return `<div class="jg-hw-sellos${grande ? " grande" : ""}">${items.map(it => {
+    const rz = rarezaHw(it.id) || "premio", e = est && est.ediciones && est.ediciones[it.id];
+    const tipo = rz === "premio" ? "Premio secreto" : RAREZAS_HW[rz].n;
+    return `<span class="jg-hw-sello r-${rz}" title="${esc(`${it.n} · ${tipo} · edición limitada de Halloween 2026${e && e.n ? ` · n.º ${e.n} de ${e.total}` : ""}`)}">` +
+      `<b>${rz === "premio" ? "🎁" : "🎃"} ${esc(it.n)}</b>${e && e.n ? `<em>n.º ${e.n}<small>/${e.total}</small></em>` : ""}` +
+      (grande ? `<small class="jg-hw-sello-s">${esc(tipo)} · Edición limitada Halloween 2026</small>` : "") + `</span>`;
+  }).join("")}</div>`;
+}
 
 /* Quién es, con lo que haya: su perfil manda, luego lo que trae quien
    pregunta (la ficha que se tocó, la cuenta de Google si es uno mismo),
@@ -73,8 +96,9 @@ export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor, cartas })
     <div class="jg-mini-fondo${f.oscuro ? " oscuro" : ""}" style="background:${esc(f.css(q.color))}">${capaFondo(f)}</div>
     <div class="jg-mini-cab">
       ${avatarMarco(q.foto, q.nombre, q.color, marco, 76)}
-      <div class="jg-mini-id"><b>${esc(q.nombre)}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
+      <div class="jg-mini-id"><b>${nombreHtml(uid, esc(q.nombre), editor ? p && p.tinta || "normal" : "")}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
     </div>
+    ${sellosHw(marco, f, est)}
     ${q.bio ? `<p class="jg-mini-bio">${esc(q.bio)}</p>` : `<p class="jg-mini-bio jg-nada">${uid === yo ? "Aún no escribes nada sobre ti." : "Sin descripción."}</p>`}
     <div class="jg-mini-num">${n.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>
     <div class="jg-mini-vit">${vit.length ? vit.map(v => pieza(v)).join("") : `<p class="jg-nada">${est ? "Todavía nada que exhibir." : "Cargando…"}</p>`}</div>
@@ -171,8 +195,9 @@ export function crearPaginaPerfil({ uid, ctx }) {
     const p = ctx.perfil(uid) || {}, yo = ctx.yo();
     const pista = uid === yo ? ctx.propio() : null;
     const cartas = exhibidasDe(uid, p, dat);
+    const plant = plantillaDe(uid, p, dat), nPlant = plant.filter(Boolean).length;
     const m = dat && ctx.mascota ? ctx.mascota(uid, p, dat, pinta) || null : null;
-    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr]), !!m]);
+    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr]), plant.map(c => c && [c.k, c.i, c.gr]), !!m]);
     if (f2 === firma) { if (masc) masc.pon(m); return; }
     firma = f2;
     const q = quien(uid, p, est, pista, ctx.colorDe);
@@ -194,7 +219,8 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <div class="jg-pf-hero-in">
           ${avatarMarco(q.foto, q.nombre, q.color, marco, 116)}
           <div class="jg-pf-id">
-            <h1>${esc(q.nombre)}</h1>
+            <h1>${nombreHtml(uid, esc(q.nombre))}</h1>
+            ${sellosHw(marco, fondo, est, true)}
             ${q.bio ? `<p>${esc(q.bio)}</p>` : propio ? `<p class="jg-nada">Escribe algo sobre ti en «Personalizar».</p>` : ""}
           </div>
         </div>
@@ -205,6 +231,13 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <header><h2>Cartas en exhibición</h2>${propio ? `<a class="btn2" href="#cartas">🃏 Abrir PRODROP</a>` : ""}</header>
         ${cartas.length ? `<div class="jg-pf-cartas-fila">${cartas.map(c => miniCarta(c)).join("")}</div>`
           : `<p class="jg-nada">Abre sobres en PRODROP y exhibe aquí tus mejores cartas (en la carta: «☆ Exhibir en mi perfil»).</p>`}
+      </section>` : ""}
+      ${est && (nPlant || propio) ? `
+      <section class="jg-pf-sec jg-pf-plantilla">
+        <header><h2>Plantilla de fútbol</h2>${nPlant ? `<b class="jg-pf-puntos" title="Promedio de las once: la rareza pone el techo y el estado lo escala">${puntosDe(plant)}<small> pts</small></b>` : ""}
+          ${propio ? `<a class="btn" href="#cartas/plantilla">✎ Editar plantilla</a>` : ""}</header>
+        ${nPlant ? `<iframe class="jg-pf-cancha" title="Plantilla de fútbol" loading="lazy" tabindex="-1" src="${esc(urlPlantilla(plant))}"></iframe>`
+          : `<p class="jg-nada">Abre sobres de Fútbol en PRODROP y arma tu once en 4-3-3 (en el resumen del sobre: «⚽ Mi plantilla»).</p>`}
       </section>` : ""}
       ${est ? `
       <section class="jg-pf-sec">

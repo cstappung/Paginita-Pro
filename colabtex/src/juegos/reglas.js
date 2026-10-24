@@ -109,6 +109,37 @@ const REGLAS = {
       ["Consejo", "Evita trazar el tercer lado de una caja: se la regalas al siguiente. El marcador sigue el orden de la mesa para que sepas a quién le estás pasando la cadena."]
     ]
   },
+  pool: {
+    lema: "Billar a ocho bolas: tus bolas primero, la negra al final.",
+    secciones: [
+      ["Formatos", lista([
+        "<b>1 contra 1</b>: cada uno juega por su cuenta.",
+        "<b>2 contra 2</b>: el anfitrión forma pareja con quien eligió al abrir la sala. Los equipos se alternan y, dentro de cada uno, tiran por turnos."
+      ])],
+      ["El objetivo", "Embolsa todas las bolas de tu grupo (<b>lisas 1-7</b> o <b>rayadas 9-15</b>) y después la <b>8</b>, en la tronera que hayas cantado."],
+      ["Cómo se tira", lista([
+        "Apunta moviendo el ratón (o con las flechas y los botones de puntería fina), elige la <b>fuerza</b> y el <b>punto de golpe</b> en la blanca y pulsa <b>Golpear</b> (o Espacio).",
+        "Golpe alto: la blanca sigue. Golpe bajo: retrocede. Golpe a los lados: efecto lateral, que se nota sobre todo en las bandas.",
+        "Con la <b>línea guía</b> ves la bola fantasma y hacia dónde saldrán la bola objetivo y la blanca. Si la sala no la activó, apuntas a ojo."
+      ])],
+      ["La rotura", "Abre quien indica la sala. La rotura es legal si se embolsa una bola o si al menos cuatro tocan banda. Si se embolsa la 8 en la rotura, vuelve a su lugar. Si la blanca cae en la rotura, el rival la coloca detrás de la línea de cabecera."],
+      ["Mesa abierta", "Al principio nadie tiene grupo. La primera bola (que no sea la 8) embolsada sin falta asigna lisas o rayadas, y el rival se queda con el otro grupo."],
+      ["Seguir o ceder el turno", "Sigues tirando mientras embolses una bola de tu grupo sin hacer falta. Si no embolsas o haces falta, pasa el turno."],
+      ["Faltas", lista([
+        "No tocar ninguna bola.",
+        "Tocar primero una bola que no es de tu grupo (la 8 solo cuenta cuando ya despejaste el tuyo).",
+        "Que tras el golpe ninguna bola toque banda y ninguna caiga.",
+        "Embolsar la blanca.",
+        "Tras una falta, el rival tiene la <b>blanca en mano</b>: la coloca donde quiera."
+      ])],
+      ["La 8", lista([
+        "Al despejar tu grupo debes <b>cantar la tronera</b> tocándola en la mesa antes de tirar.",
+        "Ganas si metes la 8 en la tronera cantada, sin falta.",
+        "Pierdes si la 8 cae antes de despejar tu grupo, en otra tronera, o con falta."
+      ])],
+      ["Abandono", "Si todos los de un equipo se van de la sala, gana el otro."]
+    ]
+  },
   reversi: {
     lema: "Atrapa las fichas del otro entre las tuyas.",
     secciones: [
@@ -431,7 +462,7 @@ const REGLAS = {
       ])],
       ["Escribir", lista([
         "En cada ronda te tocan <b>tres plantillas</b> al azar (son distintas para cada uno). Eliges una y le escribes sus textos: cada dibujo de la casa tiene de uno a cuatro.",
-        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste.",
+        "Tienes el tiempo de la sala (60, 90 o 120 s). Puedes mandar tu meme y <b>corregirlo</b> mientras quede reloj: vale el último que mandaste. Si se acaba el tiempo sin que pulses ¡Listo!, <b>se manda solo</b> lo último que escribiste.",
         "La etapa termina cuando todos mandaron el suyo o se acaba el tiempo. Quien no mandó nada se queda sin meme en esa ronda."
       ])],
       ["Calificar", lista([
@@ -627,12 +658,12 @@ const REGLAS = {
       ["Controles", lista([
         "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
-        "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se compra con tus puntos: <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín y <b>G</b> potencia.",
+        "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se abre la <b>tienda</b>: se compra con un clic o con las teclas <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín, <b>G</b> potencia y <b>M</b> muro reforzado; <b>U</b> sube de nivel el arma que llevas. <b>F</b> pone un muro reforzado, estés donde estés.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor y 40 por un bruto, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor, 40 por un bruto y 50 por un demoledor, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
@@ -641,7 +672,7 @@ const REGLAS = {
         "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
       ["Enemigos y cajas", lista([
-        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos.",
+        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos. Tus muros falsos y barriles los hacen <b>buscar otro camino</b>: solo los rompen si no queda ninguno libre. La excepción es el <b>demoledor</b> (nivel 6, casco amarillo y mazo, poco común): va derecho a tus muros y los tira a mazazos.",
         "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
         "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
         "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",
@@ -656,7 +687,9 @@ const REGLAS = {
         "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros."
       ])],
       ["Tienda", lista([
-        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una, el aviso de abajo muestra los precios y se compra con los puntos: <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una se abre un panel con cada artículo, su icono y su precio: se compra con un <b>clic</b> o con su tecla. <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "<b>Muro reforzado</b> (<b>M</b>, 450 cada uno, hasta 6 en la mochila): un bloque de acero con franja amarilla que aguanta lo que <b>seis muros falsos</b> (1000 de vida). Se pone con <b>F</b> delante de ti. Los enemigos lo rodean como a cualquier muro, y el <b>demoledor</b> igual va a por él a mazazos, solo que tarda mucho más.",
+        "<b>Mejorar armas</b>: cada arma que tengas sube hasta el <b>nivel 5</b> (clic en su tarjeta, o <b>U</b> para la que llevas en la mano). Cada nivel da +15 % de daño, dispara un 6 % más rápido, +20 % de munición, +6 % de radio en las explosivas y +25 % de vida en el muro falso, y <b>cuesta casi el doble que el anterior</b> (la pistola: 300, 550, 950, 1750, 3150). Con el nivel cambia cómo se ve el arma: <b>pulida</b> (1–2), <b>dorada</b> (3–4) y de <b>plasma</b> (5), que brilla; las estrellas de la barra de armas dicen el nivel. Se suma a las mejoras del multiplicador.",
         "Gastar puntos baja tu marcador: es el precio de llegar más lejos."
       ])],
       ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
@@ -1011,6 +1044,29 @@ const REGLAS = {
       ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que aciertas Componente, Fórmula y Símbolo (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
     ]
   },
+  /* Integrodle (juegos/club/integral/): lo que dice aquí tiene que
+     coincidir con su motor.js (PUNTOS, MAX_INTENTOS, la corrección) y su
+     juego.js (teclado, pistas). */
+  integral: {
+    lema: "Integrodle: una integral al día, la misma para todo el sitio, con seis intentos para dar con la primitiva.",
+    secciones: [
+      ["Cómo se juega", "Cada día hay una integral de nivel Cálculo I a III que pide alguna técnica: cambio de variable, por partes, fracciones parciales, sustitución trigonométrica, identidades, completar el cuadrado… Escribe la respuesta con el teclado de la hoja (o con el tuyo) y pulsa <b>Revisar</b>. Tienes 6 intentos."],
+      ["Qué hay que escribir", lista([
+        "<b>Indefinida</b> (∫ f dx): una primitiva cualquiera. No hace falta el «+ C»: cualquier constante sirve, y da lo mismo cómo la ordenes o la simplifiques.",
+        "<b>Definida</b> (con límites): el valor exacto, como π/4 o ln(2)/2. Un decimal no basta: tiene que ser la expresión exacta.",
+        "El logaritmo es <b>ln</b>, el valor absoluto va entre barras |x|, la raíz es √ o sqrt( ), y las potencias con ^. La vista previa muestra cómo se leyó lo que escribiste."
+      ])],
+      ["La corrección", lista([
+        "<b>✓</b>: la derivada de tu primitiva coincide con el integrando (o tu valor con el exacto). Ganaste el día.",
+        "<b>✗</b> en una indefinida: puedes abrir el gráfico «Ver dónde se separan», que dibuja el integrando junto a la derivada de lo que escribiste.",
+        "<b>✗</b> en una definida: te dice cuánto vale tu respuesta y si el valor correcto es mayor ↑ o menor ↓.",
+        "Un intento que no se puede leer, o uno repetido, no gasta intento."
+      ])],
+      ["Pistas", "Al primer fallo se destapa la técnica principal; al tercero, el paso clave (la sustitución o la descomposición que abre el ejercicio)."],
+      ["Diario y práctica", "La integral del <b>Diario</b> es la misma para todo el sitio y cambia a medianoche de Chile. La <b>Práctica</b> saca integrales al azar, si quieres solo de una técnica, cuantas veces quieras, y no suma puntos."],
+      ["Puntos, racha y clasificación", "Resolver al primer intento vale 100 puntos; luego 80, 65, 50, 35 y 20. Cada estrella de dificultad sobre la primera suma 10. Perder el día no suma. La 🔥 racha cuenta los días seguidos resueltos. En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
+    ]
+  },
   /* Sudoku Arcade (juegos/club/sudoku/): lo que dice aquí tiene que
      coincidir con su motor.js (puntos del arcade, racha) y su game.js
      (teclas, pistas). */
@@ -1063,7 +1119,8 @@ const REGLAS = {
         "La primera parte: <b>El enjambre</b> (la Nodriza), <b>La niebla</b> (el Faro Ciego), <b>Lo oscuro</b> (la Esfinge) y <b>El alba</b>, donde las polillas brillan solas y no disparan. El encuentro con el Alba no se gana como los otros: lee la bitácora.",
         "La segunda, <b>la otra orilla</b>: <b>Los cascos</b> (el Casco), <b>La seda</b> (la Crisálida) y <b>La hoguera</b> (la Hoguera).",
         "La tercera, <b>lo alto</b>: <b>La marea</b> (la Luna), <b>El firmamento</b> (las Siete Hermanas) y <b>El cenit</b>, donde espera <b>el Sol</b>, el último.",
-        "Después del Sol la travesía sigue <b>sin fin</b>: los actos vuelven de a dos jornadas, y sus jefes con ellos, cambiados. En la primera vuelta están en <b>fase II</b>; desde la segunda, en <b>fase III</b>.",
+        "Después del Sol la travesía sigue <b>sin fin</b>: los actos vuelven de a dos jornadas, y sus jefes con ellos, cambiados. En la primera vuelta están en <b>fase II</b>, en la segunda en <b>fase III</b>, después en <b>IV</b> y <b>V</b>, y desde la quinta vuelta (jornada 93) en <b>fase VI</b>, la última.",
+        "La fase VI tiene <b>rigor</b>: cada vuelta que pasas en ella es un grado más dura que la anterior, sin techo. Los jefes aguantan más, atacan más seguido, las escamas caen más rápido y las oleadas disparan más. El tránsito avisa cuándo sube el grado, y junto a la fase se ve cuál es (VI, VI (II), VI (III)…).",
         "Siempre se empieza una travesía nueva, desde la jornada 1: no hay puntos de control. Pero si cierras la página o eliges <b>Salir</b> en la pausa, la travesía queda guardada al empezar la jornada en que ibas (con tus mejoras y tus llamas), y <b>Seguir la travesía</b> la retoma desde ahí, en este o en otro dispositivo. Si el fanal se apaga, o eliges <b>Terminar la travesía</b>, se acaba para siempre.",
         "Entre jornadas se lee la bitácora de quien lleva el fanal y las cartas que hayas recuperado."
       ])],
@@ -1085,7 +1142,8 @@ const REGLAS = {
         "<b>La Luna</b> cruza el cielo en arco. Lanza crecientes de escamas con un solo hueco, marcado antes con dos líneas punteadas: ve a buscarlo. Tira de la marea, que arrastra el fanal de un lado a otro. En luna nueva se apaga: no se le puede dar mientras caen sus reflejos.",
         "<b>Las Siete Hermanas</b> son una constelación que gira entera. Solo se les da a las estrellas encendidas: las veladas paran la bala sin sentirla, y el velo pasa de unas a otras. Trazan su figura disparando una tras otra, dejan caer estrellas fugaces por una columna marcada, abren un anillo y, heridas, se dispersan por el cielo.",
         "<b>El Sol</b> abre coronas de escamas hacia todos lados, baja rayos por columnas marcadas (un casco encima da sombra), suelta llamaradas que caen hacia tu luz (se les puede tirar) y, herido, empuja con el viento solar y se deja eclipsar: mientras la Luna lo tapa, no se le puede dar.",
-        "<b>En fase II</b> los jefes son más grandes, más rojos y cada ráfaga vuelve un instante después, en espejo. <b>En fase III</b>, además, tres espinas les giran alrededor y paran tus tiros (se rompen de un tiro y vuelven), y con menos de un tercio de vida sueltan anillos de choque con un solo hueco abajo."
+        "En cada fase los jefes vuelven con <b>otro modelo</b> (II herida, III coronada, IV hecha cielo, V del alba, VI de vidrio) y estrenan una <b>habilidad</b> propia, que se anuncia con su nombre («✦ …») y se suma a las de antes: en la fase VI usan cinco, por turnos.",
+        "<b>Las de la fase VI</b>: la Nodriza deja su <b>Muda</b>, una piel de vidrio que también dispara (se rompe a tiros); el Faro abre un <b>Caleidoscopio</b> de haces que se marcan antes de encenderse; la Esfinge clava <b>Esquirlas</b> en el agua, que no hay que tocar; el Casco suelta <b>Botellas</b> que flotan hacia ti y revientan (se marca hasta dónde); la Crisálida baja una <b>Vidriera</b> de vidrios con un hueco, que se pasa por el hueco o a tiros; la Hoguera derrama una <b>Colada</b> de vidrio fundido que te sigue (un casco la ataja); la Luna vuelve el <b>Agua de vidrio</b> y la barca resbala; las Siete Hermanas tejen una <b>Celosía</b> de vidrios en diagonal; y el Sol te enfoca con una <b>Lupa</b>: no te quedes en el punto, o ponte bajo un casco."
       ])],
       ["Los actos", lista([
         "<b>Los cascos</b>: seis cascos hundidos que derivan de lado a lado. Te cubren, pero no se quedan quietos.",
@@ -1216,6 +1274,44 @@ const REGLAS = {
       ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
+  /* PRO PACMAN (juegos/club/propac/): lo que dice aquí tiene que coincidir
+     con motor.js (puntos, racha, turbo, pulso, compuertas, Glitch, vidas) y
+     juego.js (controles). */
+  propac: {
+    lema: "PRO PACMAN: come todos los puntos del laberinto de neón sin que te atrapen los fantasmas.",
+    secciones: [
+      ["Cómo se juega", "Recorre el laberinto y come todos los puntos para pasar al siguiente. Tienes <b>3 vidas</b>: si un fantasma te toca, pierdes una. Los laberintos se suceden (<b>Neón</b>, <b>Circuito</b> y <b>Reactor</b>, y vuelta a empezar), cada vez un poco más rápidos. Mientras los fantasmas están azules, corres un poco más. Los túneles de los lados te llevan al otro extremo."],
+      ["Puntos y racha", lista([
+        "Cada punto vale 10, multiplicado por tu <b>racha</b>: comer puntos seguidos (sin pasar más de 0,6 segundos sin comer) la sube a ×2 desde el punto 13, ×3 desde el 25, ×4 desde el 37 y ×5 desde el 49.",
+        "Un <b>núcleo</b> (los cuatro que brillan) vale 50 y asusta a los fantasmas unos segundos: menos en cada nivel. Comerse uno azul vale 200, después 400, 800, 1 600 y 3 200.",
+        "En el centro aparecen premios: una <b>carga de pulso</b> tras 50 puntos y un <b>chip</b> tras 130, que vale más en cada nivel (hasta 5 000). Se van a los 10 segundos.",
+        "Vida extra a los 10 000 puntos y después cada 25 000, hasta tener 5."
+      ])],
+      ["Turbo y pulso", lista([
+        "⚡ <b>Turbo</b>: cada punto carga energía. Con 35 puedes correr un poco menos de un segundo a casi el doble de velocidad.",
+        "◎ <b>Pulso</b>: guardas hasta 2 cargas. El pulso aturde tres segundos a los fantasmas que estén a 6 casillas o menos (ni persiguen ni matan) y da 100 puntos por cada uno."
+      ])],
+      ["Los fantasmas", lista([
+        "Piensan como en el arcade: cada uno elige en los cruces el camino que más lo acerca a su objetivo, y nunca da media vuelta por su cuenta.",
+        "<b>Rayo</b> (rojo) te persigue directo. Cuando quedan pocos puntos corre más y ya no vuelve a su rincón.",
+        "<b>Eco</b> (rosa) apunta cuatro casillas por delante de ti (si vas hacia arriba, también cuatro a la izquierda, como en el original).",
+        "<b>Rebote</b> (celeste) se guía por ti y por Rayo para cerrarte el paso.",
+        "<b>Tímido</b> (naranja) te persigue de lejos y se va a su rincón cuando se acerca.",
+        "<b>Glitch</b> (verde, desde el nivel 3) te persigue y, cada tanto, parpadea un segundo y aparece en otro lugar, lejos de ti.",
+        "Los fantasmas se turnan entre perseguirte y volver a sus rincones (en los primeros niveles, más rato en sus rincones); al cambiar, dan media vuelta.",
+        "Salen de la casa a medida que comes puntos, o si pasas unos segundos sin comer.",
+        "Un fantasma que te comiste vuelve a la casa y sale <b>persiguiéndote</b> aunque los demás sigan azules: solo un núcleo nuevo lo vuelve a asustar."
+      ])],
+      ["Compuertas", "Desde el segundo laberinto hay <b>compuertas</b> rojas que se abren y se cierran cada 8 segundos, para ti y para los fantasmas. Un segundo antes parpadean, y arriba a la derecha dice si están abiertas."],
+      ["Controles", lista([
+        "Teclado: flechas o WASD para moverte, Espacio o Shift turbo, E (o Q, X) pulso, P o Esc pausa.",
+        "Celular: desliza el dedo en cualquier parte para girar, o usa la cruceta de abajo; ⚡ es turbo y ◎ pulso. Mientras juegas, el juego ocupa la pantalla.",
+        "Mando: la cruceta o el stick para moverte, A turbo, B pulso y Start pausa.",
+        "Puedes pedir el giro antes de llegar al cruce: se hace en cuanto se puede."
+      ])],
+      ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* PRO TILES (juegos/club/protiles/): lo que dice aquí tiene que coincidir
      con motor.js (fichas, escape, largas, velocidad) y juego.js (controles). */
   protiles: {
@@ -1310,18 +1406,19 @@ const REGLAS = {
      coincidir con js/engine.js y js/data/ (reinos, rondas, torres) y con
      monedasProdefender en monedas.js. */
   prodefender: {
-    lema: "PRO DEFENDER: un tower defense de cinco reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
+    lema: "PRO DEFENDER: un tower defense de diez reinos con cien rondas cada uno. Coloca defensores junto al camino y que no pase nadie.",
     secciones: [
       ["Cómo se juega", "Los atacantes recorren el camino de un extremo al otro, y cada uno que llega te quita vidas. Elige un defensor de la tienda, colócalo junto al camino (no encima, ni pegado a otro) y pulsa <b>▶ Ronda</b>. Al perder todas las vidas la partida se acaba."],
       ["Oro y mejoras", "Cada atacante eliminado da oro, y cada ronda superada da un bono. Con ese oro compras defensores y los mejoras: cada uno tiene <b>dos caminos de cuatro mejoras</b>, pero solo uno puede pasar del nivel 2. Vender devuelve el 75 % de lo invertido."],
       ["Reinos", lista([
         "Cinco reinos: Prado Esmeralda, Dunas de Ámbar, Glaciar Cristal, Caldera Volcánica y Nexo del Vacío, cada uno con su mapa, sus atacantes y su jefe.",
         "Superar la <b>ronda 50</b> de un reino abre el siguiente, y cada reino trae dos defensas nuevas.",
+        "La <b>Segunda Era</b> suma cinco reinos más (Pantano Sombrío, Cumbres Tormentosas, Fosa Abisal, Ciudadela de Engranajes y Trono del Eclipse), que se abren a todos <b>uno por día</b>, sin tener que pasar por los anteriores. Cada uno vende menos defensas clásicas y trae una nueva y su héroe.",
         "Hay jefes en las rondas 25, 50, 75 y 100, y rondas especiales cada diez.",
         "Si pierdes, puedes reintentar la ronda desde su comienzo hasta tres veces por partida."
       ])],
       ["Atacantes", "Algunos exigen preparar algo antes: los <b>camuflados</b> solo los ven las torres con detección, los <b>voladores</b> esquivan morteros y minas, y el <b>blindaje</b> resta daño a cada golpe. La vista previa de arriba dice qué viene en la ronda siguiente; el Almanaque, el resto."],
-      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
+      ["Monedas y clasificación", "Cada reino tiene su clasificación: tu récord es la ronda más alta que superaste. Cada ronda nueva de ese récord paga <b>20 monedas por el número del reino</b>, una sola vez: 20 en el Prado, 40 en las Dunas, 60 en el Glaciar, 80 en la Caldera y 100 en el Vacío, así que llegar a la ronda 100 son 2 000, 4 000, 6 000, 8 000 y 10 000. Los cinco reinos de la Segunda Era pagan como el Vacío: 100 por ronda, 10 000 cada uno. Si tu récord era la 60 y llegas a la 70, cobras solo esas diez rondas. Antes de pagar, Juegos vuelve a jugar tu partida para comprobarla."],
       ["Controles", lista([
         "Clic en un defensor de la tienda y luego en el mapa para colocarlo (con Shift, varios seguidos). Clic sobre una torre para ver sus mejoras.",
         "Teclado: Espacio empieza la ronda, F cambia la velocidad, P pausa, M silencia. 1-9, 0, - y = eligen defensor; Z y X mejoran cada camino; Supr vende y Tab cambia el objetivo.",
@@ -1470,7 +1567,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", tulones: "Tulones", hero: "PRO HERO", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

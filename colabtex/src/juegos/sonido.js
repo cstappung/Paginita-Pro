@@ -193,6 +193,17 @@ const REPERTORIO = {
      «¿hola?». Solo suena con la pestaña escondida. */
   turno:    (a, t) => { P(a, t, H(79), 0.06, { onda: "p50", vol: 0.08 });
                         P(a, t + 0.08, H(86), 0.14, { onda: "p50", vol: 0.08, sus: 0.6 }); },
+  /* Pool, con la fuerza o el golpe (0–1) en `x`: el taco es un «tac» de
+     tiza, el choque de bolas un «clac» de marfil, la banda un golpe sordo
+     de goma, y la tronera un «toc» que cae por dentro. */
+  plTaco:    (a, t, x = 0.5) => { const v = 0.4 + 0.6 * Math.min(1, x);
+                                  seno(a, t, 190, 120, 0.07, 0.28 * v); soplo(a, t, 0.025, 0.22 * v, { f: 3400, q: 1.2 }); },
+  plChoque:  (a, t, x = 0.5) => { const v = 0.25 + 0.75 * Math.min(1, x);
+                                  seno(a, t, 2300, 1700, 0.05, 0.16 * v, "triangle"); soplo(a, t, 0.02, 0.18 * v, { f: 4200, q: 1.5 }); },
+  plBanda:   (a, t, x = 0.5) => { const v = 0.2 + 0.8 * Math.min(1, x);
+                                  seno(a, t, 150, 85, 0.09, 0.3 * v); soplo(a, t, 0.03, 0.08 * v, { f: 900, q: 0.9 }); },
+  plTronera: (a, t) => { seno(a, t, 210, 95, 0.16, 0.3); soplo(a, t + 0.04, 0.1, 0.08, { f: 700, f1: 260, q: 1 });
+                         seno(a, t + 0.17, 620, 520, 0.05, 0.1, "triangle"); },
   ficha:    (a, t) => P(a, t, 440, 0.08, { f1: 990, onda: "p50", vol: 0.08 }),
   entra:    (a, t) => [72, 76, 79, 84].forEach((n, k) => P(a, t + k * 0.045, H(n), 0.05, { onda: "p50", vol: 0.07 })),
   /* La moneda: si y mi, la segunda larga. Dos notas bastan para decir «bien». */
@@ -420,6 +431,11 @@ export const CANCIONES = [
   { id: "metrorush-city-bulevar", nombre: "El Bulevar", grupo: "De los juegos", desc: "Metro Rush · Subway City, synthpop del centro", chip: "metrorush-city-bulevar" },
   { id: "metrorush-city-parque", nombre: "El Parque", grupo: "De los juegos", desc: "Metro Rush · Subway City, juguetón con swing", chip: "metrorush-city-parque" },
   { id: "metrorush-city-bajo", nombre: "Bajo la ciudad", grupo: "De los juegos", desc: "Metro Rush · Subway City, drum'n'bass de túnel", chip: "metrorush-city-bajo" },
+  // PRO PACMAN: los tres laberintos y la huida de los fantasmas (las cortinas de una vuelta no van en la lista)
+  { id: "propac-neon", nombre: "Laberinto Neón", grupo: "De los juegos", desc: "PRO PACMAN · arcade saltarín en Fa mayor", chip: "propac-neon" },
+  { id: "propac-circuito", nombre: "Circuito", grupo: "De los juegos", desc: "PRO PACMAN · La menor a contratiempo, 156", chip: "propac-circuito" },
+  { id: "propac-reactor", nombre: "Reactor", grupo: "De los juegos", desc: "PRO PACMAN · alarma en Re menor, 164", chip: "propac-reactor" },
+  { id: "propac-poder", nombre: "¡A comer fantasmas!", grupo: "De los juegos", desc: "PRO PACMAN · la huida, arpegio nervioso a 186", chip: "propac-poder" },
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },

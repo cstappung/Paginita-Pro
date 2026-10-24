@@ -8,7 +8,7 @@ const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replac
 const ctx={crypto:require('node:crypto').webcrypto};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n;globalThis.__J=JUEGOS;',ctx);
 vm.runInContext(sin('src/juegos/controles-datos.js'),ctx);
-vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,rutaLibre,COLOR_SOLO,CONTROLES,enMovil,enPc,pideEnVez,juegoDeNovedad,DESTACADOS_INVITADO};',ctx);
+vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,rutaLibre,COLOR_SOLO,CONTROLES,enMovil,enPc,pideEnVez,juegoDeNovedad,DESTACADOS_INVITADO,CON_CUENTA_SOLO,limpiaNombreInvitado,sugiereNombreInvitado,NOMBRE_INVITADO_MAX};',ctx);
 const S=ctx.__S,J=ctx.__J;
 const main=fs.readFileSync('src/juegos-main.js','utf8');
 const reglas=fs.readFileSync('src/juegos/reglas.js','utf8');
@@ -67,18 +67,20 @@ test('«Nuevo» marca los cuatro últimos de las dos últimas semanas, sin empat
  assert.deepEqual([...S.nuevos([{id:'x',alta:'mal'}],hoy)],[]);
 });
 
-test('el invitado juega los cuatro destacados más Snake, Buscaminas, Tetris y sortEm',()=>{
+test('el invitado juega todo lo de un jugador menos PRO HERO y Tenkaichi 3',()=>{
  const {multi,solos}=S.entradasSalon(J);
  for(const m of multi){assert.equal(S.bloqueado(m,true),true);assert.equal(S.bloqueado(m,false),false);}
- const libres=solos.filter(s=>!S.bloqueado(s,true)).map(s=>s.id).sort();
- assert.deepEqual([...libres],['aleteo','bbtan','fanal','minas','snake','sortem','tetrisclub','trigon']);
+ const cerrados=solos.filter(s=>S.bloqueado(s,true)).map(s=>s.id).sort();
+ assert.deepEqual([...cerrados],['bots-bt3','heroclub']);
+ assert.deepEqual([...S.CON_CUENTA_SOLO].sort(),[...cerrados],'la lista y lo que se ve con candado son lo mismo');
  assert.deepEqual([...S.DESTACADOS_INVITADO],['bbtan','aleteo','fanal','trigon']);
  for(const d of S.DESTACADOS_INVITADO)assert.ok(solos.some(s=>s.id===d&&s.ruta==='#solo/'+d),'el destacado tiene su ruta: '+d);
  for(const s of solos)assert.equal(S.bloqueado(s,false),false,'con cuenta se juega todo: '+s.id);
- assert.ok(solos.some(s=>s.modo==='bots'&&S.bloqueado(s,true)),'las prácticas contra bots piden cuenta');
- // Las rutas #solo/<x>: el Tetris del club va por «tetris».
- for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon'])assert.ok(S.rutaLibre(r),r);
- for(const r of ['sopa','electro','sudoku','atasco','dosmil','protiles','metrorush','pokelike','hero','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
+ assert.ok(solos.some(s=>s.modo==='bots'&&!S.bloqueado(s,true)),'las prácticas contra bots se juegan sin cuenta');
+ // Las rutas #solo/<x>: el Tetris del club va por «tetris», PRO HERO por «hero».
+ for(const s of solos.filter(s=>s.ruta&&s.ruta.startsWith('#solo/')))assert.equal(S.rutaLibre(s.ruta.slice(6)),!S.bloqueado(s,true),s.ruta);
+ for(const r of ['snake','minas','tetris','sortem','bbtan','aleteo','fanal','trigon','sopa','electro','integral','sudoku','atasco','dosmil','protiles','metrorush','pokelike','prodefender','propac','tulones','frontera'])assert.ok(S.rutaLibre(r),r);
+ for(const r of ['hero','bt3','tetrisclub','nada',''])assert.ok(!S.rutaLibre(r),r);
  for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil','casino'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });
 
@@ -120,10 +122,10 @@ test('una novedad lleva las etiquetas del juego al que lleva',()=>{
 
 /* Las novedades del banner son las que eligió la dueña del sitio, en su
    orden, y cada una tiene adónde llevar con su botón grande. */
-test('las novedades: las diez elegidas, en su orden, con su botón',()=>{
+test('las novedades: las doce elegidas, en su orden, con su botón',()=>{
  const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
  const ids=[...nov.matchAll(/^  \{ id: "(\w+)"/mg)].map(m=>m[1]);
- assert.deepEqual(ids,['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
+ assert.deepEqual(ids,['futbol','boxhead','memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']);
  for(const m of nov.split(/^  \{ id: /m).slice(1)) assert.match(m,/ruta: "#|ficha: "\w+"/,'sin adónde ir: '+m.slice(0,20));
  assert.ok(!nov.includes('sala: {'),'el banner no abre salas de un toque');
 });
@@ -134,7 +136,7 @@ test('las novedades: las diez elegidas, en su orden, con su botón',()=>{
 test('las escenas de las novedades',()=>{
  const c={};vm.createContext(c);
  vm.runInContext(sin('src/juegos/novedades-arte.js')+'\n;globalThis.__E={escenaNovedad,tieneEscena};',c);
- for(const id of ['memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']){
+ for(const id of ['futbol','boxhead','memazo','prodefender','hero','mascotas','protiles','haxball','tulones','trigon','prodrop','fanal']){
   assert.ok(c.__E.tieneEscena(id),id+' sin escena');
   for(const serie1 of [false,true]){
    const h=c.__E.escenaNovedad(id,{serie1});
@@ -147,4 +149,14 @@ test('las escenas de las novedades',()=>{
  /* los id de los degradados no se repiten entre dos pintados */
  const a=c.__E.escenaNovedad('hero'),b=c.__E.escenaNovedad('hero');
  assert.notEqual(a.match(/id="(\w+)"/)[1],b.match(/id="(\w+)"/)[1]);
+});
+
+test('el nombre del invitado: limpio, corto y con uno sugerido',()=>{
+ assert.equal(S.limpiaNombreInvitado('  Ana   María  '),'Ana María');
+ assert.equal(S.limpiaNombreInvitado('<b>Ana</b>'),'bAna/b');
+ assert.equal(S.limpiaNombreInvitado('a\tb\nc\u0007'),'a b c');
+ assert.equal(S.limpiaNombreInvitado(null),'');
+ assert.equal(S.limpiaNombreInvitado('x'.repeat(50)).length,S.NOMBRE_INVITADO_MAX);
+ assert.equal(Array.from(S.limpiaNombreInvitado('😀'.repeat(30))).length,S.NOMBRE_INVITADO_MAX,'cuenta caracteres, no mitades de emoji');
+ for(const r of [0,0.5,0.999999,1]){const n=S.sugiereNombreInvitado(()=>r);assert.match(n,/^\S+ \d{2}$/,n);assert.equal(S.limpiaNombreInvitado(n),n);}
 });

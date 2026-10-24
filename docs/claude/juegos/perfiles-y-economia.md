@@ -1,6 +1,6 @@
 # Juegos — profiles, frames, shop, ranking, logros, coins
 
-`perfil*.js`, `marcos-animados.js`, `tienda.js`, `ranks.js`, `logros*.js`, `monedas*.js` in `colabtex/src/juegos/`. Read this when adding a game (its logros, `NIVEL` digits, coins, champion frame) or touching any of those. Shared architecture in `colabtex/src/juegos/CLAUDE.md`.
+`perfil*.js`, `marcos-animados.js`, `tienda.js`, `ranks.js`, `logros*.js`, `monedas*.js`, `referidos*.js` in `colabtex/src/juegos/`. Read this when adding a game (its logros, `NIVEL` digits, coins, champion frame) or touching any of those. Shared architecture in `colabtex/src/juegos/CLAUDE.md`.
 
 **Everyone's apodo, foto and colour live in `users/<uid>/perfil`**
 (`juegos/perfil.js` for the editor, `fb-juegos.js` for the three calls). Not in
@@ -105,7 +105,8 @@ the Mascotas viewer (`docs/claude/juegos/mercado.md`).
   a profile page takes the iframe, and closing it gives it back.
 - The editor offers your pets not on sale and your dances (starters plus
   gift dances). Without the full economy it offers nothing and saves the
-  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`.
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas` and
+  the football `plantilla` (`juegos/prodrop/CLAUDE.md`).
 
 `tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
 the cleaning and the pet re-check.
@@ -154,7 +155,60 @@ the positional `<g>`s. Animated backgrounds add a layer (`capaFondo`,
 
 The `tienda` node needs the rules re-published. `tests/tienda.test.cjs`
 covers the charge, the champion rules and that every animated frame has its
-drawing.
+drawing. (It is not in `test:juegos`: its champion-frame test already
+failed for Pokelike, which has no champion frame yet.)
+
+**The Halloween shop: limited edition** (`tienda.js` for the catalogue,
+`juegos/tienda-halloween.js` for the window and the lobby strip, the
+frames in `marcos-animados.js`, the background scenes in
+`juegos/fondos-halloween.js`, CSS block «Tienda de Halloween» in
+juegos.html). Six frames and five backgrounds (`hw: true` in `MARCOS` /
+`FONDOS`), priced by rarity (`RAREZAS_HW`: raro 3 000, épico 5 000,
+legendario 7 500, mítico 10 000; capped at 10 000 on purpose), on sale only inside `VENTA_HALLOWEEN`
+(until 2 Nov 00:00 Chile). It is meant to make the 50 000+ hoarders spend.
+
+- **Three places agree on prices and the closing time**: `tienda.js`,
+  the `tienda` rule (`now < …`, a price per id group) and `economia()`
+  (`precioDe` + `aLaVenta(id, at)`, with `at` the server time the rule
+  pinned). Change one, change all; `tienda.test.cjs` parses the rule and
+  fails if they differ. A new season = new ids + a new window in all three.
+- **Bought is forever; unbought disappears.** After the close, `requisito`
+  returns `agotado` for an unowned Halloween item and the editor hides it
+  (`hw()` in perfil.js); owners keep it and everyone still sees it.
+- **Two collector rewards that are not sold** (`req: {coleccion: n}`,
+  `PREMIOS_HALLOWEEN`): the Rey Calabaza frame at 5 Halloween items and the
+  Noche eterna background at all 11. Derived from `est.compras` like
+  everything else, so no write and no rule. Classic shop items do not count.
+- **The window** opens by itself on entering the lobby with a session, once
+  a day per device (`jg.tiendaHw.visto`, `quizaAbreTienda` in
+  juegos-main.js, skipped if another modal is open), from the lobby strip
+  (`data-tienda-hw`), from the editor's Halloween group and from
+  `#tienda` (not a view: it opens the window and restores the previous
+  hash; Inicio.dc.html links `juegos.html#tienda`). Buying is a two-step
+  confirm; putting it on is separate and writes only `perfil/marco` or
+  `perfil/fondo` (`fb.ponEnPerfil`, an `update`, so the rest of the profile
+  is untouched). It repaints by signature, not on every data arrival, or
+  the animations would restart.
+- **Each frame is worn, not just a ring**: the Parca's hood (an evenodd
+  path with a face-sized hole) and a scythe drawn only outside the photo,
+  the witch hat, the crown, the ghost peeking over the rim, the bat hugging
+  the top. Behind the photo, `.jg-marco-hw::before` is a blurred conic aura
+  that rotates (HTML, colours `--h1..3` per frame), which `avatarMarco`
+  turns on with the class `jg-marco-hw`.
+- **Edition numbers** (`edicion` / `edicionesDe` in tienda.js, pure): the
+  n-th account to buy an item, by server time (ties by uid), and how many
+  own it; a reward is numbered by the time of its n-th purchase. Derived,
+  never stored. `estadisticas` carries them as `ediciones`, the card and
+  the profile page show them as seals (`sellosHw` in perfil-vista.js,
+  «🎃 La Parca n.º 2/3»), and the shop says «Solo 2 personas lo tienen.
+  Serías la edición n.º 3».
+- **Background scenes animate HTML, not SVG** (`.hwf-*`, sized in
+  `cqw/cqh` inside the `.jg-fanim` container); the silhouettes are still
+  SVGs. In the lobby strip the frames are paused until hover.
+- Frame ids must match `^[a-z]{1,20}$` (the `perfil/marco` rule): no
+  digits or dashes. Exported names in `tienda.js` must not clash with
+  other modules concatenated in tests (`RAREZAS` and `rarezaDe` were
+  taken by `tacos.js`).
 
 **The ranking is written by each player about themselves.** `ranks/<juego>/<uid>`
 is the only row a browser may touch, so the table is the sum of what each one
@@ -174,10 +228,20 @@ everyone else. The entry animation plays **once per game** (`animado` holds
 the key) and the scene repaints by signature (`firma`), because `watchRanks`
 fires on every write and replaying the rise each time would make it twitch.
 
-**The Clasificación opens on a General table** (`ranks.js`, key `general`):
-the sum of every room game's `ranks` row (points, wins, games played, and a
-«Juegos» column counting in how many games each person has a row), read
-through `fb.watchRanksTodos`. The picker lists the games in the lobby's
+**The Clasificación opens on a General table** (`ranks.js`, key `general`)
+that counts **podiums**: every first place in any table is 3 points, every
+second 2, every third 1 (`podiosGeneral` in `perfil-tarjeta.js`, pure and
+tested in `tests/perfil.test.cjs`). Tables: each room game the picker shows
+(only rows with points can be on the podium) and every **current** club
+category; a table counts only with `MIN_PODIO` (3) people, the same cut as
+the profile's «podios», and vetted accounts are skipped (`fb.watchVetados`).
+It reads the lobby's data (`ctx.datos`: ranks + soloRanks).
+**Old club tables are hidden**: `categoriaVigente` (`ranks.js`) is every
+combination of its `SOLO` rows; categories from older versions of a game
+(the old Snake and Mina Club) stay in the database but `conDerivados` passes
+it as `datos.vigente`, so the profile's tables, podiums and tops skip them
+too. A new club table must be added to `SOLO` or it is invisible there.
+The picker lists the games in the lobby's
 popularity order, room games and solo games under separate labels, and the
 choice persists in `jg.rankJuego`. Each game's ficha in the lobby carries
 that game's top three (`podioHtml`, from the `ranks` that
@@ -218,10 +282,11 @@ logros, the balance is derived from the same four reads the profile uses
   the record (`monedasBbtan`, closed form: reaching round 5 pays 2, round
   100 pays 1 225; the per-round pay stops growing at round 450, 112 a round
   from there, and nothing past round 600 pays), sortEm pays the mode's blocks
-  plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
-  Electrodle streaks 10 per day. PRO DEFENDER pays 20 × the kingdom number for every
+  plus 2 per second under 3 s per block (`monedasSortem`), the Sopa,
+  Electrodle and Integrodle streaks 10 per day, and Integrodle's total
+  points one coin per 10 (Electrodle's, one per 50: it scores ~6× more a day). PRO DEFENDER pays 20 × the kingdom number for every
   round up to each kingdom's record (`monedasProdefender`: 2000…10 000 at
-  round 100) and has no per-game pay (not in `PAGO_CLUB`).
+  round 100; kingdoms 6–10 pay 100 a round like Vacío) and has no per-game pay (not in `PAGO_CLUB`).
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
   every club game that ends with a result pays `PAGO_CLUB[juego]` (15 to 25
   by how long a game lasts), up to `TOPE_CLUB_DIA` (15) per game per Chile
@@ -274,6 +339,86 @@ The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
 
+**Referidos** (`juegos/referidos.js`, pure; the view in
+`referidos-vista.js`). Whoever enters someone's code and that someone each
+get `PREMIO_REFERIDO` (5000), derived like every other income
+(`ganadoDe`'s `p.referidos`), never stored. Three branches of `referidos/`,
+all write-once:
+
+- `c/<CÓDIGO>` = uid and `m/<uid>` = {c, at}, written **together** in one
+  `update` (`fb.configuraCodigo`); each rule checks the other, so a code
+  belongs to one person and a person has one code, never changed. Codes
+  are `^[A-Z0-9]{4,12}$` (`normalizaCodigo` uppercases and strips the rest).
+- `u/<uid>` = {c, r, at}: the code used. The rule demands `c/<c> === r`,
+  `r !== uid` and that `r` did not already use yours (no mutual pair).
+- **Both sides need `MIN_JUEGOS` (3) distinct games played** to refer
+  *and* to redeem (a `ranks` row with `jugadas`, a `clubJugadas` entry or
+  a club mark). The rule cannot count, so `referidos()` checks both where
+  it is paid: a code set or used by hand by someone short of it pays
+  nobody until they qualify. The UI disables both until you qualify.
+
+UI: a gold coin «+» (`#userReferir`) shares one pill with the header
+balance (`#userSaldo`, `.jg-saldo-grupo`); it shines always and, while
+there is something left to cash (no code used yet, or you qualify and have
+no code), it pulses with a «5K» badge (`.llama`, set by `pintaBoton`). It
+opens a popover: the code field (just «✓ Código ya usado» once you used one), the
+3-games bar and **Referir a otros**, a centred `.jg-modal` that explains it
+and sets your code with a two-step confirm. **Top referidos** (`topReferidos`, top 5 by valid referrals, ties to
+whoever got there first): a box under *Top monedas* in the lobby
+(`#vesReferidos`, with a `data-referir` button that opens the window) and
+at the bottom of the window. `tests/referidos.test.cjs`
+covers the arithmetic; `test-rules.mjs` the rule. The node needs the rules
+re-published; until then the read fails alone and the rest of the economy
+works. Abuse limit, stated: an alt account still farms it after three cheap
+club games; the minimum only raises the cost.
+
+**The colour of the name** (`juegos/tintas.js`, pure). Referrals unlock
+it: 1 → rojo «brasa», 3 → verde claro «destello», 5 → azul «reflejo», 10 →
+dorado «aura dorada»; each step adds effects (`EFECTOS`, a test checks they
+grow). Optional: `users/<uid>/perfil/tinta` (kept by `limpiaPerfil`, chosen
+in the editor's Datos tab, «Normal» = unset). **`perfil` has a
+`$otro: false` rule**: a new profile field must be named in
+`database.rules.json` (`tinta` was not, and saving any colour failed with
+`PERMISSION_DENIED`), and `test-rules.mjs` must write it.
+
+- **Every painted name goes through `nombreHtml(uid, esc(name))`** →
+  `<span class="jg-nm" data-nm=uid>`. A new place that paints a person's
+  name must use it, or that name never gets its colour. Not used on
+  coloured buttons (the purple «Unirme a…») or on your own `.yo` logros
+  pill, where the colour would fight the background.
+- **One stylesheet, no repaints**: `pintaTintas()` in `juegos-main.js`
+  writes `#jgTintas` from the watched `perfiles` and the referral counts
+  (`cssTintas`), re-checked like the frames (`tintaVisible`; trusts the
+  stored choice while the economy is partial). The editor preview uses
+  `jg-tn-<id>` classes, emitted after the uid rules by the same sheet, so
+  they win.
+- **Contrast is per background, via `--tn-*` vars** in juegos.html: light
+  surfaces get deep red/blue and a dark contour on light green/gold; dark
+  ones (`html[data-tema=oscuro]`, `.head`, `.jg-cs`, `.jg-rk-podio`,
+  `.jg-pf-hero.oscuro`) bright fills and more glow; `.jg-pf-hero:not(.oscuro)`
+  is light even in dark theme; the immersive chat keeps its black shadow.
+  A new dark surface that shows names must join the dark list.
+- The reflejo is `background-clip:text`, so azul/dorado put glow and
+  contour in `filter: drop-shadow` (a `text-shadow` covers the fill), and
+  their sparkles reset `-webkit-text-fill-color` or they inherit
+  transparent. Reduced motion stops every animation.
+
+`tests/tintas.test.cjs` covers thresholds, the re-check, the sheet and
+that every `--tn-*` var and `jgTn*` keyframe the effects use exists.
+
+**The coins tab explains itself** (`detalleHtml` in `monedas-vista.js`):
+a balance of what came in and went out, every source as a bar with its %,
+the games that paid you most (`monedasDe(...).porJuego`, filled by
+`ganadoDe(uid, d, porJuego)`), what you spent by category with a
+per-game casino table, your recent movements (consecutive bets in one
+casino game collapse into one row) and «lo que más paga», a ranking of
+what each action is worth. The spending side comes from `economia()`:
+every `paga(u, p, cat, d)` notes the category (`gasto`, `cuenta`) and a
+movement (`movs`), and market sales and casino prizes note income. A new
+spend must pass its category to `paga`, or it counts in `gastadas` but
+shows nowhere in the tab. `tests/monedas.test.cjs` checks that the
+categories add up to `gastadas` and the games to their sources.
+
 **Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
 `economia()` replays three more nodes, between the re-roll and the
 listing at equal `at` (`ORDEN`: `ma` 2.1, `mr` 2.2, `mc` 2.3; the old
@@ -298,6 +443,26 @@ and `historial` (previous owners). `mascotasDe`/`objetosDe` list what an
 account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
 per-pet state (`mascotasEstado`) is read only by key.
 
+
+**Batalla de Rock boxes** (`rock/c/<uid>/<k>`, 500, event `rc`, category
+`cajaRock`; an exact repeat refunds as `premios`): `juegos/hero/js/rock/CLAUDE.md`.
+
+**`economia()` reruns on every Firebase read, in every open tab, so it must
+stay linear in the site's history.** Each box looked for the buyer's pieces
+by walking `rocas` for *everyone*: quadratic, ~0.6 s per read at 1800 boxes
+and 13 s at 7200, which froze the lobby a while after the Synyster opened
+the boxes. Now `rocasPor[uid]` lists the copies that reached each account
+(`llegaRoca` on a box, a sale and a trade; filtered by `dueno` when read),
+and `repetidaRock` keeps each piece's `invId` in a WeakMap. The memos of
+`cajaRock` and `MascotasMotor.regalo` hold 50 000: they are asked for every
+box/gift of the site on each pass, and with a cap below that total
+(it was 4000) they emptied mid-pass and never hit. A new per-event lookup
+must index by account, never scan a whole-site map.
+
+**Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
+event `sc`, category `superChat`; `superChats` in the replay lists the
+paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
+whole (`NODOS_MONEDAS` is 16).
 
 ## Casino
 

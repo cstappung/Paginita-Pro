@@ -4,8 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Laboratorio** — a static site (published to GitHub Pages) that hosts a small
-suite of browser-only tools. There is **no application backend**: everything
+**Paginita Pro** (called «Laboratorio» until October 2026) — a static site
+(published to GitHub Pages) that hosts a small suite of browser-only tools.
+The brand lives in `marca/`: the logo (`paginita-pro.png` is the master,
+`-128` the header copy), the favicons every main page links, and the
+Halloween version (`paginita-pro-halloween.svg` + its favicons), which
+juegos.html swaps in with its Halloween mode. There is **no application backend**: everything
 runs client-side, and persistence for the collaborative tools lives in Firebase.
 `index.html` redirects to `Inicio.dc.html`, the landing menu.
 
@@ -44,14 +48,14 @@ before the first edit. Read only the docs the task needs.
 | Firebase rules, Storage, security, deploy, any new RTDB node | `docs/claude/firebase.md` |
 | Idiomas, traducción, i18n | `docs/claude/i18n.md` |
 | **Any Juegos work** (rooms, a new game, a game screen) | `colabtex/src/juegos/CLAUDE.md` (always), plus the game's doc below |
-| Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades | `docs/claude/juegos/salon.md` |
-| Perfiles, marcos, fondos, tienda, clasificación/ranking, logros, monedas, recompensa diaria | `docs/claude/juegos/perfiles-y-economia.md` |
+| Salón / lobby, portada, fichas, invitado, rieles, chat general, novedades, modo Halloween | `docs/claude/juegos/salon.md` |
+| Perfiles, marcos, fondos, tienda, tienda de Halloween (edición limitada), clasificación/ranking, logros, monedas, recompensa diaria, referidos, códigos, color del nombre | `docs/claude/juegos/perfiles-y-economia.md` |
 | Música, canciones, reproductor ♪, YouTube, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |
-| PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
-| Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
+| PRODROP, sobres, cartas coleccionables, mercado, fútbol, plantilla | `juegos/prodrop/CLAUDE.md` |
+| Mascotas, crianza, mascota del perfil, regalos, comida, poción, Pueblo (plaza, vecinos, visitas, cariños) | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
 
@@ -72,18 +76,20 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Presidente | `docs/claude/juegos/presidente.md` |
 | Spicy | `docs/claude/juegos/spicy.md` |
 | Ajedrez | `docs/claude/juegos/ajedrez.md` |
+| Pool 8 (billar, 1 contra 1 y 2 contra 2, física, línea guía) | `docs/claude/juegos/pool.md` |
 | Tetris (room and Tetris Club) | `juegos/club/tetris/CLAUDE.md` |
 | Circuit Breakers (worms) | `juegos/worms/CLAUDE.md` |
 | Yemas (shooter, zombis, voz) | `juegos/yemas/CLAUDE.md` |
 | Clue | `juegos/clue/CLAUDE.md` |
-| Boxhead | `juegos/boxhead/CLAUDE.md` |
+| Pro BoxHead (boxhead, zombis, diablos) | `juegos/boxhead/CLAUDE.md` |
 | HaxBall | `juegos/haxball/CLAUDE.md` |
 | Budokai Tenkaichi 3 (BT3, PS2 port, ISO, online rooms) | `juegos/bt3/CLAUDE.md` |
 | Mario Kart Wii (MKW, Retro Rewind, WiiCompiled port, online rooms, VR) | `juegos/mkw/CLAUDE.md` (the port) and `juegos/mkw/docs/en-linea.md` + the header of `colabtex/src/juegos/mkw.js` (the room) |
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 | Memazo (memes, plantillas, estilo Make It Meme) | `docs/claude/juegos/memazo.md` |
-| PRO HERO (guitarra, canciones, estrellas; club card and online room) | `juegos/hero/CLAUDE.md` |
+| PRO HERO (guitarra, canciones, estrellas, modo batalla; club card and online room) | `juegos/hero/CLAUDE.md` |
+| Batalla de Rock (fondo 3D de PRO HERO, tu rockero, cajas de rock) | `juegos/hero/js/rock/CLAUDE.md` |
 
 Solo Club games (read `juegos/club/CLAUDE.md` too):
 
@@ -93,6 +99,7 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | BBTAN | `juegos/club/bbtan/CLAUDE.md` |
 | Sopa de letras | `juegos/club/sopa/CLAUDE.md` |
 | Electrodle | `juegos/club/electro/CLAUDE.md` |
+| Integrodle (integral diaria, cálculo, primitivas) | `juegos/club/integral/CLAUDE.md` |
 | Sudoku Arcade | `juegos/club/sudoku/CLAUDE.md` |
 | FANAL | `juegos/club/fanal/CLAUDE.md` |
 | ALETEO | `juegos/club/aleteo/CLAUDE.md` |
@@ -105,7 +112,8 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 | Frontera Batalla | `docs/claude/juegos/frontera.md` |
 | Tulones (hot-seat) | `juegos/club/tulones/CLAUDE.md` |
 | Pokelike (roguelike Pokémon, en construcción) | `juegos/club/pokelike/CLAUDE.md` |
-| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda) | `juegos/club/prodefender/CLAUDE.md` |
+| PRO DEFENDER (tower defense, reinos, rondas, monedas por ronda, segunda era / reinos en pruebas) | `juegos/club/prodefender/CLAUDE.md` |
+| PRO PACMAN (pacman, laberinto, fantasmas, racha, turbo, pulso) | `juegos/club/propac/CLAUDE.md` |
 
 Snake and Gato have no doc yet; read their code.
 

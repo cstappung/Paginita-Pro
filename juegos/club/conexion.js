@@ -11,7 +11,7 @@
   // (solo los juegos destacados del salón): el juego puede adoptar lo que
   // dejó con la cuenta «invitado» (Club.deInvitado).
   const deinvitado=embebido&&!invitado&&cuenta!=='invitado'&&new URLSearchParams(location.search).get('deinvitado')==='1';
-  let categoria='',lista,estado,propio,alPartida=null,quiere=false;
+  let categoria='',lista,estado,propio,alPartida=null,quiere=false,admin=false;
   /* El fantasma (Metro Rush, modos «Fantasma»): la mejor carrera de una tabla
      con su prueba, que pide el juego y lee la página (el juego no toca
      Firebase). Varias esperas por categoría, por si se pide dos veces. */
@@ -47,6 +47,11 @@
     /* `logro(id)`: un logro que el juego detecta en vivo (Metro Rush,
        «Cazafantasmas»). La página lo anota en la cuenta; el juego no toca Firebase. */
     logro(id){if(embebido&&!invitado&&typeof id==='string')enviar({tipo:'logro',id});},
+    /* `esAdmin()`: si la cuenta es administradora de Juegos (lo manda la página
+       al cargar el marco; false fuera de Juegos o mientras no se sabe). Solo
+       abre contenido en pruebas que no guarda nada (PRO DEFENDER, reinos 6–10):
+       no es una barrera de seguridad. Al saberse sale `club-admin`. */
+    esAdmin(){return admin;},
     inmersivo(on){quiere=!!on;const v=quiere&&window.Club.celular();
       for(const el of document.querySelectorAll('.i18n-flota'))el.style.visibility=v?'hidden':'';
       if(document.documentElement.classList.contains('club-inm')===v)return v;document.documentElement.classList.toggle('club-inm',v);enviar({tipo:'inmersivo',v});return v;}
@@ -75,6 +80,7 @@
   window.addEventListener('message',e=>{
     if(!embebido||e.source!==parent||e.origin!==location.origin||e.data?.canal!=='club-parent')return;
     const d=e.data;
+    if(d.tipo==='admin'){admin=!!d.admin;window.dispatchEvent(new CustomEvent('club-admin',{detail:{admin}}));return;}
     if(d.tipo==='tema'){document.documentElement.dataset.tema=d.oscuro?'oscuro':'claro';return;}
     if(d.tipo==='partida'){const f=alPartida;alPartida=null;if(f)f(d.error?null:d.dato||null);return;}
     if(d.tipo==='fantasma'){const l=alFantasma.get(d.categoria)||[];alFantasma.delete(d.categoria);for(const f of l)f(d.error?null:d.dato||null,d.error?'error':d.motivo||(d.dato?'':'vacia'));
@@ -85,7 +91,7 @@
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
-    lista.replaceChildren();const racha=/^club-(sopa|electro|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
+    lista.replaceChildren();const racha=/^club-(sopa|electro|integral|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
     const estrellas=categoria==='club-atasco-estrellas',metros=/^club-metrorush-(city)?distancia$/.test(categoria),jornada=categoria==='club-fanal-jornadas',ronda=categoria.startsWith('club-prodefender-');
     const marca=f=>minas?(f.tiempo/1000).toFixed(2)+' s':racha?f.puntos+(f.puntos===1?' día':' días'):estrellas?f.puntos+' ★':metros?f.puntos+' m':jornada?'jornada '+f.puntos:ronda?'ronda '+f.puntos:f.puntos+' puntos';
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+marca(f);lista.appendChild(li);}

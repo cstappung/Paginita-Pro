@@ -10,6 +10,10 @@ plain ES modules (no build) and integrated here. Two ways in, one document:
   `?modo=online`. Postman: `colabtex/src/juegos/hero-sala.js`
   (`crearHeroSala`), reducer `redHero` in `motor.js`.
 
+**Batalla de Rock** (the 3D stage behind the highway, «Tu rockero», rock
+boxes; open to everyone) lives in `js/rock/`: read
+`js/rock/CLAUDE.md` before touching it or `session.js`'s `_…Rock` methods.
+
 Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat:
 `docs/antitrampas/hero.md`.
@@ -84,6 +88,32 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
   pays once; blue → gold pays the missing 50.
 - Logros (`SOLO.hero` in `logros.js`, `NIVEL.hero`): designed so ~40 songs
   well played on Expert give all ten (the last is 40 songs with five gold).
+
+## Battle mode (`js/game/batalla.js`, Guitar Hero III style)
+
+- **1 vs 1 only**: local (Elegir instrumento › «Modo: ⚔️ Batalla» on P1; alone
+  → a bot rival with your part and difficulty) or a room whose director picks
+  «Modo: Batalla» (move `{t:"modo", m}` in `redHero`, `room.modo`; with ≠ 2
+  players in the round it plays normal).
+- **No Star Power**: each completed SP phrase gives a power (max 3,
+  `PODERES`: amp overload, broken string, lefty flip, blackout, drain,
+  steal); the SP button launches the oldest at the rival (`_lanzaBt`; it
+  never reaches the engine). A **life bar** replaces the SP cell: hits +,
+  misses/overstrums −; 0 = K.O., the song ends `FIN_KO` s later. No K.O. →
+  more life wins, then score (`cierra`).
+- Effects are **render or input only** (`p.batalla` from `bt.pintura` →
+  `highway.js`: `zurdo` flips lanes, `amp` shakes + flickers gems, `apagon`
+  hides notes before the bar, `roto` overlay); a broken string drops that
+  fret before the `Grabadora` and counts presses to repair (`REPARA`). The
+  bot is hit through `Bot.torpe` / `sinTraste` / `sinSP`.
+- **Battles are never saved** (no `prueba`, no `resultado`): no stars,
+  records or coins. The results screen says who won and how.
+- **Online**: each client simulates only its own player; its state packet
+  carries `bt` = `vista()` (life, powers, effects with seconds left, K.O. and
+  the last launched attacks, repeated because the mesh drops packets). The
+  rival applies attacks once per id (`recibidos`) and copies the rest
+  (`ponRemoto`); attacks during the countdown are ignored (stale packets).
+  The `fin` move adds `bv` (life ×1000) and `ko`.
 
 ## Proof and verification (`js/game/prueba.js`)
 

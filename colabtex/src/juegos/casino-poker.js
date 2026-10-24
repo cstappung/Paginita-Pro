@@ -173,7 +173,7 @@ export function montarPoker(h, api) {
     if (n) { e.preventDefault(); alterna(+n[1] - 1); }
     else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (estado === "elige") cambiar(); else repartir(); }
   });
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
   pinta();
 
   return {
@@ -185,7 +185,7 @@ export function montarPoker(h, api) {
       const e = api.economia(), rs = api.rondas();
       if (!e) return;
       retomada = true;
-      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "v" && x.estado === "juega" && x.valida).sort((a, b) => b.at - a.at)[0];
+      const r = api.mias().filter(x => x.j === "v" && x.estado === "juega" && x.valida)[0];
       if (!r || !rs[r.k]) return;
       const x = rs[r.k];
       activa = { k: r.k, r: { j: "v", p: x.p, at: x.at } };

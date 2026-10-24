@@ -65,6 +65,13 @@ export function PetView(props: {
   look?: Genes
   /** Colores de cada accesorio puesto (semillas del inventario). */
   tints?: Partial<Record<SlotId, number>>
+  /**
+   * Caminar hasta (x, z), medido desde el origen de esta mascota en la escena (el Pueblo). Cambia
+   * `key` para pedir otra caminata; `pace` apura el paso.
+   */
+  walk?: { x: number; z: number; key: number; pace?: number } | null
+  /** Dónde está ahora (mismo espacio que `walk`), cuadro a cuadro: para que la sigan carteles y cámara. */
+  pos?: { current: { x: number; z: number } }
 }) {
   const { stage, expression, sleeping = false, sad = false, dirt = 0, cue, time, growth = 0, voice = false, roam = true } = props
   // Los genes son un objeto nuevo en cada guardado: se comparan por valor.
@@ -170,6 +177,15 @@ export function PetView(props: {
     anim.cue(cue.id, cue.t0 ?? anim.now, cue.dance)
   }, [anim, cue])
 
+  // Caminatas pedidas por la escena (el Pueblo): en el espacio de la mascota, que está escalado.
+  const { walk } = props
+  const lastWalk = useRef<number | null>(null)
+  useEffect(() => {
+    if (!walk || walk.key === lastWalk.current) return
+    lastWalk.current = walk.key
+    anim.goTo(walk.x / stage.scale, walk.z / stage.scale, anim.now, { pace: walk.pace ?? 1 })
+  }, [anim, walk, stage.scale])
+
   useFrame(({ clock }) => {
     const fps = useGame.getState().fps
     const scrub = time != null
@@ -201,6 +217,10 @@ export function PetView(props: {
     worn.current?.update(t, out)
     // La sombra sigue al personaje y se achica cuando salta.
     const r = rig.joints.root
+    if (props.pos && r) {
+      props.pos.current.x = r.position.x * stage.scale
+      props.pos.current.z = r.position.z * stage.scale
+    }
     if (shadow.current && r) {
       const lift = Math.max(0, r.position.y)
       shadow.current.position.set(r.position.x, 0.016, r.position.z)

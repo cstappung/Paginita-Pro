@@ -11,7 +11,7 @@
   const A = {
     ctx: null, master: null, sfx: null, atk: null, mus: null, verb: null, mverb: null, delIn: null, dL: null, dR: null, noiseBuf: null,
     sfxVol: 0.8, musVol: 0.45, muted: false,
-    last: {}, voices: 0, music: null, intensity: 0
+    last: {}, vivas: [], music: null, intensity: 0
   };
   const MUS_GAIN = 0.6;
   const GKEYS = ['ctx', 'master', 'sfx', 'atk', 'mus', 'verb', 'mverb', 'delIn', 'dL', 'dR', 'noiseBuf'];
@@ -37,8 +37,12 @@
   function graph(c, muted) {
     const comp = c.createDynamicsCompressor();
     comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.18;
+    // limitador al final: con muchos efectos a la vez la suma pasaba de 1 y
+    // el parlante recortaba (el sonido «se pegaba»)
+    const lim = c.createDynamicsCompressor();
+    lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12;
     const master = c.createGain(); master.gain.value = muted ? 0 : 1;
-    master.connect(comp); comp.connect(c.destination);
+    master.connect(comp); comp.connect(lim); lim.connect(c.destination);
     const sfx = c.createGain(); sfx.gain.value = A.sfxVol; sfx.connect(master);
     // bus de ataques de torres: más bajo y sin agudos molestos
     const atk = c.createGain(); atk.gain.value = 0.9;
@@ -65,7 +69,11 @@
     if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
     const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!AC) return;
-    Object.assign(A, graph(new AC(), A.muted));
+    // búfer holgado: a un tower defense no le importan unos ms de retraso, y
+    // con el búfer mínimo un PC cargado se quedaba sin audio a ratos
+    let c;
+    try { c = new AC({ latencyHint: 'playback' }); } catch (e) { c = new AC(); }
+    Object.assign(A, graph(c, A.muted));
     if (A.pendingMusic !== undefined) A.playMusic(A.pendingMusic);
   };
   A.setVolumes = function (sfx, mus) {
@@ -455,18 +463,28 @@
 
   const ATK = new Set(['thorn', 'spear', 'frost', 'shard', 'zap', 'zapBig', 'mortar', 'boom', 'boomSmall', 'beam', 'drone', 'missile', 'gravity', 'sniper', 'sniperArc', 'mineSet', 'flame', 'pop', 'bigPop', 'shield',
     'rang', 'roots', 'rootsBreak', 'saw', 'acid', 'acidHit', 'flashB', 'rail', 'forge', 'golemHit', 'geyser', 'hex', 'blade']);
+  // Tope de efectos sonando a la vez. Cada efecto son varios osciladores y
+  // filtros: con decenas de torres disparando, el hilo de audio no daba
+  // abasto, el sonido se entrecortaba y terminaba por apagarse. Los ataques
+  // tienen su propio tope, más bajo, para que nunca tapen lo demás.
+  const ATK_MAX = 14, VOCES_MAX = 26, VOCES_DURO = 40;
   A.play = function (name, x) {
     if (!A.ctx || A.muted || A.sfxVol <= 0) return;
+    if (A.ctx.state !== 'running') { try { A.ctx.resume().catch(() => {}); } catch (e) { /* ignorar */ } }
     const def = SFX[name];
     if (!def) return;
     const now = A.ctx.currentTime;
     if (A.last[name] !== undefined && now - A.last[name] < def[0]) return;
-    if (A.voices > 34 && def[1] < 0.6) return;
+    const atk = ATK.has(name);
+    A.vivas = A.vivas.filter(v => v[0] > now);
+    let nAtk = 0;
+    for (const v of A.vivas) if (v[1]) nAtk++;
+    const n = A.vivas.length;
+    if (atk ? nAtk >= ATK_MAX || n >= VOCES_MAX : n >= (def[1] < 0.6 ? VOCES_MAX : VOCES_DURO)) return;
     A.last[name] = now;
-    A.voices++;
-    setTimeout(() => { A.voices--; }, def[1] * 1000 + 60);
+    A.vivas.push([now + def[1] + 0.06, atk]);
     const pan = x === undefined ? 0 : (x / (PD.W || 1000) - 0.5) * 1.4;
-    CUR = ATK.has(name) ? A.atk : null;
+    CUR = atk ? A.atk : null;
     try { def[2](now + 0.005, pan); } catch (e) { /* ignorar */ }
     CUR = null;
   };

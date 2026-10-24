@@ -436,7 +436,7 @@ the controls come from:
   `volumen.js`: Mina Club (toggle + slider), Circuit Breakers (music,
   effects, volume in its settings) and FANAL (its options have music and
   effects volumes; it loads `volumen.js` anyway so the mute is one click).
-  Clue, Sopa and Electrodle make no sound. Atasco has its own 🔊 in the
+  Clue, Sopa, Electrodle and Integrodle make no sound. Atasco has its own 🔊 in the
   scoreboard and loads `volumen.js`, like Sudoku Arcade.
 
 **Presentation timing and layout:** `presentacion.test.cjs` checks that

@@ -25,6 +25,7 @@ import * as bbtan from './verifica/bbtan.js';
 import * as sopa from './verifica/sopa.js';
 import * as sudoku from './verifica/sudoku.js';
 import * as electro from './verifica/electro.js';
+import * as integral from './verifica/integral.js';
 import * as fanal from './verifica/fanal.js';
 import * as atasco from './verifica/atasco.js';
 import * as aleteo from './verifica/aleteo.js';
@@ -36,8 +37,9 @@ import * as metrorush from './verifica/metrorush.js';
 import * as pokelike from './verifica/pokelike.js';
 import * as hero from './verifica/hero.js';
 import * as prodefender from './verifica/prodefender.js';
+import * as propac from './verifica/propac.js';
 
-export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, aleteo, dosmil, trigon, protiles, frontera, metrorush, pokelike, hero, prodefender};
+export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, integral, fanal, atasco, aleteo, dosmil, trigon, protiles, frontera, metrorush, pokelike, hero, prodefender, propac};
 
 /* Lo que ocupa una prueba como texto, como mucho. La regla de
    `soloPruebas` pide lo mismo. */
@@ -66,8 +68,10 @@ export function textoPrueba(prueba) {
    no se puede reescribir con el uid de quien entra: esa prueba vale para
    cualquier dueño, ahora y en cada auditoría. El límite honesto: una prueba
    de invitado ya guardada en `soloPruebas` la podría copiar otra cuenta,
-   que empataría con esa marca; nunca la mejoraría. */
-export const DE_INVITADO = new Set(['bbtan', 'aleteo', 'fanal', 'trigon']);
+   que empataría con esa marca; nunca la mejoraría. Tetris, Snake, 2048 y
+   PRO PACMAN se sumaron en octubre de 2026: también meten la cuenta en la
+   prueba (`u`) y en la semilla. */
+export const DE_INVITADO = new Set(['bbtan', 'aleteo', 'fanal', 'trigon', 'tetris', 'snake', 'dosmil', 'propac']);
 export const UID_INVITADO = 'invitado';
 
 export async function verificaClub(juego, dato, prueba, ctx = {}) {

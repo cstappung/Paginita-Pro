@@ -7,6 +7,7 @@ import {
   gemSprite, openSprite, drumSprite, kickSprite, glowSprite, sparkSprite, flameTongue, neckTexture,
   GEM_W, GEM_H, shade, lighten,
 } from './sprites.js';
+import { PODERES as PODERES_BT, MAX_PODERES as MAX_PODERES_BT, REPARA as REPARA_BT } from '../game/batalla.js';
 
 const K = 2.6; // fuerza de la perspectiva
 const S_FAR = 1 / (1 + K);
@@ -69,6 +70,8 @@ export class HighwayRenderer {
     const drums = e.kind === 'drums';
     const lanes = drums ? e.track.lanes : 5;
     const cel = !!opts.celular;
+    // modo batalla (game/batalla.js): lo que le pasa a este jugador (vida, poderes, ataques recibidos)
+    const B = p.batalla || null;
     const strikeY = view.y + view.h * (cel ? CEL_STRIKE : 0.8);
     const topY = view.y + view.h * (cel ? 0.05 : 0.08);
     const hw = cel ? anchoCelular(view.w, view.h, strikeY - view.y, topY - view.y) : Math.min(view.w * 0.4, view.h * 0.3);
@@ -76,7 +79,8 @@ export class HighwayRenderer {
       view, drums, lanes, strikeY, topY, hw, cx: view.x + view.w / 2, celular: cel,
       laneW: (2 * hw) / lanes,
       vis: 1.45 / Math.max(0.3, opts.noteSpeed),
-      lefty: opts.lefty,
+      // «Zurdo» da vuelta la pista (como el ajuste de zurdo, sin tocar los controles)
+      lefty: !!opts.lefty !== !!B?.zurdo,
       colors: drums ? (lanes === 5 ? DRUM_COLORS5 : DRUM_COLORS4) : FRET_COLORS,
     };
     G.proj = (d) => {
@@ -99,6 +103,7 @@ export class HighwayRenderer {
 
     this._consumeFx(p, fx, G, now, opts);
 
+    if (B?.amp) fx.shake = Math.max(fx.shake, 3 + 2 * Math.abs(Math.sin(perf / 90)));   // amplificador saturado: la pista tiembla
     fx.shake = Math.max(0, fx.shake - dt * 28);
     ctx.save();
     if (fx.shake > 0) ctx.translate((Math.random() * 2 - 1) * fx.shake, (Math.random() * 2 - 1) * fx.shake);
@@ -132,8 +137,13 @@ export class HighwayRenderer {
     else this._strings(ctx, G, e, now);
     this._rails(ctx, G, e, now, fx, mult);
     this._strikeBar(ctx, G, e, now, fx, opts);
+    // amplificador saturado: las notas parpadean
+    if (B?.amp) ctx.globalAlpha = 0.2 + 0.8 * Math.abs(Math.sin(perf / 70));
     if (!drums) this._sustains(ctx, G, e, now);
     this._gems(ctx, G, e, now, opts);
+    ctx.globalAlpha = 1;
+    if (B?.apagon) this._apagon(ctx, G);
+    if (B && B.roto >= 0) this._cuerdaRota(ctx, G, B, perf);
     this._hitBursts(ctx, G, fx, now);
     if (!opts.rewinding) this._flames(ctx, G, e, now, fx, dt);
     this._particles(ctx, fx, dt, now);
@@ -1215,6 +1225,116 @@ export class HighwayRenderer {
   // Star Power como celda de energía: tubo de vidrio con energía líquida que sube, burbujas,
   // una oleada al ganar energía y rayos alrededor cuando está lista para activarse.
   // (x, y, w, h) es el rectángulo en pantalla; horizontal = se llena de izquierda a derecha.
+  /* ---------- modo batalla ---------- */
+  // Apagón: una franja negra tapa las notas justo antes de llegar
+  _apagon(ctx, G) {
+    const [s0, y0] = G.proj(0.03), [s1, y1] = G.proj(0.3), [s2, y2] = G.proj(0.48), w = G.hw * 1.1;
+    ctx.save();
+    const gr = ctx.createLinearGradient(0, y2, 0, y0);
+    gr.addColorStop(0, 'rgba(4,2,14,0)');
+    gr.addColorStop(Math.max(0.05, Math.min(0.95, (y1 - y2) / (y0 - y2))), 'rgba(4,2,14,0.97)');
+    gr.addColorStop(1, 'rgba(4,2,14,0.97)');
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(G.cx - w * s2, y2); ctx.lineTo(G.cx + w * s2, y2); ctx.lineTo(G.cx + w * s0, y0); ctx.lineTo(G.cx - w * s0, y0);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // Cuerda rota: el carril queda rojo y cortado; abajo, cuántas pulsaciones faltan para repararla
+  _cuerdaRota(ctx, G, B, perf) {
+    const l = B.roto, top = G.topY, s1 = S_FAR, half = G.laneW * 0.42;
+    const x0 = G.laneX(l, 1), x1 = G.laneX(l, s1);
+    ctx.save();
+    ctx.fillStyle = `rgba(255,50,50,${0.16 + 0.08 * Math.sin(perf / 120)})`;
+    ctx.beginPath();
+    ctx.moveTo(x1 - half * s1, top); ctx.lineTo(x1 + half * s1, top); ctx.lineTo(x0 + half, G.strikeY); ctx.lineTo(x0 - half, G.strikeY);
+    ctx.closePath(); ctx.fill();
+    // la cuerda cortada: zigzag rojo
+    ctx.strokeStyle = '#ff4a4a'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= 12; i++) {
+      const k = i / 12, y = top + (G.strikeY - top) * k, x = x1 + (x0 - x1) * k + (i % 2 ? 1 : -1) * half * 0.35 * (s1 + (1 - s1) * k);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.font = '800 18px Rajdhani, "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = this.alto ? 0 : 5;
+    ctx.fillText(`✂ ${B.reparo}/${REPARA_BT}`, x0, G.strikeY - 34);
+    ctx.restore();
+  }
+
+  /* La vida (barra que sube y baja, en vez de la celda de Star Power), los poderes guardados, el aviso de lo
+     que te lanzaron o ganaste, los ataques que tienes encima y el cartel del final */
+  _hudBatalla(ctx, view, G, B, now, scale, x, y, w, h, horiz) {
+    const perf = performance.now(), v = Math.max(0, Math.min(1, B.vida));
+    const col = v > 0.5 ? '#3ee36b' : v > 0.25 ? '#ffb21e' : '#ff4d5e';
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.beginPath(); ctx.roundRect(x - 4, y - 4, w + 8, h + 8, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = v < 0.25 ? 0.55 + 0.45 * Math.abs(Math.sin(perf / 110)) : 1;
+    const gr = horiz ? ctx.createLinearGradient(x, 0, x + w, 0) : ctx.createLinearGradient(0, y + h, 0, y);
+    gr.addColorStop(0, '#ff4d5e'); gr.addColorStop(0.35, '#ffb21e'); gr.addColorStop(0.7, '#3ee36b'); gr.addColorStop(1, '#53e7ff');
+    ctx.fillStyle = gr;
+    if (horiz) ctx.fillRect(x, y, w * v, h); else ctx.fillRect(x, y + h * (1 - v), w, h * v);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = B.drenaje ? `rgba(255,58,106,${0.6 + 0.4 * Math.sin(perf / 80)})` : 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = B.drenaje ? 3 : 1.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
+    for (const k of [0.25, 0.5, 0.75]) { ctx.beginPath(); if (horiz) { ctx.moveTo(x + w * k, y); ctx.lineTo(x + w * k, y + h); } else { ctx.moveTo(x, y + h * k); ctx.lineTo(x + w, y + h * k); } ctx.stroke(); }
+    // etiqueta
+    ctx.font = `800 ${Math.round(12 * scale)}px Rajdhani, "Segoe UI", sans-serif`; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (horiz) ctx.fillText('VIDA', x - 22 * scale, y + h / 2); else ctx.fillText('VIDA', x + w / 2, y + h + 12 * scale);
+    // poderes guardados (el primero es el que sale con el botón de Star Power)
+    const R = 15 * scale;
+    for (let i = 0; i < MAX_PODERES_BT; i++) {
+      const k = B.poderes[i], P = k && PODERES_BT[k];
+      // al lado de la barra vertical; con la barra horizontal (autopistas angostas), en columna a la izquierda de
+      // la autopista (a la derecha está el multiplicador); en el celular, en fila tras la barra
+      const fila = horiz && G.celular, col = horiz && !G.celular;
+      const px = fila ? x + w + 12 * scale + R + i * (2 * R + 6 * scale) : col ? G.cx - G.hw * 1.12 - R - 8 * scale : x + w / 2;
+      const py = fila ? y + h / 2 : col ? G.strikeY - R - i * (2 * R + 6 * scale) : y - 12 * scale - R - i * (2 * R + 6 * scale);
+      ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2);
+      ctx.fillStyle = P ? 'rgba(20,10,40,0.85)' : 'rgba(0,0,0,0.35)'; ctx.fill();
+      ctx.lineWidth = i === 0 && P ? 3 : 1.5; ctx.strokeStyle = P ? P.color : 'rgba(255,255,255,0.25)'; ctx.stroke();
+      if (P) {
+        ctx.font = `${Math.round(R * 1.1)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+        ctx.fillStyle = '#fff'; ctx.fillText(P.ic, px, py + 1);
+      }
+    }
+    // ataques que tienes encima: íconos arriba de la autopista
+    const act = ['amp', 'zurdo', 'apagon', 'drenaje'].filter((k) => B[k]).concat(B.roto >= 0 ? ['cuerda'] : []);
+    act.forEach((k, i) => {
+      const P = PODERES_BT[k], ax = G.cx + (i - (act.length - 1) / 2) * 34 * scale, ay = G.topY + 26 * scale;
+      ctx.beginPath(); ctx.arc(ax, ay, 14 * scale, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = P.color; ctx.stroke();
+      ctx.font = `${Math.round(15 * scale)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`; ctx.fillStyle = '#fff'; ctx.fillText(P.ic, ax, ay + 1);
+    });
+    // el aviso: lo que te lanzaron (con cómo zafar) o el poder que ganaste
+    if (B.aviso) {
+      const age = Math.max(0, now - B.aviso.t), a = Math.min(1, age * 6) * Math.min(1, (2.2 - age) * 2), sc = 1 + 0.25 * Math.max(0, 1 - age * 5);
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.font = `800 ${Math.round(30 * scale * sc)}px Rajdhani, "Segoe UI", sans-serif`;
+      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.fillStyle = B.aviso.color || '#fff';
+      const ty = G.topY + view.h * 0.16;
+      ctx.strokeText(B.aviso.text, G.cx, ty); ctx.fillText(B.aviso.text, G.cx, ty);
+      if (B.aviso.sub) { ctx.font = `700 ${Math.round(16 * scale)}px Rajdhani, "Segoe UI", sans-serif`; ctx.lineWidth = 4; ctx.strokeText(B.aviso.sub, G.cx, ty + 28 * scale); ctx.fillStyle = '#fff'; ctx.fillText(B.aviso.sub, G.cx, ty + 28 * scale); }
+      ctx.globalAlpha = 1;
+    }
+    // el final: K.O. o quién ganó
+    if (B.gano !== null) {
+      const t = B.ko ? '¡K.O.!' : B.gano ? '¡GANASTE!' : 'PERDISTE';
+      const c = B.ko ? '#ff4d5e' : B.gano ? '#ffd34d' : '#9aa0b8';
+      ctx.font = `900 ${Math.round(64 * scale)}px Rajdhani, "Segoe UI", sans-serif`;
+      ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.fillStyle = c;
+      const ty = (G.topY + G.strikeY) / 2;
+      ctx.strokeText(t, G.cx, ty); ctx.fillText(t, G.cx, ty);
+    }
+    ctx.restore();
+  }
+
   _spCell(ctx, e, now, fx, x, y, w, h, horizontal) {
     const perf = performance.now();
     const dt = Math.min(0.05, Math.max(0, (perf - (fx.spLast ?? perf)) / 1000));
@@ -1458,13 +1578,16 @@ export class HighwayRenderer {
       ctx.fillText(`Racha ${e.combo}`, sx, compact ? sy + 24 * scale : sy + 26 * scale);
     }
 
-    // Celda de energía del Star Power
+    // Celda de energía del Star Power (en la batalla, la vida y los poderes)
+    const B = p.batalla;
     if (compact) {
       const len = hw * 1.1;
-      this._spCell(ctx, e, now, fx, sx - len / 2, sy + 34 * scale, len, 16 * scale, true);
+      if (B) this._hudBatalla(ctx, view, G, B, now, scale, sx - len / 2, sy + 34 * scale, len, 16 * scale, true);
+      else this._spCell(ctx, e, now, fx, sx - len / 2, sy + 34 * scale, len, 16 * scale, true);
     } else {
       const len = 220 * scale;
-      this._spCell(ctx, e, now, fx, cx - hw * 1.12 - 46 * scale, strikeY - len, 26 * scale, len, false);
+      if (B) this._hudBatalla(ctx, view, G, B, now, scale, cx - hw * 1.12 - 46 * scale, strikeY - len, 26 * scale, len, false);
+      else this._spCell(ctx, e, now, fx, cx - hw * 1.12 - 46 * scale, strikeY - len, 26 * scale, len, false);
     }
 
     if (p.label) {
@@ -1504,7 +1627,8 @@ export class HighwayRenderer {
     }
     const R = 30 * scale;
     this._multGauge(ctx, e, now, fx, mult, multColor, x + R + 6, y + 40 * scale + R, R);
-    this._spCell(ctx, e, now, fx, x, y + 52 * scale + 2 * R + 14 * scale, 120 * scale, 14 * scale, true);
+    if (p.batalla) this._hudBatalla(ctx, view, G, p.batalla, now, scale, x, y + 52 * scale + 2 * R + 14 * scale, 120 * scale, 14 * scale, true);
+    else this._spCell(ctx, e, now, fx, x, y + 52 * scale + 2 * R + 14 * scale, 120 * scale, 14 * scale, true);
     this._soloYPopups(ctx, view, p, now, G, scale, font);
   }
 

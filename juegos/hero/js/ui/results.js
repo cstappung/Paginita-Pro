@@ -203,14 +203,18 @@ export class ResultsScreen extends Screen {
         h('button', { class: 'primary', 'data-nav': true, onclick: () => this.app.restartSession() }, 'Repetir'),
         h('button', { 'data-nav': true, onclick: () => this.back() }, 'Elegir otra canción'),
       ];
-    // Lo que dice la página de Juegos de esta canción: guardada, estrellas, monedas
-    this.nube = celular
+    // Lo que dice la página de Juegos de esta canción: guardada, estrellas, monedas (la batalla no se guarda)
+    const bt = this.results.find((r) => r.batalla);
+    this.nube = bt
+      ? h('div', { class: 'res-nube' }, h('b', {}, 'Las batallas no se guardan'), h('span', {}, 'No dan estrellas ni récords: son para ver quién aguanta más.'))
+      : celular
       ? h('div', { class: 'res-nube' }, h('b', {}, 'En el celular las partidas no se guardan'), h('span', {}, 'Los récords y las estrellas se ganan con teclado, mando o guitarra.'))
       : sitio.embebido && sitio.cuenta ? h('div', { class: 'res-nube' }, 'Verificando tu partida…') : null;
     return h('div', { class: 'screen results' },
       this.nube,
       h('div', { class: 'res-title' },
-        h('div', { class: 'res-kicker' }, 'Canción terminada'),
+        h('div', { class: 'res-kicker' }, bt ? '⚔️ Batalla' : 'Canción terminada'),
+        bt ? this.ganadorEl() : null,
         h('div', { class: 'res-name' }, this.entry.meta.name),
         h('div', { class: 'res-artist' }, this.entry.meta.artist)),
       this.cards,
@@ -274,8 +278,16 @@ export class ResultsScreen extends Screen {
     if (changed) this.renderCards();
   }
 
+  // En la batalla: quién ganó y cómo
+  ganadorEl() {
+    const g = this.results.find((r) => r.batalla?.gano);
+    if (!g) return null;
+    const como = { ko: 'por K.O.', vida: 'con más vida al final', puntaje: 'empate de vida: por puntaje' }[g.batalla.motivo] || '';
+    return h('div', { class: 'res-batalla' }, h('b', { translate: 'no' }, `🏆 ${g.name || 'Jugador'}`), h('span', {}, `gana la batalla ${como}`));
+  }
+
   renderCards() {
-    const sorted = [...this.results].sort((a, b) => (b.stats?.score ?? -1) - (a.stats?.score ?? -1));
+    const sorted = [...this.results].sort((a, b) => (b.batalla?.gano ? 1 : 0) - (a.batalla?.gano ? 1 : 0) || (b.stats?.score ?? -1) - (a.stats?.score ?? -1));
     const multi = sorted.length > 1;
     this.cards.classList.toggle('multi', multi);
     this.cards.replaceChildren(...sorted.map((r, i) => this.card(r, i, multi)));

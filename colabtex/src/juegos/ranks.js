@@ -23,8 +23,10 @@
  */
 import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
 import { mezcla } from "./perfil.js";
-import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
+import { rankingColeccion, topColecciones, colVisible, PUNTOS_RAREZA, miniCarta, MOTOR } from "./prodrop-cartas.js";
 import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
+import { nombreHtml } from "./tintas.js";
+import { podiosGeneral, MIN_PODIO } from "./perfil-tarjeta.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -32,7 +34,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }};
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, integral: { nombre: "Integrodle", color: "#2c5aa8" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, aleteo: { nombre: "ALETEO", color: "#3fb6f5" }, dosmil: { nombre: "2048", color: "#edc22e" }, trigon: { nombre: "Trigon", color: "#f6d23c" }, protiles: { nombre: "PRO TILES", color: "#ff5a36" }, pokelike: { nombre: "Pokelike", color: "#e3350d" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } , hero: { nombre: "PRO HERO", color: "#ffb21e" }, prodefender: { nombre: "PRO DEFENDER", color: "#ffcf4d" }, propac: { nombre: "PRO PACMAN", color: "#ffe14d" }};
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -61,6 +63,8 @@ const SOLO = {
   /* Electrodle: los puntos que se acumulan día a día, o la racha. */
   electro: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos totales"], ["racha", "Racha diaria"]] }],
     cat: s => `club-electro-${s.n}` },
+  integral: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos totales"], ["racha", "Racha diaria"]] }],
+    cat: s => `club-integral-${s.n}` },
   /* Frontera Batalla: la mejor racha por instalación y nivel, o el total
      de combates ganados (que no tiene nivel). */
   frontera: { filas: [
@@ -95,8 +99,11 @@ const SOLO = {
   hero: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas doradas"]] }],
     cat: s => `club-hero-${s.n}` },
   /* PRO DEFENDER: la ronda récord de cada reino. */
-  prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"]] }],
+  prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"], ["pantano", "Pantano Sombrío"], ["cumbres", "Cumbres Tormentosas"], ["fosa", "Fosa Abisal"], ["engranajes", "Ciudadela de Engranajes"], ["eclipse", "Trono del Eclipse"]] }],
     cat: s => `club-prodefender-${s.n}` },
+  /* PRO PACMAN: una sola tabla, el puntaje de la partida. */
+  propac: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],
+    cat: s => `club-propac-${s.n}` },
   /* Metro Rush: una fila «Modo» con la mejor carrera de cada modo normal
      (carrera es el clásico) y la carrera más larga de cada mundo, en metros
      (Distancia la Línea 3, City distancia City: ahí corren también los modos
@@ -109,6 +116,21 @@ const SOLO = {
     cat: s => `club-snake-${s.m}-${s.t}`, def: { t: "grande" } }
 };
 const esSolo = k => !!SOLO[k];
+
+/* Las categorías del club que existen hoy: todas las combinaciones de las
+   filas de SOLO. Las de versiones viejas (el Snake de antes, el buscaminas
+   de antes) siguen en la base, pero ya no salen en la general ni en el
+   perfil (juegos-main.js lo pasa a los datos como `vigente`). */
+const VIGENTES = (() => {
+  const s = new Set();
+  for (const d of Object.values(SOLO)) {
+    let combos = [Object.assign({}, d.def || {})];
+    for (const f of d.filas) combos = combos.flatMap(e => f.ops.map(([v]) => Object.assign({}, e, { [f.k]: v })));
+    for (const e of combos) s.add(d.cat(e));
+  }
+  return s;
+})();
+export const categoriaVigente = c => VIGENTES.has(String(c));
 
 /* La corona es SVG dibujado, no un emoji: cada sistema pinta 👑 a su
    tamaño y su color, y aquí tiene que brillar en el oro del podio. */
@@ -160,6 +182,10 @@ export function crearRanks(ctx) {
   /* La pestaña de cartas no lee `ranks`: sale de la economía de PRODROP
      (`ctx.datos`, la misma lectura que usa el vestíbulo). */
   let datosC = null, pararC = null, firmaC = "";
+  /* La colección elegida en esa pestaña, y de quién se está mirando la
+     colección completa («Ver colección», una a la vez). */
+  let colC = "", verC = "";
+  try { colC = localStorage.getItem("jg.rankCol") || ""; } catch (e) { /* sin almacenamiento */ }
 
   function montar(donde) {
     host = donde;
@@ -203,7 +229,7 @@ export function crearRanks(ctx) {
     }
     pinta();
     const individual = esSolo(juego);
-    const oye = juego === "general" ? (_, cb) => ctx.watchTodos((todo, err) => cb(suma(todo), err))
+    const oye = juego === "general" ? oyeGeneral
       : individual ? ctx.watchSolo : watchRanks;
     parar = oye(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
@@ -214,24 +240,19 @@ export function crearRanks(ctx) {
     });
   }
 
-  /* La general: cada jugador con lo de todos los juegos sumado. La racha
-     es la mejor de cualquiera de ellos (sumar rachas de juegos distintos
-     no significa nada) y «juegos» dice en cuántos tiene fila, que es lo
-     que distingue al que gana en todo del que solo juega a uno. */
-  function suma(todo) {
-    const t = {};
-    for (const [k, filas] of Object.entries(todo || {})) {
-      if (!JUEGOS[k]) continue;
-      for (const [u, f] of Object.entries(filas || {})) {
-        if (!f) continue;
-        const a = t[u] || (t[u] = { uid: u, nombre: "", foto: "", jugadas: 0, ganadas: 0, perdidas: 0, empates: 0, puntos: 0, mejorRacha: 0, juegos: 0, _at: -1 });
-        for (const c of ["jugadas", "ganadas", "perdidas", "empates", "puntos"]) a[c] += +f[c] || 0;
-        a.mejorRacha = Math.max(a.mejorRacha, +f.mejorRacha || 0);
-        a.juegos++;
-        if ((+f.at || 0) >= a._at) { a._at = +f.at || 0; a.nombre = f.nombre || a.nombre; a.foto = f.foto || a.foto; }
-      }
-    }
-    return Object.values(t);
+  /* La general: los podios de todas las tablas que se ven aquí (las de
+     sala y las del club), 3 puntos por cada primer puesto, 2 por cada
+     segundo y 1 por cada tercero (`podiosGeneral`). Sale de los mismos
+     datos del vestíbulo (ranks + soloRanks); sin ellos, solo de las salas. */
+  const salasVisibles = () => (ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS)).filter(k => !EXTRA[k]);
+  function oyeGeneral(_, cb) {
+    const op = () => ({ salas: salasVisibles(), vigente: categoriaVigente, vetado: ctx.vetado });
+    if (!ctx.datos) return ctx.watchTodos((todo, err) => cb(podiosGeneral({ ranks: todo }, op()), err));
+    let d = null;
+    const emite = () => { if (d) cb(podiosGeneral(d, op()), null); };
+    const offD = ctx.datos(x => { d = x; emite(); });
+    const offV = ctx.watchVetados ? ctx.watchVetados(emite) : null;
+    return () => { if (offD) offD(); if (offV) offV(); };
   }
 
   /* 22 pastillas iguales, sin icono y en el orden del objeto, eran tres
@@ -271,15 +292,26 @@ export function crearRanks(ctx) {
     const t = host.querySelector("#rkTabla");
     if (!t) return;
     const solo = esSolo(juego);
-    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid))) : ordenaRanks(filas);
     const general = juego === "general";
+    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid)))
+      : general ? filas : ordenaRanks(filas);
     host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
-      : general ? 'La general suma los puntos de todos los juegos en sala (3 por victoria, 1 por empate). «Juegos» dice en cuántos tiene fila cada uno.'
+      : general ? `La general cuenta los podios de todas las clasificaciones (de sala y del club, con al menos ${MIN_PODIO} personas): cada primer puesto da 3 puntos, cada segundo 2 y cada tercero 1.`
       : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
     if (!orden.length) {
       t.innerHTML = `<tr><td class="jg-vacio">${cargando ? "Cargando…"
-        : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
+        : general ? "Todavía nadie tiene un podio." : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
+      return;
+    }
+    if (general) {
+      t.innerHTML = `
+      <thead><tr>
+        <th class="jg-th-n">#</th><th>Jugador</th>
+        <th class="jg-num jg-opc" title="Primeros puestos">🥇</th><th class="jg-num jg-opc" title="Segundos puestos">🥈</th>
+        <th class="jg-num jg-opc" title="Terceros puestos">🥉</th><th class="jg-num jg-opc">Podios</th>
+        <th class="jg-num jg-pts">Puntos</th>
+      </tr></thead><tbody>${orden.map((f, i) => filaGeneral(f, i)).join("")}</tbody>`;
       return;
     }
     const adm = solo && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord;
@@ -289,7 +321,7 @@ export function crearRanks(ctx) {
         <th class="jg-th-n">#</th><th>Jugador</th>
         <th class="jg-num jg-opc">Jugadas</th><th class="jg-num jg-opc">Ganadas</th>
         <th class="jg-num jg-opc">Perdidas</th><th class="jg-num jg-opc">Empates</th>
-        <th class="jg-num jg-opc">%</th>${general ? `<th class="jg-num jg-opc">Juegos</th>` : ""}<th class="jg-num jg-opc">Racha</th>
+        <th class="jg-num jg-opc">%</th><th class="jg-num jg-opc">Racha</th>
         <th class="jg-num jg-pts">Puntos</th>
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
@@ -302,20 +334,37 @@ export function crearRanks(ctx) {
       <td class="jg-th-n">${puesto(i)}</td>
       <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
         ${foto(f, 26)}
-        <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${f.jugadas || 0} jugadas · ${f.ganadas || 0} ganadas</small></span>
+        <span translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${f.jugadas || 0} jugadas · ${f.ganadas || 0} ganadas</small></span>
       </td>
       <td class="jg-num jg-opc">${f.jugadas || 0}</td>
       <td class="jg-num jg-gan jg-opc">${f.ganadas || 0}</td>
       <td class="jg-num jg-opc">${f.perdidas || 0}</td>
       <td class="jg-num jg-opc">${f.empates || 0}</td>
       <td class="jg-num jg-opc"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
-      ${juego === "general" ? `<td class="jg-num jg-opc">${f.juegos || 0}</td>` : ""}
       <td class="jg-num jg-opc">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
   }
 
-  /* ---- PRODROP: colección y cartas más raras ---- */
+  function filaGeneral(fx, i) {
+    const f = mezcla(fx, perfil(fx.uid));
+    const yo = f.uid === uid;
+    return `<tr class="${yo ? "jg-yo" : ""}${i < 3 ? " jg-rk-top" : ""}">
+      <td class="jg-th-n">${puesto(i)}</td>
+      <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
+        ${foto(f, 26)}
+        <span translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${medallas(f)}</small></span>
+      </td>
+      <td class="jg-num jg-opc">${f.oro}</td>
+      <td class="jg-num jg-opc">${f.plata}</td>
+      <td class="jg-num jg-opc">${f.bronce}</td>
+      <td class="jg-num jg-opc">${f.podios}</td>
+      <td class="jg-num jg-pts">${f.puntos}</td>
+    </tr>`;
+  }
+  const medallas = f => `${f.oro} 🥇 · ${f.plata} 🥈 · ${f.bronce} 🥉`;
+
+  /* ---- PRODROP: por colección, las colecciones más raras y la más completa ---- */
   function nombreDe(u) {
     const q = ctx.quien ? ctx.quien(u) : mezcla({ uid: u, nombre: "" }, perfil(u));
     return { nombre: (q && q.nombre) || "Sin nombre", foto: (q && q.foto) || "", color: q && q.color };
@@ -324,35 +373,50 @@ export function crearRanks(ctx) {
     const q = nombreDe(u);
     return `<span class="jg-jug jg-rkc-quien" data-perfil="${esc(u)}" data-nombre="${esc(q.nombre)}">
       ${foto({ uid: u, nombre: q.nombre, foto: q.foto, color: q.color }, 26)}
-      <span>${esc(q.nombre)}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
+      <span translate="no">${nombreHtml(u, esc(q.nombre))}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
   }
-  const unoEn = p => { const n = Math.round(1 / p); return n >= 1e6 ? `${(n / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })} millones` : n.toLocaleString("es-CL"); };
+  /* Décimas de punto → «18» o «0,9». */
+  const pts = d => (d / 10).toLocaleString("es-CL", { maximumFractionDigits: 1 });
+  function filaTop(f, i) {
+    const abierta = verC === f.uid;
+    return `<li class="${f.uid === uid ? "jg-yo" : ""}">
+        <span class="jg-rkc-n">${puesto(i)}</span>${quienHtml(f.uid)}
+        <b class="jg-rkc-cuenta">${pts(f.puntos)} pts</b>
+        <button type="button" class="btn2 jg-rkc-ver" data-rkc-ver="${esc(f.uid)}" aria-expanded="${abierta}">${abierta ? "Ocultar" : "Ver colección"}</button>
+        <small class="jg-rkc-extra">${plural(f.cartas.length, "carta graduada", "cartas graduadas")} de ${f.total} · ${plural(f.sobres, "sobre abierto", "sobres abiertos")}</small>
+        ${abierta ? `<div class="jg-rkc-album">${f.cartas.map(c => miniCarta(c, `<span class="jg-rkc-vale">${pts(c.pts)} pts</span>`)).join("")}</div>` : ""}
+      </li>`;
+  }
   function pintaCartas(el) {
     if (!el) return;
-    const col = rankingColeccion(datosC), raras = cartasMasRaras(datosC);
-    if (!col || !raras) { el.innerHTML = `<p class="jg-vacio">Cargando las cartas…</p>`; return; }
+    const cols = MOTOR.COLECCIONES.filter(c => colVisible(c.key));
+    if (!cols.some(c => c.key === colC)) colC = cols[0].key;
+    const k = colC, info = MOTOR.COL[k];
+    const top = topColecciones(datosC, k), col = rankingColeccion(datosC, 10, k);
+    if (!top || !col) { el.innerHTML = `<p class="jg-vacio">Cargando las cartas…</p>`; return; }
+    const mia = top.findIndex(f => f.uid === uid);
+    const valen = MOTOR.TIERS.map((t, i) => ({ t, i })).filter(({ i }) => MOTOR.POR_COL[k].some(c => c.tier === i)).reverse()
+      .map(({ t, i }) => `${esc(t.sym)} ${esc(t.label.toLowerCase())} ${pts(PUNTOS_RAREZA[i] * 10)}`).join(" · ");
     const html = `
+      ${cols.length > 1 ? `<div class="jg-rk-cats" style="--c:#c084fc"><div class="jg-rk-fila"><span>Colección</span><div class="jg-rk-seg" role="group" aria-label="Colección">${cols.map(c =>
+        `<button type="button" class="${c.key === k ? "on" : ""}" aria-pressed="${c.key === k}" data-rkc-col="${c.key}">${esc(c.label)}</button>`).join("")}</div></div></div>` : ""}
       <section class="jg-rkc">
-        <h2>Colección más completa</h2>
-        <p class="jg-rkc-sub">Cartas distintas que cada uno tiene ahora, de ${col[0] ? col[0].total : ""} en total. Las repetidas cuentan una vez.</p>
+        <h2>Colecciones más raras · ${esc(info.label)}</h2>
+        <p class="jg-rkc-sub">Solo cartas graduadas, y de cada carta solo la mejor copia (las repetidas cuentan una vez). Cada carta vale según su rareza con nota 10 (${valen}) y menos con menos nota: una legendaria con 9 son 18.</p>
+        ${top.length ? `<ol class="jg-rkc-lista jg-rkc-top">${top.slice(0, 3).map(filaTop).join("")}</ol>
+          ${mia >= 3 ? `<p class="jg-rkc-sub jg-rkc-tuya">Tu colección va #${mia + 1}.</p><ol class="jg-rkc-lista jg-rkc-top" start="${mia + 1}">${filaTop(top[mia], mia)}</ol>` : ""}`
+          : `<p class="jg-vacio">Todavía nadie ha graduado una carta de ${esc(info.label)}.</p>`}
+      </section>
+      <section class="jg-rkc">
+        <h2>Colección más completa · ${esc(info.label)}</h2>
+        <p class="jg-rkc-sub">Cartas distintas que cada uno tiene ahora, de ${MOTOR.POR_COL[k].length} en total. Las repetidas cuentan una vez.</p>
         ${col.length ? `<ol class="jg-rkc-lista">${col.map((f, i) => `
           <li class="${f.uid === uid ? "jg-yo" : ""}">
             <span class="jg-rkc-n">${puesto(i)}</span>${quienHtml(f.uid)}
             <span class="jg-rkc-barra" title="${f.tiene} de ${f.total}"><i style="width:${(100 * f.tiene / f.total).toFixed(1)}%"></i></span>
             <b class="jg-rkc-cuenta">${f.tiene}/${f.total}</b>
             <small class="jg-rkc-extra">${f.leyendas ? `${esc(MOTOR.TIERS[3].sym)} ${f.leyendas} ${f.leyendas === 1 ? "legendaria" : "legendarias"} · ` : ""}${f.copias} ${f.copias === 1 ? "copia" : "copias"}</small>
-          </li>`).join("")}</ol>` : `<p class="jg-vacio">Nadie tiene cartas todavía. <a href="#cartas">Abrir un sobre →</a></p>`}
-      </section>
-      <section class="jg-rkc">
-        <h2>Las cartas más raras</h2>
-        <p class="jg-rkc-sub">Solo graduadas. Más rara es la que menos probabilidad tenía de salir con esa nota o más.</p>
-        ${raras.length ? `<ol class="jg-rkc-lista jg-rkc-raras">${raras.map((c, i) => `
-          <li class="${c.dueno === uid ? "jg-yo" : ""}">
-            <span class="jg-rkc-n">${puesto(i)}</span>
-            <span class="jg-rkc-carta">${miniCarta(c)}</span>
-            <span class="jg-rkc-info"><b>${esc(c.carta.name)}</b><small>${esc(MOTOR.TIERS[c.carta.tier].label)} · ${esc(MOTOR.subtitulo(c.carta))}</small><small>Nota ${c.g} · 1 en ${unoEn(c.p)} sobres</small></span>
-            ${quienHtml(c.dueno)}
-          </li>`).join("")}</ol>` : `<p class="jg-vacio">Todavía nadie ha graduado una carta.</p>`}
+          </li>`).join("")}</ol>` : `<p class="jg-vacio">Nadie tiene cartas de ${esc(info.label)} todavía. <a href="#cartas">Abrir un sobre →</a></p>`}
       </section>`;
     /* Por firma: llegan perfiles uno a uno y cada uno repinta. */
     if (html !== firmaC) { firmaC = html; el.innerHTML = html; }
@@ -386,7 +450,7 @@ export function crearRanks(ctx) {
       return { valor: f => f.puntos || 0, txt: v => `${v.toLocaleString("es-CL")} m`, unidad: "", menor: false };
     if (solo && categoriaSolo.startsWith("club-frontera-"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "victoria" : "victorias"}`, unidad: "", menor: false };
-    if (solo && (categoriaSolo === "club-sopa-racha" || categoriaSolo === "club-electro-racha" || categoriaSolo === "club-sudoku-racha"))
+    if (solo && (categoriaSolo === "club-sopa-racha" || categoriaSolo === "club-electro-racha" || categoriaSolo === "club-integral-racha" || categoriaSolo === "club-sudoku-racha"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "día" : "días"}`, unidad: "", menor: false };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
@@ -419,12 +483,12 @@ export function crearRanks(ctx) {
         ${bloque}</div>`;
     const detalle = solo && categoriaSolo === "club-hero-estrellas" ? `${plural(f.h || 0, "canción", "canciones")} · ${Math.max(0, (f.puntos || 0) % 10000 - Math.floor((f.puntos || 0) / 10000))} azules`
       : solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
-      : juego === "general" ? `${f.ganadas || 0} G · ${plural(f.juegos || 0, "juego", "juegos")}`
+      : juego === "general" ? medallas(f)
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
         <div class="jg-rk-av${conMarco(f) ? " con-marco" : ""}" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
-        <b class="jg-rk-nom" title="${esc(f.nombre || "")}">${esc(f.nombre || "Sin nombre")}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
+        <b class="jg-rk-nom" title="${esc(f.nombre || "")}" translate="no">${nombreHtml(f.uid, esc(f.nombre || "Sin nombre"))}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
         <span class="jg-rk-tit">${TITULO[i]}</span>
         <div class="jg-rk-pts"><b>${m.txt(m.valor(f))}</b>${m.unidad ? ` ${m.unidad}` : ""}</div>
         <small>${detalle}</small>
@@ -442,15 +506,17 @@ export function crearRanks(ctx) {
       if (m.menor) return `${Math.max(0.01, d + 0.01).toFixed(2)} s menos`;
       const n = d + 1;
       if (solo && categoriaSolo === "club-hero-estrellas") return plural(n, "estrella dorada", "estrellas doradas");
-      return solo ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
+      return solo || juego === "general" ? plural(n, "punto", "puntos") : `${plural(n, "punto", "puntos")} (${plural(victorias(n), "victoria", "victorias")})`;
     };
     let icono = "⚔", tit, txt;
     if (!orden.length) {
       icono = "♛"; tit = "El trono está vacío";
-      txt = solo ? "El primer récord que se apunte se sienta en él." : "La primera victoria que se apunte se sienta en él.";
+      txt = solo ? "El primer récord que se apunte se sienta en él." : juego === "general" ? "El primer podio que se gane se sienta en él." : "La primera victoria que se apunte se sienta en él.";
     } else if (i < 0) {
       tit = "Todavía no estás en la tabla";
-      txt = orden.length < 3 ? "Hay un puesto libre en el podio: termina una partida y es tuyo."
+      txt = juego === "general" ? (orden.length < 3 ? "Hay un puesto libre en el podio: sube al podio de cualquier clasificación y es tuyo."
+          : `El podio empieza en ${plural(orden[2].puntos, "punto", "puntos")}: sube al podio de cualquier clasificación y entras.`)
+        : orden.length < 3 ? "Hay un puesto libre en el podio: termina una partida y es tuyo."
         : `El podio empieza en ${m.txt(m.valor(orden[2]))}${m.unidad ? " " + m.unidad : ""}. Juega y entra.`;
     } else if (i === 0) {
       icono = "♛"; tit = "Llevas la corona";
@@ -521,6 +587,18 @@ export function crearRanks(ctx) {
   }
 
   function alClic(ev) {
+    const rc = juego === CARTAS && ev.target.closest("[data-rkc-col],[data-rkc-ver]");
+    if (rc) {
+      if (rc.hasAttribute("data-rkc-col")) {
+        colC = rc.getAttribute("data-rkc-col"); verC = "";
+        try { localStorage.setItem("jg.rankCol", colC); } catch (e) { /* nada */ }
+      } else {
+        const u = rc.getAttribute("data-rkc-ver");
+        verC = verC === u ? "" : u;
+      }
+      pinta();
+      return;
+    }
     const del = ev.target.closest("[data-borra]");
     if (del && esSolo(juego) && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord) {
       ev.stopPropagation();

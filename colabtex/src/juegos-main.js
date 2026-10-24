@@ -2,7 +2,7 @@
    de que el SDK abra su primera conexión con la base. */
 import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
-import { esRachaClub, rachaClub, resultadoClub } from "./juegos/solo/club-datos.js";
+import { esRachaClub, rachaClub, resultadoClub, mejorClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
@@ -39,7 +39,8 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
       contar dos veces la misma partida, así que recargar la página con
       la partida terminada no infla el marcador.
    ============================================================ */
-import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva } from "./firebase.js";
+import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
+import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
 import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
@@ -48,6 +49,7 @@ import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearPool } from "./juegos/pool.js";
 import { crearGato } from "./juegos/gato.js";
 import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearPokemon } from "./juegos/pokemon.js";
@@ -72,17 +74,24 @@ import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
 import { crearMkw, crearMkwSolo } from "./juegos/mkw.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
+import { fijaVeRock, veRock, fichaRock } from "./juegos/rock-datos.js";
+import { fotoRock, pideFotosRock } from "./juegos/rock-fotos.js";
 import { crearHeroSala } from "./juegos/hero-sala.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { portadaSolo } from "./juegos/portadas-solo.js";
-import { crearRanks } from "./juegos/ranks.js";
+import { crearRanks, categoriaVigente } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender } from "./juegos/monedas.js";
-import { PRECIO_TIENDA } from "./juegos/tienda.js";
+  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios, monedasProdefender, dropsRock, ganariaInvitado } from "./juegos/monedas.js";
+import { precioDe, tiendaHalloweenAbierta } from "./juegos/tienda.js";
+import { tiraTiendaHtml, refrescaCuentas, abreTiendaHalloween, yaVistaHoy, tiendaAbierta, firmaYoTienda } from "./juegos/tienda-halloween.js";
+import { PRECIO_COFRE, abreCofre, esTaco, TACOS } from "./juegos/tacos.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
+import { crearReferidos, topReferidosHtml } from "./juegos/referidos-vista.js";
+import { referidos as referidosDe } from "./juegos/referidos.js";
+import { tintaVisible, cssTintas, nombreHtml } from "./juegos/tintas.js";
 import { crearCasino } from "./juegos/casino.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
@@ -102,9 +111,10 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre, DESTACADOS_INVITADO, COLOR_SOLO, bloqueado, limpiaNombreInvitado, sugiereNombreInvitado, NOMBRE_INVITADO_MAX, novedadPideCuenta, ordenaNovedades, ordenaEntradas } from "./juegos/salon-datos.js";
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
+import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
 /* Solo en ESTA PC, para probar un juego de punta a punta: el arnés local de Mario Kart (juegos/mkw/herramientas/
    experiencia.mjs, el jugar.bat del proyecto) pone window.__JG_SOLO = ["mkw"] y el catálogo muestra solo ese juego
    (su sala y su «un jugador»). En el sitio publicado no existe: se ven todos. */
@@ -119,13 +129,13 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -277,6 +287,14 @@ const OPCIONES = {
   ],
   /* Memazo: de dónde salen las plantillas (`fuente`, no `modo`), cuántas
      rondas y cuánto se tiene para escribir cada meme. */
+  /* Pool 8: uno contra uno (`cupo` 2) o dos contra dos (`cupo` 4). En
+     parejas el anfitrión juega con quien entre en el puesto elegido; en
+     uno contra uno `pareja` no se usa. `guia` es la línea de puntería. */
+  pool: [
+    { clave: "cupo", etiqueta: "Formato", valores: [{ v: 2, t: "1 contra 1" }, { v: 4, t: "2 contra 2" }] },
+    { clave: "guia", etiqueta: "Línea guía", valores: [{ v: 1, t: "Con línea guía" }, { v: 0, t: "Sin línea guía" }] },
+    { clave: "pareja", etiqueta: "Mi compañero (solo 2 contra 2)", valores: [{ v: 1, t: "El primero que entre" }, { v: 2, t: "El segundo que entre" }, { v: 3, t: "El tercero que entre" }] }
+  ],
   memazo: [
     { clave: "cupo", etiqueta: "Jugadores", por: 6, valores: cupos("memazo") },
     { clave: "fuente", etiqueta: "Plantillas", por: "reales", valores: Object.keys(MZ_FUENTES).map(v => ({ v, t: MZ_FUENTES[v] })) },
@@ -323,7 +341,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-integral", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-protiles", "club-pokelike", "club-metrorush", "club-tulones", "club-hero", "club-prodefender", "club-propac"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -384,6 +402,7 @@ function perfilDe(uid) {
       const antes = JSON.stringify(perfiles.get(uid) || null);
       if (JSON.stringify(p || null) === antes) return;
       perfiles.set(uid, p || null);
+      pintaTintas();
       if (state.base && uid === state.base.uid) aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
@@ -407,6 +426,25 @@ function perfilDe(uid) {
    fila, que es el de su cuenta de Google al escribirla. Así el apodo sale
    en todas partes, no solo donde la pantalla ya pasaba por `mezcla`. */
 const nombreVivo = (uid, n) => { const p = uid ? perfilDe(uid) : null; return (p && p.nick) || n || ""; };
+
+/* El color del nombre (juegos/tintas.js): una hoja para toda la página
+   con el color visible de cada perfil que se está escuchando. Se rehace
+   cuando llega un perfil o cambian los referidos; ningún nombre se
+   repinta. Sin las lecturas de las monedas completas, vale lo guardado. */
+let hojaTintas = null;
+function pintaTintas() {
+  const d = datosP && datosP.completo ? datosP : null, de = d ? referidosDe(d).de : null;
+  const porUid = {};
+  for (const [uid, p] of perfiles) if (p && p.tinta) porUid[uid] = tintaVisible(p.tinta, de ? (de[uid] || []).length : null);
+  const css = cssTintas(porUid);
+  if (!hojaTintas) {
+    if (!css) return;
+    hojaTintas = document.createElement("style");
+    hojaTintas.id = "jgTintas";
+    document.head.appendChild(hojaTintas);
+  }
+  if (hojaTintas.textContent !== css) hojaTintas.textContent = css;
+}
 
 /* Se escribe **dentro** de cada ficha en vez de cambiarla por otra
    para no romper ninguna referencia que el reductor haya dejado
@@ -447,6 +485,15 @@ function aplicaPropio() {
                    perfiles.get(b.uid) || null);
   state.user = { uid: b.uid, name: m.nombre, photo: m.foto, color: m.color };
   pintaUsuario();
+  /* La franja de la tienda de Halloween se escribió con el salón, a veces
+     antes de que llegara el perfil (y salía la foto de Google): se rehace
+     aquí con la foto y el nombre del perfil. */
+  const tira = document.querySelector(".jg-th-tira");
+  if (tira) {
+    const h = tiraTiendaHtml(Object.assign({}, yoTienda() || {}));
+    if (!h) tira.remove();
+    else if (tira.getAttribute("data-yo") !== firmaYo()) tira.outerHTML = h;
+  }
 }
 
 /* Las reglas limitan a 400 caracteres la `foto` de la ficha y la de
@@ -473,8 +520,9 @@ function datosPerfil(cb) {
        en un objeto nuevo por llegada, que es lo que invalida las memorias
        de juegos/monedas.js. */
     datosP = conDerivados(Object.assign({}, d, { completo: !!d.completo }));
+    pintaTintas();
     for (const f of [...oyentesP]) f(datosP);
-  });
+  }, () => (state.user ? state.user.uid : ""));
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
   return () => oyentesP.delete(cb);
 }
@@ -500,6 +548,9 @@ function conDerivados(d) {
   let lid = null, com = null;
   Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
   Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  /* Las tablas del club que existen hoy (ranks.js): el perfil no lista
+     las de versiones viejas de un juego (el Snake y el buscaminas de antes). */
+  Object.defineProperty(d, "vigente", { enumerable: false, value: categoriaVigente });
   return d;
 }
 function lideresDe(d) {
@@ -516,6 +567,59 @@ function comprasDe(d) {
   for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
   return out;
 }
+/* ---------- los tacos de Pool ----------
+   Lo que se tiene sale de `economia()` (los cofres que aceptó); lo que se
+   equipa es `users/<uid>/taco`, un id suelto que se comprueba contra lo
+   que esa cuenta tiene al pintar, como los marcos: un id escrito a mano
+   que no se ganó se ve como el taco de escuela. */
+const tacoCache = new Map(), tacoOyendo = new Set(), tacoOyentes = new Set();
+const avisaTacos = () => { for (const f of [...tacoOyentes]) f(); };
+function tacoDeUid(uid) {
+  if (!uid) return "escuela";
+  if (!tacoOyendo.has(uid)) {
+    tacoOyendo.add(uid);
+    fb.watchTaco(uid, v => { tacoCache.set(uid, v); avisaTacos(); });
+  }
+  const id = tacoCache.get(uid);
+  if (!esTaco(id)) return "escuela";
+  if (TACOS[id].regalo) return id;
+  if (datosP && datosP.completo) {
+    const e = economia(datosP).usuarios[uid];
+    if (!(e && e.tacos[id])) return "escuela";
+  }
+  return id;
+}
+const claveCofre = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => (b % 36).toString(36)).join("");
+const tacosPool = {
+  alCambiar(fn) {
+    tacoOyentes.add(fn);
+    const off = datosPerfil(() => fn());
+    return () => { tacoOyentes.delete(fn); off(); };
+  },
+  estado() {
+    const u = state.user.uid, listo = !!(datosP && datosP.completo);
+    const e = listo ? economia(datosP).usuarios[u] : null, m = listo ? monedasDe(u, datosP) : null;
+    return { listo, saldo: m ? m.saldo : 0, parada: !!(m && m.parada), poseidos: (e && e.tacos) || {}, equipado: tacoDeUid(u) };
+  },
+  async comprar() {
+    const u = state.user.uid, est = tacosPool.estado();
+    if (!est.listo || est.parada || est.saldo < PRECIO_COFRE) throw new Error("Sin saldo para el cofre.");
+    const clave = claveCofre();
+    const x = await fb.comprarCofre(u, clave, PRECIO_COFRE);
+    const id = abreCofre(u, clave, x.at);
+    suena("gana");
+    return { id, dup: !!est.poseidos[id] || !!TACOS[id].regalo };
+  },
+  async equipar(id) {
+    const u = state.user.uid, est = tacosPool.estado();
+    if (!esTaco(id) || !(TACOS[id].regalo || est.poseidos[id])) return;
+    await fb.equiparTaco(u, id);
+    tacoCache.set(u, id);
+    avisaTacos();
+    suena("clic");
+  }
+};
+
 /* El marco que se ve en una foto cualquiera (tops, chips, tiras): el del
    perfil vivo, comprobado contra lo que esa persona tiene ganado. */
 const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
@@ -583,12 +687,17 @@ async function editaPerfil(pestana) {
     uid: b.uid, colorDe: colorForUid, pestana,
     saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
     mascota: mascotaEditor(b.uid, d),
-    onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
+    referidos: d && d.completo ? (referidosDe(d).de[b.uid] || []).length : null,
+    onComprar: async id => { await fb.comprarTienda(b.uid, id, precioDe(id)); },
+    onTiendaHw: () => abreTienda(),
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
+      // lo mismo la plantilla de fútbol, que se arma en PRODROP
+      const plantilla = (perfiles.get(b.uid) || {}).plantilla;
+      if (plantilla) p = Object.assign({}, p, { plantilla });
       /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
          devuelve la que había. Nunca se pierde por guardar otra cosa. */
       const mascota = (perfiles.get(b.uid) || {}).mascota;
@@ -597,19 +706,82 @@ async function editaPerfil(pestana) {
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */
       perfiles.set(b.uid, Object.assign({}, p));
-      aplicaPropio();
-      if (state.estado) vistePerfiles(state.estado);
-      if (ranks) ranks.refresca();
-      if (paginaPerfil) paginaPerfil.refresca();
-      render();
+      trasCambiarPerfil();
       suena("clic");
     }
   });
 }
+function trasCambiarPerfil() {
+  pintaTintas();
+  aplicaPropio();
+  if (state.estado) vistePerfiles(state.estado);
+  if (ranks) ranks.refresca();
+  if (paginaPerfil) paginaPerfil.refresca();
+  render();
+}
+
+/* ---------- la tienda de Halloween ----------
+   La ventana (juegos/tienda-halloween.js) se abre sola al entrar al salón
+   una vez al día, desde la franja del salón, desde el editor del perfil y
+   con `#tienda` (el enlace de Inicio). Compra con el precio de cada
+   artículo (tienda.js) y se lo pone escribiendo solo `marco` o `fondo`
+   del perfil, sin tocar lo demás. */
+function yoTienda() {
+  const b = state.base;
+  if (!b) return null;
+  /* `state.user` ya es la cuenta con el perfil encima (aplicaPropio): la
+     foto que la persona eligió, no la de Google. */
+  const u = state.user || {};
+  const q = quien(b.uid, perfiles.get(b.uid) || null, null, { nombre: u.name || b.name, foto: u.photo || b.photo, color: u.color || b.color }, colorForUid);
+  return { uid: b.uid, nombre: q.nombre, foto: q.foto, color: q.color };
+}
+const firmaYo = () => firmaYoTienda(yoTienda());
+function abreTienda(elegido) {
+  abreTiendaHalloween({
+    yo: yoTienda,
+    datos: cb => state.user ? datosPerfil(cb) : (() => {}),
+    saldo: d => d && d.completo && state.user ? monedasDe(state.user.uid, d).saldo : null,
+    perfil: () => (state.user && perfiles.get(state.user.uid)) || null,
+    comprar: async id => { await fb.comprarTienda(state.user.uid, id, precioDe(id)); },
+    equipar: async (tipo, id) => {
+      const uid = state.user.uid;
+      await fb.ponEnPerfil(uid, tipo, id);
+      perfiles.set(uid, Object.assign({}, perfiles.get(uid) || {}, { [tipo]: id }));
+      trasCambiarPerfil();
+    },
+    login: () => entrarConGoogle("", "tienda-hw"),
+    suena
+  }, elegido);
+}
+/* Se abre sola: con sesión, en el salón, una vez al día por aparato, y
+   solo si no hay otra ventana delante (la bienvenida, una ficha, el editor). */
+function quizaAbreTienda() {
+  if (!tiendaHalloweenAbierta(Date.now()) || yaVistaHoy()) return;
+  setTimeout(() => {
+    if (!state.user || state.vista !== "vestibulo" || tiendaAbierta() || yaVistaHoy()) return;
+    if (document.querySelector(".jg-modal-capa, .jg-bv") || salon.abiertaPara()) return;
+    abreTienda();
+  }, 1400);
+}
+/* `#tienda` no es una vista: abre la ventana encima de lo que hubiera y
+   la dirección vuelve a la ruta de antes (`hashPrevio`), para que la barra
+   y la vista no se contradigan. */
+let hashPrevio = location.hash === "#tienda" ? "" : (location.hash || "");
+function revisaRutaTienda() {
+  if ((location.hash || "") !== "#tienda") { hashPrevio = location.hash || ""; return false; }
+  try { history.replaceState(null, "", location.pathname + location.search + hashPrevio); } catch (e) { location.hash = hashPrevio; }
+  abreTienda();
+  return true;
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("[data-tienda-hw]");
+  if (b) { ev.preventDefault(); abreTienda(b.getAttribute("data-tienda-hw") || ""); }
+});
+setInterval(() => refrescaCuentas(), 30000);
 
 function pintaUsuario() {
   const u = state.user;
-  $("userName").textContent = u ? u.name : "";
+  $("userName").innerHTML = u ? nombreHtml(u.uid, escapeHtml(u.name)) : "";
   const av = $("userAvatar");
   if (!u) { av.textContent = ""; av.removeAttribute("data-perfil"); return; }
   av.setAttribute("data-perfil", u.uid);
@@ -624,7 +796,7 @@ function pintaUsuario() {
 function mostrar() {
   const dentro = !!state.user;
   $("viewMain").style.display = dentro || state.invitado ? "" : "none";
-  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userMonedas"]) $(id).style.display = dentro ? "" : "none";
+  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userSaldo", "userMonedas", "userReferir"]) $(id).style.display = dentro ? "" : "none";
   $("btnEntrar").style.display = state.invitado ? "" : "none";
   /* El escudo del panel solo lo ve quien está en `admins/<uid>`. */
   $("btnAdmin").style.display = dentro && state.admin ? "" : "none";
@@ -633,7 +805,8 @@ function mostrar() {
 
 /* ---------- el invitado ----------
    Sin sesión no hay muro: se entra directo al salón en modo invitado. Se
-   juega a todo lo de un jugador (corre en el navegador); lo multijugador
+   juega a todo lo de un jugador menos PRO HERO y Tenkaichi 3
+   (`CON_CUENTA_SOLO`); lo multijugador
    se ve, con su candado, porque la base solo deja escribir a quien inició
    sesión. Lo que no se puede como invitado no se esconde: se explica y se
    ofrece la cuenta (`MOTIVO_CUENTA`, la ficha bloqueada).
@@ -643,6 +816,65 @@ function mostrar() {
    borra al empezar otra visita. Una visita es una sesión de la pestaña
    (`sessionStorage`): recargar a mitad de partida no la pierde. */
 const INVITADO = { uid: UID_INVITADO, name: "Invitado", photo: "", color: "#8a8399", invitado: true };
+/* El nombre que eligió el invitado (`pideNombreInvitado`), solo en esta
+   pestaña: no se escribe en ningún otro lado. "" mientras no elige. */
+const CLAVE_NOMBRE_INV = "jg.invitado.nombre";
+function nombreInvitado() {
+  try { return limpiaNombreInvitado(sessionStorage.getItem(CLAVE_NOMBRE_INV) || ""); } catch (e) { return nombreInvMemoria; }
+}
+let nombreInvMemoria = "";
+function ponNombreInvitado(n) {
+  nombreInvMemoria = limpiaNombreInvitado(n);
+  try { sessionStorage.setItem(CLAVE_NOMBRE_INV, nombreInvMemoria); } catch (e) { /* queda en memoria */ }
+}
+/* El usuario de la Frontera para el invitado, con su nombre. */
+const invitadoConNombre = () => Object.assign({}, INVITADO, { name: nombreInvitado() || INVITADO.name });
+
+/* «¿Cómo te llamamos?»: al abrir su primer juego, el invitado elige un
+   nombre (uno sugerido ya escrito, así que jugar sigue a un toque). Sale
+   encima del juego, que ya está cargando detrás. `cambiar` es el enlace
+   «Cambiar» del salón, que lo vuelve a abrir con el nombre actual. */
+function quitaNombreInvitado() { const c = $("jgNomInv"); if (c) c.remove(); }
+function pideNombreInvitado(cambiar) {
+  if (!state.invitado || $("jgNomInv") || castigoActivo() || (!cambiar && nombreInvitado())) return;
+  const c = document.createElement("div");
+  c.id = "jgNomInv";
+  c.className = "jg-nom";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-modal", "true");
+  c.setAttribute("aria-labelledby", "jgNomInvT");
+  const actual = nombreInvitado() || sugiereNombreInvitado();
+  c.innerHTML = `<form class="jg-invg-caja jg-nom-caja">
+    <span class="jg-invg-ico" aria-hidden="true">👋</span>
+    <div class="jg-invg-txt"><small>MODO INVITADO</small>
+      <b id="jgNomInvT">¿Cómo te llamamos?</b>
+      <p>Es tu nombre mientras juegas en esta visita. Como invitado no se guarda nada: ni el nombre ni tus puntajes.</p></div>
+    <label class="jg-nom-campo">
+      <input type="text" name="nombre" aria-label="Tu nombre de invitado" maxlength="${NOMBRE_INVITADO_MAX}" autocomplete="nickname" enterkeyhint="go" spellcheck="false" translate="no" value="${escapeHtml(actual)}"></label>
+    <div class="jg-invg-btns"><button class="btn" type="submit">¡A jugar!</button><button class="btn2" type="button" data-login data-origen="nombre-invitado">Mejor inicio sesión</button></div>
+  </form>`;
+  const campo = c.querySelector("input");
+  c.querySelector("form").onsubmit = ev => {
+    ev.preventDefault();
+    const n = limpiaNombreInvitado(campo.value) || actual;
+    evento("jg_invitado_nombre", { cambio: n === actual ? 0 : 1, desde: cambiar ? "salon" : "juego" });
+    ponNombreInvitado(n);
+    quitaNombreInvitado();
+    pintaNombreInvitado();
+  };
+  c.addEventListener("keydown", ev => { if (ev.key === "Escape") c.querySelector("form").requestSubmit(); });
+  document.body.appendChild(c);
+  /* En el celular el teclado taparía medio juego: el nombre sugerido ya
+     sirve, así que no se enfoca solo; en el PC sí, seleccionado. */
+  if (!enCelular()) { campo.focus({ preventScroll: true }); campo.select(); }
+}
+/* Donde ya se ve el nombre (el saludo, la barra del juego, el aviso del
+   salón), se cambia sin repintar la pantalla entera. */
+function pintaNombreInvitado() {
+  const n = nombreInvitado();
+  for (const el of document.querySelectorAll("[data-nombre-inv]")) el.textContent = n || INVITADO.name;
+  for (const el of document.querySelectorAll("[data-con-nombre-inv]")) el.hidden = !n;
+}
 function limpiaInvitado() {
   try {
     if (sessionStorage.getItem("jg.visitaInvitado")) return;
@@ -661,9 +893,12 @@ function vinoDeInvitado() {
   try { return sessionStorage.getItem("jg.visitaInvitado") === "1"; } catch (e) { return false; }
 }
 const nombreSolo = id => (SOLOS.find(x => x.id === id) || {}).nombre || id;
-const marcaInvitado = d => d.categoria === "club-bbtan-rondas" ? `Ronda ${d.puntos}`
-  : d.categoria === "club-fanal-jornadas" ? `${d.puntos} ${d.puntos === 1 ? "jornada" : "jornadas"}`
-  : `${Number(d.puntos).toLocaleString("es-CL")} puntos`;
+const marcaInvitado = d => valorMarca(d.categoria, d);
+/* La ruta del club (`tetris`) y la clave de sus logros, monedas y nombre
+   (`tetrisclub`) son lo mismo salvo en el Tetris. */
+const claveClub = juego => juego === "tetris" ? "tetrisclub" : juego;
+/* Los destacados que además se llevan la partida a medias o el avance. */
+const AVANCE_INVITADO = new Set(["bbtan", "fanal", "trigon", "dosmil"]);
 
 /* El aviso al invitado que acaba de terminar una partida de un destacado
    (solo/club.js lo llama solo con una marca nueva suya): todavía no se
@@ -672,6 +907,7 @@ const marcaInvitado = d => d.categoria === "club-bbtan-rondas" ? `Ronda ${d.punt
    resultados a la vez (travesía y jornadas): el segundo no tapa al primero. */
 function ofreceGuardar(juego, dato) {
   if (!state.invitado) return;
+  if ($("jgInvGuarda") && $("jgInvGuarda").dataset.reto) return;   // «¡Le ganaste!» se queda: la franja de invitado sigue ofreciendo guardar
   if (dato.categoria === "club-fanal-jornadas" && $("jgInvGuarda")) return;
   quitaOfreceGuardar();
   const c = document.createElement("div");
@@ -682,9 +918,9 @@ function ofreceGuardar(juego, dato) {
   c.innerHTML = `<div class="jg-invg-caja">
     <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
     <span class="jg-invg-ico" aria-hidden="true">🏆</span>
-    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(juego))} · ${escapeHtml(marcaInvitado(dato))}</small>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(claveClub(juego)))} · ${escapeHtml(marcaInvitado(dato))}</small>
       <b id="jgInvGuardaT">¿Guardamos esta partida?</b>
-      <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${juego === "aleteo" ? "" : ", junto con tu avance para seguir después"}.</p></div>
+      <p>Juegas como invitado, así que tu puntaje todavía no se guardó. Inicia sesión y pasa a tu cuenta y a la clasificación${AVANCE_INVITADO.has(juego) ? ", junto con tu avance para seguir después" : ""}.${lineaGanaria(claveClub(juego))}</p></div>
     <div class="jg-invg-btns"><button class="btn" type="button" data-login data-origen="aviso-guardar">Iniciar sesión y guardar</button><button class="btn2" type="button" data-cierra>Ahora no</button></div>
   </div>`;
   for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = () => { evento("jg_invitado_aviso_cierra", { juego }); quitaOfreceGuardar(); };
@@ -693,6 +929,188 @@ function ofreceGuardar(juego, dato) {
   suena("entra");
 }
 function quitaOfreceGuardar() { const c = $("jgInvGuarda"); if (c) c.remove(); }
+
+/* ---------- lo que lleva la visita ----------
+   Cada partida del club que termina en esta pestaña (`alTerminar` de
+   crearSolo, con o sin cuenta): cuántas, la mejor de cada modalidad y la
+   última. Solo en memoria: alimenta el aviso al invitado («con cuenta ya
+   llevarías…»), el botón de retar a un amigo y el reto que llegó por enlace. */
+const visita = {};
+function anotaVisita(clave, d) {
+  const v = visita[clave] || (visita[clave] = { jugadas: 0, mejores: {}, ultimo: null });
+  v.jugadas++;
+  v.ultimo = d;
+  const antes = v.mejores[d.categoria];
+  const mejoro = mejorClub(d, antes);
+  if (mejoro) v.mejores[d.categoria] = d;
+  return mejoro;
+}
+const ganariaDe = clave => { const v = visita[clave]; return v ? ganariaInvitado(clave, v.jugadas, v.mejores) : { monedas: 0, logros: [] }; };
+const nombresLogros = (clave, ids) => ids.map(id => ((LOGROS[clave] || []).find(l => l.id === id) || {}).n).filter(Boolean);
+function lineaGanaria(clave) {
+  const g = ganariaDe(clave);
+  if (!g.monedas) return "";
+  return ` Con esa cuenta te llevarías ${MONEDA} <strong>${g.monedas.toLocaleString("es-CL")}</strong>${g.logros.length ? ` y ${g.logros.length === 1 ? "un logro" : g.logros.length + " logros"}` : ""}.`;
+}
+
+/* El invitado que termina una partida de un juego que no guarda nada (los
+   que no son destacados): lo que una cuenta le habría pagado en esta
+   visita, con las reglas de la economía (`ganariaInvitado`), y las dos
+   salidas que lo hacen volver: crearse la cuenta o retar a alguien. Sale
+   con la primera partida de cada juego y después solo cuando la cuenta
+   sumaría un logro nuevo o mejora su marca, para no tapar el juego en cada
+   intento. Las partidas de los destacados ya tienen su aviso
+   (`ofreceGuardar`), que lleva la misma línea. */
+const perdidoVisto = {};
+function avisaPerdido(clave, d, mejoro) {
+  if (!state.invitado) return;
+  const g = ganariaDe(clave);
+  const visto = perdidoVisto[clave];
+  if (visto && !mejoro && g.logros.length <= visto.logros) return;
+  perdidoVisto[clave] = { logros: g.logros.length };
+  quitaOfreceGuardar();
+  const nombre = nombreInvitado() || INVITADO.name;
+  const logros = nombresLogros(clave, g.logros);
+  const c = document.createElement("div");
+  c.id = "jgInvGuarda";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInvGuardaT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
+    <span class="jg-invg-ico" aria-hidden="true">${g.monedas ? MONEDA : "🎮"}</span>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreSolo(clave))} · ${escapeHtml(valorMarca(d.categoria, d))}</small>
+      <b id="jgInvGuardaT">¡Buena partida, <span translate="no">${escapeHtml(nombre)}</span>!</b>
+      <p>${g.monedas ? `Con una cuenta, en esta visita ya llevarías ${MONEDA} <strong>${g.monedas.toLocaleString("es-CL")}</strong>${logros.length ? ` y ${logros.length === 1 ? "el logro" : "los logros"} <strong>${logros.slice(0, 3).map(escapeHtml).join("</strong>, <strong>")}</strong>${logros.length > 3 ? ` y ${logros.length - 3} más` : ""}` : ""}. ` : ""}Como invitado no se guarda: crea tu cuenta (gratis, con Google) y empiezas a sumar desde la próxima partida.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-login data-origen="perdiste">Crear cuenta gratis</button><button class="btn2" type="button" data-reto-de="${escapeHtml(clave)}">📣 Retar</button></div>
+  </div>`;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = () => { evento("jg_perdiste_cierra", { juego: clave }); quitaOfreceGuardar(); };
+  document.body.appendChild(c);
+  evento("jg_perdiste_ver", { juego: clave, monedas: g.monedas, logros: g.logros.length });
+}
+
+/* ---------- instalar como app (manifest.webmanifest) ----------
+   Quien ya jugó en esta visita y vuelve al salón recibe, una vez, la
+   invitación a instalar Paginita Pro en su inicio: tener el ícono es lo
+   que más hace volver en el celular. En Android y el PC Chrome ofrece su
+   propio botón (`beforeinstallprompt`, que se guarda para usarlo aquí); en
+   el iPhone no hay botón posible y se explica el gesto (Compartir →
+   Agregar a inicio). Nunca en la app ya instalada, y «Ahora no» la calla
+   14 días en este aparato (`jg.instalar.no`, solo esa fecha). */
+const enApp = () => { try { return navigator.standalone === true || matchMedia("(display-mode: standalone)").matches; } catch (e) { return false; } };
+const esIos = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let avisoInstalar = null, instalarVisto = false;
+addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); avisoInstalar = ev; });
+addEventListener("appinstalled", () => { evento("jg_instalar_hecho"); quitaInstalar(); });
+function quitaInstalar() { const c = $("jgInstalar"); if (c) c.remove(); }
+function ofreceInstalar() {
+  if (instalarVisto || enApp() || $("jgInstalar") || $("jgInvGuarda") || $("jgNomInv") || $("jgBienvenida")) return;
+  if (!Object.values(visita).some(v => v.jugadas > 0)) return;
+  const ios = esIos() && !avisoInstalar;
+  if (!avisoInstalar && !ios) return;   // ni botón del navegador ni iPhone: no hay cómo
+  try { if (Date.now() - Number(localStorage.getItem("jg.instalar.no") || 0) < 14 * 864e5) return; } catch (e) { /* sin almacenamiento: se ofrece */ }
+  instalarVisto = true;
+  const c = document.createElement("div");
+  c.id = "jgInstalar";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInstalarT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-no aria-label="Cerrar">✕</button>
+    <img class="jg-instalar-ico" src="marca/icono-192.png" alt="" width="44" height="44">
+    <div class="jg-invg-txt"><small>GRATIS · SIN TIENDA DE APPS</small>
+      <b id="jgInstalarT">Ten Paginita Pro en tu inicio</b>
+      <p>${ios ? "Toca <strong>Compartir</strong> <span aria-hidden=\"true\">(el cuadrado con la flecha ⬆)</span> y luego <strong>«Agregar a inicio»</strong>. Se abre a pantalla completa, como una app." : "Se abre a pantalla completa, como una app, y vuelves a tus juegos con un toque."}</p></div>
+    <div class="jg-invg-btns">${ios ? "" : '<button class="btn" type="button" data-si>Instalar</button>'}<button class="btn2" type="button" data-no>${ios ? "Entendido" : "Ahora no"}</button></div>
+  </div>`;
+  c.querySelector("[data-si]")?.addEventListener("click", async () => {
+    const e = avisoInstalar; avisoInstalar = null; quitaInstalar();
+    if (!e) return;
+    try { e.prompt(); const r = await e.userChoice; evento(r && r.outcome === "accepted" ? "jg_instalar_acepta" : "jg_instalar_rechaza"); } catch (err) { /* el navegador lo negó */ }
+  });
+  for (const b of c.querySelectorAll("[data-no]")) b.addEventListener("click", () => {
+    evento("jg_instalar_cierra", { tipo: ios ? "ios" : "boton" });
+    try { localStorage.setItem("jg.instalar.no", String(Date.now())); } catch (e) { /* nada */ }
+    quitaInstalar();
+  });
+  document.body.appendChild(c);
+  evento("jg_instalar_ver", { tipo: ios ? "ios" : "boton" });
+}
+
+/* ---------- reta a un amigo (reto.js) ----------
+   El reto que llegó por enlace se guarda en la pestaña (sobrevive a
+   recargar) y se quita de la barra de direcciones, para que el enlace que
+   esta persona comparta después no arrastre el reto de otro. */
+let retoActivo = null;
+function recogeReto() {
+  const r = leeReto(location.search);
+  try {
+    if (r) sessionStorage.setItem("jg.reto", JSON.stringify(r));
+    else retoActivo = leeReto(enlaceReto(JSON.parse(sessionStorage.getItem("jg.reto") || "null") || {}));
+  } catch (e) { /* sin almacenamiento: dura lo que dura la página */ }
+  if (r) {
+    retoActivo = r;
+    evento("jg_reto_llega", { categoria: r.categoria });
+    try { history.replaceState(history.state, "", location.pathname + location.hash); } catch (e) { /* queda en la URL */ }
+  }
+}
+const juegoDeReto = r => { const j = r ? juegoDeCategoria(r.categoria) : ""; return j === "tetris" ? "tetrisclub" : j || ""; };
+/* La franja del reto, encima del juego que corresponde. */
+function franjaReto(clave) {
+  const r = retoActivo;
+  if (!r || juegoDeReto(r) !== clave) return null;
+  const p = document.createElement("p");
+  p.className = "jg-reto-tira";
+  p.setAttribute("role", "note");
+  p.innerHTML = `<span aria-hidden="true">🥊</span><span><b translate="no">${escapeHtml(r.nombre)}</b> te reta: supera <b>${escapeHtml(valorMarca(r.categoria, r))}</b> en ${escapeHtml(nombreCategoria(r.categoria))}.</span>`;
+  return p;
+}
+function avisaRetoGanado(clave, d) {
+  const r = retoActivo;
+  if (!r || !superaReto(d, r)) return;
+  retoActivo = null;
+  try { sessionStorage.removeItem("jg.reto"); } catch (e) { /* nada */ }
+  for (const t of document.querySelectorAll(".jg-reto-tira")) t.remove();
+  evento("jg_reto_gana", { categoria: r.categoria });
+  quitaOfreceGuardar();
+  const c = document.createElement("div");
+  c.id = "jgInvGuarda";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgInvGuardaT");
+  c.dataset.reto = "1";
+  c.innerHTML = `<div class="jg-invg-caja">
+    <button class="jg-invg-x" type="button" data-cierra aria-label="Cerrar">✕</button>
+    <span class="jg-invg-ico" aria-hidden="true">🏆</span>
+    <div class="jg-invg-txt"><small>${escapeHtml(nombreCategoria(d.categoria))} · ${escapeHtml(valorMarca(d.categoria, d))}</small>
+      <b id="jgInvGuardaT">¡Le ganaste a <span translate="no">${escapeHtml(r.nombre)}</span>!</b>
+      <p>Superaste su ${escapeHtml(valorMarca(r.categoria, r))}. Ahora te toca a ti: mándale tu marca, o rétale a otra persona.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-reto-de="${escapeHtml(clave)}">📣 Devolver el reto</button><button class="btn2" type="button" data-cierra>Seguir</button></div>
+  </div>`;
+  for (const b of c.querySelectorAll("[data-cierra]")) b.onclick = quitaOfreceGuardar;
+  document.body.appendChild(c);
+  suena("entra");
+}
+/* Compartir: la mejor marca de la visita en la última modalidad jugada (o,
+   sin partidas, una invitación a ese juego). La hoja de compartir del
+   teléfono; en el PC, WhatsApp Web y el enlace copiado. */
+async function retar(clave) {
+  const v = visita[clave], d = v && v.ultimo ? (v.mejores[v.ultimo.categoria] || v.ultimo) : null;
+  const e = SOLOS.find(x => x.id === clave) || SOLOS.find(x => x.ruta === "#solo/" + clave) || {};
+  const nombre = state.user ? String(state.user.name || "").split(" ")[0] : nombreInvitado();
+  const url = location.origin + location.pathname + (d ? enlaceReto({ categoria: d.categoria, puntos: d.puntos, tiempo: d.tiempo, nombre }) : "") + (e.ruta || "");
+  const texto = textoReto(e.nombre || nombreSolo(clave), d ? valorMarca(d.categoria, d) : "");
+  evento("jg_reto_comparte", { juego: clave, marca: d ? 1 : 0 });
+  try {
+    if (navigator.share) { await navigator.share({ title: "Paginita Pro", text: texto, url }); return; }
+  } catch (err) { if (err && err.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(texto + " " + url); avisaGuardado("Enlace copiado", "Pégalo donde quieras, o mándalo por WhatsApp"); } catch (err) { /* sin portapapeles */ }
+  window.open("https://wa.me/?text=" + encodeURIComponent(texto + " " + url), "_blank", "noopener");
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("[data-reto-de]");
+  if (b) retar(b.getAttribute("data-reto-de"));
+});
 
 /* Lo que el invitado jugó en esta pestaña y quedó pendiente (solo/club.js,
    `DE_INVITADO`) pasa a la cuenta con la que acaba de entrar: se verifica
@@ -719,9 +1137,9 @@ async function subeDeInvitado(u) {
         try {
           const previa = await fb.leerSolo(dato.categoria).then(f => f.find(x => x.uid === u.uid) || null, () => null);
           const res = await guardaClub(dato.categoria, u.uid, fila, v.prueba);
-          alResultadoClub(juego)(dato, previa, v.prueba);
+          alResultadoClub(claveClub(juego))(dato, previa, v.prueba);
           evento("jg_invitado_guardado", { juego, categoria: dato.categoria, record: res && res.committed ? 1 : 0 });
-          avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(juego)}` : `Tu partida de ${nombreSolo(juego)} quedó en tu cuenta`,
+          avisaGuardado(res && res.committed ? `Guardamos tu partida de ${nombreSolo(claveClub(juego))}` : `Tu partida de ${nombreSolo(claveClub(juego))} quedó en tu cuenta`,
             res && res.committed ? marcaInvitado(dato) + " · ya está en la clasificación" : marcaInvitado(dato) + " · tu récord guardado era mejor");
         } catch (e) {
           console.warn("[juegos] no se pudo subir la partida de invitado", e);
@@ -750,10 +1168,13 @@ function avisaGuardado(titulo, detalle) {
 }
 
 /* ---------- la bienvenida (solo en el celular) ----------
-   Quien llega por primera vez desde un teléfono y sin sesión elige antes
-   de ver el salón: iniciar sesión, crear cuenta (con Google es lo mismo)
-   o seguir como invitado, y entonces se le ofrecen los cuatro destacados,
-   que se juegan sin cuenta. Una sola vez por aparato (`jg.bienvenida`, que
+   Quien llega por primera vez desde un teléfono y sin sesión ve, antes del
+   salón, una sola pantalla para jugar ya: su nombre de invitado (uno
+   sugerido) y los cuatro destacados en grande; ver todo el salón e iniciar
+   sesión quedan debajo, como salidas secundarias. Antes la primera
+   pantalla era iniciar sesión / crear cuenta / «continuar como
+   invitado», y pedir cuenta antes de jugar hacía que los nuevos se fueran
+   sin jugar a nada. Una sola vez por aparato (`jg.bienvenida`, que
    también se marca al iniciar sesión), solo en la portada (un enlace a un
    juego o a una sala va directo a lo suyo) y nunca a quien tiene cuenta. */
 const enCelular = () => {
@@ -778,52 +1199,44 @@ function abreBienvenida() {
   const tarjetas = DESTACADOS_INVITADO.map(id => {
     const e = SOLOS.find(x => x.id === id);
     return e ? `<a class="jg-bv-juego" href="${e.ruta}" data-bv-juego style="--c:${COLOR_SOLO[id] || "#f6bc64"}">
-      <span class="jg-bv-portada" aria-hidden="true">${portadaSolo(id)}</span>
+      <span class="jg-bv-portada" aria-hidden="true">${portadaSolo(id)}<i class="jg-bv-play">${PLAY}</i></span>
       <b>${escapeHtml(e.nombre)}</b><small>${escapeHtml(e.genero)}</small></a>` : "";
   }).join("");
+  const libres = SOLOS.filter(x => !bloqueado(Object.assign({ modo: x.tipo === "bots" ? "bots" : "solo" }, x), true)).length;
   c.innerHTML = `<div class="jg-bv-caja" tabindex="-1">
     <section class="jg-bv-paso" data-paso="1">
-      <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
-      <h1 id="jgBvT">Te damos la bienvenida</h1>
-      <p>Juegos para jugar solo o con amigos en línea, con clasificación, logros y monedas.</p>
-      <div class="jg-bv-btns">
-        <button class="btn" type="button" data-bv="entrar">Iniciar sesión</button>
-        <button class="btn2" type="button" data-bv="crear">Crear cuenta</button>
-        <button class="jg-bv-inv" type="button" data-bv="invitado">Continuar como invitado</button>
-      </div>
-      <p class="jg-bv-nota">Se entra con tu cuenta de Google: si es la primera vez, tu cuenta queda creada en el mismo paso.</p>
-      <p class="jg-bv-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
-    </section>
-    <section class="jg-bv-paso" data-paso="2" hidden>
-      <span class="jg-eyebrow">MODO INVITADO</span>
-      <h2>Juega ya, sin cuenta</h2>
-      <p>Elige uno. Como invitado tus puntajes y tus partidas <b>no se guardan</b>: inicia sesión cuando quieras, también después de perder, y guardamos tu mejor partida.</p>
+      <span class="jg-eyebrow">PAGINITA PRO · SALÓN DE JUEGOS</span>
+      <h1 id="jgBvT">Juega ya, sin cuenta</h1>
+      <p>${libres} juegos para jugar solo, gratis y sin registrarte. Toca uno y empiezas.</p>
+      <label class="jg-bv-nombre"><span>¿Cómo te llamamos?</span>
+        <input type="text" maxlength="${NOMBRE_INVITADO_MAX}" autocomplete="nickname" enterkeyhint="done" spellcheck="false" translate="no" value="${escapeHtml(nombreInvitado() || sugiereNombreInvitado())}" data-bv-nombre></label>
       <div class="jg-bv-juegos">${tarjetas}</div>
       <div class="jg-bv-btns">
-        <button class="btn2" type="button" data-bv="salon">Ver todo el salón</button>
-        <button class="jg-bv-inv" type="button" data-bv="entrar">Mejor inicio sesión</button>
+        <button class="btn2" type="button" data-bv="salon">Ver todos los juegos</button>
+        <button class="jg-bv-inv" type="button" data-bv="entrar">Ya tengo cuenta · Iniciar sesión</button>
       </div>
+      <p class="jg-bv-nota">Como invitado no se guarda nada. Con tu cuenta de Google (se crea en el mismo paso) guardas récords, logros y monedas, y juegas en línea con tus amigos.</p>
+      <p class="jg-bv-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
     </section>
   </div>`;
+  /* El nombre vale en cuanto se elige un juego o el salón: así el juego no
+     lo vuelve a preguntar. */
+  const guardaNombreBv = () => {
+    const campo = c.querySelector("[data-bv-nombre]");
+    if (campo) ponNombreInvitado(limpiaNombreInvitado(campo.value) || campo.defaultValue);
+  };
+  c.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("[data-bv-nombre]")) { ev.preventDefault(); ev.target.blur(); } });
   c.addEventListener("click", ev => {
     const b = ev.target.closest("[data-bv]"), j = ev.target.closest("[data-bv-juego]");
-    if (j) { evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
+    if (j) { guardaNombreBv(); evento("jg_bienvenida_juego", { juego: j.getAttribute("href").slice(6) }); marcaBienvenida(); cierraBienvenida(); return; }   // el enlace lleva al juego
     if (!b) return;
     const que = b.getAttribute("data-bv");
-    evento("jg_bienvenida_elige", { opcion: que, paso: b.closest("[data-paso]").getAttribute("data-paso") });
-    /* Iniciar sesión o crear cuenta: la ventana de Google. La bienvenida se
-       queda hasta que llega la cuenta (watchAuth la cierra); si se cancela,
-       sigue aquí para elegir otra cosa. */
-    if (que === "entrar" || que === "crear") { entrarConGoogle("", "bienvenida-" + que); return; }
-    if (que === "invitado") {
-      marcaBienvenida();
-      c.querySelector('[data-paso="1"]').hidden = true;
-      c.querySelector('[data-paso="2"]').hidden = false;
-      const primero = c.querySelector("[data-bv-juego]");
-      if (primero) primero.focus();
-      return;
-    }
-    if (que === "salon") { marcaBienvenida(); cierraBienvenida(); }
+    evento("jg_bienvenida_elige", { opcion: que, paso: "1" });
+    /* Iniciar sesión: la ventana de Google. La bienvenida se queda hasta
+       que llega la cuenta (watchAuth la cierra); si se cancela, sigue aquí
+       para elegir otra cosa. */
+    if (que === "entrar") { entrarConGoogle("", "bienvenida-entrar"); return; }
+    if (que === "salon") { guardaNombreBv(); marcaBienvenida(); cierraBienvenida(); pintaNombreInvitado(); }
   });
   document.body.appendChild(c);
   document.documentElement.classList.add("jg-bv-abierta");
@@ -840,13 +1253,70 @@ let trasLogin = "";
    partida de invitado, la franja de un destacado…), para Analytics:
    `jg_login_pide` al tocarlo y `login`/`sign_up` (los nombres estándar de
    GA4) si termina en una cuenta, con el mismo origen. */
+/* En la app del iPhone el inicio de sesión es una redirección
+   (firebase.js, `conRedireccion`): la página se va y vuelve, así que el
+   juego a reabrir y el origen viajan en `sessionStorage` y se recogen al
+   cargar (`recogeLoginRedirigido`). */
+const CLAVE_LOGIN_VUELTA = "jg.login.vuelta";
+function recogeLoginRedirigido() {
+  if (!conRedireccion) return;
+  let v = null;
+  try { v = JSON.parse(sessionStorage.getItem(CLAVE_LOGIN_VUELTA) || "null"); sessionStorage.removeItem(CLAVE_LOGIN_VUELTA); } catch (e) { v = null; }
+  if (v && typeof v.juego === "string") trasLogin = v.juego;
+  resultadoLogin().then(r => {
+    if (r) evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: v && typeof v.origen === "string" ? v.origen : "otro", app: 1 });
+    if (r && esCuentaNueva(r)) ofreceApodo(r.user);
+  }, e => {
+    trasLogin = "";
+    console.warn("[juegos] el inicio de sesión no volvió bien", e);
+    alert("No se pudo iniciar sesión: " + ((e && e.code) || (e && e.message) || e));
+  });
+}
+/* Una cuenta recién creada en una pestaña que jugó como invitado con un
+   nombre: se le ofrece seguir llamándose así (el apodo del perfil, que se
+   ve en salas, rankings y el chat) en vez del nombre de Google. Nunca se
+   escribe sin el «sí». Después, el nombre de invitado se borra. */
+function ofreceApodo(u) {
+  const nombre = nombreInvitado();
+  if (!u || !u.uid || !nombre || !vinoDeInvitado() || $("jgApodo")) return;
+  const google = String(u.displayName || "").trim();
+  if (google && google.split(" ")[0] === nombre) return;
+  const c = document.createElement("div");
+  c.id = "jgApodo";
+  c.className = "jg-invg";
+  c.setAttribute("role", "dialog");
+  c.setAttribute("aria-labelledby", "jgApodoT");
+  c.innerHTML = `<div class="jg-invg-caja">
+    <span class="jg-invg-ico" aria-hidden="true">🏷️</span>
+    <div class="jg-invg-txt"><small>CUENTA CREADA</small>
+      <b id="jgApodoT">¿Te seguimos llamando <span translate="no">${escapeHtml(nombre)}</span>?</b>
+      <p>Es el nombre que usaste como invitado. Se verá en las salas, los rankings y el chat; lo puedes cambiar cuando quieras en tu perfil.</p></div>
+    <div class="jg-invg-btns"><button class="btn" type="button" data-si>Sí, usar <span translate="no">${escapeHtml(nombre)}</span></button><button class="btn2" type="button" data-no>${google ? `Usar <span translate="no">${escapeHtml(google.split(" ")[0])}</span>` : "No"}</button></div>
+  </div>`;
+  const listo = si => {
+    evento("jg_apodo_invitado", { usa: si ? 1 : 0 });
+    c.remove();
+    try { sessionStorage.removeItem(CLAVE_NOMBRE_INV); } catch (e) { /* nada */ }
+  };
+  c.querySelector("[data-si]").onclick = () => {
+    listo(true);
+    fb.ponNickPerfil(u.uid, nombre).then(() => {
+      perfiles.set(u.uid, Object.assign({}, perfiles.get(u.uid) || {}, { nick: nombre }));
+      avisaGuardado("Apodo listo", `Ahora eres ${nombre} en Juegos`);
+    }, e => console.warn("[juegos] no se pudo guardar el apodo", e));
+  };
+  c.querySelector("[data-no]").onclick = () => listo(false);
+  document.body.appendChild(c);
+}
 async function entrarConGoogle(juego, origen) {
   trasLogin = juego || "";
   const desde = String(origen || (juego ? "ficha" : "otro")).slice(0, 40);
   evento("jg_login_pide", { origen: desde });
+  if (conRedireccion) { try { sessionStorage.setItem(CLAVE_LOGIN_VUELTA, JSON.stringify({ juego: trasLogin, origen: desde })); } catch (e) { /* sin almacenamiento: vuelve al salón */ } }
   try {
     const r = await loginGoogle();
     evento(esCuentaNueva(r) ? "sign_up" : "login", { method: "google", origen: desde });
+    if (esCuentaNueva(r)) ofreceApodo(r.user);
   }
   catch (e) {
     trasLogin = "";
@@ -869,7 +1339,7 @@ function puertaHtml(m) {
       <button class="btn" type="button" data-login>Iniciar sesión con Google</button>
       <a class="btn2" href="#">Volver al salón</a>
     </div>
-    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm.</p>
+    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a todos los juegos de un jugador menos PRO HERO.</p>
     <p class="jg-puerta-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
   </section>`;
 }
@@ -1030,16 +1500,52 @@ function pintaMonedas() {
     /* La racha va pegada al saldo: 🔥 encendida si hoy ya contó, apagada
        (y titilando) si todavía falta jugar hoy para no perderla. */
     const di = u && d ? (d.diario || {})[u.uid] : null, hoy = diaMonedas(), r = rachaHoy(di, hoy), ya = !!(di && di.dia === hoy);
-    chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
+    const h = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
       (r ? `<span class="jg-racha-chip${ya ? "" : " falta"}" title="${r} ${r === 1 ? "día seguido" : "días seguidos"}${ya ? "" : " · reclama hoy tu recompensa diaria para no perder la racha"}">🔥${r}</span>` : "");
+    // solo si cambió: se repinta con cada lectura (la racha titila con CSS)
+    if (chip.dataset.html !== h) { chip.dataset.html = h; chip.innerHTML = h; }
   }
-  const caja = $("vesMonedas");
-  if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
-  const drops = $("vesDrops");
-  if (drops && u && d && d.completo) drops.innerHTML = dropsHtml(d);
-  const tops = $("vesTops");
-  if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
+  /* Cada lectura de Firebase llega aquí, y casi nunca cambia lo que se ve:
+     reescribir igual las tiras volvía a cargar sus 24 fotos de cartas y
+     hacía que i18n.js repasara todo ese texto, en cada lectura. */
+  if (u && d) ponHtml($("vesMonedas"), () => topHtml(d, u.uid, perfilDe, colorForUid));
+  if (u && d && d.completo) {
+    ponHtml($("vesDrops"), () => dropsHtml(d));
+    ponHtml($("vesTops"), () => topsLista(d));
+  }
   pintaDropsMascotas();
+  pintaDropsRock();
+  if (u && d && d.completo) ponHtml($("vesReferidos"), () => topRefs(u.uid, d, true));
+  if (referidosUi) referidosUi.refresca();
+}
+/* Escribe `html()` en `caja` solo si cambió desde la última vez. */
+function ponHtml(caja, html) {
+  if (!caja) return;
+  const h = html();
+  if (caja._html === h) return;
+  caja._html = h;
+  caja.innerHTML = h;
+}
+/* El «+» junto al saldo: canjear un código de referido y referir a otros
+   (juegos/referidos-vista.js). Lee las mismas lecturas que el saldo. */
+let referidosUi = null;
+const topRefs = (uid, d, cta) => topReferidosHtml(d, uid, perfilDe, colorForUid, x => ({ nombre: nombreEnDatos(x, d), foto: fotoEnDatos(x, d) }), { cta });
+function montaReferidos() {
+  referidosUi = crearReferidos({
+    boton: $("userReferir"),
+    uid: () => state.user && state.user.uid,
+    datos: () => datosMonedas,
+    fb,
+    avisa: avisaMonedas,
+    nombre: x => nombreVivo(x, nombreEnDatos(x, datosMonedas || {})) || (state.user && x === state.user.uid ? state.user.name : ""),
+    alFallar: e => {
+      if (!esPermiso(e)) return false;
+      referidosUi.cierra();
+      capaReglas((e && (e.code || e.message)) || "", null);
+      return true;
+    },
+    top: () => topRefs(state.user && state.user.uid, datosMonedas, false)
+  });
 }
 /* El nombre que alguien dejó en sus filas, si no tiene perfil. */
 function nombreEnDatos(uid, d) {
@@ -1068,7 +1574,7 @@ function dropsHtml(d) {
   }
   return l.map(c => {
     const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d), foto: fotoEnDatos(c.uid, d) }, colorForUid);
-    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b translate="no">${nombreHtml(c.uid, escapeHtml(q.nombre))}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
 /* Los últimos legendarios de Mascotas (objetos y bailes de los regalos),
@@ -1095,10 +1601,48 @@ function pintaDropsMascotas() {
     return `<div class="jg-drop jg-dropm">
       <span class="jg-dropm-f"${f && f.src ? ` style="background-image:url('${escapeHtml(f.src)}')"` : ""} title="${escapeHtml(x.ficha.nombre)}">${f && f.src ? "" : `<i>${escapeHtml(x.ficha.emoji)}</i>`}<em>★</em></span>
       <b class="jg-dropm-n">${escapeHtml(x.ficha.nombre)}</b>
-      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${escapeHtml(q.nombre)}</b></span>
+      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b></span>
       <small class="jg-drop-cuando">${haceCuanto(x.at)}</small></div>`;
   }).join("");
 }
+/* Los últimos legendarios de Batalla de Rock. Las fotos (rock-fotos.js, un worker con la escena de rock) se
+   piden solo cuando la tira se ve, y quedan en localStorage con la misma clave que usa el editor del juego. */
+let dropsRVista = false;
+function pintaDropsRock() {
+  const caja = $("vesDropsR"), u = state.user, d = datosMonedas;
+  if (!caja || !u || !d || !d.completo) return;
+  const l = dropsRock(d, 24);
+  const firma = JSON.stringify([l.map(x => x.uid + x.k), dropsRVista, l.map(x => !!fotoRock(x.v))]);
+  if (caja.dataset.f === firma) return;
+  caja.dataset.f = firma;
+  if (!l.length) {
+    caja.innerHTML = `<p class="jg-nada">Nadie ha sacado todavía un legendario: 1 de cada 10 cajas de rock trae uno. <a href="#solo/hero">Abrir una caja →</a></p>`;
+    return;
+  }
+  if (dropsRVista) pideFotosRock(l.map(x => x.v), () => pintaDropsRock());
+  caja.innerHTML = l.map(x => {
+    const q = quien(x.uid, perfilDe(x.uid), null, { nombre: nombreEnDatos(x.uid, d), foto: fotoEnDatos(x.uid, d) }, colorForUid);
+    const f = fotoRock(x.v), fi = fichaRock(x.v);
+    return `<div class="jg-drop jg-dropm">
+      <span class="jg-dropm-f"${f ? ` style="background-image:url('${escapeHtml(f)}');background-size:cover"` : ""} title="${escapeHtml(fi.nombre)} · ${escapeHtml(fi.cat)}">${f ? "" : `<i>${escapeHtml(fi.emoji)}</i>`}<em>★</em></span>
+      <b class="jg-dropm-n">${escapeHtml(fi.nombre)}</b>
+      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b></span>
+      <small class="jg-drop-cuando">${x.dup ? "repetido · " : ""}${haceCuanto(x.at)}</small></div>`;
+  }).join("");
+}
+function vigilaDropsRock(h) {
+  const caja = h.querySelector("#vesDropsR");
+  if (!caja || dropsRVista || typeof IntersectionObserver === "undefined") { if (caja) pintaDropsRock(); return; }
+  const io = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    dropsRVista = true;
+    pintaDropsRock();
+  }, { rootMargin: "200px" });
+  io.observe(caja);
+  pintaDropsRock();
+}
+
 /* Pide las fotos cuando la tira entra en pantalla (una vez por salón). */
 function vigilaDropsMascotas(h) {
   const caja = h.querySelector("#vesDropsM");
@@ -1232,15 +1776,15 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
   const cs = h.match(/^casino(?:\/(avion|pinguino|ruleta|blackjack|poker|plinko))?$/);
   if (cs) return { vista: "casino", pid: "", uid: cs[1] || "" };
-  if (h === "cartas") return { vista: "cartas", pid: "" };
+  if (h === "cartas" || h === "cartas/plantilla") return { vista: "cartas", pid: "", uid: h === "cartas" ? "" : "plantilla" };
   if (h === "mascotas") return { vista: "mascotas", pid: "" };
-  const mk = h.match(/^mercado(?:\/(prodrop|mascotas))?$/);
+  const mk = h.match(/^mercado(?:\/(prodrop|mascotas|rock))?$/);
   if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
@@ -1256,6 +1800,7 @@ function ir(hash) {
 }
 
 function aplicaRuta() {
+  if (revisaRutaTienda()) return;
   const r = leerRuta();
   cierraMini();
   if (r.vista === state.vista && r.pid === state.pid && (r.uid || "") === (state.perfilUid || "")) return;
@@ -1602,8 +2147,11 @@ function render() {
   else if (state.vista === "partida" && state.user) pintaPartida();
   pintaTabs();
   /* Los rieles (repeticiones y chat general) solo en las vistas de menú:
-     en una partida, un juego del club o los sobres, la pantalla es del juego. */
-  if (rieles) rieles.pon(VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]));
+     en una partida, un juego del club o los sobres, la pantalla es del
+     juego. El chat general sí va en todas con sesión, como burbuja abajo (la
+     pantalla completa de un juego la esconde por CSS). */
+  const conRiel = VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]);
+  if (rieles) rieles.pon(conRiel, conRiel || !!state.user);
 }
 const VISTAS_RIEL = new Set(["vestibulo", "ranks", "logros", "monedas", "perfil"]);
 let rieles = null;
@@ -1766,7 +2314,8 @@ const sospechaClub = s => {
 /* PRO HERO (hero.js): la cuenta y lo que la página ya hace para el club
    (guardar con prueba, apuntar la partida, celebrar el logro, avisar a los
    administradores), para el juego solo y para la sala. */
-ponHero({ fb, usuario: () => state.user, nombreVivo, guardaClub, marcaJugadaClub, celebra, sospecha: sospechaClub });
+ponHero({ fb, usuario: () => state.user, nombreVivo, guardaClub, marcaJugadaClub, celebra, sospecha: sospechaClub,
+  datos: datosPerfil, esAdmin: () => state.admin === true, ir });
 
 /* ---------- el medidor de descarga (consumo.js) ----------
    Cuánto bajó de la base este navegador y esta cuenta hoy. Lo raro va a
@@ -1834,11 +2383,13 @@ function armazon() {
   const h = $("pantalla");
   if (state.vista !== "partida") ponInmersivo(false);
   quitaOfreceGuardar();
+  quitaNombreInvitado();
+  quitaInstalar();
   /* Como invitado, lo que lee o escribe la base (una partida, la
      clasificación, los sobres…) se cambia por una puerta que lo explica. */
   const motivo = !state.invitado ? null : MOTIVO_CUENTA[state.vista] ||
-    /* Y de los juegos de un jugador, solo los cuatro libres (`rutaLibre`):
-       una ruta escrita a mano a cualquier otro también da con la puerta. */
+    /* Y de los juegos de un jugador, PRO HERO y Tenkaichi 3 (`rutaLibre`):
+       una ruta escrita a mano también da con la puerta. */
     (state.vista.startsWith("solo-") && !rutaLibre(state.vista.slice(5)) ? MOTIVO_CUENTA.solo : null);
   /* sortEm es solo el juego: el iframe ocupa la ventana, sin la cabecera
      del sitio ni la barra de juegos individuales. */
@@ -1881,7 +2432,7 @@ function armazon() {
        Pokémon en modo local, con sus propias rachas. Como invitado juega
        igual, con el usuario `INVITADO`, y no escribe nada fuera. */
     h.innerHTML = "";
-    individual = crearFrontera({ usuario: u || INVITADO, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
+    individual = crearFrontera({ usuario: u || invitadoConNombre(), guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, "frontera"), guardar: (d, at) => fb.guardarPartidaClub(u.uid, "frontera", d, at) } : null,
       alResultado: u ? lista => { marcaJugadaClub("frontera");
         for (const { d, previa } of lista || []) {
@@ -1889,6 +2440,7 @@ function armazon() {
           for (const id of deMarca("frontera", d)) if (!antes.has(id)) celebra("frontera", id);
         } } : undefined });
     individual.montar(h);
+    if (!u) { evento("jg_invitado_abre", { juego: "frontera" }); pideNombreInvitado(); }
     return;
   }
   if (state.vista.startsWith("solo-")) {
@@ -1911,6 +2463,16 @@ function armazon() {
         fb.otorgarLogro(clave, u.uid, id).then(() => celebra(clave, id), e => console.warn("[juegos] no se pudo guardar el logro", id, e)); }) : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
+      /* ¿Administrador? (state.admin se lee una vez por sesión y puede no haber llegado aún.) */
+      esAdmin: u ? () => (state.admin === null || state.admin === undefined ? fb.esAdminJuegos(u.uid) : !!state.admin) : null,
+      /* Cada partida terminada: lo que lleva la visita, el aviso al invitado
+         que no guarda nada y el reto que llegó por enlace. */
+      alTerminar: d => {
+        const mejoro = anotaVisita(clave, d);
+        if (!state.user) evento("jg_invitado_resultado", { juego: clave, categoria: d.categoria, mejoro: mejoro ? 1 : 0 });
+        if (retoActivo && superaReto(d, retoActivo)) { avisaRetoGanado(clave, d); return; }
+        if (!state.user && !deInv) avisaPerdido(clave, d, mejoro);
+      },
       alResultado: u ? alResultadoClub(clave) : undefined });
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
@@ -1919,10 +2481,11 @@ function armazon() {
     const corto = { minas: "Buscaminas", snake: "Snake", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera" };
     const barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? "UN JUGADOR · MODO INVITADO, NO SE GUARDA" : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${este.ranking === false ? "DE 1 A 8 EN EL MISMO TECLADO · SIN RANKING" : state.invitado ? `UN JUGADOR · <span data-con-nombre-inv${nombreInvitado() ? "" : " hidden"}><span data-nombre-inv translate="no">${escapeHtml(nombreInvitado())}</span> · </span>MODO INVITADO, NO SE GUARDA` : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
       (state.invitado ? '<button class="btn jg-solo-entrar" type="button" data-login>Iniciar sesión</button>' : "") +
       `<nav aria-label="Juegos individuales">${club.map(x => `<a class="btn2${x === este ? " on" : ""}" href="${x.ruta}">${escapeHtml(corto[x.id] || x.nombre)}</a>`).join("")}` +
-      `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button></nav>`;
+      `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button>` +
+      (este.ranking === false ? "" : `<button class="btn2" type="button" data-reto-de="${escapeHtml(clave)}" title="Comparte tu mejor marca de hoy">📣 Retar a un amigo</button>`) + `</nav>`;
     barra.querySelector("[data-reglas-solo]").onclick = () => abreReglas(clave);
     h.insertBefore(barra, h.firstChild);
     /* En los destacados, el invitado lo lee antes de jugar, no solo al perder. */
@@ -1933,6 +2496,9 @@ function armazon() {
       tira.innerHTML = '<span><b>Juegas como invitado:</b> tu puntaje y tu partida no se guardan. Inicia sesión cuando quieras, también después de perder, y los guardamos.</span><button class="btn" type="button" data-login data-origen="franja-invitado">Iniciar sesión</button>';
       barra.after(tira);
     }
+    const reto = franjaReto(clave);
+    if (reto) (h.querySelector(".jg-inv-tira") || barra).after(reto);
+    if (state.invitado) pideNombreInvitado();
     return;
   }
   if (state.vista === "perfil") {
@@ -1946,28 +2512,35 @@ function armazon() {
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
       ocultos: () => bt3Visible() ? [] : ["bt3", "mkw"]
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
   if (state.vista === "cartas") {
     h.innerHTML = "";
-    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir, abrir: state.perfilUid,
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     prodropVista.montar(h);
     return;
   }
   if (state.vista === "mercado") {
     h.innerHTML = "";
     mercadoVista = crearMercado({ usuario: state.user, datos: datosPerfil, fb, ir, marcoDe: marcoDeUid, juego: state.perfilUid,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mercadoVista.montar(h);
     return;
   }
   if (state.vista === "mascotas") {
     h.innerHTML = "";
     mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir,
-      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est) });
+      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est),
+      /* `ligero`: solo lo que ya se bajó (la libreta de vecinos lista a
+         todos, y abrir la escucha del perfil de cada uno bajaba sus fotos). */
+      quien: (u, ligero) => quien(u, ligero ? perfiles.get(u) : perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mascotasVista.montar(h);
     return;
   }
@@ -2008,7 +2581,7 @@ function armazon() {
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
          vuelve a mirar que lo sea. */
-      esAdmin: () => !!state.admin,
+      esAdmin: () => !!state.admin, vetado: fb.estaVetado, watchVetados: fb.watchVetados,
       borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)) });
     ranks.montar(h);
     return;
@@ -2099,13 +2672,16 @@ function armazon() {
      multijugador, donde se busca una sala. */
   const inv = state.invitado;
   const nombre = u ? String(u.name || "").split(" ")[0] : "";
+  const nomInv = inv ? nombreInvitado() : "";
   h.innerHTML = `
-    <div class="jg-sal" id="vesSalon" data-modo="${modoVes}">
+    <div class="jg-sal${inv ? " jg-sal-inv" : ""}" id="vesSalon" data-modo="${modoVes}">
       ${novedadesHtml()}
       <header class="jg-sal-intro">
         <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
-        <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : ""}?</h1>
+        <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : inv ? `<span data-con-nombre-inv${nomInv ? "" : " hidden"}>, <span data-nombre-inv translate="no">${escapeHtml(nomInv)}</span></span>` : ""}?</h1>
         <p>Juegos para ti solo, sin esperar a nadie, y juegos para jugar con otros en línea.</p>
+        ${halloweenHtml()}
+        ${tiraTiendaHtml(Object.assign({}, yoTienda() || {}))}
       </header>
       <nav class="jg-modos" aria-label="Qué juegos mostrar">
         <div class="jg-modos-sel" role="group" aria-label="Modo de juego">
@@ -2117,13 +2693,13 @@ function armazon() {
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
-        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas sin cuenta a BBTAN, ALETEO, FANAL y Trigon (y a Snake, Buscaminas, Tetris y sortEm), pero tus puntajes y partidas no se guardan. Inicia sesión, también después de jugar, y guardamos tu mejor partida de los cuatro primeros. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
+        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado<span data-con-nombre-inv${nomInv ? "" : " hidden"}> (<span data-nombre-inv translate="no">${escapeHtml(nomInv)}</span>, <button type="button" class="jg-enlace-btn" data-nombre-cambia>cambiar</button>)</span>.</b> Sin cuenta juegas a todo lo de un jugador menos PRO HERO, pero tus puntajes no se guardan. Lo multijugador necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
         <div id="vesAviso"></div>
       </div>
       <section class="jg-sal-sec jg-sal-solo" aria-labelledby="vesSoloT">
         <header class="jg-sal-tit">
           <span class="jg-sal-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span>
-          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta: BBTAN, ALETEO, FANAL, Trigon, Snake, Buscaminas, Tetris y sortEm." : ""}</p></div>
+          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta, todos menos PRO HERO." : ""}</p></div>
           <button class="jg-sal-ver" type="button" data-ver-solo>Ver todos</button>
           <button class="jg-desliza" type="button" data-desliza="-1" aria-label="Anteriores">‹</button><button class="jg-desliza" type="button" data-desliza="1" aria-label="Siguientes">›</button>
         </header>
@@ -2143,6 +2719,10 @@ function armazon() {
         <section class="jg-lado-caja jg-mo-ves">
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
+        </section>
+        <section class="jg-lado-caja jg-ref-ves">
+          <header><span aria-hidden="true">🤝</span><h2>Top referidos</h2></header>
+          <div id="vesReferidos"><p class="jg-nada">Contando referidos…</p></div>
         </section>
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
@@ -2167,12 +2747,14 @@ function armazon() {
       ${inv ? "" : topsHtml()}
       ${inv ? "" : tiraHtml()}
       ${tiraMascotasHtml(inv)}
+      ${inv || !veRock() ? "" : tiraRockHtml()}
     </div>`;
   vesFirma = "";
   for (const b of h.querySelectorAll("[data-filtro]")) {
     b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
   }
   for (const b of h.querySelectorAll("[data-modo-ves]")) b.onclick = () => ponModo(b.dataset.modoVes);
+  for (const b of h.querySelectorAll("[data-nombre-cambia]")) b.onclick = () => pideNombreInvitado(true);
   h.querySelector("[data-ver-solo]").onclick = () => ponModo("solo");
   /* Con ratón no hay deslizar: las flechas mueven el carrusel una página. */
   for (const b of h.querySelectorAll("[data-desliza]")) {
@@ -2182,7 +2764,10 @@ function armazon() {
   enganchaNovedades(h);
   enganchaBanner(h);
   vigilaDropsMascotas(h);
+  vigilaDropsRock(h);
   salon.enganchar($("vesSalon"));
+  /* Volvió al salón después de jugar: buen momento para ofrecer la app. */
+  setTimeout(() => { if (state.vista === "vestibulo") ofreceInstalar(); }, 1500);
 }
 
 /* ---------- novedades ----------
@@ -2199,6 +2784,16 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Cada una tiene un botón grande para jugar: va a su ruta, o a la ficha
    del juego (`ficha`) cuando lo que sigue es elegir sala. */
 const NOVEDADES = [
+  { id: "futbol", color: "#1a8a3a", alta: "2026-10-23", titulo: "PRODROP · Fútbol",
+    gancho: "Especial Superclásico",
+    lema: "Llegó el sobre de Fútbol: los jugadores del primer equipo del Real Madrid y del Barça, en común, rara y épica. Ábrelos, júntalos y arma tu once ideal en 4-3-3 para mostrarlo en tu perfil.",
+    datos: () => [[String(MOTOR.FUTBOLISTAS.length), "jugadores"], [String(MOTOR.POR_COL.futbol.length), "cartas"], ["4-3-3", "tu plantilla"]],
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
+  { id: "boxhead", color: "#e23b2e", alta: "2026-10-19", titulo: "Pro BoxHead",
+    gancho: "La horda no espera a nadie", datos: [["1–8", "jugadores"], ["8", "armas"], ["10", "jefes"]],
+    lema: "Zombis y diablos de cajas en 3D, vistos desde arriba: cada baja sube el multiplicador y trae armas nuevas, la sangre se queda en el suelo y las granadas lo dejan negro. Practica solo o abre una sala para hasta ocho.",
+    ficha: "boxhead", juego: "boxhead", boton: "Jugar", reglas: ["boxhead"],
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "memazo", color: "#f5b301", alta: "2026-10-18", titulo: "Momazo :v",
     gancho: "Que se rían todos (menos el tomate)", datos: [["2–10", "jugadores"], ["100+", "plantillas reales"], ["🔥", "o 🍅"]],
     lema: "Te tocan plantillas de memes reales, GIFs o dibujos de la casa: ponles texto antes de que se acabe el reloj. Después cada meme sale sin nombre y todos lo califican de 🍅 a 🔥. Gana quien saque más risas.",
@@ -2246,9 +2841,10 @@ const NOVEDADES = [
     ruta: "#solo/fanal", boton: "Jugar", reglas: ["fanal"], modo: "solo" }
 ];
 /* Lo que se muestra: una novedad de BT3 (si vuelve) solo la ven los
-   amigos del disco (bt3Visible, bt3-amigos.js). */
+   amigos del disco (bt3Visible, bt3-amigos.js). Al invitado y en el
+   celular, primero lo que se puede jugar ahí (`ordenaNovedades`). */
 let VISIBLES = NOVEDADES;
-const filtraNovedades = () => { VISIBLES = NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()).filter(n => n.id !== "mkw" || bt3Visible()).filter(n => !SOLO_LOCAL || SOLO_LOCAL.has(n.id)); };
+const filtraNovedades = () => { VISIBLES = ordenaNovedades(NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()).filter(n => n.id !== "mkw" || bt3Visible()).filter(n => !SOLO_LOCAL || SOLO_LOCAL.has(n.id)), { invitado: state.invitado, celular: enCelular() }); };
 /* El sello de cada diapositiva: «★ Lo último» para la más reciente,
    «Nuevo» para lo de las dos últimas semanas y «Destacado» para el resto
    (PRODROP no es nuevo, pero está porque se quiere que se vea). */
@@ -2290,9 +2886,9 @@ function novedadesHtml() {
   filtraNovedades();
   const inv = state.invitado, N = VISIBLES.length;
   const diapo = (n, i, copia) => {
-    /* Como invitado solo se abren los cuatro juegos libres; lo demás
-       (también las prácticas contra bots) pide iniciar sesión. */
-    const cuenta = inv && (n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6))));
+    /* Como invitado se abre todo lo de un jugador menos PRO HERO; lo
+       demás (salas, la tienda) pide iniciar sesión. */
+    const cuenta = inv && novedadPideCuenta(n);
     const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
       /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
          para el juego al que lleva la novedad. */
@@ -2354,6 +2950,13 @@ const tiraMascotasHtml = inv => `
           : `<div id="vesDropsM" class="jg-tira-fila"><p class="jg-nada">Buscando legendarios…</p></div>`}
       </section>`;
 
+/* La de Batalla de Rock: las piezas legendarias de las cajas de PRO HERO. */
+const tiraRockHtml = () => `
+      <section class="jg-tira jg-tira-r" aria-labelledby="vesTiraRT">
+        <header><h2 id="vesTiraRT">🎸 Últimos drops legendarios · Batalla de Rock</h2><small>lo legendario de las cajas de rock, del más reciente al más antiguo</small><a href="#solo/hero">Abrir cajas →</a></header>
+        <div id="vesDropsR" class="jg-tira-fila"><p class="jg-nada">Buscando legendarios…</p></div>
+      </section>`;
+
 function enganchaNovedades(h) {
   const de = id => VISIBLES.find(n => n.id === id);
   /* «Jugar» en un juego de sala abre su ficha: ahí están las salas que
@@ -2373,9 +2976,10 @@ function enganchaNovedades(h) {
    movimiento (que empieza en pausa). El punto activo se llena con lo que
    falta para pasar. Con el dedo se arrastra; un arrastre no es un clic. */
 const BAN_MS = 7000;
-let banTic = 0;
+let banTic = 0, banVista = null;
 function enganchaBanner(h) {
   clearInterval(banTic);
+  if (banVista) { banVista.disconnect(); banVista = null; }
   const raiz = h.querySelector("#vesBanner"), N = VISIBLES.length;
   if (!raiz || N < 2) return;
   const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
@@ -2389,14 +2993,26 @@ function enganchaBanner(h) {
     pista.classList.toggle("sin-trans", !anima || quieto);
     pista.style.transform = `translateX(calc(${-k * 100}% + ${dx}px))`;
   };
+  /* El tic solo mueve la barra del punto activo (`llena`); el resto se
+     repinta al cambiar de diapositiva o de pausa, y solo si cambió: antes
+     cada tic reescribía el texto y las etiquetas del botón de pausa diez
+     veces por segundo, y el traductor de i18n.js revisaba cada cambio. */
+  let lleno = null, pausaPintada = null;
+  let aLaVista = true;
+  const llena = () => { if (lleno && aLaVista) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`; };
   const pinta = () => {
     const j = i % N;
     diapos.forEach((d, k) => d.classList.toggle("on", k === i));
-    puntos.forEach((b, k) => { b.classList.toggle("on", k === j); b.setAttribute("aria-current", String(k === j)); });
-    const lleno = raiz.querySelector(".jg-ban-puntos .on i");
-    for (const b of puntos) b.firstChild.style.transform = "";
-    if (lleno) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`;
+    puntos.forEach((b, k) => {
+      b.classList.toggle("on", k === j);
+      if (b.getAttribute("aria-current") !== String(k === j)) b.setAttribute("aria-current", String(k === j));
+    });
+    lleno = raiz.querySelector(".jg-ban-puntos .on i");
+    for (const b of puntos) if (b.firstChild !== lleno) b.firstChild.style.transform = "";
+    llena();
     raiz.classList.toggle("pausa", pausado);
+    if (pausaPintada === pausado) return;
+    pausaPintada = pausado;
     pausa.textContent = pausado ? "▶" : "❚❚";
     pausa.setAttribute("aria-label", pausado ? "Reanudar las novedades" : "Pausar las novedades");
     pausa.title = pausado ? "Reanudar" : "Pausar";
@@ -2454,11 +3070,21 @@ function enganchaBanner(h) {
   pon(0, false);
   pinta();
   banTic = setInterval(() => {
-    if (!document.body.contains(raiz)) { clearInterval(banTic); return; }
+    if (!document.body.contains(raiz)) { clearInterval(banTic); if (banVista) { banVista.disconnect(); banVista = null; } return; }
     if (pausado || encima || foco || arrastre || document.hidden || salon.abiertaPara()) return;
     t += 100;
-    if (t >= BAN_MS) ve(i + 1); else pinta();
+    if (t >= BAN_MS) ve(i + 1); else llena();
   }, 100);
+  /* Fuera de la vista (al bajar al catálogo), la escena deja de animar:
+     nadie la ve y era lo que más trabajo le daba al navegador en el salón. */
+  if (typeof IntersectionObserver === "function") {
+    banVista = new IntersectionObserver(([e]) => {
+      aLaVista = e.isIntersecting;
+      raiz.classList.toggle("fuera", !aLaVista);
+      llena();
+    });
+    banVista.observe(raiz);
+  }
 }
 
 /* ---------- últimos tops ----------
@@ -2485,7 +3111,7 @@ function topsLista(d) {
     return `<li class="jg-top p${x.p}">
           <span class="jg-top-med" aria-label="Puesto ${x.p}">${MEDALLA[x.p]}</span>
           <span class="jg-top-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 30, x.uid)}</span>
-          <span class="jg-top-txt"><b translate="no" data-perfil="${escapeHtml(x.uid)}">${escapeHtml(q.nombre)}</b> le quitó el ${NOMBRE_PUESTO[x.p]} puesto a <b translate="no" data-perfil="${escapeHtml(x.q)}">${escapeHtml(o.nombre)}</b>
+          <span class="jg-top-txt"><b translate="no" data-perfil="${escapeHtml(x.uid)}">${nombreHtml(x.uid, escapeHtml(q.nombre))}</b> le quitó el ${NOMBRE_PUESTO[x.p]} puesto a <b translate="no" data-perfil="${escapeHtml(x.q)}">${nombreHtml(x.q, escapeHtml(o.nombre))}</b>
             <small>${escapeHtml(tabla)}${marca ? ` · ${escapeHtml(marca)}` : ""} · ${haceCuanto(x.at)}</small></span>
         </li>`;
   }).join("");
@@ -2724,7 +3350,10 @@ function pintaVestibulo() {
      mientras llega la de hoy), los del club también, y las prácticas
      contra bots al final, que son la versión pequeña de un multijugador. */
   const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()).filter(k => k !== "mkw" || bt3Visible());   // BT3 y MKW: solo los amigos
+  const celular = enCelular();
   entradasVes = entradasSalon(JUEGOS, orden);
+  /* En el celular, lo que se juega con el dedo primero (`ordenaEntradas`). */
+  entradasVes.multi = ordenaEntradas(entradasVes.multi, { invitado: inv, celular });
   if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3" && e.juego !== "mkw");
   if (SOLO_LOCAL) { entradasVes.solos = entradasVes.solos.filter(e => SOLO_LOCAL.has(e.juego)); entradasVes.multi = entradasVes.multi.filter(e => SOLO_LOCAL.has(e.juego || e.id)); }
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
@@ -2732,6 +3361,8 @@ function pintaVestibulo() {
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
   const destacado = id => inv && DESTACADOS_INVITADO.includes(id) ? DESTACADOS_INVITADO.indexOf(id) - 1000 : 0;
   entradasVes.solos.sort((x, y) => destacado(x.id) - destacado(y.id) || rango.get(x.id) - rango.get(y.id));
+  /* …y lo que se juega aquí antes que lo que pide cuenta o solo va en el PC. */
+  entradasVes.solos = ordenaEntradas(entradasVes.solos, { invitado: inv, celular });
   nuevosVes = nuevos([...entradasVes.solos, ...entradasVes.multi], ahoraV);
   indiceVes = indiceBusqueda([...entradasVes.solos, ...entradasVes.multi, ...SITIOS_BUSCA]);
   const porJuego = {};
@@ -2740,7 +3371,7 @@ function pintaVestibulo() {
      primero es el primero de la tabla y la etiqueta mentiría. */
   const top = Object.keys(state.popular).length ? orden[0] : "";
   const marcas = e => ({ invitado: inv, nuevo: nuevosVes.has(e.id), top: e.id === top, salas: porJuego[e.id] || 0 });
-  const firma = JSON.stringify([inv, [...nuevosVes], top, porJuego, entradasVes.solos.map(e => e.id), orden]);
+  const firma = JSON.stringify([inv, [...nuevosVes], top, porJuego, entradasVes.solos.map(e => e.id), entradasVes.multi.map(e => e.id)]);
   if (firma !== vesFirma || !$("vesElige").firstElementChild) {
     vesFirma = firma;
     /* Repintar quita el foco de la tarjeta que lo tenía (alguien abrió
@@ -2777,7 +3408,7 @@ function pintaVestibulo() {
       <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[s.juego] || "●")}</span>
       <div class="jg-sala-txt">
         <b>${escapeHtml(j.nombre || s.juego)}</b>
-        <span translate="no">${escapeHtml(nombreVivo(s.anfitrion, s.nombre) || "Alguien")} · ${escapeHtml(timeAgo(s.at))}</span>
+        <span translate="no">${nombreHtml(s.anfitrion, escapeHtml(nombreVivo(s.anfitrion, s.nombre) || "Alguien"))} · ${escapeHtml(timeAgo(s.at))}</span>
         <span class="jg-sala-cupo" title="${n} de ${cupo} dentro"><i style="width:${Math.round(100 * n / cupo)}%"></i></span>
       </div>
       <div class="jg-sala-der"><small>${n}/${cupo}</small>
@@ -2970,7 +3601,7 @@ function panelEspera(p, est) {
   const dentro = p.juego === "mkw" ? (est.jugadores || []).filter(j => !(est.fuera && est.fuera[j.uid])).length : (est.jugadores || []).length;
   const min = minimoDe(p);
   const anfitrion = p.anfitrion === state.user.uid;
-  const varios = cupo > min;
+  const varios = cupo > min || (p.juego === "pool" && cupo > 2);
   return `
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
@@ -2983,6 +3614,7 @@ function panelEspera(p, est) {
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
         : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo; quien llegue después entra en la carrera siguiente.</div>`
         : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
+        : p.juego === "pool" ? `<div class="jg-nota">Dos contra dos: empieza sola cuando entren los cuatro. Quien abrió la sala juega con el compañero que eligió.</div>`
         : !varios ? ""
         : anfitrion && dentro >= min
           ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
@@ -3025,6 +3657,8 @@ function montaJuego(p) {
        la pinten igual que la cabecera. Sin `data-perfil`: dentro de un
        juego un clic en un asiento puede ser una jugada. */
     avatar: (j, tam, color) => avatarMarco(fotoSana(j.foto, true), j.nombre, color || colorSano(j.color) || colorForUid(j.uid || ""), j.marco || marcoDeUid(j.uid), tam),
+    tacoDe: tacoDeUid,
+    tacos: state.user ? tacosPool : null,
     secreto: () => soyJugador()
       ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del
@@ -3075,7 +3709,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3207,6 +3841,10 @@ const RAZONES = {
   catan: "Llegó a los puntos de victoria antes que nadie.",
   agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
   cierre: "La mesa votó acabar: ganó quien llevaba más puntos.",
+  ocho: "Metió la 8 en la tronera que había cantado.",
+  "ocho-pronto": "La 8 cayó antes de despejar su grupo.",
+  "ocho-mal": "La 8 cayó en una tronera distinta de la cantada.",
+  "ocho-falta": "La 8 cayó con falta.",
   mate: "Jaque mate.",
   ahogado: "Rey ahogado: sin jugadas y sin estar en jaque.",
   material: "No quedaba material para dar mate.",
@@ -3297,7 +3935,7 @@ function pintaQuienes(p, est) {
     return `
     <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
       ${avatarMarco(x.foto, x.nombre, x.color, marcoDeUid(x.uid), 20, x.uid)}
-      ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
+      <span translate="no">${nombreHtml(x.uid, escapeHtml(x.nombre || "Alguien"))}</span>${x.uid === yo ? " (tú)" : ""}
       ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
       ${boton}
     </span>`;
@@ -3338,7 +3976,7 @@ function pintaChat() {
   const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
     <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
-      <b translate="no" data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(nombreVivo(m.uid, m.nombre))}">${escapeHtml(nombreVivo(m.uid, m.nombre) || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <b translate="no" data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(nombreVivo(m.uid, m.nombre))}">${nombreHtml(m.uid, escapeHtml(nombreVivo(m.uid, m.nombre) || "Alguien"))}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
@@ -3479,6 +4117,7 @@ function wireTema() {
 
 function wire() {
   wireTema();
+  montaHalloween();
   wireInmersivo();
   /* Iniciar sesión está a la vista en todas partes mientras se es
      invitado: la cabecera, la barra de modo del salón, la barra de un
@@ -3510,11 +4149,13 @@ function wire() {
   $("tabMascotas").onclick = () => ir("#mascotas");
   $("tabMercado").onclick = () => ir("#mercado");
   $("userMonedas").onclick = () => ir("#monedas");
+  montaReferidos();
   window.addEventListener("hashchange", aplicaRuta);
 }
 
 (function boot() {
   wire();
+  pintaTintas();   // las clases de la vista previa del editor viven en esa hoja
   tickConsumo();
   setInterval(tickConsumo, 2000);
   /* El castigo del antitrampas se mira antes que la sesión: el registro
@@ -3524,7 +4165,20 @@ function wire() {
   revisaCastigo();
   rieles = crearRieles({
     fb, usuario: () => state.user ? { uid: state.user.uid, name: state.user.name } : null,
-    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora()), popular: () => state.popular
+    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora()), popular: () => state.popular,
+    /* Los super chats: el saldo para ofrecerlos y si la economía cobró el
+       de un mensaje (null mientras su cobro no llegó a los datos). */
+    saldo: () => {
+      if (!state.user || !datosP || !datosP.completo) return null;
+      const m = monedasDe(state.user.uid, datosP);
+      return { saldo: m.saldo, parada: !!m.parada };
+    },
+    superPagado: (uid, k) => {
+      if (!datosP || !datosP.completo || !((datosP.superChat || {})[uid] || {})[k]) return null;
+      const e = economia(datosP).usuarios[uid];
+      return !!(e && e.superChats[k]);
+    },
+    alDatos: fn => datosPerfil(fn)
   });
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",
@@ -3539,6 +4193,9 @@ function wire() {
   alCambiarBt3(() => { vesFirma = ""; bt3Revisada = false; if (state.vista === "vestibulo") render(); else if (state.vista === "partida") pintaPartida(); });
   // Duelo o Torneo elegido en la página del juego («un jugador»): se abre la sala aquí, con ese formato.
   alPedirSalaBt3(cupo => { if (bt3Visible()) crear("bt3", Object.assign(porOmision("bt3"), { cupo })); });
+  recogeLoginRedirigido();
+  recogeReto();
+  if (enApp()) evento("jg_app_abre", { ios: esIos() ? 1 : 0 });
   watchAuth(user => {
     revisaBt3();
     if (!user) {
@@ -3553,11 +4210,13 @@ function wire() {
       for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension, offSerie1]) { if (f) { try { f(); } catch (e) {} } }
       offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = offSerie1 = null;
       fijaSerie1({}, "");
+      fijaVeRock(false);
       state.admin = false;
       revisaCastigo({ uid: null, cuenta: 0, suspension: null });
       if (offConsumo) { try { offConsumo(); } catch (e) {} offConsumo = null; }
       medidor.ponCuenta(null); apuntadoConsumo = 0;
       if (offMonedas) { offMonedas(); offMonedas = null; datosMonedas = null; }
+      if (referidosUi) referidosUi.cierra();
       limpiaInvitado();
       mostrar(); pintaUsuario();
       const r = leerRuta();
@@ -3568,7 +4227,7 @@ function wire() {
       /* Una ficha abierta (se salió de la cuenta con ella delante) se
          repinta en su versión de invitado. */
       if (salon.abiertaPara()) salon.abre(salon.abiertaPara());
-      abreBienvenida();
+      if (!revisaRutaTienda()) abreBienvenida();
       return;
     }
     /* Con cuenta la bienvenida ya no hace falta, en este aparato tampoco
@@ -3577,6 +4236,7 @@ function wire() {
     marcaBienvenida();
     cierraBienvenida();
     quitaOfreceGuardar();
+    quitaNombreInvitado();
     state.invitado = false;
     state.base = {
       uid: user.uid,
@@ -3606,6 +4266,8 @@ function wire() {
     fb.esAdminJuegos(user.uid).then(a => {
       if (!state.user || state.user.uid !== user.uid) return;
       state.admin = a; mostrar();
+      /* Batalla de Rock, si está a prueba (ROCK_SOLO_ADMIN): sus piezas solo las ve un admin (mercado incluido). */
+      if (fijaVeRock(a) && datosP) { datosP = conDerivados(Object.assign({}, datosP)); for (const f of [...oyentesP]) f(datosP); }
       if (state.vista === "admin") { vistaPintada = ""; render(); }
       if (a && ranks && ranks.refresca) ranks.refresca();
     });
@@ -3634,6 +4296,9 @@ function wire() {
     trasLogin = "";
     if (reabrir) salon.abre(reabrir);
     subeDeInvitado(state.user);
+    /* La tienda de Halloween: pedida por el enlace (`#tienda`) o, al
+       entrar al salón, sola una vez al día. */
+    if (!revisaRutaTienda() && !reabrir) quizaAbreTienda();
   });
 })();
 
@@ -3657,6 +4322,7 @@ const ESFERAS_BT3 = [
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
+  if (k === "pool") return '<div class="jg-art-pool"><span class="mesa"></span><span class="rack">' + [[1, 0], [11, 1], [8, 0], [3, 0], [14, 1], [6, 0]].map(([n, r], i) => '<i class="b' + n + (r ? " ray" : "") + '" style="--i:' + i + '"><b>' + (n > 8 ? n : n) + '</b></i>').join("") + '</span><i class="blanca"></i><span class="taco"></span></div>';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
   if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
@@ -3676,7 +4342,7 @@ function arteJuego(k) {
   if (k === "mkw") return `<div class="jg-art-mkw"><s></s><em><small>Retro Rewind</small><strong>Mario Kart Wii</strong></em></div>`;
   if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
-  if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
+  if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>PRO BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';
   if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
@@ -3699,16 +4365,23 @@ function arteCatan() {
     [w, -1.5 * R, "#9fd66b", oveja(w, -1.5 * R)], [-w, -1.5 * R, "#a7afb9", pico(-w, -1.5 * R)],
     [w, 1.5 * R, "#a7afb9", pico(w, 1.5 * R)], [-w, 1.5 * R, "#3f8f45", arbol(-w, 1.5 * R + 2)]
   ];
-  return `<svg class="jg-art-ct" viewBox="-78 -70 156 140" aria-hidden="true">
-    <path class="jg-art-ct-ola" d="M-78 58 q9 -6 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" fill="none" stroke="#ffffff55" stroke-width="2"/>
+  /* El mar y el barco van en su propio SVG, dentro de un elemento HTML que
+     es el que se mueve: animados dentro del dibujo, obligaban a repintarlo
+     y a recomponer el salón entero en cada cuadro. Los tres SVG comparten
+     el `viewBox` y se apilan, así que el dibujo es el mismo. */
+  const capa = (clase, d) => `<i class="${clase}"><svg viewBox="-78 -70 156 140">${d}</svg></i>`;
+  return `<span class="jg-art-ct" aria-hidden="true">
+    ${capa("jg-art-ct-ola", '<path d="M-78 58 q9 -6 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" fill="none" stroke="#ffffff55" stroke-width="2"/>')}
+    <svg viewBox="-78 -70 156 140">
     ${celdas.map(([x, y, c, d]) => hex(x, y, c) + d).join("")}
     <circle cx="0" cy="2" r="9.5" fill="#f7ecd0" stroke="#b08f5a" stroke-width="1.2"/><text x="0" y="6" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="800" font-size="11" fill="#c0392b">8</text>
     <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#1d1a17" stroke-width="6.5" stroke-linecap="round"/>
     <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#d8412f" stroke-width="4" stroke-linecap="round"/>
     <path d="M-6 -${R + 6} v-7 l6 -6 6 6 v7z" fill="#d8412f" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa"/>
     <path d="M${(-w - 9).toFixed(1)} ${R / 2 + 9} v-9 l5 -6 5 6 v3 h9 v6z" fill="#2f6fd6" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa b"/>
-    <g class="jg-art-ct-barco"><path d="M50 40 h22 l-4 7 h-14z" fill="#8a5a2c"/><path d="M61 40 v-16" stroke="#3b220f" stroke-width="1.5"/><path d="M62 25 l8 13 h-8z" fill="#f3efe3"/></g>
-  </svg><b class="jg-art-ct-t">CATAN</b>`;
+    </svg>
+    ${capa("jg-art-ct-barco", '<path d="M50 40 h22 l-4 7 h-14z" fill="#8a5a2c"/><path d="M61 40 v-16" stroke="#3b220f" stroke-width="1.5"/><path d="M62 25 l8 13 h-8z" fill="#f3efe3"/>')}
+  </span><b class="jg-art-ct-t">CATAN</b>`;
 }
 
 let pidiendoRevancha = false;

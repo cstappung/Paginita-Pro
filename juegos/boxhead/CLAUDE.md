@@ -1,8 +1,9 @@
-# Boxhead — notes for Claude
+# Pro BoxHead — notes for Claude
 
 Room game of Juegos. The shared architecture (move log, `reducir`, rooms, fin cartel, votes, sound) is in `colabtex/src/juegos/CLAUDE.md`; logros/coins/ranking wiring in `docs/claude/juegos/perfiles-y-economia.md`. The room postman is `colabtex/src/juegos/boxhead.js`.
 
-**Boxhead (`boxhead`) is a top-down shooter in an iframe, Yemas' sibling.**
+**Pro BoxHead (id `boxhead`, renamed from «Boxhead»: the id stays, the rules,
+rooms and tables use it) is a top-down shooter in an iframe, Yemas' sibling.**
 An original recreation of *Boxhead: The 2Play Rooms* (its weapons, unlock
 multipliers, enemies, skins and five maps, `juegos/boxhead/js/datos.js`, UMD
 `BoxheadDatos`), but the room holds one to eight rather than two:
@@ -67,9 +68,69 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   levels, `factorPotencia`) with points. A blue box drop gives armour. `pen`
   upgrades let pistol, uzi and shotgun pellets go through one more enemy each.
   `b` cells are map barrels that come back each level (`reponBarriles`).
+- **The shop is a clickable panel** (`#tienda`, `pintaTienda`/`armaTienda` in
+  `juego.js`), shown while `tiendaCerca()`: built once, then only classes and
+  texts change (rebuilding it every 0.2 s ate clicks). Its buttons never take
+  focus (`sinFoco`): Space shoots and would otherwise re-buy the last item.
+  Keys still work (`TECLA_TIENDA` from `D.TIENDA`, plus **U** = upgrade the
+  weapon in hand and **F** = place a muro reforzado).
+- **Shop weapon levels** (`NIVEL_ARMA`, `precioNivelArma`, `conNivel` in
+  `datos.js`): up to 5 per weapon, each `sube` (×1.8) dearer, applied on top
+  of the multiplier upgrades — always read a weapon through `armaDe(i)`, never
+  `D.arma(i, yo.mejoras)` alone. The level changes the look: `partesArma(w,
+  nivel)` retints the metal (pulida 1–2, dorada 3–4, plasma 5 with a muzzle
+  glow) and `iconoArma(..., nivel)` the HUD icon. The level in hand travels
+  as `nv` in the player state so the others draw it; hits already carry the
+  damage, so nothing else changes on the network.
+- **Muro reforzado** (`blindado` in `TIENDA`, `MURO_BLINDADO`): bought per
+  unit (`yo.bl`, max 6), placed with F as a `pon` request with a 7th field
+  `bl: 1`. It is a `k: 'muro'` object with `bl` and `MURO_BLINDADO.vida`
+  (1000, the director ignores the client's figure), so every rule about
+  muros (rodeo, Demoledor, bites) applies unchanged. It travels as a 10th
+  field of `zb.o`; an old client draws it as a plain muro.
+- **Enemies go around the players' muros and barrels** (`calculaFlujo`:
+  `flujoL` is the BFS with the cells those objects touch blocked, `tapadas`;
+  `flujo` ignores them). An enemy uses `flujoL` while its cell has a distance
+  there (`rodea`), never chases straight into an object (`objetoEnMedio`), and
+  a graze is not an attack; only with no free path (or 1.5 s stuck against
+  one, `e.tr`) does it bite muros and does an explosivo blow on one. **The
+  Demoledor** (`ENEMIGOS[16]`, `rompe`, `dObj` ×4 damage to objects, from
+  level 6, at most 5 %) always takes `flujo` and goes for the walls. New
+  enemies are appended after the bosses: `PUNTOS`, `TALLA_Z`, `VIDA_Z` and
+  `PAL_E` are indexed by `k`.
+- **A body overlapping a map wall cannot move** (every step still collides):
+  big ones spawning in a corner with the random offset stayed there forever.
+  `desatasca` moves it to the nearest free spot, at spawn and every frame.
+  `__boxhead.calma/ponYo/enemigo/pon/objetos` set up these cases in practice.
 - **A muro placed on yourself no longer traps you**: `pon` refuses one that
   overlaps the player, and `choca` ignores an object the body already
   overlaps, so walking out of it is always possible.
+- **What you see lives in `js/grafico.js`** (`BoxheadGrafico`), the sounds in
+  `js/audio.js` (`BoxheadAudio`); `juego.js` only decides what to draw.
+  The audio caps the pieces sounding at once (`carga`, `TOPE`/`TOPE_LEJOS`:
+  distant sounds drop first) and ends in a limiter: with the horde on
+  screen it used to crackle and go silent.
+  Characters are **cubes in fake 3D**: `modelo` yaws each part to where the
+  body faces, pitches it back (`cae`: the knockback lean, the death fall),
+  projects with `KY` and paints only the faces toward the camera, sorted by
+  depth. An animated part goes through `humanoide`'s parts list, never as
+  extra canvas drawing, or it will not rotate. `PAL_E` has **one palette per
+  `ENEMIGOS` entry** (the test pins it): a new enemy needs its palette.
+  Models draw at `ESC` (1.15) over their collision radius; bars and labels
+  above heads are placed for that scale.
+- **The floor keeps everything** (`crearSuelo`): one canvas of the whole map,
+  painted once per map theme (`TEMAS`, keyed by map id) plus a static shadow
+  layer, where every blood drop, pool and scorch is stamped and **never
+  erased** during a game. Blood comes from particles that stamp where they
+  land (`fx.sangre`), so a new effect that should stain must do the same.
+  Walls are white chamfered blocks (`bloque`, `muroDe(mapa)` tints them);
+  neighbour walls merge, so do not stroke shared edges.
+- **A death travels as `[id, quien, k, x, y, ang, tipo]`** in `zb.m`: `ang`
+  (centiradians) is where the hit threw it, `tipo` 0 falls (`fx.cadaver`,
+  which leaves its pool), 1 bursts (explosive weapon), 2 the explosivo
+  blowing up. Old clients send five fields; `procesaMuerte` falls back to a
+  random angle. Knockback depends on the weapon (`EMPUJE_ARMA`) and adds up
+  while stunned, capped by mass: that is what makes the shotgun hit hard.
 - Room options: `variante` (coop/versus), `mapa` (`BX_MAPAS`, must match
   `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
   rules' `juego` and `logros` whitelists, so they must be re-published.

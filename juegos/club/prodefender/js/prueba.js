@@ -20,6 +20,7 @@
 //    [k, 5, c]             recargar desde la foto de ese instante (reanudar
 //                          una partida guardada, c = 0, o reintentar la
 //                          ronda perdida, c = 1: gasta un reintento)
+//    [k, 6, x, y]          tirar un montón de pinchos en el camino
 //  `k` cuenta los pasos del motor desde que empezó el tramo; una recarga
 //  empieza un tramo nuevo (k vuelve a 0, la semilla cambia con el tramo).
 //
@@ -33,11 +34,11 @@
   const STEP = 1 / 60;
   const QUIETO_MAX = 180;
   const MODOS = ['first', 'last', 'strong', 'close'];
-  const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio'];
+  const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse'];
   const MAX_JUGADAS = 8000, MAX_PASOS = 30000000;
   // Sube con cada cambio del motor, los datos o esta regla de pasos: una prueba
   // grabada con otro motor no se rehace igual (y eso es caché, no trampa).
-  const VERSION = 3;
+  const VERSION = 4;
 
   const categoria = r => 'club-prodefender-' + REINOS[r];
   const reinoDe = cat => { const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || '')); return m ? REINOS.indexOf(m[1]) : -1; };
@@ -95,6 +96,10 @@
       recarga(st, clona(g.snapshot()), j[2]);
       return null;
     }
+    if (c === 6) {
+      if (!Number.isInteger(j[2]) || !Number.isInteger(j[3])) return 'posición inválida';
+      return g.placeSpikes(j[2], j[3]) ? null : 'no se podían tirar pinchos ahí';
+    }
     return 'jugada desconocida';
   }
   function recarga(st, snap, c) {
@@ -139,6 +144,12 @@
       const t = this.game.place(type, x, y);
       if (t) this.anota([this.st.k, 0, PD.TOWER_ORDER.indexOf(type), x, y]);
       return t;
+    }
+    pinchos(x, y) {
+      x = Math.round(x); y = Math.round(y);
+      const p = this.game.placeSpikes(x, y);
+      if (p) this.anota([this.st.k, 6, x, y]);
+      return p;
     }
     mejorar(t, p) { const ok = this.game.upgrade(t, p); if (ok) this.anota([this.st.k, 1, t.id, p]); return ok; }
     vender(t) { if (this.game.towers.indexOf(t) < 0) return; this.game.sell(t); this.anota([this.st.k, 2, t.id]); }

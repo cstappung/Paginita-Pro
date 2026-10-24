@@ -6,7 +6,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const raiz=f=>path.join(__dirname,'..',f);
 const sin=f=>fs.readFileSync(raiz(f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);
-vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
+vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/referidos.js')+'\n'+sin('src/juegos/monedas.js')+
  ';globalThis.__B={reducir,reglasBt3,esCpuBt3,JUEGOS,LOGROS,NIVEL,PESO,detecta,BT3_TIEMPOS};',ctx);
 const B=ctx.__B;
 

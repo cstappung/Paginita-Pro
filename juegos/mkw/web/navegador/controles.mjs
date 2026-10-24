@@ -1,4 +1,6 @@
 // Controles del juego en la página: teclado, mandos (Gamepad API) y celular (mando táctil + inclinar para dirigir).
+// (Para el salón de Juegos —build-controles.js del sitio—: @controles: teclado . Sale para el PC, con teclado o mando;
+// lo táctil existe pero los celulares quedan fuera del lanzamiento, decisión del dueño 2026-10-19.)
 //
 // Resumen: el juego solo entiende mandos de GameCube (4 puertos). Este módulo junta todo lo que el jugador usa y,
 // una vez por refresco de pantalla, arma el estado de un mando de GameCube por puerto y se lo entrega al juego con

@@ -225,7 +225,7 @@
     let b = "";
     if (tipo === "practica") b = `<button type="button" class="boton primario" data-accion="otra">Otro al azar ↻</button>`;
     else if (sig) b = `<button type="button" class="boton primario" data-accion="ir" data-modo="${sig.id}">Siguiente: ${sig.icono} ${esc(sig.nombre)} →</button>`;
-    else b = `<button type="button" class="boton primario" data-accion="copiar">📋 Copiar resultado</button>`;
+    else b = `<button type="button" class="boton primario" data-accion="copiar">📣 Compartir resultado</button>`;
     return b + (tipo === "diario" ? `<span class="cuenta" id="cuenta"></span>` : "");
   }
   /* La tarjeta del final: verde si ganó, roja si se acabaron los intentos. */
@@ -435,7 +435,9 @@
       }
       if (a === "ir") ponModo(b.dataset.modo);
       if (a === "copiar") {
-        const txt = M.resumen(est, hoy), ok = () => { b.textContent = "¡Copiado! ✓"; setTimeout(() => { if (b.isConnected) b.textContent = "📋 Copiar resultado"; }, 1800); };
+        /* Con el enlace al juego, y en el celular la hoja de compartir (../diario.js). */
+        if (window.DiarioClub) { DiarioClub.comparte(M.resumen(est, hoy), "electro", b); return; }
+        const txt = M.resumen(est, hoy), ok = () => { b.textContent = "¡Copiado! ✓"; setTimeout(() => { if (b.isConnected) b.textContent = "📋 Compartir resultado"; }, 1800); };
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, () => prompt("Copia tu resultado:", txt));
         else prompt("Copia tu resultado:", txt);
       }

@@ -150,7 +150,7 @@ export function montarPinguino(h, api) {
     activa = null; ultimo = ro;
     pinta(); pintaFeed();
   }
-  function pintaFeed() { $("[data-feed]").innerHTML = api.feedHtml(6); }
+  function pintaFeed() { api.pintaFeed($("[data-feed]"), 6); }
 
   /* ---------- la escena ---------- */
   const escena = (() => {
@@ -158,11 +158,33 @@ export function montarPinguino(h, api) {
     let d = dif, n = 0, mov = null, rompe = null, fiesta = null, parts = [], flotan = [], anillos = [], burbujas = [], aplasta = 0;
     const lejos = Array.from({ length: 9 }, (_, i) => ({ x: i * 0.31 + Math.random() * 0.1, h: 0.4 + Math.random() * 0.6, w: 0.18 + Math.random() * 0.14 }));
     const copos = Array.from({ length: 60 }, () => ({ x: Math.random(), y: Math.random(), v: 0.02 + Math.random() * 0.05, r: 0.6 + Math.random() * 1.6, f: Math.random() * 6.3 }));
+    /* Lo que se ve igual en cada cuadro va dibujado una vez en lienzos
+       guardados (por tamaño): el cielo y el mar (`cielo`), cada témpano y
+       cada etiqueta de multiplicador (`sprites`). Rehacer sus degradados,
+       textos y sombras 60 veces por segundo trababa la página. */
+    let cielo = null;
+    const sprites = new Map();
     function mide() {
-      const r = lienzo.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1);
-      W = Math.max(280, r.width); H = Math.max(240, r.height);
+      const r = lienzo.getBoundingClientRect(), d0 = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.max(280, r.width), h = Math.max(240, r.height);
+      if (w === W && h === H && d0 === dpr) return;
+      dpr = d0; W = w; H = h;
       lienzo.width = Math.round(W * dpr); lienzo.height = Math.round(H * dpr);
+      cielo = null; sprites.clear();
+    }
+    /* Un dibujo guardado: `dibuja(c)` pinta con el origen en (ox, oy) de
+       una caja de ancho × alto; se pega con su origen en (x, y). */
+    function sprite(clave, ancho, alto, ox, oy, dibuja, x, y) {
+      let sp = sprites.get(clave);
+      if (!sp) {
+        const c = document.createElement("canvas");
+        c.width = Math.ceil(ancho * dpr); c.height = Math.ceil(alto * dpr);
+        const cx2 = c.getContext("2d");
+        cx2.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
+        dibuja(cx2);
+        sprites.set(clave, sp = { c, ancho, alto, ox, oy });
+      }
+      g.drawImage(sp.c, x - sp.ox, y - sp.oy, sp.ancho, sp.alto);
     }
     const obs = typeof ResizeObserver === "function" ? new ResizeObserver(mide) : null;
     if (obs) obs.observe(lienzo); else window.addEventListener("resize", mide);
@@ -201,7 +223,7 @@ export function montarPinguino(h, api) {
       g.fillStyle = "#ff7aa255"; g.beginPath(); g.arc(-9, -38, 2.6, 0, 6.29); g.arc(9, -38, 2.6, 0, 6.29); g.fill();
       g.restore();
     }
-    function tempano(i, x, y, t, sobre) {
+    function dibujaTempano(g, i, x, y, sobre) {
       const s = esc() * tamTempano(i), rx = 46 * s, ry = 11 * s, alto = 9 * s;
       if (i === 0) {
         // la orilla: un iceberg con nieve
@@ -219,20 +241,46 @@ export function montarPinguino(h, api) {
       g.strokeStyle = sobre ? "#ffcf5a" : "#bfe3fb"; g.lineWidth = 1.6; g.stroke();
       g.fillStyle = "#ffffffaa"; g.beginPath(); g.ellipse(x - rx * 0.35, y - ry * 0.3, rx * 0.25, ry * 0.25, -0.2, 0, 6.29); g.fill();
     }
-    function etiqueta(x, y, txt, modo, t) {
+    function dibujaEtiqueta(g, txt, modo, w) {
       g.font = "800 13px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-      const w = g.measureText(txt).width + 16, alto = 22, pul = modo === "sig" ? 1 + 0.06 * Math.sin(t * 6) : 1;
-      g.save(); g.translate(x, y); g.scale(pul, pul);
+      const alto = 22;
+      g.save();
       g.fillStyle = modo === "sig" ? "#ffcf3f" : modo === "pasado" ? "#ffffff55" : modo === "meta" ? "#ff5c8a" : "#0b3a6bcc";
       if (modo === "sig") { g.shadowColor = "#ffcf3f"; g.shadowBlur = 14; }
       g.beginPath(); g.roundRect(-w / 2, -alto / 2, w, alto, 11); g.fill(); g.shadowBlur = 0;
       g.fillStyle = modo === "sig" ? "#3b2500" : "#fff"; g.fillText(txt, 0, 1);
       g.restore();
     }
+    function tempano(i, x, y, t, sobre) {
+      const s = esc() * tamTempano(i), rx = 46 * s, ry = 11 * s, alto = 9 * s;
+      const izq = Math.max(110 * 0.7 * s, rx * 1.05) + 4, der = rx * 1.05 + 4, arriba = (i === 0 ? 66 * s : ry) + 4, abajo = alto + 6 * s + ry * 0.7 + 4;
+      sprite("t" + i + (sobre ? "s" : ""), izq + der, arriba + abajo, izq, arriba, c => dibujaTempano(c, i, 0, 0, sobre), x, y);
+    }
+    let medidor = null;
+    function etiqueta(x, y, txt, modo, t) {
+      const clave = "e" + modo + txt;
+      if (!sprites.has(clave)) {
+        medidor = medidor || document.createElement("canvas").getContext("2d");
+        medidor.font = "800 13px system-ui, sans-serif";
+      }
+      const w = sprites.has(clave) ? 0 : medidor.measureText(txt).width + 16, borde = 16;
+      if (modo === "sig") { g.save(); g.translate(x, y); const pul = 1 + 0.06 * Math.sin(t * 6); g.scale(pul, pul); x = 0; y = 0; }
+      sprite(clave, w + 2 * borde, 22 + 2 * borde, w / 2 + borde, 11 + borde, c => dibujaEtiqueta(c, txt, modo, w), x, y);
+      if (modo === "sig") g.restore();
+    }
     function fondo(t, dt) {
-      const cielo = g.createLinearGradient(0, 0, 0, agua());
-      cielo.addColorStop(0, "#1a3a7a"); cielo.addColorStop(0.55, "#5aa3e0"); cielo.addColorStop(1, "#cfeeff");
-      g.fillStyle = cielo; g.fillRect(0, 0, W, agua() + 2);
+      if (!cielo) {
+        cielo = document.createElement("canvas"); cielo.width = lienzo.width; cielo.height = lienzo.height;
+        const c = cielo.getContext("2d");
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const ci = c.createLinearGradient(0, 0, 0, agua());
+        ci.addColorStop(0, "#1a3a7a"); ci.addColorStop(0.55, "#5aa3e0"); ci.addColorStop(1, "#cfeeff");
+        c.fillStyle = ci; c.fillRect(0, 0, W, agua() + 2);
+        const mar = c.createLinearGradient(0, agua(), 0, H);
+        mar.addColorStop(0, "#2a7cc2"); mar.addColorStop(1, "#0a2f5c");
+        c.fillStyle = mar; c.fillRect(0, agua(), W, H - agua());
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(cielo, 0, 0); g.setTransform(dpr, 0, 0, dpr, 0, 0);
       // la aurora
       for (let k = 0; k < 3; k++) {
         g.globalAlpha = 0.16; g.strokeStyle = ["#7dffcf", "#9b8cff", "#5cf2ff"][k]; g.lineWidth = 18 - k * 4;
@@ -249,10 +297,8 @@ export function montarPinguino(h, api) {
         g.beginPath(); g.moveTo(x, base); g.lineTo(x + ancho * 0.3, base - b.h * 60); g.lineTo(x + ancho * 0.5, base - b.h * 44); g.lineTo(x + ancho * 0.7, base - b.h * 70); g.lineTo(x + ancho, base); g.closePath(); g.fill();
       }
       g.globalAlpha = 1;
-      // el mar
-      const mar = g.createLinearGradient(0, agua(), 0, H);
-      mar.addColorStop(0, "#2a7cc2"); mar.addColorStop(1, "#0a2f5c");
-      g.fillStyle = mar; g.fillRect(0, agua(), W, H - agua());
+      // el mar (su degradado va en `cielo`, debajo de los icebergs lejanos)
+      g.fillStyle = "#2a7cc2"; g.fillRect(0, agua(), W, 2);
       g.strokeStyle = "#ffffff26"; g.lineWidth = 2;
       for (let k = 0; k < 5; k++) {
         const y = agua() + 14 + k * (H - agua()) / 5;
@@ -449,7 +495,7 @@ export function montarPinguino(h, api) {
       const e = api.economia(), rs = api.rondas();
       if (!e) return;
       retomada = true;
-      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "p" && x.estado === "juega" && x.valida).sort((a, b) => b.at - a.at)[0];
+      const r = api.mias().filter(x => x.j === "p" && x.estado === "juega" && x.valida)[0];
       if (!r || !rs[r.k]) return;
       const x = rs[r.k];
       activa = { k: r.k, r: { j: "p", p: x.p, d: x.d, at: x.at, s: Object.assign({}, x.s || {}) }, n: r.n };

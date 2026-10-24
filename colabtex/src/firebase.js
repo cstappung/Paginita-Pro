@@ -2,15 +2,32 @@
 /* Inicialización de Firebase: Auth (Google), Realtime Database,
    Storage y Analytics (opcional). */
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, connectAuthEmulator, getAdditionalUserInfo } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, connectAuthEmulator, getAdditionalUserInfo } from "firebase/auth";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getAnalytics, logEvent, isSupported as analyticsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
+/* La app de la pantalla de inicio del iPhone (`navigator.standalone`) no
+   puede iniciar sesión con la ventana emergente: iOS la abre en otro
+   contexto, Google termina allí y la ventana nunca vuelve a la app. Ahí se
+   inicia por redirección (`loginGoogle`), y para que Safari deje leer el
+   resultado al volver, el ayudante de Firebase (`/__/auth/…`) se sirve
+   desde el mismo dominio del sitio: lo copia el flujo
+   `.github/workflows/auth-firebase.yml` y `authDomain` pasa a ser
+   paginita-pro.cl. Con firebaseapp.com el resultado vive en almacenamiento
+   de terceros, que Safari parte por sitio, y la redirección volvía sin
+   sesión. Requiere `https://paginita-pro.cl/__/auth/handler` entre las
+   URI de redirección del cliente OAuth (firebase/CONFIGURAR-FIREBASE.md).
+   En el resto de navegadores todo sigue igual: ventana emergente y
+   firebaseapp.com. */
+const DOMINIO_PROPIO = "paginita-pro.cl";
+export const conRedireccion = typeof navigator !== "undefined" && navigator.standalone === true &&
+  typeof location !== "undefined" && location.hostname === DOMINIO_PROPIO;
+
 const firebaseConfig = {
   apiKey: "AIzaSyDxarTG8KMwolWzdYT8eLwgX1wReQLF8Bc",
-  authDomain: "mi-pagina-pro.firebaseapp.com",
+  authDomain: conRedireccion ? DOMINIO_PROPIO : "mi-pagina-pro.firebaseapp.com",
   databaseURL: "https://mi-pagina-pro-default-rtdb.firebaseio.com",
   projectId: "mi-pagina-pro",
   storageBucket: "mi-pagina-pro.firebasestorage.app",
@@ -92,7 +109,15 @@ export function watchAuth(cb) {
 export async function loginGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
+  /* En la app del iPhone la página se va a Google y vuelve: la promesa no
+     llega a cumplirse (la sesión entra sola al volver, y `resultadoLogin`
+     trae lo que traería el resultado de la ventana). */
+  if (conRedireccion) return signInWithRedirect(auth, provider);
   return signInWithPopup(auth, provider);
+}
+/* El resultado de una redirección que acaba de volver (null si no hubo). */
+export function resultadoLogin() {
+  return conRedireccion ? getRedirectResult(auth) : Promise.resolve(null);
 }
 
 export function logout() {

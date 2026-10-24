@@ -22,6 +22,14 @@
   function guarda(k, v) { try { localStorage.setItem(clave(k), JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } }
   const local = lee('dosmil.datos') || {};
   let prog = M.mezclaProgreso(local.prog, null);
+  // Lo que se jugó como invitado en esta pestaña, si se acaba de iniciar
+  // sesión (Club.deInvitado): el progreso se junta con el de la cuenta. La
+  // partida a medias no: su semilla es de la cuenta «invitado» (su mejor
+  // puntaje ya pasó a la tabla con su prueba).
+  try {
+    const previo = Club && Club.deInvitado ? JSON.parse(Club.deInvitado('dosmil.datos') || 'null') : null;
+    if (previo && previo.prog) prog = M.mezclaProgreso(prog, previo.prog);
+  } catch (_) { /* nada que adoptar */ }
   let ultimaSubida = '';
 
   /* ---------- Estado ---------- */

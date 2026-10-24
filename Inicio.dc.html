@@ -2,31 +2,64 @@
 <html>
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610182253"></script>
+<script src="i18n.js?v=202610232129"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paginita Pro</title>
+<link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="marca/favicon-64.png">
+<link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Creepster&amp;display=swap" rel="stylesheet">
   <style>
     html,body{margin:0;padding:0}
     a{color:#7ab8ff;text-decoration:none}
     a:hover{color:#a8cfff}
+    /* La tienda de Halloween de Juegos (edición limitada): se ve solo
+       mientras vende; la hora de cierre es VENTA_HALLOWEEN.hasta de
+       colabtex/src/juegos/tienda.js, repetida en renderVals. */
+    .pp-hw{position:relative;display:flex;align-items:center;gap:18px;margin:0 0 30px;padding:18px 22px;border-radius:14px;overflow:hidden;isolation:isolate;color:#fff;background:radial-gradient(ellipse 40% 140% at 8% 50%,#9a341299,transparent 70%),linear-gradient(100deg,#1a0730,#2e0b4a 55%,#4a1607);box-shadow:0 0 0 1px #f9731677,0 10px 30px #00000066;transition:transform .15s}
+    .pp-hw:hover{color:#fff;transform:translateY(-2px)}
+    .pp-hw::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 2px #fb923c,inset 0 0 34px #f9731666;opacity:0;animation:ppRespira 3s ease-in-out infinite}
+    .pp-hw-luna{position:absolute;right:26%;top:10px;z-index:-1;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 36% 34%,#fffbeb,#fde68a 55%,#f59e0b);box-shadow:0 0 22px 4px #fbbf2444}
+    .pp-hw-murc{position:absolute;left:0;top:14px;z-index:-1;font-size:18px;animation:ppVuela 11s linear infinite}
+    .pp-hw-murc.m2{top:52px;font-size:13px;animation-duration:15s;animation-delay:-6s}
+    .pp-hw-cal{font-size:40px;line-height:1;animation:ppSalta 2.4s ease-in-out infinite}
+    .pp-hw-tit{font-family:'Creepster','IBM Plex Sans',sans-serif;font-size:32px;line-height:1;letter-spacing:.03em;color:#fb923c;text-shadow:0 0 14px #f97316aa,0 3px 0 #7c2d12}
+    .pp-hw-btn{position:relative;flex:0 0 auto;padding:11px 18px;border-radius:99px;font-weight:700;font-size:14px;color:#1a0700;background:linear-gradient(180deg,#fdba74,#f97316);box-shadow:0 4px 0 #9a3412,0 0 20px #f9731688;overflow:hidden}
+    @keyframes ppRespira{50%{opacity:1}}
+    @keyframes ppVuela{from{transform:translateX(-40px)}to{transform:translateX(1100px)}}
+    @keyframes ppSalta{0%,60%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-6px) rotate(-8deg)}45%{transform:translateY(0) rotate(4deg)}}
+    @media (max-width:640px){.pp-hw{flex-wrap:wrap;padding:16px}.pp-hw-btn{width:100%;text-align:center}.pp-hw-tit{font-size:27px}}
+    @media (prefers-reduced-motion:reduce){.pp-hw *,.pp-hw::after{animation:none!important}}
   </style>
 </helmet>
 <div style="min-height:100vh;background:#0d1117;color:#e6edf3;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column" data-screen-label="Menu principal">
   <header style="display:flex;align-items:center;gap:14px;padding:26px 48px;border-bottom:1px solid #1c2530">
-    <div style="width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-weight:700;font-size:15px;color:#ffffff">L</div>
+    <img src="marca/paginita-pro-128.png" alt="" width="40" height="40" style="display:block;width:40px;height:40px">
     <div style="display:flex;flex-direction:column">
-      <span style="font-weight:700;font-size:16px;letter-spacing:0.02em">Laboratorio</span>
+      <span style="font-weight:700;font-size:16px;letter-spacing:0.02em" translate="no">Paginita Pro</span>
       <span style="font-size:11.5px;color:#7d8896">estación de trabajo local · aplicaciones</span>
     </div>
   </header>
 
   <main style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:48px;max-width:1060px;width:100%;margin:0 auto;box-sizing:border-box">
+    <sc-if value="{{ tiendaHw }}" hint-placeholder-val="{{ true }}">
+      <a href="juegos.html#tienda" class="pp-hw">
+        <span class="pp-hw-luna"></span><span class="pp-hw-murc">🦇</span><span class="pp-hw-murc m2">🦇</span>
+        <span class="pp-hw-cal">🎃</span>
+        <span style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+          <span style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#fdba74">EDICIÓN LIMITADA · SOLO HASTA EL 1 DE NOVIEMBRE</span>
+          <span class="pp-hw-tit">Tienda de Halloween</span>
+          <span style="font-size:13px;line-height:1.45;color:#e9d5ff">Marcos y fondos animados para tu perfil de Juegos que no volverán. Lo que compres es tuyo para siempre.</span>
+        </span>
+        <span class="pp-hw-btn">Ver la tienda →</span>
+      </a>
+    </sc-if>
     <h1 style="font-size:26px;font-weight:600;margin:0 0 6px">Aplicaciones</h1>
     <p style="font-size:13.5px;color:#8b96a5;margin:0 0 30px">Elige una herramienta para empezar a trabajar.</p>
 
@@ -140,7 +173,7 @@
   </main>
 
   <footer style="padding:18px 48px;border-top:1px solid #1c2530;font-size:11px;color:#5c6875;display:flex;justify-content:space-between">
-    <span>Laboratorio · entorno local</span>
+    <span>Paginita Pro · entorno local</span>
     <span style="font-family:'IBM Plex Mono',monospace">v0.1</span>
   </footer>
 </div>
@@ -148,7 +181,7 @@
 <script type="text/x-dc" data-dc-script data-props="{&quot;showGhost&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Menú&quot;}}">
 class Component extends DCLogic {
   renderVals() {
-    return { showGhost: this.props.showGhost ?? true };
+    return { showGhost: this.props.showGhost ?? true, tiendaHw: Date.now() < 1793588400000 };
   }
 }
 </script>

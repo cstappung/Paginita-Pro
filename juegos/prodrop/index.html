@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610182253"></script>
+<script src="../../i18n.js?v=202610232129"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-19">
+<link rel="stylesheet" href="style.css?v=pd-30">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -78,6 +78,8 @@
       <div id="cant" class="cant" role="group" aria-label="Cuántos sobres abrir juntos"></div>
       <div class="buy-btns"><button id="freeBtn" class="btn free">🎁 Sobre gratis</button><button id="buyBtn" class="btn primary">Comprar sobre</button></div>
       <p id="buyInfo" class="buy-info"></p>
+      <button id="plantBtn2" class="link" hidden>⚽ Mi plantilla</button>
+      <div id="fuInfo" class="fu-info" hidden><button id="fuTipBtn" class="link">ⓘ Probabilidades del sobre</button><button id="fuNovBtn" class="link">📋 Novedades</button></div>
       <button id="cambiaBtn" class="link cambia">⇄ Cambiar sobre</button>
     </div>
     <div class="controls">
@@ -96,6 +98,7 @@
       <button id="againBtn" class="btn primary">Abrir otro sobre ✳</button>
       <button id="colBtn2" class="btn">Ver colección</button>
       <button id="rrBtn2" class="btn rr-btn">♻ Re-roll</button>
+      <button id="plantBtn" class="btn pl-btn" hidden>⚽ Mi plantilla</button>
       <button id="cambiaBtn2" class="btn">Cambiar sobre</button>
     </div>
   </section>
@@ -127,6 +130,26 @@
     <div id="rrBody" class="rr-body"></div>
   </div>
 </div>
+<div id="fuModal" class="overlay mk" hidden>
+  <div class="mk-panel fu-modal">
+    <div class="mk-head">
+      <div><h2 id="fuModalTit"></h2><p>Sobre de Fútbol · Especial Superclásico</p></div>
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div id="fuModalTxt" class="fu-tip"></div>
+  </div>
+</div>
+<div id="plantilla" class="overlay mk" hidden>
+  <div class="mk-panel pl-panel">
+    <div class="mk-head">
+      <div><h2>Mi plantilla</h2><p>4-3-3 · toca una casilla para poner o cambiar un jugador. Se ve en tu perfil.</p></div>
+      <b id="plPuntos" class="pl-puntos" title="Promedio de las once: la rareza pone el techo (común 60, rara 80, épica 100) y el estado lo escala"></b>
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div id="plCancha" class="pl-cancha"></div>
+    <div id="plElige" class="pl-elige" hidden></div>
+  </div>
+</div>
 <div id="ruleta" class="ruleta" hidden aria-live="polite">
   <p id="rlTitulo" class="rl-titulo">Re-roll</p>
   <div class="rl-ventana"><div id="rlTira" class="rl-tira"></div><i class="rl-marca" aria-hidden="true"></i></div>
@@ -148,12 +171,12 @@
     <div class="col-bar"><i id="colBar"></i></div>
     <div id="colFilters" class="col-filters"></div>
     <div id="colGrid" class="col-grid"></div>
-    <details class="odds"><summary>Probabilidades y reglas de los sobres</summary><p><span class="solo-serie1">Dos colecciones, cada una con su sobre: <b>Profes</b> (170 cartas: Original, Dibujo y Anime comunes; Calvo y Springfield raras; Los Santos, Cyberpunk, High Roller y Star Wars épicas; Shiny legendarias) y </span><b>Componentes</b> (275 cartas, 25 componentes en 11 temáticas: Realista, Bioware y Esquemático comunes; Pixel Art, Void y Bélico raras; Halloween, Dieciochero y Arcano épicas; Quemado y Navidad legendarias, y de cada cuatro legendarias de componentes solo una es de Navidad). El sobre trae cartas solo de su colección; el re-roll toma diez de una misma colección y da una de esa colección.<br>Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.<br>Re-roll: diez cartas de una misma rareza (común, rara o épica) se cambian por una de rareza superior: de común sale rara el 92 % de las veces, épica el 7,5 % y legendaria el 0,5 %; de rara, épica el 96 % y legendaria el 4 %; de épica, siempre legendaria. Dentro de la rareza, cualquier carta con la misma probabilidad. Su nota oculta sale de las diez que entraron: alrededor de su promedio más un punto (con diez notas que promedian 5,4, sale 6 o 7 el 57 % de las veces, 5 u 8 el 31 %, 4 o 9 el 10 %).</p></details>
+    <details class="odds"><summary>Probabilidades y reglas de los sobres</summary><p><span class="solo-serie1">Dos colecciones, cada una con su sobre: <b>Profes</b> (170 cartas: Original, Dibujo y Anime comunes; Calvo y Springfield raras; Los Santos, Cyberpunk, High Roller y Star Wars épicas; Shiny legendarias) y </span><b>Componentes</b> (275 cartas, 25 componentes en 11 temáticas: Realista, Bioware y Esquemático comunes; Pixel Art, Void y Bélico raras; Halloween, Dieciochero y Arcano épicas; Quemado y Navidad legendarias, y de cada cuatro legendarias de componentes solo una es de Navidad). <b>Fútbol</b> (159 cartas: los 53 jugadores del primer equipo del Real Madrid y del Barça, cada uno en Común, Rara y Épica; no hay legendarias, y lo que saldría legendaria sale épica). El sobre trae cartas solo de su colección; el re-roll toma diez de una misma colección y da una de esa colección.<br>Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.<br>Re-roll: diez cartas de una misma rareza (común, rara o épica) se cambian por una de rareza superior: de común sale rara el 92 % de las veces, épica el 7,5 % y legendaria el 0,5 %; de rara, épica el 96 % y legendaria el 4 %; de épica, siempre legendaria. Dentro de la rareza, cualquier carta con la misma probabilidad. Su nota oculta sale de las diez que entraron: alrededor de su promedio más un punto (con diez notas que promedian 5,4, sale 6 o 7 el 57 % de las veces, 5 u 8 el 31 %, 4 o 9 el 10 %).</p></details>
   </div>
 </div>
 
-<script src="motor.js?v=pd-19"></script>
-<script src="app.js?v=pd-19"></script>
-<script src="revela.js?v=pd-19"></script>
+<script src="motor.js?v=pd-30"></script>
+<script src="app.js?v=pd-30"></script>
+<script src="revela.js?v=pd-30"></script>
 </body>
 </html>

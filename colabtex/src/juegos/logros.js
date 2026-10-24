@@ -61,6 +61,10 @@ const mzMios = c => (c.est.historial || []).flatMap(h => h.memes).filter(m => m.
 const mzMejor = h => { const o = h.memes.slice().sort((a, b) => b.total - a.total); return o[0] && o[0].total > 0 && (!o[1] || o[1].total < o[0].total) ? o[0].uid : ""; };
 /* Pokémon: el resumen que el motor saca del registro de Showdown. */
 const pkDe = c => { const i = (c.est.lados || []).indexOf(c.me); return (i >= 0 && c.est.resumen && c.est.resumen[i]) || {}; };
+/* Pool: el bando de `me` (0 o 1) y las bolas que cada bando embolsó
+   (`hist` guarda quién tiraba, no de qué grupo era la bola). */
+const plBando = c => ((c.est.equipos || {}).de || {})[c.me] === "a" ? 0 : ((c.est.equipos || {}).de || {})[c.me] === "b" ? 1 : -1;
+const plRacha = c => { const t = plBando(c); let m = 0, r = 0; for (const h of c.hist) { r = h.t === t && h.id !== 8 ? r + 1 : 0; if (r > m) m = r; } return m; };
 const SALA = {
   orbita: [
     { id: "racimo", n: "Racimo", d: "Captura 3 estrellas o más con un solo lanzamiento.", i: "✨", x: c => orEv(c, e => e.k === "estrella" && e.nueva && e.u === c.me && e.n >= 3) },
@@ -191,6 +195,14 @@ const SALA = {
     { id: "barredor", n: "Barredor", d: "Un mismo Pokémon tuyo debilita a tres rivales en una pelea.", i: "🧹", x: c => pkDe(c).maxKo >= 3 },
     { id: "limite", n: "Al límite", d: "Gana con un solo Pokémon en pie.", i: "🫀", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).vivos === 1 },
     { id: "impecable", n: "Impecable", d: "Gana sin que se debilite ninguno de tus Pokémon.", i: "👑", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).perdidos === 0 }
+  ],
+  pool: [
+    { id: "ocho", n: "Ocho cantado", d: "Gana metiendo la 8 en la tronera que cantaste.", i: "🎱", x: c => c.gano && c.est.motivo === "ocho" },
+    { id: "paliza", n: "Paliza", d: "Gana sin que el rival haya embolsado una sola bola.", i: "🧹", x: c => c.gano && c.est.motivo === "ocho" && !c.hist.some(h => h.t === 1 - plBando(c) && h.id !== 8) },
+    { id: "serie", n: "Tirada de cinco", d: "Embolsa cinco bolas seguidas, sin que el rival embolse ninguna entre medias.", i: "🔥", x: c => plRacha(c) >= 5 },
+    { id: "parejas", n: "Mejor en pareja", d: "Gana una partida de dos contra dos.", i: "🤝", x: c => c.gano && !!c.est.dos },
+    { id: "pelos", n: "Por los pelos", d: "Gana cuando al rival solo le quedaba la 8 por embolsar.", i: "😅", x: c => { if (!c.gano) return false; const g = c.est.grupos || {}, b = plBando(c) === 0 ? "b" : "a", r = c.est.restan || {}; return !!g[b] && r[g[b]] === 0; } },
+    { id: "regalo", n: "Regalo del rival", d: "Gana porque el rival metió la 8 antes de tiempo.", i: "🎁", x: c => c.gano && ["ocho-pronto", "ocho-mal", "ocho-falta"].includes(c.est.motivo) }
   ],
   ajedrez: [
     { id: "mate", n: "Jaque mate", d: "Gana una partida dando mate.", i: "♚", x: c => c.gano && c.est.motivo === "mate" },
@@ -383,6 +395,20 @@ const SOLO = {
     { id: "p15000", n: "Alta tensión", d: "Junta 15 000 puntos.", i: "🏭", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 15000 },
     { id: "p40000", n: "Rayo", d: "Junta 40 000 puntos.", i: "🌩️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 40000 }
   ],
+  /* La racha sale de club-integral-racha (días resueltos seguidos); el
+     resto, de club-integral-puntos, la suma de todos los días. */
+  integral: [
+    { id: "dia1", n: "Primera primitiva", d: "Resuelve la integral de un día.", i: "∫", m: "Racha", s: cat(/-racha$/) },
+    { id: "racha3", n: "Más C", d: "Llega a una racha de 3 días.", i: "➕", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
+    { id: "racha7", n: "Semana integrable", d: "Llega a una racha de 7 días.", i: "📅", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
+    { id: "racha14", n: "Por partes", d: "Llega a una racha de 14 días.", i: "🧩", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 14 },
+    { id: "racha30", n: "Convergente", d: "Llega a una racha de 30 días.", i: "♾️", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 30 },
+    { id: "p300", n: "Cambio de variable", d: "Junta 300 puntos.", i: "🔁", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 300 },
+    { id: "p1000", n: "Fracciones parciales", d: "Junta 1000 puntos.", i: "➗", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1000 },
+    { id: "p3000", n: "Sustitución trigonométrica", d: "Junta 3000 puntos.", i: "📐", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 3000 },
+    { id: "p8000", n: "Cálculo III", d: "Junta 8000 puntos.", i: "📓", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 8000 },
+    { id: "p20000", n: "Riemann", d: "Junta 20 000 puntos.", i: "🎓", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
+  ],
   /* La racha sale de las seis tablas instalación × nivel; el total de
      victorias, de club-frontera-victorias. */
   frontera: [
@@ -486,6 +512,21 @@ const SOLO = {
     { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
     { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
   ],
+  /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
+     puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un
+     nivel limpio da unos 4 000; los fantasmas y la racha, el resto. */
+  propac: [
+    { id: "p1k", n: "Primer bocado", d: "Haz 1 000 puntos en una partida.", i: "🟡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1000 },
+    { id: "p5k", n: "Waka waka", d: "Haz 5 000 puntos en una partida.", i: "👻", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 5000 },
+    { id: "p10k", n: "Vida extra", d: "Haz 10 000 puntos en una partida.", i: "💛", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
+    { id: "p25k", n: "Neón encendido", d: "Haz 25 000 puntos en una partida.", i: "💡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 25000 },
+    { id: "p50k", n: "Rey del laberinto", d: "Haz 50 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 50000 },
+    { id: "p100k", n: "Leyenda arcade", d: "Haz 100 000 puntos en una partida.", i: "🕹️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100000 },
+    { id: "p200k", n: "Insert coin", d: "Haz 200 000 puntos en una partida.", i: "🪙", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 200000 },
+    { id: "t3", n: "Escurridizo", d: "Tu partida récord dura 3 minutos de juego.", i: "⏱️", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 180000 },
+    { id: "t6", n: "Glitch te conoce", d: "Tu partida récord dura 6 minutos de juego.", i: "📺", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 360000 },
+    { id: "t10", n: "Maratón de neón", d: "Tu partida récord dura 10 minutos de juego.", i: "🌃", m: "Aguante", s: d => cat(/-puntos$/)(d) && d.tiempo >= 600000 }
+  ],
   /* PRO TILES. Los siete primeros salen de cualquier canción suelta (las
      estrellas, coronas y el mundo del juego: 100 250 450 700 1000 1400
      2000); los tres últimos, de la mezcla de las ocho. */
@@ -583,7 +624,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

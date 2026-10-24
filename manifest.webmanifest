@@ -1,0 +1,17 @@
+{
+  "name": "Paginita Pro · Juegos",
+  "short_name": "Paginita Pro",
+  "description": "Juegos para jugar solo o con amigos en línea, gratis y sin instalar nada.",
+  "lang": "es",
+  "start_url": "/juegos.html?desde=app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1d1529",
+  "theme_color": "#1d1529",
+  "icons": [
+    { "src": "/marca/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/paginita-pro.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -60,7 +60,7 @@
 import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
-  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded,
+  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved,
   limitToLast, limitToFirst, startAt, endAt, goOffline
 } from "firebase/database";
 import {
@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;
@@ -338,24 +338,69 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 12;
-export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {}, casino: {} }, err = {}, llegados = new Set();
+const NODOS_MONEDAS = 16, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+export function watchLogros(cb, yo = () => "") {
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
-  /* El casino cambia varias veces por segundo mientras alguien vuela (cada
-     aviso del avión es una escritura) y cada cambio rehace la economía de
-     todos: se junta lo que llega en un segundo y se avisa una vez. */
-  let espera = 0;
+  /* El casino cambia varias veces por segundo mientras alguien juega (cada
+     aviso del avión, salto del pingüino o bola es una escritura) y cada
+     aviso rehace la economía y repinta todo lo que la escucha, en cada
+     pestaña abierta del sitio. Así que se escucha cuenta por cuenta
+     (`casino/<uid>`): lo que llega se guarda como instantánea y se vuelve
+     objeto (`val()`) recién al avisar, solo para las cuentas que cambiaron;
+     las demás conservan su objeto, que es lo que deja a monedas.js no
+     volver a mirar sus rondas. `val()` del nodo entero copiaba las rondas
+     de todo el mundo en cada escritura de cualquiera. Se avisa juntado: al
+     segundo si cambió lo propio (`yo()`: el casino de esta pestaña lo espera), a
+     los `CASINO_AJENO` ms si solo jugó otra persona, y nunca con la
+     pestaña escondida (se avisa al volver). */
+  const rC = ref(db, "casino"), pend = new Map();
+  let espera = 0, cuando = 0;
+  const vuelca = () => {
+    clearTimeout(espera); espera = 0; cuando = 0;
+    if (!pend.size) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const c = Object.assign({}, d.casino);
+    for (const [u, sn] of pend) { const v = sn && sn.val(); if (v) c[u] = v; else delete c[u]; }
+    pend.clear(); d.casino = c;
+    avisa();
+  };
+  const programa = u => {
+    if (!llegados.has("casino")) return;
+    const en = Date.now() + (u && u === yo() ? CASINO_PROPIO : CASINO_AJENO);
+    if (espera && cuando <= en) return;
+    clearTimeout(espera); cuando = en; espera = setTimeout(vuelca, en - Date.now());
+  };
+  const alCambiar = sn => { pend.set(sn.key, sn); programa(sn.key); };
+  const alQuitar = sn => { pend.set(sn.key, null); programa(sn.key); };
+  const falla = e => { err.casino = e; if (!llegados.has("casino")) { llegados.add("casino"); avisa(); } };
+  const alVolver = () => { if (!document.hidden && pend.size && llegados.has("casino") && !espera) vuelca(); };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", alVolver);
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
     d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
-    if (k === "casino" && llegados.has(k)) { if (!espera) espera = setTimeout(() => { espera = 0; avisa(); }, 1000); return; }
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"), oye("casino", "casino")];
-  return () => { clearTimeout(espera); offs.forEach(f => f()); };
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"),
+    onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
+    /* La primera lectura entera: los eventos de hijo de esa carga ya
+       llegaron todos cuando llega este, que es el que la da por completa.
+       No se lee el valor: las instantáneas pendientes ya lo traen. */
+    onValue(rC, () => {
+      if (llegados.has("casino")) return;
+      const c = {};
+      for (const [u, sn] of pend) { const v = sn && sn.val(); if (v) c[u] = v; }
+      pend.clear(); d.casino = c; err.casino = null;
+      llegados.add("casino"); avisa();
+    }, falla, { onlyOnce: true })];
+  return () => {
+    clearTimeout(espera);
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", alVolver);
+    offs.forEach(f => f());
+  };
 }
 
 /* ---------- el casino ----------
@@ -380,11 +425,47 @@ export async function marcaCasino(uid, k, ruta, extra) {
 }
 export const leeRondaCasino = (uid, k) => get(ref(db, `casino/${uid}/${k}`)).then(s => s.val());
 
+/* Los referidos (juegos/referidos.js). El código propio va en una sola
+   escritura a dos sitios, `referidos/c/<código>` = uid y
+   `referidos/m/<uid>` = {c, at}: la regla de cada uno mira el otro, así
+   que ni se reserva un código sin que sea el tuyo ni se tiene más de uno.
+   Usar el de otro es `referidos/u/<uid>` = {c, r, at}, una vez. */
+export async function configuraCodigo(uid, c) {
+  await update(ref(db), { [`referidos/c/${c}`]: uid, [`referidos/m/${uid}`]: { c, at: serverTimestamp() } });
+}
+export async function usaCodigo(uid, c, r) {
+  await set(ref(db, `referidos/u/${uid}`), { c, r, at: serverTimestamp() });
+}
+export const leeReferidos = () => get(ref(db, "referidos")).then(s => s.val() || {});
+
 /* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. La regla
    exige `at === now` y el precio; el saldo lo repasa `economia()`. */
 export async function comprarTienda(uid, item, p) {
   await set(ref(db, `tienda/${uid}/${item}`), { at: serverTimestamp(), p });
 }
+
+/* Los cofres de tacos de Pool: `cofres/<uid>/<clave>` = {at, p}. La regla
+   exige `at === now` y el precio; el saldo y el premio los decide
+   `economia()` con `abreCofre`. Devuelve la hora que puso el servidor. */
+export async function comprarCofre(uid, clave, p) {
+  const r = ref(db, `cofres/${uid}/${clave}`);
+  await set(r, { at: serverTimestamp(), p });
+  return (await get(r)).val();
+}
+/* ---------- Batalla de Rock (el fondo de PRO HERO) ----------
+   `rock/c/<uid>/<clave>` = {at, p, b}: una caja comprada; lo que trae lo
+   deriva `cajaRock` (juegos/rock-datos.js) con esa hora del servidor.
+   `rockLook/<uid>`: el rockero guardado, un JSON. Lo lee cualquiera con
+   sesión **por clave** (la sala muestra el del rival), nunca la colección. */
+export const comprarCajaRock = (uid, b) =>
+  escribeYLee(push(ref(db, `rock/c/${uid}`)), { at: serverTimestamp(), p: 500, b });
+export const guardaRockLook = (uid, json) => set(ref(db, `rockLook/${uid}`), json);
+export const leeRockLook = uid => get(ref(db, `rockLook/${uid}`)).then(s => s.val(), () => null);
+
+/* El taco equipado: `users/<uid>/taco` (un id). Fuera de `perfil` a propósito:
+   guardar el perfil lo reescribe entero y se llevaría el taco. */
+export const equiparTaco = (uid, id) => set(ref(db, `${U}/${uid}/taco`), id);
+export const watchTaco = (uid, cb) => onValue(ref(db, `${U}/${uid}/taco`), s => cb(s.val()), () => cb(null));
 
 /* ---------- PRODROP: sobres y graduaciones ----------
    `cartas/s/<uid>/<clave>` = {at, p}: un sobre comprado. `at` lo pone el
@@ -450,6 +531,8 @@ export const aceptarCambio = id => set(ref(db, `mercado/t/${id}/ok`), serverTime
 export const cerrarCambio = id => set(ref(db, `mercado/t/${id}/x`), serverTimestamp());
 /* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
 export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
+/* La plantilla de fútbol: {casilla (0 a 10): copia}; las vacías no se escriben. */
+export const ponerPlantilla = (uid, porCasilla) => set(ref(db, `${U}/${uid}/perfil/plantilla`), Object.keys(porCasilla).length ? porCasilla : null);
 
 /* ---------- Mascotas ----------
    Tres gastos de una sola escritura, como los sobres: `mascotas/a/<uid>/<k>`
@@ -491,6 +574,39 @@ export const watchPrefsMascotas = (uid, cb) =>
 export const guardaPrefsMascotas = (uid, p) => update(ref(db, `${U}/${uid}/mascotas`), p);
 export const usaComidaMascota = (uid, n = 1) =>
   runTransaction(ref(db, `${U}/${uid}/mascotas/usadas`), v => (Number.isFinite(v) ? v : 0) + n);
+/* El Pueblo de Mascotas. La plaza: `mascotasPlaza/<uid>` = {m, x, z, at,
+   em?, ea?, b?, t?, ta?} es quién pasea, adónde va y su último gesto. Se
+   reescribe al caminar (con respiro) y cada tanto para seguir «fresco», y
+   se borra al salir o al desconectarse (`onDisconnect`). Se lee solo con
+   la consulta de los PLAZA_CUPO más recientes (la regla exige
+   `orderByChild('at')` y `limitToLast` ≤ 40: `query.startAt` no se deja
+   comparar en las reglas); los que no están frescos los descarta quien
+   lee, así que una pestaña colgada se cae sola de la plaza. */
+export const PLAZA_FRESCO = 3 * 60 * 1000;
+export const PLAZA_CUPO = 40;
+export function ponPlazaMascota(uid, x) {
+  const r = ref(db, `mascotasPlaza/${uid}`);
+  onDisconnect(r).remove().catch(() => {});
+  return set(r, Object.assign({}, x, { at: serverTimestamp() }));
+}
+export function salePlazaMascotas(uid) {
+  const r = ref(db, `mascotasPlaza/${uid}`);
+  onDisconnect(r).cancel().catch(() => {});
+  return remove(r).catch(() => {});
+}
+export function watchPlazaMascotas(cb) {
+  const q = query(ref(db, "mascotasPlaza"), orderByChild("at"), limitToLast(PLAZA_CUPO));
+  return onValue(q, s => cb(s.val() || {}, null), err => cb({}, err));
+}
+/* Los cariños: `mascotasCarinos/<dueño>/<clave>/<visita>` = {at}, uno al
+   día por visita y mascota (lo exige la regla). El dueño lee los suyos
+   enteros; de una mascota ajena se lee solo esa clave. */
+export const watchCarinosMascotas = (uid, cb) =>
+  onValue(ref(db, `mascotasCarinos/${uid}`), s => cb(s.val() || {}, null), err => cb({}, err));
+export const leeCarinosMascota = (dueno, k) =>
+  get(ref(db, `mascotasCarinos/${dueno}/${k}`)).then(s => s.val() || {}).catch(() => ({}));
+export const daCarinoMascota = (dueno, k, uid) =>
+  set(ref(db, `mascotasCarinos/${dueno}/${k}/${uid}`), { at: serverTimestamp() });
 
 /* ---------- días jugando ----------
    `diario/<uid>` = {dia, racha, mejor, dias, bono, at}. La regla exige que
@@ -537,6 +653,18 @@ export const ponFotoPerfil = (uid, foto) => set(ref(db, `${U}/${uid}/perfil/foto
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 
+/* Solo el apodo (el nombre que eligió jugando como invitado, al crear la
+   cuenta: `ofreceApodo` en juegos-main.js). La regla de `nick` ya existía. */
+export const ponNickPerfil = (uid, nick) =>
+  update(ref(db, `${U}/${uid}/perfil`), { nick: String(nick || "").slice(0, 24), at: Date.now() });
+
+/* Solo el marco o solo el fondo (la tienda de Halloween: «ponérmelo»), sin
+   reescribir el resto del perfil. Los dos ya tenían su regla. */
+export const ponEnPerfil = (uid, campo, valor) => {
+  if (campo !== "marco" && campo !== "fondo") return Promise.reject(new Error("campo"));
+  return update(ref(db, `${U}/${uid}/perfil`), { [campo]: valor, at: Date.now() });
+};
+
 /* La partida a medias de un juego del club (hoy, BBTAN), para seguirla otro
    día. Va bajo users/<uid>, que ya solo escribe su dueño: no hizo falta tocar
    las reglas. Con `d` nulo queda solo `at`, una lápida que le dice al otro
@@ -574,7 +702,7 @@ export function watchPerfil(uid, cb) {
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
 const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil", "ritmo",
-  "color", "variante", "largo", "meta", "exp", "baraja", "amable", "puerto", "formato", "rondas", "acumula", "sprint"]
+  "color", "variante", "largo", "meta", "exp", "baraja", "amable", "puerto", "formato", "rondas", "acumula", "sprint", "guia", "pareja"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */
@@ -622,6 +750,9 @@ function vigilaVetados(cb) {
   return () => vetadosOyentes.delete(cb);
 }
 export const estaVetado = uid => vetadosSet.has(uid);
+/* Para quien suma tablas por su cuenta (la general por podios): avisa
+   cuando cambia la lista de vetados. */
+export const watchVetados = cb => vigilaVetados(cb);
 
 /* Récord por categoría; la transacción conserva el mejor entre pestañas. */
 export function watchSolo(categoria, cb) {
@@ -739,12 +870,33 @@ export function watchRepeticiones(categoria, cb) {
    mensaje de esa cuenta (rieles-datos.js). Se escuchan los de los últimos
    minutos (con tope), y la escucha se rehace de vez en cuando para que la
    ventana no crezca con la sesión. */
-export function mandaChatGeneral(quien, texto, largo) {
+export function mandaChatGeneral(quien, texto, largo, superP) {
   const k = push(ref(db, "chatGeneral")).key;
-  return update(ref(db), {
-    [`chatGeneral/${k}`]: { uid: quien.uid, n: String(quien.nombre || "Jugador").slice(0, 80), t: String(texto).slice(0, largo), at: serverTimestamp() },
-    [`chatGeneralUlt/${quien.uid}`]: { at: serverTimestamp(), k }
-  });
+  const msg = { uid: quien.uid, n: String(quien.nombre || "Jugador").slice(0, 80), t: String(texto).slice(0, largo), at: serverTimestamp() };
+  const cambios = { [`chatGeneral/${k}`]: msg, [`chatGeneralUlt/${quien.uid}`]: { at: serverTimestamp(), k } };
+  /* Un super chat (rieles-datos.js, `SUPER_CHAT`): el mensaje dice su
+     precio y el cobro va al lado, con la misma clave, en la misma
+     actualización; las reglas exigen que coincidan. */
+  if (superP) {
+    msg.s = superP; msg.sa = serverTimestamp();
+    cambios[`superChat/${quien.uid}/${k}`] = { at: serverTimestamp(), p: superP };
+  }
+  return update(ref(db), cambios);
+}
+/* Los super chats que aún duran: los que tienen `sa` desde hace menos que
+   el más largo de los niveles. Una escucha aparte de la de 15 minutos, para
+   no bajar horas de chat por unos pocos mensajes. */
+export function watchSuperChats(desde, max, cb) {
+  let v = null;
+  const emite = () => { if (v) cb(v.filter(m => !vetadosSet.has(m.uid)), null); };
+  const offV = vigilaVetados(emite);
+  const q = query(ref(db, "chatGeneral"), orderByChild("sa"), startAt(desde), limitToLast(max));
+  const off = onValue(q, s => {
+    v = [];
+    s.forEach(h => { v.push(Object.assign({ id: h.key }, h.val())); });
+    emite();
+  }, err => cb([], err));
+  return () => { off(); offV(); };
 }
 export const leerUltimoChatGeneral = uid => get(ref(db, `chatGeneralUlt/${uid}`)).then(s => s.val());
 export function watchChatGeneral(desde, max, cb) {

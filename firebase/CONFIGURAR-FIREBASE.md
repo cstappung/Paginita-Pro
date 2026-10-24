@@ -159,6 +159,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > juego funciona igual, pero los récords se quedan en el dispositivo y se
 > sincronizan solos la próxima vez que se abra después de publicarlas.
 
+> **Integrodle (21 de octubre de 2026):** `club-integral-racha` y
+> `club-integral-puntos` son categorías nuevas de `soloRanks` y
+> `soloPruebas` (los puntos, con tope de 1 000 000), `integral` un juego
+> nuevo de `clubJugadas` y `club-integral-racha` una racha más de
+> `rachasClub`. Hasta volver a publicar las reglas el juego funciona igual,
+> pero los récords se quedan en el dispositivo.
+
 > **Frontera Batalla (octubre de 2026):** `club-frontera-…` son categorías
 > nuevas de `soloRanks` y `frontera` un juego nuevo de `clubJugadas`. Hasta
 > volver a publicar las reglas se juega igual, pero las rachas no llegan a la
@@ -257,6 +264,12 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `users/<uid>/club` (la partida a medias vive en el navegador). Hasta volver
 > a publicar las reglas se juega igual, pero las rondas no entran en la
 > clasificación y no pagan monedas.
+
+> **PRO PACMAN (20 de octubre de 2026):** `club-propac-puntos` (el puntaje
+> de la partida, con tope de 10 000 000) es una categoría nueva de
+> `soloRanks` y `soloPruebas`, y `propac` un juego nuevo de `clubJugadas`.
+> No usa `users/<uid>/club`. Hasta volver a publicar las reglas se juega
+> igual, pero las partidas no entran en la clasificación y no pagan monedas.
 
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
@@ -527,6 +540,18 @@ partidas del club, podios, rachas, repeticiones ni el chat general (la misma
 condición que `vetados`, con la hora de fin). Hasta publicar, el panel avisa
 de que faltan las reglas y los jugadores no notan nada.
 
+### ⚠ Los super chats del chat general piden publicar otra vez
+
+- `superChat/<uid>/<id del mensaje>` — `{at, p}`, el cobro de un super chat
+  (100 o 300 monedas). Lo lee cualquiera con sesión (el saldo de monedas lo
+  suma), lo escribe su dueño **una vez** y en la misma actualización que el
+  mensaje, que lleva el mismo precio en `s`; no se reescribe ni se borra.
+- `chatGeneral` gana dos campos (`s`, el precio, y `sa`, la hora, solo en los
+  super) y un índice nuevo, `sa`, por el que se piden los que siguen vivos.
+
+Sin publicar, el super chat no se puede mandar (dice que espera las reglas y
+no cobra nada) y el chat normal sigue igual.
+
 ### ⚠ Los rieles del salón (chat general y mejores partidas) piden publicar otra vez
 
 Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
@@ -691,6 +716,40 @@ Firebase; GIPHY la limita por cantidad de llamadas, y si se abusa se
 cambia por otra en ese nodo sin tocar el código. Sin clave, una sala de
 GIFs ofrece los dibujos de la casa.
 
+### ⚠ Pool 8 pide publicar otra vez (2026-10-20)
+
+`'pool'` tiene que estar en la lista del campo `juego` y en la de `logros`.
+No hay nodo nuevo: los tiros van por `jugadas` (`tiro` con `dx`, `dy`, `f`,
+`a`, `b` y, si hace falta, `px`, `py`, `c`), y el formato de la sala entra
+como `cupo` (2 = 1 contra 1, 4 = 2 contra 2), `pareja` y `guia` por `$otro`.
+Sin publicar, la sala de Pool no se puede crear. **Tacos y cofres
+(también 2026-10-20):** hay un nodo nuevo, `cofres/<uid>/<clave>` = `{at, p}`
+(`at === now`, `p === 500`, una vez por clave); sin publicar, comprar un cofre
+falla con `PERMISSION_DENIED` y el resto del Pool juega igual. El taco
+equipado va en `users/<uid>/taco` y no pide reglas. Pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
+### ⚠ El Pueblo de Mascotas pide publicar otra vez (2026-10-22)
+
+Dos nodos nuevos para el Pueblo (la plaza y las visitas, estilo Pet Society):
+
+- `mascotasPlaza/<uid>` = `{m, x, z, at, em?, ea?, b?, t?, ta?}`: quién
+  pasea por la plaza, adónde va, su último gesto o baile y lo último que
+  dijo (hasta 100 caracteres). Cada uno escribe solo la suya, con
+  `at === now`, y se borra al salir o al desconectarse. Se lee **solo**
+  con la consulta `orderByChild('at')` + `limitToLast(≤ 40)`: nadie baja
+  la colección entera ni una entrada por clave.
+- `mascotasCarinos/<dueño>/<origen~clave>/<visita>` = `{at}`: un cariño de
+  una visita a la mascota de otro. Solo si esa mascota tiene estado, nunca
+  a una propia, `at === now` y como mucho uno cada 20 horas por visita y
+  mascota; no se borra. El dueño lee los suyos enteros; los demás, solo los
+  de una mascota por su clave.
+
+Sin publicar, el Pueblo abre pero nadie aparece en la plaza (el juego lo
+dice) y hacer cariño da el aviso de reglas. El resto de Mascotas sigue
+igual. Pegar `firebase/database.rules.json` entero y **Publicar**.
+
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
 Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:
@@ -722,7 +781,7 @@ el mensaje lo manda el navegador de quien abre la sala. Las revanchas no se
 anuncian, y las salas abiertas desde `localhost` tampoco.
 
 1. En Discord: **Editar canal → Integraciones → Webhooks → Nuevo webhook**.
-   Ponle nombre y foto si quieres (el mensaje firma como «Laboratorio ·
+   Ponle nombre y foto si quieres (el mensaje firma como «Paginita Pro ·
    Juegos») y pulsa **Copiar URL del webhook**.
 2. Publica las reglas otra vez (pegar `firebase/database.rules.json` entero y
    **Publicar**). Traen un nodo nuevo, `discord`, que pueden leer los que
@@ -806,6 +865,26 @@ Consola → **Authentication** → **Settings** → **Authorized domains** → *
 - `TU-USUARIO.github.io`  ← el dominio de GitHub Pages donde publiques
 
 (`localhost` ya viene autorizado, así que la vista previa local funciona sin más.)
+
+### La app de la pantalla de inicio del iPhone (una vez)
+
+En la página guardada en el inicio del iPhone la ventana emergente de
+Google no vuelve a la app, así que ahí el sitio inicia sesión **por
+redirección** y con el ayudante de Firebase servido desde el propio dominio
+(`https://paginita-pro.cl/__/auth/…`, carpeta `__/` del repo, que copia el
+flujo **Copiar el ayudante de inicio de sesión de Firebase** de GitHub
+Actions; `_config.yml` le dice a GitHub Pages que publique esa carpeta).
+Falta un paso que solo se hace en la consola:
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
+   → **APIs y servicios → Credenciales** → el cliente **OAuth 2.0** de tipo
+   *Aplicación web* (se llama «Web client (auto created by Google Service)»).
+2. En **URI de redireccionamiento autorizados** → *Agregar URI*:
+   `https://paginita-pro.cl/__/auth/handler` → **Guardar** (tarda unos minutos).
+
+Sin ese paso, en la app del iPhone Google responde `redirect_uri_mismatch`;
+Safari, Chrome y el PC no cambian (siguen con la ventana emergente). Para
+renovar la copia del ayudante: Actions → ese flujo → *Run workflow*.
 
 ## 4. Publicar en GitHub Pages
 

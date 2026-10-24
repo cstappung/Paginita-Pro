@@ -23,9 +23,10 @@
  *    se eligió, y lo que se perdió (un récord que alguien superó del todo,
  *    una fila borrada) desaparece solo en vez de mentir.
  */
+import { tintaDe } from "./tintas.js";
 import { JUEGOS, ordenaRanks } from "./motor.js";
 import { LOGROS, SOLO_PREFIJO, reparto } from "./logros.js";
-import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { TIENDA, HALLOWEEN, precioDe, tiendaHalloweenAbierta, coleccionHalloween, edicionesDe } from "./tienda.js";
 
 export const LARGO_BIO = 120;
 export const MAX_VITRINA = 6;
@@ -55,11 +56,20 @@ export const MARCOS = [
   { id: "sakura", n: "Sakura", anim: true, req: { tienda: true } },
   { id: "plasma", n: "Plasma", anim: true, req: { tienda: true } },
   { id: "mariposas", n: "Mariposas", anim: true, req: { tienda: true } },
+  /* La tienda de Halloween (tienda.js): edición limitada, con precio por
+     rareza (`hw`), y el premio de coleccionista, que no se vende. */
+  { id: "calabazas", n: "Calabazas embrujadas", anim: true, hw: true, req: { tienda: true } },
+  { id: "murcielagos", n: "Enjambre de murciélagos", anim: true, hw: true, req: { tienda: true } },
+  { id: "telarana", n: "Telaraña maldita", anim: true, hw: true, req: { tienda: true } },
+  { id: "fantasmas", n: "Ronda de fantasmas", anim: true, hw: true, req: { tienda: true } },
+  { id: "caldero", n: "Caldero de bruja", anim: true, hw: true, req: { tienda: true } },
+  { id: "parca", n: "La Parca", anim: true, hw: true, req: { tienda: true } },
+  { id: "reycalabaza", n: "Rey Calabaza", anim: true, hw: true, req: { coleccion: 5 } },
   /* Uno por juego, para quien es n.º 1 en cualquiera de sus tablas. */
   ...[
     ["tsnake", "snake", "Serpiente"], ["tminas", "minas", "Campo minado"], ["ttetris", "tetris", "Tetrominós"],
     ["tsortem", "sortem", "Bloques en orden"], ["tbbtan", "bbtan", "Bola retro"], ["tsopa", "sopa", "Sopa de letras"],
-    ["telectro", "electro", "Circuito"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
+    ["telectro", "electro", "Circuito"], ["tintegral", "integral", "Integral dorada"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
     ["tescondite", "escondite", "Escondidos"], ["tcartas", "cartas", "Tres elementos"], ["tcuadritos", "cuadritos", "Puntos y cajas"],
     ["treversi", "reversi", "Fichas que giran"], ["tgato", "gato", "Tiza"], ["torbita", "orbita", "Órbitas"], ["tcadena", "cadena", "Reacción en cadena"],
     ["tflip", "flip7", "Siete cartas"], ["tcacho", "cacho", "Cubilete"], ["tuno", "uno", "Sentido de juego"],
@@ -67,7 +77,7 @@ export const MARCOS = [
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
     ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["thaxball", "haxball", "Arco de oro"], ["tbt3", "bt3", "Ki desbordante"], ["ttulones", "tulones", "Torre de tulones"], ["tatasco", "atasco", "Luz verde"], ["taleteo", "aleteo", "Ala negra"], ["tdosmil", "dosmil", "Ficha dorada"],
-    ["tmetrorush", "metrorush", "Maquinista"], ["ttrigon", "trigon", "Triángulos"], ["tprotiles", "protiles", "Teclas de piano"], ["thero", "hero", "Púa dorada"], ["tmemazo", "memazo", "Marco de meme"]
+    ["tmetrorush", "metrorush", "Maquinista"], ["ttrigon", "trigon", "Triángulos"], ["tprotiles", "protiles", "Teclas de piano"], ["thero", "hero", "Púa dorada"], ["tmemazo", "memazo", "Marco de meme"], ["tpool", "pool", "Bola ocho"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 
@@ -92,10 +102,17 @@ export const FONDOS = [
   { id: "olas", n: "Marea", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(circle at 80% 25%, #fff7d6 0 6%, transparent 7%), linear-gradient(180deg, #0ea5e9, #38bdf8 45%, #0369a1)" },
   { id: "lluvia", n: "Lluvia digital", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 120%, #14532d, transparent 60%), #020a05" },
   { id: "fuegos", n: "Fuegos artificiales", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 130%, #4c1d95, transparent 60%), linear-gradient(180deg, #050314, #1b0f3d)" },
-  { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
+  { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" },
+  /* La tienda de Halloween: la escena va en `capaFondo` (fondos-halloween.js). */
+  { id: "cementerio", n: "Cementerio", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 100%, #8b7bb855, transparent 60%), linear-gradient(180deg, #070b1f 0%, #1a1745 55%, #3a3366 100%)" },
+  { id: "calabazar", n: "Campo de calabazas", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 105%, #fb923c99, transparent 55%), linear-gradient(180deg, #1e0b33 0%, #5b1a3a 50%, #b4461a 85%, #ea7a1c 100%)" },
+  { id: "aquelarre", n: "Noche de brujas", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(circle at 68% 42%, #c4b5fd33, transparent 40%), linear-gradient(180deg, #0d0221 0%, #2e0854 55%, #5b1d8f 100%)" },
+  { id: "mansion", n: "Mansión embrujada", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 30% 0%, #47557966, transparent 55%), linear-gradient(180deg, #05070f 0%, #141b2e 55%, #26324a 100%)" },
+  { id: "lunasangre", n: "Luna de sangre", oscuro: true, anim: true, hw: true, req: { tienda: true }, css: () => "radial-gradient(circle at 70% 38%, #ff3b3b55, transparent 45%), linear-gradient(180deg, #120000 0%, #3d0404 55%, #6e0c0c 100%)" },
+  { id: "nocheeterna", n: "Noche eterna", oscuro: true, anim: true, hw: true, req: { coleccion: 11 }, css: () => "linear-gradient(180deg, #02010d 0%, #0d0838 50%, #1c0b4a 100%)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", integral: "Integrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", protiles: "PRO TILES", pokelike: "Pokelike", metrorush: "Metro Rush", prodefender: "PRO DEFENDER", propac: "PRO PACMAN" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -148,10 +165,11 @@ export function valorMarca(c, f) {
   if (c === "club-pokelike-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-hero-estrellas") return `${Math.floor((f.puntos || 0) / 10000)} ★ doradas`;
   if (String(c).startsWith("club-prodefender-")) return `ronda ${f.puntos || 0}`;
+  if (c === "club-propac-puntos") return `${(f.puntos || 0).toLocaleString("es-CL")} puntos`;
   if (c === "club-pokelike-pokedex") return `${f.puntos || 0} ${f.puntos === 1 ? "especie" : "especies"}`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
   if (c === "club-metrorush-distancia" || c === "club-metrorush-citydistancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
-  if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
+  if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-integral-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }
 // El mismo orden que la tabla del club (discord.js: ordenSolo).
@@ -173,13 +191,49 @@ export function campeones(datos) {
   }
   for (const [c, filas] of Object.entries(d.solo || {})) {
     const k = topDeCategoria(c);
-    if (!k) continue;
+    if (!k || (d.vigente && !d.vigente(c))) continue;
     const orden = Object.entries(filas || {}).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
     if (orden.length >= 2) pon(orden[0].uid, k);
   }
   for (const [k, u] of Object.entries(d.lideres || {})) if (u) pon(u, k);
   memoTops.set(d, m);
   return m;
+}
+
+/* La Clasificación general: los podios de todas las tablas. Cada primer
+   puesto vale 3 puntos, cada segundo 2 y cada tercero 1. Cuentan las
+   tablas de al menos MIN_PODIO personas (ser primero solo, o de dos, sería
+   regalado: es el mismo corte de los «podios» del perfil); en las salas,
+   solo con algún punto. `op.salas`: las claves de las tablas de sala que se
+   ven (si no, todas las de JUEGOS); `op.vigente(c)`: si una categoría del
+   club existe hoy; `op.vetado(uid)`: las cuentas vetadas, fuera. */
+export const MIN_PODIO = 3;
+const METALES = ["oro", "plata", "bronce"];
+export function podiosGeneral(datos, op) {
+  const d = datos || {}, o = op || {};
+  const vetado = o.vetado || (() => false), t = {};
+  const anota = (orden, tam) => {
+    if (tam < MIN_PODIO) return;
+    orden.slice(0, 3).forEach((f, i) => {
+      const a = t[f.uid] || (t[f.uid] = { uid: f.uid, nombre: "", foto: "", oro: 0, plata: 0, bronce: 0, podios: 0, puntos: 0 });
+      a[METALES[i]]++; a.podios++; a.puntos += 3 - i;
+      if (!a.nombre && f.nombre) a.nombre = f.nombre;
+      if (!a.foto && f.foto) a.foto = f.foto;
+    });
+  };
+  const filasDe = filas => Object.entries(filas || {}).filter(([u, f]) => f && !vetado(u));
+  for (const [j, filas] of Object.entries(d.ranks || {})) {
+    if (o.salas ? o.salas.indexOf(j) < 0 : !JUEGOS[j]) continue;
+    const todas = filasDe(filas).map(([u, f]) => Object.assign({ uid: u }, f));
+    anota(ordenaRanks(todas).filter(f => (f.puntos || 0) > 0), todas.length);
+  }
+  for (const [c, filas] of Object.entries(d.solo || {})) {
+    if (o.vigente ? !o.vigente(c) : !juegoDeCategoria(c)) continue;
+    const todas = filasDe(filas).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
+    anota(todas, todas.length);
+  }
+  return Object.values(t).sort((a, b) => b.puntos - a.puntos || b.oro - a.oro || b.plata - a.plata ||
+    String(a.nombre).localeCompare(String(b.nombre)) || String(a.uid).localeCompare(String(b.uid)));
 }
 
 /* Lo que se sabe de alguien a partir de las tres lecturas: sus logros,
@@ -219,7 +273,7 @@ function calculaEstadisticas(uid, d) {
   for (const [c, filas] of Object.entries(d.solo || {})) {
     const mia = filas && filas[uid];
     const j = juegoDeCategoria(c);
-    if (!mia || !j) continue;
+    if (!mia || !j || (d.vigente && !d.vigente(c))) continue;   // las tablas de versiones viejas ya no salen
     const orden = Object.entries(filas).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
     const i = orden.findIndex(f => f.uid === uid);
     tablas.push({ clave: "s:" + c, tipo: "s", j, c, puesto: i + 1, de: orden.length, valor: valorMarca(c, mia) });
@@ -238,13 +292,17 @@ function calculaEstadisticas(uid, d) {
     /* Lo comprado en la tienda: lo que la economía aceptó (`compras`), o
        lo escrito tal cual mientras no hay economía. */
     compras: (d.compras || d.tienda || {})[uid] || {},
+    /* El número de edición de cada cosa de Halloween que tiene (tienda.js). */
+    ediciones: edicionesDe(uid, d.compras || d.tienda || {}),
     /* Sin todas las lecturas todavía, lo que se gana no se puede negar. */
     parcial: d.completo === false
   };
 }
 
-/* ¿Puede usarlo? Devuelve {ok, falta}: `falta` dice qué le queda. */
-export function requisito(item, est) {
+/* ¿Puede usarlo? Devuelve {ok, falta}: `falta` dice qué le queda. Uno de
+   la tienda sin comprar trae `tienda` y su `precio`; uno de Halloween que
+   ya no se puede conseguir (la tienda cerró), `agotado`. */
+export function requisito(item, est, ahora = Date.now()) {
   const r = item && item.req;
   if (!r) return { ok: true, falta: "" };
   if (!est) return { ok: false, falta: "Cargando…" };
@@ -252,7 +310,17 @@ export function requisito(item, est) {
   if (r.primero) return est.primeros > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sé el n.º 1 de una clasificación de 3 o más" };
   if (r.podio) return est.podios > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sube al podio de una clasificación de 3 o más" };
   if (r.top) return (est.tops || []).includes(r.top) ? { ok: true, falta: "" } : { ok: false, falta: `Sé el n.º 1 de ${nombreTop(r.top)}` };
-  if (r.tienda) return est.compras && est.compras[item.id] ? { ok: true, falta: "" } : { ok: false, falta: `🪙 ${PRECIO_TIENDA.toLocaleString("es-CL")} en la tienda`, tienda: true };
+  if (r.tienda) {
+    if (est.compras && est.compras[item.id]) return { ok: true, falta: "" };
+    if (HALLOWEEN[item.id] && !tiendaHalloweenAbierta(ahora)) return { ok: false, falta: "Edición limitada de Halloween: ya no se vende", agotado: true };
+    const p = precioDe(item.id);
+    return { ok: false, falta: `${p.toLocaleString("es-CL")} monedas en la tienda`, tienda: true, precio: p };
+  }
+  if (r.coleccion) {
+    const k = coleccionHalloween(est.compras);
+    if (k >= r.coleccion) return { ok: true, falta: "" };
+    return { ok: false, falta: `Ten ${r.coleccion} artículos de la tienda de Halloween (llevas ${k})`, agotado: !tiendaHalloweenAbierta(ahora) };
+  }
   return { ok: false, falta: "" };
 }
 
@@ -304,6 +372,7 @@ export function limpiaPerfil(p) {
   const out = {};
   if (p.marco && marcoDe(p.marco)) out.marco = p.marco;
   if (p.fondo && fondoDe(p.fondo)) out.fondo = p.fondo;
+  if (p.tinta && tintaDe(p.tinta)) out.tinta = p.tinta;
   if (typeof p.bio === "string") out.bio = p.bio.replace(/\s+/g, " ").trim().slice(0, LARGO_BIO);
   if (Array.isArray(p.vitrina)) out.vitrina = [...new Set(p.vitrina.filter(k => /^(l:[a-z0-9]+:[a-z0-9]+|r:[a-z0-9]+|s:club-[a-z0-9-]+)$/.test(k)))].slice(0, MAX_VITRINA);
   /* La mascota del perfil (de Mascotas): una copia `ma:` y, si quiere, un

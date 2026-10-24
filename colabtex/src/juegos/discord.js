@@ -67,7 +67,7 @@ export function mensajeSala(sala) {
   const aviso = `🎮 **¡Sala nueva!** ${quien} te espera en **${juego}**`;
   const foto = /^https:\/\//.test(sala.foto || "") ? sala.foto : undefined;
   return {
-    username: "Laboratorio · Juegos",
+    username: "Paginita Pro · Juegos",
     content: (sala.mencion ? recorta(sala.mencion, 100) + " " : "") + aviso,
     embeds: [{
       author: { name: `${quien} abrió una sala`, icon_url: foto },
@@ -78,7 +78,7 @@ export function mensajeSala(sala) {
       color: colorInt(sala.color),
       fields: campos,
       thumbnail: foto ? { url: foto } : undefined,
-      footer: { text: "Laboratorio · Juegos · la sala se cierra sola al llenarse" },
+      footer: { text: "Paginita Pro · Juegos · la sala se cierra sola al llenarse" },
       timestamp: new Date().toISOString()
     }],
     components: [{
@@ -122,6 +122,7 @@ const MODALIDADES = {
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
   prado: "Prado Esmeralda", dunas: "Dunas de Ámbar", glaciar: "Glaciar Cristal", caldera: "Caldera Volcánica", vacio: "Nexo del Vacío",
+  pantano: "Pantano Sombrío", cumbres: "Cumbres Tormentosas", fosa: "Fosa Abisal", engranajes: "Ciudadela de Engranajes", eclipse: "Trono del Eclipse",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
   torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
@@ -139,6 +140,7 @@ const CLUBS = {
   bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" },
   sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" },
   electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" },
+  integral: { nombre: "Integrodle", juego: "Integrodle", icono: "∫", ruta: "integral" },
   frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" },
   sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" },
   fanal: { nombre: "FANAL", juego: "FANAL", icono: "🪔", ruta: "fanal" },
@@ -150,12 +152,13 @@ const CLUBS = {
   pokelike: { nombre: "Pokelike", juego: "Pokelike", icono: "◓", ruta: "pokelike" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" },
   hero: { nombre: "PRO HERO", juego: "PRO HERO", icono: "🎸", ruta: "hero" },
-  prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" }
+  prodefender: { nombre: "PRO DEFENDER", juego: "PRO DEFENDER", icono: "🛡️", ruta: "prodefender" },
+  propac: { nombre: "PRO PACMAN", juego: "PRO PACMAN", icono: "🟡", ruta: "propac" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|pokelike|hero|prodefender|propac)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -167,10 +170,11 @@ const reloj = ms => {
 /* Lo que se lee de una marca: en el buscaminas y el sprint manda el
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
-  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-sudoku-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
+  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-integral-racha" || cat === "club-sudoku-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
   if (cat === "club-frontera-victorias") return `🏰 ${Number(f.puntos).toLocaleString("es-CL")} victorias`;
   if (/^club-frontera-/.test(cat)) return `🏰 ${f.puntos} ${f.puntos === 1 ? "combate seguido" : "combates seguidos"}`;
   if (cat === "club-electro-puntos") return `⚡ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
+  if (cat === "club-integral-puntos") return `∫ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // El arcade del sudoku se lee en puntos, con su mando de recreativa.
   if (cat === "club-sudoku-arcade") return `🕹️ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // El clásico del sudoku (puntos fijos en 1) compite por tiempo, como el buscaminas.
@@ -193,6 +197,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-hero-estrellas") return `🎸 ${Math.floor(f.puntos / 10000)} ★ doradas`;
   // PRO DEFENDER: la ronda récord del reino.
   if (/^club-prodefender-/.test(cat)) return `🛡️ ronda ${f.puntos}`;
+  if (cat === "club-propac-puntos") return `🟡 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo
@@ -228,7 +233,7 @@ export function mensajePodio(p) {
   if (p.desbancado) campos.push({ name: "💥 Desbanca a", value: recorta(p.desbancado, 80), inline: true });
   campos.push({ name: "🏆 Podio actual", value: podio || "—", inline: false });
   return {
-    username: "Laboratorio · Juegos",
+    username: "Paginita Pro · Juegos",
     content: (p.mencion ? recorta(p.mencion, 100) + " " : "") +
       `# ${TITULAR[i]}\n**${quien}** acaba de ${p.puesto === 1 ? "tomar el trono" : "subir al podio"} de **${leg.club.juego} · ${leg.modalidad}** 🎉`,
     embeds: [{
@@ -236,11 +241,11 @@ export function mensajePodio(p) {
       title: recorta(`${MEDALLA[i]} ${quien} — puesto #${p.puesto}`, 200),
       url: p.enlace,
       description: `${leg.club.icono} **${leg.club.juego}** · ${leg.modalidad}\n\n` +
-        (p.puesto === 1 ? "Nadie en el Laboratorio lo ha hecho mejor. ¿Quién se atreve?" : "¿Alguien puede bajarle del podio?"),
+        (p.puesto === 1 ? "Nadie en Paginita Pro lo ha hecho mejor. ¿Quién se atreve?" : "¿Alguien puede bajarle del podio?"),
       color: COLOR_PUESTO[i],
       fields: campos,
       thumbnail: foto ? { url: foto } : undefined,
-      footer: { text: "Laboratorio · Juegos · ranking por modalidad" },
+      footer: { text: "Paginita Pro · Juegos · ranking por modalidad" },
       timestamp: new Date().toISOString()
     }],
     components: [{

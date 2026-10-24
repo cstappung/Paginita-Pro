@@ -13,7 +13,14 @@
    Antes de cada escritura se vuelve a comprobar contra la economía completa
    (el iframe podría estar mirando algo viejo), porque las reglas no pueden
    saber si alcanza el dinero ni de quién es una mascota: sin esto, un gasto
-   sin fondos de este mismo navegador pararía la cuenta. */
+   sin fondos de este mismo navegador pararía la cuenta.
+
+   También es el cartero del **Pueblo** (estilo Pet Society): la plaza
+   donde pasean las mascotas de todos (`mascotasPlaza`), las casas de los
+   vecinos (su estado se lee por clave) y los cariños que deja una visita
+   (`mascotasCarinos`). Lo que llega de otros se revisa contra la economía
+   antes de mandarlo al juego: una mascota que no es de quien pasea, o ropa
+   que no es suya, no se dibuja. */
 import { ambientar } from "./sonido.js";
 import { monedasDe, economia, mascotasDe, objetosDe, leeCopia, claveMascota, claveObjeto } from "./monedas.js";
 import MM from "../../../juegos/mascotas/motor.js";
@@ -51,12 +58,128 @@ function limpiaEstado(e) {
   return out;
 }
 
+/* Lo que se puede dibujar de lo que lleva puesto una mascota de `u`: los
+   objetos iniciales tal cual (los resuelve el juego) y los de regalos solo
+   si siguen siendo de `u`. */
+function ropaDe(w, u, e) {
+  const out = {};
+  for (const slot of ["hat", "boots", "outfit", "shoes"]) {
+    const v = w && w[slot];
+    if (typeof v !== "string") continue;
+    if (/^start-[a-z]{3,8}-[a-z]{2,12}$/.test(v)) out[slot] = { s: v };
+    else if (e.dueno[v] === u && e.regalos[v] && e.regalos[v].item.kind === slot && !e.enVenta[v])
+      out[slot] = { id: e.regalos[v].item.id, tint: e.regalos[v].item.tint || 0 };
+  }
+  return out;
+}
+/* El baile de un gesto: inicial, o de regalos y de quien lo baila. */
+function baileDe(b, u, e) {
+  if (typeof b !== "string") return "";
+  const m = /^start-dance-([a-z]{1,20})$/.exec(b);
+  if (m) return m[1];
+  return e.dueno[b] === u && e.regalos[b] && e.regalos[b].item.kind === "dance" ? e.regalos[b].item.id : "";
+}
+const EMOTES = /^[a-z]{2,10}$/;
+/* Respiro entre dos escrituras de la plaza, y cada cuánto se refresca la
+   propia aunque no se mueva (para seguir «fresca» en la consulta). */
+const PLAZA_RESPIRO = 900, PLAZA_LATIDO = 45000;
+
 /* `alGuardar(k, estado)`: avisa lo que se acaba de guardar (null al
-   despedirse), para que la mascota del perfil lo muestre sin releer. */
-export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
+   despedirse), para que la mascota del perfil lo muestre sin releer.
+   `quien(u)` = {nombre, foto, color} de cualquier cuenta (el Pueblo). */
+export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar, quien }) {
   let host = null, frame = null, offs = [], d = null, estados = null, prefs = null, muerto = false, listo = false, ocupado = Promise.resolve();
   const uid = usuario.uid;
   const heredando = new Set();
+  const nombre = (u, ligero) => { const q = quien ? quien(u, ligero) : null; return { nombre: (q && q.nombre) || "Jugador", color: (q && q.color) || "#0d9488", foto: (q && q.foto) || "" }; };
+  /* La hora del servidor llevada al reloj de este navegador. */
+  const aLocal = t => (Number.isFinite(t) ? t - (fb.ahora() - Date.now()) : 0);
+
+  /* ---------- el Pueblo ---------- */
+  let carinos = null;                     // mascotasCarinos/<uid>, crudo
+  let plaza = null;                       // {offs, crudo, yo, reloj, latido, ultima}
+  const estadosAjenos = new Map();        // "u/k" -> {e, at, leyendo}
+  /* El estado de una mascota ajena, por clave y con memoria de cinco
+     minutos (al llegar uno nuevo se vuelve a mandar la plaza): la etapa y
+     la ropa cambian poco, y cada lectura baja el estado entero. */
+  function estadoAjeno(u, k) {
+    const key = u + "/" + k, x = estadosAjenos.get(key), t = Date.now();
+    if ((!x || t - x.at > 300000) && !(x && x.leyendo)) {
+      const y = x || { e: null, at: 0 };
+      y.leyendo = true;
+      estadosAjenos.set(key, y);
+      fb.leeEstadoMascota(u, k).then(e => { y.e = limpiaEstado(e); y.at = Date.now(); y.leyendo = false; mandaPlaza(); });
+    }
+    return x ? x.e : null;
+  }
+  function mandaPlaza() {
+    if (!plaza || !d || !d.completo) return;
+    const e = eco(), lim = fb.ahora() - fb.PLAZA_FRESCO, lista = [];
+    for (const [u, p] of Object.entries(plaza.crudo || {})) {
+      if (u === uid || !p || !(p.at > lim) || !RE_MASCOTA.test(p.m) || e.dueno[p.m] !== u || e.enVenta[p.m]) continue;
+      const m = e.mascotas[p.m];
+      if (!m) continue;
+      const est = estadoAjeno(u, claveEstado(p.m)), q = nombre(u);
+      lista.push({
+        u, nombre: q.nombre, color: q.color, c: p.m, o: m.u, k: m.k, at0: m.at, e: m.e,
+        n: est ? est.n : "", et: est ? est.e : "", w: est ? ropaDe(est.w, u, e) : {},
+        x: +p.x || 0, z: +p.z || 0,
+        em: EMOTES.test(p.em) ? p.em : "", ea: aLocal(p.ea), b: baileDe(p.b, u, e),
+        t: typeof p.t === "string" ? p.t.slice(0, 60) : "", ta: aLocal(p.ta)
+      });
+    }
+    manda({ tipo: "plaza", lista, aviso: plaza.aviso || "" });
+  }
+  function escuchaPlaza() {
+    if (!plaza) return;
+    plaza.offs = [fb.watchPlazaMascotas((v, err) => {
+      if (!plaza) return;
+      if (err) { plaza.aviso = "La plaza todavía no abre: falta publicar las reglas nuevas en la consola de Firebase."; console.warn("[mascotas] plaza", err); }
+      plaza.crudo = v;
+      mandaPlaza();
+    })];
+    /* Quien deja de estar fresco se va aunque nadie escriba. */
+    plaza.vence = setInterval(mandaPlaza, 30000);
+  }
+  /* La propia: se escribe con respiro (la última posición gana) y con un
+     latido aunque no se mueva. */
+  function escribePlaza() {
+    if (!plaza || !plaza.yo) return;
+    clearTimeout(plaza.reloj);
+    const falta = plaza.ultima + PLAZA_RESPIRO - Date.now();
+    if (falta > 0) { plaza.reloj = setTimeout(escribePlaza, falta); return; }
+    plaza.ultima = Date.now();
+    const y = plaza.yo, x = { m: y.m, x: y.x, z: y.z };
+    if (y.em) { x.em = y.em; x.ea = y.ea; }
+    if (y.b) x.b = y.b;
+    if (y.t) { x.t = y.t; x.ta = y.ta; }
+    fb.ponPlazaMascota(uid, x).catch(err => console.warn("[mascotas] plaza", err));
+  }
+  function entraPlaza() {
+    if (plaza) return;
+    plaza = { offs: [], crudo: {}, yo: null, reloj: 0, ultima: 0 };
+    escuchaPlaza();
+    plaza.latido = setInterval(() => { if (plaza && plaza.yo) { plaza.ultima = 0; escribePlaza(); } }, PLAZA_LATIDO);
+  }
+  function salePlaza() {
+    if (!plaza) return;
+    for (const f of plaza.offs) try { f(); } catch (e) { /* ya estaba */ }
+    clearTimeout(plaza.reloj); clearInterval(plaza.latido); clearInterval(plaza.vence);
+    const habia = !!plaza.yo;
+    plaza = null;
+    if (habia) fb.salePlazaMascotas(uid);
+  }
+  /* Los cariños recibidos, con quién los hizo. Van en hora del servidor
+     (y `ahora` también): el `visto` que vuelve se compara con el mismo
+     reloj, y un desfase que cambia no aplica dos veces el último. */
+  function mandaCarinos() {
+    if (!listo || !carinos || !prefs) return;
+    const lista = [];
+    for (const [k, xs] of Object.entries(carinos))
+      for (const [u, x] of Object.entries(xs || {}))
+        if (x && Number.isFinite(x.at)) lista.push({ k, u, nombre: nombre(u, true).nombre, at: x.at });
+    manda({ tipo: "carinos", lista, visto: Number.isFinite(prefs.carinos) ? prefs.carinos : null, ahora: fb.ahora() });
+  }
 
   function manda(x) { if (!muerto && frame && frame.contentWindow) frame.contentWindow.postMessage({ canal: "mascotas-parent", ...x }, location.origin); }
   const eco = () => economia(d);
@@ -214,6 +337,88 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
           if (!o || o.u !== uid || o.estado !== "activa") throw new Error("Esa oferta ya no está a la venta.");
           await fb.retirarOferta(x.id);
           responde(true, null);
+        } else if (x.accion === "carinosVistos") {
+          /* Hasta dónde se aplicaron los cariños (hora del servidor). */
+          const at = Math.round(+x.at);
+          if (!Number.isFinite(at)) throw new Error("Hora inválida.");
+          if (!(Number.isFinite(prefs && prefs.carinos) && prefs.carinos >= at)) await fb.guardaPrefsMascotas(uid, { carinos: at });
+          responde(true, null);
+        } else if (x.accion === "plaza") {
+          if (x.on) entraPlaza(); else salePlaza();
+          responde(true, null);
+        } else if (x.accion === "plazaPon") {
+          if (!plaza) entraPlaza();
+          if (!tengoMascota(x.m)) throw new Error("Esa mascota ya no es tuya.");
+          if (e.enVenta[x.m]) throw new Error("Está a la venta: no sale a pasear.");
+          const acota = v => Math.round(Math.min(9.5, Math.max(-9.5, +v || 0)) * 100) / 100;
+          const antes = plaza.yo || {}, yo = { m: x.m, x: acota(x.x), z: acota(x.z), em: antes.em, ea: antes.ea, b: antes.b, t: antes.t, ta: antes.ta };
+          if (x.em) {
+            if (!EMOTES.test(x.em)) throw new Error("Ese gesto no existe.");
+            yo.em = x.em; yo.ea = fb.ahora();
+            yo.b = x.em === "baile" && typeof x.b === "string" && baileDe(x.b, uid, e) ? x.b : undefined;
+          }
+          if (typeof x.t === "string" && x.t.trim()) { yo.t = x.t.replace(/\s+/g, " ").trim().slice(0, 60); yo.ta = fb.ahora(); }
+          plaza.yo = yo;
+          escribePlaza();
+          responde(true, null);
+        } else if (x.accion === "vecinos") {
+          /* Todas las cuentas con mascotas, menos la propia: la barra de vecinos. */
+          const por = new Map();
+          for (const [c, u] of Object.entries(e.dueno)) {
+            const m = u !== uid && e.mascotas[c];
+            if (!m) continue;
+            if (!por.has(u)) por.set(u, []);
+            por.get(u).push({ c, e: m.e, at: m.at });
+          }
+          const lista = [...por].map(([u, ms]) => {
+            const q = nombre(u, true);
+            return { u, nombre: q.nombre, color: q.color, foto: q.foto.length <= 40000 ? q.foto : "", mascotas: ms.sort((a, b) => a.at - b.at).map(m => ({ c: m.c, e: m.e })) };
+          }).sort((a, b) => b.mascotas.length - a.mascotas.length || a.nombre.localeCompare(b.nombre, "es"));
+          responde(true, lista.slice(0, 80));
+        } else if (x.accion === "vecino") {
+          /* Las mascotas de un vecino con su nombre y etapa (cada estado, por clave). */
+          const u = String(x.u || "");
+          const ms = Object.entries(e.dueno).filter(([c, w]) => w === u && e.mascotas[c]).map(([c]) => c).slice(0, MM.MAX_MASCOTAS);
+          const out = await Promise.all(ms.map(async c => {
+            const est = limpiaEstado(await fb.leeEstadoMascota(u, claveEstado(c)));
+            return { c, e: e.mascotas[c].e, n: est ? est.n : "", et: est ? est.e : "" };
+          }));
+          responde(true, out);
+        } else if (x.accion === "casa") {
+          /* La casa de una mascota ajena: su estado, lo que lleva puesto y sus
+             muebles (solo lo que sigue siendo de su dueño) y sus cariños. */
+          const c = String(x.c || ""), u = e.dueno[c], m = e.mascotas[c];
+          if (!RE_MASCOTA.test(c) || !u || !m) throw new Error("Esa mascota ya no está en el pueblo.");
+          const k = claveEstado(c);
+          const [crudo, cs] = await Promise.all([fb.leeEstadoMascota(u, k), fb.leeCarinosMascota(u, k)]);
+          const est = limpiaEstado(crudo), q = nombre(u), z = eco(), lim = fb.ahora() - 86400000;
+          const muebles = [];
+          for (const it of (est && est.d) || []) {
+            const r = z.regalos[it.i];
+            if (z.dueno[it.i] === u && r && r.item.kind === "decor" && !z.enVenta[it.i]) muebles.push({ id: r.item.id, tint: r.item.tint || 0, x: it.x, z: it.z, rot: it.rot });
+          }
+          const mio = cs[uid] && Number.isFinite(cs[uid].at) ? cs[uid].at : null;
+          responde(true, {
+            u, nombre: q.nombre, color: q.color, c, o: m.u, k: m.k, at0: m.at, e: m.e, frozen: !!z.congelada[c],
+            estado: est ? { n: est.n, e: est.e, g: est.g, s: est.s, ls: est.ls, z: !!est.z } : null,
+            w: est ? ropaDe(est.w, u, z) : {}, d: muebles,
+            hoy: Object.values(cs).filter(y => y && y.at > lim).length,
+            mio: mio === null ? null : aLocal(mio), mia: u === uid
+          });
+        } else if (x.accion === "carino") {
+          const c = String(x.c || ""), u = e.dueno[c];
+          if (!RE_MASCOTA.test(c) || !u || !e.mascotas[c]) throw new Error("Esa mascota ya no está en el pueblo.");
+          if (u === uid) throw new Error("Es tuya: los cariños son para las mascotas de los vecinos.");
+          try { await fb.daCarinoMascota(u, claveEstado(c), uid); }
+          catch (err) {
+            if (/permission|denied/i.test((err && (err.code || err.message)) || "")) {
+              const cs = await fb.leeCarinosMascota(u, claveEstado(c));
+              if (cs[uid]) throw new Error("Ya le hiciste cariño hoy: vuelve mañana.");
+              if (!(await fb.leeEstadoMascota(u, claveEstado(c)))) throw new Error("Todavía no tiene casa: su dueño aún no la abre en Mascotas.");
+            }
+            throw err;
+          }
+          responde(true, null);
         } else throw new Error("Petición desconocida.");
       } catch (err) {
         const permiso = /permission|denied/i.test((err && (err.code || err.message)) || "");
@@ -228,7 +433,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
     if (muerto || !frame || e.source !== frame.contentWindow || e.origin !== location.origin) return;
     const x = e.data;
     if (!x || x.canal !== "mascotas-child") return;
-    if (x.tipo === "listo") { listo = true; mandaTema(); enviaDatos(); return; }
+    if (x.tipo === "listo") { listo = true; mandaTema(); enviaDatos(); mandaCarinos(); return; }
     if (x.tipo === "volver") { volver(); return; }
     if (x.tipo === "mercado") { ir("#mercado/mascotas"); return; }
     if (x.tipo === "pide") atiende(x);
@@ -243,16 +448,18 @@ export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
       frame.title = "Mascotas — cría tu mascota en 3D";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/mascotas/index.html?v=mc-6";
+      frame.src = "juegos/mascotas/index.html?v=mc-8";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       vigilaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-      offs.push(datos(x => { d = x; enviaDatos(); }));
+      offs.push(datos(x => { d = x; enviaDatos(); mandaPlaza(); }));
       offs.push(fb.watchEstadosMascotas(uid, x => { estados = x || {}; enviaDatos(); }));
-      offs.push(fb.watchPrefsMascotas(uid, x => { prefs = x || {}; enviaDatos(); }));
+      offs.push(fb.watchPrefsMascotas(uid, x => { prefs = x || {}; enviaDatos(); mandaCarinos(); }));
+      offs.push(fb.watchCarinosMascotas(uid, x => { carinos = x || {}; mandaCarinos(); }));
     },
     destruir() {
       muerto = true;
+      salePlaza();
       for (const f of offs) try { f(); } catch (e) { /* ya estaba */ }
       offs = [];
       vigilaTema.disconnect();

@@ -12,19 +12,38 @@
 // con temblor y carraspera (la «voz rota»), saturada y pasada por tres
 // formantes que se mueven de una vocal a otra («uuuaaargh»). Es lo que les da
 // el gemido de Call of Duty en vez del zumbido de antes.
+//
+// Hay un tope de piezas sonando a la vez (`carga`): con la horda encima, cada
+// tiro, gruñido y fritura armaba sus osciladores y filtros, el hilo de audio
+// no daba abasto y el sonido se entrecortaba hasta apagarse. Pasado
+// `TOPE_LEJOS` se callan los sonidos lejanos; pasado `TOPE`, todos. Al final
+// un limitador evita que la suma recorte en el parlante.
 let ctx = null, ruidoBuf = null, cafeBuf = null, master = null, eco = null;
 const oidoPos = { x: 0, y: 0, z: 0, yaw: 0 };
 let voces = 0;
 const VOCES_MAX = 7;
 const mecanica = new Set();   // lo que suena de una recarga, para cortarla
+let fines = [];               // cuándo termina cada pieza que suena (una voz pesa cinco)
+const TOPE = 100, TOPE_LEJOS = 56, CERCA = 4;
+const suena = (fin, peso = 1) => { for (let i = 0; i < peso; i++) fines.push(fin); };
+function carga() {
+  const t = ctx.currentTime;
+  if (fines.length) fines = fines.filter(f => f > t);
+  return fines.length;
+}
 
 function a() {
   if (!ctx) {
-    ctx = new AudioContext();
+    // Un búfer algo más holgado que el mínimo: con Three.js dibujando, el
+    // mínimo se quedaba corto en un PC cargado y el audio se cortaba.
+    try { ctx = new AudioContext({ latencyHint: 'balanced' }); } catch { ctx = new AudioContext(); }
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.knee.value = 14; comp.ratio.value = 4;
     comp.attack.value = 0.003; comp.release.value = 0.25;
-    comp.connect(ctx.destination);
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.001; lim.release.value = 0.12;
+    comp.connect(lim).connect(ctx.destination);
     master = ctx.createGain();
     master.gain.value = 0.5;
     master.connect(comp);
@@ -44,7 +63,7 @@ function a() {
       c[i] = ult * 3.5;
     }
   }
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state === 'suspended' || ctx.state === 'interrupted') ctx.resume().catch(() => {});
   return ctx;
 }
 
@@ -74,9 +93,11 @@ function lugar(x) {
   return { d, pan: Math.max(-1, Math.min(1, pan * 0.75)) };
 }
 
-// El bus de un sonido. `k` es a qué distancia suena a la mitad.
+// El bus de un sonido. `k` es a qué distancia suena a la mitad. Pasado el
+// tope devuelve un bus mudo, y las piezas que se le piden no suenan.
 function bus(l, k = 12, vol = 1, rev = 0.18, t = 0) {
   const c = a();
+  if (carga() >= (l.d < CERCA ? TOPE : TOPE_LEJOS)) return { mudo: true, t: c.currentTime + t };
   const g = c.createGain();
   g.gain.value = vol / (1 + l.d / k);
   const f = c.createBiquadFilter();
@@ -96,7 +117,7 @@ function bus(l, k = 12, vol = 1, rev = 0.18, t = 0) {
 function ruido(b, ret, dur, o = {}) {
   const c = ctx, t = b.t + ret;
   const vol = o.vol ?? 0.5;
-  if (vol < 0.003) return null;
+  if (vol < 0.003 || b.mudo) return null;
   const src = c.createBufferSource();
   src.buffer = o.cafe ? cafeBuf : ruidoBuf;
   src.playbackRate.value = o.vel ?? 1;
@@ -113,11 +134,12 @@ function ruido(b, ret, dur, o = {}) {
   src.connect(f).connect(g).connect(b.g);
   src.start(t, Math.random() * 1.5);
   src.stop(t + dur + 0.05);
+  suena(t + dur);
   return src;
 }
 
 function tono(b, ret, f0, f1, dur, vol, tipo = 'sine', ataque = 0.002) {
-  if (vol < 0.003) return null;
+  if (vol < 0.003 || b.mudo) return null;
   const c = ctx, t = b.t + ret;
   const o = c.createOscillator();
   o.type = tipo;
@@ -130,6 +152,7 @@ function tono(b, ret, f0, f1, dur, vol, tipo = 'sine', ataque = 0.002) {
   o.connect(g).connect(b.g);
   o.start(t);
   o.stop(t + dur + 0.05);
+  suena(t + dur);
   return o;
 }
 
@@ -164,6 +187,7 @@ function saturacion(k) {
 // o: { f: [puntos de la altura en Hz], dur, de, a (vocales), aspera 0–1,
 //      aire 0–1, sat, grave (una octava abajo), vol, ret, tracto (×formantes) }
 function voz(b, o) {
+  if (b.mudo) return;
   const c = ctx, t = b.t + (o.ret || 0), d = o.dur;
   const fs = Float32Array.from(o.f.map(v => Math.max(20, v * (0.97 + Math.random() * 0.06))));
   const osc = c.createOscillator();
@@ -223,6 +247,7 @@ function voz(b, o) {
   for (const s of fuentes) { s.start(t); s.stop(t + d + 0.05); }
   voces++;
   osc.onended = () => { voces--; };
+  suena(t + d, 5);
 }
 
 const azar = (a0, a1) => a0 + Math.random() * (a1 - a0);

@@ -7,7 +7,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // `?ver=1&…`: el modo visor, una sola carta viva para el mercado de Juegos (al final del archivo)
-const VER = new URLSearchParams(location.search), VISOR = VER.has('ver');
+const VER = new URLSearchParams(location.search), VISOR = VER.has('ver') || VER.has('plantilla');
 if (VISOR) document.documentElement.classList.add('visor');
 
 /* ---------------- DATOS ---------------- */
@@ -69,6 +69,7 @@ const ATAQUES = {
   'sensor-imu': [['Giroscopio', 20, 'Sabe dónde está el rival aunque gire.'], ['Caída libre', 50]],
 };
 const CARDS = M.CARDS.map(m => {
+  if (m.col === 'futbol') return m;   // los futbolistas no tienen ataques: su carta es la foto
   if (m.col === 'comp') {
     const te = TEMA_V[m.vkey] || {}, h = hash(m.person + m.vkey);
     const v = { key: m.vkey, label: m.vlabel, type: te.type, icon: te.icon, weak: te.weak, moves: ATAQUES[m.person] };
@@ -91,6 +92,17 @@ function fijaColecciones(serie1) {
   ['#cambiaBtn', '#cambiaBtn2', '#rrCols', '#colTabs'].forEach(q => { const el = $(q); if (el) el.style.display = una ? 'none' : ''; });
   document.body.classList.toggle('serie1', !!serie1);
 }
+/* Lo que la carta de un futbolista dice además de la foto (el catálogo
+   está en el motor: M.FUTBOLISTAS). */
+const FUT_POSICION = { POR: 'Portero', DEF: 'Defensa', MED: 'Centrocampista', DEL: 'Delantero' };
+const FUT_PAIS = {
+  BE: 'Bélgica', UA: 'Ucrania', ES: 'España', BR: 'Brasil', ENG: 'Inglaterra', FR: 'Francia', DE: 'Alemania', NL: 'Países Bajos',
+  UY: 'Uruguay', TR: 'Turquía', PT: 'Portugal', MA: 'Marruecos', CI: 'Costa de Marfil', PL: 'Polonia', HR: 'Croacia',
+  DK: 'Dinamarca', SE: 'Suecia', EG: 'Egipto',
+};
+// la bandera en emoji: dos letras regionales; Inglaterra es una subdivisión (bandera negra + etiquetas)
+const bandera = cc => cc === 'ENG' ? '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}'
+  : String.fromCodePoint(...[...cc].map(l => 0x1F1E6 + l.charCodeAt(0) - 65));
 const colVisible = k => COLS.some(co => co.key === k);
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
@@ -193,7 +205,7 @@ function offCenter(c) {
    recibido en un intercambio, menos lo vendido o cambiado). Cada copia se
    rehace con el motor desde su sobre: `key` = `<origen>~<sobre>.<i>`. */
 const cuenta = { uid: '', saldo: 0, parada: false, falta: 0, mias: [], sobres: {}, gratis: 0, ofertas: [], ventas: [], cambios: [],
-  jugadores: {}, gente: {}, exh: [], listo: false, desfase: 0 };
+  jugadores: {}, gente: {}, exh: [], plant: [], listo: false, desfase: 0 };
 let col = {}, copies = {}, abriendo = new Set();   // los sobres en curso no entran a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
@@ -240,6 +252,19 @@ const artDe = c => (c.col === 'comp' && c.tier < 2 ? c.img.replace(/\/([^/]+)$/,
 function frontHTML(c, lazy) {
   const t = TIERS[c.tier], v = c.v, no = `${pad(c.num)}/${totalDe(c)}`, ld = lazy ? ' loading="lazy"' : '';
   const alt = `${c.name} — ${subtitle(c)}`;
+  // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
+  // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
+  if (c.col === 'futbol') {
+    return `<div class="face front full futbol ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
+      <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
+      ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
+      ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
+      <div class="fu-top"><span class="fu-pos" title="${FUT_POSICION[c.pos]}">${FUT_POSICION[c.pos]}</span><span class="fu-flag" title="${FUT_PAIS[c.pais]}" aria-label="${FUT_PAIS[c.pais]}">${bandera(c.pais)}</span></div>
+      ${wearHTML(c)}
+      <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><b class="fu-dorsal">${c.dorsal}</b></div>
+      <i class="fu-marco"></i>
+    </div>`;
+  }
   if (c.tier >= 2) {
     return `<div class="face front full ${t.key}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
@@ -694,6 +719,7 @@ const TEAR_Y = 13; // % de la altura del sobre
 const SKIN = {
   profes: { badge: 'SERIE 01', sub: 'DIE COLLECTION', meta: '5 CARTAS · EDICIÓN HOLO' },
   comp: { badge: 'SERIE 02', sub: 'COMPONENTES', meta: '5 CARTAS · EDICIÓN PCB' },
+  futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: '5 CARTAS · ESPECIAL SUPERCLÁSICO' },
 };
 const fanDe = (col, tier = 2) => CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
 function skinHTML(fan, col = coleccion) {
@@ -792,7 +818,9 @@ function eligeSobre() {
   const box = $('#chooserPacks');
   box.innerHTML = COLS.map(co => {
     const todas = M.POR_COL[co.key], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
-    const temas = co.key === 'comp' ? '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…' : 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…';
+    const temas = co.key === 'comp' ? '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…'
+      : co.key === 'futbol' ? 'Especial Superclásico · Real Madrid y Barça, cada jugador en común, rara y épica'
+      : 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…';
     return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
       <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
       <b>${co.label}</b><small>${k.badge} · ${todas.length} cartas</small>
@@ -988,7 +1016,7 @@ function focusTop() {
 }
 function setDots() {
   [...$('#dots').children].forEach((d, i) => {
-    const c = pull[i], on = els[i] && els[i].revealed;
+    const c = pull[i], on = !!c && els[i] && els[i].revealed;   // al cambiar de sobre, `els` aún es el del anterior
     d.className = on ? 'on' : i === current && phase === 'reveal' ? 'cur' : '';
     d.style.setProperty('--c', on ? accentOf(c) : '');
   });
@@ -1118,7 +1146,7 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
+  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta', 'plantilla', 'fuModal'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
   if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
     if (phase === 'pack' && e.target.tagName !== 'BUTTON') { e.preventDefault(); autoTear(); }
     else if (phase === 'reveal') { e.preventDefault(); act(); }
@@ -1267,11 +1295,11 @@ function closeOverlays() {
   if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
   zoomVuelve = '';
   if (!$('#ruleta').hidden) { if (!rl.girando) cierraRuleta(); return; }
-  $('#zoom').hidden = true; $('#collection').hidden = true; $('#reroll').hidden = true;
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#reroll').hidden = true; $('#plantilla').hidden = true; $('#fuModal').hidden = true;
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-for (const id of ['zoom', 'collection', 'reroll']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
+for (const id of ['zoom', 'collection', 'reroll', 'plantilla', 'fuModal']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
 
 /* ---------------- VENDER ----------------
@@ -1563,6 +1591,8 @@ const NR = M.REROLL.n;
 const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
 const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false };
 const keyDe = cp => cp.key;
+// las rarezas que se pueden re-rollear: todas bajo la más alta de la colección (fútbol no tiene legendarias)
+const rrTiers = (co = rr.col) => [0, 1, 2].filter(i => i < M.POOL[co].tope);
 // lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
 const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
@@ -1574,7 +1604,7 @@ function ordenAuto(lista) {
     const u = CARDS[cp.id].uid, m = mejor[u];
     if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
   }
-  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) || cuenta.plant.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
   return lista.slice().sort((a, b) => peso(a) - peso(b));
 }
 function miniCp(cp, extra = '') {
@@ -1588,9 +1618,10 @@ function abreReroll() {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
   // abre en la colección del sobre, o en la otra si solo ahí alcanza, y en la rareza más baja que alcanza
-  const alcanza = co => [0, 1, 2].some(i => elegibles(i, co).length >= NR);
+  const alcanza = co => rrTiers(co).some(i => elegibles(i, co).length >= NR);
   rr.col = alcanza(coleccion) || !COLS.some(co => alcanza(co.key)) ? coleccion : COLS.find(co => alcanza(co.key)).key;
-  const t = [0, 1, 2].find(i => elegibles(i).length >= NR);
+  const t = rrTiers().find(i => elegibles(i).length >= NR);
+  if (!rrTiers().includes(rr.tier)) rr.tier = 0;
   if (t !== undefined && elegibles(rr.tier).length < NR) rr.tier = t;
   rr.seguro = false;
   $('#collection').hidden = true; $('#summary').hidden || 0;
@@ -1610,16 +1641,18 @@ function notaEsperadaHTML(cps) {
     <span class="rr-campana">${d.prob.map((p, i) => `<span title="Nota ${i + 1}: ${(p * 100).toFixed(1).replace('.', ',')} %"><i style="height:${Math.max(2, p / max * 100)}%;--gc:${gradeColor(i + 1)}"></i><small>${i + 1}</small></span>`).join('')}</span>`;
 }
 function renderReroll() {
+  if (!rrTiers().includes(rr.tier)) rr.tier = 0;
   const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
+  const enPlant = rr.sel.filter(k => cuenta.plant.includes(k));
   $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
   $('#rrCols').innerHTML = COLS.map(co => {
-    const n = [0, 1, 2].reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
+    const n = rrTiers(co.key).reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
     return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === rr.col}">${co.label}<b class="rr-n${n >= NR ? ' ok' : ''}">${n >= NR ? '♻' : '·'}</b></button>`;
   }).join('');
   $('#rrCols').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { rr.col = b.dataset.col; rr.sel = []; rr.seguro = false; renderReroll(); });
-  $('#rrTabs').innerHTML = [0, 1, 2].map(i => {
+  $('#rrTabs').innerHTML = rrTiers().map(i => {
     const n = elegibles(i).length;
     return `<button role="tab" data-t="${i}" aria-selected="${i === t}">${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${TIERS[i + 1].sym}</span><b class="rr-n${n >= NR ? ' ok' : ''}">${n}</b></button>`;
   }).join('');
@@ -1635,14 +1668,15 @@ function renderReroll() {
       <span class="rr-a" aria-hidden="true">➜</span>
       <span class="rr-sale t${t + 1}"><b>?</b><small>${sig.sym} ${sig.label}</small></span>
     </div>
-    <p class="rr-sale-p">Sale ${M.probSalida(t).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('')}</p>
+    <p class="rr-sale-p">Sale ${M.probSalida(t, P.tope).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('')}</p>
     <p class="rr-nota">${notaEsperadaHTML(cps)}</p>
     <div class="rr-acc">
       <button class="btn mk-mini" id="rrAuto"${lista.length < NR ? ' disabled' : ''}>Elegir automático</button>
       <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
       <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
     </div>
-    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '')}</button>`).join('')}</div>`
+    ${enPlant.length ? `<p class="rr-aviso">⚽ ${enPlant.length === 1 ? 'Una de las que elegiste está' : `${enPlant.length} de las que elegiste están`} en tu plantilla: si haces el re-roll, ${enPlant.length === 1 ? 'sale' : 'salen'} de ella.</p>` : ''}
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, (cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '') + (cuenta.plant.includes(cp.key) ? '<em class="rr-plant" title="En tu plantilla">⚽</em>' : ''))}</button>`).join('')}</div>`
       : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
     <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
@@ -1683,6 +1717,11 @@ async function hazReroll() {
     cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
     cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
     cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
+    // las que estaban en la plantilla salen de ella (sin esperar: no frena la ruleta)
+    if (cuenta.plant.some(k => usadas.includes(k))) {
+      cuenta.plant = cuenta.plant.map(k => (usadas.includes(k) ? '' : k));
+      Red.pide('plantilla', { lista: cuenta.plant }).catch(() => {});
+    }
     rehazColeccion(); updateColCount();
     rr.sel = []; rr.seguro = false; rr.enviando = false;
     $('#reroll').hidden = true;
@@ -1720,7 +1759,7 @@ pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
 function cartaTira(base) {
-  const x = Math.random(), t = Math.min(3, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
+  const x = Math.random(), t = Math.min(M.POOL[rl.col].tope, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
   return l[Math.floor(Math.random() * l.length)].n;
 }
 function ruleta(r, t, nueva) {
@@ -1838,7 +1877,7 @@ function alDatos(d) {
   if (!colVisible(rr.col)) { rr.col = coleccion; rr.sel = []; }
   Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
     mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], pendientes: d.pendientes || 0,
-    gente: d.gente || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
+    gente: d.gente || {}, exh: d.exh || [], plant: d.plant || [], desfase: d.desfase || 0, listo: true });
   rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
@@ -1847,6 +1886,8 @@ function alDatos(d) {
     const vivos = ks.filter(k => cuenta.sobres[k] && colVisible(M.coleccionDe(k))).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
     if (vivos.length) newPacks(vivos);
     else eligeSobre();
+    // `?abre=plantilla`: el «Editar plantilla» del perfil
+    if (VER.get('abre') === 'plantilla') { if (!vivos.length) { coleccion = 'futbol'; tienda(); } abrePlantilla(); }
     return;
   }
   // cambió qué colecciones ve: se vuelve a elegir sobre si estaba eligiendo
@@ -1887,6 +1928,7 @@ const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
   const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, promo = p1 < M.PRECIO.normal, gl = gratisListo();
   pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
+  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = coleccion !== 'futbol';
   if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
@@ -1910,6 +1952,45 @@ function pintaCompra() {
   const ag = $('#againFreeBtn');
   ag.hidden = !gl; ag.disabled = comprando;
 }
+/* El tip del sobre de fútbol: qué tan seguido sale cada rareza. Sale de
+   los mismos pesos que el motor; como fútbol no tiene legendarias, lo que
+   sería legendaria cuenta como épica. */
+function tipFutbol() {
+  const w = TIERS.map(t => t.w), pct = x => `${(x * 100).toFixed(1).replace('.', ',').replace(',0', '')} %`;
+  const porCarta = [w[0], w[1], w[2] + w[3]].map(x => x / 10000);
+  const quinta = [w[1], w[2] + w[3]].map(x => x / (w[1] + w[2] + w[3]));
+  // una épica en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
+  const pD = M.DIOS / 10000, epica = pD + (1 - pD) * (1 - (1 - porCarta[2]) ** 4 * (1 - quinta[1]));
+  const E = M.ESPERADO, n = M.POR_COL.futbol.length / 3, cada = x => Math.round(n / x);
+  return `<p><b>Cada sobre trae 5 cartas.</b></p>
+    <p>Por carta: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b>.
+      La quinta siempre es Rara o mejor (Rara ${pct(quinta[0])} · Épica ${pct(quinta[1])}).</p>
+    <p>Una Épica sale en <b>1 de cada ${Math.round(1 / epica)} sobres</b> (${pct(epica)}). El ${pct(pD)} son god packs: cinco Épicas.</p>
+    <p>Un jugador en concreto (hay ${n}): en Común, 1 de cada ${cada(E[0])} sobres; en Rara, 1 de cada ${cada(E[1])}; en Épica, 1 de cada ${cada(E[2] + E[3])}.</p>
+    <p class="fu-pronto">⚽ Próximamente, más equipos.</p>`;
+}
+/* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
+const NOVEDADES_FUTBOL = [
+  ['Octubre 2026', [
+    '<b>Nuevo sobre: Fútbol · Especial Superclásico</b> (Serie 03). Los 53 jugadores del primer equipo del Real Madrid y del Barça, cada uno en Común, Rara y Épica: 159 cartas. Mismo precio, mismo sobre gratis y las mismas probabilidades que los otros sobres; no hay legendarias.',
+    '<b>Cartas de futbolista</b> con su posición, la bandera de su selección, el dorsal y un marco del color de su rareza. Se gastan y se gradúan como las demás.',
+    '<b>Re-roll de fútbol</b>: 10 comunes por una rara (a veces épica) y 10 raras por una épica.',
+    '<b>⚽ Mi plantilla</b>: arma tu once ideal en 4-3-3 con los jugadores que te van saliendo. Cualquier jugador va en cualquier casilla; el selector los ordena por posición y se filtra por DEL, MED, DEF y POR.',
+    '<b>Puntuación de la plantilla</b>, de 0 a 100: la rareza pone el techo (común 60, rara 80, épica 100) y el estado de la carta lo escala. Tu plantilla se ve en tu perfil.',
+  ]],
+];
+const novedadesHTML = () => NOVEDADES_FUTBOL.map(([fecha, items]) => `<h3>${fecha}</h3><ul>${items.map(t => `<li>${t}</li>`).join('')}</ul>`).join('')
+  + '<p class="fu-pronto">⚽ Próximamente, más equipos.</p>';
+function abreFuModal(titulo, html) {
+  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  setTilt(null, null);
+  $('#fuModalTit').textContent = titulo;
+  $('#fuModalTxt').innerHTML = html;
+  $('#fuModal').hidden = false;
+  $('#fuModal .fu-modal').scrollTop = 0;
+}
+$('#fuTipBtn').onclick = () => abreFuModal('Probabilidades', tipFutbol());
+$('#fuNovBtn').onclick = () => abreFuModal('Novedades', novedadesHTML());
 setInterval(() => { if (cuenta.listo && cuenta.gratis && ahora() >= cuenta.gratis) cuenta.gratis = 0; if (cuenta.listo) pintaCompra(); }, 20000);
 let comprando = false;
 async function comprar(drop, gratis) {
@@ -2018,9 +2099,83 @@ $('#mktBtn').onclick = () => Red.manda({ tipo: 'mercado' });
 $('#volverBtn').hidden = !EMBEBIDO;
 $('#volverBtn').onclick = () => Red.manda({ tipo: 'volver' });
 pintaCompra();
-if (VISOR) montaVisorCarta();
-else if (EMBEBIDO) Red.manda({ tipo: 'listo' });
+if (!VISOR && EMBEBIDO) Red.manda({ tipo: 'listo' });
 else $('#cargando').innerHTML = '<p>PRODROP se abre desde <a href="../../juegos.html#cartas">Juegos</a>: ahí están tus monedas y tu colección.</p>';
+
+/* ---------------- PLANTILLA DE FÚTBOL ----------------
+   Un once en 4-3-3 (M.FORMACION) con las cartas de fútbol que tienes.
+   Cualquier jugador va en cualquier casilla. Cada cambio se guarda al tiro
+   en el perfil (público): Juegos comprueba que la carta sea tuya. La
+   puntuación es la del motor: la rareza pone el techo y el estado lo escala. */
+const pl = { lista: [], casilla: -1, recien: new Set(), guardando: false, filtro: '' };
+// el orden del selector y sus filtros: delanteros arriba, porteros al final
+const POS_ORDEN = ['DEL', 'MED', 'DEF', 'POR'];
+const copiaPorClave = k => Object.values(copies).flat().find(cp => cp.key === k) || null;
+const puntosDeCopias = cps => M.puntosPlantilla(cps.map(cp => cp && { tier: CARDS[cp.id].tier, g: cp.g }));
+// la cancha: delanteros arriba, portero abajo; `alTocar(i)` hace editable cada casilla
+function pintaCancha(box, cps, alTocar) {
+  box.innerHTML = '<i class="pl-lineas" aria-hidden="true"></i>';
+  for (let f = 3; f >= 0; f--) {
+    const fila = document.createElement('div');
+    fila.className = 'pl-fila';
+    M.FORMACION.forEach((s, i) => {
+      if (s.fila !== f) return;
+      const cas = document.createElement(alTocar ? 'button' : 'div');
+      cas.className = `pl-casilla${cps[i] ? ' llena' : ''}${i === pl.casilla ? ' activa' : ''}`;
+      if (cps[i]) { const el = makeCard(fromCopy(CARDS[cps[i].id], cps[i]), { back: false }); light(el); cas.appendChild(el); }
+      else cas.innerHTML = `<span class="pl-vacia">${alTocar ? '+' : ''}</span>`;
+      cas.insertAdjacentHTML('beforeend', `<span class="pl-pos">${s.pos}</span>`);
+      if (alTocar) cas.onclick = () => alTocar(i);
+      fila.appendChild(cas);
+    });
+    box.appendChild(fila);
+  }
+}
+function renderPlantilla() {
+  const cps = pl.lista.map(k => (k ? copiaPorClave(k) : null));
+  $('#plPuntos').innerHTML = `${puntosDeCopias(cps)}<small> pts</small>`;
+  pintaCancha($('#plCancha'), cps, i => { pl.casilla = pl.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderPlantilla(); });
+  const box = $('#plElige');
+  box.hidden = pl.casilla < 0;
+  if (box.hidden) return;
+  /* Por línea (delanteros, medios, defensas, porteros) y dentro de cada
+     una, las del sobre recién abierto primero y luego de la mejor rareza a
+     la peor. El filtro solo ayuda a buscar: cualquiera va en cualquier casilla. */
+  const usadas = new Set(pl.lista.filter(Boolean));
+  const libres = Object.values(copies).flat()
+    .filter(cp => CARDS[cp.id].col === 'futbol' && !usadas.has(cp.key) && (!pl.filtro || CARDS[cp.id].pos === pl.filtro))
+    .sort((a, b) => POS_ORDEN.indexOf(CARDS[a.id].pos) - POS_ORDEN.indexOf(CARDS[b.id].pos)
+      || pl.recien.has(b.key) - pl.recien.has(a.key) || CARDS[b.id].tier - CARDS[a.id].tier);
+  const chips = POS_ORDEN.map(p => `<button class="pl-filtro" data-filtro="${p}" aria-pressed="${pl.filtro === p}" title="${FUT_POSICION[p]}">${p}</button>`).join('');
+  box.innerHTML = `<div class="pl-elige-head"><b>${M.FORMACION[pl.casilla].pos} · elige un jugador</b><span class="pl-filtros" role="group" aria-label="Filtrar por posición">${chips}</span>
+      ${pl.lista[pl.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="link" data-cancelar>Cancelar</button></div>
+    ${libres.length ? `<div class="tc-rejilla">${libres.map(cp => `<button class="tc-elige" data-c="${esc(cp.key)}">${miniCp(cp, `<i class="pl-tag">${CARDS[cp.id].pos}</i>${pl.recien.has(cp.key) ? '<em class="rr-exh">NUEVA</em>' : ''}`)}</button>`).join('')}</div>`
+      : `<p class="mk-vacio">${pl.filtro ? `No te quedan ${FUT_POSICION[pl.filtro].toLowerCase()}s libres.` : 'No te quedan jugadores libres: abre más sobres de Fútbol.'}</p>`}`;
+  // tocar un filtro deja solo esa línea; tocarlo otra vez vuelve a mostrar todos
+  box.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { pl.filtro = pl.filtro === b.dataset.filtro ? '' : b.dataset.filtro; Snd.tick(); renderPlantilla(); });
+  const pon = k => { pl.lista[pl.casilla] = k; pl.casilla = -1; guardaPlantilla(); };
+  box.querySelectorAll('[data-c]').forEach(b => b.onclick = () => pon(b.dataset.c));
+  const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => pon('');
+  box.querySelector('[data-cancelar]').onclick = () => { pl.casilla = -1; renderPlantilla(); };
+}
+async function guardaPlantilla() {
+  pl.guardando = true; Snd.flip(); renderPlantilla();
+  try { await Red.pide('plantilla', { lista: pl.lista }); cuenta.plant = pl.lista.slice(); }
+  catch (e) { toast(e.message || 'No se pudo guardar la plantilla.', true); pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : '')); }
+  pl.guardando = false; renderPlantilla();
+}
+function abrePlantilla(recien = []) {
+  if (!cuenta.listo) return;
+  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  setTilt(null, null);
+  // solo las que siguen siendo tuyas (una que se fue en un re-roll queda vacía)
+  pl.lista = M.FORMACION.map((_, i) => (cuenta.plant[i] && copiaPorClave(cuenta.plant[i]) ? cuenta.plant[i] : ''));
+  pl.casilla = -1; pl.recien = new Set(recien);
+  renderPlantilla();
+  $('#plantilla').hidden = false;
+}
+$('#plantBtn').onclick = () => abrePlantilla(pull.map(c => c._copy && c._copy.key).filter(Boolean));
+$('#plantBtn2').onclick = () => abrePlantilla();
 
 /* ---------------- VISOR ----------------
    `index.html?ver=1&o=&k=&i=&at=&gr=1[&rr=id.g.w]`: el detalle del mercado
@@ -2042,3 +2197,27 @@ function montaVisorCarta() {
   $('#visor').hidden = false;
   setTilt(el.querySelector('.tilt'), document.body, 1.1);
 }
+
+/* `?plantilla=1&pl=…`: la plantilla de alguien para su perfil en Juegos.
+   Cada casilla viene como `o~k.i!at!gr[!id.g.w]` (ver urlPlantilla en
+   prodrop-cartas.js) y se dibuja con las cartas de verdad, sin editar. */
+function montaVisorPlantilla() {
+  document.body.classList.add('visor-plantilla');
+  const cps = (VER.get('pl') || '').split(',').slice(0, M.FORMACION.length).map(x => {
+    const [c, at, gr, rr] = x.split('!'), m = /^([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(c || '');
+    if (!m) return null;
+    const r = (rr || '').split('.').map(Number);
+    try {
+      const cp = copiaDe({ o: m[1], k: m[2], i: +m[3], at: +at, gr: gr === '1', rr: r.length === 3 && r.every(Number.isFinite) ? { id: r[0], g: r[1], w: r[2] } : null });
+      return CARDS[cp.id] && CARDS[cp.id].col === 'futbol' ? cp : null;
+    } catch { return null; }
+  });
+  const box = document.createElement('div');
+  box.className = 'pl-cancha';
+  pintaCancha(box, cps, null);
+  $('#visor').appendChild(box);
+  $('#visor').hidden = false;
+}
+
+// al final: el visor usa la plantilla y todo lo de arriba
+if (VISOR) VER.has('plantilla') ? montaVisorPlantilla() : montaVisorCarta();

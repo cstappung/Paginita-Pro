@@ -156,6 +156,31 @@ test('boxhead: tienda, potencia y armadura',()=>{
  assert.ok(D.ARMADURA.absorbe>0&&D.ARMADURA.absorbe<1&&D.ARMADURA.max>0);
 });
 
+test('boxhead: niveles de arma en la tienda, cada vez más caros y con tope',()=>{
+ for(const a of D.ARMAS){
+  let antes=0;
+  for(let n=0;n<D.NIVEL_ARMA.max;n++){const p=D.precioNivelArma(a.id,n);assert.ok(p>antes,a.nombre+' nivel '+n+' más caro');antes=p;}
+  assert.equal(D.precioNivelArma(a.id,D.NIVEL_ARMA.max),Infinity,a.nombre+' tope');
+  const b=D.arma(a.id),m=D.conNivel(b,D.NIVEL_ARMA.max);
+  if(b.d){assert.ok(m.d>b.d&&m.d<=500,a.nombre+' daño');}
+  if(b.cad){assert.ok(m.cad<b.cad&&m.cad>=0.03,a.nombre+' cadencia');}
+  if(Number.isFinite(b.max))assert.ok(m.max>b.max,a.nombre+' munición');
+  assert.equal(D.conNivel(b,0),b,'nivel 0 no toca nada');
+  assert.equal(D.conNivel(b,99).nivel,D.NIVEL_ARMA.max,'nivel acotado');
+ }
+ assert.deepEqual([0,1,2,3,4,5].map(D.rangoArma),[0,1,1,2,2,3]);
+ assert.equal(D.precioNivelArma(0,0),300);
+ assert.equal(D.precioNivelArma(99,0),Infinity);
+});
+
+test('boxhead: el muro reforzado se vende por unidad y aguanta más',()=>{
+ const t=D.TIENDA.find(x=>x.id==='blindado');
+ assert.ok(t&&t.tecla==='M'&&t.precio>0);
+ assert.equal(D.precioTienda('blindado',0),t.precio);
+ assert.ok(D.MURO_BLINDADO.vida>=D.ARMAS[5].vida*5&&D.MURO_BLINDADO.vida<=1200,'más que cinco muros falsos, dentro del tope del director');
+ assert.ok(D.MURO_BLINDADO.max>=1);
+});
+
 test('boxhead: la penetración se gana con mejoras y tiene tope',()=>{
  const todas=new Set(D.MEJORAS.map(m=>m.id));
  const conPen=D.ARMAS.filter(a=>(D.PASOS[a.id]||[]).some(p=>p[0]==='pen'));
@@ -207,4 +232,29 @@ test('boxhead: la mezcla normal nunca saca un jefe',()=>{
   for(let k=0;k<p.length;k++)if(D.esJefe(k))assert.equal(p[k],0);
   for(let i=0;i<50;i++)assert.ok(!D.esJefe(D.tipoEnemigo(n,i/50)));
  }
+});
+
+/* El dibujo (grafico.js): cada enemigo tiene su paleta y su sangre, cada
+   arma su modelo con boca, y un punto proyectado sale donde debe. */
+test('boxhead: paletas, armas en la mano y proyección del dibujo',()=>{
+ const G=require('../../juegos/boxhead/js/grafico.js').BoxheadGrafico;
+ assert.equal(G.PAL_E.length,D.ENEMIGOS.length,'una paleta por enemigo');
+ for(const p of G.PAL_E){for(const c of ['piel','camisa','pantalon','pelo'])assert.match(p[c],/^#[0-9a-f]{3,6}$/i);assert.ok(['zombi','lado'].includes(p.brazos));}
+ for(let k=0;k<D.ENEMIGOS.length;k++)assert.equal(G.sangreDe(k).length,3);
+ for(const a of D.ARMAS){const m=G.partesArma(a.id);assert.ok(m.p.length>=1,a.nombre+' sin modelo');assert.equal(m.b.length,3);}
+ for(const s of D.SKINS)assert.equal(G.palJugador(s).brazos,'arma');
+ // mirando al este, la boca del arma queda a la derecha del jugador y en alto
+ const b=G.boca(100,100,0,0);
+ assert.ok(b[2]>110&&Math.abs(b[3]-100)<3&&b[4]>12&&b[1]<b[3]);
+ // inclinado 90° hacia atrás, la cabeza queda en el suelo detrás de los pies
+ const q=G.proyecta(100,100,0,0,0,30,1,Math.PI/2);
+ assert.ok(q[2]<75&&Math.abs(q[4])<1e-6);
+});
+
+test('el Demoledor: el único que va a romper, poco común; cada tipo tiene sus puntos',()=>{
+ assert.equal(D.PUNTOS.length,D.ENEMIGOS.length,'una entrada de PUNTOS por enemigo');
+ const rompen=D.ENEMIGOS.filter(e=>e.rompe);
+ assert.deepEqual(rompen.map(e=>e.id),[16]);
+ for(let n=1;n<=60;n++)assert.ok(D.mezclaNivel(n)[16]<=0.05+1e-9,'nivel '+n);
+ assert.equal(D.mezclaNivel(5)[16],0);assert.ok(D.mezclaNivel(6)[16]>0);
 });

@@ -20,6 +20,7 @@ import { SIN_COMIDA, useGame, useLuz } from '../store/gameStore'
 import { avisa, enJuegos } from '../store/red'
 import MM from '../../../../juegos/mascotas/motor.js'
 import { Scene, type Reaction, type Tool } from './Scene'
+import { Pueblo } from './Pueblo'
 import './app.css'
 
 const STAT_LABEL: Record<StatId, string> = {
@@ -673,6 +674,9 @@ export function App() {
   const [decorSel, setDecorSel] = useState<string | null>(null)
   // Vender (el mercado todavía no existe: solo el botón y el aviso).
   const [selling, setSelling] = useState<SellTarget | null>(null)
+  // El Pueblo (estilo Pet Society): la plaza y las casas de los vecinos.
+  const [pueblo, setPueblo] = useState(false)
+  const avisos = useGame((s) => s.avisos)
 
   // El tiempo avanza con la app abierta y se pone al día al volver a la pestaña.
   useEffect(() => {
@@ -685,11 +689,18 @@ export function App() {
     }
   }, [tickAll])
 
-  const say = useCallback((msg: string) => {
+  const say = useCallback((msg: string, ms = 2400) => {
     setToast(msg)
     window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setToast(null), 2400)
+    toastTimer.current = window.setTimeout(() => setToast(null), ms)
   }, [])
+  // Los cariños que dejaron las visitas se avisan al volver al corral (en el Pueblo esperan).
+  useEffect(() => {
+    if (!avisos.length || pueblo) return
+    play('grow')
+    say(avisos.join(' · '), 6000)
+    useGame.getState().limpiaAvisos()
+  }, [avisos, pueblo, say])
 
   const selected = pets.find((p) => p.id === selectedId) ?? null
   // Al cambiar de mascota, si se duerme o si se apaga la luz, se guarda lo que había en la mano.
@@ -884,6 +895,8 @@ export function App() {
       </div>
     )
 
+  if (pueblo) return <Pueblo onClose={() => setPueblo(false)} inicial={selectedId} volumen={<Volumen />} />
+
   return (
     <div className={`app${selected ? ' focus' : ''}`}>
       <header className="topbar">
@@ -911,6 +924,9 @@ export function App() {
               {lightsOn ? '💡' : '🌙'}
             </button>
           )}
+          <button className="icon-btn" aria-label="Pueblo" title="Pueblo: pasea con tu mascota y visita a los vecinos" onClick={() => (play('tap'), setPueblo(true))}>
+            🏘️
+          </button>
           <button className="icon-btn" aria-label="Regalos" title="Regalos y pociones" onClick={() => setGifts(true)}>
             🎁
           </button>

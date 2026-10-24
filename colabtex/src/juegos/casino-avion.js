@@ -9,7 +9,7 @@
    ve va un poco por detrás del reloj (`RETRASO`): cuando el aviso trae un
    choque, casi siempre llega antes de que la curva lo alcance y el avión
    revienta justo en su punto, en vez de saltar hacia atrás. */
-import { AVION, multAvion, horaAvion, resuelveAvion, pagoDe, formatoPago } from "./casino-motor.js";
+import { AVION, multAvion, horaAvion, resuelveAvion, pagoDe, formatoPago, numeroEs } from "./casino-motor.js";
 import { formatoMonedas } from "./monedas.js";
 import { MONEDA } from "./monedas-vista.js";
 import { salidaFx, silenciado } from "./sonido.js";
@@ -19,7 +19,7 @@ const lee = (k, def) => { try { const v = localStorage.getItem(k); return v === 
 const guarda = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) {} };
 const espera = ms => new Promise(r => setTimeout(r, ms));
 const baja2 = x => Math.floor(x * 100 + 1e-9) / 100;
-const coma = (x, n = 2) => x.toLocaleString("es-CL", { minimumFractionDigits: n, maximumFractionDigits: n });
+const coma = (x, n = 2) => numeroEs(x, n, n);
 
 export function montarAvion(h, api) {
   const { uid, suena, formatoMult } = api;
@@ -163,11 +163,13 @@ export function montarAvion(h, api) {
   function pintaHist() {
     const e = api.economia();
     if (!e) return;
-    const l = Object.values(e.rondas).filter(r => r.u === uid && r.j === "a" && r.estado !== "vuela").sort((a, b) => b.at - a.at).slice(0, 16);
-    $("[data-hist]").innerHTML = l.map(r => r.estado === "cobrada"
+    const l = api.mias().filter(r => r.j === "a" && r.estado !== "vuela").slice(0, 16);
+    const el = $("[data-hist]"), h = l.map(r => r.estado === "cobrada"
       ? `<span class="ok" title="Te retiraste: +${formatoPago(r.pago - r.p)}">${formatoMult(r.mult)}</span>`
       : `<span class="${r.choque >= 2 ? "medio" : "mal"}" title="Se estrelló">${r.choque ? formatoMult(r.choque) : "—"}</span>`).join("");
-    $("[data-feed]").innerHTML = api.feedHtml(6);
+    // solo si cambió: rehacerlo reinicia la animación de entrada de cada una
+    if (el.dataset.sig !== h) { el.dataset.sig = h; el.innerHTML = h; }
+    api.pintaFeed($("[data-feed]"), 6);
   }
 
   /* Lo que se ve de una ronda en este instante (con el retraso). */
@@ -437,7 +439,7 @@ export function montarAvion(h, api) {
       if (!e) { retomada = false; return; }
       // la economía resuelve sin reloj (todo vuelo viejo ya cayó): aquí se
       // vuelve a resolver con la hora de ahora
-      const r = Object.values(e.rondas).filter(x => x.u === uid && x.j === "a" && x.valida && rs[x.k] &&
+      const r = api.mias().filter(x => x.j === "a" && x.valida && rs[x.k] &&
         resuelveAvion(uid, x.k, rs[x.k], api.ahora()).estado === "vuela").sort((a, b) => b.at - a.at)[0];
       if (!r || api.ahora() > horaAvion(r.at, AVION.TOPE) - 1500 || !rs[r.k]) return;
       const x = rs[r.k];

@@ -4,9 +4,13 @@ Every game under `juegos/club/` (plus Frontera). Each one has its own `CLAUDE.md
 
 **Frame events from `conexion.js`**: `club-record` (your row, only when you
 have one; games adopt a better cloud record), `club-tabla` (`{categoria,
-propio|null}` on every table update without error) and `club-reintentar`
+propio|null}` on every table update without error), `club-reintentar`
 (the «Reintentar sincronización» button; the page also re-syncs its pending
-results and says so when there is nothing pending).
+results and says so when there is nothing pending) and `club-admin`
+(`{admin}`: the page sends whether the account is a Juegos admin when the
+frame loads; `Club.esAdmin()` reads it. Only for opening content in testing
+that saves nothing — PRO DEFENDER's kingdoms 6–10 before their day —, never as a security
+barrier: a console can flip it).
 
 ## Antitrampas (`docs/antitrampas.md`)
 
@@ -33,9 +37,10 @@ client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.
 
-**A guest's proof can become an account's** in the four guest
-*destacados* (`DE_INVITADO` in `solo/verifica.js`: BBTAN, ALETEO, FANAL,
-Trigon): `verificaClub` treats `u: "invitado"` as valid for any owner, so a
+**A guest's proof can become an account's** in `DE_INVITADO`
+(`solo/verifica.js`: the four *destacados* BBTAN, ALETEO, FANAL, Trigon, plus
+Tetris, Snake, 2048 and PRO PACMAN since Oct 2026, which also carry the
+account in proof and seed): `verificaClub` treats `u: "invitado"` as valid for any owner, so a
 score played as a guest can be saved after signing in (details in
 `docs/claude/juegos/salon.md`). Adding a game there means its proof must
 still bind everything else (seed, moves) and its game must adopt the guest's
@@ -82,9 +87,19 @@ moving the clock forward does not shorten it) and in `localStorage`
 not **another account** on the same browser. Both are the player's own, so
 a console can delete them: the punishment deters, the rejection protects.
 
+## Retos diarios: compartir y cuenta regresiva (`juegos/club/diario.js`)
+
+Sopa, Sudoku and Electrodle load `../diario.js` (before their game script,
+`?v=diario-N`); Integrodle has its own countdown and only appends the link.
+`DiarioClub.cierre(el, {texto, juego, prox})` adds «📣 Compartir resultado»
+and «Nueva sopa en hh:mm:ss» (to the Chile midnight, like each engine's
+`diaChile`); `comparte` opens the phone's share sheet (copies on a PC) and
+always appends the link `juegos.html#solo/<juego>`, which is what brings
+new people. Nothing is saved.
+
 ## Modo celular (pantalla completa mientras se juega)
 
-Tetris Club, the Tetris room, ALETEO and FANAL go **immersive on a phone in
+Tetris Club, the Tetris room, ALETEO, FANAL and PRO PACMAN go **immersive on a phone in
 portrait** (`pointer:coarse`, the smaller side ≤ 600 px, taller than wide);
 desktop and landscape are untouched. In a Club game, `Club.inmersivo(on)` in
 `conexion.js` decides it (`Club.celular()` measures `window.top`, since the
@@ -100,6 +115,7 @@ bar on top, the game filling the rest without distortion (`100dvh`,
 safe-area insets, no scroll/zoom/selection), and a control strip of at most
 ~15 % of the height with buttons ≥ 48 px — Tetris `◀ ▼ ▶ ⟳ ⤓ ⇄` (⟲ hidden),
 rival wells in a narrow right column in the room; ALETEO flaps on a tap
-anywhere; FANAL ◀ ▶ left and ✦ right. Only the screen changes: the controls
+anywhere; FANAL ◀ ▶ left and ✦ right; PRO PACMAN `⚡ ◀ ▲ ▼ ▶ ◎` plus swiping
+anywhere. Only the screen changes: the controls
 send the same actions as the keyboard, so proofs, `mando.js` and the
 generated `controles-datos.js` are unaffected.

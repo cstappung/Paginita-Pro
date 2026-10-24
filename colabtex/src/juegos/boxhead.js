@@ -160,12 +160,12 @@ export function crearBoxhead({ uid, pid, jugar, terminar, mirando }) {
     redEl.setAttribute("role", "status");
     redEl.hidden = true;
     frame = document.createElement("iframe");
-    frame.title = "Boxhead — partida en línea";
+    frame.title = "Pro BoxHead — partida en línea";
     frame.className = "jg-yemas-marco jg-boxhead-marco";
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-4";
+    frame.src = "juegos/boxhead/index.html?modo=online&v=boxhead-7";
     host.append(aviso, redEl, frame);
   }
 

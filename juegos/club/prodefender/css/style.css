@@ -140,6 +140,9 @@ button { font-family: inherit; }
 #game-main { flex: 1; display: flex; min-height: 0; }
 #stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; }
 #cv { display: block; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.6); touch-action: none; cursor: crosshair; }
+/* cursor grande: mira amarilla con borde negro, se ve sobre cualquier mapa
+   (la cruz del sistema se perdía en los fondos oscuros). «Clásico» en la pausa */
+#cv.cur-grande { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Ccircle cx='16' cy='16' r='8.5' stroke='%23000' stroke-width='5'/%3E%3Cpath d='M16 1.5v8M16 22.5v8M1.5 16h8M22.5 16h8' stroke='%23000' stroke-width='5'/%3E%3Ccircle cx='16' cy='16' r='8.5' stroke='%23ffe14d' stroke-width='2.4'/%3E%3Cpath d='M16 1.5v8M16 22.5v8M1.5 16h8M22.5 16h8' stroke='%23ffe14d' stroke-width='2.4'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%23ff3b6b' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") 16 16, crosshair; }
 #side { width: 300px; flex: none; background: var(--bg2); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; position: relative; }
 .side-title { font-family: 'Fredoka', sans-serif; font-size: 16px; padding: 10px 12px 4px; color: var(--muted); }
 #shop-wrap { flex: 1; overflow: auto; }
@@ -245,6 +248,7 @@ button { font-family: inherit; }
 .vol { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; text-align: left; }
 .vol label { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-weight: 700; font-size: 14px; }
 .vol input[type=range] { flex: 1; max-width: 220px; accent-color: var(--gold, #ffcf4d); }
+.vol select { flex: 1; max-width: 220px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; font-weight: 700; }
 
 /* defensas nuevas de cada reino */
 .shop-item.fresh { border-color: rgba(224,123,255,.45); }
@@ -289,3 +293,15 @@ button { font-family: inherit; }
 .shop-item.hero.used { opacity: .55; cursor: default; }
 .shop-item.hero.used .ct { color: var(--muted); font-size: 12px; }
 .lc-new span.hero { color: #ffe8a0; background: rgba(255,207,77,.14); border-color: rgba(255,207,77,.45); }
+.shop-item.pinchos { grid-column: 1 / -1; flex-direction: row; gap: 8px; padding: 4px 10px; border-color: rgba(200,206,220,.35); background: linear-gradient(90deg, rgba(200,206,220,.12), var(--panel)); }
+.shop-item.pinchos canvas { width: 40px; height: 40px; }
+.shop-item.pinchos .nm { flex: 1; font-size: 13px; justify-content: flex-start; min-height: 0; }
+.shop-item.pinchos .hk { top: auto; bottom: 3px; }
+
+/* Segunda era (reinos 6–10, en pruebas) */
+.lvl-sep { grid-column: 1 / -1; padding: 10px 14px; border-radius: 12px; background: linear-gradient(90deg, rgba(255,207,77,.18), rgba(176,92,255,.12)); border: 1px solid rgba(255,207,77,.35); color: var(--muted); font-size: 14px; }
+.lvl-sep b { color: var(--gold); font-family: 'Fredoka', sans-serif; font-size: 18px; margin-right: 4px; }
+.lvl-card.pronto .lock { color: #ffe8a0; letter-spacing: 1px; }
+.lvl-card.pronto .lock small { font-weight: 700; letter-spacing: 0; color: var(--muted); }
+.lvl-card .lc-prueba { position: absolute; top: 10px; left: 10px; max-width: calc(100% - 20px); background: #ffcf4d; color: #2a1a00; font-weight: 800; font-size: 12px; padding: 3px 10px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.lvl-card .lc-menos { font-size: 12px; color: #ffb0a0; font-weight: 700; }
