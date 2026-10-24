@@ -1245,9 +1245,8 @@ async function arrancar() {
         window.mkwNombresAlJuego?.();                    // (M22: y al juego, para la carrera siguiente)
       }
       else if (d.tipo === 'anfitrion' && typeof d.uid === 'string') window.mkwSala?.cambiarAnfitrion(d.uid);
-      // §99 (H1): el TURN (el repetidor de Cloudflare que entrega el Worker de amigos): las conexiones que no lograron ir
-      // directo se rearman usando también ese camino
-      else if (d.tipo === 'turn' && Array.isArray(d.iceServers)) { red?.malla?.ponerIce(d.iceServers); window.mkwEstado.turn = d.iceServers.length; nota(`[malla] TURN: ${d.iceServers.length} servidores`); }
+      // (§103b: el TURN ya no llega por aquí como reserva automática, §99; solo lo pide el modo «🛰 Todo por Cloudflare»,
+      // que lo escucha él mismo al armar la malla. Un sitio viejo que lo siga mandando no cambia nada: como en BT3)
       // §87: los pilotos que salieron de la sala del sitio (echados por el anfitrión, por votación o idos): la carrera en
       // curso los corta ya (sin esperar 2 s de silencio) y la sala no los cuenta en las que vienen
       else if (d.tipo === 'fuera' && Array.isArray(d.uids)) {

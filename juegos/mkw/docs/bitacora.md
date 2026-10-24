@@ -987,6 +987,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Asignación (TURN Allocate)** | Lo que el repetidor le presta a cada navegador: un puerto UDP propio desde donde reenvía lo suyo y donde recibe lo de los otros. Dura lo que el navegador la renueve (Refresh). Como una línea alquilada en la central. |
 | **Credenciales TURN** | El usuario y la contraseña que pide el repetidor para dar una asignación. Las de Cloudflare las entrega el Worker de amigos en `/turn` (vencen solas); cada mensaje va firmado con ellas (HMAC-SHA1). |
 | **Repetidor de mentira (`turn-local.mjs`)** | Un servidor TURN propio de este PC, solo para las pruebas: hace lo mismo que el de Cloudflare sin salir a internet. Nunca se publica. |
+| **Reserva automática (del repetidor)** | Lo que hacía la sala desde §99 y se quitó en §103b: el repetidor quedaba «enchufado» en todas las conexiones y WebRTC lo usaba solo si nada directo funcionaba. Ahora, como en BT3, el repetidor es solo el modo que prende el anfitrión. Como pasar de una transferencia automática a la red de respaldo a una manual. |
 | **SCTP (juntar mensajes)** | El protocolo que lleva los mensajes de los canales de datos de WebRTC. Si hay varios mensajes chicos esperando, los mete en un mismo paquete UDP: por eso 200 mensajes no son 200 paquetes. Como juntar varias cartas en un mismo sobre. |
 
 ## 2026-10-16 · Día 1
@@ -9653,3 +9654,24 @@ disponible»). Costo: el plan gratis de Cloudflare Realtime trae 1.000 GB al mes
 Con el modo **apagado**, la sala igual le pide al Worker las credenciales y WebRTC usa el repetidor **solo si nada
 directo funciona** (lo decidió §99, H1: con 66 pares nadie adivina cuál falla). En BT3 el repetidor no se usa nunca si el
 anfitrión no lo prende. Queda para que el dueño decida si Mario Kart sigue así o se apaga del todo como en BT3.
+
+### 103.7 La respuesta del dueño: «como en el bt3» (§103b)
+
+El dueño eligió que sea como en BT3: **sin el modo, no hay repetidor, ni de reserva**. Lo que se quitó:
+
+| Dónde | Antes (§99) | Ahora (§103b) |
+|---|---|---|
+| El sitio (`colabtex/src/juegos/mkw.js`, cuando la sala del juego existe) | le pedía al Worker las credenciales (`relevoBt3()`) y se las mandaba al marco, siempre | nada: el único pedido a `/turn` es el que hace el marco en el modo «🛰 Todo por Cloudflare» (`{tipo:'turn'}`) |
+| El juego (`mkw.mjs`, los mensajes del sitio) | sumaba ese TURN a cada conexión nueva (`malla.ponerIce`): ICE lo usaba si nada directo andaba | no lo escucha: un sitio viejo (en la caché de alguien) que lo siga mandando no cambia nada |
+| La ayuda de «Directa» en el vestíbulo | — | dice «Si a alguien no le conecta, prueben «🛰 Todo por Cloudflare»», como el «último recurso» de BT3 |
+
+**Qué significa para quien juega:** dos PC detrás de redes difíciles (las que no dejan pasar una conexión directa:
+NAT simétrico, algunas universidades o empresas, algunos datos móviles) ya no se conectan solas por Cloudflare. El
+anfitrión tiene que prender el modo y volver a empezar. A cambio, ningún paquete pasa por Cloudflare sin que el
+anfitrión lo haya elegido.
+
+**Pruebas:** sitio `mkw.test.cjs` 23/23 (la prueba de §103 ahora además exige que el sitio llame a `/turn` una sola vez,
+la del marco; que no mande el TURN por su cuenta; y que el juego use `ponerIce` solo dentro del modo; la de M22, que
+pedía lo de §99, se dio vuelta). Con el juego, con el programa final: banco `red` 35/35, `prueba-sincro --directa
+--cloudflare` 15/15 (los dos extremos «relay», 962 KB por el repetidor) y `prueba-sincro --sala` 11/11 (la sala del sitio
+de mentira, directo y sin repetidor: retraso A 3, B 2).

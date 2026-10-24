@@ -76,9 +76,9 @@ Cloudflare → **Workers & Pages** → el Worker del disco de BT3 → **Edit cod
 **Deploy**.
 
 - No hay variables nuevas: usa las mismas `AMIGOS`, `ORIGENES`, `CLAVE_SUBIDA` y el mismo binding `DISCO`.
-- El repetidor de Cloudflare (TURN) usa las mismas `TURN_ID` y `TURN_CLAVE` de BT3, si ya están. Mario Kart lo usa
-  solo si nada directo anda, o todo por ahí si el anfitrión prende «🛰 Todo por Cloudflare» en la sala (§103, apagado
-  por omisión). Sin esas dos, `/turn` contesta 404 y todo va directo: el juego anda igual.
+- El repetidor de Cloudflare (TURN) usa las mismas `TURN_ID` y `TURN_CLAVE` de BT3, si ya están. Como en BT3, Mario
+  Kart lo usa solo si el anfitrión prende «🛰 Todo por Cloudflare» en la sala (§103, apagado por omisión; sin el modo,
+  ni de reserva: §103b). Sin esas dos, `/turn` contesta 404 y todo va directo: el juego anda igual.
 - BT3 sigue igual (sus 7 pruebas pasan con este archivo). Lo nuevo son las rutas `/mkw/…` (6 pruebas más).
 - Para que los pedazos del disco queden en el caché de Cloudflare cerca de Chile, el Worker necesita un **dominio
   propio** (Settings → Domains & Routes → Custom domain); en `*.workers.dev` funciona igual, pero todo sale de R2.

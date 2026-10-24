@@ -345,11 +345,9 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       if (muerto || ++vueltas > 240) { clearInterval(esperaSala); return; }
       if (frame?.contentWindow?.mkwSala) {
         clearInterval(esperaSala); avisado = ""; avisaMarco();
-        /* §99 (crítico de la red, H1): el TURN de Cloudflare (el Worker de amigos lo entrega en /turn, el mismo de BT3):
-           sin él, dos PC detrás de redes difíciles (NAT simétrico, datos móviles, universidad) no se conectan nunca. ICE lo
-           usa solo si nada directo funciona. Siempre, sin que el anfitrión lo active: con 66 pares nadie adivina cuál falla */
-        const w = frame.contentWindow;
-        relevoBt3().then(ice => { if (!muerto && frame?.contentWindow === w && ice.length) enviar("turn", { iceServers: ice }); }, () => {});
+        /* §103b (el dueño: «como en el bt3»): el TURN de Cloudflare ya no va de reserva automática (§99 lo mandaba siempre
+           y ICE lo usaba si nada directo andaba). Como en BT3, el repetidor es solo el modo «🛰 Todo por Cloudflare» que
+           prende el anfitrión: entonces el marco pide las credenciales él mismo ({tipo:"turn"}, más abajo en mensaje()) */
       }
     }, 500);
   }
@@ -727,7 +725,7 @@ const AYUDA_NIVEL = { facil: "Para practicar o para quien recién empieza.", nor
   imposible: "Injusto a propósito: más rápidas que cualquier kart (un 15 % sobre el tope) y aceleran 1,5 veces más." };
 /* §103: cómo se conectan los pilotos (como el relevo de BT3: lo excepcional lo prende el anfitrión, nunca solo) */
 const MKW_CONEXION = { directa: "Directa", cloudflare: "🛰 Todo por Cloudflare" };
-const AYUDA_CONEXION = { directa: "Cada piloto se conecta directo con los demás: lo normal, con el ping más bajo.",
+const AYUDA_CONEXION = { directa: "Cada piloto se conecta directo con los demás: lo normal, con el ping más bajo. Si a alguien no le conecta, prueben «🛰 Todo por Cloudflare».",
   cloudflare: "Todo pasa por el repetidor de Cloudflare. Solo si les cuesta conectarse o las carreras se cortan: un poco más de ping." };
 const CORONA = '<svg class="jg2-corona" viewBox="0 0 16 16" role="img" aria-label="anfitrión"><title>Anfitrión</title><path fill="currentColor" d="M1 4.5l3.6 3.1L8 2l3.4 5.6L15 4.5 13.6 13H2.4z"/></svg>';
 /* Los estilos del vestíbulo nuevo: van aquí y no en juegos.html (ese archivo no se toca), en un <style> que se agrega

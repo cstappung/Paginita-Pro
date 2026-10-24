@@ -90,6 +90,13 @@ test('§103 «🛰 Todo por Cloudflare»: apagado por omisión, lo prende solo e
  assert.match(fuente,/if \(d\.tipo === "turn"\) \{/);assert.match(fuente,/tipo: "turn", iceServers: ice \|\| \[\]/);
  const juego=fs.readFileSync(raiz('../juegos/mkw/web/navegador/mkw.mjs'),'utf8');
  assert.match(juego,/parametros\.get\('conexion'\) === 'cloudflare'/);assert.match(juego,/soloRelevo: todoRelevo/);
+ // §103b (el dueño: «como en el bt3»): sin el modo no hay repetidor ni de reserva. El sitio pide /turn solo cuando el
+ // marco lo pide (y el marco, solo con conexion=cloudflare); el juego no suma un TURN que le llegue por otro lado
+ assert.equal((fuente.match(/relevoBt3\(\)/g)||[]).length,1,'un solo pedido al /turn: el del marco');
+ assert.doesNotMatch(fuente,/enviar\("turn"/,'el sitio ya no manda el TURN por su cuenta (era la reserva de §99)');
+ assert.equal((juego.match(/\.ponerIce\(/g)||[]).length,1,'el juego usa el TURN solo en el modo «Todo por Cloudflare»');
+ assert.match(juego,/if \(todoRelevo\) \{[\s\S]{0,700}malla\.ponerIce\(d\.iceServers\)/);
+ assert.doesNotMatch(juego,/d\.tipo === 'turn'/);
 });
 
 test('copa y playlist: la cilindrada del anfitrión, y al terminar vuelven al vestíbulo con la tabla final',()=>{
@@ -408,9 +415,11 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  assert.match(mk,/new URLSearchParams\(\{ precarga: "1", senal: "padre", privado: origen \}\)/);
  assert.match(mk,/marcoPre && e\.source === marcoPre\.contentWindow && e\.origin === location\.origin && e\.data\?\.canal === HIJO/,'solo los mensajes de ESE marco');
  assert.match(mk,/senal\.entra\("~" \+ t\)/,'la presencia lleva «~»: la malla del juego no la toma por una sesión');
- // §99: el TURN del Worker (el de BT3) va al marco apenas la sala del juego escucha
+ // §99 → §103b: el TURN del Worker (el de BT3) ya no va al marco por su cuenta al armarse la sala: solo cuando el marco
+ // lo pide, que es en el modo «🛰 Todo por Cloudflare» (como en BT3)
  assert.match(mk,/import \{ revisaBt3, relevoBt3 \} from "\.\/bt3-amigos\.js";/);
- assert.match(mk,/relevoBt3\(\)\.then\(ice => \{ if \(!muerto && frame\?\.contentWindow === w && ice\.length\) enviar\("turn", \{ iceServers: ice \}\); \}/);
+ assert.doesNotMatch(mk,/enviar\("turn", \{ iceServers: ice \}\)/);
+ assert.match(mk,/relevoBt3\(\)\.catch\(\(\) => \[\]\)\.then\(ice => \{ if \(!muerto && frame\?\.contentWindow === w\) w\.postMessage\(\{ canal: PADRE, tipo: "turn", iceServers: ice \|\| \[\] \}/);
  assert.match(mk,/● listo/);assert.match(mk,/⬇ \$\{escapeHtml\(t\)\} %/);
  // la tira dice la fase que manda el marco (antes, un texto fijo toda la copa); «Terminar la copa» pregunta
  assert.match(mk,/d\.tipo === "fase" && typeof d\.fase === "string"/);

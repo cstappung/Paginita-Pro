@@ -194,8 +194,8 @@ publicarlo (Worker + R2), guardarlo en git y terminar el en línea.
     conviene frenarse un poco también por la relevada que va poco atrás, o soltarla antes.
   - ✅ «🛰 Todo por Cloudflare» (§103, pedido del dueño, 2026-10-24): un ajuste de la sala, **apagado por omisión** y
     excepcional como en BT3, que manda todos los paquetes por el repetidor TURN de Cloudflare (`?conexion=cloudflare`,
-    `malla.mjs` `soloRelevo`). Probado con un TURN de mentira propio (`herramientas/turn-local.mjs`). **Pregunta al
-    dueño:** con el modo apagado, ¿el repetidor sigue de reserva automática (§99) o se apaga del todo como en BT3?
+    `malla.mjs` `soloRelevo`). Probado con un TURN de mentira propio (`herramientas/turn-local.mjs`). Con el modo
+    apagado, **sin repetidor, ni de reserva** (§103b, el dueño: «como en el bt3»).
 
 ### Etapa C — En línea: terminarlo y endurecerlo
 - ✅ C1. Elegir personaje y vehículo en la sala para la carrera sincronizada: con las pantallas del juego (§73)
@@ -503,6 +503,12 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 14:05** — **El repetidor, como en BT3** (§103b, el dueño: «como en el bt3»). Sin «🛰 Todo por
+  Cloudflare» ya no hay repetidor ni de reserva: el sitio dejó de mandarle al marco el TURN de §99 al armarse la sala
+  (`mkw.js`; el único `relevoBt3()` es el que pide el marco en el modo) y el juego no lo escucha por otro lado
+  (`mkw.mjs`). La ayuda de «Directa» sugiere el modo si a alguien no le conecta. Sitio `mkw.test` 23/23 (la de §103
+  exige un solo pedido a `/turn`; la de M22 se dio vuelta), banco `red` 35/35, `prueba-sincro --directa --cloudflare`
+  15/15 (962 KB por el repetidor) y `prueba-sincro --sala` 11/11 (directo, sin repetidor).
 - **2026-10-24 13:50** — **«🛰 Todo por Cloudflare»** (§103, pedido del dueño: «la opción 1… no habilitada por
   defecto, tal como en el bt3 que es excepcional»). El anfitrión lo prende en «✎ Cambiar» → Conexión (`motor.js`
   `{t:"ajuste",k:"relevo"}`, `mkw.js` la fila y `&conexion=cloudflare`); la página pide las credenciales al sitio
