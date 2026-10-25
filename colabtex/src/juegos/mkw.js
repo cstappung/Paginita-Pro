@@ -30,7 +30,9 @@ import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, MKW_NIVEL, mkwCarrera, mkwTabla } fr
      almacenes con la base del sitio y se los pasa al marco (misma página, mismo origen) apenas carga.
      El VR se mueve con cada carrera de la sala (el marco lo calcula y lo guarda, `vr-sala.mjs`, §82): el marco
      avisa el suyo (`vr`) y, al terminar la copa (`fin`), el vestíbulo vuelve a leer el de los demás.
-   - Quien entra con la copa andando espera a la siguiente tanda. Quien mira la sala sin ser jugador no carga el juego.
+   - Quien entra con la copa andando se suma a ella (§110: escribe `{t:"suma"}`; su juego corre desde la carrera
+     siguiente que alcance a cargar, como quien recargó). Los marcos que ya corren NO se recargan: se les avisa la lista
+     nueva (`sincro`) y la sala del juego lo anota. Quien mira la sala sin ser jugador no carga el juego.
 
    Controles del juego: teclado y mandos (los celulares quedaron fuera del lanzamiento: el táctil del juego queda, pero
    no se ofrece) — @controles: teclado */
@@ -101,13 +103,15 @@ const almacenPartidas = {
    CPU que eligió el anfitrión (MKW_NIVEL), aparte de la cilindrada. §103: `conexion=cloudflare` = el anfitrión prendió
    «🛰 Todo por Cloudflare» (todo por el repetidor TURN; sin eso, nada en la dirección). Los nombres no van en la
    dirección: se le mandan al marco. */
-export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", relevo = false }) {
+export function srcMkw({ pid, uid, nodo, privado, ronda, sincro, base = 0, jefe, estilo = "copa", carreras = 4, cc = "c150", nivel = "maximo", relevo = false }) {
   const q = new URLSearchParams({ auto: "1", red: "malla", senal: "padre", sala: pid, uid, nodo: String(nodo) });
   const { semilla } = mkwCarrera(pid, ronda);
   q.set("modo", "sala"); q.set("sincro", sincro.join(",")); q.set("jefe", jefe || sincro[0]); q.set("semilla", String(semilla));
   q.set("estilo", estilo === "playlist" ? "playlist" : "copa"); q.set("carreras", estilo === "playlist" ? String(carreras) : "4"); q.set("cc", cc);
   q.set("cpu", MKW_NIVEL[nivel] ? nivel : "maximo");
   if (relevo === true) q.set("conexion", "cloudflare");
+  // §110: cuántos de `sincro` estaban al empezar la copa (los demás llegaron después y se suman a una carrera)
+  if (base > 0 && base < sincro.length) q.set("base", String(base));
   if (privado) q.set("privado", privado);
   q.set("r", String(ronda));
   return PAGINA + "?" + q.toString();
@@ -183,6 +187,7 @@ export function crearMkwSolo({ volver, enLinea, revisar = revisaBt3, privadoUrl 
 export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avatar, inmersivo }) {
   let host = null, escena = null, vest = null, frame = null, partida = null, est = null;
   let permitido = false, muerto = false, firmaVest = "", firmaMarco = "", origen = null, borrado = false, jefeMarco = "", avisado = "";
+  let sumaPedida = -1;                               // §110: la tanda en que ya pedí sumarme (una vez por tanda)
   let senal = null, offP = null, offM = null, conecta = 0, esperaSala = 0;
   /* §99 (crítico de la red, H2): si al anfitrión se le corta internet o se le cuelga Chrome, nadie escribe «abandona» y
      la copa quedaba colgada (solo él la hace avanzar). Con la copa andando, cada página mira su presencia en el buzón de
@@ -291,6 +296,15 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     }
   }
 
+  /* §110: llegué (o volví) con la copa andando y no estoy en la lista de pilotos: me sumo (una vez por tanda; hasta 12).
+     Solo un amigo de la lista (permitido): a los demás ni el vestíbulo. Mi juego carga en cuanto `sincro` me incluye. */
+  function sumarme() {
+    if (!permitido || muerto || !enSala() || !corriendo() || !est?.sincro || est.sincro.includes(uid)) return;
+    if (est.sincro.length >= MKW_SINCRO_MAX || sumaPedida === est.ronda) return;
+    sumaPedida = est.ronda;
+    anota({ t: "suma", uid });
+  }
+
   /* Apenas el marco carga, le pasa los almacenes de Firebase (partidas, VR y récords) con el nombre de quien juega:
      el juego pone al día sus partidas con la cuenta antes de leerlas y lee el VR ANTES de entrar en línea (el piloto
      tarda más que esto en llegar a «VS mundial»). */
@@ -317,7 +331,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
      avisa al marco quién manda ahora (la sala del juego sigue con él). */
   async function cargaMarco() {
     if (!frame || !permitido) return;
-    // en la carrera sincronizada solo juegan los que estaban al empezar (el que llega espera a la tanda siguiente)
+    // en la carrera sincronizada juegan los de `sincro` (§110: el que llega se suma y entra en la carrera siguiente)
     const quiere = corriendo() && enSala() && (!est.sincro || est.sincro.includes(uid));
     if (!quiere) {
       frame.hidden = true;
@@ -327,14 +341,16 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     }
     if (inmersivo && inmPref && inmAuto !== est.ronda) { inmAuto = est.ronda; try { inmersivo(true); } catch {} }
     const nodo = est.nodos?.[uid];
-    const firma = `${est.ronda}|${nodo}|${(est.sincro || []).join(",")}`;
+    // (§110: sin la lista de pilotos: si crece porque alguien llegó, el juego que corre NO se recarga; avisaMarco le
+    // manda la lista nueva)
+    const firma = `${est.ronda}|${nodo}`;
     if (firma === firmaMarco) { frame.hidden = false; avisaMarco(); return; }
     firmaMarco = firma; jefeMarco = est.anfitrion; avisado = ""; faseJuego = null; conex = {};
     if (origen === null) origen = await urlPrivada();
     if (muerto || firma !== firmaMarco) return;
     frame.hidden = false;
     verMarco();
-    frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, jefe: jefeMarco,
+    frame.src = srcMkw({ pid, uid, nodo, privado: origen, ronda: est.ronda, sincro: est.sincro, base: est.sincroBase, jefe: jefeMarco,
                          estilo: est.estilo, carreras: est.carreras, cc: est.cc, nivel: est.nivel, relevo: est.relevo === true });
     frame.focus();
     conectarNube();
@@ -436,10 +452,12 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     // (§87: y los pilotos de la copa que ya no están —se fueron, los echó el anfitrión o la votación—: el juego los
     // corta de la carrera en curso al momento y la sala no los espera en la siguiente)
     const salieron = est.sincro.filter(u => est.fuera?.[u]);
-    const firma = JSON.stringify([nombres, est.anfitrion, salieron]);
+    const firma = JSON.stringify([nombres, est.anfitrion, salieron, est.sincro]);
     if (firma === avisado) return;
     avisado = firma;
     enviar("nombres", { nombres });
+    // §110: la lista de pilotos (crece si alguien llegó con la copa andando): la sala del juego anota a los nuevos
+    if (est.sincro.length > (est.sincroBase || est.sincro.length)) enviar("sincro", { sincro: est.sincro });
     if (salieron.length) enviar("fuera", { uids: salieron });
     const jefe = jefeForzado || est.anfitrion;            // (§99: el que eligieron las páginas si el del sitio desapareció)
     if (jefe && jefe !== jefeMarco && est.sincro.includes(jefe)) { jefeMarco = jefe; enviar("anfitrion", { uid: jefe }); }
@@ -515,7 +533,7 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
     const nota = !enSala() ? (sacado ? (sacado.e === "echado" ? "El anfitrión te sacó de esta sala." : "Te sacaron de esta sala por votación.")
         : corre ? "Están corriendo. Solo los jugadores de la sala ven la carrera." : "Mirando la sala.")
       : corre && est.sincro ? (est.sincro.includes(uid) ? notaFase(manda, estilo)
-        : "Esta copa empezó sin ti: entras en la siguiente.")
+        : est.sincro.length >= MKW_SINCRO_MAX ? "La copa ya tiene 12 pilotos: entras en la siguiente." : "Te estás sumando a la copa…")
       : manda && sinPrograma ? "El programa del juego todavía no está publicado." : "";
     const foco = vest.contains(document.activeElement) ? document.activeElement.getAttribute("data-foco") : null;
     const salirBtn = sacado ? `<button type="button" class="jg2-salir" data-salir data-foco="salir">← Volver a Juegos</button>` : "";
@@ -593,7 +611,15 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       anota({ t: "echa", uid, a: b.dataset.e });
       return;
     }
-    if (b.classList.contains("jg-mkw-empieza")) { b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid }); return; }
+    // (§109, el dueño: «rellenar con CPU solo cuando estén todos los jugadores reales»): con lugares libres, pregunta.
+    // (§110: quien entre después se suma en la carrera siguiente)
+    if (b.classList.contains("jg-mkw-empieza")) {
+      const n = presentes().length, cpus = MKW_SINCRO_MAX - n;
+      if (cpus > 0 && !confirm(`Hay ${n} de ${MKW_SINCRO_MAX} pilotos: la CPU completa los otros ${cpus}. ` +
+        `Quien entre después se suma en la carrera siguiente. ¿Empezar igual?`)) return;
+      // (§110: con quiénes están al apretar: los que lleguen después se suman con {t:"suma"})
+      b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid, sincro: presentes().slice(0, MKW_SINCRO_MAX).map(j => j.uid) }); return;
+    }
     // (M22, el crítico: un clic cerraba la copa de todos, sin tabla; ahora pregunta)
     if (b.classList.contains("jg-mkw-vuelve")) {
       if (!confirm("¿Terminar la copa para todos? Se cierra el juego de todos y vuelven al vestíbulo, sin la tabla de esta copa.")) return;
@@ -664,12 +690,13 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       permitido = true;
       origen = await urlPrivada();
       if (muerto) return;
-      precarga(); cargaMarco(); pideVrs(); pintaVestibulo(true);
+      sumarme(); precarga(); cargaMarco(); pideVrs(); pintaVestibulo(true);
     });
   }
 
   function actualizar(p, estado) {
     partida = p; est = estado;
+    sumarme();
     vigilarAnfitrion();
     precarga();
     cargaMarco();

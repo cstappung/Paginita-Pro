@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reasignar todo el mando</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Reasignar todo el mando: <span>botones, gatillos, sticks y teclado</span></h1>
+<p>Prueba lo de la bitácora §111 (pedidos del dueño: «mejora la personalización de botones de mando», «que se puedan
+  rebindear todas las teclas»; la lista de pruebas la pidió el crítico) <b>sin el juego</b>, con mandos de mentira:
+  <code>asignacion-mando.mjs</code> (el mapa de cada mando, la captura, los nombres), <code>controles.mjs</code> (capturar,
+  quitar, restaurar, deshacer, el perfil por modelo, el teclado con varias teclas y el stick C) y el panel
+  <code>opciones-mandos.mjs</code> (la tabla). La prueba de oro: con lo de siempre, el mando da exactamente lo mismo que
+  antes, en 10 000 estados al azar.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div class="caja" id="panel"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { mapaPorOmision, aplicarMapa, migrarPropio, capturar, fotoMando, poner, valorFuente, nombreFuente, clavePerfil, revisarMapa, BITS, OBJETIVOS, esPorOmision, conReposo } from '/web/navegador/asignacion-mando.mjs';
+
+const { ok, fin } = prueba('asignacion', 'Reasignar todo el mando (sin el juego)');
+const cuadros = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+const boton = (p = false, v = p ? 1 : 0) => ({ pressed: p, value: v });
+const mando = (index, id, mapping = 'standard', nb = 17, ne = 4) => ({ index, id, mapping, connected: true, axes: Array(ne).fill(0), buttons: Array.from({ length: nb }, () => boton()) });
+
+try {
+  // ---- 1. La prueba de oro: lo de siempre = lo de antes (la lógica de controles.mjs hasta §110, copiada) ----
+  const B = BITS;
+  const VIEJO = [[0, B.A], [1, B.B], [2, B.X], [3, B.Y], [4, B.L], [5, B.Z], [9, B.START], [8, B.START], [12, B.arriba], [13, B.abajo], [14, B.izquierda], [15, B.derecha]];
+  const VIEJO_LETRA = [[1, B.A], [0, B.B], [3, B.X], [2, B.Y], ...VIEJO.slice(4)];
+  const stickGC = (x, y, z) => { const r = Math.hypot(x, y); if (r < z) return [0, 0]; const k = Math.min(1, (r - z) / (1 - z)) / r; return [Math.round(x * k * 127), Math.round(-y * k * 127)]; };
+  const viejo = (g, letra, z) => {
+    const ap = i => !!(g.buttons[i] && g.buttons[i].pressed); let botones = 0;
+    for (const [i, bit] of (letra ? VIEJO_LETRA : VIEJO)) if (ap(i)) botones |= bit;
+    let gl = Math.round(255 * (g.buttons[6].value || 0)); const gr = Math.round(255 * (g.buttons[7].value || 0));
+    if (gl > 128) botones |= B.L; if (gr > 128) botones |= B.R; if (ap(4)) gl = 255;
+    const [sx, sy] = stickGC(g.axes[0], g.axes[1], z), [cx, cy] = stickGC(g.axes[2], g.axes[3], z);
+    return { botones, sx, sy, cx, cy, gl, gr };
+  };
+  let distintos = 0;
+  for (let n = 0; n < 10000; n++) {
+    const g = mando(0, 'x');
+    g.buttons = g.buttons.map((_, i) => { if (i === 6 || i === 7) { const v = Math.random(); return { pressed: v > 0.12, value: v }; } return boton(Math.random() < 0.3); });
+    g.axes = g.axes.map(() => (Math.random() < 0.2 ? 0 : Math.random() * 2 - 1));
+    const letra = Math.random() < 0.5, z = 0.03 + Math.random() * 0.37;
+    if (JSON.stringify(viejo(g, letra, z)) !== JSON.stringify(aplicarMapa(g, mapaPorOmision({ letra }), z))) distintos++;
+  }
+  ok('prueba de oro: con lo de siempre, 10 000 estados al azar dan lo mismo que antes (por posición y por letra)', distintos === 0, `${distintos} distintos`);
+
+  // ---- 2. Todo se puede mover ----
+  const g = mando(0, 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)');
+  let m = poner(mapaPorOmision(), 'R', 'b5').mapa;                 // derrapar con RB
+  g.buttons[5] = boton(true);
+  let r = aplicarMapa(g, m, 0.15);
+  ok('R (derrapar) en RB: botón R y gatillo a fondo; RB ya no es Z', (r.botones & B.R) && r.gr === 255 && !(r.botones & B.Z));
+  g.buttons[5] = boton(false);
+  m = poner(m, 'stick.der', 'b15').mapa;                           // girar a la derecha con la cruz →
+  g.buttons[15] = boton(true); r = aplicarMapa(g, m, 0.15);
+  ok('el stick también desde la cruz: cruz → = stick a fondo a la derecha (y ya no es la cruz →)', r.sx === 127 && !(r.botones & B.derecha), `sx ${r.sx}`);
+  g.buttons[15] = boton(false);
+  m = poner(m, 'c.arr', 'b3').mapa; g.buttons[3] = boton(true); r = aplicarMapa(g, m, 0.15);
+  ok('el stick C desde un botón (Y ↑ = C arriba)', r.cy === 127 && !(r.botones & B.Y), `cy ${r.cy}`);
+  g.buttons[3] = boton(false);
+  m = poner(m, 'L', 'a5+@-1').mapa; g.axes = [0, 0, 0, 0, 0, -0.2];     // un gatillo que el navegador da como eje (reposo −1)
+  r = aplicarMapa(g, m, 0.15);
+  ok('un gatillo-eje (reposo −1) en L: a −0,2 es el 40 % (102 de 255)', r.gl === 102, `gl ${r.gl}`);
+  g.axes = [0, 0, 0, 0, 0, -1]; r = aplicarMapa(g, m, 0.15);
+  ok('…y suelto, 0', r.gl === 0);
+  const { mapa: m2, quitadoDe } = poner(mapaPorOmision(), 'A', 'b1');
+  ok('una entrada que ya manejaba otro control se MUEVE (y se dice de dónde)', JSON.stringify(m2.A) === '["b1"]' && m2.B.length === 0 && JSON.stringify(quitadoDe) === '["B"]');
+  const m3 = poner(mapaPorOmision(), 'A', 'b5', { sumar: true }).mapa;
+  ok('«＋» suma: A con ✕ y con RB a la vez', JSON.stringify(m3.A) === '["b0","b5"]' && !m3.Z.includes('b5'));
+  ok('un mapa roto se revisa: objetivos y fuentes raras afuera', JSON.stringify(revisarMapa({ A: ['b0', 'zzz', 'b0'], Q: ['b1'] }).A) === '["b0"]' && !('Q' in revisarMapa({ Q: [] })));
+  const mig = migrarPropio({ A: 1, B: 2, R: 7 });
+  ok('el asistente viejo (§57) se respeta: lo asignado igual, lo saltado vacío, los sticks como siempre', JSON.stringify(mig.A) === '["b1"]' && mig.X.length === 0 && JSON.stringify(mig['stick.der']) === '["a0+"]');
+
+  // ---- 3. La captura ----
+  const h = mando(0, 'gen', '', 12, 10);
+  h.axes = [0, 0, 0, 0, 0, -1, 0, 0, 0, 3.29];                        // gatillo-eje en −1 y una cruceta hat en reposo 3,29
+  let base = fotoMando(h);
+  ok('en reposo no se captura nada (el gatillo-eje en −1 y la cruceta en 3,29 no cuentan)', capturar(base, h) === null);
+  h.axes[0] = 0.2; h.axes[1] = -0.18;
+  ok('un stick que tiembla ±0,2 no se captura', capturar(base, h) === null);
+  h.axes[0] = 0; h.axes[1] = 0;
+  h.buttons[4] = boton(true); base = fotoMando(h); h.buttons[2] = boton(true);
+  ok('un botón apretado desde antes no cuenta; el nuevo sí', capturar(base, h) === 'b2');
+  h.buttons[4] = boton(false); h.buttons[2] = boton(false); base = fotoMando(h);
+  h.axes[5] = 0.9;
+  const fg = capturar(base, h);
+  ok('el gatillo-eje: se guarda con su reposo (a5+@-1)', fg === 'a5+@-1', fg);
+  h.axes[5] = -1; h.axes[9] = -0.43;
+  const fh = capturar(base, h);
+  ok('la cruceta hat: se guarda el valor de esa dirección', fh === 'a9~-0.43', fh);
+  ok('…y vale solo en esa dirección (no en las vecinas)', valorFuente(h, fh) === 1 && valorFuente({ axes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.14] }, fh) === 0);
+  h.axes[9] = 3.29; h.axes[2] = -0.8;
+  ok('un eje movido a fondo: su mitad (a2−)', capturar(base, h) === 'a2-');
+  h.axes[2] = 0;
+  // (el crítico: una cruceta hat que descansa en 1,2857 —9/7— y marca −1 + k·2/7: con el umbral de 0,6 no salían ← ni ↖)
+  { const k = mando(0, 'hat', '', 12, 10); k.axes[9] = 9 / 7; const b0 = fotoMando(k), vistas = [];
+    for (let i = 0; i < 8; i++) { k.axes[9] = -1 + i * 2 / 7; vistas.push(capturar(b0, k)); }
+    const distintas = new Set(vistas).size === 8 && vistas.every(Boolean);
+    const solas = vistas.every((f, i) => { k.axes[9] = -1 + i * 2 / 7; return vistas.every((o, j) => (valorFuente(k, o) === 1) === (i === j)); });
+    ok('una cruceta hat con reposo 1,2857: las 8 direcciones se capturan, distintas, y cada una vale solo en la suya', distintas && solas, vistas.join(' ')); }
+  ok('el gatillo-eje que marcaba 0 hasta tocarlo: suelto en −1 se guarda con su reposo (a5+ → a5+@-1; un stick suelto en 0, no)',
+     conReposo('a5+', -1) === 'a5+@-1' && conReposo('a0+', 0) === 'a0+' && conReposo('b3', -1) === 'b3' && conReposo('a5+@-1', -1) === 'a5+@-1');
+  ok('el mapa de siempre se reconoce (por posición y por letra; uno movido, no)', esPorOmision(mapaPorOmision(), false) && esPorOmision(mapaPorOmision({ letra: true }), true) &&
+     !esPorOmision(mapaPorOmision(), true) && !esPorOmision(poner(mapaPorOmision(), 'A', 'b5').mapa, false));
+
+  // ---- 4. Nombres y perfil ----
+  ok('los nombres en la letra de cada familia: RT, R2, ZR; Stick izq. →; Botón 7 sin mapeo', nombreFuente('b7', 'xbox') === 'RT' && nombreFuente('b7', 'playstation') === 'R2' &&
+     nombreFuente('b7', 'nintendo') === 'ZR' && nombreFuente('a0+', 'xbox') === 'Stick izq. →' && nombreFuente('b7', 'generico', false) === 'Botón 7' && nombreFuente('b12', 'xbox') === 'Cruz ↑');
+  const usb = 'DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)', bt = 'Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)';
+  ok('el perfil es el modelo: igual por cable, por Bluetooth y en Firefox', clavePerfil(usb) === '054c:0ce6' && clavePerfil(bt) === '054c:0ce6' && clavePerfil('54c-ce6-DualSense Wireless Controller') === '054c:0ce6');
+  { const { tipoMando } = await import('/web/navegador/controles.mjs');
+    ok('un mando de Xbox («Xbox Wireless Controller») es Xbox, no PlayStation; el DualShock 4 («Wireless Controller») sí es PlayStation',
+       tipoMando('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)') === 'xbox' && tipoMando('Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)') === 'playstation'); }
+  ok('…y aparte si el mando no tiene mapeo estándar; sin números, el nombre entero', clavePerfil(usb, '') === '054c:0ce6·libre' && clavePerfil('Mando raro') === 'Mando raro');
+
+  // ---- 5. controles.mjs: capturar, quitar, restaurar, deshacer, el perfil ----
+  try { localStorage.removeItem('mkw.mandos'); localStorage.setItem('mkw.teclas', JSON.stringify({ A: 5, B: 'x', START: ['KeyP'] })); } catch {}
+  let lista = [];
+  navigator.getGamepads = () => lista;
+  const { crearControles } = await import('/web/navegador/controles.mjs');
+  const recibido = [];
+  const c = crearControles({ enviar: (p, con, botones, sx, sy, cx, cy, gl, gr) => { recibido[p] = { botones, sx, sy, cx, cy, gl, gr }; } });
+  await cuadros(3);
+  ok('un guardado de teclas roto ({"A":5}) no detiene los controles: A vuelve a sus teclas, START queda en P', c.teclasDe('A').length === 2 && JSON.stringify(c.teclasDe('START')) === '["KeyP"]');
+  const x = mando(0, usb); lista = [x];
+  await cuadros(3);
+  const clave = c.estado.mandos[0].clave;
+  const p = c.capturar(clave, 'R');
+  // (un stick inclinado un poco —0,45: menos de lo que hace falta para capturarlo— movería el kart; capturando, no)
+  x.axes[0] = 0.45; c.paso();
+  ok('mientras captura, el mando no maneja el juego (el stick inclinado no llega)', (recibido[0]?.sx ?? 0) === 0 && !!c.capturandoAhora(), `sx ${recibido[0]?.sx}`);
+  x.axes[0] = 0; c.paso();
+  x.buttons[5] = boton(true); c.paso();
+  const res = await p;
+  ok('capturar R → RB: queda y avisa que salió de Z', res?.fuente === 'b5' && JSON.stringify(res.quitadoDe) === '["Z"]', JSON.stringify(res));
+  ok('se guarda para el modelo (054c:0ce6), no para el nombre entero', !!c.prefsMandos().mapas['054c:0ce6'] && !c.prefsMandos().mapas[usb]);
+  c.paso(); await cuadros(2);
+  // (el crítico: el botón recién capturado llegaba un cuadro al juego —capturar Start pausaba—: hasta soltarlo, nada)
+  ok('el botón recién capturado NO llega al juego mientras se lo mantiene', recibido[0].botones === 0 && recibido[0].gr === 0, `botones ${recibido[0].botones}`);
+  x.buttons[5] = boton(false); c.paso(); x.buttons[5] = boton(true); c.paso(); await cuadros(2);
+  ok('…soltado y apretado otra vez, llega: RB = R', (recibido[0].botones & B.R) !== 0 && recibido[0].gr === 255);
+  x.buttons[5] = boton(false);
+  const otro = mando(1, bt); lista = [x, otro]; await cuadros(3);
+  ok('el mismo modelo por Bluetooth trae la misma asignación', JSON.stringify(c.estado.mandos.find(q => q.indice === 1)?.mapa.R) === '["b5"]');
+  lista = [x]; await cuadros(2);
+  const antes = c.mapaDe(clave);
+  c.quitarFuente(clave, 'A', 'b0'); c.paso();
+  ok('quitar: A sin nada', c.mapaDe(clave).A.length === 0);
+  c.ponerMapa(clave, antes); c.paso();
+  ok('deshacer (poner el mapa de antes): A vuelve a ✕', JSON.stringify(c.mapaDe(clave).A) === '["b0"]');
+  c.restaurarObjetivo(clave, 'R'); c.paso();
+  ok('↺ en R: vuelve a RT, y RB vuelve a… quedar libre de R', JSON.stringify(c.mapaDe(clave).R) === '["b7"]');
+  const pc = c.capturar(clave, 'X'); c.cancelarCaptura();
+  ok('cancelar no cambia nada', (await pc) === null && JSON.stringify(c.mapaDe(clave).X) === '["b2"]');
+  { // (el crítico: ↺ o «Deshacer» en un mando sin tocar lo marcaba «asignado por ti»: el mapa de siempre no se guarda)
+    const nuevo = mando(1, 'Mando nuevo (STANDARD GAMEPAD Vendor: 2dc8 Product: 6006)'); lista = [x, nuevo]; await cuadros(3);
+    const cn = c.estado.mandos.find(q => q.indice === 1).clave;
+    c.restaurarObjetivo(cn, 'A'); c.ponerMapa(cn, c.mapaDe(cn)); c.paso();
+    ok('↺ y «Deshacer» en un mando sin tocar: nada guardado, sigue «como siempre»', !c.prefsMandos().mapas['2dc8:6006'] && c.estado.mandos.find(q => q.indice === 1)?.propio === false);
+    // (el crítico: un gatillo que el navegador da como eje y marca 0 hasta el primer toque: se capturaba sin su reposo)
+    const gz = mando(2, 'Gatillo raro (Vendor: 0f0d Product: 0092)', '', 12, 6); lista = [x, gz]; await cuadros(3);
+    const cz = c.estado.mandos.find(q => q.indice === 2).clave;
+    const pz = c.capturar(cz, 'L'); c.paso();
+    gz.axes[5] = 0.9; c.paso(); const rz = await pz;
+    gz.axes[5] = -1; c.paso(); c.paso();
+    ok('gatillo-eje que marcaba 0: capturado a5+, suelto en −1 queda a5+@-1 (suelto = L en 0)', rz?.fuente === 'a5+' && JSON.stringify(c.mapaDe(cz).L) === '["a5+@-1"]', JSON.stringify(c.mapaDe(cz).L));
+    c.paso(); await cuadros(2);
+    ok('…y suelto, el juego recibe L en 0', (recibido[c.estado.mandos.find(q => q.indice === 2).puerto]?.gl ?? 0) === 0);
+    c.borrarAsignacion(cz); lista = [x]; await cuadros(2);
+  }
+
+  // ---- 6. El teclado ----
+  const tecla = (code, tipo = 'keydown') => window.dispatchEvent(new KeyboardEvent(tipo, { code, cancelable: true }));
+  c.restaurarTeclas();
+  c.reasignar('A', { sumar: true }); tecla('KeyM'); tecla('KeyM', 'keyup');
+  ok('«＋» en el teclado: A con K, Enter y M', JSON.stringify(c.teclasDe('A')) === '["KeyK","Enter","KeyM"]');
+  c.reasignar('B'); tecla('Tab'); tecla('F5');
+  ok('Tab y F5 no se asignan (son del navegador): sigue esperando', c.esperando() === 'B');
+  tecla('Escape');
+  ok('Esc cancela sin cambiar nada', c.esperando() === null && JSON.stringify(c.teclasDe('B')) === '["KeyJ","Backspace"]');
+  tecla('KeyK'); await cuadros(2);
+  ok('…y la tecla siguiente va al juego, no a una asignación', (recibido[0].botones & B.A) !== 0);
+  tecla('KeyK', 'keyup');
+  c.reasignar('B'); tecla('KeyK'); tecla('KeyK', 'keyup');
+  ok('una tecla de otra acción se mueve (K pasa de A a B)', JSON.stringify(c.teclasDe('B')) === '["KeyK"]' && !c.teclasDe('A').includes('KeyK'));
+  c.restaurarTecla('A');
+  ok('↺ en A: sus teclas de siempre (y K deja de ser B)', JSON.stringify(c.teclasDe('A')) === '["KeyK","Enter"]' && !c.teclasDe('B').includes('KeyK'));
+  ok('el stick C en el teclado empieza sin teclas (lo de siempre no cambia)', c.teclasDe('cDerecha').length === 0);
+  c.reasignar('cDerecha'); tecla('Numpad6'); tecla('Numpad6', 'keyup');
+  tecla('Numpad6'); await cuadros(2);
+  ok('el stick C desde el teclado (Num 6 = C →, asignada)', recibido[0].cx === 127, `cx ${recibido[0].cx}`);
+  tecla('Numpad6', 'keyup');
+
+  // ---- 7. El panel ----
+  const { montarMandos } = await import('/web/navegador/opciones-mandos.mjs');
+  montarMandos(document.getElementById('panel'), c);
+  await new Promise(r => setTimeout(r, 250));
+  const det = document.querySelector('.mando-asignar'); det.open = true;
+  await new Promise(r => setTimeout(r, 250));
+  const filas = document.querySelectorAll('.tabla-asignacion tr');
+  ok('la tabla tiene una fila por control de GameCube (20)', filas.length === OBJETIVOS.length, `${filas.length}`);
+  ok('cada fila dice lo que la maneja en la letra del mando (DualSense: ✕, R2, Stick izq. →)', document.querySelector('tr[data-objetivo="A"]').textContent.includes('✕') &&
+     document.querySelector('tr[data-objetivo="R"]').textContent.includes('R2') && document.querySelector('tr[data-objetivo="stick.der"]').textContent.includes('Stick izq. →'));
+  document.querySelector('tr[data-objetivo="Z"] .acciones button').click();
+  await new Promise(r => setTimeout(r, 150));
+  ok('«Cambiar» pone la fila a esperar', document.querySelector('tr[data-objetivo="Z"]').classList.contains('esperando'));
+  x.buttons[4] = boton(true); c.paso();
+  await new Promise(r => setTimeout(r, 250));
+  x.buttons[4] = boton(false);
+  ok('…apretando L1: Z = L1, y el mensaje dice que se quitó de L', document.querySelector('tr[data-objetivo="Z"]').textContent.includes('L1') &&
+     /se quitó de L/.test(document.querySelector('.mando-asignar [role="status"]').textContent), document.querySelector('.mando-asignar [role="status"]').textContent);
+  // (el crítico, el grave: un segundo «Cambiar» antes de tocar nada dejaba la captura huérfana —sin fila, sin tope—)
+  document.querySelector('tr[data-objetivo="X"] .acciones button').click();
+  await new Promise(r => setTimeout(r, 100));
+  document.querySelector('tr[data-objetivo="Y"] .acciones button').click();
+  await new Promise(r => setTimeout(r, 250));
+  ok('dos «Cambiar» seguidos: espera la segunda fila (Y), la primera ya no', document.querySelector('tr[data-objetivo="Y"]').classList.contains('esperando') &&
+     !document.querySelector('tr[data-objetivo="X"]').classList.contains('esperando') && c.capturandoAhora()?.objetivo === 'Y');
+  x.buttons[2] = boton(true); c.paso();
+  await new Promise(r => setTimeout(r, 250));
+  x.buttons[2] = boton(false); c.paso();
+  ok('…y el botón va a Y, con la fila al día', !c.capturandoAhora() && !document.querySelector('tr[data-objetivo="Y"]').classList.contains('esperando') &&
+     JSON.stringify(c.mapaDe(clave).Y) === '["b2"]');
+  c.borrarAsignacion(clave);
+  c.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+try { localStorage.removeItem('mkw.teclas'); localStorage.removeItem('mkw.mandos'); } catch {}
+fin();
+</script>
+</body>
+</html>

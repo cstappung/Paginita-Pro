@@ -3,7 +3,7 @@
 import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
 import { esRachaClub, rachaClub, resultadoClub, mejorClub } from "./juegos/solo/club-datos.js";
-import { VERIFICADORES, juegoDeCategoria, textoPrueba, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
+import { VERIFICADORES, juegoDeCategoria, textoPrueba, pruebaGuardable, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
 import { merecesRevision } from "./juegos/admin-datos.js";
@@ -2276,7 +2276,12 @@ async function guardaConPodio(categoria, uid, dato, anunciar = true) {
    prueba exista; si las reglas nuevas aún no se publican, escribir la
    prueba falla con PERMISSION_DENIED y la fila se intenta igual (con las
    viejas, no la pide). Solo se escribe si mejora la marca guardada: una
-   prueba por cada récord, no por cada partida. */
+   prueba por cada récord, no por cada partida. Se guarda en su forma
+   compacta (`pruebaGuardable`), y en los juegos que guardan una sola
+   (`UNA_PRUEBA`: PRO DEFENDER, cuyo récord cambia cada ronda) se borra la
+   que sobra: la del récord anterior si la fila nueva quedó, o la recién
+   escrita si otra pestaña guardó antes una mejor. Si las reglas aún no
+   dejan borrarla, queda como antes. */
 async function guardaClub(categoria, uid, dato, prueba) {
   const juego = juegoDeCategoria(categoria);
   if (juego) {
@@ -2294,9 +2299,18 @@ async function guardaClub(categoria, uid, dato, prueba) {
       }
     }
     if (previa && (previa.puntos > dato.puntos || previa.puntos === dato.puntos && previa.tiempo <= dato.tiempo)) return { committed: false };
-    await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(prueba) || "").catch(e => {
+    await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(pruebaGuardable(juego, prueba)) || "").catch(e => {
       if (!/permission/i.test(String(e && (e.code || e.message)))) throw e;
     });
+    if (VERIFICADORES[juego].UNA_PRUEBA) {
+      const res = await guardaConPodio(categoria, uid, dato);
+      // la fila que quedó (la transacción la trae, se haya escrito o no)
+      const fila = res && res.snapshot && typeof res.snapshot.val === "function" ? res.snapshot.val() : null;
+      const vigente = fila && fila.partida;
+      for (const p of new Set([previa && previa.partida, dato.partida]))
+        if (p && vigente && p !== vigente) fb.borraPruebaSolo(categoria, uid, p).catch(e => console.warn("[juegos] no se pudo borrar la prueba que sobra", e));
+      return res;
+    }
   }
   return guardaConPodio(categoria, uid, dato);
 }
@@ -3612,7 +3626,7 @@ function panelEspera(p, est) {
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
-        : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo; quien llegue después entra en la carrera siguiente.</div>`
+        : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo cuando estén todos (la CPU completa los lugares libres); quien llegue con la copa andando se suma en la carrera siguiente.</div>`
         : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
         : p.juego === "pool" ? `<div class="jg-nota">Dos contra dos: empieza sola cuando entren los cuatro. Quien abrió la sala juega con el compañero que eligió.</div>`
         : !varios ? ""

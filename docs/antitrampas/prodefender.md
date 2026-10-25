@@ -74,10 +74,18 @@ ronda.
 
 ## El juego solo manda lo que supera el récord
 
-`main.js` escucha las tablas de los reinos abiertos al abrir (`recorreTablas`) y manda
-`Club.result` solo cuando una ronda supera la que ya está en la nube (o la que ya
-mandó en esta visita). Por eso una partida que no bate el récord no se verifica
-ni se guarda.
+`main.js` escucha las tablas de los reinos abiertos al abrir (`recorreTablas`) y
+manda con `Club.result` cada ronda que supera la que ya está en la nube. La deja
+anotada (`save.pend`, con su prueba) hasta que la tabla la tiene: si la pestaña se
+cerró antes de guardarla, se manda al volver a abrir. Una partida que no bate el
+récord no se verifica ni se guarda.
+
+La página guarda **una sola prueba por cuenta y reino**: al escribirse la fila nueva
+borra la del récord anterior (la regla deja al dueño borrar sus pruebas salvo la que
+nombra su fila), y la guarda **compacta** (`v: 2`: las jugadas en un texto, una letra
+por código y números en base 36, el paso como lo que avanzó en su tramo; ver
+`compacta`/`expande` en `verifica/prodefender.js`). El juego sigue mandando la `v: 1`;
+el verificador acepta las dos y expande la `v: 2` antes de rehacerla.
 
 ## Límite honesto
 

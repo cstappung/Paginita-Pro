@@ -7784,7 +7784,7 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
      por omisión y nunca solo, como el relevo de BT3 (el dueño lo pidió así: es excepcional).
    - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
      vive en su pestaña).
-   - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
+   - `{t:"empieza", uid, sincro}`: el anfitrión abre las carreras: los que están al apretar (hasta 12, en este orden: `sincro`) cargan el
      juego y corren la copa juntos.
    - `{t:"ajuste", uid, k:"cc", v}`: la cilindrada de la copa y de la playlist (MKW_CC; "azar" = la de Retro Rewind).
    - `{t:"vuelve", uid, tabla?}`: el anfitrión las cierra y todos vuelven al vestíbulo. Al terminar una copa o una
@@ -7797,7 +7797,11 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
      la convierte en su `abandona` (expulsado, echado) solo si `uid` es el anfitrión en ese momento. Además la
      votación para echar de todos los juegos (`{t:"voto"}`, ⏏): en Mario Kart se ofrece con 3 o más pilotos (con 2,
      votar sería echar solo: eso es del anfitrión).
-   Quien entra con la copa andando espera a la siguiente tanda. Cada jugador tiene su NODO: 2 + su orden de llegada a
+   - `{t:"suma", uid}` (§110): quien entra con la copa andando se suma a ella (se escribe solo, desde su página): va al
+     final de `sincro` (hasta 12) y su juego corre desde la carrera siguiente que alcance a cargar (el marco: la sala del
+     juego, juegos/mkw/web/navegador/sala-carrera.mjs). `sincroBase` = cuántos había al empezar (los demás llegaron
+     después). Una sala de antes de §110 no tiene `suma`: el que llegaba esperaba a la tanda siguiente.
+   Cada jugador tiene su NODO: 2 + su orden de llegada a
    la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
    La sala termina cuando ya no queda nadie. */
 export const MKW_CPU = { ninguna: "Sin CPU", facil: "CPU fácil", normal: "CPU normal", dificil: "CPU difícil" };
@@ -7874,7 +7878,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   const ids = new Set(js.map(j => j.uid));
   const fuera = {}, hist = [];
   // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
-  let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
+  let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null, sincroBase = 0;
   let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
   let nivel = mkwNivelDe(p && p.nivel), relevo = false;
   let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
@@ -7911,9 +7915,20 @@ export function redMkw(p, js = jugadoresDe(p)) {
       fase = "jugando"; ronda++;
       // la carrera sincronizada, con los que están ahora (hasta 12), en este orden (mando 1, 2, 3…)
       const ps = presentes();
-      sincro = ps.slice(0, MKW_SINCRO_MAX).map(x => x.uid);
+      /* §110: los que estaban AL APRETAR (la jugada los trae: `sincro`). El registro se vuelve a leer con los jugadores
+         de AHORA, así que sin esa lista quien entraba con la copa andando aparecía en la largada: la lista cambiaba, la
+         dirección de cada marco también y el juego de TODOS se recargaba a mitad de copa. Una jugada de antes (sin
+         lista): como antes, todos los presentes. */
+      const alApretar = Array.isArray(j.sincro) ? new Set(j.sincro.filter(u => typeof u === "string")) : null;
+      sincro = ps.filter(x => !alApretar || alApretar.has(x.uid)).slice(0, MKW_SINCRO_MAX).map(x => x.uid);
+      if (!sincro.length) sincro = ps.slice(0, 1).map(x => x.uid);   // (una lista rara: al menos el anfitrión)
+      sincroBase = sincro.length;
       hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, nivel, jugadores: ps.length, sincro: !!sincro });
       continue;
+    }
+    // §110: llegó con la copa andando y se suma (él mismo; una vez; hasta 12)
+    if (j.t === "suma" && fase === "jugando" && sincro && !sincro.includes(j.uid) && sincro.length < MKW_SINCRO_MAX) {
+      sincro = [...sincro, j.uid]; hist.push({ e: "suma", uid: j.uid, n: ronda }); continue;
     }
     if (j.t === "vuelve" && esAnf && fase === "jugando") {
       fase = "vestibulo";
@@ -7928,7 +7943,7 @@ export function redMkw(p, js = jugadoresDe(p)) {
   const quedan = presentes().length;
   return {
     fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, relevo, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
-    sincro: fase === "jugando" ? sincro : null,
+    sincro: fase === "jugando" ? sincro : null, sincroBase: fase === "jugando" ? sincroBase : 0,
     ganador: "", motivo: quedan ? "" : "abandono"
   };
 }

@@ -151,12 +151,16 @@ r = p0();
 ok('asignado: el botón 1 del adaptador es A', (r.botones & BOTON.A) !== 0 && c.estado.mandos[0].propio && !c.estado.mandos[0].sinMapa);
 gc.buttons[1] = { pressed: false, value: 0 }; gc.buttons[7] = { pressed: true, value: 0.6 };
 r = p0();
-ok('asignado: R con su valor analógico (153 de 255)', (r.botones & BOTON.R) !== 0 && r.gr === 255, `gr ${r.gr}`);
+// (§111: el gatillo asignado a mano es analógico de verdad —antes, apretado valía 255 aunque fuera hasta la mitad—)
+ok('asignado: R con su valor analógico (153 de 255)', (r.botones & BOTON.R) !== 0 && r.gr === 153, `gr ${r.gr}`);
 gc.buttons[7] = { pressed: false, value: 0 };
+const mapaAntes = JSON.stringify(c.mapaDe(gc.id));
 const cancelada = c.asignarBoton(gc.id, 'X'); c.cancelarAsignacion();
-ok('cancelar el asistente no asigna nada', (await cancelada) === null && c.prefsMandos().propios[gc.id].X === undefined);
-c.borrarAsignacion(gc.id);
-ok('borrar la asignación vuelve al mapeo de siempre', !c.prefsMandos().propios[gc.id]);
+ok('cancelar el asistente no asigna nada', (await cancelada) === null && JSON.stringify(c.mapaDe(gc.id)) === mapaAntes);
+// (§111: se guarda para el MODELO del mando —fabricante y producto—, no para su nombre entero)
+ok('§111: lo asignado se guarda para el modelo (0079:1846, sin mapeo estándar)', !!c.prefsMandos().mapas['0079:1846·libre'], Object.keys(c.prefsMandos().mapas).join(', '));
+c.borrarAsignacion(gc.id); c.paso();
+ok('borrar la asignación vuelve al mapeo de siempre', !c.prefsMandos().propios[gc.id] && !Object.keys(c.prefsMandos().mapas).length && !c.estado.mandos[0].propio);
 mandosFalsos.length = 0;
 c.paso();
 

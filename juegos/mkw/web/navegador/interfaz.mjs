@@ -125,12 +125,20 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
     volMudo.textContent = e.silencio || e.volumen === 0 ? '🔇' : '🔊';
   }
   sonidoCambio();
-  // El mando: la pastilla dice cuál hay (o que falta apretar un botón)
+  // El mando: la pastilla dice cuál hay (o que falta apretar un botón); con más de uno, qué jugador es cada uno.
+  // Un clic abre Controles, donde se elige qué jugador es cada mando (como en BT3: la pastilla abre los ajustes).
+  const pastilla = $('mando');
+  pastilla.style.cursor = 'pointer';
+  pastilla.title = 'Controles: qué jugador es cada mando, sus botones y probarlo';
+  pastilla.addEventListener('click', () => abrirCajon('controles'));
   setInterval(() => {
-    const m = controles.estado.mandos, p = $('mando');
-    p.classList.toggle('ok', m.length > 0);
-    p.textContent = m.length ? '🎮 ' + m.map(x => x.nombre.replace(/\s*\(.*\)$/, '')).join(' · ') : 'Mando: aprieta un botón';
-    p.hidden = document.body.classList.contains('tactil') && !m.length;
+    const m = controles.estado.mandos.slice().sort((a, b) => (a.puerto ?? 9) - (b.puerto ?? 9));
+    const corto = x => x.nombre.replace(/\s*\(.*\)$/, '');
+    pastilla.classList.toggle('ok', m.length > 0);
+    pastilla.textContent = controles.estado.bloqueados ? 'Mandos bloqueados aquí'
+      : !m.length ? 'Mando: aprieta un botón'
+      : '🎮 ' + (m.length === 1 ? corto(m[0]) : m.map(x => `${x.puerto === undefined ? '–' : 'J' + (x.puerto + 1)} ${corto(x)}`).join(' · '));
+    pastilla.hidden = document.body.classList.contains('tactil') && !m.length;
   }, 500);
 
   // ---------------- Cajón ----------------
@@ -148,6 +156,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }
   function cerrarCajon() {
     hojaAbierta = null;
+    // (§111, el crítico: cerrar el cajón cancela una reasignación que esperaba; si no, seguía hasta 8 s, con el mando mudo)
+    if (controles.esperando?.() || controles.capturandoAhora?.()) { controles.cancelarTecla?.(); controles.cancelarCaptura?.(); dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada')); }
     document.body.classList.remove('cajon-abierto');
     document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (document.body.classList.contains('started')) $('canvas').focus();   // las teclas vuelven al juego
@@ -155,8 +165,19 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   document.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => abrirCajon(b.dataset.abre)));
   document.querySelectorAll('.pestanas [data-hoja]').forEach(b => b.addEventListener('click', () => { hojaAbierta = null; abrirCajon(b.dataset.hoja); }));
   $('cerrarCajon').onclick = cerrarCajon;
-  // Esc cierra el cajón (y no le llega al juego, donde Esc es Start)
-  addEventListener('keydown', e => { if (e.code === 'Escape' && hojaAbierta && !dialogo.open) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); } }, true);
+  // Esc cierra el cajón (y no le llega al juego, donde Esc es Start). §111 (el crítico): si se está reasignando una
+  // tecla o un control del mando, Esc solo cancela eso (antes este oyente se lo quedaba, la espera seguía puesta y la
+  // próxima tecla que se apretaba jugando quedaba asignada sin querer)
+  addEventListener('keydown', e => {
+    if (e.code !== 'Escape') return;
+    if (controles.esperando?.() || controles.capturandoAhora?.()) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      controles.cancelarTecla?.(); controles.cancelarCaptura?.();
+      dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada'));
+      return;
+    }
+    if (hojaAbierta && !dialogo.open) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); }
+  }, true);
 
   // ---------------- Tu partida ----------------
   let licencias = [];

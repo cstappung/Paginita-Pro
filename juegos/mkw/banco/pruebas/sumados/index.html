@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Llegar con la copa andando</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Llegar con la copa andando: <span>sumarse en la carrera siguiente</span></h1>
+<p>Prueba lo de la bitácora §110 (pedido del dueño: «que quien llega tarde entre en la siguiente carrera») <b>sin el
+  juego y sin red</b>, como el banco <code>sala-carrera</code>: pilotos <b>inventados</b> conectados por un bus en
+  memoria y un <b>reloj falso</b>. Ana (la anfitriona) y Beto empiezan la copa de 3; en la carrera 1 llega Dani (su
+  página carga con la lista nueva) y el sitio les avisa a todos (<code>sumar</code>). Comprueba: la anfitriona lo anota
+  sin carrera, todas las páginas lo conocen, nadie lo pone en la carrera en curso, corre desde la siguiente porque ya da
+  señales, la lista de cada carrera es la misma en las tres páginas, empieza con 0 puntos, su «terminé» de una carrera
+  que no corrió no cuenta, y Eva (sumada por el sitio pero sin página) no corre ni queda como un kart quieto. Y la
+  carrera sincronizada (<code>lockstep.mjs</code>) lo agrega entre carreras con su mando.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearSala, correnEn, sumadosEn, humanosDeFicha, SEGUNDOS_ELEGIR, SEGUNDOS_RESULTADOS } from '/web/navegador/sala-carrera.mjs';
+import { crearLockstep } from '/web/navegador/lockstep.mjs';
+
+const { ok, fin } = prueba('sumados', 'Llegar con la copa andando (sin el juego, reloj falso)');
+// ---- reloj falso y bus en memoria (igual que el banco sala-carrera) ----
+let t = 1_000_000;
+const tareas = new Map(); let nId = 1;
+const cada = f => { tareas.set(nId, f); return nId++; }, parar = id => tareas.delete(id);
+const listo = () => new Promise(r => setTimeout(r, 0));
+const avanzar = async ms => { t += ms; for (const f of [...tareas.values()]) f(); for (let i = 0; i < 6; i++) await listo(); };
+const segundos = async n => { for (let i = 0; i < n; i++) await avanzar(1000); };   // (de a 1 s: los latidos siguen llegando)
+const salas = new Map();
+const enviar = de => (para, bytes) => { setTimeout(() => salas.get(para)?.alBinario(de, bytes), 0); };
+const base = [{ uid: 'ana', mando: 0 }, { uid: 'beto', mando: 1 }];
+const persona = (uid, humanos, extra = {}) => {
+  const s = crearSala({ yo: uid, humanos, anfitrion: 'ana', estilo: 'copa', carreras: 3, enviar: enviar(uid), ahora: () => t, cada, parar, ...extra });
+  salas.set(uid, s); return s;
+};
+const lista = (s, n) => correnEn(s === dani ? humanosDani : base.concat(sumadosDe(s)), s.estado(), n).map(h => h.uid).join(',');
+const sumadosDe = s => (s.estado().sumados || []).map(([uid], i) => ({ uid, mando: 2 + i }));
+let dani = null, humanosDani = null;
+
+try {
+  const ana = persona('ana', base), beto = persona('beto', base);
+  await segundos(2);
+  ok('la copa empieza con la base (2) y sin sumados', ana.estado().base === 2 && JSON.stringify(ana.estado().sumados) === '[]');
+  ana.ponerPistas([{ copa: 1, fila: 0 }, { copa: 1, fila: 1 }, { copa: 1, fila: 2 }]); await avanzar(0);
+  ana.elegi({ personaje: 22, vehiculo: 2 }); beto.elegi({ personaje: 9, vehiculo: 11 });
+  await segundos(1);
+  ok('con los dos eligiendo, corre la carrera 1', ana.estado().fase === 'correr' && ana.estado().carrera === 1);
+
+  // ---- 1. Dani llega con la carrera 1 andando ----
+  humanosDani = [...base, { uid: 'dani', mando: 2 }];                       // (su página carga con la lista nueva: &base=2)
+  dani = persona('dani', humanosDani, { base: 2 });
+  // el sitio avisa a las páginas que ya estaban (la lista entera, en su orden)
+  ana.sumar(['ana', 'beto', 'dani']); beto.sumar(['ana', 'beto', 'dani']);
+  await segundos(2);
+  ok('la anfitriona lo anota sin carrera (desde = 0)', JSON.stringify(ana.estado().sumados) === '[["dani",0]]', JSON.stringify(ana.estado().sumados));
+  ok('Beto y Dani reciben la misma lista de sumados', [beto, dani].every(s => JSON.stringify(s.estado().sumados) === '[["dani",0]]'));
+  ok('Dani recibe el estado (la anfitriona ya le habla): sabe que va la carrera 1', dani.lista && dani.estado().fase === 'correr' && dani.estado().carrera === 1);
+  ok('nadie lo pone en la carrera en curso: la 1 es de Ana y Beto en las tres páginas', [ana, beto, dani].every(s => lista(s, 1) === 'ana,beto'),
+     [ana, beto, dani].map(s => lista(s, 1)).join(' | '));
+  ok('no está «fuera» de la 1 (fuera = los que corren sin dar señales; él no corre)', !(ana.estado().fuera || []).includes('dani'));
+  // su «terminé» de una carrera que no corrió no cuenta
+  dani.termine(1); await avanzar(0);
+  ok('el «terminé» de Dani de la carrera 1 no cuenta', !ana.estado().terminaron?.[1]);
+  // ana se suma dos veces lo mismo: nada nuevo
+  ok('sumar otra vez la misma lista no anota nada', ana.sumar(['ana', 'beto', 'dani']) === 0);
+
+  // ---- 2. Eva: el sitio la suma, pero su página nunca carga ----
+  ana.sumar(['ana', 'beto', 'dani', 'eva']); beto.sumar(['ana', 'beto', 'dani', 'eva']); dani.sumar(['ana', 'beto', 'dani', 'eva']);
+  await segundos(1);
+  ok('Eva también queda anotada, después de Dani (su mando: el 4.º)', JSON.stringify(ana.estado().sumados) === '[["dani",0],["eva",0]]');
+
+  // ---- 3. Termina la 1; en el descanso Dani elige; corre la 2 ----
+  ana.termine(1); beto.termine(1, Array.from({ length: 12 }, (_, i) => 10 - (i % 10)), 1); await avanzar(0);
+  ok('la carrera 1 terminó (con Ana y Beto)', !!ana.estado().terminaron?.[1]);
+  dani.elegi({ personaje: 16, vehiculo: 1 }); await avanzar(0);
+  ok('en el descanso la anfitriona acepta lo que eligió Dani', ana.estado().picks.dani?.personaje === 16);
+  await segundos(SEGUNDOS_RESULTADOS + 1);
+  const e2 = ana.estado();
+  ok('después del descanso corre la 2', e2.fase === 'correr' && e2.carrera === 2);
+  ok('Dani (ya da señales) corre desde la 2; Eva (sin página) sigue sin carrera', JSON.stringify(e2.sumados) === '[["dani",2],["eva",0]]', JSON.stringify(e2.sumados));
+  ok('la 2 es de Ana, Beto y Dani en las tres páginas (la misma ficha en todas)', [ana, beto, dani].every(s => lista(s, 2) === 'ana,beto,dani'),
+     [ana, beto, dani].map(s => lista(s, 2)).join(' | '));
+  ok('Eva no queda «fuera» (no va en la ficha: ningún kart quieto por ella)', !(e2.fuera || []).includes('eva') && !(e2.fuera || []).includes('dani'), JSON.stringify(e2.fuera));
+  const hs = humanosDeFicha(correnEn(humanosDani, e2, 2), e2);
+  ok('en la ficha de la 2, Dani es el 3.er humano, con su mando y lo que eligió', hs.length === 3 && hs[2].mando === 2 && hs[2].personaje === 16, JSON.stringify(hs));
+  ok('sumadosEn: Dani se suma en la 2 (empieza con 0 puntos: su puesto era de una CPU)', JSON.stringify(sumadosEn(e2, 2)) === '["dani"]' && sumadosEn(e2, 3).length === 0);
+  ok('la 1 sigue siendo de Ana y Beto aunque se mire después (la lista sale del estado, no del momento)', lista(ana, 1) === 'ana,beto');
+
+  // ---- 4. Una anfitriona de antes de §110 (sin base): todos corren, como antes ----
+  ok('sin base en el estado, correnEn = todos (como antes)', correnEn(humanosDani, { sumados: [] }, 1).length === 3);
+
+  // ---- 4b. Una anfitriona que abre con la lista entera (recargó: su dirección ya trae al que llegó) lo anota sola ----
+  const hx = [{ uid: 'h1', mando: 0 }, { uid: 'h2', mando: 1 }, { uid: 'h3', mando: 2 }];
+  const h1 = crearSala({ yo: 'h1', humanos: hx, base: 2, anfitrion: 'h1', estilo: 'copa', carreras: 2, enviar: enviar('h1'), ahora: () => t, cada, parar });
+  salas.set('h1', h1);
+  await segundos(9);                                                         // (sola: espera hasta 8 s a oír a todos)
+  ok('la anfitriona que abre con la lista entera anota sola a h3 (después de la base)', JSON.stringify(h1.estado().sumados) === '[["h3",0]]', JSON.stringify(h1.estado().sumados));
+  h1.detener();
+
+  // ---- 5. La carrera sincronizada lo agrega entre carreras ----
+  const humanosLs = base.map(h => ({ ...h }));
+  const ls = crearLockstep({ yo: 'ana', humanos: humanosLs, enviar: () => {}, local: () => [0, 0, 0, 0, 0, 0, 0] });
+  ok('el lockstep agrega a Dani con su mando (2)', ls.agregar({ uid: 'dani', mando: 2 }) === true && humanosLs.some(h => h.uid === 'dani' && h.mando === 2));
+  ok('…una sola vez, y no con un mando ocupado ni fuera de 0–11', ls.agregar({ uid: 'dani', mando: 2 }) === false && ls.agregar({ uid: 'x', mando: 1 }) === false && ls.agregar({ uid: 'y', mando: 12 }) === false);
+  ls.fijarCarrera(2, [3]);
+  ok('y lo acepta en la lista de una carrera (fijarCarrera con su mando no falla)', true);
+  ls.detener();
+  for (const s of [ana, beto, dani]) s.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

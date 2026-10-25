@@ -303,6 +303,16 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **BMG** | El formato de las tablas de textos del juego (cada mensaje con su número). En la de Retro Rewind, el mensaje 0x20000 + n es el nombre de la pista n: de ahí salen los nombres de la lista para elegir pista. |
 | **Caras de partida (presets)** | Mii ya armados para empezar, como los "invitados" del juego: se elige uno y solo se le pone nombre y color. Los de la página los armamos nosotros (no son los datos de Nintendo). |
 
+| **Copia de una respuesta (`clone()`)** | Pedirle al navegador dos lecturas de la MISMA descarga: los bytes llegan una vez por la red y se reparten a dos lectores. La barra de descarga (§106) lee una copia solo para contar; el juego lee la original, intacta. Como una pinza amperimétrica: mide la corriente sin cortar el cable. |
+| **Ráfaga (de descargas)** | Un grupo de pedidos que se superponen en el tiempo (el juego pide varias cosas casi a la vez). La barra muestra lo recibido de lo esperado en la ráfaga actual y vuelve a cero cuando todo queda quieto un segundo. |
+| **Puerto (del mando)** | Cada uno de los 4 enchufes de mando de la GameCube: el puerto 1 es el jugador 1. La página decide qué mando del PC va a cada puerto; desde §106 la persona lo elige («Jugador 1–4»), como el selector de entrada de una mesa de sonido. |
+| **Resolución interna / supermuestreo** | Dibujar la imagen a más pixeles de los que tiene la pantalla y después achicarla: cada pixel final sale del promedio de varios, así los bordes quedan suaves (es el antialiasing de mejor calidad). Como medir con más muestras por segundo y promediar: la curva sale más limpia, pero hay más que procesar. |
+| **Imágenes intermedias (interpolación de cuadros)** | El juego calcula 60 cuadros por segundo; el motor dibuja además imágenes «entre medio» de dos cuadros (120 o 180 por segundo) para monitores rápidos. Es solo la imagen: la física sigue a 60. Como una tele de 120 Hz que inventa los cuadros del medio de una película. |
+| **Eje (de un mando)** | Una entrada que da un número entre −1 y 1 en vez de «apretado/suelto»: cada stick son dos ejes (x e y). La página usa cada mitad por separado (`a2+`, `a2-`: de 0 a 1 según cuánto se inclina). Como un potenciómetro con el cero al medio. |
+| **Reposo (de un eje)** | Lo que marca un eje sin tocarlo. Casi siempre 0, pero algunos gatillos que el navegador da como eje descansan en −1. Al capturar se mide antes, como el offset que se anota antes de calibrar un instrumento. |
+| **Cruceta «hat»** | En algunos mandos genéricos la cruz no son 4 botones sino UN eje que toma un valor distinto por dirección (−1, −0,43, 0,14…) y descansa fuera de −1..1 (3,29). Se reconoce por eso y se guarda el valor exacto de cada dirección. |
+| **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
+
 ---
 
 ### La red en línea (§58)
@@ -9847,3 +9857,322 @@ juego): `GET /mkw/manifiesto.json` → 401 «inicia sesión»; la pregunta previ
 (el viejo contestaba 404). El enlace `MKW` solo se ve con la sesión de un amigo: la primera partida de un amigo lo
 prueba. `privado.json` (→ `juegos/mkw/privado.json` del sitio) = `https://bt3-disco.rayoluxd1.workers.dev/mkw`: el sitio
 lo lee recién cuando la rama se junte a `main`.
+
+## 2026-10-25 · §106 Los mandos como en BT3 (elegir el jugador de cada mando) y la barra de descarga
+
+Pedidos del dueño, ya con Mario Kart publicado en el sitio (PR #258): «no veo el soporte de mandos de los otros juegos»,
+«en bt3 aparece el mando que uno tiene y permite seleccionar entre mandos» (con una captura del panel Controles que decía
+«Ningún mando todavía») y «tienes que agregar la barra de descargas con el progreso cuando se esté descargando algo».
+Hecho desde la sesión de la nube (sin el juego: todo probado en el banco y en la página real sin el programa).
+
+### 106.1 Qué jugador es cada mando
+
+**Antes:** los mandos iban a los puertos en el orden en que el navegador los veía. Con dos mandos, o con uno «virtual»
+al lado del de verdad (Steam, DS4Windows y similares crean un mando de Xbox de mentira), el jugador 1 podía quedar con
+el equivocado y no había cómo cambiarlo. BT3 sí lo deja elegir (la ventana de controles del port: qué mando usa cada
+jugador).
+
+**Ahora** (`controles.mjs`):
+- `clavesMandos(lista)`: cada mando se reconoce por su nombre (`g.id`) y, si hay dos iguales, por su orden (`…#2`). El
+  índice solo no sirve (cambia al desconectar y volver a conectar).
+- `repartirPuertos(claves, elegidos)`: primero los mandos con un jugador elegido, después los demás en el primer puerto
+  libre. Se reparte de nuevo solo cuando cambia qué mandos hay o lo elegido: nadie salta de puerto solo.
+- `controles.elegirPuerto(clave, puerto)`: elegir un jugador que ya tenía otro mando los **cambia de lugar**. Se guarda
+  en el navegador (`mkw.mandos` → `puertos`), así se recuerda al desconectar el mando y al recargar.
+- Si el navegador no deja leer mandos (un marco sin el permiso `gamepad`: `getGamepads()` lanza un error), se anota
+  `estado.bloqueados` y el teclado sigue andando. Antes ese error habría parado el bucle de los controles entero.
+
+En la página: cada tarjeta del panel Controles → Mandos tiene **«Jugador 1–4»** y las tarjetas van en orden de
+jugador; la pastilla del mando de la barra dice qué jugador es cada uno («🎮 J1 DualSense · J2 Xbox 360») y **un clic
+la abre en Controles** (como la de BT3 abre sus ajustes). Sin mandos, el panel explica qué hacer: Chrome no le muestra
+un mando a la página hasta que se aprieta un botón con la página a la vista (es por privacidad); dentro del marco de
+Juegos a veces hace falta un clic en el juego antes.
+
+### 106.2 La ayuda de la tarjeta de inicio con los botones del mando
+
+Como en los otros juegos del sitio: con un mando conectado, la línea de teclado de la tarjeta de inicio
+(`.teclas`: «K acelerar · J frenar…») se cambia por los botones del mando en la letra de su familia (✕ ○ □ △ en
+PlayStation, A B X Y en Xbox). Es una línea en `mando-sitio.mjs`: `zonas: [{ sel: '.teclas' }]` para el `mando.js` del
+sitio, que esconde la ayuda y pone al lado la del mando. Solo dentro del sitio (sin el `mando.js` de Juegos no cambia
+nada).
+
+### 106.3 La barra de descarga (`descargas.mjs`)
+
+**Antes:** al abrir, la cortina tenía una barra que iba y venía, sin decir cuánto faltaba (la que se llena con % era solo
+la de la sala, §99), y durante el juego no se veía nada cuando el juego esperaba un pedazo del disco.
+
+**Ahora:** `crearDescargas()` envuelve el `fetch` de la página (encima del de `privado.mjs`, que pone el token): a cada
+respuesta del Worker le lee una **copia** (`clone()`) solo para contar los bytes mientras llegan; el juego recibe la
+original intacta.
+- **De cuánto:** el lote (§104) lo dice en su cuerpo (`{"p": [[ruta, inicio, fin], …]}`), un pedido con `Range` en su
+  cabecera y lo demás en `Content-Length`.
+- **El programa** viaja comprimido (16,5 MB en brotli) y el navegador lo entrega descomprimido (127,6 MB): lo contado se
+  divide por la proporción (7,7 la primera vez; después la medida de verdad, guardada) para hablar de lo que viaja. Se
+  cuenta **solo la primera vez** que se baja cada programa (`mkw.descargas.programas`): después sale de la caché HTTP en
+  un instante, y así la copia nunca toca la caché de código compilado de Chrome (§54).
+- **Cuándo aparece:** si bajar algo dura más de 0,4 s, o si el juego lleva más de 0,4 s esperando una lectura del disco
+  (`mkwLeeRango` avisa con `esperaJuego(±1)`): lo que llega en un instante no parpadea en pantalla. Se va sola 1,2 s
+  después de terminar, con «Listo».
+- **Qué dice:** «⬇ Bajando 42,1 MB de 118 MB · 9,8 MB/s» con la barra llenándose (sin total conocido, la barra va y
+  viene). Si el juego espera, «⬇ Cargando…». Sobre la cortina de carga va al centro y, en la primera visita, agrega «La
+  primera vez tarda más: queda guardado para la próxima».
+- **Dónde:** abajo a la izquierda mientras se juega (300 px, sin `backdrop-filter`: no re-desenfoca el juego cada
+  cuadro), y se repinta 4 veces por segundo, nada más. `?barraDescarga=0` = sin contar ni mostrar nada.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Banco `descargas` (nuevo, Worker de mentira con respuestas que llegan de a pedazos) | 29 / 29 |
+| Banco `mandos-jugador` (nuevo, mandos de mentira: dos iguales, uno virtual, uno que vuelve, uno bloqueado) | 17 / 17 |
+| Banco `mando-sitio` (+1: la ayuda de la tarjeta cambiada por los botones del mando) | 11 / 11 |
+| Banco `controles` (sin cambios de comportamiento) | 47 / 47 |
+| La página real sin el programa (banco, Chromium): la pastilla abre Controles con el selector; la barra aparece con una descarga larga y se va sola | sin errores |
+| Sitio `mkw.test.cjs` + `mkw-worker.test.cjs` + `controles.test.cjs` | 40 / 40 |
+
+Falta probarlo con el juego de verdad en la PC del proyecto (`prueba-navegador`, `prueba-sala`): el banco no tiene el
+programa.
+
+`banco/servir.cjs` busca ahora el `mando.js` del sitio también en `juegos/audio` al lado de `juegos/mkw` (dentro del
+repo del sitio no hay `terceros/`).
+
+## 2026-10-25 · §107 Gráficos opcionales (resolución interna, fluidez 120/180) y el medidor de fps y ping
+
+Pedido del dueño: «opciones gráficas tipo opcionales de display ping ms, fps, antialiasing, subirle los gráficos», «fps
+cap? vi que se podía como hasta 180 fps», «quizás se puede más fps y no se». Hecho desde la sesión de la nube, sin el
+juego: probado en el banco y en la página sin el programa. **Falta medirlo con el juego** (abajo).
+
+### 107.1 Qué trae el motor (y qué no)
+
+Revisado en `runtime/include/runtime_config.h` de WiiCompiled en el commit fijado (`bd219e38`): el `[video]` del
+`Config.toml` acepta, entre otras,
+- `resolution_multiplier` = 0, 1, 1,5, 2, 3, 4, 6 u 8 (0 = el tamaño de la ventana): la **resolución interna**;
+- `frame_interpolation_fps` = 0, 120 o 180 (un 240 guardado pasa a 180): las **imágenes intermedias**. Eso es el «hasta
+  180» que vio el dueño.
+
+**Más de 60 «de verdad» no se puede:** la física y todo el juego están hechos para 60 cuadros por segundo; correrlo más
+rápido sería el juego acelerado. Lo de 120/180 son imágenes intermedias. **No hay un antialiasing aparte** en el motor
+(no tiene MSAA ni FXAA): la resolución interna a 2× o más ya lo es, por supermuestreo.
+
+### 107.2 En la página (`graficos.mjs`)
+
+- **Avanzado → Gráficos**: «Resolución interna» (1×, 1,5×, 2×, 3×, 4×; 6× y 8× no se ofrecen, son demasiado para un
+  navegador) y «Fluidez» (60, 120, 180). Se guardan en el navegador (`mkw.graficos`) y se aplican **al reiniciar el
+  juego** (el motor lee el `Config.toml` una vez, al arrancar); el panel lo dice y trae «Reiniciar el juego ahora» (en
+  la sala, con la nota de hacerlo entre carreras: al recargar se vuelve en la siguiente, §75).
+- **Apagadas por omisión.** Con 1× y 60, `lineasVideo()` no agrega nada al `Config.toml`: el juego arranca
+  exactamente igual que antes de §107. Un valor que el motor no acepta (guardado viejo, a mano) vuelve a lo de siempre.
+- **Mostrar los fps / el ping**: un chip en la esquina de arriba a la izquierda (`#medidor`, en `#estadoJuego`),
+  repintado una vez por segundo, solo con el juego andando: «60 fps · 📶 Ana 80 ms · Juan 35 ms». Los fps son los del
+  medidor de la página (cuadros del juego por segundo); el ping es la ida y vuelta suavizada que el lockstep ya mide con
+  cada piloto (`lockstep.estado().rtt`, pings cada 0,5 s), el peor primero. **También apagados por omisión**: medir no
+  cuesta, pero tener algo encima del juego obliga al navegador a componer cada cuadro (§98.9), y el panel lo avisa.
+- Para medir sin tocar lo guardado: `?escala=2&fluidez=180`; `?graficos=0` = lo de siempre. El registro anota
+  «gráficos (§107): …» cuando hay algo distinto, y `window.mkwEstado.graficos` dice qué se usó.
+
+### 107.3 Lo que falta medir con el juego (en la PC del proyecto)
+
+1. **La fluidez en la web.** El port dibuja en un solo hilo y el parche de aurora tocó la interpolación (el presentador
+   sin hilo ayudante, `aurora-web.diff`; §88/§53 vaciaron sus tareas pendientes al cerrar el staging). Hay que ver si
+   120/180 de verdad dibujan más imágenes en Chrome (el lienzo se presenta al ritmo de `requestAnimationFrame`: con un
+   monitor de 240 Hz hay lugar) y cuánto cuesta: `node herramientas/medir-sitio.mjs --perfil pc --etiqueta fluidez180
+   --extra "&fluidez=180"` contra la misma sin `--extra`.
+2. **La resolución interna**: `--extra "&escala=2"` (y 3, 4): tiempo de GPU por cuadro, que no baje de 60 en la carrera
+   con 12 karts. Con WebGPU la memoria de video crece con el cuadrado (2× = 4 veces los pixeles).
+3. **En la sala**: con `prueba-sincro --directa --extra=&fluidez=180` que la huella siga igual (debe: es solo la imagen).
+Si alguna no anda en la web, sacarla del panel (`ESCALAS`/`FLUIDECES` de `graficos.mjs`).
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Banco `graficos` (nuevo) | 21 / 21 |
+| La página sin el programa con `?escala=2&fluidez=180` | `mkwEstado.graficos.lineas` = las dos líneas; el panel en Avanzado; sin errores |
+
+## 2026-10-25 · §108 La resolución en pixeles y la «resolución de salida» para ganar fps
+
+Pedido del dueño: «agrega opciones de resolución que puedan hasta bajar para aumentar fps», «¿resolución en tamaños de
+pixeles?».
+
+**Lo que se averiguó:** el juego ya dibuja a lo **mínimo** que acepta el motor. `resolution_multiplier` admite 0 (el
+tamaño de la ventana), 1 (la de la Wii), 1,5, 2, 3, 4, 6 y 8 (`settings_overlay.cpp` de WiiCompiled los nombra «Auto
+(window size)», «Native (1x)»…); el Config.toml de la página no lo escribe, así que va en 1× = **640×528**. Menos que
+eso el motor no lo tiene (habría que parchear aurora y recompilar).
+
+Lo que sí se puede bajar es la **salida**: aurora agranda esa imagen de 640×528 al tamaño del lienzo, y el lienzo lo pone
+SDL3 = el tamaño de su recuadro en la página × `devicePixelRatio` (aurora crea la ventana con
+`SDL_WINDOW_HIGH_PIXEL_DENSITY`; `Emscripten_HandleResize`, rama `external_size`, mide con
+`emscripten_get_element_css_size` = `getBoundingClientRect`). Con un monitor 4K y Windows al 150 %, el lienzo mide
+3840×2160: agrandar a eso, cada cuadro, es trabajo de la tarjeta de video.
+
+**Ahora** (`graficos.mjs`):
+- **«Resolución de salida»** en Avanzado → Gráficos: la de tu pantalla (lo de siempre), 1920×1080, 1600×900, 1280×720,
+  960×540. `limitarSalida(lienzo)` reemplaza el `getBoundingClientRect` **de ese lienzo** por uno que contesta un recuadro
+  achicado (el mismo 16:9) para que recuadro × dpr ≤ el alto elegido (`medidaLimitada`); el lienzo sigue ocupando el
+  mismo lugar en la página y el navegador lo estira al mostrarlo (gratis: lo hace al componer). Se aplica **en el
+  momento** (un aviso `resize`: SDL3 vuelve a medir), se guarda en `mkw.graficos.salida` y no va al Config.toml.
+  `?salida=720` para medir.
+- **Solo ayuda si lo que frena es la tarjeta de video.** En la PC del proyecto el juego está limitado por el procesador
+  (§53: 7,9 ms de CPU por cuadro): ahí no cambia los fps. En un portátil con gráficos integrados y monitor grande, sí.
+- La resolución interna se nombra en pixeles: «1× · 640×528 (la de la Wii)», «2× · 1280×1056»…
+- **Trampa:** el ratón del menú interno del motor (ImGui, el F1 de WiiCompiled) se mide con ese mismo recuadro: con un
+  tope puesto apuntaría mal. La página no lo usa.
+
+**Pruebas:** banco `graficos` 31/31 (+10: los pixeles, el recuadro con dpr 1,5, un «SDL3 de mentira» que con cada
+resize pone el lienzo en recuadro × dpr: 1600×900 → 960×540 → de vuelta; el panel lo aplica sin reiniciar). La página
+sin el programa con `?salida=540`: el lienzo contesta 540 de alto, sin errores. **Falta medir con el juego**:
+`node herramientas/medir-sitio.mjs --perfil pc --extra "&salida=720"` (y con la tarjeta integrada, si hay).
+
+## 2026-10-25 · §109 La sala: avisar al anfitrión antes de rellenar con CPU
+
+El dueño: «entran 2 jugadores y el resto es CPU, pero yo quiero jugar con aún más que 2 y rellenar con CPU solo cuando
+estén todos los jugadores reales». Revisado: la sala admite 12 personas (`JUEGOS.mkw.cupo`, la regla `cupo <= 12`) y se
+puede entrar mientras está en el vestíbulo; la CPU ya rellena solo al apretar «¡A correr!» (`redMkw`: `sincro` = los
+presentes en ese momento, hasta 12). Lo que faltaba es que el anfitrión lo sepa antes de apretar: quien llega con la copa
+andando espera a que termine **toda** la copa (la lista de pilotos queda fija en cada marco al cargar: mandos, plantel,
+cámara, lockstep), y el aviso del vestíbulo del sitio decía «entra en la carrera siguiente», que no era cierto.
+
+- «¡A correr!» con lugares libres pregunta: «Hay 2 de 12 pilotos: la CPU completa los otros 10. Quien entre después
+  espera a que termine la copa. ¿Empezar igual?» (`clicVest` en `colabtex/src/juegos/mkw.js`; `confirm`, como «Echar» y
+  «Terminar la copa» del mismo vestíbulo). Con 12, sin pregunta.
+- El aviso de la sala (`panelEspera` en `juegos-main.js`): «El anfitrión abre las carreras abajo cuando estén todos (la
+  CPU completa los lugares libres); quien llegue con la copa andando espera a que termine».
+- Además: la sala es solo para la lista de amigos del Worker (`AMIGOS`); a quien no está le sale «Esta sala es privada».
+
+Pruebas: `npm run test:juegos` 1129/1129. Pendiente (pedido del dueño): que quien llega tarde entre en la **siguiente
+carrera** de la copa (§110).
+
+## 2026-10-25 · §110 Quien llega con la copa andando corre desde la carrera siguiente
+
+Pedido del dueño: «que quien llega tarde entre en la siguiente carrera» (y no espere a que termine la copa).
+
+### 110.1 Un error de antes, encontrado de paso: el juego de todos se recargaba
+
+`redMkw` (`colabtex/src/juegos/motor.js`) arma la lista de la largada (`sincro`) en la jugada `empieza` con «los
+presentes», pero el registro se vuelve a leer con los jugadores **de ahora**. Quien entraba con la copa andando aparecía
+en la largada de una copa que ya corría: la lista cambiaba, la dirección del marco de cada piloto también (su firma
+llevaba la lista) y **el juego de todos se recargaba** a mitad de copa. Medido en Node: sala a, b; `empieza`; entra d →
+`sincro` = a, b, d. Arreglo: «¡A correr!» escribe quiénes están al apretar (`{t:"empieza", uid, sincro}`) y el
+registro usa esa lista (una jugada vieja, sin lista: como antes). Las reglas de Firebase ya aceptan campos extra en una
+jugada (`$otro`): no hay que publicar nada.
+
+### 110.2 Sumarse
+
+- **El sitio:** quien llega con la copa andando escribe `{t:"suma", uid}` él solo (`sumarme` en `mkw.js`, una vez por
+  tanda, solo un amigo de la lista); el registro lo pone al final de `sincro` (hasta 12) y `sincroBase` dice cuántos
+  estaban al empezar. Su marco carga con `&base=N`. Los marcos que ya corren **no se recargan** (su firma ya no lleva la
+  lista): se les manda `{tipo:'sincro', sincro}` y la sala del juego lo anota.
+- **La sala del juego** (`sala-carrera.mjs`): la anfitriona anota a los nuevos en `sumados = [[uid, desde], …]`, en el
+  orden del sitio (el mando de cada uno es su lugar en la lista: igual en todas las consolas). `desde` lo pone ella **al
+  empezar cada carrera**, solo a los que ya dan señales: quien todavía carga el juego no corre con un kart quieto, entra
+  en la que sigue. `correnEn(humanos, estado, n)` = quiénes corren la carrera n (la base y los sumados con
+  desde ≤ n): cada consola arma la misma ficha aunque haya visto la lista nueva antes o después.
+- **La página** (`mkw.mjs`): la lista de la carrera sincronizada cambia recién al **arrancar** una carrera
+  (`lockstep.agregar`, `sumarHumano`); si cambiara con una carrera andando, esa consola esperaría los botones de alguien
+  que no está en ella. Los sumados que todavía no corren van en `fuera` de `fijarCarrera`. Lo que va por puesto (los
+  nombres en el juego, las tablas, el VR, la cámara propia `mkwMiPuesto`) se lee de `sincro.corren`, la lista de la
+  carrera, no de `sincro.humanos`. El que se suma en la carrera n toma el puesto de una CPU y **empieza con 0 puntos**.
+- **El recién llegado** entra como quien recargó (§75): se salta la carrera en curso (cartel «Vuelves en la siguiente»),
+  elige personaje en el descanso y corre desde la siguiente.
+- Los textos: el aviso de la sala, la pregunta de «¡A correr!» (§109) y el manual 📖 dicen que se suma en la carrera
+  siguiente.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Sitio `mkw.test.cjs` (+2: la largada con su lista, `suma`, el tope de 12, `&base=`) | 24 / 24 |
+| Banco `sumados` (nuevo: Ana y Beto empiezan, Dani llega en la 1 y corre desde la 2; Eva sumada sin página no corre; la misma lista en las tres páginas; 0 puntos; el «terminé» de quien no corrió no cuenta; la anfitriona que recarga lo anota sola; `lockstep.agregar`) | 24 / 24 |
+| Banco `sala-carrera`, `lockstep`, `sala-playlist` (sin cambios de comportamiento) | 101/101, 50/50, 37/37 |
+| La página sin el programa con `?modo=sala&sincro=ana,beto,dani&uid=dani&base=2` | base 2, corren Ana y Beto, Dani con el mando 2, sin errores |
+| Banco `red` 35/35, `vr-sala` 58/58, `conexiones` 19/19, `dificultad-cpu` 28/28, `letreros` 17/17 | todo bien |
+| Banco `relevo` | 45/46 corriendo junto a la compilación del sitio y 1130 pruebas en la misma máquina (falló §102, la «PC justa», que depende de los tiempos); sola (`relevo?solo=19`) 2/2 dos veces |
+
+**Falta probarlo con el juego** (dos o tres pestañas): `node web/navegador/prueba-sala.mjs` con una tercera pestaña que
+entra en la carrera 1 de la copa (no existe todavía: hay que agregarla) y `prueba-sincro --sala`. Lo que podría fallar
+con el juego y el banco no ve: que el juego del recién llegado salte bien a la carrera siguiente (el mismo camino que
+quien recargó, §75) y que la huella de la carrera dé igual en las tres consolas.
+
+## 2026-10-25 · §111 Reasignar todo el mando (y el teclado), con un crítico; y el mando en la selección de personajes
+
+Pedidos del dueño: «mejora la personalización de botones de mando, usa un crítico para esto», «que se puedan rebindear
+todas las teclas», «hay botones que no se pueden bindear al mando» y «la selección de personajes no funciona bien con
+mando». Un agente crítico revisó lo que había (y después lo implementado); sus hallazgos están marcados (crítico).
+
+### 111.1 Lo que estaba mal
+
+- **Solo 12 botones** del mando se podían reasignar, y solo con un asistente que los pedía todos en fila. Los sticks, el
+  stick C y los gatillos iban fijos (ejes 0-3, botones 6/7); RB era siempre Z y RT siempre R. No se veía qué botón
+  manejaba cada cosa. Lo saltado en el asistente quedaba sin nada, sin aviso.
+- **Teclado:** al cambiar una acción quedaba UNA tecla (se perdía la flecha), no había stick C, solo «Restaurar» de todo.
+- (crítico) **Esc se colaba:** el oyente del cajón (Esc lo cierra) iba antes que el de los controles: la espera de
+  tecla quedaba puesta y la próxima tecla que se apretaba jugando quedaba asignada sin querer.
+- (crítico) **Un guardado roto apagaba los controles:** `mkw.teclas` con algo que no es lista hacía fallar el cuadro y
+  el bucle (`requestAnimationFrame`) no volvía a pedirse: teclado y mandos muertos en silencio.
+- (crítico) **El cursor del sitio seguía prendido** con el cajón abierto: la A que se apretaba para asignar también
+  hacía clic.
+- (crítico) La asignación se guardaba con el **nombre entero** del mando, que cambia entre cable y Bluetooth.
+- Encontrado de paso: un mando de **Xbox salía como PlayStation** (su nombre dice «Wireless Controller», como el
+  DualShock 4); `mando.js` del sitio mira Xbox primero, `controles.mjs` no.
+- **La selección de personajes con mando:** en el descanso, «Cambiar personaje y vehículo» abre la pantalla del juego,
+  pero la franja del descanso seguía a la vista y contaba como un menú de la página: el mando manejaba el cursor del
+  sitio (`mando-sitio.mjs`) y no le llegaba al juego. Con el teclado sí andaba.
+
+### 111.2 Lo nuevo
+
+- **`asignacion-mando.mjs`** (puro): un MAPA por mando, objetivo (A B X Y Z Start, la cruz, L y R analógicos, el stick y
+  el stick C en sus cuatro direcciones: 20) → fuentes (`b7` un botón con su valor; `a2+`/`a2-` media de un eje;
+  `a5+@-1` un gatillo-eje con su reposo; `a9~-0.43` una dirección de una cruceta hat). Hasta 3 por objetivo, se toma la
+  más fuerte. El mapa por omisión es el de antes: **prueba de oro, 10 000 estados al azar iguales** (y 20 000 en Node).
+  Detalle que la prueba encontró: Chrome marca un gatillo como «apretado» desde un 12 %; los botones de GameCube se
+  prenden con ese «apretado» y los gatillos usan su valor, como antes.
+- **Capturar:** la foto del mando al empezar (lo que ya estaba apretado o inclinado no cuenta); el primer botón nuevo, o
+  el primer eje que se mueve más de 0,6 desde su reposo; Esc u 8 s cancelan; mientras tanto ese mando no maneja el juego
+  y el cursor del sitio se aparta (`menuDePagina`). Una entrada que ya manejaba otro control **se mueve** y se avisa
+  («se quitó de Z») con **Deshacer**.
+- **Por modelo:** `clavePerfil` = fabricante:producto (igual por cable, por Bluetooth y en Firefox; aparte sin mapeo
+  estándar). El asistente viejo (`propios`, §57) se respeta tal cual (lo saltado sigue vacío). Lo asignado a mano ahora
+  tiene el **gatillo analógico de verdad** (antes, apretado = 255 aunque fuera a medias: la prueba vieja de `controles`
+  esperaba 255 con su texto diciendo 153; ahora 153).
+- **El panel** (Controles → Mandos → «Reasignar botones, gatillos y sticks»): una tabla de 20 filas con lo que maneja
+  cada control en la letra del mando (✕ ○ □ △ / A B X Y / ZR / «Stick izq. →» / «Botón 7»), su luz en vivo, «Cambiar»,
+  «＋», ✕, ↺; abajo «Asignar todo seguido» (espera a que se suelte todo entre uno y otro), «Deshacer», «Restaurar
+  todo». El probador muestra además el stick C y los gatillos L y R con su barra.
+- **El teclado:** hasta 3 teclas por acción (✕, «Cambiar», «＋», ↺ por fila), el **stick C** (sin teclas de partida, ver 111.3), Tab y F1-F12
+  no se asignan (son del navegador), y si una tecla se mueve de otra acción se avisa.
+- **Arreglos:** Esc cancela la reasignación sin cerrar el cajón (`interfaz.mjs`); el bucle de los controles sigue
+  aunque un cuadro falle; `mkw.teclas` se revisa al leer; Xbox antes que PlayStation.
+- **El mando en la selección de personajes:** mientras la pantalla de personajes del juego está abierta
+  (`eligiendoEnJuego`, de `directo.elegir()` hasta que se elige o abre la carrera), la franja del descanso no se queda
+  con el mando: va al juego. Lo que tapa la pantalla (el selector de pistas, el cajón) sí.
+
+**Pruebas:** banco `asignacion` (nuevo) 42/42, `controles` 48/48, `mandos-jugador` 17/17, `mando-sitio` 11/11; la página
+sin el juego: Esc con el cajón abierto cancela la espera de tecla, el cajón sigue abierto y la tecla siguiente no queda
+asignada; capturas del panel. Falta con el juego y un mando de verdad: la selección de personajes en el descanso.
+
+### 111.3 La segunda revisión del crítico (y lo que se arregló)
+
+El crítico (un agente aparte que lee el código sin saber lo que yo creo) revisó lo ya hecho. Encontró:
+
+| # | Qué pasaba (ejemplo) | Arreglo |
+|---|---|---|
+| 1 (grave) | Apretar «Cambiar» en X y, antes de tocar nada, «Cambiar» en Y: la respuesta de X (cancelada) borraba la espera de Y. Quedaba una captura sin fila, sin tope de 8 s y con el mando mudo; lo próximo que se tocaba se asignaba sin aviso. | `opciones-mandos.mjs` `esperar`: `const mia = espera = …` y la respuesta solo actúa si `espera === mia`. Un «Cambiar» de la tabla corta además «Asignar … seguido». |
+| 2 | El botón recién capturado llegaba un cuadro al juego: capturar Start pausaba. | `controles.mjs` `hastaSoltar`: ese mando manda ceros hasta que se suelta todo. |
+| 3 | Una cruceta hat que descansa en 1,2857 (= 9/7; marca −1 + k·2/7) no capturaba ← (0,714) ni ↖ (1,0): están a menos de 0,6 del reposo. | `capturar`: si el reposo está fuera de −1..1, cualquier valor a más de 0,12 es una dirección. |
+| 4 | Algunos gatillos que el navegador da como eje marcan 0 hasta que se los toca la primera vez (y desde ahí −1): se guardaban `a5+` (sin reposo) y suelto valían 50 %. | `conReposo`: si al soltarlo queda en −1, se guarda `a5+@-1`. |
+| 5 | ↺ o «Deshacer» en un mando sin tocar lo marcaban «asignado por ti» (se guardaba el mapa entero, igual al de siempre). | `esPorOmision`: el mapa de siempre no se guarda (se borra lo guardado). |
+| 6 | Las teclas Num 8/2/4/6 del stick C cambiaban lo de siempre para todos, y una tecla guardada antes (Num 8 en A) haría dos cosas. | El stick C empieza **sin teclas**; cada uno le pone las suyas. |
+| 7 | «Asignar todo seguido»: el reposo se medía después del primer botón (con uno apretado); Esc solo saltaba un paso aunque decía «cancela»; 20 pasos seguidos son muchos. | El reposo se mide antes del primer paso; Esc cancela el asistente entero; dos asistentes: «Asignar botones seguido» (12) y «Asignar sticks seguido» (8). |
+| 8 | Cerrar el cajón dejaba la captura corriendo (hasta 8 s con el mando mudo). | `cerrarCajon` cancela la espera (tecla o mando). |
+| 9 | Dos mandos iguales comparten la asignación y el panel no lo decía. | La tarjeta dice «la misma asignación para los N de este modelo». |
+
+Nota sobre el asistente viejo (§57): lo asignado así con R o L ahora es **analógico** (un gatillo a medias da a medias,
+antes 255 de golpe). Es lo que se quería (el derrape y el objeto no cambian: se prenden al pasar del 50 %).
+
+Quedó sin tocar (bajo, a propósito): mientras un mando captura, los demás siguen manejando el juego (son otros
+jugadores); `mapaDe` revisa el mapa en cada cuadro (es barato: 20 listas cortas).
+
+**Pruebas:** banco `asignacion` 52/52 (10 nuevas: las 8 direcciones de la hat con reposo 1,2857, `conReposo`,
+`esPorOmision`, el botón capturado que no llega mientras se mantiene, ↺/Deshacer en un mando sin tocar, el gatillo-eje
+que marcaba 0, el stick C sin teclas, dos «Cambiar» seguidos), `controles` 48/48, `mandos-jugador` 17/17,
+`mando-sitio` 11/11; la página sin el juego: cerrar el cajón cancela la espera de una tecla y la de un mando.

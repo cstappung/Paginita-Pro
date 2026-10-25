@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qué jugador es cada mando</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Qué jugador es cada mando: <span>elegirlo, cambiarlos de lugar y que se recuerde</span></h1>
+<p>Prueba lo de la bitácora §106 (pedido del dueño: «en BT3 aparece el mando que uno tiene y permite seleccionar entre
+  mandos») <b>sin el juego</b>: <code>controles.mjs</code> (<code>clavesMandos</code>, <code>repartirPuertos</code>,
+  <code>elegirPuerto</code>) y el panel <code>opciones-mandos.mjs</code> con su selector «Jugador 1–4», con mandos de
+  mentira (la Gamepad API falsa): dos iguales, uno «virtual» al lado del de verdad, uno que se desconecta y vuelve, y
+  un navegador que no deja leer mandos.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div class="caja" id="panel"></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearControles, clavesMandos, repartirPuertos, BOTON } from '/web/navegador/controles.mjs';
+import { montarMandos } from '/web/navegador/opciones-mandos.mjs';
+
+const { ok, fin } = prueba('mandos-jugador', 'Qué jugador es cada mando (sin el juego)');
+const cuadros = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+try { localStorage.removeItem('mkw.mandos'); localStorage.removeItem('mkw.teclas'); } catch {}
+
+const mando = (index, id) => ({ index, id, mapping: 'standard', connected: true, axes: [0, 0, 0, 0],
+  buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+const XBOX_VIRTUAL = 'Xbox 360 Controller (XInput STANDARD GAMEPAD)';
+const DUALSENSE = 'DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)';
+let lista = [];
+let bloquear = false;
+navigator.getGamepads = () => { if (bloquear) throw new DOMException('bloqueado', 'SecurityError'); return lista; };
+
+const recibido = [];
+const enviar = (p, conectado, botones) => { recibido[p] = { conectado, botones }; };
+
+try {
+  // ---- 1. Las funciones puras ----
+  const c2 = clavesMandos([mando(3, 'X'), mando(0, 'X'), mando(1, 'Y')]);
+  ok('dos mandos iguales tienen claves distintas (por orden de índice: X y X#2)', JSON.stringify(c2) === JSON.stringify([[0, 'X'], [1, 'Y'], [3, 'X#2']]), JSON.stringify(c2));
+  const r1 = repartirPuertos([[0, 'A'], [1, 'B']], {});
+  ok('sin elegir nada: en orden, jugador 1 y 2', r1.get(0) === 0 && r1.get(1) === 1);
+  const r2 = repartirPuertos([[0, 'A'], [1, 'B']], { B: 0 });
+  ok('B eligió ser el jugador 1: A pasa al 2', r2.get(1) === 0 && r2.get(0) === 1);
+  const r3 = repartirPuertos([[0, 'A'], [1, 'B']], { A: 2, B: 2 });
+  ok('dos eligieron el mismo: gana el de menor índice, el otro al primero libre', r3.get(0) === 2 && r3.get(1) === 0);
+  const r4 = repartirPuertos([0, 1, 2, 3, 4].map(i => [i, 'M' + i]), {});
+  ok('un quinto mando queda sin jugador (el juego tiene 4 puertos)', r4.size === 4 && !r4.has(4));
+
+  // ---- 2. Con los controles y el panel ----
+  lista = [mando(0, XBOX_VIRTUAL), mando(1, DUALSENSE)];      // el virtual (Steam/DS4Windows) aparece primero
+  const c = crearControles({ enviar });
+  montarMandos(document.getElementById('panel'), c);
+  await cuadros(4);
+  const de = clave => c.estado.mandos.find(m => m.clave === clave);
+  ok('al principio, el que el navegador vio primero (el virtual) es el jugador 1', de(XBOX_VIRTUAL)?.puerto === 0 && de(DUALSENSE)?.puerto === 1);
+  const selector = () => [...document.querySelectorAll('.mando-tarjeta')].find(t => t.textContent.includes('PlayStation'))?.querySelector('select.mando-jugador');
+  await new Promise(r => setTimeout(r, 150));                 // (el panel se repinta cada 100 ms)
+  ok('cada tarjeta del panel tiene su selector «Jugador 1–4» con el jugador de ahora', selector()?.value === '1' &&
+     document.querySelectorAll('select.mando-jugador').length === 2);
+  // la persona elige el DualSense como jugador 1, en el panel
+  const s = selector(); s.value = '0'; s.dispatchEvent(new Event('change'));
+  await cuadros(3);
+  ok('elegir el DualSense como jugador 1 lo cambia de lugar con el virtual', de(DUALSENSE)?.puerto === 0 && de(XBOX_VIRTUAL)?.puerto === 1,
+     `DualSense J${de(DUALSENSE)?.puerto + 1}, virtual J${de(XBOX_VIRTUAL)?.puerto + 1}`);
+  lista[1].buttons[0] = { pressed: true, value: 1 };          // A en el DualSense
+  await cuadros(3);
+  ok('…y su A llega al juego por el puerto 1', (recibido[0]?.botones & BOTON.A) && !(recibido[1]?.botones & BOTON.A));
+  lista[1].buttons[0] = { pressed: false, value: 0 };
+  await new Promise(r => setTimeout(r, 150));
+  const tarjetas = [...document.querySelectorAll('.mando-tarjeta b')].map(b => b.textContent);
+  ok('el panel lo muestra: el DualSense primero, como jugador 1', tarjetas[0]?.includes('PlayStation') && tarjetas[0].includes('jugador 1'), tarjetas.join(' | '));
+  const guardado = JSON.parse(localStorage.getItem('mkw.mandos') || '{}');
+  ok('se guarda en el navegador por mando', guardado.puertos?.[DUALSENSE] === 0 && guardado.puertos?.[XBOX_VIRTUAL] === 1, JSON.stringify(guardado.puertos));
+
+  // desconectar y volver (el navegador le da otro índice): sigue siendo el jugador 1
+  lista = [mando(0, XBOX_VIRTUAL)];
+  await cuadros(3);
+  ok('sin el DualSense, el virtual sigue en el jugador que tenía (no salta al 1 solo)', de(XBOX_VIRTUAL)?.puerto === 1);
+  lista = [mando(0, XBOX_VIRTUAL), mando(2, DUALSENSE)];
+  await cuadros(3);
+  ok('el DualSense vuelve con otro índice y sigue siendo el jugador 1', de(DUALSENSE)?.puerto === 0 && de(XBOX_VIRTUAL)?.puerto === 1);
+
+  // otra página (recarga): lo elegido se recuerda
+  const c3 = crearControles({ enviar: () => {} });
+  await cuadros(3);
+  ok('al recargar la página, lo elegido se recuerda', c3.estado.mandos.find(m => m.clave === DUALSENSE)?.puerto === 0);
+  c3.detener();
+
+  // dos mandos iguales: se eligen por separado
+  lista = [mando(0, DUALSENSE), mando(1, DUALSENSE)];
+  await cuadros(3);
+  c.elegirPuerto(DUALSENSE + '#2', 3);
+  await cuadros(3);
+  ok('dos mandos iguales: cada uno con su jugador (el segundo como jugador 4)', c.estado.mandos.map(m => m.puerto).sort().join() === '0,3', c.estado.mandos.map(m => `${m.clave.slice(0, 8)}…→J${m.puerto + 1}`).join(', '));
+
+  // un navegador que no deja leer mandos: el teclado sigue andando
+  bloquear = true;
+  await cuadros(3);
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK' }));   // A por teclado
+  await cuadros(3);
+  ok('si leer mandos da error, se avisa (bloqueados) y el teclado sigue llegando al juego', c.estado.bloqueados === true && (recibido[0]?.botones & BOTON.A),
+     `bloqueados ${c.estado.bloqueados}`);
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyK' }));
+  await new Promise(r => setTimeout(r, 150));
+  ok('…y el panel lo dice en vez de «aprieta un botón»', document.getElementById('listaMandos')?.dataset.vacia.includes('no deja leer mandos'));
+  bloquear = false;
+  c.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

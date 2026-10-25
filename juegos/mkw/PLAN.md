@@ -506,6 +506,31 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-25 06:30** — **Reasignar todo el mando y el teclado** (§111, con un crítico). Mapa por mando con 20 controles
+- **2026-10-25 08:10** — **§111.3: la segunda revisión del crítico**: un segundo «Cambiar» ya no deja la captura huérfana (`espera === mia`), lo capturado no llega al juego hasta soltarlo, la hat con reposo 1,2857 en las 8 direcciones, el gatillo-eje que marcaba 0, lo de siempre no se guarda, el stick C del teclado sin teclas de partida, el asistente en dos (botones / sticks) con el reposo medido antes y Esc que lo cancela, cerrar el cajón cancela. Banco `asignacion` 52/52, `controles` 48/48, `mandos-jugador` 17/17, `mando-sitio` 11/11.
+  (botones, gatillos analógicos, stick y stick C), captura de botón/eje/cruceta hat, por modelo (cable y Bluetooth),
+  tabla con Cambiar/＋/✕/↺/Deshacer; teclado con 3 teclas y stick C. Arreglos: Esc que se colaba, guardado roto, cursor
+  del sitio al asignar, Xbox como PlayStation, y **el mando en la selección de personajes** del descanso. Banco
+  `asignacion` 42/42.
+- **2026-10-25 04:10** — **Quien llega con la copa andando corre desde la carrera siguiente** (§110, el dueño). De paso,
+  un error de antes: el que entraba tarde aparecía en la largada y el juego de todos se recargaba; ahora «¡A correr!»
+  guarda quiénes estaban. `{t:"suma"}`, `sumados` con su carrera en la sala del juego, `correnEn`, `lockstep.agregar`.
+  Banco `sumados` 24/24, sitio 24/24. **Falta probarlo con el juego** (tres pestañas).
+- **2026-10-25 02:00** — **La resolución en pixeles y la de salida** (§108, el dueño: «resolución que pueda hasta bajar
+  para aumentar fps»). El juego ya dibuja a lo mínimo del motor (640×528); lo nuevo baja el tamaño del lienzo (1920×1080
+  … 960×540) contestándole a SDL3 un recuadro más chico, en el momento. Ayuda solo si frena la tarjeta de video. Banco
+  `graficos` 31/31. Falta medir con el juego.
+- **2026-10-25 01:10** — **Gráficos opcionales y el medidor** (§107, el dueño: «ping ms, fps, antialiasing, subirle los
+  gráficos», «hasta 180 fps»). Avanzado → Gráficos: resolución interna 1–4× (es el antialiasing: supermuestreo) y
+  fluidez 60/120/180 (imágenes intermedias; la física sigue a 60), al Config.toml al reiniciar; fps y ping en la esquina.
+  Todo apagado por omisión: con lo de siempre el Config.toml no cambia. Banco `graficos` 21/21. **Falta medir con el
+  juego** (§107.3: si la fluidez anda en la web y cuánto cuesta cada opción).
+- **2026-10-25 00:21** — **Los mandos como en BT3 y la barra de descarga** (§106, el dueño: «en bt3 aparece el mando que
+  uno tiene y permite seleccionar entre mandos»; «la barra de descargas con el progreso cuando se esté descargando
+  algo»). «Jugador 1–4» en cada tarjeta de Controles → Mandos (se cambian de lugar, se recuerda por mando), la pastilla
+  del mando abre Controles, la ayuda de la tarjeta de inicio con los botones del mando, y `descargas.mjs`: MB, total y
+  velocidad cuando bajar algo dura más de 0,4 s o el juego espera. Banco `descargas` 29/29, `mandos-jugador` 17/17,
+  `mando-sitio` 11/11, `controles` 47/47. Falta probarlo con el juego en la PC del proyecto.
 - **2026-10-24 23:50** — El dueño publicó las reglas de Firebase (base de datos y Storage, `docs/publicar.md` paso 5). Del lado de
   las cuentas no falta nada: queda juntar la rama del sitio a `main` (paso 6) cuando el dueño lo pida, y probar como amigo
   (paso 7).
