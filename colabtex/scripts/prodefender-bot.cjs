@@ -143,6 +143,9 @@ const LIBRO = (() => {
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
 const GUION = +opt('guion', 100);
 const HORIZONTE = +opt('horizonte', 2);
+// «humana» sin guion: de qué parte cada ronda antes del rescate («normal»: gastar como la mixta
+// con las cuotas de las personas; «ahorra»: no gastar)
+const BASE = opt('base', 'normal');
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   humana: { rota: MIXTA, humana: true },
@@ -657,7 +660,7 @@ class Bot {
       if (!mejor || x.perdidas < mejor.x.perdidas || x.perdidas === mejor.x.perdidas && x.av < mejor.x.av) mejor = { m, acc, x };
       return x;
     };
-    for (const m of queda ? MODOS_GUION.filter(m => /^(normal|adelanta)/.test(m)) : ['ahorra']) if (prueba(m).perdidas === 0) return this.toma(mejor);
+    for (const m of queda ? MODOS_GUION.filter(m => /^(normal|adelanta)/.test(m)) : [BASE]) if (prueba(m).perdidas === 0) return this.toma(mejor);
     if (mejor.x.perdidas < umbral) return this.toma(mejor);
     const base = mejor.m, acc = this.rescate(base, mejor.x);
     if (acc.length) prueba(base, acc);
