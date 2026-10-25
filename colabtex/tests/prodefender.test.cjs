@@ -556,7 +556,7 @@ test('tercera era: las mecánicas de los atacantes nuevos',()=>{
  // Polinizador: cura a los de alrededor
  g=nuevo3(11);const po=g.spawn('polinizador',0,300,1),he=g.spawn('robusto',0,305,1);he.hp=he.maxHp*0.5;for(let k=0;k<60;k++)g.update(1/60);assert.ok(he.hp>he.maxHp*0.5);
  // Reflejo: se desdobla al bajar de la mitad
- g=nuevo3(12);const rf=g.spawn('reflejo',0,300,1);g.damage(rf,rf.maxHp*0.6,'arcane',null,{});
+ g=nuevo3(12);const rf=g.spawn('reflejo',0,300,1);for(let k=0;k<40&&rf.hp>rf.maxHp*0.4;k++)g.damage(rf,rf.maxHp*0.6,'arcane',null,{});   // la Ley del Cristal topa cada golpe
  assert.ok(g.enemies.filter(x=>x.type==='reflejo').length===2);
  // Prisma Viviente: ningún golpe le quita más del 7%
  const pr=g.spawn('prismaVivo',0,300,1);const hp=pr.hp;g.damage(pr,1e9,'arcane',null,{});assert.ok(Math.abs(hp-pr.hp-pr.maxHp*0.07)<1e-6);
@@ -613,14 +613,15 @@ test('tercera era: cada reino tiene su ley y cambia la forma de ganar',()=>{
  // Contagio: una torre con esporas contagia a las de al lado, no a las lejanas
  g=nuevo3(11);const a=ponCerca(g,'espinas',300,300),b=ponCerca(g,'espinas',360,300),c=ponCerca(g,'espinas',700,300);
  g.active=true;a.esporaT=3;g.tickTercera(0.1);assert.ok(b.esporaT>0,'contagia a la vecina');assert.ok(!(c.esporaT>0),'no a la lejana');
- // Cristal: ningún golpe quita más del 8% (con un mínimo de 25)
- g=nuevo3(12);e=g.spawn('robusto',0,300,1);e.hp=e.maxHp=10000;assert.equal(Math.round(g.damage(e,5000,'arcane',null,{})),800);
- e.hp=e.maxHp=100;assert.equal(Math.round(g.damage(e,60,'arcane',null,{})),25,'el mínimo');
+ // Cristal: ningún golpe quita más del 4% (con un mínimo de 15)
+ g=nuevo3(12);e=g.spawn('robusto',0,300,1);e.hp=e.maxHp=10000;assert.equal(Math.round(g.damage(e,5000,'arcane',null,{})),400);
+ e.hp=e.maxHp=100;assert.equal(Math.round(g.damage(e,60,'arcane',null,{})),15,'el mínimo');
  const r0=g.spawn('robusto',0,300,1);r0.hp=r0.maxHp=10000;assert.equal(Math.round(g.damage(r0,5000,'arcane',null,{dot:true})),5000,'el daño continuo no tiene tope');
  // Altura: las de alcance largo pegan más y ven más; las cortas, menos
  g=nuevo3(13);const v=ponCerca(g,'vigia',300,300),s=ponCerca(g,'sierra',600,300);
  const vb=g.baseStats(v),sb=g.baseStats(s);assert.ok(v.s.range>vb.range&&v.s.dmg>vb.dmg,'vigía');assert.ok(s.s.dmg<sb.dmg&&s.s.range===sb.range,'sierra');
- // Noche: a oscuras ven menos; junto a un Faro, lo normal
+ // Noche: a oscuras ven menos; junto a un Faro, lo normal (el fuego no alumbra)
  g=nuevo3(14);const o=ponCerca(g,'espinas',300,300);const r=o.s.range;assert.ok(r<g.baseStats(o).range,'a oscuras');
+ ponCerca(g,'dragon',350,300);assert.ok(o.s.range<g.baseStats(o).range,'un Lanzallamas no alumbra');
  ponCerca(g,'faro',360,300);assert.equal(o.s.range,g.baseStats(o).range,'alumbrada');
 });

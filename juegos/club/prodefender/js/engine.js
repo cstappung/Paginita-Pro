@@ -89,8 +89,8 @@
   const PURGA = { dur: 2.5, hp: 0.5 };
   // Cristal: lo más que quita un golpe (parte de la vida, con un mínimo para que el principio
   // no cambie). Noche: quién alumbra, a qué distancia y cuánto ve quien está a oscuras.
-  const CRISTAL = { tope: 0.08, jefe: 0.02, minimo: 25 };
-  const LUZ = { faro: 1, dragon: 1, prisma: 1 }, LUZ_R = 110, OSCURO = 0.6;
+  const CRISTAL = { tope: 0.04, jefe: 0.01, minimo: 15 };
+  const LUZ = { faro: 1 }, LUZ_R = 140, OSCURO = 0.6;
   // Altura: desde cuánto alcance (el de base) una torre es «de altura» o «de llano».
   const ALTURA = { lejos: 150, cerca: 120, dmg: 1.3, range: 1.2, llano: 0.7 };
   // Contagio: cada cuánto salta, hasta dónde y cuánto dura lo que contagia.

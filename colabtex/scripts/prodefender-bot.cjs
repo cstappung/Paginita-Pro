@@ -146,6 +146,8 @@ const GUION = +opt('guion', 100);
 // menos de D px de otra)
 const TORRES = opt('torres', '') ? opt('torres').split(',') : null;
 const SEPARA = +opt('separa', 0);
+// --ciego: juega sin saber la ley del reino (sitio por el alcance de base, sin Faros en la Noche)
+const CIEGO = args.includes('--ciego');
 const HORIZONTE = +opt('horizonte', 2);
 // con guion, la parte de las vidas del reino que se acepta perder en una ronda antes de rescatarla
 const UMBRAL = +opt('umbral', 0);
@@ -316,7 +318,7 @@ class Bot {
         v += this.cobertura(x, y, R) * 1e-3;
       }
       // la ley del reino (Altura, Noche) cambia el alcance según el sitio
-      else v = this.cobertura(x, y, vacio || !g.leyEn ? R : R * g.leyEn(type, x, y).range, vacio);
+      else v = this.cobertura(x, y, vacio || CIEGO || !g.leyEn ? R : R * g.leyEn(type, x, y).range, vacio);
       if (v > mv) { mv = v; mejor = [x, y]; }
     }
     return mejor;
@@ -445,6 +447,12 @@ class Bot {
     if (this.est.humana) { const h = this.humana(r, presion); if (h) return h; }
     const heroe = heroeDe(this.li);
     if (!this.est.humana && heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
+    // Ley de la Noche: un Faro para empezar y otro cada cuatro torres de daño (las demás se
+    // ponen donde alumbran, ver sitio)
+    if (g.ley === 'noche' && !CIEGO && !vet.faro && PD.towersFor(this.li).includes('faro') && dmg.length) {
+      const faros = T.filter(t => t.type === 'faro').length;
+      if (faros < 1 + Math.floor(dmg.length / 4) && (!presion || g.money >= PD.TOWERS.faro.cost)) return nuevo('faro');
+    }
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
     if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana) return nuevo('huerto');

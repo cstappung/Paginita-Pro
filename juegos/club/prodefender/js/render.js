@@ -4071,7 +4071,7 @@
 
   // ===================== TERCERA ERA: poder y eventos =====================
   // los Poderes del Reino que se quedan en el suelo (engine.js: zonas)
-  // Ley de la Noche: el charco de luz de cada Faro, Lanzallamas y Prisma (lo que alumbra)
+  // Ley de la Noche: el charco de luz de cada Faro (lo que alumbra)
   function drawLuces(ctx, g, t) {
     const R = PD.LEY.luzR;
     ctx.globalCompositeOperation = 'lighter';

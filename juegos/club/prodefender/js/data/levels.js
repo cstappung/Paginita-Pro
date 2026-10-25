@@ -299,11 +299,11 @@
     contagio: { name: 'Ley del Contagio', icon: '🍄', meta: 'Torres separadas y Pararrayos',
                 desc: 'Las esporas SALTAN de torre en torre: cada 1,5 s una torre infectada contagia a las que tiene a menos de 90 px (atacan a la mitad). Separa tus torres; las que cubre un Pararrayos no se contagian.' },
     cristal:  { name: 'Ley del Cristal', icon: '💎', meta: 'Muchos golpes pequeños',
-                desc: 'Ningún golpe quita más del 8% de la vida de un enemigo (a los jefes, el 2%). Ganan las torres que pegan muchas veces: rayos, cadenas, enjambres, bumeranes y veneno.' },
+                desc: 'Ningún golpe quita más del 4% de la vida de un enemigo (a los jefes, el 1%). Ganan las torres que pegan muchas veces o a muchos: rayos, cadenas, enjambres, bumeranes y veneno.' },
     altura:   { name: 'Ley de la Altura', icon: '🏔', meta: 'Alcance largo',
                 desc: 'Desde las islas se ve lejos: las torres de alcance 150 o más hacen +30% de daño y ven un 20% más; las de menos de 120 hacen un 30% menos.' },
-    noche:    { name: 'Ley de la Noche', icon: '🌙', meta: 'Defensas alrededor de la luz',
-                desc: 'A oscuras las torres ven un 40% menos. Un Faro, un Lanzallamas o un Prisma alumbra 110 px a su alrededor y les devuelve el alcance: agrúpalas junto a la luz.' }
+    noche:    { name: 'Ley de la Noche', icon: '🌙', meta: 'Torres agrupadas alrededor de Faros',
+                desc: 'A oscuras las torres ven un 40% menos. Solo un Faro alumbra: 140 px a su alrededor, las torres ven lo normal. Pon Faros donde pelees y agrupa tus defensas junto a ellos.' }
   };
 
   // Eventos de la tercera era: lo que pasa durante una ronda (engine.js los aplica; la
