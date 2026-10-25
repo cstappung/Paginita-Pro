@@ -144,7 +144,7 @@ const LIBRO = (() => {
 const GUION = +opt('guion', 100);
 const HORIZONTE = +opt('horizonte', 2);
 // con guion, la parte de las vidas del reino que se acepta perder en una ronda antes de rescatarla
-const UMBRAL = +opt('umbral', 0.06);
+const UMBRAL = +opt('umbral', 0);
 // «humana» sin guion: de qué parte cada ronda antes del rescate («ahorra»: no gastar, y el
 // rescate compra lo justo; «normal»: gastar como la mixta con las cuotas de las personas). En
 // la Necrópolis «ahorra» llegó a la 49 y «normal» a la 32; en Eclipse y Engranajes, igual.
