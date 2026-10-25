@@ -16,6 +16,11 @@
      (`[n, niveles por torre]`; los héroes van como `heroe`). Cada partida pesa
      según la ronda a la que llegó, y ganar vale el doble.
    - `orden`: por reino y para todos, en qué orden aparece cada tipo.
+   - `guiones`: por reino, la mejor partida (la que llegó más lejos; entre las
+     ganadas, la que acabó con más vidas) jugada a jugada: `[ronda, 'p', tipo, x, y]`
+     poner, `[ronda, 'u', n.º de torre, camino]` mejorar, `'v'` vender, `'m'` objetivo
+     (el n.º de torre es el orden en que se puso). El bot la sigue al principio
+     (`--guion N`: hasta la ronda N).
 
    Solo se rehacen las pruebas de la versión del motor de esta carpeta (`ve`);
    de las partidas de una misma persona y semilla se toma la más larga (cada
@@ -43,7 +48,7 @@ function rehace(p) {
   const quieto = g => g.over || (!g.active && g.enemies.length === 0);
   let g = new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k = 0, q = 0, tramo = 0;
   let info = new Map();   // torre → {type, seq, modo}
-  const todas = [], rondas = [];
+  const todas = [], rondas = [], guion = [];
   const paso = () => {
     if (quieto(g)) { if (q >= P.QUIETO_MAX) throw new Error('espera de más'); q++; }
     const activa = g.active;
@@ -59,9 +64,13 @@ function rehace(p) {
       if (!t2) throw new Error('no se pudo colocar');
       const x = { type: t2.type, seq: [], modo: null, r: g.round + 1 };
       info.set(t2, x); todas.push(x);
-    } else if (c === 1) { if (!t || !g.upgrade(t, j[3])) throw new Error('mejora imposible'); info.get(t).seq.push(j[3]); }
-    else if (c === 2) { if (!t) throw new Error('venta imposible'); g.sell(t); }
-    else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; } }
+      guion.push([g.round + 1, 'p', t2.type, t2.x, t2.y]);
+    } else if (c === 1) {
+      if (!t || !g.upgrade(t, j[3])) throw new Error('mejora imposible');
+      info.get(t).seq.push(j[3]); guion.push([g.round + 1, 'u', todas.indexOf(info.get(t)), j[3]]);
+    }
+    else if (c === 2) { if (!t) throw new Error('venta imposible'); guion.push([g.round + 1, 'v', todas.indexOf(info.get(t))]); g.sell(t); }
+    else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; guion.push([g.round + 1, 'm', todas.indexOf(info.get(t)), t.mode]); } }
     else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); }
     else if (c === 5) {
       const viejas = g.towers.slice();
@@ -76,7 +85,7 @@ function rehace(p) {
     q = 0;
   }
   while (k < p.k) paso();
-  return { li, ronda: g.round, gano: !!g.won, todas, rondas };
+  return { li, ronda: g.round, gano: !!g.won, vidas: g.lives, todas, rondas, guion };
 }
 
 // el plan de una torre: los niveles finales más votados y, paso a paso, el camino más votado
@@ -120,7 +129,7 @@ function main() {
   };
   const pesos = (slug, r, w) => { const c = (cuotas[slug] = cuotas[slug] || {}); (c[r] = c[r] || { w: 0, t: {} }).w += w; };
   for (const x of partidas) {
-    const slug = PD.LEVELS[x.li].slug, w = x.ronda / 100 * (x.gano ? 2 : 1);
+    const slug = P.REINOS[x.li], w = x.ronda / 100 * (x.gano ? 2 : 1);
     for (const t of x.todas) {
       const tipo = PD.TOWERS[t.type].hero ? 'heroe' : t.type;
       if (t.seq.length) (seqs[tipo] = seqs[tipo] || []).push(t.seq);
@@ -138,7 +147,13 @@ function main() {
       }
     }
   }
-  const libro = { version: P.VERSION, partidas: partidas.length, ganadas: partidas.filter(x => x.gano).length, planes: {}, modos: {}, cuotas: {}, orden: {} };
+  const libro = { version: P.VERSION, partidas: partidas.length, ganadas: partidas.filter(x => x.gano).length, planes: {}, modos: {}, cuotas: {}, orden: {}, guiones: {} };
+  const nota = x => (x.gano ? 1e6 : 0) + x.ronda * 1000 + x.vidas;
+  for (const x of partidas) {
+    const slug = P.REINOS[x.li], prev = libro.guiones[slug];
+    if (!prev || nota(x) > prev.nota) libro.guiones[slug] = { nota: nota(x), ronda: x.ronda, gano: x.gano, jugadas: x.guion };
+  }
+  for (const gu of Object.values(libro.guiones)) delete gu.nota;
   for (const [tipo, l] of Object.entries(seqs)) if (l.length >= 2) libro.planes[tipo] = plan(l, tipo === 'heroe');
   for (const [tipo, m] of Object.entries(modos)) libro.modos[tipo] = Object.entries(m).sort((a, b) => b[1] - a[1])[0][0];
   for (const [slug, c] of Object.entries(cuotas)) {

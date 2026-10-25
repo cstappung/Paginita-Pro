@@ -77,7 +77,7 @@ const path = require('path');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const MOTOR = path.resolve(opt('motor', path.join(__dirname, '../../juegos/club/prodefender/js')));
-for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js']) require(path.join(MOTOR, f));
+for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(path.join(MOTOR, f));
 const PD = globalThis.PD;
 const STEP = 1 / 60;
 const AYUDA = +opt('ayuda', 0);
@@ -137,6 +137,8 @@ const LIBRO = (() => {
   try { return JSON.parse(require('fs').readFileSync(path.resolve(opt('libro', path.join(__dirname, 'prodefender-libro.json'))), 'utf8')); }
   catch { return null; }
 })();
+// hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
+const GUION = +opt('guion', 25);
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   humana: { rota: MIXTA, humana: true },
@@ -219,7 +221,7 @@ class Bot {
     if (this.est.humana) {
       if (!LIBRO) throw new Error('falta el libro: node scripts/prodefender-aprende.cjs export.json');
       // las torres de daño en el orden en que las ponen las personas (las de este reino, o las de todos)
-      const orden = (LIBRO.orden[PD.LEVELS[li].slug] || []).concat(LIBRO.orden['*'] || []);
+      const orden = (LIBRO.orden[PD.Prueba.REINOS[li]] || []).concat(LIBRO.orden['*'] || []);
       const rota = [...new Set(orden)].filter(x => vende.includes(x) && !APARTE[x] && !PD.TOWERS[x].hero);
       if (rota.length) this.rota = rota;
     }
@@ -496,7 +498,7 @@ class Bot {
   // proporción); si no alcanza, ahorra para eso, salvo bajo presión.
   humana(r, presion) {
     const g = this.game, T = g.towers, vet = this.vetadas, C = LIBRO.cuotas;
-    const rr = Math.min(100, Math.ceil(r / 5) * 5), slug = PD.LEVELS[this.li].slug;
+    const rr = Math.min(100, Math.ceil(r / 5) * 5), slug = PD.Prueba.REINOS[this.li];
     const propia = C[slug] && C[slug][rr], fila = propia || (C['*'] && C['*'][rr]);
     if (!fila) return null;
     const heroe = heroeDe(this.li);
@@ -600,7 +602,7 @@ class Bot {
       this.vetadas = {};
       this.modo = this.elegir();
       this.vetadas = {};
-      this.turno();
+      if (!this.sigueGuion(g.round + 1)) this.turno();
       foto = JSON.stringify(g.snapshot());
       for (const t of g.towers) this.mem.get(t.id).antes = t.dealt;
       const r = g.round + 1;
@@ -652,13 +654,42 @@ class Bot {
       filas
     };
   }
+  // «humana», al principio: la mejor partida de una persona en este reino, jugada a jugada
+  // (las de las rondas que ya tocan, en orden; si no alcanza el oro, ahorra como ella).
+  // Devuelve si sigue en el guion (entonces no gasta por su cuenta).
+  sigueGuion(r) {
+    const gu = this.est.humana && LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
+    if (!gu || r > GUION) return false;
+    const g = this.game, J = gu.jugadas;
+    this.gi = this.gi || 0; this.gTorres = this.gTorres || [];
+    const torre = n => { const id = this.gTorres[n]; return id === undefined ? null : g.towers.find(t => t.id === id) || null; };
+    while (this.gi < J.length && J[this.gi][0] <= r) {
+      const [, k, a, b, c] = J[this.gi];
+      if (k === 'p') {
+        if (g.money < PD.TOWERS[a].cost) return true;
+        const t = g.canPlace(a, b, c) ? g.place(a, b, c) : null;
+        if (t) {
+          this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 });
+          if (!APARTE[a]) this.marca(t);
+        }
+        this.gTorres.push(t ? t.id : -1);
+      } else if (k === 'u') {
+        const t = torre(a);
+        if (t && g.canUpgrade(t, b)) { if (g.money < g.upgradeCost(t, b)) return true; g.upgrade(t, b); }
+      } else if (k === 'v') { const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); } }
+      else if (k === 'm') { const t = torre(a); if (t) t.mode = b; }
+      this.gi++;
+    }
+    return true;
+  }
   // reintentar: rehace el motor desde la foto del comienzo de la ronda (otra semilla)
   recarga(snap) {
     const ids = this.game.towers.map(t => t.id);
     this.game = new PD.Game(this.li, snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0);
-    const mem = new Map();
-    this.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); mem.set(t.id, { ...m, dealt: m.dealt.slice() }); });
+    const mem = new Map(), nuevo = new Map();
+    this.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); mem.set(t.id, { ...m, dealt: m.dealt.slice() }); nuevo.set(ids[i], t.id); });
     this.mem = mem;
+    if (this.gTorres) this.gTorres = this.gTorres.map(id => (nuevo.has(id) ? nuevo.get(id) : -1));
   }
 }
 
