@@ -48,7 +48,7 @@ import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
-import { leerGraficos, lineasVideo, montarGraficos, montarMedidor } from './graficos.mjs';
+import { leerGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida } from './graficos.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -721,9 +721,13 @@ const graficosArranque = parametros.get('graficos') === '0' ? leerGraficos({ get
   ...leerGraficos(),
   ...(parametros.has('escala') ? { escala: Number(parametros.get('escala')) } : {}),
   ...(parametros.has('fluidez') ? { fluidez: Number(parametros.get('fluidez')) } : {}),
+  ...(parametros.has('salida') ? { salida: Number(parametros.get('salida')) } : {}),
 };
 window.mkwEstado.graficos = { ...graficosArranque, lineas: lineasVideo(graficosArranque) };
-montarGraficos($('graficosPanel'), { enSala: !!sincro });
+// §108: la resolución de salida (el alto máximo del lienzo), en el momento y cada vez que la persona la cambia
+const salidaLienzo = limitarSalida($('canvas'), { tope: graficosArranque.salida });
+window.mkwSalida = salidaLienzo;
+montarGraficos($('graficosPanel'), { enSala: !!sincro, alSalida: t => salidaLienzo?.fijar(t) });
 // …y el medidor de fps y ping, arriba a la izquierda (solo si la persona lo prende; con el juego andando)
 {
   const medidor = Object.assign(document.createElement('span'), { id: 'medidor', className: 'chip-estado', hidden: true });

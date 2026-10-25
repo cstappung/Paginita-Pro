@@ -506,6 +506,10 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-25 02:00** — **La resolución en pixeles y la de salida** (§108, el dueño: «resolución que pueda hasta bajar
+  para aumentar fps»). El juego ya dibuja a lo mínimo del motor (640×528); lo nuevo baja el tamaño del lienzo (1920×1080
+  … 960×540) contestándole a SDL3 un recuadro más chico, en el momento. Ayuda solo si frena la tarjeta de video. Banco
+  `graficos` 31/31. Falta medir con el juego.
 - **2026-10-25 01:10** — **Gráficos opcionales y el medidor** (§107, el dueño: «ping ms, fps, antialiasing, subirle los
   gráficos», «hasta 180 fps»). Avanzado → Gráficos: resolución interna 1–4× (es el antialiasing: supermuestreo) y
   fluidez 60/120/180 (imágenes intermedias; la física sigue a 60), al Config.toml al reiniciar; fps y ping en la esquina.

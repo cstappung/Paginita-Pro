@@ -10,7 +10,17 @@
 //   - «Fluidez» (frame_interpolation_fps: 120 o 180): el juego SIGUE calculando 60 cuadros por segundo (su física está
 //     hecha para 60, no se puede más), y el motor dibuja imágenes intermedias entre uno y otro. En un monitor de 144 o
 //     240 Hz se ve más suave. Es solo la imagen: en la sala no cambia nada de la carrera (las consolas siguen iguales).
-// Las dos cuestan tarjeta de video (y algo de procesador), así que vienen APAGADAS (lo de siempre: 1× y 60). Se guardan
+//   - «Resolución de salida» (§108: 1920×1080, 1600×900, 1280×720, 960×540): el tamaño de la imagen FINAL que se manda a
+//     la pantalla, para BAJARLA y ganar fps en una tarjeta de video justa. El juego ya dibuja a lo mínimo que acepta el
+//     motor (1× = 640×528, la de la Wii); lo que sí cuesta en un monitor grande es agrandar esa imagen al tamaño de la
+//     pantalla (con un 4K y la escala de Windows al 150 %, el lienzo mide 3840×2160). Esto no pasa por el motor: SDL3 le
+//     da al lienzo el tamaño de su recuadro en la página × devicePixelRatio (SDL_emscriptenevents.c, `external_size`, con
+//     SDL_WINDOW_HIGH_PIXEL_DENSITY de aurora), y lo mide con getBoundingClientRect. `limitarSalida` le contesta a esa
+//     pregunta un recuadro más chico (el mismo 16:9), así el lienzo queda de a lo más esa altura, y el navegador lo estira
+//     a la pantalla al mostrarlo (eso es gratis: lo hace al componer). Se aplica en el momento (un aviso `resize`). Solo
+//     ayuda si lo que frena es la tarjeta de video; si es el procesador, no cambia los fps.
+//     Trampa: el ratón del menú interno del motor (ImGui) se mide con ese mismo recuadro; la página no lo usa.
+// Las dos primeras cuestan tarjeta de video (y algo de procesador), así que vienen APAGADAS (lo de siempre: 1× y 60). Se guardan
 // en este navegador («mkw.graficos») y se aplican al reiniciar el juego (el motor las lee una vez, al arrancar). Con los
 // valores de siempre no se escribe nada nuevo en el Config.toml: el juego arranca exactamente igual que antes.
 // Además, dos medidores que se prenden aparte: los cuadros por segundo del juego y, en la sala, el ping (ida y vuelta, en
@@ -24,7 +34,10 @@
 
 export const ESCALAS = [1, 1.5, 2, 3, 4];            // las que acepta el motor (también 6 y 8: demasiado para un navegador)
 export const FLUIDECES = [0, 120, 180];              // 0 = lo de siempre (60); 240 ya no existe en el motor (pasa a 180)
-export const GRAFICOS = { escala: 1, fluidez: 0, verFps: false, verPing: false };
+export const SALIDAS = [0, 1080, 900, 720, 540];     // alto máximo del lienzo en pixeles (0 = el de la pantalla, lo de siempre)
+export const GRAFICOS = { escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false };
+// La resolución interna en pixeles: la de la Wii (640×528) por la escala
+export const pixelesInternos = v => `${Math.round(640 * v)}×${Math.round(528 * v)}`;
 const CLAVE = 'mkw.graficos';
 
 // Las opciones guardadas, revisadas (un valor que el motor no acepta vuelve al de siempre)
@@ -32,6 +45,7 @@ export function normalizar(g = {}) {
   return {
     escala: ESCALAS.includes(Number(g.escala)) ? Number(g.escala) : 1,
     fluidez: FLUIDECES.includes(Number(g.fluidez)) ? Number(g.fluidez) : 0,
+    salida: SALIDAS.includes(Number(g.salida)) ? Number(g.salida) : 0,
     verFps: g.verFps === true,
     verPing: g.verPing === true,
   };
@@ -67,15 +81,45 @@ export function textoMedidor({ fps = null, rtt = {}, nombres = {}, yo = null, ve
   return partes.join(' · ');
 }
 
+// El recuadro que se le contesta a SDL3 con un tope de salida: el mismo, achicado para que alto × dpr ≤ tope (puro)
+export function medidaLimitada(ancho, alto, tope, dpr = 1) {
+  if (!tope || !(alto > 0) || alto * dpr <= tope) return [ancho, alto];
+  const k = tope / (alto * dpr);
+  return [ancho * k, alto * k];
+}
+
+// Instala el tope en el lienzo (getBoundingClientRect propio de ese elemento: nada más de la página cambia).
+// fijar(tope) lo cambia en el momento: un aviso `resize` hace que SDL3 vuelva a medir.
+export function limitarSalida(lienzo, { tope = 0, dpr = () => globalThis.devicePixelRatio || 1, ventana = globalThis } = {}) {
+  if (!lienzo) return null;
+  const original = lienzo.getBoundingClientRect.bind(lienzo);
+  let actual = Number(tope) || 0;
+  lienzo.getBoundingClientRect = () => {
+    const r = original();
+    if (!actual) return r;
+    const [w, h] = medidaLimitada(r.width, r.height, actual, dpr());
+    if (w === r.width && h === r.height) return r;
+    return { x: r.x, y: r.y, left: r.left, top: r.top, width: w, height: h, right: r.left + w, bottom: r.top + h, toJSON() { return this; } };
+  };
+  return {
+    get tope() { return actual; },
+    fijar(t) { t = Number(t) || 0; if (t === actual) return; actual = t; try { ventana.dispatchEvent(new Event('resize')); } catch {} },
+  };
+}
+
 const el = (etiqueta, props = {}, ...hijos) => { const e = Object.assign(document.createElement(etiqueta), props); e.append(...hijos); return e; };
 
-// El panel: dos selectores (resolución, fluidez), dos casillas (fps, ping) y «Reiniciar el juego» si algo cambió
-export function montarGraficos(caja, { reiniciar = () => location.reload(), enSala = false, alCambiar = () => {} } = {}) {
+// El panel: tres selectores (resolución interna, fluidez, resolución de salida), dos casillas (fps, ping) y «Reiniciar el juego» si algo cambió
+export function montarGraficos(caja, { reiniciar = () => location.reload(), enSala = false, alCambiar = () => {}, alSalida = () => {} } = {}) {
   if (!caja) return null;
   const alArrancar = leerGraficos();               // lo que el juego leyó al arrancar (para saber si hay que reiniciar)
   let g = { ...alArrancar };
   const escala = el('select', { id: 'graficosEscala' },
-    ...ESCALAS.map(v => el('option', { value: String(v), textContent: v === 1 ? '1× (la de la Wii, lo de siempre)' : `${String(v).replace('.', ',')}× — más nítido y bordes suaves` })));
+    ...ESCALAS.map(v => el('option', { value: String(v), textContent: v === 1 ? `1× · ${pixelesInternos(1)} (la de la Wii, lo de siempre)`
+      : `${String(v).replace('.', ',')}× · ${pixelesInternos(v)} — más nítido y bordes suaves` })));
+  const salida = el('select', { id: 'graficosSalida' },
+    ...SALIDAS.map(v => el('option', { value: String(v), textContent: v ? `${Math.round(v * 16 / 9)}×${v}` + (v <= 720 ? ' — más fps en una tarjeta justa' : '')
+      : 'La de tu pantalla (lo de siempre)' })));
   const fluidez = el('select', { id: 'graficosFluidez' },
     el('option', { value: '0', textContent: '60 (lo de siempre)' }),
     el('option', { value: '120', textContent: '120 — imágenes intermedias (monitor de 120 Hz o más)' }),
@@ -86,23 +130,28 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
   const boton = el('button', { type: 'button', className: 'boton', id: 'graficosReiniciar', textContent: 'Reiniciar el juego ahora', hidden: true });
   boton.onclick = () => reiniciar();
   const pinta = () => {
-    escala.value = String(g.escala); fluidez.value = String(g.fluidez); verFps.checked = g.verFps; verPing.checked = g.verPing;
+    escala.value = String(g.escala); fluidez.value = String(g.fluidez); salida.value = String(g.salida); verFps.checked = g.verFps; verPing.checked = g.verPing;
     const pendiente = g.escala !== alArrancar.escala || g.fluidez !== alArrancar.fluidez;
     aviso.hidden = !pendiente; boton.hidden = !pendiente;
     aviso.textContent = pendiente ? 'Se aplica al reiniciar el juego (el motor lo lee al arrancar).' +
       (enSala ? ' En la sala, mejor entre carreras: al volver sigues en la siguiente.' : '') : '';
   };
   const cambio = () => {
-    g = guardarGraficos({ escala: escala.value, fluidez: fluidez.value, verFps: verFps.checked, verPing: verPing.checked });
+    const antes = g.salida;
+    g = guardarGraficos({ escala: escala.value, fluidez: fluidez.value, salida: salida.value, verFps: verFps.checked, verPing: verPing.checked });
     pinta(); alCambiar(g);
+    if (g.salida !== antes) alSalida(g.salida);            // (la salida se aplica en el momento, sin reiniciar)
   };
-  for (const c of [escala, fluidez, verFps, verPing]) c.addEventListener('change', cambio);
+  for (const c of [escala, fluidez, salida, verFps, verPing]) c.addEventListener('change', cambio);
   caja.replaceChildren(
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosEscala', textContent: 'Resolución interna' }), escala),
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosFluidez', textContent: 'Fluidez (imágenes por segundo)' }), fluidez),
     el('p', { className: 'nota-graficos', textContent: 'El juego siempre calcula 60 cuadros por segundo; la fluidez dibuja imágenes intermedias ' +
       'para monitores rápidos (solo la imagen: en la sala no cambia la carrera). Las dos piden más a la tarjeta de video: ' +
       'si el juego baja de 60, vuelve a lo de siempre' + (enSala ? ' (en la sala, una PC que no alcanza frena a todos).' : '.') }),
+    el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosSalida', textContent: 'Resolución de salida' }), salida),
+    el('p', { className: 'nota-graficos', textContent: 'El tamaño de la imagen que se manda a tu pantalla. Bajarla ayuda si tu tarjeta de video ' +
+      'es justa (sobre todo con un monitor grande); se ve un poco más borrosa. Se aplica en el momento.' }),
     el('div', { className: 'fila' }, el('label', {}, verFps, ' Mostrar los fps'), el('label', {}, verPing, ' Mostrar el ping (en la sala)')),
     el('p', { className: 'nota-graficos', textContent: 'Los fps y el ping van en un recuadro chico arriba a la izquierda; en una PC justa, ' +
       'tener algo encima del juego cuesta un poco.' }),

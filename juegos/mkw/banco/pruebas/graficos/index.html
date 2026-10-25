@@ -17,7 +17,7 @@
 <div class="caja"><span id="medidor" class="chip-estado" hidden></span></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { normalizar, lineasVideo, textoMedidor, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES } from '/web/navegador/graficos.mjs';
+import { normalizar, lineasVideo, textoMedidor, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES, medidaLimitada, limitarSalida, pixelesInternos } from '/web/navegador/graficos.mjs';
 
 const { ok, fin } = prueba('graficos', 'Gráficos opcionales y el medidor (sin el juego)');
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -33,7 +33,7 @@ try {
   const motorEscalas = [0, 1, 1.5, 2, 3, 4, 6, 8], motorFluidez = [0, 120, 180];
   ok('solo se ofrecen valores que el motor acepta', ESCALAS.every(v => motorEscalas.includes(v)) && FLUIDECES.every(v => motorFluidez.includes(v)));
   ok('un valor raro (guardado viejo o a mano: 240, 5×, "x") vuelve a lo de siempre', JSON.stringify(normalizar({ escala: 5, fluidez: 240, verFps: 'si' })) ===
-     JSON.stringify({ escala: 1, fluidez: 0, verFps: false, verPing: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
+     JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
 
   // ---- 2. El medidor ----
   const rtt = { yo1: 0, ana: 80.4, juan: 35 };
@@ -59,6 +59,41 @@ try {
   ok('volver a lo que tenía al arrancar: ya no hace falta reiniciar', $('graficosReiniciar').hidden);
   $('graficosFps').checked = true; $('graficosFps').dispatchEvent(new Event('change'));
   ok('prender los fps no pide reiniciar (es de la página, no del motor)', leerGraficos().verFps === true && $('graficosReiniciar').hidden);
+
+  // ---- 3b. La resolución de salida (§108) ----
+  ok('la resolución interna se nombra en pixeles: 1× = 640×528, 2× = 1280×1056', pixelesInternos(1) === '640×528' && pixelesInternos(2) === '1280×1056');
+  ok('la salida no se guarda en el Config.toml (es de la página)', lineasVideo({ salida: 720 }).length === 0 && normalizar({ salida: 720 }).salida === 720 && normalizar({ salida: 333 }).salida === 0);
+  { const [w, h] = medidaLimitada(2560, 1440, 720, 1.5);
+    ok('un recuadro de 2560×1440 con la escala de Windows al 150 % y tope 720: se contesta 853×480 (× 1,5 = 1280×720)', Math.round(w) === 853 && h === 480, `${w.toFixed(1)}×${h}`); }
+  ok('sin tope, o si ya es más chico, el recuadro no cambia', medidaLimitada(800, 450, 0, 2).join() === '800,450' && medidaLimitada(800, 450, 1080, 2).join() === '800,450');
+  { // un lienzo de prueba y un «SDL3 de mentira»: con cada resize le pone al lienzo el recuadro × devicePixelRatio
+    const lienzo = Object.assign(document.createElement('canvas'), { style: 'width:1600px;height:900px;display:block' });
+    document.body.append(lienzo);
+    const sdl = () => { const r = lienzo.getBoundingClientRect(); lienzo.width = Math.round(r.width * devicePixelRatio); lienzo.height = Math.round(r.height * devicePixelRatio); };
+    addEventListener('resize', sdl); sdl();
+    const altoLleno = lienzo.height;
+    const s = limitarSalida(lienzo, { tope: 0 });
+    sdl();
+    ok('instalado sin tope: el lienzo queda como siempre', lienzo.height === altoLleno, `${lienzo.width}×${lienzo.height}`);
+    s.fijar(540);
+    ok('fijar 960×540 avisa un resize y el «SDL» deja el lienzo de 540 de alto (16:9)', lienzo.height === 540 && Math.abs(lienzo.width - 960) <= 1, `${lienzo.width}×${lienzo.height}`);
+    ok('…y el lienzo sigue ocupando el mismo lugar en la página (el navegador lo estira al mostrarlo)', Math.round(lienzo.offsetHeight) === 900);
+    s.fijar(0);
+    ok('volver a «la de tu pantalla» devuelve el tamaño lleno', lienzo.height === altoLleno);
+    removeEventListener('resize', sdl); lienzo.remove();
+  }
+  { let pedida = null;
+    const caja2 = document.createElement('div'); document.body.append(caja2);
+    const sinCambios = { n: 0 };
+    montarGraficos(caja2, { reiniciar: () => sinCambios.n++, alSalida: t => { pedida = t; } });
+    const sel = caja2.querySelector('#graficosSalida');
+    ok('el panel ofrece la salida en pixeles (1920×1080 … 960×540)', [...sel.options].map(o => o.textContent.split(' ')[0]).slice(1).join() === '1920×1080,1600×900,1280×720,960×540',
+       [...sel.options].map(o => o.textContent.split(' ')[0]).join(' | '));
+    sel.value = '720'; sel.dispatchEvent(new Event('change'));
+    ok('elegir 1280×720 se aplica en el momento (sin pedir reiniciar) y se guarda', pedida === 720 && caja2.querySelector('#graficosReiniciar').hidden && leerGraficos().salida === 720);
+    sel.value = '0'; sel.dispatchEvent(new Event('change'));
+    caja2.remove();
+  }
 
   // ---- 4. El medidor en la página ----
   let jugando = false, fps = 60;

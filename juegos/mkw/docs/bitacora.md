@@ -9984,3 +9984,37 @@ Si alguna no anda en la web, sacarla del panel (`ESCALAS`/`FLUIDECES` de `grafic
 |---|---|
 | Banco `graficos` (nuevo) | 21 / 21 |
 | La página sin el programa con `?escala=2&fluidez=180` | `mkwEstado.graficos.lineas` = las dos líneas; el panel en Avanzado; sin errores |
+
+## 2026-10-25 · §108 La resolución en pixeles y la «resolución de salida» para ganar fps
+
+Pedido del dueño: «agrega opciones de resolución que puedan hasta bajar para aumentar fps», «¿resolución en tamaños de
+pixeles?».
+
+**Lo que se averiguó:** el juego ya dibuja a lo **mínimo** que acepta el motor. `resolution_multiplier` admite 0 (el
+tamaño de la ventana), 1 (la de la Wii), 1,5, 2, 3, 4, 6 y 8 (`settings_overlay.cpp` de WiiCompiled los nombra «Auto
+(window size)», «Native (1x)»…); el Config.toml de la página no lo escribe, así que va en 1× = **640×528**. Menos que
+eso el motor no lo tiene (habría que parchear aurora y recompilar).
+
+Lo que sí se puede bajar es la **salida**: aurora agranda esa imagen de 640×528 al tamaño del lienzo, y el lienzo lo pone
+SDL3 = el tamaño de su recuadro en la página × `devicePixelRatio` (aurora crea la ventana con
+`SDL_WINDOW_HIGH_PIXEL_DENSITY`; `Emscripten_HandleResize`, rama `external_size`, mide con
+`emscripten_get_element_css_size` = `getBoundingClientRect`). Con un monitor 4K y Windows al 150 %, el lienzo mide
+3840×2160: agrandar a eso, cada cuadro, es trabajo de la tarjeta de video.
+
+**Ahora** (`graficos.mjs`):
+- **«Resolución de salida»** en Avanzado → Gráficos: la de tu pantalla (lo de siempre), 1920×1080, 1600×900, 1280×720,
+  960×540. `limitarSalida(lienzo)` reemplaza el `getBoundingClientRect` **de ese lienzo** por uno que contesta un recuadro
+  achicado (el mismo 16:9) para que recuadro × dpr ≤ el alto elegido (`medidaLimitada`); el lienzo sigue ocupando el
+  mismo lugar en la página y el navegador lo estira al mostrarlo (gratis: lo hace al componer). Se aplica **en el
+  momento** (un aviso `resize`: SDL3 vuelve a medir), se guarda en `mkw.graficos.salida` y no va al Config.toml.
+  `?salida=720` para medir.
+- **Solo ayuda si lo que frena es la tarjeta de video.** En la PC del proyecto el juego está limitado por el procesador
+  (§53: 7,9 ms de CPU por cuadro): ahí no cambia los fps. En un portátil con gráficos integrados y monitor grande, sí.
+- La resolución interna se nombra en pixeles: «1× · 640×528 (la de la Wii)», «2× · 1280×1056»…
+- **Trampa:** el ratón del menú interno del motor (ImGui, el F1 de WiiCompiled) se mide con ese mismo recuadro: con un
+  tope puesto apuntaría mal. La página no lo usa.
+
+**Pruebas:** banco `graficos` 31/31 (+10: los pixeles, el recuadro con dpr 1,5, un «SDL3 de mentira» que con cada
+resize pone el lienzo en recuadro × dpr: 1600×900 → 960×540 → de vuelta; el panel lo aplica sin reiniciar). La página
+sin el programa con `?salida=540`: el lienzo contesta 540 de alto, sin errores. **Falta medir con el juego**:
+`node herramientas/medir-sitio.mjs --perfil pc --extra "&salida=720"` (y con la tarjeta integrada, si hay).
