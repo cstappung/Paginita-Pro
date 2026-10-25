@@ -311,6 +311,8 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Eje (de un mando)** | Una entrada que da un número entre −1 y 1 en vez de «apretado/suelto»: cada stick son dos ejes (x e y). La página usa cada mitad por separado (`a2+`, `a2-`: de 0 a 1 según cuánto se inclina). Como un potenciómetro con el cero al medio. |
 | **Reposo (de un eje)** | Lo que marca un eje sin tocarlo. Casi siempre 0, pero algunos gatillos que el navegador da como eje descansan en −1. Al capturar se mide antes, como el offset que se anota antes de calibrar un instrumento. |
 | **Cruceta «hat»** | En algunos mandos genéricos la cruz no son 4 botones sino UN eje que toma un valor distinto por dirección (−1, −0,43, 0,14…) y descansa fuera de −1..1 (3,29). Se reconoce por eso y se guarda el valor exacto de cada dirección. |
+| **Cursor del mando** | El `mando.js` del sitio: con un mando conectado y un menú de la página abierto, el stick mueve una flecha en pantalla y A hace «clic» (un clic fabricado por código, que el navegador no distingue de uno del ratón salvo en dos cosas: no muestra los textos de ayuda «title» y no mueve una barra deslizante). Como manejar un tablero con una perilla en vez de con la mano. |
+| **Clic perdido** | Un clic son dos mitades: apretar y soltar. Si entre las dos el botón sale de la página y vuelve (aunque sea idéntico), Chrome no da el clic. Como un pulsador que se desconecta y reconecta mientras uno lo aprieta: el circuito no ve el pulso completo. |
 | **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
 
 ---
@@ -10176,3 +10178,103 @@ jugadores); `mapaDe` revisa el mapa en cada cuadro (es barato: 20 listas cortas)
 `esPorOmision`, el botón capturado que no llega mientras se mantiene, ↺/Deshacer en un mando sin tocar, el gatillo-eje
 que marcaba 0, el stick C sin teclas, dos «Cambiar» seguidos), `controles` 48/48, `mandos-jugador` 17/17,
 `mando-sitio` 11/11; la página sin el juego: cerrar el cajón cancela la espera de una tecla y la de un mando.
+
+## 2026-10-25 · §112 La hoja «Controles» de nuevo (pedido del dueño, con un crítico externo)
+
+El dueño mandó dos fotos de la hoja Controles (dos tarjetas de Xbox una debajo de otra, la tabla larga del teclado) y
+dijo: «el botón de reasignar no funciona; quiero un rework de toda esta página de controles; quita eso del celular
+porque no está implementado; usa un crítico externo para darme 3 opciones con el mando 100 % funcional y su
+reasignación; escoge automáticamente lo mejor e impleméntalo, bonito, efectivo y fácil de entender».
+
+### 112.1 Por qué «Reasignar…» no se abría
+
+El panel repintaba cada 100 ms y, en cada repintada, volvía a meter cada tarjeta de mando en la lista
+(`lista.append(nodo)` de un nodo que ya estaba: el navegador lo saca y lo vuelve a poner). Un clic de verdad dura
+~100–200 ms entre apretar y soltar: si en medio la tarjeta salía y volvía, Chrome no daba el clic (ver **Clic perdido**
+en el Glosario). Medido con Playwright y el ratón de verdad: **0 de 4** clics abrían; arreglado, **4 de 4**. Las pruebas
+del banco no lo veían porque usaban `.click()` (un clic «instantáneo», sin las dos mitades). Desde ahora la hoja se
+prueba también con el ratón de verdad y con el cursor del mando.
+
+### 112.2 Las 3 propuestas del crítico y la elegida
+
+El crítico (un agente aparte que leyó el código sin saber lo que yo pensaba) propuso:
+
+| | Propuesta | A favor | En contra |
+|---|---|---|---|
+| A | **El mando dibujado**: se toca el botón en un dibujo del mando | la más linda | las 8 mitades de los sticks no caben en un dibujo; moverse con la cruz por un dibujo irregular es impredecible; ~1,5× el trabajo |
+| B | **Paso a paso primero**: una pantalla grande por botón | perfecta con solo el mando | mala para lo más común: cambiar UN botón |
+| C | **Una lista de acciones**, agrupada, con una pestaña por jugador y el mando y el teclado lado a lado | nombres claros («Derrapar»), la lista es también el probador, una fila = un clic, fácil con el cursor (una columna) | menos vistosa que A |
+
+**Elegida: C, con el asistente de B como un botón adentro** (la recomendación del crítico, y la mía: el uso más común
+es «quiero derrapar con otro botón», y eso en C es tocar el recuadro y apretar el botón).
+
+### 112.3 Cómo quedó (`web/navegador/opciones-mandos.mjs`, reescrito)
+
+- **Pestañas «Jugador 1–4»** (así piensa el juego: cada jugador es un puerto). Cada una dice qué tiene («🟢 Xbox + ⌨»,
+  «sin mando»). Dentro: el mando de ese jugador, «Este mando es el jugador [1] [2] [3] [4]» (botones grandes; antes un
+  desplegable que el cursor del mando no sabía usar bien), el probador (sticks, gatillos) y «Probar el mando 10 s».
+- **La lista**: cada fila es una ACCIÓN con su nombre primero («Acelerar», «Frenar y marcha atrás», «Girar a la
+  izquierda», «Derrapar y saltar», «Usar objeto», «Truco», «Mirar atrás», «Pausa») y el botón de GameCube chico al lado;
+  dos recuadros: lo que la maneja en el **mando** (en la letra de ese mando: ✕/A/RT) y en el **teclado** (solo en el
+  jugador 1). Una luz por fila se prende al apretar. Los 11 que casi no se usan (Y, Z, la cruz, el stick ↑↓, el stick
+  C) van en «Más controles».
+- **Cambiar un botón**: tocar el recuadro → la fila espera (con la cuenta de 8 s) → apretar el botón nuevo. Debajo de la
+  fila se abre una tira con el resultado («✓ Derrapar y saltar: LB · se quitó de Usar objeto») y «Cambiar», «＋ Sumar
+  otro», «Dejar sin nada», «↺ Como siempre», «Deshacer» y «Listo».
+- **«Asignar paso a paso»**: una tarjeta grande por acción («Paso 3 de 9 · DERRAPAR Y SALTAR · aprieta…»); si no se toca
+  nada en 6 s queda igual y sigue, así una persona con solo el mando lo recorre entero; al final ofrece «Seguir con los
+  otros 11».
+- **Abajo**: «↺ Mando como siempre», «↺ Teclado como siempre» y los ajustes de todos: estilo de botones (tres botones:
+  Automático / Por posición / Por letra), zona muerta con **− y +** (una barra deslizante no se puede mover con el
+  cursor del mando), vibración Sí/No y «Probar en este mando» (antes vibraba siempre el jugador 1).
+- **Fuera**: lo del celular (las casillas del mando táctil y de inclinar, y sus barras), la línea de depuración
+  «puerto 1: — · stick 0,0» y la tabla aparte del teclado. El mando táctil sigue prendiéndose solo en una pantalla
+  táctil (o con `?tactil=1`), sin ajustes.
+- **Todo se arma una vez**: el bucle de 100 ms solo cambia textos, clases y atributos (la regla que evita el clic perdido).
+
+### 112.4 Las fallas que el crítico encontró para «100 % funcional» (y el arreglo)
+
+| # | Qué pasaba (ejemplo) | Arreglo |
+|---|---|---|
+| 1 | Al capturar, en el MISMO cuadro el cursor volvía y veía la tecla: capturar **B** cerraba el cajón (B = «atrás»), capturar **A** hacía clic otra vez y empezaba otra espera, y el asistente con la A del paso 1 se reiniciaba solo. | `controles.ocupado()` (capturando, esperando que se suelte, probando, o 250 ms después): `menuDePagina` no da el cursor y los mandos no llegan al juego. El asistente además reserva los mandos de punta a punta (`reservar`). |
+| 2 | Cerrar el cajón entre dos pasos del asistente no lo cortaba: seguía capturando con el cajón cerrado. | `cerrarCajon` siempre cancela (y avisa con `mkw-reasignacion-cancelada`); Esc también corta el asistente y la prueba. |
+| 3 | Abierto encima del menú de inicio, el cajón no se podía usar (ni cerrar) con el mando. | En `menuDePagina`, el cajón abierto va antes que el menú de inicio. |
+| 4–5 | El desplegable «Jugador» se trababa con el cursor; cambiar de jugador movía la tarjeta bajo el cursor. | Pestañas y botones 1–4; la pestaña sigue al mando. |
+| 6 | La zona muerta era una barra deslizante. | − y + (como el volumen). |
+| 7 | «Probar vibración» probaba siempre el jugador 1, sin decir por qué no vibraba. | Prueba el mando de la pestaña y dice si está apagada o si el mando no vibra. |
+| 8 | Para probar un botón con el cursor prendido, B cerraba el cajón y A hacía clic. | «Probar el mando 10 s»: los botones solo prenden las luces. |
+| 9 | Rearmar la tabla después de ✕/↺ dejaba al cursor sin «dónde estaba» y la cruz saltaba lejos. | Nada se rearma: los botones de la tira son fijos. |
+| 10 | Una espera de tecla y una de mando podían estar a la vez. | Una sola espera en toda la página. |
+| 13 | Cada captura le cambiaba el modo a `mando.js`, que mostraba un cartel de 4–8 s. | `body.mando-quieto` esconde ese cartel mientras se usa el panel. |
+| 14 | Botones de 16–22 px con íconos y su explicación en «title» (el cursor no la muestra). | Todo ≥ 38 px y con texto. |
+| 15 | Quitar el HTML del celular sin su código rompía `mkw.mjs` entero. | Se quitó junto (y `prueba-tactil.mjs` ya no busca esos ajustes). |
+
+Y una que encontró la prueba vieja de `controles`: si el mando se desconectaba justo después de capturar (antes de
+soltar), quedaba «esperando que se suelte» para siempre y **ningún** mando llegaba al juego. Ahora se suelta solo.
+
+Quedan como estaban (bajo): dos mandos iguales se distinguen por el orden en que el navegador los ve (si se desconecta
+el primero, el segundo pasa a ser «el primero»); el teclado no tiene asistente paso a paso (con teclado se usa el ratón).
+
+### 112.5 Pruebas
+
+- **Nueva, banco `controles-panel` (25 puntos)**: esta página hace de Juegos (carga el `mando.js` de verdad del sitio y
+  un mando de mentira) y el marco es la página de Mario Kart de verdad; el cursor se lleva **con el stick**, como la
+  persona, y A hace clic. Comprueba: capturar LB/B/A sin que la B cierre el cajón ni la A vuelva a hacer clic, el cursor
+  que se aparta y vuelve al soltar, Deshacer, probar el mando (B solo prende su luz), el asistente (la X del paso 1 pasa
+  al paso 2, cerrar el cajón lo corta), jugador 2 y zona muerta con el cursor, el cajón encima del menú de inicio, y que
+  la hoja no saque ni vuelva a poner nada en 1,5 s quieta.
+- Banco `asignacion` 62/62 (la sección del panel, rehecha: la lista, «Más controles», el recuadro que espera con su
+  cuenta, L1 → Z con «se quitó de Usar objeto», dos esperas seguidas, Deshacer, Dejar sin nada, Como siempre, el teclado
+  en la misma lista, una sola espera en la página, la pestaña sin mando), `controles` 48/48, `mandos-jugador` 18/18
+  (pestañas y botones de jugador), `mando-sitio` 11/11, `inicio` 15/15, `graficos` 31/31, `descargas` 29/29; sitio
+  `npm run test:juegos` 1132/1132.
+- Con Playwright y el **ratón de verdad** (apretar, 150 ms, soltar; `node herramientas/prueba-raton-controles.mjs`, 8 puntos): el recuadro de «Derrapar» 4 de 4, la pestaña, el
+  «+», «Más controles», el recuadro del teclado con una tecla, Esc; a 440 px de ancho no hay desborde.
+- Avanzado (pedido del dueño: «revisa que funcionen los ajustes de avanzado»), con el ratón de verdad (`node herramientas/prueba-raton-avanzado.mjs`, 12 puntos): volumen, silencio,
+  resolución interna y fluidez (avisan y ofrecen reiniciar), resolución de salida (al momento), «Mostrar los fps»,
+  «Borrar» (pregunta y borra), todo recordado al recargar; nada se rearma solo. Lo único que fallaba era con el mando:
+  la barra de volumen no se mueve con el cursor → botones − y + (commit aparte). Falta con el juego: que el motor aplique
+  la resolución interna y la fluidez (§107.3).
+
+**Falta con el juego y un mando de verdad**: lo mismo de arriba con el juego andando detrás (el mando no debe llegar al
+juego mientras se captura) y la selección de personajes en el descanso (§111).

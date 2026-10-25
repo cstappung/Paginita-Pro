@@ -171,6 +171,15 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   // §111 (el crítico): después de capturar, ese mando no maneja el juego hasta que se suelta todo (si no, el botón recién
   // capturado —Start, A— llegaba un cuadro al juego): { clave, base, fuente, perfil, id, letra, objetivo }
   let hastaSoltar = null;
+  // (el rediseño de Controles, el crítico: el cursor del sitio vuelve recién 250 ms después de soltar lo capturado —si no,
+  // en el mismo cuadro la B capturada cerraba el cajón y la A hacía clic—; y el modo «Probar el mando»: N ms en que los
+  // mandos encienden las luces del panel pero no manejan ni el cursor ni el juego)
+  let ocupadoHasta = 0, probandoHasta = 0;
+  const reloj = () => performance.now();
+  const probandoAhora = () => probandoHasta > reloj();
+  let reservado = false;                          // (el asistente «paso a paso»: los mandos son del panel de punta a punta)
+  // ({ sinReserva: true } = sin contar la reserva del asistente: «¿ya se soltó lo capturado?»)
+  const ocupado = ({ sinReserva = false } = {}) => (!sinReserva && reservado) || !!capturando || !!hastaSoltar || probandoAhora() || ocupadoHasta > reloj();
 
   // --- teclado ---
   const teclasEnUso = () => new Set(Object.values(teclas).flat());
@@ -231,12 +240,15 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       for (const [i, p] of repartirPuertos(claves, prefsMandos.puertos)) puertosMando.set(i, p);
     }
     const zona = Math.min(0.4, Math.max(0.03, prefsMandos.zona / 100));
+    // (§112: si el mando de lo capturado se desconectó antes de soltarlo, no queda «esperando que se suelte» para
+    // siempre: con eso puesto ningún mando llegaba al juego)
+    if (hastaSoltar && !claves.some(([, k]) => k === hastaSoltar.clave)) { hastaSoltar = null; ocupadoHasta = reloj() + 250; }
     return lista.map(g => {
       const tipo = tipoMando(g.id), perfil = clavePerfil(g.id, g.mapping);
       const propio = !!guardadoDe(perfil, g.id) || !!prefsMandos.propios[g.id];
       const letra = prefsMandos.disposicion === 'letra' || (prefsMandos.disposicion === 'auto' && tipo === 'nintendo');
       const mapa = mapaDe(perfil, g.id, letra);
-      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), perfil, indice: g.index, tipo, letra,
+      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), perfil, indice: g.index, tipo, letra, vibra: !!g.vibrationActuator,
                       propio, sinMapa: g.mapping !== 'standard' && !propio, estandar: g.mapping === 'standard', mapa, mando: g };
       const quieto = { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };
       // §111: capturando para este mando: la primera entrada nueva (botón, eje o cruceta) queda para ese control
@@ -266,7 +278,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
         const f = fotoMando(g);
         const suelto = f.botones.every((b, i) => !b || h.base.botones[i]) && f.ejes.every((v, i) => Math.abs(v - (h.base.ejes[i] ?? 0)) < 0.3);
         if (!suelto) return quieto;
-        hastaSoltar = null;
+        hastaSoltar = null; ocupadoHasta = reloj() + 250;
       }
       return { ...comun, ...aplicarMapa(g, mapa, zona) };
     });
@@ -317,7 +329,8 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     };
     suma(0, kb, 'teclado');                       // el puerto 1 siempre está conectado (teclado)
     // (§100: mientras el cursor del sitio maneja un menú de la página, los mandos no llegan al juego; el teclado sí)
-    const mandosFuera = sinMandos ? !!sinMandos() : false;
+    // (y mientras el panel de Controles captura o prueba un mando: ningún mando maneja el juego de atrás)
+    const mandosFuera = (sinMandos ? !!sinMandos() : false) || ocupado();
     for (const m of mandos) if (m.puerto !== undefined && !mandosFuera) suma(m.puerto, m, m.nombre);
     if (tactil.activo) suma(0, { ...tactil, gl: tactil.botones & BOTON.L ? 255 : 0, gr: tactil.botones & BOTON.R ? 255 : 0 }, 'táctil');
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
@@ -339,6 +352,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     });
     estado.puertos = puertos;
     estado.mandos = mandos.map(({ mando, ...resto }) => resto);
+    estado.teclado = kb;                          // (lo del teclado solo: las luces del panel de Controles)
     if (tactilUI) tactilUI.pinta();
   }
   // (§111, el crítico: un error en un cuadro —un mando raro, un guardado roto— no puede apagar los controles para siempre)
@@ -380,6 +394,12 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     },
     restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },
     teclasDe: id => teclas[id],
+    // todas las teclas de una vez (Deshacer del panel; una acción con [] = sin teclas). Solo acciones y textos válidos
+    ponerTeclas(nuevas) {
+      for (const [id, l] of Object.entries(nuevas || {})) if (id in teclas && Array.isArray(l)) teclas[id] = l.filter(c => typeof c === 'string' && c.length < 40).slice(0, MAX_TECLAS);
+      guardar(CLAVE_TECLAS, teclas);
+    },
+    copiaTeclas: () => JSON.parse(JSON.stringify(teclas)),
     // --- mandos: disposición de botones ('auto' | 'posicion' | 'letra'), zona muerta (%), vibrar, asignaciones propias ---
     prefsMandos: () => JSON.parse(JSON.stringify(prefsMandos)),
     ajustarMandos(cambios) {
@@ -405,6 +425,17 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       return new Promise(listo => { capturando = { clave: m.clave, objetivo, sumar, base, listo }; });
     },
     cancelarCaptura() { if (capturando) { const c = capturando; capturando = null; c.listo(null); } },
+    // ¿el panel de Controles tiene ocupados los mandos? (capturando, esperando que se suelte lo capturado, probando, o
+    // los 250 ms de después): el cursor del sitio no los toma (mkw.mjs menuDePagina) y no llegan al juego
+    ocupado,
+    // «Probar el mando» durante ms (0 = terminar ya): los mandos solo encienden las luces del panel
+    probar(ms) { const estaba = probandoAhora(); probandoHasta = ms > 0 ? reloj() + ms : 0; if (!(ms > 0) && estaba) ocupadoHasta = reloj() + 250; },
+    probando: () => Math.max(0, Math.round(probandoHasta - reloj())),
+    // el asistente «paso a paso» se queda con los mandos entre un paso y otro (si no, en el hueco el cursor volvía y la A
+    // del paso siguiente hacía clic)
+    reservar(si) { reservado = !!si; if (!si) ocupadoHasta = reloj() + 250; },
+    // (para las pruebas: qué lo tiene ocupado)
+    porQueOcupado: () => ({ reservado, hastaSoltar: hastaSoltar && { ...hastaSoltar, base: undefined }, ms: Math.round(ocupadoHasta - reloj()) }),
     capturandoAhora: () => capturando ? { clave: capturando.clave, objetivo: capturando.objetivo } : null,
     // el mapa de un mando como está ahora (una copia), y cambiarlo a mano (se guarda para su modelo: su perfil)
     mapaDe(k) { const m = mandoDe(k); return m ? revisarMapa(m.mapa) : null; },
