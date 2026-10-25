@@ -158,7 +158,7 @@ function main() {
   const nota = x => (x.gano ? 1e6 : 0) + x.ronda * 1000 + x.vidas;
   for (const x of partidas) {
     const slug = P.REINOS[x.li], prev = libro.guiones[slug];
-    if (!prev || nota(x) > prev.nota) libro.guiones[slug] = { nota: nota(x), ronda: x.ronda, gano: x.gano, jugadas: x.guion };
+    if (!prev || nota(x) > prev.nota) libro.guiones[slug] = { nota: nota(x), ronda: x.ronda, gano: x.gano, vidas: x.vidas, de: PD.LEVELS[x.li].lives, jugadas: x.guion };
   }
   for (const gu of Object.values(libro.guiones)) delete gu.nota;
   for (const [tipo, l] of Object.entries(seqs)) if (l.length >= 2) libro.planes[tipo] = plan(l, tipo === 'heroe');
