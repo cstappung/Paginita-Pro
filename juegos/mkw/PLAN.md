@@ -506,6 +506,9 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 23:50** — El dueño publicó las reglas de Firebase (base de datos y Storage, `docs/publicar.md` paso 5). Del lado de
+  las cuentas no falta nada: queda juntar la rama del sitio a `main` (paso 6) cuando el dueño lo pida, y probar como amigo
+  (paso 7).
 - **2026-10-24 23:49** — **Publicado del lado de Cloudflare** (lo hizo el dueño, `docs/publicar.md` pasos 1-3): el bucket propio
   `mkw-retro` con los 7.324 archivos (5,00 GB; `--comprobar` daba 325 «0 bytes» por un error del revisor, §105.1), el
   Worker nuevo pegado y el enlace `MKW`. Revisado desde aquí sin sesión: `/mkw/manifiesto.json` y `POST /mkw/lote` dicen
