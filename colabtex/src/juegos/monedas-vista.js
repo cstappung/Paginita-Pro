@@ -246,6 +246,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <h3>En qué se gastan</h3>
           <ul class="jg-mo-pesos">
             <li><span><a href="#cartas">Sobre de PRODROP</a></span><b>${Date.now() < MOTOR.PRECIO.promoHasta ? `<s>${MOTOR.PRECIO.normal}</s> ` : ""}${MOTOR.precioSobre(Date.now())} ${MONEDA}</b></li>
+            <li><span><a href="#cartas">Sobre Plus de fútbol</a></span><b>${MOTOR.precioSobre(Date.now(), 2)} ${MONEDA}</b></li>
             <li><span>Graduar una carta</span><b>${MOTOR.PRECIO.gradua} ${MONEDA}</b></li>
             <li><span>Sobre gratis</span><b>cada 6 horas</b></li>
             <li><span>Marco o fondo de la tienda del perfil</span><b>${formatoMonedas(PRECIO_TIENDA)} ${MONEDA}</b></li>

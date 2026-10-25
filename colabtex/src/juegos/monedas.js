@@ -638,11 +638,12 @@ export function economia(datos) {
     ahora = e.at;
     if (e.t === "s") {
       const x = U(e.u);
+      const plus = String(e.k)[0] === "h";   // el sobre Plus de fútbol (prefijo h) vale el doble y no tiene gratis
       if (e.p === 0) {
-        if (x.parada || e.at - x.gratis < SEIS_HORAS) continue;
+        if (plus || x.parada || e.at - x.gratis < SEIS_HORAS) continue;
         x.gratis = e.at;
         x.cuenta.sobreGratis = (x.cuenta.sobreGratis || 0) + 1;
-      } else if (!(e.p === 50 || e.p === 80) || !paga(e.u, e.p, "sobre")) continue;
+      } else if (!(plus ? (e.p === 100 || e.p === 160) : (e.p === 50 || e.p === 80)) || !paga(e.u, e.p, "sobre")) continue;
       x.sobres[e.k] = e.at;
       sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, gratis: e.p === 0 };
       for (let i = 0; i < 5; i++) dueno[claveCopia(e.u, e.k, i)] = e.u;

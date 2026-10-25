@@ -15,7 +15,7 @@ export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
 /* El `?v=` del abridor (prodrop.js): el visor del mercado y la plantilla
    del perfil lo usan para compartir la caché. */
-export const PD_V = "pd-40";
+export const PD_V = "pd-44";
 /* La plantilla dibujada por el abridor (modo visor `?plantilla=1`), con las
    cartas de verdad: rareza, desgaste y caja si está graduada. Cada casilla
    va como `o~k.i!at!gr[!id.g.w]` (lo último, si es un re-roll), o vacía. */
@@ -209,7 +209,7 @@ export function miniCarta(c, extra = "") {
   const nota = c.gr ? `<span class="jg-pdc-nota" style="--gc:${PM.colorNota(c.g)}" title="${esc(PM.GRADE_WORD[c.g])}">${c.g}</span>` : "";
   return `<figure class="jg-pdc t${cc.tier}" style="--cc:${PM.acento(cc)}" title="${esc(cc.name + " · " + PM.subtitulo(cc) + " · " + t.label + (c.gr ? " · nota " + c.g : ""))}">
     <img src="${RAIZ}${esc(cc.img)}" alt="${esc(cc.name + ", " + PM.subtitulo(cc))}" loading="lazy" draggable="false">
-    ${nota}${c.dios ? `<span class="jg-pdc-dios" title="Salió de un god pack">GOD</span>` : ""}
+    ${PM.esFutbol(cc.col) ? `<span class="jg-pdc-media" title="Media ${cc.media} (EA SPORTS FC)">${cc.media}</span>` : ""}${nota}${c.dios ? `<span class="jg-pdc-dios" title="Salió de un god pack">GOD</span>` : ""}
     <figcaption><b>${esc(cc.name)}</b><small>${esc(t.sym)} ${esc(PM.subtitulo(cc))}</small></figcaption>${extra}
   </figure>`;
 }

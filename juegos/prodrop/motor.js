@@ -324,10 +324,113 @@
     }
   };
   const mediaDe = (club, id) => MEDIAS[club][id];
+
+  /* ---------- las posiciones de cada futbolista ----------
+     Cada uno juega de una o dos posiciones (`"DC/EI"`: la primera es la
+     principal). Salen de las de EA SPORTS FC (principal y primera
+     alternativa de otro puesto), agrupadas: CDM, CM y CAM son MC; RB y RWB
+     LD; LB y LWB LI; ST y CF DC. Se ajustan a mano aquí; no afectan a los
+     sobres (la rareza sale de la media). La línea de la carta (`pos`: POR,
+     DEF, MED, DEL) es la de su posición principal. */
+  const POSICIONES = {
+    realmadrid: {
+      "courtois": "POR", "lunin": "POR", "asencio": "DFC/LD", "militao": "DFC",
+      "huijsen": "DFC", "trent": "LD", "konate": "DFC", "cucurella": "LI",
+      "carreras": "LI", "rudiger": "DFC", "mendy": "LI", "dumfries": "LD",
+      "bellingham": "MC", "camavinga": "MC/LI", "valverde": "MC/LD", "tchouameni": "MC/DFC",
+      "arda-guler": "MD/MC", "bernardo": "MC/MD", "vini-jr": "EI/DC", "endrick": "DC/ED",
+      "mbappe": "DC/EI", "rodrygo": "ED/DC", "espi": "DC", "brahim": "ED/EI",
+      "yan-diomande": "EI/ED"
+    },
+    barcelona: {
+      "joan-garcia": "POR", "szczesny": "POR", "livakovic": "POR", "cancelo": "LD/LI",
+      "balde": "LI", "cubarsi": "DFC", "christensen": "DFC/MC", "gerard-martin": "LI/DFC",
+      "kounde": "LD/DFC", "eric-garcia": "DFC/LD", "gavi": "MC", "fermin": "MC/EI",
+      "pedri": "MC", "rodri": "MC", "dani-olmo": "MC/DC", "de-jong": "MC",
+      "marc-bernal": "MC", "gabriel-jesus": "DC/MC", "lamine-yamal": "ED", "raphinha": "EI",
+      "adeyemi": "ED/EI", "gordon": "EI/ED", "bardghji": "ED"
+    },
+    manutd: {
+      "senne-lammens": "POR", "karl-darlow": "POR", "tom-heaton": "POR", "andre-onana": "POR",
+      "diogo-dalot": "LD/LI", "noussair-mazraoui": "LD/DFC", "matthijs-de-ligt": "DFC", "harry-maguire": "DFC",
+      "lisandro-martinez": "DFC", "patrick-chinazaekpere-dorgu": "LI", "leny-yoro": "DFC", "luke-shaw": "DFC/LI",
+      "ayden-heaven": "DFC/LI", "harry-amass": "LI", "mason-mount": "MC/ED", "bruno-fernandes": "MC",
+      "andrey-santos": "MC", "youri-tielemans": "MC", "carlos-baleba": "MC", "manuel-ugarte": "MC",
+      "kobbie-mainoo": "MC", "marcus-rashford": "EI/DC", "matheus-cunha": "EI/MC", "joshua-zirkzee": "DC/MC",
+      "amad": "ED/MC", "bryan-mbeumo": "ED/DC", "benjamin-sesko": "DC"
+    },
+    mancity: {
+      "gianluigi-donnarumma": "POR", "marcus-bettinelli": "POR", "geronimo-rulli": "POR", "ruben-dias": "DFC",
+      "marc-guehi": "DFC", "rayan-ait-nouri": "LI", "vitor-reis": "DFC", "josko-gvardiol": "LI/DFC",
+      "matheus-nunes": "LD/MC", "abdukodir-khusanov": "DFC", "rico-lewis": "LD/LI", "elliot-anderson": "MC",
+      "mateo-kovacic": "MC", "rayan-cherki": "ED/MD", "enzo-fernandez": "MC", "ayyoub-bouaddi": "MC",
+      "nico-o-reilly": "LI/MC", "phil-foden": "ED/MC", "iliman-ndiaye": "EI", "erling-haaland": "DC",
+      "jeremy-doku": "EI/ED", "allan": "DC", "antoine-semenyo": "ED/EI"
+    },
+    chelsea: {
+      "emiliano-martinez": "POR", "teddy-sharman-lowe": "POR", "mike-penders": "POR", "gaga-slonina": "POR",
+      "marco-palestra": "LD/ED", "wesley-fofana": "DFC", "maxence-lacroix": "DFC", "levi-colwill": "DFC",
+      "jorrel-hato": "LI/DFC", "reece-james": "LD", "malo-gusto": "LD", "pep-chavarria": "LI",
+      "aaron-anselmino": "DFC", "josh-acheampong": "LD/DFC", "valentin-barco": "LI/MI", "jordan-henderson": "MC",
+      "moises-caicedo": "MC", "romeo-lavia": "MC", "pedro-neto": "ED/EI", "joao-pedro": "DC/MC",
+      "jamie-gittens": "EI", "morgan-rogers": "ED/MC", "danny-welbeck": "DC", "emmanuel-emegha": "DC",
+      "geovany-quenda": "ED/EI", "estevao-willian": "ED/MC"
+    },
+    liverpool: {
+      "alisson-becker": "POR", "giorgi-mamardashvili": "POR", "freddie-woodman": "POR", "vitezslav-jaros": "POR",
+      "harvey-davies": "POR", "joe-gomez": "DFC/LD", "virgil-van-dijk": "DFC", "jeremy-jacquet": "DFC",
+      "milos-kerkez": "LI", "conor-bradley": "LD", "giovanni-leoni": "DFC", "kostas-tsimikas": "LI",
+      "jeremie-frimpong": "LD/ED", "ronald-araujo": "DFC/LD", "wataru-endo": "MC", "florian-wirtz": "MC/DC",
+      "dominik-szoboszlai": "MC", "alexis-mac-allister": "MC", "ryan-gravenberch": "MC", "trey-nyoni": "MC",
+      "alexander-isak": "DC", "federico-chiesa": "ED/EI", "cody-gakpo": "EI", "hugo-ekitike": "DC/MC",
+      "victor-munoz": "EI", "bradley-barcola": "EI/ED", "lewis-koumas": "ED/EI", "rio-ngumoha": "EI"
+    },
+    tottenham: {
+      "antonin-kinsky": "POR", "martin-dubravka": "POR", "brandon-austin": "POR", "andy-robertson": "LI",
+      "tosin-adarabioyo": "DFC", "marcos-senesi": "DFC", "jan-paul-van-hecke": "DFC", "destiny-udogie": "LI",
+      "pedro-porro": "LD", "ben-davies": "DFC", "micky-van-de-ven": "DFC", "xavi-simons": "MC/MI",
+      "conor-gallagher": "MC/MI", "james-maddison": "MC", "archie-gray": "MC/DFC", "lucas-bergvall": "MC",
+      "sandro-tonali": "MC", "mateus-fernandes": "MC", "wilson-odobert": "EI/ED", "rodrigo-bentancur": "MC",
+      "richarlison": "DC/EI", "mathys-tel": "DC/EI", "savio": "ED/EI", "dominic-solanke": "DC",
+      "mohammed-kudus": "ED/EI", "dejan-kulusevski": "ED/MC", "omar-marmoush": "DC/MC", "mykhailo-mudryk": "EI/ED"
+    },
+    arsenal: {
+      "david-raya": "POR", "kepa-arrizabalaga": "POR", "illan-meslier": "POR", "william-saliba": "DFC",
+      "cristhian-mosquera": "DFC", "ben-white": "LD", "piero-hincapie": "DFC/LI", "gabriel-magalhaes": "DFC",
+      "jurrien-timber": "LD/LI", "ezri-konsa": "DFC/LD", "riccardo-calafiori": "LI/DFC", "myles-lewis-skelly": "LI/MC",
+      "martin-odegaard": "MC", "eberechi-eze": "MC/EI", "mikel-merino": "MC/DC", "martin-zubimendi": "MC",
+      "bruno-guimaraes": "MC", "declan-rice": "MC", "bukayo-saka": "ED", "viktor-gyokeres": "DC",
+      "christos-tzolis": "EI", "noni-madueke": "ED", "kai-havertz": "DC/MC"
+    }
+  };
+  const POS_LINEA = { POR: "POR", LD: "DEF", LI: "DEF", DFC: "DEF", MC: "MED", MD: "MED", MI: "MED", ED: "DEL", EI: "DEL", DC: "DEL" };
+  const posicionesDe = (club, id) => POSICIONES[club][id].split("/");
+  const PUESTO = { POR: "portero", LI: "lateral izquierdo", DFC: "central", LD: "lateral derecho", MC: "mediocentro", MI: "medio izquierdo", MD: "medio derecho", EI: "extremo izquierdo", DC: "delantero centro", ED: "extremo derecho" };
+  /* Cómo le queda una casilla a un jugador: `ok` es la suya (verde);
+     `incomodo` es otra de su línea (un central de lateral) o el cruce de
+     banda que no es un disparate (lateral a carrilero, extremo a banda): se
+     juega, con un castigo chico (amarillo); `mal` es de otra línea, y un
+     portero de campo o uno de campo bajo los palos, peor (rojo). El
+     castigo es en puntos de media. */
+  const PEN_AJUSTE = { ok: 0, incomodo: 3, mal: 10, porteria: 25 };
+  const CRUCES = new Set(["LD-MD", "MD-LD", "MD-ED", "ED-MD", "LI-MI", "MI-LI", "MI-EI", "EI-MI"]);
+  function ajuste(casilla, posiciones) {
+    if (posiciones.includes(casilla)) return { nivel: "ok", pen: PEN_AJUSTE.ok };
+    if (casilla === "POR" || posiciones.includes("POR")) return { nivel: "mal", pen: PEN_AJUSTE.porteria };
+    const l = POS_LINEA[casilla];
+    if (posiciones.some(p => POS_LINEA[p] === l || CRUCES.has(p + "-" + casilla))) return { nivel: "incomodo", pen: PEN_AJUSTE.incomodo };
+    return { nivel: "mal", pen: PEN_AJUSTE.mal };
+  }
   /* La rareza de una carta de fútbol sale de la media del jugador: hasta 80
      común, 81 a 84 rara, 85 a 87 épica y 88 o más legendaria. */
   const BANDAS = [80, 84, 87];
   const tierDeMedia = m => (m <= BANDAS[0] ? 0 : m <= BANDAS[1] ? 1 : m <= BANDAS[2] ? 2 : 3);
+  /* El buscador de jugadores: lo usa «Mi plantilla».
+     Filtra por club, por media mínima y por un texto (nombre o club, sin
+     tildes ni mayúsculas). */
+  const MEDIAS_MIN = [80, 83, 85, 88];
+  const plano = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const coincide = (c, f) => (!f.club || c.club === f.club) && (!f.mediaMin || c.media >= f.mediaMin) && (!f.texto || plano(c.name + " " + c.sub).includes(plano(f.texto)));
   /* Las probabilidades por carta de las colecciones de fútbol, en diez
      milésimas: como cada rareza es un grupo de jugadores de distinta
      media, aquí las más altas salen un poco más que en las otras colecciones
@@ -336,7 +439,13 @@
      menos: la probabilidad de un jugador es el peso de su rareza dividido
      entre cuántos jugadores tiene (la Premier solo tiene 5 legendarias, así
      que la suya pesa menos; un test lo comprueba). */
-  const PESOS_FUTBOL = { futbol: [5500, 3300, 1000, 200], premier: [5500, 3500, 900, 100] };
+  const PESOS_FUTBOL = {
+    // el sobre de fútbol (los 203 jugadores) y el Plus: menos comunes y la quinta carta, épica o mejor
+    normal: [6600, 3000, 340, 60],
+    plus: [3000, 6800, 150, 50], ultimaPlus: [9300, 700],
+    // los de las dos colecciones de antes (Clásico y Premier): solo para rehacer los sobres que ya se abrieron
+    v1: { futbol: [5500, 3300, 1000, 200], premier: [5500, 3500, 900, 100] }
+  };
 
   /* Las colecciones. El sobre dice de cuál es con la primera letra de su
      clave (`prefijo` + la clave de push): la regla ya acepta esas claves
@@ -346,10 +455,21 @@
   const COLECCIONES = [
     { key: "profes", prefijo: "p", label: "Profes", nombre: "DIE Collection", serie: "S01" },
     { key: "comp", prefijo: "c", label: "Componentes", nombre: "Componentes", serie: "S02" },
-    { key: "futbol", prefijo: "f", label: "Fútbol", nombre: "Fútbol", serie: "S03", grupo: "futbol" },
-    { key: "premier", prefijo: "e", label: "Premier", nombre: "Big Six", serie: "S04", grupo: "futbol" }
+    { key: "futbol", prefijo: "g", label: "Fútbol", nombre: "Fútbol", serie: "S03", grupo: "futbol" }
   ];
-  const esFutbol = col => col === "futbol" || col === "premier";
+  /* Lo que se compra: un sobre de cada colección y, en fútbol, el Plus (el
+     doble de caro: la quinta carta es épica o mejor y salen menos comunes).
+     `col` es la colección de sus cartas. Los prefijos `f` y `e` eran los
+     sobres de las dos colecciones de fútbol de antes (Clásico y Premier):
+     ya no se venden, pero los que se abrieron siguen saliendo igual. */
+  const SOBRES = [
+    { key: "profes", col: "profes", prefijo: "p", label: "Profes", mult: 1 },
+    { key: "comp", col: "comp", prefijo: "c", label: "Componentes", mult: 1 },
+    { key: "futbol", col: "futbol", prefijo: "g", label: "Fútbol", mult: 1, grupo: "futbol" },
+    { key: "futbolplus", col: "futbol", prefijo: "h", label: "Fútbol Plus", mult: 2, grupo: "futbol" }
+  ];
+  const SOBRE = Object.fromEntries(SOBRES.map(x => [x.key, x]));
+  const esFutbol = col => col === "futbol";
   const COL = Object.fromEntries(COLECCIONES.map(c => [c.key, c]));
 
   const CARDS = [];
@@ -372,36 +492,48 @@
     });
   }));
   const BASE_FUT = CARDS.length;
-  const cartaFutbol = (col, carpeta, [club, id, name, pos, dorsal, pais]) => {
+  const cartaFutbol = (col, carpeta, [club, id, name, , dorsal, pais]) => {
     const n = CARDS.length, media = mediaDe(club, id), tier = tierDeMedia(media), t = TIERS[tier];
+    const posiciones = posicionesDe(club, id), pos = POS_LINEA[posiciones[0]];
     CARDS.push({
-      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - (col === "futbol" ? BASE_FUT : BASE_PREM) + 1, name, vkey: t.key, vlabel: t.label,
-      col, peso: 1, tier, club, pos, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
+      n, uid: club + "-" + id + "-" + t.key, person: club + "-" + id, num: n - BASE_FUT + 1, name, vkey: t.key, vlabel: t.label,
+      col, liga: carpeta, peso: 1, tier, club, pos, posiciones, dorsal, pais, media, img: "cards/" + carpeta + "/" + club + "/" + id + ".webp",
       sub: CLUBES[club], acc: t.color
     });
   };
   FUTBOLISTAS.forEach(j => cartaFutbol("futbol", "futbol", j));
   const BASE_PREM = CARDS.length;
-  PREMIER.forEach(j => cartaFutbol("premier", "premier", j));
+  PREMIER.forEach(j => cartaFutbol("futbol", "premier", j));
   const TOTAL = CARDS.length;
   const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
-  const pool = (lista, w = TIERS.map(x => x.w)) => {
+  const pool = (lista, w = TIERS.map(x => x.w), ultima = null) => {
     const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
     t.uniforme = lista.every(c => c.peso === 1);
     t.peso = t.map(l => l.reduce((s, c) => s + c.peso, 0));
     // la rareza más alta que tiene: lo que sería de una rareza que la colección no tiene sale de la más alta
     t.tope = t.reduce((m, l, i) => (l.length ? i : m), 0);
     t.w = w;
+    t.ultima = ultima;   // sobre Plus: pesos de la quinta carta (épica, legendaria)
     let esp = null;   // se calcula al pedirlo: `DIOS` se declara más abajo
-    Object.defineProperty(t, 'esperado', { get: () => esp || (esp = esperadoPorSobre(w)) });
+    Object.defineProperty(t, 'esperado', { get: () => esp || (esp = esperadoPorSobre(w, ultima)) });
     return t;
   };
-  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp), futbol: pool(POR_COL.futbol, PESOS_FUTBOL.futbol), premier: pool(POR_COL.premier, PESOS_FUTBOL.premier) };
+  const POOL = {
+    legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp),
+    futbol: pool(POR_COL.futbol, PESOS_FUTBOL.normal), futbolplus: pool(POR_COL.futbol, PESOS_FUTBOL.plus, PESOS_FUTBOL.ultimaPlus),
+    // los de antes: las mismas listas y pesos de cuando se abrieron esos sobres
+    futbol1: pool(CARDS.slice(BASE_FUT, BASE_PREM), PESOS_FUTBOL.v1.futbol), premier1: pool(CARDS.slice(BASE_PREM), PESOS_FUTBOL.v1.premier)
+  };
   const POR_TIER = POOL.profes;
   /* De qué colección es un sobre o un re-roll, por su clave. Las claves
      de push empiezan con «-», así que lo de antes nunca lleva prefijo. */
-  const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "f" ? "futbol" : p === "e" ? "premier" : "profes"; };
-  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "f" ? POOL.futbol : p === "e" ? POOL.premier : p === "p" ? POOL.profes : POOL.legado; };
+  const coleccionDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : (p === "f" || p === "e" || p === "g" || p === "h") ? "futbol" : "profes"; };
+  const poolDe = clave => {
+    const p = String(clave)[0];
+    return p === "c" ? POOL.comp : p === "f" ? POOL.futbol1 : p === "e" ? POOL.premier1 : p === "g" ? POOL.futbol : p === "h" ? POOL.futbolplus : p === "p" ? POOL.profes : POOL.legado;
+  };
+  // qué sobre de la tienda es (para pintarlo al retomar uno): los de antes de fútbol cuentan como el sobre de fútbol
+  const sobreDe = clave => { const p = String(clave)[0]; return p === "c" ? "comp" : p === "h" ? "futbolplus" : (p === "f" || p === "e" || p === "g") ? "futbol" : "profes"; };
   const subtitulo = c => c.sub;
   const acento = c => c.acc;
 
@@ -417,7 +549,7 @@
      `cartas/s` compara con el mismo instante, así que el precio que se
      cobra es el de la hora del servidor, no el del reloj de cada uno. */
   const PRECIO = { promo: 50, normal: 80, gradua: 100, promoHasta: 1791169200000 };   // hasta el 4-10-2026 inclusive (5-10 00:00 Chile)
-  const precioSobre = ms => (ms < PRECIO.promoHasta ? PRECIO.promo : PRECIO.normal);
+  const precioSobre = (ms, mult = 1) => (ms < PRECIO.promoHasta ? PRECIO.promo : PRECIO.normal) * mult;   // el Plus cuesta `mult` veces
 
   /* El god pack: 2 % de los sobres. Trae cinco épicas o mejores, y como
      mucho una legendaria. */
@@ -504,7 +636,7 @@
     for (let i = 0; i < 5; i++) {
       let t;
       if (dios) t = leyenda ? 2 : 2 + pesado(r, [P.w[2], P.w[3]]);
-      else t = i === 4 ? 1 + pesado(r, P.w.slice(1)) : pesado(r, P.w);
+      else t = i === 4 ? (P.ultima ? 2 + pesado(r, P.ultima) : 1 + pesado(r, P.w.slice(1))) : pesado(r, P.w);
       if (t === 3) leyenda = true;
       t = Math.min(t, P.tope);
       let libres = P[t].filter(c => !usadas.has(c.n));
@@ -528,9 +660,11 @@
      Lo que se espera de cada rareza por sobre, contando la quinta carta y
      el god pack. Para cosas raras el número esperado por sobre es casi la
      probabilidad de que un sobre traiga una, que es lo que se dice. */
-  function esperadoPorSobre(w) {
+  function esperadoPorSobre(w, ultima) {
     const T = w || TIERS.map(t => t.w), tot = 10000, alta = T[1] + T[2] + T[3];
-    const normal = T.map((w, t) => 4 * w / tot + (t ? w / alta : 0));
+    // la quinta: rara o mejor, o (Plus) épica o mejor con sus propios pesos
+    const quinta = ultima ? [0, 0, ultima[0] / (ultima[0] + ultima[1]), ultima[1] / (ultima[0] + ultima[1])] : T.map((w, t) => (t ? w / alta : 0));
+    const normal = T.map((w, t) => 4 * w / tot + quinta[t]);
     const pLeg = 1 - Math.pow(T[2] / (T[2] + T[3]), 5);
     const dios = [0, 0, 5 - pLeg, pLeg];
     const pd = DIOS / 10000;
@@ -663,8 +797,8 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, MEDIAS, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL,
-    coleccionDe, poolDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, FUTBOLISTAS, PREMIER, MEDIAS, POSICIONES, POS_LINEA, PUESTO, PEN_AJUSTE, ajuste, MEDIAS_MIN, coincide, esFutbol, CLUBES, FORMACION, puntosCarta, puntosPlantilla, COLECCIONES, COL, POR_COL, POOL, SOBRES, SOBRE,
+    coleccionDe, poolDe, sobreDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO, BANDAS, tierDeMedia, PESOS_FUTBOL,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
   };

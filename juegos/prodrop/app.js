@@ -84,12 +84,16 @@ const totalDe = c => M.POR_COL[c.col].length;
    a quien está en la lista del admin (`serie1` en los datos): para el
    resto no hay sobre, ni pestaña, ni cartas (Juegos ni las manda). Sus
    cartas siguen siendo suyas: solo no se ven. */
-let COLS = M.COLECCIONES, TOTAL = CARDS.length;
+/* Las colecciones (`COLS`: pestañas de la colección y del re-roll) no son lo
+   mismo que los sobres que se compran (`PACKS`): fútbol es una sola
+   colección con dos sobres, el normal y el Plus. */
+let COLS = M.COLECCIONES, PACKS = M.SOBRES, TOTAL = CARDS.length;
 function fijaColecciones(serie1) {
   COLS = M.COLECCIONES.filter(co => serie1 || co.key !== 'profes');
+  PACKS = M.SOBRES.filter(x => serie1 || x.col !== 'profes');
   TOTAL = COLS.reduce((n, co) => n + M.POR_COL[co.key].length, 0);
-  const una = COLS.length < 2;
-  ['#cambiaBtn', '#cambiaBtn2', '#rrCols', '#colTabs'].forEach(q => { const el = $(q); if (el) el.style.display = una ? 'none' : ''; });
+  const unaCol = COLS.length < 2, unPack = PACKS.length < 2;
+  [['#rrCols', unaCol], ['#colTabs', unaCol], ['#cambiaBtn', unPack], ['#cambiaBtn2', unPack]].forEach(([q, no]) => { const el = $(q); if (el) el.style.display = no ? 'none' : ''; });
   document.body.classList.toggle('serie1', !!serie1);
 }
 /* Lo que la carta de un futbolista dice además de la foto (el catálogo
@@ -108,6 +112,10 @@ const bandera = cc => `flags/${cc.toLowerCase()}.png`;
 // el escudo del club del jugador (escudos/<club>.png)
 const escudo = club => `escudos/${club}.png`;
 const colVisible = k => COLS.some(co => co.key === k);
+const packVisible = k => PACKS.some(x => x.key === k);
+// la colección de un sobre de la tienda, y si es de futbolistas
+const colDe = k => M.SOBRE[k].col;
+const esFutbolPack = k => M.esFutbol(colDe(k));
 const pad = n => String(n).padStart(3, '0');
 const subtitle = c => M.subtitulo(c);
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
@@ -259,11 +267,11 @@ function frontHTML(c, lazy) {
   // fútbol: la foto entera y abajo el nombre con el tipo (Base), sin rareza
   // fútbol: la foto entera y abajo el nombre con su rareza; los efectos crecen con ella
   if (M.esFutbol(c.col)) {
-    return `<div class="face front full futbol ${c.col} ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
+    return `<div class="face front full futbol ${c.liga} ${t.key} club-${c.club}" style="--accent:${accentOf(c)}">
       <img src="${c.img}" alt="${alt}" draggable="false"${ld}>
       ${c.tier >= 2 ? `<div class="holo"><img src="${c.img}" alt="" draggable="false"${ld}></div><div class="glitter"></div>` : ''}
       ${c.tier >= 1 ? '<div class="sweep"></div>' : ''}<div class="glare"></div>
-      <div class="fu-top"><span class="fu-pos" title="${FUT_POSICION[c.pos]}">${FUT_POSICION[c.pos]}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
+      <div class="fu-top"><span class="fu-pos" title="${c.posiciones.map(p => M.PUESTO[p]).join(' / ')}">${c.posiciones.join(' · ')}</span><span class="fu-medida" title="Media ${c.media} (la de EA SPORTS FC)"><b class="fu-media">${c.media}</b><small>MEDIA</small></span></div>
       ${wearHTML(c)}
       <div class="fa-name fu-pie"><div><b>${c.name}</b><span class="fu-rar">${t.label} ${t.sym}</span></div><span class="fu-iconos"><img class="fu-flag" src="${bandera(c.pais)}" alt="${FUT_PAIS[c.pais]}" title="${FUT_PAIS[c.pais]}" draggable="false"><img class="fu-escudo" src="${escudo(c.club)}" alt="${M.CLUBES[c.club]}" title="${M.CLUBES[c.club]}" draggable="false"></span></div>
       <i class="fu-marco"></i>
@@ -723,8 +731,8 @@ const TEAR_Y = 13; // % de la altura del sobre
 const SKIN = {
   profes: { badge: 'SERIE 01', sub: 'DIE COLLECTION', meta: '5 CARTAS · EDICIÓN HOLO' },
   comp: { badge: 'SERIE 02', sub: 'COMPONENTES', meta: '5 CARTAS · EDICIÓN PCB' },
-  futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: '5 CARTAS · ESPECIAL SUPERCLÁSICO' },
-  premier: { badge: 'SERIE 04', sub: 'PREMIER', meta: '5 CARTAS · BIG SIX' },
+  futbol: { badge: 'SERIE 03', sub: 'FÚTBOL', meta: '5 CARTAS · MADRID, BARÇA Y PREMIER' },
+  futbolplus: { badge: 'SERIE 03 · PLUS', sub: 'FÚTBOL PLUS', meta: 'ÉPICA ASEGURADA · 5 CARTAS' },
 };
 /* Los sobres de fútbol llevan siempre los mismos tres de portada, los más
    famosos (quien entra no conoce tanto de fútbol): [izquierda, derecha,
@@ -732,7 +740,7 @@ const SKIN = {
    Los demás sobres sacan tres cartas buenas al azar. */
 const PORTADA = {
   futbol: [['barcelona', 'lamine-yamal'], ['realmadrid', 'bellingham'], ['realmadrid', 'mbappe']],
-  premier: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
+  futbolplus: [['arsenal', 'bukayo-saka'], ['liverpool', 'virgil-van-dijk'], ['mancity', 'erling-haaland']],
   hub: [['mancity', 'erling-haaland'], ['barcelona', 'lamine-yamal'], ['realmadrid', 'mbappe']],
 };
 const fanDe = (col, tier = 2) => PORTADA[col]
@@ -756,7 +764,7 @@ let phase = 'pack', pull = [], els = [], current = 0, busy = false, tearP = 0, t
 /* La colección del sobre que se va a abrir. Al entrar se elige (se
    recuerda la última para marcarla); «Cambiar sobre» vuelve a elegir. */
 let coleccion = 'profes';
-try { if (M.COL[localStorage.getItem('prodrop.coleccion')]) coleccion = localStorage.getItem('prodrop.coleccion'); } catch {}
+try { if (M.SOBRE[localStorage.getItem('prodrop.coleccion')]) coleccion = localStorage.getItem('prodrop.coleccion'); } catch {}
 const setPhase = p => { phase = p; document.body.dataset.phase = p; };
 const hint = txt => { $('#hint').textContent = txt; };
 
@@ -825,17 +833,17 @@ const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${SKIN[coleccion]
    de futbolistas (`grupo: 'futbol'`) no salen sueltas: son un solo acceso,
    «Sobres de Fútbol», que lleva a un segundo menú con solo cromos de
    fútbol (el Clásico y la Premier). */
-const hayFutbol = () => COLS.some(co => co.grupo === 'futbol');
+const hayFutbol = () => PACKS.some(x => x.grupo === 'futbol');
 let menuActual = 'todos';   // 'todos' o 'futbol': el menú que se está viendo
 const TEMAS = {
   profes: 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…',
   comp: '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…',
-  futbol: 'Especial Superclásico · Real Madrid y Barça, una carta por jugador: su rareza sale de su media',
-  premier: 'Big Six · Man United, Man City, Chelsea, Liverpool, Tottenham y Arsenal, una carta por jugador: su rareza sale de su media',
+  futbol: 'Todos los jugadores: Real Madrid, Barça y el Big Six inglés, una carta por jugador. Su rareza sale de su media',
+  futbolplus: 'El doble de caro: la quinta carta es Épica o mejor, siempre, y salen menos comunes',
 };
 function eligeSobre(menu = 'todos') {
-  const futbolistas = COLS.filter(co => co.grupo === 'futbol');
-  const sueltas = COLS.filter(co => co.grupo !== 'futbol');
+  const futbolistas = PACKS.filter(x => x.grupo === 'futbol');
+  const sueltas = PACKS.filter(x => x.grupo !== 'futbol');
   // sin nada que elegir (una sola colección, o un solo sobre de fútbol): directo a la mesa
   if (menu === 'futbol' && futbolistas.length < 2) menu = 'todos';
   if (menu === 'todos' && sueltas.length + (futbolistas.length ? 1 : 0) < 2) {
@@ -851,28 +859,28 @@ function eligeSobre(menu = 'todos') {
   document.body.classList.toggle('menu-futbol', menu === 'futbol');
   $('#chTit').textContent = menu === 'futbol' ? '⚽ Sobres de Fútbol' : 'Elige tu sobre';
   $('#chSub').textContent = menu === 'futbol'
-    ? 'Solo cromos de fútbol: elige la liga. Mismas rarezas, mismo precio, mismo sobre gratis y la misma plantilla 4-3-3 para las dos.'
-    : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Mismo precio, mismo sobre gratis.';
+    ? 'Un solo catálogo: los jugadores de Real Madrid, Barça y la Premier. El Plus cuesta el doble y asegura una Épica o mejor. Mismas cartas para ⚽ Mi plantilla y el re-roll.'
+    : 'Cada colección tiene sus propias cartas, rarezas y animaciones. Un sobre gratis cada 6 horas.';
   $('#chBack').hidden = menu !== 'futbol' || !sueltas.length;
   hideBanner(); setTilt(null, null);
   const box = $('#chooserPacks');
   const ficha = co => {
-    const todas = M.POR_COL[co.key], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
+    const todas = M.POR_COL[co.col], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
     return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
       <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
-      <b>${co.key === 'futbol' ? 'Clásico' : co.key === 'premier' ? 'Premier' : co.label}</b><small>${k.badge} · ${todas.length} cartas</small>
+      <b>${co.label}</b><small>${k.badge} · ${todas.length} cartas${co.mult > 1 ? ` · ${M.precioSobre(ahora(), co.mult)} ${MONEDA}` : ''}</small>
       <small class="ch-temas">${TEMAS[co.key]}</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
-  // el acceso al menú de fútbol: un sobre con cartas de las dos colecciones
+  // el acceso al menú de fútbol: un sobre con las cartas de todos
   const fichaFutbol = () => {
-    const todas = futbolistas.flatMap(co => M.POR_COL[co.key]), tengo = todas.filter(c => col[c.uid]).length;
+    const todas = M.POR_COL.futbol, tengo = todas.filter(c => col[c.uid]).length;
     const fan = fanDe('hub');
-    return `<button class="ch-pack hub${futbolistas.some(co => co.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
+    return `<button class="ch-pack hub${futbolistas.some(x => x.key === coleccion) ? ' ultimo' : ''}" data-menu="futbol">
       <span class="ch-skin">${skinHTML(fan, 'futbol')}<i class="hub-sello">${futbolistas.length} SOBRES</i></span>
-      <b>⚽ Sobres de Fútbol</b><small>Series 03 y 04 · ${todas.length} cartas</small>
-      <small class="ch-temas">Clásico (Real Madrid y Barça) y Premier (el Big Six inglés), en su propio menú</small>
+      <b>⚽ Sobres de Fútbol</b><small>Serie 03 · ${todas.length} cartas</small>
+      <small class="ch-temas">Real Madrid, Barça y el Big Six: el sobre normal y el Plus, con todos los jugadores</small>
       <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
     </button>`;
   };
@@ -897,7 +905,7 @@ function eligeSobre(menu = 'todos') {
 }
 $('#chBack').onclick = () => eligeSobre('todos');
 // «Cambiar sobre» vuelve al menú de donde vino: los de fútbol, al de fútbol
-const menuDe = () => (M.esFutbol(coleccion) && hayFutbol() ? 'futbol' : 'todos');
+const menuDe = () => (esFutbolPack(coleccion) && hayFutbol() ? 'futbol' : 'todos');
 $('#cambiaBtn').onclick = () => { if (phase === 'tienda' && !comprando) eligeSobre(menuDe()); };
 $('#cambiaBtn2').onclick = () => { if (phase === 'summary' && !comprando) eligeSobre(menuDe()); };
 function tienda(drop = true) {
@@ -910,7 +918,7 @@ function tienda(drop = true) {
   pintaCompra();
 }
 function newPacks(lista, drop = true) {
-  coleccion = M.coleccionDe(lista[0].k);   // un sobre retomado puede ser de la otra colección
+  coleccion = M.sobreDe(lista[0].k);   // un sobre retomado puede ser de otro tipo
   $('#chooser').hidden = true;
   comprados = lista.map(({ k, at }) => ({ k, at, dios: M.sobre(cuenta.uid, k, at).dios }));
   abriendo = new Set(); rehazColeccion();
@@ -1219,7 +1227,7 @@ function sumCard(c) {
 function showSummary() {
   setPhase('summary');
   setTilt(null, null); aura(false); hideBanner();
-  $('#cambiaBtn2').textContent = `Cambiar sobre (${M.COL[coleccion].label})`;
+  $('#cambiaBtn2').textContent = `Cambiar sobre (${M.SOBRE[coleccion].label})`;
   document.body.classList.remove('dim');
   pull.forEach(record);
   abriendo = new Set(); rehazColeccion(); updateColCount();
@@ -1229,7 +1237,7 @@ function showSummary() {
   const n = comprados.length, box = $('#sumCards'); box.innerHTML = '';
   $('#summary').classList.toggle('multi', n > 1);
   $('#summary').dataset.n = n;
-  $('#sumTitulo').textContent = `${n > 1 ? `Tus ${n} sobres` : 'Tu sobre'} · ${M.COL[coleccion].label}`;
+  $('#sumTitulo').textContent = `${n > 1 ? `Tus ${n} sobres` : 'Tu sobre'} · ${M.SOBRE[coleccion].label}`;
   /* Con varios sobres, una fila por sobre: se ve qué trajo cada uno. */
   const grupos = n > 1 ? comprados.map((x, s) => {
     const g = document.createElement('div'); g.className = 'sum-grupo';
@@ -1583,7 +1591,7 @@ function renderCopies() {
 let colCol = '';
 function renderCollection() {
   if (colView) return renderCopies();
-  if (!colVisible(colCol)) colCol = coleccion;
+  if (!colVisible(colCol)) colCol = colDe(coleccion);
   $('#colGrid').classList.remove('copies-view');
   const todas = M.POR_COL[colCol].map(m => CARDS[m.n]), deCol = todas.filter(c => col[c.uid]).length;
   const gn = Object.values(copies).flat().filter(cp => cp.gr && CARDS[cp.id].col === colCol).length;
@@ -1628,7 +1636,7 @@ function renderCollection() {
 function openCollection() {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  colView = null; zoomVuelve = ''; colCol = coleccion;
+  colView = null; zoomVuelve = ''; colCol = colDe(coleccion);
   renderCollection();
   $('#collection').hidden = false;
 }
@@ -1675,7 +1683,8 @@ function abreReroll() {
   setTilt(null, null);
   // abre en la colección del sobre, o en la otra si solo ahí alcanza, y en la rareza más baja que alcanza
   const alcanza = co => rrTiers(co).some(i => elegibles(i, co).length >= NR);
-  rr.col = alcanza(coleccion) || !COLS.some(co => alcanza(co.key)) ? coleccion : COLS.find(co => alcanza(co.key)).key;
+  const colActual = colDe(coleccion);
+  rr.col = alcanza(colActual) || !COLS.some(co => alcanza(co.key)) ? colActual : COLS.find(co => alcanza(co.key)).key;
   const t = rrTiers().find(i => elegibles(i).length >= NR);
   if (!rrTiers().includes(rr.tier)) rr.tier = 0;
   if (t !== undefined && elegibles(rr.tier).length < NR) rr.tier = t;
@@ -1929,8 +1938,8 @@ addEventListener('message', e => {
 function alDatos(d) {
   const primera = !cuenta.listo, antes = COLS.length;
   fijaColecciones(!!d.serie1);
-  if (!colVisible(coleccion)) coleccion = COLS[0].key;
-  if (!colVisible(rr.col)) { rr.col = coleccion; rr.sel = []; }
+  if (!packVisible(coleccion)) coleccion = PACKS[0].key;
+  if (!colVisible(rr.col)) { rr.col = colDe(coleccion); rr.sel = []; }
   Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
     mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], pendientes: d.pendientes || 0,
     gente: d.gente || {}, exh: d.exh || [], plant: d.plant || [], desfase: d.desfase || 0, listo: true });
@@ -1958,8 +1967,9 @@ function alDatos(d) {
    Un sobre gratis cada 6 horas (desde el último gratis que sacaste) y los
    demás a precio. Ninguno se compra si no alcanza: el botón se apaga, y
    Juegos lo vuelve a comprobar antes de cobrar. */
-const precio = () => M.precioSobre(ahora());
-const gratisListo = () => cuenta.listo && !cuenta.gratis && !cuenta.parada;
+const precio = () => M.precioSobre(ahora(), M.SOBRE[coleccion].mult);   // el Plus de fútbol cuesta el doble
+const gratisPara = () => M.SOBRE[coleccion].mult === 1;   // el gratis es solo del sobre normal
+const gratisListo = () => cuenta.listo && !cuenta.gratis && !cuenta.parada && gratisPara();
 function cuentaAtras(t) {
   const m = Math.max(1, Math.ceil((t - ahora()) / 60000)), h = Math.floor(m / 60);
   return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
@@ -1982,17 +1992,17 @@ function pintaCantidad(box, p) {
 }
 const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
-  const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, promo = p1 < M.PRECIO.normal, gl = gratisListo();
+  const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, mult = M.SOBRE[coleccion].mult, promo = p1 < M.PRECIO.normal * mult, gl = gratisListo();
   pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
-  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = !M.esFutbol(coleccion);
+  $('#fuInfo').hidden = $('#plantBtn').hidden = $('#plantBtn2').hidden = !esFutbolPack(coleccion);
   if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
-  f.innerHTML = gl ? 'Sobre gratis 🎁' : cuenta.gratis ? `🎁 Gratis en ${cuentaAtras(cuenta.gratis)}` : '🎁 Sobre gratis';
+  f.innerHTML = !gratisPara() ? '🎁 Gratis: sobre normal' : gl ? 'Sobre gratis 🎁' : cuenta.gratis ? `🎁 Gratis en ${cuentaAtras(cuenta.gratis)}` : '🎁 Sobre gratis';
   f.disabled = !gl || comprando;
   f.classList.toggle('listo', gl);
   const b = $('#buyBtn');
-  b.innerHTML = `Comprar ${sobresTxt(cantidad)} <span class="precio">${promo ? `<s>${M.PRECIO.normal * cantidad}</s>` : ''}${MONEDA}${p}</span>`;
+  b.innerHTML = `Comprar ${sobresTxt(cantidad)} <span class="precio">${promo ? `<s>${M.PRECIO.normal * mult * cantidad}</s>` : ''}${MONEDA}${p}</span>`;
   b.disabled = !cuenta.listo || falta > 0 || comprando || cuenta.parada;
   b.classList.toggle('primary', !gl); b.classList.toggle('sec', gl);
   const fin = new Date(M.PRECIO.promoHasta - 1).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', timeZone: 'America/Santiago' });
@@ -2000,7 +2010,7 @@ function pintaCompra() {
     : cuenta.parada ? `<span class="err">Una compra tuya quedó sin fondos y no vale: hasta que ganes ${fmt(cuenta.falta)} monedas más, no puedes gastar.</span>`
     : gl ? `Tu sobre gratis está listo. El siguiente, 6 horas después de abrirlo.`
     : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para ${cantidad === 1 ? 'comprar uno' : `abrir ${cantidad} juntos`}. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
-    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal} cada uno). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
+    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal * mult} cada uno). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.${!gratisPara() ? ' El sobre gratis es solo del normal.' : ''}`;
   const a = $('#againBtn');
   a.innerHTML = `${cantidad === 1 ? 'Abrir otro sobre' : `Abrir otros ${cantidad}`} ✳ <span class="precio">${MONEDA}${p}</span>`;
   a.disabled = falta > 0 || comprando || cuenta.parada;
@@ -2011,24 +2021,40 @@ function pintaCompra() {
 /* El tip del sobre de fútbol: qué tan seguido sale cada rareza y qué media
    es cada una. Sale de los mismos pesos que el motor (los de su colección). */
 function tipFutbol() {
-  const P = M.POOL[coleccion], w = P.w, n = P.map(l => l.length), tot = n.reduce((a, b) => a + b, 0), E = P.esperado;
+  const P = M.POOL[coleccion], w = P.w, n = P.map(l => l.length), tot = n.reduce((a, b) => a + b, 0), E = P.esperado, plus = !!P.ultima;
   const pct = x => `${(x * 100).toFixed(1).replace('.', ',').replace(',0', '')} %`;
-  const porCarta = w.map(x => x / 10000), alta = w[1] + w[2] + w[3], quinta = [w[1], w[2], w[3]].map(x => x / alta);
+  const porCarta = w.map(x => x / 10000);
+  // la quinta: rara o mejor (normal) o, en el Plus, épica o mejor con sus propios pesos
+  const alta = w[1] + w[2] + w[3], u = plus ? P.ultima[0] + P.ultima[1] : 0;
+  const quinta = plus ? [0, P.ultima[0] / u, P.ultima[1] / u] : [w[1] / alta, w[2] / alta, w[3] / alta];
   const [b0, b1, b2] = M.BANDAS, cada = t => { const k = Math.round(n[t] / E[t]); return k <= 1 ? 'casi todos los sobres' : `1 de cada ${k} sobres`; };
   // una Épica o mejor en el sobre: el god pack siempre la trae; si no, alguna de las cuatro primeras o la quinta
-  const pD = M.DIOS / 10000, aOMas = porCarta[2] + porCarta[3], qOMas = quinta[1] + quinta[2];
+  const pD = M.DIOS / 10000, aOMas = porCarta[2] + porCarta[3], qOMas = plus ? 1 : quinta[1] + quinta[2];
   const epica = pD + (1 - pD) * (1 - (1 - aOMas) ** 4 * (1 - qOMas));
-  return `<p><b>Cada sobre trae 5 cartas</b> y cada jugador tiene una sola carta.</p>
+  const quintaTxt = plus
+    ? `La quinta siempre es Épica o mejor (Épica ${pct(quinta[1])} · Legendaria ${pct(quinta[2])}).`
+    : `La quinta siempre es Rara o mejor (Rara ${pct(quinta[0])} · Épica ${pct(quinta[1])} · Legendaria ${pct(quinta[2])}).`;
+  const leg = 1 - (1 - porCarta[3]) ** 4 * (1 - quinta[2]);   // una Legendaria en el sobre (sin contar el god pack)
+  const epicaTxt = plus
+    ? `<b>Todos los sobres Plus traen una Épica o mejor</b>, y una Legendaria sale en <b>1 de cada ${Math.round(1 / leg)} sobres</b> (${pct(leg)}).`
+    : `Una Épica o mejor sale en <b>1 de cada ${Math.round(1 / epica)} sobres</b> (${pct(epica)}) y una Legendaria en <b>1 de cada ${Math.round(1 / leg)}</b> (${pct(leg)}).`;
+  return `<p><b>Cada sobre trae 5 cartas</b> y cada jugador tiene una sola carta. ${plus ? `El <b>Plus cuesta ${M.PRECIO.normal * 2} monedas</b> (el doble): salen menos comunes y la quinta carta es mejor.` : `El <b>sobre normal cuesta ${M.PRECIO.normal} monedas</b>; el Plus, el doble.`}</p>
     <p>Su rareza sale de su <b>media</b> (la de EA SPORTS FC, arriba a la derecha de la carta):
       <b>Común</b> hasta ${b0} · <b>Rara</b> ${b0 + 1} a ${b1} · <b>Épica</b> ${b1 + 1} a ${b2} · <b>Legendaria</b> ${b2 + 1} o más.</p>
-    <p>Por carta: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
-      La quinta siempre es Rara o mejor (Rara ${pct(quinta[0])} · Épica ${pct(quinta[1])} · Legendaria ${pct(quinta[2])}).</p>
-    <p>Una Épica o mejor sale en <b>1 de cada ${Math.round(1 / epica)} sobres</b> (${pct(epica)}). El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
-    <p>Hay ${tot} jugadores: ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario: a más media, más difícil.</p>
-    <p class="fu-pronto">⚽ Próximamente, más ligas.</p>`;
+    <p>Por carta${plus ? ' (las cuatro primeras)' : ''}: <b>Común ${pct(porCarta[0])}</b> · <b>Rara ${pct(porCarta[1])}</b> · <b>Épica ${pct(porCarta[2])}</b> · <b>Legendaria ${pct(porCarta[3])}</b>.
+      ${quintaTxt}</p>
+    <p>${epicaTxt} El ${pct(pD)} son god packs: cinco Épicas o mejores.</p>
+    <p>Hay ${tot} jugadores (Real Madrid, Barça y el Big Six): ${n[0]} comunes, ${n[1]} raras, ${n[2]} épicas y ${n[3]} legendarias. Un jugador en concreto sale, en promedio, en <b>${cada(0)}</b> si es común, en <b>${cada(1)}</b> si es raro, en <b>${cada(2)}</b> si es épico y en <b>${cada(3)}</b> si es legendario.</p>
+    <p class="fu-pronto">⚽ Próximamente, más equipos y ligas en el mismo sobre.</p>`;
 }
 /* Lo nuevo del sobre de fútbol, de lo más reciente a lo más viejo. */
 const NOVEDADES_FUTBOL = [
+  ['Octubre 2026 · Un solo catálogo de fútbol', [
+    '<b>Fútbol es una sola colección</b>: Real Madrid, Barça y el Big Six (Man United, Man City, Chelsea, Liverpool, Tottenham y Arsenal) en un mismo sobre. El Clásico y la Premier ya no son sobres aparte; los que ya abriste siguen siendo los mismos, y todas esas cartas valen igual en el <b>re-roll</b>, en <b>⚽ Mi plantilla</b> y en tu vitrina.',
+    '<b>Dos sobres</b>: el <b>normal</b> (80) y el <b>Plus</b> (160). El Plus trae menos comunes y una <b>Épica o mejor asegurada</b> en la quinta carta. El sobre gratis es del normal.',
+    '<b>Posiciones</b>: cada jugador juega de una o dos (Mbappé, DC o EI; Valverde, MC o LD). En ⚽ Mi plantilla la casilla se ve en verde (su puesto), amarillo (incómodo) o rojo (mal posicionado), y el buscador filtra por club, media y nombre, ordenado por media.',
+    'Un jugador no puede estar dos veces en el once: si lo eliges para otra casilla, se va de donde estaba.',
+  ]],
   ['Octubre 2026 · Premier y medias', [
     '<b>Nuevo sobre: Premier · Big Six</b> (Serie 04). Los jugadores del Manchester United, Manchester City, Chelsea, Liverpool, Tottenham y Arsenal, una carta cada uno. Mismo precio y mismo sobre gratis que los otros sobres.',
     '<b>La rareza sale de la media</b> del jugador (la de EA SPORTS FC, ahora visible en la carta con la etiqueta MEDIA): Común hasta 80, Rara 81 a 84, Épica 85 a 87 y Legendaria 88 o más. Por carta: Común 55 %, Rara 33 %, Épica 10 % y Legendaria 2 % en el Clásico; Común 55 %, Rara 35 %, Épica 9 % y Legendaria 1 % en la Premier (que tiene menos legendarias). Cada jugador tiene una sola carta; la media no cambia.',
@@ -2050,7 +2076,7 @@ function abreFuModal(titulo, html) {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
   $('#fuModalTit').textContent = titulo;
-  $('#fuModalSub').textContent = coleccion === 'premier' ? 'Sobre de Fútbol · Premier · Big Six' : 'Sobre de Fútbol · Especial Superclásico';
+  $('#fuModalSub').textContent = M.SOBRE[coleccion].mult > 1 ? 'Sobre de Fútbol Plus · Serie 03' : 'Sobre de Fútbol · Serie 03';
   $('#fuModalTxt').innerHTML = html;
   $('#fuModal').hidden = false;
   $('#fuModal .fu-modal').scrollTop = 0;
@@ -2173,11 +2199,15 @@ else $('#cargando').innerHTML = '<p>PRODROP se abre desde <a href="../../juegos.
    Cualquier jugador va en cualquier casilla. Cada cambio se guarda al tiro
    en el perfil (público): Juegos comprueba que la carta sea tuya. La
    puntuación es la del motor: la rareza pone el techo y el estado lo escala. */
-const pl = { lista: [], casilla: -1, recien: new Set(), guardando: false, filtro: '' };
+const pl = { lista: [], casilla: -1, recien: new Set(), guardando: false, filtro: '', puesto: false, club: '', media: 0, texto: '' };
 // el orden del selector y sus filtros: delanteros arriba, porteros al final
 const POS_ORDEN = ['DEL', 'MED', 'DEF', 'POR'];
 const copiaPorClave = k => Object.values(copies).flat().find(cp => cp.key === k) || null;
 const puntosDeCopias = cps => M.puntosPlantilla(cps.map(cp => cp && { tier: CARDS[cp.id].tier, g: cp.g }));
+const FIT_TXT = { ok: 'En su puesto', incomodo: 'Incómodo', mal: 'Mal posicionado' };
+const FIT_CLASE = { ok: 'ok', incomodo: 'inc', mal: 'mal' };
+// cómo le queda la casilla `i` de la formación a una copia (verde, amarillo o rojo)
+const ajusteDe = (i, cp) => M.ajuste(M.FORMACION[i].pos, CARDS[cp.id].posiciones);
 // la cancha: delanteros arriba, portero abajo; `alTocar(i)` hace editable cada casilla
 function pintaCancha(box, cps, alTocar) {
   box.innerHTML = '<i class="pl-lineas" aria-hidden="true"></i>';
@@ -2187,10 +2217,12 @@ function pintaCancha(box, cps, alTocar) {
     M.FORMACION.forEach((s, i) => {
       if (s.fila !== f) return;
       const cas = document.createElement(alTocar ? 'button' : 'div');
-      cas.className = `pl-casilla${cps[i] ? ' llena' : ''}${i === pl.casilla ? ' activa' : ''}`;
+      const aj = cps[i] ? ajusteDe(i, cps[i]) : null;
+      cas.className = `pl-casilla${cps[i] ? ' llena fit-' + FIT_CLASE[aj.nivel] : ''}${i === pl.casilla ? ' activa' : ''}`;
       if (cps[i]) { const el = makeCard(fromCopy(CARDS[cps[i].id], cps[i]), { back: false }); light(el); cas.appendChild(el); }
       else cas.innerHTML = `<span class="pl-vacia">${alTocar ? '+' : ''}</span>`;
-      cas.insertAdjacentHTML('beforeend', `<span class="pl-pos">${s.pos}</span>`);
+      if (aj && aj.pen) cas.insertAdjacentHTML('beforeend', `<span class="pl-pen ${FIT_CLASE[aj.nivel]}" title="${FIT_TXT[aj.nivel]}">${aj.nivel === 'mal' ? '✕' : '!'}</span>`);
+      cas.insertAdjacentHTML('beforeend', `<span class="pl-pos" title="${M.PUESTO[s.pos]}">${s.pos}</span>`);
       if (alTocar) cas.onclick = () => alTocar(i);
       fila.appendChild(cas);
     });
@@ -2200,29 +2232,71 @@ function pintaCancha(box, cps, alTocar) {
 function renderPlantilla() {
   const cps = pl.lista.map(k => (k ? copiaPorClave(k) : null));
   $('#plPuntos').innerHTML = `${puntosDeCopias(cps)}<small> pts</small>`;
-  pintaCancha($('#plCancha'), cps, i => { pl.casilla = pl.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderPlantilla(); });
+  pintaCancha($('#plCancha'), cps, i => { if (pl.casilla !== i) { pl.puesto = true; pl.filtro = ''; } pl.casilla = pl.casilla === i ? -1 : i; Snd.init(); Snd.tick(); renderPlantilla(); });
   const box = $('#plElige');
   box.hidden = pl.casilla < 0;
   if (box.hidden) return;
-  /* Por línea (delanteros, medios, defensas, porteros) y dentro de cada
-     una, las del sobre recién abierto primero y luego de la mejor rareza a
-     la peor. El filtro solo ayuda a buscar: cualquiera va en cualquier casilla. */
-  const usadas = new Set(pl.lista.filter(Boolean));
-  const libres = Object.values(copies).flat()
-    .filter(cp => M.esFutbol(CARDS[cp.id].col) && !usadas.has(cp.key) && (!pl.filtro || CARDS[cp.id].pos === pl.filtro))
-    .sort((a, b) => POS_ORDEN.indexOf(CARDS[a.id].pos) - POS_ORDEN.indexOf(CARDS[b.id].pos)
-      || pl.recien.has(b.key) - pl.recien.has(a.key) || CARDS[b.id].tier - CARDS[a.id].tier);
-  const chips = POS_ORDEN.map(p => `<button class="pl-filtro" data-filtro="${p}" aria-pressed="${pl.filtro === p}" title="${FUT_POSICION[p]}">${p}</button>`).join('');
-  box.innerHTML = `<div class="pl-elige-head"><b>${M.FORMACION[pl.casilla].pos} · elige un jugador</b><span class="pl-filtros" role="group" aria-label="Filtrar por posición">${chips}</span>
+  /* El buscador: por línea (delanteros, medios, defensas, porteros), por el
+     puesto de la casilla, por club, por media mínima y por nombre. Ordenado
+     por media. Cualquiera va en cualquier casilla (los de otro puesto salen
+     en amarillo o rojo); un jugador que ya está en el once también sale:
+     al elegirlo se va de donde estaba y pasa a esta casilla. */
+  const slot = M.FORMACION[pl.casilla];
+  const todos = Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
+  const clubes = [...new Set(todos.map(cp => CARDS[cp.id].club))].sort((a, b) => M.CLUBES[a].localeCompare(M.CLUBES[b]));
+  const puesto = M.PUESTO[slot.pos];
+  const chips = POS_ORDEN.map(p => `<button class="pl-filtro" data-filtro="${p}" aria-pressed="${pl.filtro === p}" title="${FUT_POSICION[p]}">${p}</button>`).join('')
+    + `<button class="pl-filtro" data-puesto aria-pressed="${pl.puesto}" title="Solo los que juegan de ${puesto}">solo ${slot.pos}</button>`;
+  box.innerHTML = `<div class="pl-elige-head"><b>${puesto[0].toUpperCase() + puesto.slice(1)} · elige un jugador</b>
       ${pl.lista[pl.casilla] ? '<button class="btn mk-mini" data-quitar>Quitar de la casilla</button>' : ''}<button class="link" data-cancelar>Cancelar</button></div>
-    ${libres.length ? `<div class="tc-rejilla">${libres.map(cp => `<button class="tc-elige" data-c="${esc(cp.key)}">${miniCp(cp, `<i class="pl-tag">${CARDS[cp.id].pos}</i>${pl.recien.has(cp.key) ? '<em class="rr-exh">NUEVA</em>' : ''}`)}</button>`).join('')}</div>`
-      : `<p class="mk-vacio">${pl.filtro ? `No te quedan ${FUT_POSICION[pl.filtro].toLowerCase()}s libres.` : 'No te quedan jugadores libres: abre más sobres de Fútbol.'}</p>`}`;
+    <div class="pl-buscar"><span class="pl-filtros" role="group" aria-label="Filtrar por posición">${chips}</span>
+      <select id="plClub" aria-label="Club"><option value="">Todos los clubes</option>${clubes.map(c => `<option value="${c}"${pl.club === c ? ' selected' : ''}>${esc(M.CLUBES[c])}</option>`).join('')}</select>
+      <select id="plMedia" aria-label="Media mínima"><option value="0">Cualquier media</option>${M.MEDIAS_MIN.map(m => `<option value="${m}"${pl.media === m ? ' selected' : ''}>Media ${m}+</option>`).join('')}</select>
+      <input id="plTexto" type="search" placeholder="Buscar por nombre…" value="${esc(pl.texto)}" aria-label="Buscar por nombre"></div>
+    <div class="tc-rejilla pl-lista" id="plLista"></div>`;
   // tocar un filtro deja solo esa línea; tocarlo otra vez vuelve a mostrar todos
   box.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { pl.filtro = pl.filtro === b.dataset.filtro ? '' : b.dataset.filtro; Snd.tick(); renderPlantilla(); });
-  const pon = k => { pl.lista[pl.casilla] = k; pl.casilla = -1; guardaPlantilla(); };
-  box.querySelectorAll('[data-c]').forEach(b => b.onclick = () => pon(b.dataset.c));
+  box.querySelector('[data-puesto]').onclick = () => { pl.puesto = !pl.puesto; Snd.tick(); renderPlantilla(); };
+  $('#plClub').onchange = e => { pl.club = e.target.value; renderPlantilla(); };
+  $('#plMedia').onchange = e => { pl.media = +e.target.value; renderPlantilla(); };
+  $('#plTexto').oninput = e => { pl.texto = e.target.value; pintaListaPl(); };
   const q = box.querySelector('[data-quitar]'); if (q) q.onclick = () => pon('');
   box.querySelector('[data-cancelar]').onclick = () => { pl.casilla = -1; renderPlantilla(); };
+  pintaListaPl();
+}
+// el mismo jugador no puede estar dos veces: se va de la casilla donde estaba
+const jugadorDe = k => { const cp = k ? copiaPorClave(k) : null; return cp ? CARDS[cp.id].person : null; };
+function pon(k) {
+  const quien = jugadorDe(k);
+  if (quien) pl.lista.forEach((x, j) => { if (j !== pl.casilla && jugadorDe(x) === quien) pl.lista[j] = ''; });
+  pl.lista[pl.casilla] = k; pl.casilla = -1; guardaPlantilla();
+}
+function pintaListaPl() {
+  const caja = $('#plLista');
+  if (!caja) return;
+  const slot = M.FORMACION[pl.casilla];
+  const filtro = { club: pl.club, mediaMin: pl.media, texto: pl.texto };
+  const enOnce = new Map();    // jugador -> casilla donde ya está
+  pl.lista.forEach((k, j) => { const q = jugadorDe(k); if (q && j !== pl.casilla) enOnce.set(q, j); });
+  const hay = Object.values(copies).flat().filter(cp => M.esFutbol(CARDS[cp.id].col));
+  // una sola copia por jugador (no puede repetirse): la que ya está en el once o, si no, la mejor graduada
+  const unica = new Map();
+  for (const cp of hay) {
+    const q = CARDS[cp.id].person, vista = unica.get(q), ya = pl.lista.includes(cp.key);
+    const mejor = !vista || (ya && !pl.lista.includes(vista.key)) || (!pl.lista.includes(vista.key) && ((cp.gr ? 1 : 0) - (vista.gr ? 1 : 0) || cp.g - vista.g) > 0);
+    if (mejor) unica.set(q, cp);
+  }
+  const libres = [...unica.values()]
+    .filter(cp => { const c = CARDS[cp.id]; return (!pl.filtro || c.pos === pl.filtro) && (!pl.puesto || c.posiciones.includes(slot.pos)) && M.coincide(c, filtro); })
+    .sort((a, b) => CARDS[b.id].media - CARDS[a.id].media || CARDS[b.id].tier - CARDS[a.id].tier
+      || pl.recien.has(b.key) - pl.recien.has(a.key) || CARDS[a.id].name.localeCompare(CARDS[b.id].name));
+  caja.innerHTML = libres.length ? libres.map(cp => {
+    const c = CARDS[cp.id], aj = ajusteDe(pl.casilla, cp), en = enOnce.get(c.person), aca = pl.lista[pl.casilla] === cp.key;
+    const nota = aca ? '<em class="pl-aca">AQUÍ</em>' : en !== undefined ? `<em class="pl-aca mueve" title="Ya está en tu once: pasa a esta casilla">↔ ${M.FORMACION[en].pos}</em>` : pl.recien.has(cp.key) ? '<em class="rr-exh">NUEVA</em>' : '';
+    return `<button class="tc-elige fit-${FIT_CLASE[aj.nivel]}" data-c="${esc(cp.key)}" title="${esc(c.name)} · ${c.posiciones.map(p => M.PUESTO[p]).join(' / ')} · ${FIT_TXT[aj.nivel]}${aj.pen ? ' (−' + aj.pen + ')' : ''}">${miniCp(cp, `<i class="pl-med">${c.media}</i><i class="pl-tag">${c.posiciones.join('/')}</i>${nota}`)}</button>`;
+  }).join('')
+    : `<p class="mk-vacio">${hay.length ? 'Ningún jugador cumple esos filtros: prueba quitando «solo ' + slot.pos + '».' : 'No tienes jugadores: abre sobres de Fútbol.'}</p>`;
+  caja.querySelectorAll('[data-c]').forEach(b => b.onclick = () => pon(b.dataset.c));
 }
 async function guardaPlantilla() {
   pl.guardando = true; Snd.flip(); renderPlantilla();

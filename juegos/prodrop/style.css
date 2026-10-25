@@ -1357,16 +1357,16 @@ body:not(.serie1) .solo-serie1 { display: none; }
 .full.futbol.premier { background: #0d0d14; }
 .full.futbol.premier > img, .full.futbol.premier .holo img { object-fit: cover; object-position: 50% 18%; }
 /* el envoltorio de la Premier: violeta con una cinta verde */
-.skin-premier {
+.skin-futbolplus {
   background:
     radial-gradient(circle at 50% 56%, #ffffff26 0, transparent 42%),
     repeating-linear-gradient(135deg, #0000 0 9cqw, #ffffff10 9cqw 18cqw),
     linear-gradient(165deg, #14052a 0%, #3d195b 42%, #7b22a6 76%, #00e07a 135%);
 }
-.skin-premier .skin-badge { background: #00ff85; color: #2b0a46; }
-.skin-premier .skin-fan img { object-fit: cover; object-position: 50% 12%; background: #1b0833; }
-.skin-premier .skin-fan img:nth-child(1) { transform: translate(-40%, 8%) rotate(-20deg); }
-.skin-premier .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
+.skin-futbolplus .skin-badge { background: #00ff85; color: #2b0a46; }
+.skin-futbolplus .skin-fan img { object-fit: cover; object-position: 50% 12%; background: #1b0833; }
+.skin-futbolplus .skin-fan img:nth-child(1) { transform: translate(-40%, 8%) rotate(-20deg); }
+.skin-futbolplus .skin-fan img:nth-child(2) { transform: translate(40%, 8%) rotate(20deg); }
 
 /* el menú de fútbol: un segundo menú con solo sobres de fútbol, con su cancha de fondo */
 .ch-back { align-self: flex-start; margin-bottom: 2px; font-weight: 700; color: #cfe3ff; }
@@ -1437,6 +1437,29 @@ button.pl-casilla:hover { transform: translateY(-3px); }
   position: absolute; top: 3px; right: 3px; z-index: 2; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal;
   letter-spacing: .06em; color: #fff; background: #0b1a3ad9; padding: 2px 4px; border-radius: 4px;
 }
+/* buscador de la plantilla: media a la vista, puesto del jugador y cómo le queda la casilla */
+.pl-buscar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pl-buscar select, .pl-buscar input {
+  background: #ffffff14; border: 1px solid #ffffff33; border-radius: 10px; color: var(--ink); padding: 6px 9px; font: 500 13px Rubik, sans-serif;
+}
+.pl-buscar select option { color: #111; }
+.pl-buscar input { flex: 1 1 130px; min-width: 110px; }
+.pl-lista { max-height: 52vh; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 12px 8px; padding-bottom: 10px; }
+.pl-med {
+  position: absolute; top: 3px; left: 3px; z-index: 2; font: 800 15px/1 "Barlow Condensed", sans-serif; font-style: normal;
+  color: #fff; background: #0b0618e6; padding: 2px 5px; border-radius: 5px; box-shadow: 0 0 0 1px #ffffff55;
+}
+.pl-lista .pl-tag { top: auto; right: auto; bottom: 14px; left: 3px; }
+.pl-aca { position: absolute; z-index: 3; left: 0; right: 0; top: 40%; text-align: center; font: 800 9px/1 "Barlow Condensed", sans-serif; font-style: normal; letter-spacing: .08em; background: #6dffb0; color: #062a17; padding: 2px 0; }
+.pl-aca.mueve { background: #8f6bff; color: #fff; }
+.tc-elige.fit-ok .mini { box-shadow: 0 0 0 2px #4ee08a; }
+.tc-elige.fit-inc .mini { box-shadow: 0 0 0 3px #ffcc3d, 0 0 10px #ffcc3d88; }
+.tc-elige.fit-mal .mini { box-shadow: 0 0 0 3px #ff6b7a, 0 0 10px #ff6b7a99; }
+.pl-casilla.fit-ok .card { box-shadow: 0 0 0 2px #4ee08a; border-radius: 10px; }
+.pl-casilla.fit-inc .card { box-shadow: 0 0 0 3px #ffcc3d, 0 0 12px #ffcc3d88; border-radius: 10px; }
+.pl-casilla.fit-mal .card { box-shadow: 0 0 0 3px #ff6b7a, 0 0 12px #ff6b7a99; border-radius: 10px; }
+.pl-pen { position: absolute; top: -8px; right: -6px; z-index: 6; min-width: 18px; text-align: center; font: 900 11px/1 Rubik, sans-serif; padding: 3px 5px; border-radius: 99px; }
+.pl-pen.inc { background: #ffcc3d; color: #3a2a00; } .pl-pen.mal { background: #ff6b7a; color: #3a0710; }
 @media (max-width: 520px) { .pl-pos { font-size: 8px; bottom: -7px; } .pl-vacia { font-size: 20px; } }
 /* en el perfil de Juegos: solo la cancha, a todo el iframe */
 body.visor-plantilla .visor { padding: 0; }

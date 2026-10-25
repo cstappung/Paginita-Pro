@@ -14,13 +14,16 @@ const M=ctx.__M;
 const VE_TODO={mira:{at:1,por:'adm'}};
 M.fijaSerie1(VE_TODO,'mira');
 
-test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) fútbol (48 jugadores, una carta cada uno) y Premier (155), con su imagen',()=>{
+test('el catálogo: profes (17 personas por 10 variantes), componentes (25 por 11 temáticas) y fútbol (48 del Clásico y 155 de la Premier, una carta cada uno), con su imagen',()=>{
  assert.equal(PM.TOTAL,170+275+48+155);
- assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[13,19,7,9]);assert.equal(PM.POOL.futbol.tope,3);
+ assert.deepEqual(PM.POOL.futbol.map(l=>l.length),[105,58,23,17]);assert.equal(PM.POOL.futbol.tope,3);
+ assert.deepEqual(PM.POOL.futbolplus.map(l=>l.length),[105,58,23,17]);
+ assert.deepEqual(PM.POOL.futbol1.map(l=>l.length),[13,19,7,9],'el Clásico de antes: para rehacer sus sobres');
  // las de antes conservan su id: fútbol va después de todo
- assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i));
- assert.ok(PM.POR_COL.premier.every((c,i)=>c.n===493+i),'la Premier va después de todo: no mueve el id de nada');
- assert.deepEqual(PM.POOL.premier.map(l=>l.length),[92,39,16,8]);assert.equal(PM.POOL.premier.tope,3);
+ assert.equal(PM.POR_COL.futbol.length,203);
+ assert.ok(PM.POR_COL.futbol.every((c,i)=>c.n===445+i),'fútbol va después de todo: no mueve el id de nada');
+ assert.ok(PM.POR_COL.futbol.slice(48).every(c=>/cards\/premier\//.test(c.img)),'los 155 de la Premier siguen con su id y su foto');
+ assert.deepEqual(PM.POOL.premier1.map(l=>l.length),[92,39,16,8]);assert.equal(PM.POOL.premier1.tope,3);
  assert.deepEqual(PM.POR_TIER.map(l=>l.length),[51,34,68,17]);
  assert.deepEqual(PM.POOL.legado.map(l=>l.length),[51,34,51,17],'los sobres de antes salen de las 153 de antes');
  assert.deepEqual(PM.POOL.comp.map(l=>l.length),[75,75,75,50]);
@@ -94,6 +97,22 @@ const datos=(extra)=>Object.assign({completo:true,ranks:{juego:{a:{jugadas:100,g
 // están en «partidas de 5»: v vale 5·v monedas, sea cual sea la tarifa.
 const conGanado=(u,n,extra)=>({completo:true,ranks:{juego:Object.fromEntries(Object.entries(u).map(([k,v])=>[k,{jugadas:v*5/M.TARIFA.partida}]))},solo:{},logros:{},diario:{},...extra});
 const K=i=>'-Nk'+String(i).padStart(9,'0');
+
+test('el sobre Plus de fútbol (prefijo h): el doble de precio, sin gratis, y la regla lo exige',()=>{
+ const kh=i=>'h-Nplus000'+i,kg=i=>'g-Nnorm000'+i;
+ const cartas={s:{a:{[kh(1)]:{at:5000,p:160},[kh(2)]:{at:6000,p:80},[kh(3)]:{at:7000,p:0},[kg(1)]:{at:8000,p:80},[kg(2)]:{at:9000,p:160}}}};
+ const d=conGanado({a:100},0,{cartas}),ks=Object.keys(M.economia(d).usuarios.a.sobres);
+ assert.ok(ks.includes(kh(1)),'un Plus a 160 vale');
+ assert.ok(!ks.includes(kh(2)),'un Plus a 80 no vale');
+ assert.ok(!ks.includes(kh(3)),'un Plus gratis no vale');
+ assert.ok(ks.includes(kg(1)),'un normal a 80 vale');
+ assert.ok(!ks.includes(kg(2)),'un normal a 160 no vale');
+ assert.equal(M.monedasDe('a',d).gastadas,240);
+ // las reglas de la base de datos piden lo mismo: el doble para la h y nada de gratis para ella
+ const reglas=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules.cartas.s.$uid.$k['.validate'];
+ assert.match(reglas,/\* \(\$k\.beginsWith\('h'\) \? 2 : 1\)/);
+ assert.match(reglas,/!\$k\.beginsWith\('h'\) &&/);
+});
 
 test('lo gastado se resta del saldo, no de lo ganado',()=>{
  const d=conGanado({a:100},0,{cartas:{s:{a:{[K(1)]:{at:1,p:50},[K(2)]:{at:2,p:80}}},g:{a:{[K(1)]:{0:{at:3,p:100}}}}}});
@@ -407,8 +426,8 @@ test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde n
  assert.ok(M.mejoresDrops(d).every(c=>c.carta.col==='comp'));
  assert.ok(M.mejoresDrops(d).length>=1);
  const col=M.rankingColeccion(d);
- assert.equal(col[0].total,PM.POR_COL.comp.length+PM.POR_COL.futbol.length+PM.POR_COL.premier.length);assert.equal(col[0].copias,5,'solo cuentan las de componentes');
- assert.equal(M.totalVisible(),PM.POR_COL.comp.length+PM.POR_COL.futbol.length+PM.POR_COL.premier.length);
+ assert.equal(col[0].total,PM.POR_COL.comp.length+PM.POR_COL.futbol.length);assert.equal(col[0].copias,5,'solo cuentan las de componentes');
+ assert.equal(M.totalVisible(),PM.POR_COL.comp.length+PM.POR_COL.futbol.length);
  assert.equal(M.cifras(d).sobres,1,'el sobre de los profes no se cuenta');
  // la economía no lee la lista: las cartas, el saldo y el gasto siguen iguales
  assert.equal(M.monedasDe(u,d).saldo,saldo);assert.equal(M.copiasDe(u,d).length,copias);assert.equal(copias,10);
@@ -422,49 +441,98 @@ test('la Serie 01 (profes): solo la ve quien está en la lista, y nadie pierde n
  assert.equal(M.rankingColeccion(d)[0].copias,10);
 });
 
-test('fútbol: la rareza sale de la media del jugador y los sobres siguen la tabla de probabilidades',()=>{
+test('fútbol: una sola colección; la rareza sale de la media del jugador',()=>{
  assert.deepEqual(PM.BANDAS,[80,84,87]);
  assert.deepEqual([60,80,81,84,85,87,88,99].map(PM.tierDeMedia),[0,0,1,1,2,2,3,3]);
- assert.equal(PM.coleccionDe('f-Nabcdefgh'),'futbol');
- for(const c of PM.POR_COL.futbol.concat(PM.POR_COL.premier))assert.equal(c.tier,PM.tierDeMedia(c.media),c.name+' tiene la rareza de su media');
- const mbappe=PM.POR_COL.futbol.find(c=>c.name==='Mbappé');assert.equal(mbappe.tier,3,'Mbappé (91) es legendaria');
+ assert.ok(PM.esFutbol('futbol')&&!PM.esFutbol('premier')&&!PM.esFutbol('comp')&&!PM.esFutbol('profes'));
+ assert.deepEqual(PM.COLECCIONES.map(c=>c.key),['profes','comp','futbol'],'ya no hay Clásico y Premier aparte');
+ assert.equal(PM.COL.futbol.prefijo,'g');
+ for(const c of PM.POR_COL.futbol)assert.equal(c.tier,PM.tierDeMedia(c.media),c.name+' tiene la rareza de su media');
+ assert.equal(PM.POR_COL.futbol.find(c=>c.name==='Mbappé').tier,3,'Mbappé (91) es legendaria');
  assert.equal(PM.POR_COL.futbol.find(c=>c.name==='C. Espí').tier,0,'Espí (68) es común');
- assert.deepEqual(PM.PESOS_FUTBOL,{futbol:[5500,3300,1000,200],premier:[5500,3500,900,100]});
- // a más media, más difícil: cuántos sobres hacen falta, en promedio, para un jugador en concreto sube de la rara hacia arriba.
- // (Entre común y rara no se fuerza: la Premier tiene 92 comunes y 39 raras, y exigirlo pondría 9 de cada 10 cartas comunes.)
- for(const col of ['futbol','premier']){
-  const P=PM.POOL[col],porJugador=P.map((l,t)=>P.esperado[t]/l.length);
-  for(let t=2;t<4;t++)assert.ok(porJugador[t]<porJugador[t-1],col+': un jugador de rareza '+t+' sale más que uno de la '+(t-1)+' ('+porJugador.map(x=>x.toFixed(3))+')');
- }
- for(const [col,pre] of [['futbol','f'],['premier','e']]){
-  const N=20000,t=[0,0,0,0];
-  for(let i=0;i<N;i++){
-   const so=PM.sobre('u'+(i%7),pre+'-Nk'+i+'abcdefg',1792000000000+i*7);
-   assert.ok(so.cartas.every(x=>PM.CARDS[x.id].col===col),'un sobre de '+col+' solo trae '+col);
-   assert.equal(new Set(so.cartas.map(x=>x.id)).size,5);
-   for(const x of so.cartas)t[PM.CARDS[x.id].tier]++;
-  }
-  const esp=PM.POOL[col].esperado;
-  // el Clásico tiene solo 3 comunes: las que sobran en un sobre salen de otra rareza, así que lo común queda un poco abajo
-  for(let k=0;k<4;k++)assert.ok(Math.abs(t[k]/N-esp[k])<(col==='futbol'?.12:.03),col+' rareza '+k+': '+(t[k]/N).toFixed(3)+' vs '+esp[k].toFixed(3));
-  assert.ok(t[3]>0,'las legendarias salen');
-  const pe=PM.POR_COL[col].reduce((s,c)=>s+PM.probabilidad(c.n,1).exacta,0);
-  assert.ok(Math.abs(pe-5)<1e-9,'los jugadores suman las cinco cartas del sobre');
- }
- for(let i=0;i<300;i++){
-  const r=PM.reroll('usrAAAA','f-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,2,Array(10).fill(6));
-  assert.equal(PM.CARDS[r.id].col,'futbol');assert.equal(PM.CARDS[r.id].tier,3,'10 épicas dan una legendaria');
- }
+ assert.ok(PM.POR_COL.futbol.every(c=>c.col==='futbol'),'todas las cartas de futbolistas son de fútbol');
 });
 
-test('Premier: colección aparte (prefijo e) con las medias de sus seis clubes',()=>{
- assert.equal(PM.coleccionDe('e-Nabcdefgh'),'premier');assert.equal(PM.COL.premier.prefijo,'e');
- assert.ok(PM.esFutbol('futbol')&&PM.esFutbol('premier')&&!PM.esFutbol('comp')&&!PM.esFutbol('profes'));
- const clubs=new Set(PM.POR_COL.premier.map(c=>c.club));
+test('fútbol: las claves de antes (f, e) siguen rehaciendo los mismos sobres, y las nuevas (g, h) salen del catálogo entero',()=>{
+ for(const [pre,col] of [['f','futbol'],['e','futbol'],['g','futbol'],['h','futbol'],['p','profes'],['c','comp'],['','profes']])assert.equal(PM.coleccionDe((pre?pre+'-':'-')+'Nabcdefgh'),col,pre);
+ assert.deepEqual(['f','e','g','h','p','c','-'].map(p=>PM.sobreDe(p+'-Nabcdefgh')),['futbol','futbol','futbol','futbolplus','profes','comp','profes']);
+ // los de antes: solo sus cartas, con los pesos de entonces; y salen exactamente lo que salían
+ const clasico=new Set(PM.POOL.futbol1.flat().map(c=>c.n)),premier=new Set(PM.POOL.premier1.flat().map(c=>c.n));
+ assert.equal(clasico.size,48);assert.equal(premier.size,155);
+ assert.deepEqual(PM.PESOS_FUTBOL.v1,{futbol:[5500,3300,1000,200],premier:[5500,3500,900,100]});
+ for(let i=0;i<400;i++){
+  assert.ok(PM.sobre('u'+(i%7),'f-Nk'+i+'abcdefg',1792000000000+i).cartas.every(x=>clasico.has(x.id)),'un sobre f sale del Clásico');
+  assert.ok(PM.sobre('u'+(i%7),'e-Nk'+i+'abcdefg',1792000000000+i).cartas.every(x=>premier.has(x.id)),'un sobre e sale de la Premier');
+ }
+ // fijado con el motor de antes de la unión: estos ids no pueden cambiar nunca
+ assert.deepEqual(PM.sobre('u1','e-Nk7abcdefg',1792000000000).cartas.map(c=>c.id),[599,563,596,633,582]);
+ assert.deepEqual(PM.sobre('u1','f-Nk7abcdefg',1792000000000).cartas.map(c=>c.id),[467,449,491,478,485]);
+ // un re-roll de antes también: con la lista de su colección de entonces
+ for(let i=0;i<200;i++){
+  const r=PM.reroll('usrAAAA','f-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,2,Array(10).fill(6));
+  assert.ok(clasico.has(r.id));assert.equal(PM.CARDS[r.id].tier,3,'10 épicas dan una legendaria');
+  assert.ok(premier.has(PM.reroll('usrAAAA','e-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,1,Array(10).fill(6)).id));
+ }
+ // y uno de ahora sale de todo el catálogo de fútbol
+ const salen=new Set();
+ for(let i=0;i<400;i++){const r=PM.reroll('usrAAAA','g-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,0,Array(10).fill(6));assert.equal(PM.CARDS[r.id].col,'futbol');salen.add(PM.CARDS[r.id].club);}
+ assert.ok(salen.size>=6,'el re-roll nuevo mezcla clubes: '+salen.size);
+});
+
+test('fútbol: el sobre normal y el Plus; probabilidades por rareza, quinta carta y precio',()=>{
+ assert.deepEqual(PM.SOBRES.map(x=>x.key),['profes','comp','futbol','futbolplus']);
+ assert.deepEqual(PM.SOBRES.filter(x=>x.grupo==='futbol').map(x=>[x.prefijo,x.mult]),[['g',1],['h',2]]);
+ assert.ok(PM.SOBRES.every(x=>PM.COL[x.col]),'cada sobre es de una colección');
+ assert.deepEqual(PM.PESOS_FUTBOL.normal,[6600,3000,340,60]);
+ assert.deepEqual(PM.PESOS_FUTBOL.plus,[3000,6800,150,50]);assert.deepEqual(PM.PESOS_FUTBOL.ultimaPlus,[9300,700]);
+ assert.equal(PM.PESOS_FUTBOL.normal.reduce((a,b)=>a+b,0),10000);assert.equal(PM.PESOS_FUTBOL.plus.reduce((a,b)=>a+b,0),10000);
+ assert.equal(PM.PESOS_FUTBOL.ultimaPlus.reduce((a,b)=>a+b,0),10000);
+ // el Plus cuesta el doble, en la promo y después
+ assert.equal(PM.precioSobre(PM.PRECIO.promoHasta,2),160);assert.equal(PM.precioSobre(PM.PRECIO.promoHasta-1,2),100);assert.equal(PM.precioSobre(PM.PRECIO.promoHasta),80);
+ const N=20000,tn=[0,0,0,0],tp=[0,0,0,0];let sin=0;
+ for(let i=0;i<N;i++){
+  const a=PM.sobre('u'+(i%7),'g-Nk'+i+'abcdefg',1792000000000+i*7),b=PM.sobre('u'+(i%7),'h-Nk'+i+'abcdefg',1792000000000+i*7);
+  for(const so of [a,b]){assert.equal(so.col,'futbol');assert.equal(new Set(so.cartas.map(x=>x.id)).size,5);}
+  const ta=a.cartas.map(x=>PM.CARDS[x.id].tier),tb=b.cartas.map(x=>PM.CARDS[x.id].tier);
+  assert.ok(ta[4]>=1,'la quinta del normal es rara o mejor');
+  assert.ok(tb[4]>=2,'la quinta del Plus es épica o mejor: siempre');
+  assert.ok(tb.some(t=>t>=2),'todo sobre Plus trae una épica');
+  if(!ta.some(t=>t>=2))sin++;
+  ta.forEach(t=>tn[t]++);tb.forEach(t=>tp[t]++);
+ }
+ const en=PM.POOL.futbol.esperado,ep=PM.POOL.futbolplus.esperado;
+ for(let k=0;k<4;k++){
+  assert.ok(Math.abs(tn[k]/N-en[k])<.04,'normal rareza '+k+': '+(tn[k]/N).toFixed(3)+' vs '+en[k].toFixed(3));
+  assert.ok(Math.abs(tp[k]/N-ep[k])<.04,'Plus rareza '+k+': '+(tp[k]/N).toFixed(3)+' vs '+ep[k].toFixed(3));
+ }
+ assert.ok(sin/N>.3,'un sobre normal sin épica es lo común: '+sin/N);
+ assert.ok(tp[0]/N<tn[0]/N-.5,'el Plus trae bastantes menos comunes');
+ // vale un poco más por moneda en lo más raro: por el doble de precio, bastante más épicas (la quinta está asegurada) y algo más del doble de legendarias
+ assert.ok(ep[2]+ep[3]>=1.4*(en[2]+en[3])&&ep[2]+ep[3]<=3.4*(en[2]+en[3]),'épicas o mejores por sobre: '+(ep[2]+ep[3])+' vs '+(en[2]+en[3]));
+ assert.ok(ep[3]>=1.8*en[3]&&ep[3]<3.2*en[3],'legendarias por sobre: '+ep[3]+' vs '+en[3]);
+ // lo que se promete: una legendaria en 1 de cada ~20 sobres normales y ~10 Plus (con el god pack)
+ const unaLeg=k=>{const P=PM.POOL[k],w=P.w,u=P.ultima,t=w.reduce((a,b)=>a+b,0),alta=w[1]+w[2]+w[3],q3=u?u[1]/(u[0]+u[1]):w[3]/alta,pl=w[3]/t,pd=PM.DIOS/10000,pg=1-Math.pow(w[2]/(w[2]+w[3]),5);return (1-pd)*(1-(1-pl)**4*(1-q3))+pd*pg;};
+ assert.ok(Math.abs(1/unaLeg('futbol')-19.5)<1.5,'normal: '+1/unaLeg('futbol'));
+ assert.ok(Math.abs(1/unaLeg('futbolplus')-10)<1,'Plus: '+1/unaLeg('futbolplus'));
+ // mejor media, más difícil: de la rara hacia arriba un jugador en concreto sale menos
+ for(const k of ['futbol','futbolplus']){
+  const P=PM.POOL[k],porJugador=P.map((l,t)=>P.esperado[t]/l.length);
+  for(let t=2;t<4;t++)assert.ok(porJugador[t]<porJugador[t-1],k+': un jugador de rareza '+t+' sale menos que uno de la '+(t-1)+' ('+porJugador.map(x=>x.toFixed(3))+')');
+ }
+ // las cinco cartas de un sobre normal se reparten entre todos los jugadores (exacta, por colección)
+ const pe=PM.POR_COL.futbol.reduce((s,c)=>s+PM.probabilidad(c.n,1).exacta,0);
+ assert.ok(Math.abs(pe-5)<1e-9,'los jugadores suman las cinco cartas del sobre');
+ // y dentro de un mismo sobre no se repiten ni clubes imposibles: salen de los ocho
+ const clubes=new Set();for(let i=0;i<300;i++)for(const x of PM.sobre('u1','g-Nc'+i+'abcdefg',1792000000000+i).cartas)clubes.add(PM.CARDS[x.id].club);
+ assert.equal(clubes.size,8,'el sobre trae jugadores de los ocho clubes');
+});
+
+test('Premier: 155 jugadores de seis clubes con media, foto y rareza (ahora dentro del catálogo de fútbol)',()=>{
+ const premier=PM.POR_COL.futbol.filter(c=>/cards\/premier\//.test(c.img));
+ assert.equal(premier.length,155);
+ const clubs=new Set(premier.map(c=>c.club));
  assert.deepEqual([...clubs].sort(),['arsenal','chelsea','liverpool','mancity','manutd','tottenham']);
- for(const c of PM.POR_COL.premier)assert.ok(c.media>=60&&c.media<=91,c.name);
- const so=PM.sobre('u1','e-Nk7abcdefg',1792000000000);
- assert.ok(so.cartas.every(x=>PM.CARDS[x.id].col==='premier'));
+ for(const c of premier)assert.ok(c.media>=60&&c.media<=91,c.name);
 });
 
 test('Premier: cada jugador tiene foto, posición, dorsal y un país que la página sabe nombrar',()=>{
@@ -486,7 +554,7 @@ test('Premier: cada jugador tiene foto, posición, dorsal y un país que la pág
 
 test('fútbol: cada futbolista tiene su media (60-99) y una sola carta',()=>{
  const por={};
- for(const c of PM.POR_COL.futbol.concat(PM.POR_COL.premier)){
+ for(const c of PM.POR_COL.futbol){
   assert.ok(Number.isInteger(c.media)&&c.media>=55&&c.media<=99,c.name+' '+c.media);
   assert.equal(por[c.person],undefined,c.name+' tiene una sola carta');por[c.person]=c.media;
  }
@@ -506,7 +574,7 @@ test('cartas de fútbol: cada país tiene su bandera y cada club su escudo, como
  const dir=path.join(__dirname,'../../juegos/prodrop');
  const paises=new Set([...PM.FUTBOLISTAS,...PM.PREMIER].map(x=>x[5]));
  for(const cc of paises)assert.ok(fs.existsSync(path.join(dir,'flags',cc.toLowerCase()+'.png')),'falta la bandera de '+cc);
- const clubes=new Set(PM.POR_COL.futbol.concat(PM.POR_COL.premier).map(c=>c.club));
+ const clubes=new Set(PM.POR_COL.futbol.map(c=>c.club));
  assert.equal(clubes.size,8);
  for(const k of clubes){assert.ok(PM.CLUBES[k],k);assert.ok(fs.existsSync(path.join(dir,'escudos',k+'.png')),'falta el escudo de '+k)}
 });
@@ -524,7 +592,35 @@ test('plantilla de fútbol: 4-3-3, puntos por rareza y estado, y solo cartas de 
  const l=M.plantillaDe(u,perfil,d);
  assert.equal(l.length,11);
  assert.ok(l[0]&&l[0].carta.col==='futbol','la de fútbol propia se ve');
- assert.ok(l[2]&&l[2].carta.col==='premier','una de la Premier también va en la plantilla');
+ assert.ok(l[2]&&l[2].carta.col==='futbol'&&/cards\/premier\//.test(l[2].carta.img),'una de la Premier (sobre de antes) también va en la plantilla');
  assert.equal(l[5],null,'una de componentes no entra');assert.equal(l[9],null,'una ajena no entra');
  assert.equal(M.puntosDe(l),Math.round((PM.puntosCarta(l[0].carta.tier,l[0].g)+PM.puntosCarta(l[2].carta.tier,l[2].g))/11));
+});
+
+const FUT=PM.CARDS.filter(c=>PM.esFutbol(c.col));
+test('las posiciones: cada futbolista tiene una o dos, la línea de su carta es la de la primera, y el ajuste es verde, amarillo o rojo',()=>{
+ for(const c of FUT){
+  assert.ok(c.posiciones.length>=1&&c.posiciones.length<=2,c.name);
+  assert.ok(c.posiciones.every(p=>PM.POS_LINEA[p]),c.name+' '+c.posiciones);
+  assert.equal(c.pos,PM.POS_LINEA[c.posiciones[0]],c.name);
+  assert.equal(new Set(c.posiciones).size,c.posiciones.length);
+  assert.ok(c.posiciones.includes('POR')===(c.pos==='POR'),'solo los porteros van de portero: '+c.name);
+ }
+ const por=n=>FUT.find(c=>c.name.includes(n)).posiciones;
+ assert.deepEqual(por('Mbappé'),['DC','EI']);
+ assert.deepEqual(por('Valverde'),['MC','LD']);
+ // verde, amarillo, rojo
+ assert.deepEqual(PM.ajuste('DC',['DC','EI']),{nivel:'ok',pen:0});
+ assert.equal(PM.ajuste('EI',['DC','EI']).nivel,'ok');
+ assert.equal(PM.ajuste('DFC',['LI']).nivel,'incomodo');      // un lateral de central
+ assert.equal(PM.ajuste('MD',['LD']).nivel,'incomodo');       // el cruce de banda
+ assert.equal(PM.ajuste('ED',['MD']).nivel,'incomodo');
+ assert.equal(PM.ajuste('DC',['DFC']).nivel,'mal');           // un central de delantero
+ assert.equal(PM.ajuste('MC',['EI']).nivel,'mal');
+ assert.equal(PM.ajuste('POR',['DFC']).pen,PM.PEN_AJUSTE.porteria);
+ assert.equal(PM.ajuste('DFC',['POR']).pen,PM.PEN_AJUSTE.porteria);
+ assert.ok(PM.PEN_AJUSTE.ok<PM.PEN_AJUSTE.incomodo&&PM.PEN_AJUSTE.incomodo<PM.PEN_AJUSTE.mal&&PM.PEN_AJUSTE.mal<PM.PEN_AJUSTE.porteria);
+ // las posiciones no tocan los sobres: la misma rareza de siempre
+ assert.deepEqual(PM.POOL.premier1.map(l=>l.length),[92,39,16,8]);
+ assert.deepEqual(PM.POOL.futbol1.map(l=>l.length),[13,19,7,9]);
 });
