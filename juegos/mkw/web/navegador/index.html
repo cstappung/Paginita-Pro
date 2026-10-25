@@ -619,6 +619,26 @@
   .luz { min-width: 26px; padding: 3px 6px; border-radius: 7px; background: #221d47; color: var(--suave); text-align: center; font: 600 11.5px 'IBM Plex Sans', sans-serif; }
   .luz.encendida { background: var(--amarillo); color: #1a0a00; }
   .asistente p { margin: 0 0 6px; }
+  /* §111: reasignar todo (mandos y teclado): una tabla por mando y la del teclado, con las entradas como fichas */
+  .nota-mandos { margin: 4px 0; font-size: 12.5px; color: var(--suave); }
+  .mando-asignar summary { cursor: pointer; color: var(--lila); font-weight: 600; margin: 4px 0; }
+  .tabla-asignacion { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tabla-asignacion th, .tabla-asignacion td { padding: 4px 4px; border-bottom: 1px solid #2a2357; text-align: left; vertical-align: middle; font-weight: 400; }
+  .tabla-asignacion th .luz { min-width: 10px; width: 10px; height: 10px; padding: 0; display: inline-block; border-radius: 50%; vertical-align: middle; }
+  .tabla-asignacion tr.esperando { background: #ffd21f14; }
+  .tabla-asignacion .acciones { white-space: nowrap; text-align: right; }
+  .fuente { display: inline-flex; align-items: center; gap: 2px; margin: 1px 4px 1px 0; padding: 1px 2px 1px 7px; border-radius: 7px; background: #221d47; border: 1px solid #3d3378; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .fuente .quitar { border: 0; background: none; color: var(--suave); cursor: pointer; padding: 0 4px; font: inherit; }
+  .fuente .quitar:hover { color: var(--peligro); }
+  .esperando { color: var(--amarillo); }
+  .vacio { color: var(--suave); }
+  .boton.chico { padding: 3px 8px; font-size: 12px; }
+  .stick-aro.c { width: 34px; height: 34px; }
+  .stick-aro.c .stick-punto { background: var(--lila); }
+  .gatillos { display: grid; gap: 4px; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--suave); }
+  .gatillos span { display: flex; align-items: center; gap: 4px; }
+  .barra-gatillo { display: block; width: 46px; height: 6px; border-radius: 3px; background: #221d47; overflow: hidden; }
+  .barra-gatillo i { display: block; height: 100%; width: 0; background: var(--amarillo); }
   /* ---- el editor de Mii: pantalla propia, sin arrancar el juego ---- */
   #editorMii { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
     background: linear-gradient(170deg, #1a1234, #24123a 60%, #2c1030); }
@@ -777,8 +797,10 @@
     <h3>Mandos</h3>
     <div id="mandosPanel"></div>
     <h3>Teclado (jugador 1)</h3>
-    <p>Clic en una tecla para cambiarla.</p>
-    <table id="tablaTeclas"></table>
+    <p>«Cambiar»: la próxima tecla que apretes reemplaza a las de esa fila; «＋» suma otra; ✕ quita una; ↺ vuelve a las de
+      siempre. Esc cancela.</p>
+    <table id="tablaTeclas" class="tabla-asignacion"></table>
+    <p class="nota-mandos" id="mensajeTeclas" role="status"></p>
     <button type="button" class="boton" id="restaurarTeclas" style="margin-top:8px">Restaurar teclas por defecto</button>
   </section>
 

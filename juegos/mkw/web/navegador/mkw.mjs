@@ -12,7 +12,7 @@
 //   5. Llama a main(): el runtime arranca, aurora crea el WebGPU sobre el <canvas id="canvas"> y dibuja.
 //   6. Cada segundo muestra cuadros por segundo y trabajo por cuadro, y anota las verificaciones del banco.
 import { prueba } from './verificaciones.mjs';   // (junto a la página: en el sitio ./banco/ no existe, §69)
-import { crearControles, ACCIONES, BOTON, nombreTecla } from './controles.mjs';
+import { crearControles, ACCIONES, BOTON, nombreTecla, MAX_TECLAS } from './controles.mjs';
 import { crearSonido } from './sonido.mjs';
 import { crearGuardado } from './guardado.mjs';
 import { crearNube } from './nube.mjs';
@@ -659,8 +659,21 @@ window.mkwControles = controles;            // para las pruebas
 // §100: los mandos como en el resto de Juegos (mando-sitio.mjs): en el marco del sitio, la copia de mando.js del sitio
 // maneja con su cursor los menús de la página (los selectores, los diálogos, el cajón, el zócalo del descanso) y la de
 // arriba se aparta; en el juego no hace nada (el juego lee el mando solo). El menú de inicio lee el mando él mismo
-const menuDePagina = () => !document.body.classList.contains('con-inicio') && !!(document.getElementById('elegirPista') ||
-  document.getElementById('playlistBreve') || document.body.classList.contains('cajon-abierto'));
+// (§111, el crítico: mientras se reasigna un control del mando, el cursor del sitio se aparta: si no, la A que se aprieta
+// para asignar también hacía clic, y la cruz movía el foco)
+// (§111, el dueño: «la selección de personajes no funciona bien con mando»: con la pantalla de personajes del juego
+// abierta, la franja del descanso —«Cambiar personaje y vehículo», «+ Agregar pistas»— contaba como un menú de la página:
+// el mando manejaba el cursor del sitio y no le llegaba al juego (con el teclado sí andaba). Mientras se elige en el juego
+// el mando es del juego; solo lo que tapa la pantalla —el selector de pistas, el cajón— se lo queda)
+const menuDePagina = () => {
+  if (controles.capturandoAhora() || document.body.classList.contains('con-inicio')) return false;
+  if (document.getElementById('elegirPista') || document.body.classList.contains('cajon-abierto')) return true;
+  return !!document.getElementById('playlistBreve') && !eligiendoEnJuego;
+};
+// §111: ¿está abierta la pantalla de personajes y vehículos del juego, esperando que esta persona elija? (directo.elegir)
+let eligiendoEnJuego = 0;
+const marcarEligiendo = promesaEleccion => { eligiendoEnJuego++; window.mkwEstado.eligiendoEnJuego = true;
+  Promise.resolve(promesaEleccion).catch(() => {}).finally(() => { eligiendoEnJuego = Math.max(0, eligiendoEnJuego - 1); window.mkwEstado.eligiendoEnJuego = eligiendoEnJuego > 0; }); };
 if (parametros.get('mandoSitio') !== '0') montarMandoSitio({ menu: menuDePagina, controles }).then(M => { window.mkwMandoSitio = !!M; });
 const esCelular = matchMedia('(pointer: coarse)').matches;   // pantalla táctil como puntero principal
 const casillaTactil = document.getElementById('usarTactil');
@@ -693,19 +706,50 @@ document.getElementById('completa').addEventListener('click', async () => {
 });
 document.getElementById('restaurarTeclas').addEventListener('click', () => { controles.restaurarTeclas(); pintarTeclas(); });
 // La tabla de teclas: una fila por acción; clic en el botón y luego la tecla nueva (Esc cancela)
+// §111: la tabla del teclado (jugador 1): cada acción con sus teclas (hasta MAX_TECLAS), «✕» para quitar una,
+// «Cambiar» (la próxima tecla la reemplaza), «＋» (la suma), «↺» (las de siempre). Mientras espera: Esc o 8 s cancelan.
+// Si la tecla nueva era de otra acción, se mueve y se avisa (una tecla, una acción)
+let teclasAntes = null, relojTecla = 0;
+const mensajeTeclas = () => document.getElementById('mensajeTeclas');
+function esperarTecla(id, sumar) {
+  teclasAntes = JSON.parse(JSON.stringify(controles.teclas));
+  controles.reasignar(id, { sumar });
+  clearTimeout(relojTecla);
+  relojTecla = setTimeout(() => { if (controles.esperando()) { controles.cancelarTecla(); teclasAntes = null; mensajeTeclas().textContent = 'Pasaron 8 s: no se cambió nada.'; pintarTeclas(); } }, 8000);
+  pintarTeclas();
+}
 function pintarTeclas() {
   const tabla = document.getElementById('tablaTeclas');
+  // ¿terminó una espera? lo que cambió y de dónde se quitó
+  if (teclasAntes && !controles.esperando()) {
+    clearTimeout(relojTecla);
+    const ahora = controles.teclas, quitadas = [];
+    for (const [id, nombre] of ACCIONES) for (const c of teclasAntes[id] || []) if (!(ahora[id] || []).includes(c) && Object.entries(ahora).some(([k, l]) => k !== id && l.includes(c))) quitadas.push(`${nombreTecla(c)} se quitó de «${nombre.split(' —')[0]}»`);
+    mensajeTeclas().textContent = quitadas.length ? quitadas.join(' · ') : '';
+    teclasAntes = null;
+  }
   tabla.innerHTML = '';
   for (const [id, nombre] of ACCIONES) {
     const fila = tabla.insertRow();
     fila.insertCell().textContent = nombre;
     const celda = fila.insertCell();
-    const boton = document.createElement('button');
-    boton.textContent = controles.esperando() === id ? 'aprieta una tecla…' : controles.teclasDe(id).map(nombreTecla).join(' / ') || '—';
-    boton.addEventListener('click', () => { controles.reasignar(id); pintarTeclas(); });
-    celda.append(boton);
+    if (controles.esperando() === id) celda.append(Object.assign(document.createElement('i'), { className: 'esperando', textContent: 'aprieta una tecla… (Esc cancela)' }));
+    else if (!controles.teclasDe(id).length) celda.append(Object.assign(document.createElement('i'), { className: 'vacio', textContent: 'ninguna' }));
+    else for (const c of controles.teclasDe(id)) {
+      const chip = Object.assign(document.createElement('span'), { className: 'fuente', textContent: nombreTecla(c) });
+      const quitar = Object.assign(document.createElement('button'), { type: 'button', className: 'quitar', textContent: '✕', title: 'Quitar esta tecla' });
+      quitar.addEventListener('click', () => { controles.quitarTecla(id, c); pintarTeclas(); });
+      chip.append(quitar); celda.append(chip);
+    }
+    const acciones = fila.insertCell(); acciones.className = 'acciones';
+    const boton = (texto, titulo, f) => { const b = Object.assign(document.createElement('button'), { type: 'button', className: 'boton chico', textContent: texto, title: titulo }); b.addEventListener('click', f); acciones.append(b); };
+    if (controles.esperando() === id) boton('Cancelar', 'No cambiar nada', () => { controles.cancelarTecla(); teclasAntes = null; pintarTeclas(); });
+    else boton('Cambiar', 'La próxima tecla reemplaza a estas', () => esperarTecla(id, false));
+    if (controles.teclasDe(id).length < MAX_TECLAS) boton('＋', 'Sumar otra tecla para lo mismo', () => esperarTecla(id, true));
+    boton('↺', 'Las de siempre', () => { controles.restaurarTecla(id); pintarTeclas(); });
   }
 }
+addEventListener('mkw-reasignacion-cancelada', () => { teclasAntes = null; pintarTeclas(); });
 pintarTeclas();
 // Lo que recibe el puerto 1, 5 veces por segundo (para ver que todo responde; los mandos: opciones-mandos.mjs)
 const NOMBRES_BOTON = Object.entries(BOTON);
@@ -1519,6 +1563,7 @@ async function arrancar() {
     let nombresCpu = null;                          // cómo nombra el juego a cada CPU (de la carrera en curso)
     // el juego: directo a la pantalla de personaje (la licencia 1, creada si hace falta)
     directo.elegir().then(({ abierto, eleccion }) => {
+      if (abierto) marcarEligiendo(eleccion);                    // (§111: el mando, al juego mientras elige)
       window.mkwEstado.piloto = { llego: abierto, modo: 'sala', eligiendo: true };
       revisarCortina();
       eleccion.then(p => {
@@ -1690,6 +1735,7 @@ async function arrancar() {
       directo.elegir().then(({ abierto, eleccion }) => {
         nota(`sala: elegir otra vez en el descanso de la ${n}: ${abierto ? 'abierta' : 'no se pudo abrir'}`);
         if (!abierto) { reeleccion = window.mkwEstado.reeleccion = null; if (sala.estado().carrera === n) mostrarBreve(sala.estado()); return; }
+        marcarEligiendo(eleccion);                                  // (§111: el mando, al juego mientras elige)
         eleccion.then(p => {
           const x = sala.estado();
           if (!p || x.carrera !== n || reeleccion?.carrera !== n) return;      // (el descanso ya terminó: corre con el de antes)
@@ -1827,6 +1873,8 @@ async function arrancar() {
         // que todavía no corren van en `fuera` (fijarCarrera, abajo)
         for (const [u] of e.sumados || []) sumarHumano(u);
         sala.saltar(0);
+        // (§111: la carrera abre: la pantalla de personajes se cerró aunque nadie haya confirmado)
+        eligiendoEnJuego = 0; window.mkwEstado.eligiendoEnJuego = false;
         ui.aviso('');
         letreros?.quitarCartel(); letreros?.quitarMarcas(); marcasFirma = '';
         // §74: la carrera nueva: fuera el panel y los selectores de entre carreras
