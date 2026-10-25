@@ -246,24 +246,30 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
 - `prodefender-analiza.cjs`: replays a proof from `soloPruebas` (console
   export) and prints it round by round: lives, gold, leaks by type, max
   advance, what was built. A proof only replays with the engine of its `ve`.
-- `prodefender-aprende.cjs export.json`: replays every current-`ve` proof of
-  a console export (longest per player and seed; ~11 min for 44 games) and
-  writes `prodefender-libro.json` — no uids, so it is committed: upgrade order
-  per tower, preferred target mode, tower counts and levels every 5 rounds
-  (per kingdom and `*`), and each kingdom's best game move by move (`guiones`).
-  `prodefender-bot.cjs --estrategia humana` reads it: it copies that game up to
-  round `--guion N` (25), then keeps the counts/levels people had at that
-  point, and spends the rest like `mixta`. Re-run it after a new export.
-  What the first export (Oct 2026) taught: the winners open with Dragon,
-  Prism or Ballista, add Frost Cannon and Beacon before round 15, push few
-  towers deep (Prism 4-2 is in almost every win) and buy the hero late; the
-  plain bot spams Spike Launchers, hoards gold and dies around round 9–27
-  without `--ayuda`. Without help, seed 1: `humana` wins Caldera, Pantano and
-  Cumbres and reaches 79–81 in Prado, Glaciar and Fosa, 27–39 in Vacío,
-  Engranajes and Dunas, but Dunas and Glaciar do worse than `mixta` (89/91)
-  once the script ends; with `--guion 0` (counts only) it dies by round 10–24
-  like `mixta`, so what helps is the copied opening. Kingdoms nobody has
-  played yet (Eclipse, the third era) gain nothing.
+- `prodefender-aprende.cjs export.json`: replays the current-`ve` proofs of a
+  console export that reached round 100 (`--todas`: all; longest per player and
+  seed) and writes `prodefender-libro.json` — no uids, so it is committed:
+  upgrade order per tower, preferred target mode, tower counts and levels every
+  5 rounds, and each kingdom's best win move by move (`guiones`: `[ronda,
+  cuándo, …]`, where `cuándo` is the step inside the round: most human moves
+  happen mid-round, and replaying them before the round broke Cumbres). Re-run
+  it after each new export.
+- `prodefender-bot.cjs --estrategia humana` (the strongest bot): before every
+  round it rebuilds the game from its snapshot with the same seed, so copies
+  predict exactly, and tries plans on copies over two rounds (`--horizonte`):
+  the kingdom's human script, the script moved 1/3/8 rounds earlier, or (no
+  script) spending nothing (`--base ahorra`). If a round would cost lives, the
+  rescue buys, one at a time, the cheapest tower or 1–2 upgrade steps that
+  saves it (else the most lives saved per gold), selling its own extras when the
+  script needs the gold; mid-round script moves run at their step and are
+  rewound on a retry. Slow: 2–4 min a game with a script, up to ~1 h without.
+  Oct 2026, seed 1, no help (lives lost; the human script's in brackets):
+  Prado 0 (0), Dunas 0 (18), Glaciar 37 (32), Caldera 12 (25), Vacío 79 (97),
+  Pantano 0 (2), Cumbres 0 (59), Fosa 0 (29). Without a human win it does not
+  get far yet: Engranajes 13, Eclipse 15, Necrópolis 49 (`mixta`: 9, 12, —).
+  What the export taught: winners open with Dragon, Prism or Ballista, add
+  Frost Cannon and Beacon before round 15, push few towers deep (Prism 4-2)
+  and buy the hero late; `mixta` spams Spike Launchers and dies by round 9–27.
 
 ## Determinism — do not break it
 
