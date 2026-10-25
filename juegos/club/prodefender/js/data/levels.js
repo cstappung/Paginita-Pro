@@ -208,14 +208,14 @@
     {
       name: 'Jardín de Esporas', short: 'Esporas', slug: 'esporas', abre: '2026-10-28', era: 3, musica: 0,
       subtitle: 'Hongos que brillan, polen que cura… y esporas que atascan tus defensas.',
-      diff: 2.6, lives: 80, cash: 1050, seed: 12161, stars: 5,
+      diff: 4.4, lives: 80, cash: 1050, seed: 12161, stars: 5,
       theme: { bg1: '#1a1426', bg2: '#120e1c', path: '#4a3446', pathEdge: '#0e0810', deco: 'fungi', accent: '#5affc8' },
       paths: [
         [[-30, 140], [260, 140], [260, 520], [560, 520], [560, 300], [820, 300], [820, 560], [1030, 560]],
         [[600, -30], [600, 150], [380, 150], [380, 380], [680, 380], [680, 670]]
       ],
       obstacles: [{ x: 130, y: 300, r: 40, kind: 'hongo' }, { x: 470, y: 250, r: 32, kind: 'charco' }, { x: 900, y: 175, r: 38, kind: 'hongo' }, { x: 160, y: 600, r: 28, kind: 'charco' }, { x: 945, y: 420, r: 28, kind: 'hongo' }],
-      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'huerto', 'acido', 'sierra', 'balista', 'pararrayos', 'bruja', 'desintegrador'],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'huerto', 'acido', 'sierra', 'balista', 'pararrayos', 'bruja'],
       heroes: 'todos', eventos: ['esporas', 'frenesi', 'bendicion', 'niebla'], poder: 'floracion',
       boss: 'reinaMicelio',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['seta', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['enredadera', 8, 1.3],

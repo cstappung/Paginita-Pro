@@ -151,10 +151,14 @@ kingdom, Vacío included (its opening), so that number says nothing.
 Necrópolis Olvidada, Jardín de Esporas, Laberinto de Espejos, Archipiélago Celeste
 and La Noche Eterna (`levels.js`, `era: 3`, `abre` Oct 27–31; tables `necropolis`,
 `esporas`, `espejos`, `archipielago`, `noche` = `L.slug`; 100 coins a round like
-the second era). Harder (`diff` 2.5–3.0) and with their own rules, all gated on
+the second era). Harder (`diff` 4.2 / 4.4 / 3.4 / 3.9 / 4.1) and with their own rules, all gated on
 `game.era3` or on new enemy fields, so **kingdoms 1–10 replay identically**
 (checked: the same scripted game hashed over 280 rounds on the old and new
-engine; `VERSION` stays 4, only `?v=pd-8` moved):
+engine; `VERSION` stays 4, only `?v=pd-8` moved). The `diff` values were
+calibrated with `prodefender-bot --reino tercera --ayuda 100` against Eclipse
+(~67k lives lost by the bot): all land near it or above. `diff` barely moved
+Esporas until dragon and desintegrador left its tower list (the bot's late game
+there was only them). What they add:
 
 - **Pacts** (`PD.PACTOS` in engine.js): at round 0 and after every 10th round
   three are offered (`ofertasPacto`: shuffled from `L.seed` + round, minus those
