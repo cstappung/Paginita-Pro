@@ -190,7 +190,7 @@
     {
       name: 'Necrópolis Olvidada', short: 'Necrópolis', slug: 'necropolis', abre: '2026-10-27', era: 3, musica: 4,
       subtitle: 'Las tumbas no guardan a nadie. Lo que cae aquí, se vuelve a levantar.',
-      diff: 2.5, lives: 80, cash: 1000, seed: 11149, stars: 5,
+      diff: 4.2, lives: 80, cash: 1000, seed: 11149, stars: 5,
       theme: { bg1: '#1e2a26', bg2: '#141c1a', path: '#5a5248', pathEdge: '#14100f', deco: 'necro', accent: '#7affb0' },
       paths: [
         [[-30, 90], [300, 90], [300, 260], [120, 260], [120, 450], [420, 450], [420, 200], [640, 200], [640, 520], [880, 520], [880, 300], [1030, 300]],
@@ -226,7 +226,7 @@
     {
       name: 'Laberinto de Espejos', short: 'Espejos', slug: 'espejos', abre: '2026-10-29', era: 3, musica: 2,
       subtitle: 'Nada es lo que parece. Cada reflejo es un enemigo más.',
-      diff: 2.75, lives: 75, cash: 1050, seed: 13171, stars: 5,
+      diff: 3.4, lives: 75, cash: 1050, seed: 13171, stars: 5,
       theme: { bg1: '#2a3048', bg2: '#1c2236', path: '#9aaccc', pathEdge: '#3a4a7a', deco: 'mirror', accent: '#ff7ad8' },
       paths: [
         [[-30, 320], [180, 320], [180, 100], [420, 100], [420, 320], [300, 320], [300, 540], [560, 540], [700, 140, 1], [900, 140], [900, 460], [1030, 460]],
@@ -244,7 +244,7 @@
     {
       name: 'Archipiélago Celeste', short: 'Archipiélago', slug: 'archipielago', abre: '2026-10-30', era: 3, musica: 1,
       subtitle: 'Islas que flotan entre las nubes, puentes colgantes y un cielo lleno de velas.',
-      diff: 2.85, lives: 75, cash: 1100, seed: 14173, stars: 5,
+      diff: 3.9, lives: 75, cash: 1100, seed: 14173, stars: 5,
       theme: { bg1: '#8ac8f0', bg2: '#5aa0d8', path: '#b8905a', pathEdge: '#4a2a12', deco: 'sky', accent: '#ffffff' },
       paths: [
         [[-30, 120], [220, 120], [220, 330], [80, 330], [80, 540], [340, 540], [520, 180, 1], [760, 180], [760, 400], [600, 400], [600, 560], [1030, 560]],
@@ -262,7 +262,7 @@
     {
       name: 'La Noche Eterna', short: 'Noche', slug: 'noche', abre: '2026-10-31', era: 3, musica: 3,
       subtitle: 'Tres caminos, una luna naranja y un jinete que perdió la cabeza.',
-      diff: 3.0, lives: 70, cash: 1150, seed: 15187, stars: 5,
+      diff: 4.1, lives: 70, cash: 1150, seed: 15187, stars: 5,
       theme: { bg1: '#1a1024', bg2: '#100a18', path: '#4a3428', pathEdge: '#0c060e', deco: 'night', accent: '#ff7a1a' },
       paths: [
         [[-30, 90], [260, 90], [260, 320], [500, 320], [500, 560], [1030, 560]],
