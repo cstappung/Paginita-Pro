@@ -30,6 +30,13 @@
      detección no ve a los camuflados; el mortero y las minas, a los voladores.
    - Usa los tres reintentos.
 
+   «humana» juega como las personas: lee `prodefender-libro.json` (lo escribe
+   `prodefender-aprende.cjs` desde una exportación de soloPruebas) y procura tener,
+   cada 5 rondas, las torres de cada tipo y los niveles que tenían ellas a esa
+   altura (en ese reino, o en todos si nadie llegó tan lejos ahí), sube cada torre
+   en el orden de caminos que eligen y les pone su objetivo. Lo que sobra lo gasta
+   como la mixta.
+
    Estrategias (--estrategia): qué torres de daño se permite. «mixta» usa
    todas las de su reino; «control» mete el Ancla y la escarcha (para medir
    el retroceso y las congelaciones); «sinheroe» juega sin héroe (para ver
@@ -53,7 +60,7 @@
    (--pacto rechaza para no tomar ninguno), lanza el Poder del Reino sobre el enemigo más
    fuerte en cuanto se llena y llama al héroe de --heroe (Nyx si no se dice).
 
-   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|todas]
+   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|humana|todas] [--libro archivo.json]
                                           [--semilla N[,M…]] [--motor DIR] [--json] [--rondas] [--fugas] [--anticipa] [--ayuda N]
 
    --motor DIR   carga el juego de otra carpeta (p. ej. una versión anterior
@@ -124,8 +131,15 @@ function lanzaPoder(g) {
   const e = vivos.sort((a, b) => (b.maxHp + (b.d.boss ? 1e12 : 0)) - (a.maxHp + (a.d.boss ? 1e12 : 0)))[0];
   g.lanzarPoder(Math.round(e.x), Math.round(e.y));
 }
+// --estrategia humana: lo aprendido de las partidas de las personas (prodefender-aprende.cjs
+// escribe el libro desde una exportación de soloPruebas; --libro para usar otro)
+const LIBRO = (() => {
+  try { return JSON.parse(require('fs').readFileSync(path.resolve(opt('libro', path.join(__dirname, 'prodefender-libro.json'))), 'utf8')); }
+  catch { return null; }
+})();
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
+  humana: { rota: MIXTA, humana: true },
   control: { rota: MIXTA.map(l => l.slice(0, 3).concat(['ancla', 'escarcha'], l.slice(3), ['ancla'])) },
   sinheroe: { rota: MIXTA, sinHeroe: true },
   adapta: { rota: MIXTA, adapta: true }
@@ -202,11 +216,20 @@ class Bot {
     for (let x = 24; x < PD.W - 20; x += 16) for (let y = 24; y < PD.H - 20; y += 16) this.sitios.push([x, y]);
     const vende = PD.towersFor(li);
     this.rota = this.est.rota[li].filter(x => vende.includes(x));
+    if (this.est.humana) {
+      if (!LIBRO) throw new Error('falta el libro: node scripts/prodefender-aprende.cjs export.json');
+      // las torres de daño en el orden en que las ponen las personas (las de este reino, o las de todos)
+      const orden = (LIBRO.orden[PD.LEVELS[li].slug] || []).concat(LIBRO.orden['*'] || []);
+      const rota = [...new Set(orden)].filter(x => vende.includes(x) && !APARTE[x] && !PD.TOWERS[x].hero);
+      if (rota.length) this.rota = rota;
+    }
     this.ri = 0;
     const heroe = heroeDe(li);
     // las de control solo las usa «adapta» (por reglas, ver adapta())
     const control = this.est.adapta ? Object.keys(CONTROL).filter(x => vende.includes(x)) : [];
     this.permitidas = [...new Set(this.rota.concat(control, heroe && !this.est.sinHeroe ? [heroe] : []))];
+    // «humana» usa todo lo que vende el reino (las cuotas dicen cuánto de cada una)
+    if (this.est.humana) this.permitidas = [...new Set(vende.filter(x => !PD.TOWERS[x].hero).concat(heroe ? [heroe] : []))];
     // qué mecánicas trae el reino (para «adapta»)
     const pool = PD.LEVELS[li].pool.map(p => PD.ENEMIES[p[0]]).concat([PD.ENEMIES[PD.LEVELS[li].boss]]);
     this.mec = { protege: pool.some(d => d.thunder || d.ink || d.grab), fuego: pool.some(d => d.regenFuego), adapta: pool.some(d => d.adapt) };
@@ -317,12 +340,18 @@ class Bot {
     const s = this.sitio(type);
     if (!s) return null;
     const t = this.game.place(type, s[0], s[1]);
-    if (t) { this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[type]) this.marca(t); }
+    if (t) {
+      this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 });
+      if (!APARTE[type]) this.marca(t);
+      const modo = this.est.humana && LIBRO.modos[type];
+      if (modo && t.def.targeting) t.mode = modo;
+    }
     return t;
   }
   // los próximos pasos del plan de una torre (los que ya hizo se descuentan por camino)
   pasosPlan(t) {
-    const plan = t.def.hero ? PLAN_HEROE : PLAN[t.type] || [0, 0, 1, 1, 0, 0];
+    const aprendido = this.est.humana && LIBRO.planes[t.def.hero ? 'heroe' : t.type];
+    const plan = aprendido || (t.def.hero ? PLAN_HEROE : PLAN[t.type] || [0, 0, 1, 1, 0, 0]);
     const hechos = [0, 0], fut = [], tt = t.tiers.slice();
     for (const p of plan) {
       if (hechos[p] < t.tiers[p]) { hechos[p]++; continue; }
@@ -368,8 +397,8 @@ class Bot {
     const nuevo = type => ({ k: 'place', type, cost: PD.TOWERS[type].cost });
     const modo = this.modo || 'normal';
     const presion = this.presion || dmg.length < 2 || modo === 'gasta';
-    // tarde, los huertos ya no pagan su sitio: se venden para comprar daño
-    if (r >= 78) { const f = T.find(t => t.type === 'huerto'); if (f) return { k: 'sell', t: f, cost: 0 }; }
+    // tarde, los huertos ya no pagan su sitio: se venden para comprar daño (las personas no)
+    if (r >= 78 && !this.est.humana) { const f = T.find(t => t.type === 'huerto'); if (f) return { k: 'sell', t: f, cost: 0 }; }
     // lo que piden las tres rondas siguientes y el campo de tiro no mide
     const vienen = this.vienen(r);
     const camos = dmg.filter(t => t.s.camo).length + (T.some(t => t.type === 'faro') ? 2 : 0);
@@ -391,13 +420,14 @@ class Bot {
     if (vienen.phase && !dmg.some(t => t.type === 'prisma' || t.s.dtype === 'arcane') && this.permitidas.includes('prisma') && !vet.prisma) return nuevo('prisma');
     for (const f of this.est.fuerza || []) if (r >= 10 && !T.some(t => t.type === f) && this.permitidas.includes(f) && !vet[f]) return nuevo(f);
     if (this.est.adapta) { const a = this.adapta(r, presion); if (a) return a; }
+    if (this.est.humana) { const h = this.humana(r, presion); if (h) return h; }
     const heroe = heroeDe(this.li);
-    if (heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
+    if (!this.est.humana && heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
-    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto) return nuevo('huerto');
+    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana) return nuevo('huerto');
     const totems = T.filter(t => t.type === 'totem').length;
-    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760)) return nuevo('totem');
+    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760) && !this.est.humana) return nuevo('totem');
 
     // Lo demás compite por eficiencia: daño que suma cada oro. Cada torre sube por su plan
     // (mirando hasta tres pasos adelante, para que llegue a las mejoras grandes); la torre
@@ -457,6 +487,48 @@ class Bot {
     if (best.cost <= g.money) return best;
     const alt = cands.find(c => c.cost <= g.money && c.sc > 0);
     return alt && (presion || alt.sc >= best.sc * 0.75) ? alt : best;
+  }
+
+  // ---- «humana»: tener lo que tienen las personas a esta altura de la partida ----
+  // Las cuotas del libro (cada 5 rondas: cuántas torres de cada tipo y cuántos niveles
+  // por torre, en promedio) son las de este reino o, si nadie llegó tan lejos en él, las
+  // de todos, escaladas a lo que este reino vende. Va primero lo que más falta (en
+  // proporción); si no alcanza, ahorra para eso, salvo bajo presión.
+  humana(r, presion) {
+    const g = this.game, T = g.towers, vet = this.vetadas, C = LIBRO.cuotas;
+    const rr = Math.min(100, Math.ceil(r / 5) * 5), slug = PD.LEVELS[this.li].slug;
+    const propia = C[slug] && C[slug][rr], fila = propia || (C['*'] && C['*'][rr]);
+    if (!fila) return null;
+    const heroe = heroeDe(this.li);
+    const tipo = x => (x === 'heroe' ? heroe : x);
+    const vale = x => x && this.permitidas.includes(x) && !vet[x];
+    let escala = 1;
+    if (!propia) {
+      let todo = 0, aqui = 0;
+      for (const [x, [n]] of Object.entries(fila)) { todo += n; if (vale(tipo(x))) aqui += n; }
+      escala = aqui ? Math.min(2, todo / aqui) : 1;
+    }
+    const acc = [];
+    for (const [x, [n, niv]] of Object.entries(fila)) {
+      const ty = tipo(x);
+      if (!vale(ty)) continue;
+      const mias = T.filter(t => (x === 'heroe' ? t.def.hero : t.type === ty));
+      const quiere = Math.round(n * escala * (x === 'heroe' ? 1 / escala : 1));
+      if (mias.length < quiere) acc.push({ k: 'place', type: ty, cost: PD.TOWERS[ty].cost, falta: (quiere - mias.length) / quiere });
+      const nivel = Math.round(niv);
+      for (const t of mias) {
+        const tn = t.tiers[0] + t.tiers[1];
+        if (tn >= nivel) continue;
+        const p = this.pasosPlan(t)[0];
+        if (p === undefined || !g.canUpgrade(t, p)) continue;
+        acc.push({ k: 'up', t, p, cost: g.upgradeCost(t, p), falta: (nivel - tn) / nivel });
+      }
+    }
+    if (!acc.length) return null;
+    acc.sort((a, b) => b.falta - a.falta || a.cost - b.cost);
+    const best = acc[0];
+    if (best.cost <= g.money || !presion) return best;
+    return acc.find(a => a.cost <= g.money) || best;
   }
 
   // ---- «adapta»: las respuestas a las mecánicas de la segunda era ----
