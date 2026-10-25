@@ -616,7 +616,8 @@ class Bot {
   // desarma: solo si ni el guion ni adelantarlo bastan y se perderían bastantes vidas.
   elegirHumana() {
     const queda = this.guion && this.game.round + 1 <= GUION && (this.gi || 0) < this.guion.length;
-    const umbral = queda ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 0;
+    // un guion prestado de otro reino es solo una sugerencia: a la primera vida perdida se prueba todo
+    const umbral = queda && !this.prestado ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 0;
     let mejor = null;
     for (const m of queda ? MODOS_GUION : MODOS) {
       if (queda && !/^(normal|adelanta)/.test(m) && mejor && mejor[1].perdidas < umbral) break;
@@ -747,7 +748,19 @@ class Bot {
       } else if (k === 'u') {
         const t = torre(a);
         if (t && g.canUpgrade(t, b)) { if (g.money < g.upgradeCost(t, b)) return true; g.upgrade(t, b); }
-      } else if (k === 'v') { const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); } }
+      } else if (k === 'v') {
+        // vender para pagar lo que sigue: solo si con lo vendido alcanza (si no, se quedaría
+        // sin esas torres y sin lo que iba a comprar)
+        let oro = g.money, i = this.gi;
+        for (; i < J.length && J[i][2] === 'v'; i++) { const v = torre(J[i][3]); if (v) oro += g.sellValue(v); }
+        const sig = J[i];
+        if (sig) {
+          const tt = sig[2] === 'u' ? torre(sig[3]) : null;
+          const costo = sig[2] === 'p' ? (g.towerCost ? g.towerCost(sig[3]) : PD.TOWERS[sig[3]].cost) : tt && g.canUpgrade(tt, sig[4]) ? g.upgradeCost(tt, sig[4]) : 0;
+          if (oro < costo) return true;
+        }
+        const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); }
+      }
       else if (k === 'm') { const t = torre(a); if (t) t.mode = b; }
       this.gi++;
     }
