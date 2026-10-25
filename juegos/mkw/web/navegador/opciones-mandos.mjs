@@ -218,7 +218,7 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
     for (const m of mandos) {
       let t = tarjetas.get(m.clave);
       if (!t) { t = tarjeta(m); tarjetas.set(m.clave, t); reposos.delete(m.clave); }
-      lista.append(t.nodo);                       // (en orden de jugador: append de un nodo que ya está solo lo mueve)
+      if (lista.children[mandos.indexOf(m)] !== t.nodo) lista.insertBefore(t.nodo, lista.children[mandos.indexOf(m)] || null);
       const sinPuerto = m.puerto === undefined;
       t.titulo.textContent = `${ICONO[m.tipo] || '🎮'} ${NOMBRE_TIPO[m.tipo] || 'Mando'}${sinPuerto ? ' · sin jugador' : ` · jugador ${m.puerto + 1}`}`;
       if (document.activeElement !== t.jugador) t.jugador.value = sinPuerto ? '' : String(m.puerto);   // (no mientras la persona elige)
