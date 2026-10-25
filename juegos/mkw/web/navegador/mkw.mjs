@@ -542,6 +542,10 @@ const barraVolumen = document.getElementById('volumen'), casillaSilencio = docum
 barraVolumen.value = Math.round(sonido.estado.volumen * 100);
 casillaSilencio.checked = sonido.estado.silencio;
 barraVolumen.addEventListener('input', () => sonido.volumen(barraVolumen.value / 100));
+// − y + de a 10 %: el cursor del mando (mando.js) hace clic, pero un clic simulado no mueve una barra deslizante
+const pasoVolumen = d => { const v = Math.min(100, Math.max(0, Math.round(sonido.estado.volumen * 10) * 10 + d)); barraVolumen.value = v; sonido.volumen(v / 100); };
+document.getElementById('volumenMenos').addEventListener('click', () => pasoVolumen(-10));
+document.getElementById('volumenMas').addEventListener('click', () => pasoVolumen(10));
 casillaSilencio.addEventListener('change', () => sonido.silenciar(casillaSilencio.checked));
 function pintarSonido() {
   const e = sonido.estado;
