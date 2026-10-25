@@ -275,8 +275,8 @@
       heroes: 'todos', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], poder: 'hoguera', ley: 'noche',
       boss: 'jineteSinCabeza',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['calabaza', 4, 1.3], ['murcielago', 5, 1.3], ['escudero', 7, 1], ['espantapajaros', 8, 1.3],
-        ['sombra', 9, 1], ['esqueleto', 11, 0.9], ['alma', 13, 0.8], ['blindado', 14, 1], ['divisor', 15, 1], ['seta', 17, 0.7], ['templario', 19, 0.7],
-        ['reflejo', 21, 0.7], ['nigromante', 23, 0.6], ['portador', 25, 0.8], ['galeon', 28, 0.8], ['zepelin', 30, 0.8], ['titan', 46, 0.7],
+        ['sombra', 9, 1], ['martir', 11, 0.8], ['bruma', 13, 0.8], ['blindado', 14, 1], ['divisor', 15, 1], ['seta', 17, 0.7], ['templario', 19, 0.7],
+        ['reflejo', 21, 0.7], ['gargola', 23, 0.6], ['portador', 25, 0.8], ['galeon', 28, 0.8], ['zepelin', 30, 0.8], ['titan', 46, 0.7],
         ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
     }
   ];
