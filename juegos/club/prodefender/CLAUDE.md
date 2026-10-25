@@ -258,7 +258,12 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
   Prism or Ballista, add Frost Cannon and Beacon before round 15, push few
   towers deep (Prism 4-2 is in almost every win) and buy the hero late; the
   plain bot spams Spike Launchers, hoards gold and dies around round 9–27
-  without `--ayuda`.
+  without `--ayuda`. Without help, seed 1: `humana` wins Caldera, Pantano and
+  Cumbres and reaches 79–81 in Prado, Glaciar and Fosa, 27–39 in Vacío,
+  Engranajes and Dunas, but Dunas and Glaciar do worse than `mixta` (89/91)
+  once the script ends; with `--guion 0` (counts only) it dies by round 10–24
+  like `mixta`, so what helps is the copied opening. Kingdoms nobody has
+  played yet (Eclipse, the third era) gain nothing.
 
 ## Determinism — do not break it
 
