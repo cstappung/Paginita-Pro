@@ -506,6 +506,12 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-25 06:30** — **Reasignar todo el mando y el teclado** (§111, con un crítico). Mapa por mando con 20 controles
+- **2026-10-25 08:10** — **§111.3: la segunda revisión del crítico**: un segundo «Cambiar» ya no deja la captura huérfana (`espera === mia`), lo capturado no llega al juego hasta soltarlo, la hat con reposo 1,2857 en las 8 direcciones, el gatillo-eje que marcaba 0, lo de siempre no se guarda, el stick C del teclado sin teclas de partida, el asistente en dos (botones / sticks) con el reposo medido antes y Esc que lo cancela, cerrar el cajón cancela. Banco `asignacion` 52/52, `controles` 48/48, `mandos-jugador` 17/17, `mando-sitio` 11/11.
+  (botones, gatillos analógicos, stick y stick C), captura de botón/eje/cruceta hat, por modelo (cable y Bluetooth),
+  tabla con Cambiar/＋/✕/↺/Deshacer; teclado con 3 teclas y stick C. Arreglos: Esc que se colaba, guardado roto, cursor
+  del sitio al asignar, Xbox como PlayStation, y **el mando en la selección de personajes** del descanso. Banco
+  `asignacion` 42/42.
 - **2026-10-25 04:10** — **Quien llega con la copa andando corre desde la carrera siguiente** (§110, el dueño). De paso,
   un error de antes: el que entraba tarde aparecía en la largada y el juego de todos se recargaba; ahora «¡A correr!»
   guarda quiénes estaban. `{t:"suma"}`, `sumados` con su carrera en la sala del juego, `correnEn`, `lockstep.agregar`.

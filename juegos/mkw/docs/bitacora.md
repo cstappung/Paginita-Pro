@@ -308,6 +308,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Puerto (del mando)** | Cada uno de los 4 enchufes de mando de la GameCube: el puerto 1 es el jugador 1. La página decide qué mando del PC va a cada puerto; desde §106 la persona lo elige («Jugador 1–4»), como el selector de entrada de una mesa de sonido. |
 | **Resolución interna / supermuestreo** | Dibujar la imagen a más pixeles de los que tiene la pantalla y después achicarla: cada pixel final sale del promedio de varios, así los bordes quedan suaves (es el antialiasing de mejor calidad). Como medir con más muestras por segundo y promediar: la curva sale más limpia, pero hay más que procesar. |
 | **Imágenes intermedias (interpolación de cuadros)** | El juego calcula 60 cuadros por segundo; el motor dibuja además imágenes «entre medio» de dos cuadros (120 o 180 por segundo) para monitores rápidos. Es solo la imagen: la física sigue a 60. Como una tele de 120 Hz que inventa los cuadros del medio de una película. |
+| **Eje (de un mando)** | Una entrada que da un número entre −1 y 1 en vez de «apretado/suelto»: cada stick son dos ejes (x e y). La página usa cada mitad por separado (`a2+`, `a2-`: de 0 a 1 según cuánto se inclina). Como un potenciómetro con el cero al medio. |
+| **Reposo (de un eje)** | Lo que marca un eje sin tocarlo. Casi siempre 0, pero algunos gatillos que el navegador da como eje descansan en −1. Al capturar se mide antes, como el offset que se anota antes de calibrar un instrumento. |
+| **Cruceta «hat»** | En algunos mandos genéricos la cruz no son 4 botones sino UN eje que toma un valor distinto por dirección (−1, −0,43, 0,14…) y descansa fuera de −1..1 (3,29). Se reconoce por eso y se guarda el valor exacto de cada dirección. |
+| **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
 
 ---
 
@@ -10088,3 +10092,87 @@ jugada (`$otro`): no hay que publicar nada.
 entra en la carrera 1 de la copa (no existe todavía: hay que agregarla) y `prueba-sincro --sala`. Lo que podría fallar
 con el juego y el banco no ve: que el juego del recién llegado salte bien a la carrera siguiente (el mismo camino que
 quien recargó, §75) y que la huella de la carrera dé igual en las tres consolas.
+
+## 2026-10-25 · §111 Reasignar todo el mando (y el teclado), con un crítico; y el mando en la selección de personajes
+
+Pedidos del dueño: «mejora la personalización de botones de mando, usa un crítico para esto», «que se puedan rebindear
+todas las teclas», «hay botones que no se pueden bindear al mando» y «la selección de personajes no funciona bien con
+mando». Un agente crítico revisó lo que había (y después lo implementado); sus hallazgos están marcados (crítico).
+
+### 111.1 Lo que estaba mal
+
+- **Solo 12 botones** del mando se podían reasignar, y solo con un asistente que los pedía todos en fila. Los sticks, el
+  stick C y los gatillos iban fijos (ejes 0-3, botones 6/7); RB era siempre Z y RT siempre R. No se veía qué botón
+  manejaba cada cosa. Lo saltado en el asistente quedaba sin nada, sin aviso.
+- **Teclado:** al cambiar una acción quedaba UNA tecla (se perdía la flecha), no había stick C, solo «Restaurar» de todo.
+- (crítico) **Esc se colaba:** el oyente del cajón (Esc lo cierra) iba antes que el de los controles: la espera de
+  tecla quedaba puesta y la próxima tecla que se apretaba jugando quedaba asignada sin querer.
+- (crítico) **Un guardado roto apagaba los controles:** `mkw.teclas` con algo que no es lista hacía fallar el cuadro y
+  el bucle (`requestAnimationFrame`) no volvía a pedirse: teclado y mandos muertos en silencio.
+- (crítico) **El cursor del sitio seguía prendido** con el cajón abierto: la A que se apretaba para asignar también
+  hacía clic.
+- (crítico) La asignación se guardaba con el **nombre entero** del mando, que cambia entre cable y Bluetooth.
+- Encontrado de paso: un mando de **Xbox salía como PlayStation** (su nombre dice «Wireless Controller», como el
+  DualShock 4); `mando.js` del sitio mira Xbox primero, `controles.mjs` no.
+- **La selección de personajes con mando:** en el descanso, «Cambiar personaje y vehículo» abre la pantalla del juego,
+  pero la franja del descanso seguía a la vista y contaba como un menú de la página: el mando manejaba el cursor del
+  sitio (`mando-sitio.mjs`) y no le llegaba al juego. Con el teclado sí andaba.
+
+### 111.2 Lo nuevo
+
+- **`asignacion-mando.mjs`** (puro): un MAPA por mando, objetivo (A B X Y Z Start, la cruz, L y R analógicos, el stick y
+  el stick C en sus cuatro direcciones: 20) → fuentes (`b7` un botón con su valor; `a2+`/`a2-` media de un eje;
+  `a5+@-1` un gatillo-eje con su reposo; `a9~-0.43` una dirección de una cruceta hat). Hasta 3 por objetivo, se toma la
+  más fuerte. El mapa por omisión es el de antes: **prueba de oro, 10 000 estados al azar iguales** (y 20 000 en Node).
+  Detalle que la prueba encontró: Chrome marca un gatillo como «apretado» desde un 12 %; los botones de GameCube se
+  prenden con ese «apretado» y los gatillos usan su valor, como antes.
+- **Capturar:** la foto del mando al empezar (lo que ya estaba apretado o inclinado no cuenta); el primer botón nuevo, o
+  el primer eje que se mueve más de 0,6 desde su reposo; Esc u 8 s cancelan; mientras tanto ese mando no maneja el juego
+  y el cursor del sitio se aparta (`menuDePagina`). Una entrada que ya manejaba otro control **se mueve** y se avisa
+  («se quitó de Z») con **Deshacer**.
+- **Por modelo:** `clavePerfil` = fabricante:producto (igual por cable, por Bluetooth y en Firefox; aparte sin mapeo
+  estándar). El asistente viejo (`propios`, §57) se respeta tal cual (lo saltado sigue vacío). Lo asignado a mano ahora
+  tiene el **gatillo analógico de verdad** (antes, apretado = 255 aunque fuera a medias: la prueba vieja de `controles`
+  esperaba 255 con su texto diciendo 153; ahora 153).
+- **El panel** (Controles → Mandos → «Reasignar botones, gatillos y sticks»): una tabla de 20 filas con lo que maneja
+  cada control en la letra del mando (✕ ○ □ △ / A B X Y / ZR / «Stick izq. →» / «Botón 7»), su luz en vivo, «Cambiar»,
+  «＋», ✕, ↺; abajo «Asignar todo seguido» (espera a que se suelte todo entre uno y otro), «Deshacer», «Restaurar
+  todo». El probador muestra además el stick C y los gatillos L y R con su barra.
+- **El teclado:** hasta 3 teclas por acción (✕, «Cambiar», «＋», ↺ por fila), el **stick C** (sin teclas de partida, ver 111.3), Tab y F1-F12
+  no se asignan (son del navegador), y si una tecla se mueve de otra acción se avisa.
+- **Arreglos:** Esc cancela la reasignación sin cerrar el cajón (`interfaz.mjs`); el bucle de los controles sigue
+  aunque un cuadro falle; `mkw.teclas` se revisa al leer; Xbox antes que PlayStation.
+- **El mando en la selección de personajes:** mientras la pantalla de personajes del juego está abierta
+  (`eligiendoEnJuego`, de `directo.elegir()` hasta que se elige o abre la carrera), la franja del descanso no se queda
+  con el mando: va al juego. Lo que tapa la pantalla (el selector de pistas, el cajón) sí.
+
+**Pruebas:** banco `asignacion` (nuevo) 42/42, `controles` 48/48, `mandos-jugador` 17/17, `mando-sitio` 11/11; la página
+sin el juego: Esc con el cajón abierto cancela la espera de tecla, el cajón sigue abierto y la tecla siguiente no queda
+asignada; capturas del panel. Falta con el juego y un mando de verdad: la selección de personajes en el descanso.
+
+### 111.3 La segunda revisión del crítico (y lo que se arregló)
+
+El crítico (un agente aparte que lee el código sin saber lo que yo creo) revisó lo ya hecho. Encontró:
+
+| # | Qué pasaba (ejemplo) | Arreglo |
+|---|---|---|
+| 1 (grave) | Apretar «Cambiar» en X y, antes de tocar nada, «Cambiar» en Y: la respuesta de X (cancelada) borraba la espera de Y. Quedaba una captura sin fila, sin tope de 8 s y con el mando mudo; lo próximo que se tocaba se asignaba sin aviso. | `opciones-mandos.mjs` `esperar`: `const mia = espera = …` y la respuesta solo actúa si `espera === mia`. Un «Cambiar» de la tabla corta además «Asignar … seguido». |
+| 2 | El botón recién capturado llegaba un cuadro al juego: capturar Start pausaba. | `controles.mjs` `hastaSoltar`: ese mando manda ceros hasta que se suelta todo. |
+| 3 | Una cruceta hat que descansa en 1,2857 (= 9/7; marca −1 + k·2/7) no capturaba ← (0,714) ni ↖ (1,0): están a menos de 0,6 del reposo. | `capturar`: si el reposo está fuera de −1..1, cualquier valor a más de 0,12 es una dirección. |
+| 4 | Algunos gatillos que el navegador da como eje marcan 0 hasta que se los toca la primera vez (y desde ahí −1): se guardaban `a5+` (sin reposo) y suelto valían 50 %. | `conReposo`: si al soltarlo queda en −1, se guarda `a5+@-1`. |
+| 5 | ↺ o «Deshacer» en un mando sin tocar lo marcaban «asignado por ti» (se guardaba el mapa entero, igual al de siempre). | `esPorOmision`: el mapa de siempre no se guarda (se borra lo guardado). |
+| 6 | Las teclas Num 8/2/4/6 del stick C cambiaban lo de siempre para todos, y una tecla guardada antes (Num 8 en A) haría dos cosas. | El stick C empieza **sin teclas**; cada uno le pone las suyas. |
+| 7 | «Asignar todo seguido»: el reposo se medía después del primer botón (con uno apretado); Esc solo saltaba un paso aunque decía «cancela»; 20 pasos seguidos son muchos. | El reposo se mide antes del primer paso; Esc cancela el asistente entero; dos asistentes: «Asignar botones seguido» (12) y «Asignar sticks seguido» (8). |
+| 8 | Cerrar el cajón dejaba la captura corriendo (hasta 8 s con el mando mudo). | `cerrarCajon` cancela la espera (tecla o mando). |
+| 9 | Dos mandos iguales comparten la asignación y el panel no lo decía. | La tarjeta dice «la misma asignación para los N de este modelo». |
+
+Nota sobre el asistente viejo (§57): lo asignado así con R o L ahora es **analógico** (un gatillo a medias da a medias,
+antes 255 de golpe). Es lo que se quería (el derrape y el objeto no cambian: se prenden al pasar del 50 %).
+
+Quedó sin tocar (bajo, a propósito): mientras un mando captura, los demás siguen manejando el juego (son otros
+jugadores); `mapaDe` revisa el mapa en cada cuadro (es barato: 20 listas cortas).
+
+**Pruebas:** banco `asignacion` 52/52 (10 nuevas: las 8 direcciones de la hat con reposo 1,2857, `conReposo`,
+`esPorOmision`, el botón capturado que no llega mientras se mantiene, ↺/Deshacer en un mando sin tocar, el gatillo-eje
+que marcaba 0, el stick C sin teclas, dos «Cambiar» seguidos), `controles` 48/48, `mandos-jugador` 17/17,
+`mando-sitio` 11/11; la página sin el juego: cerrar el cajón cancela la espera de una tecla y la de un mando.

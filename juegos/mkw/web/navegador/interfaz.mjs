@@ -156,6 +156,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }
   function cerrarCajon() {
     hojaAbierta = null;
+    // (§111, el crítico: cerrar el cajón cancela una reasignación que esperaba; si no, seguía hasta 8 s, con el mando mudo)
+    if (controles.esperando?.() || controles.capturandoAhora?.()) { controles.cancelarTecla?.(); controles.cancelarCaptura?.(); dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada')); }
     document.body.classList.remove('cajon-abierto');
     document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (document.body.classList.contains('started')) $('canvas').focus();   // las teclas vuelven al juego
@@ -163,8 +165,19 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   document.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => abrirCajon(b.dataset.abre)));
   document.querySelectorAll('.pestanas [data-hoja]').forEach(b => b.addEventListener('click', () => { hojaAbierta = null; abrirCajon(b.dataset.hoja); }));
   $('cerrarCajon').onclick = cerrarCajon;
-  // Esc cierra el cajón (y no le llega al juego, donde Esc es Start)
-  addEventListener('keydown', e => { if (e.code === 'Escape' && hojaAbierta && !dialogo.open) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); } }, true);
+  // Esc cierra el cajón (y no le llega al juego, donde Esc es Start). §111 (el crítico): si se está reasignando una
+  // tecla o un control del mando, Esc solo cancela eso (antes este oyente se lo quedaba, la espera seguía puesta y la
+  // próxima tecla que se apretaba jugando quedaba asignada sin querer)
+  addEventListener('keydown', e => {
+    if (e.code !== 'Escape') return;
+    if (controles.esperando?.() || controles.capturandoAhora?.()) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      controles.cancelarTecla?.(); controles.cancelarCaptura?.();
+      dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada'));
+      return;
+    }
+    if (hojaAbierta && !dialogo.open) { e.stopImmediatePropagation(); e.preventDefault(); cerrarCajon(); }
+  }, true);
 
   // ---------------- Tu partida ----------------
   let licencias = [];

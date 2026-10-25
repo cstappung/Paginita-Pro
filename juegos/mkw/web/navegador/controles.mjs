@@ -17,6 +17,9 @@
 //   - Inclinar el teléfono (como el Wii Wheel) → mueve el stick a izquierda/derecha del puerto 1 (opcional).
 //   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular.
 
+import { mapaPorOmision, revisarMapa, migrarPropio, aplicarMapa, fotoMando, capturar as capturarFuente, poner as ponerFuente,
+         clavePerfil, ES_OBJETIVO, esPorOmision, conReposo } from './asignacion-mando.mjs';
+
 // ---- Botones de GameCube (los mismos bits que dolphin/pad.h) ----
 export const BOTON = {
   izquierda: 0x0001, derecha: 0x0002, abajo: 0x0004, arriba: 0x0008,   // cruz (en MKW: truco = cruz arriba)
@@ -42,7 +45,14 @@ export const ACCIONES = [
   ['Y',              'Y',                                  ['KeyO']],
   ['Z',              'Z',                                  ['KeyN']],
   ['START',          'Start — pausa',                      ['KeyP', 'Escape']],
+  // §111: el stick C también desde el teclado (antes no había cómo). Sin teclas de partida (el crítico: lo de siempre no
+  // cambia, y una tecla que alguien ya usaba no hace dos cosas): la persona le pone las que quiera
+  ['cArriba',        'Stick C ↑',                          []],
+  ['cAbajo',         'Stick C ↓',                          []],
+  ['cIzquierda',     'Stick C ←',                          []],
+  ['cDerecha',       'Stick C →',                          []],
 ];
+export const MAX_TECLAS = 3;                       // §111: teclas por acción (lo de siempre trae hasta 2)
 const CLAVE_TECLAS = 'mkw.teclas';
 const CLAVE_TACTIL = 'mkw.tactil';
 const leer = clave => { try { return JSON.parse(localStorage.getItem(clave)); } catch { return null; } };
@@ -67,8 +77,10 @@ export function tipoMando(id = '') {
   const s = id.toLowerCase();
   if (/0079.{0,12}1846|mayflash|gamecube|057e.{0,12}0337/.test(s)) return 'gamecube';
   if (/057e|nintendo|pro controller|joy-con/.test(s)) return 'nintendo';
-  if (/054c|playstation|dualsense|dualshock|wireless controller/.test(s)) return 'playstation';
+  // (§111: Xbox antes que PlayStation, como juegos/audio/mando.js: el nombre del de Xbox también dice «Wireless
+  // Controller», que es el del DualShock 4; antes un mando de Xbox salía como PlayStation)
   if (/045e|xbox|xinput/.test(s)) return 'xbox';
+  if (/054c|playstation|dualsense|dualshock|wireless controller/.test(s)) return 'playstation';
   return 'generico';
 }
 export const NOMBRE_TIPO = { nintendo: 'Nintendo (Switch Pro / Joy-Con)', playstation: 'PlayStation', xbox: 'Xbox', gamecube: 'GameCube (adaptador)', generico: 'Mando genérico' };
@@ -123,7 +135,9 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   // --- estado de cada fuente ---
   const teclasApretadas = new Set();              // KeyboardEvent.code de las teclas apretadas ahora
   let teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def]));
-  Object.assign(teclas, leer(CLAVE_TECLAS) || {});   // lo que el jugador cambió
+  // lo que el jugador cambió (solo acciones conocidas y listas de textos: un guardado viejo o roto no rompe nada)
+  for (const [id, l] of Object.entries(leer(CLAVE_TECLAS) || {}))
+    if (id in teclas && Array.isArray(l)) teclas[id] = l.filter(c => typeof c === 'string' && c.length < 40).slice(0, MAX_TECLAS);
   const tactil = { activo: false, sx: 0, sy: 0, botones: 0 };
   const inclinacion = { activa: false, centro: null, x: 0 };
   const piloto = { botones: 0 };                  // la página aprieta botones sola (menus.mjs: ir a una copa/pista)
@@ -132,25 +146,45 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   let filtro = null;                              // §99: función que dice qué botones de la persona NO van al juego ahora (la sala)
   let sinMandos = null;                           // §100: función que dice si AHORA los mandos son de la página (el cursor del sitio)
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
+  let sumarTecla = false;                         // §111: esa tecla se suma a las que tiene (si no, las reemplaza)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
   const estado = { puertos: [], mandos: [], bloqueados: false };   // para mostrar en pantalla y para las pruebas
   const prefsMandos = { ...PREFS_MANDOS, ...(leer(CLAVE_MANDOS) || {}) };   // disposición, zona muerta, vibrar, asignaciones
   prefsMandos.propios = { ...(prefsMandos.propios || {}) };            // (copias propias: el default no se toca)
+  prefsMandos.mapas = { ...(prefsMandos.mapas || {}) };               // §111: el mapa entero de cada mando (asignacion-mando.mjs)
   prefsMandos.puertos = { ...(prefsMandos.puertos || {}) };
-  let asignando = null;                           // { id, boton, antes:Set, listo } mientras el asistente espera un botón
+  // §111: capturando = { clave (la de ESE mando: dos iguales no se escuchan los dos), objetivo, sumar, base (foto del
+  // mando al empezar), listo } mientras se espera una entrada
+  let capturando = null;
+  // el mapa de un mando: el que armó la persona para su modelo (§111, por perfil; antes de eso, por su nombre entero),
+  // el del asistente viejo (§57: solo botones) o el de siempre
+  const guardadoDe = (perfil, id) => prefsMandos.mapas[perfil] || prefsMandos.mapas[id] || null;
+  const mapaDe = (perfil, id, letra) => guardadoDe(perfil, id) ? revisarMapa(guardadoDe(perfil, id))
+    : prefsMandos.propios[id] ? migrarPropio(prefsMandos.propios[id]) : mapaPorOmision({ letra });
+  // (§111: el mapa de siempre no se guarda —ver esPorOmision—; el asistente viejo de ese mando queda reemplazado)
+  const guardarMapa = (perfil, id, m, letra) => {
+    if (id !== perfil) delete prefsMandos.mapas[id];
+    if (esPorOmision(m, letra)) { delete prefsMandos.mapas[perfil]; delete prefsMandos.propios[id]; } else prefsMandos.mapas[perfil] = m;
+    guardar(CLAVE_MANDOS, prefsMandos);
+  };
+  // §111 (el crítico): después de capturar, ese mando no maneja el juego hasta que se suelta todo (si no, el botón recién
+  // capturado —Start, A— llegaba un cuadro al juego): { clave, base, fuente, perfil, id, letra, objetivo }
+  let hastaSoltar = null;
 
   // --- teclado ---
   const teclasEnUso = () => new Set(Object.values(teclas).flat());
   const alBajar = e => {
     if (esperandoTecla) {                         // reasignando: esta tecla pasa a ser de esa acción
       e.preventDefault();
-      if (e.code !== 'Escape') {
+      // (§111: Tab y F1–F12 no se pueden asignar —son del navegador—: se sigue esperando otra)
+      if (e.code === 'Tab' || /^F([1-9]|1[0-2])$/.test(e.code)) return;
+      if (e.code !== 'Escape') {                  // (Esc cancela: Esc sigue siendo Start por omisión)
         for (const id of Object.keys(teclas)) teclas[id] = teclas[id].filter(c => c !== e.code);   // sin repetidas
-        teclas[esperandoTecla] = [e.code];
+        teclas[esperandoTecla] = sumarTecla ? [...teclas[esperandoTecla], e.code].slice(-MAX_TECLAS) : [e.code];
         guardar(CLAVE_TECLAS, teclas);
       }
-      esperandoTecla = null;
+      esperandoTecla = null; sumarTecla = false;
       alCambiar && alCambiar();
       return;
     }
@@ -171,8 +205,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     for (const [id] of ACCIONES) if (BOTON[id] && accion(id)) botones |= BOTON[id];
     const sx = (accion('stickDerecha') ? 127 : 0) - (accion('stickIzquierda') ? 128 : 0);
     const sy = (accion('stickArriba') ? 127 : 0) - (accion('stickAbajo') ? 128 : 0);
+    const cx = (accion('cDerecha') ? 127 : 0) - (accion('cIzquierda') ? 128 : 0);
+    const cy = (accion('cArriba') ? 127 : 0) - (accion('cAbajo') ? 128 : 0);
     // el teclado no tiene gatillos analógicos: L o R apretados = gatillo a fondo (como el clic de la GameCube)
-    return { botones, sx, sy, gl: botones & BOTON.L ? 255 : 0, gr: botones & BOTON.R ? 255 : 0, activo: teclasApretadas.size > 0 };
+    return { botones, sx, sy, cx, cy, gl: botones & BOTON.L ? 255 : 0, gr: botones & BOTON.R ? 255 : 0, activo: teclasApretadas.size > 0 };
   }
 
   // --- mandos (Gamepad API) ---
@@ -196,39 +232,43 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     }
     const zona = Math.min(0.4, Math.max(0.03, prefsMandos.zona / 100));
     return lista.map(g => {
-      const tipo = tipoMando(g.id), propio = prefsMandos.propios[g.id];
+      const tipo = tipoMando(g.id), perfil = clavePerfil(g.id, g.mapping);
+      const propio = !!guardadoDe(perfil, g.id) || !!prefsMandos.propios[g.id];
       const letra = prefsMandos.disposicion === 'letra' || (prefsMandos.disposicion === 'auto' && tipo === 'nintendo');
-      const apretado = i => !!(g.buttons[i] && g.buttons[i].pressed);
-      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), indice: g.index, tipo, letra,
-                      propio: !!propio, sinMapa: g.mapping !== 'standard' && !propio, mando: g };
-      // el asistente de asignar: el primer botón que se aprieta (y no estaba apretado al empezar) queda para ese botón
-      if (asignando && asignando.id === g.id) {
-        const i = g.buttons.findIndex((b, k) => b && b.pressed && !asignando.antes.has(k));
-        if (i >= 0) {
-          const listo = asignando.listo;
-          prefsMandos.propios[g.id] = { ...(prefsMandos.propios[g.id] || {}), [asignando.boton]: i };
-          guardar(CLAVE_MANDOS, prefsMandos); asignando = null; listo(i);
+      const mapa = mapaDe(perfil, g.id, letra);
+      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), perfil, indice: g.index, tipo, letra,
+                      propio, sinMapa: g.mapping !== 'standard' && !propio, estandar: g.mapping === 'standard', mapa, mando: g };
+      const quieto = { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };
+      // §111: capturando para este mando: la primera entrada nueva (botón, eje o cruceta) queda para ese control
+      if (capturando && capturando.clave === comun.clave) {
+        if (!capturando.base) capturando.base = fotoMando(g);             // (la foto, del primer cuadro si no la había)
+        const fuente = capturarFuente(capturando.base, g);
+        if (fuente) {
+          const c = capturando; capturando = null;
+          const r = ponerFuente(mapa, c.objetivo, fuente, { sumar: c.sumar });
+          guardarMapa(perfil, g.id, r.mapa, letra);
+          hastaSoltar = { clave: comun.clave, base: c.base, fuente, perfil, id: g.id, letra, objetivo: c.objetivo };
+          c.listo({ fuente, quitadoDe: r.quitadoDe, antes: mapa });
         }
-        return { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };   // mientras asigna, el mando no maneja
+        return quieto;                                                    // mientras captura, el mando no maneja
       }
-      let botones = 0, gl = 0, gr = 0;
-      if (propio) {
-        // asignación propia: cada botón de GameCube sale del botón del mando que se eligió (L y R con su valor analógico)
-        for (const [nombre] of ASIGNABLES) if (propio[nombre] !== undefined && apretado(propio[nombre])) botones |= BOTON[nombre];
-        const valor = i => i === undefined ? 0 : Math.round(255 * ((g.buttons[i] && g.buttons[i].value) || 0));
-        gl = Math.max(valor(propio.L), botones & BOTON.L ? 255 : 0);
-        gr = Math.max(valor(propio.R), botones & BOTON.R ? 255 : 0);
-      } else {
-        for (const [i, bit] of (letra ? MANDO_LETRA : MANDO_BOTONES)) if (apretado(i)) botones |= bit;
-        gl = Math.round(255 * ((g.buttons[6] && g.buttons[6].value) || 0));   // LT/ZL analógico → L
-        gr = Math.round(255 * ((g.buttons[7] && g.buttons[7].value) || 0));   // RT/ZR analógico → R (derrapar)
-        if (gl > 128) botones |= BOTON.L;          // pasada la mitad, también cuenta el clic digital
-        if (gr > 128) botones |= BOTON.R;
-        if (apretado(4)) gl = 255;                 // LB / L (digital) = L a fondo
+      if (hastaSoltar && hastaSoltar.clave === comun.clave) {
+        const h = hastaSoltar, m = /^a(\d{1,2})[+-]$/.exec(h.fuente);
+        // (el gatillo-eje que marcaba 0 hasta tocarlo: al soltarlo queda en −1 → se guarda con su reposo)
+        if (m && Math.abs(h.base.ejes[+m[1]] ?? 0) < 0.3) {
+          const fija = conReposo(h.fuente, g.axes?.[+m[1]]);
+          if (fija !== h.fuente) {
+            const mp = revisarMapa(mapaDe(h.perfil, h.id, h.letra));
+            mp[h.objetivo] = mp[h.objetivo].map(f => (f === h.fuente ? fija : f));
+            guardarMapa(h.perfil, h.id, mp, h.letra); h.base.ejes[+m[1]] = g.axes[+m[1]]; h.fuente = fija;
+          }
+        }
+        const f = fotoMando(g);
+        const suelto = f.botones.every((b, i) => !b || h.base.botones[i]) && f.ejes.every((v, i) => Math.abs(v - (h.base.ejes[i] ?? 0)) < 0.3);
+        if (!suelto) return quieto;
+        hastaSoltar = null;
       }
-      const [sx, sy] = aStickGC(g.axes[0] || 0, g.axes[1] || 0, zona);
-      const [cx, cy] = aStickGC(g.axes[2] || 0, g.axes[3] || 0, zona);
-      return { ...comun, botones, sx, sy, cx, cy, gl, gr };
+      return { ...comun, ...aplicarMapa(g, mapa, zona) };
     });
   }
 
@@ -301,8 +341,14 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     estado.mandos = mandos.map(({ mando, ...resto }) => resto);
     if (tactilUI) tactilUI.pinta();
   }
-  let vivo = true;
-  const bucle = () => { if (!vivo) return; paso(); requestAnimationFrame(bucle); };
+  // (§111, el crítico: un error en un cuadro —un mando raro, un guardado roto— no puede apagar los controles para siempre)
+  const mandoDe = k => estado.mandos.find(x => x.clave === k) || estado.mandos.find(x => x.nombre === k) || null;
+  let vivo = true, errores = 0;
+  const bucle = () => {
+    if (!vivo) return;
+    try { paso(); } catch (e) { if (errores++ < 5) console.warn('[controles]', e); }
+    requestAnimationFrame(bucle);
+  };
   requestAnimationFrame(bucle);
 
   return {
@@ -321,8 +367,17 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     // §100: sinMandos(f) = f() dice, en cada cuadro, si los mandos son ahora de la página (mando-sitio.mjs; null = nunca)
     sinMandos(f) { sinMandos = typeof f === 'function' ? f : null; paso(); },
     get silenciado() { return silencio; },                           // volver a mandar todo (p. ej. al arrancar el juego)
-    reasignar(id) { esperandoTecla = id; },                      // la próxima tecla queda para esa acción
+    // la próxima tecla queda para esa acción (§111: { sumar: true } = además de las que tiene, hasta MAX_TECLAS)
+    reasignar(id, { sumar = false } = {}) { esperandoTecla = id in teclas ? id : null; sumarTecla = !!sumar; },
+    cancelarTecla() { esperandoTecla = null; sumarTecla = false; },
     esperando: () => esperandoTecla,
+    // §111: quitar una tecla de una acción, y volver una acción a sus teclas de siempre
+    quitarTecla(id, code) { if (!(id in teclas)) return; teclas[id] = teclas[id].filter(c => c !== code); guardar(CLAVE_TECLAS, teclas); },
+    restaurarTecla(id) {
+      const def = ACCIONES.find(([x]) => x === id)?.[2]; if (!def) return;
+      for (const k of Object.keys(teclas)) if (k !== id) teclas[k] = teclas[k].filter(c => !def.includes(c));   // (sin repetidas)
+      teclas[id] = [...def]; guardar(CLAVE_TECLAS, teclas);
+    },
     restaurarTeclas() { teclas = Object.fromEntries(ACCIONES.map(([id, , def]) => [id, def])); guardar(CLAVE_TECLAS, teclas); this.teclas = teclas; },
     teclasDe: id => teclas[id],
     // --- mandos: disposición de botones ('auto' | 'posicion' | 'letra'), zona muerta (%), vibrar, asignaciones propias ---
@@ -336,14 +391,44 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     },
     // asistente: espera que se apriete un botón del mando `id` y lo deja para el botón de GameCube `boton`.
     // → Promise con el número del botón del mando (o null si se cancela)
-    asignarBoton(id, boton) {
-      if (asignando) asignando.listo(null);
-      const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.id === id);
-      const antes = new Set(g ? g.buttons.map((b, k) => b && b.pressed ? k : -1).filter(k => k >= 0) : []);
-      return new Promise(listo => { asignando = { id, boton, antes, listo }; });
+    // §111: reasignar UN control de GameCube (objetivo: 'A', 'R', 'stick.izq', 'c.arr'…) del mando `id`: espera la
+    // primera entrada nueva (botón, eje o cruceta) y la deja ahí (sola, o { sumar: true }: además de las que tenía; la
+    // misma entrada se quita de cualquier otro control). → Promise con { fuente, quitadoDe }, o null si se cancela
+    // (k = la clave de ese mando —estado.mandos[i].clave— o su nombre: el primero con ese nombre)
+    capturar(k, objetivo, { sumar = false } = {}) {
+      if (capturando) { const c = capturando; capturando = null; c.listo(null); }
+      const m = mandoDe(k);
+      if (!m || !ES_OBJETIVO.has(objetivo)) return Promise.resolve(null);
+      let base = null;
+      try { const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.index === m.indice); if (g) base = fotoMando(g); } catch {}
+      hastaSoltar = null;
+      return new Promise(listo => { capturando = { clave: m.clave, objetivo, sumar, base, listo }; });
     },
-    cancelarAsignacion() { if (asignando) { asignando.listo(null); asignando = null; } },
-    borrarAsignacion(id) { delete prefsMandos.propios[id]; guardar(CLAVE_MANDOS, prefsMandos); },
+    cancelarCaptura() { if (capturando) { const c = capturando; capturando = null; c.listo(null); } },
+    capturandoAhora: () => capturando ? { clave: capturando.clave, objetivo: capturando.objetivo } : null,
+    // el mapa de un mando como está ahora (una copia), y cambiarlo a mano (se guarda para su modelo: su perfil)
+    mapaDe(k) { const m = mandoDe(k); return m ? revisarMapa(m.mapa) : null; },
+    ponerMapa(k, mapa) { const m = mandoDe(k); if (m) guardarMapa(m.perfil, m.nombre, revisarMapa(mapa), m.letra); },
+    quitarFuente(k, objetivo, fuente) {
+      const m = mandoDe(k); if (!m || !ES_OBJETIVO.has(objetivo)) return;
+      const mapa = revisarMapa(m.mapa); mapa[objetivo] = mapa[objetivo].filter(f => f !== fuente); guardarMapa(m.perfil, m.nombre, mapa, m.letra);
+    },
+    restaurarObjetivo(k, objetivo) {
+      const m = mandoDe(k), def = mapaPorOmision({ letra: !!m?.letra })[objetivo];
+      if (!m || !def) return;
+      let mapa = revisarMapa(m.mapa);
+      mapa[objetivo] = [];
+      for (const f of def) mapa = ponerFuente(mapa, objetivo, f, { sumar: true }).mapa;   // (y se quitan de otros)
+      guardarMapa(m.perfil, m.nombre, mapa, m.letra);
+    },
+    // (compatibles con el asistente de §57: asignar un botón = capturar ese control; borrar = volver a lo de siempre)
+    asignarBoton(k, boton) { return this.capturar(k, boton).then(r => (r ? (/^b\d+$/.test(r.fuente) ? +r.fuente.slice(1) : r.fuente) : null)); },
+    cancelarAsignacion() { this.cancelarCaptura(); },
+    borrarAsignacion(k) {
+      const m = mandoDe(k), id = m?.nombre ?? k;
+      delete prefsMandos.propios[id]; delete prefsMandos.mapas[id]; if (m) delete prefsMandos.mapas[m.perfil];
+      guardar(CLAVE_MANDOS, prefsMandos);
+    },
     // Elegir qué jugador (puerto 0..3) es un mando (como el «qué mando usa cada jugador» de BT3). Si ese jugador ya lo
     // tenía otro mando conectado, se cambian de lugar: el otro queda con el jugador que tenía este. Se guarda por mando.
     elegirPuerto(clave, puerto) {
@@ -474,5 +559,6 @@ export function nombreTecla(code) {
   if (especiales[code]) return especiales[code];
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return 'Num ' + code.slice(6);
   return code;
 }
