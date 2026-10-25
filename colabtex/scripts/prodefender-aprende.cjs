@@ -115,7 +115,7 @@ function main() {
   // la más larga de cada partida (misma persona, mismo reino, misma semilla)
   const mejor = new Map();
   for (const { p } of pruebasDe(JSON.parse(fs.readFileSync(archivo, 'utf8')))) {
-    if (!p || p.ve !== P.VERSION) continue;
+    if (!p || p.ve !== P.VERSION || !Array.isArray(p.j)) continue;   // una prueba rota (j no es una lista) no se puede rehacer
     const key = p.u + '|' + p.r + '|' + p.s;
     const prev = mejor.get(key);
     if (!prev || p.j.length > prev.j.length) mejor.set(key, p);

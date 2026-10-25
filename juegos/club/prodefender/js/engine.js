@@ -84,6 +84,17 @@
   };
   // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
   const REMATA = { fire: 1, explosive: 1, arcane: 1 };
+  // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
+  // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
+  const PURGA = { dur: 2.5, hp: 0.5 };
+  // Cristal: lo más que quita un golpe (parte de la vida, con un mínimo para que el principio
+  // no cambie). Noche: quién alumbra, a qué distancia y cuánto ve quien está a oscuras.
+  const CRISTAL = { tope: 0.08, jefe: 0.02, minimo: 25 };
+  const LUZ = { faro: 1, dragon: 1, prisma: 1 }, LUZ_R = 110, OSCURO = 0.6;
+  // Altura: desde cuánto alcance (el de base) una torre es «de altura» o «de llano».
+  const ALTURA = { lejos: 150, cerca: 120, dmg: 1.3, range: 1.2, llano: 0.7 };
+  // Contagio: cada cuánto salta, hasta dónde y cuánto dura lo que contagia.
+  const CONTAGIO = { cada: 1.5, r: 90, dur: 3 };
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
@@ -178,6 +189,7 @@
       this.bosses = [];
       // tercera era: pactos (y sus modificadores), el Poder del Reino, el evento de la ronda
       this.era3 = this.L.era === 3;
+      this.ley = this.era3 ? this.L.ley || null : null; this.contagioT = 0;
       this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
       this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
       this.vendavalT = 0; this.apagonT = 0;
@@ -403,7 +415,34 @@
         if (b.ap) s.armorPierce = Math.max(s.armorPierce || 0, b.ap);
         if (b.pierce) s.pierce += b.pierce;
       }
+      if (this.ley === 'altura' || this.ley === 'noche') this.aplicaLey();
       if (this.pactos.length) this.aplicaPactos();
+    }
+    // Altura y Noche sobre las torres (después de tótems y auras, antes de los pactos)
+    aplicaLey() {
+      for (const t of this.towers) {
+        const k = t.def.kind, s = t.s;
+        if (k === 'support' || k === 'farm') continue;
+        const f = this.leyEn(t.type, t.x, t.y, t);
+        if (s.range < 5000) s.range *= f.range;
+        if (f.dmg !== 1) for (const q of DANIOS) if (s[q]) s[q] *= f.dmg;
+      }
+    }
+    // lo que la ley le hace a una torre de ese tipo en (x, y): {range, dmg} (el bot lo usa para
+    // elegir sitio; `yo`, la torre misma, que no cuenta como su propia luz salvo si alumbra)
+    leyEn(type, x, y, yo) {
+      const def = PD.TOWERS[type], o = { range: 1, dmg: 1 };
+      if (!def || def.kind === 'support' || def.kind === 'farm') return o;
+      if (this.ley === 'altura') {
+        const R = def.base.range || 0;
+        if (R >= ALTURA.lejos) { o.range = ALTURA.range; o.dmg = ALTURA.dmg; }
+        else if (R < ALTURA.cerca) o.dmg = ALTURA.llano;
+      } else if (this.ley === 'noche' && !LUZ[type] && !this.alumbrado(x, y, yo)) o.range = OSCURO;
+      return o;
+    }
+    alumbrado(x, y, yo) {
+      for (const t of this.towers) if (t !== yo && LUZ[t.type] && Math.hypot(t.x - x, t.y - y) <= LUZ_R) return true;
+      return false;
     }
     // los modificadores de los pactos sobre las torres (después de tótems y auras)
     aplicaPactos() {
@@ -768,6 +807,7 @@
       if (amp > 0) dmg *= 1 + amp;
       if (e.campo > 0) dmg *= 1 - e.campo;   // campo de fuerza del Mecatitán
       if (e.d.maxHit && !dot) dmg = Math.min(dmg, e.maxHp * e.d.maxHit);   // Prisma Viviente
+      if (this.ley === 'cristal' && !dot) dmg = Math.min(dmg, Math.max(CRISTAL.minimo, e.maxHp * (e.d.boss ? CRISTAL.jefe : CRISTAL.tope)));
       let dealt = 0;
       if (e.shield > 0) {
         const sm = (o && o.shieldMult) || 1;
@@ -795,7 +835,7 @@
         this.snd('teleport', e.x);
         e.dist = Math.min(this.paths[e.path].len - 30, e.dist + e.d.blink.dist);
       }
-      if (e.d.rise) e.ultimo = dtype;
+      if (e.d.rise || this.ley === 'purga') e.ultimo = dtype;
       if (e.d.mirror && !e.desdoblado && e.hp > 0 && e.hp < e.maxHp * e.d.mirror) this.desdobla(e);
       if (e.hp <= 0) this.kill(e, src);
       return dealt;
@@ -850,8 +890,9 @@
       if (e.dead) return;
       if (e.d.twins && !e.split) { this.parte(e); return; }
       // Esqueleto: se queda en huesos y se levanta (salvo que lo remate fuego, explosivo o arcano)
-      if (e.d.rise && !e.risen && !REMATA[e.ultimo]) {
-        e.risen = true; e.huesosT = e.d.rise.dur; e.hp = e.maxHp * e.d.rise.hp;
+      const rise = e.d.rise || (this.ley === 'purga' && !e.d.boss && !e.d.big && !e.zombi && !e.falso && !e.d.ilusion && !e.copia ? PURGA : null);
+      if (rise && !e.risen && !REMATA[e.ultimo]) {
+        e.risen = true; e.huesosT = rise.dur; e.hp = e.maxHp * rise.hp;
         e.burnT = 0; e.poisT = 0; e.slowT = 0; e.slowF = 0;
         if (e.engaged) this.release(e);
         this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.4, color: '#e8e0c8', r: e.d.r });
@@ -2791,6 +2832,16 @@
     // relojes de la tercera era en cada paso de una ronda: eventos, los que se levantan, el vendaval
     tickTercera(dt) {
       if (this.vendavalT > 0) this.vendavalT -= dt;
+      // Contagio: cada infectada pasa las esporas a las sanas que tiene cerca (los Pararrayos protegen)
+      if (this.ley === 'contagio' && (this.contagioT -= dt) <= 0) {
+        this.contagioT = CONTAGIO.cada;
+        const enfermas = this.towers.filter(t => t.esporaT > 0.2);
+        for (const a of enfermas) for (const t of this.towers) {
+          if (t.esporaT > 0 || this.protegida(t) || Math.hypot(t.x - a.x, t.y - a.y) > CONTAGIO.r) continue;
+          t.esporaT = CONTAGIO.dur;
+          this.fx.push({ k: 'bolt', pts: [[a.x, a.y], [(a.x + t.x) / 2, (a.y + t.y) / 2 - 8], [t.x, t.y]], t: 0, T: 0.4, color: '#d85aa8', w: 2 });
+        }
+      }
       if (this.caidos.length && this.time - this.caidos[0].t > 4) this.caidos = this.caidos.filter(c => this.time - c.t <= 4);
       if (this.alzar.length) {
         for (const a of this.alzar) if ((a.espera -= dt) <= 0) this.levanta(a, 0.5);

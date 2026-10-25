@@ -187,6 +187,7 @@
     //  - `poder`: el Poder del Reino (engine.js: PODERES), que se carga matando y se lanza
     //    donde el jugador quiera.
     //  - Pactos cada diez rondas (engine.js: PD.PACTOS).
+    //  - `ley`: la regla propia del reino (PD.LEYES, abajo), que decide la forma de ganarlo.
     {
       name: 'Necrópolis Olvidada', short: 'Necrópolis', slug: 'necropolis', abre: '2026-10-27', era: 3, musica: 4,
       subtitle: 'Las tumbas no guardan a nadie. Lo que cae aquí, se vuelve a levantar.',
@@ -198,7 +199,7 @@
       ],
       obstacles: [{ x: 205, y: 172, r: 36, kind: 'cripta' }, { x: 530, y: 330, r: 30, kind: 'fosa' }, { x: 770, y: 410, r: 28, kind: 'tumba' }, { x: 930, y: 140, r: 32, kind: 'cripta' }],
       torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'faro', 'obelisco', 'segador', 'campanario', 'bruja'],
-      heroes: 'todos', eventos: ['muertos', 'lunaSangre', 'niebla', 'apagon'], poder: 'cadenas',
+      heroes: 'todos', eventos: ['muertos', 'lunaSangre', 'niebla', 'apagon'], poder: 'cadenas', ley: 'purga',
       boss: 'liche',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['esqueleto', 4, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['nigromante', 9, 1.3],
         ['sombra', 10, 1], ['alma', 12, 1.3], ['blindado', 13, 1], ['divisor', 15, 1], ['espectro', 17, 0.8], ['bruma', 19, 0.7], ['martir', 21, 0.7],
@@ -216,7 +217,7 @@
       ],
       obstacles: [{ x: 130, y: 300, r: 40, kind: 'hongo' }, { x: 470, y: 250, r: 32, kind: 'charco' }, { x: 900, y: 175, r: 38, kind: 'hongo' }, { x: 160, y: 600, r: 28, kind: 'charco' }, { x: 945, y: 420, r: 28, kind: 'hongo' }],
       torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'huerto', 'acido', 'sierra', 'balista', 'pararrayos', 'bruja'],
-      heroes: 'todos', eventos: ['esporas', 'frenesi', 'bendicion', 'niebla'], poder: 'floracion',
+      heroes: 'todos', eventos: ['esporas', 'frenesi', 'bendicion', 'niebla'], poder: 'floracion', ley: 'contagio',
       boss: 'reinaMicelio',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['seta', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['enredadera', 8, 1.3],
         ['sombra', 10, 1], ['polinizador', 11, 1.3], ['blindado', 12, 1], ['musgo', 14, 0.8], ['chaman', 16, 0.8], ['divisor', 17, 1], ['sapo', 19, 0.7],
@@ -234,7 +235,7 @@
       ],
       obstacles: [{ x: 300, y: 205, r: 30, kind: 'espejo' }, { x: 740, y: 290, r: 32, kind: 'espejo' }, { x: 430, y: 440, r: 34, kind: 'espejo' }, { x: 975, y: 300, r: 26, kind: 'espejo' }, { x: 80, y: 520, r: 36, kind: 'espejo' }],
       torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'colmena', 'prisma', 'totem', 'huerto', 'bumeran', 'acido', 'faro', 'burbujas', 'campanario'],
-      heroes: 'todos', eventos: ['espejismo', 'apagon', 'oro', 'viento'], poder: 'destello',
+      heroes: 'todos', eventos: ['espejismo', 'apagon', 'oro', 'viento'], poder: 'destello', ley: 'cristal',
       boss: 'reinaEspejos',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['reflejo', 4, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['prismaVivo', 8, 1.3],
         ['sombra', 10, 1], ['blindado', 11, 1], ['espejismo', 13, 0.9], ['divisor', 14, 1], ['cristal', 16, 0.8], ['fractal', 18, 0.8], ['automata', 20, 0.7],
@@ -252,7 +253,7 @@
       ],
       obstacles: [{ x: 420, y: 330, r: 46, kind: 'abismo' }, { x: 155, y: 435, r: 30, kind: 'abismo' }, { x: 865, y: 460, r: 34, kind: 'abismo' }, { x: 500, y: 60, r: 30, kind: 'molino' }],
       torres: ['espinas', 'vigia', 'voltaico', 'prisma', 'colmena', 'totem', 'huerto', 'balista', 'sierra', 'geiser', 'pararrayos', 'burbujas', 'desintegrador'],
-      heroes: 'todos', eventos: ['tormenta', 'meteoros', 'viento', 'frenesi'], poder: 'rayo',
+      heroes: 'todos', eventos: ['tormenta', 'meteoros', 'viento', 'frenesi'], poder: 'rayo', ley: 'altura',
       boss: 'tifon',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['templario', 5, 1.3], ['escudero', 7, 1], ['jinete', 8, 1.3],
         ['enjambre', 10, 0.9], ['sombra', 11, 1], ['blindado', 12, 1], ['ave', 14, 0.8], ['tormentoso', 16, 0.7], ['divisor', 17, 1], ['gargola', 19, 0.7],
@@ -270,8 +271,8 @@
         [[-30, 580], [150, 580], [150, 440], [500, 440], [500, 560], [1030, 560]]
       ],
       obstacles: [{ x: 380, y: 185, r: 40, kind: 'calabazar' }, { x: 640, y: 205, r: 36, kind: 'cripta' }, { x: 760, y: 440, r: 32, kind: 'arbolMuerto' }, { x: 330, y: 525, r: 28, kind: 'calabazar' }, { x: 80, y: 300, r: 34, kind: 'arbolMuerto' }],
-      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'obelisco', 'segador', 'pararrayos', 'campanario'],
-      heroes: 'todos', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], poder: 'hoguera',
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'obelisco', 'segador', 'pararrayos', 'campanario', 'faro'],
+      heroes: 'todos', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], poder: 'hoguera', ley: 'noche',
       boss: 'jineteSinCabeza',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['calabaza', 4, 1.3], ['murcielago', 5, 1.3], ['escudero', 7, 1], ['espantapajaros', 8, 1.3],
         ['sombra', 9, 1], ['esqueleto', 11, 0.9], ['alma', 13, 0.8], ['blindado', 14, 1], ['divisor', 15, 1], ['seta', 17, 0.7], ['templario', 19, 0.7],
@@ -289,6 +290,21 @@
   };
   // ¿Está abierto a todos el reino li? (los cinco primeros, siempre)
   PD.abierto = (li, dia) => !PD.LEVELS[li].abre || PD.LEVELS[li].abre <= (dia || PD.diaChile());
+
+  // Leyes de la tercera era: una por reino, toda la partida, para que cada uno se gane de otra
+  // manera (engine.js las aplica: PURGA, CRISTAL, LUZ, ALTURA, CONTAGIO).
+  PD.LEYES = {
+    purga:    { name: 'Ley de la Purga', icon: '🔥', meta: 'Fuego, explosivos y luz arcana',
+                desc: 'Lo que no muere por FUEGO, EXPLOSIVO o ARCANO queda en huesos y se levanta con la mitad de su vida. Remátalos con Lanzallamas, Morteros, Prismas u Obeliscos.' },
+    contagio: { name: 'Ley del Contagio', icon: '🍄', meta: 'Torres separadas y Pararrayos',
+                desc: 'Las esporas SALTAN de torre en torre: cada 1,5 s una torre infectada contagia a las que tiene a menos de 90 px (atacan a la mitad). Separa tus torres; las que cubre un Pararrayos no se contagian.' },
+    cristal:  { name: 'Ley del Cristal', icon: '💎', meta: 'Muchos golpes pequeños',
+                desc: 'Ningún golpe quita más del 8% de la vida de un enemigo (a los jefes, el 2%). Ganan las torres que pegan muchas veces: rayos, cadenas, enjambres, bumeranes y veneno.' },
+    altura:   { name: 'Ley de la Altura', icon: '🏔', meta: 'Alcance largo',
+                desc: 'Desde las islas se ve lejos: las torres de alcance 150 o más hacen +30% de daño y ven un 20% más; las de menos de 120 hacen un 30% menos.' },
+    noche:    { name: 'Ley de la Noche', icon: '🌙', meta: 'Defensas alrededor de la luz',
+                desc: 'A oscuras las torres ven un 40% menos. Un Faro, un Lanzallamas o un Prisma alumbra 110 px a su alrededor y les devuelve el alcance: agrúpalas junto a la luz.' }
+  };
 
   // Eventos de la tercera era: lo que pasa durante una ronda (engine.js los aplica; la
   // vista previa los anuncia una ronda antes, así que se puede preparar la defensa).

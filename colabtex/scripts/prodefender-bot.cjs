@@ -60,7 +60,7 @@
    (--pacto rechaza para no tomar ninguno), lanza el Poder del Reino sobre el enemigo más
    fuerte en cuanto se llena y llama al héroe de --heroe (Nyx si no se dice).
 
-   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|humana|todas] [--libro archivo.json]
+   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|humana|todas] [--libro archivo.json] [--torres a,b] [--separa D]
                                           [--semilla N[,M…]] [--motor DIR] [--json] [--rondas] [--fugas] [--anticipa] [--ayuda N]
 
    --motor DIR   carga el juego de otra carpeta (p. ej. una versión anterior
@@ -142,6 +142,10 @@ const LIBRO = (() => {
 })();
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
 const GUION = +opt('guion', 100);
+// para comparar estilos: --torres a,b,c (solo esas torres de daño) y --separa D (ninguna torre a
+// menos de D px de otra)
+const TORRES = opt('torres', '') ? opt('torres').split(',') : null;
+const SEPARA = +opt('separa', 0);
 const HORIZONTE = +opt('horizonte', 2);
 // con guion, la parte de las vidas del reino que se acepta perder en una ronda antes de rescatarla
 const UMBRAL = +opt('umbral', 0);
@@ -230,6 +234,7 @@ class Bot {
     for (let x = 24; x < PD.W - 20; x += 16) for (let y = 24; y < PD.H - 20; y += 16) this.sitios.push([x, y]);
     const vende = PD.towersFor(li);
     this.rota = this.est.rota[li].filter(x => vende.includes(x));
+    if (TORRES) this.rota = TORRES.filter(x => vende.includes(x));
     if (this.est.humana) {
       if (!LIBRO) throw new Error('falta el libro: node scripts/prodefender-aprende.cjs export.json');
       // las torres de daño en el orden en que las ponen las personas (las de este reino, o las de todos)
@@ -297,6 +302,7 @@ class Bot {
     let mejor = null, mv = -Infinity;
     for (const [x, y] of this.sitios) {
       if (!g.canPlace(type, x, y)) continue;
+      if (SEPARA && !vacio && g.towers.some(t => Math.hypot(t.x - x, t.y - y) < SEPARA)) continue;
       let v;
       if (aura && !vacio) {
         v = 0;
@@ -309,7 +315,8 @@ class Bot {
         for (const t of g.towers) if (t.type !== 'pararrayos' && !g.protegida(t) && Math.hypot(t.x - x, t.y - y) < R - 4) v += t.spent;
         v += this.cobertura(x, y, R) * 1e-3;
       }
-      else v = this.cobertura(x, y, R, vacio);
+      // la ley del reino (Altura, Noche) cambia el alcance según el sitio
+      else v = this.cobertura(x, y, vacio || !g.leyEn ? R : R * g.leyEn(type, x, y).range, vacio);
       if (v > mv) { mv = v; mejor = [x, y]; }
     }
     return mejor;
