@@ -143,6 +143,8 @@ const LIBRO = (() => {
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
 const GUION = +opt('guion', 100);
 const HORIZONTE = +opt('horizonte', 2);
+// con guion, la parte de las vidas del reino que se acepta perder en una ronda antes de rescatarla
+const UMBRAL = +opt('umbral', 0.06);
 // «humana» sin guion: de qué parte cada ronda antes del rescate («ahorra»: no gastar, y el
 // rescate compra lo justo; «normal»: gastar como la mixta con las cuotas de las personas). En
 // la Necrópolis «ahorra» llegó a la 49 y «normal» a la 32; en Eclipse y Engranajes, igual.
@@ -653,7 +655,7 @@ class Bot {
   // anticipación. Gana el que menos pierde.
   elegirHumana() {
     const r = this.game.round + 1, queda = this.guion && r <= GUION && (this.gi || 0) < this.guion.length;
-    const umbral = queda ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 1;
+    const umbral = queda ? Math.max(1, Math.round(PD.LEVELS[this.li].lives * UMBRAL)) : 1;
     let mejor = null;
     const prueba = (m, acc) => {
       const x = this.ensaya(m, acc);
