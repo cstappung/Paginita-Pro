@@ -14,7 +14,8 @@
 //   3. mientras el cursor maneja la página, el mando no llega al juego (controles.sinMandos): un A en «Jugar la Copa»
 //      no es también un A en la pantalla de personajes de atrás. El teclado sigue igual;
 //   4. al conectar, el aviso del sitio («🎮 Mando DualSense conectado») con los botones de Mario Kart en la letra de la
-//      familia del mando (✕ ○ □ △ en PlayStation, A B X Y en Xbox, B A Y X en Switch).
+//      familia del mando (✕ ○ □ △ en PlayStation, A B X Y en Xbox, B A Y X en Switch), y la ayuda de teclado de la
+//      tarjeta de inicio cambiada por esos mismos botones mientras el mando está conectado (§106).
 // Como un tablero con dos tomas para el mismo enchufe: el conmutador decide cuál está conectada, nunca las dos.
 //
 // Uso:  montarMandoSitio({ menu: () => bool, controles });  devuelve una promesa con el Mando del marco (o null)
@@ -48,6 +49,9 @@ export function montarMandoSitio({ menu = () => false, controles = null, raiz = 
         botones: { select: () => {} },           // (Select no cambia a cursor: en Mario Kart es Start)
         flechas: false, stick: null,             // (en el juego no se fabrican teclas: el juego lee el mando)
         pistas: PISTAS_MKW,
+        // §106: con un mando conectado, la ayuda de teclado de la tarjeta de inicio (.teclas: «K acelerar · J frenar…»)
+        // se cambia por los botones del mando en su letra (✕ ○ □ △, A B X Y), como en los otros juegos del sitio
+        zonas: [{ sel: '.teclas' }],
         menu: () => { try { return !!menu(); } catch { return false; } },
       });
       controles?.sinMandos?.(enCursor);

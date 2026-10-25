@@ -506,6 +506,12 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-25 00:21** — **Los mandos como en BT3 y la barra de descarga** (§106, el dueño: «en bt3 aparece el mando que
+  uno tiene y permite seleccionar entre mandos»; «la barra de descargas con el progreso cuando se esté descargando
+  algo»). «Jugador 1–4» en cada tarjeta de Controles → Mandos (se cambian de lugar, se recuerda por mando), la pastilla
+  del mando abre Controles, la ayuda de la tarjeta de inicio con los botones del mando, y `descargas.mjs`: MB, total y
+  velocidad cuando bajar algo dura más de 0,4 s o el juego espera. Banco `descargas` 29/29, `mandos-jugador` 17/17,
+  `mando-sitio` 11/11, `controles` 47/47. Falta probarlo con el juego en la PC del proyecto.
 - **2026-10-24 23:50** — El dueño publicó las reglas de Firebase (base de datos y Storage, `docs/publicar.md` paso 5). Del lado de
   las cuentas no falta nada: queda juntar la rama del sitio a `main` (paso 6) cuando el dueño lo pida, y probar como amigo
   (paso 7).

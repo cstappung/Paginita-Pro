@@ -303,6 +303,10 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **BMG** | El formato de las tablas de textos del juego (cada mensaje con su número). En la de Retro Rewind, el mensaje 0x20000 + n es el nombre de la pista n: de ahí salen los nombres de la lista para elegir pista. |
 | **Caras de partida (presets)** | Mii ya armados para empezar, como los "invitados" del juego: se elige uno y solo se le pone nombre y color. Los de la página los armamos nosotros (no son los datos de Nintendo). |
 
+| **Copia de una respuesta (`clone()`)** | Pedirle al navegador dos lecturas de la MISMA descarga: los bytes llegan una vez por la red y se reparten a dos lectores. La barra de descarga (§106) lee una copia solo para contar; el juego lee la original, intacta. Como una pinza amperimétrica: mide la corriente sin cortar el cable. |
+| **Ráfaga (de descargas)** | Un grupo de pedidos que se superponen en el tiempo (el juego pide varias cosas casi a la vez). La barra muestra lo recibido de lo esperado en la ráfaga actual y vuelve a cero cuando todo queda quieto un segundo. |
+| **Puerto (del mando)** | Cada uno de los 4 enchufes de mando de la GameCube: el puerto 1 es el jugador 1. La página decide qué mando del PC va a cada puerto; desde §106 la persona lo elige («Jugador 1–4»), como el selector de entrada de una mesa de sonido. |
+
 ---
 
 ### La red en línea (§58)
@@ -9847,3 +9851,81 @@ juego): `GET /mkw/manifiesto.json` → 401 «inicia sesión»; la pregunta previ
 (el viejo contestaba 404). El enlace `MKW` solo se ve con la sesión de un amigo: la primera partida de un amigo lo
 prueba. `privado.json` (→ `juegos/mkw/privado.json` del sitio) = `https://bt3-disco.rayoluxd1.workers.dev/mkw`: el sitio
 lo lee recién cuando la rama se junte a `main`.
+
+## 2026-10-25 · §106 Los mandos como en BT3 (elegir el jugador de cada mando) y la barra de descarga
+
+Pedidos del dueño, ya con Mario Kart publicado en el sitio (PR #258): «no veo el soporte de mandos de los otros juegos»,
+«en bt3 aparece el mando que uno tiene y permite seleccionar entre mandos» (con una captura del panel Controles que decía
+«Ningún mando todavía») y «tienes que agregar la barra de descargas con el progreso cuando se esté descargando algo».
+Hecho desde la sesión de la nube (sin el juego: todo probado en el banco y en la página real sin el programa).
+
+### 106.1 Qué jugador es cada mando
+
+**Antes:** los mandos iban a los puertos en el orden en que el navegador los veía. Con dos mandos, o con uno «virtual»
+al lado del de verdad (Steam, DS4Windows y similares crean un mando de Xbox de mentira), el jugador 1 podía quedar con
+el equivocado y no había cómo cambiarlo. BT3 sí lo deja elegir (la ventana de controles del port: qué mando usa cada
+jugador).
+
+**Ahora** (`controles.mjs`):
+- `clavesMandos(lista)`: cada mando se reconoce por su nombre (`g.id`) y, si hay dos iguales, por su orden (`…#2`). El
+  índice solo no sirve (cambia al desconectar y volver a conectar).
+- `repartirPuertos(claves, elegidos)`: primero los mandos con un jugador elegido, después los demás en el primer puerto
+  libre. Se reparte de nuevo solo cuando cambia qué mandos hay o lo elegido: nadie salta de puerto solo.
+- `controles.elegirPuerto(clave, puerto)`: elegir un jugador que ya tenía otro mando los **cambia de lugar**. Se guarda
+  en el navegador (`mkw.mandos` → `puertos`), así se recuerda al desconectar el mando y al recargar.
+- Si el navegador no deja leer mandos (un marco sin el permiso `gamepad`: `getGamepads()` lanza un error), se anota
+  `estado.bloqueados` y el teclado sigue andando. Antes ese error habría parado el bucle de los controles entero.
+
+En la página: cada tarjeta del panel Controles → Mandos tiene **«Jugador 1–4»** y las tarjetas van en orden de
+jugador; la pastilla del mando de la barra dice qué jugador es cada uno («🎮 J1 DualSense · J2 Xbox 360») y **un clic
+la abre en Controles** (como la de BT3 abre sus ajustes). Sin mandos, el panel explica qué hacer: Chrome no le muestra
+un mando a la página hasta que se aprieta un botón con la página a la vista (es por privacidad); dentro del marco de
+Juegos a veces hace falta un clic en el juego antes.
+
+### 106.2 La ayuda de la tarjeta de inicio con los botones del mando
+
+Como en los otros juegos del sitio: con un mando conectado, la línea de teclado de la tarjeta de inicio
+(`.teclas`: «K acelerar · J frenar…») se cambia por los botones del mando en la letra de su familia (✕ ○ □ △ en
+PlayStation, A B X Y en Xbox). Es una línea en `mando-sitio.mjs`: `zonas: [{ sel: '.teclas' }]` para el `mando.js` del
+sitio, que esconde la ayuda y pone al lado la del mando. Solo dentro del sitio (sin el `mando.js` de Juegos no cambia
+nada).
+
+### 106.3 La barra de descarga (`descargas.mjs`)
+
+**Antes:** al abrir, la cortina tenía una barra que iba y venía, sin decir cuánto faltaba (la que se llena con % era solo
+la de la sala, §99), y durante el juego no se veía nada cuando el juego esperaba un pedazo del disco.
+
+**Ahora:** `crearDescargas()` envuelve el `fetch` de la página (encima del de `privado.mjs`, que pone el token): a cada
+respuesta del Worker le lee una **copia** (`clone()`) solo para contar los bytes mientras llegan; el juego recibe la
+original intacta.
+- **De cuánto:** el lote (§104) lo dice en su cuerpo (`{"p": [[ruta, inicio, fin], …]}`), un pedido con `Range` en su
+  cabecera y lo demás en `Content-Length`.
+- **El programa** viaja comprimido (16,5 MB en brotli) y el navegador lo entrega descomprimido (127,6 MB): lo contado se
+  divide por la proporción (7,7 la primera vez; después la medida de verdad, guardada) para hablar de lo que viaja. Se
+  cuenta **solo la primera vez** que se baja cada programa (`mkw.descargas.programas`): después sale de la caché HTTP en
+  un instante, y así la copia nunca toca la caché de código compilado de Chrome (§54).
+- **Cuándo aparece:** si bajar algo dura más de 0,4 s, o si el juego lleva más de 0,4 s esperando una lectura del disco
+  (`mkwLeeRango` avisa con `esperaJuego(±1)`): lo que llega en un instante no parpadea en pantalla. Se va sola 1,2 s
+  después de terminar, con «Listo».
+- **Qué dice:** «⬇ Bajando 42,1 MB de 118 MB · 9,8 MB/s» con la barra llenándose (sin total conocido, la barra va y
+  viene). Si el juego espera, «⬇ Cargando…». Sobre la cortina de carga va al centro y, en la primera visita, agrega «La
+  primera vez tarda más: queda guardado para la próxima».
+- **Dónde:** abajo a la izquierda mientras se juega (300 px, sin `backdrop-filter`: no re-desenfoca el juego cada
+  cuadro), y se repinta 4 veces por segundo, nada más. `?barraDescarga=0` = sin contar ni mostrar nada.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Banco `descargas` (nuevo, Worker de mentira con respuestas que llegan de a pedazos) | 29 / 29 |
+| Banco `mandos-jugador` (nuevo, mandos de mentira: dos iguales, uno virtual, uno que vuelve, uno bloqueado) | 17 / 17 |
+| Banco `mando-sitio` (+1: la ayuda de la tarjeta cambiada por los botones del mando) | 11 / 11 |
+| Banco `controles` (sin cambios de comportamiento) | 47 / 47 |
+| La página real sin el programa (banco, Chromium): la pastilla abre Controles con el selector; la barra aparece con una descarga larga y se va sola | sin errores |
+| Sitio `mkw.test.cjs` + `mkw-worker.test.cjs` + `controles.test.cjs` | 40 / 40 |
+
+Falta probarlo con el juego de verdad en la PC del proyecto (`prueba-navegador`, `prueba-sala`): el banco no tiene el
+programa.
+
+`banco/servir.cjs` busca ahora el `mando.js` del sitio también en `juegos/audio` al lado de `juegos/mkw` (dentro del
+repo del sitio no hay `terceros/`).

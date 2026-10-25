@@ -59,6 +59,9 @@ try {
   ok('al cerrarse el menú, el mando vuelve al juego', H.Mando.estado()?.modo === 'juego' && H.sinMandosF() === false && !cursorVisible(H.document));
   ok('las ayudas del mando son los botones de Mario Kart, con «select» (así mando.js no ofrece «Select: cursor»)',
      H.Mando.pistas(PISTAS_MKW).includes('acelerar') && PISTAS_MKW.some(p => /\bselect\b/.test(p[0])));
+  { const ayuda = H.document.querySelector('.teclas:not(.mando-pista)'), pista = H.document.querySelector('.teclas.mando-pista');
+    ok('§106: con el mando conectado, la ayuda de teclado se cambia por los botones del mando (como en los otros juegos)',
+       !!ayuda && H.getComputedStyle(ayuda).display === 'none' && !!pista && pista.textContent.includes('acelerar'), pista?.textContent.trim().slice(0, 60)); }
   marco.style.display = 'none'; await cuadros(12);
   ok('con el marco escondido, la página de arriba vuelve a manejar su cursor', cursorVisible(document));
 } catch (e) {

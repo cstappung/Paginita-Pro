@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La barra de descarga</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>
+  /* la barra con los mismos estilos que index.html del juego (lo mínimo para verla) */
+  :root { --texto: #eee; --suave: #aab; --morado: #7042df; --lila: #b9a6ff; --sl: 0px; --sb: 0px; }
+  #descarga { position: fixed; left: 12px; bottom: 12px; width: 300px; padding: 7px 10px 8px; border-radius: 10px; background: #0f0c24e6; border: 1px solid #463d7a; color: var(--texto); font: 600 12.5px sans-serif; }
+  #descarga[hidden] { display: none; }
+  #descarga .descarga-barra { display: block; height: 5px; margin-top: 6px; background: #ffffff1f; }
+  #descarga .descarga-barra i { display: block; height: 100%; background: var(--lila); }
+</style>
+</head>
+<body>
+<h1>La barra de descarga: <span>cuánto se baja, de cuánto y a qué velocidad</span></h1>
+<p>Prueba <code>web/navegador/descargas.mjs</code> (bitácora §106, pedido del dueño: «la barra de descargas con el progreso
+  cuando se esté descargando algo») <b>sin el juego</b>: un «Worker» de mentira entrega respuestas que llegan de a pedazos,
+  con la forma de lo que pide la página (el manifiesto, un lote de trozos del disco, un pedido con Range y el programa
+  comprimido). Comprueba que quien pidió recibe los bytes intactos, que la barra cuenta lo que llega, conoce el total
+  de cada pedido, muestra la velocidad, no aparece por lo que llega en un instante, avisa cuando el juego espera, y se
+  va sola al terminar; y que el programa se cuenta por lo que viaja comprimido y solo la primera vez.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div id="descarga" hidden><span class="descarga-texto"></span><span class="descarga-barra"><i></i></span><span class="descarga-nota" hidden></span></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearDescargas, esperadoDe, textoBarra, textoBytes, montarBarraDescarga, ESPERA_MIN_MS } from '/web/navegador/descargas.mjs';
+
+const { ok, nota, fin } = prueba('descargas', 'La barra de descarga (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const BASE = 'https://worker.falso/mkw/';
+const MB = 1048576;
+
+// Un «Worker» de mentira: entrega `largo` bytes en `pedazos` partes, una cada `cadaMs` (como la red), con el patrón
+// i & 255 para revisar que lleguen intactos. contentLength: la cabecera (null = sin ella).
+function respuesta(largo, { pedazos = 8, cadaMs = 60, contentLength = largo, estado = 200 } = {}) {
+  let enviado = 0, k = 0;
+  const cuerpo = new ReadableStream({
+    async pull(c) {
+      if (enviado >= largo) { c.close(); return; }
+      await espera(cadaMs);
+      const n = k++ === pedazos - 1 ? largo - enviado : Math.min(largo - enviado, Math.ceil(largo / pedazos));
+      const p = new Uint8Array(n);
+      for (let i = 0; i < n; i++) p[i] = (enviado + i) & 255;
+      enviado += n;
+      c.enqueue(p);
+    },
+  });
+  const cab = new Headers({ 'Content-Type': 'application/octet-stream' });
+  if (contentLength !== null) cab.set('Content-Length', String(contentLength));
+  return new Response(cuerpo, { status: estado, headers: cab });
+}
+const intacto = b => { for (let i = 0; i < b.length; i++) if (b[i] !== (i & 255)) return false; return true; };
+
+try {
+  // ---- 1. Cuánto se espera de cada pedido (sin red) ----
+  ok('el lote dice su total en el cuerpo (fin incluido, como Range)',
+     esperadoDe(BASE + 'lote', { method: 'POST', body: JSON.stringify({ p: [['a', 0, 262143], ['b', 100, 199]] }) }) === 262144 + 100);
+  ok('un pedido con Range dice su total en la cabecera',
+     esperadoDe(BASE + 'mkw/disco/x.szs', { headers: new Headers({ Range: 'bytes=1000-1999' }) }) === 1000 &&
+     esperadoDe(BASE + 'x', { headers: { Range: 'bytes=0-9' } }) === 10);
+  ok('lo demás, por Content-Length; sin ella, «no se sabe»',
+     esperadoDe(BASE + 'manifiesto.json', {}, respuesta(5, { contentLength: 5 })) === 5 &&
+     esperadoDe(BASE + 'manifiesto.json', {}, respuesta(5, { contentLength: null })) === null);
+  ok('textoBytes: MB con coma y KB', textoBytes(12.4 * MB) === '12,4 MB' && textoBytes(850 * 1024) === '850 KB' && textoBytes(128 * MB) === '128 MB',
+     `${textoBytes(12.4 * MB)} · ${textoBytes(850 * 1024)} · ${textoBytes(128 * MB)}`);
+
+  // ---- 2. La barra: cuándo aparece y qué dice (relojes de mentira) ----
+  const base = { bajando: true, activos: 1, recibido: 3 * MB, esperado: 12 * MB, pct: 25, velocidad: 2 * MB, total: 3 * MB, msRafaga: 0, msQuieto: 0, esperaJuego: 0 };
+  ok('lo que llega en un instante no aparece (ráfaga de 0,3 s)', textoBarra({ ...base, msRafaga: 300 }) === null);
+  const t1 = textoBarra({ ...base, msRafaga: ESPERA_MIN_MS + 50 });
+  ok('una ráfaga de más de 0,4 s aparece con lo recibido, el total y la velocidad', t1 && t1.titulo === '⬇ Bajando 3,0 MB de 12,0 MB · 2,0 MB/s' && t1.pct === 25, t1?.titulo);
+  const t2 = textoBarra({ ...base, msRafaga: 100, esperaJuego: 600 });
+  ok('si el juego espera más de 0,4 s aparece aunque la ráfaga recién empiece, y dice «Cargando»', t2 && t2.titulo.startsWith('⬇ Cargando'), t2?.titulo);
+  const t3 = textoBarra({ ...base, bajando: false, activos: 0, recibido: 12 * MB, msQuieto: 500, pct: 100 }, { visible: true });
+  ok('al terminar se queda un momento con «Listo» y la barra llena', t3 && t3.titulo.startsWith('⬇ Listo 12,0 MB') && t3.pct === 100, t3?.titulo);
+  ok('…y se va 1,2 s después', textoBarra({ ...base, bajando: false, activos: 0, msQuieto: 1300 }, { visible: true }) === null);
+  const t4 = textoBarra({ ...base, msRafaga: 900 }, { enCortina: true, primeraVez: true });
+  ok('sobre la cortina, la primera vez, dice que queda guardado para la próxima', t4?.nota.includes('queda guardado'), t4?.nota);
+  ok('sin total conocido, la barra es «va y viene» (pct no numérico)', !Number.isFinite(textoBarra({ ...base, pct: null, msRafaga: 900 }).pct));
+
+  // ---- 3. Con fetch de mentira: contar sin tocar lo que recibe quien pidió ----
+  const almacen = (() => { const m = new Map(); return { leer: k => m.get(k) ?? null, guardar: (k, v) => m.set(k, v), m }; })();
+  const pedidos = [];
+  const red = async (url, o = {}) => {
+    pedidos.push(url);
+    if (url.endsWith('/manifiesto.json')) return respuesta(40 * 1024, { pedazos: 2, cadaMs: 5 });
+    if (url.endsWith('/lote')) return respuesta(2 * MB, { pedazos: 10, cadaMs: 80, contentLength: null });   // (el lote no manda largo)
+    if (/mkw\.wasm/.test(url)) return respuesta(8 * MB, { pedazos: 8, cadaMs: 40, contentLength: 1 * MB });   // «comprimido» 8:1
+    if (url.endsWith('/no-hay')) return respuesta(0, { estado: 404 });
+    return respuesta(100, { pedazos: 1, cadaMs: 1 });
+  };
+  const d = crearDescargas({ base: BASE, almacen });
+  const buscar = d.envolver(red);
+  ok('lo que no es del Worker pasa sin contarse', (await (await buscar('https://otro.sitio/x')).arrayBuffer()).byteLength === 100 && d.estado.pedidos === 0);
+  ok('primera visita: sin programas bajados antes', d.primeraVez === true);
+
+  // un lote de 2 MB (sin Content-Length: el total sale del cuerpo del pedido), leído por quien pidió como lo hace lote.mjs
+  const cuerpoLote = JSON.stringify({ p: [['mkw/disco/a.szs', 0, MB - 1], ['mkw/disco/b.szs', 0, MB - 1]] });
+  const marcas = [];
+  const vigia = setInterval(() => marcas.push(d.mirar()), 100);
+  const barra = montarBarraDescarga(document.getElementById('descarga'), d, { cada: 100 });
+  let visto = false;
+  const vigiaDom = setInterval(() => { if (!document.getElementById('descarga').hidden) visto = true; }, 50);
+  const rLote = await buscar(BASE + 'lote', { method: 'POST', body: cuerpoLote });
+  const bytesLote = new Uint8Array(await rLote.arrayBuffer());
+  ok('quien pidió recibe el lote entero e intacto (la copia no le quita nada)', bytesLote.length === 2 * MB && intacto(bytesLote));
+  await espera(150);
+  clearInterval(vigia);
+  const medio = marcas.find(m => m.bajando && m.recibido > 0 && m.recibido < 2 * MB);
+  ok('a mitad de camino, la barra sabe el total del lote y va por la mitad', !!medio && medio.esperado === 2 * MB && medio.pct > 0 && medio.pct < 100,
+     medio ? `${textoBytes(medio.recibido)} de ${textoBytes(medio.esperado)} (${medio.pct.toFixed(0)} %)` : 'nunca a medias');
+  const conVel = marcas.filter(m => m.bajando && m.velocidad > 0).map(m => m.velocidad);
+  const velMedia = conVel.reduce((s, v) => s + v, 0) / Math.max(1, conVel.length);
+  ok('la velocidad se parece a la de verdad (2 MB en ~0,8 s ≈ 2,5 MB/s)', velMedia > 1.2 * MB && velMedia < 5 * MB, textoBytes(velMedia) + '/s');
+  const final = d.mirar();
+  ok('al final: todo contado (2 MB) y nada en camino', final.recibido === 2 * MB && final.activos === 0 && final.pct === 100,
+     `${textoBytes(final.recibido)}, activos ${final.activos}`);
+  ok('la barra se vio en la página mientras bajaba (más de 0,4 s)', visto);
+  await espera(1400);
+  ok('…y se fue sola al terminar', document.getElementById('descarga').hidden);
+
+  // un pedido corto: no aparece
+  visto = false;
+  await (await buscar(BASE + 'manifiesto.json')).arrayBuffer();
+  await espera(200);
+  ok('un pedido que llega en un instante (el manifiesto) no hace aparecer la barra', !visto);
+
+  // ---- 4. El programa: cuenta lo que viaja comprimido, y solo la primera vez ----
+  await espera(1200);                                       // (otra ráfaga)
+  const urlPrograma = BASE + 'build/mkw.wasm?v=abc';
+  const rProg = await buscar(urlPrograma);
+  const bytesProg = new Uint8Array(await rProg.arrayBuffer());
+  await espera(50);
+  const m = d.mirar();
+  ok('el programa llega entero e intacto a quien lo pidió (8 MB descomprimidos)', bytesProg.length === 8 * MB && intacto(bytesProg));
+  ok('…y la barra cuenta lo que viaja: el Content-Length comprimido (1 MB), no los 8 MB', m.esperado === 1 * MB && m.recibido === 1 * MB,
+     `${textoBytes(m.recibido)} de ${textoBytes(m.esperado)}`);
+  d.programaListo(urlPrograma, 8 * MB, 1 * MB);
+  ok('programaListo guarda la proporción de verdad (8) y el programa', almacen.m.get('mkw.descargas.proporcion') === 8 &&
+     (almacen.m.get('mkw.descargas.programas') || []).includes(urlPrograma));
+  const antes = d.estado.pedidos;
+  await (await buscar(urlPrograma)).arrayBuffer();
+  ok('la segunda vez el programa no se cuenta (sale de la caché; sin copia que toque la caché de código)', d.estado.pedidos === antes);
+  const d2 = crearDescargas({ base: BASE, almacen });
+  ok('otra visita (mismo navegador): ya no es la primera vez', d2.primeraVez === false);
+
+  // ---- 5. Errores: nada queda «en camino» ----
+  const r404 = await buscar(BASE + 'no-hay');
+  ok('un 404 no queda en camino ni suma bytes', r404.status === 404 && d.estado.activos === 0);
+  let fallo = false;
+  try { await d.envolver(async () => { throw new TypeError('sin red'); })(BASE + 'x'); } catch { fallo = true; }
+  ok('un error de red sigue siendo error para quien pidió, y no queda en camino', fallo && d.estado.activos === 0);
+
+  // ---- 6. El juego esperando ----
+  const d3 = crearDescargas({ base: BASE, almacen });
+  d3.esperaJuego(+1); d3.esperaJuego(+1);
+  await espera(450);
+  ok('dos lecturas esperando: el juego espera desde la primera', d3.mirar().esperaJuego >= 400 && d3.estado.juego.esperando === 2);
+  d3.esperaJuego(-1); d3.esperaJuego(-1); d3.esperaJuego(-1);
+  ok('al llegar las dos (y una de más), deja de esperar sin quedar negativo', d3.mirar().esperaJuego === 0 && d3.estado.juego.esperando === 0);
+  clearInterval(vigiaDom); barra.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>

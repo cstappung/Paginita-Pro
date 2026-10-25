@@ -259,6 +259,20 @@
     font: 600 12.5px/1.3 'IBM Plex Sans', sans-serif; box-shadow: 0 4px 12px #0008; }
   .chip-estado.mal { border-color: var(--peligro); color: #ffb4b4; }
   /* §81: «el juego va lento: ¿tarjeta de video equivocada?» (aviso-gpu.mjs), abajo a la izquierda, con «Ver cómo» y «✕» */
+  /* §106: la barra de descarga (descargas.mjs): abajo a la izquierda mientras se juega, chica y sin backdrop-filter (no
+     re-desenfoca el juego cada cuadro); sobre la cortina de carga, al centro y más grande. Solo aparece si bajar algo dura
+     más de 0,4 s. */
+  #descarga { position: fixed; z-index: 6; left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); width: min(300px, calc(100vw - 24px));
+    box-sizing: border-box; padding: 7px 10px 8px; border-radius: 10px; background: #0f0c24e6; border: 1px solid #463d7a;
+    color: var(--texto); font: 600 12.5px 'IBM Plex Sans', sans-serif; pointer-events: none; }
+  #descarga[hidden] { display: none; }
+  #descarga .descarga-texto { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  #descarga .descarga-barra { display: block; height: 5px; margin-top: 6px; border-radius: 3px; background: #ffffff1f; overflow: hidden; }
+  #descarga .descarga-barra i { display: block; height: 100%; width: 2%; border-radius: 3px; background: linear-gradient(90deg, var(--morado), var(--lila)); transition: width .25s linear; }
+  #descarga.indefinida .descarga-barra i { width: 35%; animation: cortina-ida 1.1s ease-in-out infinite alternate; transition: none; }
+  #descarga .descarga-nota { display: block; margin-top: 5px; color: var(--suave); font-weight: 400; font-size: 12px; }
+  #descarga.en-cortina { left: 50%; translate: -50% 0; bottom: calc(28px + var(--sb)); width: min(380px, calc(100vw - 32px)); font-size: 13.5px; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { #descarga.indefinida .descarga-barra i { animation: none; width: 100%; opacity: .6; } }
   #avisoGpu { position: fixed; z-index: 6; left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); max-width: min(440px, calc(100vw - 24px)); display: flex; gap: 10px;
     align-items: center; padding: 10px 12px; border-radius: 14px; background: #161233f2; border: 1px solid #4b3d93; color: var(--texto);
     font: 500 13px/1.35 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; }
@@ -591,7 +605,8 @@
   .mandos-lista { display: grid; gap: 8px; margin-top: 6px; }
   .mandos-lista.vacia::before { content: attr(data-vacia); color: var(--suave); font-size: 13px; }
   .mando-tarjeta { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
-  .mando-cab { display: grid; }
+  .mando-cab { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  .mando-nombre { display: grid; min-width: 0; }
   .mando-cab small { color: var(--suave); }
   .probador { display: flex; gap: 12px; align-items: center; }
   .stick-aro { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #4b3d93; display: grid; place-items: center; flex: none; }
@@ -645,6 +660,13 @@
     <div class="carga"><i></i></div>
     <p id="cortinaTexto">Cargando el juego…</p>
   </div>
+</div>
+
+<!-- §106: la barra de descarga (descargas.mjs: aparece sola cuando se baja algo) -->
+<div id="descarga" role="status" aria-live="off" hidden>
+  <span class="descarga-texto"></span>
+  <span class="descarga-barra"><i></i></span>
+  <span class="descarga-nota" hidden></span>
 </div>
 
 <div id="barra">

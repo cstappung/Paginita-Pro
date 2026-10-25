@@ -47,6 +47,7 @@ import { escribirNombres, leerNombresCpu, leerSkins, escribirSkins } from './nom
 import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
+import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -163,6 +164,11 @@ const ORIGEN = (parametros.get('privado') || '').replace(/\/+$/, '');
 // (el marco padre, como el de BT3) y se lo pone a cada pedido que va a ORIGEN (bitácora §65). Sin ORIGEN, nada cambia.
 const privado = ORIGEN ? crearPrivado({ origen: ORIGEN }).instalar() : null;
 window.mkwPrivado = privado;
+// §106: la barra de descarga (descargas.mjs): encima del fetch con token, cuenta lo que llega de lo privado (sin ORIGEN,
+// todo lo que se pide con fetch es del juego: servidor.mjs). ?barraDescarga=0 = sin contar ni mostrar nada.
+const descargas = parametros.get('barraDescarga') === '0' ? null : crearDescargas({ base: ORIGEN ? ORIGEN + '/' : '' });
+if (descargas) window.fetch = descargas.envolver(window.fetch.bind(window));
+window.mkwDescargas = descargas;
 const TRAZA_DISCO = parametros.has('trazaDisco');   // anotar cada lectura del disco que hace el juego (bitácora §52)
 const CUADROS_PRUEBA = Number(parametros.get('cuadros') || 0);   // 0 = jugar sin fin
 const { ok, nota, fin } = prueba('juego', 'Juego en el navegador (fase 3)');
@@ -704,6 +710,10 @@ var ui = crearInterfaz({ guardado, sonido, controles, imagenes: ORIGEN + '/build
   estadoNube: () => nube?.estado,
   alCambiarGuardado: () => { guardadosAlAbrir = esperaLectura.then(() => guardado.cargar()).catch(() => new Map()); } });
 window.mkwInterfaz = ui;
+// §106: la barra, abajo a la izquierda (sobre la cortina de carga, al centro y con «queda guardado» la primera vez)
+// (la cortina «puesta» pero tapada por la portada, ?portada=1, no cuenta: se mira si de verdad se ve)
+if (descargas) montarBarraDescarga($('descarga'), descargas, { primeraVez: () => descargas.primeraVez,
+  enCortina: () => ui.cortinaPuesta && getComputedStyle($('cortina')).visibility !== 'hidden' });
 
 // ---- El menú de inicio «JloKart Wii» (inicio.mjs, bitácora §67) ----
 // Sale al abrir el juego sin un modo ya decidido (sin ?modo= de una sala): la imagen del dueño con Single Player,
@@ -935,8 +945,10 @@ async function arrancar() {
       let datos;
       const t0 = performance.now();
       const donde = TRAZA_DISCO ? disco.donde(direccion(ruta), inicio) : null;   // diagnóstico: dónde estaba el bloque
+      descargas?.esperaJuego(+1);                              // §106: el juego espera (si tarda, la barra lo dice)
       try { datos = await disco.leer(direccion(ruta), tam, inicio, largo); }   // bloques de 256 KB, con caché
       catch (e) { escribe('[mkw] ' + e.message); return -1; }
+      finally { descargas?.esperaJuego(-1); }
       msEsperaDisco += performance.now() - t0;   // el juego estuvo parado esperando estos bytes
       if (TRAZA_DISCO && performance.now() - t0 > 5) { const ms = performance.now() - t0; donde.then(d => escribe(`[espera] ${ms.toFixed(0)} ms ${ruta} ${inicio} ${largo} ${JSON.stringify(d)}`)); }
       lecturas++; bytes += datos.length;
@@ -1014,6 +1026,7 @@ async function arrancar() {
       inicio: t1, llegó: w.responseEnd, listo, bajarMs: w.responseEnd - w.startTime, compilarMs: listo - w.responseEnd,
       bytes: w.transferSize, comprimido: w.encodedBodySize, descomprimido: w.decodedBodySize,
     } : { inicio: t1, listo };
+    if (w) descargas?.programaListo(w.name, w.decodedBodySize, w.encodedBodySize);   // §106: la próxima vez, sin contarlo
     if (w) nota(`programa: llegó en ${(w.responseEnd - w.startTime).toFixed(0)} ms (${(w.transferSize / 1048576).toFixed(1)} MB por la red` +
                 `${w.transferSize === 0 ? ', de la caché' : ''}), listo ${(listo - w.responseEnd).toFixed(0)} ms después`);
   }

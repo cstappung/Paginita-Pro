@@ -12,7 +12,9 @@ const path = require('path');                 // armar rutas sin errores de barr
 
 const RAIZ = __dirname;                       // lo que se sirve: la carpeta banco/
 const WEB = path.join(__dirname, '..', 'web'); // y web/ (código de la página, sin nada del juego) en /web/
-const SITIO_AUDIO = path.join(__dirname, '..', 'terceros', 'Paginita-Pro', 'juegos', 'audio');   // §100: en /sitio/audio/
+// §100: en /sitio/audio/ (en la PC del proyecto, el clon de terceros/; dentro del sitio, juegos/audio al lado de juegos/mkw)
+const SITIO_AUDIO = [path.join(__dirname, '..', 'terceros', 'Paginita-Pro', 'juegos', 'audio'), path.join(__dirname, '..', '..', 'audio')]
+  .find(d => fs.existsSync(d)) || path.join(__dirname, '..', 'terceros', 'Paginita-Pro', 'juegos', 'audio');
 const PUERTO = Number(process.argv[2]) || 8130;
 const TIPOS = {                               // extensión → tipo de contenido
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
