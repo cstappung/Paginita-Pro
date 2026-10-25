@@ -506,6 +506,11 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 23:49** — **Publicado del lado de Cloudflare** (lo hizo el dueño, `docs/publicar.md` pasos 1-3): el bucket propio
+  `mkw-retro` con los 7.324 archivos (5,00 GB; `--comprobar` daba 325 «0 bytes» por un error del revisor, §105.1), el
+  Worker nuevo pegado y el enlace `MKW`. Revisado desde aquí sin sesión: `/mkw/manifiesto.json` y `POST /mkw/lote` dicen
+  401 «inicia sesión» y la pregunta previa permite POST (el código de §104). `privado.json` = el Worker + `/mkw`. Falta:
+  las reglas de Firebase (paso 5) y juntar la rama (paso 6, cuando el dueño lo pida).
 - **2026-10-24 23:09** — **Mario Kart en su propio bucket de R2** (§105, el dueño: «mejor creamos otro bucket para no usar el
   mismo»). El Worker lee Mario Kart del enlace `MKW` (sin él, de `DISCO`, como antes); las llaves no cambian, así que
   `subir-r2.mjs` sube igual con otro `R2_BUCKET`. El Worker local usa `MKW` y deja `DISCO` vacío. `publicar.md`: crear el

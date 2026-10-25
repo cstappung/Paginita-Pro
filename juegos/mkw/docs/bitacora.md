@@ -9838,3 +9838,12 @@ WebAssembly) y entonces la respuesta a `HEAD` llega **sin `Content-Length`**; el
 `subir-r2.mjs` pide todo sin comprimir (`Accept-Encoding: identity`, una cabecera que no va firmada). El R2 falso de
 `prueba-subir-r2.mjs` ahora hace lo mismo que Cloudflare (comprime el texto si el cliente acepta): con el script viejo
 da 19 bien y 4 mal, con el arreglo 23/23. El Worker no se entera de nada de esto (lee R2 por su enlace, no por la API S3).
+
+### 105.2 El Worker publicado y la dirección
+
+El dueño pegó el Worker nuevo y agregó el enlace `MKW` → `mkw-retro`. Revisado desde aquí, sin sesión (no baja nada del
+juego): `GET /mkw/manifiesto.json` → 401 «inicia sesión»; la pregunta previa de `POST /mkw/lote` → 204 con
+`Access-Control-Allow-Methods: GET, HEAD, PUT, POST, OPTIONS` (el Worker viejo no tenía POST) y el lote sin sesión → 401
+(el viejo contestaba 404). El enlace `MKW` solo se ve con la sesión de un amigo: la primera partida de un amigo lo
+prueba. `privado.json` (→ `juegos/mkw/privado.json` del sitio) = `https://bt3-disco.rayoluxd1.workers.dev/mkw`: el sitio
+lo lee recién cuando la rama se junte a `main`.
