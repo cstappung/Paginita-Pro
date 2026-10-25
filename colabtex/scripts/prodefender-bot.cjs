@@ -204,7 +204,7 @@ function tiro(li, type, tiers, x, y, muneco, vida, cada, entradas) {
 }
 
 class Bot {
-  // op: {guion, hasta, sinAnticipa, banco, covBanco} (las pruebas de guiones prestados)
+  // op: {guion, hasta, sinAnticipa, banco, covBanco}: para jugar a prueba con otro guion, hasta una ronda, sin anticipar o sin medir de nuevo el campo de tiro
   constructor(li, estrategia, semilla, op = {}) {
     this.op = op;
     this.li = li; this.est = ESTRATEGIAS[estrategia]; this.nombre = estrategia; this.semilla = semilla >>> 0;
@@ -241,7 +241,7 @@ class Bot {
     const pool = PD.LEVELS[li].pool.map(p => PD.ENEMIES[p[0]]).concat([PD.ENEMIES[PD.LEVELS[li].boss]]);
     this.mec = { protege: pool.some(d => d.thunder || d.ink || d.grab), fuego: pool.some(d => d.regenFuego), adapta: pool.some(d => d.adapt) };
     if (op.banco) { this.banco = op.banco; this.covBanco = op.covBanco; } else this.campo();
-    if (this.est.humana) this.guion = op.guion || this.guionPropio() || (GUION > 0 ? this.prestaGuion() : null);
+    if (this.est.humana) this.guion = op.guion || this.guionPropio();
   }
   // mide todas las combinaciones de todas las torres permitidas (una vez por partida)
   campo() {
@@ -576,15 +576,30 @@ class Bot {
   }
   // gasta con ese plan: el guion (adelantado n rondas con «adelantaN») y, si ya no hay guion
   // o el plan es otro, por su cuenta
-  planea(modo) {
+  // «ahorra» no gasta nada; `acc`, las compras del rescate (abajo), van al final
+  planea(modo, acc) {
     const r = this.game.round + 1, adel = /^adelanta(\d+)$/.exec(modo);
-    const enGuion = this.sigueGuion(adel ? r + +adel[1] : r);
-    if (!enGuion || (modo !== 'normal' && !adel)) this.turno();
+    if (modo !== 'ahorra') {
+      const enGuion = this.sigueGuion(adel ? r + +adel[1] : r);
+      if (!enGuion || (modo !== 'normal' && !adel)) this.turno();
+    }
+    if (acc) this.aplica(acc);
+  }
+  // compras sueltas: {k: 'p', type, x, y} poner, {k: 'u', i, p} mejorar la torre n.º i
+  // (el orden de g.towers es el mismo en la copia y en el juego de verdad)
+  aplica(acc) {
+    const g = this.game;
+    for (const a of acc) {
+      if (a.k === 'p') {
+        const t = g.canPlace(a.type, a.x, a.y) ? g.place(a.type, a.x, a.y) : null;
+        if (t) { this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[a.type]) this.marca(t); }
+      } else { const t = g.towers[a.i]; if (t && g.canUpgrade(t, a.p)) g.upgrade(t, a.p); }
+    }
   }
   // gasta con ese plan en la copia y juega ahí la ronda siguiente
-  ensaya(modo) {
+  ensaya(modo, acc) {
     const c = this.copia();
-    c.modo = modo; c.planea(modo);
+    c.modo = modo; c.planea(modo, acc);
     const g = c.game, v0 = g.lives;
     if (g.pactoPendiente()) eligePacto(g);
     g.startRound();
@@ -614,19 +629,57 @@ class Bot {
   // si ninguno, el que menos pierde. Fuera del guion no se prueban los «adelanta».
   // Con guion, gastar por su cuenta le quita oro a lo que el guion compra después y lo
   // desarma: solo si ni el guion ni adelantarlo bastan y se perderían bastantes vidas.
+  // Con guion: el guion o adelantarlo. Sin guion: no gastar nada. Si así pierde vidas (con
+  // guion, bastantes: desviarse le quita oro a lo que el guion compra después), el rescate
+  // busca las compras más baratas que salvan la ronda; si ni así, los planes de gasto de la
+  // anticipación. Gana el que menos pierde.
   elegirHumana() {
-    const queda = this.guion && this.game.round + 1 <= GUION && (this.gi || 0) < this.guion.length;
-    // un guion prestado de otro reino es solo una sugerencia: a la primera vida perdida se prueba todo
-    const umbral = queda && !this.prestado ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 0;
+    const r = this.game.round + 1, queda = this.guion && r <= GUION && (this.gi || 0) < this.guion.length;
+    const umbral = queda ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 1;
     let mejor = null;
-    for (const m of queda ? MODOS_GUION : MODOS) {
-      if (queda && !/^(normal|adelanta)/.test(m) && mejor && mejor[1].perdidas < umbral) break;
-      const x = this.ensaya(m);
-      if (process.env.PD_DEBUG) console.log(`    r${this.game.round + 1} ${m}: pierde ${x.perdidas}, oro ${Math.round(x.oro)}`);
-      if (x.perdidas === 0) return m;
-      if (!mejor || x.perdidas < mejor[1].perdidas || x.perdidas === mejor[1].perdidas && x.av < mejor[1].av) mejor = [m, x];
+    const prueba = (m, acc) => {
+      const x = this.ensaya(m, acc);
+      if (process.env.PD_DEBUG) console.log(`    r${r} ${m}${acc ? '+' + acc.length : ''}: pierde ${x.perdidas}, oro ${Math.round(x.oro)}`);
+      if (!mejor || x.perdidas < mejor.x.perdidas || x.perdidas === mejor.x.perdidas && x.av < mejor.x.av) mejor = { m, acc, x };
+      return x;
+    };
+    for (const m of queda ? MODOS_GUION.filter(m => /^(normal|adelanta)/.test(m)) : ['ahorra']) if (prueba(m).perdidas === 0) return this.toma(mejor);
+    if (mejor.x.perdidas < umbral) return this.toma(mejor);
+    const base = mejor.m, acc = this.rescate(base, mejor.x);
+    if (acc.length) prueba(base, acc);
+    if (mejor.x.perdidas === 0) return this.toma(mejor);
+    for (const m of MODOS) if (prueba(m).perdidas === 0) break;
+    return this.toma(mejor);
+  }
+  toma(x) { this.plan = x.acc || null; return x.m; }
+  // Rescate: de a una compra (una torre en el mejor sitio libre o el próximo paso del plan de
+  // una torre), la más barata que salva la ronda; si ninguna, la que más vidas salva por oro.
+  rescate(modo, x0) {
+    const acc = [];
+    let best = x0;
+    for (let it = 0; it < 8 && best.perdidas > 0; it++) {
+      const c0 = this.copia(); c0.planea(modo, acc);
+      const g = c0.game, cands = [];
+      for (const type of this.permitidas) {
+        if (PD.TOWERS[type].hero && g.towers.some(t => t.def.hero)) continue;
+        const cost = g.towerCost ? g.towerCost(type) : PD.TOWERS[type].cost;
+        if (cost > g.money) continue;
+        const s = c0.sitio(type);
+        if (s) cands.push({ k: 'p', type, x: s[0], y: s[1], cost });
+      }
+      g.towers.forEach((t, i) => {
+        const p = c0.pasosPlan(t)[0];
+        if (p !== undefined && g.canUpgrade(t, p) && g.upgradeCost(t, p) <= g.money) cands.push({ k: 'u', i, p, cost: g.upgradeCost(t, p) });
+      });
+      const res = cands.map(a => [a, this.ensaya(modo, acc.concat([a]))]);
+      const salva = res.filter(([, x]) => x.perdidas === 0).sort((a, b) => a[0].cost - b[0].cost)[0];
+      if (salva) { acc.push(salva[0]); best = salva[1]; break; }
+      let el = null, sc = 0;
+      for (const [a, x] of res) { const v = (best.perdidas - x.perdidas) / a.cost; if (v > sc) { sc = v; el = [a, x]; } }
+      if (!el) break;
+      acc.push(el[0]); best = el[1];
     }
-    return mejor[0];
+    return acc;
   }
 
   // Una partida entera. Devuelve el resumen.
@@ -637,9 +690,10 @@ class Bot {
     while (g.round < (this.op.hasta || PD.MAX_ROUND)) {
       this.vetadas = {};
       if (this.est.humana) { this.rehaceDe(JSON.parse(JSON.stringify(g.snapshot())), g.rs, g); g = this.game; }
+      this.plan = null;
       this.modo = this.elegir();
       this.vetadas = {};
-      this.planea(this.modo);
+      this.planea(this.modo, this.plan);
       foto = JSON.stringify(g.snapshot());
       // lo del bot al empezar la ronda (un reintento vuelve aquí: el guion y las torres de la
       // foto, aunque a mitad de la ronda haya vendido o puesto alguna)
@@ -692,39 +746,17 @@ class Bot {
       vidasFinal: G.lives, vidasMax: PD.LEVELS[this.li].lives, vidasPerdidas,
       avanceMedio: Math.round(filas.reduce((a, f) => a + f.avance, 0) / Math.max(1, filas.length)),
       avanceTarde: tarde.length ? Math.round(tarde.reduce((a, f) => a + f.avance, 0) / tarde.length) : null,
-      heroe: (G.towers.find(t => t.def.hero) || { tiers: null }).tiers, prestado: this.prestado,
+      heroe: (G.towers.find(t => t.def.hero) || { tiers: null }).tiers,
       filas
     };
   }
   // «humana», al principio: la mejor partida de una persona en este reino, jugada a jugada
   // (las de las rondas que ya tocan, en orden; si no alcanza el oro, ahorra como ella).
   // Devuelve si sigue en el guion (entonces no gasta por su cuenta).
-  // El guion de este reino (con sus sitios) o, si nadie lo ganó, el de otro reino que mejor le
-  // resulta aquí hasta la ronda 30: las mismas compras en el mismo orden, sin las torres que
-  // este reino no vende, con el héroe de este reino y cada torre en el mejor sitio libre.
+  // la mejor partida de una persona en este reino, si alguien lo ganó
   guionPropio() {
     const gu = LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
     return gu ? gu.jugadas : null;
-  }
-  prestaGuion() {
-    const vende = PD.towersFor(this.li), heroe = heroeDe(this.li);
-    let mejor = null;
-    for (const [slug, gu] of Object.entries(LIBRO.guiones || {})) {
-      const J = [], nuevo = [];
-      for (const a of gu.jugadas) {
-        if (a[2] === 'p') {
-          const t = PD.TOWERS[a[3]].hero ? heroe : a[3];
-          nuevo.push(t && vende.includes(t) ? J.filter(x => x[2] === 'p').length : -1);
-          if (nuevo[nuevo.length - 1] >= 0) J.push([a[0], a[1], 'p', t]);
-        } else if (nuevo[a[3]] >= 0) J.push([a[0], a[1], a[2], nuevo[a[3]], a[4]]);
-      }
-      const b = new Bot(this.li, this.nombre, this.semilla, { guion: J, hasta: 30, sinAnticipa: true, banco: this.banco, covBanco: this.covBanco });
-      const x = b.juega(false);
-      const nota = (x.primeraDerrota ? (101 - x.primeraDerrota) * 1e4 : 0) + x.vidasPerdidas.reduce((a, v) => a + v, 0);
-      if (!mejor || nota < mejor.nota) mejor = { nota, J, slug };
-    }
-    if (mejor) this.prestado = mejor.slug;
-    return mejor ? mejor.J : null;
   }
   // Hace lo del guion hasta la ronda r. Lo que la persona hizo durante una ronda espera a esa
   // ronda y a su paso (`pasos`, los de la ronda en curso; sin él, se está entre rondas).
@@ -733,11 +765,22 @@ class Bot {
     const g = this.game, J = this.guion, cur = g.round + 1;
     this.gi = this.gi || 0; this.gTorres = this.gTorres || [];
     const torre = n => { const id = this.gTorres[n]; return id === undefined ? null : g.towers.find(t => t.id === id) || null; };
+    // Lo que el bot puso por su cuenta (al rescatar una ronda) le quita oro al guion: con el
+    // guion de este reino, se vende si con eso alcanza lo que toca.
+    const extras = () => g.towers.filter(t => !this.gTorres.includes(t.id) && !t.def.hero).sort((x, y) => g.sellValue(x) - g.sellValue(y));
+    const alcanza = costo => g.money + extras().reduce((a, t) => a + g.sellValue(t), 0) >= costo;
+    const paga = costo => {
+      if (g.money >= costo) return true;
+      if (!alcanza(costo)) return false;
+      for (const t of extras()) { if (g.money >= costo) break; g.sell(t); this.mem.delete(t.id); }
+      return true;
+    };
     while (this.gi < J.length && J[this.gi][0] <= r) {
       const [ronda, cuando, k, a, b, c] = J[this.gi];
+      if (process.env.PD_DEBUG > 1) console.log(`      guion ${this.gi}: ${JSON.stringify(J[this.gi])} oro ${Math.round(g.money)} paso ${pasos}`);
       if (cuando >= 0 && ronda >= cur && (pasos === undefined || ronda > cur || cuando > pasos)) return true;
       if (k === 'p') {
-        if (g.money < (g.towerCost ? g.towerCost(a) : PD.TOWERS[a].cost)) return true;
+        if (!paga(g.towerCost ? g.towerCost(a) : PD.TOWERS[a].cost)) return true;
         const s = b === undefined ? this.sitio(a) : [b, c];
         const t = s && g.canPlace(a, s[0], s[1]) ? g.place(a, s[0], s[1]) : null;
         if (t) {
@@ -747,7 +790,7 @@ class Bot {
         this.gTorres.push(t ? t.id : -1);
       } else if (k === 'u') {
         const t = torre(a);
-        if (t && g.canUpgrade(t, b)) { if (g.money < g.upgradeCost(t, b)) return true; g.upgrade(t, b); }
+        if (t && g.canUpgrade(t, b)) { if (!paga(g.upgradeCost(t, b))) return true; g.upgrade(t, b); }
       } else if (k === 'v') {
         // vender para pagar lo que sigue: solo si con lo vendido alcanza (si no, se quedaría
         // sin esas torres y sin lo que iba a comprar)
@@ -757,7 +800,7 @@ class Bot {
         if (sig) {
           const tt = sig[2] === 'u' ? torre(sig[3]) : null;
           const costo = sig[2] === 'p' ? (g.towerCost ? g.towerCost(sig[3]) : PD.TOWERS[sig[3]].cost) : tt && g.canUpgrade(tt, sig[4]) ? g.upgradeCost(tt, sig[4]) : 0;
-          if (oro < costo) return true;
+          if (!alcanza(costo - (oro - g.money))) return true;
         }
         const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); }
       }
@@ -800,7 +843,7 @@ function main() {
     res.push(x);
     if (!args.includes('--json')) {
       console.log(`${x.reino.padEnd(8)} ${x.estrategia.padEnd(8)} s${x.semilla}  ronda ${String(x.ronda).padStart(3)}${x.gano ? ' GANA' : '     '}  1ª derrota ${x.primeraDerrota ?? '-'}  reintentos ${x.reintentosUsados}  vidas ${x.vidasFinal}/${x.vidasMax}  ` +
-        `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}${x.prestado ? '  guion de ' + x.prestado : ''}  ${(x.ms / 1000).toFixed(0)} s`);
+        `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`);
     }
   }
   if (args.includes('--json')) console.log(JSON.stringify(res));
