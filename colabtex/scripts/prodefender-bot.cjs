@@ -142,6 +142,7 @@ const LIBRO = (() => {
 })();
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
 const GUION = +opt('guion', 100);
+const HORIZONTE = +opt('horizonte', 2);
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   humana: { rota: MIXTA, humana: true },
@@ -593,24 +594,37 @@ class Bot {
       if (a.k === 'p') {
         const t = g.canPlace(a.type, a.x, a.y) ? g.place(a.type, a.x, a.y) : null;
         if (t) { this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[a.type]) this.marca(t); }
-      } else { const t = g.towers[a.i]; if (t && g.canUpgrade(t, a.p)) g.upgrade(t, a.p); }
+      } else {
+        const t = g.towers[a.i];
+        if (t && g.canUpgrade(t, a.p)) g.upgrade(t, a.p);
+        if (t && a.k === 'u2' && g.canUpgrade(t, a.q)) g.upgrade(t, a.q);
+      }
     }
   }
-  // gasta con ese plan en la copia y juega ahí la ronda siguiente
+  // Gasta con ese plan en la copia y juega ahí la ronda siguiente. «humana» mira una ronda
+  // más (`--horizonte`, 2 por defecto) sin más compras que las del guion: lo que pierda en
+  // ella cuenta la mitad. Así una compra que rinde dos rondas le gana a una que salva una.
   ensaya(modo, acc) {
     const c = this.copia();
     c.modo = modo; c.planea(modo, acc);
-    const g = c.game, v0 = g.lives;
-    if (g.pactoPendiente()) eligePacto(g);
-    g.startRound();
-    let pasos = 0, av = 0;
-    while (g.active && !g.over && pasos < 60 * 900) {
-      c.enRonda(pasos);
-      g.update(STEP); pasos++;
-      if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
-      if (pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
+    const g = c.game, H = this.est.humana ? HORIZONTE : 1;
+    let perdidas = 0, av = 0;
+    for (let h = 0; h < H && !g.over && g.round < PD.MAX_ROUND; h++) {
+      if (h) { c.vetadas = {}; c.planea(modo === 'ahorra' ? 'ahorra' : 'normal'); }
+      const v0 = g.lives;
+      if (g.pactoPendiente()) eligePacto(g);
+      g.startRound();
+      let pasos = 0;
+      while (g.active && !g.over && pasos < 60 * 900) {
+        c.enRonda(pasos);
+        g.update(STEP); pasos++;
+        if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
+        if (!h && pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
+      }
+      perdidas += (v0 - g.lives + (g.over ? 1000 : 0)) * (h ? 0.5 : 1);
+      if (!h) var oro = g.money;
     }
-    return { perdidas: v0 - g.lives + (g.over ? 1000 : 0), av, oro: g.money };
+    return { perdidas, av, oro };
   }
   // Si el plan normal pasa la ronda sin pérdidas, ese. Si no, el que la pase guardando más
   // oro; y si ninguno la pasa limpia, el que menos pierde (y menos deja avanzar).
@@ -668,8 +682,16 @@ class Bot {
         if (s) cands.push({ k: 'p', type, x: s[0], y: s[1], cost });
       }
       g.towers.forEach((t, i) => {
-        const p = c0.pasosPlan(t)[0];
-        if (p !== undefined && g.canUpgrade(t, p) && g.upgradeCost(t, p) <= g.money) cands.push({ k: 'u', i, p, cost: g.upgradeCost(t, p) });
+        const [p, q] = c0.pasosPlan(t);
+        if (p === undefined || !g.canUpgrade(t, p)) return;
+        const c1 = g.upgradeCost(t, p);
+        if (c1 <= g.money) cands.push({ k: 'u', i, p, cost: c1 });
+        // y dos pasos de una vez (las mejoras grandes no se ven de a uno)
+        if (q !== undefined) {
+          const tt = { ...t, tiers: t.tiers.slice() }; tt.tiers[p]++;
+          const c2 = c1 + g.upgradeCost(tt, q);
+          if (c2 <= g.money) cands.push({ k: 'u2', i, p, q, cost: c2 });
+        }
       });
       const res = cands.map(a => [a, this.ensaya(modo, acc.concat([a]))]);
       const salva = res.filter(([, x]) => x.perdidas === 0).sort((a, b) => a[0].cost - b[0].cost)[0];
