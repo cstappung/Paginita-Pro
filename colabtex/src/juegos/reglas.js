@@ -517,7 +517,7 @@ const REGLAS = {
         "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."
       ])],
       ["Llegar tarde y salir", lista([
-        "Quien entra con la copa andando espera a la <b>siguiente</b>.",
+        "Quien entra con la copa andando <b>se suma</b>: carga el juego, elige personaje en el descanso y corre desde la <b>carrera siguiente</b> (empieza con 0 puntos). Caben 12.",
         "Si a alguien se le corta la conexión, la carrera sigue sin él (al empezar cada carrera se lo espera unos segundos más) y vuelve en la siguiente; lo mismo si recarga la página.",
         "Si el anfitrión se va, el puesto pasa al siguiente y la copa sigue.",
         "Cada carrera termina 30 s después de que llega el primero (a los que faltan el juego les da un tiempo), o a los 5 minutos."

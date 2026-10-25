@@ -8,7 +8,8 @@
 // web/navegador/pad_web.cpp). No sabe nada del juego: por eso se prueba solo en el banco (banco/pruebas/controles).
 //
 //   - Teclado → puerto 1. Mapeo por defecto pensado para Mario Kart, cambiable y guardado en el navegador.
-//   - Mandos → el primero comparte el puerto 1 con el teclado; los siguientes van a los puertos 2, 3 y 4.
+//   - Mandos → el primero comparte el puerto 1 con el teclado; los siguientes van a los puertos 2, 3 y 4. La persona
+//     puede elegir qué jugador es cada mando (elegirPuerto, se recuerda por mando), como en BT3.
 //     Mapeo "standard" del navegador (Xbox/PlayStation/Switch Pro/genéricos), zona muerta ajustable, gatillos
 //     analógicos; disposición «por letra» para los de Nintendo (A a la derecha) y asignación propia por mando (para
 //     adaptadores de GameCube y mandos sin mapeo estándar), todo guardado en el navegador ("mkw.mandos").
@@ -75,7 +76,38 @@ export const NOMBRE_TIPO = { nintendo: 'Nintendo (Switch Pro / Joy-Con)', playst
 export const ASIGNABLES = [['A', 'A — acelerar'], ['B', 'B — frenar'], ['R', 'R — derrapar'], ['L', 'L — objeto'], ['X', 'X — mirar atrás'],
   ['Y', 'Y'], ['Z', 'Z'], ['START', 'Start — pausa'], ['arriba', 'Cruz arriba — truco'], ['abajo', 'Cruz abajo'], ['izquierda', 'Cruz izquierda'], ['derecha', 'Cruz derecha']];
 const CLAVE_MANDOS = 'mkw.mandos';
-const PREFS_MANDOS = { disposicion: 'auto', zona: 15, vibrar: true, propios: {} };   // zona muerta en %
+// zona muerta en %; puertos = el jugador que la persona eligió para cada mando (clave del mando → puerto 0..3)
+const PREFS_MANDOS = { disposicion: 'auto', zona: 15, vibrar: true, propios: {}, puertos: {} };
+
+// La clave de un mando: su nombre (g.id) y, si hay dos iguales conectados, cuál de ellos (#2, #3… por orden de índice).
+// El índice solo no sirve para recordarlo: cambia al desconectar y volver a conectar; el nombre solo, tampoco: dos
+// mandos iguales lo comparten. Como dos enchufes iguales en un tablero: se distinguen por su posición en la fila.
+export function clavesMandos(lista) {
+  const vistos = new Map();                                   // nombre → cuántos van con ese nombre
+  return [...lista].sort((a, b) => a.index - b.index).map(g => {
+    const n = (vistos.get(g.id) || 0) + 1;
+    vistos.set(g.id, n);
+    return [g.index, n === 1 ? g.id : `${g.id}#${n}`];
+  });
+}
+
+// Reparte los mandos en los 4 puertos (jugadores). Primero los que tienen un jugador elegido (si dos eligieron el mismo,
+// gana el de menor índice); después los demás, cada uno en el primer puerto libre. Devuelve Map índice → puerto.
+// (Los que no caben, del 5.º en adelante, quedan sin puerto: el juego solo tiene 4.)
+export function repartirPuertos(claves, elegidos = {}) {
+  const puertos = new Map(), usados = new Set();
+  for (const [indice, clave] of claves) {
+    const p = elegidos[clave];
+    if (Number.isInteger(p) && p >= 0 && p <= 3 && !usados.has(p)) { puertos.set(indice, p); usados.add(p); }
+  }
+  for (const [indice] of claves) {
+    if (puertos.has(indice)) continue;
+    const libre = [0, 1, 2, 3].find(p => !usados.has(p));
+    if (libre === undefined) break;
+    puertos.set(indice, libre); usados.add(libre);
+  }
+  return puertos;
+}
 
 // stick del navegador (−1..1, +y = ABAJO) → stick de GameCube (−128..127, +y = ARRIBA), con zona muerta redonda
 // (un stick suelto nunca marca 0 exacto: por debajo de la zona muerta se toma como centro; por defecto 15 %)
@@ -102,8 +134,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
   const ultimo = [];                              // lo último enviado por puerto (para no repetir)
-  const estado = { puertos: [], mandos: [] };     // para mostrar en pantalla y para las pruebas
+  const estado = { puertos: [], mandos: [], bloqueados: false };   // para mostrar en pantalla y para las pruebas
   const prefsMandos = { ...PREFS_MANDOS, ...(leer(CLAVE_MANDOS) || {}) };   // disposición, zona muerta, vibrar, asignaciones
+  prefsMandos.propios = { ...(prefsMandos.propios || {}) };            // (copias propias: el default no se toca)
+  prefsMandos.puertos = { ...(prefsMandos.puertos || {}) };
   let asignando = null;                           // { id, boton, antes:Set, listo } mientras el asistente espera un botón
 
   // --- teclado ---
@@ -142,21 +176,31 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   }
 
   // --- mandos (Gamepad API) ---
+  // Si el navegador no deja leer mandos aquí (un marco sin permiso «gamepad»: getGamepads lanza un error), se anota en
+  // estado.bloqueados y se sigue sin mandos: el teclado no se puede caer por eso.
+  const listaMandos = () => {
+    try { estado.bloqueados = false; return (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(Boolean); }
+    catch { estado.bloqueados = true; return []; }
+  };
+  let firmaReparto = '';                          // qué mandos había la última vez que se repartieron los puertos
   function leerMandos() {
-    const lista = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(Boolean);
-    for (const idx of [...puertosMando.keys()]) if (!lista.some(g => g.index === idx)) puertosMando.delete(idx);
-    for (const g of lista) {                      // un mando nuevo va al primer puerto libre
-      if (puertosMando.has(g.index)) continue;
-      const usados = new Set(puertosMando.values());
-      const libre = [0, 1, 2, 3].find(p => !usados.has(p));
-      if (libre !== undefined) puertosMando.set(g.index, libre);
+    const lista = listaMandos();
+    const claves = clavesMandos(lista);
+    const claveDe = new Map(claves);
+    // se reparte de nuevo solo si cambió qué mandos hay (o lo que eligió la persona): así nadie salta de puerto solo
+    const firma = claves.map(c => c.join('=')).join('|');
+    if (firma !== firmaReparto) {
+      firmaReparto = firma;
+      puertosMando.clear();
+      for (const [i, p] of repartirPuertos(claves, prefsMandos.puertos)) puertosMando.set(i, p);
     }
     const zona = Math.min(0.4, Math.max(0.03, prefsMandos.zona / 100));
     return lista.map(g => {
       const tipo = tipoMando(g.id), propio = prefsMandos.propios[g.id];
       const letra = prefsMandos.disposicion === 'letra' || (prefsMandos.disposicion === 'auto' && tipo === 'nintendo');
       const apretado = i => !!(g.buttons[i] && g.buttons[i].pressed);
-      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, tipo, letra, propio: !!propio, sinMapa: g.mapping !== 'standard' && !propio, mando: g };
+      const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), indice: g.index, tipo, letra,
+                      propio: !!propio, sinMapa: g.mapping !== 'standard' && !propio, mando: g };
       // el asistente de asignar: el primer botón que se aprieta (y no estaba apretado al empezar) queda para ese botón
       if (asignando && asignando.id === g.id) {
         const i = g.buttons.findIndex((b, k) => b && b.pressed && !asignando.antes.has(k));
@@ -300,6 +344,23 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     },
     cancelarAsignacion() { if (asignando) { asignando.listo(null); asignando = null; } },
     borrarAsignacion(id) { delete prefsMandos.propios[id]; guardar(CLAVE_MANDOS, prefsMandos); },
+    // Elegir qué jugador (puerto 0..3) es un mando (como el «qué mando usa cada jugador» de BT3). Si ese jugador ya lo
+    // tenía otro mando conectado, se cambian de lugar: el otro queda con el jugador que tenía este. Se guarda por mando.
+    elegirPuerto(clave, puerto) {
+      puerto = Number(puerto);
+      if (!Number.isInteger(puerto) || puerto < 0 || puerto > 3) return;
+      const mandos = estado.mandos || [];
+      const este = mandos.find(m => m.clave === clave);
+      const otro = mandos.find(m => m.clave !== clave && m.puerto === puerto);
+      if (otro && este && este.puerto !== undefined) prefsMandos.puertos[otro.clave] = este.puerto;   // el cambio de lugar
+      else if (otro) delete prefsMandos.puertos[otro.clave];                                         // (este no tenía: el otro busca uno libre)
+      for (const [k, p] of Object.entries(prefsMandos.puertos)) if (p === puerto && k !== clave && k !== otro?.clave) delete prefsMandos.puertos[k];
+      prefsMandos.puertos[clave] = puerto;
+      guardar(CLAVE_MANDOS, prefsMandos);
+      firmaReparto = '';                         // repartir de nuevo en el próximo cuadro
+      ultimo.length = 0;                         // y volver a mandar los 4 puertos al juego
+      paso();
+    },
     tactil(activar) { tactil.activo = activar; if (tactilUI) tactilUI.mostrar(activar); },
     // Tamaño (0,8–1,3) y opacidad (0,3–1) del mando táctil, guardados en el navegador ("mkw.tactil")
     ajustesTactil: () => ({ ...ajustesTactil }),

@@ -6,6 +6,10 @@
 // «Asignar botones» un asistente pide, uno por uno, que aprietes el botón del mando para A, B, R, L… (útil con
 // adaptadores de GameCube y mandos sin mapeo estándar, que el navegador no sabe leer solo). Arriba, los ajustes de
 // todos: disposición (automática / por posición / por letra), zona muerta del stick y vibración (con «Probar»).
+// Cada tarjeta tiene además «Jugador 1–4»: qué jugador es ese mando (como en BT3, donde se elige qué mando usa cada
+// jugador). Elegir uno que ya tenía otro mando los cambia de lugar. Así, con dos mandos (o uno «virtual» de Steam o
+// DS4Windows al lado del de verdad), la persona elige cuál maneja al jugador 1 en vez de quedar con el primero que vio
+// el navegador.
 // Todo lo guarda controles.mjs en el navegador ("mkw.mandos").
 //
 // Uso:  montarMandos(document.getElementById('mandosPanel'), controles)
@@ -50,11 +54,16 @@ export function montarMandos(caja, controles) {
     const asistente = el('div', { className: 'asistente', hidden: true });
     const asignar = el('button', { type: 'button', className: 'boton', textContent: 'Asignar botones' });
     const borrar = el('button', { type: 'button', className: 'boton', textContent: 'Borrar asignación', hidden: true });
+    // qué jugador es este mando (1–4); «sin jugador» solo se ve si hay más de 4 mandos conectados
+    const jugador = el('select', { className: 'mando-jugador', title: 'Qué jugador maneja este mando' },
+      ...[0, 1, 2, 3].map(p => el('option', { value: String(p), textContent: `Jugador ${p + 1}` })),
+      el('option', { value: '', textContent: 'Sin jugador (más de 4 mandos)', disabled: true }));
+    jugador.onchange = () => { if (jugador.value !== '') controles.elegirPuerto(m.clave, Number(jugador.value)); };
     const nodo = el('div', { className: 'mando-tarjeta' },
-      el('div', { className: 'mando-cab' }, titulo, sub), aviso,
+      el('div', { className: 'mando-cab' }, el('div', { className: 'mando-nombre' }, titulo, sub), jugador), aviso,
       el('div', { className: 'probador' }, el('div', { className: 'stick-aro' }, punto), el('div', { className: 'luces' }, ...Object.values(luces))),
       el('div', { className: 'fila-botones' }, asignar, borrar), asistente);
-    const t = { nodo, luces, punto, titulo, sub, aviso, borrar, asistente, id: m.nombre };
+    const t = { nodo, luces, punto, titulo, sub, aviso, borrar, asistente, jugador, id: m.nombre };
     asignar.onclick = () => asistir(t);
     borrar.onclick = () => { controles.borrarAsignacion(t.id); };
     return t;
@@ -76,12 +85,16 @@ export function montarMandos(caja, controles) {
 
   // ---- cada 100 ms: tarjetas al día y luces del probador ----
   function pintar() {
-    const mandos = controles.estado.mandos || [];
-    for (const [id, t] of tarjetas) if (!mandos.some(m => m.nombre === id)) { t.nodo.remove(); tarjetas.delete(id); }
+    // (las tarjetas van por la clave del mando, no por su nombre: dos mandos iguales son dos tarjetas)
+    const mandos = (controles.estado.mandos || []).slice().sort((a, b) => (a.puerto ?? 9) - (b.puerto ?? 9));
+    for (const [clave, t] of tarjetas) if (!mandos.some(m => m.clave === clave)) { t.nodo.remove(); tarjetas.delete(clave); }
     for (const m of mandos) {
-      let t = tarjetas.get(m.nombre);
-      if (!t) { t = tarjeta(m); tarjetas.set(m.nombre, t); lista.append(t.nodo); }
-      t.titulo.textContent = `${ICONO[m.tipo] || '🎮'} ${NOMBRE_TIPO[m.tipo] || 'Mando'} · jugador ${m.puerto + 1}`;
+      let t = tarjetas.get(m.clave);
+      if (!t) { t = tarjeta(m); tarjetas.set(m.clave, t); }
+      lista.append(t.nodo);                       // (en orden de jugador: append de un nodo que ya está solo lo mueve)
+      const sinPuerto = m.puerto === undefined;
+      t.titulo.textContent = `${ICONO[m.tipo] || '🎮'} ${NOMBRE_TIPO[m.tipo] || 'Mando'}${sinPuerto ? ' · sin jugador' : ` · jugador ${m.puerto + 1}`}`;
+      if (document.activeElement !== t.jugador) t.jugador.value = sinPuerto ? '' : String(m.puerto);   // (no mientras la persona elige)
       t.sub.textContent = `${m.nombre.replace(/\s*\(.*$/, '')} · ${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}`;
       t.aviso.hidden = !m.sinMapa;
       t.borrar.hidden = !m.propio;
@@ -89,7 +102,11 @@ export function montarMandos(caja, controles) {
       t.punto.style.transform = `translate(${(m.sx / 128) * 18}px, ${(-m.sy / 128) * 18}px)`;
     }
     lista.classList.toggle('vacia', !mandos.length);
-    if (!mandos.length) lista.dataset.vacia = 'Ningún mando todavía: conéctalo y aprieta un botón para que el navegador lo vea.';
+    // Sin mandos: qué hacer. Chrome no muestra un mando a la página hasta que se aprieta un botón con la página a la vista
+    // (por privacidad); en el marco de Juegos, a veces hace falta un clic en el juego para que el marco sea el activo.
+    if (!mandos.length) lista.dataset.vacia = controles.estado.bloqueados
+      ? 'El navegador no deja leer mandos en esta página (permiso «gamepad» del marco). Recarga Juegos; si sigue, avísale al dueño.'
+      : 'Ningún mando todavía: conéctalo y aprieta un botón (si no aparece, haz clic en el juego y vuelve a apretar uno).';
   }
   setInterval(pintar, 100);
   pintar();

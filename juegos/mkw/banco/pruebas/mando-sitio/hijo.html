@@ -12,6 +12,8 @@
 <!-- Hace de la página de Mario Kart dentro del marco del sitio (banco mando-sitio, §100): un botón que llena todo (un
      menú de la página) y lo mismo que hace mkw.mjs con los mandos (montarMandoSitio). Nada del juego. -->
 <button id="boton" type="button">Un menú de la página</button>
+<!-- §106: la ayuda de teclado de la tarjeta de inicio (la misma clase que en index.html del juego) -->
+<div class="teclas" style="position:fixed;left:0;bottom:0;color:#fff"><kbd>K</kbd> acelerar · <kbd>J</kbd> frenar</div>
 <script>navigator.getGamepads = () => parent.mandosFalsos;</script>
 <script type="module">
 import { montarMandoSitio } from '/web/navegador/mando-sitio.mjs';
