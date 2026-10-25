@@ -417,6 +417,167 @@
       color: '#1a1030', accent: '#ffcf4d', shape: 'eclipse', boss: true,
       twins: ['solGemelo', 'lunaGemela'], silence: { every: 9, radius: 220 }, spawn: { every: 6, type: 'martir', n: 2 },
       desc: 'JEFE FINAL. SILENCIA las habilidades cercanas y, a la mitad de su vida, se PARTE en el Sol y la Luna.'
+    },
+
+    // ================= TERCERA ERA (reinos 11–15) =================
+    // Otra vez una mecánica por campo (engine.js: terceraEra y los ganchos de damage,
+    // kill y pick), así que los diez reinos anteriores se juegan exactamente igual:
+    //   rise        al caer se queda en huesos y se levanta (salvo fuego, explosivo o arcano)
+    //   raise       levanta como zombis a los caídos recientes de su alrededor
+    //   intangible  los proyectiles lo atraviesan
+    //   phylactery  esconde su alma en filacterias: invulnerable mientras vivan
+    //   deathSpores al morir suelta esporas que frenan a las torres cercanas
+    //   root        echa raíces: quieto, con más blindaje y curándose
+    //   pollen      su polen cura a los aliados cercanos
+    //   infect      infecta torres al azar: atacan a la mitad de velocidad
+    //   mirror      al bajar de esa parte de su vida se desdobla
+    //   maxHit      ningún golpe le quita más de esa parte de su vida
+    //   swap        cambia de sitio con una de sus ilusiones
+    //   frontShield de frente solo recibe esa parte del daño
+    //   gust        ráfaga que acorta el alcance de todas las torres
+    //   drain       chupa oro mientras vive
+    //   taunt       las torres a esa distancia tienen que dispararle
+    //   pumpkins    lanza calabazas que apagan torres
+    //   charge      embiste: corre mucho más unos segundos
+
+    // ---------------------- REINO 11 · NECRÓPOLIS OLVIDADA ----------------------
+    esqueleto: {
+      name: 'Esqueleto Errante', hp: 32, speed: 54, bounty: 5, leak: 2, r: 11,
+      rise: { dur: 2.5, hp: 0.5 },
+      color: '#e8e0c8', accent: '#7affb0', shape: 'skeleton',
+      desc: 'Al caer queda en un montón de HUESOS y a los 2.5 s se levanta con la mitad de su vida. El fuego, lo explosivo y el arcano lo rematan.'
+    },
+    nigromante: {
+      name: 'Nigromante', hp: 75, speed: 42, bounty: 10, leak: 4, r: 13,
+      raise: { every: 5, radius: 130, n: 3, hp: 0.4 },
+      color: '#3a2a4a', accent: '#7affb0', shape: 'necro',
+      desc: 'Cada 5 s LEVANTA como zombis a los últimos caídos de su alrededor (hasta 3), con el 40% de su vida.'
+    },
+    alma: {
+      name: 'Alma en Pena', hp: 28, speed: 76, bounty: 5, leak: 2, r: 11, flying: true, intangible: true,
+      color: '#bfe8ff', accent: '#7affb0', shape: 'soul',
+      desc: 'Voladora e INTANGIBLE: los proyectiles la atraviesan. Solo la dañan rayos, áreas, auras y disparos directos.'
+    },
+    filacteria: {
+      name: 'Filacteria', hp: 260, armor: 6, speed: 14, bounty: 20, leak: 3, r: 12, minor: true,
+      color: '#5a2a7a', accent: '#7affb0', shape: 'phylactery',
+      desc: 'Guarda el alma del Rey Liche: mientras quede una, el Liche es INVULNERABLE y anda despacio.'
+    },
+    liche: {
+      name: 'Rey Liche', hp: 6800, armor: 5, speed: 18, bounty: 900, leak: 9999, r: 44,
+      color: '#2a1a3a', accent: '#7affb0', shape: 'lich', boss: true,
+      phylactery: { at: [0.66, 0.33], type: 'filacteria', n: 3 },
+      sabotage: { every: 8, radius: 150, dur: 2 }, spawn: { every: 6, type: 'esqueleto', n: 3 },
+      desc: 'JEFE de la Necrópolis. Al perder un tercio de su vida esconde su alma en 3 FILACTERIAS: es invulnerable hasta que caigan. Congela torres e invoca esqueletos.'
+    },
+
+    // ------------------------ REINO 12 · JARDÍN DE ESPORAS ------------------------
+    seta: {
+      name: 'Seta Venenosa', hp: 48, speed: 46, bounty: 7, leak: 3, r: 12,
+      deathSpores: { radius: 95, dur: 4 },
+      color: '#c83a8a', accent: '#ffe0f0', shape: 'mushroom',
+      desc: 'Al morir suelta una nube de ESPORAS: las torres cercanas atacan a la mitad de velocidad durante 4 s.'
+    },
+    enredadera: {
+      name: 'Enredadera Trepadora', hp: 85, speed: 40, bounty: 9, leak: 3, r: 13,
+      root: { every: 5, dur: 2, armor: 12, regen: 0.06 },
+      color: '#3a8a3a', accent: '#ff7ad8', shape: 'vine',
+      desc: 'Cada 5 s ECHA RAÍCES 2 s: se queda quieta, gana blindaje 12 y se cura un 6% por segundo.'
+    },
+    polinizador: {
+      name: 'Polinizador', hp: 36, speed: 72, bounty: 7, leak: 2, r: 11, flying: true,
+      pollen: { radius: 85, heal: 0.03 },
+      color: '#ffd84d', accent: '#ff7ad8', shape: 'pollinator',
+      desc: 'Volador. Su POLEN cura a los aliados cercanos un 3% de su vida por segundo.'
+    },
+    reinaMicelio: {
+      name: 'Reina Micelio', hp: 7400, armor: 4, speed: 17, bounty: 950, leak: 9999, r: 46,
+      color: '#5a2a6a', accent: '#5affc8', shape: 'myco', boss: true,
+      infect: { every: 7, n: 3, dur: 6 }, pollen: { radius: 140, heal: 0.04 },
+      heads: { type: 'enredadera', n: 4, at: [0.66, 0.33] }, spawn: { every: 6, type: 'seta', n: 2 },
+      desc: 'JEFE del Jardín. INFECTA torres (atacan a la mitad de velocidad), cura a los suyos con su polen y hace brotar Enredaderas al perder vida.'
+    },
+
+    // ----------------------- REINO 13 · LABERINTO DE ESPEJOS -----------------------
+    reflejo: {
+      name: 'Reflejo', hp: 42, speed: 62, bounty: 6, leak: 2, r: 11, mirror: 0.5,
+      color: '#c8e8ff', accent: '#ff7ad8', shape: 'reflection',
+      desc: 'Al bajar de la mitad de su vida SE DESDOBLA: aparece una copia con la misma vida que le queda.'
+    },
+    prismaVivo: {
+      name: 'Prisma Viviente', hp: 75, armor: 2, speed: 48, bounty: 9, leak: 3, r: 13, maxHit: 0.07,
+      color: '#e0d0ff', accent: '#5affff', shape: 'prism',
+      desc: 'CORAZA DE CRISTAL: ningún golpe le quita más del 7% de su vida. Hacen falta muchos golpes: torres rápidas y daño continuo.'
+    },
+    ilusion: {
+      name: 'Ilusión', hp: 320, speed: 34, bounty: 0, leak: 1, r: 34, minor: true, ilusion: true,
+      color: '#c8e8ff', accent: '#ff7ad8', shape: 'mirrorqueen',
+      desc: 'Un reflejo de la Reina: no da oro y casi no quita vidas, pero ella puede CAMBIARSE DE SITIO con él.'
+    },
+    reinaEspejos: {
+      name: 'Reina de los Espejos', hp: 7000, armor: 3, speed: 20, bounty: 950, leak: 9999, r: 44,
+      color: '#a8c8ff', accent: '#ff7ad8', shape: 'mirrorqueen', boss: true,
+      spawn: { every: 8, type: 'ilusion', n: 2 }, swap: { every: 10 },
+      desc: 'JEFE del Laberinto. Crea ILUSIONES de sí misma, más rápidas que ella, y cada 10 s CAMBIA DE SITIO con una. ¡Acaba con las ilusiones!'
+    },
+
+    // ---------------------- REINO 14 · ARCHIPIÉLAGO CELESTE ----------------------
+    templario: {
+      name: 'Templario de Bronce', hp: 110, armor: 4, speed: 38, bounty: 11, leak: 4, r: 14, frontShield: 0.25,
+      color: '#c8903a', accent: '#5ad1ff', shape: 'templar',
+      desc: 'ESCUDO FRONTAL: de frente solo recibe el 25% del daño. Pon torres detrás de las curvas, que le den por la espalda.'
+    },
+    jinete: {
+      name: 'Jinete del Viento', hp: 40, speed: 92, bounty: 6, leak: 2, r: 11, flying: true,
+      teleport: { every: 4, dist: 90 },
+      color: '#bfe0ff', accent: '#ffffff', shape: 'windrider',
+      desc: 'Volador y veloz. Cada 4 s da un ACELERÓN y avanza de golpe.'
+    },
+    pirata: {
+      name: 'Pirata del Aire', hp: 30, speed: 70, bounty: 4, leak: 2, r: 10, steal: 0.02, minor: true,
+      color: '#3a4a6a', accent: '#ff4a3a', shape: 'pirate',
+      desc: 'Salta de los galeones. Si se escapa se lleva el 2% de tu oro.'
+    },
+    galeon: {
+      name: 'Galeón Celeste', hp: 900, armor: 3, speed: 30, bounty: 60, leak: 12, r: 26, flying: true, big: true,
+      spawn: { every: 5, type: 'pirata', n: 2 }, children: [['pirata', 4]], fugaHijos: 0.5,
+      color: '#8a5a3a', accent: '#ffe08a', shape: 'galleon',
+      desc: 'Barco VOLADOR blindado: deja caer Piratas del Aire cada 5 s y suelta 4 más al hundirse.'
+    },
+    tifon: {
+      name: 'Tifón, Dragón del Cielo', hp: 6600, shield: 1600, speed: 26, bounty: 950, leak: 9999, r: 46, flying: true,
+      color: '#3a8ad8', accent: '#e0f8ff', shape: 'skydragon', boss: true,
+      gust: { every: 9, dur: 4, f: 0.35 }, spawn: { every: 6, type: 'jinete', n: 3 },
+      desc: 'JEFE del Archipiélago. Volador con escudo. Su VENDAVAL acorta un 35% el alcance de todas tus torres durante 4 s.'
+    },
+
+    // ------------------------- REINO 15 · LA NOCHE ETERNA -------------------------
+    calabaza: {
+      name: 'Calabaza Maldita', hp: 60, speed: 44, bounty: 7, leak: 3, r: 13, resist: { fire: 0.5 },
+      children: [['semilla', 4]],
+      color: '#ff8a1a', accent: '#ffe060', shape: 'pumpkin',
+      desc: 'Resiste el fuego. Al reventar suelta 4 Semillas Ardientes.'
+    },
+    semilla: {
+      name: 'Semilla Ardiente', hp: 9, speed: 95, bounty: 1, leak: 1, r: 7, minor: true, resist: { fire: 0 },
+      color: '#ffb04a', shape: 'seed',
+      desc: 'Brasa veloz de calabaza, inmune al fuego.'
+    },
+    murcielago: {
+      name: 'Murciélago Vampiro', hp: 26, speed: 86, bounty: 4, leak: 1, r: 10, flying: true, drain: 0.004,
+      color: '#3a2a4a', accent: '#ff3a5a', shape: 'bat',
+      desc: 'Volador. Mientras vive te CHUPA ORO cada segundo. ¡Acaba rápido con la bandada!'
+    },
+    espantapajaros: {
+      name: 'Espantapájaros', hp: 130, armor: 6, speed: 34, bounty: 12, leak: 4, r: 14, taunt: 115,
+      color: '#c8a050', accent: '#ff7a1a', shape: 'scarecrow',
+      desc: 'PROVOCA: las torres a menos de 115 de él tienen que dispararle a él (si lo ven). Blindaje 6.'
+    },
+    jineteSinCabeza: {
+      name: 'El Jinete sin Cabeza', hp: 7800, armor: 6, speed: 22, bounty: 1200, leak: 9999, r: 46,
+      color: '#1a1020', accent: '#ff7a1a', shape: 'horseman', boss: true, resist: { fire: 0.5 },
+      pumpkins: { every: 6, n: 2, dur: 3.5 }, charge: { every: 9, dur: 1.5, mult: 2.6 }, spawn: { every: 7, type: 'calabaza', n: 2 },
+      desc: 'JEFE FINAL. Lanza CALABAZAS ardientes que apagan tus torres y cada pocos segundos EMBISTE a toda velocidad.'
     }
   };
 
@@ -457,6 +618,18 @@
     if (d.shieldAura) t *= 1.5;
     if (d.cleanse) t *= 1.5;
     if (d.ward) t *= 1.4;
+    // tercera era
+    if (d.rise) t *= 1 + d.rise.hp;
+    if (d.raise) t *= 1.6;
+    if (d.intangible) t *= 1.35;
+    if (d.deathSpores) t *= 1.3;
+    if (d.root) t *= 1.35;
+    if (d.pollen) t *= 1.5;
+    if (d.mirror) t *= 1.5;
+    if (d.maxHit) t *= 1.5;
+    if (d.frontShield) t *= 1.5;
+    if (d.drain) t *= 1.3;
+    if (d.taunt) t *= 1.4;
     t *= Math.pow(d.speed / 55, 0.6);
     if (d.children) for (const [c, n] of d.children) t += threat(c) * n;
     return (d._threat = t);
