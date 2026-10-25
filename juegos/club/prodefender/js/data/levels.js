@@ -303,7 +303,7 @@
     altura:   { name: 'Ley de la Altura', icon: '🏔', meta: 'Alcance largo',
                 desc: 'Desde las islas se ve lejos: las torres de alcance 150 o más hacen +30% de daño y ven un 20% más; las de menos de 120 hacen un 30% menos.' },
     noche:    { name: 'Ley de la Noche', icon: '🌙', meta: 'Torres agrupadas alrededor de Faros',
-                desc: 'A oscuras las torres ven un 40% menos. Solo un Faro alumbra: 140 px a su alrededor, las torres ven lo normal. Pon Faros donde pelees y agrupa tus defensas junto a ellos.' }
+                desc: 'A oscuras las torres ven un 40% menos. Solo un Faro alumbra: a menos de 140 px de uno, las torres ven lo normal y hacen +20% de daño. Pon Faros donde pelees y agrupa tus defensas junto a ellos.' }
   };
 
   // Eventos de la tercera era: lo que pasa durante una ronda (engine.js los aplica; la

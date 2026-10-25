@@ -90,7 +90,7 @@
   // Cristal: lo más que quita un golpe (parte de la vida, con un mínimo para que el principio
   // no cambie). Noche: quién alumbra, a qué distancia y cuánto ve quien está a oscuras.
   const CRISTAL = { tope: 0.04, jefe: 0.01, minimo: 15 };
-  const LUZ = { faro: 1 }, LUZ_R = 140, OSCURO = 0.6;
+  const LUZ = { faro: 1 }, LUZ_R = 140, OSCURO = 0.6, ALUMBRADA = 1.2;
   // Altura: desde cuánto alcance (el de base) una torre es «de altura» o «de llano».
   const ALTURA = { lejos: 150, cerca: 120, dmg: 1.3, range: 1.2, llano: 0.7 };
   // Contagio: cada cuánto salta, hasta dónde y cuánto dura lo que contagia.
@@ -438,7 +438,9 @@
         const R = def.base.range || 0;
         if (R >= ALTURA.lejos) { o.range = ALTURA.range; o.dmg = ALTURA.dmg; }
         else if (R < ALTURA.cerca) o.dmg = ALTURA.llano;
-      } else if (this.ley === 'noche' && !LUZ[type] && !this.alumbrado(x, y, yo)) o.range = OSCURO;
+      } else if (this.ley === 'noche' && !LUZ[type]) {
+        if (this.alumbrado(x, y, yo)) o.dmg = ALUMBRADA; else o.range = OSCURO;
+      }
       return o;
     }
     alumbrado(x, y, yo) {
