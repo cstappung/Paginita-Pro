@@ -15,7 +15,7 @@ export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
 /* El `?v=` del abridor (prodrop.js): el visor del mercado y la plantilla
    del perfil lo usan para compartir la caché. */
-export const PD_V = "pd-30";
+export const PD_V = "pd-44";
 /* La plantilla dibujada por el abridor (modo visor `?plantilla=1`), con las
    cartas de verdad: rareza, desgaste y caja si está graduada. Cada casilla
    va como `o~k.i!at!gr[!id.g.w]` (lo último, si es un re-roll), o vacía. */
@@ -34,7 +34,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&am
    la economía no lee la lista, así que quien sale de ella no pierde nada
    (sus cartas, su saldo y sus gastos siguen igual) y al volver a entrar
    las ve otra vez. La colección de una copia sale de la clave de su sobre
-   (`coleccionDe`: «c…» componentes, lo demás profes), sin rehacerlo.
+   (`coleccionDe`: «c…» componentes, «f…» fútbol, «e…» Premier, lo demás profes), sin rehacerlo.
    Hasta que llega la lista (o sin reglas publicadas) no se ve. */
 export const SERIE1 = "profes";
 let serie1 = {}, yo = "";
@@ -95,7 +95,7 @@ export function plantillaDe(uid, perfil, datos) {
   return PM.FORMACION.map((_, i) => {
     const q = e && typeof l[i] === "string" ? leeCopia(l[i]) : null;
     const c = q && q.tipo === "carta" ? copia(e, q.o, q.k, q.i) : null;
-    return c && c.dueno === uid && c.carta.col === "futbol" ? c : null;
+    return c && c.dueno === uid && PM.esFutbol(c.carta.col) ? c : null;
   });
 }
 export const puntosDe = lista => PM.puntosPlantilla(lista.map(c => c && { tier: c.carta.tier, g: c.g }));
@@ -209,7 +209,7 @@ export function miniCarta(c, extra = "") {
   const nota = c.gr ? `<span class="jg-pdc-nota" style="--gc:${PM.colorNota(c.g)}" title="${esc(PM.GRADE_WORD[c.g])}">${c.g}</span>` : "";
   return `<figure class="jg-pdc t${cc.tier}" style="--cc:${PM.acento(cc)}" title="${esc(cc.name + " · " + PM.subtitulo(cc) + " · " + t.label + (c.gr ? " · nota " + c.g : ""))}">
     <img src="${RAIZ}${esc(cc.img)}" alt="${esc(cc.name + ", " + PM.subtitulo(cc))}" loading="lazy" draggable="false">
-    ${nota}${c.dios ? `<span class="jg-pdc-dios" title="Salió de un god pack">GOD</span>` : ""}
+    ${PM.esFutbol(cc.col) ? `<span class="jg-pdc-media" title="Media ${cc.media} (EA SPORTS FC)">${cc.media}</span>` : ""}${nota}${c.dios ? `<span class="jg-pdc-dios" title="Salió de un god pack">GOD</span>` : ""}
     <figcaption><b>${esc(cc.name)}</b><small>${esc(t.sym)} ${esc(PM.subtitulo(cc))}</small></figcaption>${extra}
   </figure>`;
 }

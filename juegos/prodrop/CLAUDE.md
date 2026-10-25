@@ -16,7 +16,7 @@ no build: bump `?v=pd-N` on its two scripts/stylesheet and in `prodrop.js`.
 The cards are real people (teachers), served from the public repo like any
 other file of the site. Things that hold it together:
 
-- **Three collections, chosen per pack** (`COLECCIONES`; Fútbol below): **Profes** (`profes`,
+- **Three collections; four packs on sale** (`COLECCIONES`; Fútbol below): **Profes** (`profes`,
   17 people x 10 variants = 170, Star Wars being the tenth, epic) and
   **Componentes** (`comp`, 25 components x 11 themes = 275: realista,
   bioware, esquemático common; pixelart, void, bélico rare; halloween,
@@ -62,26 +62,82 @@ other file of the site. Things that hold it together:
   left. A change of list re-sends `datosP` as a new object
   (`alCambiarSerie1`), which repaints every view. The images are still
   public files of the repo: this hides, it does not lock.
-- **Fútbol** (`futbol`, prefix `f`, Serie 03, visible to everyone) is the
-  third collection: the Real Madrid and Barça first teams (`FUTBOLISTAS` in
-  the motor, 53 players x común/rara/épica = 159, photos in
-  `cards/futbol/<club>/<id>.webp`). **It has no legendaries**: `pool()`
-  sets `tope` (the highest tier with cards) and a pack or re-roll that
-  would give a legendary gives an épica instead (`Math.min(t, P.tope)`;
-  pools with legendaries are untouched, so old packs rebuild the same).
-  Same odds, price and free pack as the others. The frame offers re-roll
-  only below `tope` (`rrTiers`), and `probSalida(tier, tope)` folds the
-  jump. The card (`frontHTML`, `.futbol` in `style.css`) is the photo with
-  position (top left), flag (top right, emoji: Windows paints two letters),
-  name and rarity (bottom left), shirt number (bottom right) and a frame in
-  the tier's colour (`.fu-marco`). The country is the national team, typed
-  by hand: the clubs' pages only give birthplace. Players are only ever
-  appended to `FUTBOLISTAS` (the order fixes each card's id).
-  The Fútbol shop shows two links that open `#fuModal`: the odds
-  (`tipFutbol`, computed from the motor's weights) and the changelog
-  (`NOVEDADES_FUTBOL`, newest first: add an entry when the pack changes).
+- **Fútbol** (`futbol`, prefix `g`, Serie 03, visible to everyone) is the
+  third collection and **one single catalogue of footballers**: the Real Madrid
+  and Barça first teams (`FUTBOLISTAS`, 48) and the Premier Big Six (`PREMIER`,
+  155: Man United, Man City, Chelsea, Liverpool, Tottenham, Arsenal), 203
+  players with an EA rating, **one card per player** (photos in
+  `cards/futbol/…` and `cards/premier/<club>/<id>.webp`, all with `col:
+  "futbol"`). The re-roll, the collection tab, the squad and the showcase
+  see them as one category. **The card's rarity comes from the player's media**
+  (`BANDAS` = 80 / 84 / 87: común up to 80, rara 81-84, épica 85-87,
+  legendaria 88+; `tierDeMedia`), so a star is never a común. Re-roll:
+  común→rara…, and 10 épicas give a legendaria. The card (`frontHTML`,
+  `.futbol` in `style.css`) is the photo with its positions (top left,
+  `c.posiciones`), media with its «MEDIA» label (top right, big), name and
+  rarity (bottom left), flag and the club's crest together (bottom right) and
+  a frame in the tier's colour. The shirt number (`dorsal`) stays in the data
+  but is not drawn. **The flag is an image** (`flags/<país en minúscula>.png`,
+  160 px from flagcdn; `eng`, `sco`, `wal`, `nir` are the UK nations), never
+  an emoji: Windows paints flag emoji as two letters. A new `pais` needs its
+  file in `flags/` and a name in `FUT_PAIS`, a new club its crest in `escudos/`
+  (football-data.org, 200 px); a test checks all of it. **Media**: `MEDIAS` in
+  the motor, by `<club>/<photo id>`, from EA's public ratings API
+  (`drop-api.ea.com/rating/ea-sports-fc?team=<id>` or `&search=`), whose squads
+  lag the real transfer window: **check nationality and club before trusting a
+  match**. Players EA does not have (youth) are left out; Mudryk (76) is the
+  one estimate. The photos are 470 px squares (head and chest) cut out of the
+  clubs' official squad-page portraits on a club-coloured background (the
+  neutral one, never the hover shot). The Fútbol shop shows two links that
+  open `#fuModal`: the odds (`tipFutbol`, from the pack's weights) and the
+  changelog (`NOVEDADES_FUTBOL`, newest first: add an entry when the packs
+  change).
+- **Two football packs** (`SOBRES` in the motor; the shop buys *packs*, the
+  collection tabs and the re-roll use *collections* — `COLS` vs `PACKS` in
+  `app.js`, `M.SOBRE[k].col` goes from one to the other): the **normal** pack
+  (`futbol`, prefix `g`, 80) and the **Plus** (`futbolplus`, prefix `h`, 160 =
+  `precioSobre(ms, 2)`). Both draw from all 203. Weights `PESOS_FUTBOL`: normal
+  66 / 30 / 3,4 / 0,6 % per card, the fifth rara or better; Plus 30 / 68 / 1,5 / 0,5 %
+  for the first four cards and a **fifth that is always épica or better**
+  (`ultimaPlus` 93 / 7 %: `pool(lista, w, ultima)` keeps `P.ultima`, `sobre`
+  and `esperadoPorSobre` read it). A legendary comes in about 1 of every 20
+  normal packs and 1 of every 10 Plus packs (god pack included), and a Plus
+  carries 1.2 épicas or better per pack (normal 0.37); a test keeps those relations and keeps a player's odds falling with
+  the media (rara → épica → legendaria). There is **no free pack for the Plus**
+  (the client, the postman and the economy all refuse it).
+  **Price is checked in three places**: the Firebase rule of `cartas/s/$uid/$k`
+  (`50|80`, ×2 if the key begins with `h`; it also forbids a free `h`), the
+  economy replay (`monedas.js`: `h` keys must be 100 or 160) and the postman
+  (`multDe`). **The rules file must be published (`firebase deploy --only
+  database`) before the site that sells the Plus**, or buying it fails.
+- **Old football packs keep working** (prefixes `f` = Clásico, `e` =
+  Premier, sold before the merge): `coleccionDe` answers `futbol` for
+  `f`, `e`, `g` and `h`, but `poolDe` keeps their original lists and weights
+  (`POOL.futbol1` = the 48, `POOL.premier1` = the 155, `PESOS_FUTBOL.v1`), so
+  every pack and re-roll already written derives exactly the same cards (a
+  test pins ids, and the merge was checked against the previous motor on
+  33,000 packs and re-rolls). **Never edit those two pools.** They are not
+  sold any more and do not appear in any menu. **Danger for the next
+  league**: `g` and `h` packs derive from the whole catalogue, so appending
+  players to it rebuilds the `g`/`h` packs already opened. Before adding
+  teams, make the pool depend on the pack's `at` (each new card carries a
+  `desde` timestamp and a pack only sees the cards that existed when it was
+  bought) or give the new league its own prefix.
+- **The football pack covers are fixed** (`PORTADA` in `app.js`, read by
+  `fanDe`): normal = Lamine Yamal, Bellingham and, in the centre, Mbappé;
+  Plus = Saka, Van Dijk and Haaland; the «Sobres de Fútbol» tile shows
+  Haaland, Yamal and Mbappé. The order is [left, right, centre]. Profes and
+  componentes still show three good cards at random. A test checks that every
+  name exists.
+- **«Sobres de Fútbol» is its own menu.** Packs carry `grupo: "futbol"` (the
+  normal and the Plus): the first screen (`eligeSobre('todos')`) shows Profes
+  / Componentes and **one** football tile (`data-menu="futbol"`), which opens
+  a second menu (`eligeSobre('futbol')`, `body.menu-futbol`) with the two packs
+  and a «← Todos los sobres» button. «Cambiar sobre» goes back to the menu the
+  pack came from (`menuDe()`), and a data refresh keeps you in the menu you
+  were in (`menuActual`). The Plus' cover is `.skin-futbolplus`.
 - **The football squad (plantilla)**: a fixed 4-3-3 (`FORMACION` in the
-  motor: GK, 4 DEF, 3 MID, 3 FWD), any football card in any slot. Stored
+  motor: GK, 4 DEF, 3 MID, 3 FWD), any football card in any slot (the squad itself is still the 4-3-3 of the motor, with Mi plantilla's own fit marks; see below). Stored
   public in `users/<uid>/perfil/plantilla` = `{0..10: copy key}` (rule
   regex like `perfil/cartas`; **re-publish the rules**). The frame's
   overlay `#plantilla` (buttons «⚽ Mi plantilla» in the summary and the
@@ -286,3 +342,11 @@ other file of the site. Things that hold it together:
   pulled them and when.
 
 The `cartas`, `mercado` and `prodropSerie1` nodes and `perfil/cartas` need the rules re-published.
+
+## Posiciones y buscador de la plantilla
+
+- Cada futbolista tiene una o dos posiciones (`M.POSICIONES`, `"DC/EI"`; la primera es la principal): LD, LI, DFC, MC, MD, MI, ED, EI, DC y POR. Salen de EA FC (`alternatePositions` de la misma API de ratings): CDM/CM/CAM = MC, RB/RWB = LD, LB/LWB = LI, ST/CF = DC; se queda la principal y la primera alternativa de otro grupo. `c.posiciones` está en la carta y `c.pos` (línea POR/DEF/MED/DEL) es la de la principal. **No afecta a los sobres** (la rareza sale de la media). Los RM/LM de EA van de extremo cuando la web del club los pone de delanteros.
+- `M.ajuste(casilla, posiciones)` → `{nivel: ok|incomodo|mal, pen}`. «Mi plantilla» solo lo muestra (anillo verde/amarillo/rojo y «!» o «✕» en la casilla): su puntuación sigue siendo rareza + nota.
+- Buscador (`M.coincide`, `M.MEDIAS_MIN`): club, media mínima y nombre, además de la línea y «solo <puesto>»; el selector va ordenado por media, con una sola copia por jugador.
+- Un jugador no puede estar dos veces en el once: en el selector sale con su casilla y, al elegirlo, se va de ella y pasa a la nueva.
+- Hubo una prueba de concepto de «retos diarios» con mini liga (valoración por media, posición y química); se descartó y se borró. `M.ajuste`, las posiciones y el buscador salieron de ahí y se quedan.

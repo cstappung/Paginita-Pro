@@ -86,10 +86,13 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
   /* El prefijo de la colección que pide el abridor. Uno viejo (de antes de
      las colecciones, en caché) no la manda: su sobre va sin prefijo y sale
      del catálogo que ese abridor conoce. */
-  const prefijo = col => (MOTOR.COL[col] ? MOTOR.COL[col].prefijo : "");
+  const prefijo = col => (MOTOR.SOBRE[col] ? MOTOR.SOBRE[col].prefijo : "");
   /* Un sobre sin prefijo es de los profes (`coleccionDe`): un abridor viejo
-     en caché tampoco compra la Serie 01 si no la ve. */
-  const sobreVisible = col => colVisible(MOTOR.coleccionDe(prefijo(col)));
+     en caché tampoco compra la Serie 01 si no la ve. Uno que pide un sobre
+     que ya no existe (la Premier o el Clásico de antes) no compra nada. */
+  const sobreVisible = col => (col == null || !!MOTOR.SOBRE[col]) && colVisible(MOTOR.coleccionDe(prefijo(col)));
+  // lo que cuesta ese sobre (el Plus de fútbol, el doble) y si trae el gratis (solo los de precio normal)
+  const multDe = col => (MOTOR.SOBRE[col] ? MOTOR.SOBRE[col].mult : 1);
   const SIN_SOBRE = "Ese sobre no está disponible.";
 
   /* Una petición a la vez: dos compras seguidas con el saldo justo para
@@ -101,7 +104,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
         if (!d || !d.completo) throw new Error("Todavía se está cargando tu cuenta.");
         const e = eco();
         if (x.accion === "comprar") {
-          const p = MOTOR.precioSobre(fb.ahora());
+          const p = MOTOR.precioSobre(fb.ahora(), multDe(x.col));
           if (!sobreVisible(x.col)) throw new Error(SIN_SOBRE);
           pagable(p, "Un sobre");
           const r = await fb.comprarSobre(uid, p, prefijo(x.col));
@@ -109,6 +112,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
           responde(true, r);
         } else if (x.accion === "gratis") {
           if (!sobreVisible(x.col)) throw new Error(SIN_SOBRE);
+          if (multDe(x.col) > 1) throw new Error("El sobre gratis es solo para el sobre normal.");
           if (proximoGratis(uid, d, fb.ahora())) throw new Error("Tu sobre gratis todavía no está listo.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se abren sobres.");
           const r = await fb.sobreGratis(uid, prefijo(x.col));
@@ -166,7 +170,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
             if (!c || vistas.has(c) || !mia(c)) return;
             const q = leeCopia(c), so = q && q.tipo === "carta" && eco().sobres[q.o + "~" + q.k];
             const id = so && (so.r ? so.r.id : MOTOR.sobre(q.o, q.k, so.at).cartas[q.i].id);
-            if (id == null || MOTOR.CARDS[id].col !== "futbol") return;
+            if (id == null || !MOTOR.esFutbol(MOTOR.CARDS[id].col)) return;
             vistas.add(c); porCasilla[i] = c;
           });
           await fb.ponerPlantilla(uid, porCasilla);
@@ -221,7 +225,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir, ab
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
       // `abrir`: lo que se abre al llegar (`#cartas/plantilla` → la plantilla)
-      frame.src = "juegos/prodrop/index.html?v=pd-30" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
+      frame.src = "juegos/prodrop/index.html?v=pd-44" + (abrir ? "&abre=" + encodeURIComponent(abrir) : "");
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });
