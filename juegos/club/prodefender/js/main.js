@@ -227,7 +227,7 @@
         <div class="lc-body">
           <h3><span class="num">${li + 1}</span>${L.name}</h3>
           <p>${L.subtitle}</p>
-          ${L.era === 3 ? `<div class="lc-new">${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span><span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
+          ${L.era === 3 ? `<div class="lc-new">${L.ley ? `<span class="ley" title="${PD.LEYES[L.ley].desc}">${PD.LEYES[L.ley].icon} ${PD.LEYES[L.ley].name} · ${PD.LEYES[L.ley].meta}</span>` : ''}${L.poder ? `<span class="poder" title="${PD.PODERES[L.poder].desc}">${PD.PODERES[L.poder].icon} ${PD.PODERES[L.poder].name}</span>` : ''}<span class="hero" title="Elige uno de los diez héroes (uno por partida).">♛ Héroe a elección</span><span title="${L.eventos.map(id => PD.EVENTOS[id].name).join(' · ')}">${L.eventos.map(id => PD.EVENTOS[id].icon).join(' ')} Eventos</span></div>`
             : `<div class="lc-new">${realmTowers(li).concat(PD.heroOf(li) ? [PD.heroOf(li)] : []).map(id => `<span class="${PD.TOWERS[id].hero ? 'hero' : ''}" title="${PD.TOWERS[id].desc}"><canvas width="44" height="44" data-t="${id}"></canvas>${PD.TOWERS[id].hero ? '♛ ' : ''}${PD.TOWERS[id].name}</span>`).join('')}</div>`}
           ${L.torres ? `<div class="lc-menos" title="${PD.TOWER_ORDER.filter(id => !PD.TOWERS[id].hero && PD.TOWERS[id].realm === undefined && L.torres.indexOf(id) < 0).map(id => PD.TOWERS[id].name).join(', ')}">Solo ${clasicas} de las 12 defensas clásicas y ${L.torres.filter(id => PD.TOWERS[id].realm !== undefined && (L.era === 3 || PD.TOWERS[id].realm < PUB)).length} de las ${L.era === 3 ? 15 : 10} de reino</div>` : ''}
           <div class="meta">
@@ -338,6 +338,9 @@
     if (tab === 'caos') {
       // la tercera era: pactos, eventos y poderes de cada reino
       const era3 = PD.LEVELS.map((L, li) => [L, li]).filter(([L]) => L.era === 3);
+      box.appendChild(el('<div class="alm-sec">⚖ Leyes de los reinos</div>'));
+      box.appendChild(el('<p class="alm-nota">Cada reino de la Tercera Era tiene su propia ley, que dura toda la partida y decide la forma de ganarlo: lo que funciona en uno no sirve en otro.</p>'));
+      for (const [L] of era3) { const Y = PD.LEYES[L.ley]; if (Y) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${Y.icon}</span><div><h4>${Y.name}</h4><div class="sub">${L.name} · ${Y.meta}</div></div></div><p>${Y.desc}</p></div>`)); }
       box.appendChild(el('<div class="alm-sec">📜 Pactos</div>'));
       box.appendChild(el('<p class="alm-nota">En la Tercera Era, antes de la primera ronda y cada diez rondas se ofrecen tres de estos pactos: tomas uno (o ninguno) y su ventaja y su carga duran toda la partida. No se repiten.</p>'));
       for (const P of PD.PACTOS) box.appendChild(el(`<div class="alm-card"><div class="alm-head"><span class="alm-ico">${P.icon}</span><div><h4>${P.name}</h4><div class="sub" style="color:#7affb0">✔ ${P.bueno}</div><div class="sub" style="color:#ff8a8a">✘ ${P.malo}</div></div></div></div>`));
@@ -467,6 +470,8 @@
       const hid = PD.heroOf(li);
       if (hid) toast(`<b>♛ Héroe del reino: ${PD.TOWERS[hid].name}</b>Uno por partida y muy caro, pero único. Está arriba en la tienda (tecla H).`, 'special', { tower: hid }, 8000);
       if (game.era3) {
+        const Y = PD.LEYES[game.L.ley];
+        if (Y) toast(`<b>${Y.icon} ${Y.name}</b>${Y.desc}`, 'boss', null, 11000);
         toast('<b>♛ Héroe a elección</b>En este reino puedes llamar a cualquiera de los diez héroes (uno por partida). Arriba en la tienda o con la tecla H.', 'special', null, 8000);
         const P = PD.PODERES[game.L.poder];
         if (P) toast(`<b>${P.icon} Poder del Reino: ${P.name}</b>${P.desc} Se carga eliminando enemigos; lánzalo con el botón de abajo a la izquierda o la tecla V.`, 'special', null, 9000);

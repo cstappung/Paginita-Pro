@@ -599,3 +599,28 @@ test('tercera era: los eventos de ronda',()=>{
  g=con(10,'muertos');for(let i=0;i<40;i++){const x=g.spawn('brote',0,200+i,1);g.damage(x,1e9,'arcane',null,{});}
  for(let k=0;k<120;k++)g.update(1/60);assert.ok(g.enemies.some(x=>x.zombi));
 });
+
+test('tercera era: cada reino tiene su ley y cambia la forma de ganar',()=>{
+ const leyes=[10,11,12,13,14].map(li=>PD.LEVELS[li].ley);
+ assert.deepEqual(leyes,['purga','contagio','cristal','altura','noche']);
+ for(const id of leyes)assert.ok(PD.LEYES[id]&&PD.LEYES[id].desc&&PD.LEYES[id].meta,id);
+ for(let li=0;li<10;li++)assert.equal(new PD.Game(li,null,1).ley,null,'los reinos 1-10 no tienen ley');
+ // Purga: lo que no remata fuego, explosivo o arcano se levanta en huesos
+ let g=nuevo3(10);let e=g.spawn('robusto',0,300,1);g.damage(e,1e9,'phys',null,{});
+ assert.ok(!e.dead&&e.huesosT>0,'huesos');for(let k=0;k<200;k++)g.update(1/60);assert.ok(!e.dead&&!(e.huesosT>0)&&e.risen,'se levantó');
+ e=g.spawn('robusto',0,300,1);g.damage(e,1e9,'fire',null,{});assert.ok(e.dead,'el fuego lo remata');
+ const j=g.spawn('liche',0,300,1,2);j.filas=[];g.damage(j,1e12,'phys',null,{});assert.ok(j.dead,'los jefes no se levantan');
+ // Contagio: una torre con esporas contagia a las de al lado, no a las lejanas
+ g=nuevo3(11);const a=ponCerca(g,'espinas',300,300),b=ponCerca(g,'espinas',360,300),c=ponCerca(g,'espinas',700,300);
+ g.active=true;a.esporaT=3;g.tickTercera(0.1);assert.ok(b.esporaT>0,'contagia a la vecina');assert.ok(!(c.esporaT>0),'no a la lejana');
+ // Cristal: ningún golpe quita más del 8% (con un mínimo de 25)
+ g=nuevo3(12);e=g.spawn('robusto',0,300,1);e.hp=e.maxHp=10000;assert.equal(Math.round(g.damage(e,5000,'arcane',null,{})),800);
+ e.hp=e.maxHp=100;assert.equal(Math.round(g.damage(e,60,'arcane',null,{})),25,'el mínimo');
+ const r0=g.spawn('robusto',0,300,1);r0.hp=r0.maxHp=10000;assert.equal(Math.round(g.damage(r0,5000,'arcane',null,{dot:true})),5000,'el daño continuo no tiene tope');
+ // Altura: las de alcance largo pegan más y ven más; las cortas, menos
+ g=nuevo3(13);const v=ponCerca(g,'vigia',300,300),s=ponCerca(g,'sierra',600,300);
+ const vb=g.baseStats(v),sb=g.baseStats(s);assert.ok(v.s.range>vb.range&&v.s.dmg>vb.dmg,'vigía');assert.ok(s.s.dmg<sb.dmg&&s.s.range===sb.range,'sierra');
+ // Noche: a oscuras ven menos; junto a un Faro, lo normal
+ g=nuevo3(14);const o=ponCerca(g,'espinas',300,300);const r=o.s.range;assert.ok(r<g.baseStats(o).range,'a oscuras');
+ ponCerca(g,'faro',360,300);assert.equal(o.s.range,g.baseStats(o).range,'alumbrada');
+});

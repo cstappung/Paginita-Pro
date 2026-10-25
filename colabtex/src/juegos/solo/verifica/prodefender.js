@@ -33,7 +33,7 @@ export const UNA_PRUEBA = true;
 const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/;
 const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
   'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-8';
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-9';
 
 /* La prueba tal como se guarda (v: 2). El juego manda la de siempre (v: 1,
    cada jugada un arreglo [paso, código, …], prueba.js) y la página la guarda

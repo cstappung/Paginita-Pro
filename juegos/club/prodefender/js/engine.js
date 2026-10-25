@@ -95,6 +95,7 @@
   const ALTURA = { lejos: 150, cerca: 120, dmg: 1.3, range: 1.2, llano: 0.7 };
   // Contagio: cada cuánto salta, hasta dónde y cuánto dura lo que contagia.
   const CONTAGIO = { cada: 1.5, r: 90, dur: 3 };
+  PD.LEY = { luz: LUZ, luzR: LUZ_R, contagioR: CONTAGIO.r };   // para dibujarlas
 
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {

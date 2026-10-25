@@ -311,6 +311,7 @@ button { font-family: inherit; }
 .lvl-sep.era3 b { color: #ff9a6a; }
 .lvl-sep.era3 b + b, .lvl-sep.era3 b ~ b { font-family: inherit; font-size: inherit; color: #ffe0c8; margin: 0; }
 .lc-new span.poder { color: #c8ffe0; background: rgba(90,255,170,.12); border-color: rgba(90,255,170,.4); padding-left: 8px; }
+.lc-new span.ley { color: #ffd8b0; background: rgba(255,140,60,.14); border-color: rgba(255,140,60,.45); flex-basis: 100%; }
 .lc-new span:not(:has(canvas)) { padding-left: 8px; }
 .hud-c .ev { color: #ffb08a; font-weight: 800; background: rgba(255,90,60,.14); border: 1px solid rgba(255,120,80,.4); border-radius: 8px; padding: 1px 6px; white-space: nowrap; }
 #pactos { position: absolute; left: 14px; top: 12px; display: flex; gap: 6px; z-index: 3; flex-wrap: wrap; max-width: 60%; }

@@ -4071,6 +4071,19 @@
 
   // ===================== TERCERA ERA: poder y eventos =====================
   // los Poderes del Reino que se quedan en el suelo (engine.js: zonas)
+  // Ley de la Noche: el charco de luz de cada Faro, Lanzallamas y Prisma (lo que alumbra)
+  function drawLuces(ctx, g, t) {
+    const R = PD.LEY.luzR;
+    ctx.globalCompositeOperation = 'lighter';
+    for (const tw of g.towers) {
+      if (!PD.LEY.luz[tw.type]) continue;
+      const f = 1 + Math.sin(t * 3 + tw.x * 0.05) * 0.04;
+      const gr = ctx.createRadialGradient(tw.x, tw.y, 6, tw.x, tw.y, R * f);
+      gr.addColorStop(0, 'rgba(255,190,90,0.30)'); gr.addColorStop(0.7, 'rgba(255,150,50,0.12)'); gr.addColorStop(1, 'rgba(255,120,30,0)');
+      circle(ctx, tw.x, tw.y, R * f, gr);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
   function drawZonas(ctx, g, t) {
     for (const z of g.zonas) {
       const a = Math.min(1, z.t / 0.6, (z.T - z.t) / 0.3 + 0.2);
@@ -4235,6 +4248,7 @@
         ctx.globalCompositeOperation = 'source-over';
       }
       if (g.zonas && g.zonas.length) drawZonas(ctx, g, t);
+      if (g.ley === 'noche') drawLuces(ctx, g, t);
       for (const h of g.holes) {
         const gr = ctx.createRadialGradient(h.x, h.y, 2, h.x, h.y, h.r);
         gr.addColorStop(0, '#000'); gr.addColorStop(0.45, 'rgba(25,5,55,0.95)'); gr.addColorStop(0.8, 'rgba(120,70,230,0.35)'); gr.addColorStop(1, 'rgba(138,107,255,0)');
@@ -4552,7 +4566,10 @@
       } else if (ui.placing && ui.mouse) {
         const def = PD.TOWERS[ui.placing];
         const ok = g.canPlace(ui.placing, ui.mouse.x, ui.mouse.y) && g.money >= g.towerCost(ui.placing);
-        const range = def.base.range;
+        const range = def.base.range * (g.ley ? g.leyEn(ui.placing, ui.mouse.x, ui.mouse.y).range : 1);
+        // leyes: dónde alumbran las luces (Noche) y hasta dónde contagian las torres (Esporas)
+        if (g.ley === 'noche') { ctx.setLineDash([6, 6]); for (const tw of g.towers) if (PD.LEY.luz[tw.type]) circle(ctx, tw.x, tw.y, PD.LEY.luzR, null, 'rgba(255,190,90,0.7)', 1.5); ctx.setLineDash([]); }
+        if (g.ley === 'contagio') { ctx.setLineDash([4, 5]); for (const tw of g.towers) if (!g.protegida(tw) && Math.hypot(tw.x - ui.mouse.x, tw.y - ui.mouse.y) < PD.LEY.contagioR * 2.2) circle(ctx, tw.x, tw.y, PD.LEY.contagioR, 'rgba(216,90,168,0.06)', 'rgba(216,90,168,0.6)', 1.3); ctx.setLineDash([]); }
         if (range < 5000) {
           circle(ctx, ui.mouse.x, ui.mouse.y, range, ok ? 'rgba(255,255,255,0.12)' : 'rgba(255,60,60,0.16)');
           ctx.setLineDash([8, 6]); circle(ctx, ui.mouse.x, ui.mouse.y, range, null, ok ? 'rgba(255,255,255,0.75)' : 'rgba(255,90,90,0.85)', 1.6); ctx.setLineDash([]);
