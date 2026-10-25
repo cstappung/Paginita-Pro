@@ -151,7 +151,7 @@ kingdom, Vacío included (its opening), so that number says nothing.
 Necrópolis Olvidada, Jardín de Esporas, Laberinto de Espejos, Archipiélago Celeste
 and La Noche Eterna (`levels.js`, `era: 3`, `abre` Oct 27–31; tables `necropolis`,
 `esporas`, `espejos`, `archipielago`, `noche` = `L.slug`; 100 coins a round like
-the second era). Harder (`diff` 5.2 / 5.0 / 3.8 / 5.0 / 4.3, recalibrated with the laws) and with their own rules, all gated on
+the second era). Harder (`diff` 5.2 / 4.8 / 4.2 / 5.4 / 4.3, recalibrated with the laws so that playing each meta loses roughly what Eclipse costs, ~30–90k lives with `--ayuda 100`; single runs vary by 2× or more) and with their own rules, all gated on
 `game.era3` or on new enemy fields, so **kingdoms 1–10 replay identically**
 (checked: the same scripted game hashed over 280 rounds on the old and new
 engine; `VERSION` stays 4, only `?v=pd-8` moved). The `diff` values were
