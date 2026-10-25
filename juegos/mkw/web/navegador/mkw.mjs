@@ -48,6 +48,7 @@ import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
+import { leerGraficos, lineasVideo, montarGraficos, montarMedidor } from './graficos.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -714,6 +715,26 @@ window.mkwInterfaz = ui;
 // (la cortina «puesta» pero tapada por la portada, ?portada=1, no cuenta: se mira si de verdad se ve)
 if (descargas) montarBarraDescarga($('descarga'), descargas, { primeraVez: () => descargas.primeraVez,
   enCortina: () => ui.cortinaPuesta && getComputedStyle($('cortina')).visibility !== 'hidden' });
+// §107: gráficos opcionales (graficos.mjs): resolución interna y fluidez van al Config.toml al arrancar; para medir sin
+// tocar lo guardado, ?escala=2&fluidez=180 (o ?graficos=0 = lo de siempre, ignore lo guardado)
+const graficosArranque = parametros.get('graficos') === '0' ? leerGraficos({ getItem: () => null }) : {
+  ...leerGraficos(),
+  ...(parametros.has('escala') ? { escala: Number(parametros.get('escala')) } : {}),
+  ...(parametros.has('fluidez') ? { fluidez: Number(parametros.get('fluidez')) } : {}),
+};
+window.mkwEstado.graficos = { ...graficosArranque, lineas: lineasVideo(graficosArranque) };
+montarGraficos($('graficosPanel'), { enSala: !!sincro });
+// …y el medidor de fps y ping, arriba a la izquierda (solo si la persona lo prende; con el juego andando)
+{
+  const medidor = Object.assign(document.createElement('span'), { id: 'medidor', className: 'chip-estado', hidden: true });
+  $('estadoJuego')?.prepend(medidor);
+  montarMedidor(medidor, {
+    fps: () => window.mkwEstado.cuadros > 0 ? window.mkwEstado.fps : null,
+    rtt: () => { try { return sincro?.lockstep?.estado().rtt || {}; } catch { return {}; } },
+    nombres: () => window.mkwNombresSala || {}, yo: sincro?.yo ?? null,
+    jugando: () => document.body.classList.contains('started') && !ui.cortinaPuesta,
+  });
+}
 
 // ---- El menú de inicio «JloKart Wii» (inicio.mjs, bitácora §67) ----
 // Sale al abrir el juego sin un modo ya decidido (sin ?modo= de una sala): la imagen del dueño con Single Player,
@@ -2415,9 +2436,11 @@ function armarArchivos(m, contenidos, tamaños) {
     // del sitio) cambia de tamaño; sin esto, el "aspecto dinámico" de WiiCompiled estiraba la escena 3D a esa forma y lo
     // 2D del juego (la cortina de Lakitu, el HUD) quedaba en la franja 16:9 del medio. Con force_16_9 aurora dibuja 16:9
     // y pone las barras negras dentro del canvas. ?aspecto=libre: el estirado de antes (para comparar)
-    '[video]', 'widescreen = true', `force_16_9 = ${parametros.get('aspecto') === 'libre' ? 'false' : 'true'}`, '',
+    '[video]', 'widescreen = true', `force_16_9 = ${parametros.get('aspecto') === 'libre' ? 'false' : 'true'}`,
+    ...lineasVideo(graficosArranque), '',   // §107: resolución interna y fluidez (con lo de siempre, nada)
     '[paths]', 'dvd_root = "/mkw/disco"', 'retro_rewind_root = "/mkw/sd/RetroRewind6"', '',
   ].join('\n'));
+  if (lineasVideo(graficosArranque).length) nota('gráficos (§107): ' + lineasVideo(graficosArranque).join(', '));
   m.ENV.XDG_DATA_HOME = '/datos';       // la "AppData" del juego (Config, NAND, registros)
   // ?thp=traducido: los videos THP con el decodificador traducido del juego (el de antes, para comparar);
   // ?thp=comparar: los dos, y anota en la consola cuánto difieren y cuánto tarda cada uno (bitácora §47).

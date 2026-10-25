@@ -506,6 +506,11 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-25 01:10** — **Gráficos opcionales y el medidor** (§107, el dueño: «ping ms, fps, antialiasing, subirle los
+  gráficos», «hasta 180 fps»). Avanzado → Gráficos: resolución interna 1–4× (es el antialiasing: supermuestreo) y
+  fluidez 60/120/180 (imágenes intermedias; la física sigue a 60), al Config.toml al reiniciar; fps y ping en la esquina.
+  Todo apagado por omisión: con lo de siempre el Config.toml no cambia. Banco `graficos` 21/21. **Falta medir con el
+  juego** (§107.3: si la fluidez anda en la web y cuánto cuesta cada opción).
 - **2026-10-25 00:21** — **Los mandos como en BT3 y la barra de descarga** (§106, el dueño: «en bt3 aparece el mando que
   uno tiene y permite seleccionar entre mandos»; «la barra de descargas con el progreso cuando se esté descargando
   algo»). «Jugador 1–4» en cada tarjeta de Controles → Mandos (se cambian de lugar, se recuerda por mando), la pastilla

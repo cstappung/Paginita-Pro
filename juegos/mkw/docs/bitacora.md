@@ -306,6 +306,8 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Copia de una respuesta (`clone()`)** | Pedirle al navegador dos lecturas de la MISMA descarga: los bytes llegan una vez por la red y se reparten a dos lectores. La barra de descarga (§106) lee una copia solo para contar; el juego lee la original, intacta. Como una pinza amperimétrica: mide la corriente sin cortar el cable. |
 | **Ráfaga (de descargas)** | Un grupo de pedidos que se superponen en el tiempo (el juego pide varias cosas casi a la vez). La barra muestra lo recibido de lo esperado en la ráfaga actual y vuelve a cero cuando todo queda quieto un segundo. |
 | **Puerto (del mando)** | Cada uno de los 4 enchufes de mando de la GameCube: el puerto 1 es el jugador 1. La página decide qué mando del PC va a cada puerto; desde §106 la persona lo elige («Jugador 1–4»), como el selector de entrada de una mesa de sonido. |
+| **Resolución interna / supermuestreo** | Dibujar la imagen a más pixeles de los que tiene la pantalla y después achicarla: cada pixel final sale del promedio de varios, así los bordes quedan suaves (es el antialiasing de mejor calidad). Como medir con más muestras por segundo y promediar: la curva sale más limpia, pero hay más que procesar. |
+| **Imágenes intermedias (interpolación de cuadros)** | El juego calcula 60 cuadros por segundo; el motor dibuja además imágenes «entre medio» de dos cuadros (120 o 180 por segundo) para monitores rápidos. Es solo la imagen: la física sigue a 60. Como una tele de 120 Hz que inventa los cuadros del medio de una película. |
 
 ---
 
@@ -9929,3 +9931,56 @@ programa.
 
 `banco/servir.cjs` busca ahora el `mando.js` del sitio también en `juegos/audio` al lado de `juegos/mkw` (dentro del
 repo del sitio no hay `terceros/`).
+
+## 2026-10-25 · §107 Gráficos opcionales (resolución interna, fluidez 120/180) y el medidor de fps y ping
+
+Pedido del dueño: «opciones gráficas tipo opcionales de display ping ms, fps, antialiasing, subirle los gráficos», «fps
+cap? vi que se podía como hasta 180 fps», «quizás se puede más fps y no se». Hecho desde la sesión de la nube, sin el
+juego: probado en el banco y en la página sin el programa. **Falta medirlo con el juego** (abajo).
+
+### 107.1 Qué trae el motor (y qué no)
+
+Revisado en `runtime/include/runtime_config.h` de WiiCompiled en el commit fijado (`bd219e38`): el `[video]` del
+`Config.toml` acepta, entre otras,
+- `resolution_multiplier` = 0, 1, 1,5, 2, 3, 4, 6 u 8 (0 = el tamaño de la ventana): la **resolución interna**;
+- `frame_interpolation_fps` = 0, 120 o 180 (un 240 guardado pasa a 180): las **imágenes intermedias**. Eso es el «hasta
+  180» que vio el dueño.
+
+**Más de 60 «de verdad» no se puede:** la física y todo el juego están hechos para 60 cuadros por segundo; correrlo más
+rápido sería el juego acelerado. Lo de 120/180 son imágenes intermedias. **No hay un antialiasing aparte** en el motor
+(no tiene MSAA ni FXAA): la resolución interna a 2× o más ya lo es, por supermuestreo.
+
+### 107.2 En la página (`graficos.mjs`)
+
+- **Avanzado → Gráficos**: «Resolución interna» (1×, 1,5×, 2×, 3×, 4×; 6× y 8× no se ofrecen, son demasiado para un
+  navegador) y «Fluidez» (60, 120, 180). Se guardan en el navegador (`mkw.graficos`) y se aplican **al reiniciar el
+  juego** (el motor lee el `Config.toml` una vez, al arrancar); el panel lo dice y trae «Reiniciar el juego ahora» (en
+  la sala, con la nota de hacerlo entre carreras: al recargar se vuelve en la siguiente, §75).
+- **Apagadas por omisión.** Con 1× y 60, `lineasVideo()` no agrega nada al `Config.toml`: el juego arranca
+  exactamente igual que antes de §107. Un valor que el motor no acepta (guardado viejo, a mano) vuelve a lo de siempre.
+- **Mostrar los fps / el ping**: un chip en la esquina de arriba a la izquierda (`#medidor`, en `#estadoJuego`),
+  repintado una vez por segundo, solo con el juego andando: «60 fps · 📶 Ana 80 ms · Juan 35 ms». Los fps son los del
+  medidor de la página (cuadros del juego por segundo); el ping es la ida y vuelta suavizada que el lockstep ya mide con
+  cada piloto (`lockstep.estado().rtt`, pings cada 0,5 s), el peor primero. **También apagados por omisión**: medir no
+  cuesta, pero tener algo encima del juego obliga al navegador a componer cada cuadro (§98.9), y el panel lo avisa.
+- Para medir sin tocar lo guardado: `?escala=2&fluidez=180`; `?graficos=0` = lo de siempre. El registro anota
+  «gráficos (§107): …» cuando hay algo distinto, y `window.mkwEstado.graficos` dice qué se usó.
+
+### 107.3 Lo que falta medir con el juego (en la PC del proyecto)
+
+1. **La fluidez en la web.** El port dibuja en un solo hilo y el parche de aurora tocó la interpolación (el presentador
+   sin hilo ayudante, `aurora-web.diff`; §88/§53 vaciaron sus tareas pendientes al cerrar el staging). Hay que ver si
+   120/180 de verdad dibujan más imágenes en Chrome (el lienzo se presenta al ritmo de `requestAnimationFrame`: con un
+   monitor de 240 Hz hay lugar) y cuánto cuesta: `node herramientas/medir-sitio.mjs --perfil pc --etiqueta fluidez180
+   --extra "&fluidez=180"` contra la misma sin `--extra`.
+2. **La resolución interna**: `--extra "&escala=2"` (y 3, 4): tiempo de GPU por cuadro, que no baje de 60 en la carrera
+   con 12 karts. Con WebGPU la memoria de video crece con el cuadrado (2× = 4 veces los pixeles).
+3. **En la sala**: con `prueba-sincro --directa --extra=&fluidez=180` que la huella siga igual (debe: es solo la imagen).
+Si alguna no anda en la web, sacarla del panel (`ESCALAS`/`FLUIDECES` de `graficos.mjs`).
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Banco `graficos` (nuevo) | 21 / 21 |
+| La página sin el programa con `?escala=2&fluidez=180` | `mkwEstado.graficos.lineas` = las dos líneas; el panel en Avanzado; sin errores |

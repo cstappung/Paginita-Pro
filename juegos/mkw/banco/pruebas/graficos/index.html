@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gráficos opcionales y el medidor</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Gráficos opcionales: <span>resolución interna, fluidez, fps y ping</span></h1>
+<p>Prueba <code>web/navegador/graficos.mjs</code> (bitácora §107, pedido del dueño: «opciones gráficas… ping ms, fps,
+  antialiasing, subirle los gráficos», «fps cap? hasta 180») <b>sin el juego</b>: que con lo de siempre el Config.toml no
+  cambie, que cada opción escriba la línea que el motor (WiiCompiled) acepta y nada que no acepte, que el panel guarde y
+  pida reiniciar, y el texto del medidor de fps y ping (con los rtt que da el lockstep).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div class="caja" id="panel"></div>
+<div class="caja"><span id="medidor" class="chip-estado" hidden></span></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { normalizar, lineasVideo, textoMedidor, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES } from '/web/navegador/graficos.mjs';
+
+const { ok, fin } = prueba('graficos', 'Gráficos opcionales y el medidor (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+try { localStorage.removeItem('mkw.graficos'); } catch {}
+try {
+  // ---- 1. Lo que va al Config.toml ----
+  ok('con lo de siempre (1× y 60) no se escribe nada: el juego arranca igual que antes', lineasVideo({}).length === 0 && lineasVideo(leerGraficos()).length === 0);
+  ok('2× → resolution_multiplier = 2.0', JSON.stringify(lineasVideo({ escala: 2 })) === '["resolution_multiplier = 2.0"]');
+  ok('1,5× → resolution_multiplier = 1.5 (con punto: es TOML)', lineasVideo({ escala: 1.5 })[0] === 'resolution_multiplier = 1.5');
+  ok('fluidez 180 → frame_interpolation_fps = 180', JSON.stringify(lineasVideo({ fluidez: 180 })) === '["frame_interpolation_fps = 180"]');
+  ok('las dos juntas', lineasVideo({ escala: 3, fluidez: 120 }).join('|') === 'resolution_multiplier = 3.0|frame_interpolation_fps = 120');
+  // los valores que acepta el motor (runtime_config.h de WiiCompiled @ bd219e38: 0/1/1,5/2/3/4/6/8 y 0/120/180)
+  const motorEscalas = [0, 1, 1.5, 2, 3, 4, 6, 8], motorFluidez = [0, 120, 180];
+  ok('solo se ofrecen valores que el motor acepta', ESCALAS.every(v => motorEscalas.includes(v)) && FLUIDECES.every(v => motorFluidez.includes(v)));
+  ok('un valor raro (guardado viejo o a mano: 240, 5×, "x") vuelve a lo de siempre', JSON.stringify(normalizar({ escala: 5, fluidez: 240, verFps: 'si' })) ===
+     JSON.stringify({ escala: 1, fluidez: 0, verFps: false, verPing: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
+
+  // ---- 2. El medidor ----
+  const rtt = { yo1: 0, ana: 80.4, juan: 35 };
+  const nombres = { yo1: 'Yo', ana: 'Ana María', juan: 'Juan' };
+  ok('fps y ping: «60 fps · 📶 Ana 80 ms · Juan 35 ms» (el peor primero; sin mí; el primer nombre)',
+     textoMedidor({ fps: 59.7, rtt, nombres, yo: 'yo1' }) === '60 fps · 📶 Ana 80 ms · Juan 35 ms', textoMedidor({ fps: 59.7, rtt, nombres, yo: 'yo1' }));
+  ok('solo fps (fuera de la sala no hay ping)', textoMedidor({ fps: 58.2, rtt: {}, yo: 'x' }) === '58 fps');
+  ok('solo ping', textoMedidor({ fps: 60, rtt, nombres, yo: 'yo1', verFps: false }) === '📶 Ana 80 ms · Juan 35 ms');
+  ok('nada que mostrar → texto vacío', textoMedidor({ fps: null, rtt: {}, verPing: true }) === '');
+
+  // ---- 3. El panel ----
+  let reinicios = 0, cambios = 0;
+  const p = montarGraficos(document.getElementById('panel'), { reiniciar: () => reinicios++, enSala: true, alCambiar: () => cambios++ });
+  const $ = id => document.getElementById(id);
+  ok('el panel empieza en lo de siempre, sin aviso ni botón', $('graficosEscala').value === '1' && $('graficosFluidez').value === '0' && $('graficosAviso').hidden && $('graficosReiniciar').hidden);
+  $('graficosEscala').value = '2'; $('graficosEscala').dispatchEvent(new Event('change'));
+  ok('elegir 2× se guarda en el navegador', leerGraficos().escala === 2 && cambios === 1);
+  ok('…y pide reiniciar (el motor lo lee al arrancar), con la nota de la sala', !$('graficosAviso').hidden && !$('graficosReiniciar').hidden &&
+     $('graficosAviso').textContent.includes('entre carreras'), $('graficosAviso').textContent);
+  $('graficosReiniciar').click();
+  ok('«Reiniciar el juego ahora» reinicia', reinicios === 1);
+  $('graficosEscala').value = '1'; $('graficosEscala').dispatchEvent(new Event('change'));
+  ok('volver a lo que tenía al arrancar: ya no hace falta reiniciar', $('graficosReiniciar').hidden);
+  $('graficosFps').checked = true; $('graficosFps').dispatchEvent(new Event('change'));
+  ok('prender los fps no pide reiniciar (es de la página, no del motor)', leerGraficos().verFps === true && $('graficosReiniciar').hidden);
+
+  // ---- 4. El medidor en la página ----
+  let jugando = false, fps = 60;
+  const med = $('medidor');
+  const m = montarMedidor(med, { fps: () => fps, rtt: () => rtt, nombres: () => nombres, yo: 'yo1', jugando: () => jugando, cada: 50 });
+  await espera(120);
+  ok('con los fps prendidos pero sin juego andando, no se muestra', med.hidden);
+  jugando = true; await espera(120);
+  ok('con el juego andando: «60 fps»', !med.hidden && med.textContent === '60 fps', med.textContent);
+  localStorage.setItem('mkw.graficos', JSON.stringify({ verFps: true, verPing: true })); fps = 47.6;
+  await espera(120);
+  ok('con el ping prendido, también el ping de la sala', med.textContent === '48 fps · 📶 Ana 80 ms · Juan 35 ms', med.textContent);
+  localStorage.setItem('mkw.graficos', JSON.stringify({})); await espera(120);
+  ok('todo apagado: se esconde', med.hidden);
+  m.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+try { localStorage.removeItem('mkw.graficos'); } catch {}
+fin();
+</script>
+</body>
+</html>
