@@ -246,6 +246,19 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
 - `prodefender-analiza.cjs`: replays a proof from `soloPruebas` (console
   export) and prints it round by round: lives, gold, leaks by type, max
   advance, what was built. A proof only replays with the engine of its `ve`.
+- `prodefender-aprende.cjs export.json`: replays every current-`ve` proof of
+  a console export (longest per player and seed; ~11 min for 44 games) and
+  writes `prodefender-libro.json` — no uids, so it is committed: upgrade order
+  per tower, preferred target mode, tower counts and levels every 5 rounds
+  (per kingdom and `*`), and each kingdom's best game move by move (`guiones`).
+  `prodefender-bot.cjs --estrategia humana` reads it: it copies that game up to
+  round `--guion N` (25), then keeps the counts/levels people had at that
+  point, and spends the rest like `mixta`. Re-run it after a new export.
+  What the first export (Oct 2026) taught: the winners open with Dragon,
+  Prism or Ballista, add Frost Cannon and Beacon before round 15, push few
+  towers deep (Prism 4-2 is in almost every win) and buy the hero late; the
+  plain bot spams Spike Launchers, hoards gold and dies around round 9–27
+  without `--ayuda`.
 
 ## Determinism — do not break it
 
