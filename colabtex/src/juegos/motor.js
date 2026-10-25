@@ -234,6 +234,15 @@ export const JUEGOS = {
     cupo: 10,
     alta: "2026-10-18"
   },
+  mkw: {
+    nombre: "Mario Kart Wii",
+    lema: "Mario Kart Wii con Retro Rewind en el navegador: copas de hasta 12 amigos y la CPU completa los lugares que sobran",
+    color: "#e4202e",
+    minimo: 1,   // se puede abrir la sala solo (con la CPU) y esperar a los demás
+    cupo: 12,    // 12 humanos, como Mario Kart en línea: los 4 primeros con su puerto de mando y el resto con los
+                 // mandos "virtuales" del juego (juegos/mkw: mandos_virtuales_nativo.cpp, bitácora §91)
+    alta: "2026-10-17"
+  },
   pool: {
     nombre: "Pool 8",
     lema: "Billar a ocho bolas: lisas contra rayadas, con fuerza y efecto, y la negra al final. Uno contra uno o dos contra dos",
@@ -955,7 +964,12 @@ export function mayoriaExpulsion(n) {
   return otros <= 1 ? 1 : Math.floor(otros / 2) + 1;
 }
 
-export function votacion(p) {
+/* `anfitrionEn(q)` (opcional): quién manda la sala con el registro `q` hasta ese punto. Con él vale también
+   `{t:"echa", uid, a}`: si la escribe quien es el anfitrión en ese momento, se reescribe como la expulsión de `a`
+   (`{t:"abandona", uid:a, expulsado:true, echado:true, por:[uid]}`); si no, desaparece. Lo usa Mario Kart Wii
+   (§87 del port: el anfitrión puede sacar a alguien de la sala, además de la votación). Va en esta misma pasada
+   para que los votos y las expulsiones vean a los mismos en la sala: el voto de alguien ya echado no cuenta. */
+export function votacion(p, anfitrionEn = null) {
   const js = jugadoresDe(p), ids = new Set(js.map(j => j.uid));
   const fuera = new Set(), votos = {}, expulsados = [], jugadas = {};
   let hay = false;
@@ -969,6 +983,18 @@ export function votacion(p) {
   };
   for (const j of jugadasDe(p)) {
     const { k, ...v } = j;
+    if (j.t === "echa" && anfitrionEn) {             // (sin anfitrionEn, «echa» es del juego: el torneo tiene la suya)
+      hay = true;
+      const a = j.a;
+      if (ids.has(j.uid) && ids.has(a) && a !== j.uid && !fuera.has(j.uid) && !fuera.has(a)
+          && anfitrionEn({ ...p, jugadas }) === j.uid) {
+        jugadas[k] = { t: "abandona", uid: a, expulsado: true, echado: true, por: [j.uid] };
+        expulsados.push({ uid: a, por: [j.uid], k, echado: true });
+        fuera.add(a);
+        olvida(a);
+      }
+      continue;
+    }
     if (j.t !== "voto") {
       if (j.t === "abandona" && ids.has(j.uid)) { fuera.add(j.uid); olvida(j.uid); }
       jugadas[k] = v;
@@ -999,7 +1025,7 @@ export function votacion(p) {
    si no, el tercero llegaría a un tablero empezado y sin turno. Ese
    cierre es justo el `estado`, que deja de ser «esperando». */
 export function reducir(p) {
-  const V = votacion(p);
+  const V = votacion(p, p && p.juego === "mkw" ? q => redMkw(q).anfitrion : null);
   p = V.p;
   const js = jugadoresDe(p);
   const cupo = cupoDe(p);
@@ -1033,6 +1059,7 @@ export function reducir(p) {
   if (p.juego === "haxball") return { ...base, ...redHaxball(p, js, listos) };
   if (p.juego === "bt3") return { ...base, ...redBt3(p, js) };
   if (p.juego === "memazo") return { ...base, ...redMemazo(p, js, listos) };
+  if (p.juego === "mkw") return { ...base, ...redMkw(p, js) };
   if (p.juego === "pool") return { ...base, ...redPool(p, js, listos) };
   return base;
 }
@@ -7736,6 +7763,173 @@ export function redMemazo(p, js = jugadoresDe(p), listos = true) {
     debe: fin ? [] : falta(), listosYa: etapa === "escribir" ? Object.keys(envios) : [],
     memes: etapa === "votar" || fin ? memes : [], total: memes.length,
     historial, puntos, fuegos, tomates, fuera, cierre, ganador, motivo
+  };
+}
+
+/* ---------- Mario Kart Wii (+ Retro Rewind) ----------
+   El juego compilado a WebAssembly (`juegos/mkw/`, ver su CLAUDE.md), en un iframe. Sin el Wi-Fi del juego (el dueño,
+   2026-10-19: «no te conectes a Retro WFC»): cada navegador corre la MISMA carrera (la "carrera sincronizada": los
+   botones de todos en cada cuadro, por una malla WebRTC abierta DENTRO del marco; el buzón de Firebase,
+   `vivo/<pid>/rtc`, solo presenta), con los humanos como jugadores de verdad y la CPU completando los 12 lugares.
+   Dentro del juego, el anfitrión arma la copa con el selector de la página y cada uno elige personaje y vehículo con
+   las pantallas del juego (juegos/mkw/web/navegador/sala-carrera.mjs). Al registro va solo el vestíbulo:
+   - `{t:"ajuste", uid, k:"estilo", v}`: el anfitrión elige el modo de la sala (MKW_MODOS): "copa" = N carreras con
+     puntos (`{k:"carreras"}`: MKW_CARRERAS; las pistas las elige el anfitrión en el juego), "playlist" = una cola de
+     N pistas sorteadas. (El "wfc" de antes —Retro WFC tal cual— ya no existe: una sala vieja con él pasa a copa.)
+   - `{t:"ajuste", uid, k:"cpu", v}`: ya no se ofrece (la CPU de relleno siempre completa los 12).
+   - `{t:"ajuste", uid, k:"nivel", v}` (M20): el nivel de la CPU que completa los 12 (MKW_NIVEL), aparte de la
+     cilindrada; "maximo" por omisión.
+   - `{t:"ajuste", uid, k:"relevo", v}` (§103): el anfitrión prende (true) o apaga «🛰 Todo por Cloudflare»: cada marco
+     manda todo por el repetidor TURN de Cloudflare que entrega el Worker, aunque la conexión directa funcione. Apagado
+     por omisión y nunca solo, como el relevo de BT3 (el dueño lo pidió así: es excepcional).
+   - `{t:"anfitrion", uid, a}`: el anfitrión le pasa el puesto a otro (solo en el vestíbulo: el servidor del juego
+     vive en su pestaña).
+   - `{t:"empieza", uid}`: el anfitrión abre las carreras: los que están (hasta 12, en este orden: `sincro`) cargan el
+     juego y corren la copa juntos.
+   - `{t:"ajuste", uid, k:"cc", v}`: la cilindrada de la copa y de la playlist (MKW_CC; "azar" = la de Retro Rewind).
+   - `{t:"vuelve", uid, tabla?}`: el anfitrión las cierra y todos vuelven al vestíbulo. Al terminar una copa o una
+     playlist la manda el marco del anfitrión con la tabla final ([{nombre, puntos}], `mkwTabla`), que el vestíbulo
+     muestra como «la última».
+   La cola de la playlist la sortea cada navegador igual (`mkwPlaylist(pid, ronda, n)`): nadie la escribe.
+   - `{t:"abandona", uid}`: se va. Si era el anfitrión, el puesto pasa al siguiente que queda y la copa sigue con él
+     (no hay servidor: su kart sigue sin nadie y el nuevo anfitrión lleva la sala del juego).
+   - `{t:"echa", uid, a}` (§87): el anfitrión saca a `a` de la sala, en el vestíbulo o con la copa andando. `votacion`
+     la convierte en su `abandona` (expulsado, echado) solo si `uid` es el anfitrión en ese momento. Además la
+     votación para echar de todos los juegos (`{t:"voto"}`, ⏏): en Mario Kart se ofrece con 3 o más pilotos (con 2,
+     votar sería echar solo: eso es del anfitrión).
+   Quien entra con la copa andando espera a la siguiente tanda. Cada jugador tiene su NODO: 2 + su orden de llegada a
+   la sala, fijo aunque otros se vayan. El juego no le dice a la página quién ganó: la sala no clasifica.
+   La sala termina cuando ya no queda nadie. */
+export const MKW_CPU = { ninguna: "Sin CPU", facil: "CPU fácil", normal: "CPU normal", dificil: "CPU difícil" };
+const mkwCpu = v => tiene(MKW_CPU, v) ? v : "normal";
+/* Los dos modos de una sala y las carreras de una copa */
+export const MKW_MODOS = { copa: "Modo copa", playlist: "Modo playlist" };
+export const MKW_CARRERAS = [2, 4, 8, 12];
+const mkwEstilo = v => tiene(MKW_MODOS, v) ? v : "copa";
+const mkwCarrerasDe = v => MKW_CARRERAS.includes(Number(v)) ? Number(v) : 4;
+/* La cilindrada de la copa y de la playlist ("azar": cada carrera la suya, como Retro Rewind: 10 % 200cc, 65 % 150cc,
+   25 % espejo, sorteada con la semilla de la tanda). La clave "c100" es la cilindrada 100cc del juego, que Retro
+   Rewind corre como 200cc fuera de las salas mundiales (Pulsar, Is200cc; medido con el juego en §84): por eso se
+   llama 200cc. La clave se queda igual: las salas guardadas y el marco la usan. El orden es el de los botones, de menos a
+   más (el dueño): 150cc, espejo (la misma velocidad, la pista dada vuelta), 200cc y al azar (la mezcla) al final. */
+export const MKW_CC = { c150: "150cc", espejo: "Espejo", c100: "200cc", azar: "Al azar" };
+const mkwCcDe = v => tiene(MKW_CC, v) ? v : "c150";
+/* El nivel de la CPU que completa los 12 lugares (M20, el dueño: «un ajuste propio de la sala, que elige el anfitrión
+   aparte de la cilindrada, con máximo por omisión»). En las carreras VS del juego la cilindrada y el nivel de la CPU
+   son dos ajustes separados (solo el Grand Prix los ata). Las claves son las que entiende el marco (`&cpu=`,
+   juegos/mkw/web/navegador/mkw.mjs): "maximo" = todo al tope; los otros, más duros que los del juego (bitácora §96).
+   El orden es el de los botones, de menos a más, como la cilindrada. M23 (el dueño): dos más arriba, injustos a
+   propósito: "intenso" = el Hard AI de Retro Rewind (siempre al tope de velocidad) e "imposible" = además, solo las
+   CPU, más tope, más velocidad base y más aceleración que cualquier kart (juegos/mkw: dificultad-cpu.mjs, §99). */
+export const MKW_NIVEL = { facil: "Fácil", normal: "Normal", dificil: "Difícil", maximo: "Máximo", intenso: "Intenso", imposible: "Imposible" };
+const mkwNivelDe = v => tiene(MKW_NIVEL, v) ? v : "maximo";
+/* La tabla final que manda el marco: hasta 12 filas {nombre (≤ 20 letras), puntos (entero 0..9999)}; lo demás se tira */
+export function mkwTabla(t) {
+  if (!Array.isArray(t)) return null;
+  const r = [];
+  for (const f of t.slice(0, 12)) {
+    if (!f || typeof f.nombre !== "string") continue;
+    const puntos = Math.round(Number(f.puntos));
+    if (!Number.isFinite(puntos) || puntos < 0 || puntos > 9999) continue;
+    r.push({ nombre: f.nombre.slice(0, 20), puntos });
+  }
+  return r.length ? r : null;
+}
+/* La carrera sincronizada (cada navegador corre la misma carrera con los botones de todos): cada humano es un jugador
+   "local" del juego. Hay 4 puertos de mando de GameCube; del 5.º al 12.º manejan con los mandos "virtuales" del juego
+   (los que usan la CPU y los rivales en línea), así caben los 12 de Mario Kart en línea. */
+export const MKW_SINCRO_MAX = 12;
+export const MKW_COPAS = 79;            // copas de carrera de Retro Rewind (las de arenas no cuentan)
+/* La semilla y las 4 pistas de una tanda: salen de la sala y del número de tanda, así cada navegador calcula lo mismo
+   sin que nadie lo escriba. */
+/* La cola de la playlist: n pistas distintas, sorteadas con la sala y la tanda (igual en cada navegador) */
+export function mkwPlaylist(pid, ronda, n) {
+  let h = 2166136261;
+  for (const c of `lista|${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let x = (h >>> 0) || 1;
+  const azar = m => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % m; };
+  const pistas = [], vistas = new Set();
+  while (pistas.length < Math.min(n, MKW_COPAS * 4)) {
+    const copa = azar(MKW_COPAS), fila = azar(4), k = copa * 4 + fila;
+    if (vistas.has(k)) continue;
+    vistas.add(k); pistas.push({ copa, fila });
+  }
+  return pistas;
+}
+export function mkwCarrera(pid, ronda) {
+  let h = 2166136261;
+  for (const c of `${pid}|${ronda}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  let x = (h >>> 0) || 1;
+  const azar = n => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % n; };
+  const semilla = (h >>> 0) || 1, pistas = [], vistas = new Set();
+  while (pistas.length < 4) {
+    const copa = azar(MKW_COPAS), fila = azar(4), k = copa * 4 + fila;
+    if (vistas.has(k)) continue;
+    vistas.add(k); pistas.push({ copa, fila });
+  }
+  return { semilla, pistas };
+}
+
+export function redMkw(p, js = jugadoresDe(p)) {
+  const ids = new Set(js.map(j => j.uid));
+  const fuera = {}, hist = [];
+  // (una sala sin `cpu` es de las nuevas: sin CPU de relleno)
+  let fase = "vestibulo", ronda = 0, cpu = p && p.cpu !== undefined ? mkwCpu(p.cpu) : "ninguna", sincro = null;
+  let estilo = mkwEstilo(p && p.estilo), carreras = mkwCarrerasDe(p && p.carreras), cc = mkwCcDe(p && p.cc), ultimaTabla = null;
+  let nivel = mkwNivelDe(p && p.nivel), relevo = false;
+  let anfitrion = ids.has(p && p.anfitrion) ? p.anfitrion : ((js[0] || {}).uid || "");
+  const presentes = () => js.filter(j => !fuera[j.uid]);
+  for (const j of jugadasDe(p)) {
+    if (!j || !ids.has(j.uid) || fuera[j.uid]) continue;
+    if (j.t === "abandona") {
+      fuera[j.uid] = true; hist.push(j.echado ? { e: "echado", uid: j.uid, por: (j.por || [])[0] || "" }
+        : j.expulsado ? { e: "expulsado", uid: j.uid } : { e: "sale", uid: j.uid });
+      if (j.uid === anfitrion) {
+        anfitrion = (presentes()[0] || {}).uid || "";
+        // (la carrera sincronizada no tiene servidor: siguen, con el nuevo llevando la sala del juego)
+      }
+      continue;
+    }
+    const esAnf = j.uid === anfitrion;
+    if (j.t === "ajuste" && esAnf && j.k === "cpu") { cpu = mkwCpu(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "estilo" && fase === "vestibulo") { estilo = mkwEstilo(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "carreras" && fase === "vestibulo") { carreras = mkwCarrerasDe(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "cc" && fase === "vestibulo") { cc = mkwCcDe(j.v); continue; }
+    if (j.t === "ajuste" && esAnf && j.k === "nivel" && fase === "vestibulo") { nivel = mkwNivelDe(j.v); continue; }
+    // §103: «🛰 Todo por Cloudflare» (como el relevo de BT3: lo prende el anfitrión, nunca solo; solo en el vestíbulo,
+    // porque cada marco lo lee al abrir la copa)
+    if (j.t === "ajuste" && esAnf && j.k === "relevo" && fase === "vestibulo") { relevo = j.v === true; continue; }
+    if (j.t === "anfitrion" && esAnf && fase === "vestibulo" && ids.has(j.a) && !fuera[j.a]) { anfitrion = j.a; hist.push({ e: "anfitrion", a: j.a }); continue; }
+    /* §99 (H2): con la copa andando, el anfitrión desapareció del buzón (se le cortó internet o se le cerró Chrome sin
+       escribir «abandona»): las páginas de los demás eligen al mismo reemplazo —el primero de la copa que sigue
+       presente— y ese escribe {t:"toma", de: el que reemplaza}. Vale solo si `de` es el anfitrión de ese momento (una
+       toma vieja, de antes de otro cambio, no hace nada) y quien toma corre en la copa. */
+    if (j.t === "toma" && fase === "jugando" && !esAnf && j.de === anfitrion && sincro && sincro.includes(j.uid)) {
+      anfitrion = j.uid; hist.push({ e: "toma", a: j.uid, de: j.de }); continue;
+    }
+    if (j.t === "empieza" && esAnf && fase === "vestibulo") {
+      fase = "jugando"; ronda++;
+      // la carrera sincronizada, con los que están ahora (hasta 12), en este orden (mando 1, 2, 3…)
+      const ps = presentes();
+      sincro = ps.slice(0, MKW_SINCRO_MAX).map(x => x.uid);
+      hist.push({ e: "ronda", n: ronda, anf: anfitrion, cpu, estilo, cc, nivel, jugadores: ps.length, sincro: !!sincro });
+      continue;
+    }
+    if (j.t === "vuelve" && esAnf && fase === "jugando") {
+      fase = "vestibulo";
+      const tabla = estilo !== "wfc" ? mkwTabla(j.tabla) : null;
+      if (tabla) ultimaTabla = { n: ronda, estilo, tabla };
+      hist.push(tabla ? { e: "vuelve", n: ronda, tabla } : { e: "vuelve", n: ronda });
+      continue;
+    }
+  }
+  const nodos = {};
+  js.forEach((j, i) => { nodos[j.uid] = 2 + i; });
+  const quedan = presentes().length;
+  return {
+    fase: quedan ? fase : "fin", turno: "", anfitrion, cpu, estilo, carreras, cc, nivel, relevo, ultimaTabla, ronda, nodos, fuera, hist: hist.slice(-40),
+    sincro: fase === "jugando" ? sincro : null,
+    ganador: "", motivo: quedan ? "" : "abandono"
   };
 }
 

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco MKW</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<h1>Banco de pruebas · <span>Mario Kart Wii</span> + Retro Rewind</h1>
+<p>Cada prueba es una página suelta que muestra qué pasó. Aquí se ve el último resultado de cada una (guardado en
+  este navegador). Nada del juego vive aquí: los datos de prueba solo tienen la forma del juego.</p>
+<div class="caja">
+  <table>
+    <thead><tr><th>Prueba</th><th>Qué verifica</th><th>Fase</th><th>Último resultado</th></tr></thead>
+    <tbody id="tabla"></tbody>
+  </table>
+</div>
+<div class="caja"><button id="borrar">Borrar resultados guardados</button></div>
+<script>
+  // id → [página, qué verifica, fase del PLAN.md]
+  const PRUEBAS = {
+    capacidades: ['pruebas/capacidades.html', 'Si el navegador tiene lo que necesita el juego: JSPI, WebGPU, memoria, 60 Hz, mandos', '1'],
+    fibers:      ['pruebas/fibers/index.html', 'Los «hilos» del juego (fibers) cambiando de pila con JSPI, sin Asyncify', '1'],
+    excepciones: ['pruebas/excepciones/index.html', 'Excepciones C++ (-fwasm-exceptions) atrapadas por el hilo correcto entre fibers', '1'],
+    webgpu:      ['pruebas/webgpu/index.html', 'WebGPU desde C++ (emdawnwebgpu): esperas de aurora con JSPI, 60 fps, lectura de vuelta por cuadro', '1'],
+    fma:         ['pruebas/fma/index.html', 'Multiplicar y sumar exacto (fmadd/ps_madd) bit a bit contra musl, y más rápido', '1'],
+    paridad:     ['pruebas/paridad/index.html', 'La matemática real del runtime en wasm da los mismos bits que el build x86 (22 operaciones, NaN incluidos)', '1'],
+    sonido:      ['pruebas/sonido/index.html', 'Sonido: SDL3 pasa por el volumen y el medidor de la página, arranca bloqueado y se desbloquea con el primer toque, volumen, silencio, cortes, otro AudioContext que no se adueña (14 puntos; necesita un clic)', '3'],
+    'sonido-worklet': ['pruebas/sonido-worklet/index.html', 'Sonido por AudioWorklet (§88): la cola del worklet muestra por muestra (fundidos, vacíos, huecos, objetivo que sube y baja, arranque alto, PC lenta, descarte de silencio, el clic) y de verdad con un juego falso (bloqueo, nivel, volumen, tirón, demora con el clic, otro AudioContext) (34 puntos; necesita un clic)', '3'],
+    guardado:    ['pruebas/guardado/index.html', 'Partidas guardadas con el MEMFS real de Emscripten: lo que el juego escribe llega solo a IndexedDB, vuelve al reabrir, paquete para descargar/cargar (y subir a Firebase) (15 puntos)', '3'],
+    controles:   ['pruebas/controles/index.html', 'Teclado, mandos (Gamepad API falsa), mando táctil e inclinación → mando de GameCube por puerto, sin el juego (28 puntos)', '3'],
+    nube:        ['pruebas/nube/index.html', 'Partidas en la nube: dos navegadores y un Firebase Storage falso con las reglas del sitio: subir, bajar, sin cambios, sin conexión, conflictos con respaldo, permisos y tope (23 puntos)', '5'],
+    disco:       ['pruebas/disco/index.html', 'Caché del disco: bloques de 256 KB en Cache Storage, un pedido por tramo, nada se baja dos veces, versión nueva borra la vieja; bajar antes con un servidor lento: avisos del juego en paralelo, lectura seguida, tope de 12 pedidos, fila de prioridad baja y (§93) el paquete de los diminutos (38 puntos)', '3'],
+    lote:        ['pruebas/lote/index.html', '§104, menos llamadas al Worker (100.000 al día): muchos pedazos del disco en UNA llamada POST /lote, exactos aunque la respuesta llegue en trozos; lo urgente primero y en seguida; topes de 12 pedazos y 16 MB; la primera llamada sola; Worker viejo (404 o sin POST) o lote cortado = de a uno; un video leído en orden rellena de a 8 MB (20 puntos)', '3'],
+    brsar:       ['pruebas/brsar/index.html', 'Grupos de sonido con un BRSAR falso: leer la tabla de grupos (formato de Tockdom), archivos rotos, y bajar el grupo entero apenas se lee dentro de él (9 puntos)', '3'],
+    pipelines:   ['pruebas/pipelines/index.html', 'Precalentar pipelines con un aurora falso: leer la semilla y la lista de este navegador, dejarlas para aurora, guardar solo si la lista creció o al esconder la pestaña, datos malos y IndexedDB bloqueado (14 puntos)', '3'],
+    thp:         ['pruebas/thp/index.html', 'Video THP con el decodificador nativo: cuadros falsos (JPEG estándar sin relleno 0xFF00) iguales a la IDCT exacta ±1, texturas en baldosas de 8×4, datos cortados/basura/no soportados, un cuadro de 672×736 en < 6 ms (8 puntos; Node: node banco/pruebas/thp/prueba-node.mjs)', '3'],
+    licencias:   ['pruebas/licencias/index.html', 'Tu partida, sin el juego: leer un rksys.dat inventado (licencias, nombre, VR, código de amigo con su control MD5 de Tockdom), rechazar uno dañado o cortado, reconocer el tipo de archivo, reemplazar solo el rksys.dat, abrir un paquete sin tocar nada y las copias de respaldo (26 puntos)', '3'],
+    sala:        ['pruebas/sala/index.html', 'Sala en línea, sin el juego ni red: hasta 12 personas, cola de pistas tipo playlist, 45 s para elegir con «Confirmar», entrar con la carrera andando (mirar y elegir) y cambio de anfitrión (22 puntos)', '3'],
+    records:     ['pruebas/records/index.html', 'Récords, sin el juego: leer el tiempo final y la categoría de una memoria de Wii inventada, avisar una vez por carrera, récord local, subir a un Firestore falso con sus reglas solo si mejora, y la tabla ordenada (19 puntos)', '3'],
+    'fantasma-pagina': ['pruebas/fantasma-pagina/index.html', '§92, la Contrarreloj contra el mejor de la página, sin el juego: un juego, archivos y una nube FALSOS con .rkg inventados; el tiempo de un .rkg, el nombre que les pone Pulsar, subir el de un récord nuevo (el justo, no otro; no con pluma, no en Carrera, no sin sesión), bajar el del mejor que tenga fantasma saltando a quien no lo subió, dejarlo en el juego con su pista y modo, no repetir, nada a 200cc sin fantasmas, con pluma o fuera de RR, y nada si cambió la pista mientras bajaba (19 puntos)', '3'],
+    mii:         ['pruebas/mii/index.html', 'Mi Mii, sin el juego: los 74 bytes de un Mii ida y vuelta (300 al azar), CRC-16/XMODEM, la base de 100 casillas (RFL_DB.dat), dañada, desfile conservado, tope de 100 y la vista previa (11 puntos)', '3'],
+    'mii-invitados': ['pruebas/mii-invitados/index.html', '§86, los 6 Mii invitados en «Mi Mii», sin el juego y con Mii y caras FALSAS: texturas de la Wii en baldosas (RGBA8, RGB5A3, RGB565, IA8, I8) ida y vuelta, lo que deja invitados_nativo.cpp leído de la memoria, PNG, cara vacía rechazada, IndexedDB, «cambiar» conserva el id de la licencia y «nuevo» da uno nuevo, prepararMii con el invitado elegido, la galería con 6 imágenes, guardar y el dibujo que vuelve al tocar un rasgo (41 puntos)', 'M'],
+    ocultar:     ['pruebas/ocultar/index.html', 'Botones del juego escondidos, sin el juego: una memoria de Wii inventada con la forma de los menús (página, administrador de mandos, recuadros, botones en la página y en el montón); en el menú principal se esconden el recuadro «Retro WFC» y sus 2 botones y nada más, en la sala en línea no se toca, en «Un jugador» se esconde «Settings», un botón igual de otra página no se toca y si la forma no calza no se escribe nada (11 puntos)', 'B'],
+    inicio:      ['pruebas/inicio/index.html', 'Menú de inicio «JloKart Wii», sin el juego y con una imagen FALSA: aparece solo si el Worker entrega la imagen (200; con 401, 403, 404 o sin red no), 3 botones sin «Championship», teclado (flechas/WS, Enter, Esc) sin que la tecla le llegue al juego, bits del mando de GameCube (cruz con repetición, stick, A, B), clic y «PRESS START», «Online» solo dentro del sitio, quieto con el cajón encima, y la forma acostado y en un teléfono parado (14 puntos)', 'B'],
+    privado:     ['pruebas/privado/index.html', 'Lo privado con token, sin el juego ni el sitio: la página le pide la sesión a una «Juegos» falsa y pone Authorization en cada pedido al Worker (y en ninguno más), una sola pregunta para 20 pedidos, token vencido renovado una vez, 403 sin insistir, sin Juegos no se queda esperando, respuestas de otra ventana no valen, mkw.js importado desde un blob (18 puntos)', 'B'],
+    lockstep:    ['pruebas/lockstep/index.html', 'Carrera sincronizada de la sala con CPU, sin el juego: consolas falsas con red mala (latencia y pérdidas) reciben los mismos botones en cada cuadro, alguien se va, alguien llega tarde, el que decide nunca llega, carrera nueva, desincronización detectada, el plantel de 12 karts, recargar a mitad de carrera la acción en un cuadro y (§93) el margen largo de la largada (47 puntos)', '6'],
+    relevo:      ['pruebas/relevo/index.html', '§80, un lento no frena a todos, sin el juego: consolas a ritmo (un cuadro cada 10 ms, sin ponerse al día); un jugador con la red mala (muy mala y no tanto), una PC a la mitad (con y sin relevo), un apagón, uno que se va, la autoridad lenta que pasa el papel y el corte que llega tarde a una consola que ya corrió más allá (21 puntos; ?solo=N = una parte)', '6'],
+    'aviso-gpu': ['pruebas/aviso-gpu/index.html', '§81, la ayuda de la tarjeta de video, sin el juego: no sale por un tirón, en el arranque, esperando el disco, con la pestaña escondida ni en la sala; sale con la lentitud sostenida si Windows eligió la tarjeta (o va por software); «Ver cómo», «✕» 7 días, una vez por visita (18 puntos)', '6'],
+    'vr-sala':   ['pruebas/vr-sala/index.html', '§82, el VR de la sala, sin el juego: la curva de Mario Kart Wii (13 contra uno igual, de 0 a 112), lo que gana uno lo pierde otro, el 1.º nunca pierde, empates, cortados (pierden contra todos, nadie gana por ellos), el peor caso guardado mientras se corre, topes, la memoria del juego y la foto de los VR de cada carrera, la copia local por cuenta (27 puntos)', '6'],
+    sincro:      ['node web/navegador/prueba-sincro.mjs', 'Con el juego de verdad: dos pestañas corren la misma carrera con 10 CPU, cada una con su teclado y su cámara, y las huellas coinciden', '6'],
+    piloto:      ['node web/navegador/prueba-piloto.mjs', 'Con el juego de verdad: el piloto lleva solo a una pista de Carrera y a una copa de Gran Premio, leyendo la memoria del juego, y lo verifica (pista y nombre)', '3'],
+    tactil:      ['node web/navegador/prueba-tactil.mjs', 'Mando táctil en un Pixel 7 emulado, parado y acostado: el recuadro ocupa la pantalla, de 80 % a 130 % ningún botón pisa a otro, toques reales por CDP con uno y dos dedos (16 puntos)', '3'],
+    subir:       ['node herramientas/prueba-subir-r2.mjs', 'Subir a R2 sin R2 ni el juego: un R2 falso que revisa la firma (Signature V4, igual al ejemplo de AWS) y el SHA-256 de cada archivo; archivos inventados con la forma de lo que se sube; la lista, el manifiesto, subir sin repetir, la versión al final, comprobar y sobrantes (22 puntos)', 'B'],
+    // Las que usan el juego de verdad corren en Node (el .wasm del juego nunca se sirve desde el banco)
+    arranque:    ['node web/node/prueba-arranque.mjs', 'El juego + Retro Rewind arranca en Node sin pantalla: disco, OS, escenas, 60 fps, volcado de memoria (13 puntos)', '2'],
+    partidas:    ['node web/navegador/prueba-partidas.mjs', 'Con el juego de verdad: crear una licencia, recargar la página y que siga ahí (6 puntos)', '3'],
+    nubejuego:   ['node web/navegador/prueba-nube.mjs', 'Con el juego de verdad dentro de la sala falsa del sitio: dos navegadores vacíos con la misma cuenta; la licencia creada en uno sube sola a una nube falsa con las reglas de Storage (copiada al reino de la sala) y el otro la baja ANTES de que el juego lea sus partidas; volver a entrar no baja nada; sin nube el juego espera solo 4 s (9 puntos)', 'B'],
+    juego:       ['node web/navegador/prueba-navegador.mjs', 'El juego en Chrome con aurora real: WebGPU en el canvas, disco por HTTP Range, imagen, 60 fps, enganche al monitor, la tecla A llega y el juego responde, sonido desbloqueado, sin cortes y con la cola centrada (20 puntos). Para jugar: node web/navegador/servidor.mjs y abrir http://127.0.0.1:8140/', '3'],
+  };
+  const pinta = () => {
+    document.getElementById('tabla').innerHTML = Object.entries(PRUEBAS).map(([id, [url, que, fase]]) => {
+      let r = null; try { r = JSON.parse(localStorage.getItem('banco.' + id)); } catch (e) {}
+      const estado = !r ? '<span class="estado-nada">sin correr</span>'
+        : `<span class="${r.mal ? 'estado-mal' : 'estado-bien'}">${r.bien} bien, ${r.mal} mal</span><br><small>${new Date(r.cuando).toLocaleString()}</small>`;
+      const enlace = url.startsWith('node ') ? `${id}<br><small><code>${url}</code></small>` : `<a href="${url}">${id}</a>`;
+      const est = url.startsWith('node ') && !r ? '<span class="estado-nada">en Node (ver la terminal)</span>' : estado;
+      return `<tr><td>${enlace}</td><td>${que}</td><td>${fase}</td><td>${est}</td></tr>`;
+    }).join('');
+  };
+  document.getElementById('borrar').onclick = () => { Object.keys(PRUEBAS).forEach(id => localStorage.removeItem('banco.' + id)); pinta(); };
+  addEventListener('storage', pinta); addEventListener('focus', pinta);
+  pinta();
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prueba de conexión</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Prueba de conexión: <span>🟢 directa, 🛰 por el repetidor, 🔴 por otro o sin conexión, ⏳ conectando</span></h1>
+<p>Prueba <code>conexiones.mjs</code> (bitácora §100, H1.2 del crítico de la red) <b>sin el juego</b>, con un reloj de
+  mentira, una malla de mentira (qué conexiones están sanas y qué dice su <code>getStats</code>) y lo que «oye» una sala de
+  mentira (cuándo llegó algo de cada piloto, directo o pasado por otro). Comprueba cómo se clasifica cada caso, los
+  textos y el aviso de la esquina (solo los 🔴), y que la vigilancia cada 2 s avisa solo cuando algo cambia.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { clasificar, textoConexion, avisoConexiones, crearConexiones, ICONO, CONECTANDO_MS } from '/web/navegador/conexiones.mjs';
+
+const { ok, fin } = prueba('conexiones', 'Prueba de conexión (sin el juego)');
+const J = JSON.stringify;
+try {
+  // 1) cada caso suelto
+  ok('conexión sana y directa: 🟢 con su ida y vuelta', J(clasificar({ sano: true, camino: { relevo: false, ms: 34 } })) === J({ e: 'directa', ms: 34 }));
+  ok('sana pero por el TURN: 🛰', clasificar({ sano: true, camino: { relevo: true, ms: 81 } }).e === 'repetidor' && ICONO.repetidor === '🛰');
+  ok('sana, sin getStats todavía: 🟢 sin ms', J(clasificar({ sano: true, camino: null })) === J({ e: 'directa', ms: null }));
+  ok('un tirón («disconnected» un momento) pero le llegó algo directo hace 1 s: sigue 🟢',
+     clasificar({ sano: false, oido: { hace: 1000, directo: 1000, por: null }, malMs: 1000 }).e === 'directa');
+  ok('sin conexión propia, pero le llega por Beto: 🔴 «por otro», con quién',
+     J(clasificar({ sano: false, oido: { hace: 800, directo: 60000, por: 'beto' }, malMs: 60000 })) === J({ e: 'puente', por: 'beto' }));
+  ok('los primeros 15 s sin conexión ni nada oído: ⏳ conectando', clasificar({ sano: false, oido: { hace: Infinity, directo: Infinity, por: null }, malMs: 5000 }).e === 'conectando');
+  ok('pasados los 15 s sin nada: 🔴 sin conexión', clasificar({ sano: false, oido: { hace: 20000, directo: 20000, por: 'beto' }, malMs: 20000 }).e === 'sin');
+
+  // 2) los textos y el aviso de la esquina
+  const nombres = { beto: 'Beto', caro: 'Caro', dani: 'Dani' }, n = u => nombres[u] || u;
+  ok('los textos', textoConexion({ e: 'directa', ms: 34 }, 'Beto') === 'Beto: conexión directa · 34 ms' &&
+     textoConexion({ e: 'repetidor', ms: null }, 'Caro') === 'Caro: por el repetidor' &&
+     textoConexion({ e: 'puente', por: 'beto' }, 'Dani', n) === 'Dani: sin conexión directa (le llega por Beto)' &&
+     textoConexion({ e: 'sin' }, 'Dani') === 'Dani: sin conexión', textoConexion({ e: 'puente', por: 'beto' }, 'Dani', n));
+  ok('el aviso de la esquina: nada si todo anda (🟢, 🛰 y ⏳ no avisan)',
+     avisoConexiones([{ uid: 'beto', e: 'directa' }, { uid: 'caro', e: 'repetidor' }, { uid: 'dani', e: 'conectando' }], n) === '');
+  ok('…y con 🔴, quiénes y por dónde', avisoConexiones([{ uid: 'beto', e: 'directa' }, { uid: 'dani', e: 'puente', por: 'beto' }, { uid: 'caro', e: 'sin' }], n) ===
+     '🔴 Dani: sin conexión directa (le llega por Beto) · Caro: sin conexión');
+
+  // 3) la vigilancia: una malla y una sala de mentira, el reloj a mano
+  let t = 0, tic = null;
+  const sanos = new Set(), stats = {}, oidos = {};
+  const malla = { sano: u => sanos.has(u), camino: async u => stats[u] ?? null };
+  const sala = { oido: u => oidos[u] || { hace: Infinity, directo: Infinity, por: null } };
+  const avisos = [];
+  const c = crearConexiones({ malla, sala, quienes: () => ['beto', 'caro'], alCambiar: l => avisos.push(l.map(x => x.uid + ':' + x.e).join(',')),
+    ahora: () => t, reloj: f => { tic = f; return 1; }, parar: () => { tic = null; } });
+  const paso = async ms => { t += ms; await tic(); };
+  await Promise.resolve();
+  ok('al abrir: los dos ⏳ conectando (un aviso)', avisos.length === 1 && avisos[0] === 'beto:conectando,caro:conectando', J(avisos));
+  sanos.add('beto'); stats.beto = { relevo: false, ms: 30 };
+  await paso(2000);
+  ok('se conecta Beto: 🟢 con 30 ms', c.lista()[0].e === 'directa' && c.lista()[0].ms === 30 && avisos.length === 2, J(c.lista()));
+  stats.beto = { relevo: false, ms: 36 };
+  await paso(2000);
+  ok('la ida y vuelta se mueve 6 ms: no vuelve a avisar', avisos.length === 2 && c.lista()[0].ms === 36, J(avisos));
+  await paso(CONECTANDO_MS);
+  ok('Caro sigue sin conexión pasados los 15 s: 🔴 sin', c.lista()[1].e === 'sin' && avisos.length === 3, J(c.lista()));
+  oidos.caro = { hace: 500, directo: Infinity, por: 'beto' };
+  await paso(2000);
+  ok('a Caro se la oye por Beto (la sala lo pasa): 🔴 por otro, con Beto', c.lista()[1].e === 'puente' && c.lista()[1].por === 'beto' && avisos.length === 4, J(c.lista()));
+  sanos.add('caro'); stats.caro = { relevo: true, ms: 95 }; oidos.caro = { hace: 0, directo: 0, por: 'beto' };
+  await paso(2000);
+  ok('Caro conecta por el TURN: 🛰', c.lista()[1].e === 'repetidor' && c.lista()[1].ms === 95, J(c.lista()));
+  sanos.delete('beto'); oidos.beto = { hace: 9000, directo: 9000, por: null };
+  await paso(2000);
+  ok('a Beto se le cae la conexión que tenía: ⏳ conectando otra vez (15 s para rearmarse)', c.lista()[0].e === 'conectando', J(c.lista()));
+  await paso(CONECTANDO_MS);
+  ok('…y si no vuelve, 🔴 sin conexión', c.lista()[0].e === 'sin', J(c.lista()));
+  c.detener();
+  ok('detener() para el reloj', tic === null);
+} catch (e) {
+  ok('la prueba corrió sin errores', false, e.stack || e.message);
+}
+fin();
+</script>
+</body>
+</html>

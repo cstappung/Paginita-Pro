@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contador de los que faltan</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Contador de los que faltan: <span>«30 · ¡A LA META!» con las letras de la cuenta de salida</span></h1>
+<p>Prueba <code>dnf.mjs</code> y <code>fuente-wii.mjs</code> (bitácora §78) <b>sin el juego</b>: una memoria de Wii inventada
+  con la forma de la carrera (Raceinfo con su etapa, su reloj y los corredores con la bandera de «cruzó la meta»; Racedata
+  con el puesto de esta consola), un juego falso que dice cuándo llegó el primero y una <b>fuente de mentira con la forma
+  de las del juego</b>: letras dibujadas por el navegador, guardadas como hojas IA4 dentro de dos BRFNT, en un U8 comprimido
+  con Yaz0 (como <code>UI/Font.szs</code>). Mueve el reloj de la carrera y comprueba lo que muestra el contador: nada mientras
+  nadie llegó, 30 cuando llega el primero (aunque sea una CPU), los colores de la cuenta de salida (naranja con borde
+  oliva), la entrada «como en la salida» en los últimos 10, el 3-2-1 con la fuente de la cuenta, un pitido en cada uno de los
+  últimos 5, el aviso tranquilo para quien ya llegó, encima de la imagen del juego y que se va cuando vence.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<canvas id="canvas" width="1280" height="720" style="position:fixed;left:0;top:0;width:100vw;height:100vh;object-fit:contain;visibility:hidden;pointer-events:none"></canvas>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearCuentaDnf, DNF_MS, RUTAS_FUENTE, PALETAS } from '/web/navegador/dnf.mjs';
+import { abrirSzs, abrirBrfnt } from '/web/navegador/fuente-wii.mjs';
+
+const { ok, fin } = prueba('cuenta-dnf', 'Contador de los que faltan (sin el juego)');
+
+import { hacerBrfnt, hacerU8, hacerYaz0 } from '../../fuente-falsa.js';   // (la fuente de mentira: letras del navegador)
+const TEXTO = '0123456789¡!ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚº.… ';
+const fuenteFalsa = hacerYaz0(hacerU8([
+  ['kart_kanji_font.brfnt', hacerBrfnt(TEXTO.trim(), 40, 50, '900 36px sans-serif')],
+  ['tt_kart_font_rodan_ntlg_pro_b.brfnt', hacerBrfnt('!123GO', 34, 42, 'italic 900 32px serif')],
+]));
+const pedidas = [];
+let sinRR = false;
+const leerArchivo = async ruta => { pedidas.push(ruta); return ruta.includes('RetroRewind6') && sinRR ? null : fuenteFalsa; };
+
+// el decodificador solo, con la fuente de mentira
+const archivos = abrirSzs(fuenteFalsa);
+const kanji = abrirBrfnt(archivos.get('/kart_kanji_font.brfnt'));
+ok('fuente-wii abre el Font.szs (Yaz0 → U8 → BRFNT) y encuentra cada letra (por tramo y por pares)',
+   archivos.size === 2 && kanji.tiene('0123456789¡LLEGÓ EL 1.º!') && !kanji.tiene('ç') && kanji.glifo('7').g === 7, [...archivos.keys()].join(' '));
+
+// ---- memoria falsa (big-endian, como la Wii) con el lector de menus.mjs: u32, u16, u8 ----
+const m = new Map();
+const u8 = a => m.get(a) ?? 0, u16 = a => (u8(a) << 8) | u8(a + 1), u32 = a => ((u16(a) << 16) | u16(a + 2)) >>> 0;
+const w8 = (a, v) => m.set(a, v & 0xFF), w16 = (a, v) => { w8(a, v >> 8); w8(a + 1, v); };
+const w32 = (a, v) => { w16(a, v >>> 16); w16(a + 2, v & 0xFFFF); };
+const L = { u8, u16, u32 };
+const RI = 0x90000000, RELOJ = 0x90001000, LISTA = 0x90002000, JUG = i => 0x90003000 + i * 0x100, RD = 0x91000000;
+w32(0x809BD730, RI); w32(RI + 0x14, RELOJ); w32(RI + 0xC, LISTA); w32(0x809BD728, RD);
+for (let i = 0; i < 12; i++) w32(LISTA + 4 * i, JUG(i));
+const etapa = e => w32(RI + 0x28, e);
+const reloj = ms => { w16(RELOJ + 0x8, Math.floor(ms / 60000)); w8(RELOJ + 0xA, Math.floor(ms / 1000) % 60); w16(RELOJ + 0xC, ms % 1000); };
+const llego = (i, si = true) => w32(JUG(i) + 0x38, si ? 2 : 0);
+const soyPuesto = i => w8(RD + 0x20 + 0xB64, i);
+
+// ---- el juego falso: cuándo llegó el primero (el reloj de la carrera; −1 = nadie) ----
+let desde = -1;
+const M = { _mkw_sala_dnf_desde: () => desde };
+const pitidos = [];
+const c = crearCuentaDnf({ M, lector: () => L, manual: true, leerArchivo, pitido: ultimo => pitidos.push(ultimo ? 'último' : 'pi') });
+await c.listo;
+const caja = document.getElementById('cuentaDnf');
+const en = ms => { reloj(ms); c.actualizar(); return c.estado(); };
+ok('lee la fuente del juego del disco: primero la de Retro Rewind (la que carga el juego)', c.estado().fuente === 'juego' &&
+   pedidas[0] === RUTAS_FUENTE[0] && RUTAS_FUENTE[0].includes('RetroRewind6/UI/Font.szs'), pedidas.join(' '));
+
+etapa(2); soyPuesto(1); reloj(12000);
+c.actualizar();
+ok('mientras nadie llegó no se muestra nada', !c.estado().visible && caja.hidden);
+ok('el plazo es de 30 s (el mismo que la página le pasa al juego)', DNF_MS === 30000);
+
+// llega una CPU (puesto 7) con el reloj de la carrera en 1:40.000
+llego(7); desde = 100000;
+let e = en(100000);
+ok('llega el primero (una CPU): quien sigue corriendo ve 30 y «¡LLEGÓ EL 1.º!», entrando como en la salida',
+   e.visible && e.modo === 'apurate' && e.segundos === 30 && e.letrero === '¡LLEGÓ EL 1.º!' && e.animacion === 'golpe', e.texto + ' · ' + e.animacion);
+// los colores: los del 3-2-1 de la salida (go.brlyt): relleno naranja y borde oliva
+const pix = caja.querySelector('.cara').getContext('2d').getImageData(0, 0, caja.querySelector('.cara').width, caja.querySelector('.cara').height).data;
+let naranja = 0, oliva = 0;
+for (let i = 0; i < pix.length; i += 4) {
+  if (pix[i + 3] < 250) continue;
+  if (pix[i] > 225 && pix[i + 1] > 110 && pix[i + 1] < 150 && pix[i + 2] < 20) naranja++;
+  if (pix[i] > 55 && pix[i] < 80 && pix[i + 1] > 55 && pix[i + 1] < 80 && pix[i + 2] < 15) oliva++;
+}
+ok('el número sale de los glifos de la fuente con los colores de la cuenta: relleno naranja y borde oliva', naranja > 80 && oliva > 40 &&
+   PALETAS.naranja.relleno.join() === '255,137,137' && PALETAS.naranja.borde.join() === '70,70,70', `${naranja} px naranjas, ${oliva} oliva`);
+e = en(102500);
+ok('a los 2 s el letrero cambia a «¡A LA META!»', e.letrero === '¡A LA META!' && e.segundos === 28, e.texto);
+e = en(112500);
+ok('cuenta en el tiempo de la carrera: a los 12,5 s quedan 18 (redondea hacia arriba), con un golpecito', e.segundos === 18 && e.animacion === 'tic', `${e.segundos} · ${e.animacion}`);
+// encima de la imagen del juego (el canvas va con object-fit: contain: la imagen puede tener franjas)
+document.getAnimations().forEach(a => a.finish());            // (medir sin el golpecito a medio camino)
+const lz = document.getElementById('canvas'), r = lz.getBoundingClientRect(), s = Math.min(r.width / 1280, r.height / 720);
+const im = { x: r.left + (r.width - 1280 * s) / 2, y: r.top + (r.height - 720 * s) / 2, w: 1280 * s, h: 720 * s };
+const rc = caja.getBoundingClientRect(), rn = caja.querySelector('.cuenta-dnf-numero').getBoundingClientRect();
+ok('va encima de la imagen del juego (no de la ventana) y el número mide lo de la cuenta de salida (11 % del alto)',
+   Math.abs(rc.left - im.x) < 1.5 && Math.abs(rc.top - im.y) < 1.5 && Math.abs(rc.width - im.w) < 1.5 &&
+   Math.abs(rn.height - Math.max(0.11 * im.h, 30)) < 1.5, `${Math.round(rc.left)},${Math.round(rc.top)} ${Math.round(rc.width)}×${Math.round(rc.height)} · número ${rn.height.toFixed(1)} px`);
+ok('al centro, debajo del HUD de arriba: el número empieza en el 20 % del alto y no baja de la mitad',
+   Math.abs((rn.left + rn.right) / 2 - (im.x + im.w / 2)) < 2 && Math.abs(rn.top - im.y - 0.2 * im.h) < 2 && rn.bottom <= im.y + im.h / 2, `${Math.round(rn.top - im.y)}–${Math.round(rn.bottom - im.y)} de ${Math.round(im.h)}`);
+e = en(120000);
+ok('a los 10 que quedan cada número entra como en la salida', e.segundos === 10 && e.animacion === 'golpe' && e.fuenteNumero === 'texto');
+ok('todavía sin pitidos (empiezan en los últimos 5)', pitidos.length === 0, pitidos.join());
+en(125200); en(125600);
+ok('en el 5 suena un pitido, una sola vez aunque se mire dos veces en ese segundo', pitidos.join() === 'pi', pitidos.join());
+en(126100);
+e = en(127100);
+ok('el 3, el 2 y el 1 salen de la fuente de la cuenta de salida (la que solo trae 1, 2 y 3)', e.segundos === 3 && e.fuenteNumero === 'cuenta', e.fuenteNumero);
+en(128100);
+e = en(129400);
+ok('uno por segundo, y el del último es distinto (1320 Hz, más largo)', pitidos.join() === 'pi,pi,pi,pi,último' && e.segundos === 1, pitidos.join());
+e = en(130000);
+ok('al vencer el plazo el contador se va (el juego ya le terminó la carrera)', !e.visible && caja.hidden);
+
+// otra carrera: esta vez yo (puesto 1) ya llegué
+desde = -1; llego(7, false); etapa(0); c.actualizar(); etapa(2);
+llego(0); desde = 50000; llego(1);
+e = en(56000);
+ok('quien ya llegó ve el aviso tranquilo «ESPERANDO A LOS DEMÁS» con lo que falta, en blanco y sin entrada', e.visible && e.modo === 'espera' &&
+   e.segundos === 24 && e.letrero === 'ESPERANDO A LOS DEMÁS' && e.animacion === '', e.texto);
+const antes = pitidos.length;
+en(76000); en(77000);
+ok('…sin pitidos (la presión es para los que faltan)', pitidos.length === antes);
+etapa(4); c.actualizar();
+ok('cuando la carrera termina (etapa 4) el contador se va', !c.estado().visible);
+
+// sin juego o sin memoria: no se rompe; sin la fuente de RR, la del disco; sin ninguna, la letra de reserva
+const c2 = crearCuentaDnf({ M: {}, lector: () => null, manual: true, pitido: () => {} });
+let rompio = false; try { c2.actualizar(); } catch { rompio = true; }
+ok('sin juego o sin memoria no se rompe y no muestra nada', !rompio && !c2.estado().visible);
+c2.detener();
+sinRR = true; pedidas.length = 0;
+const c3 = crearCuentaDnf({ M, lector: () => L, manual: true, leerArchivo, pitido: () => {} });
+await c3.listo;
+ok('si no está la de Retro Rewind usa la fuente del disco (Scene/UI/Font.szs)', c3.estado().fuente === 'juego' && pedidas.join() === RUTAS_FUENTE.join(), pedidas.join(' '));
+c3.detener();
+const c4 = crearCuentaDnf({ M, lector: () => L, manual: true, leerArchivo: async () => { throw new Error('sin disco'); }, pitido: () => {} });
+await c4.listo;
+llego(0, false); llego(1, false); etapa(2); desde = 10000; reloj(20000); c4.actualizar();
+ok('sin la fuente del juego escribe con la letra de reserva (y se ve igual)', c4.estado().fuente === 'reserva' && c4.estado().visible &&
+   c4.estado().segundos === 20 && document.querySelectorAll('#cuentaDnf').length === 2, c4.estado().texto);
+c4.detener();
+
+// a lo ancho de un teléfono (la imagen del juego queda en una franja de 360 × 203): entra entera
+lz.style.width = '360px'; lz.style.height = '740px';
+c.colocar();
+e = en(20000);
+document.getAnimations().forEach(a => a.finish());
+const rp = caja.getBoundingClientRect(), rpila = caja.querySelector('.cuenta-dnf-letrero').getBoundingClientRect();
+ok('en un teléfono cabe en la imagen del juego y se lee (número ≥ 30 px, letrero ≥ 12 px y no más alto que el 9 % de la franja)', e.visible && rpila.left >= rp.left - 0.5 && rpila.right <= rp.right + 0.5 &&
+   Math.abs(rp.width - 360) < 1.5 && caja.querySelector('.cuenta-dnf-numero').getBoundingClientRect().height >= 29.5 &&
+   caja.querySelector('.cuenta-dnf-letrero').getBoundingClientRect().height >= 11.5 && caja.querySelector('.cuenta-dnf-letrero').getBoundingClientRect().height <= 0.09 * rp.height,
+   `letrero ${Math.round(rpila.left)}–${Math.round(rpila.right)} en ${Math.round(rp.left)}–${Math.round(rp.right)}`);
+// §79: SDL3 le pone al canvas el tamaño de su recuadro (no 16:9) y el juego dibuja su imagen 16:9 al centro, con franjas
+lz.style.width = '100vw'; lz.style.height = '100vh'; lz.width = 1786; lz.height = 1575;
+c.colocar();
+const r3 = lz.getBoundingClientRect(), s3 = Math.min(r3.width / 1786, r3.height / 1575);
+let w3 = 1786 * s3, h3 = 1575 * s3;
+if (w3 / h3 > 16 / 9) w3 = h3 * 16 / 9; else h3 = w3 * 9 / 16;
+const rf = caja.getBoundingClientRect();
+ok('con el canvas de otra forma (1786×1575, §79) va sobre la imagen 16:9 del medio, donde el juego dibuja su HUD',
+   Math.abs(rf.width - w3) < 1.5 && Math.abs(rf.height - h3) < 1.5 && Math.abs(rf.left - (r3.left + (r3.width - w3) / 2)) < 1.5 &&
+   Math.abs(rf.top - (r3.top + (r3.height - h3) / 2)) < 1.5 && Math.abs(rf.width / rf.height - 16 / 9) < 0.01,
+   `${Math.round(rf.left)},${Math.round(rf.top)} ${Math.round(rf.width)}×${Math.round(rf.height)}`);
+c.detener();
+ok('detener() la saca de la página', !document.getElementById('cuentaDnf'));
+fin();
+</script>
+</body>
+</html>

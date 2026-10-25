@@ -73,7 +73,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 export const PESO = {
   escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
-  boxhead: 1.3, haxball: 1.2, bt3: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, pool: 1.6, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
+  boxhead: 1.3, haxball: 1.2, bt3: 1.5, mkw: 1.5, tulones: 1.6, hero: 1.2, memazo: 1.4, pool: 1.6, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -94,6 +94,8 @@ export const NIVEL = {
   /* BT3 no lleva los de la fila (no clasifica): primera anfitrion visita revancha maraton incansable
      equipo dp infinito relampago. */
   bt3: "1112342212",
+  /* Mario Kart Wii tampoco (no clasifica): largada anfitrion visita puros rivales grupo parrilla otra gira leyenda. */
+  mkw: "1112323234",
   minas: "1232323344", snake: "2222221334", tetrisclub: "1231234124",
   sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333", electro: "1123412334",
   integral: "1123412334",

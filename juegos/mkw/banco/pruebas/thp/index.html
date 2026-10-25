@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video THP nativo</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Videos THP: <span>el decodificador nativo</span></h1>
+<p>En la pantalla de elegir copa y pista, detrás de la lista, corre un video THP (un JPEG por cuadro, 60 por
+  segundo). Traducido desde el código de la Wii costaba ~25 ms por cuadro; este decodificador nativo
+  (<code>web/thp/thp_decodificador.cpp</code>, escrito desde el formato público) lo reemplaza. Aquí se prueba con
+  cuadros FALSOS que arma esta misma página: imágenes sintéticas codificadas con el JPEG estándar (tablas del
+  anexo K de T.81) sin el relleno 0xFF00, como los THP. La imagen esperada sale de la IDCT exacta en doble
+  precisión.</p>
+<div class="caja"><div id="resumen">corriendo…</div><ul id="resultados"></ul></div>
+<div class="caja">Con el juego: <code>?thp=comparar</code> en la página del juego decodifica cada cuadro con los dos
+  (el traducido y el nativo) y anota en la consola cuánto difieren y cuánto tarda cada uno. Código de esta prueba:
+  <code>banco/pruebas/thp/prueba.mjs</code>; compilar: <code>construir.ps1</code>.</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { correTHP } from './prueba.mjs';
+const { ok, nota, fin } = prueba('thp', 'Video THP nativo');
+const crea = (await import('./thp.js')).default;
+await correTHP(crea, ok, nota);
+fin();
+</script>
+</body>
+</html>

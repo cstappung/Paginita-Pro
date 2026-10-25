@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partidas en la nube</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Partidas en la nube: <span>Firebase Storage falso</span></h1>
+<p>Prueba <code>web/navegador/nube.mjs</code> <b>sin Firebase ni internet</b>. Hay dos "navegadores" (A y B, como un
+  computador y un celular de la misma persona), cada uno con su propia base IndexedDB de partidas (el
+  <code>guardado.mjs</code> de verdad) y su propia memoria (localStorage falso). La nube es un Firebase Storage falso
+  que guarda objetos con sus metadatos y <b>aplica las mismas reglas</b> que tendrá el sitio: solo la persona dueña
+  escribe en <code>mkw/&lt;uid&gt;/</code>, el objeto debe decir su uid y tiene un tope de tamaño. Las partidas son
+  falsas, con la forma de las del juego (rutas de la SD y de la NAND, un <code>rksys.dat</code> que empieza con
+  "RKSD").</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearGuardado } from '/web/navegador/guardado.mjs';
+import { crearNube, almacenFirebase, huellaDe } from '/web/navegador/nube.mjs';
+
+const { ok, nota, fin } = prueba('nube', 'Partidas en la nube (Firebase falso)');
+const UID = 'persona-uid-123';
+const TOPE = 8 * 1024 * 1024;
+
+// ---- Firebase Storage falso, con las reglas que tendrá el sitio para mkw/{uid}/partidas.mkwp ----
+function nubeFalsa() {
+  const objetos = new Map();               // ruta → { bytes, customMetadata }
+  const n = { objetos, pedidos: { meta: 0, bajar: 0, subir: 0 }, caida: false, auth: UID };
+  const regla = (ruta, bytes, meta) => {   // lo mismo que storage.rules (ver docs/firebase-mkw.md)
+    const m = /^mkw\/([^/]+)\/partidas\.mkwp$/.exec(ruta);
+    if (!m || m[1] !== n.auth) throw Object.assign(new Error('storage/unauthorized'), { code: 'storage/unauthorized' });
+    if (bytes.length >= TOPE) throw Object.assign(new Error('storage/unauthorized (tope)'), { code: 'storage/unauthorized' });
+    if ((meta && meta.uid) !== n.auth) throw Object.assign(new Error('storage/unauthorized (uid)'), { code: 'storage/unauthorized' });
+  };
+  const red = () => { if (n.caida) throw new Error('Failed to fetch'); };
+  n.almacen = {
+    async meta(ruta) { red(); n.pedidos.meta++; const o = objetos.get(ruta);
+      return o ? { huella: o.customMetadata.huella, actualizado: Number(o.customMetadata.actualizado), jugado: Number(o.customMetadata.jugado),
+                   version: o.customMetadata.version, tam: o.bytes.length } : null; },
+    async bajar(ruta) { red(); n.pedidos.bajar++; const o = objetos.get(ruta); if (!o) throw new Error('object-not-found'); return o.bytes.slice(); },
+    async subir(ruta, bytes, meta) { red(); regla(ruta, bytes, meta); n.pedidos.subir++; objetos.set(ruta, { bytes: bytes.slice(), customMetadata: { ...meta } }); },
+  };
+  return n;
+}
+const recuerdoFalso = () => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), m }; };
+
+// ---- Un paquete .mkwp armado a mano (el mismo formato que guardado.exportar) ----
+async function paquete(archivos) {
+  const lista = Object.entries(archivos);
+  const indice = lista.map(([ruta, [datos, mtime]]) => ({ ruta, tam: datos.length, mtime }));
+  const json = new TextEncoder().encode(JSON.stringify(indice));
+  const cabeza = new Uint8Array(9); cabeza.set([0x4d, 0x4b, 0x57, 0x50, 1]);
+  new DataView(cabeza.buffer).setUint32(5, json.length, true);
+  const crudo = new Blob([cabeza, json, ...lista.map(([, [d]]) => d)]);
+  return new Response(crudo.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+}
+const rksys = (licencia, n = 64 * 1024) => { const d = new Uint8Array(n); d.set([0x52, 0x4b, 0x53, 0x44]); d.set(new TextEncoder().encode(licencia), 8); return d; };
+const PARTIDA = '/mkw/sd/riivolution/save/RetroWFC/RMCP/rksys.dat';
+const AJUSTES = '/datos/WiiCompiled/NAND/shared2/Pulsar/RetroRewind6/RRGameSettings.pul';
+const licenciaDe = async g => { const m = await g.cargar(); const v = m.get(PARTIDA); return v ? new TextDecoder().decode(v.datos.subarray(8, 16)).replace(/\0/g, '') : ''; };
+
+// ---- Los dos navegadores ----
+const bases = ['mkw-prueba-nube-A', 'mkw-prueba-nube-B'];
+const borrarBase = n => new Promise(r => { const p = indexedDB.deleteDatabase(n); p.onsuccess = p.onerror = p.onblocked = () => r(); });
+for (const b of bases) await borrarBase(b);
+const nube = nubeFalsa();
+function aparato(base, recuerdo, opciones = {}) {
+  const guardado = crearGuardado({ base });
+  const n = crearNube({ guardado, almacen: nube.almacen, uid: UID, recuerdo, esperaMs: 40, minIntervaloMs: 0, ...opciones });
+  return { guardado, nube: n };
+}
+const memA = recuerdoFalso(), memB = recuerdoFalso();
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const cuenta = () => ({ ...nube.pedidos });
+const dif = (a, b) => ({ meta: b.meta - a.meta, bajar: b.bajar - a.bajar, subir: b.subir - a.subir });
+
+try {
+  // 0) sin sesión: no toca la nube
+  {
+    const g = crearGuardado({ base: bases[0] });
+    const n = crearNube({ guardado: g, almacen: nube.almacen, uid: null, recuerdo: recuerdoFalso() });
+    const antes = cuenta();
+    const r = await n.alEntrar(); n.cambio();
+    ok('sin sesión iniciada no se toca la nube (todo queda en este navegador)', /sin sesión/.test(r) && JSON.stringify(dif(antes, cuenta())) === '{"meta":0,"bajar":0,"subir":0}', r);
+  }
+
+  // 1) A tiene una licencia; la nube está vacía → sube
+  let A = aparato(bases[0], memA);
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Mario'), 1000], [AJUSTES]: [new Uint8Array([1, 2, 3]), 1000] }));
+  let antes = cuenta();
+  let r = await A.nube.alEntrar();
+  const obj = nube.objetos.get(`mkw/${UID}/partidas.mkwp`);
+  ok('A entra con partidas y la nube vacía → las sube (1 subida)', /subida/.test(r) && dif(antes, cuenta()).subir === 1, r);
+  ok('el objeto queda en mkw/<uid>/partidas.mkwp con uid, huella y versión en sus metadatos',
+     !!obj && obj.customMetadata.uid === UID && /^[0-9a-f]{64}$/.test(obj.customMetadata.huella) && obj.customMetadata.version === '1');
+  ok('…y es chico: 64 KB de partida casi toda ceros quedan en pocos bytes (gzip)', obj.bytes.length < 2000, `${obj.bytes.length} bytes`);
+
+  // 2) B (otro aparato, vacío) entra → baja
+  let B = aparato(bases[1], memB);
+  antes = cuenta();
+  r = await B.nube.alEntrar();
+  ok('B entra sin partidas → baja la de la nube', /bajada/.test(r) && dif(antes, cuenta()).bajar === 1 && await licenciaDe(B.guardado) === 'Mario', r);
+  ok('A y B quedan con la misma huella', await huellaDe(await A.guardado.cargar()) === await huellaDe(await B.guardado.cargar()));
+
+  // 3) sin cambios: solo se miran los metadatos
+  antes = cuenta();
+  A = aparato(bases[0], memA);
+  r = await A.nube.alEntrar();
+  ok('A vuelve a entrar sin cambios → "iguales", sin bajar ni subir nada (solo mira los metadatos)', r === 'iguales' && JSON.stringify(dif(antes, cuenta())) === '{"meta":1,"bajar":0,"subir":0}', r);
+
+  // 4) A juega: el guardado avisa → sube sola unos instantes después; varios avisos seguidos = 1 subida
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Luigi'), 2000], [AJUSTES]: [new Uint8Array([1, 2, 3]), 1000] }));
+  antes = cuenta();
+  A.nube.cambio(); A.nube.cambio(); A.nube.cambio();
+  await espera(150);
+  ok('mientras se juega: 3 avisos de guardado seguidos → 1 sola subida, sola, al rato', dif(antes, cuenta()).subir === 1, JSON.stringify(dif(antes, cuenta())));
+  {
+    const C = aparato(bases[0], recuerdoFalso(), { esperaMs: 10, minIntervaloMs: 300 });
+    await C.nube.enviar('primera');
+    const t0 = cuenta();
+    C.nube.cambio();
+    await espera(100);
+    const t1 = cuenta();
+    ok('nunca más de una subida cada cierto tiempo (aquí 300 ms; en el sitio 30 s)', dif(t0, t1).subir === 0);
+    await espera(400);
+  }
+
+  // 5) B entra → baja la nueva
+  B = aparato(bases[1], memB);
+  r = await B.nube.alEntrar();
+  ok('B entra después → baja la partida nueva de A', /bajada/.test(r) && await licenciaDe(B.guardado) === 'Luigi', r);
+
+  // 6) sin conexión al entrar: se juega con lo local y después sube
+  nube.caida = true;
+  await B.guardado.importar(await paquete({ [PARTIDA]: [rksys('Peach'), 3000] }));
+  B = aparato(bases[1], memB);
+  r = await B.nube.alEntrar();
+  ok('sin conexión al entrar → se juega con lo de este navegador, sin error para el juego', /sin conexión/.test(r) && await licenciaDe(B.guardado) === 'Peach', r);
+  nube.caida = false;
+  antes = cuenta();
+  B.nube.cambio();
+  await espera(150);
+  ok('cuando vuelve la conexión, el próximo guardado sube lo jugado sin conexión', dif(antes, cuenta()).subir === 1 && /^mkw/.test(B.nube.destino));
+
+  // 7) conflicto: A y B juegan sin conexión; gana la más nueva y la otra queda de respaldo
+  A = aparato(bases[0], memA);
+  await A.nube.alEntrar();                                       // A queda igual a la nube (Peach)
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Yoshi'), 4000] }));    // A juega primero (hora 4000)
+  await B.guardado.importar(await paquete({ [PARTIDA]: [rksys('Toad'), Date.now()] }));// B juega después
+  r = await A.nube.alEntrar();                                   // la nube no cambió desde A → A sube
+  ok('A jugó sin conexión y la nube no cambió → A sube', /subida/.test(r), r);
+  B = aparato(bases[1], memB);
+  r = await B.nube.alEntrar();
+  ok('B también jugó sin conexión, más tarde → CONFLICTO: gana la jugada más recientemente (la de B), aunque A subió después', B.nube.estado.conflicto && /ganó la de este navegador/.test(r) && await licenciaDe(B.guardado) === 'Toad', r);
+  const resp = B.nube.respaldo;
+  const D = crearGuardado({ base: 'mkw-prueba-nube-D' });
+  await D.importar(resp.blob);
+  ok('…y la de A no se pierde: queda de respaldo para descargarla', resp.de === 'nube' && await licenciaDe(D) === 'Yoshi', `respaldo de ${resp && resp.de}: ${await licenciaDe(D)}`);
+  await borrarBase('mkw-prueba-nube-D');
+
+  // 8) conflicto al revés: la de la nube es más nueva → baja, y la local queda de respaldo
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Wario'), 5000] }));    // A juega, pero con hora vieja
+  A = aparato(bases[0], memA);
+  r = await A.nube.alEntrar();
+  ok('conflicto con la nube más nueva → baja la de la nube y la de este navegador queda de respaldo',
+     A.nube.estado.conflicto && /ganó la de la nube/.test(r) && await licenciaDe(A.guardado) === 'Toad' && A.nube.respaldo.de === 'local', r);
+
+  // 9) otro aparato sube mientras este juega: antes de pisarla, se guarda de respaldo
+  B = aparato(bases[1], memB); await B.nube.alEntrar();
+  A = aparato(bases[0], memA); await A.nube.alEntrar();
+  await B.guardado.importar(await paquete({ [PARTIDA]: [rksys('Daisy'), Date.now()] })); await B.nube.enviar();
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Bowser'), Date.now()] }));
+  await A.nube.enviar();
+  ok('si otro aparato subió mientras se jugaba aquí, su partida queda de respaldo antes de subir la nuestra',
+     A.nube.respaldo && A.nube.respaldo.de === 'nube' && A.nube.estado.subidas >= 1);
+
+  // 10) reglas de Storage
+  nube.auth = 'otra-persona';
+  let error = '';
+  try { await nube.almacen.subir(`mkw/${UID}/partidas.mkwp`, new Uint8Array(10), { uid: 'otra-persona' }); } catch (e) { error = e.code; }
+  ok('reglas: otra persona no puede escribir en la carpeta de esta (storage/unauthorized)', error === 'storage/unauthorized');
+  nube.auth = UID;
+  error = '';
+  try { await nube.almacen.subir(`mkw/${UID}/partidas.mkwp`, new Uint8Array(10), { uid: 'otra-persona' }); } catch (e) { error = e.code; }
+  ok('reglas: el objeto debe decir el uid de quien lo sube', error === 'storage/unauthorized');
+  error = '';
+  try { await nube.almacen.subir(`mkw/${UID}/partidas.mkwp`, new Uint8Array(TOPE), { uid: UID }); } catch (e) { error = e.code; }
+  ok('reglas: tope de tamaño (8 MB)', error === 'storage/unauthorized');
+  nube.auth = 'otra-persona';
+  await A.guardado.importar(await paquete({ [PARTIDA]: [rksys('Koopa'), Date.now()] }));
+  const subio = await A.nube.enviar();
+  ok('si la nube niega el permiso, la subida avisa el error y la partida local sigue intacta',
+     !subio && /unauthorized/.test(A.nube.estado.error) && await licenciaDe(A.guardado) === 'Koopa', A.nube.estado.error);
+  nube.auth = UID;
+
+  // 11) un paquete dañado en la nube no borra nada
+  nube.objetos.get(`mkw/${UID}/partidas.mkwp`).bytes = new Uint8Array([1, 2, 3, 4]);
+  nube.objetos.get(`mkw/${UID}/partidas.mkwp`).customMetadata.huella = 'f'.repeat(64);
+  await B.guardado.borrarTodo();
+  B = aparato(bases[1], memB);
+  r = await B.nube.alEntrar();
+  ok('un paquete dañado en la nube se rechaza sin tocar lo local', /sin conexión/.test(r) && /paquete/.test(B.nube.estado.error), B.nube.estado.error);
+
+  // 12) el almacén de Firebase llama al SDK como corresponde (con un SDK falso que anota)
+  const llamadas = [];
+  const objetosSdk = new Map();
+  const st = {
+    ref: (storage, ruta) => ({ storage, ruta }),
+    async getMetadata(ref) { llamadas.push(['getMetadata', ref.ruta]); const o = objetosSdk.get(ref.ruta);
+      if (!o) throw Object.assign(new Error('no'), { code: 'storage/object-not-found' }); return { size: o.bytes.length, customMetadata: o.meta.customMetadata }; },
+    async getBytes(ref) { llamadas.push(['getBytes', ref.ruta]); return objetosSdk.get(ref.ruta).bytes.buffer; },
+    async uploadBytes(ref, bytes, meta) { llamadas.push(['uploadBytes', ref.ruta, meta]); objetosSdk.set(ref.ruta, { bytes, meta }); },
+  };
+  const fb = almacenFirebase({ st, storage: 'bucket' });
+  const sinNada = await fb.meta('mkw/x/partidas.mkwp');
+  await fb.subir('mkw/x/partidas.mkwp', new Uint8Array([9, 9]), { uid: 'x', huella: 'h', actualizado: '7', version: '1' });
+  const m = await fb.meta('mkw/x/partidas.mkwp');
+  const b = await fb.bajar('mkw/x/partidas.mkwp');
+  const sube = llamadas.find(l => l[0] === 'uploadBytes');
+  ok('almacén de Firebase: "no existe" → null; sube con uploadBytes y customMetadata (uid, huella, hora, versión) como binario',
+     sinNada === null && sube[2].customMetadata.uid === 'x' && sube[2].contentType === 'application/octet-stream' &&
+     m.huella === 'h' && m.actualizado === 7 && b.length === 2 && b[0] === 9);
+} catch (e) {
+  ok('la prueba corrió sin errores', false, String(e && e.stack || e));
+}
+for (const b of bases) await borrarBase(b);
+fin();
+</script>
+</body>
+</html>

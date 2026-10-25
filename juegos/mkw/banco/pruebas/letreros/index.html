@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Letreros con la letra del juego</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Letreros: <span>el ±VR al lado de la tabla, el podio y el cartel de quien recargó</span></h1>
+<p>Prueba <code>letreros.mjs</code> (bitácora §98, M22) <b>sin el juego</b>: una imagen del juego de mentira (un
+  <code>&lt;canvas id="canvas"&gt;</code> que no es 16:9, para que haya bandas) y la <b>fuente de mentira</b> del banco
+  (<code>fuente-falsa.js</code>: letras del navegador con la forma de <code>UI/Font.szs</code>). Comprueba en qué fila de la
+  tabla de puntos queda cada puesto (más puntos arriba; a igual puntos, el que llegó antes), que cada marca cae a la altura
+  de su fila y en la franja libre de la derecha, verde si el VR sube y rojo si baja, con la fuente del juego o la de
+  reserva si le falta una letra; el podio («¡GANÓ …!», los tres primeros y tu fila) y el cartel de arriba.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<canvas id="canvas" width="1280" height="720" style="position:fixed;left:0;top:0;width:100vw;height:100vh;object-fit:contain;visibility:hidden;pointer-events:none"></canvas>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { hacerBrfnt, hacerU8, hacerYaz0 } from '../../fuente-falsa.js';
+import { crearLetreros, filaTabla, filasDeTabla, BORDE_TABLA } from '/web/navegador/letreros.mjs';
+
+const { ok, nota, fin } = prueba('letreros', 'Letreros con la letra del juego (sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const cerca = (a, b, tol) => Math.abs(a - b) <= tol;
+
+// ---- 1. en qué fila de la tabla queda cada puesto de la ficha ----
+// 4 corredores (los puestos 4..11 vacíos): puntos de la copa y la llegada de esta carrera
+const vacio = Array(8).fill(0);
+let f = filasDeTabla([15, 22, 10, 22, ...vacio], [1, 3, 2, 4, ...vacio]);
+ok('más puntos arriba; a igual puntos (22 y 22), primero el que llegó antes (3.º antes que 4.º)',
+   f && f.slice(0, 4).join(',') === '3,1,4,2' && f.slice(4).every(x => x === 0), f?.join(','));
+f = filasDeTabla([15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+ok('la primera carrera de una sala llena: la tabla es la llegada', f?.join(',') === '1,2,3,4,5,6,7,8,9,10,11,12', f?.join(','));
+ok('sin puntos o sin llegada (o con tablas de otro largo) no hay filas',
+   filasDeTabla(null, Array(12).fill(1)) === null && filasDeTabla(Array(12).fill(0), Array(12).fill(0)) === null &&
+   filasDeTabla([1, 2], [1, 2]) === null);
+ok('las alturas de las filas (medidas en la foto del descanso: 44 + 40,45·(k−1) de 540)',
+   cerca(filaTabla(1), 0.0815, 0.001) && cerca(filaTabla(12), 0.905, 0.002) && cerca(BORDE_TABLA, 0.856, 0.001),
+   `${filaTabla(1).toFixed(4)} … ${filaTabla(12).toFixed(4)}`);
+
+// ---- 2. las marcas, con la fuente de mentira ----
+const TEXTO = '0123456789¡!ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚº.…+-()abcdefghijklmnopqrstuvwxyzáéíóú ';
+const fuente = hacerYaz0(hacerU8([['kart_kanji_font.brfnt', hacerBrfnt(TEXTO.trim(), 40, 50, '900 36px sans-serif')]]));
+const pedidas = [];
+const l = crearLetreros({ leerArchivo: async ruta => { pedidas.push(ruta); return fuente; } });
+// la ventana de la prueba casi nunca es 16:9: la imagen va centrada con bandas (como el juego)
+const lienzo = document.getElementById('canvas').getBoundingClientRect();
+const W = Math.min(lienzo.width, lienzo.height * 16 / 9), H = W * 9 / 16;
+const img = { x: lienzo.left + (lienzo.width - W) / 2, y: lienzo.top + (lienzo.height - H) / 2, w: W, h: H };
+nota(`ventana ${Math.round(lienzo.width)}×${Math.round(lienzo.height)} → imagen ${Math.round(W)}×${Math.round(H)} en (${Math.round(img.x)}, ${Math.round(img.y)})`);
+await l.marcas([{ puesto: 2, texto: '+109 VR', sube: true, yo: true }, { puesto: 7, texto: '-17 VR', sube: false }]);
+const marcas = [...document.querySelectorAll('.letrero-marca')];
+ok('una marca por humano, con su texto', marcas.length === 2 && l.marcasVisibles.map(m => `${m.puesto}:${m.texto}`).join(' ') === '2:+109 VR 7:-17 VR',
+   JSON.stringify(l.marcasVisibles));
+ok('leyó la fuente del juego de Retro Rewind (la primera ruta)', pedidas[0] === '/mkw/sd/RetroRewind6/UI/Font.szs', pedidas.join(' '));
+const centro = d => { const r = d.getBoundingClientRect(); return { x: r.left, y: (r.top + r.bottom) / 2, h: r.height, der: r.right }; };
+const c2 = centro(marcas[0]), c7 = centro(marcas[1]);
+ok('cada marca a la altura de su fila (±2 px) y en la franja libre de la derecha',
+   cerca(c2.y, img.y + filaTabla(2) * img.h, 2) && cerca(c7.y, img.y + filaTabla(7) * img.h, 2) &&
+   c2.x >= img.x + BORDE_TABLA * img.w && c2.der <= img.x + img.w + 1,
+   `fila 2: ${c2.y.toFixed(1)} (esperada ${(img.y + filaTabla(2) * img.h).toFixed(1)}), x ${c2.x.toFixed(0)}…${c2.der.toFixed(0)}`);
+// el color: el píxel más saturado de cada marca (el centro de la letra)
+function tono(canvas) {
+  const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  let r = 0, g = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && (d[i] + d[i + 1] + d[i + 2]) > 300) { r += d[i]; g += d[i + 1]; n++; }
+  return n ? { r: r / n, g: g / n } : { r: 0, g: 0 };
+}
+const t2 = tono(marcas[0].querySelector('canvas')), t7 = tono(marcas[1].querySelector('canvas'));
+ok('verde si el VR sube, rojo si baja', t2.g > t2.r + 30 && t7.r > t7.g + 30, `sube r${t2.r | 0} g${t2.g | 0} · baja r${t7.r | 0} g${t7.g | 0}`);
+// la letra de reserva: una letra que la fuente no tiene (ñ) no rompe nada
+await l.marcas([{ puesto: 12, texto: '+1 VR ñ', sube: true }]);
+const r12 = document.querySelector('.letrero-marca canvas');
+ok('si a la fuente le falta una letra, sale la de reserva (y en su fila)', !!r12 && r12.height === 50 && l.marcasVisibles[0]?.puesto === 12,
+   `alto del lienzo ${r12?.height}`);
+l.quitarMarcas();
+ok('quitarMarcas las saca', l.marcasVisibles.length === 0 && !document.querySelector('.letrero-marca'));
+// un canvas de otra forma (el marco del sitio, §79): la imagen 16:9 va al medio, con bandas arriba y abajo
+const cv = document.getElementById('canvas');
+Object.assign(cv.style, { width: '800px', height: '700px' });
+await l.marcas([{ puesto: 5, texto: '+13 VR', sube: true }]);
+const m5 = centro(document.querySelector('.letrero-marca'));
+const y5 = (700 - 450) / 2 + filaTabla(5) * 450;
+ok('con bandas (canvas 800×700 → imagen 800×450 al medio) la marca sigue en su fila', cerca(m5.y, y5, 2) && m5.x >= BORDE_TABLA * 800,
+   `y ${m5.y.toFixed(1)} (esperada ${y5.toFixed(1)}), x ${m5.x.toFixed(0)}`);
+l.quitarMarcas();
+Object.assign(cv.style, { width: '100vw', height: '100vh' });
+
+// ---- 3. el podio y el cartel ----
+const podio = l.podio([{ nombre: 'Uno', puntos: 45, vr: 38 }, { nombre: 'Meowser', puntos: 40 }, { nombre: 'Dos', puntos: 33, vr: -12 }], 600,
+  { puesto: 7, nombre: 'Tres', puntos: 20, vr: -5 });
+await espera(100);
+const capa = document.querySelector('.letreros-podio');
+const lineas = capa ? [...capa.querySelectorAll('canvas')] : [];
+ok('el podio: «¡GANÓ UNO!», los tres primeros y tu fila (7.º)', /Ganó Uno con 45 puntos/.test(l.podioVisible) && lineas.length === 5 &&
+   lineas[0].classList.contains('grande') && lineas[4].classList.contains('yo'), `${l.podioVisible} · ${lineas.length} líneas`);
+const rc = capa.getBoundingClientRect();
+ok('el podio tapa justo la imagen del juego', cerca(rc.left, img.x, 1) && cerca(rc.top, img.y, 1) && cerca(rc.width, img.w, 1), `${rc.left | 0},${rc.top | 0} ${rc.width | 0}×${rc.height | 0}`);
+await podio;
+l.quitarPodio();
+ok('al terminar el plazo (ms) la promesa se cumple y quitarPodio lo esconde', l.podioVisible === '');
+l.cartel('Carrera 2 de 4 en curso', 'Vuelves en la 3.');
+ok('el cartel de arriba, con título y texto', l.cartelVisible === 'Carrera 2 de 4 en cursoVuelves en la 3.' &&
+   document.querySelector('.letreros-cartel').getAttribute('role') === 'status', l.cartelVisible);
+l.quitarCartel();
+ok('quitarCartel lo saca', l.cartelVisible === '');
+
+// ---- 4. sin la fuente (no se pudo leer): todo con la letra de reserva ----
+const sin = crearLetreros({ leerArchivo: async () => null });
+await sin.marcas([{ puesto: 1, texto: '+13 VR', sube: true }]);
+ok('sin la fuente del juego, las marcas salen igual (letra de reserva)', sin.marcasVisibles.length === 1 && document.querySelectorAll('.letrero-marca').length === 1);
+sin.quitarMarcas();
+fin();
+</script>
+</body>
+</html>

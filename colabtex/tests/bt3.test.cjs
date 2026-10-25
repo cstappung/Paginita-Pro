@@ -574,11 +574,11 @@ test('BT3 oculto por omisión, y cada vista que nombra juegos lo respeta',()=>{
  const lee=f=>fs.readFileSync(raiz(f),'utf8'),main=lee('src/juegos-main.js');
  assert.match(lee('src/juegos/bt3-amigos.js'),/ponOculto\("bt3", !v\)/,'la respuesta del Worker mueve juegoOculto');
  // la sala abierta por enlace: «Sala privada», sin chat, sin quiénes, sin «Unirse»; y entrar() se niega
- assert.match(main,/const privada = p\.juego === "bt3" && !bt3Visible\(\);[\s\S]{0,80}\$\("jgChat"\)\.hidden = privada;/);
+ assert.match(main,/const privada = \(?p\.juego === "bt3"(?: \|\| p\.juego === "mkw"\))? && !bt3Visible\(\);[\s\S]{0,80}\$\("jgChat"\)\.hidden = privada;/);
  assert.match(main,/async function entrar\(pid\) \{[\s\S]{0,400}sala\.juego === "bt3" && !bt3Visible\(\)\) return;/);
  assert.match(main,/function pintaQuienes\(p, est\) \{[\s\S]{0,150}p\.juego === "bt3" && !bt3Visible\(\)/);
  // las listas del salón (catálogo, solos, novedades, salas abiertas, en juego), clasificación y logros
- for (const r of [/k !== "bt3" \|\| bt3Visible\(\)/, /n\.id !== "bt3" \|\| bt3Visible\(\)/, /s\.juego !== "bt3" \|\| bt3Visible\(\)/, /x\.juego !== "bt3" \|\| bt3Visible\(\)/, /ocultos: \(\) => bt3Visible\(\) \? \[\] : \["bt3"\]/])
+ for (const r of [/k !== "bt3" \|\| bt3Visible\(\)/, /n\.id !== "bt3" \|\| bt3Visible\(\)/, /s\.juego !== "bt3" \|\| bt3Visible\(\)/, /x\.juego !== "bt3" \|\| bt3Visible\(\)/, /ocultos: \(\) => bt3Visible\(\) \? \[\] : \["bt3"(?:, "mkw")?\]/])
   assert.match(main,r);
  assert.match(lee('src/juegos/logros-vista.js'),/!fuera\.has\(j\)/,'los logros no vuelven a meter un juego oculto');
  assert.match(lee('src/juegos/monedas-vista.js'),/filter\(j => !juegoOculto\(j\)\)/,'la tabla de monedas no nombra a BT3');

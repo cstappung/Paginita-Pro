@@ -159,13 +159,13 @@
         "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
         "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'tulones' || newData.val() === 'hero' || newData.val() === 'memazo' || newData.val() === 'pool'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'gato' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno' || newData.val() === 'catan' || newData.val() === 'presidente' || newData.val() === 'spicy' || newData.val() === 'tetris' || newData.val() === 'yemas' || newData.val() === 'clue' || newData.val() === 'ajedrez' || newData.val() === 'pokemon' || newData.val() === 'boxhead' || newData.val() === 'haxball' || newData.val() === 'bt3' || newData.val() === 'mkw' || newData.val() === 'tulones' || newData.val() === 'hero' || newData.val() === 'memazo' || newData.val() === 'pool'" },
         "modo": { ".validate": "newData.val() === 'normal' || newData.val() === 'venganza' || newData.val() === 'super' || newData.val() === 'clasico' || newData.val() === 'nomercy' || newData.val() === 'nomercyx' || newData.val() === 'allwild' || newData.val() === 'liar'" },
         "malla": { ".validate": "newData.val() === 'chica' || newData.val() === 'clasica' || newData.val() === 'grande'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "semilla": { ".validate": "newData.isNumber()" },
         "lado": { ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 10" },
-        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 10" },
+        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 12" },
         "sicil": { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1)" },
 
         "estado": {
@@ -217,6 +217,34 @@
       }
     },
 
+    "mkw": {
+      "records": {
+        ".read": true,
+        "$tabla": {
+          ".indexOn": ["ms"],
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || !data.exists() || newData.child('ms').val() < data.child('ms').val())",
+            ".validate": "newData.hasChildren(['uid', 'nombre', 'ms', 'pista', 'cat', 'version', 'at']) && newData.child('uid').val() === $uid && newData.child('ms').isNumber() && newData.child('ms').val() >= 5000 && newData.child('ms').val() <= 3600000 && newData.child('nombre').isString() && newData.child('nombre').val().length <= 20 && newData.child('pista').isString() && newData.child('pista').val().matches(/^[0-9a-f]{3}$/) && newData.child('cat').isString() && newData.child('cat').val().matches(/^(tt|vs)(150|200|500|100|espejo)$/) && $tabla === newData.child('pista').val() + '-' + newData.child('cat').val() && newData.child('at').val() === now",
+            "personaje": { ".validate": "newData.isNumber()" },
+            "kart": { ".validate": "newData.isNumber()" },
+            "uid": { ".validate": true }, "nombre": { ".validate": true }, "ms": { ".validate": true }, "pista": { ".validate": true },
+            "cat": { ".validate": true }, "version": { ".validate": "newData.isNumber()" }, "at": { ".validate": true },
+            "$otro": { ".validate": false }
+          }
+        }
+      },
+      "vr": {
+        ".read": true,
+        ".indexOn": ["vr"],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['uid', 'nombre', 'vr', 'br', 'version', 'at']) && newData.child('uid').val() === $uid && newData.child('vr').isNumber() && newData.child('vr').val() >= 1 && newData.child('vr').val() <= 1000000 && newData.child('br').isNumber() && newData.child('br').val() >= 1 && newData.child('br').val() <= 1000000 && newData.child('nombre').isString() && newData.child('nombre').val().length <= 20 && newData.child('at').val() === now",
+          "uid": { ".validate": true }, "nombre": { ".validate": true }, "vr": { ".validate": true }, "br": { ".validate": true },
+          "version": { ".validate": "newData.isNumber()" }, "at": { ".validate": true },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "vivo": {
       "$pid": {
         ".read": "auth != null",
@@ -934,7 +962,7 @@
     "logros": {
       ".read": "auth != null",
       "$juego": {
-        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|metrorush|tulones|memazo|pool)$/)",
+        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|gato|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris|yemas|clue|ajedrez|pokemon|boxhead|haxball|bt3|mkw|metrorush|tulones|memazo|pool)$/)",
         "$uid": {
           "$id": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",

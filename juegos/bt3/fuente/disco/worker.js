@@ -25,6 +25,10 @@
    página vuelve a pedir de a uno.
    Para subir la ISO, `/subir` es una página que la lee en tu navegador y la manda por pedazos con la clave
    `CLAVE_SUBIDA` (un secreto del Worker). Sin esa clave no se puede escribir nada.
+   **Mario Kart Wii** (juegos/mkw) usa este mismo Worker y la misma lista de amigos: todo lo suyo va bajo `/mkw/`, en
+   **su propio bucket** (el enlace `MKW`; sin ese enlace, en `DISCO`, como antes), con llaves que empiezan con `mkw/`
+   (ver «Mario Kart Wii» más abajo). Se sube con juegos/mkw/herramientas/subir-r2.mjs (la API S3 de R2, desde el PC
+   del dueño), no por este Worker.
 
    Variables del Worker (Settings → Variables and Secrets):
      AMIGOS        correos de Google (o uids de Firebase) con acceso, separados por comas (el tuyo incluido)
@@ -32,7 +36,8 @@
      ORIGENES      opcional: orígenes permitidos, separados por comas (por defecto el sitio)
      TURN_ID       opcional: el «Turn Token ID» de Cloudflare Realtime → TURN (el relevo de las peleas en línea)
      TURN_CLAVE    opcional, secreto: su «API Token». Sin estos dos, /turn contesta 404 y se conecta solo directo
-   Enlace (Bindings): un bucket R2 con el nombre de variable DISCO. */
+   Enlaces (Bindings): un bucket R2 con el nombre de variable DISCO (la ISO de BT3) y otro con el nombre MKW (Mario
+   Kart Wii; opcional: sin él, Mario Kart se lee de DISCO). */
 const PROYECTO = "mi-pagina-pro";                                  // el proyecto de Firebase del sitio
 const ORIGENES = "https://paginita-pro.cl,https://www.paginita-pro.cl,http://localhost:8123";
 const CLAVES_GOOGLE = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
@@ -92,9 +97,11 @@ function cors(req, env) {
   const origen = req.headers.get("Origin") || "";
   const permitidos = (env.ORIGENES || ORIGENES).split(",").map(s => s.trim());
   if (!permitidos.includes(origen)) return {};
-  return { "Access-Control-Allow-Origin": origen, "Access-Control-Allow-Headers": "Authorization, X-Clave, Content-Type",
-           "Access-Control-Allow-Methods": "GET, PUT, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin",
-           "Access-Control-Expose-Headers": "X-Borde" };
+  // (Range y HEAD, y las cabeceras X-Mkw-* y Content-Range a la vista: los pide la página de Mario Kart Wii)
+  return { "Access-Control-Allow-Origin": origen, "Access-Control-Allow-Headers": "Authorization, X-Clave, Content-Type, Range",
+           "Access-Control-Allow-Methods": "GET, HEAD, PUT, POST, OPTIONS", "Access-Control-Max-Age": "86400", "Vary": "Origin",
+           "Access-Control-Expose-Headers": "X-Borde, X-Mkw-Version, X-Mkw-Build, Content-Range, Content-Length",
+           "Timing-Allow-Origin": origen };
 }
 const responde = (cuerpo, estado, cabeceras) => new Response(cuerpo, { status: estado, headers: cabeceras });
 const ARRANQUE_MAX = 300;                                    // pedazos en la lista de arranque, como mucho (300 MB)
@@ -159,6 +166,159 @@ async function relevo(env) {
   }
 }
 
+// ---------- Mario Kart Wii (juegos/mkw): el mismo Worker y la misma lista de amigos ----------
+/* Todo bajo `/mkw/`, en el bucket propio de Mario Kart (el enlace MKW; sin él, en DISCO, el de la ISO de BT3, como
+   antes): la llave de R2 es la dirección sin la "/" del principio (`/mkw/build/mkw.js` → `mkw/build/mkw.js`), en los
+   dos casos (así subir-r2.mjs sube igual a cualquiera de los dos). Son las mismas rutas que da el servidor de pruebas del juego
+   (juegos/mkw/web/navegador/servidor.mjs), con `/mkw` delante; la página las arma con `?privado=<Worker>/mkw`:
+     /mkw/manifiesto.json  la lista de archivos (ruta y tamaño) que verá el juego, con X-Mkw-Version (cambia si cambia
+                           cualquier archivo: la página tira su caché vieja) y X-Mkw-Build (la huella del programa),
+                           sacadas de `mkw/version.json` (las escribe subir-r2.mjs)
+     /mkw/build/…          el programa (mkw.js; mkw.wasm se entrega YA comprimido, mkw.wasm.br con Content-Encoding: br,
+                           ~16 MB en vez de ~130), las semillas (pipelines.bin, bloques.json) y las imágenes
+     /mkw/mkw/disco/…, /mkw/mkw/sd/…, /mkw/wc/runtime/assets/…
+                           los archivos del disco y de Retro Rewind, por pedazos (Range: la página pide bloques de 256 KB
+                           seguidos y los guarda ella en Cache Storage, así que al navegador va `no-store`)
+     POST /mkw/lote        §104: varios pedazos en UNA llamada (el plan gratis cuenta llamadas: 100.000 al día). El
+                           cuerpo dice cuáles, {"p": [[ruta, inicio, fin], …]} (la ruta sin el /mkw/ del principio, fin
+                           incluido, como en Range) y la respuesta los trae pegados en ese orden, sin separadores (la
+                           página sabe cuánto mide cada uno). Hasta MKW_LOTE_PIEZAS pedazos (cada uno gasta hasta 3 de las
+                           50 operaciones de R2 + caché que tiene cada llamada gratis) y MKW_LOTE_BYTES en total. Siempre
+                           la MISMA dirección y POST: el navegador pregunta los permisos (CORS) una vez cada 2 horas, no
+                           antes de cada pedazo. Se mandan a medida que se leen (con 2 de adelanto) y sin copiarlos.
+   El programa con su huella vigente (`?v=<build>`) va guardable para siempre (immutable): la 2.ª visita no lo baja ni
+   lo vuelve a compilar; igual los paquetes de imágenes, que llevan su huella en el nombre. Los pedazos del disco quedan
+   además en el caché de Cloudflare (como los de BT3: solo con dominio propio), con la versión en la llave. */
+const MKW_RUTAS = /^\/mkw\/(manifiesto\.json$|build\/|mkw\/disco\/|mkw\/sd\/|wc\/runtime\/assets\/)/;
+const MKW_TIPOS = { js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", json: "application/json; charset=utf-8",
+                    wasm: "application/wasm", png: "image/png", webp: "image/webp", svg: "image/svg+xml" };
+const MKW_PEDAZO_MAX = 32 * 1024 * 1024;                             // un pedido Range, como mucho (la página pide ≤ 2-4 MB)
+const MKW_LOTE_PIEZAS = 12, MKW_LOTE_BYTES = 32 * 1024 * 1024;      // §104: un lote, como mucho (12 × 3 operaciones ≤ 50)
+// lo que puede ir en un lote: lo de las carpetas del juego y de build/, salvo el programa y el manifiesto (van aparte)
+const MKW_LOTE_RUTAS = /^\/mkw\/(build\/(?!mkw\.(js|wasm)(\.br)?$)|mkw\/disco\/|mkw\/sd\/|wc\/runtime\/assets\/)/;
+// paquetes de imágenes con su huella en el nombre (clips-000.3b1e268f.pak): su contenido no cambia nunca
+const MKW_CON_HUELLA = /^\/mkw\/build\/imagenes\/paquetes\/[\w-]+\.[0-9a-f]{8}\.pak$/;
+let mkwVer = null, mkwVerHasta = 0;                                 // mkw/version.json en memoria, 60 s
+const mkwR2 = env => env.MKW || env.DISCO;                          // el bucket de Mario Kart: el propio, o el de BT3
+
+async function mkwVersion(env) {
+  if (mkwVer && Date.now() < mkwVerHasta) return mkwVer;
+  let v = { version: "sin-version", build: "" };
+  try { const o = await mkwR2(env).get("mkw/version.json"); if (o) v = { ...v, ...JSON.parse(await new Response(o.body).text()) }; } catch (e) {}
+  mkwVer = v; mkwVerHasta = Date.now() + 60000;
+  return v;
+}
+
+/* §104: un lote de pedazos (ya se revisó que es un amigo). Cada pedazo sale del caché de Cloudflare o de R2 (y se
+   deja en el caché para el próximo, sin copiarlo: tee), en orden, con 2 de adelanto (como mucho 3 operaciones
+   esperando a la vez: el límite son 6). Si uno falla, la respuesta se corta y la página pide los que faltan de a uno. */
+async function mkwLote(req, url, env, ctx, c, ver) {
+  let p;
+  try { p = (await req.json()).p; } catch (e) { return responde("lote inválido", 400, c); }
+  let total = 0;
+  const ok = Array.isArray(p) && p.length >= 1 && p.length <= MKW_LOTE_PIEZAS && p.every(x => {
+    if (!Array.isArray(x) || x.length !== 3 || typeof x[0] !== "string") return false;
+    const [ruta, ini, fin] = x, n = fin - ini + 1;
+    if (!Number.isInteger(ini) || !Number.isInteger(fin) || ini < 0 || n < 1 || n > MKW_PEDAZO_MAX) return false;
+    total += n;
+    return MKW_LOTE_RUTAS.test("/mkw/" + ruta) && !/(^|\/)\.\.?(\/|$)|\\/.test(ruta);
+  }) && total <= MKW_LOTE_BYTES;
+  if (!ok) return responde("lote inválido", 400, c);
+  const cache = borde();
+  const abrir = async ([ruta, ini, fin]) => {
+    const llaveBorde = `${url.origin}/mkw/${encodeURI(ruta)}?r=${ini}-${fin}&v=${encodeURIComponent(ver.version)}`;
+    if (cache) {
+      try { const g = await cache.match(llaveBorde); if (g && g.body) return g.body; } catch (e) {}
+    }
+    const o = await mkwR2(env).get("mkw/" + ruta, { range: { offset: ini, length: fin - ini + 1 } });
+    if (!o || !o.body || fin >= o.size) throw new Error("falta " + ruta);
+    const cuerpo = typeof o.body.getReader === "function" ? o.body : new Response(o.body).body;
+    if (!cache) return cuerpo;
+    const [a, b] = cuerpo.tee();
+    tarde(ctx, cache.put(llaveBorde, new Response(b, { headers: { "Cache-Control": "public, max-age=2592000", "Content-Range": `bytes ${ini}-${fin}/${o.size}` } })));
+    return a;
+  };
+  const { readable, writable } = new TransformStream();
+  const abiertos = [];
+  const sigue = i => { if (i < p.length) { abiertos[i] = abrir(p[i]); abiertos[i].catch(() => {}); } };
+  const escribir = (async () => {
+    sigue(0); sigue(1); sigue(2);
+    for (let i = 0; i < p.length; i++) {
+      const s = await abiertos[i];
+      await s.pipeTo(writable, { preventClose: true });
+      sigue(i + 3);
+    }
+    await writable.close();
+  })().catch(e => writable.abort(e).catch(() => {}));
+  tarde(ctx, escribir);
+  return responde(readable, 200, { ...c, "Content-Type": "application/octet-stream", "Cache-Control": "no-store",
+                                   "X-Mkw-Version": ver.version, "X-Lote": String(p.length) });
+}
+
+/* Un pedido de Mario Kart (ya se revisó que es un amigo). */
+async function mkw(req, url, env, ctx, c) {
+  if (req.method === "POST") return url.pathname === "/mkw/lote" ? mkwLote(req, url, env, ctx, c, await mkwVersion(env)) : responde("no existe", 404, c);
+  let ruta;
+  try { ruta = decodeURIComponent(url.pathname); } catch (e) { return responde("dirección inválida", 400, c); }
+  if (!MKW_RUTAS.test(ruta) || /(^|\/)\.\.?(\/|$)|\\/.test(ruta)) return responde("no existe", 404, c);
+  const llave = ruta.slice(1), cabeza = req.method === "HEAD", ver = await mkwVersion(env);
+  const tipo = MKW_TIPOS[(/\.(\w+)$/.exec(ruta) || [])[1]] || "application/octet-stream";
+  const r2 = mkwR2(env), lee = k => cabeza ? r2.head(k) : r2.get(k);
+
+  if (ruta === "/mkw/manifiesto.json") {
+    const o = await lee(llave);
+    if (!o) return responde("no está subido", 404, c);
+    return responde(cabeza ? null : o.body, 200, { ...c, "Content-Type": tipo, "Cache-Control": "no-store",
+                                                  "X-Mkw-Version": ver.version, "X-Mkw-Build": ver.build });
+  }
+  // el programa: con su huella vigente, guardable para siempre; el .wasm (y el .js) ya comprimidos si el navegador acepta brotli
+  let guardar = "no-store";
+  if (MKW_CON_HUELLA.test(ruta)) guardar = "public, max-age=31536000, immutable";   // §104: la 2.ª visita, de la caché HTTP
+  if (/^\/mkw\/build\/mkw\.(js|wasm)$/.test(ruta)) {
+    if (ver.build && url.searchParams.get("v") === ver.build) guardar = "public, max-age=31536000, immutable";
+    if (!req.headers.get("Range") && /(^|[\s,])br($|[\s,;])/.test(req.headers.get("Accept-Encoding") || "")) {
+      const o = await lee(llave + ".br");
+      // encodeBody "manual": Cloudflare entrega los bytes tal cual (ya son brotli) y el navegador los descomprime solo
+      if (o) return new Response(cabeza ? null : o.body, { status: 200, encodeBody: "manual", headers: { ...c, "Content-Type": tipo,
+        "Content-Encoding": "br", "Content-Length": String(o.size), "Cache-Control": guardar, "Vary": "Accept-Encoding, Origin" } });
+    }
+  }
+  const rango = req.headers.get("Range");
+  if (!rango || cabeza) {                                           // el archivo entero (o solo sus cabeceras)
+    const o = await lee(llave);
+    if (!o) return responde("no está subido", 404, c);
+    return responde(cabeza ? null : o.body, 200, { ...c, "Content-Type": tipo, "Content-Length": String(o.size),
+                                                  "Accept-Ranges": "bytes", "Cache-Control": guardar });
+  }
+  // un pedazo: "bytes=INICIO-FIN" o "bytes=INICIO-" (lo que pide la página; nada de varios rangos ni de "los últimos N")
+  const m = /^bytes=(\d+)-(\d*)$/.exec(rango);
+  if (!m || (m[2] && Number(m[2]) < Number(m[1]))) return responde("rango inválido", 416, c);
+  const inicio = Number(m[1]), finPedido = m[2] ? Number(m[2]) : inicio + MKW_PEDAZO_MAX - 1;
+  if (finPedido - inicio + 1 > MKW_PEDAZO_MAX) return responde("pedazo demasiado grande", 416, c);
+  const cache = borde(), llaveBorde = `${url.origin}${url.pathname}?r=${inicio}-${m[2] || ""}&v=${encodeURIComponent(ver.version)}`;
+  if (cache) {
+    try {
+      const g = await cache.match(llaveBorde);
+      if (g) return responde(await g.arrayBuffer(), 206, { ...c, "Content-Type": tipo, "Content-Range": g.headers.get("Content-Range"),
+                                                          "Cache-Control": guardar, "X-Borde": "HIT" });
+    } catch (e) {}
+  }
+  let o;
+  try { o = await r2.get(llave, { range: { offset: inicio, length: finPedido - inicio + 1 } }); } catch (e) { o = undefined; }
+  if (o === null) return responde("no está subido", 404, c);
+  if (!o) {                                                         // R2 rechazó el rango (pasa del final): se mide y se recorta
+    const h = await r2.head(llave);
+    if (!h) return responde("no está subido", 404, c);
+    if (inicio >= h.size) return responde(null, 416, { ...c, "Content-Range": `bytes */${h.size}` });
+    o = await r2.get(llave, { range: { offset: inicio, length: Math.min(finPedido, h.size - 1) - inicio + 1 } });
+    if (!o) return responde("no está subido", 404, c);
+  }
+  const fin = Math.min(finPedido, o.size - 1), contenido = `bytes ${inicio}-${fin}/${o.size}`;
+  const bytes = await new Response(o.body).arrayBuffer();
+  if (cache) await tarde(ctx, cache.put(llaveBorde, new Response(bytes, { headers: { "Cache-Control": "public, max-age=2592000", "Content-Range": contenido } })));
+  return responde(bytes, 206, { ...c, "Content-Type": tipo, "Content-Range": contenido, "Cache-Control": guardar, "X-Borde": cache ? "MISS" : "NO" });
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url), c = cors(req, env);
@@ -178,7 +338,9 @@ export default {
     // Leer: el índice o un pedazo, solo para los amigos. `/soy` contesta solo si quien pregunta está en la
     // lista: el sitio lo usa para mostrar BT3 únicamente a los amigos (colabtex/src/juegos/bt3-amigos.js).
     const lee = req.method === "GET" && (url.pathname === "/soy" || url.pathname === "/indice.json" || url.pathname === "/arranque.json" || url.pathname === "/lote" || url.pathname === "/turn" || /^\/pieza\/\d{5}\.bin$/.test(url.pathname));
-    if (!lee && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
+    const deMkw = ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/mkw/"))   // Mario Kart Wii
+               || (req.method === "POST" && url.pathname === "/mkw/lote");                              // (§104: el lote)
+    if (!lee && !deMkw && !(req.method === "PUT" && url.pathname === "/arranque.json")) return responde("no existe", 404, c);
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const quien = token ? await uidDe(token) : null;
     if (!quien) return responde("inicia sesión", 401, c);
@@ -186,6 +348,7 @@ export default {
     const esta = amigos.includes(quien.uid) || (!!quien.correo && amigos.some(a => a.toLowerCase() === quien.correo));
     if (!esta) return responde("sin acceso", 403, c);
     if (url.pathname === "/soy") return responde("amigo", 200, { ...c, "Cache-Control": "no-store" });
+    if (deMkw) return mkw(req, url, env, ctx, c);
     if (url.pathname === "/turn") {   // el relevo para las peleas en línea, solo para amigos
       const ice = await relevo(env);
       return responde(JSON.stringify({ iceServers: ice }), ice.length ? 200 : 404, { ...c, "Content-Type": "application/json", "Cache-Control": "no-store" });

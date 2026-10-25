@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VR en la nube</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>VR y BR: <span>de la consola a Firebase y de vuelta</span></h1>
+<p>Prueba <code>vr.mjs</code> (bitácora §59) <b>sin el juego</b>, con datos falsos con la forma de los del juego.
+  Retro Rewind calcula su VR y, al terminar cada carrera, se lo <b>informa</b> al servidor por GPCM
+  (<code>\wl:report\\wl:mkw_vrbr\vr=…|br=…</code>); al entrar en línea <b>pregunta</b> el guardado
+  (<code>GET /api/mkw_rr_ratings?pid=…</code> → <code>{"found":1,"vr":…,"br":…}</code>: «found» es un número). Aquí una consola falsa hace
+  las dos cosas contra el WFC de verdad (<code>wfc.mjs</code>), y un Firebase falso imita las reglas
+  (<code>mkw/vr/{uid}</code>: cada persona escribe solo el suyo, con números sensatos).</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPila, crearConmutador } from '/web/navegador/red.mjs';
+import { crearWfc, escribirGs } from '/web/navegador/wfc.mjs';
+import { crearVr, presentarVr, extraerVrbr, respuestaRatings, valido, PUERTO_VR } from '/web/navegador/vr.mjs';
+import { consolaFalsa, hasta } from '../red/consola-falsa.mjs';
+
+const { ok, fin } = prueba('vr', 'VR y BR en la nube (sin el juego)');
+const latin1 = new TextDecoder('latin1');
+
+// Firebase falso: mkw/vr en memoria y las reglas de docs/firebase-mkw.md
+const bd = new Map();
+const almacenFalso = usuario => ({
+  async mio(uid) { return bd.has(uid) ? { ...bd.get(uid) } : null; },
+  async guardar(uid, dato) {
+    if (!usuario || usuario !== uid || dato.uid !== uid) throw Object.assign(new Error('sin permiso'), { code: 'permission-denied' });
+    if (!valido(dato.vr) || !valido(dato.br) || String(dato.nombre || '').length > 20) throw Object.assign(new Error('dato malo'), { code: 'permission-denied' });
+    bd.set(uid, { ...dato });
+  },
+  async top(n) { return [...bd.values()].sort((a, b) => b.vr - a.vr).slice(0, n); },
+});
+// un localStorage falso por "aparato"
+const recuerdoFalso = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
+
+try {
+  // ---- 1) leer y contestar en el formato del juego ----
+  ok('extraer el VR del informe GPCM', JSON.stringify(extraerVrbr('\\wl:report\\\\wl:mkw_vrbr\\vr=5123|br=4990\\final\\')) === '{"vr":5123,"br":4990}');
+  ok('otros informes no se confunden con el VR', extraerVrbr('\\wl:report\\\\wl:mkw_select_cc\\2\\final\\') === null);
+  ok('respuesta a la API: found es un NÚMERO (1), VR y BR tal cual', JSON.stringify(respuestaRatings({ vr: 5123, br: 4990 })) === '{"found":1,"vr":5123,"br":4990}');
+  ok('sin dato → found: 0 (el juego usa su archivo)', JSON.stringify(respuestaRatings(null)) === '{"found":0}' && respuestaRatings({ vr: 0, br: 5 }).found === 0);
+
+  // ---- 2) la cuenta en la nube: un aparato sube, otro baja ----
+  const pc = crearVr({ almacen: almacenFalso('ana'), uid: 'ana', nombre: 'Ana', recuerdo: recuerdoFalso() });
+  ok('primera vez: no hay VR en ningún lado', (await pc.cargar()) === null);
+  const r1 = await pc.informar({ vr: 5230, br: 5000 });
+  ok('el juego informa un VR → queda aquí y sube a la nube', r1.cambio && r1.nube === 'subido' && bd.get('ana')?.vr === 5230, JSON.stringify(r1));
+  ok('el mismo VR otra vez no se vuelve a subir', (await pc.informar({ vr: 5230, br: 5000 })).nube === 'igual');
+  ok('un VR imposible se descarta', (await pc.informar({ vr: -3, br: 5000 })).nube === 'no válido' && bd.get('ana').vr === 5230);
+  const celular = crearVr({ almacen: almacenFalso('ana'), uid: 'ana', nombre: 'Ana', recuerdo: recuerdoFalso() });
+  ok('en otro aparato con la misma cuenta, el VR baja de la nube', (await celular.cargar())?.vr === 5230);
+  const sinSesion = crearVr({ recuerdo: recuerdoFalso() });
+  ok('sin sesión: queda solo en este navegador', (await sinSesion.informar({ vr: 6000, br: 5000 })).nube === 'sin sesión' && sinSesion.actual.vr === 6000);
+  // jugó sin sesión y después inició sesión: lo de este navegador sube (si la nube no tenía nada)
+  const rec = recuerdoFalso(); rec.setItem('mkw.vr', JSON.stringify({ vr: 7100, br: 5100 }));
+  const luego = crearVr({ almacen: almacenFalso('beto'), uid: 'beto', nombre: 'Beto', recuerdo: rec });
+  ok('jugó sin sesión y luego entró: su VR local sube a la nube', (await luego.cargar())?.vr === 7100 && bd.get('beto')?.vr === 7100);
+  // reglas: nadie escribe el VR de otro
+  const tramposo = crearVr({ almacen: almacenFalso('carla'), uid: 'ana', recuerdo: recuerdoFalso() });
+  ok('las reglas: nadie puede escribir el VR de otra persona', (await tramposo.informar({ vr: 99999, br: 5000 })).nube.includes('permission-denied') && bd.get('ana').vr === 5230);
+  const tabla = await pc.tabla(5);
+  ok('la tabla: ordenada de mayor a menor y marca el tuyo', tabla[0].uid === 'beto' && tabla[1].uid === 'ana' && tabla[1].tuyo, tabla.map(f => f.uid + ':' + f.vr).join(' '));
+
+  // ---- 3) con el WFC: presentar, preguntar, informar ----
+  const sw = crearConmutador();
+  const informados = [];
+  const wfc = crearWfc({ pila: crearPila({ ip: '10.77.0.1', enlace: sw.enlace() }), alVr: v => informados.push(v) });
+  // la página de Ana: su juego en 10.77.0.2, con el espía que vigila lo que el juego informa (como mkw.mjs)
+  const ana = crearVr({ almacen: almacenFalso('ana'), uid: 'ana', nombre: 'Ana', recuerdo: recuerdoFalso() });
+  const espia = (par, d) => { if (par?.puerto === 29900) { const vb = extraerVrbr(latin1.decode(d)); if (vb) ana.informar(vb); } };
+  const juego = crearPila({ ip: '10.77.0.2', enlace: sw.enlace(), dns: () => '10.77.0.1', espia });
+  const presentador = presentarVr({ pila: juego, cadaMs: 200 });
+  presentador.presentar(await ana.cargar());
+  ok('la página presenta el VR de la cuenta al WFC y el WFC contesta "ok"', await hasta(() => presentador.presentado, 3000));
+  const consola = consolaFalsa(juego);
+  const sesion = await consola.entrar({ action: 'login', gamecd: 'RMCP', userid: '1112223334445', gsbrcd: 'RMCJzzzzzzz', ingamesn: 'Ana' });
+  const pid = sesion.r.datos.profileid;
+  const pregunta = async p => JSON.parse((await consola.http(`GET /api/mkw_rr_ratings?pid=${p}`)).cuerpo);
+  const q1 = await pregunta(pid);
+  ok('el juego pregunta su VR al entrar: el WFC le da el de la nube', q1.found === 1 && q1.vr === 5230 && q1.br === 5000, JSON.stringify(q1));
+  ok('un perfil desconocido: found 0', (await pregunta(123)).found === 0);
+  // termina una carrera: el juego informa su VR nuevo por GPCM
+  sesion.enviar(escribirGs([['wl:report', ''], ['wl:mkw_vrbr', 'vr=5312|br=5000']]));
+  ok('el espía de la página lo ve y lo sube a la nube', await hasta(() => bd.get('ana').vr === 5312, 3000), JSON.stringify(bd.get('ana')));
+  ok('el WFC también lo anota (alVr con el perfil)', informados.some(v => v.perfil === +pid && v.vr === 5312));
+  const q2 = await pregunta(pid);
+  ok('si vuelve a preguntar, el WFC da el VR nuevo', q2.vr === 5312, JSON.stringify(q2));
+  // el puerto del VR no es del juego: un paquete basura no rompe nada
+  let respuesta = '';
+  const basura = juego.udp(0, d => { respuesta = latin1.decode(d); });
+  basura.enviar(new TextEncoder().encode('{no es json'), '10.77.0.1', PUERTO_VR);
+  ok('un paquete basura al puerto del VR no rompe el WFC', await hasta(() => respuesta === 'ok', 2000) && (await pregunta(pid)).vr === 5312);
+  presentador.detener();
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e.stack || e.message);
+}
+fin();
+</script>
+</body>
+</html>

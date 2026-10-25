@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playlist con sugerencias</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Playlist de la sala: <span>sugerir, aceptar, rechazar</span></h1>
+<p>Prueba <code>web/navegador/playlist-sala.mjs</code> (bitácora §74) <b>sin el juego</b>, con pistas <b>inventadas</b>
+  (copa y fila) y pilotos de mentira («uidA» es el anfitrión, «uidB» y «uidC» sugieren). Comprueba: sugerir deja la
+  pista pendiente; no se sugiere una que ya está en la lista o que ya espera; hasta 8 pendientes por persona; aceptar la
+  pone al final de la lista; rechazar la marca; si el anfitrión la agrega por su cuenta, la sugerencia cuenta como
+  aceptada; la lista llena (32) no recibe más; y el estado exportado (el que viaja en la sala) se importa igual en otro
+  navegador, como cuando cambia el anfitrión. Los datos raros que lleguen por la red se descartan.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearPlaylistSala, PENDIENTES_POR_PERSONA } from '/web/navegador/playlist-sala.mjs';
+
+const { ok, fin } = prueba('playlist-sala', 'Playlist con sugerencias (sin el juego)');
+const P = (copa, fila) => ({ copa, fila });
+const texto = l => l.map(p => `${p.copa}.${p.fila}`).join(' ');
+
+// 1) sugerir
+const pl = crearPlaylistSala();
+pl.ponerPistas([P(0, 0), P(1, 2)]);
+ok('el anfitrión pone su lista', texto(pl.pistas) === '0.0 1.2');
+ok('sugerir una pista nueva la deja pendiente', pl.sugerir('uidB', P(5, 3)) === 'sugerida' && pl.pendientes.length === 1 && pl.pendientes[0].de === 'uidB');
+ok('no se sugiere una que ya está en la lista', pl.sugerir('uidB', P(1, 2)) === 'ya-esta' && pl.pendientes.length === 1);
+ok('ni una que ya espera respuesta (aunque la sugiera otro)', pl.sugerir('uidC', P(5, 3)) === 'ya-sugerida' && pl.pendientes.length === 1);
+ok('una pista inválida o sin quién no hace nada', pl.sugerir('uidB', P(120, 0)) === 'nada' && pl.sugerir('', P(2, 2)) === 'nada' && pl.sugerir('uidB', null) === 'nada');
+ok('«revisar» dice qué pasaría sin cambiar nada', pl.revisar('uidC', P(9, 1)) === 'sugerida' && pl.pendientes.length === 1);
+for (let i = 0; i < 10; i++) pl.sugerir('uidC', P(20 + i, 0));
+ok(`cada persona tiene hasta ${PENDIENTES_POR_PERSONA} pendientes a la vez`, pl.de('uidC').length === PENDIENTES_POR_PERSONA && pl.sugerir('uidC', P(40, 0)) === 'tope');
+const ids = pl.pendientes.map(s => s.id);
+ok('cada sugerencia tiene su número, sin repetir', new Set(ids).size === ids.length && ids.every(n => n > 0));
+
+// 2) aceptar y rechazar
+const deB = pl.pendientes.find(s => s.de === 'uidB');
+ok('aceptar la pone al final de la lista', pl.aceptar(deB.id) === 'agregada' && texto(pl.pistas) === '0.0 1.2 5.3');
+ok('y quien la sugirió la ve aceptada', pl.de('uidB')[0].estado === 'aceptada');
+ok('aceptarla otra vez no hace nada', pl.aceptar(deB.id) === 'nada' && pl.pistas.length === 3);
+const deC = pl.pendientes.filter(s => s.de === 'uidC');
+ok('rechazar la marca rechazada y no la agrega', pl.rechazar(deC[0].id) && pl.de('uidC')[0].estado === 'rechazada' && pl.pistas.length === 3);
+ok('rechazada, libera un lugar de las 8 de esa persona', pl.sugerir('uidC', P(40, 0)) === 'sugerida');
+ok('una rechazada se puede volver a sugerir', pl.sugerir('uidB', P(20, 0)) === 'sugerida');
+// el anfitrión agrega por su cuenta una pista que estaba sugerida
+const otra = pl.pendientes.find(s => s.de === 'uidC' && s.copa === 21);
+pl.ponerPistas([...pl.pistas, P(21, 0)]);
+ok('si el anfitrión la agrega por su cuenta, la sugerencia queda aceptada', pl.sugerencias.find(s => s.id === otra.id).estado === 'aceptada');
+pl.ponerPistas([P(21, 0), P(0, 0)]);
+ok('quitar o reordenar en el selector cambia la lista', texto(pl.pistas) === '21.0 0.0');
+
+// 3) la lista llena
+const llena = crearPlaylistSala({ max: 32 });
+llena.ponerPistas(Array.from({ length: 31 }, (_, n) => P(Math.floor(n / 4), n % 4)));
+llena.sugerir('uidB', P(50, 0)); llena.sugerir('uidB', P(51, 0));
+const [s1, s2] = llena.pendientes;
+ok('aceptar hasta llenar (32)', llena.aceptar(s1.id) === 'agregada' && llena.pistas.length === 32 && llena.llena);
+ok('con la lista llena, aceptar otra no entra (queda pendiente)', llena.aceptar(s2.id) === 'llena' && llena.pendientes.length === 1);
+ok('y no se sugiere más', llena.sugerir('uidC', P(60, 0)) === 'llena');
+ok('ponerPistas nunca pasa de 32 ni repite', llena.ponerPistas([...Array(40)].map((_, n) => P(n, 0)).concat([P(0, 0)])) === 32);
+
+// 4) viaja en la sala: exportar e importar (otro navegador, el anfitrión nuevo)
+const e = JSON.parse(JSON.stringify(pl.exportar()));
+const copia = crearPlaylistSala({ estado: e });
+ok('importar deja la misma lista y las mismas sugerencias', texto(copia.pistas) === texto(pl.pistas) &&
+   JSON.stringify(copia.sugerencias) === JSON.stringify(pl.sugerencias));
+const r = copia.sugerir('uidB', P(70, 1));
+ok('el anfitrión nuevo sigue numerando sin chocar', r === 'sugerida' && !pl.sugerencias.some(s => s.id === copia.pendientes.at(-1).id));
+const rara = crearPlaylistSala({ estado: { pistas: [P(1, 1), P(1, 1), { copa: 'x' }, P(2, 9)], sugerencias: [{ id: 1, de: 'uidB', copa: 3, fila: 0, estado: 'pendiente' },
+  { id: 1, de: 'uidB', copa: 4, fila: 0, estado: 'pendiente' }, { id: -2, de: 'uidB', copa: 4, fila: 0, estado: 'pendiente' }, { id: 5, de: 7, copa: 4, fila: 0, estado: 'pendiente' },
+  { id: 6, de: 'uidC', copa: 4, fila: 0, estado: 'quizás' }], sig: 'mucho' } });
+ok('lo raro que llega por la red se descarta', texto(rara.pistas) === '1.1' && rara.sugerencias.length === 1 && rara.sugerir('uidC', P(9, 0)) === 'sugerida' && rara.pendientes.at(-1).id === 2);
+ok('importar algo que no es un estado no rompe nada', (() => { const x = crearPlaylistSala({ estado: 'hola' }); x.importar(null); return x.pistas.length === 0; })());
+
+// 5) las respondidas viejas se van; las pendientes no
+const mucho = crearPlaylistSala();
+for (let i = 0; i < 60; i++) { mucho.sugerir('uidB', P(i, 1)); mucho.rechazar(mucho.pendientes[0].id); }
+mucho.sugerir('uidC', P(99, 3));
+ok('quedan las últimas 40 respondidas y la pendiente', mucho.sugerencias.length === 41 && mucho.pendientes.length === 1 && mucho.sugerencias[0].copa === 20);
+fin();
+</script>
+</body>
+</html>

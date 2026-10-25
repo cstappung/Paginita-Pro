@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lista de pistas</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Lista de pistas: <span>agregar, quitar, guardar y sonar</span></h1>
+<p>Prueba <code>web/navegador/lista-pistas.mjs</code> (bitácora §74) <b>sin el juego</b>: pistas <b>inventadas</b>
+  (copa y fila, sin nombres del juego), un almacén falso en vez de <code>localStorage</code> y un
+  <code>AudioContext</code> falso que cuenta los tonos. Comprueba: un clic agrega al final y otro quita; nunca pasa
+  de 32 ni repite; subir, bajar, quitar y vaciar; el sorteo con semilla es siempre igual y no repite; el borrador
+  queda guardado y vuelve al abrir; las listas guardadas con nombre (el mismo nombre reemplaza, hasta 30); los sonidos
+  de agregar, quitar y «llena», y el silencio.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearLista, crearPresets, crearSonidosLista, MAX_PISTAS, misma } from '/web/navegador/lista-pistas.mjs';
+
+const { ok, fin } = prueba('lista-pistas', 'Lista de pistas (sin el juego)');
+// un almacén falso con la forma de localStorage
+const almacenFalso = () => { const m = new Map(); return { m, getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)) }; };
+const P = (copa, fila) => ({ copa, fila });
+const todas = Array.from({ length: 40 }, (_, c) => [0, 1, 2, 3].map(f => P(c, f))).flat();   // 160 pistas inventadas
+const texto = l => l.map(p => `${p.copa}.${p.fila}`).join(' ');
+
+// 1) agregar y quitar con un clic
+{
+  const l = crearLista({ almacen: null });
+  let avisos = 0; l.alCambiar(() => avisos++);
+  ok('un clic en una pista que no está la agrega al final', l.alternar(P(3, 1)) === 'agregada' && l.alternar(P(7, 2)) === 'agregada' && texto(l.pistas) === '3.1 7.2', texto(l.pistas));
+  ok('otro clic en la misma la quita', l.alternar(P(3, 1)) === 'quitada' && texto(l.pistas) === '7.2');
+  ok('cada cambio se avisa (para volver a dibujar)', avisos === 3, `${avisos} avisos`);
+  ok('una pista inválida no hace nada', l.alternar(P(200, 1)) === 'nada' && l.alternar(P(1, 4)) === 'nada' && l.alternar(null) === 'nada' && l.pistas.length === 1);
+  ok('agregar una que ya está no la repite', l.agregar(P(7, 2)) === 'nada' && l.pistas.length === 1);
+  ok('posición y «tiene»', l.posicion(P(7, 2)) === 0 && l.tiene(P(7, 2)) && !l.tiene(P(0, 0)) && l.posicion(P(0, 0)) === -1);
+  const copia = l.pistas; copia.push(P(1, 1));
+  ok('«pistas» devuelve una copia (cambiarla no cambia la lista)', l.pistas.length === 1);
+}
+// 2) el tope: 32 (como una copa de VS del juego)
+{
+  const l = crearLista({ almacen: null });
+  for (let i = 0; i < 40; i++) l.agregar(todas[i]);
+  ok('nunca pasa de 32 pistas', l.pistas.length === MAX_PISTAS && MAX_PISTAS === 32 && l.llena);
+  ok('con la lista llena, un clic en otra dice «llena» y no agrega', l.alternar(todas[50]) === 'llena' && l.pistas.length === 32);
+  ok('con la lista llena, un clic en una que está sí la quita', l.alternar(todas[0]) === 'quitada' && l.pistas.length === 31);
+  const chica = crearLista({ max: 4, almacen: null });
+  for (let i = 0; i < 6; i++) chica.agregar(todas[i]);
+  ok('con otro tope (4) se respeta ese', chica.pistas.length === 4 && chica.max === 4);
+}
+// 3) ordenar, quitar, vaciar, poner
+{
+  const l = crearLista({ pistas: [P(1, 0), P(2, 0), P(3, 0)], almacen: null });
+  ok('bajar la primera', l.mover(0, 1) && texto(l.pistas) === '2.0 1.0 3.0', texto(l.pistas));
+  ok('subir la última', l.mover(2, -1) && texto(l.pistas) === '2.0 3.0 1.0', texto(l.pistas));
+  ok('no se puede subir la primera ni bajar la última', !l.mover(0, -1) && !l.mover(2, 1) && texto(l.pistas) === '2.0 3.0 1.0');
+  ok('quitar la del medio', l.quitar(1) && texto(l.pistas) === '2.0 1.0' && !l.quitar(5));
+  ok('vaciar', l.vaciar() && l.pistas.length === 0 && !l.vaciar());
+  ok('poner una lista nueva la limpia (sin repetidas, sin inválidas, sin pasar el tope)',
+     l.poner([P(1, 1), P(1, 1), { copa: 'x', fila: 0 }, P(2, 2), ...todas]) === 32 && texto(l.pistas.slice(0, 2)) === '1.1 2.2', texto(l.pistas.slice(0, 3)));
+}
+// 4) al azar con semilla: siempre igual, sin repetir
+{
+  const a = crearLista({ pistas: [P(0, 0)], almacen: null }), b = crearLista({ pistas: [P(0, 0)], almacen: null });
+  const na = a.llenar(todas, 6, 0xC0FFEE), nb = b.llenar(todas, 6, 0xC0FFEE);
+  ok('llenar hasta 6 agrega 5 (ya tenía 1)', na === 5 && a.pistas.length === 6, `${na}`);
+  ok('la misma semilla da las mismas pistas', texto(a.pistas) === texto(b.pistas), texto(a.pistas));
+  ok('sin repetir', new Set(a.pistas.map(p => `${p.copa}.${p.fila}`)).size === 6);
+  const c = crearLista({ pistas: [P(0, 0)], almacen: null }); c.llenar(todas, 6, 12345);
+  ok('otra semilla da otras', texto(c.pistas) !== texto(a.pistas));
+  const d = crearLista({ almacen: null });
+  ok('si quedan menos libres que las pedidas, agrega las que hay', d.llenar(todas.slice(0, 3), 10, 1) === 3 && d.pistas.length === 3);
+}
+// 5) el borrador: la lista sigue ahí al volver a abrir
+{
+  const alm = almacenFalso();
+  const l = crearLista({ clave: 'mkw.lista.prueba', almacen: alm });
+  l.alternar(P(5, 1)); l.alternar(P(9, 3));
+  ok('cada cambio queda guardado en el navegador', alm.m.get('mkw.lista.prueba') === JSON.stringify([P(5, 1), P(9, 3)]), alm.m.get('mkw.lista.prueba'));
+  const otra = crearLista({ clave: 'mkw.lista.prueba', almacen: alm });
+  ok('al volver a abrir, la lista guardada vuelve', texto(otra.pistas) === '5.1 9.3', texto(otra.pistas));
+  const traida = crearLista({ pistas: [P(1, 1)], clave: 'mkw.lista.prueba', almacen: alm });
+  ok('si la abren con una lista ya armada (la de la sala), manda esa', texto(traida.pistas) === '1.1');
+  alm.setItem('mkw.lista.rota', '{esto no es json');
+  ok('un borrador roto no rompe nada (lista vacía)', crearLista({ clave: 'mkw.lista.rota', almacen: alm }).pistas.length === 0);
+  const sinAlmacen = crearLista({ clave: 'x', almacen: { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } } });
+  ok('sin almacén (ventana privada, bloqueado) igual funciona', sinAlmacen.alternar(P(2, 2)) === 'agregada' && sinAlmacen.pistas.length === 1);
+}
+// 6) listas guardadas con nombre
+{
+  const alm = almacenFalso();
+  let reloj = 1000;
+  const p = crearPresets({ almacen: alm, ahora: () => reloj++ });
+  ok('guardar una lista con nombre', p.guardar('Retro de la noche', [P(1, 0), P(2, 1)]) === true);
+  p.guardar('Nitro', [P(8, 0)]);
+  ok('la lista de guardadas va de la más nueva a la más vieja', p.listar().map(x => x.nombre).join('|') === 'Nitro|Retro de la noche');
+  ok('cargar devuelve sus pistas', texto(p.cargar('Retro de la noche')) === '1.0 2.1' && p.cargar('No existe') === null);
+  p.guardar('retro DE la noche', [P(4, 4 - 1)]);
+  const ls = p.listar();
+  ok('el mismo nombre (sin importar mayúsculas) reemplaza la vieja', ls.length === 2 && ls[0].nombre === 'retro DE la noche' && texto(ls[0].pistas) === '4.3');
+  ok('sin nombre o sin pistas no se guarda', p.guardar('   ', [P(1, 1)]) === false && p.guardar('Vacía', []) === false && p.listar().length === 2);
+  ok('borrar una', p.borrar('Nitro') && p.listar().length === 1 && !p.borrar('Nitro'));
+  for (let i = 0; i < 35; i++) p.guardar(`L${i}`, [P(i, 0)]);
+  ok('hasta 30 listas guardadas (se van las más viejas)', p.listar().length === 30 && p.listar()[0].nombre === 'L34', `${p.listar().length}`);
+  p.guardar('x'.repeat(60), [P(1, 1)]);
+  ok('el nombre se corta en 40 letras', p.listar()[0].nombre.length === 40);
+}
+// 7) los sonidos (WebAudio, con un contexto falso que cuenta osciladores)
+{
+  const falso = () => {
+    const c = { state: 'running', currentTime: 0, destination: {}, osciladores: 0, frecuencias: [] };
+    c.createOscillator = () => { c.osciladores++; return { type: '', frequency: { setValueAtTime: f => c.frecuencias.push(f) }, connect: g => g, start() {}, stop() {} }; };
+    c.createGain = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: x => x });
+    return c;
+  };
+  const c = falso();
+  const s = crearSonidosLista({ contexto: () => c });
+  s.agregar();
+  ok('agregar: dos notas que suben', c.osciladores === 2 && c.frecuencias[1] > c.frecuencias[0], c.frecuencias.join(','));
+  c.frecuencias.length = 0; s.quitar();
+  ok('quitar: dos notas que bajan', c.osciladores === 4 && c.frecuencias[1] < c.frecuencias[0], c.frecuencias.join(','));
+  s.llena();
+  ok('«llena»: una nota grave', c.osciladores === 5);
+  ok('cuenta cada sonido (para las pruebas con la página)', s.contados.agregar === 1 && s.contados.quitar === 1 && s.contados.llena === 1);
+  c.frecuencias.length = 0; s.sugerencia();
+  ok('sugerencia: un «ding» de dos notas que suben', c.osciladores === 7 && c.frecuencias[1] > c.frecuencias[0] && s.contados.sugerencia === 1, c.frecuencias.join(','));
+  // sin el contexto del juego: crea uno propio y respeta el silencio de la página
+  const viejo = globalThis.AudioContext; const propio = falso(); globalThis.AudioContext = function () { return propio; };
+  const callado = crearSonidosLista({ contexto: () => null, silencio: () => true });
+  callado.agregar();
+  ok('con la página en silencio no suena nada', propio.osciladores === 0 && callado.contados.agregar === 1);
+  const conVolumen = crearSonidosLista({ contexto: () => null, volumen: () => 0.5 });
+  conVolumen.quitar();
+  ok('sin el sonido del juego todavía, suena con su propio contexto', propio.osciladores === 2);
+  globalThis.AudioContext = viejo;
+}
+ok('«misma» compara copa y fila', misma(P(1, 2), P(1, 2)) && !misma(P(1, 2), P(1, 3)) && !misma(null, P(1, 2)));
+fin();
+</script>
+</body>
+</html>

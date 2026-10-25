@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fibers sobre JSPI</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Los «hilos» del juego sobre <span>JSPI</span></h1>
+<p>Mario Kart Wii tiene varios hilos (OSThread) que se pasan el turno. En el escritorio, WiiCompiled cambia de pila
+  con fibers de Windows; en el navegador no se puede, y los fibers de Emscripten solo existen con Asyncify (que
+  reescribiría las ~33 000 funciones del juego). Esta prueba hace los fibers <b>a mano sobre JSPI</b>: cada hilo es
+  una llamada a wasm con su propia pila, y pasar el turno es suspenderse y despertar al otro.</p>
+<div class="caja"><div id="resumen">corriendo…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>Qué significa cada línea:</b>
+  <ul>
+    <li><b>Orden de los turnos</b>: tres hilos (A, B, C) y main se pasan el turno en un orden fijo; si el orden sale
+      distinto, el planificador está mal.</li>
+    <li><b>Pila de C intacta</b>: cada hilo entra a una recursión con arreglos locales y pasa el turno en lo más hondo;
+      si las pilas se mezclaran, la suma no daría 136.</li>
+    <li><b>Espera asíncrona</b>: un hilo espera algo (como un archivo del disco o la GPU) en medio de todo.</li>
+    <li><b>Costo</b>: cuánto tarda un cambio de hilo. El juego cambia de hilo decenas de veces por cuadro; con
+      menos de 5 µs por cambio sobra (un cuadro a 60 fps son 16 700 µs).</li>
+  </ul>
+  Código: <code>banco/pruebas/fibers/fibers.c</code>.</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('fibers', 'Fibers sobre JSPI');
+if (!('Suspending' in WebAssembly)) { ok('el navegador tiene JSPI', false, 'sin JSPI no se puede'); fin(); }
+else {
+  const crea = (await import('./fibers.js')).default;
+  const M = await crea({ print: t => nota('[wasm] ' + t) });
+  await M.callMain([]);
+  const orden = M.UTF8ToString(M._orden()), res = [1, 2, 3].map(i => M._resultado(i));
+  ok('orden de los turnos', orden === 'MABCcab31m2no', orden + ' (esperado MABCcab31m2no)');
+  ok('cada pila de C intacta tras los cambios', res.every(r => r === 136), res.join(', ') + ' (esperado 136 c/u)');
+  ok('un hilo esperó algo asíncrono en medio', M._quien_espero() === 3, 'hilo ' + M._quien_espero());
+  const ms = await M._mide_cambios(100000);
+  const us = ms * 1000 / 200000;
+  ok('un cambio de hilo cuesta menos de 5 µs', us < 5, `${us.toFixed(2)} µs (${Math.round(200000 / ms * 1000).toLocaleString('es')} cambios por segundo)`);
+  fin();
+}
+</script>
+</body>
+</html>

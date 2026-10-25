@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paridad x86 y wasm</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Matemática del juego: <span>wasm igual a x86, bit a bit</span></h1>
+<p>El build de PC de WiiCompiled coincide con la Wii (los ghosts lo prueban). Esta página corre el mismo código del
+  runtime (<code>ppc_isa_float.h</code>, <code>ppc_isa_quantized.h</code>) compilado a wasm con nuestro parche y
+  compara cada resultado con las huellas del build x86 (<code>referencia-x86.txt</code>, hecha con g++ y
+  <code>-march=x86-64-v3</code>). Un millón de casos por operación, muchos raros: NaN con carga, SNaN, infinitos,
+  subnormales, ceros con signo.</p>
+<div class="caja"><div id="resumen">corriendo…</div><ul id="resultados"></ul></div>
+<div class="caja">Con dos o más operandos NaN ni x86 es determinista (depende del orden de operandos que elige el
+  compilador), por eso esos casos solo se informan. Código: <code>banco/pruebas/paridad/paridad.cpp</code>; parche:
+  <code>parches/runtime-web.diff</code>.</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { correParidad } from './prueba.mjs';
+const { ok, nota, fin } = prueba('paridad', 'Paridad x86 y wasm');
+const [crea, x86] = await Promise.all([import('./paridad.js').then(m => m.default), fetch('referencia-x86.txt').then(r => r.text())]);
+await correParidad(crea, x86, ok, nota);
+fin();
+</script>
+</body>
+</html>

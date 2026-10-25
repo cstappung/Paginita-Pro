@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controles del juego</title>
+<link rel="stylesheet" href="../../estilo.css">
+<style>#pantalla{position:relative;width:100%;max-width:640px;aspect-ratio:640/528;background:#223;border-radius:8px}</style>
+</head>
+<body>
+<h1>Controles: <span>teclado, mandos y celular</span></h1>
+<p>Prueba el módulo de controles de la página (<code>web/navegador/controles.mjs</code>) <b>sin el juego</b>: en vez del
+  juego hay un "juego falso" que anota el mando de GameCube que recibe cada puerto. Se simulan teclas, mandos falsos
+  (Gamepad API de mentira), toques en el mando táctil y la inclinación del teléfono.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>El mando táctil</b> (el de la prueba, sobre un rectángulo del tamaño del juego):
+  <div id="pantalla"></div></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { crearControles, BOTON, tipoMando } from '/web/navegador/controles.mjs';
+
+const { ok, nota, fin } = prueba('controles', 'Controles (sin el juego)');
+try { localStorage.removeItem('mkw.teclas'); localStorage.removeItem('mkw.mandos'); } catch {}      // empezar con el mapeo por defecto
+
+// ---- "juego falso": guarda lo último que recibió cada puerto ----
+const recibido = [];
+const enviar = (puerto, conectado, botones, sx, sy, cx, cy, gl, gr) => { recibido[puerto] = { conectado, botones, sx, sy, cx, cy, gl, gr }; };
+
+// ---- mandos falsos: se reemplaza navigator.getGamepads por una lista que la prueba controla ----
+const mandosFalsos = [];
+const efectos = [];                                          // vibraciones pedidas a los mandos falsos
+navigator.getGamepads = () => mandosFalsos;
+const mandoFalso = (index, id) => ({
+  index, id, mapping: 'standard', connected: true,
+  axes: [0, 0, 0, 0],
+  buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+  vibrationActuator: { playEffect: (tipo, o) => { efectos.push(['vibra', index, tipo]); return Promise.resolve(); },
+                       reset: () => { efectos.push(['para', index]); return Promise.resolve(); } },
+});
+
+const c = crearControles({ enviar, contenedorTactil: document.getElementById('pantalla') });
+const tecla = (tipo, code) => { const e = new KeyboardEvent(tipo, { code, bubbles: true, cancelable: true }); window.dispatchEvent(e); return e; };
+const p0 = () => (c.paso(), recibido[0]);
+
+// ---- 1) teclado ----
+ok('el puerto 1 está conectado aunque no se toque nada', p0().conectado === 1);
+c.paso();
+ok('los puertos 2 a 4 empiezan desconectados', [1, 2, 3].every(p => !recibido[p] || recibido[p].conectado === 0));
+tecla('keydown', 'KeyK');
+ok('tecla K → botón A', (p0().botones & BOTON.A) !== 0, `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'KeyK');
+ok('al soltar K se suelta A', (p0().botones & BOTON.A) === 0);
+tecla('keydown', 'KeyA');
+ok('tecla A (izquierda) → stick a fondo a la izquierda', p0().sx === -128 && recibido[0].sy === 0, `sx ${recibido[0].sx}`);
+tecla('keyup', 'KeyA'); tecla('keydown', 'KeyW'); tecla('keydown', 'KeyD');
+ok('W + D → stick arriba y a la derecha', p0().sx === 127 && recibido[0].sy === 127);
+tecla('keyup', 'KeyW'); tecla('keyup', 'KeyD');
+tecla('keydown', 'KeyL');
+ok('tecla L → R (derrapar) con el gatillo analógico a fondo', (p0().botones & BOTON.R) !== 0 && recibido[0].gr === 255);
+tecla('keyup', 'KeyL');
+const flecha = tecla('keydown', 'ArrowUp'); tecla('keyup', 'ArrowUp');
+ok('las flechas no mueven la página (preventDefault)', flecha.defaultPrevented);
+const otra = tecla('keydown', 'F5'); tecla('keyup', 'F5');
+ok('una tecla sin uso (F5) sigue funcionando para el navegador', !otra.defaultPrevented);
+
+// ---- 2) cambiar una tecla ----
+c.reasignar('A');
+tecla('keydown', 'KeyM'); tecla('keyup', 'KeyM');
+tecla('keydown', 'KeyM');
+ok('reasignar A a la tecla M', (p0().botones & BOTON.A) !== 0 && c.teclasDe('A').join() === 'KeyM');
+tecla('keyup', 'KeyM');
+let guardado = null; try { guardado = JSON.parse(localStorage.getItem('mkw.teclas')); } catch {}
+ok('el cambio queda guardado en el navegador', guardado && guardado.A && guardado.A[0] === 'KeyM');
+c.restaurarTeclas();
+tecla('keydown', 'KeyK');
+ok('restaurar el mapeo por defecto (K vuelve a ser A)', (p0().botones & BOTON.A) !== 0);
+tecla('keyup', 'KeyK');
+
+// ---- 3) mandos ----
+const m1 = mandoFalso(0, 'Mando falso Xbox (STANDARD GAMEPAD)');
+mandosFalsos.push(m1);
+m1.buttons[0] = { pressed: true, value: 1 };             // botón de abajo (Xbox A)
+m1.axes = [1, -1, 0, 0];                                // stick a la derecha y arriba (en el navegador, −1 = arriba)
+m1.buttons[7] = { pressed: true, value: 0.8 };          // RT al 80 %
+let r = p0();
+ok('mando 1 → puerto 1: botón A', (r.botones & BOTON.A) !== 0);
+ok('mando 1: stick arriba-derecha (con +y arriba como en la GameCube)', r.sx > 80 && r.sy > 80, `sx ${r.sx}, sy ${r.sy}`);
+ok('mando 1: gatillo RT analógico → R (204 de 255) y su clic digital', r.gr === 204 && (r.botones & BOTON.R) !== 0, `gr ${r.gr}`);
+m1.axes = [0.1, 0.08, 0, 0];
+ok('zona muerta: un stick casi suelto marca centro', p0().sx === 0 && recibido[0].sy === 0);
+m1.axes = [0, 0, -1, 0];
+ok('stick derecho del mando → stick C', p0().cx === -127, `cx ${recibido[0].cx}`);
+const m2 = mandoFalso(1, 'Mando falso PlayStation');
+mandosFalsos.push(m2);
+m2.buttons[1] = { pressed: true, value: 1 };            // botón derecho (PS ○) → B
+c.paso();
+ok('un segundo mando va al puerto 2', recibido[1] && recibido[1].conectado === 1 && (recibido[1].botones & BOTON.B) !== 0);
+mandosFalsos.splice(1, 1);
+c.paso();
+ok('al desconectarlo, el puerto 2 queda desconectado', recibido[1].conectado === 0);
+c.vibrar(0, 1);
+c.vibrar(0, 0);
+ok('vibración: el juego la pide y llega al mando del puerto 1 (vibra y para)',
+   efectos.some(e => e[0] === 'vibra' && e[1] === 0) && efectos.some(e => e[0] === 'para' && e[1] === 0), JSON.stringify(efectos));
+mandosFalsos.length = 0;
+c.paso();
+
+// ---- 3b) mandos de Nintendo, ajustes y asignar botones (bitácora §57) ----
+ok('reconoce el tipo de mando por su nombre', [
+  tipoMando('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)'), tipoMando('DualSense Wireless Controller (Vendor: 054c Product: 0ce6)'),
+  tipoMando('Xbox 360 Controller (XInput STANDARD GAMEPAD)'), tipoMando('USB GamePad (Vendor: 0079 Product: 1846)'), tipoMando('Mando raro')].join() === 'nintendo,playstation,xbox,gamecube,generico');
+const pro = mandoFalso(0, 'Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)');
+mandosFalsos.push(pro);
+pro.buttons[1] = { pressed: true, value: 1 };           // el botón de la DERECHA = la «A» de un Switch Pro
+r = p0();
+ok('Switch Pro (automático): la «A» de la etiqueta (derecha) es A', (r.botones & BOTON.A) !== 0 && (r.botones & BOTON.B) === 0, `botones 0x${r.botones.toString(16)}`);
+pro.buttons[1] = { pressed: false, value: 0 }; pro.buttons[0] = { pressed: true, value: 1 };
+ok('… y la «B» (abajo) es B', (p0().botones & BOTON.B) !== 0);
+c.ajustarMandos({ disposicion: 'posicion' });
+ok('con «por posición» el de abajo vuelve a ser A (como Xbox)', (p0().botones & BOTON.A) !== 0);
+c.ajustarMandos({ disposicion: 'auto' });
+pro.buttons[0] = { pressed: false, value: 0 };
+pro.axes = [0.12, 0, 0, 0];
+ok('zona muerta 15 %: el stick al 12 % marca centro', p0().sx === 0);
+c.ajustarMandos({ zona: 5 });
+ok('zona muerta 5 %: el mismo 12 % ya mueve', p0().sx > 0, `sx ${recibido[0].sx}`);
+ok('los ajustes quedan guardados en el navegador', JSON.parse(localStorage.getItem('mkw.mandos')).zona === 5);
+c.ajustarMandos({ zona: 15 }); pro.axes = [0, 0, 0, 0];
+efectos.length = 0;
+c.ajustarMandos({ vibrar: false });
+c.vibrar(0, 1); c.vibrar(0, 0);
+ok('vibración apagada: no vibra (pero sí para)', !efectos.some(e => e[0] === 'vibra') && efectos.some(e => e[0] === 'para'));
+c.ajustarMandos({ vibrar: true });
+mandosFalsos.length = 0;
+// un adaptador de GameCube sin mapeo estándar: se le asignan los botones con el asistente
+const gc = mandoFalso(0, 'USB GamePad (Vendor: 0079 Product: 1846)');
+gc.mapping = '';
+mandosFalsos.push(gc);
+c.paso();
+ok('un mando sin mapeo estándar se marca para asignarle botones', c.estado.mandos[0]?.sinMapa === true);
+const espera = ms => new Promise(res => setTimeout(res, ms));
+for (const [boton, i] of [['A', 1], ['B', 2], ['R', 7]]) {
+  const prometido = c.asignarBoton(gc.id, boton);
+  gc.buttons[i] = { pressed: true, value: 1 }; c.paso();
+  const n = await Promise.race([prometido, espera(200).then(() => 'tarde')]);
+  gc.buttons[i] = { pressed: false, value: 0 }; c.paso();
+  if (n !== i) ok(`asignar ${boton}`, false, `devolvió ${n}`);
+}
+gc.buttons[1] = { pressed: true, value: 1 };
+r = p0();
+ok('asignado: el botón 1 del adaptador es A', (r.botones & BOTON.A) !== 0 && c.estado.mandos[0].propio && !c.estado.mandos[0].sinMapa);
+gc.buttons[1] = { pressed: false, value: 0 }; gc.buttons[7] = { pressed: true, value: 0.6 };
+r = p0();
+ok('asignado: R con su valor analógico (153 de 255)', (r.botones & BOTON.R) !== 0 && r.gr === 255, `gr ${r.gr}`);
+gc.buttons[7] = { pressed: false, value: 0 };
+const cancelada = c.asignarBoton(gc.id, 'X'); c.cancelarAsignacion();
+ok('cancelar el asistente no asigna nada', (await cancelada) === null && c.prefsMandos().propios[gc.id].X === undefined);
+c.borrarAsignacion(gc.id);
+ok('borrar la asignación vuelve al mapeo de siempre', !c.prefsMandos().propios[gc.id]);
+mandosFalsos.length = 0;
+c.paso();
+
+// ---- 4) mando táctil ----
+c.tactil(true);
+const centro = el => { const b = el.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+const toque = (tipo, el, id, dx = 0, dy = 0) => {
+  const [x, y] = el instanceof Element ? centro(el) : el;
+  document.querySelector('.mkw-tactil').dispatchEvent(new PointerEvent(tipo, { pointerId: id, clientX: x + dx, clientY: y + dy, bubbles: true, pointerType: 'touch' }));
+};
+const ui = document.querySelector('.mkw-tactil');
+const botonTactil = texto => [...ui.children].find(e => e.textContent === texto);
+toque('pointerdown', botonTactil('A'), 11);
+ok('táctil: tocar A → botón A', (p0().botones & BOTON.A) !== 0);
+const aro = ui.children[0];
+const ancho = aro.getBoundingClientRect().width;
+toque('pointerdown', aro, 12, ancho * 0.45, 0);
+r = p0();
+ok('táctil: un segundo dedo en el stick (a la derecha) mientras A sigue apretado', r.sx > 90 && (r.botones & BOTON.A) !== 0, `sx ${r.sx}`);
+toque('pointermove', botonTactil('R'), 11);
+r = p0();
+ok('táctil: deslizar el dedo de A a R suelta A y aprieta R', (r.botones & BOTON.A) === 0 && (r.botones & BOTON.R) !== 0);
+toque('pointerup', botonTactil('R'), 11); toque('pointerup', aro, 12);
+r = p0();
+ok('táctil: al levantar los dedos se suelta todo', r.botones === 0 && r.sx === 0);
+c.tactil(false);
+
+// ---- 5) inclinar para dirigir ----
+await c.inclinar(true);
+const inclina = beta => window.dispatchEvent(Object.assign(new Event('deviceorientation'), { beta, gamma: 0, alpha: 0 }));
+inclina(10);                                              // posición al activar = centro
+ok('inclinación: la posición al activar es el centro', p0().sx === 0);
+inclina(27.5);                                            // 17,5° de giro = medio volante
+ok('inclinación: girar 17,5° → stick a la mitad', Math.abs(p0().sx - 64) <= 1, `sx ${recibido[0].sx}`);
+inclina(10 + 50);
+ok('inclinación: girar de más no pasa del tope', p0().sx === 127);
+await c.inclinar(false);
+ok('inclinación apagada: el stick vuelve al centro', p0().sx === 0);
+
+// ---- §99: el filtro de la sala: Start (y Esc, que es Start) nunca llega; B no llega en la primera pantalla de personajes ----
+let pantalla = 'personajes';
+c.filtro(() => BOTON.START | (pantalla === 'personajes' ? BOTON.B : 0));
+tecla('keydown', 'Escape');
+ok('§99: con el filtro de la sala, Esc (Start, la pausa) no llega al juego', (p0().botones & BOTON.START) === 0, `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'Escape');
+tecla('keydown', 'KeyJ'); tecla('keydown', 'KeyK');
+ok('§99: en la pantalla de personajes, B (volver al menú) no llega, A sí', (p0().botones & BOTON.B) === 0 && (recibido[0].botones & BOTON.A) !== 0,
+   `botones 0x${recibido[0].botones.toString(16)}`);
+pantalla = 'vehiculo';
+ok('§99: en la de vehículo, B (volver al personaje) sí llega', (p0().botones & BOTON.B) !== 0);
+tecla('keyup', 'KeyJ'); tecla('keyup', 'KeyK');
+c.filtro(null);
+tecla('keydown', 'Escape');
+ok('§99: sin filtro (fuera de la sala), Start vuelve a llegar', (p0().botones & BOTON.START) !== 0);
+tecla('keyup', 'Escape');
+
+// ---- §100: mientras el cursor del sitio maneja un menú de la página (mando-sitio.mjs), el mando no llega al juego; el teclado sí ----
+const m100 = mandoFalso(0, 'Xbox Wireless Controller (STANDARD GAMEPAD)');
+mandosFalsos.splice(0, mandosFalsos.length, m100);
+m100.buttons[0] = { pressed: true, value: 1 };
+let enCursor = true;
+c.sinMandos(() => enCursor);
+tecla('keydown', 'KeyL');
+ok('§100: con el cursor del sitio en un menú, el A del mando no llega al juego (el teclado sí: L → R)', (p0().botones & BOTON.A) === 0 && (recibido[0].botones & BOTON.R) !== 0,
+   `botones 0x${recibido[0].botones.toString(16)}`);
+tecla('keyup', 'KeyL');
+enCursor = false;
+ok('§100: cerrado el menú, el A del mando vuelve a llegar', (p0().botones & BOTON.A) !== 0);
+c.sinMandos(null); m100.buttons[0] = { pressed: false, value: 0 }; mandosFalsos.length = 0; c.paso();
+
+c.restaurarTeclas();
+nota('teclas por defecto: stick WASD/flechas · A = K/Enter · B = J/Retroceso · R = L/Shift · L = Espacio/I · truco = T · Start = P/Esc');
+fin();
+</script>
+</body>
+</html>

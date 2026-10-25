@@ -1,0 +1,2142 @@
+diff --git a/runtime/include/audio_backend.h b/runtime/include/audio_backend.h
+index ae05827..33f84cb 100644
+--- a/runtime/include/audio_backend.h
++++ b/runtime/include/audio_backend.h
+@@ -23,6 +23,13 @@ public:
+     void SetMasterVolume(float volume);
+     void SetMuted(bool muted);
+ 
++#ifdef __EMSCRIPTEN__
++    // Web port: queue level and playback-rate trim, read by the page (web/navegador/puente.cpp exports them).
++    double WebQueuedMs() const;      // smoothed SDL stream queue, in ms of audio
++    double WebRateRatio() const;     // current SDL_SetAudioStreamFrequencyRatio value
++    uint32_t WebDroppedBlocks() const;
++#endif
++
+ private:
+     AudioBackend() = default;
+     ~AudioBackend() = default;
+@@ -45,4 +52,20 @@ private:
+     bool m_muted = false;
+     bool m_reportedDroppedBlock = false;
+     std::vector<int16_t> m_convertBuffer;
++#ifdef __EMSCRIPTEN__
++    void WebTrimRateLocked();
++    // §88: the page plays the sound with an AudioWorklet (web/navegador/sonido.mjs). SDL3 then has no device: m_stream
++    // only converts (32 kHz S16 -> the card's rate in F32, with the rate trim) and every push goes straight to the page,
++    // whose worklet holds the queue. false = SDL3's own device (a ScriptProcessorNode), as before (?audio=viejo).
++    void WebDeliverLocked();
++    bool m_webWorklet = false;
++    bool m_sdlAudioInit = false;     // SDL_INIT_AUDIO taken (only the SDL device path needs it)
++    std::vector<float> m_webFloat;   // converted samples on their way to the page
++    double m_webQueuedMs = -1.0;
++    double m_webRatio = 1.0;
++    double m_webIntegral = 0.0;
++    double m_webLastMs = 0.0;
++    uint32_t m_webDropped = 0;
++    int m_webTrim = -1;              // -1 = not read yet; 0 = off (?ajusteSonido=0); 1 = on
++#endif
+ };
+diff --git a/runtime/include/guest_flat_memory.h b/runtime/include/guest_flat_memory.h
+index 6c0bdd3..8c7c085 100644
+--- a/runtime/include/guest_flat_memory.h
++++ b/runtime/include/guest_flat_memory.h
+@@ -36,6 +36,12 @@ inline constexpr uintptr_t kFixedFlatGuestBase = 0x0000'0080'0000'0000ull;
+ // probing to sit far below where the PIE image, heap, shared libraries and
+ // stack actually land (all clustered above ~340 GiB on a 39-bit/512 GiB system).
+ inline constexpr uintptr_t kFixedFlatGuestBase = 0x0000'0010'0000'0000ull;
++#elif defined(__EMSCRIPTEN__)
++// wasm32 has a single linear memory of at most 4 GiB that also holds the runtime itself, so a
++// flat 4 GiB guest view cannot exist and there are no page protections to trap on. The flat path
++// is compiled out (RequiresCheckedAccess() is constant true below) and every translated access
++// goes through the checked Memory::* path; the base only has to be a valid constant.
++inline constexpr uintptr_t kFixedFlatGuestBase = 0;
+ #else
+ #error "guest_flat_memory.h has no fixed flat guest base chosen for this architecture"
+ #endif
+@@ -77,7 +83,9 @@ bool IsActive();
+ #define MKW_GUEST_FLAT_FIXED_PAGE_SIZE 1
+ #endif
+ 
+-#if defined(MKW_GUEST_FLAT_FIXED_PAGE_SIZE)
++#if defined(__EMSCRIPTEN__)
++inline constexpr bool RequiresCheckedAccess() noexcept { return true; }
++#elif defined(MKW_GUEST_FLAT_FIXED_PAGE_SIZE)
+ inline constexpr bool RequiresCheckedAccess() noexcept { return false; }
+ #else
+ extern bool g_requiresCheckedAccess;
+diff --git a/runtime/include/hle/dvd_contract.h b/runtime/include/hle/dvd_contract.h
+index 9cb9576..c717818 100644
+--- a/runtime/include/hle/dvd_contract.h
++++ b/runtime/include/hle/dvd_contract.h
+@@ -284,6 +284,13 @@ inline constexpr const char* Describe(HostReadFailure failure) noexcept {
+     return "unknown host read error";
+ }
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (browser): the page can serve disc files itself (over HTTP) instead of the file system.
++// Returns bytes copied, -1 missing file, -3 offset outside the file, or -2 when the page has no
++// reader (Node), in which case the normal file system read below is used. Defined in dvd.cpp.
++extern "C" int mkw_web_lee_rango(const char* path, double offset, unsigned length, uint8_t* destination);
++#endif
++
+ // Read into private storage first and publish it only after the complete host
+ // range has been obtained. Callers can therefore leave a guest DMA destination
+ // untouched for every failure, including a host file truncated after indexing.
+@@ -294,6 +301,30 @@ inline bool ReadExact(const std::filesystem::path& hostPath,
+                       HostReadFailure& failure) {
+     failure = HostReadFailure::None;
+ 
++#if defined(__EMSCRIPTEN__)
++    {
++        std::vector<uint8_t> staged(length);
++        const int got = mkw_web_lee_rango(hostPath.generic_string().c_str(), static_cast<double>(offset),
++                                          length, staged.data());
++        if (got != -2) {
++            if (got == -1) {
++                failure = HostReadFailure::MissingFile;
++                return false;
++            }
++            if (got == -3) {
++                failure = HostReadFailure::BadOffset;
++                return false;
++            }
++            if (got != static_cast<int>(length)) {
++                failure = HostReadFailure::ShortRead;
++                return false;
++            }
++            destination = std::move(staged);
++            return true;
++        }
++    }
++#endif
++
+     std::ifstream file(hostPath, std::ios::binary);
+     if (!file.is_open()) {
+         failure = HostReadFailure::MissingFile;
+diff --git a/runtime/include/isa/ppc_isa_config.h b/runtime/include/isa/ppc_isa_config.h
+index b062184..7cc0764 100644
+--- a/runtime/include/isa/ppc_isa_config.h
++++ b/runtime/include/isa/ppc_isa_config.h
+@@ -8,6 +8,9 @@
+ #include <immintrin.h>
+ #elif defined(__aarch64__)
+ #include <arm_neon.h>
++#elif defined(__EMSCRIPTEN__)
++// wasm32: generic-vector stand-ins for the NEON subset used here; wasm takes the AArch64 paths.
++#include "ppc_isa_wasm_neon.h"
+ #else
+ #error "ppc_isa_config.h has no SIMD intrinsics header for this architecture"
+ #endif
+diff --git a/runtime/include/isa/ppc_isa_float.h b/runtime/include/isa/ppc_isa_float.h
+index e5f6c62..2bd8b74 100644
+--- a/runtime/include/isa/ppc_isa_float.h
++++ b/runtime/include/isa/ppc_isa_float.h
+@@ -30,6 +30,16 @@
+ #include <cstring>
+ #include <limits>
+ 
++// Fused multiply-add with a single rounding. wasm (no FMA instruction) supplies its own exact
++// version with x86 NaN answers in ppc_isa_wasm_neon.h; elsewhere this is the hardware FMA.
++#if !defined(__EMSCRIPTEN__)
++inline double MkwFma(double a, double b, double c) { return std::fma(a, b, c); }
++inline float MkwFma(float a, float b, float c) { return std::fma(a, b, c); }
++// a*b - c; the compiler folds the negation into one fmsub, which keeps a NaN c's sign.
++inline double MkwFms(double a, double b, double c) { return std::fma(a, b, -c); }
++inline float MkwFms(float a, float b, float c) { return std::fma(a, b, -c); }
++#endif
++
+ inline uint64_t PpcBitCastToU64Inline(double value)
+ {
+     uint64_t integral = 0;
+@@ -80,7 +90,7 @@ inline void PpcSetPairedFprInline(PPC_FPR& fpr, double packed)
+ 
+ #if defined(__x86_64__)
+ using PpcPairVec = __m128;
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+ // Only 2 lanes are ever meaningful (a PPC paired-single register), so a 2-lane float32x2_t
+ // (one 64-bit D register) is a more natural fit than mirroring x86's 128-bit register usage.
+ using PpcPairVec = float32x2_t;
+@@ -93,7 +103,7 @@ inline PpcPairVec PpcPsToM128Inline(double value)
+ {
+ #if defined(__x86_64__)
+     return _mm_castpd_ps(_mm_set_sd(value));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return vreinterpret_f32_f64(vdup_n_f64(value));
+ #endif
+ }
+@@ -102,7 +112,7 @@ inline double PpcM128ToPsInline(PpcPairVec value)
+ {
+ #if defined(__x86_64__)
+     return _mm_cvtsd_f64(_mm_castps_pd(value));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return vget_lane_f64(vreinterpret_f64_f32(value), 0);
+ #endif
+ }
+@@ -112,7 +122,7 @@ inline PpcPairVec PpcBroadcastPs0Inline(double value)
+ #if defined(__x86_64__)
+     const __m128 lanes = PpcPsToM128Inline(value);
+     return _mm_shuffle_ps(lanes, lanes, _MM_SHUFFLE(1, 1, 1, 1));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // ps0 lives in lane 1 (see the lane-accessor comment below).
+     return vdup_lane_f32(PpcPsToM128Inline(value), 1);
+ #endif
+@@ -123,7 +133,7 @@ inline PpcPairVec PpcBroadcastPs1Inline(double value)
+ #if defined(__x86_64__)
+     const __m128 lanes = PpcPsToM128Inline(value);
+     return _mm_shuffle_ps(lanes, lanes, _MM_SHUFFLE(0, 0, 0, 0));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // ps1 is already lane 0.
+     return vdup_lane_f32(PpcPsToM128Inline(value), 0);
+ #endif
+@@ -136,7 +146,7 @@ inline PpcPairVec PpcNegateNonNanLanesInline(PpcPairVec value)
+     const __m128 negated = _mm_xor_ps(value, signMask);
+     const __m128 ordered = _mm_cmpord_ps(value, value);
+     return _mm_or_ps(_mm_and_ps(ordered, negated), _mm_andnot_ps(ordered, value));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const uint32x2_t signMask = vdup_n_u32(0x80000000u);
+     const float32x2_t negated = vreinterpret_f32_u32(veor_u32(vreinterpret_u32_f32(value), signMask));
+     // NEON has no direct "ordered compare"; a value compares equal to itself iff it's not NaN.
+@@ -155,7 +165,7 @@ inline float PpcGetPs0Inline(double value)
+     // ps0 lives in lane 1; PpcBroadcastPs0Inline already splats it.
+ #if defined(__x86_64__)
+     return _mm_cvtss_f32(PpcBroadcastPs0Inline(value));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return vget_lane_f32(PpcBroadcastPs0Inline(value), 0);
+ #endif
+ }
+@@ -165,7 +175,7 @@ inline float PpcGetPs1Inline(double value)
+     // ps1 is already lane 0 of the packed representation.
+ #if defined(__x86_64__)
+     return _mm_cvtss_f32(PpcPsToM128Inline(value));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return vget_lane_f32(PpcPsToM128Inline(value), 0);
+ #endif
+ }
+@@ -176,7 +186,7 @@ inline double PpcPackPairedInline(float ps0, float ps1)
+     // _mm_unpacklo_ps(x, y) -> { x[0], y[0], x[1], y[1] }, so lane 0 becomes
+     // ps1 and lane 1 becomes ps0, matching the union layout bit for bit.
+     return PpcM128ToPsInline(_mm_unpacklo_ps(_mm_set_ss(ps1), _mm_set_ss(ps0)));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Lane 0 = ps1, lane 1 = ps0, matching the union layout bit for bit.
+     const float32x2_t lane0 = vdup_n_f32(ps1);
+     return PpcM128ToPsInline(vset_lane_f32(ps0, lane0, 1));
+@@ -205,7 +215,7 @@ inline float PpcForceSingleValueInline(double value)
+     const __m128d flush = _mm_cmplt_sd(magnitude, _mm_set_sd(g_mkwNiFlushThreshold));
+     const __m128d kept = _mm_andnot_pd(_mm_andnot_pd(signMask, flush), v);
+     return static_cast<float>(_mm_cvtsd_f64(kept));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const float64x1_t v = vdup_n_f64(value);
+     const uint64x1_t signMask = vdup_n_u64(0x8000000000000000ULL);
+     const float64x1_t magnitude = vreinterpret_f64_u64(vbic_u64(vreinterpret_u64_f64(v), signMask));
+@@ -422,19 +432,17 @@ inline double PpcPackIntegerWordInline(int32_t value)
+ template <bool Subtract>
+ inline float PpcAccuratePsMaddLaneInline(float a, float c, float b)
+ {
+-    const float signedB = Subtract ? -b : b;
+     // Paired values are stored as exact float32 lanes in this runtime.  An
+     // explicit float FMA therefore matches Gekko's single rounding point;
+     // multiplying and adding separately can differ by an ULP on ordinary
+     // vector and matrix workloads.
+-    return PpcFlushSingleForNiInline(std::fma(a, c, signedB));
++    return PpcFlushSingleForNiInline(Subtract ? MkwFms(a, c, b) : MkwFma(a, c, b));
+ }
+ 
+ template <bool Subtract>
+ inline float PpcAccuratePsMaddLaneNoNiInline(float a, float c, float b)
+ {
+-    const float signedB = Subtract ? -b : b;
+-    return std::fma(a, c, signedB);
++    return Subtract ? MkwFms(a, c, b) : MkwFma(a, c, b);
+ }
+ 
+ template <bool Subtract>
+@@ -447,7 +455,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
+     // Recover the direction of that discarded error for those tie cases.
+     const double roundedC = PpcForce25BitInline(c);
+     const double signedB = Subtract ? -b : b;
+-    double result = std::fma(a, roundedC, signedB);
++    double result = Subtract ? MkwFms(a, roundedC, b) : MkwFma(a, roundedC, b);
+     const uint64_t resultBits = PpcBitCastToU64Inline(result);
+     constexpr uint64_t kDiscardedMask = 0x000000001FFFFFFFULL;
+     constexpr uint64_t kEvenTie = 0x0000000010000000ULL;
+@@ -455,7 +463,7 @@ inline double PpcAccurateSingleMaddIntermediateInline(double a, double c, double
+     {
+         const double aPrime = signedB - result;
+         const double bPrime = result + aPrime;
+-        const double deltaA = std::fma(a, roundedC, aPrime);
++        const double deltaA = MkwFma(a, roundedC, aPrime);
+         const double deltaB = signedB - bPrime;
+         const double error = deltaA + deltaB;
+         if (error != 0.0)
+@@ -480,23 +488,23 @@ inline double PpcFmulsNoNiInline(double a, double c)
+ 
+ inline double PpcFmaddInline(double a, double c, double b)
+ {
+-    return std::fma(a, c, b);
++    return MkwFma(a, c, b);
+ }
+ 
+ inline double PpcFmsubInline(double a, double c, double b)
+ {
+-    return std::fma(a, c, -b);
++    return MkwFms(a, c, b);
+ }
+ 
+ inline double PpcFnmaddInline(double a, double c, double b)
+ {
+-    const double result = std::fma(a, c, b);
++    const double result = MkwFma(a, c, b);
+     return std::isnan(result) ? result : -result;
+ }
+ 
+ inline double PpcFnmsubInline(double a, double c, double b)
+ {
+-    const double result = std::fma(a, c, -b);
++    const double result = MkwFms(a, c, b);
+     return std::isnan(result) ? result : -result;
+ }
+ 
+@@ -526,7 +534,7 @@ inline double PpcFnmsubsInline(double a, double c, double b)
+     return static_cast<double>(std::isnan(result) ? result : -result);
+ }
+ 
+-#if defined(__aarch64__)
++#if (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+ // x86 resolves a single NaN source operand (SNaN or QNaN alike) to that operand quieted with
+ // sign and payload kept, and an invalid op with no NaN input to 0xFFC00000; NEON prefers SNaNs,
+ // checks the accumulator first, and yields the positive default NaN 0x7FC00000. NaN result
+@@ -569,13 +577,13 @@ inline PpcPairVec PpcResolveNanLanes3Inline(
+     const uint32x2_t resultNan = vmvn_u32(vceq_f32(result, result));
+     return vbsl_f32(resultNan, replacement, result);
+ }
+-#endif // defined(__aarch64__)
++#endif // (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+ 
+ inline PpcPairVec PpcMulPairInline(PpcPairVec lhs, PpcPairVec rhs)
+ {
+ #if defined(__x86_64__)
+     return _mm_mul_ps(lhs, rhs);
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vmul_f32(lhs, rhs);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanesInline(result, lhs, rhs);
+@@ -619,7 +627,7 @@ inline PpcPairVec PpcFmaddPairInline(PpcPairVec multiplicand, PpcPairVec multipl
+         PpcAccuratePsMaddLaneNoNiInline<false>(PpcGetPs0Inline(a), PpcGetPs0Inline(c), PpcGetPs0Inline(b)),
+         PpcAccuratePsMaddLaneNoNiInline<false>(PpcGetPs1Inline(a), PpcGetPs1Inline(c), PpcGetPs1Inline(b))));
+ #endif
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vfma_f32(addend, multiplicand, multiplier);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanes3Inline(result, multiplicand, multiplier, addend);
+@@ -640,7 +648,7 @@ inline PpcPairVec PpcFmsubPairInline(PpcPairVec multiplicand, PpcPairVec multipl
+         PpcAccuratePsMaddLaneNoNiInline<true>(PpcGetPs0Inline(a), PpcGetPs0Inline(c), PpcGetPs0Inline(b)),
+         PpcAccuratePsMaddLaneNoNiInline<true>(PpcGetPs1Inline(a), PpcGetPs1Inline(c), PpcGetPs1Inline(b))));
+ #endif
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vfma_f32(vneg_f32(subtractor), multiplicand, multiplier);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanes3Inline(result, multiplicand, multiplier, subtractor);
+@@ -746,7 +754,7 @@ inline double PPC_PsMerge00Inline(double aValue, double bValue)
+     const __m128 gathered = _mm_shuffle_ps(
+         PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(1, 1, 1, 1));
+     return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return PpcPackPairedInline(PpcGetPs0Inline(aValue), PpcGetPs0Inline(bValue));
+ #endif
+ }
+@@ -758,7 +766,7 @@ inline double PPC_PsMerge01Inline(double aValue, double bValue)
+     const __m128 gathered = _mm_shuffle_ps(
+         PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(1, 1, 0, 0));
+     return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return PpcPackPairedInline(PpcGetPs0Inline(aValue), PpcGetPs1Inline(bValue));
+ #endif
+ }
+@@ -770,7 +778,7 @@ inline double PPC_PsMerge10Inline(double aValue, double bValue)
+     const __m128 gathered = _mm_shuffle_ps(
+         PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue), _MM_SHUFFLE(0, 0, 1, 1));
+     return PpcM128ToPsInline(_mm_shuffle_ps(gathered, gathered, _MM_SHUFFLE(0, 0, 2, 0)));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return PpcPackPairedInline(PpcGetPs1Inline(aValue), PpcGetPs0Inline(bValue));
+ #endif
+ }
+@@ -782,7 +790,7 @@ inline double PPC_PsMerge11Inline(double aValue, double bValue)
+ #if defined(__x86_64__)
+     return PpcM128ToPsInline(
+         _mm_unpacklo_ps(PpcPsToM128Inline(bValue), PpcPsToM128Inline(aValue)));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     return PpcPackPairedInline(PpcGetPs1Inline(aValue), PpcGetPs1Inline(bValue));
+ #endif
+ }
+@@ -791,7 +799,7 @@ inline PpcPairVec PpcAddPairInline(PpcPairVec lhs, PpcPairVec rhs)
+ {
+ #if defined(__x86_64__)
+     return _mm_add_ps(lhs, rhs);
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vadd_f32(lhs, rhs);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanesInline(result, lhs, rhs);
+@@ -803,7 +811,7 @@ inline PpcPairVec PpcSubPairInline(PpcPairVec lhs, PpcPairVec rhs)
+ {
+ #if defined(__x86_64__)
+     return _mm_sub_ps(lhs, rhs);
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vsub_f32(lhs, rhs);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanesInline(result, lhs, rhs);
+@@ -815,7 +823,7 @@ inline PpcPairVec PpcDivPairInline(PpcPairVec lhs, PpcPairVec rhs)
+ {
+ #if defined(__x86_64__)
+     return _mm_div_ps(lhs, rhs);
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     const PpcPairVec result = vdiv_f32(lhs, rhs);
+     if (PpcPairNanLaneBitsInline(result) != 0) [[unlikely]]
+         return PpcResolveNanLanesInline(result, lhs, rhs);
+diff --git a/runtime/include/isa/ppc_isa_fpenv.h b/runtime/include/isa/ppc_isa_fpenv.h
+index f3bc7b9..a5d3653 100644
+--- a/runtime/include/isa/ppc_isa_fpenv.h
++++ b/runtime/include/isa/ppc_isa_fpenv.h
+@@ -21,6 +21,13 @@ inline constexpr uint32_t kMkwFpControlFlushToZeroBits = (1u << 15) | (1u << 6);
+ // inputs and outputs - actually a cleaner match to the "flush everything" trade above than x86's
+ // two-bit combo, not an extra deviation.
+ inline constexpr uint32_t kMkwFpControlFlushToZeroBits = (1u << 24); // FZ
++#elif defined(__EMSCRIPTEN__)
++// wasm has no FP control register and no flush-to-zero mode: denormals are always kept. The
++// "register" is a per-thread software value so FPSCR[NI] round-trips through the same
++// save/restore paths; only PpcForceSingleValueInline's pre-round flush (driven by
++// g_mkwNiFlushThreshold) actually honours NI. Bit 24 mirrors the AArch64 FZ layout.
++inline constexpr uint32_t kMkwFpControlFlushToZeroBits = (1u << 24);
++inline thread_local uint32_t g_mkwWasmFpControl = 0;
+ #else
+ #error "ppc_isa_fpenv.h has no host FP control register mapping for this architecture"
+ #endif
+@@ -44,6 +51,8 @@ inline uint32_t MkwGetHostFpControl() noexcept
+     uint64_t fpcr = 0;
+     __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+     return static_cast<uint32_t>(fpcr);
++#elif defined(__EMSCRIPTEN__)
++    return g_mkwWasmFpControl;
+ #endif
+ }
+ 
+@@ -58,6 +67,8 @@ inline void MkwSetHostFpControl(uint32_t value) noexcept
+     __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+     fpcr = (fpcr & ~static_cast<uint64_t>(0xFFFFFFFFu)) | value;
+     __asm__ __volatile__("msr fpcr, %0" :: "r"(fpcr));
++#elif defined(__EMSCRIPTEN__)
++    g_mkwWasmFpControl = value;
+ #endif
+ }
+ 
+diff --git a/runtime/include/isa/ppc_isa_quantized.h b/runtime/include/isa/ppc_isa_quantized.h
+index a5066f8..48dd0a6 100644
+--- a/runtime/include/isa/ppc_isa_quantized.h
++++ b/runtime/include/isa/ppc_isa_quantized.h
+@@ -46,7 +46,7 @@ inline uint64_t PpcLoadPairPsqFloatBitsPackedInline(uint64_t value)
+     const __m128i result = _mm_or_si128(
+         lanes, _mm_and_si128(nanMask, _mm_set1_epi32(0x00400000)));
+     return static_cast<uint64_t>(_mm_cvtsi128_si64(result));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Equivalent to applying PpcLoadPsqFloatBitsInline to each 32-bit lane: the
+     // x86 body above only ever acts on these same two lanes (the upper 64 bits
+     // _mm_cvtsi64_si128 zero-fills never survive the final truncating extract).
+@@ -71,7 +71,7 @@ inline uint64_t PpcStorePairPsqFloatBitsPackedInline(uint64_t value)
+         _mm_and_si128(subnormalMask, signedZero),
+         _mm_andnot_si128(subnormalMask, quieted));
+     return static_cast<uint64_t>(_mm_cvtsi128_si64(result));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Equivalent to applying PpcStorePsqFloatBitsInline to each 32-bit lane;
+     // same reasoning as the load-side port above.
+     const uint32_t lo = PpcStorePsqFloatBitsInline(static_cast<uint32_t>(value));
+@@ -123,7 +123,7 @@ inline double PpcLoadPairPsqFloatFromHostInline(const uint8_t* host)
+     const __m128i raw = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(host));
+     return PpcM128ToPsInline(_mm_castsi128_ps(
+         PpcLoadPairPsqFloatBitsLanesInline(PpcPsqSwapPairBytesInline(raw))));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // The x86 path's full 8-byte pshufb reversal plus a same-endian load is,
+     // taken together, exactly a 64-bit byteswap of a plain little-endian load:
+     // it turns the on-disk [ps0 big-endian][ps1 big-endian] byte layout into a
+@@ -143,7 +143,7 @@ inline void PpcStorePairPsqFloatToHostInline(uint8_t* host, double value)
+     const __m128i lanes = PpcStorePairPsqFloatBitsLanesInline(
+         _mm_castps_si128(PpcPsToM128Inline(value)));
+     _mm_storel_epi64(reinterpret_cast<__m128i*>(host), PpcPsqSwapPairBytesInline(lanes));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Inverse of the load path above: bswap64 is its own inverse, so applying
+     // it to the quieted packed value reproduces the on-disk big-endian bytes.
+     const uint64_t quieted = PpcStorePairPsqFloatBitsPackedInline(PpcBitCastToU64Inline(value));
+@@ -383,7 +383,7 @@ inline uint16_t PpcQuantizePairPsqU8Scale61PackedInline(double value)
+     // Native lane 0 is ps1 and lane 1 is ps0. Packing to the low uint16_t
+     // therefore produces the guest-order numeric value (ps0 << 8) | ps1.
+     return static_cast<uint16_t>(_mm_cvtsi128_si32(lanes8));
+-#elif defined(__aarch64__)
++#elif (defined(__aarch64__) || defined(__EMSCRIPTEN__))
+     // Equivalent to two calls of the already-portable scalar quantizer above
+     // (its own !(scaled > 0) rule maps NaN to 0, matching what MAXPS-with-zero
+     // does on the x86 path per the comment there), packed the same way the
+diff --git a/runtime/include/memory_access.h b/runtime/include/memory_access.h
+index 7ac535d..1d1ff22 100644
+--- a/runtime/include/memory_access.h
++++ b/runtime/include/memory_access.h
+@@ -368,9 +368,20 @@ MKW_MEMORY_FORCE_INLINE bool TryReadGuestScalar(uint32_t address, T& outValue) {
+     return true;
+ }
+ 
++#ifdef MKW_VIGIA
++}  // namespace MemoryInline
++// MKW web, depuración (MKW_CFLAGS_EXTRA=-DMKW_VIGIA, taller aparte): "punto de vigilancia" de escritura: si se escribe
++// en [g_mkwVigiaDesde, +g_mkwVigiaTam) se avisa a mkw_vigia_toque (web/juego/depurar_lockstep.cpp).
++extern "C" uint32_t g_mkwVigiaDesde, g_mkwVigiaTam;
++extern "C" void mkw_vigia_toque(uint32_t address, uint32_t size);
++namespace MemoryInline {
++#endif
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE bool TryWriteGuestScalar(uint32_t address, T value) {
+     static_assert(sizeof(T) >= 1 && sizeof(T) <= kMaxFastScalarSize);
++#ifdef MKW_VIGIA
++    if (address - g_mkwVigiaDesde < g_mkwVigiaTam) [[unlikely]] mkw_vigia_toque(address, sizeof(T));
++#endif
+     // A mixed executable/data 1 MiB page zeroes the coarse writable bias even though most of
+     // its 4 KiB sub-pages are plain data; MKW's THP buffers share such a page with .text, which
+     // used to force ~15% of total CPU through the cold path. The sparse sub-page tier below
+@@ -539,6 +550,9 @@ MKW_MEMORY_FORCE_INLINE void WriteResolvedFloat64(uint8_t* r, uint32_t o, uint32
+ 
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
++#if defined(__EMSCRIPTEN__)
++    __builtin_trap();  // no flat view in wasm: every caller must take the checked path first
++#endif
+     T value{};
+     std::memcpy(&value, MKW_FLAT_GUEST_BASE + address, sizeof(T));
+     return MaybeByteSwap(value);
+@@ -546,6 +560,9 @@ MKW_MEMORY_FORCE_INLINE T FlatLoad(uint32_t address) {
+ 
+ template <typename T>
+ MKW_MEMORY_FORCE_INLINE void FlatStore(uint32_t address, T value) {
++#if defined(__EMSCRIPTEN__)
++    __builtin_trap();  // see FlatLoad
++#endif
+     const T swapped = MaybeByteSwap(value);
+     std::memcpy(MKW_FLAT_GUEST_BASE + address, &swapped, sizeof(T));
+ }
+@@ -616,25 +633,32 @@ MKW_MEMORY_FORCE_INLINE void FlatWriteFloat64(uint32_t address, double value) {
+ // of flat stores), skipping the MMIO mask/compare that's pure overhead there. Still safe if that proof were ever wrong: the flat view maps
+ // 0xCC000000..0xCDFFFFFF PAGE_NOACCESS, so a stray MMIO store faults into the same handler and diagnostic as the checked path, just reported
+ // instead of dispatched inline. Never use these for an address the translator hasn't proven.
++// Hosts without the flat view (wasm, where RequiresCheckedAccess() is constant true) have no protected
++// pages to fall back on, so there these go through the checked Memory::Write* like FlatWrite* does.
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam8(uint32_t address, uint8_t value) {
++    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write8(address, value); return; }
+     FlatStore<uint8_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam16(uint32_t address, uint16_t value) {
++    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write16(address, value); return; }
+     FlatStore<uint16_t>(address, value);
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRam32(uint32_t address, uint32_t value) {
++    if (GuestFlat::RequiresCheckedAccess()) { Memory::Write32(address, value); return; }
+     FlatStore<uint32_t>(address, value);
+ }
+ 
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat32(uint32_t address, double value) {
++    if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat32(address, value); return; }
+     FlatStore<uint32_t>(address, ConvertPpcDoubleToSingleBits(value));
+ }
+ 
+ MKW_MEMORY_FORCE_INLINE void FlatWriteRamFloat64(uint32_t address, double value) {
++    if (GuestFlat::RequiresCheckedAccess()) { Memory::WriteFloat64(address, value); return; }
+     uint64_t bits = 0;
+     std::memcpy(&bits, &value, sizeof(bits));
+     FlatStore<uint64_t>(address, bits);
+diff --git a/runtime/include/nand_settings.h b/runtime/include/nand_settings.h
+index 055f4c2..5dfe865 100644
+--- a/runtime/include/nand_settings.h
++++ b/runtime/include/nand_settings.h
+@@ -5,6 +5,7 @@
+ #include <chrono>
+ #include <ctime>
+ #include <cstdint>
++#include <cstdio>
+ #include <filesystem>
+ #include <fstream>
+ #include <map>
+@@ -200,6 +201,10 @@ inline bool Ensure(const std::filesystem::path& root, std::string& error,
+     if (written) {
+ #ifdef _WIN32
+         published = MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH) != 0;
++#elif defined(__EMSCRIPTEN__)
++        // MKW RETRO: Emscripten's in-memory file system has no hard links. The browser build is
++        // single-threaded, so "rename if the destination is still missing" is equally no-replace.
++        published = !std::filesystem::exists(path) && std::rename(temporary.c_str(), path.c_str()) == 0;
+ #else
+         published = ::link(temporary.c_str(), path.c_str()) == 0;
+ #endif
+diff --git a/runtime/include/runtime_config.h b/runtime/include/runtime_config.h
+index 2204f70..d837567 100644
+--- a/runtime/include/runtime_config.h
++++ b/runtime/include/runtime_config.h
+@@ -175,6 +175,9 @@ inline bool IsSupportedGraphicsApi(std::string_view value) {
+     static constexpr std::array<std::string_view, 2> values{"auto", "vulkan"};
+ #elif defined(_WIN32)
+     static constexpr std::array<std::string_view, 3> values{"auto", "d3d12", "vulkan"};
++#elif defined(__EMSCRIPTEN__)
++    // The browser has a single backend: WebGPU (aurora via emdawnwebgpu).
++    static constexpr std::array<std::string_view, 2> values{"auto", "webgpu"};
+ #endif
+     return std::find(values.begin(), values.end(), value) != values.end();
+ }
+diff --git a/runtime/src/audio_backend.cpp b/runtime/src/audio_backend.cpp
+index 7ceda4c..8c6a9f3 100644
+--- a/runtime/src/audio_backend.cpp
++++ b/runtime/src/audio_backend.cpp
+@@ -3,12 +3,59 @@
+ #include "runtime_log.h"
+ 
+ #include <algorithm>
++#include <cmath>
+ #include <cstdint>
+ #include <cstdlib>
+ #include <iostream>
+ 
+ #include <SDL3/SDL_init.h>
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++
++// Web port: the game produces audio on its own clock (Audio_HLE_Tick follows emulated time, which the VI
++// pacing locks to the monitor refresh: 60.025 Hz on a 240.1 Hz screen), while WebAudio consumes it on the
++// sound card's crystal (exactly 48 kHz). The ~0.04% mismatch slowly fills (or drains) the 120 ms queue until
++// QueueHasCapacityLocked drops a block (an audible click), periodically. Like Dolphin/RetroArch "dynamic
++// rate control", a tiny playback-rate trim (at most +/-0.2%, ~3 cents: inaudible) keeps the queue centred.
++EM_JS(int, mkw_web_sonido_ajuste_activo, (), { return Module.mkwSonidoAjuste === false ? 0 : 1; });
++
++// §88: the page can play the sound itself with an AudioWorklet (web/navegador/sonido.mjs, `Module.mkwSonido`): a
++// short queue on the browser's audio thread instead of SDL3's ScriptProcessorNode (2048-sample blocks on the page
++// thread) plus our 60 ms queue. abrir() answers the card's rate (0 = no: SDL3's device as before, ?audio=viejo).
++EM_JS(int, mkw_web_sonido_abrir, (), {
++    const s = Module.mkwSonido;
++    return s && s.abrir ? (s.abrir() | 0) : 0;
++});
++EM_JS(void, mkw_web_sonido_entregar, (const float* datos, int cuadros, int canales), {
++    Module.mkwSonido.entregar(HEAPF32.subarray(datos >> 2, (datos >> 2) + cuadros * canales));
++});
++EM_JS(double, mkw_web_sonido_nivel, (), { return Module.mkwSonido.nivelMs(); });
++EM_JS(double, mkw_web_sonido_objetivo, (), { return Module.mkwSonido.objetivoMs(); });
++
++namespace {
++// §88, measuring the delay with a click (sonido.mjs medirDemora): 0 = normal; 1 = every push goes out silent (so only
++// the click is heard); 2 = the next push starts with a click (4 samples at full scale) and its time is noted, then 1.
++int g_webMarca = 0;
++double g_webMarcaMs = 0.0;
++
++void WebMark(int16_t* samples, size_t frameCount, size_t channels) {
++    if (!g_webMarca) {
++        return;
++    }
++    std::fill(samples, samples + frameCount * channels, int16_t{0});
++    if (g_webMarca == 2) {
++        std::fill(samples, samples + std::min<size_t>(4, frameCount) * channels, int16_t{32767});
++        g_webMarcaMs = emscripten_get_now();
++        g_webMarca = 1;
++    }
++}
++} // namespace
++
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_web_sonido_marca(int fase) { g_webMarca = fase; }
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_sonido_marca_ms() { return g_webMarcaMs; }
++#endif
++
+ AudioBackend& AudioBackend::Instance() {
+     static AudioBackend instance;
+     return instance;
+@@ -46,10 +93,43 @@ bool AudioBackend::EnsureInitializedLocked(uint32_t sampleRate, uint32_t channel
+         m_stream = nullptr;
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    // §88: the page plays it (AudioWorklet). SDL3 opens no device: a bare stream converts 32 kHz S16 to the card's
++    // rate in F32 (and applies the rate trim and the gain), and WebDeliverLocked hands each push to the page.
++    if (const int pageRate = mkw_web_sonido_abrir(); pageRate > 0) {
++        SDL_AudioSpec src{};
++        src.format = SDL_AUDIO_S16LE;
++        src.channels = static_cast<int>(channels);
++        src.freq = static_cast<int>(sampleRate);
++        SDL_AudioSpec dst = src;
++        dst.format = SDL_AUDIO_F32;
++        dst.freq = pageRate;
++        SDL_AudioStream* stream = SDL_CreateAudioStream(&src, &dst);
++        if (!stream || !SDL_SetAudioStreamGain(stream, EffectiveGainLocked())) {
++            RT_LOG(RT_TAG_AUDIO) << "page audio stream failed: " << SDL_GetError() << std::endl;
++            if (stream) {
++                SDL_DestroyAudioStream(stream);
++            }
++            return false;
++        }
++        m_stream = stream;
++        m_spec = src;
++        m_sampleRate = sampleRate;
++        m_channels = channels;
++        m_initialized = true;
++        m_webWorklet = true;
++        return true;
++    }
++    m_webWorklet = false;
++#endif
++
+     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+         RT_LOG(RT_TAG_AUDIO) << "SDL_InitSubSystem(SDL_INIT_AUDIO) failed: " << SDL_GetError() << std::endl;
+         return false;
+     }
++#ifdef __EMSCRIPTEN__
++    m_sdlAudioInit = true;
++#endif
+ 
+     SDL_AudioSpec spec{};
+     spec.format = SDL_AUDIO_S16LE;
+@@ -93,9 +173,17 @@ void AudioBackend::Shutdown() {
+         SDL_DestroyAudioStream(m_stream);
+         m_stream = nullptr;
+     }
++#ifdef __EMSCRIPTEN__
++    if (m_initialized && m_sdlAudioInit) {   // (the page's AudioWorklet path never took SDL's audio)
++        SDL_QuitSubSystem(SDL_INIT_AUDIO);
++    }
++    m_sdlAudioInit = false;
++    m_webWorklet = false;
++#else
+     if (m_initialized) {
+         SDL_QuitSubSystem(SDL_INIT_AUDIO);
+     }
++#endif
+     m_initialized = false;
+     m_sampleRate = 0;
+     m_channels = 0;
+@@ -127,6 +215,9 @@ bool AudioBackend::QueueHasCapacityLocked(int incomingBytes) {
+         // stream creates an audible discontinuity (the severe crackle seen when
+         // VI-batched DMA briefly outran playback).
+         // A drop is audible; report the first one so it is not invisible.
++#ifdef __EMSCRIPTEN__
++        ++m_webDropped;
++#endif
+         if (!m_reportedDroppedBlock) {
+             m_reportedDroppedBlock = true;
+             RT_LOG(RT_TAG_AUDIO) << "output queue full (" << queued << "/" << maxQueued
+@@ -167,6 +258,9 @@ bool AudioBackend::PushWiiAiSamplesBE16(const uint8_t* data, size_t bytes) {
+         m_convertBuffer[frame * 2] = static_cast<int16_t>(left);
+         m_convertBuffer[frame * 2 + 1] = static_cast<int16_t>(right);
+     }
++#ifdef __EMSCRIPTEN__
++    WebMark(m_convertBuffer.data(), frameCount, 2);   // only while the page measures the delay (§88)
++#endif
+ 
+     const int lenBytes = static_cast<int>(frameCount * 2 * sizeof(int16_t));
+     if (!QueueHasCapacityLocked(lenBytes)) {
+@@ -176,6 +270,12 @@ bool AudioBackend::PushWiiAiSamplesBE16(const uint8_t* data, size_t bytes) {
+         RT_LOG(RT_TAG_AUDIO) << "SDL_PutAudioStreamData failed: " << SDL_GetError() << std::endl;
+         return false;
+     }
++#ifdef __EMSCRIPTEN__
++    if (m_webWorklet) {
++        WebDeliverLocked();
++    }
++    WebTrimRateLocked();
++#endif
+ 
+     return true;
+ }
+@@ -198,6 +298,104 @@ bool AudioBackend::PushSamplesLE16(const int16_t* samples, size_t sampleCount) {
+         RT_LOG(RT_TAG_AUDIO) << "SDL_PutAudioStreamData failed: " << SDL_GetError() << std::endl;
+         return false;
+     }
++#ifdef __EMSCRIPTEN__
++    if (m_webWorklet) {
++        WebDeliverLocked();
++    }
++    WebTrimRateLocked();
++#endif
+ 
+     return true;
+ }
++
++#ifdef __EMSCRIPTEN__
++void AudioBackend::WebTrimRateLocked() {
++    // A PI controller (like a PLL loop filter): the proportional part reacts to the queue error now, the
++    // integral part learns the steady clock mismatch (measured ~0.13%: the Wii's real AI rate is ~32029 Hz,
++    // not 32000, plus the 240.1 Hz monitor lock) so the queue settles exactly at the target.
++    constexpr double kTargetMs = 60.0;   // half of the 120 ms queue limit: room both ways
++    constexpr double kSmoothing = 0.02;  // the queue saw-tooths by one WebAudio block (~43 ms): average it
++    constexpr double kGainPerMs = 1e-4;  // proportional: 10 ms off target -> 0.1% faster/slower
++    constexpr double kIntegralPerMsS = 1e-5;  // integral: 10 ms off for 10 s -> +0.1% learned
++    constexpr double kMaxTrim = 0.006;   // 0.6% (~10 cents) covers a monitor-locked clock plus the AI rate
++    constexpr double kStep = 1e-4;       // only re-tune SDL's resampler in 0.01% steps
++    if (m_webTrim < 0) {
++        m_webTrim = mkw_web_sonido_ajuste_activo();
++    }
++    double ms = 0.0;
++    double targetMs = kTargetMs;
++    if (m_webWorklet) {
++        // §88: the queue is the page's worklet (its average over ~21 ms) and its target adapts to the page's hiccups
++        ms = mkw_web_sonido_nivel();
++        if (ms < 0.0) {              // blocked, paused or refilling after running dry: hold what the loop learned
++            m_webLastMs = 0.0;
++            return;
++        }
++        targetMs = mkw_web_sonido_objetivo();
++    } else {
++        const int queued = SDL_GetAudioStreamQueued(m_stream);
++        const double bytesPerMs = static_cast<double>(m_spec.freq) * m_spec.channels * sizeof(int16_t) / 1000.0;
++        if (queued < 0 || bytesPerMs <= 0.0) {
++            return;
++        }
++        ms = queued / bytesPerMs;
++    }
++    m_webQueuedMs = m_webQueuedMs < 0.0 ? ms : m_webQueuedMs + kSmoothing * (ms - m_webQueuedMs);
++    const double now = emscripten_get_now();
++    const double dt = m_webLastMs > 0.0 ? std::min((now - m_webLastMs) / 1000.0, 0.1) : 0.0;
++    m_webLastMs = now;
++    if (!m_webTrim) {
++        return;
++    }
++    // Queue above target -> play slightly faster (ratio > 1 consumes input faster), and vice versa
++    const double error = m_webQueuedMs - targetMs;
++    m_webIntegral = std::clamp(m_webIntegral + kIntegralPerMsS * error * dt, -kMaxTrim, kMaxTrim);
++    // §88: twice as firm with the page's worklet: its queue is small and its target moves (it starts high and comes
++    // down once the game has booted), and the queue should follow it within seconds (10 ms off -> 0.2%, ~3 cents)
++    const double gain = m_webWorklet ? 2.0 * kGainPerMs : kGainPerMs;
++    const double wanted = 1.0 + std::clamp(gain * error + m_webIntegral, -kMaxTrim, kMaxTrim);
++    const double ratio = 1.0 + std::round((wanted - 1.0) / kStep) * kStep;
++    if (ratio != m_webRatio && SDL_SetAudioStreamFrequencyRatio(m_stream, static_cast<float>(ratio))) {
++        m_webRatio = ratio;
++    }
++}
++
++// §88: whatever SDL already converted goes to the page's worklet now (a 3 ms push is ~144 frames at 48 kHz)
++void AudioBackend::WebDeliverLocked() {
++    const int bytes = SDL_GetAudioStreamAvailable(m_stream);
++    if (bytes <= 0) {
++        return;
++    }
++    const size_t floats = static_cast<size_t>(bytes) / sizeof(float);
++    if (m_webFloat.size() < floats) {
++        m_webFloat.resize(floats);
++    }
++    const int got = SDL_GetAudioStreamData(m_stream, m_webFloat.data(), bytes);
++    const int frameBytes = static_cast<int>(sizeof(float) * m_channels);
++    if (got >= frameBytes) {
++        mkw_web_sonido_entregar(m_webFloat.data(), got / frameBytes, static_cast<int>(m_channels));
++    }
++}
++
++double AudioBackend::WebQueuedMs() const {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    return m_webQueuedMs;
++}
++
++double AudioBackend::WebRateRatio() const {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    return m_webRatio;
++}
++
++uint32_t AudioBackend::WebDroppedBlocks() const {
++    std::lock_guard<std::mutex> lock(m_mutex);
++    return m_webDropped;
++}
++#endif
++
++#ifdef __EMSCRIPTEN__
++// Read by the page meter (web/navegador/mkw.mjs) and its bench test
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_sonido_cola_ms() { return AudioBackend::Instance().WebQueuedMs(); }
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_web_sonido_ritmo() { return AudioBackend::Instance().WebRateRatio(); }
++extern "C" EMSCRIPTEN_KEEPALIVE unsigned mkw_web_sonido_tirados() { return AudioBackend::Instance().WebDroppedBlocks(); }
++#endif
+diff --git a/runtime/src/hle/net/network_core.cpp b/runtime/src/hle/net/network_core.cpp
+index 7c68222..62121a0 100644
+--- a/runtime/src/hle/net/network_core.cpp
++++ b/runtime/src/hle/net/network_core.cpp
+@@ -368,11 +368,20 @@ bool WaitForReadable(NativeSocket socket, int timeoutMs) {
+     return ret > 0 && (pfd.revents & (POLLRDNORM | POLLIN | POLLERR | POLLHUP)) != 0;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// Web: the sockets live in the page's virtual network (web/navegador/red_web.cpp + red.mjs). close() and
++// fcntl() stay the file-system ones, so the two calls that touch a socket descriptor go to the bridge directly.
++extern "C" int mkw_red_cerrar(int fd);
++extern "C" void mkw_red_bloqueante(int fd, bool blocking);
++#endif
++
+ void CloseNativeSocket(NativeSocket socket) {
+     if (socket == kInvalidSocket) {
+         return;
+     }
+-#ifdef _WIN32
++#ifdef __EMSCRIPTEN__
++    mkw_red_cerrar(socket);
++#elif defined(_WIN32)
+     closesocket(socket);
+ #else
+     close(socket);
+@@ -380,7 +389,9 @@ void CloseNativeSocket(NativeSocket socket) {
+ }
+ 
+ void SetNonBlocking(NativeSocket socket, bool enabled) {
+-#ifdef _WIN32
++#ifdef __EMSCRIPTEN__
++    mkw_red_bloqueante(socket, !enabled);
++#elif defined(_WIN32)
+     u_long mode = enabled ? 1 : 0;
+     ioctlsocket(socket, FIONBIO, &mode);
+ #else
+diff --git a/runtime/src/hle/net/network_deferred.cpp b/runtime/src/hle/net/network_deferred.cpp
+index 8ed5e0e..4210d69 100644
+--- a/runtime/src/hle/net/network_deferred.cpp
++++ b/runtime/src/hle/net/network_deferred.cpp
+@@ -269,6 +269,12 @@ static DeferredDnsCompletion ResolveDeferredDns(DeferredDnsWork work) {
+ }
+ 
+ static bool LaunchDeferredDns(DeferredDnsWork work) {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    // Web without threads: the page's resolver (red_web.cpp getaddrinfo -> red.mjs) answers from a table at once,
++    // so resolve inline and queue the completion; the scheduler pump delivers it exactly like a worker's.
++    QueueDeferredDnsCompletion(ResolveDeferredDns(std::move(work)));
++    return true;
++#endif
+     std::unique_ptr<std::thread> worker;
+     try {
+         worker = std::make_unique<std::thread>([work = std::move(work)]() mutable {
+diff --git a/runtime/src/hle/net/network_ssl.cpp b/runtime/src/hle/net/network_ssl.cpp
+index 9e4fd76..6918747 100644
+--- a/runtime/src/hle/net/network_ssl.cpp
++++ b/runtime/src/hle/net/network_ssl.cpp
+@@ -2,7 +2,12 @@
+ #include "runtime_config.h"
+ #include "runtime_log.h"
+ 
+-#ifndef _WIN32
++// Web (__EMSCRIPTEN__): no TLS library. Every session is plaintext: the only servers are the room's virtual WFC
++// (web/navegador), which speaks plain HTTP on 80 and 443, like Retro WFC's plaintext hosts below.
++#ifdef __EMSCRIPTEN__
++#include <sys/time.h>
++#endif
++#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+ #include <mbedtls/ctr_drbg.h>
+ #include <mbedtls/entropy.h>
+ #include <mbedtls/error.h>
+@@ -75,7 +80,7 @@ struct SslSession {
+     CredHandle cred{};
+     CtxtHandle context{};
+     SecPkgContext_StreamSizes sizes{};
+-#else
++#elif !defined(__EMSCRIPTEN__)
+     bool haveSsl = false;
+     mbedtls_ssl_context sslContext{};
+     mbedtls_ssl_config sslConfig{};
+@@ -562,6 +567,57 @@ static int32_t SslRead(SslSession& ssl, uint8_t* out, uint32_t size) {
+     ssl.decrypted.erase(ssl.decrypted.begin(), ssl.decrypted.begin() + copied);
+     return copied == 0 ? SSL_ERR_ZERO : static_cast<int32_t>(copied);
+ }
++#elif defined(__EMSCRIPTEN__)
++// Web: plaintext only (see the include block at the top). The "handshake" just checks there is a socket; reads
++// and writes go straight to it, exactly like the plaintextWfc path below.
++static void ClearSslSession(SslSession& ssl) {
++    ssl = {};
++}
++
++static int32_t SslHandshakeImpl(SslSession& ssl) {
++    if (ssl.native == kInvalidSocket) {
++        return SSL_ERR_SYSCALL;
++    }
++    ssl.handshaked = true;
++    return SSL_OK;
++}
++
++static int32_t SslWrite(SslSession& ssl, const uint8_t* data, uint32_t size) {
++    if (!data || size == 0) {
++        return SSL_ERR_ZERO;
++    }
++    const int32_t handshakeRet = SslHandshake(ssl);
++    if (handshakeRet != SSL_OK) {
++        return handshakeRet;
++    }
++    uint32_t total = 0;
++    while (total < size) {
++        const ssize_t sent = send(ssl.native, data + total, size - total, 0);
++        if (sent <= 0) {
++            return SSL_ERR_SYSCALL;
++        }
++        total += static_cast<uint32_t>(sent);
++    }
++    return static_cast<int32_t>(total);
++}
++
++static int32_t SslRead(SslSession& ssl, uint8_t* out, uint32_t size) {
++    if (!out || size == 0) {
++        return SSL_ERR_ZERO;
++    }
++    const int32_t handshakeRet = SslHandshake(ssl);
++    if (handshakeRet != SSL_OK) {
++        return handshakeRet;
++    }
++    const ssize_t ret = recv(ssl.native, out, size, 0);
++    if (ret == 0) {
++        return SSL_ERR_ZERO;
++    }
++    if (ret < 0) {
++        return SSL_ERR_RAGAIN;
++    }
++    return static_cast<int32_t>(ret);
++}
+ #else
+ // Windows gets TLS for free from the OS (Schannel, above) - mbed TLS is this project's own
+ // vendored equivalent for everywhere else (runtime/third_party/mbedtls, see runtime/CMakeLists.txt
+diff --git a/runtime/src/hle/os/os_time.cpp b/runtime/src/hle/os/os_time.cpp
+index a89e4a4..75ea581 100644
+--- a/runtime/src/hle/os/os_time.cpp
++++ b/runtime/src/hle/os/os_time.cpp
+@@ -26,6 +26,42 @@ void ReadTimeBaseRegisters(uint32_t& outHi, uint32_t& outLo)
+ }
+ } // namespace
+ 
++// MKW web — la hora de la carrera sincronizada (lockstep, bitácora §61). Con g_mkwRelojFijo encendido (la sala con
++// CPU, ppc_helpers.cpp), OSGetTime no da la hora de la PC sino una que sale de los cuadros DEL JUEGO (Raceinfo
++// 0x809BD730: +0x1E cuenta la presentación, +0x20 la carrera): todas las lecturas de un mismo cuadro dan lo mismo y
++// cada cuadro avanza 1/60 s. Así lo que el juego (o Retro Rewind: tiene un temporizador de 3 s en la carrera) mide en
++// tiempo real sale igual en todas las consolas. (Antes salía de los refrescos del monitor, g_mkwCuadros: si el juego
++// se atrasaba un momento, esa cuenta saltaba distinto en cada consola y la carrera se separaba.) Si alguien la lee
++// muchísimas veces en un cuadro (esperando que pase el tiempo), después de 256 lecturas empieza a avanzar un poco
++// por lectura para que esa espera termine. Cada carrera empieza de cero (g_mkwRelojGeneracion cambia en InitRng).
++// Las alarmas y el resto del runtime siguen con el reloj real.
++extern "C" int g_mkwRelojFijo;
++extern "C" unsigned g_mkwRelojGeneracion;
++namespace {
++bool HoraDeCarrera(uint32_t& hi, uint32_t& lo)
++{
++    if (!g_mkwRelojFijo) return false;
++    static unsigned generacion = ~0u, lecturas = 0;
++    static uint64_t base = 0, pasos = ~0ull;       // base: lo que sumaron los Raceinfo anteriores (presentación → carrera)
++    static uint32_t ultimo = 0;
++    if (generacion != g_mkwRelojGeneracion) { generacion = g_mkwRelojGeneracion; base = 0; ultimo = 0; pasos = ~0ull; lecturas = 0; }
++    const uint32_t ri = ::Memory::Read32(0x809BD730u);
++    if (::Memory::Contains(ri, 0x24)) {
++        const uint32_t f = static_cast<uint32_t>(::Memory::Read16(ri + 0x1E)) + ::Memory::Read32(ri + 0x20);
++        if (f < ultimo) base += static_cast<uint64_t>(ultimo) + 1;   // empezó otro Raceinfo: la hora no vuelve atrás
++        ultimo = f;
++    }
++    const uint64_t ahora = base + ultimo;
++    if (ahora != pasos) { pasos = ahora; lecturas = 0; }
++    ++lecturas;
++    const uint64_t t = (1ull << 44) + ahora * 1012500u                                   // 60,75 MHz / 60
++                     + (lecturas > 256 ? static_cast<uint64_t>(lecturas - 256) * 600u : 0u);
++    hi = static_cast<uint32_t>(t >> 32);
++    lo = static_cast<uint32_t>(t);
++    return true;
++}
++} // namespace
++
+ namespace OsHleInternal {
+ uint64_t ReadSystemTime()
+ {
+@@ -50,7 +86,7 @@ extern "C" void OS__GetTime_HLE(CpuContext* ctx)
+ 
+     uint32_t hi = 0;
+     uint32_t lo = 0;
+-    ReadTimeBaseRegisters(hi, lo);
++    if (!HoraDeCarrera(hi, lo)) ReadTimeBaseRegisters(hi, lo);
+     ctx->gpr[3] = hi;
+     ctx->gpr[4] = lo;
+ }
+diff --git a/runtime/src/hle/storage/dvd.cpp b/runtime/src/hle/storage/dvd.cpp
+index 1acf239..e89bdd6 100644
+--- a/runtime/src/hle/storage/dvd.cpp
++++ b/runtime/src/hle/storage/dvd.cpp
+@@ -31,6 +31,24 @@ extern "C" void GxNotifyGuestRamDmaWrite(uint32_t addr, uint32_t size);
+ #include <sstream>
+ #include <utility>
+ 
++#if defined(__EMSCRIPTEN__)
++#include <emscripten.h>
++// MKW RETRO (browser): disc reads go to the page's Module.mkwLeeRango(path, offset, length), which
++// resolves to a Uint8Array with the bytes, or to a number: -1 no such file, -3 offset past the end,
++// -2 "read it from the file system yourself" (files the page already put in memory). EM_ASYNC_JS +
++// JSPI suspend the guest while the page fetches, so to the C++ code this still looks like a blocking
++// read. Without Module.mkwLeeRango (Node) it always answers -2.
++EM_JS_DEPS(mkw_web_disco, "$UTF8ToString");
++EM_ASYNC_JS(int, mkw_web_lee_rango, (const char* path, double offset, unsigned length, uint8_t* destination), {
++    if (!Module.mkwLeeRango) return -2;
++    const data = await Module.mkwLeeRango(UTF8ToString(path), offset, length);
++    if (typeof data === 'number') return data;
++    const n = Math.min(data.length, length);
++    HEAPU8.set(data.subarray(0, n), destination);  // HEAPU8 read after the await: memory may have grown
++    return n;
++});
++#endif
++
+ namespace fs = std::filesystem;
+ 
+ // ============================================================================
+@@ -491,7 +509,16 @@ static void ScanDirectory(const fs::path& root, const std::string& virtualPrefix
+             return;
+         }
+ 
++#if defined(__EMSCRIPTEN__)
++        // fs::relative canonicalizes both sides (realpath), which Emscripten's NODERAWFS cannot do for
++        // Windows host paths. The iterator's paths always start with `root`, so the lexical form is exact.
++        const fs::path relative = entry.path().lexically_relative(root);
++        if (relative.empty()) {
++            return;
++        }
++#else
+         const fs::path relative = fs::relative(entry.path(), root, entryEc);
++#endif
+         if (entryEc) {
+             return;
+         }
+@@ -743,6 +770,22 @@ extern "C" const char* DVDResolveHostPathForTest(const char* dvdPath)
+     return resolved.c_str();
+ }
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (browser): host path and size of a published FST entry number (what DVDConvertPathToEntrynum
++// returns), or nullptr for a directory / unknown entry. web/dvd/rutas_nativo.cpp uses it to tell the page
++// "this file is about to be read" right when the game finds it, so the page can fetch it in parallel.
++extern "C" const char* mkw_dvd_ruta_de_entrada(int32_t entry, uint32_t* size)
++{
++    static std::string resolved;
++    if (entry <= 0 || entry >= static_cast<int32_t>(g_fileEntries.size()) || g_fileEntries[entry].isDirectory) {
++        return nullptr;
++    }
++    resolved = HostPathText(g_fileEntries[entry].hostPath);
++    if (size) *size = g_fileEntries[entry].size;
++    return resolved.c_str();
++}
++#endif
++
+ // ============================================================================
+ // High-Level DVD API
+ // ============================================================================
+diff --git a/runtime/src/hle/storage/nand_api.cpp b/runtime/src/hle/storage/nand_api.cpp
+index f09d88e..e59c1af 100644
+--- a/runtime/src/hle/storage/nand_api.cpp
++++ b/runtime/src/hle/storage/nand_api.cpp
+@@ -488,7 +488,17 @@ extern "C" int32_t NANDMove_HLE(uint32_t srcPathPtr, uint32_t dstPathPtr) {
+             // link(2) and CreateHardLink do not replace an existing destination,
+             // unlike rename(2) on POSIX. Both paths are already on the target
+             // filesystem, so the link is a no-replace publication operation.
++#if defined(__EMSCRIPTEN__)
++            // MKW RETRO: no hard links in Emscripten's file system; single-threaded, so check + rename
++            // is equally no-replace.
++            if (std::filesystem::exists(dstHost)) {
++                publishEc = std::make_error_code(std::errc::file_exists);
++            } else {
++                std::filesystem::rename(tempHost, dstHost, publishEc);
++            }
++#else
+             std::filesystem::create_hard_link(tempHost, dstHost, publishEc);
++#endif
+         }
+         if (publishEc) {
+             LogNandError("NANDMove", "failed to publish cross-mount copy: %s",
+diff --git a/runtime/src/hle/vi.cpp b/runtime/src/hle/vi.cpp
+index 7ee76b5..d58be64 100644
+--- a/runtime/src/hle/vi.cpp
++++ b/runtime/src/hle/vi.cpp
+@@ -15,12 +15,77 @@
+ #include <array>
+ #include <atomic>
+ #include <chrono>
++#include <cmath>
+ #include <cstdint>
+ #include <cstdio>
+ #include <iostream>
+ #include <mutex>
+ #include <thread>
+ 
++#if defined(__EMSCRIPTEN__)
++#include <emscripten.h>
++// Milliseconds the host spent waiting (not running the game) since start; the headless driver
++// reads it to report how much of each 16.7 ms frame is real work.
++extern "C" double g_mkwHostIdleMs = 0.0;
++// Frames handed to aurora so far; the browser page reads it to show fps.
++extern "C" unsigned g_mkwCuadros = 0;
++
++// MKW RETRO (browser): lock the VI retrace grid to the monitor's refresh. The page measures the
++// refresh with requestAnimationFrame (Module.mkwVsync: t = time of the last refresh, p = period,
++// both in emscripten_get_now() milliseconds). Without it (Node, hidden tab, ?enganche=0) both
++// return 0 and VI keeps its plain wall-clock grid.
++EM_JS(double, mkw_web_vsync_p, (), {
++    const v = Module.mkwVsync;
++    return v && v.valido() ? v.p : 0;
++});
++EM_JS(double, mkw_web_vsync_t, (), {
++    const v = Module.mkwVsync;
++    return v && v.valido() ? v.t : 0;
++});
++EM_JS(void, mkw_web_fase_informe, (double error, int refreshesPerRetrace, double adjust), {
++    if (Module.mkwFaseInforme) Module.mkwFaseInforme(error, refreshesPerRetrace, adjust);
++});
++// Suspends (JSPI) until the last refresh before `deadline` arrives (1), `serviceMs` pass (0), or the
++// deadline is already well past (2). 3 = the page offers no refresh clock.
++// Where in the refresh period the retrace grid should sit (ms after a refresh), chosen by the page
++// (Module.mkwVsync.objetivo, see relojMonitor in mkw.mjs); -1 = the page offers none.
++EM_JS(double, mkw_web_vsync_objetivo, (double period), {
++    const v = Module.mkwVsync;
++    return v && v.objetivo ? v.objetivo(period) : -1;
++});
++// The frame is about to be handed to aurora (and so to the canvas). retraceMs = the retrace it belongs to,
++// in emscripten_get_now() ms: the page measures from there how long until the browser takes the canvas.
++EM_JS(void, mkw_web_entrega, (double retraceMs), {
++    if (Module.mkwVsync && Module.mkwVsync.entrega) Module.mkwVsync.entrega(retraceMs);
++});
++// Diagnostic trace of the frame pacing (?traza=1 in the page): code 1/2 = before/after aurora_end_frame,
++// 3 = frame start (value = the retrace deadline it was paced to), 4 = the refresh wait returned (value = how).
++EM_JS(void, mkw_web_traza, (int code, double value), {
++    if (Module.mkwTraza) Module.mkwTraza(code, value);
++});
++EM_ASYNC_JS(int, mkw_web_espera_hasta, (double deadline, double serviceMs), {
++    if (!Module.mkwEsperaHasta) return 3;
++    return await Module.mkwEsperaHasta(deadline, serviceMs);
++});
++// Whether the idle wait yields to the page (bitácora §48): Module.mkwCeder, with the refresh wait above.
++// Without it (Node, ?ceder=0, ?enganche=0) the idle wait spins as before.
++EM_JS(int, mkw_web_cede, (), {
++    return Module.mkwCeder && Module.mkwEsperaHasta ? 1 : 0;
++});
++// MKW RETRO (browser, grid NOT locked to the monitor: the online rooms ?red, §58, and a tab whose refresh clock went
++// stale): suspends (JSPI) until `deadline` arrives (1, the page wakes us at or just after it) or `serviceMs` pass (0);
++// the caller spins whatever is left (usually nothing).
++// Without it the unlocked waits spun on the page's only thread: in the synchronized race the page got a turn only
++// when the lockstep waited for the other console, and when the race ended it never got one again (bitácora §63).
++EM_ASYNC_JS(int, mkw_web_espera_reloj, (double deadline, double serviceMs), {
++    if (!Module.mkwEsperaReloj) return 3;
++    return await Module.mkwEsperaReloj(deadline, serviceMs);
++});
++EM_JS(int, mkw_web_cede_reloj, (), {
++    return Module.mkwEsperaReloj ? 1 : 0;
++});
++#endif
++
+ #if defined(_WIN32)
+ #ifndef WIN32_LEAN_AND_MEAN
+ #define WIN32_LEAN_AND_MEAN
+@@ -167,6 +232,21 @@ void SleepPreciselyUntil(Clock::time_point deadline, bool finishWithSpin = false
+     }
+     const auto timerDeadline =
+         finishWithSpin && deadline - now > spinWindow ? deadline - spinWindow : deadline;
++#if defined(__EMSCRIPTEN__)
++    // The browser (and Node) must never be blocked: sleep_until would busy-wait on the only
++    // thread. emscripten_sleep suspends the game through JSPI and lets the event loop run
++    // (rendering, audio, input); timers are ~1 ms coarse, so the last stretch is a short spin.
++    (void)timerDeadline;
++    const double idleStart = emscripten_get_now();
++    const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
++    if (remaining >= 2) {
++        emscripten_sleep(static_cast<unsigned int>(remaining - 1));
++    }
++    while (Clock::now() < deadline) {
++    }
++    g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++    return;
++#endif
+ #if defined(_WIN32)
+ #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+ #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+@@ -238,6 +318,59 @@ void WriteGuestStateLocked() {
+     }
+ }
+ 
++#if defined(__EMSCRIPTEN__)
++// True while the grid is locked to the monitor (refresh period divides the retrace interval).
++bool s_mkwVsyncLocked = false;
++// MKW RETRO (§99, C3): ms of retrace grid the page asked to win back, and how much was won (see PaceToRetraceBoundary)
++double s_mkwPrisaMs = 0.0;
++double s_mkwPrisaGanada = 0.0;
++// Where in the refresh period the retrace grid should sit (ms after a refresh). What has to land at a
++// fixed place in the refresh is not the retrace itself but Chrome's present of the frame: MKW hands the
++// frame to aurora ~0.6 ms after the retrace (GXCopyDisp), aurora encodes and submits it and then yields
++// to the page (its present wait), the page's next rendering update takes the canvas, and ~2 ms later
++// Chrome's compositor presents it. If that present lands near a refresh, the frame alternates between
++// that refresh and the next one (3-5-3-5 at 240 Hz). The page measures retrace→take and answers with
++// the phase that puts the present mid-refresh (bitácora §43). Without the page, a quarter millisecond
++// after the refresh.
++double MkwVsyncTargetMs(double period) {
++    const double fromPage = mkw_web_vsync_objetivo(period);
++    if (fromPage >= 0.0 && fromPage < period) {
++        return fromPage;
++    }
++    return 0.25;
++}
++
++// Phase-locked loop, run once per presented frame with g_viMutex held. The next retrace deadline
++// should land kTargetMs after a monitor refresh, so the frame starts right after that refresh and
++// has the whole period to be drawn. Each call measures the phase error and moves the grid by a
++// fraction of it, at most kMaxStepMs per frame (0.25 ms per 16.7 ms = at most 1.5 % faster or
++// slower for an instant; once locked the corrections are microseconds). Only locks when the
++// retrace interval is a whole number of refreshes (60/120/180/240 Hz); at 144 Hz no phase lines up.
++void MkwVsyncPhaseLockLocked() {
++    constexpr double kGain = 0.25;
++    constexpr double kMaxStepMs = 0.25;
++    const double period = mkw_web_vsync_p();
++    const double intervalMs = std::chrono::duration<double, std::milli>(g_vi.retraceInterval).count();
++    const long refreshes = period > 0.0 ? std::lround(intervalMs / period) : 0;
++    if (refreshes < 1 || std::abs(intervalMs - refreshes * period) > intervalMs * 0.005) {
++        s_mkwVsyncLocked = false;
++        mkw_web_fase_informe(0.0, 0, 0.0);
++        return;
++    }
++    const double lastRefresh = mkw_web_vsync_t();
++    const auto deadline = g_vi.lastRetrace + g_vi.retraceInterval;
++    const double deadlineMs =
++        emscripten_get_now() + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
++    double error = std::fmod(deadlineMs - lastRefresh - MkwVsyncTargetMs(period), period);  // (-period, period)
++    if (error > period / 2) error -= period;
++    if (error <= -period / 2) error += period;
++    const double adjust = std::clamp(-kGain * error, -kMaxStepMs, kMaxStepMs);
++    g_vi.lastRetrace += std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(adjust));
++    s_mkwVsyncLocked = true;
++    mkw_web_fase_informe(error, static_cast<int>(refreshes), adjust);
++}
++#endif
++
+ void EnsureInitializedLocked() {
+     if (g_vi.initialized) {
+         return;
+@@ -390,6 +523,19 @@ bool AdvanceDueRetraces(CpuContext* ctx, int maxToProcess, bool serviceAurora)
+                 return advancedAny;
+             }
+             target = g_vi.lastRetrace + g_vi.retraceInterval;
++#if defined(__EMSCRIPTEN__)
++            // MKW RETRO (§99, C3): while the page asked to catch up, the next retrace is due now instead of at its
++            // grid time (one per call: each retrace is one game frame, so the game runs them back to back)
++            if (now < target && catchUpCount == 0 && s_mkwPrisaMs > 0.0 && !s_mkwVsyncLocked) {
++                const double wait = std::chrono::duration<double, std::milli>(target - now).count();
++                const double gain = wait < s_mkwPrisaMs ? wait : s_mkwPrisaMs;
++                const auto shift = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(gain));
++                g_vi.lastRetrace -= shift;
++                target -= shift;
++                s_mkwPrisaMs -= gain;
++                s_mkwPrisaGanada += gain;
++            }
++#endif
+             if (now < target) {
+                 return advancedAny;
+             }
+@@ -465,6 +611,40 @@ void VI_HLE_WaitForNextRetracePoll() {
+     if (now >= retraceDeadline) {
+         return;
+     }
++#if defined(__EMSCRIPTEN__)
++    // MKW RETRO (browser): this poll runs once per pass of the guest's idle loop, which services audio
++    // DMA and alarms between passes. Spinning here kept a whole core busy and left the browser only
++    // aurora's present pause to breathe. With the grid locked to the monitor, yield instead: the page
++    // wakes us (in a fresh task, after its rendering update) on the refresh right before the retrace,
++    // or after 1 ms so the idle loop can service audio and alarms. From that refresh to the retrace is
++    // the grid's phase (under 1 ms): that last stretch spins, so the retrace still starts on time.
++    static const bool canYield = mkw_web_cede() != 0;
++    if (canYield && s_mkwVsyncLocked) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(retraceDeadline - now).count();
++        const int woke = mkw_web_espera_hasta(deadlineMs, 1.0);
++        if (woke != 0) {  // the refresh before the retrace (or the deadline already passed)
++            while (Clock::now() < retraceDeadline) {
++            }
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        return;
++    }
++    // Grid not locked (online rooms, §63): yield to the page by time, as in PaceToRetraceBoundary.
++    static const bool canYieldClock = mkw_web_cede_reloj() != 0;
++    if (canYieldClock) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(retraceDeadline - now).count();
++        if (mkw_web_espera_reloj(deadlineMs, 1.0) != 0) {  // the retrace is due
++            while (Clock::now() < retraceDeadline) {
++            }
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        return;
++    }
++#endif
+     // Audio DMA and alarm queues still need regular service even when the VI
+     // deadline is farther away. The high-resolution wait removes the 1 ms
+     // scheduler overshoot when retrace is the next event.
+@@ -485,10 +665,84 @@ uint32_t s_lastPacedRetraceCount = ~0u;
+ // comment at the stamping site). Producer-thread only, like the memo above.
+ uint64_t s_lastPresentAnchorNanos = 0;
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (§99, C3 «ponerse al día»): milliseconds of retrace grid the page asked us to win back. Mario Kart Wii
++// never catches up by itself: a frame that came late leaves the console behind the synchronized race for good (and
++// its kart relayed). While this is above zero and the grid is not locked to the monitor (the online rooms), the
++// paced wait below moves the grid back by what it would have slept, so the next retrace is due at once and the game
++// runs frames back to back (every frame still drawn: drawing all of them keeps the race identical) until it is
++// even. s_mkwPrisaGanada = what was won back so far (ms), for the page and its tests.
++// (s_mkwPrisaMs / s_mkwPrisaGanada are declared next to s_mkwVsyncLocked; mkw_prisa / mkw_prisa_ganada, the page's
++// side, are defined after this namespace)
++#endif
++
+ // Sleeps to the same VI retrace boundary VIWaitForRetrace targets, servicing alarms every 1 ms so audio
+ // DMA and timers keep running, then delivers that retrace so guest logic starts exactly on the grid.
+ void PaceToRetraceBoundary(Clock::time_point deadline) {
+     constexpr auto kServiceSlice = 1ms;
++#if defined(__EMSCRIPTEN__)
++    if (s_mkwPrisaMs > 0.0 && !s_mkwVsyncLocked) {
++        const auto now = Clock::now();
++        if (deadline > now) {
++            const double wait = std::chrono::duration<double, std::milli>(deadline - now).count();
++            const double gain = wait < s_mkwPrisaMs ? wait : s_mkwPrisaMs;
++            const auto shift = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(gain));
++            {
++                std::lock_guard<std::mutex> lock(g_viMutex);
++                g_vi.lastRetrace -= shift;
++            }
++            deadline -= shift;
++            s_mkwPrisaMs -= gain;
++            s_mkwPrisaGanada += gain;
++        }
++    }
++    // MKW RETRO (browser, grid locked to the monitor): wake on the refresh right before the deadline
++    // instead of a timer (setTimeout arrives 1-4 ms late, enough to land on the wrong refresh). The
++    // page wakes us every serviceMs too, so alarms and audio DMA keep their cadence meanwhile.
++    if (s_mkwVsyncLocked) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
++        for (;;) {
++            const int woke = mkw_web_espera_hasta(deadlineMs, 1.0);
++            mkw_web_traza(4, woke);
++            OS_HLE_ProcessAlarmsDeferred(8);
++            Audio_HLE_PollDeferred();
++            if (woke != 0) {
++                break;
++            }
++        }
++        while (Clock::now() < deadline) {  // from the refresh to the target phase (under one refresh)
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        mkw_web_traza(3, deadlineMs);
++        VI_HLE_ProcessRetracesDeferred(1);
++        return;
++    }
++    // MKW RETRO (browser, grid NOT locked: the online rooms ?red go by the wall clock, bitácora §58/§63): the
++    // slice loop below never sleeps (1 ms slices are under emscripten_sleep's 2 ms floor), so it spun the whole
++    // wait without ever giving the page a turn. Yield to the page by time instead. Waking a little late is fine: the
++    // retrace is stamped on the grid (lastRetrace = target), and with no lock there is no refresh to line up with.
++    static const bool canYieldClock = mkw_web_cede_reloj() != 0;
++    if (canYieldClock) {
++        const double idleStart = emscripten_get_now();
++        const double deadlineMs =
++            idleStart + std::chrono::duration<double, std::milli>(deadline - Clock::now()).count();
++        for (;;) {
++            const int woke = mkw_web_espera_reloj(deadlineMs, 1.0);
++            OS_HLE_ProcessAlarmsDeferred(8);
++            Audio_HLE_PollDeferred();
++            if (woke != 0) {
++                break;
++            }
++        }
++        while (Clock::now() < deadline) {
++        }
++        g_mkwHostIdleMs += emscripten_get_now() - idleStart;
++        VI_HLE_ProcessRetracesDeferred(1);
++        return;
++    }
++#endif
+     for (;;) {
+         const auto now = Clock::now();
+         if (now >= deadline) {
+@@ -512,6 +766,14 @@ void PaceToRetraceBoundary(Clock::time_point deadline) {
+ 
+ } // namespace
+ 
++#if defined(__EMSCRIPTEN__)
++// MKW RETRO (§99, C3): the page asks to win back `ms` of retrace grid (0 = stop), and reads what was won so far
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_prisa(double ms) {
++    s_mkwPrisaMs = ms > 0.0 ? (ms < 2000.0 ? ms : 2000.0) : 0.0;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE double mkw_prisa_ganada() { return s_mkwPrisaGanada; }
++#endif
++
+ // Single owner of the Aurora frame presentation sequence: seals the active frame, optionally paces the
+ // producer to the VI retrace boundary, and pre-warms the next frame. Paced from GXCopyDisp; unpaced for
+ // the retrace-context black/boot present path in AdvanceRetrace.
+@@ -524,6 +786,9 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+     } sequenceGuard;
+     Clock::time_point paceDeadline{};
+     bool paceThisFrame = false;
++#if defined(__EMSCRIPTEN__)
++    double retraceMs = 0.0;  // the retrace this frame belongs to, for the page (mkw_web_entrega)
++#endif
+     if (paceToRetrace) {
+         uint64_t baseNanos = 0;
+         uint64_t intervalNanos = 0;
+@@ -531,6 +796,11 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+         {
+             std::lock_guard<std::mutex> lock(g_viMutex);
+             EnsureInitializedLocked();
++#if defined(__EMSCRIPTEN__)
++            MkwVsyncPhaseLockLocked();
++            retraceMs = emscripten_get_now() +
++                        std::chrono::duration<double, std::milli>(g_vi.lastRetrace - Clock::now()).count();
++#endif
+             paceDeadline = g_vi.lastRetrace + g_vi.retraceInterval;
+             retraceCount = g_vi.retraceCount;
+             baseNanos = static_cast<uint64_t>(
+@@ -577,7 +847,15 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
+         aurora_set_present_schedule(0, 0);
+     }
+ 
++#if defined(__EMSCRIPTEN__)
++    mkw_web_traza(1, retraceMs);
++    if (retraceMs > 0.0) mkw_web_entrega(retraceMs);
++#endif
+     aurora_end_frame();
++#if defined(__EMSCRIPTEN__)
++    mkw_web_traza(2, 0.0);
++    ++g_mkwCuadros;
++#endif
+     if (paceThisFrame) {
+         PaceToRetraceBoundary(paceDeadline);
+         std::lock_guard<std::mutex> lock(g_viMutex);
+diff --git a/runtime/src/host_context.cpp b/runtime/src/host_context.cpp
+index 502f72c..3d576df 100644
+--- a/runtime/src/host_context.cpp
++++ b/runtime/src/host_context.cpp
+@@ -19,6 +19,59 @@ extern "C" void* mkw_co_init(void* stackTop, void (*entry)(void*), void* argumen
+ 
+ #include <cstdlib>
+ #include <unordered_map>
++#elif defined(__EMSCRIPTEN__)
++#include <emscripten.h>
++#include <emscripten/stack.h>
++
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <unordered_map>
++
++// Browser backend: the web has no way to switch stacks by hand, so each context is its own call
++// into wasm (an export made "promising" by JSPI, which gives it a separate wasm stack) and a
++// switch suspends the current one on a promise and wakes the target. Each context also owns a C
++// shadow stack (Emscripten keeps locals whose address is taken in linear memory), swapped with
++// stackSave/stackRestore. Same mechanism as banco/pruebas/fibers (0.7 us per switch in Chrome).
++// The link must list mkw_host_context_trampoline in -sJSPI_EXPORTS and EXPORTED_FUNCTIONS.
++EM_JS_DEPS(mkw_host_context, "$stackSave,$stackRestore,emscripten_stack_set_limits");
++EM_JS(void, mkw_hc_js_init, (int id, uintptr_t base, uintptr_t limit), {
++    Module.mkwFibers = new Map();
++    Module.mkwFibers.set(id, { sp: 0, base, limit, wake: null, started: true });
++    Module.mkwFiberActual = id;
++});
++EM_JS(void, mkw_hc_js_create, (int id, uintptr_t base, uintptr_t limit), {
++    Module.mkwFibers.set(id, { sp: base, base, limit, wake: null, started: false });
++});
++EM_JS(void, mkw_hc_js_destroy, (int id), {
++    Module.mkwFibers.delete(id);
++});
++EM_ASYNC_JS(void, mkw_hc_js_switch, (int target), {
++    const F = Module.mkwFibers, me = F.get(Module.mkwFiberActual);
++    me.sp = stackSave();
++    const myTurn = new Promise(resolve => me.wake = resolve);
++    // Runs once this context is suspended: install the target's C stack, then start or wake it.
++    queueMicrotask(() => {
++        Module.mkwFiberActual = target;
++        const f = F.get(target);
++        _emscripten_stack_set_limits(f.base, f.limit);
++        stackRestore(f.sp);
++        if (!f.started) {
++            f.started = true;
++            Promise.resolve(Module._mkw_host_context_trampoline(target)).catch(e => {
++                err('[host_context] context ' + target + ' died: ' + e);
++                abort(e);
++            });
++        } else {
++            const wake = f.wake;
++            f.wake = null;
++            wake();
++        }
++    });
++    await myTurn;
++    _emscripten_stack_set_limits(me.base, me.limit);
++    stackRestore(me.sp);
++});
+ #else
+ #error "HostContext needs a supported cooperative-context backend"
+ #endif
+@@ -265,6 +318,115 @@ void Switch(Handle target)
+     g_current = source;
+ }
+ 
++#elif defined(__EMSCRIPTEN__)
++
++namespace {
++struct Context {
++    int id = 0;
++    Entry entry = nullptr;
++    void* argument = nullptr;
++    void* stack = nullptr;  // C shadow stack (nullptr for the scheduler, which uses the main one)
++};
++
++// Single-threaded: all guest scheduling happens on the browser's main thread.
++Context* g_current = nullptr;
++int g_nextId = 1;
++std::unordered_map<int, Context*> g_contexts;
++}
++
++} // namespace HostContext
++
++// First entry into a new context (called from JS as its own promising export). The entry
++// function is not supposed to return - like a Windows fiber, it must switch away forever.
++extern "C" EMSCRIPTEN_KEEPALIVE void mkw_host_context_trampoline(int id)
++{
++    const auto it = HostContext::g_contexts.find(id);
++    if (it == HostContext::g_contexts.end()) {
++        std::fprintf(stderr, "[host_context] unknown context %d\n", id);
++        std::abort();
++    }
++    it->second->entry(it->second->argument);
++    std::fprintf(stderr, "[host_context] context %d returned from its entry\n", id);
++    std::abort();
++}
++
++namespace HostContext {
++
++bool InitializeScheduler(Handle* scheduler)
++{
++    auto* context = new Context();
++    context->id = 0;
++    g_contexts[0] = context;
++    g_current = context;
++    // Emscripten's stack grows down: base is the high end, "end" the low limit.
++    mkw_hc_js_init(0, emscripten_stack_get_base(), emscripten_stack_get_end());
++    *scheduler = context;
++    return true;
++}
++
++void ShutdownScheduler(Handle scheduler)
++{
++    auto* context = static_cast<Context*>(scheduler);
++    if (!context) {
++        return;
++    }
++    g_contexts.erase(context->id);
++    if (g_current == context) {
++        g_current = nullptr;
++    }
++    delete context;
++}
++
++Handle Create(std::size_t stackSize, Entry entry, void* argument)
++{
++    stackSize = (stackSize + 15) & ~static_cast<std::size_t>(15);
++    void* stack = std::aligned_alloc(16, stackSize);
++    if (!stack) {
++        return nullptr;
++    }
++    auto* context = new Context();
++    context->id = g_nextId++;
++    context->entry = entry;
++    context->argument = argument;
++    context->stack = stack;
++    g_contexts[context->id] = context;
++    const auto low = reinterpret_cast<uintptr_t>(stack);
++    mkw_hc_js_create(context->id, low + stackSize, low);
++    return context;
++}
++
++void Destroy(Handle context)
++{
++    auto* webContext = static_cast<Context*>(context);
++    if (!webContext) {
++        return;
++    }
++    // A suspended context is just a pending promise nobody can resolve any more once its
++    // entry is gone from the JS map; the garbage collector then frees its wasm stack.
++    mkw_hc_js_destroy(webContext->id);
++    g_contexts.erase(webContext->id);
++    std::free(webContext->stack);
++    delete webContext;
++}
++
++bool IsCurrent(Handle context)
++{
++    return context != nullptr && context == g_current;
++}
++
++void Switch(Handle target)
++{
++    auto* destination = static_cast<Context*>(target);
++    Context* source = g_current;
++    if (!destination || destination == source) {
++        return;
++    }
++
++    g_current = destination;
++    mkw_hc_js_switch(destination->id);
++    g_current = source;
++}
++
+ #endif
+ 
+ } // namespace HostContext
+diff --git a/runtime/src/main.cpp b/runtime/src/main.cpp
+index 1597d20..6580730 100644
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -1320,10 +1320,16 @@ int RuntimeMain(int argc, char** argv) {
+     ConfigureWindowsFatalDialogBehavior();
+     InstallSehLogger();
+     WindowsTimerResolutionGuard timerResolutionGuard;
++#elif defined(__EMSCRIPTEN__)
++    // wasm has no memory faults to catch (out-of-range accesses are bounds-checked traps) and no
++    // threads for the transcript's stdout/stderr pumps; the host page (Node or the browser) owns
++    // the console, so the log goes straight there.
+ #else
+     InstallPosixMemoryFaultHandler();
+ #endif
++#if !defined(__EMSCRIPTEN__)
+     InitializeProcessTranscript(argc, argv);
++#endif
+     std::signal(SIGABRT, AbortSignalHandler);
+     // Install exit/terminate handlers to ensure we get crash info
+     std::atexit(AtExitHandler);
+@@ -1405,6 +1411,11 @@ int RuntimeMain(int argc, char** argv) {
+         static constexpr std::array<GraphicsBackendEntry, 3> kGraphicsBackends{{
+             {"auto", BACKEND_AUTO}, {"d3d12", BACKEND_D3D12}, {"vulkan", BACKEND_VULKAN},
+         }};
++#elif defined(__EMSCRIPTEN__)
++        // The browser offers exactly one GPU API.
++        static constexpr std::array<GraphicsBackendEntry, 2> kGraphicsBackends{{
++            {"auto", BACKEND_WEBGPU}, {"webgpu", BACKEND_WEBGPU},
++        }};
+ 
+ #endif
+         const auto backendDisplayName = [](AuroraBackend value) -> const char* {
+diff --git a/runtime/src/ppc_helpers.cpp b/runtime/src/ppc_helpers.cpp
+index 488f943..ea88be9 100644
+--- a/runtime/src/ppc_helpers.cpp
++++ b/runtime/src/ppc_helpers.cpp
+@@ -403,6 +403,59 @@ extern "C" uint32_t PPC_Mftb()
+     return static_cast<uint32_t>(GetTimeBase());
+ }
+ 
++// MKW web — el reloj del azar de la carrera sincronizada (lockstep, bitácora §61). Las pocas funciones del juego
++// que sacan su azar del reloj del procesador (Random::__ct/Reset, los objetos, el temporizador: la lista está en
++// compilar-web.py, RELOJ_CARRERA) leen este en vez de mftb. Con g_mkwRelojFijo encendido es un contador: cada
++// lectura avanza kMkwRelojPaso desde un número que la página fija al preparar la carrera (semillas_nativo.cpp), así
++// todas las consolas de la sala sacan el mismo azar. Apagado (siempre, salvo en la sala con CPU) es el reloj normal.
++extern "C" {
++int g_mkwRelojFijo = 0;
++uint64_t g_mkwRelojValor = 0;
++unsigned g_mkwRelojGeneracion = 0;   // cambia en cada carrera (semillas_nativo.cpp): la hora de os_time.cpp empieza de cero
++}
++extern "C" uint32_t PPC_MftbCarrera()
++{
++    if (!g_mkwRelojFijo) return PPC_Mftb();
++    g_mkwRelojValor += 2000;                              // ~33 µs del reloj de la Wii por lectura
++    return static_cast<uint32_t>(g_mkwRelojValor);
++}
++
++// Lo que de verdad usan esas funciones (compilar-web.py): un reloj POR LUGAR. Con un solo contador para todas, una
++// lectura de más en cualquier parte (un efecto que arma su azar en una consola y no en otra) corría todos los números
++// siguientes: el sorteo del objeto de una caja salía distinto y la carrera se separaba (bitácora §62). Ahora el valor
++// sale solo de (cuadro de la carrera, función que lee, desde dónde la llamaron = lr, cuántas veces leyó ese mismo
++// lugar en este cuadro): base + cuadro·1012500 (un cuadro de 1/60 s del reloj de la Wii) + un corrimiento por lugar
++// + 7 por lectura. Sigue subiendo con el tiempo para cada lugar (los que miden cuánto pasó lo ven avanzar).
++namespace {
++struct LecturaReloj { uint64_t clave; uint64_t cuadro; uint32_t cuenta; };
++LecturaReloj g_lecturas[512];
++unsigned g_lecturasGen = ~0u;
++}
++extern "C" uint32_t PPC_MftbCarreraEn(uint32_t sitio, uint32_t lr)
++{
++    if (!g_mkwRelojFijo) return PPC_Mftb();
++    if (g_lecturasGen != g_mkwRelojGeneracion) {           // carrera nueva: tabla en cero
++        g_lecturasGen = g_mkwRelojGeneracion;
++        for (auto& l : g_lecturas) l = LecturaReloj{0, 0, 0};
++    }
++    uint64_t cuadro = 0;                                   // Raceinfo (0x809BD730): +0x1E (16 bits) + +0x20
++    const uint32_t ri = ::Memory::Read32(0x809BD730u);
++    if (ri && ::Memory::Contains(ri, 0x24)) cuadro = 1 + ::Memory::Read16(ri + 0x1E) + ::Memory::Read32(ri + 0x20);
++    const uint64_t clave = (static_cast<uint64_t>(sitio + 1) << 32) | lr;
++    uint32_t h = static_cast<uint32_t>(clave * 0x9E3779B97F4A7C15ull >> 32);
++    uint32_t i = h & 511u;
++    for (uint32_t n = 0; n < 512; n++, i = (i + 1) & 511u) {
++        LecturaReloj& l = g_lecturas[i];
++        if (l.clave == clave || l.clave == 0) {
++            if (l.clave == 0) l = LecturaReloj{clave, cuadro, 0};
++            if (l.cuadro != cuadro) { l.cuadro = cuadro; l.cuenta = 0; }
++            const uint32_t k = l.cuenta++;
++            return static_cast<uint32_t>(g_mkwRelojValor + cuadro * 1012500ull + (h & 255u) * 1000u + k * 7ull);
++        }
++    }
++    return static_cast<uint32_t>(g_mkwRelojValor + cuadro * 1012500ull + (h & 255u) * 1000u);   // tabla llena
++}
++
+ extern "C" uint32_t PPC_Mftbu()
+ {
+     return static_cast<uint32_t>(GetTimeBase() >> 32);
+diff --git a/runtime/include/isa/ppc_isa_wasm_neon.h b/runtime/include/isa/ppc_isa_wasm_neon.h
+new file mode 100644
+index 0000000..834be87
+--- /dev/null
++++ b/runtime/include/isa/ppc_isa_wasm_neon.h
+@@ -0,0 +1,197 @@
++#pragma once
++// WebAssembly (Emscripten) port: the subset of <arm_neon.h> the ISA headers use, implemented with
++// clang's generic vector extension. wasm32 then reuses the AArch64 code paths unchanged, which is
++// the right model for it: like NEON, wasm arithmetic does not produce x86's NaN bits (wasm NaN
++// payloads are even nondeterministic), so it needs the same explicit NaN-lane resolution the
++// AArch64 branches already do (PpcResolveNanLanes*). wasm has no FP control register, so
++// flush-to-zero (FPSCR[NI]) is only tracked as state - see ppc_isa_fpenv.h.
++//
++// Only element-wise semantics matter here; whether clang lowers these to simd128 or to scalar
++// code is its choice. vfma_f32 is the one op that must not become an unfused multiply+add: it is
++// built from an exact single-rounding float FMA (MkwWasmFmaf).
++
++#include <cmath>
++#include <cstdint>
++#include <cstring>
++
++typedef float float32x2_t __attribute__((vector_size(8)));
++typedef uint32_t uint32x2_t __attribute__((vector_size(8)));
++typedef double float64x1_t __attribute__((vector_size(8)));
++typedef uint64_t uint64x1_t __attribute__((vector_size(8)));
++
++// Exact fmaf for wasm (no hardware FMA): a float*float product fits exactly in a double, the sum's
++// rounding error is recovered with TwoSum and folded in as round-to-odd, and the final
++// double->float conversion then rounds once correctly (Boldo-Melquiond: 53 >= 24 + 2).
++// Verified bit-identical to musl's fmaf on 40M cases (banco/pruebas/fma).
++static inline __attribute__((always_inline)) float MkwWasmFmaf(float a, float b, float c) noexcept
++{
++    const double p = static_cast<double>(a) * static_cast<double>(b);
++    double s = p + static_cast<double>(c);
++    const double bb = s - p;
++    const double err = (p - (s - bb)) + (static_cast<double>(c) - bb);
++    if (err != 0.0 && __builtin_isfinite(s)) {
++        uint64_t u;
++        std::memcpy(&u, &s, sizeof(u));
++        if ((u & 1) == 0)
++            u += ((err > 0) == (s > 0)) ? 1 : static_cast<uint64_t>(-1);
++        std::memcpy(&s, &u, sizeof(u));
++    }
++    return static_cast<float>(s);
++}
++
++// MkwFma: what ppc_isa_float.h calls instead of std::fma (on other hosts it is std::fma). In wasm
++// std::fma is musl's software FMA: exact, but slow, and its NaN answers are not x86's (it returns a
++// signaling-NaN addend unquieted). This version is exact on the fast path above / below, and
++// rewrites every NaN result to what x86's FMA instruction gives: a NaN operand comes out quieted
++// with sign and payload kept (first NaN of a, b, c when several - with two or more NaN operands
++// even x86 depends on the operand order clang picked), and an invalid operation with no NaN input
++// (inf*0, inf-inf) gives x86's negative default NaN. That also hides wasm's nondeterministic NaN
++// bits, which differ between x86 and ARM clients.
++static inline __attribute__((always_inline)) uint64_t MkwWasmBits64(double x) noexcept { uint64_t u; std::memcpy(&u, &x, 8); return u; }
++static inline __attribute__((always_inline)) double MkwWasmFromBits64(uint64_t u) noexcept { double x; std::memcpy(&x, &u, 8); return x; }
++static inline __attribute__((always_inline)) uint32_t MkwWasmBits32(float x) noexcept { uint32_t u; std::memcpy(&u, &x, 4); return u; }
++static inline __attribute__((always_inline)) float MkwWasmFromBits32(uint32_t u) noexcept { float x; std::memcpy(&x, &u, 4); return x; }
++
++static inline __attribute__((noinline, cold)) double MkwWasmFmaNanSlow(double a, double b, double c) noexcept
++{
++    const double ops[3] = {a, b, c};
++    for (const double v : ops)
++        if (v != v)
++            return MkwWasmFromBits64(MkwWasmBits64(v) | 0x0008000000000000ull);
++    return MkwWasmFromBits64(0xFFF8000000000000ull);
++}
++static inline __attribute__((noinline, cold)) float MkwWasmFmafNanSlow(float a, float b, float c) noexcept
++{
++    const float ops[3] = {a, b, c};
++    for (const float v : ops)
++        if (v != v)
++            return MkwWasmFromBits32(MkwWasmBits32(v) | 0x00400000u);
++    return MkwWasmFromBits32(0xFFC00000u);
++}
++
++static inline __attribute__((always_inline)) float MkwFma(float a, float b, float c) noexcept
++{
++    const float r = MkwWasmFmaf(a, b, c);
++    if (r != r) [[unlikely]]
++        return MkwWasmFmafNanSlow(a, b, c);
++    return r;
++}
++
++// MkwFms(a, b, c) = a*b - c. Not the same as MkwFma(a, b, -c) for NaNs: x86 folds the negation
++// into one vfmsub instruction, so a NaN c comes out with its ORIGINAL sign; negating first would
++// flip it. (fmsub, fnmsub, ps_msub and the Subtract forms all go through here.)
++static inline __attribute__((always_inline)) float MkwFms(float a, float b, float c) noexcept
++{
++    const float r = MkwWasmFmaf(a, b, -c);
++    if (r != r) [[unlikely]]
++        return MkwWasmFmafNanSlow(a, b, c);
++    return r;
++}
++
++// Exact double FMA: Dekker TwoProduct + TwoSum + round-to-odd, one final rounding. Exponents that
++// could overflow/underflow the error terms (and 0/inf/NaN/subnormal multiplicands) go to musl.
++// Verified bit-identical to musl's fma on 50M cases including fabricated ties (banco/pruebas/fma).
++static inline __attribute__((always_inline)) double MkwWasmFmaRaw(double a, double b, double c) noexcept
++{
++    const uint32_t ea = (MkwWasmBits64(a) >> 52) & 0x7FF, eb = (MkwWasmBits64(b) >> 52) & 0x7FF,
++                   ec = (MkwWasmBits64(c) >> 52) & 0x7FF;
++    const int ep = static_cast<int>(ea) + static_cast<int>(eb) - 1023;
++    double r;
++    if (ea - 1u >= 1990u || eb - 1u >= 1990u || ep < 200 || ep > 1990 || ec > 1990) [[unlikely]] {
++        r = std::fma(a, b, c);  // musl: exact, slow, only for these rare exponents
++    } else {
++        const double K = 134217729.0;  // 2^27 + 1 (Dekker split)
++        double t = K * a;
++        const double ah = t - (t - a), al = a - ah;
++        t = K * b;
++        const double bh = t - (t - b), bl = b - bh;
++        const double ph = a * b;
++        const double pl = ((ah * bh - ph) + ah * bl + al * bh) + al * bl;  // a*b = ph + pl
++        const double sh = ph + c;
++        double bb = sh - ph;
++        const double sl = (ph - (sh - bb)) + (c - bb);                     // ph + c = sh + sl
++        double vh = sl + pl;
++        bb = vh - sl;
++        const double vl = (sl - (vh - bb)) + (pl - bb);                    // sl + pl = vh + vl
++        if (vl != 0.0) {                                                   // vh := round-to-odd(vh + vl)
++            uint64_t u = MkwWasmBits64(vh);
++            if ((u & 1) == 0)
++                u += ((vl > 0) == (vh > 0)) ? 1 : static_cast<uint64_t>(-1);
++            vh = MkwWasmFromBits64(u);
++        }
++        r = sh + vh;
++    }
++    return r;
++}
++
++static inline __attribute__((always_inline)) double MkwFma(double a, double b, double c) noexcept
++{
++    const double r = MkwWasmFmaRaw(a, b, c);
++    if (r != r) [[unlikely]]
++        return MkwWasmFmaNanSlow(a, b, c);
++    return r;
++}
++
++static inline __attribute__((always_inline)) double MkwFms(double a, double b, double c) noexcept
++{
++    const double r = MkwWasmFmaRaw(a, b, -c);
++    if (r != r) [[unlikely]]
++        return MkwWasmFmaNanSlow(a, b, c);
++    return r;
++}
++
++#define MKW_WASM_NEON static inline __attribute__((always_inline))
++
++// Reinterprets (bit casts between same-size vectors).
++MKW_WASM_NEON float32x2_t vreinterpret_f32_u32(uint32x2_t v) { return reinterpret_cast<float32x2_t>(v); }
++MKW_WASM_NEON uint32x2_t vreinterpret_u32_f32(float32x2_t v) { return reinterpret_cast<uint32x2_t>(v); }
++MKW_WASM_NEON float32x2_t vreinterpret_f32_f64(float64x1_t v) { return reinterpret_cast<float32x2_t>(v); }
++MKW_WASM_NEON float64x1_t vreinterpret_f64_f32(float32x2_t v) { return reinterpret_cast<float64x1_t>(v); }
++MKW_WASM_NEON uint64x1_t vreinterpret_u64_f64(float64x1_t v) { return reinterpret_cast<uint64x1_t>(v); }
++MKW_WASM_NEON float64x1_t vreinterpret_f64_u64(uint64x1_t v) { return reinterpret_cast<float64x1_t>(v); }
++MKW_WASM_NEON uint64x1_t vreinterpret_u64_u32(uint32x2_t v) { return reinterpret_cast<uint64x1_t>(v); }
++
++// Broadcasts and lane access.
++MKW_WASM_NEON uint32x2_t vdup_n_u32(uint32_t x) { return uint32x2_t{x, x}; }
++MKW_WASM_NEON float32x2_t vdup_n_f32(float x) { return float32x2_t{x, x}; }
++MKW_WASM_NEON float64x1_t vdup_n_f64(double x) { return float64x1_t{x}; }
++MKW_WASM_NEON uint64x1_t vdup_n_u64(uint64_t x) { return uint64x1_t{x}; }
++#define vdup_lane_f32(v, lane) (float32x2_t{(v)[lane], (v)[lane]})
++#define vget_lane_f32(v, lane) ((float)(v)[lane])
++#define vget_lane_f64(v, lane) ((double)(v)[lane])
++#define vget_lane_u64(v, lane) ((uint64_t)(v)[lane])
++MKW_WASM_NEON float32x2_t MkwWasmSetLaneF32(float x, float32x2_t v, int lane) { v[lane] = x; return v; }
++#define vset_lane_f32(x, v, lane) MkwWasmSetLaneF32((x), (v), (lane))
++
++// Comparisons: all-ones lane where true (NEON and the vector extension agree on this).
++MKW_WASM_NEON uint32x2_t vceq_f32(float32x2_t a, float32x2_t b) { return reinterpret_cast<uint32x2_t>(a == b); }
++MKW_WASM_NEON uint64x1_t vclt_f64(float64x1_t a, float64x1_t b) { return reinterpret_cast<uint64x1_t>(a < b); }
++
++// Bitwise.
++MKW_WASM_NEON uint32x2_t vmvn_u32(uint32x2_t a) { return ~a; }
++MKW_WASM_NEON uint32x2_t veor_u32(uint32x2_t a, uint32x2_t b) { return a ^ b; }
++MKW_WASM_NEON uint32x2_t vorr_u32(uint32x2_t a, uint32x2_t b) { return a | b; }
++MKW_WASM_NEON uint64x1_t vand_u64(uint64x1_t a, uint64x1_t b) { return a & b; }
++MKW_WASM_NEON uint64x1_t vbic_u64(uint64x1_t a, uint64x1_t b) { return a & ~b; }
++MKW_WASM_NEON uint64x1_t vbsl_u64(uint64x1_t m, uint64x1_t a, uint64x1_t b) { return (m & a) | (~m & b); }
++MKW_WASM_NEON float32x2_t vbsl_f32(uint32x2_t m, float32x2_t a, float32x2_t b)
++{
++    return reinterpret_cast<float32x2_t>((m & reinterpret_cast<uint32x2_t>(a)) | (~m & reinterpret_cast<uint32x2_t>(b)));
++}
++
++// Arithmetic. vneg flips the sign bit unconditionally (NaN included), like NEON's FNEG.
++MKW_WASM_NEON float32x2_t vneg_f32(float32x2_t a)
++{
++    return reinterpret_cast<float32x2_t>(reinterpret_cast<uint32x2_t>(a) ^ uint32x2_t{0x80000000u, 0x80000000u});
++}
++MKW_WASM_NEON float32x2_t vadd_f32(float32x2_t a, float32x2_t b) { return a + b; }
++MKW_WASM_NEON float32x2_t vsub_f32(float32x2_t a, float32x2_t b) { return a - b; }
++MKW_WASM_NEON float32x2_t vmul_f32(float32x2_t a, float32x2_t b) { return a * b; }
++MKW_WASM_NEON float32x2_t vdiv_f32(float32x2_t a, float32x2_t b) { return a / b; }
++// vfma_f32(acc, a, b) = acc + a*b per lane, one rounding.
++MKW_WASM_NEON float32x2_t vfma_f32(float32x2_t acc, float32x2_t a, float32x2_t b)
++{
++    return float32x2_t{MkwWasmFmaf(a[0], b[0], acc[0]), MkwWasmFmaf(a[1], b[1], acc[1])};
++}
++
++#undef MKW_WASM_NEON
+diff --git a/runtime/src/guest_flat_memory_wasm.cpp b/runtime/src/guest_flat_memory_wasm.cpp
+new file mode 100644
+index 0000000..57cb93d
+--- /dev/null
++++ b/runtime/src/guest_flat_memory_wasm.cpp
+@@ -0,0 +1,128 @@
++// WebAssembly backend for the guest memory regions.
++//
++// wasm has one linear memory (at most 4 GiB, shared with the runtime itself) and no page protection, so
++// there is no flat guest view: RequiresCheckedAccess() is a compile-time true (guest_flat_memory.h) and
++// every access goes through Memory's page table. This module therefore only has to hand out host
++// storage per region. Mirrors share one store, exactly like the macOS backend this follows
++// (guest_flat_memory_macos.cpp): MEM1 at 0x00000000/0x80000000/0xC0000000 and MEM2 at
++// 0x10000000/0x90000000/0xD0000000 must alias, other regions own their bytes. The protection hooks are
++// no-ops; deferred EFB reads and executable-write guards are enforced by the page table's readable /
++// writable bias tables instead.
++#if defined(__EMSCRIPTEN__)
++
++#include "guest_flat_memory.h"
++
++#include <algorithm>
++#include <cstdlib>
++#include <cstring>
++#include <stdexcept>
++#include <vector>
++
++namespace GuestFlat {
++namespace {
++
++struct Store {
++    Backing kind = Backing::Owned;
++    uint32_t owned = 0;
++    uint64_t size = 0;
++    uint8_t* host = nullptr;
++};
++
++struct Mapping {
++    uint32_t base = 0;
++    uint64_t size = 0;
++    uint8_t* host = nullptr;
++};
++
++std::vector<Store> g_stores;
++std::vector<Mapping> g_mappings;
++std::vector<RegionRequest> g_layout;
++bool g_active = false;
++
++inline uint64_t RoundUp(uint64_t value, uint64_t align) {
++    return (value + align - 1) & ~(align - 1);
++}
++
++uint64_t Offset(const RegionRequest& r) {
++    if (r.backing == Backing::Mem1) return r.base & 0x1fffffffu;
++    if (r.backing == Backing::Mem2) return (r.base & 0x1fffffffu) - 0x10000000u;
++    return 0;
++}
++
++bool Same(const std::vector<RegionRequest>& a, const std::vector<RegionRequest>& b) {
++    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
++        [](const auto& x, const auto& y) { return x.base == y.base && x.size == y.size && x.backing == y.backing; });
++}
++
++} // namespace
++
++bool IsActive() { return g_active; }
++
++void Initialize(const std::vector<RegionRequest>& regions) {
++    if (g_active) {
++        if (!Same(g_layout, regions))
++            throw std::runtime_error("guest memory layout cannot be remapped");
++        return;
++    }
++
++    std::vector<Store> stores;
++    for (const auto& r : regions) {
++        if (!r.size) continue;
++        if (r.size > kGuestSpaceSize - r.base)
++            throw std::runtime_error("invalid guest memory region");
++        const uint32_t owned = r.backing == Backing::Owned ? r.base : 0;
++        auto it = std::find_if(stores.begin(), stores.end(), [&](const Store& s) {
++            return s.kind == r.backing && s.owned == owned;
++        });
++        const uint64_t need = RoundUp(Offset(r) + r.size, kGuestPageSize);
++        if (it == stores.end()) {
++            stores.push_back({r.backing, owned, need, nullptr});
++        } else {
++            it->size = std::max(it->size, need);
++        }
++    }
++
++    for (auto& s : stores) {
++        // Zero-filled like fresh pages: the game's BSS relies on it.
++        void* host = std::aligned_alloc(kGuestPageSize, static_cast<size_t>(s.size));
++        if (!host) {
++            for (auto& done : stores) std::free(done.host);
++            throw std::runtime_error("unable to allocate guest memory in the wasm heap");
++        }
++        std::memset(host, 0, static_cast<size_t>(s.size));
++        s.host = static_cast<uint8_t*>(host);
++    }
++
++    for (const auto& r : regions) {
++        if (!r.size) continue;
++        const uint32_t owned = r.backing == Backing::Owned ? r.base : 0;
++        const auto& s = *std::find_if(stores.begin(), stores.end(), [&](const Store& x) {
++            return x.kind == r.backing && x.owned == owned;
++        });
++        g_mappings.push_back({r.base, r.size, s.host + Offset(r)});
++    }
++
++    g_layout = regions;
++    g_stores = std::move(stores);
++    g_active = true;
++}
++
++uint8_t* HostPointer(uint32_t a) {
++    for (const auto& m : g_mappings) {
++        if (a >= m.base && uint64_t(a - m.base) < m.size) {
++            return m.host + (a - m.base);
++        }
++    }
++    return nullptr;
++}
++
++void ProtectDeferredRange(uint32_t, size_t) {}
++void UnprotectDeferredRange(uint32_t, size_t) {}
++void RegisterExecutableRange(uint32_t, uint32_t) {}
++FaultCounters Counters() { return {}; }
++void LogFaultSummary() noexcept {}
++bool HandleAccessViolation(void*, bool) noexcept { return false; }
++
++} // namespace GuestFlat
++
++#endif // defined(__EMSCRIPTEN__)

@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Mario Kart Wii</title>
+<!-- La página del juego (bitácora §55), con la cara de Paginita Pro / Juegos y la forma de la de BT3: el juego ocupa toda
+     la ventana; adelante, la tarjeta de inicio con "Tu partida" y la columna de modos; arriba a la derecha una barra que
+     se esconde sola mientras se juega; a la derecha, un cajón con los paneles (Partida, Controles, Sonido, Avanzado).
+     El programa de la página es mkw.mjs (el juego) + interfaz.mjs (todo lo de la pantalla de inicio, paneles y diálogos).
+     Aquí la sirve web/navegador/servidor.mjs en 127.0.0.1; en el sitio, el juego en sí viene del Worker de amigos.
+     Parámetros: ?auto=1 arranca sin apretar el botón (pruebas); ?cuadros=N termina la prueba en N cuadros. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Lilita+One&display=swap" rel="stylesheet">
+<style>
+  /* Los colores del sitio (juegos.html: --jg-ink, --jg-purple…) más los de la tarjeta de carreras (rojo y amarillo) */
+  :root { --tinta: #232137; --morado: #7042df; --lila: #ab8bff; --suave: #a7a3bd; --texto: #f1effa; --panel: #17142a;
+    --panel2: #201c38; --linea: #3a3361; --amarillo: #ffd21f; --rojo: #e8322e; --verde: #3fd59a; --peligro: #ff6b7a;
+    --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
+    --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--texto); overflow: hidden;
+    font: 15px/1.5 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  button { font: inherit; }
+  :focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+
+  /* ---- el juego: toda la ventana; la imagen centrada sin deformarse (el canvas mide lo que pide SDL) ---- */
+  #pantalla { inset: 0; background: #000; }
+  #canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; }
+
+  /* ---- la pantalla de inicio: el cielo de un circuito de noche, la bandera a cuadros y líneas de velocidad ---- */
+  #inicio { position: fixed; inset: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 22px; overflow: auto;
+    align-items: safe center; justify-content: safe center; align-content: safe center;
+    padding: calc(56px + var(--st)) calc(16px + var(--sr)) calc(20px + var(--sb)) calc(16px + var(--sl));
+    background:
+      repeating-linear-gradient(100deg, #ffffff06 0 2px, transparent 2px 46px),
+      radial-gradient(ellipse 80% 55% at 50% 110%, #e8322e44, transparent 70%),
+      radial-gradient(ellipse 60% 45% at 50% -10%, #7042df66, transparent 70%),
+      linear-gradient(170deg, #120f2a, #1b1440 45%, #2a1036 80%, #300f18); }
+  #inicio::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 14px; opacity: .55; pointer-events: none;
+    background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14px 14px; }
+  body.started #inicio { display: none; }
+  /* la portada solo con ?portada=1 (el banco y las pruebas de la página): lo normal es entrar directo al juego (§66) */
+  body:not(.portada) #inicio { display: none; }
+
+  /* ---- la cortina: tapa la pantalla mientras el juego carga y mientras el piloto recorre solo los menús del juego
+     (de ahí la persona pasa directo a la carrera o a la sala). Es nuestra: nada del juego. Se va con un fundido ---- */
+  #cortina { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center;
+    padding: calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl)); transition: opacity .4s;
+    background:
+      repeating-linear-gradient(100deg, #ffffff06 0 2px, transparent 2px 46px),
+      radial-gradient(ellipse 80% 55% at 50% 110%, #e8322e44, transparent 70%),
+      radial-gradient(ellipse 60% 45% at 50% -10%, #7042df66, transparent 70%),
+      linear-gradient(170deg, #120f2a, #1b1440 45%, #2a1036 80%, #300f18); }
+  #cortina::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 14px; opacity: .55; pointer-events: none;
+    background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14px 14px; }
+  /* al irse: fundido y después fuera del dibujo (visibility) y sin animar: no le cuesta nada al navegador mientras se juega */
+  body.sin-cortina #cortina, body.portada:not(.started) #cortina { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .4s, visibility 0s .4s; }
+  body.sin-cortina #cortina .carga i { animation: none; }
+  #cortina h1 { font-size: 34px; }
+  #cortina .carga { width: min(320px, 70vw); height: 6px; margin: 18px auto 12px; border-radius: 3px; background: #ffffff1f; overflow: hidden; }
+  #cortina .carga i { display: block; width: 35%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--morado), var(--lila));
+    animation: cortina-ida 1.1s ease-in-out infinite alternate; }
+  /* §99: con porcentaje (la preparación de la sala) la barra se llena en vez de ir y venir */
+  #cortina .carga.con-pct i { animation: none; transform: none; transition: width .3s ease; }
+  #cortina p { margin: 0; color: var(--suave); font-size: 14px; min-height: 1.5em; }
+  #cortina.mal p { color: var(--peligro); }
+  #cortina.mal .carga { visibility: hidden; }
+  @keyframes cortina-ida { from { transform: translateX(-10%); } to { transform: translateX(195%); } }
+  @media (prefers-reduced-motion: reduce) { #cortina .carga i { animation: none; width: 100%; opacity: .6; } #cortina { transition: none; } }
+  .tarjeta { width: 460px; max-width: 100%; box-sizing: border-box; padding: 26px; border-radius: 18px;
+    background: #161233ee; border: 2px solid #4b3d93; box-shadow: 0 24px 60px #000b, 0 0 40px #7042df33; }
+  .ceja { margin: 0 0 4px; font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--lila); }
+  h1 { margin: 0 0 4px; font: 400 40px/1.02 'Lilita One', system-ui, sans-serif; letter-spacing: .01em;
+    background: linear-gradient(180deg, #fff7c2, #ffe14a 35%, #ff9d00 65%, #e8322e); -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-stroke: 1.5px #3b0a06; filter: drop-shadow(0 3px 0 #1a0402) drop-shadow(0 0 14px #ff6a0055); }
+  .sub { display: inline-block; margin: 0 0 14px; padding: 2px 10px; border-radius: 999px; background: #e8322e; color: #fff;
+    font: 400 15px 'Lilita One', system-ui, sans-serif; letter-spacing: .04em; box-shadow: 0 2px 0 #5a0d0b; }
+  .tarjeta p { margin: 0 0 14px; color: var(--suave); font-size: 14px; }
+  .jugar { display: block; width: 100%; padding: 13px 16px; border-radius: 12px; cursor: pointer; border: 3px solid #3b0a06;
+    background: linear-gradient(180deg, #fff27a, #ffd21f 30%, #ff9d00 65%, #ff5a00); color: #2a0800;
+    font: 400 21px 'Lilita One', system-ui, sans-serif; letter-spacing: .03em; box-shadow: 0 5px 0 #3b0a06, 0 0 24px #ff6a0055; }
+  .jugar:hover { filter: brightness(1.07); }
+  .jugar:disabled { filter: grayscale(.5) brightness(.8); cursor: default; }
+  .boton { padding: 7px 12px; border-radius: 10px; border: 1px solid var(--linea); background: var(--panel2); color: var(--texto);
+    cursor: pointer; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .boton:hover { border-color: var(--lila); }
+  .boton.principal, .boton.primario { background: var(--morado); border-color: var(--morado); color: #fff; }
+  .boton.peligro { color: var(--peligro); border-color: #6a2a3a; }
+  .boton:disabled { opacity: .5; cursor: default; }
+  #estadoInicio { margin-top: 12px; min-height: 1.4em; font-size: 13px; color: var(--suave); }
+  .teclas { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
+  kbd { font: 12px ui-monospace, Consolas, monospace; background: #241f40; border: 1px solid var(--linea); border-radius: 4px; padding: 1px 5px; }
+
+  /* "Tu partida": las licencias como fichas, con su estado (guardada aquí / en tu cuenta) */
+  .partida { margin: 0 0 16px; padding: 12px; border-radius: 14px; background: #0f0c24; border: 1px solid var(--linea); }
+  .partida-tit { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .partida-tit b { font: 400 17px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .chip { margin-left: auto; padding: 2px 9px; border-radius: 999px; font: 600 11px 'IBM Plex Sans', sans-serif; background: #2a2450; color: var(--suave); }
+  .chip.bien { background: #133a2d; color: var(--verde); }
+  .licencias { display: grid; gap: 6px; margin: 0 0 10px; }
+  .licencia { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--linea); }
+  .licencia .num { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--morado);
+    color: #fff; font: 400 15px 'Lilita One', system-ui, sans-serif; }
+  .licencia strong { display: block; font-weight: 600; }
+  .licencia small { display: block; color: var(--suave); font-size: 12px; }
+  .licencia .ca { margin-left: auto; font: 12px ui-monospace, Consolas, monospace; color: var(--lila); white-space: nowrap; }
+  .vacia { margin: 0 0 10px; font-size: 13px; color: var(--suave); }
+  .fila-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ayuda-donde { margin-top: 8px; font-size: 12.5px; color: var(--suave); }
+  .ayuda-donde summary { cursor: pointer; color: var(--lila); }
+  .ayuda-donde code { font-size: 11.5px; word-break: break-all; color: var(--texto); }
+  .ayuda-donde li { margin: 4px 0; }
+
+  /* ---- la columna de modos (como la de BT3 y Snake Club): una tarjeta por modo, con su emblema ---- */
+  .modos-lista { width: 340px; max-width: 100%; display: grid; gap: 8px; align-content: start; }
+  .modos-tit { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 4px; }
+  .modos-tit h2 { margin: 0; font: 400 21px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-shadow: 0 2px 0 #1a0402; }
+  .modos-tit span { font: 400 13px 'Lilita One', system-ui, sans-serif; letter-spacing: .08em; color: #8a83b8; }
+  .modo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 11px 12px; border-radius: 14px; text-align: left;
+    border: 2px solid #3d3378; background: #161233e6; color: var(--texto); cursor: pointer; font: 13px/1.35 'IBM Plex Sans', sans-serif;
+    transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .modo:hover { border-color: #7a68d6; transform: translateY(-1px); }
+  .modo .ico { --c1: #ff9d00; --c2: #b33a00; width: 50px; height: 50px; flex: none; display: grid; place-items: center; border-radius: 14px;
+    box-shadow: inset 0 0 0 2px #ffffff22, 0 3px 0 #0a0820;
+    background: repeating-linear-gradient(115deg, #ffffff1c 0 4px, transparent 4px 11px), radial-gradient(circle at 50% 35%, var(--c1), var(--c2) 78%); }
+  .modo .ico svg { width: 30px; height: 30px; filter: drop-shadow(0 2px 0 #0006); }
+  .ico-libre { --c1: #ffb340 !important; --c2: #c2410c !important; }
+  .ico-gp { --c1: #ffe14a !important; --c2: #b45309 !important; }
+  .ico-vs { --c1: #ff6b6b !important; --c2: #8f1d1d !important; }
+  .ico-tt { --c1: #5ad1ff !important; --c2: #0b5a8a !important; }
+  .ico-bat { --c1: #4ade80 !important; --c2: #0f5132 !important; }
+  .ico-red { --c1: #b69bff !important; --c2: #4a24a8 !important; }
+  .ico-mii { --c1: #ff9ad5 !important; --c2: #a1306f !important; }
+  .modo strong { display: flex; align-items: center; gap: 6px; font: 400 18px 'Lilita One', system-ui, sans-serif; color: #fff; }
+  .modo strong em { font: 700 9px 'IBM Plex Sans', sans-serif; font-style: normal; letter-spacing: .08em; padding: 2px 5px; border-radius: 4px;
+    background: #7042df44; color: #c9b8ff; text-transform: uppercase; }
+  .modo small { display: block; margin-top: 2px; font-size: 12px; color: var(--suave); }
+  .modo .radio { margin-left: auto; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #5d5598; }
+  .modo.activo { border-color: var(--amarillo); background: linear-gradient(180deg, #2a2160, #1a1442); box-shadow: 0 0 20px #ffd21f33; }
+  .modo.activo strong { color: var(--amarillo); }
+  .modo.activo .radio { background: var(--amarillo); border-color: var(--amarillo); box-shadow: inset 0 0 0 3px #1a1442; }
+  /* lo que se elige dentro de un modo (copa, pista, cilindrada): fichas bajo la columna */
+  .opciones-modo { display: grid; gap: 8px; padding: 10px 12px; margin-bottom: 14px; border-radius: 14px; border: 2px solid #3d3378; background: #161233e6; }
+  .opciones-modo > span { font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); }
+  .fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opciones-nota { color: var(--suave); font-size: 12px; }
+  .opciones-modo[hidden] { display: none; }
+  .fichas button { padding: 6px 10px; border-radius: 999px; border: 1px solid #3d3378; background: #221c4a; color: var(--texto);
+    font: 600 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
+  .fichas button:hover { border-color: var(--amarillo); }
+  .fichas button[aria-pressed="true"] { background: linear-gradient(180deg, #ffd21f, #ff8a00); border-color: var(--amarillo); color: #1a0a00; }
+  .pistas { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 210px; overflow: auto; }
+  .pistas button { text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto);
+    font: 12px 'IBM Plex Sans', sans-serif; cursor: pointer; }
+  .pistas button[aria-pressed="true"] { border-color: var(--amarillo); color: var(--amarillo); }
+  @media (max-width: 860px) { .modos-lista { width: 460px; grid-template-columns: 1fr 1fr; } .modos-tit { grid-column: 1 / -1; } .modo .radio { display: none; } }
+  @media (max-width: 520px) { .modos-lista { width: 100%; grid-template-columns: 1fr; } }
+
+  /* ---- la barra de arriba: volumen, Partida, Controles, ⛶, el mando; con el juego andando se esconde sola ---- */
+  #barra { position: fixed; z-index: 7; top: calc(var(--st) + 22px); right: calc(var(--sr) + 10px); display: flex; gap: 6px; align-items: center;
+    flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 20px); font: 600 12px 'IBM Plex Sans', sans-serif; transition: opacity .25s, transform .25s; }
+  body.started #barra { top: calc(var(--st) + 8px); }
+  /* en el celular, antes de jugar, la barra es una franja de cabecera (fondo propio): no queda encima del texto */
+  @media (max-width: 860px) {
+    html body:not(.started) #barra { left: 0; right: 0; top: 0; translate: none; max-width: none; justify-content: center; padding: calc(var(--st) + 16px) 10px 8px;
+      background: linear-gradient(#0d0a1f 75%, #0d0a1f00); }
+    body:not(.started) #inicio { padding-top: calc(var(--st) + 104px); }
+  }
+  /* las teclas no sirven en una pantalla táctil */
+  @media (pointer: coarse) { .teclas { display: none; } }
+  #barra > button, #barra > a, #mando { background: rgba(23,20,42,.9); color: var(--texto); border: 1px solid #463d7a; border-radius: 8px;
+    padding: 5px 10px; font: inherit; cursor: pointer; text-decoration: none; }
+  #barra > button:hover { border-color: var(--lila); }
+  #barra > button[aria-expanded="true"] { background: var(--morado); border-color: var(--morado); }
+  #mando { cursor: default; max-width: min(240px, 34vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mando.ok { border-color: var(--verde); color: var(--verde); }
+  #barra button.seguro { border-color: var(--amarillo); color: var(--amarillo); }
+  body.started:not(.barra-viva):not(.cajon-abierto) #barra { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+  #volverJuegos { display: none; }
+  html.en-juegos #volverJuegos { display: inline-block; }
+  .vol-mini { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; background: rgba(23,20,42,.9); border: 1px solid #463d7a; }
+  .vol-mini input { width: 80px; accent-color: var(--amarillo); }
+  .vol-mini button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; }
+  body.tactil .vol-mini input { display: none; }
+  /* en el celular, la barra va arriba al centro: a la derecha está el ▶ (pausa) del mando táctil */
+  body.tactil #barra { left: 50%; right: auto; translate: -50% 0; justify-content: center; max-width: calc(100vw - 30cqmin); }
+  body.tactil.started #barra { max-width: 60vw; }
+
+  /* ---- el cajón: un panel a la derecha con pestañas ---- */
+  #cajon { position: fixed; z-index: 8; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); box-sizing: border-box; display: flex; flex-direction: column;
+    background: #120f26f7; border-left: 1px solid var(--linea); box-shadow: -18px 0 40px #0009; transform: translateX(105%);
+    transition: transform .22s ease; padding-top: var(--st); padding-bottom: var(--sb); }
+  body.cajon-abierto #cajon { transform: none; }
+  .pestanas { display: flex; gap: 4px; padding: 10px 10px 0; border-bottom: 1px solid var(--linea); }
+  .pestanas button { padding: 8px 10px; border: 0; border-radius: 10px 10px 0 0; background: none; color: var(--suave); cursor: pointer; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .pestanas button[aria-selected="true"] { background: var(--panel2); color: var(--amarillo); }
+  .pestanas .cerrar { margin-left: auto; font-size: 18px; line-height: 1; padding: 6px 10px; }
+  .hoja { flex: 1; overflow: auto; padding: 14px 16px 24px; }
+  .hoja h2 { margin: 0 0 10px; font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .hoja h3 { margin: 16px 0 6px; font: 700 11px 'IBM Plex Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--lila); }
+  .hoja p, .hoja li { font-size: 13px; color: var(--suave); }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; font-size: 13px; }
+  .fila input[type=range] { accent-color: var(--amarillo); }
+  .dato { font: 600 12.5px ui-monospace, Consolas, monospace; color: var(--texto); }
+  .aviso { margin: 8px 0 10px; padding: 7px 12px; border-left: 3px solid var(--amarillo); border-radius: 6px; font-size: 13px;
+    color: var(--texto); background: #ffd21f14; }
+  details.aviso summary { cursor: pointer; color: var(--amarillo); }
+  #tablaTeclas { border-collapse: collapse; font-size: 13px; }
+  #tablaTeclas td { padding: 2px 6px; color: var(--suave); }
+  #tablaTeclas button { font: 600 12px ui-monospace, Consolas, monospace; padding: 3px 8px; margin: 1px; border-radius: 6px;
+    border: 1px solid var(--linea); background: var(--panel2); color: var(--texto); cursor: pointer; }
+  .respaldos { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .respaldos li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--panel2); }
+  .respaldos li span { flex: 1; min-width: 0; }
+  .respaldos li small { display: block; color: var(--suave); }
+  #log { max-height: 260px; overflow: auto; font: 11.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--suave); margin: 0;
+    background: #0b0918; padding: 8px; border-radius: 8px; }
+  #resultados { margin: 0; padding-left: 18px; font-size: 12.5px; }
+  #resumen { font-weight: 600; }
+
+  /* ---- arrastrar un archivo a la página ---- */
+  #soltar { position: fixed; inset: 12px; z-index: 20; display: grid; place-items: center; border: 3px dashed var(--amarillo); border-radius: 22px;
+    background: #120f26e6; color: var(--amarillo); font: 400 26px 'Lilita One', system-ui, sans-serif; text-align: center; pointer-events: none; }
+
+  /* ---- los diálogos de la página (en un marco con sandbox confirm()/alert() no andan) ---- */
+  dialog { max-width: min(480px, calc(100vw - 32px)); border: 2px solid #4b3d93; border-radius: 16px; padding: 20px; background: var(--panel);
+    color: var(--texto); box-shadow: 0 24px 60px #000c; }
+  dialog::backdrop { background: #05031099; }
+  dialog h2 { margin: 0 0 8px; font: 400 21px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  dialog .cuerpo { font-size: 14px; color: var(--suave); }
+  dialog .cuerpo b { color: var(--texto); }
+  dialog .acciones { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+  /* ---- sobre el juego: el aviso del piloto y la lista para elegir copa/pista ---- */
+  #avisoJuego { position: fixed; z-index: 6; left: 50%; top: calc(var(--st) + 10px); translate: -50% 0; max-width: calc(100vw - 32px);
+    padding: 7px 14px; border-radius: 999px; background: #161233ee; border: 1px solid #4b3d93; color: var(--texto);
+    font: 600 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; pointer-events: none; }
+  #avisoJuego.mal { border-color: var(--peligro); color: var(--peligro); }
+  /* §100: el botón debajo del aviso («🙋 Pedir copa») */
+  #accionJuego { position: fixed; z-index: 6; left: 50%; top: calc(var(--st) + 50px); translate: -50% 0; min-height: 36px; padding: 6px 16px;
+    border-radius: 999px; border: 2px solid var(--amarillo); background: #161233f2; color: var(--amarillo); cursor: pointer;
+    font: 700 13px 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; }
+  #accionJuego:hover, #accionJuego:focus-visible { background: #2a2160; outline: none; }
+  /* §100: arriba del selector de la anfitriona, un botón por copa pedida */
+  .pedidas-cab { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+  .pedida-ir { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--amarillo); background: #ffd21f1f; color: var(--amarillo); cursor: pointer;
+    font: 700 12px 'IBM Plex Sans', sans-serif; }
+  .pedida-ir:hover, .pedida-ir:focus-visible { background: #ffd21f38; outline: none; }
+  /* §100: la copa que piden los demás (en el selector de la anfitriona) */
+  .copa-pedida { flex: none; padding: 1px 8px; border-radius: 999px; background: #ffd21f26; border: 1px solid var(--amarillo); color: var(--amarillo);
+    font: 700 11px 'IBM Plex Sans', sans-serif; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+  /* M22: la esquina de los avisos de estado (📶 la red, la PC lenta): arriba a la izquierda, donde el juego no pone HUD */
+  #estadoJuego { position: fixed; z-index: 6; left: calc(10px + var(--sl)); top: calc(10px + var(--st)); display: flex; flex-direction: column;
+    align-items: flex-start; gap: 6px; max-width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+  .chip-estado { padding: 4px 10px; border-radius: 999px; background: #161233e6; border: 1px solid #4b3d93; color: var(--texto);
+    font: 600 12.5px/1.3 'IBM Plex Sans', sans-serif; box-shadow: 0 4px 12px #0008; }
+  .chip-estado.mal { border-color: var(--peligro); color: #ffb4b4; }
+  /* §81: «el juego va lento: ¿tarjeta de video equivocada?» (aviso-gpu.mjs), abajo a la izquierda, con «Ver cómo» y «✕» */
+  #avisoGpu { position: fixed; z-index: 6; left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); max-width: min(440px, calc(100vw - 24px)); display: flex; gap: 10px;
+    align-items: center; padding: 10px 12px; border-radius: 14px; background: #161233f2; border: 1px solid #4b3d93; color: var(--texto);
+    font: 500 13px/1.35 'IBM Plex Sans', sans-serif; box-shadow: 0 6px 20px #0008; }
+  #avisoGpu[hidden] { display: none; }
+  #avisoGpu .boton { flex: none; }
+  .aviso-gpu-cerrar { flex: none; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--suave); cursor: pointer; font-size: 15px; }
+  .aviso-gpu-cerrar:hover { background: #ffffff14; color: var(--texto); }
+  /* el descanso entre carreras (§74, §94). M22: un ZÓCALO abajo, en una línea (como el de la tele), que deja libre la tabla
+     de puntos del juego; con la ventana más alta que 16:9 queda en la banda negra de abajo */
+  .playlist-breve { position: fixed; z-index: 7; left: 50%; bottom: calc(4px + var(--sb)); translate: -50% 0; width: max-content;
+    max-width: calc(100vw - 16px - var(--sl) - var(--sr)); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px;
+    padding: 3px 10px; border-radius: 12px; background: #1b1440e8; border: 2px solid #4b3d93; color: var(--texto);
+    box-shadow: inset 0 3px 0 var(--amarillo), 0 10px 28px #000a; backdrop-filter: blur(6px); animation: pb-entra .25s ease-out; }
+  @keyframes pb-entra { from { opacity: 0; transform: translateY(18px); } }
+  .playlist-breve .pb-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .pb-viene { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pb-viene .pb-sub { margin: 0; }
+  .pb-viene .pb-lista li { grid-template-columns: 16px 32px minmax(0, 1fr); gap: 6px; padding: 0 8px 0 4px; max-width: 280px; }
+  .pb-viene .renglon-foto { width: 32px; height: 18px; }
+  .playlist-breve .pb-cab b { font-size: 17px; }
+  .playlist-breve > .boton { min-height: 26px; padding: 2px 12px; font-size: 13px; }
+  .pb-yo { margin: 0; display: flex; gap: 8px; align-items: baseline; padding: 2px 8px; border-radius: 10px; background: #2a2140; border: 1px solid var(--amarillo);
+    font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pb-yo .num { font: 400 16px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .pb-cab { display: flex; align-items: center; gap: 8px; font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--suave); }
+  .pb-cab b { font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .pb-cab .sug-chip { margin-left: auto; }
+  .pb-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .pb-lista li { display: grid; grid-template-columns: 22px 56px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 10px; background: #161233; border: 1px solid #3d3378; }
+  .pb-lista li.sigue { border-color: var(--lila); background: #231c52; }
+  .pb-lista .num { font: 400 17px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-align: center; }
+  .pb-nombre { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-lista em { font: 600 11px 'IBM Plex Sans', sans-serif; font-style: normal; color: #1b1440; background: var(--lila); padding: 1px 7px; border-radius: 999px; }
+  .pb-mas, .pb-nota { margin: 0; color: var(--suave); font-size: 12.5px; }
+  .pb-nota { color: var(--lila); }
+  .playlist-breve > .boton { min-height: 38px; }
+  /* §94: el descanso entre carreras: la cuenta y los resultados (puesto, puntos y VR de cada humano) */
+  .pb-cuenta { margin: 0; padding: 2px 8px; border-radius: 10px; background: #0f0c26; border: 1px solid #3d3378; text-align: center; white-space: nowrap;
+    font: 400 15px 'Lilita One', system-ui, sans-serif; color: var(--texto); font-variant-numeric: tabular-nums; }
+  .pb-cuenta.pronto { color: var(--amarillo); border-color: var(--amarillo); }
+  .pb-sub { margin: 2px 0 0; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
+  .pb-res { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .pb-res li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 10px;
+    background: #161233; border: 1px solid #3d3378; font-size: 13px; }
+  .pb-res li.yo { border-color: var(--amarillo); background: #2a2140; }
+  .pb-res .num { font: 400 16px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .pb-quien { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-pts { color: var(--suave); font-variant-numeric: tabular-nums; }
+  .pb-vr { font: 600 12px 'IBM Plex Sans', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pb-vr.sube { color: var(--verde); }
+  .pb-vr.baja { color: var(--peligro); }
+  @media (max-width: 1100px) { .playlist-breve .pb-cab span:not(.sug-chip), .pb-viene .pb-sub { display: none; } }
+  @media (max-width: 699px) { .pb-viene .pb-lista li { max-width: 200px; } }
+  @media (prefers-reduced-motion: reduce) { .playlist-breve { animation: none; } }
+  /* ---- elegir copa, pista o armar una lista (§56, §74; repasado con una revisión crítica del diseño) ---- */
+  #elegirPista { position: fixed; inset: 0; z-index: 9; overflow: auto; overscroll-behavior: contain; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
+    background: radial-gradient(ellipse 60% 45% at 50% -10%, #7042df44, transparent 70%), linear-gradient(170deg, #120f2a, #1b1440 45%, #1d1030); }
+  .elegir-cab, .elegir-cuerpo { max-width: 1320px; margin-left: auto; margin-right: auto; }
+  /* la cabecera (título, buscador, salida) queda arriba al desplazar: con 80 copas el buscador es lo que más se usa */
+  .elegir-cab { position: sticky; top: calc(-16px - var(--st)); z-index: 3; margin-top: calc(-16px - var(--st)); margin-bottom: 4px;
+    padding: calc(14px + var(--st)) 0 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: linear-gradient(#120f2a 82%, #120f2a00); }
+  .elegir-cab h2 { margin: 0 8px 0 0; font: 400 28px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .elegir-cab input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; }
+  .elegir-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+  .modo-lista .elegir-cuerpo, .modo-gp .elegir-cuerpo { grid-template-columns: minmax(0, 1fr) 390px; }
+  .copas { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .copa { display: grid; gap: 3px; padding: 8px; border-radius: 12px; background: #161233; border: 2px solid #3d3378; align-content: start; }
+  .copa-cab { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border: 0; border-radius: 8px; background: none; color: #fff; font: 600 12px 'IBM Plex Sans', sans-serif; text-align: left; }
+  button.copa-cab { cursor: pointer; }
+  .copa-cab b { font: 400 16px 'Lilita One', system-ui, sans-serif; flex: 1; }
+  button.copa-cab:focus-visible { background: #2a2160; outline: none; }
+  .copa-icono { width: 34px; height: 34px; object-fit: contain; flex: none; }
+  .copa .pista { display: flex; align-items: center; gap: 6px; min-height: 30px; text-align: left; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; background: #1d1840; color: var(--texto); cursor: pointer; font: 12.5px 'IBM Plex Sans', sans-serif; }
+  .copa .pista-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* pasar por encima = lila; el amarillo queda para lo elegido */
+  .copa .pista:hover, .copa .pista:focus-visible, .copa .pista.visto { border-color: var(--lila); color: #fff; background: #2a2160; outline: none; }
+  .copa .pista.apagada { opacity: .4; }
+  /* modo copa (elegir una copa entera): se marca la tarjeta, no una pista */
+  /* modo copa (elegir una copa entera): la tarjeta lleva la tira de sus 4 fotos y las pistas numeradas (texto, no
+     botones: un clic en cualquier parte MARCA la copa). Pasar = lila; la que se ve en el panel = borde lila oscuro; la
+     marcada = amarillo (lo elegido) */
+  .modo-gp .copa { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+  .modo-gp .copa.en-vista { border-color: #6a5bc0; }
+  .modo-gp .copa:hover, .modo-gp .copa:focus-within { border-color: var(--lila); box-shadow: 0 0 0 1px var(--lila); }
+  .modo-gp .copa.elegida { border-color: var(--amarillo); box-shadow: 0 0 0 1px var(--amarillo), 0 0 22px #ffd21f2e; }
+  .copa-tira { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin: 2px 0 4px; }
+  .copa-tira-foto { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #221d47; opacity: .85; display: block; outline: 2px solid transparent; outline-offset: -2px; transition: opacity .12s; }
+  .modo-gp .copa:hover .copa-tira-foto { opacity: 1; }
+  .modo-gp .copa .pista { min-height: 26px; padding: 3px 6px; background: none; gap: 8px; }
+  .modo-gp .copa .pista-num { flex: none; width: 14px; font: 400 14px 'Lilita One', system-ui, sans-serif; font-style: normal; color: var(--suave); text-align: center; }
+  .modo-gp .copa .pista:hover, .modo-gp .copa .pista:focus-visible { border-color: transparent; background: #2a2160; }
+  .modo-gp .copa .pista:hover .pista-num, .modo-gp .copa .pista.visto .pista-num { color: var(--lila); }
+  .modo-gp .copa .pista.visto { border-color: transparent; background: #231c52; color: #fff; }
+  .modo-gp .copa:has(.pista:nth-of-type(1):hover) .copa-tira-foto:nth-child(1), .modo-gp .copa:has(.pista:nth-of-type(2):hover) .copa-tira-foto:nth-child(2),
+  .modo-gp .copa:has(.pista:nth-of-type(3):hover) .copa-tira-foto:nth-child(3), .modo-gp .copa:has(.pista:nth-of-type(4):hover) .copa-tira-foto:nth-child(4),
+  .modo-gp .copa-tira-foto:hover { outline-color: var(--lila); opacity: 1; }
+  /* modo lista: «+» al pasar por encima; las de la lista, en amarillo con su número */
+  .modo-lista .copa .pista::after { content: '+'; flex: none; width: 20px; text-align: center; font: 700 15px 'IBM Plex Sans', sans-serif; color: var(--lila); opacity: 0; transition: opacity .12s; }
+  .modo-lista .copa .pista:hover::after, .modo-lista .copa .pista:focus-visible::after { opacity: 1; }
+  .modo-lista .copa .pista.en-lista { background: linear-gradient(180deg, #ffd21f, #ff9d00); border-color: var(--amarillo); color: #1a0a00; font-weight: 600; }
+  .modo-lista .copa .pista.en-lista::after { content: attr(data-pos); opacity: 1; min-width: 20px; width: auto; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #1b1440; color: var(--amarillo); font: 400 13px/20px 'Lilita One', system-ui, sans-serif; }
+  @media (hover: hover) { .modo-lista .copa .pista.en-lista:hover::after { content: '✕'; background: var(--peligro); color: #fff; font: 700 11px/20px 'IBM Plex Sans', sans-serif; } }
+  .modo-lista.llena .copa .pista:not(.en-lista)::after { content: ''; }
+  .modo-lista.llena .copa .pista:not(.en-lista) { opacity: .6; }
+  /* M22: elegir otro personaje en el descanso: el panel se achica abajo a la derecha y deja libre la pantalla del juego */
+  .playlist-breve .pb-kart { margin: 0; font-size: .9rem; color: var(--suave, #d8d0f0); }
+  /* M22: la imagen que falta es una ficha de color (antes, una caja vacía que parecía rota) */
+  .sin-imagen { visibility: visible; background: repeating-linear-gradient(135deg, #3a2a6e 0 10px, #33255f 10px 20px); border-radius: 8px; }
+  img.sin-imagen:not([src]) { content: none; }
+  /* el costado (quieto mientras la grilla corre, debajo de la cabecera): la lista arriba y la vista previa abajo */
+  /* (el «top» de un sticky se cuenta desde el borde interior del relleno: 16 px + la muesca) */
+  .lado { position: sticky; top: calc(var(--alto-cab, 16px) - 12px - var(--st)); display: flex; flex-direction: column; gap: 10px; max-height: calc(100dvh - var(--alto-cab, 16px) - 20px - var(--sb)); }
+  .modo-lista .lado { height: calc(100dvh - var(--alto-cab, 16px) - 20px - var(--sb)); }
+  .vista { flex: none; display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #161233; border: 2px solid #3d3378; min-height: 200px; align-content: start; }
+  .vista-cab { display: flex; gap: 8px; align-items: center; color: var(--suave); font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .vista h3 { margin: 0; font: 400 20px 'Lilita One', system-ui, sans-serif; color: var(--texto); }
+  .vista-icono { width: 30px; height: 30px; object-fit: contain; }
+  .vista-icono.grande { width: 56px; height: 56px; }
+  .vista-imagenes { display: grid; gap: 8px; }
+  .vista-foto { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #0f0c24; display: block; }
+  .vista-plano { width: 100%; aspect-ratio: 4/3; border-radius: 10px; background: #221d47; display: block; }
+  /* el panel del modo copa: la presentación de la pista (videíto) con su plano de minimapa, las 4 fotos y «Jugar» */
+  .vista.vista-copa { min-height: 0; gap: 10px; padding: 12px; background: #1b1440; border-color: #4b3d93; box-shadow: inset 0 3px 0 var(--amarillo), 0 8px 28px #0007; }
+  .vc-cab { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .vc-icono { width: 40px; height: 40px; object-fit: contain; flex: none; }
+  .vc-titulos { display: grid; min-width: 0; flex: 1; }
+  .vc-cab h3 { margin: 0; font: 400 22px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); line-height: 1.1; }
+  .vc-cab small { font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vc-teclas { flex: none; padding: 2px 7px; border: 1px solid var(--linea); border-radius: 6px; color: var(--suave); font: 600 11.5px ui-monospace, monospace; }
+  .vc-cerrar { display: none; }
+  .vc-escenario { position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #0f0c24; border: 1px solid #3d3378; touch-action: pan-y; }
+  .vc-escenario > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .vc-foto { opacity: 0; transition: opacity .14s ease-out; }
+  .vc-foto.frente { opacity: 1; }
+  .vc-clip { opacity: 0; }
+  .vc-clip.lista { opacity: 1; transition: opacity .2s ease-out; }
+  .vc-num { position: absolute; top: 8px; left: 8px; padding: 1px 9px; border-radius: 999px; background: #0d0a1fcc; font: 400 15px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .vc-escenario > img.vc-plano { inset: 8px 8px auto auto; width: 104px; height: 78px; padding: 4px; box-sizing: border-box; object-fit: contain;
+    background: #0d0a1fb8; backdrop-filter: blur(4px); border: 1px solid #ffffff1f; border-radius: 8px; transform-origin: top right; transition: transform .15s; }
+  .vc-escenario > img.vc-plano:hover { transform: scale(1.92); }
+  .vc-pie { position: absolute; inset: auto 0 0; padding: 24px 12px 9px; display: flex; align-items: end; gap: 8px;
+    background: linear-gradient(#0d0a1f00, #0d0a1fe6 70%); font: 400 19px 'Lilita One', system-ui, sans-serif; color: #fff; text-shadow: 0 2px 0 #0008; }
+  .vc-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vc-pie b { margin-left: auto; flex: none; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--amarillo); font-variant-numeric: tabular-nums; }
+  .vc-tira { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .vc-tira button { position: relative; display: block; width: 100%; aspect-ratio: 16/9; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden;
+    background: #0f0c24; opacity: .62; cursor: pointer; transition: opacity .12s, border-color .12s; }
+  .vc-tira img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vc-tira button:hover { opacity: 1; border-color: #6a5bc0; }
+  .vc-tira button.actual { opacity: 1; border-color: var(--lila); box-shadow: 0 0 0 1px var(--lila), 0 4px 14px #ab8bff33; }
+  .vc-tira i { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 999px; background: #0d0a1fd9; color: #fff; font: 400 12px/18px 'Lilita One', system-ui, sans-serif; font-style: normal; text-align: center; }
+  .vc-tira .actual i { background: var(--lila); color: #1b1440; }
+  .avanza .vc-tira .actual::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; background: var(--lila); transform-origin: left; animation: vc-avance 4s linear; }
+  .vista-copa:hover .vc-tira .actual::after { animation-play-state: paused; }
+  @keyframes vc-avance { from { transform: scaleX(0); } }
+  @media (prefers-reduced-motion: reduce) { .vc-foto, .vc-clip.lista, .vc-escenario > img.vc-plano { transition: none; } .vc-tira .actual::after { display: none; } }
+  .vista-records { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; }
+  .vista-records li { display: flex; justify-content: space-between; padding: 3px 8px; border-radius: 8px; background: #221d47; color: var(--suave); }
+  .vista-records b { color: var(--amarillo); font-variant-numeric: tabular-nums; }
+  .vista-tabla { justify-self: start; }
+
+  /* en el modo lista la vista previa es una franja: el alto es para la lista */
+  .modo-lista .vista { min-height: 0; padding: 10px; gap: 6px; grid-template-columns: minmax(0, 1fr) auto; }
+  .modo-lista .vista-cab { grid-column: 1; grid-row: 1; }
+  .modo-lista .vista-tabla { grid-column: 2; grid-row: 1; padding: 2px 8px; font-size: 13px; }
+  .modo-lista .vista h3, .modo-lista .vista-imagenes, .modo-lista .vista-vacia { grid-column: 1 / -1; }
+  .modo-lista .vista h3 { font-size: 17px; }
+  .modo-lista .vista-records { display: none; }
+  .modo-lista .vista-imagenes { grid-template-columns: auto auto; justify-content: start; gap: 6px; }
+  .modo-lista .vista-foto { width: auto; height: 110px; }
+  .modo-lista .vista-plano { width: 110px; height: 110px; aspect-ratio: 1; object-fit: contain; }
+  @media (max-height: 720px) { .modo-lista .vista-foto { height: 72px; } .modo-lista .vista-plano { width: 72px; height: 72px; } }
+  .tabla-records { display: grid; gap: 10px; min-width: min(460px, 80vw); }
+  .tabla-filas { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+  .tabla-filas li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; background: #1d1840; }
+  .tabla-filas li.tuyo { outline: 2px solid var(--amarillo); }
+  .tabla-filas .puesto { font: 400 18px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-align: center; }
+  .tabla-filas b { font-variant-numeric: tabular-nums; }
+  .tabla-filas .tabla-vacia { display: block; color: var(--suave); text-align: center; background: none; }
+  .tabla-nota { margin: 0; color: var(--suave); font-size: 12px; }
+  .vista-vacia { margin: auto; color: var(--suave); font-size: 13px; text-align: center; }
+  /* la lista (modo lista): siempre a la vista, con sus renglones corriendo adentro */
+  .tu-lista { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: #1b1440;
+    border: 2px solid #4b3d93; box-shadow: inset 0 3px 0 var(--amarillo), 0 8px 28px #0007; }
+  .tu-lista-cab { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .tu-lista-cab b { font: 400 22px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); }
+  .tu-lista-cuenta { font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--suave); font-variant-numeric: tabular-nums; }
+  .llena .tu-lista-cuenta { color: var(--peligro); }
+  .tu-lista-cab .semilla { margin-left: auto; opacity: .55; }
+  .tu-lista-abrir { display: none; width: 34px; height: 30px; border-radius: 9px; border: 1px solid var(--linea); background: #221d47; color: var(--texto); cursor: pointer; font-size: 14px; }
+  .tu-lista-abrir .flecha { display: inline-block; transition: rotate .15s; }
+  .tu-lista-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .tu-lista-acciones .boton { padding: 5px 10px; font-size: 13px; }
+  /* las listas guardadas: un menú que se abre encima de los renglones (no los empuja) */
+  .guardadas { position: relative; margin-left: auto; }
+  .guardadas summary { display: flex; align-items: center; white-space: nowrap; cursor: pointer; padding: 5px 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--panel2); color: var(--texto); font: 600 13px 'IBM Plex Sans', sans-serif; list-style: none; }
+  .guardadas summary::-webkit-details-marker { display: none; }
+  .guardadas summary:hover, .guardadas summary:focus-visible, .guardadas[open] summary { border-color: var(--lila); outline: none; }
+  .guardadas-menu { position: absolute; top: calc(100% + 6px); right: 0; width: min(340px, 86vw); z-index: 5; display: grid; gap: 8px; padding: 10px;
+    border-radius: 12px; background: #161233; border: 1px solid #4b3d93; box-shadow: 0 14px 34px #000c; }
+  .guardadas-form { display: flex; gap: 6px; }
+  .guardadas-form input { flex: 1; min-width: 0; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: 13px 'IBM Plex Sans', sans-serif; }
+  .guardadas-form .boton { padding: 5px 10px; font-size: 13px; }
+  .guardadas-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow: auto; }
+  .guardadas-lista li { display: flex; gap: 4px; align-items: center; }
+  .guardada { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid transparent; background: #221d47; color: var(--texto); cursor: pointer; font: 13px 'IBM Plex Sans', sans-serif; text-align: left; }
+  .guardada b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .guardada span { color: var(--suave); white-space: nowrap; font-size: 12px; }
+  .guardada span::after { content: ' · Cargar ▸'; color: var(--amarillo); }
+  .guardada:hover, .guardada:focus-visible { border-color: var(--amarillo); outline: none; }
+  .mini.borrar-ya { min-width: 70px; border-color: var(--peligro); color: var(--peligro); }
+  .guardadas-vacia { color: var(--suave); font-size: 12.5px; padding: 2px; }
+  .renglones { list-style: none; margin: 0; padding: 8px 0; display: grid; gap: 4px; overflow: auto; flex: 1 1 auto; min-height: 64px; align-content: start;
+    scroll-padding-block: 8px; scrollbar-width: thin; scrollbar-color: #4b3d93 transparent;
+    mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent); }
+  .renglon { display: grid; grid-template-columns: 20px 56px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 10px; background: #161233; border: 1px solid #3d3378; }
+  .renglon:hover { border-color: #6a5bc0; }
+  .renglon.nueva { animation: renglon-nuevo .7s ease-out; }
+  @keyframes renglon-nuevo { from { background: #ffd21f38; border-color: var(--amarillo); } }
+  .renglon .num { font: 400 18px 'Lilita One', system-ui, sans-serif; color: var(--amarillo); text-align: center; font-variant-numeric: tabular-nums; }
+  .renglon-foto { width: 56px; height: 32px; object-fit: cover; border-radius: 6px; background: #0f0c24; display: block; }
+  .renglon-texto { display: grid; min-width: 0; gap: 1px; }
+  .renglon-nombre { font-size: 13.5px; font-weight: 600; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .renglon-copa { display: flex; align-items: center; gap: 5px; min-width: 0; font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--suave); white-space: nowrap; overflow: hidden; }
+  .renglon-icono { width: 16px; height: 16px; object-fit: contain; flex: none; }
+  .renglon-botones { display: flex; gap: 3px; }
+  .renglon-botones .mini { min-width: 26px; padding: 0 4px; }
+  .renglon-botones .mini:disabled { visibility: hidden; }
+  @media (hover: hover) {
+    .renglon .mini:not(.quitar) { opacity: 0; transition: opacity .12s; }
+    .renglon:hover .mini, .renglon:focus-within .mini { opacity: 1; }
+  }
+  .mini.quitar:hover:not(:disabled) { border-color: var(--peligro); color: var(--peligro); }
+  .renglones-vacia { margin: 0; padding: 18px 12px; border-radius: 10px; border: 1px dashed #4b3d93; color: var(--suave); font-size: 13px; text-align: center; }
+  /* sugerencias (playlist de la sala): el panel del anfitrión (✓ / ✕) y «Tus sugerencias» de los demás */
+  .sugerencias { flex: none; display: grid; gap: 6px; padding: 8px; border-radius: 10px; background: #161233; border: 1px solid var(--lila);
+    max-height: 36%; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #4b3d93 transparent; }
+  .sugerencias-cab { display: flex; align-items: center; gap: 8px; font: 600 13px 'IBM Plex Sans', sans-serif; color: var(--lila); }
+  .sugerencias-cab b { font: 400 16px 'Lilita One', system-ui, sans-serif; }
+  .sugerencias-cuenta { min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--lila); color: #120f2a; font: 400 14px/22px 'Lilita One', system-ui, sans-serif; text-align: center; }
+  .sugerencias-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .sugerencia { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 10px; background: #1d1840; border: 1px solid #3d3378; }
+  .sugerencia.nueva { animation: sugerencia-nueva 1.2s ease-out; }
+  @keyframes sugerencia-nueva { from { background: #ab8bff40; border-color: var(--lila); } }
+  .sugerencia .renglon-botones .mini { min-width: 30px; height: 28px; font-size: 14px; }
+  .mini.aceptar { border-color: var(--verde); color: var(--verde); }
+  .mini.aceptar:hover { background: var(--verde); color: #0d2a1e; }
+  .sugerencia .estado { font: 600 12px 'IBM Plex Sans', sans-serif; white-space: nowrap; color: var(--suave); }
+  .sugerencia.estado-aceptada .estado { color: var(--amarillo); }
+  .sugerencia.estado-rechazada { opacity: .65; }
+  .sugerencia.estado-rechazada .estado { color: var(--peligro); }
+  .sug-chip { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--lila); background: #2a2160; color: #fff; font: 600 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer; white-space: nowrap; }
+  .tu-lista-cab .sug-chip { margin-left: auto; }
+  .tu-lista-cab .sug-chip + .tu-lista-abrir { margin-left: 0; }
+  /* en la grilla: sugerida (💬 para el anfitrión, ⌛ la mía esperando) */
+  .modo-lista .copa .pista.sugerida { border-color: #ab8bff80; border-style: dashed; }
+  .modo-lista .copa .pista.sugerida::after { content: attr(data-marca); opacity: 1; font-size: 12px; }
+  .sugerir-nota { flex: 1; margin: 0; color: var(--suave); font-size: 12.5px; line-height: 1.35; }
+  #sugerirListo { flex: none; min-height: 40px; padding: 8px 18px; }
+  .tu-lista-pie { display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+  #listaDeshacer { flex: none; padding: 8px 12px; }
+  /* Confirmar: el mismo botón grande de la portada («Jugar») */
+  #listaConfirmar, .vc-jugar { flex: 1; min-height: 44px; padding: 8px 14px; border-radius: 12px; border: 3px solid #3b0a06; cursor: pointer;
+    background: linear-gradient(180deg, #fff27a, #ffd21f 30%, #ff9d00 65%, #ff5a00); color: #2a0800;
+    font: 400 18px 'Lilita One', system-ui, sans-serif; box-shadow: 0 4px 0 #3b0a06; }
+  #listaConfirmar:hover:not(:disabled), .vc-jugar:hover { filter: brightness(1.07); }
+  .vc-jugar { min-height: 48px; }
+  #listaConfirmar:active:not(:disabled), .vc-jugar:active { translate: 0 2px; box-shadow: 0 2px 0 #3b0a06; }
+  #listaConfirmar:disabled { filter: grayscale(1) brightness(.6); box-shadow: none; cursor: default; }
+  .semilla { font: 600 11.5px ui-monospace, monospace; color: var(--suave); padding: 3px 8px; border-radius: 999px; background: #0f0c24; white-space: nowrap; }
+  .mini { min-width: 28px; height: 24px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--linea); background: #221d47; color: var(--texto); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .mini:disabled { opacity: .35; cursor: default; }
+  /* con el dedo: blancos de toque de 40 px o más */
+  @media (pointer: coarse) {
+    .copa .pista { min-height: 42px; font-size: 14px; }
+    .renglon-botones { gap: 6px; }
+    .renglon-botones .mini { min-width: 40px; height: 40px; border-radius: 10px; font-size: 15px; }
+    .tu-lista-abrir { width: 44px; height: 44px; }
+    .tu-lista-cab { min-height: 44px; }
+    .tu-lista-acciones .boton, .guardadas summary { min-height: 40px; }
+  }
+  /* pantallas angostas: el costado es una hoja pegada abajo (plegada: su cabeza y «Confirmar»); en el modo lista no
+     hay vista previa flotante (la foto del renglón alcanza); en los otros, la vista sale arriba de todo y se cierra al
+     desplazar. La grilla deja libre ese alto al final. */
+  @media (max-width: 899px) {
+    .elegir-cuerpo, .modo-lista .elegir-cuerpo { grid-template-columns: minmax(0, 1fr); padding-bottom: calc(var(--alto-lado, 0px) + 8px); }
+    .lado, .modo-lista .lado { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 4; gap: 0; height: auto; padding-bottom: var(--sb);
+      max-height: calc(100dvh - var(--alto-cab, 72px) - var(--st)); background: #0d0a1f; border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px #000c; }
+    .vista { display: none; min-height: 0; padding: 10px 12px; gap: 4px 10px; border-radius: 16px 16px 0 0; border-width: 2px 0 0; }
+    .vista.con-algo { display: grid; }
+    .modo-lista .vista, .modo-lista .vista.con-algo { display: none; }
+    .vista-records, .vista-tabla { display: none; }
+    .vista-imagenes { grid-template-columns: auto minmax(0, 1fr); gap: 6px; }
+    .vista-foto { width: auto; height: 96px; }
+    .vista-plano { height: 96px; width: auto; aspect-ratio: 1; object-fit: contain; }
+    /* angosto: las 4 miniaturas (2×2) al lado del video, para que el panel no pase de ~45 % del alto */
+    .vista.vista-copa { gap: 8px; padding: 8px 12px 10px; border-radius: 16px 16px 0 0; border-width: 2px 0 0; box-shadow: inset 0 3px 0 var(--amarillo);
+      grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: center; }
+    .vista.vista-copa .vc-cab, .vista.vista-copa .vc-jugar { grid-column: 1 / -1; }
+    .vista.vista-copa .vc-tira { grid-template-columns: 1fr 1fr; gap: 4px; }
+    .vista.vista-copa .vc-jugar { min-height: 44px; }
+    .lado.arriba .vista.vista-copa { border-radius: 0 0 16px 16px; border-width: 0 0 2px; box-shadow: none; }
+    .vista.vista-copa .vc-cab { min-height: 36px; }
+    .vista.vista-copa .vc-icono { width: 28px; height: 28px; }
+    .vista.vista-copa .vc-cab h3 { font-size: 19px; }
+    .vc-teclas { display: none; }
+    .vc-cerrar { display: block; flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--linea); background: #221d47; color: var(--texto); cursor: pointer; font-size: 15px; }
+    .vista.vista-copa .vc-escenario { width: 100%; max-height: min(180px, 26dvh); }
+    .vista.vista-copa .vc-escenario > img.vc-plano { width: 72px; height: 54px; }
+    .vista.vista-copa .vc-pie { font-size: 16px; padding: 18px 10px 7px; }
+    .vista h3 { font-size: 17px; }
+    /* en la hoja el alto lo pone el contenido (con «flex: 1 1 0» la hoja, de alto automático, quedaba en cero) */
+    .tu-lista { flex: 0 1 auto; border-radius: 16px 16px 0 0; border-width: 2px 0 0; padding: 8px 12px 12px; gap: 6px; box-shadow: inset 0 3px 0 var(--amarillo); }
+    .tu-lista::before { content: ""; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: #ffffff40; margin: 0 0 2px; }
+    .tu-lista-cab { cursor: pointer; }
+    .tu-lista-abrir { display: inline-block; }
+    /* la vista previa arriba (bajo la cabecera) cuando lo señalado está en la mitad de abajo; el «top» lo pone el JS */
+    .lado.arriba { bottom: auto; padding-bottom: 0; border-radius: 0 0 16px 16px; box-shadow: 0 10px 30px #000c; }
+    .lado.arriba .vista { border-radius: 0 0 16px 16px; border-width: 0 0 2px; }
+    .lado:not(.abierta) .tu-lista > :not(.tu-lista-cab):not(.tu-lista-pie) { display: none; }
+    .lado:not(.abierta) .tu-lista::before { display: block; }
+    .lado:not(.abierta) .tu-lista-cab .semilla { display: none; }
+    .lado.abierta .flecha { rotate: 180deg; }
+    .renglones { min-height: 0; }
+  }
+  @media (max-width: 600px) { .elegir-cab h2 { font-size: 20px; } }
+
+  /* ---- panel de mandos (opciones-mandos.mjs) ---- */
+  #cajon select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; max-width: 100%; }
+  .mandos-lista { display: grid; gap: 8px; margin-top: 6px; }
+  .mandos-lista.vacia::before { content: attr(data-vacia); color: var(--suave); font-size: 13px; }
+  .mando-tarjeta { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
+  .mando-cab { display: grid; }
+  .mando-cab small { color: var(--suave); }
+  .probador { display: flex; gap: 12px; align-items: center; }
+  .stick-aro { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #4b3d93; display: grid; place-items: center; flex: none; }
+  .stick-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--amarillo); }
+  .luces { display: flex; flex-wrap: wrap; gap: 4px; }
+  .luz { min-width: 26px; padding: 3px 6px; border-radius: 7px; background: #221d47; color: var(--suave); text-align: center; font: 600 11.5px 'IBM Plex Sans', sans-serif; }
+  .luz.encendida { background: var(--amarillo); color: #1a0a00; }
+  .asistente p { margin: 0 0 6px; }
+  /* ---- el editor de Mii: pantalla propia, sin arrancar el juego ---- */
+  #editorMii { position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(16px + var(--st)) 16px calc(16px + var(--sb));
+    background: linear-gradient(170deg, #1a1234, #24123a 60%, #2c1030); }
+  .mii-marco { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: 220px 1fr; gap: 16px; }
+  .mii-cabeza { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .mii-cabeza h2 { margin: 0; font: 400 28px 'Lilita One', system-ui, sans-serif; color: #ff9ad5; text-shadow: 0 2px 0 #3a0a24; }
+  .mii-cabeza .boton:first-child { margin-right: 4px; }
+  .mii-lista { display: grid; gap: 6px; align-content: start; }
+  .mii-lista button.mii { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 12px; border: 2px solid #3d3378; background: #161233;
+    color: var(--texto); cursor: pointer; text-align: left; font: 600 13px 'IBM Plex Sans', sans-serif; }
+  .mii-lista button.mii[aria-pressed="true"] { border-color: #ff9ad5; }
+  .mii-lista button.mii svg { width: 40px; height: 40px; flex: none; }
+  .mii-editor { display: grid; grid-template-columns: 200px 1fr; gap: 16px; padding: 16px; border-radius: 16px; background: #161233ee; border: 2px solid #4b3d93; }
+  .mii-vista { display: grid; justify-items: center; gap: 6px; align-content: start; }
+  .mii-vista svg { width: 180px; height: 180px; background: #0f0c24; border-radius: 18px; }
+  .mii-vista small { color: var(--suave); font-size: 11.5px; text-align: center; }
+  .mii-pestanas { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .mii-pestanas button { padding: 5px 10px; border-radius: 999px; border: 1px solid #3d3378; background: #221c4a; color: var(--texto); cursor: pointer; font: 600 12px 'IBM Plex Sans', sans-serif; }
+  .mii-pestanas button[aria-selected="true"] { background: #ff9ad5; border-color: #ff9ad5; color: #2a0a1c; }
+  .mii-campos { display: grid; gap: 8px; }
+  .mii-campos label { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 8px; font-size: 13px; color: var(--suave); }
+  .mii-campos input[type=range] { width: 100%; accent-color: #ff9ad5; }
+  .mii-campos input[type=text] { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: #0f0c24; color: var(--texto); font: inherit; }
+  .mii-campos output { text-align: right; font: 600 12px ui-monospace, Consolas, monospace; color: var(--texto); }
+  .mii-campos .colores { display: flex; gap: 4px; flex-wrap: wrap; }
+  .mii-campos .colores button { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #0006; cursor: pointer; }
+  .mii-campos .colores button[aria-pressed="true"] { outline: 2px solid #fff; outline-offset: 1px; }
+  .mii-pie { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .mii-pie p { flex-basis: 100%; margin: 4px 0 0; font-size: 12.5px; color: var(--suave); }
+  @media (max-width: 760px) { .mii-marco, .mii-editor { grid-template-columns: 1fr; } .mii-lista { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } }
+</style>
+</head>
+<body>
+<!-- el juego (position:fixed va en el atributo: controles.mjs le pone position:relative si no tiene una propia) -->
+<div id="pantalla" style="position:fixed"><canvas id="canvas" tabindex="0"></canvas></div>
+
+<!-- la cortina (interfaz.mjs: ui.cortina): está desde el primer instante para que nunca se vea nada antes de tiempo -->
+<div id="cortina" role="status" aria-live="polite">
+  <div>
+    <p class="ceja">El juego de Wii, en tu navegador</p>
+    <h1>Mario Kart Wii</h1>
+    <span class="sub">+ Retro Rewind</span>
+    <div class="carga"><i></i></div>
+    <p id="cortinaTexto">Cargando el juego…</p>
+  </div>
+</div>
+
+<div id="barra">
+  <button id="volverJuegos" type="button" title="Volver a Juegos">← Juegos</button>
+  <span data-volumen hidden></span>
+  <span class="vol-mini" id="volMini"><button type="button" id="volMiniMudo" title="Silencio">🔊</button><input type="range" id="volMiniBarra" min="0" max="100" aria-label="Volumen"></span>
+  <button type="button" data-abre="partida" aria-expanded="false">Partida</button>
+  <button type="button" data-abre="controles" aria-expanded="false">Controles</button>
+  <button type="button" data-abre="avanzado" aria-expanded="false" title="Ajustes y diagnóstico">⚙</button>
+  <button type="button" id="completa" title="Pantalla completa">⛶</button>
+  <span id="mando" role="status">Mando: aprieta un botón</span>
+</div>
+
+<div id="inicio">
+  <div class="tarjeta">
+    <p class="ceja">El juego de Wii, en tu navegador</p>
+    <h1>Mario Kart Wii</h1>
+    <span class="sub">+ Retro Rewind</span>
+    <p>Más de 200 pistas clásicas, todo desbloqueado. Se juega con el teclado, un mando o el celular.</p>
+
+    <section class="partida" aria-labelledby="tituloPartida">
+      <div class="partida-tit"><b id="tituloPartida">Tu partida</b><span class="chip" id="chipPartida">—</span></div>
+      <div class="licencias" id="licenciasInicio"></div>
+      <p class="vacia" id="partidaVacia" hidden>Todavía no hay licencias. Al jugar, el juego crea una y se guarda sola en
+        este navegador. ¿Ya juegas en una Wii o en Dolphin? <b>Carga tu partida</b> y sigue donde quedaste.</p>
+      <div class="fila-botones">
+        <button type="button" class="boton principal" data-cargar>Cargar mi partida…</button>
+        <button type="button" class="boton" data-abre="partida">Descargar · respaldos</button>
+      </div>
+    </section>
+
+    <button id="arrancar" class="jugar" type="button">Jugar</button>
+    <div id="estadoInicio" role="status"></div>
+    <div class="teclas"><kbd>K</kbd> acelerar · <kbd>J</kbd> frenar · <kbd>←</kbd><kbd>→</kbd> girar · <kbd>L</kbd> derrapar ·
+      <kbd>Espacio</kbd> objeto · <kbd>P</kbd> pausa — todo se cambia en «Controles». La partida se guarda sola en este navegador.</div>
+  </div>
+
+  <div class="modos-lista" id="modos">
+    <div class="modos-tit"><h2>Modos</h2><span>ELIGE CÓMO JUGAR</span></div>
+    <!-- interfaz.mjs las arma (MODOS): cada una con su emblema, su texto y si ya anda -->
+  </div>
+</div>
+
+<aside id="cajon" aria-label="Opciones">
+  <div class="pestanas" role="tablist">
+    <button type="button" role="tab" data-hoja="partida" aria-selected="true">Partida</button>
+    <button type="button" role="tab" data-hoja="controles" aria-selected="false">Controles</button>
+    <button type="button" role="tab" data-hoja="avanzado" aria-selected="false">Avanzado</button>
+    <button type="button" class="cerrar" id="cerrarCajon" title="Cerrar (Esc)">×</button>
+  </div>
+
+  <section class="hoja" id="hojaPartida" role="tabpanel">
+    <h2>Tu partida</h2>
+    <div class="licencias" id="licenciasPanel"></div>
+    <p id="partidas" style="font-size:12.5px;color:var(--suave);margin:0 0 10px">—</p>
+    <div class="fila-botones">
+      <button type="button" class="boton principal" id="subirPartidas" data-cargar>Cargar mi partida…</button>
+      <button type="button" class="boton" id="bajarRksys">Descargar rksys.dat</button>
+      <button type="button" class="boton" id="bajarPartidas">Descargar copia completa</button>
+      <button type="button" class="boton" id="abrirMii">Mi Mii</button>
+    </div>
+    <input type="file" id="archivoPartidas" accept=".dat,.mkwp,.mii,application/octet-stream" hidden>
+    <p style="margin-top:8px">Carga el <b>rksys.dat</b> de tu Wii o de Dolphin, o una <b>copia completa</b> (.mkwp) bajada de aquí.
+      También puedes arrastrarlo a la página. Antes de reemplazar algo se guarda una copia de respaldo.</p>
+    <details class="ayuda-donde">
+      <summary>¿Dónde está mi partida?</summary>
+      <ul>
+        <li><b>Wii con Retro Rewind</b> (tarjeta SD): <code>riivolution/save/RetroWFC/RMCP/rksys.dat</code></li>
+        <li><b>Dolphin con Retro Rewind</b> (o WheelWizard): en la carpeta de Dolphin,
+          <code>Load/Riivolution/riivolution/save/RetroWFC/RMCP/rksys.dat</code></li>
+        <li><b>Dolphin sin mods</b>: <code>Wii/title/00010000/524d4350/data/rksys.dat</code> (Europa; 524d4345 = EE. UU., 524d434a = Japón)</li>
+        <li>La carpeta de Dolphin: en Windows, <code>Documentos\Dolphin Emulator</code> o <code>%AppData%\Dolphin Emulator</code>; en Dolphin,
+          menú Archivo → Abrir carpeta de usuario.</li>
+        <li>Para volver a llevarla a la Wii o a Dolphin: «Descargar rksys.dat» y ponlo en la misma carpeta (guarda antes una copia del que había).</li>
+      </ul>
+    </details>
+    <h3>En tu cuenta</h3>
+    <p id="nubeEstado">Inicia sesión en Paginita Pro para tener tu partida en la nube y seguir en otro equipo.</p>
+    <h3>Copias de respaldo</h3>
+    <ul class="respaldos" id="listaRespaldos"></ul>
+    <h3>Borrar</h3>
+    <button type="button" class="boton peligro" id="borrarPartidas">Borrar las partidas de este navegador</button>
+  </section>
+
+  <section class="hoja" id="hojaControles" role="tabpanel" hidden>
+    <h2>Controles</h2>
+    <div class="fila">
+      <label><input type="checkbox" id="usarTactil"> Mando táctil (celular)</label>
+      <label><input type="checkbox" id="usarInclinacion"> Dirigir inclinando el teléfono</label>
+    </div>
+    <div id="ajustesTactil" hidden>
+      <div class="fila">
+        <label for="tamTactil">Tamaño del mando táctil</label>
+        <input type="range" id="tamTactil" min="80" max="130" step="5" style="width:130px">
+        <span class="dato" id="tamTactilDato">—</span>
+      </div>
+      <div class="fila">
+        <label for="opaTactil">Opacidad</label>
+        <input type="range" id="opaTactil" min="30" max="100" step="5" style="width:130px">
+        <span class="dato" id="opaTactilDato">—</span>
+      </div>
+    </div>
+    <p class="dato" id="puerto1">puerto 1: —</p>
+    <h3>Mandos</h3>
+    <div id="mandosPanel"></div>
+    <h3>Teclado (jugador 1)</h3>
+    <p>Clic en una tecla para cambiarla.</p>
+    <table id="tablaTeclas"></table>
+    <button type="button" class="boton" id="restaurarTeclas" style="margin-top:8px">Restaurar teclas por defecto</button>
+  </section>
+
+  <section class="hoja" id="hojaAvanzado" role="tabpanel" hidden>
+    <h2>Avanzado</h2>
+    <h3>Sonido</h3>
+    <div class="fila">
+      <label for="volumen">Volumen</label>
+      <input type="range" id="volumen" min="0" max="100" step="1" style="width:160px">
+      <span class="dato" id="volumenDato">—</span>
+      <label><input type="checkbox" id="silencio"> Silencio</label>
+    </div>
+    <p class="aviso" id="sonidoAviso" hidden>🔇 El navegador tiene el sonido bloqueado hasta que toques la página o aprietes una tecla.</p>
+    <h3>Video</h3>
+    <p id="gpuEnUso" style="margin:0">🎮 tarjeta de video: —</p>
+    <details class="aviso" id="gpuAyuda" hidden>
+      <summary>¿Tienes una tarjeta de video dedicada y el juego va lento?</summary>
+      La tarjeta que usa el navegador la decide Windows, no la página. Para cambiarla: Configuración → Sistema →
+      Pantalla → Gráficos → tu navegador (p. ej. Google Chrome) → <i>Alto rendimiento</i>, y reinicia el navegador.
+    </details>
+    <h3>Datos del juego</h3>
+    <div class="fila"><span id="datosDisco" style="color:var(--suave)">—</span>
+      <button type="button" class="boton" id="borrarDisco">Borrar</button></div>
+    <h3>Diagnóstico</h3>
+    <div class="fila">
+      <span class="dato" id="fps">— fps</span>
+      <span class="dato" id="trabajo">trabajo — ms</span>
+      <span class="dato" id="sonidoDato">sonido: —</span>
+    </div>
+    <p class="dato" id="lecturas" style="font-weight:400">disco: —</p>
+    <div id="resumen"></div>
+    <ul id="resultados"></ul>
+    <h3>Registro</h3>
+    <pre id="log"></pre>
+  </section>
+</aside>
+
+<div id="editorMii" hidden></div>
+<div id="soltar" hidden>Suelta tu partida aquí<br><small style="font:14px 'IBM Plex Sans',sans-serif">rksys.dat, copia .mkwp, RFL_DB.dat o un Mii (.mii)</small></div>
+<dialog id="dialogo"><h2></h2><div class="cuerpo"></div><div class="acciones"></div></dialog>
+
+<script type="module" src="mkw.mjs"></script>
+</body>
+</html>

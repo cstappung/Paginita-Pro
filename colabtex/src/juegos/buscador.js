@@ -87,6 +87,7 @@ export const APODOS = {
   boxhead: "box head zombis demonios disparos armas",
   haxball: "futbol soccer pelota arco goles",
   bt3: "dragon ball budokai tenkaichi goku pelea ps2",
+  mkw: "mario kart wii retro rewind carreras autos karts nintendo",
   tulones: "escalar trepar torre fisica calzoncillos pudu",
   hero: "guitar hero clone hero guitarra bajo bateria musica canciones",
   mascotas: "tamagotchi crianza criar mascota gallina gato 3d adoptar",

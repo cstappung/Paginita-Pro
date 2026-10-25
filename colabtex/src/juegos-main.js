@@ -71,6 +71,7 @@ import { crearMemazo } from "./juegos/memazo.js";
 import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
+import { crearMkw, crearMkwSolo } from "./juegos/mkw.js";
 import { bt3Visible, revisaBt3, alCambiarBt3 } from "./juegos/bt3-amigos.js";
 import { crearHero, ponHero } from "./juegos/hero.js";
 import { fijaVeRock, veRock, fichaRock } from "./juegos/rock-datos.js";
@@ -114,6 +115,11 @@ import { SOLOS, entradasSalon, nuevos, diasDesde, modoSalon, esClaveInvitado, UI
 import { indiceBusqueda, buscaJuegos } from "./juegos/buscador.js";
 import { escenaNovedad } from "./juegos/novedades-arte.js";
 import { montaHalloween, halloweenHtml } from "./juegos/halloween.js";
+/* Solo en ESTA PC, para probar un juego de punta a punta: el arnés local de Mario Kart (juegos/mkw/herramientas/
+   experiencia.mjs, el jugar.bat del proyecto) pone window.__JG_SOLO = ["mkw"] y el catálogo muestra solo ese juego
+   (su sala y su «un jugador»). En el sitio publicado no existe: se ven todos. */
+const SOLO_LOCAL = typeof location !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Array.isArray(window.__JG_SOLO)
+  ? new Set(window.__JG_SOLO) : null;
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -123,10 +129,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, pool: crearPool
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", pool: "🎱" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
@@ -250,6 +256,15 @@ const OPCIONES = {
      el organizador empieza cuando están todos. */
   bt3: [{ clave: "cupo", etiqueta: "Formato", por: 2, valores: [
     { v: 2, t: "Duelo (1 contra 1)" }, { v: 4, t: "Torneo, hasta 4" }, { v: 8, t: "Torneo, hasta 8" }] }],
+  /* Mario Kart Wii: SOLO el modo de la sala (pedido del dueño, 2026-10-19: «al abrir sala, no cuántas personas: los
+     modos»): copa o playlist (redMkw: MKW_MODOS), sin el Wi-Fi del juego. Caben 4 (cada piloto es un jugador de
+     verdad en todas las consolas; la CPU completa los 12). Se guarda como `estilo` (las reglas de Firebase reservan
+     `modo` para los valores de otros juegos). En el vestíbulo el anfitrión lo cambia y elige la cilindrada; la copa o la lista se eligen en el juego (§74).
+     El cupo no se pregunta (el dueño, 2026-10-20: «por defecto es para el número máximo de jugadores»): toda sala
+     nace con el máximo (oculta: la ficha no la muestra, pero va al crearla; sin ella cupoDe la dejaba en 2). */
+  mkw: [{ clave: "cupo", etiqueta: "Pilotos", por: JUEGOS.mkw.cupo, oculta: true, valores: [{ v: JUEGOS.mkw.cupo, t: JUEGOS.mkw.cupo + " pilotos" }] },
+    { clave: "estilo", etiqueta: "Modo", por: "copa", valores: [
+      { v: "copa", t: "Modo copa (una copa del juego, 4 carreras con puntos)" }, { v: "playlist", t: "Modo playlist (una lista de pistas, con sugerencias)" }] }],
   /* HaxBall: cuántos caben, a cuántos goles y en qué cancha. Los equipos se
      eligen en el vestíbulo de la sala y el anfitrión arranca desde dos. */
   haxball: [
@@ -1441,6 +1456,7 @@ async function anotar(p) {
   if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
   if (p.juego === "bt3") return;                    // BT3: el juego no dice quién ganó; la sala no clasifica
+  if (p.juego === "mkw") return;                    // Mario Kart Wii: tampoco
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -1760,7 +1776,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|bt3)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|integral|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|protiles|metrorush|tulones|pokelike|hero|prodefender|propac|bt3|mkw)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1965,7 +1981,7 @@ async function crear(juego, extra) {
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
-    if (juego !== "bt3") anunciaSala(salaParaDiscord(pid, juego, extra, u));   // BT3 es privado: ni en Discord
+    if (juego !== "bt3" && juego !== "mkw") anunciaSala(salaParaDiscord(pid, juego, extra, u));   // BT3 es privado: ni en Discord
     ir("#p/" + pid);
   } catch (e) { avisa(e, juego); }
 }
@@ -1997,6 +2013,7 @@ async function entrar(pid) {
   // BT3: solo entran los amigos de la lista (la sala privada no ofrece «Unirse», y esto cierra cualquier otro camino)
   const sala = state.partida && state.pid === pid ? state.partida : state.salas.find(s => s.id === pid);
   if (sala && sala.juego === "bt3" && !bt3Visible()) return;
+  if (sala && sala.juego === "mkw" && !bt3Visible()) return;   // Mario Kart Wii: la misma lista de amigos
   try {
     await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
@@ -2381,6 +2398,8 @@ function armazon() {
   document.documentElement.classList.toggle("jg-hero", state.vista === "solo-hero" && !motivo);
   /* BT3 «un jugador» también: la página del juego, en un marco de Juegos para que tenga la sesión (disco privado). */
   document.documentElement.classList.toggle("jg-bt3solo", state.vista === "solo-bt3" && !motivo);
+  /* Mario Kart Wii «un jugador» igual: su página con el menú de inicio «JloKart Wii», solo para la lista de amigos. */
+  document.documentElement.classList.toggle("jg-mkwsolo", state.vista === "solo-mkw" && !motivo);
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
   /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
   document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
@@ -2398,6 +2417,13 @@ function armazon() {
   if (state.vista === "solo-bt3") {
     h.innerHTML = "";
     individual = crearBt3Solo({ volver: () => ir("") });
+    individual.montar(h);
+    return;
+  }
+  if (state.vista === "solo-mkw") {
+    /* Su Multiplayer → Online abre las salas de Mario Kart (salón), como «En línea» de PRO HERO. */
+    h.innerHTML = "";
+    individual = crearMkwSolo({ volver: () => ir(""), enLinea: () => { ir(""); setTimeout(() => salon.abre && salon.abre("mkw"), 50); } });
     individual.montar(h);
     return;
   }
@@ -2485,7 +2511,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES]).filter(k => k !== "bt3" || bt3Visible()),
-      ocultos: () => bt3Visible() ? [] : ["bt3"]
+      ocultos: () => bt3Visible() ? [] : ["bt3", "mkw"]
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-integral": "integral", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-protiles": "protiles", "club-pokelike": "pokelike", "club-metrorush": "metrorush", "club-tulones": "tulones", "club-hero": "hero", "club-prodefender": "prodefender", "club-propac": "propac" })[k] || k) });
     logrosVista.montar(h);
     return;
@@ -2550,7 +2576,7 @@ function armazon() {
   if (state.vista === "ranks") {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
-      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()),
+      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()).filter(k => k !== "mkw" || bt3Visible()),
       datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "", foto: fotoEnDatos(u, datosP) }, colorForUid),
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
@@ -2818,7 +2844,7 @@ const NOVEDADES = [
    amigos del disco (bt3Visible, bt3-amigos.js). Al invitado y en el
    celular, primero lo que se puede jugar ahí (`ordenaNovedades`). */
 let VISIBLES = NOVEDADES;
-const filtraNovedades = () => { VISIBLES = ordenaNovedades(NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()), { invitado: state.invitado, celular: enCelular() }); };
+const filtraNovedades = () => { VISIBLES = ordenaNovedades(NOVEDADES.filter(n => n.id !== "bt3" || bt3Visible()).filter(n => n.id !== "mkw" || bt3Visible()).filter(n => !SOLO_LOCAL || SOLO_LOCAL.has(n.id)), { invitado: state.invitado, celular: enCelular() }); };
 /* El sello de cada diapositiva: «★ Lo último» para la más reciente,
    «Nuevo» para lo de las dos últimas semanas y «Destacado» para el resto
    (PRODROP no es nuevo, pero está porque se quiere que se vea). */
@@ -3272,7 +3298,7 @@ const entradaVes = id => entradasVes.solos.find(e => e.id === id) || entradasVes
 function salasAbiertas() {
   if (!state.user) return [];
   const mias = new Set(state.mias.map(x => x.id)), ahora = fb.ahora();
-  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()));
+  return state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahora) && (s.juego !== "bt3" || bt3Visible()) && (s.juego !== "mkw" || bt3Visible()));
 }
 
 /* El podio de un juego, en su ficha: es la razón para abrir una sala de
@@ -3323,12 +3349,13 @@ function pintaVestibulo() {
   /* El catálogo: los multijugador por popularidad (la de la última visita
      mientras llega la de hoy), los del club también, y las prácticas
      contra bots al final, que son la versión pequeña de un multijugador. */
-  const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible());   // BT3: solo los amigos
+  const orden = ordenPopular(Object.keys(JUEGOS)).filter(k => k !== "bt3" || bt3Visible()).filter(k => k !== "mkw" || bt3Visible());   // BT3 y MKW: solo los amigos
   const celular = enCelular();
   entradasVes = entradasSalon(JUEGOS, orden);
   /* En el celular, lo que se juega con el dedo primero (`ordenaEntradas`). */
   entradasVes.multi = ordenaEntradas(entradasVes.multi, { invitado: inv, celular });
-  if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3");
+  if (!bt3Visible()) entradasVes.solos = entradasVes.solos.filter(e => e.juego !== "bt3" && e.juego !== "mkw");
+  if (SOLO_LOCAL) { entradasVes.solos = entradasVes.solos.filter(e => SOLO_LOCAL.has(e.juego)); entradasVes.multi = entradasVes.multi.filter(e => SOLO_LOCAL.has(e.juego || e.id)); }
   const posClub = Object.fromEntries(ordenPopular(SOLOS.filter(x => x.popular).map(x => x.popular)).map((k, i) => [k, i]));
   const rango = new Map(entradasVes.solos.map((e, i) => [e.id, e.popular ? posClub[e.popular] : 100 + i]));
   /* Al invitado, primero los cuatro destacados (los que se juegan sin cuenta y se guardan al entrar). */
@@ -3416,7 +3443,7 @@ function pintaVestibulo() {
      anuncio viejo es de una partida que alguien dejó a medias sin
      cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
   const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
-  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()));
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco && (x.juego !== "bt3" || bt3Visible()) && (x.juego !== "mkw" || bt3Visible()));
   $("vesNCurso").textContent = vivas.length;
   $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
     const j = JUEGOS[x.juego] || {};
@@ -3470,7 +3497,7 @@ function pintaPartida() {
   /* BT3 es privado (bt3-amigos.js): a quien no está en la lista de amigos no se le muestra nada de la sala —ni
      el juego, ni quiénes están, ni el chat, ni «Unirse»—, aunque tenga el enlace. Mientras el Worker no contesta
      (`/soy`, una vez por sesión) dice que se está comprobando, y al llegar la respuesta la sala se repinta. */
-  const privada = p.juego === "bt3" && !bt3Visible();
+  const privada = (p.juego === "bt3" || p.juego === "mkw") && !bt3Visible();
   $("jgChat").hidden = privada;
   if (privada) {
     ambientar(""); desmontaJuego();
@@ -3537,7 +3564,7 @@ function pintaPartida() {
 
   /* Mientras falte gente, el enlace es lo único que hay que hacer. */
   $("jgInvita").innerHTML = est.listos ? "" : panelEspera(p, est);
-  if (!est.listos) {
+  if (!est.listos && $("jgCopiar")) {   // (M22: a quien echaron de Mario Kart no se le arma la caja: panelEspera da "")
     $("jgCopiar").onclick = async () => {
       const campo = $("jgUrl");
       campo.select();
@@ -3569,7 +3596,9 @@ function pintaPartida() {
    quien puso las condiciones. */
 function panelEspera(p, est) {
   const cupo = est.cupo || 2;
-  const dentro = (est.jugadores || []).length;
+  // (Mario Kart, M22: los echados y los que se fueron ya no cuentan, y al echado no se le ofrece invitar)
+  if (p.juego === "mkw" && est.fuera && est.fuera[state.user.uid]) return "";
+  const dentro = p.juego === "mkw" ? (est.jugadores || []).filter(j => !(est.fuera && est.fuera[j.uid])).length : (est.jugadores || []).length;
   const min = minimoDe(p);
   const anfitrion = p.anfitrion === state.user.uid;
   const varios = cupo > min || (p.juego === "pool" && cupo > 2);
@@ -3577,12 +3606,13 @@ function panelEspera(p, est) {
     <div class="jg-invita">
       <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
       <p>Pásale este enlace a quien quieras: en cuanto entre,
-         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : p.juego === "bt3" ? "aparece en el vestíbulo de la sala" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
+         ${p.juego === "haxball" ? "aparece en el vestíbulo de equipos" : (p.juego === "bt3" || p.juego === "mkw") ? "aparece en el vestíbulo de la sala" : varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
       <div class="jg-enlace">
         <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
+        : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo; quien llegue después entra en la carrera siguiente.</div>`
         : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
         : p.juego === "pool" ? `<div class="jg-nota">Dos contra dos: empieza sola cuando entren los cuatro. Quien abrió la sala juega con el compañero que eligió.</div>`
         : !varios ? ""
@@ -3612,6 +3642,9 @@ function montaJuego(p) {
        un juego cuyo marco tapa la página (BT3 a pantalla completa) y que
        ofrece su propio botón de salida. */
     salir: salirDeLaPartida,
+    /* El modo inmersivo de la sala (la pantalla completa del sitio, con el chat flotante): Mario Kart lo pone solo al
+       empezar la copa y lo saca al volver al vestíbulo. */
+    inmersivo: si => ponInmersivo(si),
     /* Escribir en el chat de la sala a nombre de quien está: para que una
        decisión a mano quede a la vista de todos (BT3: «Dar la victoria»). */
     chat: texto => fb.mandaChat(state.pid, { uid: state.user.uid, nombre: state.user.name }, texto).catch(() => false),
@@ -3676,7 +3709,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3717,8 +3750,9 @@ function pintaFin(p, est) {
     : "Ganó " + nombreDe(est, g);
   const sub = clase === "perdi" ? "Ganó " + nombreDe(est, g) : "";
   const marca = marcadorFin(est);
-  const echados = (est.expulsados || []).map(x => nombreDe(est, x.uid)).join(", ");
-  const expulsion = echados ? `Expulsad${(est.expulsados || []).length > 1 ? "os" : "o"} por votación: ${echados}.` : "";
+  const porVoto = (est.expulsados || []).filter(x => !x.echado);   // (§87: los que echó el anfitrión no van «por votación»)
+  const echados = porVoto.map(x => nombreDe(est, x.uid)).join(", ");
+  const expulsion = echados ? `Expulsad${porVoto.length > 1 ? "os" : "o"} por votación: ${echados}.` : "";
   const firma = clase + titulo + sub + f.motivo + marca + expulsion + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
@@ -3875,6 +3909,7 @@ function pintaQuienes(p, est) {
   const caja = $("jgQuienes");
   if (!caja) return;
   if (p.juego === "bt3" && !bt3Visible()) { caja.innerHTML = ""; return; }   // (sala privada: ni quiénes están)
+  if (p.juego === "mkw" && !bt3Visible()) { caja.innerHTML = ""; return; }
   const yo = state.user.uid;
   const juego = !!(p.jugadores || {})[yo];
   const fuera = fueraDe(est);
@@ -3882,7 +3917,11 @@ function pintaQuienes(p, est) {
   const hace = mayoriaExpulsion(activos.length);
   const abierta = juego && est.listos && !datosFin(p, est) && !fuera.has(yo) && activos.length >= 2;
   const duelo = activos.length <= 2;
-  const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
+  // Mario Kart Wii (§87 del port): la sala está abierta siempre (vestíbulo y copa, sin `listos`) y se vota con 3 o más
+  // pilotos; con 2, votar sería echar solo, y eso lo hace el anfitrión (su botón «Echar» del vestíbulo)
+  const enMkw = p.juego === "mkw";
+  const puedoVotar = enMkw ? juego && !datosFin(p, est) && !fuera.has(yo) && activos.length >= 3
+    : abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
   const votos = est.votos || {};
   const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, marcoDeUid(x.uid)]), [...fuera], votos, puedoVotar, hace]);
   if (caja.dataset.firma === firma) return;
@@ -4299,6 +4338,8 @@ function arteJuego(k) {
   if (k === "memazo") return '<div class="jg-art-mz">' + memeHtml("sino", ["Jugar solo", "Hacer memes con amigos"]) + '<em>MOMAZO :v</em></div>';
   if (k === "tulones") return '<div class="jg-art-tl">' + portadaSolo("tulones") + '<em>TULONES</em></div>';
   if (k === "hero") return '<div class="jg-art-tl">' + portadaSolo("hero") + '<em>EN LÍNEA</em></div>';
+  /* Mario Kart Wii: una bandera a cuadros que flamea y el nombre en letras nuestras (nada del arte del juego). */
+  if (k === "mkw") return `<div class="jg-art-mkw"><s></s><em><small>Retro Rewind</small><strong>Mario Kart Wii</strong></em></div>`;
   if (k === "bt3") return `<div class="jg-art-bt3"><s></s><b>Z</b><u>${ESFERAS_BT3}</u><em><small>Budokai</small><strong>TENKAICHI 3</strong></em></div>`;
   if (k === "haxball") return '<div class="jg-art-hx"><i></i><i></i><i></i><i></i><b></b><s></s><u></u><em>HAXBALL</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>PRO BOXHEAD</em></div>';

@@ -504,6 +504,32 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  /* Mario Kart Wii: una sola pestaña. Lo que pasa en la sala del sitio (vestíbulo, modos, llegar tarde, cortes);
+     las carreras en sí son las del juego (Retro Rewind), así que el manual no las repite. */
+  mkw: {
+    lema: "Mario Kart Wii con Retro Rewind, entero en tu navegador: copas de hasta 12 amigos, y la CPU completa la parrilla.",
+    secciones: [
+      ["Cómo se juega", pasos([
+        "Abre una sala de <b>Mario Kart Wii</b> en <b>Modo copa</b> (una copa del juego: sus 4 carreras, con puntos) o <b>Modo playlist</b> (una lista de pistas que arma el anfitrión, con las sugerencias de todos) y pasa el enlace. Quien la abre es el <b>anfitrión</b> (👑).",
+        "En el vestíbulo el anfitrión elige la <b>cilindrada</b> y el <b>nivel de la CPU</b> (Fácil, Normal, Difícil, Máximo, Intenso o Imposible; Máximo por omisión: Intenso e Imposible son injustos a propósito) y aprieta <b>¡A correr!</b>; la copa o la lista se eligen en el juego. Caben 12 pilotos, como en Mario Kart en línea: si son menos, la CPU completa los 12 lugares.",
+        "Cada uno carga el juego (la primera vez tarda; después sale de tu computador). En la copa, el anfitrión <b>elige las pistas</b> con el selector (fotos, logos y planos de cada pista).",
+        "Después, cada uno elige <b>personaje y vehículo</b> en las pantallas del juego (45 s; a quien no alcanza se le pone uno).",
+        "Todos corren <b>la misma carrera</b> y empiezan al mismo tiempo: si alguien todavía carga, los demás lo esperan. Al final la tabla de la copa queda en el vestíbulo."
+      ])],
+      ["Llegar tarde y salir", lista([
+        "Quien entra con la copa andando espera a la <b>siguiente</b>.",
+        "Si a alguien se le corta la conexión, la carrera sigue sin él (al empezar cada carrera se lo espera unos segundos más) y vuelve en la siguiente; lo mismo si recarga la página.",
+        "Si el anfitrión se va, el puesto pasa al siguiente y la copa sigue.",
+        "Cada carrera termina 30 s después de que llega el primero (a los que faltan el juego les da un tiempo), o a los 5 minutos."
+      ])],
+      ["Controles", tabla([
+        ["Teclado", "Las teclas del juego (se cambian en <b>Opciones</b> dentro de la página del juego)."],
+        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."]
+      ])],
+      ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta; empieza en 5000). Cada carrera lo mueve con tu puesto entre los 12: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo; la CPU también cuenta, con menos peso y con un VR fijo según su nivel. Contra <b>Intenso</b> e <b>Imposible</b>, que nadie puede ganar, la CPU no da ni quita VR: gana quien le ganó a más CPU que los otros humanos. Si te vas a mitad de carrera (o no tocas nada 30 s al empezar) pierdes contra todos, y nadie gana VR por ti. Solo, sin otro humano, el VR no se mueve."],
+      ["Qué hace falta", "Chrome o Edge en el computador (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
+    ]
+  },
   /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:
      cupo 2 = duelo). Lo común va detrás: qué hace falta, los personajes prohibidos, mirar y qué hacer si algo falla. */
   bt3: {

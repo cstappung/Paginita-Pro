@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "banco",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "banco/servir.cjs",
+        "8130"
+      ],
+      "port": 8130
+    },
+    {
+      "name": "juego",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "web/navegador/servidor.mjs",
+        "8140"
+      ],
+      "port": 8140,
+      "url": "http://127.0.0.1:8140"
+    },
+    {
+      "name": "sitio",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "herramientas/sitio-local.mjs"
+      ],
+      "port": 8150,
+      "url": "http://127.0.0.1:8150"
+    }
+  ]
+}

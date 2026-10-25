@@ -1,0 +1,4 @@
+{
+  "//": "paridad.js (de Emscripten) es un módulo ES; banco/package.json dice commonjs (lo puso npm al instalar Playwright)",
+  "type": "module"
+}

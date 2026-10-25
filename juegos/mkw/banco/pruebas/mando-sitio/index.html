@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mandos como en el sitio</title>
+<link rel="stylesheet" href="../../estilo.css">
+<script>
+  // un mando de Xbox de mentira (el mapeo «standard» de la Gamepad API), el mismo para esta página y para el marco
+  const boton = () => ({ pressed: false, value: 0 });
+  window.mandoFalso = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true, mapping: 'standard',
+    timestamp: 0, buttons: Array.from({ length: 17 }, boton), axes: [0, 0, 0, 0] };
+  window.mandosFalsos = [window.mandoFalso];
+  navigator.getGamepads = () => window.mandosFalsos;
+</script>
+<!-- el mando.js de verdad del sitio (terceros/Paginita-Pro/juegos/audio, servido en /sitio/audio por servir.cjs) -->
+<script src="/sitio/audio/mando.js?v=mando-2"></script>
+</head>
+<body>
+<h1>Mandos como en el sitio: <span>el mando.js de Juegos y el marco de Mario Kart</span></h1>
+<p>Prueba <code>web/navegador/mando-sitio.mjs</code> (bitácora §100, pedido del dueño: «el soporte de mandos como lo hacen
+  los otros juegos») <b>sin el juego</b>: esta página hace de Juegos (carga el <code>mando.js</code> de verdad del sitio) y
+  el marco hace de la página de Mario Kart (<code>hijo.html</code>: un botón que llena todo, como un menú de la página).
+  Un mando de Xbox <b>de mentira</b>. Comprueba: el marco carga su copia de mando.js; con el marco a la vista, la página
+  de arriba se aparta (sin cursor ni clics arriba); en el juego, el mando de la página no fabrica teclas y el mando
+  llega al juego; con un menú abierto, el cursor del sitio maneja el marco, A hace clic y el mando deja de llegar al
+  juego; con el marco escondido, arriba vuelve el cursor.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<iframe id="marco" style="width: 480px; height: 300px; border: 0;"></iframe>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { direccionMandoSitio, PISTAS_MKW } from '/web/navegador/mando-sitio.mjs';
+
+const { ok, fin } = prueba('mando-sitio', 'Mandos como en el sitio (sin el juego)');
+const cuadros = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+const pulsa = async (i, si) => { mandoFalso.buttons[i] = { pressed: si, value: si ? 1 : 0 }; mandoFalso.timestamp++; await cuadros(6); };
+const cursorVisible = doc => { const c = doc.getElementById('mando-cursor'); return !!c && getComputedStyle(c).display !== 'none'; };
+try {
+  ok('la página de arriba (sin marco padre) no busca otro mando.js', direccionMandoSitio(window) === null);
+  const marco = document.getElementById('marco');
+  await new Promise(r => { marco.onload = r; marco.src = 'hijo.html'; });
+  const H = marco.contentWindow;
+  const M = await H.listo;
+  ok('el marco carga su propia copia del mando.js del sitio (la dirección sale del <script> de arriba)',
+     !!M && !!H.Mando && H.Mando !== window.Mando && direccionMandoSitio(H)?.includes('/sitio/audio/mando.js'), direccionMandoSitio(H) || 'sin dirección');
+  await cuadros(20);
+  ok('con un mando conectado y el marco a la vista, la página de arriba se aparta (sin su cursor)', H.Mando.conectado() && !cursorVisible(document),
+     `marco: ${H.Mando.nombre()} · cursor arriba ${cursorVisible(document)}`);
+  ok('en el juego (ningún menú de la página): el mando.js del marco no maneja nada y el mando llega al juego',
+     H.Mando.estado()?.modo === 'juego' && H.sinMandosF?.() === false && !cursorVisible(H.document), `modo ${H.Mando.estado()?.modo}`);
+  await pulsa(0, true); await pulsa(0, false);
+  ok('…un A en el juego no fabrica teclas ni clics en la página (el juego lee el mando solo)', H.teclas === 0 && H.clics === 0, `teclas ${H.teclas}, clics ${H.clics}`);
+  H.menuAbierto = true; await cuadros(10);
+  ok('con un menú de la página abierto: el cursor del sitio aparece en el marco y el mando deja de llegar al juego',
+     H.Mando.estado()?.modo === 'cursor' && H.sinMandosF() === true && cursorVisible(H.document), `modo ${H.Mando.estado()?.modo}`);
+  await pulsa(0, true); await pulsa(0, false);
+  ok('…y A hace clic donde está el cursor (como en los demás juegos)', H.clics === 1 && H.teclas === 0, `clics ${H.clics}`);
+  H.menuAbierto = false; await cuadros(10);
+  ok('al cerrarse el menú, el mando vuelve al juego', H.Mando.estado()?.modo === 'juego' && H.sinMandosF() === false && !cursorVisible(H.document));
+  ok('las ayudas del mando son los botones de Mario Kart, con «select» (así mando.js no ofrece «Select: cursor»)',
+     H.Mando.pistas(PISTAS_MKW).includes('acelerar') && PISTAS_MKW.some(p => /\bselect\b/.test(p[0])));
+  marco.style.display = 'none'; await cuadros(12);
+  ok('con el marco escondido, la página de arriba vuelve a manejar su cursor', cursorVisible(document));
+} catch (e) {
+  ok('la prueba corrió sin errores', false, e.stack || e.message);
+}
+fin();
+</script>
+</body>
+</html>

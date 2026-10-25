@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FMA exacta en wasm</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>Multiplicar y sumar <span>exacto</span> en WebAssembly</h1>
+<p>El procesador de la Wii hace <code>a×c+b</code> con un solo redondeo (fmadd, ps_madd), y la física del juego
+  depende de eso: los ghosts coinciden bit a bit con la Wii. WebAssembly no tiene esa instrucción. Aquí se compara
+  la versión de software de musl (exacta, la que usaría <code>std::fma</code>) con dos propias, bit a bit.</p>
+<div class="caja"><div id="resumen">calculando (unos segundos)…</div><ul id="resultados"></ul></div>
+<div class="caja"><b>Cómo funcionan las propias:</b>
+  <ul>
+    <li><b>float</b> (ps_madd, la de los vértices): el producto de dos float cabe exacto en un double; se suma
+      recuperando el error y se «redondea a impar» antes de bajar a float. Así no hay doble redondeo.</li>
+    <li><b>double</b> (fmadd): el producto se parte sin error en dos doubles (Dekker), se suman las tres piezas sin
+      error y se redondea una sola vez. Los casos extremos (desbordes, subnormales, infinitos) usan musl.</li>
+  </ul>
+  Código: <code>banco/pruebas/fma/fma.c</code>. En Node: <code>node banco/pruebas/fma/prueba-node.mjs 40</code>
+  (40 millones de casos de cada tipo).</div>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('fma', 'FMA exacta en wasm');
+await new Promise(r => setTimeout(r, 50));                     // dejar que se pinte "calculando…"
+const crea = (await import('./fma.js')).default;
+const M = await crea();
+M._corre(2);                                                    // 2 millones de cada tipo (en el navegador, rápido)
+const d = i => M._dato(i), ej = M.UTF8ToString(M._ejemplo());
+ok('double (fmadd): mismos bits que musl', d(1) === 0, `${d(0).toLocaleString('es')} casos, ${d(1)} distintos`);
+ok('double: empates fabricados', d(5) === 0, `${d(4).toLocaleString('es')} casos, ${d(5)} distintos`);
+ok('float (ps_madd): mismos bits que musl', d(3) === 0, `${d(2).toLocaleString('es')} casos, ${d(3)} distintos`);
+if (ej) nota('primer caso distinto: ' + ej);
+const ns = ms => ms * 1e6 / 4e6;
+ok('double rápida más veloz que musl', ns(d(7)) < ns(d(6)), `musl ${ns(d(6)).toFixed(2)} ns, rápida ${ns(d(7)).toFixed(2)} ns, sin fusionar ${ns(d(10)).toFixed(2)} ns`);
+ok('float rápida más veloz que musl', ns(d(9)) < ns(d(8)), `musl ${ns(d(8)).toFixed(2)} ns, rápida ${ns(d(9)).toFixed(2)} ns`);
+nota('presupuesto: aunque el juego hiciera un millón de FMA por cuadro, a ~5 ns son 5 ms de los 16,7 ms del cuadro');
+fin();
+</script>
+</body>
+</html>
