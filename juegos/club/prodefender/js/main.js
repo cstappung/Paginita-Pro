@@ -50,7 +50,7 @@
 
   // ------------------------------ Guardado -------------------------------
   // `pend`: por reino, el récord que todavía no confirma la tabla de Juegos ({r, t, p}: ronda,
-  // tiempo y su prueba). Se manda cada CADA rondas y al salir (ver «Clasificación y monedas»).
+  // tiempo y su prueba). Si la pestaña se cierra antes, se manda al volver (ver «Clasificación y monedas»).
   function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, pend: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45, cursor: 'grande' } }; }
   function loadSave() {
     try {
@@ -783,7 +783,6 @@
   function openPause() {
     if (!game || ui.modal) return;
     ui.paused = true;
-    manda(game.li);   // en pausa se puede cerrar la pestaña: el récord se guarda antes
     modal(`<h2>Pausa</h2><p>${game.L.name} · Ronda ${Math.min(100, game.round + 1)}/100<br>Eliminados: ${fmt(game.stats.kills)} · Fugas: ${fmt(game.stats.leaked)}</p>
       ${game.active ? '<p style="font-size:13px;color:var(--muted)">Si sales ahora, la partida se reanudará al inicio de esta ronda.</p>' : ''}
       <div class="vol"><label>Música <input type="range" id="v-mus" min="0" max="1" step="0.05" value="${save.settings.music}"></label>
@@ -805,7 +804,6 @@
   }
   function exitGame() {
     if (game && !game.over && !game.won) guardaPartida();
-    if (game) manda(game.li);
     game = null; rec = null; ui.paused = false;
     show('levels');
   }
@@ -848,7 +846,7 @@
           if (!prueba) anota(li, ev.round);   // los reinos en pruebas no guardan récords
           if (game.won) { delete save.runs[li]; if (!prueba) save.won[li] = true; writeSave(); }
           else guardaPartida();
-          if (!prueba && (ev.round % CADA === 0 || game.won)) manda(li);
+          if (!prueba) manda(li);
           buildPreview();
           if (ui.auto && !game.won) ui.autoT = 1.2;
           break;
@@ -890,7 +888,6 @@
           else delete save.runs[li];
           if (!enPrueba(li)) save.best[li] = Math.max(save.best[li] || 0, game.round);
           writeSave();
-          manda(li);   // la partida acabó: su récord va a Juegos ya
           const btns = [];
           if (g) btns.push({ label: `Reintentar ronda ${r} (quedan ${cont})`, cls: 'go', fn: () => startGame(li, save.runs[li]) });
           btns.push({ label: 'Reiniciar reino', cls: 'gold', fn: () => { delete save.runs[li]; writeSave(); startGame(li, null); } });
@@ -962,11 +959,7 @@
       }
     }
   });
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && game) manda(game.li);   // la pestaña se esconde (o se va a cerrar): se guarda el récord
-    if (document.hidden && game && !ui.modal && game.active) openPause();
-  });
-  window.addEventListener('pagehide', () => { if (game) manda(game.li); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && game && !ui.modal && game.active) openPause(); });
 
   function drainSounds() {
     const q = game.sounds;
@@ -1004,13 +997,10 @@
   // ------------------------- Clasificación y monedas -------------------------
   // Lo que la tabla del club sabe de cada reino (tu ronda récord; null: aún no se sabe).
   // Cada ronda que la supera queda anotada (`save.pend`) y se manda a Juegos con la prueba
-  // de la partida cada CADA rondas, al perder, al pausar, al salir de la partida y al
-  // esconder la pestaña: la página la rehace (verifica/prodefender.js), la guarda y eso paga
-  // monedasRonda(li) por cada ronda nueva, las mismas que antes. Antes se mandaba en cada
-  // ronda, y cada envío es la partida entera desde la ronda 1: cien copias crecientes por
-  // reino. Lo anotado se borra cuando la tabla lo confirma; si la pestaña se cerró antes,
-  // se manda la próxima vez que se abra el juego (recorreTablas).
-  const CADA = 10;
+  // de la partida: la página la rehace (verifica/prodefender.js), la guarda (compacta, y
+  // borrando la del récord anterior: una sola por reino) y eso paga monedasRonda(li) por
+  // ronda. Lo anotado se borra cuando la tabla lo confirma; si la pestaña se cerró antes de
+  // que la página lo guardara, se manda la próxima vez que se abra el juego (recorreTablas).
   const nube = PD.LEVELS.map(() => null), enviada = PD.LEVELS.map(() => 0);
   let verTabla = -1;
   function escuchaTabla(li) {
@@ -1062,8 +1052,7 @@
     const antes = Math.max(nube[li] || 0, enviada[li]);
     if (ronda <= antes || (save.pend[li] && save.pend[li].r >= ronda)) return;
     save.pend[li] = { r: ronda, t: rec.tiempo(), p: rec.prueba() };
-    const falta = ronda % CADA && ronda < PD.MAX_ROUND;
-    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>${falta ? `Se guarda en Juegos cada ${CADA} rondas y al salir: 🪙 ${fmt(monedasRonda(li))} por ronda nueva.` : `Juegos la comprueba y te paga 🪙 ${fmt((ronda - antes) * monedasRonda(li))}`}`, 'good', null, 3200);
+    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>Juegos la comprueba y te paga 🪙 ${fmt((ronda - antes) * monedasRonda(li))}`, 'good', null, 3200);
   }
   // Manda a Juegos el récord anotado del reino, si la tabla todavía no lo tiene.
   function manda(li) {

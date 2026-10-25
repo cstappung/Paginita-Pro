@@ -126,13 +126,12 @@ test('la prueba se guarda compacta (v: 2): pesa menos, vuelve exacta y el verifi
  assert.ok(w.includes("(auth.uid === $uid && !newData.exists() && root.child('soloRanks').child($categoria).child($uid).child('partida').val() !== $partida)"),w);
 });
 
-test('el juego manda su récord cada 10 rondas y al salir, no en cada ronda',()=>{
+test('el juego manda su récord en cada ronda y reenvía al abrir lo que no confirmó la tabla',()=>{
  const main=fs.readFileSync(D+'main.js','utf8');
- assert.match(main,/const CADA = 10;/);
  assert.equal((main.match(/CLUB\.result\(/g)||[]).length,1,'un solo envío: manda()');
- assert.match(main,/ev\.round % CADA === 0 \|\| game\.won\)\) manda\(li\)/,'cada 10 rondas y al ganar');
- for(const donde of ['function openPause() {','function exitGame() {',"window.addEventListener('pagehide'",'manda(li);   // la partida acabó'])
-  assert.ok(main.slice(main.indexOf(donde),main.indexOf(donde)+260).includes('manda('),donde);
+ assert.match(main,/if \(!prueba\) anota\(li, ev\.round\);[^\n]*\n[^\n]*\n[^\n]*\n\s*if \(!prueba\) manda\(li\);/,'al terminar cada ronda');
+ assert.match(main,/for \(const k of Object\.keys\(save\.pend\)\)[^\n]*manda\(\+k\)/,'lo pendiente se manda al abrir');
+ assert.match(main,/nube\[li\] >= save\.pend\[li\]\.r\) \{ delete save\.pend\[li\]/,'y se borra cuando la tabla lo tiene');
 });
 
 test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo la diferencia',()=>{

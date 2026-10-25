@@ -70,13 +70,13 @@ segundos. En Node (tests, `scripts/auditar-club.cjs`) se usa el motor cargado en
 `sospecha()` (filas sin prueba): más de 100 rondas, o menos de 5 s de juego por
 ronda.
 
-## El juego solo manda lo que supera el récord, cada 10 rondas
+## El juego solo manda lo que supera el récord
 
 `main.js` escucha las tablas de los reinos abiertos al abrir (`recorreTablas`) y
-anota cada ronda que supera la que ya está en la nube (`save.pend`, con su prueba);
-la manda con `Club.result` cada 10 rondas, al perder, al pausar, al salir de la
-partida y al esconder la pestaña, y lo que quedó sin confirmar se manda al volver a
-abrir. Una partida que no bate el récord no se verifica ni se guarda.
+manda con `Club.result` cada ronda que supera la que ya está en la nube. La deja
+anotada (`save.pend`, con su prueba) hasta que la tabla la tiene: si la pestaña se
+cerró antes de guardarla, se manda al volver a abrir. Una partida que no bate el
+récord no se verifica ni se guarda.
 
 La página guarda **una sola prueba por cuenta y reino**: al escribirse la fila nueva
 borra la del récord anterior (la regla deja al dueño borrar sus pruebas salvo la que

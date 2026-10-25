@@ -226,18 +226,17 @@ versión» (cache, not cheating: no castigo).
 
 Every record round is a new `partida` whose proof is the **whole game since
 round 1**, so a 100-round run used to leave up to 100 growing copies in
-`soloPruebas` (never deleted), plus 100 row writes broadcast to every open
-Juegos tab, and the admin audit re-downloaded the proof each time. Now:
+`soloPruebas` (never deleted), and the console, exports and the admin audit
+downloaded them. The record is still saved **every round** (owner's choice:
+a 10-round batch was tried and reverted), but:
 
-- **Every 10 rounds, not every round** (`CADA` in `main.js`): a round that
-  beats the record is noted in the local save (`save.pend[li] = {r, t, p}`:
-  round, time, `rec.prueba()` at that round's end) and sent by `manda(li)` at
-  rounds 10, 20…100, on defeat, when opening the pause menu, on `exitGame`,
-  and when the tab hides (`visibilitychange`/`pagehide`). It is deleted when
-  `club-tabla` shows the row (or on a rejection that is not «No se pudo
-  comprobar…»); anything left is resent by `recorreTablas` on the next open.
-  Coins are the same (paid per new round, in batches). The game still sends
-  the usual v1 proof, so a stale iframe or worker never meets a new format.
+- **Resent if lost**: a round that beats the record is noted in the local
+  save (`save.pend[li] = {r, t, p}`: round, time, `rec.prueba()` at that
+  round's end) and sent by `manda(li)`. It is deleted when `club-tabla` shows
+  the row (or on a rejection that is not «No se pudo comprobar…»); if the
+  frame closed before the page saved it, `recorreTablas` resends it on the
+  next open. The game still sends the usual v1 proof, so a stale iframe or
+  worker never meets a new format.
 - **One proof per account and kingdom** (`UNA_PRUEBA` in
   `verifica/prodefender.js`): after the new row commits, `guardaClub` deletes
   the previous record's proof (or its own, if another tab saved a better one).
@@ -260,9 +259,9 @@ Juegos tab, and the admin audit re-downloaded the proof each time. Now:
 - Ten tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
   of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
-  kingdoms (round 50 opens the next one), and sends `Club.result` only for a
-  round that **beats** the cloud record, in batches (see «Saving records to the
-  cloud» above). The levels screen
+  kingdoms (round 50 opens the next one), and sends `Club.result` for each
+  round that **beats** the cloud record (see «Saving records to the cloud»
+  above). The levels screen
   shows each kingdom's table in its `<aside>` (where `conexion.js` puts the
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
