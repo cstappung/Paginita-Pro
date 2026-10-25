@@ -10138,7 +10138,7 @@ mando». Un agente crítico revisó lo que había (y después lo implementado); 
   cada control en la letra del mando (✕ ○ □ △ / A B X Y / ZR / «Stick izq. →» / «Botón 7»), su luz en vivo, «Cambiar»,
   «＋», ✕, ↺; abajo «Asignar todo seguido» (espera a que se suelte todo entre uno y otro), «Deshacer», «Restaurar
   todo». El probador muestra además el stick C y los gatillos L y R con su barra.
-- **El teclado:** hasta 3 teclas por acción (✕, «Cambiar», «＋», ↺ por fila), el **stick C** (Num 8/2/4/6), Tab y F1-F12
+- **El teclado:** hasta 3 teclas por acción (✕, «Cambiar», «＋», ↺ por fila), el **stick C** (sin teclas de partida, ver 111.3), Tab y F1-F12
   no se asignan (son del navegador), y si una tecla se mueve de otra acción se avisa.
 - **Arreglos:** Esc cancela la reasignación sin cerrar el cajón (`interfaz.mjs`); el bucle de los controles sigue
   aunque un cuadro falle; `mkw.teclas` se revisa al leer; Xbox antes que PlayStation.
@@ -10149,3 +10149,30 @@ mando». Un agente crítico revisó lo que había (y después lo implementado); 
 **Pruebas:** banco `asignacion` (nuevo) 42/42, `controles` 48/48, `mandos-jugador` 17/17, `mando-sitio` 11/11; la página
 sin el juego: Esc con el cajón abierto cancela la espera de tecla, el cajón sigue abierto y la tecla siguiente no queda
 asignada; capturas del panel. Falta con el juego y un mando de verdad: la selección de personajes en el descanso.
+
+### 111.3 La segunda revisión del crítico (y lo que se arregló)
+
+El crítico (un agente aparte que lee el código sin saber lo que yo creo) revisó lo ya hecho. Encontró:
+
+| # | Qué pasaba (ejemplo) | Arreglo |
+|---|---|---|
+| 1 (grave) | Apretar «Cambiar» en X y, antes de tocar nada, «Cambiar» en Y: la respuesta de X (cancelada) borraba la espera de Y. Quedaba una captura sin fila, sin tope de 8 s y con el mando mudo; lo próximo que se tocaba se asignaba sin aviso. | `opciones-mandos.mjs` `esperar`: `const mia = espera = …` y la respuesta solo actúa si `espera === mia`. Un «Cambiar» de la tabla corta además «Asignar … seguido». |
+| 2 | El botón recién capturado llegaba un cuadro al juego: capturar Start pausaba. | `controles.mjs` `hastaSoltar`: ese mando manda ceros hasta que se suelta todo. |
+| 3 | Una cruceta hat que descansa en 1,2857 (= 9/7; marca −1 + k·2/7) no capturaba ← (0,714) ni ↖ (1,0): están a menos de 0,6 del reposo. | `capturar`: si el reposo está fuera de −1..1, cualquier valor a más de 0,12 es una dirección. |
+| 4 | Algunos gatillos que el navegador da como eje marcan 0 hasta que se los toca la primera vez (y desde ahí −1): se guardaban `a5+` (sin reposo) y suelto valían 50 %. | `conReposo`: si al soltarlo queda en −1, se guarda `a5+@-1`. |
+| 5 | ↺ o «Deshacer» en un mando sin tocar lo marcaban «asignado por ti» (se guardaba el mapa entero, igual al de siempre). | `esPorOmision`: el mapa de siempre no se guarda (se borra lo guardado). |
+| 6 | Las teclas Num 8/2/4/6 del stick C cambiaban lo de siempre para todos, y una tecla guardada antes (Num 8 en A) haría dos cosas. | El stick C empieza **sin teclas**; cada uno le pone las suyas. |
+| 7 | «Asignar todo seguido»: el reposo se medía después del primer botón (con uno apretado); Esc solo saltaba un paso aunque decía «cancela»; 20 pasos seguidos son muchos. | El reposo se mide antes del primer paso; Esc cancela el asistente entero; dos asistentes: «Asignar botones seguido» (12) y «Asignar sticks seguido» (8). |
+| 8 | Cerrar el cajón dejaba la captura corriendo (hasta 8 s con el mando mudo). | `cerrarCajon` cancela la espera (tecla o mando). |
+| 9 | Dos mandos iguales comparten la asignación y el panel no lo decía. | La tarjeta dice «la misma asignación para los N de este modelo». |
+
+Nota sobre el asistente viejo (§57): lo asignado así con R o L ahora es **analógico** (un gatillo a medias da a medias,
+antes 255 de golpe). Es lo que se quería (el derrape y el objeto no cambian: se prenden al pasar del 50 %).
+
+Quedó sin tocar (bajo, a propósito): mientras un mando captura, los demás siguen manejando el juego (son otros
+jugadores); `mapaDe` revisa el mapa en cada cuadro (es barato: 20 listas cortas).
+
+**Pruebas:** banco `asignacion` 52/52 (10 nuevas: las 8 direcciones de la hat con reposo 1,2857, `conReposo`,
+`esPorOmision`, el botón capturado que no llega mientras se mantiene, ↺/Deshacer en un mando sin tocar, el gatillo-eje
+que marcaba 0, el stick C sin teclas, dos «Cambiar» seguidos), `controles` 48/48, `mandos-jugador` 17/17,
+`mando-sitio` 11/11; la página sin el juego: cerrar el cajón cancela la espera de una tecla y la de un mando.

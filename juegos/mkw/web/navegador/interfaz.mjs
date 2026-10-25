@@ -156,6 +156,8 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }
   function cerrarCajon() {
     hojaAbierta = null;
+    // (§111, el crítico: cerrar el cajón cancela una reasignación que esperaba; si no, seguía hasta 8 s, con el mando mudo)
+    if (controles.esperando?.() || controles.capturandoAhora?.()) { controles.cancelarTecla?.(); controles.cancelarCaptura?.(); dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada')); }
     document.body.classList.remove('cajon-abierto');
     document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (document.body.classList.contains('started')) $('canvas').focus();   // las teclas vuelven al juego

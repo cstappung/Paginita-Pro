@@ -147,8 +147,11 @@ export function capturar(base, g) {
   const es = g.axes || [];
   for (let i = 0; i < es.length; i++) {
     const v = es[i], r = base.ejes[i] ?? 0;
-    if (!Number.isFinite(v) || Math.abs(v - r) < 0.6) continue;
-    if (Math.abs(r) > 1.05) return `a${i}~${redondea(v)}`;                       // hat: descansa fuera de −1..1
+    if (!Number.isFinite(v)) continue;
+    // hat: descansa fuera de −1..1 (3,29 en Chrome; 1,2857 en otros): cualquier valor lejos del reposo es una dirección
+    // (§111, el crítico: con el umbral de 0,6 no se capturaban ← —0,714— ni ↖ —1— de una que descansa en 1,2857)
+    if (Math.abs(r) > 1.05) { if (Math.abs(v - r) > 0.12) return `a${i}~${redondea(v)}`; continue; }
+    if (Math.abs(v - r) < 0.6) continue;
     if (Math.abs(v) < 0.5) continue;                                            // (pasó por el centro: todavía no)
     const s = v > 0 ? '+' : '-';
     return Math.abs(r) > 0.8 && Math.sign(r) !== Math.sign(v) ? `a${i}${s}@${redondea(r)}` : `a${i}${s}`;
@@ -156,6 +159,13 @@ export function capturar(base, g) {
   return null;
 }
 const redondea = v => String(Math.round(v * 100) / 100);
+
+// ¿es el mapa de siempre? (§111, el crítico: entonces no se guarda: un ↺ o un «Deshacer» en un mando sin tocar no lo
+// marca como «asignado por ti», y la disposición —por posición / por letra— sigue valiendo para él)
+export const esPorOmision = (m, letra) => JSON.stringify(revisarMapa(m)) === JSON.stringify(revisarMapa(mapaPorOmision({ letra })));
+// Un gatillo que el navegador da como eje y marca 0 hasta que se lo toca por primera vez (y desde ahí descansa en −1):
+// la foto vio 0 y la captura guardó «a5+»; si al soltarlo queda en −1, es «a5+@-1» (§111, el crítico)
+export const conReposo = (f, v) => (/^a\d{1,2}[+-]$/.test(f) && Number.isFinite(v) && Math.abs(v) > 0.8 && Math.sign(v) !== (f.endsWith('+') ? 1 : -1) ? `${f}@${redondea(v)}` : f);
 
 // ---- cambiar un mapa ----
 // poner(mapa, objetivo, fuente, { sumar }) → { mapa, quitadoDe }: la fuente queda en ese control (sola, o sumada a las

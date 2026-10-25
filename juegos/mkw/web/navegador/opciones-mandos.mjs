@@ -11,7 +11,7 @@
 //   «＋»       lo suma a lo que tenía (dos botones para lo mismo);
 //   «✕» en cada entrada la quita; «↺» vuelve esa fila a la de siempre.
 // Una entrada que ya manejaba otro control se mueve (no hace dos cosas a la vez) y se avisa («se quitó de Z»), con
-// «Deshacer». Abajo, «Asignar todo seguido» (el asistente de antes: uno por uno, con «Saltar») y «Restaurar todo».
+// «Deshacer». Abajo, «Asignar botones seguido» y «Asignar sticks seguido» (el asistente de antes: uno por uno, con «Saltar»; Esc lo cancela entero) y «Restaurar todo».
 // Mientras se espera una entrada: Esc o 8 s la cancelan, ese mando no maneja el juego y el cursor del sitio se aparta.
 // Arriba, los ajustes de todos: disposición (automática / por posición / por letra), zona muerta y vibración.
 // Lo que se cambia se guarda para el MODELO del mando (su fabricante y producto: sirve por cable y por Bluetooth).
@@ -67,10 +67,13 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
     cancelarEspera();
     const antes = controles.mapaDe(t.clave);
     const p = controles.capturar(t.clave, objetivo, { sumar });
-    espera = { clave: t.clave, objetivo, reloj: setTimeout(() => controles.cancelarCaptura(), ESPERA_CAPTURA_MS) };
+    // (§111, el crítico: la espera es ESTA; la respuesta de una cancelada —otro «Cambiar» antes de tocar nada— no puede
+    // borrar la de ahora: quedaba la captura sin fila, sin tope de 8 s, y lo próximo que se tocaba se asignaba sin aviso)
+    const mia = espera = { clave: t.clave, objetivo, reloj: setTimeout(() => controles.cancelarCaptura(), ESPERA_CAPTURA_MS) };
     t.pintarTabla();
     return p.then(r => {
-      clearTimeout(espera?.reloj); espera = null;
+      if (espera !== mia) return r;                     // (ya hay otra espera: esta se canceló por ella)
+      clearTimeout(mia.reloj); espera = null;
       if (r) {
         t.deshacer = antes;
         t.mensaje.textContent = `${NOMBRE_OBJETIVO[objetivo]}: ${nombreFuente(r.fuente, t.tipo, t.estandar)}` +
@@ -82,7 +85,8 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
     });
   }
   function cancelarEspera() { if (espera) { clearTimeout(espera.reloj); espera = null; controles.cancelarCaptura(); } }
-  addEventListener('mkw-reasignacion-cancelada', () => { for (const t of tarjetas.values()) t.pintarTabla(); });
+  addEventListener('mkw-reasignacion-cancelada', () => { asistiendo && (asistiendo.cancelado = true); for (const t of tarjetas.values()) t.pintarTabla(); });
+  let asistiendo = null;                             // el asistente en curso ({ cancelado }): Esc lo cancela entero
 
   // ---- una tarjeta por mando ----
   const tarjetas = new Map();                       // clave del mando → la tarjeta
@@ -91,7 +95,7 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
     const punto = el('i', { className: 'stick-punto' }), puntoC = el('i', { className: 'stick-punto c' });
     const barraL = el('i'), barraR = el('i');
     const titulo = el('b', {}), sub = el('small', {}), aviso = el('p', { className: 'aviso', hidden: true,
-      textContent: 'Este mando no tiene mapeo estándar: el navegador no sabe qué botón es cuál. Usa «Asignar todo seguido».' });
+      textContent: 'Este mando no tiene mapeo estándar: el navegador no sabe qué botón es cuál. Usa «Asignar botones seguido».' });
     // qué jugador es este mando (1–4); «sin jugador» solo se ve si hay más de 4 mandos conectados
     const jugador = el('select', { className: 'mando-jugador', title: 'Qué jugador maneja este mando' },
       ...[0, 1, 2, 3].map(p => el('option', { value: String(p), textContent: `Jugador ${p + 1}` })),
@@ -100,11 +104,12 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
     const tabla = el('table', { className: 'tabla-asignacion' });
     const mensaje = el('p', { className: 'nota-mandos', role: 'status' });
     const botonDeshacer = el('button', { type: 'button', className: 'boton', textContent: 'Deshacer', hidden: true });
-    const asistir = el('button', { type: 'button', className: 'boton', textContent: 'Asignar todo seguido' });
+    const asistir = el('button', { type: 'button', className: 'boton', textContent: 'Asignar botones seguido' });
+    const asistirSticks = el('button', { type: 'button', className: 'boton', textContent: 'Asignar sticks seguido' });
     const restaurar = el('button', { type: 'button', className: 'boton', textContent: 'Restaurar todo' });
     const asistente = el('div', { className: 'asistente', hidden: true });
     const detalles = el('details', { className: 'mando-asignar' }, el('summary', { textContent: 'Reasignar botones, gatillos y sticks' }),
-      tabla, el('div', { className: 'fila-botones' }, asistir, botonDeshacer, restaurar), mensaje, asistente);
+      tabla, el('div', { className: 'fila-botones' }, asistir, asistirSticks, botonDeshacer, restaurar), mensaje, asistente);
     const nodo = el('div', { className: 'mando-tarjeta' },
       el('div', { className: 'mando-cab' }, el('div', { className: 'mando-nombre' }, titulo, sub), jugador), aviso,
       el('div', { className: 'probador' },
@@ -116,7 +121,8 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
                 clave: m.clave, tipo: m.tipo, estandar: m.estandar, deshacer: null, filas: new Map(), firmaTabla: '' };
     botonDeshacer.onclick = () => { if (t.deshacer) { controles.ponerMapa(t.clave, t.deshacer); t.deshacer = null; botonDeshacer.hidden = true; mensaje.textContent = 'Deshecho.'; t.pintarTabla(); } };
     restaurar.onclick = () => { t.deshacer = controles.mapaDe(t.clave); controles.borrarAsignacion(t.clave); botonDeshacer.hidden = false; mensaje.textContent = 'Todo como siempre.'; t.pintarTabla(); };
-    asistir.onclick = () => asistirTodo(t);
+    asistir.onclick = () => asistirTodo(t, OBJETIVOS.filter(([id]) => !id.includes('.')));
+    asistirSticks.onclick = () => asistirTodo(t, OBJETIVOS.filter(([id]) => id.includes('.')));
 
     // la tabla: una fila por control (se arma de nuevo solo si cambió lo asignado o la espera)
     t.pintarTabla = () => {
@@ -139,9 +145,12 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
           fuentes.append(el('span', { className: 'fuente' }, nombreFuente(f, t.tipo, t.estandar), quitar));
         }
         const cambiar = el('button', { type: 'button', className: 'boton chico', textContent: esperando === id ? 'Cancelar' : 'Cambiar' });
-        cambiar.onclick = () => (esperando === id ? (cancelarEspera(), t.pintarTabla()) : esperar(t, id, false));
+        // (un «Cambiar» o «＋» de la tabla corta el asistente en curso: si no, el asistente seguía al paso siguiente y le
+        // quitaba la captura a la fila)
+        const cortaAsistente = () => { if (asistiendo) asistiendo.cancelado = true; };
+        cambiar.onclick = () => { cortaAsistente(); return esperando === id ? (cancelarEspera(), t.pintarTabla()) : esperar(t, id, false); };
         const sumar = el('button', { type: 'button', className: 'boton chico', textContent: '＋', title: 'Sumar otra entrada para lo mismo' });
-        sumar.onclick = () => esperar(t, id, true);
+        sumar.onclick = () => { cortaAsistente(); return esperar(t, id, true); };
         const deNuevo = el('button', { type: 'button', className: 'boton chico', textContent: '↺', title: 'Como siempre' });
         deNuevo.onclick = () => { t.deshacer = controles.mapaDe(t.clave); controles.restaurarObjetivo(t.clave, id); botonDeshacer.hidden = false; mensaje.textContent = `${nombre.split(' —')[0]}: como siempre.`; t.pintarTabla(); };
         t.filas.set(id, luz);
@@ -156,20 +165,26 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
 
   // El asistente: uno por uno, «Toca lo que quieres para A — acelerar…» (con «Saltar» y «Cancelar»); entre uno y otro
   // espera a que se suelte todo, para que el mismo botón no quede en el siguiente
-  async function asistirTodo(t) {
+  // (§111, el crítico: los botones —12— y los sticks —8— van en dos asistentes; Esc cancela el asistente entero; el
+  // reposo se mide ANTES del primer paso, con todo suelto)
+  async function asistirTodo(t, objetivos = OBJETIVOS) {
     cancelarEspera();
     t.detalles.open = true;
     t.asistente.hidden = false;
-    let cancelado = false;
-    const cancelar = el('button', { type: 'button', className: 'boton', textContent: 'Cancelar', onclick: () => { cancelado = true; cancelarEspera(); } });
+    const yo = asistiendo = { cancelado: false };
+    const cancelar = el('button', { type: 'button', className: 'boton', textContent: 'Cancelar', onclick: () => { yo.cancelado = true; cancelarEspera(); } });
     const antes = controles.mapaDe(t.clave);
-    for (const [id, texto] of OBJETIVOS) {
-      if (cancelado) break;
+    reposos.delete(t.clave);
+    await soltado(t);                                  // (la foto del reposo, con todo suelto)
+    for (const [id, texto] of objetivos) {
+      if (yo.cancelado || asistiendo !== yo) break;
       const saltar = el('button', { type: 'button', className: 'boton', textContent: 'Saltar', onclick: () => cancelarEspera() });
       t.asistente.replaceChildren(el('p', {}, 'Toca en el mando lo que quieres para ', el('b', { textContent: texto }), '…'), el('div', { className: 'fila-botones' }, saltar, cancelar));
       await esperar(t, id, false);
       await soltado(t);
     }
+    const cancelado = yo.cancelado;
+    if (asistiendo === yo) asistiendo = null;
     t.deshacer = antes; t.botonDeshacer.hidden = false;
     t.asistente.replaceChildren(el('p', { textContent: cancelado ? 'Asignación cancelada (lo que alcanzaste a asignar quedó guardado; «Deshacer» lo vuelve atrás).' : '¡Listo! Prueba los botones arriba.' }));
     setTimeout(() => { t.asistente.hidden = true; }, 3000);
@@ -207,7 +222,10 @@ export function montarMandos(caja, controles, { ahora = () => Date.now(), leerMa
       const sinPuerto = m.puerto === undefined;
       t.titulo.textContent = `${ICONO[m.tipo] || '🎮'} ${NOMBRE_TIPO[m.tipo] || 'Mando'}${sinPuerto ? ' · sin jugador' : ` · jugador ${m.puerto + 1}`}`;
       if (document.activeElement !== t.jugador) t.jugador.value = sinPuerto ? '' : String(m.puerto);   // (no mientras la persona elige)
-      t.sub.textContent = `${m.nombre.replace(/\s*\(.*$/, '')} · ${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}`;
+      // (§111: la asignación es del MODELO: dos mandos iguales comparten la suya)
+      const iguales = mandos.filter(x => x.perfil === m.perfil).length;
+      t.sub.textContent = `${m.nombre.replace(/\s*\(.*$/, '')} · ${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}` +
+        (iguales > 1 ? ` · la misma asignación para los ${iguales} de este modelo` : '');
       t.aviso.hidden = !m.sinMapa;
       for (const b of PROBAR) t.luces[b].classList.toggle('encendida', !!(m.botones & BOTON[b]));
       t.punto.style.transform = `translate(${(m.sx / 128) * 18}px, ${(-m.sy / 128) * 18}px)`;

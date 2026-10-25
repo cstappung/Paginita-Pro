@@ -18,7 +18,7 @@
 //   - Vibración: el juego la pide con vibrar(puerto, cmd); va al mando (vibrationActuator) o al celular.
 
 import { mapaPorOmision, revisarMapa, migrarPropio, aplicarMapa, fotoMando, capturar as capturarFuente, poner as ponerFuente,
-         clavePerfil, ES_OBJETIVO } from './asignacion-mando.mjs';
+         clavePerfil, ES_OBJETIVO, esPorOmision, conReposo } from './asignacion-mando.mjs';
 
 // ---- Botones de GameCube (los mismos bits que dolphin/pad.h) ----
 export const BOTON = {
@@ -45,11 +45,12 @@ export const ACCIONES = [
   ['Y',              'Y',                                  ['KeyO']],
   ['Z',              'Z',                                  ['KeyN']],
   ['START',          'Start — pausa',                      ['KeyP', 'Escape']],
-  // §111: el stick C también desde el teclado (antes no había cómo): el teclado numérico, que nada usaba
-  ['cArriba',        'Stick C ↑',                          ['Numpad8']],
-  ['cAbajo',         'Stick C ↓',                          ['Numpad2']],
-  ['cIzquierda',     'Stick C ←',                          ['Numpad4']],
-  ['cDerecha',       'Stick C →',                          ['Numpad6']],
+  // §111: el stick C también desde el teclado (antes no había cómo). Sin teclas de partida (el crítico: lo de siempre no
+  // cambia, y una tecla que alguien ya usaba no hace dos cosas): la persona le pone las que quiera
+  ['cArriba',        'Stick C ↑',                          []],
+  ['cAbajo',         'Stick C ↓',                          []],
+  ['cIzquierda',     'Stick C ←',                          []],
+  ['cDerecha',       'Stick C →',                          []],
 ];
 export const MAX_TECLAS = 3;                       // §111: teclas por acción (lo de siempre trae hasta 2)
 const CLAVE_TECLAS = 'mkw.teclas';
@@ -161,7 +162,15 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   const guardadoDe = (perfil, id) => prefsMandos.mapas[perfil] || prefsMandos.mapas[id] || null;
   const mapaDe = (perfil, id, letra) => guardadoDe(perfil, id) ? revisarMapa(guardadoDe(perfil, id))
     : prefsMandos.propios[id] ? migrarPropio(prefsMandos.propios[id]) : mapaPorOmision({ letra });
-  const guardarMapa = (perfil, id, m) => { prefsMandos.mapas[perfil] = m; if (id !== perfil) delete prefsMandos.mapas[id]; guardar(CLAVE_MANDOS, prefsMandos); };
+  // (§111: el mapa de siempre no se guarda —ver esPorOmision—; el asistente viejo de ese mando queda reemplazado)
+  const guardarMapa = (perfil, id, m, letra) => {
+    if (id !== perfil) delete prefsMandos.mapas[id];
+    if (esPorOmision(m, letra)) { delete prefsMandos.mapas[perfil]; delete prefsMandos.propios[id]; } else prefsMandos.mapas[perfil] = m;
+    guardar(CLAVE_MANDOS, prefsMandos);
+  };
+  // §111 (el crítico): después de capturar, ese mando no maneja el juego hasta que se suelta todo (si no, el botón recién
+  // capturado —Start, A— llegaba un cuadro al juego): { clave, base, fuente, perfil, id, letra, objetivo }
+  let hastaSoltar = null;
 
   // --- teclado ---
   const teclasEnUso = () => new Set(Object.values(teclas).flat());
@@ -229,6 +238,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       const mapa = mapaDe(perfil, g.id, letra);
       const comun = { puerto: puertosMando.get(g.index), nombre: g.id, clave: claveDe.get(g.index), perfil, indice: g.index, tipo, letra,
                       propio, sinMapa: g.mapping !== 'standard' && !propio, estandar: g.mapping === 'standard', mapa, mando: g };
+      const quieto = { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };
       // §111: capturando para este mando: la primera entrada nueva (botón, eje o cruceta) queda para ese control
       if (capturando && capturando.clave === comun.clave) {
         if (!capturando.base) capturando.base = fotoMando(g);             // (la foto, del primer cuadro si no la había)
@@ -236,10 +246,27 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
         if (fuente) {
           const c = capturando; capturando = null;
           const r = ponerFuente(mapa, c.objetivo, fuente, { sumar: c.sumar });
-          guardarMapa(perfil, g.id, r.mapa);
+          guardarMapa(perfil, g.id, r.mapa, letra);
+          hastaSoltar = { clave: comun.clave, base: c.base, fuente, perfil, id: g.id, letra, objetivo: c.objetivo };
           c.listo({ fuente, quitadoDe: r.quitadoDe, antes: mapa });
         }
-        return { ...comun, botones: 0, sx: 0, sy: 0, cx: 0, cy: 0, gl: 0, gr: 0 };   // mientras captura, el mando no maneja
+        return quieto;                                                    // mientras captura, el mando no maneja
+      }
+      if (hastaSoltar && hastaSoltar.clave === comun.clave) {
+        const h = hastaSoltar, m = /^a(\d{1,2})[+-]$/.exec(h.fuente);
+        // (el gatillo-eje que marcaba 0 hasta tocarlo: al soltarlo queda en −1 → se guarda con su reposo)
+        if (m && Math.abs(h.base.ejes[+m[1]] ?? 0) < 0.3) {
+          const fija = conReposo(h.fuente, g.axes?.[+m[1]]);
+          if (fija !== h.fuente) {
+            const mp = revisarMapa(mapaDe(h.perfil, h.id, h.letra));
+            mp[h.objetivo] = mp[h.objetivo].map(f => (f === h.fuente ? fija : f));
+            guardarMapa(h.perfil, h.id, mp, h.letra); h.base.ejes[+m[1]] = g.axes[+m[1]]; h.fuente = fija;
+          }
+        }
+        const f = fotoMando(g);
+        const suelto = f.botones.every((b, i) => !b || h.base.botones[i]) && f.ejes.every((v, i) => Math.abs(v - (h.base.ejes[i] ?? 0)) < 0.3);
+        if (!suelto) return quieto;
+        hastaSoltar = null;
       }
       return { ...comun, ...aplicarMapa(g, mapa, zona) };
     });
@@ -374,16 +401,17 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       if (!m || !ES_OBJETIVO.has(objetivo)) return Promise.resolve(null);
       let base = null;
       try { const g = (navigator.getGamepads ? [...navigator.getGamepads()] : []).find(x => x && x.index === m.indice); if (g) base = fotoMando(g); } catch {}
+      hastaSoltar = null;
       return new Promise(listo => { capturando = { clave: m.clave, objetivo, sumar, base, listo }; });
     },
     cancelarCaptura() { if (capturando) { const c = capturando; capturando = null; c.listo(null); } },
     capturandoAhora: () => capturando ? { clave: capturando.clave, objetivo: capturando.objetivo } : null,
     // el mapa de un mando como está ahora (una copia), y cambiarlo a mano (se guarda para su modelo: su perfil)
     mapaDe(k) { const m = mandoDe(k); return m ? revisarMapa(m.mapa) : null; },
-    ponerMapa(k, mapa) { const m = mandoDe(k); if (m) guardarMapa(m.perfil, m.nombre, revisarMapa(mapa)); },
+    ponerMapa(k, mapa) { const m = mandoDe(k); if (m) guardarMapa(m.perfil, m.nombre, revisarMapa(mapa), m.letra); },
     quitarFuente(k, objetivo, fuente) {
       const m = mandoDe(k); if (!m || !ES_OBJETIVO.has(objetivo)) return;
-      const mapa = revisarMapa(m.mapa); mapa[objetivo] = mapa[objetivo].filter(f => f !== fuente); guardarMapa(m.perfil, m.nombre, mapa);
+      const mapa = revisarMapa(m.mapa); mapa[objetivo] = mapa[objetivo].filter(f => f !== fuente); guardarMapa(m.perfil, m.nombre, mapa, m.letra);
     },
     restaurarObjetivo(k, objetivo) {
       const m = mandoDe(k), def = mapaPorOmision({ letra: !!m?.letra })[objetivo];
@@ -391,7 +419,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       let mapa = revisarMapa(m.mapa);
       mapa[objetivo] = [];
       for (const f of def) mapa = ponerFuente(mapa, objetivo, f, { sumar: true }).mapa;   // (y se quitan de otros)
-      guardarMapa(m.perfil, m.nombre, mapa);
+      guardarMapa(m.perfil, m.nombre, mapa, m.letra);
     },
     // (compatibles con el asistente de §57: asignar un botón = capturar ese control; borrar = volver a lo de siempre)
     asignarBoton(k, boton) { return this.capturar(k, boton).then(r => (r ? (/^b\d+$/.test(r.fuente) ? +r.fuente.slice(1) : r.fuente) : null)); },
