@@ -160,6 +160,21 @@ calibrated with `prodefender-bot --reino tercera --ayuda 100` against Eclipse
 Esporas until dragon and desintegrador left its tower list (the bot's late game
 there was only them). What they add:
 
+- **One law per kingdom** (owner: «que la forma de ganar cada uno se sienta
+  distinta»; `L.ley`, `PD.LEYES` in levels.js, constants at the top of
+  engine.js): Necrópolis `purga` (non-boss enemies not finished by fire,
+  explosive or arcane go to bones and rise, the skeleton rule), Esporas
+  `contagio` (every 1.5 s an infected tower infects towers within 90 px; rods
+  protect: spread out), Espejos `cristal` (a hit takes at most 4 % of max HP,
+  1 % on bosses, never less than 15; DoTs uncapped: many small hits),
+  Archipiélago `altura` (base range ≥ 150: +30 % damage, +20 % range; < 120:
+  −30 % damage), Noche `noche` (towers see 40 % less unless within 140 px of a
+  Faro, now sold there). `aplicaLey`/`leyEn` run inside `recalcAll`; the bot
+  reads `leyEn` to pick sites. Checked with the bot (`--ayuda 100 --pacto
+  rechaza`, restricted with `--torres`/`--separa`/`--ciego`): each kingdom's
+  meta loses 3–7× fewer lives than the others, and no two share a winner. The
+  first try had Dragon and Prism as lights, so Noche was won like Necrópolis.
+
 - **Pacts** (`PD.PACTOS` in engine.js): at round 0 and after every 10th round
   three are offered (`ofertasPacto`: shuffled from `L.seed` + round, minus those
   already taken), the player takes one or declines (`elegirPacto(i)`, i = 3
