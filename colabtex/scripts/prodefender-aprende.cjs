@@ -22,11 +22,12 @@
      (el n.º de torre es el orden en que se puso). El bot la sigue al principio
      (`--guion N`: hasta la ronda N).
 
+   Solo aprende de las partidas que llegaron a la ronda 100 (`--todas`: de todas).
    Solo se rehacen las pruebas de la versión del motor de esta carpeta (`ve`);
    de las partidas de una misma persona y semilla se toma la más larga (cada
    récord guarda la partida hasta esa ronda).
 
-   Uso:  node scripts/prodefender-aprende.cjs export.json [--salida archivo.json]
+   Uso:  node scripts/prodefender-aprende.cjs export.json [--salida archivo.json] [--todas]
 
    No subas al repositorio la exportación: trae uids y nombres. */
 'use strict';
@@ -117,8 +118,14 @@ function main() {
     if (!prev || p.j.length > prev.j.length) mejor.set(key, p);
   }
   const partidas = [];
+  // solo las que llegaron a la ronda 100 (--todas: también las demás). Una partida empieza
+  // al menos 100 rondas (código 4) para llegar: así no se rehacen las cortas.
+  const todas = args.includes('--todas');
   for (const p of mejor.values()) {
-    try { partidas.push(rehace(p)); } catch (e) { /* de un motor con la misma versión pero otro balance: no se rehace */ }
+    if (!todas && p.j.filter(j => j[1] === 4).length < PD.MAX_ROUND) continue;
+    let x;
+    try { x = rehace(p); } catch (e) { continue; /* de un motor con la misma versión pero otro balance: no se rehace */ }
+    if (todas || x.ronda >= PD.MAX_ROUND) partidas.push(x);
   }
   if (!partidas.length) { console.error('No hay partidas de la versión ' + P.VERSION + ' que se puedan rehacer.'); process.exit(1); }
 

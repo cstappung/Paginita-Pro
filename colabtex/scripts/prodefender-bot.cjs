@@ -87,6 +87,9 @@ const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1 };
 const APARTE = { ...SOPORTE, ...CONTROL };
 // planes de gasto que prueba la anticipación (decide los lee en this.modo)
 const MODOS = ['normal', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
+// «humana» siguiendo un guion: adelantar lo que el guion hace en las rondas siguientes no
+// cuesta economía, así que se prueba antes que gastar por su cuenta
+const MODOS_GUION = ['normal', 'adelanta1', 'adelanta3', 'adelanta8', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
 const DETECTA = { espinas: 1, vigia: 1, voltaico: 1, colmena: 1, balista: 1 };   // camuflados en el 2.º camino, nivel 2
 // Estrategias: el orden en que un jugador experto agrega torres de daño en cada reino
 // (se repite en ciclo). «control» mete el Ancla y la Escarcha (para medir el retroceso y
@@ -138,7 +141,7 @@ const LIBRO = (() => {
   catch { return null; }
 })();
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
-const GUION = +opt('guion', 25);
+const GUION = +opt('guion', 100);
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   humana: { rota: MIXTA, humana: true },
@@ -557,26 +560,35 @@ class Bot {
 
   // ---- anticipación: probar varios planes de gasto contra la ronda que viene ----
   // copia del bot sobre una copia del juego (la misma foto, otra semilla)
+  // («humana» rehace el juego de verdad desde la misma foto y con la misma semilla antes de
+  // cada ronda, así que la copia juega exactamente lo que jugaría él con ese plan)
   copia() {
     const c = Object.create(Bot.prototype);
     Object.assign(c, this);
-    const ids = this.game.towers.map(t => t.id);
-    c.game = new PD.Game(this.li, JSON.parse(JSON.stringify(this.game.snapshot())), (this.semilla ^ 0x9e3779b9) >>> 0);
-    c.mem = new Map();
-    c.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); c.mem.set(t.id, { ...m, dealt: m.dealt.slice() }); });
+    const exacta = this.est.humana;
+    c.game = null; c.gTorres = this.gTorres && this.gTorres.slice();
+    c.rehaceDe(JSON.parse(JSON.stringify(this.game.snapshot())), exacta ? this.game.rs : (this.semilla ^ 0x9e3779b9) >>> 0, this.game);
     c.dens = this.dens.slice(); c.cal = { ...this.cal }; c.vetadas = {};
     return c;
+  }
+  // gasta con ese plan: el guion (adelantado n rondas con «adelantaN») y, si ya no hay guion
+  // o el plan es otro, por su cuenta
+  planea(modo) {
+    const r = this.game.round + 1, adel = /^adelanta(\d+)$/.exec(modo);
+    const enGuion = this.sigueGuion(adel ? r + +adel[1] : r);
+    if (!enGuion || (modo !== 'normal' && !adel)) this.turno();
   }
   // gasta con ese plan en la copia y juega ahí la ronda siguiente
   ensaya(modo) {
     const c = this.copia();
-    c.modo = modo; c.turno();
+    c.modo = modo; c.planea(modo);
     const g = c.game, v0 = g.lives;
     if (g.pactoPendiente()) eligePacto(g);
     g.startRound();
     let pasos = 0, av = 0;
     while (g.active && !g.over && pasos < 60 * 900) {
       g.update(STEP); pasos++;
+      if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
       if (pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
     }
     return { perdidas: v0 - g.lives + (g.over ? 1000 : 0), av, oro: g.money };
@@ -584,6 +596,7 @@ class Bot {
   // Si el plan normal pasa la ronda sin pérdidas, ese. Si no, el que la pase guardando más
   // oro; y si ninguno la pasa limpia, el que menos pierde (y menos deja avanzar).
   elegir() {
+    if (this.est.humana && !args.includes('--sin-anticipa')) return this.elegirHumana();
     if (!args.includes('--anticipa')) return 'normal';
     const normal = this.ensaya('normal');
     if (normal.perdidas === 0 && normal.av < 0.85) return 'normal';
@@ -593,6 +606,21 @@ class Bot {
     return res.sort((a, b) => a[1].perdidas - b[1].perdidas || a[1].av - b[1].av)[0][0];
   }
 
+  // «humana»: el primer plan (en el orden de MODOS_GUION) que pasa la ronda sin perder vidas;
+  // si ninguno, el que menos pierde. Fuera del guion no se prueban los «adelanta».
+  elegirHumana() {
+    const gu = LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
+    const queda = gu && this.game.round + 1 <= GUION && (this.gi || 0) < gu.jugadas.length;
+    const modos = queda ? MODOS_GUION : MODOS;
+    let mejor = null;
+    for (const m of modos) {
+      const x = this.ensaya(m);
+      if (x.perdidas === 0) return m;
+      if (!mejor || x.perdidas < mejor[1].perdidas || x.perdidas === mejor[1].perdidas && x.av < mejor[1].av) mejor = [m, x];
+    }
+    return mejor[0];
+  }
+
   // Una partida entera. Devuelve el resumen.
   juega(verRondas) {
     const filas = [];
@@ -600,9 +628,10 @@ class Bot {
     const vidasPerdidas = new Array(10).fill(0);
     while (g.round < PD.MAX_ROUND) {
       this.vetadas = {};
+      if (this.est.humana) { this.rehaceDe(JSON.parse(JSON.stringify(g.snapshot())), g.rs, g); g = this.game; }
       this.modo = this.elegir();
       this.vetadas = {};
-      if (!this.sigueGuion(g.round + 1)) this.turno();
+      this.planea(this.modo);
       foto = JSON.stringify(g.snapshot());
       for (const t of g.towers) this.mem.get(t.id).antes = t.dealt;
       const r = g.round + 1;
@@ -684,8 +713,13 @@ class Bot {
   }
   // reintentar: rehace el motor desde la foto del comienzo de la ronda (otra semilla)
   recarga(snap) {
-    const ids = this.game.towers.map(t => t.id);
-    this.game = new PD.Game(this.li, snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0);
+    this.rehaceDe(snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0, this.game);
+  }
+  // el juego rehecho desde una foto de `antes` (sus torres, en el mismo orden), con lo que el
+  // bot recuerda de cada una pasado a los ids nuevos
+  rehaceDe(snap, semilla, antes) {
+    const ids = antes.towers.map(t => t.id);
+    this.game = new PD.Game(this.li, snap, semilla);
     const mem = new Map(), nuevo = new Map();
     this.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); mem.set(t.id, { ...m, dealt: m.dealt.slice() }); nuevo.set(ids[i], t.id); });
     this.mem = mem;
