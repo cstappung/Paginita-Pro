@@ -384,7 +384,7 @@ the same in `ranks.js`).
 ## Download cap (`src/consumo.js`)
 
 The free plan gives the whole site ~360 MB of RTDB download a day, and the
-database has no per-user quota, so **each player is capped at 80 MB a day**
+database has no per-user quota, so **each player is capped at 90 MB a day**
 on the client. `consumo.js` is imported **first** in `juegos-main.js`: the
 SDK captures the `WebSocket` class when it is evaluated, but sets
 `onmessage` on every new connection, so wrapping the *setter* on

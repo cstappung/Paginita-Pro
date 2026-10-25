@@ -573,9 +573,14 @@ console.log("— Monedas: partidas del club y podios —");
   await denied("ni un puesto 4", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 4, q: "usuarioOtro1" }));
   await allowed("A cobra el podio de su récord", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro1" }));
   await denied("y no lo cobra dos veces", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro2" }));
+  // una sola prueba por récord (PRO DEFENDER): el dueño borra la que ya no nombra su fila, nunca la vigente
+  await prueba("club-bbtan-rondas", "partidaA0", {}).catch(() => {});
+  await denied("A no borra la prueba de su récord vigente", () => remove(ref(db, `soloPruebas/club-bbtan-rondas/${ua.uid}/${fila.partida}`)));
   await loginAs(B);
   await denied("B no cobra a nombre de A", () => set(ref(db, `podios/${ua.uid}/x123456`), { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro1", at: serverTimestamp() }));
+  await denied("B no borra las pruebas de A", () => remove(ref(db, `soloPruebas/club-bbtan-rondas/${ua.uid}/partidaA0`)));
   await loginAs(A);
+  await allowed("A borra su prueba que ya no respalda la fila", () => remove(ref(db, `soloPruebas/club-bbtan-rondas/${ua.uid}/partidaA0`)));
 }
 
 console.log("— PRODROP: re-roll —");

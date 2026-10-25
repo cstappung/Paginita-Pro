@@ -49,7 +49,9 @@
   const abCd = t => t.s.abCd || PD.ABILITIES[t.s.ability].cd;
 
   // ------------------------------ Guardado -------------------------------
-  function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45, cursor: 'grande' } }; }
+  // `pend`: por reino, el récord que todavía no confirma la tabla de Juegos ({r, t, p}: ronda,
+  // tiempo y su prueba). Se manda cada CADA rondas y al salir (ver «Clasificación y monedas»).
+  function defaultSave() { return { v: 1, unlocked: 0, best: PD.LEVELS.map(() => 0), won: PD.LEVELS.map(() => false), runs: {}, pend: {}, settings: { auto: false, muted: false, sfx: 0.8, music: 0.45, cursor: 'grande' } }; }
   function loadSave() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -57,6 +59,8 @@
         const d = defaultSave(); const o = Object.assign(d, s); o.settings = Object.assign(defaultSave().settings, s.settings || {});
         // Una partida guardada sin su prueba (o con la de otro motor) no se puede verificar: se descarta.
         for (const k of Object.keys(o.runs || {})) { const r = o.runs[k]; if (!r || !r.snap || !r.pr || r.pr.ve !== PR.VERSION) delete o.runs[k]; }
+        o.pend = o.pend && typeof o.pend === 'object' ? o.pend : {};
+        for (const k of Object.keys(o.pend)) { const r = o.pend[k]; if (!r || !r.p || r.p.ve !== PR.VERSION || !(r.r > 0)) delete o.pend[k]; }
         return o;
       }
     } catch (e) { /* sin almacenamiento disponible */ }
@@ -779,6 +783,7 @@
   function openPause() {
     if (!game || ui.modal) return;
     ui.paused = true;
+    manda(game.li);   // en pausa se puede cerrar la pestaña: el récord se guarda antes
     modal(`<h2>Pausa</h2><p>${game.L.name} · Ronda ${Math.min(100, game.round + 1)}/100<br>Eliminados: ${fmt(game.stats.kills)} · Fugas: ${fmt(game.stats.leaked)}</p>
       ${game.active ? '<p style="font-size:13px;color:var(--muted)">Si sales ahora, la partida se reanudará al inicio de esta ronda.</p>' : ''}
       <div class="vol"><label>Música <input type="range" id="v-mus" min="0" max="1" step="0.05" value="${save.settings.music}"></label>
@@ -800,6 +805,7 @@
   }
   function exitGame() {
     if (game && !game.over && !game.won) guardaPartida();
+    if (game) manda(game.li);
     game = null; rec = null; ui.paused = false;
     show('levels');
   }
@@ -839,9 +845,10 @@
           const li = game.li, prueba = enPrueba(li);
           if (!prueba) save.best[li] = Math.max(save.best[li] || 0, ev.round);
           if (ev.round >= PD.UNLOCK_ROUND && li < PUB - 1) save.unlocked = Math.max(save.unlocked, li + 1);
+          if (!prueba) anota(li, ev.round);   // los reinos en pruebas no guardan récords
           if (game.won) { delete save.runs[li]; if (!prueba) save.won[li] = true; writeSave(); }
           else guardaPartida();
-          if (!prueba) reporta(li, ev.round);   // los reinos en pruebas no guardan récords
+          if (!prueba && (ev.round % CADA === 0 || game.won)) manda(li);
           buildPreview();
           if (ui.auto && !game.won) ui.autoT = 1.2;
           break;
@@ -883,6 +890,7 @@
           else delete save.runs[li];
           if (!enPrueba(li)) save.best[li] = Math.max(save.best[li] || 0, game.round);
           writeSave();
+          manda(li);   // la partida acabó: su récord va a Juegos ya
           const btns = [];
           if (g) btns.push({ label: `Reintentar ronda ${r} (quedan ${cont})`, cls: 'go', fn: () => startGame(li, save.runs[li]) });
           btns.push({ label: 'Reiniciar reino', cls: 'gold', fn: () => { delete save.runs[li]; writeSave(); startGame(li, null); } });
@@ -954,7 +962,11 @@
       }
     }
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && game && !ui.modal && game.active) openPause(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && game) manda(game.li);   // la pestaña se esconde (o se va a cerrar): se guarda el récord
+    if (document.hidden && game && !ui.modal && game.active) openPause();
+  });
+  window.addEventListener('pagehide', () => { if (game) manda(game.li); });
 
   function drainSounds() {
     const q = game.sounds;
@@ -991,8 +1003,14 @@
 
   // ------------------------- Clasificación y monedas -------------------------
   // Lo que la tabla del club sabe de cada reino (tu ronda récord; null: aún no se sabe).
-  // Cada ronda que la supera se manda a Juegos con la prueba de la partida: la página la
-  // rehace (verifica/prodefender.js), la guarda y eso paga monedasRonda(li) por ronda.
+  // Cada ronda que la supera queda anotada (`save.pend`) y se manda a Juegos con la prueba
+  // de la partida cada CADA rondas, al perder, al pausar, al salir de la partida y al
+  // esconder la pestaña: la página la rehace (verifica/prodefender.js), la guarda y eso paga
+  // monedasRonda(li) por cada ronda nueva, las mismas que antes. Antes se mandaba en cada
+  // ronda, y cada envío es la partida entera desde la ronda 1: cien copias crecientes por
+  // reino. Lo anotado se borra cuando la tabla lo confirma; si la pestaña se cerró antes,
+  // se manda la próxima vez que se abra el juego (recorreTablas).
+  const CADA = 10;
   const nube = PD.LEVELS.map(() => null), enviada = PD.LEVELS.map(() => 0);
   let verTabla = -1;
   function escuchaTabla(li) {
@@ -1016,6 +1034,7 @@
     const li = PR.reinoDe(e.detail && e.detail.categoria);
     if (li < 0) return;
     nube[li] = Math.max(nube[li] || 0, (e.detail.propio && e.detail.propio.puntos) || 0);
+    if (save.pend[li] && nube[li] >= save.pend[li].r) { delete save.pend[li]; writeSave(); }   // ya está en la tabla
     if (adoptaNube() || screen === 'levels') { if (screen === 'levels') buildLevels(); }
     if (esperaTabla && esperaTabla.li === li) esperaTabla.listo();
   });
@@ -1034,19 +1053,34 @@
       });
     }
     if (!game) { let ul = 0; PD.LEVELS.forEach((L, li) => { if (li <= save.unlocked && li < PUB) ul = li; }); escuchaTabla(ul); if (screen === 'levels') buildLevels(); }
+    // Lo que quedó anotado y la tabla no tiene (la pestaña se cerró antes de guardarlo).
+    for (const k of Object.keys(save.pend)) if (!game || game.li !== +k) manda(+k);
   }
-  function reporta(li, ronda) {
+  // Una ronda que supera el récord: se anota con su prueba (se guarda con la partida local).
+  function anota(li, ronda) {
     if (!EN_LA_NUBE || !rec || enPrueba(li)) return;
     const antes = Math.max(nube[li] || 0, enviada[li]);
-    if (ronda <= antes) return;
-    enviada[li] = ronda;
-    CLUB.result({ categoria: PR.categoria(li), puntos: ronda, tiempo: rec.tiempo() }, rec.prueba());
+    if (ronda <= antes || (save.pend[li] && save.pend[li].r >= ronda)) return;
+    save.pend[li] = { r: ronda, t: rec.tiempo(), p: rec.prueba() };
+    const falta = ronda % CADA && ronda < PD.MAX_ROUND;
+    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>${falta ? `Se guarda en Juegos cada ${CADA} rondas y al salir: 🪙 ${fmt(monedasRonda(li))} por ronda nueva.` : `Juegos la comprueba y te paga 🪙 ${fmt((ronda - antes) * monedasRonda(li))}`}`, 'good', null, 3200);
+  }
+  // Manda a Juegos el récord anotado del reino, si la tabla todavía no lo tiene.
+  function manda(li) {
+    const P = save.pend[li];
+    if (!EN_LA_NUBE || !P || enPrueba(li)) return;
+    if (P.r <= Math.max(nube[li] || 0, enviada[li])) { if (P.r <= (nube[li] || 0)) { delete save.pend[li]; writeSave(); } return; }
+    enviada[li] = P.r;
+    CLUB.result({ categoria: PR.categoria(li), puntos: P.r, tiempo: P.t }, P.p);
     // Las monedas las avisa Juegos cuando termina de comprobar la partida (puede tardar unos segundos).
-    toast(`<b>¡Récord del reino: ronda ${ronda}!</b>Juegos la comprueba y te paga 🪙 ${fmt((ronda - antes) * monedasRonda(li))}`, 'good', null, 3200);
   }
   window.addEventListener('club-rechazo', e => {
-    if (PR.reinoDe(e.detail && e.detail.categoria) < 0) return;
-    toast(`<b>Esta ronda no se guardó</b>${String(e.detail.motivo || '').replace(/[<&]/g, '')}`, 'boss', null, 7000);
+    const li = PR.reinoDe(e.detail && e.detail.categoria);
+    if (li < 0) return;
+    const motivo = String(e.detail.motivo || '');
+    // Un rechazo no se vuelve a mandar; «No se pudo comprobar…» (el verificador falló) sí, la próxima vez.
+    if (save.pend[li] && !/^No se pudo comprobar/.test(motivo)) { delete save.pend[li]; writeSave(); }
+    toast(`<b>Esta ronda no se guardó</b>${motivo.replace(/[<&]/g, '')}`, 'boss', null, 7000);
   });
   recorreTablas();
   // A medianoche de Chile se abre el reino del día: la pantalla de reinos se rehace sola

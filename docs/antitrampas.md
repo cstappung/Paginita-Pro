@@ -114,7 +114,8 @@ paso: el verificador es un módulo puro que corre igual en Node.
   solo si mejora la marca guardada (una prueba por récord, no por partida).
 - `fb-juegos.js`: `guardarPruebaSolo`, `leerPruebaSolo`, `reportaSospecha`,
   y `watchSolo`/`leerSolo` ya no muestran cuentas vetadas.
-- Reglas: `rachasClub` (la racha contada, ver §4), `soloPruebas` (escribe su dueño, una vez; lee cualquiera con
+- Reglas: `rachasClub` (la racha contada, ver §4), `soloPruebas` (escribe su dueño, una vez, y solo
+  borra las suyas que ya no nombra su fila —PRO DEFENDER guarda una por reino—; lee cualquiera con
   sesión, para poder auditar), `sospechas` (escribe su dueño, una vez; lee
   solo un admin), `vetados` (escribe solo un admin), `soloRanks` exige la
   prueba y deja borrar a un admin. **Hay que publicarlas a mano** en la
