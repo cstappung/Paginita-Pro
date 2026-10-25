@@ -422,7 +422,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Token de Firebase (JWT)** | Un texto firmado por Google que dice "esta persona inició sesión, es tal uid, vale hasta tal hora" (una hora). El Worker revisa la firma con las claves públicas de Google, el proyecto y la hora; si todo calza, sabe quién pide sin preguntarle a nadie. Como una credencial con foto, holograma y fecha de vencimiento. |
 | **Pregunta previa (preflight de CORS)** | Antes de un pedido "no simple" a otro sitio (por ejemplo, con la cabecera `Authorization`), el navegador pregunta primero con `OPTIONS` si está permitido; el servidor contesta qué cabeceras y métodos acepta. El navegador recuerda la respuesta un rato, **por dirección**: por eso hay una pregunta previa por cada archivo distinto. Como pedir permiso en portería la primera vez que vas a una oficina. |
 | **Blob** | Un pedazo de bytes guardado en la memoria de la página, con una dirección local (`blob:…`) que solo ella entiende. Sirve para importar un programa que se bajó con fetch (con el token), porque `import()` no deja poner cabeceras. |
-| **Bucket y prefijo (R2)** | Un bucket es un "disco en la nube" de Cloudflare R2; cada archivo es un objeto con una llave (su nombre completo). El prefijo es el comienzo común de las llaves: todo lo de Mario Kart empieza con `mkw/`, así convive con los pedazos de BT3 en el mismo bucket sin mezclarse. |
+| **Bucket y prefijo (R2)** | Un bucket es un "disco en la nube" de Cloudflare R2; cada archivo es un objeto con una llave (su nombre completo). El prefijo es el comienzo común de las llaves: todo lo de Mario Kart empieza con `mkw/`. Hasta §104 convivía así con los pedazos de BT3 en el mismo bucket; desde §105 Mario Kart tiene su propio bucket (con las mismas llaves). |
 | **API S3 y firma (Signature V4)** | S3 es la forma de hablar con un "disco en la nube" que inventó Amazon y que R2 también entiende. Cada pedido va firmado: una cadena de cuentas HMAC-SHA256 con el secreto, la fecha, la región y el contenido del pedido. El secreto no viaja; viaja la firma, que solo vale para ese pedido y por unos minutos. Como un sello lacrado que depende del contenido de la carta. |
 | **HMAC** | Una huella (SHA-256) que se calcula mezclando el mensaje con una clave secreta: solo quien tiene la clave puede producirla o comprobarla. |
 | **Vector de prueba (de una firma)** | El ejemplo publicado por AWS con entradas fijas y su firma esperada (`f0e8bd…`). Si nuestra cuenta da exactamente esos 64 dígitos, está bien hecha: con un error cualquiera daría otros. |
@@ -1001,6 +1001,13 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Histéresis (del adelanto)** | La lectura seguida de un video ya no pide un bloque cada vez que avanza un bloque: mientras queden 4 MB por delante no pide nada, y cuando baja de eso rellena 8 MB de una vez. Como un termostato con banda muerta: no prende y apaga el calefactor cada décima de grado. |
 | **Operaciones por llamada** | Lo que el Worker gratis puede hacer dentro de UNA llamada: 50 operaciones de R2 y de la caché de Cloudflare (juntas), con 6 esperando a la vez. Cada pedazo de un lote gasta hasta 3 (mirar la caché, leer de R2, guardar en la caché): por eso un lote lleva como mucho 12. |
 | **`tee` (de un flujo)** | Partir un flujo de bytes en dos copias que avanzan juntas: una va a la página y la otra se guarda en la caché de Cloudflare, sin copiar el pedazo entero en la memoria del Worker (gasta menos de sus 10 ms de procesador). Como una derivación en T en una cañería. |
+
+### Mario Kart en su propio bucket (§105)
+
+| Término | Qué es y qué hace |
+|---|---|
+| **Enlace (binding) del Worker** | El nombre con que el código del Worker ve un recurso de Cloudflare: `env.DISCO` es el bucket de la ISO de BT3 y, desde §105, `env.MKW` el de Mario Kart. Se conecta en el panel (Settings → Bindings), no en el código: el mismo archivo sirve para cualquier bucket. Como la bornera de un tablero: el equipo dice «entrada 1», y en la instalación se decide qué cable llega ahí. |
+| **Respaldo del enlace** | Si el Worker no tiene el enlace `MKW`, Mario Kart se busca en `DISCO`, como antes de §105 (`mkwR2 = env => env.MKW \|\| env.DISCO`). Así un Worker pegado antes de crear el bucket no se cae: dice «no está subido». |
 
 ## 2026-10-16 · Día 1
 
@@ -9792,3 +9799,31 @@ clic. La prueba ahora deja la marca de «vista hoy» que deja el sitio (`jg.tien
 
 **Volver a pegar el Worker** (`docs/publicar.md` paso 3): trae `POST /mkw/lote`. Con el de antes el juego anda igual,
 pero gasta ~10 veces más llamadas.
+
+## 2026-10-24 · §105 Mario Kart en su propio bucket de R2
+
+El dueño, antes de subir: «mejor creamos otro bucket para no usar el mismo». Así lo de Mario Kart queda aparte de la ISO
+de BT3: su propia llave de subida (que solo puede tocar ese bucket), su uso a la vista en Metrics, y se puede vaciar o
+borrar sin riesgo para BT3.
+
+**Lo que cambió:**
+1. El Worker (`juegos/bt3/fuente/disco/worker.js`): Mario Kart lee de `mkwR2(env) = env.MKW || env.DISCO`. Con el enlace
+   `MKW`, del bucket propio; sin él, de `DISCO`, como antes. **Las llaves no cambian** (`mkw/build/mkw.js`,
+   `mkw/mkw/disco/…`): así `subir-r2.mjs` sube igual (solo cambia `R2_BUCKET`), el caché de Cloudflare guarda con las
+   mismas llaves y volver atrás es quitar el enlace. BT3 (`/pieza/…`, `/indice.json`, `/subir`) sigue solo en `DISCO`.
+2. El Worker local (`herramientas/worker-local.mjs`, el de `sitio-local`, `medir-sitio`, `jugar.bat` y
+   `prueba-experiencia`) ahora le da a Mario Kart el enlace `MKW` (los archivos de este PC) y a `DISCO` un bucket vacío:
+   lo mismo que tendrá el Cloudflare del dueño, y si algo de Mario Kart se fuera a buscar a `DISCO` fallaría a la vista.
+3. `docs/publicar.md`: el paso 1 crea el bucket (`mkw-retro`, sin acceso público) y la llave solo para él; el paso 3
+   agrega el enlace `MKW` en el Worker.
+
+**Ojo con el espacio:** el plan gratis de R2 da 10 GB **por cuenta**, sumando todos los buckets: un bucket aparte no da
+más espacio gratis. Mario Kart son 5,0 GB; lo que pase de 10 GB cuesta ~0,015 USD por GB al mes.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Sitio `mkw-worker.test.cjs` + `bt3-disco.test.cjs` | 19 / 19 (nueva §105: con `MKW`, los pedazos, el archivo entero, el manifiesto y el lote salen del bucket propio; lo que está solo en `DISCO` ya no se lee para Mario Kart; BT3 sigue en `DISCO`) |
+| El Worker local con `MKW` (curl con el token de prueba) | manifiesto 200, lote 200, pedazo 206; `/indice.json` de BT3 404 (su bucket, vacío aquí) |
+| `prueba-experiencia` (la sala entera por el Worker local, ahora con `MKW`) | 23 / 23 (330 llamadas: 31 preguntas previas, 265 lotes) |

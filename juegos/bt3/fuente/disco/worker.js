@@ -26,8 +26,9 @@
    Para subir la ISO, `/subir` es una página que la lee en tu navegador y la manda por pedazos con la clave
    `CLAVE_SUBIDA` (un secreto del Worker). Sin esa clave no se puede escribir nada.
    **Mario Kart Wii** (juegos/mkw) usa este mismo Worker y la misma lista de amigos: todo lo suyo va bajo `/mkw/`, en
-   el mismo bucket con el prefijo `mkw/` (ver «Mario Kart Wii» más abajo). Se sube con
-   juegos/mkw/herramientas/subir-r2.mjs (la API S3 de R2, desde el PC del dueño), no por este Worker.
+   **su propio bucket** (el enlace `MKW`; sin ese enlace, en `DISCO`, como antes), con llaves que empiezan con `mkw/`
+   (ver «Mario Kart Wii» más abajo). Se sube con juegos/mkw/herramientas/subir-r2.mjs (la API S3 de R2, desde el PC
+   del dueño), no por este Worker.
 
    Variables del Worker (Settings → Variables and Secrets):
      AMIGOS        correos de Google (o uids de Firebase) con acceso, separados por comas (el tuyo incluido)
@@ -35,7 +36,8 @@
      ORIGENES      opcional: orígenes permitidos, separados por comas (por defecto el sitio)
      TURN_ID       opcional: el «Turn Token ID» de Cloudflare Realtime → TURN (el relevo de las peleas en línea)
      TURN_CLAVE    opcional, secreto: su «API Token». Sin estos dos, /turn contesta 404 y se conecta solo directo
-   Enlace (Bindings): un bucket R2 con el nombre de variable DISCO. */
+   Enlaces (Bindings): un bucket R2 con el nombre de variable DISCO (la ISO de BT3) y otro con el nombre MKW (Mario
+   Kart Wii; opcional: sin él, Mario Kart se lee de DISCO). */
 const PROYECTO = "mi-pagina-pro";                                  // el proyecto de Firebase del sitio
 const ORIGENES = "https://paginita-pro.cl,https://www.paginita-pro.cl,http://localhost:8123";
 const CLAVES_GOOGLE = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
@@ -165,8 +167,9 @@ async function relevo(env) {
 }
 
 // ---------- Mario Kart Wii (juegos/mkw): el mismo Worker y la misma lista de amigos ----------
-/* Todo bajo `/mkw/`, en el bucket DISCO con el prefijo `mkw/`: la llave de R2 es la dirección sin la "/" del
-   principio (`/mkw/build/mkw.js` → `mkw/build/mkw.js`). Son las mismas rutas que da el servidor de pruebas del juego
+/* Todo bajo `/mkw/`, en el bucket propio de Mario Kart (el enlace MKW; sin él, en DISCO, el de la ISO de BT3, como
+   antes): la llave de R2 es la dirección sin la "/" del principio (`/mkw/build/mkw.js` → `mkw/build/mkw.js`), en los
+   dos casos (así subir-r2.mjs sube igual a cualquiera de los dos). Son las mismas rutas que da el servidor de pruebas del juego
    (juegos/mkw/web/navegador/servidor.mjs), con `/mkw` delante; la página las arma con `?privado=<Worker>/mkw`:
      /mkw/manifiesto.json  la lista de archivos (ruta y tamaño) que verá el juego, con X-Mkw-Version (cambia si cambia
                            cualquier archivo: la página tira su caché vieja) y X-Mkw-Build (la huella del programa),
@@ -196,11 +199,12 @@ const MKW_LOTE_RUTAS = /^\/mkw\/(build\/(?!mkw\.(js|wasm)(\.br)?$)|mkw\/disco\/|
 // paquetes de imágenes con su huella en el nombre (clips-000.3b1e268f.pak): su contenido no cambia nunca
 const MKW_CON_HUELLA = /^\/mkw\/build\/imagenes\/paquetes\/[\w-]+\.[0-9a-f]{8}\.pak$/;
 let mkwVer = null, mkwVerHasta = 0;                                 // mkw/version.json en memoria, 60 s
+const mkwR2 = env => env.MKW || env.DISCO;                          // el bucket de Mario Kart: el propio, o el de BT3
 
 async function mkwVersion(env) {
   if (mkwVer && Date.now() < mkwVerHasta) return mkwVer;
   let v = { version: "sin-version", build: "" };
-  try { const o = await env.DISCO.get("mkw/version.json"); if (o) v = { ...v, ...JSON.parse(await new Response(o.body).text()) }; } catch (e) {}
+  try { const o = await mkwR2(env).get("mkw/version.json"); if (o) v = { ...v, ...JSON.parse(await new Response(o.body).text()) }; } catch (e) {}
   mkwVer = v; mkwVerHasta = Date.now() + 60000;
   return v;
 }
@@ -226,7 +230,7 @@ async function mkwLote(req, url, env, ctx, c, ver) {
     if (cache) {
       try { const g = await cache.match(llaveBorde); if (g && g.body) return g.body; } catch (e) {}
     }
-    const o = await env.DISCO.get("mkw/" + ruta, { range: { offset: ini, length: fin - ini + 1 } });
+    const o = await mkwR2(env).get("mkw/" + ruta, { range: { offset: ini, length: fin - ini + 1 } });
     if (!o || !o.body || fin >= o.size) throw new Error("falta " + ruta);
     const cuerpo = typeof o.body.getReader === "function" ? o.body : new Response(o.body).body;
     if (!cache) return cuerpo;
@@ -259,7 +263,7 @@ async function mkw(req, url, env, ctx, c) {
   if (!MKW_RUTAS.test(ruta) || /(^|\/)\.\.?(\/|$)|\\/.test(ruta)) return responde("no existe", 404, c);
   const llave = ruta.slice(1), cabeza = req.method === "HEAD", ver = await mkwVersion(env);
   const tipo = MKW_TIPOS[(/\.(\w+)$/.exec(ruta) || [])[1]] || "application/octet-stream";
-  const lee = k => cabeza ? env.DISCO.head(k) : env.DISCO.get(k);
+  const r2 = mkwR2(env), lee = k => cabeza ? r2.head(k) : r2.get(k);
 
   if (ruta === "/mkw/manifiesto.json") {
     const o = await lee(llave);
@@ -300,13 +304,13 @@ async function mkw(req, url, env, ctx, c) {
     } catch (e) {}
   }
   let o;
-  try { o = await env.DISCO.get(llave, { range: { offset: inicio, length: finPedido - inicio + 1 } }); } catch (e) { o = undefined; }
+  try { o = await r2.get(llave, { range: { offset: inicio, length: finPedido - inicio + 1 } }); } catch (e) { o = undefined; }
   if (o === null) return responde("no está subido", 404, c);
   if (!o) {                                                         // R2 rechazó el rango (pasa del final): se mide y se recorta
-    const h = await env.DISCO.head(llave);
+    const h = await r2.head(llave);
     if (!h) return responde("no está subido", 404, c);
     if (inicio >= h.size) return responde(null, 416, { ...c, "Content-Range": `bytes */${h.size}` });
-    o = await env.DISCO.get(llave, { range: { offset: inicio, length: Math.min(finPedido, h.size - 1) - inicio + 1 } });
+    o = await r2.get(llave, { range: { offset: inicio, length: Math.min(finPedido, h.size - 1) - inicio + 1 } });
     if (!o) return responde("no está subido", 404, c);
   }
   const fin = Math.min(finPedido, o.size - 1), contenido = `bytes ${inicio}-${fin}/${o.size}`;

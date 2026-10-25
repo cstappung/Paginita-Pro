@@ -30,7 +30,7 @@ hay que armarlo: `subir-r2.mjs` lo arma solo desde los archivos que sube. Recié
 | Qué | Dónde | ¿Público? |
 |---|---|---|
 | La página del juego, la sala, las reglas del juego (`juegos/mkw/`, `juegos-app.js`, `juegos.html`) | GitHub Pages (el repo del sitio) | sí: no tienen nada del juego |
-| El programa (`mkw.js`, `mkw.wasm.br`), el disco extraído, Retro Rewind, las semillas y las imágenes (también la del menú de inicio «JloKart Wii», que muestra a una persona real) | El R2 del dueño, prefijo `mkw/` del mismo bucket que el disco de BT3 | **no**: solo los entrega el Worker, y solo a la lista de amigos |
+| El programa (`mkw.js`, `mkw.wasm.br`), el disco extraído, Retro Rewind, las semillas y las imágenes (también la del menú de inicio «JloKart Wii», que muestra a una persona real) | Un bucket R2 **propio de Mario Kart** (§105; aparte del de la ISO de BT3), enlazado al Worker de amigos con el nombre `MKW`; las llaves empiezan con `mkw/` | **no**: solo los entrega el Worker, y solo a la lista de amigos |
 | Quién puede jugar | La variable `AMIGOS` del Worker (la misma de BT3) | no |
 | El VR y los récords de cada uno | Firebase (`mkw/vr`, `mkw/records`) | lo lee el sitio |
 
@@ -38,11 +38,15 @@ Como en BT3: el Worker revisa en cada pedido el token de Firebase de quien juega
 y que esté en `AMIGOS`. Sin eso contesta 401 (sin sesión) o 403 (no es amigo). El bucket **nunca** se hace público
 (nada de la dirección `r2.dev`): solo el Worker lo lee.
 
-## 1. Las llaves de R2 (una vez)
+## 1. El bucket de Mario Kart y sus llaves (una vez)
 
-Cloudflare → **R2** → **Manage R2 API Tokens** → **Create API token**:
+**El bucket** (§105: Mario Kart va en uno propio, no en el de la ISO de BT3): Cloudflare → **R2** → **Create bucket** →
+nombre, por ejemplo `mkw-retro` → Location: Automatic → Default storage class: Standard → **Create bucket**. **No** se le
+prende el acceso público (ni `r2.dev` ni dominio propio): solo el Worker lo lee.
+
+**Las llaves**: Cloudflare → **R2** → **Manage R2 API Tokens** → **Create API token**:
 - Permisos: **Object Read & Write**.
-- Alcance: **solo el bucket** del disco de BT3 (el del binding `DISCO` del Worker; su nombre está en R2 → Overview).
+- Alcance: **solo el bucket de Mario Kart** (`mkw-retro`, o el nombre que le pusiste).
 - Al crearlo, Cloudflare muestra una sola vez el **Access Key ID** y el **Secret Access Key**. El **Account ID** está en
   la misma página de R2 (a la derecha). Guárdalos donde guardas tus claves, **nunca en un archivo de esta carpeta**.
 
@@ -64,8 +68,9 @@ node herramientas/subir-r2.mjs --comprobar  # revisa en R2 cada archivo (tamaño
 - Son **~7.300 archivos, ~5,0 GB**. A 20 Mbit/s de subida tarda ~35 min; a 10 Mbit/s, ~70 min.
 - Cada archivo va con su huella SHA-256: R2 la recalcula y **rechaza** un archivo que llegó distinto.
 - `mkw/version.json` se sube **al final**: hasta que está todo arriba, quien juegue sigue con la versión anterior.
-- Espacio: el plan gratis de R2 da **10 GB** al mes. Con la ISO de BT3 + Mario Kart (~4,9 GB) mira el uso en
-  R2 → el bucket → Metrics. Pasado el límite cuesta ~0,015 USD por GB al mes.
+- Espacio: el plan gratis de R2 da **10 GB por cuenta**, sumando todos los buckets (un bucket aparte no da más espacio
+  gratis). Mario Kart ocupa 5,0 GB; súmale lo que ocupa la ISO de BT3 (R2 → su bucket → Metrics). Pasado el límite
+  cuesta ~0,015 USD por GB al mes (5 GB de más ≈ 0,08 USD al mes).
 - Después de una actualización (programa nuevo o Retro Rewind nuevo): de nuevo `--subir` y `--comprobar`;
   `--sobrantes` muestra lo viejo que quedó en `mkw/` (no borra nada: se borra a mano si se quiere).
 
@@ -75,14 +80,19 @@ Cloudflare → **Workers & Pages** → el Worker del disco de BT3 → **Edit cod
 `terceros/Paginita-Pro/juegos/bt3/fuente/disco/worker.js` (en el sitio: `juegos/bt3/fuente/disco/worker.js`) →
 **Deploy**.
 
-- No hay variables nuevas: usa las mismas `AMIGOS`, `ORIGENES`, `CLAVE_SUBIDA` y el mismo binding `DISCO`.
+- **§105: el enlace al bucket de Mario Kart.** En el mismo Worker: **Settings** → **Bindings** → **Add** → **R2 bucket** →
+  Variable name **`MKW`** → el bucket de Mario Kart (`mkw-retro`) → **Deploy**. El de BT3 (`DISCO`) queda como está. Sin
+  el enlace `MKW`, el Worker busca Mario Kart en `DISCO` (como antes de §105) y, como ahí no está, la sala dice que el
+  juego no está subido.
+- Variables: las mismas `AMIGOS`, `ORIGENES` y `CLAVE_SUBIDA` de BT3 (la lista de amigos es una sola).
 - **§104: hay que volver a pegarlo** aunque ya esté el de antes: trae `POST /mkw/lote` (muchos pedazos del disco en una
   llamada). Con el Worker viejo el juego igual anda (la página lo nota y pide de a uno), pero gasta ~10 veces más
   llamadas.
 - El repetidor de Cloudflare (TURN) usa las mismas `TURN_ID` y `TURN_CLAVE` de BT3, si ya están. Como en BT3, Mario
   Kart lo usa solo si el anfitrión prende «🛰 Todo por Cloudflare» en la sala (§103, apagado por omisión; sin el modo,
   ni de reserva: §103b). Sin esas dos, `/turn` contesta 404 y todo va directo: el juego anda igual.
-- BT3 sigue igual (sus 7 pruebas pasan con este archivo). Lo nuevo son las rutas `/mkw/…` (6 pruebas más).
+- BT3 sigue igual (sus 7 pruebas pasan con este archivo). Lo nuevo son las rutas `/mkw/…` (12 pruebas más, en
+  `colabtex/tests/mkw-worker.test.cjs`; la del bucket propio es la §105).
 - Para que los pedazos del disco queden en el caché de Cloudflare cerca de Chile, el Worker necesita un **dominio
   propio** (Settings → Domains & Routes → Custom domain); en `*.workers.dev` funciona igual, pero todo sale de R2.
 
@@ -127,7 +137,7 @@ GitHub Pages publica `main`.
 **Antes, en este PC (sin publicar nada):** doble clic en `jugar.bat` abre esta misma página de Juegos, con Firebase y
 cuentas de mentira y el Worker de verdad, mostrando solo Mario Kart; con 2 o 3 ventanas se prueba la sala como si
 fueran varios PC (bitácora §69). La prueba automática del mismo recorrido: `node herramientas/prueba-experiencia.mjs`
-(17 puntos: dos cuentas, la sala, la copa, elegir en el juego y la carrera juntos). Lo de abajo es lo mismo, pero ya
+(23 puntos: dos cuentas, la sala, la copa, elegir en el juego y la carrera juntos). Lo de abajo es lo mismo, pero ya
 en el sitio publicado.
 
 - **Como amigo** (una cuenta de `AMIGOS`): Juegos muestra Mario Kart Wii → abrir una sala (modo copa o playlist) →

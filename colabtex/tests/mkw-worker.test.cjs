@@ -23,10 +23,10 @@ async function token(uid,o={}){
 const bytes=n=>Uint8Array.from({length:n},(_,i)=>(i*7+3)&255);
 const r2=new Map();
 const pon=(k,v,meta)=>r2.set(k,typeof v==='string'?new TextEncoder().encode(v):v);
-const R2={
+const cuboDe=m=>({
   async get(k,o={}){
-    if(!r2.has(k))return null;
-    const v=r2.get(k);
+    if(!m.has(k))return null;
+    const v=m.get(k);
     if(o.range){
       const {offset=0,length=v.length-offset}=o.range;
       if(offset>=v.length||offset+length>v.length)throw new Error('rango fuera del objeto');
@@ -34,9 +34,10 @@ const R2={
     }
     return {body:v,size:v.length};
   },
-  async head(k){return r2.has(k)?{size:r2.get(k).length}:null;},
-  async put(k,v){r2.set(k,new Uint8Array(v));}
-};
+  async head(k){return m.has(k)?{size:m.get(k).length}:null;},
+  async put(k,v){m.set(k,new Uint8Array(v));}
+});
+const R2=cuboDe(r2);
 let W,env,tAmigo,tExtrano;
 const pide=(ruta,cab={},metodo='GET')=>W.fetch(new Request('https://disco.ejemplo'+ruta,{method:metodo,headers:{Origin:'https://paginita-pro.cl',...cab}}),env);
 const amigo=(ruta,cab={},metodo)=>pide(ruta,{Authorization:'Bearer '+tAmigo,...cab},metodo);
@@ -218,4 +219,27 @@ test('§104 los paquetes de imágenes con su huella en el nombre van guardables 
   assert.equal(r.status,200); assert.equal(r.headers.get('cache-control'),'public, max-age=31536000, immutable');
   r=await amigo('/mkw/build/imagenes/paquetes/indice.json');
   assert.equal(r.headers.get('cache-control'),'no-store','el índice cambia: siempre fresco');
+});
+
+/* §105: Mario Kart en su propio bucket (el enlace MKW). Las mismas llaves (mkw/…) en otro bucket: el Worker lee de ahí
+   los pedazos, los archivos enteros y los lotes, y deja de mirar DISCO para Mario Kart; BT3 sigue en DISCO. Sin el
+   enlace MKW (todas las pruebas de arriba), Mario Kart se lee de DISCO como antes. */
+test('§105 bucket propio: con el enlace MKW, Mario Kart lee de ahí (pedazos, entero y lote) y BT3 sigue en DISCO',async()=>{
+  const otros=Uint8Array.from({length:1000},(_,i)=>(i*13+1)&255);
+  const propio=cuboDe(new Map([['mkw/mkw/disco/files/a.szs',otros],['mkw/manifiesto.json',new TextEncoder().encode('{"propio":1}')]]));
+  const env2={...env,MKW:propio};
+  const pide2=(ruta,cab={},metodo='GET',cuerpo)=>W.fetch(new Request('https://disco.ejemplo'+ruta,{method:metodo,
+    headers:{Origin:'https://paginita-pro.cl',Authorization:'Bearer '+tAmigo,...cab},body:cuerpo}),env2,{waitUntil(){}});
+  let r=await pide2('/mkw/mkw/disco/files/a.szs',{Range:'bytes=10-19'});
+  assert.equal(r.status,206); assert.deepEqual(await cuerpo(r),[...otros.slice(10,20)],'el pedazo sale del bucket propio, no de DISCO');
+  r=await pide2('/mkw/manifiesto.json');
+  assert.equal(r.status,200); assert.deepEqual(JSON.parse(await r.text()),{propio:1},'el manifiesto también');
+  r=await pide2('/mkw/mkw/disco/files/a.szs');
+  assert.equal(r.status,200); assert.deepEqual(await cuerpo(r),[...otros],'el archivo entero también');
+  r=await pide2('/mkw/lote',{},'POST',JSON.stringify({p:[['mkw/disco/files/a.szs',0,9],['mkw/disco/files/a.szs',500,503]]}));
+  assert.equal(r.status,200); assert.deepEqual(await cuerpo(r),[...otros.slice(0,10),...otros.slice(500,504)],'y el lote');
+  r=await pide2('/mkw/mkw/sd/RetroRewind6/Mi%20Pista.szs',{Range:'bytes=0-4'});
+  assert.equal(r.status,404,'lo que está solo en DISCO ya no se lee para Mario Kart');
+  r=await pide2('/indice.json');
+  assert.equal(r.status,200); assert.equal(await r.text(),'{"size":3,"pieza":1048576}','BT3 sigue leyendo de DISCO');
 });

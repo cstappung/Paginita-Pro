@@ -3,7 +3,7 @@
 // Resumen: para ensayar la publicación sin publicar nada. Carga juegos/bt3/fuente/disco/worker.js del sitio (con las
 // rutas /mkw/ de Mario Kart) y lo atiende con un servidor de Node en 127.0.0.1 (solo esta PC). Lo que en Cloudflare
 // pone la plataforma, aquí lo pone este archivo:
-//   - el bucket R2 (`DISCO`): los archivos locales, con las MISMAS llaves que subirá subir-r2.mjs
+//   - el bucket R2 de Mario Kart (`MKW`, §105): los archivos locales, con las MISMAS llaves que subirá subir-r2.mjs
 //     (mkw/manifiesto.json, mkw/version.json, mkw/build/…, mkw/mkw/disco/…, mkw/mkw/sd/…, mkw/wc/runtime/assets/…);
 //     el manifiesto y las versiones se arman al arrancar, como en servidor.mjs. Un rango que pasa del final se
 //     rechaza (como el caso más estricto de R2), así se ensaya también el camino de "medir y recortar" del Worker;
@@ -145,7 +145,8 @@ async function firmarDelEmulador(autorizacion) {
 // ---- el Worker ----
 const archivoWorker = path.join(raiz, 'terceros/Paginita-Pro/juegos/bt3/fuente/disco/worker.js');
 const W = (await import(pathToFileURL(archivoWorker).href)).default;
-const env = { AMIGOS, ORIGENES: ORIGEN, DISCO: R2 };
+// §105: Mario Kart en su propio bucket (el enlace MKW); el de BT3 (DISCO), vacío: aquí no se sirve la ISO
+const env = { AMIGOS, ORIGENES: ORIGEN, MKW: R2, DISCO: { get: async () => null, head: async () => null, put: async () => {} } };
 // cada pedido atendido (para medir cuántas llamadas gasta una visita: el plan gratis de Workers da 100.000 al día):
 // [ms desde el arranque, método, ruta sin la consulta, bytes pedidos por Range ('' si es el archivo entero), estado]
 const contador = { pedidos: 0, preguntas: 0, porEstado: {}, lista: [] };

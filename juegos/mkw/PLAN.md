@@ -506,6 +506,11 @@ conectados. Nada del juego adentro (los datos falsos solo tienen la *forma*).
 
 (Fecha y hora local de cada avance; el más nuevo arriba.)
 
+- **2026-10-24 23:09** — **Mario Kart en su propio bucket de R2** (§105, el dueño: «mejor creamos otro bucket para no usar el
+  mismo»). El Worker lee Mario Kart del enlace `MKW` (sin él, de `DISCO`, como antes); las llaves no cambian, así que
+  `subir-r2.mjs` sube igual con otro `R2_BUCKET`. El Worker local usa `MKW` y deja `DISCO` vacío. `publicar.md`: crear el
+  bucket `mkw-retro` (sin acceso público), la llave solo para él y el enlace `MKW` en el Worker. Sitio `mkw-worker` +
+  `bt3-disco` 19/19.
 - **2026-10-24 17:21** — **Menos llamadas al Worker** (§104, el dueño: «optimiza las llamadas de descarga… 100k calls
   por dia»). Medido con el Worker de verdad en este PC (`medir-sitio.mjs`, que ahora cuenta las llamadas por visita y por
   tipo): la 1.ª visita gastaba 1.392 (696 preguntas previas: con `cache: 'no-store'` Chrome pregunta antes de cada
