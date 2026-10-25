@@ -271,7 +271,7 @@
         [[-30, 580], [150, 580], [150, 440], [500, 440], [500, 560], [1030, 560]]
       ],
       obstacles: [{ x: 380, y: 185, r: 40, kind: 'calabazar' }, { x: 640, y: 205, r: 36, kind: 'cripta' }, { x: 760, y: 440, r: 32, kind: 'arbolMuerto' }, { x: 330, y: 525, r: 28, kind: 'calabazar' }, { x: 80, y: 300, r: 34, kind: 'arbolMuerto' }],
-      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'obelisco', 'segador', 'pararrayos', 'campanario', 'faro'],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'segador', 'pararrayos', 'faro', 'sierra'],
       heroes: 'todos', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], poder: 'hoguera', ley: 'noche',
       boss: 'jineteSinCabeza',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['calabaza', 4, 1.3], ['murcielago', 5, 1.3], ['escudero', 7, 1], ['espantapajaros', 8, 1.3],
