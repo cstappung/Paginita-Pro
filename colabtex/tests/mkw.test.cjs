@@ -180,6 +180,30 @@ test('cada tanda es una carrera sincronizada con los que estaban al empezar (has
  assert.deepEqual([...M.reducir(con(13)).sincro],'abcdefghijkl'.split(''),'en una sala con 13 (no debería haber): corren los 12 primeros');
 });
 
+test('§110: la largada guarda quiénes estaban; quien llega con la copa andando se suma (hasta 12) sin cambiar la largada',()=>{
+ // (d llegó después de «¡A correr!»: el registro se lee con los jugadores de ahora, pero la largada es la de la jugada)
+ const con=(...js)=>({...sala(...js),jugadores:{a:{nombre:'Ana',orden:0},b:{nombre:'Beto',orden:1},c:{nombre:'Carla',orden:2},d:{nombre:'Dani',orden:3}}});
+ let e=M.reducir(con({t:'empieza',uid:'a',sincro:['a','b','c']}));
+ assert.deepEqual([...e.sincro],['a','b','c'],'d no está en la largada aunque ya esté en la sala');assert.equal(e.sincroBase,3);
+ e=M.reducir(con({t:'empieza',uid:'a',sincro:['a','b','c']},{t:'suma',uid:'d'}));
+ assert.deepEqual([...e.sincro],['a','b','c','d'],'d se suma al final (su mando: el 4.º)');assert.equal(e.sincroBase,3,'la base no cambia');
+ e=M.reducir(con({t:'empieza',uid:'a',sincro:['a','b','c']},{t:'suma',uid:'d'},{t:'suma',uid:'d'}));
+ assert.deepEqual([...e.sincro],['a','b','c','d'],'una sola vez');
+ e=M.reducir(con({t:'suma',uid:'d'},{t:'empieza',uid:'a',sincro:['a','b','c']}));
+ assert.deepEqual([...e.sincro],['a','b','c'],'en el vestíbulo no hay nada que sumar');
+ e=M.reducir(con({t:'empieza',uid:'a',sincro:['a','b','c']},{t:'suma',uid:'d'},{t:'vuelve',uid:'a'},{t:'empieza',uid:'a',sincro:['a','b','c','d']}));
+ assert.deepEqual([...e.sincro],['a','b','c','d']);assert.equal(e.sincroBase,4,'la tanda siguiente empieza con todos');
+ e=M.reducir(con({t:'empieza',uid:'a',sincro:['a','b','x','c']}));
+ assert.deepEqual([...e.sincro],['a','b','c'],'en la lista solo valen los que están en la sala');
+ e=M.reducir(con({t:'empieza',uid:'a'}));
+ assert.deepEqual([...e.sincro],['a','b','c','d'],'una jugada de antes (sin lista): todos los presentes, como antes');
+ // la sala llena: con 12 nadie más se suma
+ const doce='abcdefghijklm'.split('');
+ const llena=(...js)=>({...sala(...js),jugadores:Object.fromEntries(doce.map((u,i)=>[u,{nombre:u,orden:i}]))});
+ e=M.reducir(llena({t:'empieza',uid:'a',sincro:doce.slice(0,12)},{t:'suma',uid:'m'}));
+ assert.equal(e.sincro.length,12,'con 12 no se suma un 13.º');
+});
+
 test('la semilla y las 4 pistas de cada tanda salen de la sala y del número de tanda',()=>{
  const a=M.mkwCarrera('p1',1),b=M.mkwCarrera('p1',1),c=M.mkwCarrera('p1',2),d=M.mkwCarrera('p2',1);
  assert.deepEqual(a,b,'lo mismo en cada navegador');
@@ -230,6 +254,10 @@ test('la dirección del marco: la sala nueva del juego (modo=sala) con su malla,
  assert.equal(pl.get('pistas'),null,'la lista de la playlist la arma el anfitrión en el juego, con sugerencias (§74)');assert.equal(pl.get('carreras'),'4','hasta cuántas llena su 🎲');
  const sinJefe=new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['c','b']})).searchParams;
  assert.equal(sinJefe.get('jefe'),'c','sin anfitrión: el primero de la lista');
+ // §110: &base= = cuántos estaban al empezar la copa (los demás se sumaron); sin sumados, nada
+ const b3=new URL('https://x/'+c.__s({pid:'p1',uid:'d',nodo:5,privado:'',ronda:2,sincro:['a','b','c','d'],base:3,jefe:'a'})).searchParams;
+ assert.equal(b3.get('base'),'3');assert.equal(b3.get('sincro'),'a,b,c,d');
+ assert.equal(new URL('https://x/'+c.__s({pid:'p1',uid:'b',nodo:3,privado:'',ronda:2,sincro:['a','b'],base:2,jefe:'a'})).searchParams.get('base'),null);
 });
 
 test('está en las reglas de Firebase (con el tope de 12 y su nodo mkw), en el salón y es privado como BT3',()=>{

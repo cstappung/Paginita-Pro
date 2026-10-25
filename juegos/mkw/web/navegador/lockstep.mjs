@@ -54,6 +54,7 @@
 // Uso:  const ls = crearLockstep({ yo, humanos: [{ uid, mando }], enviar: (uid, bytes, canal) => …, local: () => [7 números] });
 //       Module.mkwLockstep = ls;  malla → ls.alBinario(de, bytes)  (los que empiezan con MARCA)
 //       §75: ls.fijarCarrera(k, [mandos fuera]); ls.saltar(mando, k); ls.enCuadro(k, cuadro, fn) (fn en ese cuadro)
+//       §110: ls.agregar({ uid, mando }) entre carreras (llegó con la copa andando; hasta que corra, va en `fuera`)
 export const MARCA = 0xA7;
 export const RETRASO = 3;                  // el de partida si no hay medidas (y el de siempre con ?retraso=fijo)
 export const RETRASO_MIN = 2;
@@ -873,7 +874,7 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
       for (let k = 1; k < 8 && nada; k++) if (datos[p * 8 + k] !== 0) nada = false;
       // (§100: el que ya llegó no está ausente aunque no toque nada: antes, quien llegaba antes del minuto —en una pista
       // corta, o por código en prueba-sala— juntaba 30 s «quieto» esperando a los demás y perdía como cortado)
-      if (nada && llego?.(i)) nada = false;
+      if (nada && llego?.(i, p)) nada = false;     // (§110: con el mando: el puesto en la carrera lo sabe la página)
       q.racha = nada ? q.racha + 1 : 0; q.max = Math.max(q.max, q.racha); quieto.set(p, q);
     });
     // lo que dejó la autoridad de este cuadro: quiénes iban relevados (para avisar), si inventó los míos y si pasa el papel
@@ -1374,7 +1375,17 @@ export function crearLockstep({ yo, humanos, enviar, local, huella = null, retra
              // los que nunca mandaron nada en esta carrera todavía vienen cargando (no es un corte)
              llegando: espera.faltan.every(m => tabla(m).size === 0) };
   };
-  return { pad, alBinario, fijarCarrera, saltar, enCuadro,
+  // §110: un piloto que llegó con la copa andando, a la lista (entre carreras: la página lo llama antes de fijarCarrera;
+  // en las carreras que no corre va en `fuera`, así nadie lo espera). Su mando es su lugar en la lista de la sala
+  function agregar(h) {
+    if (!h || typeof h.uid !== 'string' || !Number.isInteger(h.mando) || h.mando < 0 || h.mando >= MANDOS) return false;
+    if (mandoDe.has(h.uid) || duenoDe.has(h.mando)) return false;
+    if (!humanos.some(x => x.uid === h.uid)) humanos.push(h);
+    mandos.push(h.mando); duenoDe.set(h.mando, h.uid); mandoDe.set(h.uid, h.mando);
+    registro(`[lockstep] §110: se suma ${h.uid} con el mando ${h.mando}`);
+    return true;
+  }
+  return { pad, alBinario, fijarCarrera, saltar, enCuadro, agregar,
     estado: () => ({ ...est, esperaDe: { ...est.esperaDe }, estable: { ...est.estable }, delantes: Object.fromEntries(delanteDe),
       quieto: Object.fromEntries([...quieto].map(([m, q]) => [m, q.max])),
       // §99 (C1): si estoy pausado (mi kart va solo hasta que vuelva) y las pausas de esta carrera

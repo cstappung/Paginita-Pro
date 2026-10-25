@@ -10037,3 +10037,52 @@ cámara, lockstep), y el aviso del vestíbulo del sitio decía «entra en la car
 
 Pruebas: `npm run test:juegos` 1129/1129. Pendiente (pedido del dueño): que quien llega tarde entre en la **siguiente
 carrera** de la copa (§110).
+
+## 2026-10-25 · §110 Quien llega con la copa andando corre desde la carrera siguiente
+
+Pedido del dueño: «que quien llega tarde entre en la siguiente carrera» (y no espere a que termine la copa).
+
+### 110.1 Un error de antes, encontrado de paso: el juego de todos se recargaba
+
+`redMkw` (`colabtex/src/juegos/motor.js`) arma la lista de la largada (`sincro`) en la jugada `empieza` con «los
+presentes», pero el registro se vuelve a leer con los jugadores **de ahora**. Quien entraba con la copa andando aparecía
+en la largada de una copa que ya corría: la lista cambiaba, la dirección del marco de cada piloto también (su firma
+llevaba la lista) y **el juego de todos se recargaba** a mitad de copa. Medido en Node: sala a, b; `empieza`; entra d →
+`sincro` = a, b, d. Arreglo: «¡A correr!» escribe quiénes están al apretar (`{t:"empieza", uid, sincro}`) y el
+registro usa esa lista (una jugada vieja, sin lista: como antes). Las reglas de Firebase ya aceptan campos extra en una
+jugada (`$otro`): no hay que publicar nada.
+
+### 110.2 Sumarse
+
+- **El sitio:** quien llega con la copa andando escribe `{t:"suma", uid}` él solo (`sumarme` en `mkw.js`, una vez por
+  tanda, solo un amigo de la lista); el registro lo pone al final de `sincro` (hasta 12) y `sincroBase` dice cuántos
+  estaban al empezar. Su marco carga con `&base=N`. Los marcos que ya corren **no se recargan** (su firma ya no lleva la
+  lista): se les manda `{tipo:'sincro', sincro}` y la sala del juego lo anota.
+- **La sala del juego** (`sala-carrera.mjs`): la anfitriona anota a los nuevos en `sumados = [[uid, desde], …]`, en el
+  orden del sitio (el mando de cada uno es su lugar en la lista: igual en todas las consolas). `desde` lo pone ella **al
+  empezar cada carrera**, solo a los que ya dan señales: quien todavía carga el juego no corre con un kart quieto, entra
+  en la que sigue. `correnEn(humanos, estado, n)` = quiénes corren la carrera n (la base y los sumados con
+  desde ≤ n): cada consola arma la misma ficha aunque haya visto la lista nueva antes o después.
+- **La página** (`mkw.mjs`): la lista de la carrera sincronizada cambia recién al **arrancar** una carrera
+  (`lockstep.agregar`, `sumarHumano`); si cambiara con una carrera andando, esa consola esperaría los botones de alguien
+  que no está en ella. Los sumados que todavía no corren van en `fuera` de `fijarCarrera`. Lo que va por puesto (los
+  nombres en el juego, las tablas, el VR, la cámara propia `mkwMiPuesto`) se lee de `sincro.corren`, la lista de la
+  carrera, no de `sincro.humanos`. El que se suma en la carrera n toma el puesto de una CPU y **empieza con 0 puntos**.
+- **El recién llegado** entra como quien recargó (§75): se salta la carrera en curso (cartel «Vuelves en la siguiente»),
+  elige personaje en el descanso y corre desde la siguiente.
+- Los textos: el aviso de la sala, la pregunta de «¡A correr!» (§109) y el manual 📖 dicen que se suma en la carrera
+  siguiente.
+
+**Pruebas:**
+
+| Prueba | Resultado |
+|---|---|
+| Sitio `mkw.test.cjs` (+2: la largada con su lista, `suma`, el tope de 12, `&base=`) | 24 / 24 |
+| Banco `sumados` (nuevo: Ana y Beto empiezan, Dani llega en la 1 y corre desde la 2; Eva sumada sin página no corre; la misma lista en las tres páginas; 0 puntos; el «terminé» de quien no corrió no cuenta; la anfitriona que recarga lo anota sola; `lockstep.agregar`) | 24 / 24 |
+| Banco `sala-carrera`, `lockstep`, `sala-playlist` (sin cambios de comportamiento) | 101/101, 50/50, 37/37 |
+| La página sin el programa con `?modo=sala&sincro=ana,beto,dani&uid=dani&base=2` | base 2, corren Ana y Beto, Dani con el mando 2, sin errores |
+
+**Falta probarlo con el juego** (dos o tres pestañas): `node web/navegador/prueba-sala.mjs` con una tercera pestaña que
+entra en la carrera 1 de la copa (no existe todavía: hay que agregarla) y `prueba-sincro --sala`. Lo que podría fallar
+con el juego y el banco no ve: que el juego del recién llegado salte bien a la carrera siguiente (el mismo camino que
+quien recargó, §75) y que la huella de la carrera dé igual en las tres consolas.

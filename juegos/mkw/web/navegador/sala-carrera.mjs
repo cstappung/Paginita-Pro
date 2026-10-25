@@ -50,6 +50,19 @@
 //     página anota la diferencia con el suyo (restan(plazo) = lo que falta, igual en todos los PC aunque sus relojes
 //     no coincidan).
 //
+// §110, llegar con la copa andando (pedido del dueño: «que quien llega tarde entre en la siguiente carrera»):
+//   - la sala del sitio agrega al recién llegado al final de la lista de pilotos (`sincro`, en el orden en que llegaron)
+//     y se lo avisa a cada marco (sumar). La anfitriona lo anota en el estado: sumados = [[uid, desde], …], en ese
+//     mismo orden (el mando de cada uno es su lugar en esa lista: base + i, igual en todas las consolas).
+//   - desde = la carrera desde la que corre (0 = todavía no). Lo pone la anfitriona AL EMPEZAR cada carrera, a los
+//     sumados que ya dan señales (su página cargó y manda latidos): así nadie corre con un kart quieto porque su juego
+//     todavía cargaba; el que no llegó a tiempo entra en la que sigue.
+//   - quiénes corren la carrera n (correnEn): los de la base (los que estaban al empezar la copa) y los sumados con
+//     desde ≤ n, en el orden de la sala. Con eso cada consola arma la MISMA ficha (los puestos de los humanos y las
+//     CPU), aunque haya visto la lista nueva antes o después: la lista sale del estado de esa carrera, no del momento.
+//   - el recién llegado entra como quien recargó (§75): se salta la carrera en curso, elige personaje en el descanso
+//     y corre desde la siguiente, con 0 puntos (su puesto era de una CPU: esos puntos no son suyos).
+//
 // Los mensajes viajan por la malla (canal "tcp": en orden y sin pérdidas) como bytes: [0xA8, …JSON en UTF-8].
 //
 // Uso:  const s = crearSala({ yo, humanos: [{uid, mando}], anfitrion, estilo: 'copa'|'playlist', carreras, pistas,
@@ -66,6 +79,8 @@
 //       §75: alSalta: (uid, n) => … (ese humano se salta la carrera n); s.saltar(n) (esta página se salta la n)
 //       §82 VR: s.miVr(vr) (todos: el VR que tengo ahora); vrsDeCarrera(estado, n) = los VR con que se cuenta la n
 //       §87: s.quitar(uid) (la sala del sitio lo sacó: echado por el anfitrión, por votación, o se fue)
+//       §110: s.sumar([uid, …]) (los pilotos que la sala del sitio agregó con la copa andando, en su orden);
+//       correnEn(humanos, estado, n) = quiénes corren la carrera n
 //
 // §82, el VR: cada página le dice a la anfitriona el VR que tiene ({t:'vr'}); ella los lleva en el estado (vrs) y, al
 // empezar cada carrera, los congela (vrCarrera: {n, vrs}). Así todas las consolas calculan el VR de esa carrera con
@@ -115,12 +130,16 @@ export const ratosMalos = e => Math.min(9999, Math.max(0, (e?.malas | 0) + (e?.a
 // lo que se le pone al que no eligió a tiempo: Mario, Luigi, Peach, Yoshi con el kart estándar de su peso
 const POR_OMISION = [[0, 1], [7, 1], [16, 1], [10, 1]];
 
-export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 4, pistas = null, enviar, alCambiar = () => {},
+export function crearSala({ yo, humanos: humanosIniciales, anfitrion, estilo = 'copa', carreras = 4, pistas = null, enviar, alCambiar = () => {},
   ahora = () => Date.now(), cada = (f, ms) => setInterval(f, ms), parar = id => clearInterval(id),
   registro = () => {}, segundosElegir = SEGUNDOS_ELEGIR, segundosResultados = SEGUNDOS_RESULTADOS, alSalta = () => {},
   segundosCopa = SEGUNDOS_COPA, alVencioCopa = () => {}, esperarListo = false,
   // §100: uid => true si esa página se fue (la página: ni en el buzón ni con su WebRTC sano); sin ella, solo el silencio largo
-  ido = () => false }) {
+  ido = () => false,
+  // §110: cuántos de `humanos` estaban al empezar la copa (los demás son sumados: llegaron después)
+  base = humanosIniciales.length }) {
+  // §110: una lista propia (crece con sumar): la de la carrera sincronizada cambia recién al empezar cada carrera
+  const humanos = humanosIniciales.map(h => ({ ...h }));
   let jefe = anfitrion, deQuien = anfitrion;      // quién manda ahora, y de quién vino la última copia aceptada
   let oficial = anfitrion;                        // §100: la anfitriona que nombró el sitio (jefe puede ser una provisoria)
   const soy = () => jefe === yo;
@@ -150,12 +169,29 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     const hace = ahora() - (vistos.get(h.uid) ?? -Infinity);
     return sacados.has(h.uid) || !(hace <= PRESENTE_MS) || (hace > JEFE_IDO_MS && ido(h.uid));
   }).map(h => h.uid);
+  // §110: los que corren la carrera n pero no dan señales (van «sin nadie»); los sumados que no corren no van en la ficha
+  const fueraEn = (n, sumados) => { const corren = new Set(correnEn(humanos, { ...estado, sumados }, n).map(h => h.uid)); return ausentes().filter(u => corren.has(u)); };
   const enPlaylist = estilo === 'playlist';
   // §74: la playlist empieza armando la lista (si la sala trae pistas, quedan de base); la copa no tiene lista
   const listaInicial = enPlaylist ? crearPlaylistSala({ estado: { pistas: Array.isArray(pistas) ? pistas : [] } }).exportar() : null;
   // el estado de la sala (el del anfitrión manda; los demás tienen la última copia que les llegó)
   let estado = { fase: 'copa', pistas: null, carreras, carrera: 0, picks: {}, terminaron: {}, plazo: 0, fuera: [], version: 0,
-    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null, estable: {}, autoridad: null, pedidas: {} };
+    lista: listaInicial, pausa: 0, vrs: {}, vrCarrera: null, llegada: null, estable: {}, autoridad: null, pedidas: {},
+    base: Math.max(0, Math.min(12, base | 0)), sumados: [] };
+  // §110: el estado nuevo puede traer sumados que esta página todavía no conoce (se los dijo el sitio a la anfitriona
+  // antes que a mí): a la lista, para poder hablarles
+  const conocer = e => { for (const [u] of e?.sumados || []) if (typeof u === 'string' && !esHumano(u)) humanos.push({ uid: u, mando: humanos.length }); };
+  const baseDe = () => Number.isInteger(estado.base) ? estado.base : humanos.length;
+  const esSumado = u => (estado.sumados || []).some(([x]) => x === u);
+  // ¿uid corre la carrera n? (los de la base siempre; los sumados desde su carrera)
+  const corre = (u, n) => correnEn(humanos, estado, n).some(h => h.uid === u);
+  // §110: al empezar la carrera n, los sumados que ya dan señales corren desde esta (desde = n)
+  const unir = n => {
+    const aus = new Set(ausentes());
+    let cambio = false;
+    const sumados = (estado.sumados || []).map(([u, d]) => (!d && !aus.has(u) ? (cambio = true, [u, n]) : [u, d]));
+    return cambio ? sumados : estado.sumados;
+  };
   // §99 (D): la primera autoridad de cada carrera (la que releva a los atrasados): el más estable de las anteriores
   // (estado.estable: uid → los ratos malos que contó su consola —la mayoría lo vio tarde, o iba atrás—, sumados); al que no contó
   // nada (recargó, se cortó) se le ponen ESTABLE_SIN_DATO. Empate: el orden de la sala
@@ -207,16 +243,25 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
   function revisar() {
     if (!soy()) return;
     const t = ahora();
+    // §110: los que conozco después de la base y la anfitriona todavía no anotó (el sitio me los dijo antes de que la sala
+    // estuviera lista, o era otra la anfitriona): a sumados, en su orden
+    if (lista) {
+      const faltan = humanos.slice(baseDe()).filter(h => !esSumado(h.uid)).slice(0, Math.max(0, 12 - baseDe() - (estado.sumados || []).length));
+      if (faltan.length) cambiar({ sumados: [...(estado.sumados || []), ...faltan.map(h => [h.uid, 0])] });
+    }
     if (estado.fase === 'copa' && !estado.lista && lista && segundosCopa > 0 && listoCopa) {
       // M22: la copa con reloj (lo ven todos); al vencer, la página de la anfitriona pone una al azar
       if (!estado.plazo) cambiar({ plazo: t + segundosCopa * 1000 });
       else if (t >= estado.plazo && vencida !== estado.plazo) { vencida = estado.plazo; alVencioCopa(); }
     } else if (estado.fase === 'elegir') {
-      const todos = humanos.every(h => estado.picks[h.uid]);
+      // (§110: el sumado que todavía no carga no frena la elección: corre desde la carrera en que ya dé señales)
+      const aus = new Set(ausentes());
+      const todos = humanos.every(h => estado.picks[h.uid] || (esSumado(h.uid) && aus.has(h.uid)));
       if (todos || t >= estado.plazo) {
         const picks = { ...estado.picks };
         humanos.forEach((h, i) => { if (!picks[h.uid]) picks[h.uid] = { personaje: POR_OMISION[i % 4][0], vehiculo: POR_OMISION[i % 4][1], derrape: 0, solo: true }; });
-        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, fuera: ausentes(), vrCarrera: congelar(1), autoridad: null });
+        const sumados = unir(1);
+        cambiar({ fase: 'correr', carrera: 1, picks, terminaron: {}, plazo: 0, sumados, fuera: fueraEn(1, sumados), vrCarrera: congelar(1), autoridad: null });
       }
     } else if (estado.fase === 'correr') {
       // la carrera n terminó para todos los que siguen (o para el anfitrión hace rato: quien se fue no avisa)
@@ -224,7 +269,12 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
       if (fin && !estado.plazo) cambiar({ plazo: t + segundosResultados * 1000 });
       else if (estado.plazo && t >= estado.plazo) {
         if (n >= estado.carreras) cambiar({ fase: 'fin', plazo: 0, pausa: 0 });
-        else { const fuera = ausentes(); cambiar({ carrera: n + 1, plazo: 0, pausa: 0, fuera, vrCarrera: congelar(n + 1), autoridad: elegirAutoridad(fuera) }); }
+        else {
+          const sumados = unir(n + 1), fuera = fueraEn(n + 1, sumados);
+          // (§110: la autoridad, solo entre los que corren)
+          const noCorren = humanos.filter(h => !correnEn(humanos, { ...estado, sumados }, n + 1).includes(h)).map(h => h.uid);
+          cambiar({ carrera: n + 1, plazo: 0, pausa: 0, sumados, fuera, vrCarrera: congelar(n + 1), autoridad: elegirAutoridad([...fuera, ...noCorren]) });
+        }
       }
     }
   }
@@ -336,7 +386,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     if (m.t === 'dame' && de === jefe && !soy()) { enviar(de, codificar({ t: 'copia', estado })); return; }
     if (m.t === 'copia' && soy() && m.estado && typeof m.estado === 'object' && (m.estado.version | 0) > estado.version) {
       // §75: la copia más nueva (la anfitriona recargó): sigue desde ahí, con un número más alto que todos
-      estado = m.estado;
+      estado = m.estado; conocer(estado);
       registro(`[sala] copia de ${de}: ${estado.fase} carrera ${estado.carrera} (v${estado.version})`);
       if (!lista) { lista = true; }
       cambiar({});
@@ -363,7 +413,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     if (m.t === 'estado' && !soy() && de === jefe && Number.isFinite(m.reloj)) desfase = m.reloj - ahora();
     if (desfaseNtp !== null && !soy()) desfase = desfaseNtp;
     if (m.t === 'estado' && !soy() && de === jefe && m.estado && (!lista || m.estado.version > estado.version || deQuien !== jefe)) {
-      estado = m.estado; deQuien = jefe; lista = true; alCambiar(estado);
+      estado = m.estado; deQuien = jefe; lista = true; conocer(estado); alCambiar(estado);
     } else if (!lista) {
       return;                                   // (la anfitriona recién abierta: todavía no sabe en qué va la sala)
     } else if (soy() && m.t === 'pido' && esHumano(de) && de !== yo && estado.fase === 'copa' && !estado.lista) {
@@ -388,7 +438,7 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // (§99, S3 del crítico: solo de un humano de la sala que corrió esa carrera —no de uno que quedó fuera desde el
     // principio—: antes valía el primer «terminé» de cualquiera)
     } else if (soy() && m.t === 'termine' && m.carrera === estado.carrera && estado.fase === 'correr' && esHumano(de) &&
-               !(estado.fuera || []).includes(de)) {
+               !(estado.fuera || []).includes(de) && corre(de, m.carrera)) {
       const cambio = {};
       if (!estado.terminaron[m.carrera]) cambio.terminaron = { ...estado.terminaron, [m.carrera]: de };
       // §75: los puntos que lleva la copa según esa consola; vale la de quien corrió desde más atrás (quien recargó
@@ -525,6 +575,22 @@ export function crearSala({ yo, humanos, anfitrion, estilo = 'copa', carreras = 
     // §87: la sala del sitio sacó a ese piloto (lo echó el anfitrión, la votación, o se fue): desde la carrera que
     // empiece después queda fuera en todas las consolas (la anfitriona lo pone en `fuera`), aunque siga conectado
     quitar(uid) { if (!esHumano(uid) || uid === yo || sacados.has(uid)) return false; sacados.add(uid); return true; },
+    // §110: los pilotos que la sala del sitio agregó con la copa andando (la lista entera o solo los nuevos, en su
+    // orden). Todas las páginas los conocen desde ya (para hablarles); la anfitriona los anota en sumados (sin carrera:
+    // corren desde la que empiece cuando ya den señales). Devuelve cuántos anotó
+    sumar(uids) {
+      if (!Array.isArray(uids)) return 0;
+      const nuevos = [];
+      for (const u of uids) {
+        if (typeof u !== 'string' || !u || u.length > 128) continue;
+        if (!esHumano(u)) humanos.push({ uid: u, mando: humanos.length });
+        const i = humanos.findIndex(h => h.uid === u);
+        if (soy() && lista && i >= baseDe() && !esSumado(u) && !nuevos.some(([x]) => x === u) && baseDe() + (estado.sumados || []).length + nuevos.length < 12)
+          nuevos.push([u, 0]);
+      }
+      if (nuevos.length) { cambiar({ sumados: [...(estado.sumados || []), ...nuevos] }); registro(`[sala] §110: se suman ${nuevos.map(([u]) => u).join(', ')}`); }
+      return nuevos.length;
+    },
     get lista() { return lista; },
     // §100 (H1.2, la prueba de conexión): hace cuánto (ms) llegó algo de ese piloto (por donde sea), hace cuánto directo
     // (por su conexión propia) y por quién llegó lo último pasado por otro
@@ -553,6 +619,17 @@ export const skinsValidas = t => Array.isArray(t) && t.length === 12 && t.every(
 // §94: la llegada: 12 números, 0 (nadie en ese puesto) o del 1 al 12 sin repetir
 const llegadaValida = t => Array.isArray(t) && t.length === 12 && t.every(x => Number.isInteger(x) && x >= 0 && x <= 12) &&
   new Set(t.filter(x => x)).size === t.filter(x => x).length;
+
+// §110: quiénes corren la carrera n, en el orden de la sala: los de la base (los primeros `estado.base` de la lista:
+// estaban al empezar la copa) y los sumados con desde entre 1 y n. Un sumado que esta página conoce pero la anfitriona
+// todavía no anotó, no corre. Sin `base` en el estado (una anfitriona de antes de §110): todos, como antes.
+export function correnEn(humanos, estado, n) {
+  if (!Number.isInteger(estado?.base)) return humanos.slice();
+  const desde = new Map((estado.sumados || []).map(([u, d]) => [u, d | 0]));
+  return humanos.filter((h, i) => desde.has(h.uid) ? desde.get(h.uid) >= 1 && desde.get(h.uid) <= n : i < estado.base);
+}
+// §110: los que se suman en la carrera n (su primera): su puesto era de una CPU, los puntos de ese puesto no son suyos
+export const sumadosEn = (estado, n) => (estado?.sumados || []).filter(([, d]) => (d | 0) === n).map(([u]) => u);
 
 // Los humanos de la ficha de la carrera n: en el orden de la sala (el mando de cada uno), con lo que eligieron
 export function humanosDeFicha(humanos, estado) {
