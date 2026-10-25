@@ -17,10 +17,11 @@
      según la ronda a la que llegó, y ganar vale el doble.
    - `orden`: por reino y para todos, en qué orden aparece cada tipo.
    - `guiones`: por reino, la mejor partida (la que llegó más lejos; entre las
-     ganadas, la que acabó con más vidas) jugada a jugada: `[ronda, 'p', tipo, x, y]`
-     poner, `[ronda, 'u', n.º de torre, camino]` mejorar, `'v'` vender, `'m'` objetivo
-     (el n.º de torre es el orden en que se puso). El bot la sigue al principio
-     (`--guion N`: hasta la ronda N).
+     ganadas, la que acabó con más vidas) jugada a jugada: `[ronda, cuándo, 'p',
+     tipo, x, y]` poner, `[ronda, cuándo, 'u', n.º de torre, camino]` mejorar,
+     `'v'` vender, `'m'` objetivo (el n.º de torre es el orden en que se puso;
+     cuándo es -1 entre rondas o los pasos desde que empezó la ronda: hay quien
+     vende y rehace a mitad de una). El bot la sigue (`--guion N`: hasta la ronda N).
 
    Solo aprende de las partidas que llegaron a la ronda 100 (`--todas`: de todas).
    Solo se rehacen las pruebas de la versión del motor de esta carpeta (`ve`);
@@ -47,7 +48,9 @@ function rehace(p) {
   if (p.ve !== P.VERSION) throw new Error('otra versión del motor');
   const u = String(p.u), li = p.r;
   const quieto = g => g.over || (!g.active && g.enemies.length === 0);
-  let g = new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k = 0, q = 0, tramo = 0;
+  let g = new PD.Game(li, null, P.semillaTramo(p.s, u, 0)), k = 0, q = 0, tramo = 0, inicio = 0;
+  // cuándo: -1 entre rondas; si no, los pasos desde que empezó la ronda
+  const cuando = () => (g.active ? k - inicio : -1);
   let info = new Map();   // torre → {type, seq, modo}
   const todas = [], rondas = [], guion = [];
   const paso = () => {
@@ -65,14 +68,14 @@ function rehace(p) {
       if (!t2) throw new Error('no se pudo colocar');
       const x = { type: t2.type, seq: [], modo: null, r: g.round + 1 };
       info.set(t2, x); todas.push(x);
-      guion.push([g.round + 1, 'p', t2.type, t2.x, t2.y]);
+      guion.push([g.round + 1, cuando(), 'p', t2.type, t2.x, t2.y]);
     } else if (c === 1) {
       if (!t || !g.upgrade(t, j[3])) throw new Error('mejora imposible');
-      info.get(t).seq.push(j[3]); guion.push([g.round + 1, 'u', todas.indexOf(info.get(t)), j[3]]);
+      info.get(t).seq.push(j[3]); guion.push([g.round + 1, cuando(), 'u', todas.indexOf(info.get(t)), j[3]]);
     }
-    else if (c === 2) { if (!t) throw new Error('venta imposible'); guion.push([g.round + 1, 'v', todas.indexOf(info.get(t))]); g.sell(t); }
-    else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; guion.push([g.round + 1, 'm', todas.indexOf(info.get(t)), t.mode]); } }
-    else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); }
+    else if (c === 2) { if (!t) throw new Error('venta imposible'); guion.push([g.round + 1, cuando(), 'v', todas.indexOf(info.get(t))]); g.sell(t); }
+    else if (c === 3) { if (t) { t.mode = P.MODOS[j[3]]; info.get(t).modo = t.mode; guion.push([g.round + 1, cuando(), 'm', todas.indexOf(info.get(t)), t.mode]); } }
+    else if (c === 4) { if (!g.startRound()) throw new Error('ronda imposible'); inicio = k; }
     else if (c === 5) {
       const viejas = g.towers.slice();
       const snap = JSON.parse(JSON.stringify(g.snapshot()));

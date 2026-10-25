@@ -590,6 +590,7 @@ class Bot {
     g.startRound();
     let pasos = 0, av = 0;
     while (g.active && !g.over && pasos < 60 * 900) {
+      c.enRonda(pasos);
       g.update(STEP); pasos++;
       if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
       if (pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
@@ -620,6 +621,7 @@ class Bot {
     for (const m of queda ? MODOS_GUION : MODOS) {
       if (queda && !/^(normal|adelanta)/.test(m) && mejor && mejor[1].perdidas < umbral) break;
       const x = this.ensaya(m);
+      if (process.env.PD_DEBUG) console.log(`    r${this.game.round + 1} ${m}: pierde ${x.perdidas}, oro ${Math.round(x.oro)}`);
       if (x.perdidas === 0) return m;
       if (!mejor || x.perdidas < mejor[1].perdidas || x.perdidas === mejor[1].perdidas && x.av < mejor[1].av) mejor = [m, x];
     }
@@ -638,6 +640,9 @@ class Bot {
       this.vetadas = {};
       this.planea(this.modo);
       foto = JSON.stringify(g.snapshot());
+      // lo del bot al empezar la ronda (un reintento vuelve aquí: el guion y las torres de la
+      // foto, aunque a mitad de la ronda haya vendido o puesto alguna)
+      const fotoBot = { ids: g.towers.map(t => t.id), mem: new Map([...this.mem].map(([k, m]) => [k, { ...m, dealt: m.dealt.slice() }])), gi: this.gi, gTorres: this.gTorres && this.gTorres.slice() };
       for (const t of g.towers) this.mem.get(t.id).antes = t.dealt;
       const r = g.round + 1;
       // --ayuda N: hasta la ronda N las vidas no se acaban (se cuentan igual las que se pierden)
@@ -652,6 +657,7 @@ class Bot {
       g.startRound();
       let pasos = 0, avance = 0;
       while (g.active && !g.over && pasos < 60 * 900) {
+        this.enRonda(pasos);
         g.update(STEP); pasos++;
         if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
         if (pasos % 10 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > avance) avance = pr; }
@@ -672,7 +678,8 @@ class Bot {
         if (reintentos <= 0) break;
         reintentos--;
         const snap = JSON.parse(foto); snap.continues = reintentos;
-        this.recarga(snap);
+        this.mem = fotoBot.mem; this.gi = fotoBot.gi; this.gTorres = fotoBot.gTorres;
+        this.recarga(snap, { towers: fotoBot.ids.map(id => ({ id })) });
         g = this.game;
       }
     }
@@ -704,11 +711,11 @@ class Bot {
     for (const [slug, gu] of Object.entries(LIBRO.guiones || {})) {
       const J = [], nuevo = [];
       for (const a of gu.jugadas) {
-        if (a[1] === 'p') {
-          const t = PD.TOWERS[a[2]].hero ? heroe : a[2];
-          nuevo.push(t && vende.includes(t) ? J.filter(x => x[1] === 'p').length : -1);
-          if (nuevo[nuevo.length - 1] >= 0) J.push([a[0], 'p', t]);
-        } else if (nuevo[a[2]] >= 0) J.push([a[0], a[1], nuevo[a[2]], a[3]]);
+        if (a[2] === 'p') {
+          const t = PD.TOWERS[a[3]].hero ? heroe : a[3];
+          nuevo.push(t && vende.includes(t) ? J.filter(x => x[2] === 'p').length : -1);
+          if (nuevo[nuevo.length - 1] >= 0) J.push([a[0], a[1], 'p', t]);
+        } else if (nuevo[a[3]] >= 0) J.push([a[0], a[1], a[2], nuevo[a[3]], a[4]]);
       }
       const b = new Bot(this.li, this.nombre, this.semilla, { guion: J, hasta: 30, sinAnticipa: true, banco: this.banco, covBanco: this.covBanco });
       const x = b.juega(false);
@@ -718,13 +725,16 @@ class Bot {
     if (mejor) this.prestado = mejor.slug;
     return mejor ? mejor.J : null;
   }
-  sigueGuion(r) {
+  // Hace lo del guion hasta la ronda r. Lo que la persona hizo durante una ronda espera a esa
+  // ronda y a su paso (`pasos`, los de la ronda en curso; sin él, se está entre rondas).
+  sigueGuion(r, pasos) {
     if (!this.est.humana || !this.guion || r > GUION) return false;
-    const g = this.game, J = this.guion;
+    const g = this.game, J = this.guion, cur = g.round + 1;
     this.gi = this.gi || 0; this.gTorres = this.gTorres || [];
     const torre = n => { const id = this.gTorres[n]; return id === undefined ? null : g.towers.find(t => t.id === id) || null; };
     while (this.gi < J.length && J[this.gi][0] <= r) {
-      const [, k, a, b, c] = J[this.gi];
+      const [ronda, cuando, k, a, b, c] = J[this.gi];
+      if (cuando >= 0 && ronda >= cur && (pasos === undefined || ronda > cur || cuando > pasos)) return true;
       if (k === 'p') {
         if (g.money < (g.towerCost ? g.towerCost(a) : PD.TOWERS[a].cost)) return true;
         const s = b === undefined ? this.sitio(a) : [b, c];
@@ -743,9 +753,11 @@ class Bot {
     }
     return true;
   }
+  // durante la ronda: lo que el guion hace a mitad de ella
+  enRonda(pasos) { if (this.guion && this.est.humana && (this.gi || 0) < this.guion.length) this.sigueGuion(this.game.round + 1, pasos); }
   // reintentar: rehace el motor desde la foto del comienzo de la ronda (otra semilla)
-  recarga(snap) {
-    this.rehaceDe(snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0, this.game);
+  recarga(snap, antes) {
+    this.rehaceDe(snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0, antes || this.game);
   }
   // el juego rehecho desde una foto de `antes` (sus torres, en el mismo orden), con lo que el
   // bot recuerda de cada una pasado a los ids nuevos
