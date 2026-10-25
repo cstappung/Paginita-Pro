@@ -222,6 +222,33 @@ in `verificador.js` and `RUTA` in `colabtex/src/juegos/solo/verifica/prodefender
 worker load the same `?v=`. A proof from another `ve` is rejected as «otra
 versión» (cache, not cheating: no castigo).
 
+## Saving records to the cloud (keep the download low)
+
+Every record round is a new `partida` whose proof is the **whole game since
+round 1**, so a 100-round run used to leave up to 100 growing copies in
+`soloPruebas` (never deleted), and the console, exports and the admin audit
+downloaded them. The record is still saved **every round** (owner's choice:
+a 10-round batch was tried and reverted), but:
+
+- **Resent if lost**: a round that beats the record is noted in the local
+  save (`save.pend[li] = {r, t, p}`: round, time, `rec.prueba()` at that
+  round's end) and sent by `manda(li)`. It is deleted when `club-tabla` shows
+  the row (or on a rejection that is not «No se pudo comprobar…»); if the
+  frame closed before the page saved it, `recorreTablas` resends it on the
+  next open. The game still sends the usual v1 proof, so a stale iframe or
+  worker never meets a new format.
+- **One proof per account and kingdom** (`UNA_PRUEBA` in
+  `verifica/prodefender.js`): after the new row commits, `guardaClub` deletes
+  the previous record's proof (or its own, if another tab saved a better one).
+  The `soloPruebas` rule lets the owner delete any of theirs **except** the one
+  their row names; until the rules are published the delete just fails.
+- **Stored compact** (`v: 2`, `compacta`/`expande` in
+  `verifica/prodefender.js`, applied through `pruebaGuardable` in
+  `verifica.js`): all moves in one string, a letter per op code and base-36
+  numbers, the step as a delta within its segment. About 45 % of the v1 size;
+  `compacta` only returns v2 if it expands back identical, and the verifier
+  expands before replaying. `prodefender-analiza.cjs` expands too.
+
 ## In Juegos
 
 - Route `#solo/prodefender`, card `prodefender` in `salon-datos.js`. Guests play it
@@ -232,8 +259,9 @@ versión» (cache, not cheating: no castigo).
 - Ten tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
   of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
-  kingdoms (round 50 opens the next one), and sends `Club.result` with
-  `rec.prueba()` only when a round **beats** the cloud record. The levels screen
+  kingdoms (round 50 opens the next one), and sends `Club.result` for each
+  round that **beats** the cloud record (see «Saving records to the cloud»
+  above). The levels screen
   shows each kingdom's table in its `<aside>` (where `conexion.js` puts the
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
@@ -253,7 +281,8 @@ versión» (cache, not cheating: no castigo).
   and a limiter after the compressor; the context uses `latencyHint:
   'playback'`. Without them a big map crackled and then went silent (the
   audio thread could not keep up). `audio.js`, `main.js` and the CSS carry
-  `?v=pd-7a`: they are not in the proof, so they move without `VERSION`.
+  their own tag (`pd-7a`, `main.js` `pd-7b`): they are not in the proof, so
+  they move without `VERSION`.
 - **Cursor**: on the map it is a big yellow crosshair with a black outline
   (`#cv.cur-grande`, an inline SVG); the pause menu's «Cursor» select switches
   back to the system crosshair (`save.settings.cursor = 'clasico'`).

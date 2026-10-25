@@ -438,6 +438,20 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ PRO DEFENDER guarda una sola partida por reino: pide publicar otra vez (2026-10-25)
+
+Cada ronda del récord de PRO DEFENDER es una partida nueva con la prueba entera
+desde la ronda 1, y antes quedaban todas en `soloPruebas` (hasta cien copias
+crecientes por cuenta y reino, que la consola, las exportaciones y la auditoría
+bajaban). Ahora la página borra la del récord anterior apenas se guarda la fila
+nueva, y para eso la regla de `soloPruebas/$categoria/$uid/$partida` deja al
+dueño **borrar** sus pruebas **salvo la que nombra su fila** de `soloRanks`
+(nunca la del récord vigente; reescribir sigue sin poderse). Hasta publicarla,
+el borrado falla en silencio y las copias se siguen juntando como antes: nada
+se rompe. Las copias viejas que ya están ahí se pueden borrar a mano en la
+consola (cualquier partida de `soloPruebas/club-prodefender-…/<uid>` que no
+sea la `partida` de su fila).
+
 ### ⚠ El tope de descarga pide publicar otra vez
 
 El plan gratuito trae unos 360 MB de descarga al día para todo el sitio.
@@ -450,7 +464,8 @@ Dos cosas lo protegen:
   'partidas'))`) bajaba el registro de jugadas de todas las partidas de la
   historia. **Esto es lo único que el servidor hace cumplir**, y hay que
   publicar las reglas para que valga.
-- **Cada jugador tiene un tope de 80 MB al día** (`colabtex/src/consumo.js`).
+- **Cada jugador tiene un tope de 90 MB al día** (`colabtex/src/consumo.js`; eran 80 hasta el
+  25 de octubre de 2026).
   Juegos mide lo que baja por el WebSocket de la base, lo suma entre
   pestañas y aparatos de la misma cuenta (`users/<uid>/consumo`, que no
   necesita reglas nuevas) y, al llegar al tope, corta la conexión y tapa la

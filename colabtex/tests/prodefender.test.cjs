@@ -102,6 +102,38 @@ test('el verificador del club acepta la partida y rechaza cada trampa',async()=>
  assert.equal(V.sospechaFila('club-prodefender-prado',{puntos:50,tiempo:3000000}),null);
 });
 
+test('la prueba se guarda compacta (v: 2): pesa menos, vuelve exacta y el verificador la acepta',async()=>{
+ const VP=carga('src/juegos/solo/verifica/prodefender.js');
+ const {pruebas}=juega(1,'uidC',8,{semilla:11});
+ const x=pruebas[pruebas.length-1];
+ assert.ok(x.p.j.some(j=>j[1]===5),'con recargas: el paso vuelve a 0 en cada tramo');
+ const c=V.pruebaGuardable('prodefender',x.p);
+ assert.equal(c.v,2);assert.equal(typeof c.j,'string');
+ assert.deepEqual(VP.expande(c),x.p,'vuelve exacta a la v: 1');
+ assert.ok(JSON.stringify(c).length<JSON.stringify(x.p).length*0.6,'pesa menos del 60 %');
+ assert.equal(VP.compacta({v:1,ve:4,u:'u',r:0,s:1,j:[[95,0,3,300,170],[140,1,1,0],[300,4]],k:300}).j,'A2n,3,8c,4qB19,1,0E4g','el ejemplo del comentario');
+ const dato={categoria:'club-prodefender-dunas',puntos:x.ronda,tiempo:x.tiempo,partida:'p1'};
+ assert.equal(await V.verificaClub('prodefender',dato,c,{uid:'uidC'}),null,'la guardada (v: 2) se verifica igual');
+ assert.match(await V.verificaClub('prodefender',{...dato,puntos:x.ronda+1},c,{uid:'uidC'}),/llega a la ronda/);
+ for(const j of [c.j+'?','E',c.j.replace(/^A/,'Z')])assert.match(await V.verificaClub('prodefender',dato,{...c,j},{uid:'uidC'}),/forma esperada/,j.slice(0,12));
+ // lo que no tiene la forma de siempre se guarda como vino, y los demás juegos guardan su prueba tal cual
+ const rara={v:1,j:[[1.5,4]]};assert.equal(V.pruebaGuardable('prodefender',rara),rara);
+ assert.equal(V.pruebaGuardable('tetris',x.p),x.p);
+ assert.equal(V.pruebaGuardable('prodefender',c),c,'compactar dos veces no cambia nada');
+ // una sola prueba por cuenta y reino: la regla deja al dueño borrar las suyas, salvo la de su fila
+ assert.equal(VP.UNA_PRUEBA,true);
+ const w=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules.soloPruebas.$categoria.$uid.$partida['.write'];
+ assert.ok(w.includes("(auth.uid === $uid && !newData.exists() && root.child('soloRanks').child($categoria).child($uid).child('partida').val() !== $partida)"),w);
+});
+
+test('el juego manda su récord en cada ronda y reenvía al abrir lo que no confirmó la tabla',()=>{
+ const main=fs.readFileSync(D+'main.js','utf8');
+ assert.equal((main.match(/CLUB\.result\(/g)||[]).length,1,'un solo envío: manda()');
+ assert.match(main,/if \(!prueba\) anota\(li, ev\.round\);[^\n]*\n[^\n]*\n[^\n]*\n\s*if \(!prueba\) manda\(li\);/,'al terminar cada ronda');
+ assert.match(main,/for \(const k of Object\.keys\(save\.pend\)\)[^\n]*manda\(\+k\)/,'lo pendiente se manda al abrir');
+ assert.match(main,/nube\[li\] >= save\.pend\[li\]\.r\) \{ delete save\.pend\[li\]/,'y se borra cuando la tabla lo tiene');
+});
+
 test('las monedas: 20 × reino por ronda del récord, hasta 2000…10000, y solo la diferencia',()=>{
  assert.deepEqual(['prado','dunas','glaciar','caldera','vacio','pantano','cumbres','fosa','engranajes','eclipse'].map(r=>M.monedasProdefender('club-prodefender-'+r,100)),[2000,4000,6000,8000,10000,10000,10000,10000,10000,10000]);
  assert.equal(M.monedasProdefender('club-prodefender-fosa',37),3700,'la segunda era paga 100 por ronda, como el Vacío');

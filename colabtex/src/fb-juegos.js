@@ -776,6 +776,10 @@ export async function leerSolo(categoria) {
    cuya prueba no exista. Se escribe una vez y no se reescribe. */
 export const guardarPruebaSolo = (categoria, uid, partida, v, texto) =>
   set(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`), { v: Number.isSafeInteger(v) ? v : 0, d: String(texto || ""), at: serverTimestamp() });
+/* La prueba que ya no respalda ninguna fila (la del récord anterior). La
+   regla deja a su dueño borrar las suyas salvo la que nombra su fila. */
+export const borraPruebaSolo = (categoria, uid, partida) =>
+  /^[-a-zA-Z0-9]{1,80}$/.test(String(partida)) ? remove(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`)) : Promise.resolve();
 export const leerPruebaSolo = (categoria, uid, partida) =>
   get(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`)).then(s => s.val());
 /* La racha diaria de verdad de un juego del club (club-datos.js:

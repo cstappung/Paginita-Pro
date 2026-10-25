@@ -3,7 +3,7 @@
 import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
 import { esRachaClub, rachaClub, resultadoClub, mejorClub } from "./juegos/solo/club-datos.js";
-import { VERIFICADORES, juegoDeCategoria, textoPrueba, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
+import { VERIFICADORES, juegoDeCategoria, textoPrueba, pruebaGuardable, verificaClub, DE_INVITADO } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
 import { merecesRevision } from "./juegos/admin-datos.js";
@@ -2276,7 +2276,12 @@ async function guardaConPodio(categoria, uid, dato, anunciar = true) {
    prueba exista; si las reglas nuevas aún no se publican, escribir la
    prueba falla con PERMISSION_DENIED y la fila se intenta igual (con las
    viejas, no la pide). Solo se escribe si mejora la marca guardada: una
-   prueba por cada récord, no por cada partida. */
+   prueba por cada récord, no por cada partida. Se guarda en su forma
+   compacta (`pruebaGuardable`), y en los juegos que guardan una sola
+   (`UNA_PRUEBA`: PRO DEFENDER, cuyo récord cambia cada ronda) se borra la
+   que sobra: la del récord anterior si la fila nueva quedó, o la recién
+   escrita si otra pestaña guardó antes una mejor. Si las reglas aún no
+   dejan borrarla, queda como antes. */
 async function guardaClub(categoria, uid, dato, prueba) {
   const juego = juegoDeCategoria(categoria);
   if (juego) {
@@ -2294,9 +2299,18 @@ async function guardaClub(categoria, uid, dato, prueba) {
       }
     }
     if (previa && (previa.puntos > dato.puntos || previa.puntos === dato.puntos && previa.tiempo <= dato.tiempo)) return { committed: false };
-    await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(prueba) || "").catch(e => {
+    await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(pruebaGuardable(juego, prueba)) || "").catch(e => {
       if (!/permission/i.test(String(e && (e.code || e.message)))) throw e;
     });
+    if (VERIFICADORES[juego].UNA_PRUEBA) {
+      const res = await guardaConPodio(categoria, uid, dato);
+      // la fila que quedó (la transacción la trae, se haya escrito o no)
+      const fila = res && res.snapshot && typeof res.snapshot.val === "function" ? res.snapshot.val() : null;
+      const vigente = fila && fila.partida;
+      for (const p of new Set([previa && previa.partida, dato.partida]))
+        if (p && vigente && p !== vigente) fb.borraPruebaSolo(categoria, uid, p).catch(e => console.warn("[juegos] no se pudo borrar la prueba que sobra", e));
+      return res;
+    }
   }
   return guardaConPodio(categoria, uid, dato);
 }

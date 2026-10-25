@@ -1,6 +1,6 @@
 import {ambientar} from '../sonido.js';
 import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
-import {verificaClub,DE_INVITADO} from './verifica.js';
+import {verificaClub,DE_INVITADO,pruebaGuardable} from './verifica.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase.
@@ -204,7 +204,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           await cargados;
           // La página cuenta cada partida, pero su aviso sale solo con una marca nueva del invitado.
           const mejoro=mejorClub(dato,pendientes[dato.categoria]);
-          if(mejoro){pendientes[dato.categoria]={...dato,prueba:d.prueba,h:Date.now()};persistir();}
+          if(mejoro){pendientes[dato.categoria]={...dato,prueba:pruebaGuardable(juego,d.prueba),h:Date.now()};persistir();}
           estado('Buena partida. Como invitado todavía no se guardó: inicia sesión y tu mejor marca pasa a la clasificación.',dato.categoria);
           if(alInvitado){try{alInvitado(dato,mejoro);}catch(err){/* el aviso no debe romper la partida */}}
         });
@@ -220,7 +220,8 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           return;
         }
         if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null,prueba);}catch(err){/* un logro no debe romper la partida */}}
-        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba,h:Date.now()};persistir();}
+        /* Pendiente queda en la forma en que se guarda (más chica: PRO DEFENDER la compacta). */
+        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba:pruebaGuardable(juego,prueba),h:Date.now()};persistir();}
         sincronizar();
       });
     }
@@ -243,7 +244,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-70&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-71&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'')+(!invitado&&deInvitado?'&deinvitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm','jg-club-pleno');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

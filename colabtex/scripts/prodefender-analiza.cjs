@@ -4,7 +4,10 @@
    Las partidas que baten un récord quedan en Firebase (Realtime Database) como
    su prueba: `soloPruebas/club-prodefender-<reino>/<uid>/<partida>` =
    {v, d, at}, donde `d` es la prueba en texto JSON ({v, ve, u, r, s, j, k}:
-   la semilla y cada jugada con su paso, prueba.js). La `partida` del récord
+   la semilla y cada jugada con su paso, prueba.js). Desde octubre de 2026 la
+   página la guarda compacta (v: 2, las jugadas en un texto:
+   src/juegos/solo/verifica/prodefender.js); aquí se expande a la v: 1. Hay
+   una sola por cuenta y reino: la de su récord vigente. La `partida` del récord
    vigente es la que dice la fila `soloRanks/club-prodefender-<reino>/<uid>`.
    En la consola: Realtime Database → soloPruebas → club-prodefender-… → el
    uid → la partida → ⋮ → Exportar JSON.
@@ -35,14 +38,22 @@ const opt = k => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1]
 const MOTOR = path.resolve(opt('motor') || path.join(__dirname, '../../juegos/club/prodefender/js'));
 for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(path.join(MOTOR, f));
 const PD = globalThis.PD, P = PD.Prueba;
+// La prueba compacta (v: 2) que guarda la página → la v: 1 que rehace prueba.js.
+const { expande } = (() => {
+  const code = require('esbuild').buildSync({ entryPoints: [path.join(__dirname, '../src/juegos/solo/verifica/prodefender.js')], bundle: true, format: 'cjs', platform: 'node', write: false }).outputFiles[0].text;
+  const mod = { exports: {} };
+  new Function('module', 'exports', 'require', code)(mod, mod.exports, require);
+  return mod.exports;
+})();
 
 // ------------------------- buscar pruebas en el archivo -------------------------
 function pruebasDe(raiz, soloUid) {
   const out = [];
   const comoPrueba = (x, donde) => {
     if (!x || typeof x !== 'object') return;
-    if (typeof x.d === 'string' && x.d) { try { out.push({ donde, p: JSON.parse(x.d) }); } catch { console.error('No se puede leer la prueba de ' + donde); } return; }
-    if (Array.isArray(x.j) && x.s !== undefined) out.push({ donde, p: x });
+    const pon = p => { if (p && Array.isArray(p.j)) out.push({ donde, p }); else console.error('No se puede leer la prueba de ' + donde); };
+    if (typeof x.d === 'string' && x.d) { try { pon(expande(JSON.parse(x.d))); } catch { pon(null); } return; }
+    if ((Array.isArray(x.j) || typeof x.j === 'string') && x.s !== undefined) pon(expande(x));
   };
   comoPrueba(raiz, '(archivo)');
   if (out.length) return out;

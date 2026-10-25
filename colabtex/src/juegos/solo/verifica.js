@@ -51,6 +51,17 @@ export const juegoDeCategoria = c => {
   return m && VERIFICADORES[m[1]] ? m[1] : null;
 };
 
+/* La prueba en la forma en que se guarda: la que mandó el juego, o la
+   compacta que dé su verificador (`guardable`; hoy solo PRO DEFENDER, que
+   guarda partidas de cien rondas). Esa es la que se mide contra
+   PRUEBA_MAX, se escribe en `soloPruebas` y queda pendiente en
+   localStorage; el verificador acepta las dos. Nunca lanza. */
+export function pruebaGuardable(juego, prueba) {
+  const v = VERIFICADORES[juego];
+  if (!v || typeof v.guardable !== 'function' || !prueba || typeof prueba !== 'object') return prueba;
+  try { return v.guardable(prueba); } catch { return prueba; }
+}
+
 /* La prueba tal como viaja y se guarda: texto JSON, o '' si no hay. */
 export function textoPrueba(prueba) {
   if (prueba === undefined || prueba === null) return '';
@@ -78,7 +89,7 @@ export async function verificaClub(juego, dato, prueba, ctx = {}) {
   const v = VERIFICADORES[juego];
   if (!v) return null;
   if (DE_INVITADO.has(juego) && prueba && typeof prueba === 'object' && prueba.u === UID_INVITADO) ctx = Object.assign({}, ctx, { uid: UID_INVITADO });
-  const texto = textoPrueba(prueba);
+  const texto = textoPrueba(pruebaGuardable(juego, prueba));
   if (texto === null) return 'La prueba de la partida no se puede leer.';
   if (texto.length > PRUEBA_MAX) return 'La prueba de la partida es demasiado grande.';
   if (v.PRUEBA > 0 && !texto) return 'La partida llegó sin prueba (¿una versión vieja del juego? recarga la página).';
