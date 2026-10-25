@@ -75,7 +75,10 @@ const servidor = http.createServer(async (q, r) => {
   if (q.method === 'HEAD') {
     const o = guardado.get(llave);
     if (!o) { r.writeHead(404); return r.end(); }
-    r.writeHead(200, { 'content-length': o.datos.length, 'x-amz-meta-sha256': o.meta }); return r.end();
+    // como Cloudflare: si el cliente acepta comprimido y el archivo es de texto (js, json, svg, wasm…), lo comprime y la
+    // respuesta va sin Content-Length (el script leía «0 bytes» y daba por mal subidos 325 archivos que estaban bien)
+    const comprime = /gzip|br|deflate/.test(q.headers['accept-encoding'] || '') && /text|json|javascript|svg|wasm/.test(o.tipo || '');
+    r.writeHead(200, { ...(comprime ? { 'content-encoding': 'gzip' } : { 'content-length': o.datos.length }), 'x-amz-meta-sha256': o.meta }); return r.end();
   }
   if (q.method === 'GET' && url.searchParams.get('list-type') === '2') {          // de a 3, para probar la continuación
     const todas = [...guardado.keys()].filter(k => k.startsWith(url.searchParams.get('prefix') || '')).sort();

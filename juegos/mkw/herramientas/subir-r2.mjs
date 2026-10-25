@@ -135,7 +135,9 @@ function cliente({ cuenta, id, secreto, bucket, endpoint }) {
     const f = firmar({ metodo, host: base.host, ruta, consulta, cabeceras, hashCuerpo: hash, id, secreto, fecha: new Date() });
     const { firma, host, ...h } = f;
     const url = `${base.origin}${ruta.split('/').map(codifica).join('/')}${consulta ? '?' + consulta : ''}`;
-    return fetch(url, { method: metodo, headers: h, body: cuerpo });
+    // sin comprimir: si no, Cloudflare comprime los archivos de texto (js, json, svg, wasm…) y su HEAD llega sin
+    // Content-Length («0 bytes»: --comprobar los daba por mal subidos y --subir los volvía a subir). No va firmada.
+    return fetch(url, { method: metodo, headers: { ...h, 'accept-encoding': 'identity' }, body: cuerpo });
   };
   return {
     async cabeza(llave) {

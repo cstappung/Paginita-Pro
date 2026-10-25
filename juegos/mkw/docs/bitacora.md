@@ -9827,3 +9827,14 @@ más espacio gratis. Mario Kart son 5,0 GB; lo que pase de 10 GB cuesta ~0,015 U
 | Sitio `mkw-worker.test.cjs` + `bt3-disco.test.cjs` | 19 / 19 (nueva §105: con `MKW`, los pedazos, el archivo entero, el manifiesto y el lote salen del bucket propio; lo que está solo en `DISCO` ya no se lee para Mario Kart; BT3 sigue en `DISCO`) |
 | El Worker local con `MKW` (curl con el token de prueba) | manifiesto 200, lote 200, pedazo 206; `/indice.json` de BT3 404 (su bucket, vacío aquí) |
 | `prueba-experiencia` (la sala entera por el Worker local, ahora con `MKW`) | 23 / 23 (330 llamadas: 31 preguntas previas, 265 lotes) |
+
+### 105.1 La primera subida de verdad: «325 de 7324 no están bien» (y estaban bien)
+
+El dueño subió a su bucket y `--comprobar` dijo `✗ 325 de 7324 no están bien`, todos «distinto … (0 bytes, huella …)» y
+todos de texto (`mkw.js`, `mkw.wasm.br`, los `.json`, los planos `.svg`). La huella que R2 tenía guardada era la de la
+lista (`115476d9b43f` = `mkw.js`): **estaban bien subidos**. Lo que fallaba era la revisión: el `fetch` de Node pide las
+respuestas comprimidas (`Accept-Encoding: gzip, br`), Cloudflare comprime los tipos de texto (JavaScript, JSON, SVG,
+WebAssembly) y entonces la respuesta a `HEAD` llega **sin `Content-Length`**; el script leía eso como 0 bytes. Arreglo:
+`subir-r2.mjs` pide todo sin comprimir (`Accept-Encoding: identity`, una cabecera que no va firmada). El R2 falso de
+`prueba-subir-r2.mjs` ahora hace lo mismo que Cloudflare (comprime el texto si el cliente acepta): con el script viejo
+da 19 bien y 4 mal, con el arreglo 23/23. El Worker no se entera de nada de esto (lee R2 por su enlace, no por la API S3).
