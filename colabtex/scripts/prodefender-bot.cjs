@@ -204,7 +204,9 @@ function tiro(li, type, tiers, x, y, muneco, vida, cada, entradas) {
 }
 
 class Bot {
-  constructor(li, estrategia, semilla) {
+  // op: {guion, hasta, sinAnticipa, banco, covBanco} (las pruebas de guiones prestados)
+  constructor(li, estrategia, semilla, op = {}) {
+    this.op = op;
     this.li = li; this.est = ESTRATEGIAS[estrategia]; this.nombre = estrategia; this.semilla = semilla >>> 0;
     this.game = new PD.Game(li, null, this.semilla);
     this.mem = new Map();   // id de torre → {cov, dealt: [por ronda], antes}
@@ -238,7 +240,8 @@ class Bot {
     // qué mecánicas trae el reino (para «adapta»)
     const pool = PD.LEVELS[li].pool.map(p => PD.ENEMIES[p[0]]).concat([PD.ENEMIES[PD.LEVELS[li].boss]]);
     this.mec = { protege: pool.some(d => d.thunder || d.ink || d.grab), fuego: pool.some(d => d.regenFuego), adapta: pool.some(d => d.adapt) };
-    this.campo();
+    if (op.banco) { this.banco = op.banco; this.covBanco = op.covBanco; } else this.campo();
+    if (this.est.humana) this.guion = op.guion || this.guionPropio() || (GUION > 0 ? this.prestaGuion() : null);
   }
   // mide todas las combinaciones de todas las torres permitidas (una vez por partida)
   campo() {
@@ -596,7 +599,7 @@ class Bot {
   // Si el plan normal pasa la ronda sin pérdidas, ese. Si no, el que la pase guardando más
   // oro; y si ninguno la pasa limpia, el que menos pierde (y menos deja avanzar).
   elegir() {
-    if (this.est.humana && !args.includes('--sin-anticipa')) return this.elegirHumana();
+    if (this.est.humana && !args.includes('--sin-anticipa') && !this.op.sinAnticipa) return this.elegirHumana();
     if (!args.includes('--anticipa')) return 'normal';
     const normal = this.ensaya('normal');
     if (normal.perdidas === 0 && normal.av < 0.85) return 'normal';
@@ -608,12 +611,14 @@ class Bot {
 
   // «humana»: el primer plan (en el orden de MODOS_GUION) que pasa la ronda sin perder vidas;
   // si ninguno, el que menos pierde. Fuera del guion no se prueban los «adelanta».
+  // Con guion, gastar por su cuenta le quita oro a lo que el guion compra después y lo
+  // desarma: solo si ni el guion ni adelantarlo bastan y se perderían bastantes vidas.
   elegirHumana() {
-    const gu = LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
-    const queda = gu && this.game.round + 1 <= GUION && (this.gi || 0) < gu.jugadas.length;
-    const modos = queda ? MODOS_GUION : MODOS;
+    const queda = this.guion && this.game.round + 1 <= GUION && (this.gi || 0) < this.guion.length;
+    const umbral = queda ? Math.max(3, Math.round(PD.LEVELS[this.li].lives * 0.06)) : 0;
     let mejor = null;
-    for (const m of modos) {
+    for (const m of queda ? MODOS_GUION : MODOS) {
+      if (queda && !/^(normal|adelanta)/.test(m) && mejor && mejor[1].perdidas < umbral) break;
       const x = this.ensaya(m);
       if (x.perdidas === 0) return m;
       if (!mejor || x.perdidas < mejor[1].perdidas || x.perdidas === mejor[1].perdidas && x.av < mejor[1].av) mejor = [m, x];
@@ -626,7 +631,7 @@ class Bot {
     const filas = [];
     let g = this.game, reintentos = 3, primeraDerrota = null, foto = null;
     const vidasPerdidas = new Array(10).fill(0);
-    while (g.round < PD.MAX_ROUND) {
+    while (g.round < (this.op.hasta || PD.MAX_ROUND)) {
       this.vetadas = {};
       if (this.est.humana) { this.rehaceDe(JSON.parse(JSON.stringify(g.snapshot())), g.rs, g); g = this.game; }
       this.modo = this.elegir();
@@ -679,24 +684,51 @@ class Bot {
       vidasFinal: G.lives, vidasMax: PD.LEVELS[this.li].lives, vidasPerdidas,
       avanceMedio: Math.round(filas.reduce((a, f) => a + f.avance, 0) / Math.max(1, filas.length)),
       avanceTarde: tarde.length ? Math.round(tarde.reduce((a, f) => a + f.avance, 0) / tarde.length) : null,
-      heroe: (G.towers.find(t => t.def.hero) || { tiers: null }).tiers,
+      heroe: (G.towers.find(t => t.def.hero) || { tiers: null }).tiers, prestado: this.prestado,
       filas
     };
   }
   // «humana», al principio: la mejor partida de una persona en este reino, jugada a jugada
   // (las de las rondas que ya tocan, en orden; si no alcanza el oro, ahorra como ella).
   // Devuelve si sigue en el guion (entonces no gasta por su cuenta).
+  // El guion de este reino (con sus sitios) o, si nadie lo ganó, el de otro reino que mejor le
+  // resulta aquí hasta la ronda 30: las mismas compras en el mismo orden, sin las torres que
+  // este reino no vende, con el héroe de este reino y cada torre en el mejor sitio libre.
+  guionPropio() {
+    const gu = LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
+    return gu ? gu.jugadas : null;
+  }
+  prestaGuion() {
+    const vende = PD.towersFor(this.li), heroe = heroeDe(this.li);
+    let mejor = null;
+    for (const [slug, gu] of Object.entries(LIBRO.guiones || {})) {
+      const J = [], nuevo = [];
+      for (const a of gu.jugadas) {
+        if (a[1] === 'p') {
+          const t = PD.TOWERS[a[2]].hero ? heroe : a[2];
+          nuevo.push(t && vende.includes(t) ? J.filter(x => x[1] === 'p').length : -1);
+          if (nuevo[nuevo.length - 1] >= 0) J.push([a[0], 'p', t]);
+        } else if (nuevo[a[2]] >= 0) J.push([a[0], a[1], nuevo[a[2]], a[3]]);
+      }
+      const b = new Bot(this.li, this.nombre, this.semilla, { guion: J, hasta: 30, sinAnticipa: true, banco: this.banco, covBanco: this.covBanco });
+      const x = b.juega(false);
+      const nota = (x.primeraDerrota ? (101 - x.primeraDerrota) * 1e4 : 0) + x.vidasPerdidas.reduce((a, v) => a + v, 0);
+      if (!mejor || nota < mejor.nota) mejor = { nota, J, slug };
+    }
+    if (mejor) this.prestado = mejor.slug;
+    return mejor ? mejor.J : null;
+  }
   sigueGuion(r) {
-    const gu = this.est.humana && LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
-    if (!gu || r > GUION) return false;
-    const g = this.game, J = gu.jugadas;
+    if (!this.est.humana || !this.guion || r > GUION) return false;
+    const g = this.game, J = this.guion;
     this.gi = this.gi || 0; this.gTorres = this.gTorres || [];
     const torre = n => { const id = this.gTorres[n]; return id === undefined ? null : g.towers.find(t => t.id === id) || null; };
     while (this.gi < J.length && J[this.gi][0] <= r) {
       const [, k, a, b, c] = J[this.gi];
       if (k === 'p') {
-        if (g.money < PD.TOWERS[a].cost) return true;
-        const t = g.canPlace(a, b, c) ? g.place(a, b, c) : null;
+        if (g.money < (g.towerCost ? g.towerCost(a) : PD.TOWERS[a].cost)) return true;
+        const s = b === undefined ? this.sitio(a) : [b, c];
+        const t = s && g.canPlace(a, s[0], s[1]) ? g.place(a, s[0], s[1]) : null;
         if (t) {
           this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 });
           if (!APARTE[a]) this.marca(t);
@@ -743,7 +775,7 @@ function main() {
     res.push(x);
     if (!args.includes('--json')) {
       console.log(`${x.reino.padEnd(8)} ${x.estrategia.padEnd(8)} s${x.semilla}  ronda ${String(x.ronda).padStart(3)}${x.gano ? ' GANA' : '     '}  1ª derrota ${x.primeraDerrota ?? '-'}  reintentos ${x.reintentosUsados}  vidas ${x.vidasFinal}/${x.vidasMax}  ` +
-        `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}  ${(x.ms / 1000).toFixed(0)} s`);
+        `perdidas/decena [${x.vidasPerdidas.join(' ')}]  avance medio ${x.avanceMedio}% (r>60: ${x.avanceTarde ?? '-'}%)  héroe ${x.heroe ? x.heroe.join('-') : '-'}${x.prestado ? '  guion de ' + x.prestado : ''}  ${(x.ms / 1000).toFixed(0)} s`);
     }
   }
   if (args.includes('--json')) console.log(JSON.stringify(res));
