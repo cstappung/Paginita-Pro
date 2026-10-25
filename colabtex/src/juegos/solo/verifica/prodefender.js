@@ -1,8 +1,8 @@
 /* Verificador antitrampas de PRO DEFENDER (ver docs/antitrampas.md y
    docs/antitrampas/prodefender.md).
 
-   Diez tablas, una por reino (los de la segunda era desde el día en que
-   se abren, levels.js `abre`): `club-prodefender-<reino>`, puntos = la
+   Quince tablas, una por reino (los de la segunda y la tercera era desde
+   el día en que se abren, levels.js `abre`): `club-prodefender-<reino>`, puntos = la
    ronda más alta superada en una partida (1–100), tiempo = los ms de juego
    que llevaba esa partida al superarla (los pasos del motor / 60).
 
@@ -23,9 +23,10 @@
    válida, y la prueba no dice nada de quién estaba frente al teclado. */
 export const PRUEBA = 1;
 
-const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse)$/;
-const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-7';
+const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/;
+const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
+  'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-8';
 
 let trabajador = null, serie = 0;
 const espera = new Map();

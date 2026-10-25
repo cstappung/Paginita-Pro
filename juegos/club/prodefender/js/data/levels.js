@@ -177,6 +177,106 @@
         ['reparador', 19, 0.8], ['sapo', 21, 0.7], ['bruma', 23, 0.7], ['cangrejo', 25, 0.7], ['portador', 26, 0.8], ['gargola', 27, 0.7],
         ['pulpo', 29, 0.7], ['zepelin', 31, 0.8], ['titan', 46, 0.7], ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7],
         ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
+    },
+
+    // ======================= TERCERA ERA: reinos 11–15 ========================
+    // Como la segunda (`abre`, `torres`, `musica`), y además (era: 3):
+    //  - `heroes: 'todos'`: el jugador elige UNO de los diez héroes (towers.js: towersFor).
+    //  - `eventos`: lo que puede pasar en una ronda (PD.EVENTOS); buildRounds reparte uno
+    //    cada cinco rondas (la 8, la 13, …) y la vista previa lo anuncia.
+    //  - `poder`: el Poder del Reino (engine.js: PODERES), que se carga matando y se lanza
+    //    donde el jugador quiera.
+    //  - Pactos cada diez rondas (engine.js: PD.PACTOS).
+    {
+      name: 'Necrópolis Olvidada', short: 'Necrópolis', slug: 'necropolis', abre: '2026-10-27', era: 3, musica: 4,
+      subtitle: 'Las tumbas no guardan a nadie. Lo que cae aquí, se vuelve a levantar.',
+      diff: 2.5, lives: 80, cash: 1000, seed: 11149, stars: 5,
+      theme: { bg1: '#1e2a26', bg2: '#141c1a', path: '#5a5248', pathEdge: '#14100f', deco: 'necro', accent: '#7affb0' },
+      paths: [
+        [[-30, 90], [300, 90], [300, 260], [120, 260], [120, 450], [420, 450], [420, 200], [640, 200], [640, 520], [880, 520], [880, 300], [1030, 300]],
+        [[520, -30], [520, 120], [640, 120], [640, 520], [880, 520], [880, 300], [1030, 300]]
+      ],
+      obstacles: [{ x: 205, y: 172, r: 36, kind: 'cripta' }, { x: 530, y: 330, r: 30, kind: 'fosa' }, { x: 770, y: 410, r: 28, kind: 'tumba' }, { x: 930, y: 140, r: 32, kind: 'cripta' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'faro', 'obelisco', 'segador', 'campanario', 'bruja'],
+      heroes: 'todos', eventos: ['muertos', 'lunaSangre', 'niebla', 'apagon'], poder: 'cadenas',
+      boss: 'liche',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['esqueleto', 4, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['nigromante', 9, 1.3],
+        ['sombra', 10, 1], ['alma', 12, 1.3], ['blindado', 13, 1], ['divisor', 15, 1], ['espectro', 17, 0.8], ['bruma', 19, 0.7], ['martir', 21, 0.7],
+        ['gargola', 23, 0.7], ['portador', 25, 0.8], ['purificador', 27, 0.7], ['zepelin', 30, 0.8], ['titan', 46, 0.7], ['fortaleza', 54, 0.8],
+        ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
+    },
+    {
+      name: 'Jardín de Esporas', short: 'Esporas', slug: 'esporas', abre: '2026-10-28', era: 3, musica: 0,
+      subtitle: 'Hongos que brillan, polen que cura… y esporas que atascan tus defensas.',
+      diff: 2.6, lives: 80, cash: 1050, seed: 12161, stars: 5,
+      theme: { bg1: '#1a1426', bg2: '#120e1c', path: '#4a3446', pathEdge: '#0e0810', deco: 'fungi', accent: '#5affc8' },
+      paths: [
+        [[-30, 140], [260, 140], [260, 520], [560, 520], [560, 300], [820, 300], [820, 560], [1030, 560]],
+        [[600, -30], [600, 150], [380, 150], [380, 380], [680, 380], [680, 670]]
+      ],
+      obstacles: [{ x: 130, y: 300, r: 40, kind: 'hongo' }, { x: 470, y: 250, r: 32, kind: 'charco' }, { x: 900, y: 175, r: 38, kind: 'hongo' }, { x: 160, y: 600, r: 28, kind: 'charco' }, { x: 945, y: 420, r: 28, kind: 'hongo' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'huerto', 'acido', 'sierra', 'balista', 'pararrayos', 'bruja', 'desintegrador'],
+      heroes: 'todos', eventos: ['esporas', 'frenesi', 'bendicion', 'niebla'], poder: 'floracion',
+      boss: 'reinaMicelio',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['seta', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['enredadera', 8, 1.3],
+        ['sombra', 10, 1], ['polinizador', 11, 1.3], ['blindado', 12, 1], ['musgo', 14, 0.8], ['chaman', 16, 0.8], ['divisor', 17, 1], ['sapo', 19, 0.7],
+        ['duende', 21, 0.6], ['reparador', 23, 0.7], ['portador', 25, 0.8], ['automata', 27, 0.7], ['zepelin', 30, 0.8], ['titan', 46, 0.7],
+        ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
+    },
+    {
+      name: 'Laberinto de Espejos', short: 'Espejos', slug: 'espejos', abre: '2026-10-29', era: 3, musica: 2,
+      subtitle: 'Nada es lo que parece. Cada reflejo es un enemigo más.',
+      diff: 2.75, lives: 75, cash: 1050, seed: 13171, stars: 5,
+      theme: { bg1: '#2a3048', bg2: '#1c2236', path: '#9aaccc', pathEdge: '#3a4a7a', deco: 'mirror', accent: '#ff7ad8' },
+      paths: [
+        [[-30, 320], [180, 320], [180, 100], [420, 100], [420, 320], [300, 320], [300, 540], [560, 540], [700, 140, 1], [900, 140], [900, 460], [1030, 460]],
+        [[500, -30], [500, 200], [620, 200], [620, 400], [780, 400], [780, 600], [1030, 600]]
+      ],
+      obstacles: [{ x: 300, y: 205, r: 30, kind: 'espejo' }, { x: 740, y: 290, r: 32, kind: 'espejo' }, { x: 430, y: 440, r: 34, kind: 'espejo' }, { x: 975, y: 300, r: 26, kind: 'espejo' }, { x: 80, y: 520, r: 36, kind: 'espejo' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'colmena', 'prisma', 'totem', 'huerto', 'bumeran', 'acido', 'faro', 'burbujas', 'campanario'],
+      heroes: 'todos', eventos: ['espejismo', 'apagon', 'oro', 'viento'], poder: 'destello',
+      boss: 'reinaEspejos',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['reflejo', 4, 1.3], ['alado', 6, 1], ['escudero', 7, 1], ['prismaVivo', 8, 1.3],
+        ['sombra', 10, 1], ['blindado', 11, 1], ['espejismo', 13, 0.9], ['divisor', 14, 1], ['cristal', 16, 0.8], ['fractal', 18, 0.8], ['automata', 20, 0.7],
+        ['martir', 22, 0.7], ['portador', 24, 0.8], ['cangrejo', 26, 0.7], ['zepelin', 30, 0.8], ['titan', 46, 0.7], ['fortaleza', 54, 0.8],
+        ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
+    },
+    {
+      name: 'Archipiélago Celeste', short: 'Archipiélago', slug: 'archipielago', abre: '2026-10-30', era: 3, musica: 1,
+      subtitle: 'Islas que flotan entre las nubes, puentes colgantes y un cielo lleno de velas.',
+      diff: 2.85, lives: 75, cash: 1100, seed: 14173, stars: 5,
+      theme: { bg1: '#8ac8f0', bg2: '#5aa0d8', path: '#b8905a', pathEdge: '#4a2a12', deco: 'sky', accent: '#ffffff' },
+      paths: [
+        [[-30, 120], [220, 120], [220, 330], [80, 330], [80, 540], [340, 540], [520, 180, 1], [760, 180], [760, 400], [600, 400], [600, 560], [1030, 560]],
+        [[1030, 60], [900, 60], [900, 300], [760, 300], [760, 400], [600, 400], [600, 560], [1030, 560]]
+      ],
+      obstacles: [{ x: 420, y: 330, r: 46, kind: 'abismo' }, { x: 155, y: 435, r: 30, kind: 'abismo' }, { x: 865, y: 460, r: 34, kind: 'abismo' }, { x: 500, y: 60, r: 30, kind: 'molino' }],
+      torres: ['espinas', 'vigia', 'voltaico', 'prisma', 'colmena', 'totem', 'huerto', 'balista', 'sierra', 'geiser', 'pararrayos', 'burbujas', 'desintegrador'],
+      heroes: 'todos', eventos: ['tormenta', 'meteoros', 'viento', 'frenesi'], poder: 'rayo',
+      boss: 'tifon',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['templario', 5, 1.3], ['escudero', 7, 1], ['jinete', 8, 1.3],
+        ['enjambre', 10, 0.9], ['sombra', 11, 1], ['blindado', 12, 1], ['ave', 14, 0.8], ['tormentoso', 16, 0.7], ['divisor', 17, 1], ['gargola', 19, 0.7],
+        ['heraldo', 21, 0.7], ['portador', 23, 0.8], ['galeon', 26, 1], ['zepelin', 28, 0.8], ['reparador', 30, 0.7], ['titan', 46, 0.7],
+        ['fortaleza', 54, 0.8], ['dirigible', 56, 0.9], ['ciudadela', 70, 0.8], ['celeste', 72, 0.9], ['leviatan', 86, 0.9], ['arca', 86, 0.9]]
+    },
+    {
+      name: 'La Noche Eterna', short: 'Noche', slug: 'noche', abre: '2026-10-31', era: 3, musica: 3,
+      subtitle: 'Tres caminos, una luna naranja y un jinete que perdió la cabeza.',
+      diff: 3.0, lives: 70, cash: 1150, seed: 15187, stars: 5,
+      theme: { bg1: '#1a1024', bg2: '#100a18', path: '#4a3428', pathEdge: '#0c060e', deco: 'night', accent: '#ff7a1a' },
+      paths: [
+        [[-30, 90], [260, 90], [260, 320], [500, 320], [500, 560], [1030, 560]],
+        [[1030, 90], [760, 90], [760, 320], [500, 320], [500, 560], [1030, 560]],
+        [[-30, 580], [150, 580], [150, 440], [500, 440], [500, 560], [1030, 560]]
+      ],
+      obstacles: [{ x: 380, y: 185, r: 40, kind: 'calabazar' }, { x: 640, y: 205, r: 36, kind: 'cripta' }, { x: 760, y: 440, r: 32, kind: 'arbolMuerto' }, { x: 330, y: 525, r: 28, kind: 'calabazar' }, { x: 80, y: 300, r: 34, kind: 'arbolMuerto' }],
+      torres: ['espinas', 'escarcha', 'vigia', 'voltaico', 'mortero', 'dragon', 'prisma', 'totem', 'huerto', 'acido', 'obelisco', 'segador', 'pararrayos', 'campanario'],
+      heroes: 'todos', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], poder: 'hoguera',
+      boss: 'jineteSinCabeza',
+      pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['calabaza', 4, 1.3], ['murcielago', 5, 1.3], ['escudero', 7, 1], ['espantapajaros', 8, 1.3],
+        ['sombra', 9, 1], ['esqueleto', 11, 0.9], ['alma', 13, 0.8], ['blindado', 14, 1], ['divisor', 15, 1], ['seta', 17, 0.7], ['templario', 19, 0.7],
+        ['reflejo', 21, 0.7], ['nigromante', 23, 0.6], ['portador', 25, 0.8], ['galeon', 28, 0.8], ['zepelin', 30, 0.8], ['titan', 46, 0.7],
+        ['fortaleza', 54, 0.8], ['dirigible', 58, 0.8], ['colosoVacio', 64, 0.7], ['ciudadela', 70, 0.8], ['celeste', 74, 0.8], ['leviatan', 86, 0.9], ['arca', 88, 0.9]]
     }
   ];
   // Los reinos de siempre, que se abren uno tras otro con la ronda 50 (los de `abre`
@@ -189,6 +289,23 @@
   };
   // ¿Está abierto a todos el reino li? (los cinco primeros, siempre)
   PD.abierto = (li, dia) => !PD.LEVELS[li].abre || PD.LEVELS[li].abre <= (dia || PD.diaChile());
+
+  // Eventos de la tercera era: lo que pasa durante una ronda (engine.js los aplica; la
+  // vista previa los anuncia una ronda antes, así que se puede preparar la defensa).
+  PD.EVENTOS = {
+    muertos:    { name: 'Noche de los Muertos', icon: '💀', desc: 'Uno de cada cuatro caídos se LEVANTA al rato con la mitad de su vida.' },
+    lunaSangre: { name: 'Luna de Sangre', icon: '🌕', desc: 'Los enemigos corren un 20% más, pero dan un 60% más de oro.' },
+    niebla:     { name: 'Niebla Densa', icon: '🌫', desc: 'Las torres ven un 20% menos lejos (los Pararrayos las protegen).' },
+    apagon:     { name: 'Apagón', icon: '🌑', desc: 'Cada 8 s todo se oscurece 3 s: los enemigos quedan CAMUFLADOS.' },
+    esporas:    { name: 'Lluvia de Esporas', icon: '🍄', desc: 'Cada 5 s caen esporas sobre dos torres: atacan a la mitad de velocidad 4 s.' },
+    frenesi:    { name: 'Frenesí', icon: '😡', desc: 'Los grupos llegan mucho más juntos.' },
+    bendicion:  { name: 'Marea de Fortuna', icon: '🍀', desc: 'Buena suerte: +25% de oro por enemigo y +50% de bono al terminar la ronda.' },
+    espejismo:  { name: 'Espejismo', icon: '🪞', desc: 'Uno de cada tres enemigos llega con una copia falsa: poca vida, sin oro, quita 1 vida.' },
+    oro:        { name: 'Fiebre del Oro', icon: '✨', desc: 'Uno de cada seis enemigos es DORADO: el triple de vida y ocho veces su oro.' },
+    viento:     { name: 'Viento a Favor', icon: '🍃', desc: 'Buena suerte: todas las torres atacan un 20% más rápido.' },
+    tormenta:   { name: 'Tormenta Eléctrica', icon: '⛈', desc: 'Cada 2 s un rayo cae sobre un enemigo… y cada 7 s otro apaga una torre sin pararrayos.' },
+    meteoros:   { name: 'Lluvia de Estrellas', icon: '☄', desc: 'Caen estrellas sobre el camino: dañan a los enemigos y apagan 2 s las torres de al lado.' }
+  };
 
   // ---------------------- Curvas de dificultad -------------------------
   // Presión temprana más alta: desde las primeras rondas hay que pensar dónde y qué colocar.
@@ -373,6 +490,21 @@
         round.groups.push({ type: L.boss, n: 1, interval: 1, start: bossStart, path: 0, bossTier: round.boss.tier });
       }
       rounds.push(round);
+    }
+    // Tercera era: un evento cada cinco rondas (la 8, la 13, … la 98), nunca en las de
+    // jefe ni dos iguales seguidos, con su propio azar (el resto sale igual que siempre).
+    if (L.eventos) {
+      const er = mulberry32(L.seed + 4243);
+      let antes = null;
+      for (let r = 8; r <= PD.MAX_ROUND; r += 5) {
+        const R = rounds[r - 1];
+        if (R.boss) continue;
+        let ev = L.eventos[Math.floor(er() * L.eventos.length)];
+        if (ev === antes) ev = L.eventos[(L.eventos.indexOf(ev) + 1) % L.eventos.length];
+        R.evento = antes = ev;
+        // Frenesí: los grupos salen más juntos (y más seguidos dentro de cada uno)
+        if (ev === 'frenesi') for (const g of R.groups) { g.interval *= 0.6; g.start *= 0.7; }
+      }
     }
     L._rounds = rounds;
     return rounds;

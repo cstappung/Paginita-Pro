@@ -830,12 +830,16 @@
   // Defensas disponibles en un reino: las 12 clásicas + las 2 nuevas de cada reino ya alcanzado
   // + el héroe de ESE reino (los héroes no pasan a los reinos siguientes).
   // Los reinos de la segunda era (levels.js: `torres`) venden solo su lista, cada vez más corta.
+  // En la tercera era (`heroes: 'todos'`) se elige UNO de los diez héroes (canPlace: uno por partida).
   PD.towersFor = li => {
     const L = PD.LEVELS && PD.LEVELS[li];
-    if (L && L.torres) return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : L.torres.indexOf(id) >= 0);
+    const heroe = id => (L && L.heroes === 'todos') || T[id].realm === li;
+    if (L && L.torres) return PD.TOWER_ORDER.filter(id => T[id].hero ? heroe(id) : L.torres.indexOf(id) >= 0);
     return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
   };
   PD.heroOf = li => PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
+  // los héroes que se pueden poner en un reino (uno solo, o los diez para elegir)
+  PD.heroesOf = li => PD.towersFor(li).filter(id => T[id].hero);
   for (const id in T) T[id].id = id;
   PD.TOWERS = T;
 })();

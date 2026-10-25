@@ -99,7 +99,7 @@ const SOLO = {
   hero: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas doradas"]] }],
     cat: s => `club-hero-${s.n}` },
   /* PRO DEFENDER: la ronda récord de cada reino. */
-  prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"], ["pantano", "Pantano Sombrío"], ["cumbres", "Cumbres Tormentosas"], ["fosa", "Fosa Abisal"], ["engranajes", "Ciudadela de Engranajes"], ["eclipse", "Trono del Eclipse"]] }],
+  prodefender: { filas: [{ k: "n", t: "Reino", ops: [["prado", "Prado Esmeralda"], ["dunas", "Dunas de Ámbar"], ["glaciar", "Glaciar Cristal"], ["caldera", "Caldera Volcánica"], ["vacio", "Nexo del Vacío"], ["pantano", "Pantano Sombrío"], ["cumbres", "Cumbres Tormentosas"], ["fosa", "Fosa Abisal"], ["engranajes", "Ciudadela de Engranajes"], ["eclipse", "Trono del Eclipse"], ["necropolis", "Necrópolis Olvidada"], ["esporas", "Jardín de Esporas"], ["espejos", "Laberinto de Espejos"], ["archipielago", "Archipiélago Celeste"], ["noche", "La Noche Eterna"]] }],
     cat: s => `club-prodefender-${s.n}` },
   /* PRO PACMAN: una sola tabla, el puntaje de la partida. */
   propac: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],

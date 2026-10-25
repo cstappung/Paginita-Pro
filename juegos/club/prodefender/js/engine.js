@@ -42,6 +42,49 @@
     multi: e => (e.d.boss ? 3 : e.d.big ? 4 : 1)
   };
 
+  // =========================== TERCERA ERA ===========================
+  // Solo en los reinos con `era: 3` (levels.js): todo lo de abajo mira this.era3 o un campo
+  // nuevo de un enemigo, así que los diez reinos anteriores se simulan igual que antes.
+  //
+  // PACTOS: al empezar y cada diez rondas (la 10, 20…, 90) se ofrecen tres; el jugador toma
+  // uno o los rechaza antes de seguir (startRound no arranca mientras tanto). Cada uno trae
+  // una ventaja (`bueno`) y una carga (`malo`): `m` multiplica modificadores, `set` los fija,
+  // `oro`/`vidas`/`vidasF` pasan en el momento. Los modificadores viven en this.mods
+  // (aplicaMods) y valen 1 (o 0) sin pactos, así que no tocan nada hasta que se elige uno.
+  PD.PACTOS = [
+    { id: 'codicia', icon: '💰', name: 'Pacto de la Codicia', bueno: '+40% de oro por cada enemigo', malo: 'Los enemigos tienen +15% de vida', m: { oro: 1.4, vidaEnem: 1.15 } },
+    { id: 'furia', icon: '⚡', name: 'Pacto de la Furia', bueno: 'Tus torres atacan un 20% más rápido', malo: 'Los enemigos corren un 10% más', m: { rate: 1.2, velEnem: 1.1 } },
+    { id: 'cristal', icon: '💎', name: 'Pacto de Cristal', bueno: 'Tus torres hacen +30% de daño', malo: 'Vender una torre devuelve solo el 40%', m: { dmg: 1.3 }, set: { venta: 0.4 } },
+    { id: 'mercenario', icon: '🪙', name: 'Contrato Mercenario', bueno: 'Cobras ahora un adelanto de oro', malo: 'El bono de cada ronda baja un 30%', m: { bono: 0.7 }, oro: r => Math.round(800 + 3 * PD.roundBonus(r + 1)) },
+    { id: 'vision', icon: '👁', name: 'Ojo que Todo lo Ve', bueno: 'Todas tus torres ven a los camuflados', malo: 'Los enemigos tienen +12% de vida', set: { camo: true }, m: { vidaEnem: 1.12 } },
+    { id: 'hierro', icon: '⚒', name: 'Pacto de Hierro', bueno: 'Tus torres ignoran la mitad del blindaje', malo: 'Las mejoras cuestan un 20% más', set: { ap: 0.5 }, m: { costoMejora: 1.2 } },
+    { id: 'cuervo', icon: '🪶', name: 'Alas del Cuervo', bueno: 'Tus torres ven un 15% más lejos', malo: 'Las torres nuevas cuestan un 15% más', m: { range: 1.15, costoTorre: 1.15 } },
+    { id: 'usura', icon: '🏦', name: 'Usura', bueno: 'Al terminar cada ronda cobras el 8% del oro que guardas', malo: 'Los enemigos tienen +10% de vida', set: { usura: 0.08 }, m: { vidaEnem: 1.1 } },
+    { id: 'sangre', icon: '❤', name: 'Corazón de Sangre', bueno: '+40 vidas ahora', malo: 'Los jefes tienen +30% de vida', m: { vidaJefe: 1.3 }, vidas: 40 },
+    { id: 'heroe', icon: '♛', name: 'Llamado del Héroe', bueno: 'Tu héroe hace +40% de daño y su habilidad recarga un 30% antes', malo: 'Las demás torres hacen un 10% menos de daño', m: { heroDmg: 1.4, heroCd: 0.7, otras: 0.9 } },
+    { id: 'herrero', icon: '📌', name: 'Pacto del Herrero', bueno: 'Pinchos a mitad de precio y con el doble de daño', malo: 'Pierdes 10 vidas ahora', m: { pinchoCosto: 0.5, pinchoDanio: 2 }, vidas: -10 },
+    { id: 'caos', icon: '🌀', name: 'Pacto del Caos', bueno: 'El Poder del Reino se carga el doble de rápido', malo: 'Los enemigos corren un 8% más', m: { energia: 2, velEnem: 1.08 } },
+    { id: 'ofrenda', icon: '🩸', name: 'Ofrenda', bueno: 'Tus torres hacen +25% de daño', malo: 'Pierdes un cuarto de tus vidas ahora', m: { dmg: 1.25 }, vidasF: -0.25 },
+    { id: 'cautela', icon: '🛡', name: 'Pacto de la Cautela', bueno: 'Las fugas quitan un 40% menos de vidas', malo: 'Los enemigos dan un 25% menos de oro', m: { fuga: 0.6, oro: 0.75 } }
+  ];
+  const MODS0 = { dmg: 1, otras: 1, rate: 1, range: 1, camo: false, ap: 0, heroDmg: 1, heroCd: 1, oro: 1, vidaEnem: 1, vidaJefe: 1, velEnem: 1,
+    venta: 0.75, costoTorre: 1, costoMejora: 1, bono: 1, usura: 0, fuga: 1, energia: 1, pinchoCosto: 1, pinchoDanio: 1 };
+  // lo que multiplica el daño de una torre (también las habilidades de los héroes)
+  const DANIOS = ['dmg', 'droneDmg', 'mineDmg', 'dps', 'pulseDmg', 'shardDmg', 'burnDps', 'poisonDps', 'kamikaze', 'pct', 'eco', 'golemDmg', 'thornDps',
+    'flashDmg', 'popDmg', 'acidDps', 'puddleDps', 'eruptDmg', 'tempDmg', 'waveDmg', 'dawnDmg', 'bogDps', 'selvaDps', 'winterDmg', 'riftDmg'];
+  // EL PODER DEL REINO: se carga matando (`energia`, hasta ENERGIA_MAX) y el jugador lo lanza
+  // donde quiera mientras dura una ronda (prueba.js: jugada 8). Su daño sigue a la ronda.
+  PD.ENERGIA_MAX = 100;
+  PD.PODERES = {
+    cadenas:   { name: 'Cadenas de Almas', icon: '⛓', color: '#7affb0', r: 110, desc: 'Encadena 3 s a los enemigos del área (a los jefes los frena), les hace daño arcano y remata los huesos.' },
+    floracion: { name: 'Floración Carnívora', icon: '🌺', color: '#ff7ad8', r: 95, desc: 'Brota un jardín carnívoro 8 s: envenena y frena a todo lo que pase, también a los voladores.' },
+    destello:  { name: 'Destello Prismático', icon: '🔆', color: '#9ff0ff', r: 140, desc: 'Un estallido de luz: destruye ilusiones y copias, y deja a los demás revelados y más vulnerables.' },
+    rayo:      { name: 'Ira del Cielo', icon: '🌩', color: '#fff27a', r: 150, desc: 'Seis rayos sobre los enemigos más fuertes del área: mucho daño y los aturden.' },
+    hoguera:   { name: 'Hoguera de Calabazas', icon: '🎃', color: '#ff7a1a', r: 100, desc: 'Un anillo de fuego 6 s que quema a todos y hace retroceder a los que entran.' }
+  };
+  // lo que remata los huesos de un Esqueleto (y lo único que les hace algo mientras yacen)
+  const REMATA = { fire: 1, explosive: 1, arcane: 1 };
+
   // ------------------------------- Caminos -------------------------------
   function buildPath(pts) {
     const segs = [];
@@ -133,6 +176,11 @@
       this.stats = { kills: 0, leaked: 0 };
       this.grid = new Grid();
       this.bosses = [];
+      // tercera era: pactos (y sus modificadores), el Poder del Reino, el evento de la ronda
+      this.era3 = this.L.era === 3;
+      this.pactos = []; this.mods = { ...MODS0 }; this.energia = 0;
+      this.evento = null; this.caidos = []; this.alzar = []; this.zonas = []; this.provoca = null;
+      this.vendavalT = 0; this.apagonT = 0;
       if (snap) this.load(snap);
     }
 
@@ -149,17 +197,20 @@
 
     // --------------------------- Guardado ---------------------------------
     snapshot() {
-      return {
+      const s = {
         li: this.li, round: this.round, money: this.money, lives: this.lives, continues: this.continues,
         stats: { ...this.stats },
         towers: this.towers.map(t => ({ type: t.type, x: t.x, y: t.y, tiers: t.tiers.slice(), mode: t.mode, dealt: t.dealt, spent: t.spent })),
         spikes: this.spikes.map(p => ({ x: p.x, y: p.y, n: p.n, dmg: p.dmg }))
       };
+      if (this.era3) { s.pactos = this.pactos.map(p => ({ r: p.r, id: p.id })); s.energia = this.energia; }
+      return s;
     }
     load(s) {
       this.round = s.round; this.money = s.money; this.lives = s.lives;
       this.continues = s.continues !== undefined ? s.continues : 3;
       if (s.stats) this.stats = { ...s.stats };
+      if (this.era3) { this.pactos = (s.pactos || []).map(p => ({ r: p.r, id: p.id })); this.energia = s.energia || 0; this.aplicaMods(); }
       for (const st of s.towers) {
         const t = this.makeTower(st.type, st.x, st.y);
         t.tiers = st.tiers.slice(); t.mode = st.mode || t.mode; t.dealt = st.dealt || 0; t.spent = st.spent;
@@ -196,11 +247,14 @@
         flashT: 0, sawQ: 0, sawQT: 0, hitMap: new Map()
       };
     }
+    // lo que cuesta poner una torre (los pactos pueden encarecerla)
+    towerCost(type) { return Math.round(PD.TOWERS[type].cost * this.mods.costoTorre); }
     place(type, x, y) {
-      const def = PD.TOWERS[type];
-      if (this.money < def.cost || !this.canPlace(type, x, y)) return null;
-      this.money -= def.cost;
+      const cost = this.towerCost(type);
+      if (this.money < cost || !this.canPlace(type, x, y)) return null;
+      this.money -= cost;
       const t = this.makeTower(type, x, y);
+      if (cost !== t.spent) t.spent = cost;
       this.towers.push(t);
       this.recalcAll();
       this.emit({ type: 'place', tower: t });
@@ -225,7 +279,7 @@
     upgradeCost(t, p) {
       const up = t.def.paths[p].ups[t.tiers[p]];
       if (!up) return Infinity;
-      return Math.round(up.cost * (1 - this.discountFor(t)));
+      return Math.round(up.cost * (1 - this.discountFor(t)) * this.mods.costoMejora);
     }
     upgrade(t, p) {
       if (!this.canUpgrade(t, p)) return false;
@@ -236,7 +290,7 @@
       this.emit({ type: 'upgrade', tower: t });
       return true;
     }
-    sellValue(t) { return Math.floor(t.spent * 0.75); }
+    sellValue(t) { return Math.floor(t.spent * this.mods.venta); }
     sell(t) {
       const i = this.towers.indexOf(t);
       if (i < 0) return;
@@ -251,7 +305,7 @@
     }
 
     // ------------------------------ Pinchos --------------------------------
-    spikeCost() { return PD.PINCHOS.costo(this.round + 1); }
+    spikeCost() { return Math.round(PD.PINCHOS.costo(this.round + 1) * this.mods.pinchoCosto); }
     // dónde caería un montón tirado en (x, y): el punto del camino más cercano, o null
     spikeSpot(x, y) {
       let best = null, bd = PATH_HALF;
@@ -272,7 +326,7 @@
       const at = this.spikeSpot(x, y);
       if (!at) return null;
       this.money -= c;
-      const p = { x: at.x, y: at.y, n: PD.PINCHOS.puas, dmg: PD.PINCHOS.danio(this.L, this.round + 1), hit: [] };
+      const p = { x: at.x, y: at.y, n: PD.PINCHOS.puas, dmg: PD.PINCHOS.danio(this.L, this.round + 1) * this.mods.pinchoDanio, hit: [] };
       this.spikes.push(p);
       this.emit({ type: 'spikes', spikes: p });
       return p;
@@ -349,6 +403,111 @@
         if (b.ap) s.armorPierce = Math.max(s.armorPierce || 0, b.ap);
         if (b.pierce) s.pierce += b.pierce;
       }
+      if (this.pactos.length) this.aplicaPactos();
+    }
+    // los modificadores de los pactos sobre las torres (después de tótems y auras)
+    aplicaPactos() {
+      const M = this.mods;
+      for (const t of this.towers) {
+        const k = t.def.kind, s = t.s;
+        if (k === 'support' || k === 'farm') continue;
+        const dm = M.dmg * (t.def.hero ? M.heroDmg : M.otras);
+        if (dm !== 1) for (const q of DANIOS) if (s[q]) s[q] *= dm;
+        if (M.rate !== 1) {
+          if (s.cd) s.cd /= M.rate;
+          if (s.droneCd) s.droneCd /= M.rate;
+          if (s.shardCd) s.shardCd /= M.rate;
+          if (k === 'beam' || k === 'disint') s.dps *= M.rate;
+        }
+        if (M.range !== 1 && s.range < 5000) s.range *= M.range;
+        if (M.camo) s.camo = true;
+        if (M.ap) s.armorPierce = Math.max(s.armorPierce || 0, M.ap);
+        if (t.def.hero && M.heroCd !== 1 && s.ability) s.abCd = (s.abCd || PD.ABILITIES[s.ability].cd) * M.heroCd;
+      }
+    }
+
+    // ------------------------------- Pactos -------------------------------
+    // ¿Toca elegir pacto antes de la siguiente ronda? (al empezar y tras la 10, 20…, 90)
+    pactoPendiente() {
+      if (!this.era3 || this.over || this.active || this.round >= PD.MAX_ROUND || this.round % 10 !== 0) return false;
+      return !this.pactos.some(p => p.r === this.round);
+    }
+    // las tres ofertas de ahora: salen del reino y la ronda (y de los pactos ya tomados)
+    ofertasPacto() {
+      const tomados = new Set(this.pactos.map(p => p.id));
+      const libres = PD.PACTOS.filter(p => !tomados.has(p.id));
+      const rng = PD.rng((this.L.seed * 31 + this.round * 7 + 1) >>> 0);
+      for (let i = libres.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const x = libres[i]; libres[i] = libres[j]; libres[j] = x; }
+      return libres.slice(0, 3);
+    }
+    // i: 0–2 toma esa oferta, 3 las rechaza todas
+    elegirPacto(i) {
+      if (!this.pactoPendiente() || !(i >= 0 && i <= 3)) return false;
+      if (i === 3) { this.pactos.push({ r: this.round, id: null }); this.emit({ type: 'pacto', pacto: null }); return true; }
+      const P = this.ofertasPacto()[i];
+      if (!P) return false;
+      this.pactos.push({ r: this.round, id: P.id });
+      if (P.oro) this.money += P.oro(this.round);
+      if (P.vidas) this.lives = Math.max(1, this.lives + P.vidas);
+      if (P.vidasF) this.lives = Math.max(1, Math.round(this.lives * (1 + P.vidasF)));
+      this.aplicaMods();
+      this.recalcAll();
+      this.emit({ type: 'pacto', pacto: P });
+      this.snd('ab_wardrum');
+      return true;
+    }
+    aplicaMods() {
+      const M = { ...MODS0 };
+      for (const p of this.pactos) {
+        const P = p.id && PD.PACTOS.find(q => q.id === p.id);
+        if (!P) continue;
+        for (const k in P.m || {}) M[k] *= P.m[k];
+        for (const k in P.set || {}) M[k] = k === 'ap' ? Math.max(M.ap, P.set.ap) : P.set[k];
+      }
+      this.mods = M;
+    }
+
+    // ---------------------------- Poder del Reino ----------------------------
+    poderListo() { return this.era3 && !!this.L.poder && this.active && !this.over && this.energia >= PD.ENERGIA_MAX; }
+    lanzarPoder(x, y) {
+      if (!this.poderListo() || !(x >= 0 && x <= W && y >= 0 && y <= H)) return false;
+      this.energia = 0;
+      const id = this.L.poder, P = PD.PODERES[id], cur = this.curRound() || 1;
+      const k = PD.hpMult(this.L, cur) * PD.hpBoost(cur, false);
+      const dentro = e => !e.dead && Math.hypot(e.x - x, e.y - y) < P.r + e.d.r * 0.5;
+      const lista = this.enemies.filter(dentro);
+      if (id === 'cadenas') {
+        for (const e of lista) {
+          if (e.huesosT > 0) { e.huesosT = 0; e.hp = 0; this.kill(e, null); continue; }
+          e.holdT = Math.max(e.holdT, 3);
+          this.damage(e, 40 * k, 'arcane', null, { bossMult: 2 });
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 4, r1: e.d.r + 12, color: P.color, w: 3 });
+        }
+      } else if (id === 'floracion') {
+        this.zonas.push({ x, y, r: P.r, t: 8, T: 8, dps: 22 * k, dtype: 'poison', slow: 0.5, air: true, look: 'flor', hit: [] });
+      } else if (id === 'destello') {
+        for (const e of lista) {
+          if (e.d.ilusion || e.falso) { e.hp = 0; this.kill(e, null); continue; }
+          this.damage(e, 120 * k, 'arcane', null, { bossMult: 2 });
+          if (e.dead) continue;
+          e.hexT = Math.max(e.hexT, 6); e.hexReveal = true; e.hexAmp = Math.max(e.hexAmp, e.d.boss ? 0.1 : 0.2);
+        }
+        this.fx.push({ k: 'flashscreen', t: 0, T: 0.5, color: 'rgba(200,250,255,' });
+      } else if (id === 'rayo') {
+        const top = lista.filter(e => !e.burrowed).sort((a, b) => (b.maxHp + (b.d.boss ? 1e9 : 0)) - (a.maxHp + (a.d.boss ? 1e9 : 0)) || a.id - b.id).slice(0, 6);
+        for (const e of top) {
+          this.fx.push({ k: 'bolt', pts: [[e.x + 20, -10], [e.x - 10, e.y * 0.5], [e.x, e.y]], t: 0, T: 0.45, color: P.color, w: 6 });
+          this.damage(e, 90 * k, 'elec', null, { bossMult: 3, ap: 1 });
+          if (!e.dead) this.applyStun(e, 1);
+        }
+        this.fx.push({ k: 'flashscreen', t: 0, T: 0.35, color: 'rgba(255,250,200,' });
+      } else if (id === 'hoguera') {
+        this.zonas.push({ x, y, r: P.r, t: 6, T: 6, dps: 30 * k, dtype: 'fire', fireFloor: 0.5, empuja: 70, look: 'hoguera', hit: [] });
+      }
+      this.fx.push({ k: 'ring', x, y, t: 0, T: 0.8, r0: 10, r1: P.r, color: P.color, w: 8 });
+      this.emit({ type: 'poder', id, x, y });
+      this.snd(id === 'rayo' ? 'zapBig' : id === 'hoguera' ? 'ab_inferno' : id === 'destello' ? 'ab_supernova' : 'ab_selva', x);
+      return true;
     }
 
     // ------------------------------ Rondas --------------------------------
@@ -357,10 +516,11 @@
       if (!R) return null;
       const agg = {};
       for (const g of R.groups) agg[g.type] = (agg[g.type] || 0) + g.n;
-      return { list: Object.entries(agg).sort((a, b) => PD.enemyThreat(b[0]) - PD.enemyThreat(a[0])), special: R.special, boss: R.boss };
+      return { list: Object.entries(agg).sort((a, b) => PD.enemyThreat(b[0]) - PD.enemyThreat(a[0])), special: R.special, boss: R.boss, evento: R.evento || null };
     }
     startRound() {
       if (this.active || this.over || this.round >= PD.MAX_ROUND) return false;
+      if (this.era3 && this.pactoPendiente()) return false;   // primero hay que elegir pacto
       const r = this.round + 1;
       const R = this.rounds[r - 1];
       const q = [];
@@ -374,7 +534,12 @@
       this.queue = q; this.qi = 0; this.rt = 0;
       this.hurryT = (q.length ? q[q.length - 1].t : 0) + 90;
       this.active = true;
-      this.emit({ type: 'roundStart', round: r, special: R.special, boss: R.boss });
+      if (this.era3) {
+        // el evento de la ronda: sus relojes empiezan a la mitad (el primero llega pronto)
+        this.evento = R.evento ? { id: R.evento, a: 2, b: 3.5, n: 0 } : null;
+        this.vendavalT = 0; this.apagonT = 0;
+      }
+      this.emit({ type: 'roundStart', round: r, special: R.special, boss: R.boss, evento: R.evento || null });
       return true;
     }
     endRound() {
@@ -384,6 +549,15 @@
       this.round++;
       const r = this.round;
       let bonus = PD.roundBonus(r);
+      if (this.era3) {
+        bonus = Math.round(bonus * this.mods.bono * (this.evento && this.evento.id === 'bendicion' ? 1.5 : 1));
+        if (this.mods.usura) {
+          const u = Math.round(Math.min(this.money * this.mods.usura, 400 + 30 * r));
+          if (u > 0) { bonus += u; this.fx.push({ k: 'text', x: W / 2, y: 60, t: 0, T: 1.6, text: '🏦 +' + u, color: '#ffd84d' }); }
+        }
+        this.evento = null; this.vendavalT = 0; this.apagonT = 0;
+        this.zonas = []; this.caidos = []; this.alzar = [];
+      }
       let farm = 0;
       for (const t of this.towers) if (t.def.kind === 'farm') {
         const inc = t.s.income * (t.s.incomeMult || 1);
@@ -410,7 +584,9 @@
       const boost = PD.hpBoost(this.curRound() || 1, d.boss);
       let hp = d.hp * hpM * boost;
       if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
-      const shield = (d.shield || 0) * hpM * boost;
+      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) : 1;   // pactos
+      hp *= fv;
+      const shield = (d.shield || 0) * hpM * boost * fv;
       const e = {
         id: this.uid++, d, type, path, dist: Math.max(0, dist), hp, maxHp: hp, shield, maxShield: shield, shieldT: 0,
         x: 0, y: 0, a: 0, vx: 0, vy: 0, hpM, tier: tier || 0,
@@ -438,6 +614,15 @@
       if (d.cleanse) e.clT = d.cleanse.every;
       if (d.silence) e.silT = d.silence.every * 0.5;
       if (d.cycle) { e.cicloT = d.cycle.every; e.inmune = CICLO[0]; }
+      // tercera era (los relojes de sus mecánicas; azar solo para los suyos)
+      if (d.raise) e.raiseT = d.raise.every * 0.6;
+      if (d.root) e.raizCd = d.root.every * (0.5 + this.rnd() * 0.5);
+      if (d.infect) e.infT = d.infect.every * 0.6;
+      if (d.swap) e.swapT = d.swap.every;
+      if (d.gust) e.gustT = d.gust.every * 0.6;
+      if (d.pumpkins) e.calT = d.pumpkins.every * 0.5;
+      if (d.charge) e.cargaCd = d.charge.every * 0.7;
+      if (d.phylactery) { e.filI = 0; e.filas = []; }
       e.camo = !!d.camo && !(d.boss && tier === 1);
       if (d.boss) e.name = d.name + (tier === 1 ? ' (Joven)' : tier === 3 ? ' (Furioso)' : tier === 4 ? ' (Supremo)' : '');
       posAt(this.paths[path], e.dist, tmp);
@@ -458,11 +643,22 @@
     revealed(e) { return e.lit || (e.hexT > 0 && e.hexReveal); }
     canSee(t, e) {
       if (e.dead || e.burrowed) return false;
-      if ((e.camo || e.niebla) && !(e.sapoT > 0) && !t.s.camo && !this.revealed(e)) return false;
+      if (e.huesosT > 0 && !REMATA[t.s.dtype]) return false;   // huesos: solo los ve quien puede rematarlos
+      if ((e.camo || e.niebla || this.apagonT > 0) && !(e.sapoT > 0) && !t.s.camo && !this.revealed(e)) return false;
       if (e.d.flying && t.s.noFlying) return false;
       return true;
     }
     pick(t, x, y, range, mode, exclude) {
+      // Espantapájaros: las torres cerca de él tienen que dispararle (si lo ven y lo alcanzan)
+      if (this.provoca) {
+        let pv = null, pd = Infinity;
+        for (const e of this.provoca) {
+          if (e.dead || !this.canSee(t, e) || (exclude && exclude.indexOf(e) >= 0) || Math.hypot(e.x - t.x, e.y - t.y) > e.d.taunt) continue;
+          const dd = Math.hypot(e.x - x, e.y - y);
+          if (dd <= range + e.d.r * 0.6 && dd < pd) { pd = dd; pv = e; }
+        }
+        if (pv) return pv;
+      }
       let best = null, bv = -Infinity;
       const r2base = range;
       for (const e of this.enemies) {
@@ -530,6 +726,8 @@
 
     damage(e, amt, dtype, src, o) {
       if (e.dead || e.burrowed || e.invulnT > 0 || amt <= 0) return 0;
+      if (e.huesosT > 0 && !REMATA[dtype]) return 0;   // huesos: solo los rematan fuego, explosivo y arcano
+      if (e.filas && e.filas.length && !(this.rt > this.hurryT) && e.filas.some(f => !f.dead)) return 0;   // el Liche, con su alma a salvo
       if (e.phased && dtype !== 'arcane' && !e.lightPhase) return 0;
       if (e.d.absorb === dtype) {   // Elemental de Tormenta: la electricidad lo cura
         if (e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + amt * 0.5);
@@ -538,6 +736,10 @@
       let m = e.d.resist && e.d.resist[dtype] !== undefined ? e.d.resist[dtype] : 1;
       if (e.inmune && FAMILIA[dtype] === e.inmune) m *= 0.15;   // Mecatitán
       if (e.res && e.res[dtype]) m *= e.res[dtype];             // Autómata adaptado
+      if (e.d.frontShield && src && src.x !== undefined) {       // Templario: de frente casi nada
+        const vx = src.x - e.x, vy = src.y - e.y, l = Math.hypot(vx, vy) || 1;
+        if ((Math.cos(e.a) * vx + Math.sin(e.a) * vy) / l > 0.3) m *= e.d.frontShield;
+      }
       if (dtype === 'fire' && o && o.fireFloor && m < o.fireFloor) m = o.fireFloor;
       if (e.wetT > 0) {
         // mojado: pierde la protección contra el fuego y conduce la electricidad
@@ -554,6 +756,7 @@
       let arm = e.d.armor || 0;
       if (e.d.shellHits && e.golpes >= e.d.shellHits) arm = 0;   // caparazón roto
       if (e.sapoT > 0) arm = 0;
+      if (e.raizT > 0) arm += e.d.root.armor;   // Enredadera con raíces
       if (!dot) e.golpes++;
       const armor = Math.max(0, arm - e.corr - (e.hexT > 0 ? e.hexArmor : 0) - e.shred);
       if (armor > 0 && !dot && dtype !== 'arcane' && dtype !== 'fire' && dtype !== 'poison') {
@@ -564,6 +767,7 @@
       const amp = (e.hexT > 0 ? e.hexAmp : 0) + e.corr * e.corrAmp + e.lightAmp + (e.wetT > 0 ? e.wetAmp : 0) + (e.sapoT > 0 ? e.sapoAmp : 0) + (e.burbujaT > 0 ? e.burbujaAmp : 0);
       if (amp > 0) dmg *= 1 + amp;
       if (e.campo > 0) dmg *= 1 - e.campo;   // campo de fuerza del Mecatitán
+      if (e.d.maxHit && !dot) dmg = Math.min(dmg, e.maxHp * e.d.maxHit);   // Prisma Viviente
       let dealt = 0;
       if (e.shield > 0) {
         const sm = (o && o.shieldMult) || 1;
@@ -591,8 +795,47 @@
         this.snd('teleport', e.x);
         e.dist = Math.min(this.paths[e.path].len - 30, e.dist + e.d.blink.dist);
       }
+      if (e.d.rise) e.ultimo = dtype;
+      if (e.d.mirror && !e.desdoblado && e.hp > 0 && e.hp < e.maxHp * e.d.mirror) this.desdobla(e);
       if (e.hp <= 0) this.kill(e, src);
       return dealt;
+    }
+    // Reflejo: al bajar de la mitad aparece una copia con la vida que le queda
+    desdobla(e) {
+      e.desdoblado = true;
+      const c = this.spawn(e.type, e.path, Math.max(0, e.dist - 16), e.hpM);
+      c.desdoblado = true; c.copia = true; c.hp = e.hp; c.maxHp = e.maxHp;
+      c.slowF = e.slowF; c.slowT = e.slowT; c.pulled = e.pulled; c.kb = e.kb ? { ...e.kb } : null; c.rifted = e.rifted;
+      if (e.mod) this.modifica(c, e.mod);
+      this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.5, r0: 4, r1: e.d.r + 20, color: '#c8e8ff', w: 3 });
+      this.snd('teleport', e.x);
+    }
+    // lo que multiplica el oro de un enemigo en la tercera era (pactos, eventos, dorados)
+    oroDe(e) {
+      if (e.falso || e.d.ilusion) return 0;
+      let m = this.mods.oro;
+      const ev = this.evento && this.evento.id;
+      if (ev === 'lunaSangre') m *= 1.6; else if (ev === 'bendicion') m *= 1.25;
+      if (e.dorado) m *= 8;
+      return m;
+    }
+    // al caer (tercera era): carga el Poder del Reino y queda en la lista de caídos (Nigromante,
+    // Noche de los Muertos)
+    alCaer(e) {
+      const d = e.d;
+      if (!e.falso && !d.ilusion) this.energia = Math.min(PD.ENERGIA_MAX, this.energia + (d.boss ? 25 : d.big ? 4 : d.minor ? 0.4 : 1) * this.mods.energia);
+      if (d.boss || d.big || e.zombi || e.falso || d.ilusion) return;
+      const c = { type: e.type, path: e.path, dist: e.dist, x: e.x, y: e.y, t: this.time, hpM: e.hpM };
+      this.caidos.push(c);
+      if (this.caidos.length > 40) this.caidos.shift();
+      if (this.evento && this.evento.id === 'muertos' && this.rnd() < 0.25) this.alzar.push({ ...c, espera: 1.5 });
+    }
+    // un caído que vuelve como zombi (con esa parte de su vida); los zombis no vuelven dos veces
+    levanta(c, f) {
+      const z = this.spawn(c.type, c.path, c.dist, c.hpM);
+      z.zombi = true; z.hp = z.maxHp * f;
+      this.fx.push({ k: 'puff', x: c.x, y: c.y, t: 0, T: 0.5, color: '#7affb0', r: z.d.r * 1.3 });
+      return z;
     }
 
     adapta(e, dtype, dealt) {
@@ -606,6 +849,15 @@
     kill(e, src) {
       if (e.dead) return;
       if (e.d.twins && !e.split) { this.parte(e); return; }
+      // Esqueleto: se queda en huesos y se levanta (salvo que lo remate fuego, explosivo o arcano)
+      if (e.d.rise && !e.risen && !REMATA[e.ultimo]) {
+        e.risen = true; e.huesosT = e.d.rise.dur; e.hp = e.maxHp * e.d.rise.hp;
+        e.burnT = 0; e.poisT = 0; e.slowT = 0; e.slowF = 0;
+        if (e.engaged) this.release(e);
+        this.fx.push({ k: 'puff', x: e.x, y: e.y, t: 0, T: 0.4, color: '#e8e0c8', r: e.d.r });
+        this.snd('golemHit', e.x);
+        return;
+      }
       if (e.d.revive && !e.revived) {
         e.revived = true; e.hp = e.maxHp * 0.5; e.invulnT = 1.5;
         e.burnT = 0; e.poisT = 0;
@@ -617,8 +869,9 @@
       e.dead = true;
       this.stats.kills++;
       const cur = this.curRound() || 1;
-      this.money += e.d.bounty * PD.incomeMult(cur) * (e.goldT > 0 ? e.goldMult : 1);
+      this.money += e.d.bounty * PD.incomeMult(cur) * (e.goldT > 0 ? e.goldMult : 1) * (this.era3 ? this.oroDe(e) : 1);
       const d = e.d;
+      if (this.era3) this.alCaer(e);
       if (e.engaged) this.release(e);
       if (e.hexT > 0 && e.hexSpread) {
         // Plaga: la maldición salta a los enemigos más cercanos
@@ -645,6 +898,12 @@
         this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 8, r1: W2.radius, color: '#ffe08a', w: 4 });
       }
       if (e.agarres) this.suelta(e);
+      if (d.deathSpores) {
+        // Seta: las torres de alrededor atacan a la mitad de velocidad un rato
+        for (const t of this.towers) if (Math.hypot(t.x - e.x, t.y - e.y) < d.deathSpores.radius && !this.protegida(t)) t.esporaT = Math.max(t.esporaT || 0, d.deathSpores.dur);
+        this.fx.push({ k: 'splash', x: e.x, y: e.y, t: 0, T: 0.9, r: d.deathSpores.radius, color: '#d85aa8' });
+        this.snd('acidHit', e.x);
+      }
       if (d.deathFreeze) {
         for (const t of this.towers) if (Math.hypot(t.x - e.x, t.y - e.y) < d.deathFreeze.radius) this.disableTower(t, d.deathFreeze.dur);
         this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.6, r0: 10, r1: d.deathFreeze.radius, color: '#dff4ff', w: 5 });
@@ -666,7 +925,8 @@
       this.stats.leaked++;
       // un grande que se escapa quita mucho, pero nunca más del 60 % de las vidas del reino de
       // un golpe (con la escalera de tanques, un Titán perdido eran 90 vidas: fin de la partida)
-      const l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : Math.min(e.d._leak, Math.ceil(this.L.lives * 0.6));
+      let l = e.d.boss ? PD.BOSS_LEAK[e.tier || 2] : Math.min(e.d._leak, Math.ceil(this.L.lives * 0.6));
+      if (this.era3) l = e.falso ? 1 : e.d.boss ? l : Math.max(1, Math.ceil(l * this.mods.fuga));
       this.lives -= l;
       if (e.agarres) this.suelta(e);
       if (e.d.steal && this.money > 0) {
@@ -690,6 +950,7 @@
       const list = this.enemies;
       // auras
       for (const e of list) { e.haste = 1; e.auraSlow = 0; e.lit = false; e.lightAmp = 0; e.lightPhase = false; e.shred = 0; e.niebla = false; e.campo = 0; }
+      if (this.era3) this.aurasTercera(list);
       // auras de los héroes: quitar blindaje (Dunas) y daño recibido (Dunas, Vacío; suma como la luz del faro)
       for (const t of this.towers) if (t.def.hero && t.disabledT <= 0 && (t.s.shredAura || t.s.ampAura || t.s.goldAura || t.s.purgeAura)) {
         const s = t.s, R = (s.goldAura || s.purgeAura) ? s.range : s.aura || s.range;
@@ -824,9 +1085,10 @@
         }
         if (d.enrage && !e.enraged && e.hp < e.maxHp * d.enrage.below) e.enraged = true;
         if (this.segundaEra(e, d, dt, mudo, cur)) continue;
+        if (this.era3 && this.terceraEra(e, d, dt, mudo, cur, hurry)) continue;
         // movimiento
         let sp = 0;
-        const vel = d.speed * sm * (e.fast || 1);
+        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1);
         if (hurry) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
         else if (e.frozenT <= 0 && e.stunT <= 0) {
           sp = vel * (1 - e.slowF) * e.haste;
@@ -1075,12 +1337,23 @@
         if (s.ability) this.autoAbility(t);
         const kind = t.def.kind;
         // segunda era: Sobrecarga de Ada (x2) y la tinta del Pulpo (alcance x0.55 mientras dura)
-        const rmT = t.sobreT > 0 ? rm * 2 : rm;
+        let rmT = t.sobreT > 0 ? rm * 2 : rm;
         if (t.sobreT > 0) t.sobreT -= dt;
+        // tercera era: esporas (x0.5), Viento a Favor (x1.2); niebla y vendaval acortan el alcance
+        let rf = 1;
+        if (this.era3) {
+          if (t.esporaT > 0) { t.esporaT -= dt; rmT *= 0.5; }
+          if (this.evento && this.evento.id === 'viento') rmT *= 1.2;
+          if (!SIN_TINTA[kind] && (this.vendavalT > 0 || (this.evento && this.evento.id === 'niebla')) && !this.protegida(t)) {
+            if (this.vendavalT > 0) rf *= 1 - this.vendavalF;
+            if (this.evento && this.evento.id === 'niebla') rf *= 0.8;
+          }
+        }
         const tdt = dt * rmT;
         const r0 = s.range, ciega = t.tintaT > 0 && !SIN_TINTA[kind];
         if (t.tintaT > 0) t.tintaT -= dt;
         if (ciega) s.range = r0 * 0.55;
+        if (rf !== 1) s.range *= rf;
         switch (kind) {
           case 'projectile': this.tProjectile(t, s, tdt); break;
           case 'pulse': this.tPulse(t, s, tdt); break;
@@ -1109,7 +1382,7 @@
           case 'disint': this.tDisint(t, s, dt, rmT); break;
           case 'bell': this.tBell(t, s, tdt); break;
         }
-        if (ciega) s.range = r0;
+        if (ciega || rf !== 1) s.range = r0;
       }
     }
     tProjectile(t, s, dt) {
@@ -1220,6 +1493,20 @@
       t.cdT = s.cd;
     }
     landShell(sh) {
+      if (sh.calabaza) {   // calabaza del Jinete: apaga la torre a la que cae
+        if (this.towers.indexOf(sh.torre) >= 0) this.disableTower(sh.torre, sh.dur);
+        this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.5, r: 34, color: '#ff7a1a' });
+        this.snd('boomSmall', sh.x1);
+        return;
+      }
+      if (sh.estrella) {   // Lluvia de Estrellas: daña a los enemigos y apaga las torres de al lado
+        const cur = this.curRound() || 1, k = PD.hpMult(this.L, cur) * PD.hpBoost(cur, false);
+        this.explode(sh.x1, sh.y1, sh.radius, 25 * k, 'explosive', null, { ap: 1 }, { hitsFlying: true });
+        for (const t of this.towers) if (Math.hypot(t.x - sh.x1, t.y - sh.y1) < 45 + t.def.size && !this.protegida(t)) this.disableTower(t, 2);
+        this.fx.push({ k: 'boom', x: sh.x1, y: sh.y1, t: 0, T: 0.6, r: sh.radius, color: '#ffd84d' });
+        this.snd('boom', sh.x1);
+        return;
+      }
       const t = sh.src, s = t.s;
       if (sh.acid) { this.landAcid(sh); return; }
       if (sh.sun) { this.landSun(sh); return; }
@@ -2254,7 +2541,9 @@
           const q = this.queue[this.qi++];
           const e = this.spawn(q.type, q.path, 0, PD.hpMult(this.L, this.round + 1) * q.hpX, q.tier);   // hpX: grupo reforzado
           if (q.mod) this.modifica(e, q.mod);
+          if (this.evento) this.alAparecer(e);
         }
+        if (this.era3) this.tickTercera(dt);
       }
       this.grid.clear();
       for (const e of this.enemies) if (!e.dead && !e.burrowed) this.grid.add(e);
@@ -2298,6 +2587,7 @@
         this.grid.query(p.x, p.y, p.r + 46, e => {
           if (e.dead || p.hit.indexOf(e.id) >= 0) return;
           if (p.noFlying && e.d.flying) return;
+          if (e.d.intangible) return;   // Alma en Pena: los proyectiles la atraviesan
           const rr = p.r + e.d.r;
           const dx = e.x - p.x, dy = e.y - p.y;
           if (dx * dx + dy * dy > rr * rr) return;
@@ -2358,6 +2648,201 @@
         this.inRange(r, r.r, e => this.damage(e, r.dps * dt, 'fire', r.src, { dot: true, fireFloor: 0.5 }));
       }
       this.rings = this.rings.filter(r => r.t > 0);
+      if (this.zonas.length) {
+        // Poderes del Reino que se quedan en el suelo (Floración, Hoguera)
+        for (const z of this.zonas) {
+          z.t -= dt;
+          this.grid.query(z.x, z.y, z.r + 44, e => {
+            if (e.dead || (e.d.flying && !z.air) || Math.hypot(e.x - z.x, e.y - z.y) > z.r + e.d.r * 0.5) return;
+            this.damage(e, z.dps * dt, z.dtype, null, { dot: true, fireFloor: z.fireFloor });
+            if (e.dead) return;
+            if (z.slow) this.applySlow(e, z.slow, 0.4);
+            if (z.empuja && z.hit.indexOf(e.id) < 0) { z.hit.push(e.id); this.retrocede(e, z.empuja * (e.d.boss ? 0.3 : 1), null); if (e.engaged) this.release(e); }
+          });
+        }
+        this.zonas = this.zonas.filter(z => z.t > 0);
+      }
+    }
+
+    // ================== TERCERA ERA: mecánicas y eventos ==================
+    // auras: el polen (cura a los cercanos) y la lista de Espantapájaros que provocan
+    aurasTercera(list) {
+      let prov = null;
+      for (const e of list) e.polen = 0;
+      for (const e of list) {
+        if (e.dead || e.sapoT > 0) continue;
+        const P = e.d.pollen;
+        if (P) for (const o of list) if (o !== e && !o.dead && !o.d.boss && Math.abs(o.x - e.x) < P.radius && Math.hypot(o.x - e.x, o.y - e.y) < P.radius) o.polen = Math.max(o.polen, P.heal);
+        if (e.d.taunt && !e.burrowed && !(e.huesosT > 0)) (prov || (prov = [])).push(e);
+      }
+      this.provoca = prov;
+    }
+    // multiplicador de velocidad (pactos, Luna de Sangre, embestida; 0 con raíces)
+    velTercera(e, hurry) {
+      if (e.raizT > 0 && !hurry) return 0;
+      let v = this.mods.velEnem;
+      if (this.evento && this.evento.id === 'lunaSangre') v *= 1.2;
+      if (e.cargaT > 0) v *= e.d.charge.mult;
+      if (e.filas && e.filas.length && !hurry) v *= 0.35;   // el Liche anda despacio mientras lo protegen
+      return v;
+    }
+    // Devuelve true si el enemigo no se mueve este paso (huesos en el suelo).
+    terceraEra(e, d, dt, mudo, cur, hurry) {
+      if (e.huesosT > 0) {
+        e.huesosT -= dt;
+        if (e.huesosT <= 0) { e.huesosT = 0; this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.5, r: d.r * 1.4 }); this.snd('roots', e.x); }
+        return true;
+      }
+      if (e.polen > 0 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.polen * dt);
+      if (d.root && !mudo) {
+        if (e.raizT > 0) {
+          e.raizT -= dt;
+          e.hp = Math.min(e.maxHp, e.hp + e.maxHp * d.root.regen * dt);
+          if (e.raizT <= 0) { e.raizT = 0; e.raizCd = d.root.every; }
+        } else if (!hurry && (e.raizCd -= dt) <= 0) {
+          e.raizT = d.root.dur;
+          if (e.engaged) this.release(e);
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.5, r0: d.r, r1: d.r + 16, color: '#7ad85a', w: 3 });
+        }
+      }
+      if (d.raise && !mudo && (e.raiseT -= dt) <= 0) {
+        e.raiseT = d.raise.every;
+        const R = d.raise, cand = this.caidos.filter(c => Math.hypot(c.x - e.x, c.y - e.y) < R.radius).sort((a, b) => b.t - a.t).slice(0, R.n);
+        for (const c of cand) { this.caidos.splice(this.caidos.indexOf(c), 1); this.levanta(c, R.hp); }
+        if (cand.length) { this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 0.7, r0: 8, r1: R.radius, color: '#7affb0', w: 4 }); this.snd('revive', e.x); }
+      }
+      if (d.phylactery) {
+        const F = d.phylactery;
+        while (e.filI < F.at.length && e.hp < e.maxHp * F.at[e.filI]) {
+          e.filI++;
+          const hpM = PD.hpMult(this.L, cur), L2 = this.paths[e.path].len;
+          for (let i = 0; i < F.n; i++) e.filas.push(this.spawn(F.type, e.path, Math.min(L2 - 60, e.dist + (i - 1) * 45 + 30), hpM));
+          this.fx.push({ k: 'ring', x: e.x, y: e.y, t: 0, T: 1, r0: 10, r1: 150, color: '#7affb0', w: 6 });
+          this.emit({ type: 'filacteria', enemy: e });
+          this.snd('revive', e.x);
+        }
+        if (e.filas.length && e.filas.every(f => f.dead)) e.filas = [];
+      }
+      if (d.infect && (e.infT -= dt) <= 0) {
+        e.infT = d.infect.every;
+        const libres = this.towers.filter(t => !(t.esporaT > 0) && !this.protegida(t)).sort((a, b) => a.id - b.id);
+        for (let i = 0; i < d.infect.n && libres.length; i++) {
+          const t = libres.splice(Math.floor(this.rnd() * libres.length), 1)[0];
+          t.esporaT = d.infect.dur;
+          this.fx.push({ k: 'bolt', pts: [[e.x, e.y], [(e.x + t.x) / 2, (e.y + t.y) / 2 - 30], [t.x, t.y]], t: 0, T: 0.5, color: '#5affc8', w: 3 });
+        }
+        this.snd('acidHit', e.x);
+      }
+      if (d.swap && !hurry && (e.swapT -= dt) <= 0) {
+        e.swapT = d.swap.every;
+        const ils = this.enemies.filter(o => !o.dead && o.d.ilusion).sort((a, b) => a.id - b.id);
+        if (ils.length) {
+          const o = ils[Math.floor(this.rnd() * ils.length)];
+          const p0 = e.path, d0 = e.dist;
+          e.path = o.path; e.dist = o.dist; o.path = p0; o.dist = d0;
+          for (const q of [e, o]) { posAt(this.paths[q.path], q.dist, tmp); q.x = tmp.x; q.y = tmp.y; q.a = tmp.a; if (q.engaged) this.release(q); this.fx.push({ k: 'puff', x: q.x, y: q.y, t: 0, T: 0.6, color: '#c8e8ff', r: q.d.r * 1.3 }); }
+          this.emit({ type: 'swap', enemy: e });
+          this.snd('teleport', e.x);
+        }
+      }
+      if (d.gust && (e.gustT -= dt) <= 0) {
+        e.gustT = d.gust.every;
+        this.vendavalT = d.gust.dur; this.vendavalF = d.gust.f;
+        this.fx.push({ k: 'flashscreen', t: 0, T: 0.5, color: 'rgba(200,235,255,' });
+        this.emit({ type: 'vendaval', enemy: e });
+        this.snd('ab_tormenta', e.x);
+      }
+      if (d.drain) {
+        const q = Math.min(this.money, d.drain * PD.roundBonus(cur) * dt);
+        if (q > 0) this.money -= q;
+      }
+      if (d.pumpkins && (e.calT -= dt) <= 0) {
+        e.calT = d.pumpkins.every;
+        const libres = this.towers.filter(t => !(t.disImm > 0) && !(t.disabledT > 0) && !this.protegida(t)).sort((a, b) => a.id - b.id);
+        for (let i = 0; i < d.pumpkins.n && libres.length; i++) {
+          const t = libres.splice(Math.floor(this.rnd() * libres.length), 1)[0];
+          this.shells.push({ x0: e.x, y0: e.y, x1: t.x, y1: t.y, t: 0, T: 0.9, calabaza: true, torre: t, dur: d.pumpkins.dur });
+        }
+        this.snd('mortar', e.x);
+      }
+      if (d.charge) {
+        if (e.cargaT > 0) e.cargaT -= dt;
+        else if ((e.cargaCd -= dt) <= 0) {
+          e.cargaCd = d.charge.every; e.cargaT = d.charge.dur;
+          this.fx.push({ k: 'dust', x: e.x, y: e.y, t: 0, T: 0.6, r: d.r * 1.6 });
+          this.emit({ type: 'embiste', enemy: e });
+          this.snd('bossSpawn', e.x);
+        }
+      }
+      return false;
+    }
+    // lo que trae el evento a cada enemigo de la oleada (los dorados, las copias falsas)
+    alAparecer(e) {
+      if (e.d.boss) return;
+      const ev = this.evento;
+      ev.n++;
+      if (ev.id === 'oro' && ev.n % 6 === 0) { e.dorado = true; e.hp *= 3; e.maxHp *= 3; }
+      else if (ev.id === 'espejismo' && ev.n % 3 === 0) {
+        const c = this.spawn(e.type, e.path, Math.max(0, e.dist - 18), e.hpM);
+        c.falso = true; c.hp = c.maxHp = c.maxHp * 0.3; c.shield = c.maxShield = 0;
+        if (e.mod) this.modifica(c, e.mod);
+      }
+    }
+    // relojes de la tercera era en cada paso de una ronda: eventos, los que se levantan, el vendaval
+    tickTercera(dt) {
+      if (this.vendavalT > 0) this.vendavalT -= dt;
+      if (this.caidos.length && this.time - this.caidos[0].t > 4) this.caidos = this.caidos.filter(c => this.time - c.t <= 4);
+      if (this.alzar.length) {
+        for (const a of this.alzar) if ((a.espera -= dt) <= 0) this.levanta(a, 0.5);
+        this.alzar = this.alzar.filter(a => a.espera > 0);
+      }
+      const ev = this.evento;
+      if (!ev) return;
+      const cur = this.curRound() || 1, k = PD.hpMult(this.L, cur) * PD.hpBoost(cur, false);
+      if (ev.id === 'meteoros') {
+        if ((ev.a -= dt) <= 0) {
+          ev.a = 2.5;
+          const p = this.paths[Math.floor(this.rnd() * this.paths.length)];
+          posAt(p, p.len * (0.1 + this.rnd() * 0.85), tmp);
+          this.shells.push({ x0: tmp.x - 160, y0: tmp.y - 420, x1: tmp.x, y1: tmp.y, t: 0, T: 0.9, estrella: true, meteor: true, radius: 70 });
+        }
+      } else if (ev.id === 'tormenta') {
+        if ((ev.a -= dt) <= 0) {
+          ev.a = 2;
+          const vivos = this.enemies.filter(e => !e.dead && !e.burrowed && !(e.huesosT > 0));
+          if (vivos.length) {
+            const e = vivos[Math.floor(this.rnd() * vivos.length)];
+            this.fx.push({ k: 'bolt', pts: [[e.x + 25, -10], [e.x - 10, e.y * 0.5], [e.x, e.y]], t: 0, T: 0.35, color: '#fff27a', w: 4 });
+            this.damage(e, 15 * k, 'elec', null, {});
+            if (!e.dead) this.applyStun(e, 0.5);
+            this.snd('zap', e.x);
+          }
+        }
+        if ((ev.b -= dt) <= 0) {
+          ev.b = 7;
+          const ts = this.towers.filter(t => !(t.disImm > 0) && !this.protegida(t)).sort((a, b) => a.id - b.id);
+          if (ts.length) {
+            const t = ts[Math.floor(this.rnd() * ts.length)];
+            this.disableTower(t, 2.5);
+            this.fx.push({ k: 'bolt', pts: [[t.x + 30, -10], [t.x - 10, t.y * 0.5], [t.x, t.y]], t: 0, T: 0.4, color: '#fff27a', w: 5 });
+            this.fx.push({ k: 'flashscreen', t: 0, T: 0.25, color: 'rgba(255,250,200,' });
+            this.snd('zapBig', t.x);
+          }
+        }
+      } else if (ev.id === 'apagon') {
+        if (this.apagonT > 0) this.apagonT -= dt;
+        if ((ev.a -= dt) <= 0) { ev.a = 8; this.apagonT = 3; this.snd('sabotage'); }
+      } else if (ev.id === 'esporas') {
+        if ((ev.a -= dt) <= 0) {
+          ev.a = 5;
+          const libres = this.towers.filter(t => !(t.esporaT > 0) && !this.protegida(t)).sort((a, b) => a.id - b.id);
+          for (let i = 0; i < 2 && libres.length; i++) {
+            const t = libres.splice(Math.floor(this.rnd() * libres.length), 1)[0];
+            t.esporaT = 4;
+            this.fx.push({ k: 'splash', x: t.x, y: t.y, t: 0, T: 0.8, r: 30, color: '#d85aa8' });
+          }
+        }
+      }
     }
   }
 

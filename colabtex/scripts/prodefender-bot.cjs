@@ -49,13 +49,18 @@
    alguno en la ronda, en %). Un bot que gana sin perder vidas y con los
    enemigos al 40 % del camino es un juego fácil.
 
-   Uso:  node scripts/prodefender-bot.cjs [--reino 0..9|todos|nuevos|diez] [--estrategia mixta|control|sinheroe|adapta|todas]
+   Tercera era (--reino tercera, reinos 10–14): elige pactos por una lista de preferencia
+   (--pacto rechaza para no tomar ninguno), lanza el Poder del Reino sobre el enemigo más
+   fuerte en cuanto se llena y llama al héroe de --heroe (Nyx si no se dice).
+
+   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|todas]
                                           [--semilla N[,M…]] [--motor DIR] [--json] [--rondas] [--fugas] [--anticipa] [--ayuda N]
 
    --motor DIR   carga el juego de otra carpeta (p. ej. una versión anterior
                  sacada con `git archive`), para comparar antes y después.
    --rondas      una línea por ronda (oro, vidas, avance, torres).
    --fugas       además, qué enemigos se escaparon y, cada 5 rondas, las torres.
+   --diff X      juega el reino con esa dificultad (levels.js `diff`), para calibrarla.
    --ayuda N     hasta la ronda N las vidas no se acaban (las perdidas se cuentan igual,
                  y no hay oro extra): para medir el juego tardío aunque la apertura del
                  bot, más floja que la de una persona, pierda vidas. */
@@ -90,8 +95,35 @@ const MIXTA = [
   ['espinas', 'espinas', 'vigia', 'espinas', 'voltaico', 'mortero', 'prisma', 'dragon', 'balista', 'vigia', 'prisma'],
   ['espinas', 'espinas', 'sierra', 'espinas', 'prisma', 'vigia', 'mortero', 'balista', 'sierra', 'geiser', 'prisma'],
   ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'mortero', 'desintegrador', 'balista', 'dragon', 'voltaico', 'desintegrador'],
-  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'balista', 'mortero', 'desintegrador', 'prisma', 'segador']
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'balista', 'mortero', 'desintegrador', 'prisma', 'segador'],
+  // tercera era (reinos 10–14)
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'mortero', 'vigia', 'segador', 'voltaico', 'dragon', 'prisma'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'sierra', 'balista', 'desintegrador', 'mortero', 'dragon', 'vigia'],
+  ['espinas', 'espinas', 'voltaico', 'espinas', 'prisma', 'colmena', 'vigia', 'bumeran', 'voltaico', 'colmena', 'prisma'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'balista', 'colmena', 'desintegrador', 'sierra', 'voltaico', 'prisma'],
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'mortero', 'segador', 'vigia', 'obelisco', 'dragon', 'prisma']
 ];
+// Tercera era: el héroe que elige (se puede cambiar con --heroe), el orden en que prefiere los
+// pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
+const HEROE_TERCERA = opt('heroe', 'heroevacio');
+// --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
+if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
+const PACTOS_PREF = ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
+const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
+function eligePacto(g) {
+  const ofs = g.ofertasPacto();
+  if (opt('pacto', '') === 'rechaza') return g.elegirPacto(3);
+  let mejor = 3, mv = Infinity;
+  ofs.forEach((P, i) => { const v = PACTOS_PREF.indexOf(P.id); if (v >= 0 && v < mv) { mv = v; mejor = i; } });
+  return g.elegirPacto(mejor);
+}
+function lanzaPoder(g) {
+  if (!g.poderListo()) return;
+  const vivos = g.enemies.filter(e => !e.dead && !e.burrowed);
+  if (!vivos.length) return;
+  const e = vivos.sort((a, b) => (b.maxHp + (b.d.boss ? 1e12 : 0)) - (a.maxHp + (a.d.boss ? 1e12 : 0)))[0];
+  g.lanzarPoder(Math.round(e.x), Math.round(e.y));
+}
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   control: { rota: MIXTA.map(l => l.slice(0, 3).concat(['ancla', 'escarcha'], l.slice(3), ['ancla'])) },
@@ -171,7 +203,7 @@ class Bot {
     const vende = PD.towersFor(li);
     this.rota = this.est.rota[li].filter(x => vende.includes(x));
     this.ri = 0;
-    const heroe = PD.heroOf(li);
+    const heroe = heroeDe(li);
     // las de control solo las usa «adapta» (por reglas, ver adapta())
     const control = this.est.adapta ? Object.keys(CONTROL).filter(x => vende.includes(x)) : [];
     this.permitidas = [...new Set(this.rota.concat(control, heroe && !this.est.sinHeroe ? [heroe] : []))];
@@ -359,7 +391,7 @@ class Bot {
     if (vienen.phase && !dmg.some(t => t.type === 'prisma' || t.s.dtype === 'arcane') && this.permitidas.includes('prisma') && !vet.prisma) return nuevo('prisma');
     for (const f of this.est.fuerza || []) if (r >= 10 && !T.some(t => t.type === f) && this.permitidas.includes(f) && !vet[f]) return nuevo(f);
     if (this.est.adapta) { const a = this.adapta(r, presion); if (a) return a; }
-    const heroe = PD.heroOf(this.li);
+    const heroe = heroeDe(this.li);
     if (heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
@@ -466,6 +498,7 @@ class Bot {
     const c = this.copia();
     c.modo = modo; c.turno();
     const g = c.game, v0 = g.lives;
+    if (g.pactoPendiente()) eligePacto(g);
     g.startRound();
     let pasos = 0, av = 0;
     while (g.active && !g.over && pasos < 60 * 900) {
@@ -507,10 +540,12 @@ class Bot {
       g.emit = ev => { if (ev.type === 'leak') fugas[ev.quien] = (fugas[ev.quien] || 0) + ev.amount; };
       const leak = g.leak.bind(g);
       g.leak = e => { const ev = g.emit; g.emit = x => ev({ ...x, quien: e.type }); leak(e); g.emit = ev; };
+      if (g.pactoPendiente()) { eligePacto(g); this.turno(); }
       g.startRound();
       let pasos = 0, avance = 0;
       while (g.active && !g.over && pasos < 60 * 900) {
         g.update(STEP); pasos++;
+        if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
         if (pasos % 10 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > avance) avance = pr; }
       }
       for (const t of g.towers) { const m = this.mem.get(t.id); m.dealt.push(t.dealt - m.antes); }
@@ -557,7 +592,8 @@ class Bot {
 
 function main() {
   const reinoArg = opt('reino', 'todos'), estArg = opt('estrategia', 'mixta');
-  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg === 'nuevos' ? [5, 6, 7, 8, 9] : reinoArg === 'diez' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : reinoArg.split(',').map(Number);
+  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg === 'nuevos' ? [5, 6, 7, 8, 9] : reinoArg === 'diez' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    : reinoArg === 'tercera' ? [10, 11, 12, 13, 14] : reinoArg === 'quince' ? [...Array(15).keys()] : reinoArg.split(',').map(Number);
   const ests = estArg === 'todas' ? Object.keys(ESTRATEGIAS) : estArg.split(',');
   const semillas = String(opt('semilla', '1')).split(',').map(Number);
   const res = [];

@@ -1,7 +1,8 @@
 # PRO DEFENDER — notes for Claude
 
 Solo Club game of Juegos: a tower defense with 5 kingdoms × 100 rounds (plus
-5 more that open one per day, Oct 22–26 2026: «Second era» below), 22 towers and 30+
+5 more that opened one per day, Oct 22–26 2026: «Second era», and 5 harder ones,
+Oct 27–31: «Third era» below), 27 towers, 10 heroes and 70+
 enemies, written by the owner as plain scripts (no build) and integrated here. Shared club rules (proof, castigo, modo celular) are in
 `juegos/club/CLAUDE.md`; logros/coins/ranking wiring in
 `docs/claude/juegos/perfiles-y-economia.md`; anti-cheat details in
@@ -145,6 +146,57 @@ and 0–1 escaped bosses and Eclipse above Vacío; `adapta` beats `mixta` clearl
 in Fosa and Eclipse. Without `--ayuda` the bot dies around round 15 in every
 kingdom, Vacío included (its opening), so that number says nothing.
 
+## Third era: kingdoms 11–15, «La Era del Caos» (owner's request, Oct 2026)
+
+Necrópolis Olvidada, Jardín de Esporas, Laberinto de Espejos, Archipiélago Celeste
+and La Noche Eterna (`levels.js`, `era: 3`, `abre` Oct 27–31; tables `necropolis`,
+`esporas`, `espejos`, `archipielago`, `noche` = `L.slug`; 100 coins a round like
+the second era). Harder (`diff` 2.5–3.0) and with their own rules, all gated on
+`game.era3` or on new enemy fields, so **kingdoms 1–10 replay identically**
+(checked: the same scripted game hashed over 280 rounds on the old and new
+engine; `VERSION` stays 4, only `?v=pd-8` moved):
+
+- **Pacts** (`PD.PACTOS` in engine.js): at round 0 and after every 10th round
+  three are offered (`ofertasPacto`: shuffled from `L.seed` + round, minus those
+  already taken), the player takes one or declines (`elegirPacto(i)`, i = 3
+  declines). `startRound` refuses while `pactoPendiente()`, so main.js opens the
+  modal first (`abrePacto`). Each pact has `m` (multipliers), `set`, and instant
+  `oro`/`vidas`/`vidasF`; `aplicaMods` folds them into `this.mods` (all 1/0
+  without pacts) and `aplicaPactos` applies them to tower stats at the end of
+  `recalcAll` (damage keys in `DANIOS`). Pacts and energy are in the snapshot.
+  Proof op **7** `[k, 7, i]`.
+- **Events** (`PD.EVENTOS` in levels.js): `buildRounds` puts one on rounds 8, 13,
+  … 98 from `L.eventos` with its own rng (never two equal in a row; Frenesí
+  tightens the groups right there). `startRound` sets `this.evento`; the engine
+  applies it in `tickTercera` (timers), `alAparecer` (golden enemies, fake
+  copies), `oroDe`, `velTercera`, `updateTowers` (fog, wind, spores) and
+  `alCaer` (Noche de los Muertos). The preview and a canvas banner announce it.
+- **Kingdom Power** (`PD.PODERES`, `L.poder`): `energia` fills on kills (`alCaer`:
+  1, minors 0.4, big 4, bosses 25, × pact) up to `ENERGIA_MAX`; `lanzarPoder(x, y)`
+  only during a round. Floración and Hoguera leave `zonas` (cleared at
+  `endRound`). Proof op **8** `[k, 8, x, y]`; main.js: button `#poder`, key V,
+  `ui.placing = '@poder'`.
+- **Hero of your choice**: `heroes: 'todos'` makes `towersFor` include all ten
+  heroes; still one per game. `PD.heroesOf(li)`; the shop shows one «A elección»
+  item that opens `eligeHeroe`.
+- **New mechanics** (comment at the top of the third-era block in enemies.js,
+  logic in `terceraEra` + hooks in `damage`/`kill`/`pick`/`canSee`/projectiles):
+  bones that rise unless finished by fire/explosive/arcane (`huesosT`, towers that
+  can't finish them don't target them), Nigromante raising `caidos`, intangible
+  souls, the Lich's phylacteries (invulnerable and slow while any lives; never in
+  hurry mode), spores and infection (`t.esporaT`, ×0.5 attack rate), roots, pollen,
+  mirror split, `maxHit`, the Mirror Queen swapping with her illusions,
+  `frontShield` (uses the tower's position vs `e.a`), the Typhoon's `gust`
+  (`vendavalT`), bats draining gold, the Scarecrow's `taunt` (`provoca`) and the
+  Horseman's pumpkins (shells with `calabaza`) and `charge`.
+- Every timer that could stall a round is off in hurry mode, like the others.
+- Art: 22 new `ART` shapes; maps `necro`, `fungi`, `mirror`, `sky`, `night`
+  (`TERCERA` in render.js: `sueloTercera`, `caminoTercera`, `bordeTercera`,
+  `itemTercera`, `escenaTercera`, `escenaOverTercera`) and event overlays
+  (`eventoEncima`, `drawZonas`).
+- Bot: `--reino tercera` picks pacts from `PACTOS_PREF` (`--pacto rechaza`),
+  casts the power on the strongest enemy and calls `--heroe` (Nyx by default).
+
 ## Knockback and crowd control
 
 Every push back along the path goes through `Game.retrocede(e, px, src)`:
@@ -229,7 +281,7 @@ versión» (cache, not cheating: no castigo).
   (`PLENO` in `solo/club.js` → `html.jg-club-pleno` in `juegos.html`), like PRO
   HERO; the game's own «← Volver a Juegos» / «← Juegos» buttons click the
   hidden `.club-volver` link that `conexion.js` adds.
-- Ten tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
+- Fifteen tables `club-prodefender-<reino>`, `puntos` = best round, `tiempo` = ms
   of game time. `main.js` reads the tables of the open kingdoms once on open (`recorreTablas`,
   via `Club.category` + `club-tabla`) to adopt cloud records and unlock
   kingdoms (round 50 opens the next one), and sends `Club.result` with
@@ -238,7 +290,7 @@ versión» (cache, not cheating: no castigo).
   panel) and the coins won so far.
 - **Coins** (owner's spec): each new round of a kingdom's record pays 20 × the
   kingdom number, once: 2000/4000/6000/8000/10000 for reaching round 100 of
-  kingdom 1–5, 10000 each for kingdoms 6–10 (100 a round), and beating 60 with 70 pays only the ten new rounds
+  kingdom 1–5, 10000 each for kingdoms 6–15 (100 a round), and beating 60 with 70 pays only the ten new rounds
   (`monedasProdefender` in `monedas.js`, from the row like every club record).
   **No per-game pay**: `prodefender` is not in `PAGO_CLUB`/`JUEGOS_CLUB`, and
   `alResultadoClub` in `juegos-main.js` skips `marcaJugadaClub` for it and
