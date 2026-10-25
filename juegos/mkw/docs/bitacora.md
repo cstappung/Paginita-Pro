@@ -10081,6 +10081,8 @@ jugada (`$otro`): no hay que publicar nada.
 | Banco `sumados` (nuevo: Ana y Beto empiezan, Dani llega en la 1 y corre desde la 2; Eva sumada sin página no corre; la misma lista en las tres páginas; 0 puntos; el «terminé» de quien no corrió no cuenta; la anfitriona que recarga lo anota sola; `lockstep.agregar`) | 24 / 24 |
 | Banco `sala-carrera`, `lockstep`, `sala-playlist` (sin cambios de comportamiento) | 101/101, 50/50, 37/37 |
 | La página sin el programa con `?modo=sala&sincro=ana,beto,dani&uid=dani&base=2` | base 2, corren Ana y Beto, Dani con el mando 2, sin errores |
+| Banco `red` 35/35, `vr-sala` 58/58, `conexiones` 19/19, `dificultad-cpu` 28/28, `letreros` 17/17 | todo bien |
+| Banco `relevo` | 45/46 corriendo junto a la compilación del sitio y 1130 pruebas en la misma máquina (falló §102, la «PC justa», que depende de los tiempos); sola (`relevo?solo=19`) 2/2 dos veces |
 
 **Falta probarlo con el juego** (dos o tres pestañas): `node web/navegador/prueba-sala.mjs` con una tercera pestaña que
 entra en la carrera 1 de la copa (no existe todavía: hay que agregarla) y `prueba-sincro --sala`. Lo que podría fallar
