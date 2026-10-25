@@ -143,9 +143,10 @@ const LIBRO = (() => {
 // hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
 const GUION = +opt('guion', 100);
 const HORIZONTE = +opt('horizonte', 2);
-// «humana» sin guion: de qué parte cada ronda antes del rescate («normal»: gastar como la mixta
-// con las cuotas de las personas; «ahorra»: no gastar)
-const BASE = opt('base', 'normal');
+// «humana» sin guion: de qué parte cada ronda antes del rescate («ahorra»: no gastar, y el
+// rescate compra lo justo; «normal»: gastar como la mixta con las cuotas de las personas). En
+// la Necrópolis «ahorra» llegó a la 49 y «normal» a la 32; en Eclipse y Engranajes, igual.
+const BASE = opt('base', 'ahorra');
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
   humana: { rota: MIXTA, humana: true },
