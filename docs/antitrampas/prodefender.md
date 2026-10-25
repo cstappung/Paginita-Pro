@@ -84,7 +84,8 @@ La página guarda **una sola prueba por cuenta y reino**: al escribirse la fila 
 borra la del récord anterior (la regla deja al dueño borrar sus pruebas salvo la que
 nombra su fila), y la guarda **compacta** (`v: 2`: las jugadas en un texto, una letra
 por código y números en base 36, el paso como lo que avanzó en su tramo; ver
-`compacta`/`expande` en `verifica/prodefender.js`). El juego sigue mandando la `v: 1`;
+`compacta`/`expande` en `verifica/prodefender.js`; A–G las jugadas de siempre, H el pacto
+e I el Poder del Reino de la tercera era). El juego sigue mandando la `v: 1`;
 el verificador acepta las dos y expande la `v: 2` antes de rehacerla.
 
 ## Límite honesto

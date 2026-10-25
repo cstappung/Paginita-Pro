@@ -625,3 +625,11 @@ test('tercera era: cada reino tiene su ley y cambia la forma de ganar',()=>{
  ponCerca(g,'dragon',350,300);assert.ok(o.s.range<g.baseStats(o).range,'un Lanzallamas no alumbra');
  ponCerca(g,'faro',360,300);assert.equal(o.s.range,g.baseStats(o).range,'alumbrada');
 });
+
+test('tercera era: la prueba con pactos y Poder del Reino también se guarda compacta',()=>{
+ const VP=carga('src/juegos/solo/verifica/prodefender.js');
+ const p={v:1,ve:4,u:'u',r:10,s:5,j:[[0,7,1],[95,0,3,300,170],[300,4],[900,8,410,220],[1200,7,3]],k:1300};
+ const c=VP.compacta(p);
+ assert.equal(c.v,2,'se compacta');assert.match(c.j,/H/);assert.match(c.j,/I/);
+ assert.deepEqual(VP.expande(c),p,'vuelve exacta');
+});

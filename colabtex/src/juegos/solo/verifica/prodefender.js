@@ -39,7 +39,7 @@ const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-9';
    cada jugada un arreglo [paso, código, …], prueba.js) y la página la guarda
    compacta: todas las jugadas en un solo texto, cada una con una letra por
    código (A colocar, B mejorar, C vender, D objetivo, E ronda, F recargar,
-   G pinchos) seguida de sus números en base 36 separados por comas. El paso
+   G pinchos; la tercera era suma H pacto e I Poder del Reino) seguida de sus números en base 36 separados por comas. El paso
    va como lo que avanzó desde la jugada anterior del mismo tramo (tras una
    recarga el tramo nuevo empieza en 0), que casi siempre son dos o tres
    letras en vez de seis cifras.
@@ -47,7 +47,7 @@ const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-9';
    Pesa menos de la mitad y `expande` la devuelve exacta a la v: 1 antes de
    rehacerla. El juego y su trabajador no cambian: un iframe o un
    trabajador viejo en caché nunca ven la v: 2 (no hay castigo por caché). */
-const LETRAS = 'ABCDEFG';
+const LETRAS = 'ABCDEFGHI';
 function aTexto(p) {
   let base = 0, t = '';
   for (const j of p.j) {
@@ -71,7 +71,7 @@ export function compacta(p) {
 export function expande(p) {
   if (!p || typeof p !== 'object' || p.v !== 2) return p;
   if (typeof p.j !== 'string') return null;
-  const partes = p.j.match(/[A-G][-0-9a-z,]*/g) || [];
+  const partes = p.j.match(/[A-I][-0-9a-z,]*/g) || [];
   if (partes.join('').length !== p.j.length) return null;
   const j = [];
   let base = 0;
