@@ -3612,7 +3612,7 @@ function panelEspera(p, est) {
         <button class="btn2" id="jgCopiar">Copiar</button>
       </div>
       ${p.juego === "haxball" ? `<div class="jg-nota">Elijan equipo abajo: quien abrió la sala empieza el partido.</div>`
-        : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo; quien llegue después entra en la carrera siguiente.</div>`
+        : p.juego === "mkw" ? `<div class="jg-nota">El anfitrión abre las carreras abajo cuando estén todos (la CPU completa los lugares libres); quien llegue con la copa andando espera a que termine.</div>`
         : p.juego === "bt3" ? `<div class="jg-nota">${varios ? "Cuando estén todos, el organizador empieza el torneo abajo." : "Elijan abajo quién es el anfitrión: él empieza la pelea."}</div>`
         : p.juego === "pool" ? `<div class="jg-nota">Dos contra dos: empieza sola cuando entren los cuatro. Quien abrió la sala juega con el compañero que eligió.</div>`
         : !varios ? ""

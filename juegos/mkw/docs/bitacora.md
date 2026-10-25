@@ -10018,3 +10018,22 @@ SDL3 = el tamaño de su recuadro en la página × `devicePixelRatio` (aurora cre
 resize pone el lienzo en recuadro × dpr: 1600×900 → 960×540 → de vuelta; el panel lo aplica sin reiniciar). La página
 sin el programa con `?salida=540`: el lienzo contesta 540 de alto, sin errores. **Falta medir con el juego**:
 `node herramientas/medir-sitio.mjs --perfil pc --extra "&salida=720"` (y con la tarjeta integrada, si hay).
+
+## 2026-10-25 · §109 La sala: avisar al anfitrión antes de rellenar con CPU
+
+El dueño: «entran 2 jugadores y el resto es CPU, pero yo quiero jugar con aún más que 2 y rellenar con CPU solo cuando
+estén todos los jugadores reales». Revisado: la sala admite 12 personas (`JUEGOS.mkw.cupo`, la regla `cupo <= 12`) y se
+puede entrar mientras está en el vestíbulo; la CPU ya rellena solo al apretar «¡A correr!» (`redMkw`: `sincro` = los
+presentes en ese momento, hasta 12). Lo que faltaba es que el anfitrión lo sepa antes de apretar: quien llega con la copa
+andando espera a que termine **toda** la copa (la lista de pilotos queda fija en cada marco al cargar: mandos, plantel,
+cámara, lockstep), y el aviso del vestíbulo del sitio decía «entra en la carrera siguiente», que no era cierto.
+
+- «¡A correr!» con lugares libres pregunta: «Hay 2 de 12 pilotos: la CPU completa los otros 10. Quien entre después
+  espera a que termine la copa. ¿Empezar igual?» (`clicVest` en `colabtex/src/juegos/mkw.js`; `confirm`, como «Echar» y
+  «Terminar la copa» del mismo vestíbulo). Con 12, sin pregunta.
+- El aviso de la sala (`panelEspera` en `juegos-main.js`): «El anfitrión abre las carreras abajo cuando estén todos (la
+  CPU completa los lugares libres); quien llegue con la copa andando espera a que termine».
+- Además: la sala es solo para la lista de amigos del Worker (`AMIGOS`); a quien no está le sale «Esta sala es privada».
+
+Pruebas: `npm run test:juegos` 1129/1129. Pendiente (pedido del dueño): que quien llega tarde entre en la **siguiente
+carrera** de la copa (§110).

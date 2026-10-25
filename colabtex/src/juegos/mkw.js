@@ -593,7 +593,14 @@ export function crearMkw({ uid, pid, jugar, terminar, mirando, salir, chat, avat
       anota({ t: "echa", uid, a: b.dataset.e });
       return;
     }
-    if (b.classList.contains("jg-mkw-empieza")) { b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid }); return; }
+    // (§109, el dueño: «rellenar con CPU solo cuando estén todos los jugadores reales»): con lugares libres, pregunta.
+    // Quien entre después espera a que termine la copa (la lista de pilotos queda fija al empezar).
+    if (b.classList.contains("jg-mkw-empieza")) {
+      const n = presentes().length, cpus = MKW_SINCRO_MAX - n;
+      if (cpus > 0 && !confirm(`Hay ${n} de ${MKW_SINCRO_MAX} pilotos: la CPU completa los otros ${cpus}. ` +
+        `Quien entre después espera a que termine la ${est?.estilo === "playlist" ? "playlist" : "copa"}. ¿Empezar igual?`)) return;
+      b.disabled = true; abierto.cambiar = false; anota({ t: "empieza", uid }); return;
+    }
     // (M22, el crítico: un clic cerraba la copa de todos, sin tabla; ahora pregunta)
     if (b.classList.contains("jg-mkw-vuelve")) {
       if (!confirm("¿Terminar la copa para todos? Se cierra el juego de todos y vuelven al vestíbulo, sin la tabla de esta copa.")) return;
