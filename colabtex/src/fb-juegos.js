@@ -818,6 +818,14 @@ export const watchConsumo = (uid, cb) =>
 export const desconecta = () => goOffline(db);
 /* La vuelta de una pestaña que estuvo dormida (juegos-main.js, `duerme`). */
 export const reconecta = () => goOnline(db);
+/* ¿Lo que se escucha está al día? Conectada hace al menos `ms`: tras volver
+   la conexión, las escuchas tardan un momento en traer lo que cambió. Un
+   cierre de la economía calculado sobre datos viejos dejaría fuera eventos
+   reales (juegos/cierre.js), así que se pide esto antes de calcularlo.
+   `.info/connected` es local: no baja nada. */
+let enLineaDesde = 0;
+onValue(ref(db, ".info/connected"), s => { enLineaDesde = s.val() ? Date.now() : 0; });
+export const alDia = (ms = 15000) => enLineaDesde > 0 && Date.now() - enLineaDesde >= ms;
 /* La versión mínima de Juegos (`juegosVersion/min`, el sello `?v=` de
    juegos-app.js, doce cifras): la pone un administrador, y una pestaña con
    una versión más vieja se tapa y pide recargar (juegos-main.js,

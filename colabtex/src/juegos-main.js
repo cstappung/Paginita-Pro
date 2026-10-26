@@ -7,7 +7,7 @@ import { VERIFICADORES, juegoDeCategoria, textoPrueba, pruebaGuardable, verifica
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
 import { merecesRevision } from "./juegos/admin-datos.js";
-import { hacerCierre, verificaCierre, MARGEN_CIERRE, AUTO_CIERRE_DIAS } from "./juegos/cierre.js";
+import { hacerCierre, verificaCierre, MARGEN_CIERRE, AUTO_CIERRE_DIAS, PRIMER_CIERRE } from "./juegos/cierre.js";
 import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hastaDeCuenta } from "./juegos/castigo.js";
 "use strict";
 /* ============================================================
@@ -532,16 +532,24 @@ function datosPerfil(cb) {
    La página de un administrador rehace el cierre cuando pasaron
    AUTO_CIERRE_DIAS desde el anterior, con la misma comprobación que el
    botón del panel: si algo no cuadra, no escribe. Una vez por sesión, a los
-   20 s de tener los datos (el cálculo pesa un segundo) y nunca el primero,
-   que se hace a mano. */
-let cierreIntentado = false;
+   20 s de tener los datos (el cálculo pesa un segundo). El primero, desde
+   PRIMER_CIERRE (cierre.js), la hora que eligió el dueño: si la página ya
+   está abierta antes, espera a esa hora con un temporizador. */
+let cierreIntentado = false, primeroProgramado = false;
 function cierraSiToca() {
-  if (cierreIntentado || state.admin !== true || !datosP || !datosP.completo || !state.user) return;
-  const ci = datosP.cierre;
-  if (!ci || !Number.isFinite(ci.T) || fb.ahora() - ci.T < MARGEN_CIERRE + AUTO_CIERRE_DIAS * 864e5) return;
+  if (cierreIntentado || state.admin !== true || !datosP || !datosP.completo || !state.user || dormida) return;
+  const ci = datosP.cierre, t = fb.ahora();
+  if (!ci) {
+    if (t < PRIMER_CIERRE) {
+      if (!primeroProgramado && PRIMER_CIERRE - t < 2 * 864e5) { primeroProgramado = true; setTimeout(cierraSiToca, PRIMER_CIERRE - t + 1000); }
+      return;
+    }
+  } else if (!Number.isFinite(ci.T) || t - ci.T < MARGEN_CIERRE + AUTO_CIERRE_DIAS * 864e5) return;
   cierreIntentado = true;
   setTimeout(async () => {
     if (!datosP || !datosP.completo || !state.user || state.admin !== true) return;
+    // sin conexión (o recién vuelta) los datos pueden ser viejos: se reintenta con la próxima lectura
+    if (dormida || !fb.alDia()) { cierreIntentado = false; return; }
     const c = hacerCierre(datosP, fb.ahora() - MARGEN_CIERRE);
     if (c.nada || !c.archivar.length) return;
     const dif = verificaCierre(datosP, c);

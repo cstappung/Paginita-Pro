@@ -41,6 +41,10 @@ export const NODOS_ARCHIVO = ["casino", "cartas", "mercado"];
    administrador cierra sola (juegos-main.js, `cierraSiToca`), con la misma
    comprobación. El primer cierre siempre es a mano, desde el panel. */
 export const AUTO_CIERRE_DIAS = 2;
+/* El primer cierre, a la hora que eligió el dueño: lunes 26-10-2026 a la
+   1:30 de Chile. Lo hace la página del primer administrador que tenga
+   Juegos abierto desde esa hora (también se puede hacer antes, a mano). */
+export const PRIMER_CIERRE = Date.parse("2026-10-26T04:30:00Z");
 
 /* Los totales de los sobres contados en el cierre (para cifras y tablas de
    PRODROP): los del cierre anterior más los sobres nuevos de este. */

@@ -510,11 +510,17 @@ So an admin **closes** the history:
 - Writing (`fb.escribeCierre`) copies to `archivo/`, writes the cierre and
   deletes the originals, in batches of 800; it need not be atomic, since
   live records at or before `T` are skipped anyway.
-- The first cierre is manual (`#admin`, Economía); after that an admin's
-  page redoes it by itself every `AUTO_CIERRE_DIAS` (`cierraSiToca` in
-  juegos-main.js), with the same check. **Deploy the code and wait a day
-  before the first cierre**: a cached old bundle does not know the cierre
-  and would show balances without the archived history.
+- An admin's page closes by itself (`cierraSiToca` in juegos-main.js):
+  the first time from `PRIMER_CIERRE` (26-10-2026, 1:30 Chile, the owner's
+  choice; a timer if the page is already open), then every
+  `AUTO_CIERRE_DIAS`, with the same check; the panel can also do it by
+  hand. A cached old bundle does not know the cierre and shows balances
+  without the archived history: the owner accepted that the first cierre
+  comes ~3 h after the deploy and fixes stopped accounts by hand.
+- **A cierre is only computed with a live connection** (`fb.alDia()`,
+  connected for ≥ 15 s). A dormant or offline tab holds stale data, and a
+  cierre computed on it, written once the connection returns, would leave
+  out real events at or before `T`.
 - The rules forbid rewriting an archived key (`casino`, `cartas/s|r|g`:
   `!archivo/... exists()`), let a copy of an archived pack be graded, and
   let admins delete those records. `tests/cierre.test.cjs` and
