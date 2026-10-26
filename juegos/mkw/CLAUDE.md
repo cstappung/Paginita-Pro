@@ -43,7 +43,9 @@ línea más un resumen general. **Es ingeniero eléctrico, no de software**: la 
   la lógica de WheelWizard (rksys, friend codes, Miis) reimplementar desde la documentación pública (Tockdom).
 - Repos de terceros en `terceros/` (ignorados): sus cambios se guardan como parches en `parches/`, con el commit
   fijado en `herramientas/versiones.md` (igual que `parche.diff` de BT3).
-- Firebase y el Worker los publica el dueño a mano. PR/merge en Paginita-Pro solo cuando el dueño lo pida.
+- Firebase y el Worker los publica el dueño a mano. **PR/merge en Paginita-Pro: nunca sin decírselo antes y esperar
+  su confirmación explícita, cada vez** (el dueño, 2026-10-26: «no hagas PR sin decirme y pedirme confirmar»). Un «sí»
+  anterior no vale para el PR siguiente, aunque sea del mismo tema.
 - **Quitar rivales NO es una opción para mejorar el rendimiento** (el dueño, 2026-10-26: «grábalo bien», §114.7).
   Siempre 12 karts (humanos + la CPU que completa la parrilla), en el celular, en un PC justo y en la sala. No se
   propone ni como ajuste, «modo celular» o prueba. Tampoco se sacan efectos (§114.6): el rendimiento se gana

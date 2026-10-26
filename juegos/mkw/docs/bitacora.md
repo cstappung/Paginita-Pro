@@ -10482,3 +10482,14 @@ Lo que dijo (Chrome 155, Android, 8 núcleos, 8 GB, «arm gen-5», salida 540 �
 **ms esperando el disco**, **pipelines nuevos y los ms que bloquearon** (`createRenderPipeline`/`createComputePipeline`/
 `…Async` y `createShaderModule` envueltos siempre: solo cuesta cuando se crea uno) y **dónde estaba el juego**
 (menú / presentación / cuenta / carrera / fin, de la etapa de Raceinfo). Con eso se ve cuál de los tres sospechosos es.
+
+### 114.9 Dos precisiones del dueño (2026-10-26)
+
+- **El tramo lento es dentro de la carrera**: los ~21 s a 20–37 fps son jugando la carrera (no la carga ni los menús).
+  Ahí el juego ve por primera vez la pista, los karts en movimiento, los objetos y sus efectos: los tres sospechosos
+  de §114.8 siguen en pie (código todavía sin optimizar, pipelines nuevos, disco). El informe de 2 min con la etapa por
+  segundo dirá cuál.
+- **Su pantalla va a 120 Hz**: el 60,4 del informe es el ritmo que Chrome le da a la página, no el de la pantalla. Para
+  el juego da igual (necesita 60). Lo único que importa de ese número es el enganche (§114.8).
+- **PR: nunca sin avisar y esperar su confirmación** (dos PR, #271 y #272, se fusionaron dando por hecho un permiso
+  anterior; el dueño lo corrigió). Anotado en `CLAUDE.md` → Reglas.
