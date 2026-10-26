@@ -30,6 +30,13 @@
      detección no ve a los camuflados; el mortero y las minas, a los voladores.
    - Usa los tres reintentos.
 
+   «humana» juega como las personas: lee `prodefender-libro.json` (lo escribe
+   `prodefender-aprende.cjs` desde una exportación de soloPruebas) y procura tener,
+   cada 5 rondas, las torres de cada tipo y los niveles que tenían ellas a esa
+   altura (en ese reino, o en todos si nadie llegó tan lejos ahí), sube cada torre
+   en el orden de caminos que eligen y les pone su objetivo. Lo que sobra lo gasta
+   como la mixta.
+
    Estrategias (--estrategia): qué torres de daño se permite. «mixta» usa
    todas las de su reino; «control» mete el Ancla y la escarcha (para medir
    el retroceso y las congelaciones); «sinheroe» juega sin héroe (para ver
@@ -49,13 +56,18 @@
    alguno en la ronda, en %). Un bot que gana sin perder vidas y con los
    enemigos al 40 % del camino es un juego fácil.
 
-   Uso:  node scripts/prodefender-bot.cjs [--reino 0..9|todos|nuevos|diez] [--estrategia mixta|control|sinheroe|adapta|todas]
+   Tercera era (--reino tercera, reinos 10–14): elige pactos por una lista de preferencia
+   (--pacto rechaza para no tomar ninguno), lanza el Poder del Reino sobre el enemigo más
+   fuerte en cuanto se llena y llama al héroe de --heroe (Nyx si no se dice).
+
+   Uso:  node scripts/prodefender-bot.cjs [--reino 0..14|todos|nuevos|diez|tercera|quince] [--estrategia mixta|control|sinheroe|adapta|humana|todas] [--libro archivo.json] [--torres a,b] [--separa D]
                                           [--semilla N[,M…]] [--motor DIR] [--json] [--rondas] [--fugas] [--anticipa] [--ayuda N]
 
    --motor DIR   carga el juego de otra carpeta (p. ej. una versión anterior
                  sacada con `git archive`), para comparar antes y después.
    --rondas      una línea por ronda (oro, vidas, avance, torres).
    --fugas       además, qué enemigos se escaparon y, cada 5 rondas, las torres.
+   --diff X      juega el reino con esa dificultad (levels.js `diff`), para calibrarla.
    --ayuda N     hasta la ronda N las vidas no se acaban (las perdidas se cuentan igual,
                  y no hay oro extra): para medir el juego tardío aunque la apertura del
                  bot, más floja que la de una persona, pierda vidas. */
@@ -65,7 +77,7 @@ const path = require('path');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const MOTOR = path.resolve(opt('motor', path.join(__dirname, '../../juegos/club/prodefender/js')));
-for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js']) require(path.join(MOTOR, f));
+for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(path.join(MOTOR, f));
 const PD = globalThis.PD;
 const STEP = 1 / 60;
 const AYUDA = +opt('ayuda', 0);
@@ -75,6 +87,9 @@ const CONTROL = { bruja: 1, burbujas: 1, campanario: 1, pararrayos: 1 };
 const APARTE = { ...SOPORTE, ...CONTROL };
 // planes de gasto que prueba la anticipación (decide los lee en this.modo)
 const MODOS = ['normal', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
+// «humana» siguiendo un guion: adelantar lo que el guion hace en las rondas siguientes no
+// cuesta economía, así que se prueba antes que gastar por su cuenta
+const MODOS_GUION = ['normal', 'adelanta1', 'adelanta3', 'adelanta8', 'gasta', 'mejora', 'nueva', 'diversa', 'heroe', 'detecta'];
 const DETECTA = { espinas: 1, vigia: 1, voltaico: 1, colmena: 1, balista: 1 };   // camuflados en el 2.º camino, nivel 2
 // Estrategias: el orden en que un jugador experto agrega torres de daño en cada reino
 // (se repite en ciclo). «control» mete el Ancla y la Escarcha (para medir el retroceso y
@@ -90,10 +105,59 @@ const MIXTA = [
   ['espinas', 'espinas', 'vigia', 'espinas', 'voltaico', 'mortero', 'prisma', 'dragon', 'balista', 'vigia', 'prisma'],
   ['espinas', 'espinas', 'sierra', 'espinas', 'prisma', 'vigia', 'mortero', 'balista', 'sierra', 'geiser', 'prisma'],
   ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'mortero', 'desintegrador', 'balista', 'dragon', 'voltaico', 'desintegrador'],
-  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'balista', 'mortero', 'desintegrador', 'prisma', 'segador']
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'segador', 'balista', 'mortero', 'desintegrador', 'prisma', 'segador'],
+  // tercera era (reinos 10–14)
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'mortero', 'vigia', 'segador', 'voltaico', 'dragon', 'prisma'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'sierra', 'balista', 'desintegrador', 'mortero', 'dragon', 'vigia'],
+  ['espinas', 'espinas', 'voltaico', 'espinas', 'prisma', 'colmena', 'vigia', 'bumeran', 'voltaico', 'colmena', 'prisma'],
+  ['espinas', 'espinas', 'vigia', 'espinas', 'prisma', 'balista', 'colmena', 'desintegrador', 'sierra', 'voltaico', 'prisma'],
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'mortero', 'segador', 'vigia', 'obelisco', 'dragon', 'prisma']
 ];
+// Tercera era: el héroe que elige (se puede cambiar con --heroe), el orden en que prefiere los
+// pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
+const HEROE_TERCERA = opt('heroe', 'heroevacio');
+// --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
+if (opt('diff', '')) for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { PD.LEVELS[li].diff = +opt('diff'); delete PD.LEVELS[li]._rounds; }
+const PACTOS_PREF = ['cristal', 'furia', 'ofrenda', 'hierro', 'codicia', 'vision', 'heroe', 'cuervo', 'usura', 'caos', 'mercenario', 'sangre', 'cautela', 'herrero'];
+const heroeDe = li => PD.heroOf(li) || (PD.LEVELS[li].heroes === 'todos' ? HEROE_TERCERA : null);
+function eligePacto(g) {
+  const ofs = g.ofertasPacto();
+  if (opt('pacto', '') === 'rechaza') return g.elegirPacto(3);
+  let mejor = 3, mv = Infinity;
+  ofs.forEach((P, i) => { const v = PACTOS_PREF.indexOf(P.id); if (v >= 0 && v < mv) { mv = v; mejor = i; } });
+  return g.elegirPacto(mejor);
+}
+function lanzaPoder(g) {
+  if (!g.poderListo()) return;
+  const vivos = g.enemies.filter(e => !e.dead && !e.burrowed);
+  if (!vivos.length) return;
+  const e = vivos.sort((a, b) => (b.maxHp + (b.d.boss ? 1e12 : 0)) - (a.maxHp + (a.d.boss ? 1e12 : 0)))[0];
+  g.lanzarPoder(Math.round(e.x), Math.round(e.y));
+}
+// --estrategia humana: lo aprendido de las partidas de las personas (prodefender-aprende.cjs
+// escribe el libro desde una exportación de soloPruebas; --libro para usar otro)
+const LIBRO = (() => {
+  try { return JSON.parse(require('fs').readFileSync(path.resolve(opt('libro', path.join(__dirname, 'prodefender-libro.json'))), 'utf8')); }
+  catch { return null; }
+})();
+// hasta qué ronda sigue «humana» la mejor partida de una persona en ese reino (el guion del libro)
+const GUION = +opt('guion', 100);
+// para comparar estilos: --torres a,b,c (solo esas torres de daño) y --separa D (ninguna torre a
+// menos de D px de otra)
+const TORRES = opt('torres', '') ? opt('torres').split(',') : null;
+const SEPARA = +opt('separa', 0);
+// --ciego: juega sin saber la ley del reino (sitio por el alcance de base, sin Faros en la Noche)
+const CIEGO = args.includes('--ciego');
+const HORIZONTE = +opt('horizonte', 2);
+// con guion, la parte de las vidas del reino que se acepta perder en una ronda antes de rescatarla
+const UMBRAL = +opt('umbral', 0);
+// «humana» sin guion: de qué parte cada ronda antes del rescate («ahorra»: no gastar, y el
+// rescate compra lo justo; «normal»: gastar como la mixta con las cuotas de las personas). En
+// la Necrópolis «ahorra» llegó a la 49 y «normal» a la 32; en Eclipse y Engranajes, igual.
+const BASE = opt('base', 'ahorra');
 const ESTRATEGIAS = {
   mixta: { rota: MIXTA },
+  humana: { rota: MIXTA, humana: true },
   control: { rota: MIXTA.map(l => l.slice(0, 3).concat(['ancla', 'escarcha'], l.slice(3), ['ancla'])) },
   sinheroe: { rota: MIXTA, sinHeroe: true },
   adapta: { rota: MIXTA, adapta: true }
@@ -153,7 +217,9 @@ function tiro(li, type, tiers, x, y, muneco, vida, cada, entradas) {
 }
 
 class Bot {
-  constructor(li, estrategia, semilla) {
+  // op: {guion, hasta, sinAnticipa, banco, covBanco}: para jugar a prueba con otro guion, hasta una ronda, sin anticipar o sin medir de nuevo el campo de tiro
+  constructor(li, estrategia, semilla, op = {}) {
+    this.op = op;
     this.li = li; this.est = ESTRATEGIAS[estrategia]; this.nombre = estrategia; this.semilla = semilla >>> 0;
     this.game = new PD.Game(li, null, this.semilla);
     this.mem = new Map();   // id de torre → {cov, dealt: [por ronda], antes}
@@ -170,15 +236,26 @@ class Bot {
     for (let x = 24; x < PD.W - 20; x += 16) for (let y = 24; y < PD.H - 20; y += 16) this.sitios.push([x, y]);
     const vende = PD.towersFor(li);
     this.rota = this.est.rota[li].filter(x => vende.includes(x));
+    if (TORRES) this.rota = TORRES.filter(x => vende.includes(x));
+    if (this.est.humana) {
+      if (!LIBRO) throw new Error('falta el libro: node scripts/prodefender-aprende.cjs export.json');
+      // las torres de daño en el orden en que las ponen las personas (las de este reino, o las de todos)
+      const orden = (LIBRO.orden[PD.Prueba.REINOS[li]] || []).concat(LIBRO.orden['*'] || []);
+      const rota = [...new Set(orden)].filter(x => vende.includes(x) && !APARTE[x] && !PD.TOWERS[x].hero);
+      if (rota.length) this.rota = rota;
+    }
     this.ri = 0;
-    const heroe = PD.heroOf(li);
+    const heroe = heroeDe(li);
     // las de control solo las usa «adapta» (por reglas, ver adapta())
     const control = this.est.adapta ? Object.keys(CONTROL).filter(x => vende.includes(x)) : [];
     this.permitidas = [...new Set(this.rota.concat(control, heroe && !this.est.sinHeroe ? [heroe] : []))];
+    // «humana» usa todo lo que vende el reino (las cuotas dicen cuánto de cada una)
+    if (this.est.humana) this.permitidas = [...new Set(vende.filter(x => !PD.TOWERS[x].hero).concat(heroe ? [heroe] : []))];
     // qué mecánicas trae el reino (para «adapta»)
     const pool = PD.LEVELS[li].pool.map(p => PD.ENEMIES[p[0]]).concat([PD.ENEMIES[PD.LEVELS[li].boss]]);
     this.mec = { protege: pool.some(d => d.thunder || d.ink || d.grab), fuego: pool.some(d => d.regenFuego), adapta: pool.some(d => d.adapt) };
-    this.campo();
+    if (op.banco) { this.banco = op.banco; this.covBanco = op.covBanco; } else this.campo();
+    if (this.est.humana) this.guion = op.guion || this.guionPropio();
   }
   // mide todas las combinaciones de todas las torres permitidas (una vez por partida)
   campo() {
@@ -227,6 +304,7 @@ class Bot {
     let mejor = null, mv = -Infinity;
     for (const [x, y] of this.sitios) {
       if (!g.canPlace(type, x, y)) continue;
+      if (SEPARA && !vacio && g.towers.some(t => Math.hypot(t.x - x, t.y - y) < SEPARA)) continue;
       let v;
       if (aura && !vacio) {
         v = 0;
@@ -239,7 +317,8 @@ class Bot {
         for (const t of g.towers) if (t.type !== 'pararrayos' && !g.protegida(t) && Math.hypot(t.x - x, t.y - y) < R - 4) v += t.spent;
         v += this.cobertura(x, y, R) * 1e-3;
       }
-      else v = this.cobertura(x, y, R, vacio);
+      // la ley del reino (Altura, Noche) cambia el alcance según el sitio
+      else v = this.cobertura(x, y, vacio || CIEGO || !g.leyEn ? R : R * g.leyEn(type, x, y).range, vacio);
       if (v > mv) { mv = v; mejor = [x, y]; }
     }
     return mejor;
@@ -285,12 +364,18 @@ class Bot {
     const s = this.sitio(type);
     if (!s) return null;
     const t = this.game.place(type, s[0], s[1]);
-    if (t) { this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[type]) this.marca(t); }
+    if (t) {
+      this.mem.set(t.id, { cov: this.cobertura(s[0], s[1], t.s.range || 110, true), dealt: [], antes: 0 });
+      if (!APARTE[type]) this.marca(t);
+      const modo = this.est.humana && LIBRO.modos[type];
+      if (modo && t.def.targeting) t.mode = modo;
+    }
     return t;
   }
   // los próximos pasos del plan de una torre (los que ya hizo se descuentan por camino)
   pasosPlan(t) {
-    const plan = t.def.hero ? PLAN_HEROE : PLAN[t.type] || [0, 0, 1, 1, 0, 0];
+    const aprendido = this.est.humana && LIBRO.planes[t.def.hero ? 'heroe' : t.type];
+    const plan = aprendido || (t.def.hero ? PLAN_HEROE : PLAN[t.type] || [0, 0, 1, 1, 0, 0]);
     const hechos = [0, 0], fut = [], tt = t.tiers.slice();
     for (const p of plan) {
       if (hechos[p] < t.tiers[p]) { hechos[p]++; continue; }
@@ -336,8 +421,8 @@ class Bot {
     const nuevo = type => ({ k: 'place', type, cost: PD.TOWERS[type].cost });
     const modo = this.modo || 'normal';
     const presion = this.presion || dmg.length < 2 || modo === 'gasta';
-    // tarde, los huertos ya no pagan su sitio: se venden para comprar daño
-    if (r >= 78) { const f = T.find(t => t.type === 'huerto'); if (f) return { k: 'sell', t: f, cost: 0 }; }
+    // tarde, los huertos ya no pagan su sitio: se venden para comprar daño (las personas no)
+    if (r >= 78 && !this.est.humana) { const f = T.find(t => t.type === 'huerto'); if (f) return { k: 'sell', t: f, cost: 0 }; }
     // lo que piden las tres rondas siguientes y el campo de tiro no mide
     const vienen = this.vienen(r);
     const camos = dmg.filter(t => t.s.camo).length + (T.some(t => t.type === 'faro') ? 2 : 0);
@@ -359,13 +444,20 @@ class Bot {
     if (vienen.phase && !dmg.some(t => t.type === 'prisma' || t.s.dtype === 'arcane') && this.permitidas.includes('prisma') && !vet.prisma) return nuevo('prisma');
     for (const f of this.est.fuerza || []) if (r >= 10 && !T.some(t => t.type === f) && this.permitidas.includes(f) && !vet[f]) return nuevo(f);
     if (this.est.adapta) { const a = this.adapta(r, presion); if (a) return a; }
-    const heroe = PD.heroOf(this.li);
-    if (heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
+    if (this.est.humana) { const h = this.humana(r, presion); if (h) return h; }
+    const heroe = heroeDe(this.li);
+    if (!this.est.humana && heroe && this.permitidas.includes(heroe) && !T.some(t => t.def.hero) && r >= 5 && !vet[heroe] && (!presion || g.money >= PD.TOWERS[heroe].cost)) return nuevo(heroe);
+    // Ley de la Noche: un Faro para empezar y otro cada cuatro torres de daño (las demás se
+    // ponen donde alumbran, ver sitio)
+    if (g.ley === 'noche' && !CIEGO && !vet.faro && PD.towersFor(this.li).includes('faro') && dmg.length) {
+      const faros = T.filter(t => t.type === 'faro').length;
+      if (faros < 1 + Math.floor(dmg.length / 4) && (!presion || g.money >= PD.TOWERS.faro.cost)) return nuevo('faro');
+    }
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
-    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto) return nuevo('huerto');
+    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana) return nuevo('huerto');
     const totems = T.filter(t => t.type === 'totem').length;
-    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760)) return nuevo('totem');
+    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760) && !this.est.humana) return nuevo('totem');
 
     // Lo demás compite por eficiencia: daño que suma cada oro. Cada torre sube por su plan
     // (mirando hasta tres pasos adelante, para que llegue a las mejoras grandes); la torre
@@ -427,6 +519,48 @@ class Bot {
     return alt && (presion || alt.sc >= best.sc * 0.75) ? alt : best;
   }
 
+  // ---- «humana»: tener lo que tienen las personas a esta altura de la partida ----
+  // Las cuotas del libro (cada 5 rondas: cuántas torres de cada tipo y cuántos niveles
+  // por torre, en promedio) son las de este reino o, si nadie llegó tan lejos en él, las
+  // de todos, escaladas a lo que este reino vende. Va primero lo que más falta (en
+  // proporción); si no alcanza, ahorra para eso, salvo bajo presión.
+  humana(r, presion) {
+    const g = this.game, T = g.towers, vet = this.vetadas, C = LIBRO.cuotas;
+    const rr = Math.min(100, Math.ceil(r / 5) * 5), slug = PD.Prueba.REINOS[this.li];
+    const propia = C[slug] && C[slug][rr], fila = propia || (C['*'] && C['*'][rr]);
+    if (!fila) return null;
+    const heroe = heroeDe(this.li);
+    const tipo = x => (x === 'heroe' ? heroe : x);
+    const vale = x => x && this.permitidas.includes(x) && !vet[x];
+    let escala = 1;
+    if (!propia) {
+      let todo = 0, aqui = 0;
+      for (const [x, [n]] of Object.entries(fila)) { todo += n; if (vale(tipo(x))) aqui += n; }
+      escala = aqui ? Math.min(2, todo / aqui) : 1;
+    }
+    const acc = [];
+    for (const [x, [n, niv]] of Object.entries(fila)) {
+      const ty = tipo(x);
+      if (!vale(ty)) continue;
+      const mias = T.filter(t => (x === 'heroe' ? t.def.hero : t.type === ty));
+      const quiere = Math.round(n * escala * (x === 'heroe' ? 1 / escala : 1));
+      if (mias.length < quiere) acc.push({ k: 'place', type: ty, cost: PD.TOWERS[ty].cost, falta: (quiere - mias.length) / quiere });
+      const nivel = Math.round(niv);
+      for (const t of mias) {
+        const tn = t.tiers[0] + t.tiers[1];
+        if (tn >= nivel) continue;
+        const p = this.pasosPlan(t)[0];
+        if (p === undefined || !g.canUpgrade(t, p)) continue;
+        acc.push({ k: 'up', t, p, cost: g.upgradeCost(t, p), falta: (nivel - tn) / nivel });
+      }
+    }
+    if (!acc.length) return null;
+    acc.sort((a, b) => b.falta - a.falta || a.cost - b.cost);
+    const best = acc[0];
+    if (best.cost <= g.money || !presion) return best;
+    return acc.find(a => a.cost <= g.money) || best;
+  }
+
   // ---- «adapta»: las respuestas a las mecánicas de la segunda era ----
   adapta(r, presion) {
     const g = this.game, T = g.towers, vet = this.vetadas, puede = x => this.permitidas.includes(x) && !vet[x];
@@ -451,32 +585,72 @@ class Bot {
 
   // ---- anticipación: probar varios planes de gasto contra la ronda que viene ----
   // copia del bot sobre una copia del juego (la misma foto, otra semilla)
+  // («humana» rehace el juego de verdad desde la misma foto y con la misma semilla antes de
+  // cada ronda, así que la copia juega exactamente lo que jugaría él con ese plan)
   copia() {
     const c = Object.create(Bot.prototype);
     Object.assign(c, this);
-    const ids = this.game.towers.map(t => t.id);
-    c.game = new PD.Game(this.li, JSON.parse(JSON.stringify(this.game.snapshot())), (this.semilla ^ 0x9e3779b9) >>> 0);
-    c.mem = new Map();
-    c.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); c.mem.set(t.id, { ...m, dealt: m.dealt.slice() }); });
+    const exacta = this.est.humana;
+    c.game = null; c.gTorres = this.gTorres && this.gTorres.slice();
+    c.rehaceDe(JSON.parse(JSON.stringify(this.game.snapshot())), exacta ? this.game.rs : (this.semilla ^ 0x9e3779b9) >>> 0, this.game);
     c.dens = this.dens.slice(); c.cal = { ...this.cal }; c.vetadas = {};
     return c;
   }
-  // gasta con ese plan en la copia y juega ahí la ronda siguiente
-  ensaya(modo) {
-    const c = this.copia();
-    c.modo = modo; c.turno();
-    const g = c.game, v0 = g.lives;
-    g.startRound();
-    let pasos = 0, av = 0;
-    while (g.active && !g.over && pasos < 60 * 900) {
-      g.update(STEP); pasos++;
-      if (pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
+  // gasta con ese plan: el guion (adelantado n rondas con «adelantaN») y, si ya no hay guion
+  // o el plan es otro, por su cuenta
+  // «ahorra» no gasta nada; `acc`, las compras del rescate (abajo), van al final
+  planea(modo, acc) {
+    const r = this.game.round + 1, adel = /^adelanta(\d+)$/.exec(modo);
+    if (modo !== 'ahorra') {
+      const enGuion = this.sigueGuion(adel ? r + +adel[1] : r);
+      if (!enGuion || (modo !== 'normal' && !adel)) this.turno();
     }
-    return { perdidas: v0 - g.lives + (g.over ? 1000 : 0), av, oro: g.money };
+    if (acc) this.aplica(acc);
+  }
+  // compras sueltas: {k: 'p', type, x, y} poner, {k: 'u', i, p} mejorar la torre n.º i
+  // (el orden de g.towers es el mismo en la copia y en el juego de verdad)
+  aplica(acc) {
+    const g = this.game;
+    for (const a of acc) {
+      if (a.k === 'p') {
+        const t = g.canPlace(a.type, a.x, a.y) ? g.place(a.type, a.x, a.y) : null;
+        if (t) { this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 }); if (!APARTE[a.type]) this.marca(t); }
+      } else {
+        const t = g.towers[a.i];
+        if (t && g.canUpgrade(t, a.p)) g.upgrade(t, a.p);
+        if (t && a.k === 'u2' && g.canUpgrade(t, a.q)) g.upgrade(t, a.q);
+      }
+    }
+  }
+  // Gasta con ese plan en la copia y juega ahí la ronda siguiente. «humana» mira una ronda
+  // más (`--horizonte`, 2 por defecto) sin más compras que las del guion: lo que pierda en
+  // ella cuenta la mitad. Así una compra que rinde dos rondas le gana a una que salva una.
+  ensaya(modo, acc) {
+    const c = this.copia();
+    c.modo = modo; c.planea(modo, acc);
+    const g = c.game, H = this.est.humana ? HORIZONTE : 1;
+    let perdidas = 0, av = 0;
+    for (let h = 0; h < H && !g.over && g.round < PD.MAX_ROUND; h++) {
+      if (h) { c.vetadas = {}; c.planea(modo === 'ahorra' ? 'ahorra' : 'normal'); }
+      const v0 = g.lives;
+      if (g.pactoPendiente()) eligePacto(g);
+      g.startRound();
+      let pasos = 0;
+      while (g.active && !g.over && pasos < 60 * 900) {
+        c.enRonda(pasos);
+        g.update(STEP); pasos++;
+        if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
+        if (!h && pasos % 15 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > av) av = pr; }
+      }
+      perdidas += (v0 - g.lives + (g.over ? 1000 : 0)) * (h ? 0.5 : 1);
+      if (!h) var oro = g.money;
+    }
+    return { perdidas, av, oro };
   }
   // Si el plan normal pasa la ronda sin pérdidas, ese. Si no, el que la pase guardando más
   // oro; y si ninguno la pasa limpia, el que menos pierde (y menos deja avanzar).
   elegir() {
+    if (this.est.humana && !args.includes('--sin-anticipa') && !this.op.sinAnticipa) return this.elegirHumana();
     if (!args.includes('--anticipa')) return 'normal';
     const normal = this.ensaya('normal');
     if (normal.perdidas === 0 && normal.av < 0.85) return 'normal';
@@ -486,17 +660,87 @@ class Bot {
     return res.sort((a, b) => a[1].perdidas - b[1].perdidas || a[1].av - b[1].av)[0][0];
   }
 
+  // «humana»: el primer plan (en el orden de MODOS_GUION) que pasa la ronda sin perder vidas;
+  // si ninguno, el que menos pierde. Fuera del guion no se prueban los «adelanta».
+  // Con guion, gastar por su cuenta le quita oro a lo que el guion compra después y lo
+  // desarma: solo si ni el guion ni adelantarlo bastan y se perderían bastantes vidas.
+  // Con guion: el guion o adelantarlo. Sin guion: no gastar nada. Si así pierde vidas (con
+  // guion, bastantes: desviarse le quita oro a lo que el guion compra después), el rescate
+  // busca las compras más baratas que salvan la ronda; si ni así, los planes de gasto de la
+  // anticipación. Gana el que menos pierde.
+  elegirHumana() {
+    const r = this.game.round + 1, queda = this.guion && r <= GUION && (this.gi || 0) < this.guion.length;
+    const umbral = queda ? Math.max(1, Math.round(PD.LEVELS[this.li].lives * UMBRAL)) : 1;
+    let mejor = null;
+    const prueba = (m, acc) => {
+      const x = this.ensaya(m, acc);
+      if (process.env.PD_DEBUG) console.log(`    r${r} ${m}${acc ? '+' + acc.length : ''}: pierde ${x.perdidas}, oro ${Math.round(x.oro)}`);
+      if (!mejor || x.perdidas < mejor.x.perdidas || x.perdidas === mejor.x.perdidas && x.av < mejor.x.av) mejor = { m, acc, x };
+      return x;
+    };
+    for (const m of queda ? MODOS_GUION.filter(m => /^(normal|adelanta)/.test(m)) : [BASE]) if (prueba(m).perdidas === 0) return this.toma(mejor);
+    if (mejor.x.perdidas < umbral) return this.toma(mejor);
+    const base = mejor.m, acc = this.rescate(base, mejor.x);
+    if (acc.length) prueba(base, acc);
+    if (mejor.x.perdidas === 0) return this.toma(mejor);
+    for (const m of MODOS) if (prueba(m).perdidas === 0) break;
+    return this.toma(mejor);
+  }
+  toma(x) { this.plan = x.acc || null; return x.m; }
+  // Rescate: de a una compra (una torre en el mejor sitio libre o el próximo paso del plan de
+  // una torre), la más barata que salva la ronda; si ninguna, la que más vidas salva por oro.
+  rescate(modo, x0) {
+    const acc = [];
+    let best = x0;
+    for (let it = 0; it < 8 && best.perdidas > 0; it++) {
+      const c0 = this.copia(); c0.planea(modo, acc);
+      const g = c0.game, cands = [];
+      for (const type of this.permitidas) {
+        if (PD.TOWERS[type].hero && g.towers.some(t => t.def.hero)) continue;
+        const cost = g.towerCost ? g.towerCost(type) : PD.TOWERS[type].cost;
+        if (cost > g.money) continue;
+        const s = c0.sitio(type);
+        if (s) cands.push({ k: 'p', type, x: s[0], y: s[1], cost });
+      }
+      g.towers.forEach((t, i) => {
+        const [p, q] = c0.pasosPlan(t);
+        if (p === undefined || !g.canUpgrade(t, p)) return;
+        const c1 = g.upgradeCost(t, p);
+        if (c1 <= g.money) cands.push({ k: 'u', i, p, cost: c1 });
+        // y dos pasos de una vez (las mejoras grandes no se ven de a uno)
+        if (q !== undefined) {
+          const tt = { ...t, tiers: t.tiers.slice() }; tt.tiers[p]++;
+          const c2 = c1 + g.upgradeCost(tt, q);
+          if (c2 <= g.money) cands.push({ k: 'u2', i, p, q, cost: c2 });
+        }
+      });
+      const res = cands.map(a => [a, this.ensaya(modo, acc.concat([a]))]);
+      const salva = res.filter(([, x]) => x.perdidas === 0).sort((a, b) => a[0].cost - b[0].cost)[0];
+      if (salva) { acc.push(salva[0]); best = salva[1]; break; }
+      let el = null, sc = 0;
+      for (const [a, x] of res) { const v = (best.perdidas - x.perdidas) / a.cost; if (v > sc) { sc = v; el = [a, x]; } }
+      if (!el) break;
+      acc.push(el[0]); best = el[1];
+    }
+    return acc;
+  }
+
   // Una partida entera. Devuelve el resumen.
   juega(verRondas) {
     const filas = [];
     let g = this.game, reintentos = 3, primeraDerrota = null, foto = null;
     const vidasPerdidas = new Array(10).fill(0);
-    while (g.round < PD.MAX_ROUND) {
+    while (g.round < (this.op.hasta || PD.MAX_ROUND)) {
       this.vetadas = {};
+      if (this.est.humana) { this.rehaceDe(JSON.parse(JSON.stringify(g.snapshot())), g.rs, g); g = this.game; }
+      this.plan = null;
       this.modo = this.elegir();
       this.vetadas = {};
-      this.turno();
+      this.planea(this.modo, this.plan);
       foto = JSON.stringify(g.snapshot());
+      // lo del bot al empezar la ronda (un reintento vuelve aquí: el guion y las torres de la
+      // foto, aunque a mitad de la ronda haya vendido o puesto alguna)
+      const fotoBot = { ids: g.towers.map(t => t.id), mem: new Map([...this.mem].map(([k, m]) => [k, { ...m, dealt: m.dealt.slice() }])), gi: this.gi, gTorres: this.gTorres && this.gTorres.slice() };
       for (const t of g.towers) this.mem.get(t.id).antes = t.dealt;
       const r = g.round + 1;
       // --ayuda N: hasta la ronda N las vidas no se acaban (se cuentan igual las que se pierden)
@@ -507,10 +751,13 @@ class Bot {
       g.emit = ev => { if (ev.type === 'leak') fugas[ev.quien] = (fugas[ev.quien] || 0) + ev.amount; };
       const leak = g.leak.bind(g);
       g.leak = e => { const ev = g.emit; g.emit = x => ev({ ...x, quien: e.type }); leak(e); g.emit = ev; };
+      if (g.pactoPendiente()) { eligePacto(g); this.turno(); }
       g.startRound();
       let pasos = 0, avance = 0;
       while (g.active && !g.over && pasos < 60 * 900) {
+        this.enRonda(pasos);
         g.update(STEP); pasos++;
+        if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
         if (pasos % 10 === 0) for (const e of g.enemies) { const pr = e.dist / g.paths[e.path].len; if (pr > avance) avance = pr; }
       }
       for (const t of g.towers) { const m = this.mem.get(t.id); m.dealt.push(t.dealt - m.antes); }
@@ -529,7 +776,8 @@ class Bot {
         if (reintentos <= 0) break;
         reintentos--;
         const snap = JSON.parse(foto); snap.continues = reintentos;
-        this.recarga(snap);
+        this.mem = fotoBot.mem; this.gi = fotoBot.gi; this.gTorres = fotoBot.gTorres;
+        this.recarga(snap, { towers: fotoBot.ids.map(id => ({ id })) });
         g = this.game;
       }
     }
@@ -545,19 +793,87 @@ class Bot {
       filas
     };
   }
+  // «humana», al principio: la mejor partida de una persona en este reino, jugada a jugada
+  // (las de las rondas que ya tocan, en orden; si no alcanza el oro, ahorra como ella).
+  // Devuelve si sigue en el guion (entonces no gasta por su cuenta).
+  // la mejor partida de una persona en este reino, si alguien lo ganó
+  guionPropio() {
+    const gu = LIBRO.guiones && LIBRO.guiones[PD.Prueba.REINOS[this.li]];
+    return gu ? gu.jugadas : null;
+  }
+  // Hace lo del guion hasta la ronda r. Lo que la persona hizo durante una ronda espera a esa
+  // ronda y a su paso (`pasos`, los de la ronda en curso; sin él, se está entre rondas).
+  sigueGuion(r, pasos) {
+    if (!this.est.humana || !this.guion || r > GUION) return false;
+    const g = this.game, J = this.guion, cur = g.round + 1;
+    this.gi = this.gi || 0; this.gTorres = this.gTorres || [];
+    const torre = n => { const id = this.gTorres[n]; return id === undefined ? null : g.towers.find(t => t.id === id) || null; };
+    // Lo que el bot puso por su cuenta (al rescatar una ronda) le quita oro al guion: con el
+    // guion de este reino, se vende si con eso alcanza lo que toca.
+    const extras = () => g.towers.filter(t => !this.gTorres.includes(t.id) && !t.def.hero).sort((x, y) => g.sellValue(x) - g.sellValue(y));
+    const alcanza = costo => g.money + extras().reduce((a, t) => a + g.sellValue(t), 0) >= costo;
+    const paga = costo => {
+      if (g.money >= costo) return true;
+      if (!alcanza(costo)) return false;
+      for (const t of extras()) { if (g.money >= costo) break; g.sell(t); this.mem.delete(t.id); }
+      return true;
+    };
+    while (this.gi < J.length && J[this.gi][0] <= r) {
+      const [ronda, cuando, k, a, b, c] = J[this.gi];
+      if (process.env.PD_DEBUG > 1) console.log(`      guion ${this.gi}: ${JSON.stringify(J[this.gi])} oro ${Math.round(g.money)} paso ${pasos}`);
+      if (cuando >= 0 && ronda >= cur && (pasos === undefined || ronda > cur || cuando > pasos)) return true;
+      if (k === 'p') {
+        if (!paga(g.towerCost ? g.towerCost(a) : PD.TOWERS[a].cost)) return true;
+        const s = b === undefined ? this.sitio(a) : [b, c];
+        const t = s && g.canPlace(a, s[0], s[1]) ? g.place(a, s[0], s[1]) : null;
+        if (t) {
+          this.mem.set(t.id, { cov: this.cobertura(t.x, t.y, t.s.range || 110, true), dealt: [], antes: 0 });
+          if (!APARTE[a]) this.marca(t);
+        }
+        this.gTorres.push(t ? t.id : -1);
+      } else if (k === 'u') {
+        const t = torre(a);
+        if (t && g.canUpgrade(t, b)) { if (!paga(g.upgradeCost(t, b))) return true; g.upgrade(t, b); }
+      } else if (k === 'v') {
+        // vender para pagar lo que sigue: solo si con lo vendido alcanza (si no, se quedaría
+        // sin esas torres y sin lo que iba a comprar)
+        let oro = g.money, i = this.gi;
+        for (; i < J.length && J[i][2] === 'v'; i++) { const v = torre(J[i][3]); if (v) oro += g.sellValue(v); }
+        const sig = J[i];
+        if (sig) {
+          const tt = sig[2] === 'u' ? torre(sig[3]) : null;
+          const costo = sig[2] === 'p' ? (g.towerCost ? g.towerCost(sig[3]) : PD.TOWERS[sig[3]].cost) : tt && g.canUpgrade(tt, sig[4]) ? g.upgradeCost(tt, sig[4]) : 0;
+          if (!alcanza(costo - (oro - g.money))) return true;
+        }
+        const t = torre(a); if (t) { g.sell(t); this.mem.delete(t.id); }
+      }
+      else if (k === 'm') { const t = torre(a); if (t) t.mode = b; }
+      this.gi++;
+    }
+    return true;
+  }
+  // durante la ronda: lo que el guion hace a mitad de ella
+  enRonda(pasos) { if (this.guion && this.est.humana && (this.gi || 0) < this.guion.length) this.sigueGuion(this.game.round + 1, pasos); }
   // reintentar: rehace el motor desde la foto del comienzo de la ronda (otra semilla)
-  recarga(snap) {
-    const ids = this.game.towers.map(t => t.id);
-    this.game = new PD.Game(this.li, snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0);
-    const mem = new Map();
-    this.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); mem.set(t.id, { ...m, dealt: m.dealt.slice() }); });
+  recarga(snap, antes) {
+    this.rehaceDe(snap, (this.semilla + 7919 * (4 - snap.continues)) >>> 0, antes || this.game);
+  }
+  // el juego rehecho desde una foto de `antes` (sus torres, en el mismo orden), con lo que el
+  // bot recuerda de cada una pasado a los ids nuevos
+  rehaceDe(snap, semilla, antes) {
+    const ids = antes.towers.map(t => t.id);
+    this.game = new PD.Game(this.li, snap, semilla);
+    const mem = new Map(), nuevo = new Map();
+    this.game.towers.forEach((t, i) => { const m = this.mem.get(ids[i]); mem.set(t.id, { ...m, dealt: m.dealt.slice() }); nuevo.set(ids[i], t.id); });
     this.mem = mem;
+    if (this.gTorres) this.gTorres = this.gTorres.map(id => (nuevo.has(id) ? nuevo.get(id) : -1));
   }
 }
 
 function main() {
   const reinoArg = opt('reino', 'todos'), estArg = opt('estrategia', 'mixta');
-  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg === 'nuevos' ? [5, 6, 7, 8, 9] : reinoArg === 'diez' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : reinoArg.split(',').map(Number);
+  const reinos = reinoArg === 'todos' ? [0, 1, 2, 3, 4] : reinoArg === 'nuevos' ? [5, 6, 7, 8, 9] : reinoArg === 'diez' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    : reinoArg === 'tercera' ? [10, 11, 12, 13, 14] : reinoArg === 'quince' ? [...Array(15).keys()] : reinoArg.split(',').map(Number);
   const ests = estArg === 'todas' ? Object.keys(ESTRATEGIAS) : estArg.split(',');
   const semillas = String(opt('semilla', '1')).split(',').map(Number);
   const res = [];

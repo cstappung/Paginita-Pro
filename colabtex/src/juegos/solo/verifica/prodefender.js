@@ -1,8 +1,8 @@
 /* Verificador antitrampas de PRO DEFENDER (ver docs/antitrampas.md y
    docs/antitrampas/prodefender.md).
 
-   Diez tablas, una por reino (los de la segunda era desde el día en que
-   se abren, levels.js `abre`): `club-prodefender-<reino>`, puntos = la
+   Quince tablas, una por reino (los de la segunda y la tercera era desde
+   el día en que se abren, levels.js `abre`): `club-prodefender-<reino>`, puntos = la
    ronda más alta superada en una partida (1–100), tiempo = los ms de juego
    que llevaba esa partida al superarla (los pasos del motor / 60).
 
@@ -30,15 +30,16 @@ export const PRUEBA = 1;
    las bajaban todas. */
 export const UNA_PRUEBA = true;
 
-const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse)$/;
-const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse'];
-const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-7';
+const CATEGORIA = /^club-prodefender-(prado|dunas|glaciar|caldera|vacio|pantano|cumbres|fosa|engranajes|eclipse|necropolis|esporas|espejos|archipielago|noche)$/;
+const REINOS = ['prado', 'dunas', 'glaciar', 'caldera', 'vacio', 'pantano', 'cumbres', 'fosa', 'engranajes', 'eclipse',
+  'necropolis', 'esporas', 'espejos', 'archipielago', 'noche'];
+const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-9';
 
 /* La prueba tal como se guarda (v: 2). El juego manda la de siempre (v: 1,
    cada jugada un arreglo [paso, código, …], prueba.js) y la página la guarda
    compacta: todas las jugadas en un solo texto, cada una con una letra por
    código (A colocar, B mejorar, C vender, D objetivo, E ronda, F recargar,
-   G pinchos) seguida de sus números en base 36 separados por comas. El paso
+   G pinchos; la tercera era suma H pacto e I Poder del Reino) seguida de sus números en base 36 separados por comas. El paso
    va como lo que avanzó desde la jugada anterior del mismo tramo (tras una
    recarga el tramo nuevo empieza en 0), que casi siempre son dos o tres
    letras en vez de seis cifras.
@@ -46,7 +47,7 @@ const RUTA = 'juegos/club/prodefender/js/verificador.js?v=pd-7';
    Pesa menos de la mitad y `expande` la devuelve exacta a la v: 1 antes de
    rehacerla. El juego y su trabajador no cambian: un iframe o un
    trabajador viejo en caché nunca ven la v: 2 (no hay castigo por caché). */
-const LETRAS = 'ABCDEFG';
+const LETRAS = 'ABCDEFGHI';
 function aTexto(p) {
   let base = 0, t = '';
   for (const j of p.j) {
@@ -70,7 +71,7 @@ export function compacta(p) {
 export function expande(p) {
   if (!p || typeof p !== 'object' || p.v !== 2) return p;
   if (typeof p.j !== 'string') return null;
-  const partes = p.j.match(/[A-G][-0-9a-z,]*/g) || [];
+  const partes = p.j.match(/[A-I][-0-9a-z,]*/g) || [];
   if (partes.join('').length !== p.j.length) return null;
   const j = [];
   let base = 0;
