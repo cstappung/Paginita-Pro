@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El perfil de la tarjeta de video</title>
+<link rel="stylesheet" href="../../estilo.css">
+</head>
+<body>
+<h1>El perfil de la tarjeta de video: <span>contar y medir cada pasada sin cambiar el dibujo</span></h1>
+<p>Prueba <code>web/navegador/perfil-gpu.mjs</code> (bitácora §115: el Oppo Find X9 Pro tardaba 31–35 ms por cuadro en la
+  tarjeta) con <b>WebGPU de verdad</b> (en una PC sin tarjeta, la de software de Chrome): se instala antes de crear el
+  dispositivo, se dibujan 10 cuadros de 3 pasadas (una grande de 640×528 con 50 dibujos, una chica de 160×132 con 3, otra
+  grande con 1) más subidas y una copia, y se comprueba el conteo, los tiempos de cada pasada (marcas de la propia
+  tarjeta) y que el dibujo sale igual que sin el perfil.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<script type="module">
+import { prueba } from '../../comun.js';
+import { instalarPerfilGpu } from '/web/navegador/perfil-gpu.mjs';
+const { ok, nota, fin } = prueba('perfil-gpu', 'El perfil de la tarjeta de video (WebGPU de verdad, sin el juego)');
+const espera = ms => new Promise(r => setTimeout(r, ms));
+
+try {
+  const perfil = instalarPerfilGpu({ tiempos: true });       // (antes de crear el dispositivo, como en la página)
+  const adaptador = navigator.gpu && await navigator.gpu.requestAdapter();
+  if (!adaptador) { ok('hay WebGPU en este navegador (si no, esta prueba no se puede hacer)', false); throw null; }
+  const dev = await adaptador.requestDevice();
+  const errores = []; dev.onuncapturederror = e => errores.push(e.error?.message || String(e));
+  ok('el dispositivo se pidió con las marcas de tiempo (timestamp-query) porque la tarjeta las tiene',
+     perfil.conMarcas === adaptador.features.has('timestamp-query') && dev.features.has('timestamp-query') === adaptador.features.has('timestamp-query'));
+  // una receta mínima: un triángulo que tapa todo, rojo
+  const modulo = dev.createShaderModule({ code: `
+    @vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+      var p = array<vec2f, 3>(vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3)); return vec4f(p[i], 0, 1); }
+    @fragment fn f() -> @location(0) vec4f { return vec4f(1, 0, 0, 1); }` });
+  const receta = dev.createRenderPipeline({ layout: 'auto', vertex: { module: modulo, entryPoint: 'v' },
+    fragment: { module: modulo, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] } });
+  const textura = (w, h) => dev.createTexture({ size: [w, h], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST });
+  const grande = textura(640, 528), chica = textura(160, 132), destino = textura(64, 64);
+  const buf = dev.createBuffer({ size: 4096, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const pasada = (enc, tex, dibujos, limpiar) => {
+    const p = enc.beginRenderPass({ colorAttachments: [{ view: tex.createView(), loadOp: limpiar ? 'clear' : 'load', clearValue: [0, 0, 1, 1], storeOp: 'store' }] });
+    p.setPipeline(receta);
+    for (let i = 0; i < dibujos; i++) p.draw(3);
+    p.end();
+  };
+  ok('las marcas se prenden', perfil.medirTiempos(true) === adaptador.features.has('timestamp-query'));
+  for (let c = 0; c < 10; c++) {
+    dev.queue.writeBuffer(buf, 0, new Uint8Array(4096));
+    dev.queue.writeTexture({ texture: destino }, new Uint8Array(64 * 64 * 4), { bytesPerRow: 256 }, [64, 64]);
+    const enc = dev.createCommandEncoder();
+    pasada(enc, grande, 50, true);
+    pasada(enc, chica, 3, true);
+    pasada(enc, grande, 1, false);
+    enc.copyTextureToTexture({ texture: chica }, { texture: destino }, [64, 64]);
+    dev.queue.submit([enc.finish()]);
+  }
+  await dev.queue.onSubmittedWorkDone(); await espera(300);
+  const f = perfil.foto();
+  ok('el conteo: 30 pasadas, 540 dibujos, 30 recetas, 10 envíos, 1 copia por cuadro', f.pasadas === 30 && f.dibujos === 540 && f.recetas === 30 && f.envios === 10 && f.copias === 10, JSON.stringify(f));
+  ok('…y lo subido: 20 subidas, 4 KB + 16 KB por cuadro', f.subidas === 20 && f.bytes === 10 * (4096 + 256 * 64), `${f.bytes} bytes`);
+  const t = perfil.tiempos();
+  nota('tiempos: ' + t.map(x => `#${x.n} ${x.tam} ${x.ms} ms ${x.dibujos} dib ×${x.veces}`).join(' | '));
+  if (adaptador.features.has('timestamp-query')) {
+    const de = n => t.find(x => x.n === n);
+    ok('los tiempos: las 3 pasadas, cada una con su tamaño, sus dibujos y 10 veces', t.length === 3 && de(0)?.tam === '640×528' && de(1)?.tam === '160×132' && de(2)?.tam === '640×528' &&
+       de(0).dibujos === 50 && de(1).dibujos === 3 && de(2).dibujos === 1 && t.every(x => x.veces === 10 && x.ms >= 0));
+    ok('la pasada grande de 50 dibujos tarda más que la chica de 3', de(0).ms >= de(1).ms, `${de(0).ms} ms contra ${de(1).ms} ms`);
+  } else nota('esta tarjeta no tiene marcas de tiempo: solo se prueba el conteo');
+  // el dibujo salió igual: la grande quedó roja (las marcas no cambian lo que se dibuja)
+  const lectura = dev.createBuffer({ size: 256 * 1, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  const enc = dev.createCommandEncoder();
+  enc.copyTextureToBuffer({ texture: grande, origin: [10, 10] }, { buffer: lectura, bytesPerRow: 256 }, [1, 1]);
+  perfil.medirTiempos(false);
+  dev.queue.submit([enc.finish()]);
+  await lectura.mapAsync(GPUMapMode.READ);
+  const px = [...new Uint8Array(lectura.getMappedRange()).slice(0, 4)];
+  ok('el dibujo sale igual con el perfil (rojo)', px.join() === '255,0,0,255', px.join());
+  ok('sin errores de WebGPU ni del perfil', !errores.length && !perfil.fallo, errores.join(' | ') + (perfil.fallo || ''));
+} catch (e) {
+  if (e !== null) ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+fin();
+</script>
+</body>
+</html>
