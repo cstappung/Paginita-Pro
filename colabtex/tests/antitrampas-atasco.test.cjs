@@ -256,3 +256,58 @@ test('Anti-bot: personas de verdad pasan (teclado, mando, muy rápidas, muy pare
  const p0=partida(0,soluciones[0],()=>500);
  await ok(dato(3,p0.ms),{v:1,n:{0:p0.texto}});
 });
+
+/* La base: una fila de antes de las pruebas (sin nada en soloPruebas) no
+   tiene partidas que traer, y la tabla quedaba clavada aunque se ganaran
+   niveles nuevos (184 ★ en el juego, 37 vueltos a ganar, fila de 150). Esa
+   fila pasa a ser la base: los primeros ⌈p/3⌉ niveles, y encima los de ahí
+   en adelante que tienen partida. */
+test('Atasco: la fila sin prueba es la base, y encima suman los niveles nuevos',async()=>{
+ const {esTrampa}=carga('src/juegos/castigo.js');
+ // Lo del caso real: 50 niveles ganados antes de las pruebas (fila de 150), y con esta versión el 1, del 51 al 61 y uno del tercer piso.
+ let prog={v:1,n:{}};for(let i=0;i<50;i++)prog.n[i]=[3,NIVELES[i][1],5000];
+ const r=rng(21);
+ for(const i of [0,...Array.from({length:11},(_,k)=>50+k),80]){const p=partida(i,soluciones[i],()=>700+Math.floor(r()*900));prog=M.anotaPrueba(M.anota(prog,i,p.movs,p.ms,NIVELES[i][1]).prog,i,p.texto);}
+ const sola=M.resumenPruebas(prog.p,N.pisos);
+ assert.equal(sola.estrellas,13*3,'sin base, la tabla solo ve lo vuelto a ganar');
+ const fila={puntos:150,tiempo:250000,partida:'vieja'},base=M.limpiaBase({p:fila.puntos,t:fila.tiempo},720);
+ const c=M.resumenConBase(prog.p,N.pisos,base);
+ assert.equal(c.desde,50);
+ assert.equal(c.estrellas,150+12*3,'la base y los 12 niveles de arriba; el 1 ya está en la base');
+ assert.equal(c.estrellas,M.totales(prog).estrellas,'lo mismo que se ve en el edificio');
+ assert.ok(!('0' in c.contados));
+ const n={};for(const k of Object.keys(c.contados))n[k]=prog.p[k];
+ const pr={v:3,b:base,n},d=dato(c.estrellas,c.tiempo);
+ // Auditoría (sin la fila a mano): vale lo que valía la fila vieja.
+ await ok(d,pr);
+ // En vivo: solo con TU fila sin prueba, con ese puntaje y ese tiempo.
+ const en=async(leida,re)=>{const m=await V.verificaClub('atasco',d,pr,{uid:'u',filaPropia:async()=>leida});if(re===undefined)assert.equal(m,null);else{assert.match(m,re);assert.equal(esTrampa({m,vivo:true}),false,'no castiga: puede ser la tabla que cambió');}};
+ await en({fila,d:''});
+ await en({fila:{...fila,puntos:151},d:''},/^No se pudo comprobar la base/);
+ await en({fila:{...fila,tiempo:1},d:''},/^No se pudo comprobar la base/);
+ await en({fila:null,d:''},/^No se pudo comprobar la base/);
+ await en({fila,d:JSON.stringify({v:2,n:{0:prog.p[0]}})},/^No se pudo comprobar la base/,'una fila con prueba no es base');
+ // La fila que la base hizo subir guarda la base en su prueba: se sigue con esa.
+ await en({fila:{puntos:c.estrellas,tiempo:c.tiempo,partida:'nueva'},d:JSON.stringify(pr)});
+ await en({fila:{puntos:c.estrellas,tiempo:c.tiempo,partida:'nueva'},d:JSON.stringify({...pr,b:{p:149,t:fila.tiempo}})},/^No se pudo comprobar la base/);
+ const m=await V.verificaClub('atasco',d,pr,{filaPropia:async()=>{throw new Error('sin red');}});assert.match(m,/^No se pudo comprobar/);
+ // Trampas con la base.
+ await no(dato(c.estrellas+3,c.tiempo),pr,/no cuadran/);
+ await no(d,{v:3,b:base,n:{...n,0:prog.p[0]}},/nivel 1 ya está dentro de la base/);
+ await no(dato(720,3000),{v:3,b:{p:700,t:1000},n:{239:partida(239,soluciones[239],()=>900).texto}},/no es creíble/);
+ await no(d,{v:3,n},/base/);
+ await no(d,{v:2,b:base,n},/forma/);
+ await no(d,{v:3,b:{p:0,t:5},n},/base/);
+ await no(d,{v:3,b:{p:'150',t:fila.tiempo},n},/base/);
+ // Quien vuelve a ganar todo lo de abajo deja de necesitar la base.
+ for(let i=1;i<50;i++){const p=partida(i,soluciones[i],()=>800);prog=M.anotaPrueba(M.anota(prog,i,p.movs,p.ms,NIVELES[i][1]).prog,i,p.texto);}
+ assert.equal(M.resumenPruebas(prog.p,N.pisos).estrellas,M.resumenConBase(prog.p,N.pisos,base).estrellas,'sin base ya da lo mismo');
+});
+
+test('Atasco: la página le pasa al verificador tu fila, y el juego manda la base',()=>{
+ const fs=require('node:fs');
+ const club=fs.readFileSync(path.join(__dirname,'../src/juegos/solo/club.js'),'utf8'),juego=fs.readFileSync(path.join(D,'game.js'),'utf8');
+ assert.equal((club.match(/filaPropia:\(\)=>filaPropia\(dato\.categoria\)/g)||[]).length,2,'en vivo y al volver a verificar lo pendiente');
+ assert.match(juego,/v: M\.PRUEBA_VERSION_BASE, b: r\.base, n/);
+ assert.match(juego,/!texto && fila \? M\.limpiaBase/,'una fila sin prueba pasa a ser la base');
+});

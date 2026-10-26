@@ -359,7 +359,9 @@
   /* Versión 2: cada nivel con su partida cuenta solo, sin pedir que estuviera
      «abierto» según las otras (ver resumenPruebas). El verificador acepta las
      dos: una de versión 1 manda justo el subconjunto que la 2 también cuenta. */
-  const PRUEBA_VERSION = 2, PRUEBA_VERSIONES = [1, 2];
+  /* Versión 3: la de una fila de antes de las pruebas (ver resumenConBase):
+     lleva además `b`, la base de esa fila. */
+  const PRUEBA_VERSION = 2, PRUEBA_VERSION_BASE = 3, PRUEBA_VERSIONES = [1, 2, 3];
   const PRUEBA_MAX_MOVS = 250;        // más que esto en un nivel no se guarda (es ★, y vuelve a jugarse)
   const PRUEBAS_MAX_LETRAS = 180000;  // todas juntas, con margen bajo los 200 000 de la cuenta y la prueba
   const TIEMPO_MAX = 604800000;       // una semana: el tope del tiempo de la tabla
@@ -525,12 +527,43 @@
     return { estrellas: e, tiempo: Math.min(TIEMPO_MAX, Math.max(1, t)), contados: cuenta, errores, bots };
   }
 
+  /* La base: las estrellas de una fila de la tabla que no tiene prueba
+     guardada (se escribió antes de que existieran, o mientras las reglas de
+     `soloPruebas` no estaban publicadas). Esas estrellas se ganaron con el
+     juego de entonces, que abría los niveles en orden, y sus partidas no
+     están en ninguna parte: ni en el navegador ni con la fila. Sin base,
+     quien tenía una fila de 150 sin prueba no subía nunca más (el juego
+     contaba solo lo vuelto a ganar, 37, y la tabla seguía en 150) aunque
+     ganara niveles nuevos. Con base, la fila se toma como los primeros
+     ⌈p/3⌉ niveles y encima cuentan los niveles de ahí en adelante que sí
+     tienen partida; los de abajo ya están en la base. `b` = {p, t}: las
+     estrellas y el tiempo de esa fila. null si no tiene esa forma. */
+  function limpiaBase(b, maxEstrellas) {
+    if (!b || typeof b !== "object" || Array.isArray(b)) return null;
+    const p = b.p, t = b.t;
+    if (!Number.isInteger(p) || p < 1 || (maxEstrellas && p > maxEstrellas)) return null;
+    if (!Number.isInteger(t) || t < 0 || t > TIEMPO_MAX) return null;
+    return { p, t };
+  }
+  const desdeBase = b => Math.ceil(b.p / 3);                      // el primer nivel que no está en la base
+  /* Lo que cuenta con una base: la base más los niveles desde ⌈p/3⌉ con su
+     partida. Lo mismo que resumenPruebas (errores y bots de todos), con
+     `base` y `desde` además. */
+  function resumenConBase(pruebas, paquetes, base) {
+    const r = resumenPruebas(pruebas, paquetes);
+    if (!base) return r;
+    const desde = desdeBase(base), contados = {};
+    let e = base.p, t = base.t;
+    for (const [k, v] of Object.entries(r.contados)) if (Number(k) >= desde) { contados[k] = v; e += v[0]; t += v[2]; }
+    return Object.assign({}, r, { estrellas: e, tiempo: Math.min(TIEMPO_MAX, Math.max(1, t)), contados, base, desde });
+  }
+
   return {
     TAM, FILA_SALIDA, ROJO, LIBRE, CONO, META,
     lee, texto, casilla, ocupacion, alcance, puede, aplica, movimientos, resuelto, clave,
     resuelve, limites, estrellas,
     limpiaProgreso, mezclaProgreso, anota, anotaPrueba, totales, pisoAbierto, nivelAbierto,
-    PRUEBA_VERSION, PRUEBA_VERSIONES, PRUEBA_MAX_MOVS, PRUEBAS_MAX_LETRAS, GAP_MIN, VENTANA, RITMO_MIN, REACCION_MIN, GESTO_MIN,
-    codificaPrueba, juegaPrueba, resumenPruebas, cuentaMovidas
+    PRUEBA_VERSION, PRUEBA_VERSION_BASE, PRUEBA_VERSIONES, PRUEBA_MAX_MOVS, PRUEBAS_MAX_LETRAS, GAP_MIN, VENTANA, RITMO_MIN, REACCION_MIN, GESTO_MIN,
+    codificaPrueba, juegaPrueba, resumenPruebas, cuentaMovidas, limpiaBase, desdeBase, resumenConBase
   };
 });

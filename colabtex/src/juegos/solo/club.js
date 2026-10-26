@@ -55,7 +55,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       /* Un pendiente de antes de la verificación (sin prueba) se descarta en
          silencio: no es trampa, es una versión vieja. */
       if(v.prueba===undefined||v.prueba===null)continue;
-      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria),ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
       if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
     }
@@ -156,6 +156,18 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       responde({dato:{...base,d:await pruebasFantasma.get(clave)}});
     }).catch(()=>responde({error:true}));
   }
+  /* Tu fila de una tabla y la prueba guardada con ella ({fila, d}; d = ''
+     si no hay fila, no tiene partida o su prueba no está). La lee el juego
+     (Atasco recupera sus partidas) y el verificador: la base de una prueba
+     de Atasco tiene que ser la de tu fila sin prueba (verifica/atasco.js).
+     Si la tabla aún no llegó por el oyente, se lee una vez. */
+  async function filaPropia(cat){
+    if(invitado||!fantasma)throw new Error('sin cuenta');
+    const fila=propios[cat]!==undefined?propios[cat]:((await fantasma.leerTabla(cat)).find(f=>f.uid===usuario.uid)||null);
+    if(!fila||typeof fila.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(fila.partida))return{fila,d:''};
+    const v=await fantasma.leerPrueba(cat,usuario.uid,fila.partida);
+    return{fila,d:v&&typeof v.d==='string'?v.d:''};
+  }
   function mensaje(e){
     if(muerto||e.source!==frame.contentWindow||e.origin!==location.origin||e.data?.canal!=='club-child')return;
     const d=e.data;
@@ -175,9 +187,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
        récord, por si este navegador ya no las tiene (otro dispositivo,
        almacenamiento borrado). Se lee por clave, como la del fantasma. */
     if(d.tipo==='prueba-propia-pedir'){
-      const cat=String(d.categoria||''),f=propios[cat],responde=r=>enviar({tipo:'prueba-propia',categoria:cat,...r});
-      if(invitado||!fantasma||!categoriaClub(juego,cat)||!f||typeof f.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(f.partida)){responde({d:''});return;}
-      fantasma.leerPrueba(cat,usuario.uid,f.partida).then(v=>responde({d:v&&typeof v.d==='string'?v.d:''}),()=>responde({error:true}));
+      const cat=String(d.categoria||''),responde=r=>enviar({tipo:'prueba-propia',categoria:cat,...r});
+      if(invitado||!fantasma||!categoriaClub(juego,cat)){responde({d:''});return;}
+      filaPropia(cat).then(r=>responde({d:r.d}),()=>responde({error:true}));
       return;
     }
     /* Un logro en vivo (Metro Rush: «Cazafantasmas»). Solo los que el juego
@@ -211,7 +223,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
         return;
       }
       const prueba=d.prueba;
-      verificaClub(juego,dato,prueba,{uid:cuenta}).then(motivo=>{
+      verificaClub(juego,dato,prueba,{uid:cuenta,filaPropia:()=>filaPropia(dato.categoria)}).then(motivo=>{
         if(muerto)return;
         if(motivo){
           sospecha(dato,motivo,'en vivo');

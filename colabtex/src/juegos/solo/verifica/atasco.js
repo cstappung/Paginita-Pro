@@ -50,14 +50,25 @@ const nombreNivel = k => (/^\d+$/.test(k) ? 'El nivel ' + (Number(k) + 1) : 'Un 
 
 /* Un resultado recién jugado y la prueba que mandó el juego. Devuelve
    null si vale, o el motivo (una frase corta en castellano) si no. */
-export function verifica(dato, prueba) {
+export async function verifica(dato, prueba, ctx = {}) {
   if (!dato || dato.categoria !== CATEGORIA) return 'Atasco no tiene esa tabla.';
   if (!prueba || typeof prueba !== 'object' || Array.isArray(prueba)) return 'La prueba de Atasco no tiene la forma esperada.';
   if (!M.PRUEBA_VERSIONES.includes(prueba.v)) return 'La prueba es de otra versión de Atasco (recarga la página).';
   const n = prueba.n;
   if (!n || typeof n !== 'object' || Array.isArray(n) || !Object.keys(n).length) return 'La prueba de Atasco no trae ningún nivel.';
   if (Object.keys(n).length > NIVELES.length) return 'La prueba trae más niveles de los que tiene el juego.';
-  const r = M.resumenPruebas(n, N.pisos);
+  let base = null;
+  if (prueba.v === M.PRUEBA_VERSION_BASE) {
+    base = M.limpiaBase(prueba.b, MAX_ESTRELLAS);
+    if (!base) return 'La base de la prueba de Atasco no tiene la forma esperada.';
+    const rara = sospecha(CATEGORIA, { puntos: base.p, tiempo: base.t });
+    if (rara) return 'La base de la prueba no es creíble: ' + rara;
+    const desde = M.desdeBase(base), dentro = Object.keys(n).find(k => /^\d+$/.test(k) && Number(k) < desde);
+    if (dentro !== undefined) return `${nombreNivel(dentro)} ya está dentro de la base de la prueba.`;
+    const motivo = await baseDeTuFila(base, ctx);
+    if (motivo) return motivo;
+  } else if (prueba.b !== undefined) return 'La prueba de Atasco no tiene la forma esperada.';
+  const r = M.resumenConBase(n, N.pisos, base);
   const mal = Object.keys(r.errores);
   if (mal.length) return `${nombreNivel(mal[0])} no se puede rehacer: ${r.errores[mal[0]]}.`;
   if (dato.puntos !== r.estrellas)
@@ -65,6 +76,29 @@ export function verifica(dato, prueba) {
   if (dato.tiempo !== r.tiempo)
     return `El tiempo no cuadra con los instantes de las movidas (${r.tiempo} ms contra ${dato.tiempo} ms).`;
   return null;
+}
+
+/* La base (motor.js: limpiaBase) son las estrellas de una fila sin prueba,
+   así que solo vale la de TU fila: la página pasa `ctx.filaPropia()`, que
+   lee tu fila de la tabla y la prueba guardada con ella. Vale si esa fila
+   no tiene prueba y la base es justo su puntaje y su tiempo, o si su prueba
+   ya traía esta misma base (la fila que la base hizo subir). Si no, se
+   rechaza con «No se pudo comprobar…», que no castiga: también puede ser
+   una tabla que cambió en otra pestaña. Sin `filaPropia` (las auditorías,
+   que miran una prueba ya guardada) la base vale lo que valía su fila sin
+   prueba: solo se le pide que sea creíble (sospecha). */
+async function baseDeTuFila(base, ctx) {
+  if (!ctx || typeof ctx.filaPropia !== 'function') return null;
+  const mal = 'No se pudo comprobar la base de la prueba con tu fila de la tabla (recarga la página).';
+  let leida;
+  try { leida = await ctx.filaPropia(); } catch (e) { return mal; }
+  const fila = leida && leida.fila;
+  if (!fila) return mal;
+  if (!leida.d) return fila.puntos === base.p && fila.tiempo === base.t ? null : mal;
+  let suya = null;
+  try { suya = JSON.parse(leida.d); } catch (e) { return mal; }
+  const b = suya && suya.v === M.PRUEBA_VERSION_BASE ? M.limpiaBase(suya.b, MAX_ESTRELLAS) : null;
+  return b && b.p === base.p && b.t === base.t ? null : mal;
 }
 
 /* Lo menos que tarda alguien en juntar `e` estrellas: hace falta ganar

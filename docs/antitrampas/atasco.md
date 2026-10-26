@@ -88,9 +88,21 @@ el verificador: no pueden discrepar.
    justo un subconjunto que la 2 también cuenta); el juego manda la 2, y
    una página con el verificador viejo en caché la rechaza como «de otra
    versión», que no castiga.
-4. **Capa anti-bot** (ver abajo).
-5. `puntos` = estrellas de los niveles que cuentan, y `tiempo` = suma de
-   sus tiempos (topes 1 ms – 7 días): **igualdad exacta** con lo declarado.
+4. **La base (versión 3 de la prueba)**: `{v: 3, b: {p, t}, n}` trae
+   además las estrellas y el tiempo de una fila **sin prueba** (§5). La
+   base cuenta como los primeros ⌈p/3⌉ niveles y solo pueden venir
+   partidas de ahí en adelante (una de abajo rechaza: ya está en la base);
+   `puntos` = p + sus estrellas, `tiempo` = t + sus tiempos. Tiene que
+   pasar `sospecha()` como pasaba la fila. En vivo la página da
+   `ctx.filaPropia()` (`solo/club.js`: tu fila y la prueba guardada con
+   ella) y la base vale solo si es la de **tu** fila: una sin prueba con
+   ese mismo puntaje y tiempo, o una cuya prueba ya traía esa misma base.
+   Si no, «No se pudo comprobar la base…», que no castiga (puede ser la
+   tabla que cambió en otra pestaña).
+5. **Capa anti-bot** (ver abajo).
+6. `puntos` = estrellas de los niveles que cuentan (más la base), y
+   `tiempo` = suma de sus tiempos (topes 1 ms – 7 días): **igualdad
+   exacta** con lo declarado.
 
 ### Qué hace el juego con las partidas que no valen
 
@@ -161,8 +173,16 @@ escrito a mano. Para **no castigar** a nadie:
   (`.sin-prueba`), con el motivo en su `title`: así se sabe cuál volver a
   ganar.
 
-Lo que se pierde: un honesto con 720 ★ viejos tendría que volver a jugar
-para mejorar su fila. Es el precio de no poder distinguirlo de un tramposo.
+Lo que se perdía: con una fila vieja **sin prueba guardada** (escrita
+antes de las pruebas, o con las reglas de `soloPruebas` sin publicar, que
+`guardaClub` deja pasar) no había partidas que rescatar, y la fila no subía
+nunca: 184 ★ en el juego, 37 vueltos a ganar y la fila en 150 aunque se
+ganaran niveles nuevos. Ahora esa fila es la **base** (§3, punto 4): la
+fila vieja se toma como los primeros ⌈p/3⌉ niveles y encima suman los
+niveles nuevos con su partida. El juego la saca de `rescata` (la prueba de
+la fila llega vacía: base = su puntaje y su tiempo; o la prueba de la fila
+ya trae `b`: se sigue con esa) y manda lo que más dé, con base o sin ella;
+los niveles que la base cubre ya no llevan ⚠.
 
 ## 6. Ganchos de depuración
 
@@ -189,7 +209,14 @@ rechaza (probado en Chromium).
   de otro vale igual. Se ve auditando: dos cuentas con la misma partida
   (mismos instantes y gestos al ms) en un nivel es una copia (ver abajo).
 - Un cliente reescrito que escriba en Firebase saltándose la página: queda
-  la prueba guardada y auditable.
+  la prueba guardada y auditable. Con una base (`v: 3`) la auditoría no
+  tiene la fila vieja a mano y solo puede pedirle a `b` lo que se le pedía
+  a una fila sin prueba (`sospecha`): quien escriba directo en la base de
+  datos puede inventar una. Se ve auditando (`b` está en la prueba).
+- **La base supone que la fila vieja eran los primeros niveles.** Si
+  alguien tenía estrellas viejas más arriba, al volver a ganarlas cuentan
+  dos veces, a lo sumo lo que valía su fila vieja. Solo les pasa a las
+  filas sin prueba, que ya no se pueden crear (las reglas piden la prueba).
 
 ## 8. Cambios compartidos pedidos
 
