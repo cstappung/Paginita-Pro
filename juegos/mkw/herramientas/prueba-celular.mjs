@@ -164,6 +164,7 @@ ok('frenando (B) no acelera: hay marcha atrás', (await recibe()) === 0);
 await p.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' })));
 await p.evaluate(() => window.mkwControles.ajustarAyudas({ acelerar: false }));
 ok('con «Acelerar solo» en No, no acelera', (await recibe()) === 0);
+await espera(250);                                                         // (la hoja se pinta cada 100 ms)
 ok('la casilla de la hoja dice lo guardado (No) y se recuerda', await p.evaluate(() => JSON.parse(localStorage.getItem('mkw.ayudas')).acelerar === false &&
    document.querySelector('.ctl-ayudas button[aria-pressed="true"]')?.textContent === 'No'));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
