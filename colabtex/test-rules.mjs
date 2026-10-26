@@ -719,6 +719,9 @@ console.log("— Salón: chat general y repeticiones del día —");
   await denied("no de mañana", () => fj.guardarRepeticion("club-minas-medium", ub.uid, entradaRep("club-minas-medium", hoy + 2, dato, 1, '{"v":1}', "Beto")));
   await denied("no de otra categoría", () => fj.guardarRepeticion("club-minas-hard", ub.uid, Object.assign({}, e)));
   await denied("no a nombre de otro", () => fj.guardarRepeticion("club-minas-medium", ua.uid, e));
+  const sinC = Object.assign({}, entradaRep("club-minas-medium", hoy, { puntos: 1, tiempo: 25000 }, 1, '{"v":1}', "Beto"));
+  delete sinC.c;
+  await allowed("una sin categoría (la de una pestaña vieja) todavía vale", () => fj.guardarRepeticion("club-minas-medium", ub.uid, sinC));
   await allowed("una de Tetris por puntos", () => fj.guardarRepeticion("club-tetris-maraton", ub.uid, entradaRep("club-tetris-maraton", hoy, { puntos: 12345, tiempo: 99000 }, 1, '{"v":1}', "Beto")));
   await loginAs(A);
   await allowed("A lee las mejores del día", () => new Promise((res, rej) => { const off = fj.watchRepeticiones("club-minas-medium", (f, err) => { off(); err ? rej(err) : res(f); }); }));
@@ -842,9 +845,16 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await allowed("pero una carta de un sobre archivado se gradúa", () => set(ref(db, `cartas/g/${ub.uid}/${sobre}/0`), { at: serverTimestamp(), p: 100 }));
   await denied("y una de un sobre que no existe, no", () => set(ref(db, `cartas/g/${ub.uid}/pNoExiste0001/0`), { at: serverTimestamp(), p: 100 }));
   await allowed("y las rondas nuevas siguen igual", () => set(push(ref(db, `casino/${ub.uid}`)), Object.assign({ at: serverTimestamp() }, unaRonda)));
+  // la versión mínima de Juegos: la pone un admin, la leen todos
+  await denied("B no exige versión", () => set(ref(db, "juegosVersion/min"), "209912312359"));
+  await allowed("B lee la versión mínima", () => get(ref(db, "juegosVersion/min")));
   await loginAs(A);
+  await denied("la versión es un sello de doce cifras", () => set(ref(db, "juegosVersion/min"), "nueva"));
+  await denied("y no hay otros campos", () => set(ref(db, "juegosVersion/otro"), "202610260001"));
+  await allowed("el admin exige una versión", () => set(ref(db, "juegosVersion/min"), "202610260001"));
   await comoDueno(`admins/${ua.uid}`, null);
   await denied("sin ser admin ya no escribe el cierre", () => cierre({}));
+  await denied("ni la versión mínima", () => set(ref(db, "juegosVersion/min"), "202610260002"));
   await denied("sin ser admin ya no suma monedas", () => ajuste({}));
   await denied("ni se pone en la Serie 01", () => s1(ua.uid, {}));
 }

@@ -2429,6 +2429,44 @@ document.addEventListener("visibilitychange", () => {
   try { fb.reconecta(); } catch (e) { console.warn("[juegos] despertar", e); }
 });
 
+/* ---------- la versión mínima ----------
+   Una pestaña abierta con un juegos-app.js viejo sigue corriendo ese código
+   hasta que se recarga: el sello `?v=` solo vale para las cargas nuevas.
+   Cuando un cambio de datos lo exige (el cierre de la economía: el código
+   viejo no lo conoce y vería saldos sin la historia archivada, y dejaría
+   gastar lo que no hay), un administrador pone `juegosVersion/min` y estas
+   pestañas se tapan. Si nadie la mira se recarga sola, una vez por versión
+   (`sessionStorage`): Pages puede servir un rato el HTML viejo, y sin el
+   tope se recargaría en bucle. */
+let offVersion = null;
+const SELLO = /^[0-9]{12}$/;
+function revisaVersion(min) {
+  if (!SELLO.test(VER) || typeof min !== "string" || !SELLO.test(min) || VER >= min) return;
+  let ya = "";
+  try { ya = sessionStorage.getItem("jg.recargaPor") || ""; } catch (e) { /* nada */ }
+  if (document.hidden && ya !== min) {
+    try { sessionStorage.setItem("jg.recargaPor", min); } catch (e) { /* nada */ }
+    location.reload();
+    return;
+  }
+  if (document.getElementById("jgVersionVieja")) return;
+  const capa = document.createElement("div");
+  capa.id = "jgVersionVieja";
+  capa.className = "jg-fin-capa";
+  capa.style.zIndex = "96";
+  capa.innerHTML = `<div class="jg-fin jg-fin-empate" role="alertdialog" aria-modal="true">
+    <div class="jg-fin-cara">🔄</div>
+    <div class="jg-fin-t">Hay una versión nueva de Juegos</div>
+    <div class="jg-fin-sub">Esta pestaña tiene una versión vieja y ya no puede mostrar bien tus monedas ni tus cartas.</div>
+    <button type="button" class="btn" data-recarga>Recargar la página</button>
+  </div>`;
+  capa.querySelector("[data-recarga]").onclick = () => location.reload();
+  document.body.appendChild(capa);
+}
+/* El sello de esta pestaña, si es de la página publicada: desde el
+   servidor local (otro sello, más nuevo) exigirlo taparía a todo el sitio. */
+const VER_PUBLICA = SELLO.test(VER) && !/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname) ? VER : "";
+
 function pintaTopeConsumo(e) {
   if (document.getElementById("jgTopeDatos")) return;
   const capa = document.createElement("div");
@@ -2617,7 +2655,7 @@ function armazon() {
       return;
     }
     h.innerHTML = "";
-    adminVista = crearAdmin({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora,
+    adminVista = crearAdmin({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora, ver: VER_PUBLICA,
       nombre: u => (datosP && nombreEnDatos(u, datosP)) || "" });
     adminVista.montar(h);
     return;
@@ -4322,6 +4360,7 @@ function wire() {
     if (offSuspension) { try { offSuspension(); } catch (e) {} }
     revisaCastigo({ suspension: null });
     offSuspension = fb.watchSuspension(user.uid, v => revisaCastigo({ suspension: v }));
+    if (!offVersion) offVersion = fb.watchVersionMinima(revisaVersion);
     /* Quién ve la Serie 01 de PRODROP (la lista del panel de admin). */
     if (offSerie1) { try { offSerie1(); } catch (e) {} }
     fijaSerie1({}, user.uid);

@@ -756,6 +756,9 @@ calcular las monedas. Ahora un administrador la «cierra»
   administrador.
 - `archivo/…`: lo viejo de `casino`, `cartas` y `mercado`, con las mismas
   rutas. Solo lo leen y escriben los administradores.
+- `juegosVersion/min`: la versión mínima de Juegos (el sello `?v=`). La
+  lee cualquiera con sesión; la escribe un administrador. Una pestaña más
+  vieja se tapa y pide recargar.
 - Además: los administradores pueden borrar en `casino`, `cartas/s|g|r` y
   `mercado/o|t` (es lo que mueve al archivo); nadie puede volver a escribir
   una clave archivada, y una carta de un sobre archivado se puede graduar.
@@ -766,7 +769,11 @@ calcular las monedas. Ahora un administrador la «cierra»
 2. Subir el código (la página nueva ya sabe leer el cierre).
 3. **Esperar un día**, para que todos hayan recargado: una pestaña con la
    página vieja no conoce el cierre y, una vez archivado lo viejo, vería
-   saldos sin esa historia.
+   saldos sin esa historia (y podría dejar gastar lo que no hay: esa cuenta
+   quedaría parada, y se arregla con un ajuste en **Monedas**). Desde esta
+   versión existe `juegosVersion/min`: el cierre manual la sube y tapa las
+   pestañas con código más viejo, pero las abiertas antes de esta versión
+   no la conocen, así que esta primera vez solo sirve esperar.
 4. Hacer el primer cierre a mano: `juegos.html#admin` → **Economía** →
    **Preparar cierre** → **Cerrar y archivar**. Después la página de un
    administrador lo rehace sola cada dos días.

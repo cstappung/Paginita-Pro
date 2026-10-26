@@ -337,7 +337,8 @@
         ".indexOn": ["o"],
         "$uid": {
           ".write": "auth != null && ((auth.uid === $uid && newData.exists() && !root.child('vetados').child(auth.uid).exists() && (!root.child('suspensiones').child(auth.uid).exists() || root.child('suspensiones').child(auth.uid).child('hasta').val() <= now)) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
-          ".validate": "$categoria.matches(/^club-(tetris-(maraton|sprint|ultra)|snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|sortem-(10|20)|minas-(easy|medium|hard)|dosmil-(puntos|ficha))$/) && newData.hasChildren(['dia', 'o', 'p', 't', 'n', 'v', 'd', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('o').val() === newData.child('dia').val() * 10000000000 + ($categoria.matches(/^club-(sortem-(10|20)|minas-(easy|medium|hard)|tetris-sprint)$/) ? 1000000000 - newData.child('t').val() : newData.child('p').val()) && (!data.exists() || newData.child('o').val() > data.child('o').val())",
+          ".validate": "$categoria.matches(/^club-(tetris-(maraton|sprint|ultra)|snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|sortem-(10|20)|minas-(easy|medium|hard)|dosmil-(puntos|ficha))$/) && newData.hasChildren(['dia', 'o', 'p', 't', 'n', 'v', 'd', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('o').val() === newData.child('dia').val() * 10000000000 + ($categoria.matches(/^club-(sortem-(10|20)|minas-(easy|medium|hard)|tetris-sprint)$/) ? 1000000000 - newData.child('t').val() : newData.child('p').val()) && (!data.exists() || newData.child('o').val() > data.child('o').val()) && (!newData.hasChild('c') || newData.child('c').val() === $categoria)",
+          "c": {".validate": "newData.isString()"},
           "dia": {".validate": "newData.isNumber() && newData.val() % 1 === 0"},
           "o": {".validate": "newData.isNumber()"},
           "p": {".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 1000000000"},
@@ -941,6 +942,14 @@
     "archivo": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+    },
+    "juegosVersion": {
+      ".read": "auth != null",
+      "min": {
+        ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
+        ".validate": "newData.isString() && newData.val().matches(/^[0-9]{12}$/)"
+      },
+      "$otro": { ".validate": false }
     },
     "ajustesMonedas": {
       ".read": "auth != null",

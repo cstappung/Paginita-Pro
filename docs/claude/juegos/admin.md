@@ -51,9 +51,14 @@ not the key: every write is re-checked by the rules. Five tabs:
   stopped accounts that hold it back are listed with a link to Monedas.
   *Recalcular desde el archivo* downloads `archivo/` (only then), replays
   everything from scratch, lists accounts whose balance differs and can
-  rebuild the cierre from scratch.
+  rebuild the cierre from scratch. The tab also shows and raises the
+  minimum Juegos version (`juegosVersion/min`, `colabtex/src/juegos/CLAUDE.md`);
+  *Cerrar y archivar* raises it to this tab's stamp before archiving.
 
-`test-rules.mjs` covers the new nodes. To run it here the database emulator
-had to be started with `java -jar` and the rules PUT with curl to the
-namespace `mi-pagina-pro-default-rtdb`: the CLI loads rules through
-`HTTPS_PROXY` and fails behind a proxy.
+`test-rules.mjs` covers the new nodes. In a cloud session the CLI works
+(`firebase-tools@13` installed in a scratch folder, `emulators:start --only
+auth,database --project mi-pagina-pro`); an older note said it failed
+behind the proxy, and then the emulator had to be started with
+`java -jar` and the rules PUT with curl to `mi-pagina-pro-default-rtdb`.
+**The test is not idempotent**: it writes today's club counters, so a
+second run on the same emulator dies early. Restart it for each run.

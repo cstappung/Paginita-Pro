@@ -818,6 +818,12 @@ export const watchConsumo = (uid, cb) =>
 export const desconecta = () => goOffline(db);
 /* La vuelta de una pestaña que estuvo dormida (juegos-main.js, `duerme`). */
 export const reconecta = () => goOnline(db);
+/* La versión mínima de Juegos (`juegosVersion/min`, el sello `?v=` de
+   juegos-app.js, doce cifras): la pone un administrador, y una pestaña con
+   una versión más vieja se tapa y pide recargar (juegos-main.js,
+   `revisaVersion`). */
+export const watchVersionMinima = cb => onValue(ref(db, "juegosVersion/min"), s => cb(s.val()), () => cb(null));
+export const exigeVersion = v => set(ref(db, "juegosVersion/min"), v);
 /* El castigo del antitrampas (juegos/castigo.js): la hora *del servidor*
    en que empezó. Vive bajo `users/<uid>`, que ya es solo del dueño, así
    que no necesita reglas nuevas; se escucha para que llegue en vivo a las

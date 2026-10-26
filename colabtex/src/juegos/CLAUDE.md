@@ -413,6 +413,17 @@ What actually spent the quota (October 2026, measured on an export) was
 `archivo/` and tabs start from a compact snapshot. A new whole-node read
 of something that only grows must get the same treatment, or stay small.
 
+**Old tabs can be told to reload** (`juegosVersion/min`, admin-written,
+`revisaVersion` in `juegos-main.js`). The `?v=` stamp only reaches new page
+loads; a tab left open keeps its old bundle. When a data change needs every
+tab on new code (the economy cierre was the first), the admin raises the
+minimum to their tab's stamp (`#admin` → Economía, and the manual cierre
+does it before archiving). Older tabs reload by themselves if hidden (once
+per version, `sessionStorage`, so a stale cached page cannot loop) or get
+a «Recargar» cover. Never from localhost: a dev stamp is newer than the
+published one and would cover the whole site (`VER_PUBLICA`). Tabs on code
+from before this switch existed cannot be reached: only waiting helps them.
+
 **A tab hidden for `OCULTA_MS` (10 min) goes offline** (`duerme` in
 `juegos-main.js`, `fb.desconecta`/`fb.reconecta`), so it stops receiving
 every bet and message of the site. Only in views where nothing waits on

@@ -54,7 +54,8 @@ const fecha = at => at ? new Date(at).toLocaleString("es-CL", { dateStyle: "shor
 const peso = b => b < 1e6 ? Math.round(b / 1000) + " kB" : (b / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 }) + " MB";
 const PRESETS = [["1h", "1 hora"], ["1d", "1 día"], ["3d", "3 días"], ["1s", "1 semana"], ["30d", "30 días"]];
 
-/* `ctx` = {uid, fb, datos (datosPerfil), nombre(uid), ahora()}. */
+/* `ctx` = {uid, fb, datos (datosPerfil), nombre(uid), ahora(), ver (el sello
+   de esta pestaña si es la página publicada, o "")}. */
 export function crearAdmin(ctx) {
   const { uid: yo, fb } = ctx;
   let host = null, muerto = false;
@@ -72,6 +73,7 @@ export function crearAdmin(ctx) {
      la escritura ({hechas, total}) y el recálculo desde el archivo
      ({cargando} o {full, difs, ms}). */
   let prep = null, escribiendo = null, recalculo = null;
+  let verMin = null, offVer = null;     // juegosVersion/min: la versión que se exige
 
   /* ---------- la cáscara ---------- */
   function montar(h) {
@@ -79,6 +81,7 @@ export function crearAdmin(ctx) {
     offDatos = ctx.datos(d => { datos = d; pinta(); });
     offAdm = fb.watchAdmin((d, err) => { adm = d; errAdm = err; pinta(); });
     offSerie1 = fb.watchSerie1(l => { serie1 = l; pinta(); });
+    offVer = fb.watchVersionMinima(v => { verMin = v; pinta(); });
     host.addEventListener("click", alClic);
     host.addEventListener("submit", alEnviar);
     host.addEventListener("input", alEscribir);
@@ -89,6 +92,7 @@ export function crearAdmin(ctx) {
     if (offDatos) offDatos();
     if (offAdm) offAdm();
     if (offSerie1) offSerie1();
+    if (offVer) offVer();
     cierraPlayer();
     if (host) { host.removeEventListener("click", alClic); host.removeEventListener("submit", alEnviar); host.removeEventListener("input", alEscribir); host.innerHTML = ""; }
   }
@@ -420,7 +424,10 @@ export function crearAdmin(ctx) {
         ? `<b class="jg-adm-mal">${recalculo.difs.length} cuentas no cuadran</b> con lo que se ve ahora.</p><ul class="jg-adm-hist">${recalculo.difs.slice(0, 30).map(x => `<li><span translate="no">${esc(nombre(x.uid))}</span>: ahora ${formatoMonedas(x.ahora)}, desde cero ${formatoMonedas(x.full)}${x.parada ? " (parada desde cero)" : ""}</li>`).join("")}</ul>`
         : `todas las cuentas cuadran.</p>`}
       <button type="button" class="btn2" data-rehace-cierre>Rehacer el cierre desde cero</button></div>`;
-    return `<div class="jg-adm-caja">${estado}
+    const version = `<div class="jg-adm-caja"><p>Versión mínima de Juegos: <b>${esc(verMin || "ninguna")}</b> · esta pestaña: <b>${esc(ctx.ver || "no publicada")}</b>.
+        Una pestaña más vieja queda tapada y pide recargar (si nadie la mira, se recarga sola). Cerrar la economía la sube a la de esta pestaña antes de archivar.</p>
+      ${ctx.ver && (!verMin || ctx.ver > verMin) ? `<button type="button" class="btn2" data-exige-version>Exigir esta versión a todos</button>` : ""}</div>`;
+    return `${version}<div class="jg-adm-caja">${estado}
       <p>El cierre guarda el estado de la economía hasta ayer (${dias(MARGEN_CIERRE)} día de margen) y pasa lo viejo de casino, cartas y mercado a <code>archivo/</code>, que solo leen los administradores.</p>
       <span class="jg-adm-btns"><button type="button" class="btn2" data-prepara-cierre ${datos.completo && !escribiendo ? "" : "disabled"}>Preparar cierre</button>
       <button type="button" class="btn2" data-recalcula ${datos.completo && !escribiendo ? "" : "disabled"}>Recalcular desde el archivo</button></span></div>
@@ -445,6 +452,9 @@ export function crearAdmin(ctx) {
     if (!confirm(`¿Cerrar la economía hasta ${fecha(c.T)} y pasar ${c.archivar.length} registros al archivo?`)) return;
     escribiendo = { hechas: 0, total: c.archivar.length * 2 + 1 }; pinta();
     try {
+      /* Primero se tapan las pestañas con código viejo: no conocen el
+         cierre y, sin la historia archivada, verían saldos de más. */
+      if (ctx.ver && (!verMin || ctx.ver > verMin)) await fb.exigeVersion(ctx.ver);
       await fb.escribeCierre(c.nodo, c.archivar, yo, (h, t) => { escribiendo = { hechas: h, total: t }; pinta(); });
       aviso = `Cierre escrito hasta ${fecha(c.T)}.`; prep = null; recalculo = null;
     } catch (e) { aviso = "No se pudo terminar: " + (permiso(e) ? "las reglas no lo permiten (¿están publicadas?)" : (e && e.message || e)) + ". Se puede volver a cerrar."; }
@@ -579,6 +589,11 @@ export function crearAdmin(ctx) {
     // el cálculo tarda un segundo: primero se pinta el «Calculando…»
     if ("preparaCierre" in ds) { prep = { calculando: true }; pinta(); setTimeout(() => { preparaCierre(datos, false); pinta(); }, 30); return; }
     if ("escribeCierre" in ds) { escribeElCierre(); return; }
+    if ("exigeVersion" in ds) {
+      if (!confirm(`¿Exigir la versión ${ctx.ver}? Toda pestaña de Juegos más vieja quedará tapada hasta recargar.`)) return;
+      try { await fb.exigeVersion(ctx.ver); aviso = `Versión mínima: ${ctx.ver}.`; } catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
+      pinta(); return;
+    }
     if ("recalcula" in ds) { recalcula(); return; }
     if ("rehaceCierre" in ds && recalculo && recalculo.full) { const full = recalculo.full; prep = { calculando: true }; pinta(); setTimeout(() => { preparaCierre(full, true); pinta(); }, 30); return; }
     if (ds.cuentaMonedas) { cuenta = ds.cuentaMonedas; pestaña = "monedas"; pinta(); return; }
