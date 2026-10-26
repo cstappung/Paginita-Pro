@@ -10428,9 +10428,9 @@ microsegundos. Las opciones de compilación ya estaban afinadas (SIMD, -O3 en el
 2. Jugar una carrera un minuto y mirar el recuadro de arriba a la izquierda.
 3. Avanzado → Diagnóstico → **«📋 Copiar el informe de rendimiento»** y pegarlo en el chat.
 
-Con eso: si frena **el procesador** (lo más probable), lo que sigue es achicar el trabajo del juego por cuadro (lo que
-más pesa son los 12 karts: dibujo, física e IA; menos rivales de CPU en el teléfono, y medir qué parte del juego gasta
-más con la traza); si frena **la tarjeta**, bajar la salida; si es **la pantalla**, desactivar el ahorro de batería.
+Con eso: si frena **el procesador** (lo más probable), lo que sigue es achicar el trabajo del juego por cuadro
+**optimizando el motor** (medir con la traza qué parte del juego gasta más y acelerarla; quitar rivales NO es una
+opción, ver §114.7); si frena **la tarjeta**, bajar la salida; si es **la pantalla**, desactivar el ahorro de batería.
 
 ### 114.4 Pruebas
 
@@ -10452,3 +10452,11 @@ sigue abierto es **el rendimiento en el teléfono** (30 fps en un Oppo Find X9 P
 igual debería correr a 60». Y, preguntado qué se puede sacrificar en el celular si lo que frena es el procesador:
 **nada** — mismos 12 karts y todos los efectos, **solo optimizar el motor**. El paso siguiente sale del informe del Oppo
 (§114.3): con él se sabe qué parte del cuadro hay que achicar.
+
+### 114.7 Regla del dueño: quitar rivales NO es una opción (2026-10-26)
+
+El dueño, textual: **«quitar rivales no es una opción, para mejorar rendimiento, grábalo bien»**. Queda como regla no
+negociable (también en `CLAUDE.md`, «Reglas»): para que el juego ande más rápido —en el celular, en un PC justo o en
+la sala— **nunca** se baja la cantidad de karts (siempre 12: los humanos y la CPU que completa la parrilla), ni se
+propone como opción, ajuste, «modo celular» o prueba. Tampoco se sacan efectos (§114.6). El rendimiento se gana
+optimizando el motor y la página.
