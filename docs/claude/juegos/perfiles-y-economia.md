@@ -462,7 +462,63 @@ must index by account, never scan a whole-site map.
 **Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
 event `sc`, category `superChat`; `superChats` in the replay lists the
 paid ones): `docs/claude/juegos/salon.md`. `watchLogros` reads the node
-whole (`NODOS_MONEDAS` is 16).
+whole (`NODOS_MONEDAS` is 17 with `economiaCierre`, below).
+
+## The economy is closed by periods (`juegos/cierre.js`, `cierre-datos.js`)
+
+Every tab downloaded the whole spending history to replay it: in October
+2026 each page load cost **~3.8 MB** (`users/*/consumo` showed it per tab),
+almost all `cartas` (each re-roll carries ten copy keys) and `casino` (one
+mark per plane tick), and 20 daily players used up the free plan's 360 MB.
+So an admin **closes** the history:
+
+- `economiaCierre` = `{v, T, d, por, at}`, admin-written, read by everyone:
+  `d` is the replay's state after every event with `at ≤ T`, packed as
+  text (accounts by index, times in base 36; ~0.3 MB for the October
+  export). `recorreEconomia(datos, hasta, crudo)` starts from it and
+  replays only events after `T`; `economia()` is that, memoised. A record
+  still live with `at ≤ T` (an active listing, an unfinished casino round,
+  an adoption) is skipped, its state comes from the cierre.
+- The old records of `casino`, `cartas` and `mercado` (closed listings and
+  trades) move to `archivo/` (admins only). Everything else stays: it is
+  small, or the rules read its history (first free adoption, the shop,
+  referrals, the free pack). Unfinished rounds and active listings stay
+  live.
+- The cierre keeps only what a later event can look at: per-account state
+  (amounts **unrounded**: casino hundredths are floored once at the end),
+  every live copy grouped by pack (`at`, live and graded masks; `aj` for
+  copies that changed hands), live pets/objects/rock pieces, active
+  listings, unfinished rounds' validity, and per-collection pack totals
+  (`est`) for `cifras`/`topColecciones`, which skip `so.cierre` packs. Per
+  account it drops `sobres`, keeps the last `MOVS_CIERRE` movements and the
+  rock boxes PRO HERO shows (`cajasPrevias` counts the rest).
+- **Nobody stopped is closed** (owner's decision): a stopped account
+  recovers when its earnings grow, because spends are measured against
+  what is earned *now*, and a cierre would freeze it. `hacerCierre` puts
+  `T` before the first unfunded spend of every account stopped now
+  (`paradaDesde`, `frenos`); an adjustment unblocks it.
+- **Nothing is written unchecked**: `verificaCierre` compares the economy
+  with everything against the cierre plus what will stay live (balances,
+  owners, graded copies, listings, pets…). Tested on the October export:
+  0 differences, two chained cierres, and rebuilding from the archive.
+- What is closed stops moving: if an admin later deletes records and
+  someone ends up owing something from before `T`, it still counts. The
+  panel's **Recalcular** reads `archivo/`, joins it with the live data
+  (`conArchivo`), replays from scratch, lists the accounts that differ and
+  can **rebuild the cierre from scratch** (never to a `T` before the
+  current one).
+- Writing (`fb.escribeCierre`) copies to `archivo/`, writes the cierre and
+  deletes the originals, in batches of 800; it need not be atomic, since
+  live records at or before `T` are skipped anyway.
+- The first cierre is manual (`#admin`, Economía); after that an admin's
+  page redoes it by itself every `AUTO_CIERRE_DIAS` (`cierraSiToca` in
+  juegos-main.js), with the same check. **Deploy the code and wait a day
+  before the first cierre**: a cached old bundle does not know the cierre
+  and would show balances without the archived history.
+- The rules forbid rewriting an archived key (`casino`, `cartas/s|r|g`:
+  `!archivo/... exists()`), let a copy of an archived pack be graded, and
+  let admins delete those records. `tests/cierre.test.cjs` and
+  `test-rules.mjs` cover it.
 
 ## Casino
 

@@ -61,6 +61,7 @@ import { CORTES } from "./cortes.js";
 import * as CM from "./casino-motor.js";
 import { monedasReferidos } from "./referidos.js";
 import { nivelSuper } from "./rieles-datos.js";
+import { leeCierre } from "./cierre-datos.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -509,6 +510,70 @@ function rondasDe(u, l) {
 export function economia(datos) {
   const d = datos || {};
   if (memoEco.has(d)) return memoEco.get(d);
+  const res = recorreEconomia(d).res;
+  memoEco.set(d, res);
+  return res;
+}
+
+/* El estado con que empieza el recorrido: vacío, o el del último cierre
+   (`datos.cierre`, ver cierre-datos.js), nuevo en cada recorrido porque el
+   recorrido lo cambia. Las cartas, regalos y piezas se rehacen con su hora,
+   como al abrirlas. */
+function estadoInicial(base) {
+  const st = { usuarios: {}, dueno: {}, graduada: {}, enVenta: {}, sobres: {}, ofertas: {}, mascotas: {}, regalos: {}, congelada: {}, historial: {}, rocas: {}, rocasPor: {}, tiene: {} };
+  if (!base) return st;
+  for (const [u, x] of Object.entries(base.usuarios)) st.usuarios[u] = JSON.parse(JSON.stringify(x));
+  const de = (cc, o) => base.ajenas[cc] || o;
+  for (const so of base.sobres) {
+    st.sobres[so.u + "~" + so.k] = { u: so.u, k: so.k, at: so.at, gratis: false, cierre: true };
+    for (let i = 0; i < 5; i++) if (so.vivas & (1 << i)) {
+      const cc = claveCopia(so.u, so.k, i);
+      st.dueno[cc] = de(cc, so.u);
+      if (so.grad & (1 << i)) st.graduada[cc] = base.T;
+    }
+  }
+  for (const so of base.rerolls) {
+    st.sobres[so.u + "~" + so.k] = { u: so.u, k: so.k, at: so.at, r: so.r, de: [], tier: so.tier, cierre: true };
+    const cc = claveCopia(so.u, so.k, 0);
+    st.dueno[cc] = de(cc, so.u);
+    if (so.grad) st.graduada[cc] = base.T;
+  }
+  for (const [cc, m] of Object.entries(base.mascotas)) {
+    const q = leeCopia(cc);
+    if (!q) continue;
+    st.mascotas[cc] = { u: q.o, k: q.k, at: m.at, e: m.e };
+    const w = st.dueno[cc] = de(cc, q.o);
+    st.tiene[w] = (st.tiene[w] || 0) + 1;
+    if (base.congelada[cc]) st.congelada[cc] = base.congelada[cc];
+    if (base.historial[cc]) st.historial[cc] = base.historial[cc].slice();
+  }
+  for (const [cc, at] of Object.entries(base.regalos)) {
+    const q = leeCopia(cc);
+    if (!q) continue;
+    st.regalos[cc] = { u: q.o, k: q.k, at, item: MM.regalo(q.o, q.k, at) };
+    st.dueno[cc] = de(cc, q.o);
+  }
+  for (const [cc, x] of Object.entries(base.rocas)) {
+    const q = leeCopia(cc);
+    if (!q) continue;
+    st.rocas[cc] = { u: q.o, k: q.k, at: x.at, b: x.b, item: cajaRock(q.o, q.k, x.at, x.b) };
+    const w = st.dueno[cc] = de(cc, q.o);
+    (st.rocasPor[w] = st.rocasPor[w] || []).push(cc);
+  }
+  for (const [id, o] of Object.entries(base.ofertas)) {
+    st.ofertas[id] = { id, u: o.u, c: o.c, p: o.p, at: o.at, estado: "activa" };
+    st.enVenta[o.c] = id;
+  }
+  return st;
+}
+
+/* El recorrido de la economía: los eventos de después del cierre (si lo
+   hay) y hasta `hasta`, en orden. `crudo` deja los importes sin redondear,
+   que es como los guarda un cierre (las centésimas del casino se suman y
+   se redondean una sola vez al final). Devuelve también desde cuándo está
+   parada cada cuenta parada (`paradaDesde`): un cierre no pasa de ahí. */
+export function recorreEconomia(datos, hasta = Infinity, crudo = false) {
+  const d = datos || {}, base = d.cierre ? leeCierre(d.cierre) : null, desde = base ? base.T : -Infinity;
   const c = d.cartas || {}, m = d.mercado || {}, ms = d.mascotas || {}, ev = [];
   /* Mascotas va entre el re-roll y la oferta: a igual hora se adopta, se
      abre un regalo y se compra antes de que eso mismo salga a la venta. */
@@ -576,19 +641,23 @@ export function economia(datos) {
       for (const e of er) ev.push(e);
     }
   }
-  ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
+  const T0 = desde;
+  for (const r of Object.values(rondas)) r.valida = !!(base && r.at <= T0 && base.rondas[r.u + "~" + r.k]);
+  const evs = ev.filter(e => e.at > T0 && e.at <= hasta);
+  evs.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
 
-  const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
+  const st = estadoInicial(base), paradaDesde = {};
+  const { usuarios, dueno, graduada, enVenta, sobres, ofertas } = st, cambios = {};
   /* Mascotas: las adopciones y los regalos válidos (por clave de copia),
      las que tomaron la poción, y quiénes tuvieron cada mascota antes que
      su dueño de ahora (para heredar su estado). */
-  const mascotas = {}, regalos = {}, congelada = {}, historial = {}, tiene = {};
+  const { mascotas, regalos, congelada, historial, tiene } = st;
   /* Batalla de Rock: las piezas de cajas válidas, por clave de copia, y
      las claves que pasaron alguna vez por cada cuenta (`rocasPor`, se
      filtra por `dueno` al leer). Buscar las propias recorriendo `rocas`
      entera en cada caja era cuadrático: con unas 2000 cajas en el sitio,
      más de medio segundo por cada lectura de Firebase, en cada pestaña. */
-  const rocas = {}, rocasPor = {};
+  const { rocas, rocasPor } = st;
   const llegaRoca = (cc, u) => { if (rocas[cc]) (rocasPor[u] = rocasPor[u] || []).push(cc); };
   const ganado = {};
   /* `gasto`/`cuenta`: lo pagado y cuántas veces, por categoría (`CATEGORIAS`);
@@ -626,7 +695,7 @@ export function economia(datos) {
     if (x.parada) { x.falta += p; return false; }
     const k = enCorte(u);
     if (k && ahora < (k.desde || 0)) { const q = Math.min(p, Math.max(0, saldo(u))); x.gastadas += q; anota(u, cat, -q, d); return true; }
-    if (saldo(u) < p) { if (k) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
+    if (saldo(u) < p) { if (k) return false; x.parada = true; paradaDesde[u] = ahora; x.falta += p - Math.max(0, saldo(u)); return false; }
     x.gastadas += p; anota(u, cat, -p, d); return true;
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
@@ -637,7 +706,7 @@ export function economia(datos) {
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
   };
   const casinoDe = (u, j) => { const pj = U(u).casino.porJuego; return pj[j] || (pj[j] = { apostado: 0, pagado: 0, rondas: 0 }); };
-  for (const e of ev) {
+  for (const e of evs) {
     ahora = e.at;
     if (e.t === "s") {
       const x = U(e.u);
@@ -711,7 +780,7 @@ export function economia(datos) {
       for (const cc of rocasPor[e.u] || []) if (dueno[cc] === e.u) propias.push(rocas[cc].item);
       const dup = repetidaRock(v, propias), cc = claveRock(e.u, e.k);
       if (dup) { const r = reembolsoRock(v); U(e.u).premios += r; anota(e.u, "cajaRock", r, "repetida"); }
-      else { rocas[cc] = { u: e.u, k: e.k, at: e.at, item: v }; dueno[cc] = e.u; llegaRoca(cc, e.u); }
+      else { rocas[cc] = { u: e.u, k: e.k, at: e.at, b: e.b, item: v }; dueno[cc] = e.u; llegaRoca(cc, e.u); }
       U(e.u).cajasRock.push({ k: e.k, at: e.at, c: dup ? "" : cc, v, dup, reembolso: dup ? reembolsoRock(v) : 0 });
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
@@ -787,13 +856,13 @@ export function economia(datos) {
       }
     }
   }
-  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.premios = Math.floor(x.premios + 1e-6); x.casino.pagado = Math.round(x.casino.pagado * 100) / 100; x.falta = Math.round(x.falta);
+  if (!crudo) for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.premios = Math.floor(x.premios + 1e-6); x.casino.pagado = Math.round(x.casino.pagado * 100) / 100; x.falta = Math.round(x.falta);
     for (const c of Object.keys(x.gasto)) x.gasto[c] = Math.round(x.gasto[c]);
     for (const z of Object.values(x.casino.porJuego)) { z.apostado = Math.round(z.apostado); z.pagado = Math.round(z.pagado * 100) / 100; }
     void u; }
-  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta };
-  memoEco.set(d, res);
-  return res;
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios, mascotas, regalos, congelada, historial, rocas, rondas, casinoPorCuenta,
+    cierre: base ? { T: base.T, est: base.est } : null };
+  return { res, paradaDesde };
 }
 
 /* Las copias de una cuenta, ya resueltas a {o, k, at, i, gr, venta}. */
@@ -873,6 +942,8 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
   for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r, (d.rock || {}).c, d.superChat, d.casino, (d.referidos || {}).m, (d.referidos || {}).u]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  /* Y quien solo sale en el cierre (todo lo suyo ya está archivado). */
+  if (d.cierre) for (const u of Object.keys(economia(d).usuarios)) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

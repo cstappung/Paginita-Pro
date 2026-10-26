@@ -108,7 +108,10 @@ export function ordenRep(cat, dia, p, t) {
 }
 
 /* La entrada que se escribe para una partida ya verificada, o null si no
-   cabe en lo que la regla deja (y entonces no se intenta). */
+   cabe en lo que la regla deja (y entonces no se intenta). Lleva su
+   categoría (`c`), que la regla exige igual a la de la ruta: las tres de
+   Mina Club se ordenan igual (por tiempo), y sin eso una partida de una
+   cabía en otra y el riel la rehacía en el tablero equivocado. */
 export function entradaRep(cat, dia, dato, version, texto, nombre) {
   const r = repDe(cat);
   if (!r || !dato || !Number.isSafeInteger(dato.puntos) || !Number.isSafeInteger(dato.tiempo)) return null;
@@ -116,7 +119,7 @@ export function entradaRep(cat, dia, dato, version, texto, nombre) {
   if (p < 1 || p > P_MAX || t < 1 || t > T_MAX) return null;
   if (typeof texto !== "string" || !texto || texto.length > 200000) return null;
   return {
-    dia, o: ordenRep(cat, dia, p, t), p, t,
+    c: cat, dia, o: ordenRep(cat, dia, p, t), p, t,
     n: String(nombre || "Jugador").slice(0, 80),
     v: Number.isSafeInteger(version) && version >= 0 && version <= 1000 ? version : 0,
     d: texto

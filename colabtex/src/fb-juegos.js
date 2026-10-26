@@ -61,7 +61,7 @@ import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
   runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded, onChildChanged, onChildRemoved,
-  limitToLast, limitToFirst, startAt, endAt, goOffline
+  limitToLast, limitToFirst, startAt, endAt, goOffline, goOnline
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
@@ -338,9 +338,13 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 16, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
+/* `economiaCierre` es el cierre de la economía (juegos/cierre-datos.js): lo
+   de antes de su hora ya no está en `casino`, `cartas` ni `mercado`, así que
+   sin él las cuentas saldrían mal. Si no existe (o las reglas aún no dejan
+   leerlo), `cierre` queda en null y se rehace todo como siempre. */
+const NODOS_MONEDAS = 17, CASINO_PROPIO = 1000, CASINO_AJENO = 8000;
 export function watchLogros(cb, yo = () => "") {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, cofres: {}, ajustes: {}, mascotas: {}, casino: {}, referidos: {}, rock: {}, superChat: {}, cierre: null }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const avisa = () => { d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); };
@@ -379,12 +383,12 @@ export function watchLogros(cb, yo = () => "") {
   const alVolver = () => { if (!document.hidden && pend.size && llegados.has("casino") && !espera) vuelca(); };
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", alVolver);
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
-    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
+    d[k] = k === "cierre" ? s.val() : (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null;
     llegados.add(k); avisa();
   }, e => { err[k] = e; llegados.add(k); avisa(); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
     oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas"),
-    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"),
+    oye("referidos", "referidos"), oye("cofres", "cofres"), oye("rock", "rock"), oye("superChat", "superChat"), oye("economiaCierre", "cierre"),
     onChildAdded(rC, alCambiar, falla), onChildChanged(rC, alCambiar, falla), onChildRemoved(rC, alQuitar, falla),
     /* La primera lectura entera: los eventos de hijo de esa carga ya
        llegaron todos cuando llega este, que es el que la da por completa.
@@ -812,6 +816,14 @@ export const watchConsumo = (uid, cb) =>
   onValue(ref(db, `users/${uid}/consumo`), s => cb(s.val()), () => cb(null));
 /* Llegado el tope: la conexión se corta y no vuelve sola. */
 export const desconecta = () => goOffline(db);
+/* La vuelta de una pestaña que estuvo dormida (juegos-main.js, `duerme`). */
+export const reconecta = () => goOnline(db);
+/* La versión mínima de Juegos (`juegosVersion/min`, el sello `?v=` de
+   juegos-app.js, doce cifras): la pone un administrador, y una pestaña con
+   una versión más vieja se tapa y pide recargar (juegos-main.js,
+   `revisaVersion`). */
+export const watchVersionMinima = cb => onValue(ref(db, "juegosVersion/min"), s => cb(s.val()), () => cb(null));
+export const exigeVersion = v => set(ref(db, "juegosVersion/min"), v);
 /* El castigo del antitrampas (juegos/castigo.js): la hora *del servidor*
    en que empezó. Vive bajo `users/<uid>`, que ya es solo del dueño, así
    que no necesita reglas nuevas; se escucha para que llegue en vivo a las
@@ -1133,6 +1145,32 @@ export const descartaRevision = (categoria, uid) => remove(ref(db, `revisiones/$
    deshacerlo se pone otro al revés). La regla pide `por` = quien escribe. */
 export const ajustaMonedas = (uid, n, m, por) =>
   set(push(ref(db, `ajustesMonedas/${uid}`)), { n, m: String(m || "").slice(0, 200), por, at: serverTimestamp() });
+
+/* El cierre de la economía (juegos/cierre.js). Tres pasos, por tandas de
+   `TANDA_ARCHIVO` rutas: copiar lo viejo a `archivo/`, escribir el cierre
+   y borrar lo viejo. No hace falta que sea atómico: con el cierre puesto,
+   lo de antes de su hora que siga vivo se salta (monedas.js), y un corte a
+   mitad se arregla volviendo a cerrar. `avanza(hechas, total)` cuenta. */
+const TANDA_ARCHIVO = 800;
+export async function escribeCierre(nodo, archivar, por, avanza = () => {}) {
+  const total = archivar.length * 2 + 1;
+  let hechas = 0;
+  const tandas = async f => {
+    for (let i = 0; i < archivar.length; i += TANDA_ARCHIVO) {
+      const u = {};
+      for (const [ruta, v] of archivar.slice(i, i + TANDA_ARCHIVO)) f(u, ruta, v);
+      await update(ref(db), u);
+      hechas += Object.keys(u).length; avanza(hechas, total);
+    }
+  };
+  await tandas((u, ruta, v) => { u["archivo/" + ruta] = v; });
+  await set(ref(db, "economiaCierre"), { v: nodo.v, T: nodo.T, d: nodo.d, por, at: serverTimestamp() });
+  avanza(++hechas, total);
+  await tandas((u, ruta) => { u[ruta] = null; });
+}
+/* Lo archivado, entero: solo para recalcular desde cero (pesa lo que pesaba
+   la historia; lo baja un administrador cuando lo pide). */
+export const leerArchivo = () => get(ref(db, "archivo")).then(s => s.val() || {});
 
 /* Suspender hasta una hora (del servidor) y levantar la suspensión. */
 export const suspende = (uid, hasta, m, por) =>

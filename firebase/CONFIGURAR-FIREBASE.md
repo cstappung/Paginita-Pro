@@ -745,6 +745,42 @@ equipado va en `users/<uid>/taco` y no pide reglas. Pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ El cierre de la economía pide publicar otra vez (2026-10-25)
+
+Cada pestaña de Juegos bajaba la historia entera de gastos (~3,8 MB) para
+calcular las monedas. Ahora un administrador la «cierra»
+(`colabtex/src/juegos/cierre.js`):
+
+- `economiaCierre` = `{v, T, d, por, at}`: el estado de la economía hasta
+  la hora `T`. Lo lee cualquiera con sesión; lo escribe solo un
+  administrador.
+- `archivo/…`: lo viejo de `casino`, `cartas` y `mercado`, con las mismas
+  rutas. Solo lo leen y escriben los administradores.
+- `juegosVersion/min`: la versión mínima de Juegos (el sello `?v=`). La
+  lee cualquiera con sesión; la escribe un administrador. Una pestaña más
+  vieja se tapa y pide recargar.
+- Además: los administradores pueden borrar en `casino`, `cartas/s|g|r` y
+  `mercado/o|t` (es lo que mueve al archivo); nadie puede volver a escribir
+  una clave archivada, y una carta de un sobre archivado se puede graduar.
+
+**El orden importa:**
+
+1. Publicar estas reglas.
+2. Subir el código (la página nueva ya sabe leer el cierre).
+3. **Esperar un día**, para que todos hayan recargado: una pestaña con la
+   página vieja no conoce el cierre y, una vez archivado lo viejo, vería
+   saldos sin esa historia (y podría dejar gastar lo que no hay: esa cuenta
+   quedaría parada, y se arregla con un ajuste en **Monedas**). Desde esta
+   versión existe `juegosVersion/min`: el cierre manual la sube y tapa las
+   pestañas con código más viejo, pero las abiertas antes de esta versión
+   no la conocen, así que esta primera vez solo sirve esperar.
+4. Hacer el primer cierre a mano: `juegos.html#admin` → **Economía** →
+   **Preparar cierre** → **Cerrar y archivar**. Después la página de un
+   administrador lo rehace sola cada dos días.
+
+Si el panel dice que una cuenta parada frena el cierre, súmale lo que le
+falta en la pestaña **Monedas** y vuelve a prepararlo.
+
 ### ⚠ El Pueblo de Mascotas pide publicar otra vez (2026-10-22)
 
 Dos nodos nuevos para el Pueblo (la plaza y las visitas, estilo Pet Society):

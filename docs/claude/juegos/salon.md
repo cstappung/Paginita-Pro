@@ -417,8 +417,11 @@ on a phone. Things to keep:
   shot, so seeking (the last-stretch start, going back) never re-simulates
   hundreds of rounds of physics on the lobby's thread. The rail splits its
   height by each scene's `aspecto`, with no card box around them.
-- **`repeticiones/<cat>/<uid>`** = `{dia, o, p, t, n, v, d, at}`: each
-  account's best game of the day. `apuntaRepeticion` in `juegos-main.js`
+- **`repeticiones/<cat>/<uid>`** = `{c, dia, o, p, t, n, v, d, at}`: each
+  account's best game of the day. `c` is the category and the rule
+  demands it equal to the path: the three Mina Club tables order the same
+  way (by time), so without it a game of one fit in another. An entry
+  without `c` (a tab on older code) is still accepted. `apuntaRepeticion` in `juegos-main.js`
   writes it from `alResultado` (which now also gets the proof, third
   argument in `solo/club.js`) even when it is not a record, only when it
   beats the stored one, one write at a time. `o = dia·1e10 + score`, where
