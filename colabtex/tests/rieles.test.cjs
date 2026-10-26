@@ -210,7 +210,7 @@ test('La clave de orden: el día manda, después los puntos o el tiempo',()=>{
   assert.ok(D.ordenRep('club-sortem-20',hoy,20,D.T_MAX)>D.ordenRep('club-sortem-20',hoy-1,20,1));
   assert.equal(D.ordenRep('club-bbtan-rondas',hoy,1,1),null);
   const e=D.entradaRep('club-snake-classic-mediano',hoy,{puntos:240,tiempo:31000},1,'{"v":1}','Ana');
-  assert.deepEqual(e,{dia:hoy,o:hoy*1e10+240,p:240,t:31000,n:'Ana',v:1,d:'{"v":1}'});
+  assert.deepEqual(e,{c:'club-snake-classic-mediano',dia:hoy,o:hoy*1e10+240,p:240,t:31000,n:'Ana',v:1,d:'{"v":1}'});
   assert.equal(D.entradaRep('club-snake-classic-mediano',hoy,{puntos:240,tiempo:31000},1,'','Ana'),null,'sin prueba no');
   assert.equal(D.entradaRep('club-snake-classic-mediano',hoy,{puntos:0,tiempo:31000},1,'x','Ana'),null);
   assert.equal(D.entradaRep('club-minas-medium',hoy,{puntos:1,tiempo:1e9},1,'x','Ana'),null,'el tiempo tiene tope');

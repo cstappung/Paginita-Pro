@@ -86,6 +86,14 @@ como cualquier gasto sin fondos. `monedasDe` devuelve `premios` y
 `casino: {apostado, pagado, rondas}`. `economia(d).rondas["uid~clave"]`
 trae cada ronda resuelta, que es lo que lee el feed.
 
+Con el cierre de la economía (`docs/claude/juegos/perfiles-y-economia.md`)
+las rondas terminadas antes de su hora pasan a `archivo/casino`: el feed y
+«tus rondas» solo muestran las de después, y los totales por cuenta
+(`casino: {apostado, pagado, rondas, porJuego}`) vienen del cierre. Una
+ronda sin terminar (un pingüino sin cobrar) se queda viva, con su apuesta
+ya contada en el cierre. Las reglas no dejan reescribir una ronda
+archivada ni ponerle marcas.
+
 ## Rendimiento (lo que hacía tirones a todo el sitio)
 
 Cada apuesta, aviso del avión o salto es una escritura, y `casino` lo
