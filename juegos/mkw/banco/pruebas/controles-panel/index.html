@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La hoja Controles con el cursor del mando</title>
+<link rel="stylesheet" href="../../estilo.css">
+<script>
+  // un mando de Xbox de mentira (mapeo «standard»), el MISMO para esta página y para el marco (el marco lo toma de aquí)
+  const boton = () => ({ pressed: false, value: 0 });
+  window.mandoFalso = { id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true, mapping: 'standard',
+    timestamp: 0, buttons: Array.from({ length: 17 }, boton), axes: [0, 0, 0, 0] };
+  window.mandosFalsos = [window.mandoFalso];
+  navigator.getGamepads = () => window.mandosFalsos;
+</script>
+<!-- el mando.js de verdad del sitio (servido en /sitio/audio por servir.cjs) -->
+<script src="/sitio/audio/mando.js?v=mando-2"></script>
+</head>
+<body>
+<h1>La hoja Controles con el cursor del mando: <span>la página de Mario Kart de verdad, en su marco</span></h1>
+<p>Prueba el rediseño de la hoja «Controles» (bitácora §112, pedido del dueño: «el mando 100 % funcional y su
+  reasignación») <b>sin el juego</b>, como lo usa una persona que solo tiene el mando: esta página hace de Juegos (carga el
+  <code>mando.js</code> del sitio) y el marco es <code>web/navegador/index.html</code> de verdad. El cursor se lleva con el
+  stick (como la persona) y A hace clic. Comprueba las fallas que encontró el crítico: la B capturada no cierra el cajón,
+  la A capturada no vuelve a hacer clic, el cursor se aparta mientras se captura y vuelve al soltar, la prueba del mando,
+  el asistente paso a paso (la A del paso 1 no lo reinicia), cerrar el cajón lo corta, los botones de jugador, la zona
+  muerta con − y +, y el cajón encima del menú de inicio.</p>
+<div class="caja"><div id="resumen">probando…</div><ul id="resultados"></ul></div>
+<iframe id="marco" style="width: 900px; height: 860px; border: 0;"></iframe>
+<script type="module">
+import { prueba } from '../../comun.js';
+const { ok, nota, fin } = prueba('controles-panel', 'La hoja Controles con el cursor del mando (sin el juego)');
+const cuadros = n => new Promise(r => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const M = window.mandoFalso;
+const pon = (i, si) => { M.buttons[i] = { pressed: si, value: si ? 1 : 0 }; M.timestamp++; };
+const pulsa = async (i, ms = 120) => { pon(i, true); await espera(ms); pon(i, false); await espera(120); };
+
+try {
+  try { localStorage.removeItem('mkw.mandos'); localStorage.removeItem('mkw.teclas'); } catch {}
+  const marco = document.getElementById('marco');
+  await new Promise(r => { marco.onload = r; marco.src = '/web/navegador/index.html?portada=1&inicio=0'; });
+  const H = marco.contentWindow, D = H.document;
+  H.navigator.getGamepads = () => window.mandosFalsos;                  // (el marco ve el mismo mando de mentira)
+  for (let i = 0; i < 100 && !(H.mkwPanelControles && H.Mando); i++) await espera(100);
+  ok('el marco tiene la hoja nueva y su copia de mando.js', !!H.mkwPanelControles && !!H.Mando && H.Mando !== window.Mando);
+  const C = H.mkwControles, P = H.mkwPanelControles;
+  const cursor = () => D.getElementById('mando-cursor');
+  const cursorVisible = () => !!cursor() && H.getComputedStyle(cursor()).display !== 'none';
+  const modo = () => H.Mando.estado()?.modo;
+  const cajon = () => D.body.classList.contains('cajon-abierto');
+  // llevar el cursor a un elemento con el stick (como la persona: inclina hacia allá y suelta cerca)
+  async function ir(el) {
+    el.scrollIntoView({ block: 'center' }); await cuadros(3);
+    for (let i = 0; i < 400; i++) {
+      const r = el.getBoundingClientRect(), c = cursor();
+      const dx = r.left + r.width / 2 - (parseFloat(c.style.left) || 0), dy = r.top + r.height / 2 - (parseFloat(c.style.top) || 0);
+      const d = Math.hypot(dx, dy);
+      if (d < 5) break;
+      const m = Math.min(1, Math.max(0.5, d / 250));
+      M.axes[0] = dx / d * m; M.axes[1] = dy / d * m; M.timestamp++;
+      await cuadros(1);
+    }
+    M.axes[0] = 0; M.axes[1] = 0; M.timestamp++; await cuadros(3);
+    const r = el.getBoundingClientRect(), c = cursor();
+    nota(`cursor en ${c.style.left},${c.style.top} → ${el.textContent.trim().slice(0, 20)} (${Math.round(r.left + r.width / 2)},${Math.round(r.top + r.height / 2)}) · sobre: ${D.querySelector('.mando-sobre')?.textContent.trim().slice(0, 20)} · modo ${modo()} · ocupado ${C.ocupado()}`);
+  }
+  const chip = (obj, col = 'mando') => D.querySelector(`.ctl-fila[data-objetivo="${obj}"] .ctl-chip[data-col="${col}"]`);
+  const mensaje = () => D.querySelector('.ctl-tira .ctl-mensaje')?.textContent || '';
+
+  // ---- 1. Abrir Controles: el cursor maneja la hoja ----
+  H.mkwInterfaz.abrirCajon('controles'); await espera(400);
+  ok('con el cajón abierto, el mando maneja el cursor del sitio en el marco', modo() === 'cursor' && cursorVisible(), `modo ${modo()}`);
+  ok('la hoja: 4 pestañas de jugador, el mando en el jugador 1, la lista con el mando y el teclado',
+     D.querySelectorAll('.ctl-pestana').length === 4 && D.querySelector('.ctl-titulo').textContent.includes('Xbox') && !!chip('R') && !!chip('R', 'teclado') &&
+     D.querySelector('.ctl').classList.contains('con-teclado'));
+  ok('…sin lo del celular ni la línea de depuración', !D.getElementById('usarTactil') && !D.getElementById('puerto1') && !D.getElementById('ajustesTactil'));
+
+  // ---- 2. Derrapar = LB, solo con el mando ----
+  await ir(chip('R'));
+  await pulsa(0);                                                      // A: clic en el recuadro (al soltar)
+  await cuadros(3);
+  ok('A en el recuadro de «Derrapar»: la fila espera y el cursor se aparta', P.espera?.obj === 'R' && !cursorVisible() && modo() === 'juego' && C.ocupado(),
+     `espera ${P.espera?.obj} · modo ${modo()}`);
+  pon(4, true); await espera(150);                                     // LB, mantenido
+  ok('LB capturado; mientras se mantiene, el cursor sigue apartado y no llega nada al juego',
+     JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).R) === '["b4"]' && !cursorVisible() && (C.estado.puertos[0].botones & 0x40) === 0 && C.estado.puertos[0].gl === 0);
+  ok('…y mando.js no muestra su cartel mientras tanto', D.body.classList.contains('mando-quieto'));
+  pon(4, false); await espera(500);
+  ok('soltado: el cursor vuelve y la fila dice qué pasó (y de dónde se quitó)', cursorVisible() && modo() === 'cursor' && /Derrapar y saltar: LB/.test(mensaje()) && /se quitó de Usar objeto/.test(mensaje()), mensaje());
+
+  // ---- 3. Capturar B no cierra el cajón (la falla 1 del crítico) ----
+  await ir(chip('B')); await pulsa(0); await cuadros(3);
+  ok('A en «Frenar»: espera', P.espera?.obj === 'B');
+  await pulsa(1, 150); await espera(450);
+  ok('capturar B (el «atrás» del cursor) NO cierra el cajón y queda asignado', cajon() && /Frenar y marcha atrás: B/.test(mensaje()) && !P.espera, `cajón ${cajon()} · ${mensaje()}`);
+
+  // ---- 4. Capturar A no vuelve a hacer clic (no empieza otra espera) ----
+  await ir(chip('A')); await pulsa(0); await cuadros(3);
+  ok('A en «Acelerar»: espera', P.espera?.obj === 'A');
+  await pulsa(0, 150); await espera(600);
+  ok('capturar A: queda, y esa A no hizo clic otra vez (nada espera)', !P.espera && /Acelerar: A/.test(mensaje()), `espera ${JSON.stringify(P.espera)} · ${mensaje()}`);
+
+  // ---- 5. «Deshacer» con el cursor ----
+  const antes = JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).R);
+  await ir(chip('R')); await pulsa(0); await cuadros(3);
+  pon(5, true); await espera(150); pon(5, false); await espera(500);        // RB para derrapar
+  const deshacer = [...D.querySelectorAll('.ctl-tira button')].find(b => b.textContent === 'Deshacer');
+  await ir(deshacer); await pulsa(0); await espera(200);
+  ok('«Deshacer» con el cursor: R vuelve a lo de antes', JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).R) === antes, JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).R));
+
+  // ---- 6. Probar el mando: B no cierra nada, se enciende la fila ----
+  await ir(D.querySelector('.ctl-probar')); await pulsa(0); await espera(150);
+  ok('«Probar el mando 10 s»: el cursor se aparta', C.probando() > 0 && !cursorVisible());
+  pon(1, true); await espera(250);
+  const luzB = D.querySelector('.ctl-fila[data-objetivo="B"] .luz').classList.contains('encendida');
+  pon(1, false); await espera(150);
+  ok('…B enciende la fila «Frenar» y no cierra el cajón ni llega al juego', luzB && cajon() && (C.estado.puertos[0].botones & 0x200) === 0);
+  D.body.dispatchEvent(new H.KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true, cancelable: true })); await espera(400);
+  ok('Esc termina la prueba (sin cerrar el cajón) y vuelve el cursor', !C.probando() && cajon() && cursorVisible());
+
+  // ---- 7. El asistente paso a paso: la A del paso 1 no lo reinicia; cerrar el cajón lo corta ----
+  await ir(D.querySelector('.ctl-pie .boton.principal')); await pulsa(0); await espera(300);
+  const tarjeta = () => D.querySelector('.ctl-asistente');
+  ok('«Asignar paso a paso»: la tarjeta grande con el paso 1 (Acelerar), sin cursor', !tarjeta().hidden && /Paso 1 de 9/.test(tarjeta().textContent) && /ACELERAR/.test(tarjeta().textContent) && !cursorVisible());
+  await pulsa(2, 150); await espera(700);                                     // X para acelerar
+  ok('X para acelerar: pasa al paso 2 (la X no hizo clic en nada: el asistente no se reinició)', /Paso 2 de 9/.test(tarjeta().textContent) && JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).A) === '["b2"]',
+     tarjeta().textContent.slice(0, 60));
+  H.mkwInterfaz.abrirCajon('controles');                                       // (el mismo botón de la barra: cierra el cajón)
+  await espera(400);
+  ok('cerrar el cajón en medio del asistente lo termina (y el mando vuelve al juego)', !cajon() && !P.ocupado && !C.ocupado() && !D.body.classList.contains('asistiendo-mando'),
+     `cajón ${cajon()} · panel ${P.ocupado} · controles ${C.ocupado()} (sin reserva ${C.ocupado({ sinReserva: true })}, captura ${JSON.stringify(C.capturandoAhora())}, prueba ${C.probando()}, ${JSON.stringify(C.porQueOcupado())}) · clase ${D.body.classList.contains('asistiendo-mando')}`);
+  pon(3, true); await espera(200); pon(3, false); await espera(200);
+  ok('…la Y que se aprieta después no queda asignada a nada', JSON.stringify(C.mapaDe(C.estado.mandos[0].clave).B) === '["b1"]');
+
+  // ---- 8. Jugador y zona muerta con el cursor ----
+  H.mkwInterfaz.abrirCajon('controles'); await espera(400);
+  const zona0 = C.prefsMandos().zona;
+  const mas = [...D.querySelectorAll('.ctl-ajustes .ctl-paso')].find(b => b.textContent === '+');
+  await ir(mas); await pulsa(0); await espera(150);
+  ok('zona muerta: «+» con el cursor la sube (una barra deslizante no se podía mover)', C.prefsMandos().zona === zona0 + 2, `${zona0} → ${C.prefsMandos().zona}`);
+  await ir(D.querySelector('.ctl-num[data-puerto="1"]')); await pulsa(0); await espera(300);
+  ok('«2» con el cursor: el mando pasa a ser el jugador 2 y la pestaña lo sigue', C.estado.mandos[0].puerto === 1 && P.pestana === 1 &&
+     D.querySelector('.ctl-pestana[data-jugador="1"]').getAttribute('aria-selected') === 'true');
+  ok('…en el jugador 2 no hay columna de teclado', !D.querySelector('.ctl').classList.contains('con-teclado'));
+  await ir(D.querySelector('.ctl-num[data-puerto="0"]')); await pulsa(0); await espera(300);
+
+  // ---- 9. El cajón encima del menú de inicio: el mando lo maneja (la falla 3 del crítico) ----
+  D.body.classList.add('con-inicio'); await espera(200);
+  ok('con el menú de inicio debajo, el cajón abierto se maneja con el cursor', modo() === 'cursor' && cursorVisible(), `modo ${modo()}`);
+  D.body.classList.remove('con-inicio');
+
+  // ---- 10. Nada se rearma solo (la falla del «Reasignar» que no abría) ----
+  const sacados = await new Promise(r => {
+    let n = 0; const o = new H.MutationObserver(ms => { for (const m of ms) n += [...m.removedNodes].filter(x => x.nodeType === 1).length; });
+    o.observe(D.getElementById('hojaControles'), { childList: true, subtree: true });
+    setTimeout(() => { o.disconnect(); r(n); }, 1500);
+  });
+  ok('en 1,5 s quietos, la hoja no saca ni vuelve a poner elementos (un clic de ratón o del cursor nunca se pierde)', sacados === 0, `${sacados} sacados`);
+  C.borrarAsignacion(C.estado.mandos[0].clave);
+} catch (e) {
+  ok('la prueba terminó sin errores', false, e?.stack || String(e));
+}
+try { localStorage.removeItem('mkw.mandos'); localStorage.removeItem('mkw.teclas'); } catch {}
+fin();
+</script>
+</body>
+</html>

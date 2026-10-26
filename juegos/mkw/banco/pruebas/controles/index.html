@@ -146,6 +146,7 @@ for (const [boton, i] of [['A', 1], ['B', 2], ['R', 7]]) {
   gc.buttons[i] = { pressed: false, value: 0 }; c.paso();
   if (n !== i) ok(`asignar ${boton}`, false, `devolvió ${n}`);
 }
+await espera(300);                                  // (§112: el mando vuelve al juego 250 ms después de soltar lo capturado)
 gc.buttons[1] = { pressed: true, value: 1 };
 r = p0();
 ok('asignado: el botón 1 del adaptador es A', (r.botones & BOTON.A) !== 0 && c.estado.mandos[0].propio && !c.estado.mandos[0].sinMapa);

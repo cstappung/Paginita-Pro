@@ -12,7 +12,7 @@
 //   5. Llama a main(): el runtime arranca, aurora crea el WebGPU sobre el <canvas id="canvas"> y dibuja.
 //   6. Cada segundo muestra cuadros por segundo y trabajo por cuadro, y anota las verificaciones del banco.
 import { prueba } from './verificaciones.mjs';   // (junto a la página: en el sitio ./banco/ no existe, §69)
-import { crearControles, ACCIONES, BOTON, nombreTecla, MAX_TECLAS } from './controles.mjs';
+import { crearControles, BOTON } from './controles.mjs';
 import { crearSonido } from './sonido.mjs';
 import { crearGuardado } from './guardado.mjs';
 import { crearNube } from './nube.mjs';
@@ -22,7 +22,7 @@ import { crearLotes } from './lote.mjs';
 import { crearPipelines } from './pipelines.mjs';
 import { largoEncabezadoBrsar, gruposBrsar, gruposConNombreBrsar } from './brsar.mjs';
 import { crearInterfaz } from './interfaz.mjs';
-import { montarMandos } from './opciones-mandos.mjs';
+import { montarControles } from './opciones-mandos.mjs';
 import { crearRecords, vigilarCarreras, textoTiempo, nombreCategoria as NOMBRE_CATEGORIA } from './records.mjs';
 import { crearLector, crearPiloto, leerNombres, SECCION, PAGINA, BOT } from './menus.mjs';
 import { crearPila, crearConmutador, crearEnlaceCanal, crearRouterMalla } from './red.mjs';
@@ -542,6 +542,10 @@ const barraVolumen = document.getElementById('volumen'), casillaSilencio = docum
 barraVolumen.value = Math.round(sonido.estado.volumen * 100);
 casillaSilencio.checked = sonido.estado.silencio;
 barraVolumen.addEventListener('input', () => sonido.volumen(barraVolumen.value / 100));
+// − y + de a 10 %: el cursor del mando (mando.js) hace clic, pero un clic simulado no mueve una barra deslizante
+const pasoVolumen = d => { const v = Math.min(100, Math.max(0, Math.round(sonido.estado.volumen * 10) * 10 + d)); barraVolumen.value = v; sonido.volumen(v / 100); };
+document.getElementById('volumenMenos').addEventListener('click', () => pasoVolumen(-10));
+document.getElementById('volumenMas').addEventListener('click', () => pasoVolumen(10));
 casillaSilencio.addEventListener('change', () => sonido.silenciar(casillaSilencio.checked));
 function pintarSonido() {
   const e = sonido.estado;
@@ -650,10 +654,11 @@ function pintarPartidas() {
 // ---- Controles (web/navegador/controles.mjs) ----
 // Funcionan desde que se abre la página; hasta que el juego arranca, lo que juntan no va a ningún lado.
 let enviarAlJuego = () => {};
+let panelControles = null;                  // la hoja «Controles» (opciones-mandos.mjs; se monta más abajo)
 const controles = crearControles({
   enviar: (...estado) => enviarAlJuego(...estado),
   contenedorTactil: document.getElementById('pantalla'),
-  alCambiar: () => pintarTeclas(),
+  alCambiar: () => panelControles?.refrescar(),     // (cambió una tecla o terminó la espera de una tecla)
 });
 window.mkwControles = controles;            // para las pruebas
 // §100: los mandos como en el resto de Juegos (mando-sitio.mjs): en el marco del sitio, la copia de mando.js del sitio
@@ -665,9 +670,14 @@ window.mkwControles = controles;            // para las pruebas
 // abierta, la franja del descanso —«Cambiar personaje y vehículo», «+ Agregar pistas»— contaba como un menú de la página:
 // el mando manejaba el cursor del sitio y no le llegaba al juego (con el teclado sí andaba). Mientras se elige en el juego
 // el mando es del juego; solo lo que tapa la pantalla —el selector de pistas, el cajón— se lo queda)
+// (§112, el crítico: mientras el panel de Controles captura o prueba un mando —y 250 ms después de soltar lo capturado—
+// el cursor no lo toma: si no, en el mismo cuadro la B capturada cerraba el cajón y la A hacía clic. Y el cajón abierto
+// encima del menú de inicio sí es un menú de la página: antes el mando no podía ni cerrarlo)
 const menuDePagina = () => {
-  if (controles.capturandoAhora() || document.body.classList.contains('con-inicio')) return false;
-  if (document.getElementById('elegirPista') || document.body.classList.contains('cajon-abierto')) return true;
+  if (controles.ocupado()) return false;
+  if (document.body.classList.contains('cajon-abierto')) return true;
+  if (document.body.classList.contains('con-inicio')) return false;
+  if (document.getElementById('elegirPista')) return true;
   return !!document.getElementById('playlistBreve') && !eligiendoEnJuego;
 };
 // §111: ¿está abierta la pantalla de personajes y vehículos del juego, esperando que esta persona elija? (directo.elegir)
@@ -675,28 +685,11 @@ let eligiendoEnJuego = 0;
 const marcarEligiendo = promesaEleccion => { eligiendoEnJuego++; window.mkwEstado.eligiendoEnJuego = true;
   Promise.resolve(promesaEleccion).catch(() => {}).finally(() => { eligiendoEnJuego = Math.max(0, eligiendoEnJuego - 1); window.mkwEstado.eligiendoEnJuego = eligiendoEnJuego > 0; }); };
 if (parametros.get('mandoSitio') !== '0') montarMandoSitio({ menu: menuDePagina, controles }).then(M => { window.mkwMandoSitio = !!M; });
-const esCelular = matchMedia('(pointer: coarse)').matches;   // pantalla táctil como puntero principal
-const casillaTactil = document.getElementById('usarTactil');
-casillaTactil.checked = esCelular;
-// Mando táctil prendido: el recuadro del juego pasa a ocupar la pantalla (body.tactil) y aparecen sus ajustes
-const usarTactil = si => {
-  controles.tactil(si);
-  document.body.classList.toggle('tactil', si);
-  document.getElementById('ajustesTactil').hidden = !si;
-};
-usarTactil(esCelular);
-casillaTactil.addEventListener('change', () => usarTactil(casillaTactil.checked));
-const tamTactil = document.getElementById('tamTactil'), opaTactil = document.getElementById('opaTactil');
-const pintarAjustesTactil = () => {
-  const a = controles.ajustesTactil();
-  tamTactil.value = Math.round(a.esc * 100); opaTactil.value = Math.round(a.opa * 100);
-  document.getElementById('tamTactilDato').textContent = `${Math.round(a.esc * 100)} %`;
-  document.getElementById('opaTactilDato').textContent = `${Math.round(a.opa * 100)} %`;
-};
-tamTactil.addEventListener('input', () => { controles.ajustarTactil({ esc: tamTactil.value / 100 }); pintarAjustesTactil(); });
-opaTactil.addEventListener('input', () => { controles.ajustarTactil({ opa: opaTactil.value / 100 }); pintarAjustesTactil(); });
-pintarAjustesTactil();
-document.getElementById('usarInclinacion').addEventListener('change', e => controles.inclinar(e.target.checked));
+// El mando táctil (celular): sin ajustes en la hoja Controles (§112, el dueño: los teléfonos no están en el lanzamiento);
+// se prende solo en una pantalla táctil, como antes, o con ?tactil=1 (?tactil=0 lo apaga)
+const usarTactil = parametros.has('tactil') ? parametros.get('tactil') === '1' : matchMedia('(pointer: coarse)').matches;
+controles.tactil(usarTactil);
+document.body.classList.toggle('tactil', usarTactil);
 document.getElementById('completa').addEventListener('click', async () => {
   // pantalla completa y, en el celular, acostado (horizontal); si el navegador no deja girar, no pasa nada
   // (toda la página, no solo el juego: así la barra y el cajón siguen a mano)
@@ -704,63 +697,6 @@ document.getElementById('completa').addEventListener('click', async () => {
   await document.documentElement.requestFullscreen().catch(() => {});
   if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
 });
-document.getElementById('restaurarTeclas').addEventListener('click', () => { controles.restaurarTeclas(); pintarTeclas(); });
-// La tabla de teclas: una fila por acción; clic en el botón y luego la tecla nueva (Esc cancela)
-// §111: la tabla del teclado (jugador 1): cada acción con sus teclas (hasta MAX_TECLAS), «✕» para quitar una,
-// «Cambiar» (la próxima tecla la reemplaza), «＋» (la suma), «↺» (las de siempre). Mientras espera: Esc o 8 s cancelan.
-// Si la tecla nueva era de otra acción, se mueve y se avisa (una tecla, una acción)
-let teclasAntes = null, relojTecla = 0;
-const mensajeTeclas = () => document.getElementById('mensajeTeclas');
-function esperarTecla(id, sumar) {
-  teclasAntes = JSON.parse(JSON.stringify(controles.teclas));
-  controles.reasignar(id, { sumar });
-  clearTimeout(relojTecla);
-  relojTecla = setTimeout(() => { if (controles.esperando()) { controles.cancelarTecla(); teclasAntes = null; mensajeTeclas().textContent = 'Pasaron 8 s: no se cambió nada.'; pintarTeclas(); } }, 8000);
-  pintarTeclas();
-}
-function pintarTeclas() {
-  const tabla = document.getElementById('tablaTeclas');
-  // ¿terminó una espera? lo que cambió y de dónde se quitó
-  if (teclasAntes && !controles.esperando()) {
-    clearTimeout(relojTecla);
-    const ahora = controles.teclas, quitadas = [];
-    for (const [id, nombre] of ACCIONES) for (const c of teclasAntes[id] || []) if (!(ahora[id] || []).includes(c) && Object.entries(ahora).some(([k, l]) => k !== id && l.includes(c))) quitadas.push(`${nombreTecla(c)} se quitó de «${nombre.split(' —')[0]}»`);
-    mensajeTeclas().textContent = quitadas.length ? quitadas.join(' · ') : '';
-    teclasAntes = null;
-  }
-  tabla.innerHTML = '';
-  for (const [id, nombre] of ACCIONES) {
-    const fila = tabla.insertRow();
-    fila.insertCell().textContent = nombre;
-    const celda = fila.insertCell();
-    if (controles.esperando() === id) celda.append(Object.assign(document.createElement('i'), { className: 'esperando', textContent: 'aprieta una tecla… (Esc cancela)' }));
-    else if (!controles.teclasDe(id).length) celda.append(Object.assign(document.createElement('i'), { className: 'vacio', textContent: 'ninguna' }));
-    else for (const c of controles.teclasDe(id)) {
-      const chip = Object.assign(document.createElement('span'), { className: 'fuente', textContent: nombreTecla(c) });
-      const quitar = Object.assign(document.createElement('button'), { type: 'button', className: 'quitar', textContent: '✕', title: 'Quitar esta tecla' });
-      quitar.addEventListener('click', () => { controles.quitarTecla(id, c); pintarTeclas(); });
-      chip.append(quitar); celda.append(chip);
-    }
-    const acciones = fila.insertCell(); acciones.className = 'acciones';
-    const boton = (texto, titulo, f) => { const b = Object.assign(document.createElement('button'), { type: 'button', className: 'boton chico', textContent: texto, title: titulo }); b.addEventListener('click', f); acciones.append(b); };
-    if (controles.esperando() === id) boton('Cancelar', 'No cambiar nada', () => { controles.cancelarTecla(); teclasAntes = null; pintarTeclas(); });
-    else boton('Cambiar', 'La próxima tecla reemplaza a estas', () => esperarTecla(id, false));
-    if (controles.teclasDe(id).length < MAX_TECLAS) boton('＋', 'Sumar otra tecla para lo mismo', () => esperarTecla(id, true));
-    boton('↺', 'Las de siempre', () => { controles.restaurarTecla(id); pintarTeclas(); });
-  }
-}
-addEventListener('mkw-reasignacion-cancelada', () => { teclasAntes = null; pintarTeclas(); });
-pintarTeclas();
-// Lo que recibe el puerto 1, 5 veces por segundo (para ver que todo responde; los mandos: opciones-mandos.mjs)
-const NOMBRES_BOTON = Object.entries(BOTON);
-setInterval(() => {
-  const p = controles.estado.puertos[0];
-  if (p) {
-    const apretados = NOMBRES_BOTON.filter(([, bit]) => p.botones & bit).map(([n]) => n).join(' ');
-    document.getElementById('puerto1').textContent = `puerto 1: ${apretados || '—'} · stick ${p.sx},${p.sy}` + (p.gr ? ` · R ${p.gr}` : '');
-  }
-}, 200);
-
 // ---- La cara de la página (interfaz.mjs): inicio, modos, barra, cajón, «Tu partida», diálogos ----
 // alCambiarGuardado: el editor de Mii guardó algo sin recargar la página → se vuelve a leer lo guardado para el arranque
 var ui = crearInterfaz({ guardado, sonido, controles, imagenes: ORIGEN + '/build/imagenes',
@@ -859,8 +795,10 @@ if (quiereInicio) inicio.cargar().then(ok => {
   if (ok && !modoInicio) mostrarInicio();
   else if (!ok) nota(`menú de inicio: sin imagen (${inicio.estado.imagen}): la página sigue sin él`);
 });
-// Panel «Mandos» (opciones-mandos.mjs): tipo de mando, disposición de botones, zona muerta, vibración, probar y asignar
-montarMandos(document.getElementById('mandosPanel'), controles);
+// La hoja «Controles» (opciones-mandos.mjs, §112): pestaña por jugador, la lista de acciones (mando y teclado), el asistente
+// paso a paso, probar el mando y los ajustes de todos
+panelControles = montarControles(document.getElementById('panelControles'), controles);
+window.mkwPanelControles = panelControles;  // para las pruebas
 // Récords (records.mjs): existen desde el principio (la lista de pistas muestra tus mejores tiempos antes de jugar)
 const records = crearRecords();
 window.mkwRecords = records;
