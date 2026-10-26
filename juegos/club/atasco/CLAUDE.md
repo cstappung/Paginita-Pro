@@ -68,8 +68,18 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   than the local proofs back, the game asks the page for the proof saved with
   its own row (`Club.pedirPruebaPropia` → `soloPruebas/<cat>/<uid>/<partida>`,
   read by key), replays each level and merges the valid ones like a cloud
-  copy. A player whose browser lost the proofs saw ⚠ on levels the table had
-  already accepted (180 ★ in game, 30 backed, row of 150). Ten logros by stars,
+  copy. **A row with no proof at all** (written before proofs existed, or
+  while the `soloPruebas` rules were unpublished: `guardaClub` swallows the
+  permission error and writes the row anyway) has nothing to rescue, and the
+  table froze for good: 184 ★ in game, 37 replayed, row of 150 that new
+  levels could never beat. Such a row becomes the **base** (`motor.js`:
+  `limpiaBase`/`resumenConBase`, proof `v: 3` with `b: {p, t}`): it stands
+  for the first ⌈p/3⌉ levels and the proven levels from there up add on
+  top; the game sends whichever total is larger, with base or without.
+  The live verifier only accepts the base of *your* row
+  (`ctx.filaPropia` from `solo/club.js`: a row with no proof and exactly
+  that `puntos`/`tiempo`, or a row whose own proof carries the same `b`),
+  rejecting with «No se pudo comprobar…», which never punishes. Ten logros by stars,
   coins (4 per star, `RECORD` 40, `PAGO_CLUB` 15), the `tatasco` champion
   frame, the Discord podium (`🚗 N ★`), the manual with three illustrated
   examples and the lobby card. The `soloRanks` and `clubJugadas` regexes were

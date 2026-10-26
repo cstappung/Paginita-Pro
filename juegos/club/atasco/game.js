@@ -64,9 +64,20 @@
      el mismo objeto: cada cambio del progreso arma uno nuevo. */
   let resumenDe = null, resumen = null;
   const respaldadas = () => (resumenDe === prog.p ? resumen : (resumenDe = prog.p, resumen = M.resumenPruebas(prog.p, PISOS)));
+  /* La base de tu fila sin prueba (motor.js: limpiaBase), si la tiene: la
+     trae `rescata`. Lo que cuenta es lo que más dé, con base o sin ella:
+     quien vuelve a ganar todo lo de abajo termina mandando sin base. */
+  let base = null, conBaseDe = null, conBase = null;
+  const cuenta = () => {
+    const r = respaldadas();
+    if (!base) return r;
+    if (conBaseDe !== prog.p || conBase.base !== base) { conBaseDe = prog.p; conBase = M.resumenConBase(prog.p, PISOS, base); }
+    return conBase.estrellas > r.estrellas ? conBase : r;
+  };
   let pisoVisto = Math.min(PISOS.length - 1, Math.max(0, lee("atasco.piso", 0) | 0)); // la pestaña abierta
   let ultimaSubida = "";                                               // lo último mandado a la cuenta
   let enTabla = null;                                                  // las ★ de tu fila en la tabla (0 sin fila); null hasta saberlo (ponAlDia)
+  let filaTabla = null;                                                // tu fila: {puntos, tiempo}, o null
   let mandadas = 0;                                                    // el último total mandado a la tabla
 
   /* ---------- Estado de la partida ---------- */
@@ -234,7 +245,7 @@
   const textoEstrellas = n => "★".repeat(n) + "☆".repeat(3 - n);
 
   function pintaTotal() {
-    const t = M.totales(prog), r = respaldadas().estrellas, b = $("totalEstrellas");
+    const t = M.totales(prog), r = cuenta().estrellas, b = $("totalEstrellas");
     /* Estrellas sin la partida que las ganó (de antes de las pruebas, o de
        un intento que no se pudo guardar): se ven, pero la tabla no las
        cuenta. Se dice a la vista, no solo en el `title`: si no, la tabla
@@ -269,10 +280,10 @@
     lista.replaceChildren();
     const ini = primeroDe(pisoVisto);
     let siguienteMarcado = false;
-    const { contados: cuentan, errores } = respaldadas();
+    const { contados: cuentan, errores, desde: enBase = 0 } = cuenta();
     p.niveles.forEach((_, k) => {
       const i = ini + k, e = estrellasDe(i), puede = M.nivelAbierto(prog, PISOS, i);
-      const sinPrueba = e > 0 && !cuentan[i];                         // se ve ganado, pero la tabla no lo cuenta
+      const sinPrueba = e > 0 && !cuentan[i] && i >= enBase;        // se ve ganado, pero la tabla no lo cuenta (ni está en la base)
       const b = document.createElement("button");
       b.type = "button"; b.className = "puesto"; b.setAttribute("role", "listitem");
       b.disabled = !puede;
@@ -633,7 +644,7 @@
     // El tiempo del nivel es el instante de la última movida: así cuadra al ms con la prueba.
     const ms = Math.max(1, J.jugadas.length ? J.jugadas[J.jugadas.length - 1][2] : Math.round(J.acum));
     const n = NIVELES[J.i];
-    const antes = respaldadas().estrellas;
+    const antes = cuenta().estrellas;
     const pisosAntes = PISOS.map((_, j) => M.pisoAbierto(prog, PISOS, j));
     const r = M.anota(prog, J.i, J.movs, ms, n.optimo);
     prog = r.prog;
@@ -647,7 +658,7 @@
     // guion) no suma, pero se manda igual con su prueba: la página la
     // rechaza y deja el aviso para los administradores.
     const sinMano = !!prueba && prog.p[J.i] === prueba && !!respaldadas().bots[J.i];
-    if (respaldadas().estrellas > antes || sinMano) mandaResultado(sinMano ? J.i : -1); // solo si subió el total que cuenta
+    if (cuenta().estrellas > antes || sinMano) mandaResultado(sinMano ? J.i : -1); // solo si subió el total que cuenta
     const abrio = PISOS.findIndex((_, j) => !pisosAntes[j] && M.pisoAbierto(prog, PISOS, j));
     pintaTotal();                                                      // el ★ de la cabecera ya cuenta este nivel
     pintaMarcador();
@@ -700,7 +711,7 @@
      que cuenta: la página las vuelve a jugar antes de guardar nada. */
   function mandaResultado(conBot = -1) {
     if (!Club) return;
-    const r = respaldadas();
+    const r = cuenta();
     const n = {};
     let puntos = r.estrellas, tiempo = r.tiempo;
     for (const k of Object.keys(r.contados)) n[k] = prog.p[k];
@@ -708,7 +719,7 @@
     if (b) { n[conBot] = prog.p[conBot]; puntos += b[0]; tiempo = Math.min(604800000, tiempo + b[2]); } // lo que diría haber ganado
     if (puntos < 1) return;
     if (conBot < 0) mandadas = puntos;                                 // ya va camino a la tabla: ponAlDia no lo repite
-    Club.result({ categoria: CATEGORIA, puntos, tiempo }, { v: M.PRUEBA_VERSION, n });
+    Club.result({ categoria: CATEGORIA, puntos, tiempo }, r.base ? { v: M.PRUEBA_VERSION_BASE, b: r.base, n } : { v: M.PRUEBA_VERSION, n });
   }
   function subeNube(forzar) {
     if (!Club || !Club.guardarPartida) return;
@@ -745,12 +756,13 @@
      al pulsar «Reintentar sincronización». */
   function ponAlDia(forzar) {
     if (!Club || (enTabla === null && !forzar)) return;               // sin saber la tabla, solo si lo pidió la persona
-    const r = respaldadas().estrellas;
+    const r = cuenta().estrellas;
     if (r > (enTabla || 0) && (forzar || r !== mandadas)) mandaResultado();
   }
   window.addEventListener("club-tabla", e => {
     if (!e.detail || e.detail.categoria !== CATEGORIA) return;
     enTabla = e.detail.propio ? e.detail.propio.puntos || 0 : 0;
+    filaTabla = e.detail.propio ? { puntos: e.detail.propio.puntos, tiempo: e.detail.propio.tiempo } : null;
     ponAlDia();
     pideRescate();
   });
@@ -760,16 +772,27 @@
      una versión vieja las perdió), esos niveles quedaban con ⚠ y la tabla
      no podía subir hasta volver a ganarlos uno por uno. Se vuelve a jugar
      cada una con el motor y las que valen se juntan como si llegaran de la
-     cuenta (mezclaProgreso se queda con la mejor de cada nivel). */
+     cuenta (mezclaProgreso se queda con la mejor de cada nivel).
+     Si la fila NO tiene prueba (se escribió antes de que existieran, o con
+     las reglas de `soloPruebas` sin publicar) no hay partidas que traer, y
+     antes eso dejaba la tabla clavada: 184 ★ en el juego, 37 vueltos a
+     ganar y la fila en 150 para siempre. Ahora esa fila pasa a ser la base
+     (motor.js: limpiaBase) y encima suman los niveles nuevos; si la prueba
+     de la fila ya traía una base, se sigue con esa. */
   let rescatando = false;
   function pideRescate() {                                             // la fila respalda más que lo de aquí: sus partidas están guardadas con ella
     if (rescatando || !Club || !Club.pedirPruebaPropia || enTabla === null || enTabla <= respaldadas().estrellas) return;
     rescatando = true;
-    Club.pedirPruebaPropia(CATEGORIA, rescata);
+    const fila = filaTabla;                                            // la fila de la que se piden las partidas
+    Club.pedirPruebaPropia(CATEGORIA, texto => rescata(texto, fila));
   }
-  function rescata(texto) {
+  function rescata(texto, fila) {
+    if (texto === null) return;                                        // no se pudo leer: «Reintentar» vuelve a probar
     let pr = null;
     try { pr = texto ? JSON.parse(texto) : null; } catch (_) { pr = null; }
+    const b = !texto && fila ? M.limpiaBase({ p: fila.puntos, t: fila.tiempo }, MAX_ESTRELLAS)
+      : pr && pr.v === M.PRUEBA_VERSION_BASE ? M.limpiaBase(pr.b, MAX_ESTRELLAS) : null;
+    if (b && (!base || base.p !== b.p || base.t !== b.t)) { base = b; if (!J) pintaPisos(); else pintaTotal(); ponAlDia(); }
     const n = pr && pr.n && typeof pr.n === "object" && !Array.isArray(pr.n) ? pr.n : null;
     if (!n) return;
     const traido = { n: {}, p: {} };
