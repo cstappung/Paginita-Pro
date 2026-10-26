@@ -10445,3 +10445,10 @@ con el juego y con mando/teléfono de verdad lo que hasta ahora solo estaba prob
 (§112: reasignar el mando y el teclado, el cursor del mando en la hoja), elegir personaje con el mando en el descanso
 (§111), el celular con el mando en pantalla editable y reasignable (§113, §113b) y «Acelerar solo» (§113c). Lo que
 sigue abierto es **el rendimiento en el teléfono** (30 fps en un Oppo Find X9 Pro): espera el informe de §114.3.
+
+### 114.6 La meta y la regla (el dueño, 2026-10-26)
+
+«La idea es que corra mínimo a 60 fps; este Oppo es más potente que la mayoría de los celulares: en los de menor gama
+igual debería correr a 60». Y, preguntado qué se puede sacrificar en el celular si lo que frena es el procesador:
+**nada** — mismos 12 karts y todos los efectos, **solo optimizar el motor**. El paso siguiente sale del informe del Oppo
+(§114.3): con él se sabe qué parte del cuadro hay que achicar.

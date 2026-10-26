@@ -27,7 +27,8 @@ línea más un resumen general. **Es ingeniero eléctrico, no de software**: la 
 - **Celulares: sí, en Chrome de Android** (el dueño, 2026-10-26, «coloca compatibilidad con móviles», §113; antes,
   el 2026-10-19, habían quedado fuera del lanzamiento). El mando en pantalla se edita botón por botón como en BT3
   (mover, agrandar, agregar, ocultar). Probado por el dueño con el juego: los controles andan; **el rendimiento no**
-  (30 fps en un Oppo Find X9 Pro, §114: falta su informe para saber qué frena).
+  (30 fps en un Oppo Find X9 Pro, §114: falta su informe para saber qué frena). **Meta: 60 fps también en
+  celulares de gama menor, sin sacrificar nada** (12 karts y todos los efectos: solo optimizar el motor, el dueño §114.6).
 - Disco: PAL `RMCP01` revisión 0 (`Mario Kart Wii (Europe Australia) (EnFrDeEsIt)/…rvz`).
 
 ## Reglas (no negociables)
