@@ -10460,3 +10460,25 @@ negociable (también en `CLAUDE.md`, «Reglas»): para que el juego ande más r�
 la sala— **nunca** se baja la cantidad de karts (siempre 12: los humanos y la CPU que completa la parrilla), ni se
 propone como opción, ajuste, «modo celular» o prueba. Tampoco se sacan efectos (§114.6). El rendimiento se gana
 optimizando el motor y la página.
+
+### 114.8 El primer informe del Oppo Find X9 Pro (2026-10-26) y el informe más detallado
+
+Lo que dijo (Chrome 155, Android, 8 núcleos, 8 GB, «arm gen-5», salida 540 → lienzo 1176×539, dpr 3,5):
+
+- **Los últimos 9 s: 59–60 fps con 12,3–12,6 ms por cuadro** (de 16,7). El motor SÍ le alcanza a este teléfono cuando
+  ya anda.
+- **Los ~21 s anteriores: 20–37 fps con 27–48 ms por cuadro**, 2 a 4 veces más. Un tramo que se pasa solo: huele a
+  «la primera vez que algo pasa». Tres sospechosos: (1) Chrome corre primero el WebAssembly con su compilador rápido de
+  preparar pero lento (Liftoff) y lo va optimizando (TurboFan) a medida que se usa: en un teléfono tarda más; (2) la
+  tarjeta compilando los pipelines de lo que aparece por primera vez; (3) el disco bajando lo de la pista nueva.
+- **La pantalla va a 60,4 Hz** y el reloj del juego (59,94: un cuadro de 16,683 ms) **nunca se enganchó** al monitor
+  (0 de 5167): el runtime solo engancha si el refresco cae a menos del 0,5 % de un múltiplo (vi.cpp,
+  `MkwVsyncPhaseLockLocked`), y 60,4 Hz está a 0,76 %. Sin enganche, de vez en cuando una imagen dura dos refrescos (un
+  tironcito cada ~2 s aunque marque 60). Candidato para la sesión que compila (cambia el runtime): enganchar hasta ~1 %
+  fuera de la sala (el juego andaría 0,76 % más rápido, como hacen los emuladores que se atan al monitor).
+- La tarjeta no se midió (la casilla se prende y hay que recargar: el aviso de WebGPU se instala al abrir la página).
+
+**El informe nuevo**: guarda **2 minutos** (una carrera entera) y cada segundo dice fps, ms del juego, ms de la tarjeta,
+**ms esperando el disco**, **pipelines nuevos y los ms que bloquearon** (`createRenderPipeline`/`createComputePipeline`/
+`…Async` y `createShaderModule` envueltos siempre: solo cuesta cuando se crea uno) y **dónde estaba el juego**
+(menú / presentación / cuenta / carrera / fin, de la etapa de Raceinfo). Con eso se ve cuál de los tres sospechosos es.
