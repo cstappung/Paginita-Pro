@@ -48,7 +48,7 @@ import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
-import { leerGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida } from './graficos.mjs';
+import { leerGraficos, guardarGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida } from './graficos.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -685,11 +685,43 @@ let eligiendoEnJuego = 0;
 const marcarEligiendo = promesaEleccion => { eligiendoEnJuego++; window.mkwEstado.eligiendoEnJuego = true;
   Promise.resolve(promesaEleccion).catch(() => {}).finally(() => { eligiendoEnJuego = Math.max(0, eligiendoEnJuego - 1); window.mkwEstado.eligiendoEnJuego = eligiendoEnJuego > 0; }); };
 if (parametros.get('mandoSitio') !== '0') montarMandoSitio({ menu: menuDePagina, controles }).then(M => { window.mkwMandoSitio = !!M; });
-// El mando táctil (celular): sin ajustes en la hoja Controles (§112, el dueño: los teléfonos no están en el lanzamiento);
-// se prende solo en una pantalla táctil, como antes, o con ?tactil=1 (?tactil=0 lo apaga)
-const usarTactil = parametros.has('tactil') ? parametros.get('tactil') === '1' : matchMedia('(pointer: coarse)').matches;
-controles.tactil(usarTactil);
-document.body.classList.toggle('tactil', usarTactil);
+// §113 (el dueño: «coloca compatibilidad con móviles»): el celular. Un TELÉFONO es una pantalla táctil sin puntero fino
+// (como BT3: un PC con pantalla táctil o drivers de toque también dice «coarse», y el mando en pantalla le tapaba el
+// juego). Ahí el mando en pantalla se prende solo (salvo que la persona lo apagó: `mkw.tactil.activo`) y la hoja
+// Controles muestra la sección «Celular». ?tactil=1 lo prende en cualquier lado (pruebas), ?tactil=0 lo apaga.
+const esTelefono = matchMedia('(any-pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
+const conCelular = parametros.get('tactil') === '1' || esTelefono;
+const ponerTactil = si => {
+  controles.tactil(si);
+  document.body.classList.toggle('tactil', !!si);
+  controles.ajustarTactil({ activo: !!si });     // (se recuerda en el navegador)
+};
+ponerTactil(parametros.has('tactil') ? parametros.get('tactil') === '1' : esTelefono && controles.ajustesTactil().activo !== false);
+if (conCelular && controles.ajustesTactil().inclinar) controles.inclinar(true);   // (dirigir inclinando, si lo dejó prendido)
+// editar el mando en pantalla (mover, agrandar, agregar u ocultar botones, cambiar lo que hacen): se cierra el cajón y se
+// edita sobre el juego. opciones.objetivo (§113b): la acción que se tocó en la lista de Controles (ese botón ya elegido)
+const editarTactil = (opciones = {}) => {
+  ui.cerrarCajon();
+  document.body.classList.add('editando-tactil');
+  controles.editarTactil(true, () => document.body.classList.remove('editando-tactil'), opciones);
+};
+// §113c: «Acelerar solo»: ¿puede el kart acelerar solo AHORA? Sí con la carrera corriendo (Raceinfo +0x28 = 2, desde el
+// «¡YA!»: en la cuenta, 1, la salida rápida es de la persona) y con la pantalla de la carrera encima. Esa pantalla se
+// anota al largar (la de arriba de la pila en ese momento: el HUD, sea cual sea el modo); si después hay otra encima
+// (la pausa, los resultados), no acelera: en un menú, A apretado elegiría por la persona
+let etapaAntes = -1, paginaCarrera = -1;
+controles.acelerar(() => {
+  try {
+    const L = window.mkwMenus, ri = L?.u32(0x809BD730), etapa = ri ? L.u32(ri + 0x28) : -1, pagina = L?.estado().pagina ?? -1;
+    if (etapa === 2 && etapaAntes !== 2) paginaCarrera = pagina;
+    etapaAntes = etapa;
+    return etapa === 2 && pagina === paginaCarrera && pagina !== -1;
+  } catch { return false; }
+});
+window.mkwCelular = { esTelefono, conCelular, ponerTactil, editarTactil };   // (para las pruebas)
+// «Gira el teléfono»: jugando parado, la imagen 16:9 queda chica; el aviso ofrece pantalla completa acostada
+document.getElementById('girarCompleta')?.addEventListener('click', () => document.getElementById('completa').click());
+document.getElementById('girarCerrar')?.addEventListener('click', () => document.body.classList.add('girar-visto'));
 document.getElementById('completa').addEventListener('click', async () => {
   // pantalla completa y, en el celular, acostado (horizontal); si el navegador no deja girar, no pasa nada
   // (toda la página, no solo el juego: así la barra y el cajón siguen a mano)
@@ -709,6 +741,10 @@ if (descargas) montarBarraDescarga($('descarga'), descargas, { primeraVez: () =>
   enCortina: () => ui.cortinaPuesta && getComputedStyle($('cortina')).visibility !== 'hidden' });
 // §107: gráficos opcionales (graficos.mjs): resolución interna y fluidez van al Config.toml al arrancar; para medir sin
 // tocar lo guardado, ?escala=2&fluidez=180 (o ?graficos=0 = lo de siempre, ignore lo guardado)
+// §113: en un teléfono, la primera vez, la resolución de salida empieza en 720 (la pantalla de un teléfono tiene 3 pixeles
+// por punto: sin tope el lienzo medía ~2400×1080 y la tarjeta del teléfono dibujaba 5 veces más que en 720); la
+// persona la cambia en Avanzado → Gráficos y desde ahí manda lo suyo
+try { if (esTelefono && localStorage.getItem('mkw.graficos') === null) guardarGraficos({ ...leerGraficos(), salida: 720 }); } catch {}
 const graficosArranque = parametros.get('graficos') === '0' ? leerGraficos({ getItem: () => null }) : {
   ...leerGraficos(),
   ...(parametros.has('escala') ? { escala: Number(parametros.get('escala')) } : {}),
@@ -797,7 +833,8 @@ if (quiereInicio) inicio.cargar().then(ok => {
 });
 // La hoja «Controles» (opciones-mandos.mjs, §112): pestaña por jugador, la lista de acciones (mando y teclado), el asistente
 // paso a paso, probar el mando y los ajustes de todos
-panelControles = montarControles(document.getElementById('panelControles'), controles);
+panelControles = montarControles(document.getElementById('panelControles'), controles,
+  { celular: { visible: conCelular, ponerTactil, alEditar: editarTactil } });
 window.mkwPanelControles = panelControles;  // para las pruebas
 // Récords (records.mjs): existen desde el principio (la lista de pistas muestra tus mejores tiempos antes de jugar)
 const records = crearRecords();

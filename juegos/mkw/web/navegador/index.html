@@ -185,6 +185,14 @@
   .vol-mini input { width: 80px; accent-color: var(--amarillo); }
   .vol-mini button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; }
   body.tactil .vol-mini input { display: none; }
+  /* §113: el aviso de girar el teléfono (solo jugando parado con el mando en pantalla, hasta cerrarlo) y el editor del
+     mando en pantalla (mientras se edita, nada más encima: ni la barra ni los avisos) */
+  #girar { display: none; position: fixed; z-index: 8; left: 50%; top: calc(var(--st, 0px) + 8px); translate: -50% 0; max-width: calc(100vw - 16px);
+    align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 8px 10px; border-radius: 12px;
+    background: rgba(18,14,40,.94); border: 1px solid #5b4bb0; color: var(--texto); font-size: 14px; }
+  #girar .boton { min-height: 40px; }
+  @media (orientation: portrait) { body.tactil.started:not(.girar-visto):not(.editando-tactil):not(.cajon-abierto) #girar { display: flex; } }
+  body.editando-tactil #barra, body.editando-tactil #girar, body.editando-tactil #descarga { display: none !important; }
   /* en el celular, la barra va arriba al centro: a la derecha está el ▶ (pausa) del mando táctil */
   body.tactil #barra { left: 50%; right: auto; translate: -50% 0; justify-content: center; max-width: calc(100vw - 30cqmin); }
   body.tactil.started #barra { max-width: 60vw; }
@@ -610,6 +618,10 @@
   .ctl { display: grid; gap: 10px; --cols: minmax(0, 1.3fr) minmax(0, 1fr); }
   .ctl.con-teclado { --cols: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
   .ctl:not(.con-teclado) .ctl-col-teclado { display: none; }
+  .ctl:not(.con-pantalla) .ctl-col-pantalla, .ctl.sin-mando .ctl-col-mando { display: none; }
+  .ctl-ayudas { padding: 8px 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
+  .ctl-ayudas .fila { margin-bottom: 4px; }
+  .ctl.sin-lista .ctl-lista, .ctl.sin-lista .ctl-pie { display: none; }
   .ctl .boton { min-height: 38px; }
   .ctl .boton[aria-pressed="true"] { background: var(--morado); border-color: var(--amarillo); color: #fff; }
   .ctl-pestanas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
@@ -709,6 +721,10 @@
 <body>
 <!-- el juego (position:fixed va en el atributo: controles.mjs le pone position:relative si no tiene una propia) -->
 <div id="pantalla" style="position:fixed"><canvas id="canvas" tabindex="0"></canvas></div>
+<!-- §113: jugando con el teléfono parado, la imagen 16:9 queda chica: un aviso (cerrable) ofrece pantalla completa acostada -->
+<div id="girar" role="status"><span>📱 Gira el teléfono: acostado se ve más grande.</span>
+  <button type="button" class="boton" id="girarCompleta">⛶ Pantalla completa</button>
+  <button type="button" class="boton" id="girarCerrar" aria-label="Cerrar el aviso">✕</button></div>
 
 <!-- la cortina (interfaz.mjs: ui.cortina): está desde el primer instante para que nunca se vea nada antes de tiempo -->
 <div id="cortina" role="status" aria-live="polite">
