@@ -79,7 +79,9 @@ const oculto = (n, si) => { if (n.hidden !== !!si) n.hidden = !!si; };
 const apagado = (n, si) => { if (n.disabled !== !!si) n.disabled = !!si; };
 const marcado = (n, si) => { const v = String(!!si); if (n.getAttribute('aria-pressed') !== v) n.setAttribute('aria-pressed', v); };
 
-export function montarControles(caja, controles, { ahora = () => performance.now() } = {}) {
+// celular (§113): { visible, ponerTactil(si), alEditar() } — la sección «Celular» (el mando en pantalla, su tamaño, su
+// transparencia, editarlo y dirigir inclinando); visible solo en una pantalla táctil sin ratón (o con ?tactil=1)
+export function montarControles(caja, controles, { ahora = () => performance.now(), celular = null } = {}) {
   if (!caja) return null;
   const boton = (t, clase = '') => el('button', { type: 'button', className: 'boton ' + clase, textContent: t });
 
@@ -182,7 +184,35 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     el('p', { className: 'ctl-nota', textContent: 'Cuánto hay que mover el stick para que cuente. Súbela si el kart gira solo.' }),
     el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: 'Vibración' }), vibSi, vibNo, vibProbar), vibNota);
 
-  const raiz = el('div', { className: 'ctl' }, barraPestanas, cabeza, avisoSinMapa, asistente, lista, pie,
+  // ---------------- §113: el celular (el mando en pantalla) ----------------
+  const tactilSi = boton('Sí', 'ctl-opcion'), tactilNo = boton('No', 'ctl-opcion');
+  tactilSi.onclick = () => { celular?.ponerTactil(true); pintar(); }; tactilNo.onclick = () => { celular?.ponerTactil(false); pintar(); };
+  const tamDato = el('span', { className: 'dato ctl-zona' }), tamMenos = boton('−', 'ctl-paso'), tamMas = boton('+', 'ctl-paso');
+  const opaDato = el('span', { className: 'dato ctl-zona' }), opaMenos = boton('−', 'ctl-paso'), opaMas = boton('+', 'ctl-paso');
+  tamMenos.setAttribute('aria-label', 'Mando en pantalla más chico'); tamMas.setAttribute('aria-label', 'Mando en pantalla más grande');
+  opaMenos.setAttribute('aria-label', 'Más transparente'); opaMas.setAttribute('aria-label', 'Menos transparente');
+  const tactil = (k, d, min, max) => { const a = controles.ajustesTactil(); controles.ajustarTactil({ [k]: Math.round(Math.min(max, Math.max(min, a[k] + d)) * 100) / 100 }); pintar(); };
+  tamMenos.onclick = () => tactil('esc', -0.05, 0.8, 1.3); tamMas.onclick = () => tactil('esc', 0.05, 0.8, 1.3);
+  opaMenos.onclick = () => tactil('opa', -0.1, 0.3, 1); opaMas.onclick = () => tactil('opa', 0.1, 0.3, 1);
+  const editarTactil = boton('✏️ Mover, agrandar, agregar u ocultar botones', 'principal');
+  editarTactil.onclick = () => celular?.alEditar();
+  const incSi = boton('Sí', 'ctl-opcion'), incNo = boton('No', 'ctl-opcion');
+  incSi.onclick = () => { controles.inclinar(true); controles.ajustarTactil({ inclinar: true }); pintar(); };
+  incNo.onclick = () => { controles.inclinar(false); controles.ajustarTactil({ inclinar: false }); pintar(); };
+  const tactilComoVenia = boton('↺ Como venía');
+  tactilComoVenia.onclick = () => { controles.ajustarTactil({ esc: 1, opa: 1 }); controles.borrarPiezasTactil(); pintar(); };
+  const seccionCelular = el('div', { className: 'ctl-celular', hidden: !celular?.visible },
+    el('h3', { textContent: '📱 Celular' }),
+    el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: 'Mando en pantalla' }), tactilSi, tactilNo),
+    el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: 'Tamaño de todos' }), tamMenos, tamDato, tamMas),
+    el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: 'Opacidad' }), opaMenos, opaDato, opaMas),
+    el('div', { className: 'fila' }, editarTactil),
+    el('p', { className: 'ctl-nota', textContent: 'Arrastra cada botón (o el stick) a donde te acomode, agranda o achica uno solo, agrega «Mirar atrás», Z o la cruz, u oculta los que no uses. Se guarda aparte con el teléfono acostado y parado.' }),
+    el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: 'Dirigir inclinando el teléfono' }), incSi, incNo),
+    el('p', { className: 'ctl-nota', textContent: 'Como un volante: se centra en la posición del teléfono al prenderlo (para centrarlo de nuevo, «No» y «Sí»).' }),
+    el('div', { className: 'fila' }, tactilComoVenia));
+
+  const raiz = el('div', { className: 'ctl' }, seccionCelular, barraPestanas, cabeza, avisoSinMapa, asistente, lista, pie,
     el('div', { className: 'fila-botones' }, mensajeAbajo, bDeshacerAbajo), ajustes);
   caja.replaceChildren(raiz);
 
@@ -384,13 +414,17 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     const t = ahora();
     const mandos = (controles.estado.mandos || []);
     const m = mandoDeAhora();
-    const conTeclado = pestana === 0;
+    // (en un teléfono —sección Celular a la vista— no hay teclado: sin esa columna)
+    const conTeclado = pestana === 0 && !celular?.visible;
     raiz.classList.toggle('con-teclado', conTeclado);
     raiz.classList.toggle('sin-mando', !m);
+    // (en un teléfono sin mando conectado, la lista no tiene nada que mostrar —ni mando ni teclado—: se esconde)
+    raiz.classList.toggle('sin-lista', !m && !conTeclado);
     // pestañas: quién es cada jugador
     pestanas.forEach(({ b, sub: s }, p) => {
       const x = mandos.find(y => y.puerto === p);
-      texto(s, x ? `${ICONO[x.tipo] || '🎮'} ${NOMBRE_TIPO[x.tipo]?.split(' (')[0] || 'Mando'}` + (p === 0 ? ' + ⌨' : '') : p === 0 ? '⌨ Teclado' : 'sin mando');
+      const propio = celular?.visible ? (controles.tactilActivo() ? '📱 En pantalla' : 'sin mando') : '⌨ Teclado';
+      texto(s, x ? `${ICONO[x.tipo] || '🎮'} ${NOMBRE_TIPO[x.tipo]?.split(' (')[0] || 'Mando'}` + (p === 0 && !celular?.visible ? ' + ⌨' : '') : p === 0 ? propio : 'sin mando');
       b.setAttribute('aria-selected', String(p === pestana));
     });
     // la cabeza
@@ -400,8 +434,10 @@ export function montarControles(caja, controles, { ahora = () => performance.now
       texto(sub, `${m.nombre.replace(/\s*\(.*$/, '')} · ${m.propio ? 'botones asignados por ti' : m.letra ? 'botones por letra (A a la derecha)' : 'botones por posición'}` +
         (iguales > 1 ? ` · ${iguales} iguales: comparten botones` : ''));
     } else {
-      texto(titulo, conTeclado ? '⌨ Teclado' : `Jugador ${pestana + 1}: sin mando`);
-      texto(sub, controles.estado.bloqueados ? 'El navegador no deja leer mandos en esta página (permiso «gamepad» del marco). Recarga Juegos; si sigue, avísale al dueño.'
+      const enPantalla = pestana === 0 && celular?.visible;
+      texto(titulo, enPantalla ? (controles.tactilActivo() ? '📱 Mando en pantalla' : 'Jugador 1: sin mando') : conTeclado ? '⌨ Teclado' : `Jugador ${pestana + 1}: sin mando`);
+      texto(sub, enPantalla && !mandos.length ? 'Juegas con el mando en pantalla (lo ajustas arriba, en «Celular»). Si conectas un mando por Bluetooth o cable, aparece aquí.'
+        : controles.estado.bloqueados ? 'El navegador no deja leer mandos en esta página (permiso «gamepad» del marco). Recarga Juegos; si sigue, avísale al dueño.'
         : mandos.length ? (conTeclado ? 'Juegas con el teclado. Para usar un mando aquí, elige cuál:' : 'Elige qué mando es este jugador:')
         : 'Ningún mando todavía: conéctalo y aprieta un botón (si no aparece, haz clic en el juego y vuelve a apretar uno).');
     }
@@ -464,6 +500,14 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     oculto(pie, false);
     apagado(bAsistir, !m || !!ayudante); apagado(bRestaurarMando, !m);
     oculto(bDeshacerAbajo, !deshacer || !!sel); oculto(mensajeAbajo, !!sel);
+    // §113: el celular
+    if (celular?.visible) {
+      const a = controles.ajustesTactil(), on = controles.tactilActivo();
+      marcado(tactilSi, on); marcado(tactilNo, !on);
+      texto(tamDato, `${Math.round(a.esc * 100)} %`); apagado(tamMenos, a.esc <= 0.8); apagado(tamMas, a.esc >= 1.3);
+      texto(opaDato, `${Math.round(a.opa * 100)} %`); apagado(opaMenos, a.opa <= 0.3); apagado(opaMas, a.opa >= 1);
+      const inc = controles.inclinando(); marcado(incSi, inc); marcado(incNo, !inc);
+    }
     // los ajustes de todos
     const pr = controles.prefsMandos();
     estilos.forEach(b => marcado(b, b.dataset.valor === pr.disposicion));

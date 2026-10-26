@@ -34,8 +34,8 @@ import { MKW_SINCRO_MAX, MKW_MODOS, MKW_CC, MKW_NIVEL, mkwCarrera, mkwTabla } fr
      siguiente que alcance a cargar, como quien recargó). Los marcos que ya corren NO se recargan: se les avisa la lista
      nueva (`sincro`) y la sala del juego lo anota. Quien mira la sala sin ser jugador no carga el juego.
 
-   Controles del juego: teclado y mandos (los celulares quedaron fuera del lanzamiento: el táctil del juego queda, pero
-   no se ofrece) — @controles: teclado */
+   Controles del juego: teclado y mandos en el PC; en el celular, el mando en pantalla del juego (§113: se mueve, agranda,
+   agrega u oculta botón por botón, como BT3) y dirigir inclinando — @controles: tactil teclado */
 const PADRE = "mkw-padre", HIJO = "mkw-hijo";
 const PAGINA = "juegos/mkw/web/navegador/index.html";
 
