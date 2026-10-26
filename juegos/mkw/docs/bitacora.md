@@ -314,6 +314,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Cursor del mando** | El `mando.js` del sitio: con un mando conectado y un menú de la página abierto, el stick mueve una flecha en pantalla y A hace «clic» (un clic fabricado por código, que el navegador no distingue de uno del ratón salvo en dos cosas: no muestra los textos de ayuda «title» y no mueve una barra deslizante). Como manejar un tablero con una perilla en vez de con la mano. |
 | **Clic perdido** | Un clic son dos mitades: apretar y soltar. Si entre las dos el botón sale de la página y vuelve (aunque sea idéntico), Chrome no da el clic. Como un pulsador que se desconecta y reconecta mientras uno lo aprieta: el circuito no ve el pulso completo. |
 | **Puntero fino / grueso** | Lo que el navegador dice que tiene la persona para señalar: «fino» es un ratón o un lápiz (exacto), «grueso» un dedo. Un teléfono tiene solo grueso; un PC con pantalla táctil tiene los dos. Por eso «teléfono» = grueso **sin** fino. |
+| **Los «30 fps justos»** | La pantalla muestra una imagen nueva solo en cada refresco (60 por segundo = cada 16,7 ms). Si el juego tarda 17 ms en una imagen, no llega al refresco y esa imagen sale en el siguiente: se ve cada 33 ms, o sea 30 por segundo. Por eso pasarse un poco del presupuesto baja de golpe de 60 a 30, y no a 58. Como un tren que sale cada 16,7 minutos: quien llega un minuto tarde no espera un minuto, espera el tren siguiente. |
 | **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
 
 ---
@@ -10384,3 +10385,70 @@ cambios (`controles-panel` 25, `asignacion` 62, `controles` 48, `mandos-jugador`
 **Falta con el juego y un teléfono de verdad:** si el juego anda a 60 en un Android (WebGPU y JSPI sí están en Chrome
 de Android; la velocidad nunca se midió), la memoria (el `.wasm` y lo que baja del disco), y el sonido y la
 inclinación en un teléfono real. `prueba-tactil.mjs` (con el juego) sigue valiendo.
+
+## 2026-10-26 · §114 Por qué el celular va a 30 fps, y cómo saberlo con certeza (pedido del dueño)
+
+El dueño: «revisa porque en móviles hay tanto lag: tengo un Oppo Find X9 Pro y me va a 30 fps; eso es imposible para
+otros celulares de menor gama, revisa bien para optimizarlo».
+
+### 114.1 Lo que se sabe y lo que no
+
+- El juego corre entero en el procesador del navegador (el código de la Wii traducido a WebAssembly). En el PC usa
+  **8–9 ms** de los 16,7 que tiene cada cuadro (§54, `medir-sitio`). En un teléfono, aunque sea de los mejores, el
+  WebAssembly de Chrome suele andar 1,5–2,5 veces más lento: **13–22 ms**. Pasado de 16,7, la pantalla muestra cada
+  imagen en el refresco siguiente y quedan **30 justos** (ver «Los 30 fps justos» en el Glosario).
+- Pero «30 justos» también lo da una pantalla que refresca a 30 (algunos modos de ahorro de batería) o una tarjeta de
+  video atorada. **Aquí no hay ni el juego ni un teléfono**: adivinar sería perder el tiempo del dueño. Por eso este
+  paso deja en el teléfono una lectura que dice cuál de las tres es, y arregla lo que la página hacía de más.
+
+### 114.2 Qué se cambió
+
+- **«Mostrar qué frena»** (Avanzado → Gráficos, `mkw.graficos.verDetalle`): el recuadro de arriba a la izquierda dice
+  «31 fps · juego 22,4 ms · video 5,1 ms · 120 Hz · 1280×720 · frena: el procesador…». `queFrena` (graficos.mjs, puro)
+  decide: a 57 o más, nada; pantalla bajo 50 Hz → la pantalla (¿ahorro de batería?); tarjeta sobre 14 ms → la tarjeta
+  (bajar la resolución de salida); juego sobre 14,5 ms → el procesador; si no, el ritmo. La tarjeta se mide con el aviso
+  de «terminé» de WebGPU (`onSubmittedWorkDone`, como `?gpu=1`), solo con la casilla prendida (cuesta un aviso por cuadro).
+- **«📋 Copiar el informe de rendimiento»** (Avanzado → Diagnóstico): un texto para pegar en el chat con el navegador,
+  núcleos, memoria, tarjeta, Hz, lienzo, gráficos, el enganche al monitor y los últimos 30 s (fps, juego ms, video ms por
+  segundo). Nada personal.
+- **El lienzo en el teléfono, a 720 también para quien ya tenía guardado «la de tu pantalla»** (una sola vez,
+  `mkw.graficos.telefono`; si después elige otra, se respeta). Un Find X9 Pro tiene ~3,5 pixeles por punto: el lienzo
+  medía ~2770×1270, siete veces los pixeles de 1280×720. Y una salida más, **640×360**, para teléfonos justos.
+- **El mando en pantalla ya no se repinta en cada cuadro** si nada cambió (`pinta()` escribía 13 estilos 60 veces por
+  segundo: el navegador recalculaba y repintaba el mando en cada cuadro, tiempo que se le quita al juego).
+- **La hoja Controles no trabaja con el cajón cerrado** (su bucle de 100 ms leía el estado y los ajustes aunque nadie la
+  mirara).
+
+Los demás bucles de cada cuadro de la página (el reloj del monitor, el medidor, los controles, el contador DNF) son de
+microsegundos. Las opciones de compilación ya estaban afinadas (SIMD, -O3 en el motor, §54).
+
+### 114.3 Qué tiene que hacer el dueño (para el paso siguiente)
+
+1. En el teléfono: Avanzado → Gráficos → prender **«Mostrar qué frena»** y recargar.
+2. Jugar una carrera un minuto y mirar el recuadro de arriba a la izquierda.
+3. Avanzado → Diagnóstico → **«📋 Copiar el informe de rendimiento»** y pegarlo en el chat.
+
+Con eso: si frena **el procesador** (lo más probable), lo que sigue es achicar el trabajo del juego por cuadro (lo que
+más pesa son los 12 karts: dibujo, física e IA; menos rivales de CPU en el teléfono, y medir qué parte del juego gasta
+más con la traza); si frena **la tarjeta**, bajar la salida; si es **la pantalla**, desactivar el ahorro de batería.
+
+### 114.4 Pruebas
+
+`node herramientas/prueba-celular.mjs` **40** (más: el cambio a 720 una sola vez y el respeto de la elección después;
+el informe de rendimiento); banco `graficos` **38** (más: `queFrena` en sus 5 casos, el texto del medidor con el
+detalle, 360 de salida); `controles-panel` 25, `asignacion` 62, `controles` 48, `mandos-jugador` 18.
+
+### 114.5 Lo que el dueño probó con el juego (2026-10-26)
+
+El dueño, después de jugar: «todo lo demás funciona bien (lo que no sean gráficos ni rendimiento)». Queda confirmado
+con el juego y con mando/teléfono de verdad lo que hasta ahora solo estaba probado en el banco: la hoja Controles
+(§112: reasignar el mando y el teclado, el cursor del mando en la hoja), elegir personaje con el mando en el descanso
+(§111), el celular con el mando en pantalla editable y reasignable (§113, §113b) y «Acelerar solo» (§113c). Lo que
+sigue abierto es **el rendimiento en el teléfono** (30 fps en un Oppo Find X9 Pro): espera el informe de §114.3.
+
+### 114.6 La meta y la regla (el dueño, 2026-10-26)
+
+«La idea es que corra mínimo a 60 fps; este Oppo es más potente que la mayoría de los celulares: en los de menor gama
+igual debería correr a 60». Y, preguntado qué se puede sacrificar en el celular si lo que frena es el procesador:
+**nada** — mismos 12 karts y todos los efectos, **solo optimizar el motor**. El paso siguiente sale del informe del Oppo
+(§114.3): con él se sabe qué parte del cuadro hay que achicar.

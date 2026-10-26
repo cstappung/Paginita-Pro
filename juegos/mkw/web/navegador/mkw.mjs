@@ -48,7 +48,7 @@ import { crearPreparacion } from './preparacion.mjs';
 import { crearAvisoGpu } from './aviso-gpu.mjs';
 import { crearFantasmaPagina } from './fantasma-pagina.mjs';
 import { crearDescargas, montarBarraDescarga } from './descargas.mjs';
-import { leerGraficos, guardarGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida } from './graficos.mjs';
+import { leerGraficos, guardarGraficos, lineasVideo, montarGraficos, montarMedidor, limitarSalida, queFrena } from './graficos.mjs';
 
 const parametros = new URLSearchParams(location.search);
 // Abrir directo por código (§71): ?directo=0 vuelve al piloto que aprieta botones (para comparar)
@@ -281,7 +281,10 @@ const revisionGpu = (async () => {
 // (onSubmittedWorkDone) y mide la demora. Si la tarjeta estaba libre, eso es su tiempo de trabajo; si se acerca a un
 // refresco del monitor, el compositor a veces no alcanza a mostrar la imagen a tiempo (ritmo 3-5-3-5).
 const gpuMedida = { muestras: [] };
-if (parametros.get('gpu') === '1' && globalThis.GPUQueue) {
+// (§114: también con «Mostrar qué frena» prendido: el medidor dice cuánto tarda la tarjeta por cuadro. Medir cuesta un
+// aviso de la tarjeta por cuadro: por eso solo si se pidió)
+const MEDIR_GPU = parametros.get('gpu') === '1' || leerGraficos().verDetalle;
+if (MEDIR_GPU && globalThis.GPUQueue) {
   const original = GPUQueue.prototype.submit;
   let pendiente = null;
   GPUQueue.prototype.submit = function (buffers) {
@@ -292,6 +295,7 @@ if (parametros.get('gpu') === '1' && globalThis.GPUQueue) {
     queueMicrotask(() => {                            // el último envío seguido (mismo trozo de trabajo) cuenta junto
       cola.onSubmittedWorkDone().then(() => {
         if (gpuMedida.muestras.length < 200000) gpuMedida.muestras.push([pendiente, performance.now() - pendiente]);
+        else gpuMedida.muestras.splice(0, 100000);   // (§114: medido en una sesión larga, sin crecer sin fin)
         pendiente = null;
       });
     });
@@ -299,6 +303,14 @@ if (parametros.get('gpu') === '1' && globalThis.GPUQueue) {
   };
   window.mkwGpu = () => gpuMedida.muestras;
 }
+// §114: la mediana de la tarjeta de video en los últimos `ms` (null si no se mide)
+const gpuReciente = (ms = 2000) => {
+  const desde = performance.now() - ms, v = [];
+  for (let i = gpuMedida.muestras.length - 1; i >= 0 && gpuMedida.muestras[i][0] >= desde; i--) v.push(gpuMedida.muestras[i][1]);
+  if (!v.length) return null;
+  v.sort((a, b) => a - b);
+  return v[v.length >> 1];
+};
 // Traza del ritmo (?traza=1, diagnóstico): guarda con hora cada refresco, cada espera del juego y cada cuadro
 // entregado, y al final la vuelca a la consola en líneas "[traza] [...]" para analizarla fuera (ver
 // herramientas/analizar-traza.mjs). Códigos: 'r' = refresco (valor = hora del rAF), 'v' = lo que vio el medidor
@@ -745,6 +757,14 @@ if (descargas) montarBarraDescarga($('descarga'), descargas, { primeraVez: () =>
 // por punto: sin tope el lienzo medía ~2400×1080 y la tarjeta del teléfono dibujaba 5 veces más que en 720); la
 // persona la cambia en Avanzado → Gráficos y desde ahí manda lo suyo
 try { if (esTelefono && localStorage.getItem('mkw.graficos') === null) guardarGraficos({ ...leerGraficos(), salida: 720 }); } catch {}
+// §114: y una vez, para quien ya tenía guardado «la de tu pantalla» en el teléfono (lo de siempre del PC, sin elegirlo):
+// también 720 (en un teléfono de 3,5 pixeles por punto el lienzo medía ~2770×1270, ¡7 veces 720!)
+try {
+  if (esTelefono && localStorage.getItem('mkw.graficos.telefono') !== '1') {
+    localStorage.setItem('mkw.graficos.telefono', '1');
+    if (leerGraficos().salida === 0) guardarGraficos({ ...leerGraficos(), salida: 720 });
+  }
+} catch {}
 const graficosArranque = parametros.get('graficos') === '0' ? leerGraficos({ getItem: () => null }) : {
   ...leerGraficos(),
   ...(parametros.has('escala') ? { escala: Number(parametros.get('escala')) } : {}),
@@ -765,8 +785,40 @@ montarGraficos($('graficosPanel'), { enSala: !!sincro, alSalida: t => salidaLien
     rtt: () => { try { return sincro?.lockstep?.estado().rtt || {}; } catch { return {}; } },
     nombres: () => window.mkwNombresSala || {}, yo: sincro?.yo ?? null,
     jugando: () => document.body.classList.contains('started') && !ui.cortinaPuesta,
+    // §114: el detalle (qué frena): ms del juego por cuadro, de la tarjeta, Hz de la pantalla y el lienzo
+    detalle: () => ({ trabajo: window.mkwEstado.trabajo, gpu: gpuReciente() ?? undefined,
+      hz: relojMonitor.p ? 1000 / relojMonitor.p : undefined, lienzo: `${$('canvas').width}×${$('canvas').height}` }),
   });
 }
+// §114: «📋 Copiar el informe de rendimiento» (Avanzado → Diagnóstico): todo lo que hace falta para saber por qué un
+// teléfono (o un PC) no llega a 60, en un texto para pegarlo en el chat. Nada personal: el navegador, el teléfono o PC
+// (núcleos, memoria, tarjeta de video), la pantalla y los últimos 30 s del medidor
+function informeRendimiento() {
+  const h = window.mkwEstado.historial || [], ult = h.slice(-10);
+  const media = i => { const v = ult.map(x => x[i]).filter(Number.isFinite); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null; };
+  const hz = relojMonitor.p ? Math.round(1000 / relojMonitor.p * 10) / 10 : null;
+  const fps = media(0), trabajo = media(1), gpu = media(2);
+  return {
+    cuando: new Date().toISOString(), navegador: navigator.userAgent, telefono: esTelefono,
+    nucleos: navigator.hardwareConcurrency ?? null, memoriaGB: navigator.deviceMemory ?? null,
+    tarjeta: window.mkwEstado.gpu?.dada ?? null, pantallaHz: hz, dpr: devicePixelRatio,
+    lienzo: `${$('canvas').width}×${$('canvas').height}`, ventana: `${innerWidth}×${innerHeight}`,
+    graficos: leerGraficos(), mandoEnPantalla: controles.tactilActivo(), enSala: !!sincro,
+    enganche: { ...window.mkwEstado.fase }, memoriaJuegoMB: window.mkwHeapMB ? Math.round(window.mkwHeapMB()) : null,
+    ultimos10s: { fps, juegoMs: trabajo, videoMs: gpu }, frena: queFrena({ fps, trabajo, gpu: gpu ?? undefined, hz: hz ?? undefined }),
+    porSegundo: h.map(([f, t, g]) => (g === null ? `${f} fps ${t} ms` : `${f} fps ${t} ms ${g} ms`)),
+    ...(gpu === null ? { nota: 'sin medida de la tarjeta: prende «Mostrar qué frena» en Avanzado → Gráficos y recarga' } : {}),
+  };
+}
+window.mkwInformeRendimiento = informeRendimiento;   // (para las pruebas)
+$('copiarRendimiento')?.addEventListener('click', async () => {
+  const texto = JSON.stringify(informeRendimiento(), null, 1);
+  $('informeRendimiento').hidden = false; $('informeRendimiento').textContent = texto;
+  let copiado = false;
+  try { await navigator.clipboard.writeText(texto); copiado = true; } catch {}
+  $('copiarRendimiento').textContent = copiado ? '✓ Copiado: pégalo en el chat' : '📋 No se pudo copiar: selecciona el texto de abajo';
+  setTimeout(() => { $('copiarRendimiento').textContent = '📋 Copiar el informe de rendimiento'; }, 4000);
+});
 
 // ---- El menú de inicio «JloKart Wii» (inicio.mjs, bitácora §67) ----
 // Sale al abrir el juego sin un modo ya decidido (sin ?modo= de una sala): la imagen del dueño con Single Player,
@@ -2115,6 +2167,10 @@ async function arrancar() {
     const esperaDiscoSeg = msEsperaDisco - (antes.disco || 0);   // ms de este segundo esperando el disco
     antes = ahora;
     Object.assign(window.mkwEstado, { cuadros: ahora.c, fps, trabajo });
+    // §114: los últimos 30 s (para el informe de rendimiento)
+    const hist = window.mkwEstado.historial || (window.mkwEstado.historial = []);
+    hist.push([Math.round(fps * 10) / 10, Math.round(trabajo * 10) / 10, gpuReciente(1000) === null ? null : Math.round(gpuReciente(1000) * 10) / 10]);
+    if (hist.length > 30) hist.shift();
     avisoGpu?.medir({ fps, trabajo, cuadros: ahora.c, esperaDisco: esperaDiscoSeg, oculta: document.hidden, enSala: enSalaGpu });
     $('fps').textContent = `${fps.toFixed(1)} fps`;
     $('trabajo').textContent = `trabajo ${trabajo.toFixed(2)} ms`;

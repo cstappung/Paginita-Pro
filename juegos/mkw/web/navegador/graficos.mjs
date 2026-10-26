@@ -34,8 +34,10 @@
 
 export const ESCALAS = [1, 1.5, 2, 3, 4];            // las que acepta el motor (también 6 y 8: demasiado para un navegador)
 export const FLUIDECES = [0, 120, 180];              // 0 = lo de siempre (60); 240 ya no existe en el motor (pasa a 180)
-export const SALIDAS = [0, 1080, 900, 720, 540];     // alto máximo del lienzo en pixeles (0 = el de la pantalla, lo de siempre)
-export const GRAFICOS = { escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false };
+export const SALIDAS = [0, 1080, 900, 720, 540, 360];   // alto máximo del lienzo en pixeles (0 = el de la pantalla, lo de siempre)
+// (verDetalle, §114: el medidor dice además cuánto tarda el juego por cuadro, la tarjeta de video, a cuántos Hz va la
+// pantalla y el tamaño del lienzo, y QUÉ FRENA; para ver por qué un teléfono no llega a 60)
+export const GRAFICOS = { escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false, verDetalle: false };
 // La resolución interna en pixeles: la de la Wii (640×528) por la escala
 export const pixelesInternos = v => `${Math.round(640 * v)}×${Math.round(528 * v)}`;
 const CLAVE = 'mkw.graficos';
@@ -48,6 +50,7 @@ export function normalizar(g = {}) {
     salida: SALIDAS.includes(Number(g.salida)) ? Number(g.salida) : 0,
     verFps: g.verFps === true,
     verPing: g.verPing === true,
+    verDetalle: g.verDetalle === true,
   };
 }
 export function leerGraficos(almacen = globalThis.localStorage) {
@@ -67,10 +70,33 @@ export function lineasVideo(g) {
   return l;
 }
 
-// El texto del medidor: «60 fps · 📶 Juan 35 ms · Ana 80 ms» (puro: lo prueba el banco)
-export function textoMedidor({ fps = null, rtt = {}, nombres = {}, yo = null, verFps = true, verPing = true } = {}) {
+// §114: qué frena el juego, con los números del medidor (puro: lo prueba el banco). Un cuadro tiene 16,7 ms (60 por
+// segundo); si se pasa aunque sea un poco, la pantalla lo muestra en el refresco siguiente: de ahí los «30 fps justos».
+//   trabajo = ms por cuadro que el juego NO espera (su cálculo + lo que la página hace en medio);
+//   gpu = ms que tarda la tarjeta de video en terminar lo de un cuadro; hz = refrescos por segundo de la pantalla
+export function queFrena({ fps = null, trabajo = null, gpu = null, hz = null } = {}) {
+  if (!Number.isFinite(fps) || fps <= 0) return '';
+  if (fps >= 57) return 'nada (va a 60)';
+  if (Number.isFinite(hz) && hz > 0 && hz < 50) return `la pantalla: refresca a ${Math.round(hz)} Hz (¿ahorro de batería?)`;
+  if (Number.isFinite(gpu) && gpu > 14) return 'la tarjeta de video: baja la resolución de salida';
+  if (Number.isFinite(trabajo) && trabajo > 14.5) return 'el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms';
+  return 'el ritmo (ni el procesador ni la tarjeta están al tope)';
+}
+
+// El texto del medidor: «60 fps · 📶 Juan 35 ms · Ana 80 ms» (puro: lo prueba el banco); con el detalle (§114):
+// «31 fps · juego 26 ms · video 5 ms · 120 Hz · 1280×720 · frena: el procesador…»
+export function textoMedidor({ fps = null, rtt = {}, nombres = {}, yo = null, verFps = true, verPing = true, verDetalle = false, detalle = {} } = {}) {
   const partes = [];
-  if (verFps && Number.isFinite(fps)) partes.push(`${Math.round(fps)} fps`);
+  if ((verFps || verDetalle) && Number.isFinite(fps)) partes.push(`${Math.round(fps)} fps`);
+  if (verDetalle) {
+    const { trabajo, gpu, hz, lienzo } = detalle || {};
+    if (Number.isFinite(trabajo)) partes.push(`juego ${trabajo.toFixed(1)} ms`);
+    if (Number.isFinite(gpu)) partes.push(`video ${gpu.toFixed(1)} ms`);
+    if (Number.isFinite(hz) && hz > 0) partes.push(`${Math.round(hz)} Hz`);
+    if (lienzo) partes.push(lienzo);
+    const f = queFrena({ fps, trabajo, gpu, hz });
+    if (f) partes.push(`frena: ${f}`);
+  }
   if (verPing) {
     const otros = Object.entries(rtt || {}).filter(([u, ms]) => u !== yo && Number.isFinite(ms));
     if (otros.length) {
@@ -126,11 +152,12 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
     el('option', { value: '180', textContent: '180 — imágenes intermedias (monitor de 180 Hz o más)' }));
   const verFps = el('input', { type: 'checkbox', id: 'graficosFps' });
   const verPing = el('input', { type: 'checkbox', id: 'graficosPing' });
+  const verDetalle = el('input', { type: 'checkbox', id: 'graficosDetalle' });
   const aviso = el('p', { className: 'aviso', id: 'graficosAviso', hidden: true });
   const boton = el('button', { type: 'button', className: 'boton', id: 'graficosReiniciar', textContent: 'Reiniciar el juego ahora', hidden: true });
   boton.onclick = () => reiniciar();
   const pinta = () => {
-    escala.value = String(g.escala); fluidez.value = String(g.fluidez); salida.value = String(g.salida); verFps.checked = g.verFps; verPing.checked = g.verPing;
+    escala.value = String(g.escala); fluidez.value = String(g.fluidez); salida.value = String(g.salida); verFps.checked = g.verFps; verPing.checked = g.verPing; verDetalle.checked = g.verDetalle;
     const pendiente = g.escala !== alArrancar.escala || g.fluidez !== alArrancar.fluidez;
     aviso.hidden = !pendiente; boton.hidden = !pendiente;
     aviso.textContent = pendiente ? 'Se aplica al reiniciar el juego (el motor lo lee al arrancar).' +
@@ -138,11 +165,11 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
   };
   const cambio = () => {
     const antes = g.salida;
-    g = guardarGraficos({ escala: escala.value, fluidez: fluidez.value, salida: salida.value, verFps: verFps.checked, verPing: verPing.checked });
+    g = guardarGraficos({ escala: escala.value, fluidez: fluidez.value, salida: salida.value, verFps: verFps.checked, verPing: verPing.checked, verDetalle: verDetalle.checked });
     pinta(); alCambiar(g);
     if (g.salida !== antes) alSalida(g.salida);            // (la salida se aplica en el momento, sin reiniciar)
   };
-  for (const c of [escala, fluidez, salida, verFps, verPing]) c.addEventListener('change', cambio);
+  for (const c of [escala, fluidez, salida, verFps, verPing, verDetalle]) c.addEventListener('change', cambio);
   caja.replaceChildren(
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosEscala', textContent: 'Resolución interna' }), escala),
     el('div', { className: 'fila' }, el('label', { htmlFor: 'graficosFluidez', textContent: 'Fluidez (imágenes por segundo)' }), fluidez),
@@ -153,6 +180,7 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
     el('p', { className: 'nota-graficos', textContent: 'El tamaño de la imagen que se manda a tu pantalla. Bajarla ayuda si tu tarjeta de video ' +
       'es justa (sobre todo con un monitor grande); se ve un poco más borrosa. Se aplica en el momento.' }),
     el('div', { className: 'fila' }, el('label', {}, verFps, ' Mostrar los fps'), el('label', {}, verPing, ' Mostrar el ping (en la sala)')),
+    el('div', { className: 'fila' }, el('label', {}, verDetalle, ' Mostrar qué frena (cuánto tarda el juego y la tarjeta de video por cuadro, los Hz de la pantalla)')),
     el('p', { className: 'nota-graficos', textContent: 'Los fps y el ping van en un recuadro chico arriba a la izquierda; en una PC justa, ' +
       'tener algo encima del juego cuesta un poco.' }),
     aviso, boton);
@@ -162,12 +190,13 @@ export function montarGraficos(caja, { reiniciar = () => location.reload(), enSa
 
 // El medidor en la esquina (una vez por segundo; escondido si no hay nada que mostrar)
 export function montarMedidor(nodo, { graficos = () => leerGraficos(), fps = () => null, rtt = () => ({}), nombres = () => ({}),
-                                     yo = null, jugando = () => true, cada = 1000 } = {}) {
+                                     yo = null, jugando = () => true, cada = 1000, detalle = () => ({}) } = {}) {
   if (!nodo) return null;
   const pinta = () => {
     const g = graficos();
-    const texto = (g.verFps || g.verPing) && jugando()
-      ? textoMedidor({ fps: fps(), rtt: g.verPing ? rtt() : {}, nombres: nombres(), yo, verFps: g.verFps, verPing: g.verPing }) : '';
+    const texto = (g.verFps || g.verPing || g.verDetalle) && jugando()
+      ? textoMedidor({ fps: fps(), rtt: g.verPing ? rtt() : {}, nombres: nombres(), yo, verFps: g.verFps, verPing: g.verPing,
+                       verDetalle: g.verDetalle, detalle: g.verDetalle ? detalle() : {} }) : '';
     nodo.hidden = !texto;
     if (nodo.textContent !== texto) nodo.textContent = texto;
   };
