@@ -156,8 +156,10 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   }
   function cerrarCajon() {
     hojaAbierta = null;
-    // (§111, el crítico: cerrar el cajón cancela una reasignación que esperaba; si no, seguía hasta 8 s, con el mando mudo)
-    if (controles.esperando?.() || controles.capturandoAhora?.()) { controles.cancelarTecla?.(); controles.cancelarCaptura?.(); dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada')); }
+    // (§111, el crítico: cerrar el cajón cancela una reasignación que esperaba; si no, seguía hasta 8 s, con el mando mudo.
+    // §112: siempre —también la prueba del mando y el asistente «paso a paso» entre un paso y otro, cuando nada espera—)
+    controles.cancelarTecla?.(); controles.cancelarCaptura?.(); controles.probar?.(0);
+    dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada'));
     document.body.classList.remove('cajon-abierto');
     document.querySelectorAll('#barra [data-abre]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if (document.body.classList.contains('started')) $('canvas').focus();   // las teclas vuelven al juego
@@ -170,9 +172,9 @@ export function crearInterfaz({ guardado, sonido, controles, alCambiarGuardado =
   // próxima tecla que se apretaba jugando quedaba asignada sin querer)
   addEventListener('keydown', e => {
     if (e.code !== 'Escape') return;
-    if (controles.esperando?.() || controles.capturandoAhora?.()) {
+    if (controles.esperando?.() || controles.capturandoAhora?.() || controles.probando?.() || document.body.classList.contains('asistiendo-mando')) {
       e.stopImmediatePropagation(); e.preventDefault();
-      controles.cancelarTecla?.(); controles.cancelarCaptura?.();
+      controles.cancelarTecla?.(); controles.cancelarCaptura?.(); controles.probar?.(0);
       dispatchEvent(new CustomEvent('mkw-reasignacion-cancelada'));
       return;
     }

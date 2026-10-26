@@ -71,10 +71,8 @@ for (const orientacion of ['parado', 'acostado']) {
   ok(`${orientacion}: el recuadro del juego ocupa justo la pantalla (${Math.round(m0.capa.w)}×${Math.round(m0.capa.h)} en ` +
      `${Math.round(m0.capa.x)},${Math.round(m0.capa.y)}; pantalla ${m0.pantalla.w}×${m0.pantalla.h})`,
      Math.abs(m0.capa.x) <= 1 && Math.abs(m0.capa.y) <= 1 && Math.abs(m0.capa.w - m0.pantalla.w) <= 1 && Math.abs(m0.capa.h - m0.pantalla.h) <= 1);
-  // los ajustes del mando táctil están en el cajón, pestaña «Controles» (interfaz.mjs): se abre como lo haría la persona
-  await pagina.evaluate(() => window.mkwInterfaz.abrirCajon('controles'));
-  ok(`${orientacion}: el control de tamaño está a la vista (Controles)`, await pagina.locator('#ajustesTactil').isVisible());
-  await pagina.evaluate(() => window.mkwInterfaz.cerrarCajon());
+  // (§112, el dueño: los teléfonos no están en el lanzamiento: la hoja Controles ya no tiene los ajustes del mando
+  // táctil; el tamaño se sigue probando por código, controles.ajustarTactil)
 
   // Cada tamaño del deslizador: nada se pisa y todo cabe
   const problemas = [];

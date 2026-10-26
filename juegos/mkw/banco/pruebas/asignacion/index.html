@@ -142,7 +142,8 @@ try {
   c.paso(); await cuadros(2);
   // (el crítico: el botón recién capturado llegaba un cuadro al juego —capturar Start pausaba—: hasta soltarlo, nada)
   ok('el botón recién capturado NO llega al juego mientras se lo mantiene', recibido[0].botones === 0 && recibido[0].gr === 0, `botones ${recibido[0].botones}`);
-  x.buttons[5] = boton(false); c.paso(); x.buttons[5] = boton(true); c.paso(); await cuadros(2);
+  // (§112: el cursor del sitio y el juego vuelven 250 ms después de soltar: si no, la B capturada cerraba el cajón)
+  x.buttons[5] = boton(false); c.paso(); await new Promise(r => setTimeout(r, 300)); x.buttons[5] = boton(true); c.paso(); await cuadros(2);
   ok('…soltado y apretado otra vez, llega: RB = R', (recibido[0].botones & B.R) !== 0 && recibido[0].gr === 255);
   x.buttons[5] = boton(false);
   const otro = mando(1, bt); lista = [x, otro]; await cuadros(3);
@@ -196,36 +197,66 @@ try {
   ok('el stick C desde el teclado (Num 6 = C →, asignada)', recibido[0].cx === 127, `cx ${recibido[0].cx}`);
   tecla('Numpad6', 'keyup');
 
-  // ---- 7. El panel ----
-  const { montarMandos } = await import('/web/navegador/opciones-mandos.mjs');
-  montarMandos(document.getElementById('panel'), c);
-  await new Promise(r => setTimeout(r, 250));
-  const det = document.querySelector('.mando-asignar'); det.open = true;
-  await new Promise(r => setTimeout(r, 250));
-  const filas = document.querySelectorAll('.tabla-asignacion tr');
-  ok('la tabla tiene una fila por control de GameCube (20)', filas.length === OBJETIVOS.length, `${filas.length}`);
-  ok('cada fila dice lo que la maneja en la letra del mando (DualSense: ✕, R2, Stick izq. →)', document.querySelector('tr[data-objetivo="A"]').textContent.includes('✕') &&
-     document.querySelector('tr[data-objetivo="R"]').textContent.includes('R2') && document.querySelector('tr[data-objetivo="stick.der"]').textContent.includes('Stick izq. →'));
-  document.querySelector('tr[data-objetivo="Z"] .acciones button').click();
-  await new Promise(r => setTimeout(r, 150));
-  ok('«Cambiar» pone la fila a esperar', document.querySelector('tr[data-objetivo="Z"]').classList.contains('esperando'));
+  // ---- 7. El panel (la hoja Controles de §112: pestañas por jugador y una fila por acción, con el mando y el teclado) ----
+  const { montarControles } = await import('/web/navegador/opciones-mandos.mjs');
+  const panel = montarControles(document.getElementById('panel'), c);
+  const espera = ms => new Promise(r => setTimeout(r, ms));
+  await espera(250);
+  const fila = obj => document.querySelector(`.ctl-fila[data-objetivo="${obj}"]`);
+  const chip = (obj, col = 'mando') => fila(obj).querySelector(`.ctl-chip[data-col="${col}"]`);
+  const msj = () => document.querySelector('.ctl-tira .ctl-mensaje')?.textContent || '';
+  const boton2 = t => [...document.querySelectorAll('.ctl-tira button')].find(b => b.textContent === t);
+  ok('la lista tiene una fila por control de GameCube (20), con el nombre de la acción primero', document.querySelectorAll('.ctl-fila').length === OBJETIVOS.length &&
+     fila('R').textContent.startsWith('Derrapar'), `${document.querySelectorAll('.ctl-fila').length}`);
+  ok('cada fila dice lo que la maneja en la letra del mando (DualSense: ✕, R2, Stick izq. →) y en el teclado', chip('A').textContent === '✕' &&
+     chip('R').textContent === 'R2' && chip('stick.der').textContent === 'Stick izq. →' && chip('A', 'teclado').textContent === 'K · Enter');
+  // (el banco no carga los estilos de la página: se mira la marca que los esconde, .ctl-otro sin .ver-mas)
+  const verMas = () => document.querySelector('.ctl').classList.contains('ver-mas');
+  ok('«Más controles» esconde los 11 que casi no se usan hasta abrirlo', document.querySelectorAll('.ctl-otro').length === 11 && fila('Y').classList.contains('ctl-otro') &&
+     !fila('X').classList.contains('ctl-otro') && !verMas());
+  document.querySelector('.ctl-mas').click(); await espera(50);
+  ok('…y al abrirlo se ven', verMas());
+  chip('Z').click();
+  await espera(150);
+  ok('un clic en el recuadro: la fila espera, con la cuenta de 8 s y la tira debajo', chip('Z').classList.contains('esperando') && fila('Z').nextElementSibling?.classList.contains('ctl-tira') &&
+     / s \(Esc/.test(msj()), msj());
   x.buttons[4] = boton(true); c.paso();
-  await new Promise(r => setTimeout(r, 250));
-  x.buttons[4] = boton(false);
-  ok('…apretando L1: Z = L1, y el mensaje dice que se quitó de L', document.querySelector('tr[data-objetivo="Z"]').textContent.includes('L1') &&
-     /se quitó de L/.test(document.querySelector('.mando-asignar [role="status"]').textContent), document.querySelector('.mando-asignar [role="status"]').textContent);
-  // (el crítico, el grave: un segundo «Cambiar» antes de tocar nada dejaba la captura huérfana —sin fila, sin tope—)
-  document.querySelector('tr[data-objetivo="X"] .acciones button').click();
-  await new Promise(r => setTimeout(r, 100));
-  document.querySelector('tr[data-objetivo="Y"] .acciones button').click();
-  await new Promise(r => setTimeout(r, 250));
-  ok('dos «Cambiar» seguidos: espera la segunda fila (Y), la primera ya no', document.querySelector('tr[data-objetivo="Y"]').classList.contains('esperando') &&
-     !document.querySelector('tr[data-objetivo="X"]').classList.contains('esperando') && c.capturandoAhora()?.objetivo === 'Y');
+  await espera(250);
+  x.buttons[4] = boton(false); c.paso();
+  await espera(350);
+  ok('…apretando L1: Z = L1, y el mensaje dice que se quitó de «Usar objeto»', chip('Z').textContent === 'L1' && /✓ Z: L1/.test(msj()) && /se quitó de Usar objeto/.test(msj()), msj());
+  // (el crítico, el grave: una segunda espera antes de tocar nada dejaba la captura huérfana —sin fila, sin tope—)
+  chip('X').click(); await espera(100);
+  chip('Y').click(); await espera(250);
+  ok('dos recuadros seguidos: espera el segundo (Y), el primero ya no', chip('Y').classList.contains('esperando') && !chip('X').classList.contains('esperando') && c.capturandoAhora()?.objetivo === 'Y');
   x.buttons[2] = boton(true); c.paso();
-  await new Promise(r => setTimeout(r, 250));
+  await espera(250);
   x.buttons[2] = boton(false); c.paso();
-  ok('…y el botón va a Y, con la fila al día', !c.capturandoAhora() && !document.querySelector('tr[data-objetivo="Y"]').classList.contains('esperando') &&
-     JSON.stringify(c.mapaDe(clave).Y) === '["b2"]');
+  await espera(350);
+  ok('…y el botón va a Y, con la fila al día', !c.capturandoAhora() && !chip('Y').classList.contains('esperando') && JSON.stringify(c.mapaDe(clave).Y) === '["b2"]');
+  boton2('Deshacer').click(); await espera(150);
+  ok('«Deshacer» en la tira: Y vuelve a △', JSON.stringify(c.mapaDe(clave).Y) === '["b3"]' && chip('Y').textContent === '△', chip('Y').textContent);
+  chip('X').click(); await espera(100); boton2('Cancelar').click(); await espera(150);
+  boton2('Dejar sin nada').click(); await espera(150);
+  ok('«Dejar sin nada»: X sin entradas, y el recuadro lo dice', !c.mapaDe(clave).X.length && chip('X').textContent === 'nada' && chip('X').classList.contains('vacio'));
+  boton2('↺ Como siempre').click(); await espera(150);
+  ok('«↺ Como siempre»: X vuelve a □', chip('X').textContent === '□');
+  // el teclado, en la misma lista (jugador 1)
+  chip('arriba', 'teclado').click(); await espera(100);
+  ok('el recuadro del teclado espera una tecla', c.esperando() === 'arriba' && chip('arriba', 'teclado').classList.contains('esperando'));
+  tecla('KeyR'); tecla('KeyR', 'keyup'); await espera(200);
+  ok('…R: Truco = R (y la fila lo dice)', JSON.stringify(c.teclasDe('arriba')) === '["KeyR"]' && chip('arriba', 'teclado').textContent === 'R' && /✓ Truco: R/.test(msj()), msj());
+  chip('A', 'teclado').click(); await espera(100);
+  chip('B', 'mando').click(); await espera(100);
+  ok('una sola espera en toda la página: la del mando cancela la del teclado', !c.esperando() && c.capturandoAhora()?.objetivo === 'B');
+  boton2('Cancelar').click(); await espera(100);
+  boton2('Deshacer').click(); await espera(150);
+  ok('«Deshacer» del teclado: Truco vuelve a T', JSON.stringify(c.teclasDe('arriba')) === '["KeyT"]');
+  document.querySelector('.ctl-pestana[data-jugador="1"]').click(); await espera(150);
+  ok('la pestaña del jugador 2 (sin mando): sin columna de teclado, y dice qué mando puede traer', !document.querySelector('.ctl').classList.contains('con-teclado') &&
+     /DualSense|PlayStation/.test(document.querySelector('.ctl-traer').textContent) && chip('A').disabled);
+  document.querySelector('.ctl-pestana[data-jugador="0"]').click(); await espera(150);
+  panel.detener();
   c.borrarAsignacion(clave);
   c.detener();
 } catch (e) {
