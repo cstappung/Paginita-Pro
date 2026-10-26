@@ -10550,3 +10550,38 @@ y se optimiza **eso** (en el renderizador o en la página), sin quitar rivales n
   de 50 dibujos tarda más que la de 3), el dibujo sale igual (el píxel sigue rojo) y sin errores de WebGPU.
 - `prueba-celular` 41/41 (nuevo: «🔬 Perfilar» recarga con la medida pedida, «Mostrar qué frena» prendido y el medidor
   puesto). Banco `graficos` 38/38.
+
+### 115.5 El tercer informe y el código de aurora (2026-10-26): lo que se descartó y el plan
+
+El dueño mandó el informe con el registro entero («con eso es suficiente: optimiza antes de otro PR»). Lo que dice,
+leído junto al código de aurora (el commit fijado + `parches/aurora-web.diff`):
+
+- **En la carrera, cada cuadro**: 12 pasadas, 200–420 dibujos de WebGPU que juntan **5 000–12 500 dibujos de la Wii**
+  («merged» en la línea `staging` de aurora), y se suben 1,1–2,5 MB (vértices, uniformes, índices, storage).
+- **La resolución NO es**: con la escala 1×, aurora dibuja siempre en **640×528** (`window.cpp` `get_window_size`:
+  `g_frameBufferScale = 1` y `g_frameBufferAspectFit` → el tamaño de la Wii) y solo **estira** esa imagen al lienzo
+  con un shader de una lectura por pixel (`gpu.cpp` `create_copy_pipeline`). Bajar la «resolución de salida» casi no
+  cambia nada: el consejo del medidor («baja la resolución de salida») estaba mal y se sacó (`queFrena`).
+- **Lo que se ve SÍ**: con el cajón abierto el lienzo quedó en 266×539; el juego (pantalla «dinámica» de RR,
+  `dynamic_aspect.cpp`: el ancho de la vista sigue al del lienzo) ve una tajada angosta de la pista y bajó a 20 ms
+  por cuadro; a pantalla completa (2,18:1, más ancho que el 16:9 de la Wii) 34 ms. El costo sigue a lo que se dibuja.
+- **Descartado en el código**: lecturas de la tarjeta que hagan esperar al juego (la copia del EFB a la memoria
+  sincrónica, `complete_downloads`, no la llama nadie; la del destello del sol y la del Z van en segundo plano),
+  antialiasing (MSAA = 1), el estirado final.
+- **Por qué «juego» y «tarjeta» marcan igual (33 y 34 ms)**: «juego» cuenta todo lo que no es la espera del reloj VI,
+  así que incluye la pausa de presentar de aurora (esperar que el navegador tome el lienzo, §54), que se alarga si la
+  tarjeta va atrasada; y «tarjeta» (del envío a `onSubmittedWorkDone`) incluye la cola y el proceso de GPU del
+  navegador. Cada número contiene al otro: con ellos no se puede saber cuál frena.
+- **El precalentado de pipelines** (931, de a 2 por cuadro y 4 a la vez, 100–1000 ms cada uno en el teléfono) duró
+  **41 s desde el arranque** y entró a la primera carrera: coincide con el tramo lento del primer informe (§114.8).
+
+**El plan** (el dueño eligió hacerlo en la sesión del PC, donde se compila y corre el juego):
+1. Separar de verdad: (a) el cálculo puro del juego por cuadro = «juego» menos lo que esperó en
+   `mkwEsperaToma`/`mkwEsperaAtrasada` (las dos son de la página: se miden ahí); (b) el tiempo de la tarjeta por pasada
+   con las marcas de tiempo (`perfil-gpu.mjs`, §115.2). Medir en el PC con la CPU frenada (`--perfil celular` de
+   `medir-sitio.mjs`) y, si se puede, en el teléfono.
+2. Si frena el cálculo: perfilar qué parte de aurora se lleva el tiempo convirtiendo los miles de dibujos de la Wii
+   (procesador de comandos, conversión de vértices, juntar dibujos) y optimizar eso.
+3. Si frena la tarjeta: las pasadas y copias más caras (§115.2) y cómo cuestan en una tarjeta por baldosas.
+4. Además: el precalentado que no entre a la carrera en el teléfono, y el enganche del reloj VI hasta ~1 % (§114.8).
+Siempre 12 karts y todos los efectos (§114.6–114.7); nada se publica sin la confirmación del dueño.
