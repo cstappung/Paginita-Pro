@@ -808,8 +808,43 @@ console.log("— Administración: revisiones, auditoría, ajustes y suspensiones
   await denied("ni una caja a nombre de otro", () => caja(ua.uid, {}));
   await allowed("pero se lee el del rival, por clave", () => get(ref(db, `rockLook/${ua.uid}`)));
   await denied("no la colección entera", () => get(ref(db, "rockLook")));
+  // el cierre de la economía (juegos/cierre.js): lo escribe un admin, lo viejo va a `archivo/`
+  const cierre = x => set(ref(db, "economiaCierre"), Object.assign({ v: 1, T: Date.now() - 86400000, d: "{}", por: ua.uid, at: serverTimestamp() }, x));
+  const ronda = push(ref(db, `casino/${ub.uid}`)).key, sobre = "p" + push(ref(db, `cartas/s/${ub.uid}`)).key;
+  const unaRonda = { j: "r", p: 10, b: { rojo: 10 } };
+  await allowed("B apuesta en el casino", () => set(ref(db, `casino/${ub.uid}/${ronda}`), Object.assign({ at: serverTimestamp() }, unaRonda)));
+  await allowed("y compra un sobre", () => set(ref(db, `cartas/s/${ub.uid}/${sobre}`), { at: serverTimestamp(), p: 80 }));
+  const oferta = push(ref(db, "mercado/o"));
+  await allowed("y pone una carta a la venta", () => set(oferta, { u: ub.uid, c: `${ub.uid}~${sobre}.1`, p: 300, at: serverTimestamp() }));
+  await allowed("y la retira", () => set(ref(db, `mercado/o/${oferta.key}/x`), serverTimestamp()));
+  await denied("B no escribe el cierre", () => set(ref(db, "economiaCierre"), { v: 1, T: 1, d: "{}", por: ub.uid, at: serverTimestamp() }));
+  await denied("ni lee el archivo", () => get(ref(db, "archivo")));
+  await denied("ni escribe en él", () => set(ref(db, `archivo/casino/${ub.uid}/${ronda}`), unaRonda));
+  await denied("ni borra su ronda", () => remove(ref(db, `casino/${ub.uid}/${ronda}`)));
+  await denied("ni su oferta cerrada", () => remove(oferta));
+  await loginAs(A);
+  await denied("el cierre no se firma a nombre de otro", () => cierre({ por: ub.uid }));
+  await denied("ni llega al futuro", () => cierre({ T: Date.now() + 86400000 }));
+  await denied("ni lleva campos de más", () => cierre({ extra: 1 }));
+  await allowed("el admin escribe el cierre", () => cierre({}));
+  await allowed("y archiva la ronda, el sobre y la oferta cerrada", async () => {
+    const [vr, vs, vo] = await Promise.all([get(ref(db, `casino/${ub.uid}/${ronda}`)), get(ref(db, `cartas/s/${ub.uid}/${sobre}`)), get(oferta)]);
+    await update(ref(db), {
+      [`archivo/casino/${ub.uid}/${ronda}`]: vr.val(), [`archivo/cartas/s/${ub.uid}/${sobre}`]: vs.val(), [`archivo/mercado/o/${oferta.key}`]: vo.val() });
+    await update(ref(db), { [`casino/${ub.uid}/${ronda}`]: null, [`cartas/s/${ub.uid}/${sobre}`]: null, [`mercado/o/${oferta.key}`]: null });
+  });
+  await allowed("el admin lee el archivo", () => get(ref(db, "archivo")));
+  await loginAs(B);
+  await allowed("todos leen el cierre", () => get(ref(db, "economiaCierre")));
+  await denied("una ronda archivada no se vuelve a escribir", () => set(ref(db, `casino/${ub.uid}/${ronda}`), Object.assign({ at: serverTimestamp() }, unaRonda)));
+  await denied("ni un sobre archivado", () => set(ref(db, `cartas/s/${ub.uid}/${sobre}`), { at: serverTimestamp(), p: 80 }));
+  await denied("ni se le ponen marcas a la ronda archivada", () => set(ref(db, `casino/${ub.uid}/${ronda}/c`), serverTimestamp()));
+  await allowed("pero una carta de un sobre archivado se gradúa", () => set(ref(db, `cartas/g/${ub.uid}/${sobre}/0`), { at: serverTimestamp(), p: 100 }));
+  await denied("y una de un sobre que no existe, no", () => set(ref(db, `cartas/g/${ub.uid}/pNoExiste0001/0`), { at: serverTimestamp(), p: 100 }));
+  await allowed("y las rondas nuevas siguen igual", () => set(push(ref(db, `casino/${ub.uid}`)), Object.assign({ at: serverTimestamp() }, unaRonda)));
   await loginAs(A);
   await comoDueno(`admins/${ua.uid}`, null);
+  await denied("sin ser admin ya no escribe el cierre", () => cierre({}));
   await denied("sin ser admin ya no suma monedas", () => ajuste({}));
   await denied("ni se pone en la Serie 01", () => s1(ua.uid, {}));
 }

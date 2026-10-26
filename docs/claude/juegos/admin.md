@@ -45,6 +45,13 @@ not the key: every write is re-checked by the rules. Five tabs:
   someone keeps every card of theirs (`juegos/prodrop/CLAUDE.md`). The tab
   shows how many Serie 01 copies each account owns, and the admin must add
   themselves to see it too.
+- **Economía**: the economy cierre (`docs/claude/juegos/perfiles-y-economia.md`,
+  «closed by periods»). *Preparar cierre* computes it up to a day ago,
+  checks it (`verificaCierre`) and only then offers *Cerrar y archivar*;
+  stopped accounts that hold it back are listed with a link to Monedas.
+  *Recalcular desde el archivo* downloads `archivo/` (only then), replays
+  everything from scratch, lists accounts whose balance differs and can
+  rebuild the cierre from scratch.
 
 `test-rules.mjs` covers the new nodes. To run it here the database emulator
 had to be started with `java -jar` and the rules PUT with curl to the

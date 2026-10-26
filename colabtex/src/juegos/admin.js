@@ -23,6 +23,11 @@
    - **Serie 01**: quién ve la colección de los profes de PRODROP
      (`prodropSerie1`). Es solo de vista: quitar a alguien no le toca
      ninguna carta, solo deja de verlas hasta que se le vuelva a poner.
+   - **Economía**: el cierre de la economía (cierre.js). Calcula el
+     estado hasta ayer, comprueba que con él salen las mismas cuentas y
+     pasa lo viejo de `casino`, `cartas` y `mercado` al archivo, para que
+     cada pestaña del sitio baje menos. Y «Recalcular»: junta el archivo
+     con lo vivo, rehace todo desde cero y dice qué cuenta no cuadra.
 
    El panel es la cara, no la llave: las reglas de Firebase vuelven a
    comprobar que quien escribe está en `admins`.
@@ -35,7 +40,8 @@ import { verificaClub, juegoDeCategoria, sospechaFila, VERIFICADORES } from "./s
 import { crearRepro } from "./repeticion.js";
 import { repDe } from "./rieles-datos.js";
 import { nombreCategoria } from "./perfil-tarjeta.js";
-import { monedasDe, formatoMonedas, copiasDe } from "./monedas.js";
+import { monedasDe, formatoMonedas, copiasDe, economia } from "./monedas.js";
+import { hacerCierre, verificaCierre, conArchivo, enVivo, MARGEN_CIERRE, AUTO_CIERRE_DIAS } from "./cierre.js";
 import { MOTOR, SERIE1 } from "./prodrop-cartas.js";
 
 // Escapa texto para meterlo en HTML sin que nadie cuele etiquetas
@@ -62,6 +68,10 @@ export function crearAdmin(ctx) {
   const pruebas = new Map();             // "cat|uid|partida" → {prueba, at, bytes, motivo} ya bajadas en esta visita
   let offDatos = null, offAdm = null, offSerie1 = null, aviso = "";
   let serie1 = {};                       // prodropSerie1: {uid: {at, por}}
+  /* La pestaña Economía: el cierre preparado ({c, dif, ms}), el avance de
+     la escritura ({hechas, total}) y el recálculo desde el archivo
+     ({cargando} o {full, difs, ms}). */
+  let prep = null, escribiendo = null, recalculo = null;
 
   /* ---------- la cáscara ---------- */
   function montar(h) {
@@ -103,11 +113,11 @@ export function crearAdmin(ctx) {
       ${sinReglas ? `<p class="jg-adm-aviso">Faltan publicar las reglas nuevas en la consola de Firebase (revisiones, suspensiones, auditados, ajustesMonedas). Hasta entonces el panel no puede leer ni escribir.</p>` : ""}
       ${aviso ? `<p class="jg-adm-aviso" role="status">${esc(aviso)}</p>` : ""}
       <nav class="jg-adm-tabs" role="tablist">
-        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"]]
+        ${[["records", `Récords${nRev ? ` <b>${nRev}</b>` : ""}`], ["auditoria", "Auditoría"], ["monedas", "Monedas"], ["suspensiones", `Suspensiones${nSus ? ` <b>${nSus}</b>` : ""}`], ["serie1", "Serie 01"], ["economia", "Economía"]]
           .map(([k, t]) => `<button type="button" role="tab" class="btn2${pestaña === k ? " on" : ""}" data-tab="${k}" aria-selected="${pestaña === k}">${t}</button>`).join("")}
       </nav>
       ${detalle ? detalleHtml() : ""}
-      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : suspensionesHtml()}</div>
+      <div class="jg-adm-cuerpo">${pestaña === "records" ? recordsHtml() : pestaña === "auditoria" ? auditoriaHtml() : pestaña === "monedas" ? monedasHtml() : pestaña === "serie1" ? serie1Html() : pestaña === "economia" ? economiaHtml() : suspensionesHtml()}</div>
     </section>`;
     if (pl) { const sitio = host.querySelector(".jg-adm-player-sitio"); if (sitio) sitio.replaceWith(pl); else cierraPlayer(); }
     for (const [id, v] of Object.entries(escrito)) { const i = host.querySelector("#" + id); if (i && id !== "admBusca") i.value = v; }
@@ -331,6 +341,8 @@ export function crearAdmin(ctx) {
     for (const k of ["ranks", "solo", "logros"]) for (const t of Object.values((datos && datos[k]) || {})) for (const u of Object.keys(t || {})) s.add(u);
     for (const k of ["diario", "clubJugadas", "ajustes"]) for (const u of Object.keys((datos && datos[k]) || {})) s.add(u);
     for (const u of Object.keys((datos && datos.cartas && datos.cartas.s) || {})) s.add(u);
+    // quien solo sale en el cierre de la economía (lo suyo ya está archivado)
+    if (datos && datos.completo && datos.cierre) for (const u of Object.keys(economia(datos).usuarios)) s.add(u);
     for (const u of Object.keys(serie1)) s.add(u);
     return [...s];
   }
@@ -376,6 +388,80 @@ export function crearAdmin(ctx) {
     if (!confirm(`¿${n > 0 ? "Sumar" : "Restar"} ${formatoMonedas(Math.abs(n))} monedas a ${nombre(cuenta)}?`)) return;
     try { await fb.ajustaMonedas(cuenta, n, motivo, yo); aviso = `Ajuste de ${n > 0 ? "+" : ""}${formatoMonedas(n)} aplicado a ${nombre(cuenta)}.`; vacia("#admCant", "#admMotivoM"); }
     catch (e) { aviso = "No se pudo aplicar: " + (permiso(e) ? "las reglas no lo permiten (¿están publicadas?)" : (e && e.message || e)); }
+    pinta();
+  }
+
+  /* ---------- economía: el cierre ---------- */
+  function economiaHtml() {
+    if (!datos) return `<p class="jg-nada">Cargando…</p>`;
+    const ci = datos.cierre, ahora = ctx.ahora();
+    const dias = ms => (ms / 864e5).toLocaleString("es-CL", { maximumFractionDigits: 1 });
+    const estado = ci && Number.isFinite(ci.T)
+      ? `<p>Último cierre: hasta <b>${fecha(ci.T)}</b> (hace ${dias(ahora - ci.T)} días) · ${peso((ci.d || "").length)} · por ${esc(nombre(ci.por || ""))}.
+          Se rehace solo cuando un administrador tiene Juegos abierto y pasaron ${AUTO_CIERRE_DIAS} días.</p>`
+      : `<p>Todavía no hay ningún cierre: cada pestaña del sitio baja la historia entera de gastos al abrirse. El primero se hace aquí, a mano.</p>`;
+    let p = "";
+    if (escribiendo) p = `<p class="jg-adm-nota">Escribiendo… ${escribiendo.hechas} de ${escribiendo.total} rutas. No cierres la pestaña (si se corta, se vuelve a cerrar y listo).</p>`;
+    else if (prep && prep.calculando) p = `<p class="jg-adm-nota">Calculando y comprobando el cierre…</p>`;
+    else if (prep) {
+      const c = prep.c;
+      if (c.nada) p = `<p class="jg-adm-nota">${esc(c.motivo)}</p>`;
+      else p = `<div class="jg-adm-caja"><p>Cierre hasta <b>${fecha(c.T)}</b>: ${peso(c.bytes)} para cada pestaña, y ${formatoMonedas(c.archivar.length)} registros pasan al archivo.</p>
+        ${prep.dif.length ? `<p class="jg-adm-mal">No cuadra (${prep.dif.length} diferencias), así que no se puede escribir:</p><ul class="jg-adm-hist">${prep.dif.slice(0, 20).map(x => `<li translate="no">${esc(x)}</li>`).join("")}</ul>`
+          : `<p class="jg-adm-bien">Comprobado: con el cierre salen exactamente las mismas cuentas (${seg(prep.ms)}).</p>
+             <button type="button" class="btn" data-escribe-cierre>Cerrar y archivar</button>`}</div>`;
+    }
+    const frenos = prep && prep.c && prep.c.frenos && prep.c.frenos.length ? `<div class="jg-adm-caja"><p>Las cuentas paradas no se cierran: el cierre llega hasta antes de su primer gasto sin fondos. Para destrabarlo, súmale lo que le falta (pestaña Monedas):</p>
+      <ul class="jg-adm-hist">${prep.c.frenos.map(f => `<li><button type="button" class="btn2" data-cuenta-monedas="${esc(f.uid)}" translate="no">${esc(nombre(f.uid))}</button> parada desde ${fecha(f.desde)} · le faltan ${formatoMonedas(f.falta)} 🪙</li>`).join("")}</ul></div>` : "";
+    let r = "";
+    if (recalculo && recalculo.cargando) r = `<p class="jg-adm-nota">Bajando el archivo y rehaciendo la historia entera…</p>`;
+    else if (recalculo && recalculo.error) r = `<p class="jg-adm-mal">${esc(recalculo.error)}</p>`;
+    else if (recalculo) r = `<div class="jg-adm-caja"><p>Con la historia entera (archivo ${peso(recalculo.bytes)}, ${seg(recalculo.ms)}): ${recalculo.difs.length
+        ? `<b class="jg-adm-mal">${recalculo.difs.length} cuentas no cuadran</b> con lo que se ve ahora.</p><ul class="jg-adm-hist">${recalculo.difs.slice(0, 30).map(x => `<li><span translate="no">${esc(nombre(x.uid))}</span>: ahora ${formatoMonedas(x.ahora)}, desde cero ${formatoMonedas(x.full)}${x.parada ? " (parada desde cero)" : ""}</li>`).join("")}</ul>`
+        : `todas las cuentas cuadran.</p>`}
+      <button type="button" class="btn2" data-rehace-cierre>Rehacer el cierre desde cero</button></div>`;
+    return `<div class="jg-adm-caja">${estado}
+      <p>El cierre guarda el estado de la economía hasta ayer (${dias(MARGEN_CIERRE)} día de margen) y pasa lo viejo de casino, cartas y mercado a <code>archivo/</code>, que solo leen los administradores.</p>
+      <span class="jg-adm-btns"><button type="button" class="btn2" data-prepara-cierre ${datos.completo && !escribiendo ? "" : "disabled"}>Preparar cierre</button>
+      <button type="button" class="btn2" data-recalcula ${datos.completo && !escribiendo ? "" : "disabled"}>Recalcular desde el archivo</button></span></div>
+      ${p}${frenos}${r}`;
+  }
+  /* Prepara un cierre sobre `base` y lo comprueba contra esa misma base.
+     Al rehacerlo desde cero, `base` es la historia entera: se comprueba sin
+     todo lo archivable (lo que quedará vivo), pero solo se mueve al archivo
+     lo que todavía no está ahí. */
+  function preparaCierre(base, desdeCero) {
+    const t = performance.now(), c = hacerCierre(base, ctx.ahora() - MARGEN_CIERRE);
+    /* Lo ya archivado no se rehace: un cierre que no llega al de ahora
+       (una cuenta parada desde antes) dejaría fuera esos registros. */
+    const ahoraT = datos.cierre && Number.isFinite(datos.cierre.T) ? datos.cierre.T : -Infinity;
+    if (!c.nada && c.T < ahoraT) { prep = { c: { nada: true, frenos: c.frenos, motivo: `Desde cero el cierre llegaría solo hasta ${fecha(c.T)}, antes del de ahora (${fecha(ahoraT)}), por las cuentas paradas de abajo. Destrábalas primero.` }, dif: [] }; return; }
+    if (desdeCero && !c.nada) c.archivar = enVivo(datos, c.archivar);
+    prep = { c, dif: c.nada ? [] : verificaCierre(base, c, datos), ms: performance.now() - t };
+  }
+  async function escribeElCierre() {
+    const c = prep && prep.c;
+    if (!c || c.nada || prep.dif.length) return;
+    if (!confirm(`¿Cerrar la economía hasta ${fecha(c.T)} y pasar ${c.archivar.length} registros al archivo?`)) return;
+    escribiendo = { hechas: 0, total: c.archivar.length * 2 + 1 }; pinta();
+    try {
+      await fb.escribeCierre(c.nodo, c.archivar, yo, (h, t) => { escribiendo = { hechas: h, total: t }; pinta(); });
+      aviso = `Cierre escrito hasta ${fecha(c.T)}.`; prep = null; recalculo = null;
+    } catch (e) { aviso = "No se pudo terminar: " + (permiso(e) ? "las reglas no lo permiten (¿están publicadas?)" : (e && e.message || e)) + ". Se puede volver a cerrar."; }
+    escribiendo = null; pinta();
+  }
+  async function recalcula() {
+    recalculo = { cargando: true }; prep = null; pinta();
+    try {
+      const t = performance.now(), archivo = await fb.leerArchivo(), full = conArchivo(datos, archivo);
+      full.completo = true;
+      const difs = [];
+      for (const u of new Set([...Object.keys(economia(full).usuarios), ...Object.keys(economia(datos).usuarios)])) {
+        const a = monedasDe(u, datos), b = monedasDe(u, full);
+        if (a.saldo !== b.saldo || a.parada !== b.parada) difs.push({ uid: u, ahora: a.saldo, full: b.saldo, parada: b.parada });
+      }
+      recalculo = { full, difs, bytes: JSON.stringify(archivo).length, ms: performance.now() - t };
+    } catch (e) { recalculo = { error: "No se pudo leer el archivo: " + (permiso(e) ? "las reglas no lo permiten (¿están publicadas?)" : (e && e.message || e)) }; }
     pinta();
   }
 
@@ -490,6 +576,12 @@ export function crearAdmin(ctx) {
       catch (err) { aviso = "No se pudo: " + (permiso(err) ? "las reglas no lo permiten (¿están publicadas?)" : (err && err.message || err)); }
       pinta(); return;
     }
+    // el cálculo tarda un segundo: primero se pinta el «Calculando…»
+    if ("preparaCierre" in ds) { prep = { calculando: true }; pinta(); setTimeout(() => { preparaCierre(datos, false); pinta(); }, 30); return; }
+    if ("escribeCierre" in ds) { escribeElCierre(); return; }
+    if ("recalcula" in ds) { recalcula(); return; }
+    if ("rehaceCierre" in ds && recalculo && recalculo.full) { const full = recalculo.full; prep = { calculando: true }; pinta(); setTimeout(() => { preparaCierre(full, true); pinta(); }, 30); return; }
+    if (ds.cuentaMonedas) { cuenta = ds.cuentaMonedas; pestaña = "monedas"; pinta(); return; }
     if (ds.quitaveto) { if (confirm(`¿Quitar el veto a ${nombre(ds.quitaveto)}?`)) fb.quitaVeto(ds.quitaveto).catch(err => alert(err && err.message || err)); return; }
   }
   function alEnviar(e) {

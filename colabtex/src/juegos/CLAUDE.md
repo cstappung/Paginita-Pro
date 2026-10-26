@@ -406,6 +406,23 @@ pid, and `vivo`, `chat`, `soloPruebas` and `mascotasEstado` only by key
 (`test-rules.mjs` pins it). A new node that clients read by key should get its `.read` at the key
 level, not on the collection.
 
+What actually spent the quota (October 2026, measured on an export) was
+`watchLogros`: every page load downloaded the whole spending history,
+~3.8 MB a tab. That is now the **economy cierre**
+(`docs/claude/juegos/perfiles-y-economia.md`): old history moves to
+`archivo/` and tabs start from a compact snapshot. A new whole-node read
+of something that only grows must get the same treatment, or stay small.
+
+**A tab hidden for `OCULTA_MS` (10 min) goes offline** (`duerme` in
+`juegos-main.js`, `fb.desconecta`/`fb.reconecta`), so it stops receiving
+every bet and message of the site. Only in views where nothing waits on
+the network (`VISTAS_DORMIBLES`: lobby, ranks, logros, coins, profile,
+packs, market, pets) and never with a waiting room of yours open: its
+`onDisconnect` would delete the room. On return the SDK re-listens with a
+hash and the server resends **whole** any node that changed (the web SDK
+has no per-range hashes), which is why this only pays off with small
+nodes.
+
 ## Every game can be muted and turned down (a rule, not a nicety)
 
 **Every game must offer both a mute and a volume control that are visible

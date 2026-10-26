@@ -7,6 +7,7 @@ import { VERIFICADORES, juegoDeCategoria, textoPrueba, pruebaGuardable, verifica
 import { crearFrontera } from "./juegos/frontera.js";
 import { crearAdmin } from "./juegos/admin.js";
 import { merecesRevision } from "./juegos/admin-datos.js";
+import { hacerCierre, verificaCierre, MARGEN_CIERRE, AUTO_CIERRE_DIAS } from "./juegos/cierre.js";
 import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hastaDeCuenta } from "./juegos/castigo.js";
 "use strict";
 /* ============================================================
@@ -522,9 +523,32 @@ function datosPerfil(cb) {
     datosP = conDerivados(Object.assign({}, d, { completo: !!d.completo }));
     pintaTintas();
     for (const f of [...oyentesP]) f(datosP);
+    cierraSiToca();
   }, () => (state.user ? state.user.uid : ""));
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
   return () => oyentesP.delete(cb);
+}
+/* ---------- el cierre de la economía, solo (juegos/cierre.js) ----------
+   La página de un administrador rehace el cierre cuando pasaron
+   AUTO_CIERRE_DIAS desde el anterior, con la misma comprobación que el
+   botón del panel: si algo no cuadra, no escribe. Una vez por sesión, a los
+   20 s de tener los datos (el cálculo pesa un segundo) y nunca el primero,
+   que se hace a mano. */
+let cierreIntentado = false;
+function cierraSiToca() {
+  if (cierreIntentado || state.admin !== true || !datosP || !datosP.completo || !state.user) return;
+  const ci = datosP.cierre;
+  if (!ci || !Number.isFinite(ci.T) || fb.ahora() - ci.T < MARGEN_CIERRE + AUTO_CIERRE_DIAS * 864e5) return;
+  cierreIntentado = true;
+  setTimeout(async () => {
+    if (!datosP || !datosP.completo || !state.user || state.admin !== true) return;
+    const c = hacerCierre(datosP, fb.ahora() - MARGEN_CIERRE);
+    if (c.nada || !c.archivar.length) return;
+    const dif = verificaCierre(datosP, c);
+    if (dif.length) { console.warn("[cierre] no cuadra; no se escribe", dif.slice(0, 20)); return; }
+    try { await fb.escribeCierre(c.nodo, c.archivar, state.user.uid); console.info(`[cierre] hasta ${new Date(c.T).toISOString()}, ${c.archivar.length} registros al archivo`); }
+    catch (e) { console.warn("[cierre]", e); }
+  }, 20000);
 }
 /* La Serie 01 de PRODROP cambió para alguien (prodrop-cartas.js): lo que
    se ve de las cartas sale de los mismos datos, así que se vuelven a
@@ -2378,6 +2402,33 @@ async function cortaPorConsumo(e) {
   try { fb.desconecta(); } catch (err) { console.warn("[consumo]", err); }
   pintaTopeConsumo(e);
 }
+/* ---------- la pestaña escondida se duerme ----------
+   Escondida, una pestaña sigue recibiendo cada cambio de lo que escucha:
+   cada apuesta del casino de cualquiera, cada mensaje, cada sobre. Tras
+   OCULTA_MS escondida en una vista donde nada espera a la red, se
+   desconecta (`goOffline`), y al volver se reconecta. El SDK vuelve a pedir
+   cada escucha con el hash de lo que ya tiene y el servidor reenvía entero
+   solo el nodo que cambió, así que esto conviene desde el cierre de la
+   economía (juegos/cierre.js), que dejó chicos los nodos que cambian. No en
+   una sala, el club, el casino ni el panel: ahí la pestaña escondida
+   trabaja (el turno, una partida, un vuelo del avión, un cierre) o un
+   `onDisconnect` borraría algo (la sala que espera a su anfitrión). */
+const OCULTA_MS = 10 * 60 * 1000;
+const VISTAS_DORMIBLES = new Set(["vestibulo", "ranks", "logros", "monedas", "perfil", "cartas", "mercado", "mascotas"]);
+let dormida = false, sueno = 0;
+function duerme() {
+  if (!document.hidden || dormida || cortadoConsumo || cancelarLimpieza || !VISTAS_DORMIBLES.has(state.vista)) return;
+  dormida = true;
+  try { fb.desconecta(); } catch (e) { console.warn("[juegos] dormir", e); }
+}
+document.addEventListener("visibilitychange", () => {
+  clearTimeout(sueno);
+  if (document.hidden) { sueno = setTimeout(duerme, OCULTA_MS); return; }
+  if (!dormida || cortadoConsumo) return;
+  dormida = false;
+  try { fb.reconecta(); } catch (e) { console.warn("[juegos] despertar", e); }
+});
+
 function pintaTopeConsumo(e) {
   if (document.getElementById("jgTopeDatos")) return;
   const capa = document.createElement("div");
@@ -4280,6 +4331,7 @@ function wire() {
     fb.esAdminJuegos(user.uid).then(a => {
       if (!state.user || state.user.uid !== user.uid) return;
       state.admin = a; mostrar();
+      cierraSiToca();
       /* Batalla de Rock, si está a prueba (ROCK_SOLO_ADMIN): sus piezas solo las ve un admin (mercado incluido). */
       if (fijaVeRock(a) && datosP) { datosP = conDerivados(Object.assign({}, datosP)); for (const f of [...oyentesP]) f(datosP); }
       if (state.vista === "admin") { vistaPintada = ""; render(); }
