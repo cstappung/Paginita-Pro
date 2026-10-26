@@ -41,7 +41,7 @@ import { crearRepro } from "./repeticion.js";
 import { repDe } from "./rieles-datos.js";
 import { nombreCategoria } from "./perfil-tarjeta.js";
 import { monedasDe, formatoMonedas, copiasDe, economia } from "./monedas.js";
-import { hacerCierre, verificaCierre, conArchivo, enVivo, MARGEN_CIERRE, AUTO_CIERRE_DIAS } from "./cierre.js";
+import { hacerCierre, verificaCierre, conArchivo, enVivo, MARGEN_CIERRE, AUTO_CIERRE_DIAS, PRIMER_CIERRE } from "./cierre.js";
 import { MOTOR, SERIE1 } from "./prodrop-cartas.js";
 
 // Escapa texto para meterlo en HTML sin que nadie cuele etiquetas
@@ -403,7 +403,7 @@ export function crearAdmin(ctx) {
     const estado = ci && Number.isFinite(ci.T)
       ? `<p>Último cierre: hasta <b>${fecha(ci.T)}</b> (hace ${dias(ahora - ci.T)} días) · ${peso((ci.d || "").length)} · por ${esc(nombre(ci.por || ""))}.
           Se rehace solo cuando un administrador tiene Juegos abierto y pasaron ${AUTO_CIERRE_DIAS} días.</p>`
-      : `<p>Todavía no hay ningún cierre: cada pestaña del sitio baja la historia entera de gastos al abrirse. El primero se hace aquí, a mano.</p>`;
+      : `<p>Todavía no hay ningún cierre: cada pestaña del sitio baja la historia entera de gastos al abrirse. El primero se hace solo desde el <b>${fecha(PRIMER_CIERRE)}</b>, en la página del primer administrador que tenga Juegos abierto (o aquí, a mano).</p>`;
     let p = "";
     if (escribiendo) p = `<p class="jg-adm-nota">Escribiendo… ${escribiendo.hechas} de ${escribiendo.total} rutas. No cierres la pestaña (si se corta, se vuelve a cerrar y listo).</p>`;
     else if (prep && prep.calculando) p = `<p class="jg-adm-nota">Calculando y comprobando el cierre…</p>`;
@@ -438,6 +438,7 @@ export function crearAdmin(ctx) {
      todo lo archivable (lo que quedará vivo), pero solo se mueve al archivo
      lo que todavía no está ahí. */
   function preparaCierre(base, desdeCero) {
+    if (!fb.alDia()) { prep = { c: { nada: true, motivo: "Sin conexión estable con la base (o recién vuelta): los datos pueden estar viejos. Espera unos segundos y vuelve a prepararlo." }, dif: [] }; return; }
     const t = performance.now(), c = hacerCierre(base, ctx.ahora() - MARGEN_CIERRE);
     /* Lo ya archivado no se rehace: un cierre que no llega al de ahora
        (una cuenta parada desde antes) dejaría fuera esos registros. */
@@ -449,6 +450,7 @@ export function crearAdmin(ctx) {
   async function escribeElCierre() {
     const c = prep && prep.c;
     if (!c || c.nada || prep.dif.length) return;
+    if (!fb.alDia()) { aviso = "Se perdió la conexión con la base: vuelve a preparar el cierre."; prep = null; pinta(); return; }
     if (!confirm(`¿Cerrar la economía hasta ${fecha(c.T)} y pasar ${c.archivar.length} registros al archivo?`)) return;
     escribiendo = { hechas: 0, total: c.archivar.length * 2 + 1 }; pinta();
     try {

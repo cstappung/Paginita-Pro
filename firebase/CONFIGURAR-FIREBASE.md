@@ -765,18 +765,24 @@ calcular las monedas. Ahora un administrador la «cierra»
 
 **El orden importa:**
 
-1. Publicar estas reglas.
+1. Publicar estas reglas **antes del primer cierre**: sin ellas el cierre
+   no se puede escribir.
 2. Subir el código (la página nueva ya sabe leer el cierre).
-3. **Esperar un día**, para que todos hayan recargado: una pestaña con la
-   página vieja no conoce el cierre y, una vez archivado lo viejo, vería
-   saldos sin esa historia (y podría dejar gastar lo que no hay: esa cuenta
-   quedaría parada, y se arregla con un ajuste en **Monedas**). Desde esta
-   versión existe `juegosVersion/min`: el cierre manual la sube y tapa las
-   pestañas con código más viejo, pero las abiertas antes de esta versión
-   no la conocen, así que esta primera vez solo sirve esperar.
-4. Hacer el primer cierre a mano: `juegos.html#admin` → **Economía** →
-   **Preparar cierre** → **Cerrar y archivar**. Después la página de un
-   administrador lo rehace sola cada dos días.
+3. El primer cierre está programado para el **lunes 26-10-2026 a la 1:30
+   (Chile)** (`PRIMER_CIERRE` en `colabtex/src/juegos/cierre.js`): lo hace
+   sola la página del primer administrador que tenga Juegos abierto desde
+   esa hora. También se puede hacer antes a mano: `juegos.html#admin` →
+   **Economía** → **Preparar cierre** → **Cerrar y archivar**. Después se
+   rehace solo cada dos días.
+
+Una pestaña abierta con la página vieja no conoce el cierre y, una vez
+archivado lo viejo, ve saldos sin esa historia: podría dejar gastar lo que
+no hay, y esa cuenta quedaría parada (se arregla con un ajuste en
+**Monedas**). Lo ideal era esperar un día tras subir el código; el dueño
+prefirió cerrar a la 1:30 y arreglar a mano lo que salga. Desde esta
+versión existe `juegosVersion/min`: el cierre manual la sube y tapa las
+pestañas con código más viejo, pero las abiertas antes de esta versión no
+la conocen.
 
 Si el panel dice que una cuenta parada frena el cierre, súmale lo que le
 falta en la pestaña **Monedas** y vuelve a prepararlo.
