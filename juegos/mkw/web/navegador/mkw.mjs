@@ -303,6 +303,22 @@ if (MEDIR_GPU && globalThis.GPUQueue) {
   };
   window.mkwGpu = () => gpuMedida.muestras;
 }
+// §114b: los «pipelines» que crea aurora (la receta con que la tarjeta dibuja cada material nuevo) y los shaders: cuántos
+// y cuánto bloquean al pedirlos. Siempre (solo cuesta cuando se crea uno). En un teléfono compilar uno puede costar
+// decenas de ms: si el tramo lento de la primera carrera coincide con muchos, el culpable es ese (el informe lo dice)
+const pipelinesMedida = { n: 0, ms: 0, nAsync: 0, shaders: 0, msShaders: 0 };
+if (globalThis.GPUDevice) {
+  const envolver = (nombre, contar) => {
+    const original = GPUDevice.prototype[nombre];
+    if (typeof original !== 'function') return;
+    GPUDevice.prototype[nombre] = function (...a) { const t0 = performance.now(); try { return original.apply(this, a); } finally { contar(performance.now() - t0); } };
+  };
+  envolver('createRenderPipeline', ms => { pipelinesMedida.n++; pipelinesMedida.ms += ms; });
+  envolver('createComputePipeline', ms => { pipelinesMedida.n++; pipelinesMedida.ms += ms; });
+  envolver('createRenderPipelineAsync', () => { pipelinesMedida.nAsync++; });
+  envolver('createShaderModule', ms => { pipelinesMedida.shaders++; pipelinesMedida.msShaders += ms; });
+}
+window.mkwPipelines = () => ({ ...pipelinesMedida });
 // §114: la mediana de la tarjeta de video en los últimos `ms` (null si no se mide)
 const gpuReciente = (ms = 2000) => {
   const desde = performance.now() - ms, v = [];
@@ -795,9 +811,9 @@ montarGraficos($('graficosPanel'), { enSala: !!sincro, alSalida: t => salidaLien
 // (núcleos, memoria, tarjeta de video), la pantalla y los últimos 30 s del medidor
 function informeRendimiento() {
   const h = window.mkwEstado.historial || [], ult = h.slice(-10);
-  const media = i => { const v = ult.map(x => x[i]).filter(Number.isFinite); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null; };
+  const media = k => { const v = ult.map(x => x[k]).filter(Number.isFinite); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null; };
   const hz = relojMonitor.p ? Math.round(1000 / relojMonitor.p * 10) / 10 : null;
-  const fps = media(0), trabajo = media(1), gpu = media(2);
+  const fps = media('fps'), trabajo = media('juego'), gpu = media('video');
   return {
     cuando: new Date().toISOString(), navegador: navigator.userAgent, telefono: esTelefono,
     nucleos: navigator.hardwareConcurrency ?? null, memoriaGB: navigator.deviceMemory ?? null,
@@ -806,7 +822,10 @@ function informeRendimiento() {
     graficos: leerGraficos(), mandoEnPantalla: controles.tactilActivo(), enSala: !!sincro,
     enganche: { ...window.mkwEstado.fase }, memoriaJuegoMB: window.mkwHeapMB ? Math.round(window.mkwHeapMB()) : null,
     ultimos10s: { fps, juegoMs: trabajo, videoMs: gpu }, frena: queFrena({ fps, trabajo, gpu: gpu ?? undefined, hz: hz ?? undefined }),
-    porSegundo: h.map(([f, t, g]) => (g === null ? `${f} fps ${t} ms` : `${f} fps ${t} ms ${g} ms`)),
+    pipelines: { ...pipelinesMedida, ms: Math.round(pipelinesMedida.ms), msShaders: Math.round(pipelinesMedida.msShaders) },
+    // un renglón por segundo: «s · fps · juego ms · video ms · disco ms · pipelines nuevos (ms) · dónde»
+    porSegundo: h.map(x => `${x.s}s ${x.fps}fps juego${x.juego}` + (x.video === null ? '' : ` video${x.video}`) + (x.disco ? ` disco${x.disco}` : '') +
+      (x.pip ? ` pip${x.pip}(${x.pipMs}ms)` : '') + (x.shaders ? ` sh${x.shaders}` : '') + (x.lugar ? ` ${x.lugar}` : '')),
     ...(gpu === null ? { nota: 'sin medida de la tarjeta: prende «Mostrar qué frena» en Avanzado → Gráficos y recarga' } : {}),
   };
 }
@@ -2164,13 +2183,25 @@ async function arrancar() {
     const trabajo = dc ? ((dt - (ahora.espera - antes.espera)) / dc) : 0;
     const desde = antes.c;                     // cuadro con que empezó este segundo de medición
     ahora.disco = msEsperaDisco;
+    ahora.pip = antes.pip;                   // (se pone al día abajo, con el historial)
     const esperaDiscoSeg = msEsperaDisco - (antes.disco || 0);   // ms de este segundo esperando el disco
     antes = ahora;
     Object.assign(window.mkwEstado, { cuadros: ahora.c, fps, trabajo });
-    // §114: los últimos 30 s (para el informe de rendimiento)
+    // §114: los últimos 2 min, un renglón por segundo (para el informe de rendimiento): fps, ms del juego por cuadro,
+    // ms de la tarjeta, ms esperando el disco, pipelines nuevos (y ms bloqueados creándolos) y dónde estaba el juego
     const hist = window.mkwEstado.historial || (window.mkwEstado.historial = []);
-    hist.push([Math.round(fps * 10) / 10, Math.round(trabajo * 10) / 10, gpuReciente(1000) === null ? null : Math.round(gpuReciente(1000) * 10) / 10]);
-    if (hist.length > 30) hist.shift();
+    const pip = { ...pipelinesMedida }, pipAntes = antes.pip || { n: 0, ms: 0, nAsync: 0, shaders: 0 };
+    ahora.pip = pip;
+    let lugar = '';
+    try {
+      const L = window.mkwMenus, ri = L?.u32(0x809BD730), et = ri ? L.u32(ri + 0x28) : -1;
+      lugar = et === 0 ? 'presentación' : et === 1 ? 'cuenta' : et === 2 ? 'carrera' : et >= 3 ? 'fin' : 'menú';
+    } catch {}
+    const g1 = gpuReciente(1000);
+    hist.push({ s: Math.round(performance.now() / 1000), fps: Math.round(fps * 10) / 10, juego: Math.round(trabajo * 10) / 10,
+      video: g1 === null ? null : Math.round(g1 * 10) / 10, disco: Math.round(esperaDiscoSeg),
+      pip: pip.n + pip.nAsync - pipAntes.n - (pipAntes.nAsync || 0), pipMs: Math.round(pip.ms - pipAntes.ms), shaders: pip.shaders - (pipAntes.shaders || 0), lugar });
+    if (hist.length > 120) hist.shift();
     avisoGpu?.medir({ fps, trabajo, cuadros: ahora.c, esperaDisco: esperaDiscoSeg, oculta: document.hidden, enSala: enSalaGpu });
     $('fps').textContent = `${fps.toFixed(1)} fps`;
     $('trabajo').textContent = `trabajo ${trabajo.toFixed(2)} ms`;

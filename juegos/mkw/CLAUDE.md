@@ -44,6 +44,10 @@ línea más un resumen general. **Es ingeniero eléctrico, no de software**: la 
 - Repos de terceros en `terceros/` (ignorados): sus cambios se guardan como parches en `parches/`, con el commit
   fijado en `herramientas/versiones.md` (igual que `parche.diff` de BT3).
 - Firebase y el Worker los publica el dueño a mano. PR/merge en Paginita-Pro solo cuando el dueño lo pida.
+- **Quitar rivales NO es una opción para mejorar el rendimiento** (el dueño, 2026-10-26: «grábalo bien», §114.7).
+  Siempre 12 karts (humanos + la CPU que completa la parrilla), en el celular, en un PC justo y en la sala. No se
+  propone ni como ajuste, «modo celular» o prueba. Tampoco se sacan efectos (§114.6): el rendimiento se gana
+  **optimizando el motor y la página**.
 - **Decompilar uno mismo** (el dueño, 2026-10-19): si un detalle del juego no está documentado o la decompilación de
   internet no se alcanza, se saca del juego mismo: el C++ traducido (`terceros/Wiicompiled/generated/build_shards/`,
   cada función es `func_<DIRECCIÓN>`), la memoria del juego corriendo o el desensamblado de `extraido/`. Nunca frenar
