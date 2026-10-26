@@ -103,9 +103,10 @@ Shared Juegos rules: `colabtex/src/juegos/CLAUDE.md`; logros/coins:
   misses/overstrums −; 0 = K.O., the song ends `FIN_KO` s later. No K.O. →
   more life wins, then score (`cierra`).
 - Effects (`p.batalla` from `bt.pintura` → `highway.js`): `amp` shakes,
-  rotates and stretches the whole highway and strobes the gems; `apagon` is
-  an **opaque** black cover over the whole highway down past the strike bar
-  (only hit flames show); `roto` overlay; each active attack's icon has a
+  rotates and stretches the whole highway and strobes the gems; `apagon` lets
+  you see the notes appear on the far part of the highway (to guess where
+  they land) and covers from `APAGON_DESDE` down past the strike bar with
+  opaque black (only hit flames show; covering it all was too much); `roto` overlay; each active attack's icon has a
   ring that empties (`quedan`).
 - **Input effects** happen before the `Grabadora`: in battle the guitar's
   sounding frets are `_trastesBt` = what you press (`p.fis`) through
