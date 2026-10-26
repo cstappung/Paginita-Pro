@@ -167,6 +167,19 @@ ok('con «Acelerar solo» en No, no acelera', (await recibe()) === 0);
 await espera(250);                                                         // (la hoja se pinta cada 100 ms)
 ok('la casilla de la hoja dice lo guardado (No) y se recuerda', await p.evaluate(() => JSON.parse(localStorage.getItem('mkw.ayudas')).acelerar === false &&
    document.querySelector('.ctl-ayudas button[aria-pressed="true"]')?.textContent === 'No'));
+// ---- §114: el rendimiento en el teléfono ----
+await p.evaluate(() => { localStorage.setItem('mkw.graficos', JSON.stringify({ salida: 0 })); localStorage.removeItem('mkw.graficos.telefono'); });
+await p.reload(); await espera(1500); await andando();
+ok('quien ya tenía «la de tu pantalla» guardada en el teléfono pasa a 720 (una sola vez)', await p.evaluate(() => JSON.parse(localStorage.getItem('mkw.graficos')).salida === 720 &&
+   localStorage.getItem('mkw.graficos.telefono') === '1'));
+await p.evaluate(() => localStorage.setItem('mkw.graficos', JSON.stringify({ salida: 0 })));
+await p.reload(); await espera(1500); await andando();
+ok('…y si después elige «la de tu pantalla», se respeta', await p.evaluate(() => JSON.parse(localStorage.getItem('mkw.graficos')).salida === 0));
+await p.evaluate(() => window.mkwInterfaz.abrirCajon('avanzado')); await espera(400);
+await toca('#copiarRendimiento'); await espera(300);
+const inf = await p.evaluate(() => { try { return JSON.parse(document.getElementById('informeRendimiento').textContent); } catch { return null; } });
+ok('«📋 Copiar el informe de rendimiento»: el informe dice teléfono, pantalla, lienzo y qué frena', !!inf && inf.telefono === true && 'pantallaHz' in inf && /×/.test(inf.lienzo) && 'frena' in inf,
+   JSON.stringify(inf && { telefono: inf.telefono, hz: inf.pantallaHz, lienzo: inf.lienzo, nota: inf.nota }));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
 console.log(`fin: ${bien} bien, ${mal} mal`);
 await b.close(); srv.kill();

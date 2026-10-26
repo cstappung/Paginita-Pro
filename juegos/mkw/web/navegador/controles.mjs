@@ -616,11 +616,13 @@ function crearTactil(contenedor, tactil) {
   });
   const porOmision = id => BOTONES_TACTILES.find(b => b[0] === id)?.[6] !== false;
   // §113b: qué hace cada pieza (se escribe en su bit y en su etiqueta: el dedo y la vista siguen al cambio)
+  let ultimaPinta = '';                            // (§114: lo último pintado, para no repintar lo mismo)
   let hace = revisarHace(leer(CLAVE_HACE));
   const haceDe = id => hace[id] || id;
   const nombrePieza = id => (id === 'stick' ? 'Stick' : `${ACCION_TACTIL[haceDe(id)].etiqueta} (${ACCION_TACTIL[haceDe(id)].nombre.toLowerCase()})`);
   const aplicarHace = () => {
     for (const b of botones) { const a = haceDe(b.dataset.pieza); b.dataset.bit = BOTON[a]; b.textContent = ACCION_TACTIL[a].etiqueta; }
+    ultimaPinta = '';
   };
   aplicarHace();
   contenedor.style.position = contenedor.style.position || 'relative';
@@ -818,7 +820,13 @@ function crearTactil(contenedor, tactil) {
   return {
     mostrar(si) { capa.style.display = si ? 'block' : 'none'; if (!si) { if (editando) editar(false); dedos.clear(); recalcula(); } else aplicarPiezas(); },
     ajustar({ esc, opa }) { capa.style.setProperty('--esc', String(esc)); capa.dataset.opa = String(opa); if (!editando) capa.style.opacity = String(opa); aplicarPiezas(); },
-    pinta() {                                      // la perilla sigue al dedo; los botones apretados se iluminan
+    // la perilla sigue al dedo; los botones apretados se iluminan. (§114: solo si algo cambió: se llama en cada cuadro, y
+    // escribir 13 estilos por cuadro hacía que el navegador recalculara y volviera a pintar el mando en cada uno —en un
+    // teléfono, tiempo que se le quita al juego—)
+    pinta() {
+      const firma = `${tactil.sx},${tactil.sy},${tactil.botones},${capa.style.display}`;
+      if (firma === ultimaPinta) return;
+      ultimaPinta = firma;
       perilla.style.transform = `translate(${(tactil.sx / 127) * 60}%, ${(-tactil.sy / 127) * 60}%)`;
       for (const b of botones) b.style.background = tactil.botones & Number(b.dataset.bit) ? 'rgba(228,0,43,.6)' : 'rgba(255,255,255,.18)';
     },

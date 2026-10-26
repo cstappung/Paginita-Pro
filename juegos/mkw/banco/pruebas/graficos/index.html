@@ -17,7 +17,7 @@
 <div class="caja"><span id="medidor" class="chip-estado" hidden></span></div>
 <script type="module">
 import { prueba } from '../../comun.js';
-import { normalizar, lineasVideo, textoMedidor, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES, medidaLimitada, limitarSalida, pixelesInternos } from '/web/navegador/graficos.mjs';
+import { normalizar, lineasVideo, textoMedidor, queFrena, SALIDAS, montarGraficos, montarMedidor, leerGraficos, ESCALAS, FLUIDECES, medidaLimitada, limitarSalida, pixelesInternos } from '/web/navegador/graficos.mjs';
 
 const { ok, fin } = prueba('graficos', 'Gráficos opcionales y el medidor (sin el juego)');
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -33,7 +33,7 @@ try {
   const motorEscalas = [0, 1, 1.5, 2, 3, 4, 6, 8], motorFluidez = [0, 120, 180];
   ok('solo se ofrecen valores que el motor acepta', ESCALAS.every(v => motorEscalas.includes(v)) && FLUIDECES.every(v => motorFluidez.includes(v)));
   ok('un valor raro (guardado viejo o a mano: 240, 5×, "x") vuelve a lo de siempre', JSON.stringify(normalizar({ escala: 5, fluidez: 240, verFps: 'si' })) ===
-     JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
+     JSON.stringify({ escala: 1, fluidez: 0, salida: 0, verFps: false, verPing: false, verDetalle: false }) && lineasVideo({ escala: 'x', fluidez: 60 }).length === 0);
 
   // ---- 2. El medidor ----
   const rtt = { yo1: 0, ana: 80.4, juan: 35 };
@@ -43,6 +43,17 @@ try {
   ok('solo fps (fuera de la sala no hay ping)', textoMedidor({ fps: 58.2, rtt: {}, yo: 'x' }) === '58 fps');
   ok('solo ping', textoMedidor({ fps: 60, rtt, nombres, yo: 'yo1', verFps: false }) === '📶 Ana 80 ms · Juan 35 ms');
   ok('nada que mostrar → texto vacío', textoMedidor({ fps: null, rtt: {}, verPing: true }) === '');
+  // §114: qué frena (por qué un teléfono no llega a 60)
+  ok('qué frena: a 60, nada', queFrena({ fps: 59.8, trabajo: 9 }) === 'nada (va a 60)');
+  ok('qué frena: el procesador (el juego tarda más que un cuadro)', /^el procesador/.test(queFrena({ fps: 30, trabajo: 22, gpu: 5, hz: 120 })));
+  ok('qué frena: la tarjeta de video', /^la tarjeta de video/.test(queFrena({ fps: 30, trabajo: 9, gpu: 20, hz: 60 })));
+  ok('qué frena: la pantalla a 30 Hz (ahorro de batería)', /^la pantalla: refresca a 30 Hz/.test(queFrena({ fps: 30, trabajo: 9, gpu: 4, hz: 30 })));
+  ok('qué frena: el ritmo (nada al tope)', /^el ritmo/.test(queFrena({ fps: 40, trabajo: 9, gpu: 4, hz: 60 })));
+  ok('el medidor con el detalle: fps, juego, video, Hz, lienzo y qué frena', textoMedidor({ fps: 31.2, verFps: false, verPing: false, verDetalle: true,
+     detalle: { trabajo: 22.4, gpu: 5.1, hz: 120, lienzo: '1280×720' } }) === '31 fps · juego 22.4 ms · video 5.1 ms · 120 Hz · 1280×720 · frena: el procesador: el juego no alcanza a calcular un cuadro en 16,7 ms',
+     textoMedidor({ fps: 31.2, verFps: false, verPing: false, verDetalle: true, detalle: { trabajo: 22.4, gpu: 5.1, hz: 120, lienzo: '1280×720' } }));
+  ok('el detalle se guarda como los otros, y hay 360 de salida para teléfonos justos', normalizar({ verDetalle: true }).verDetalle === true && normalizar({}).verDetalle === false &&
+     SALIDAS.includes(360) && normalizar({ salida: 360 }).salida === 360);
 
   // ---- 3. El panel ----
   let reinicios = 0, cambios = 0;
@@ -87,7 +98,7 @@ try {
     const sinCambios = { n: 0 };
     montarGraficos(caja2, { reiniciar: () => sinCambios.n++, alSalida: t => { pedida = t; } });
     const sel = caja2.querySelector('#graficosSalida');
-    ok('el panel ofrece la salida en pixeles (1920×1080 … 960×540)', [...sel.options].map(o => o.textContent.split(' ')[0]).slice(1).join() === '1920×1080,1600×900,1280×720,960×540',
+    ok('el panel ofrece la salida en pixeles (1920×1080 … 640×360)', [...sel.options].map(o => o.textContent.split(' ')[0]).slice(1).join() === '1920×1080,1600×900,1280×720,960×540,640×360',
        [...sel.options].map(o => o.textContent.split(' ')[0]).join(' | '));
     sel.value = '720'; sel.dispatchEvent(new Event('change'));
     ok('elegir 1280×720 se aplica en el momento (sin pedir reiniciar) y se guarda', pedida === 720 && caja2.querySelector('#graficosReiniciar').hidden && leerGraficos().salida === 720);

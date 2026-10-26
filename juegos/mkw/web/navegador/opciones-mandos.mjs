@@ -422,6 +422,9 @@ export function montarControles(caja, controles, { ahora = () => performance.now
   // ---------------- pintar (cada 100 ms y después de cada cambio): solo textos, clases y atributos ----------------
   let firmaTraer = '';
   function pintar() {
+    // (§114: con la hoja escondida —el cajón cerrado, otra pestaña— no hay nada que mostrar: el bucle de 100 ms no toca
+    // nada; en un teléfono cada milisegundo de la página se lo quita al juego. Una espera en curso sí se sigue atendiendo)
+    if (!caja.isConnected || (!caja.offsetParent && !espera && !ayudante)) { if (quietoHasta) { quietoHasta = 0; document.body.classList.remove('mando-quieto'); } return; }
     // (la espera de una tecla terminó —alCambiar de controles.mjs lo avisa, y por si no está conectado, aquí también—)
     if (espera?.tipo === 'tecla' && !controles.esperando()) terminarTecla(espera);
     const t = ahora();
