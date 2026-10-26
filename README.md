@@ -16,6 +16,10 @@ Sin instalar nada, gratis y hecho a la medida de nuestro grupo.
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-222?style=for-the-badge&logo=github)
 ![Firebase](https://img.shields.io/badge/datos-Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black)
 
+<br>
+
+<a href="https://paginita-pro.cl"><img src="docs/capturas/inicio.webp" alt="Menú de inicio de Paginita Pro" width="900"></a>
+
 </div>
 
 ---
@@ -43,11 +47,32 @@ desde donde se llega a cada aplicación.
 | 🎮 | **[Juegos](https://paginita-pro.cl/juegos.html)** | Salas multijugador, Solo Club con rankings, monedas, logros, perfiles, Casino, PRODROP, Mascotas 3D y PRO HERO. ¡Detalles abajo! |
 | ⚑ | **[Informes](https://paginita-pro.cl/informes.html)** | El buzón de errores y sugerencias compartido: lo que recogen las apps y lo que escribe el equipo, en un solo lugar y exportable. |
 
+### Así se ven
+
+<table>
+<tr>
+<td width="50%"><img src="docs/capturas/csv-scope.webp" alt="CSV·Scope con una captura de 60 Hz distorsionada"><br><sub><b>CSV·Scope</b> — una captura de 60 Hz con su corriente</sub></td>
+<td width="50%"><img src="docs/capturas/csv-scope-fft.webp" alt="Análisis de armónicos en CSV·Scope"><br><sub><b>CSV·Scope</b> — FFT y armónicos, con THD</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/capturas/filtrolab.webp" alt="FiltroLab con un Butterworth de orden 4"><br><sub><b>FiltroLab</b> — Butterworth de orden 4 sobre su plantilla</sub></td>
+<td width="50%"><img src="docs/capturas/ajustelab.webp" alt="AjusteLab ajustando la ley de Ohm"><br><sub><b>AjusteLab</b> — ley de Ohm con residuos normalizados</sub></td>
+</tr>
+</table>
+
 ## 🎮 Juegos
 
 La sección más grande del sitio. Se instala como app en el celular y todo se
 juega con tu cuenta: ganas monedas, desbloqueas logros y personalizas tu
-perfil con marcos, fondos y tu mascota.
+perfil con marcos, fondos y tu mascota. Hoy son **52 juegos**: 27 para jugar
+solo y 25 multijugador.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/capturas/juegos.webp" alt="Portada del salón de Juegos"><br><sub>El salón de juegos (con su decoración de Halloween 🎃)</sub></td>
+<td width="50%"><img src="docs/capturas/juegos-solo-club.webp" alt="Juegos del Solo Club"><br><sub>Algunos juegos del Solo Club</sub></td>
+</tr>
+</table>
 
 <table>
 <tr>
@@ -105,6 +130,7 @@ colabtex/               espacio de build: código fuente, tests y node_modules
 firebase/               reglas de seguridad de la base de datos
 marca/                  logo y favicons
 docs/claude/            notas técnicas de cada app y cada juego
+docs/capturas/          las capturas de este README
 ```
 
 ## 🚀 Probarlo en tu computador
