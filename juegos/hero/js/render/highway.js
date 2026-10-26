@@ -55,6 +55,10 @@ function anchoCelular(w, h, strikeY, topY) {
   return w / 2 / s;
 }
 
+// el apagón de la batalla tapa desde esta distancia (0 = la barra, 1 = el fondo de la pista) hacia la barra,
+// con un borde que se funde en APAGON_BORDE: lo lejano se ve, lo que está por llegar no
+const APAGON_DESDE = 0.35, APAGON_BORDE = 0.1;
+
 // las etiquetas de teclas con dos trastes intercambiados (teclas cruzadas de la batalla)
 function cruzaEtiquetas(labels, [a, b]) {
   const out = Object.assign(labels.slice(), labels);
@@ -1243,14 +1247,22 @@ export class HighwayRenderer {
   // una oleada al ganar energía y rayos alrededor cuando está lista para activarse.
   // (x, y, w, h) es el rectángulo en pantalla; horizontal = se llena de izquierda a derecha.
   /* ---------- modo batalla ---------- */
-  // Apagón: la pista entera queda negra, opaca, hasta pasada la barra donde se tocan las notas (se toca a ciegas:
-  // solo se ven las llamas y chispas de lo que aciertas, que se pintan encima)
+  // Apagón: las notas se ven al aparecer, en la parte lejana de la pista (para adivinar dónde van a caer), y se
+  // pierden en un negro opaco que tapa desde APAGON_DESDE hasta pasada la barra donde se tocan; solo se ven
+  // las llamas y chispas de lo que aciertas, que se pintan encima
   _apagon(ctx, G, perf) {
-    const [s0, y0] = G.proj(Math.max(G.dBottom, -0.09)), [s2, y2] = G.proj(1), w = G.hw * 1.14;
+    const [s0, y0] = G.proj(Math.max(G.dBottom, -0.09)), [s1, y1] = G.proj(APAGON_DESDE), [s2, y2] = G.proj(APAGON_DESDE + APAGON_BORDE), w = G.hw * 1.14;
     ctx.save();
+    const gr = ctx.createLinearGradient(0, y2, 0, y1);
+    gr.addColorStop(0, 'rgba(3,2,8,0)');
+    gr.addColorStop(1, 'rgba(3,2,8,1)');
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(G.cx - w * s2, y2); ctx.lineTo(G.cx + w * s2, y2); ctx.lineTo(G.cx + w * s1, y1); ctx.lineTo(G.cx - w * s1, y1);
+    ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#030208';
     ctx.beginPath();
-    ctx.moveTo(G.cx - w * s2, y2 - 6); ctx.lineTo(G.cx + w * s2, y2 - 6); ctx.lineTo(G.cx + w * s0, y0); ctx.lineTo(G.cx - w * s0, y0);
+    ctx.moveTo(G.cx - w * s1, y1 - 0.5); ctx.lineTo(G.cx + w * s1, y1 - 0.5); ctx.lineTo(G.cx + w * s0, y0); ctx.lineTo(G.cx - w * s0, y0);
     ctx.closePath(); ctx.fill();
     // el borde de abajo, apenas marcado (para saber dónde está la barra), y el aviso
     const [sb, yb] = G.proj(0);
@@ -1258,7 +1270,7 @@ export class HighwayRenderer {
     ctx.beginPath(); ctx.moveTo(G.cx - G.hw * sb, yb); ctx.lineTo(G.cx + G.hw * sb, yb); ctx.stroke();
     ctx.font = `800 ${Math.round(Math.max(14, G.laneW * 0.42))}px Rajdhani, "Segoe UI", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(106,138,255,0.35)';
-    ctx.fillText('🌑 APAGÓN', G.cx, (G.topY + G.strikeY) / 2);
+    ctx.fillText('🌑 APAGÓN', G.cx, (y1 + yb) / 2);
     ctx.restore();
   }
 

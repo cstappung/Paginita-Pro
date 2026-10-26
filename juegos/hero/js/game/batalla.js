@@ -11,7 +11,7 @@ export const PODERES = {
   cuerda: { n: 'Cuerda rota', ic: '✂️', dur: 14, color: '#ff4a4a', txt: '¡CUERDA ROTA!', ayuda: 'Pulsa ese traste varias veces para repararla' },
   cruce: { n: 'Teclas cruzadas', ic: '🔀', dur: 9, color: '#c79bff', txt: '¡TECLAS CRUZADAS!', ayuda: 'Dos trastes se intercambiaron' },
   dobles: { n: 'Notas dobles', ic: '👯', dur: 8, color: '#ff7ad8', txt: '¡NOTAS DOBLES!', ayuda: 'Cada nota viene con otra al lado' },
-  apagon: { n: 'Apagón', ic: '🌑', dur: 6, color: '#6a8aff', txt: '¡APAGÓN!', ayuda: 'Toca a ciegas: la pista queda a oscuras' },
+  apagon: { n: 'Apagón', ic: '🌑', dur: 6, color: '#6a8aff', txt: '¡APAGÓN!', ayuda: 'Las notas se apagan antes de llegar: adivina dónde caen' },
   drenaje: { n: 'Drenaje', ic: '🩸', dur: 6, color: '#ff3a6a', txt: '¡DRENAJE!', ayuda: 'La vida baja sola unos segundos' },
   robo: { n: 'Robo', ic: '🦝', dur: 0, color: '#9dff6f', txt: '¡TE ROBARON LOS PODERES!', ayuda: 'Le quitas los poderes al rival y te quedas uno' },
 };
