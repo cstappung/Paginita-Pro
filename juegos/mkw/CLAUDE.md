@@ -26,7 +26,8 @@ línea más un resumen general. **Es ingeniero eléctrico, no de software**: la 
   teléfono). Todo llega al juego como un mando de GameCube por un gancho de la página.
 - **Celulares: sí, en Chrome de Android** (el dueño, 2026-10-26, «coloca compatibilidad con móviles», §113; antes,
   el 2026-10-19, habían quedado fuera del lanzamiento). El mando en pantalla se edita botón por botón como en BT3
-  (mover, agrandar, agregar, ocultar). La velocidad en un teléfono de verdad **nunca se midió**.
+  (mover, agrandar, agregar, ocultar). Probado por el dueño con el juego: los controles andan; **el rendimiento no**
+  (30 fps en un Oppo Find X9 Pro, §114: falta su informe para saber qué frena).
 - Disco: PAL `RMCP01` revisión 0 (`Mario Kart Wii (Europe Australia) (EnFrDeEsIt)/…rvz`).
 
 ## Reglas (no negociables)

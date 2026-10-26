@@ -10437,3 +10437,11 @@ más con la traza); si frena **la tarjeta**, bajar la salida; si es **la pantall
 `node herramientas/prueba-celular.mjs` **40** (más: el cambio a 720 una sola vez y el respeto de la elección después;
 el informe de rendimiento); banco `graficos` **38** (más: `queFrena` en sus 5 casos, el texto del medidor con el
 detalle, 360 de salida); `controles-panel` 25, `asignacion` 62, `controles` 48, `mandos-jugador` 18.
+
+### 114.5 Lo que el dueño probó con el juego (2026-10-26)
+
+El dueño, después de jugar: «todo lo demás funciona bien (lo que no sean gráficos ni rendimiento)». Queda confirmado
+con el juego y con mando/teléfono de verdad lo que hasta ahora solo estaba probado en el banco: la hoja Controles
+(§112: reasignar el mando y el teclado, el cursor del mando en la hoja), elegir personaje con el mando en el descanso
+(§111), el celular con el mando en pantalla editable y reasignable (§113, §113b) y «Acelerar solo» (§113c). Lo que
+sigue abierto es **el rendimiento en el teléfono** (30 fps en un Oppo Find X9 Pro): espera el informe de §114.3.
