@@ -698,12 +698,26 @@ const ponerTactil = si => {
 };
 ponerTactil(parametros.has('tactil') ? parametros.get('tactil') === '1' : esTelefono && controles.ajustesTactil().activo !== false);
 if (conCelular && controles.ajustesTactil().inclinar) controles.inclinar(true);   // (dirigir inclinando, si lo dejó prendido)
-// editar el mando en pantalla (mover, agrandar, agregar u ocultar botones): se cierra el cajón y se edita sobre el juego
-const editarTactil = () => {
+// editar el mando en pantalla (mover, agrandar, agregar u ocultar botones, cambiar lo que hacen): se cierra el cajón y se
+// edita sobre el juego. opciones.objetivo (§113b): la acción que se tocó en la lista de Controles (ese botón ya elegido)
+const editarTactil = (opciones = {}) => {
   ui.cerrarCajon();
   document.body.classList.add('editando-tactil');
-  controles.editarTactil(true, () => document.body.classList.remove('editando-tactil'));
+  controles.editarTactil(true, () => document.body.classList.remove('editando-tactil'), opciones);
 };
+// §113c: «Acelerar solo»: ¿puede el kart acelerar solo AHORA? Sí con la carrera corriendo (Raceinfo +0x28 = 2, desde el
+// «¡YA!»: en la cuenta, 1, la salida rápida es de la persona) y con la pantalla de la carrera encima. Esa pantalla se
+// anota al largar (la de arriba de la pila en ese momento: el HUD, sea cual sea el modo); si después hay otra encima
+// (la pausa, los resultados), no acelera: en un menú, A apretado elegiría por la persona
+let etapaAntes = -1, paginaCarrera = -1;
+controles.acelerar(() => {
+  try {
+    const L = window.mkwMenus, ri = L?.u32(0x809BD730), etapa = ri ? L.u32(ri + 0x28) : -1, pagina = L?.estado().pagina ?? -1;
+    if (etapa === 2 && etapaAntes !== 2) paginaCarrera = pagina;
+    etapaAntes = etapa;
+    return etapa === 2 && pagina === paginaCarrera && pagina !== -1;
+  } catch { return false; }
+});
 window.mkwCelular = { esTelefono, conCelular, ponerTactil, editarTactil };   // (para las pruebas)
 // «Gira el teléfono»: jugando parado, la imagen 16:9 queda chica; el aviso ofrece pantalla completa acostada
 document.getElementById('girarCompleta')?.addEventListener('click', () => document.getElementById('completa').click());

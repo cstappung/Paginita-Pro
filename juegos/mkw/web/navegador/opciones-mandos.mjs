@@ -118,7 +118,8 @@ export function montarControles(caja, controles, { ahora = () => performance.now
 
   // ---------------- la lista de acciones ----------------
   const lista = el('div', { className: 'ctl-lista' },
-    el('div', { className: 'ctl-encab' }, el('span', { textContent: 'Acción' }), el('span', { textContent: 'Mando' }), el('span', { className: 'ctl-col-teclado', textContent: 'Teclado' })));
+    el('div', { className: 'ctl-encab' }, el('span', { textContent: 'Acción' }), el('span', { className: 'ctl-col-mando', textContent: 'Mando' }),
+      el('span', { className: 'ctl-col-teclado', textContent: 'Teclado' }), el('span', { className: 'ctl-col-pantalla', textContent: 'En pantalla' })));
   const filas = new Map();                      // objetivo → { fila, luz, mando, teclado }
   const verMas = boton('▸ Más controles (Y, Z, la cruz, el stick ↑↓ y el stick C)', 'ctl-mas');
   verMas.onclick = () => { raiz.classList.toggle('ver-mas'); texto(verMas, (raiz.classList.contains('ver-mas') ? '▾ Menos controles' : '▸ Más controles (Y, Z, la cruz, el stick ↑↓ y el stick C)')); };
@@ -126,13 +127,16 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     lista.append(g === 2 ? el('div', { className: 'ctl-grupo' }, verMas) : el('div', { className: 'ctl-grupo', textContent: nombreGrupo }));
     for (const obj of objetivos) {
       const luz = el('i', { className: 'luz' });
-      const mando = el('button', { type: 'button', className: 'ctl-chip' }), teclado = el('button', { type: 'button', className: 'ctl-chip ctl-col-teclado' });
-      mando.dataset.col = 'mando'; teclado.dataset.col = 'teclado';
+      const mando = el('button', { type: 'button', className: 'ctl-chip ctl-col-mando' }), teclado = el('button', { type: 'button', className: 'ctl-chip ctl-col-teclado' });
+      // §113b: en el celular, qué botón en pantalla hace esto; tocarlo abre el editor con ese botón elegido (o agrega uno)
+      const pantalla = el('button', { type: 'button', className: 'ctl-chip ctl-col-pantalla' });
+      mando.dataset.col = 'mando'; teclado.dataset.col = 'teclado'; pantalla.dataset.col = 'pantalla';
       mando.onclick = () => tocarRecuadro(obj, 'mando'); teclado.onclick = () => tocarRecuadro(obj, 'teclado');
+      pantalla.onclick = () => { cancelarTodo(); celular?.alEditar({ objetivo: obj }); };
       const fila = el('div', { className: 'ctl-fila' + (g === 2 ? ' ctl-otro' : '') },
-        el('span', { className: 'ctl-accion' }, luz, el('span', { textContent: nombreDe(obj) }), el('small', { textContent: ACCION[obj][1] })), mando, teclado);
+        el('span', { className: 'ctl-accion' }, luz, el('span', { textContent: nombreDe(obj) }), el('small', { textContent: ACCION[obj][1] })), mando, teclado, pantalla);
       fila.dataset.objetivo = obj;
-      filas.set(obj, { fila, luz, mando, teclado });
+      filas.set(obj, { fila, luz, mando, teclado, pantalla });
       lista.append(fila);
     }
   });
@@ -212,7 +216,16 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     el('p', { className: 'ctl-nota', textContent: 'Como un volante: se centra en la posición del teléfono al prenderlo (para centrarlo de nuevo, «No» y «Sí»).' }),
     el('div', { className: 'fila' }, tactilComoVenia));
 
-  const raiz = el('div', { className: 'ctl' }, seccionCelular, barraPestanas, cabeza, avisoSinMapa, asistente, lista, pie,
+  // ---------------- §113c: «Acelerar solo» ----------------
+  const aceSi = boton('Sí', 'ctl-opcion'), aceNo = boton('No', 'ctl-opcion');
+  aceSi.onclick = () => { controles.ajustarAyudas({ acelerar: true }); pintar(); };
+  aceNo.onclick = () => { controles.ajustarAyudas({ acelerar: false }); pintar(); };
+  const seccionAyudas = el('div', { className: 'ctl-ayudas' },
+    el('div', { className: 'fila' }, el('span', { className: 'ctl-etq', textContent: '🚗 Acelerar solo' }), aceSi, aceNo),
+    el('p', { className: 'ctl-nota', textContent: 'Con la carrera andando, el kart acelera sin apretar nada; frenar le gana (para ir marcha atrás). ' +
+      'La salida rápida la haces tú: en la cuenta 3-2-1, aprieta tu botón de acelerar justo cuando sale el «2» y mantenlo.' }));
+
+  const raiz = el('div', { className: 'ctl' }, seccionCelular, seccionAyudas, barraPestanas, cabeza, avisoSinMapa, asistente, lista, pie,
     el('div', { className: 'fila-botones' }, mensajeAbajo, bDeshacerAbajo), ajustes);
   caja.replaceChildren(raiz);
 
@@ -414,12 +427,17 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     const t = ahora();
     const mandos = (controles.estado.mandos || []);
     const m = mandoDeAhora();
-    // (en un teléfono —sección Celular a la vista— no hay teclado: sin esa columna)
+    // (en un teléfono —sección Celular a la vista— no hay teclado: sin esa columna; en cambio, «En pantalla» —§113b—)
     const conTeclado = pestana === 0 && !celular?.visible;
+    const conPantalla = pestana === 0 && !!celular?.visible && controles.tactilActivo();
+    raiz.classList.toggle('con-pantalla', conPantalla);
     raiz.classList.toggle('con-teclado', conTeclado);
     raiz.classList.toggle('sin-mando', !m);
     // (en un teléfono sin mando conectado, la lista no tiene nada que mostrar —ni mando ni teclado—: se esconde)
-    raiz.classList.toggle('sin-lista', !m && !conTeclado);
+    raiz.classList.toggle('sin-lista', !m && !conTeclado && !conPantalla);
+    // las columnas de la lista: la acción, el mando (si hay) y el teclado o lo de la pantalla
+    const cols = 'minmax(0, 1.3fr)' + (m ? ' minmax(0, 1fr)' : '') + (conTeclado || conPantalla ? ' minmax(0, 1fr)' : '');
+    if (raiz.style.getPropertyValue('--cols') !== cols) raiz.style.setProperty('--cols', cols);
     // pestañas: quién es cada jugador
     pestanas.forEach(({ b, sub: s }, p) => {
       const x = mandos.find(y => y.puerto === p);
@@ -468,6 +486,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     if (prueba) texto(estadoPrueba, `Probando: aprieta botones y mueve los sticks; se enciende lo que manejan (no hacen nada más). Quedan ${Math.ceil(prueba / 1000)} s.`);
     // la lista: lo de cada fila, su luz y si espera
     const mapa = m?.mapa || {};
+    const queHace = conPantalla ? controles.queHaceTactil() : {};
     for (const [obj, f] of filas) {
       const fuentes = mapa[obj] || [];
       const esperaAqui = espera && espera.obj === obj;
@@ -479,6 +498,11 @@ export function montarControles(caja, controles, { ahora = () => performance.now
       texto(f.teclado, esperaTecla ? 'Aprieta una tecla…' : teclas.length ? teclas.map(nombreTecla).join(' · ') : 'nada');
       f.teclado.classList.toggle('esperando', !!esperaTecla); f.teclado.classList.toggle('vacio', !teclas.length && !esperaTecla);
       f.luz.classList.toggle('encendida', encendido(m, obj) || (conTeclado && encendido(controles.estado.teclado, obj)));
+      if (conPantalla) {                             // §113b: qué botones en pantalla lo hacen
+        const enPantalla = queHace[obj] || [], sinBoton = obj.startsWith('c.');
+        texto(f.pantalla, sinBoton ? '—' : enPantalla.length ? enPantalla.join(' · ') : 'agregar');
+        apagado(f.pantalla, sinBoton); f.pantalla.classList.toggle('vacio', !enPantalla.length);
+      }
       f.fila.classList.toggle('esperando', !!esperaAqui);
     }
     // la tira
@@ -497,7 +521,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
     }
     // el asistente: la cuenta del paso
     if (ayudante?.cuenta && espera?.paso) texto(ayudante.cuenta, `Si no tocas nada en ${Math.max(0, Math.ceil((espera.hasta - t) / 1000))} s, queda igual y sigue. (Esc: terminar)`);
-    oculto(pie, false);
+    oculto(pie, !m && !conTeclado);
     apagado(bAsistir, !m || !!ayudante); apagado(bRestaurarMando, !m);
     oculto(bDeshacerAbajo, !deshacer || !!sel); oculto(mensajeAbajo, !!sel);
     // §113: el celular
@@ -508,6 +532,7 @@ export function montarControles(caja, controles, { ahora = () => performance.now
       texto(opaDato, `${Math.round(a.opa * 100)} %`); apagado(opaMenos, a.opa <= 0.3); apagado(opaMas, a.opa >= 1);
       const inc = controles.inclinando(); marcado(incSi, inc); marcado(incNo, !inc);
     }
+    const ace = controles.ayudas().acelerar; marcado(aceSi, ace); marcado(aceNo, !ace);
     // los ajustes de todos
     const pr = controles.prefsMandos();
     estilos.forEach(b => marcado(b, b.dataset.valor === pr.disposicion));

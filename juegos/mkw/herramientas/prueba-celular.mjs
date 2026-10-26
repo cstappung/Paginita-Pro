@@ -124,6 +124,48 @@ ok('parado y jugando: el aviso «Gira el teléfono» con «⛶ Pantalla completa
 await toca('#girarCerrar');
 ok('…y se cierra con ✕', await p.evaluate(() => getComputedStyle(document.getElementById('girar')).display === 'none'));
 ok('parado vuelve su disposición (A movida)', await p.evaluate(() => window.mkwControles.piezasTactil().A?.k === 1.2));
+// ---- §113b: cambiar lo que hace un botón en pantalla ----
+await p.evaluate(() => window.mkwCelular.editarTactil()); await espera(300);
+const [lx, ly] = await centro('.mkw-tactil [data-pieza="L"]');
+await dedo(lx, ly);
+await toca('.mkw-tactil-barra button[data-e="hace"]');
+await toca('.mkw-tactil-barra button[data-accion="R"]');
+ok('tocar L, «Hace» y «R · Derrapar»: ese botón ahora dice R', await p.evaluate(() => document.querySelector('.mkw-tactil [data-pieza="L"]').textContent === 'R' && window.mkwControles.haceTactil().L === 'R'));
+await toca('.mkw-tactil-barra button[data-e="listo"]');
+ok('…y apretarlo derrapa (R), ya no usa el objeto (L)', await (async () => { const v = await apretado(lx, ly); return (v & 0x20) !== 0 && (v & 0x40) === 0; })());
+// la columna «En pantalla» de la lista
+await p.evaluate(() => window.mkwInterfaz.abrirCajon('controles')); await espera(400);
+const col = await p.evaluate(() => ({ R: document.querySelector('.ctl-fila[data-objetivo="R"] .ctl-chip[data-col="pantalla"]').textContent,
+  L: document.querySelector('.ctl-fila[data-objetivo="L"] .ctl-chip[data-col="pantalla"]').textContent, visible: document.querySelector('.ctl').classList.contains('con-pantalla') }));
+ok('la lista muestra «En pantalla»: Derrapar = R · R (dos botones), Usar objeto = agregar', col.visible && col.R === 'R · R' && col.L === 'agregar', JSON.stringify(col));
+await toca('.ctl-fila[data-objetivo="L"] .ctl-chip[data-col="pantalla"]');
+const nuevo = await p.evaluate(() => ({ editando: document.body.classList.contains('editando-tactil'), hace: window.mkwControles.queHaceTactil().L,
+  texto: document.querySelector('.mkw-tactil-barra span').textContent }));
+ok('tocar «agregar» en Usar objeto: se abre el editor con un botón nuevo que usa el objeto, ya elegido', nuevo.editando && nuevo.hace?.length === 1 && /usar objeto/.test(nuevo.texto), JSON.stringify(nuevo));
+await toca('.mkw-tactil-barra button[data-e="listo"]');
+
+// ---- §113c: «Acelerar solo» (la etapa de la carrera, de mentira: Raceinfo +0x28 y la pantalla de arriba) ----
+await p.evaluate(() => {
+  window.__etapa = 0; window.__pagina = 0x40;
+  window.mkwMenus = { u32: a => (a === 0x809BD730 ? 0x80001000 : a === 0x80001028 ? window.__etapa : 0), estado: () => ({ pagina: window.__pagina, seccion: 0x20 }) };
+  window.mkwControles.ajustarAyudas({ acelerar: true });
+});
+const recibe = () => p.evaluate(async () => { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return window.mkwControles.estado.enviados[0] & 0x100; });
+await p.evaluate(() => { window.__etapa = 1; });
+ok('«Acelerar solo» en la cuenta 3-2-1: NO acelera (la salida rápida es de la persona)', (await recibe()) === 0);
+await p.evaluate(() => { window.__etapa = 2; window.__pagina = 0x0E; });
+ok('al «¡YA!» (etapa 2, la pantalla de la carrera): acelera solo', (await recibe()) !== 0);
+await p.evaluate(() => { window.__pagina = 0x1B; });
+ok('con la pausa encima: no (en un menú, A apretado elegiría por la persona)', (await recibe()) === 0);
+await p.evaluate(() => { window.__pagina = 0x0E; });
+ok('cerrada la pausa: vuelve a acelerar solo', (await recibe()) !== 0);
+await p.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' })));
+ok('frenando (B) no acelera: hay marcha atrás', (await recibe()) === 0);
+await p.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' })));
+await p.evaluate(() => window.mkwControles.ajustarAyudas({ acelerar: false }));
+ok('con «Acelerar solo» en No, no acelera', (await recibe()) === 0);
+ok('la casilla de la hoja dice lo guardado (No) y se recuerda', await p.evaluate(() => JSON.parse(localStorage.getItem('mkw.ayudas')).acelerar === false &&
+   document.querySelector('.ctl-ayudas button[aria-pressed="true"]')?.textContent === 'No'));
 ok('sin errores en la página', errores.length === 0, errores.join(' | '));
 console.log(`fin: ${bien} bien, ${mal} mal`);
 await b.close(); srv.kill();

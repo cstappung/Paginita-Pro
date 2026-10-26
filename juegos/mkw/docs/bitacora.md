@@ -10343,6 +10343,44 @@ lo nuevo. Sitio `npm run test:juegos` 1140/1140.
   `inicio` 15/15; en el PC con el ratón de verdad `prueba-raton-controles` 8/8 y `prueba-raton-avanzado` 12/12 (la
   sección Celular no aparece en el PC).
 
+### 113.6 Cambiar lo que hace cada botón en pantalla (el dueño: «los botones del celular también se deben poder rebindear»)
+
+En el editor, al tocar un botón aparece **«Hace: Usar objeto ▾»**; abre las 12 acciones (A · Acelerar, B · Frenar,
+R · Derrapar, L · Usar objeto, ↑ · Truco, X · Mirar atrás, ▶ · Pausa, Y, Z, la cruz ↓←→) y la elegida pasa a ser lo
+que hace ese botón: cambia su letra y lo que aprieta el dedo. Ejemplo: tocar L y elegir «R · Derrapar» deja dos botones
+que derrapan (el R de siempre y el que era L). Se guarda en `mkw.tactil.hace` (`{pieza: acción}`, solo las cambiadas;
+el mismo para acostado y parado: es qué hace el botón, no dónde está). «↺ Esta», «↺ Todas» y «↺ Como venía» lo vuelven.
+
+En la lista de Controles, en el teléfono, la columna del teclado se cambia por **«En pantalla»**: qué botones en
+pantalla hacen cada acción («R · R» si son dos). Tocarla abre el editor con ese botón ya elegido; si ninguno la hace
+(«agregar»), aparece uno nuevo que la hace, listo para arrastrarlo. Las filas del stick C dicen «—» (en pantalla no hay
+stick C).
+
+### 113.7 «🚗 Acelerar solo» (el dueño: «agrega una opción de aceleración automática, con ojo en que el headstart se hace con el botón asignado a la aceleración»)
+
+Arriba de la hoja Controles, para todos (PC y celular): **Acelerar solo: Sí / No** (`mkw.ayudas`).
+
+- **La salida rápida (el turbo de la largada) es de la persona.** En Mario Kart Wii se gana apretando acelerar justo
+  cuando sale el «2» de la cuenta y manteniéndolo; si se aprieta antes, el kart patina. Por eso «Acelerar solo» **no
+  actúa en la cuenta**: ahí acelera lo que la persona aprieta, con SU botón de acelerar (A del mando, K o Enter, o el
+  botón en pantalla, el que tenga asignado). Desde el «¡YA!» la página mantiene A apretado; si la persona venía
+  apretando, no hay corte.
+- Cómo lo sabe: la página lee del juego la etapa de la carrera (Raceinfo 0x809BD730, +0x28: 0 presentación, 1 cuenta,
+  2 corriendo) y qué pantalla está arriba de la pila (`mkwMenus.estado().pagina`). Al pasar a 2 anota la pantalla de la
+  carrera (el HUD, sea cual sea el modo); acelera solo mientras esa siga arriba. **En la pausa o en los resultados no**
+  (hay otra pantalla encima): en un menú, A apretado elegiría por la persona.
+- **Frenar le gana**: con B apretado no acelera (así hay marcha atrás).
+- En la sala va por el lockstep como cualquier botón de la persona (cada consola manda lo suyo): las carreras siguen
+  iguales en todas.
+
+### 113.8 Pruebas (después de 113.6 y 113.7)
+
+`node herramientas/prueba-celular.mjs` **37 puntos** (los 26 de antes y: tocar L → «Hace» → «R · Derrapar» y el botón
+dice R y aprieta R, ya no L; la columna «En pantalla» con «R · R» y «agregar»; tocar «agregar» en Usar objeto abre el
+editor con un botón nuevo que usa el objeto; «Acelerar solo» con la etapa de mentira: en la cuenta no, al «¡YA!» sí,
+con la pausa encima no, cerrada la pausa sí, frenando no, apagado no, y se recuerda). Bancos y pruebas del PC sin
+cambios (`controles-panel` 25, `asignacion` 62, `controles` 48, `mandos-jugador` 18, `mando-sitio` 11; ratón 8).
+
 **Falta con el juego y un teléfono de verdad:** si el juego anda a 60 en un Android (WebGPU y JSPI sí están en Chrome
 de Android; la velocidad nunca se midió), la memoria (el `.wasm` y lo que baja del disco), y el sonido y la
 inclinación en un teléfono real. `prueba-tactil.mjs` (con el juego) sigue valiendo.

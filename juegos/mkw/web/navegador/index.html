@@ -618,6 +618,9 @@
   .ctl { display: grid; gap: 10px; --cols: minmax(0, 1.3fr) minmax(0, 1fr); }
   .ctl.con-teclado { --cols: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
   .ctl:not(.con-teclado) .ctl-col-teclado { display: none; }
+  .ctl:not(.con-pantalla) .ctl-col-pantalla, .ctl.sin-mando .ctl-col-mando { display: none; }
+  .ctl-ayudas { padding: 8px 10px; border-radius: 12px; background: #161233; border: 1px solid #3d3378; }
+  .ctl-ayudas .fila { margin-bottom: 4px; }
   .ctl.sin-lista .ctl-lista, .ctl.sin-lista .ctl-pie { display: none; }
   .ctl .boton { min-height: 38px; }
   .ctl .boton[aria-pressed="true"] { background: var(--morado); border-color: var(--amarillo); color: #fff; }

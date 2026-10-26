@@ -146,6 +146,12 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
   let cerrojo = null;                             // §94: función que dice si AHORA lo de la persona no va al juego (la sala)
   let filtro = null;                              // §99: función que dice qué botones de la persona NO van al juego ahora (la sala)
   let sinMandos = null;                           // §100: función que dice si AHORA los mandos son de la página (el cursor del sitio)
+  // §113c (el dueño: «agrega una opción de aceleración automática, con ojo en que el headstart se hace con el botón
+  // asignado a la aceleración»): «Acelerar solo». acelerar() = la página dice si AHORA el kart puede acelerar solo (la
+  // carrera corriendo, desde el «¡YA!», con su pantalla encima: no en la cuenta, ni en la pausa, ni en los menús)
+  let acelerar = null;
+  const ayudas = { acelerar: false, ...(leer('mkw.ayudas') || {}) };
+  ayudas.acelerar = ayudas.acelerar === true;
   let esperandoTecla = null;                      // acción que se está reasignando (la próxima tecla va ahí)
   let sumarTecla = false;                         // §111: esa tecla se suma a las que tiene (si no, las reemplaza)
   const puertosMando = new Map();                 // índice del Gamepad → puerto (0..3)
@@ -337,7 +343,14 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     if (inclinacion.activa) suma(0, { sx: inclinacion.x }, 'inclinación');
     if (piloto.botones) suma(0, piloto, 'piloto');
     const callado = silencio || (cerrojo ? !!cerrojo() : false);
-    puertos.forEach((d, p) => {
+    // §113c: «Acelerar solo». En la cuenta 3-2-1 no actúa: la salida rápida (el turbo de la largada) la hace la persona con
+    // SU botón de acelerar, apretándolo justo cuando sale el «2»; si lo tiene apretado al «¡YA!», sigue sin corte. Desde
+    // ahí A queda apretado en cada puerto con alguien, salvo que frene (B le gana: así hay marcha atrás)
+    const solo = ayudas.acelerar && !callado && acelerar ? !!acelerar() : false;
+    const enviados = estado.enviados || (estado.enviados = []);
+    estado.acelerandoSolo = solo;
+    puertos.forEach((d0, p) => {
+      const d = solo && d0.conectado && !(d0.botones & BOTON.B) ? { ...d0, botones: d0.botones | BOTON.A } : d0;
       // silenciado (el menú de inicio, inicio.mjs, está encima): al juego le llega solo lo del piloto; lo de la
       // persona lo lee el menú (estado.puertos y estado.mandos siguen al día), como un interruptor que corta la
       // salida pero deja el medidor conectado
@@ -349,6 +362,7 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
       const firma = [s.conectado, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr].join();
       if (firma === ultimo[p]) return;            // sin cambios: no hace falta volver a mandarlo
       ultimo[p] = firma;
+      enviados[p] = s.botones;                    // (lo último que recibió el juego en cada puerto: para las pruebas)
       enviar(p, s.conectado ? 1 : 0, s.botones, s.sx, s.sy, s.cx, s.cy, s.gl, s.gr);
     });
     estado.puertos = puertos;
@@ -379,6 +393,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     cerrojo(f) { cerrojo = typeof f === 'function' ? f : null; paso(); },
     // §99: filtro(f) = f() devuelve, en cada cuadro, los bits de botones que no llegan al juego (null = ninguno)
     filtro(f) { filtro = typeof f === 'function' ? f : null; paso(); },
+    // §113c: acelerar(f) = f() dice si ahora el kart puede acelerar solo (la página lee la etapa de la carrera); y la ayuda
+    acelerar(f) { acelerar = typeof f === 'function' ? f : null; },
+    ayudas: () => ({ ...ayudas }),
+    ajustarAyudas(c) { if ('acelerar' in c) ayudas.acelerar = !!c.acelerar; guardar('mkw.ayudas', ayudas); paso(); },
     // §100: sinMandos(f) = f() dice, en cada cuadro, si los mandos son ahora de la página (mando-sitio.mjs; null = nunca)
     sinMandos(f) { sinMandos = typeof f === 'function' ? f : null; paso(); },
     get silenciado() { return silencio; },                           // volver a mandar todo (p. ej. al arrancar el juego)
@@ -481,7 +499,10 @@ export function crearControles({ enviar, objetivoTeclado = window, contenedorTac
     tactil(activar) { tactil.activo = !!activar; if (tactilUI) tactilUI.mostrar(!!activar); },
     tactilActivo: () => tactil.activo,
     // §113: editar el mando en pantalla (mover, agrandar, agregar u ocultar botones); listo() se llama al terminar
-    editarTactil(si, listo) { if (!tactilUI) return; if (si && !tactil.activo) this.tactil(true); tactilUI.editar(si, listo); },
+    editarTactil(si, listo, opciones) { if (!tactilUI) return; if (si && !tactil.activo) this.tactil(true); tactilUI.editar(si, listo, opciones); },
+    // §113b: qué botones en pantalla hacen cada acción, y qué hace cada pieza cambiada
+    queHaceTactil: () => tactilUI?.queHace() || {},
+    haceTactil: () => tactilUI?.hace() || {},
     tactilEditando: () => !!tactilUI?.editando,
     piezasTactil: () => tactilUI?.piezas() || {},
     borrarPiezasTactil() { tactilUI?.borrarPiezas(); },
@@ -529,6 +550,22 @@ const BOTONES_TACTILES = [
 // los nombres que ve la persona al editar (el stick es una pieza más)
 export const NOMBRE_TACTIL = { stick: 'Stick', A: 'A (acelerar)', B: 'B (frenar)', R: 'R (derrapar)', L: 'L (objeto)', arriba: '↑ (truco)',
   START: '▶ (pausa)', X: 'X (mirar atrás)', Y: 'Y', Z: 'Z', abajo: '↓', izquierda: '←', derecha: '→' };
+// §113b (el dueño: «los botones del celular también se deben poder rebindear»): QUÉ HACE cada botón en pantalla. Cada
+// pieza tiene una acción de partida (la de su nombre: la pieza «L» usa el objeto) y la persona puede cambiarla (la pieza
+// «L» derrapa, o dos piezas aceleran). [acción, nombre, etiqueta que se ve en el botón]
+export const ACCIONES_TACTILES = [['A', 'Acelerar', 'A'], ['B', 'Frenar', 'B'], ['R', 'Derrapar', 'R'], ['L', 'Usar objeto', 'L'],
+  ['arriba', 'Truco', '↑'], ['X', 'Mirar atrás', 'X'], ['START', 'Pausa', '▶'], ['Y', 'Y', 'Y'], ['Z', 'Z', 'Z'],
+  ['abajo', 'Cruz ↓', '↓'], ['izquierda', 'Cruz ←', '←'], ['derecha', 'Cruz →', '→']];
+const ACCION_TACTIL = Object.fromEntries(ACCIONES_TACTILES.map(([id, nombre, etiqueta]) => [id, { nombre, etiqueta }]));
+// { pieza: acción } solo de las cambiadas (la misma para acostado y parado: es qué hace el botón, no dónde está)
+const CLAVE_HACE = 'mkw.tactil.hace';
+export function revisarHace(v) {
+  const r = {};
+  if (!v || typeof v !== 'object') return r;
+  for (const [pieza, accion] of Object.entries(v))
+    if (BOTONES_TACTILES.some(b => b[0] === pieza) && ACCION_TACTIL[accion] && accion !== pieza) r[pieza] = accion;
+  return r;
+}
 // §113: lo que la persona movió, agrandó, agregó u ocultó, por orientación (como BT3: `mkw.tactil.pos.h` acostado, `.v`
 // parado): { pieza: { x, y, k, ver } } — x/y el corrimiento en fracción del ancho/alto del recuadro, k el tamaño
 // (1 = el de siempre) y ver = true/false si se agregó u ocultó (sin ver = lo de siempre)
@@ -578,6 +615,14 @@ function crearTactil(contenedor, tactil) {
     return b;
   });
   const porOmision = id => BOTONES_TACTILES.find(b => b[0] === id)?.[6] !== false;
+  // §113b: qué hace cada pieza (se escribe en su bit y en su etiqueta: el dedo y la vista siguen al cambio)
+  let hace = revisarHace(leer(CLAVE_HACE));
+  const haceDe = id => hace[id] || id;
+  const nombrePieza = id => (id === 'stick' ? 'Stick' : `${ACCION_TACTIL[haceDe(id)].etiqueta} (${ACCION_TACTIL[haceDe(id)].nombre.toLowerCase()})`);
+  const aplicarHace = () => {
+    for (const b of botones) { const a = haceDe(b.dataset.pieza); b.dataset.bit = BOTON[a]; b.textContent = ACCION_TACTIL[a].etiqueta; }
+  };
+  aplicarHace();
   contenedor.style.position = contenedor.style.position || 'relative';
   contenedor.append(capa);
 
@@ -655,26 +700,36 @@ function crearTactil(contenedor, tactil) {
     b.style.cssText = 'min-width:44px;min-height:40px;padding:6px 10px;border-radius:9px;border:1px solid #5b4bb0;background:#2a2350;color:#fff;font:inherit';
     return b;
   };
+  const bHace = bot('Hace: —', 'hace');
+  // (el menú «¿qué hace este botón?»: las 12 acciones, una fila de botones que se abre bajo la barra)
+  const menuHace = document.createElement('div');
+  menuHace.style.cssText = 'flex-basis:100%;display:none;flex-wrap:wrap;justify-content:center;gap:6px';
+  menuHace.append(...ACCIONES_TACTILES.map(([id, nombre, etiqueta]) => { const b = bot(`${etiqueta} · ${nombre}`, 'poner'); b.dataset.accion = id; return b; }));
   const bMenos = bot('−', 'menos', 'Más chico'), bMas = bot('+', 'mas', 'Más grande'), bOcultar = bot('Ocultar', 'ocultar'),
         bEsta = bot('↺ Esta', 'esta'), bTodas = bot('↺ Todas', 'todas'), bListo = bot('✓ Listo', 'listo');
   bListo.style.background = '#ffd21f'; bListo.style.color = '#1a0a00'; bListo.style.borderColor = '#ffd21f';
   const agregar = document.createElement('div');
   agregar.style.cssText = 'flex-basis:100%;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;align-items:center';
-  barra.append(texto, bMenos, bMas, bOcultar, bEsta, bTodas, bListo, agregar);
+  barra.append(texto, bHace, bMenos, bMas, bOcultar, bEsta, bTodas, bListo, menuHace, agregar);
   capa.append(editor, barra);
   const pintaEditor = () => {
     for (const el of [base, ...botones]) el.style.outline = editando ? (el.dataset.pieza === elegida ? '3px solid #ffd21f' : '2px dashed rgba(255,255,255,.7)') : '';
     const k = Math.round(((piezas[elegida] && piezas[elegida].k) || 1) * 100);
-    texto.textContent = elegida ? `«${NOMBRE_TACTIL[elegida]}» · ${k} % — arrástralo o usa − / +` : 'Toca un botón (o el stick) y arrástralo para moverlo. − / + cambia su tamaño.';
+    texto.textContent = elegida ? `«${nombrePieza(elegida)}» · ${k} % — arrástralo, usa − / + o cambia lo que hace`
+      : 'Toca un botón (o el stick) y arrástralo para moverlo. − / + cambia su tamaño; «Hace» cambia lo que hace.';
     for (const b of [bMenos, bMas, bEsta]) b.disabled = !elegida;
+    bHace.disabled = !elegida || elegida === 'stick';
+    bHace.textContent = elegida && elegida !== 'stick' ? `Hace: ${ACCION_TACTIL[haceDe(elegida)].nombre} ▾` : 'Hace: —';
+    if (bHace.disabled) menuHace.style.display = 'none';
+    for (const b of menuHace.children) b.style.background = elegida && b.dataset.accion === haceDe(elegida) ? '#7042df' : '#2a2350';
     bOcultar.disabled = !elegida || elegida === 'stick';
     // «Agregar»: las que no se ven (se arma de nuevo solo al ocultar o agregar)
     const ocultas = botones.filter(b => !visible(b)).map(b => b.dataset.pieza);
-    const firma = ocultas.join();
+    const firma = ocultas.map(id => id + '=' + haceDe(id)).join();
     if (agregar.dataset.firma !== firma) {
       agregar.dataset.firma = firma;
       agregar.replaceChildren(...(ocultas.length ? [Object.assign(document.createElement('span'), { textContent: 'Agregar:' }),
-        ...ocultas.map(id => { const b = bot('＋ ' + NOMBRE_TACTIL[id], 'agregar'); b.dataset.pieza = id; return b; })] : []));
+        ...ocultas.map(id => { const b = bot('＋ ' + nombrePieza(id), 'agregar'); b.dataset.pieza = id; return b; })] : []));
     }
   };
   const piezaEn = (x, y) => {
@@ -714,22 +769,48 @@ function crearTactil(contenedor, tactil) {
     if (!q) return;
     const que = q.dataset.e;
     if (que === 'listo') return editar(false);
-    if (que === 'todas') { piezas = {}; elegida = ''; }
+    if (que === 'hace') { menuHace.style.display = menuHace.style.display === 'flex' ? 'none' : 'flex'; return; }
+    if (que === 'poner') {                         // §113b: este botón ahora hace eso
+      if (!elegida || elegida === 'stick') return;
+      hace = revisarHace({ ...hace, [elegida]: q.dataset.accion });
+      if (q.dataset.accion === elegida) delete hace[elegida];
+      guardar(CLAVE_HACE, hace); aplicarHace();
+      menuHace.style.display = 'none';
+      return pintaEditor();
+    }
+    if (que === 'todas') { piezas = {}; hace = {}; guardar(CLAVE_HACE, hace); aplicarHace(); elegida = ''; }
     else if (que === 'agregar') { const id = q.dataset.pieza; piezas[id] = { ...(piezas[id] || {}), ver: true }; elegida = id; }
     else if (!elegida) return;
-    else if (que === 'esta') delete piezas[elegida];
+    else if (que === 'esta') { delete piezas[elegida]; if (hace[elegida]) { delete hace[elegida]; guardar(CLAVE_HACE, hace); aplicarHace(); } }
     else if (que === 'ocultar') { piezas[elegida] = { ...(piezas[elegida] || {}), ver: false }; elegida = ''; }
     else { const a = piezas[elegida] || (piezas[elegida] = {}); a.k = Math.max(0.6, Math.min(2, Math.round(((a.k || 1) + (que === 'mas' ? 0.1 : -0.1)) * 10) / 10)); }
     piezas = revisarPiezas(piezas);
     guardarPiezas(); aplicarPiezas(); pintaEditor();
   });
-  function editar(si, listo = null) {
+  // editar(si, listo, { objetivo }): con un objetivo (lo que tocó la persona en la lista de Controles: 'R', 'stick.izq'…)
+  // abre con el botón que hace eso ya elegido; si ninguno lo hace, agrega uno de los que no se ven y se lo asigna
+  function editar(si, listo = null, { objetivo = null } = {}) {
     editando = !!si;
     if (editando) { alTerminar = listo; dedos.clear(); recalcula(); }
     editor.style.display = editando ? 'block' : 'none';
     barra.style.display = editando ? 'flex' : 'none';
+    menuHace.style.display = 'none';
     capa.style.opacity = editando ? '1' : capa.dataset.opa || '1';
     elegida = ''; arrastre = null;
+    if (editando && objetivo) {
+      if (/^stick\./.test(objetivo)) elegida = 'stick';
+      else if (ACCION_TACTIL[objetivo]) {
+        const ya = botones.find(b => visible(b) && haceDe(b.dataset.pieza) === objetivo);
+        const libre = ya ? null : (botones.find(b => !visible(b) && haceDe(b.dataset.pieza) === objetivo) || botones.find(b => !visible(b)));
+        if (ya) elegida = ya.dataset.pieza;
+        else if (libre) {
+          const id = libre.dataset.pieza;
+          piezas = revisarPiezas({ ...piezas, [id]: { ...(piezas[id] || {}), ver: true } }); guardarPiezas();
+          if (haceDe(id) !== objetivo) { hace = revisarHace({ ...hace, [id]: objetivo }); guardar(CLAVE_HACE, hace); aplicarHace(); }
+          elegida = id;
+        }
+      }
+    }
     aplicarPiezas(); pintaEditor();
     if (!editando) { guardarPiezas(); const f = alTerminar; alTerminar = null; f?.(); }
   }
@@ -743,7 +824,15 @@ function crearTactil(contenedor, tactil) {
     },
     editar, get editando() { return editando; },
     piezas: () => JSON.parse(JSON.stringify(piezas)),
-    borrarPiezas() { for (const o of ['h', 'v']) guardar(CLAVE_PIEZAS + o, {}); leerPiezas(); aplicarPiezas(); pintaEditor(); },
+    hace: () => ({ ...hace }),
+    // §113b: qué botones a la vista hacen cada acción ({ 'R': ['L'], 'A': ['A', 'X'] …}: la etiqueta de cada uno), y el stick
+    queHace() {
+      const r = {};
+      for (const b of botones) if (visible(b)) (r[haceDe(b.dataset.pieza)] ||= []).push(ACCION_TACTIL[haceDe(b.dataset.pieza)].etiqueta);
+      if (visible(base)) for (const d of ['izq', 'der', 'arr', 'aba']) r['stick.' + d] = ['Stick'];
+      return r;
+    },
+    borrarPiezas() { for (const o of ['h', 'v']) guardar(CLAVE_PIEZAS + o, {}); hace = {}; guardar(CLAVE_HACE, hace); aplicarHace(); leerPiezas(); aplicarPiezas(); pintaEditor(); },
     capa, base, botones,
   };
 }
