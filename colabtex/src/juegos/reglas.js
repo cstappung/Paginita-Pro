@@ -524,10 +524,11 @@ const REGLAS = {
       ])],
       ["Controles", tabla([
         ["Teclado", "Las teclas del juego (se cambian en <b>Opciones</b> dentro de la página del juego)."],
-        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."]
+        ["Mandos", "Cualquier mando del computador, varios a la vez, también el de Switch."],
+        ["Celular", "Un mando en pantalla: cada botón se mueve, se agranda o se esconde, y se pueden agregar «Mirar atrás», Z o la cruz (en <b>Controles → Celular</b> de la página del juego). También se puede dirigir inclinando el teléfono, como un volante. Se juega mejor acostado y con pantalla completa."]
       ])],
       ["Tu VR", "La sala muestra el <b>VR</b> de cada piloto (guardado en tu cuenta; empieza en 5000). Cada carrera lo mueve con tu puesto entre los 12: ganarle a alguien de tu mismo VR da +13 (más si tenía más VR, menos si tenía menos) y perder resta lo mismo; la CPU también cuenta, con menos peso y con un VR fijo según su nivel. Contra <b>Intenso</b> e <b>Imposible</b>, que nadie puede ganar, la CPU no da ni quita VR: gana quien le ganó a más CPU que los otros humanos. Si te vas a mitad de carrera (o no tocas nada 30 s al empezar) pierdes contra todos, y nadie gana VR por ti. Solo, sin otro humano, el VR no se mueve."],
-      ["Qué hace falta", "Chrome o Edge en el computador (el juego usa WebGPU). Es privado: solo para los amigos de la lista."]
+      ["Qué hace falta", "Chrome o Edge en el computador, o Chrome en Android (el juego usa WebGPU; en el iPhone no funciona). En un teléfono justo puede ir lento: en <b>Avanzado → Gráficos</b> baja la resolución de salida. Es privado: solo para los amigos de la lista."]
     ]
   },
   /* BT3: tres pestañas (duelo, torneo y un jugador); la sala abre la de su formato (modoReglas en juegos-main.js:

@@ -313,6 +313,7 @@ ahí al navegador. Cuando ayuda, una comparación con electrónica. Se va amplia
 | **Cruceta «hat»** | En algunos mandos genéricos la cruz no son 4 botones sino UN eje que toma un valor distinto por dirección (−1, −0,43, 0,14…) y descansa fuera de −1..1 (3,29). Se reconoce por eso y se guarda el valor exacto de cada dirección. |
 | **Cursor del mando** | El `mando.js` del sitio: con un mando conectado y un menú de la página abierto, el stick mueve una flecha en pantalla y A hace «clic» (un clic fabricado por código, que el navegador no distingue de uno del ratón salvo en dos cosas: no muestra los textos de ayuda «title» y no mueve una barra deslizante). Como manejar un tablero con una perilla en vez de con la mano. |
 | **Clic perdido** | Un clic son dos mitades: apretar y soltar. Si entre las dos el botón sale de la página y vuelve (aunque sea idéntico), Chrome no da el clic. Como un pulsador que se desconecta y reconecta mientras uno lo aprieta: el circuito no ve el pulso completo. |
+| **Puntero fino / grueso** | Lo que el navegador dice que tiene la persona para señalar: «fino» es un ratón o un lápiz (exacto), «grueso» un dedo. Un teléfono tiene solo grueso; un PC con pantalla táctil tiene los dos. Por eso «teléfono» = grueso **sin** fino. |
 | **Perfil (de un mando)** | El modelo del mando (fabricante y producto: dos números que trae su nombre). La asignación se guarda por modelo, así sirve por cable y por Bluetooth, donde el nombre entero cambia. |
 
 ---
@@ -10278,3 +10279,108 @@ el primero, el segundo pasa a ser «el primero»); el teclado no tiene asistente
 
 **Falta con el juego y un mando de verdad**: lo mismo de arriba con el juego andando detrás (el mando no debe llegar al
 juego mientras se captura) y la selección de personajes en el descanso (§111).
+
+## 2026-10-26 · §113 El celular (pedido del dueño), con el mando en pantalla editable como en BT3
+
+El dueño: «ok ahora coloca compatibilidad con móviles», y mientras se hacía: «recuerda que si hay algún mando virtual
+o controles virtuales estos deben ser reajustables en tamaño y posición tal como en BT3; también permite agregar o
+ocultar botones». Hasta ahora los teléfonos estaban fuera del lanzamiento (2026-10-19): el mando en pantalla existía
+pero sin ajustes (en §112 se habían quitado de la hoja Controles), y el sitio decía «Solo en PC».
+
+### 113.1 Qué es un teléfono
+
+Un teléfono = una pantalla táctil **sin** puntero fino (ver el Glosario). Un PC con pantalla táctil también tiene dedo,
+pero tiene ratón: BT3 aprendió que ahí el mando en pantalla tapaba el juego. En un teléfono:
+
+- el mando en pantalla se prende solo (salvo que la persona lo apagó: se recuerda);
+- la hoja Controles empieza con la sección **«📱 Celular»**, sin la columna del teclado, y sin la lista de acciones si no
+  hay un mando conectado (con un mando por Bluetooth aparece);
+- la **resolución de salida empieza en 720** la primera vez: un teléfono tiene ~3 pixeles por punto y sin tope el lienzo
+  medía ~2400×1080, cinco veces más pixeles que en 720 para la tarjeta del teléfono. Se cambia en Avanzado → Gráficos;
+- jugando con el teléfono parado sale un aviso «📱 Gira el teléfono: acostado se ve más grande» con «⛶ Pantalla
+  completa» (que además lo pone acostado si el navegador deja) y ✕.
+
+### 113.2 La sección «Celular»
+
+- **Mando en pantalla: Sí / No.**
+- **Tamaño de todos** y **Opacidad** con − y + (80–130 % y 30–100 %): con el dedo una barra deslizante va, pero con −/+
+  es igual que el resto de la hoja.
+- **«✏️ Mover, agrandar, agregar u ocultar botones»**: cierra el cajón y abre el editor sobre el juego.
+- **Dirigir inclinando el teléfono: Sí / No** (como un volante; se centra donde está el teléfono al prenderlo).
+- **«↺ Como venía»**: tamaño, opacidad y posiciones como al principio.
+
+### 113.3 El editor del mando en pantalla (como el «✏️ Mover y agrandar» de BT3, más agregar y ocultar)
+
+Ejemplo: alguien con dedos grandes quiere A más grande y más al centro, no usa el truco (↑) y quiere «Mirar atrás»:
+
+1. toca A y la arrastra a donde le acomoda; «+» dos veces → 120 %;
+2. toca ↑ y «Ocultar»;
+3. en «Agregar:» toca «＋ X (mirar atrás)»: aparece X, y la arrastra junto a A;
+4. «✓ Listo».
+
+Cómo funciona: cada pieza (los 12 botones posibles y el stick) se corre con `translate` y se agranda con `scale`, sin
+tocar la disposición original; como el mando decide qué botón aprieta un dedo con `getBoundingClientRect` (el
+recuadro que se VE, que ya incluye el corrimiento y la escala), el toque cae donde se ve el botón. Lo editado se
+guarda por orientación (`mkw.tactil.pos.h` acostado, `.v` parado; `{pieza: {x, y, k, ver}}`, x/y en fracción del
+recuadro, k el tamaño 0,6–2, ver = agregado/oculto): acostado y parado el espacio es otro, como en BT3. Mientras se
+edita, una capa encima recibe los toques: ninguno llega al juego.
+
+### 113.4 El sitio
+
+`@controles: tactil teclado` en `controles.mjs` (la página) y en `colabtex/src/juegos/mkw.js` (la sala): el salón ya
+muestra Mario Kart como «Se juega en el celular y en el PC». Las reglas dicen «Chrome en Android (en el iPhone no
+funciona)» y explican el mando en pantalla. La prueba del sitio que exigía «solo PC» (`mkw.test.cjs`, M22) ahora exige
+lo nuevo. Sitio `npm run test:juegos` 1140/1140.
+
+### 113.5 Pruebas
+
+- **Nueva: `node herramientas/prueba-celular.mjs`** (26 puntos, Pixel 7 emulado, sin el juego, con el dedo): el mando se
+  prende solo, 720 la primera vez, la sección Celular sin la columna del teclado y sin desborde a 412 px, Sí/No, tamaño y
+  opacidad, inclinar, el editor (arrastrar A la mueve, «+» la agranda, ocultar B, agregar X), con el editor cerrado un
+  dedo donde quedó A aprieta A y donde estaba no, X agregado aprieta X, todo recordado al recargar, acostado otra
+  disposición, el aviso de girar solo parado.
+- Banco `controles-panel` 25/25, `asignacion` 62/62, `controles` 48/48, `mandos-jugador` 18/18, `mando-sitio` 11/11,
+  `inicio` 15/15; en el PC con el ratón de verdad `prueba-raton-controles` 8/8 y `prueba-raton-avanzado` 12/12 (la
+  sección Celular no aparece en el PC).
+
+### 113.6 Cambiar lo que hace cada botón en pantalla (el dueño: «los botones del celular también se deben poder rebindear»)
+
+En el editor, al tocar un botón aparece **«Hace: Usar objeto ▾»**; abre las 12 acciones (A · Acelerar, B · Frenar,
+R · Derrapar, L · Usar objeto, ↑ · Truco, X · Mirar atrás, ▶ · Pausa, Y, Z, la cruz ↓←→) y la elegida pasa a ser lo
+que hace ese botón: cambia su letra y lo que aprieta el dedo. Ejemplo: tocar L y elegir «R · Derrapar» deja dos botones
+que derrapan (el R de siempre y el que era L). Se guarda en `mkw.tactil.hace` (`{pieza: acción}`, solo las cambiadas;
+el mismo para acostado y parado: es qué hace el botón, no dónde está). «↺ Esta», «↺ Todas» y «↺ Como venía» lo vuelven.
+
+En la lista de Controles, en el teléfono, la columna del teclado se cambia por **«En pantalla»**: qué botones en
+pantalla hacen cada acción («R · R» si son dos). Tocarla abre el editor con ese botón ya elegido; si ninguno la hace
+(«agregar»), aparece uno nuevo que la hace, listo para arrastrarlo. Las filas del stick C dicen «—» (en pantalla no hay
+stick C).
+
+### 113.7 «🚗 Acelerar solo» (el dueño: «agrega una opción de aceleración automática, con ojo en que el headstart se hace con el botón asignado a la aceleración»)
+
+Arriba de la hoja Controles, para todos (PC y celular): **Acelerar solo: Sí / No** (`mkw.ayudas`).
+
+- **La salida rápida (el turbo de la largada) es de la persona.** En Mario Kart Wii se gana apretando acelerar justo
+  cuando sale el «2» de la cuenta y manteniéndolo; si se aprieta antes, el kart patina. Por eso «Acelerar solo» **no
+  actúa en la cuenta**: ahí acelera lo que la persona aprieta, con SU botón de acelerar (A del mando, K o Enter, o el
+  botón en pantalla, el que tenga asignado). Desde el «¡YA!» la página mantiene A apretado; si la persona venía
+  apretando, no hay corte.
+- Cómo lo sabe: la página lee del juego la etapa de la carrera (Raceinfo 0x809BD730, +0x28: 0 presentación, 1 cuenta,
+  2 corriendo) y qué pantalla está arriba de la pila (`mkwMenus.estado().pagina`). Al pasar a 2 anota la pantalla de la
+  carrera (el HUD, sea cual sea el modo); acelera solo mientras esa siga arriba. **En la pausa o en los resultados no**
+  (hay otra pantalla encima): en un menú, A apretado elegiría por la persona.
+- **Frenar le gana**: con B apretado no acelera (así hay marcha atrás).
+- En la sala va por el lockstep como cualquier botón de la persona (cada consola manda lo suyo): las carreras siguen
+  iguales en todas.
+
+### 113.8 Pruebas (después de 113.6 y 113.7)
+
+`node herramientas/prueba-celular.mjs` **37 puntos** (los 26 de antes y: tocar L → «Hace» → «R · Derrapar» y el botón
+dice R y aprieta R, ya no L; la columna «En pantalla» con «R · R» y «agregar»; tocar «agregar» en Usar objeto abre el
+editor con un botón nuevo que usa el objeto; «Acelerar solo» con la etapa de mentira: en la cuenta no, al «¡YA!» sí,
+con la pausa encima no, cerrada la pausa sí, frenando no, apagado no, y se recuerda). Bancos y pruebas del PC sin
+cambios (`controles-panel` 25, `asignacion` 62, `controles` 48, `mandos-jugador` 18, `mando-sitio` 11; ratón 8).
+
+**Falta con el juego y un teléfono de verdad:** si el juego anda a 60 en un Android (WebGPU y JSPI sí están en Chrome
+de Android; la velocidad nunca se midió), la memoria (el `.wasm` y lo que baja del disco), y el sonido y la
+inclinación en un teléfono real. `prueba-tactil.mjs` (con el juego) sigue valiendo.

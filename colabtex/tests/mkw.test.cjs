@@ -428,7 +428,7 @@ test('§87 echar: el anfitrión saca a quien quiera (vestíbulo o copa andando);
  assert.match(mk,/enviar\("fuera", \{ uids: salieron \}\)/,'el marco sabe quién salió (la carrera lo corta ya)');
 });
 
-test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado de cada piloto, la tira con la fase real y solo PC',()=>{
+test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado de cada piloto, la tira con la fase real y en el celular (§113)',()=>{
  const main=fs.readFileSync(raiz('src/juegos-main.js'),'utf8'),mk=fs.readFileSync(raiz('src/juegos/mkw.js'),'utf8');
  // el sitio le presta su modo inmersivo al módulo; Mario Kart lo pone al cargar el marco (una vez por copa) y lo saca al volver
  assert.match(main,/inmersivo: si => ponInmersivo\(si\)/);
@@ -456,13 +456,13 @@ test('M22 «Modo consola»: inmersivo solo al empezar, la precarga con el estado
  // al echado no se le arma la caja de invitar, y el sitio no le busca el botón «Copiar» (se cortaba la actualización)
  assert.match(main,/if \(p\.juego === "mkw" && est\.fuera && est\.fuera\[state\.user\.uid\]\) return "";/);
  assert.match(main,/if \(!est\.listos && \$\("jgCopiar"\)\)/);
- // solo PC (celulares fuera del lanzamiento): ni táctil en los controles ni Android en «Qué hace falta»
+ // §113 (el dueño, 2026-10-26: «coloca compatibilidad con móviles»): en el celular y en el PC, con la marca
+ // @controles: tactil teclado de su código (la sala y «un jugador»), y Android y el mando en pantalla en las reglas
  const datos=fs.readFileSync(raiz('src/juegos/controles-datos.js'),'utf8'),reg=fs.readFileSync(raiz('src/juegos/reglas.js'),'utf8');
- /* (§101: la regla del salón —salon.test.cjs— acepta solo «teclado» o «teclado y ratón»; la sala y «un jugador», los
-    dos solo PC, con la marca @controles: teclado de su código) */
- assert.match(datos,/"mkw": \{"movil":false,"pc":true,"pide":"teclado"/);
- assert.match(datos,/"bots-mkw": \{"movil":false,"pc":true,"pide":"teclado"/);
- assert.ok(!/Chrome en Android \(el juego usa WebGPU\)/.test(reg),'sin Android en Mario Kart');
+ assert.match(datos,/"mkw": \{"movil":true,"pc":true,"pide":""/);
+ assert.match(datos,/"bots-mkw": \{"movil":true,"pc":true,"pide":""/);
+ assert.match(reg,/o Chrome en Android \(el juego usa WebGPU; en el iPhone no funciona\)/);
+ assert.match(reg,/\["Celular", "Un mando en pantalla: cada botón se mueve, se agranda o se esconde/);
 });
 
 test('§100 (H1.2) la prueba de conexión: el marco dice cómo le llega cada piloto y la tira pone 🟢/🛰/🔴/⏳ al lado de cada uno',()=>{
