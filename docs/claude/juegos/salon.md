@@ -616,6 +616,17 @@ Chrome painted all thirteen scenes. Its animated scene is still the most
 expensive thing on the page, and that cost grows with everything else
 painted on the page.
 
+**Far sections are not painted** (`content-visibility:auto` on the solo
+carousel, the multiplayer catalogue, «Últimos tops» and the three strips,
+with an estimated `contain-intrinsic-block-size` that becomes the real one
+once painted). The banner, the intro, the mode bar and the sticky rooms
+column are left out: sticky cannot live in a contained box, and what is on
+screen at entry gains nothing. With the catalogue unpainted, each banner
+frame costs ~20–25 % less at the top. Paint containment clips what overflows
+these sections; today their rows scroll and their covers clip, so nothing
+shows. A full-page screenshot shows these sections empty, but scrolling to
+them paints them.
+
 **No `backdrop-filter` on what stays on screen while scrolling or under an
 animation**: the sticky mode bar, the phone tab bar and the banner's fact
 pills used to blur what moved beneath them on every frame, which is heavy on
