@@ -629,12 +629,22 @@
     }
 
     // ----------------------------- Enemigos -------------------------------
+    // Reinos 12-15 (levels.js `vidaTarde: {desde, hasta, x}`): la vida de los enemigos crece de
+    // x1 en la ronda `desde` a `x` en la `hasta`, y sigue así. El comienzo no cambia (sin oro
+    // todavía, cualquier extra rompía la apertura) y el final deja de ser un paseo: quien ganó la
+    // Necrópolis llegó a la ronda 80 con 286 000 de oro sin gastar.
+    vidaTarde() {
+      const V = this.L.vidaTarde;
+      if (!V) return 1;
+      const r = this.curRound() || 1;
+      return 1 + (V.x - 1) * Math.max(0, Math.min(1, (r - V.desde) / (V.hasta - V.desde)));
+    }
     spawn(type, path, dist, hpM, tier) {
       const d = PD.ENEMIES[type];
       const boost = PD.hpBoost(this.curRound() || 1, d.boss);
       let hp = d.hp * hpM * boost;
       if (d.boss) hp = d.hp * PD.BOSS_SCALE[tier || 2] * PD.BOSS_GROW[tier || 2] * this.L.diff * boost;
-      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) : 1;   // pactos
+      const fv = this.era3 ? (d.boss ? this.mods.vidaJefe : this.mods.vidaEnem) * this.vidaTarde() : 1;   // pactos y reino
       hp *= fv;
       const shield = (d.shield || 0) * hpM * boost * fv;
       const e = {
