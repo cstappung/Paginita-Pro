@@ -2874,6 +2874,7 @@ function armazon() {
   enganchaBuscador(h);
   enganchaNovedades(h);
   enganchaBanner(h);
+  vigilaFueraDeVista("salon", h.querySelectorAll(".jg-sal > :not(.jg-ban)"));
   vigilaDropsMascotas(h);
   vigilaDropsRock(h);
   salon.enganchar($("vesSalon"));
@@ -3088,6 +3089,24 @@ function enganchaNovedades(h) {
    falta para pasar. Con el dedo se arrastra; un arrastre no es un clic. */
 const BAN_MS = 7000;
 let banTic = 0, banVista = null;
+/* Lo que no se ve no se anima (`.jg-fuera-vista`, la regla en juegos.html):
+   las secciones del salón y la cabecera. Una animación que no va por GPU
+   (un box-shadow, un nombre de color, un marco) hace que Chrome rehaga las
+   capas de la página entera en cada cuadro, esté o no en pantalla. El
+   banner tiene su propio `.fuera`. Cada grupo suelta lo que vigilaba antes:
+   el salón se rehace entero al volver a él. */
+let fueraVista = null;
+const vigiladosFuera = new Map();
+function vigilaFueraDeVista(grupo, els) {
+  if (typeof IntersectionObserver !== "function") return;
+  if (!fueraVista) fueraVista = new IntersectionObserver(es => {
+    for (const e of es) e.target.classList.toggle("jg-fuera-vista", !e.isIntersecting);
+  }, { rootMargin: "80px" });
+  for (const el of vigiladosFuera.get(grupo) || []) fueraVista.unobserve(el);
+  vigiladosFuera.set(grupo, [...els]);
+  for (const el of els) fueraVista.observe(el);
+}
+
 function enganchaBanner(h) {
   clearInterval(banTic);
   if (banVista) { banVista.disconnect(); banVista = null; }
@@ -3182,7 +3201,9 @@ function enganchaBanner(h) {
   pinta();
   banTic = setInterval(() => {
     if (!document.body.contains(raiz)) { clearInterval(banTic); if (banVista) { banVista.disconnect(); banVista = null; } return; }
-    if (pausado || encima || foco || arrastre || document.hidden || salon.abiertaPara()) return;
+    /* Fuera de la vista tampoco cuenta: cambiar de diapositiva ahí era trabajo (la transición, la
+       escena nueva) que nadie veía, y al volver arriba sigue la que se dejó. */
+    if (pausado || encima || foco || arrastre || document.hidden || !aLaVista || salon.abiertaPara()) return;
     t += 100;
     if (t >= BAN_MS) ve(i + 1); else llena();
   }, 100);
@@ -4230,6 +4251,9 @@ function wire() {
   wireTema();
   montaHalloween();
   wireInmersivo();
+  /* El brillo del «+» de referidos y el titilar de la racha, quietos con la cabecera fuera de pantalla. */
+  const cab = document.querySelector(".head");
+  if (cab) vigilaFueraDeVista("cabecera", [cab]);
   /* Iniciar sesión está a la vista en todas partes mientras se es
      invitado: la cabecera, la barra de modo del salón, la barra de un
      juego del club, la puerta de cada pantalla con cuenta. Todos son

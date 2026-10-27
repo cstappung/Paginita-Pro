@@ -533,14 +533,68 @@ is the same: it runs on every Firebase read, and rewriting reloaded the 24
 card photos and made i18n.js rescan the text each time (the Mascotas and
 Rock strips have their own `firma`).
 
-**Avatar frames are still in the salón and the general chat** (rule after
-the Halloween reduced-motion block in juegos.html): every `.jg-av` inside
-`.jg-sal` or `.jg-cg-lista` has its animations paused (the SVG adorno and
-the `::before`/`::after` of the CSS frames), and they run while the pointer
-is over their row or tile (`.jg-drop`, `.jg-top`, `.jg-cg-msg`, `li`, `a`).
+**Avatar frames are still in the salón, the general chat and the replays
+rail** (rule after the Halloween reduced-motion block in juegos.html):
+every `.jg-av`, animated name (`.jg-nm`, which animates its text-shadow) and
+legendary PRODROP card (`.jg-pdc`) inside `.jg-sal`, `.jg-cg-lista` or
+`.jg-riel` has its animations paused (the SVG adorno and the
+`::before`/`::after` of the CSS frames), and so has the turning ring of the
+1.º in «Últimos tops»; they run while the pointer is over their row or tile
+(`.jg-drop`, `.jg-top`, `.jg-cg-msg`, `.jg-rp`, `li`, `a`).
 Measured with this stylesheet: 4 moving frames on screen kept the main
 thread 25 % busy, 12 → 41 %, 30 → 92 % at 26 fps; the three drop strips
 (24 tiles each, mostly the heavy box openers, who wear animated frames)
 froze the page at the bottom. The rock photos themselves cost nothing once
 painted (their one-time cost is in the worker). A new list of avatars in the
-lobby is covered by the rule; one outside `.jg-sal` needs adding to it.
+lobby is covered by the rule; one outside `.jg-sal`, `.jg-cg-lista` and
+`.jg-riel` needs adding to it.
+
+**Any animation Chrome cannot run on the GPU re-layers the whole page
+every frame, on screen or not.** In October 2026 this was measured against
+the exported database on the emulator: the lobby kept the main thread at
+90–100 % at every height, with 21–38 fps on PC and 23–29 on a phone,
+scrolling or not.
+
+GPU-only means `transform`, `opacity` and `filter` on an HTML element or
+pseudo-element. `box-shadow`, `text-shadow`, `background-position`, a
+registered `--property` and anything inside an SVG run on the main thread.
+
+What was running then:
+
+- the rail's avatar frames (64 SVG pieces; the rail was outside the rule
+  above);
+- 47 animated names;
+- the green «live» dots;
+- the daily-reward button and day;
+- the 1.º aura and ring;
+- the legendary cards;
+- the header's «+» coin.
+
+Now:
+
+- **The pulses that must keep moving are GPU-only**, each built from
+  transform, opacity or filter. A new pulse should be built the same way:
+  - `jgVivo`: a `::after` ring that scales and fades, on `.jg-vivo`,
+    `.jg-mn-vivo i` and `.jg-hoja-salas i`;
+  - `jgReclama`: a `::after` glow that fades;
+  - `jgHoyTitila`: opacity;
+  - the header chip's `jgRachaTitila`: filter, plus a `::before` tint;
+  - the «+» coin's `jgRefLatido`: a `::before` ring;
+  - the 1.º aura: `::before` opacity.
+- **Off screen, everything pauses.** `vigilaFueraDeVista` in
+  juegos-main.js uses one IntersectionObserver to put `.jg-fuera-vista` on
+  each section of `.jg-sal` and on the header. The banner has its own
+  `.fuera`, and its clock does not count off screen either.
+- **Outside the menu views** (`html:not(.jg-rieles)`: a room, a club game),
+  the header's «+» shine and the streak chip stay still. They repainted the
+  page every frame during a game, and a game's iframe shares the main
+  thread with the page.
+
+The result: 55–60 fps from the catalogue down on PC and 57–60 on a phone,
+with the main thread at ~25–45 % (mostly the rail's replays). The top still
+costs: the banner scene and the Halloween strips are SVG by design, so look
+there next.
+
+To check, filter `document.getAnimations()` to `playState === "running"` on
+the lobby. Anything running that is not transform, opacity or filter on HTML
+costs every frame.
