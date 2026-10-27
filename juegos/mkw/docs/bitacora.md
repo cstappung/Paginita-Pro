@@ -10605,3 +10605,26 @@ lo devuelve como antes, para probar el multijugador mientras se arregla. Para vo
 Pruebas: banco `inicio` 16/16 (nuevo §10c: gris con el cartel, no abre por teclado, mando ni clic, también en el sitio,
 la ayuda lo dice y Options sigue; las pruebas viejas de Multiplayer → Local/Online corren con `multiEnObra: false`).
 Fotos acostado y en un teléfono parado: el cartel se lee y no tapa nada.
+
+### 116.1 También las salas que se crean desde Juegos (el dueño: «tienes que ocultar también los que se crean desde juegos»)
+
+El multijugador de Mario Kart también se abre desde la página de **Juegos** (el sitio): su tarjeta en el salón abre una
+ficha con «Abrir sala e invitar», y las salas que esperan se ofrecen con «Unirme». Eso también queda «trabajando para
+usted», con una lista nueva del sitio, **`SALAS_EN_OBRA`** (`colabtex/src/juegos/salon-datos.js`: `{ mkw: { solo:
+"#solo/mkw" } }`):
+
+- **La tarjeta** del salón lleva el cartel amarillo «🚧 Trabajando para usted» (dentro de la imagen, debajo de las
+  etiquetas de jugadores y Celular/PC).
+- **La ficha** ya no tiene salas, opciones ni «Abrir sala»: un recuadro amarillo «Trabajando para usted — las salas de
+  Mario Kart Wii están en arreglo» y el botón grande **«▶ Jugar solo»** (el Mario Kart de un jugador, `#solo/mkw`, que
+  anda).
+- **Nadie abre ni entra a una sala** por otro camino: `crear()` y `entrar()` no hacen nada para un juego de la lista, y
+  las salas de Mario Kart que ya esperaban o se estaban jugando no aparecen en el vestíbulo.
+- **Quien llega por un enlace** a una sala vieja (o desde «mis salas») ve solo el cartel y «▶ Jugar solo mientras
+  tanto», sin cargar el juego.
+- `?salasObra=0` en la dirección de Juegos las deja abrir igual, para probarlas mientras se arreglan. Para volver a
+  abrirlas para todos: borrar la línea `mkw` de `SALAS_EN_OBRA`.
+
+Pruebas: sitio `mkw.test.cjs` 25/25 (nuevo §116) y `npm run test:juegos` entero; la tarjeta y la ficha dibujadas con
+el `salon.js` de verdad y las hojas de `juegos.html`, en claro y oscuro y con una tarjeta angosta (el cartel no tapa
+nada; la ficha no ofrece abrir sala y su botón va a `#solo/mkw`).

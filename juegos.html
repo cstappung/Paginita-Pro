@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610260403"></script>
+<script src="i18n.js?v=202610270427"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Paginita Pro</title>
@@ -5410,6 +5410,9 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-etq:after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#fff8 50%,transparent 70%);transform:translateX(-120%);animation:jgEtqBrillo 3.2s ease-in-out infinite}
 .jg-mn-etq.top{background:#f5b819;color:#3a2600;letter-spacing:.03em}
 .jg-mn-etq.top:after{display:none}
+/* «Trabajando para usted» (SALAS_EN_OBRA): cinta de obra amarilla y negra */
+.jg-mn-etq.obra{top:84px;background:repeating-linear-gradient(-45deg,#ffd21f 0 7px,#ffbf00 7px 14px);color:#1a0a00;letter-spacing:.02em;text-transform:none;border:1px solid #1a0a00}
+.jg-mn-etq.obra:after{display:none}
 /* En una tarjeta angosta la estrella sola: el texto pisaba la insignia de modo. */
 @container (max-width:250px){.jg-mn-etq.top>span{display:none}}
 /* Y en una de teléfono chico (dos columnas a 320 px) «2–10 jugadores» no
@@ -5504,6 +5507,9 @@ a.jg-hoja-ya{color:#fff!important}
 .jg-hoja-cuenta{display:grid;justify-items:center;gap:8px;padding:16px 14px;border-radius:16px;background:#f5f1ff;border:1px solid #e1d6fb;text-align:center}
 .jg-hoja-candado{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--m-multi-bg);color:#fff}
 .jg-hoja-candado svg{width:22px;height:22px}
+.jg-hoja-obra{background:#fff8dc;border-color:#f3d46e}
+.jg-hoja-obra .jg-hoja-candado{background:#ffd21f;font-size:22px}
+.jg-invita.jg-obra{display:grid;gap:8px;justify-items:start}
 .jg-hoja-cuenta h3{margin:0;font-size:16px;letter-spacing:-.2px;color:var(--jg-ink)}
 .jg-hoja-cuenta p{margin:0;font-size:12.5px;line-height:1.55;color:#5f5a70}
 .jg-hoja-alt{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 6px;border:0;background:none;font:600 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;text-decoration:none}
@@ -5725,6 +5731,7 @@ html[data-tema=oscuro] .jg-hoja-ops label{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-ops select{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-hoja-modos li{background:color-mix(in srgb,var(--c) 16%,var(--os-sup2));border-color:color-mix(in srgb,var(--c) 34%,var(--os-borde));color:var(--os-tx)}
 html[data-tema=oscuro] .jg-hoja-cuenta{background:#221a38;border-color:#3b2d63}
+html[data-tema=oscuro] .jg-hoja-obra{background:#2a2410;border-color:#6b5a1c}
 html[data-tema=oscuro] .jg-puerta{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-bv{background:radial-gradient(ellipse at top,#2a1f4a,#141019 62%)}
 html[data-tema=oscuro] .jg-bv-paso>p,html[data-tema=oscuro] .jg-invg-txt p{color:var(--os-tx2)}
@@ -6877,6 +6884,6 @@ html[data-tema=oscuro] .hw-tela{background-image:var(--hw-tela-b);opacity:.28}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610260403"></script>
+<script src="juegos-app.js?v=202610270427"></script>
 </body>
 </html>
