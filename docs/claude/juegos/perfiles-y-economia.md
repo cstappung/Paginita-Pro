@@ -105,8 +105,8 @@ the Mascotas viewer (`docs/claude/juegos/mercado.md`).
   a profile page takes the iframe, and closing it gives it back.
 - The editor offers your pets not on sale and your dances (starters plus
   gift dances). Without the full economy it offers nothing and saves the
-  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas` and
-  the football `plantilla` (`juegos/prodrop/CLAUDE.md`).
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`. (The
+  football `plantilla` was removed; see `juegos/prodrop/CLAUDE.md`.)
 
 `tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
 the cleaning and the pet re-check.
@@ -458,6 +458,8 @@ and `repetidaRock` keeps each piece's `invId` in a WeakMap. The memos of
 box/gift of the site on each pass, and with a cap below that total
 (it was 4000) they emptied mid-pass and never hit. A new per-event lookup
 must index by account, never scan a whole-site map.
+
+**Desafíos de plantilla** (`plantillas/p/<uid>/<plantilla>_<n>`, event `pl`, income in `premios`, category `plantilla`; its prize pack is a `p: 0` pack with `pl`): `juegos/prodrop/CLAUDE.md`. `watchLogros` reads `plantillas` whole (`NODOS_MONEDAS` is 18).
 
 **Super chats** (`superChat/<uid>/<message id>` = `{at, p}`, 100 or 300,
 event `sc`, category `superChat`; `superChats` in the replay lists the

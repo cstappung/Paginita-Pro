@@ -54,7 +54,7 @@ before the first edit. Read only the docs the task needs.
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |
-| PRODROP, sobres, cartas coleccionables, mercado, fútbol, plantilla | `juegos/prodrop/CLAUDE.md` |
+| PRODROP, sobres, cartas coleccionables, mercado, fútbol, plantilla, desafíos de plantilla (retos semanales, álbum de clubes) | `juegos/prodrop/CLAUDE.md` |
 | Mascotas, crianza, mascota del perfil, regalos, comida, poción, Pueblo (plaza, vecinos, visitas, cariños) | `juegos/mascotas/CLAUDE.md` |
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |

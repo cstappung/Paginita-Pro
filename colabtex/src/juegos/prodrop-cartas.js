@@ -13,16 +13,9 @@ import { economia, leeCopia, claveCopia } from "./monedas.js";
 
 export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
-/* El `?v=` del abridor (prodrop.js): el visor del mercado y la plantilla
-   del perfil lo usan para compartir la caché. */
-export const PD_V = "pd-49";
-/* La plantilla dibujada por el abridor (modo visor `?plantilla=1`), con las
-   cartas de verdad: rareza, desgaste y caja si está graduada. Cada casilla
-   va como `o~k.i!at!gr[!id.g.w]` (lo último, si es un re-roll), o vacía. */
-export function urlPlantilla(lista) {
-  const pl = lista.map(c => (c ? [`${c.o}~${c.k}.${c.i}`, c.at, c.gr ? 1 : 0].concat(c.rr ? [[c.id, c.g, c.w].join(".")] : []).join("!") : "")).join(",");
-  return RAIZ + "index.html?" + new URLSearchParams({ v: PD_V, plantilla: "1", pl });
-}
+/* El `?v=` del abridor (prodrop.js): el visor del mercado lo usa para
+   compartir la caché. */
+export const PD_V = "pd-58";
 export const MAX_EXHIBIDAS = 4;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -88,17 +81,6 @@ export function exhibidasDe(uid, perfil, datos) {
   return out;
 }
 
-/* La plantilla de fútbol: once casillas (FORMACION), cada una con su copia
-   si todavía es suya y de fútbol, o null. */
-export function plantillaDe(uid, perfil, datos) {
-  const l = (perfil && perfil.plantilla) || {}, e = ecoDe(datos);
-  return PM.FORMACION.map((_, i) => {
-    const q = e && typeof l[i] === "string" ? leeCopia(l[i]) : null;
-    const c = q && q.tipo === "carta" ? copia(e, q.o, q.k, q.i) : null;
-    return c && c.dueno === uid && PM.esFutbol(c.carta.col) ? c : null;
-  });
-}
-export const puntosDe = lista => PM.puntosPlantilla(lista.map(c => c && { tier: c.carta.tier, g: c.g }));
 
 /* Lo que han sacado todos al abrir sobres, solo épicas y legendarias, en
    orden de salida: la más reciente primero (a igual sobre, la mejor carta
