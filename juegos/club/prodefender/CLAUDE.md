@@ -164,8 +164,14 @@ there was only them). What they add:
   was far too soft for people: the only Necrópolis win never leaked, stacking Furia,
   Cristal, Ofrenda, Codicia and Usura (≈2× damage; Ofrenda's quarter of lives cost
   nothing). Necrópolis was left as played (its records replay identically); kingdoms
-  12–15 got `diff` ×1.25 and `pactoPrecio: 0.12` (each accepted pact: +12 % enemy HP,
-  additive, in `aplicaMods`), shown on the card and in the pact modal.
+  12–15 got `diff` ×1.25, `pactoPrecio: 0.12` (each accepted pact: +12 % enemy HP,
+  additive, in `aplicaMods`) and `vidaTarde: {desde: 30, hasta: 80, x: 9/10/10/11}`
+  (enemy HP ramps from ×1 at round 30 to ×x at 80; `vidaTarde()` in spawn), all shown on
+  the card. Measured by replaying that win with the bot (`--estrategia humana --libro`
+  built from its proof): `diff` alone does nothing (it adds enemies, and enemies pay
+  gold; even ×6 diff he loses 0), extra HP from round 1 breaks his opening, a late ramp
+  is what bites: at ×10 the adaptive replay wins losing 26 lives, his exact moves die
+  near round 55. `vidaX`/`oroX` exist for flat HP/gold multipliers (unused).
 - **Every kingdom needs round 50 of the previous one**, the dated ones too (before, a
   dated kingdom only waited for its day: `locked = prueba ? !admin : li > save.unlocked`).
   The verifier checks it as well with `ctx.filaEn` (your row of the previous table,

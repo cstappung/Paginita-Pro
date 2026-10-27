@@ -660,3 +660,14 @@ test('reinos 12-15: cada pacto aceptado da más vida a los enemigos; la Necrópo
  const h=nuevo3(10);h.active=false;h.round=0;h.elegirPacto(0);const Q=PD.PACTOS.find(q=>q.id===h.pactos[0].id);
  assert.ok(Math.abs(h.mods.vidaEnem-((Q.m&&Q.m.vidaEnem)||1))<1e-9,'la Necrópolis sin precio');
 });
+
+test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis no)',()=>{
+ assert.equal(PD.LEVELS[10].vidaTarde,undefined);
+ assert.deepEqual([11,12,13,14].map(li=>PD.LEVELS[li].vidaTarde.x),[9,10,10,11]);
+ const g=new PD.Game(12,null,1);g.round=29;assert.equal(g.vidaTarde(),1,'igual hasta la 30');
+ g.round=55;assert.ok(Math.abs(g.vidaTarde()-(1+9*0.5))<1e-9,'a mitad de camino');
+ g.round=90;assert.equal(g.vidaTarde(),10,'x10 desde la 80');
+ const n=new PD.Game(10,null,1);n.round=90;assert.equal(n.vidaTarde(),1);
+ g.round=90;const e=g.spawn('robusto',0,0,1);const h=new PD.Game(12,null,1);h.round=29;const f=h.spawn('robusto',0,0,1);
+ assert.ok(e.maxHp>f.maxHp*9,'la vida del enemigo sube');
+});
