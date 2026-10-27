@@ -885,6 +885,7 @@ const inicio = crearInicio({
   ocupado: () => document.body.classList.contains('cajon-abierto') || !!document.querySelector('dialog[open]') ||
     aLaVista('editorMii') || aLaVista('elegirPista'),
   alElegir: que => elegirInicio(que),
+  multiEnObra: parametros.get('multi') !== '1',     // §116: Multiplayer «trabajando para usted» (?multi=1 = como antes)
 });
 window.mkwInicio = inicio;
 function mostrarInicio() {

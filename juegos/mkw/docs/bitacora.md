@@ -10585,3 +10585,23 @@ leído junto al código de aurora (el commit fijado + `parches/aurora-web.diff`)
 3. Si frena la tarjeta: las pasadas y copias más caras (§115.2) y cómo cuestan en una tarjeta por baldosas.
 4. Además: el precalentado que no entre a la carrera en el teléfono, y el enganche del reloj VI hasta ~1 % (§114.8).
 Siempre 12 karts y todos los efectos (§114.6–114.7); nada se publica sin la confirmación del dueño.
+
+## 2026-10-27 · §116 Multiplayer «trabajando para usted» (pedido del dueño)
+
+El dueño: «el multiplayer está totalmente roto, oculta el multiplayer de la página por ahora y ponle trabajando para
+usted». En el menú de inicio «JloKart Wii» (`inicio.mjs`, §67) el botón **Multiplayer** sigue a la vista pero:
+
+- pintado de **gris** con un cartel amarillo de obra **«🚧 Trabajando para usted»** encima (gris pintado y no con un
+  filtro: un filtro gris apagaba también el cartel);
+- **no abre nada**: ni con el teclado, ni con A del mando, ni con el clic o «PRESS START» (se sacude un poco y la línea
+  de ayuda dice «Trabajando para usted: el multijugador vuelve pronto»); tampoco dentro del sitio, así que no se llega
+  ni a «Local» ni a «Online»;
+- Single Player y Options siguen igual.
+
+Es una opción del menú (`crearInicio({ multiEnObra })`, por omisión sí). **`?multi=1`** en la dirección de la página
+lo devuelve como antes, para probar el multijugador mientras se arregla. Para volver a abrirlo para todos: en
+`mkw.mjs`, `multiEnObra` en `false`.
+
+Pruebas: banco `inicio` 16/16 (nuevo §10c: gris con el cartel, no abre por teclado, mando ni clic, también en el sitio,
+la ayuda lo dice y Options sigue; las pruebas viejas de Multiplayer → Local/Online corren con `multiEnObra: false`).
+Fotos acostado y en un teléfono parado: el cartel se lee y no tapa nada.
