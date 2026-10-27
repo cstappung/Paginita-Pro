@@ -1,0 +1,63 @@
+/* Type Race — la práctica de un jugador. Claro y oscuro con las mismas
+   variables que lee la caja de tecleo (vista.js). */
+:root{
+  --fondo:#f4f1ea;--tinta:#2b2a27;--tenue:#9a958b;--acento:#d08c00;--mal:#d63c3c;--borde:#e2ddd2;--panel:#ebe6db;
+  --tr-fondo:var(--fondo);--tr-texto:var(--tinta);--tr-tenue:var(--tenue);--tr-acento:var(--acento);--tr-mal:var(--mal);
+  color-scheme:light;
+}
+html[data-tema=oscuro]{
+  --fondo:#25272c;--tinta:#e8e6e1;--tenue:#6f737b;--acento:#e2b714;--mal:#f0616d;--borde:#34373d;--panel:#2d3036;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--tinta)}
+body{font:15px/1.45 "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;min-height:100vh}
+button{font:inherit;color:inherit}
+.tr-hoja{max-width:980px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;gap:22px;min-height:100vh}
+.tr-cab{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tr-marca{display:flex;align-items:center;gap:8px;font-size:24px;font-weight:600;color:var(--tinta);text-decoration:none;letter-spacing:-.02em}
+.tr-marca b{color:var(--acento)}
+.tr-logo{font-size:22px;color:var(--acento)}
+.tr-cab-der{display:flex;align-items:center;gap:10px}
+.tr-ico{background:none;border:1px solid var(--borde);border-radius:8px;padding:4px 9px;cursor:pointer}
+.tr-ajustes{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 14px;background:var(--panel);border-radius:12px;padding:8px 12px}
+.tr-grupo{display:flex;flex-wrap:wrap;gap:2px}
+.tr-grupo+.tr-grupo{border-left:2px solid var(--borde);padding-left:12px}
+.tr-grupo[hidden]{display:none}
+.tr-grupo button{background:none;border:0;padding:4px 8px;border-radius:6px;cursor:pointer;color:var(--tenue);font-size:13px}
+.tr-grupo button:hover{color:var(--tinta)}
+.tr-grupo button.si{color:var(--acento)}
+.tr-pista-solo{display:flex;flex-direction:column;gap:14px;margin-top:4vh}
+.tr-pista-solo[hidden]{display:none}
+.tr-vivo{display:flex;gap:22px;align-items:baseline;color:var(--acento);font-size:20px;min-height:1.5em}
+.tr-vivo span:not(.tr-cuenta){font-size:14px;color:var(--tenue)}
+.tr-vivo b{font-size:20px;color:var(--acento);font-weight:600}
+.tr-cuenta{font-weight:600}
+.tr-acciones{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px}
+.tr-btn{background:var(--panel);border:1px solid var(--borde);border-radius:9px;padding:8px 16px;cursor:pointer;color:var(--tinta)}
+.tr-btn:hover{border-color:var(--acento)}
+.tr-pista-txt{color:var(--tenue);font-size:12px}
+kbd{background:var(--panel);border:1px solid var(--borde);border-radius:4px;padding:0 5px;font:inherit;font-size:11px}
+.tr-res{display:flex;flex-direction:column;gap:16px;margin-top:2vh;animation:trEntra .3s ease}
+.tr-res[hidden]{display:none}
+@keyframes trEntra{from{opacity:0;transform:translateY(8px)}}
+.tr-res-gran{display:flex;gap:40px;flex-wrap:wrap}
+.tr-res p{margin:0;display:flex;flex-direction:column}
+.tr-res small{color:var(--tenue);font-size:13px}
+.tr-res-gran b{font-size:56px;line-height:1;color:var(--acento);font-weight:600}
+.tr-res-datos{display:flex;gap:30px;flex-wrap:wrap}
+.tr-res-datos b{font-size:22px}
+.tr-graf{width:100%;height:140px;background:var(--panel);border-radius:10px}
+.tr-graf .linea{fill:none;stroke:var(--acento);stroke-width:2.5;vector-effect:non-scaling-stroke}
+.tr-graf .area{fill:var(--acento);opacity:.12}
+.tr-graf .err{fill:var(--mal)}
+.tr-graf .eje{stroke:var(--borde);stroke-width:1;vector-effect:non-scaling-stroke}
+.tr-graf text{fill:var(--tenue);font-size:11px}
+.tr-nuevo{color:var(--acento);font-weight:600;margin:0}
+.tr-res .tr-nuevo[hidden]{display:none}
+.tr-pie{margin-top:auto;color:var(--tenue);font-size:12px;text-align:center}
+@media (max-width:600px){
+  .tr-grupo+.tr-grupo{border-left:0;padding-left:0}
+  .tr-res-gran b{font-size:42px}
+  .tr-pista-solo{margin-top:0}
+}

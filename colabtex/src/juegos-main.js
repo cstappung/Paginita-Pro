@@ -44,7 +44,7 @@ import { leeReto, enlaceReto, superaReto, textoReto } from "./juegos/reto.js";
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA, evento, esCuentaNueva, conRedireccion, resultadoLogin } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, TR_TEXTOS, TR_LARGOS, TR_FINALES, TR_TIEMPOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, HB_METAS, HB_CANCHAS, HB_TIEMPOS, equiposHaxball, GT_VARIANTES, TL_TIEMPOS, TL_RONDAS, MZ_TIEMPOS, MZ_RONDAS, MZ_FUENTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -69,6 +69,7 @@ import { crearYemas } from "./juegos/yemas.js";
 import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearTulones } from "./juegos/tulones.js";
 import { crearMemazo } from "./juegos/memazo.js";
+import { crearTyperace } from "./juegos/typerace.js";
 import { memeHtml } from "./juegos/memazo-plantillas.js";
 import { crearHaxball } from "./juegos/haxball.js";
 import { crearBt3, crearBt3Solo, alPedirSalaBt3 } from "./juegos/bt3.js";
@@ -134,10 +135,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato, tulones: crearTulones, hero: crearHeroSala, haxball: crearHaxball, bt3: crearBt3, memazo: crearMemazo, mkw: crearMkw, pool: crearPool, typerace: crearTyperace
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲", hero: "🎸", haxball: "⚽", bt3: "🐉", memazo: "🖼️", mkw: "🏁", pool: "🎱", typerace: "⌨" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", integral: "∫", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", protiles: "🎹", pokelike: "◓", metrorush: "🚇", tulones: "🩲", hero: "🎸", prodefender: "🛡️", propac: "🟡", yzombis: "🧟" };
@@ -299,6 +300,18 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Formato", valores: [{ v: 2, t: "1 contra 1" }, { v: 4, t: "2 contra 2" }] },
     { clave: "guia", etiqueta: "Línea guía", valores: [{ v: 1, t: "Con línea guía" }, { v: 0, t: "Sin línea guía" }] },
     { clave: "pareja", etiqueta: "Mi compañero (solo 2 contra 2)", valores: [{ v: 1, t: "El primero que entre" }, { v: 2, t: "El segundo que entre" }, { v: 3, t: "El tercero que entre" }] }
+  ],
+  /* Type Race: lo mismo que se elige en la práctica, más cómo se acaba.
+     Ninguna clave es `modo`. El libre siempre va con reloj
+     (`ajustesTyperace`), y el tiempo solo cuenta con reloj. */
+  typerace: [
+    { clave: "cupo", etiqueta: "Corredores", por: 4, valores: cupos("typerace") },
+    { clave: "idioma", etiqueta: "Idioma", por: "es", valores: [{ v: "es", t: "Español" }, { v: "en", t: "English" }] },
+    { clave: "acentos", etiqueta: "Tildes (español)", por: 1, valores: [{ v: 1, t: "Con tildes" }, { v: 0, t: "Sin tildes" }] },
+    { clave: "texto", etiqueta: "Texto", por: "palabras", valores: Object.keys(TR_TEXTOS).map(v => ({ v, t: TR_TEXTOS[v] })) },
+    { clave: "largo", etiqueta: "Largo", por: 50, valores: TR_LARGOS.map(v => ({ v, t: v ? v + " palabras" : "Libre (hasta el tiempo)" })) },
+    { clave: "final", etiqueta: "Final", por: "todos", valores: Object.keys(TR_FINALES).map(v => ({ v, t: TR_FINALES[v] })) },
+    { clave: "tiempo", etiqueta: "Límite de tiempo", por: 120, valores: TR_TIEMPOS.map(v => ({ v, t: v < 60 ? v + " s" : v / 60 + " min" })) }
   ],
   memazo: [
     { clave: "cupo", etiqueta: "Jugadores", por: 6, valores: cupos("memazo") },
@@ -1490,6 +1503,7 @@ async function anotar(p) {
   if (p.juego === "hero") return;                   // PRO HERO clasifica por estrellas (hero.js), no por salas
   if (p.juego === "bt3") return;                    // BT3: el juego no dice quién ganó; la sala no clasifica
   if (p.juego === "mkw") return;                    // Mario Kart Wii: tampoco
+  if (p.juego === "typerace" && Object.keys(p.jugadores || {}).length < 2) return;   // correr solo es práctica: no clasifica
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -3878,7 +3892,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, haxball: 1500, bt3: 1200, mkw: 1200, gato: 1200, tulones: 1800, hero: 1500, memazo: 1200, pool: 1600, typerace: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -3999,6 +4013,8 @@ const RAZONES = {
   fichas: "Acabó con más fichas sobre el tablero.",
   empate: "Nadie sacó ventaja.",
   risas: "Sus memes sumaron más puntos que los de nadie.",
+  tecleo: "Terminó el texto antes que nadie.",
+  cronometro: "Cuando se cortó la carrera, era quien más había escrito bien.",
   victoria: "Su cuadrilla fue la última en pie.",
   apagon: "Apagón total: no quedó ninguna cuadrilla en pie.",
   reaccion: "Su reacción en cadena se tragó a todos los demás.",
@@ -4496,6 +4512,7 @@ const ESFERAS_BT3 = [
 function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
+  if (k === "typerace") return '<div class="jg-art-tr"><span class="txt"><b>rápido</b> <b>teclas</b> <i>car</i>rera</span><span class="pista"><i style="--a:.82">🏎</i><i style="--a:.55">🚗</i><i style="--a:.3">🚙</i></span><span class="ppm">128 ppm</span></div>';
   if (k === "pool") return '<div class="jg-art-pool"><span class="mesa"></span><span class="rack">' + [[1, 0], [11, 1], [8, 0], [3, 0], [14, 1], [6, 0]].map(([n, r], i) => '<i class="b' + n + (r ? " ray" : "") + '" style="--i:' + i + '"><b>' + (n > 8 ? n : n) + '</b></i>').join("") + '</span><i class="blanca"></i><span class="taco"></span></div>';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';

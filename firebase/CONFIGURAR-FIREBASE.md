@@ -787,6 +787,18 @@ la conocen.
 Si el panel dice que una cuenta parada frena el cierre, súmale lo que le
 falta en la pestaña **Monedas** y vuelve a prepararlo.
 
+### ⚠ Type Race pide publicar otra vez (2026-10-27)
+
+`'typerace'` tiene que estar en la lista del campo `juego`, en la de
+`jugadas/$n/at` (la largada y el corte se juzgan con esa hora) y en la de
+`logros`. No hay nodo nuevo: los ajustes de la sala (`idioma`, `acentos`,
+`texto`, `largo`, `final`, `tiempo`) entran por `$otro`, la carrera va por
+`jugadas` (`arranca`, `meta`, `corta`) y la pista en vivo por
+`vivo/<pid>/t/<uid>`, el mismo nodo del Tetris. Sin publicar, la sala de Type
+Race no se puede crear (la práctica de un jugador, `juegos/typerace/`, no
+toca Firebase y funciona igual). Pegar `firebase/database.rules.json` entero y
+**Publicar**.
+
 ### ⚠ Los desafíos de plantilla piden publicar otra vez (2026-10-27)
 
 Un nodo nuevo, `plantillas` (`s`: lo que cada uno sube a la clasificación

@@ -116,6 +116,16 @@ const SALA = {
     { id: "tomatazo", n: "Tomatazo", d: "Un meme tuyo recibe 🍅 de todos los demás (con 2 o más calificando).", i: "🍅", x: c => mzMios(c).some(m => { const v = Object.values(m.notas); return v.length >= 2 && v.every(x => x === 1); }) },
     { id: "justo", n: "Por una risa", d: "Gana por un solo punto.", i: "🤏", x: c => c.gano && margen(c.est.puntos || {}, c) === 1 }
   ],
+  /* Type Race: todo sale de las metas (`est.metas`, con caracteres buenos,
+     errores y milisegundos) y de los ajustes de la sala. */
+  typerace: [
+    { id: "cien", n: "Cien por minuto", d: "Termina una carrera a 100 ppm o más.", i: "💯", x: c => { const m = (c.est.metas || {})[c.me]; return !!(m && m.ok) && ((c.est.puntos || {})[c.me] || 0) >= 100; } },
+    { id: "limpio", n: "Sin borrón", d: "Termina un texto de 25 palabras o más sin un solo error.", i: "✨", x: c => { const m = (c.est.metas || {})[c.me]; return !!(m && m.ok && m.e === 0) && (c.est.aj || {}).largo >= 25; } },
+    { id: "maraton", n: "Maratonista", d: "Termina un texto de 200 palabras.", i: "📜", x: c => { const m = (c.est.metas || {})[c.me]; return !!(m && m.ok) && (c.est.aj || {}).largo === 200; } },
+    { id: "foto", n: "Fotofinish", d: "Gana llegando menos de un segundo antes que el segundo.", i: "📸", x: c => { const o = c.est.orden || [], M = c.est.metas || {}; return c.gano && o[0] === c.me && !!(M[o[1]] && M[o[1]].ok) && M[o[1]].ms - M[c.me].ms < 1000; } },
+    { id: "bilingue", n: "Bilingüe", d: "Gana una carrera en inglés contra alguien.", i: "🇬🇧", x: c => c.gano && c.n >= 2 && (c.est.aj || {}).idioma === "en" },
+    { id: "peloton", n: "Pelotón", d: "Gana una carrera de 5 corredores o más.", i: "🏎️", x: c => c.gano && c.n >= 5 }
+  ],
   reversi: [
     { id: "cincuenta", n: "Marea negra", d: "Gana con 50 fichas o más.", i: "🌊", x: c => c.gano && ((c.est.cuenta || {})[c.me] || 0) >= 50 },
     { id: "esquinas", n: "Las cuatro esquinas", d: "Ten las cuatro esquinas a la vez.", i: "🏰", x: c => { const L = (c.est.lado || 8) - 1, t = c.est.tab || {}; return ["0_0", `0_${L}`, `${L}_0`, `${L}_${L}`].every(q => t[q] === c.me); } },

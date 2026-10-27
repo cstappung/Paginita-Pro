@@ -88,6 +88,7 @@ Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 | Pokémon (rooms, team editor) | `colabtex/src/juegos/pokemon/CLAUDE.md` |
 | Tulones en línea (room) | `juegos/club/tulones/CLAUDE.md` |
 | Memazo (memes, plantillas, estilo Make It Meme) | `docs/claude/juegos/memazo.md` |
+| Type Race (mecanografía, Monkeytype, ppm, carrera de tipeo, práctica) | `juegos/typerace/CLAUDE.md` |
 | PRO HERO (guitarra, canciones, estrellas, modo batalla; club card and online room) | `juegos/hero/CLAUDE.md` |
 | Batalla de Rock (fondo 3D de PRO HERO, tu rockero, cajas de rock) | `juegos/hero/js/rock/CLAUDE.md` |
 

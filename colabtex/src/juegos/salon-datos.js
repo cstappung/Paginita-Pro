@@ -162,7 +162,11 @@ export const SOLOS = [
   { id: "bots-mkw", tipo: "bots", juego: "mkw", nombre: "Mario Kart Wii · un jugador", genero: "Carreras", icono: "🏁", alta: "2026-10-18",
     url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
     lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
-    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] }
+    modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] },
+  { id: "bots-typerace", tipo: "bots", juego: "typerace", nombre: "Type Race · práctica", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
+    url: "juegos/typerace/index.html?v=typerace-1", reglas: "typerace",
+    lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés.",
+    modos: ["Palabras", "Frases", "Cuentos", "Libre con reloj"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
@@ -173,7 +177,7 @@ export const GENERO = {
   worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", mkw: "Carreras", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", pool: "Deporte"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción", haxball: "Deporte", bt3: "Pelea", mkw: "Carreras", tulones: "Física", hero: "Ritmo", memazo: "Fiesta", typerace: "Teclado", pool: "Deporte"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la
